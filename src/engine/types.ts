@@ -1,2 +1,438 @@
-// types: filled in a later task of Turn 1.
-export {};
+// All shapes of the simulation. Everything here is plain JSON: no classes, no functions,
+// no Map, no Set. `JSON.parse(JSON.stringify(state))` must return an identical state.
+
+export type Difficulty = 'veryEasy' | 'easy' | 'hard';
+
+/** 0 is paused. Nothing above 4x exists (CLAUDE.md 6.1). */
+export type Speed = 0 | 1 | 2 | 4;
+
+export type MaterialKind = 'sheet' | 'solidWood';
+
+export type Finish = 'laminate' | 'lacquer' | 'veneer';
+
+export type SoftwareTier = 'basic' | 'standard' | 'pro';
+
+export type SoftwareMode = 'none' | 'oneOff' | 'subscription';
+
+export type TaskCategory = 'admin' | 'design' | 'workshop';
+
+export type WorkerRole = 'joiner' | 'helper' | 'officeAdmin' | 'purchasingClerk' | 'salesman';
+
+export type WorkerTier = 'poor' | 'normal' | 'super';
+
+export type EquipmentCategory =
+  | 'furniture'
+  | 'machine'
+  | 'bench'
+  | 'welfare'
+  | 'tools'
+  | 'vehicle'
+  | 'extraction';
+
+/** One line of the day 1 catalogue (CLAUDE.md 9.2). */
+export interface EquipmentSpec {
+  id: string;
+  name: string;
+  price: number;
+  category: EquipmentCategory;
+  /** Footprint in tiles. */
+  width: number;
+  depth: number;
+  height: number;
+  spriteKey: string;
+  /** Minutes of use before the bag is full. 0 means the item has no bag. */
+  bagInterval: number;
+  /** Multiplies the labour of every job. 1 means no effect. */
+  labourFactor: number;
+  /** Only applies to jobs of this material kind. null means every job. */
+  labourAppliesTo: MaterialKind | null;
+  /** Multiplies unloading minutes. 1 means no effect. */
+  unloadFactor: number;
+  /** Reputation needed to buy. */
+  minReputation: number;
+  /** Parked for a later stage: shown with a price, buy button disabled. */
+  locked: boolean;
+  lockReason: string;
+  /** One per worker (workbench, locker, canteen seat, hand tool set). */
+  perWorker: boolean;
+  /** More than one may be owned. */
+  stackable: boolean;
+  /** Other catalogue ids that must be owned first. */
+  requires: string[];
+  effect: string;
+}
+
+/** A purchased item standing in the hall. */
+export interface Equipment {
+  id: string;
+  specId: string;
+  spriteKey: string;
+  anchorX: number;
+  anchorY: number;
+  /** Minutes of production since the last bag change. */
+  minutesUsed: number;
+  bagFull: boolean;
+  broken: boolean;
+  purchasePrice: number;
+}
+
+export interface ProductTemplate {
+  id: string;
+  name: string;
+  basePrice: number;
+  material: MaterialKind;
+  designMinutes: number;
+  calls: number;
+  deadlineMinDays: number;
+  deadlineMaxDays: number;
+  needsMeasure: boolean;
+  requiredEquipment: string[];
+  allowedFinishes: Finish[];
+  minReputation: number;
+  /** Draw weight per reputation tier, index 0 is the lowest tier. */
+  weightsByTier: number[];
+  byHandAllowed: boolean;
+}
+
+export interface Clock {
+  /** 1-based absolute day. Day 1 is a Monday. */
+  day: number;
+  /** Minutes since 08:00. 480 is 16:00. Overtime runs above 480. */
+  minute: number;
+}
+
+export interface OwnerState {
+  present: boolean;
+  minutesByCategory: Record<TaskCategory, number>;
+  minutesWorked: number;
+  /** Overtime hours worked today, whole hours completed. */
+  overtimeHours: number;
+  /** Efficiency penalty carried from yesterday's overtime, 0 to 1. */
+  fatigue: number;
+  wentHome: boolean;
+  currentTaskId: string | null;
+  productionJobId: string | null;
+  sickDaysRemaining: number;
+  /** Absolute day the next sick leave starts. */
+  sickStartDay: number | null;
+  /** Player asked to stay home today. */
+  stayHome: boolean;
+}
+
+export interface UnitState {
+  areaM2: number;
+  widthTiles: number;
+  depthTiles: number;
+  rentMonthly: number;
+  ratesMonthly: number;
+  benchSlots: number;
+  sheetCapacity: number;
+}
+
+export interface Worker {
+  id: string;
+  name: string;
+  role: WorkerRole;
+  tier: WorkerTier | null;
+  /** Fraction of the owner's speed. 0 for non-production roles. */
+  rate: number;
+  weeklyWage: number;
+  monthlyWage: number;
+  startDay: number;
+  jobId: string | null;
+  taskId: string | null;
+  absentDaysRemaining: number;
+  anchorX: number;
+  anchorY: number;
+}
+
+export interface HiringOption {
+  role: WorkerRole;
+  tier: WorkerTier | null;
+  label: string;
+  rate: number;
+  weeklyWage: number;
+  monthlyWage: number;
+  minReputation: number;
+  available: boolean;
+  blockReason: string;
+  /** Catalogue ids that must be bought before this hire is possible. */
+  missing: string[];
+  missingCost: number;
+}
+
+export interface Enquiry {
+  id: string;
+  templateId: string;
+  name: string;
+  sizeMultiplier: number;
+  price: number;
+  finish: Finish;
+  materialKind: MaterialKind;
+  deadlineDays: number;
+  express: boolean;
+  bespokeMaterial: boolean;
+  needsMeasure: boolean;
+  createdDay: number;
+  /** Last day the enquiry is on the board. */
+  expiresOnDay: number;
+  lockReason: string | null;
+  byHandAvailable: boolean;
+}
+
+export type JobStage =
+  | 'accepted'
+  | 'materialPending'
+  | 'materialOrdered'
+  | 'materialInYard'
+  | 'ready'
+  | 'inProduction'
+  | 'completed';
+
+export type MaterialMode = 'perJob' | 'stock';
+
+export interface Job {
+  id: string;
+  templateId: string;
+  name: string;
+  price: number;
+  sizeMultiplier: number;
+  finish: Finish;
+  materialKind: MaterialKind;
+  materialCost: number;
+  materialMode: MaterialMode;
+  sheets: number;
+  bespokeMaterial: boolean;
+  express: boolean;
+  byHand: boolean;
+  needsMeasure: boolean;
+  measureDone: boolean;
+  /** 0.40 P of the price. */
+  labourValue: number;
+  /** Labour still to do, after machine reductions and the by-hand penalty. */
+  labourRemaining: number;
+  /** Labour the job started with, for progress display. */
+  labourTotal: number;
+  acceptedDay: number;
+  dueDay: number;
+  stage: JobStage;
+  callsRemaining: number;
+  designMinutesRemaining: number;
+  assignedTo: string | null;
+  completedDay: number | null;
+  daysLate: number;
+  depositPaid: number;
+  balancePaid: number;
+  penalty: number;
+  rating: number | null;
+  overdueWarned: boolean;
+}
+
+export interface Delivery {
+  id: string;
+  jobId: string | null;
+  sheets: number;
+  arriveDay: number;
+  arrived: boolean;
+  unloaded: boolean;
+  bespoke: boolean;
+  /** Sheets that did not fit in the rack and still need a decision. */
+  overflowSheets: number;
+  overflowResolved: boolean;
+}
+
+export type TaskKind =
+  | 'emails'
+  | 'bookkeeping'
+  | 'dailyOrdering'
+  | 'staffManagement'
+  | 'clientCall'
+  | 'design'
+  | 'materialOrder'
+  | 'siteMeasure'
+  | 'unload'
+  | 'bagChange'
+  | 'cleaning'
+  | 'fetchStorage'
+  | 'repairExtractor';
+
+export interface TaskInstance {
+  id: string;
+  kind: TaskKind;
+  category: TaskCategory;
+  label: string;
+  minutesTotal: number;
+  minutesRemaining: number;
+  jobId: string | null;
+  equipmentId: string | null;
+  deliveryId: string | null;
+  /** Day the task belongs to. Daily tasks are created fresh each working day. */
+  day: number;
+  done: boolean;
+  /** Worker id, 'owner', or null while nobody works on it. */
+  doneBy: string | null;
+  /** Roles that may take this task off the owner. */
+  eligibleRoles: WorkerRole[];
+}
+
+export type GameEventKind =
+  | 'deliveryArrived'
+  | 'stockOverflow'
+  | 'bagFull'
+  | 'extractorBroken'
+  | 'accident'
+  | 'dayEnd'
+  | 'weekend'
+  | 'wagesPaid'
+  | 'monthlyBills'
+  | 'arrearsWarning'
+  | 'arrearsFinalWarning'
+  | 'bailiff'
+  | 'bankruptcy'
+  | 'ownerSick'
+  | 'jobOverdue'
+  | 'jobPaid';
+
+export interface GameEventChoice {
+  id: string;
+  label: string;
+}
+
+export type JsonValue = string | number | boolean | null;
+
+export interface GameEvent {
+  id: string;
+  kind: GameEventKind;
+  title: string;
+  body: string;
+  choices: GameEventChoice[];
+  data: Record<string, JsonValue>;
+  day: number;
+  minute: number;
+}
+
+export type LedgerCategory =
+  | 'rent'
+  | 'rates'
+  | 'power'
+  | 'living'
+  | 'wages'
+  | 'salaries'
+  | 'software'
+  | 'waste'
+  | 'equipment'
+  | 'material'
+  | 'unitDeposit'
+  | 'jobDeposit'
+  | 'jobBalance'
+  | 'interest'
+  | 'repair'
+  | 'storage'
+  | 'taxi'
+  | 'pellets'
+  | 'seizure';
+
+export interface LedgerEntry {
+  id: string;
+  day: number;
+  minute: number;
+  category: LedgerCategory;
+  label: string;
+  /** Positive is money in, negative is money out. */
+  amount: number;
+  balance: number;
+  /** True when the cost could not be paid and became arrears. */
+  unpaid: boolean;
+}
+
+export interface PeriodTotals {
+  income: number;
+  costs: number;
+  byCategory: Record<string, number>;
+}
+
+export interface FinanceState {
+  overdraftLimit: number;
+  arrearsAmount: number;
+  arrearsMonths: number;
+  firstArrearsDay: number | null;
+  day: PeriodTotals;
+  week: PeriodTotals;
+  month: PeriodTotals;
+}
+
+export interface StockState {
+  sheets: number;
+  capacity: number;
+  /** Sheets sitting in paid temporary storage, fetched next morning. */
+  tempStorageSheets: number;
+}
+
+export interface SoftwareState {
+  mode: SoftwareMode;
+  tier: SoftwareTier;
+  /** Jobs left on a one-off licence. */
+  jobsRemaining: number;
+}
+
+export interface DayStats {
+  jobsAdvanced: string[];
+  jobsCompleted: string[];
+  productionMinutes: number;
+  dustAtStart: number;
+}
+
+export interface GameOver {
+  reason: string;
+  day: number;
+}
+
+export interface GameState {
+  version: number;
+  seed: number;
+  /** Cursor of the seeded RNG. The only source of randomness in the engine. */
+  rng: number;
+  nextId: number;
+  difficulty: Difficulty;
+  playerName: string;
+  companyName: string;
+  clock: Clock;
+  speed: Speed;
+  cash: number;
+  reputation: number;
+  dust: number;
+  unit: UnitState;
+  owner: OwnerState;
+  software: SoftwareState;
+  stock: StockState;
+  equipment: Equipment[];
+  workers: Worker[];
+  enquiries: Enquiry[];
+  jobs: Job[];
+  tasks: TaskInstance[];
+  deliveries: Delivery[];
+  finance: FinanceState;
+  ledger: LedgerEntry[];
+  eventQueue: GameEvent[];
+  activeEvent: GameEvent | null;
+  dayStats: DayStats;
+  gameOver: GameOver | null;
+}
+
+export type GameAction =
+  | { type: 'SET_SPEED'; speed: Speed }
+  | { type: 'BUY_EQUIPMENT'; specId: string }
+  | { type: 'BUY_SOFTWARE'; mode: 'oneOff' | 'subscription' }
+  | { type: 'ACCEPT_ENQUIRY'; enquiryId: string; byHand: boolean }
+  | { type: 'START_TASK'; taskId: string }
+  | { type: 'PAUSE_TASK' }
+  | { type: 'SET_MATERIAL_MODE'; jobId: string; mode: MaterialMode }
+  | { type: 'BUY_STOCK'; sheets: number }
+  | { type: 'WORK_HERE'; jobId: string | null }
+  | { type: 'ASSIGN_JOB'; jobId: string; workerId: string | null }
+  | { type: 'HIRE'; role: WorkerRole; tier: WorkerTier | null }
+  | { type: 'START_CLEANING' }
+  | { type: 'REPAIR_EXTRACTOR' }
+  | { type: 'RESOLVE_EVENT'; choiceId: string }
+  | { type: 'END_DAY' }
+  | { type: 'STAY_HOME' };
