@@ -1,8 +1,69 @@
-/* Palette and layout land in T1-12. */
+/* Palette. Layout lands in T1-12. */
 :root {
-  --page: #22252a;
+  --page: #23262b;
   --panel: #2d3138;
+  --panel-2: #363b43;
+  --border: #454b55;
   --text: #e8e6e1;
+  --text-dim: #a8adb6;
+  --accent: #c98a3b;
+  --good: #6ba368;
+  --bad: #c05a4e;
+
+  /* Placeholder art, section 10.3. Flat colours, no gradients. */
+  --concrete: #8f9298;
+  --yard: #6f7278;
+  --grid: #7f8288;
+  --room: #b0a79a;
+  --room-dark: #8d857a;
+  --room-floor: #9c948a;
+  --kit-machine: #7a6a9c;
+  --kit-machine-dark: #5d5178;
+  --kit-bench: #4f9b93;
+  --kit-bench-dark: #3c7671;
+  --kit-stock: #c9a23b;
+  --kit-stock-dark: #9c7d2d;
+  --kit-welfare: #9c8f7a;
+  --kit-welfare-dark: #7a705f;
+  --kit-tools: #8a8f96;
+  --kit-tools-dark: #6b6f75;
+  --kit-vehicle: #6b7f9c;
+  --kit-vehicle-dark: #526278;
+  --kit-extraction: #8f9298;
+  --kit-extraction-dark: #6f7278;
+  --kit-furniture: #a08a6b;
+  --kit-furniture-dark: #7d6b52;
+  --stopped: #c05a4e;
+  --stopped-dark: #94453c;
+  --locked: #75787e;
+  --locked-dark: #5b5e63;
+  --sawdust: #d8cba8;
+  --worker: #5a7fa8;
+  --owner: #5f9c5f;
+  --shadow: rgba(0, 0, 0, 0.25);
+}
+
+.iso-label {
+  font-size: 11px;
+  fill: #1c1f24;
+  pointer-events: none;
+}
+
+.hall-view,
+.office-view {
+  display: block;
+  width: 100%;
+  max-height: 62vh;
+}
+
+.clickable {
+  cursor: pointer;
+}
+
+.view-note {
+  margin: 4px 0 0;
+  color: var(--text-dim);
+  font-size: 12px;
 }
 
 body {

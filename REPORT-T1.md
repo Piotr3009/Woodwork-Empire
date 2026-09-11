@@ -31,3 +31,6 @@ and repair, dust accumulation with the bands, cleaning, the helper Friday clean 
 
 T1-10 Materials: per job and stock purchasing, the bespoke three day wait with its uplift, the sheet
 rack with its capacity, and the overflow decision with both outcomes.
+
+T1-11 Render: `render/iso.ts` holds the 2:1 dimetric projection with a tile to screen round trip,
+`render/hall.ts` and `render/office.ts` build flat placeholder SVG from the state alone.
