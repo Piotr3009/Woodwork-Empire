@@ -19,3 +19,6 @@ absence, sick leave, `SKIP_DAY`, the task minute curves and the runner that spen
 
 T1-06 Catalogue and board: product templates with tool gating and lock reasons, enquiry generation
 with size, express, bespoke and expiry, and a board that refills and expires every morning.
+
+T1-07 Jobs: the full lifecycle from accepted through calls, drawing, material order, next day
+delivery, unloading, production, payment and rating, with late penalties and the by hand path.

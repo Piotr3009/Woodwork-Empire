@@ -8,7 +8,7 @@ import {
   UNIT_DEPOSIT,
 } from '../../src/engine/constants';
 import { createTask } from '../../src/engine/tasks';
-import { DEFAULT_OPTIONS as OPTIONS, clearEvents } from '../helpers';
+import { DEFAULT_OPTIONS as OPTIONS, clearEvents, withLicence } from '../helpers';
 
 /** What day 1 takes out before the player does anything: deposit, rent, rates, power, living. */
 function dayOneCosts(rentMonthly: number, ratesMonthly: number): number {
@@ -111,7 +111,7 @@ describe('day boundary', () => {
   });
 
   it('stops the day at the 12 hour hard stop', () => {
-    let state = createGame(OPTIONS);
+    let state = withLicence(createGame(OPTIONS));
     // A drawing far too long for one day keeps the owner in past 16:00. Twelve hours is the wall.
     const design = createTask(state, { kind: 'design', label: 'Endless drawing', minutes: 2000 });
     state = applyAction(state, { type: 'START_TASK', taskId: design.id });

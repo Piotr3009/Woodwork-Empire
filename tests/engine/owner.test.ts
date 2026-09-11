@@ -18,7 +18,7 @@ import {
 import { createTask } from '../../src/engine/tasks';
 import { isWorkingDay, yearOfDay } from '../../src/engine/clock';
 import { applyAction, tick } from '../../src/engine/index';
-import { act, clearEvents, eventsOfKind, newGame, runToDay } from '../helpers';
+import { act, clearEvents, eventsOfKind, newGame, runToDay, withLicence } from '../helpers';
 
 describe('owner efficiency', () => {
   it('is full for the first eight hours', () => {
@@ -62,7 +62,7 @@ describe('owner efficiency', () => {
 
 describe('fatigue', () => {
   it('charges 0.05 of efficiency per overtime hour worked, and recovers after a normal day', () => {
-    let state = newGame();
+    let state = withLicence(newGame());
     const task = createTask(state, { kind: 'design', label: 'Long drawing', minutes: 900 });
     state = act(state, { type: 'START_TASK', taskId: task.id });
     state = tick(state, 800);

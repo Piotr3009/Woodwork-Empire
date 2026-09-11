@@ -9,6 +9,7 @@ import {
   MAX_MINUTES_PER_DAY,
   MINUTES_PER_WORKING_DAY,
   OVERDRAFT_LIMIT,
+  OWNER_LABOUR_PER_MINUTE,
   REPUTATION_START,
   SOFTWARE_ONE_OFF_JOBS,
   SOFTWARE_ONE_OFF_PRICE,
@@ -20,13 +21,36 @@ import { expireEnquiries, refillBoard, refreshLocks } from './board';
 import { isDayExhausted, isWorkingDay } from './clock';
 import { canAfford, pay, runDayCosts } from './economy';
 import { isPaused, openNextEvent, queueEvent } from './events';
-import { countOf, findSpec, has, specOf } from './machines';
+import {
+  countOf,
+  findSpec,
+  hallProductivityFactor,
+  has,
+  machinesStopped,
+  specOf,
+} from './machines';
+import {
+  acceptEnquiry,
+  addLabour,
+  assignJob,
+  chargeSiteMeasure,
+  checkOverdueJobs,
+  findJob,
+  oldestReadyJob,
+  onDeliveryArrived,
+  onDeliveryUnloaded,
+  onMaterialOrdered,
+  refreshJob,
+  setMaterialMode,
+} from './jobs';
+import { arriveDeliveries, findDelivery } from './materials';
 import {
   ownerEfficiency,
   ownerIsAvailable,
   runOwnerDayStart,
   setTomorrowFatigue,
   spendOwnerMinute,
+  staffOutputFactor,
 } from './owner';
 import { makeId } from './rng';
 import {
@@ -37,7 +61,15 @@ import {
   pauseOwnerTask,
   startTask,
 } from './tasks';
-import type { Difficulty, GameAction, GameState, PeriodTotals, Speed, TaskInstance } from './types';
+import type {
+  Delivery,
+  Difficulty,
+  GameAction,
+  GameState,
+  PeriodTotals,
+  Speed,
+  TaskInstance,
+} from './types';
 
 export interface NewGameOptions {
   seed: number;
@@ -158,8 +190,30 @@ function startDay(state: GameState): void {
   runOwnerDayStart(state);
   expireEnquiries(state);
   refillBoard(state);
+  const arriving = arriveDeliveries(state);
+  checkOverdueJobs(state);
+  for (const delivery of arriving) onDeliveryArrived(state, delivery.jobId);
   createDailyTasks(state);
   assignStaffTasks(state);
+  queueDeliveryEvents(state, arriving);
+}
+
+/** A lorry at the gate is a decision: unload now, or leave it standing there (CLAUDE.md 10.1). */
+function queueDeliveryEvents(state: GameState, arriving: Delivery[]): void {
+  for (const delivery of arriving) {
+    const task = state.tasks.find((entry) => entry.deliveryId === delivery.id && !entry.done);
+    if (!task) continue;
+    queueEvent(state, {
+      kind: 'deliveryArrived',
+      title: 'Delivery at the gate',
+      body: `${delivery.sheets} sheets have arrived. Nothing can be made until they are inside.`,
+      choices: [
+        { id: 'unload', label: `Unload now, ${task.minutesTotal} min` },
+        { id: 'later', label: 'Leave it at the gate' },
+      ],
+      data: { deliveryId: delivery.id, taskId: task.id, sheets: delivery.sheets },
+    });
+  }
 }
 
 /** Ends the working day and opens the summary. The player clicks on to the next day. */
@@ -207,12 +261,33 @@ function advanceToNextDay(state: GameState): void {
 
 /** What a finished task does to the rest of the world. */
 function applyTaskCompletion(state: GameState, task: TaskInstance): void {
+  const job = task.jobId ? findJob(state, task.jobId) : null;
   switch (task.kind) {
+    case 'clientCall':
+    case 'design':
+      if (job) refreshJob(state, job);
+      break;
+    case 'siteMeasure':
+      if (job) {
+        chargeSiteMeasure(state, job);
+        refreshJob(state, job);
+      }
+      break;
+    case 'materialOrder':
+      if (job) onMaterialOrdered(state, job);
+      break;
+    case 'unload': {
+      const delivery = task.deliveryId ? findDelivery(state, task.deliveryId) : null;
+      if (delivery) {
+        delivery.unloaded = true;
+        onDeliveryUnloaded(state, delivery.jobId);
+      }
+      break;
+    }
     default:
       // Emails, bookkeeping, ordering and staff management only cost minutes.
       break;
   }
-  void state;
 }
 
 /** One minute of work, at the clock's current minute, before time moves on. */
@@ -235,8 +310,46 @@ function settle(state: GameState): void {
   openNextEvent(state);
 }
 
+/** Production, by the owner at the bench and by every joiner on a job. */
+function runProductionMinute(state: GameState): void {
+  if (machinesStopped(state)) return;
+  const hall = hallProductivityFactor(state);
+  let worked = false;
+  const ownerJobId = state.owner.productionJobId;
+  if (ownerJobId !== null && ownerIsAvailable(state)) {
+    const job = findJob(state, ownerJobId);
+    if (job && job.stage === 'inProduction') {
+      spendOwnerMinute(state, 'workshop');
+      worked = true;
+      addLabour(state, job, OWNER_LABOUR_PER_MINUTE * ownerEfficiency(state) * hall);
+    } else {
+      state.owner.productionJobId = null;
+    }
+  }
+  // Staff work the normal day only: nobody but the owner does overtime.
+  if (state.clock.minute < MINUTES_PER_WORKING_DAY) {
+    const staffFactor = staffOutputFactor(state);
+    for (const worker of state.workers) {
+      if (worker.role !== 'joiner' || worker.jobId === null) continue;
+      if (worker.absentDaysRemaining > 0 || worker.startDay > state.clock.day) continue;
+      const job = findJob(state, worker.jobId);
+      if (!job || job.stage !== 'inProduction') {
+        worker.jobId = null;
+        continue;
+      }
+      worked = true;
+      addLabour(state, job, OWNER_LABOUR_PER_MINUTE * worker.rate * hall * staffFactor);
+    }
+  }
+  if (worked) {
+    state.dayStats.productionMinutes += 1;
+    state.productionMinutesMonth += 1;
+  }
+}
+
 function advanceMinute(state: GameState): void {
   runMinute(state);
+  runProductionMinute(state);
   state.clock.minute += 1;
   if (shouldFinishDay(state)) finishDay(state);
   settle(state);
@@ -261,10 +374,15 @@ function resolveEvent(state: GameState, choiceId: string): void {
     case 'dayEnd':
       advanceToNextDay(state);
       break;
+    case 'deliveryArrived':
+      if (choiceId === 'unload') {
+        const taskId = event.data.taskId;
+        if (typeof taskId === 'string') startTask(state, taskId);
+      }
+      break;
     default:
       break;
   }
-  void choiceId;
 }
 
 export function applyAction(state: GameState, action: GameAction): GameState {
@@ -291,6 +409,20 @@ export function applyAction(state: GameState, action: GameAction): GameState {
       break;
     case 'START_TASK':
       startTask(next, action.taskId);
+      break;
+    case 'ACCEPT_ENQUIRY':
+      acceptEnquiry(next, action.enquiryId, action.byHand);
+      break;
+    case 'SET_MATERIAL_MODE':
+      setMaterialMode(next, action.jobId, action.mode);
+      break;
+    case 'WORK_HERE': {
+      const job = action.jobId ? findJob(next, action.jobId) : oldestReadyJob(next);
+      if (job) assignJob(next, job.id, 'owner');
+      break;
+    }
+    case 'ASSIGN_JOB':
+      assignJob(next, action.jobId, action.workerId);
       break;
     case 'PAUSE_TASK':
       pauseOwnerTask(next);

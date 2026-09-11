@@ -1,7 +1,15 @@
 // Shared test driver. One place clicks events away, so no test file grows its own copy.
 
 import { applyAction, createGame, tick } from '../src/engine/index';
-import type { GameAction, GameEvent, GameState, NewGameOptions } from '../src/engine/index';
+import type {
+  Enquiry,
+  GameAction,
+  GameEvent,
+  GameState,
+  Job,
+  NewGameOptions,
+  TaskInstance,
+} from '../src/engine/index';
 
 export const DEFAULT_OPTIONS: NewGameOptions = {
   seed: 20260911,
@@ -88,5 +96,57 @@ export function buyStartingKit(state: GameState): GameState {
   for (const specId of STARTING_KIT) {
     next = applyAction(next, { type: 'BUY_EQUIPMENT', specId });
   }
+  return applyAction(next, { type: 'BUY_SOFTWARE', mode: 'oneOff' });
+}
+
+/** Puts an exact enquiry on the board, so a test can work with round numbers. */
+export function placeEnquiry(state: GameState, partial: Partial<Enquiry> = {}): Enquiry {
+  const enquiry: Enquiry = {
+    id: `enq-fixed-${state.enquiries.length + 1}`,
+    templateId: 'garageShelves',
+    name: 'Garage shelves',
+    sizeMultiplier: 1,
+    price: 400,
+    finish: 'laminate',
+    materialKind: 'sheet',
+    deadlineDays: 15,
+    express: false,
+    bespokeMaterial: false,
+    needsMeasure: false,
+    createdDay: state.clock.day,
+    expiresOnDay: state.clock.day + 2,
+    lockReason: null,
+    byHandAvailable: false,
+    ...partial,
+  };
+  state.enquiries.push(enquiry);
+  return enquiry;
+}
+
+/** Starts the named open task and runs the clock until it is done. */
+export function doTask(state: GameState, kind: TaskInstance['kind']): GameState {
+  const task = state.tasks.find((entry) => entry.kind === kind && !entry.done);
+  if (!task) throw new Error(`no open task of kind ${kind}`);
+  let next = applyAction(state, { type: 'START_TASK', taskId: task.id });
+  if (next.owner.currentTaskId !== task.id) throw new Error(`could not start ${kind}`);
+  let guard = 0;
+  while (next.owner.currentTaskId === task.id && guard < 2000) {
+    next = tick(next, 1);
+    guard += 1;
+  }
+  return next;
+}
+
+/** The one job on the books, for tests that work with a single order. */
+export function firstJob(state: GameState): Job {
+  const job = state.jobs[0];
+  if (!job) throw new Error('no job on the books');
+  return job;
+}
+
+/** A desk, a laptop and a one off licence: the minimum to be allowed to draw. */
+export function withLicence(state: GameState): GameState {
+  let next = applyAction(state, { type: 'BUY_EQUIPMENT', specId: 'desk' });
+  next = applyAction(next, { type: 'BUY_EQUIPMENT', specId: 'laptop' });
   return applyAction(next, { type: 'BUY_SOFTWARE', mode: 'oneOff' });
 }

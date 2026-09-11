@@ -59,6 +59,9 @@ const TASK_DEFINITIONS: Record<TaskKind, TaskDefinition> = {
   repairExtractor: { category: 'workshop', eligibleRoles: ['joiner'] },
 };
 
+/** Float guard, not a game number: work this small is finished work. */
+export const WORK_EPSILON = 1e-9;
+
 export function taskCategory(kind: TaskKind): TaskCategory {
   return TASK_DEFINITIONS[kind].category;
 }
@@ -91,6 +94,12 @@ export function materialOrderMinutes(price: number): number {
   const span = MATERIAL_ORDER_PRICE_HIGH - MATERIAL_ORDER_PRICE_LOW;
   const rise = MATERIAL_ORDER_MINUTES_HIGH - MATERIAL_ORDER_MINUTES_LOW;
   return MATERIAL_ORDER_MINUTES_LOW + ((price - MATERIAL_ORDER_PRICE_LOW) / span) * rise;
+}
+
+/** A one off licence covers 30 jobs, a subscription covers everything (CLAUDE.md 9.2). */
+export function softwareActive(state: GameState): boolean {
+  if (state.software.mode === 'subscription') return true;
+  return state.software.mode === 'oneOff' && state.software.jobsRemaining > 0;
 }
 
 /** Template minutes scale with the size, and the software tier divides them. */
@@ -222,6 +231,8 @@ export function startTask(state: GameState, taskId: string): boolean {
   const task = findTask(state, taskId);
   if (!task || task.done) return false;
   if (!state.owner.present || state.owner.wentHome) return false;
+  // No drawing without a licence for the software (CLAUDE.md 9.2).
+  if (task.kind === 'design' && !softwareActive(state)) return false;
   state.owner.productionJobId = null;
   state.owner.currentTaskId = task.id;
   task.doneBy = 'owner';
@@ -247,7 +258,7 @@ export function advanceOwnerTask(state: GameState, work: number): TaskInstance |
     return null;
   }
   task.minutesRemaining -= work;
-  if (task.minutesRemaining > 0) return null;
+  if (task.minutesRemaining > WORK_EPSILON) return null;
   task.minutesRemaining = 0;
   task.done = true;
   state.owner.currentTaskId = null;

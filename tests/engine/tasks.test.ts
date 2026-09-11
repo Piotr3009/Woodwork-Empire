@@ -16,7 +16,7 @@ import {
 } from '../../src/engine/tasks';
 import { tick } from '../../src/engine/index';
 import type { GameState, ProductTemplate, Worker } from '../../src/engine/index';
-import { act, clearEvents, newGame, runToDay } from '../helpers';
+import { act, clearEvents, newGame, runToDay, withLicence } from '../helpers';
 
 function template(id: string): ProductTemplate {
   const found = PRODUCT_TEMPLATES.find((entry) => entry.id === id);
@@ -163,7 +163,7 @@ describe('the task runner', () => {
     state: GameState;
     taskId: string;
   } {
-    const state = newGame();
+    const state = withLicence(newGame());
     const task = createTask(state, { kind, label: 'Test task', minutes });
     return { state, taskId: task.id };
   }
@@ -214,7 +214,7 @@ describe('the task runner', () => {
 
   it('pushes what the owner did not finish to the next day', () => {
     // The rule from CLAUDE.md 8.10: an hour lost on admin is an hour of workshop work lost today.
-    const state = newGame();
+    const state = withLicence(newGame());
     const emails = createTask(state, { kind: 'emails', label: 'Emails', minutes: 60 });
     const design = createTask(state, { kind: 'design', label: 'Wardrobe drawing', minutes: 480 });
     let next = tick(act(state, { type: 'START_TASK', taskId: emails.id }), 60);
@@ -230,7 +230,7 @@ describe('the task runner', () => {
   });
 
   it('finishes the same drawing inside one day when no admin got in the way', () => {
-    const state = newGame();
+    const state = withLicence(newGame());
     const design = createTask(state, { kind: 'design', label: 'Wardrobe drawing', minutes: 480 });
     const next = tick(act(state, { type: 'START_TASK', taskId: design.id }), 480);
     expect(findTask(next, design.id)?.done).toBe(true);
