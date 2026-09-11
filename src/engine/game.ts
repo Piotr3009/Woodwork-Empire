@@ -53,6 +53,7 @@ import {
   staffOutputFactor,
 } from './owner';
 import { makeId } from './rng';
+import { autoAssignJobs, hire, runStaffDayStart, sawRatioFactor } from './staff';
 import {
   advanceOwnerTask,
   assignStaffTasks,
@@ -188,6 +189,7 @@ function startDay(state: GameState): void {
   };
   runDayCosts(state, state.clock.day);
   runOwnerDayStart(state);
+  runStaffDayStart(state);
   expireEnquiries(state);
   refillBoard(state);
   const arriving = arriveDeliveries(state);
@@ -307,6 +309,7 @@ function runMinute(state: GameState): void {
 /** Everything derived that has to be true before the state is handed back. */
 function settle(state: GameState): void {
   refreshLocks(state);
+  autoAssignJobs(state);
   openNextEvent(state);
 }
 
@@ -338,7 +341,8 @@ function runProductionMinute(state: GameState): void {
         continue;
       }
       worked = true;
-      addLabour(state, job, OWNER_LABOUR_PER_MINUTE * worker.rate * hall * staffFactor);
+      const rate = worker.rate * sawRatioFactor(state, worker);
+      addLabour(state, job, OWNER_LABOUR_PER_MINUTE * rate * hall * staffFactor);
     }
   }
   if (worked) {
@@ -423,6 +427,9 @@ export function applyAction(state: GameState, action: GameAction): GameState {
     }
     case 'ASSIGN_JOB':
       assignJob(next, action.jobId, action.workerId);
+      break;
+    case 'HIRE':
+      hire(next, action.role, action.tier);
       break;
     case 'PAUSE_TASK':
       pauseOwnerTask(next);

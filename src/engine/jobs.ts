@@ -267,17 +267,22 @@ export function assignJob(state: GameState, jobId: string, workerId: string | nu
     releaseJob(state, job);
     return true;
   }
+  const worker =
+    workerId === 'owner' ? null : state.workers.find((entry) => entry.id === workerId) ?? null;
   if (workerId === 'owner') {
     if (!state.owner.present || state.owner.wentHome) return false;
+  } else if (!worker || worker.role !== 'joiner' || worker.absentDaysRemaining > 0) {
+    return false;
+  }
+  // Whoever was on this job comes off it, and the new man comes off whatever he was on.
+  releaseJob(state, job);
+  const previous = state.jobs.find((entry) => entry.id !== job.id && entry.assignedTo === workerId);
+  if (previous) releaseJob(state, previous);
+  if (worker) {
+    worker.jobId = job.id;
+  } else {
     state.owner.currentTaskId = null;
     state.owner.productionJobId = job.id;
-  } else {
-    const worker = state.workers.find((entry) => entry.id === workerId);
-    if (!worker || worker.role !== 'joiner' || worker.absentDaysRemaining > 0) return false;
-    for (const other of state.jobs) {
-      if (other.id !== job.id && other.assignedTo === workerId) other.assignedTo = null;
-    }
-    worker.jobId = job.id;
   }
   job.assignedTo = workerId;
   job.stage = 'inProduction';

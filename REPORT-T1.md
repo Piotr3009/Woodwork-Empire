@@ -22,3 +22,6 @@ with size, express, bespoke and expiry, and a board that refills and expires eve
 
 T1-07 Jobs: the full lifecycle from accepted through calls, drawing, material order, next day
 delivery, unloading, production, payment and rating, with late penalties and the by hand path.
+
+T1-08 Staff: hiring gated by reputation and by bench, locker, seat and tool set, weekly and monthly
+wages, automatic assignment with a manual override, the saw ratio slowdown and the helper effects.
