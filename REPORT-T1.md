@@ -16,3 +16,6 @@ the bailiff seizure and bankruptcy, with a ledger entry behind every movement of
 
 T1-05 Owner and tasks: the 480 minute pool, overtime efficiency, fatigue, the 12 hour hard stop,
 absence, sick leave, `SKIP_DAY`, the task minute curves and the runner that spends owner minutes.
+
+T1-06 Catalogue and board: product templates with tool gating and lock reasons, enquiry generation
+with size, express, bespoke and expiry, and a board that refills and expires every morning.

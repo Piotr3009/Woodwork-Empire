@@ -16,6 +16,7 @@ import {
   STARTING_LAYOUT,
   STATE_VERSION,
 } from './constants';
+import { expireEnquiries, refillBoard, refreshLocks } from './board';
 import { isDayExhausted, isWorkingDay } from './clock';
 import { canAfford, pay, runDayCosts } from './economy';
 import { isPaused, openNextEvent, queueEvent } from './events';
@@ -121,7 +122,7 @@ export function createGame(options: NewGameOptions): GameState {
     gameOver: null,
   };
   startDay(state);
-  openNextEvent(state);
+  settle(state);
   return state;
 }
 
@@ -155,6 +156,8 @@ function startDay(state: GameState): void {
   };
   runDayCosts(state, state.clock.day);
   runOwnerDayStart(state);
+  expireEnquiries(state);
+  refillBoard(state);
   createDailyTasks(state);
   assignStaffTasks(state);
 }
@@ -226,11 +229,17 @@ function runMinute(state: GameState): void {
   if (finished) applyTaskCompletion(state, finished);
 }
 
+/** Everything derived that has to be true before the state is handed back. */
+function settle(state: GameState): void {
+  refreshLocks(state);
+  openNextEvent(state);
+}
+
 function advanceMinute(state: GameState): void {
   runMinute(state);
   state.clock.minute += 1;
   if (shouldFinishDay(state)) finishDay(state);
-  openNextEvent(state);
+  settle(state);
 }
 
 /** One tick is one game minute (CLAUDE.md 4). Minutes left over when an event opens are dropped:
@@ -256,7 +265,6 @@ function resolveEvent(state: GameState, choiceId: string): void {
       break;
   }
   void choiceId;
-  openNextEvent(state);
 }
 
 export function applyAction(state: GameState, action: GameAction): GameState {
@@ -299,7 +307,7 @@ export function applyAction(state: GameState, action: GameAction): GameState {
     default:
       break;
   }
-  openNextEvent(next);
+  settle(next);
   return next;
 }
 
