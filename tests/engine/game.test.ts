@@ -1,24 +1,23 @@
 import { describe, expect, it } from 'vitest';
 import { applyAction, createGame, tick } from '../../src/engine/index';
-import type { GameState, NewGameOptions } from '../../src/engine/index';
+import type { GameState } from '../../src/engine/index';
+import {
+  DAYS_PER_MONTH,
+  LIVING_COST_PER_WORKING_DAY,
+  POWER_BASE_DAILY,
+  UNIT_DEPOSIT,
+} from '../../src/engine/constants';
+import { DEFAULT_OPTIONS as OPTIONS, clearEvents } from '../helpers';
 
-const OPTIONS: NewGameOptions = {
-  seed: 20260911,
-  difficulty: 'easy',
-  playerName: 'Piotr',
-  companyName: 'Woodwork Empire',
-};
-
-/** Clicks through whatever event is open. Returns the state with the clock running again. */
-export function clearEvents(state: GameState): GameState {
-  let next = state;
-  let guard = 0;
-  while (next.activeEvent && guard < 200) {
-    const choice = next.activeEvent.choices[0];
-    next = applyAction(next, { type: 'RESOLVE_EVENT', choiceId: choice ? choice.id : 'ok' });
-    guard += 1;
-  }
-  return next;
+/** What day 1 takes out before the player does anything: deposit, rent, rates, power, living. */
+function dayOneCosts(rentMonthly: number, ratesMonthly: number): number {
+  return (
+    UNIT_DEPOSIT +
+    rentMonthly / DAYS_PER_MONTH +
+    ratesMonthly / DAYS_PER_MONTH +
+    POWER_BASE_DAILY +
+    LIVING_COST_PER_WORKING_DAY
+  );
 }
 
 describe('createGame', () => {
@@ -26,14 +25,20 @@ describe('createGame', () => {
     const state = createGame(OPTIONS);
     expect(state.clock).toEqual({ day: 1, minute: 0 });
     expect(state.speed).toBe(0);
-    expect(state.cash).toBe(20000);
+    expect(state.cash).toBeCloseTo(20000 - dayOneCosts(1200, 450), 6);
     expect(state.difficulty).toBe('easy');
     expect(state.activeEvent).toBeNull();
   });
 
   it('gives each difficulty its cash and unit', () => {
-    expect(createGame({ ...OPTIONS, difficulty: 'veryEasy' }).cash).toBe(50000);
-    expect(createGame({ ...OPTIONS, difficulty: 'hard' }).cash).toBe(0);
+    expect(createGame({ ...OPTIONS, difficulty: 'veryEasy' }).cash).toBeCloseTo(
+      50000 - dayOneCosts(1000, 450),
+      6,
+    );
+    expect(createGame({ ...OPTIONS, difficulty: 'hard' }).cash).toBeCloseTo(
+      -dayOneCosts(1200, 450),
+      6,
+    );
     expect(createGame({ ...OPTIONS, difficulty: 'veryEasy' }).unit.benchSlots).toBe(6);
     expect(createGame({ ...OPTIONS, difficulty: 'easy' }).unit.benchSlots).toBe(4);
   });

@@ -341,7 +341,7 @@ export interface LedgerEntry {
   /** Positive is money in, negative is money out. */
   amount: number;
   balance: number;
-  /** True when the cost could not be paid and became arrears. */
+  /** True when no cash moved: a cost that became arrears, or a credit applied against them. */
   unpaid: boolean;
 }
 
@@ -416,6 +416,8 @@ export interface GameState {
   eventQueue: GameEvent[];
   activeEvent: GameEvent | null;
   dayStats: DayStats;
+  /** Production minutes since the 1st, for pellet sales. */
+  productionMinutesMonth: number;
   gameOver: GameOver | null;
 }
 

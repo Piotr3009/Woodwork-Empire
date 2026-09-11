@@ -10,3 +10,6 @@ T1-02 Constants and types: `engine/constants.ts` holds every number of sections 
 
 T1-03 RNG and clock: mulberry32 in `engine/rng.ts` with the cursor in the state, calendar and time
 helpers in `engine/clock.ts`, and the day, weekend and month rollover in `engine/game.ts`.
+
+T1-04 Economy: daily, weekly and monthly cadences, the day 1 deposit, overdraft interest, arrears,
+the bailiff seizure and bankruptcy, with a ledger entry behind every movement of money.

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { createGame } from '../../src/engine/game';
 import {
   DIFFICULTIES,
   EQUIPMENT_SPECS,
@@ -7,69 +8,17 @@ import {
   OWNER_LABOUR_PER_MINUTE,
   PRODUCT_TEMPLATES,
   PROFIT_FRACTION,
-  STATE_VERSION,
   WORKER_RATES,
 } from '../../src/engine/constants';
 import type { GameState } from '../../src/engine/types';
 
-const sample: GameState = {
-  version: STATE_VERSION,
+// One code path builds states: the engine's own createGame.
+const sample: GameState = createGame({
   seed: 1234,
-  rng: 1234,
-  nextId: 1,
   difficulty: 'easy',
   playerName: 'Piotr',
   companyName: 'Woodwork Empire',
-  clock: { day: 1, minute: 0 },
-  speed: 1,
-  cash: 20000,
-  reputation: 0,
-  dust: 0,
-  unit: {
-    areaM2: 60,
-    widthTiles: 24,
-    depthTiles: 10,
-    rentMonthly: 1200,
-    ratesMonthly: 450,
-    benchSlots: 4,
-    sheetCapacity: 12,
-  },
-  owner: {
-    present: true,
-    minutesByCategory: { admin: 0, design: 0, workshop: 0 },
-    minutesWorked: 0,
-    overtimeHours: 0,
-    fatigue: 0,
-    wentHome: false,
-    currentTaskId: null,
-    productionJobId: null,
-    sickDaysRemaining: 0,
-    sickStartDay: null,
-    stayHome: false,
-  },
-  software: { mode: 'none', tier: 'basic', jobsRemaining: 0 },
-  stock: { sheets: 0, capacity: 12, tempStorageSheets: 0 },
-  equipment: [],
-  workers: [],
-  enquiries: [],
-  jobs: [],
-  tasks: [],
-  deliveries: [],
-  finance: {
-    overdraftLimit: -10000,
-    arrearsAmount: 0,
-    arrearsMonths: 0,
-    firstArrearsDay: null,
-    day: { income: 0, costs: 0, byCategory: {} },
-    week: { income: 0, costs: 0, byCategory: {} },
-    month: { income: 0, costs: 0, byCategory: {} },
-  },
-  ledger: [],
-  eventQueue: [],
-  activeEvent: null,
-  dayStats: { jobsAdvanced: [], jobsCompleted: [], productionMinutes: 0, dustAtStart: 0 },
-  gameOver: null,
-};
+});
 
 describe('GameState', () => {
   it('survives a JSON round trip unchanged', () => {

@@ -2,15 +2,25 @@
 // callers never see their input mutated. Every other engine module mutates the state it is given.
 
 import {
+  BENCH_SLOT_LAYOUT,
+  CANTEEN_SLOT_LAYOUT,
   DIFFICULTIES,
+  LOCKER_SLOT_LAYOUT,
   MAX_MINUTES_PER_DAY,
   MINUTES_PER_WORKING_DAY,
   OVERDRAFT_LIMIT,
   REPUTATION_START,
+  SOFTWARE_ONE_OFF_JOBS,
+  SOFTWARE_ONE_OFF_PRICE,
+  SOFTWARE_TURN1_TIER,
+  STARTING_LAYOUT,
   STATE_VERSION,
 } from './constants';
 import { isDayExhausted, isWorkingDay } from './clock';
+import { canAfford, pay, runDayCosts } from './economy';
 import { isPaused, openNextEvent, queueEvent } from './events';
+import { countOf, findSpec, has, specOf } from './machines';
+import { makeId } from './rng';
 import type { Difficulty, GameAction, GameState, PeriodTotals, Speed } from './types';
 
 export interface NewGameOptions {
@@ -92,6 +102,7 @@ export function createGame(options: NewGameOptions): GameState {
     eventQueue: [],
     activeEvent: null,
     dayStats: { jobsAdvanced: [], jobsCompleted: [], productionMinutes: 0, dustAtStart: 0 },
+    productionMinutesMonth: 0,
     gameOver: null,
   };
   startDay(state);
@@ -122,13 +133,13 @@ function startDay(state: GameState): void {
   owner.productionJobId = null;
   owner.present = true;
   owner.stayHome = false;
-  state.finance.day = emptyTotals();
   state.dayStats = {
     jobsAdvanced: [],
     jobsCompleted: [],
     productionMinutes: 0,
     dustAtStart: state.dust,
   };
+  runDayCosts(state, state.clock.day);
 }
 
 /** Ends the working day and opens the summary. The player clicks on to the next day. */
@@ -150,15 +161,22 @@ function advanceToNextDay(state: GameState): void {
     skipped.push(day);
     day += 1;
   }
+  let weekendCosts = 0;
+  for (const weekendDay of skipped) {
+    state.clock.day = weekendDay;
+    const before = state.cash;
+    runDayCosts(state, weekendDay);
+    weekendCosts += before - state.cash;
+  }
   state.clock.day = day;
   state.clock.minute = 0;
   if (skipped.length > 0) {
     queueEvent(state, {
       kind: 'weekend',
       title: 'Weekend',
-      body: `${skipped.length} days off. Rent and rates still ran.`,
+      body: `${skipped.length} days off. Rent and rates ran anyway.`,
       choices: [{ id: 'ok', label: 'Monday then' }],
-      data: { days: skipped.length },
+      data: { days: skipped.length, costs: Math.round(weekendCosts) },
     });
   }
   startDay(state);
@@ -218,6 +236,12 @@ export function applyAction(state: GameState, action: GameAction): GameState {
       next.owner.currentTaskId = null;
       next.owner.productionJobId = null;
       break;
+    case 'BUY_EQUIPMENT':
+      buyEquipment(next, action.specId);
+      break;
+    case 'BUY_SOFTWARE':
+      buySoftware(next, action.mode);
+      break;
     case 'RESOLVE_EVENT':
       resolveEvent(next, action.choiceId);
       break;
@@ -226,6 +250,104 @@ export function applyAction(state: GameState, action: GameAction): GameState {
   }
   openNextEvent(next);
   return next;
+}
+
+
+// ---------------------------------------------------------------------------
+// Buying from the day 1 catalogue. The catalogue queries live in machines.ts, the payment in
+// economy.ts: the transaction that needs both lives here.
+// ---------------------------------------------------------------------------
+
+
+export interface BuyCheck {
+  ok: boolean;
+  reason: string;
+}
+
+const OK: BuyCheck = { ok: true, reason: '' };
+
+/** One reason per refusal, used by the catalogue modal and by the buy action itself. */
+export function canBuy(state: GameState, specId: string): BuyCheck {
+  const spec = findSpec(specId);
+  if (!spec) return { ok: false, reason: 'Not in the catalogue' };
+  if (spec.locked) return { ok: false, reason: spec.lockReason };
+  if (state.reputation < spec.minReputation) {
+    return { ok: false, reason: `Needs reputation ${spec.minReputation}` };
+  }
+  for (const required of spec.requires) {
+    if (!has(state, required)) {
+      const name = findSpec(required)?.name ?? required;
+      return { ok: false, reason: `Needs ${name} first` };
+    }
+  }
+  if (!spec.stackable && has(state, specId)) return { ok: false, reason: 'Already owned' };
+  if (specId === 'workbench' && countOf(state, 'workbench') >= state.unit.benchSlots) {
+    return { ok: false, reason: 'No free bench slot in this unit' };
+  }
+  if (!canAfford(state, spec.price)) return { ok: false, reason: 'Not enough cash' };
+  return OK;
+}
+
+function slotFrom(slots: readonly { x: number; y: number }[], index: number): { x: number; y: number } {
+  const slot = slots[Math.min(index, slots.length - 1)];
+  return slot ? { x: slot.x, y: slot.y } : { x: 0, y: 0 };
+}
+
+/** Fixed placement from constants. Free placement by the player is parked (CLAUDE.md 14.9). */
+function anchorFor(state: GameState, specId: string): { x: number; y: number } {
+  const index = countOf(state, specId);
+  if (specId === 'workbench') return slotFrom(BENCH_SLOT_LAYOUT, index);
+  if (specId === 'locker') return slotFrom(LOCKER_SLOT_LAYOUT, index);
+  if (specId === 'canteenSeat') return slotFrom(CANTEEN_SLOT_LAYOUT, index);
+  const slot = STARTING_LAYOUT[specId];
+  const base = slot ? { x: slot.yard === true ? state.unit.widthTiles + slot.x : slot.x, y: slot.y } : { x: 0, y: 6 };
+  // A second machine of the same kind stands beside the first.
+  return { x: base.x + index * 2, y: base.y };
+}
+
+export function buyEquipment(state: GameState, specId: string): BuyCheck {
+  const check = canBuy(state, specId);
+  if (!check.ok) return check;
+  const spec = specOf(specId);
+  const anchor = anchorFor(state, specId);
+  pay(state, 'equipment', spec.name, spec.price);
+  state.equipment.push({
+    id: makeId(state, 'kit'),
+    specId,
+    spriteKey: spec.spriteKey,
+    anchorX: anchor.x,
+    anchorY: anchor.y,
+    minutesUsed: 0,
+    bagFull: false,
+    broken: false,
+    purchasePrice: spec.price,
+  });
+  return OK;
+}
+
+/** Management software: one-off for 30 jobs, or a subscription billed on the 1st (CLAUDE.md 9.2). */
+export function canBuySoftware(state: GameState, mode: 'oneOff' | 'subscription'): BuyCheck {
+  if (!has(state, 'laptop')) return { ok: false, reason: 'Needs a laptop first' };
+  if (mode === 'oneOff' && !canAfford(state, SOFTWARE_ONE_OFF_PRICE)) {
+    return { ok: false, reason: 'Not enough cash' };
+  }
+  return OK;
+}
+
+export function buySoftware(state: GameState, mode: 'oneOff' | 'subscription'): BuyCheck {
+  const check = canBuySoftware(state, mode);
+  if (!check.ok) return check;
+  if (mode === 'oneOff') {
+    pay(state, 'software', 'Management software, one off', SOFTWARE_ONE_OFF_PRICE);
+    state.software = {
+      mode: 'oneOff',
+      tier: SOFTWARE_TURN1_TIER,
+      jobsRemaining: SOFTWARE_ONE_OFF_JOBS,
+    };
+    return OK;
+  }
+  state.software = { mode: 'subscription', tier: SOFTWARE_TURN1_TIER, jobsRemaining: 0 };
+  return OK;
 }
 
 export const MAX_DAY_MINUTES = MAX_MINUTES_PER_DAY;
