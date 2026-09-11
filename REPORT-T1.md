@@ -37,3 +37,6 @@ T1-11 Render: `render/iso.ts` holds the 2:1 dimetric projection with a tile to s
 
 T1-12 UI: start screen, top bar with the minute bar, hall and office views, seven modals, the event
 modal, the end of day summary, the game over screen and the loop with speed and pause on events.
+
+T1-13 Scenario tests: a scripted month on Easy that takes shelves, bookcases and TV units, a month
+on Hard doing nothing, and a byte for byte replay of the Easy month from the same seed.
