@@ -418,6 +418,7 @@ export const PRODUCT_TEMPLATES: ProductTemplate[] = [
 
 const BASE_SPEC = {
   bagInterval: 0,
+  usedOn: null as MaterialKind | null,
   labourFactor: 1,
   labourAppliesTo: null as MaterialKind | null,
   unloadFactor: 1,
@@ -479,6 +480,7 @@ export const EQUIPMENT_SPECS: EquipmentSpec[] = [
     height: 2,
     spriteKey: 'tableSaw',
     bagInterval: 2400,
+    usedOn: 'sheet',
     stackable: true,
     effect: 'Cuts sheets. Bag every 2400 minutes. One saw per three joiners.',
   },
@@ -505,6 +507,7 @@ export const EQUIPMENT_SPECS: EquipmentSpec[] = [
     height: 2,
     spriteKey: 'edgebander',
     bagInterval: 4800,
+    usedOn: 'sheet',
     effect: 'Edges sheet goods. Bag every 4800 minutes.',
   },
   {
@@ -636,6 +639,7 @@ export const EQUIPMENT_SPECS: EquipmentSpec[] = [
     height: 2,
     spriteKey: 'thicknesser',
     bagInterval: 480,
+    usedOn: 'solidWood',
     effect: 'Solid wood tools, part 1. Bag every 480 minutes.',
   },
   {
@@ -648,6 +652,7 @@ export const EQUIPMENT_SPECS: EquipmentSpec[] = [
     depth: 2,
     height: 2,
     spriteKey: 'solidWoodTools',
+    usedOn: 'solidWood',
     effect: 'Solid wood tools, part 2. With the thicknesser this unlocks solid wood.',
   },
   {

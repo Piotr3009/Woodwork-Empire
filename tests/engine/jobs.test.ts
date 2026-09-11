@@ -10,7 +10,7 @@ import {
   SITE_MEASURE_TAXI_COST,
 } from '../../src/engine/constants';
 import { machineLabourFactor } from '../../src/engine/machines';
-import { findJob, minutesRemainingFor } from '../../src/engine/jobs';
+import { findJob, minutesRemainingFor, ownerJob } from '../../src/engine/jobs';
 import { materialCostFor, sheetsForCost } from '../../src/engine/materials';
 import { tick } from '../../src/engine/index';
 import type { GameEvent, GameState } from '../../src/engine/index';
@@ -244,7 +244,7 @@ describe('production', () => {
     expect(minutesRemainingFor(firstJob(state), 1)).toBeCloseTo(240, 6);
     state = act(state, { type: 'WORK_HERE', jobId: null });
     expect(state.jobs[0]?.stage).toBe('inProduction');
-    expect(state.owner.productionJobId).toBe(state.jobs[0]?.id);
+    expect(ownerJob(state)?.id).toBe(state.jobs[0]?.id);
     state = tick(state, 239);
     expect(state.jobs[0]?.stage).toBe('inProduction');
     state = tick(state, 1);
@@ -265,7 +265,7 @@ describe('production', () => {
     expect(state.reputation).toBe(0.3);
     expect(state.cash).toBeCloseTo(afterDeposit + 200, 6);
     expect(state.activeEvent?.kind).toBe('jobPaid');
-    expect(state.owner.productionJobId).toBeNull();
+    expect(ownerJob(state)).toBeNull();
   });
 
   it('works at 0.6667 of job value a minute, so 800 of job value fills a day', () => {

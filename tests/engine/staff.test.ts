@@ -14,7 +14,7 @@ import {
   missingForHire,
   sawRatioFactor,
 } from '../../src/engine/staff';
-import { minutesRemainingFor } from '../../src/engine/jobs';
+import { minutesRemainingFor, ownerJob } from '../../src/engine/jobs';
 import { weeklyWageBill } from '../../src/engine/economy';
 import { tick } from '../../src/engine/index';
 import type { GameState, Worker } from '../../src/engine/index';
@@ -155,7 +155,7 @@ describe('joiners at the bench', () => {
     const jobId = firstJob(state).id;
     state = act(state, { type: 'ASSIGN_JOB', jobId, workerId: 'owner' });
     expect(firstJob(state).assignedTo).toBe('owner');
-    expect(state.owner.productionJobId).toBe(jobId);
+    expect(ownerJob(state)?.id).toBe(jobId);
     expect(state.workers[0]?.jobId).toBeNull();
   });
 

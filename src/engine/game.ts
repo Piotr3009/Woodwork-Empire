@@ -2,9 +2,13 @@
 // callers never see their input mutated. Every other engine module mutates the state it is given.
 
 import {
+  ACCIDENT_CHANCE_PER_DAY,
+  ACCIDENT_DAYS_OFF,
   BENCH_SLOT_LAYOUT,
   CANTEEN_SLOT_LAYOUT,
   DIFFICULTIES,
+  EXTRACTOR_REPAIR_COST,
+  HELPER_CLEAN_WEEKDAY,
   LOCKER_SLOT_LAYOUT,
   MAX_MINUTES_PER_DAY,
   MINUTES_PER_WORKING_DAY,
@@ -18,15 +22,24 @@ import {
   STATE_VERSION,
 } from './constants';
 import { expireEnquiries, refillBoard, refreshLocks } from './board';
-import { isDayExhausted, isWorkingDay } from './clock';
+import { isDayExhausted, isWorkingDay, weekday } from './clock';
 import { canAfford, pay, runDayCosts } from './economy';
 import { isPaused, openNextEvent, queueEvent } from './events';
 import {
+  accidentRisk,
+  accumulateBagMinutes,
+  addDust,
+  bagBlocked,
+  breakExtractor,
+  clearDust,
   countOf,
+  emptyBag,
+  extractorBreakdownChance,
   findSpec,
   hallProductivityFactor,
   has,
   machinesStopped,
+  repairExtractor,
   specOf,
 } from './machines';
 import {
@@ -38,26 +51,41 @@ import {
   findJob,
   oldestReadyJob,
   onDeliveryArrived,
+  ownerJob,
   onDeliveryUnloaded,
   onMaterialOrdered,
   refreshJob,
+  releaseJob,
   setMaterialMode,
 } from './jobs';
 import { arriveDeliveries, findDelivery } from './materials';
 import {
   ownerEfficiency,
   ownerIsAvailable,
+  ownerMinutesLeft,
   runOwnerDayStart,
   setTomorrowFatigue,
   spendOwnerMinute,
   staffOutputFactor,
 } from './owner';
-import { makeId } from './rng';
-import { autoAssignJobs, hire, runStaffDayStart, sawRatioFactor } from './staff';
+import { chance, int, makeId } from './rng';
 import {
+  autoAssignJobs,
+  availableJoiners,
+  helpers,
+  hire,
+  joiners,
+  runStaffDayStart,
+  sawRatioFactor,
+} from './staff';
+import {
+  AD_HOC_TASK_MINUTES,
   advanceOwnerTask,
+  advanceTask,
   assignStaffTasks,
+  assignWorkerTask,
   createDailyTasks,
+  createTask,
   findTask,
   pauseOwnerTask,
   startTask,
@@ -65,6 +93,8 @@ import {
 import type {
   Delivery,
   Difficulty,
+  Equipment,
+  MaterialKind,
   GameAction,
   GameState,
   PeriodTotals,
@@ -125,7 +155,6 @@ export function createGame(options: NewGameOptions): GameState {
       fatigue: 0,
       wentHome: false,
       currentTaskId: null,
-      productionJobId: null,
       sickDaysRemaining: 0,
       sickStartDay: null,
       stayHome: false,
@@ -161,7 +190,7 @@ export function createGame(options: NewGameOptions): GameState {
 
 /** True while the owner is on a task or standing at a machine. */
 export function ownerIsWorking(state: GameState): boolean {
-  return state.owner.currentTaskId !== null || state.owner.productionJobId !== null;
+  return state.owner.currentTaskId !== null || ownerJob(state) !== null;
 }
 
 function shouldFinishDay(state: GameState): boolean {
@@ -178,7 +207,6 @@ function startDay(state: GameState): void {
   owner.minutesWorked = 0;
   owner.wentHome = false;
   owner.currentTaskId = null;
-  owner.productionJobId = null;
   owner.present = true;
   owner.stayHome = false;
   state.dayStats = {
@@ -196,8 +224,60 @@ function startDay(state: GameState): void {
   checkOverdueJobs(state);
   for (const delivery of arriving) onDeliveryArrived(state, delivery.jobId);
   createDailyTasks(state);
-  assignStaffTasks(state);
+  runExtractorBreakdown(state);
+  runAccidentRoll(state);
+  runHelperClean(state);
+  delegateTasks(state);
   queueDeliveryEvents(state, arriving);
+}
+
+/** The extractor can give up, and the filthier the hall the likelier it is (CLAUDE.md 9.6). */
+function runExtractorBreakdown(state: GameState): void {
+  if (machinesStopped(state)) return;
+  if (!chance(state, extractorBreakdownChance(state))) return;
+  const extractor = breakExtractor(state);
+  if (!extractor) return;
+  const task = ensureTask(state, 'repairExtractor', 'Repair the extractor', extractor.id);
+  const choices = [{ id: 'owner', label: `Fix it yourself, ${task.minutesTotal} min` }];
+  if (joiners(state).length > 0) {
+    choices.push({ id: 'joiner', label: `Send a joiner, ${task.minutesTotal} min` });
+  }
+  choices.push({ id: 'later', label: 'Leave it' });
+  queueEvent(state, {
+    kind: 'extractorBroken',
+    title: 'The extractor has stopped',
+    body:
+      `Every machine in the hall is dead until it is fixed, and the dust piles up faster. ` +
+      `The parts cost ${EXTRACTOR_REPAIR_COST}.`,
+    choices,
+    data: { equipmentId: extractor.id, taskId: task.id },
+  });
+}
+
+/** A dangerous hall hurts somebody sooner or later (CLAUDE.md 9.7). */
+function runAccidentRoll(state: GameState): void {
+  if (!accidentRisk(state)) return;
+  const crew = joiners(state).filter((worker) => worker.absentDaysRemaining === 0);
+  if (crew.length === 0) return;
+  if (!chance(state, ACCIDENT_CHANCE_PER_DAY)) return;
+  const worker = crew[int(state, 0, crew.length - 1)];
+  if (!worker) return;
+  worker.absentDaysRemaining = ACCIDENT_DAYS_OFF;
+  const job = worker.jobId ? findJob(state, worker.jobId) : null;
+  if (job) releaseJob(state, job);
+  queueEvent(state, {
+    kind: 'accident',
+    title: 'Accident in the hall',
+    body: `${worker.name} has been hurt in all that mess. He is off for ${ACCIDENT_DAYS_OFF} days.`,
+    data: { workerId: worker.id, days: ACCIDENT_DAYS_OFF },
+  });
+}
+
+/** A helper cleans every Friday at no cost to the owner (CLAUDE.md 9.7). */
+function runHelperClean(state: GameState): void {
+  if (helpers(state).length === 0) return;
+  if (weekday(state.clock.day) !== HELPER_CLEAN_WEEKDAY) return;
+  ensureTask(state, 'cleaning', 'Weekly clean', null);
 }
 
 /** A lorry at the gate is a decision: unload now, or leave it standing there (CLAUDE.md 10.1). */
@@ -223,7 +303,6 @@ function finishDay(state: GameState): void {
   pauseOwnerTask(state);
   setTomorrowFatigue(state);
   state.owner.wentHome = true;
-  state.owner.productionJobId = null;
   queueEvent(state, {
     kind: 'dayEnd',
     title: `End of day ${state.clock.day}`,
@@ -261,6 +340,37 @@ function advanceToNextDay(state: GameState): void {
   startDay(state);
 }
 
+/** Finds the open task of this kind for this machine, or puts one on the list. */
+function ensureTask(
+  state: GameState,
+  kind: 'cleaning' | 'repairExtractor' | 'bagChange',
+  label: string,
+  equipmentId: string | null,
+): TaskInstance {
+  const open = state.tasks.find(
+    (task) => task.kind === kind && !task.done && task.equipmentId === equipmentId,
+  );
+  if (open) return open;
+  return createTask(state, {
+    kind,
+    label,
+    minutes: AD_HOC_TASK_MINUTES[kind],
+    equipmentId,
+  });
+}
+
+/** Hands a task to the owner, or to a joiner at the cost of his production minutes. */
+function delegateAdHocTask(state: GameState, task: TaskInstance, choiceId: string): void {
+  if (choiceId === 'owner') {
+    startTask(state, task.id);
+    return;
+  }
+  if (choiceId === 'joiner') {
+    const joiner = availableJoiners(state)[0] ?? joiners(state)[0];
+    if (joiner) assignWorkerTask(state, joiner.id, task.id);
+  }
+}
+
 /** What a finished task does to the rest of the world. */
 function applyTaskCompletion(state: GameState, task: TaskInstance): void {
   const job = task.jobId ? findJob(state, task.jobId) : null;
@@ -277,6 +387,16 @@ function applyTaskCompletion(state: GameState, task: TaskInstance): void {
       break;
     case 'materialOrder':
       if (job) onMaterialOrdered(state, job);
+      break;
+    case 'bagChange':
+      if (task.equipmentId) emptyBag(state, task.equipmentId);
+      break;
+    case 'cleaning':
+      clearDust(state);
+      break;
+    case 'repairExtractor':
+      repairExtractor(state);
+      pay(state, 'repair', 'Extractor repair', EXTRACTOR_REPAIR_COST);
       break;
     case 'unload': {
       const delivery = task.deliveryId ? findDelivery(state, task.deliveryId) : null;
@@ -307,48 +427,103 @@ function runMinute(state: GameState): void {
 }
 
 /** Everything derived that has to be true before the state is handed back. */
+/** Staff pick up what their role covers, and what they finish takes effect. */
+function delegateTasks(state: GameState): void {
+  for (const task of assignStaffTasks(state)) applyTaskCompletion(state, task);
+}
+
 function settle(state: GameState): void {
   refreshLocks(state);
+  delegateTasks(state);
   autoAssignJobs(state);
   openNextEvent(state);
 }
 
 /** Production, by the owner at the bench and by every joiner on a job. */
+/** A joiner on a bag change or a repair is not at his bench. True when he spent the minute. */
+function runWorkerTaskMinute(state: GameState, workerId: string, taskId: string): boolean {
+  const task = findTask(state, taskId);
+  const worker = state.workers.find((entry) => entry.id === workerId);
+  if (!worker) return false;
+  if (!task || task.done) {
+    worker.taskId = null;
+    return false;
+  }
+  if (advanceTask(task, 1)) {
+    worker.taskId = null;
+    applyTaskCompletion(state, task);
+  }
+  return true;
+}
+
 function runProductionMinute(state: GameState): void {
-  if (machinesStopped(state)) return;
   const hall = hallProductivityFactor(state);
+  const stopped = machinesStopped(state);
   let worked = false;
-  const ownerJobId = state.owner.productionJobId;
-  if (ownerJobId !== null && ownerIsAvailable(state)) {
-    const job = findJob(state, ownerJobId);
-    if (job && job.stage === 'inProduction') {
-      spendOwnerMinute(state, 'workshop');
-      worked = true;
-      addLabour(state, job, OWNER_LABOUR_PER_MINUTE * ownerEfficiency(state) * hall);
-    } else {
-      state.owner.productionJobId = null;
-    }
+  const materials = new Set<MaterialKind>();
+  const atTheBench = state.owner.currentTaskId === null ? ownerJob(state) : null;
+  if (atTheBench && ownerIsAvailable(state) && !stopped && !bagBlocked(state, atTheBench.materialKind)) {
+    spendOwnerMinute(state, 'workshop');
+    worked = true;
+    materials.add(atTheBench.materialKind);
+    addLabour(state, atTheBench, OWNER_LABOUR_PER_MINUTE * ownerEfficiency(state) * hall);
   }
   // Staff work the normal day only: nobody but the owner does overtime.
   if (state.clock.minute < MINUTES_PER_WORKING_DAY) {
     const staffFactor = staffOutputFactor(state);
     for (const worker of state.workers) {
-      if (worker.role !== 'joiner' || worker.jobId === null) continue;
       if (worker.absentDaysRemaining > 0 || worker.startDay > state.clock.day) continue;
+      if (worker.taskId !== null) {
+        runWorkerTaskMinute(state, worker.id, worker.taskId);
+        continue;
+      }
+      if (worker.role !== 'joiner' || worker.jobId === null) continue;
       const job = findJob(state, worker.jobId);
       if (!job || job.stage !== 'inProduction') {
         worker.jobId = null;
         continue;
       }
+      if (stopped || bagBlocked(state, job.materialKind)) continue;
       worked = true;
+      materials.add(job.materialKind);
       const rate = worker.rate * sawRatioFactor(state, worker);
       addLabour(state, job, OWNER_LABOUR_PER_MINUTE * rate * hall * staffFactor);
     }
   }
-  if (worked) {
-    state.dayStats.productionMinutes += 1;
-    state.productionMinutesMonth += 1;
+  if (!worked) return;
+  state.dayStats.productionMinutes += 1;
+  state.productionMinutesMonth += 1;
+  addDust(state, 1);
+  for (const material of materials) {
+    for (const machine of accumulateBagMinutes(state, material)) raiseBagFull(state, machine);
   }
+}
+
+/** A full bag stops the machine. A helper deals with it for nothing, otherwise somebody has to
+ *  give up 15 minutes (CLAUDE.md 9.6). */
+function raiseBagFull(state: GameState, machine: Equipment): void {
+  const name = findSpec(machine.specId)?.name ?? machine.specId;
+  const task = ensureTask(state, 'bagChange', `Bag change: ${name}`, machine.id);
+  if (helpers(state).length > 0) {
+    // The helper takes it, free and without asking.
+    delegateTasks(state);
+    return;
+  }
+  const choices = [];
+  if (ownerIsAvailable(state) && ownerMinutesLeft(state) > 0) {
+    choices.push({ id: 'owner', label: 'Change it yourself, 15 min' });
+  }
+  if (joiners(state).length > 0) {
+    choices.push({ id: 'joiner', label: 'Send a joiner, 15 min off his bench' });
+  }
+  choices.push({ id: 'later', label: 'Leave the machine stopped' });
+  queueEvent(state, {
+    kind: 'bagFull',
+    title: `Bag full: ${name.toLowerCase()}`,
+    body: 'The machine has stopped. Nothing of this kind gets made until the bag is changed.',
+    choices,
+    data: { equipmentId: machine.id, taskId: task.id },
+  });
 }
 
 function advanceMinute(state: GameState): void {
@@ -384,6 +559,13 @@ function resolveEvent(state: GameState, choiceId: string): void {
         if (typeof taskId === 'string') startTask(state, taskId);
       }
       break;
+    case 'bagFull':
+    case 'extractorBroken': {
+      const taskId = event.data.taskId;
+      const task = typeof taskId === 'string' ? findTask(state, taskId) : null;
+      if (task) delegateAdHocTask(state, task, choiceId);
+      break;
+    }
     default:
       break;
   }
@@ -402,14 +584,12 @@ export function applyAction(state: GameState, action: GameAction): GameState {
         // Going home early counts as absence for the rest of the day (CLAUDE.md 7.2).
         pauseOwnerTask(next);
         next.owner.wentHome = true;
-        next.owner.productionJobId = null;
       }
       break;
     case 'SKIP_DAY':
       next.owner.present = false;
       next.owner.stayHome = true;
       pauseOwnerTask(next);
-      next.owner.productionJobId = null;
       break;
     case 'START_TASK':
       startTask(next, action.taskId);
@@ -431,6 +611,19 @@ export function applyAction(state: GameState, action: GameAction): GameState {
     case 'HIRE':
       hire(next, action.role, action.tier);
       break;
+    case 'START_CLEANING': {
+      const task = ensureTask(next, 'cleaning', 'Clean the hall', null);
+      startTask(next, task.id);
+      break;
+    }
+    case 'REPAIR_EXTRACTOR': {
+      const extractor = next.equipment.find((item) => item.specId === 'extractor');
+      if (extractor && extractor.broken) {
+        const task = ensureTask(next, 'repairExtractor', 'Repair the extractor', extractor.id);
+        startTask(next, task.id);
+      }
+      break;
+    }
     case 'PAUSE_TASK':
       pauseOwnerTask(next);
       break;

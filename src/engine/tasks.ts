@@ -37,26 +37,41 @@ import type {
   WorkerRole,
 } from './types';
 
-/** Which bar segment a task fills, and who else in the company may take it (CLAUDE.md 8.10). */
+/** Which bar segment a task fills, who may be asked to do it, and who takes it off the owner
+ *  without being asked. A joiner can always be sent, but it costs him bench minutes, so he never
+ *  takes anything automatically (CLAUDE.md 8.10, 9.6). */
 interface TaskDefinition {
   category: TaskCategory;
   eligibleRoles: WorkerRole[];
+  autoRoles: WorkerRole[];
 }
 
 const TASK_DEFINITIONS: Record<TaskKind, TaskDefinition> = {
-  emails: { category: 'admin', eligibleRoles: ['officeAdmin'] },
-  bookkeeping: { category: 'admin', eligibleRoles: ['officeAdmin'] },
-  dailyOrdering: { category: 'admin', eligibleRoles: ['purchasingClerk', 'officeAdmin'] },
-  staffManagement: { category: 'admin', eligibleRoles: [] },
-  clientCall: { category: 'admin', eligibleRoles: ['salesman'] },
-  design: { category: 'design', eligibleRoles: [] },
-  materialOrder: { category: 'admin', eligibleRoles: ['purchasingClerk'] },
-  siteMeasure: { category: 'admin', eligibleRoles: [] },
-  unload: { category: 'workshop', eligibleRoles: ['joiner', 'helper'] },
-  bagChange: { category: 'workshop', eligibleRoles: ['joiner', 'helper'] },
-  cleaning: { category: 'workshop', eligibleRoles: ['helper'] },
-  fetchStorage: { category: 'workshop', eligibleRoles: ['joiner', 'helper'] },
-  repairExtractor: { category: 'workshop', eligibleRoles: ['joiner'] },
+  emails: { category: 'admin', eligibleRoles: ['officeAdmin'], autoRoles: ['officeAdmin'] },
+  bookkeeping: { category: 'admin', eligibleRoles: ['officeAdmin'], autoRoles: ['officeAdmin'] },
+  dailyOrdering: {
+    category: 'admin',
+    eligibleRoles: ['purchasingClerk', 'officeAdmin'],
+    autoRoles: ['purchasingClerk', 'officeAdmin'],
+  },
+  staffManagement: { category: 'admin', eligibleRoles: [], autoRoles: [] },
+  clientCall: { category: 'admin', eligibleRoles: ['salesman'], autoRoles: ['salesman'] },
+  design: { category: 'design', eligibleRoles: [], autoRoles: [] },
+  materialOrder: {
+    category: 'admin',
+    eligibleRoles: ['purchasingClerk'],
+    autoRoles: ['purchasingClerk'],
+  },
+  siteMeasure: { category: 'admin', eligibleRoles: [], autoRoles: [] },
+  unload: { category: 'workshop', eligibleRoles: ['joiner', 'helper'], autoRoles: ['helper'] },
+  bagChange: { category: 'workshop', eligibleRoles: ['joiner', 'helper'], autoRoles: ['helper'] },
+  cleaning: { category: 'workshop', eligibleRoles: ['helper'], autoRoles: ['helper'] },
+  fetchStorage: {
+    category: 'workshop',
+    eligibleRoles: ['joiner', 'helper'],
+    autoRoles: ['helper'],
+  },
+  repairExtractor: { category: 'workshop', eligibleRoles: ['joiner'], autoRoles: [] },
 };
 
 /** Float guard, not a game number: work this small is finished work. */
@@ -201,17 +216,20 @@ export function createDailyTasks(state: GameState): void {
   }
 }
 
-/** A worker on the books takes the tasks his role covers, and the owner never sees them. */
-export function assignStaffTasks(state: GameState): void {
+/** A worker on the books takes the tasks his role covers, and the owner never sees them.
+ *  Returns what was cleared, so the caller can apply what each finished task does. */
+export function assignStaffTasks(state: GameState): TaskInstance[] {
+  const cleared: TaskInstance[] = [];
   const started = state.workers.filter(
     (worker) => worker.startDay <= state.clock.day && worker.absentDaysRemaining === 0,
   );
-  if (started.length === 0) return;
+  if (started.length === 0) return cleared;
   let clerkOrders = started.filter((worker) => worker.role === 'purchasingClerk').length
     * CLERK_ORDERS_PER_DAY;
   for (const task of state.tasks) {
     if (task.done || task.doneBy !== null) continue;
-    const staff = started.find((worker) => task.eligibleRoles.includes(worker.role));
+    const autoRoles = TASK_DEFINITIONS[task.kind].autoRoles;
+    const staff = started.find((worker) => autoRoles.includes(worker.role));
     if (!staff) continue;
     if (task.kind === 'materialOrder' && staff.role === 'purchasingClerk') {
       if (clerkOrders <= 0) continue;
@@ -220,7 +238,9 @@ export function assignStaffTasks(state: GameState): void {
     task.done = true;
     task.minutesRemaining = 0;
     task.doneBy = staff.id;
+    cleared.push(task);
   }
+  return cleared;
 }
 
 // ---------------------------------------------------------------------------
@@ -233,7 +253,6 @@ export function startTask(state: GameState, taskId: string): boolean {
   if (!state.owner.present || state.owner.wentHome) return false;
   // No drawing without a licence for the software (CLAUDE.md 9.2).
   if (task.kind === 'design' && !softwareActive(state)) return false;
-  state.owner.productionJobId = null;
   state.owner.currentTaskId = task.id;
   task.doneBy = 'owner';
   return true;
@@ -248,6 +267,15 @@ export function pauseOwnerTask(state: GameState): void {
   state.owner.currentTaskId = null;
 }
 
+/** Works one minute into a task. True when it finished. One path for the owner and for staff. */
+export function advanceTask(task: TaskInstance, work: number): boolean {
+  task.minutesRemaining -= work;
+  if (task.minutesRemaining > WORK_EPSILON) return false;
+  task.minutesRemaining = 0;
+  task.done = true;
+  return true;
+}
+
 /** Spends one clock minute of owner time on his current task. Returns it if it finished. */
 export function advanceOwnerTask(state: GameState, work: number): TaskInstance | null {
   const taskId = state.owner.currentTaskId;
@@ -257,12 +285,19 @@ export function advanceOwnerTask(state: GameState, work: number): TaskInstance |
     state.owner.currentTaskId = null;
     return null;
   }
-  task.minutesRemaining -= work;
-  if (task.minutesRemaining > WORK_EPSILON) return null;
-  task.minutesRemaining = 0;
-  task.done = true;
+  if (!advanceTask(task, work)) return null;
   state.owner.currentTaskId = null;
   return task;
+}
+
+/** Puts a joiner on a job of work that is not production, at the cost of his production minutes. */
+export function assignWorkerTask(state: GameState, workerId: string, taskId: string): boolean {
+  const worker = state.workers.find((entry) => entry.id === workerId);
+  const task = findTask(state, taskId);
+  if (!worker || !task || task.done) return false;
+  worker.taskId = task.id;
+  task.doneBy = worker.id;
+  return true;
 }
 
 export const AD_HOC_TASK_MINUTES = {

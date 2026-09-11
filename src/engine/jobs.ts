@@ -36,6 +36,11 @@ export function findJob(state: GameState, jobId: string): Job | null {
   return state.jobs.find((job) => job.id === jobId) ?? null;
 }
 
+/** The job the owner is standing at. One source of truth: the job's own assignment. */
+export function ownerJob(state: GameState): Job | null {
+  return state.jobs.find((job) => job.assignedTo === 'owner' && job.stage === 'inProduction') ?? null;
+}
+
 export function openJobs(state: GameState): Job[] {
   return state.jobs.filter((job) => job.stage !== 'completed');
 }
@@ -281,8 +286,8 @@ export function assignJob(state: GameState, jobId: string, workerId: string | nu
   if (worker) {
     worker.jobId = job.id;
   } else {
+    // The owner cannot draw and cut at the same time.
     state.owner.currentTaskId = null;
-    state.owner.productionJobId = job.id;
   }
   job.assignedTo = workerId;
   job.stage = 'inProduction';
@@ -291,7 +296,6 @@ export function assignJob(state: GameState, jobId: string, workerId: string | nu
 
 /** Takes whoever is on the job off it, leaving the work done in place. */
 export function releaseJob(state: GameState, job: Job): void {
-  if (job.assignedTo === 'owner') state.owner.productionJobId = null;
   const worker = state.workers.find((entry) => entry.jobId === job.id);
   if (worker) worker.jobId = null;
   job.assignedTo = null;

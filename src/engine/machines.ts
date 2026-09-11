@@ -3,8 +3,15 @@
 
 import {
   DUST_BANDS,
+  DUST_HIGH_THRESHOLD,
+  DUST_MAX,
+  DUST_PER_PRODUCTION_MINUTE,
   EQUIPMENT_SPECS,
+  EXTRACTOR_BREAKDOWN_CHANCE,
+  EXTRACTOR_BREAKDOWN_CHANCE_HIGH_DUST,
+  EXTRACTOR_BROKEN_DUST_MULTIPLIER,
   HELPER_REQUIRED_FROM_JOINERS,
+  NO_HELPER_DUST_MULTIPLIER,
   NO_HELPER_PRODUCTIVITY_FACTOR,
 } from './constants';
 import type { Equipment, EquipmentSpec, GameState, MaterialKind } from './types';
@@ -92,4 +99,97 @@ export function machineLabourFactor(state: GameState, material: MaterialKind): n
 /** A broken extractor stops every machine in the hall (CLAUDE.md 9.6). */
 export function machinesStopped(state: GameState): boolean {
   return state.equipment.some((item) => item.specId === 'extractor' && item.broken);
+}
+
+// ---------------------------------------------------------------------------
+// Bags, the extractor and dust (CLAUDE.md 9.6, 9.7)
+// ---------------------------------------------------------------------------
+
+/** With the central system there are no bags at all (CLAUDE.md 9.2). */
+export function bagsExist(state: GameState): boolean {
+  if (has(state, 'dustSystem')) return false;
+  return has(state, 'extractor');
+}
+
+/** Machines with a bag that this material runs through. */
+export function bagMachinesFor(state: GameState, material: MaterialKind): Equipment[] {
+  return state.equipment.filter((item) => {
+    const spec = findSpec(item.specId);
+    if (!spec || spec.bagInterval <= 0) return false;
+    return spec.usedOn === null || spec.usedOn === material;
+  });
+}
+
+/** A full bag stops the machine, and nothing of that kind can be made (CLAUDE.md 9.6). */
+export function bagBlocked(state: GameState, material: MaterialKind): boolean {
+  return bagMachinesFor(state, material).some((item) => item.bagFull);
+}
+
+/** Books one minute of use on every machine the job runs through. Returns the bags that just
+ *  filled, so the caller can raise the event. */
+export function accumulateBagMinutes(state: GameState, material: MaterialKind): Equipment[] {
+  if (!bagsExist(state)) return [];
+  const filled: Equipment[] = [];
+  for (const item of bagMachinesFor(state, material)) {
+    if (item.bagFull) continue;
+    const spec = findSpec(item.specId);
+    if (!spec) continue;
+    item.minutesUsed += 1;
+    if (item.minutesUsed >= spec.bagInterval) {
+      item.bagFull = true;
+      filled.push(item);
+    }
+  }
+  return filled;
+}
+
+export function emptyBag(state: GameState, equipmentId: string): void {
+  const item = state.equipment.find((entry) => entry.id === equipmentId);
+  if (!item) return;
+  item.bagFull = false;
+  item.minutesUsed = 0;
+}
+
+/** Dust gained per minute of production, tripled by a broken extractor and doubled when the crew
+ *  is too big for no helper (CLAUDE.md 9.6, 9.7). */
+export function dustGainPerMinute(state: GameState): number {
+  let gain = DUST_PER_PRODUCTION_MINUTE;
+  if (machinesStopped(state)) gain *= EXTRACTOR_BROKEN_DUST_MULTIPLIER;
+  if (helperMissing(state)) gain *= NO_HELPER_DUST_MULTIPLIER;
+  return gain;
+}
+
+export function addDust(state: GameState, minutes: number): void {
+  state.dust = Math.min(DUST_MAX, state.dust + dustGainPerMinute(state) * minutes);
+}
+
+export function clearDust(state: GameState): void {
+  state.dust = 0;
+}
+
+/** Chance the extractor gives up today, higher when the hall is filthy [TUNE]. */
+export function extractorBreakdownChance(state: GameState): number {
+  if (has(state, 'dustSystem')) return 0;
+  if (!has(state, 'extractor')) return 0;
+  return state.dust >= DUST_HIGH_THRESHOLD
+    ? EXTRACTOR_BREAKDOWN_CHANCE_HIGH_DUST
+    : EXTRACTOR_BREAKDOWN_CHANCE;
+}
+
+export function breakExtractor(state: GameState): Equipment | null {
+  const extractor = state.equipment.find((item) => item.specId === 'extractor');
+  if (!extractor || extractor.broken) return null;
+  extractor.broken = true;
+  return extractor;
+}
+
+export function repairExtractor(state: GameState): void {
+  for (const item of state.equipment) {
+    if (item.specId === 'extractor') item.broken = false;
+  }
+}
+
+/** True when the hall is dangerous enough for somebody to get hurt (CLAUDE.md 9.7). */
+export function accidentRisk(state: GameState): boolean {
+  return dustBand(state.dust).label === 'dangerous';
 }

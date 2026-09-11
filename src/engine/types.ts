@@ -42,6 +42,8 @@ export interface EquipmentSpec {
   spriteKey: string;
   /** Minutes of use before the bag is full. 0 means the item has no bag. */
   bagInterval: number;
+  /** The machine only runs on jobs of this material. null means every job. */
+  usedOn: MaterialKind | null;
   /** Multiplies the labour of every job. 1 means no effect. */
   labourFactor: number;
   /** Only applies to jobs of this material kind. null means every job. */
@@ -111,7 +113,6 @@ export interface OwnerState {
   fatigue: number;
   wentHome: boolean;
   currentTaskId: string | null;
-  productionJobId: string | null;
   sickDaysRemaining: number;
   /** Absolute day the next sick leave starts. */
   sickStartDay: number | null;
