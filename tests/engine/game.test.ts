@@ -7,6 +7,7 @@ import {
   POWER_BASE_DAILY,
   UNIT_DEPOSIT,
 } from '../../src/engine/constants';
+import { createTask } from '../../src/engine/tasks';
 import { DEFAULT_OPTIONS as OPTIONS, clearEvents } from '../helpers';
 
 /** What day 1 takes out before the player does anything: deposit, rent, rates, power, living. */
@@ -111,9 +112,9 @@ describe('day boundary', () => {
 
   it('stops the day at the 12 hour hard stop', () => {
     let state = createGame(OPTIONS);
-    // Nothing is running, so the day ends at 16:00 unless the owner is busy. Force the long day by
-    // keeping a task in hand: this stands in until tasks exist, the hard stop is what matters.
-    state.owner.currentTaskId = 'placeholder';
+    // A drawing far too long for one day keeps the owner in past 16:00. Twelve hours is the wall.
+    const design = createTask(state, { kind: 'design', label: 'Endless drawing', minutes: 2000 });
+    state = applyAction(state, { type: 'START_TASK', taskId: design.id });
     state = tick(state, 900);
     expect(state.clock.minute).toBe(720);
     expect(state.activeEvent?.kind).toBe('dayEnd');

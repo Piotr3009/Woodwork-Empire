@@ -13,3 +13,6 @@ helpers in `engine/clock.ts`, and the day, weekend and month rollover in `engine
 
 T1-04 Economy: daily, weekly and monthly cadences, the day 1 deposit, overdraft interest, arrears,
 the bailiff seizure and bankruptcy, with a ledger entry behind every movement of money.
+
+T1-05 Owner and tasks: the 480 minute pool, overtime efficiency, fatigue, the 12 hour hard stop,
+absence, sick leave, `SKIP_DAY`, the task minute curves and the runner that spends owner minutes.

@@ -105,8 +105,8 @@ export interface OwnerState {
   present: boolean;
   minutesByCategory: Record<TaskCategory, number>;
   minutesWorked: number;
-  /** Overtime hours worked today, whole hours completed. */
-  overtimeHours: number;
+  /** Overtime minutes worked today. Drives tomorrow's fatigue. */
+  overtimeMinutes: number;
   /** Efficiency penalty carried from yesterday's overtime, 0 to 1. */
   fatigue: number;
   wentHome: boolean;
@@ -437,4 +437,4 @@ export type GameAction =
   | { type: 'REPAIR_EXTRACTOR' }
   | { type: 'RESOLVE_EVENT'; choiceId: string }
   | { type: 'END_DAY' }
-  | { type: 'STAY_HOME' };
+  | { type: 'SKIP_DAY' };

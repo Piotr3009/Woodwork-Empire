@@ -20,8 +20,23 @@ import { isDayExhausted, isWorkingDay } from './clock';
 import { canAfford, pay, runDayCosts } from './economy';
 import { isPaused, openNextEvent, queueEvent } from './events';
 import { countOf, findSpec, has, specOf } from './machines';
+import {
+  ownerEfficiency,
+  ownerIsAvailable,
+  runOwnerDayStart,
+  setTomorrowFatigue,
+  spendOwnerMinute,
+} from './owner';
 import { makeId } from './rng';
-import type { Difficulty, GameAction, GameState, PeriodTotals, Speed } from './types';
+import {
+  advanceOwnerTask,
+  assignStaffTasks,
+  createDailyTasks,
+  findTask,
+  pauseOwnerTask,
+  startTask,
+} from './tasks';
+import type { Difficulty, GameAction, GameState, PeriodTotals, Speed, TaskInstance } from './types';
 
 export interface NewGameOptions {
   seed: number;
@@ -72,7 +87,7 @@ export function createGame(options: NewGameOptions): GameState {
       present: true,
       minutesByCategory: { admin: 0, design: 0, workshop: 0 },
       minutesWorked: 0,
-      overtimeHours: 0,
+      overtimeMinutes: 0,
       fatigue: 0,
       wentHome: false,
       currentTaskId: null,
@@ -127,7 +142,6 @@ function startDay(state: GameState): void {
   const owner = state.owner;
   owner.minutesByCategory = { admin: 0, design: 0, workshop: 0 };
   owner.minutesWorked = 0;
-  owner.overtimeHours = 0;
   owner.wentHome = false;
   owner.currentTaskId = null;
   owner.productionJobId = null;
@@ -140,11 +154,17 @@ function startDay(state: GameState): void {
     dustAtStart: state.dust,
   };
   runDayCosts(state, state.clock.day);
+  runOwnerDayStart(state);
+  createDailyTasks(state);
+  assignStaffTasks(state);
 }
 
 /** Ends the working day and opens the summary. The player clicks on to the next day. */
 function finishDay(state: GameState): void {
+  pauseOwnerTask(state);
+  setTomorrowFatigue(state);
   state.owner.wentHome = true;
+  state.owner.productionJobId = null;
   queueEvent(state, {
     kind: 'dayEnd',
     title: `End of day ${state.clock.day}`,
@@ -182,7 +202,32 @@ function advanceToNextDay(state: GameState): void {
   startDay(state);
 }
 
+/** What a finished task does to the rest of the world. */
+function applyTaskCompletion(state: GameState, task: TaskInstance): void {
+  switch (task.kind) {
+    default:
+      // Emails, bookkeeping, ordering and staff management only cost minutes.
+      break;
+  }
+  void state;
+}
+
+/** One minute of work, at the clock's current minute, before time moves on. */
+function runMinute(state: GameState): void {
+  const owner = state.owner;
+  if (!ownerIsAvailable(state) || owner.currentTaskId === null) return;
+  const task = findTask(state, owner.currentTaskId);
+  if (!task || task.done) {
+    owner.currentTaskId = null;
+    return;
+  }
+  spendOwnerMinute(state, task.category);
+  const finished = advanceOwnerTask(state, ownerEfficiency(state));
+  if (finished) applyTaskCompletion(state, finished);
+}
+
 function advanceMinute(state: GameState): void {
+  runMinute(state);
   state.clock.minute += 1;
   if (shouldFinishDay(state)) finishDay(state);
   openNextEvent(state);
@@ -225,16 +270,22 @@ export function applyAction(state: GameState, action: GameAction): GameState {
         finishDay(next);
       } else {
         // Going home early counts as absence for the rest of the day (CLAUDE.md 7.2).
+        pauseOwnerTask(next);
         next.owner.wentHome = true;
-        next.owner.currentTaskId = null;
         next.owner.productionJobId = null;
       }
       break;
-    case 'STAY_HOME':
+    case 'SKIP_DAY':
       next.owner.present = false;
       next.owner.stayHome = true;
-      next.owner.currentTaskId = null;
+      pauseOwnerTask(next);
       next.owner.productionJobId = null;
+      break;
+    case 'START_TASK':
+      startTask(next, action.taskId);
+      break;
+    case 'PAUSE_TASK':
+      pauseOwnerTask(next);
       break;
     case 'BUY_EQUIPMENT':
       buyEquipment(next, action.specId);
