@@ -1,0 +1,14 @@
+/* Palette and layout land in T1-12. */
+:root {
+  --page: #22252a;
+  --panel: #2d3138;
+  --text: #e8e6e1;
+}
+
+body {
+  margin: 0;
+  background: var(--page);
+  color: var(--text);
+  font-family: system-ui, sans-serif;
+  font-size: 14px;
+}
