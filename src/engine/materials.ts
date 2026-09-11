@@ -8,9 +8,10 @@ import {
   MATERIAL_FRACTION,
   SHEET_PRICE,
   SHEET_PRICE_STOCK,
+  TEMP_STORAGE_COST,
 } from './constants';
 import { addWorkingDays } from './clock';
-import { pay } from './economy';
+import { canAfford, pay } from './economy';
 import { makeId } from './rng';
 import { createTask, unloadMinutes } from './tasks';
 import type { Delivery, GameState, Job, MaterialMode } from './types';
@@ -96,4 +97,75 @@ export function arriveDeliveries(state: GameState): Delivery[] {
 
 export function materialModeLabel(mode: MaterialMode): string {
   return mode === 'stock' ? 'from stock' : 'ordered per job';
+}
+
+/** Room left on the sheet rack. */
+export function stockFree(state: GameState): number {
+  return Math.max(0, state.stock.capacity - state.stock.sheets);
+}
+
+/** Buying sheets in advance: cheaper per job, but it ties up cash and rack space. */
+export function buyStock(state: GameState, sheets: number): boolean {
+  if (sheets <= 0) return false;
+  const cost = stockCostFor(sheets);
+  if (!canAfford(state, cost)) return false;
+  pay(state, 'material', `${sheets} sheets for stock`, cost);
+  createDelivery(state, null, sheets, false);
+  return true;
+}
+
+/** Sheets come off the lorry. What does not fit on the rack needs a decision (CLAUDE.md 8.9). */
+export function unloadIntoStock(state: GameState, delivery: Delivery): number {
+  const room = stockFree(state);
+  const fitted = Math.min(delivery.sheets, room);
+  state.stock.sheets += fitted;
+  const overflow = delivery.sheets - fitted;
+  delivery.overflowSheets = overflow;
+  delivery.overflowResolved = overflow === 0;
+  return overflow;
+}
+
+/** 150 now, and somebody loses an hour fetching them in the morning (CLAUDE.md 8.9). */
+export function moveOverflowToStorage(state: GameState, delivery: Delivery): void {
+  if (delivery.overflowSheets <= 0) return;
+  pay(state, 'storage', `Temporary storage for ${delivery.overflowSheets} sheets`, TEMP_STORAGE_COST);
+  state.stock.tempStorageSheets += delivery.overflowSheets;
+  delivery.overflowSheets = 0;
+  delivery.overflowResolved = true;
+}
+
+/** Sheets left in the yard overnight are gone in the morning. */
+export function writeOffSheetsLeftOutside(state: GameState): number {
+  let lost = 0;
+  for (const delivery of state.deliveries) {
+    if (delivery.overflowSheets <= 0) continue;
+    lost += delivery.overflowSheets;
+    delivery.overflowSheets = 0;
+    delivery.overflowResolved = true;
+  }
+  if (lost > 0) {
+    // The cash went days ago: this line is the loss, not a payment.
+    writeOffLedger(state, lost);
+  }
+  return lost;
+}
+
+function writeOffLedger(state: GameState, sheets: number): void {
+  const value = stockCostFor(sheets);
+  state.ledger.push({
+    id: makeId(state, 'ledger'),
+    day: state.clock.day,
+    minute: state.clock.minute,
+    category: 'material',
+    label: `${sheets} sheets left outside, written off`,
+    amount: -value,
+    balance: state.cash,
+    unpaid: true,
+  });
+}
+
+/** The hour somebody loses in the morning bringing the stored sheets back. */
+export function fetchFromStorage(state: GameState): void {
+  state.stock.sheets += state.stock.tempStorageSheets;
+  state.stock.tempStorageSheets = 0;
 }

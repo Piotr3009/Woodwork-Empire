@@ -28,3 +28,6 @@ wages, automatic assignment with a manual override, the saw ratio slowdown and t
 
 T1-09 Machines and dust: bag intervals per machine with the stop and the event, extractor breakdown
 and repair, dust accumulation with the bands, cleaning, the helper Friday clean and the accident.
+
+T1-10 Materials: per job and stock purchasing, the bespoke three day wait with its uplift, the sheet
+rack with its capacity, and the overflow decision with both outcomes.

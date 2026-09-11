@@ -18,7 +18,7 @@ import { template } from './catalog';
 import { pay, receive } from './economy';
 import { queueEvent } from './events';
 import { has, machineLabourFactor } from './machines';
-import { materialCostFor, orderMaterialForJob, sheetsForCost } from './materials';
+import { materialCostFor, orderMaterialForJob, sheetsForCost, stockCostFor } from './materials';
 import { applyRating } from './reputation';
 import { makeId } from './rng';
 import {
@@ -221,6 +221,8 @@ export function chargeSiteMeasure(state: GameState, job: Job): void {
 export function onMaterialOrdered(state: GameState, job: Job): void {
   if (job.materialMode === 'stock' && state.stock.sheets >= job.sheets) {
     state.stock.sheets -= job.sheets;
+    // The sheets were paid for when they were bought, at the cheaper stock price.
+    job.materialCost = stockCostFor(job.sheets);
     job.stage = 'ready';
     return;
   }

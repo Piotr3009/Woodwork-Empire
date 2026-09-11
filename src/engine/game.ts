@@ -19,6 +19,7 @@ import {
   SOFTWARE_ONE_OFF_PRICE,
   SOFTWARE_TURN1_TIER,
   STARTING_LAYOUT,
+  TEMP_STORAGE_COST,
   STATE_VERSION,
 } from './constants';
 import { expireEnquiries, refillBoard, refreshLocks } from './board';
@@ -58,7 +59,15 @@ import {
   releaseJob,
   setMaterialMode,
 } from './jobs';
-import { arriveDeliveries, findDelivery } from './materials';
+import {
+  arriveDeliveries,
+  buyStock,
+  fetchFromStorage,
+  findDelivery,
+  moveOverflowToStorage,
+  unloadIntoStock,
+  writeOffSheetsLeftOutside,
+} from './materials';
 import {
   ownerEfficiency,
   ownerIsAvailable,
@@ -220,6 +229,22 @@ function startDay(state: GameState): void {
   runStaffDayStart(state);
   expireEnquiries(state);
   refillBoard(state);
+  const lost = writeOffSheetsLeftOutside(state);
+  if (lost > 0) {
+    queueEvent(state, {
+      kind: 'stockOverflow',
+      title: 'The yard is empty',
+      body: `${lost} sheets left outside overnight have gone. Written off.`,
+      data: { sheets: lost },
+    });
+  }
+  if (state.stock.tempStorageSheets > 0) {
+    createTask(state, {
+      kind: 'fetchStorage',
+      label: `Fetch ${state.stock.tempStorageSheets} sheets from storage`,
+      minutes: AD_HOC_TASK_MINUTES.fetchStorage,
+    });
+  }
   const arriving = arriveDeliveries(state);
   checkOverdueJobs(state);
   for (const delivery of arriving) onDeliveryArrived(state, delivery.jobId);
@@ -398,10 +423,17 @@ function applyTaskCompletion(state: GameState, task: TaskInstance): void {
       repairExtractor(state);
       pay(state, 'repair', 'Extractor repair', EXTRACTOR_REPAIR_COST);
       break;
+    case 'fetchStorage':
+      fetchFromStorage(state);
+      break;
     case 'unload': {
       const delivery = task.deliveryId ? findDelivery(state, task.deliveryId) : null;
       if (delivery) {
         delivery.unloaded = true;
+        if (delivery.jobId === null) {
+          const overflow = unloadIntoStock(state, delivery);
+          if (overflow > 0) raiseStockOverflow(state, delivery, overflow);
+        }
         onDeliveryUnloaded(state, delivery.jobId);
       }
       break;
@@ -499,6 +531,23 @@ function runProductionMinute(state: GameState): void {
   }
 }
 
+/** Sheets that do not fit on the rack: leave them out and lose them, or pay to store them
+ *  (CLAUDE.md 8.9). */
+function raiseStockOverflow(state: GameState, delivery: Delivery, overflow: number): void {
+  queueEvent(state, {
+    kind: 'stockOverflow',
+    title: 'The rack is full',
+    body:
+      `${overflow} sheets do not fit. Left in the yard they will be gone by morning. ` +
+      `Temporary storage is ${TEMP_STORAGE_COST} now and an hour to fetch them back.`,
+    choices: [
+      { id: 'storage', label: `Pay ${TEMP_STORAGE_COST} for storage` },
+      { id: 'outside', label: 'Leave them in the yard' },
+    ],
+    data: { deliveryId: delivery.id, sheets: overflow },
+  });
+}
+
 /** A full bag stops the machine. A helper deals with it for nothing, otherwise somebody has to
  *  give up 15 minutes (CLAUDE.md 9.6). */
 function raiseBagFull(state: GameState, machine: Equipment): void {
@@ -559,6 +608,12 @@ function resolveEvent(state: GameState, choiceId: string): void {
         if (typeof taskId === 'string') startTask(state, taskId);
       }
       break;
+    case 'stockOverflow': {
+      const deliveryId = event.data.deliveryId;
+      const delivery = typeof deliveryId === 'string' ? findDelivery(state, deliveryId) : null;
+      if (delivery && choiceId === 'storage') moveOverflowToStorage(state, delivery);
+      break;
+    }
     case 'bagFull':
     case 'extractorBroken': {
       const taskId = event.data.taskId;
@@ -632,6 +687,9 @@ export function applyAction(state: GameState, action: GameAction): GameState {
       break;
     case 'BUY_SOFTWARE':
       buySoftware(next, action.mode);
+      break;
+    case 'BUY_STOCK':
+      buyStock(next, action.sheets);
       break;
     case 'RESOLVE_EVENT':
       resolveEvent(next, action.choiceId);
