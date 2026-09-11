@@ -1,2 +1,79 @@
-// ui/topbar: filled in a later task of Turn 1.
-export {};
+// The one slim top bar every view shares (CLAUDE.md 10.1). Nothing else lives here.
+
+import { MINUTES_PER_WORKING_DAY, SPEEDS } from '../engine/constants';
+import { formatDate, ownerMinutesLeft } from '../engine/index';
+import type { GameState, Speed } from '../engine/index';
+import { escapeHtml, money } from './modal';
+
+function speedButtons(state: GameState): string {
+  return SPEEDS.map((speed) => {
+    const label = speed === 0 ? 'Pause' : `${speed}x`;
+    const active = state.speed === speed ? ' is-on' : '';
+    return (
+      `<button class="chip${active}" data-do="setSpeed" data-speed="${speed}">` +
+      `${escapeHtml(label)}</button>`
+    );
+  }).join('');
+}
+
+/** Admin grey, design purple, workshop green, the rest free (CLAUDE.md 7.1). */
+function minuteBar(state: GameState): string {
+  const used = state.owner.minutesByCategory;
+  const total = MINUTES_PER_WORKING_DAY;
+  const width = (value: number): string => `${Math.min(100, (value / total) * 100)}%`;
+  return (
+    '<div class="minutes" title="Owner minutes today">' +
+    '<div class="minute-bar">' +
+    `<span class="seg seg-admin" style="width:${width(used.admin)}"></span>` +
+    `<span class="seg seg-design" style="width:${width(used.design)}"></span>` +
+    `<span class="seg seg-workshop" style="width:${width(used.workshop)}"></span>` +
+    '</div>' +
+    `<span class="minute-count">${state.owner.minutesWorked} / ${total} min</span>` +
+    '</div>'
+  );
+}
+
+export function renderTopbar(state: GameState, view: 'hall' | 'office'): string {
+  const net = state.finance.day.income - state.finance.day.costs;
+  const netClass = net > 0 ? 'good' : net < 0 ? 'bad' : 'flat';
+  const away = !state.owner.present
+    ? '<span class="chip is-warn">Owner away</span>'
+    : state.owner.wentHome
+      ? '<span class="chip is-warn">Owner gone home</span>'
+      : '';
+  return (
+    '<div class="topbar">' +
+    `<span class="cash">${money(state.cash)}</span>` +
+    `<span class="net ${netClass}">${net >= 0 ? '+' : ''}${money(net)} today</span>` +
+    `<span class="date">${escapeHtml(formatDate(state.clock))}</span>` +
+    `<span class="speeds">${speedButtons(state)}</span>` +
+    minuteBar(state) +
+    `<span class="left">${ownerMinutesLeft(state)} min of the day left</span>` +
+    away +
+    '<span class="spacer"></span>' +
+    '<button class="chip" data-do="openModal" data-modal="board">Board</button>' +
+    `<button class="chip" data-do="setView" data-view="${view === 'hall' ? 'office' : 'hall'}">` +
+    `${view === 'hall' ? 'Office' : 'Hall'}</button>` +
+    '<button class="chip" data-do="toggleMenu">Menu</button>' +
+    '</div>'
+  );
+}
+
+export function renderMenu(state: GameState): string {
+  const stayHome = state.owner.present
+    ? '<button class="btn" data-do="skipDay">Stay home today</button>'
+    : '<button class="btn" disabled title="Already a day off">Stay home today</button>';
+  return (
+    '<div class="menu-pop">' +
+    '<button class="btn" data-do="endDay">End day</button>' +
+    stayHome +
+    '<button class="btn" data-do="openModal" data-modal="accounting">Accounting</button>' +
+    '</div>'
+  );
+}
+
+export function speedFromString(value: string): Speed {
+  const parsed = Number(value);
+  if (parsed === 1 || parsed === 2 || parsed === 4) return parsed;
+  return 0;
+}

@@ -1,6 +1,5 @@
 import './ui/styles.css';
+import { mount } from './ui/app';
 
 const root = document.querySelector('#app');
-if (root) {
-  root.textContent = 'Woodwork Empire: prototype shell. Views land in T1-12.';
-}
+if (root instanceof HTMLElement) mount(root);
