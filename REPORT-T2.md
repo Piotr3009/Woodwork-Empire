@@ -62,6 +62,10 @@ T2-14 Scenario tests. The three Turn 1 scenarios now assert the Turn 2 clock and
 fourth scripted month hires a poor joiner, buys the shelving, works two jobs off one small rack,
 runs dry, orders transport ten times and ends with the books behind and the accountant paid.
 
+T2-16 Persistence (optional). A Supabase client behind two environment variables, a magic link
+sign in, autosave into slot 1 at every end of day, Save now and Load in the Menu, Continue on the
+start screen, and `supabase/001_saves.sql` for Piotr to run. With no env the feature is dark.
+
 ## 2. Not done or partial
 
 ## 3. Tests

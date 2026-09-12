@@ -49,6 +49,8 @@ import {
   renderModal,
 } from './modal';
 import { renderStart } from './start';
+import { cloudAvailable } from '../cloud/supabase';
+import { hasSave, loadGame, saveGame, sendMagicLink, signOut, signedInEmail } from '../cloud/saves';
 import { renderMenu, renderTopbar, speedFromString } from './topbar';
 
 type ModalId = 'board' | 'laptop' | 'accounting' | 'catalogue' | 'hiring' | 'materials';
@@ -73,6 +75,13 @@ interface Ui {
   showWhy: boolean;
   /** The real life note the player has open, and where he clicked for it. */
   why: { key: string; left: number; top: number } | null;
+  cloud: {
+    available: boolean;
+    email: string;
+    signedIn: string | null;
+    hasSave: boolean;
+    note: string;
+  };
   difficulty: Difficulty;
   playerName: string;
   companyName: string;
@@ -111,6 +120,13 @@ function freshUi(): Ui {
     drag: null,
     showWhy: true,
     why: null,
+    cloud: {
+      available: cloudAvailable(),
+      email: '',
+      signedIn: null,
+      hasSave: false,
+      note: '',
+    },
     difficulty: 'easy',
     playerName: 'Piotr',
     companyName: 'Woodwork Empire',
@@ -124,6 +140,7 @@ function game(): GameState {
 
 function dispatch(action: GameAction): void {
   state = applyAction(game(), action);
+  autosave();
   render();
 }
 
@@ -228,6 +245,7 @@ function screenHtml(): string {
       playerName: ui.playerName,
       companyName: ui.companyName,
       showWhy: ui.showWhy,
+      cloud: ui.cloud,
     });
   }
   const current = state;
@@ -272,7 +290,7 @@ function screenHtml(): string {
   const why = renderWhy();
   return (
     renderTopbar(current, ui.view) +
-    (ui.menuOpen ? renderMenu(current) : '') +
+    (ui.menuOpen ? renderMenu(current, ui.cloud) : '') +
     `<main class="view">${view}${controls}${note}</main>` +
     `<div class="modal-layer">${modals.join('')}</div>${why}`
   );
@@ -563,11 +581,83 @@ function handleAction(element: DataElement, point: { x: number; y: number }): vo
     case 'copyState':
       copyState();
       break;
+    case 'signIn':
+      void runCloud(async () => (await sendMagicLink(ui.cloud.email)).note);
+      break;
+    case 'signOut':
+      void runCloud(async () => {
+        await signOut();
+        return 'Signed out.';
+      });
+      break;
+    case 'saveGame':
+      ui.menuOpen = false;
+      void runCloud(async () => (await saveGame(game())).note);
+      break;
+    case 'loadGame':
+      ui.menuOpen = false;
+      void runCloud(async () => {
+        const result = await loadGame();
+        if (result.state !== null) {
+          state = result.state;
+          ui.screen = 'game';
+        }
+        return result.note;
+      });
+      break;
+    case 'continueGame':
+      void runCloud(async () => {
+        const result = await loadGame();
+        if (result.state !== null) {
+          state = result.state;
+          ui.screen = 'game';
+          accumulator = 0;
+        }
+        return result.note;
+      });
+      break;
     default:
       break;
   }
   void point;
   render();
+}
+
+/** Every cloud call goes through here: it runs, it leaves a line, and it renders again. */
+async function runCloud(work: () => Promise<string>): Promise<void> {
+  if (!ui.cloud.available) return;
+  ui.cloud.note = 'Working.';
+  render();
+  try {
+    ui.cloud.note = await work();
+  } catch {
+    ui.cloud.note = 'The save service did not answer. Try again in a moment.';
+  }
+  await refreshCloud();
+  render();
+}
+
+/** Who is signed in, and is there anything to come back to. */
+async function refreshCloud(): Promise<void> {
+  if (!ui.cloud.available) return;
+  try {
+    ui.cloud.signedIn = await signedInEmail();
+    ui.cloud.hasSave = ui.cloud.signedIn === null ? false : await hasSave();
+  } catch {
+    ui.cloud.signedIn = null;
+    ui.cloud.hasSave = false;
+  }
+}
+
+/** Slot 1 keeps up with the end of every day, once the player is signed in (T2 3.14). */
+let autosavedDay = 0;
+
+function autosave(): void {
+  if (!ui.cloud.available || ui.cloud.signedIn === null || state === null) return;
+  if (state.activeEvent?.kind !== 'dayEnd') return;
+  if (autosavedDay === state.clock.day) return;
+  autosavedDay = state.clock.day;
+  void runCloud(async () => (await saveGame(game())).note);
 }
 
 function newSeed(): number {
@@ -665,6 +755,10 @@ function onInput(event: Event): void {
     return;
   }
   const field = target.dataset.field;
+  if (field === 'cloudEmail') {
+    ui.cloud.email = target.value;
+    return;
+  }
   if (field === 'showWhy') {
     ui.showWhy = target.checked;
     render();
@@ -800,6 +894,7 @@ export function advanceMinutes(wholeMinutes: number): number {
   if (state === null || wholeMinutes <= 0) return 0;
   const result = runMinutes(state, wholeMinutes);
   state = result.state;
+  autosave();
   render();
   return result.minutesRun;
 }
@@ -821,6 +916,7 @@ function frame(now: number): void {
 
 export function mount(element: HTMLElement): void {
   root = element;
+  void refreshCloud().then(render);
   element.addEventListener('click', onClick);
   element.addEventListener('input', onInput);
   element.addEventListener('mousedown', onPointerDown);

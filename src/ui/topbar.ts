@@ -56,7 +56,12 @@ export function renderTopbar(state: GameState, view: 'hall' | 'office'): string 
   );
 }
 
-export function renderMenu(state: GameState): string {
+export interface MenuCloud {
+  available: boolean;
+  signedIn: string | null;
+}
+
+export function renderMenu(state: GameState, cloud: MenuCloud): string {
   const stayHome = state.owner.present
     ? '<button class="btn" data-do="skipDay">Stay home today</button>'
     : '<button class="btn" disabled title="Already a day off">Stay home today</button>';
@@ -67,6 +72,10 @@ export function renderMenu(state: GameState): string {
     `<button class="btn" data-do="toggleWhy">${
       state.showWhy ? 'Hide real-life notes' : 'Show real-life notes'
     }</button>` +
+    (cloud.available && cloud.signedIn !== null
+      ? '<button class="btn" data-do="saveGame">Save now</button>' +
+        '<button class="btn" data-do="loadGame">Load</button>'
+      : '') +
     '</div>'
   );
 }

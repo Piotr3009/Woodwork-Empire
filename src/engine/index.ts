@@ -15,6 +15,7 @@ export * from './types';
 export {
   CLEANING_MINUTES,
   MINUTES_PER_WORKING_DAY,
+  STATE_VERSION,
   WHY,
   SHEET_PRICE_STOCK,
   SHEET_VALUE,
