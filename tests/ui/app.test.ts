@@ -265,6 +265,26 @@ describe('assigning work by hand', () => {
   });
 });
 
+describe('start production', () => {
+  it('takes the owner to the bench, closes the laptop and shows the hall', () => {
+    const state = currentState();
+    expect(state).not.toBeNull();
+    if (state && state.jobs[0]) {
+      state.jobs[0].stage = 'ready';
+      state.jobs[0].assignedTo = null;
+      state.stock.sheets = 20;
+    }
+    click('[data-office="laptop"]');
+    expect(html()).toContain('data-do="startProduction"');
+    click('[data-do="startProduction"]');
+    expect(html()).not.toContain('data-modal="laptop"');
+    expect(html()).toContain('hall-view');
+    expect(currentState()?.jobs[0]?.assignedTo).toBe('owner');
+    expect(currentState()?.jobs[0]?.stage).toBe('inProduction');
+    click('[data-do="setView"][data-view="office"]');
+  });
+});
+
 describe('accounting', () => {
   it('plays blind while the books are behind, and shows everything once they are written up', () => {
     click('[data-office="accounting"]');

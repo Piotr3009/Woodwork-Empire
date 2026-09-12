@@ -153,6 +153,22 @@ export {
   stockIsLow,
 } from './materials';
 
+// Where everybody is standing
+export {
+  PRODUCTION_CYCLE,
+  PRODUCTION_CYCLE_MINUTES,
+  STATION_BENCH,
+  STATION_GATE,
+  STATION_IDLE,
+  STATION_OFFICE,
+  STATION_RACK,
+  cycleStation,
+  machineStation,
+  stationForProduction,
+  stationForTask,
+  stationMachine,
+} from './stations';
+
 // Reputation
 export {
   clampReputation,

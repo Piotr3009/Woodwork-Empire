@@ -105,6 +105,10 @@ function jobAction(job: Job): string {
     }
     return primaryButton('orderTransport', 'Order transport', `data-id="${job.id}"`);
   }
+  // Nobody is on it and the material is in the hall: the owner can go and make it.
+  if ((job.stage === 'ready' || job.stage === 'inProduction') && job.assignedTo === null) {
+    return primaryButton('startProduction', 'Start production', `data-id="${job.id}"`);
+  }
   return '';
 }
 
@@ -118,7 +122,8 @@ function jobRow(state: GameState, job: Job): string {
     `${job.dueDay}${job.stage === 'inProduction' ? ` \u00b7 ${done}% made` : ''}` +
     `${escapeHtml(waiting)}</span>` +
     `<span class="row-figure">${labourCostLine(state, job)}</span>` +
-    (action === '' ? assignControls(state, job) : `<span class="row-action">${action}</span>`) +
+    assignControls(state, job) +
+    (action === '' ? '' : `<span class="row-action">${action}</span>`) +
     '</div>'
   );
 }

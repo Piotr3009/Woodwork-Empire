@@ -202,6 +202,8 @@ describe('a day off with nobody in the hall', () => {
       taskId: null,
       minutesWorked: 0,
       ordersToday: 0,
+      station: 'idle',
+      productionMinutes: 0,
       absentDaysRemaining: 0,
       anchorX: 0,
       anchorY: 4,

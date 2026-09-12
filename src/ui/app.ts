@@ -379,6 +379,13 @@ function handleAction(element: DataElement, point: { x: number; y: number }): vo
     case 'orderTransport':
       dispatch({ type: 'ORDER_TRANSPORT', jobId: id });
       return;
+    case 'startProduction':
+      // Straight to the bench: the laptop closes and the hall comes up (CLAUDE.md T2 3.3).
+      ui.modal = null;
+      ui.modalPosition = null;
+      ui.view = 'hall';
+      dispatch({ type: 'WORK_HERE', jobId: id });
+      return;
     case 'payArrears': {
       const typed = element.dataset.amount ?? 'all';
       dispatch({ type: 'PAY_ARREARS', amount: typed === 'all' ? null : Number(typed) });

@@ -15,6 +15,7 @@ import { addWorkingDays } from './clock';
 import { assignJob, oldestReadyJob } from './jobs';
 import { countOf, findSpec } from './machines';
 import { int, makeId } from './rng';
+import { STATION_IDLE } from './stations';
 import type { GameState, HiringOption, Worker, WorkerRole, WorkerTier } from './types';
 
 /** The roles that have a working day of their own, the way the owner does (CLAUDE.md T2 3.8).
@@ -144,6 +145,8 @@ export function hire(state: GameState, role: WorkerRole, tier: WorkerTier | null
     taskId: null,
     minutesWorked: 0,
     ordersToday: 0,
+    station: STATION_IDLE,
+    productionMinutes: 0,
     absentDaysRemaining: 0,
     anchorX: anchor.x,
     anchorY: anchor.y,

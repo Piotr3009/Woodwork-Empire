@@ -277,6 +277,8 @@ describe('the office working day', () => {
       taskId: null,
       minutesWorked: 0,
       ordersToday: 0,
+      station: 'idle',
+      productionMinutes: 0,
       absentDaysRemaining: 0,
       anchorX: 1,
       anchorY: 1,

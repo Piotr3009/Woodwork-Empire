@@ -123,6 +123,10 @@ export interface OwnerState {
   sickStartDay: number | null;
   /** Player asked to stay home today. */
   stayHome: boolean;
+  /** Where he is standing: bench, machine:<specId>, rack, gate, office or idle. */
+  station: string;
+  /** Minutes of production worked, which drives the bench and machine cycle. */
+  productionMinutes: number;
 }
 
 export interface UnitState {
@@ -152,6 +156,10 @@ export interface Worker {
   minutesWorked: number;
   /** Per job material orders this clerk has put through today. */
   ordersToday: number;
+  /** Where he is standing: bench, machine:<specId>, rack, gate, office or idle. */
+  station: string;
+  /** Minutes of production worked, which drives the bench and machine cycle. */
+  productionMinutes: number;
   absentDaysRemaining: number;
   anchorX: number;
   anchorY: number;

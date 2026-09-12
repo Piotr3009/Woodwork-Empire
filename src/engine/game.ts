@@ -105,6 +105,11 @@ import {
 } from './owner';
 import { chance, int, makeId } from './rng';
 import {
+  STATION_IDLE,
+  stationForProduction,
+  stationForTask,
+} from './stations';
+import {
   autoAssignJobs,
   availableJoiners,
   hasWorkingDay,
@@ -198,6 +203,8 @@ export function createGame(options: NewGameOptions): GameState {
       sickDaysRemaining: 0,
       sickStartDay: null,
       stayHome: false,
+      station: STATION_IDLE,
+      productionMinutes: 0,
     },
     software: { mode: 'none', tier: 'basic', jobsRemaining: 0 },
     stock: { sheets: 0, tempStorageSheets: 0 },
@@ -586,10 +593,42 @@ function delegateTasks(state: GameState): void {
   for (const task of assignStaffTasks(state)) applyTaskCompletion(state, task);
 }
 
+/** Where everybody is standing, worked out from what they are doing (CLAUDE.md T2 3.3). */
+function updateStations(state: GameState): void {
+  const owner = state.owner;
+  if (!ownerIsAvailable(state)) {
+    owner.station = STATION_IDLE;
+  } else if (owner.currentTaskId !== null) {
+    const task = findTask(state, owner.currentTaskId);
+    owner.station = task ? stationForTask(state, task) : STATION_IDLE;
+  } else if (ownerJob(state) !== null) {
+    owner.station = stationForProduction(state, owner.productionMinutes);
+  } else {
+    owner.station = STATION_IDLE;
+  }
+  for (const worker of state.workers) {
+    if (!isWorkingToday(state, worker)) {
+      worker.station = STATION_IDLE;
+      continue;
+    }
+    if (worker.taskId !== null) {
+      const task = findTask(state, worker.taskId);
+      worker.station = task ? stationForTask(state, task) : STATION_IDLE;
+      continue;
+    }
+    const job = worker.jobId ? findJob(state, worker.jobId) : null;
+    worker.station =
+      job && job.stage === 'inProduction'
+        ? stationForProduction(state, worker.productionMinutes)
+        : STATION_IDLE;
+  }
+}
+
 function settle(state: GameState): void {
   refreshLocks(state);
   delegateTasks(state);
   autoAssignJobs(state);
+  updateStations(state);
   openNextEvent(state);
 }
 
@@ -686,6 +725,7 @@ function runProductionMinute(state: GameState): void {
   const atTheBench = state.owner.currentTaskId === null ? ownerJob(state) : null;
   if (atTheBench && ownerIsAvailable(state) && canWorkOn(state, atTheBench)) {
     spendOwnerMinute(state, 'workshop');
+    state.owner.productionMinutes += 1;
     worked = true;
     materials.add(atTheBench.materialKind);
     const minute = (OWNER_LABOUR_PER_MINUTE * ownerEfficiency(state) * hall) /
@@ -708,6 +748,7 @@ function runProductionMinute(state: GameState): void {
         continue;
       }
       if (!canWorkOn(state, job)) continue;
+      worker.productionMinutes += 1;
       worked = true;
       materials.add(job.materialKind);
       const rate = worker.rate * sawRatioFactor(state, worker);

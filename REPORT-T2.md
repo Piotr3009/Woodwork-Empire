@@ -38,6 +38,10 @@ T2-08 Board as tiles. The order board is a full page modal of tiles, three colum
 four at 1600, each carrying the name, the price, the finish, the deadline, the expiry, the sheets,
 the owner days, the tools it needs, and either an Accept button or the reason it is locked.
 
+T2-09 Start production and stations. Every job card carries a Start production button that puts
+the owner on the job and takes the player to the hall, and every figure has a station the engine
+works out: the bench and machine cycle while producing, the gate, the rack, the office or idle.
+
 ## 2. Not done or partial
 
 ## 3. Tests
