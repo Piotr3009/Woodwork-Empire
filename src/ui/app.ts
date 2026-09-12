@@ -42,6 +42,7 @@ import { renderEvent, renderEventFooter } from './eventModal';
 import { renderHiring } from './hiring';
 import { renderLaptop } from './laptop';
 import { renderMachine } from './machine';
+import { renderSpriteCheck } from './spriteCheck';
 import { renderMaterials } from './materials';
 import {
   type ModalPosition,
@@ -67,7 +68,8 @@ type ModalId =
 
 interface Ui {
   screen: 'start' | 'game';
-  view: 'hall' | 'office';
+  /** The sprite check is a page of its own, reached from the Menu (CLAUDE.md T3 3.6). */
+  view: 'hall' | 'office' | 'sprites';
   modal: ModalId | null;
   modalPosition: ModalPosition | null;
   eventPosition: ModalPosition | null;
@@ -311,7 +313,12 @@ function pageHtml(): string {
   const current = state;
   // The last word the company gets is the bankruptcy event, over the game over screen.
   if (current.gameOver) return renderGameOver(current);
-  const view = ui.view === 'hall' ? renderHall(current, ghostFor(current)) : renderOffice(current);
+  const view =
+    ui.view === 'sprites'
+      ? renderSpriteCheck()
+      : ui.view === 'hall'
+        ? renderHall(current, ghostFor(current))
+        : renderOffice(current);
   const controls = ui.view === 'hall' ? hallControls(current) : '';
   const note = ui.note === '' ? '' : `<p class="view-note">${escapeHtml(ui.note)}</p>`;
   return (
@@ -540,6 +547,12 @@ function handleAction(element: DataElement, point: { x: number; y: number }): vo
     case 'setView':
       ui.view = element.dataset.view === 'office' ? 'office' : 'hall';
       if (ui.view !== 'hall') endSetup();
+      break;
+    case 'showSprites':
+      // The acceptance page for the art side, always one click away (CLAUDE.md T3 3.6).
+      endSetup();
+      ui.view = 'sprites';
+      ui.menuOpen = false;
       break;
     case 'startSetup':
       ui.setup = true;

@@ -33,7 +33,10 @@ function minuteBar(state: GameState): string {
   );
 }
 
-export function renderTopbar(state: GameState, view: 'hall' | 'office'): string {
+export function renderTopbar(
+  state: GameState,
+  view: 'hall' | 'office' | 'sprites',
+): string {
   const net = netOf(state.finance.day);
   const blind = booksBehind(state);
   const netClass = blind ? 'flat' : net > 0 ? 'good' : net < 0 ? 'bad' : 'flat';
@@ -72,6 +75,7 @@ export function renderMenu(state: GameState, cloud: MenuCloud): string {
     `<button class="btn" data-do="toggleWhy">${
       state.showWhy ? 'Hide real-life notes' : 'Show real-life notes'
     }</button>` +
+    '<button class="btn" data-do="showSprites">Sprite check</button>' +
     (cloud.available && cloud.signedIn !== null
       ? '<button class="btn" data-do="saveGame">Save now</button>' +
         '<button class="btn" data-do="loadGame">Load</button>'

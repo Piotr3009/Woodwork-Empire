@@ -635,6 +635,76 @@ input.num {
 }
 
 /* --------------------------------------------------------------------------
+   The sprite check page (CLAUDE.md T3 3.6)
+   -------------------------------------------------------------------------- */
+
+.sprite-page {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.sprite-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+}
+
+.sprite-cell {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 8px 10px;
+}
+
+.sprite-pair {
+  align-items: flex-end;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  min-height: 140px;
+  padding: 6px;
+}
+
+.sprite-proof {
+  height: 130px;
+  width: 50%;
+}
+
+.sprite-shot {
+  align-items: flex-end;
+  display: flex;
+  justify-content: center;
+  width: 50%;
+}
+
+.sprite-shot img {
+  display: block;
+  max-height: 130px;
+  max-width: 100%;
+}
+
+.sprite-shot.is-missing {
+  align-items: center;
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
+.sprite-key {
+  color: var(--text);
+  font-size: 13px;
+  margin: 6px 0 2px;
+}
+
+.sprite-figures {
+  color: var(--text-dim);
+  font-size: 11px;
+  margin: 1px 0;
+}
+
+/* --------------------------------------------------------------------------
    The five steps of a job (CLAUDE.md T3 3.1)
    -------------------------------------------------------------------------- */
 

@@ -464,6 +464,21 @@ describe('accounting', () => {
   });
 });
 
+describe('the sprite check page', () => {
+  it('is one click away in the Menu, and the top bar brings the hall back', () => {
+    click('[data-do="toggleMenu"]');
+    expect(html()).toContain('data-do="showSprites"');
+    click('[data-do="showSprites"]');
+    expect(html()).toContain('sprite-grid');
+    expect(html()).toContain('tableSaw.png');
+    expect(html()).toContain('no file');
+    expect(html()).not.toContain('hall-view');
+    click('[data-do="setView"][data-view="hall"]');
+    expect(html()).toContain('hall-view');
+    click('[data-do="setView"][data-view="office"]');
+  });
+});
+
 describe('the style rules of 10.4', () => {
   it('shows one accent button at a time, not one per row', () => {
     click('[data-office="catalogue"]');

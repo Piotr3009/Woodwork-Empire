@@ -101,3 +101,12 @@ Run `npm run dev` and work through this. It is the same path the jsdom smoke tes
    and everything comes back.
 10. Press Set up hall and drag the table saw somewhere else. Green means it fits, red says why not.
     Press Done and the clock starts again. That is the game.
+
+## Sprite check
+
+The Menu has a Sprite check entry. It lists every sprite key the game can draw, with the footprint
+the engine expects, the placeholder box, the picture beside it when there is a file, and the exact
+canvas the art side has to hit. It is the acceptance page of `docs/art/SPRITES.md`.
+
+Put delivered PNG files in `public/sprites/`, then run `npm run sprites:manifest` (the build runs
+it first anyway). With no files the manifest is empty and the game draws its boxes as before.
