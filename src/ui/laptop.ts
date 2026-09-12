@@ -2,6 +2,8 @@
 // (CLAUDE.md 10.1).
 
 import {
+  callsScheduled,
+  callsTaken,
   findJob,
   isWorkingToday,
   joiners,
@@ -135,6 +137,14 @@ function jobAction(state: GameState, job: Job): string {
     : lockedButton(`Start production, ${check.reason}`, check.reason);
 }
 
+/** What the client has rung about, and what rang out (CLAUDE.md T4 3.3). */
+export function callsLine(job: Job): string {
+  const total = callsScheduled(job);
+  if (total === 0) return '';
+  const missed = job.callsMissed > 0 ? `, ${job.callsMissed} missed` : '';
+  return `<span class="row-figure">Calls: ${callsTaken(job)} of ${total} taken${missed}</span>`;
+}
+
 function jobRow(state: GameState, job: Job): string {
   const done = Math.round(jobProgress(job) * 100);
   const waiting = job.blockedBy === '' ? '' : ` · ${job.blockedBy}`;
@@ -146,6 +156,7 @@ function jobRow(state: GameState, job: Job): string {
     `${job.dueDay}${job.stage === 'inProduction' ? ` \u00b7 ${done}% made` : ''}` +
     `${escapeHtml(waiting)}</span>` +
     `<span class="row-figure">${labourCostLine(state, job)}</span>` +
+    callsLine(job) +
     assignControls(state, job) +
     (action === '' ? '' : `<span class="row-action">${action}</span>`) +
     '</div>'

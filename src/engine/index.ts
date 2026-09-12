@@ -106,10 +106,19 @@ export {
 } from './jobs';
 export type { LifecycleStep, StartCheck, StepState } from './jobs';
 
+// Client calls
+export {
+  callRinging,
+  callsForPrice,
+  callsScheduled,
+  callsTaken,
+  dueCall,
+  nextDueCall,
+  penalisedMisses,
+} from './calls';
+
 // Tasks
 export {
-  callsForPrice,
-  clientCallMinutes,
   designMinutes,
   emailsForPrice,
   findTask,
@@ -218,6 +227,7 @@ export { plural } from './text';
 
 // Reputation
 export {
+  callRatingFactor,
   clampReputation,
   emailRatingFactor,
   formatReputation,

@@ -6,14 +6,9 @@ import {
   BOOKKEEPING_MINUTES,
   EMAIL_MINUTES,
   OWN_DELIVERY_MINUTES,
-  CALLS_ABOVE_BREAKS,
-  CALLS_PRICE_BREAKS,
   CLEANING_MINUTES,
   CLERK_ORDERS_PER_DAY,
-  CLIENT_CALL_BASE_MINUTES,
-  CLIENT_CALL_MINUTES_CAP,
-  CLIENT_CALL_MINUTES_PER_1000,
-  CLIENT_CALL_PRICE_STEP,
+  CLIENT_CALL_ANSWER_MINUTES,
   DAILY_ORDERING_MINUTES,
   EMAIL_ABOVE_BREAKS,
   EMAIL_ABOVE_PRICE,
@@ -92,23 +87,6 @@ export const WORK_EPSILON = 1e-9;
 // ---------------------------------------------------------------------------
 // Minute curves
 // ---------------------------------------------------------------------------
-
-/** 2 calls up to 1000, 3 up to 3000, 4 above (CLAUDE.md 8.10). */
-export function callsForPrice(price: number): number {
-  for (const [max, calls] of CALLS_PRICE_BREAKS) {
-    if (price <= max) return calls;
-  }
-  return CALLS_ABOVE_BREAKS;
-}
-
-/** 15 minutes a call up to 1000, then 15 more per further 1000, capped at 200 [TUNE curve]. */
-export function clientCallMinutes(price: number): number {
-  const steps = Math.max(0, Math.ceil(price / CLIENT_CALL_PRICE_STEP) - 1);
-  return Math.min(
-    CLIENT_CALL_MINUTES_CAP,
-    CLIENT_CALL_BASE_MINUTES + steps * CLIENT_CALL_MINUTES_PER_1000,
-  );
-}
 
 /** 30 minutes up to a price of 10000, 200 at 100000, linear between (CLAUDE.md 8.10). */
 export function materialOrderMinutes(price: number): number {
@@ -333,6 +311,33 @@ export function pauseOwnerTask(state: GameState): void {
     if (task && !task.done) task.doneBy = null;
   }
   state.owner.currentTaskId = null;
+  // Putting something down on purpose ends whatever the phone was going to send him back to.
+  state.owner.resumeTaskId = null;
+}
+
+/** The phone goes and the owner picks it up. This is the one thing that comes before the checks
+ *  in `startTaskCheck`: a call is an interruption, so whatever he was holding waits those minutes
+ *  and he goes back to it when the call is over (CLAUDE.md T4 3.3). */
+export function interruptOwnerWith(state: GameState, task: TaskInstance): void {
+  const held = state.owner.currentTaskId;
+  if (held !== null && held !== task.id) {
+    const paused = findTask(state, held);
+    if (paused && !paused.done) paused.doneBy = null;
+    state.owner.resumeTaskId = held;
+  }
+  for (const worker of state.workers) {
+    if (worker.taskId === task.id) worker.taskId = null;
+  }
+  state.owner.currentTaskId = task.id;
+  task.doneBy = 'owner';
+}
+
+/** Back to whatever the phone interrupted. A man at the bench was holding nothing, so he simply
+ *  walks back to the bench. */
+export function resumeOwnerTask(state: GameState): void {
+  const resume = state.owner.resumeTaskId;
+  state.owner.resumeTaskId = null;
+  if (resume !== null) startTask(state, resume);
 }
 
 /** Works one minute into a task. True when it finished. One path for the owner and for staff.
@@ -378,6 +383,7 @@ export function assignWorkerTask(state: GameState, workerId: string, taskId: str
 
 export const AD_HOC_TASK_MINUTES = {
   bagChange: BAG_CHANGE_MINUTES,
+  clientCall: CLIENT_CALL_ANSWER_MINUTES,
   cleaning: CLEANING_MINUTES,
   deliver: OWN_DELIVERY_MINUTES,
   fetchStorage: FETCH_STORAGE_MINUTES,

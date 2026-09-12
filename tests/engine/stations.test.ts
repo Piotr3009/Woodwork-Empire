@@ -85,8 +85,8 @@ describe('where the owner stands', () => {
     state.enquiries = [];
     const enquiry = placeEnquiry(state, { price: 400, deadlineDays: 30 });
     state = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
-    const call = state.tasks.find((task) => task.kind === 'clientCall');
-    state = act(state, { type: 'START_TASK', taskId: call?.id ?? '' });
+    const email = state.tasks.find((task) => task.kind === 'emails');
+    state = act(state, { type: 'START_TASK', taskId: email?.id ?? '' });
     expect(state.owner.station).toBe(STATION_OFFICE);
 
     const unload = createTask(state, { kind: 'unload', label: 'Unload', minutes: 45 });

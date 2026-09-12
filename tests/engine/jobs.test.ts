@@ -20,7 +20,7 @@ import {
   machineLabourFactor,
 } from '../../src/engine/machines';
 import { emailRatingFactor } from '../../src/engine/reputation';
-import { callsForPrice } from '../../src/engine/tasks';
+import { callsForPrice } from '../../src/engine/calls';
 import {
   emailPaymentPenalty,
   findJob,
@@ -46,6 +46,7 @@ import {
   nextDay,
   placeEnquiry,
   runToDay,
+  runToStage,
 } from '../helpers';
 
 /** An Easy game with the day 1 kit bought, a clean board and a full rack. The saw is the budget
@@ -85,15 +86,15 @@ describe('accepting an enquiry', () => {
     expect(state.enquiries.some((enquiry) => enquiry.price === 400)).toBe(false);
   });
 
-  it('puts the calls, the emails and the drawing on the owner', () => {
+  it('puts the emails and the drawing on the owner, and the calls in the diary', () => {
     const state = accept(ready());
     const kinds = state.tasks.filter((task) => task.jobId !== null).map((task) => task.kind);
-    // A 400 job is one email now, not one per call (CLAUDE.md T3 3.2).
-    expect(kinds).toEqual(['clientCall', 'clientCall', 'emails', 'design']);
+    // A 400 job is one email now, not one per call (CLAUDE.md T3 3.2), and the calls are no
+    // longer tasks at all: they ring while the work goes on (CLAUDE.md T4 3.3).
+    expect(kinds).toEqual(['emails', 'design']);
     expect(state.tasks.filter((task) => task.kind === 'emails' && task.minutesTotal === 10))
       .toHaveLength(1);
-    const calls = state.tasks.filter((task) => task.kind === 'clientCall');
-    expect(calls.every((task) => task.minutesTotal === 15)).toBe(true);
+    expect(state.jobs[0]?.calls).toHaveLength(2);
     expect(state.tasks.find((task) => task.kind === 'design')?.minutesTotal).toBe(30);
     expect(state.jobs[0]?.stage).toBe('accepted');
   });
@@ -191,32 +192,18 @@ describe('machine labour reductions', () => {
 });
 
 describe('the order of the lifecycle', () => {
-  it('keeps the material order shut until the calls and the drawing are done', () => {
+  it('keeps the material order shut until the drawing is done, and the calls do not gate it', () => {
     let state = accept(ready());
     expect(state.tasks.some((task) => task.kind === 'materialOrder')).toBe(false);
-    state = doTask(state, 'clientCall');
-    expect(state.tasks.some((task) => task.kind === 'materialOrder')).toBe(false);
-    state = doTask(state, 'clientCall');
-    expect(state.jobs[0]?.callsRemaining).toBe(0);
-    expect(state.tasks.some((task) => task.kind === 'materialOrder')).toBe(false);
+    // Two calls are in the diary and not one of them has been taken (CLAUDE.md T4 3.3).
+    expect(state.jobs[0]?.calls).toHaveLength(2);
     state = doTask(state, 'design');
     expect(state.jobs[0]?.stage).toBe('materialPending');
     expect(state.tasks.some((task) => task.kind === 'materialOrder')).toBe(true);
   });
 
-  it('lets the drawing come before the calls', () => {
-    let state = accept(ready());
-    state = doTask(state, 'design');
-    expect(state.jobs[0]?.stage).toBe('accepted');
-    state = doTask(state, 'clientCall');
-    state = doTask(state, 'clientCall');
-    expect(state.jobs[0]?.stage).toBe('materialPending');
-  });
-
   it('pays for the material when the order goes in and books the lorry for tomorrow', () => {
     let state = accept(ready());
-    state = doTask(state, 'clientCall');
-    state = doTask(state, 'clientCall');
     state = doTask(state, 'design');
     const before = state.cash;
     state = doTask(state, 'materialOrder');
@@ -229,8 +216,6 @@ describe('the order of the lifecycle', () => {
 
   it('brings the lorry in the next morning and asks for the unloading', () => {
     let state = accept(ready());
-    state = doTask(state, 'clientCall');
-    state = doTask(state, 'clientCall');
     state = doTask(state, 'design');
     state = doTask(state, 'materialOrder');
     const events: GameEvent[] = [];
@@ -313,11 +298,11 @@ describe('late delivery', () => {
     state = doAllEmails(state);
     state.clock.day = 1 + daysLate;
     state = act(state, { type: 'WORK_HERE', jobId: null });
-    state = clearEvents(tick(state, 240));
+    state = runToStage(state, 'awaitingTransport');
     state = act(state, { type: 'ORDER_TRANSPORT', jobId: firstJob(state).id });
     // With a van it is a question of whose 90 minutes it is. The owner takes it himself.
     state = act(state, { type: 'RESOLVE_EVENT', choiceId: 'owner' });
-    return clearEvents(tick(state, OWN_DELIVERY_MINUTES));
+    return runToStage(state, 'completed');
   }
 
   it('takes 5% of the price a day out of the balance', () => {
@@ -360,14 +345,13 @@ describe('scenario: garage shelves on Easy', () => {
     const start = ready();
     const cashBefore = start.cash;
     let state = accept(start, 400);
-    // Day 1: two calls, one email, the drawing, the material order.
-    state = doTask(state, 'clientCall');
-    state = doTask(state, 'clientCall');
+    // Day 1: one email, the drawing, the material order. The calls are in the diary and ring
+    // when they ring: they are not desk work any more (CLAUDE.md T4 3.3).
     state = doAllEmails(state);
     state = doTask(state, 'design');
     state = doTask(state, 'materialOrder');
-    expect(state.clock.minute).toBe(15 + 15 + 10 + 30 + 30);
-    expect(state.owner.minutesByCategory.admin).toBe(70);
+    expect(state.clock.minute).toBe(10 + 30 + 30);
+    expect(state.owner.minutesByCategory.admin).toBe(40);
     expect(state.owner.minutesByCategory.design).toBe(30);
     // Day 2: the lorry, the unloading, then the bench.
     const events: GameEvent[] = [];
@@ -377,7 +361,7 @@ describe('scenario: garage shelves on Easy', () => {
     expect(state.clock.minute).toBe(45);
     expect(state.jobs[0]?.stage).toBe('ready');
     state = act(state, { type: 'WORK_HERE', jobId: null });
-    state = tick(state, 240);
+    state = runToStage(state, 'awaitingTransport');
     expect(state.jobs[0]?.stage).toBe('awaitingTransport');
     // Day 2: the courier is booked, and the client has it on day 3.
     state = act(clearEvents(state), { type: 'ORDER_TRANSPORT', jobId: state.jobs[0]?.id ?? '' });
@@ -593,8 +577,6 @@ describe('emails nobody answered', () => {
 
   it('never holds the material order up', () => {
     let state = accept(ready(), 400);
-    state = doTask(state, 'clientCall');
-    state = doTask(state, 'clientCall');
     state = doTask(state, 'design');
     expect(firstJob(state).stage).toBe('materialPending');
     expect(state.tasks.some((task) => task.kind === 'emails' && !task.done)).toBe(true);

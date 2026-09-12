@@ -147,6 +147,8 @@ export interface OwnerState {
   fatigue: number;
   wentHome: boolean;
   currentTaskId: string | null;
+  /** What the phone interrupted, so he goes back to it when the call is over (T4 3.3). */
+  resumeTaskId: string | null;
   sickDaysRemaining: number;
   /** Absolute day the next sick leave starts. */
   sickStartDay: number | null;
@@ -276,7 +278,10 @@ export interface Job {
   finishedDay: number | null;
   /** Transport is booked and the piece leaves on this day. Null while nothing is booked. */
   deliverOnDay: number | null;
-  callsRemaining: number;
+  /** The calls the client makes about this job, in the diary (CLAUDE.md T4 3.3). */
+  calls: ClientCall[];
+  /** Calls nobody picked up. The first is free, every one after it costs. */
+  callsMissed: number;
   designMinutesRemaining: number;
   assignedTo: string | null;
   completedDay: number | null;
@@ -288,6 +293,17 @@ export interface Job {
   emailsUnanswered: number;
   rating: number | null;
   overdueWarned: boolean;
+}
+
+/** One call from the client: when he rings, and what happened when he did. */
+export interface ClientCall {
+  /** Absolute day he rings on. */
+  day: number;
+  /** Minute of the working day he rings at. */
+  minute: number;
+  state: 'waiting' | 'taken' | 'missed';
+  /** The second attempt after a missed call. The same call trying again, not a call of its own. */
+  retry: boolean;
 }
 
 export interface Delivery {
@@ -359,7 +375,8 @@ export type GameEventKind =
   | 'jobOverdue'
   | 'lateAccounts'
   | 'jobAtGate'
-  | 'jobPaid';
+  | 'jobPaid'
+  | 'clientCall';
 
 export interface GameEventChoice {
   id: string;

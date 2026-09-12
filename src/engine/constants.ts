@@ -18,7 +18,7 @@ import type {
 /** Bumped in Turn 3: a machine now carries its class, its hours and the hours it has in it, and
  *  a task carries the day it was finished. A Turn 2 save has none of those, so the loader refuses
  *  it rather than opening a game with half a workshop in it (CLAUDE.md T3 3.5, 3.3). */
-export const STATE_VERSION = 2;
+export const STATE_VERSION = 3;
 
 // ---------------------------------------------------------------------------
 // 6. Time
@@ -301,11 +301,13 @@ export const LATE_ACCOUNTS_CHARGE = 100;
 export const DAILY_ORDERING_MINUTES = 60;
 /** 10 minutes per joiner per day (PIOTR). */
 export const STAFF_MANAGEMENT_MINUTES_PER_JOINER = 10;
-/** [TUNE curve] 15 minutes per call up to a price of 1000, then 15 more per further 1000, capped. */
-export const CLIENT_CALL_BASE_MINUTES = 15;
-export const CLIENT_CALL_MINUTES_PER_1000 = 15;
-export const CLIENT_CALL_MINUTES_CAP = 200;
-export const CLIENT_CALL_PRICE_STEP = 1000;
+/** A call is 15 minutes of whoever takes it, whatever the job is worth (PIOTR, T4 3.3). */
+export const CLIENT_CALL_ANSWER_MINUTES = 15;
+/** The first call a job loses is free. From the second on, each takes a tenth off what the client
+ *  will say about the job (PIOTR) and a point off the rating itself [TUNE]. */
+export const CALL_MISSES_FREE = 1;
+export const CALL_SATISFACTION_PENALTY = 0.1;
+export const CALL_RATING_PENALTY = 1;
 /** 2 to 3 calls per job (PIOTR): 2 up to 1000, 3 up to 3000, 4 above. */
 export const CALLS_PRICE_BREAKS: Array<[number, number]> = [
   [1000, 2],

@@ -19,7 +19,7 @@ import {
   templatesForReputation,
 } from '../../src/engine/catalog';
 import { clampReputation, ratingFor, reputationTier } from '../../src/engine/reputation';
-import { callsForPrice } from '../../src/engine/tasks';
+import { callsForPrice } from '../../src/engine/calls';
 import type { Job } from '../../src/engine/index';
 import { act, newGame } from '../helpers';
 
@@ -49,7 +49,8 @@ function job(partial: Partial<Job>): Job {
     deliverOnDay: null,
     dueDay: 11,
     stage: 'completed',
-    callsRemaining: 0,
+    calls: [],
+    callsMissed: 0,
     designMinutesRemaining: 0,
     assignedTo: null,
     completedDay: 11,

@@ -22,6 +22,7 @@ import {
   STATE_VERSION,
 } from './constants';
 import { expireEnquiries, refillBoard, refreshLocks } from './board';
+import { missCall, nextDueCall, takeCall } from './calls';
 import { canPlaceSpec, firstFreeTile, moveItem } from './layout';
 import { daysBetween, isDayExhausted, isOvertime, isWorkingDay, weekOfDay, weekday } from './clock';
 import {
@@ -133,7 +134,9 @@ import {
   createDailyTasks,
   createTask,
   findTask,
+  interruptOwnerWith,
   pauseOwnerTask,
+  resumeOwnerTask,
   startTask,
 } from './tasks';
 import type {
@@ -147,6 +150,7 @@ import type {
   GameState,
   Speed,
   TaskInstance,
+  Worker,
 } from './types';
 
 
@@ -202,6 +206,7 @@ export function createGame(options: NewGameOptions): GameState {
       fatigue: 0,
       wentHome: false,
       currentTaskId: null,
+      resumeTaskId: null,
       sickDaysRemaining: 0,
       sickStartDay: null,
       stayHome: false,
@@ -265,6 +270,7 @@ function startDay(state: GameState): void {
   owner.minutesWorked = 0;
   owner.wentHome = false;
   owner.currentTaskId = null;
+  owner.resumeTaskId = null;
   owner.present = true;
   owner.stayHome = false;
   state.dayStats = {
@@ -522,6 +528,9 @@ function applyTaskCompletion(state: GameState, task: TaskInstance): void {
   const job = task.jobId ? findJob(state, task.jobId) : null;
   switch (task.kind) {
     case 'clientCall':
+      // The phone is down: back to whatever it took him off (CLAUDE.md T4 3.3).
+      resumeOwnerTask(state);
+      break;
     case 'design':
       if (job) refreshJob(state, job);
       break;
@@ -830,7 +839,63 @@ function raiseBagFull(state: GameState, machine: Equipment): void {
   });
 }
 
+/** The minutes a call takes out of whoever answers it. */
+function createCallTask(state: GameState, job: Job): TaskInstance {
+  return createTask(state, {
+    kind: 'clientCall',
+    label: `Client call: ${job.name}`,
+    minutes: AD_HOC_TASK_MINUTES.clientCall,
+    jobId: job.id,
+  });
+}
+
+/** A salesman on the books and with a day left in him takes every call without being asked
+ *  (CLAUDE.md T4 3.3). */
+function callTaker(state: GameState): Worker | null {
+  return (
+    state.workers.find(
+      (worker) =>
+        worker.role === 'salesman' &&
+        isWorkingToday(state, worker) &&
+        staffMinutesLeft(worker) > 0,
+    ) ?? null
+  );
+}
+
+/** The client rings. Nothing is held up by it: the phone simply goes, and the owner answers or
+ *  lets it ring (CLAUDE.md T4 3.3). Nobody in the office means nobody to ring: the call waits for
+ *  a day somebody is in, rather than being missed behind the player's back. */
+function ringDueCalls(state: GameState): void {
+  if (state.activeEvent !== null) return;
+  const due = nextDueCall(state);
+  if (due === null) return;
+  const salesman = callTaker(state);
+  if (salesman) {
+    takeCall(due.job, due.index);
+    createCallTask(state, due.job);
+    return;
+  }
+  if (!ownerIsAvailable(state)) return;
+  const missedLine =
+    due.job.callsMissed > 0
+      ? ` You have already let ${plural(due.job.callsMissed, 'call', 'calls')} ring out on this one.`
+      : '';
+  queueEvent(state, {
+    kind: 'clientCall',
+    title: `Client calling: ${due.job.name}`,
+    body:
+      'The client is on the phone about his job. Whatever you are on waits while you talk to ' +
+      `him.${missedLine}`,
+    choices: [
+      { id: 'answer', label: `Answer, ${AD_HOC_TASK_MINUTES.clientCall} min` },
+      { id: 'ignore', label: 'Let it ring' },
+    ],
+    data: { jobId: due.job.id, call: due.index },
+  });
+}
+
 function advanceMinute(state: GameState): void {
+  ringDueCalls(state);
   // He cannot be on the laptop and at the bench in the same minute, so a task that finishes this
   // minute keeps him off production until the next one.
   const onTask = state.owner.currentTaskId !== null;
@@ -893,6 +958,20 @@ function resolveEvent(state: GameState, choiceId: string): void {
         (entry) => entry.kind === 'deliver' && entry.jobId === jobId && !entry.done,
       );
       if (task) delegateAdHocTask(state, task, choiceId);
+      break;
+    }
+    case 'clientCall': {
+      const jobId = event.data.jobId;
+      const index = event.data.call;
+      const job = typeof jobId === 'string' ? findJob(state, jobId) : null;
+      if (!job || typeof index !== 'number') break;
+      if (choiceId === 'answer') {
+        takeCall(job, index);
+        // A call comes before whatever he is holding: that is what an interruption is.
+        interruptOwnerWith(state, createCallTask(state, job));
+      } else {
+        missCall(state, job, index);
+      }
       break;
     }
     case 'bagFull':

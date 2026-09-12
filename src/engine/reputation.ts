@@ -2,6 +2,8 @@
 // rating a client leaves when a job closes.
 
 import {
+  CALL_RATING_PENALTY,
+  CALL_SATISFACTION_PENALTY,
   EMAIL_RATING_PENALTY,
   RATING_BY_HAND,
   RATING_EXPRESS_ON_TIME,
@@ -11,6 +13,7 @@ import {
   REPUTATION_MIN,
   REPUTATION_TIERS,
 } from './constants';
+import { penalisedMisses } from './calls';
 import type { GameState, Job } from './types';
 
 /** Index into the tier tables: 0 for a new company, then 1 and 2 as the ratings come in. */
@@ -47,11 +50,20 @@ export function emailRatingFactor(unanswered: number): number {
   return Math.max(0, 1 - EMAIL_RATING_PENALTY * unanswered);
 }
 
+/** Calls nobody answered eat into the same thing the emails do, from the second miss on
+ *  (CLAUDE.md T4 3.3). Like the emails, it only ever reduces a gain. */
+export function callRatingFactor(missed: number): number {
+  return Math.max(0, 1 - CALL_SATISFACTION_PENALTY * penalisedMisses(missed));
+}
+
 /** Applies the rating and hands back the change, for the event body. */
 export function applyRating(state: GameState, job: Job): number {
   const raw = ratingFor(job);
-  const rating =
-    raw > 0 ? Math.round(raw * emailRatingFactor(job.emailsUnanswered) * 100) / 100 : raw;
+  const share = emailRatingFactor(job.emailsUnanswered) * callRatingFactor(job.callsMissed);
+  const scaled = raw > 0 ? raw * share : raw;
+  // And every one of those missed calls is a point off in its own right [TUNE].
+  const missed = penalisedMisses(job.callsMissed) * CALL_RATING_PENALTY;
+  const rating = Math.round((scaled - missed) * 100) / 100;
   job.rating = rating;
   state.reputation = clampReputation(state.reputation + rating);
   return rating;

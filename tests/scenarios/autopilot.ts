@@ -9,7 +9,8 @@ export function answer(state: GameState): string {
   const event = state.activeEvent;
   if (!event) return 'ok';
   const ids = event.choices.map((choice) => choice.id);
-  for (const preferred of ['unload', 'owner', 'storage', 'next', 'ok']) {
+  // The scripted owner is a careful one: he picks the phone up (CLAUDE.md T4 3.3).
+  for (const preferred of ['answer', 'unload', 'owner', 'storage', 'next', 'ok']) {
     if (ids.includes(preferred)) return preferred;
   }
   return ids[0] ?? 'ok';
@@ -80,10 +81,10 @@ export const SHORT_HANDED: Policy = {
   cleanAbove: 60,
   wanted: ['bookcase', 'garageShelves'],
   hireJoiner: true,
-  // Two jobs drawing off one small rack is how a workshop runs itself dry. Ten sheets, not the
-  // twelve of Turn 2: a small job is one email now and the used saw is 5% slower, so the month
-  // runs differently and twelve sheets lasted it out (CLAUDE.md T3 3.2, T3 3.5).
-  stockSheets: 10,
+  // Two jobs drawing off one small rack is how a workshop runs itself dry. Eight sheets, not the
+  // ten of Turn 3: the calls no longer hold the material order up, so every job reaches the rack
+  // sooner and ten sheets lasted it out (CLAUDE.md T4 3.3).
+  stockSheets: 8,
 };
 
 /** A month that spends the money on the best saw there is, to see what it buys (CLAUDE.md T3 4). */

@@ -106,13 +106,16 @@ describe('the first ten minutes', () => {
     expect(state?.jobs[0]?.depositPaid).toBeGreaterThan(0);
   });
 
-  it('5. finds the calls in the laptop and the drawing on the roll beside it', () => {
+  it('5. finds the desk work in the laptop and the drawing on the roll beside it', () => {
     click('[data-do="closeModal"]');
     // Still standing in the office, so the laptop is right there on the desk.
     click('[data-office="laptop"]');
     expect(html()).toContain('Laptop');
     const name = currentState()?.jobs[0]?.name ?? '';
-    expect(html()).toContain('Client call 1 of');
+    // The calls are in the client's diary now, not on the desk (CLAUDE.md T4 3.3).
+    expect(html()).not.toContain('Client call');
+    expect((currentState()?.jobs[0]?.calls ?? []).length).toBeGreaterThan(0);
+    expect(html()).toContain('Calls: 0 of');
     expect(html()).toContain('Email 1 of');
     expect(html()).toContain('Bookkeeping');
     // The drawings moved out of the laptop and onto the desk (CLAUDE.md T3 3.3).
