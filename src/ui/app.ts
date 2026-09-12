@@ -41,13 +41,11 @@ import { renderAccounting } from './accounting';
 import { renderBoard } from './board';
 import { renderCatalogue } from './catalogue';
 import { renderDayEnd, renderGameOver } from './dayEnd';
-import { renderDrawings } from './drawings';
 import { renderEvent, renderEventFooter } from './eventModal';
-import { renderHiring } from './hiring';
-import { renderLaptop } from './laptop';
+import { type LaptopTab, laptopTabFrom, renderLaptop } from './laptop';
 import { renderMachine } from './machine';
 import { renderSpriteCheck } from './spriteCheck';
-import { renderMaterials } from './materials';
+import { renderWorkPlan } from './workPlan';
 import {
   type ModalPosition,
   type ModalSpec,
@@ -63,14 +61,9 @@ import { cloudAvailable } from '../cloud/supabase';
 import { hasSave, loadGame, saveGame, sendMagicLink, signOut, signedInEmail } from '../cloud/saves';
 import { renderMenu, renderTopbar, speedFromString } from './topbar';
 
-type ModalId =
-  | 'board'
-  | 'laptop'
-  | 'drawings'
-  | 'accounting'
-  | 'catalogue'
-  | 'hiring'
-  | 'materials';
+/** The modals the room can open. Materials, Team and Drawings are tabs inside the laptop now:
+ *  one path per modal, only the entry moved (docs/art/SPRITES.md 8.4). */
+type ModalId = 'board' | 'laptop' | 'workPlan' | 'accounting' | 'catalogue';
 
 interface Ui {
   screen: 'start' | 'game';
@@ -86,6 +79,8 @@ interface Ui {
   focusNext: string | null;
   stockSheets: string;
   arrearsAmount: string;
+  /** Which tab of the laptop is on top (CLAUDE.md T4 3.1). */
+  laptopTab: LaptopTab;
   /** The family whose classes are on screen, over whatever else is open (CLAUDE.md T3 3.5). */
   machine: string | null;
   machinePosition: ModalPosition | null;
@@ -111,11 +106,9 @@ interface Ui {
 const MODAL_TITLES: Record<ModalId, string> = {
   board: 'Order board',
   laptop: 'Laptop',
-  drawings: 'Drawings',
+  workPlan: 'Work Plan',
   accounting: 'Accounting',
   catalogue: 'Equipment catalogue',
-  hiring: 'Team board',
-  materials: 'Materials and stock',
 };
 
 let ui: Ui = freshUi();
@@ -137,6 +130,7 @@ function freshUi(): Ui {
     focusNext: null,
     stockSheets: '6',
     arrearsAmount: '500',
+    laptopTab: 'tasks',
     machine: null,
     machinePosition: null,
     setup: false,
@@ -177,17 +171,13 @@ function modalBody(id: ModalId, current: GameState): string {
     case 'board':
       return renderBoard(current, ui.filters.board ?? '');
     case 'laptop':
-      return renderLaptop(current);
-    case 'drawings':
-      return renderDrawings(current);
+      return renderLaptop(current, { tab: ui.laptopTab, stockSheets: ui.stockSheets });
+    case 'workPlan':
+      return renderWorkPlan(current);
     case 'accounting':
       return renderAccounting(current, ui.arrearsAmount);
     case 'catalogue':
       return renderCatalogue(current, ui.filters.catalogue ?? '');
-    case 'hiring':
-      return renderHiring(current);
-    case 'materials':
-      return renderMaterials(current, ui.stockSheets);
   }
 }
 
@@ -270,6 +260,21 @@ function hallControls(current: GameState): string {
   );
 }
 
+/** These two match `.topbar` and `.view` in styles.css. The room is scaled in code, so the two
+ *  numbers have to agree with the stylesheet (docs/art/SPRITES.md 8.1). */
+const TOPBAR_HEIGHT = 45;
+const VIEW_PADDING = 12;
+
+/** The room the office has under the top bar, in CSS pixels. */
+function officeViewport(): { width: number; height: number } {
+  const width = typeof window === 'undefined' ? 1280 : window.innerWidth;
+  const height = typeof window === 'undefined' ? 800 : window.innerHeight;
+  return {
+    width: Math.max(1, width - VIEW_PADDING * 2),
+    height: Math.max(1, height - TOPBAR_HEIGHT - VIEW_PADDING * 2),
+  };
+}
+
 /** The little popover behind an "i" link (CLAUDE.md T2 3.12). */
 function renderWhy(): string {
   const open = ui.why;
@@ -295,7 +300,7 @@ function modalSpecs(): ModalSpec[] {
       id: ui.modal,
       title: MODAL_TITLES[ui.modal],
       body: modalBody(ui.modal, current),
-      wide: ui.modal === 'accounting',
+      wide: ui.modal === 'accounting' || ui.modal === 'workPlan',
       full: ui.modal === 'board',
       position: ui.modalPosition,
     });
@@ -344,7 +349,7 @@ function pageHtml(): string {
       ? renderSpriteCheck()
       : ui.view === 'hall'
         ? renderHall(current, ghostFor(current))
-        : renderOffice(current);
+        : renderOffice(current, officeViewport());
   const controls = ui.view === 'hall' ? hallControls(current) : '';
   const note = ui.note === '' ? '' : `<p class="view-note">${escapeHtml(ui.note)}</p>`;
   return (
@@ -514,25 +519,15 @@ function askUnload(deliveryId: string): void {
   dispatch({ type: 'ASK_UNLOAD', deliveryId });
 }
 
-/** Objects on the desk open their modal beside where the player clicked (CLAUDE.md 10.4). */
-const OFFICE_MODALS: Record<string, ModalId> = {
+/** What each region of the room opens (docs/art/SPRITES.md 8.2 and 8.4). The door is the one
+ *  region that is not a modal: it is the way back into the hall. */
+const OFFICE_REGION_MODALS: Record<string, ModalId> = {
+  workPlan: 'workPlan',
+  orders: 'board',
   laptop: 'laptop',
-  drawings: 'drawings',
-  accounting: 'accounting',
-  materials: 'materials',
   catalogue: 'catalogue',
-  hiring: 'hiring',
-  phone: 'board',
+  binder: 'accounting',
 };
-
-function officeTarget(id: string, point: { x: number; y: number }): void {
-  const modal = OFFICE_MODALS[id];
-  if (modal !== undefined) {
-    openModal(modal, point);
-    return;
-  }
-  if (id === 'desk') ui.note = 'The desk. The laptop goes on it.';
-}
 
 /** Elements in the SVG views are SVGElement, not HTMLElement, but both carry a dataset. */
 type DataElement = HTMLElement | SVGElement;
@@ -611,6 +606,19 @@ function handleAction(element: DataElement, point: { x: number; y: number }): vo
       break;
     case 'openModal':
       openModal((element.dataset.modal ?? 'board') as ModalId, null);
+      break;
+    case 'officeRegion': {
+      const region = element.dataset.office ?? '';
+      if (region === 'door') {
+        ui.view = 'hall';
+        break;
+      }
+      const modal = OFFICE_REGION_MODALS[region];
+      if (modal !== undefined) openModal(modal, null);
+      break;
+    }
+    case 'laptopTab':
+      ui.laptopTab = laptopTabFrom(id);
       break;
     case 'openMachine':
       // The classes of a family fill the page, over the catalogue that sent the player here.
@@ -827,7 +835,7 @@ function copyState(): void {
   ui.note = 'State copied as JSON.';
 }
 
-function handleSceneClick(element: DataElement, point: { x: number; y: number }): boolean {
+function handleSceneClick(element: DataElement): boolean {
   // In setup mode a click on the kit is a drag, not a question about the bag.
   if (ui.setup) return true;
   const room = element.dataset.room;
@@ -862,18 +870,6 @@ function handleSceneClick(element: DataElement, point: { x: number; y: number })
     render();
     return true;
   }
-  const office = element.dataset.office;
-  if (office !== undefined) {
-    const lock = element.dataset.lock;
-    if (lock !== undefined) {
-      ui.note = `${lock} first.`;
-      render();
-      return true;
-    }
-    officeTarget(office, point);
-    render();
-    return true;
-  }
   return false;
 }
 
@@ -891,9 +887,9 @@ function onClick(event: MouseEvent): void {
     handleAction(doer, point);
     return;
   }
-  const scene = dataElement(target.closest('[data-room],[data-van],[data-kit],[data-office]'));
+  const scene = dataElement(target.closest('[data-room],[data-van],[data-kit]'));
   if (scene && state !== null) {
-    handleSceneClick(scene, point);
+    handleSceneClick(scene);
   }
 }
 

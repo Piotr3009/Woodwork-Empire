@@ -69,7 +69,7 @@ describe('a modal keeps its place while the clock runs', () => {
     expect(rows.length).toBeLessThanOrEqual(LEDGER_MAX_ENTRIES);
     state.ledger = rows;
     click('[data-do="setView"][data-view="office"]');
-    click('[data-office="accounting"]');
+    click('[data-office="binder"]');
     expect(body('accounting').innerHTML).toContain('Line 80');
     body('accounting').scrollTop = 500;
     advanceMinutes(1);
@@ -101,7 +101,7 @@ describe('a modal keeps its place while the clock runs', () => {
   });
 
   it('clamps to the new bottom when the content shrinks under the scroll', () => {
-    click('[data-office="accounting"]');
+    click('[data-office="binder"]');
     const shell = body('accounting');
     Object.defineProperty(shell, 'scrollHeight', { configurable: true, value: 200 });
     Object.defineProperty(shell, 'clientHeight', { configurable: true, value: 120 });

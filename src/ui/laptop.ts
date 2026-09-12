@@ -1,37 +1,37 @@
-// The laptop: the design queue and today's office tasks. Everything the owner can start is here
-// (CLAUDE.md 10.1).
+// The laptop on the office desk. Four tabs, because four things the owner does sit inside one
+// machine: the day's jobs of work, the material, the team and the drawings (CLAUDE.md T4 3.1).
+//
+// The jobs on the books moved out to the Work Plan board on the office wall.
 
 import {
-  callsScheduled,
-  callsTaken,
   findJob,
-  isWorkingToday,
-  joiners,
-  jobLabourCost,
-  jobProgress,
   jobsAtGate,
-  lifecycleSteps,
-  openJobs,
   openTasks,
-  showsStartProduction,
   staffMinutesLeft,
-  startProductionCheck,
   startTaskCheck,
-  transportLabel,
   workerById,
 } from '../engine/index';
-import type { GameState, Job, TaskInstance } from '../engine/index';
-import {
-  button,
-  emptyLine,
-  escapeHtml,
-  lockedButton,
-  minutes,
-  money,
-  plural,
-  primaryButton,
-  reasonLabel,
-} from './modal';
+import type { GameState, TaskInstance } from '../engine/index';
+import { renderDrawings } from './drawings';
+import { renderHiring } from './hiring';
+import { gateSection } from './jobCard';
+import { renderMaterials } from './materials';
+import { button, emptyLine, escapeHtml, minutes, money, plural, reasonLabel } from './modal';
+
+/** The four tabs, in the order the contract names them (docs/art/SPRITES.md 8.2). */
+export type LaptopTab = 'tasks' | 'materials' | 'team' | 'drawings';
+
+const TABS: Array<[LaptopTab, string]> = [
+  ['tasks', 'Tasks'],
+  ['materials', 'Materials'],
+  ['team', 'Team'],
+  ['drawings', 'Drawings'],
+];
+
+export function laptopTabFrom(value: string): LaptopTab {
+  const found = TABS.find(([tab]) => tab === value);
+  return found ? found[0] : 'tasks';
+}
 
 /** Who has this one, and how much of his day is left (CLAUDE.md T2 3.8). */
 function onItLine(state: GameState, task: TaskInstance): string {
@@ -73,119 +73,8 @@ function taskRow(state: GameState, task: TaskInstance): string {
   );
 }
 
-/** The informational labour cost of a job in progress comes from the engine (CLAUDE.md 8.5). */
-function labourCostLine(state: GameState, job: Job): string {
-  const { minutes: left, cost } = jobLabourCost(state, job);
-  const worker = job.assignedTo === null ? null : workerById(state, job.assignedTo);
-  if (!worker) return `${minutes(left)} of your own time left`;
-  return `${minutes(left)} of ${escapeHtml(worker.name)}, about ${money(cost)} of wages`;
-}
-
-/** Automatic assignment can always be overridden from the job card (CLAUDE.md 9.4). */
-function assignControls(state: GameState, job: Job): string {
-  if (job.stage !== 'ready' && job.stage !== 'inProduction') return '';
-  const chip = (workerId: string, label: string): string =>
-    `<button class="chip${job.assignedTo === workerId ? ' is-on' : ''}" data-do="assignJob" ` +
-    `data-id="${job.id}" data-worker="${workerId}">${escapeHtml(label)}</button>`;
-  const crew = joiners(state)
-    .filter((worker) => isWorkingToday(state, worker))
-    .map((worker) => chip(worker.id, worker.name))
-    .join('');
-  return `<span class="row-action">${chip('owner', 'You')}${crew}</span>`;
-}
-
-/** Plain English for a job stage. The stage id is never printed at the player. */
-const STAGE_LABELS: Record<Job['stage'], string> = {
-  accepted: 'calls and drawing',
-  materialPending: 'material to order',
-  materialOrdered: 'material ordered',
-  materialInYard: 'material at the gate',
-  ready: 'ready for production',
-  inProduction: 'in production',
-  awaitingTransport: 'awaiting transport',
-  completed: 'delivered',
-};
-
-/** The five steps of the job, so the card answers "what am I waiting for" at a glance. One
- *  helper, used by every card in the game (CLAUDE.md T3 3.1). */
-export function lifecycleRow(state: GameState, job: Job): string {
-  const steps = lifecycleSteps(state, job)
-    .map((step) => `<span class="step is-${step.state}">${escapeHtml(step.label)}</span>`)
-    .join('');
-  return `<span class="steps">${steps}</span>`;
-}
-
-/** The accent button of a job card: start the work, or get the finished piece away. Start
- *  production is on the card from the day the job is accepted, and when it cannot be pressed it
- *  says what is in the way (CLAUDE.md T3 3.1). */
-function jobAction(state: GameState, job: Job): string {
-  if (job.stage === 'awaitingTransport') {
-    if (job.deliverOnDay !== null) {
-      return reasonLabel(`Booked out, leaves day ${job.deliverOnDay}`);
-    }
-    // The van run is a task on somebody's list, so the piece is booked out either way.
-    const inTheVan = state.tasks.some(
-      (task) => task.kind === 'deliver' && task.jobId === job.id && !task.done,
-    );
-    if (inTheVan) return reasonLabel('Booked out, goes in the van');
-    return primaryButton('orderTransport', 'Order transport', `data-id="${job.id}"`);
-  }
-  if (!showsStartProduction(job)) return '';
-  const check = startProductionCheck(state, job);
-  return check.ok
-    ? primaryButton('startProduction', 'Start production', `data-id="${job.id}"`)
-    : lockedButton(`Start production, ${check.reason}`, check.reason);
-}
-
-/** What the client has rung about, and what rang out (CLAUDE.md T4 3.3). */
-export function callsLine(job: Job): string {
-  const total = callsScheduled(job);
-  if (total === 0) return '';
-  const missed = job.callsMissed > 0 ? `, ${job.callsMissed} missed` : '';
-  return `<span class="row-figure">Calls: ${callsTaken(job)} of ${total} taken${missed}</span>`;
-}
-
-function jobRow(state: GameState, job: Job): string {
-  const done = Math.round(jobProgress(job) * 100);
-  const waiting = job.blockedBy === '' ? '' : ` · ${job.blockedBy}`;
-  const action = jobAction(state, job);
-  return (
-    `<div class="row"><span class="row-main">${escapeHtml(job.name)} ${money(job.price)}</span>` +
-    lifecycleRow(state, job) +
-    `<span class="row-figure">${escapeHtml(STAGE_LABELS[job.stage])} \u00b7 due day ` +
-    `${job.dueDay}${job.stage === 'inProduction' ? ` \u00b7 ${done}% made` : ''}` +
-    `${escapeHtml(waiting)}</span>` +
-    `<span class="row-figure">${labourCostLine(state, job)}</span>` +
-    callsLine(job) +
-    assignControls(state, job) +
-    (action === '' ? '' : `<span class="row-action">${action}</span>`) +
-    '</div>'
-  );
-}
-
-/** Everything made and standing in front of the gate (CLAUDE.md T2 3.7). */
-function gateSection(state: GameState): string {
-  const waiting = jobsAtGate(state);
-  if (waiting.length === 0) return emptyLine('Nothing waiting to go out.');
-  return (
-    `<p class="hint">${escapeHtml(transportLabel(state))}.</p>` +
-    waiting
-      .map(
-        (job) =>
-          `<div class="row"><span class="row-main">${escapeHtml(job.name)} ` +
-          `${money(job.price)}</span>` +
-          lifecycleRow(state, job) +
-          `<span class="row-figure">finished day ${job.finishedDay ?? '?'} \u00b7 due day ` +
-          `${job.dueDay}</span>` +
-          `<span class="row-action">${jobAction(state, job)}</span></div>`,
-      )
-      .join('')
-  );
-}
-
-export function renderLaptop(state: GameState): string {
-  // Today's desk: everything still open, and what was finished today. Yesterday's is gone. The
-  // drawings live in their own place on the desk now (CLAUDE.md T3 3.3).
+/** Today's desk: everything still open, and what was finished today. Yesterday's is gone. */
+function tasksTab(state: GameState): string {
   const office = state.tasks.filter(
     (task) =>
       task.category !== 'workshop' &&
@@ -193,19 +82,43 @@ export function renderLaptop(state: GameState): string {
       (!task.done || task.day === state.clock.day),
   );
   const workshop = openTasks(state).filter((task) => task.category === 'workshop');
-  const jobLines = openJobs(state)
-    .map((job) => jobRow(state, job))
-    .join('');
   return (
     '<h3>Office tasks today</h3>' +
-    (office.length === 0 ? emptyLine('Nothing on the desk.') : office.map((task) => taskRow(state, task)).join('')) +
+    (office.length === 0
+      ? emptyLine('Nothing on the desk.')
+      : office.map((task) => taskRow(state, task)).join('')) +
     '<h3>Workshop jobs of work</h3>' +
     (workshop.length === 0
       ? emptyLine('Nothing waiting in the hall.')
       : workshop.map((task) => taskRow(state, task)).join('')) +
     `<h3>At the gate, ${plural(jobsAtGate(state).length, 'piece', 'pieces')}</h3>` +
-    gateSection(state) +
-    '<h3>Jobs on the books</h3>' +
-    (jobLines === '' ? emptyLine('No jobs yet. Open the board.') : jobLines)
+    gateSection(state)
   );
+}
+
+function tabBar(tab: LaptopTab): string {
+  const chips = TABS.map(
+    ([id, label]) =>
+      `<button class="chip${id === tab ? ' is-on' : ''}" data-do="laptopTab" data-id="${id}">` +
+      `${escapeHtml(label)}</button>`,
+  ).join('');
+  return `<div class="tabs">${chips}</div>`;
+}
+
+export interface LaptopView {
+  tab: LaptopTab;
+  /** What the player has typed into the sheet count on the Materials tab. */
+  stockSheets: string;
+}
+
+export function renderLaptop(state: GameState, view: LaptopView): string {
+  const body =
+    view.tab === 'materials'
+      ? renderMaterials(state, view.stockSheets)
+      : view.tab === 'team'
+        ? renderHiring(state)
+        : view.tab === 'drawings'
+          ? renderDrawings(state)
+          : tasksTab(state);
+  return tabBar(view.tab) + body;
 }

@@ -2,10 +2,8 @@
 // The drawings are a roll on the desk, not a list inside the laptop (CLAUDE.md T3 3.3).
 
 import { describe, expect, it } from 'vitest';
-import { DESK_LAYOUT } from '../../src/engine/constants';
 import { renderDrawings } from '../../src/ui/drawings';
 import { renderLaptop } from '../../src/ui/laptop';
-import { renderOffice } from '../../src/render/office';
 import type { GameState } from '../../src/engine/index';
 import { act, buyStartingKit, clearEvents, doTask, newGame, placeEnquiry } from '../helpers';
 
@@ -23,39 +21,29 @@ function withJob(): GameState {
   return clearEvents(state);
 }
 
-describe('the drawings on the desk', () => {
-  it('stands on the desk beside the laptop and opens something', () => {
-    const drawings = DESK_LAYOUT.find((object) => object.id === 'drawings');
-    expect(drawings).toBeDefined();
-    expect(drawings?.spriteKey).toBe('drawings');
-    expect({ width: drawings?.width, depth: drawings?.depth, height: drawings?.height }).toEqual({
-      width: 2,
-      depth: 1,
-      height: 1,
-    });
-    const office = parse(renderOffice(withJob()));
-    expect(office.querySelector('[data-office="drawings"]')).not.toBeNull();
-  });
-
-  it('holds the design queue, and the laptop no longer does', () => {
+describe('the drawings in the laptop', () => {
+  it('is the Drawings tab of the laptop, and the Tasks tab has none of it', () => {
     const state = withJob();
-    const drawings = parse(renderDrawings(state));
-    const laptop = parse(renderLaptop(state));
+    const drawings = parse(renderLaptop(state, { tab: 'drawings', stockSheets: '6' }));
+    const tasks = parse(renderLaptop(state, { tab: 'tasks', stockSheets: '6' }));
     expect(drawings.innerHTML).toContain('Design queue');
     expect(drawings.innerHTML).toContain('Design: Garage shelves');
-    expect(laptop.innerHTML).not.toContain('Design queue');
-    expect(laptop.innerHTML).not.toContain('Design: Garage shelves');
-    // The laptop keeps what CLAUDE.md T3 3.3 leaves it.
-    expect(laptop.innerHTML).toContain('Office tasks today');
-    expect(laptop.innerHTML).toContain('Workshop jobs of work');
-    expect(laptop.innerHTML).toContain('At the gate');
-    expect(laptop.innerHTML).toContain('Jobs on the books');
+    expect(tasks.innerHTML).not.toContain('Design queue');
+    expect(tasks.innerHTML).not.toContain('Design: Garage shelves');
+    // The Tasks tab keeps what CLAUDE.md T3 3.3 and T4 3.1 leave it.
+    expect(tasks.innerHTML).toContain('Office tasks today');
+    expect(tasks.innerHTML).toContain('Workshop jobs of work');
+    expect(tasks.innerHTML).toContain('At the gate');
+    // The jobs on the books hang on the Work Plan board now (CLAUDE.md T4 3.1).
+    expect(tasks.innerHTML).not.toContain('Jobs on the books');
   });
 
   it('says which licence the drawings are being done on', () => {
     const state = withJob();
     expect(parse(renderDrawings(state)).innerHTML).toContain('One off licence');
-    expect(parse(renderLaptop(state)).innerHTML).not.toContain('One off licence');
+    expect(
+      parse(renderLaptop(state, { tab: 'tasks', stockSheets: '6' })).innerHTML,
+    ).not.toContain('One off licence');
   });
 
   it('offers Continue once a drawing has been started, and Start before that', () => {

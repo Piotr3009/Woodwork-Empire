@@ -1,0 +1,162 @@
+// @vitest-environment jsdom
+// The office is a room now: three layers on one canvas, scaled to the page and centred, with
+// transparent click regions and two live texts over them (docs/art/SPRITES.md 8, CLAUDE.md T4 3.1).
+
+import { describe, expect, it } from 'vitest';
+import {
+  OFFICE_CANVAS,
+  OFFICE_LAYERS,
+  OFFICE_REGIONS,
+  OFFICE_TEXTS,
+  officeScale,
+  renderOffice,
+} from '../../src/render/office';
+import { formatTime } from '../../src/engine/clock';
+import { tick } from '../../src/engine/index';
+import { newGame } from '../helpers';
+
+function room(viewport = { width: 1280, height: 800 }, files?: string[]): HTMLElement {
+  const holder = document.createElement('div');
+  holder.innerHTML = renderOffice(newGame(), viewport, files);
+  return holder;
+}
+
+describe('the canvas and the scale', () => {
+  it('is the 1672 by 941 of the contract, and keeps its ratio', () => {
+    expect(OFFICE_CANVAS).toEqual({ width: 1672, height: 941 });
+    const stack = room().querySelector('.office-stack');
+    expect(stack?.getAttribute('style')).toContain('width:1672px');
+    expect(stack?.getAttribute('style')).toContain('height:941px');
+  });
+
+  it('scales to a 1280 by 800 viewport by the width, which is the tighter of the two', () => {
+    expect(officeScale({ width: 1280, height: 800 })).toBeCloseTo(1280 / 1672, 10);
+    expect(room().querySelector('.office-stack')?.getAttribute('data-scale')).toBe(
+      String(Math.round((1280 / 1672) * 10000) / 10000),
+    );
+  });
+
+  it('scales by the height when that is the tighter one, and never crops', () => {
+    const viewport = { width: 2400, height: 800 };
+    expect(officeScale(viewport)).toBeCloseTo(800 / 941, 10);
+    for (const size of [
+      { width: 1280, height: 800 },
+      { width: 2400, height: 800 },
+      { width: 900, height: 1400 },
+    ]) {
+      const scale = officeScale(size);
+      expect(OFFICE_CANVAS.width * scale).toBeLessThanOrEqual(size.width + 1e-9);
+      expect(OFFICE_CANVAS.height * scale).toBeLessThanOrEqual(size.height + 1e-9);
+    }
+  });
+
+  it('carries one scale value, so the regions and the text cannot drift off the artwork', () => {
+    const stack = room().querySelector('.office-stack');
+    const style = stack?.getAttribute('style') ?? '';
+    expect(style).toContain(`scale(${stack?.getAttribute('data-scale')})`);
+    // The regions are in canvas pixels: the stack's own transform is what scales them.
+    const workPlan = room().querySelector('[data-office="workPlan"]');
+    expect(workPlan?.getAttribute('style')).toBe(
+      'left:20px;top:10px;width:365px;height:515px',
+    );
+  });
+});
+
+describe('the layers', () => {
+  it('stacks the three files of the contract, back to front', () => {
+    const layers = Array.from(room().querySelectorAll('.office-layer'));
+    expect(layers.map((layer) => layer.getAttribute('data-layer'))).toEqual(
+      OFFICE_LAYERS.map((layer) => layer.key),
+    );
+  });
+
+  it('shows a flat rectangle with the layer name while the art is not there', () => {
+    const bare = room({ width: 1280, height: 800 }, []);
+    const layers = Array.from(bare.querySelectorAll('.office-layer'));
+    expect(layers).toHaveLength(3);
+    for (const layer of layers) expect(layer.className).toContain('office-placeholder');
+    expect(bare.innerHTML).toContain('Office background');
+    expect(bare.innerHTML).toContain('Office desk');
+    expect(bare.innerHTML).toContain('Office laptop');
+    expect(bare.querySelector('img')).toBeNull();
+    // The room still works: every region and both texts are there without any art at all.
+    expect(bare.querySelectorAll('.office-region')).toHaveLength(OFFICE_REGIONS.length);
+    expect(bare.querySelector('[data-office-text="clock"]')).not.toBeNull();
+    expect(bare.querySelector('[data-office-text="company"]')).not.toBeNull();
+  });
+});
+
+describe('the click regions', () => {
+  it('is the seven rectangles of the contract, at the contract coordinates', () => {
+    expect(OFFICE_REGIONS.map((region) => region.id)).toEqual([
+      'workPlan',
+      'orders',
+      'door',
+      'clock',
+      'laptop',
+      'catalogue',
+      'binder',
+    ]);
+    const boxes = OFFICE_REGIONS.map((region) => [
+      region.id,
+      region.x,
+      region.y,
+      region.width,
+      region.height,
+    ]);
+    expect(boxes).toEqual([
+      ['workPlan', 20, 10, 365, 515],
+      ['orders', 1290, 20, 372, 500],
+      ['door', 640, 15, 305, 585],
+      ['clock', 1040, 88, 122, 58],
+      ['laptop', 558, 449, 557, 443],
+      ['catalogue', 60, 680, 445, 210],
+      ['binder', 1170, 620, 435, 280],
+    ]);
+  });
+
+  it('gives every region that opens something a hook and a tooltip, and no visible frame', () => {
+    const node = room();
+    for (const region of OFFICE_REGIONS) {
+      const element = node.querySelector(`[data-office="${region.id}"]`);
+      expect(element, region.id).not.toBeNull();
+      if (region.opens) {
+        expect(element?.getAttribute('data-do'), region.id).toBe('officeRegion');
+        expect(element?.getAttribute('title'), region.id).toBe(region.name);
+      } else {
+        // The clock is the live clock and opens nothing (docs/art/SPRITES.md 8.2).
+        expect(element?.getAttribute('data-do'), region.id).toBeNull();
+      }
+      expect(element?.textContent, region.id).toBe('');
+    }
+  });
+});
+
+describe('the live text', () => {
+  it('puts the clock and the company name in the blank areas the artwork leaves', () => {
+    const state = tick(newGame(), 95);
+    const holder = document.createElement('div');
+    holder.innerHTML = renderOffice(state, { width: 1280, height: 800 });
+    const clock = holder.querySelector('[data-office-text="clock"]');
+    expect(clock?.textContent).toBe(formatTime(state.clock.minute));
+    expect(clock?.textContent).toBe('09:35');
+    expect(clock?.getAttribute('style')).toBe(
+      `left:${OFFICE_TEXTS.clock.x}px;top:${OFFICE_TEXTS.clock.y}px;` +
+        `width:${OFFICE_TEXTS.clock.width}px;height:${OFFICE_TEXTS.clock.height}px;font-size:28px`,
+    );
+    const company = holder.querySelector('[data-office-text="company"]');
+    expect(company?.textContent).toBe(state.companyName);
+    expect(company?.getAttribute('style')).toContain('font-size:22px');
+  });
+
+  it('prints the company the player named, whatever it is', () => {
+    const holder = document.createElement('div');
+    holder.innerHTML = renderOffice(
+      newGame({ companyName: 'Joinery Core & Sons' }),
+      { width: 1280, height: 800 },
+    );
+    expect(holder.querySelector('[data-office-text="company"]')?.textContent).toBe(
+      'Joinery Core & Sons',
+    );
+  });
+});

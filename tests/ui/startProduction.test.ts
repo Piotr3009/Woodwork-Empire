@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
 // The visible path to work: Start production is on the job card from the day the job is accepted,
-// and it says the one thing that is in the way (CLAUDE.md T3 3.1).
+// and it says the one thing that is in the way (CLAUDE.md T3 3.1). The cards hang on the Work Plan
+// board on the office wall now (CLAUDE.md T4 3.1).
 
 import { describe, expect, it } from 'vitest';
-import { renderLaptop } from '../../src/ui/laptop';
+import { renderWorkPlan } from '../../src/ui/workPlan';
 import type { GameState } from '../../src/engine/index';
 import {
   act,
@@ -18,7 +19,7 @@ import {
 
 function card(state: GameState): HTMLElement {
   const holder = document.createElement('div');
-  holder.innerHTML = renderLaptop(state);
+  holder.innerHTML = renderWorkPlan(state);
   const rows = Array.from(holder.querySelectorAll('.row'));
   const row = rows.find((entry) => entry.querySelector('[data-do="startProduction"], .btn[disabled]'));
   if (!(row instanceof HTMLElement)) throw new Error('no job card with a Start production button');
