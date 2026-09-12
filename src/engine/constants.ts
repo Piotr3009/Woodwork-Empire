@@ -273,8 +273,18 @@ export const TEMP_STORAGE_FETCH_MINUTES = 60;
 // 8.10 Owner tasks
 // ---------------------------------------------------------------------------
 
-/** Emails are per job now, not a daily block: the same count curve as the calls, 10 minutes each
- *  (PIOTR for the curve, [TUNE] for the minutes). */
+/** Emails are per job, not a daily block, and they scale with what the job is worth: 1 up to
+ *  3000, 2 up to 10000, 3 up to 20000, then one more for every further 10000 (PIOTR gave the
+ *  first two bands and the rule above 20000; the 10000 to 20000 band as 3 is Claude's reading,
+ *  reported). Ten minutes each is [TUNE]. */
+export const EMAIL_PRICE_BREAKS: Array<[number, number]> = [
+  [3000, 1],
+  [10000, 2],
+  [20000, 3],
+];
+export const EMAIL_ABOVE_BREAKS = 3;
+export const EMAIL_ABOVE_PRICE = 20000;
+export const EMAIL_ABOVE_PRICE_STEP = 10000;
 export const EMAIL_MINUTES = 10;
 /** Unanswered emails at delivery: 1% of the price each, capped at 5% (PIOTR). */
 export const EMAIL_PAYMENT_PENALTY = 0.01;

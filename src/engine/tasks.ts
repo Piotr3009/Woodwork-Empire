@@ -15,6 +15,10 @@ import {
   CLIENT_CALL_MINUTES_PER_1000,
   CLIENT_CALL_PRICE_STEP,
   DAILY_ORDERING_MINUTES,
+  EMAIL_ABOVE_BREAKS,
+  EMAIL_ABOVE_PRICE,
+  EMAIL_ABOVE_PRICE_STEP,
+  EMAIL_PRICE_BREAKS,
   REPAIR_MINUTES,
   FETCH_STORAGE_MINUTES,
   MATERIAL_ORDER_MINUTES_HIGH,
@@ -138,6 +142,15 @@ export function unloadMinutes(state: GameState): number {
     if (spec && spec.unloadFactor < factor) factor = spec.unloadFactor;
   }
   return Math.round(UNLOAD_BASE_MINUTES * factor);
+}
+
+/** Emails a job carries: 1 up to 3000, 2 up to 10000, 3 up to 20000, then one more for every
+ *  further 10000 (CLAUDE.md T3 3.2). A small job is one email, not three. */
+export function emailsForPrice(price: number): number {
+  for (const [max, emails] of EMAIL_PRICE_BREAKS) {
+    if (price <= max) return emails;
+  }
+  return EMAIL_ABOVE_BREAKS + Math.ceil((price - EMAIL_ABOVE_PRICE) / EMAIL_ABOVE_PRICE_STEP);
 }
 
 /** Minutes one email takes [TUNE]. */

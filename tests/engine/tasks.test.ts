@@ -11,6 +11,7 @@ import {
   createDailyTasks,
   createTask,
   designMinutes,
+  emailsForPrice,
   findTask,
   materialOrderMinutes,
   openTasks,
@@ -20,7 +21,7 @@ import {
 } from '../../src/engine/tasks';
 import { tick } from '../../src/engine/index';
 import type { GameState, ProductTemplate, Worker } from '../../src/engine/index';
-import { act, clearEvents, newGame, runToDay, withLicence } from '../helpers';
+import { act, clearEvents, newGame, placeEnquiry, runToDay, withLicence } from '../helpers';
 
 function template(id: string): ProductTemplate {
   const found = PRODUCT_TEMPLATES.find((entry) => entry.id === id);
@@ -273,5 +274,42 @@ describe('one thing at a time', () => {
     // The first one kept its minutes and nobody is holding it.
     expect(findTask(next, emails.id)?.minutesRemaining).toBe(60);
     expect(findTask(next, emails.id)?.doneBy).toBeNull();
+  });
+});
+
+describe('emails scale with what the job is worth (CLAUDE.md T3 3.2)', () => {
+  it('gives a small job one email and a big one as many as the bands say', () => {
+    expect(emailsForPrice(400)).toBe(1);
+    expect(emailsForPrice(3000)).toBe(1);
+    expect(emailsForPrice(3001)).toBe(2);
+    expect(emailsForPrice(10000)).toBe(2);
+    expect(emailsForPrice(10001)).toBe(3);
+    expect(emailsForPrice(20000)).toBe(3);
+    expect(emailsForPrice(20001)).toBe(4);
+    expect(emailsForPrice(30000)).toBe(4);
+    expect(emailsForPrice(30001)).toBe(5);
+    expect(emailsForPrice(40000)).toBe(5);
+  });
+
+  it('never falls below one and never goes down as the price goes up', () => {
+    let last = 0;
+    for (let price = 100; price <= 100000; price += 100) {
+      const emails = emailsForPrice(price);
+      expect(emails).toBeGreaterThanOrEqual(1);
+      expect(emails).toBeGreaterThanOrEqual(last);
+      last = emails;
+    }
+  });
+
+  it('puts that many on the job, at ten minutes each', () => {
+    let state = withLicence(newGame());
+    state.enquiries = [];
+    const enquiry = placeEnquiry(state, { price: 900, name: 'Bookcase' });
+    state = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+    const emails = state.tasks.filter((task) => task.kind === 'emails');
+    expect(emails).toHaveLength(1);
+    expect(emails.every((task) => task.minutesTotal === 10)).toBe(true);
+    // The calls still follow their own curve, which is not this one.
+    expect(state.tasks.filter((task) => task.kind === 'clientCall')).toHaveLength(2);
   });
 });

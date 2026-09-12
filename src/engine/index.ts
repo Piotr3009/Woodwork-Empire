@@ -100,6 +100,7 @@ export {
   callsForPrice,
   clientCallMinutes,
   designMinutes,
+  emailsForPrice,
   findTask,
   materialOrderMinutes,
   openTasks,

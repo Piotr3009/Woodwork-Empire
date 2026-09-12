@@ -49,6 +49,7 @@ import {
   createTask,
   designMinutes,
   emailMinutes,
+  emailsForPrice,
   jobTasks,
   materialOrderMinutes,
 } from './tasks';
@@ -202,7 +203,7 @@ export function createJobTasks(state: GameState, job: Job): void {
     });
   }
   // Emails ride with the job, in any order with the calls and the drawing, and hold nothing up.
-  const emails = callsForPrice(job.price);
+  const emails = emailsForPrice(job.price);
   for (let index = 0; index < emails; index += 1) {
     createTask(state, {
       kind: 'emails',

@@ -85,9 +85,10 @@ describe('accepting an enquiry', () => {
   it('puts the calls, the emails and the drawing on the owner', () => {
     const state = accept(ready());
     const kinds = state.tasks.filter((task) => task.jobId !== null).map((task) => task.kind);
-    expect(kinds).toEqual(['clientCall', 'clientCall', 'emails', 'emails', 'design']);
+    // A 400 job is one email now, not one per call (CLAUDE.md T3 3.2).
+    expect(kinds).toEqual(['clientCall', 'clientCall', 'emails', 'design']);
     expect(state.tasks.filter((task) => task.kind === 'emails' && task.minutesTotal === 10))
-      .toHaveLength(2);
+      .toHaveLength(1);
     const calls = state.tasks.filter((task) => task.kind === 'clientCall');
     expect(calls.every((task) => task.minutesTotal === 15)).toBe(true);
     expect(state.tasks.find((task) => task.kind === 'design')?.minutesTotal).toBe(30);
@@ -378,14 +379,14 @@ describe('scenario: garage shelves on Easy', () => {
     const start = ready();
     const cashBefore = start.cash;
     let state = accept(start, 400);
-    // Day 1: two calls, two emails, the drawing, the material order.
+    // Day 1: two calls, one email, the drawing, the material order.
     state = doTask(state, 'clientCall');
     state = doTask(state, 'clientCall');
     state = doAllEmails(state);
     state = doTask(state, 'design');
     state = doTask(state, 'materialOrder');
-    expect(state.clock.minute).toBe(15 + 15 + 10 + 10 + 30 + 30);
-    expect(state.owner.minutesByCategory.admin).toBe(80);
+    expect(state.clock.minute).toBe(15 + 15 + 10 + 30 + 30);
+    expect(state.owner.minutesByCategory.admin).toBe(70);
     expect(state.owner.minutesByCategory.design).toBe(30);
     // Day 2: the lorry, the unloading, then the bench.
     const events: GameEvent[] = [];
@@ -574,8 +575,9 @@ describe('the piece at the gate', () => {
 });
 
 describe('emails nobody answered', () => {
+  // A 20000 job carries three emails, which is enough of them to be worth ignoring.
   function delivered(answer: number): GameState {
-    let state = accept(ready(), 2000);
+    let state = accept(ready(), 20000);
     for (let index = 0; index < answer; index += 1) state = doTask(state, 'emails');
     const job = firstJob(state);
     job.stage = 'awaitingTransport';
@@ -586,12 +588,15 @@ describe('emails nobody answered', () => {
     return clearEvents(tick(state, OWN_DELIVERY_MINUTES));
   }
 
-  it('carries the same count curve as the calls', () => {
+  it('carries the count its price asks for, which is not the call curve', () => {
     const emailsFor = (price: number): number =>
       accept(ready(), price).tasks.filter((task) => task.kind === 'emails').length;
-    expect(emailsFor(400)).toBe(callsForPrice(400));
-    expect(emailsFor(2000)).toBe(callsForPrice(2000));
-    expect(emailsFor(5000)).toBe(callsForPrice(5000));
+    expect(emailsFor(400)).toBe(1);
+    expect(emailsFor(2000)).toBe(1);
+    expect(emailsFor(5000)).toBe(2);
+    expect(emailsFor(20000)).toBe(3);
+    // Two calls on a small job, one email: they parted company in Turn 3.
+    expect(callsForPrice(400)).toBe(2);
   });
 
   it('takes 1% of the price off the payment each, capped at 5%', () => {
@@ -604,12 +609,13 @@ describe('emails nobody answered', () => {
   it('reduces the payment and the rating of the job it belongs to', () => {
     const clean = delivered(3);
     expect(firstJob(clean).emailsUnanswered).toBe(0);
-    expect(firstJob(clean).balancePaid).toBe(1000);
+    expect(firstJob(clean).balancePaid).toBe(10000);
     expect(firstJob(clean).rating).toBe(RATING_ON_TIME);
 
     const sloppy = delivered(0);
     expect(firstJob(sloppy).emailsUnanswered).toBe(3);
-    expect(firstJob(sloppy).balancePaid).toBe(1000 - 60);
+    // Three of them, 1% of the price each, off a balance of 10000.
+    expect(firstJob(sloppy).balancePaid).toBe(10000 - 600);
     // The gain is multiplied by 1 less 0.2 per email: 3 by 0.4.
     expect(firstJob(sloppy).rating).toBeCloseTo(RATING_ON_TIME * 0.4, 6);
     expect(emailRatingFactor(5)).toBe(0);
