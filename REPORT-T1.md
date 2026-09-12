@@ -81,20 +81,20 @@ them except the first cut of T1-06, which is named in section 5 below.
 | tasks | tests/engine/tasks.test.ts | 17 |
 | catalogue and reputation | tests/engine/catalog.test.ts | 12 |
 | board | tests/engine/board.test.ts | 18 |
-| jobs | tests/engine/jobs.test.ts | 23 |
+| jobs | tests/engine/jobs.test.ts | 26 |
 | staff | tests/engine/staff.test.ts | 17 |
-| machines, bags, dust | tests/engine/machines.test.ts | 25 |
+| machines, bags, dust | tests/engine/machines.test.ts | 27 |
 | materials | tests/engine/materials.test.ts | 20 |
 | iso projection | tests/render/iso.test.ts | 10 |
 | hall and office SVG | tests/render/views.test.ts | 21 |
 | UI in jsdom | tests/ui/app.test.ts | 18 |
 | 30 day scenarios | tests/scenarios/thirtyDays.test.ts | 10 |
 
-Total 274 tests in 18 files, about 5 seconds. Never run with `--silent`. The three scenario
+Total 279 tests in 18 files, about 5 seconds. Never run with `--silent`. The three scenario
 playthroughs take about 1 second together, well inside the 10 second limit of T1-13.
 
 A fresh clone of this branch passes `npm ci && npm run check`: lint clean, type check and production
-build clean, 274 tests green.
+build clean, 279 tests green.
 
 Command: `npm test`. Gate: `npm run check` (lint, then type check and production build, then tests).
 
@@ -317,8 +317,9 @@ because most of it was the audit: dead state, duplicated predicates and copy pas
 
 ## 10. What the audit found and fixed after the first cut
 
-The report was written, then the whole thing was audited section by section against the contract and
-every finding checked against the code. Twelve held up and are fixed on this branch:
+The report was written, then the whole thing was audited section by section against the contract,
+with a second pass that tried to refute every finding against the code. Ninety findings came out of
+it, 34 held up, and all 34 are fixed on this branch. The first twelve:
 
 1. **The day closed itself at 16:00** whenever the owner had nothing in hand, an end condition the
    contract does not have. It meant the overtime hours of 7.2 could only finish a task already
