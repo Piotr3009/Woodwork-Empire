@@ -42,8 +42,7 @@
   --owner: #5f9c5f;
 }
 
-/* 11 px is the floor for a label and 12 px for a name (CLAUDE.md 10.4, T2 3.11). The views draw
-   at one screen pixel per unit, so nothing here is ever scaled down. */
+/* Base label sizes in scene coordinates. The scene scales uniformly with the viewport. */
 .iso-label {
   font-size: 11px;
   fill: #1c1f24;
@@ -61,7 +60,10 @@
 .hall-view,
 .office-view {
   display: block;
-  margin: 0 auto;
+  flex: 1 1 0;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
 }
 
 .clickable {
@@ -97,6 +99,17 @@ body {
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   font-size: 14px;
   line-height: 1.4;
+}
+
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+}
+
+#app > .topbar {
+  flex-shrink: 0;
 }
 
 h1 {
@@ -305,12 +318,22 @@ input.num {
    -------------------------------------------------------------------------- */
 
 .view {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  min-height: 0;
   overflow: hidden;
   padding: 12px;
 }
 
+.view > .view-note,
+.view > .view-controls {
+  flex-shrink: 0;
+}
+
 .view-controls {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   margin-top: 10px;
 }
