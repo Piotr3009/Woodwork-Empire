@@ -22,8 +22,21 @@ import { template } from './catalog';
 import { nextWorkingDay } from './clock';
 import { chargeUnavoidable, formatMoney, receive } from './economy';
 import { queueEvent } from './events';
-import { has, machineLabourFactor } from './machines';
-import { materialCostFor, orderMaterialForJob, sheetsForCost, stockCostFor } from './materials';
+import {
+  bagBlocked,
+  brokenMachineFor,
+  findSpec,
+  has,
+  hasExtraction,
+  machineLabourFactor,
+} from './machines';
+import {
+  materialCostFor,
+  orderMaterialForJob,
+  rackCanSupply,
+  sheetsForCost,
+  stockCostFor,
+} from './materials';
 import { ownerIsAvailable } from './owner';
 import { applyRating } from './reputation';
 import { makeId } from './rng';
@@ -39,7 +52,7 @@ import {
   jobTasks,
   materialOrderMinutes,
 } from './tasks';
-import type { GameState, Job, MaterialMode } from './types';
+import type { GameState, Job, JobStage, MaterialMode } from './types';
 
 export function findJob(state: GameState, jobId: string): Job | null {
   return state.jobs.find((job) => job.id === jobId) ?? null;
@@ -321,6 +334,109 @@ export function setMaterialMode(state: GameState, jobId: string, mode: MaterialM
 // ---------------------------------------------------------------------------
 // Production
 // ---------------------------------------------------------------------------
+
+/** Everything in the hall that can stop a job, in the order the player would notice it. Empty
+ *  while the job is free to be worked on (CLAUDE.md T2 3.9). */
+export function hallBlock(state: GameState, job: Job): string {
+  if (!job.byHand && !hasExtraction(state)) return 'no extraction';
+  const broken = brokenMachineFor(state, job.materialKind);
+  if (broken && !job.byHand) {
+    return `${(findSpec(broken.specId)?.name ?? 'a machine').toLowerCase()} is broken`;
+  }
+  if (bagBlocked(state, job.materialKind)) return 'bag full';
+  return '';
+}
+
+/** The stages a job can still be sent to the bench from. Once somebody is on it there is nothing
+ *  to start (CLAUDE.md T3 3.1). */
+const STARTABLE_STAGES: JobStage[] = [
+  'accepted',
+  'materialPending',
+  'materialOrdered',
+  'materialInYard',
+  'ready',
+  'inProduction',
+];
+
+/** True while the job card carries a Start production button, pressable or not. */
+export function showsStartProduction(job: Job): boolean {
+  return STARTABLE_STAGES.includes(job.stage) && job.assignedTo === null;
+}
+
+export interface StartCheck {
+  ok: boolean;
+  reason: string;
+}
+
+const CAN_START: StartCheck = { ok: true, reason: '' };
+
+function blocked(reason: string): StartCheck {
+  return { ok: false, reason };
+}
+
+/** When the lorry for this job is due, in the words the player uses for it. */
+function arrivalReason(state: GameState, job: Job): string {
+  const delivery = state.deliveries.find(
+    (entry) => entry.jobId === job.id && !entry.arrived,
+  );
+  if (!delivery) return 'material not ordered';
+  const wait = delivery.arriveDay - state.clock.day;
+  if (wait <= 1) return 'material arrives tomorrow';
+  return `material arrives on day ${delivery.arriveDay}`;
+}
+
+/** Why the owner cannot go and make this one, or that he can. Exactly one reason, the first
+ *  thing in the lifecycle that is in the way (CLAUDE.md T3 3.1). */
+export function startProductionCheck(state: GameState, job: Job): StartCheck {
+  // The stage is the job's place in the lifecycle, so the desk work is only in the way while the
+  // job is still standing at the desk.
+  if (job.stage === 'accepted') {
+    const calls = callsOutstanding(state, job);
+    if (calls > 0) return blocked(plural(calls, 'call to make', 'calls to make'));
+    if (designOutstanding(state, job)) return blocked('design not done');
+    if (measureOutstanding(state, job)) return blocked('site measure not done');
+  }
+  if (job.stage === 'accepted' || job.stage === 'materialPending') {
+    return blocked('material not ordered');
+  }
+  if (job.stage === 'materialOrdered') return blocked(arrivalReason(state, job));
+  if (job.stage === 'materialInYard') return blocked('unload the delivery');
+  if (!rackCanSupply(state, job, jobProgress(job))) return blocked('waiting for material');
+  const hall = hallBlock(state, job);
+  if (hall !== '') return blocked(hall);
+  if (!ownerIsAvailable(state)) return blocked('no free hands');
+  return CAN_START;
+}
+
+export type StepState = 'done' | 'now' | 'todo';
+
+export interface LifecycleStep {
+  label: string;
+  state: StepState;
+}
+
+const LIFECYCLE_LABELS = ['Calls', 'Design', 'Material', 'Delivery', 'Production'];
+
+/** The five steps of a job, so the card answers "what am I waiting for" without being read
+ *  (CLAUDE.md T3 3.1). The first step that is not finished is the one in hand. */
+export function lifecycleSteps(state: GameState, job: Job): LifecycleStep[] {
+  const ordered = job.stage !== 'accepted' && job.stage !== 'materialPending';
+  const done = [
+    ordered || callsOutstanding(state, job) === 0,
+    ordered || (!designOutstanding(state, job) && !measureOutstanding(state, job)),
+    ordered,
+    job.stage === 'ready' ||
+      job.stage === 'inProduction' ||
+      job.stage === 'awaitingTransport' ||
+      job.stage === 'completed',
+    job.stage === 'awaitingTransport' || job.stage === 'completed',
+  ];
+  const now = done.indexOf(false);
+  return LIFECYCLE_LABELS.map((label, index) => ({
+    label,
+    state: done[index] === true ? 'done' : index === now ? 'now' : 'todo',
+  }));
+}
 
 /** The oldest job with its material in the hall and nobody on it. */
 export function oldestReadyJob(state: GameState): Job | null {

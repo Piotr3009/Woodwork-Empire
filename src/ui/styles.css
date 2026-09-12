@@ -592,6 +592,40 @@ input.num {
 }
 
 /* --------------------------------------------------------------------------
+   The five steps of a job (CLAUDE.md T3 3.1)
+   -------------------------------------------------------------------------- */
+
+.steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.step {
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  font-size: 11px;
+  padding: 1px 6px;
+  white-space: nowrap;
+}
+
+.step.is-done {
+  background: var(--good);
+  border-color: var(--good);
+  color: var(--page);
+}
+
+.step.is-now {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.step.is-todo {
+  color: var(--text-dim);
+  opacity: 0.6;
+}
+
+/* --------------------------------------------------------------------------
    Lists, cards and rows
    -------------------------------------------------------------------------- */
 

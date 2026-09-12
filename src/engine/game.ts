@@ -39,19 +39,16 @@ import {
   accidentRisk,
   accumulateBagMinutes,
   addDust,
-  bagBlocked,
   breakExtractor,
   clearDust,
   countOf,
   emptyBag,
   breakMachine,
-  brokenMachineFor,
   extractorBreakdownChance,
   extractorBroken,
   findSpec,
   hallProductivityFactor,
   has,
-  hasExtraction,
   machinesDueService,
   overdueBreakdownChance,
   repairCostFor,
@@ -69,6 +66,7 @@ import {
   checkOverdueJobs,
   deliverJob,
   findJob,
+  hallBlock,
   jobProgress,
   jobSpeedFactor,
   oldestReadyJob,
@@ -683,18 +681,6 @@ function materialReady(state: GameState, job: Job): boolean {
     raiseNoMaterial(state);
   }
   return ok;
-}
-
-/** Everything in the hall that can stop a job, in the order the player would notice it. Empty
- *  while the job is free to be worked on (CLAUDE.md T2 3.9). */
-function hallBlock(state: GameState, job: Job): string {
-  if (!job.byHand && !hasExtraction(state)) return 'no extraction';
-  const broken = brokenMachineFor(state, job.materialKind);
-  if (broken && !job.byHand) {
-    return `${(findSpec(broken.specId)?.name ?? 'a machine').toLowerCase()} is broken`;
-  }
-  if (bagBlocked(state, job.materialKind)) return 'bag full';
-  return '';
 }
 
 /** True when the job can be worked on this minute. Writes down why it cannot, either way. */

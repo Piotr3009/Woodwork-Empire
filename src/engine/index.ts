@@ -77,7 +77,9 @@ export {
 export {
   emailsOutstanding,
   findJob,
+  hallBlock,
   labourValueFor,
+  lifecycleSteps,
   ownerDaysFor,
   jobLabourCost,
   jobsAtGate,
@@ -87,8 +89,11 @@ export {
   jobSpeedFactor,
   openJobs,
   ownerJob,
+  showsStartProduction,
+  startProductionCheck,
   transportLabel,
 } from './jobs';
+export type { LifecycleStep, StartCheck, StepState } from './jobs';
 
 // Tasks
 export {
@@ -147,6 +152,7 @@ export {
   deliveriesOnTheWay,
   materialCostFor,
   materialModeLabel,
+  rackCanSupply,
   rackCapacity,
   sheetsDueFor,
   sheetsForCost,
