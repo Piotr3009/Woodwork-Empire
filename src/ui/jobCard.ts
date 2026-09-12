@@ -31,7 +31,7 @@ import {
 
 /** Plain English for a job stage. The stage id is never printed at the player. */
 const STAGE_LABELS: Record<Job['stage'], string> = {
-  accepted: 'calls and drawing',
+  accepted: 'drawing to do',
   materialPending: 'material to order',
   materialOrdered: 'material ordered',
   materialInYard: 'material at the gate',

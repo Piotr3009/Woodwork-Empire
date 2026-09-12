@@ -994,6 +994,16 @@ input.num {
   color: var(--text);
 }
 
+/* The four tabs of the laptop (CLAUDE.md T4 3.1). */
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 10px;
+  padding: 0 0 10px;
+  border-bottom: 1px solid var(--border);
+}
+
 /* --------------------------------------------------------------------------
    The office room (docs/art/SPRITES.md 8)
    -------------------------------------------------------------------------- */

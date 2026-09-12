@@ -83,7 +83,7 @@ T4-10b `c08c955` A tidy up before the report: the task row control moved out of 
 row primitives, which broke an import cycle between the laptop and the drawings, and the catalogue
 region's tooltip now says what it opens.
 
-T4-11 This report, and twelve defects that came out of writing it and of putting the whole diff
+T4-11 This report, and eighteen defects that came out of writing it and of putting the whole diff
 through a five way adversarial review (contract, correctness, UI, tests, conventions). Every
 finding was checked against the code before it counted. What was fixed:
 
@@ -123,6 +123,21 @@ finding was checked against the code before it counted. What was fixed:
     resize with the clock stopped left the room at the old scale. `mount` listens for a resize.
 12. The company name could never be ellipsised: `text-overflow` does nothing to a flex container's
     own text. It sits in a block inside the box now, which is what SPRITES.md 8.3 asks for.
+13. The office scale was worked out from a copy of the stylesheet's numbers, and `TOPBAR_HEIGHT`
+    matched nothing in it. The room is measured from its own box once it is on the page, so the
+    stylesheet is the authority and no copy of it can be wrong. Checked in the browser: the stack
+    now fits its box exactly, and follows a resize.
+14. The new laptop tab bar had no CSS rule at all, so the four chips butted together.
+15. Switching tabs landed the player part way down the new one, because all four share one modal
+    shell and its scroll memory. A new tab starts at the top; a re-render a minute later still does
+    not, which is what that memory is for.
+16. `clampToViewport` and the anchor parameter of `openModal` died with the desk items: every
+    surviving caller passed null. Both are gone.
+17. The job card called an accepted job "calls and drawing" when the calls stopped gating anything.
+    It says "drawing to do".
+18. The hall banner and the top bar read two different predicates for the same state, so the hall
+    claimed nothing was being made while nobody was carrying the move. The banner is for a move
+    somebody is on; a move merely waiting takes the Set up hall button away and says why.
 
 ---
 
@@ -145,7 +160,7 @@ finding was checked against the code before it counted. What was fixed:
 
 ## 3. Tests
 
-509 pass across 40 files; `npm run check` (lint, build, tests) is green and was green before every
+511 pass across 40 files; `npm run check` (lint, build, tests) is green and was green before every
 commit. 454 was the Turn 3 count, of which two were failing on `main` before tonight (T4-01).
 
 The tests the brief asks for by name:
@@ -266,9 +281,15 @@ Two more lists moved without losing a desk item:
 | List | Where it is now | Other routes |
 |---|---|---|
 | Jobs on the books (was in the laptop) | Work Plan board region | none |
+| Order transport on a finished piece | Work Plan card | the gate list in the laptop's Tasks tab |
 | The hall | Door region | the top bar Hall/Office toggle, and the office block in the hall |
 
-The two rows with a second route are the two the brief names: "Menu keeps Board and Hall/Office
+Order transport is the one route that was not counted: a piece standing at the gate is both on the
+Work Plan board and in the gate list, so its button is drawn twice. That is inherited from the Turn
+3 laptop, which held both lists, and 3.1 says nothing else changes about the jobs list, so it is
+left as it was and put here rather than fixed.
+
+The two rows the brief names are: "Menu keeps Board and Hall/Office
 toggle as before (two ways to the same modal and view are entries, not paths)." Every other modal in
 the game has exactly one way in. `ModalId` is down from seven to five (`board`, `laptop`, `workPlan`,
 `accounting`, `catalogue`): Materials, Team and Drawings are no longer modals of their own at all,
@@ -367,10 +388,11 @@ placeholder box; the sprite check page lists it.
 
 ## 11. Known risks
 
-1. **The office scale is computed in code from two numbers that live in the stylesheet.** Change the
-   top bar padding in `styles.css` and the room letterboxes by a few pixels until the two agree
-   again. The alternative is measuring the DOM every render, which cannot be tested in jsdom. The
-   room is redrawn on a window resize, so the scale follows the window.
+1. **The office scale is worked out twice: once from the window, then again from the room's own
+   box.** The first pass is what the renderer can do before the room exists and what the jsdom
+   tests assert; the second corrects it the moment it is on the page and is what the player sees.
+   In a headless DOM the box measures zero and the first pass stands, so the tests never exercise
+   the correction. It was checked in a browser instead.
 2. **A move job with nobody able to do it stands still for the rest of the day.** The clock is only
    forced while somebody is actually on the move, so the game does not lock; the moved machines
    carry their ducting bill into the morning, when the move is picked up again by whoever is in.

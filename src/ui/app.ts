@@ -11,6 +11,7 @@ import {
   machinesDueService,
   ductingDue,
   movePending,
+  movingMachines,
   oldestReadyJob,
   ownerJob,
   runMinutes,
@@ -36,7 +37,7 @@ interface Drag {
 import { WHY, boxOf, canPlace } from '../engine/index';
 import { renderHall } from '../render/hall';
 import { screenToTile } from '../render/iso';
-import { renderOffice } from '../render/office';
+import { fitOfficeStack, renderOffice } from '../render/office';
 import { renderAccounting } from './accounting';
 import { renderBoard } from './board';
 import { renderCatalogue } from './catalogue';
@@ -81,6 +82,8 @@ interface Ui {
   arrearsAmount: string;
   /** Which tab of the laptop is on top (CLAUDE.md T4 3.1). */
   laptopTab: LaptopTab;
+  /** A new tab is new content, not the same list a minute later: it starts at the top. */
+  scrollModalTop: boolean;
   /** The family whose classes are on screen, over whatever else is open (CLAUDE.md T3 3.5). */
   machine: string | null;
   machinePosition: ModalPosition | null;
@@ -131,6 +134,7 @@ function freshUi(): Ui {
     stockSheets: '6',
     arrearsAmount: '500',
     laptopTab: 'tasks',
+    scrollModalTop: false,
     machine: null,
     machinePosition: null,
     setup: false,
@@ -213,7 +217,8 @@ function setupControls(current: GameState): string {
 
 function hallControls(current: GameState): string {
   if (ui.setup) return setupControls(current);
-  if (movePending(current) !== null) {
+  // Somebody is carrying the kit: nothing else happens in the hall until it is down (T4 3.5).
+  if (movingMachines(current) !== null) {
     return (
       '<div class="view-controls">' +
       '<span class="reason">Moving machines. Nothing gets made until the kit is back down and ' +
@@ -253,7 +258,7 @@ function hallControls(current: GameState): string {
     workHere +
     '<button class="btn" data-do="startCleaning">Clean up · ' +
     `${minutes(CLEANING_MINUTES)}</button>` +
-    '<button class="btn" data-do="startSetup">Set up hall</button>' +
+    setupButton(current) +
     fix +
     service +
     '</div>'
@@ -273,6 +278,15 @@ function officeViewport(): { width: number; height: number } {
     width: Math.max(1, width - VIEW_PADDING * 2),
     height: Math.max(1, height - TOPBAR_HEIGHT - VIEW_PADDING * 2),
   };
+}
+
+/** The hall cannot be set out again while a move is still on the list, carried or waiting, or the
+ *  second batch would ride on the first one's minutes (CLAUDE.md T4 3.5). */
+function setupButton(current: GameState): string {
+  if (movePending(current) !== null) {
+    return reasonLabel('The kit is half shifted. Finish the move first.');
+  }
+  return '<button class="btn" data-do="startSetup">Set up hall</button>';
 }
 
 /** The little popover behind an "i" link (CLAUDE.md T2 3.12). */
@@ -489,6 +503,13 @@ export function render(): void {
   ui.focusNext = null;
   parts.page.innerHTML = pageHtml();
   syncModals(parts.layer, modalSpecs());
+  if (ui.scrollModalTop) {
+    ui.scrollModalTop = false;
+    const body = parts.layer.querySelector('.modal-body');
+    if (body) body.scrollTop = 0;
+  }
+  // The stylesheet is the authority on how much room the office has (docs/art/SPRITES.md 8.1).
+  fitOfficeStack(parts.page);
   slideFigures(nowMs());
   restoreFocus(memory);
 }
@@ -497,21 +518,12 @@ export function render(): void {
 // Actions
 // ---------------------------------------------------------------------------
 
-function openModal(id: ModalId, anchor: { x: number; y: number } | null): void {
+/** The room fills the page, so there is no small object for a modal to sit beside any more: every
+ *  modal opens centred, and the player drags it where he wants it (CLAUDE.md T4 3.1). */
+function openModal(id: ModalId): void {
   ui.modal = id;
-  // The board fills the page, so it is always centred (CLAUDE.md T2 3.2).
-  const beside = anchor === null || id === 'board' ? null : clampToViewport(anchor.x + 24, anchor.y - 40);
-  ui.modalPosition = beside;
+  ui.modalPosition = null;
   ui.menuOpen = false;
-}
-
-function clampToViewport(x: number, y: number): ModalPosition {
-  const width = typeof window === 'undefined' ? 1280 : window.innerWidth;
-  const height = typeof window === 'undefined' ? 800 : window.innerHeight;
-  return {
-    left: Math.max(8, Math.min(x, width - 520)),
-    top: Math.max(56, Math.min(y, height - 220)),
-  };
 }
 
 /** Clicking the van at the gate opens the unloading choice again (CLAUDE.md 10.1). */
@@ -605,7 +617,7 @@ function handleAction(element: DataElement, point: { x: number; y: number }): vo
       ui.why = null;
       break;
     case 'openModal':
-      openModal((element.dataset.modal ?? 'board') as ModalId, null);
+      openModal((element.dataset.modal ?? 'board') as ModalId);
       break;
     case 'officeRegion': {
       const region = element.dataset.office ?? '';
@@ -614,11 +626,12 @@ function handleAction(element: DataElement, point: { x: number; y: number }): vo
         break;
       }
       const modal = OFFICE_REGION_MODALS[region];
-      if (modal !== undefined) openModal(modal, null);
+      if (modal !== undefined) openModal(modal);
       break;
     }
     case 'laptopTab':
       ui.laptopTab = laptopTabFrom(id);
+      ui.scrollModalTop = true;
       break;
     case 'openMachine':
       // The classes of a family fill the page, over the catalogue that sent the player here.

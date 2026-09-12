@@ -138,6 +138,22 @@ function liveText(state: GameState): string {
 
 /** `files` is what the art side has delivered. It is a parameter so a test can ask what the room
  *  looks like before the art arrives, which is what the placeholders are for (T4 3.1). */
+/** The scale the renderer works out is taken from the window, because the room has to be drawn
+ *  before it can be measured. Once it is on the page its own box is the authority, so the scale is
+ *  re-taken from it: no copy of the stylesheet's numbers can then be wrong. In a headless DOM the
+ *  box measures zero and the computed value stands. */
+export function fitOfficeStack(page: ParentNode): void {
+  const room = page.querySelector('.office-room');
+  const stack = room === null ? null : room.querySelector('.office-stack');
+  if (!(room instanceof HTMLElement) || !(stack instanceof HTMLElement)) return;
+  const box = room.getBoundingClientRect();
+  if (box.width <= 0 || box.height <= 0) return;
+  const scale = round(officeScale({ width: box.width, height: box.height }));
+  if (stack.dataset.scale === String(scale)) return;
+  stack.dataset.scale = String(scale);
+  stack.style.transform = `translate(-50%,-50%) scale(${scale})`;
+}
+
 export function renderOffice(
   state: GameState,
   viewport: Viewport,

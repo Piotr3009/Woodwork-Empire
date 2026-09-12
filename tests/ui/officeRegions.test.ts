@@ -2,6 +2,7 @@
 // Every region of the room does what docs/art/SPRITES.md 8.2 and 8.4 say it does, and the four
 // laptop tabs are the one path to the modals that lost their desk item (CLAUDE.md T4 3.1).
 
+import { readFileSync } from 'node:fs';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { currentState, mount } from '../../src/ui/app';
 import { OFFICE_REGIONS } from '../../src/render/office';
@@ -118,6 +119,25 @@ describe('the laptop tabs', () => {
     expect(html()).not.toContain('data-modal="hiring"');
     expect(html()).not.toContain('data-modal="drawings"');
     click('[data-do="laptopTab"][data-id="tasks"]');
+    click('[data-do="closeModal"]');
+  });
+
+  it('starts a new tab at the top rather than where the last one was scrolled', () => {
+    click('[data-office="laptop"]');
+    const body = root().querySelector('.modal-layer [data-modal="laptop"] .modal-body');
+    if (!(body instanceof HTMLElement)) throw new Error('no laptop body');
+    body.scrollTop = 120;
+    click('[data-do="laptopTab"][data-id="team"]');
+    expect(body.scrollTop).toBe(0);
+    click('[data-do="laptopTab"][data-id="tasks"]');
+    click('[data-do="closeModal"]');
+  });
+
+  it('gives the tab bar a rule of its own, so the four chips are laid out', () => {
+    click('[data-office="laptop"]');
+    expect(html()).toContain('class="tabs"');
+    const css = readFileSync('src/ui/styles.css', 'utf8');
+    expect(css).toContain('.tabs {');
     click('[data-do="closeModal"]');
   });
 
