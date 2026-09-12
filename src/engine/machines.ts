@@ -97,6 +97,27 @@ export function countOf(state: GameState, specId: string): number {
   return owned(state, specId).length;
 }
 
+/** The jobs standing at a bench this minute, in the order they went to one. */
+function jobsAtBenches(state: GameState): string[] {
+  return state.jobs
+    .filter((job) => job.stage === 'inProduction' && job.assignedTo !== null)
+    .map((job) => job.id);
+}
+
+/** Without a bench there is no way to start production, and two men cannot share one
+ *  (CLAUDE.md T4 3.4). A job already standing at a bench keeps it. */
+export function hasBenchFor(state: GameState, jobId: string | null): boolean {
+  const benches = countOf(state, 'workbench');
+  const standing = jobsAtBenches(state);
+  const index = jobId === null ? -1 : standing.indexOf(jobId);
+  return index >= 0 ? index < benches : standing.length < benches;
+}
+
+/** Benches nobody is standing at. */
+export function freeBenches(state: GameState): number {
+  return Math.max(0, countOf(state, 'workbench') - jobsAtBenches(state).length);
+}
+
 /** What the machines in the hall draw in a day. A dearer class pulls more (CLAUDE.md T3 3.5). */
 export function machinePowerPerDay(state: GameState): number {
   let total = 0;

@@ -26,6 +26,7 @@ import {
   STATION_BENCH,
   STATION_GATE,
   STATION_IDLE,
+  STATION_NO_BENCH,
   STATION_OFFICE,
   STATION_RACK,
   stationMachine,
@@ -258,7 +259,7 @@ export function stationTile(
     const office = ROOM_LAYOUT[0];
     return { x: office.x + 2, y: office.y + office.depth };
   }
-  if (station === STATION_IDLE) {
+  if (station === STATION_IDLE || station === STATION_NO_BENCH) {
     const canteen = ROOM_LAYOUT[2];
     return { x: canteen.x + 2, y: canteen.y + canteen.depth };
   }
@@ -273,6 +274,7 @@ function stationLabel(station: string): string {
   if (station === STATION_GATE) return 'the gate';
   if (station === STATION_OFFICE) return 'the office';
   if (station === STATION_BENCH) return 'the bench';
+  if (station === STATION_NO_BENCH) return 'no bench';
   return 'waiting';
 }
 

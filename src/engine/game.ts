@@ -49,8 +49,10 @@ import {
   extractorBreakdownChance,
   extractorBroken,
   findSpec,
+  freeBenches,
   hallProductivityFactor,
   has,
+  hasBenchFor,
   machinesDueService,
   overdueBreakdownChance,
   repairCostFor,
@@ -110,6 +112,7 @@ import { chance, int, makeId } from './rng';
 import { plural } from './text';
 import {
   STATION_IDLE,
+  STATION_NO_BENCH,
   stationForProduction,
   stationForTask,
 } from './stations';
@@ -626,7 +629,11 @@ function updateStations(state: GameState): void {
     const task = findTask(state, owner.currentTaskId);
     owner.station = task ? stationForTask(state, task) : STATION_IDLE;
   } else if (ownerJob(state) !== null) {
-    owner.station = stationForProduction(state, owner.productionMinutes);
+    const job = ownerJob(state);
+    owner.station =
+      job !== null && !hasBenchFor(state, job.id)
+        ? STATION_NO_BENCH
+        : stationForProduction(state, owner.productionMinutes);
   } else {
     owner.station = STATION_IDLE;
   }
@@ -641,10 +648,16 @@ function updateStations(state: GameState): void {
       continue;
     }
     const job = worker.jobId ? findJob(state, worker.jobId) : null;
-    worker.station =
-      job && job.stage === 'inProduction'
+    if (job && job.stage === 'inProduction') {
+      worker.station = hasBenchFor(state, job.id)
         ? stationForProduction(state, worker.productionMinutes)
-        : STATION_IDLE;
+        : STATION_NO_BENCH;
+      continue;
+    }
+    // A joiner with work waiting and nowhere to do it stands at the canteen door (T4 3.4).
+    const stuck =
+      worker.role === 'joiner' && freeBenches(state) === 0 && oldestReadyJob(state) !== null;
+    worker.station = stuck ? STATION_NO_BENCH : STATION_IDLE;
   }
 }
 

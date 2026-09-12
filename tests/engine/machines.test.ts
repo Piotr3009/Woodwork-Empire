@@ -28,6 +28,7 @@ import {
   serviceDueOn,
   serviceIsDue,
   bagMachinesFor,
+  hasBenchFor,
   bagsExist,
   dustBand,
   dustFactor,
@@ -36,7 +37,8 @@ import {
   has,
 } from '../../src/engine/machines';
 import { canBuy } from '../../src/engine/game';
-import { tick } from '../../src/engine/index';
+import { startProductionCheck } from '../../src/engine/jobs';
+import { STATION_NO_BENCH, tick } from '../../src/engine/index';
 import type { Equipment, GameEvent, GameState } from '../../src/engine/index';
 import { renderHall } from '../../src/render/hall';
 import {
@@ -495,6 +497,57 @@ describe('no extraction at all', () => {
     const before = firstJob(state).labourRemaining;
     state = tick(state, 60);
     expect(firstJob(state).labourRemaining).toBeLessThan(before);
+  });
+});
+
+describe('no bench in the hall', () => {
+  it('will not start production with a saw and no bench, and a bench unblocks it', () => {
+    let state = atTheBench();
+    // Take the bench out of the hall, leaving the saw and the extraction standing.
+    state.equipment = state.equipment.filter((item) => item.specId !== 'workbench');
+    expect(has(state, 'tableSaw')).toBe(true);
+    expect(hasExtraction(state)).toBe(true);
+    expect(hasBenchFor(state, firstJob(state).id)).toBe(false);
+    const before = firstJob(state).labourRemaining;
+    state = tick(state, 60);
+    expect(firstJob(state).labourRemaining).toBe(before);
+    expect(firstJob(state).blockedBy).toBe('no bench');
+    // The extraction comes first in the list, so the bench is the next thing it names.
+    expect(startProductionCheck(state, firstJob(state)).reason).toBe('no bench');
+    const bought = tick(act(state, { type: 'BUY_EQUIPMENT', specId: 'workbench' }), 10);
+    expect(firstJob(bought).labourRemaining).toBeLessThan(before);
+    expect(firstJob(bought).blockedBy).toBe('');
+  });
+
+  it('says no extraction before it says no bench', () => {
+    const state = atTheBench();
+    state.equipment = state.equipment.filter(
+      (item) => item.specId !== 'workbench' && item.specId !== 'extractor',
+    );
+    expect(startProductionCheck(state, firstJob(state)).reason).toBe('no extraction');
+  });
+
+  it('stands a joiner with nowhere to work at the canteen door', () => {
+    let state = atTheBench();
+    // He is taken on while there is a bench, with the kit a joiner has to have, and starts today.
+    for (const specId of ['locker', 'canteenSeat', 'handToolSet']) {
+      state = act(state, { type: 'BUY_EQUIPMENT', specId });
+    }
+    state = act(state, { type: 'HIRE', role: 'joiner', tier: 'poor' });
+    const joiner = state.workers[0];
+    if (!joiner) throw new Error('nobody was hired');
+    joiner.startDay = state.clock.day;
+    // A second job with its material in the hall, and then the bailiff takes the bench.
+    const second = placeEnquiry(state, { price: 400, name: 'Garage shelves' });
+    state = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: second.id, byHand: false });
+    const waiting = state.jobs[1];
+    if (!waiting) throw new Error('no second job');
+    waiting.stage = 'ready';
+    state.equipment = state.equipment.filter((item) => item.specId !== 'workbench');
+    state = tick(state, 1);
+    expect(state.workers[0]?.station).toBe(STATION_NO_BENCH);
+    expect(state.owner.station).toBe(STATION_NO_BENCH);
+    expect(renderHall(state)).toContain('no bench');
   });
 });
 

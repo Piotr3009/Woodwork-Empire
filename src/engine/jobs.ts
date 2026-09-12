@@ -28,6 +28,7 @@ import {
   brokenMachineFor,
   findSpec,
   has,
+  hasBenchFor,
   hasExtraction,
   machineLabourFactor,
   machineOutputFactor,
@@ -331,6 +332,8 @@ export function setMaterialMode(state: GameState, jobId: string, mode: MaterialM
  *  while the job is free to be worked on (CLAUDE.md T2 3.9). */
 export function hallBlock(state: GameState, job: Job): string {
   if (!job.byHand && !hasExtraction(state)) return 'no extraction';
+  // A bench is the one thing a piece cannot be made without, by hand or not (CLAUDE.md T4 3.4).
+  if (!hasBenchFor(state, job.id)) return 'no bench';
   const broken = brokenMachineFor(state, job.materialKind);
   if (broken && !job.byHand) {
     return `${(findSpec(broken.specId)?.name ?? 'a machine').toLowerCase()} is broken`;

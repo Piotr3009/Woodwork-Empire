@@ -12,6 +12,7 @@ import {
   oldestReadyJob,
   ownerJob,
   runMinutes,
+  startProductionCheck,
 } from '../engine/index';
 import type {
   Difficulty,
@@ -210,11 +211,15 @@ function hallControls(current: GameState): string {
   if (ui.setup) return setupControls();
   const ready = oldestReadyJob(current);
   const working = ownerJob(current) !== null;
+  // The hall says exactly what the job card says, out of the one check (CLAUDE.md T4 3.4).
+  const check = ready === null ? null : startProductionCheck(current, ready);
   const workHere = working
     ? reasonLabel('You are at the bench')
-    : ready
-      ? '<button class="btn btn-primary" data-do="workHere">Work here</button>'
-      : reasonLabel('No job has its material in the hall yet');
+    : check === null
+      ? reasonLabel('No job has its material in the hall yet')
+      : check.ok
+        ? '<button class="btn btn-primary" data-do="workHere">Work here</button>'
+        : reasonLabel(`Cannot work here, ${check.reason}`);
   const name = (specId: string): string =>
     (findSpec(specId)?.name ?? specId).toLowerCase();
   const fix = brokenMachines(current)
