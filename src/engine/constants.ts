@@ -272,8 +272,17 @@ export const TEMP_STORAGE_FETCH_MINUTES = 60;
 // 8.10 Owner tasks
 // ---------------------------------------------------------------------------
 
-export const EMAILS_MINUTES = 60;
+/** Emails are per job now, not a daily block: the same count curve as the calls, 10 minutes each
+ *  (PIOTR for the curve, [TUNE] for the minutes). */
+export const EMAIL_MINUTES = 10;
+/** Unanswered emails at delivery: 1% of the price each, capped at 5% (PIOTR). */
+export const EMAIL_PAYMENT_PENALTY = 0.01;
+export const EMAIL_PAYMENT_PENALTY_MAX = 0.05;
+/** And the rating gain is multiplied by 1 less 0.2 per unanswered email, floored at 0 (PIOTR). */
+export const EMAIL_RATING_PENALTY = 0.2;
 export const BOOKKEEPING_MINUTES = 60;
+/** Books behind on the 1st: 100 per consecutive month behind (PIOTR). */
+export const LATE_ACCOUNTS_CHARGE = 100;
 export const DAILY_ORDERING_MINUTES = 60;
 /** 10 minutes per joiner per day (PIOTR). */
 export const STAFF_MANAGEMENT_MINUTES_PER_JOINER = 10;

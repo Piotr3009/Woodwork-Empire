@@ -2,6 +2,7 @@
 // rating a client leaves when a job closes.
 
 import {
+  EMAIL_RATING_PENALTY,
   RATING_BY_HAND,
   RATING_EXPRESS_ON_TIME,
   RATING_ON_TIME,
@@ -40,9 +41,17 @@ export function ratingFor(job: Job): number {
   return Math.round(rating * 100) / 100;
 }
 
+/** Unanswered emails eat into what the client is willing to say about the job (CLAUDE.md T2 3.5).
+ *  It only ever reduces a gain: a late job is already paying for being late. */
+export function emailRatingFactor(unanswered: number): number {
+  return Math.max(0, 1 - EMAIL_RATING_PENALTY * unanswered);
+}
+
 /** Applies the rating and hands back the change, for the event body. */
 export function applyRating(state: GameState, job: Job): number {
-  const rating = ratingFor(job);
+  const raw = ratingFor(job);
+  const rating =
+    raw > 0 ? Math.round(raw * emailRatingFactor(job.emailsUnanswered) * 100) / 100 : raw;
   job.rating = rating;
   state.reputation = clampReputation(state.reputation + rating);
   return rating;

@@ -21,6 +21,11 @@ T2-04 Finished goods and transport. A made piece stands at the gate until transp
 the balance is paid only when the client has it, a courier costs 120 and comes the next working
 day, the van costs 90 minutes and goes today, and a fourth piece at the gate slows the hall to 0.7.
 
+T2-05 Emails and bookkeeping. Emails belong to the job now, on the same count curve as the calls,
+and the ones nobody answered cost 1% of the price each and a slice of the rating. Skipped books
+freeze the Accounting modal at the last day written up, put a "?" in the top bar, and cost 100 a
+month on the 1st.
+
 ## 2. Not done or partial
 
 ## 3. Tests

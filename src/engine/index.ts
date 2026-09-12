@@ -47,6 +47,7 @@ export {
 // Money
 export {
   arrearsCarryInterest,
+  booksBehind,
   canAfford,
   dailyPower,
   formatMoney,
@@ -56,6 +57,7 @@ export {
   monthlySalaryBill,
   netOf,
   nextDueDays,
+  visibleTotals,
   weeklyWageBill,
 } from './economy';
 
@@ -71,6 +73,7 @@ export {
 
 // Jobs
 export {
+  emailsOutstanding,
   findJob,
   jobLabourCost,
   jobsAtGate,
@@ -132,4 +135,10 @@ export {
 } from './materials';
 
 // Reputation
-export { clampReputation, formatReputation, ratingFor, reputationTier } from './reputation';
+export {
+  clampReputation,
+  emailRatingFactor,
+  formatReputation,
+  ratingFor,
+  reputationTier,
+} from './reputation';

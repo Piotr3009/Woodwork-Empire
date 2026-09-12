@@ -4,11 +4,13 @@
 import { LEDGER_VISIBLE_ENTRIES } from '../engine/constants';
 import {
   arrearsCarryInterest,
+  booksBehind,
   dailyPower,
   dailyRates,
   dailyRent,
   netOf,
   nextDueDays,
+  visibleTotals,
   weeklyWageBill,
 } from '../engine/index';
 import type { GameState, PeriodTotals } from '../engine/index';
@@ -62,7 +64,16 @@ function arrearsBlock(state: GameState, typed: string): string {
 export function renderAccounting(state: GameState, arrearsTyped: string): string {
   const due = nextDueDays(state);
   const arrears = arrearsBlock(state, arrearsTyped);
-  const ledger = state.ledger
+  const behind = booksBehind(state);
+  const books = visibleTotals(state);
+  const banner = behind
+    ? `<p class="warn">Books not up to date since day ${Math.max(1, state.booksUpToDay)}. ` +
+      'These are the last figures anybody wrote down. Do the bookkeeping to catch up.</p>'
+    : '';
+  const entries = behind
+    ? state.ledger.filter((entry) => entry.day <= state.booksUpToDay)
+    : state.ledger;
+  const ledger = entries
     .slice(-LEDGER_VISIBLE_ENTRIES)
     .reverse()
     .map(
@@ -76,11 +87,12 @@ export function renderAccounting(state: GameState, arrearsTyped: string): string
   return (
     `<p class="figures"><strong>${money(state.cash)}</strong> in the bank. ` +
     `Overdraft limit ${money(state.finance.overdraftLimit)}.</p>` +
+    banner +
     arrears +
     '<div class="cols">' +
-    totalsBlock('Today', state.finance.day) +
-    totalsBlock('This week', state.finance.week) +
-    totalsBlock('This month', state.finance.month) +
+    totalsBlock('Today', books.day) +
+    totalsBlock('This week', books.week) +
+    totalsBlock('This month', books.month) +
     '</div>' +
     '<h3>What is coming</h3>' +
     `<div class="row"><span class="row-main">Rent, every day</span>` +

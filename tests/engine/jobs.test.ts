@@ -11,6 +11,7 @@ import {
   MATERIAL_FRACTION,
   OWNER_JOB_VALUE_PER_DAY,
   OWNER_LABOUR_PER_MINUTE,
+  RATING_ON_TIME,
   SITE_MEASURE_TAXI_COST,
 } from '../../src/engine/constants';
 import {
@@ -18,7 +19,15 @@ import {
   hallProductivityFactor,
   machineLabourFactor,
 } from '../../src/engine/machines';
-import { findJob, jobSpeedFactor, minutesRemainingFor, ownerJob } from '../../src/engine/jobs';
+import { emailRatingFactor } from '../../src/engine/reputation';
+import { callsForPrice } from '../../src/engine/tasks';
+import {
+  emailPaymentPenalty,
+  findJob,
+  jobSpeedFactor,
+  minutesRemainingFor,
+  ownerJob,
+} from '../../src/engine/jobs';
 import { materialCostFor, sheetsForCost } from '../../src/engine/materials';
 import { tick } from '../../src/engine/index';
 import type { GameEvent, GameState, Job } from '../../src/engine/index';
@@ -26,6 +35,7 @@ import {
   act,
   buyStartingKit,
   clearEvents,
+  doAllEmails,
   doTask,
   fillRack,
   eventsOfKind,
@@ -71,10 +81,12 @@ describe('accepting an enquiry', () => {
     expect(state.enquiries.some((enquiry) => enquiry.price === 400)).toBe(false);
   });
 
-  it('puts the calls and the drawing on the owner', () => {
+  it('puts the calls, the emails and the drawing on the owner', () => {
     const state = accept(ready());
     const kinds = state.tasks.filter((task) => task.jobId !== null).map((task) => task.kind);
-    expect(kinds).toEqual(['clientCall', 'clientCall', 'design']);
+    expect(kinds).toEqual(['clientCall', 'clientCall', 'emails', 'emails', 'design']);
+    expect(state.tasks.filter((task) => task.kind === 'emails' && task.minutesTotal === 10))
+      .toHaveLength(2);
     const calls = state.tasks.filter((task) => task.kind === 'clientCall');
     expect(calls.every((task) => task.minutesTotal === 15)).toBe(true);
     expect(state.tasks.find((task) => task.kind === 'design')?.minutesTotal).toBe(30);
@@ -274,6 +286,9 @@ describe('production', () => {
     let state = accept(ready());
     const afterDeposit = state.cash;
     firstJob(state).stage = 'ready';
+    state = doAllEmails(state);
+    const afterEmails = state.cash;
+    expect(afterEmails).toBe(afterDeposit);
     state = act(state, { type: 'WORK_HERE', jobId: null });
     state = tick(state, 240);
     expect(firstJob(state).stage).toBe('awaitingTransport');
@@ -310,6 +325,7 @@ describe('late delivery', () => {
     const job = firstJob(state);
     job.stage = 'ready';
     job.dueDay = 1;
+    state = doAllEmails(state);
     state.clock.day = 1 + daysLate;
     state = act(state, { type: 'WORK_HERE', jobId: null });
     state = clearEvents(tick(state, 240));
@@ -357,13 +373,14 @@ describe('scenario: garage shelves on Easy', () => {
     const start = ready();
     const cashBefore = start.cash;
     let state = accept(start, 400);
-    // Day 1: two calls, the drawing, the material order.
+    // Day 1: two calls, two emails, the drawing, the material order.
     state = doTask(state, 'clientCall');
     state = doTask(state, 'clientCall');
+    state = doAllEmails(state);
     state = doTask(state, 'design');
     state = doTask(state, 'materialOrder');
-    expect(state.clock.minute).toBe(15 + 15 + 30 + 30);
-    expect(state.owner.minutesByCategory.admin).toBe(60);
+    expect(state.clock.minute).toBe(15 + 15 + 10 + 10 + 30 + 30);
+    expect(state.owner.minutesByCategory.admin).toBe(80);
     expect(state.owner.minutesByCategory.design).toBe(30);
     // Day 2: the lorry, the unloading, then the bench.
     const events: GameEvent[] = [];
@@ -473,6 +490,7 @@ describe('the piece at the gate', () => {
     for (let index = 0; index < count; index += 1) {
       const enquiry = placeEnquiry(state, { price: 400 + index * 10, deadlineDays: 60 });
       state = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+      state = doAllEmails(state);
       const job = state.jobs[index];
       if (job) {
         job.stage = 'awaitingTransport';
@@ -522,5 +540,58 @@ describe('the piece at the gate', () => {
     const cash = state.cash;
     state = act(state, { type: 'ORDER_TRANSPORT', jobId: firstJob(state).id });
     expect(state.cash).toBe(cash);
+  });
+});
+
+describe('emails nobody answered', () => {
+  function delivered(answer: number): GameState {
+    let state = accept(ready(), 2000);
+    for (let index = 0; index < answer; index += 1) state = doTask(state, 'emails');
+    const job = firstJob(state);
+    job.stage = 'awaitingTransport';
+    job.finishedDay = 1;
+    state = act(act(state, { type: 'BUY_EQUIPMENT', specId: 'van' }), {
+      type: 'ORDER_TRANSPORT',
+      jobId: job.id,
+    });
+    return clearEvents(tick(state, OWN_DELIVERY_MINUTES));
+  }
+
+  it('carries the same count curve as the calls', () => {
+    const emailsFor = (price: number): number =>
+      accept(ready(), price).tasks.filter((task) => task.kind === 'emails').length;
+    expect(emailsFor(400)).toBe(callsForPrice(400));
+    expect(emailsFor(2000)).toBe(callsForPrice(2000));
+    expect(emailsFor(5000)).toBe(callsForPrice(5000));
+  });
+
+  it('takes 1% of the price off the payment each, capped at 5%', () => {
+    expect(emailPaymentPenalty(1000, 0)).toBe(0);
+    expect(emailPaymentPenalty(1000, 1)).toBe(10);
+    expect(emailPaymentPenalty(1000, 3)).toBe(30);
+    expect(emailPaymentPenalty(1000, 9)).toBe(50);
+  });
+
+  it('reduces the payment and the rating of the job it belongs to', () => {
+    const clean = delivered(3);
+    expect(firstJob(clean).emailsUnanswered).toBe(0);
+    expect(firstJob(clean).balancePaid).toBe(1000);
+    expect(firstJob(clean).rating).toBe(RATING_ON_TIME);
+
+    const sloppy = delivered(0);
+    expect(firstJob(sloppy).emailsUnanswered).toBe(3);
+    expect(firstJob(sloppy).balancePaid).toBe(1000 - 60);
+    // The gain is multiplied by 1 less 0.2 per email: 3 by 0.4.
+    expect(firstJob(sloppy).rating).toBeCloseTo(RATING_ON_TIME * 0.4, 6);
+    expect(emailRatingFactor(5)).toBe(0);
+  });
+
+  it('never holds the material order up', () => {
+    let state = accept(ready(), 400);
+    state = doTask(state, 'clientCall');
+    state = doTask(state, 'clientCall');
+    state = doTask(state, 'design');
+    expect(firstJob(state).stage).toBe('materialPending');
+    expect(state.tasks.some((task) => task.kind === 'emails' && !task.done)).toBe(true);
   });
 });

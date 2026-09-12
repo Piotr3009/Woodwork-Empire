@@ -88,6 +88,13 @@ export function nextWorkingDay(day: number): number {
   return next;
 }
 
+/** The last day the workshop was open before this one. 0 when there is none. */
+export function previousWorkingDay(day: number): number {
+  let previous = day - 1;
+  while (previous > 0 && !isWorkingDay(previous)) previous -= 1;
+  return previous;
+}
+
 /** The day `count` working days after `day`. */
 export function addWorkingDays(day: number, count: number): number {
   let result = day;

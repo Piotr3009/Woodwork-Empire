@@ -6,6 +6,8 @@ import {
   BY_HAND_DURATION_FACTOR,
   COURIER_COST,
   DEPOSIT_FRACTION,
+  EMAIL_PAYMENT_PENALTY,
+  EMAIL_PAYMENT_PENALTY_MAX,
   LABOUR_FRACTION,
   LATE_PENALTY_PER_DAY,
   LATE_PENALTY_PER_DAY_EXPRESS,
@@ -31,6 +33,7 @@ import {
   clientCallMinutes,
   createTask,
   designMinutes,
+  emailMinutes,
   jobTasks,
   materialOrderMinutes,
 } from './tasks';
@@ -151,6 +154,7 @@ export function acceptEnquiry(state: GameState, enquiryId: string, byHand: boole
     depositPaid: 0,
     balancePaid: 0,
     penalty: 0,
+    emailsUnanswered: 0,
     rating: null,
     overdueWarned: false,
   };
@@ -166,7 +170,7 @@ export function acceptEnquiry(state: GameState, enquiryId: string, byHand: boole
   return { ok: true, reason: '', job };
 }
 
-/** The calls, the drawing and the site visit the job needs from the owner. */
+/** The calls, the emails, the drawing and the site visit the job needs from the owner. */
 export function createJobTasks(state: GameState, job: Job): void {
   const minutes = clientCallMinutes(job.price);
   for (let index = 0; index < job.callsRemaining; index += 1) {
@@ -174,6 +178,16 @@ export function createJobTasks(state: GameState, job: Job): void {
       kind: 'clientCall',
       label: `Client call ${index + 1} of ${job.callsRemaining}: ${job.name}`,
       minutes,
+      jobId: job.id,
+    });
+  }
+  // Emails ride with the job, in any order with the calls and the drawing, and hold nothing up.
+  const emails = callsForPrice(job.price);
+  for (let index = 0; index < emails; index += 1) {
+    createTask(state, {
+      kind: 'emails',
+      label: `Email ${index + 1} of ${emails}: ${job.name}`,
+      minutes: emailMinutes(),
       jobId: job.id,
     });
   }
@@ -199,6 +213,11 @@ export function createJobTasks(state: GameState, job: Job): void {
 
 function callsOutstanding(state: GameState, job: Job): number {
   return jobTasks(state, job.id).filter((task) => task.kind === 'clientCall' && !task.done).length;
+}
+
+/** Emails the client never got an answer to. They hold nothing up, they just cost at the end. */
+export function emailsOutstanding(state: GameState, job: Job): number {
+  return jobTasks(state, job.id).filter((task) => task.kind === 'emails' && !task.done).length;
 }
 
 function designOutstanding(state: GameState, job: Job): boolean {
@@ -413,30 +432,46 @@ export function orderTransport(state: GameState, jobId: string): boolean {
 
 /** Late penalties come out of the balance, and the client always pays the rest (CLAUDE.md 8.7).
  *  The clock on lateness runs to the day the client actually gets the piece. */
+/** What the emails nobody answered take off the payment: 1% of the price each, capped at 5%. */
+export function emailPaymentPenalty(price: number, unanswered: number): number {
+  const fraction = Math.min(EMAIL_PAYMENT_PENALTY_MAX, EMAIL_PAYMENT_PENALTY * unanswered);
+  return Math.round(price * fraction * 100) / 100;
+}
+
 export function deliverJob(state: GameState, job: Job): void {
   if (job.stage !== 'awaitingTransport') return;
   job.stage = 'completed';
   job.completedDay = state.clock.day;
   job.deliverOnDay = null;
   job.daysLate = Math.max(0, state.clock.day - job.dueDay);
+  job.emailsUnanswered = emailsOutstanding(state, job);
   const rate = job.express ? LATE_PENALTY_PER_DAY_EXPRESS : LATE_PENALTY_PER_DAY;
   const balanceDue = Math.round(job.price * (1 - DEPOSIT_FRACTION) * 100) / 100;
-  const penalty = Math.min(balanceDue, Math.round(job.daysLate * rate * job.price * 100) / 100);
+  const late = Math.round(job.daysLate * rate * job.price * 100) / 100;
+  const emails = emailPaymentPenalty(job.price, job.emailsUnanswered);
+  const penalty = Math.min(balanceDue, Math.round((late + emails) * 100) / 100);
   job.penalty = penalty;
   job.balancePaid = Math.round((balanceDue - penalty) * 100) / 100;
   receive(state, 'jobBalance', `Balance for ${job.name}`, job.balancePaid);
+  // The unanswered ones are moot once the client has the job: they come off the list.
+  state.tasks = state.tasks.filter((task) => !(task.kind === 'emails' && task.jobId === job.id));
   const rating = applyRating(state, job);
   const lateLine =
     job.daysLate > 0
-      ? ` ${job.daysLate === 1 ? '1 day' : `${job.daysLate} days`} late, penalty ` +
-        `${formatMoney(penalty)}.`
+      ? ` ${job.daysLate === 1 ? '1 day' : `${job.daysLate} days`} late.`
       : '';
+  const emailLine =
+    job.emailsUnanswered > 0
+      ? ` ${job.emailsUnanswered === 1 ? '1 email' : `${job.emailsUnanswered} emails`} never got ` +
+        'an answer.'
+      : '';
+  const penaltyLine = penalty > 0 ? ` Penalty ${formatMoney(penalty)}.` : '';
   queueEvent(state, {
     kind: 'jobPaid',
     title: `${job.name} delivered`,
     body:
-      `Balance ${formatMoney(job.balancePaid)} in.${lateLine} The client rates the job ` +
-      `${rating >= 0 ? '+' : ''}${rating}.`,
+      `Balance ${formatMoney(job.balancePaid)} in.${lateLine}${emailLine}${penaltyLine} ` +
+      `The client rates the job ${rating >= 0 ? '+' : ''}${rating}.`,
     data: { jobId: job.id, rating, balance: Math.round(job.balancePaid), late: job.daysLate },
   });
 }

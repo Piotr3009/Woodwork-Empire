@@ -95,7 +95,7 @@ describe('the first ten minutes', () => {
     const name = currentState()?.jobs[0]?.name ?? '';
     expect(html()).toContain(`Design: ${name}`);
     expect(html()).toContain('Client call 1 of');
-    expect(html()).toContain('Emails');
+    expect(html()).toContain('Email 1 of');
     expect(html()).toContain('Bookkeeping');
     click('[data-do="startTask"]');
     expect(currentState()?.owner.currentTaskId).not.toBeNull();
@@ -196,8 +196,17 @@ describe('assigning work by hand', () => {
 });
 
 describe('accounting', () => {
-  it('shows the day 1 deposit and the daily costs', () => {
+  it('plays blind while the books are behind, and shows everything once they are written up', () => {
     click('[data-office="accounting"]');
+    expect(html()).toContain('Books not up to date since day 1');
+    expect(html()).toContain('? today');
+    expect(html()).not.toContain('Unit deposit');
+    click('[data-do="closeModal"]');
+    // The bookkeeping task catches every day up at once.
+    const state = currentState();
+    if (state) state.booksUpToDay = state.clock.day;
+    click('[data-office="accounting"]');
+    expect(html()).not.toContain('Books not up to date');
     expect(html()).toContain('Unit deposit');
     expect(html()).toContain('Rent');
     expect(html()).toContain('Living costs');

@@ -4,6 +4,7 @@
 import {
   BAG_CHANGE_MINUTES,
   BOOKKEEPING_MINUTES,
+  EMAIL_MINUTES,
   OWN_DELIVERY_MINUTES,
   CALLS_ABOVE_BREAKS,
   CALLS_PRICE_BREAKS,
@@ -14,7 +15,6 @@ import {
   CLIENT_CALL_MINUTES_PER_1000,
   CLIENT_CALL_PRICE_STEP,
   DAILY_ORDERING_MINUTES,
-  EMAILS_MINUTES,
   EXTRACTOR_REPAIR_MINUTES,
   FETCH_STORAGE_MINUTES,
   MATERIAL_ORDER_MINUTES_HIGH,
@@ -137,6 +137,11 @@ export function unloadMinutes(state: GameState): number {
   return Math.round(UNLOAD_BASE_MINUTES * factor);
 }
 
+/** Minutes one email takes [TUNE]. */
+export function emailMinutes(): number {
+  return EMAIL_MINUTES;
+}
+
 export function staffManagementMinutes(state: GameState): number {
   return joiners(state).length * STAFF_MANAGEMENT_MINUTES_PER_JOINER;
 }
@@ -191,16 +196,16 @@ export function jobTasks(state: GameState, jobId: string): TaskInstance[] {
   return state.tasks.filter((task) => task.jobId === jobId);
 }
 
-/** Drops yesterday's daily tasks, done or not: the day is gone. */
+/** Drops yesterday's daily tasks, done or not: the day is gone. Emails belong to a job now, so
+ *  they are not on this list: an unanswered email follows the job to the client (T2 3.5). */
 function dropDailyTasks(state: GameState): void {
-  const daily: TaskKind[] = ['emails', 'bookkeeping', 'dailyOrdering', 'staffManagement'];
+  const daily: TaskKind[] = ['bookkeeping', 'dailyOrdering', 'staffManagement'];
   state.tasks = state.tasks.filter((task) => !daily.includes(task.kind));
 }
 
 /** The admin that lands on the desk every working day (CLAUDE.md 8.10). */
 export function createDailyTasks(state: GameState): void {
   dropDailyTasks(state);
-  createTask(state, { kind: 'emails', label: 'Emails', minutes: EMAILS_MINUTES });
   createTask(state, { kind: 'bookkeeping', label: 'Bookkeeping', minutes: BOOKKEEPING_MINUTES });
   if (state.jobs.some((job) => job.stage !== 'completed')) {
     createTask(state, {

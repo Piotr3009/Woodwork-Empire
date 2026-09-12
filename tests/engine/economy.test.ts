@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   ARREARS_MONTHLY_INTEREST,
   BAILIFF_SEIZURE_FRACTION,
+  LATE_ACCOUNTS_CHARGE,
   DAYS_PER_MONTH,
   DUST_WASTE_MONTHLY,
   LIVING_COST_PER_WORKING_DAY,
@@ -19,6 +20,7 @@ import {
 import {
   arrearsCarryInterest,
   bankruptcyFloor,
+  booksBehind,
   canAfford,
   dailyPower,
   dailyRates,
@@ -30,11 +32,21 @@ import {
   payArrears,
   receive,
   runBailiff,
+  visibleTotals,
   weeklyWageBill,
 } from '../../src/engine/economy';
 import { applyAction, tick } from '../../src/engine/index';
 import type { GameState, Worker } from '../../src/engine/index';
-import { act, clearEvents, eventsOfKind, newGame, runDays, runToDay } from '../helpers';
+import {
+  act,
+  clearEvents,
+  doTask,
+  eventsOfKind,
+  newGame,
+  nextDay,
+  runDays,
+  runToDay,
+} from '../helpers';
 
 function ledgerFor(state: GameState, category: string): number {
   return state.ledger
@@ -408,5 +420,61 @@ describe('the Turn 2 balance', () => {
     );
     expect(interest).toHaveLength(1);
     expect(-(interest[0]?.amount ?? 0)).toBeCloseTo(20000 * ARREARS_MONTHLY_INTEREST, 4);
+  });
+});
+
+describe('the books', () => {
+  it('fall behind the moment a working day ends without the bookkeeping', () => {
+    const day1 = newGame();
+    expect(booksBehind(day1)).toBe(false);
+    expect(day1.booksUpToDay).toBe(0);
+    const day2 = nextDay(day1);
+    expect(booksBehind(day2)).toBe(true);
+  });
+
+  it('catch every day up at once when somebody writes them up', () => {
+    let state = runToDay(newGame(), 4).state;
+    expect(booksBehind(state)).toBe(true);
+    state = doTask(state, 'bookkeeping');
+    expect(booksBehind(state)).toBe(false);
+    expect(state.booksUpToDay).toBe(4);
+    // The figures the player sees come back to the live ones.
+    expect(visibleTotals(state).month).toEqual(state.finance.month);
+  });
+
+  it('freezes what the player can see at the last day anybody wrote up', () => {
+    let state = doTask(newGame(), 'bookkeeping');
+    const booked = visibleTotals(state).month.costs;
+    state = runToDay(state, 4).state;
+    expect(booksBehind(state)).toBe(true);
+    expect(visibleTotals(state).month.costs).toBe(booked);
+    expect(state.finance.month.costs).toBeGreaterThan(booked);
+  });
+
+  it('charges 100 a month for late accounts, and more the longer it runs', () => {
+    const run = runToDay(newGame(), 62);
+    const charges = run.state.ledger.filter((entry) => entry.category === 'accounts');
+    expect(charges.map((entry) => entry.amount)).toEqual([
+      -LATE_ACCOUNTS_CHARGE,
+      -LATE_ACCOUNTS_CHARGE * 2,
+    ]);
+    expect(run.state.lateAccountsMonths).toBe(2);
+    expect(eventsOfKind(run.events, 'lateAccounts')).toHaveLength(2);
+  });
+
+  it('charges nothing on the 1st when the books are up to date', () => {
+    let state = newGame();
+    let guard = 0;
+    while (state.clock.day < 32 && guard < 60) {
+      guard += 1;
+      state = clearEvents(state);
+      if (state.tasks.some((task) => task.kind === 'bookkeeping' && !task.done)) {
+        state = doTask(state, 'bookkeeping');
+      }
+      state = nextDay(state);
+    }
+    expect(state.clock.day).toBeGreaterThanOrEqual(31);
+    expect(state.ledger.filter((entry) => entry.category === 'accounts')).toHaveLength(0);
+    expect(state.lateAccountsMonths).toBe(0);
   });
 });

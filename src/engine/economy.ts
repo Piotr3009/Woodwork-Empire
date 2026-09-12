@@ -11,6 +11,7 @@ import {
   BANKRUPTCY_OVERDRAFT_MULTIPLIER,
   DAYS_PER_MONTH,
   DUST_WASTE_MONTHLY,
+  LATE_ACCOUNTS_CHARGE,
   LEDGER_MAX_ENTRIES,
   LIVING_COST_PER_WORKING_DAY,
   OVERDRAFT_MONTHLY_INTEREST,
@@ -22,11 +23,11 @@ import {
   WORKING_DAYS_PER_MONTH,
   unitDepositFor,
 } from './constants';
-import { isFirstOfMonth, isFriday, isWorkingDay, weekday } from './clock';
+import { isFirstOfMonth, isFriday, isWorkingDay, previousWorkingDay, weekday } from './clock';
 import { queueEvent } from './events';
 import { has, poweredMachines, seizableMachines } from './machines';
 import { makeId } from './rng';
-import type { GameState, LedgerCategory, PeriodTotals } from './types';
+import type { BookedTotals, GameState, LedgerCategory, PeriodTotals } from './types';
 
 /** What a period came to: money in less money out. */
 export function netOf(totals: PeriodTotals): number {
@@ -42,6 +43,35 @@ export function formatMoney(value: number): string {
 
 export function emptyTotals(): PeriodTotals {
   return { income: 0, costs: 0, byCategory: {} };
+}
+
+export function emptyBooked(): BookedTotals {
+  return { day: emptyTotals(), week: emptyTotals(), month: emptyTotals() };
+}
+
+/** True while the last working day that has gone by was never written up (CLAUDE.md T2 3.5). */
+export function booksBehind(state: GameState): boolean {
+  const last = previousWorkingDay(state.clock.day);
+  if (last <= 0) return false;
+  return state.booksUpToDay < last;
+}
+
+/** The figures the player is allowed to see: the live ones, or the last ones he wrote up. */
+export function visibleTotals(state: GameState): BookedTotals {
+  if (!booksBehind(state)) {
+    return { day: state.finance.day, week: state.finance.week, month: state.finance.month };
+  }
+  return state.finance.booked;
+}
+
+/** The bookkeeping task is done: the books catch up on every day at once. */
+export function writeUpBooks(state: GameState): void {
+  state.booksUpToDay = state.clock.day;
+  state.finance.booked = {
+    day: JSON.parse(JSON.stringify(state.finance.day)) as PeriodTotals,
+    week: JSON.parse(JSON.stringify(state.finance.week)) as PeriodTotals,
+    month: JSON.parse(JSON.stringify(state.finance.month)) as PeriodTotals,
+  };
 }
 
 function addLedger(
@@ -197,9 +227,30 @@ export function monthlySalaryBill(state: GameState): number {
     .reduce((total, worker) => total + worker.monthlyWage, 0);
 }
 
+/** The accountant charges for the mess on the 1st, and the longer it runs the dearer it gets
+ *  (CLAUDE.md T2 3.5). */
+function runLateAccounts(state: GameState): void {
+  if (!booksBehind(state)) {
+    state.lateAccountsMonths = 0;
+    return;
+  }
+  state.lateAccountsMonths += 1;
+  const charge = LATE_ACCOUNTS_CHARGE * state.lateAccountsMonths;
+  chargeUnavoidable(state, 'accounts', 'Late accounts', charge);
+  queueEvent(state, {
+    kind: 'lateAccounts',
+    title: 'Late accounts',
+    body:
+      'The books are not up to date, so somebody else has to put them right. ' +
+      `${formatMoney(charge)} for ${state.lateAccountsMonths === 1 ? 'one month' : `${state.lateAccountsMonths} months`} of it.`,
+    data: { months: state.lateAccountsMonths, charge: Math.round(charge) },
+  });
+}
+
 function runMonthlyItems(state: GameState): void {
   const before = state.cash;
   const entriesBefore = state.ledger.length;
+  runLateAccounts(state);
   if (state.cash < 0) {
     const interest = -state.cash * OVERDRAFT_MONTHLY_INTEREST;
     chargeUnavoidable(state, 'interest', 'Overdraft interest', interest);

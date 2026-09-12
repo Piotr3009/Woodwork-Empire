@@ -22,6 +22,7 @@ const TASK_ORDER: TaskInstance['kind'][] = [
   'repairExtractor',
   'fetchStorage',
   'clientCall',
+  'emails',
   'siteMeasure',
   'design',
   'materialOrder',

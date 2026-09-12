@@ -241,6 +241,8 @@ export interface Job {
   depositPaid: number;
   balancePaid: number;
   penalty: number;
+  /** Emails still unanswered when the client took delivery. */
+  emailsUnanswered: number;
   rating: number | null;
   overdueWarned: boolean;
 }
@@ -308,6 +310,7 @@ export type GameEventKind =
   | 'bankruptcy'
   | 'ownerSick'
   | 'jobOverdue'
+  | 'lateAccounts'
   | 'jobAtGate'
   | 'jobPaid';
 
@@ -348,6 +351,7 @@ export type LedgerCategory =
   | 'storage'
   | 'taxi'
   | 'transport'
+  | 'accounts'
   | 'pellets'
   | 'arrears'
   | 'seizure';
@@ -371,6 +375,12 @@ export interface PeriodTotals {
   byCategory: Record<string, number>;
 }
 
+export interface BookedTotals {
+  day: PeriodTotals;
+  week: PeriodTotals;
+  month: PeriodTotals;
+}
+
 export interface FinanceState {
   overdraftLimit: number;
   arrearsAmount: number;
@@ -379,6 +389,8 @@ export interface FinanceState {
   day: PeriodTotals;
   week: PeriodTotals;
   month: PeriodTotals;
+  /** What the books said the last time somebody wrote them up. */
+  booked: BookedTotals;
 }
 
 export interface StockState {
@@ -441,6 +453,10 @@ export interface GameState {
   lastExpressDay: number | null;
   /** Day the last low stock warning went out. One a week is the cap. */
   lastLowStockDay: number | null;
+  /** Last day the bookkeeping was done. 0 means it never has been. */
+  booksUpToDay: number;
+  /** Consecutive months the books were behind on the 1st. */
+  lateAccountsMonths: number;
   /** Production minutes since the 1st, for pellet sales. */
   productionMinutesMonth: number;
   gameOver: GameOver | null;

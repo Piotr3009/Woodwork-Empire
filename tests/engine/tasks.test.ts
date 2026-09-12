@@ -98,14 +98,15 @@ describe('minute curves', () => {
 });
 
 describe('the daily list', () => {
-  it('puts emails and bookkeeping on the desk every working day', () => {
+  it('puts the bookkeeping on the desk every working day, and emails no longer', () => {
     const state = newGame();
-    expect(tasksOfKind(state, 'emails')).toHaveLength(1);
+    // Emails belong to a job now, so an empty order book means no emails (CLAUDE.md T2 3.5).
+    expect(tasksOfKind(state, 'emails')).toHaveLength(0);
     expect(tasksOfKind(state, 'bookkeeping')).toHaveLength(1);
     expect(tasksOfKind(state, 'dailyOrdering')).toHaveLength(0);
     const day2 = clearEvents(tick(state, 600));
-    expect(tasksOfKind(day2, 'emails')).toHaveLength(1);
-    expect(day2.tasks.filter((task) => task.kind === 'emails')).toHaveLength(1);
+    expect(tasksOfKind(day2, 'bookkeeping')).toHaveLength(1);
+    expect(day2.tasks.filter((task) => task.kind === 'bookkeeping')).toHaveLength(1);
   });
 
   it('adds the daily ordering only while there are jobs on the books', () => {
@@ -143,6 +144,7 @@ describe('the daily list', () => {
       depositPaid: 200,
       balancePaid: 0,
       penalty: 0,
+      emailsUnanswered: 0,
       rating: null,
       overdueWarned: false,
     });
@@ -154,9 +156,9 @@ describe('the daily list', () => {
     const state = newGame();
     state.workers.push(staff('a1', 'officeAdmin', 1900));
     const day2 = runToDay(state, 2).state;
-    const emails = day2.tasks.find((task) => task.kind === 'emails');
-    expect(emails?.done).toBe(true);
-    expect(emails?.doneBy).toBe('a1');
+    const books = day2.tasks.find((task) => task.kind === 'bookkeeping');
+    expect(books?.done).toBe(true);
+    expect(books?.doneBy).toBe('a1');
     expect(openTasks(day2).some((task) => task.kind === 'bookkeeping')).toBe(false);
   });
 });

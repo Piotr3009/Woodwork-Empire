@@ -1,7 +1,7 @@
 // The one slim top bar every view shares (CLAUDE.md 10.1). Nothing else lives here.
 
 import { MINUTES_PER_WORKING_DAY, SPEEDS } from '../engine/constants';
-import { formatDate, netOf } from '../engine/index';
+import { booksBehind, formatDate, netOf } from '../engine/index';
 import type { GameState, Speed } from '../engine/index';
 import { escapeHtml, money } from './modal';
 
@@ -35,11 +35,15 @@ function minuteBar(state: GameState): string {
 
 export function renderTopbar(state: GameState, view: 'hall' | 'office'): string {
   const net = netOf(state.finance.day);
-  const netClass = net > 0 ? 'good' : net < 0 ? 'bad' : 'flat';
+  const blind = booksBehind(state);
+  const netClass = blind ? 'flat' : net > 0 ? 'good' : net < 0 ? 'bad' : 'flat';
+  // Books behind, so nobody knows what today came to (CLAUDE.md T2 3.5).
+  const netText = blind ? '? today' : `${net >= 0 ? '+' : ''}${money(net)} today`;
   return (
     '<div class="topbar">' +
     `<span class="cash">${money(state.cash)}</span>` +
-    `<span class="net ${netClass}">${net >= 0 ? '+' : ''}${money(net)} today</span>` +
+    `<span class="net ${netClass}" title="${blind ? 'The books are behind' : 'Today'}">` +
+    `${escapeHtml(netText)}</span>` +
     `<span class="date">${escapeHtml(formatDate(state.clock))}</span>` +
     `<span class="speeds">${speedButtons(state)}</span>` +
     minuteBar(state) +

@@ -167,6 +167,17 @@ export function doTask(state: GameState, kind: TaskInstance['kind']): GameState 
   return next;
 }
 
+/** Answers every open email, the way an owner who cares about the rating would. */
+export function doAllEmails(state: GameState): GameState {
+  let next = state;
+  let guard = 0;
+  while (next.tasks.some((task) => task.kind === 'emails' && !task.done) && guard < 20) {
+    next = doTask(next, 'emails');
+    guard += 1;
+  }
+  return next;
+}
+
 /** The one job on the books, for tests that work with a single order. */
 export function firstJob(state: GameState): Job {
   const job = state.jobs[0];

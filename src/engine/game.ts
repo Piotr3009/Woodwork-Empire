@@ -25,11 +25,13 @@ import { expireEnquiries, refillBoard, refreshLocks } from './board';
 import { daysBetween, isDayExhausted, isOvertime, isWorkingDay, weekOfDay, weekday } from './clock';
 import {
   canAfford,
+  emptyBooked,
   emptyTotals,
   formatMoney,
   pay,
   payArrears,
   runDayCosts,
+  writeUpBooks,
 } from './economy';
 import { isPaused, openNextEvent, queueEvent } from './events';
 import {
@@ -201,6 +203,7 @@ export function createGame(options: NewGameOptions): GameState {
       day: emptyTotals(),
       week: emptyTotals(),
       month: emptyTotals(),
+      booked: emptyBooked(),
     },
     ledger: [],
     eventQueue: [],
@@ -208,6 +211,8 @@ export function createGame(options: NewGameOptions): GameState {
     dayStats: { jobsAdvanced: [], jobsCompleted: [], dustAtStart: 0, noMaterialWarned: false },
     lastExpressDay: null,
     lastLowStockDay: null,
+    booksUpToDay: 0,
+    lateAccountsMonths: 0,
     productionMinutesMonth: 0,
     gameOver: null,
   };
@@ -452,6 +457,9 @@ function applyTaskCompletion(state: GameState, task: TaskInstance): void {
       break;
     case 'cleaning':
       clearDust(state);
+      break;
+    case 'bookkeeping':
+      writeUpBooks(state);
       break;
     case 'repairExtractor':
       repairExtractor(state);
