@@ -200,7 +200,7 @@ function figure(
       '<rect x="-6" y="-30" width="12" height="26" rx="6" ' +
       `fill="${fill}" />` +
       '<text x="0" y="14" text-anchor="middle" ' +
-      `class="iso-label">${escapeText(name.split(',')[0] ?? name)}</text></g>`,
+      `class="iso-label figure-label">${escapeText(name.split(',')[0] ?? name)}</text></g>`,
   };
 }
 
@@ -387,12 +387,13 @@ export function renderHall(state: GameState, ghost: Ghost | null = null): string
     );
   }
 
-  const viewBox = [
-    Math.round(bounds.minX - pad),
-    Math.round(bounds.minY - pad),
-    Math.round(bounds.width + pad * 2),
-    Math.round(bounds.height + pad * 2),
-  ].join(' ');
+  const size = {
+    x: Math.round(bounds.minX - pad),
+    y: Math.round(bounds.minY - pad),
+    width: Math.round(bounds.width + pad * 2),
+    height: Math.round(bounds.height + pad * 2),
+  };
+  const viewBox = [size.x, size.y, size.width, size.height].join(' ');
   const output = `${Math.round(staffOutputFactor(state) * 100)}%`;
   const ownerLine = !state.owner.present
     ? `. The owner is not in today, so everyone works at ${output}`
@@ -444,8 +445,9 @@ export function renderHall(state: GameState, ghost: Ghost | null = null): string
       ? '<p class="view-note warn">No shelving in the hall, so nothing can be unloaded.</p>'
       : '';
   return (
-    `<svg class="hall-view" viewBox="${viewBox}" xmlns="http://www.w3.org/2000/svg" ` +
-    `role="img" aria-label="Workshop hall">${parts.join('')}</svg>` +
+    `<svg class="hall-view" viewBox="${viewBox}" width="${size.width}" height="${size.height}" ` +
+    `xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Workshop hall">` +
+    `${parts.join('')}</svg>` +
     `<p class="view-note">${escapeText(stateLine)}</p>` +
     `${extractionLine}${brokenLine}${serviceLine}${gateLine}${lowStock}`
   );

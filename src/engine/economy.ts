@@ -27,6 +27,7 @@ import { isFirstOfMonth, isFriday, isWorkingDay, previousWorkingDay, weekday } f
 import { queueEvent } from './events';
 import { has, poweredMachines, seizableMachines } from './machines';
 import { makeId } from './rng';
+import { plural } from './text';
 import type { BookedTotals, GameState, LedgerCategory, PeriodTotals } from './types';
 
 /** What a period came to: money in less money out. */
@@ -242,7 +243,7 @@ function runLateAccounts(state: GameState): void {
     title: 'Late accounts',
     body:
       'The books are not up to date, so somebody else has to put them right. ' +
-      `${formatMoney(charge)} for ${state.lateAccountsMonths === 1 ? 'one month' : `${state.lateAccountsMonths} months`} of it.`,
+      `${formatMoney(charge)} for ${plural(state.lateAccountsMonths, 'month', 'months')} of it.`,
     data: { months: state.lateAccountsMonths, charge: Math.round(charge) },
   });
 }

@@ -27,6 +27,7 @@ import { materialCostFor, orderMaterialForJob, sheetsForCost, stockCostFor } fro
 import { ownerIsAvailable } from './owner';
 import { applyRating } from './reputation';
 import { makeId } from './rng';
+import { plural } from './text';
 import {
   AD_HOC_TASK_MINUTES,
   WORK_EPSILON,
@@ -464,12 +465,11 @@ export function deliverJob(state: GameState, job: Job): void {
   const rating = applyRating(state, job);
   const lateLine =
     job.daysLate > 0
-      ? ` ${job.daysLate === 1 ? '1 day' : `${job.daysLate} days`} late.`
+      ? ` ${plural(job.daysLate, 'day', 'days')} late.`
       : '';
   const emailLine =
     job.emailsUnanswered > 0
-      ? ` ${job.emailsUnanswered === 1 ? '1 email' : `${job.emailsUnanswered} emails`} never got ` +
-        'an answer.'
+      ? ` ${plural(job.emailsUnanswered, 'email', 'emails')} never got an answer.`
       : '';
   const penaltyLine = penalty > 0 ? ` Penalty ${formatMoney(penalty)}.` : '';
   queueEvent(state, {

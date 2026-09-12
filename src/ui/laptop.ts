@@ -41,7 +41,8 @@ function taskRow(state: GameState, task: TaskInstance): string {
   const running = state.owner.currentTaskId === task.id;
   const staffLine = onItLine(state, task);
   const job = task.jobId === null ? null : findJob(state, task.jobId);
-  const jobLine = job === null ? '' : ` · ${escapeHtml(job.name)} ${money(job.price)}`;
+  // The task label already names the job, so the row adds the price and nothing else (T2 3.11).
+  const jobLine = job === null ? '' : ` · ${money(job.price)}`;
   let action: string;
   if (task.done) {
     action = '<span class="done">Done</span>';

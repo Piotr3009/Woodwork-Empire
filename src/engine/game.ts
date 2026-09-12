@@ -105,6 +105,7 @@ import {
   staffOutputFactor,
 } from './owner';
 import { chance, int, makeId } from './rng';
+import { plural } from './text';
 import {
   STATION_IDLE,
   stationForProduction,
@@ -147,10 +148,6 @@ import type {
   TaskInstance,
 } from './types';
 
-/** The one plural in the engine copy: "1 sheet", "2 sheets" (CLAUDE.md T2 3.11). */
-export function plural(count: number, one: string, many: string): string {
-  return `${count} ${count === 1 ? one : many}`;
-}
 
 export interface NewGameOptions {
   seed: number;

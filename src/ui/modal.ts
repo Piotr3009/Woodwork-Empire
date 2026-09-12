@@ -4,7 +4,7 @@
 // One escape and one money format for the whole game: the renderers and the engine own them,
 // because both layers sit below the modals.
 
-import { formatMoney } from '../engine/index';
+import { formatMoney, plural } from '../engine/index';
 import { escapeText } from '../render/hall';
 
 export const escapeHtml = escapeText;
@@ -31,10 +31,8 @@ export function minutes(value: number): string {
   return `${Math.max(0, Math.round(value))} min`;
 }
 
-/** The one plural in the game: "1 day", "2 days", "1 enquiry", "3 enquiries" (CLAUDE.md T2 3.11). */
-export function plural(count: number, one: string, many: string): string {
-  return `${count} ${count === 1 ? one : many}`;
-}
+/** The one plural in the game lives in the engine, because the event copy needs it too. */
+export { plural };
 
 export function days(value: number): string {
   return plural(Math.round(value), 'day', 'days');

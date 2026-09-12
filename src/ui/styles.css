@@ -42,17 +42,26 @@
   --owner: #5f9c5f;
 }
 
+/* 11 px is the floor for a label and 12 px for a name (CLAUDE.md 10.4, T2 3.11). The views draw
+   at one screen pixel per unit, so nothing here is ever scaled down. */
 .iso-label {
   font-size: 11px;
   fill: #1c1f24;
   pointer-events: none;
 }
 
+.figure-label {
+  font-size: 12px;
+}
+
+.ghost-label {
+  font-size: 12px;
+}
+
 .hall-view,
 .office-view {
   display: block;
-  width: 100%;
-  max-height: 62vh;
+  margin: 0 auto;
 }
 
 .clickable {
@@ -294,6 +303,7 @@ input.num {
    -------------------------------------------------------------------------- */
 
 .view {
+  overflow: hidden;
   padding: 12px;
 }
 

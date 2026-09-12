@@ -50,6 +50,10 @@ T2-11 Hall setup. A Set up hall button stops the clock and lets the machines, be
 be dragged about on the tile grid, with a ghost footprint that goes green or red with the reason.
 The layout lives in the state, and a new purchase lands on the first free tile when its own is taken.
 
+T2-12 Audit fixes. The hall and the office draw at one screen pixel per unit with a 48 by 24 tile,
+so no label is ever scaled down; the job name is printed once on every row; and there is one plural
+helper in the engine that the UI re-exports.
+
 ## 2. Not done or partial
 
 ## 3. Tests

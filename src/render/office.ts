@@ -46,14 +46,16 @@ export function renderOffice(state: GameState): string {
     };
   }).sort((left, right) => left.depth - right.depth);
   parts.push(drawables.map((drawable) => drawable.svg).join(''));
-  const viewBox = [
-    Math.round(bounds.minX - pad),
-    Math.round(bounds.minY - pad),
-    Math.round(bounds.width + pad * 2),
-    Math.round(bounds.height + pad * 2),
-  ].join(' ');
+  const size = {
+    x: Math.round(bounds.minX - pad),
+    y: Math.round(bounds.minY - pad),
+    width: Math.round(bounds.width + pad * 2),
+    height: Math.round(bounds.height + pad * 2),
+  };
+  const viewBox = [size.x, size.y, size.width, size.height].join(' ');
   return (
-    `<svg class="office-view" viewBox="${viewBox}" xmlns="http://www.w3.org/2000/svg" ` +
+    `<svg class="office-view" viewBox="${viewBox}" width="${size.width}" ` +
+    `height="${size.height}" xmlns="http://www.w3.org/2000/svg" ` +
     `role="img" aria-label="Office desk">${parts.join('')}</svg>` +
     `<p class="view-note">The desk. Everything on it opens something.</p>`
   );

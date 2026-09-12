@@ -180,6 +180,9 @@ export {
   stationMachine,
 } from './stations';
 
+// Text
+export { plural } from './text';
+
 // Reputation
 export {
   clampReputation,
