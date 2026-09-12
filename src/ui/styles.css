@@ -70,6 +70,14 @@
   cursor: pointer;
 }
 
+/* The game draws the shadow, never the sprite: a sprite with its own would give a double one
+   (docs/art/SPRITES.md 1). */
+.contact-shadow {
+  fill: #000;
+  opacity: 0.18;
+  pointer-events: none;
+}
+
 /* A figure slides between its stations instead of jumping (CLAUDE.md T2 3.3). How long is left of
    the slide is app.ts's to say: the view is rebuilt part way through it. */
 .figure {

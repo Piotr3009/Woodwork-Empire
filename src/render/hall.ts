@@ -42,6 +42,7 @@ import {
   footprintPolygon,
   gridBounds,
 } from './iso';
+import { contactShadow, spriteBox, spriteImage, spriteUrl } from './sprites';
 
 // ---------------------------------------------------------------------------
 // SVG primitives. office.ts uses these too: one place builds the strings.
@@ -81,6 +82,35 @@ export function box(faces: BoxFaces, fill: string, shade: string, extra = ''): s
     polygon(faces.right, shade, extra),
     polygon(faces.top, fill, extra),
   ].join('');
+}
+
+/** What an object on the floor looks like: its picture when the art side has delivered one, the
+ *  placeholder box when it has not, and the contact shadow under either (CLAUDE.md T3 3.6).
+ *  When there is a picture the name is a tooltip only: no text over the art. */
+export function objectArt(art: {
+  spriteKey: string;
+  tier?: string | null;
+  x: number;
+  y: number;
+  width: number;
+  depth: number;
+  height: number;
+  fill: string;
+  shade: string;
+  label: string;
+}): string {
+  const shadow = contactShadow(art.x, art.y, art.width, art.depth);
+  const url = spriteUrl(art.spriteKey, art.tier);
+  if (url !== null) {
+    const at = spriteBox(art.x, art.y, art.width, art.depth, art.height);
+    return shadow + spriteImage(url, at);
+  }
+  const faces = boxPolygons(art.x, art.y, art.width, art.depth, art.height);
+  return (
+    shadow +
+    box(faces, art.fill, art.shade) +
+    label(centreOf(art.x, art.y, art.width, art.depth, art.height), art.label)
+  );
 }
 
 interface Drawable {
@@ -246,13 +276,22 @@ export function renderHall(state: GameState, ghost: Ghost | null = null): string
 
   // The three small rooms along the back wall.
   for (const room of ROOM_LAYOUT) {
-    const faces = boxPolygons(room.x, room.y, room.width, room.depth, room.height);
     drawables.push({
       depth: depthKey(room.x, room.y),
       svg:
-        `<g data-room="${room.id}" class="clickable"><title>${escapeText(room.tooltip)}</title>` +
-        box(faces, 'var(--room)', 'var(--room-dark)') +
-        label(centreOf(room.x, room.y, room.width, room.depth, room.height), room.name) +
+        `<g data-room="${room.id}" data-sprite="${room.spriteKey}" class="clickable">` +
+        `<title>${escapeText(room.tooltip)}</title>` +
+        objectArt({
+          spriteKey: room.spriteKey,
+          x: room.x,
+          y: room.y,
+          width: room.width,
+          depth: room.depth,
+          height: room.height,
+          fill: 'var(--room)',
+          shade: 'var(--room-dark)',
+          label: room.name,
+        }) +
         '</g>',
     });
   }
@@ -262,7 +301,6 @@ export function renderHall(state: GameState, ghost: Ghost | null = null): string
     const spec = findSpec(item.specId);
     if (!spec || spec.category === 'furniture') continue;
     const broken = item.broken;
-    const faces = boxPolygons(item.anchorX, item.anchorY, spec.width, spec.depth, spec.height);
     const fill = broken ? 'var(--stopped)' : CATEGORY_FILL[spec.category] ?? 'var(--kit-machine)';
     const shade = broken
       ? 'var(--stopped-dark)'
@@ -279,17 +317,25 @@ export function renderHall(state: GameState, ghost: Ghost | null = null): string
         : undefined;
     const benchLine =
       spec.category !== 'bench' ? '' : atThisBench ? `: ${atThisBench.name}` : ' (free)';
+    const name = `${spec.name}${bagLine}${serviceLine}${benchLine}${rackLine}`;
     drawables.push({
       depth: depthKey(item.anchorX, item.anchorY),
       svg:
         `<g data-kit="${item.id}"${spec.category === 'storage' ? ' data-rack="1"' : ''} ` +
-        `data-sprite="${item.spriteKey}" class="clickable">` +
-        `<title>${escapeText(spec.effect)}</title>` +
-        box(faces, fill, shade) +
-        label(
-          centreOf(item.anchorX, item.anchorY, spec.width, spec.depth, spec.height),
-          `${spec.name}${bagLine}${serviceLine}${benchLine}${rackLine}`,
-        ) +
+        `data-sprite="${item.spriteKey}" data-tier="${item.variantId}" class="clickable">` +
+        `<title>${escapeText(`${name}. ${spec.effect}`)}</title>` +
+        objectArt({
+          spriteKey: item.spriteKey,
+          tier: item.variantId,
+          x: item.anchorX,
+          y: item.anchorY,
+          width: spec.width,
+          depth: spec.depth,
+          height: spec.height,
+          fill,
+          shade,
+          label: name,
+        }) +
         '</g>',
     });
   }
@@ -329,17 +375,22 @@ export function renderHall(state: GameState, ghost: Ghost | null = null): string
   if (waiting) {
     const gate = GATE_LAYOUT;
     const gateX = unit.widthTiles + gate.x;
-    const faces = boxPolygons(gateX, gate.y, gate.width, gate.depth, gate.height);
     drawables.push({
       depth: depthKey(gateX, gate.y),
       svg:
         `<g data-van="${waiting.id}" data-sprite="${DELIVERY_VAN_SPRITE}" class="clickable">` +
         '<title>Click the van to decide who unloads it</title>' +
-        box(faces, 'var(--kit-vehicle)', 'var(--kit-vehicle-dark)') +
-        label(
-          centreOf(gateX, gate.y, gate.width, gate.depth, gate.height),
-          `Delivery: ${plural(waiting.sheets, 'sheet', 'sheets')}`,
-        ) +
+        objectArt({
+          spriteKey: DELIVERY_VAN_SPRITE,
+          x: gateX,
+          y: gate.y,
+          width: gate.width,
+          depth: gate.depth,
+          height: gate.height,
+          fill: 'var(--kit-vehicle)',
+          shade: 'var(--kit-vehicle-dark)',
+          label: `Delivery: ${plural(waiting.sheets, 'sheet', 'sheets')}`,
+        }) +
         '</g>',
     });
   }

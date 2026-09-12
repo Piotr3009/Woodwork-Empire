@@ -238,7 +238,7 @@ describe('the warnings on the hall line', () => {
 });
 
 describe('the placeholder art rules of 10.3', () => {
-  it('uses flat colours: no gradient, no shadow, no texture', () => {
+  it('uses flat colours: no gradient, no texture, and the one contact shadow', () => {
     const state = buyStartingKit(newGame());
     state.dust = 60;
     state.workers.push({
@@ -261,17 +261,21 @@ describe('the placeholder art rules of 10.3', () => {
       anchorY: 4,
     });
     const svg = renderHall(state);
-    expect(svg).not.toContain('shadow');
     expect(svg).not.toContain('Gradient');
     expect(svg).not.toContain('filter=');
     expect(svg).not.toContain('opacity');
+    // The one shadow in the hall is the contact shadow the game draws under every object, which
+    // is what keeps a sprite from floating (CLAUDE.md T3 3.6). It carries no colour of its own.
+    expect(svg.split('shadow').length - 1).toBe(svg.split('class="contact-shadow"').length - 1);
   });
 
   it('keeps the sawdust grey and near the machines', () => {
     const state = buyStartingKit(newGame());
     state.dust = 30;
     const svg = renderHall(state);
-    const piles = svg.match(/<ellipse[^>]*>/g) ?? [];
+    const piles = (svg.match(/<ellipse[^>]*>/g) ?? []).filter((pile) =>
+      pile.includes('var(--sawdust)'),
+    );
     expect(piles).toHaveLength(3);
     const saw = state.equipment.find((item) => item.specId === 'tableSaw');
     // The first pile sits at the near edge of the first machine.
