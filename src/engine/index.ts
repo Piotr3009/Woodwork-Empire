@@ -7,7 +7,15 @@
 //
 // The UI never computes economics. Everything it needs to show is a selector exported here.
 
-export { applyAction, canBuy, canBuySoftware, createGame, runMinutes, tick } from './game';
+export {
+  applyAction,
+  canBuy,
+  canBuySoftware,
+  createGame,
+  machineInUse,
+  runMinutes,
+  tick,
+} from './game';
 export type { BuyCheck, NewGameOptions, TickResult } from './game';
 export * from './types';
 

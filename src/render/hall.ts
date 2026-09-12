@@ -20,6 +20,7 @@ import {
   serviceIsDue,
 } from '../engine/machines';
 import { jobsAtGate } from '../engine/jobs';
+import { machineInUse } from '../engine/game';
 import { rackCapacity, stockIsLow } from '../engine/materials';
 import {
   STATION_BENCH,
@@ -31,7 +32,7 @@ import {
 } from '../engine/stations';
 import { ownerIsAvailable, staffOutputFactor } from '../engine/owner';
 import { plural } from '../engine/text';
-import type { GameState } from '../engine/types';
+import type { Equipment, EquipmentSpec, GameState } from '../engine/types';
 import {
   type BoxFaces,
   type Point,
@@ -116,6 +117,70 @@ export function objectArt(art: {
 interface Drawable {
   depth: number;
   svg: string;
+}
+
+// ---------------------------------------------------------------------------
+// What a machine looks like while it is running (CLAUDE.md T3 3.7). All of it is presentation on
+// top of whatever the machine is drawn with, and all of it moves through CSS on SVG groups: the
+// renderer starts no timer of its own.
+// ---------------------------------------------------------------------------
+
+/** Particles in a chip stream [TUNE: the brief asks for 3 to 6 and the renderer never guesses]. */
+const FX_CHIPS = 4;
+
+function at(point: Point): string {
+  return `transform="translate(${round(point.x)},${round(point.y)})"`;
+}
+
+/** The disc of a saw blade, with the spokes that make the spin visible. */
+function blade(point: Point): string {
+  const spokes = [0, 45, 90, 135]
+    .map((angle) => `<line x1="0" y1="-9" x2="0" y2="9" transform="rotate(${angle})" />`)
+    .join('');
+  return (
+    `<g class="fx fx-blade" ${at(point)}><circle r="10" />` +
+    `<g class="fx-blade-spin">${spokes}</g></g>`
+  );
+}
+
+/** Dust and chips thrown down-right from a cutter, over and over while it runs. */
+function chipStream(point: Point): string {
+  const parts: string[] = [];
+  for (let index = 0; index < FX_CHIPS; index += 1) {
+    parts.push(
+      `<circle class="fx-chip" r="2" style="animation-delay:${(index * 0.3).toFixed(1)}s" />`,
+    );
+  }
+  return `<g class="fx fx-chips" ${at(point)}>${parts.join('')}</g>`;
+}
+
+/** A lamp on the machine: amber while it works, red when it has given up. */
+function lamp(point: Point, tone: 'amber' | 'red'): string {
+  return `<circle class="fx fx-lamp fx-${tone}" cx="${round(point.x)}" cy="${round(point.y)}" r="4" />`;
+}
+
+export interface MachineFx {
+  /** Goes on the object's own group: the extractor breathes as a whole. */
+  className: string;
+  svg: string;
+}
+
+const NO_FX: MachineFx = { className: '', svg: '' };
+
+export function machineFx(state: GameState, item: Equipment, spec: EquipmentSpec): MachineFx {
+  // The top of the object, where a lamp or a blade would sit on the real thing.
+  const point = centreOf(item.anchorX, item.anchorY, spec.width, spec.depth, spec.height);
+  if (spec.category === 'extraction') {
+    if (item.broken) return { className: '', svg: lamp(point, 'red') };
+    return machineInUse(state, item) ? { className: ' fx-breathe', svg: '' } : NO_FX;
+  }
+  if (!machineInUse(state, item)) return NO_FX;
+  if (item.specId === 'tableSaw') {
+    return { className: '', svg: blade(point) + chipStream(point) };
+  }
+  if (item.specId === 'thicknesser') return { className: '', svg: chipStream(point) };
+  if (item.specId === 'edgebander') return { className: '', svg: lamp(point, 'amber') };
+  return NO_FX;
 }
 
 const CATEGORY_FILL: Record<string, string> = {
@@ -318,11 +383,13 @@ export function renderHall(state: GameState, ghost: Ghost | null = null): string
     const benchLine =
       spec.category !== 'bench' ? '' : atThisBench ? `: ${atThisBench.name}` : ' (free)';
     const name = `${spec.name}${bagLine}${serviceLine}${benchLine}${rackLine}`;
+    const fx = machineFx(state, item, spec);
     drawables.push({
       depth: depthKey(item.anchorX, item.anchorY),
       svg:
         `<g data-kit="${item.id}"${spec.category === 'storage' ? ' data-rack="1"' : ''} ` +
-        `data-sprite="${item.spriteKey}" data-tier="${item.variantId}" class="clickable">` +
+        `data-sprite="${item.spriteKey}" data-tier="${item.variantId}" ` +
+        `class="clickable${fx.className}">` +
         `<title>${escapeText(`${name}. ${spec.effect}`)}</title>` +
         objectArt({
           spriteKey: item.spriteKey,
@@ -336,6 +403,7 @@ export function renderHall(state: GameState, ghost: Ghost | null = null): string
           shade,
           label: name,
         }) +
+        fx.svg +
         '</g>',
     });
   }

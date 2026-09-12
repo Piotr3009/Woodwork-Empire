@@ -78,6 +78,94 @@
   pointer-events: none;
 }
 
+/* What a machine does while it is running (CLAUDE.md T3 3.7). Every one of these is CSS on an SVG
+   group: the renderer starts no timer of its own. */
+.fx {
+  pointer-events: none;
+}
+
+.fx-blade circle {
+  fill: var(--panel-2);
+  stroke: var(--text-dim);
+  stroke-width: 1;
+}
+
+.fx-blade line {
+  stroke: var(--text-dim);
+  stroke-width: 1.5;
+}
+
+.fx-blade-spin {
+  animation: fx-spin 0.4s linear infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+@keyframes fx-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.fx-chip {
+  animation: fx-chip 1.2s linear infinite;
+  fill: var(--sawdust);
+}
+
+@keyframes fx-chip {
+  0% {
+    opacity: 0.9;
+    transform: translate(0, 0);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(20px, 14px);
+  }
+}
+
+.fx-lamp {
+  animation: fx-blink 1.6s ease-in-out infinite;
+}
+
+.fx-amber {
+  fill: var(--accent);
+}
+
+.fx-red {
+  animation-duration: 1s;
+  fill: var(--bad);
+}
+
+@keyframes fx-blink {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}
+
+/* The extractor breathes while it pulls (CLAUDE.md T3 3.7). */
+.fx-breathe {
+  animation: fx-breathe 2s ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: center bottom;
+}
+
+@keyframes fx-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.04);
+  }
+}
+
 /* A figure slides between its stations instead of jumping (CLAUDE.md T2 3.3). How long is left of
    the slide is app.ts's to say: the view is rebuilt part way through it. */
 .figure {

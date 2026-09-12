@@ -1034,6 +1034,34 @@ export function applyAction(state: GameState, action: GameAction): GameState {
 // ---------------------------------------------------------------------------
 
 
+/** Somebody is actually standing at this job this minute, rather than the job merely being open
+ *  and assigned to a man who has gone home or gone to the desk. */
+function someoneIsOnIt(state: GameState, job: Job): boolean {
+  if (job.assignedTo === null) return false;
+  if (job.assignedTo === 'owner') {
+    return ownerIsAvailable(state) && state.owner.currentTaskId === null;
+  }
+  const worker = state.workers.find((entry) => entry.id === job.assignedTo);
+  if (!worker) return false;
+  return isWorkingToday(state, worker) && worker.taskId === null;
+}
+
+/** True when something that runs through this machine is being made this minute. The hall reads
+ *  it to spin the blade and throw the dust: nothing in the engine turns on it (CLAUDE.md T3 3.7). */
+export function machineInUse(state: GameState, item: Equipment): boolean {
+  const spec = findSpec(item.specId);
+  if (!spec || item.broken) return false;
+  if (spec.category !== 'machine' && spec.category !== 'extraction') return false;
+  if (spec.category === 'machine' && item.bagFull) return false;
+  return state.jobs.some((job) => {
+    if (job.stage !== 'inProduction' || job.blockedBy !== '') return false;
+    if (!someoneIsOnIt(state, job)) return false;
+    // The extraction serves whatever is running, so anything at the bench sets it going.
+    if (spec.category === 'extraction') return true;
+    return spec.usedOn === null || spec.usedOn === job.materialKind;
+  });
+}
+
 export interface BuyCheck {
   ok: boolean;
   reason: string;
