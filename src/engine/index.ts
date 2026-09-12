@@ -118,9 +118,11 @@ export {
   openTasks,
   softwareActive,
   staffManagementMinutes,
+  startTaskCheck,
   tasksOfKind,
   unloadMinutes,
 } from './tasks';
+export type { TaskStartCheck } from './tasks';
 
 // Staff
 export {

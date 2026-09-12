@@ -11,11 +11,10 @@ import {
   lifecycleSteps,
   openJobs,
   openTasks,
-  ownerIsAvailable,
   showsStartProduction,
-  softwareActive,
   staffMinutesLeft,
   startProductionCheck,
+  startTaskCheck,
   transportLabel,
   workerById,
 } from '../engine/index';
@@ -41,24 +40,27 @@ function onItLine(state: GameState, task: TaskInstance): string {
   return `${worker.name} is on it, ${minutes(staffMinutesLeft(worker))} of his day left`;
 }
 
+/** The one control a task row carries, wherever the row is drawn. The engine is asked whether the
+ *  owner could start this task and the answer is shown: a button he can press, or the reason he
+ *  cannot, with the way out of it. A Start that the engine would refuse is never drawn, which is
+ *  what left the drawings unable to be drawn (CLAUDE.md T4 3.2). */
+export function taskStartAction(state: GameState, task: TaskInstance, startLabel: string): string {
+  if (task.done) return '<span class="done">Done</span>';
+  if (state.owner.currentTaskId === task.id) return button('pauseTask', 'Pause');
+  const check = startTaskCheck(state, task.id);
+  if (check.ok) return button('startTask', startLabel, `data-id="${task.id}"`);
+  // He is holding something else: he can put it down here, without going to find it.
+  const wayOut = check.blockingTaskId === null ? '' : button('pauseTask', 'Put that down');
+  return reasonLabel(check.reason) + wayOut;
+}
+
 function taskRow(state: GameState, task: TaskInstance): string {
   const running = state.owner.currentTaskId === task.id;
   const staffLine = onItLine(state, task);
   const job = task.jobId === null ? null : findJob(state, task.jobId);
   // The task label already names the job, so the row adds the price and nothing else (T2 3.11).
   const jobLine = job === null ? '' : ` · ${money(job.price)}`;
-  let action: string;
-  if (task.done) {
-    action = '<span class="done">Done</span>';
-  } else if (running) {
-    action = button('pauseTask', 'Pause');
-  } else if (task.kind === 'design' && !softwareActive(state)) {
-    action = reasonLabel('No software licence');
-  } else if (!ownerIsAvailable(state)) {
-    action = reasonLabel('The owner is not in today');
-  } else {
-    action = button('startTask', staffLine === '' ? 'Start' : 'Take it on', `data-id="${task.id}"`);
-  }
+  const action = taskStartAction(state, task, staffLine === '' ? 'Start' : 'Take it on');
   return (
     `<div class="row${task.done ? ' is-done' : ''}${running ? ' is-running' : ''}">` +
     `<span class="row-main">${escapeHtml(task.label)}${jobLine}</span>` +

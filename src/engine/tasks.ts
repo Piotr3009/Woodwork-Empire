@@ -278,16 +278,44 @@ export function assignStaffTasks(state: GameState): TaskInstance[] {
 // The runner
 // ---------------------------------------------------------------------------
 
-export function startTask(state: GameState, taskId: string): boolean {
+/** Why the owner cannot pick this one up, or that he can. The one place the refusals are
+ *  written down: `startTask` asks this and nothing else, and every row that offers a Start asks
+ *  it too, so a button the engine would refuse is never drawn (CLAUDE.md T4 3.2). */
+export interface TaskStartCheck {
+  ok: boolean;
+  reason: string;
+  /** What he is holding, so the row can offer to put that down where the player is standing. */
+  blockingTaskId: string | null;
+}
+
+const CAN_START_TASK: TaskStartCheck = { ok: true, reason: '', blockingTaskId: null };
+
+function refused(reason: string, blockingTaskId: string | null = null): TaskStartCheck {
+  return { ok: false, reason, blockingTaskId };
+}
+
+export function startTaskCheck(state: GameState, taskId: string): TaskStartCheck {
   const task = findTask(state, taskId);
-  if (!task || task.done) return false;
-  if (!ownerIsAvailable(state)) return false;
+  if (!task) return refused('That job of work has gone');
+  if (task.done) return refused('Done');
+  if (!ownerIsAvailable(state)) return refused('The owner is not in today');
   // One thing at a time: the current task has to be finished or paused first (CLAUDE.md 10.1).
-  if (state.owner.currentTaskId !== null && state.owner.currentTaskId !== task.id) return false;
+  const current = state.owner.currentTaskId;
+  if (current !== null && current !== task.id) {
+    const held = findTask(state, current);
+    return refused(`Busy with ${held ? held.label : 'something else'}`, current);
+  }
   // No drawing without a licence for the software (CLAUDE.md 9.2).
-  if (task.kind === 'design' && !softwareActive(state)) return false;
+  if (task.kind === 'design' && !softwareActive(state)) return refused('No software licence');
   // Nothing comes off the lorry until there is shelving to put it on (CLAUDE.md T2 3.6).
-  if (task.kind === 'unload' && !canUnload(state)) return false;
+  if (task.kind === 'unload' && !canUnload(state)) return refused('Nowhere to put it');
+  return CAN_START_TASK;
+}
+
+export function startTask(state: GameState, taskId: string): boolean {
+  if (!startTaskCheck(state, taskId).ok) return false;
+  const task = findTask(state, taskId);
+  if (!task) return false;
   // Every refusal is behind us, so it is safe to take the task off whoever was holding it. The
   // work he did on it stays done.
   for (const worker of state.workers) {

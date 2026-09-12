@@ -71,6 +71,34 @@ describe('the drawings on the desk', () => {
       .toBe('Start');
   });
 
+  it('says what the owner is busy with instead of a Start that cannot work', () => {
+    let state = withJob();
+    const books = state.tasks.find((task) => task.kind === 'bookkeeping');
+    const design = state.tasks.find((task) => task.kind === 'design');
+    if (!books || !design) throw new Error('no tasks');
+    state = act(state, { type: 'START_TASK', taskId: books.id });
+    // The owner does one thing at a time, so the engine refuses the drawing (CLAUDE.md 10.1).
+    const refused = act(state, { type: 'START_TASK', taskId: design.id });
+    expect(refused.owner.currentTaskId).toBe(books.id);
+    // The roll used to offer a Start that did nothing and said nothing. Now it says why.
+    const html = parse(renderDrawings(state)).innerHTML;
+    expect(html).not.toContain('data-do="startTask"');
+    expect(html).toContain('Busy with Bookkeeping');
+    expect(html).toContain('data-do="pauseTask"');
+  });
+
+  it('draws the drawing to the end once the other job of work is put down', () => {
+    let state = withJob();
+    const books = state.tasks.find((task) => task.kind === 'bookkeeping');
+    if (!books) throw new Error('no bookkeeping');
+    state = act(state, { type: 'START_TASK', taskId: books.id });
+    state = act(state, { type: 'PAUSE_TASK' });
+    state = doTask(state, 'design');
+    const design = state.tasks.find((task) => task.kind === 'design');
+    expect(design?.done).toBe(true);
+    expect(parse(renderDrawings(state)).innerHTML).toContain('drawn on day 1');
+  });
+
   it('lists a finished drawing with the day it was drawn', () => {
     let state = withJob();
     state = doTask(state, 'design');
