@@ -10,6 +10,7 @@ import {
   templatesForReputation,
 } from '../../src/engine/catalog';
 import { clampReputation, ratingFor, reputationTier } from '../../src/engine/reputation';
+import { callsForPrice } from '../../src/engine/tasks';
 import type { Job } from '../../src/engine/index';
 import { act, newGame } from '../helpers';
 
@@ -133,5 +134,16 @@ describe('reputation', () => {
     expect(ratingFor(job({ daysLate: 3 }))).toBe(-0.3);
     expect(ratingFor(job({ express: true, daysLate: 1 }))).toBe(-0.1);
     expect(ratingFor(job({ byHand: true }))).toBe(0.3);
+  });
+});
+
+describe('the call counts of 9.1 against the price curve of 8.10', () => {
+  it('agrees with the 9.1 column at every base price', () => {
+    // 9.1 lists calls per template, 8.10 gives them by price. They agree at the base price of all
+    // six templates, so the curve is the one code path and the column is its check. Size variants
+    // follow the curve: a 0.8 size TV unit gets 2 calls, not the 3 the column shows.
+    for (const entry of PRODUCT_TEMPLATES) {
+      expect(callsForPrice(entry.basePrice), entry.id).toBe(entry.calls);
+    }
   });
 });

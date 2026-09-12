@@ -131,7 +131,8 @@ describe('the first ten minutes', () => {
     expect(html()).toContain('data-room="wc"');
     click('[data-room="wc"]');
     expect(html()).toContain('The WC.');
-    expect(html()).toContain('Work here');
+    // Nothing has its material in the hall yet, so the hall says why instead of a dead button.
+    expect(html()).toContain('No job has its material in the hall yet');
     expect(html()).toContain('Clean up');
   });
 });

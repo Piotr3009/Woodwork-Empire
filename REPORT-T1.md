@@ -312,6 +312,29 @@ every finding checked against the code. Twelve held up and are fixed on this bra
 12. **Bankruptcy never opened an event**, although 6.2 lists it among the things that stop the clock.
     It now opens over the game over screen.
 
+Six more from the audit of section 9 and the standing rules, also fixed here:
+
+13. **A bag that filled before the central system was bought kept the machine stopped**, although
+    9.6 says no bags exist once the system is in.
+14. **The order board did not need the laptop**, although 9.2 lists the board as one of the three
+    things the laptop is required for. The board now says to buy one.
+15. **The accident risk warning of the dirty band was nowhere in the UI.** The line under the hall
+    now says somebody will get hurt from the dirty band on, as 9.7 asks.
+16. **Dust 70 was read two ways**: messy for productivity, high for the extractor breakdown. Both
+    now use the same edge.
+17. **The disabled button with a reason, which 9.2 declares the one allowed pattern for a locked
+    catalogue line, had spread to the board, the hiring modal, the laptop and the hall.** Those four
+    now print the reason as text, so the only control a player cannot press is a locked catalogue
+    line.
+18. **The calls column of 9.1 was dead data**, because calls come from the price curve of 8.10. The
+    curve stays the one code path and a test now checks it reproduces the 9.1 column at every base
+    price. They agree at all six base prices, and size variants follow the curve, so a 0.8 size TV
+    unit asks for 2 calls where the column shows 3. That is the 9.1 against 8.10 contradiction rule
+    3.2 asks me to record.
+
 Two findings were judged wrong and left alone, both named in section 8 as questions instead: that
 `END_DAY` before 16:00 should end the day (7.2 says it means going home, and the hours that follow
 count as absence), and that the on time rating bonus should survive a late delivery.
+
+One more is disclosed rather than fixed: the lacquer finish of 9.1 is unreachable content, because
+every template lists laminate only and the spray booth that unlocks lacquer is locked for Turn 1.

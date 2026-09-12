@@ -85,8 +85,12 @@ export function primaryButton(action: string, text: string, extra = ''): string 
   );
 }
 
-export function disabledButton(text: string, reason: string): string {
-  return (
-    `<button class="btn" disabled title="${escapeHtml(reason)}">${escapeHtml(text)}</button>`
-  );
+/** The one allowed disabled button: a locked catalogue line with its reason (CLAUDE.md 9.2). */
+export function lockedButton(text: string, reason: string): string {
+  return `<button class="btn" disabled title="${escapeHtml(reason)}">${escapeHtml(text)}</button>`;
+}
+
+/** Everywhere else, a reason the player can read instead of a control he cannot press. */
+export function reasonLabel(reason: string): string {
+  return `<span class="reason">${escapeHtml(reason)}</span>`;
 }

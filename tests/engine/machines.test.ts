@@ -371,3 +371,29 @@ describe('the extractor', () => {
     expect(eventsOfKind(run.events, 'extractorBroken').length).toBeGreaterThanOrEqual(1);
   });
 });
+
+describe('the central system and a bag that was already full', () => {
+  it('unblocks the machine, because with the system there are no bags at all', () => {
+    let state = atTheBench();
+    const saw = state.equipment.find((item) => item.specId === 'tableSaw');
+    if (saw) saw.bagFull = true;
+    expect(bagBlocked(state, 'sheet')).toBe(true);
+    state = act(state, { type: 'BUY_EQUIPMENT', specId: 'dustSystem' });
+    expect(bagBlocked(state, 'sheet')).toBe(false);
+    const working = tick(state, 30);
+    expect(firstJob(working).labourRemaining).toBeLessThan(firstJob(state).labourRemaining);
+  });
+
+  it('reads the messy to dirty edge the same way everywhere', () => {
+    const state = act(newGame({ difficulty: 'veryEasy' }), {
+      type: 'BUY_EQUIPMENT',
+      specId: 'extractor',
+    });
+    state.dust = 70;
+    expect(dustBand(state.dust).label).toBe('messy');
+    expect(extractorBreakdownChance(state)).toBe(EXTRACTOR_BREAKDOWN_CHANCE);
+    state.dust = 70.5;
+    expect(dustBand(state.dust).label).toBe('dirty');
+    expect(extractorBreakdownChance(state)).toBe(EXTRACTOR_BREAKDOWN_CHANCE_HIGH_DUST);
+  });
+});

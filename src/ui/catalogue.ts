@@ -4,10 +4,10 @@ import { EQUIPMENT_SPECS, SOFTWARE_ONE_OFF_PRICE, SOFTWARE_SUBSCRIPTION_MONTHLY 
 import { canBuy, canBuySoftware, countOf } from '../engine/index';
 import type { GameState } from '../engine/index';
 import {
-  disabledButton,
   emptyLine,
   escapeHtml,
   filterField,
+  lockedButton,
   money,
   primaryButton,
 } from './modal';
@@ -23,7 +23,7 @@ export function renderCatalogue(state: GameState, filter: string): string {
       const owned = count > 0 ? `<span class="badge">Owned ${count}</span>` : '';
       const action = check.ok
         ? primaryButton('buyEquipment', 'Buy', `data-id="${spec.id}"`)
-        : disabledButton('Buy', check.reason);
+        : lockedButton('Buy', check.reason);
       return (
         `<div class="card${check.ok ? '' : ' is-locked'}">` +
         `<div class="card-main"><h3>${escapeHtml(spec.name)} ${owned}</h3>` +
@@ -60,7 +60,7 @@ function renderSoftware(state: GameState): string {
     `<div class="card-action">${
       oneOff.ok
         ? primaryButton('buySoftware', 'Buy', 'data-id="oneOff"')
-        : disabledButton('Buy', oneOff.reason)
+        : lockedButton('Buy', oneOff.reason)
     }</div></div>` +
     '<div class="card"><div class="card-main"><h3>Subscription</h3>' +
     `<p class="figures"><strong>${money(SOFTWARE_SUBSCRIPTION_MONTHLY)}</strong> a month · ` +
@@ -68,7 +68,7 @@ function renderSoftware(state: GameState): string {
     `<div class="card-action">${
       subscription.ok
         ? primaryButton('buySoftware', 'Subscribe', 'data-id="subscription"')
-        : disabledButton('Subscribe', subscription.reason)
+        : lockedButton('Subscribe', subscription.reason)
     }</div></div>`
   );
 }

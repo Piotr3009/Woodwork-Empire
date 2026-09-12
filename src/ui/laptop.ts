@@ -14,12 +14,12 @@ import {
 import type { GameState, Job, TaskInstance } from '../engine/index';
 import {
   button,
-  disabledButton,
   emptyLine,
   escapeHtml,
   minutes,
   money,
   primaryButton,
+  reasonLabel,
 } from './modal';
 
 function taskRow(state: GameState, task: TaskInstance): string {
@@ -33,9 +33,9 @@ function taskRow(state: GameState, task: TaskInstance): string {
   } else if (running) {
     action = button('pauseTask', 'Pause');
   } else if (task.kind === 'design' && !softwareActive(state)) {
-    action = disabledButton('Start', 'No software licence');
+    action = reasonLabel('No software licence');
   } else if (!state.owner.present || state.owner.wentHome) {
-    action = disabledButton('Start', 'The owner is not in today');
+    action = reasonLabel('The owner is not in today');
   } else {
     action = primaryButton('startTask', 'Start', `data-id="${task.id}"`);
   }

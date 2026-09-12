@@ -24,6 +24,7 @@ import {
   type ModalPosition,
   escapeHtml,
   minutes,
+  reasonLabel,
   renderModal,
 } from './modal';
 import { renderStart } from './start';
@@ -113,12 +114,10 @@ function hallControls(current: GameState): string {
   const ready = oldestReadyJob(current);
   const working = current.jobs.some((job) => job.assignedTo === 'owner');
   const workHere = working
-    ? '<button class="btn" data-do="workHere" disabled title="You are already at a bench">' +
-      'Work here</button>'
+    ? reasonLabel('You are at the bench')
     : ready
       ? '<button class="btn btn-primary" data-do="workHere">Work here</button>'
-      : '<button class="btn" disabled title="No job has its material in the hall yet">' +
-        'Work here</button>';
+      : reasonLabel('No job has its material in the hall yet');
   const fix = machinesStopped(current)
     ? '<button class="btn btn-primary" data-do="repairExtractor">Fix extractor</button>'
     : '';

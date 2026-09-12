@@ -120,8 +120,10 @@ export function bagMachinesFor(state: GameState, material: MaterialKind): Equipm
   });
 }
 
-/** A full bag stops the machine, and nothing of that kind can be made (CLAUDE.md 9.6). */
+/** A full bag stops the machine, and nothing of that kind can be made (CLAUDE.md 9.6). Once the
+ *  central system is in there are no bags, so nothing is stopped by one. */
 export function bagBlocked(state: GameState, material: MaterialKind): boolean {
+  if (!bagsExist(state)) return false;
   return bagMachinesFor(state, material).some((item) => item.bagFull);
 }
 
@@ -171,7 +173,8 @@ export function clearDust(state: GameState): void {
 export function extractorBreakdownChance(state: GameState): number {
   if (has(state, 'dustSystem')) return 0;
   if (!has(state, 'extractor')) return 0;
-  return state.dust >= DUST_HIGH_THRESHOLD
+  // Past the messy band, which is the same edge dustBand uses.
+  return state.dust > DUST_HIGH_THRESHOLD
     ? EXTRACTOR_BREAKDOWN_CHANCE_HIGH_DUST
     : EXTRACTOR_BREAKDOWN_CHANCE;
 }

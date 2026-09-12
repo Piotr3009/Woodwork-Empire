@@ -251,9 +251,13 @@ export function renderHall(state: GameState): string {
     : state.owner.wentHome
       ? '. The owner has gone home, so everyone works at 0.7'
       : '';
+  const band = dustBand(state.dust);
+  // 9.7: from the dirty band on, the player is warned that somebody can get hurt.
+  const riskLine =
+    band.label === 'dirty' || band.label === 'dangerous' ? ', somebody will get hurt in this' : '';
   const stateLine = machinesStopped(state)
     ? `Hall: everything stopped, the extractor is broken${ownerLine}`
-    : `Hall: ${dustBand(state.dust).label}${ownerLine}`;
+    : `Hall: ${band.label}${riskLine}${ownerLine}`;
   return (
     `<svg class="hall-view" viewBox="${viewBox}" xmlns="http://www.w3.org/2000/svg" ` +
     `role="img" aria-label="Workshop hall">${parts.join('')}</svg>` +

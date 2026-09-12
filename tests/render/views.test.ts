@@ -181,3 +181,15 @@ describe('the game over screen', () => {
     expect(html).toContain('data-do="restart"');
   });
 });
+
+describe('the warnings on the hall line', () => {
+  it('warns that somebody will get hurt from the dirty band on, as 9.7 asks', () => {
+    const state = newGame();
+    state.dust = 50;
+    expect(renderHall(state)).not.toContain('get hurt');
+    state.dust = 75;
+    expect(renderHall(state)).toContain('Hall: dirty, somebody will get hurt');
+    state.dust = 95;
+    expect(renderHall(state)).toContain('Hall: dangerous, somebody will get hurt');
+  });
+});

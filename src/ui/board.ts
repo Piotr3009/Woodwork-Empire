@@ -1,16 +1,16 @@
 // The order board: the enquiries waiting, with what is greyed out and why (CLAUDE.md 10.1).
 
-import { canAccept, template } from '../engine/index';
+import { canAccept, has, template } from '../engine/index';
 import type { Enquiry, GameState } from '../engine/index';
 import {
   days,
-  disabledButton,
   emptyLine,
   escapeHtml,
   filterField,
   minutes,
   money,
   primaryButton,
+  reasonLabel,
 } from './modal';
 import { callsForPrice, clientCallMinutes, designMinutes } from '../engine/index';
 
@@ -38,7 +38,7 @@ function row(state: GameState, enquiry: Enquiry): string {
         byHand ? 'Take it by hand' : 'Accept',
         `data-id="${enquiry.id}" data-byhand="${byHand ? '1' : '0'}"`,
       )
-    : disabledButton('Accept', allowed.reason);
+    : reasonLabel(allowed.reason);
   const lockLine =
     enquiry.lockReason === null
       ? ''
@@ -61,6 +61,10 @@ function row(state: GameState, enquiry: Enquiry): string {
 }
 
 export function renderBoard(state: GameState, filter: string): string {
+  // The laptop is what the enquiries come in on (CLAUDE.md 9.2).
+  if (!has(state, 'laptop')) {
+    return emptyLine('The enquiries come in by email. Buy a laptop from the catalogue first.');
+  }
   const needle = filter.trim().toLowerCase();
   const shown = state.enquiries.filter(
     (enquiry) => needle === '' || enquiry.name.toLowerCase().includes(needle),

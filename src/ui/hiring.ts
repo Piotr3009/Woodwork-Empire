@@ -4,12 +4,12 @@
 import { hiringOptions } from '../engine/index';
 import type { GameState, HiringOption } from '../engine/index';
 import {
-  disabledButton,
   emptyLine,
   escapeHtml,
   minutes,
   money,
   primaryButton,
+  reasonLabel,
 } from './modal';
 
 function optionRow(option: HiringOption): string {
@@ -29,7 +29,7 @@ function optionRow(option: HiringOption): string {
         'Hire',
         `data-role="${option.role}" data-tier="${option.tier ?? ''}"`,
       )
-    : disabledButton('Hire', option.blockReason);
+    : reasonLabel(option.blockReason);
   return (
     `<div class="card${option.available ? '' : ' is-locked'}">` +
     `<div class="card-main"><h3>${escapeHtml(option.label)}</h3>` +
