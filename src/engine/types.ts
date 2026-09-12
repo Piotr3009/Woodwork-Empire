@@ -489,6 +489,7 @@ export type GameAction =
   | { type: 'BUY_STOCK'; sheets: number }
   | { type: 'PAY_ARREARS'; amount: number | null }
   | { type: 'ORDER_TRANSPORT'; jobId: string }
+  | { type: 'MOVE_ITEM'; itemId: string; x: number; y: number }
   | { type: 'WORK_HERE'; jobId: string | null }
   | { type: 'ASSIGN_JOB'; jobId: string; workerId: string | null }
   | { type: 'HIRE'; role: WorkerRole; tier: WorkerTier | null }

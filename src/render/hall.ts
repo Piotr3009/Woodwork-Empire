@@ -204,7 +204,17 @@ function figure(
   };
 }
 
-export function renderHall(state: GameState): string {
+/** What the player is dragging, and whether it can go where the mouse is (CLAUDE.md T2 3.10). */
+export interface Ghost {
+  x: number;
+  y: number;
+  width: number;
+  depth: number;
+  ok: boolean;
+  reason: string;
+}
+
+export function renderHall(state: GameState, ghost: Ghost | null = null): string {
   const unit = state.unit;
   const bounds = gridBounds(unit.widthTiles + YARD_WIDTH_TILES, unit.depthTiles, 5);
   const pad = 24;
@@ -362,6 +372,20 @@ export function renderHall(state: GameState): string {
   drawables.push(...sawdust(state));
   drawables.sort((left, right) => left.depth - right.depth);
   parts.push(drawables.map((drawable) => drawable.svg).join(''));
+
+  // The ghost footprint of whatever is being dragged, on top of everything else.
+  if (ghost !== null) {
+    const colour = ghost.ok ? 'var(--good)' : 'var(--bad)';
+    parts.push(
+      `<g data-ghost="1">` +
+        `<polygon points="${points(footprintPolygon(ghost.x, ghost.y, ghost.width, ghost.depth))}" ` +
+        `fill="none" stroke="${colour}" stroke-width="3" />` +
+        `<text x="${Math.round(centreOf(ghost.x, ghost.y, ghost.width, ghost.depth).x)}" ` +
+        `y="${Math.round(centreOf(ghost.x, ghost.y, ghost.width, ghost.depth).y)}" ` +
+        `text-anchor="middle" class="iso-label ghost-label" fill="${colour}">` +
+        `${escapeText(ghost.ok ? 'Drop it here' : ghost.reason)}</text></g>`,
+    );
+  }
 
   const viewBox = [
     Math.round(bounds.minX - pad),

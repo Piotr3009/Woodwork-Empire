@@ -915,6 +915,8 @@ export const CANTEEN_SLOT_LAYOUT: LayoutSlot[] = [
 
 /** Where a waiting delivery van stands, and how big it is. */
 export const GATE_LAYOUT = { x: 0, y: 4, yard: true, width: 4, depth: 2, height: 2 };
+/** The tile rows in front of the gate that have to stay clear [TUNE]. */
+export const GATE_LANE_TILES = 2;
 /** The apron beside the gate where finished pieces stand, outside the floor (CLAUDE.md T2 3.13). */
 export const FINISHED_GOODS_LAYOUT = { x: 0, y: 6, yard: true, width: 3, depth: 1, height: 1 };
 export const DELIVERY_VAN_SPRITE = 'deliveryVan';

@@ -22,6 +22,7 @@ import {
   STATE_VERSION,
 } from './constants';
 import { expireEnquiries, refillBoard, refreshLocks } from './board';
+import { canPlaceSpec, firstFreeTile, moveItem } from './layout';
 import { daysBetween, isDayExhausted, isOvertime, isWorkingDay, weekOfDay, weekday } from './clock';
 import {
   canAfford,
@@ -981,6 +982,9 @@ export function applyAction(state: GameState, action: GameAction): GameState {
     case 'PAY_ARREARS':
       payArrears(next, action.amount);
       break;
+    case 'MOVE_ITEM':
+      moveItem(next, action.itemId, action.x, action.y);
+      break;
     case 'ORDER_TRANSPORT': {
       if (orderTransport(next, action.jobId)) {
         const task = next.tasks.find(
@@ -1041,8 +1045,8 @@ function slotFrom(slots: readonly { x: number; y: number }[], index: number): { 
   return slot ? { x: slot.x, y: slot.y } : { x: 0, y: 0 };
 }
 
-/** Fixed placement from constants. Free placement by the player is parked (CLAUDE.md 14.9). */
-function anchorFor(state: GameState, specId: string): { x: number; y: number } {
+/** The tile the catalogue would like to put a new item on. */
+function defaultAnchor(state: GameState, specId: string): { x: number; y: number } {
   const index = countOf(state, specId);
   if (specId === 'workbench') return slotFrom(BENCH_SLOT_LAYOUT, index);
   if (specId === 'locker') return slotFrom(LOCKER_SLOT_LAYOUT, index);
@@ -1050,11 +1054,22 @@ function anchorFor(state: GameState, specId: string): { x: number; y: number } {
   const desk = DESK_LAYOUT.find((object) => object.id === specId);
   if (desk) return { x: desk.x, y: desk.y };
   const slot = STARTING_LAYOUT[specId];
-  const base = slot
+  return slot
     ? { x: slot.yard === true ? state.unit.widthTiles + slot.x : slot.x, y: slot.y }
     : { x: 0, y: 6 };
-  // A second machine of the same kind stands beside the first.
-  return { x: base.x + index * 2, y: base.y };
+}
+
+/** A new purchase lands on its default tile, or on the first free one when that is taken. The
+ *  player moves it wherever he likes afterwards (CLAUDE.md T2 3.10). */
+function anchorFor(state: GameState, specId: string): { x: number; y: number } {
+  const spec = findSpec(specId);
+  const preferred = defaultAnchor(state, specId);
+  // The office furniture and anything in the yard are not on the hall floor.
+  if (!spec || spec.category === 'furniture' || STARTING_LAYOUT[specId]?.yard === true) {
+    return preferred;
+  }
+  if (canPlaceSpec(state, specId, preferred.x, preferred.y, null).ok) return preferred;
+  return firstFreeTile(state, specId) ?? preferred;
 }
 
 export function buyEquipment(state: GameState, specId: string): BuyCheck {

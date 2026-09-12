@@ -300,6 +300,25 @@ describe('the sliding figures', () => {
   });
 });
 
+describe('setting the hall out', () => {
+  it('stops the clock, offers Done, and starts it again', () => {
+    click('[data-do="setView"][data-view="hall"]');
+    click('[data-do="setSpeed"][data-speed="2"]');
+    expect(currentState()?.speed).toBe(2);
+    expect(html()).toContain('data-do="startSetup"');
+    click('[data-do="startSetup"]');
+    expect(currentState()?.speed).toBe(0);
+    expect(html()).toContain('data-do="endSetup"');
+    expect(html()).toContain('Drag the machines');
+    expect(html()).not.toContain('data-do="startSetup"');
+    click('[data-do="endSetup"]');
+    expect(currentState()?.speed).toBe(2);
+    expect(html()).toContain('data-do="startSetup"');
+    click('[data-do="setSpeed"][data-speed="0"]');
+    click('[data-do="setView"][data-view="office"]');
+  });
+});
+
 describe('accounting', () => {
   it('plays blind while the books are behind, and shows everything once they are written up', () => {
     click('[data-office="accounting"]');

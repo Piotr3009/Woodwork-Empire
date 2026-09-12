@@ -13,8 +13,25 @@ import {
   ownerJob,
   runMinutes,
 } from '../engine/index';
-import type { Difficulty, GameAction, GameState, WorkerRole, WorkerTier } from '../engine/index';
+import type {
+  Difficulty,
+  GameAction,
+  GameState,
+  Speed,
+  WorkerRole,
+  WorkerTier,
+} from '../engine/index';
+import type { Ghost } from '../render/hall';
+
+/** The item under the mouse while the hall is being set out. */
+interface Drag {
+  itemId: string;
+  x: number;
+  y: number;
+}
+import { boxOf, canPlace } from '../engine/index';
 import { renderHall } from '../render/hall';
+import { screenToTile } from '../render/iso';
 import { renderOffice } from '../render/office';
 import { renderAccounting } from './accounting';
 import { renderBoard } from './board';
@@ -49,6 +66,10 @@ interface Ui {
   focusNext: string | null;
   stockSheets: string;
   arrearsAmount: string;
+  /** Setting the hall out: the clock is stopped and the kit can be dragged about. */
+  setup: boolean;
+  speedBeforeSetup: Speed;
+  drag: Drag | null;
   difficulty: Difficulty;
   playerName: string;
   companyName: string;
@@ -82,6 +103,9 @@ function freshUi(): Ui {
     focusNext: null,
     stockSheets: '6',
     arrearsAmount: '500',
+    setup: false,
+    speedBeforeSetup: 0,
+    drag: null,
     difficulty: 'easy',
     playerName: 'Piotr',
     companyName: 'Woodwork Empire',
@@ -119,7 +143,29 @@ function modalBody(id: ModalId, current: GameState): string {
   }
 }
 
+/** The ghost of the item being dragged, with the engine's verdict on the tile under the mouse. */
+function ghostFor(current: GameState): Ghost | null {
+  const drag = ui.drag;
+  if (drag === null) return null;
+  const item = current.equipment.find((entry) => entry.id === drag.itemId);
+  if (!item) return null;
+  const box = boxOf(item.specId, drag.x, drag.y);
+  const check = canPlace(current, drag.itemId, drag.x, drag.y);
+  return { x: box.x, y: box.y, width: box.width, depth: box.depth, ok: check.ok, reason: check.reason };
+}
+
+function setupControls(): string {
+  return (
+    '<div class="view-controls">' +
+    '<button class="btn btn-primary" data-do="endSetup">Done</button>' +
+    '<span class="reason">Drag the machines, the benches and the shelving where you want them. ' +
+    'The rooms and the gate stay where they are.</span>' +
+    '</div>'
+  );
+}
+
 function hallControls(current: GameState): string {
+  if (ui.setup) return setupControls();
   const ready = oldestReadyJob(current);
   const working = ownerJob(current) !== null;
   const workHere = working
@@ -149,6 +195,7 @@ function hallControls(current: GameState): string {
     workHere +
     '<button class="btn" data-do="startCleaning">Clean up · ' +
     `${minutes(CLEANING_MINUTES)}</button>` +
+    '<button class="btn" data-do="startSetup">Set up hall</button>' +
     fix +
     service +
     '</div>'
@@ -199,7 +246,7 @@ function screenHtml(): string {
   if (current.gameOver) {
     return renderGameOver(current) + `<div class="modal-layer">${modals.join('')}</div>`;
   }
-  const view = ui.view === 'hall' ? renderHall(current) : renderOffice(current);
+  const view = ui.view === 'hall' ? renderHall(current, ghostFor(current)) : renderOffice(current);
   const controls = ui.view === 'hall' ? hallControls(current) : '';
   const note = ui.note === '' ? '' : `<p class="view-note">${escapeHtml(ui.note)}</p>`;
   return (
@@ -362,7 +409,18 @@ function handleAction(element: DataElement, point: { x: number; y: number }): vo
       return;
     case 'setView':
       ui.view = element.dataset.view === 'office' ? 'office' : 'hall';
+      if (ui.view !== 'hall') endSetup();
       break;
+    case 'startSetup':
+      ui.setup = true;
+      ui.drag = null;
+      ui.speedBeforeSetup = game().speed;
+      dispatch({ type: 'SET_SPEED', speed: 0 });
+      return;
+    case 'endSetup':
+      endSetup();
+      dispatch({ type: 'SET_SPEED', speed: ui.speedBeforeSetup });
+      return;
     case 'toggleMenu':
       ui.menuOpen = !ui.menuOpen;
       break;
@@ -491,6 +549,8 @@ function copyState(): void {
 }
 
 function handleSceneClick(element: DataElement, point: { x: number; y: number }): boolean {
+  // In setup mode a click on the kit is a drag, not a question about the bag.
+  if (ui.setup) return true;
   const room = element.dataset.room;
   if (room !== undefined) {
     if (room === 'office') {
@@ -580,8 +640,19 @@ function onInput(event: Event): void {
   }
 }
 
+function endSetup(): void {
+  ui.setup = false;
+  ui.drag = null;
+}
+
 function onKeyDown(event: KeyboardEvent): void {
   if (event.key !== 'Escape') return;
+  // Escape drops whatever is in hand before it closes anything (CLAUDE.md T2 3.10).
+  if (ui.drag !== null) {
+    ui.drag = null;
+    render();
+    return;
+  }
   if (ui.modal !== null) {
     ui.modal = null;
     ui.modalPosition = null;
@@ -589,8 +660,64 @@ function onKeyDown(event: KeyboardEvent): void {
   }
 }
 
+/** The tile under the mouse, read through the hall SVG's own view box. */
+function tileUnder(event: MouseEvent): { x: number; y: number } | null {
+  if (!root) return null;
+  const svg = root.querySelector('.hall-view');
+  if (!(svg instanceof SVGSVGElement)) return null;
+  const viewBox = (svg.getAttribute('viewBox') ?? '').split(' ').map(Number);
+  const [minX, minY, width, height] = viewBox;
+  if (minX === undefined || minY === undefined || width === undefined || height === undefined) {
+    return null;
+  }
+  const rect = svg.getBoundingClientRect();
+  if (rect.width === 0 || rect.height === 0) return null;
+  const userX = ((event.clientX - rect.left) / rect.width) * width + minX;
+  const userY = ((event.clientY - rect.top) / rect.height) * height + minY;
+  const tile = screenToTile(userX, userY);
+  return { x: Math.floor(tile.x), y: Math.floor(tile.y) };
+}
+
+/** Dragging a machine about while the hall is being set out (CLAUDE.md T2 3.10). */
+function onSetupPointerDown(event: MouseEvent): boolean {
+  if (!ui.setup || state === null) return false;
+  const target = event.target;
+  if (!(target instanceof Element)) return false;
+  const kit = target.closest('[data-kit]');
+  if (kit === null) return false;
+  const itemId = kit.getAttribute('data-kit');
+  if (itemId === null) return false;
+  const at = tileUnder(event);
+  if (at === null) return false;
+  ui.drag = { itemId, x: at.x, y: at.y };
+  const move = (moveEvent: MouseEvent): void => {
+    if (ui.drag === null) return;
+    const tile = tileUnder(moveEvent);
+    if (tile === null || (tile.x === ui.drag.x && tile.y === ui.drag.y)) return;
+    ui.drag = { itemId: ui.drag.itemId, x: tile.x, y: tile.y };
+    render();
+  };
+  const up = (): void => {
+    window.removeEventListener('mousemove', move);
+    window.removeEventListener('mouseup', up);
+    const drag = ui.drag;
+    ui.drag = null;
+    if (drag === null) {
+      render();
+      return;
+    }
+    dispatch({ type: 'MOVE_ITEM', itemId: drag.itemId, x: drag.x, y: drag.y });
+  };
+  window.addEventListener('mousemove', move);
+  window.addEventListener('mouseup', up);
+  event.preventDefault();
+  render();
+  return true;
+}
+
 /** Modals are dragged by their header (CLAUDE.md 3.9). */
 function onPointerDown(event: MouseEvent): void {
+  if (onSetupPointerDown(event)) return;
   const target = event.target;
   if (!(target instanceof Element)) return;
   const head = target.closest('[data-drag]');

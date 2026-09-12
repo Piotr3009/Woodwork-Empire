@@ -46,6 +46,10 @@ T2-10 Moving figures. Each figure is drawn at its station's anchor tile as a tra
 with a 0.8 s CSS transition, and the render loop puts a moved figure back where it was so the
 transition actually runs. The tooltip names the machine a figure is standing at.
 
+T2-11 Hall setup. A Set up hall button stops the clock and lets the machines, benches and shelving
+be dragged about on the tile grid, with a ghost footprint that goes green or red with the reason.
+The layout lives in the state, and a new purchase lands on the first free tile when its own is taken.
+
 ## 2. Not done or partial
 
 ## 3. Tests

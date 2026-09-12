@@ -153,6 +153,17 @@ export {
   stockIsLow,
 } from './materials';
 
+// The hall floor
+export {
+  boxOf,
+  canPlace,
+  canPlaceSpec,
+  firstFreeTile,
+  gateLane,
+  hallItems,
+} from './layout';
+export type { Box, PlaceCheck } from './layout';
+
 // Where everybody is standing
 export {
   PRODUCTION_CYCLE,
