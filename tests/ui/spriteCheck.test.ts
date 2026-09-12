@@ -4,7 +4,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   DELIVERY_VAN_SPRITE,
-  DESK_LAYOUT,
   EQUIPMENT_SPECS,
   ROOM_LAYOUT,
 } from '../../src/engine/constants';
@@ -22,10 +21,11 @@ describe('the sprite check page', () => {
     expect(new Set(names).size).toBe(names.length);
     for (const spec of EQUIPMENT_SPECS) expect(names, spec.id).toContain(spec.spriteKey);
     for (const room of ROOM_LAYOUT) expect(names, room.id).toContain(room.spriteKey);
-    for (const object of DESK_LAYOUT) expect(names, object.id).toContain(object.spriteKey);
     expect(names).toContain(DELIVERY_VAN_SPRITE);
-    // The drawings that moved onto the desk, and the five classes of saw (CLAUDE.md T3 3.3, 3.5).
-    expect(names).toContain('drawings');
+    // The office desk items went with the desk: the page asks for the catalogue, the rooms and
+    // the van, and nothing else (the grep in tests/render/deskItemsGone.test.ts proves it).
+    expect(names.every((name) => name !== '')).toBe(true);
+    // The five classes of saw (CLAUDE.md T3 3.5).
     expect(names).toContain('tableSaw.used');
     expect(names).toContain('tableSaw.industrial');
     // A family with one class gets no class cell of its own.

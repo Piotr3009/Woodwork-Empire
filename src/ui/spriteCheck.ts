@@ -2,12 +2,7 @@
 // placeholder box, and the picture beside it when the art side has delivered one. This page is
 // the acceptance tool of docs/art/SPRITES.md item 7 (CLAUDE.md T3 3.6).
 
-import {
-  DELIVERY_VAN_SPRITE,
-  DESK_LAYOUT,
-  EQUIPMENT_SPECS,
-  ROOM_LAYOUT,
-} from '../engine/constants';
+import { DELIVERY_VAN_SPRITE, EQUIPMENT_SPECS, ROOM_LAYOUT } from '../engine/constants';
 import { box, escapeText, label, polygon } from '../render/hall';
 import { boxPolygons, centreOf, footprintPolygon, gridBounds, tileToScreen } from '../render/iso';
 import { spriteCanvas, spriteFileSize, spriteUrl } from '../render/sprites';
@@ -26,7 +21,8 @@ export interface SpriteTarget {
 }
 
 /** Every key the game can ask for, once each: the catalogue families and their classes, the three
- *  rooms, everything on the office desk, and the lorry at the gate. */
+ *  rooms, and the lorry at the gate. The office is a room of full width layers now, which the
+ *  page shows on its own below (CLAUDE.md T4 3.1). */
 export function spriteTargets(): SpriteTarget[] {
   const targets: SpriteTarget[] = [];
   const seen = new Set<string>();
@@ -67,17 +63,6 @@ export function spriteTargets(): SpriteTarget[] {
       depth: room.depth,
       height: room.height,
       where: 'hall room',
-    });
-  }
-  for (const object of DESK_LAYOUT) {
-    add({
-      name: object.spriteKey,
-      spriteKey: object.spriteKey,
-      tier: null,
-      width: object.width,
-      depth: object.depth,
-      height: object.height,
-      where: 'office desk',
     });
   }
   add({

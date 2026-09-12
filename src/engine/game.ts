@@ -6,7 +6,6 @@ import {
   ACCIDENT_DAYS_OFF,
   BENCH_SLOT_LAYOUT,
   CANTEEN_SLOT_LAYOUT,
-  DESK_LAYOUT,
   DIFFICULTIES,
   HELPER_CLEAN_WEEKDAY,
   LOCKER_SLOT_LAYOUT,
@@ -1303,8 +1302,6 @@ function defaultAnchor(state: GameState, specId: string): { x: number; y: number
   if (specId === 'workbench') return slotFrom(BENCH_SLOT_LAYOUT, index);
   if (specId === 'locker') return slotFrom(LOCKER_SLOT_LAYOUT, index);
   if (specId === 'canteenSeat') return slotFrom(CANTEEN_SLOT_LAYOUT, index);
-  const desk = DESK_LAYOUT.find((object) => object.id === specId);
-  if (desk) return { x: desk.x, y: desk.y };
   const slot = STARTING_LAYOUT[specId];
   return slot
     ? { x: slot.yard === true ? state.unit.widthTiles + slot.x : slot.x, y: slot.y }

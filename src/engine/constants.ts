@@ -1022,8 +1022,8 @@ export const ROOM_LAYOUT = [
   },
 ] as const;
 
-/** Hall placement. The office furniture is placed by DESK_LAYOUT instead, and the chair is bought
- *  but never drawn: 10.1 puts nothing on the office screen but the desk and what is on it. */
+/** Hall placement. The office furniture is not placed at all: the office is a photoreal room and
+ *  the desk, the chair and the laptop are in the artwork, not on a tile (CLAUDE.md T4 3.1). */
 export const STARTING_LAYOUT: Record<string, LayoutSlot> = {
   sheetRack: { x: 20, y: 0 },
   sheetRackBetter: { x: 20, y: 2 },
@@ -1081,82 +1081,6 @@ export const GATE_LANE_TILES = 2;
 export const FINISHED_GOODS_LAYOUT = { x: 0, y: 6, yard: true, width: 3, depth: 1, height: 1 };
 export const DELIVERY_VAN_SPRITE = 'deliveryVan';
 
-/** The office desk and everything on it. Fixed placement, like the hall (CLAUDE.md 10.3). */
-export interface DeskObjectSpec {
-  id: string;
-  name: string;
-  x: number;
-  y: number;
-  width: number;
-  depth: number;
-  height: number;
-  spriteKey: string;
-  /** Catalogue item that has to be owned before the object is usable. */
-  needs: string | null;
-}
-
-export const OFFICE_TILES = 12;
-
-export const DESK_LAYOUT: DeskObjectSpec[] = [
-  { id: 'desk', name: 'Desk', x: 3, y: 4, width: 5, depth: 3, height: 1, spriteKey: 'desk', needs: 'desk' },
-  { id: 'laptop', name: 'Laptop', x: 4, y: 5, width: 2, depth: 1, height: 1, spriteKey: 'laptop', needs: 'laptop' },
-  {
-    id: 'accounting',
-    name: 'Accounting',
-    x: 6,
-    y: 5,
-    width: 1,
-    depth: 1,
-    height: 1,
-    spriteKey: 'ledgerFolder',
-    needs: 'laptop',
-  },
-  {
-    id: 'materials',
-    name: 'Materials',
-    x: 1,
-    y: 5,
-    width: 1,
-    depth: 2,
-    height: 1,
-    spriteKey: 'materialsBinder',
-    needs: null,
-  },
-  {
-    id: 'drawings',
-    name: 'Drawings',
-    x: 4,
-    y: 6,
-    width: 2,
-    depth: 1,
-    height: 1,
-    spriteKey: 'drawings',
-    needs: 'desk',
-  },
-  {
-    id: 'catalogue',
-    name: 'Catalogue',
-    x: 1,
-    y: 2,
-    width: 2,
-    depth: 1,
-    height: 1,
-    spriteKey: 'catalogue',
-    needs: null,
-  },
-  {
-    id: 'hiring',
-    name: 'Team board',
-    x: 8,
-    y: 0,
-    width: 3,
-    depth: 1,
-    height: 3,
-    spriteKey: 'teamBoard',
-    needs: null,
-  },
-  { id: 'phone', name: 'Phone', x: 7, y: 7, width: 1, depth: 1, height: 1, spriteKey: 'phone', needs: 'laptop' },
-];
 /** Width of the yard strip drawn to the right of the unit, in tiles. */
 export const YARD_WIDTH_TILES = 5;
 
