@@ -49,6 +49,9 @@ export const MAX_HOURS_PER_DAY = 12;
 export const MAX_MINUTES_PER_DAY = MAX_HOURS_PER_DAY * 60;
 /** [TUNE] each overtime hour costs 0.05 of tomorrow's efficiency, recovered after one normal day. */
 export const FATIGUE_PER_OVERTIME_HOUR = 0.05;
+/** [TUNE] a floor so a tired owner can never stall a task completely. With the numbers above it is
+ *  never reached: the worst case is hour 12 at 0.4 less four hours of fatigue at 0.2. */
+export const MIN_OWNER_EFFICIENCY = 0.05;
 /** Owner away: all staff production drops 30% (PIOTR). */
 export const ABSENCE_OUTPUT_FACTOR = 0.7;
 /** With a hired CEO the drop is 5% (PIOTR). CEO hiring is parked, the constant is modelled only. */
@@ -303,8 +306,9 @@ export const RATING_EXPRESS_ON_TIME = 0.5;
 export const RATING_PER_DAY_LATE = -0.1;
 /** Made by hand carries no penalty (PIOTR). */
 export const RATING_BY_HAND = 0;
-/** Reputation tier thresholds, used for the board, templates and the hiring pool. */
-export const REPUTATION_TIERS = [0, 1, 2.5] as const;
+/** Reputation tier thresholds for the board and the template weights (CLAUDE.md 8.8: reputation 0,
+ *  reputation 1, reputation 2 and up). The hiring pool has its own gate per role in 9.3. */
+export const REPUTATION_TIERS = [0, 1, 2] as const;
 
 // ---------------------------------------------------------------------------
 // 9.1 Product catalogue (PIOTR: products, prices, design minutes, calls)

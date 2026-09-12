@@ -140,10 +140,6 @@ function screenHtml(): string {
     });
   }
   const current = state;
-  if (current.gameOver) return renderGameOver(current);
-  const view = ui.view === 'hall' ? renderHall(current) : renderOffice(current);
-  const controls = ui.view === 'hall' ? hallControls(current) : '';
-  const note = ui.note === '' ? '' : `<p class="view-note">${escapeHtml(ui.note)}</p>`;
   const modals: string[] = [];
   if (ui.modal !== null) {
     modals.push(
@@ -174,6 +170,13 @@ function screenHtml(): string {
       ),
     );
   }
+  // The last word the company gets is the bankruptcy event, over the game over screen.
+  if (current.gameOver) {
+    return renderGameOver(current) + `<div class="modal-layer">${modals.join('')}</div>`;
+  }
+  const view = ui.view === 'hall' ? renderHall(current) : renderOffice(current);
+  const controls = ui.view === 'hall' ? hallControls(current) : '';
+  const note = ui.note === '' ? '' : `<p class="view-note">${escapeHtml(ui.note)}</p>`;
   return (
     renderTopbar(current, ui.view) +
     (ui.menuOpen ? renderMenu(current) : '') +

@@ -26,14 +26,17 @@ describe('30 days on Easy, working the board', () => {
     expect(state.reputation).toBeGreaterThan(0.5);
   });
 
-  it('finished the cheap work and got to the dearer templates', () => {
+  it('took shelves, a bookcase and a TV unit, and finished most of them', () => {
     const done = state.jobs.filter((job) => job.stage === 'completed');
     expect(done.length).toBeGreaterThanOrEqual(3);
-    const names = new Set(done.map((job) => job.templateId));
-    expect(names.has('garageShelves')).toBe(true);
-    expect(names.has('bookcase')).toBe(true);
+    const taken = new Set(state.jobs.map((job) => job.templateId));
+    expect(taken.has('garageShelves')).toBe(true);
+    expect(taken.has('bookcase')).toBe(true);
     // A TV unit needs a reputation of 0.5, so it can only come after the first jobs landed.
-    expect(names.has('tvUnit')).toBe(true);
+    expect(taken.has('tvUnit')).toBe(true);
+    // Nothing dearer was touched: the script only takes what it is told to take.
+    expect(taken.has('wardrobe')).toBe(false);
+    expect(taken.has('oakDiningTable')).toBe(false);
   });
 
   it('hired nobody, so every one of those jobs was made by the owner', () => {

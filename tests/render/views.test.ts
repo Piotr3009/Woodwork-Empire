@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { renderHall } from '../../src/render/hall';
 import { renderOffice } from '../../src/render/office';
+import { renderGameOver } from '../../src/ui/dayEnd';
 import { tick } from '../../src/engine/index';
 import { act, buyStartingKit, clearEvents, firstJob, newGame, placeEnquiry, runToDay } from '../helpers';
 
@@ -165,5 +166,18 @@ describe('the office', () => {
     const svg = renderOffice(newGame());
     expect(svg.match(/<svg/g)).toHaveLength(1);
     expect(svg).toMatch(/viewBox="/);
+  });
+});
+
+describe('the game over screen', () => {
+  it('says what happened, how long the company lasted, and offers a fresh start', () => {
+    const state = newGame();
+    state.gameOver = { reason: 'Three months of arrears and nothing left to seize.', day: 97 };
+    state.reputation = 1.25;
+    const html = renderGameOver(state);
+    expect(html).toContain('Three months of arrears');
+    expect(html).toContain('97 days');
+    expect(html).toContain('1.25');
+    expect(html).toContain('data-do="restart"');
   });
 });

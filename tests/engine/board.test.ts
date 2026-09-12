@@ -195,18 +195,27 @@ describe('the board over time', () => {
     state.enquiries = [express, standard];
     state.clock.day = 2;
     expireEnquiries(state);
-    expect(state.enquiries.map((enquiry) => enquiry.id)).toEqual(['enq-s']);
+    expect(state.enquiries.map((enquiry) => enquiry.id)).toContain('enq-s');
+    expect(state.enquiries.map((enquiry) => enquiry.id)).not.toContain('enq-e');
     state.clock.day = 4;
     expireEnquiries(state);
-    expect(state.enquiries).toHaveLength(0);
+    expect(state.enquiries.map((enquiry) => enquiry.id)).not.toContain('enq-s');
   });
 
-  it('tops the board back up when an enquiry leaves it', () => {
+  it('draws a new enquiry the moment one is taken', () => {
     const state = newGame();
+    const before = state.enquiries.length;
     const first = state.enquiries[0];
     expect(first).toBeDefined();
     removeEnquiry(state, first?.id ?? '');
-    while (state.enquiries.length > 0) removeEnquiry(state, state.enquiries[0]?.id ?? '');
+    // CLAUDE.md 8.8: after an enquiry is taken or expires, the board draws a new one.
+    expect(state.enquiries.length).toBe(before);
+    expect(state.enquiries.some((enquiry) => enquiry.id === first?.id)).toBe(false);
+  });
+
+  it('tops an empty board back up in the morning', () => {
+    const state = newGame();
+    state.enquiries = [];
     refillBoard(state);
     expect(state.enquiries.length).toBeGreaterThanOrEqual(1);
   });
@@ -218,5 +227,26 @@ describe('the board over time', () => {
       state = clearEvents(tick(state, 600));
       expect(state.enquiries.length).toBeLessThanOrEqual(max);
     }
+  });
+});
+
+describe('board size and the express chance follow the reputation', () => {
+  it('gives 3 to 5 enquiries from reputation 2, as CLAUDE.md 8.8 says', () => {
+    const state = newGame();
+    state.reputation = 2;
+    expect(boardSizeRange(state)).toEqual(BOARD_SIZE_BY_TIER[2]);
+    state.reputation = 1.9;
+    expect(boardSizeRange(state)).toEqual(BOARD_SIZE_BY_TIER[1]);
+  });
+
+  it('lowers the express chance when the reputation is negative', () => {
+    expect(expressProbability(-1)).toBeCloseTo(
+      EXPRESS_PROBABILITY_BASE - EXPRESS_PROBABILITY_PER_REPUTATION,
+      10,
+    );
+    expect(expressProbability(-3)).toBeCloseTo(
+      EXPRESS_PROBABILITY_BASE - 3 * EXPRESS_PROBABILITY_PER_REPUTATION,
+      10,
+    );
   });
 });

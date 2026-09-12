@@ -217,3 +217,55 @@ describe('unloading', () => {
     expect(firstJob(working).labourRemaining).toBeLessThan(160);
   });
 });
+
+describe('what stock cannot cover', () => {
+  it('never gives solid wood or bespoke material off the sheet rack', () => {
+    let state = act(ready('veryEasy'), { type: 'BUY_STOCK', sheets: 20 });
+    state = clearEvents(runToDay(state, 2).state);
+    state = doTask(state, 'unload');
+    expect(state.stock.sheets).toBe(20);
+    state.reputation = 1;
+    const table = placeEnquiry(state, {
+      templateId: 'oakDiningTable',
+      name: 'Oak dining table',
+      price: 1200,
+      sizeMultiplier: 0.5,
+      materialKind: 'solidWood',
+      deadlineDays: 60,
+      byHandAvailable: true,
+      lockReason: 'Needs solid wood tools',
+    });
+    state = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: table.id, byHand: true });
+    state = doTask(state, 'clientCall');
+    state = doTask(state, 'clientCall');
+    state = doTask(state, 'clientCall');
+    state = doTask(state, 'design');
+    state = act(state, { type: 'SET_MATERIAL_MODE', jobId: firstJob(state).id, mode: 'stock' });
+    state = doTask(state, 'materialOrder');
+    // Solid wood is ordered, not taken off the board rack.
+    expect(firstJob(state).stage).toBe('materialOrdered');
+    expect(state.stock.sheets).toBe(20);
+  });
+
+  it('charges material against the overdraft floor and books it as arrears when there is no room', () => {
+    let state = upToMaterial(ready());
+    state.cash = state.finance.overdraftLimit + 10;
+    state = doTask(state, 'materialOrder');
+    expect(state.cash).toBeGreaterThanOrEqual(state.finance.overdraftLimit);
+    expect(state.finance.arrearsAmount).toBeGreaterThan(0);
+    const unpaid = state.ledger.filter((entry) => entry.unpaid && entry.category === 'material');
+    expect(unpaid).toHaveLength(1);
+  });
+
+  it('puts the write off through the ledger like every other line', () => {
+    let state = act(ready(), { type: 'BUY_STOCK', sheets: 15 });
+    state = clearEvents(runToDay(state, 2).state);
+    state = doTask(state, 'unload');
+    state = choose(state, 'outside');
+    const run = runToDay(state, 3);
+    const writeOff = run.state.ledger.find((entry) => entry.label.includes('written off'));
+    expect(writeOff).toBeDefined();
+    expect(writeOff?.balance).toBeGreaterThan(0);
+    expect(run.state.ledger.length).toBeLessThanOrEqual(200);
+  });
+});

@@ -173,10 +173,14 @@ function runMonthlyItems(state: GameState): void {
   }
 }
 
-function runArrearsEscalation(state: GameState): void {
+/** Months of arrears, counted from the day the first bill went unpaid (CLAUDE.md 8.3). Runs every
+ *  day, because a month of arrears can come due on any day. */
+function runArrearsEscalation(state: GameState, day: number): void {
   const finance = state.finance;
-  if (finance.arrearsAmount <= 0) return;
-  finance.arrearsMonths += 1;
+  if (finance.arrearsAmount <= 0 || finance.firstArrearsDay === null) return;
+  const months = 1 + Math.floor((day - finance.firstArrearsDay) / DAYS_PER_MONTH);
+  if (months <= finance.arrearsMonths) return;
+  finance.arrearsMonths = months;
   if (finance.arrearsMonths === ARREARS_MONTHS_FINAL_WARNING) {
     queueEvent(state, {
       kind: 'arrearsFinalWarning',
@@ -189,6 +193,28 @@ function runArrearsEscalation(state: GameState): void {
   if (finance.arrearsMonths >= ARREARS_MONTHS_BAILIFF) {
     runBailiff(state);
   }
+}
+
+/** A cost the player cannot refuse once it has been incurred: material that has been ordered.
+ *  It obeys the overdraft floor and becomes arrears when there is no room left. */
+export function chargeUnavoidable(
+  state: GameState,
+  category: LedgerCategory,
+  label: string,
+  amount: number,
+): void {
+  chargePeriodic(state, category, label, amount);
+}
+
+/** A loss with no cash movement: sheets left in the yard overnight. */
+export function noteLoss(
+  state: GameState,
+  category: LedgerCategory,
+  label: string,
+  amount: number,
+): void {
+  if (amount <= 0) return;
+  addLedger(state, category, label, -amount, true);
 }
 
 /** Three months of arrears: the dearest machine goes, credited at half its purchase price. */
@@ -207,7 +233,9 @@ export function runBailiff(state: GameState): void {
     state.finance.arrearsMonths = 0;
     state.finance.firstArrearsDay = null;
   } else {
-    state.finance.arrearsMonths = ARREARS_MONTHS_BAILIFF;
+    // The debt is still there, so the ladder starts again from one month of arrears.
+    state.finance.arrearsMonths = ARREARS_MONTHS_WARNING;
+    state.finance.firstArrearsDay = state.clock.day;
   }
   queueEvent(state, {
     kind: 'bailiff',
@@ -220,6 +248,13 @@ export function runBailiff(state: GameState): void {
 export function declareBankruptcy(state: GameState, reason: string): void {
   if (state.gameOver) return;
   state.gameOver = { reason, day: state.clock.day };
+  queueEvent(state, {
+    kind: 'bankruptcy',
+    title: 'Bankrupt',
+    body: `${reason} That is the end of the company.`,
+    choices: [{ id: 'ok', label: 'That is that' }],
+    data: { day: state.clock.day },
+  });
 }
 
 export function checkBankruptcy(state: GameState): void {
@@ -235,11 +270,11 @@ export function runDayCosts(state: GameState, day: number): void {
   if (weekday(day) === 0) state.finance.week = emptyTotals();
   if (isFirstOfMonth(day)) {
     state.finance.month = emptyTotals();
-    runArrearsEscalation(state);
     // The pellet bonus reads the month that has just gone, so the counter resets after it.
     runMonthlyItems(state);
     state.productionMinutesMonth = 0;
   }
+  runArrearsEscalation(state, day);
   if (day === 1) {
     chargePeriodic(state, 'unitDeposit', 'Unit deposit', UNIT_DEPOSIT);
   }

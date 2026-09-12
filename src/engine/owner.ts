@@ -8,6 +8,7 @@ import {
   DAYS_PER_YEAR,
   FATIGUE_PER_OVERTIME_HOUR,
   MINUTES_PER_WORKING_DAY,
+  MIN_OWNER_EFFICIENCY,
   OVERTIME_EFFICIENCY,
   OWNER_NORMAL_HOURS,
   SICK_DAYS_MAX,
@@ -27,7 +28,7 @@ export function hourEfficiency(minute: number): number {
 
 /** Work done per clock minute the owner spends. Yesterday's overtime is subtracted. */
 export function ownerEfficiency(state: GameState): number {
-  return Math.max(0.05, hourEfficiency(state.clock.minute) - state.owner.fatigue);
+  return Math.max(MIN_OWNER_EFFICIENCY, hourEfficiency(state.clock.minute) - state.owner.fatigue);
 }
 
 /** Minutes of the normal working day still ahead. Overtime is not in the pool. */
@@ -62,9 +63,11 @@ export function spendOwnerMinute(state: GameState, category: 'admin' | 'design' 
   if (state.clock.minute >= MINUTES_PER_WORKING_DAY) owner.overtimeMinutes += 1;
 }
 
-/** Called when the day closes: the overtime worked today costs efficiency tomorrow. */
+/** Called when the day closes: each whole overtime hour worked today costs efficiency tomorrow
+ *  (CLAUDE.md 7.2). A part hour is not charged. */
 export function setTomorrowFatigue(state: GameState): void {
-  state.owner.fatigue = (state.owner.overtimeMinutes / 60) * FATIGUE_PER_OVERTIME_HOUR;
+  const hours = Math.floor(state.owner.overtimeMinutes / 60);
+  state.owner.fatigue = hours * FATIGUE_PER_OVERTIME_HOUR;
 }
 
 /** Sick leave lands once per game year, on a random working day (CLAUDE.md 7.3). */

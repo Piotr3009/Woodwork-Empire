@@ -111,12 +111,12 @@ describe('prices', () => {
 });
 
 describe('reputation', () => {
-  it('maps a score onto a tier', () => {
+  it('maps a score onto a tier at 0, 1 and 2, as CLAUDE.md 8.8 lists them', () => {
     expect(reputationTier(0)).toBe(0);
     expect(reputationTier(0.9)).toBe(0);
     expect(reputationTier(1)).toBe(1);
-    expect(reputationTier(2.4)).toBe(1);
-    expect(reputationTier(2.5)).toBe(2);
+    expect(reputationTier(1.9)).toBe(1);
+    expect(reputationTier(2)).toBe(2);
     expect(reputationTier(5)).toBe(2);
     expect(reputationTier(-1)).toBe(0);
   });

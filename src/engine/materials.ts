@@ -11,7 +11,7 @@ import {
   TEMP_STORAGE_COST,
 } from './constants';
 import { addWorkingDays } from './clock';
-import { canAfford, pay } from './economy';
+import { canAfford, chargeUnavoidable, noteLoss, pay } from './economy';
 import { makeId } from './rng';
 import { createTask, unloadMinutes } from './tasks';
 import type { Delivery, GameState, Job, MaterialMode } from './types';
@@ -61,7 +61,8 @@ export function createDelivery(
 /** The per job order: pay for the material and book the lorry (CLAUDE.md 8.9). */
 export function orderMaterialForJob(state: GameState, job: Job): Delivery | null {
   if (job.materialMode !== 'perJob') return null;
-  pay(state, 'material', `Material for ${job.name}`, job.materialCost);
+  // The lorry is booked and the supplier will be paid, overdraft or not (CLAUDE.md 8.3).
+  chargeUnavoidable(state, 'material', `Material for ${job.name}`, job.materialCost);
   return createDelivery(state, job.id, job.sheets, job.bespokeMaterial);
 }
 
@@ -145,23 +146,9 @@ export function writeOffSheetsLeftOutside(state: GameState): number {
   }
   if (lost > 0) {
     // The cash went days ago: this line is the loss, not a payment.
-    writeOffLedger(state, lost);
+    noteLoss(state, 'material', `${lost} sheets left outside, written off`, stockCostFor(lost));
   }
   return lost;
-}
-
-function writeOffLedger(state: GameState, sheets: number): void {
-  const value = stockCostFor(sheets);
-  state.ledger.push({
-    id: makeId(state, 'ledger'),
-    day: state.clock.day,
-    minute: state.clock.minute,
-    category: 'material',
-    label: `${sheets} sheets left outside, written off`,
-    amount: -value,
-    balance: state.cash,
-    unpaid: true,
-  });
 }
 
 /** The hour somebody loses in the morning bringing the stored sheets back. */

@@ -15,7 +15,7 @@ import {
 } from './constants';
 import { canAccept, findEnquiry, removeEnquiry } from './board';
 import { template } from './catalog';
-import { pay, receive } from './economy';
+import { chargeUnavoidable, receive } from './economy';
 import { queueEvent } from './events';
 import { has, machineLabourFactor } from './machines';
 import { materialCostFor, orderMaterialForJob, sheetsForCost, stockCostFor } from './materials';
@@ -213,13 +213,20 @@ export function refreshJob(state: GameState, job: Job): void {
 export function chargeSiteMeasure(state: GameState, job: Job): void {
   job.measureDone = true;
   if (!has(state, 'van')) {
-    pay(state, 'taxi', `Taxi to the site for ${job.name}`, SITE_MEASURE_TAXI_COST);
+    chargeUnavoidable(state, 'taxi', `Taxi to the site for ${job.name}`, SITE_MEASURE_TAXI_COST);
   }
 }
 
 /** The material order task is done: the lorry is booked, or the sheets come off the rack. */
+/** Sheets off the rack only cover board jobs of standard material (CLAUDE.md 8.9). */
+export function canDrawFromStock(state: GameState, job: Job): boolean {
+  if (job.materialMode !== 'stock') return false;
+  if (job.materialKind !== 'sheet' || job.bespokeMaterial) return false;
+  return state.stock.sheets >= job.sheets;
+}
+
 export function onMaterialOrdered(state: GameState, job: Job): void {
-  if (job.materialMode === 'stock' && state.stock.sheets >= job.sheets) {
+  if (canDrawFromStock(state, job)) {
     state.stock.sheets -= job.sheets;
     // The sheets were paid for when they were bought, at the cheaper stock price.
     job.materialCost = stockCostFor(job.sheets);

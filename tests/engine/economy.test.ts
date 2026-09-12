@@ -196,12 +196,17 @@ describe('arrears, bailiff and bankruptcy', () => {
     expect(unpaid.length).toBeGreaterThan(0);
   });
 
-  it('escalates to a final warning at two months', () => {
+  it('counts months of arrears from the day the first bill went unpaid', () => {
     const kitted = act(newGame({ difficulty: 'hard' }), {
       type: 'BUY_EQUIPMENT',
       specId: 'tableSaw',
     });
-    const run = runToDay(kitted, 32);
+    // The first miss is on day 29, so one month of arrears runs to day 58.
+    const first = runToDay(kitted, 30);
+    expect(first.state.finance.firstArrearsDay).toBe(29);
+    expect(first.state.finance.arrearsMonths).toBe(1);
+    expect(runToDay(kitted, 58).state.finance.arrearsMonths).toBe(1);
+    const run = runToDay(kitted, 60);
     expect(eventsOfKind(run.events, 'arrearsFinalWarning')).toHaveLength(1);
     expect(run.state.finance.arrearsMonths).toBe(2);
   });
@@ -211,13 +216,14 @@ describe('arrears, bailiff and bankruptcy', () => {
       type: 'BUY_EQUIPMENT',
       specId: 'tableSaw',
     });
-    const run = runToDay(kitted, 61);
+    const run = runToDay(kitted, 90);
     const bailiff = eventsOfKind(run.events, 'bailiff');
     expect(bailiff).toHaveLength(1);
     expect(bailiff[0]?.data.specId).toBe('tableSaw');
     expect(bailiff[0]?.data.credit).toBe(Math.round(1800 * BAILIFF_SEIZURE_FRACTION));
     expect(run.state.equipment).toHaveLength(0);
-    expect(run.state.finance.arrearsMonths).toBe(3);
+    // The debt outlived the machine, so the ladder starts again from one month.
+    expect(run.state.finance.arrearsMonths).toBe(1);
     const seizure = run.state.ledger.find((entry) => entry.category === 'seizure');
     expect(seizure?.amount).toBe(1800 * BAILIFF_SEIZURE_FRACTION);
   });
@@ -246,15 +252,17 @@ describe('arrears, bailiff and bankruptcy', () => {
     expect(withKit.finance.firstArrearsDay).toBeNull();
   });
 
-  it('goes bankrupt at three months with nothing left to seize', () => {
-    const run = runToDay(newGame({ difficulty: 'hard' }), 95);
+  it('goes bankrupt at three months with nothing left to seize, and says so', () => {
+    const run = runToDay(newGame({ difficulty: 'hard' }), 100);
     expect(run.state.gameOver).not.toBeNull();
     expect(run.state.gameOver?.reason).toContain('arrears');
-    expect(run.state.gameOver?.day).toBe(91);
+    // First miss on day 37, so three months of arrears are up on day 97.
+    expect(run.state.gameOver?.day).toBe(97);
+    expect(eventsOfKind(run.events, 'bankruptcy')).toHaveLength(1);
   });
 
   it('stops the clock once the game is over', () => {
-    const run = runToDay(newGame({ difficulty: 'hard' }), 95);
+    const run = runToDay(newGame({ difficulty: 'hard' }), 100);
     const frozen = tick(run.state, 100);
     expect(frozen.clock).toEqual(run.state.clock);
   });

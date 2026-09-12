@@ -31,7 +31,7 @@ export function boardSizeRange(state: GameState): [number, number] {
 
 /** Chance the next enquiry is an express job [TUNE]. */
 export function expressProbability(reputation: number): number {
-  const whole = Math.floor(Math.max(0, reputation));
+  const whole = Math.floor(reputation);
   return EXPRESS_PROBABILITY_BASE + EXPRESS_PROBABILITY_PER_REPUTATION * whole;
 }
 
@@ -90,15 +90,23 @@ export function generateEnquiry(state: GameState): Enquiry | null {
   return null;
 }
 
-/** Tops the board back up once it has dropped below what the reputation supports. */
+/** Adds one enquiry if the board has room for it. The one place the board grows. */
+function drawInto(state: GameState): boolean {
+  const [, max] = boardSizeRange(state);
+  if (state.enquiries.length >= max) return false;
+  const enquiry = generateEnquiry(state);
+  if (!enquiry) return false;
+  state.enquiries.push(enquiry);
+  return true;
+}
+
+/** Tops the board up to what the reputation supports. Runs at the start of every working day. */
 export function refillBoard(state: GameState): void {
   const [min, max] = boardSizeRange(state);
   if (state.enquiries.length >= min) return;
   const target = int(state, min, max);
   while (state.enquiries.length < target) {
-    const enquiry = generateEnquiry(state);
-    if (!enquiry) return;
-    state.enquiries.push(enquiry);
+    if (!drawInto(state)) return;
   }
 }
 
@@ -110,17 +118,24 @@ export function refreshLocks(state: GameState): void {
   }
 }
 
-/** Drops what nobody took in time. Runs at the start of every working day. */
+/** Drops what nobody took in time, and draws a replacement for each (CLAUDE.md 8.8). */
 export function expireEnquiries(state: GameState): void {
+  const before = state.enquiries.length;
   state.enquiries = state.enquiries.filter((enquiry) => enquiry.expiresOnDay >= state.clock.day);
+  for (let gone = state.enquiries.length; gone < before; gone += 1) {
+    if (!drawInto(state)) return;
+  }
 }
 
 export function findEnquiry(state: GameState, enquiryId: string): Enquiry | null {
   return state.enquiries.find((enquiry) => enquiry.id === enquiryId) ?? null;
 }
 
+/** Takes an enquiry off the board and draws a new one in its place (CLAUDE.md 8.8). */
 export function removeEnquiry(state: GameState, enquiryId: string): void {
+  const before = state.enquiries.length;
   state.enquiries = state.enquiries.filter((enquiry) => enquiry.id !== enquiryId);
+  if (state.enquiries.length < before) drawInto(state);
 }
 
 /** Locked entries can still be taken when the template allows the by hand path (CLAUDE.md 8.8). */

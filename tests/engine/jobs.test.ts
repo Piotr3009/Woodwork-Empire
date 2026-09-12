@@ -57,7 +57,8 @@ describe('accepting an enquiry', () => {
     const state = accept(before);
     expect(state.cash - before.cash).toBe(400 * DEPOSIT_FRACTION);
     expect(state.jobs[0]?.depositPaid).toBe(200);
-    expect(state.enquiries).toHaveLength(0);
+    // The board draws a replacement at once, so the taken enquiry is gone but the board is not bare.
+    expect(state.enquiries.some((enquiry) => enquiry.price === 400)).toBe(false);
   });
 
   it('puts the calls and the drawing on the owner', () => {

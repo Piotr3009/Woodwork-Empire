@@ -59,7 +59,7 @@ them except the first cut of T1-06, which is named in section 5 below.
 4. Caught in my own audit after the report was first written: `ASSIGN_JOB` had no clickable way in,
    which rule 3.5 forbids. The job card in the laptop now carries the manual override of 9.4: a chip
    for the owner and one for every joiner on the floor.
-5. Two defects the same audit found and this branch fixes. First, the pellet income of 8.1 never
+5. Ten more defects the same audit found and this branch fixes, listed in section 10. First, the pellet income of 8.1 never
    paid its production bonus: the monthly counter was reset before the bill that reads it, so the
    pelletiser always paid exactly the 600 base. Second, the day used to close itself at 16:00 the
    moment the owner had nothing in hand, which is a rule the spec does not have: it meant the
@@ -239,6 +239,20 @@ About 6,200 lines of source under `src/` and about 3,500 lines of tests.
 13. How low should reputation go? I clamped it at minus 5 with no consequence at the bottom.
 14. When the tools ARE in the hall, the by hand path is switched off: an oak table with a thicknesser
     is never made by hand. Should the player be allowed to choose the slow way anyway?
+15. Arrears never go down except when the bailiff takes a machine. A company that misses one rent
+    day and then earns well still marches to a seizure. Should the player be able to pay arrears
+    off, and at what point should a cleared debt reset the ladder?
+16. A rating is either the on time bonus or the late deduction tonight: one day late scores minus
+    0.1, not plus 0.3 minus 0.1. Is the on time bonus forfeited the moment a job is late, or should
+    the two be added?
+17. A part hour of overtime now costs nothing: fatigue charges only whole hours, so 59 minutes past
+    16:00 is free. Should a part hour cost part of the 0.05?
+18. A day off has to be watched: the owner stays home, the clock still runs to 16:00 (45 real
+    seconds at 4x) because the staff are working. Should a day off jump straight to the next
+    morning when there is nobody in the hall to work it?
+19. Buying sheets for stock is meant to be the 0.34 P route, but sheets are whole things, so a 900
+    job costs 340 in sheets against the 306 the fraction implies. Is the rounding up acceptable, or
+    should stock be priced per job rather than per sheet?
 
 ## 9. Known risks
 
@@ -264,3 +278,40 @@ About 6,200 lines of source under `src/` and about 3,500 lines of tests.
 9. **Restarting tasks every morning may annoy.** It is what 8.10 asks for, and it is the one part of
    the loop I would expect a player to complain about first.
 10. **No accessibility work.** Keyboard reaches the buttons and Escape closes a modal. That is all.
+
+## 10. What the audit found and fixed after the first cut
+
+The report was written, then the whole thing was audited section by section against the contract and
+every finding checked against the code. Twelve held up and are fixed on this branch:
+
+1. **The day closed itself at 16:00** whenever the owner had nothing in hand, an end condition the
+   contract does not have. It meant the overtime hours of 7.2 could only finish a task already
+   running, never take a new one on.
+2. **The pelletiser never paid its production bonus**: the monthly counter was reset before the bill
+   that reads it.
+3. **The arrears ladder counted calendar months, not months of arrears.** A bill missed on day 30
+   got its final warning on day 31. It now counts from the day of the first miss, so the warning,
+   the final warning and the bailiff are 30 days apart, which is what 8.3 describes.
+4. **The board did not draw a replacement when an enquiry was taken or expired**, only at the start
+   of a day and only when it had fallen below the tier minimum. 8.8 says the board draws a new one.
+5. **The top board size band started at reputation 2.5**, not 2, because the board shared the
+   thresholds of the hiring pool. They are separate now: the board and the template weights use 0, 1
+   and 2, and the super joiner keeps his own 2.5 gate.
+6. **A negative reputation did not lower the express chance**, although 8.11 allows negatives and
+   8.8 gives the formula as 0.10 plus 0.05 times the whole reputation.
+7. **Sheets off the rack covered any job**, including a bespoke solid wood table. Stock is board, so
+   it now only covers sheet jobs of standard material.
+8. **The per job material purchase ignored the overdraft floor**, the only purchase in the game that
+   did. It is now charged the way an unavoidable bill is: it obeys the floor and becomes arrears when
+   there is no room, which is what happens when a supplier invoices a company with no money.
+9. **Sheets written off after a night in the yard bypassed the ledger helper**, so the loss missed
+   the day, week and month totals and the ledger trim.
+10. **Fatigue was prorated by the minute** instead of costing 0.05 per overtime hour worked.
+11. **The efficiency floor of 0.05 was an untagged number inlined in the code.** It is a tagged
+    `[TUNE]` constant now, and it is documented as unreachable with your numbers.
+12. **Bankruptcy never opened an event**, although 6.2 lists it among the things that stop the clock.
+    It now opens over the game over screen.
+
+Two findings were judged wrong and left alone, both named in section 8 as questions instead: that
+`END_DAY` before 16:00 should end the day (7.2 says it means going home, and the hours that follow
+count as absence), and that the on time rating bonus should survive a late delivery.
