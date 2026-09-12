@@ -17,7 +17,7 @@ function box(svg: string): { width: number; height: number; boxWidth: number; bo
   };
 }
 
-describe('the views draw at one screen pixel per unit', () => {
+describe('the views retain intrinsic scene dimensions for viewport scaling', () => {
   it('gives the hall a width and a height equal to its view box', () => {
     for (const difficulty of ['easy', 'veryEasy', 'hard'] as const) {
       const svg = renderHall(buyStartingKit(newGame({ difficulty })));

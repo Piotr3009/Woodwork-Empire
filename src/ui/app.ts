@@ -855,16 +855,14 @@ function tileUnder(event: MouseEvent): { x: number; y: number } | null {
   if (!root) return null;
   const svg = root.querySelector('.hall-view');
   if (!(svg instanceof SVGSVGElement)) return null;
-  const viewBox = (svg.getAttribute('viewBox') ?? '').split(' ').map(Number);
-  const [minX, minY, width, height] = viewBox;
-  if (minX === undefined || minY === undefined || width === undefined || height === undefined) {
-    return null;
-  }
-  const rect = svg.getBoundingClientRect();
-  if (rect.width === 0 || rect.height === 0) return null;
-  const userX = ((event.clientX - rect.left) / rect.width) * width + minX;
-  const userY = ((event.clientY - rect.top) / rect.height) * height + minY;
-  const tile = screenToTile(userX, userY);
+  const matrix = svg.getScreenCTM();
+  if (matrix === null) return null;
+  const point = svg.createSVGPoint();
+  point.x = event.clientX;
+  point.y = event.clientY;
+  // Include the centred margins introduced by the SVG's uniform viewport scaling.
+  const local = point.matrixTransform(matrix.inverse());
+  const tile = screenToTile(local.x, local.y);
   return { x: Math.floor(tile.x), y: Math.floor(tile.y) };
 }
 
