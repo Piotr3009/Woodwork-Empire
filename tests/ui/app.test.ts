@@ -97,17 +97,26 @@ describe('the first ten minutes', () => {
     expect(state?.jobs[0]?.depositPaid).toBeGreaterThan(0);
   });
 
-  it('5. finds the job in the laptop design queue and starts the calls', () => {
+  it('5. finds the calls in the laptop and the drawing on the roll beside it', () => {
     click('[data-do="closeModal"]');
     // Still standing in the office, so the laptop is right there on the desk.
     click('[data-office="laptop"]');
     expect(html()).toContain('Laptop');
-    expect(html()).toContain('Design queue');
     const name = currentState()?.jobs[0]?.name ?? '';
-    expect(html()).toContain(`Design: ${name}`);
     expect(html()).toContain('Client call 1 of');
     expect(html()).toContain('Email 1 of');
     expect(html()).toContain('Bookkeeping');
+    // The drawings moved out of the laptop and onto the desk (CLAUDE.md T3 3.3).
+    expect(html()).not.toContain('Design queue');
+    expect(html()).not.toContain(`Design: ${name}`);
+    click('[data-do="closeModal"]');
+    click('[data-office="drawings"]');
+    expect(html()).toContain('Drawings');
+    expect(html()).toContain('Design queue');
+    expect(html()).toContain(`Design: ${name}`);
+    expect(html()).toContain('Finished drawings');
+    click('[data-do="closeModal"]');
+    click('[data-office="laptop"]');
     click('[data-do="startTask"]');
     expect(currentState()?.owner.currentTaskId).not.toBeNull();
     expect(html()).toContain('Pause');

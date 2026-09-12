@@ -37,6 +37,7 @@ import { renderAccounting } from './accounting';
 import { renderBoard } from './board';
 import { renderCatalogue } from './catalogue';
 import { renderDayEnd, renderGameOver } from './dayEnd';
+import { renderDrawings } from './drawings';
 import { renderEvent, renderEventFooter } from './eventModal';
 import { renderHiring } from './hiring';
 import { renderLaptop } from './laptop';
@@ -54,7 +55,14 @@ import { cloudAvailable } from '../cloud/supabase';
 import { hasSave, loadGame, saveGame, sendMagicLink, signOut, signedInEmail } from '../cloud/saves';
 import { renderMenu, renderTopbar, speedFromString } from './topbar';
 
-type ModalId = 'board' | 'laptop' | 'accounting' | 'catalogue' | 'hiring' | 'materials';
+type ModalId =
+  | 'board'
+  | 'laptop'
+  | 'drawings'
+  | 'accounting'
+  | 'catalogue'
+  | 'hiring'
+  | 'materials';
 
 interface Ui {
   screen: 'start' | 'game';
@@ -91,6 +99,7 @@ interface Ui {
 const MODAL_TITLES: Record<ModalId, string> = {
   board: 'Order board',
   laptop: 'Laptop',
+  drawings: 'Drawings',
   accounting: 'Accounting',
   catalogue: 'Equipment catalogue',
   hiring: 'Team board',
@@ -155,6 +164,8 @@ function modalBody(id: ModalId, current: GameState): string {
       return renderBoard(current, ui.filters.board ?? '');
     case 'laptop':
       return renderLaptop(current);
+    case 'drawings':
+      return renderDrawings(current);
     case 'accounting':
       return renderAccounting(current, ui.arrearsAmount);
     case 'catalogue':
@@ -457,6 +468,7 @@ function askUnload(deliveryId: string): void {
 /** Objects on the desk open their modal beside where the player clicked (CLAUDE.md 10.4). */
 const OFFICE_MODALS: Record<string, ModalId> = {
   laptop: 'laptop',
+  drawings: 'drawings',
   accounting: 'accounting',
   materials: 'materials',
   catalogue: 'catalogue',

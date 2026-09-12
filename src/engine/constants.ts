@@ -974,6 +974,17 @@ export const DESK_LAYOUT: DeskObjectSpec[] = [
     needs: null,
   },
   {
+    id: 'drawings',
+    name: 'Drawings',
+    x: 4,
+    y: 6,
+    width: 2,
+    depth: 1,
+    height: 1,
+    spriteKey: 'drawings',
+    needs: 'desk',
+  },
+  {
     id: 'catalogue',
     name: 'Catalogue',
     x: 1,

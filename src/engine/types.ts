@@ -303,6 +303,8 @@ export interface TaskInstance {
   /** Day the task belongs to. Daily tasks are created fresh each working day. */
   day: number;
   done: boolean;
+  /** Day it was finished. Null while it is still open. */
+  doneDay: number | null;
   /** Worker id, 'owner', or null while nobody works on it. */
   doneBy: string | null;
 }

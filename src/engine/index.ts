@@ -102,6 +102,7 @@ export {
   designMinutes,
   emailsForPrice,
   findTask,
+  jobTasks,
   materialOrderMinutes,
   openTasks,
   softwareActive,

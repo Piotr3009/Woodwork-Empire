@@ -10,6 +10,7 @@ import { boxPolygons, centreOf, depthKey, footprintPolygon, gridBounds } from '.
 const FILLS: Record<string, [string, string]> = {
   desk: ['var(--kit-furniture)', 'var(--kit-furniture-dark)'],
   laptop: ['var(--kit-tools)', 'var(--kit-tools-dark)'],
+  drawings: ['var(--kit-furniture)', 'var(--kit-furniture-dark)'],
   accounting: ['var(--kit-stock)', 'var(--kit-stock-dark)'],
   materials: ['var(--kit-bench)', 'var(--kit-bench-dark)'],
   catalogue: ['var(--kit-vehicle)', 'var(--kit-vehicle-dark)'],

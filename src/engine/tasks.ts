@@ -189,6 +189,7 @@ export function createTask(state: GameState, draft: TaskDraft): TaskInstance {
     deliveryId: draft.deliveryId ?? null,
     day: state.clock.day,
     done: false,
+    doneDay: null,
     doneBy: null,
   };
   state.tasks.push(task);
@@ -266,7 +267,7 @@ export function assignStaffTasks(state: GameState): TaskInstance[] {
       task.doneBy = staff.id;
       continue;
     }
-    advanceTask(task, task.minutesRemaining);
+    advanceTask(task, task.minutesRemaining, state.clock.day);
     task.doneBy = staff.id;
     cleared.push(task);
   }
@@ -306,12 +307,15 @@ export function pauseOwnerTask(state: GameState): void {
   state.owner.currentTaskId = null;
 }
 
-/** Works one minute into a task. True when it finished. One path for the owner and for staff. */
-export function advanceTask(task: TaskInstance, work: number): boolean {
+/** Works one minute into a task. True when it finished. One path for the owner and for staff.
+ *  The day it was finished is written down, because the drawings the workshop has done carry a
+ *  date on the desk (CLAUDE.md T3 3.3). */
+export function advanceTask(task: TaskInstance, work: number, day: number): boolean {
   task.minutesRemaining -= work;
   if (task.minutesRemaining > WORK_EPSILON) return false;
   task.minutesRemaining = 0;
   task.done = true;
+  task.doneDay = day;
   return true;
 }
 
@@ -324,7 +328,7 @@ export function advanceOwnerTask(state: GameState, work: number): TaskInstance |
     state.owner.currentTaskId = null;
     return null;
   }
-  if (!advanceTask(task, work)) return null;
+  if (!advanceTask(task, work, state.clock.day)) return null;
   state.owner.currentTaskId = null;
   return task;
 }

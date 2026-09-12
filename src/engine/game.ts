@@ -662,7 +662,7 @@ function runWorkerTaskMinute(state: GameState, workerId: string, taskId: string)
     return false;
   }
   worker.minutesWorked += 1;
-  if (advanceTask(task, 1)) {
+  if (advanceTask(task, 1, state.clock.day)) {
     worker.taskId = null;
     if (task.kind === 'materialOrder' && worker.role === 'purchasingClerk') {
       worker.ordersToday += 1;

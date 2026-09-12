@@ -171,26 +171,19 @@ function gateSection(state: GameState): string {
 }
 
 export function renderLaptop(state: GameState): string {
-  // Today's desk: everything still open, and what was finished today. Yesterday's is gone.
-  const open = state.tasks.filter(
-    (task) => task.category !== 'workshop' && (!task.done || task.day === state.clock.day),
+  // Today's desk: everything still open, and what was finished today. Yesterday's is gone. The
+  // drawings live in their own place on the desk now (CLAUDE.md T3 3.3).
+  const office = state.tasks.filter(
+    (task) =>
+      task.category !== 'workshop' &&
+      task.kind !== 'design' &&
+      (!task.done || task.day === state.clock.day),
   );
-  const design = open.filter((task) => task.kind === 'design');
-  const office = open.filter((task) => task.kind !== 'design');
   const workshop = openTasks(state).filter((task) => task.category === 'workshop');
-  const licence =
-    state.software.mode === 'none'
-      ? 'No licence. Buy management software from the catalogue.'
-      : state.software.mode === 'oneOff'
-        ? `One off licence, ${state.software.jobsRemaining} jobs left, ${state.software.tier} tier`
-        : `Subscription, ${state.software.tier} tier`;
   const jobLines = openJobs(state)
     .map((job) => jobRow(state, job))
     .join('');
   return (
-    `<p class="hint">${escapeHtml(licence)}</p>` +
-    '<h3>Design queue</h3>' +
-    (design.length === 0 ? emptyLine('No drawings waiting.') : design.map((task) => taskRow(state, task)).join('')) +
     '<h3>Office tasks today</h3>' +
     (office.length === 0 ? emptyLine('Nothing on the desk.') : office.map((task) => taskRow(state, task)).join('')) +
     '<h3>Workshop jobs of work</h3>' +

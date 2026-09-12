@@ -78,9 +78,11 @@ Run `npm run dev` and work through this. It is the same path the jsdom smoke tes
 4. Close the catalogue and press Board. It fills the page with a tile per enquiry: the price, the
    sheets it takes, about how many of your own days, and what it needs. Accept one. Half the price
    lands as a deposit.
-5. Click the laptop on the desk. Start the client calls, the emails and the drawing. The minute bar
-   fills with grey and purple. Press 4x, which is two real minutes a game day. When they are done,
-   the material order appears: start that too.
+5. Click the laptop on the desk. Start the client calls and the emails, and watch the job card:
+   Start production is on it from the day the job is accepted, greyed out with the one thing in
+   its way. The drawing is on the roll of drawings beside the laptop. The minute bar fills with
+   grey and purple. Press 4x, which is two real minutes a game day. When the calls and the drawing
+   are done, the material order appears: start that too.
 6. Open the menu and press End day. Before 16:00 that means going home, so the top bar says so and
    the rest of the day runs without you. Let the clock run out: the summary says the day went on
    admin and nothing was made.
