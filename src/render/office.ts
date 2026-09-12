@@ -4,12 +4,13 @@
 import { DESK_LAYOUT, OFFICE_TILES } from '../engine/constants';
 import { findSpec, has } from '../engine/machines';
 import type { GameState } from '../engine/types';
-import { box, escapeText, label, polygon } from './hall';
-import { boxPolygons, centreOf, depthKey, footprintPolygon, gridBounds } from './iso';
+import { escapeText, objectArt, polygon } from './hall';
+import { depthKey, footprintPolygon, gridBounds } from './iso';
 
 const FILLS: Record<string, [string, string]> = {
   desk: ['var(--kit-furniture)', 'var(--kit-furniture-dark)'],
   laptop: ['var(--kit-tools)', 'var(--kit-tools-dark)'],
+  drawings: ['var(--kit-furniture)', 'var(--kit-furniture-dark)'],
   accounting: ['var(--kit-stock)', 'var(--kit-stock-dark)'],
   materials: ['var(--kit-bench)', 'var(--kit-bench-dark)'],
   catalogue: ['var(--kit-vehicle)', 'var(--kit-vehicle-dark)'],
@@ -24,7 +25,6 @@ export function renderOffice(state: GameState): string {
     polygon(footprintPolygon(0, 0, OFFICE_TILES, OFFICE_TILES), 'var(--room-floor)'),
   ];
   const drawables = DESK_LAYOUT.map((object) => {
-    const faces = boxPolygons(object.x, object.y, object.width, object.depth, object.height);
     const missing = object.needs !== null && !has(state, object.needs);
     const lockReason = missing ? `Buy a ${(findSpec(object.needs ?? '')?.name ?? '').toLowerCase()}` : '';
     const [fill, shade] = FILLS[object.id] ?? ['var(--room)', 'var(--room-dark)'];
@@ -37,11 +37,18 @@ export function renderOffice(state: GameState): string {
       depth: depthKey(object.x, object.y),
       svg:
         `<g ${attrs}><title>${escapeText(text)}</title>` +
-        box(faces, missing ? 'var(--locked)' : fill, missing ? 'var(--locked-dark)' : shade) +
-        label(
-          centreOf(object.x, object.y, object.width, object.depth, object.height),
-          text,
-        ) +
+        objectArt({
+          // Nothing the workshop has not bought carries its picture: it is a locked box.
+          spriteKey: missing ? '' : object.spriteKey,
+          x: object.x,
+          y: object.y,
+          width: object.width,
+          depth: object.depth,
+          height: object.height,
+          fill: missing ? 'var(--locked)' : fill,
+          shade: missing ? 'var(--locked-dark)' : shade,
+          label: text,
+        }) +
         '</g>',
     };
   }).sort((left, right) => left.depth - right.depth);

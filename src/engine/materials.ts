@@ -53,12 +53,24 @@ export function sheetsDueFor(job: Job, progress: number): number {
   return Math.min(job.sheets, Math.max(1, Math.ceil(job.sheets * progress)));
 }
 
+/** Sheets the next slice of work still has to come off the rack for. */
+function sheetsOwedBy(job: Job, progress: number): number {
+  return sheetsDueFor(job, progress) - job.sheetsUsed;
+}
+
+/** Asks the rack without taking anything, so a job card can say what is in the way before the
+ *  player presses anything (CLAUDE.md T3 3.1). */
+export function rackCanSupply(state: GameState, job: Job, progress: number): boolean {
+  const due = sheetsOwedBy(job, progress);
+  return due <= 0 || state.stock.sheets >= due;
+}
+
 /** Takes what the next slice of work needs off the rack. False when the rack cannot supply it,
  *  which stops the job where it stands. */
 export function drawSheetsFor(state: GameState, job: Job, progress: number): boolean {
-  const due = sheetsDueFor(job, progress) - job.sheetsUsed;
+  const due = sheetsOwedBy(job, progress);
   if (due <= 0) return true;
-  if (state.stock.sheets < due) return false;
+  if (!rackCanSupply(state, job, progress)) return false;
   state.stock.sheets -= due;
   job.sheetsUsed += due;
   return true;

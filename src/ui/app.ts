@@ -37,27 +37,39 @@ import { renderAccounting } from './accounting';
 import { renderBoard } from './board';
 import { renderCatalogue } from './catalogue';
 import { renderDayEnd, renderGameOver } from './dayEnd';
+import { renderDrawings } from './drawings';
 import { renderEvent, renderEventFooter } from './eventModal';
 import { renderHiring } from './hiring';
 import { renderLaptop } from './laptop';
+import { renderMachine } from './machine';
+import { renderSpriteCheck } from './spriteCheck';
 import { renderMaterials } from './materials';
 import {
   type ModalPosition,
+  type ModalSpec,
   escapeHtml,
   minutes,
   reasonLabel,
-  renderModal,
+  syncModals,
 } from './modal';
 import { renderStart } from './start';
 import { cloudAvailable } from '../cloud/supabase';
 import { hasSave, loadGame, saveGame, sendMagicLink, signOut, signedInEmail } from '../cloud/saves';
 import { renderMenu, renderTopbar, speedFromString } from './topbar';
 
-type ModalId = 'board' | 'laptop' | 'accounting' | 'catalogue' | 'hiring' | 'materials';
+type ModalId =
+  | 'board'
+  | 'laptop'
+  | 'drawings'
+  | 'accounting'
+  | 'catalogue'
+  | 'hiring'
+  | 'materials';
 
 interface Ui {
   screen: 'start' | 'game';
-  view: 'hall' | 'office';
+  /** The sprite check is a page of its own, reached from the Menu (CLAUDE.md T3 3.6). */
+  view: 'hall' | 'office' | 'sprites';
   modal: ModalId | null;
   modalPosition: ModalPosition | null;
   eventPosition: ModalPosition | null;
@@ -68,6 +80,9 @@ interface Ui {
   focusNext: string | null;
   stockSheets: string;
   arrearsAmount: string;
+  /** The family whose classes are on screen, over whatever else is open (CLAUDE.md T3 3.5). */
+  machine: string | null;
+  machinePosition: ModalPosition | null;
   /** Setting the hall out: the clock is stopped and the kit can be dragged about. */
   setup: boolean;
   speedBeforeSetup: Speed;
@@ -90,6 +105,7 @@ interface Ui {
 const MODAL_TITLES: Record<ModalId, string> = {
   board: 'Order board',
   laptop: 'Laptop',
+  drawings: 'Drawings',
   accounting: 'Accounting',
   catalogue: 'Equipment catalogue',
   hiring: 'Team board',
@@ -115,6 +131,8 @@ function freshUi(): Ui {
     focusNext: null,
     stockSheets: '6',
     arrearsAmount: '500',
+    machine: null,
+    machinePosition: null,
     setup: false,
     speedBeforeSetup: 0,
     drag: null,
@@ -154,6 +172,8 @@ function modalBody(id: ModalId, current: GameState): string {
       return renderBoard(current, ui.filters.board ?? '');
     case 'laptop':
       return renderLaptop(current);
+    case 'drawings':
+      return renderDrawings(current);
     case 'accounting':
       return renderAccounting(current, ui.arrearsAmount);
     case 'catalogue':
@@ -239,7 +259,48 @@ function renderWhy(): string {
   );
 }
 
-function screenHtml(): string {
+/** What should be open on the modal layer, in the order it is stacked (CLAUDE.md T3 3.4). */
+function modalSpecs(): ModalSpec[] {
+  if (ui.screen === 'start' || state === null) return [];
+  const current = state;
+  const specs: ModalSpec[] = [];
+  if (ui.modal !== null) {
+    specs.push({
+      id: ui.modal,
+      title: MODAL_TITLES[ui.modal],
+      body: modalBody(ui.modal, current),
+      wide: ui.modal === 'accounting',
+      full: ui.modal === 'board',
+      position: ui.modalPosition,
+    });
+  }
+  if (ui.machine !== null) {
+    const spec = findSpec(ui.machine);
+    specs.push({
+      id: 'machine',
+      title: spec === null ? 'Machine' : spec.name,
+      body: renderMachine(current, ui.machine),
+      full: true,
+      position: ui.machinePosition,
+    });
+  }
+  const event = current.activeEvent;
+  if (event) {
+    specs.push({
+      id: 'event',
+      title: event.title,
+      body: event.kind === 'dayEnd' ? renderDayEnd(current) : renderEvent(current, event),
+      footer: renderEventFooter(event),
+      closable: event.choices.length === 1,
+      wide: event.kind === 'dayEnd',
+      position: ui.eventPosition,
+    });
+  }
+  return specs;
+}
+
+/** Everything on the page except the modal layer, which keeps its own DOM between renders. */
+function pageHtml(): string {
   if (ui.screen === 'start' || state === null) {
     return renderStart({
       difficulty: ui.difficulty,
@@ -250,50 +311,21 @@ function screenHtml(): string {
     });
   }
   const current = state;
-  const modals: string[] = [];
-  if (ui.modal !== null) {
-    modals.push(
-      renderModal(
-        {
-          id: ui.modal,
-          title: MODAL_TITLES[ui.modal],
-          body: modalBody(ui.modal, current),
-          wide: ui.modal === 'accounting',
-          full: ui.modal === 'board',
-        },
-        ui.modalPosition,
-      ),
-    );
-  }
-  if (current.activeEvent) {
-    const event = current.activeEvent;
-    modals.push(
-      renderModal(
-        {
-          id: 'event',
-          title: event.title,
-          body: event.kind === 'dayEnd' ? renderDayEnd(current) : renderEvent(current, event),
-          footer: renderEventFooter(event),
-          closable: event.choices.length === 1,
-          wide: event.kind === 'dayEnd',
-        },
-        ui.eventPosition,
-      ),
-    );
-  }
   // The last word the company gets is the bankruptcy event, over the game over screen.
-  if (current.gameOver) {
-    return renderGameOver(current) + `<div class="modal-layer">${modals.join('')}</div>`;
-  }
-  const view = ui.view === 'hall' ? renderHall(current, ghostFor(current)) : renderOffice(current);
+  if (current.gameOver) return renderGameOver(current);
+  const view =
+    ui.view === 'sprites'
+      ? renderSpriteCheck()
+      : ui.view === 'hall'
+        ? renderHall(current, ghostFor(current))
+        : renderOffice(current);
   const controls = ui.view === 'hall' ? hallControls(current) : '';
   const note = ui.note === '' ? '' : `<p class="view-note">${escapeHtml(ui.note)}</p>`;
-  const why = renderWhy();
   return (
     renderTopbar(current, ui.view) +
     (ui.menuOpen ? renderMenu(current, ui.cloud) : '') +
     `<main class="view">${view}${controls}${note}</main>` +
-    `<div class="modal-layer">${modals.join('')}</div>${why}`
+    renderWhy()
   );
 }
 
@@ -305,14 +337,14 @@ interface FocusMemory {
 function captureFocus(): FocusMemory | null {
   const active = document.activeElement;
   if (!(active instanceof HTMLInputElement)) return null;
-  const key = active.dataset.focusKey;
+  const key = active.dataset.field;
   if (key === undefined) return null;
   return { key, start: active.selectionStart };
 }
 
 function restoreFocus(memory: FocusMemory | null): void {
   if (!memory || !root) return;
-  const field = root.querySelector(`[data-focus-key="${memory.key}"]`);
+  const field = root.querySelector(`[data-field="${memory.key}"]`);
   if (!(field instanceof HTMLInputElement)) return;
   field.focus();
   if (memory.start !== null && field.type === 'text') {
@@ -404,11 +436,28 @@ function slideFigures(now: number): void {
   }
 }
 
+/** The two halves of the page: the part that is rebuilt from the state every render, and the
+ *  modal layer, whose shells outlive a render so the scroll and the caret do too (T3 3.4). */
+function halves(): { page: Element; layer: Element } | null {
+  if (!root) return null;
+  let page = root.querySelector(':scope > .page');
+  let layer = root.querySelector(':scope > .modal-layer');
+  if (page === null || layer === null) {
+    root.innerHTML = '<div class="page"></div><div class="modal-layer"></div>';
+    page = root.querySelector(':scope > .page');
+    layer = root.querySelector(':scope > .modal-layer');
+  }
+  if (page === null || layer === null) return null;
+  return { page, layer };
+}
+
 export function render(): void {
-  if (!root) return;
+  const parts = halves();
+  if (parts === null) return;
   const memory = ui.focusNext === null ? captureFocus() : { key: ui.focusNext, start: null };
   ui.focusNext = null;
-  root.innerHTML = screenHtml();
+  parts.page.innerHTML = pageHtml();
+  syncModals(parts.layer, modalSpecs());
   slideFigures(nowMs());
   restoreFocus(memory);
 }
@@ -442,6 +491,7 @@ function askUnload(deliveryId: string): void {
 /** Objects on the desk open their modal beside where the player clicked (CLAUDE.md 10.4). */
 const OFFICE_MODALS: Record<string, ModalId> = {
   laptop: 'laptop',
+  drawings: 'drawings',
   accounting: 'accounting',
   materials: 'materials',
   catalogue: 'catalogue',
@@ -498,6 +548,12 @@ function handleAction(element: DataElement, point: { x: number; y: number }): vo
       ui.view = element.dataset.view === 'office' ? 'office' : 'hall';
       if (ui.view !== 'hall') endSetup();
       break;
+    case 'showSprites':
+      // The acceptance page for the art side, always one click away (CLAUDE.md T3 3.6).
+      endSetup();
+      ui.view = 'sprites';
+      ui.menuOpen = false;
+      break;
     case 'startSetup':
       ui.setup = true;
       ui.drag = null;
@@ -528,15 +584,29 @@ function handleAction(element: DataElement, point: { x: number; y: number }): vo
     case 'openModal':
       openModal((element.dataset.modal ?? 'board') as ModalId, null);
       break;
+    case 'openMachine':
+      // The classes of a family fill the page, over the catalogue that sent the player here.
+      ui.machine = id;
+      ui.machinePosition = null;
+      break;
+    case 'closeMachine':
+      ui.machine = null;
+      ui.machinePosition = null;
+      break;
     case 'closeModal': {
       // The cross on the event modal is the one choice it has. The cross on anything else just
-      // shuts that modal: the event is still there behind it.
-      const inEvent = element.closest('[data-modal]')?.getAttribute('data-modal') === 'event';
+      // shuts that modal: whatever is behind it is still there.
+      const which = element.closest('[data-modal]')?.getAttribute('data-modal');
       const event = game().activeEvent;
-      if (inEvent && event !== null && event.choices.length === 1) {
+      if (which === 'event' && event !== null && event.choices.length === 1) {
         const choice = event.choices[0];
         dispatch({ type: 'RESOLVE_EVENT', choiceId: choice ? choice.id : 'ok' });
         return;
+      }
+      if (which === 'machine') {
+        ui.machine = null;
+        ui.machinePosition = null;
+        break;
       }
       ui.modal = null;
       ui.modalPosition = null;
@@ -571,7 +641,7 @@ function handleAction(element: DataElement, point: { x: number; y: number }): vo
       dispatch({ type: 'PAUSE_TASK' });
       return;
     case 'buyEquipment':
-      dispatch({ type: 'BUY_EQUIPMENT', specId: id });
+      dispatch({ type: 'BUY_EQUIPMENT', specId: id, variantId: element.dataset.variant });
       return;
     case 'buySoftware':
       dispatch({ type: 'BUY_SOFTWARE', mode: id === 'subscription' ? 'subscription' : 'oneOff' });
@@ -843,6 +913,12 @@ function onKeyDown(event: KeyboardEvent): void {
     render();
     return;
   }
+  if (ui.machine !== null) {
+    ui.machine = null;
+    ui.machinePosition = null;
+    render();
+    return;
+  }
   if (ui.modal !== null) {
     ui.modal = null;
     ui.modalPosition = null;
@@ -926,14 +1002,16 @@ function onPointerDown(event: MouseEvent): void {
   const rect = modal.getBoundingClientRect();
   const grabX = event.clientX - rect.left;
   const grabY = event.clientY - rect.top;
-  const isEvent = modal.dataset.modal === 'event';
+  const which = modal.dataset.modal;
   const move = (moveEvent: MouseEvent): void => {
     const position = {
       left: Math.max(0, moveEvent.clientX - grabX),
       top: Math.max(0, moveEvent.clientY - grabY),
     };
-    if (isEvent) {
+    if (which === 'event') {
       ui.eventPosition = position;
+    } else if (which === 'machine') {
+      ui.machinePosition = position;
     } else {
       ui.modalPosition = position;
     }

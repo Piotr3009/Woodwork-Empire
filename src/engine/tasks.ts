@@ -15,6 +15,10 @@ import {
   CLIENT_CALL_MINUTES_PER_1000,
   CLIENT_CALL_PRICE_STEP,
   DAILY_ORDERING_MINUTES,
+  EMAIL_ABOVE_BREAKS,
+  EMAIL_ABOVE_PRICE,
+  EMAIL_ABOVE_PRICE_STEP,
+  EMAIL_PRICE_BREAKS,
   REPAIR_MINUTES,
   FETCH_STORAGE_MINUTES,
   MATERIAL_ORDER_MINUTES_HIGH,
@@ -140,6 +144,15 @@ export function unloadMinutes(state: GameState): number {
   return Math.round(UNLOAD_BASE_MINUTES * factor);
 }
 
+/** Emails a job carries: 1 up to 3000, 2 up to 10000, 3 up to 20000, then one more for every
+ *  further 10000 (CLAUDE.md T3 3.2). A small job is one email, not three. */
+export function emailsForPrice(price: number): number {
+  for (const [max, emails] of EMAIL_PRICE_BREAKS) {
+    if (price <= max) return emails;
+  }
+  return EMAIL_ABOVE_BREAKS + Math.ceil((price - EMAIL_ABOVE_PRICE) / EMAIL_ABOVE_PRICE_STEP);
+}
+
 /** Minutes one email takes [TUNE]. */
 export function emailMinutes(): number {
   return EMAIL_MINUTES;
@@ -176,6 +189,7 @@ export function createTask(state: GameState, draft: TaskDraft): TaskInstance {
     deliveryId: draft.deliveryId ?? null,
     day: state.clock.day,
     done: false,
+    doneDay: null,
     doneBy: null,
   };
   state.tasks.push(task);
@@ -253,7 +267,7 @@ export function assignStaffTasks(state: GameState): TaskInstance[] {
       task.doneBy = staff.id;
       continue;
     }
-    advanceTask(task, task.minutesRemaining);
+    advanceTask(task, task.minutesRemaining, state.clock.day);
     task.doneBy = staff.id;
     cleared.push(task);
   }
@@ -293,12 +307,15 @@ export function pauseOwnerTask(state: GameState): void {
   state.owner.currentTaskId = null;
 }
 
-/** Works one minute into a task. True when it finished. One path for the owner and for staff. */
-export function advanceTask(task: TaskInstance, work: number): boolean {
+/** Works one minute into a task. True when it finished. One path for the owner and for staff.
+ *  The day it was finished is written down, because the drawings the workshop has done carry a
+ *  date on the desk (CLAUDE.md T3 3.3). */
+export function advanceTask(task: TaskInstance, work: number, day: number): boolean {
   task.minutesRemaining -= work;
   if (task.minutesRemaining > WORK_EPSILON) return false;
   task.minutesRemaining = 0;
   task.done = true;
+  task.doneDay = day;
   return true;
 }
 
@@ -311,7 +328,7 @@ export function advanceOwnerTask(state: GameState, work: number): TaskInstance |
     state.owner.currentTaskId = null;
     return null;
   }
-  if (!advanceTask(task, work)) return null;
+  if (!advanceTask(task, work, state.clock.day)) return null;
   state.owner.currentTaskId = null;
   return task;
 }

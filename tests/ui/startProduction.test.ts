@@ -1,0 +1,144 @@
+// @vitest-environment jsdom
+// The visible path to work: Start production is on the job card from the day the job is accepted,
+// and it says the one thing that is in the way (CLAUDE.md T3 3.1).
+
+import { describe, expect, it } from 'vitest';
+import { renderLaptop } from '../../src/ui/laptop';
+import type { GameState } from '../../src/engine/index';
+import {
+  act,
+  buyStartingKit,
+  clearEvents,
+  doTask,
+  firstJob,
+  newGame,
+  nextDay,
+  placeEnquiry,
+} from '../helpers';
+
+function card(state: GameState): HTMLElement {
+  const holder = document.createElement('div');
+  holder.innerHTML = renderLaptop(state);
+  const rows = Array.from(holder.querySelectorAll('.row'));
+  const row = rows.find((entry) => entry.querySelector('[data-do="startProduction"], .btn[disabled]'));
+  if (!(row instanceof HTMLElement)) throw new Error('no job card with a Start production button');
+  return row;
+}
+
+/** What the button on the job card says, and whether it can be pressed. */
+function startButton(state: GameState): { text: string; enabled: boolean; title: string } {
+  const button = card(state).querySelector('.row-action .btn');
+  if (!(button instanceof HTMLButtonElement)) throw new Error('no button on the card');
+  return {
+    text: button.textContent ?? '',
+    enabled: !button.disabled,
+    title: button.getAttribute('title') ?? '',
+  };
+}
+
+function steps(state: GameState): string[] {
+  return Array.from(card(state).querySelectorAll('.step')).map(
+    (step) => `${step.textContent ?? ''}:${(step.className.split('is-')[1] ?? '').trim()}`,
+  );
+}
+
+/** A game on day 1 with the kit bought and one shelves job accepted. */
+function withJob(): GameState {
+  let state = buyStartingKit(newGame());
+  state.enquiries = [];
+  const enquiry = placeEnquiry(state, { price: 400, name: 'Garage shelves' });
+  state = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+  return clearEvents(state);
+}
+
+describe('the Start production button through the lifecycle', () => {
+  it('names the one thing in the way, in the order the lifecycle blocks it', () => {
+    const seen: string[] = [];
+    let state = withJob();
+    seen.push(startButton(state).text);
+    state = doTask(state, 'clientCall');
+    seen.push(startButton(state).text);
+    state = doTask(state, 'clientCall');
+    seen.push(startButton(state).text);
+    state = doTask(state, 'design');
+    seen.push(startButton(state).text);
+    state = doTask(state, 'materialOrder');
+    seen.push(startButton(state).text);
+    state = clearEvents(nextDay(state));
+    seen.push(startButton(state).text);
+    state = doTask(state, 'unload');
+    state = clearEvents(state);
+    seen.push(startButton(state).text);
+    expect(seen).toEqual([
+      'Start production, 2 calls to make',
+      'Start production, 1 call to make',
+      'Start production, design not done',
+      'Start production, material not ordered',
+      'Start production, material arrives tomorrow',
+      'Start production, unload the delivery',
+      'Start production',
+    ]);
+    expect(startButton(state).enabled).toBe(true);
+  });
+
+  it('puts the reason in the tooltip as well, and never offers a live button with one', () => {
+    const state = withJob();
+    const button = startButton(state);
+    expect(button.enabled).toBe(false);
+    expect(button.title).toBe('2 calls to make');
+  });
+
+  it('says the rack is empty before it says anything about the hall', () => {
+    const state = readyToMake();
+    state.stock.sheets = 0;
+    expect(startButton(state).text).toBe('Start production, waiting for material');
+    // With sheets on the rack the next thing in the way is the extraction.
+    state.stock.sheets = 20;
+    state.equipment = state.equipment.filter((item) => item.specId !== 'extractor');
+    expect(startButton(state).text).toBe('Start production, no extraction');
+  });
+
+  it('says there are no free hands when the owner is not in', () => {
+    let state = readyToMake();
+    state.stock.sheets = 20;
+    state = act(state, { type: 'SKIP_DAY' });
+    expect(startButton(state).text).toBe('Start production, no free hands');
+  });
+
+  it('fills the five steps as the job goes through them', () => {
+    let state = withJob();
+    expect(steps(state)).toEqual([
+      'Calls:now', 'Design:todo', 'Material:todo', 'Delivery:todo', 'Production:todo',
+    ]);
+    state = doTask(state, 'clientCall');
+    state = doTask(state, 'clientCall');
+    expect(steps(state)).toEqual([
+      'Calls:done', 'Design:now', 'Material:todo', 'Delivery:todo', 'Production:todo',
+    ]);
+    state = doTask(state, 'design');
+    expect(steps(state)).toEqual([
+      'Calls:done', 'Design:done', 'Material:now', 'Delivery:todo', 'Production:todo',
+    ]);
+    state = doTask(state, 'materialOrder');
+    expect(steps(state)).toEqual([
+      'Calls:done', 'Design:done', 'Material:done', 'Delivery:now', 'Production:todo',
+    ]);
+    state = clearEvents(nextDay(state));
+    state = clearEvents(doTask(state, 'unload'));
+    expect(steps(state)).toEqual([
+      'Calls:done', 'Design:done', 'Material:done', 'Delivery:done', 'Production:now',
+    ]);
+  });
+});
+
+/** A job with its material on the rack and nobody on it. */
+function readyToMake(): GameState {
+  let state = withJob();
+  state = doTask(state, 'clientCall');
+  state = doTask(state, 'clientCall');
+  state = doTask(state, 'design');
+  const job = firstJob(state);
+  job.stage = 'ready';
+  state.tasks = state.tasks.filter((task) => task.kind !== 'materialOrder');
+  return state;
+}

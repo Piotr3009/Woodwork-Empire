@@ -3,8 +3,11 @@
 A tycoon game about running a joinery workshop in the UK. This repository holds the prototype:
 a pure simulation engine plus an intentionally ugly SVG prototype of the views.
 
-The design contract for the current stage is `CLAUDE.md`. `docs` history: the Turn 1 brief is
-`turn-1-brief.md` and the build reports are `REPORT-T1.md` and `REPORT-T2.md`.
+The design contract for the current stage is `CLAUDE.md`. The briefs of the finished stages are
+archived in `docs`: `docs/turn-1-brief.md` and `docs/turn-2-brief.md`. The build reports are
+`REPORT-T1.md` and `REPORT-T2.md`.
+
+The sprite contract between the art side and the game is `docs/art/SPRITES.md`.
 
 ## Requirements
 
@@ -70,14 +73,20 @@ Run `npm run dev` and work through this. It is the same path the jsdom smoke tes
 2. Day 1, 08:00, hall view. An empty unit with three small rooms along the back wall. There is no
    shelving yet, and the line under the hall says so.
 3. Press Office in the top bar, or click the office room in the hall. Click the catalogue and buy:
-   desk, chair, laptop, table saw, cordless drill, hand edgebander, small compressor, extractor,
-   one workbench and the cheap shelving. Then buy the one off software bundle. Watch the cash drop.
+   desk, chair, laptop, cordless drill, one workbench and the cheap shelving. The machines are
+   families: press Choose on the table saw and the page fills with its five classes, from a used
+   one at 1,800 to an industrial one at 25,000, each with what it does to the speed of the bench,
+   to the bag, to the life of the machine and to the meter. Buy the used saw, then the edgebander,
+   the compressor and the extractor the same way. Then buy the one off software bundle. Watch the
+   cash drop.
 4. Close the catalogue and press Board. It fills the page with a tile per enquiry: the price, the
    sheets it takes, about how many of your own days, and what it needs. Accept one. Half the price
    lands as a deposit.
-5. Click the laptop on the desk. Start the client calls, the emails and the drawing. The minute bar
-   fills with grey and purple. Press 4x, which is two real minutes a game day. When they are done,
-   the material order appears: start that too.
+5. Click the laptop on the desk. Start the client calls and the emails, and watch the job card:
+   Start production is on it from the day the job is accepted, greyed out with the one thing in
+   its way. The drawing is on the roll of drawings beside the laptop. The minute bar fills with
+   grey and purple. Press 4x, which is two real minutes a game day. When the calls and the drawing
+   are done, the material order appears: start that too.
 6. Open the menu and press End day. Before 16:00 that means going home, so the top bar says so and
    the rest of the day runs without you. Let the clock run out: the summary says the day went on
    admin and nothing was made.
@@ -92,3 +101,12 @@ Run `npm run dev` and work through this. It is the same path the jsdom smoke tes
    and everything comes back.
 10. Press Set up hall and drag the table saw somewhere else. Green means it fits, red says why not.
     Press Done and the clock starts again. That is the game.
+
+## Sprite check
+
+The Menu has a Sprite check entry. It lists every sprite key the game can draw, with the footprint
+the engine expects, the placeholder box, the picture beside it when there is a file, and the exact
+canvas the art side has to hit. It is the acceptance page of `docs/art/SPRITES.md`.
+
+Put delivered PNG files in `public/sprites/`, then run `npm run sprites:manifest` (the build runs
+it first anyway). With no files the manifest is empty and the game draws its boxes as before.

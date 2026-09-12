@@ -135,7 +135,8 @@ describe('the hiring pool', () => {
 });
 
 function jobReadyWith(price: number, tier: Worker['tier']): GameState {
-  let state = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
+  // The budget saw, whose factors are 1.0: these are the worker rates of CLAUDE.md 8.5.
+  let state = buyStartingKit(newGame({ difficulty: 'veryEasy' }), { sawVariant: 'budget' });
   state.reputation = 40;
   state = withCrew(state, 1, tier);
   const enquiry = placeEnquiry(state, {
@@ -208,7 +209,7 @@ describe('the saw ratio', () => {
   });
 
   it('shows up in what the fourth joiner produces', () => {
-    let state = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
+    let state = buyStartingKit(newGame({ difficulty: 'veryEasy' }), { sawVariant: 'budget' });
     state.reputation = 10;
     state = withCrew(state, 4, 'normal');
     for (let index = 0; index < 4; index += 1) {

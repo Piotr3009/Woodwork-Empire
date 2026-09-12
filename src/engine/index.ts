@@ -7,13 +7,24 @@
 //
 // The UI never computes economics. Everything it needs to show is a selector exported here.
 
-export { applyAction, canBuy, canBuySoftware, createGame, runMinutes, tick } from './game';
+export {
+  applyAction,
+  canBuy,
+  canBuySoftware,
+  createGame,
+  machineInUse,
+  runMinutes,
+  tick,
+} from './game';
 export type { BuyCheck, NewGameOptions, TickResult } from './game';
 export * from './types';
 
 // Numbers the UI is allowed to print
 export {
   CLEANING_MINUTES,
+  EQUIPMENT_SPECS,
+  MACHINE_ENDURANCE_HOURS,
+  MACHINE_ENDURANCE_HOURS_DEFAULT,
   MINUTES_PER_WORKING_DAY,
   STATE_VERSION,
   WHY,
@@ -77,7 +88,9 @@ export {
 export {
   emailsOutstanding,
   findJob,
+  hallBlock,
   labourValueFor,
+  lifecycleSteps,
   ownerDaysFor,
   jobLabourCost,
   jobsAtGate,
@@ -87,15 +100,20 @@ export {
   jobSpeedFactor,
   openJobs,
   ownerJob,
+  showsStartProduction,
+  startProductionCheck,
   transportLabel,
 } from './jobs';
+export type { LifecycleStep, StartCheck, StepState } from './jobs';
 
 // Tasks
 export {
   callsForPrice,
   clientCallMinutes,
   designMinutes,
+  emailsForPrice,
   findTask,
+  jobTasks,
   materialOrderMinutes,
   openTasks,
   softwareActive,
@@ -121,8 +139,17 @@ export {
 export {
   accidentRisk,
   bagBlocked,
+  bagIntervalFor,
   bagsExist,
   countOf,
+  enduranceHoursFor,
+  findVariant,
+  machineOutputFactor,
+  machinePowerPerDay,
+  machinesUsedFor,
+  pastEndurance,
+  variantFor,
+  variantOf,
   dustBand,
   findSpec,
   gateIsCrowded,
@@ -133,6 +160,7 @@ export {
   hasExtraction,
   machineLabourFactor,
   machinesDueService,
+  overdueBreakdownChance,
   owned,
   repairCostFor,
   serviceCostFor,
@@ -147,6 +175,7 @@ export {
   deliveriesOnTheWay,
   materialCostFor,
   materialModeLabel,
+  rackCanSupply,
   rackCapacity,
   sheetsDueFor,
   sheetsForCost,

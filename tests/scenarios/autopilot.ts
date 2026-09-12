@@ -51,6 +51,8 @@ export interface Policy {
   hireJoiner: boolean;
   /** Sheets to buy in advance on day 1. Jobs then try to draw from the rack. */
   stockSheets: number;
+  /** The class of table saw to buy on day 1. Undefined takes the cheapest, the used one. */
+  sawVariant?: string;
 }
 
 export const CAREFUL: Policy = {
@@ -78,8 +80,21 @@ export const SHORT_HANDED: Policy = {
   cleanAbove: 60,
   wanted: ['bookcase', 'garageShelves'],
   hireJoiner: true,
-  // Two jobs drawing off one small rack is how a workshop runs itself dry.
-  stockSheets: 12,
+  // Two jobs drawing off one small rack is how a workshop runs itself dry. Ten sheets, not the
+  // twelve of Turn 2: a small job is one email now and the used saw is 5% slower, so the month
+  // runs differently and twelve sheets lasted it out (CLAUDE.md T3 3.2, T3 3.5).
+  stockSheets: 10,
+};
+
+/** A month that spends the money on the best saw there is, to see what it buys (CLAUDE.md T3 4). */
+export const BIG_SAW: Policy = {
+  maxOpenJobs: 1,
+  buyKit: true,
+  cleanAbove: 55,
+  wanted: ['tvUnit', 'bookcase', 'garageShelves'],
+  hireJoiner: false,
+  stockSheets: 0,
+  sawVariant: 'industrial',
 };
 
 export const DAY_ONE_KIT = [
@@ -95,10 +110,14 @@ export const DAY_ONE_KIT = [
   'sheetRack',
 ];
 
-function buyKit(state: GameState): GameState {
+function buyKit(state: GameState, policy: Policy): GameState {
   let next = state;
   for (const specId of DAY_ONE_KIT) {
-    next = applyAction(next, { type: 'BUY_EQUIPMENT', specId });
+    next = applyAction(next, {
+      type: 'BUY_EQUIPMENT',
+      specId,
+      variantId: specId === 'tableSaw' ? policy.sawVariant : undefined,
+    });
   }
   return applyAction(next, { type: 'BUY_SOFTWARE', mode: 'oneOff' });
 }
@@ -143,7 +162,7 @@ function takeWork(state: GameState, policy: Policy): GameState {
 export function playDay(state: GameState, policy: Policy, seen: GameEvent[] = []): GameState {
   let next = state;
   const day = next.clock.day;
-  if (policy.buyKit && day === 1) next = buyKit(next);
+  if (policy.buyKit && day === 1) next = buyKit(next, policy);
   if (policy.hireJoiner && day === 1) next = takeOnJoiner(next);
   if (policy.stockSheets > 0 && day === 1) {
     next = applyAction(next, { type: 'BUY_STOCK', sheets: policy.stockSheets });

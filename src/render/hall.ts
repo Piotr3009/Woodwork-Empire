@@ -20,6 +20,7 @@ import {
   serviceIsDue,
 } from '../engine/machines';
 import { jobsAtGate } from '../engine/jobs';
+import { machineInUse } from '../engine/game';
 import { rackCapacity, stockIsLow } from '../engine/materials';
 import {
   STATION_BENCH,
@@ -31,7 +32,7 @@ import {
 } from '../engine/stations';
 import { ownerIsAvailable, staffOutputFactor } from '../engine/owner';
 import { plural } from '../engine/text';
-import type { GameState } from '../engine/types';
+import type { Equipment, EquipmentSpec, GameState } from '../engine/types';
 import {
   type BoxFaces,
   type Point,
@@ -42,6 +43,7 @@ import {
   footprintPolygon,
   gridBounds,
 } from './iso';
+import { contactShadow, spriteBox, spriteImage, spriteUrl } from './sprites';
 
 // ---------------------------------------------------------------------------
 // SVG primitives. office.ts uses these too: one place builds the strings.
@@ -83,9 +85,102 @@ export function box(faces: BoxFaces, fill: string, shade: string, extra = ''): s
   ].join('');
 }
 
+/** What an object on the floor looks like: its picture when the art side has delivered one, the
+ *  placeholder box when it has not, and the contact shadow under either (CLAUDE.md T3 3.6).
+ *  When there is a picture the name is a tooltip only: no text over the art. */
+export function objectArt(art: {
+  spriteKey: string;
+  tier?: string | null;
+  x: number;
+  y: number;
+  width: number;
+  depth: number;
+  height: number;
+  fill: string;
+  shade: string;
+  label: string;
+}): string {
+  const shadow = contactShadow(art.x, art.y, art.width, art.depth);
+  const url = spriteUrl(art.spriteKey, art.tier);
+  if (url !== null) {
+    const at = spriteBox(art.x, art.y, art.width, art.depth, art.height);
+    return shadow + spriteImage(url, at);
+  }
+  const faces = boxPolygons(art.x, art.y, art.width, art.depth, art.height);
+  return (
+    shadow +
+    box(faces, art.fill, art.shade) +
+    label(centreOf(art.x, art.y, art.width, art.depth, art.height), art.label)
+  );
+}
+
 interface Drawable {
   depth: number;
   svg: string;
+}
+
+// ---------------------------------------------------------------------------
+// What a machine looks like while it is running (CLAUDE.md T3 3.7). All of it is presentation on
+// top of whatever the machine is drawn with, and all of it moves through CSS on SVG groups: the
+// renderer starts no timer of its own.
+// ---------------------------------------------------------------------------
+
+/** Particles in a chip stream [TUNE: the brief asks for 3 to 6 and the renderer never guesses]. */
+const FX_CHIPS = 4;
+
+function at(point: Point): string {
+  return `transform="translate(${round(point.x)},${round(point.y)})"`;
+}
+
+/** The disc of a saw blade, with the spokes that make the spin visible. */
+function blade(point: Point): string {
+  const spokes = [0, 45, 90, 135]
+    .map((angle) => `<line x1="0" y1="-9" x2="0" y2="9" transform="rotate(${angle})" />`)
+    .join('');
+  return (
+    `<g class="fx fx-blade" ${at(point)}><circle r="10" />` +
+    `<g class="fx-blade-spin">${spokes}</g></g>`
+  );
+}
+
+/** Dust and chips thrown down-right from a cutter, over and over while it runs. */
+function chipStream(point: Point): string {
+  const parts: string[] = [];
+  for (let index = 0; index < FX_CHIPS; index += 1) {
+    parts.push(
+      `<circle class="fx-chip" r="2" style="animation-delay:${(index * 0.3).toFixed(1)}s" />`,
+    );
+  }
+  return `<g class="fx fx-chips" ${at(point)}>${parts.join('')}</g>`;
+}
+
+/** A lamp on the machine: amber while it works, red when it has given up. */
+function lamp(point: Point, tone: 'amber' | 'red'): string {
+  return `<circle class="fx fx-lamp fx-${tone}" cx="${round(point.x)}" cy="${round(point.y)}" r="4" />`;
+}
+
+export interface MachineFx {
+  /** Goes on the object's own group: the extractor breathes as a whole. */
+  className: string;
+  svg: string;
+}
+
+const NO_FX: MachineFx = { className: '', svg: '' };
+
+export function machineFx(state: GameState, item: Equipment, spec: EquipmentSpec): MachineFx {
+  // The top of the object, where a lamp or a blade would sit on the real thing.
+  const point = centreOf(item.anchorX, item.anchorY, spec.width, spec.depth, spec.height);
+  if (spec.category === 'extraction') {
+    if (item.broken) return { className: '', svg: lamp(point, 'red') };
+    return machineInUse(state, item) ? { className: ' fx-breathe', svg: '' } : NO_FX;
+  }
+  if (!machineInUse(state, item)) return NO_FX;
+  if (item.specId === 'tableSaw') {
+    return { className: '', svg: blade(point) + chipStream(point) };
+  }
+  if (item.specId === 'thicknesser') return { className: '', svg: chipStream(point) };
+  if (item.specId === 'edgebander') return { className: '', svg: lamp(point, 'amber') };
+  return NO_FX;
 }
 
 const CATEGORY_FILL: Record<string, string> = {
@@ -246,13 +341,22 @@ export function renderHall(state: GameState, ghost: Ghost | null = null): string
 
   // The three small rooms along the back wall.
   for (const room of ROOM_LAYOUT) {
-    const faces = boxPolygons(room.x, room.y, room.width, room.depth, room.height);
     drawables.push({
       depth: depthKey(room.x, room.y),
       svg:
-        `<g data-room="${room.id}" class="clickable"><title>${escapeText(room.tooltip)}</title>` +
-        box(faces, 'var(--room)', 'var(--room-dark)') +
-        label(centreOf(room.x, room.y, room.width, room.depth, room.height), room.name) +
+        `<g data-room="${room.id}" data-sprite="${room.spriteKey}" class="clickable">` +
+        `<title>${escapeText(room.tooltip)}</title>` +
+        objectArt({
+          spriteKey: room.spriteKey,
+          x: room.x,
+          y: room.y,
+          width: room.width,
+          depth: room.depth,
+          height: room.height,
+          fill: 'var(--room)',
+          shade: 'var(--room-dark)',
+          label: room.name,
+        }) +
         '</g>',
     });
   }
@@ -262,7 +366,6 @@ export function renderHall(state: GameState, ghost: Ghost | null = null): string
     const spec = findSpec(item.specId);
     if (!spec || spec.category === 'furniture') continue;
     const broken = item.broken;
-    const faces = boxPolygons(item.anchorX, item.anchorY, spec.width, spec.depth, spec.height);
     const fill = broken ? 'var(--stopped)' : CATEGORY_FILL[spec.category] ?? 'var(--kit-machine)';
     const shade = broken
       ? 'var(--stopped-dark)'
@@ -279,17 +382,28 @@ export function renderHall(state: GameState, ghost: Ghost | null = null): string
         : undefined;
     const benchLine =
       spec.category !== 'bench' ? '' : atThisBench ? `: ${atThisBench.name}` : ' (free)';
+    const name = `${spec.name}${bagLine}${serviceLine}${benchLine}${rackLine}`;
+    const fx = machineFx(state, item, spec);
     drawables.push({
       depth: depthKey(item.anchorX, item.anchorY),
       svg:
         `<g data-kit="${item.id}"${spec.category === 'storage' ? ' data-rack="1"' : ''} ` +
-        `data-sprite="${item.spriteKey}" class="clickable">` +
-        `<title>${escapeText(spec.effect)}</title>` +
-        box(faces, fill, shade) +
-        label(
-          centreOf(item.anchorX, item.anchorY, spec.width, spec.depth, spec.height),
-          `${spec.name}${bagLine}${serviceLine}${benchLine}${rackLine}`,
-        ) +
+        `data-sprite="${item.spriteKey}" data-tier="${item.variantId}" ` +
+        `class="clickable${fx.className}">` +
+        `<title>${escapeText(`${name}. ${spec.effect}`)}</title>` +
+        objectArt({
+          spriteKey: item.spriteKey,
+          tier: item.variantId,
+          x: item.anchorX,
+          y: item.anchorY,
+          width: spec.width,
+          depth: spec.depth,
+          height: spec.height,
+          fill,
+          shade,
+          label: name,
+        }) +
+        fx.svg +
         '</g>',
     });
   }
@@ -329,17 +443,22 @@ export function renderHall(state: GameState, ghost: Ghost | null = null): string
   if (waiting) {
     const gate = GATE_LAYOUT;
     const gateX = unit.widthTiles + gate.x;
-    const faces = boxPolygons(gateX, gate.y, gate.width, gate.depth, gate.height);
     drawables.push({
       depth: depthKey(gateX, gate.y),
       svg:
         `<g data-van="${waiting.id}" data-sprite="${DELIVERY_VAN_SPRITE}" class="clickable">` +
         '<title>Click the van to decide who unloads it</title>' +
-        box(faces, 'var(--kit-vehicle)', 'var(--kit-vehicle-dark)') +
-        label(
-          centreOf(gateX, gate.y, gate.width, gate.depth, gate.height),
-          `Delivery: ${plural(waiting.sheets, 'sheet', 'sheets')}`,
-        ) +
+        objectArt({
+          spriteKey: DELIVERY_VAN_SPRITE,
+          x: gateX,
+          y: gate.y,
+          width: gate.width,
+          depth: gate.depth,
+          height: gate.height,
+          fill: 'var(--kit-vehicle)',
+          shade: 'var(--kit-vehicle-dark)',
+          label: `Delivery: ${plural(waiting.sheets, 'sheet', 'sheets')}`,
+        }) +
         '</g>',
     });
   }

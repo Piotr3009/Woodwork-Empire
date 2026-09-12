@@ -6,10 +6,11 @@
   "description": "Woodwork Empire, a joinery workshop management game. Turn 1 prototype.",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
+    "build": "npm run sprites:manifest && tsc --noEmit && vite build",
     "test": "vitest run",
     "lint": "eslint src tests",
-    "check": "npm run lint && npm run build && npm test"
+    "check": "npm run lint && npm run build && npm test",
+    "sprites:manifest": "node scripts/sprites-manifest.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.14.0",

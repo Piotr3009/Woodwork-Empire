@@ -75,7 +75,16 @@ describe('the first ten minutes', () => {
     expect(html()).toContain('Equipment catalogue');
     const before = currentState()?.cash ?? 0;
     for (const specId of STARTING_KIT) {
-      click(`[data-do="buyEquipment"][data-id="${specId}"]`);
+      // A machine is a family: the catalogue offers its classes, and the money is spent there
+      // (CLAUDE.md T3 3.5).
+      const choose = root().querySelector(`[data-do="openMachine"][data-id="${specId}"]`);
+      if (choose === null) {
+        click(`[data-do="buyEquipment"][data-id="${specId}"]`);
+        continue;
+      }
+      click(`[data-do="openMachine"][data-id="${specId}"]`);
+      click(`[data-modal="machine"] [data-do="buyEquipment"][data-id="${specId}"]`);
+      click('[data-modal="machine"] [data-do="closeModal"]');
     }
     click('[data-do="buySoftware"][data-id="oneOff"]');
     const state = currentState();
@@ -97,17 +106,26 @@ describe('the first ten minutes', () => {
     expect(state?.jobs[0]?.depositPaid).toBeGreaterThan(0);
   });
 
-  it('5. finds the job in the laptop design queue and starts the calls', () => {
+  it('5. finds the calls in the laptop and the drawing on the roll beside it', () => {
     click('[data-do="closeModal"]');
     // Still standing in the office, so the laptop is right there on the desk.
     click('[data-office="laptop"]');
     expect(html()).toContain('Laptop');
-    expect(html()).toContain('Design queue');
     const name = currentState()?.jobs[0]?.name ?? '';
-    expect(html()).toContain(`Design: ${name}`);
     expect(html()).toContain('Client call 1 of');
     expect(html()).toContain('Email 1 of');
     expect(html()).toContain('Bookkeeping');
+    // The drawings moved out of the laptop and onto the desk (CLAUDE.md T3 3.3).
+    expect(html()).not.toContain('Design queue');
+    expect(html()).not.toContain(`Design: ${name}`);
+    click('[data-do="closeModal"]');
+    click('[data-office="drawings"]');
+    expect(html()).toContain('Drawings');
+    expect(html()).toContain('Design queue');
+    expect(html()).toContain(`Design: ${name}`);
+    expect(html()).toContain('Finished drawings');
+    click('[data-do="closeModal"]');
+    click('[data-office="laptop"]');
     click('[data-do="startTask"]');
     expect(currentState()?.owner.currentTaskId).not.toBeNull();
     expect(html()).toContain('Pause');
@@ -446,6 +464,21 @@ describe('accounting', () => {
   });
 });
 
+describe('the sprite check page', () => {
+  it('is one click away in the Menu, and the top bar brings the hall back', () => {
+    click('[data-do="toggleMenu"]');
+    expect(html()).toContain('data-do="showSprites"');
+    click('[data-do="showSprites"]');
+    expect(html()).toContain('sprite-grid');
+    expect(html()).toContain('tableSaw.png');
+    expect(html()).toContain('no file');
+    expect(html()).not.toContain('hall-view');
+    click('[data-do="setView"][data-view="hall"]');
+    expect(html()).toContain('hall-view');
+    click('[data-do="setView"][data-view="office"]');
+  });
+});
+
 describe('the style rules of 10.4', () => {
   it('shows one accent button at a time, not one per row', () => {
     click('[data-office="catalogue"]');
@@ -467,8 +500,10 @@ describe('the style rules of 10.4', () => {
     click('[data-do="setView"][data-view="office"]');
     click('[data-office="hiring"]');
     const modal = root().querySelector('.modal');
-    expect(modal?.getAttribute('style')).toMatch(/left:\d+px;top:\d+px/);
-    expect(modal?.className).not.toContain('modal-centred');
+    if (!(modal instanceof HTMLElement)) throw new Error('no modal');
+    expect(modal.style.left).toMatch(/^\d+px$/);
+    expect(modal.style.top).toMatch(/^\d+px$/);
+    expect(modal.className).not.toContain('modal-centred');
     click('[data-do="closeModal"]');
   });
 

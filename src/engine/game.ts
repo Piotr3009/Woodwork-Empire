@@ -39,19 +39,17 @@ import {
   accidentRisk,
   accumulateBagMinutes,
   addDust,
-  bagBlocked,
   breakExtractor,
   clearDust,
   countOf,
   emptyBag,
+  enduranceHoursFor,
   breakMachine,
-  brokenMachineFor,
   extractorBreakdownChance,
   extractorBroken,
   findSpec,
   hallProductivityFactor,
   has,
-  hasExtraction,
   machinesDueService,
   overdueBreakdownChance,
   repairCostFor,
@@ -60,6 +58,7 @@ import {
   serviceMachine,
   serviceableMachines,
   specOf,
+  variantOf,
 } from './machines';
 import {
   acceptEnquiry,
@@ -69,6 +68,7 @@ import {
   checkOverdueJobs,
   deliverJob,
   findJob,
+  hallBlock,
   jobProgress,
   jobSpeedFactor,
   oldestReadyJob,
@@ -664,7 +664,7 @@ function runWorkerTaskMinute(state: GameState, workerId: string, taskId: string)
     return false;
   }
   worker.minutesWorked += 1;
-  if (advanceTask(task, 1)) {
+  if (advanceTask(task, 1, state.clock.day)) {
     worker.taskId = null;
     if (task.kind === 'materialOrder' && worker.role === 'purchasingClerk') {
       worker.ordersToday += 1;
@@ -683,18 +683,6 @@ function materialReady(state: GameState, job: Job): boolean {
     raiseNoMaterial(state);
   }
   return ok;
-}
-
-/** Everything in the hall that can stop a job, in the order the player would notice it. Empty
- *  while the job is free to be worked on (CLAUDE.md T2 3.9). */
-function hallBlock(state: GameState, job: Job): string {
-  if (!job.byHand && !hasExtraction(state)) return 'no extraction';
-  const broken = brokenMachineFor(state, job.materialKind);
-  if (broken && !job.byHand) {
-    return `${(findSpec(broken.specId)?.name ?? 'a machine').toLowerCase()} is broken`;
-  }
-  if (bagBlocked(state, job.materialKind)) return 'bag full';
-  return '';
 }
 
 /** True when the job can be worked on this minute. Writes down why it cannot, either way. */
@@ -1001,7 +989,7 @@ export function applyAction(state: GameState, action: GameAction): GameState {
       pauseOwnerTask(next);
       break;
     case 'BUY_EQUIPMENT':
-      buyEquipment(next, action.specId);
+      buyEquipment(next, action.specId, action.variantId);
       break;
     case 'BUY_SOFTWARE':
       buySoftware(next, action.mode);
@@ -1046,6 +1034,34 @@ export function applyAction(state: GameState, action: GameAction): GameState {
 // ---------------------------------------------------------------------------
 
 
+/** Somebody is actually standing at this job this minute, rather than the job merely being open
+ *  and assigned to a man who has gone home or gone to the desk. */
+function someoneIsOnIt(state: GameState, job: Job): boolean {
+  if (job.assignedTo === null) return false;
+  if (job.assignedTo === 'owner') {
+    return ownerIsAvailable(state) && state.owner.currentTaskId === null;
+  }
+  const worker = state.workers.find((entry) => entry.id === job.assignedTo);
+  if (!worker) return false;
+  return isWorkingToday(state, worker) && worker.taskId === null;
+}
+
+/** True when something that runs through this machine is being made this minute. The hall reads
+ *  it to spin the blade and throw the dust: nothing in the engine turns on it (CLAUDE.md T3 3.7). */
+export function machineInUse(state: GameState, item: Equipment): boolean {
+  const spec = findSpec(item.specId);
+  if (!spec || item.broken) return false;
+  if (spec.category !== 'machine' && spec.category !== 'extraction') return false;
+  if (spec.category === 'machine' && item.bagFull) return false;
+  return state.jobs.some((job) => {
+    if (job.stage !== 'inProduction' || job.blockedBy !== '') return false;
+    if (!someoneIsOnIt(state, job)) return false;
+    // The extraction serves whatever is running, so anything at the bench sets it going.
+    if (spec.category === 'extraction') return true;
+    return spec.usedOn === null || spec.usedOn === job.materialKind;
+  });
+}
+
 export interface BuyCheck {
   ok: boolean;
   reason: string;
@@ -1054,9 +1070,10 @@ export interface BuyCheck {
 const OK: BuyCheck = { ok: true, reason: '' };
 
 /** One reason per refusal, used by the catalogue modal and by the buy action itself. */
-export function canBuy(state: GameState, specId: string): BuyCheck {
+export function canBuy(state: GameState, specId: string, variantId?: string): BuyCheck {
   const spec = findSpec(specId);
   if (!spec) return { ok: false, reason: 'Not in the catalogue' };
+  const variant = variantOf(spec, variantId ?? spec.variants[0]?.id ?? '');
   if (spec.locked) return { ok: false, reason: spec.lockReason };
   if (state.reputation < spec.minReputation) {
     return { ok: false, reason: `Needs reputation ${spec.minReputation}` };
@@ -1071,7 +1088,7 @@ export function canBuy(state: GameState, specId: string): BuyCheck {
   if (specId === 'workbench' && countOf(state, 'workbench') >= state.unit.benchSlots) {
     return { ok: false, reason: 'No free bench slot in this unit' };
   }
-  if (!canAfford(state, spec.price)) return { ok: false, reason: 'Not enough cash' };
+  if (!canAfford(state, variant.price)) return { ok: false, reason: 'Not enough cash' };
   return OK;
 }
 
@@ -1107,15 +1124,17 @@ function anchorFor(state: GameState, specId: string): { x: number; y: number } {
   return firstFreeTile(state, specId) ?? preferred;
 }
 
-export function buyEquipment(state: GameState, specId: string): BuyCheck {
-  const check = canBuy(state, specId);
+export function buyEquipment(state: GameState, specId: string, variantId?: string): BuyCheck {
+  const check = canBuy(state, specId, variantId);
   if (!check.ok) return check;
   const spec = specOf(specId);
+  const variant = variantOf(spec, variantId ?? spec.variants[0]?.id ?? '');
   const anchor = anchorFor(state, specId);
-  pay(state, 'equipment', spec.name, spec.price);
+  pay(state, 'equipment', variant.name, variant.price);
   state.equipment.push({
     id: makeId(state, 'kit'),
     specId,
+    variantId: variant.id,
     spriteKey: spec.spriteKey,
     anchorX: anchor.x,
     anchorY: anchor.y,
@@ -1123,7 +1142,9 @@ export function buyEquipment(state: GameState, specId: string): BuyCheck {
     bagFull: false,
     broken: false,
     lastServiceDay: state.clock.day,
-    purchasePrice: spec.price,
+    enduranceHours: enduranceHoursFor(specId, variant.id),
+    hoursUsed: 0,
+    purchasePrice: variant.price,
   });
   return OK;
 }
