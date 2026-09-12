@@ -467,8 +467,10 @@ describe('the style rules of 10.4', () => {
     click('[data-do="setView"][data-view="office"]');
     click('[data-office="hiring"]');
     const modal = root().querySelector('.modal');
-    expect(modal?.getAttribute('style')).toMatch(/left:\d+px;top:\d+px/);
-    expect(modal?.className).not.toContain('modal-centred');
+    if (!(modal instanceof HTMLElement)) throw new Error('no modal');
+    expect(modal.style.left).toMatch(/^\d+px$/);
+    expect(modal.style.top).toMatch(/^\d+px$/);
+    expect(modal.className).not.toContain('modal-centred');
     click('[data-do="closeModal"]');
   });
 

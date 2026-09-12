@@ -10,6 +10,11 @@ import { escapeText } from '../render/hall';
 export const escapeHtml = escapeText;
 export const money = formatMoney;
 
+export interface ModalPosition {
+  left: number;
+  top: number;
+}
+
 export interface ModalSpec {
   id: string;
   title: string;
@@ -20,11 +25,8 @@ export interface ModalSpec {
   wide?: boolean;
   /** Fills the page, for the order board (CLAUDE.md T2 3.2). */
   full?: boolean;
-}
-
-export interface ModalPosition {
-  left: number;
-  top: number;
+  /** Where the player dragged it. Null is centred. */
+  position?: ModalPosition | null;
 }
 
 export function minutes(value: number): string {
@@ -38,22 +40,90 @@ export function days(value: number): string {
   return plural(Math.round(value), 'day', 'days');
 }
 
-export function renderModal(spec: ModalSpec, position: ModalPosition | null): string {
-  const style = position ? ` style="left:${position.left}px;top:${position.top}px"` : '';
-  const closable = spec.closable !== false;
-  const cross = closable
-    ? '<button class="modal-close" data-do="closeModal" title="Close" aria-label="Close">' +
-      '×</button>'
-    : '';
+const CROSS =
+  '<button class="modal-close" data-do="closeModal" title="Close" aria-label="Close">' +
+  '×</button>';
+
+function modalClass(spec: ModalSpec): string {
   const size = spec.full === true ? ' modal-full' : spec.wide === true ? ' modal-wide' : '';
+  return `modal${size}${spec.position ? '' : ' modal-centred'}`;
+}
+
+/** The shell of a modal: a head, an empty body and an empty foot. Content goes in through
+ *  `fillModal`, which is the only path that touches it afterwards (CLAUDE.md T3 3.4). */
+export function renderModal(spec: ModalSpec): string {
   return (
-    `<div class="modal${size}${position ? '' : ' modal-centred'}"` +
-    ` data-modal="${spec.id}"${style}>` +
-    `<header class="modal-head" data-drag="1"><h2>${escapeHtml(spec.title)}</h2>${cross}</header>` +
-    `<div class="modal-body">${spec.body}</div>` +
-    (spec.footer === undefined ? '' : `<footer class="modal-foot">${spec.footer}</footer>`) +
+    `<div class="${modalClass(spec)}" data-modal="${spec.id}">` +
+    '<header class="modal-head" data-drag="1"><h2></h2></header>' +
+    '<div class="modal-body"></div>' +
+    '<footer class="modal-foot"></footer>' +
     '</div>'
   );
+}
+
+/** Puts this render's content into a shell that is already on the page, and leaves the body
+ *  scrolled where the player left it. Replacing the whole modal every game minute is what threw
+ *  him back to the top (CLAUDE.md T3 3.4). */
+function fillModal(node: Element, spec: ModalSpec): void {
+  node.className = modalClass(spec);
+  if (node instanceof HTMLElement) {
+    node.style.left = spec.position ? `${spec.position.left}px` : '';
+    node.style.top = spec.position ? `${spec.position.top}px` : '';
+  }
+  const head = node.querySelector('.modal-head');
+  const heading = node.querySelector('.modal-head h2');
+  if (heading !== null && heading.textContent !== spec.title) heading.textContent = spec.title;
+  if (head !== null) {
+    const cross = head.querySelector('.modal-close');
+    const closable = spec.closable !== false;
+    if (closable && cross === null) head.insertAdjacentHTML('beforeend', CROSS);
+    if (!closable && cross !== null) cross.remove();
+  }
+  const body = node.querySelector('.modal-body');
+  if (body !== null) {
+    const scrolled = body.scrollTop;
+    body.innerHTML = spec.body;
+    // Clamp only when the new content measures shorter. A browser clamps for itself, and the
+    // measurement is zero in a headless DOM, where clamping would throw the player to the top.
+    const most = body.scrollHeight - body.clientHeight;
+    body.scrollTop = most > 0 ? Math.min(scrolled, most) : scrolled;
+  }
+  const foot = node.querySelector('.modal-foot');
+  if (foot !== null) {
+    if (spec.footer === undefined) {
+      foot.setAttribute('hidden', 'hidden');
+      foot.innerHTML = '';
+    } else {
+      foot.removeAttribute('hidden');
+      foot.innerHTML = spec.footer;
+    }
+  }
+}
+
+/** Brings the modal layer into line with what should be open, keeping every shell that is still
+ *  wanted. One path for every modal in the game, with no special case (CLAUDE.md T3 3.4). */
+export function syncModals(layer: Element, specs: ModalSpec[]): void {
+  const wanted = new Set(specs.map((spec) => spec.id));
+  for (const node of Array.from(layer.children)) {
+    if (!wanted.has(node.getAttribute('data-modal') ?? '')) node.remove();
+  }
+  let previous: Element | null = null;
+  for (const spec of specs) {
+    let node: Element | null = layer.querySelector(`[data-modal="${spec.id}"]`);
+    if (node === null) {
+      const holder = document.createElement('div');
+      holder.innerHTML = renderModal(spec);
+      node = holder.firstElementChild;
+      if (node === null) continue;
+      layer.appendChild(node);
+    }
+    fillModal(node, spec);
+    // The event modal sits over a desk modal, so the order the caller asked for is kept.
+    const after: Element | null =
+      previous === null ? layer.firstElementChild : previous.nextElementSibling;
+    if (after !== node) layer.insertBefore(node, after);
+    previous = node;
+  }
 }
 
 /** A text filter with the clear cross every filter field has (CLAUDE.md 3.10). */
@@ -65,7 +135,7 @@ export function filterField(key: string, value: string, placeholder: string): st
         'title="Clear" aria-label="Clear">×</button>';
   return (
     `<div class="field"><input type="text" class="filter-input" data-filter="${key}" ` +
-    `data-focus-key="filter-${key}" value="${escapeHtml(value)}" ` +
+    `data-field="filter-${key}" value="${escapeHtml(value)}" ` +
     `placeholder="${escapeHtml(placeholder)}" />${clear}</div>`
   );
 }

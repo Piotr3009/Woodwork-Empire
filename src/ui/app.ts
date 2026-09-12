@@ -43,10 +43,11 @@ import { renderLaptop } from './laptop';
 import { renderMaterials } from './materials';
 import {
   type ModalPosition,
+  type ModalSpec,
   escapeHtml,
   minutes,
   reasonLabel,
-  renderModal,
+  syncModals,
 } from './modal';
 import { renderStart } from './start';
 import { cloudAvailable } from '../cloud/supabase';
@@ -239,7 +240,38 @@ function renderWhy(): string {
   );
 }
 
-function screenHtml(): string {
+/** What should be open on the modal layer, in the order it is stacked (CLAUDE.md T3 3.4). */
+function modalSpecs(): ModalSpec[] {
+  if (ui.screen === 'start' || state === null) return [];
+  const current = state;
+  const specs: ModalSpec[] = [];
+  if (ui.modal !== null) {
+    specs.push({
+      id: ui.modal,
+      title: MODAL_TITLES[ui.modal],
+      body: modalBody(ui.modal, current),
+      wide: ui.modal === 'accounting',
+      full: ui.modal === 'board',
+      position: ui.modalPosition,
+    });
+  }
+  const event = current.activeEvent;
+  if (event) {
+    specs.push({
+      id: 'event',
+      title: event.title,
+      body: event.kind === 'dayEnd' ? renderDayEnd(current) : renderEvent(current, event),
+      footer: renderEventFooter(event),
+      closable: event.choices.length === 1,
+      wide: event.kind === 'dayEnd',
+      position: ui.eventPosition,
+    });
+  }
+  return specs;
+}
+
+/** Everything on the page except the modal layer, which keeps its own DOM between renders. */
+function pageHtml(): string {
   if (ui.screen === 'start' || state === null) {
     return renderStart({
       difficulty: ui.difficulty,
@@ -250,50 +282,16 @@ function screenHtml(): string {
     });
   }
   const current = state;
-  const modals: string[] = [];
-  if (ui.modal !== null) {
-    modals.push(
-      renderModal(
-        {
-          id: ui.modal,
-          title: MODAL_TITLES[ui.modal],
-          body: modalBody(ui.modal, current),
-          wide: ui.modal === 'accounting',
-          full: ui.modal === 'board',
-        },
-        ui.modalPosition,
-      ),
-    );
-  }
-  if (current.activeEvent) {
-    const event = current.activeEvent;
-    modals.push(
-      renderModal(
-        {
-          id: 'event',
-          title: event.title,
-          body: event.kind === 'dayEnd' ? renderDayEnd(current) : renderEvent(current, event),
-          footer: renderEventFooter(event),
-          closable: event.choices.length === 1,
-          wide: event.kind === 'dayEnd',
-        },
-        ui.eventPosition,
-      ),
-    );
-  }
   // The last word the company gets is the bankruptcy event, over the game over screen.
-  if (current.gameOver) {
-    return renderGameOver(current) + `<div class="modal-layer">${modals.join('')}</div>`;
-  }
+  if (current.gameOver) return renderGameOver(current);
   const view = ui.view === 'hall' ? renderHall(current, ghostFor(current)) : renderOffice(current);
   const controls = ui.view === 'hall' ? hallControls(current) : '';
   const note = ui.note === '' ? '' : `<p class="view-note">${escapeHtml(ui.note)}</p>`;
-  const why = renderWhy();
   return (
     renderTopbar(current, ui.view) +
     (ui.menuOpen ? renderMenu(current, ui.cloud) : '') +
     `<main class="view">${view}${controls}${note}</main>` +
-    `<div class="modal-layer">${modals.join('')}</div>${why}`
+    renderWhy()
   );
 }
 
@@ -305,14 +303,14 @@ interface FocusMemory {
 function captureFocus(): FocusMemory | null {
   const active = document.activeElement;
   if (!(active instanceof HTMLInputElement)) return null;
-  const key = active.dataset.focusKey;
+  const key = active.dataset.field;
   if (key === undefined) return null;
   return { key, start: active.selectionStart };
 }
 
 function restoreFocus(memory: FocusMemory | null): void {
   if (!memory || !root) return;
-  const field = root.querySelector(`[data-focus-key="${memory.key}"]`);
+  const field = root.querySelector(`[data-field="${memory.key}"]`);
   if (!(field instanceof HTMLInputElement)) return;
   field.focus();
   if (memory.start !== null && field.type === 'text') {
@@ -404,11 +402,28 @@ function slideFigures(now: number): void {
   }
 }
 
+/** The two halves of the page: the part that is rebuilt from the state every render, and the
+ *  modal layer, whose shells outlive a render so the scroll and the caret do too (T3 3.4). */
+function halves(): { page: Element; layer: Element } | null {
+  if (!root) return null;
+  let page = root.querySelector(':scope > .page');
+  let layer = root.querySelector(':scope > .modal-layer');
+  if (page === null || layer === null) {
+    root.innerHTML = '<div class="page"></div><div class="modal-layer"></div>';
+    page = root.querySelector(':scope > .page');
+    layer = root.querySelector(':scope > .modal-layer');
+  }
+  if (page === null || layer === null) return null;
+  return { page, layer };
+}
+
 export function render(): void {
-  if (!root) return;
+  const parts = halves();
+  if (parts === null) return;
   const memory = ui.focusNext === null ? captureFocus() : { key: ui.focusNext, start: null };
   ui.focusNext = null;
-  root.innerHTML = screenHtml();
+  parts.page.innerHTML = pageHtml();
+  syncModals(parts.layer, modalSpecs());
   slideFigures(nowMs());
   restoreFocus(memory);
 }

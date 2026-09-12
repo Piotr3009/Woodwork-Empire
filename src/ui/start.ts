@@ -36,7 +36,7 @@ function cloudBlock(choice: StartChoice): string {
   if (cloud.signedIn === null) {
     return (
       '<label class="field-row">Email for a sign in link' +
-      '<input type="text" data-field="cloudEmail" data-focus-key="cloudEmail" ' +
+      '<input type="text" data-field="cloudEmail" ' +
       `value="${escapeHtml(cloud.email)}" /></label>` +
       '<button class="btn" data-do="signIn">Sign in to save</button>' +
       note
@@ -68,10 +68,10 @@ export function renderStart(choice: StartChoice): string {
     '<p class="lead">You quit your job. You have some savings and the trade. Find a unit.</p>' +
     `<div class="difficulties">${options}</div>` +
     '<label class="field-row">Your name' +
-    `<input type="text" data-field="playerName" data-focus-key="playerName" ` +
+    `<input type="text" data-field="playerName" ` +
     `value="${escapeHtml(choice.playerName)}" /></label>` +
     '<label class="field-row">Company name' +
-    `<input type="text" data-field="companyName" data-focus-key="companyName" ` +
+    `<input type="text" data-field="companyName" ` +
     `value="${escapeHtml(choice.companyName)}" /></label>` +
     '<label class="field-row check-row">' +
     `<input type="checkbox" data-field="showWhy"${choice.showWhy ? ' checked' : ''} />` +

@@ -108,7 +108,16 @@ body {
   height: 100dvh;
 }
 
-#app > .topbar {
+/* The page is everything but the modal layer, which keeps its own DOM between renders so a
+   scrolled modal stays where the player left it (CLAUDE.md T3 3.4). */
+.page {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.page > .topbar {
   flex-shrink: 0;
 }
 
