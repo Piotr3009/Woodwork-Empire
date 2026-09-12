@@ -434,6 +434,7 @@ export type GameAction =
   | { type: 'WORK_HERE'; jobId: string | null }
   | { type: 'ASSIGN_JOB'; jobId: string; workerId: string | null }
   | { type: 'HIRE'; role: WorkerRole; tier: WorkerTier | null }
+  | { type: 'ASK_UNLOAD'; deliveryId: string }
   | { type: 'START_CLEANING' }
   | { type: 'REPAIR_EXTRACTOR' }
   | { type: 'RESOLVE_EVENT'; choiceId: string }

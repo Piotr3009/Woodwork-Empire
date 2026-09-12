@@ -11,7 +11,7 @@ import {
   stockFree,
 } from '../engine/index';
 import type { GameState, Job } from '../engine/index';
-import { emptyLine, escapeHtml, money, primaryButton } from './modal';
+import { button, emptyLine, escapeHtml, money } from './modal';
 
 function jobRow(job: Job): string {
   const choosable = job.stage === 'accepted' || job.stage === 'materialPending';
@@ -48,7 +48,7 @@ export function renderMaterials(state: GameState, sheets: string): string {
     '<input type="number" class="num" data-field="stockSheets" data-focus-key="stockSheets" ' +
     `value="${escapeHtml(sheets)}" min="1" max="99" /> sheets</span>` +
     `<span class="row-figure">${money(stockCostFor(wanted))}</span>` +
-    `<span class="row-action">${primaryButton('buyStock', 'Order', `data-sheets="${wanted}"`)}` +
+    `<span class="row-action">${button('buyStock', 'Order', `data-sheets="${wanted}"`)}` +
     '</span></div>' +
     '<h3>Material for each job</h3>' +
     (jobs.length === 0 ? emptyLine('No jobs on the books.') : jobs.map(jobRow).join('')) +

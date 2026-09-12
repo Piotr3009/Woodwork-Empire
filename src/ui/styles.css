@@ -37,10 +37,9 @@
   --stopped-dark: #94453c;
   --locked: #75787e;
   --locked-dark: #5b5e63;
-  --sawdust: #d8cba8;
+  --sawdust: #b4b0a8;
   --worker: #5a7fa8;
   --owner: #5f9c5f;
-  --shadow: rgba(0, 0, 0, 0.25);
 }
 
 .iso-label {

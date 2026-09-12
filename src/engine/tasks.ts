@@ -247,6 +247,8 @@ export function startTask(state: GameState, taskId: string): boolean {
   const task = findTask(state, taskId);
   if (!task || task.done) return false;
   if (!state.owner.present || state.owner.wentHome) return false;
+  // One thing at a time: the current task has to be finished or paused first (CLAUDE.md 10.1).
+  if (state.owner.currentTaskId !== null && state.owner.currentTaskId !== task.id) return false;
   // No drawing without a licence for the software (CLAUDE.md 9.2).
   if (task.kind === 'design' && !softwareActive(state)) return false;
   state.owner.currentTaskId = task.id;

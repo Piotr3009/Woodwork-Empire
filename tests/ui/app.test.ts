@@ -206,3 +206,39 @@ describe('accounting', () => {
     click('[data-do="closeModal"]');
   });
 });
+
+describe('the style rules of 10.4', () => {
+  it('shows one accent button at a time, not one per row', () => {
+    click('[data-office="catalogue"]');
+    const primaries = (html().match(/btn-primary/g) ?? []).length;
+    // The catalogue rows are outlined: nothing in this view is the accent button.
+    expect(primaries).toBe(0);
+    click('[data-do="closeModal"]');
+    click('[data-do="setView"][data-view="hall"]');
+    expect((html().match(/btn-primary/g) ?? []).length).toBeLessThanOrEqual(1);
+  });
+
+  it('prints money with a pound sign and a comma, and minutes with a unit', () => {
+    expect(html()).toMatch(/£[\d,]+/);
+    expect(html()).toContain('120 min');
+    expect(html()).not.toMatch(/£\d+\.\d/);
+  });
+
+  it('opens a desk modal beside the object that was clicked', () => {
+    click('[data-do="setView"][data-view="office"]');
+    click('[data-office="hiring"]');
+    const modal = root().querySelector('.modal');
+    expect(modal?.getAttribute('style')).toMatch(/left:\d+px;top:\d+px/);
+    expect(modal?.className).not.toContain('modal-centred');
+    click('[data-do="closeModal"]');
+  });
+
+  it('puts the caret back in a filter field when the cross clears it', () => {
+    click('[data-office="catalogue"]');
+    type('[data-filter="catalogue"]', 'saw');
+    click('[data-do="clearFilter"]');
+    const field = root().querySelector('[data-filter="catalogue"]');
+    expect(document.activeElement).toBe(field);
+    click('[data-do="closeModal"]');
+  });
+});

@@ -15,7 +15,7 @@ import {
 } from './constants';
 import { canAccept, findEnquiry, removeEnquiry } from './board';
 import { template } from './catalog';
-import { chargeUnavoidable, receive } from './economy';
+import { chargeUnavoidable, formatMoney, receive } from './economy';
 import { queueEvent } from './events';
 import { has, machineLabourFactor } from './machines';
 import { materialCostFor, orderMaterialForJob, sheetsForCost, stockCostFor } from './materials';
@@ -338,12 +338,13 @@ export function completeJob(state: GameState, job: Job): void {
   job.stage = 'completed';
   state.dayStats.jobsCompleted.push(job.id);
   const rating = applyRating(state, job);
-  const lateLine = job.daysLate > 0 ? ` ${job.daysLate} days late, penalty ${Math.round(penalty)}.` : '';
+  const lateLine =
+    job.daysLate > 0 ? ` ${job.daysLate} days late, penalty ${formatMoney(penalty)}.` : '';
   queueEvent(state, {
     kind: 'jobPaid',
     title: `${job.name} delivered`,
     body:
-      `Balance ${Math.round(job.balancePaid)} in.${lateLine} The client rates the job ` +
+      `Balance ${formatMoney(job.balancePaid)} in.${lateLine} The client rates the job ` +
       `${rating >= 0 ? '+' : ''}${rating}.`,
     data: { jobId: job.id, rating, balance: Math.round(job.balancePaid), late: job.daysLate },
   });

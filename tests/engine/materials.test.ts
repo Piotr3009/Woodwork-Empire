@@ -269,3 +269,23 @@ describe('what stock cannot cover', () => {
     expect(run.state.ledger.length).toBeLessThanOrEqual(200);
   });
 });
+
+describe('the van at the gate', () => {
+  it('asks again who unloads it when it is clicked (CLAUDE.md 10.1)', () => {
+    let state = doTask(upToMaterial(ready()), 'materialOrder');
+    state = clearEvents(runToDay(state, 2).state);
+    const delivery = state.deliveries[0];
+    expect(delivery?.arrived).toBe(true);
+    expect(state.activeEvent).toBeNull();
+    state = act(state, { type: 'ASK_UNLOAD', deliveryId: delivery?.id ?? '' });
+    expect(state.activeEvent?.kind).toBe('deliveryArrived');
+    expect(state.activeEvent?.choices.map((choice) => choice.id)).toEqual(['unload', 'later']);
+    state = choose(state, 'unload');
+    expect(state.owner.currentTaskId).not.toBeNull();
+  });
+
+  it('says nothing when there is nothing at the gate', () => {
+    const state = act(ready(), { type: 'ASK_UNLOAD', deliveryId: 'nothing' });
+    expect(state.activeEvent).toBeNull();
+  });
+});

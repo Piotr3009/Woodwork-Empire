@@ -2,6 +2,7 @@
 // and it hands back an SVG string (CLAUDE.md 10.3).
 
 import {
+  DELIVERY_VAN_SPRITE,
   GATE_LAYOUT,
   ROOM_LAYOUT,
   STOCK_RACK_LAYOUT,
@@ -86,13 +87,22 @@ const CATEGORY_SHADE: Record<string, string> = {
   furniture: 'var(--kit-furniture-dark)',
 };
 
-/** Sawdust piles, one per ten points of dust, in a fixed pattern so the view never jitters. */
+/** Grey sawdust piles near the machines, one per ten points of dust, in a fixed pattern so the
+ *  view never jitters (CLAUDE.md 10.3). */
 function sawdust(state: GameState): Drawable[] {
   const piles = Math.round(state.dust / 10);
   const drawables: Drawable[] = [];
+  const machines = state.equipment.filter((item) => {
+    const spec = findSpec(item.specId);
+    return spec !== null && spec.category === 'machine';
+  });
   for (let index = 0; index < piles; index += 1) {
-    const x = 1 + ((index * 7) % Math.max(1, state.unit.widthTiles - 2));
-    const y = 6 + (index % 3);
+    const machine = machines[index % Math.max(1, machines.length)];
+    const spec = machine ? findSpec(machine.specId) : null;
+    const x = machine && spec
+      ? machine.anchorX + (index % spec.width)
+      : 1 + ((index * 7) % Math.max(1, state.unit.widthTiles - 2));
+    const y = machine && spec ? machine.anchorY + spec.depth : 6 + (index % 3);
     const at = centreOf(x, y, 1, 1);
     const radius = 8 + state.dust / 12;
     drawables.push({
@@ -112,8 +122,7 @@ function figure(x: number, y: number, name: string, isOwner: boolean, extra: str
   return {
     depth: depthKey(x, y) + 0.2,
     svg:
-      `<g ${extra}><ellipse cx="${Math.round(feet.x)}" cy="${Math.round(feet.y)}" rx="9" ry="4" ` +
-      `fill="var(--shadow)" />` +
+      `<g ${extra}><title>${escapeText(name)}</title>` +
       `<rect x="${Math.round(feet.x - 6)}" y="${Math.round(feet.y - 30)}" width="12" height="26" ` +
       `rx="6" fill="${fill}" />` +
       `<text x="${Math.round(feet.x)}" y="${Math.round(feet.y + 14)}" text-anchor="middle" ` +
@@ -152,26 +161,30 @@ export function renderHall(state: GameState): string {
 
   // The three small rooms along the back wall.
   for (const room of ROOM_LAYOUT) {
-    const faces = boxPolygons(room.x, room.y, room.width, room.depth, 2);
+    const faces = boxPolygons(room.x, room.y, room.width, room.depth, room.height);
     drawables.push({
       depth: depthKey(room.x, room.y),
       svg:
-        box(faces, 'var(--room)', 'var(--room-dark)', `data-room="${room.id}" class="clickable"`) +
-        label(centreOf(room.x, room.y, room.width, room.depth, 2), room.name),
+        `<g data-room="${room.id}" class="clickable"><title>${escapeText(room.tooltip)}</title>` +
+        box(faces, 'var(--room)', 'var(--room-dark)') +
+        label(centreOf(room.x, room.y, room.width, room.depth, room.height), room.name) +
+        '</g>',
     });
   }
 
   // The sheet rack, with what is on it.
   const rack = STOCK_RACK_LAYOUT;
-  const rackFaces = boxPolygons(rack.x, rack.y, rack.width, rack.depth, 2);
+  const rackFaces = boxPolygons(rack.x, rack.y, rack.width, rack.depth, rack.height);
   drawables.push({
     depth: depthKey(rack.x, rack.y),
     svg:
-      box(rackFaces, 'var(--kit-stock)', 'var(--kit-stock-dark)', 'data-rack="1"') +
+      `<g data-rack="1"><title>The sheet rack</title>` +
+      box(rackFaces, 'var(--kit-stock)', 'var(--kit-stock-dark)') +
       label(
-        centreOf(rack.x, rack.y, rack.width, rack.depth, 2),
+        centreOf(rack.x, rack.y, rack.width, rack.depth, rack.height),
         `${state.stock.sheets} / ${unit.sheetCapacity}`,
-      ),
+      ) +
+      '</g>',
   });
 
   // Everything the player has bought, except the office furniture, which lives in the office view.
@@ -185,14 +198,25 @@ export function renderHall(state: GameState): string {
       ? 'var(--stopped-dark)'
       : CATEGORY_SHADE[spec.category] ?? 'var(--kit-machine-dark)';
     const bagLine = item.bagFull ? ' (bag full)' : '';
+    const atThisBench =
+      spec.category === 'bench'
+        ? state.workers.find(
+            (worker) => worker.anchorX === item.anchorX && worker.anchorY === item.anchorY,
+          )
+        : undefined;
+    const benchLine =
+      spec.category !== 'bench' ? '' : atThisBench ? `: ${atThisBench.name}` : ' (free)';
     drawables.push({
       depth: depthKey(item.anchorX, item.anchorY),
       svg:
-        box(faces, fill, shade, `data-kit="${item.id}" class="clickable"`) +
+        `<g data-kit="${item.id}" data-sprite="${item.spriteKey}" class="clickable">` +
+        `<title>${escapeText(spec.effect)}</title>` +
+        box(faces, fill, shade) +
         label(
           centreOf(item.anchorX, item.anchorY, spec.width, spec.depth, spec.height),
-          `${spec.name}${bagLine}`,
-        ),
+          `${spec.name}${bagLine}${benchLine}`,
+        ) +
+        '</g>',
     });
   }
 
@@ -222,17 +246,20 @@ export function renderHall(state: GameState): string {
   // A lorry at the gate while something is waiting to be unloaded.
   const waiting = state.deliveries.find((delivery) => delivery.arrived && !delivery.unloaded);
   if (waiting) {
-    const gateX = unit.widthTiles + GATE_LAYOUT.x;
-    const faces = boxPolygons(gateX, GATE_LAYOUT.y, 4, 2, 2);
+    const gate = GATE_LAYOUT;
+    const gateX = unit.widthTiles + gate.x;
+    const faces = boxPolygons(gateX, gate.y, gate.width, gate.depth, gate.height);
     drawables.push({
-      depth: depthKey(gateX, GATE_LAYOUT.y),
+      depth: depthKey(gateX, gate.y),
       svg:
-        box(
-          faces,
-          'var(--kit-vehicle)',
-          'var(--kit-vehicle-dark)',
-          `data-van="${waiting.id}" class="clickable"`,
-        ) + label(centreOf(gateX, GATE_LAYOUT.y, 4, 2, 2), `Delivery: ${waiting.sheets} sheets`),
+        `<g data-van="${waiting.id}" data-sprite="${DELIVERY_VAN_SPRITE}" class="clickable">` +
+        '<title>Click the van to decide who unloads it</title>' +
+        box(faces, 'var(--kit-vehicle)', 'var(--kit-vehicle-dark)') +
+        label(
+          centreOf(gateX, gate.y, gate.width, gate.depth, gate.height),
+          `Delivery: ${waiting.sheets} sheets`,
+        ) +
+        '</g>',
     });
   }
 

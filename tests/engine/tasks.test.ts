@@ -237,3 +237,21 @@ describe('the task runner', () => {
     expect(next.clock.minute).toBe(480);
   });
 });
+
+describe('one thing at a time', () => {
+  it('refuses a second task until the first is done or paused (CLAUDE.md 10.1)', () => {
+    const state = withLicence(newGame());
+    const emails = createTask(state, { kind: 'emails', label: 'Emails', minutes: 60 });
+    const books = createTask(state, { kind: 'bookkeeping', label: 'Books', minutes: 60 });
+    let next = act(state, { type: 'START_TASK', taskId: emails.id });
+    next = act(next, { type: 'START_TASK', taskId: books.id });
+    expect(next.owner.currentTaskId).toBe(emails.id);
+    expect(findTask(next, books.id)?.doneBy).toBeNull();
+    next = act(next, { type: 'PAUSE_TASK' });
+    next = act(next, { type: 'START_TASK', taskId: books.id });
+    expect(next.owner.currentTaskId).toBe(books.id);
+    // The first one kept its minutes and nobody is holding it.
+    expect(findTask(next, emails.id)?.minutesRemaining).toBe(60);
+    expect(findTask(next, emails.id)?.doneBy).toBeNull();
+  });
+});

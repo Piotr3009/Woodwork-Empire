@@ -193,3 +193,81 @@ describe('the warnings on the hall line', () => {
     expect(renderHall(state)).toContain('Hall: dangerous, somebody will get hurt');
   });
 });
+
+describe('the placeholder art rules of 10.3', () => {
+  it('uses flat colours: no gradient, no shadow, no texture', () => {
+    const state = buyStartingKit(newGame());
+    state.dust = 60;
+    state.workers.push({
+      id: 'staff-1',
+      name: 'Ben',
+      role: 'joiner',
+      tier: 'poor',
+      rate: 0.6,
+      weeklyWage: 480,
+      monthlyWage: 0,
+      startDay: 1,
+      jobId: null,
+      taskId: null,
+      absentDaysRemaining: 0,
+      anchorX: 0,
+      anchorY: 4,
+    });
+    const svg = renderHall(state);
+    expect(svg).not.toContain('shadow');
+    expect(svg).not.toContain('Gradient');
+    expect(svg).not.toContain('filter=');
+    expect(svg).not.toContain('opacity');
+  });
+
+  it('keeps the sawdust grey and near the machines', () => {
+    const state = buyStartingKit(newGame());
+    state.dust = 30;
+    const svg = renderHall(state);
+    const piles = svg.match(/<ellipse[^>]*>/g) ?? [];
+    expect(piles).toHaveLength(3);
+    const saw = state.equipment.find((item) => item.specId === 'tableSaw');
+    // The first pile sits at the near edge of the first machine.
+    const first = piles[0] ?? '';
+    expect(first).toContain('var(--sawdust)');
+    expect(saw).toBeDefined();
+  });
+
+  it('says whether a bench is free or who is at it', () => {
+    const state = buyStartingKit(newGame());
+    expect(renderHall(state)).toContain('Workbench (free)');
+    const bench = state.equipment.find((item) => item.specId === 'workbench');
+    state.workers.push({
+      id: 'staff-1',
+      name: 'Ben',
+      role: 'joiner',
+      tier: 'poor',
+      rate: 0.6,
+      weeklyWage: 480,
+      monthlyWage: 0,
+      startDay: 1,
+      jobId: null,
+      taskId: null,
+      absentDaysRemaining: 0,
+      anchorX: bench?.anchorX ?? 0,
+      anchorY: bench?.anchorY ?? 0,
+    });
+    expect(renderHall(state)).toContain('Workbench: Ben');
+    expect(renderHall(state)).not.toContain('Workbench (free)');
+  });
+
+  it('gives the rooms the one line tooltip 10.1 asks for', () => {
+    const svg = renderHall(newGame());
+    expect(svg).toContain('<title>The WC. Cold tap, one towel.</title>');
+    expect(svg).toContain('<title>The canteen.');
+  });
+
+  it('carries a sprite key on every placed object, for the sprite pipeline later', () => {
+    const svg = renderHall(buyStartingKit(newGame()));
+    expect(svg).toContain('data-sprite="tableSaw"');
+    expect(svg).toContain('data-sprite="extractor"');
+    const office = renderOffice(newGame());
+    expect(office).toContain('data-sprite="catalogue"');
+    expect(office).toContain('data-sprite="teamBoard"');
+  });
+});

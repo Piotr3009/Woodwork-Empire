@@ -23,7 +23,7 @@ export function renderDayEnd(state: GameState): string {
     row('Admin', minutes(used.admin)) +
     row('Design', minutes(used.design)) +
     row('Workshop', minutes(used.workshop)) +
-    row('Worked', `${state.owner.minutesWorked} of ${MINUTES_PER_WORKING_DAY}`) +
+    row('Worked', `${minutes(state.owner.minutesWorked)} of ${minutes(MINUTES_PER_WORKING_DAY)}`) +
     (state.owner.overtimeMinutes > 0
       ? row('Overtime', minutes(state.owner.overtimeMinutes))
       : '') +

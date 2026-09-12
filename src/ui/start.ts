@@ -1,7 +1,7 @@
 // The start screen: an empty unit seen from outside, and the three decisions (CLAUDE.md 10.1).
 
 import { DIFFICULTIES } from '../engine/constants';
-import { escapeHtml } from './modal';
+import { escapeHtml, money } from './modal';
 
 export interface StartChoice {
   difficulty: string;
@@ -22,9 +22,9 @@ const UNIT_SKETCH =
 export function renderStart(choice: StartChoice): string {
   const options = DIFFICULTIES.map(
     (spec) =>
-      `<button class="btn${choice.difficulty === spec.id ? ' btn-primary' : ''}" ` +
+      `<button class="btn${choice.difficulty === spec.id ? ' is-on' : ''}" ` +
       `data-do="pickDifficulty" data-id="${spec.id}">${escapeHtml(spec.label)}` +
-      `<small>${escapeHtml(spec.startingCash.toLocaleString('en-GB'))} to start</small></button>`,
+      `<small>${money(spec.startingCash)} to start</small></button>`,
   ).join('');
   return (
     '<div class="start">' +

@@ -2,6 +2,7 @@
 // here, in one place (CLAUDE.md 3.5, 10.1).
 
 import {
+  CLEANING_MINUTES,
   applyAction,
   createGame,
   gameMinutesPerRealSecond,
@@ -41,6 +42,8 @@ interface Ui {
   menuOpen: boolean;
   note: string;
   filters: Record<string, string>;
+  /** Field to put the caret back in after the next render. */
+  focusNext: string | null;
   stockSheets: string;
   difficulty: Difficulty;
   playerName: string;
@@ -72,6 +75,7 @@ function freshUi(): Ui {
     menuOpen: false,
     note: '',
     filters: { board: '', catalogue: '' },
+    focusNext: null,
     stockSheets: '6',
     difficulty: 'easy',
     playerName: 'Piotr',
@@ -119,12 +123,13 @@ function hallControls(current: GameState): string {
       ? '<button class="btn btn-primary" data-do="workHere">Work here</button>'
       : reasonLabel('No job has its material in the hall yet');
   const fix = machinesStopped(current)
-    ? '<button class="btn btn-primary" data-do="repairExtractor">Fix extractor</button>'
+    ? '<button class="btn" data-do="repairExtractor">Fix extractor</button>'
     : '';
   return (
     '<div class="view-controls">' +
     workHere +
-    `<button class="btn" data-do="startCleaning">Clean up · ${minutes(120)}</button>` +
+    '<button class="btn" data-do="startCleaning">Clean up · ' +
+    `${minutes(CLEANING_MINUTES)}</button>` +
     fix +
     '</div>'
   );
@@ -209,7 +214,8 @@ function restoreFocus(memory: FocusMemory | null): void {
 
 export function render(): void {
   if (!root) return;
-  const memory = captureFocus();
+  const memory = ui.focusNext === null ? captureFocus() : { key: ui.focusNext, start: null };
+  ui.focusNext = null;
   root.innerHTML = screenHtml();
   restoreFocus(memory);
 }
@@ -233,39 +239,28 @@ function clampToViewport(x: number, y: number): ModalPosition {
   };
 }
 
-function startUnload(deliveryId: string): void {
-  const task = game().tasks.find(
-    (entry) => entry.deliveryId === deliveryId && !entry.done,
-  );
-  if (task) dispatch({ type: 'START_TASK', taskId: task.id });
+/** Clicking the van at the gate opens the unloading choice again (CLAUDE.md 10.1). */
+function askUnload(deliveryId: string): void {
+  dispatch({ type: 'ASK_UNLOAD', deliveryId });
 }
 
-function officeTarget(id: string): void {
-  switch (id) {
-    case 'laptop':
-      openModal('laptop', null);
-      break;
-    case 'accounting':
-      openModal('accounting', null);
-      break;
-    case 'materials':
-      openModal('materials', null);
-      break;
-    case 'catalogue':
-      openModal('catalogue', null);
-      break;
-    case 'hiring':
-      openModal('hiring', null);
-      break;
-    case 'phone':
-      openModal('board', null);
-      break;
-    case 'desk':
-      ui.note = 'The desk. The laptop goes on it.';
-      break;
-    default:
-      break;
+/** Objects on the desk open their modal beside where the player clicked (CLAUDE.md 10.4). */
+const OFFICE_MODALS: Record<string, ModalId> = {
+  laptop: 'laptop',
+  accounting: 'accounting',
+  materials: 'materials',
+  catalogue: 'catalogue',
+  hiring: 'hiring',
+  phone: 'board',
+};
+
+function officeTarget(id: string, point: { x: number; y: number }): void {
+  const modal = OFFICE_MODALS[id];
+  if (modal !== undefined) {
+    openModal(modal, point);
+    return;
   }
+  if (id === 'desk') ui.note = 'The desk. The laptop goes on it.';
 }
 
 /** Elements in the SVG views are SVGElement, not HTMLElement, but both carry a dataset. */
@@ -321,9 +316,13 @@ function handleAction(element: DataElement, point: { x: number; y: number }): vo
       ui.modal = null;
       ui.modalPosition = null;
       break;
-    case 'clearFilter':
-      ui.filters[element.dataset.key ?? ''] = '';
+    case 'clearFilter': {
+      const key = element.dataset.key ?? '';
+      ui.filters[key] = '';
+      // Rule 3.10: clearing a filter puts the caret back in the field.
+      ui.focusNext = `filter-${key}`;
       break;
+    }
     case 'endDay':
       ui.menuOpen = false;
       dispatch({ type: 'END_DAY' });
@@ -426,7 +425,7 @@ function handleSceneClick(element: DataElement, point: { x: number; y: number })
   }
   const van = element.dataset.van;
   if (van !== undefined) {
-    startUnload(van);
+    askUnload(van);
     return true;
   }
   const kit = element.dataset.kit;
@@ -451,11 +450,10 @@ function handleSceneClick(element: DataElement, point: { x: number; y: number })
       render();
       return true;
     }
-    officeTarget(office);
+    officeTarget(office, point);
     render();
     return true;
   }
-  void point;
   return false;
 }
 

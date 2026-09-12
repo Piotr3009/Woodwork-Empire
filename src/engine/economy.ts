@@ -25,6 +25,13 @@ import { has, poweredMachines, seizableMachines } from './machines';
 import { makeId } from './rng';
 import type { GameState, LedgerCategory, PeriodTotals } from './types';
 
+/** Money as the player reads it: a comma for the thousands and no decimals (CLAUDE.md 10.4). */
+export function formatMoney(value: number): string {
+  const rounded = Math.round(value);
+  const text = Math.abs(rounded).toLocaleString('en-GB');
+  return `${rounded < 0 ? '-' : ''}\u00a3${text}`;
+}
+
 function emptyTotals(): PeriodTotals {
   return { income: 0, costs: 0, byCategory: {} };
 }
@@ -240,7 +247,9 @@ export function runBailiff(state: GameState): void {
   queueEvent(state, {
     kind: 'bailiff',
     title: 'Bailiff',
-    body: `The bailiff took the ${target.specId} and credited half of what it cost.`,
+    body:
+      `The bailiff took the ${target.specId} and credited ${formatMoney(credit)}, ` +
+      'half of what it cost, against the arrears.',
     data: { specId: target.specId, credit: Math.round(credit) },
   });
 }

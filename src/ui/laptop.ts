@@ -18,7 +18,6 @@ import {
   escapeHtml,
   minutes,
   money,
-  primaryButton,
   reasonLabel,
 } from './modal';
 
@@ -37,7 +36,7 @@ function taskRow(state: GameState, task: TaskInstance): string {
   } else if (!state.owner.present || state.owner.wentHome) {
     action = reasonLabel('The owner is not in today');
   } else {
-    action = primaryButton('startTask', 'Start', `data-id="${task.id}"`);
+    action = button('startTask', 'Start', `data-id="${task.id}"`);
   }
   return (
     `<div class="row${task.done ? ' is-done' : ''}${running ? ' is-running' : ''}">` +

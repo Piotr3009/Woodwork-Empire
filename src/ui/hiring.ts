@@ -8,7 +8,7 @@ import {
   escapeHtml,
   minutes,
   money,
-  primaryButton,
+  button,
   reasonLabel,
 } from './modal';
 
@@ -24,7 +24,7 @@ function optionRow(option: HiringOption): string {
       : `<p class="lock">To make this hire possible: ${escapeHtml(option.missing.join(', '))}` +
         ` · ${money(option.missingCost)}</p>`;
   const action = option.available
-    ? primaryButton(
+    ? button(
         'hire',
         'Hire',
         `data-role="${option.role}" data-tier="${option.tier ?? ''}"`,

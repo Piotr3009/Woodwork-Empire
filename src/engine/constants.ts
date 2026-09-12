@@ -742,10 +742,41 @@ export interface LayoutSlot {
   yard?: boolean;
 }
 
+/** The three small rooms of 4 m2 along the back wall, with the one line each shows on hover. */
 export const ROOM_LAYOUT = [
-  { id: 'office', name: 'Office', x: 0, y: 0, width: 4, depth: 4 },
-  { id: 'wc', name: 'WC', x: 5, y: 0, width: 4, depth: 4 },
-  { id: 'canteen', name: 'Canteen', x: 10, y: 0, width: 4, depth: 4 },
+  {
+    id: 'office',
+    name: 'Office',
+    x: 0,
+    y: 0,
+    width: 4,
+    depth: 4,
+    height: 2,
+    spriteKey: 'roomOffice',
+    tooltip: 'The office. The desk, the laptop, the paperwork.',
+  },
+  {
+    id: 'wc',
+    name: 'WC',
+    x: 5,
+    y: 0,
+    width: 4,
+    depth: 4,
+    height: 2,
+    spriteKey: 'roomWc',
+    tooltip: 'The WC. Cold tap, one towel.',
+  },
+  {
+    id: 'canteen',
+    name: 'Canteen',
+    x: 10,
+    y: 0,
+    width: 4,
+    depth: 4,
+    height: 2,
+    spriteKey: 'roomCanteen',
+    tooltip: 'The canteen. Tea, and somewhere to eat out of the dust.',
+  },
 ] as const;
 
 export const STARTING_LAYOUT: Record<string, LayoutSlot> = {
@@ -779,29 +810,103 @@ export const BENCH_SLOT_LAYOUT: LayoutSlot[] = [
   { x: 20, y: 4 },
 ];
 
-/** Welfare items stack along the back of the rooms. */
+/** Welfare items stand along the walkway, clear of the room blocks. */
 export const LOCKER_SLOT_LAYOUT: LayoutSlot[] = [
-  { x: 5, y: 3 },
-  { x: 6, y: 3 },
-  { x: 7, y: 3 },
-  { x: 8, y: 3 },
-  { x: 5, y: 2 },
-  { x: 6, y: 2 },
+  { x: 0, y: 6 },
+  { x: 1, y: 6 },
+  { x: 2, y: 6 },
+  { x: 3, y: 6 },
+  { x: 4, y: 6 },
+  { x: 5, y: 6 },
 ];
 
 export const CANTEEN_SLOT_LAYOUT: LayoutSlot[] = [
-  { x: 10, y: 3 },
-  { x: 11, y: 3 },
-  { x: 12, y: 3 },
-  { x: 13, y: 3 },
-  { x: 10, y: 2 },
-  { x: 11, y: 2 },
+  { x: 7, y: 6 },
+  { x: 8, y: 6 },
+  { x: 9, y: 6 },
+  { x: 10, y: 6 },
+  { x: 11, y: 6 },
+  { x: 12, y: 6 },
 ];
 
 /** The sheet rack, drawn with its count. */
-export const STOCK_RACK_LAYOUT = { x: 21, y: 0, width: 2, depth: 4 };
-/** Where a waiting delivery van stands. */
-export const GATE_LAYOUT: LayoutSlot = { x: 0, y: 4, yard: true };
+export const STOCK_RACK_LAYOUT = {
+  x: 21,
+  y: 0,
+  width: 2,
+  depth: 4,
+  height: 2,
+  spriteKey: 'sheetRack',
+};
+/** Where a waiting delivery van stands, and how big it is. */
+export const GATE_LAYOUT = { x: 0, y: 4, yard: true, width: 4, depth: 2, height: 2 };
+export const DELIVERY_VAN_SPRITE = 'deliveryVan';
+
+/** The office desk and everything on it. Fixed placement, like the hall (CLAUDE.md 10.3). */
+export interface DeskObjectSpec {
+  id: string;
+  name: string;
+  x: number;
+  y: number;
+  width: number;
+  depth: number;
+  height: number;
+  spriteKey: string;
+  /** Catalogue item that has to be owned before the object is usable. */
+  needs: string | null;
+}
+
+export const OFFICE_TILES = 12;
+
+export const DESK_LAYOUT: DeskObjectSpec[] = [
+  { id: 'desk', name: 'Desk', x: 3, y: 4, width: 5, depth: 3, height: 1, spriteKey: 'desk', needs: 'desk' },
+  { id: 'laptop', name: 'Laptop', x: 4, y: 5, width: 2, depth: 1, height: 1, spriteKey: 'laptop', needs: 'laptop' },
+  {
+    id: 'accounting',
+    name: 'Accounting',
+    x: 6,
+    y: 5,
+    width: 1,
+    depth: 1,
+    height: 1,
+    spriteKey: 'ledgerFolder',
+    needs: 'laptop',
+  },
+  {
+    id: 'materials',
+    name: 'Materials',
+    x: 1,
+    y: 5,
+    width: 1,
+    depth: 2,
+    height: 1,
+    spriteKey: 'materialsBinder',
+    needs: null,
+  },
+  {
+    id: 'catalogue',
+    name: 'Catalogue',
+    x: 1,
+    y: 2,
+    width: 2,
+    depth: 1,
+    height: 1,
+    spriteKey: 'catalogue',
+    needs: null,
+  },
+  {
+    id: 'hiring',
+    name: 'Team board',
+    x: 8,
+    y: 0,
+    width: 3,
+    depth: 1,
+    height: 3,
+    spriteKey: 'teamBoard',
+    needs: null,
+  },
+  { id: 'phone', name: 'Phone', x: 7, y: 7, width: 1, depth: 1, height: 1, spriteKey: 'phone', needs: 'laptop' },
+];
 /** Width of the yard strip drawn to the right of the unit, in tiles. */
 export const YARD_WIDTH_TILES = 5;
 

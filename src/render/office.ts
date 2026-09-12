@@ -1,144 +1,50 @@
-// The office desk, drawn from the state. Every object on it is a way into one modal, and nothing
-// else is on the screen (CLAUDE.md 10.1).
+// The office desk, drawn from the fixed layout in constants. Every object on it is a way into one
+// modal, and nothing else is on the screen (CLAUDE.md 10.1).
 
-import { has } from '../engine/machines';
+import { DESK_LAYOUT, OFFICE_TILES } from '../engine/constants';
+import { findSpec, has } from '../engine/machines';
 import type { GameState } from '../engine/types';
 import { box, escapeText, label, polygon } from './hall';
 import { boxPolygons, centreOf, depthKey, footprintPolygon, gridBounds } from './iso';
 
-interface DeskObject {
-  id: string;
-  name: string;
-  x: number;
-  y: number;
-  width: number;
-  depth: number;
-  height: number;
-  fill: string;
-  shade: string;
-  /** Shown but not usable yet, with the reason. */
-  lockReason: string;
-}
-
-const ROOM_TILES = 12;
-
-function deskObjects(state: GameState): DeskObject[] {
-  const laptopLock = has(state, 'laptop') ? '' : 'Buy a laptop';
-  const deskLock = has(state, 'desk') ? '' : 'Buy a desk';
-  return [
-    {
-      id: 'desk',
-      name: 'Desk',
-      x: 3,
-      y: 4,
-      width: 5,
-      depth: 3,
-      height: 1,
-      fill: 'var(--kit-furniture)',
-      shade: 'var(--kit-furniture-dark)',
-      lockReason: deskLock,
-    },
-    {
-      id: 'laptop',
-      name: 'Laptop',
-      x: 4,
-      y: 5,
-      width: 2,
-      depth: 1,
-      height: 1,
-      fill: 'var(--kit-tools)',
-      shade: 'var(--kit-tools-dark)',
-      lockReason: laptopLock,
-    },
-    {
-      id: 'accounting',
-      name: 'Accounting',
-      x: 6,
-      y: 5,
-      width: 1,
-      depth: 1,
-      height: 1,
-      fill: 'var(--kit-stock)',
-      shade: 'var(--kit-stock-dark)',
-      lockReason: laptopLock,
-    },
-    {
-      id: 'materials',
-      name: 'Materials',
-      x: 1,
-      y: 5,
-      width: 1,
-      depth: 2,
-      height: 1,
-      fill: 'var(--kit-bench)',
-      shade: 'var(--kit-bench-dark)',
-      lockReason: '',
-    },
-    {
-      id: 'catalogue',
-      name: 'Catalogue',
-      x: 1,
-      y: 2,
-      width: 2,
-      depth: 1,
-      height: 1,
-      fill: 'var(--kit-vehicle)',
-      shade: 'var(--kit-vehicle-dark)',
-      lockReason: '',
-    },
-    {
-      id: 'hiring',
-      name: 'Team board',
-      x: 8,
-      y: 0,
-      width: 3,
-      depth: 1,
-      height: 3,
-      fill: 'var(--room)',
-      shade: 'var(--room-dark)',
-      lockReason: '',
-    },
-    {
-      id: 'phone',
-      name: 'Phone',
-      x: 7,
-      y: 7,
-      width: 1,
-      depth: 1,
-      height: 1,
-      fill: 'var(--kit-welfare)',
-      shade: 'var(--kit-welfare-dark)',
-      lockReason: '',
-    },
-  ];
-}
+const FILLS: Record<string, [string, string]> = {
+  desk: ['var(--kit-furniture)', 'var(--kit-furniture-dark)'],
+  laptop: ['var(--kit-tools)', 'var(--kit-tools-dark)'],
+  accounting: ['var(--kit-stock)', 'var(--kit-stock-dark)'],
+  materials: ['var(--kit-bench)', 'var(--kit-bench-dark)'],
+  catalogue: ['var(--kit-vehicle)', 'var(--kit-vehicle-dark)'],
+  hiring: ['var(--room)', 'var(--room-dark)'],
+  phone: ['var(--kit-welfare)', 'var(--kit-welfare-dark)'],
+};
 
 export function renderOffice(state: GameState): string {
-  const bounds = gridBounds(ROOM_TILES, ROOM_TILES, 4);
+  const bounds = gridBounds(OFFICE_TILES, OFFICE_TILES, 4);
   const pad = 24;
   const parts: string[] = [
-    polygon(footprintPolygon(0, 0, ROOM_TILES, ROOM_TILES), 'var(--room-floor)'),
+    polygon(footprintPolygon(0, 0, OFFICE_TILES, OFFICE_TILES), 'var(--room-floor)'),
   ];
-  const drawables = deskObjects(state)
-    .map((object) => {
-      const faces = boxPolygons(object.x, object.y, object.width, object.depth, object.height);
-      const locked = object.lockReason !== '';
-      const attrs =
-        `data-office="${object.id}" class="clickable${locked ? ' locked' : ''}"` +
-        (locked ? ` data-lock="${escapeText(object.lockReason)}"` : '');
-      const text = locked ? `${object.name}: ${object.lockReason}` : object.name;
-      return {
-        depth: depthKey(object.x, object.y),
-        svg:
-          box(faces, locked ? 'var(--locked)' : object.fill, locked ? 'var(--locked-dark)' : object.shade, attrs) +
-          label(
-            centreOf(object.x, object.y, object.width, object.depth, object.height),
-            text,
-            attrs,
-          ),
-      };
-    })
-    .sort((left, right) => left.depth - right.depth);
+  const drawables = DESK_LAYOUT.map((object) => {
+    const faces = boxPolygons(object.x, object.y, object.width, object.depth, object.height);
+    const missing = object.needs !== null && !has(state, object.needs);
+    const lockReason = missing ? `Buy a ${(findSpec(object.needs ?? '')?.name ?? '').toLowerCase()}` : '';
+    const [fill, shade] = FILLS[object.id] ?? ['var(--room)', 'var(--room-dark)'];
+    const attrs =
+      `data-office="${object.id}" data-sprite="${object.spriteKey}" ` +
+      `class="clickable${missing ? ' locked' : ''}"` +
+      (missing ? ` data-lock="${escapeText(lockReason)}"` : '');
+    const text = missing ? `${object.name}: ${lockReason}` : object.name;
+    return {
+      depth: depthKey(object.x, object.y),
+      svg:
+        `<g ${attrs}><title>${escapeText(text)}</title>` +
+        box(faces, missing ? 'var(--locked)' : fill, missing ? 'var(--locked-dark)' : shade) +
+        label(
+          centreOf(object.x, object.y, object.width, object.depth, object.height),
+          text,
+        ) +
+        '</g>',
+    };
+  }).sort((left, right) => left.depth - right.depth);
   parts.push(drawables.map((drawable) => drawable.svg).join(''));
   const viewBox = [
     Math.round(bounds.minX - pad),

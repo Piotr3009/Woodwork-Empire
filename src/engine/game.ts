@@ -23,7 +23,7 @@ import {
 } from './constants';
 import { expireEnquiries, refillBoard, refreshLocks } from './board';
 import { isDayExhausted, isWorkingDay, weekday } from './clock';
-import { canAfford, pay, runDayCosts } from './economy';
+import { canAfford, formatMoney, pay, runDayCosts } from './economy';
 import { isPaused, openNextEvent, queueEvent } from './events';
 import {
   accidentRisk,
@@ -269,7 +269,7 @@ function runExtractorBreakdown(state: GameState): void {
     title: 'The extractor has stopped',
     body:
       `Every machine in the hall is dead until it is fixed, and the dust piles up faster. ` +
-      `The parts cost ${EXTRACTOR_REPAIR_COST}.`,
+      `The parts cost ${formatMoney(EXTRACTOR_REPAIR_COST)}.`,
     choices,
     data: { equipmentId: extractor.id, taskId: task.id },
   });
@@ -301,7 +301,8 @@ function runHelperClean(state: GameState): void {
   ensureTask(state, 'cleaning', 'Weekly clean', null);
 }
 
-/** A lorry at the gate is a decision: unload now, or leave it standing there (CLAUDE.md 10.1). */
+/** A lorry at the gate is a decision: unload now, or leave it standing there (CLAUDE.md 10.1).
+ *  Clicking the van in the hall asks the same question again. */
 function queueDeliveryEvents(state: GameState, arriving: Delivery[]): void {
   for (const delivery of arriving) {
     const task = state.tasks.find((entry) => entry.deliveryId === delivery.id && !entry.done);
@@ -353,7 +354,9 @@ function advanceToNextDay(state: GameState): void {
     queueEvent(state, {
       kind: 'weekend',
       title: 'Weekend',
-      body: `${skipped.length} days off. Rent and rates ran anyway.`,
+      body:
+        `${skipped.length} days off. Rent and rates ran anyway: ` +
+        `${formatMoney(weekendCosts)} out.`,
       choices: [{ id: 'ok', label: 'Monday then' }],
       data: { days: skipped.length, costs: Math.round(weekendCosts) },
     });
@@ -535,9 +538,10 @@ function raiseStockOverflow(state: GameState, delivery: Delivery, overflow: numb
     title: 'The rack is full',
     body:
       `${overflow} sheets do not fit. Left in the yard they will be gone by morning. ` +
-      `Temporary storage is ${TEMP_STORAGE_COST} now and an hour to fetch them back.`,
+      `Temporary storage is ${formatMoney(TEMP_STORAGE_COST)} now and ` +
+      `${AD_HOC_TASK_MINUTES.fetchStorage} min to fetch them back.`,
     choices: [
-      { id: 'storage', label: `Pay ${TEMP_STORAGE_COST} for storage` },
+      { id: 'storage', label: `Pay ${formatMoney(TEMP_STORAGE_COST)} for storage` },
       { id: 'outside', label: 'Leave them in the yard' },
     ],
     data: { deliveryId: delivery.id, sheets: overflow },
@@ -662,6 +666,13 @@ export function applyAction(state: GameState, action: GameAction): GameState {
     case 'HIRE':
       hire(next, action.role, action.tier);
       break;
+    case 'ASK_UNLOAD': {
+      const delivery = findDelivery(next, action.deliveryId);
+      if (delivery && delivery.arrived && !delivery.unloaded) {
+        queueDeliveryEvents(next, [delivery]);
+      }
+      break;
+    }
     case 'START_CLEANING': {
       const task = ensureTask(next, 'cleaning', 'Clean the hall', null);
       startTask(next, task.id);

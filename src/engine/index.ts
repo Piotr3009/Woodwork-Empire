@@ -11,6 +11,16 @@ export { applyAction, canBuy, canBuySoftware, createGame, tick } from './game';
 export type { BuyCheck, NewGameOptions } from './game';
 export * from './types';
 
+// Numbers the UI is allowed to print
+export {
+  CLEANING_MINUTES,
+  MINUTES_PER_WORKING_DAY,
+  SHEET_PRICE_STOCK,
+  SOFTWARE_ONE_OFF_PRICE,
+  SOFTWARE_SUBSCRIPTION_MONTHLY,
+  SPEEDS,
+} from './constants';
+
 // Time
 export {
   addWorkingDays,
@@ -38,6 +48,7 @@ export {
 export {
   canAfford,
   dailyPower,
+  formatMoney,
   dailyRates,
   dailyRent,
   monthlySalaryBill,

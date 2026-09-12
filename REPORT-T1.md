@@ -336,5 +336,45 @@ Two findings were judged wrong and left alone, both named in section 8 as questi
 `END_DAY` before 16:00 should end the day (7.2 says it means going home, and the hours that follow
 count as absence), and that the on time rating bonus should survive a late delivery.
 
+Fourteen more from the audit of the views, section 10 and section 15, also fixed here:
+
+19. **A second task could be started while one was running**, which silently abandoned the first and
+    left it marked as the owner's so no member of staff could take it. 10.1 says another task can be
+    started only when the current one is done or paused, and now it cannot.
+20. **Money appeared unformatted in the copy the player reads**: the start screen, the storage
+    event, the repair event, the bailiff and the balance line all printed raw numbers. There is one
+    money formatter now and the engine event copy uses it too.
+21. **Minutes appeared without their unit** in the end of day summary and the storage event.
+22. **No modal opened beside the object that was clicked**, although 10.4 asks for it and the
+    anchoring code was already there. Desk objects now open their modal where the player clicked.
+23. **Clicking the van started the owner's unloading** instead of opening the choice 10.1 describes.
+    It asks again now, so a joiner or the helper can take it.
+24. **Benches looked the same whether anybody was at them.** They now read "(free)" or carry the
+    name of the man at the bench, as 10.1 asks.
+25. **Every figure was drawn with a drop shadow**, which 10.3 forbids. Gone.
+26. **The sawdust was tan and scattered anywhere.** 10.3 asks for grey ellipses near the machines,
+    and that is what it is now.
+27. **The rooms, the rack, the van and the whole office desk carried their sizes as literals in the
+    renderers.** They are in `constants.ts` now, each with a footprint, a height, an anchor and a
+    sprite key, as 10.3 requires, and the sprite key reaches the DOM so the sprite pipeline has
+    something to hook.
+28. **Locker and canteen seat slots sat inside the room footprints** and painted over them. They
+    stand along the walkway now.
+29. **Every list row had its own accent button.** 10.4 allows one accent button per view: the rows
+    are outlined now.
+30. **The clear cross on a filter did not put the caret back**, which rule 3.10 asks for by name.
+31. **The WC and the canteen had no tooltip**, only a line under the view. Every room, machine and
+    desk object carries a real one now.
+32. **The board rows printed the call count, the drawing minutes and the raw size multiplier**,
+    none of which 10.1 lists for the board.
+
 One more is disclosed rather than fixed: the lacquer finish of 9.1 is unreachable content, because
 every template lists laminate only and the spray booth that unlocks lacquer is locked for Turn 1.
+
+Two shapes of the laptop modal stay wider than 10.1's "two lists", each for a reason:
+
+- **Workshop jobs of work.** Without it, an unloading or a bag change that the player put off has no
+  way back: the hall has buttons only for cleaning and the extractor. The list is how the owner
+  picks that work up again.
+- **Jobs on the books.** This is the job card 9.4 asks for, and it carries the Assign override. 10.1
+  does not say which view holds the job card.
