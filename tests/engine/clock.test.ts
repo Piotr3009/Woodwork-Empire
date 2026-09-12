@@ -10,6 +10,7 @@ import {
   isDayExhausted,
   isFirstOfMonth,
   isFriday,
+  isLastWorkingDayOfMonth,
   isOvertime,
   isWorkingDay,
   monthOfDay,
@@ -18,7 +19,13 @@ import {
   weekdayName,
   yearOfDay,
 } from '../../src/engine/clock';
-import { MINUTES_PER_WORKING_DAY, REAL_SECONDS_PER_DAY_AT_1X } from '../../src/engine/constants';
+import {
+  DAYS_PER_MONTH,
+  MINUTES_PER_WORKING_DAY,
+  REAL_SECONDS_PER_DAY_AT_1X,
+} from '../../src/engine/constants';
+import { showsDaySummary, summaryTitle } from '../../src/engine/game';
+import { newGame } from '../helpers';
 
 describe('the real time the clock runs at', () => {
   it('takes 480 real seconds for one game day at 1x', () => {
@@ -106,5 +113,40 @@ describe('clock time of day', () => {
     expect(gameMinutesPerRealSecond(4)).toBe(4);
     expect(MINUTES_PER_WORKING_DAY / gameMinutesPerRealSecond(1) / 60).toBe(8);
     expect(MINUTES_PER_WORKING_DAY / gameMinutesPerRealSecond(4) / 60).toBe(2);
+  });
+});
+
+describe('the summary cadence', () => {
+  it('shows every day, on Friday, or on the last working day of the month', () => {
+    const state = newGame();
+    expect(state.summaryCadence).toBe('daily');
+    // Day 1 is a Monday, day 5 the Friday, days 6 and 7 the weekend.
+    expect(showsDaySummary({ ...state, clock: { day: 1, minute: 0 } })).toBe(true);
+    const weekly = { ...state, summaryCadence: 'weekly' as const };
+    expect(showsDaySummary({ ...weekly, clock: { day: 1, minute: 0 } })).toBe(false);
+    expect(showsDaySummary({ ...weekly, clock: { day: 5, minute: 0 } })).toBe(true);
+    expect(showsDaySummary({ ...weekly, clock: { day: 12, minute: 0 } })).toBe(true);
+    const monthly = { ...state, summaryCadence: 'monthly' as const };
+    for (let day = 1; day <= DAYS_PER_MONTH; day += 1) {
+      expect(showsDaySummary({ ...monthly, clock: { day, minute: 0 } })).toBe(
+        isLastWorkingDayOfMonth(day),
+      );
+    }
+    // Exactly one working day of the month carries it.
+    const days: number[] = [];
+    for (let day = 1; day <= DAYS_PER_MONTH; day += 1) days.push(day);
+    const carried = days.filter((day) => isLastWorkingDayOfMonth(day));
+    expect(carried).toHaveLength(1);
+  });
+
+  it('names the summary after the span of figures it carries', () => {
+    const state = newGame();
+    expect(summaryTitle({ ...state, clock: { day: 5, minute: 0 } })).toBe('End of day 5');
+    expect(
+      summaryTitle({ ...state, summaryCadence: 'weekly', clock: { day: 5, minute: 0 } }),
+    ).toBe('End of week 1');
+    expect(
+      summaryTitle({ ...state, summaryCadence: 'monthly', clock: { day: 5, minute: 0 } }),
+    ).toBe('End of month 1');
   });
 });

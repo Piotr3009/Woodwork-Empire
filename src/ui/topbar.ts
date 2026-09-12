@@ -3,6 +3,7 @@
 import { MINUTES_PER_WORKING_DAY, SPEEDS } from '../engine/constants';
 import { booksBehind, formatDate, movingMachines, netOf } from '../engine/index';
 import type { GameState, Speed } from '../engine/index';
+import { cadenceControl } from './dayEnd';
 import { escapeHtml, money } from './modal';
 
 function speedButtons(state: GameState): string {
@@ -81,6 +82,7 @@ export function renderMenu(state: GameState, cloud: MenuCloud): string {
       state.showWhy ? 'Hide real-life notes' : 'Show real-life notes'
     }</button>` +
     '<button class="btn" data-do="showSprites">Sprite check</button>' +
+    cadenceControl(state) +
     (cloud.available && cloud.signedIn !== null
       ? '<button class="btn" data-do="saveGame">Save now</button>' +
         '<button class="btn" data-do="loadGame">Load</button>'

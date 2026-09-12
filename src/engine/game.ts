@@ -27,7 +27,17 @@ import {
 import { expireEnquiries, refillBoard, refreshLocks } from './board';
 import { missCall, nextDueCall, takeCall } from './calls';
 import { canPlaceSpec, firstFreeTile, moveItem } from './layout';
-import { daysBetween, isDayExhausted, isOvertime, isWorkingDay, weekOfDay, weekday } from './clock';
+import {
+  daysBetween,
+  isDayExhausted,
+  isFriday,
+  isLastWorkingDayOfMonth,
+  isOvertime,
+  isWorkingDay,
+  monthOfDay,
+  weekOfDay,
+  weekday,
+} from './clock';
 import {
   canAfford,
   emptyBooked,
@@ -250,6 +260,7 @@ export function createGame(options: NewGameOptions): GameState {
     lateAccountsMonths: 0,
     productionMinutesMonth: 0,
     movedItems: [],
+    summaryCadence: 'daily',
     gameOver: null,
   };
   startDay(state);
@@ -457,7 +468,23 @@ function queueDeliveryEvents(state: GameState, arriving: Delivery[]): void {
   }
 }
 
-/** Ends the working day and opens the summary. The player clicks on to the next day. */
+/** Whether today's summary is one the player asked to see. Daily is every day, weekly is Friday
+ *  and monthly is the last working day of the month (CLAUDE.md T4 3.6). */
+export function showsDaySummary(state: GameState): boolean {
+  if (state.summaryCadence === 'weekly') return isFriday(state.clock.day);
+  if (state.summaryCadence === 'monthly') return isLastWorkingDayOfMonth(state.clock.day);
+  return true;
+}
+
+/** The title the summary carries, which says what span of figures is in it. */
+export function summaryTitle(state: GameState): string {
+  if (state.summaryCadence === 'weekly') return `End of week ${weekOfDay(state.clock.day)}`;
+  if (state.summaryCadence === 'monthly') return `End of month ${monthOfDay(state.clock.day)}`;
+  return `End of day ${state.clock.day}`;
+}
+
+/** Ends the working day. The summary is put in front of the player as often as he asked for it,
+ *  and the day ends the same way either way: only the modal is skipped (CLAUDE.md T4 3.6). */
 function finishDay(state: GameState): void {
   const ending =
     state.activeEvent?.kind === 'dayEnd' || state.eventQueue.some((event) => event.kind === 'dayEnd');
@@ -465,9 +492,13 @@ function finishDay(state: GameState): void {
   pauseOwnerTask(state);
   setTomorrowFatigue(state);
   state.owner.wentHome = true;
+  if (!showsDaySummary(state)) {
+    advanceToNextDay(state);
+    return;
+  }
   queueEvent(state, {
     kind: 'dayEnd',
-    title: `End of day ${state.clock.day}`,
+    title: summaryTitle(state),
     body: 'The day is over.',
     choices: [{ id: 'next', label: 'Next day' }],
   });
@@ -1066,6 +1097,9 @@ export function applyAction(state: GameState, action: GameAction): GameState {
       break;
     case 'END_SETUP':
       endSetup(next, action.speed as Speed);
+      break;
+    case 'SET_SUMMARY_CADENCE':
+      next.summaryCadence = action.cadence;
       break;
     case 'END_DAY':
       if (next.clock.minute >= MINUTES_PER_WORKING_DAY) {

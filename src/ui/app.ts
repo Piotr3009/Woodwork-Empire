@@ -21,6 +21,7 @@ import type {
   GameAction,
   GameState,
   Speed,
+  SummaryCadence,
   WorkerRole,
   WorkerTier,
 } from '../engine/index';
@@ -650,6 +651,9 @@ function handleAction(element: DataElement, point: { x: number; y: number }): vo
       ui.menuOpen = false;
       dispatch({ type: 'END_DAY' });
       return;
+    case 'setCadence':
+      dispatch({ type: 'SET_SUMMARY_CADENCE', cadence: id as SummaryCadence });
+      return;
     case 'skipDay':
       ui.menuOpen = false;
       dispatch({ type: 'SKIP_DAY' });
@@ -797,12 +801,12 @@ async function refreshCloud(): Promise<void> {
   }
 }
 
-/** Slot 1 keeps up with the end of every day, once the player is signed in (T2 3.14). */
+/** Slot 1 keeps up with every day, once the player is signed in (T2 3.14). The summary modal can
+ *  be turned down to weekly or monthly, so the save follows the day and not the modal (T4 3.6). */
 let autosavedDay = 0;
 
 function autosave(): void {
   if (!ui.cloud.available || ui.cloud.signedIn === null || state === null) return;
-  if (state.activeEvent?.kind !== 'dayEnd') return;
   if (autosavedDay === state.clock.day) return;
   autosavedDay = state.clock.day;
   void runCloud(async () => (await saveGame(game())).note);

@@ -16,6 +16,10 @@ export type SoftwareMode = 'none' | 'oneOff' | 'subscription';
 
 export type TaskCategory = 'admin' | 'design' | 'workshop';
 
+/** How often the player wants the end of day summary in front of him. A preference, not an
+ *  engine number: the day ends the same way whatever it says (CLAUDE.md T4 3.6). */
+export type SummaryCadence = 'daily' | 'weekly' | 'monthly';
+
 export type WorkerRole = 'joiner' | 'helper' | 'officeAdmin' | 'purchasingClerk' | 'salesman';
 
 export type WorkerTier = 'poor' | 'normal' | 'super';
@@ -531,6 +535,8 @@ export interface GameState {
   productionMinutesMonth: number;
   /** Kit the player has dragged about and not yet paid for in time and ducting (T4 3.5). */
   movedItems: string[];
+  /** How often the end of day summary is put in front of the player (CLAUDE.md T4 3.6). */
+  summaryCadence: SummaryCadence;
   gameOver: GameOver | null;
 }
 
@@ -547,6 +553,7 @@ export type GameAction =
   | { type: 'ORDER_TRANSPORT'; jobId: string }
   | { type: 'MOVE_ITEM'; itemId: string; x: number; y: number }
   | { type: 'END_SETUP'; speed: Speed }
+  | { type: 'SET_SUMMARY_CADENCE'; cadence: SummaryCadence }
   | { type: 'SET_SHOW_WHY'; on: boolean }
   | { type: 'WORK_HERE'; jobId: string | null }
   | { type: 'ASSIGN_JOB'; jobId: string; workerId: string | null }

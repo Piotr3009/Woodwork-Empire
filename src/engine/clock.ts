@@ -50,6 +50,17 @@ export function isFirstOfMonth(day: number): boolean {
   return dayOfMonth(day) === 1;
 }
 
+/** The last day of the month the workshop is open, which is where a monthly summary lands
+ *  (CLAUDE.md T4 3.6). */
+export function isLastWorkingDayOfMonth(day: number): boolean {
+  if (!isWorkingDay(day)) return false;
+  const month = monthOfDay(day);
+  for (let next = day + 1; monthOfDay(next) === month; next += 1) {
+    if (isWorkingDay(next)) return false;
+  }
+  return true;
+}
+
 /** 1-based year of the game calendar. */
 export function yearOfDay(day: number): number {
   return Math.floor((day - 1) / (DAYS_PER_MONTH * MONTHS_PER_YEAR)) + 1;
