@@ -3,8 +3,11 @@
 A tycoon game about running a joinery workshop in the UK. This repository holds the prototype:
 a pure simulation engine plus an intentionally ugly SVG prototype of the views.
 
-The design contract for the current stage is `CLAUDE.md`. `docs` history: the Turn 1 brief is
-`turn-1-brief.md` and the build reports are `REPORT-T1.md` and `REPORT-T2.md`.
+The design contract for the current stage is `CLAUDE.md`. The briefs of the finished stages are
+archived in `docs`: `docs/turn-1-brief.md` and `docs/turn-2-brief.md`. The build reports are
+`REPORT-T1.md` and `REPORT-T2.md`.
+
+The sprite contract between the art side and the game is `docs/art/SPRITES.md`.
 
 ## Requirements
 
