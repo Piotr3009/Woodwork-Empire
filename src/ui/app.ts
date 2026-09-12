@@ -6,7 +6,9 @@ import {
   applyAction,
   createGame,
   gameMinutesPerRealSecond,
-  machinesStopped,
+  brokenMachines,
+  findSpec,
+  machinesDueService,
   oldestReadyJob,
   ownerJob,
   runMinutes,
@@ -125,15 +127,30 @@ function hallControls(current: GameState): string {
     : ready
       ? '<button class="btn btn-primary" data-do="workHere">Work here</button>'
       : reasonLabel('No job has its material in the hall yet');
-  const fix = machinesStopped(current)
-    ? '<button class="btn" data-do="repairExtractor">Fix extractor</button>'
-    : '';
+  const name = (specId: string): string =>
+    (findSpec(specId)?.name ?? specId).toLowerCase();
+  const fix = brokenMachines(current)
+    .map(
+      (item) =>
+        `<button class="btn" data-do="repairMachine" data-id="${item.id}">` +
+        `Fix the ${escapeHtml(name(item.specId))}</button>`,
+    )
+    .join('');
+  const service = machinesDueService(current)
+    .filter((item) => !item.broken)
+    .map(
+      (item) =>
+        `<button class="btn" data-do="serviceMachine" data-id="${item.id}">` +
+        `Service the ${escapeHtml(name(item.specId))}</button>`,
+    )
+    .join('');
   return (
     '<div class="view-controls">' +
     workHere +
     '<button class="btn" data-do="startCleaning">Clean up · ' +
     `${minutes(CLEANING_MINUTES)}</button>` +
     fix +
+    service +
     '</div>'
   );
 }
@@ -389,8 +406,11 @@ function handleAction(element: DataElement, point: { x: number; y: number }): vo
     case 'startCleaning':
       dispatch({ type: 'START_CLEANING' });
       return;
-    case 'repairExtractor':
-      dispatch({ type: 'REPAIR_EXTRACTOR' });
+    case 'repairMachine':
+      dispatch({ type: 'REPAIR_MACHINE', equipmentId: id });
+      return;
+    case 'serviceMachine':
+      dispatch({ type: 'SERVICE_MACHINE', equipmentId: id });
       return;
     case 'resolveEvent':
       ui.eventPosition = null;

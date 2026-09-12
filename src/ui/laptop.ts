@@ -110,7 +110,7 @@ function jobAction(job: Job): string {
 
 function jobRow(state: GameState, job: Job): string {
   const done = Math.round(jobProgress(job) * 100);
-  const waiting = job.waitingForMaterial ? ' \u00b7 waiting for material' : '';
+  const waiting = job.blockedBy === '' ? '' : ` · ${job.blockedBy}`;
   const action = jobAction(job);
   return (
     `<div class="row"><span class="row-main">${escapeHtml(job.name)} ${money(job.price)}</span>` +

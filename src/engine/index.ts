@@ -123,9 +123,16 @@ export {
   findSpec,
   gateIsCrowded,
   has,
+  brokenMachines,
+  extractorBroken,
+  serviceIsDue,
+  hasExtraction,
   machineLabourFactor,
-  machinesStopped,
+  machinesDueService,
   owned,
+  repairCostFor,
+  serviceCostFor,
+  serviceDueOn,
 } from './machines';
 
 // Material and deliveries

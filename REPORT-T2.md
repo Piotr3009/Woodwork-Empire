@@ -30,6 +30,10 @@ T2-06 Office staff working day. The office admin, the purchasing clerk and the s
 480 minutes of their own and work their tasks off through the same runner as the owner; the clerk
 stops at 16 orders, what is not finished waits for tomorrow, and the owner can take any of it on.
 
+T2-07 Extractor and service. A broken extractor slows the hall to 0.25 instead of stopping it, no
+extraction at all means no machine runs, and every machine wants a service every 30 days or takes
+a 2% chance a working day of giving up until it is repaired.
+
 ## 2. Not done or partial
 
 ## 3. Tests

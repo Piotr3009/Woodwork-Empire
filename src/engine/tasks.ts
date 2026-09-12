@@ -15,12 +15,13 @@ import {
   CLIENT_CALL_MINUTES_PER_1000,
   CLIENT_CALL_PRICE_STEP,
   DAILY_ORDERING_MINUTES,
-  EXTRACTOR_REPAIR_MINUTES,
+  REPAIR_MINUTES,
   FETCH_STORAGE_MINUTES,
   MATERIAL_ORDER_MINUTES_HIGH,
   MATERIAL_ORDER_MINUTES_LOW,
   MATERIAL_ORDER_PRICE_HIGH,
   MATERIAL_ORDER_PRICE_LOW,
+  SERVICE_MINUTES,
   SITE_MEASURE_MINUTES,
   SOFTWARE_DESIGN_FACTOR,
   STAFF_MANAGEMENT_MINUTES_PER_JOINER,
@@ -77,7 +78,8 @@ const TASK_DEFINITIONS: Record<TaskKind, TaskDefinition> = {
     autoRoles: ['helper'],
   },
   deliver: { category: 'workshop', eligibleRoles: ['joiner', 'helper'], autoRoles: [] },
-  repairExtractor: { category: 'workshop', eligibleRoles: ['joiner'], autoRoles: [] },
+  service: { category: 'workshop', eligibleRoles: ['joiner'], autoRoles: [] },
+  repair: { category: 'workshop', eligibleRoles: ['joiner'], autoRoles: [] },
 };
 
 /** Float guard, not a game number: work this small is finished work. */
@@ -328,6 +330,7 @@ export const AD_HOC_TASK_MINUTES = {
   cleaning: CLEANING_MINUTES,
   deliver: OWN_DELIVERY_MINUTES,
   fetchStorage: FETCH_STORAGE_MINUTES,
-  repairExtractor: EXTRACTOR_REPAIR_MINUTES,
+  repair: REPAIR_MINUTES,
+  service: SERVICE_MINUTES,
   siteMeasure: SITE_MEASURE_MINUTES,
 };

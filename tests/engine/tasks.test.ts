@@ -130,7 +130,7 @@ describe('the daily list', () => {
       materialMode: 'perJob',
       sheets: 2,
       sheetsUsed: 0,
-      waitingForMaterial: false,
+      blockedBy: '',
       bespokeMaterial: false,
       express: false,
       byHand: false,

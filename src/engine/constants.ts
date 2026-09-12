@@ -316,9 +316,17 @@ export const BAG_CHANGE_MINUTES = 15;
 export const CLEANING_MINUTES = 120;
 /** Fetch from temporary storage the next morning (PIOTR). */
 export const FETCH_STORAGE_MINUTES = TEMP_STORAGE_FETCH_MINUTES;
-/** [TUNE] extractor repair. */
-export const EXTRACTOR_REPAIR_MINUTES = 90;
+/** Repairing anything takes 90 minutes [TUNE]. */
+export const REPAIR_MINUTES = 90;
+/** [TUNE] the extractor keeps its Turn 1 parts bill; every other machine is 5% of what it cost. */
 export const EXTRACTOR_REPAIR_COST = 150;
+export const MACHINE_REPAIR_COST_FRACTION = 0.05;
+/** Every machine wants a service once a month, and it costs half an hour (PIOTR). */
+export const SERVICE_INTERVAL_DAYS = 30;
+export const SERVICE_MINUTES = 30;
+/** [TUNE] the service bill, and what an overdue machine risks every working day. */
+export const SERVICE_COST_FRACTION = 0.02;
+export const OVERDUE_BREAKDOWN_CHANCE = 0.02;
 
 /** Design speed by software tier (PIOTR: 5 to 80% faster). */
 export const SOFTWARE_DESIGN_FACTOR: Record<SoftwareTier, number> = {
@@ -1105,8 +1113,10 @@ export const WORKER_NAMES = [
 export const EXTRACTOR_BREAKDOWN_CHANCE = 0.01;
 export const EXTRACTOR_BREAKDOWN_CHANCE_HIGH_DUST = 0.03;
 export const DUST_HIGH_THRESHOLD = 70;
-/** A broken extractor triples the dust rate (PIOTR). */
+/** A broken extractor triples the dust rate (PIOTR). The hall carries on at a quarter speed
+ *  rather than stopping dead (PIOTR, Turn 2). */
 export const EXTRACTOR_BROKEN_DUST_MULTIPLIER = 3;
+export const EXTRACTOR_BROKEN_OUTPUT_FACTOR = 0.25;
 /** [TUNE] dust gained per minute of production. */
 export const DUST_PER_PRODUCTION_MINUTE = 0.02;
 export const DUST_MAX = 100;

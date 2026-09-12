@@ -134,7 +134,7 @@ export function acceptEnquiry(state: GameState, enquiryId: string, byHand: boole
     materialMode: 'perJob',
     sheets: sheetsForCost(materialCost),
     sheetsUsed: 0,
-    waitingForMaterial: false,
+    blockedBy: '',
     bespokeMaterial: enquiry.bespokeMaterial,
     express: enquiry.express,
     byHand: madeByHand,

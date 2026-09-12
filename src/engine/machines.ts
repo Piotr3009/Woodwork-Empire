@@ -3,12 +3,18 @@
 
 import {
   DUST_BANDS,
+  EXTRACTOR_BROKEN_OUTPUT_FACTOR,
   GATE_CROWD_FACTOR,
   GATE_CROWD_LIMIT,
+  MACHINE_REPAIR_COST_FRACTION,
+  OVERDUE_BREAKDOWN_CHANCE,
+  SERVICE_COST_FRACTION,
+  SERVICE_INTERVAL_DAYS,
   DUST_HIGH_THRESHOLD,
   DUST_MAX,
   DUST_PER_PRODUCTION_MINUTE,
   EQUIPMENT_SPECS,
+  EXTRACTOR_REPAIR_COST,
   EXTRACTOR_BREAKDOWN_CHANCE,
   EXTRACTOR_BREAKDOWN_CHANCE_HIGH_DUST,
   EXTRACTOR_BROKEN_DUST_MULTIPLIER,
@@ -93,6 +99,8 @@ export function hallProductivityFactor(state: GameState): number {
   if (helperMissing(state)) factor *= NO_HELPER_PRODUCTIVITY_FACTOR;
   // Nowhere to put anything down with four finished pieces in the way (CLAUDE.md T2 3.7).
   if (gateIsCrowded(state)) factor *= GATE_CROWD_FACTOR;
+  // The extraction is down: the hall crawls rather than stopping dead (CLAUDE.md T2 3.9).
+  if (extractorBroken(state)) factor *= EXTRACTOR_BROKEN_OUTPUT_FACTOR;
   return factor;
 }
 
@@ -108,9 +116,60 @@ export function machineLabourFactor(state: GameState, material: MaterialKind): n
   return factor;
 }
 
-/** A broken extractor stops every machine in the hall (CLAUDE.md 9.6). */
-export function machinesStopped(state: GameState): boolean {
+/** The extractor is on the floor. The hall carries on at a quarter speed (CLAUDE.md T2 3.9). */
+export function extractorBroken(state: GameState): boolean {
   return state.equipment.some((item) => item.specId === 'extractor' && item.broken);
+}
+
+/** Extraction of some kind is in the hall. Without it no machine will run at all (PIOTR). */
+export function hasExtraction(state: GameState): boolean {
+  return has(state, 'extractor') || has(state, 'dustSystem');
+}
+
+/** Machines with a bag or a blade, the ones that are serviced and can break down. */
+export function serviceableMachines(state: GameState): Equipment[] {
+  return state.equipment.filter((item) => findSpec(item.specId)?.category === 'machine');
+}
+
+export function serviceDueOn(item: Equipment): number {
+  return item.lastServiceDay + SERVICE_INTERVAL_DAYS;
+}
+
+export function serviceIsDue(state: GameState, item: Equipment): boolean {
+  return state.clock.day >= serviceDueOn(item);
+}
+
+export function machinesDueService(state: GameState): Equipment[] {
+  return serviceableMachines(state).filter((item) => serviceIsDue(state, item));
+}
+
+/** 2% of what the machine cost [TUNE]. */
+export function serviceCostFor(item: Equipment): number {
+  return Math.round(item.purchasePrice * SERVICE_COST_FRACTION * 100) / 100;
+}
+
+/** The extractor keeps its Turn 1 parts bill, every other machine is 5% of its price [TUNE]. */
+export function repairCostFor(item: Equipment): number {
+  if (item.specId === 'extractor') return EXTRACTOR_REPAIR_COST;
+  return Math.round(item.purchasePrice * MACHINE_REPAIR_COST_FRACTION * 100) / 100;
+}
+
+/** A machine that has gone past its service date can give up on any working day [TUNE]. */
+export function overdueBreakdownChance(state: GameState, item: Equipment): number {
+  if (item.broken || !serviceIsDue(state, item)) return 0;
+  return OVERDUE_BREAKDOWN_CHANCE;
+}
+
+/** A broken machine is out until it is repaired: nothing of its material gets made. */
+export function brokenMachineFor(state: GameState, material: MaterialKind): Equipment | null {
+  return (
+    serviceableMachines(state).find((item) => {
+      if (!item.broken) return false;
+      const spec = findSpec(item.specId);
+      if (!spec) return false;
+      return spec.usedOn === null || spec.usedOn === material;
+    }) ?? null
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -168,7 +227,7 @@ export function emptyBag(state: GameState, equipmentId: string): void {
  *  is too big for no helper (CLAUDE.md 9.6, 9.7). */
 export function dustGainPerMinute(state: GameState): number {
   let gain = DUST_PER_PRODUCTION_MINUTE;
-  if (machinesStopped(state)) gain *= EXTRACTOR_BROKEN_DUST_MULTIPLIER;
+  if (extractorBroken(state)) gain *= EXTRACTOR_BROKEN_DUST_MULTIPLIER;
   if (helperMissing(state)) gain *= NO_HELPER_DUST_MULTIPLIER;
   return gain;
 }
@@ -198,10 +257,32 @@ export function breakExtractor(state: GameState): Equipment | null {
   return extractor;
 }
 
-export function repairExtractor(state: GameState): void {
-  for (const item of state.equipment) {
-    if (item.specId === 'extractor') item.broken = false;
-  }
+export function breakMachine(state: GameState, equipmentId: string): Equipment | null {
+  const item = state.equipment.find((entry) => entry.id === equipmentId);
+  if (!item || item.broken) return null;
+  item.broken = true;
+  return item;
+}
+
+/** One path for putting anything right again, the extractor included. */
+export function repairMachine(state: GameState, equipmentId: string): Equipment | null {
+  const item = state.equipment.find((entry) => entry.id === equipmentId);
+  if (!item) return null;
+  item.broken = false;
+  return item;
+}
+
+/** The service is done: the clock on the next one starts again. */
+export function serviceMachine(state: GameState, equipmentId: string): Equipment | null {
+  const item = state.equipment.find((entry) => entry.id === equipmentId);
+  if (!item) return null;
+  item.lastServiceDay = state.clock.day;
+  item.broken = false;
+  return item;
+}
+
+export function brokenMachines(state: GameState): Equipment[] {
+  return state.equipment.filter((item) => item.broken);
 }
 
 /** True when the hall is dangerous enough for somebody to get hurt (CLAUDE.md 9.7). */

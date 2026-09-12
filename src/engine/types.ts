@@ -78,6 +78,8 @@ export interface Equipment {
   minutesUsed: number;
   bagFull: boolean;
   broken: boolean;
+  /** Day of the last service. A machine is bought serviced. */
+  lastServiceDay: number;
   purchasePrice: number;
 }
 
@@ -219,8 +221,8 @@ export interface Job {
   sheets: number;
   /** Whole sheets already taken off the rack for this job. */
   sheetsUsed: number;
-  /** The rack could not give the job what the next slice of work needs. */
-  waitingForMaterial: boolean;
+  /** Why the job is standing still, in plain English. Empty while nothing is in its way. */
+  blockedBy: string;
   bespokeMaterial: boolean;
   express: boolean;
   byHand: boolean;
@@ -277,7 +279,8 @@ export type TaskKind =
   | 'cleaning'
   | 'fetchStorage'
   | 'deliver'
-  | 'repairExtractor';
+  | 'service'
+  | 'repair';
 
 export interface TaskInstance {
   id: string;
@@ -300,7 +303,8 @@ export type GameEventKind =
   | 'deliveryArrived'
   | 'stockOverflow'
   | 'bagFull'
-  | 'extractorBroken'
+  | 'machineBroken'
+  | 'serviceDue'
   | 'noMaterial'
   | 'lowStock'
   | 'accident'
@@ -483,7 +487,8 @@ export type GameAction =
   | { type: 'ASK_UNLOAD'; deliveryId: string }
   | { type: 'ASK_BAG_CHANGE'; equipmentId: string }
   | { type: 'START_CLEANING' }
-  | { type: 'REPAIR_EXTRACTOR' }
+  | { type: 'REPAIR_MACHINE'; equipmentId: string }
+  | { type: 'SERVICE_MACHINE'; equipmentId: string }
   | { type: 'RESOLVE_EVENT'; choiceId: string }
   | { type: 'END_DAY' }
   | { type: 'SKIP_DAY' };

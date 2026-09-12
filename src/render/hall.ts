@@ -9,7 +9,16 @@ import {
   ROOM_LAYOUT,
   YARD_WIDTH_TILES,
 } from '../engine/constants';
-import { dustBand, findSpec, gateIsCrowded, machinesStopped } from '../engine/machines';
+import {
+  brokenMachines,
+  dustBand,
+  extractorBroken,
+  findSpec,
+  gateIsCrowded,
+  hasExtraction,
+  machinesDueService,
+  serviceIsDue,
+} from '../engine/machines';
 import { jobsAtGate, ownerJob } from '../engine/jobs';
 import { rackCapacity, stockIsLow } from '../engine/materials';
 import { ownerIsAvailable, staffOutputFactor } from '../engine/owner';
@@ -181,13 +190,14 @@ export function renderHall(state: GameState): string {
   for (const item of state.equipment) {
     const spec = findSpec(item.specId);
     if (!spec || spec.category === 'furniture') continue;
-    const broken = item.specId === 'extractor' && item.broken;
+    const broken = item.broken;
     const faces = boxPolygons(item.anchorX, item.anchorY, spec.width, spec.depth, spec.height);
     const fill = broken ? 'var(--stopped)' : CATEGORY_FILL[spec.category] ?? 'var(--kit-machine)';
     const shade = broken
       ? 'var(--stopped-dark)'
       : CATEGORY_SHADE[spec.category] ?? 'var(--kit-machine-dark)';
     const bagLine = item.bagFull ? ' (bag full)' : '';
+    const serviceLine = !item.broken && serviceIsDue(state, item) ? ' (service due)' : '';
     const rackLine =
       spec.category === 'storage' ? `: ${state.stock.sheets} / ${rackCapacity(state)}` : '';
     const atThisBench =
@@ -207,7 +217,7 @@ export function renderHall(state: GameState): string {
         box(faces, fill, shade) +
         label(
           centreOf(item.anchorX, item.anchorY, spec.width, spec.depth, spec.height),
-          `${spec.name}${bagLine}${benchLine}${rackLine}`,
+          `${spec.name}${bagLine}${serviceLine}${benchLine}${rackLine}`,
         ) +
         '</g>',
     });
@@ -302,9 +312,35 @@ export function renderHall(state: GameState): string {
   // 9.7: from the dirty band on, the player is warned that somebody can get hurt.
   const riskLine =
     band.label === 'dirty' || band.label === 'dangerous' ? ', somebody will get hurt in this' : '';
-  const stateLine = machinesStopped(state)
-    ? `Hall: everything stopped, the extractor is broken${ownerLine}`
+  const stateLine = extractorBroken(state)
+    ? `Hall: the extractor is broken, everything runs at a quarter speed${ownerLine}`
     : `Hall: ${band.label}${riskLine}${ownerLine}`;
+  const machines = state.equipment.filter((item) => findSpec(item.specId)?.category === 'machine');
+  const extractionLine =
+    machines.length > 0 && !hasExtraction(state)
+      ? '<p class="view-note warn">No extraction in the hall, so no machine will run. ' +
+        'Buy an extractor.</p>'
+      : '';
+  const brokenLine =
+    brokenMachines(state).length > 0
+      ? '<p class="view-note warn">Broken: ' +
+        escapeText(
+          brokenMachines(state)
+            .map((item) => (findSpec(item.specId)?.name ?? item.specId).toLowerCase())
+            .join(', '),
+        ) +
+        '.</p>'
+      : '';
+  const serviceLine =
+    machinesDueService(state).length > 0
+      ? '<p class="view-note warn">Service due: ' +
+        escapeText(
+          machinesDueService(state)
+            .map((item) => (findSpec(item.specId)?.name ?? item.specId).toLowerCase())
+            .join(', '),
+        ) +
+        '.</p>'
+      : '';
   const gateLine = gateIsCrowded(state)
     ? `<p class="view-note warn">Order transport, no room at the gate: ${jobsAtGate(state).length}` +
       ` finished pieces against a limit of ${GATE_CROWD_LIMIT}. Everything in the hall is 30% ` +
@@ -319,7 +355,8 @@ export function renderHall(state: GameState): string {
   return (
     `<svg class="hall-view" viewBox="${viewBox}" xmlns="http://www.w3.org/2000/svg" ` +
     `role="img" aria-label="Workshop hall">${parts.join('')}</svg>` +
-    `<p class="view-note">${escapeText(stateLine)}</p>${gateLine}${lowStock}`
+    `<p class="view-note">${escapeText(stateLine)}</p>` +
+    `${extractionLine}${brokenLine}${serviceLine}${gateLine}${lowStock}`
   );
 }
 

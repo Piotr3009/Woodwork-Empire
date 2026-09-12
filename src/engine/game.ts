@@ -8,12 +8,12 @@ import {
   CANTEEN_SLOT_LAYOUT,
   DESK_LAYOUT,
   DIFFICULTIES,
-  EXTRACTOR_REPAIR_COST,
   HELPER_CLEAN_WEEKDAY,
   LOCKER_SLOT_LAYOUT,
   MINUTES_PER_WORKING_DAY,
   OWNER_LABOUR_PER_MINUTE,
   REPUTATION_START,
+  SERVICE_INTERVAL_DAYS,
   SOFTWARE_ONE_OFF_JOBS,
   SOFTWARE_ONE_OFF_PRICE,
   SOFTWARE_TURN1_TIER,
@@ -43,12 +43,21 @@ import {
   clearDust,
   countOf,
   emptyBag,
+  breakMachine,
+  brokenMachineFor,
   extractorBreakdownChance,
+  extractorBroken,
   findSpec,
   hallProductivityFactor,
   has,
-  machinesStopped,
-  repairExtractor,
+  hasExtraction,
+  machinesDueService,
+  overdueBreakdownChance,
+  repairCostFor,
+  repairMachine,
+  serviceCostFor,
+  serviceMachine,
+  serviceableMachines,
   specOf,
 } from './machines';
 import {
@@ -123,6 +132,7 @@ import type {
   Delivery,
   Difficulty,
   Equipment,
+  GameEventChoice,
   Job,
   MaterialKind,
   GameAction,
@@ -281,6 +291,8 @@ function startDay(state: GameState): void {
   for (const delivery of arriving) onDeliveryArrived(state, delivery.jobId);
   createDailyTasks(state);
   runExtractorBreakdown(state);
+  runServiceDue(state);
+  runOverdueBreakdowns(state);
   checkLowStock(state);
   runAccidentRoll(state);
   runHelperClean(state);
@@ -288,27 +300,73 @@ function startDay(state: GameState): void {
   queueDeliveryEvents(state, arriving);
 }
 
-/** The extractor can give up, and the filthier the hall the likelier it is (CLAUDE.md 9.6). */
+/** Who can be sent at a job of work, as choices on the event that raised it. */
+function adHocChoices(state: GameState, minutesTotal: number, ownerLabel: string): GameEventChoice[] {
+  const choices = [{ id: 'owner', label: `${ownerLabel}, ${minutesTotal} min` }];
+  if (joiners(state).length > 0) {
+    choices.push({ id: 'joiner', label: `Send a joiner, ${minutesTotal} min` });
+  }
+  choices.push({ id: 'later', label: 'Leave it' });
+  return choices;
+}
+
+/** Anything in the hall can give up. The extractor goes on dust, everything else on a service it
+ *  never had (CLAUDE.md 9.6 and T2 3.9). */
+function raiseMachineBroken(state: GameState, machine: Equipment): void {
+  const name = findSpec(machine.specId)?.name ?? machine.specId;
+  const task = ensureTask(state, 'repair', `Repair the ${name.toLowerCase()}`, machine.id);
+  const body =
+    machine.specId === 'extractor'
+      ? 'The hall runs at a quarter speed until it is fixed, and the dust piles up three times ' +
+        `as fast. The parts cost ${formatMoney(repairCostFor(machine))}.`
+      : `Nothing that goes through it gets made until it is fixed. The parts cost ` +
+        `${formatMoney(repairCostFor(machine))}.`;
+  queueEvent(state, {
+    kind: 'machineBroken',
+    title: `${name} has stopped`,
+    body,
+    choices: adHocChoices(state, task.minutesTotal, 'Fix it yourself'),
+    data: { equipmentId: machine.id, taskId: task.id },
+  });
+}
+
 function runExtractorBreakdown(state: GameState): void {
-  if (machinesStopped(state)) return;
+  if (extractorBroken(state)) return;
   if (!chance(state, extractorBreakdownChance(state))) return;
   const extractor = breakExtractor(state);
   if (!extractor) return;
-  const task = ensureTask(state, 'repairExtractor', 'Repair the extractor', extractor.id);
-  const choices = [{ id: 'owner', label: `Fix it yourself, ${task.minutesTotal} min` }];
-  if (joiners(state).length > 0) {
-    choices.push({ id: 'joiner', label: `Send a joiner, ${task.minutesTotal} min` });
+  raiseMachineBroken(state, extractor);
+}
+
+/** A machine wants a service once a month, and one that never gets it gives up (CLAUDE.md T2 3.9). */
+function runServiceDue(state: GameState): void {
+  for (const machine of machinesDueService(state)) {
+    if (machine.broken) continue;
+    const name = findSpec(machine.specId)?.name ?? machine.specId;
+    const open = state.tasks.some(
+      (task) => task.kind === 'service' && task.equipmentId === machine.id && !task.done,
+    );
+    if (open) continue;
+    const task = ensureTask(state, 'service', `Service the ${name.toLowerCase()}`, machine.id);
+    queueEvent(state, {
+      kind: 'serviceDue',
+      title: `Service due: ${name.toLowerCase()}`,
+      body:
+        `It has been ${SERVICE_INTERVAL_DAYS} days. The parts and the oil come to ` +
+        `${formatMoney(serviceCostFor(machine))}. Left alone it will give up in the middle of a ` +
+        'job.',
+      choices: adHocChoices(state, task.minutesTotal, 'Do it yourself'),
+      data: { equipmentId: machine.id, taskId: task.id },
+    });
   }
-  choices.push({ id: 'later', label: 'Leave it' });
-  queueEvent(state, {
-    kind: 'extractorBroken',
-    title: 'The extractor has stopped',
-    body:
-      `Every machine in the hall is dead until it is fixed, and the dust piles up faster. ` +
-      `The parts cost ${formatMoney(EXTRACTOR_REPAIR_COST)}.`,
-    choices,
-    data: { equipmentId: extractor.id, taskId: task.id },
-  });
+}
+
+function runOverdueBreakdowns(state: GameState): void {
+  for (const machine of serviceableMachines(state)) {
+    if (!chance(state, overdueBreakdownChance(state, machine))) continue;
+    const broken = breakMachine(state, machine.id);
+    if (broken) raiseMachineBroken(state, broken);
+  }
 }
 
 /** A dangerous hall hurts somebody sooner or later (CLAUDE.md 9.7). */
@@ -409,7 +467,7 @@ function advanceToNextDay(state: GameState): void {
 /** Finds the open task of this kind for this machine, or puts one on the list. */
 function ensureTask(
   state: GameState,
-  kind: 'cleaning' | 'repairExtractor' | 'bagChange',
+  kind: 'cleaning' | 'repair' | 'service' | 'bagChange',
   label: string,
   equipmentId: string | null,
 ): TaskInstance {
@@ -463,10 +521,28 @@ function applyTaskCompletion(state: GameState, task: TaskInstance): void {
     case 'bookkeeping':
       writeUpBooks(state);
       break;
-    case 'repairExtractor':
-      repairExtractor(state);
-      pay(state, 'repair', 'Extractor repair', EXTRACTOR_REPAIR_COST);
+    case 'repair': {
+      const machine = task.equipmentId
+        ? state.equipment.find((item) => item.id === task.equipmentId)
+        : null;
+      if (machine) {
+        const name = findSpec(machine.specId)?.name ?? machine.specId;
+        pay(state, 'repair', `${name} repair`, repairCostFor(machine));
+        repairMachine(state, machine.id);
+      }
       break;
+    }
+    case 'service': {
+      const machine = task.equipmentId
+        ? state.equipment.find((item) => item.id === task.equipmentId)
+        : null;
+      if (machine) {
+        const name = findSpec(machine.specId)?.name ?? machine.specId;
+        pay(state, 'repair', `${name} service`, serviceCostFor(machine));
+        serviceMachine(state, machine.id);
+      }
+      break;
+    }
     case 'fetchStorage':
       fetchFromStorage(state);
       break;
@@ -548,9 +624,31 @@ function runWorkerTaskMinute(state: GameState, workerId: string, taskId: string)
  *  joiners stand around (CLAUDE.md T2 3.6). */
 function materialReady(state: GameState, job: Job): boolean {
   const ok = drawSheetsFor(state, job, jobProgress(job));
-  job.waitingForMaterial = !ok;
-  if (!ok) raiseNoMaterial(state);
+  if (!ok) {
+    job.blockedBy = 'waiting for material';
+    raiseNoMaterial(state);
+  }
   return ok;
+}
+
+/** Everything in the hall that can stop a job, in the order the player would notice it. Empty
+ *  while the job is free to be worked on (CLAUDE.md T2 3.9). */
+function hallBlock(state: GameState, job: Job): string {
+  if (!job.byHand && !hasExtraction(state)) return 'no extraction';
+  const broken = brokenMachineFor(state, job.materialKind);
+  if (broken && !job.byHand) {
+    return `${(findSpec(broken.specId)?.name ?? 'a machine').toLowerCase()} is broken`;
+  }
+  if (bagBlocked(state, job.materialKind)) return 'bag full';
+  return '';
+}
+
+/** True when the job can be worked on this minute. Writes down why it cannot, either way. */
+function canWorkOn(state: GameState, job: Job): boolean {
+  const block = hallBlock(state, job);
+  job.blockedBy = block;
+  if (block !== '') return false;
+  return materialReady(state, job);
 }
 
 function raiseNoMaterial(state: GameState): void {
@@ -583,17 +681,10 @@ function checkLowStock(state: GameState): void {
 
 function runProductionMinute(state: GameState): void {
   const hall = hallProductivityFactor(state);
-  const stopped = machinesStopped(state);
   let worked = false;
   const materials = new Set<MaterialKind>();
   const atTheBench = state.owner.currentTaskId === null ? ownerJob(state) : null;
-  if (
-    atTheBench &&
-    ownerIsAvailable(state) &&
-    !stopped &&
-    !bagBlocked(state, atTheBench.materialKind) &&
-    materialReady(state, atTheBench)
-  ) {
+  if (atTheBench && ownerIsAvailable(state) && canWorkOn(state, atTheBench)) {
     spendOwnerMinute(state, 'workshop');
     worked = true;
     materials.add(atTheBench.materialKind);
@@ -616,8 +707,7 @@ function runProductionMinute(state: GameState): void {
         worker.jobId = null;
         continue;
       }
-      if (stopped || bagBlocked(state, job.materialKind)) continue;
-      if (!materialReady(state, job)) continue;
+      if (!canWorkOn(state, job)) continue;
       worked = true;
       materials.add(job.materialKind);
       const rate = worker.rate * sawRatioFactor(state, worker);
@@ -746,7 +836,8 @@ function resolveEvent(state: GameState, choiceId: string): void {
       break;
     }
     case 'bagFull':
-    case 'extractorBroken': {
+    case 'serviceDue':
+    case 'machineBroken': {
       const taskId = event.data.taskId;
       const task = typeof taskId === 'string' ? findTask(state, taskId) : null;
       if (task) delegateAdHocTask(state, task, choiceId);
@@ -816,10 +907,20 @@ export function applyAction(state: GameState, action: GameAction): GameState {
       startTask(next, task.id);
       break;
     }
-    case 'REPAIR_EXTRACTOR': {
-      const extractor = next.equipment.find((item) => item.specId === 'extractor');
-      if (extractor && extractor.broken) {
-        const task = ensureTask(next, 'repairExtractor', 'Repair the extractor', extractor.id);
+    case 'REPAIR_MACHINE': {
+      const machine = next.equipment.find((item) => item.id === action.equipmentId);
+      if (machine && machine.broken) {
+        const name = findSpec(machine.specId)?.name ?? machine.specId;
+        const task = ensureTask(next, 'repair', `Repair the ${name.toLowerCase()}`, machine.id);
+        startTask(next, task.id);
+      }
+      break;
+    }
+    case 'SERVICE_MACHINE': {
+      const machine = next.equipment.find((item) => item.id === action.equipmentId);
+      if (machine) {
+        const name = findSpec(machine.specId)?.name ?? machine.specId;
+        const task = ensureTask(next, 'service', `Service the ${name.toLowerCase()}`, machine.id);
         startTask(next, task.id);
       }
       break;
@@ -930,6 +1031,7 @@ export function buyEquipment(state: GameState, specId: string): BuyCheck {
     minutesUsed: 0,
     bagFull: false,
     broken: false,
+    lastServiceDay: state.clock.day,
     purchasePrice: spec.price,
   });
   return OK;

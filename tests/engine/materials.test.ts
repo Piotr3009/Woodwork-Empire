@@ -364,7 +364,7 @@ describe('material coming off the rack as the job is made', () => {
     state.stock.sheets = 2;
     const stalled = tick(state, 3000);
     const job = firstJob(stalled);
-    expect(job.waitingForMaterial).toBe(true);
+    expect(job.blockedBy).toBe('waiting for material');
     expect(stalled.stock.sheets).toBe(0);
     expect(job.sheetsUsed).toBe(2);
     expect(jobProgress(job)).toBeLessThan(0.2);

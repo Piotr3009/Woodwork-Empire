@@ -187,6 +187,7 @@ describe('machine labour reductions', () => {
       minutesUsed: 0,
       bagFull: false,
       broken: false,
+      lastServiceDay: 1,
       purchasePrice: 45000,
     });
     expect(machineLabourFactor(state, 'sheet')).toBeCloseTo(0.8, 10);
@@ -199,6 +200,7 @@ describe('machine labour reductions', () => {
       minutesUsed: 0,
       bagFull: false,
       broken: false,
+      lastServiceDay: 1,
       purchasePrice: 9000,
     });
     expect(machineLabourFactor(state, 'sheet')).toBeCloseTo(0.8 * 0.95, 10);
@@ -432,6 +434,7 @@ describe('machine reductions act on the minutes, every minute', () => {
       minutesUsed: 0,
       bagFull: false,
       broken: false,
+      lastServiceDay: 1,
       purchasePrice: 45000,
     });
     return state;

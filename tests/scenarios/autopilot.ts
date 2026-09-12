@@ -19,7 +19,8 @@ export function answer(state: GameState): string {
 const TASK_ORDER: TaskInstance['kind'][] = [
   'unload',
   'bagChange',
-  'repairExtractor',
+  'repair',
+  'service',
   'fetchStorage',
   'clientCall',
   'emails',
