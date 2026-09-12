@@ -99,11 +99,16 @@ const STAGE_LABELS: Record<Job['stage'], string> = {
 };
 
 /** The accent button of a job card: start the work, or get the finished piece away. */
-function jobAction(job: Job): string {
+function jobAction(state: GameState, job: Job): string {
   if (job.stage === 'awaitingTransport') {
     if (job.deliverOnDay !== null) {
       return reasonLabel(`Booked out, leaves day ${job.deliverOnDay}`);
     }
+    // The van run is a task on somebody's list, so the piece is booked out either way.
+    const inTheVan = state.tasks.some(
+      (task) => task.kind === 'deliver' && task.jobId === job.id && !task.done,
+    );
+    if (inTheVan) return reasonLabel('Booked out, goes in the van');
     return primaryButton('orderTransport', 'Order transport', `data-id="${job.id}"`);
   }
   // Nobody is on it and the material is in the hall: the owner can go and make it.
@@ -116,7 +121,7 @@ function jobAction(job: Job): string {
 function jobRow(state: GameState, job: Job): string {
   const done = Math.round(jobProgress(job) * 100);
   const waiting = job.blockedBy === '' ? '' : ` · ${job.blockedBy}`;
-  const action = jobAction(job);
+  const action = jobAction(state, job);
   return (
     `<div class="row"><span class="row-main">${escapeHtml(job.name)} ${money(job.price)}</span>` +
     `<span class="row-figure">${escapeHtml(STAGE_LABELS[job.stage])} \u00b7 due day ` +
@@ -142,14 +147,17 @@ function gateSection(state: GameState): string {
           `${money(job.price)}</span>` +
           `<span class="row-figure">finished day ${job.finishedDay ?? '?'} \u00b7 due day ` +
           `${job.dueDay}</span>` +
-          `<span class="row-action">${jobAction(job)}</span></div>`,
+          `<span class="row-action">${jobAction(state, job)}</span></div>`,
       )
       .join('')
   );
 }
 
 export function renderLaptop(state: GameState): string {
-  const open = state.tasks.filter((task) => task.category !== 'workshop');
+  // Today's desk: everything still open, and what was finished today. Yesterday's is gone.
+  const open = state.tasks.filter(
+    (task) => task.category !== 'workshop' && (!task.done || task.day === state.clock.day),
+  );
   const design = open.filter((task) => task.kind === 'design');
   const office = open.filter((task) => task.kind !== 'design');
   const workshop = openTasks(state).filter((task) => task.category === 'workshop');

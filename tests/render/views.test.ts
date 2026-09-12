@@ -107,6 +107,10 @@ describe('the hall on day 1', () => {
     const svg = renderHall(state);
     expect(svg).toContain('data-van="del-1"');
     expect(svg).toContain('Delivery: 4 sheets');
+    // One of anything is never printed as one of many (CLAUDE.md T2 3.11).
+    const single = state.deliveries[0];
+    if (single) single.sheets = 1;
+    expect(renderHall(state)).toContain('Delivery: 1 sheet<');
   });
 
   it('stands the finished pieces on the apron beside the gate, with the count', () => {

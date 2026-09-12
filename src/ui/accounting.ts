@@ -13,11 +13,41 @@ import {
   visibleTotals,
   weeklyWageBill,
 } from '../engine/index';
-import type { GameState, PeriodTotals } from '../engine/index';
+import type { GameState, LedgerCategory, PeriodTotals } from '../engine/index';
 import { button, escapeHtml, money, plural, primaryButton, whyLink } from './modal';
 
+/** Plain English for every ledger category. The engine's own key is never printed (CLAUDE.md 3). */
+const CATEGORY_LABELS: Record<LedgerCategory, string> = {
+  rent: 'Rent',
+  rates: 'Business rates',
+  power: 'Power',
+  living: 'Living costs',
+  wages: 'Wages',
+  salaries: 'Salaries',
+  software: 'Software',
+  waste: 'Waste collection',
+  equipment: 'Equipment',
+  material: 'Material',
+  unitDeposit: 'Deposit on the unit',
+  jobDeposit: 'Deposits from clients',
+  jobBalance: 'Balances from clients',
+  interest: 'Interest',
+  repair: 'Repairs and service',
+  storage: 'Storage',
+  taxi: 'Taxis',
+  transport: 'Transport',
+  accounts: 'Late accounts',
+  pellets: 'Pellets sold',
+  arrears: 'Arrears',
+  seizure: 'Seized by the bailiff',
+};
+
+function categoryLabel(category: string): string {
+  return CATEGORY_LABELS[category as LedgerCategory] ?? category;
+}
+
 /** The ledger categories that carry a real life note (CLAUDE.md T2 3.12). */
-const WHY_BY_CATEGORY: Record<string, string> = {
+const WHY_BY_CATEGORY: Partial<Record<LedgerCategory, string>> = {
   unitDeposit: 'unitDeposit',
   rent: 'rent',
   rates: 'rates',
@@ -36,8 +66,8 @@ function totalsBlock(state: GameState, title: string, totals: PeriodTotals): str
     .sort((left, right) => left[1] - right[1])
     .map(
       ([category, amount]) =>
-        `<div class="row"><span class="row-main">${escapeHtml(category)}` +
-        `${whyLink(state, WHY_BY_CATEGORY[category] ?? '')}</span>` +
+        `<div class="row"><span class="row-main">${escapeHtml(categoryLabel(category))}` +
+        `${whyLink(state, WHY_BY_CATEGORY[category as LedgerCategory] ?? '')}</span>` +
         `<span class="row-figure ${amount < 0 ? 'bad' : 'good'}">${money(amount)}</span></div>`,
     )
     .join('');

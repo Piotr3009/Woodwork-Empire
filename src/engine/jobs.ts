@@ -381,25 +381,14 @@ export function addLabour(state: GameState, job: Job, labour: number): boolean {
 }
 
 /** The piece is made. It stands in front of the gate until somebody takes it to the client, and
- *  nothing is paid until it gets there (CLAUDE.md T2 3.7). */
+ *  nothing is paid until it gets there (CLAUDE.md T2 3.7). Who takes it there is a decision, so
+ *  the event that asks is raised by game.ts, the only module that can send a man. */
 export function completeJob(state: GameState, job: Job): void {
   releaseJob(state, job);
   job.assignedTo = null;
   job.stage = 'awaitingTransport';
   job.finishedDay = state.clock.day;
   state.dayStats.jobsCompleted.push(job.id);
-  queueEvent(state, {
-    kind: 'jobAtGate',
-    title: `${job.name} is finished`,
-    body:
-      'It is standing in front of the gate. The balance is paid when the client has it. ' +
-      `${transportLabel(state)}.`,
-    choices: [
-      { id: 'transport', label: transportLabel(state) },
-      { id: 'later', label: 'Leave it at the gate' },
-    ],
-    data: { jobId: job.id },
-  });
 }
 
 /** Everything made and not yet taken away. */

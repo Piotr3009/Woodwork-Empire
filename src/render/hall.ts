@@ -30,6 +30,7 @@ import {
   stationMachine,
 } from '../engine/stations';
 import { ownerIsAvailable, staffOutputFactor } from '../engine/owner';
+import { plural } from '../engine/text';
 import type { GameState } from '../engine/types';
 import {
   type BoxFaces,
@@ -337,7 +338,7 @@ export function renderHall(state: GameState, ghost: Ghost | null = null): string
         box(faces, 'var(--kit-vehicle)', 'var(--kit-vehicle-dark)') +
         label(
           centreOf(gateX, gate.y, gate.width, gate.depth, gate.height),
-          `Delivery: ${waiting.sheets} sheets`,
+          `Delivery: ${plural(waiting.sheets, 'sheet', 'sheets')}`,
         ) +
         '</g>',
     });

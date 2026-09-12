@@ -3,7 +3,7 @@
 import { MINUTES_PER_WORKING_DAY } from '../engine/constants';
 import { deliveriesArrivingOn, dustBand, findJob, formatReputation, netOf } from '../engine/index';
 import type { GameState } from '../engine/index';
-import { days, escapeHtml, minutes, money } from './modal';
+import { days, escapeHtml, minutes, money, plural } from './modal';
 
 export function renderDayEnd(state: GameState): string {
   const used = state.owner.minutesByCategory;
@@ -13,7 +13,7 @@ export function renderDayEnd(state: GameState): string {
     .join(', ');
   const advanced = state.dayStats.jobsAdvanced.length;
   const tomorrow = deliveriesArrivingOn(state, state.clock.day + 1)
-    .map((delivery) => `${delivery.sheets} sheets`)
+    .map((delivery) => plural(delivery.sheets, 'sheet', 'sheets'))
     .join(', ');
   const net = netOf(state.finance.day);
   return (

@@ -28,6 +28,15 @@ function html(): string {
   return root().innerHTML;
 }
 
+/** Answers whatever the engine is asking with the first choice, the way a player clicks on. */
+function dismissEvents(): void {
+  let guard = 0;
+  while (root().querySelector('[data-do="resolveEvent"]') !== null && guard < 50) {
+    click('[data-do="resolveEvent"]');
+    guard += 1;
+  }
+}
+
 beforeAll(() => {
   document.body.innerHTML = '<div id="app"></div>';
   mount(root());
@@ -123,6 +132,10 @@ describe('the first ten minutes', () => {
     expect(html()).toContain('Jobs finished');
     click('[data-do="resolveEvent"][data-id="next"]');
     expect(currentState()?.clock.day).toBe(2);
+    // Day 2 opens with the rack alarm: nothing has been ordered yet (CLAUDE.md T2 3.6).
+    expect(html()).toContain('The rack is nearly empty');
+    dismissEvents();
+    expect(currentState()?.activeEvent).toBeNull();
   });
 
   it('8. shows the hall with the kit, the owner and the rooms', () => {
@@ -391,6 +404,45 @@ describe('accounting', () => {
     expect(currentState()?.finance.arrearsAmount).toBe(0);
     expect(html()).not.toContain('data-do="payArrears"');
     click('[data-do="closeModal"]');
+  });
+
+  it('names every line in plain English, never the engine key', () => {
+    click('[data-office="accounting"]');
+    expect(html()).toContain('Business rates');
+    expect(html()).toContain('Living costs');
+    expect(html()).toContain('Deposit on the unit');
+    expect(html()).not.toContain('row-main">living');
+    expect(html()).not.toContain('row-main">unitDeposit');
+    expect(html()).not.toContain('row-main">jobDeposit');
+    click('[data-do="closeModal"]');
+  });
+
+  it('leaves a question open when the cross belongs to a desk modal', () => {
+    click('[data-office="accounting"]');
+    const state = currentState();
+    if (state) {
+      state.activeEvent = {
+        id: 'event-test',
+        kind: 'jobOverdue',
+        title: 'Something wants an answer',
+        body: 'It is still there when the accounting is shut.',
+        choices: [{ id: 'ok', label: 'Right' }],
+        data: {},
+        day: state.clock.day,
+        minute: state.clock.minute,
+      };
+    }
+    // Any click rebuilds the view, which is where the event modal comes from.
+    click('[data-do="toggleMenu"]');
+    click('[data-do="toggleMenu"]');
+    expect(html()).toContain('Something wants an answer');
+    // The first cross in the page is the accounting one. It shuts the accounting, nothing else.
+    click('[data-do="closeModal"]');
+    expect(currentState()?.activeEvent).not.toBeNull();
+    expect(html()).toContain('Something wants an answer');
+    expect(html()).not.toContain('data-modal="accounting"');
+    dismissEvents();
+    expect(currentState()?.activeEvent).toBeNull();
   });
 });
 

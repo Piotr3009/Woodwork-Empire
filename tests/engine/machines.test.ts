@@ -554,10 +554,13 @@ describe('the monthly service', () => {
     let broken = 0;
     for (const seed of [1, 2, 3, 4]) {
       const state = atTheBench({ seed });
-      // No dust, so the extractor is not the one giving up.
+      // The extractor gives up on dust, not on a service it never had: it is not counted here.
+      const machines = new Set(
+        state.equipment.filter((item) => item.specId !== 'extractor').map((item) => item.id),
+      );
       broken += runToDay(state, 120)
         .events.filter((event) => event.kind === 'machineBroken')
-        .filter((event) => event.data.equipmentId !== undefined).length;
+        .filter((event) => machines.has(String(event.data.equipmentId))).length;
     }
     expect(broken).toBeGreaterThanOrEqual(1);
   });

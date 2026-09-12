@@ -194,7 +194,8 @@ export const PROFIT_FRACTION = 0.2;
 export const STOCK_MATERIAL_FRACTION = 0.34;
 /** Deposit on acceptance, balance on delivery (PIOTR). */
 export const DEPOSIT_FRACTION = 0.5;
-/** A finished piece stands at the gate until it is taken to the client (PIOTR). */
+/** A finished piece stands at the gate until it is taken to the client (PIOTR). The courier bill
+ *  and the minutes the van costs somebody are both [TUNE]. */
 export const COURIER_COST = 120;
 export const OWN_DELIVERY_MINUTES = 90;
 /** More than three pieces at the gate and the hall is in its own way (PIOTR: 30% slower). */

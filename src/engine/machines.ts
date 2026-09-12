@@ -59,10 +59,11 @@ export function poweredMachines(state: GameState): Equipment[] {
   });
 }
 
-/** What the bailiff can take: machines and extraction kit, cheapest first (CLAUDE.md T2 3.4).
- *  Everything slows down, but the company is not finished off in one visit. */
+/** What the bailiff can take: machines, cheapest first (CLAUDE.md T2 3.4). The extraction kit is
+ *  left where it is, because taking it would stop the hall dead instead of slowing it. */
 export function seizableMachines(state: GameState): Equipment[] {
-  return poweredMachines(state)
+  return state.equipment
+    .filter((item) => findSpec(item.specId)?.category === 'machine')
     .slice()
     .sort((left, right) => left.purchasePrice - right.purchasePrice);
 }
@@ -272,12 +273,12 @@ export function repairMachine(state: GameState, equipmentId: string): Equipment 
   return item;
 }
 
-/** The service is done: the clock on the next one starts again. */
+/** The service is done: the clock on the next one starts again. A service is not a repair, so a
+ *  machine that has already given up stays broken until somebody repairs it. */
 export function serviceMachine(state: GameState, equipmentId: string): Equipment | null {
   const item = state.equipment.find((entry) => entry.id === equipmentId);
   if (!item) return null;
   item.lastServiceDay = state.clock.day;
-  item.broken = false;
   return item;
 }
 

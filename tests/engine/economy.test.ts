@@ -37,6 +37,7 @@ import {
 } from '../../src/engine/economy';
 import { applyAction, tick } from '../../src/engine/index';
 import type { GameState, Worker } from '../../src/engine/index';
+import { createTask } from '../../src/engine/tasks';
 import {
   act,
   clearEvents,
@@ -157,7 +158,9 @@ describe('weekly and monthly cadences', () => {
     const oneOff = act(subscription, { type: 'BUY_SOFTWARE', mode: 'oneOff' });
     expect(oneOff.software.jobsRemaining).toBe(30);
     const oneOffNextMonth = runToDay(oneOff, 31).state;
-    expect(SOFTWARE_ONE_OFF_PRICE).toBe(SOFTWARE_SUBSCRIPTION_MONTHLY * 24);
+    // The law of CLAUDE.md T2 3.4: 150 a month, and the one off is two years of it.
+    expect(SOFTWARE_SUBSCRIPTION_MONTHLY).toBe(150);
+    expect(SOFTWARE_ONE_OFF_PRICE).toBe(3600);
     expect(ledgerFor(oneOffNextMonth, 'software')).toBe(-SOFTWARE_ONE_OFF_PRICE);
   });
 
@@ -273,6 +276,26 @@ describe('arrears, bailiff and bankruptcy', () => {
     runBailiff(copy);
     expect(copy.equipment.map((item) => item.specId)).toEqual(['thicknesser']);
     expect(copy.finance.arrearsAmount).toBe(5000 - 1800 * BAILIFF_SEIZURE_FRACTION);
+  });
+
+  it('takes the seized machine off everybody who was working on it', () => {
+    const withKit = act(newGame(), { type: 'BUY_EQUIPMENT', specId: 'tableSaw' });
+    const saw = withKit.equipment[0];
+    const service = createTask(withKit, {
+      kind: 'service',
+      label: 'Service the table saw',
+      minutes: 30,
+      equipmentId: saw?.id ?? null,
+    });
+    withKit.owner.currentTaskId = service.id;
+    service.doneBy = 'owner';
+    withKit.finance.arrearsAmount = 500;
+    withKit.finance.arrearsMonths = 3;
+    withKit.finance.firstArrearsDay = 1;
+    runBailiff(withKit);
+    // There is nothing left to service, so the job of work goes with the machine.
+    expect(withKit.tasks.some((task) => task.id === service.id)).toBe(false);
+    expect(withKit.owner.currentTaskId).toBeNull();
   });
 
   it('clears the arrears when the seizure covers them', () => {

@@ -81,6 +81,7 @@ import {
   releaseJob,
   runBookedTransport,
   setMaterialMode,
+  transportLabel,
 } from './jobs';
 import {
   arriveDeliveries,
@@ -308,13 +309,22 @@ function startDay(state: GameState): void {
   queueDeliveryEvents(state, arriving);
 }
 
-/** Who can be sent at a job of work, as choices on the event that raised it. */
-function adHocChoices(state: GameState, minutesTotal: number, ownerLabel: string): GameEventChoice[] {
-  const choices = [{ id: 'owner', label: `${ownerLabel}, ${minutesTotal} min` }];
-  if (joiners(state).length > 0) {
+/** Who can be sent at a job of work, as choices on the event that raised it. Nobody who is not
+ *  in the hall today is offered: the choice would do nothing (CLAUDE.md T2 3.8). */
+function adHocChoices(
+  state: GameState,
+  minutesTotal: number,
+  ownerLabel: string,
+  leaveLabel = 'Leave it',
+): GameEventChoice[] {
+  const choices: GameEventChoice[] = [];
+  if (ownerIsAvailable(state) && ownerMinutesLeft(state) > 0) {
+    choices.push({ id: 'owner', label: `${ownerLabel}, ${minutesTotal} min` });
+  }
+  if (joiners(state).some((worker) => isWorkingToday(state, worker))) {
     choices.push({ id: 'joiner', label: `Send a joiner, ${minutesTotal} min` });
   }
-  choices.push({ id: 'later', label: 'Leave it' });
+  choices.push({ id: 'later', label: leaveLabel });
   return choices;
 }
 
@@ -433,6 +443,9 @@ function queueDeliveryEvents(state: GameState, arriving: Delivery[]): void {
 
 /** Ends the working day and opens the summary. The player clicks on to the next day. */
 function finishDay(state: GameState): void {
+  const ending =
+    state.activeEvent?.kind === 'dayEnd' || state.eventQueue.some((event) => event.kind === 'dayEnd');
+  if (ending) return;
   pauseOwnerTask(state);
   setTomorrowFatigue(state);
   state.owner.wentHome = true;
@@ -498,7 +511,8 @@ function delegateAdHocTask(state: GameState, task: TaskInstance, choiceId: strin
     return;
   }
   if (choiceId === 'joiner') {
-    const joiner = availableJoiners(state)[0] ?? joiners(state)[0];
+    const joiner =
+      availableJoiners(state)[0] ?? joiners(state).find((entry) => isWorkingToday(state, entry));
     if (joiner) assignWorkerTask(state, joiner.id, task.id);
   }
 }
@@ -719,11 +733,11 @@ function checkLowStock(state: GameState): void {
   });
 }
 
-function runProductionMinute(state: GameState): void {
+function runProductionMinute(state: GameState, ownerOnTask: boolean): void {
   const hall = hallProductivityFactor(state);
   let worked = false;
   const materials = new Set<MaterialKind>();
-  const atTheBench = state.owner.currentTaskId === null ? ownerJob(state) : null;
+  const atTheBench = !ownerOnTask && state.owner.currentTaskId === null ? ownerJob(state) : null;
   if (atTheBench && ownerIsAvailable(state) && canWorkOn(state, atTheBench)) {
     spendOwnerMinute(state, 'workshop');
     state.owner.productionMinutes += 1;
@@ -731,7 +745,7 @@ function runProductionMinute(state: GameState): void {
     materials.add(atTheBench.materialKind);
     const minute = (OWNER_LABOUR_PER_MINUTE * ownerEfficiency(state) * hall) /
       jobSpeedFactor(state, atTheBench);
-    addLabour(state, atTheBench, minute);
+    if (addLabour(state, atTheBench, minute)) raiseJobAtGate(state, atTheBench);
   }
   // Staff work the normal day only: nobody but the owner does overtime.
   if (!isOvertime(state.clock.minute)) {
@@ -755,7 +769,7 @@ function runProductionMinute(state: GameState): void {
       const rate = worker.rate * sawRatioFactor(state, worker);
       const minute = (OWNER_LABOUR_PER_MINUTE * rate * hall * staffFactor) /
         jobSpeedFactor(state, job);
-      addLabour(state, job, minute);
+      if (addLabour(state, job, minute)) raiseJobAtGate(state, job);
     }
   }
   if (!worked) return;
@@ -764,6 +778,26 @@ function runProductionMinute(state: GameState): void {
   for (const material of materials) {
     for (const machine of accumulateBagMinutes(state, material)) raiseBagFull(state, machine);
   }
+}
+
+/** The piece is made and standing in front of the gate. Nothing is paid until the client has it,
+ *  so the only question is who takes it there (CLAUDE.md T2 3.7). */
+function raiseJobAtGate(state: GameState, job: Job): void {
+  const choices = has(state, 'van')
+    ? adHocChoices(state, AD_HOC_TASK_MINUTES.deliver, 'Take it in the van', 'Leave it at the gate')
+    : [
+        { id: 'transport', label: transportLabel(state) },
+        { id: 'later', label: 'Leave it at the gate' },
+      ];
+  queueEvent(state, {
+    kind: 'jobAtGate',
+    title: `${job.name} is finished`,
+    body:
+      'It is standing in front of the gate. The balance is paid when the client has it. ' +
+      `${transportLabel(state)}.`,
+    choices,
+    data: { jobId: job.id },
+  });
 }
 
 /** Sheets that do not fit on the rack: leave them out and lose them, or pay to store them
@@ -794,29 +828,26 @@ function raiseBagFull(state: GameState, machine: Equipment): void {
     delegateTasks(state);
     return;
   }
-  const choices = [];
-  if (ownerIsAvailable(state) && ownerMinutesLeft(state) > 0) {
-    choices.push({ id: 'owner', label: `Change it yourself, ${task.minutesTotal} min` });
-  }
-  if (joiners(state).length > 0) {
-    choices.push({
-      id: 'joiner',
-      label: `Send a joiner, ${task.minutesTotal} min off his bench`,
-    });
-  }
-  choices.push({ id: 'later', label: 'Leave the machine stopped' });
   queueEvent(state, {
     kind: 'bagFull',
     title: `Bag full: ${name.toLowerCase()}`,
     body: 'The machine has stopped. Nothing of this kind gets made until the bag is changed.',
-    choices,
+    choices: adHocChoices(
+      state,
+      task.minutesTotal,
+      'Change it yourself',
+      'Leave the machine stopped',
+    ),
     data: { equipmentId: machine.id, taskId: task.id },
   });
 }
 
 function advanceMinute(state: GameState): void {
+  // He cannot be on the laptop and at the bench in the same minute, so a task that finishes this
+  // minute keeps him off production until the next one.
+  const onTask = state.owner.currentTaskId !== null;
   runMinute(state);
-  runProductionMinute(state);
+  runProductionMinute(state, onTask);
   state.clock.minute += 1;
   if (shouldFinishDay(state)) finishDay(state);
   settle(state);
@@ -867,14 +898,13 @@ function resolveEvent(state: GameState, choiceId: string): void {
     }
     case 'jobAtGate': {
       const jobId = event.data.jobId;
-      if (choiceId === 'transport' && typeof jobId === 'string') {
-        if (orderTransport(state, jobId)) {
-          const task = state.tasks.find(
-            (entry) => entry.kind === 'deliver' && entry.jobId === jobId && !entry.done,
-          );
-          if (task) startTask(state, task.id);
-        }
-      }
+      if (choiceId === 'later' || typeof jobId !== 'string') break;
+      if (!orderTransport(state, jobId)) break;
+      // The courier needs nobody. The van run is a task, and the choice says whose minutes it costs.
+      const task = state.tasks.find(
+        (entry) => entry.kind === 'deliver' && entry.jobId === jobId && !entry.done,
+      );
+      if (task) delegateAdHocTask(state, task, choiceId);
       break;
     }
     case 'bagFull':
@@ -989,11 +1019,13 @@ export function applyAction(state: GameState, action: GameAction): GameState {
       moveItem(next, action.itemId, action.x, action.y);
       break;
     case 'ORDER_TRANSPORT': {
-      if (orderTransport(next, action.jobId)) {
-        const task = next.tasks.find(
-          (entry) => entry.kind === 'deliver' && entry.jobId === action.jobId && !entry.done,
-        );
-        if (task) startTask(next, task.id);
+      const job = findJob(next, action.jobId);
+      if (!job || job.stage !== 'awaitingTransport' || job.deliverOnDay !== null) break;
+      if (has(next, 'van')) {
+        // Who drives it is a decision, and the event is where decisions are made.
+        raiseJobAtGate(next, job);
+      } else {
+        orderTransport(next, job.id);
       }
       break;
     }

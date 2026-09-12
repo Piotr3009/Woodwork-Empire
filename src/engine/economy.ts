@@ -326,6 +326,17 @@ export function runBailiff(state: GameState): void {
   }
   const credit = target.purchasePrice * BAILIFF_SEIZURE_FRACTION;
   state.equipment = state.equipment.filter((item) => item.id !== target.id);
+  // Nobody can service or repair a machine that is on the back of a lorry.
+  const orphaned = new Set(
+    state.tasks.filter((task) => task.equipmentId === target.id && !task.done).map((task) => task.id),
+  );
+  state.tasks = state.tasks.filter((task) => !orphaned.has(task.id));
+  if (state.owner.currentTaskId !== null && orphaned.has(state.owner.currentTaskId)) {
+    state.owner.currentTaskId = null;
+  }
+  for (const worker of state.workers) {
+    if (worker.taskId !== null && orphaned.has(worker.taskId)) worker.taskId = null;
+  }
   state.finance.arrearsAmount -= credit;
   addLedger(state, 'seizure', `Seized ${target.specId}, credited against arrears`, credit, true);
   if (state.finance.arrearsAmount <= 0) {

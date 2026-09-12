@@ -16,6 +16,7 @@ import { canAfford, chargeUnavoidable, noteLoss, pay } from './economy';
 import { findSpec } from './machines';
 import { makeId } from './rng';
 import { createTask, unloadMinutes } from './tasks';
+import { plural } from './text';
 import type { Delivery, GameState, Job, MaterialMode } from './types';
 
 /** Sheets a job needs: one sheet is 200 of material value (PIOTR). */
@@ -134,7 +135,7 @@ export function arriveDeliveries(state: GameState): Delivery[] {
     delivery.arrived = true;
     createTask(state, {
       kind: 'unload',
-      label: `Unload ${delivery.sheets} sheets`,
+      label: `Unload ${plural(delivery.sheets, 'sheet', 'sheets')}`,
       minutes: unloadMinutes(state),
       deliveryId: delivery.id,
       jobId: delivery.jobId,

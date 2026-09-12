@@ -268,16 +268,17 @@ export function startTask(state: GameState, taskId: string): boolean {
   const task = findTask(state, taskId);
   if (!task || task.done) return false;
   if (!ownerIsAvailable(state)) return false;
-  // The owner can take anything off a member of staff: the work he did on it stays done.
-  for (const worker of state.workers) {
-    if (worker.taskId === task.id) worker.taskId = null;
-  }
   // One thing at a time: the current task has to be finished or paused first (CLAUDE.md 10.1).
   if (state.owner.currentTaskId !== null && state.owner.currentTaskId !== task.id) return false;
   // No drawing without a licence for the software (CLAUDE.md 9.2).
   if (task.kind === 'design' && !softwareActive(state)) return false;
   // Nothing comes off the lorry until there is shelving to put it on (CLAUDE.md T2 3.6).
   if (task.kind === 'unload' && !canUnload(state)) return false;
+  // Every refusal is behind us, so it is safe to take the task off whoever was holding it. The
+  // work he did on it stays done.
+  for (const worker of state.workers) {
+    if (worker.taskId === task.id) worker.taskId = null;
+  }
   state.owner.currentTaskId = task.id;
   task.doneBy = 'owner';
   return true;
@@ -320,6 +321,11 @@ export function assignWorkerTask(state: GameState, workerId: string, taskId: str
   const worker = state.workers.find((entry) => entry.id === workerId);
   const task = findTask(state, taskId);
   if (!worker || !task || task.done) return false;
+  // One man on a task: the owner comes off it the moment somebody else is sent.
+  if (state.owner.currentTaskId === task.id) state.owner.currentTaskId = null;
+  for (const other of state.workers) {
+    if (other.id !== worker.id && other.taskId === task.id) other.taskId = null;
+  }
   worker.taskId = task.id;
   task.doneBy = worker.id;
   return true;

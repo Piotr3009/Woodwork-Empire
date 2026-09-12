@@ -1,14 +1,28 @@
 import { describe, expect, it } from 'vitest';
 import { applyAction, createGame, gameMinutesPerRealSecond, runMinutes, tick } from '../../src/engine/index';
+import { missingForHire } from '../../src/engine/staff';
 import type { GameState } from '../../src/engine/index';
 import {
   DAYS_PER_MONTH,
   LIVING_COST_PER_WORKING_DAY,
+  MINUTES_PER_WORKING_DAY,
   POWER_BASE_DAILY,
   unitDepositFor,
 } from '../../src/engine/constants';
 import { createTask } from '../../src/engine/tasks';
-import { DEFAULT_OPTIONS as OPTIONS, clearEvents, nextDay, withLicence } from '../helpers';
+import {
+  DEFAULT_OPTIONS as OPTIONS,
+  act,
+  buyStartingKit,
+  choose,
+  clearEvents,
+  fillRack,
+  firstJob,
+  newGame,
+  nextDay,
+  placeEnquiry,
+  withLicence,
+} from '../helpers';
 
 /** What day 1 takes out before the player does anything: deposit, rent, rates, power, living. */
 function dayOneCosts(rentMonthly: number, ratesMonthly: number): number {
@@ -245,5 +259,79 @@ describe('determinism', () => {
     const right = createGame({ ...OPTIONS, seed: 2 });
     expect(left.seed).not.toBe(right.seed);
     expect(left.rng).not.toBe(right.rng);
+  });
+});
+
+describe('the minute the owner spends', () => {
+  /** The day 1 kit, a job at the bench and the owner standing at it. */
+  function atTheBench(): GameState {
+    let state = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
+    state.enquiries = [];
+    const enquiry = placeEnquiry(state, { price: 4000, deadlineDays: 90 });
+    state = fillRack(act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false }));
+    firstJob(state).stage = 'ready';
+    return clearEvents(act(state, { type: 'WORK_HERE', jobId: null }));
+  }
+
+  it('goes on the task or on the bench, never on both in the same minute', () => {
+    let state = atTheBench();
+    const task = createTask(state, { kind: 'emails', label: 'An email', minutes: 3 });
+    state = clearEvents(applyAction(state, { type: 'START_TASK', taskId: task.id }));
+    state = clearEvents(tick(state, 3));
+    // The third minute is the one that finishes the email. It is not also a minute at the bench.
+    expect(state.owner.minutesWorked).toBe(3);
+    expect(state.owner.minutesByCategory.admin).toBe(3);
+    expect(state.owner.minutesByCategory.workshop).toBe(0);
+    // From the next minute he is back on the job.
+    state = clearEvents(tick(state, 1));
+    expect(state.owner.minutesWorked).toBe(4);
+    expect(state.owner.minutesByCategory.workshop).toBe(1);
+  });
+});
+
+describe('ending the day', () => {
+  it('ends it once however many times the button is pressed', () => {
+    const state = clearEvents(createGame(OPTIONS));
+    state.clock.minute = MINUTES_PER_WORKING_DAY;
+    const once = applyAction(state, { type: 'END_DAY' });
+    expect(once.activeEvent?.kind).toBe('dayEnd');
+    const twice = applyAction(once, { type: 'END_DAY' });
+    expect(twice.eventQueue.filter((event) => event.kind === 'dayEnd')).toHaveLength(0);
+    expect(clearEvents(choose(twice, 'next')).clock.day).toBe(2);
+  });
+});
+
+describe('who can be sent at a job of work', () => {
+  it('never offers a man who is not in the hall today', () => {
+    let state = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
+    for (const specId of missingForHire(state, 'joiner')) {
+      state = act(state, { type: 'BUY_EQUIPMENT', specId });
+    }
+    state = clearEvents(act(state, { type: 'HIRE', role: 'joiner', tier: 'poor' }));
+    expect(state.workers).toHaveLength(1);
+    // He does not start for a few days yet, so sending him would do nothing at all.
+    const saw = state.equipment.find((item) => item.specId === 'tableSaw');
+    if (saw) saw.bagFull = true;
+    const sawId = saw?.id ?? '';
+    const ids = (next: GameState): string[] =>
+      (next.activeEvent?.choices ?? []).map((choice) => choice.id);
+    // He does not start for a few days yet, so sending him would do nothing at all.
+    expect(ids(act(state, { type: 'ASK_BAG_CHANGE', equipmentId: sawId }))).toEqual([
+      'owner',
+      'later',
+    ]);
+    const joiner = state.workers[0];
+    if (joiner) joiner.startDay = state.clock.day;
+    expect(ids(act(state, { type: 'ASK_BAG_CHANGE', equipmentId: sawId }))).toEqual([
+      'owner',
+      'joiner',
+      'later',
+    ]);
+    // Hurt in the hall and off for three days: he is not offered again either.
+    if (joiner) joiner.absentDaysRemaining = 3;
+    expect(ids(act(state, { type: 'ASK_BAG_CHANGE', equipmentId: sawId }))).toEqual([
+      'owner',
+      'later',
+    ]);
   });
 });

@@ -230,7 +230,8 @@ function renderWhy(): string {
   if (open === null) return '';
   const text = WHY[open.key];
   if (text === undefined) return '';
-  const left = Math.max(8, Math.min(open.left, 1280 - 340));
+  const width = typeof window === 'undefined' ? 1280 : window.innerWidth;
+  const left = Math.max(8, Math.min(open.left, Math.max(8, width - 340)));
   return (
     `<div class="why-pop" style="left:${left}px;top:${open.top + 16}px">` +
     `<p>${escapeHtml(text)}</p>` +
@@ -319,35 +320,82 @@ function restoreFocus(memory: FocusMemory | null): void {
   }
 }
 
-/** Where every figure was standing before this render, by its key. */
-function figurePositions(): Map<string, string> {
-  const positions = new Map<string, string>();
-  if (!root) return positions;
-  for (const node of Array.from(root.querySelectorAll('[data-figure]'))) {
-    const key = node.getAttribute('data-figure');
-    const transform = node.getAttribute('transform');
-    if (key !== null && transform !== null) positions.set(key, transform);
-  }
-  return positions;
+/** How long a figure takes to walk from one station to the next [TUNE]. */
+const FIGURE_SLIDE_MS = 800;
+
+interface Point {
+  x: number;
+  y: number;
 }
 
-/** The view is rebuilt from the state every frame, so a figure that moved would jump. It is put
- *  back where it was and moved on the next frame, which is what the CSS transition needs. */
-function slideFigures(before: Map<string, string>): void {
-  if (!root || before.size === 0) return;
-  const moving: Array<{ node: Element; to: string }> = [];
+/** Who is walking where, and when he set off. The view is rebuilt from the state many times a
+ *  second, so the walk has to be remembered here or it would start again from nothing on every
+ *  rebuild and never finish (CLAUDE.md T2 3.3). */
+const slides = new Map<string, { from: Point; to: Point; startedAt: number }>();
+
+function translateOf(point: Point): string {
+  return `translate(${Math.round(point.x)},${Math.round(point.y)})`;
+}
+
+function pointOf(transform: string): Point | null {
+  const found = /translate\(\s*(-?[\d.]+)[\s,]+(-?[\d.]+)\s*\)/.exec(transform);
+  const x = Number(found?.[1]);
+  const y = Number(found?.[2]);
+  if (found === null || Number.isNaN(x) || Number.isNaN(y)) return null;
+  return { x, y };
+}
+
+/** How far along the walk he is now. */
+function positionAt(slide: { from: Point; to: Point; startedAt: number }, now: number): Point {
+  const part = Math.min(1, Math.max(0, (now - slide.startedAt) / FIGURE_SLIDE_MS));
+  return {
+    x: slide.from.x + (slide.to.x - slide.from.x) * part,
+    y: slide.from.y + (slide.to.y - slide.from.y) * part,
+  };
+}
+
+function nowMs(): number {
+  return typeof performance === 'undefined' ? 0 : performance.now();
+}
+
+/** Puts every figure back where he had actually got to, and lets the browser carry him the rest
+ *  of the way in what is left of the 0.8 s. */
+function slideFigures(now: number): void {
+  if (!root) return;
+  const moving: Array<{ node: Element; to: Point }> = [];
+  const seen = new Set<string>();
   for (const node of Array.from(root.querySelectorAll('[data-figure]'))) {
     const key = node.getAttribute('data-figure');
-    const to = node.getAttribute('transform');
+    const to = pointOf(node.getAttribute('transform') ?? '');
     if (key === null || to === null) continue;
-    const from = before.get(key);
-    if (from === undefined || from === to) continue;
-    node.setAttribute('transform', from);
+    seen.add(key);
+    const walking = slides.get(key);
+    if (walking === undefined) {
+      // First sight of him: he is where he is, and nothing is left to walk.
+      slides.set(key, { from: to, to, startedAt: now - FIGURE_SLIDE_MS });
+      continue;
+    }
+    const at = positionAt(walking, now);
+    if (walking.to.x !== to.x || walking.to.y !== to.y) {
+      // He has been sent somewhere else, and he sets off from wherever he had got to.
+      slides.set(key, { from: at, to, startedAt: now });
+    } else if (at.x === to.x && at.y === to.y) {
+      continue;
+    }
+    const started = slides.get(key)?.startedAt ?? now;
+    const left = Math.max(0, FIGURE_SLIDE_MS - (now - started));
+    if (node instanceof SVGElement || node instanceof HTMLElement) {
+      node.style.transitionDuration = `${Math.round(left)}ms`;
+    }
+    node.setAttribute('transform', translateOf(at));
     moving.push({ node, to });
+  }
+  for (const key of Array.from(slides.keys())) {
+    if (!seen.has(key)) slides.delete(key);
   }
   if (moving.length === 0) return;
   const step = (): void => {
-    for (const entry of moving) entry.node.setAttribute('transform', entry.to);
+    for (const entry of moving) entry.node.setAttribute('transform', translateOf(entry.to));
   };
   if (typeof requestAnimationFrame === 'function') {
     requestAnimationFrame(step);
@@ -360,9 +408,8 @@ export function render(): void {
   if (!root) return;
   const memory = ui.focusNext === null ? captureFocus() : { key: ui.focusNext, start: null };
   ui.focusNext = null;
-  const before = figurePositions();
   root.innerHTML = screenHtml();
-  slideFigures(before);
+  slideFigures(nowMs());
   restoreFocus(memory);
 }
 
@@ -459,7 +506,6 @@ function handleAction(element: DataElement, point: { x: number; y: number }): vo
       return;
     case 'endSetup':
       endSetup();
-      dispatch({ type: 'SET_SPEED', speed: ui.speedBeforeSetup });
       return;
     case 'toggleMenu':
       ui.menuOpen = !ui.menuOpen;
@@ -482,15 +528,20 @@ function handleAction(element: DataElement, point: { x: number; y: number }): vo
     case 'openModal':
       openModal((element.dataset.modal ?? 'board') as ModalId, null);
       break;
-    case 'closeModal':
-      if (game().activeEvent && game().activeEvent?.choices.length === 1) {
-        const choice = game().activeEvent?.choices[0];
+    case 'closeModal': {
+      // The cross on the event modal is the one choice it has. The cross on anything else just
+      // shuts that modal: the event is still there behind it.
+      const inEvent = element.closest('[data-modal]')?.getAttribute('data-modal') === 'event';
+      const event = game().activeEvent;
+      if (inEvent && event !== null && event.choices.length === 1) {
+        const choice = event.choices[0];
         dispatch({ type: 'RESOLVE_EVENT', choiceId: choice ? choice.id : 'ok' });
         return;
       }
       ui.modal = null;
       ui.modalPosition = null;
       break;
+    }
     case 'clearFilter': {
       const key = element.dataset.key ?? '';
       ui.filters[key] = '';
@@ -776,9 +827,12 @@ function onInput(event: Event): void {
   }
 }
 
+/** Leaving setup mode always starts the clock again at the speed it was stopped at. */
 function endSetup(): void {
+  if (!ui.setup) return;
   ui.setup = false;
   ui.drag = null;
+  dispatch({ type: 'SET_SPEED', speed: ui.speedBeforeSetup });
 }
 
 function onKeyDown(event: KeyboardEvent): void {
@@ -823,14 +877,24 @@ function onSetupPointerDown(event: MouseEvent): boolean {
   if (kit === null) return false;
   const itemId = kit.getAttribute('data-kit');
   if (itemId === null) return false;
+  const item = state.equipment.find((entry) => entry.id === itemId);
+  if (item === undefined) return false;
   const at = tileUnder(event);
   if (at === null) return false;
-  ui.drag = { itemId, x: at.x, y: at.y };
+  // He has hold of it where he took hold of it, not by its corner.
+  const offsetX = item.anchorX - at.x;
+  const offsetY = item.anchorY - at.y;
+  let moved = false;
+  ui.drag = { itemId, x: item.anchorX, y: item.anchorY };
   const move = (moveEvent: MouseEvent): void => {
     if (ui.drag === null) return;
     const tile = tileUnder(moveEvent);
-    if (tile === null || (tile.x === ui.drag.x && tile.y === ui.drag.y)) return;
-    ui.drag = { itemId: ui.drag.itemId, x: tile.x, y: tile.y };
+    if (tile === null) return;
+    const x = tile.x + offsetX;
+    const y = tile.y + offsetY;
+    if (x === ui.drag.x && y === ui.drag.y) return;
+    moved = true;
+    ui.drag = { itemId: ui.drag.itemId, x, y };
     render();
   };
   const up = (): void => {
@@ -838,7 +902,8 @@ function onSetupPointerDown(event: MouseEvent): boolean {
     window.removeEventListener('mouseup', up);
     const drag = ui.drag;
     ui.drag = null;
-    if (drag === null) {
+    // A click that never moved is not a move: it leaves the hall exactly as it was.
+    if (drag === null || !moved) {
       render();
       return;
     }

@@ -67,7 +67,7 @@ function tile(state: GameState, enquiry: Enquiry): string {
     `<p class="tile-figures">${escapeHtml(enquiry.finish)} · deadline ` +
     `${days(enquiry.deadlineDays)} · ${escapeHtml(expiryLine(state, enquiry))}</p>` +
     `<p class="tile-figures">${plural(sheets, 'sheet', 'sheets')} of material · about ` +
-    `${ownerDays} owner days</p>` +
+    `${plural(ownerDays, 'owner day', 'owner days')}</p>` +
     `<p class="tile-figures">Needs ${escapeHtml(toolsLine(enquiry))}</p>` +
     `<p class="badges">${badges}</p>` +
     lockLine +

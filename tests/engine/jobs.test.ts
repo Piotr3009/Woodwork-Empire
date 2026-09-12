@@ -29,6 +29,7 @@ import {
   ownerJob,
 } from '../../src/engine/jobs';
 import { materialCostFor, sheetsForCost } from '../../src/engine/materials';
+import { missingForHire } from '../../src/engine/staff';
 import { tick } from '../../src/engine/index';
 import type { GameEvent, GameState, Job } from '../../src/engine/index';
 import {
@@ -332,6 +333,8 @@ describe('late delivery', () => {
     state = act(state, { type: 'WORK_HERE', jobId: null });
     state = clearEvents(tick(state, 240));
     state = act(state, { type: 'ORDER_TRANSPORT', jobId: firstJob(state).id });
+    // With a van it is a question of whose 90 minutes it is. The owner takes it himself.
+    state = act(state, { type: 'RESOLVE_EVENT', choiceId: 'owner' });
     return clearEvents(tick(state, OWN_DELIVERY_MINUTES));
   }
 
@@ -516,10 +519,13 @@ describe('the piece at the gate', () => {
   });
 
   it('costs 90 minutes and no money with a van, and goes the same day', () => {
-    let state = act(finished(), { type: 'BUY_EQUIPMENT', specId: 'van' });
+    let state = clearEvents(act(finished(), { type: 'BUY_EQUIPMENT', specId: 'van' }));
     const before = state.cash;
     state = act(state, { type: 'ORDER_TRANSPORT', jobId: firstJob(state).id });
     expect(state.cash).toBe(before);
+    // The van run is a job of work, so the game asks whose minutes it costs.
+    expect(state.activeEvent?.kind).toBe('jobAtGate');
+    state = act(state, { type: 'RESOLVE_EVENT', choiceId: 'owner' });
     const task = state.tasks.find((entry) => entry.kind === 'deliver' && !entry.done);
     expect(task?.minutesTotal).toBe(OWN_DELIVERY_MINUTES);
     expect(state.owner.currentTaskId).toBe(task?.id);
@@ -535,6 +541,27 @@ describe('the piece at the gate', () => {
     expect(gateIsCrowded(crowded)).toBe(true);
     expect(hallProductivityFactor(crowded)).toBeCloseTo(GATE_CROWD_FACTOR, 6);
     expect(hallProductivityFactor(finished(3))).toBeCloseTo(1, 6);
+  });
+
+  it('lets a joiner take the van run instead of the owner', () => {
+    let state = clearEvents(act(finished(), { type: 'BUY_EQUIPMENT', specId: 'van' }));
+    for (const specId of missingForHire(state, 'joiner')) {
+      state = act(state, { type: 'BUY_EQUIPMENT', specId });
+    }
+    state = clearEvents(act(state, { type: 'HIRE', role: 'joiner', tier: 'poor' }));
+    const joiner = state.workers[0];
+    if (joiner) joiner.startDay = state.clock.day;
+    state = act(state, { type: 'ORDER_TRANSPORT', jobId: firstJob(state).id });
+    expect((state.activeEvent?.choices ?? []).map((choice) => choice.id)).toEqual([
+      'owner',
+      'joiner',
+      'later',
+    ]);
+    state = act(state, { type: 'RESOLVE_EVENT', choiceId: 'joiner' });
+    const task = state.tasks.find((entry) => entry.kind === 'deliver' && !entry.done);
+    expect(task).toBeDefined();
+    expect(state.workers[0]?.taskId).toBe(task?.id);
+    expect(state.owner.currentTaskId).toBeNull();
   });
 
   it('never books the same piece out twice', () => {
@@ -553,10 +580,9 @@ describe('emails nobody answered', () => {
     const job = firstJob(state);
     job.stage = 'awaitingTransport';
     job.finishedDay = 1;
-    state = act(act(state, { type: 'BUY_EQUIPMENT', specId: 'van' }), {
-      type: 'ORDER_TRANSPORT',
-      jobId: job.id,
-    });
+    state = clearEvents(act(state, { type: 'BUY_EQUIPMENT', specId: 'van' }));
+    state = act(state, { type: 'ORDER_TRANSPORT', jobId: job.id });
+    state = act(state, { type: 'RESOLVE_EVENT', choiceId: 'owner' });
     return clearEvents(tick(state, OWN_DELIVERY_MINUTES));
   }
 

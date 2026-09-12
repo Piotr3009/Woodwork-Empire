@@ -44,5 +44,8 @@ describe('the real life notes', () => {
     expect(whyKeyForEvent('jobAtGate')).toBe('finishedGoods');
     expect(whyKeyForEvent('lowStock')).toBe('lowStock');
     expect(whyKeyForEvent('dayEnd')).toBeNull();
+    // Only the extraction itself gets the extraction note. Everything else is a service note.
+    expect(whyKeyForEvent('machineBroken', 'extractor')).toBe('extractor');
+    expect(whyKeyForEvent('machineBroken', 'tableSaw')).toBe('service');
   });
 });

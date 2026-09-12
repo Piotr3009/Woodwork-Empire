@@ -6,6 +6,7 @@ import {
   BOARD_SIZE_BY_TIER,
   EXPIRY_EXPRESS_DAYS,
   EXPIRY_STANDARD_DAYS,
+  EXPRESS_MAX_PER_WEEK,
   EXPRESS_PRICE_UPLIFT,
   EXPRESS_PROBABILITY_BASE,
   EXPRESS_PROBABILITY_MAX,
@@ -44,8 +45,12 @@ export function expressProbability(reputation: number): number {
 
 /** One express enquiry a week and no more (PIOTR). */
 export function expressAllowed(state: GameState): boolean {
-  if (state.lastExpressDay === null) return true;
-  return weekOfDay(state.lastExpressDay) !== weekOfDay(state.clock.day);
+  const alreadyThisWeek =
+    state.lastExpressDay !== null &&
+    weekOfDay(state.lastExpressDay) === weekOfDay(state.clock.day)
+      ? 1
+      : 0;
+  return alreadyThisWeek < EXPRESS_MAX_PER_WEEK;
 }
 
 function drawTemplate(state: GameState): ProductTemplate | null {
