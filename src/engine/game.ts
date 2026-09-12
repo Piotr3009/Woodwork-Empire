@@ -22,7 +22,7 @@ import {
   STATE_VERSION,
 } from './constants';
 import { expireEnquiries, refillBoard, refreshLocks } from './board';
-import { daysBetween, isDayExhausted, isOvertime, isWorkingDay, weekday } from './clock';
+import { daysBetween, isDayExhausted, isOvertime, isWorkingDay, weekOfDay, weekday } from './clock';
 import {
   canAfford,
   emptyTotals,
@@ -56,6 +56,7 @@ import {
   chargeSiteMeasure,
   checkOverdueJobs,
   findJob,
+  jobProgress,
   jobSpeedFactor,
   oldestReadyJob,
   onDeliveryArrived,
@@ -69,9 +70,13 @@ import {
 import {
   arriveDeliveries,
   buyStock,
+  canUnload,
+  drawSheetsFor,
   fetchFromStorage,
   findDelivery,
   moveOverflowToStorage,
+  rackCapacity,
+  stockIsLow,
   unloadIntoStock,
   writeOffSheetsLeftOutside,
 } from './materials';
@@ -111,12 +116,18 @@ import type {
   Delivery,
   Difficulty,
   Equipment,
+  Job,
   MaterialKind,
   GameAction,
   GameState,
   Speed,
   TaskInstance,
 } from './types';
+
+/** The one plural in the engine copy: "1 sheet", "2 sheets" (CLAUDE.md T2 3.11). */
+export function plural(count: number, one: string, many: string): string {
+  return `${count} ${count === 1 ? one : many}`;
+}
 
 export interface NewGameOptions {
   seed: number;
@@ -157,7 +168,6 @@ export function createGame(options: NewGameOptions): GameState {
       rentMonthly: spec.rentMonthly,
       ratesMonthly: spec.ratesMonthly,
       benchSlots: spec.benchSlots,
-      sheetCapacity: spec.sheetCapacity,
       depositHeld: 0,
     },
     owner: {
@@ -192,8 +202,9 @@ export function createGame(options: NewGameOptions): GameState {
     ledger: [],
     eventQueue: [],
     activeEvent: null,
-    dayStats: { jobsAdvanced: [], jobsCompleted: [], dustAtStart: 0 },
+    dayStats: { jobsAdvanced: [], jobsCompleted: [], dustAtStart: 0, noMaterialWarned: false },
     lastExpressDay: null,
+    lastLowStockDay: null,
     productionMinutesMonth: 0,
     gameOver: null,
   };
@@ -227,7 +238,12 @@ function startDay(state: GameState): void {
   owner.currentTaskId = null;
   owner.present = true;
   owner.stayHome = false;
-  state.dayStats = { jobsAdvanced: [], jobsCompleted: [], dustAtStart: state.dust };
+  state.dayStats = {
+    jobsAdvanced: [],
+    jobsCompleted: [],
+    dustAtStart: state.dust,
+    noMaterialWarned: false,
+  };
   runDayCosts(state, state.clock.day);
   runOwnerDayStart(state);
   runStaffDayStart(state);
@@ -254,6 +270,7 @@ function startDay(state: GameState): void {
   for (const delivery of arriving) onDeliveryArrived(state, delivery.jobId);
   createDailyTasks(state);
   runExtractorBreakdown(state);
+  checkLowStock(state);
   runAccidentRoll(state);
   runHelperClean(state);
   delegateTasks(state);
@@ -315,14 +332,23 @@ function queueDeliveryEvents(state: GameState, arriving: Delivery[]): void {
   for (const delivery of arriving) {
     const task = state.tasks.find((entry) => entry.deliveryId === delivery.id && !entry.done);
     if (!task) continue;
+    const room = canUnload(state);
+    const choices = room
+      ? [
+          { id: 'unload', label: `Unload now, ${task.minutesTotal} min` },
+          { id: 'later', label: 'Leave it at the gate' },
+        ]
+      : [{ id: 'later', label: 'Leave it at the gate' }];
+    const body = room
+      ? `${plural(delivery.sheets, 'sheet', 'sheets')} have arrived. Nothing can be made until ` +
+        'they are inside.'
+      : `${plural(delivery.sheets, 'sheet', 'sheets')} have arrived and there is no shelving to ` +
+        'put them on. Buy some from the catalogue.';
     queueEvent(state, {
       kind: 'deliveryArrived',
       title: 'Delivery at the gate',
-      body: `${delivery.sheets} sheets have arrived. Nothing can be made until they are inside.`,
-      choices: [
-        { id: 'unload', label: `Unload now, ${task.minutesTotal} min` },
-        { id: 'later', label: 'Leave it at the gate' },
-      ],
+      body,
+      choices,
       data: { deliveryId: delivery.id, taskId: task.id, sheets: delivery.sheets },
     });
   }
@@ -434,10 +460,9 @@ function applyTaskCompletion(state: GameState, task: TaskInstance): void {
       const delivery = task.deliveryId ? findDelivery(state, task.deliveryId) : null;
       if (delivery) {
         delivery.unloaded = true;
-        if (delivery.jobId === null) {
-          const overflow = unloadIntoStock(state, delivery);
-          if (overflow > 0) raiseStockOverflow(state, delivery, overflow);
-        }
+        // Every delivery lands on the rack, per job orders included (CLAUDE.md T2 3.6).
+        const overflow = unloadIntoStock(state, delivery);
+        if (overflow > 0) raiseStockOverflow(state, delivery, overflow);
         onDeliveryUnloaded(state, delivery.jobId);
       }
       break;
@@ -492,13 +517,56 @@ function runWorkerTaskMinute(state: GameState, workerId: string, taskId: string)
   return true;
 }
 
+/** The rack has to hand over what the next slice of work needs, or the job stands still and the
+ *  joiners stand around (CLAUDE.md T2 3.6). */
+function materialReady(state: GameState, job: Job): boolean {
+  const ok = drawSheetsFor(state, job, jobProgress(job));
+  job.waitingForMaterial = !ok;
+  if (!ok) raiseNoMaterial(state);
+  return ok;
+}
+
+function raiseNoMaterial(state: GameState): void {
+  if (state.dayStats.noMaterialWarned) return;
+  state.dayStats.noMaterialWarned = true;
+  queueEvent(state, {
+    kind: 'noMaterial',
+    title: 'No material',
+    body: 'Your joiners are standing around laughing. No material. The wages run anyway.',
+  });
+}
+
+/** A rack under a tenth full is worth a word in the morning, once a week (CLAUDE.md T2 3.6).
+ *  It never interrupts the working day: the line under the hall carries the live figure. */
+function checkLowStock(state: GameState): void {
+  if (!stockIsLow(state)) return;
+  if (!state.jobs.some((job) => job.stage !== 'completed')) return;
+  const week = weekOfDay(state.clock.day);
+  if (state.lastLowStockDay !== null && weekOfDay(state.lastLowStockDay) === week) return;
+  state.lastLowStockDay = state.clock.day;
+  queueEvent(state, {
+    kind: 'lowStock',
+    title: 'The rack is nearly empty',
+    body:
+      `${plural(state.stock.sheets, 'sheet', 'sheets')} left of ` +
+      `${rackCapacity(state)}. Order material before the benches stop.`,
+    data: { sheets: state.stock.sheets },
+  });
+}
+
 function runProductionMinute(state: GameState): void {
   const hall = hallProductivityFactor(state);
   const stopped = machinesStopped(state);
   let worked = false;
   const materials = new Set<MaterialKind>();
   const atTheBench = state.owner.currentTaskId === null ? ownerJob(state) : null;
-  if (atTheBench && ownerIsAvailable(state) && !stopped && !bagBlocked(state, atTheBench.materialKind)) {
+  if (
+    atTheBench &&
+    ownerIsAvailable(state) &&
+    !stopped &&
+    !bagBlocked(state, atTheBench.materialKind) &&
+    materialReady(state, atTheBench)
+  ) {
     spendOwnerMinute(state, 'workshop');
     worked = true;
     materials.add(atTheBench.materialKind);
@@ -522,6 +590,7 @@ function runProductionMinute(state: GameState): void {
         continue;
       }
       if (stopped || bagBlocked(state, job.materialKind)) continue;
+      if (!materialReady(state, job)) continue;
       worked = true;
       materials.add(job.materialKind);
       const rate = worker.rate * sawRatioFactor(state, worker);

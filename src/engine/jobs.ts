@@ -127,6 +127,8 @@ export function acceptEnquiry(state: GameState, enquiryId: string, byHand: boole
     materialCost,
     materialMode: 'perJob',
     sheets: sheetsForCost(materialCost),
+    sheetsUsed: 0,
+    waitingForMaterial: false,
     bespokeMaterial: enquiry.bespokeMaterial,
     express: enquiry.express,
     byHand: madeByHand,
@@ -252,8 +254,8 @@ export function canDrawFromStock(state: GameState, job: Job): boolean {
 
 export function onMaterialOrdered(state: GameState, job: Job): void {
   if (canDrawFromStock(state, job)) {
-    state.stock.sheets -= job.sheets;
-    // The sheets were paid for when they were bought, at the cheaper stock price.
+    // The sheets were paid for when they were bought, at the cheaper stock price. They stay on
+    // the rack and come off it as the job is made, like every other job (CLAUDE.md T2 3.6).
     job.materialCost = stockCostFor(job.sheets);
     job.stage = 'ready';
     return;

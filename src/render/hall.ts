@@ -1,15 +1,10 @@
 // The hall, drawn from the state as flat placeholder boxes. No memory of its own: give it a state
 // and it hands back an SVG string (CLAUDE.md 10.3).
 
-import {
-  DELIVERY_VAN_SPRITE,
-  GATE_LAYOUT,
-  ROOM_LAYOUT,
-  STOCK_RACK_LAYOUT,
-  YARD_WIDTH_TILES,
-} from '../engine/constants';
+import { DELIVERY_VAN_SPRITE, GATE_LAYOUT, ROOM_LAYOUT, YARD_WIDTH_TILES } from '../engine/constants';
 import { dustBand, findSpec, machinesStopped } from '../engine/machines';
 import { ownerJob } from '../engine/jobs';
+import { rackCapacity, stockIsLow } from '../engine/materials';
 import { ownerIsAvailable, staffOutputFactor } from '../engine/owner';
 import type { GameState } from '../engine/types';
 import {
@@ -69,6 +64,7 @@ interface Drawable {
 }
 
 const CATEGORY_FILL: Record<string, string> = {
+  storage: 'var(--kit-stock)',
   machine: 'var(--kit-machine)',
   bench: 'var(--kit-bench)',
   welfare: 'var(--kit-welfare)',
@@ -79,6 +75,7 @@ const CATEGORY_FILL: Record<string, string> = {
 };
 
 const CATEGORY_SHADE: Record<string, string> = {
+  storage: 'var(--kit-stock-dark)',
   machine: 'var(--kit-machine-dark)',
   bench: 'var(--kit-bench-dark)',
   welfare: 'var(--kit-welfare-dark)',
@@ -173,21 +170,6 @@ export function renderHall(state: GameState): string {
     });
   }
 
-  // The sheet rack, with what is on it.
-  const rack = STOCK_RACK_LAYOUT;
-  const rackFaces = boxPolygons(rack.x, rack.y, rack.width, rack.depth, rack.height);
-  drawables.push({
-    depth: depthKey(rack.x, rack.y),
-    svg:
-      `<g data-rack="1"><title>The sheet rack</title>` +
-      box(rackFaces, 'var(--kit-stock)', 'var(--kit-stock-dark)') +
-      label(
-        centreOf(rack.x, rack.y, rack.width, rack.depth, rack.height),
-        `${state.stock.sheets} / ${unit.sheetCapacity}`,
-      ) +
-      '</g>',
-  });
-
   // Everything the player has bought, except the office furniture, which lives in the office view.
   for (const item of state.equipment) {
     const spec = findSpec(item.specId);
@@ -199,6 +181,8 @@ export function renderHall(state: GameState): string {
       ? 'var(--stopped-dark)'
       : CATEGORY_SHADE[spec.category] ?? 'var(--kit-machine-dark)';
     const bagLine = item.bagFull ? ' (bag full)' : '';
+    const rackLine =
+      spec.category === 'storage' ? `: ${state.stock.sheets} / ${rackCapacity(state)}` : '';
     const atThisBench =
       spec.category === 'bench'
         ? state.workers.find(
@@ -210,12 +194,13 @@ export function renderHall(state: GameState): string {
     drawables.push({
       depth: depthKey(item.anchorX, item.anchorY),
       svg:
-        `<g data-kit="${item.id}" data-sprite="${item.spriteKey}" class="clickable">` +
+        `<g data-kit="${item.id}"${spec.category === 'storage' ? ' data-rack="1"' : ''} ` +
+        `data-sprite="${item.spriteKey}" class="clickable">` +
         `<title>${escapeText(spec.effect)}</title>` +
         box(faces, fill, shade) +
         label(
           centreOf(item.anchorX, item.anchorY, spec.width, spec.depth, spec.height),
-          `${spec.name}${bagLine}${benchLine}`,
+          `${spec.name}${bagLine}${benchLine}${rackLine}`,
         ) +
         '</g>',
     });
@@ -287,10 +272,16 @@ export function renderHall(state: GameState): string {
   const stateLine = machinesStopped(state)
     ? `Hall: everything stopped, the extractor is broken${ownerLine}`
     : `Hall: ${band.label}${riskLine}${ownerLine}`;
+  const lowStock = stockIsLow(state)
+    ? `<p class="view-note warn">The rack is nearly empty: ${state.stock.sheets} of ` +
+      `${rackCapacity(state)} sheets left.</p>`
+    : rackCapacity(state) === 0
+      ? '<p class="view-note warn">No shelving in the hall, so nothing can be unloaded.</p>'
+      : '';
   return (
     `<svg class="hall-view" viewBox="${viewBox}" xmlns="http://www.w3.org/2000/svg" ` +
     `role="img" aria-label="Workshop hall">${parts.join('')}</svg>` +
-    `<p class="view-note">${escapeText(stateLine)}</p>`
+    `<p class="view-note">${escapeText(stateLine)}</p>${lowStock}`
   );
 }
 

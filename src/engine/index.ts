@@ -16,6 +16,7 @@ export {
   CLEANING_MINUTES,
   MINUTES_PER_WORKING_DAY,
   SHEET_PRICE_STOCK,
+  SHEET_VALUE,
   SOFTWARE_ONE_OFF_PRICE,
   SOFTWARE_SUBSCRIPTION_MONTHLY,
   SPEEDS,
@@ -113,14 +114,18 @@ export {
 
 // Material and deliveries
 export {
+  canUnload,
   deliveriesArrivingOn,
   deliveriesInYard,
   deliveriesOnTheWay,
   materialCostFor,
   materialModeLabel,
+  rackCapacity,
+  sheetsDueFor,
   sheetsForCost,
   stockCostFor,
   stockFree,
+  stockIsLow,
 } from './materials';
 
 // Reputation

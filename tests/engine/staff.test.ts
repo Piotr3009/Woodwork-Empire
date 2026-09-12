@@ -19,7 +19,16 @@ import { minutesRemainingFor, ownerJob } from '../../src/engine/jobs';
 import { weeklyWageBill } from '../../src/engine/economy';
 import { tick } from '../../src/engine/index';
 import type { GameState, Worker } from '../../src/engine/index';
-import { act, buyStartingKit, clearEvents, firstJob, newGame, placeEnquiry, runToDay } from '../helpers';
+import {
+  act,
+  buyStartingKit,
+  clearEvents,
+  fillRack,
+  firstJob,
+  newGame,
+  placeEnquiry,
+  runToDay,
+} from '../helpers';
 
 /** Buys exactly what the engine says is missing for one more joiner. */
 function withJoinerKit(state: GameState): GameState {
@@ -129,7 +138,7 @@ function jobReadyWith(price: number, tier: Worker['tier']): GameState {
     price,
     deadlineDays: 60,
   });
-  state = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+  state = fillRack(act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false }));
   firstJob(state).stage = 'ready';
   return state;
 }
@@ -205,6 +214,7 @@ describe('the saw ratio', () => {
       });
       state = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
     }
+    fillRack(state);
     for (const job of state.jobs) job.stage = 'ready';
     state = clearEvents(runToDay(state, 2).state);
     const assigned = state.jobs.filter((job) => job.stage === 'inProduction');

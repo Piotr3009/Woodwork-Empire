@@ -110,6 +110,7 @@ export const STARTING_KIT = [
   'compressor',
   'extractor',
   'workbench',
+  'sheetRack',
 ];
 
 export function buyStartingKit(state: GameState): GameState {
@@ -118,6 +119,12 @@ export function buyStartingKit(state: GameState): GameState {
     next = applyAction(next, { type: 'BUY_EQUIPMENT', specId });
   }
   return applyAction(next, { type: 'BUY_SOFTWARE', mode: 'oneOff' });
+}
+
+/** Puts sheets on the rack, so a job pushed straight to the bench has material to work with. */
+export function fillRack(state: GameState, sheets = 20): GameState {
+  state.stock.sheets = sheets;
+  return state;
 }
 
 /** Puts an exact enquiry on the board, so a test can work with round numbers. */

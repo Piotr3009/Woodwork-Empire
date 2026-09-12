@@ -91,7 +91,6 @@ export function unitDepositFor(rentMonthly: number): number {
 export const POWER_BASE_DAILY = 4;
 export const POWER_PER_MACHINE_DAILY = 3;
 export const BENCH_SLOTS = 4;
-export const SHEET_STOCK_CAPACITY = 12;
 /** Waste collection once the central dust system exists (PIOTR). */
 export const DUST_WASTE_MONTHLY = 400;
 /** Pellet sales with a pelletiser, rising with production (PIOTR). */
@@ -119,7 +118,6 @@ export interface DifficultySpec {
   rentMonthly: number;
   ratesMonthly: number;
   benchSlots: number;
-  sheetCapacity: number;
   widthTiles: number;
   depthTiles: number;
   /** Negative: how far the bank lets the company go (PIOTR for Hard, [TUNE] for the other two). */
@@ -136,7 +134,6 @@ export const DIFFICULTIES: DifficultySpec[] = [
     rentMonthly: 90 * RENT_PER_M2_MONTHLY,
     ratesMonthly: UNIT_RATES_MONTHLY,
     benchSlots: 6,
-    sheetCapacity: 20,
     widthTiles: 30,
     depthTiles: 12,
     overdraftLimit: -10000,
@@ -149,7 +146,6 @@ export const DIFFICULTIES: DifficultySpec[] = [
     rentMonthly: UNIT_RENT_MONTHLY,
     ratesMonthly: UNIT_RATES_MONTHLY,
     benchSlots: BENCH_SLOTS,
-    sheetCapacity: SHEET_STOCK_CAPACITY,
     widthTiles: UNIT_WIDTH_TILES,
     depthTiles: UNIT_DEPTH_TILES,
     overdraftLimit: -10000,
@@ -162,7 +158,6 @@ export const DIFFICULTIES: DifficultySpec[] = [
     rentMonthly: UNIT_RENT_MONTHLY,
     ratesMonthly: UNIT_RATES_MONTHLY,
     benchSlots: BENCH_SLOTS,
-    sheetCapacity: SHEET_STOCK_CAPACITY,
     widthTiles: UNIT_WIDTH_TILES,
     depthTiles: UNIT_DEPTH_TILES,
     overdraftLimit: -5000,
@@ -251,10 +246,13 @@ export const BESPOKE_PROBABILITY = 0.15;
 // 8.9 Materials
 // ---------------------------------------------------------------------------
 
-/** [TUNE] one sheet of board. Job sheet counts come from the material cost. */
-export const SHEET_PRICE = 80;
+/** A sheet is a storage unit worth 200 of material value and stands for everything a job needs:
+ *  boards, edging, screws (PIOTR). Job sheet counts come from the material cost. */
+export const SHEET_VALUE = 200;
 /** [TUNE] sheets bought for stock are cheaper, which gives the 0.34 P per job. */
-export const SHEET_PRICE_STOCK = SHEET_PRICE * (STOCK_MATERIAL_FRACTION / MATERIAL_FRACTION);
+export const SHEET_PRICE_STOCK = SHEET_VALUE * (STOCK_MATERIAL_FRACTION / MATERIAL_FRACTION);
+/** Under this fraction of the rack the player is warned (PIOTR: under 10%). */
+export const LOW_STOCK_FRACTION = 0.1;
 /** Material always arrives the next working day (PIOTR). */
 export const DELIVERY_WORKING_DAYS_STANDARD = 1;
 /** [TUNE] bespoke material takes three working days and costs 15% more. */
@@ -461,6 +459,7 @@ const BASE_SPEC = {
   labourFactor: 1,
   labourAppliesTo: null as MaterialKind | null,
   unloadFactor: 1,
+  sheetCapacity: 0,
   minReputation: REPUTATION_MIN,
   locked: false,
   lockReason: '',
@@ -586,6 +585,32 @@ export const EQUIPMENT_SPECS: EquipmentSpec[] = [
     perWorker: true,
     stackable: true,
     effect: 'One per worker. The unit has a fixed number of bench slots.',
+  },
+  {
+    ...BASE_SPEC,
+    id: 'sheetRack',
+    name: 'Cheap shelving',
+    price: 400,
+    category: 'storage',
+    width: 4,
+    depth: 1,
+    height: 2,
+    spriteKey: 'sheetRack',
+    sheetCapacity: 50,
+    effect: 'Holds 50 sheets. Nothing can be unloaded without somewhere to put it.',
+  },
+  {
+    ...BASE_SPEC,
+    id: 'sheetRackBetter',
+    name: 'Better shelving',
+    price: 900,
+    category: 'storage',
+    width: 4,
+    depth: 1,
+    height: 2,
+    spriteKey: 'sheetRackBetter',
+    sheetCapacity: 75,
+    effect: 'Holds 75 sheets. More than that needs a bigger unit.',
   },
   {
     ...BASE_SPEC,
@@ -817,6 +842,8 @@ export const ROOM_LAYOUT = [
 /** Hall placement. The office furniture is placed by DESK_LAYOUT instead, and the chair is bought
  *  but never drawn: 10.1 puts nothing on the office screen but the desk and what is on it. */
 export const STARTING_LAYOUT: Record<string, LayoutSlot> = {
+  sheetRack: { x: 20, y: 0 },
+  sheetRackBetter: { x: 20, y: 2 },
   extractor: { x: 15, y: 1 },
   dustSystem: { x: 15, y: 1 },
   tableSaw: { x: 0, y: 7 },
@@ -863,15 +890,6 @@ export const CANTEEN_SLOT_LAYOUT: LayoutSlot[] = [
   { x: 12, y: 6 },
 ];
 
-/** The sheet rack, drawn with its count. */
-export const STOCK_RACK_LAYOUT = {
-  x: 21,
-  y: 0,
-  width: 2,
-  depth: 4,
-  height: 2,
-  spriteKey: 'sheetRack',
-};
 /** Where a waiting delivery van stands, and how big it is. */
 export const GATE_LAYOUT = { x: 0, y: 4, yard: true, width: 4, depth: 2, height: 2 };
 export const DELIVERY_VAN_SPRITE = 'deliveryVan';

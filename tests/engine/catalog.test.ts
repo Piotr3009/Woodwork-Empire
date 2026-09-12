@@ -36,6 +36,8 @@ function job(partial: Partial<Job>): Job {
     materialCost: 160,
     materialMode: 'perJob',
     sheets: 2,
+    sheetsUsed: 0,
+    waitingForMaterial: false,
     bespokeMaterial: false,
     express: false,
     byHand: false,

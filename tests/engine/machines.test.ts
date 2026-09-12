@@ -31,6 +31,7 @@ import {
   buyStartingKit,
   clearEvents,
   eventsOfKind,
+  fillRack,
   firstJob,
   newGame,
   placeEnquiry,
@@ -44,7 +45,9 @@ function atTheBench(options: { price?: number; seed?: number } = {}): GameState 
   );
   state.enquiries = [];
   const enquiry = placeEnquiry(state, { price: options.price ?? 4000, deadlineDays: 90 });
-  const accepted = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+  const accepted = fillRack(
+    act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false }),
+  );
   firstJob(accepted).stage = 'ready';
   return act(accepted, { type: 'WORK_HERE', jobId: null });
 }

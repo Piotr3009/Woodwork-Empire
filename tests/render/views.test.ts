@@ -6,7 +6,7 @@ import { tick } from '../../src/engine/index';
 import { act, buyStartingKit, clearEvents, firstJob, newGame, placeEnquiry, runToDay } from '../helpers';
 
 describe('the hall on day 1', () => {
-  it('draws the three rooms, the floor and the rack, and nothing that was not bought', () => {
+  it('draws the three rooms and the floor, and nothing that was not bought', () => {
     const svg = renderHall(newGame());
     expect(svg).toContain('data-room="office"');
     expect(svg).toContain('data-room="wc"');
@@ -14,12 +14,22 @@ describe('the hall on day 1', () => {
     expect(svg).toContain('Office');
     expect(svg).toContain('WC');
     expect(svg).toContain('Canteen');
-    expect(svg).toContain('data-rack="1"');
-    expect(svg).toContain('0 / 12');
+    // The rack is bought from the catalogue now, so on day 1 there is none.
+    expect(svg).not.toContain('data-rack="1"');
+    expect(svg).toContain('No shelving in the hall');
     expect(svg).not.toContain('Table saw');
     expect(svg).not.toContain('Extractor');
     expect(svg).not.toContain('data-kit=');
     expect(svg).not.toContain('data-van=');
+  });
+
+  it('draws the shelving with what is on it once it has been bought', () => {
+    const state = buyStartingKit(newGame());
+    state.stock.sheets = 12;
+    const svg = renderHall(state);
+    expect(svg).toContain('data-rack="1"');
+    expect(svg).toContain('Cheap shelving: 12 / 50');
+    expect(renderHall(state)).not.toContain('No shelving in the hall');
   });
 
   it('draws what has been bought, and leaves the office furniture in the office', () => {
@@ -127,7 +137,6 @@ describe('the hall on day 1', () => {
   it('keeps the bigger unit bigger', () => {
     const easy = renderHall(newGame());
     const veryEasy = renderHall(newGame({ difficulty: 'veryEasy' }));
-    expect(veryEasy).toContain('0 / 20');
     const easyBox = easy.match(/viewBox="(-?\d+) (-?\d+) (\d+) (\d+)"/);
     const bigBox = veryEasy.match(/viewBox="(-?\d+) (-?\d+) (\d+) (\d+)"/);
     expect(Number(bigBox?.[3] ?? 0)).toBeGreaterThan(Number(easyBox?.[3] ?? 0));

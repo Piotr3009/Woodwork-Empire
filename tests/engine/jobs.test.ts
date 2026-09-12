@@ -19,6 +19,7 @@ import {
   act,
   buyStartingKit,
   doTask,
+  fillRack,
   eventsOfKind,
   firstJob,
   newGame,
@@ -26,11 +27,11 @@ import {
   placeEnquiry,
 } from '../helpers';
 
-/** An Easy game with the day 1 kit bought and a clean board. */
+/** An Easy game with the day 1 kit bought, a clean board and a full rack. */
 function ready(): GameState {
   const state = buyStartingKit(newGame());
   state.enquiries = [];
-  return state;
+  return fillRack(state);
 }
 
 function accept(state: GameState, price = 400, extra = {}): GameState {

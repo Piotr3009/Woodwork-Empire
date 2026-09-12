@@ -26,6 +26,7 @@ import {
   UNLOAD_BASE_MINUTES,
 } from './constants';
 import { findSpec } from './machines';
+import { canUnload } from './materials';
 import { ownerIsAvailable } from './owner';
 import { makeId } from './rng';
 import { isWorkingToday, joiners } from './staff';
@@ -222,6 +223,7 @@ export function assignStaffTasks(state: GameState): TaskInstance[] {
     * CLERK_ORDERS_PER_DAY;
   for (const task of state.tasks) {
     if (task.done || task.doneBy !== null) continue;
+    if (task.kind === 'unload' && !canUnload(state)) continue;
     const autoRoles = TASK_DEFINITIONS[task.kind].autoRoles;
     const staff = started.find((worker) => autoRoles.includes(worker.role));
     if (!staff) continue;
@@ -249,6 +251,8 @@ export function startTask(state: GameState, taskId: string): boolean {
   if (state.owner.currentTaskId !== null && state.owner.currentTaskId !== task.id) return false;
   // No drawing without a licence for the software (CLAUDE.md 9.2).
   if (task.kind === 'design' && !softwareActive(state)) return false;
+  // Nothing comes off the lorry until there is shelving to put it on (CLAUDE.md T2 3.6).
+  if (task.kind === 'unload' && !canUnload(state)) return false;
   state.owner.currentTaskId = task.id;
   task.doneBy = 'owner';
   return true;

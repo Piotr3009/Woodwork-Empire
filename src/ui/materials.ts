@@ -7,11 +7,12 @@ import {
   deliveriesOnTheWay,
   materialModeLabel,
   openJobs,
+  rackCapacity,
   stockCostFor,
   stockFree,
 } from '../engine/index';
 import type { GameState, Job } from '../engine/index';
-import { button, emptyLine, escapeHtml, money } from './modal';
+import { button, emptyLine, escapeHtml, money, plural } from './modal';
 
 function jobRow(job: Job): string {
   const choosable = job.stage === 'accepted' || job.stage === 'materialPending';
@@ -23,8 +24,8 @@ function jobRow(job: Job): string {
     : `<span class="dim">${escapeHtml(materialModeLabel(job.materialMode))}</span>`;
   return (
     `<div class="row"><span class="row-main">${escapeHtml(job.name)} ${money(job.price)}</span>` +
-    `<span class="row-figure">${job.sheets} sheets · ${money(job.materialCost)}` +
-    `${job.bespokeMaterial ? ' · bespoke' : ''}</span>` +
+    `<span class="row-figure">${plural(job.sheets, 'sheet', 'sheets')} · ` +
+    `${money(job.materialCost)}${job.bespokeMaterial ? ' · bespoke' : ''}</span>` +
     `<span class="row-action">${modes}</span></div>`
   );
 }
@@ -35,10 +36,14 @@ export function renderMaterials(state: GameState, sheets: string): string {
   const yard = deliveriesInYard(state);
   const coming = deliveriesOnTheWay(state);
   return (
-    `<p class="figures"><strong>${state.stock.sheets} / ${state.unit.sheetCapacity}</strong> ` +
+    (rackCapacity(state) === 0
+      ? '<p class="warn">No shelving yet. Buy some from the catalogue before anything is ' +
+        'delivered.</p>'
+      : '') +
+    `<p class="figures"><strong>${state.stock.sheets} / ${rackCapacity(state)}</strong> ` +
     `sheets on the rack, ${stockFree(state)} spaces free.` +
     (state.stock.tempStorageSheets > 0
-      ? ` ${state.stock.tempStorageSheets} sheets are in paid storage.`
+      ? ` ${plural(state.stock.tempStorageSheets, 'sheet is', 'sheets are')} in paid storage.`
       : '') +
     '</p>' +
     '<h3>Buy sheets for stock</h3>' +
@@ -58,13 +63,15 @@ export function renderMaterials(state: GameState, sheets: string): string {
       : yard
           .map(
             (delivery) =>
-              `<div class="row"><span class="row-main">${delivery.sheets} sheets at the gate` +
+              '<div class="row"><span class="row-main">' +
+              `${plural(delivery.sheets, 'sheet', 'sheets')} at the gate` +
               '</span><span class="row-figure">waiting to be unloaded</span></div>',
           )
           .concat(
             coming.map(
               (delivery) =>
-                `<div class="row"><span class="row-main">${delivery.sheets} sheets` +
+                '<div class="row"><span class="row-main">' +
+                `${plural(delivery.sheets, 'sheet', 'sheets')}` +
                 `${delivery.bespoke ? ', bespoke' : ''}</span>` +
                 `<span class="row-figure">arrives day ${delivery.arriveDay}</span></div>`,
             ),

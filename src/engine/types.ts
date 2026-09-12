@@ -27,7 +27,8 @@ export type EquipmentCategory =
   | 'welfare'
   | 'tools'
   | 'vehicle'
-  | 'extraction';
+  | 'extraction'
+  | 'storage';
 
 /** One line of the day 1 catalogue (CLAUDE.md 9.2). */
 export interface EquipmentSpec {
@@ -50,6 +51,8 @@ export interface EquipmentSpec {
   labourAppliesTo: MaterialKind | null;
   /** Multiplies unloading minutes. 1 means no effect. */
   unloadFactor: number;
+  /** Sheets this item can hold on the rack. 0 for everything that is not shelving. */
+  sheetCapacity: number;
   /** Reputation needed to buy. */
   minReputation: number;
   /** Parked for a later stage: shown with a price, buy button disabled. */
@@ -127,7 +130,6 @@ export interface UnitState {
   rentMonthly: number;
   ratesMonthly: number;
   benchSlots: number;
-  sheetCapacity: number;
   /** One month of rent the landlord holds. Returned on a move, which is parked. */
   depositHeld: number;
 }
@@ -210,6 +212,10 @@ export interface Job {
   materialCost: number;
   materialMode: MaterialMode;
   sheets: number;
+  /** Whole sheets already taken off the rack for this job. */
+  sheetsUsed: number;
+  /** The rack could not give the job what the next slice of work needs. */
+  waitingForMaterial: boolean;
   bespokeMaterial: boolean;
   express: boolean;
   byHand: boolean;
@@ -283,6 +289,8 @@ export type GameEventKind =
   | 'stockOverflow'
   | 'bagFull'
   | 'extractorBroken'
+  | 'noMaterial'
+  | 'lowStock'
   | 'accident'
   | 'dayEnd'
   | 'weekend'
@@ -383,6 +391,8 @@ export interface DayStats {
   jobsCompleted: string[];
   /** The dust reading the day opened with, for the end of day summary. */
   dustAtStart: number;
+  /** The empty rack is reported once a day and no more. */
+  noMaterialWarned: boolean;
 }
 
 export interface GameOver {
@@ -421,6 +431,8 @@ export interface GameState {
   dayStats: DayStats;
   /** Day the last express enquiry reached the board. One a week is the cap. */
   lastExpressDay: number | null;
+  /** Day the last low stock warning went out. One a week is the cap. */
+  lastLowStockDay: number | null;
   /** Production minutes since the 1st, for pellet sales. */
   productionMinutesMonth: number;
   gameOver: GameOver | null;

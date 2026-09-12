@@ -66,6 +66,7 @@ export const DAY_ONE_KIT = [
   'compressor',
   'extractor',
   'workbench',
+  'sheetRack',
 ];
 
 function buyKit(state: GameState): GameState {

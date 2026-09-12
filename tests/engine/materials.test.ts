@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   BESPOKE_COST_UPLIFT,
   MATERIAL_FRACTION,
-  SHEET_PRICE,
   SHEET_PRICE_STOCK,
+  SHEET_VALUE,
   STOCK_MATERIAL_FRACTION,
   TEMP_STORAGE_COST,
   TEMP_STORAGE_FETCH_MINUTES,
@@ -11,11 +11,15 @@ import {
 import {
   deliveryDay,
   materialCostFor,
+  rackCapacity,
+  sheetsDueFor,
   sheetsForCost,
   stockCostFor,
   stockFree,
+  stockIsLow,
 } from '../../src/engine/materials';
-import { tick } from '../../src/engine/index';
+import { canBuy } from '../../src/engine/game';
+import { jobProgress, tick } from '../../src/engine/index';
 import type { GameEvent, GameState } from '../../src/engine/index';
 import {
   act,
@@ -25,6 +29,7 @@ import {
   doTask,
   eventsOfKind,
   firstJob,
+  fillRack,
   newGame,
   placeEnquiry,
   runToDay,
@@ -57,13 +62,17 @@ describe('what material costs', () => {
     const perJob = materialCostFor(1000, false);
     const sheets = sheetsForCost(perJob);
     expect(stockCostFor(sheets)).toBeCloseTo(1000 * STOCK_MATERIAL_FRACTION, 6);
-    expect(SHEET_PRICE_STOCK).toBeLessThan(SHEET_PRICE);
+    expect(SHEET_PRICE_STOCK).toBeLessThan(SHEET_VALUE);
   });
 
-  it('turns a material cost into whole sheets', () => {
-    expect(sheetsForCost(160)).toBe(2);
-    expect(sheetsForCost(161)).toBe(3);
+  it('turns a material cost into whole sheets of 200 of value each', () => {
+    expect(SHEET_VALUE).toBe(200);
+    expect(sheetsForCost(160)).toBe(1);
+    expect(sheetsForCost(200)).toBe(1);
+    expect(sheetsForCost(201)).toBe(2);
     expect(sheetsForCost(1)).toBe(1);
+    // A 10,000 job carries 4,000 of material, which is 20 sheets (CLAUDE.md T2 3.6).
+    expect(sheetsForCost(10000 * MATERIAL_FRACTION)).toBe(20);
   });
 });
 
@@ -110,7 +119,8 @@ describe('buying sheets for stock', () => {
     expect(state.stock.sheets).toBe(0);
     state = doTask(state, 'unload');
     expect(state.stock.sheets).toBe(5);
-    expect(stockFree(state)).toBe(state.unit.sheetCapacity - 5);
+    expect(rackCapacity(state)).toBe(50);
+    expect(stockFree(state)).toBe(45);
   });
 
   it('lets a job draw from the rack instead of ordering, with no second payment', () => {
@@ -122,9 +132,10 @@ describe('buying sheets for stock', () => {
     const before = state.cash;
     state = doTask(state, 'materialOrder');
     expect(state.cash).toBe(before);
-    expect(state.stock.sheets).toBe(4);
+    // The sheets stay on the rack and come off it as the job is made (CLAUDE.md T2 3.6).
+    expect(state.stock.sheets).toBe(6);
     expect(firstJob(state).stage).toBe('ready');
-    expect(firstJob(state).materialCost).toBeCloseTo(stockCostFor(2), 6);
+    expect(firstJob(state).materialCost).toBeCloseTo(stockCostFor(1), 6);
     // No lorry, so nothing to unload.
     expect(state.deliveries.filter((delivery) => delivery.jobId !== null)).toHaveLength(0);
   });
@@ -140,7 +151,7 @@ describe('buying sheets for stock', () => {
 
 describe('a rack that is too small', () => {
   function overflowing(): { state: GameState; events: GameEvent[] } {
-    let state = act(ready(), { type: 'BUY_STOCK', sheets: 15 });
+    let state = act(ready('veryEasy'), { type: 'BUY_STOCK', sheets: 55 });
     const events: GameEvent[] = [];
     state = clearEvents(runToDay(state, 2).state, events);
     state = doTask(state, 'unload');
@@ -149,23 +160,23 @@ describe('a rack that is too small', () => {
 
   it('fills the rack and asks what happens to the rest', () => {
     const { state } = overflowing();
-    expect(state.stock.sheets).toBe(12);
+    expect(state.stock.sheets).toBe(50);
     expect(state.activeEvent?.kind).toBe('stockOverflow');
-    expect(state.activeEvent?.data.sheets).toBe(3);
+    expect(state.activeEvent?.data.sheets).toBe(5);
     expect(state.activeEvent?.choices.map((choice) => choice.id)).toEqual(['storage', 'outside']);
   });
 
   it('writes off what was left in the yard, in the morning', () => {
     const { state } = overflowing();
     const left = choose(state, 'outside');
-    expect(left.deliveries[0]?.overflowSheets).toBe(3);
+    expect(left.deliveries[0]?.overflowSheets).toBe(5);
     const cashBefore = left.cash;
     const run = runToDay(left, 3);
-    expect(run.state.stock.sheets).toBe(12);
+    expect(run.state.stock.sheets).toBe(50);
     expect(run.state.deliveries[0]?.overflowSheets).toBe(0);
     const writeOff = run.state.ledger.find((entry) => entry.label.includes('written off'));
     expect(writeOff?.unpaid).toBe(true);
-    expect(writeOff?.amount).toBeCloseTo(-stockCostFor(3), 6);
+    expect(writeOff?.amount).toBeCloseTo(-stockCostFor(5), 6);
     // The cash went when the sheets were bought: the write off moves no money.
     expect(run.state.cash).toBeLessThan(cashBefore);
     expect(
@@ -180,13 +191,13 @@ describe('a rack that is too small', () => {
     const cashBefore = state.cash;
     let stored = choose(state, 'storage');
     expect(cashBefore - stored.cash).toBe(TEMP_STORAGE_COST);
-    expect(stored.stock.tempStorageSheets).toBe(3);
+    expect(stored.stock.tempStorageSheets).toBe(5);
     expect(stored.deliveries[0]?.overflowSheets).toBe(0);
     stored = clearEvents(runToDay(stored, 3).state);
     const fetch = stored.tasks.find((task) => task.kind === 'fetchStorage' && !task.done);
     expect(fetch?.minutesTotal).toBe(TEMP_STORAGE_FETCH_MINUTES);
     const done = doTask(stored, 'fetchStorage');
-    expect(done.stock.sheets).toBe(15);
+    expect(done.stock.sheets).toBe(55);
     expect(done.stock.tempStorageSheets).toBe(0);
     expect(done.owner.minutesByCategory.workshop).toBeGreaterThanOrEqual(60);
   });
@@ -224,7 +235,7 @@ describe('what stock cannot cover', () => {
     state = clearEvents(runToDay(state, 2).state);
     state = doTask(state, 'unload');
     expect(state.stock.sheets).toBe(20);
-    state.reputation = 1;
+    state.reputation = 10;
     const table = placeEnquiry(state, {
       templateId: 'oakDiningTable',
       name: 'Oak dining table',
@@ -258,7 +269,7 @@ describe('what stock cannot cover', () => {
   });
 
   it('puts the write off through the ledger like every other line', () => {
-    let state = act(ready(), { type: 'BUY_STOCK', sheets: 15 });
+    let state = act(ready('veryEasy'), { type: 'BUY_STOCK', sheets: 55 });
     state = clearEvents(runToDay(state, 2).state);
     state = doTask(state, 'unload');
     state = choose(state, 'outside');
@@ -287,5 +298,113 @@ describe('the van at the gate', () => {
   it('says nothing when there is nothing at the gate', () => {
     const state = act(ready(), { type: 'ASK_UNLOAD', deliveryId: 'nothing' });
     expect(state.activeEvent).toBeNull();
+  });
+});
+
+describe('the rack the sheets live on', () => {
+  it('is bought from the catalogue and nothing can be unloaded without it', () => {
+    const bare = newGame();
+    expect(rackCapacity(bare)).toBe(0);
+    expect(canBuy(bare, 'sheetRack').ok).toBe(true);
+    const cheap = act(bare, { type: 'BUY_EQUIPMENT', specId: 'sheetRack' });
+    expect(rackCapacity(cheap)).toBe(50);
+    const better = act(cheap, { type: 'BUY_EQUIPMENT', specId: 'sheetRackBetter' });
+    expect(rackCapacity(better)).toBe(75);
+  });
+
+  it('leaves a delivery at the gate while there is nowhere to put it', () => {
+    let state = newGame();
+    state.enquiries = [];
+    // Everything but the shelving, so the job can be taken and ordered.
+    for (const specId of ['desk', 'laptop', 'tableSaw', 'drill', 'edgebander', 'extractor']) {
+      state = act(state, { type: 'BUY_EQUIPMENT', specId });
+    }
+    state = act(state, { type: 'BUY_SOFTWARE', mode: 'oneOff' });
+    state = doTask(upToMaterial(state), 'materialOrder');
+    state = clearEvents(runToDay(state, 2).state);
+    const task = state.tasks.find((entry) => entry.kind === 'unload' && !entry.done);
+    expect(task).toBeDefined();
+    const tried = act(state, { type: 'START_TASK', taskId: task?.id ?? '' });
+    expect(tried.owner.currentTaskId).toBeNull();
+    // Buy the shelving and the same task goes through.
+    const withRack = act(state, { type: 'BUY_EQUIPMENT', specId: 'sheetRack' });
+    const started = act(withRack, { type: 'START_TASK', taskId: task?.id ?? '' });
+    expect(started.owner.currentTaskId).toBe(task?.id);
+  });
+});
+
+describe('material coming off the rack as the job is made', () => {
+  function onTheBench(price: number): GameState {
+    let state = ready('veryEasy');
+    const enquiry = placeEnquiry(state, { price, deadlineDays: 90 });
+    state = fillRack(act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false }));
+    firstJob(state).stage = 'ready';
+    return act(state, { type: 'WORK_HERE', jobId: null });
+  }
+
+  it('draws whole sheets pro rata to the labour, so half made is half the sheets', () => {
+    // A 10,000 job carries 4,000 of material: 20 sheets.
+    const state = onTheBench(10000);
+    expect(firstJob(state).sheets).toBe(20);
+    expect(sheetsDueFor(firstJob(state), 0)).toBe(1);
+    expect(sheetsDueFor(firstJob(state), 0.5)).toBe(10);
+    expect(sheetsDueFor(firstJob(state), 1)).toBe(20);
+    // Half made: the rack has given up half the sheets and no more.
+    const halfWay = { ...state, jobs: state.jobs.map((job) => ({ ...job })) };
+    const first = halfWay.jobs[0];
+    if (first) first.labourRemaining = first.labourValue / 2;
+    expect(jobProgress(firstJob(halfWay))).toBe(0.5);
+    const half = tick(halfWay, 1);
+    expect(firstJob(half).sheetsUsed).toBe(10);
+    expect(half.stock.sheets).toBe(20 - 10);
+  });
+
+  it('stops the job where it stands when the rack cannot cover the next slice', () => {
+    const state = onTheBench(10000);
+    state.stock.sheets = 2;
+    const stalled = tick(state, 3000);
+    const job = firstJob(stalled);
+    expect(job.waitingForMaterial).toBe(true);
+    expect(stalled.stock.sheets).toBe(0);
+    expect(job.sheetsUsed).toBe(2);
+    expect(jobProgress(job)).toBeLessThan(0.2);
+  });
+
+  it('says so once a day and no more, and the wages run anyway', () => {
+    const state = onTheBench(10000);
+    state.stock.sheets = 0;
+    const events: GameEvent[] = [];
+    const day = clearEvents(tick(state, 400), events);
+    expect(eventsOfKind(events, 'noMaterial')).toHaveLength(1);
+    const more = clearEvents(tick(day, 400), events);
+    expect(eventsOfKind(events, 'noMaterial')).toHaveLength(1);
+    // A new day, a new reminder.
+    const tomorrow = runToDay(more, 3);
+    expect(eventsOfKind(tomorrow.events, 'noMaterial').length).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe('the low stock alarm', () => {
+  it('reads under a tenth of the rack as low', () => {
+    const state = ready();
+    expect(rackCapacity(state)).toBe(50);
+    state.stock.sheets = 4;
+    expect(stockIsLow(state)).toBe(true);
+    state.stock.sheets = 5;
+    expect(stockIsLow(state)).toBe(false);
+    // No shelving, no alarm: the hall says there is no shelving instead.
+    const bare = newGame();
+    expect(stockIsLow(bare)).toBe(false);
+  });
+
+  it('says it once a week in the morning, with work on the books', () => {
+    let state = ready();
+    const enquiry = placeEnquiry(state, { price: 400, deadlineDays: 90 });
+    state = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+    state.stock.sheets = 0;
+    const week = runToDay(state, 5);
+    expect(eventsOfKind(week.events, 'lowStock')).toHaveLength(1);
+    const fortnight = runToDay(state, 12);
+    expect(eventsOfKind(fortnight.events, 'lowStock')).toHaveLength(2);
   });
 });

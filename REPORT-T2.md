@@ -13,6 +13,10 @@ overdrafts by difficulty, PAY_ARREARS with interest on large arrears, the cheape
 the software bundle, express uplift as pure profit with one a week, the minus 50 to 100 reputation
 scale with its new gates, and pro rata fatigue.
 
+T2-03 Materials as sheets. A sheet is 200 of material value, the rack is shelving bought from the
+catalogue (50 or 75 sheets), every delivery lands on it, and the sheets come off it as the job is
+made, with the empty rack stopping the bench and the low stock alarm in the morning.
+
 ## 2. Not done or partial
 
 ## 3. Tests
