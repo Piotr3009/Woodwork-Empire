@@ -75,23 +75,26 @@ them except the first cut of T1-06, which is named in section 5 below.
 | types and constants | tests/engine/types.test.ts | 6 |
 | rng | tests/engine/rng.test.ts | 13 |
 | clock | tests/engine/clock.test.ts | 11 |
-| game, day boundary, determinism | tests/engine/game.test.ts | 14 |
-| economy | tests/engine/economy.test.ts | 23 |
+| game, day boundary, determinism | tests/engine/game.test.ts | 16 |
+| economy | tests/engine/economy.test.ts | 24 |
 | owner | tests/engine/owner.test.ts | 12 |
-| tasks | tests/engine/tasks.test.ts | 16 |
-| catalogue and reputation | tests/engine/catalog.test.ts | 11 |
-| board | tests/engine/board.test.ts | 15 |
+| tasks | tests/engine/tasks.test.ts | 17 |
+| catalogue and reputation | tests/engine/catalog.test.ts | 12 |
+| board | tests/engine/board.test.ts | 18 |
 | jobs | tests/engine/jobs.test.ts | 23 |
-| staff | tests/engine/staff.test.ts | 15 |
-| machines, bags, dust | tests/engine/machines.test.ts | 23 |
-| materials | tests/engine/materials.test.ts | 15 |
+| staff | tests/engine/staff.test.ts | 17 |
+| machines, bags, dust | tests/engine/machines.test.ts | 25 |
+| materials | tests/engine/materials.test.ts | 20 |
 | iso projection | tests/render/iso.test.ts | 10 |
-| hall and office SVG | tests/render/views.test.ts | 14 |
-| UI in jsdom | tests/ui/app.test.ts | 13 |
+| hall and office SVG | tests/render/views.test.ts | 21 |
+| UI in jsdom | tests/ui/app.test.ts | 18 |
 | 30 day scenarios | tests/scenarios/thirtyDays.test.ts | 10 |
 
-Total 245 tests in 18 files. `npm test` runs in about 3.3 seconds, never with `--silent`. The three
-scenario playthroughs run in about 1.0 second together, well inside the 10 second limit of T1-13.
+Total 274 tests in 18 files, about 5 seconds. Never run with `--silent`. The three scenario
+playthroughs take about 1 second together, well inside the 10 second limit of T1-13.
+
+A fresh clone of this branch passes `npm ci && npm run check`: lint clean, type check and production
+build clean, 274 tests green.
 
 Command: `npm test`. Gate: `npm run check` (lint, then type check and production build, then tests).
 
@@ -230,9 +233,10 @@ Per task, package-lock.json excluded:
 | T1-11 | 864 | 8 |
 | T1-12 | 2187 | 28 |
 | T1-13 | 231 | 0 |
-| T1-14 | see the commit | see the commit |
+| T1-14 | 1527 | 580 |
 
-About 6,200 lines of source under `src/` and about 3,500 lines of tests.
+About 6,400 lines of source under `src/` and about 3,900 lines of tests. T1-14 removed 580 lines
+because most of it was the audit: dead state, duplicated predicates and copy pasted arithmetic.
 
 ## 8. Open questions for Piotr
 
