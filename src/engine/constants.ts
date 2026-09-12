@@ -6,6 +6,7 @@
 import type {
   Difficulty,
   EquipmentSpec,
+  EquipmentVariant,
   Finish,
   MaterialKind,
   ProductTemplate,
@@ -487,6 +488,92 @@ export const PRODUCT_TEMPLATES: ProductTemplate[] = [
 // 9.2 Day 1 catalogue (PIOTR: items; prices [TUNE] unless marked)
 // ---------------------------------------------------------------------------
 
+/** Every family has this one unless the table below gives it more (CLAUDE.md T3 3.5). */
+export const STANDARD_VARIANT = 'standard';
+
+/** Hours of use a standard machine of each family has in it [TUNE]. Piotr will set the real
+ *  figures per machine later, and they all live in this one table. */
+export const MACHINE_ENDURANCE_HOURS: Record<string, number> = {
+  tableSaw: 3000,
+  edgebander: 4000,
+  thicknesser: 2500,
+};
+export const MACHINE_ENDURANCE_HOURS_DEFAULT = 5000;
+
+/** The five classes of table saw. Prices and the used saw's three effects are (PIOTR), the rest
+ *  of the factors are [TUNE] (CLAUDE.md T3 3.5). */
+export const TABLE_SAW_VARIANTS: EquipmentVariant[] = [
+  {
+    id: 'used',
+    name: 'Used table saw',
+    price: 1800,
+    outputFactor: 0.95,
+    bagIntervalFactor: 0.5,
+    enduranceFactor: 0.25,
+    powerPerDay: 3,
+    description:
+      'Somebody else wore this one out first. The table is true enough and the motor still ' +
+      'pulls, but the bearings rumble and the fence needs coaxing. It is what a workshop buys ' +
+      'when the bank is the problem and the work is waiting.',
+  },
+  {
+    id: 'budget',
+    name: 'Budget table saw',
+    price: 5000,
+    outputFactor: 1,
+    bagIntervalFactor: 1,
+    enduranceFactor: 1,
+    powerPerDay: 3,
+    description:
+      'A new saw at the bottom of the trade range. Cast iron table, a fence that locks square, ' +
+      'and nothing you did not pay for. It will cut sheets all day for years if it is looked ' +
+      'after, and it is the saw most one man workshops start with.',
+  },
+  {
+    id: 'standard',
+    name: 'Standard table saw',
+    price: 7000,
+    outputFactor: 1.05,
+    bagIntervalFactor: 1.2,
+    enduranceFactor: 1.2,
+    powerPerDay: 4,
+    description:
+      'The saw a working joinery shop settles on. A heavier table, a sliding carriage that ' +
+      'takes a full sheet, and extraction that actually pulls the dust off the blade. It saves ' +
+      'a few minutes on every sheet, and the minutes add up over a month.',
+  },
+  {
+    id: 'pro',
+    name: 'Professional table saw',
+    price: 15000,
+    outputFactor: 1.15,
+    bagIntervalFactor: 1.5,
+    enduranceFactor: 1.5,
+    powerPerDay: 5,
+    description:
+      'Built for a shop where the saw runs most of the day. Scoring blade, powered rise and ' +
+      'fall, a carriage long enough for a kitchen worktop. It cuts cleaner, which means less ' +
+      'sanding later, and it holds its settings between jobs.',
+  },
+  {
+    id: 'industrial',
+    name: 'Industrial table saw',
+    price: 25000,
+    outputFactor: 1.3,
+    bagIntervalFactor: 2,
+    enduranceFactor: 2,
+    powerPerDay: 7,
+    description:
+      'A panel saw meant for production, three phase and heavy enough that it does not move ' +
+      'when you lean on it. It eats sheets, it takes the whole day without complaining, and it ' +
+      'costs more than most workshops earn in a good month.',
+  },
+];
+
+const VARIANTS_BY_FAMILY: Record<string, EquipmentVariant[]> = {
+  tableSaw: TABLE_SAW_VARIANTS,
+};
+
 const BASE_SPEC = {
   bagInterval: 0,
   usedOn: null as MaterialKind | null,
@@ -503,7 +590,36 @@ const BASE_SPEC = {
   height: 1,
 };
 
-export const EQUIPMENT_SPECS: EquipmentSpec[] = [
+/** A catalogue line before its variants are worked out. */
+type SpecDraft = Omit<EquipmentSpec, 'variants' | 'enduranceHours'>;
+
+/** Every family gets its variants and its endurance here, so the table above stays a table.
+ *  A family with nothing in VARIANTS_BY_FAMILY has the one standard variant, at the Turn 1 price
+ *  and with every factor at 1.0 (CLAUDE.md T3 3.5). */
+function withVariants(draft: SpecDraft): EquipmentSpec {
+  const variants = VARIANTS_BY_FAMILY[draft.id] ?? [
+    {
+      id: STANDARD_VARIANT,
+      name: draft.name,
+      price: draft.price,
+      outputFactor: 1,
+      bagIntervalFactor: 1,
+      enduranceFactor: 1,
+      powerPerDay: POWER_PER_MACHINE_DAILY,
+      description: draft.effect,
+    },
+  ];
+  const cheapest = variants[0];
+  return {
+    ...draft,
+    variants,
+    // The catalogue line carries the price of the cheapest way into the family.
+    price: cheapest ? cheapest.price : draft.price,
+    enduranceHours: MACHINE_ENDURANCE_HOURS[draft.id] ?? MACHINE_ENDURANCE_HOURS_DEFAULT,
+  };
+}
+
+const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'desk',
@@ -824,6 +940,8 @@ export const EQUIPMENT_SPECS: EquipmentSpec[] = [
     effect: 'No waste cost and pellet sales that rise with production.',
   },
 ];
+
+export const EQUIPMENT_SPECS: EquipmentSpec[] = SPEC_DRAFTS.map(withVariants);
 
 /** Machines that must be owned before solid wood jobs can be made without the by-hand path. */
 export const SOLID_WOOD_EQUIPMENT = ['thicknesser', 'solidWoodTools'];

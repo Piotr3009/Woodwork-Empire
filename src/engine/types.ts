@@ -30,7 +30,26 @@ export type EquipmentCategory =
   | 'extraction'
   | 'storage';
 
-/** One line of the day 1 catalogue (CLAUDE.md 9.2). */
+/** One class of a machine: the same job done by a worn out one or by an industrial one
+ *  (CLAUDE.md T3 3.5). Every family has at least one. */
+export interface EquipmentVariant {
+  id: string;
+  name: string;
+  price: number;
+  /** Multiplies the production speed of every job that goes through this machine. */
+  outputFactor: number;
+  /** Multiplies the family's base bag interval. Below 1 means the bag fills sooner. */
+  bagIntervalFactor: number;
+  /** Multiplies the family's base endurance in hours. */
+  enduranceFactor: number;
+  /** Power this one draws a day. */
+  powerPerDay: number;
+  /** Two or three lines of plain English about what this class of machine is. */
+  description: string;
+}
+
+/** One line of the day 1 catalogue (CLAUDE.md 9.2). A catalogue line is a family: the modal
+ *  behind it shows one tile per variant (CLAUDE.md T3 3.5). */
 export interface EquipmentSpec {
   id: string;
   name: string;
@@ -65,12 +84,18 @@ export interface EquipmentSpec {
   /** Other catalogue ids that must be owned first. */
   requires: string[];
   effect: string;
+  /** What this family can be bought as, cheapest first. The catalogue price is the first one. */
+  variants: EquipmentVariant[];
+  /** Hours of use a standard one of these has in it [TUNE]. */
+  enduranceHours: number;
 }
 
 /** A purchased item standing in the hall. */
 export interface Equipment {
   id: string;
   specId: string;
+  /** Which variant of its family was bought (CLAUDE.md T3 3.5). */
+  variantId: string;
   spriteKey: string;
   anchorX: number;
   anchorY: number;
@@ -80,6 +105,10 @@ export interface Equipment {
   broken: boolean;
   /** Day of the last service. A machine is bought serviced. */
   lastServiceDay: number;
+  /** Hours of use it has in it, family base times the variant factor. */
+  enduranceHours: number;
+  /** Hours of use it has had. Past its endurance it starts giving up. */
+  hoursUsed: number;
   purchasePrice: number;
 }
 
@@ -484,7 +513,7 @@ export interface GameState {
 
 export type GameAction =
   | { type: 'SET_SPEED'; speed: Speed }
-  | { type: 'BUY_EQUIPMENT'; specId: string }
+  | { type: 'BUY_EQUIPMENT'; specId: string; variantId?: string }
   | { type: 'BUY_SOFTWARE'; mode: 'oneOff' | 'subscription' }
   | { type: 'ACCEPT_ENQUIRY'; enquiryId: string; byHand: boolean }
   | { type: 'START_TASK'; taskId: string }

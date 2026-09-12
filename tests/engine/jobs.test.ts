@@ -35,6 +35,7 @@ import type { GameEvent, GameState, Job } from '../../src/engine/index';
 import {
   act,
   buyStartingKit,
+  placeEquipment,
   clearEvents,
   doAllEmails,
   doTask,
@@ -47,9 +48,11 @@ import {
   runToDay,
 } from '../helpers';
 
-/** An Easy game with the day 1 kit bought, a clean board and a full rack. */
+/** An Easy game with the day 1 kit bought, a clean board and a full rack. The saw is the budget
+ *  one, whose factors are all 1.0: these are the labour figures of CLAUDE.md 8.5, not a test of
+ *  what a class of machine does to them (CLAUDE.md T3 3.5). */
 function ready(): GameState {
-  const state = buyStartingKit(newGame());
+  const state = buyStartingKit(newGame(), { sawVariant: 'budget' });
   state.enquiries = [];
   return fillRack(state);
 }
@@ -180,31 +183,9 @@ describe('machine labour reductions', () => {
   it('multiplies the reductions of the machines that are there', () => {
     const state = newGame();
     expect(machineLabourFactor(state, 'sheet')).toBe(1);
-    state.equipment.push({
-      id: 'kit-cnc',
-      specId: 'cnc',
-      spriteKey: 'cnc',
-      anchorX: 0,
-      anchorY: 0,
-      minutesUsed: 0,
-      bagFull: false,
-      broken: false,
-      lastServiceDay: 1,
-      purchasePrice: 45000,
-    });
+    placeEquipment(state, 'cnc');
     expect(machineLabourFactor(state, 'sheet')).toBeCloseTo(0.8, 10);
-    state.equipment.push({
-      id: 'kit-head',
-      specId: 'cncHead',
-      spriteKey: 'cncHead',
-      anchorX: 0,
-      anchorY: 0,
-      minutesUsed: 0,
-      bagFull: false,
-      broken: false,
-      lastServiceDay: 1,
-      purchasePrice: 9000,
-    });
+    placeEquipment(state, 'cncHead');
     expect(machineLabourFactor(state, 'sheet')).toBeCloseTo(0.8 * 0.95, 10);
   });
 });
@@ -429,18 +410,7 @@ describe('scenario: garage shelves on Easy', () => {
 
 describe('machine reductions act on the minutes, every minute', () => {
   function cncInto(state: GameState): GameState {
-    state.equipment.push({
-      id: 'kit-cnc',
-      specId: 'cnc',
-      spriteKey: 'cnc',
-      anchorX: 12,
-      anchorY: 7,
-      minutesUsed: 0,
-      bagFull: false,
-      broken: false,
-      lastServiceDay: 1,
-      purchasePrice: 45000,
-    });
+    placeEquipment(state, 'cnc', { x: 12, y: 7 });
     return state;
   }
 

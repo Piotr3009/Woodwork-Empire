@@ -22,7 +22,13 @@ import {
   NO_HELPER_DUST_MULTIPLIER,
   NO_HELPER_PRODUCTIVITY_FACTOR,
 } from './constants';
-import type { Equipment, EquipmentSpec, GameState, MaterialKind } from './types';
+import type {
+  Equipment,
+  EquipmentSpec,
+  EquipmentVariant,
+  GameState,
+  MaterialKind,
+} from './types';
 
 export function specOf(specId: string): EquipmentSpec {
   const spec = EQUIPMENT_SPECS.find((entry) => entry.id === specId);
@@ -32,6 +38,47 @@ export function specOf(specId: string): EquipmentSpec {
 
 export function findSpec(specId: string): EquipmentSpec | null {
   return EQUIPMENT_SPECS.find((entry) => entry.id === specId) ?? null;
+}
+
+/** The class of machine this is, or the cheapest one in the family when the id is unknown. */
+export function variantOf(spec: EquipmentSpec, variantId: string): EquipmentVariant {
+  const found = spec.variants.find((entry) => entry.id === variantId);
+  const first = spec.variants[0];
+  if (found) return found;
+  if (first) return first;
+  throw new Error(`family with no variants: ${spec.id}`);
+}
+
+export function findVariant(specId: string, variantId: string): EquipmentVariant | null {
+  const spec = findSpec(specId);
+  return spec ? variantOf(spec, variantId) : null;
+}
+
+/** What a machine standing in the hall actually is. */
+export function variantFor(item: Equipment): EquipmentVariant | null {
+  const spec = findSpec(item.specId);
+  return spec ? variantOf(spec, item.variantId) : null;
+}
+
+/** Minutes of use this one takes before its bag is full: the family's interval stretched or cut
+ *  by its class (CLAUDE.md T3 3.5). */
+export function bagIntervalFor(item: Equipment): number {
+  const spec = findSpec(item.specId);
+  if (!spec || spec.bagInterval <= 0) return 0;
+  const variant = variantOf(spec, item.variantId);
+  return Math.max(1, Math.round(spec.bagInterval * variant.bagIntervalFactor));
+}
+
+/** Hours of use a machine of this family and class has in it. */
+export function enduranceHoursFor(specId: string, variantId: string): number {
+  const spec = findSpec(specId);
+  if (!spec) return 0;
+  return Math.round(spec.enduranceHours * variantOf(spec, variantId).enduranceFactor);
+}
+
+/** Worn out: it still runs, but it gives up as often as a machine that never sees a service. */
+export function pastEndurance(item: Equipment): boolean {
+  return item.enduranceHours > 0 && item.hoursUsed >= item.enduranceHours;
 }
 
 export function owned(state: GameState, specId: string): Equipment[] {
@@ -48,6 +95,15 @@ export function hasAll(state: GameState, specIds: readonly string[]): boolean {
 
 export function countOf(state: GameState, specId: string): number {
   return owned(state, specId).length;
+}
+
+/** What the machines in the hall draw in a day. A dearer class pulls more (CLAUDE.md T3 3.5). */
+export function machinePowerPerDay(state: GameState): number {
+  let total = 0;
+  for (const item of poweredMachines(state)) {
+    total += variantFor(item)?.powerPerDay ?? 0;
+  }
+  return total;
 }
 
 /** Machines that draw power: every machine plus the extraction kit. */
@@ -105,6 +161,23 @@ export function hallProductivityFactor(state: GameState): number {
   return factor;
 }
 
+/** What the classes of machine in the hall do to the speed of a job of this material: the best
+ *  one of each family, multiplied together. Above 1 is quicker (CLAUDE.md T3 3.5). Two saws do
+ *  not make the work twice as fast: only the better of them is used. */
+export function machineOutputFactor(state: GameState, material: MaterialKind): number {
+  const best = new Map<string, number>();
+  for (const item of state.equipment) {
+    const spec = findSpec(item.specId);
+    if (!spec || spec.category !== 'machine') continue;
+    if (spec.usedOn !== null && spec.usedOn !== material) continue;
+    const factor = variantOf(spec, item.variantId).outputFactor;
+    best.set(spec.id, Math.max(best.get(spec.id) ?? 0, factor));
+  }
+  let product = 1;
+  for (const factor of best.values()) product *= factor;
+  return product;
+}
+
 /** Machines that cut the labour of a job, multiplied together (CLAUDE.md 8.6). */
 export function machineLabourFactor(state: GameState, material: MaterialKind): number {
   let factor = 1;
@@ -155,10 +228,14 @@ export function repairCostFor(item: Equipment): number {
   return Math.round(item.purchasePrice * MACHINE_REPAIR_COST_FRACTION * 100) / 100;
 }
 
-/** A machine that has gone past its service date can give up on any working day [TUNE]. */
+/** A machine that has gone past its service date can give up on any working day, and so can one
+ *  that is past its endurance. The two stack (CLAUDE.md T3 3.5) [TUNE]. */
 export function overdueBreakdownChance(state: GameState, item: Equipment): number {
-  if (item.broken || !serviceIsDue(state, item)) return 0;
-  return OVERDUE_BREAKDOWN_CHANCE;
+  if (item.broken) return 0;
+  let chance = 0;
+  if (serviceIsDue(state, item)) chance += OVERDUE_BREAKDOWN_CHANCE;
+  if (pastEndurance(item)) chance += OVERDUE_BREAKDOWN_CHANCE;
+  return chance;
 }
 
 /** A broken machine is out until it is repaired: nothing of its material gets made. */
@@ -199,17 +276,28 @@ export function bagBlocked(state: GameState, material: MaterialKind): boolean {
   return bagMachinesFor(state, material).some((item) => item.bagFull);
 }
 
-/** Books one minute of use on every machine the job runs through. Returns the bags that just
- *  filled, so the caller can raise the event. */
+/** Machines this material runs through, bag or no bag: what the hours of use are booked on. */
+export function machinesUsedFor(state: GameState, material: MaterialKind): Equipment[] {
+  return state.equipment.filter((item) => {
+    const spec = findSpec(item.specId);
+    if (!spec || spec.category !== 'machine') return false;
+    return spec.usedOn === null || spec.usedOn === material;
+  });
+}
+
+/** Books one minute of use on every machine the job runs through: the hours that wear it out,
+ *  and the minutes that fill its bag. Returns the bags that just filled, so the caller can raise
+ *  the event (CLAUDE.md 9.6, T3 3.5). */
 export function accumulateBagMinutes(state: GameState, material: MaterialKind): Equipment[] {
+  for (const item of machinesUsedFor(state, material)) {
+    item.hoursUsed = Math.round((item.hoursUsed + 1 / 60) * 10000) / 10000;
+  }
   if (!bagsExist(state)) return [];
   const filled: Equipment[] = [];
   for (const item of bagMachinesFor(state, material)) {
     if (item.bagFull) continue;
-    const spec = findSpec(item.specId);
-    if (!spec) continue;
     item.minutesUsed += 1;
-    if (item.minutesUsed >= spec.bagInterval) {
+    if (item.minutesUsed >= bagIntervalFor(item)) {
       item.bagFull = true;
       filled.push(item);
     }

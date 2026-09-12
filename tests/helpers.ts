@@ -1,8 +1,9 @@
 // Shared test driver. One place clicks events away, so no test file grows its own copy.
 
-import { applyAction, createGame, tick } from '../src/engine/index';
+import { applyAction, createGame, enduranceHoursFor, findSpec, tick } from '../src/engine/index';
 import type {
   Enquiry,
+  Equipment,
   GameAction,
   GameEvent,
   GameState,
@@ -114,12 +115,52 @@ export const STARTING_KIT = [
   'sheetRack',
 ];
 
-export function buyStartingKit(state: GameState): GameState {
+/** The day 1 shopping. The saw it buys is the used one at 1800, which is what the catalogue
+ *  offers first; a test about the labour figures of CLAUDE.md 8.5 asks for the budget saw, whose
+ *  factors are all 1.0 and which is therefore the baseline those figures describe. */
+export function buyStartingKit(
+  state: GameState,
+  options: { sawVariant?: string } = {},
+): GameState {
   let next = state;
   for (const specId of STARTING_KIT) {
-    next = applyAction(next, { type: 'BUY_EQUIPMENT', specId });
+    next = applyAction(next, {
+      type: 'BUY_EQUIPMENT',
+      specId,
+      variantId: specId === 'tableSaw' ? options.sawVariant : undefined,
+    });
   }
   return applyAction(next, { type: 'BUY_SOFTWARE', mode: 'oneOff' });
+}
+
+/** Stands a machine in the hall without paying for it or looking for a free tile, for tests that
+ *  only need it to be there (CLAUDE.md T3 3.5 gave every item a variant). */
+export function placeEquipment(
+  state: GameState,
+  specId: string,
+  options: { variantId?: string; x?: number; y?: number; id?: string } = {},
+): Equipment {
+  const spec = findSpec(specId);
+  if (!spec) throw new Error(`unknown equipment: ${specId}`);
+  const variantId = options.variantId ?? spec.variants[0]?.id ?? 'standard';
+  const variant = spec.variants.find((entry) => entry.id === variantId);
+  const item: Equipment = {
+    id: options.id ?? `kit-${specId}-${state.equipment.length + 1}`,
+    specId,
+    variantId,
+    spriteKey: spec.spriteKey,
+    anchorX: options.x ?? 0,
+    anchorY: options.y ?? 0,
+    minutesUsed: 0,
+    bagFull: false,
+    broken: false,
+    lastServiceDay: state.clock.day,
+    enduranceHours: enduranceHoursFor(specId, variantId),
+    hoursUsed: 0,
+    purchasePrice: variant ? variant.price : spec.price,
+  };
+  state.equipment.push(item);
+  return item;
 }
 
 /** Puts sheets on the rack, so a job pushed straight to the bench has material to work with. */

@@ -29,6 +29,7 @@ import {
   has,
   hasExtraction,
   machineLabourFactor,
+  machineOutputFactor,
 } from './machines';
 import {
   materialCostFor,
@@ -108,7 +109,10 @@ export function jobProgress(job: Job): number {
  *  losing one to the bailiff slows it down again. */
 export function jobSpeedFactor(state: GameState, job: Job): number {
   const byHand = job.byHand ? BY_HAND_DURATION_FACTOR : 1;
-  return machineLabourFactor(state, job.materialKind) * byHand;
+  // A better class of machine gets through the same work in fewer minutes, so its output factor
+  // divides the time the labour reductions have already cut (CLAUDE.md T3 3.5).
+  const output = job.byHand ? 1 : machineOutputFactor(state, job.materialKind);
+  return (machineLabourFactor(state, job.materialKind) * byHand) / output;
 }
 
 /** Minutes this job still needs from a worker of the given rate (1 is the owner). */

@@ -43,6 +43,7 @@ import {
   clearDust,
   countOf,
   emptyBag,
+  enduranceHoursFor,
   breakMachine,
   extractorBreakdownChance,
   extractorBroken,
@@ -57,6 +58,7 @@ import {
   serviceMachine,
   serviceableMachines,
   specOf,
+  variantOf,
 } from './machines';
 import {
   acceptEnquiry,
@@ -987,7 +989,7 @@ export function applyAction(state: GameState, action: GameAction): GameState {
       pauseOwnerTask(next);
       break;
     case 'BUY_EQUIPMENT':
-      buyEquipment(next, action.specId);
+      buyEquipment(next, action.specId, action.variantId);
       break;
     case 'BUY_SOFTWARE':
       buySoftware(next, action.mode);
@@ -1040,9 +1042,10 @@ export interface BuyCheck {
 const OK: BuyCheck = { ok: true, reason: '' };
 
 /** One reason per refusal, used by the catalogue modal and by the buy action itself. */
-export function canBuy(state: GameState, specId: string): BuyCheck {
+export function canBuy(state: GameState, specId: string, variantId?: string): BuyCheck {
   const spec = findSpec(specId);
   if (!spec) return { ok: false, reason: 'Not in the catalogue' };
+  const variant = variantOf(spec, variantId ?? spec.variants[0]?.id ?? '');
   if (spec.locked) return { ok: false, reason: spec.lockReason };
   if (state.reputation < spec.minReputation) {
     return { ok: false, reason: `Needs reputation ${spec.minReputation}` };
@@ -1057,7 +1060,7 @@ export function canBuy(state: GameState, specId: string): BuyCheck {
   if (specId === 'workbench' && countOf(state, 'workbench') >= state.unit.benchSlots) {
     return { ok: false, reason: 'No free bench slot in this unit' };
   }
-  if (!canAfford(state, spec.price)) return { ok: false, reason: 'Not enough cash' };
+  if (!canAfford(state, variant.price)) return { ok: false, reason: 'Not enough cash' };
   return OK;
 }
 
@@ -1093,15 +1096,17 @@ function anchorFor(state: GameState, specId: string): { x: number; y: number } {
   return firstFreeTile(state, specId) ?? preferred;
 }
 
-export function buyEquipment(state: GameState, specId: string): BuyCheck {
-  const check = canBuy(state, specId);
+export function buyEquipment(state: GameState, specId: string, variantId?: string): BuyCheck {
+  const check = canBuy(state, specId, variantId);
   if (!check.ok) return check;
   const spec = specOf(specId);
+  const variant = variantOf(spec, variantId ?? spec.variants[0]?.id ?? '');
   const anchor = anchorFor(state, specId);
-  pay(state, 'equipment', spec.name, spec.price);
+  pay(state, 'equipment', variant.name, variant.price);
   state.equipment.push({
     id: makeId(state, 'kit'),
     specId,
+    variantId: variant.id,
     spriteKey: spec.spriteKey,
     anchorX: anchor.x,
     anchorY: anchor.y,
@@ -1109,7 +1114,9 @@ export function buyEquipment(state: GameState, specId: string): BuyCheck {
     bagFull: false,
     broken: false,
     lastServiceDay: state.clock.day,
-    purchasePrice: spec.price,
+    enduranceHours: enduranceHoursFor(specId, variant.id),
+    hoursUsed: 0,
+    purchasePrice: variant.price,
   });
   return OK;
 }

@@ -36,7 +36,9 @@ import {
 } from '../helpers';
 
 function ready(difficulty: 'easy' | 'veryEasy' = 'easy'): GameState {
-  const state = buyStartingKit(newGame({ difficulty }));
+  // The budget saw: this file is about the rack, not about what a class of saw does to the bag
+  // or to the speed of the bench (CLAUDE.md T3 3.5).
+  const state = buyStartingKit(newGame({ difficulty }), { sawVariant: 'budget' });
   state.enquiries = [];
   return state;
 }

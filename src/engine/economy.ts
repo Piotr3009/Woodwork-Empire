@@ -18,14 +18,13 @@ import {
   PELLET_INCOME_MONTHLY_BASE,
   PELLET_INCOME_PER_1000_PRODUCTION_MINUTES,
   POWER_BASE_DAILY,
-  POWER_PER_MACHINE_DAILY,
   SOFTWARE_SUBSCRIPTION_MONTHLY,
   WORKING_DAYS_PER_MONTH,
   unitDepositFor,
 } from './constants';
 import { isFirstOfMonth, isFriday, isWorkingDay, previousWorkingDay, weekday } from './clock';
 import { queueEvent } from './events';
-import { has, poweredMachines, seizableMachines } from './machines';
+import { has, machinePowerPerDay, seizableMachines } from './machines';
 import { makeId } from './rng';
 import { plural } from './text';
 import type { BookedTotals, GameState, LedgerCategory, PeriodTotals } from './types';
@@ -174,8 +173,10 @@ export function dailyRates(state: GameState): number {
   return state.unit.ratesMonthly / DAYS_PER_MONTH;
 }
 
+/** The base the unit draws plus what every machine in it pulls: a dearer class of machine costs
+ *  more to run (CLAUDE.md T3 3.5). */
 export function dailyPower(state: GameState): number {
-  return POWER_BASE_DAILY + POWER_PER_MACHINE_DAILY * poweredMachines(state).length;
+  return POWER_BASE_DAILY + machinePowerPerDay(state);
 }
 
 /** One month of the costs that arrive whether or not a single job is made. The arrears interest

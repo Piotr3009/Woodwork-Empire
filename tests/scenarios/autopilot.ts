@@ -78,10 +78,10 @@ export const SHORT_HANDED: Policy = {
   cleanAbove: 60,
   wanted: ['bookcase', 'garageShelves'],
   hireJoiner: true,
-  // Two jobs drawing off one small rack is how a workshop runs itself dry. Eight sheets, not the
-  // twelve of Turn 2: a small job is one email now, so the owner reaches the bench sooner and
-  // twelve sheets lasted him the month (CLAUDE.md T3 3.2).
-  stockSheets: 8,
+  // Two jobs drawing off one small rack is how a workshop runs itself dry. Ten sheets, not the
+  // twelve of Turn 2: a small job is one email now and the used saw is 5% slower, so the month
+  // runs differently and twelve sheets lasted it out (CLAUDE.md T3 3.2, T3 3.5).
+  stockSheets: 10,
 };
 
 export const DAY_ONE_KIT = [
