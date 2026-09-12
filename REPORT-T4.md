@@ -83,31 +83,49 @@ T4-10b `c08c955` A tidy up before the report: the task row control moved out of 
 row primitives, which broke an import cycle between the laptop and the drawings, and the catalogue
 region's tooltip now says what it opens.
 
-T4-11 This report, and the three defects that came out of writing it and of putting the whole diff
-through an adversarial review. Setup mode was blocked only while somebody was actually carrying a
-move, so an owner at home could have set the hall out a second time and had the second batch ride
-on the first one's minutes; it is blocked while any move is on the list. Answering the phone used
-to release whatever the owner was holding, the way putting it down on purpose does: it is not the
-same thing, he is coming back in fifteen minutes, and a call in the middle of a move now leaves the
-move in hand so the clock stays forced at 4x for the whole span. And the benches were handed out in
-the order the jobs sit on the books rather than the order the men got to them, so a job started
-later but accepted earlier turned a man off the bench he was already standing at: a job writes down
-the minute it took a bench, and the oldest claim wins. The last two have a test that fails on the
-old code.
+T4-11 This report, and nine defects that came out of writing it and of putting the whole diff
+through a five way adversarial review (contract, correctness, UI, tests, conventions). Every
+finding was checked against the code before it counted. What was fixed:
+
+1. A move the day ended in the middle of was never picked up again: `finishDay` takes the owner off
+   what he is holding, nothing re-assigned it, and because the hall cannot be set out while a move
+   is on the list, "Set up hall" was dead for the rest of the game and the ducting was never
+   charged. The morning picks it up now, the owner first, a joiner or the helper if he is not in.
+2. `resumeTaskId` outlived the interruption that set it, so a call that found the owner holding
+   nothing sent him back to whatever an earlier interruption had left behind. An interruption now
+   always writes down what it interrupted, holding nothing included, and a finished move sends him
+   back the same way a finished call does.
+3. Benches were handed out in the order the jobs sit on the books rather than the order the men got
+   to them, so a job started later but accepted earlier turned a man off the bench he was already
+   standing at. A job writes down the minute it took a bench, and the oldest claim wins.
+4. Answering the phone used to release whatever the owner was holding, the way putting it down on
+   purpose does. It is not the same thing: he is coming back in fifteen minutes and nobody else may
+   pick it up, and a call in the middle of a move leaves the move in hand, so the clock stays
+   forced at 4x for the whole span.
+5. Setup mode was blocked only while somebody was actually carrying a move, so an owner at home
+   could have set the hall out a second time and had the second batch ride on the first one's
+   minutes. It is blocked while any move is on the list.
+6. An item dragged away and dragged back inside one setup session was still charged 800. A move now
+   remembers the tile the item started on and takes it off the list when it goes back, which is
+   what the comment always claimed.
+7. The clock stayed at 4x after a move. It goes back to the speed the player was on before he
+   opened setup mode.
+8. A salesman with less than fifteen minutes of his day left took a call he could not finish,
+   leaving a part done job of work that survived into later days. He only takes one he can see out;
+   otherwise the owner is asked.
+9. The weekly and monthly summary said "End of week 1" over a minutes column and a hall column that
+   were still the day's. The money column carries the span, and the other two headings say "today",
+   because the state keeps no weekly count of a man's minutes.
 
 ---
 
 ## 2. Not done or partial
 
-1. **The clock keeps the forced 4x after the move.** CLAUDE.md 3.5 says the player cannot change
-   the speed until the move is done. He can the moment it is done, but the speed is left at 4x
-   rather than put back where it was: putting it back would mean remembering a second speed in the
-   state, and the brief did not ask for it. One click fixes it.
-2. **A joiner or the helper cannot be sent to a move from the UI.** The engine lets anybody eligible
+1. **A joiner or the helper cannot be sent to a move from the UI.** The engine lets anybody eligible
    carry it (`assignWorkerTask`), and one is sent automatically when the owner is not in, but there
    is no control for the player to choose. The brief names who may do it, not a decision to be made;
    adding a chooser would be a new event, which was not asked for.
-3. **No browser check.** Everything is verified in jsdom and by the build. The room's scale, the
+2. **No browser check.** Everything is verified in jsdom and by the build. The room's scale, the
    hover overlay on a region and the seven-segment font stack have not been looked at in a real
    browser: the environment has Chromium but no art review was asked for tonight, and the layout
    numbers the scale uses are asserted against the stylesheet in code, not on screen.
@@ -116,7 +134,7 @@ old code.
 
 ## 3. Tests
 
-503 pass across 41 files; `npm run check` (lint, build, tests) is green and was green before every
+507 pass across 40 files; `npm run check` (lint, build, tests) is green and was green before every
 commit. 454 was the Turn 3 count, of which two were failing on `main` before tonight (T4-01).
 
 The tests the brief asks for by name:
@@ -140,14 +158,13 @@ The tests the brief asks for by name:
   four tabs, one path per modal).
 - **T4-08** `tests/render/deskItemsGone.test.ts` greps every `.ts`, `.css` and `.mjs` under `src`,
   `tests` and `scripts`.
-- **The two review fixes** `tests/engine/moving.test.ts`, "takes the fifteen minutes and leaves the
-  move forced at 4x all the way through", and `tests/engine/machines.test.ts`, "never turns a man
-  off a bench he is already standing at". Both were run against the code before the fix and both
-  went red.
-
-The whole diff was put through a five way adversarial review (contract, correctness, UI, tests,
-conventions), and every finding was checked against the code before it counted. The two above are
-what survived that check at the time of writing.
+- **The review fixes** have a test each: "is picked up again in the morning, and charged when it is
+  finished" and "comes back the moment the kit is down" and "is not a move either when he drags it
+  away and drags it back again" and "takes the fifteen minutes and leaves the move forced at 4x all
+  the way through" in `tests/engine/moving.test.ts`; "never turns a man off a bench he is already
+  standing at" in `tests/engine/machines.test.ts`; "does not send him back to a task an earlier
+  interruption had left behind" and "leaves the call to the owner once his day is too short to see
+  it out" in `tests/engine/calls.test.ts`; and the two headings in `tests/ui/summary.test.ts`.
 
 The office SVG snapshot test went with the SVG: the `the office` block of `tests/render/views.test.ts`
 and the office half of `tests/render/sizing.test.ts` are deleted.
@@ -285,8 +302,8 @@ New, all in `src/engine/constants.ts` with their provenance (the last row is a h
 
 Deleted: `CLIENT_CALL_MINUTES_PER_1000`, `CLIENT_CALL_MINUTES_CAP`, `CLIENT_CALL_PRICE_STEP`,
 `OFFICE_TILES`, `DESK_LAYOUT`, `DeskObjectSpec`. `STATE_VERSION` is 3: the state carries
-`job.calls`, `job.callsMissed`, `job.benchSince`, `owner.resumeTaskId`, `movedItems` and
-`summaryCadence`, and a save
+`job.calls`, `job.callsMissed`, `job.benchSince`, `owner.resumeTaskId`, `movedItems`,
+`speedBeforeMove` and `summaryCadence`, and a save
 from the old shape is refused rather than half read, as Turn 3 left it.
 
 The office canvas, the seven region rectangles and the two text boxes are in
@@ -336,9 +353,9 @@ placeholder box; the sprite check page lists it.
 1. **The office scale is computed in code from two numbers that live in the stylesheet.** Change the
    top bar padding in `styles.css` and the room letterboxes by a few pixels until the two agree
    again. The alternative is measuring the DOM every render, which cannot be tested in jsdom.
-2. **A move job with nobody able to do it stands still.** The clock is only forced while somebody is
-   actually on the move, so the game does not lock; but the moved machines carry their ducting bill
-   to the next day, and a player who drags the hall about and goes home will find the bill waiting.
+2. **A move job with nobody able to do it stands still for the rest of the day.** The clock is only
+   forced while somebody is actually on the move, so the game does not lock; the moved machines
+   carry their ducting bill into the morning, when the move is picked up again by whoever is in.
    The hall cannot be set out again while a move is on the list, carried or waiting, so a second
    batch of moves can never ride on the first one's minutes.
 3. **The call schedule is drawn at acceptance from the job's expected span.** A job accepted with a

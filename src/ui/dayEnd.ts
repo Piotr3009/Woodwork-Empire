@@ -23,7 +23,9 @@ export function cadenceControl(state: GameState): string {
   return `<p class="hint">Show this: ${chips}</p>`;
 }
 
-/** Which span of figures the summary carries: the day, the week or the month (T4 3.6). */
+/** Which span of figures the money column carries: the day, the week or the month (T4 3.6). The
+ *  owner's minutes and the day's work are a day's figures whatever the cadence, and their headings
+ *  say so, because the state keeps no weekly count of them. */
 function totalsFor(state: GameState): { totals: PeriodTotals; label: string } {
   if (state.summaryCadence === 'weekly') return { totals: state.finance.week, label: 'this week' };
   if (state.summaryCadence === 'monthly') {
@@ -46,7 +48,7 @@ export function renderDayEnd(state: GameState): string {
   const net = netOf(totals);
   return (
     '<div class="cols">' +
-    '<div class="col"><h3>Your minutes</h3>' +
+    '<div class="col"><h3>Your minutes today</h3>' +
     row('Admin', minutes(used.admin)) +
     row('Design', minutes(used.design)) +
     row('Workshop', minutes(used.workshop)) +
@@ -61,7 +63,7 @@ export function renderDayEnd(state: GameState): string {
     row('Net', money(net)) +
     row('In the bank', money(state.cash)) +
     '</div>' +
-    '<div class="col"><h3>The hall</h3>' +
+    '<div class="col"><h3>The hall today</h3>' +
     row('Jobs moved on', String(advanced)) +
     row('Jobs finished', jobs === '' ? 'none' : jobs) +
     row(

@@ -315,6 +315,14 @@ export interface ClientCall {
   retry: boolean;
 }
 
+/** One item the player has dragged, and the tile it stood on before he started. An item put back
+ *  exactly where it was is taken off this list: it was never moved (CLAUDE.md T4 3.5). */
+export interface MovedItem {
+  itemId: string;
+  fromX: number;
+  fromY: number;
+}
+
 export interface Delivery {
   id: string;
   jobId: string | null;
@@ -537,7 +545,9 @@ export interface GameState {
   /** Production minutes since the 1st, for pellet sales. */
   productionMinutesMonth: number;
   /** Kit the player has dragged about and not yet paid for in time and ducting (T4 3.5). */
-  movedItems: string[];
+  movedItems: MovedItem[];
+  /** The speed the clock was on before the move forced itself to 4x. Null while none is on. */
+  speedBeforeMove: Speed | null;
   /** How often the end of day summary is put in front of the player (CLAUDE.md T4 3.6). */
   summaryCadence: SummaryCadence;
   gameOver: GameOver | null;

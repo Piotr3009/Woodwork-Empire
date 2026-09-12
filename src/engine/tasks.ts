@@ -339,11 +339,10 @@ export function pauseOwnerTask(state: GameState): void {
  *  and he goes back to it when the call is over (CLAUDE.md T4 3.3). */
 export function interruptOwnerWith(state: GameState, task: TaskInstance): void {
   const held = state.owner.currentTaskId;
-  if (held !== null && held !== task.id) {
-    // What he was on stays his, unlike a task he put down on purpose: he is coming back to it
-    // in fifteen minutes, and until then nobody else may pick it up.
-    state.owner.resumeTaskId = held;
-  }
+  // What he was on stays his, unlike a task he put down on purpose: he is coming back to it, and
+  // until then nobody else may pick it up. Holding nothing is written down too, or the last
+  // interruption's task would be resumed after this one.
+  state.owner.resumeTaskId = held !== null && held !== task.id ? held : null;
   for (const worker of state.workers) {
     if (worker.taskId === task.id) worker.taskId = null;
   }

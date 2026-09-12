@@ -260,6 +260,7 @@ export function createGame(options: NewGameOptions): GameState {
     lateAccountsMonths: 0,
     productionMinutesMonth: 0,
     movedItems: [],
+    speedBeforeMove: null,
     summaryCadence: 'daily',
     gameOver: null,
   };
@@ -284,6 +285,20 @@ function hallIsEmpty(state: GameState): boolean {
   return !state.workers.some((worker) => isWorkingToday(state, worker));
 }
 
+/** A move the day ended in the middle of is picked up again in the morning, or the hall would be
+ *  half shifted for ever and could never be set out again (CLAUDE.md T4 3.5). */
+function resumeMove(state: GameState): void {
+  const move = movePending(state);
+  if (move === null || move.doneBy !== null) return;
+  if (ownerIsAvailable(state)) {
+    startTask(state, move.id);
+    return;
+  }
+  const hand =
+    availableJoiners(state)[0] ?? helpers(state).find((worker) => isWorkingToday(state, worker));
+  if (hand) assignWorkerTask(state, hand.id, move.id);
+}
+
 /** Resets everything that is scoped to one day and charges what the new day owes. */
 function startDay(state: GameState): void {
   const owner = state.owner;
@@ -303,6 +318,7 @@ function startDay(state: GameState): void {
   runDayCosts(state, state.clock.day);
   runOwnerDayStart(state);
   runStaffDayStart(state);
+  resumeMove(state);
   expireEnquiries(state);
   refillBoard(state);
   const lost = writeOffSheetsLeftOutside(state);
@@ -592,6 +608,8 @@ function applyTaskCompletion(state: GameState, task: TaskInstance): void {
       break;
     case 'moveMachines':
       chargeDucting(state);
+      // The same as a call: he goes back to whatever the move took him off.
+      resumeOwnerTask(state);
       break;
     case 'bookkeeping':
       writeUpBooks(state);
@@ -641,12 +659,27 @@ function applyTaskCompletion(state: GameState, task: TaskInstance): void {
   }
 }
 
+/** A drag is a move only while the item is not standing where it started. Dragging it out and
+ *  back again, however many drags it takes, costs nothing (CLAUDE.md T4 3.5). */
+function recordMove(state: GameState, item: Equipment, stood: { x: number; y: number }): void {
+  const index = state.movedItems.findIndex((moved) => moved.itemId === item.id);
+  if (index < 0) {
+    if (item.anchorX === stood.x && item.anchorY === stood.y) return;
+    state.movedItems.push({ itemId: item.id, fromX: stood.x, fromY: stood.y });
+    return;
+  }
+  const start = state.movedItems[index];
+  if (start && item.anchorX === start.fromX && item.anchorY === start.fromY) {
+    state.movedItems.splice(index, 1);
+  }
+}
+
 /** Every moved machine that is ducted into the extraction has to be reconnected, and that is
  *  paid for when the move is finished. The flexi system never needs it (CLAUDE.md T4 3.5). */
 function chargeDucting(state: GameState): void {
   const free = ductingIsFree(state);
-  for (const itemId of state.movedItems) {
-    const item = state.equipment.find((entry) => entry.id === itemId);
+  for (const moved of state.movedItems) {
+    const item = state.equipment.find((entry) => entry.id === moved.itemId);
     if (!item || !needsDucting(item.specId)) continue;
     if (free) continue;
     const name = findSpec(item.specId)?.name ?? item.specId;
@@ -658,6 +691,11 @@ function chargeDucting(state: GameState): void {
     );
   }
   state.movedItems = [];
+  // The clock goes back to the speed the player left it on before the move took it (T4 3.5).
+  if (state.speedBeforeMove !== null) {
+    state.speed = state.speedBeforeMove;
+    state.speedBeforeMove = null;
+  }
 }
 
 /** Leaving setup mode with the kit moved: the move is a job of work in the hall, an hour an item,
@@ -666,6 +704,7 @@ function endSetup(state: GameState, speed: Speed): void {
   state.speed = speed;
   if (state.movedItems.length === 0) return;
   if (movePending(state) !== null) return;
+  state.speedBeforeMove = speed;
   const task = createTask(state, {
     kind: 'moveMachines',
     label: `Moving machines: ${plural(state.movedItems.length, 'item', 'items')}`,
@@ -958,7 +997,8 @@ function callTaker(state: GameState): Worker | null {
       (worker) =>
         worker.role === 'salesman' &&
         isWorkingToday(state, worker) &&
-        staffMinutesLeft(worker) > 0,
+        // Enough of his day left to see the call out, or the owner is asked instead.
+        staffMinutesLeft(worker) >= AD_HOC_TASK_MINUTES.clientCall,
     ) ?? null
   );
 }
@@ -1194,12 +1234,7 @@ export function applyAction(state: GameState, action: GameAction): GameState {
       const item = next.equipment.find((entry) => entry.id === action.itemId);
       const stood = item ? { x: item.anchorX, y: item.anchorY } : null;
       moveItem(next, action.itemId, action.x, action.y);
-      // A machine put back exactly where it stood was never moved (CLAUDE.md T4 3.5).
-      const shifted =
-        item !== undefined && stood !== null && (item.anchorX !== stood.x || item.anchorY !== stood.y);
-      if (shifted && !next.movedItems.includes(action.itemId)) {
-        next.movedItems.push(action.itemId);
-      }
+      if (item && stood) recordMove(next, item, stood);
       break;
     }
     case 'ORDER_TRANSPORT': {

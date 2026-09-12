@@ -247,8 +247,8 @@ export function needsDucting(specId: string): boolean {
 /** What the moves the player has made will cost in ducting, and on how many machines. */
 export function ductingDue(state: GameState): { machines: number; cost: number } {
   if (ductingIsFree(state)) return { machines: 0, cost: 0 };
-  const machines = state.movedItems.filter((itemId) => {
-    const item = state.equipment.find((entry) => entry.id === itemId);
+  const machines = state.movedItems.filter((moved) => {
+    const item = state.equipment.find((entry) => entry.id === moved.itemId);
     return item !== undefined && needsDucting(item.specId);
   }).length;
   return { machines, cost: machines * DUCTING_RECONNECT_COST };

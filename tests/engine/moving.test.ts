@@ -8,13 +8,14 @@ import {
   MOVING_SPEED,
 } from '../../src/engine/constants';
 import { ductingDue, hasCentralExtraction, needsDucting } from '../../src/engine/machines';
-import { movingMachines } from '../../src/engine/tasks';
+import { movePending, movingMachines } from '../../src/engine/tasks';
 import { tick } from '../../src/engine/index';
 import type { GameState } from '../../src/engine/index';
 import { renderTopbar } from '../../src/ui/topbar';
 import {
   act,
   buyStartingKit,
+  clearEvents,
   fillRack,
   newGame,
   placeEnquiry,
@@ -112,6 +113,42 @@ describe('a move of two machines', () => {
   });
 });
 
+describe('a move the day ended in the middle of', () => {
+  it('is picked up again in the morning, and charged when it is finished', () => {
+    let state = drag(drag(inSetup(), 'tableSaw'), 'edgebander');
+    const cash = state.cash;
+    state = act(state, { type: 'END_SETUP', speed: 1 });
+    const move = movePending(state);
+    expect(move).not.toBeNull();
+    // Near the twelve hour wall, so the day ends with the kit still up in the air.
+    state.clock.minute = 700;
+    state = clearEvents(tick(state, 30));
+    expect(state.clock.day).toBe(2);
+    expect(movePending(state)?.id).toBe(move?.id);
+    // Nobody had to be told: he starts the morning where he left off.
+    expect(state.owner.currentTaskId).toBe(move?.id);
+    expect(state.speed).toBe(MOVING_SPEED);
+    let guard = 0;
+    while (movePending(state) !== null && guard < 400) {
+      state = clearEvents(tick(state, 1));
+      guard += 1;
+    }
+    expect(cash - state.cash).toBeGreaterThanOrEqual(2 * DUCTING_RECONNECT_COST);
+    expect(state.movedItems).toEqual([]);
+  });
+});
+
+describe('the speed the player was on', () => {
+  it('comes back the moment the kit is down', () => {
+    let state = act(drag(inSetup(), 'workbench'), { type: 'END_SETUP', speed: 2 });
+    expect(state.speed).toBe(MOVING_SPEED);
+    state = tick(state, MOVE_MINUTES_PER_ITEM);
+    expect(movingMachines(state)).toBeNull();
+    expect(state.speed).toBe(2);
+    expect(state.speedBeforeMove).toBeNull();
+  });
+});
+
 describe('a client ringing in the middle of a move', () => {
   it('takes the fifteen minutes and leaves the move forced at 4x all the way through', () => {
     let state = inSetup();
@@ -197,5 +234,21 @@ describe('a bench move', () => {
     });
     expect(stood.movedItems).toEqual([]);
     expect(act(stood, { type: 'END_SETUP', speed: 1 }).speed).toBe(1);
+  });
+
+  it('is not a move either when he drags it away and drags it back again', () => {
+    const start = inSetup();
+    const saw = start.equipment.find((item) => item.specId === 'tableSaw');
+    if (!saw) throw new Error('no saw');
+    const from = { x: saw.anchorX, y: saw.anchorY };
+    const away = act(start, { type: 'MOVE_ITEM', itemId: saw.id, x: from.x, y: from.y + 1 });
+    expect(away.movedItems).toHaveLength(1);
+    const back = act(away, { type: 'MOVE_ITEM', itemId: saw.id, x: from.x, y: from.y });
+    expect(back.movedItems).toEqual([]);
+    expect(ductingDue(back)).toEqual({ machines: 0, cost: 0 });
+    // Nothing to carry and nothing to pay for.
+    const done = act(back, { type: 'END_SETUP', speed: 1 });
+    expect(movePending(done)).toBeNull();
+    expect(done.cash).toBe(start.cash);
   });
 });

@@ -73,5 +73,9 @@ describe('a week at the weekly cadence', () => {
     const html = parse(renderDayEnd(friday)).innerHTML;
     expect(html).toContain('Money this week');
     expect(html).not.toContain('Money today');
+    // The owner's minutes and the day's work are a day's figures whatever the cadence, and the
+    // headings say so rather than letting the week's title speak for them.
+    expect(html).toContain('Your minutes today');
+    expect(html).toContain('The hall today');
   });
 });

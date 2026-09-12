@@ -188,6 +188,28 @@ describe('letting it ring', () => {
   });
 });
 
+describe('the phone and what it interrupted', () => {
+  it('does not send him back to a task an earlier interruption had left behind', () => {
+    let state = withJob(2000);
+    const books = state.tasks.find((task) => task.kind === 'bookkeeping');
+    if (!books) throw new Error('no bookkeeping');
+    state = act(state, { type: 'START_TASK', taskId: books.id });
+    // The first call takes him off the books and puts him back on them.
+    state = choose(ring(state), 'answer');
+    expect(state.owner.resumeTaskId).toBe(books.id);
+    state = tick(state, 15);
+    expect(state.owner.currentTaskId).toBe(books.id);
+    // He puts the books down himself, and a second call finds him holding nothing.
+    state = act(state, { type: 'PAUSE_TASK' });
+    expect(state.owner.currentTaskId).toBeNull();
+    state = choose(ring(state, 1), 'answer');
+    expect(state.owner.resumeTaskId).toBeNull();
+    state = tick(state, 15);
+    // The phone is down and he is standing idle, not back on the books he put down.
+    expect(state.owner.currentTaskId).toBeNull();
+  });
+});
+
 describe('a salesman on the books', () => {
   it('takes every call himself, and the owner is never asked', () => {
     let state = withJob();
@@ -209,5 +231,19 @@ describe('a salesman on the books', () => {
     state = tick(state, 15);
     expect(state.tasks.find((task) => task.kind === 'clientCall')?.done).toBe(true);
     expect(firstJob(state).callsMissed).toBe(0);
+  });
+
+  it('leaves the call to the owner once his day is too short to see it out', () => {
+    let state = withJob();
+    state.reputation = 20;
+    state = act(state, { type: 'HIRE', role: 'salesman', tier: null });
+    const salesman = state.workers[0];
+    if (!salesman) throw new Error('nobody was hired');
+    salesman.startDay = state.clock.day;
+    // Ten minutes of his day left is not enough for a fifteen minute call.
+    salesman.minutesWorked = MINUTES_PER_WORKING_DAY - 10;
+    state = ring(state);
+    expect(state.activeEvent?.kind).toBe('clientCall');
+    expect(state.tasks.some((task) => task.kind === 'clientCall')).toBe(false);
   });
 });
