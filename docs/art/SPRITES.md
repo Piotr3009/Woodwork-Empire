@@ -208,3 +208,74 @@ Mapping approved by Piotr:
 4. No people, no real brand except the Joinery Core sign.
 5. On the game's office view at 1280 px wide, every region in 8.2 opens the right modal and the
    two live texts sit inside their blank areas.
+
+---
+
+## 9. Hall (approved by Piotr, 13.09.2026): painted background on the game grid
+
+The hall is a painted isometric background with two movable room layers, registered to the game
+grid. Measured against the template: front edges 26.6 and 26.7 degrees (2:1), floor corners within
+3 px, rooms and shutter within 3 px. Machines, benches, racks and figures stay sprites placed on the
+grid on top of it.
+
+### 9.1 World unit changes to 1 metre
+
+From this section on, **one grid cell is 1 m × 1 m**, not 0.5 m. The starting hall is 20 × 10 m
+= 200 cells (x = 0..20 along the rear wall, y = 0..10 along the left wall, origin at the rear-left
+corner). Every footprint given in tiles earlier in this file is in 0.5 m tiles: divide by two to get
+metres (table saw 4 × 2 × 2 tiles = 2 × 1 × 1 m). The engine's footprints are re-expressed in
+metres in the same turn that adopts this hall.
+
+Screen scale at 1x: 1 m = 48 × 24 px (the tile the game already draws), 1 m of height = 24 px.
+Sprite files stay at 2x: 1 m = 96 × 48 px, 1 m of height = 48 px. The canvas formula of section 2
+holds with `w`, `d`, `h` in metres. Objects therefore draw at half the on-screen size they had on
+the 60 m² hall; that is the price of 200 m² on one screen and it was accepted.
+
+### 9.2 Projection constants (identical in the template, the art and `render/iso.ts`)
+
+For world (x, y, z) in metres, on the 2x canvas:
+`sx = ox + (x - y) × 48`, `sy = oy + (x + y) × 24 - z × 48`, with `ox = 600`, `oy = 288` on the
+1680 × 1128 canvas (padding 120 px, wall height 3.5 m). At 1x the game divides everything by two and
+offsets to its own viewport. Floor corners on the canvas: (0,0) = 600, 288; (20,0) = 1560, 768;
+(0,10) = 120, 528; (20,10) = 1080, 1008.
+
+### 9.3 Layers
+
+| Layer | File in `public/sprites/` | Format | Contents | Position |
+|---|---|---|---|---|
+| 1 | `hallBackground.png` | RGB, opaque | floor, rear and left walls, front kerbs, roller shutter, personnel door, the fixed WC block | canvas origin |
+| 2 | `hallOffice.png` | RGBA | the office block only | canvas origin; footprint x 1..3, y 0..4, height 2.7 m |
+| 3 | `hallCanteen.png` | RGBA | the canteen block only | canvas origin; footprint x 3..5, y 0..4, height 2.7 m |
+| review | `hallPreview.png` | RGB | the three stacked | not in the repository |
+
+Canvas 1680 × 1128, all layers aligned at (0, 0). Draw order: background, office, canteen, then
+sprites and figures sorted by (x + y) as today. The office and canteen layers are pre-registered to
+their footprints; if a later turn lets the player move or enlarge a room, the room becomes a
+footprint-anchored sprite like any other object and gets its own canvas per section 2.
+
+Fixed geometry the engine must know (cells): WC x 0..1, y 0..2 (2 cells); office x 1..3, y 0..4
+(8 cells); canteen x 3..5, y 0..4 (8 cells); roller shutter on the left wall at y 6..9, 3 m wide,
+3 m high; personnel door on the left wall at y 4.5..5.5; gate lane x 0..2, y 6..10 kept clear
+(8 cells); room doors on the y = 4 faces (office and canteen) and the y = 2 face (WC), centred,
+opening into the hall. Free cells for equipment: 200 minus 18 for rooms minus 8 for the gate lane
+= 174.
+
+### 9.4 Accepted quirk
+
+The front kerbs are painted about 0.4 m inside the floor line along the two front edges (y = 10 and
+x = 20). The last row of cells along those edges is placeable; an object placed there overlaps the
+kerb by a few pixels. Piotr accepted this (13.09.2026); no placement restriction is added for it.
+
+### 9.5 Live text and labels
+
+No text is baked in. The game draws: the company name on the rear wall beside the shutter (canvas
+box x 300..560, y 130..200, dark lettering, scaled with the scene), and room labels ("WC", "Office",
+"Canteen", or the names Piotr chooses later) as small text on each room's front face. All as HTML
+positioned in canvas coordinates.
+
+### 9.6 Acceptance (done for this delivery)
+
+1. 1680 × 1128 all layers; office and canteen with real alpha. Passed.
+2. Registration to the template: floor corners, walls, rooms, shutter within 3 px. Passed.
+3. No text, logo, people, machines. Passed.
+4. Style matches section 4 (realistic, muted, upper-left light). Passed.
