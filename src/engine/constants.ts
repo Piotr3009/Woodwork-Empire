@@ -329,6 +329,16 @@ export const SITE_MEASURE_TAXI_COST = 40;
 export const UNLOAD_BASE_MINUTES = 45;
 /** Bag change (PIOTR). */
 export const BAG_CHANGE_MINUTES = 15;
+/** Moving the kit about is a job of work: an hour a machine or a bench [TUNE]. */
+export const MOVE_MINUTES_PER_ITEM = 60;
+/** Reconnecting one machine's ducting to the extraction, every time it is moved (PIOTR). */
+export const DUCTING_RECONNECT_COST = 800;
+/** Every machine family is ducted into the extraction except the compressor. The hand tools are
+ *  not machines at all, so they never appear here (PIOTR). */
+export const NO_DUCTING_SPECS = ['compressor'];
+/** The clock runs itself at 4x while the hall is being moved about, and the player cannot touch
+ *  it until it is done (PIOTR). */
+export const MOVING_SPEED = 4;
 /** Weekly clean (PIOTR). */
 export const CLEANING_MINUTES = 120;
 /** Fetch from temporary storage the next morning (PIOTR). */
@@ -592,6 +602,7 @@ const BASE_SPEC = {
   perWorker: false,
   stackable: false,
   requires: [] as string[],
+  requiresOneOf: [] as string[],
   height: 1,
 };
 
@@ -933,6 +944,21 @@ const SPEC_DRAFTS: SpecDraft[] = [
   },
   {
     ...BASE_SPEC,
+    id: 'flexiSystem',
+    name: 'Flexi extraction system',
+    price: 50000,
+    category: 'extraction',
+    width: 3,
+    depth: 3,
+    height: 4,
+    spriteKey: 'flexiSystem',
+    effect:
+      'Everything the central system does, and flexible ducting on every machine: move the hall ' +
+      'about as often as you like and the reconnection never costs again. Waste collection 400 ' +
+      'per month.',
+  },
+  {
+    ...BASE_SPEC,
     id: 'pelletiser',
     name: 'Pelletiser',
     price: 15000,
@@ -941,7 +967,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
     depth: 2,
     height: 3,
     spriteKey: 'pelletiser',
-    requires: ['dustSystem'],
+    requiresOneOf: ['dustSystem', 'flexiSystem'],
     effect: 'No waste cost and pellet sales that rise with production.',
   },
 ];

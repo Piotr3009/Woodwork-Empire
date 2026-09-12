@@ -83,6 +83,8 @@ export interface EquipmentSpec {
   stackable: boolean;
   /** Other catalogue ids that must be owned first. */
   requires: string[];
+  /** Catalogue ids of which at least one must be owned first. Empty means no such condition. */
+  requiresOneOf: string[];
   effect: string;
   /** What this family can be bought as, cheapest first. The catalogue price is the first one. */
   variants: EquipmentVariant[];
@@ -333,7 +335,8 @@ export type TaskKind =
   | 'fetchStorage'
   | 'deliver'
   | 'service'
-  | 'repair';
+  | 'repair'
+  | 'moveMachines';
 
 export interface TaskInstance {
   id: string;
@@ -412,6 +415,7 @@ export type LedgerCategory =
   | 'jobBalance'
   | 'interest'
   | 'repair'
+  | 'ducting'
   | 'storage'
   | 'taxi'
   | 'transport'
@@ -525,6 +529,8 @@ export interface GameState {
   lateAccountsMonths: number;
   /** Production minutes since the 1st, for pellet sales. */
   productionMinutesMonth: number;
+  /** Kit the player has dragged about and not yet paid for in time and ducting (T4 3.5). */
+  movedItems: string[];
   gameOver: GameOver | null;
 }
 
@@ -540,6 +546,7 @@ export type GameAction =
   | { type: 'PAY_ARREARS'; amount: number | null }
   | { type: 'ORDER_TRANSPORT'; jobId: string }
   | { type: 'MOVE_ITEM'; itemId: string; x: number; y: number }
+  | { type: 'END_SETUP'; speed: Speed }
   | { type: 'SET_SHOW_WHY'; on: boolean }
   | { type: 'WORK_HERE'; jobId: string | null }
   | { type: 'ASSIGN_JOB'; jobId: string; workerId: string | null }

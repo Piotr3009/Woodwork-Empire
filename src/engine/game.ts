@@ -10,7 +10,10 @@ import {
   DIFFICULTIES,
   HELPER_CLEAN_WEEKDAY,
   LOCKER_SLOT_LAYOUT,
+  DUCTING_RECONNECT_COST,
   MINUTES_PER_WORKING_DAY,
+  MOVE_MINUTES_PER_ITEM,
+  MOVING_SPEED,
   OWNER_LABOUR_PER_MINUTE,
   REPUTATION_START,
   SERVICE_INTERVAL_DAYS,
@@ -48,11 +51,13 @@ import {
   breakMachine,
   extractorBreakdownChance,
   extractorBroken,
+  ductingIsFree,
   findSpec,
   freeBenches,
   hallProductivityFactor,
   has,
   hasBenchFor,
+  needsDucting,
   machinesDueService,
   overdueBreakdownChance,
   repairCostFor,
@@ -138,6 +143,7 @@ import {
   createTask,
   findTask,
   interruptOwnerWith,
+  movingMachines,
   pauseOwnerTask,
   resumeOwnerTask,
   startTask,
@@ -243,6 +249,7 @@ export function createGame(options: NewGameOptions): GameState {
     booksUpToDay: 0,
     lateAccountsMonths: 0,
     productionMinutesMonth: 0,
+    movedItems: [],
     gameOver: null,
   };
   startDay(state);
@@ -552,6 +559,9 @@ function applyTaskCompletion(state: GameState, task: TaskInstance): void {
     case 'cleaning':
       clearDust(state);
       break;
+    case 'moveMachines':
+      chargeDucting(state);
+      break;
     case 'bookkeeping':
       writeUpBooks(state);
       break;
@@ -598,6 +608,47 @@ function applyTaskCompletion(state: GameState, task: TaskInstance): void {
       // Emails, bookkeeping, ordering and staff management only cost minutes.
       break;
   }
+}
+
+/** Every moved machine that is ducted into the extraction has to be reconnected, and that is
+ *  paid for when the move is finished. The flexi system never needs it (CLAUDE.md T4 3.5). */
+function chargeDucting(state: GameState): void {
+  const free = ductingIsFree(state);
+  for (const itemId of state.movedItems) {
+    const item = state.equipment.find((entry) => entry.id === itemId);
+    if (!item || !needsDucting(item.specId)) continue;
+    if (free) continue;
+    const name = findSpec(item.specId)?.name ?? item.specId;
+    pay(
+      state,
+      'ducting',
+      `Ducting reconnection: ${name.toLowerCase()}`,
+      DUCTING_RECONNECT_COST,
+    );
+  }
+  state.movedItems = [];
+}
+
+/** Leaving setup mode with the kit moved: the move is a job of work in the hall, an hour an item,
+ *  and the clock runs itself at 4x until it is done (CLAUDE.md T4 3.5). */
+function endSetup(state: GameState, speed: Speed): void {
+  state.speed = speed;
+  if (state.movedItems.length === 0) return;
+  if (state.tasks.some((task) => task.kind === 'moveMachines' && !task.done)) return;
+  const task = createTask(state, {
+    kind: 'moveMachines',
+    label: `Moving machines: ${plural(state.movedItems.length, 'item', 'items')}`,
+    minutes: state.movedItems.length * MOVE_MINUTES_PER_ITEM,
+  });
+  // The owner moved the kit, so the owner shifts it, whatever else he was holding. A joiner or
+  // the helper can be sent instead while the owner is not in.
+  if (ownerIsAvailable(state)) {
+    interruptOwnerWith(state, task);
+    return;
+  }
+  const hand =
+    availableJoiners(state)[0] ?? helpers(state).find((worker) => isWorkingToday(state, worker));
+  if (hand) assignWorkerTask(state, hand.id, task.id);
 }
 
 /** One minute of work, at the clock's current minute, before time moves on. */
@@ -663,6 +714,8 @@ function updateStations(state: GameState): void {
 
 function settle(state: GameState): void {
   refreshLocks(state);
+  // Nothing else happens while the hall is being moved, and the clock runs itself (T4 3.5).
+  if (movingMachines(state) !== null) state.speed = MOVING_SPEED;
   delegateTasks(state);
   autoAssignJobs(state);
   updateStations(state);
@@ -747,7 +800,10 @@ function runProductionMinute(state: GameState, ownerOnTask: boolean): void {
   const hall = hallProductivityFactor(state);
   let worked = false;
   const materials = new Set<MaterialKind>();
-  const atTheBench = !ownerOnTask && state.owner.currentTaskId === null ? ownerJob(state) : null;
+  // Every bench waits while the machines are being shifted about (CLAUDE.md T4 3.5).
+  const moving = movingMachines(state) !== null;
+  const atTheBench =
+    !ownerOnTask && !moving && state.owner.currentTaskId === null ? ownerJob(state) : null;
   if (atTheBench && ownerIsAvailable(state) && canWorkOn(state, atTheBench)) {
     spendOwnerMinute(state, 'workshop');
     state.owner.productionMinutes += 1;
@@ -766,6 +822,7 @@ function runProductionMinute(state: GameState, ownerOnTask: boolean): void {
         runWorkerTaskMinute(state, worker.id, worker.taskId);
         continue;
       }
+      if (moving) continue;
       if (worker.role !== 'joiner' || worker.jobId === null) continue;
       const job = findJob(state, worker.jobId);
       if (!job || job.stage !== 'inProduction') {
@@ -1004,7 +1061,11 @@ export function applyAction(state: GameState, action: GameAction): GameState {
   const next = clone(state);
   switch (action.type) {
     case 'SET_SPEED':
-      next.speed = action.speed as Speed;
+      // The speed is not the player's while the hall is being moved (CLAUDE.md T4 3.5).
+      if (movingMachines(next) === null) next.speed = action.speed as Speed;
+      break;
+    case 'END_SETUP':
+      endSetup(next, action.speed as Speed);
       break;
     case 'END_DAY':
       if (next.clock.minute >= MINUTES_PER_WORKING_DAY) {
@@ -1095,9 +1156,18 @@ export function applyAction(state: GameState, action: GameAction): GameState {
     case 'SET_SHOW_WHY':
       next.showWhy = action.on;
       break;
-    case 'MOVE_ITEM':
+    case 'MOVE_ITEM': {
+      const item = next.equipment.find((entry) => entry.id === action.itemId);
+      const stood = item ? { x: item.anchorX, y: item.anchorY } : null;
       moveItem(next, action.itemId, action.x, action.y);
+      // A machine put back exactly where it stood was never moved (CLAUDE.md T4 3.5).
+      const shifted =
+        item !== undefined && stood !== null && (item.anchorX !== stood.x || item.anchorY !== stood.y);
+      if (shifted && !next.movedItems.includes(action.itemId)) {
+        next.movedItems.push(action.itemId);
+      }
       break;
+    }
     case 'ORDER_TRANSPORT': {
       const job = findJob(next, action.jobId);
       if (!job || job.stage !== 'awaitingTransport' || job.deliverOnDay !== null) break;
@@ -1175,6 +1245,10 @@ export function canBuy(state: GameState, specId: string, variantId?: string): Bu
       const name = findSpec(required)?.name ?? required;
       return { ok: false, reason: `Needs ${name} first` };
     }
+  }
+  if (spec.requiresOneOf.length > 0 && !spec.requiresOneOf.some((id) => has(state, id))) {
+    const names = spec.requiresOneOf.map((id) => findSpec(id)?.name ?? id).join(' or ');
+    return { ok: false, reason: `Needs ${names} first` };
   }
   if (!spec.stackable && has(state, specId)) return { ok: false, reason: 'Already owned' };
   if (specId === 'workbench' && countOf(state, 'workbench') >= state.unit.benchSlots) {

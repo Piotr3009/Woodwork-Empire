@@ -33,6 +33,7 @@ const CATEGORY_LABELS: Record<LedgerCategory, string> = {
   jobBalance: 'Balances from clients',
   interest: 'Interest',
   repair: 'Repairs and service',
+  ducting: 'Ducting reconnection',
   storage: 'Storage',
   taxi: 'Taxis',
   transport: 'Transport',

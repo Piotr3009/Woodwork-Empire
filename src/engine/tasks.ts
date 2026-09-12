@@ -10,6 +10,7 @@ import {
   CLERK_ORDERS_PER_DAY,
   CLIENT_CALL_ANSWER_MINUTES,
   DAILY_ORDERING_MINUTES,
+  MOVE_MINUTES_PER_ITEM,
   EMAIL_ABOVE_BREAKS,
   EMAIL_ABOVE_PRICE,
   EMAIL_ABOVE_PRICE_STEP,
@@ -79,6 +80,7 @@ const TASK_DEFINITIONS: Record<TaskKind, TaskDefinition> = {
   deliver: { category: 'workshop', eligibleRoles: ['joiner', 'helper'], autoRoles: [] },
   service: { category: 'workshop', eligibleRoles: ['joiner'], autoRoles: [] },
   repair: { category: 'workshop', eligibleRoles: ['joiner'], autoRoles: [] },
+  moveMachines: { category: 'workshop', eligibleRoles: ['joiner', 'helper'], autoRoles: [] },
 };
 
 /** Float guard, not a game number: work this small is finished work. */
@@ -181,6 +183,16 @@ export function findTask(state: GameState, taskId: string): TaskInstance | null 
 /** Everything still waiting for somebody. */
 export function openTasks(state: GameState): TaskInstance[] {
   return state.tasks.filter((task) => !task.done);
+}
+
+/** The move of the hall somebody is actually doing this minute, or null. While one is running
+ *  the clock is forced to 4x and every bench waits (CLAUDE.md T4 3.5). */
+export function movingMachines(state: GameState): TaskInstance | null {
+  return (
+    state.tasks.find(
+      (task) => task.kind === 'moveMachines' && !task.done && task.doneBy !== null,
+    ) ?? null
+  );
 }
 
 export function tasksOfKind(state: GameState, kind: TaskKind): TaskInstance[] {
@@ -384,6 +396,7 @@ export function assignWorkerTask(state: GameState, workerId: string, taskId: str
 export const AD_HOC_TASK_MINUTES = {
   bagChange: BAG_CHANGE_MINUTES,
   clientCall: CLIENT_CALL_ANSWER_MINUTES,
+  moveMachines: MOVE_MINUTES_PER_ITEM,
   cleaning: CLEANING_MINUTES,
   deliver: OWN_DELIVERY_MINUTES,
   fetchStorage: FETCH_STORAGE_MINUTES,

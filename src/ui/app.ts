@@ -9,6 +9,8 @@ import {
   brokenMachines,
   findSpec,
   machinesDueService,
+  ductingDue,
+  movingMachines,
   oldestReadyJob,
   ownerJob,
   runMinutes,
@@ -50,6 +52,8 @@ import {
   type ModalSpec,
   escapeHtml,
   minutes,
+  money,
+  plural,
   reasonLabel,
   syncModals,
 } from './modal';
@@ -197,18 +201,34 @@ function ghostFor(current: GameState): Ghost | null {
   return { x: box.x, y: box.y, width: box.width, depth: box.depth, ok: check.ok, reason: check.reason };
 }
 
-function setupControls(): string {
+function setupControls(current: GameState): string {
+  // What the moves made so far will cost to reconnect, before he presses Done (T4 3.5).
+  const due = ductingDue(current);
+  const bill =
+    due.machines === 0
+      ? ''
+      : `<span class="reason">Ducting to reconnect: ${plural(due.machines, 'machine', 'machines')}, ` +
+        `${money(due.cost)}</span>`;
   return (
     '<div class="view-controls">' +
     '<button class="btn btn-primary" data-do="endSetup">Done</button>' +
+    bill +
     '<span class="reason">Drag the machines, the benches and the shelving where you want them. ' +
-    'The rooms and the gate stay where they are.</span>' +
+    'The rooms and the gate stay where they are. Every item moved is an hour of somebody\'s ' +
+    'time.</span>' +
     '</div>'
   );
 }
 
 function hallControls(current: GameState): string {
-  if (ui.setup) return setupControls();
+  if (ui.setup) return setupControls(current);
+  if (movingMachines(current) !== null) {
+    return (
+      '<div class="view-controls">' +
+      '<span class="reason">Moving machines. Nothing gets made until the kit is back down and ' +
+      'the ducting is on.</span></div>'
+    );
+  }
   const ready = oldestReadyJob(current);
   const working = ownerJob(current) !== null;
   // The hall says exactly what the job card says, out of the one check (CLAUDE.md T4 3.4).
@@ -560,6 +580,8 @@ function handleAction(element: DataElement, point: { x: number; y: number }): vo
       ui.menuOpen = false;
       break;
     case 'startSetup':
+      // Nothing is dragged while the last move is still being carried out.
+      if (movingMachines(game()) !== null) break;
       ui.setup = true;
       ui.drag = null;
       ui.speedBeforeSetup = game().speed;
@@ -902,12 +924,13 @@ function onInput(event: Event): void {
   }
 }
 
-/** Leaving setup mode always starts the clock again at the speed it was stopped at. */
+/** Leaving setup mode starts the clock again at the speed it was stopped at, and hands the moves
+ *  to the engine: they are an hour an item and a ducting bill (CLAUDE.md T4 3.5). */
 function endSetup(): void {
   if (!ui.setup) return;
   ui.setup = false;
   ui.drag = null;
-  dispatch({ type: 'SET_SPEED', speed: ui.speedBeforeSetup });
+  dispatch({ type: 'END_SETUP', speed: ui.speedBeforeSetup });
 }
 
 function onKeyDown(event: KeyboardEvent): void {

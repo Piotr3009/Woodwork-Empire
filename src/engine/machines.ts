@@ -2,6 +2,7 @@
 // ownership and power side that the economy needs.
 
 import {
+  DUCTING_RECONNECT_COST,
   DUST_BANDS,
   EXTRACTOR_BROKEN_OUTPUT_FACTOR,
   GATE_CROWD_FACTOR,
@@ -19,6 +20,7 @@ import {
   EXTRACTOR_BREAKDOWN_CHANCE_HIGH_DUST,
   EXTRACTOR_BROKEN_DUST_MULTIPLIER,
   HELPER_REQUIRED_FROM_JOINERS,
+  NO_DUCTING_SPECS,
   NO_HELPER_DUST_MULTIPLIER,
   NO_HELPER_PRODUCTIVITY_FACTOR,
 } from './constants';
@@ -218,7 +220,35 @@ export function extractorBroken(state: GameState): boolean {
 
 /** Extraction of some kind is in the hall. Without it no machine will run at all (PIOTR). */
 export function hasExtraction(state: GameState): boolean {
-  return has(state, 'extractor') || has(state, 'dustSystem');
+  return has(state, 'extractor') || hasCentralExtraction(state);
+}
+
+/** Ducted extraction for the whole hall: the central system, or the flexi one that never needs
+ *  reconnecting (CLAUDE.md T4 3.5). Everything the central system does, the flexi one does. */
+export function hasCentralExtraction(state: GameState): boolean {
+  return has(state, 'dustSystem') || has(state, 'flexiSystem');
+}
+
+/** With the flexi system every machine stays connected wherever it is put. */
+export function ductingIsFree(state: GameState): boolean {
+  return has(state, 'flexiSystem');
+}
+
+/** True for a machine that is ducted into the extraction and has to be reconnected when it is
+ *  moved. A bench, a rack, a locker or a seat is simply carried (CLAUDE.md T4 3.5). */
+export function needsDucting(specId: string): boolean {
+  if (NO_DUCTING_SPECS.includes(specId)) return false;
+  return findSpec(specId)?.category === 'machine';
+}
+
+/** What the moves the player has made will cost in ducting, and on how many machines. */
+export function ductingDue(state: GameState): { machines: number; cost: number } {
+  if (ductingIsFree(state)) return { machines: 0, cost: 0 };
+  const machines = state.movedItems.filter((itemId) => {
+    const item = state.equipment.find((entry) => entry.id === itemId);
+    return item !== undefined && needsDucting(item.specId);
+  }).length;
+  return { machines, cost: machines * DUCTING_RECONNECT_COST };
 }
 
 /** Machines with a bag or a blade, the ones that are serviced and can break down. */
@@ -277,7 +307,7 @@ export function brokenMachineFor(state: GameState, material: MaterialKind): Equi
 
 /** With the central system there are no bags at all (CLAUDE.md 9.2). */
 export function bagsExist(state: GameState): boolean {
-  if (has(state, 'dustSystem')) return false;
+  if (hasCentralExtraction(state)) return false;
   return has(state, 'extractor');
 }
 
@@ -352,7 +382,7 @@ export function clearDust(state: GameState): void {
 
 /** Chance the extractor gives up today, higher when the hall is filthy [TUNE]. */
 export function extractorBreakdownChance(state: GameState): number {
-  if (has(state, 'dustSystem')) return 0;
+  if (hasCentralExtraction(state)) return 0;
   if (!has(state, 'extractor')) return 0;
   // Past the messy band, which is the same edge dustBand uses.
   return state.dust > DUST_HIGH_THRESHOLD

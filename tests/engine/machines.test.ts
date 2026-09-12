@@ -78,7 +78,10 @@ describe('the catalogue', () => {
 
   it('asks for the thing a machine needs first', () => {
     const state = newGame({ difficulty: 'veryEasy' });
-    expect(canBuy(state, 'pelletiser').reason).toBe('Needs Central dust extraction system first');
+    // The pelletiser works off either ducted system (CLAUDE.md T4 3.5).
+    expect(canBuy(state, 'pelletiser').reason).toBe(
+      'Needs Central dust extraction system or Flexi extraction system first',
+    );
     expect(canBuy(state, 'laptop').reason).toBe('Needs Desk first');
   });
 
