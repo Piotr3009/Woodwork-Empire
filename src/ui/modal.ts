@@ -1,5 +1,14 @@
 // The one modal in the game: draggable by its header, scrollable in the body, sticky footer, and a
 // close cross top right (CLAUDE.md 3.9, 10.4).
+//
+// One escape and one money format for the whole game: the renderers and the engine own them,
+// because both layers sit below the modals.
+
+import { formatMoney } from '../engine/index';
+import { escapeText } from '../render/hall';
+
+export const escapeHtml = escapeText;
+export const money = formatMoney;
 
 export interface ModalSpec {
   id: string;
@@ -14,21 +23,6 @@ export interface ModalSpec {
 export interface ModalPosition {
   left: number;
   top: number;
-}
-
-export function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
-
-/** Money with a thousands comma and no decimals (CLAUDE.md 10.4). */
-export function money(value: number): string {
-  const rounded = Math.round(value);
-  const text = Math.abs(rounded).toLocaleString('en-GB');
-  return `${rounded < 0 ? '-' : ''}£${text}`;
 }
 
 export function minutes(value: number): string {

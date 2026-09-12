@@ -30,7 +30,6 @@ function job(partial: Partial<Job>): Job {
     express: false,
     byHand: false,
     needsMeasure: false,
-    measureDone: false,
     labourValue: 160,
     labourRemaining: 0,
     labourTotal: 160,

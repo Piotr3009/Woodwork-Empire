@@ -6,6 +6,7 @@ import {
   ACCIDENT_DAYS_OFF,
   BENCH_SLOT_LAYOUT,
   CANTEEN_SLOT_LAYOUT,
+  DESK_LAYOUT,
   DIFFICULTIES,
   EXTRACTOR_REPAIR_COST,
   HELPER_CLEAN_WEEKDAY,
@@ -22,8 +23,8 @@ import {
   STATE_VERSION,
 } from './constants';
 import { expireEnquiries, refillBoard, refreshLocks } from './board';
-import { isDayExhausted, isWorkingDay, weekday } from './clock';
-import { canAfford, formatMoney, pay, runDayCosts } from './economy';
+import { daysBetween, isDayExhausted, isOvertime, isWorkingDay, weekday } from './clock';
+import { canAfford, emptyTotals, formatMoney, pay, runDayCosts } from './economy';
 import { isPaused, openNextEvent, queueEvent } from './events';
 import {
   accidentRisk,
@@ -82,6 +83,7 @@ import {
   availableJoiners,
   helpers,
   hire,
+  isWorkingToday,
   joiners,
   runStaffDayStart,
   sawRatioFactor,
@@ -105,7 +107,6 @@ import type {
   MaterialKind,
   GameAction,
   GameState,
-  PeriodTotals,
   Speed,
   TaskInstance,
 } from './types';
@@ -115,10 +116,6 @@ export interface NewGameOptions {
   difficulty: Difficulty;
   playerName: string;
   companyName: string;
-}
-
-function emptyTotals(): PeriodTotals {
-  return { income: 0, costs: 0, byCategory: {} };
 }
 
 export function clone(state: GameState): GameState {
@@ -168,7 +165,7 @@ export function createGame(options: NewGameOptions): GameState {
       stayHome: false,
     },
     software: { mode: 'none', tier: 'basic', jobsRemaining: 0 },
-    stock: { sheets: 0, capacity: spec.sheetCapacity, tempStorageSheets: 0 },
+    stock: { sheets: 0, tempStorageSheets: 0 },
     equipment: [],
     workers: [],
     enquiries: [],
@@ -187,7 +184,7 @@ export function createGame(options: NewGameOptions): GameState {
     ledger: [],
     eventQueue: [],
     activeEvent: null,
-    dayStats: { jobsAdvanced: [], jobsCompleted: [], productionMinutes: 0, dustAtStart: 0 },
+    dayStats: { jobsAdvanced: [], jobsCompleted: [], dustAtStart: 0 },
     productionMinutesMonth: 0,
     gameOver: null,
   };
@@ -201,8 +198,8 @@ export function createGame(options: NewGameOptions): GameState {
  *  (CLAUDE.md 7.2). */
 function shouldFinishDay(state: GameState): boolean {
   if (isDayExhausted(state.clock.minute)) return true;
-  if (state.clock.minute < MINUTES_PER_WORKING_DAY) return false;
-  return !state.owner.present || state.owner.wentHome;
+  if (!isOvertime(state.clock.minute)) return false;
+  return !ownerIsAvailable(state);
 }
 
 /** Resets everything that is scoped to one day and charges what the new day owes. */
@@ -214,12 +211,7 @@ function startDay(state: GameState): void {
   owner.currentTaskId = null;
   owner.present = true;
   owner.stayHome = false;
-  state.dayStats = {
-    jobsAdvanced: [],
-    jobsCompleted: [],
-    productionMinutes: 0,
-    dustAtStart: state.dust,
-  };
+  state.dayStats = { jobsAdvanced: [], jobsCompleted: [], dustAtStart: state.dust };
   runDayCosts(state, state.clock.day);
   runOwnerDayStart(state);
   runStaffDayStart(state);
@@ -336,11 +328,8 @@ function finishDay(state: GameState): void {
 /** Moves to the next working day, walking over the weekend days on the way. */
 function advanceToNextDay(state: GameState): void {
   let day = state.clock.day + 1;
-  const skipped: number[] = [];
-  while (!isWorkingDay(day)) {
-    skipped.push(day);
-    day += 1;
-  }
+  while (!isWorkingDay(day)) day += 1;
+  const skipped = daysBetween(state.clock.day, day);
   let weekendCosts = 0;
   for (const weekendDay of skipped) {
     state.clock.day = weekendDay;
@@ -500,10 +489,10 @@ function runProductionMinute(state: GameState): void {
     addLabour(state, atTheBench, OWNER_LABOUR_PER_MINUTE * ownerEfficiency(state) * hall);
   }
   // Staff work the normal day only: nobody but the owner does overtime.
-  if (state.clock.minute < MINUTES_PER_WORKING_DAY) {
+  if (!isOvertime(state.clock.minute)) {
     const staffFactor = staffOutputFactor(state);
     for (const worker of state.workers) {
-      if (worker.absentDaysRemaining > 0 || worker.startDay > state.clock.day) continue;
+      if (!isWorkingToday(state, worker)) continue;
       if (worker.taskId !== null) {
         runWorkerTaskMinute(state, worker.id, worker.taskId);
         continue;
@@ -522,7 +511,6 @@ function runProductionMinute(state: GameState): void {
     }
   }
   if (!worked) return;
-  state.dayStats.productionMinutes += 1;
   state.productionMinutesMonth += 1;
   addDust(state, 1);
   for (const material of materials) {
@@ -560,10 +548,13 @@ function raiseBagFull(state: GameState, machine: Equipment): void {
   }
   const choices = [];
   if (ownerIsAvailable(state) && ownerMinutesLeft(state) > 0) {
-    choices.push({ id: 'owner', label: 'Change it yourself, 15 min' });
+    choices.push({ id: 'owner', label: `Change it yourself, ${task.minutesTotal} min` });
   }
   if (joiners(state).length > 0) {
-    choices.push({ id: 'joiner', label: 'Send a joiner, 15 min off his bench' });
+    choices.push({
+      id: 'joiner',
+      label: `Send a joiner, ${task.minutesTotal} min off his bench`,
+    });
   }
   choices.push({ id: 'later', label: 'Leave the machine stopped' });
   queueEvent(state, {
@@ -755,8 +746,12 @@ function anchorFor(state: GameState, specId: string): { x: number; y: number } {
   if (specId === 'workbench') return slotFrom(BENCH_SLOT_LAYOUT, index);
   if (specId === 'locker') return slotFrom(LOCKER_SLOT_LAYOUT, index);
   if (specId === 'canteenSeat') return slotFrom(CANTEEN_SLOT_LAYOUT, index);
+  const desk = DESK_LAYOUT.find((object) => object.id === specId);
+  if (desk) return { x: desk.x, y: desk.y };
   const slot = STARTING_LAYOUT[specId];
-  const base = slot ? { x: slot.yard === true ? state.unit.widthTiles + slot.x : slot.x, y: slot.y } : { x: 0, y: 6 };
+  const base = slot
+    ? { x: slot.yard === true ? state.unit.widthTiles + slot.x : slot.x, y: slot.y }
+    : { x: 0, y: 6 };
   // A second machine of the same kind stands beside the first.
   return { x: base.x + index * 2, y: base.y };
 }

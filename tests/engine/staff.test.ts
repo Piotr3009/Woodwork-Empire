@@ -10,6 +10,7 @@ import {
   availableJoiners,
   canHire,
   hiringOptions,
+  isWorkingToday,
   joiners,
   missingForHire,
   sawRatioFactor,
@@ -114,22 +115,22 @@ describe('the hiring pool', () => {
   });
 });
 
-describe('joiners at the bench', () => {
-  function jobReadyWith(price: number, tier: Worker['tier']): GameState {
-    let state = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
-    state.reputation = 2.5;
-    state = withCrew(state, 1, tier);
-    const enquiry = placeEnquiry(state, {
-      templateId: 'wardrobe',
-      name: 'Wardrobe',
-      price,
-      deadlineDays: 60,
-    });
-    state = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
-    firstJob(state).stage = 'ready';
-    return state;
-  }
+function jobReadyWith(price: number, tier: Worker['tier']): GameState {
+  let state = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
+  state.reputation = 2.5;
+  state = withCrew(state, 1, tier);
+  const enquiry = placeEnquiry(state, {
+    templateId: 'wardrobe',
+    name: 'Wardrobe',
+    price,
+    deadlineDays: 60,
+  });
+  state = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+  firstJob(state).stage = 'ready';
+  return state;
+}
 
+describe('joiners at the bench', () => {
   it('takes a poor joiner 13.3 days to make a 6400 wardrobe', () => {
     const state = jobReadyWith(6400, 'poor');
     const job = firstJob(state);
@@ -210,5 +211,33 @@ describe('the saw ratio', () => {
     const full = 60 * OWNER_LABOUR_PER_MINUTE * WORKER_RATES.normal;
     expect(done.filter((value) => Math.abs(value - full) < 1e-6)).toHaveLength(3);
     expect(done.filter((value) => Math.abs(value - full * OVER_SAW_RATIO_FACTOR) < 1e-6)).toHaveLength(1);
+  });
+});
+
+describe('one path for putting a man on a job', () => {
+  it('automatic assignment goes through the same door as the manual one', () => {
+    const state = runToDay(jobReadyWith(1600, 'poor'), 2).state;
+    const worker = state.workers[0];
+    const job = firstJob(state);
+    expect(worker?.jobId).toBe(job.id);
+    expect(job.assignedTo).toBe(worker?.id);
+    expect(job.stage).toBe('inProduction');
+    // And putting the owner on it takes the joiner off, whichever way it was assigned.
+    const taken = act(state, { type: 'ASSIGN_JOB', jobId: job.id, workerId: 'owner' });
+    expect(taken.workers[0]?.jobId).toBeNull();
+    expect(firstJob(taken).assignedTo).toBe('owner');
+  });
+
+  it('knows who is on the books today', () => {
+    const state = withCrew(buyStartingKit(newGame()), 1, 'poor');
+    const worker = state.workers[0];
+    expect(worker).toBeDefined();
+    if (!worker) return;
+    expect(isWorkingToday(state, worker)).toBe(false);
+    const day2 = runToDay(state, 2).state;
+    const started = day2.workers[0];
+    expect(started && isWorkingToday(day2, started)).toBe(true);
+    if (started) started.absentDaysRemaining = 2;
+    expect(started && isWorkingToday(day2, started)).toBe(false);
   });
 });

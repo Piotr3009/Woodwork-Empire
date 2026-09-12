@@ -26,7 +26,9 @@ import {
   UNLOAD_BASE_MINUTES,
 } from './constants';
 import { findSpec } from './machines';
+import { ownerIsAvailable } from './owner';
 import { makeId } from './rng';
+import { isWorkingToday, joiners } from './staff';
 import type {
   GameState,
   ProductTemplate,
@@ -133,8 +135,7 @@ export function unloadMinutes(state: GameState): number {
 }
 
 export function staffManagementMinutes(state: GameState): number {
-  const joiners = state.workers.filter((worker) => worker.role === 'joiner').length;
-  return joiners * STAFF_MANAGEMENT_MINUTES_PER_JOINER;
+  return joiners(state).length * STAFF_MANAGEMENT_MINUTES_PER_JOINER;
 }
 
 // ---------------------------------------------------------------------------
@@ -165,7 +166,6 @@ export function createTask(state: GameState, draft: TaskDraft): TaskInstance {
     day: state.clock.day,
     done: false,
     doneBy: null,
-    eligibleRoles: definition.eligibleRoles,
   };
   state.tasks.push(task);
   return task;
@@ -216,9 +216,7 @@ export function createDailyTasks(state: GameState): void {
  *  Returns what was cleared, so the caller can apply what each finished task does. */
 export function assignStaffTasks(state: GameState): TaskInstance[] {
   const cleared: TaskInstance[] = [];
-  const started = state.workers.filter(
-    (worker) => worker.startDay <= state.clock.day && worker.absentDaysRemaining === 0,
-  );
+  const started = state.workers.filter((worker) => isWorkingToday(state, worker));
   if (started.length === 0) return cleared;
   let clerkOrders = started.filter((worker) => worker.role === 'purchasingClerk').length
     * CLERK_ORDERS_PER_DAY;
@@ -231,8 +229,8 @@ export function assignStaffTasks(state: GameState): TaskInstance[] {
       if (clerkOrders <= 0) continue;
       clerkOrders -= 1;
     }
-    task.done = true;
-    task.minutesRemaining = 0;
+    // Staff clear their own work: one path finishes a task, whoever did it.
+    advanceTask(task, task.minutesRemaining);
     task.doneBy = staff.id;
     cleared.push(task);
   }
@@ -246,7 +244,7 @@ export function assignStaffTasks(state: GameState): TaskInstance[] {
 export function startTask(state: GameState, taskId: string): boolean {
   const task = findTask(state, taskId);
   if (!task || task.done) return false;
-  if (!state.owner.present || state.owner.wentHome) return false;
+  if (!ownerIsAvailable(state)) return false;
   // One thing at a time: the current task has to be finished or paused first (CLAUDE.md 10.1).
   if (state.owner.currentTaskId !== null && state.owner.currentTaskId !== task.id) return false;
   // No drawing without a licence for the software (CLAUDE.md 9.2).

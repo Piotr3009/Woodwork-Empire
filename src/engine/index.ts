@@ -30,7 +30,6 @@ export {
   gameMinutesPerRealSecond,
   isFriday,
   isWorkingDay,
-  monthOfDay,
   weekday,
   weekdayName,
 } from './clock';
@@ -52,6 +51,7 @@ export {
   dailyRates,
   dailyRent,
   monthlySalaryBill,
+  netOf,
   nextDueDays,
   weeklyWageBill,
 } from './economy';
@@ -63,12 +63,12 @@ export { availableFinishes, findTemplate, lockReasonFor, template } from './cata
 // Jobs
 export {
   findJob,
+  jobLabourCost,
   minutesRemainingFor,
   oldestReadyJob,
+  jobProgress,
   openJobs,
   ownerJob,
-  readyToOrderMaterial,
-  workerMinuteCost,
 } from './jobs';
 
 // Tasks
@@ -77,16 +77,16 @@ export {
   clientCallMinutes,
   designMinutes,
   findTask,
-  jobTasks,
   materialOrderMinutes,
   openTasks,
   softwareActive,
+  staffManagementMinutes,
   tasksOfKind,
   unloadMinutes,
 } from './tasks';
 
 // Staff
-export { availableJoiners, helpers, hiringOptions, joiners, workerById } from './staff';
+export { availableJoiners, helpers, hiringOptions, isWorkingToday, joiners, workerById } from './staff';
 
 // Machines, bags and dust
 export {
@@ -97,18 +97,16 @@ export {
   dustBand,
   findSpec,
   has,
-  hallProductivityFactor,
   machineLabourFactor,
   machinesStopped,
   owned,
-  specOf,
 } from './machines';
 
 // Material and deliveries
 export {
-  deliveriesDueTomorrow,
+  deliveriesArrivingOn,
   deliveriesInYard,
-  findDelivery,
+  deliveriesOnTheWay,
   materialCostFor,
   materialModeLabel,
   sheetsForCost,

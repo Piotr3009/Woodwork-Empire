@@ -1,7 +1,7 @@
 // The team board: who can be hired, what is missing before they can start, and the crew
 // (CLAUDE.md 9.3).
 
-import { hiringOptions } from '../engine/index';
+import { hiringOptions, staffManagementMinutes } from '../engine/index';
 import type { GameState, HiringOption } from '../engine/index';
 import {
   emptyLine,
@@ -66,7 +66,7 @@ export function renderHiring(state: GameState): string {
       );
     })
     .join('');
-  const management = state.workers.filter((worker) => worker.role === 'joiner').length * 10;
+  const management = staffManagementMinutes(state);
   return (
     '<h3>The crew</h3>' +
     (crew === '' ? emptyLine('Nobody yet. Every hour is your own hour.') : crew) +

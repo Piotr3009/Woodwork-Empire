@@ -8,6 +8,7 @@ import {
   gameMinutesPerRealSecond,
   machinesStopped,
   oldestReadyJob,
+  ownerJob,
   tick,
 } from '../engine/index';
 import type { Difficulty, GameAction, GameState, WorkerRole, WorkerTier } from '../engine/index';
@@ -116,7 +117,7 @@ function modalBody(id: ModalId, current: GameState): string {
 
 function hallControls(current: GameState): string {
   const ready = oldestReadyJob(current);
-  const working = current.jobs.some((job) => job.assignedTo === 'owner');
+  const working = ownerJob(current) !== null;
   const workHere = working
     ? reasonLabel('You are at the bench')
     : ready

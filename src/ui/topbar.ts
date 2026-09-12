@@ -1,7 +1,7 @@
 // The one slim top bar every view shares (CLAUDE.md 10.1). Nothing else lives here.
 
 import { MINUTES_PER_WORKING_DAY, SPEEDS } from '../engine/constants';
-import { formatDate } from '../engine/index';
+import { formatDate, netOf } from '../engine/index';
 import type { GameState, Speed } from '../engine/index';
 import { escapeHtml, money } from './modal';
 
@@ -34,7 +34,7 @@ function minuteBar(state: GameState): string {
 }
 
 export function renderTopbar(state: GameState, view: 'hall' | 'office'): string {
-  const net = state.finance.day.income - state.finance.day.costs;
+  const net = netOf(state.finance.day);
   const netClass = net > 0 ? 'good' : net < 0 ? 'bad' : 'flat';
   return (
     '<div class="topbar">' +

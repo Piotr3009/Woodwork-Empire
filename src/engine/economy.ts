@@ -25,6 +25,11 @@ import { has, poweredMachines, seizableMachines } from './machines';
 import { makeId } from './rng';
 import type { GameState, LedgerCategory, PeriodTotals } from './types';
 
+/** What a period came to: money in less money out. */
+export function netOf(totals: PeriodTotals): number {
+  return totals.income - totals.costs;
+}
+
 /** Money as the player reads it: a comma for the thousands and no decimals (CLAUDE.md 10.4). */
 export function formatMoney(value: number): string {
   const rounded = Math.round(value);
@@ -32,7 +37,7 @@ export function formatMoney(value: number): string {
   return `${rounded < 0 ? '-' : ''}\u00a3${text}`;
 }
 
-function emptyTotals(): PeriodTotals {
+export function emptyTotals(): PeriodTotals {
   return { income: 0, costs: 0, byCategory: {} };
 }
 
@@ -98,8 +103,9 @@ export function canAfford(state: GameState, amount: number): boolean {
   return state.cash - amount >= state.finance.overdraftLimit;
 }
 
-/** A cost that arrives whether the player likes it or not. Unpayable costs become arrears. */
-function chargePeriodic(
+/** A cost that arrives whether the player likes it or not: rent, wages, or material already
+ *  ordered. It obeys the overdraft floor and becomes arrears when there is no room left. */
+export function chargeUnavoidable(
   state: GameState,
   category: LedgerCategory,
   label: string,
@@ -155,15 +161,15 @@ function runMonthlyItems(state: GameState): void {
   const entriesBefore = state.ledger.length;
   if (state.cash < 0) {
     const interest = -state.cash * OVERDRAFT_MONTHLY_INTEREST;
-    chargePeriodic(state, 'interest', 'Overdraft interest', interest);
+    chargeUnavoidable(state, 'interest', 'Overdraft interest', interest);
   }
   const salaries = monthlySalaryBill(state);
-  if (salaries > 0) chargePeriodic(state, 'salaries', 'Office salaries', salaries);
+  if (salaries > 0) chargeUnavoidable(state, 'salaries', 'Office salaries', salaries);
   if (state.software.mode === 'subscription') {
-    chargePeriodic(state, 'software', 'Software subscription', SOFTWARE_SUBSCRIPTION_MONTHLY);
+    chargeUnavoidable(state, 'software', 'Software subscription', SOFTWARE_SUBSCRIPTION_MONTHLY);
   }
   if (has(state, 'dustSystem') && !has(state, 'pelletiser')) {
-    chargePeriodic(state, 'waste', 'Dust waste collection', DUST_WASTE_MONTHLY);
+    chargeUnavoidable(state, 'waste', 'Dust waste collection', DUST_WASTE_MONTHLY);
   }
   if (has(state, 'pelletiser')) {
     const bonus =
@@ -200,17 +206,6 @@ function runArrearsEscalation(state: GameState, day: number): void {
   if (finance.arrearsMonths >= ARREARS_MONTHS_BAILIFF) {
     runBailiff(state);
   }
-}
-
-/** A cost the player cannot refuse once it has been incurred: material that has been ordered.
- *  It obeys the overdraft floor and becomes arrears when there is no room left. */
-export function chargeUnavoidable(
-  state: GameState,
-  category: LedgerCategory,
-  label: string,
-  amount: number,
-): void {
-  chargePeriodic(state, category, label, amount);
 }
 
 /** A loss with no cash movement: sheets left in the yard overnight. */
@@ -285,18 +280,18 @@ export function runDayCosts(state: GameState, day: number): void {
   }
   runArrearsEscalation(state, day);
   if (day === 1) {
-    chargePeriodic(state, 'unitDeposit', 'Unit deposit', UNIT_DEPOSIT);
+    chargeUnavoidable(state, 'unitDeposit', 'Unit deposit', UNIT_DEPOSIT);
   }
-  chargePeriodic(state, 'rent', 'Rent', dailyRent(state));
-  chargePeriodic(state, 'rates', 'Business rates', dailyRates(state));
-  chargePeriodic(state, 'power', 'Power', dailyPower(state));
+  chargeUnavoidable(state, 'rent', 'Rent', dailyRent(state));
+  chargeUnavoidable(state, 'rates', 'Business rates', dailyRates(state));
+  chargeUnavoidable(state, 'power', 'Power', dailyPower(state));
   if (isWorkingDay(day)) {
-    chargePeriodic(state, 'living', 'Living costs', LIVING_COST_PER_WORKING_DAY);
+    chargeUnavoidable(state, 'living', 'Living costs', LIVING_COST_PER_WORKING_DAY);
   }
   if (isFriday(day)) {
     const wages = weeklyWageBill(state);
     if (wages > 0) {
-      chargePeriodic(state, 'wages', 'Weekly wages', wages);
+      chargeUnavoidable(state, 'wages', 'Weekly wages', wages);
       queueEvent(state, {
         kind: 'wagesPaid',
         title: 'Wages',

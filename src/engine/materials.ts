@@ -52,7 +52,6 @@ export function createDelivery(
     unloaded: false,
     bespoke,
     overflowSheets: 0,
-    overflowResolved: true,
   };
   state.deliveries.push(delivery);
   return delivery;
@@ -74,8 +73,14 @@ export function deliveriesInYard(state: GameState): Delivery[] {
   return state.deliveries.filter((delivery) => delivery.arrived && !delivery.unloaded);
 }
 
-export function deliveriesDueTomorrow(state: GameState): Delivery[] {
+/** Everything ordered and not yet at the gate. */
+export function deliveriesOnTheWay(state: GameState): Delivery[] {
   return state.deliveries.filter((delivery) => !delivery.arrived);
+}
+
+/** What the next morning brings, for the end of day summary. */
+export function deliveriesArrivingOn(state: GameState, day: number): Delivery[] {
+  return state.deliveries.filter((delivery) => !delivery.arrived && delivery.arriveDay <= day);
 }
 
 /** Marks today's lorries as here and puts the unloading on the task list. */
@@ -102,7 +107,7 @@ export function materialModeLabel(mode: MaterialMode): string {
 
 /** Room left on the sheet rack. */
 export function stockFree(state: GameState): number {
-  return Math.max(0, state.stock.capacity - state.stock.sheets);
+  return Math.max(0, state.unit.sheetCapacity - state.stock.sheets);
 }
 
 /** Buying sheets in advance: cheaper per job, but it ties up cash and rack space. */
@@ -122,7 +127,6 @@ export function unloadIntoStock(state: GameState, delivery: Delivery): number {
   state.stock.sheets += fitted;
   const overflow = delivery.sheets - fitted;
   delivery.overflowSheets = overflow;
-  delivery.overflowResolved = overflow === 0;
   return overflow;
 }
 
@@ -132,7 +136,6 @@ export function moveOverflowToStorage(state: GameState, delivery: Delivery): voi
   pay(state, 'storage', `Temporary storage for ${delivery.overflowSheets} sheets`, TEMP_STORAGE_COST);
   state.stock.tempStorageSheets += delivery.overflowSheets;
   delivery.overflowSheets = 0;
-  delivery.overflowResolved = true;
 }
 
 /** Sheets left in the yard overnight are gone in the morning. */
@@ -142,7 +145,6 @@ export function writeOffSheetsLeftOutside(state: GameState): number {
     if (delivery.overflowSheets <= 0) continue;
     lost += delivery.overflowSheets;
     delivery.overflowSheets = 0;
-    delivery.overflowResolved = true;
   }
   if (lost > 0) {
     // The cash went days ago: this line is the loss, not a payment.

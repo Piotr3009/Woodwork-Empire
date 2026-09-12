@@ -84,7 +84,7 @@ describe('accepting an enquiry', () => {
     const before = state.cash;
     state = doTask(state, 'siteMeasure');
     expect(before - state.cash).toBe(SITE_MEASURE_TAXI_COST);
-    expect(state.jobs[0]?.measureDone).toBe(true);
+    expect(state.tasks.find((task) => task.kind === 'siteMeasure')?.done).toBe(true);
   });
 
   it('uses one job of a one off licence', () => {

@@ -207,7 +207,6 @@ export interface Job {
   express: boolean;
   byHand: boolean;
   needsMeasure: boolean;
-  measureDone: boolean;
   /** 0.40 P of the price. */
   labourValue: number;
   /** Labour still to do, after machine reductions and the by-hand penalty. */
@@ -239,7 +238,6 @@ export interface Delivery {
   bespoke: boolean;
   /** Sheets that did not fit in the rack and still need a decision. */
   overflowSheets: number;
-  overflowResolved: boolean;
 }
 
 export type TaskKind =
@@ -272,8 +270,6 @@ export interface TaskInstance {
   done: boolean;
   /** Worker id, 'owner', or null while nobody works on it. */
   doneBy: string | null;
-  /** Roles that may take this task off the owner. */
-  eligibleRoles: WorkerRole[];
 }
 
 export type GameEventKind =
@@ -364,7 +360,6 @@ export interface FinanceState {
 
 export interface StockState {
   sheets: number;
-  capacity: number;
   /** Sheets sitting in paid temporary storage, fetched next morning. */
   tempStorageSheets: number;
 }
@@ -379,7 +374,7 @@ export interface SoftwareState {
 export interface DayStats {
   jobsAdvanced: string[];
   jobsCompleted: string[];
-  productionMinutes: number;
+  /** The dust reading the day opened with, for the end of day summary. */
   dustAtStart: number;
 }
 

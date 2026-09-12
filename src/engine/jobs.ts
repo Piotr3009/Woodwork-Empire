@@ -19,6 +19,7 @@ import { chargeUnavoidable, formatMoney, receive } from './economy';
 import { queueEvent } from './events';
 import { has, machineLabourFactor } from './machines';
 import { materialCostFor, orderMaterialForJob, sheetsForCost, stockCostFor } from './materials';
+import { ownerIsAvailable } from './owner';
 import { applyRating } from './reputation';
 import { makeId } from './rng';
 import {
@@ -52,6 +53,24 @@ export function labourValueFor(price: number): number {
 /** What a worker of this rate is worth per minute, for the job card only [TUNE]. */
 export function workerMinuteCost(weeklyWage: number): number {
   return weeklyWage / WORKER_MINUTE_RATE_DIVISOR;
+}
+
+/** What the rest of a job costs in wages if the man on it finishes it, for the job card only
+ *  (CLAUDE.md 8.5). The owner costs nothing: his time is not a wage. */
+export function jobLabourCost(state: GameState, job: Job): { minutes: number; cost: number } {
+  if (job.assignedTo === null || job.assignedTo === 'owner') {
+    return { minutes: minutesRemainingFor(job, 1), cost: 0 };
+  }
+  const worker = state.workers.find((entry) => entry.id === job.assignedTo);
+  if (!worker || worker.rate <= 0) return { minutes: minutesRemainingFor(job, 1), cost: 0 };
+  const minutes = minutesRemainingFor(job, worker.rate);
+  return { minutes, cost: minutes * workerMinuteCost(worker.weeklyWage) };
+}
+
+/** How far through the job the bench is, 0 to 1. */
+export function jobProgress(job: Job): number {
+  if (job.labourTotal <= 0) return 1;
+  return Math.min(1, Math.max(0, 1 - job.labourRemaining / job.labourTotal));
 }
 
 /** Minutes this job still needs from a worker of the given rate (1 is the owner). */
@@ -103,7 +122,6 @@ export function acceptEnquiry(state: GameState, enquiryId: string, byHand: boole
     express: enquiry.express,
     byHand: madeByHand,
     needsMeasure: enquiry.needsMeasure,
-    measureDone: !enquiry.needsMeasure,
     labourValue,
     labourRemaining: labourTotal,
     labourTotal,
@@ -211,7 +229,6 @@ export function refreshJob(state: GameState, job: Job): void {
 
 /** The site measure costs a taxi while there is no van (CLAUDE.md 8.10). */
 export function chargeSiteMeasure(state: GameState, job: Job): void {
-  job.measureDone = true;
   if (!has(state, 'van')) {
     chargeUnavoidable(state, 'taxi', `Taxi to the site for ${job.name}`, SITE_MEASURE_TAXI_COST);
   }
@@ -284,7 +301,7 @@ export function assignJob(state: GameState, jobId: string, workerId: string | nu
   const worker =
     workerId === 'owner' ? null : state.workers.find((entry) => entry.id === workerId) ?? null;
   if (workerId === 'owner') {
-    if (!state.owner.present || state.owner.wentHome) return false;
+    if (!ownerIsAvailable(state)) return false;
   } else if (!worker || worker.role !== 'joiner' || worker.absentDaysRemaining > 0) {
     return false;
   }

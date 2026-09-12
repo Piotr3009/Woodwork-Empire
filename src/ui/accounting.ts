@@ -2,7 +2,14 @@
 // (CLAUDE.md 10.1). Nothing arrives as a letter, it is all here.
 
 import { LEDGER_VISIBLE_ENTRIES } from '../engine/constants';
-import { dailyPower, dailyRates, dailyRent, nextDueDays, weeklyWageBill } from '../engine/index';
+import {
+  dailyPower,
+  dailyRates,
+  dailyRent,
+  netOf,
+  nextDueDays,
+  weeklyWageBill,
+} from '../engine/index';
 import type { GameState, PeriodTotals } from '../engine/index';
 import { button, escapeHtml, money } from './modal';
 
@@ -16,7 +23,7 @@ function totalsBlock(title: string, totals: PeriodTotals): string {
         `<span class="row-figure ${amount < 0 ? 'bad' : 'good'}">${money(amount)}</span></div>`,
     )
     .join('');
-  const net = totals.income - totals.costs;
+  const net = netOf(totals);
   return (
     `<div class="col"><h3>${escapeHtml(title)}</h3>` +
     `<div class="row"><span class="row-main">In</span>` +

@@ -161,7 +161,8 @@ The first 10 minutes script is at the bottom of README.md and follows section 15
 
 ## 6. Duplicate paths
 
-"How many code paths do the same job?" One, everywhere I looked. What I found and removed on the way:
+"How many code paths do the same job?" One, everywhere, after the audit went through it. What was
+found and removed, first while building and then in the audit pass:
 
 1. **The job the owner stands at** was held twice: `owner.productionJobId` and `job.assignedTo`.
    They could disagree, and they did: after a bag change the owner was off his job with the job
@@ -176,6 +177,34 @@ The first 10 minutes script is at the bottom of README.md and follows section 15
 6. **The state fixture** in `types.test.ts` was a hand written `GameState`. It uses `createGame`.
 7. **Four exports nothing called** are gone: `hasQueuedEvent`, `taskCategory`, `MAX_DAY_MINUTES`,
    and the UI's `workerName`. `hourEfficiency` read a literal 8 where `OWNER_NORMAL_HOURS` exists.
+8. **Putting a man on a job** was written twice: the automatic assignment hand wrote the three state
+   changes instead of going through `assignJob`. It goes through it now.
+9. **Two HTML escapes and two money formatters** existed, one in the renderers and one in the modal
+   helpers. There is one of each, and the engine event copy uses the same money format.
+10. **`emptyTotals` was defined twice**, in the economy and again in `createGame`.
+11. **`chargeUnavoidable` was a pure alias** of the private periodic charge. One name, one body.
+12. **"Is the owner in today"** was written out in five places beside the `ownerIsAvailable` helper
+    that already said it, and **"is this man on the books today"** in four beside nothing at all.
+    Both are one helper now.
+13. **The period net** (`income - costs`) was computed in three UI files. It is an engine selector.
+14. **The informational labour cost of 8.5** was multiplied out in the laptop. It is an engine
+    selector, which is what section 4 asks for.
+15. **The rack capacity was stored twice**, on the stock and on the unit, so the two could disagree.
+    The unit owns it.
+16. **`deliveriesDueTomorrow` returned everything on the way**, so the end of day summary filtered
+    "tomorrow" again in the UI. Two names now, each meaning what it says.
+17. **Staff finished their tasks by hand** instead of going through `advanceTask`, whose comment
+    already claimed to be the one path.
+18. **Five fields on `GameState` were written and never read**: `eligibleRoles` on a task,
+    `overflowResolved` on a delivery, `measureDone` on a job, `productionMinutes` on the day stats,
+    and the sheet rack capacity above. The dead ones are gone; `dustAtStart` and `labourTotal` are
+    now read, by the end of day summary and by the "% made" figure on the job card.
+19. **Six exports nothing outside the engine used** are out of the public API: `findDelivery`,
+    `hallProductivityFactor`, `jobTasks`, `readyToOrderMaterial`, `specOf` and `monthOfDay`.
+
+One duplication is left on purpose, and it is one line: `machines.ts` filters the crew by role
+inline because `staff.ts` already imports `machines.ts`, so the crew selectors cannot be imported
+back without a cycle. The comment there says so.
 
 Reused modules, named as rule 3.6 asks: `render/hall.ts` exports the SVG primitives that
 `render/office.ts` builds on; `ui/modal.ts` is the only modal frame, money and minute formatter;

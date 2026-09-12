@@ -110,7 +110,7 @@ describe('buying sheets for stock', () => {
     expect(state.stock.sheets).toBe(0);
     state = doTask(state, 'unload');
     expect(state.stock.sheets).toBe(5);
-    expect(stockFree(state)).toBe(state.stock.capacity - 5);
+    expect(stockFree(state)).toBe(state.unit.sheetCapacity - 5);
   });
 
   it('lets a job draw from the rack instead of ordering, with no second payment', () => {

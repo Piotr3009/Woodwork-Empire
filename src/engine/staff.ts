@@ -11,6 +11,7 @@ import {
   WORKER_RATES,
 } from './constants';
 import { addWorkingDays } from './clock';
+import { assignJob, oldestReadyJob } from './jobs';
 import { countOf, findSpec } from './machines';
 import { int, makeId } from './rng';
 import type { GameState, HiringOption, Worker, WorkerRole, WorkerTier } from './types';
@@ -27,10 +28,14 @@ export function workerById(state: GameState, workerId: string): Worker | null {
   return state.workers.find((worker) => worker.id === workerId) ?? null;
 }
 
+/** On the books today and fit to work. The one predicate for it. */
+export function isWorkingToday(state: GameState, worker: Worker): boolean {
+  return worker.startDay <= state.clock.day && worker.absentDaysRemaining === 0;
+}
+
 export function availableJoiners(state: GameState): Worker[] {
   return joiners(state).filter(
-    (worker) =>
-      worker.startDay <= state.clock.day && worker.absentDaysRemaining === 0 && worker.jobId === null,
+    (worker) => isWorkingToday(state, worker) && worker.jobId === null,
   );
 }
 
@@ -136,14 +141,13 @@ export function sawRatioFactor(state: GameState, worker: Worker): number {
   return index < capacity ? 1 : OVER_SAW_RATIO_FACTOR;
 }
 
-/** A free joiner takes the oldest job whose material has arrived (CLAUDE.md 9.4). */
+/** A free joiner takes the oldest job whose material has arrived (CLAUDE.md 9.4). The assignment
+ *  itself goes through the one path in jobs.ts. */
 export function autoAssignJobs(state: GameState): void {
   for (const worker of availableJoiners(state)) {
-    const job = state.jobs.find((entry) => entry.stage === 'ready' && entry.assignedTo === null);
-    if (!job) return;
-    worker.jobId = job.id;
-    job.assignedTo = worker.id;
-    job.stage = 'inProduction';
+    const job = oldestReadyJob(state);
+    if (!job || job.assignedTo !== null) return;
+    assignJob(state, job.id, worker.id);
   }
 }
 

@@ -1,7 +1,7 @@
 // The end of day summary, and the game over screen (CLAUDE.md 10.1).
 
 import { MINUTES_PER_WORKING_DAY } from '../engine/constants';
-import { deliveriesDueTomorrow, dustBand, findJob } from '../engine/index';
+import { deliveriesArrivingOn, dustBand, findJob, netOf } from '../engine/index';
 import type { GameState } from '../engine/index';
 import { escapeHtml, minutes, money } from './modal';
 
@@ -12,11 +12,10 @@ export function renderDayEnd(state: GameState): string {
     .map((name) => escapeHtml(name))
     .join(', ');
   const advanced = state.dayStats.jobsAdvanced.length;
-  const tomorrow = deliveriesDueTomorrow(state)
-    .filter((delivery) => delivery.arriveDay <= state.clock.day + 1)
+  const tomorrow = deliveriesArrivingOn(state, state.clock.day + 1)
     .map((delivery) => `${delivery.sheets} sheets`)
     .join(', ');
-  const net = state.finance.day.income - state.finance.day.costs;
+  const net = netOf(state.finance.day);
   return (
     '<div class="cols">' +
     '<div class="col"><h3>Your minutes</h3>' +
@@ -37,7 +36,10 @@ export function renderDayEnd(state: GameState): string {
     '<div class="col"><h3>The hall</h3>' +
     row('Jobs moved on', String(advanced)) +
     row('Jobs finished', jobs === '' ? 'none' : jobs) +
-    row('Dust', dustBand(state.dust).label) +
+    row(
+      'Dust',
+      `${dustBand(state.dust).label}, opened ${dustBand(state.dayStats.dustAtStart).label}`,
+    ) +
     row('Tomorrow', tomorrow === '' ? 'no deliveries' : tomorrow) +
     '</div></div>' +
     (state.owner.fatigue > 0

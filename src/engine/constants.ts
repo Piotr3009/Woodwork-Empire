@@ -779,10 +779,9 @@ export const ROOM_LAYOUT = [
   },
 ] as const;
 
+/** Hall placement. The office furniture is placed by DESK_LAYOUT instead, and the chair is bought
+ *  but never drawn: 10.1 puts nothing on the office screen but the desk and what is on it. */
 export const STARTING_LAYOUT: Record<string, LayoutSlot> = {
-  desk: { x: 0, y: 1 },
-  chair: { x: 3, y: 2 },
-  laptop: { x: 1, y: 1 },
   extractor: { x: 15, y: 1 },
   dustSystem: { x: 15, y: 1 },
   tableSaw: { x: 0, y: 7 },

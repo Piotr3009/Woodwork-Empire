@@ -3,13 +3,15 @@
 
 import {
   findJob,
+  isWorkingToday,
   joiners,
-  minutesRemainingFor,
+  jobLabourCost,
+  jobProgress,
   openJobs,
   openTasks,
+  ownerIsAvailable,
   softwareActive,
   workerById,
-  workerMinuteCost,
 } from '../engine/index';
 import type { GameState, Job, TaskInstance } from '../engine/index';
 import {
@@ -33,7 +35,7 @@ function taskRow(state: GameState, task: TaskInstance): string {
     action = button('pauseTask', 'Pause');
   } else if (task.kind === 'design' && !softwareActive(state)) {
     action = reasonLabel('No software licence');
-  } else if (!state.owner.present || state.owner.wentHome) {
+  } else if (!ownerIsAvailable(state)) {
     action = reasonLabel('The owner is not in today');
   } else {
     action = button('startTask', 'Start', `data-id="${task.id}"`);
@@ -47,16 +49,12 @@ function taskRow(state: GameState, task: TaskInstance): string {
   );
 }
 
-/** The informational labour cost of a job in progress (CLAUDE.md 8.5). */
+/** The informational labour cost of a job in progress comes from the engine (CLAUDE.md 8.5). */
 function labourCostLine(state: GameState, job: Job): string {
-  if (job.assignedTo === null || job.assignedTo === 'owner') {
-    return `${minutes(minutesRemainingFor(job, 1))} of your own time left`;
-  }
-  const worker = workerById(state, job.assignedTo);
-  if (!worker) return `${minutes(minutesRemainingFor(job, 1))} left`;
-  const left = minutesRemainingFor(job, worker.rate);
-  return `${minutes(left)} of ${escapeHtml(worker.name)}, about ` +
-    `${money(left * workerMinuteCost(worker.weeklyWage))} of wages`;
+  const { minutes: left, cost } = jobLabourCost(state, job);
+  const worker = job.assignedTo === null ? null : workerById(state, job.assignedTo);
+  if (!worker) return `${minutes(left)} of your own time left`;
+  return `${minutes(left)} of ${escapeHtml(worker.name)}, about ${money(cost)} of wages`;
 }
 
 /** Automatic assignment can always be overridden from the job card (CLAUDE.md 9.4). */
@@ -66,16 +64,18 @@ function assignControls(state: GameState, job: Job): string {
     `<button class="chip${job.assignedTo === workerId ? ' is-on' : ''}" data-do="assignJob" ` +
     `data-id="${job.id}" data-worker="${workerId}">${escapeHtml(label)}</button>`;
   const crew = joiners(state)
-    .filter((worker) => worker.startDay <= state.clock.day && worker.absentDaysRemaining === 0)
+    .filter((worker) => isWorkingToday(state, worker))
     .map((worker) => chip(worker.id, worker.name))
     .join('');
   return `<span class="row-action">${chip('owner', 'You')}${crew}</span>`;
 }
 
 function jobRow(state: GameState, job: Job): string {
+  const done = Math.round(jobProgress(job) * 100);
   return (
     `<div class="row"><span class="row-main">${escapeHtml(job.name)} ${money(job.price)}</span>` +
-    `<span class="row-figure">${escapeHtml(job.stage)} \u00b7 due day ${job.dueDay}</span>` +
+    `<span class="row-figure">${escapeHtml(job.stage)} \u00b7 due day ${job.dueDay}` +
+    `${job.stage === 'inProduction' ? ` \u00b7 ${done}% made` : ''}</span>` +
     `<span class="row-figure">${labourCostLine(state, job)}</span>` +
     assignControls(state, job) +
     '</div>'

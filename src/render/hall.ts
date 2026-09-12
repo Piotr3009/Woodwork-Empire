@@ -10,6 +10,7 @@ import {
 } from '../engine/constants';
 import { dustBand, findSpec, machinesStopped } from '../engine/machines';
 import { ownerJob } from '../engine/jobs';
+import { ownerIsAvailable, staffOutputFactor } from '../engine/owner';
 import type { GameState } from '../engine/types';
 import {
   type BoxFaces,
@@ -235,7 +236,7 @@ export function renderHall(state: GameState): string {
     );
   }
   const job = ownerJob(state);
-  if (state.owner.present && !state.owner.wentHome) {
+  if (ownerIsAvailable(state)) {
     const saw = state.equipment.find((item) => item.specId === 'tableSaw');
     const atBench = job !== null && saw !== undefined;
     const x = atBench && saw ? saw.anchorX + 1 : 2;
@@ -273,10 +274,11 @@ export function renderHall(state: GameState): string {
     Math.round(bounds.width + pad * 2),
     Math.round(bounds.height + pad * 2),
   ].join(' ');
+  const output = `${Math.round(staffOutputFactor(state) * 100)}%`;
   const ownerLine = !state.owner.present
-    ? '. The owner is not in today, so everyone works at 0.7'
+    ? `. The owner is not in today, so everyone works at ${output}`
     : state.owner.wentHome
-      ? '. The owner has gone home, so everyone works at 0.7'
+      ? `. The owner has gone home, so everyone works at ${output}`
       : '';
   const band = dustBand(state.dust);
   // 9.7: from the dirty band on, the player is warned that somebody can get hurt.

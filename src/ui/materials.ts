@@ -3,8 +3,8 @@
 
 import { SHEET_PRICE_STOCK } from '../engine/constants';
 import {
-  deliveriesDueTomorrow,
   deliveriesInYard,
+  deliveriesOnTheWay,
   materialModeLabel,
   openJobs,
   stockCostFor,
@@ -33,7 +33,7 @@ export function renderMaterials(state: GameState, sheets: string): string {
   const wanted = Number(sheets) || 0;
   const jobs = openJobs(state);
   const yard = deliveriesInYard(state);
-  const coming = deliveriesDueTomorrow(state);
+  const coming = deliveriesOnTheWay(state);
   return (
     `<p class="figures"><strong>${state.stock.sheets} / ${state.unit.sheetCapacity}</strong> ` +
     `sheets on the rack, ${stockFree(state)} spaces free.` +
