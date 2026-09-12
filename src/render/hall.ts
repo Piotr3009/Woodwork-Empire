@@ -19,8 +19,16 @@ import {
   machinesDueService,
   serviceIsDue,
 } from '../engine/machines';
-import { jobsAtGate, ownerJob } from '../engine/jobs';
+import { jobsAtGate } from '../engine/jobs';
 import { rackCapacity, stockIsLow } from '../engine/materials';
+import {
+  STATION_BENCH,
+  STATION_GATE,
+  STATION_IDLE,
+  STATION_OFFICE,
+  STATION_RACK,
+  stationMachine,
+} from '../engine/stations';
 import { ownerIsAvailable, staffOutputFactor } from '../engine/owner';
 import type { GameState } from '../engine/types';
 import {
@@ -129,18 +137,70 @@ function sawdust(state: GameState): Drawable[] {
   return drawables;
 }
 
-/** A worker is a capsule with his name under it. The owner is the green one. */
-function figure(x: number, y: number, name: string, isOwner: boolean, extra: string): Drawable {
-  const feet = centreOf(x, y, 1, 1);
+/** The tile a station puts a figure on. Anything the workshop has not bought falls back to the
+ *  middle of the floor (CLAUDE.md T2 3.3). */
+export function stationTile(
+  state: GameState,
+  station: string,
+  bench: { x: number; y: number },
+): { x: number; y: number } {
+  const specId = stationMachine(station);
+  if (specId !== null) {
+    const item = state.equipment.find((entry) => entry.specId === specId);
+    const spec = item ? findSpec(item.specId) : null;
+    if (item && spec) return { x: item.anchorX, y: item.anchorY + spec.depth };
+  }
+  if (station === STATION_RACK) {
+    const rack = state.equipment.find((entry) => findSpec(entry.specId)?.sheetCapacity ?? 0);
+    const spec = rack ? findSpec(rack.specId) : null;
+    if (rack && spec) return { x: rack.anchorX, y: rack.anchorY + spec.depth };
+  }
+  if (station === STATION_GATE) {
+    return { x: state.unit.widthTiles + GATE_LAYOUT.x + 1, y: GATE_LAYOUT.y + GATE_LAYOUT.depth };
+  }
+  if (station === STATION_OFFICE) {
+    const office = ROOM_LAYOUT[0];
+    return { x: office.x + 2, y: office.y + office.depth };
+  }
+  if (station === STATION_IDLE) {
+    const canteen = ROOM_LAYOUT[2];
+    return { x: canteen.x + 2, y: canteen.y + canteen.depth };
+  }
+  return bench;
+}
+
+/** The line under a figure's name: where he is standing, in words. */
+function stationLabel(station: string): string {
+  const specId = stationMachine(station);
+  if (specId !== null) return (findSpec(specId)?.name ?? specId).toLowerCase();
+  if (station === STATION_RACK) return 'the rack';
+  if (station === STATION_GATE) return 'the gate';
+  if (station === STATION_OFFICE) return 'the office';
+  if (station === STATION_BENCH) return 'the bench';
+  return 'waiting';
+}
+
+/** A worker is a capsule with his name under it. The owner is the green one. The group carries
+ *  its position as a transform, so a change of station slides instead of jumping. */
+function figure(
+  key: string,
+  tile: { x: number; y: number },
+  name: string,
+  isOwner: boolean,
+  extra: string,
+): Drawable {
+  const feet = centreOf(tile.x, tile.y, 1, 1);
   const fill = isOwner ? 'var(--owner)' : 'var(--worker)';
   return {
-    depth: depthKey(x, y) + 0.2,
+    depth: depthKey(tile.x, tile.y) + 0.2,
     svg:
-      `<g ${extra}><title>${escapeText(name)}</title>` +
-      `<rect x="${Math.round(feet.x - 6)}" y="${Math.round(feet.y - 30)}" width="12" height="26" ` +
-      `rx="6" fill="${fill}" />` +
-      `<text x="${Math.round(feet.x)}" y="${Math.round(feet.y + 14)}" text-anchor="middle" ` +
-      `class="iso-label">${escapeText(name)}</text></g>`,
+      `<g class="figure" data-figure="${key}" ` +
+      `transform="translate(${Math.round(feet.x)},${Math.round(feet.y)})" ${extra}>` +
+      `<title>${escapeText(name)}</title>` +
+      '<rect x="-6" y="-30" width="12" height="26" rx="6" ' +
+      `fill="${fill}" />` +
+      '<text x="0" y="14" text-anchor="middle" ' +
+      `class="iso-label">${escapeText(name.split(',')[0] ?? name)}</text></g>`,
   };
 }
 
@@ -223,27 +283,34 @@ export function renderHall(state: GameState): string {
     });
   }
 
-  // The crew, and the owner when he is at a bench.
+  // The crew, and the owner, each at the station the engine put him on.
   for (const worker of state.workers) {
     if (worker.startDay > state.clock.day) continue;
     const away = worker.absentDaysRemaining > 0;
+    const bench = { x: worker.anchorX, y: worker.anchorY };
+    const where = stationLabel(worker.station);
     drawables.push(
       figure(
-        worker.anchorX,
-        worker.anchorY,
-        away ? `${worker.name} (off)` : worker.name,
+        `worker-${worker.id}`,
+        stationTile(state, worker.station, bench),
+        away ? `${worker.name} (off)` : `${worker.name}, ${where}`,
         false,
         `data-worker="${worker.id}"`,
       ),
     );
   }
-  const job = ownerJob(state);
   if (ownerIsAvailable(state)) {
-    const saw = state.equipment.find((item) => item.specId === 'tableSaw');
-    const atBench = job !== null && saw !== undefined;
-    const x = atBench && saw ? saw.anchorX + 1 : 2;
-    const y = atBench && saw ? saw.anchorY - 1 : 5;
-    drawables.push(figure(x, y, state.playerName, true, 'data-owner="1"'));
+    const bench = state.equipment.find((item) => item.specId === 'workbench');
+    const ownerBench = bench ? { x: bench.anchorX + 1, y: bench.anchorY + 2 } : { x: 2, y: 5 };
+    drawables.push(
+      figure(
+        'owner',
+        stationTile(state, state.owner.station, ownerBench),
+        `${state.playerName}, ${stationLabel(state.owner.station)}`,
+        true,
+        'data-owner="1"',
+      ),
+    );
   }
 
   // A lorry at the gate while something is waiting to be unloaded.

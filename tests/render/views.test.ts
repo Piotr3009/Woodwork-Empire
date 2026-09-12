@@ -3,6 +3,9 @@ import { renderHall } from '../../src/render/hall';
 import { renderOffice } from '../../src/render/office';
 import { renderGameOver } from '../../src/ui/dayEnd';
 import { renderLaptop } from '../../src/ui/laptop';
+import { findSpec } from '../../src/engine/machines';
+import { centreOf } from '../../src/render/iso';
+import type { GameState } from '../../src/engine/index';
 import { tick } from '../../src/engine/index';
 import { act, buyStartingKit, clearEvents, firstJob, newGame, placeEnquiry, runToDay } from '../helpers';
 
@@ -349,5 +352,55 @@ describe('the laptop', () => {
     const state = newGame();
     expect(renderLaptop(state)).toContain('At the gate, 0 pieces');
     expect(renderLaptop(state)).toContain('Nothing waiting to go out.');
+  });
+});
+
+describe('the figures that move', () => {
+  function atTheSaw(): GameState {
+    const state = buyStartingKit(newGame());
+    state.owner.station = 'machine:tableSaw';
+    return state;
+  }
+
+  it('draws the owner on the tile of the machine he is standing at', () => {
+    const state = atTheSaw();
+    const saw = state.equipment.find((item) => item.specId === 'tableSaw');
+    expect(saw).toBeDefined();
+    const spec = findSpec('tableSaw');
+    const feet = centreOf(saw?.anchorX ?? 0, (saw?.anchorY ?? 0) + (spec?.depth ?? 0), 1, 1);
+    const svg = renderHall(state);
+    expect(svg).toContain('data-figure="owner"');
+    expect(svg).toContain(
+      `transform="translate(${Math.round(feet.x)},${Math.round(feet.y)})"`,
+    );
+    // The tooltip names the machine he is at (CLAUDE.md T2 3.3).
+    expect(svg).toContain('<title>Piotr, table saw</title>');
+    expect(svg).toContain('class="figure"');
+  });
+
+  it('moves him when the station changes, and leaves the rest of the hall alone', () => {
+    const saw = renderHall(atTheSaw());
+    const bench = atTheSaw();
+    bench.owner.station = 'bench';
+    const atBench = renderHall(bench);
+    expect(saw).not.toBe(atBench);
+    expect(atBench).toContain('<title>Piotr, the bench</title>');
+    const transforms = (text: string): string[] =>
+      (text.match(/data-figure="owner" transform="[^"]+"/g) ?? []).slice();
+    expect(transforms(saw)).not.toEqual(transforms(atBench));
+  });
+
+  it('puts a figure at the gate, the rack, the office and the canteen door', () => {
+    const state = buyStartingKit(newGame());
+    const places = ['gate', 'rack', 'office', 'idle'];
+    const seen = new Set<string>();
+    for (const station of places) {
+      state.owner.station = station;
+      const match = renderHall(state).match(/data-figure="owner" transform="([^"]+)"/);
+      expect(match?.[1]).toBeDefined();
+      seen.add(match?.[1] ?? '');
+    }
+    // Four different stations, four different places to stand.
+    expect(seen.size).toBe(places.length);
   });
 });

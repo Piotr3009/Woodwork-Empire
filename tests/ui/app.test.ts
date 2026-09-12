@@ -285,6 +285,21 @@ describe('start production', () => {
   });
 });
 
+describe('the sliding figures', () => {
+  it('puts a moved figure back where it was so the CSS transition can run', () => {
+    click('[data-do="setView"][data-view="hall"]');
+    const before = root().querySelector('[data-figure="owner"]')?.getAttribute('transform');
+    expect(before).toBeTruthy();
+    const state = currentState();
+    if (state) state.owner.station = 'gate';
+    advanceMinutes(1);
+    const after = root().querySelector('[data-figure="owner"]')?.getAttribute('transform');
+    // The new node starts at the old place: the move happens on the next animation frame.
+    expect(after).toBe(before);
+    click('[data-do="setView"][data-view="office"]');
+  });
+});
+
 describe('accounting', () => {
   it('plays blind while the books are behind, and shows everything once they are written up', () => {
     click('[data-office="accounting"]');

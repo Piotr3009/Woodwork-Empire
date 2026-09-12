@@ -59,6 +59,11 @@
   cursor: pointer;
 }
 
+/* A figure slides between its stations instead of jumping (CLAUDE.md T2 3.3, 0.8 s is [TUNE]). */
+.figure {
+  transition: transform 0.8s linear;
+}
+
 .view-note {
   margin: 4px 0 0;
   color: var(--text-dim);

@@ -42,6 +42,10 @@ T2-09 Start production and stations. Every job card carries a Start production b
 the owner on the job and takes the player to the hall, and every figure has a station the engine
 works out: the bench and machine cycle while producing, the gate, the rack, the office or idle.
 
+T2-10 Moving figures. Each figure is drawn at its station's anchor tile as a translated SVG group
+with a 0.8 s CSS transition, and the render loop puts a moved figure back where it was so the
+transition actually runs. The tooltip names the machine a figure is standing at.
+
 ## 2. Not done or partial
 
 ## 3. Tests

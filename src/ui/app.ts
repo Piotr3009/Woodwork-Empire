@@ -233,11 +233,50 @@ function restoreFocus(memory: FocusMemory | null): void {
   }
 }
 
+/** Where every figure was standing before this render, by its key. */
+function figurePositions(): Map<string, string> {
+  const positions = new Map<string, string>();
+  if (!root) return positions;
+  for (const node of Array.from(root.querySelectorAll('[data-figure]'))) {
+    const key = node.getAttribute('data-figure');
+    const transform = node.getAttribute('transform');
+    if (key !== null && transform !== null) positions.set(key, transform);
+  }
+  return positions;
+}
+
+/** The view is rebuilt from the state every frame, so a figure that moved would jump. It is put
+ *  back where it was and moved on the next frame, which is what the CSS transition needs. */
+function slideFigures(before: Map<string, string>): void {
+  if (!root || before.size === 0) return;
+  const moving: Array<{ node: Element; to: string }> = [];
+  for (const node of Array.from(root.querySelectorAll('[data-figure]'))) {
+    const key = node.getAttribute('data-figure');
+    const to = node.getAttribute('transform');
+    if (key === null || to === null) continue;
+    const from = before.get(key);
+    if (from === undefined || from === to) continue;
+    node.setAttribute('transform', from);
+    moving.push({ node, to });
+  }
+  if (moving.length === 0) return;
+  const step = (): void => {
+    for (const entry of moving) entry.node.setAttribute('transform', entry.to);
+  };
+  if (typeof requestAnimationFrame === 'function') {
+    requestAnimationFrame(step);
+  } else {
+    step();
+  }
+}
+
 export function render(): void {
   if (!root) return;
   const memory = ui.focusNext === null ? captureFocus() : { key: ui.focusNext, start: null };
   ui.focusNext = null;
+  const before = figurePositions();
   root.innerHTML = screenHtml();
+  slideFigures(before);
   restoreFocus(memory);
 }
 
