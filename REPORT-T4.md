@@ -83,7 +83,7 @@ T4-10b `c08c955` A tidy up before the report: the task row control moved out of 
 row primitives, which broke an import cycle between the laptop and the drawings, and the catalogue
 region's tooltip now says what it opens.
 
-T4-11 This report, and nine defects that came out of writing it and of putting the whole diff
+T4-11 This report, and twelve defects that came out of writing it and of putting the whole diff
 through a five way adversarial review (contract, correctness, UI, tests, conventions). Every
 finding was checked against the code before it counted. What was fixed:
 
@@ -116,6 +116,13 @@ finding was checked against the code before it counted. What was fixed:
 9. The weekly and monthly summary said "End of week 1" over a minutes column and a hall column that
    were still the day's. The money column carries the span, and the other two headings say "today",
    because the state keeps no weekly count of a man's minutes.
+10. A second client ringing while the owner was on the first call overwrote what the first call
+    had interrupted, so the work under both was dropped. One phone at a time: the next client rings
+    when he is off it.
+11. The room was scaled from the window size and nothing redrew it when the window changed, so a
+    resize with the clock stopped left the room at the old scale. `mount` listens for a resize.
+12. The company name could never be ellipsised: `text-overflow` does nothing to a flex container's
+    own text. It sits in a block inside the box now, which is what SPRITES.md 8.3 asks for.
 
 ---
 
@@ -134,7 +141,7 @@ finding was checked against the code before it counted. What was fixed:
 
 ## 3. Tests
 
-507 pass across 40 files; `npm run check` (lint, build, tests) is green and was green before every
+509 pass across 40 files; `npm run check` (lint, build, tests) is green and was green before every
 commit. 454 was the Turn 3 count, of which two were failing on `main` before tonight (T4-01).
 
 The tests the brief asks for by name:
@@ -164,7 +171,9 @@ The tests the brief asks for by name:
   the way through" in `tests/engine/moving.test.ts`; "never turns a man off a bench he is already
   standing at" in `tests/engine/machines.test.ts`; "does not send him back to a task an earlier
   interruption had left behind" and "leaves the call to the owner once his day is too short to see
-  it out" in `tests/engine/calls.test.ts`; and the two headings in `tests/ui/summary.test.ts`.
+  it out" and "rings one client at a time, so the work under the call is not lost" in
+  `tests/engine/calls.test.ts`; "keeps the company name on one line, with an ellipsis when it does
+  not fit" in `tests/render/officeRoom.test.ts`; and the two headings in `tests/ui/summary.test.ts`.
 
 The office SVG snapshot test went with the SVG: the `the office` block of `tests/render/views.test.ts`
 and the office half of `tests/render/sizing.test.ts` are deleted.
@@ -352,7 +361,8 @@ placeholder box; the sprite check page lists it.
 
 1. **The office scale is computed in code from two numbers that live in the stylesheet.** Change the
    top bar padding in `styles.css` and the room letterboxes by a few pixels until the two agree
-   again. The alternative is measuring the DOM every render, which cannot be tested in jsdom.
+   again. The alternative is measuring the DOM every render, which cannot be tested in jsdom. The
+   room is redrawn on a window resize, so the scale follows the window.
 2. **A move job with nobody able to do it stands still for the rest of the day.** The clock is only
    forced while somebody is actually on the move, so the game does not lock; the moved machines
    carry their ducting bill into the morning, when the move is picked up again by whoever is in.

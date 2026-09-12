@@ -132,7 +132,7 @@ function liveText(state: GameState): string {
     `${escapeText(formatTime(state.clock.minute))}</span>` +
     `<span class="office-company" data-office-text="company" ` +
     `style="${boxStyle(company)};font-size:${company.fontSize}px">` +
-    `${escapeText(state.companyName)}</span>`
+    `<span>${escapeText(state.companyName)}</span></span>`
   );
 }
 

@@ -1091,7 +1091,15 @@ input.num {
   color: #3a3a38;
   font-family: 'Segoe Script', 'Bradley Hand', cursive, sans-serif;
   font-weight: 600;
+}
+
+/* A flex container cannot ellipsise its own text, so the name is a block inside it. */
+.office-company > span {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* The office layers are full width pictures, not sprites on a tile (CLAUDE.md T4 4). */

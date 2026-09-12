@@ -1008,6 +1008,10 @@ function callTaker(state: GameState): Worker | null {
  *  a day somebody is in, rather than being missed behind the player's back. */
 function ringDueCalls(state: GameState): void {
   if (state.activeEvent !== null) return;
+  // He is already on the phone. The next client rings when he is off it, or the call he is on
+  // would be what he goes back to instead of the work it interrupted.
+  const held = state.owner.currentTaskId;
+  if (held !== null && findTask(state, held)?.kind === 'clientCall') return;
   const due = nextDueCall(state);
   if (due === null) return;
   const salesman = callTaker(state);

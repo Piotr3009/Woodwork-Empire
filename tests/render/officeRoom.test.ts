@@ -149,6 +149,21 @@ describe('the live text', () => {
     expect(company?.getAttribute('style')).toContain('font-size:22px');
   });
 
+  it('keeps the company name on one line, with an ellipsis when it does not fit', () => {
+    const holder = document.createElement('div');
+    holder.innerHTML = renderOffice(
+      newGame({ companyName: 'A very long joinery company name indeed' }),
+      { width: 1280, height: 800 },
+    );
+    const company = holder.querySelector('[data-office-text="company"]');
+    // The ellipsis is drawn on a block inside the box, because a flex container cannot
+    // ellipsise its own text.
+    const line = company?.firstElementChild;
+    expect(line?.tagName.toLowerCase()).toBe('span');
+    expect(line?.textContent).toBe('A very long joinery company name indeed');
+    expect(company?.textContent).toBe('A very long joinery company name indeed');
+  });
+
   it('prints the company the player named, whatever it is', () => {
     const holder = document.createElement('div');
     holder.innerHTML = renderOffice(

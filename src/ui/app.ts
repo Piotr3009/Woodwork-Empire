@@ -1090,6 +1090,9 @@ export function mount(element: HTMLElement): void {
   element.addEventListener('input', onInput);
   element.addEventListener('mousedown', onPointerDown);
   window.addEventListener('keydown', onKeyDown);
+  // The office room is scaled in code, so a resized window has to be drawn again for it, and the
+  // clock may be stopped (docs/art/SPRITES.md 8.1).
+  window.addEventListener('resize', render);
   render();
   lastFrame = typeof performance === 'undefined' ? 0 : performance.now();
   if (typeof requestAnimationFrame === 'function') requestAnimationFrame(frame);

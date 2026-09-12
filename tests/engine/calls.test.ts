@@ -208,6 +208,33 @@ describe('the phone and what it interrupted', () => {
     // The phone is down and he is standing idle, not back on the books he put down.
     expect(state.owner.currentTaskId).toBeNull();
   });
+
+  it('rings one client at a time, so the work under the call is not lost', () => {
+    let state = withJob(2000);
+    const books = state.tasks.find((task) => task.kind === 'bookkeeping');
+    if (!books) throw new Error('no bookkeeping');
+    state = act(state, { type: 'START_TASK', taskId: books.id });
+    state = choose(ring(state), 'answer');
+    expect(state.owner.resumeTaskId).toBe(books.id);
+    // A second client is due this minute. He is on the phone, so it waits.
+    const second = firstJob(state).calls[1];
+    if (!second) throw new Error('no second call');
+    second.day = state.clock.day;
+    second.minute = state.clock.minute;
+    state = tick(state, 5);
+    expect(state.activeEvent).toBeNull();
+    expect(state.owner.resumeTaskId).toBe(books.id);
+    state = tick(state, 10);
+    // First call over, back on the books, and now the second client gets through.
+    expect(state.owner.currentTaskId).toBe(books.id);
+    state = tick(state, 1);
+    expect(state.activeEvent?.kind).toBe('clientCall');
+    state = choose(state, 'answer');
+    expect(state.owner.resumeTaskId).toBe(books.id);
+    state = tick(state, 15);
+    expect(state.owner.currentTaskId).toBe(books.id);
+    expect(callsTaken(firstJob(state))).toBe(2);
+  });
 });
 
 describe('a salesman on the books', () => {
