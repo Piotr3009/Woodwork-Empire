@@ -6,6 +6,7 @@ import {
   LATE_PENALTY_PER_DAY,
   LATE_PENALTY_PER_DAY_EXPRESS,
   MATERIAL_FRACTION,
+  OWNER_JOB_VALUE_PER_DAY,
   OWNER_LABOUR_PER_MINUTE,
   SITE_MEASURE_TAXI_COST,
 } from '../../src/engine/constants';
@@ -269,7 +270,9 @@ describe('production', () => {
   });
 
   it('works at 0.6667 of job value a minute, so 800 of job value fills a day', () => {
-    expect(OWNER_LABOUR_PER_MINUTE * 480).toBeCloseTo(320, 6);
+    // CLAUDE.md 8.5: 800 of job value a day, of which 0.40 is labour value.
+    expect(OWNER_LABOUR_PER_MINUTE * 480).toBeCloseTo(OWNER_JOB_VALUE_PER_DAY * LABOUR_FRACTION, 6);
+    expect(OWNER_JOB_VALUE_PER_DAY * LABOUR_FRACTION).toBe(320);
   });
 });
 

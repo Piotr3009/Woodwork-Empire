@@ -9,6 +9,7 @@ import {
   FATIGUE_PER_OVERTIME_HOUR,
   MINUTES_PER_WORKING_DAY,
   OVERTIME_EFFICIENCY,
+  OWNER_NORMAL_HOURS,
   SICK_DAYS_MAX,
   SICK_DAYS_MIN,
 } from './constants';
@@ -20,10 +21,8 @@ import type { GameState } from './types';
 /** Hours 1 to 8 are full, then 0.8, 0.6, 0.4, 0.4 (CLAUDE.md 7.2). */
 export function hourEfficiency(minute: number): number {
   const hour = hourIndex(minute);
-  if (hour < OVERTIME_EFFICIENCY.length + 8 && minute >= MINUTES_PER_WORKING_DAY) {
-    return OVERTIME_EFFICIENCY[hour - 8] ?? 0.4;
-  }
-  return 1;
+  if (minute < MINUTES_PER_WORKING_DAY) return 1;
+  return OVERTIME_EFFICIENCY[hour - OWNER_NORMAL_HOURS] ?? 0.4;
 }
 
 /** Work done per clock minute the owner spends. Yesterday's overtime is subtracted. */

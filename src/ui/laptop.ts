@@ -1,8 +1,16 @@
 // The laptop: the design queue and today's office tasks. Everything the owner can start is here
 // (CLAUDE.md 10.1).
 
-import { findJob, minutesRemainingFor, openTasks, softwareActive } from '../engine/index';
-import type { GameState, TaskInstance } from '../engine/index';
+import {
+  findJob,
+  minutesRemainingFor,
+  openJobs,
+  openTasks,
+  softwareActive,
+  workerById,
+  workerMinuteCost,
+} from '../engine/index';
+import type { GameState, Job, TaskInstance } from '../engine/index';
 import {
   button,
   disabledButton,
@@ -39,6 +47,26 @@ function taskRow(state: GameState, task: TaskInstance): string {
   );
 }
 
+/** The informational labour cost of a job in progress (CLAUDE.md 8.5). */
+function labourCostLine(state: GameState, job: Job): string {
+  if (job.assignedTo === null || job.assignedTo === 'owner') {
+    return `${minutes(minutesRemainingFor(job, 1))} of your own time left`;
+  }
+  const worker = workerById(state, job.assignedTo);
+  if (!worker) return `${minutes(minutesRemainingFor(job, 1))} left`;
+  const left = minutesRemainingFor(job, worker.rate);
+  return `${minutes(left)} of ${escapeHtml(worker.name)}, about ` +
+    `${money(left * workerMinuteCost(worker.weeklyWage))} of wages`;
+}
+
+function jobRow(state: GameState, job: Job): string {
+  return (
+    `<div class="row"><span class="row-main">${escapeHtml(job.name)} ${money(job.price)}</span>` +
+    `<span class="row-figure">${escapeHtml(job.stage)} \u00b7 due day ${job.dueDay}</span>` +
+    `<span class="row-figure">${labourCostLine(state, job)}</span></div>`
+  );
+}
+
 export function renderLaptop(state: GameState): string {
   const open = state.tasks.filter((task) => task.category !== 'workshop');
   const design = open.filter((task) => task.kind === 'design');
@@ -50,16 +78,8 @@ export function renderLaptop(state: GameState): string {
       : state.software.mode === 'oneOff'
         ? `One off licence, ${state.software.jobsRemaining} jobs left, ${state.software.tier} tier`
         : `Subscription, ${state.software.tier} tier`;
-  const jobLines = state.jobs
-    .filter((job) => job.stage !== 'completed')
-    .map(
-      (job) =>
-        `<div class="row"><span class="row-main">${escapeHtml(job.name)} ` +
-        `${money(job.price)}</span>` +
-        `<span class="row-figure">${escapeHtml(job.stage)} · due day ${job.dueDay}</span>` +
-        `<span class="row-figure">${minutes(minutesRemainingFor(job, 1))} of bench work</span>` +
-        '</div>',
-    )
+  const jobLines = openJobs(state)
+    .map((job) => jobRow(state, job))
     .join('');
   return (
     `<p class="hint">${escapeHtml(licence)}</p>` +

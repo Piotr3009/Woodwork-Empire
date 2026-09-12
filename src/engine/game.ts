@@ -10,7 +10,6 @@ import {
   EXTRACTOR_REPAIR_COST,
   HELPER_CLEAN_WEEKDAY,
   LOCKER_SLOT_LAYOUT,
-  MAX_MINUTES_PER_DAY,
   MINUTES_PER_WORKING_DAY,
   OVERDRAFT_LIMIT,
   OWNER_LABOUR_PER_MINUTE,
@@ -798,5 +797,3 @@ export function buySoftware(state: GameState, mode: 'oneOff' | 'subscription'): 
   state.software = { mode: 'subscription', tier: SOFTWARE_TURN1_TIER, jobsRemaining: 0 };
   return OK;
 }
-
-export const MAX_DAY_MINUTES = MAX_MINUTES_PER_DAY;

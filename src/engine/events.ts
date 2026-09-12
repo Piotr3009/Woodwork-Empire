@@ -40,8 +40,3 @@ export function openNextEvent(state: GameState): void {
 export function isPaused(state: GameState): boolean {
   return state.activeEvent !== null || state.gameOver !== null;
 }
-
-export function hasQueuedEvent(state: GameState, kind: GameEventKind): boolean {
-  if (state.activeEvent?.kind === kind) return true;
-  return state.eventQueue.some((event) => event.kind === kind);
-}

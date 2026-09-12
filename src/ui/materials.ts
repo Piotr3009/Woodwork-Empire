@@ -2,7 +2,14 @@
 // Section 4 does not list this file, section 10.1 asks for the modal: noted in REPORT-T1.
 
 import { SHEET_PRICE_STOCK } from '../engine/constants';
-import { deliveriesDueTomorrow, deliveriesInYard, stockCostFor, stockFree } from '../engine/index';
+import {
+  deliveriesDueTomorrow,
+  deliveriesInYard,
+  materialModeLabel,
+  openJobs,
+  stockCostFor,
+  stockFree,
+} from '../engine/index';
 import type { GameState, Job } from '../engine/index';
 import { emptyLine, escapeHtml, money, primaryButton } from './modal';
 
@@ -13,7 +20,7 @@ function jobRow(job: Job): string {
       `data-do="setMaterialMode" data-id="${job.id}" data-mode="perJob">Per job</button>` +
       `<button class="chip${job.materialMode === 'stock' ? ' is-on' : ''}" ` +
       `data-do="setMaterialMode" data-id="${job.id}" data-mode="stock">From stock</button>`
-    : `<span class="dim">${escapeHtml(job.materialMode === 'stock' ? 'from stock' : 'per job')}</span>`;
+    : `<span class="dim">${escapeHtml(materialModeLabel(job.materialMode))}</span>`;
   return (
     `<div class="row"><span class="row-main">${escapeHtml(job.name)} ${money(job.price)}</span>` +
     `<span class="row-figure">${job.sheets} sheets · ${money(job.materialCost)}` +
@@ -24,7 +31,7 @@ function jobRow(job: Job): string {
 
 export function renderMaterials(state: GameState, sheets: string): string {
   const wanted = Number(sheets) || 0;
-  const jobs = state.jobs.filter((job) => job.stage !== 'completed');
+  const jobs = openJobs(state);
   const yard = deliveriesInYard(state);
   const coming = deliveriesDueTomorrow(state);
   return (

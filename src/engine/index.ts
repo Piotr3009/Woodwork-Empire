@@ -70,7 +70,6 @@ export {
   materialOrderMinutes,
   openTasks,
   softwareActive,
-  taskCategory,
   tasksOfKind,
   unloadMinutes,
 } from './tasks';
@@ -100,6 +99,7 @@ export {
   deliveriesInYard,
   findDelivery,
   materialCostFor,
+  materialModeLabel,
   sheetsForCost,
   stockCostFor,
   stockFree,

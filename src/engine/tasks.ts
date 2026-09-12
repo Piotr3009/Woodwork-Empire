@@ -77,10 +77,6 @@ const TASK_DEFINITIONS: Record<TaskKind, TaskDefinition> = {
 /** Float guard, not a game number: work this small is finished work. */
 export const WORK_EPSILON = 1e-9;
 
-export function taskCategory(kind: TaskKind): TaskCategory {
-  return TASK_DEFINITIONS[kind].category;
-}
-
 // ---------------------------------------------------------------------------
 // Minute curves
 // ---------------------------------------------------------------------------

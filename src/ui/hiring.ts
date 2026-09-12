@@ -1,7 +1,7 @@
 // The team board: who can be hired, what is missing before they can start, and the crew
 // (CLAUDE.md 9.3).
 
-import { hiringOptions, workerById } from '../engine/index';
+import { hiringOptions } from '../engine/index';
 import type { GameState, HiringOption } from '../engine/index';
 import {
   disabledButton,
@@ -76,8 +76,4 @@ export function renderHiring(state: GameState): string {
     '<h3>Taking somebody on</h3>' +
     hiringOptions(state).map(optionRow).join('')
   );
-}
-
-export function workerName(state: GameState, workerId: string): string {
-  return workerById(state, workerId)?.name ?? 'somebody';
 }
