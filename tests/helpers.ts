@@ -49,6 +49,27 @@ export function act(state: GameState, action: GameAction): GameState {
   return applyAction(state, action);
 }
 
+/** One step of a driven day: run the clock, and at 16:00 do what a player does and go home. */
+function step(state: GameState, events: GameEvent[]): GameState {
+  const next = clearEvents(tick(state, 60), events);
+  if (next.clock.minute >= 480 && next.activeEvent === null && !next.owner.wentHome) {
+    return clearEvents(applyAction(next, { type: 'END_DAY' }), events);
+  }
+  return next;
+}
+
+/** Plays to the start of the next day the way a player does: work, then End day at 16:00. */
+export function nextDay(state: GameState, events: GameEvent[] = []): GameState {
+  let next = clearEvents(state, events);
+  const day = next.clock.day;
+  let guard = 0;
+  while (next.clock.day === day && !next.gameOver && guard < 200) {
+    next = step(next, events);
+    guard += 1;
+  }
+  return next;
+}
+
 /** Runs whole days, answering every event with its first choice. */
 export function runDays(state: GameState, days: number): Run {
   const events: GameEvent[] = [];
@@ -56,7 +77,7 @@ export function runDays(state: GameState, days: number): Run {
   const target = next.clock.day + days;
   let guard = 0;
   while (next.clock.day < target && !next.gameOver && guard < days * 40 + 200) {
-    next = clearEvents(tick(next, 60), events);
+    next = step(next, events);
     guard += 1;
   }
   return { state: next, events };
@@ -68,7 +89,7 @@ export function runToDay(state: GameState, day: number): Run {
   let next = clearEvents(state, events);
   let guard = 0;
   while (next.clock.day < day && !next.gameOver && guard < 20000) {
-    next = clearEvents(tick(next, 60), events);
+    next = step(next, events);
     guard += 1;
   }
   return { state: next, events };

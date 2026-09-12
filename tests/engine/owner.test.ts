@@ -18,7 +18,15 @@ import {
 import { createTask } from '../../src/engine/tasks';
 import { isWorkingDay, yearOfDay } from '../../src/engine/clock';
 import { applyAction, tick } from '../../src/engine/index';
-import { act, clearEvents, eventsOfKind, newGame, runToDay, withLicence } from '../helpers';
+import {
+  act,
+  clearEvents,
+  eventsOfKind,
+  newGame,
+  nextDay,
+  runToDay,
+  withLicence,
+} from '../helpers';
 
 describe('owner efficiency', () => {
   it('is full for the first eight hours', () => {
@@ -73,7 +81,7 @@ describe('fatigue', () => {
     expect(day2.owner.fatigue).toBeCloseTo(4 * FATIGUE_PER_OVERTIME_HOUR, 10);
     expect(ownerEfficiency(day2)).toBeCloseTo(0.8, 10);
     // Day 2 with no overtime clears it.
-    const day3 = clearEvents(tick(day2, 600));
+    const day3 = nextDay(day2);
     expect(day3.owner.fatigue).toBe(0);
   });
 });
@@ -100,6 +108,8 @@ describe('absence', () => {
     state = act(state, { type: 'START_TASK', taskId: task.id });
     expect(state.owner.currentTaskId).toBeNull();
     state = tick(state, 500);
+    // Nobody is there to work the overtime, so the day closes itself at 16:00.
+    expect(state.clock.minute).toBe(480);
     expect(state.activeEvent?.kind).toBe('dayEnd');
     const day2 = clearEvents(state);
     expect(day2.owner.present).toBe(true);
@@ -109,7 +119,7 @@ describe('absence', () => {
   it('still charges the fixed costs on a day off', () => {
     const home = applyAction(newGame(), { type: 'SKIP_DAY' });
     const before = home.cash;
-    const day2 = clearEvents(tick(home, 500));
+    const day2 = nextDay(home);
     expect(day2.cash).toBeLessThan(before);
   });
 });

@@ -235,9 +235,10 @@ export function runDayCosts(state: GameState, day: number): void {
   if (weekday(day) === 0) state.finance.week = emptyTotals();
   if (isFirstOfMonth(day)) {
     state.finance.month = emptyTotals();
-    state.productionMinutesMonth = 0;
     runArrearsEscalation(state);
+    // The pellet bonus reads the month that has just gone, so the counter resets after it.
     runMonthlyItems(state);
+    state.productionMinutesMonth = 0;
   }
   if (day === 1) {
     chargePeriodic(state, 'unitDeposit', 'Unit deposit', UNIT_DEPOSIT);

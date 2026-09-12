@@ -196,16 +196,13 @@ export function createGame(options: NewGameOptions): GameState {
   return state;
 }
 
-/** True while the owner is on a task or standing at a machine. */
-export function ownerIsWorking(state: GameState): boolean {
-  return state.owner.currentTaskId !== null || ownerJob(state) !== null;
-}
-
+/** The day ends at the twelve hour wall, or at 16:00 once the owner is not there to work the
+ *  overtime. After 16:00 with the owner still in, it is his decision: the End day button
+ *  (CLAUDE.md 7.2). */
 function shouldFinishDay(state: GameState): boolean {
   if (isDayExhausted(state.clock.minute)) return true;
   if (state.clock.minute < MINUTES_PER_WORKING_DAY) return false;
-  if (!state.owner.present || state.owner.wentHome) return true;
-  return !ownerIsWorking(state);
+  return !state.owner.present || state.owner.wentHome;
 }
 
 /** Resets everything that is scoped to one day and charges what the new day owes. */

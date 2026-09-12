@@ -8,7 +8,7 @@ import {
   UNIT_DEPOSIT,
 } from '../../src/engine/constants';
 import { createTask } from '../../src/engine/tasks';
-import { DEFAULT_OPTIONS as OPTIONS, clearEvents, withLicence } from '../helpers';
+import { DEFAULT_OPTIONS as OPTIONS, clearEvents, nextDay, withLicence } from '../helpers';
 
 /** What day 1 takes out before the player does anything: deposit, rent, rates, power, living. */
 function dayOneCosts(rentMonthly: number, ratesMonthly: number): number {
@@ -54,14 +54,29 @@ describe('createGame', () => {
 });
 
 describe('day boundary', () => {
-  it('ends the day at 16:00 when the owner has nothing on', () => {
+  it('keeps the clock running past 16:00 while the owner is still in', () => {
     const state = tick(createGame(OPTIONS), 600);
+    expect(state.clock.minute).toBe(600);
+    expect(state.activeEvent).toBeNull();
+  });
+
+  it('ends the day when the owner says so, any time after 16:00', () => {
+    const state = applyAction(tick(createGame(OPTIONS), 500), { type: 'END_DAY' });
+    expect(state.activeEvent?.kind).toBe('dayEnd');
+  });
+
+  it('ends the day at 16:00 once the owner has gone home', () => {
+    let state = applyAction(tick(createGame(OPTIONS), 100), { type: 'END_DAY' });
+    expect(state.activeEvent).toBeNull();
+    state = tick(state, 379);
+    expect(state.activeEvent).toBeNull();
+    state = tick(state, 1);
     expect(state.clock.minute).toBe(480);
     expect(state.activeEvent?.kind).toBe('dayEnd');
   });
 
   it('moves to the next day when the summary is clicked away', () => {
-    const state = clearEvents(tick(createGame(OPTIONS), 600));
+    const state = nextDay(createGame(OPTIONS));
     expect(state.clock).toEqual({ day: 2, minute: 0 });
     expect(state.activeEvent).toBeNull();
   });
@@ -70,15 +85,15 @@ describe('day boundary', () => {
     let state = createGame(OPTIONS);
     for (let day = 1; day <= 5; day += 1) {
       expect(state.clock.day).toBe(day);
-      state = clearEvents(tick(state, 600));
+      state = nextDay(state);
     }
     expect(state.clock.day).toBe(8);
   });
 
   it('reports the weekend once, not twice', () => {
     let state = createGame(OPTIONS);
-    for (let day = 1; day <= 4; day += 1) state = clearEvents(tick(state, 600));
-    const friday = tick(state, 600);
+    for (let day = 1; day <= 4; day += 1) state = nextDay(state);
+    const friday = applyAction(tick(state, 480), { type: 'END_DAY' });
     const afterDayEnd = applyAction(friday, { type: 'RESOLVE_EVENT', choiceId: 'next' });
     expect(afterDayEnd.activeEvent?.kind).toBe('weekend');
     expect(afterDayEnd.activeEvent?.data.days).toBe(2);
@@ -89,12 +104,13 @@ describe('day boundary', () => {
 
   it('rolls into the second month on day 31', () => {
     let state = createGame(OPTIONS);
-    while (state.clock.day < 31) state = clearEvents(tick(state, 800));
+    while (state.clock.day < 31) state = nextDay(state);
     expect(state.clock.day).toBe(31);
   });
 
   it('freezes the clock while an event is open', () => {
-    const state = tick(createGame(OPTIONS), 600);
+    const state = applyAction(tick(createGame(OPTIONS), 480), { type: 'END_DAY' });
+    expect(state.activeEvent?.kind).toBe('dayEnd');
     const again = tick(state, 100);
     expect(again.clock.minute).toBe(state.clock.minute);
   });
@@ -107,6 +123,7 @@ describe('day boundary', () => {
     state = tick(state, 100);
     expect(state.clock.minute).toBe(200);
     state = tick(state, 400);
+    expect(state.clock.minute).toBe(480);
     expect(state.activeEvent?.kind).toBe('dayEnd');
   });
 
@@ -124,12 +141,8 @@ describe('day boundary', () => {
 describe('determinism', () => {
   it('replays to the same JSON from the same seed and the same actions', () => {
     const run = (): GameState => {
-      let state = createGame(OPTIONS);
-      state = applyAction(state, { type: 'SET_SPEED', speed: 4 });
-      for (let step = 0; step < 10; step += 1) {
-        state = tick(state, 100);
-        state = clearEvents(state);
-      }
+      let state = applyAction(createGame(OPTIONS), { type: 'SET_SPEED', speed: 4 });
+      for (let index = 0; index < 10; index += 1) state = nextDay(state);
       return state;
     };
     expect(JSON.stringify(run())).toBe(JSON.stringify(run()));

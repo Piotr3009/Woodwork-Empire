@@ -18,11 +18,11 @@ import type { GameEvent, GameState } from '../../src/engine/index';
 import {
   act,
   buyStartingKit,
-  clearEvents,
   doTask,
   eventsOfKind,
   firstJob,
   newGame,
+  nextDay,
   placeEnquiry,
 } from '../helpers';
 
@@ -219,9 +219,8 @@ describe('the order of the lifecycle', () => {
     state = doTask(state, 'clientCall');
     state = doTask(state, 'design');
     state = doTask(state, 'materialOrder');
-    const day2 = tick(state, 600);
     const events: GameEvent[] = [];
-    const settled = clearEvents(day2, events);
+    const settled = nextDay(state, events);
     expect(eventsOfKind(events, 'deliveryArrived')).toHaveLength(1);
     expect(settled.clock.day).toBe(2);
     expect(settled.deliveries[0]?.arrived).toBe(true);
@@ -311,13 +310,13 @@ describe('late delivery', () => {
   it('warns once when the deadline goes by', () => {
     const state = accept(ready(), 400, { deadlineDays: 1 });
     firstJob(state).stage = 'ready';
-    const run = clearEvents(tick(state, 600));
+    const run = nextDay(state);
     const events: GameEvent[] = [];
-    const later = clearEvents(tick(run, 600), events);
+    const later = nextDay(run, events);
     expect(eventsOfKind(events, 'jobOverdue')).toHaveLength(1);
     expect(later.jobs[0]?.overdueWarned).toBe(true);
     const more: GameEvent[] = [];
-    clearEvents(tick(later, 600), more);
+    nextDay(later, more);
     expect(eventsOfKind(more, 'jobOverdue')).toHaveLength(0);
   });
 });
@@ -337,7 +336,7 @@ describe('scenario: garage shelves on Easy', () => {
     expect(state.owner.minutesByCategory.design).toBe(30);
     // Day 2: the lorry, the unloading, then the bench.
     const events: GameEvent[] = [];
-    state = clearEvents(tick(state, 600), events);
+    state = nextDay(state, events);
     expect(state.clock.day).toBe(2);
     state = doTask(state, 'unload');
     expect(state.clock.minute).toBe(45);

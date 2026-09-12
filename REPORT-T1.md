@@ -59,6 +59,13 @@ them except the first cut of T1-06, which is named in section 5 below.
 4. Caught in my own audit after the report was first written: `ASSIGN_JOB` had no clickable way in,
    which rule 3.5 forbids. The job card in the laptop now carries the manual override of 9.4: a chip
    for the owner and one for every joiner on the floor.
+5. Two defects the same audit found and this branch fixes. First, the pellet income of 8.1 never
+   paid its production bonus: the monthly counter was reset before the bill that reads it, so the
+   pelletiser always paid exactly the 600 base. Second, the day used to close itself at 16:00 the
+   moment the owner had nothing in hand, which is a rule the spec does not have: it meant the
+   overtime hours of 7.2 could only ever finish a task already in flight, never take a new one on.
+   The day now ends at the twelve hour wall, or at 16:00 once the owner has gone home or is not in,
+   and after 16:00 with the owner still there it is his decision, which is what 7.2 says.
 
 ## 3. Tests
 

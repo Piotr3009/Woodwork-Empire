@@ -6,6 +6,8 @@ import {
   LIVING_COST_PER_WORKING_DAY,
   OVERDRAFT_LIMIT,
   OVERDRAFT_MONTHLY_INTEREST,
+  PELLET_INCOME_MONTHLY_BASE,
+  PELLET_INCOME_PER_1000_PRODUCTION_MINUTES,
   POWER_BASE_DAILY,
   POWER_PER_MACHINE_DAILY,
   SOFTWARE_SUBSCRIPTION_MONTHLY,
@@ -283,5 +285,25 @@ describe('speed and pausing', () => {
     const state = applyAction(newGame(), { type: 'SET_SPEED', speed: 4 });
     expect(state.speed).toBe(4);
     expect(clearEvents(state).speed).toBe(4);
+  });
+});
+
+describe('the pelletiser', () => {
+  it('pays the base and a bonus that rises with the month just gone', () => {
+    const state = newGame({ difficulty: 'veryEasy' });
+    const withSystem = act(act(state, { type: 'BUY_EQUIPMENT', specId: 'dustSystem' }), {
+      type: 'BUY_EQUIPMENT',
+      specId: 'pelletiser',
+    });
+    withSystem.productionMinutesMonth = 5000;
+    const nextMonth = runToDay(withSystem, 31).state;
+    const pellets = ledgerFor(nextMonth, 'pellets');
+    expect(pellets).toBeCloseTo(
+      PELLET_INCOME_MONTHLY_BASE + 5 * PELLET_INCOME_PER_1000_PRODUCTION_MINUTES,
+      6,
+    );
+    // The counter starts again for the new month, and no waste is charged with a pelletiser.
+    expect(nextMonth.productionMinutesMonth).toBe(0);
+    expect(ledgerFor(nextMonth, 'waste')).toBe(0);
   });
 });
