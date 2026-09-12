@@ -58,6 +58,10 @@ T2-13 Why strings. Twelve real life notes live in engine/constants.ts as WHY, re
 text link on the event modal and on the Accounting rows that have one, with a small popover. The
 start screen carries a "Show real-life notes" checkbox, on by default, and the Menu toggles it.
 
+T2-14 Scenario tests. The three Turn 1 scenarios now assert the Turn 2 clock and balance, and a
+fourth scripted month hires a poor joiner, buys the shelving, works two jobs off one small rack,
+runs dry, orders transport ten times and ends with the books behind and the accountant paid.
+
 ## 2. Not done or partial
 
 ## 3. Tests
