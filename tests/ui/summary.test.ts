@@ -5,6 +5,7 @@
 import { describe, expect, it } from 'vitest';
 import { renderDayEnd } from '../../src/ui/dayEnd';
 import { renderMenu } from '../../src/ui/topbar';
+import { formatMoney } from '../../src/engine/index';
 import type { GameEvent, GameState } from '../../src/engine/index';
 import { act, buyStartingKit, eventsOfKind, newGame, runDays } from '../helpers';
 
@@ -70,9 +71,25 @@ describe('a week at the weekly cadence', () => {
     const week = friday.finance.week;
     expect(week.costs).toBeCloseTo(spentInWeekOne(friday), 6);
     expect(week.costs).toBeGreaterThan(friday.finance.day.costs);
-    const html = parse(renderDayEnd(friday)).innerHTML;
+    const node = parse(renderDayEnd(friday));
+    const html = node.innerHTML;
     expect(html).toContain('Money this week');
     expect(html).not.toContain('Money today');
+    // The figures under that heading are the week's, not the Friday's.
+    const money = Array.from(node.querySelectorAll('.col'))
+      .find((col) => (col.querySelector('h3')?.textContent ?? '').startsWith('Money'));
+    const figures = Array.from(money?.querySelectorAll('.row') ?? []).map((row) => [
+      row.querySelector('.row-main')?.textContent,
+      row.querySelector('.row-figure')?.textContent,
+    ]);
+    expect(figures).toEqual([
+      ['In', formatMoney(week.income)],
+      ['Out', formatMoney(-week.costs)],
+      ['Net', formatMoney(week.income - week.costs)],
+      ['In the bank', formatMoney(friday.cash)],
+    ]);
+    // And they are not the day's, which is the whole point of the cadence.
+    expect(formatMoney(week.costs)).not.toBe(formatMoney(friday.finance.day.costs));
     // The owner's minutes and the day's work are a day's figures whatever the cadence, and the
     // headings say so rather than letting the week's title speak for them.
     expect(html).toContain('Your minutes today');

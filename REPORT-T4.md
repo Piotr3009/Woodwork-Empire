@@ -83,7 +83,7 @@ T4-10b `c08c955` A tidy up before the report: the task row control moved out of 
 row primitives, which broke an import cycle between the laptop and the drawings, and the catalogue
 region's tooltip now says what it opens.
 
-T4-11 This report, and eighteen defects that came out of writing it and of putting the whole diff
+T4-11 This report, and the defects that came out of writing it and of putting the whole diff
 through a five way adversarial review (contract, correctness, UI, tests, conventions). Every
 finding was checked against the code before it counted. What was fixed:
 
@@ -139,6 +139,24 @@ finding was checked against the code before it counted. What was fixed:
     claimed nothing was being made while nobody was carrying the move. The banner is for a move
     somebody is on; a move merely waiting takes the Set up hall button away and says why.
 
+The tests came in for the same treatment, and were the worse for it. Seven of them were proved
+hollow by mutating the code they were meant to guard and watching them stay green: the one test 3.6
+asks for never read the figures the summary renders, the "Calls: 1 of 3 taken" line of 3.3 was
+never rendered at all, the retry's day was never asserted, the rating penalty was only ever checked
+at exactly two misses, the flexi system's "everything the central system has" asserted something
+about the extractor instead, the ducting bill in setup mode had no test, and the Calls step was
+never seen in the ringing state. Two more were tautologies and one scenario asserted a lower bound
+where the brief asked for a span. All are rewritten, and every one of those mutations now fails.
+Three more findings that were about the report rather than the code are fixed here: the test count,
+the count of tests in one file, and the claim that both new drawings tests fail on the old code
+(only the first does; the second is a regression test, which is what it is for).
+
+And the conventions: a doc comment stranded on the wrong function, a comment claiming a number
+matched the stylesheet when the stylesheet declares no such number, the ducting rule written out
+twice, the flexi system with no tile of its own in the hall layout, two exports nothing outside
+their module used, the cadence mapped to a period in the UI as well as the engine, and nine new CSS
+rules that did not sort their properties the way the file does.
+
 ---
 
 ## 2. Not done or partial
@@ -160,23 +178,26 @@ finding was checked against the code before it counted. What was fixed:
 
 ## 3. Tests
 
-511 pass across 40 files; `npm run check` (lint, build, tests) is green and was green before every
+513 pass across 40 files; `npm run check` (lint, build, tests) is green and was green before every
 commit. 454 was the Turn 3 count, of which two were failing on `main` before tonight (T4-01).
 
 The tests the brief asks for by name:
 
 - **3.2** `tests/ui/drawings.test.ts`, "says what the owner is busy with instead of a Start that
   cannot work". Written first and red on the old code, with the exact symptom: the roll offered a
-  Start, the engine refused it, and nothing on the screen said so. A second test draws a drawing to
-  the end once the other job of work is put down.
+  Start, the engine refused it, and nothing on the screen said so. Beside it, "draws the drawing to
+  the end once the other job of work is put down", which passes on the old code too: it is the
+  regression test, not the failing one.
 - **3.3** `tests/engine/calls.test.ts`, ten tests: no call blocks production; an ignored first call
   changes nothing but the note and the second attempt; the second miss applies both penalties
   (3 x 0.9 - 1 on a delivered job); the salesman clears calls without an event; the schedule is the
   same for the same seed and different for another.
 - **3.4** `tests/engine/machines.test.ts`, "will not start production with a saw and no bench, and a
   bench unblocks it", plus the precedence against "no extraction" and the joiner at the canteen door.
-- **3.5** `tests/engine/moving.test.ts`, seven tests: two machines charge 1,600 and take 120 minutes
-  at forced 4x; the flexi system charges zero; a bench move charges nothing.
+- **3.5** `tests/engine/moving.test.ts`: two machines charge 1,600 and take 120 minutes at forced
+  4x; the flexi system charges zero and is the central system in everything else; a bench move
+  charges nothing; and the running bill in setup mode carries the words the brief names, in
+  `tests/ui/officeRegions.test.ts`.
 - **3.6** `tests/ui/summary.test.ts`, "puts the summary up once in five working days, with the week
   in it", and "carries the figures of the week, not of the day".
 - **3.1** `tests/render/officeRoom.test.ts` (scale, layers, placeholders, regions, live text) and
@@ -405,6 +426,11 @@ placeholder box; the sprite check page lists it.
 4. **`summaryCadence` at weekly or monthly makes the day end silent.** The day still runs its costs,
    the wages, the bills and the events that need a decision: only the summary is skipped. A player
    who sets monthly will see the arrears warnings but not the daily net.
+5. **The short handed month's rack was retuned, not its assertion.** Its ten sheets became eight
+   because the material now reaches the rack sooner and ten lasted the month out. That is turning
+   the input until the old outcome comes back, and it is worth saying plainly: the scenario still
+   proves a workshop can run itself dry, but it does not prove the new rules made that more or less
+   likely.
 
 ---
 

@@ -265,12 +265,14 @@ function hallControls(current: GameState): string {
   );
 }
 
-/** These two match `.topbar` and `.view` in styles.css. The room is scaled in code, so the two
- *  numbers have to agree with the stylesheet (docs/art/SPRITES.md 8.1). */
+/** A first guess at the room the office has, for the one render before it is on the page and can
+ *  be measured. `VIEW_PADDING` is the padding of `.view` in styles.css; `TOPBAR_HEIGHT` is what the
+ *  top bar comes to with that stylesheet's padding and type, and it is a guess, not a declared
+ *  number. `fitOfficeStack` takes the real box a moment later, so neither has to be right. */
 const TOPBAR_HEIGHT = 45;
 const VIEW_PADDING = 12;
 
-/** The room the office has under the top bar, in CSS pixels. */
+/** The room the office has under the top bar, in CSS pixels, before it has been measured. */
 function officeViewport(): { width: number; height: number } {
   const width = typeof window === 'undefined' ? 1280 : window.innerWidth;
   const height = typeof window === 'undefined' ? 800 : window.innerHeight;

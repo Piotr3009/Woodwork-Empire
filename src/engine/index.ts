@@ -14,8 +14,7 @@ export {
   createGame,
   machineInUse,
   runMinutes,
-  showsDaySummary,
-  summaryTitle,
+  summaryTotals,
   tick,
 } from './game';
 export type { BuyCheck, NewGameOptions, TickResult } from './game';
@@ -173,6 +172,7 @@ export {
   pastEndurance,
   variantFor,
   variantOf,
+  ductedMoves,
   ductingDue,
   ductingIsFree,
   dustBand,

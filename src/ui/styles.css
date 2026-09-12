@@ -996,12 +996,12 @@ input.num {
 
 /* The four tabs of the laptop (CLAUDE.md T4 3.1). */
 .tabs {
+  border-bottom: 1px solid var(--border);
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
   margin: 0 0 10px;
   padding: 0 0 10px;
-  border-bottom: 1px solid var(--border);
 }
 
 /* --------------------------------------------------------------------------
@@ -1010,39 +1010,39 @@ input.num {
 
 /* The room is letterboxed on the page background: one uniform scale, centred, never cropped. */
 .office-room {
-  position: relative;
+  background: var(--page);
   flex: 1 1 0;
   min-height: 0;
   overflow: hidden;
-  background: var(--page);
+  position: relative;
 }
 
 .office-stack {
-  position: absolute;
   left: 50%;
+  position: absolute;
   top: 50%;
   transform-origin: 50% 50%;
 }
 
 .office-layer {
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: 100%;
   height: 100%;
+  left: 0;
+  position: absolute;
+  top: 0;
   user-select: none;
+  width: 100%;
 }
 
 /* No art yet: a flat rectangle per layer with its name on it, so the room still works. */
 .office-placeholder {
-  display: flex;
   align-items: flex-start;
-  justify-content: flex-end;
   box-sizing: border-box;
-  padding: 16px 24px;
-  font-size: 28px;
-  letter-spacing: 1px;
   color: rgb(255 255 255 / 65%);
+  display: flex;
+  font-size: 28px;
+  justify-content: flex-end;
+  letter-spacing: 1px;
+  padding: 16px 24px;
 }
 
 .office-placeholder-1 {
@@ -1059,12 +1059,12 @@ input.num {
 
 /* Transparent: the room carries no drawn buttons. Hover lightens it, nothing more. */
 .office-region {
-  position: absolute;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
   margin: 0;
   padding: 0;
-  border: 0;
-  background: transparent;
-  cursor: pointer;
+  position: absolute;
 }
 
 .office-region:hover,
@@ -1080,19 +1080,19 @@ input.num {
 /* The two live texts sit in the blank areas the artwork leaves for them. */
 .office-clock,
 .office-company {
-  position: absolute;
-  display: flex;
   align-items: center;
+  display: flex;
   overflow: hidden;
   pointer-events: none;
+  position: absolute;
   white-space: nowrap;
 }
 
 .office-clock {
-  justify-content: center;
   color: #ffb02e;
   font-family: 'DSEG7 Classic', 'Seven Segment', ui-monospace, 'Courier New', monospace;
   font-weight: 700;
+  justify-content: center;
   letter-spacing: 2px;
   text-shadow: 0 0 8px rgb(255 176 46 / 45%);
 }
@@ -1124,9 +1124,9 @@ input.num {
 }
 
 .office-preview img {
-  display: block;
-  width: 100%;
-  height: auto;
   background: var(--panel);
   border: 1px solid var(--border);
+  display: block;
+  height: auto;
+  width: 100%;
 }

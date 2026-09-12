@@ -305,6 +305,7 @@ describe('a month that shifts two machines on day 3', () => {
     expect(act(shifted, { type: 'SET_SPEED', speed: 1 }).speed).toBe(MOVING_SPEED);
     const speeds = new Set<number>();
     const madeAtFirst = shifted.jobs.map((job) => job.labourRemaining);
+    const deskBefore = shifted.owner.minutesByCategory.admin;
     let at = shifted;
     let minutes = 0;
     while (movingMachines(at) !== null && minutes < 600) {
@@ -312,9 +313,11 @@ describe('a month that shifts two machines on day 3', () => {
       at = clearEvents(tick(at, 1));
       minutes += 1;
     }
-    // Nothing but 4x for the whole of it, and it took the 120 minutes it was given.
+    // Nothing but 4x for the whole of it, and the span is the 120 minutes the move was given
+    // plus whatever the phone took out of him inside it, to the minute.
     expect(Array.from(speeds)).toEqual([MOVING_SPEED]);
-    expect(minutes).toBeGreaterThanOrEqual(2 * MOVE_MINUTES_PER_ITEM);
+    const onThePhone = at.owner.minutesByCategory.admin - deskBefore;
+    expect(minutes).toBe(2 * MOVE_MINUTES_PER_ITEM + onThePhone);
     // Every bench stood still while the kit was up in the air.
     expect(at.jobs.map((job) => job.labourRemaining)).toEqual(madeAtFirst);
     // And the clock is the player's again.
@@ -337,7 +340,11 @@ describe('a month that shifts two machines on day 3', () => {
     expect(lines.reduce((total, entry) => total - entry.amount, 0)).toBe(
       2 * DUCTING_RECONNECT_COST,
     );
-    expect(cashBefore - at.cash).toBeGreaterThanOrEqual(2 * DUCTING_RECONNECT_COST);
+    // The ducting is the whole of what the move cost: no other money moved in those two hours.
+    expect(lines.reduce((total, entry) => total - entry.amount, 0)).toBe(
+      2 * DUCTING_RECONNECT_COST,
+    );
+    expect(cashBefore - at.cash).toBe(2 * DUCTING_RECONNECT_COST);
     expect(at.movedItems).toEqual([]);
   });
 

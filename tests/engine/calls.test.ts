@@ -2,9 +2,11 @@
 // cost minutes, and letting them ring costs the job (CLAUDE.md T4 3.3).
 
 import { describe, expect, it } from 'vitest';
-import { callsForPrice, callsScheduled, callsTaken } from '../../src/engine/calls';
+import { callsForPrice, callsScheduled, callsTaken, penalisedMisses } from '../../src/engine/calls';
+import { callsLine, jobRow } from '../../src/ui/jobCard';
+import { nextWorkingDay } from '../../src/engine/clock';
 import { CALL_MISSES_FREE, MINUTES_PER_WORKING_DAY } from '../../src/engine/constants';
-import { callRatingFactor, ratingFor } from '../../src/engine/reputation';
+import { applyRating, callRatingFactor, ratingFor } from '../../src/engine/reputation';
 import { startProductionCheck } from '../../src/engine/jobs';
 import { isWorkingDay, tick } from '../../src/engine/index';
 import type { GameState, Job } from '../../src/engine/index';
@@ -29,6 +31,17 @@ function withJob(price = 400): GameState {
   const enquiry = placeEnquiry(state, { price, name: 'Garage shelves' });
   state = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
   return clearEvents(state);
+}
+
+/** What the engine actually rates an on time job once this many calls have rung out. */
+function ratingWith(missed: number): number {
+  const state = withJob();
+  const job = firstJob(state);
+  job.callsMissed = missed;
+  job.daysLate = 0;
+  job.emailsUnanswered = 0;
+  applyRating(state, job);
+  return job.rating ?? 0;
 }
 
 /** Makes the client ring this minute, and runs the one minute that puts him through. */
@@ -137,7 +150,11 @@ describe('letting it ring', () => {
     expect(CALL_MISSES_FREE).toBe(1);
     // The second attempt is in the diary and is not a call of its own.
     expect(job.calls).toHaveLength(scheduled + 1);
-    expect(job.calls[job.calls.length - 1]?.retry).toBe(true);
+    const retry = job.calls[job.calls.length - 1];
+    expect(retry?.retry).toBe(true);
+    // One working day later, not the same day and not a week on (CLAUDE.md T4 3.3).
+    expect(retry?.day).toBe(nextWorkingDay(state.clock.day));
+    expect(retry?.state).toBe('waiting');
     expect(callsScheduled(job)).toBe(scheduled);
     expect(startProductionCheck(state, job).reason).toBe('design not done');
   });
@@ -148,7 +165,18 @@ describe('letting it ring', () => {
     state = choose(ring(state, firstJob(state).calls.length - 1), 'ignore');
     const job = firstJob(state);
     expect(job.callsMissed).toBe(2);
+    // A point and a tenth for each miss from the second on, not a flat penalty.
+    expect(callRatingFactor(1)).toBe(1);
     expect(callRatingFactor(2)).toBeCloseTo(0.9, 10);
+    expect(callRatingFactor(3)).toBeCloseTo(0.8, 10);
+    expect(callRatingFactor(4)).toBeCloseTo(0.7, 10);
+    expect(penalisedMisses(1)).toBe(0);
+    expect(penalisedMisses(3)).toBe(2);
+    // Three points on time, a tenth off per costing miss, then a point off per costing miss.
+    expect(ratingWith(1)).toBe(3);
+    expect(ratingWith(2)).toBe(1.7);
+    expect(ratingWith(3)).toBe(0.4);
+    expect(ratingWith(4)).toBe(-0.9);
     // On time, not express, every email answered: three points, a tenth off for the miss, then
     // a point off for it.
     state = doAllEmails(state);
@@ -185,6 +213,13 @@ describe('letting it ring', () => {
     const job: Job = firstJob(state);
     expect(callsTaken(job)).toBe(1);
     expect(job.callsMissed).toBe(1);
+    // The words CLAUDE.md T4 3.3 asks for, on the card the player reads.
+    expect(callsLine(job)).toContain('Calls: 1 of 3 taken, 1 missed');
+    expect(jobRow(state, job)).toContain('Calls: 1 of 3 taken, 1 missed');
+    // Nothing missed, nothing said about missing.
+    const clean = withJob(2000);
+    expect(callsLine(firstJob(clean))).toContain('Calls: 0 of 3 taken');
+    expect(callsLine(firstJob(clean))).not.toContain('missed');
   });
 });
 

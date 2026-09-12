@@ -23,9 +23,16 @@ describe('the sprite check page', () => {
     for (const spec of EQUIPMENT_SPECS) expect(names, spec.id).toContain(spec.spriteKey);
     for (const room of ROOM_LAYOUT) expect(names, room.id).toContain(room.spriteKey);
     expect(names).toContain(DELIVERY_VAN_SPRITE);
-    // The office desk items went with the desk: the page asks for the catalogue, the rooms and
-    // the van, and nothing else (the grep in tests/render/deskItemsGone.test.ts proves it).
-    expect(names.every((name) => name !== '')).toBe(true);
+    // The page asks for the catalogue families and their classes, the rooms and the van, and for
+    // nothing else: the office desk items went with the desk (CLAUDE.md T4 3.1).
+    const wanted = new Set<string>([DELIVERY_VAN_SPRITE]);
+    for (const spec of EQUIPMENT_SPECS) {
+      wanted.add(spec.spriteKey);
+      if (spec.variants.length < 2) continue;
+      for (const variant of spec.variants) wanted.add(`${spec.spriteKey}.${variant.id}`);
+    }
+    for (const room of ROOM_LAYOUT) wanted.add(room.spriteKey);
+    expect(new Set(names)).toEqual(wanted);
     // The five classes of saw (CLAUDE.md T3 3.5).
     expect(names).toContain('tableSaw.used');
     expect(names).toContain('tableSaw.industrial');

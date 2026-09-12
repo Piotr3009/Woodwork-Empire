@@ -1029,6 +1029,7 @@ export const STARTING_LAYOUT: Record<string, LayoutSlot> = {
   sheetRackBetter: { x: 20, y: 2 },
   extractor: { x: 15, y: 1 },
   dustSystem: { x: 15, y: 1 },
+  flexiSystem: { x: 15, y: 1 },
   tableSaw: { x: 0, y: 7 },
   edgebander: { x: 5, y: 7 },
   compressor: { x: 9, y: 7 },

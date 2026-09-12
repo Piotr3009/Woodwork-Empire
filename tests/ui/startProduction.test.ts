@@ -101,6 +101,23 @@ describe('the Start production button through the lifecycle', () => {
     expect(startButton(state).text).toBe('Start production, no free hands');
   });
 
+  it('turns the Calls step amber while the client is actually on the line, and back', () => {
+    const state = withJob();
+    expect(steps(state)[0]).toBe('Calls:done');
+    const call = state.jobs[0]?.calls[0];
+    if (!call) throw new Error('no call in the diary');
+    // The client is ringing this minute: the step is the one in hand and the drawing waits.
+    call.day = state.clock.day;
+    call.minute = state.clock.minute;
+    call.state = 'waiting';
+    expect(steps(state)[0]).toBe('Calls:now');
+    expect(steps(state)[1]).toBe('Design:todo');
+    // He picks it up, and it is behind him again.
+    call.state = 'taken';
+    expect(steps(state)[0]).toBe('Calls:done');
+    expect(steps(state)[1]).toBe('Design:now');
+  });
+
   it('fills the five steps as the job goes through them', () => {
     let state = withJob();
     // The Calls step is only ever amber while the client is actually on the line (T4 3.3).

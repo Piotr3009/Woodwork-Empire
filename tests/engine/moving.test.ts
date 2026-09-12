@@ -7,7 +7,15 @@ import {
   MOVE_MINUTES_PER_ITEM,
   MOVING_SPEED,
 } from '../../src/engine/constants';
-import { ductingDue, hasCentralExtraction, needsDucting } from '../../src/engine/machines';
+import {
+  bagsExist,
+  ductingDue,
+  extractorBreakdownChance,
+  hasCentralExtraction,
+  hasExtraction,
+  needsDucting,
+} from '../../src/engine/machines';
+import { canBuy } from '../../src/engine/game';
 import { movePending, movingMachines } from '../../src/engine/tasks';
 import { tick } from '../../src/engine/index';
 import type { GameState } from '../../src/engine/index';
@@ -199,14 +207,25 @@ describe('the flexi extraction system', () => {
   });
 
   it('has everything the central system has, and the pelletiser works off it', () => {
-    const state = inSetup();
-    placeEquipment(state, 'flexiSystem');
-    expect(hasCentralExtraction(state)).toBe(true);
-    // No bags once it is in, exactly as with the central system.
-    expect(state.equipment.some((item) => item.specId === 'extractor')).toBe(true);
-    expect(act(state, { type: 'BUY_EQUIPMENT', specId: 'pelletiser' }).equipment.some(
-      (item) => item.specId === 'pelletiser',
-    )).toBe(true);
+    const plain = inSetup();
+    // The day 1 kit has a bag extractor, so there are bags until a ducted system goes in.
+    expect(bagsExist(plain)).toBe(true);
+    expect(hasCentralExtraction(plain)).toBe(false);
+    expect(canBuy(plain, 'pelletiser').reason).toContain('Central dust extraction system or Flexi');
+    const flexi = inSetup();
+    placeEquipment(flexi, 'flexiSystem');
+    expect(hasCentralExtraction(flexi)).toBe(true);
+    expect(hasExtraction(flexi)).toBe(true);
+    // No bags, and the extractor cannot break down, exactly as with the central system.
+    expect(bagsExist(flexi)).toBe(false);
+    expect(extractorBreakdownChance(flexi)).toBe(0);
+    // The waste is the same 400 a month unless the pelletiser is in, which it will take.
+    expect(canBuy(flexi, 'pelletiser').ok).toBe(true);
+    const central = inSetup();
+    placeEquipment(central, 'dustSystem');
+    expect(bagsExist(central)).toBe(bagsExist(flexi));
+    expect(extractorBreakdownChance(central)).toBe(extractorBreakdownChance(flexi));
+    expect(canBuy(central, 'pelletiser').ok).toBe(canBuy(flexi, 'pelletiser').ok);
   });
 });
 

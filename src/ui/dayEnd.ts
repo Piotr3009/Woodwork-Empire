@@ -1,8 +1,15 @@
 // The end of day summary, and the game over screen (CLAUDE.md 10.1).
 
 import { MINUTES_PER_WORKING_DAY } from '../engine/constants';
-import { deliveriesArrivingOn, dustBand, findJob, formatReputation, netOf } from '../engine/index';
-import type { GameState, PeriodTotals, SummaryCadence } from '../engine/index';
+import {
+  deliveriesArrivingOn,
+  dustBand,
+  findJob,
+  formatReputation,
+  netOf,
+  summaryTotals,
+} from '../engine/index';
+import type { GameState, SummaryCadence } from '../engine/index';
 import { days, escapeHtml, minutes, money, plural } from './modal';
 
 /** The three cadences in the words the player reads, in the order they are offered. */
@@ -23,16 +30,14 @@ export function cadenceControl(state: GameState): string {
   return `<p class="hint">Show this: ${chips}</p>`;
 }
 
-/** Which span of figures the money column carries: the day, the week or the month (T4 3.6). The
- *  owner's minutes and the day's work are a day's figures whatever the cadence, and their headings
- *  say so, because the state keeps no weekly count of them. */
-function totalsFor(state: GameState): { totals: PeriodTotals; label: string } {
-  if (state.summaryCadence === 'weekly') return { totals: state.finance.week, label: 'this week' };
-  if (state.summaryCadence === 'monthly') {
-    return { totals: state.finance.month, label: 'this month' };
-  }
-  return { totals: state.finance.day, label: 'today' };
-}
+/** What the money column is headed. Which figures it carries is the engine's to say, not the
+ *  UI's; the owner's minutes and the day's work are a day's figures whatever the cadence, and
+ *  their headings say so, because the state keeps no weekly count of them (T4 3.6). */
+const SPAN_LABELS: Record<SummaryCadence, string> = {
+  daily: 'today',
+  weekly: 'this week',
+  monthly: 'this month',
+};
 
 export function renderDayEnd(state: GameState): string {
   const used = state.owner.minutesByCategory;
@@ -44,7 +49,8 @@ export function renderDayEnd(state: GameState): string {
   const tomorrow = deliveriesArrivingOn(state, state.clock.day + 1)
     .map((delivery) => plural(delivery.sheets, 'sheet', 'sheets'))
     .join(', ');
-  const { totals, label } = totalsFor(state);
+  const totals = summaryTotals(state);
+  const label = SPAN_LABELS[state.summaryCadence];
   const net = netOf(totals);
   return (
     '<div class="cols">' +

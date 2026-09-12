@@ -520,6 +520,7 @@ describe('the style rules of 10.4', () => {
     window.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: 520, clientY: 300 }));
     window.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
     expect(modal.style.left).toMatch(/^\d+px$/);
+    expect(modal.style.top).toMatch(/^\d+px$/);
     expect(modal.className).not.toContain('modal-centred');
     click('[data-do="closeModal"]');
   });

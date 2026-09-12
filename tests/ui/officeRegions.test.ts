@@ -4,7 +4,8 @@
 
 import { readFileSync } from 'node:fs';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { currentState, mount } from '../../src/ui/app';
+import { currentState, mount, render } from '../../src/ui/app';
+import { applyAction } from '../../src/engine/index';
 import { OFFICE_REGIONS } from '../../src/render/office';
 import { STARTING_KIT } from '../helpers';
 
@@ -22,6 +23,15 @@ function click(selector: string): void {
 
 function html(): string {
   return root().innerHTML;
+}
+
+/** Drags an item to a tile, the way setup mode does through the engine. */
+function moveItem(itemId: string, x: number, y: number): void {
+  const state = currentState();
+  if (!state) throw new Error('no game');
+  const next = applyAction(state, { type: 'MOVE_ITEM', itemId, x, y });
+  Object.assign(state, next);
+  render();
 }
 
 function openModalId(): string | null {
@@ -45,6 +55,10 @@ beforeAll(() => {
     click('[data-modal="machine"] [data-do="closeModal"]');
   }
   click('[data-do="buySoftware"][data-id="oneOff"]');
+  click('[data-do="closeModal"]');
+  // A job on the books, or the tests below would pass on an empty board.
+  click('[data-do="openModal"][data-modal="board"]');
+  click('[data-do="acceptEnquiry"]');
   click('[data-do="closeModal"]');
 });
 
@@ -87,6 +101,30 @@ describe('what each region of the room opens', () => {
     const company = root().querySelector('[data-office-text="company"]');
     expect(clock?.textContent).toBe('08:00');
     expect(company?.textContent).toBe(state?.companyName ?? '');
+  });
+});
+
+describe('setting the hall out', () => {
+  it('says what the moves made so far will cost to reconnect, before Done', () => {
+    click('[data-office="door"]');
+    expect(html()).toContain('hall-view');
+    click('[data-do="startSetup"]');
+    expect(html()).toContain('data-do="endSetup"');
+    expect(html()).not.toContain('Ducting to reconnect');
+    const state = currentState();
+    const saw = state?.equipment.find((item) => item.specId === 'tableSaw');
+    const bander = state?.equipment.find((item) => item.specId === 'edgebander');
+    if (!saw || !bander) throw new Error('no machines in the hall');
+    for (const item of [saw, bander]) {
+      moveItem(item.id, item.anchorX, item.anchorY + 1);
+    }
+    // The exact words CLAUDE.md T4 3.5 asks for, with the running total.
+    expect(html()).toContain('Ducting to reconnect: 2 machines, £1,600');
+    click('[data-do="endSetup"]');
+    expect(html()).toContain('Moving machines');
+    // Back to a hall that is being shifted, so the kit cannot be dragged again.
+    expect(html()).not.toContain('data-do="startSetup"');
+    click('[data-do="setView"][data-view="office"]');
   });
 });
 
@@ -142,11 +180,23 @@ describe('the laptop tabs', () => {
   });
 
   it('puts the jobs on the books on the Work Plan board and nowhere else', () => {
-    click('[data-office="laptop"]');
-    expect(html()).not.toContain('data-do="startProduction"');
-    click('[data-do="closeModal"]');
+    const job = currentState()?.jobs[0];
+    expect(job).toBeDefined();
+    // The card is on the board, with the Start production the brief asks it to carry.
     click('[data-office="workPlan"]');
-    expect(html()).toContain('Work Plan');
+    expect(openModalId()).toBe('workPlan');
+    expect(html()).toContain(job?.name ?? 'no job');
+    expect(html()).toContain('Start production');
+    expect(html()).toContain('Calls: 0 of');
+    click('[data-do="closeModal"]');
+    // And nowhere in the laptop, on any of its four tabs.
+    click('[data-office="laptop"]');
+    for (const tab of ['tasks', 'materials', 'team', 'drawings']) {
+      click(`[data-do="laptopTab"][data-id="${tab}"]`);
+      expect(html(), tab).not.toContain('Start production');
+      expect(html(), tab).not.toContain('Calls: 0 of');
+    }
+    click('[data-do="laptopTab"][data-id="tasks"]');
     click('[data-do="closeModal"]');
   });
 });

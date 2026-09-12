@@ -244,13 +244,22 @@ export function needsDucting(specId: string): boolean {
   return findSpec(specId)?.category === 'machine';
 }
 
+/** The machines the player has moved that have to be reconnected, in the order he moved them.
+ *  The one place that says which move is charged: the bill in setup mode and the ledger lines when
+ *  the kit is down both read it (CLAUDE.md T4 3.5). */
+export function ductedMoves(state: GameState): Equipment[] {
+  if (ductingIsFree(state)) return [];
+  const moved: Equipment[] = [];
+  for (const entry of state.movedItems) {
+    const item = state.equipment.find((kit) => kit.id === entry.itemId);
+    if (item && needsDucting(item.specId)) moved.push(item);
+  }
+  return moved;
+}
+
 /** What the moves the player has made will cost in ducting, and on how many machines. */
 export function ductingDue(state: GameState): { machines: number; cost: number } {
-  if (ductingIsFree(state)) return { machines: 0, cost: 0 };
-  const machines = state.movedItems.filter((moved) => {
-    const item = state.equipment.find((entry) => entry.id === moved.itemId);
-    return item !== undefined && needsDucting(item.specId);
-  }).length;
+  const machines = ductedMoves(state).length;
   return { machines, cost: machines * DUCTING_RECONNECT_COST };
 }
 

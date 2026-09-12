@@ -60,13 +60,12 @@ import {
   breakMachine,
   extractorBreakdownChance,
   extractorBroken,
-  ductingIsFree,
+  ductedMoves,
   findSpec,
   freeBenches,
   hallProductivityFactor,
   has,
   hasBenchFor,
-  needsDucting,
   machinesDueService,
   overdueBreakdownChance,
   repairCostFor,
@@ -167,6 +166,7 @@ import type {
   MaterialKind,
   GameAction,
   GameState,
+  PeriodTotals,
   Speed,
   TaskInstance,
   Worker,
@@ -492,6 +492,14 @@ export function showsDaySummary(state: GameState): boolean {
   return true;
 }
 
+/** The figures the summary carries: the day, the week or the month (CLAUDE.md T4 3.6). The one
+ *  place the cadence is turned into a span of money. */
+export function summaryTotals(state: GameState): PeriodTotals {
+  if (state.summaryCadence === 'weekly') return state.finance.week;
+  if (state.summaryCadence === 'monthly') return state.finance.month;
+  return state.finance.day;
+}
+
 /** The title the summary carries, which says what span of figures is in it. */
 export function summaryTitle(state: GameState): string {
   if (state.summaryCadence === 'weekly') return `End of week ${weekOfDay(state.clock.day)}`;
@@ -677,11 +685,7 @@ function recordMove(state: GameState, item: Equipment, stood: { x: number; y: nu
 /** Every moved machine that is ducted into the extraction has to be reconnected, and that is
  *  paid for when the move is finished. The flexi system never needs it (CLAUDE.md T4 3.5). */
 function chargeDucting(state: GameState): void {
-  const free = ductingIsFree(state);
-  for (const moved of state.movedItems) {
-    const item = state.equipment.find((entry) => entry.id === moved.itemId);
-    if (!item || !needsDucting(item.specId)) continue;
-    if (free) continue;
+  for (const item of ductedMoves(state)) {
     const name = findSpec(item.specId)?.name ?? item.specId;
     pay(
       state,

@@ -32,10 +32,15 @@ describe('which file an object is drawn with', () => {
   });
 
   it('asks the manifest and never the network', () => {
-    // Whatever the art side has delivered, the loader knows it from the manifest alone.
-    expect(spriteFiles()).toEqual(manifest.slice().sort((left, right) => left.localeCompare(right)));
-    for (const name of manifest) expect(spriteFiles()).toContain(name);
+    // The loader knows what has been delivered from the files on disk, through the manifest the
+    // build writes, and by no other route.
+    expect(spriteFiles()).toEqual(spriteFilesIn('public/sprites'));
+    for (const name of spriteFilesIn('public/sprites')) {
+      const key = name.replace(/\.png$/i, '');
+      expect(spriteUrl(key), key).toBe(`/sprites/${name}`);
+    }
     // Nothing has been delivered for the saw, so it still falls back to its box.
+    expect(spriteFilesIn('public/sprites')).not.toContain('tableSaw.png');
     expect(spriteUrl('tableSaw', 'used')).toBeNull();
   });
 });

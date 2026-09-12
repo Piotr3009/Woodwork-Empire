@@ -43,7 +43,7 @@ const STAGE_LABELS: Record<Job['stage'], string> = {
 
 /** The five steps of the job, so the card answers "what am I waiting for" at a glance. One
  *  helper, used by every card in the game (CLAUDE.md T3 3.1). */
-export function lifecycleRow(state: GameState, job: Job): string {
+function lifecycleRow(state: GameState, job: Job): string {
   const steps = lifecycleSteps(state, job)
     .map((step) => `<span class="step is-${step.state}">${escapeHtml(step.label)}</span>`)
     .join('');
@@ -82,7 +82,7 @@ function assignControls(state: GameState, job: Job): string {
 /** The accent button of a job card: start the work, or get the finished piece away. Start
  *  production is on the card from the day the job is accepted, and when it cannot be pressed it
  *  says what is in the way (CLAUDE.md T3 3.1). */
-export function jobAction(state: GameState, job: Job): string {
+function jobAction(state: GameState, job: Job): string {
   if (job.stage === 'awaitingTransport') {
     if (job.deliverOnDay !== null) {
       return reasonLabel(`Booked out, leaves day ${job.deliverOnDay}`);
