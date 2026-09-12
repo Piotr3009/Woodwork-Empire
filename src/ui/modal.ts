@@ -4,7 +4,8 @@
 // One escape and one money format for the whole game: the renderers and the engine own them,
 // because both layers sit below the modals.
 
-import { WHY, formatMoney, plural } from '../engine/index';
+import { WHY, formatMoney, plural, startTaskCheck } from '../engine/index';
+import type { GameState, TaskInstance } from '../engine/index';
 import { escapeText } from '../render/hall';
 
 export const escapeHtml = escapeText;
@@ -172,4 +173,18 @@ export function whyLink(state: { showWhy: boolean }, key: string): string {
 /** Everywhere else, a reason the player can read instead of a control he cannot press. */
 export function reasonLabel(reason: string): string {
   return `<span class="reason">${escapeHtml(reason)}</span>`;
+}
+
+/** The one control a task row carries, wherever the row is drawn. The engine is asked whether the
+ *  owner could start this task and the answer is shown: a button he can press, or the reason he
+ *  cannot, with the way out of it. A Start the engine would refuse is never drawn, which is what
+ *  left the drawings unable to be drawn (CLAUDE.md T4 3.2). */
+export function taskStartAction(state: GameState, task: TaskInstance, startLabel: string): string {
+  if (task.done) return '<span class="done">Done</span>';
+  if (state.owner.currentTaskId === task.id) return button('pauseTask', 'Pause');
+  const check = startTaskCheck(state, task.id);
+  if (check.ok) return button('startTask', startLabel, `data-id="${task.id}"`);
+  // He is holding something else: he can put it down here, without going to find it.
+  const wayOut = check.blockingTaskId === null ? '' : button('pauseTask', 'Put that down');
+  return reasonLabel(check.reason) + wayOut;
 }

@@ -3,20 +3,13 @@
 //
 // The jobs on the books moved out to the Work Plan board on the office wall.
 
-import {
-  findJob,
-  jobsAtGate,
-  openTasks,
-  staffMinutesLeft,
-  startTaskCheck,
-  workerById,
-} from '../engine/index';
+import { findJob, jobsAtGate, openTasks, staffMinutesLeft, workerById } from '../engine/index';
 import type { GameState, TaskInstance } from '../engine/index';
 import { renderDrawings } from './drawings';
 import { renderHiring } from './hiring';
 import { gateSection } from './jobCard';
 import { renderMaterials } from './materials';
-import { button, emptyLine, escapeHtml, minutes, money, plural, reasonLabel } from './modal';
+import { emptyLine, escapeHtml, minutes, money, plural, taskStartAction } from './modal';
 
 /** The four tabs, in the order the contract names them (docs/art/SPRITES.md 8.2). */
 export type LaptopTab = 'tasks' | 'materials' | 'team' | 'drawings';
@@ -40,20 +33,6 @@ function onItLine(state: GameState, task: TaskInstance): string {
   if (!worker) return '';
   if (task.done) return `done by ${worker.name}`;
   return `${worker.name} is on it, ${minutes(staffMinutesLeft(worker))} of his day left`;
-}
-
-/** The one control a task row carries, wherever the row is drawn. The engine is asked whether the
- *  owner could start this task and the answer is shown: a button he can press, or the reason he
- *  cannot, with the way out of it. A Start that the engine would refuse is never drawn, which is
- *  what left the drawings unable to be drawn (CLAUDE.md T4 3.2). */
-export function taskStartAction(state: GameState, task: TaskInstance, startLabel: string): string {
-  if (task.done) return '<span class="done">Done</span>';
-  if (state.owner.currentTaskId === task.id) return button('pauseTask', 'Pause');
-  const check = startTaskCheck(state, task.id);
-  if (check.ok) return button('startTask', startLabel, `data-id="${task.id}"`);
-  // He is holding something else: he can put it down here, without going to find it.
-  const wayOut = check.blockingTaskId === null ? '' : button('pauseTask', 'Put that down');
-  return reasonLabel(check.reason) + wayOut;
 }
 
 function taskRow(state: GameState, task: TaskInstance): string {

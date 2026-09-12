@@ -3,8 +3,7 @@
 
 import { findJob, jobTasks, openJobs, staffMinutesLeft, workerById } from '../engine/index';
 import type { GameState, TaskInstance } from '../engine/index';
-import { taskStartAction } from './laptop';
-import { emptyLine, escapeHtml, minutes, money } from './modal';
+import { emptyLine, escapeHtml, minutes, money, taskStartAction } from './modal';
 
 /** What the workshop is licensed to draw with, in words (CLAUDE.md 9.2). */
 export function licenceLine(state: GameState): string {

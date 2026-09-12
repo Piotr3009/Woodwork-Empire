@@ -45,7 +45,15 @@ export const OFFICE_REGIONS: OfficeRegion[] = [
   { id: 'door', name: 'Door to the hall', x: 640, y: 15, width: 305, height: 585, opens: true },
   { id: 'clock', name: 'Clock', x: 1040, y: 88, width: 122, height: 58, opens: false },
   { id: 'laptop', name: 'Laptop', x: 558, y: 449, width: 557, height: 443, opens: true },
-  { id: 'catalogue', name: 'Product catalogue', x: 60, y: 680, width: 445, height: 210, opens: true },
+  {
+    id: 'catalogue',
+    name: 'Equipment catalogue',
+    x: 60,
+    y: 680,
+    width: 445,
+    height: 210,
+    opens: true,
+  },
   { id: 'binder', name: 'Accounting binder', x: 1170, y: 620, width: 435, height: 280, opens: true },
 ];
 
