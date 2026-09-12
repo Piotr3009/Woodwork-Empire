@@ -10,7 +10,7 @@ import {
   findSpec,
   machinesDueService,
   ductingDue,
-  movingMachines,
+  movePending,
   oldestReadyJob,
   ownerJob,
   runMinutes,
@@ -213,7 +213,7 @@ function setupControls(current: GameState): string {
 
 function hallControls(current: GameState): string {
   if (ui.setup) return setupControls(current);
-  if (movingMachines(current) !== null) {
+  if (movePending(current) !== null) {
     return (
       '<div class="view-controls">' +
       '<span class="reason">Moving machines. Nothing gets made until the kit is back down and ' +
@@ -576,8 +576,8 @@ function handleAction(element: DataElement, point: { x: number; y: number }): vo
       ui.menuOpen = false;
       break;
     case 'startSetup':
-      // Nothing is dragged while the last move is still being carried out.
-      if (movingMachines(game()) !== null) break;
+      // Nothing is dragged while the last move is still on the list, carried or waiting.
+      if (movePending(game()) !== null) break;
       ui.setup = true;
       ui.drag = null;
       ui.speedBeforeSetup = game().speed;

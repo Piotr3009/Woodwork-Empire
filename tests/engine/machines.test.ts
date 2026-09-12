@@ -530,6 +530,42 @@ describe('no bench in the hall', () => {
     expect(startProductionCheck(state, firstJob(state)).reason).toBe('no extraction');
   });
 
+  it('never turns a man off a bench he is already standing at', () => {
+    let state = fillRack(buyStartingKit(newGame({ difficulty: 'veryEasy' })));
+    state.enquiries = [];
+    for (const specId of ['locker', 'canteenSeat', 'handToolSet']) {
+      state = act(state, { type: 'BUY_EQUIPMENT', specId });
+    }
+    state = act(state, { type: 'HIRE', role: 'joiner', tier: 'poor' });
+    const joiner = state.workers[0];
+    if (!joiner) throw new Error('nobody was hired');
+    joiner.startDay = state.clock.day;
+    // Two jobs, in the order they were accepted, and one bench in the hall.
+    for (const name of ['Accepted first', 'Accepted second']) {
+      const enquiry = placeEnquiry(state, { price: 400, name, deadlineDays: 90 });
+      state = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+    }
+    const first = state.jobs[0];
+    const second = state.jobs[1];
+    if (!first || !second) throw new Error('two jobs wanted');
+    second.stage = 'ready';
+    expect(state.equipment.filter((item) => item.specId === 'workbench')).toHaveLength(1);
+    // The second job gets to the one bench first, with the owner on it.
+    state = act(state, { type: 'ASSIGN_JOB', jobId: second.id, workerId: 'owner' });
+    expect(hasBenchFor(state, second.id)).toBe(true);
+    state = tick(state, 1);
+    // A minute later the joiner is put on the first job, which sits earlier on the books.
+    const waiting = state.jobs[0];
+    if (!waiting) throw new Error('no first job');
+    waiting.stage = 'ready';
+    state = act(state, { type: 'ASSIGN_JOB', jobId: first.id, workerId: joiner.id });
+    expect(state.jobs[0]?.id).toBe(first.id);
+    // The owner keeps the bench he is standing at; the joiner is the one with nowhere to work.
+    expect(hasBenchFor(state, second.id)).toBe(true);
+    expect(hasBenchFor(state, first.id)).toBe(false);
+    expect((state.jobs[1]?.benchSince ?? 0) < (state.jobs[0]?.benchSince ?? 0)).toBe(true);
+  });
+
   it('stands a joiner with nowhere to work at the canteen door', () => {
     let state = atTheBench();
     // He is taken on while there is a bench, with the kit a joiner has to have, and starts today.

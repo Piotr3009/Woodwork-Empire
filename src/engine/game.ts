@@ -152,6 +152,7 @@ import {
   createTask,
   findTask,
   interruptOwnerWith,
+  movePending,
   movingMachines,
   pauseOwnerTask,
   resumeOwnerTask,
@@ -664,7 +665,7 @@ function chargeDucting(state: GameState): void {
 function endSetup(state: GameState, speed: Speed): void {
   state.speed = speed;
   if (state.movedItems.length === 0) return;
-  if (state.tasks.some((task) => task.kind === 'moveMachines' && !task.done)) return;
+  if (movePending(state) !== null) return;
   const task = createTask(state, {
     kind: 'moveMachines',
     label: `Moving machines: ${plural(state.movedItems.length, 'item', 'items')}`,

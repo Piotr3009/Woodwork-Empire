@@ -132,6 +132,7 @@ export {
   findTask,
   jobTasks,
   materialOrderMinutes,
+  movePending,
   movingMachines,
   openTasks,
   softwareActive,

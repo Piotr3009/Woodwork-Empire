@@ -20,7 +20,7 @@ import {
 import { canAccept, findEnquiry, removeEnquiry } from './board';
 import { callRinging, scheduleCalls } from './calls';
 import { template } from './catalog';
-import { nextWorkingDay } from './clock';
+import { minuteStamp, nextWorkingDay } from './clock';
 import { chargeUnavoidable, formatMoney, receive } from './economy';
 import { queueEvent } from './events';
 import {
@@ -175,6 +175,7 @@ export function acceptEnquiry(state: GameState, enquiryId: string, byHand: boole
     callsMissed: 0,
     designMinutesRemaining: designMinutes(entry, enquiry.sizeMultiplier, state.software.tier),
     assignedTo: null,
+    benchSince: null,
     completedDay: null,
     daysLate: 0,
     depositPaid: 0,
@@ -469,6 +470,7 @@ export function assignJob(state: GameState, jobId: string, workerId: string | nu
   }
   job.assignedTo = workerId;
   job.stage = 'inProduction';
+  job.benchSince = minuteStamp(state.clock);
   return true;
 }
 
@@ -477,6 +479,7 @@ export function releaseJob(state: GameState, job: Job): void {
   const worker = state.workers.find((entry) => entry.jobId === job.id);
   if (worker) worker.jobId = null;
   job.assignedTo = null;
+  job.benchSince = null;
   if (job.stage === 'inProduction') job.stage = 'ready';
 }
 

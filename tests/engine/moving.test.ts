@@ -112,6 +112,38 @@ describe('a move of two machines', () => {
   });
 });
 
+describe('a client ringing in the middle of a move', () => {
+  it('takes the fifteen minutes and leaves the move forced at 4x all the way through', () => {
+    let state = inSetup();
+    const enquiry = placeEnquiry(state, { price: 4000, deadlineDays: 90 });
+    state = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+    state = drag(state, 'tableSaw');
+    state = act(state, { type: 'END_SETUP', speed: 1 });
+    const move = movingMachines(state);
+    expect(move).not.toBeNull();
+    // Make the client ring this minute.
+    const call = state.jobs[0]?.calls[0];
+    if (!call) throw new Error('no call in the diary');
+    call.day = state.clock.day;
+    call.minute = state.clock.minute;
+    call.state = 'waiting';
+    state = tick(state, 1);
+    expect(state.activeEvent?.kind).toBe('clientCall');
+    state = act(state, { type: 'RESOLVE_EVENT', choiceId: 'answer' });
+    // He is on the phone, the move is still his, and the clock is still not the player's.
+    expect(state.owner.resumeTaskId).toBe(move?.id);
+    expect(movingMachines(state)?.id).toBe(move?.id);
+    expect(state.speed).toBe(MOVING_SPEED);
+    expect(act(state, { type: 'SET_SPEED', speed: 1 }).speed).toBe(MOVING_SPEED);
+    state = tick(state, 15);
+    // Phone down, back on the move, and it still has all its minutes to go but fifteen fewer
+    // of the day.
+    expect(state.owner.currentTaskId).toBe(move?.id);
+    expect(state.owner.resumeTaskId).toBeNull();
+    expect(state.owner.minutesByCategory.admin).toBe(15);
+  });
+});
+
 describe('the flexi extraction system', () => {
   it('makes the reconnection free for ever', () => {
     let state = inSetup();

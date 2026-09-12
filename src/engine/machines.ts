@@ -99,10 +99,13 @@ export function countOf(state: GameState, specId: string): number {
   return owned(state, specId).length;
 }
 
-/** The jobs standing at a bench this minute, in the order they went to one. */
+/** The jobs standing at a bench this minute, oldest first by the minute they went to one, so a
+ *  job that starts later never turns a man off the bench he is already at (CLAUDE.md T4 3.4). */
 function jobsAtBenches(state: GameState): string[] {
   return state.jobs
     .filter((job) => job.stage === 'inProduction' && job.assignedTo !== null)
+    .slice()
+    .sort((left, right) => (left.benchSince ?? 0) - (right.benchSince ?? 0))
     .map((job) => job.id);
 }
 

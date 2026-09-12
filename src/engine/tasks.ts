@@ -185,6 +185,13 @@ export function openTasks(state: GameState): TaskInstance[] {
   return state.tasks.filter((task) => !task.done);
 }
 
+/** A move of the hall that has been asked for and not finished, whoever is or is not on it. The
+ *  hall cannot be set out again until it is done, or the second batch of moves would ride on the
+ *  first one's minutes (CLAUDE.md T4 3.5). */
+export function movePending(state: GameState): TaskInstance | null {
+  return state.tasks.find((task) => task.kind === 'moveMachines' && !task.done) ?? null;
+}
+
 /** The move of the hall somebody is actually doing this minute, or null. While one is running
  *  the clock is forced to 4x and every bench waits (CLAUDE.md T4 3.5). */
 export function movingMachines(state: GameState): TaskInstance | null {
@@ -333,8 +340,8 @@ export function pauseOwnerTask(state: GameState): void {
 export function interruptOwnerWith(state: GameState, task: TaskInstance): void {
   const held = state.owner.currentTaskId;
   if (held !== null && held !== task.id) {
-    const paused = findTask(state, held);
-    if (paused && !paused.done) paused.doneBy = null;
+    // What he was on stays his, unlike a task he put down on purpose: he is coming back to it
+    // in fifteen minutes, and until then nobody else may pick it up.
     state.owner.resumeTaskId = held;
   }
   for (const worker of state.workers) {

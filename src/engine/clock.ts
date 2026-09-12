@@ -66,6 +66,12 @@ export function yearOfDay(day: number): number {
   return Math.floor((day - 1) / (DAYS_PER_MONTH * MONTHS_PER_YEAR)) + 1;
 }
 
+/** The minute of the game so far, for putting in order two things that happened on different
+ *  days. Not a clock reading the player ever sees. */
+export function minuteStamp(clock: Clock): number {
+  return clock.day * MAX_MINUTES_PER_DAY + clock.minute;
+}
+
 /** Whole hours of the day worked so far. 0 for the first hour. */
 export function hourIndex(minute: number): number {
   return Math.floor(minute / 60);

@@ -290,6 +290,9 @@ export interface Job {
   callsMissed: number;
   designMinutesRemaining: number;
   assignedTo: string | null;
+  /** When this job took a bench, so the benches are held by the men who got to them first and
+   *  nobody is turned off one he is standing at (CLAUDE.md T4 3.4). Null while it holds none. */
+  benchSince: number | null;
   completedDay: number | null;
   daysLate: number;
   depositPaid: number;
