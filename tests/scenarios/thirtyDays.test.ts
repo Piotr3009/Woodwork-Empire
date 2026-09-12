@@ -1,11 +1,24 @@
 // The scripted playthroughs of CLAUDE.md T1-13.
 
 import { describe, expect, it } from 'vitest';
-import { CAREFUL, IDLE, SHORT_HANDED, playUntilDay } from './autopilot';
+import { BIG_SAW, CAREFUL, IDLE, SHORT_HANDED, playUntilDay } from './autopilot';
 import { eventsOfKind, newGame, runToDay } from '../helpers';
-import { LATE_ACCOUNTS_CHARGE } from '../../src/engine/constants';
-import { gameMinutesPerRealSecond } from '../../src/engine/index';
-import type { GameEvent, GameState } from '../../src/engine/index';
+import { LATE_ACCOUNTS_CHARGE, POWER_BASE_DAILY } from '../../src/engine/constants';
+import {
+  bagIntervalFor,
+  dailyPower,
+  emailsForPrice,
+  gameMinutesPerRealSecond,
+  machineOutputFactor,
+  minutesRemainingFor,
+} from '../../src/engine/index';
+import type { Equipment, GameEvent, GameState } from '../../src/engine/index';
+
+function machineOf(state: GameState, specId: string): Equipment {
+  const item = state.equipment.find((entry) => entry.specId === specId);
+  if (!item) throw new Error(`no ${specId} in the hall`);
+  return item;
+}
 
 const SEED = 20260911;
 
@@ -59,6 +72,30 @@ describe('30 days on Easy, working the board', () => {
     expect(transport.length).toBeGreaterThanOrEqual(delivered.length);
   });
 
+  it('bought the saw the catalogue offers first, which is the used one at 1800', () => {
+    const saw = machineOf(state, 'tableSaw');
+    expect(saw.variantId).toBe('used');
+    expect(saw.purchasePrice).toBe(1800);
+    // Five per cent slower than a new one and the bag fills twice as often (CLAUDE.md T3 3.5).
+    expect(machineOutputFactor(state, 'sheet')).toBeCloseTo(0.95, 10);
+    expect(bagIntervalFor(saw)).toBe(1200);
+    // And it wore its hours down as the month went on.
+    expect(saw.hoursUsed).toBeGreaterThan(0);
+    expect(saw.enduranceHours).toBe(750);
+  });
+
+  it('sent one email per small job, not one per call', () => {
+    expect(emailsForPrice(900)).toBe(1);
+    for (const job of state.jobs) {
+      const emails = state.tasks.filter(
+        (task) => task.kind === 'emails' && task.jobId === job.id,
+      ).length;
+      // The emails of a delivered job are cleared when the client takes it.
+      if (emails === 0) continue;
+      expect(emails, job.name).toBe(emailsForPrice(job.price));
+    }
+  });
+
   it('was paid for every job it delivered', () => {
     for (const job of state.jobs.filter((entry) => entry.stage === 'completed')) {
       expect(job.depositPaid).toBeGreaterThan(0);
@@ -101,6 +138,50 @@ describe('replay', () => {
   it('gives a different month from a different seed', () => {
     const other = playUntilDay(newGame({ seed: SEED + 1, difficulty: 'easy' }), 31, CAREFUL);
     expect(JSON.stringify(other)).not.toBe(JSON.stringify(easyMonth()));
+  });
+});
+
+describe('30 days on Very easy behind the best saw money can buy', () => {
+  const state = playUntilDay(newGame({ seed: SEED, difficulty: 'veryEasy' }), 31, BIG_SAW);
+
+  it('stood an industrial saw in the hall on day 1 and paid 25000 for it', () => {
+    const saw = machineOf(state, 'tableSaw');
+    expect(saw.variantId).toBe('industrial');
+    expect(saw.purchasePrice).toBe(25000);
+    expect(
+      state.ledger.some(
+        (entry) => entry.category === 'equipment' && entry.amount === -25000,
+      ),
+    ).toBe(true);
+  });
+
+  it('gets 30% more out of every minute at the bench', () => {
+    expect(machineOutputFactor(state, 'sheet')).toBeCloseTo(1.3, 10);
+    const taken = state.jobs[0];
+    if (!taken) throw new Error('no jobs in the month');
+    // Measured on the whole job, because the month finished the ones it started.
+    const job = { ...taken, labourRemaining: taken.labourValue };
+    expect(job.labourValue).toBeGreaterThan(0);
+    const minutes = minutesRemainingFor(state, job, 1);
+    // A workshop with no saw at all is the 1.0 baseline: this one is 1.3 times quicker.
+    const bare = { ...state, equipment: [] };
+    expect(minutesRemainingFor(bare, job, 1) / minutes).toBeCloseTo(1.3, 6);
+  });
+
+  it('empties the bag half as often and draws more off the meter', () => {
+    const saw = machineOf(state, 'tableSaw');
+    expect(bagIntervalFor(saw)).toBe(4800);
+    expect(saw.enduranceHours).toBe(6000);
+    // Seven a day for the industrial saw where the used one draws three (CLAUDE.md T3 3.5).
+    const machines = state.equipment.filter((item) => item.id !== saw.id);
+    const others = dailyPower({ ...state, equipment: machines }) - POWER_BASE_DAILY;
+    expect(dailyPower(state) - POWER_BASE_DAILY - others).toBe(7);
+  });
+
+  it('still trades at the end of the month after spending that much on day 1', () => {
+    expect(state.gameOver).toBeNull();
+    expect(state.clock.day).toBe(31);
+    expect(state.jobs.filter((job) => job.stage === 'completed').length).toBeGreaterThanOrEqual(3);
   });
 });
 
