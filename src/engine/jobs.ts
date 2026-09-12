@@ -12,6 +12,7 @@ import {
   LATE_PENALTY_PER_DAY,
   LATE_PENALTY_PER_DAY_EXPRESS,
   OWNER_LABOUR_PER_MINUTE,
+  OWNER_LABOUR_VALUE_PER_DAY,
   SITE_MEASURE_MINUTES,
   SITE_MEASURE_TAXI_COST,
   WORKER_MINUTE_RATE_DIVISOR,
@@ -54,6 +55,11 @@ export function openJobs(state: GameState): Job[] {
 
 export function labourValueFor(price: number): number {
   return price * LABOUR_FRACTION;
+}
+
+/** Days of the owner's own time this much labour takes, to one decimal (CLAUDE.md T2 3.2). */
+export function ownerDaysFor(labourValue: number): number {
+  return Math.round((labourValue / OWNER_LABOUR_VALUE_PER_DAY) * 10) / 10;
 }
 
 /** What a worker of this rate is worth per minute, for the job card only [TUNE]. */

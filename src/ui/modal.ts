@@ -18,6 +18,8 @@ export interface ModalSpec {
   /** Decisions have no cross: the choice buttons are the way out. */
   closable?: boolean;
   wide?: boolean;
+  /** Fills the page, for the order board (CLAUDE.md T2 3.2). */
+  full?: boolean;
 }
 
 export interface ModalPosition {
@@ -45,8 +47,9 @@ export function renderModal(spec: ModalSpec, position: ModalPosition | null): st
     ? '<button class="modal-close" data-do="closeModal" title="Close" aria-label="Close">' +
       '×</button>'
     : '';
+  const size = spec.full === true ? ' modal-full' : spec.wide === true ? ' modal-wide' : '';
   return (
-    `<div class="modal${spec.wide === true ? ' modal-wide' : ''}${position ? '' : ' modal-centred'}"` +
+    `<div class="modal${size}${position ? '' : ' modal-centred'}"` +
     ` data-modal="${spec.id}"${style}>` +
     `<header class="modal-head" data-drag="1"><h2>${escapeHtml(spec.title)}</h2>${cross}</header>` +
     `<div class="modal-body">${spec.body}</div>` +

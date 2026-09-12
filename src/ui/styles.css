@@ -378,6 +378,21 @@ input.num {
   width: 760px;
 }
 
+/* The order board fills the page (CLAUDE.md T2 3.2). */
+.modal-full {
+  height: min(92vh, 900px);
+  max-height: min(92vh, 900px);
+  width: min(96vw, 1400px);
+}
+
+.modal-full .modal-body {
+  flex: 1;
+}
+
+.modal-full.modal-centred {
+  top: 4vh;
+}
+
 .modal-centred {
   left: 50%;
   top: 12vh;
@@ -427,6 +442,63 @@ input.num {
 
 .event-body {
   margin: 2px 0 8px;
+}
+
+/* --------------------------------------------------------------------------
+   The order board tiles
+   -------------------------------------------------------------------------- */
+
+/* 300 px minimum with a 10 px gap gives 3 columns at 1280 and 4 at 1600. */
+.tile-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+}
+
+.tile {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  display: flex;
+  flex-direction: column;
+  padding: 10px 12px;
+  position: relative;
+}
+
+.tile.is-locked {
+  background: var(--panel);
+  color: var(--text-dim);
+}
+
+.tile-name {
+  color: var(--text);
+  font-size: 17px;
+  margin: 0 90px 2px 0;
+}
+
+.tile-price {
+  font-size: 24px;
+  font-weight: 600;
+  margin: 2px 0 6px;
+}
+
+.tile-figures {
+  color: var(--text-dim);
+  font-size: 12px;
+  margin: 2px 0;
+}
+
+.tile-flag {
+  position: absolute;
+  right: 10px;
+  top: 10px;
+}
+
+.tile-action {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: auto;
+  padding-top: 8px;
 }
 
 /* --------------------------------------------------------------------------

@@ -173,6 +173,7 @@ function screenHtml(): string {
           title: MODAL_TITLES[ui.modal],
           body: modalBody(ui.modal, current),
           wide: ui.modal === 'accounting',
+          full: ui.modal === 'board',
         },
         ui.modalPosition,
       ),
@@ -246,7 +247,9 @@ export function render(): void {
 
 function openModal(id: ModalId, anchor: { x: number; y: number } | null): void {
   ui.modal = id;
-  ui.modalPosition = anchor === null ? null : clampToViewport(anchor.x + 24, anchor.y - 40);
+  // The board fills the page, so it is always centred (CLAUDE.md T2 3.2).
+  const beside = anchor === null || id === 'board' ? null : clampToViewport(anchor.x + 24, anchor.y - 40);
+  ui.modalPosition = beside;
   ui.menuOpen = false;
 }
 

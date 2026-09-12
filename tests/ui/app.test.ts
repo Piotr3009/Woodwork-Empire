@@ -137,6 +137,76 @@ describe('the first ten minutes', () => {
   });
 });
 
+describe('the order board as tiles', () => {
+  it('fills the page with one tile per enquiry, and says what each one is', () => {
+    click('[data-do="openModal"][data-modal="board"]');
+    expect(html()).toContain('class="modal modal-full modal-centred"');
+    expect(html()).toContain('class="tile-grid"');
+    const state = currentState();
+    const enquiries = state?.enquiries ?? [];
+    expect(enquiries.length).toBeGreaterThan(0);
+    const tiles = root().querySelectorAll('[data-enquiry]');
+    expect(tiles).toHaveLength(enquiries.length);
+    for (const enquiry of enquiries) {
+      expect(html()).toContain(`data-enquiry="${enquiry.id}"`);
+    }
+    // Every tile carries the price, the sheets and the owner days.
+    expect(html()).toContain('class="tile-price"');
+    expect(html()).toMatch(/\d+ sheets? of material/);
+    expect(html()).toMatch(/about [\d.]+ owner days/);
+    expect(html()).toContain('Needs ');
+    // The header counts them with the right plural, on the new reputation scale.
+    expect(html()).toMatch(/Reputation -?[\d.]+ · \d+ enquir(y|ies) waiting/);
+    // No accent button inside the grid: the tiles are all outlined (CLAUDE.md T2 3.2).
+    const grid = root().querySelector('.tile-grid');
+    expect(grid?.querySelectorAll('.btn-primary')).toHaveLength(0);
+    click('[data-do="closeModal"]');
+  });
+
+  it('greys a locked tile and prints the reason instead of a dead button', () => {
+    const state = currentState();
+    if (state) {
+      state.enquiries = [
+        {
+          id: 'enq-locked',
+          templateId: 'oakDiningTable',
+          name: 'Oak dining table',
+          sizeMultiplier: 1,
+          price: 12000,
+          basePrice: 12000,
+          finish: 'laminate',
+          materialKind: 'solidWood',
+          deadlineDays: 50,
+          express: true,
+          bespokeMaterial: false,
+          needsMeasure: false,
+          createdDay: state.clock.day,
+          expiresOnDay: state.clock.day + 2,
+          lockReason: 'Needs solid wood tools',
+          byHandAvailable: true,
+        },
+      ];
+    }
+    click('[data-do="openModal"][data-modal="board"]');
+    expect(html()).toContain('class="tile is-locked"');
+    expect(html()).toContain('Needs solid wood tools');
+    expect(html()).toContain('Express');
+    expect(html()).toContain('1 enquiry waiting');
+    expect(html()).toContain('Accept, by hand, plus 50% time');
+    click('[data-do="closeModal"]');
+  });
+
+  it('says one line and offers no button when the board is bare', () => {
+    const state = currentState();
+    if (state) state.enquiries = [];
+    click('[data-do="openModal"][data-modal="board"]');
+    expect(html()).toContain('Nothing on the board. Reputation brings enquiries.');
+    expect(html()).toContain('0 enquiries waiting');
+    expect(html()).not.toContain('data-do="acceptEnquiry"');
+    click('[data-do="closeModal"]');
+  });
+});
+
 describe('the modals', () => {
   it('open from the office desk, one per object', () => {
     click('[data-do="setView"][data-view="office"]');

@@ -75,6 +75,8 @@ export {
 export {
   emailsOutstanding,
   findJob,
+  labourValueFor,
+  ownerDaysFor,
   jobLabourCost,
   jobsAtGate,
   minutesRemainingFor,

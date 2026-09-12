@@ -34,6 +34,10 @@ T2-07 Extractor and service. A broken extractor slows the hall to 0.25 instead o
 extraction at all means no machine runs, and every machine wants a service every 30 days or takes
 a 2% chance a working day of giving up until it is repaired.
 
+T2-08 Board as tiles. The order board is a full page modal of tiles, three columns at 1280 px and
+four at 1600, each carrying the name, the price, the finish, the deadline, the expiry, the sheets,
+the owner days, the tools it needs, and either an Accept button or the reason it is locked.
+
 ## 2. Not done or partial
 
 ## 3. Tests
