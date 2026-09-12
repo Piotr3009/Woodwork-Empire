@@ -1093,3 +1093,22 @@ input.num {
   font-weight: 600;
   text-overflow: ellipsis;
 }
+
+/* The office layers are full width pictures, not sprites on a tile (CLAUDE.md T4 4). */
+.sprite-wide-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.sprite-cell.is-wide {
+  width: 100%;
+}
+
+.office-preview img {
+  display: block;
+  width: 100%;
+  height: auto;
+  background: var(--panel);
+  border: 1px solid var(--border);
+}

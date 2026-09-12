@@ -4,6 +4,7 @@
 
 import { DELIVERY_VAN_SPRITE, EQUIPMENT_SPECS, ROOM_LAYOUT } from '../engine/constants';
 import { box, escapeText, label, polygon } from '../render/hall';
+import { OFFICE_CANVAS, OFFICE_LAYERS } from '../render/office';
 import { boxPolygons, centreOf, footprintPolygon, gridBounds, tileToScreen } from '../render/iso';
 import { spriteCanvas, spriteFileSize, spriteUrl } from '../render/sprites';
 import { escapeHtml } from './modal';
@@ -142,6 +143,36 @@ function cell(target: SpriteTarget): string {
   );
 }
 
+/** The office is not a sprite on a tile: it is three full width layers on one canvas, so the page
+ *  shows each one as it is, scaled to fit, for the art PR to be checked against
+ *  (docs/art/SPRITES.md 8.1 and 8.5). */
+function officeSection(): string {
+  const cells = OFFICE_LAYERS.map((layer) => {
+    const url = spriteUrl(layer.key);
+    const shot =
+      url === null
+        ? '<div class="sprite-shot is-missing"><span>no file</span></div>'
+        : `<div class="office-preview"><img src="${url}" ` +
+          `alt="${escapeHtml(layer.name)}" /></div>`;
+    return (
+      `<div class="sprite-cell is-wide" data-sprite-target="${escapeHtml(layer.key)}">` +
+      shot +
+      `<p class="sprite-key">${escapeHtml(`${layer.key}.png`)}</p>` +
+      `<p class="sprite-figures">${escapeHtml(layer.name)} · ` +
+      `${OFFICE_CANVAS.width} by ${OFFICE_CANVAS.height}</p>` +
+      `<p class="sprite-figures">${url === null ? 'no file yet' : escapeHtml(url)}</p>` +
+      '</div>'
+    );
+  }).join('');
+  const delivered = OFFICE_LAYERS.filter((layer) => spriteUrl(layer.key) !== null).length;
+  return (
+    `<h3>The office room, ${delivered} of ${OFFICE_LAYERS.length} layers delivered</h3>` +
+    '<p class="hint">One canvas, three layers, stacked at the origin. They reproduce the ' +
+    'review composite when they are laid over each other.</p>' +
+    `<div class="sprite-wide-grid">${cells}</div>`
+  );
+}
+
 export function renderSpriteCheck(): string {
   const targets = spriteTargets();
   const delivered = targets.filter(
@@ -153,6 +184,7 @@ export function renderSpriteCheck(): string {
     'Every cell shows the footprint the game expects, the placeholder box, and the picture ' +
     'beside it. A picture that floats or sinks has the wrong anchor.</p>' +
     `<div class="sprite-grid">${targets.map((target) => cell(target)).join('')}</div>` +
+    officeSection() +
     '</div>'
   );
 }

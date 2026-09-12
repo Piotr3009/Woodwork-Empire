@@ -7,6 +7,7 @@ import {
   EQUIPMENT_SPECS,
   ROOM_LAYOUT,
 } from '../../src/engine/constants';
+import { OFFICE_LAYERS } from '../../src/render/office';
 import { renderSpriteCheck, spriteTargets } from '../../src/ui/spriteCheck';
 
 function parse(html: string): HTMLElement {
@@ -34,7 +35,7 @@ describe('the sprite check page', () => {
 
   it('draws one cell per key, each with a footprint, a box and a picture slot', () => {
     const page = parse(renderSpriteCheck());
-    const cells = Array.from(page.querySelectorAll('.sprite-cell'));
+    const cells = Array.from(page.querySelectorAll('.sprite-grid .sprite-cell'));
     expect(cells).toHaveLength(spriteTargets().length);
     const keys = cells.map((cell) => cell.getAttribute('data-sprite-target'));
     expect(new Set(keys).size).toBe(keys.length);
@@ -42,6 +43,20 @@ describe('the sprite check page', () => {
       expect(cell.querySelector('.sprite-proof')).not.toBeNull();
       expect(cell.querySelector('.sprite-shot')).not.toBeNull();
     }
+  });
+
+  it('shows the three office layers full width, so the art PR can be checked here', () => {
+    const page = parse(renderSpriteCheck());
+    expect(page.innerHTML).toContain('The office room');
+    for (const layer of OFFICE_LAYERS) {
+      const cell = page.querySelector(`.sprite-wide-grid [data-sprite-target="${layer.key}"]`);
+      expect(cell, layer.key).not.toBeNull();
+      expect(cell?.textContent, layer.key).toContain(`${layer.key}.png`);
+      expect(cell?.textContent, layer.key).toContain('1672 by 941');
+      expect(cell?.textContent, layer.key).toContain(layer.name);
+    }
+    // They are full width pictures, not a footprint diamond with a box on it.
+    expect(page.querySelector('.sprite-wide-grid .sprite-proof')).toBeNull();
   });
 
   it('prints the key, the footprint and the canvas the art side has to hit', () => {
@@ -56,7 +71,7 @@ describe('the sprite check page', () => {
 
   it('says so plainly where there is no file yet', () => {
     const page = parse(renderSpriteCheck());
-    expect(page.querySelectorAll('.sprite-shot.is-missing')).toHaveLength(
+    expect(page.querySelectorAll('.sprite-grid .sprite-shot.is-missing')).toHaveLength(
       spriteTargets().length,
     );
     expect(page.innerHTML).toContain('no file');
