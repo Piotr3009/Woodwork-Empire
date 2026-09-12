@@ -1,19 +1,33 @@
 import { describe, expect, it } from 'vitest';
-import { applyAction, createGame, tick } from '../../src/engine/index';
+import { applyAction, createGame, gameMinutesPerRealSecond, runMinutes, tick } from '../../src/engine/index';
+import { missingForHire } from '../../src/engine/staff';
 import type { GameState } from '../../src/engine/index';
 import {
   DAYS_PER_MONTH,
   LIVING_COST_PER_WORKING_DAY,
+  MINUTES_PER_WORKING_DAY,
   POWER_BASE_DAILY,
-  UNIT_DEPOSIT,
+  unitDepositFor,
 } from '../../src/engine/constants';
 import { createTask } from '../../src/engine/tasks';
-import { DEFAULT_OPTIONS as OPTIONS, clearEvents, nextDay, withLicence } from '../helpers';
+import {
+  DEFAULT_OPTIONS as OPTIONS,
+  act,
+  buyStartingKit,
+  choose,
+  clearEvents,
+  fillRack,
+  firstJob,
+  newGame,
+  nextDay,
+  placeEnquiry,
+  withLicence,
+} from '../helpers';
 
 /** What day 1 takes out before the player does anything: deposit, rent, rates, power, living. */
 function dayOneCosts(rentMonthly: number, ratesMonthly: number): number {
   return (
-    UNIT_DEPOSIT +
+    unitDepositFor(rentMonthly) +
     rentMonthly / DAYS_PER_MONTH +
     ratesMonthly / DAYS_PER_MONTH +
     POWER_BASE_DAILY +
@@ -26,18 +40,18 @@ describe('createGame', () => {
     const state = createGame(OPTIONS);
     expect(state.clock).toEqual({ day: 1, minute: 0 });
     expect(state.speed).toBe(0);
-    expect(state.cash).toBeCloseTo(20000 - dayOneCosts(1200, 450), 6);
+    expect(state.cash).toBeCloseTo(20000 - dayOneCosts(720, 450), 6);
     expect(state.difficulty).toBe('easy');
     expect(state.activeEvent).toBeNull();
   });
 
   it('gives each difficulty its cash and unit', () => {
     expect(createGame({ ...OPTIONS, difficulty: 'veryEasy' }).cash).toBeCloseTo(
-      50000 - dayOneCosts(1000, 450),
+      50000 - dayOneCosts(1080, 450),
       6,
     );
     expect(createGame({ ...OPTIONS, difficulty: 'hard' }).cash).toBeCloseTo(
-      -dayOneCosts(1200, 450),
+      -dayOneCosts(720, 450),
       6,
     );
     expect(createGame({ ...OPTIONS, difficulty: 'veryEasy' }).unit.benchSlots).toBe(6);
@@ -138,6 +152,83 @@ describe('day boundary', () => {
   });
 });
 
+describe('the loop the UI drives', () => {
+  it('advances exactly 4000 game minutes in 1000 real seconds at 4x, across day boundaries', () => {
+    const perSecond = gameMinutesPerRealSecond(4);
+    let state = createGame(OPTIONS);
+    let accumulator = 0;
+    let minutesRun = 0;
+    for (let second = 0; second < 1000; second += 1) {
+      accumulator += perSecond;
+      let whole = Math.floor(accumulator);
+      accumulator -= whole;
+      let guard = 0;
+      while (whole > 0 && state.gameOver === null && guard < 50) {
+        guard += 1;
+        const result = runMinutes(state, whole);
+        state = result.state;
+        minutesRun += result.minutesRun;
+        // What the engine could not run stays in hand: the modal is answered and the rest goes in.
+        whole -= result.minutesRun;
+        if (whole > 0) state = clearEvents(state);
+      }
+    }
+    // Nothing was dropped on the way, and the accumulator never carried a whole minute over.
+    expect(minutesRun).toBe(4000);
+    expect(accumulator).toBe(0);
+    expect(state.clock.day).toBeGreaterThan(5);
+  });
+
+  it('stops on the minute an event fires and hands the rest of the batch back', () => {
+    // The twelve hour wall is at minute 720, so a 800 minute batch from minute 0 stops there.
+    let state = withLicence(createGame(OPTIONS));
+    const design = createTask(state, { kind: 'design', label: 'Endless drawing', minutes: 2000 });
+    state = applyAction(state, { type: 'START_TASK', taskId: design.id });
+    const result = runMinutes(state, 800);
+    expect(result.minutesRun).toBe(720);
+    expect(result.state.clock.minute).toBe(720);
+    expect(result.state.activeEvent?.kind).toBe('dayEnd');
+    expect(runMinutes(result.state, 80).minutesRun).toBe(0);
+  });
+});
+
+describe('a day off with nobody in the hall', () => {
+  it('jumps straight to the summary and on to the next morning at 08:00', () => {
+    const state = applyAction(createGame(OPTIONS), { type: 'SKIP_DAY' });
+    expect(state.clock.minute).toBe(0);
+    expect(state.activeEvent?.kind).toBe('dayEnd');
+    const tomorrow = clearEvents(state);
+    expect(tomorrow.clock).toEqual({ day: 2, minute: 0 });
+  });
+
+  it('runs the day at the selected speed while staff are working', () => {
+    let state = createGame(OPTIONS);
+    state.workers.push({
+      id: 'staff-1',
+      name: 'Ben',
+      role: 'joiner',
+      tier: 'poor',
+      rate: 0.6,
+      weeklyWage: 480,
+      monthlyWage: 0,
+      startDay: 1,
+      jobId: null,
+      taskId: null,
+      minutesWorked: 0,
+      ordersToday: 0,
+      station: 'idle',
+      productionMinutes: 0,
+      absentDaysRemaining: 0,
+      anchorX: 0,
+      anchorY: 4,
+    });
+    state = applyAction(state, { type: 'SKIP_DAY' });
+    expect(state.activeEvent).toBeNull();
+    state = tick(state, 100);
+    expect(state.clock.minute).toBe(100);
+  });
+});
+
 describe('determinism', () => {
   it('replays to the same JSON from the same seed and the same actions', () => {
     const run = (): GameState => {
@@ -168,5 +259,79 @@ describe('determinism', () => {
     const right = createGame({ ...OPTIONS, seed: 2 });
     expect(left.seed).not.toBe(right.seed);
     expect(left.rng).not.toBe(right.rng);
+  });
+});
+
+describe('the minute the owner spends', () => {
+  /** The day 1 kit, a job at the bench and the owner standing at it. */
+  function atTheBench(): GameState {
+    let state = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
+    state.enquiries = [];
+    const enquiry = placeEnquiry(state, { price: 4000, deadlineDays: 90 });
+    state = fillRack(act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false }));
+    firstJob(state).stage = 'ready';
+    return clearEvents(act(state, { type: 'WORK_HERE', jobId: null }));
+  }
+
+  it('goes on the task or on the bench, never on both in the same minute', () => {
+    let state = atTheBench();
+    const task = createTask(state, { kind: 'emails', label: 'An email', minutes: 3 });
+    state = clearEvents(applyAction(state, { type: 'START_TASK', taskId: task.id }));
+    state = clearEvents(tick(state, 3));
+    // The third minute is the one that finishes the email. It is not also a minute at the bench.
+    expect(state.owner.minutesWorked).toBe(3);
+    expect(state.owner.minutesByCategory.admin).toBe(3);
+    expect(state.owner.minutesByCategory.workshop).toBe(0);
+    // From the next minute he is back on the job.
+    state = clearEvents(tick(state, 1));
+    expect(state.owner.minutesWorked).toBe(4);
+    expect(state.owner.minutesByCategory.workshop).toBe(1);
+  });
+});
+
+describe('ending the day', () => {
+  it('ends it once however many times the button is pressed', () => {
+    const state = clearEvents(createGame(OPTIONS));
+    state.clock.minute = MINUTES_PER_WORKING_DAY;
+    const once = applyAction(state, { type: 'END_DAY' });
+    expect(once.activeEvent?.kind).toBe('dayEnd');
+    const twice = applyAction(once, { type: 'END_DAY' });
+    expect(twice.eventQueue.filter((event) => event.kind === 'dayEnd')).toHaveLength(0);
+    expect(clearEvents(choose(twice, 'next')).clock.day).toBe(2);
+  });
+});
+
+describe('who can be sent at a job of work', () => {
+  it('never offers a man who is not in the hall today', () => {
+    let state = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
+    for (const specId of missingForHire(state, 'joiner')) {
+      state = act(state, { type: 'BUY_EQUIPMENT', specId });
+    }
+    state = clearEvents(act(state, { type: 'HIRE', role: 'joiner', tier: 'poor' }));
+    expect(state.workers).toHaveLength(1);
+    // He does not start for a few days yet, so sending him would do nothing at all.
+    const saw = state.equipment.find((item) => item.specId === 'tableSaw');
+    if (saw) saw.bagFull = true;
+    const sawId = saw?.id ?? '';
+    const ids = (next: GameState): string[] =>
+      (next.activeEvent?.choices ?? []).map((choice) => choice.id);
+    // He does not start for a few days yet, so sending him would do nothing at all.
+    expect(ids(act(state, { type: 'ASK_BAG_CHANGE', equipmentId: sawId }))).toEqual([
+      'owner',
+      'later',
+    ]);
+    const joiner = state.workers[0];
+    if (joiner) joiner.startDay = state.clock.day;
+    expect(ids(act(state, { type: 'ASK_BAG_CHANGE', equipmentId: sawId }))).toEqual([
+      'owner',
+      'joiner',
+      'later',
+    ]);
+    // Hurt in the hall and off for three days: he is not offered again either.
+    if (joiner) joiner.absentDaysRemaining = 3;
+    expect(ids(act(state, { type: 'ASK_BAG_CHANGE', equipmentId: sawId }))).toEqual([
+      'owner',
+      'later',
+    ]);
   });
 });

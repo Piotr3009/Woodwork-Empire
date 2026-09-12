@@ -2,11 +2,15 @@ import { describe, expect, it } from 'vitest';
 import { renderHall } from '../../src/render/hall';
 import { renderOffice } from '../../src/render/office';
 import { renderGameOver } from '../../src/ui/dayEnd';
+import { renderLaptop } from '../../src/ui/laptop';
+import { findSpec } from '../../src/engine/machines';
+import { centreOf } from '../../src/render/iso';
+import type { GameState } from '../../src/engine/index';
 import { tick } from '../../src/engine/index';
 import { act, buyStartingKit, clearEvents, firstJob, newGame, placeEnquiry, runToDay } from '../helpers';
 
 describe('the hall on day 1', () => {
-  it('draws the three rooms, the floor and the rack, and nothing that was not bought', () => {
+  it('draws the three rooms and the floor, and nothing that was not bought', () => {
     const svg = renderHall(newGame());
     expect(svg).toContain('data-room="office"');
     expect(svg).toContain('data-room="wc"');
@@ -14,12 +18,22 @@ describe('the hall on day 1', () => {
     expect(svg).toContain('Office');
     expect(svg).toContain('WC');
     expect(svg).toContain('Canteen');
-    expect(svg).toContain('data-rack="1"');
-    expect(svg).toContain('0 / 12');
+    // The rack is bought from the catalogue now, so on day 1 there is none.
+    expect(svg).not.toContain('data-rack="1"');
+    expect(svg).toContain('No shelving in the hall');
     expect(svg).not.toContain('Table saw');
     expect(svg).not.toContain('Extractor');
     expect(svg).not.toContain('data-kit=');
     expect(svg).not.toContain('data-van=');
+  });
+
+  it('draws the shelving with what is on it once it has been bought', () => {
+    const state = buyStartingKit(newGame());
+    state.stock.sheets = 12;
+    const svg = renderHall(state);
+    expect(svg).toContain('data-rack="1"');
+    expect(svg).toContain('Cheap shelving: 12 / 50');
+    expect(renderHall(state)).not.toContain('No shelving in the hall');
   });
 
   it('draws what has been bought, and leaves the office furniture in the office', () => {
@@ -93,6 +107,33 @@ describe('the hall on day 1', () => {
     const svg = renderHall(state);
     expect(svg).toContain('data-van="del-1"');
     expect(svg).toContain('Delivery: 4 sheets');
+    // One of anything is never printed as one of many (CLAUDE.md T2 3.11).
+    const single = state.deliveries[0];
+    if (single) single.sheets = 1;
+    expect(renderHall(state)).toContain('Delivery: 1 sheet<');
+  });
+
+  it('stands the finished pieces on the apron beside the gate, with the count', () => {
+    const state = buyStartingKit(newGame());
+    state.enquiries = [];
+    expect(renderHall(state)).not.toContain('data-finished=');
+    for (let index = 0; index < 4; index += 1) {
+      const enquiry = placeEnquiry(state, { price: 400 + index * 10 });
+      state.jobs.push({
+        ...firstJob(act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false })),
+        id: `job-gate-${index}`,
+        stage: 'awaitingTransport',
+      });
+      state.enquiries = [];
+    }
+    const svg = renderHall(state);
+    expect(svg).toContain('data-finished="0"');
+    expect(svg).toContain('data-finished="2"');
+    // Three tiles of apron, so the fourth piece shows in the count and not as a box.
+    expect(svg).not.toContain('data-finished="3"');
+    expect(svg).toContain('At the gate: 4');
+    expect(svg).toContain('var(--kit-stock)');
+    expect(svg).toContain('Order transport, no room at the gate');
   });
 
   it('shows the owner, and the crew with their names', () => {
@@ -110,6 +151,10 @@ describe('the hall on day 1', () => {
       startDay: 1,
       jobId: null,
       taskId: null,
+      minutesWorked: 0,
+      ordersToday: 0,
+      station: 'idle',
+      productionMinutes: 0,
       absentDaysRemaining: 0,
       anchorX: 4,
       anchorY: 4,
@@ -127,7 +172,6 @@ describe('the hall on day 1', () => {
   it('keeps the bigger unit bigger', () => {
     const easy = renderHall(newGame());
     const veryEasy = renderHall(newGame({ difficulty: 'veryEasy' }));
-    expect(veryEasy).toContain('0 / 20');
     const easyBox = easy.match(/viewBox="(-?\d+) (-?\d+) (\d+) (\d+)"/);
     const bigBox = veryEasy.match(/viewBox="(-?\d+) (-?\d+) (\d+) (\d+)"/);
     expect(Number(bigBox?.[3] ?? 0)).toBeGreaterThan(Number(easyBox?.[3] ?? 0));
@@ -172,11 +216,11 @@ describe('the game over screen', () => {
   it('says what happened, how long the company lasted, and offers a fresh start', () => {
     const state = newGame();
     state.gameOver = { reason: 'Three months of arrears and nothing left to seize.', day: 97 };
-    state.reputation = 1.25;
+    state.reputation = 12.5;
     const html = renderGameOver(state);
     expect(html).toContain('Three months of arrears');
     expect(html).toContain('97 days');
-    expect(html).toContain('1.25');
+    expect(html).toContain('12.5');
     expect(html).toContain('data-do="restart"');
   });
 });
@@ -208,6 +252,10 @@ describe('the placeholder art rules of 10.3', () => {
       startDay: 1,
       jobId: null,
       taskId: null,
+      minutesWorked: 0,
+      ordersToday: 0,
+      station: 'idle',
+      productionMinutes: 0,
       absentDaysRemaining: 0,
       anchorX: 0,
       anchorY: 4,
@@ -247,6 +295,10 @@ describe('the placeholder art rules of 10.3', () => {
       startDay: 1,
       jobId: null,
       taskId: null,
+      minutesWorked: 0,
+      ordersToday: 0,
+      station: 'idle',
+      productionMinutes: 0,
       absentDaysRemaining: 0,
       anchorX: bench?.anchorX ?? 0,
       anchorY: bench?.anchorY ?? 0,
@@ -268,5 +320,91 @@ describe('the placeholder art rules of 10.3', () => {
     const office = renderOffice(newGame());
     expect(office).toContain('data-sprite="catalogue"');
     expect(office).toContain('data-sprite="teamBoard"');
+  });
+});
+
+describe('the laptop', () => {
+  it('says who is on a task and how much of his day is left (CLAUDE.md T2 3.8)', () => {
+    const state = newGame();
+    state.workers.push({
+      id: 'a1',
+      name: 'Ben',
+      role: 'officeAdmin',
+      tier: null,
+      rate: 0,
+      weeklyWage: 0,
+      monthlyWage: 1900,
+      startDay: 1,
+      jobId: null,
+      taskId: null,
+      minutesWorked: 180,
+      ordersToday: 0,
+      station: 'idle',
+      productionMinutes: 0,
+      absentDaysRemaining: 0,
+      anchorX: 1,
+      anchorY: 1,
+    });
+    const books = state.tasks.find((task) => task.kind === 'bookkeeping');
+    if (books) books.doneBy = 'a1';
+    const html = renderLaptop(state);
+    expect(html).toContain('Ben is on it, 300 min of his day left');
+    expect(html).toContain('Take it on');
+  });
+
+  it('lists what is standing at the gate with a way to order transport', () => {
+    const state = newGame();
+    expect(renderLaptop(state)).toContain('At the gate, 0 pieces');
+    expect(renderLaptop(state)).toContain('Nothing waiting to go out.');
+  });
+});
+
+describe('the figures that move', () => {
+  function atTheSaw(): GameState {
+    const state = buyStartingKit(newGame());
+    state.owner.station = 'machine:tableSaw';
+    return state;
+  }
+
+  it('draws the owner on the tile of the machine he is standing at', () => {
+    const state = atTheSaw();
+    const saw = state.equipment.find((item) => item.specId === 'tableSaw');
+    expect(saw).toBeDefined();
+    const spec = findSpec('tableSaw');
+    const feet = centreOf(saw?.anchorX ?? 0, (saw?.anchorY ?? 0) + (spec?.depth ?? 0), 1, 1);
+    const svg = renderHall(state);
+    expect(svg).toContain('data-figure="owner"');
+    expect(svg).toContain(
+      `transform="translate(${Math.round(feet.x)},${Math.round(feet.y)})"`,
+    );
+    // The tooltip names the machine he is at (CLAUDE.md T2 3.3).
+    expect(svg).toContain('<title>Piotr, table saw</title>');
+    expect(svg).toContain('class="figure"');
+  });
+
+  it('moves him when the station changes, and leaves the rest of the hall alone', () => {
+    const saw = renderHall(atTheSaw());
+    const bench = atTheSaw();
+    bench.owner.station = 'bench';
+    const atBench = renderHall(bench);
+    expect(saw).not.toBe(atBench);
+    expect(atBench).toContain('<title>Piotr, the bench</title>');
+    const transforms = (text: string): string[] =>
+      (text.match(/data-figure="owner" transform="[^"]+"/g) ?? []).slice();
+    expect(transforms(saw)).not.toEqual(transforms(atBench));
+  });
+
+  it('puts a figure at the gate, the rack, the office and the canteen door', () => {
+    const state = buyStartingKit(newGame());
+    const places = ['gate', 'rack', 'office', 'idle'];
+    const seen = new Set<string>();
+    for (const station of places) {
+      state.owner.station = station;
+      const match = renderHall(state).match(/data-figure="owner" transform="([^"]+)"/);
+      expect(match?.[1]).toBeDefined();
+      seen.add(match?.[1] ?? '');
+    }
+    // Four different stations, four different places to stand.
+    expect(seen.size).toBe(places.length);
   });
 });

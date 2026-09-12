@@ -4,6 +4,8 @@
 import {
   BAG_CHANGE_MINUTES,
   BOOKKEEPING_MINUTES,
+  EMAIL_MINUTES,
+  OWN_DELIVERY_MINUTES,
   CALLS_ABOVE_BREAKS,
   CALLS_PRICE_BREAKS,
   CLEANING_MINUTES,
@@ -13,25 +15,27 @@ import {
   CLIENT_CALL_MINUTES_PER_1000,
   CLIENT_CALL_PRICE_STEP,
   DAILY_ORDERING_MINUTES,
-  EMAILS_MINUTES,
-  EXTRACTOR_REPAIR_MINUTES,
+  REPAIR_MINUTES,
   FETCH_STORAGE_MINUTES,
   MATERIAL_ORDER_MINUTES_HIGH,
   MATERIAL_ORDER_MINUTES_LOW,
   MATERIAL_ORDER_PRICE_HIGH,
   MATERIAL_ORDER_PRICE_LOW,
+  SERVICE_MINUTES,
   SITE_MEASURE_MINUTES,
   SOFTWARE_DESIGN_FACTOR,
   STAFF_MANAGEMENT_MINUTES_PER_JOINER,
   UNLOAD_BASE_MINUTES,
 } from './constants';
 import { findSpec } from './machines';
+import { canUnload } from './materials';
 import { ownerIsAvailable } from './owner';
 import { makeId } from './rng';
-import { isWorkingToday, joiners } from './staff';
+import { hasWorkingDay, isWorkingToday, joiners, staffMinutesLeft } from './staff';
 import type {
   GameState,
   ProductTemplate,
+  Worker,
   SoftwareTier,
   TaskCategory,
   TaskInstance,
@@ -73,7 +77,9 @@ const TASK_DEFINITIONS: Record<TaskKind, TaskDefinition> = {
     eligibleRoles: ['joiner', 'helper'],
     autoRoles: ['helper'],
   },
-  repairExtractor: { category: 'workshop', eligibleRoles: ['joiner'], autoRoles: [] },
+  deliver: { category: 'workshop', eligibleRoles: ['joiner', 'helper'], autoRoles: [] },
+  service: { category: 'workshop', eligibleRoles: ['joiner'], autoRoles: [] },
+  repair: { category: 'workshop', eligibleRoles: ['joiner'], autoRoles: [] },
 };
 
 /** Float guard, not a game number: work this small is finished work. */
@@ -134,6 +140,11 @@ export function unloadMinutes(state: GameState): number {
   return Math.round(UNLOAD_BASE_MINUTES * factor);
 }
 
+/** Minutes one email takes [TUNE]. */
+export function emailMinutes(): number {
+  return EMAIL_MINUTES;
+}
+
 export function staffManagementMinutes(state: GameState): number {
   return joiners(state).length * STAFF_MANAGEMENT_MINUTES_PER_JOINER;
 }
@@ -188,16 +199,16 @@ export function jobTasks(state: GameState, jobId: string): TaskInstance[] {
   return state.tasks.filter((task) => task.jobId === jobId);
 }
 
-/** Drops yesterday's daily tasks, done or not: the day is gone. */
+/** Drops yesterday's daily tasks, done or not: the day is gone. Emails belong to a job now, so
+ *  they are not on this list: an unanswered email follows the job to the client (T2 3.5). */
 function dropDailyTasks(state: GameState): void {
-  const daily: TaskKind[] = ['emails', 'bookkeeping', 'dailyOrdering', 'staffManagement'];
+  const daily: TaskKind[] = ['bookkeeping', 'dailyOrdering', 'staffManagement'];
   state.tasks = state.tasks.filter((task) => !daily.includes(task.kind));
 }
 
 /** The admin that lands on the desk every working day (CLAUDE.md 8.10). */
 export function createDailyTasks(state: GameState): void {
   dropDailyTasks(state);
-  createTask(state, { kind: 'emails', label: 'Emails', minutes: EMAILS_MINUTES });
   createTask(state, { kind: 'bookkeeping', label: 'Bookkeeping', minutes: BOOKKEEPING_MINUTES });
   if (state.jobs.some((job) => job.stage !== 'completed')) {
     createTask(state, {
@@ -212,24 +223,36 @@ export function createDailyTasks(state: GameState): void {
   }
 }
 
+/** Can this man take this task on today? Office roles work it off minute by minute out of their
+ *  own 480, a helper still clears his workshop jobs on the spot (CLAUDE.md T2 3.8). */
+function canTakeOn(worker: Worker, task: TaskInstance): boolean {
+  if (!TASK_DEFINITIONS[task.kind].autoRoles.includes(worker.role)) return false;
+  if (!hasWorkingDay(worker.role)) return true;
+  if (worker.taskId !== null) return false;
+  if (staffMinutesLeft(worker) <= 0) return false;
+  if (task.kind === 'materialOrder' && worker.role === 'purchasingClerk') {
+    return worker.ordersToday < CLERK_ORDERS_PER_DAY;
+  }
+  return true;
+}
+
 /** A worker on the books takes the tasks his role covers, and the owner never sees them.
- *  Returns what was cleared, so the caller can apply what each finished task does. */
+ *  Returns what was cleared on the spot, so the caller can apply what each finished task does. */
 export function assignStaffTasks(state: GameState): TaskInstance[] {
   const cleared: TaskInstance[] = [];
   const started = state.workers.filter((worker) => isWorkingToday(state, worker));
   if (started.length === 0) return cleared;
-  let clerkOrders = started.filter((worker) => worker.role === 'purchasingClerk').length
-    * CLERK_ORDERS_PER_DAY;
   for (const task of state.tasks) {
     if (task.done || task.doneBy !== null) continue;
-    const autoRoles = TASK_DEFINITIONS[task.kind].autoRoles;
-    const staff = started.find((worker) => autoRoles.includes(worker.role));
+    if (task.kind === 'unload' && !canUnload(state)) continue;
+    const staff = started.find((worker) => canTakeOn(worker, task));
     if (!staff) continue;
-    if (task.kind === 'materialOrder' && staff.role === 'purchasingClerk') {
-      if (clerkOrders <= 0) continue;
-      clerkOrders -= 1;
+    if (hasWorkingDay(staff.role)) {
+      // He picks it up and works it off as the clock runs, like the owner does.
+      staff.taskId = task.id;
+      task.doneBy = staff.id;
+      continue;
     }
-    // Staff clear their own work: one path finishes a task, whoever did it.
     advanceTask(task, task.minutesRemaining);
     task.doneBy = staff.id;
     cleared.push(task);
@@ -249,6 +272,13 @@ export function startTask(state: GameState, taskId: string): boolean {
   if (state.owner.currentTaskId !== null && state.owner.currentTaskId !== task.id) return false;
   // No drawing without a licence for the software (CLAUDE.md 9.2).
   if (task.kind === 'design' && !softwareActive(state)) return false;
+  // Nothing comes off the lorry until there is shelving to put it on (CLAUDE.md T2 3.6).
+  if (task.kind === 'unload' && !canUnload(state)) return false;
+  // Every refusal is behind us, so it is safe to take the task off whoever was holding it. The
+  // work he did on it stays done.
+  for (const worker of state.workers) {
+    if (worker.taskId === task.id) worker.taskId = null;
+  }
   state.owner.currentTaskId = task.id;
   task.doneBy = 'owner';
   return true;
@@ -291,6 +321,11 @@ export function assignWorkerTask(state: GameState, workerId: string, taskId: str
   const worker = state.workers.find((entry) => entry.id === workerId);
   const task = findTask(state, taskId);
   if (!worker || !task || task.done) return false;
+  // One man on a task: the owner comes off it the moment somebody else is sent.
+  if (state.owner.currentTaskId === task.id) state.owner.currentTaskId = null;
+  for (const other of state.workers) {
+    if (other.id !== worker.id && other.taskId === task.id) other.taskId = null;
+  }
   worker.taskId = task.id;
   task.doneBy = worker.id;
   return true;
@@ -299,7 +334,9 @@ export function assignWorkerTask(state: GameState, workerId: string, taskId: str
 export const AD_HOC_TASK_MINUTES = {
   bagChange: BAG_CHANGE_MINUTES,
   cleaning: CLEANING_MINUTES,
+  deliver: OWN_DELIVERY_MINUTES,
   fetchStorage: FETCH_STORAGE_MINUTES,
-  repairExtractor: EXTRACTOR_REPAIR_MINUTES,
+  repair: REPAIR_MINUTES,
+  service: SERVICE_MINUTES,
   siteMeasure: SITE_MEASURE_MINUTES,
 };

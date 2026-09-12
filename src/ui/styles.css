@@ -42,21 +42,37 @@
   --owner: #5f9c5f;
 }
 
+/* 11 px is the floor for a label and 12 px for a name (CLAUDE.md 10.4, T2 3.11). The views draw
+   at one screen pixel per unit, so nothing here is ever scaled down. */
 .iso-label {
   font-size: 11px;
   fill: #1c1f24;
   pointer-events: none;
 }
 
+.figure-label {
+  font-size: 12px;
+}
+
+.ghost-label {
+  font-size: 12px;
+}
+
 .hall-view,
 .office-view {
   display: block;
-  width: 100%;
-  max-height: 62vh;
+  margin: 0 auto;
 }
 
 .clickable {
   cursor: pointer;
+}
+
+/* A figure slides between its stations instead of jumping (CLAUDE.md T2 3.3). How long is left of
+   the slide is app.ts's to say: the view is rebuilt part way through it. */
+.figure {
+  transition-property: transform;
+  transition-timing-function: linear;
 }
 
 .view-note {
@@ -289,6 +305,7 @@ input.num {
    -------------------------------------------------------------------------- */
 
 .view {
+  overflow: hidden;
   padding: 12px;
 }
 
@@ -378,6 +395,21 @@ input.num {
   width: 760px;
 }
 
+/* The order board fills the page (CLAUDE.md T2 3.2). */
+.modal-full {
+  height: min(92vh, 900px);
+  max-height: min(92vh, 900px);
+  width: min(96vw, 1400px);
+}
+
+.modal-full .modal-body {
+  flex: 1;
+}
+
+.modal-full.modal-centred {
+  top: 4vh;
+}
+
 .modal-centred {
   left: 50%;
   top: 12vh;
@@ -427,6 +459,104 @@ input.num {
 
 .event-body {
   margin: 2px 0 8px;
+}
+
+/* --------------------------------------------------------------------------
+   Why it is like this in real life
+   -------------------------------------------------------------------------- */
+
+.why-link {
+  background: none;
+  border: none;
+  color: var(--accent);
+  cursor: pointer;
+  font: inherit;
+  font-style: italic;
+  padding: 0 4px;
+  text-decoration: underline;
+}
+
+.why-pop {
+  background: var(--panel);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  max-width: 340px;
+  padding: 10px 12px;
+  position: fixed;
+  z-index: 80;
+}
+
+.why-pop p {
+  font-size: 13px;
+  margin: 0 0 8px;
+}
+
+.check-row {
+  align-items: center;
+  display: flex;
+  gap: 6px;
+}
+
+.check-row input {
+  margin: 0;
+}
+
+/* --------------------------------------------------------------------------
+   The order board tiles
+   -------------------------------------------------------------------------- */
+
+/* 300 px minimum with a 10 px gap gives 3 columns at 1280 and 4 at 1600. */
+.tile-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+}
+
+.tile {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  display: flex;
+  flex-direction: column;
+  padding: 10px 12px;
+  position: relative;
+}
+
+.tile.is-locked {
+  background: var(--panel);
+  color: var(--text-dim);
+}
+
+.tile-name {
+  color: var(--text);
+  font-size: 17px;
+  margin: 0 90px 2px 0;
+}
+
+.tile-price {
+  font-size: 24px;
+  font-weight: 600;
+  margin: 2px 0 6px;
+}
+
+.tile-figures {
+  color: var(--text-dim);
+  font-size: 12px;
+  margin: 2px 0;
+}
+
+.tile-flag {
+  position: absolute;
+  right: 10px;
+  top: 10px;
+}
+
+.tile-action {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: auto;
+  padding-top: 8px;
 }
 
 /* --------------------------------------------------------------------------

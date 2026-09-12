@@ -16,6 +16,7 @@ export const DEFAULT_OPTIONS: NewGameOptions = {
   difficulty: 'easy',
   playerName: 'Piotr',
   companyName: 'Woodwork Empire',
+  showWhy: true,
 };
 
 export function newGame(options: Partial<NewGameOptions> = {}): GameState {
@@ -110,6 +111,7 @@ export const STARTING_KIT = [
   'compressor',
   'extractor',
   'workbench',
+  'sheetRack',
 ];
 
 export function buyStartingKit(state: GameState): GameState {
@@ -120,14 +122,22 @@ export function buyStartingKit(state: GameState): GameState {
   return applyAction(next, { type: 'BUY_SOFTWARE', mode: 'oneOff' });
 }
 
+/** Puts sheets on the rack, so a job pushed straight to the bench has material to work with. */
+export function fillRack(state: GameState, sheets = 20): GameState {
+  state.stock.sheets = sheets;
+  return state;
+}
+
 /** Puts an exact enquiry on the board, so a test can work with round numbers. */
 export function placeEnquiry(state: GameState, partial: Partial<Enquiry> = {}): Enquiry {
+  const price = partial.price ?? 400;
   const enquiry: Enquiry = {
     id: `enq-fixed-${state.enquiries.length + 1}`,
     templateId: 'garageShelves',
     name: 'Garage shelves',
     sizeMultiplier: 1,
-    price: 400,
+    price,
+    basePrice: price,
     finish: 'laminate',
     materialKind: 'sheet',
     deadlineDays: 15,
@@ -153,6 +163,17 @@ export function doTask(state: GameState, kind: TaskInstance['kind']): GameState 
   let guard = 0;
   while (next.owner.currentTaskId === task.id && guard < 2000) {
     next = tick(next, 1);
+    guard += 1;
+  }
+  return next;
+}
+
+/** Answers every open email, the way an owner who cares about the rating would. */
+export function doAllEmails(state: GameState): GameState {
+  let next = state;
+  let guard = 0;
+  while (next.tasks.some((task) => task.kind === 'emails' && !task.done) && guard < 20) {
+    next = doTask(next, 'emails');
     guard += 1;
   }
   return next;

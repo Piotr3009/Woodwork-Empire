@@ -27,7 +27,8 @@ export type EquipmentCategory =
   | 'welfare'
   | 'tools'
   | 'vehicle'
-  | 'extraction';
+  | 'extraction'
+  | 'storage';
 
 /** One line of the day 1 catalogue (CLAUDE.md 9.2). */
 export interface EquipmentSpec {
@@ -50,6 +51,8 @@ export interface EquipmentSpec {
   labourAppliesTo: MaterialKind | null;
   /** Multiplies unloading minutes. 1 means no effect. */
   unloadFactor: number;
+  /** Sheets this item can hold on the rack. 0 for everything that is not shelving. */
+  sheetCapacity: number;
   /** Reputation needed to buy. */
   minReputation: number;
   /** Parked for a later stage: shown with a price, buy button disabled. */
@@ -75,6 +78,8 @@ export interface Equipment {
   minutesUsed: number;
   bagFull: boolean;
   broken: boolean;
+  /** Day of the last service. A machine is bought serviced. */
+  lastServiceDay: number;
   purchasePrice: number;
 }
 
@@ -118,6 +123,10 @@ export interface OwnerState {
   sickStartDay: number | null;
   /** Player asked to stay home today. */
   stayHome: boolean;
+  /** Where he is standing: bench, machine:<specId>, rack, gate, office or idle. */
+  station: string;
+  /** Minutes of production worked, which drives the bench and machine cycle. */
+  productionMinutes: number;
 }
 
 export interface UnitState {
@@ -127,7 +136,8 @@ export interface UnitState {
   rentMonthly: number;
   ratesMonthly: number;
   benchSlots: number;
-  sheetCapacity: number;
+  /** One month of rent the landlord holds. Returned on a move, which is parked. */
+  depositHeld: number;
 }
 
 export interface Worker {
@@ -142,6 +152,14 @@ export interface Worker {
   startDay: number;
   jobId: string | null;
   taskId: string | null;
+  /** Minutes of his own day spent so far. Office roles have 480 of them (CLAUDE.md T2 3.8). */
+  minutesWorked: number;
+  /** Per job material orders this clerk has put through today. */
+  ordersToday: number;
+  /** Where he is standing: bench, machine:<specId>, rack, gate, office or idle. */
+  station: string;
+  /** Minutes of production worked, which drives the bench and machine cycle. */
+  productionMinutes: number;
   absentDaysRemaining: number;
   anchorX: number;
   anchorY: number;
@@ -167,7 +185,10 @@ export interface Enquiry {
   templateId: string;
   name: string;
   sizeMultiplier: number;
+  /** What the client pays. An express job carries the 20% uplift here and nowhere else. */
   price: number;
+  /** The price the material and the labour are worked out from: no express uplift. */
+  basePrice: number;
   finish: Finish;
   materialKind: MaterialKind;
   deadlineDays: number;
@@ -188,6 +209,7 @@ export type JobStage =
   | 'materialInYard'
   | 'ready'
   | 'inProduction'
+  | 'awaitingTransport'
   | 'completed';
 
 export type MaterialMode = 'perJob' | 'stock';
@@ -197,12 +219,18 @@ export interface Job {
   templateId: string;
   name: string;
   price: number;
+  /** The price the material and the labour were worked out from: no express uplift. */
+  basePrice: number;
   sizeMultiplier: number;
   finish: Finish;
   materialKind: MaterialKind;
   materialCost: number;
   materialMode: MaterialMode;
   sheets: number;
+  /** Whole sheets already taken off the rack for this job. */
+  sheetsUsed: number;
+  /** Why the job is standing still, in plain English. Empty while nothing is in its way. */
+  blockedBy: string;
   bespokeMaterial: boolean;
   express: boolean;
   byHand: boolean;
@@ -215,6 +243,10 @@ export interface Job {
   acceptedDay: number;
   dueDay: number;
   stage: JobStage;
+  /** Day the piece was finished and stood at the gate. */
+  finishedDay: number | null;
+  /** Transport is booked and the piece leaves on this day. Null while nothing is booked. */
+  deliverOnDay: number | null;
   callsRemaining: number;
   designMinutesRemaining: number;
   assignedTo: string | null;
@@ -223,6 +255,8 @@ export interface Job {
   depositPaid: number;
   balancePaid: number;
   penalty: number;
+  /** Emails still unanswered when the client took delivery. */
+  emailsUnanswered: number;
   rating: number | null;
   overdueWarned: boolean;
 }
@@ -252,7 +286,9 @@ export type TaskKind =
   | 'bagChange'
   | 'cleaning'
   | 'fetchStorage'
-  | 'repairExtractor';
+  | 'deliver'
+  | 'service'
+  | 'repair';
 
 export interface TaskInstance {
   id: string;
@@ -275,7 +311,10 @@ export type GameEventKind =
   | 'deliveryArrived'
   | 'stockOverflow'
   | 'bagFull'
-  | 'extractorBroken'
+  | 'machineBroken'
+  | 'serviceDue'
+  | 'noMaterial'
+  | 'lowStock'
   | 'accident'
   | 'dayEnd'
   | 'weekend'
@@ -287,6 +326,8 @@ export type GameEventKind =
   | 'bankruptcy'
   | 'ownerSick'
   | 'jobOverdue'
+  | 'lateAccounts'
+  | 'jobAtGate'
   | 'jobPaid';
 
 export interface GameEventChoice {
@@ -325,7 +366,10 @@ export type LedgerCategory =
   | 'repair'
   | 'storage'
   | 'taxi'
+  | 'transport'
+  | 'accounts'
   | 'pellets'
+  | 'arrears'
   | 'seizure';
 
 export interface LedgerEntry {
@@ -347,6 +391,12 @@ export interface PeriodTotals {
   byCategory: Record<string, number>;
 }
 
+export interface BookedTotals {
+  day: PeriodTotals;
+  week: PeriodTotals;
+  month: PeriodTotals;
+}
+
 export interface FinanceState {
   overdraftLimit: number;
   arrearsAmount: number;
@@ -355,6 +405,8 @@ export interface FinanceState {
   day: PeriodTotals;
   week: PeriodTotals;
   month: PeriodTotals;
+  /** What the books said the last time somebody wrote them up. */
+  booked: BookedTotals;
 }
 
 export interface StockState {
@@ -375,6 +427,8 @@ export interface DayStats {
   jobsCompleted: string[];
   /** The dust reading the day opened with, for the end of day summary. */
   dustAtStart: number;
+  /** The empty rack is reported once a day and no more. */
+  noMaterialWarned: boolean;
 }
 
 export interface GameOver {
@@ -391,6 +445,8 @@ export interface GameState {
   difficulty: Difficulty;
   playerName: string;
   companyName: string;
+  /** The optional real life notes under decisions are on. */
+  showWhy: boolean;
   clock: Clock;
   speed: Speed;
   cash: number;
@@ -411,6 +467,14 @@ export interface GameState {
   eventQueue: GameEvent[];
   activeEvent: GameEvent | null;
   dayStats: DayStats;
+  /** Day the last express enquiry reached the board. One a week is the cap. */
+  lastExpressDay: number | null;
+  /** Day the last low stock warning went out. One a week is the cap. */
+  lastLowStockDay: number | null;
+  /** Last day the bookkeeping was done. 0 means it never has been. */
+  booksUpToDay: number;
+  /** Consecutive months the books were behind on the 1st. */
+  lateAccountsMonths: number;
   /** Production minutes since the 1st, for pellet sales. */
   productionMinutesMonth: number;
   gameOver: GameOver | null;
@@ -425,13 +489,18 @@ export type GameAction =
   | { type: 'PAUSE_TASK' }
   | { type: 'SET_MATERIAL_MODE'; jobId: string; mode: MaterialMode }
   | { type: 'BUY_STOCK'; sheets: number }
+  | { type: 'PAY_ARREARS'; amount: number | null }
+  | { type: 'ORDER_TRANSPORT'; jobId: string }
+  | { type: 'MOVE_ITEM'; itemId: string; x: number; y: number }
+  | { type: 'SET_SHOW_WHY'; on: boolean }
   | { type: 'WORK_HERE'; jobId: string | null }
   | { type: 'ASSIGN_JOB'; jobId: string; workerId: string | null }
   | { type: 'HIRE'; role: WorkerRole; tier: WorkerTier | null }
   | { type: 'ASK_UNLOAD'; deliveryId: string }
   | { type: 'ASK_BAG_CHANGE'; equipmentId: string }
   | { type: 'START_CLEANING' }
-  | { type: 'REPAIR_EXTRACTOR' }
+  | { type: 'REPAIR_MACHINE'; equipmentId: string }
+  | { type: 'SERVICE_MACHINE'; equipmentId: string }
   | { type: 'RESOLVE_EVENT'; choiceId: string }
   | { type: 'END_DAY' }
   | { type: 'SKIP_DAY' };

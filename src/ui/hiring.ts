@@ -9,6 +9,7 @@ import {
   minutes,
   money,
   button,
+  plural,
   reasonLabel,
 } from './modal';
 
@@ -46,7 +47,7 @@ export function renderHiring(state: GameState): string {
       const job = worker.jobId === null ? null : state.jobs.find((entry) => entry.id === worker.jobId);
       const doing =
         worker.absentDaysRemaining > 0
-          ? `off for ${worker.absentDaysRemaining} more days`
+          ? `off for ${plural(worker.absentDaysRemaining, 'more day', 'more days')}`
           : worker.startDay > state.clock.day
             ? `starts day ${worker.startDay}`
             : worker.taskId !== null

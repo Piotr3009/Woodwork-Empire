@@ -1,33 +1,53 @@
 import { describe, expect, it } from 'vitest';
 import {
+  ARREARS_MONTHLY_INTEREST,
   BAILIFF_SEIZURE_FRACTION,
+  LATE_ACCOUNTS_CHARGE,
   DAYS_PER_MONTH,
   DUST_WASTE_MONTHLY,
   LIVING_COST_PER_WORKING_DAY,
-  OVERDRAFT_LIMIT,
   OVERDRAFT_MONTHLY_INTEREST,
   PELLET_INCOME_MONTHLY_BASE,
   PELLET_INCOME_PER_1000_PRODUCTION_MINUTES,
   POWER_BASE_DAILY,
   POWER_PER_MACHINE_DAILY,
   SOFTWARE_SUBSCRIPTION_MONTHLY,
-  UNIT_DEPOSIT,
+  SOFTWARE_ONE_OFF_PRICE,
+  UNIT_RATES_MONTHLY,
+  UNIT_RENT_MONTHLY,
+  unitDepositFor,
 } from '../../src/engine/constants';
 import {
+  arrearsCarryInterest,
+  bankruptcyFloor,
+  booksBehind,
   canAfford,
   dailyPower,
   dailyRates,
   dailyRent,
+  monthlyFixedCosts,
   monthlySalaryBill,
   nextDueDays,
   pay,
+  payArrears,
   receive,
   runBailiff,
+  visibleTotals,
   weeklyWageBill,
 } from '../../src/engine/economy';
 import { applyAction, tick } from '../../src/engine/index';
 import type { GameState, Worker } from '../../src/engine/index';
-import { act, clearEvents, eventsOfKind, newGame, runDays, runToDay } from '../helpers';
+import { createTask } from '../../src/engine/tasks';
+import {
+  act,
+  clearEvents,
+  doTask,
+  eventsOfKind,
+  newGame,
+  nextDay,
+  runDays,
+  runToDay,
+} from '../helpers';
 
 function ledgerFor(state: GameState, category: string): number {
   return state.ledger
@@ -47,6 +67,10 @@ function joiner(id: string, weeklyWage: number): Worker {
     startDay: 1,
     jobId: null,
     taskId: null,
+    minutesWorked: 0,
+    ordersToday: 0,
+    station: 'idle',
+    productionMinutes: 0,
     absentDaysRemaining: 0,
     anchorX: 0,
     anchorY: 4,
@@ -54,17 +78,24 @@ function joiner(id: string, weeklyWage: number): Worker {
 }
 
 describe('daily costs', () => {
-  it('charges the deposit once, on day 1', () => {
+  it('charges one month of rent as the deposit once, on day 1, and holds it', () => {
     const day1 = newGame();
-    expect(ledgerFor(day1, 'unitDeposit')).toBe(-UNIT_DEPOSIT);
+    const deposit = unitDepositFor(UNIT_RENT_MONTHLY);
+    expect(deposit).toBe(720);
+    expect(ledgerFor(day1, 'unitDeposit')).toBe(-deposit);
+    expect(day1.unit.depositHeld).toBe(deposit);
     const later = runToDay(day1, 4).state;
-    expect(ledgerFor(later, 'unitDeposit')).toBe(-UNIT_DEPOSIT);
+    expect(ledgerFor(later, 'unitDeposit')).toBe(-deposit);
+    // Nothing comes back tonight: moving out is parked.
+    expect(later.unit.depositHeld).toBe(deposit);
   });
 
-  it('charges rent and rates as a thirtieth of the month, every calendar day', () => {
+  it('charges rent at 12 per m2 a month, a thirtieth every calendar day', () => {
     const state = newGame();
-    expect(dailyRent(state)).toBeCloseTo(1200 / DAYS_PER_MONTH, 8);
-    expect(dailyRates(state)).toBeCloseTo(450 / DAYS_PER_MONTH, 8);
+    expect(state.unit.rentMonthly).toBe(720);
+    expect(newGame({ difficulty: 'veryEasy' }).unit.rentMonthly).toBe(1080);
+    expect(dailyRent(state)).toBeCloseTo(UNIT_RENT_MONTHLY / DAYS_PER_MONTH, 8);
+    expect(dailyRates(state)).toBeCloseTo(UNIT_RATES_MONTHLY / DAYS_PER_MONTH, 8);
     // Day 1 to the start of day 8 is eight charged calendar days, two of them the weekend.
     const week = runToDay(state, 8).state;
     expect(ledgerFor(week, 'rent')).toBeCloseTo(-8 * dailyRent(state), 6);
@@ -127,7 +158,10 @@ describe('weekly and monthly cadences', () => {
     const oneOff = act(subscription, { type: 'BUY_SOFTWARE', mode: 'oneOff' });
     expect(oneOff.software.jobsRemaining).toBe(30);
     const oneOffNextMonth = runToDay(oneOff, 31).state;
-    expect(ledgerFor(oneOffNextMonth, 'software')).toBe(-900);
+    // The law of CLAUDE.md T2 3.4: 150 a month, and the one off is two years of it.
+    expect(SOFTWARE_SUBSCRIPTION_MONTHLY).toBe(150);
+    expect(SOFTWARE_ONE_OFF_PRICE).toBe(3600);
+    expect(ledgerFor(oneOffNextMonth, 'software')).toBe(-SOFTWARE_ONE_OFF_PRICE);
   });
 
   it('charges dust waste collection only with the dust system', () => {
@@ -141,7 +175,9 @@ describe('weekly and monthly cadences', () => {
   });
 
   it('charges overdraft interest on the 1st when cash is negative', () => {
-    const state = newGame({ difficulty: 'hard' });
+    const state = newGame();
+    // Deep enough in the red for the interest to bite, with room left before the floor.
+    state.cash = -2000;
     const nextMonth = runToDay(state, 31);
     const interest = ledgerFor(nextMonth.state, 'interest');
     expect(interest).toBeLessThan(0);
@@ -190,7 +226,7 @@ describe('arrears, bailiff and bankruptcy', () => {
     const run = runToDay(start, 45);
     expect(run.state.finance.arrearsAmount).toBeGreaterThan(0);
     expect(run.state.finance.arrearsMonths).toBe(1);
-    expect(run.state.cash).toBeGreaterThan(OVERDRAFT_LIMIT - 300);
+    expect(run.state.cash).toBeGreaterThan(run.state.finance.overdraftLimit - 300);
     expect(eventsOfKind(run.events, 'arrearsWarning')).toHaveLength(1);
     const unpaid = run.state.ledger.filter((entry) => entry.unpaid);
     expect(unpaid.length).toBeGreaterThan(0);
@@ -201,17 +237,18 @@ describe('arrears, bailiff and bankruptcy', () => {
       type: 'BUY_EQUIPMENT',
       specId: 'tableSaw',
     });
-    // The first miss is on day 29, so one month of arrears runs to day 58.
-    const first = runToDay(kitted, 30);
-    expect(first.state.finance.firstArrearsDay).toBe(29);
+    // With the 5000 overdraft of Hard the first miss is on day 12, so month two lands on day 42.
+    const first = runToDay(kitted, 13);
+    expect(first.state.finance.firstArrearsDay).toBe(12);
     expect(first.state.finance.arrearsMonths).toBe(1);
-    expect(runToDay(kitted, 58).state.finance.arrearsMonths).toBe(1);
-    const run = runToDay(kitted, 60);
+    // Day 41 is a Saturday, so the clock walks to the Monday: day 40 is the last look inside month one.
+    expect(runToDay(kitted, 40).state.finance.arrearsMonths).toBe(1);
+    const run = runToDay(kitted, 43);
     expect(eventsOfKind(run.events, 'arrearsFinalWarning')).toHaveLength(1);
     expect(run.state.finance.arrearsMonths).toBe(2);
   });
 
-  it('sends the bailiff for the dearest machine at three months, within 90 days', () => {
+  it('sends the bailiff for the cheapest machine at three months, within 90 days', () => {
     const kitted = act(newGame({ difficulty: 'hard' }), {
       type: 'BUY_EQUIPMENT',
       specId: 'tableSaw',
@@ -228,7 +265,7 @@ describe('arrears, bailiff and bankruptcy', () => {
     expect(seizure?.amount).toBe(1800 * BAILIFF_SEIZURE_FRACTION);
   });
 
-  it('takes the dearest machine first', () => {
+  it('takes the cheapest machine first, so the company can carry on', () => {
     const state = newGame();
     const withKit = act(act(state, { type: 'BUY_EQUIPMENT', specId: 'tableSaw' }), {
       type: 'BUY_EQUIPMENT',
@@ -237,8 +274,28 @@ describe('arrears, bailiff and bankruptcy', () => {
     const copy = { ...withKit, equipment: withKit.equipment.map((item) => ({ ...item })) };
     copy.finance = { ...copy.finance, arrearsAmount: 5000, arrearsMonths: 3, firstArrearsDay: 1 };
     runBailiff(copy);
-    expect(copy.equipment.map((item) => item.specId)).toEqual(['tableSaw']);
-    expect(copy.finance.arrearsAmount).toBe(5000 - 2500 * BAILIFF_SEIZURE_FRACTION);
+    expect(copy.equipment.map((item) => item.specId)).toEqual(['thicknesser']);
+    expect(copy.finance.arrearsAmount).toBe(5000 - 1800 * BAILIFF_SEIZURE_FRACTION);
+  });
+
+  it('takes the seized machine off everybody who was working on it', () => {
+    const withKit = act(newGame(), { type: 'BUY_EQUIPMENT', specId: 'tableSaw' });
+    const saw = withKit.equipment[0];
+    const service = createTask(withKit, {
+      kind: 'service',
+      label: 'Service the table saw',
+      minutes: 30,
+      equipmentId: saw?.id ?? null,
+    });
+    withKit.owner.currentTaskId = service.id;
+    service.doneBy = 'owner';
+    withKit.finance.arrearsAmount = 500;
+    withKit.finance.arrearsMonths = 3;
+    withKit.finance.firstArrearsDay = 1;
+    runBailiff(withKit);
+    // There is nothing left to service, so the job of work goes with the machine.
+    expect(withKit.tasks.some((task) => task.id === service.id)).toBe(false);
+    expect(withKit.owner.currentTaskId).toBeNull();
   });
 
   it('clears the arrears when the seizure covers them', () => {
@@ -256,8 +313,8 @@ describe('arrears, bailiff and bankruptcy', () => {
     const run = runToDay(newGame({ difficulty: 'hard' }), 100);
     expect(run.state.gameOver).not.toBeNull();
     expect(run.state.gameOver?.reason).toContain('arrears');
-    // First miss on day 37, so three months of arrears are up on day 97.
-    expect(run.state.gameOver?.day).toBe(97);
+    // First miss on day 23 with the 5000 overdraft, so three months are up on day 83.
+    expect(run.state.gameOver?.day).toBe(83);
     expect(eventsOfKind(run.events, 'bankruptcy')).toHaveLength(1);
   });
 
@@ -313,5 +370,138 @@ describe('the pelletiser', () => {
     // The counter starts again for the new month, and no waste is charged with a pelletiser.
     expect(nextMonth.productionMinutesMonth).toBe(0);
     expect(ledgerFor(nextMonth, 'waste')).toBe(0);
+  });
+});
+
+describe('the Turn 2 balance', () => {
+  it('gives Hard a 5000 overdraft and the other two 10000', () => {
+    expect(newGame({ difficulty: 'hard' }).finance.overdraftLimit).toBe(-5000);
+    expect(newGame().finance.overdraftLimit).toBe(-10000);
+    expect(newGame({ difficulty: 'veryEasy' }).finance.overdraftLimit).toBe(-10000);
+  });
+
+  it('declares bankruptcy at twice the limit, whatever the difficulty set it to', () => {
+    const hard = newGame({ difficulty: 'hard' });
+    expect(bankruptcyFloor(hard)).toBe(-10000);
+    expect(bankruptcyFloor(newGame())).toBe(-20000);
+  });
+
+  it('pays arrears off from cash, all of them or a typed amount', () => {
+    const state = newGame();
+    state.finance.arrearsAmount = 1000;
+    state.finance.arrearsMonths = 2;
+    state.finance.firstArrearsDay = 3;
+    const cash = state.cash;
+    expect(payArrears(state, 400)).toBe(400);
+    expect(state.cash).toBeCloseTo(cash - 400, 6);
+    expect(state.finance.arrearsAmount).toBe(600);
+    // Part paid, so the ladder is still running.
+    expect(state.finance.arrearsMonths).toBe(2);
+    expect(payArrears(state, null)).toBe(600);
+    expect(state.finance.arrearsAmount).toBe(0);
+    expect(state.finance.arrearsMonths).toBe(0);
+    expect(state.finance.firstArrearsDay).toBeNull();
+    const paid = state.ledger.filter((entry) => entry.category === 'arrears');
+    expect(paid.map((entry) => entry.amount)).toEqual([-400, -600]);
+  });
+
+  it('never pays arrears past the overdraft floor', () => {
+    const state = newGame();
+    state.cash = state.finance.overdraftLimit + 100;
+    state.finance.arrearsAmount = 5000;
+    state.finance.firstArrearsDay = 1;
+    state.finance.arrearsMonths = 1;
+    expect(payArrears(state, null)).toBe(100);
+    expect(state.finance.arrearsAmount).toBe(4900);
+    expect(state.cash).toBe(state.finance.overdraftLimit);
+    expect(payArrears(state, null)).toBe(0);
+  });
+
+  it('reaches the player through the PAY_ARREARS action', () => {
+    let state = newGame();
+    state.finance.arrearsAmount = 300;
+    state.finance.firstArrearsDay = 1;
+    state.finance.arrearsMonths = 1;
+    state = act(state, { type: 'PAY_ARREARS', amount: 100 });
+    expect(state.finance.arrearsAmount).toBe(200);
+    state = act(state, { type: 'PAY_ARREARS', amount: null });
+    expect(state.finance.arrearsAmount).toBe(0);
+  });
+
+  it('charges 1% a month on the arrears only while they are large', () => {
+    const small = newGame();
+    small.finance.arrearsAmount = 100;
+    expect(arrearsCarryInterest(small)).toBe(false);
+    const large = newGame();
+    large.finance.arrearsAmount = monthlyFixedCosts(large) + 1;
+    expect(arrearsCarryInterest(large)).toBe(true);
+
+    // A whole month with large arrears on the books adds 1% of them on the 1st.
+    const state = newGame();
+    state.finance.arrearsAmount = 20000;
+    state.finance.arrearsMonths = 1;
+    state.finance.firstArrearsDay = 1;
+    const run = runToDay(state, 31);
+    const interest = run.state.ledger.filter(
+      (entry) => entry.category === 'interest' && entry.label === 'Interest on the arrears',
+    );
+    expect(interest).toHaveLength(1);
+    expect(-(interest[0]?.amount ?? 0)).toBeCloseTo(20000 * ARREARS_MONTHLY_INTEREST, 4);
+  });
+});
+
+describe('the books', () => {
+  it('fall behind the moment a working day ends without the bookkeeping', () => {
+    const day1 = newGame();
+    expect(booksBehind(day1)).toBe(false);
+    expect(day1.booksUpToDay).toBe(0);
+    const day2 = nextDay(day1);
+    expect(booksBehind(day2)).toBe(true);
+  });
+
+  it('catch every day up at once when somebody writes them up', () => {
+    let state = runToDay(newGame(), 4).state;
+    expect(booksBehind(state)).toBe(true);
+    state = doTask(state, 'bookkeeping');
+    expect(booksBehind(state)).toBe(false);
+    expect(state.booksUpToDay).toBe(4);
+    // The figures the player sees come back to the live ones.
+    expect(visibleTotals(state).month).toEqual(state.finance.month);
+  });
+
+  it('freezes what the player can see at the last day anybody wrote up', () => {
+    let state = doTask(newGame(), 'bookkeeping');
+    const booked = visibleTotals(state).month.costs;
+    state = runToDay(state, 4).state;
+    expect(booksBehind(state)).toBe(true);
+    expect(visibleTotals(state).month.costs).toBe(booked);
+    expect(state.finance.month.costs).toBeGreaterThan(booked);
+  });
+
+  it('charges 100 a month for late accounts, and more the longer it runs', () => {
+    const run = runToDay(newGame(), 62);
+    const charges = run.state.ledger.filter((entry) => entry.category === 'accounts');
+    expect(charges.map((entry) => entry.amount)).toEqual([
+      -LATE_ACCOUNTS_CHARGE,
+      -LATE_ACCOUNTS_CHARGE * 2,
+    ]);
+    expect(run.state.lateAccountsMonths).toBe(2);
+    expect(eventsOfKind(run.events, 'lateAccounts')).toHaveLength(2);
+  });
+
+  it('charges nothing on the 1st when the books are up to date', () => {
+    let state = newGame();
+    let guard = 0;
+    while (state.clock.day < 32 && guard < 60) {
+      guard += 1;
+      state = clearEvents(state);
+      if (state.tasks.some((task) => task.kind === 'bookkeeping' && !task.done)) {
+        state = doTask(state, 'bookkeeping');
+      }
+      state = nextDay(state);
+    }
+    expect(state.clock.day).toBeGreaterThanOrEqual(31);
+    expect(state.ledger.filter((entry) => entry.category === 'accounts')).toHaveLength(0);
+    expect(state.lateAccountsMonths).toBe(0);
   });
 });

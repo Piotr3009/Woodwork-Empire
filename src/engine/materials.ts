@@ -5,20 +5,63 @@ import {
   BESPOKE_COST_UPLIFT,
   DELIVERY_WORKING_DAYS_BESPOKE,
   DELIVERY_WORKING_DAYS_STANDARD,
+  LOW_STOCK_FRACTION,
   MATERIAL_FRACTION,
-  SHEET_PRICE,
   SHEET_PRICE_STOCK,
+  SHEET_VALUE,
   TEMP_STORAGE_COST,
 } from './constants';
 import { addWorkingDays } from './clock';
 import { canAfford, chargeUnavoidable, noteLoss, pay } from './economy';
+import { findSpec } from './machines';
 import { makeId } from './rng';
 import { createTask, unloadMinutes } from './tasks';
+import { plural } from './text';
 import type { Delivery, GameState, Job, MaterialMode } from './types';
 
-/** Sheets a job needs, from what its material costs [TUNE: one sheet is SHEET_PRICE]. */
+/** Sheets a job needs: one sheet is 200 of material value (PIOTR). */
 export function sheetsForCost(cost: number): number {
-  return Math.max(1, Math.ceil(cost / SHEET_PRICE));
+  return Math.max(1, Math.ceil(cost / SHEET_VALUE));
+}
+
+/** What the shelving in the hall can hold. No shelving, no room for a delivery (PIOTR). */
+export function rackCapacity(state: GameState): number {
+  let capacity = 0;
+  for (const item of state.equipment) {
+    const spec = findSpec(item.specId);
+    if (spec && spec.sheetCapacity > capacity) capacity = spec.sheetCapacity;
+  }
+  return capacity;
+}
+
+/** Nothing comes off a lorry until there is somewhere to put it (CLAUDE.md T2 3.6). */
+export function canUnload(state: GameState): boolean {
+  return rackCapacity(state) > 0;
+}
+
+/** The rack is nearly empty and the joiners are about to run out (CLAUDE.md T2 3.6). */
+export function stockIsLow(state: GameState): boolean {
+  const capacity = rackCapacity(state);
+  if (capacity <= 0) return false;
+  return state.stock.sheets < capacity * LOW_STOCK_FRACTION;
+}
+
+/** Whole sheets the job should have taken off the rack by the progress it has reached. A job on
+ *  the bench always holds at least one sheet (CLAUDE.md T2 3.6). */
+export function sheetsDueFor(job: Job, progress: number): number {
+  if (job.sheets <= 0) return 0;
+  return Math.min(job.sheets, Math.max(1, Math.ceil(job.sheets * progress)));
+}
+
+/** Takes what the next slice of work needs off the rack. False when the rack cannot supply it,
+ *  which stops the job where it stands. */
+export function drawSheetsFor(state: GameState, job: Job, progress: number): boolean {
+  const due = sheetsDueFor(job, progress) - job.sheetsUsed;
+  if (due <= 0) return true;
+  if (state.stock.sheets < due) return false;
+  state.stock.sheets -= due;
+  job.sheetsUsed += due;
+  return true;
 }
 
 /** 0.40 of the price per job, 15% more when the material is bespoke (CLAUDE.md 8.4, 8.9). */
@@ -92,7 +135,7 @@ export function arriveDeliveries(state: GameState): Delivery[] {
     delivery.arrived = true;
     createTask(state, {
       kind: 'unload',
-      label: `Unload ${delivery.sheets} sheets`,
+      label: `Unload ${plural(delivery.sheets, 'sheet', 'sheets')}`,
       minutes: unloadMinutes(state),
       deliveryId: delivery.id,
       jobId: delivery.jobId,
@@ -107,7 +150,7 @@ export function materialModeLabel(mode: MaterialMode): string {
 
 /** Room left on the sheet rack. */
 export function stockFree(state: GameState): number {
-  return Math.max(0, state.unit.sheetCapacity - state.stock.sheets);
+  return Math.max(0, rackCapacity(state) - state.stock.sheets);
 }
 
 /** Buying sheets in advance: cheaper per job, but it ties up cash and rack space. */

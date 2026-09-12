@@ -3,6 +3,7 @@
 
 import {
   HIRE_START_DELAY_DAYS,
+  MINUTES_PER_WORKING_DAY,
   HIRING_SPECS,
   JOINERS_PER_TABLE_SAW,
   JOINER_PREREQUISITES,
@@ -14,7 +15,25 @@ import { addWorkingDays } from './clock';
 import { assignJob, oldestReadyJob } from './jobs';
 import { countOf, findSpec } from './machines';
 import { int, makeId } from './rng';
+import { STATION_IDLE } from './stations';
 import type { GameState, HiringOption, Worker, WorkerRole, WorkerTier } from './types';
+
+/** The roles that have a working day of their own, the way the owner does (CLAUDE.md T2 3.8).
+ *  A helper still clears his workshop jobs at no cost, as in Turn 1. */
+const OFFICE_ROLES: WorkerRole[] = ['officeAdmin', 'purchasingClerk', 'salesman'];
+
+export function hasWorkingDay(role: WorkerRole): boolean {
+  return OFFICE_ROLES.includes(role);
+}
+
+/** Minutes of his own day this man has left. */
+export function staffMinutesLeft(worker: Worker): number {
+  return Math.max(0, MINUTES_PER_WORKING_DAY - worker.minutesWorked);
+}
+
+export function officeStaff(state: GameState): Worker[] {
+  return state.workers.filter((worker) => hasWorkingDay(worker.role));
+}
 
 export function joiners(state: GameState): Worker[] {
   return state.workers.filter((worker) => worker.role === 'joiner');
@@ -124,6 +143,10 @@ export function hire(state: GameState, role: WorkerRole, tier: WorkerTier | null
     startDay: addWorkingDays(state.clock.day, HIRE_START_DELAY_DAYS),
     jobId: null,
     taskId: null,
+    minutesWorked: 0,
+    ordersToday: 0,
+    station: STATION_IDLE,
+    productionMinutes: 0,
     absentDaysRemaining: 0,
     anchorX: anchor.x,
     anchorY: anchor.y,
@@ -151,9 +174,12 @@ export function autoAssignJobs(state: GameState): void {
   }
 }
 
-/** Counts down an injured joiner's days off. Runs at the start of the day. */
+/** Counts down an injured joiner's days off and hands everybody a fresh day. What a man did not
+ *  finish yesterday he is still holding this morning (CLAUDE.md T2 3.8). */
 export function runStaffDayStart(state: GameState): void {
   for (const worker of state.workers) {
     if (worker.absentDaysRemaining > 0) worker.absentDaysRemaining -= 1;
+    worker.minutesWorked = 0;
+    worker.ordersToday = 0;
   }
 }

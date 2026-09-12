@@ -4,7 +4,7 @@
 // One escape and one money format for the whole game: the renderers and the engine own them,
 // because both layers sit below the modals.
 
-import { formatMoney } from '../engine/index';
+import { WHY, formatMoney, plural } from '../engine/index';
 import { escapeText } from '../render/hall';
 
 export const escapeHtml = escapeText;
@@ -18,6 +18,8 @@ export interface ModalSpec {
   /** Decisions have no cross: the choice buttons are the way out. */
   closable?: boolean;
   wide?: boolean;
+  /** Fills the page, for the order board (CLAUDE.md T2 3.2). */
+  full?: boolean;
 }
 
 export interface ModalPosition {
@@ -29,8 +31,11 @@ export function minutes(value: number): string {
   return `${Math.max(0, Math.round(value))} min`;
 }
 
+/** The one plural in the game lives in the engine, because the event copy needs it too. */
+export { plural };
+
 export function days(value: number): string {
-  return `${Math.round(value)} days`;
+  return plural(Math.round(value), 'day', 'days');
 }
 
 export function renderModal(spec: ModalSpec, position: ModalPosition | null): string {
@@ -40,8 +45,9 @@ export function renderModal(spec: ModalSpec, position: ModalPosition | null): st
     ? '<button class="modal-close" data-do="closeModal" title="Close" aria-label="Close">' +
       '×</button>'
     : '';
+  const size = spec.full === true ? ' modal-full' : spec.wide === true ? ' modal-wide' : '';
   return (
-    `<div class="modal${spec.wide === true ? ' modal-wide' : ''}${position ? '' : ' modal-centred'}"` +
+    `<div class="modal${size}${position ? '' : ' modal-centred'}"` +
     ` data-modal="${spec.id}"${style}>` +
     `<header class="modal-head" data-drag="1"><h2>${escapeHtml(spec.title)}</h2>${cross}</header>` +
     `<div class="modal-body">${spec.body}</div>` +
@@ -82,6 +88,15 @@ export function primaryButton(action: string, text: string, extra = ''): string 
 /** The one allowed disabled button: a locked catalogue line with its reason (CLAUDE.md 9.2). */
 export function lockedButton(text: string, reason: string): string {
   return `<button class="btn" disabled title="${escapeHtml(reason)}">${escapeHtml(text)}</button>`;
+}
+
+/** The optional real life note beside a decision: a text link, never an icon (CLAUDE.md T2 3.12). */
+export function whyLink(state: { showWhy: boolean }, key: string): string {
+  if (!state.showWhy || WHY[key] === undefined) return '';
+  return (
+    `<button class="why-link" data-do="showWhy" data-id="${key}" ` +
+    'title="Why it is like this in real life">i</button>'
+  );
 }
 
 /** Everywhere else, a reason the player can read instead of a control he cannot press. */

@@ -8,13 +8,12 @@ import {
   CANTEEN_SLOT_LAYOUT,
   DESK_LAYOUT,
   DIFFICULTIES,
-  EXTRACTOR_REPAIR_COST,
   HELPER_CLEAN_WEEKDAY,
   LOCKER_SLOT_LAYOUT,
   MINUTES_PER_WORKING_DAY,
-  OVERDRAFT_LIMIT,
   OWNER_LABOUR_PER_MINUTE,
   REPUTATION_START,
+  SERVICE_INTERVAL_DAYS,
   SOFTWARE_ONE_OFF_JOBS,
   SOFTWARE_ONE_OFF_PRICE,
   SOFTWARE_TURN1_TIER,
@@ -23,8 +22,18 @@ import {
   STATE_VERSION,
 } from './constants';
 import { expireEnquiries, refillBoard, refreshLocks } from './board';
-import { daysBetween, isDayExhausted, isOvertime, isWorkingDay, weekday } from './clock';
-import { canAfford, emptyTotals, formatMoney, pay, runDayCosts } from './economy';
+import { canPlaceSpec, firstFreeTile, moveItem } from './layout';
+import { daysBetween, isDayExhausted, isOvertime, isWorkingDay, weekOfDay, weekday } from './clock';
+import {
+  canAfford,
+  emptyBooked,
+  emptyTotals,
+  formatMoney,
+  pay,
+  payArrears,
+  runDayCosts,
+  writeUpBooks,
+} from './economy';
 import { isPaused, openNextEvent, queueEvent } from './events';
 import {
   accidentRisk,
@@ -35,12 +44,21 @@ import {
   clearDust,
   countOf,
   emptyBag,
+  breakMachine,
+  brokenMachineFor,
   extractorBreakdownChance,
+  extractorBroken,
   findSpec,
   hallProductivityFactor,
   has,
-  machinesStopped,
-  repairExtractor,
+  hasExtraction,
+  machinesDueService,
+  overdueBreakdownChance,
+  repairCostFor,
+  repairMachine,
+  serviceCostFor,
+  serviceMachine,
+  serviceableMachines,
   specOf,
 } from './machines';
 import {
@@ -49,23 +67,32 @@ import {
   assignJob,
   chargeSiteMeasure,
   checkOverdueJobs,
+  deliverJob,
   findJob,
+  jobProgress,
   jobSpeedFactor,
   oldestReadyJob,
   onDeliveryArrived,
+  orderTransport,
   ownerJob,
   onDeliveryUnloaded,
   onMaterialOrdered,
   refreshJob,
   releaseJob,
+  runBookedTransport,
   setMaterialMode,
+  transportLabel,
 } from './jobs';
 import {
   arriveDeliveries,
   buyStock,
+  canUnload,
+  drawSheetsFor,
   fetchFromStorage,
   findDelivery,
   moveOverflowToStorage,
+  rackCapacity,
+  stockIsLow,
   unloadIntoStock,
   writeOffSheetsLeftOutside,
 } from './materials';
@@ -79,15 +106,23 @@ import {
   staffOutputFactor,
 } from './owner';
 import { chance, int, makeId } from './rng';
+import { plural } from './text';
+import {
+  STATION_IDLE,
+  stationForProduction,
+  stationForTask,
+} from './stations';
 import {
   autoAssignJobs,
   availableJoiners,
+  hasWorkingDay,
   helpers,
   hire,
   isWorkingToday,
   joiners,
   runStaffDayStart,
   sawRatioFactor,
+  staffMinutesLeft,
 } from './staff';
 import {
   AD_HOC_TASK_MINUTES,
@@ -105,6 +140,8 @@ import type {
   Delivery,
   Difficulty,
   Equipment,
+  GameEventChoice,
+  Job,
   MaterialKind,
   GameAction,
   GameState,
@@ -112,11 +149,14 @@ import type {
   TaskInstance,
 } from './types';
 
+
 export interface NewGameOptions {
   seed: number;
   difficulty: Difficulty;
   playerName: string;
   companyName: string;
+  /** The real life notes are on unless the player turned them off on the start screen. */
+  showWhy: boolean;
 }
 
 export function clone(state: GameState): GameState {
@@ -139,6 +179,7 @@ export function createGame(options: NewGameOptions): GameState {
     difficulty: options.difficulty,
     playerName: options.playerName,
     companyName: options.companyName,
+    showWhy: options.showWhy,
     clock: { day: 1, minute: 0 },
     speed: 0,
     cash: spec.startingCash,
@@ -151,7 +192,7 @@ export function createGame(options: NewGameOptions): GameState {
       rentMonthly: spec.rentMonthly,
       ratesMonthly: spec.ratesMonthly,
       benchSlots: spec.benchSlots,
-      sheetCapacity: spec.sheetCapacity,
+      depositHeld: 0,
     },
     owner: {
       present: true,
@@ -164,6 +205,8 @@ export function createGame(options: NewGameOptions): GameState {
       sickDaysRemaining: 0,
       sickStartDay: null,
       stayHome: false,
+      station: STATION_IDLE,
+      productionMinutes: 0,
     },
     software: { mode: 'none', tier: 'basic', jobsRemaining: 0 },
     stock: { sheets: 0, tempStorageSheets: 0 },
@@ -174,18 +217,23 @@ export function createGame(options: NewGameOptions): GameState {
     tasks: [],
     deliveries: [],
     finance: {
-      overdraftLimit: OVERDRAFT_LIMIT,
+      overdraftLimit: spec.overdraftLimit,
       arrearsAmount: 0,
       arrearsMonths: 0,
       firstArrearsDay: null,
       day: emptyTotals(),
       week: emptyTotals(),
       month: emptyTotals(),
+      booked: emptyBooked(),
     },
     ledger: [],
     eventQueue: [],
     activeEvent: null,
-    dayStats: { jobsAdvanced: [], jobsCompleted: [], dustAtStart: 0 },
+    dayStats: { jobsAdvanced: [], jobsCompleted: [], dustAtStart: 0, noMaterialWarned: false },
+    lastExpressDay: null,
+    lastLowStockDay: null,
+    booksUpToDay: 0,
+    lateAccountsMonths: 0,
     productionMinutesMonth: 0,
     gameOver: null,
   };
@@ -203,6 +251,13 @@ function shouldFinishDay(state: GameState): boolean {
   return !ownerIsAvailable(state);
 }
 
+/** Nobody is left to work the rest of the day: the owner is at home and no member of staff is on
+ *  the books and fit today (Turn 2 brief 3.1). */
+function hallIsEmpty(state: GameState): boolean {
+  if (ownerIsAvailable(state)) return false;
+  return !state.workers.some((worker) => isWorkingToday(state, worker));
+}
+
 /** Resets everything that is scoped to one day and charges what the new day owes. */
 function startDay(state: GameState): void {
   const owner = state.owner;
@@ -212,7 +267,12 @@ function startDay(state: GameState): void {
   owner.currentTaskId = null;
   owner.present = true;
   owner.stayHome = false;
-  state.dayStats = { jobsAdvanced: [], jobsCompleted: [], dustAtStart: state.dust };
+  state.dayStats = {
+    jobsAdvanced: [],
+    jobsCompleted: [],
+    dustAtStart: state.dust,
+    noMaterialWarned: false,
+  };
   runDayCosts(state, state.clock.day);
   runOwnerDayStart(state);
   runStaffDayStart(state);
@@ -235,37 +295,96 @@ function startDay(state: GameState): void {
     });
   }
   const arriving = arriveDeliveries(state);
+  runBookedTransport(state);
   checkOverdueJobs(state);
   for (const delivery of arriving) onDeliveryArrived(state, delivery.jobId);
   createDailyTasks(state);
   runExtractorBreakdown(state);
+  runServiceDue(state);
+  runOverdueBreakdowns(state);
+  checkLowStock(state);
   runAccidentRoll(state);
   runHelperClean(state);
   delegateTasks(state);
   queueDeliveryEvents(state, arriving);
 }
 
-/** The extractor can give up, and the filthier the hall the likelier it is (CLAUDE.md 9.6). */
+/** Who can be sent at a job of work, as choices on the event that raised it. Nobody who is not
+ *  in the hall today is offered: the choice would do nothing (CLAUDE.md T2 3.8). */
+function adHocChoices(
+  state: GameState,
+  minutesTotal: number,
+  ownerLabel: string,
+  leaveLabel = 'Leave it',
+): GameEventChoice[] {
+  const choices: GameEventChoice[] = [];
+  if (ownerIsAvailable(state) && ownerMinutesLeft(state) > 0) {
+    choices.push({ id: 'owner', label: `${ownerLabel}, ${minutesTotal} min` });
+  }
+  if (joiners(state).some((worker) => isWorkingToday(state, worker))) {
+    choices.push({ id: 'joiner', label: `Send a joiner, ${minutesTotal} min` });
+  }
+  choices.push({ id: 'later', label: leaveLabel });
+  return choices;
+}
+
+/** Anything in the hall can give up. The extractor goes on dust, everything else on a service it
+ *  never had (CLAUDE.md 9.6 and T2 3.9). */
+function raiseMachineBroken(state: GameState, machine: Equipment): void {
+  const name = findSpec(machine.specId)?.name ?? machine.specId;
+  const task = ensureTask(state, 'repair', `Repair the ${name.toLowerCase()}`, machine.id);
+  const body =
+    machine.specId === 'extractor'
+      ? 'The hall runs at a quarter speed until it is fixed, and the dust piles up three times ' +
+        `as fast. The parts cost ${formatMoney(repairCostFor(machine))}.`
+      : `Nothing that goes through it gets made until it is fixed. The parts cost ` +
+        `${formatMoney(repairCostFor(machine))}.`;
+  queueEvent(state, {
+    kind: 'machineBroken',
+    title: `${name} has stopped`,
+    body,
+    choices: adHocChoices(state, task.minutesTotal, 'Fix it yourself'),
+    data: { equipmentId: machine.id, taskId: task.id },
+  });
+}
+
 function runExtractorBreakdown(state: GameState): void {
-  if (machinesStopped(state)) return;
+  if (extractorBroken(state)) return;
   if (!chance(state, extractorBreakdownChance(state))) return;
   const extractor = breakExtractor(state);
   if (!extractor) return;
-  const task = ensureTask(state, 'repairExtractor', 'Repair the extractor', extractor.id);
-  const choices = [{ id: 'owner', label: `Fix it yourself, ${task.minutesTotal} min` }];
-  if (joiners(state).length > 0) {
-    choices.push({ id: 'joiner', label: `Send a joiner, ${task.minutesTotal} min` });
+  raiseMachineBroken(state, extractor);
+}
+
+/** A machine wants a service once a month, and one that never gets it gives up (CLAUDE.md T2 3.9). */
+function runServiceDue(state: GameState): void {
+  for (const machine of machinesDueService(state)) {
+    if (machine.broken) continue;
+    const name = findSpec(machine.specId)?.name ?? machine.specId;
+    const open = state.tasks.some(
+      (task) => task.kind === 'service' && task.equipmentId === machine.id && !task.done,
+    );
+    if (open) continue;
+    const task = ensureTask(state, 'service', `Service the ${name.toLowerCase()}`, machine.id);
+    queueEvent(state, {
+      kind: 'serviceDue',
+      title: `Service due: ${name.toLowerCase()}`,
+      body:
+        `It has been ${SERVICE_INTERVAL_DAYS} days. The parts and the oil come to ` +
+        `${formatMoney(serviceCostFor(machine))}. Left alone it will give up in the middle of a ` +
+        'job.',
+      choices: adHocChoices(state, task.minutesTotal, 'Do it yourself'),
+      data: { equipmentId: machine.id, taskId: task.id },
+    });
   }
-  choices.push({ id: 'later', label: 'Leave it' });
-  queueEvent(state, {
-    kind: 'extractorBroken',
-    title: 'The extractor has stopped',
-    body:
-      `Every machine in the hall is dead until it is fixed, and the dust piles up faster. ` +
-      `The parts cost ${formatMoney(EXTRACTOR_REPAIR_COST)}.`,
-    choices,
-    data: { equipmentId: extractor.id, taskId: task.id },
-  });
+}
+
+function runOverdueBreakdowns(state: GameState): void {
+  for (const machine of serviceableMachines(state)) {
+    if (!chance(state, overdueBreakdownChance(state, machine))) continue;
+    const broken = breakMachine(state, machine.id);
+    if (broken) raiseMachineBroken(state, broken);
+  }
 }
 
 /** A dangerous hall hurts somebody sooner or later (CLAUDE.md 9.7). */
@@ -300,14 +419,23 @@ function queueDeliveryEvents(state: GameState, arriving: Delivery[]): void {
   for (const delivery of arriving) {
     const task = state.tasks.find((entry) => entry.deliveryId === delivery.id && !entry.done);
     if (!task) continue;
+    const room = canUnload(state);
+    const choices = room
+      ? [
+          { id: 'unload', label: `Unload now, ${task.minutesTotal} min` },
+          { id: 'later', label: 'Leave it at the gate' },
+        ]
+      : [{ id: 'later', label: 'Leave it at the gate' }];
+    const body = room
+      ? `${plural(delivery.sheets, 'sheet', 'sheets')} have arrived. Nothing can be made until ` +
+        'they are inside.'
+      : `${plural(delivery.sheets, 'sheet', 'sheets')} have arrived and there is no shelving to ` +
+        'put them on. Buy some from the catalogue.';
     queueEvent(state, {
       kind: 'deliveryArrived',
       title: 'Delivery at the gate',
-      body: `${delivery.sheets} sheets have arrived. Nothing can be made until they are inside.`,
-      choices: [
-        { id: 'unload', label: `Unload now, ${task.minutesTotal} min` },
-        { id: 'later', label: 'Leave it at the gate' },
-      ],
+      body,
+      choices,
       data: { deliveryId: delivery.id, taskId: task.id, sheets: delivery.sheets },
     });
   }
@@ -315,6 +443,9 @@ function queueDeliveryEvents(state: GameState, arriving: Delivery[]): void {
 
 /** Ends the working day and opens the summary. The player clicks on to the next day. */
 function finishDay(state: GameState): void {
+  const ending =
+    state.activeEvent?.kind === 'dayEnd' || state.eventQueue.some((event) => event.kind === 'dayEnd');
+  if (ending) return;
   pauseOwnerTask(state);
   setTomorrowFatigue(state);
   state.owner.wentHome = true;
@@ -357,7 +488,7 @@ function advanceToNextDay(state: GameState): void {
 /** Finds the open task of this kind for this machine, or puts one on the list. */
 function ensureTask(
   state: GameState,
-  kind: 'cleaning' | 'repairExtractor' | 'bagChange',
+  kind: 'cleaning' | 'repair' | 'service' | 'bagChange',
   label: string,
   equipmentId: string | null,
 ): TaskInstance {
@@ -380,7 +511,8 @@ function delegateAdHocTask(state: GameState, task: TaskInstance, choiceId: strin
     return;
   }
   if (choiceId === 'joiner') {
-    const joiner = availableJoiners(state)[0] ?? joiners(state)[0];
+    const joiner =
+      availableJoiners(state)[0] ?? joiners(state).find((entry) => isWorkingToday(state, entry));
     if (joiner) assignWorkerTask(state, joiner.id, task.id);
   }
 }
@@ -408,21 +540,44 @@ function applyTaskCompletion(state: GameState, task: TaskInstance): void {
     case 'cleaning':
       clearDust(state);
       break;
-    case 'repairExtractor':
-      repairExtractor(state);
-      pay(state, 'repair', 'Extractor repair', EXTRACTOR_REPAIR_COST);
+    case 'bookkeeping':
+      writeUpBooks(state);
       break;
+    case 'repair': {
+      const machine = task.equipmentId
+        ? state.equipment.find((item) => item.id === task.equipmentId)
+        : null;
+      if (machine) {
+        const name = findSpec(machine.specId)?.name ?? machine.specId;
+        pay(state, 'repair', `${name} repair`, repairCostFor(machine));
+        repairMachine(state, machine.id);
+      }
+      break;
+    }
+    case 'service': {
+      const machine = task.equipmentId
+        ? state.equipment.find((item) => item.id === task.equipmentId)
+        : null;
+      if (machine) {
+        const name = findSpec(machine.specId)?.name ?? machine.specId;
+        pay(state, 'repair', `${name} service`, serviceCostFor(machine));
+        serviceMachine(state, machine.id);
+      }
+      break;
+    }
     case 'fetchStorage':
       fetchFromStorage(state);
+      break;
+    case 'deliver':
+      if (job) deliverJob(state, job);
       break;
     case 'unload': {
       const delivery = task.deliveryId ? findDelivery(state, task.deliveryId) : null;
       if (delivery) {
         delivery.unloaded = true;
-        if (delivery.jobId === null) {
-          const overflow = unloadIntoStock(state, delivery);
-          if (overflow > 0) raiseStockOverflow(state, delivery, overflow);
-        }
+        // Every delivery lands on the rack, per job orders included (CLAUDE.md T2 3.6).
+        const overflow = unloadIntoStock(state, delivery);
+        if (overflow > 0) raiseStockOverflow(state, delivery, overflow);
         onDeliveryUnloaded(state, delivery.jobId);
       }
       break;
@@ -453,10 +608,42 @@ function delegateTasks(state: GameState): void {
   for (const task of assignStaffTasks(state)) applyTaskCompletion(state, task);
 }
 
+/** Where everybody is standing, worked out from what they are doing (CLAUDE.md T2 3.3). */
+function updateStations(state: GameState): void {
+  const owner = state.owner;
+  if (!ownerIsAvailable(state)) {
+    owner.station = STATION_IDLE;
+  } else if (owner.currentTaskId !== null) {
+    const task = findTask(state, owner.currentTaskId);
+    owner.station = task ? stationForTask(state, task) : STATION_IDLE;
+  } else if (ownerJob(state) !== null) {
+    owner.station = stationForProduction(state, owner.productionMinutes);
+  } else {
+    owner.station = STATION_IDLE;
+  }
+  for (const worker of state.workers) {
+    if (!isWorkingToday(state, worker)) {
+      worker.station = STATION_IDLE;
+      continue;
+    }
+    if (worker.taskId !== null) {
+      const task = findTask(state, worker.taskId);
+      worker.station = task ? stationForTask(state, task) : STATION_IDLE;
+      continue;
+    }
+    const job = worker.jobId ? findJob(state, worker.jobId) : null;
+    worker.station =
+      job && job.stage === 'inProduction'
+        ? stationForProduction(state, worker.productionMinutes)
+        : STATION_IDLE;
+  }
+}
+
 function settle(state: GameState): void {
   refreshLocks(state);
   delegateTasks(state);
   autoAssignJobs(state);
+  updateStations(state);
   openNextEvent(state);
 }
 
@@ -470,26 +657,95 @@ function runWorkerTaskMinute(state: GameState, workerId: string, taskId: string)
     worker.taskId = null;
     return false;
   }
+  if (hasWorkingDay(worker.role) && staffMinutesLeft(worker) <= 0) {
+    // His day is full. What is left of the task waits for tomorrow, or for the owner.
+    worker.taskId = null;
+    task.doneBy = null;
+    return false;
+  }
+  worker.minutesWorked += 1;
   if (advanceTask(task, 1)) {
     worker.taskId = null;
+    if (task.kind === 'materialOrder' && worker.role === 'purchasingClerk') {
+      worker.ordersToday += 1;
+    }
     applyTaskCompletion(state, task);
   }
   return true;
 }
 
-function runProductionMinute(state: GameState): void {
+/** The rack has to hand over what the next slice of work needs, or the job stands still and the
+ *  joiners stand around (CLAUDE.md T2 3.6). */
+function materialReady(state: GameState, job: Job): boolean {
+  const ok = drawSheetsFor(state, job, jobProgress(job));
+  if (!ok) {
+    job.blockedBy = 'waiting for material';
+    raiseNoMaterial(state);
+  }
+  return ok;
+}
+
+/** Everything in the hall that can stop a job, in the order the player would notice it. Empty
+ *  while the job is free to be worked on (CLAUDE.md T2 3.9). */
+function hallBlock(state: GameState, job: Job): string {
+  if (!job.byHand && !hasExtraction(state)) return 'no extraction';
+  const broken = brokenMachineFor(state, job.materialKind);
+  if (broken && !job.byHand) {
+    return `${(findSpec(broken.specId)?.name ?? 'a machine').toLowerCase()} is broken`;
+  }
+  if (bagBlocked(state, job.materialKind)) return 'bag full';
+  return '';
+}
+
+/** True when the job can be worked on this minute. Writes down why it cannot, either way. */
+function canWorkOn(state: GameState, job: Job): boolean {
+  const block = hallBlock(state, job);
+  job.blockedBy = block;
+  if (block !== '') return false;
+  return materialReady(state, job);
+}
+
+function raiseNoMaterial(state: GameState): void {
+  if (state.dayStats.noMaterialWarned) return;
+  state.dayStats.noMaterialWarned = true;
+  queueEvent(state, {
+    kind: 'noMaterial',
+    title: 'No material',
+    body: 'Your joiners are standing around laughing. No material. The wages run anyway.',
+  });
+}
+
+/** A rack under a tenth full is worth a word in the morning, once a week (CLAUDE.md T2 3.6).
+ *  It never interrupts the working day: the line under the hall carries the live figure. */
+function checkLowStock(state: GameState): void {
+  if (!stockIsLow(state)) return;
+  if (!state.jobs.some((job) => job.stage !== 'completed')) return;
+  const week = weekOfDay(state.clock.day);
+  if (state.lastLowStockDay !== null && weekOfDay(state.lastLowStockDay) === week) return;
+  state.lastLowStockDay = state.clock.day;
+  queueEvent(state, {
+    kind: 'lowStock',
+    title: 'The rack is nearly empty',
+    body:
+      `${plural(state.stock.sheets, 'sheet', 'sheets')} left of ` +
+      `${rackCapacity(state)}. Order material before the benches stop.`,
+    data: { sheets: state.stock.sheets },
+  });
+}
+
+function runProductionMinute(state: GameState, ownerOnTask: boolean): void {
   const hall = hallProductivityFactor(state);
-  const stopped = machinesStopped(state);
   let worked = false;
   const materials = new Set<MaterialKind>();
-  const atTheBench = state.owner.currentTaskId === null ? ownerJob(state) : null;
-  if (atTheBench && ownerIsAvailable(state) && !stopped && !bagBlocked(state, atTheBench.materialKind)) {
+  const atTheBench = !ownerOnTask && state.owner.currentTaskId === null ? ownerJob(state) : null;
+  if (atTheBench && ownerIsAvailable(state) && canWorkOn(state, atTheBench)) {
     spendOwnerMinute(state, 'workshop');
+    state.owner.productionMinutes += 1;
     worked = true;
     materials.add(atTheBench.materialKind);
     const minute = (OWNER_LABOUR_PER_MINUTE * ownerEfficiency(state) * hall) /
       jobSpeedFactor(state, atTheBench);
-    addLabour(state, atTheBench, minute);
+    if (addLabour(state, atTheBench, minute)) raiseJobAtGate(state, atTheBench);
   }
   // Staff work the normal day only: nobody but the owner does overtime.
   if (!isOvertime(state.clock.minute)) {
@@ -506,13 +762,14 @@ function runProductionMinute(state: GameState): void {
         worker.jobId = null;
         continue;
       }
-      if (stopped || bagBlocked(state, job.materialKind)) continue;
+      if (!canWorkOn(state, job)) continue;
+      worker.productionMinutes += 1;
       worked = true;
       materials.add(job.materialKind);
       const rate = worker.rate * sawRatioFactor(state, worker);
       const minute = (OWNER_LABOUR_PER_MINUTE * rate * hall * staffFactor) /
         jobSpeedFactor(state, job);
-      addLabour(state, job, minute);
+      if (addLabour(state, job, minute)) raiseJobAtGate(state, job);
     }
   }
   if (!worked) return;
@@ -521,6 +778,26 @@ function runProductionMinute(state: GameState): void {
   for (const material of materials) {
     for (const machine of accumulateBagMinutes(state, material)) raiseBagFull(state, machine);
   }
+}
+
+/** The piece is made and standing in front of the gate. Nothing is paid until the client has it,
+ *  so the only question is who takes it there (CLAUDE.md T2 3.7). */
+function raiseJobAtGate(state: GameState, job: Job): void {
+  const choices = has(state, 'van')
+    ? adHocChoices(state, AD_HOC_TASK_MINUTES.deliver, 'Take it in the van', 'Leave it at the gate')
+    : [
+        { id: 'transport', label: transportLabel(state) },
+        { id: 'later', label: 'Leave it at the gate' },
+      ];
+  queueEvent(state, {
+    kind: 'jobAtGate',
+    title: `${job.name} is finished`,
+    body:
+      'It is standing in front of the gate. The balance is paid when the client has it. ' +
+      `${transportLabel(state)}.`,
+    choices,
+    data: { jobId: job.id },
+  });
 }
 
 /** Sheets that do not fit on the rack: leave them out and lose them, or pay to store them
@@ -551,43 +828,52 @@ function raiseBagFull(state: GameState, machine: Equipment): void {
     delegateTasks(state);
     return;
   }
-  const choices = [];
-  if (ownerIsAvailable(state) && ownerMinutesLeft(state) > 0) {
-    choices.push({ id: 'owner', label: `Change it yourself, ${task.minutesTotal} min` });
-  }
-  if (joiners(state).length > 0) {
-    choices.push({
-      id: 'joiner',
-      label: `Send a joiner, ${task.minutesTotal} min off his bench`,
-    });
-  }
-  choices.push({ id: 'later', label: 'Leave the machine stopped' });
   queueEvent(state, {
     kind: 'bagFull',
     title: `Bag full: ${name.toLowerCase()}`,
     body: 'The machine has stopped. Nothing of this kind gets made until the bag is changed.',
-    choices,
+    choices: adHocChoices(
+      state,
+      task.minutesTotal,
+      'Change it yourself',
+      'Leave the machine stopped',
+    ),
     data: { equipmentId: machine.id, taskId: task.id },
   });
 }
 
 function advanceMinute(state: GameState): void {
+  // He cannot be on the laptop and at the bench in the same minute, so a task that finishes this
+  // minute keeps him off production until the next one.
+  const onTask = state.owner.currentTaskId !== null;
   runMinute(state);
-  runProductionMinute(state);
+  runProductionMinute(state, onTask);
   state.clock.minute += 1;
   if (shouldFinishDay(state)) finishDay(state);
   settle(state);
 }
 
-/** One tick is one game minute (CLAUDE.md 4). Minutes left over when an event opens are dropped:
- *  the UI recomputes them from elapsed real time on the next frame. */
-export function tick(state: GameState, minutes: number): GameState {
+export interface TickResult {
+  state: GameState;
+  /** Minutes actually advanced. Fewer than asked when an event opened or the company ended. */
+  minutesRun: number;
+}
+
+/** One tick is one game minute (CLAUDE.md 4). An event that opens part way through stops the run
+ *  and the caller is told how many minutes went in, so the rest is not lost (Turn 2 brief 3.1). */
+export function runMinutes(state: GameState, minutes: number): TickResult {
   const next = clone(state);
+  let minutesRun = 0;
   for (let i = 0; i < minutes; i += 1) {
     if (isPaused(next)) break;
     advanceMinute(next);
+    minutesRun += 1;
   }
-  return next;
+  return { state: next, minutesRun };
+}
+
+export function tick(state: GameState, minutes: number): GameState {
+  return runMinutes(state, minutes).state;
 }
 
 function resolveEvent(state: GameState, choiceId: string): void {
@@ -610,8 +896,20 @@ function resolveEvent(state: GameState, choiceId: string): void {
       if (delivery && choiceId === 'storage') moveOverflowToStorage(state, delivery);
       break;
     }
+    case 'jobAtGate': {
+      const jobId = event.data.jobId;
+      if (choiceId === 'later' || typeof jobId !== 'string') break;
+      if (!orderTransport(state, jobId)) break;
+      // The courier needs nobody. The van run is a task, and the choice says whose minutes it costs.
+      const task = state.tasks.find(
+        (entry) => entry.kind === 'deliver' && entry.jobId === jobId && !entry.done,
+      );
+      if (task) delegateAdHocTask(state, task, choiceId);
+      break;
+    }
     case 'bagFull':
-    case 'extractorBroken': {
+    case 'serviceDue':
+    case 'machineBroken': {
       const taskId = event.data.taskId;
       const task = typeof taskId === 'string' ? findTask(state, taskId) : null;
       if (task) delegateAdHocTask(state, task, choiceId);
@@ -641,6 +939,8 @@ export function applyAction(state: GameState, action: GameAction): GameState {
       next.owner.present = false;
       next.owner.stayHome = true;
       pauseOwnerTask(next);
+      // A day off with nobody in the hall is not worth watching: straight to the summary.
+      if (hallIsEmpty(next)) finishDay(next);
       break;
     case 'START_TASK':
       startTask(next, action.taskId);
@@ -679,10 +979,20 @@ export function applyAction(state: GameState, action: GameAction): GameState {
       startTask(next, task.id);
       break;
     }
-    case 'REPAIR_EXTRACTOR': {
-      const extractor = next.equipment.find((item) => item.specId === 'extractor');
-      if (extractor && extractor.broken) {
-        const task = ensureTask(next, 'repairExtractor', 'Repair the extractor', extractor.id);
+    case 'REPAIR_MACHINE': {
+      const machine = next.equipment.find((item) => item.id === action.equipmentId);
+      if (machine && machine.broken) {
+        const name = findSpec(machine.specId)?.name ?? machine.specId;
+        const task = ensureTask(next, 'repair', `Repair the ${name.toLowerCase()}`, machine.id);
+        startTask(next, task.id);
+      }
+      break;
+    }
+    case 'SERVICE_MACHINE': {
+      const machine = next.equipment.find((item) => item.id === action.equipmentId);
+      if (machine) {
+        const name = findSpec(machine.specId)?.name ?? machine.specId;
+        const task = ensureTask(next, 'service', `Service the ${name.toLowerCase()}`, machine.id);
         startTask(next, task.id);
       }
       break;
@@ -699,6 +1009,26 @@ export function applyAction(state: GameState, action: GameAction): GameState {
     case 'BUY_STOCK':
       buyStock(next, action.sheets);
       break;
+    case 'PAY_ARREARS':
+      payArrears(next, action.amount);
+      break;
+    case 'SET_SHOW_WHY':
+      next.showWhy = action.on;
+      break;
+    case 'MOVE_ITEM':
+      moveItem(next, action.itemId, action.x, action.y);
+      break;
+    case 'ORDER_TRANSPORT': {
+      const job = findJob(next, action.jobId);
+      if (!job || job.stage !== 'awaitingTransport' || job.deliverOnDay !== null) break;
+      if (has(next, 'van')) {
+        // Who drives it is a decision, and the event is where decisions are made.
+        raiseJobAtGate(next, job);
+      } else {
+        orderTransport(next, job.id);
+      }
+      break;
+    }
     case 'RESOLVE_EVENT':
       resolveEvent(next, action.choiceId);
       break;
@@ -750,8 +1080,8 @@ function slotFrom(slots: readonly { x: number; y: number }[], index: number): { 
   return slot ? { x: slot.x, y: slot.y } : { x: 0, y: 0 };
 }
 
-/** Fixed placement from constants. Free placement by the player is parked (CLAUDE.md 14.9). */
-function anchorFor(state: GameState, specId: string): { x: number; y: number } {
+/** The tile the catalogue would like to put a new item on. */
+function defaultAnchor(state: GameState, specId: string): { x: number; y: number } {
   const index = countOf(state, specId);
   if (specId === 'workbench') return slotFrom(BENCH_SLOT_LAYOUT, index);
   if (specId === 'locker') return slotFrom(LOCKER_SLOT_LAYOUT, index);
@@ -759,11 +1089,22 @@ function anchorFor(state: GameState, specId: string): { x: number; y: number } {
   const desk = DESK_LAYOUT.find((object) => object.id === specId);
   if (desk) return { x: desk.x, y: desk.y };
   const slot = STARTING_LAYOUT[specId];
-  const base = slot
+  return slot
     ? { x: slot.yard === true ? state.unit.widthTiles + slot.x : slot.x, y: slot.y }
     : { x: 0, y: 6 };
-  // A second machine of the same kind stands beside the first.
-  return { x: base.x + index * 2, y: base.y };
+}
+
+/** A new purchase lands on its default tile, or on the first free one when that is taken. The
+ *  player moves it wherever he likes afterwards (CLAUDE.md T2 3.10). */
+function anchorFor(state: GameState, specId: string): { x: number; y: number } {
+  const spec = findSpec(specId);
+  const preferred = defaultAnchor(state, specId);
+  // The office furniture and anything in the yard are not on the hall floor.
+  if (!spec || spec.category === 'furniture' || STARTING_LAYOUT[specId]?.yard === true) {
+    return preferred;
+  }
+  if (canPlaceSpec(state, specId, preferred.x, preferred.y, null).ok) return preferred;
+  return firstFreeTile(state, specId) ?? preferred;
 }
 
 export function buyEquipment(state: GameState, specId: string): BuyCheck {
@@ -781,6 +1122,7 @@ export function buyEquipment(state: GameState, specId: string): BuyCheck {
     minutesUsed: 0,
     bagFull: false,
     broken: false,
+    lastServiceDay: state.clock.day,
     purchasePrice: spec.price,
   });
   return OK;
