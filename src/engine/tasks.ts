@@ -30,10 +30,11 @@ import { findSpec } from './machines';
 import { canUnload } from './materials';
 import { ownerIsAvailable } from './owner';
 import { makeId } from './rng';
-import { isWorkingToday, joiners } from './staff';
+import { hasWorkingDay, isWorkingToday, joiners, staffMinutesLeft } from './staff';
 import type {
   GameState,
   ProductTemplate,
+  Worker,
   SoftwareTier,
   TaskCategory,
   TaskInstance,
@@ -220,25 +221,36 @@ export function createDailyTasks(state: GameState): void {
   }
 }
 
+/** Can this man take this task on today? Office roles work it off minute by minute out of their
+ *  own 480, a helper still clears his workshop jobs on the spot (CLAUDE.md T2 3.8). */
+function canTakeOn(worker: Worker, task: TaskInstance): boolean {
+  if (!TASK_DEFINITIONS[task.kind].autoRoles.includes(worker.role)) return false;
+  if (!hasWorkingDay(worker.role)) return true;
+  if (worker.taskId !== null) return false;
+  if (staffMinutesLeft(worker) <= 0) return false;
+  if (task.kind === 'materialOrder' && worker.role === 'purchasingClerk') {
+    return worker.ordersToday < CLERK_ORDERS_PER_DAY;
+  }
+  return true;
+}
+
 /** A worker on the books takes the tasks his role covers, and the owner never sees them.
- *  Returns what was cleared, so the caller can apply what each finished task does. */
+ *  Returns what was cleared on the spot, so the caller can apply what each finished task does. */
 export function assignStaffTasks(state: GameState): TaskInstance[] {
   const cleared: TaskInstance[] = [];
   const started = state.workers.filter((worker) => isWorkingToday(state, worker));
   if (started.length === 0) return cleared;
-  let clerkOrders = started.filter((worker) => worker.role === 'purchasingClerk').length
-    * CLERK_ORDERS_PER_DAY;
   for (const task of state.tasks) {
     if (task.done || task.doneBy !== null) continue;
     if (task.kind === 'unload' && !canUnload(state)) continue;
-    const autoRoles = TASK_DEFINITIONS[task.kind].autoRoles;
-    const staff = started.find((worker) => autoRoles.includes(worker.role));
+    const staff = started.find((worker) => canTakeOn(worker, task));
     if (!staff) continue;
-    if (task.kind === 'materialOrder' && staff.role === 'purchasingClerk') {
-      if (clerkOrders <= 0) continue;
-      clerkOrders -= 1;
+    if (hasWorkingDay(staff.role)) {
+      // He picks it up and works it off as the clock runs, like the owner does.
+      staff.taskId = task.id;
+      task.doneBy = staff.id;
+      continue;
     }
-    // Staff clear their own work: one path finishes a task, whoever did it.
     advanceTask(task, task.minutesRemaining);
     task.doneBy = staff.id;
     cleared.push(task);
@@ -254,6 +266,10 @@ export function startTask(state: GameState, taskId: string): boolean {
   const task = findTask(state, taskId);
   if (!task || task.done) return false;
   if (!ownerIsAvailable(state)) return false;
+  // The owner can take anything off a member of staff: the work he did on it stays done.
+  for (const worker of state.workers) {
+    if (worker.taskId === task.id) worker.taskId = null;
+  }
   // One thing at a time: the current task has to be finished or paused first (CLAUDE.md 10.1).
   if (state.owner.currentTaskId !== null && state.owner.currentTaskId !== task.id) return false;
   // No drawing without a licence for the software (CLAUDE.md 9.2).

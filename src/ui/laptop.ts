@@ -12,6 +12,7 @@ import {
   openTasks,
   ownerIsAvailable,
   softwareActive,
+  staffMinutesLeft,
   transportLabel,
   workerById,
 } from '../engine/index';
@@ -27,14 +28,23 @@ import {
   reasonLabel,
 } from './modal';
 
+/** Who has this one, and how much of his day is left (CLAUDE.md T2 3.8). */
+function onItLine(state: GameState, task: TaskInstance): string {
+  if (task.doneBy === null || task.doneBy === 'owner') return '';
+  const worker = workerById(state, task.doneBy);
+  if (!worker) return '';
+  if (task.done) return `done by ${worker.name}`;
+  return `${worker.name} is on it, ${minutes(staffMinutesLeft(worker))} of his day left`;
+}
+
 function taskRow(state: GameState, task: TaskInstance): string {
   const running = state.owner.currentTaskId === task.id;
-  const staff = task.doneBy !== null && task.doneBy !== 'owner';
+  const staffLine = onItLine(state, task);
   const job = task.jobId === null ? null : findJob(state, task.jobId);
   const jobLine = job === null ? '' : ` · ${escapeHtml(job.name)} ${money(job.price)}`;
   let action: string;
   if (task.done) {
-    action = `<span class="done">Done${staff ? ' by the office' : ''}</span>`;
+    action = '<span class="done">Done</span>';
   } else if (running) {
     action = button('pauseTask', 'Pause');
   } else if (task.kind === 'design' && !softwareActive(state)) {
@@ -42,13 +52,14 @@ function taskRow(state: GameState, task: TaskInstance): string {
   } else if (!ownerIsAvailable(state)) {
     action = reasonLabel('The owner is not in today');
   } else {
-    action = button('startTask', 'Start', `data-id="${task.id}"`);
+    action = button('startTask', staffLine === '' ? 'Start' : 'Take it on', `data-id="${task.id}"`);
   }
   return (
     `<div class="row${task.done ? ' is-done' : ''}${running ? ' is-running' : ''}">` +
     `<span class="row-main">${escapeHtml(task.label)}${jobLine}</span>` +
     `<span class="row-figure">${minutes(task.minutesRemaining)} left of ` +
-    `${minutes(task.minutesTotal)}</span>` +
+    `${minutes(task.minutesTotal)}${staffLine === '' ? '' : ` · ${escapeHtml(staffLine)}`}` +
+    '</span>' +
     `<span class="row-action">${action}</span></div>`
   );
 }

@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { CLIENT_CALL_MINUTES_CAP, SOFTWARE_DESIGN_FACTOR } from '../../src/engine/constants';
+import {
+  BOOKKEEPING_MINUTES,
+  CLIENT_CALL_MINUTES_CAP,
+  SOFTWARE_DESIGN_FACTOR,
+} from '../../src/engine/constants';
 import { PRODUCT_TEMPLATES } from '../../src/engine/constants';
 import {
   callsForPrice,
@@ -36,6 +40,8 @@ function staff(id: string, role: Worker['role'], monthlyWage: number): Worker {
     startDay: 1,
     jobId: null,
     taskId: null,
+    minutesWorked: 0,
+    ordersToday: 0,
     absentDaysRemaining: 0,
     anchorX: 0,
     anchorY: 0,
@@ -152,14 +158,21 @@ describe('the daily list', () => {
     expect(tasksOfKind(state, 'dailyOrdering')).toHaveLength(1);
   });
 
-  it('hands the office admin his own tasks so the owner never sees them', () => {
+  it('hands the office admin his own tasks, which he works off out of his own day', () => {
     const state = newGame();
     state.workers.push(staff('a1', 'officeAdmin', 1900));
     const day2 = runToDay(state, 2).state;
-    const books = day2.tasks.find((task) => task.kind === 'bookkeeping');
+    const taken = day2.tasks.find((task) => task.kind === 'bookkeeping');
+    expect(taken?.doneBy).toBe('a1');
+    expect(taken?.done).toBe(false);
+    // An hour of his day later, it is done and the owner never touched it.
+    const later = clearEvents(tick(day2, BOOKKEEPING_MINUTES));
+    const books = later.tasks.find((task) => task.kind === 'bookkeeping');
     expect(books?.done).toBe(true);
     expect(books?.doneBy).toBe('a1');
-    expect(openTasks(day2).some((task) => task.kind === 'bookkeeping')).toBe(false);
+    expect(later.workers[0]?.minutesWorked).toBe(BOOKKEEPING_MINUTES);
+    expect(later.owner.minutesWorked).toBe(0);
+    expect(openTasks(later).some((task) => task.kind === 'bookkeeping')).toBe(false);
   });
 });
 

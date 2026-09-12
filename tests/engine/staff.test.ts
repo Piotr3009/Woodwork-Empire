@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+  BOOKKEEPING_MINUTES,
+  CLERK_ORDERS_PER_DAY,
   JOINER_PREREQUISITES,
   LABOUR_FRACTION,
+  MINUTES_PER_WORKING_DAY,
   OVER_SAW_RATIO_FACTOR,
   OWNER_LABOUR_PER_MINUTE,
   WORKER_RATES,
@@ -9,12 +12,15 @@ import {
 import {
   availableJoiners,
   canHire,
+  hasWorkingDay,
   hiringOptions,
   isWorkingToday,
   joiners,
   missingForHire,
   sawRatioFactor,
+  staffMinutesLeft,
 } from '../../src/engine/staff';
+import { createTask } from '../../src/engine/tasks';
 import { minutesRemainingFor, ownerJob } from '../../src/engine/jobs';
 import { weeklyWageBill } from '../../src/engine/economy';
 import { tick } from '../../src/engine/index';
@@ -253,5 +259,96 @@ describe('one path for putting a man on a job', () => {
     expect(started && isWorkingToday(day2, started)).toBe(true);
     if (started) started.absentDaysRemaining = 2;
     expect(started && isWorkingToday(day2, started)).toBe(false);
+  });
+});
+
+describe('the office working day', () => {
+  function officeWorker(id: string, role: 'officeAdmin' | 'purchasingClerk'): Worker {
+    return {
+      id,
+      name: id,
+      role,
+      tier: null,
+      rate: 0,
+      weeklyWage: 0,
+      monthlyWage: 1900,
+      startDay: 1,
+      jobId: null,
+      taskId: null,
+      minutesWorked: 0,
+      ordersToday: 0,
+      absentDaysRemaining: 0,
+      anchorX: 1,
+      anchorY: 1,
+    };
+  }
+
+  it('gives the three office roles 480 minutes of their own, and nobody else', () => {
+    expect(hasWorkingDay('officeAdmin')).toBe(true);
+    expect(hasWorkingDay('purchasingClerk')).toBe(true);
+    expect(hasWorkingDay('salesman')).toBe(true);
+    expect(hasWorkingDay('helper')).toBe(false);
+    expect(hasWorkingDay('joiner')).toBe(false);
+    expect(staffMinutesLeft(officeWorker('a1', 'officeAdmin'))).toBe(MINUTES_PER_WORKING_DAY);
+  });
+
+  it('leaves what the admin could not finish for tomorrow, and lets the owner take it on', () => {
+    let state = newGame();
+    state.workers.push(officeWorker('a1', 'officeAdmin'));
+    state = clearEvents(runToDay(state, 2).state);
+    const taken = state.tasks.find((task) => task.kind === 'bookkeeping');
+    expect(taken?.doneBy).toBe('a1');
+    // Ten minutes of his day left, and the bookkeeping is an hour.
+    const admin = state.workers[0];
+    if (admin) admin.minutesWorked = MINUTES_PER_WORKING_DAY - 10;
+    state = clearEvents(tick(state, 20));
+    const left = state.tasks.find((task) => task.kind === 'bookkeeping');
+    expect(left?.done).toBe(false);
+    expect(left?.doneBy).toBeNull();
+    expect(left?.minutesRemaining).toBe(BOOKKEEPING_MINUTES - 10);
+    expect(staffMinutesLeft(state.workers[0] as Worker)).toBe(0);
+    // The owner picks up what is left of it.
+    state = act(state, { type: 'START_TASK', taskId: left?.id ?? '' });
+    expect(state.owner.currentTaskId).toBe(left?.id);
+  });
+
+  it('takes a task off the man who was holding it when the owner takes it on', () => {
+    let state = newGame();
+    state.workers.push(officeWorker('a1', 'officeAdmin'));
+    state = clearEvents(runToDay(state, 2).state);
+    const books = state.tasks.find((task) => task.kind === 'bookkeeping');
+    expect(state.workers[0]?.taskId).toBe(books?.id);
+    state = act(state, { type: 'START_TASK', taskId: books?.id ?? '' });
+    expect(state.workers[0]?.taskId).toBeNull();
+    expect(state.tasks.find((task) => task.kind === 'bookkeeping')?.doneBy).toBe('owner');
+  });
+
+  it('stops the purchasing clerk at 16 orders a day', () => {
+    let state = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
+    state.enquiries = [];
+    state.workers.push(officeWorker('c1', 'purchasingClerk'));
+    const enquiry = placeEnquiry(state, { price: 400, deadlineDays: 90 });
+    state = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+    const first = firstJob(state);
+    for (let index = 1; index < 20; index += 1) {
+      state.jobs.push({ ...first, id: `job-clone-${index}` });
+    }
+    state.tasks = state.tasks.filter((task) => task.jobId === null);
+    for (const job of state.jobs) {
+      job.stage = 'materialPending';
+      createTask(state, {
+        kind: 'materialOrder',
+        label: `Material order: ${job.name}`,
+        minutes: 30,
+        jobId: job.id,
+      });
+    }
+    // One action to settle the state, so the clerk is holding his first order at 08:00.
+    const morning = act(clearEvents(state), { type: 'SET_SPEED', speed: 1 });
+    const day = clearEvents(tick(morning, MINUTES_PER_WORKING_DAY));
+    const done = day.tasks.filter((task) => task.kind === 'materialOrder' && task.done).length;
+    expect(done).toBe(CLERK_ORDERS_PER_DAY);
+    expect(day.workers[0]?.ordersToday).toBe(CLERK_ORDERS_PER_DAY);
+    expect(staffMinutesLeft(day.workers[0] as Worker)).toBe(0);
   });
 });

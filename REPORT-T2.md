@@ -26,6 +26,10 @@ and the ones nobody answered cost 1% of the price each and a slice of the rating
 freeze the Accounting modal at the last day written up, put a "?" in the top bar, and cost 100 a
 month on the 1st.
 
+T2-06 Office staff working day. The office admin, the purchasing clerk and the salesman each have
+480 minutes of their own and work their tasks off through the same runner as the owner; the clerk
+stops at 16 orders, what is not finished waits for tomorrow, and the owner can take any of it on.
+
 ## 2. Not done or partial
 
 ## 3. Tests

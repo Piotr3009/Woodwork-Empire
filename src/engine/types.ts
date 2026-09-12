@@ -146,6 +146,10 @@ export interface Worker {
   startDay: number;
   jobId: string | null;
   taskId: string | null;
+  /** Minutes of his own day spent so far. Office roles have 480 of them (CLAUDE.md T2 3.8). */
+  minutesWorked: number;
+  /** Per job material orders this clerk has put through today. */
+  ordersToday: number;
   absentDaysRemaining: number;
   anchorX: number;
   anchorY: number;

@@ -101,7 +101,17 @@ export {
 } from './tasks';
 
 // Staff
-export { availableJoiners, helpers, hiringOptions, isWorkingToday, joiners, workerById } from './staff';
+export {
+  availableJoiners,
+  hasWorkingDay,
+  helpers,
+  hiringOptions,
+  isWorkingToday,
+  joiners,
+  officeStaff,
+  staffMinutesLeft,
+  workerById,
+} from './staff';
 
 // Machines, bags and dust
 export {

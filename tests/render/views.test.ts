@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { renderHall } from '../../src/render/hall';
 import { renderOffice } from '../../src/render/office';
 import { renderGameOver } from '../../src/ui/dayEnd';
+import { renderLaptop } from '../../src/ui/laptop';
 import { tick } from '../../src/engine/index';
 import { act, buyStartingKit, clearEvents, firstJob, newGame, placeEnquiry, runToDay } from '../helpers';
 
@@ -143,6 +144,8 @@ describe('the hall on day 1', () => {
       startDay: 1,
       jobId: null,
       taskId: null,
+      minutesWorked: 0,
+      ordersToday: 0,
       absentDaysRemaining: 0,
       anchorX: 4,
       anchorY: 4,
@@ -240,6 +243,8 @@ describe('the placeholder art rules of 10.3', () => {
       startDay: 1,
       jobId: null,
       taskId: null,
+      minutesWorked: 0,
+      ordersToday: 0,
       absentDaysRemaining: 0,
       anchorX: 0,
       anchorY: 4,
@@ -279,6 +284,8 @@ describe('the placeholder art rules of 10.3', () => {
       startDay: 1,
       jobId: null,
       taskId: null,
+      minutesWorked: 0,
+      ordersToday: 0,
       absentDaysRemaining: 0,
       anchorX: bench?.anchorX ?? 0,
       anchorY: bench?.anchorY ?? 0,
@@ -300,5 +307,39 @@ describe('the placeholder art rules of 10.3', () => {
     const office = renderOffice(newGame());
     expect(office).toContain('data-sprite="catalogue"');
     expect(office).toContain('data-sprite="teamBoard"');
+  });
+});
+
+describe('the laptop', () => {
+  it('says who is on a task and how much of his day is left (CLAUDE.md T2 3.8)', () => {
+    const state = newGame();
+    state.workers.push({
+      id: 'a1',
+      name: 'Ben',
+      role: 'officeAdmin',
+      tier: null,
+      rate: 0,
+      weeklyWage: 0,
+      monthlyWage: 1900,
+      startDay: 1,
+      jobId: null,
+      taskId: null,
+      minutesWorked: 180,
+      ordersToday: 0,
+      absentDaysRemaining: 0,
+      anchorX: 1,
+      anchorY: 1,
+    });
+    const books = state.tasks.find((task) => task.kind === 'bookkeeping');
+    if (books) books.doneBy = 'a1';
+    const html = renderLaptop(state);
+    expect(html).toContain('Ben is on it, 300 min of his day left');
+    expect(html).toContain('Take it on');
+  });
+
+  it('lists what is standing at the gate with a way to order transport', () => {
+    const state = newGame();
+    expect(renderLaptop(state)).toContain('At the gate, 0 pieces');
+    expect(renderLaptop(state)).toContain('Nothing waiting to go out.');
   });
 });

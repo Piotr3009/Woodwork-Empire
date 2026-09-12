@@ -98,12 +98,14 @@ import { chance, int, makeId } from './rng';
 import {
   autoAssignJobs,
   availableJoiners,
+  hasWorkingDay,
   helpers,
   hire,
   isWorkingToday,
   joiners,
   runStaffDayStart,
   sawRatioFactor,
+  staffMinutesLeft,
 } from './staff';
 import {
   AD_HOC_TASK_MINUTES,
@@ -525,8 +527,18 @@ function runWorkerTaskMinute(state: GameState, workerId: string, taskId: string)
     worker.taskId = null;
     return false;
   }
+  if (hasWorkingDay(worker.role) && staffMinutesLeft(worker) <= 0) {
+    // His day is full. What is left of the task waits for tomorrow, or for the owner.
+    worker.taskId = null;
+    task.doneBy = null;
+    return false;
+  }
+  worker.minutesWorked += 1;
   if (advanceTask(task, 1)) {
     worker.taskId = null;
+    if (task.kind === 'materialOrder' && worker.role === 'purchasingClerk') {
+      worker.ordersToday += 1;
+    }
     applyTaskCompletion(state, task);
   }
   return true;
