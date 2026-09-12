@@ -11,10 +11,10 @@ import {
   SITE_MEASURE_TAXI_COST,
 } from '../../src/engine/constants';
 import { machineLabourFactor } from '../../src/engine/machines';
-import { findJob, minutesRemainingFor, ownerJob } from '../../src/engine/jobs';
+import { findJob, jobSpeedFactor, minutesRemainingFor, ownerJob } from '../../src/engine/jobs';
 import { materialCostFor, sheetsForCost } from '../../src/engine/materials';
 import { tick } from '../../src/engine/index';
-import type { GameEvent, GameState } from '../../src/engine/index';
+import type { GameEvent, GameState, Job } from '../../src/engine/index';
 import {
   act,
   buyStartingKit,
@@ -48,7 +48,7 @@ describe('accepting an enquiry', () => {
     // Bespoke material costs 15% more and is not returnable (CLAUDE.md 8.9).
     expect(materialCostFor(400, true)).toBe(184);
     expect(job?.labourValue).toBe(400 * LABOUR_FRACTION);
-    expect(job?.labourTotal).toBe(160);
+    expect(job?.labourRemaining).toBe(160);
     expect(job?.sheets).toBe(sheetsForCost(160));
   });
 
@@ -126,7 +126,13 @@ describe('the by hand path', () => {
     state = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: table.id, byHand: true });
     const job = state.jobs[0];
     expect(job?.byHand).toBe(true);
-    expect(job?.labourTotal).toBe(12000 * LABOUR_FRACTION * BY_HAND_DURATION_FACTOR);
+    expect(job?.labourValue).toBe(12000 * LABOUR_FRACTION);
+    // The penalty is on the minutes it takes, not on the labour the job carries (CLAUDE.md 9.5).
+    expect(jobSpeedFactor(state, job as Job)).toBe(BY_HAND_DURATION_FACTOR);
+    expect(minutesRemainingFor(state, job as Job, 1)).toBeCloseTo(
+      ((12000 * LABOUR_FRACTION) / OWNER_LABOUR_PER_MINUTE) * BY_HAND_DURATION_FACTOR,
+      6,
+    );
   });
 
   it('does not flag a job as by hand when the tools are there', () => {
@@ -242,7 +248,7 @@ describe('production', () => {
     let state = accept(ready());
 
     firstJob(state).stage = 'ready';
-    expect(minutesRemainingFor(firstJob(state), 1)).toBeCloseTo(240, 6);
+    expect(minutesRemainingFor(state, firstJob(state), 1)).toBeCloseTo(240, 6);
     state = act(state, { type: 'WORK_HERE', jobId: null });
     expect(state.jobs[0]?.stage).toBe('inProduction');
     expect(ownerJob(state)?.id).toBe(state.jobs[0]?.id);
@@ -365,5 +371,48 @@ describe('scenario: garage shelves on Easy', () => {
       .reduce((total, entry) => total + entry.amount, 0);
     expect(day2Costs).toBeLessThan(-250);
     expect(state.cash).toBeCloseTo(cashBefore + 240 + day2Costs, 6);
+  });
+});
+
+describe('machine reductions act on the minutes, every minute', () => {
+  function cncInto(state: GameState): GameState {
+    state.equipment.push({
+      id: 'kit-cnc',
+      specId: 'cnc',
+      spriteKey: 'cnc',
+      anchorX: 12,
+      anchorY: 7,
+      minutesUsed: 0,
+      bagFull: false,
+      broken: false,
+      purchasePrice: 45000,
+    });
+    return state;
+  }
+
+  it('shortens a job that is already on the books', () => {
+    const state = accept(ready());
+    firstJob(state).stage = 'ready';
+    const working = act(state, { type: 'WORK_HERE', jobId: null });
+    const plain = tick(working, 60);
+    const withCnc = tick(cncInto(act(state, { type: 'WORK_HERE', jobId: null })), 60);
+    const plainDone = 160 - firstJob(plain).labourRemaining;
+    const cncDone = 160 - firstJob(withCnc).labourRemaining;
+    // A CNC cuts the labour of every job by 20%, so the same hour gets 25% more of it done.
+    expect(cncDone).toBeCloseTo(plainDone / 0.8, 6);
+    expect(jobSpeedFactor(withCnc, firstJob(withCnc))).toBeCloseTo(0.8, 10);
+  });
+
+  it('lengthens it again when the bailiff takes the machine away', () => {
+    const state = cncInto(accept(ready()));
+    const job = firstJob(state);
+    const fast = minutesRemainingFor(state, job, 1);
+    state.equipment = state.equipment.filter((item) => item.specId !== 'cnc');
+    expect(minutesRemainingFor(state, job, 1)).toBeCloseTo(fast / 0.8, 6);
+  });
+
+  it('still takes 240 minutes for a 400 job in a workshop with no reductions', () => {
+    const state = accept(ready());
+    expect(minutesRemainingFor(state, firstJob(state), 1)).toBeCloseTo(240, 6);
   });
 });

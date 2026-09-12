@@ -397,3 +397,29 @@ describe('the central system and a bag that was already full', () => {
     expect(extractorBreakdownChance(state)).toBe(EXTRACTOR_BREAKDOWN_CHANCE_HIGH_DUST);
   });
 });
+
+describe('a stopped machine can always be dealt with', () => {
+  it('asks again who changes the bag when the machine is clicked', () => {
+    let state = atTheBench();
+    const saw = state.equipment.find((item) => item.specId === 'tableSaw');
+    if (saw) saw.minutesUsed = 2399;
+    state = tick(state, 1);
+    expect(state.activeEvent?.kind).toBe('bagFull');
+    // The player puts it off, and then thinks better of it.
+    state = act(state, { type: 'RESOLVE_EVENT', choiceId: 'later' });
+    expect(state.activeEvent).toBeNull();
+    expect(bagBlocked(state, 'sheet')).toBe(true);
+    state = act(state, { type: 'ASK_BAG_CHANGE', equipmentId: saw?.id ?? '' });
+    expect(state.activeEvent?.kind).toBe('bagFull');
+    state = act(state, { type: 'RESOLVE_EVENT', choiceId: 'owner' });
+    state = tick(state, BAG_CHANGE_MINUTES);
+    expect(bagBlocked(state, 'sheet')).toBe(false);
+  });
+
+  it('says nothing when the machine is running', () => {
+    const state = atTheBench();
+    const saw = state.equipment.find((item) => item.specId === 'tableSaw');
+    const asked = act(state, { type: 'ASK_BAG_CHANGE', equipmentId: saw?.id ?? '' });
+    expect(asked.activeEvent).toBeNull();
+  });
+});

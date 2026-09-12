@@ -67,6 +67,7 @@ export {
   minutesRemainingFor,
   oldestReadyJob,
   jobProgress,
+  jobSpeedFactor,
   openJobs,
   ownerJob,
 } from './jobs';

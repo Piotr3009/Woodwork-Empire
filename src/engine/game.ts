@@ -50,6 +50,7 @@ import {
   chargeSiteMeasure,
   checkOverdueJobs,
   findJob,
+  jobSpeedFactor,
   oldestReadyJob,
   onDeliveryArrived,
   ownerJob,
@@ -486,7 +487,9 @@ function runProductionMinute(state: GameState): void {
     spendOwnerMinute(state, 'workshop');
     worked = true;
     materials.add(atTheBench.materialKind);
-    addLabour(state, atTheBench, OWNER_LABOUR_PER_MINUTE * ownerEfficiency(state) * hall);
+    const minute = (OWNER_LABOUR_PER_MINUTE * ownerEfficiency(state) * hall) /
+      jobSpeedFactor(state, atTheBench);
+    addLabour(state, atTheBench, minute);
   }
   // Staff work the normal day only: nobody but the owner does overtime.
   if (!isOvertime(state.clock.minute)) {
@@ -507,7 +510,9 @@ function runProductionMinute(state: GameState): void {
       worked = true;
       materials.add(job.materialKind);
       const rate = worker.rate * sawRatioFactor(state, worker);
-      addLabour(state, job, OWNER_LABOUR_PER_MINUTE * rate * hall * staffFactor);
+      const minute = (OWNER_LABOUR_PER_MINUTE * rate * hall * staffFactor) /
+        jobSpeedFactor(state, job);
+      addLabour(state, job, minute);
     }
   }
   if (!worked) return;
@@ -662,6 +667,11 @@ export function applyAction(state: GameState, action: GameAction): GameState {
       if (delivery && delivery.arrived && !delivery.unloaded) {
         queueDeliveryEvents(next, [delivery]);
       }
+      break;
+    }
+    case 'ASK_BAG_CHANGE': {
+      const machine = next.equipment.find((item) => item.id === action.equipmentId);
+      if (machine && machine.bagFull) raiseBagFull(next, machine);
       break;
     }
     case 'START_CLEANING': {

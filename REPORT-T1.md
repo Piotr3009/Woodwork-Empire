@@ -149,8 +149,11 @@ The first 10 minutes script is at the bottom of README.md and follows section 15
     day of their own yet. Open question 6.
 13. **Per job material never overflows the rack.** 8.9 says per job material needs no stock, so only
     sheets bought in advance can overflow.
-14. **Machine labour reductions are fixed when the job is accepted.** Buying a CNC halfway through a
-    job does not shorten that job.
+14. **The laptop carries two lists more than 10.1 asks for.** "Jobs on the books" is the job card
+    that 9.4 needs for its Assign override, and 10.1 never says which view holds a job card.
+    "Workshop jobs of work" is the only entry to the morning fetch from paid storage, which has no
+    event and no hall button, and it is where an unloading or a bag change the player put off comes
+    back. Both are extra UI surface that section 10.1 does not list.
 15. **The board is never empty at reputation 0.** 8.8 gives the tier a minimum of 1 enquiry and also
     says the board is often empty at low reputation. The minimum won. Open question 12.
 16. **"30 days" in the tests means 30 calendar days**, day 1 to the start of day 31, so a scripted
@@ -404,10 +407,17 @@ Fourteen more from the audit of the views, section 10 and section 15, also fixed
 One more is disclosed rather than fixed: the lacquer finish of 9.1 is unreachable content, because
 every template lists laminate only and the spray booth that unlocks lacquer is locked for Turn 1.
 
-Two shapes of the laptop modal stay wider than 10.1's "two lists", each for a reason:
+The adversarial pass rejected 58 of the 90 findings, most of them because the fix had already landed
+by the time the checker read the code, and confirmed two that were still real. Both are fixed:
 
-- **Workshop jobs of work.** Without it, an unloading or a bag change that the player put off has no
-  way back: the hall has buttons only for cleaning and the extractor. The list is how the owner
-  picks that work up again.
-- **Jobs on the books.** This is the job card 9.4 asks for, and it carries the Assign override. 10.1
-  does not say which view holds the job card.
+33. **Machine reductions were stamped on the job at acceptance** instead of acting on the production
+    minute, which is where 9.5 puts them. It meant a CNC bought halfway through a job never
+    shortened that job, and worse, a job kept the reduction of a machine the bailiff had already
+    taken away. The reduction and the by hand penalty are read every minute now, so the workshop
+    the job is actually made in is the one that decides how long it takes. That also left one labour
+    figure on the job instead of two, so the duplicated `labourTotal` is gone.
+34. **The laptop's two extra lists were recorded in this section but not in section 5**, where a
+    reader looks for deviations. They are deviation 14 now, with their reasons. One of those reasons
+    got weaker in the process: clicking a stopped machine in the hall now asks again who changes the
+    bag, the same way clicking the van asks who unloads it, so the workshop list is no longer the
+    only way back to a job of work the player put off.

@@ -58,25 +58,36 @@ export function workerMinuteCost(weeklyWage: number): number {
 /** What the rest of a job costs in wages if the man on it finishes it, for the job card only
  *  (CLAUDE.md 8.5). The owner costs nothing: his time is not a wage. */
 export function jobLabourCost(state: GameState, job: Job): { minutes: number; cost: number } {
-  if (job.assignedTo === null || job.assignedTo === 'owner') {
-    return { minutes: minutesRemainingFor(job, 1), cost: 0 };
+  const worker =
+    job.assignedTo === null || job.assignedTo === 'owner'
+      ? null
+      : state.workers.find((entry) => entry.id === job.assignedTo);
+  if (!worker || worker.rate <= 0) {
+    return { minutes: minutesRemainingFor(state, job, 1), cost: 0 };
   }
-  const worker = state.workers.find((entry) => entry.id === job.assignedTo);
-  if (!worker || worker.rate <= 0) return { minutes: minutesRemainingFor(job, 1), cost: 0 };
-  const minutes = minutesRemainingFor(job, worker.rate);
+  const minutes = minutesRemainingFor(state, job, worker.rate);
   return { minutes, cost: minutes * workerMinuteCost(worker.weeklyWage) };
 }
 
 /** How far through the job the bench is, 0 to 1. */
 export function jobProgress(job: Job): number {
-  if (job.labourTotal <= 0) return 1;
-  return Math.min(1, Math.max(0, 1 - job.labourRemaining / job.labourTotal));
+  if (job.labourValue <= 0) return 1;
+  return Math.min(1, Math.max(0, 1 - job.labourRemaining / job.labourValue));
+}
+
+/** What the workshop does to the minutes this job takes: the machine reductions of 8.6 multiplied
+ *  together, and half again as long if it is being made by hand (CLAUDE.md 9.5). Below 1 is
+ *  quicker. It is read every minute, so buying a machine speeds up work already on the books and
+ *  losing one to the bailiff slows it down again. */
+export function jobSpeedFactor(state: GameState, job: Job): number {
+  const byHand = job.byHand ? BY_HAND_DURATION_FACTOR : 1;
+  return machineLabourFactor(state, job.materialKind) * byHand;
 }
 
 /** Minutes this job still needs from a worker of the given rate (1 is the owner). */
-export function minutesRemainingFor(job: Job, rate: number): number {
+export function minutesRemainingFor(state: GameState, job: Job, rate: number): number {
   if (rate <= 0) return Infinity;
-  return job.labourRemaining / (OWNER_LABOUR_PER_MINUTE * rate);
+  return (job.labourRemaining / (OWNER_LABOUR_PER_MINUTE * rate)) * jobSpeedFactor(state, job);
 }
 
 // ---------------------------------------------------------------------------
@@ -103,10 +114,6 @@ export function acceptEnquiry(state: GameState, enquiryId: string, byHand: boole
   const entry = template(enquiry.templateId);
   const materialCost = materialCostFor(enquiry.price, enquiry.bespokeMaterial);
   const labourValue = labourValueFor(enquiry.price);
-  const labourTotal =
-    labourValue *
-    machineLabourFactor(state, enquiry.materialKind) *
-    (madeByHand ? BY_HAND_DURATION_FACTOR : 1);
   const job: Job = {
     id: makeId(state, 'job'),
     templateId: enquiry.templateId,
@@ -123,8 +130,7 @@ export function acceptEnquiry(state: GameState, enquiryId: string, byHand: boole
     byHand: madeByHand,
     needsMeasure: enquiry.needsMeasure,
     labourValue,
-    labourRemaining: labourTotal,
-    labourTotal,
+    labourRemaining: labourValue,
     acceptedDay: state.clock.day,
     dueDay: state.clock.day + enquiry.deadlineDays,
     stage: 'accepted',

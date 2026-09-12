@@ -432,14 +432,15 @@ function handleSceneClick(element: DataElement, point: { x: number; y: number })
   const kit = element.dataset.kit;
   if (kit !== undefined) {
     const item = game().equipment.find((entry) => entry.id === kit);
-    ui.note =
-      item === undefined
-        ? ''
-        : item.bagFull
-          ? 'The bag is full. Somebody has to change it.'
-          : item.broken
-            ? 'It has stopped. Nothing runs until it is fixed.'
-            : `${item.minutesUsed} minutes of use since the last bag change.`;
+    if (item === undefined) return true;
+    if (item.bagFull) {
+      // The machine is stopped: clicking it asks again who changes the bag.
+      dispatch({ type: 'ASK_BAG_CHANGE', equipmentId: item.id });
+      return true;
+    }
+    ui.note = item.broken
+      ? 'It has stopped. Nothing runs until it is fixed.'
+      : `${minutes(item.minutesUsed)} of use since the last bag change.`;
     render();
     return true;
   }

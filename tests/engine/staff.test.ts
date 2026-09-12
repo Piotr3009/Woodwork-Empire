@@ -135,12 +135,12 @@ describe('joiners at the bench', () => {
     const state = jobReadyWith(6400, 'poor');
     const job = firstJob(state);
     expect(job.labourValue).toBe(6400 * LABOUR_FRACTION);
-    const minutes = minutesRemainingFor(job, WORKER_RATES.poor);
+    const minutes = minutesRemainingFor(state, job, WORKER_RATES.poor);
     expect(minutes).toBeCloseTo(6400, 6);
     expect(minutes / 480).toBeCloseTo(13.333, 3);
     // The same wardrobe is 8 days for the owner and 10 for a normal joiner (CLAUDE.md 8.5).
-    expect(minutesRemainingFor(job, 1) / 480).toBeCloseTo(8, 6);
-    expect(minutesRemainingFor(job, WORKER_RATES.normal) / 480).toBeCloseTo(10, 6);
+    expect(minutesRemainingFor(state, job, 1) / 480).toBeCloseTo(8, 6);
+    expect(minutesRemainingFor(state, job, WORKER_RATES.normal) / 480).toBeCloseTo(10, 6);
   });
 
   it('picks up the oldest ready job on its own', () => {

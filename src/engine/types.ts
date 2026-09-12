@@ -207,12 +207,11 @@ export interface Job {
   express: boolean;
   byHand: boolean;
   needsMeasure: boolean;
-  /** 0.40 P of the price. */
+  /** 0.40 P of the price: the labour the job carries. */
   labourValue: number;
-  /** Labour still to do, after machine reductions and the by-hand penalty. */
+  /** Labour still to do. Machine reductions and the by hand penalty act on the minutes it takes
+   *  to work this off, not on the figure itself (CLAUDE.md 9.5). */
   labourRemaining: number;
-  /** Labour the job started with, for progress display. */
-  labourTotal: number;
   acceptedDay: number;
   dueDay: number;
   stage: JobStage;
@@ -430,6 +429,7 @@ export type GameAction =
   | { type: 'ASSIGN_JOB'; jobId: string; workerId: string | null }
   | { type: 'HIRE'; role: WorkerRole; tier: WorkerTier | null }
   | { type: 'ASK_UNLOAD'; deliveryId: string }
+  | { type: 'ASK_BAG_CHANGE'; equipmentId: string }
   | { type: 'START_CLEANING' }
   | { type: 'REPAIR_EXTRACTOR' }
   | { type: 'RESOLVE_EVENT'; choiceId: string }
