@@ -24,8 +24,9 @@ export const STATE_VERSION = 1;
 export const MINUTES_PER_WORKING_DAY = 480;
 /** Clock starts at 08:00 (PIOTR). */
 export const DAY_START_HOUR = 8;
-/** One game day at 1x speed, in real seconds (PIOTR, "for testing, maybe 4 or 5"). */
-export const REAL_SECONDS_PER_DAY_AT_1X = 180;
+/** One game day at 1x speed, in real seconds (PIOTR, Turn 2: one game minute per real second).
+ *  8 real minutes at 1x, 4 at 2x, 2 at 4x. */
+export const REAL_SECONDS_PER_DAY_AT_1X = 480;
 export const SPEEDS = [0, 1, 2, 4] as const;
 export const DAYS_PER_WEEK = 7;
 /** [TUNE] simplification for Turn 1: every month is 30 days. */
@@ -47,7 +48,8 @@ export const OVERTIME_EFFICIENCY = [0.8, 0.6, 0.4, 0.4] as const;
 /** After 12 hours the owner goes home, no way to force more (PIOTR). */
 export const MAX_HOURS_PER_DAY = 12;
 export const MAX_MINUTES_PER_DAY = MAX_HOURS_PER_DAY * 60;
-/** [TUNE] each overtime hour costs 0.05 of tomorrow's efficiency, recovered after one normal day. */
+/** An overtime hour costs 0.05 of tomorrow's efficiency, pro rata for a part hour, recovered
+ *  after one normal day ([TUNE] rate, PIOTR that it is pro rata: 30 minutes cost 0.025). */
 export const FATIGUE_PER_OVERTIME_HOUR = 0.05;
 /** [TUNE] a floor so a tired owner can never stall a task completely. With the numbers above it is
  *  never reached: the worst case is hour 12 at 0.4 less four hours of fatigue at 0.2. */
@@ -73,22 +75,32 @@ export const OWNER_LABOUR_PER_MINUTE = OWNER_LABOUR_VALUE_PER_DAY / MINUTES_PER_
 
 /** Family living costs, every working day (PIOTR). */
 export const LIVING_COST_PER_WORKING_DAY = 200;
-/** [TUNE] every value of the standard 60 m2 unit. */
+/** Rent per square metre per month (PIOTR). Later stages use 15 to 20, which is parked. */
+export const RENT_PER_M2_MONTHLY = 12;
+/** The standard 60 m2 unit (PIOTR for the rate, [TUNE] for the area). */
 export const UNIT_AREA_M2 = 60;
-export const UNIT_RENT_MONTHLY = 1200;
+export const UNIT_RENT_MONTHLY = UNIT_AREA_M2 * RENT_PER_M2_MONTHLY;
+/** [TUNE] business rates, unchanged from Turn 1. */
 export const UNIT_RATES_MONTHLY = 450;
-/** Paid on day 1 (TUNE amount). */
-export const UNIT_DEPOSIT = 2400;
+
+/** The landlord holds one month of rent, paid on day 1 (PIOTR). It comes back when the company
+ *  moves out, which is parked: the held figure is modelled, nothing is returned. */
+export function unitDepositFor(rentMonthly: number): number {
+  return rentMonthly;
+}
 export const POWER_BASE_DAILY = 4;
 export const POWER_PER_MACHINE_DAILY = 3;
 export const BENCH_SLOTS = 4;
-export const SHEET_STOCK_CAPACITY = 12;
 /** Waste collection once the central dust system exists (PIOTR). */
 export const DUST_WASTE_MONTHLY = 400;
 /** Pellet sales with a pelletiser, rising with production (PIOTR). */
 export const PELLET_INCOME_MONTHLY_BASE = 600;
 /** [TUNE] extra pellet income per 1000 minutes of production in the month. */
 export const PELLET_INCOME_PER_1000_PRODUCTION_MINUTES = 40;
+
+/** Working days in a month of 30 calendar days, for the fixed cost figure the arrears interest
+ *  threshold is measured against [TUNE]. */
+export const WORKING_DAYS_PER_MONTH = (DAYS_PER_MONTH * WORKING_DAYS_PER_WEEK) / DAYS_PER_WEEK;
 
 /** Unit geometry in tiles. One tile is 0.5 m by 0.5 m [TUNE proportions]. */
 export const UNIT_WIDTH_TILES = 24;
@@ -106,9 +118,10 @@ export interface DifficultySpec {
   rentMonthly: number;
   ratesMonthly: number;
   benchSlots: number;
-  sheetCapacity: number;
   widthTiles: number;
   depthTiles: number;
+  /** Negative: how far the bank lets the company go (PIOTR for Hard, [TUNE] for the other two). */
+  overdraftLimit: number;
 }
 
 /** Starting cash is [PIOTR]. The bigger very easy unit is [TUNE]. */
@@ -118,12 +131,12 @@ export const DIFFICULTIES: DifficultySpec[] = [
     label: 'Very easy',
     startingCash: 50000,
     areaM2: 90,
-    rentMonthly: 1000,
+    rentMonthly: 90 * RENT_PER_M2_MONTHLY,
     ratesMonthly: UNIT_RATES_MONTHLY,
     benchSlots: 6,
-    sheetCapacity: 20,
     widthTiles: 30,
     depthTiles: 12,
+    overdraftLimit: -10000,
   },
   {
     id: 'easy',
@@ -133,9 +146,9 @@ export const DIFFICULTIES: DifficultySpec[] = [
     rentMonthly: UNIT_RENT_MONTHLY,
     ratesMonthly: UNIT_RATES_MONTHLY,
     benchSlots: BENCH_SLOTS,
-    sheetCapacity: SHEET_STOCK_CAPACITY,
     widthTiles: UNIT_WIDTH_TILES,
     depthTiles: UNIT_DEPTH_TILES,
+    overdraftLimit: -10000,
   },
   {
     id: 'hard',
@@ -145,9 +158,9 @@ export const DIFFICULTIES: DifficultySpec[] = [
     rentMonthly: UNIT_RENT_MONTHLY,
     ratesMonthly: UNIT_RATES_MONTHLY,
     benchSlots: BENCH_SLOTS,
-    sheetCapacity: SHEET_STOCK_CAPACITY,
     widthTiles: UNIT_WIDTH_TILES,
     depthTiles: UNIT_DEPTH_TILES,
+    overdraftLimit: -5000,
   },
 ];
 
@@ -157,10 +170,12 @@ export const DIFFICULTIES: DifficultySpec[] = [
 
 /** [TUNE] 2% per month on a negative balance, charged on the 1st. */
 export const OVERDRAFT_MONTHLY_INTEREST = 0.02;
-/** [TUNE] a periodic cost that would push cash below this becomes arrears. */
-export const OVERDRAFT_LIMIT = -10000;
-/** [TUNE] bankruptcy when the overdraft passes twice the limit. */
-export const BANKRUPTCY_OVERDRAFT = OVERDRAFT_LIMIT * 2;
+/** 1% per month on the arrears balance while the arrears are large (PIOTR). */
+export const ARREARS_MONTHLY_INTEREST = 0.01;
+/** [TUNE] "large arrears" means more than this many months of fixed costs. */
+export const ARREARS_INTEREST_THRESHOLD_MONTHS = 1;
+/** [TUNE] bankruptcy when the overdraft passes this multiple of the limit. */
+export const BANKRUPTCY_OVERDRAFT_MULTIPLIER = 2;
 export const ARREARS_MONTHS_WARNING = 1;
 export const ARREARS_MONTHS_FINAL_WARNING = 2;
 export const ARREARS_MONTHS_BAILIFF = 3;
@@ -179,11 +194,21 @@ export const PROFIT_FRACTION = 0.2;
 export const STOCK_MATERIAL_FRACTION = 0.34;
 /** Deposit on acceptance, balance on delivery (PIOTR). */
 export const DEPOSIT_FRACTION = 0.5;
+/** A finished piece stands at the gate until it is taken to the client (PIOTR). The courier bill
+ *  and the minutes the van costs somebody are both [TUNE]. */
+export const COURIER_COST = 120;
+export const OWN_DELIVERY_MINUTES = 90;
+/** More than three pieces at the gate and the hall is in its own way (PIOTR: 30% slower). */
+export const GATE_CROWD_LIMIT = 3;
+export const GATE_CROWD_FACTOR = 0.7;
 /** Late penalty per day, as a fraction of the price (PIOTR). */
 export const LATE_PENALTY_PER_DAY = 0.05;
 export const LATE_PENALTY_PER_DAY_EXPRESS = 0.3;
-/** Express jobs pay 20% more (PIOTR). */
+/** Express jobs pay 20% more, and the material and the labour are still worked out from the base
+ *  price, so the uplift is pure profit (PIOTR). */
 export const EXPRESS_PRICE_UPLIFT = 0.2;
+/** At most one express enquiry reaches the board in a week (PIOTR). */
+export const EXPRESS_MAX_PER_WEEK = 1;
 /** A job made by hand takes half again as long (PIOTR). */
 export const BY_HAND_DURATION_FACTOR = 1.5;
 /** Worker speed as a fraction of the owner. Nobody matches the owner (PIOTR). */
@@ -207,10 +232,15 @@ export const PRICE_ROUNDING = 10;
 /** Days an enquiry stays on the board (PIOTR). */
 export const EXPIRY_STANDARD_DAYS = 3;
 export const EXPIRY_EXPRESS_DAYS = 1;
-/** [TUNE] express chance is base plus per whole point of reputation. */
+/** Express chance: 0.10 plus 0.05 per whole ten points of reputation, floored and capped
+ *  [TUNE mapping of the Turn 1 formula onto the new scale]. */
 export const EXPRESS_PROBABILITY_BASE = 0.1;
-export const EXPRESS_PROBABILITY_PER_REPUTATION = 0.05;
-/** [TUNE] board size, minimum and maximum enquiries, by reputation tier. */
+export const EXPRESS_PROBABILITY_PER_REPUTATION_STEP = 0.05;
+export const EXPRESS_PROBABILITY_REPUTATION_STEP = 10;
+export const EXPRESS_PROBABILITY_MIN = 0.05;
+export const EXPRESS_PROBABILITY_MAX = 0.3;
+/** Board size, minimum and maximum enquiries, by reputation tier (PIOTR: below 0, 0 to 20,
+ *  above 20). */
 export const BOARD_SIZE_BY_TIER: Array<[number, number]> = [
   [1, 2],
   [2, 3],
@@ -223,10 +253,13 @@ export const BESPOKE_PROBABILITY = 0.15;
 // 8.9 Materials
 // ---------------------------------------------------------------------------
 
-/** [TUNE] one sheet of board. Job sheet counts come from the material cost. */
-export const SHEET_PRICE = 80;
+/** A sheet is a storage unit worth 200 of material value and stands for everything a job needs:
+ *  boards, edging, screws (PIOTR). Job sheet counts come from the material cost. */
+export const SHEET_VALUE = 200;
 /** [TUNE] sheets bought for stock are cheaper, which gives the 0.34 P per job. */
-export const SHEET_PRICE_STOCK = SHEET_PRICE * (STOCK_MATERIAL_FRACTION / MATERIAL_FRACTION);
+export const SHEET_PRICE_STOCK = SHEET_VALUE * (STOCK_MATERIAL_FRACTION / MATERIAL_FRACTION);
+/** Under this fraction of the rack the player is warned (PIOTR: under 10%). */
+export const LOW_STOCK_FRACTION = 0.1;
 /** Material always arrives the next working day (PIOTR). */
 export const DELIVERY_WORKING_DAYS_STANDARD = 1;
 /** [TUNE] bespoke material takes three working days and costs 15% more. */
@@ -240,8 +273,17 @@ export const TEMP_STORAGE_FETCH_MINUTES = 60;
 // 8.10 Owner tasks
 // ---------------------------------------------------------------------------
 
-export const EMAILS_MINUTES = 60;
+/** Emails are per job now, not a daily block: the same count curve as the calls, 10 minutes each
+ *  (PIOTR for the curve, [TUNE] for the minutes). */
+export const EMAIL_MINUTES = 10;
+/** Unanswered emails at delivery: 1% of the price each, capped at 5% (PIOTR). */
+export const EMAIL_PAYMENT_PENALTY = 0.01;
+export const EMAIL_PAYMENT_PENALTY_MAX = 0.05;
+/** And the rating gain is multiplied by 1 less 0.2 per unanswered email, floored at 0 (PIOTR). */
+export const EMAIL_RATING_PENALTY = 0.2;
 export const BOOKKEEPING_MINUTES = 60;
+/** Books behind on the 1st: 100 per consecutive month behind (PIOTR). */
+export const LATE_ACCOUNTS_CHARGE = 100;
 export const DAILY_ORDERING_MINUTES = 60;
 /** 10 minutes per joiner per day (PIOTR). */
 export const STAFF_MANAGEMENT_MINUTES_PER_JOINER = 10;
@@ -275,9 +317,17 @@ export const BAG_CHANGE_MINUTES = 15;
 export const CLEANING_MINUTES = 120;
 /** Fetch from temporary storage the next morning (PIOTR). */
 export const FETCH_STORAGE_MINUTES = TEMP_STORAGE_FETCH_MINUTES;
-/** [TUNE] extractor repair. */
-export const EXTRACTOR_REPAIR_MINUTES = 90;
+/** Repairing anything takes 90 minutes [TUNE]. */
+export const REPAIR_MINUTES = 90;
+/** [TUNE] the extractor keeps its Turn 1 parts bill; every other machine is 5% of what it cost. */
 export const EXTRACTOR_REPAIR_COST = 150;
+export const MACHINE_REPAIR_COST_FRACTION = 0.05;
+/** Every machine wants a service once a month, and it costs half an hour (PIOTR). */
+export const SERVICE_INTERVAL_DAYS = 30;
+export const SERVICE_MINUTES = 30;
+/** [TUNE] the service bill, and what an overdue machine risks every working day. */
+export const SERVICE_COST_FRACTION = 0.02;
+export const OVERDUE_BREAKDOWN_CHANCE = 0.02;
 
 /** Design speed by software tier (PIOTR: 5 to 80% faster). */
 export const SOFTWARE_DESIGN_FACTOR: Record<SoftwareTier, number> = {
@@ -287,8 +337,12 @@ export const SOFTWARE_DESIGN_FACTOR: Record<SoftwareTier, number> = {
 };
 /** A one-off licence works for 30 jobs, then must be bought again (PIOTR). */
 export const SOFTWARE_ONE_OFF_JOBS = 30;
-export const SOFTWARE_ONE_OFF_PRICE = 900;
-export const SOFTWARE_SUBSCRIPTION_MONTHLY = 60;
+/** The company needs the bundle, not the cheapest line: 150 a month, and the one-off is two years
+ *  of it (PIOTR). */
+export const SOFTWARE_SUBSCRIPTION_MONTHLY = 150;
+export const SOFTWARE_ONE_OFF_YEARS = 2;
+export const SOFTWARE_ONE_OFF_PRICE =
+  SOFTWARE_SUBSCRIPTION_MONTHLY * MONTHS_PER_YEAR * SOFTWARE_ONE_OFF_YEARS;
 /** [TUNE] both Turn 1 licences are the basic tier. Standard and pro have no purchase path yet. */
 export const SOFTWARE_TURN1_TIER: SoftwareTier = 'basic';
 
@@ -296,19 +350,22 @@ export const SOFTWARE_TURN1_TIER: SoftwareTier = 'basic';
 // 8.11 Reputation
 // ---------------------------------------------------------------------------
 
+/** Minus 50 to 100, starting at 0 (PIOTR). */
 export const REPUTATION_START = 0;
-/** [TUNE] scale 0 to 5 with negatives allowed. */
-export const REPUTATION_MIN = -5;
-export const REPUTATION_MAX = 5;
-/** [TUNE weights] rating changes at job completion. */
-export const RATING_ON_TIME = 0.3;
-export const RATING_EXPRESS_ON_TIME = 0.5;
-export const RATING_PER_DAY_LATE = -0.1;
+export const REPUTATION_MIN = -50;
+export const REPUTATION_MAX = 100;
+/** Rating changes at job completion, ten times the Turn 1 weights (PIOTR). */
+export const RATING_ON_TIME = 3;
+export const RATING_EXPRESS_ON_TIME = 5;
+export const RATING_PER_DAY_LATE = -1;
 /** Made by hand carries no penalty (PIOTR). */
 export const RATING_BY_HAND = 0;
-/** Reputation tier thresholds for the board and the template weights (CLAUDE.md 8.8: reputation 0,
- *  reputation 1, reputation 2 and up). The hiring pool has its own gate per role in 9.3. */
-export const REPUTATION_TIERS = [0, 1, 2] as const;
+/** Below this band the work on offer is barely profitable [TUNE band and factor]. */
+export const LOW_REPUTATION_BAND = -25;
+export const LOW_REPUTATION_PRICE_FACTOR = 0.85;
+/** Reputation tier thresholds for the board and the template weights (PIOTR: below 0, 0 to 20,
+ *  above 20). The hiring pool has its own gate per role in 9.3. */
+export const REPUTATION_TIERS = [REPUTATION_MIN, 0, 20] as const;
 
 // ---------------------------------------------------------------------------
 // 9.1 Product catalogue (PIOTR: products, prices, design minutes, calls)
@@ -330,7 +387,7 @@ export const PRODUCT_TEMPLATES: ProductTemplate[] = [
     needsMeasure: false,
     requiredEquipment: ['tableSaw', 'drill'],
     allowedFinishes: FINISHES_SHEET,
-    minReputation: 0,
+    minReputation: -50,
     weightsByTier: [50, 20, 8],
     byHandAllowed: false,
   },
@@ -346,7 +403,7 @@ export const PRODUCT_TEMPLATES: ProductTemplate[] = [
     needsMeasure: false,
     requiredEquipment: ['tableSaw', 'drill', 'edgebander'],
     allowedFinishes: FINISHES_SHEET,
-    minReputation: 0,
+    minReputation: -50,
     weightsByTier: [30, 25, 12],
     byHandAllowed: false,
   },
@@ -362,7 +419,7 @@ export const PRODUCT_TEMPLATES: ProductTemplate[] = [
     needsMeasure: false,
     requiredEquipment: ['tableSaw', 'drill', 'edgebander'],
     allowedFinishes: FINISHES_SHEET,
-    minReputation: 0.5,
+    minReputation: 5,
     weightsByTier: [12, 25, 18],
     byHandAllowed: false,
   },
@@ -378,7 +435,7 @@ export const PRODUCT_TEMPLATES: ProductTemplate[] = [
     needsMeasure: false,
     requiredEquipment: ['tableSaw', 'drill', 'edgebander'],
     allowedFinishes: FINISHES_SHEET,
-    minReputation: 1,
+    minReputation: 10,
     weightsByTier: [0, 20, 22],
     byHandAllowed: false,
   },
@@ -394,7 +451,7 @@ export const PRODUCT_TEMPLATES: ProductTemplate[] = [
     needsMeasure: true,
     requiredEquipment: ['tableSaw', 'drill', 'edgebander'],
     allowedFinishes: FINISHES_SHEET,
-    minReputation: 1.5,
+    minReputation: 20,
     weightsByTier: [0, 8, 25],
     byHandAllowed: false,
   },
@@ -410,7 +467,7 @@ export const PRODUCT_TEMPLATES: ProductTemplate[] = [
     needsMeasure: false,
     requiredEquipment: ['thicknesser', 'solidWoodTools'],
     allowedFinishes: FINISHES_SOLID,
-    minReputation: 1,
+    minReputation: 10,
     weightsByTier: [0, 2, 15],
     byHandAllowed: true,
   },
@@ -426,7 +483,8 @@ const BASE_SPEC = {
   labourFactor: 1,
   labourAppliesTo: null as MaterialKind | null,
   unloadFactor: 1,
-  minReputation: 0,
+  sheetCapacity: 0,
+  minReputation: REPUTATION_MIN,
   locked: false,
   lockReason: '',
   perWorker: false,
@@ -551,6 +609,32 @@ export const EQUIPMENT_SPECS: EquipmentSpec[] = [
     perWorker: true,
     stackable: true,
     effect: 'One per worker. The unit has a fixed number of bench slots.',
+  },
+  {
+    ...BASE_SPEC,
+    id: 'sheetRack',
+    name: 'Cheap shelving',
+    price: 400,
+    category: 'storage',
+    width: 4,
+    depth: 1,
+    height: 2,
+    spriteKey: 'sheetRack',
+    sheetCapacity: 50,
+    effect: 'Holds 50 sheets. Nothing can be unloaded without somewhere to put it.',
+  },
+  {
+    ...BASE_SPEC,
+    id: 'sheetRackBetter',
+    name: 'Better shelving',
+    price: 900,
+    category: 'storage',
+    width: 4,
+    depth: 1,
+    height: 2,
+    spriteKey: 'sheetRackBetter',
+    sheetCapacity: 75,
+    effect: 'Holds 75 sheets. More than that needs a bigger unit.',
   },
   {
     ...BASE_SPEC,
@@ -782,6 +866,8 @@ export const ROOM_LAYOUT = [
 /** Hall placement. The office furniture is placed by DESK_LAYOUT instead, and the chair is bought
  *  but never drawn: 10.1 puts nothing on the office screen but the desk and what is on it. */
 export const STARTING_LAYOUT: Record<string, LayoutSlot> = {
+  sheetRack: { x: 20, y: 0 },
+  sheetRackBetter: { x: 20, y: 2 },
   extractor: { x: 15, y: 1 },
   dustSystem: { x: 15, y: 1 },
   tableSaw: { x: 0, y: 7 },
@@ -828,17 +914,12 @@ export const CANTEEN_SLOT_LAYOUT: LayoutSlot[] = [
   { x: 12, y: 6 },
 ];
 
-/** The sheet rack, drawn with its count. */
-export const STOCK_RACK_LAYOUT = {
-  x: 21,
-  y: 0,
-  width: 2,
-  depth: 4,
-  height: 2,
-  spriteKey: 'sheetRack',
-};
 /** Where a waiting delivery van stands, and how big it is. */
 export const GATE_LAYOUT = { x: 0, y: 4, yard: true, width: 4, depth: 2, height: 2 };
+/** The tile rows in front of the gate that have to stay clear [TUNE]. */
+export const GATE_LANE_TILES = 2;
+/** The apron beside the gate where finished pieces stand, outside the floor (CLAUDE.md T2 3.13). */
+export const FINISHED_GOODS_LAYOUT = { x: 0, y: 6, yard: true, width: 3, depth: 1, height: 1 };
 export const DELIVERY_VAN_SPRITE = 'deliveryVan';
 
 /** The office desk and everything on it. Fixed placement, like the hall (CLAUDE.md 10.3). */
@@ -930,7 +1011,7 @@ export const HIRING_SPECS: HiringSpec[] = [
     label: 'Joiner, poor',
     weeklyWage: 480,
     monthlyWage: 0,
-    minReputation: 0,
+    minReputation: -50,
     duties: 'Production at 0.60 of the owner speed.',
   },
   {
@@ -939,7 +1020,7 @@ export const HIRING_SPECS: HiringSpec[] = [
     label: 'Joiner, normal',
     weeklyWage: 640,
     monthlyWage: 0,
-    minReputation: 1,
+    minReputation: 10,
     duties: 'Production at 0.80 of the owner speed.',
   },
   {
@@ -948,7 +1029,7 @@ export const HIRING_SPECS: HiringSpec[] = [
     label: 'Joiner, super',
     weeklyWage: 800,
     monthlyWage: 0,
-    minReputation: 2.5,
+    minReputation: 40,
     duties: 'Production at 0.90 of the owner speed.',
   },
   {
@@ -957,7 +1038,7 @@ export const HIRING_SPECS: HiringSpec[] = [
     label: 'Helper',
     weeklyWage: 420,
     monthlyWage: 0,
-    minReputation: 0,
+    minReputation: -50,
     duties: 'Bag changes, cleaning, unloading.',
   },
   {
@@ -966,7 +1047,7 @@ export const HIRING_SPECS: HiringSpec[] = [
     label: 'Office admin',
     weeklyWage: 0,
     monthlyWage: 1900,
-    minReputation: 0.5,
+    minReputation: 5,
     duties: 'Emails, bookkeeping, daily ordering.',
   },
   {
@@ -975,7 +1056,7 @@ export const HIRING_SPECS: HiringSpec[] = [
     label: 'Purchasing clerk',
     weeklyWage: 0,
     monthlyWage: 1700,
-    minReputation: 1,
+    minReputation: 10,
     duties: 'Per job material orders, about 16 a day.',
   },
   {
@@ -984,7 +1065,7 @@ export const HIRING_SPECS: HiringSpec[] = [
     label: 'Salesman',
     weeklyWage: 0,
     monthlyWage: 2200,
-    minReputation: 1.5,
+    minReputation: 15,
     duties: 'Client calls.',
   },
 ];
@@ -1035,8 +1116,10 @@ export const WORKER_NAMES = [
 export const EXTRACTOR_BREAKDOWN_CHANCE = 0.01;
 export const EXTRACTOR_BREAKDOWN_CHANCE_HIGH_DUST = 0.03;
 export const DUST_HIGH_THRESHOLD = 70;
-/** A broken extractor triples the dust rate (PIOTR). */
+/** A broken extractor triples the dust rate (PIOTR). The hall carries on at a quarter speed
+ *  rather than stopping dead (PIOTR, Turn 2). */
 export const EXTRACTOR_BROKEN_DUST_MULTIPLIER = 3;
+export const EXTRACTOR_BROKEN_OUTPUT_FACTOR = 0.25;
 /** [TUNE] dust gained per minute of production. */
 export const DUST_PER_PRODUCTION_MINUTE = 0.02;
 export const DUST_MAX = 100;
@@ -1061,3 +1144,60 @@ export const HELPER_CLEAN_WEEKDAY = 4;
 export const LEDGER_VISIBLE_ENTRIES = 50;
 /** [TUNE] the state keeps this many ledger entries so it stays small. */
 export const LEDGER_MAX_ENTRIES = 200;
+
+// ---------------------------------------------------------------------------
+// 3.12 Why it is like this in real life
+// ---------------------------------------------------------------------------
+
+/** Two or three sentences per decision, in plain English. The player can turn them off, and they
+ *  never carry a number the engine might change (CLAUDE.md T2 3.12). */
+export const WHY: Record<string, string> = {
+  unitDeposit:
+    'A landlord wants a deposit before he hands over the keys, and it is usually one month of ' +
+    'rent. It sits in his account for the whole tenancy and does nothing for you. Budget for it ' +
+    'as money you will not see again until you leave.',
+  depositReturn:
+    'The deposit comes back when you hand the unit over in the state you took it in. Anything ' +
+    'the landlord has to put right comes out of it first. Most people get a good part of it back ' +
+    'and nobody should count on all of it.',
+  rent:
+    'Rent is agreed by the month but it is really a daily cost: every day the doors are shut is ' +
+    'a day you paid for and did not use. Working out the daily figure is the quickest way to see ' +
+    'what a slow week costs you.',
+  rates:
+    'Business rates are a tax on the property, paid to the council whether you make anything or ' +
+    'not. Small units often get relief, larger ones do not. They arrive as a yearly bill you pay ' +
+    'in monthly instalments.',
+  jobDeposit:
+    'A deposit on acceptance is normal in joinery and it is what pays for the material. Without ' +
+    'it you are lending the client the cost of his own kitchen. Half on order and half on ' +
+    'delivery is the usual arrangement.',
+  arrearsInterest:
+    'Once a bill goes unpaid it starts to cost extra. Suppliers and landlords add interest to ' +
+    'what you owe, so a debt you ignore grows on its own. The longer it runs the harder it is ' +
+    'to get out from under it.',
+  bailiff:
+    'After a few months of arrears a creditor can send enforcement agents to take goods to the ' +
+    'value of the debt. They take what they can sell, and they credit you a fraction of what it ' +
+    'cost you. Losing a machine you still owe money on is how a workshop stops being a workshop.',
+  lateAccounts:
+    'Books that are not written up have to be reconstructed by somebody else, and accountants ' +
+    'charge by the hour for that. The longer you leave it the more there is to untangle. It is ' +
+    'the cheapest work in the business to do yourself and the dearest to put off.',
+  extractor:
+    'Dust extraction is not optional in a workshop. Without it the machines clog, the air is ' +
+    'dangerous to breathe, and an inspector will stop you. With the extractor down you can still ' +
+    'work, but slowly, and the mess builds up three times as fast.',
+  service:
+    'A machine that is serviced runs for years and one that is not gives up in the middle of a ' +
+    'job. Blades, bearings and filters all have a life. A monthly check costs a fraction of a ' +
+    'breakdown and it never happens on a quiet day.',
+  finishedGoods:
+    'A finished piece is not money until the client has it. It stands by the door taking up ' +
+    'floor space and getting in the way of the next job. Booking the transport the day it is ' +
+    'finished is what keeps the workshop moving.',
+  lowStock:
+    'Material is ordered days before it is needed and arrives when the supplier feels like it. ' +
+    'An empty rack means joiners standing around on full wages. Keeping a small buffer costs ' +
+    'cash but it costs less than a stopped bench.',
+};

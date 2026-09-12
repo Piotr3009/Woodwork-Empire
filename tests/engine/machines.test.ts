@@ -8,13 +8,25 @@ import {
   EXTRACTOR_BREAKDOWN_CHANCE,
   EXTRACTOR_BREAKDOWN_CHANCE_HIGH_DUST,
   EXTRACTOR_BROKEN_DUST_MULTIPLIER,
+  EXTRACTOR_BROKEN_OUTPUT_FACTOR,
+  MACHINE_REPAIR_COST_FRACTION,
+  OVERDUE_BREAKDOWN_CHANCE,
+  SERVICE_COST_FRACTION,
+  SERVICE_INTERVAL_DAYS,
+  SERVICE_MINUTES,
   EXTRACTOR_REPAIR_COST,
-  EXTRACTOR_REPAIR_MINUTES,
+  REPAIR_MINUTES,
   NO_HELPER_DUST_MULTIPLIER,
 } from '../../src/engine/constants';
 import {
   accidentRisk,
   bagBlocked,
+  brokenMachineFor,
+  hasExtraction,
+  overdueBreakdownChance,
+  serviceCostFor,
+  serviceDueOn,
+  serviceIsDue,
   bagMachinesFor,
   bagsExist,
   dustBand,
@@ -25,12 +37,14 @@ import {
 } from '../../src/engine/machines';
 import { canBuy } from '../../src/engine/game';
 import { tick } from '../../src/engine/index';
-import type { GameEvent, GameState } from '../../src/engine/index';
+import type { Equipment, GameEvent, GameState } from '../../src/engine/index';
+import { renderHall } from '../../src/render/hall';
 import {
   act,
   buyStartingKit,
   clearEvents,
   eventsOfKind,
+  fillRack,
   firstJob,
   newGame,
   placeEnquiry,
@@ -38,11 +52,15 @@ import {
 } from '../helpers';
 
 /** A workshop with the day 1 kit and a 400 job already at the bench. */
-function atTheBench(options: { price?: number } = {}): GameState {
-  const state = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
+function atTheBench(options: { price?: number; seed?: number } = {}): GameState {
+  const state = buyStartingKit(
+    newGame({ difficulty: 'veryEasy', ...(options.seed === undefined ? {} : { seed: options.seed }) }),
+  );
   state.enquiries = [];
   const enquiry = placeEnquiry(state, { price: options.price ?? 4000, deadlineDays: 90 });
-  const accepted = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+  const accepted = fillRack(
+    act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false }),
+  );
   firstJob(accepted).stage = 'ready';
   return act(accepted, { type: 'WORK_HERE', jobId: null });
 }
@@ -134,6 +152,10 @@ describe('bags', () => {
       startDay: 1,
       jobId: null,
       taskId: null,
+      minutesWorked: 0,
+      ordersToday: 0,
+      station: 'idle',
+      productionMinutes: 0,
       absentDaysRemaining: 0,
       anchorX: 0,
       anchorY: 4,
@@ -170,6 +192,10 @@ describe('bags', () => {
       startDay: 1,
       jobId: null,
       taskId: null,
+      minutesWorked: 0,
+      ordersToday: 0,
+      station: 'idle',
+      productionMinutes: 0,
       absentDaysRemaining: 0,
       anchorX: 0,
       anchorY: 4,
@@ -243,6 +269,10 @@ describe('dust', () => {
         startDay: 1,
         jobId: null,
         taskId: null,
+        minutesWorked: 0,
+        ordersToday: 0,
+        station: 'idle',
+        productionMinutes: 0,
         absentDaysRemaining: 0,
         anchorX: 0,
         anchorY: 4,
@@ -278,6 +308,10 @@ describe('dust', () => {
       startDay: 1,
       jobId: null,
       taskId: null,
+      minutesWorked: 0,
+      ordersToday: 0,
+      station: 'idle',
+      productionMinutes: 0,
       absentDaysRemaining: 0,
       anchorX: 0,
       anchorY: 4,
@@ -296,26 +330,33 @@ describe('dust', () => {
   });
 
   it('puts a joiner off for three days when the hall is dangerous', () => {
-    const state = atTheBench();
-    state.dust = 95;
-    state.workers.push({
-      id: 'staff-1',
-      name: 'Ben',
-      role: 'joiner',
-      tier: 'normal',
-      rate: 0.8,
-      weeklyWage: 640,
-      monthlyWage: 0,
-      startDay: 1,
-      jobId: null,
-      taskId: null,
-      absentDaysRemaining: 0,
-      anchorX: 0,
-      anchorY: 4,
-    });
-    // 2% a day: over 60 working days somebody gets hurt.
-    const run = runToDay(state, 60);
-    const accidents = eventsOfKind(run.events, 'accident');
+    // 2% a day. One seed is a coin toss over two months, so four of them are run and the test
+    // asks only that somebody gets hurt somewhere in them.
+    const accidents: GameEvent[] = [];
+    for (const seed of [1, 2, 3, 4]) {
+      const state = atTheBench({ seed });
+      state.dust = 95;
+      state.workers.push({
+        id: 'staff-1',
+        name: 'Ben',
+        role: 'joiner',
+        tier: 'normal',
+        rate: 0.8,
+        weeklyWage: 640,
+        monthlyWage: 0,
+        startDay: 1,
+        jobId: null,
+        taskId: null,
+        minutesWorked: 0,
+        ordersToday: 0,
+        station: 'idle',
+        productionMinutes: 0,
+        absentDaysRemaining: 0,
+        anchorX: 0,
+        anchorY: 4,
+      });
+      accidents.push(...eventsOfKind(runToDay(state, 60).events, 'accident'));
+    }
     expect(accidents.length).toBeGreaterThanOrEqual(1);
     expect(accidents[0]?.data.days).toBe(ACCIDENT_DAYS_OFF);
   });
@@ -334,26 +375,29 @@ describe('the extractor', () => {
     expect(extractorBreakdownChance(withSystem)).toBe(0);
   });
 
-  it('stops every machine until it is repaired, and the repair costs time and parts', () => {
+  it('lets the hall crawl on at a quarter speed, and costs time and parts to put right', () => {
     let state = atTheBench();
     const extractor = state.equipment.find((item) => item.specId === 'extractor');
     if (extractor) extractor.broken = true;
     const before = firstJob(state).labourRemaining;
-    state = tick(state, 30);
-    expect(firstJob(state).labourRemaining).toBe(before);
+    const slow = tick(state, 30);
+    const doneBroken = before - firstJob(slow).labourRemaining;
+    expect(doneBroken).toBeGreaterThan(0);
     expect(dustGainPerMinute(state)).toBeCloseTo(
       DUST_PER_PRODUCTION_MINUTE * EXTRACTOR_BROKEN_DUST_MULTIPLIER,
       10,
     );
     const cash = state.cash;
-    state = act(state, { type: 'REPAIR_EXTRACTOR' });
-    const task = state.tasks.find((entry) => entry.kind === 'repairExtractor');
-    expect(task?.minutesTotal).toBe(EXTRACTOR_REPAIR_MINUTES);
-    state = tick(state, EXTRACTOR_REPAIR_MINUTES);
+    state = act(state, { type: 'REPAIR_MACHINE', equipmentId: extractor?.id ?? '' });
+    const task = state.tasks.find((entry) => entry.kind === 'repair');
+    expect(task?.minutesTotal).toBe(REPAIR_MINUTES);
+    state = tick(state, REPAIR_MINUTES);
     expect(state.equipment.find((item) => item.specId === 'extractor')?.broken).toBe(false);
     expect(cash - state.cash).toBe(EXTRACTOR_REPAIR_COST);
-    const running = tick(state, 10);
-    expect(firstJob(running).labourRemaining).toBeLessThan(before);
+    // Mended, and the same half hour now does four times the work (CLAUDE.md T2 3.9).
+    const running = tick(state, 30);
+    const doneMended = firstJob(state).labourRemaining - firstJob(running).labourRemaining;
+    expect(doneMended / doneBroken).toBeCloseTo(1 / EXTRACTOR_BROKEN_OUTPUT_FACTOR, 6);
   });
 
   it('cannot break down when the central system is in', () => {
@@ -361,14 +405,17 @@ describe('the extractor', () => {
     state = act(state, { type: 'BUY_EQUIPMENT', specId: 'dustSystem' });
     expect(has(state, 'dustSystem')).toBe(true);
     const run = runToDay(state, 40);
-    expect(eventsOfKind(run.events, 'extractorBroken')).toHaveLength(0);
+    expect(eventsOfKind(run.events, 'machineBroken')).toHaveLength(0);
   });
 
   it('does break down eventually on its own', () => {
-    const state = atTheBench();
-    state.dust = 80;
-    const run = runToDay(state, 100);
-    expect(eventsOfKind(run.events, 'extractorBroken').length).toBeGreaterThanOrEqual(1);
+    let broken = 0;
+    for (const seed of [1, 2, 3, 4]) {
+      const state = atTheBench({ seed });
+      state.dust = 80;
+      broken += eventsOfKind(runToDay(state, 100).events, 'machineBroken').length;
+    }
+    expect(broken).toBeGreaterThanOrEqual(1);
   });
 });
 
@@ -421,5 +468,100 @@ describe('a stopped machine can always be dealt with', () => {
     const saw = state.equipment.find((item) => item.specId === 'tableSaw');
     const asked = act(state, { type: 'ASK_BAG_CHANGE', equipmentId: saw?.id ?? '' });
     expect(asked.activeEvent).toBeNull();
+  });
+});
+
+describe('no extraction at all', () => {
+  it('refuses to run the machines and says why on the job', () => {
+    let state = atTheBench();
+    // Take the extractor out of the hall, the way the bailiff would.
+    state.equipment = state.equipment.filter((item) => item.specId !== 'extractor');
+    expect(hasExtraction(state)).toBe(false);
+    const before = firstJob(state).labourRemaining;
+    state = tick(state, 60);
+    expect(firstJob(state).labourRemaining).toBe(before);
+    expect(firstJob(state).blockedBy).toBe('no extraction');
+    expect(renderHall(state)).toContain('No extraction in the hall');
+    // Buy one and the bench starts again.
+    const fixed = tick(act(state, { type: 'BUY_EQUIPMENT', specId: 'extractor' }), 10);
+    expect(firstJob(fixed).labourRemaining).toBeLessThan(before);
+    expect(firstJob(fixed).blockedBy).toBe('');
+  });
+
+  it('lets a by hand job carry on without any extraction at all', () => {
+    let state = atTheBench();
+    state.equipment = state.equipment.filter((item) => item.specId !== 'extractor');
+    firstJob(state).byHand = true;
+    const before = firstJob(state).labourRemaining;
+    state = tick(state, 60);
+    expect(firstJob(state).labourRemaining).toBeLessThan(before);
+  });
+});
+
+describe('the monthly service', () => {
+  it('falls due 30 days after the machine was bought, with its minutes and its bill', () => {
+    const state = atTheBench();
+    const saw = state.equipment.find((item) => item.specId === 'tableSaw');
+    expect(saw?.lastServiceDay).toBe(1);
+    expect(serviceDueOn(saw as Equipment)).toBe(1 + SERVICE_INTERVAL_DAYS);
+    expect(serviceIsDue(state, saw as Equipment)).toBe(false);
+    expect(serviceCostFor(saw as Equipment)).toBe(1800 * SERVICE_COST_FRACTION);
+
+    const run = runToDay(state, 1 + SERVICE_INTERVAL_DAYS);
+    const due = eventsOfKind(run.events, 'serviceDue');
+    expect(due.length).toBeGreaterThanOrEqual(1);
+    expect(due[0]?.title).toContain('Service due');
+    const task = run.state.tasks.find((entry) => entry.kind === 'service' && !entry.done);
+    expect(task?.minutesTotal).toBe(SERVICE_MINUTES);
+  });
+
+  it('is done in half an hour and starts the clock again', () => {
+    let state = runToDay(atTheBench(), 1 + SERVICE_INTERVAL_DAYS).state;
+    const saw = state.equipment.find((item) => item.specId === 'tableSaw');
+    const cash = state.cash;
+    state = act(state, { type: 'SERVICE_MACHINE', equipmentId: saw?.id ?? '' });
+    state = tick(state, SERVICE_MINUTES);
+    const serviced = state.equipment.find((item) => item.specId === 'tableSaw');
+    expect(serviced?.lastServiceDay).toBe(state.clock.day);
+    expect(serviceIsDue(state, serviced as Equipment)).toBe(false);
+    expect(cash - state.cash).toBeCloseTo(serviceCostFor(saw as Equipment), 6);
+  });
+
+  it('gives an overdue machine a 2% chance a day of giving up, and it is out until repaired', () => {
+    const state = atTheBench();
+    const saw = state.equipment.find((item) => item.specId === 'tableSaw');
+    expect(overdueBreakdownChance(state, saw as Equipment)).toBe(0);
+    // Put the saw's service date a month back, so it is the only machine that is overdue.
+    const broken = { ...state, equipment: state.equipment.map((item) => ({ ...item })) };
+    const target = broken.equipment.find((item) => item.specId === 'tableSaw');
+    if (target) target.lastServiceDay = broken.clock.day - SERVICE_INTERVAL_DAYS;
+    expect(overdueBreakdownChance(broken, target as Equipment)).toBe(OVERDUE_BREAKDOWN_CHANCE);
+    if (target) target.broken = true;
+    expect(brokenMachineFor(broken, 'sheet')?.specId).toBe('tableSaw');
+    const before = firstJob(broken).labourRemaining;
+    const idle = tick(broken, 60);
+    expect(firstJob(idle).labourRemaining).toBe(before);
+    expect(firstJob(idle).blockedBy).toBe('table saw is broken');
+    // The repair is 90 minutes and 5% of what the saw cost.
+    const cash = idle.cash;
+    let fixed = act(idle, { type: 'REPAIR_MACHINE', equipmentId: target?.id ?? '' });
+    fixed = tick(fixed, REPAIR_MINUTES);
+    expect(fixed.equipment.find((item) => item.specId === 'tableSaw')?.broken).toBe(false);
+    expect(cash - fixed.cash).toBeCloseTo(1800 * MACHINE_REPAIR_COST_FRACTION, 6);
+  });
+
+  it('breaks an overdue machine sooner or later, and never a serviced one', () => {
+    let broken = 0;
+    for (const seed of [1, 2, 3, 4]) {
+      const state = atTheBench({ seed });
+      // The extractor gives up on dust, not on a service it never had: it is not counted here.
+      const machines = new Set(
+        state.equipment.filter((item) => item.specId !== 'extractor').map((item) => item.id),
+      );
+      broken += runToDay(state, 120)
+        .events.filter((event) => event.kind === 'machineBroken')
+        .filter((event) => machines.has(String(event.data.equipmentId))).length;
+    }
+    expect(broken).toBeGreaterThanOrEqual(1);
   });
 });

@@ -4,17 +4,22 @@
 
 import {
   BY_HAND_DURATION_FACTOR,
+  COURIER_COST,
   DEPOSIT_FRACTION,
+  EMAIL_PAYMENT_PENALTY,
+  EMAIL_PAYMENT_PENALTY_MAX,
   LABOUR_FRACTION,
   LATE_PENALTY_PER_DAY,
   LATE_PENALTY_PER_DAY_EXPRESS,
   OWNER_LABOUR_PER_MINUTE,
+  OWNER_LABOUR_VALUE_PER_DAY,
   SITE_MEASURE_MINUTES,
   SITE_MEASURE_TAXI_COST,
   WORKER_MINUTE_RATE_DIVISOR,
 } from './constants';
 import { canAccept, findEnquiry, removeEnquiry } from './board';
 import { template } from './catalog';
+import { nextWorkingDay } from './clock';
 import { chargeUnavoidable, formatMoney, receive } from './economy';
 import { queueEvent } from './events';
 import { has, machineLabourFactor } from './machines';
@@ -22,12 +27,15 @@ import { materialCostFor, orderMaterialForJob, sheetsForCost, stockCostFor } fro
 import { ownerIsAvailable } from './owner';
 import { applyRating } from './reputation';
 import { makeId } from './rng';
+import { plural } from './text';
 import {
+  AD_HOC_TASK_MINUTES,
   WORK_EPSILON,
   callsForPrice,
   clientCallMinutes,
   createTask,
   designMinutes,
+  emailMinutes,
   jobTasks,
   materialOrderMinutes,
 } from './tasks';
@@ -48,6 +56,11 @@ export function openJobs(state: GameState): Job[] {
 
 export function labourValueFor(price: number): number {
   return price * LABOUR_FRACTION;
+}
+
+/** Days of the owner's own time this much labour takes, to one decimal (CLAUDE.md T2 3.2). */
+export function ownerDaysFor(labourValue: number): number {
+  return Math.round((labourValue / OWNER_LABOUR_VALUE_PER_DAY) * 10) / 10;
 }
 
 /** What a worker of this rate is worth per minute, for the job card only [TUNE]. */
@@ -112,19 +125,23 @@ export function acceptEnquiry(state: GameState, enquiryId: string, byHand: boole
   }
   const madeByHand = locked;
   const entry = template(enquiry.templateId);
-  const materialCost = materialCostFor(enquiry.price, enquiry.bespokeMaterial);
-  const labourValue = labourValueFor(enquiry.price);
+  // Material and labour come off the base price, so the express uplift is pure profit (T2 3.4).
+  const materialCost = materialCostFor(enquiry.basePrice, enquiry.bespokeMaterial);
+  const labourValue = labourValueFor(enquiry.basePrice);
   const job: Job = {
     id: makeId(state, 'job'),
     templateId: enquiry.templateId,
     name: enquiry.name,
     price: enquiry.price,
+    basePrice: enquiry.basePrice,
     sizeMultiplier: enquiry.sizeMultiplier,
     finish: enquiry.finish,
     materialKind: enquiry.materialKind,
     materialCost,
     materialMode: 'perJob',
     sheets: sheetsForCost(materialCost),
+    sheetsUsed: 0,
+    blockedBy: '',
     bespokeMaterial: enquiry.bespokeMaterial,
     express: enquiry.express,
     byHand: madeByHand,
@@ -134,6 +151,8 @@ export function acceptEnquiry(state: GameState, enquiryId: string, byHand: boole
     acceptedDay: state.clock.day,
     dueDay: state.clock.day + enquiry.deadlineDays,
     stage: 'accepted',
+    finishedDay: null,
+    deliverOnDay: null,
     callsRemaining: callsForPrice(enquiry.price),
     designMinutesRemaining: designMinutes(entry, enquiry.sizeMultiplier, state.software.tier),
     assignedTo: null,
@@ -142,6 +161,7 @@ export function acceptEnquiry(state: GameState, enquiryId: string, byHand: boole
     depositPaid: 0,
     balancePaid: 0,
     penalty: 0,
+    emailsUnanswered: 0,
     rating: null,
     overdueWarned: false,
   };
@@ -157,7 +177,7 @@ export function acceptEnquiry(state: GameState, enquiryId: string, byHand: boole
   return { ok: true, reason: '', job };
 }
 
-/** The calls, the drawing and the site visit the job needs from the owner. */
+/** The calls, the emails, the drawing and the site visit the job needs from the owner. */
 export function createJobTasks(state: GameState, job: Job): void {
   const minutes = clientCallMinutes(job.price);
   for (let index = 0; index < job.callsRemaining; index += 1) {
@@ -165,6 +185,16 @@ export function createJobTasks(state: GameState, job: Job): void {
       kind: 'clientCall',
       label: `Client call ${index + 1} of ${job.callsRemaining}: ${job.name}`,
       minutes,
+      jobId: job.id,
+    });
+  }
+  // Emails ride with the job, in any order with the calls and the drawing, and hold nothing up.
+  const emails = callsForPrice(job.price);
+  for (let index = 0; index < emails; index += 1) {
+    createTask(state, {
+      kind: 'emails',
+      label: `Email ${index + 1} of ${emails}: ${job.name}`,
+      minutes: emailMinutes(),
       jobId: job.id,
     });
   }
@@ -190,6 +220,11 @@ export function createJobTasks(state: GameState, job: Job): void {
 
 function callsOutstanding(state: GameState, job: Job): number {
   return jobTasks(state, job.id).filter((task) => task.kind === 'clientCall' && !task.done).length;
+}
+
+/** Emails the client never got an answer to. They hold nothing up, they just cost at the end. */
+export function emailsOutstanding(state: GameState, job: Job): number {
+  return jobTasks(state, job.id).filter((task) => task.kind === 'emails' && !task.done).length;
 }
 
 function designOutstanding(state: GameState, job: Job): boolean {
@@ -250,8 +285,8 @@ export function canDrawFromStock(state: GameState, job: Job): boolean {
 
 export function onMaterialOrdered(state: GameState, job: Job): void {
   if (canDrawFromStock(state, job)) {
-    state.stock.sheets -= job.sheets;
-    // The sheets were paid for when they were bought, at the cheaper stock price.
+    // The sheets were paid for when they were bought, at the cheaper stock price. They stay on
+    // the rack and come off it as the job is made, like every other job (CLAUDE.md T2 3.6).
     job.materialCost = stockCostFor(job.sheets);
     job.stage = 'ready';
     return;
@@ -345,32 +380,102 @@ export function addLabour(state: GameState, job: Job, labour: number): boolean {
   return true;
 }
 
-/** Late penalties come out of the balance, and the client always pays the rest (CLAUDE.md 8.7). */
+/** The piece is made. It stands in front of the gate until somebody takes it to the client, and
+ *  nothing is paid until it gets there (CLAUDE.md T2 3.7). Who takes it there is a decision, so
+ *  the event that asks is raised by game.ts, the only module that can send a man. */
 export function completeJob(state: GameState, job: Job): void {
+  releaseJob(state, job);
+  job.assignedTo = null;
+  job.stage = 'awaitingTransport';
+  job.finishedDay = state.clock.day;
+  state.dayStats.jobsCompleted.push(job.id);
+}
+
+/** Everything made and not yet taken away. */
+export function jobsAtGate(state: GameState): Job[] {
+  return state.jobs.filter((job) => job.stage === 'awaitingTransport');
+}
+
+/** What ordering transport costs today: a courier, or 90 minutes of somebody with the van. */
+export function transportLabel(state: GameState): string {
+  return has(state, 'van')
+    ? `Take it in the van, ${AD_HOC_TASK_MINUTES.deliver} min`
+    : `Courier ${formatMoney(COURIER_COST)}, next working day`;
+}
+
+/** Books the piece out: the van goes today, a courier comes tomorrow (CLAUDE.md T2 3.7). */
+export function orderTransport(state: GameState, jobId: string): boolean {
+  const job = findJob(state, jobId);
+  if (!job || job.stage !== 'awaitingTransport' || job.deliverOnDay !== null) return false;
+  if (has(state, 'van')) {
+    const open = state.tasks.find(
+      (task) => task.kind === 'deliver' && task.jobId === job.id && !task.done,
+    );
+    if (!open) {
+      createTask(state, {
+        kind: 'deliver',
+        label: `Deliver ${job.name}`,
+        minutes: AD_HOC_TASK_MINUTES.deliver,
+        jobId: job.id,
+      });
+    }
+    return true;
+  }
+  chargeUnavoidable(state, 'transport', `Courier for ${job.name}`, COURIER_COST);
+  job.deliverOnDay = nextWorkingDay(state.clock.day);
+  return true;
+}
+
+/** Late penalties come out of the balance, and the client always pays the rest (CLAUDE.md 8.7).
+ *  The clock on lateness runs to the day the client actually gets the piece. */
+/** What the emails nobody answered take off the payment: 1% of the price each, capped at 5%. */
+export function emailPaymentPenalty(price: number, unanswered: number): number {
+  const fraction = Math.min(EMAIL_PAYMENT_PENALTY_MAX, EMAIL_PAYMENT_PENALTY * unanswered);
+  return Math.round(price * fraction * 100) / 100;
+}
+
+export function deliverJob(state: GameState, job: Job): void {
+  if (job.stage !== 'awaitingTransport') return;
   job.stage = 'completed';
   job.completedDay = state.clock.day;
+  job.deliverOnDay = null;
   job.daysLate = Math.max(0, state.clock.day - job.dueDay);
+  job.emailsUnanswered = emailsOutstanding(state, job);
   const rate = job.express ? LATE_PENALTY_PER_DAY_EXPRESS : LATE_PENALTY_PER_DAY;
   const balanceDue = Math.round(job.price * (1 - DEPOSIT_FRACTION) * 100) / 100;
-  const penalty = Math.min(balanceDue, Math.round(job.daysLate * rate * job.price * 100) / 100);
+  const late = Math.round(job.daysLate * rate * job.price * 100) / 100;
+  const emails = emailPaymentPenalty(job.price, job.emailsUnanswered);
+  const penalty = Math.min(balanceDue, Math.round((late + emails) * 100) / 100);
   job.penalty = penalty;
   job.balancePaid = Math.round((balanceDue - penalty) * 100) / 100;
   receive(state, 'jobBalance', `Balance for ${job.name}`, job.balancePaid);
-  releaseJob(state, job);
-  job.assignedTo = null;
-  job.stage = 'completed';
-  state.dayStats.jobsCompleted.push(job.id);
+  // The unanswered ones are moot once the client has the job: they come off the list.
+  state.tasks = state.tasks.filter((task) => !(task.kind === 'emails' && task.jobId === job.id));
   const rating = applyRating(state, job);
   const lateLine =
-    job.daysLate > 0 ? ` ${job.daysLate} days late, penalty ${formatMoney(penalty)}.` : '';
+    job.daysLate > 0
+      ? ` ${plural(job.daysLate, 'day', 'days')} late.`
+      : '';
+  const emailLine =
+    job.emailsUnanswered > 0
+      ? ` ${plural(job.emailsUnanswered, 'email', 'emails')} never got an answer.`
+      : '';
+  const penaltyLine = penalty > 0 ? ` Penalty ${formatMoney(penalty)}.` : '';
   queueEvent(state, {
     kind: 'jobPaid',
     title: `${job.name} delivered`,
     body:
-      `Balance ${formatMoney(job.balancePaid)} in.${lateLine} The client rates the job ` +
-      `${rating >= 0 ? '+' : ''}${rating}.`,
+      `Balance ${formatMoney(job.balancePaid)} in.${lateLine}${emailLine}${penaltyLine} ` +
+      `The client rates the job ${rating >= 0 ? '+' : ''}${rating}.`,
     data: { jobId: job.id, rating, balance: Math.round(job.balancePaid), late: job.daysLate },
   });
+}
+
+/** The couriers that were booked yesterday turn up. Runs at the start of the day. */
+export function runBookedTransport(state: GameState): void {
+  for (const job of jobsAtGate(state)) {
+    if (job.deliverOnDay !== null && job.deliverOnDay <= state.clock.day) deliverJob(state, job);
+  }
 }
 
 /** Warns once per job when the deadline has gone by. Runs at the start of the day. */

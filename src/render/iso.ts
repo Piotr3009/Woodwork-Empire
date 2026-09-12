@@ -1,12 +1,14 @@
 // Isometric projection helpers. Pure geometry, no SVG and no DOM, so the same numbers can feed a
 // sprite renderer later (CLAUDE.md 10.3).
 //
-// 2:1 dimetric. One tile is 64 by 32 pixels on screen and half a metre by half a metre in the world.
+// 2:1 dimetric. One tile is 48 by 24 pixels on screen and half a metre by half a metre in the
+// world. The tile came down from 64 by 32 in Turn 2 so the whole hall fits on a 1280 px page at
+// one screen pixel per unit, which is what keeps the labels readable (CLAUDE.md T2 3.11).
 
-export const TILE_WIDTH = 64;
-export const TILE_HEIGHT = 32;
+export const TILE_WIDTH = 48;
+export const TILE_HEIGHT = 24;
 /** Pixels of screen height per tile of object height. */
-export const TILE_RISE = 32;
+export const TILE_RISE = 24;
 
 export interface Point {
   x: number;

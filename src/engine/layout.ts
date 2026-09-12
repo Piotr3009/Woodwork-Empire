@@ -1,0 +1,134 @@
+// Where things stand on the hall floor. Pure geometry over the state, so the setup view can ask
+// before it drops and the catalogue can ask before it buys (CLAUDE.md T2 3.10).
+
+import { GATE_LANE_TILES, GATE_LAYOUT, ROOM_LAYOUT } from './constants';
+import { findSpec } from './machines';
+import type { Equipment, GameState } from './types';
+
+export interface PlaceCheck {
+  ok: boolean;
+  reason: string;
+}
+
+export interface Box {
+  x: number;
+  y: number;
+  width: number;
+  depth: number;
+}
+
+const OK: PlaceCheck = { ok: true, reason: '' };
+
+function overlaps(left: Box, right: Box): boolean {
+  return (
+    left.x < right.x + right.width &&
+    right.x < left.x + left.width &&
+    left.y < right.y + right.depth &&
+    right.y < left.y + left.depth
+  );
+}
+
+/** The tiles in front of the gate that nothing may stand on (CLAUDE.md T2 3.10). */
+export function gateLane(state: GameState): Box {
+  return {
+    x: Math.max(0, state.unit.widthTiles - GATE_LANE_TILES),
+    y: GATE_LAYOUT.y,
+    width: GATE_LANE_TILES,
+    depth: GATE_LAYOUT.depth,
+  };
+}
+
+/** Everything standing on the hall floor: what a move can bump into. The office furniture lives
+ *  in the office view and the van stands in the yard, so neither is in the way. */
+export function hallItems(state: GameState): Equipment[] {
+  return state.equipment.filter((item) => {
+    const spec = findSpec(item.specId);
+    if (!spec || spec.category === 'furniture') return false;
+    return item.anchorX < state.unit.widthTiles;
+  });
+}
+
+export function boxOf(specId: string, x: number, y: number): Box {
+  const spec = findSpec(specId);
+  return { x, y, width: spec?.width ?? 1, depth: spec?.depth ?? 1 };
+}
+
+/** Can a thing of this kind stand here? `ignoreItemId` is the item being moved, which never
+ *  collides with itself. */
+export function canPlaceSpec(
+  state: GameState,
+  specId: string,
+  x: number,
+  y: number,
+  ignoreItemId: string | null,
+): PlaceCheck {
+  const spec = findSpec(specId);
+  if (!spec) return { ok: false, reason: 'Not in the catalogue' };
+  const box = boxOf(specId, x, y);
+  if (
+    x < 0 ||
+    y < 0 ||
+    x + spec.width > state.unit.widthTiles ||
+    y + spec.depth > state.unit.depthTiles
+  ) {
+    return { ok: false, reason: 'Off the floor' };
+  }
+  for (const room of ROOM_LAYOUT) {
+    if (overlaps(box, { x: room.x, y: room.y, width: room.width, depth: room.depth })) {
+      return { ok: false, reason: `On the ${room.name.toLowerCase()}` };
+    }
+  }
+  if (overlaps(box, gateLane(state))) {
+    return { ok: false, reason: 'Blocking the way to the gate' };
+  }
+  for (const item of hallItems(state)) {
+    if (item.id === ignoreItemId) continue;
+    const other = findSpec(item.specId);
+    if (!other) continue;
+    if (overlaps(box, { x: item.anchorX, y: item.anchorY, width: other.width, depth: other.depth })) {
+      return { ok: false, reason: `On the ${other.name.toLowerCase()}` };
+    }
+  }
+  return OK;
+}
+
+/** Can this item stand here? */
+export function canPlace(state: GameState, itemId: string, x: number, y: number): PlaceCheck {
+  const item = state.equipment.find((entry) => entry.id === itemId);
+  if (!item) return { ok: false, reason: 'Nothing to move' };
+  const spec = findSpec(item.specId);
+  if (spec?.category === 'furniture') return { ok: false, reason: 'It lives in the office' };
+  if (item.anchorX >= state.unit.widthTiles) return { ok: false, reason: 'It stands in the yard' };
+  return canPlaceSpec(state, item.specId, x, y, item.id);
+}
+
+/** Moves it, or says why not. The man at a bench goes with his bench. */
+export function moveItem(state: GameState, itemId: string, x: number, y: number): PlaceCheck {
+  const check = canPlace(state, itemId, x, y);
+  if (!check.ok) return check;
+  const item = state.equipment.find((entry) => entry.id === itemId);
+  if (!item) return check;
+  const fromX = item.anchorX;
+  const fromY = item.anchorY;
+  item.anchorX = x;
+  item.anchorY = y;
+  for (const worker of state.workers) {
+    if (worker.anchorX === fromX && worker.anchorY === fromY) {
+      worker.anchorX = x;
+      worker.anchorY = y;
+    }
+  }
+  return OK;
+}
+
+/** The first tile, reading along each row in turn, where a thing of this kind fits. */
+export function firstFreeTile(state: GameState, specId: string): { x: number; y: number } | null {
+  const spec = findSpec(specId);
+  if (!spec) return null;
+  for (let y = 0; y + spec.depth <= state.unit.depthTiles; y += 1) {
+    for (let x = 0; x + spec.width <= state.unit.widthTiles; x += 1) {
+      if (canPlaceSpec(state, specId, x, y, null).ok) return { x, y };
+    }
+  }
+  return null;
+}

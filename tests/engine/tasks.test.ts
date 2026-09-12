@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { CLIENT_CALL_MINUTES_CAP, SOFTWARE_DESIGN_FACTOR } from '../../src/engine/constants';
+import {
+  BOOKKEEPING_MINUTES,
+  CLIENT_CALL_MINUTES_CAP,
+  SOFTWARE_DESIGN_FACTOR,
+} from '../../src/engine/constants';
 import { PRODUCT_TEMPLATES } from '../../src/engine/constants';
 import {
   callsForPrice,
@@ -36,6 +40,10 @@ function staff(id: string, role: Worker['role'], monthlyWage: number): Worker {
     startDay: 1,
     jobId: null,
     taskId: null,
+    minutesWorked: 0,
+    ordersToday: 0,
+    station: 'idle',
+    productionMinutes: 0,
     absentDaysRemaining: 0,
     anchorX: 0,
     anchorY: 0,
@@ -98,14 +106,15 @@ describe('minute curves', () => {
 });
 
 describe('the daily list', () => {
-  it('puts emails and bookkeeping on the desk every working day', () => {
+  it('puts the bookkeeping on the desk every working day, and emails no longer', () => {
     const state = newGame();
-    expect(tasksOfKind(state, 'emails')).toHaveLength(1);
+    // Emails belong to a job now, so an empty order book means no emails (CLAUDE.md T2 3.5).
+    expect(tasksOfKind(state, 'emails')).toHaveLength(0);
     expect(tasksOfKind(state, 'bookkeeping')).toHaveLength(1);
     expect(tasksOfKind(state, 'dailyOrdering')).toHaveLength(0);
     const day2 = clearEvents(tick(state, 600));
-    expect(tasksOfKind(day2, 'emails')).toHaveLength(1);
-    expect(day2.tasks.filter((task) => task.kind === 'emails')).toHaveLength(1);
+    expect(tasksOfKind(day2, 'bookkeeping')).toHaveLength(1);
+    expect(day2.tasks.filter((task) => task.kind === 'bookkeeping')).toHaveLength(1);
   });
 
   it('adds the daily ordering only while there are jobs on the books', () => {
@@ -115,19 +124,24 @@ describe('the daily list', () => {
       templateId: 'garageShelves',
       name: 'Garage shelves',
       price: 400,
+      basePrice: 400,
       sizeMultiplier: 1,
       finish: 'laminate',
       materialKind: 'sheet',
       materialCost: 160,
       materialMode: 'perJob',
       sheets: 2,
+      sheetsUsed: 0,
+      blockedBy: '',
       bespokeMaterial: false,
       express: false,
       byHand: false,
       needsMeasure: false,
-        labourValue: 160,
+      labourValue: 160,
       labourRemaining: 160,
-        acceptedDay: 1,
+      acceptedDay: 1,
+      finishedDay: null,
+      deliverOnDay: null,
       dueDay: 11,
       stage: 'accepted',
       callsRemaining: 2,
@@ -138,6 +152,7 @@ describe('the daily list', () => {
       depositPaid: 200,
       balancePaid: 0,
       penalty: 0,
+      emailsUnanswered: 0,
       rating: null,
       overdueWarned: false,
     });
@@ -145,14 +160,21 @@ describe('the daily list', () => {
     expect(tasksOfKind(state, 'dailyOrdering')).toHaveLength(1);
   });
 
-  it('hands the office admin his own tasks so the owner never sees them', () => {
+  it('hands the office admin his own tasks, which he works off out of his own day', () => {
     const state = newGame();
     state.workers.push(staff('a1', 'officeAdmin', 1900));
     const day2 = runToDay(state, 2).state;
-    const emails = day2.tasks.find((task) => task.kind === 'emails');
-    expect(emails?.done).toBe(true);
-    expect(emails?.doneBy).toBe('a1');
-    expect(openTasks(day2).some((task) => task.kind === 'bookkeeping')).toBe(false);
+    const taken = day2.tasks.find((task) => task.kind === 'bookkeeping');
+    expect(taken?.doneBy).toBe('a1');
+    expect(taken?.done).toBe(false);
+    // An hour of his day later, it is done and the owner never touched it.
+    const later = clearEvents(tick(day2, BOOKKEEPING_MINUTES));
+    const books = later.tasks.find((task) => task.kind === 'bookkeeping');
+    expect(books?.done).toBe(true);
+    expect(books?.doneBy).toBe('a1');
+    expect(later.workers[0]?.minutesWorked).toBe(BOOKKEEPING_MINUTES);
+    expect(later.owner.minutesWorked).toBe(0);
+    expect(openTasks(later).some((task) => task.kind === 'bookkeeping')).toBe(false);
   });
 });
 

@@ -84,6 +84,17 @@ describe('fatigue', () => {
     const day3 = nextDay(day2);
     expect(day3.owner.fatigue).toBe(0);
   });
+
+  it('charges a part hour pro rata: 30 minutes of overtime cost 0.025', () => {
+    let state = withLicence(newGame());
+    const task = createTask(state, { kind: 'design', label: 'Long drawing', minutes: 900 });
+    state = act(state, { type: 'START_TASK', taskId: task.id });
+    state = tick(state, 510);
+    expect(state.owner.overtimeMinutes).toBe(30);
+    const day2 = clearEvents(act(state, { type: 'END_DAY' }));
+    expect(day2.owner.fatigue).toBeCloseTo(FATIGUE_PER_OVERTIME_HOUR / 2, 10);
+    expect(day2.owner.fatigue).toBe(0.025);
+  });
 });
 
 describe('absence', () => {
@@ -107,9 +118,8 @@ describe('absence', () => {
     const task = createTask(state, { kind: 'emails', label: 'Emails', minutes: 60 });
     state = act(state, { type: 'START_TASK', taskId: task.id });
     expect(state.owner.currentTaskId).toBeNull();
-    state = tick(state, 500);
-    // Nobody is there to work the overtime, so the day closes itself at 16:00.
-    expect(state.clock.minute).toBe(480);
+    // Nobody is in the hall, so the day is over the moment it is taken off (Turn 2 brief 3.1).
+    expect(state.clock.minute).toBe(0);
     expect(state.activeEvent?.kind).toBe('dayEnd');
     const day2 = clearEvents(state);
     expect(day2.owner.present).toBe(true);

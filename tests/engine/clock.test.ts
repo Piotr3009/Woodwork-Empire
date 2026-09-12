@@ -18,6 +18,13 @@ import {
   weekdayName,
   yearOfDay,
 } from '../../src/engine/clock';
+import { MINUTES_PER_WORKING_DAY, REAL_SECONDS_PER_DAY_AT_1X } from '../../src/engine/constants';
+
+describe('the real time the clock runs at', () => {
+  it('takes 480 real seconds for one game day at 1x', () => {
+    expect(REAL_SECONDS_PER_DAY_AT_1X).toBe(480);
+  });
+});
 
 describe('clock calendar', () => {
   it('starts on a Monday', () => {
@@ -92,9 +99,12 @@ describe('clock time of day', () => {
     expect(isDayExhausted(720)).toBe(true);
   });
 
-  it('converts speed into game minutes', () => {
+  it('runs one game minute per real second at 1x, so a day is 8 real minutes', () => {
     expect(gameMinutesPerRealSecond(0)).toBe(0);
-    expect(gameMinutesPerRealSecond(1)).toBeCloseTo(480 / 180, 6);
-    expect(gameMinutesPerRealSecond(4)).toBeCloseTo((480 / 180) * 4, 6);
+    expect(gameMinutesPerRealSecond(1)).toBe(1);
+    expect(gameMinutesPerRealSecond(2)).toBe(2);
+    expect(gameMinutesPerRealSecond(4)).toBe(4);
+    expect(MINUTES_PER_WORKING_DAY / gameMinutesPerRealSecond(1) / 60).toBe(8);
+    expect(MINUTES_PER_WORKING_DAY / gameMinutesPerRealSecond(4) / 60).toBe(2);
   });
 });

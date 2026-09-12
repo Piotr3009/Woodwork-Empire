@@ -12,12 +12,21 @@ import {
   tileToScreen,
 } from '../../src/render/iso';
 
+describe('the tile', () => {
+  it('is 48 by 24, so the biggest hall fits on a 1280 px page (CLAUDE.md T2 3.11)', () => {
+    expect(TILE_WIDTH).toBe(48);
+    expect(TILE_HEIGHT).toBe(24);
+    expect(TILE_RISE).toBe(24);
+    expect(TILE_WIDTH / TILE_HEIGHT).toBe(2);
+  });
+});
+
 describe('the projection', () => {
   it('puts the origin at the origin', () => {
     expect(tileToScreen(0, 0)).toEqual({ x: 0, y: 0 });
   });
 
-  it('is 2:1 dimetric on a 64 by 32 tile', () => {
+  it('is 2:1 dimetric on a 48 by 24 tile', () => {
     expect(tileToScreen(1, 0)).toEqual({ x: TILE_WIDTH / 2, y: TILE_HEIGHT / 2 });
     expect(tileToScreen(0, 1)).toEqual({ x: -TILE_WIDTH / 2, y: TILE_HEIGHT / 2 });
     expect(tileToScreen(1, 1)).toEqual({ x: 0, y: TILE_HEIGHT });

@@ -6,13 +6,32 @@ import {
   applyAction,
   createGame,
   gameMinutesPerRealSecond,
-  machinesStopped,
+  brokenMachines,
+  findSpec,
+  machinesDueService,
   oldestReadyJob,
   ownerJob,
-  tick,
+  runMinutes,
 } from '../engine/index';
-import type { Difficulty, GameAction, GameState, WorkerRole, WorkerTier } from '../engine/index';
+import type {
+  Difficulty,
+  GameAction,
+  GameState,
+  Speed,
+  WorkerRole,
+  WorkerTier,
+} from '../engine/index';
+import type { Ghost } from '../render/hall';
+
+/** The item under the mouse while the hall is being set out. */
+interface Drag {
+  itemId: string;
+  x: number;
+  y: number;
+}
+import { WHY, boxOf, canPlace } from '../engine/index';
 import { renderHall } from '../render/hall';
+import { screenToTile } from '../render/iso';
 import { renderOffice } from '../render/office';
 import { renderAccounting } from './accounting';
 import { renderBoard } from './board';
@@ -30,6 +49,8 @@ import {
   renderModal,
 } from './modal';
 import { renderStart } from './start';
+import { cloudAvailable } from '../cloud/supabase';
+import { hasSave, loadGame, saveGame, sendMagicLink, signOut, signedInEmail } from '../cloud/saves';
 import { renderMenu, renderTopbar, speedFromString } from './topbar';
 
 type ModalId = 'board' | 'laptop' | 'accounting' | 'catalogue' | 'hiring' | 'materials';
@@ -46,6 +67,21 @@ interface Ui {
   /** Field to put the caret back in after the next render. */
   focusNext: string | null;
   stockSheets: string;
+  arrearsAmount: string;
+  /** Setting the hall out: the clock is stopped and the kit can be dragged about. */
+  setup: boolean;
+  speedBeforeSetup: Speed;
+  drag: Drag | null;
+  showWhy: boolean;
+  /** The real life note the player has open, and where he clicked for it. */
+  why: { key: string; left: number; top: number } | null;
+  cloud: {
+    available: boolean;
+    email: string;
+    signedIn: string | null;
+    hasSave: boolean;
+    note: string;
+  };
   difficulty: Difficulty;
   playerName: string;
   companyName: string;
@@ -78,6 +114,19 @@ function freshUi(): Ui {
     filters: { board: '', catalogue: '' },
     focusNext: null,
     stockSheets: '6',
+    arrearsAmount: '500',
+    setup: false,
+    speedBeforeSetup: 0,
+    drag: null,
+    showWhy: true,
+    why: null,
+    cloud: {
+      available: cloudAvailable(),
+      email: '',
+      signedIn: null,
+      hasSave: false,
+      note: '',
+    },
     difficulty: 'easy',
     playerName: 'Piotr',
     companyName: 'Woodwork Empire',
@@ -91,6 +140,7 @@ function game(): GameState {
 
 function dispatch(action: GameAction): void {
   state = applyAction(game(), action);
+  autosave();
   render();
 }
 
@@ -105,7 +155,7 @@ function modalBody(id: ModalId, current: GameState): string {
     case 'laptop':
       return renderLaptop(current);
     case 'accounting':
-      return renderAccounting(current);
+      return renderAccounting(current, ui.arrearsAmount);
     case 'catalogue':
       return renderCatalogue(current, ui.filters.catalogue ?? '');
     case 'hiring':
@@ -115,7 +165,29 @@ function modalBody(id: ModalId, current: GameState): string {
   }
 }
 
+/** The ghost of the item being dragged, with the engine's verdict on the tile under the mouse. */
+function ghostFor(current: GameState): Ghost | null {
+  const drag = ui.drag;
+  if (drag === null) return null;
+  const item = current.equipment.find((entry) => entry.id === drag.itemId);
+  if (!item) return null;
+  const box = boxOf(item.specId, drag.x, drag.y);
+  const check = canPlace(current, drag.itemId, drag.x, drag.y);
+  return { x: box.x, y: box.y, width: box.width, depth: box.depth, ok: check.ok, reason: check.reason };
+}
+
+function setupControls(): string {
+  return (
+    '<div class="view-controls">' +
+    '<button class="btn btn-primary" data-do="endSetup">Done</button>' +
+    '<span class="reason">Drag the machines, the benches and the shelving where you want them. ' +
+    'The rooms and the gate stay where they are.</span>' +
+    '</div>'
+  );
+}
+
 function hallControls(current: GameState): string {
+  if (ui.setup) return setupControls();
   const ready = oldestReadyJob(current);
   const working = ownerJob(current) !== null;
   const workHere = working
@@ -123,16 +195,47 @@ function hallControls(current: GameState): string {
     : ready
       ? '<button class="btn btn-primary" data-do="workHere">Work here</button>'
       : reasonLabel('No job has its material in the hall yet');
-  const fix = machinesStopped(current)
-    ? '<button class="btn" data-do="repairExtractor">Fix extractor</button>'
-    : '';
+  const name = (specId: string): string =>
+    (findSpec(specId)?.name ?? specId).toLowerCase();
+  const fix = brokenMachines(current)
+    .map(
+      (item) =>
+        `<button class="btn" data-do="repairMachine" data-id="${item.id}">` +
+        `Fix the ${escapeHtml(name(item.specId))}</button>`,
+    )
+    .join('');
+  const service = machinesDueService(current)
+    .filter((item) => !item.broken)
+    .map(
+      (item) =>
+        `<button class="btn" data-do="serviceMachine" data-id="${item.id}">` +
+        `Service the ${escapeHtml(name(item.specId))}</button>`,
+    )
+    .join('');
   return (
     '<div class="view-controls">' +
     workHere +
     '<button class="btn" data-do="startCleaning">Clean up · ' +
     `${minutes(CLEANING_MINUTES)}</button>` +
+    '<button class="btn" data-do="startSetup">Set up hall</button>' +
     fix +
+    service +
     '</div>'
+  );
+}
+
+/** The little popover behind an "i" link (CLAUDE.md T2 3.12). */
+function renderWhy(): string {
+  const open = ui.why;
+  if (open === null) return '';
+  const text = WHY[open.key];
+  if (text === undefined) return '';
+  const width = typeof window === 'undefined' ? 1280 : window.innerWidth;
+  const left = Math.max(8, Math.min(open.left, Math.max(8, width - 340)));
+  return (
+    `<div class="why-pop" style="left:${left}px;top:${open.top + 16}px">` +
+    `<p>${escapeHtml(text)}</p>` +
+    '<button class="btn" data-do="closeWhy">Right</button></div>'
   );
 }
 
@@ -142,6 +245,8 @@ function screenHtml(): string {
       difficulty: ui.difficulty,
       playerName: ui.playerName,
       companyName: ui.companyName,
+      showWhy: ui.showWhy,
+      cloud: ui.cloud,
     });
   }
   const current = state;
@@ -154,6 +259,7 @@ function screenHtml(): string {
           title: MODAL_TITLES[ui.modal],
           body: modalBody(ui.modal, current),
           wide: ui.modal === 'accounting',
+          full: ui.modal === 'board',
         },
         ui.modalPosition,
       ),
@@ -166,7 +272,7 @@ function screenHtml(): string {
         {
           id: 'event',
           title: event.title,
-          body: event.kind === 'dayEnd' ? renderDayEnd(current) : renderEvent(event),
+          body: event.kind === 'dayEnd' ? renderDayEnd(current) : renderEvent(current, event),
           footer: renderEventFooter(event),
           closable: event.choices.length === 1,
           wide: event.kind === 'dayEnd',
@@ -179,14 +285,15 @@ function screenHtml(): string {
   if (current.gameOver) {
     return renderGameOver(current) + `<div class="modal-layer">${modals.join('')}</div>`;
   }
-  const view = ui.view === 'hall' ? renderHall(current) : renderOffice(current);
+  const view = ui.view === 'hall' ? renderHall(current, ghostFor(current)) : renderOffice(current);
   const controls = ui.view === 'hall' ? hallControls(current) : '';
   const note = ui.note === '' ? '' : `<p class="view-note">${escapeHtml(ui.note)}</p>`;
+  const why = renderWhy();
   return (
     renderTopbar(current, ui.view) +
-    (ui.menuOpen ? renderMenu(current) : '') +
+    (ui.menuOpen ? renderMenu(current, ui.cloud) : '') +
     `<main class="view">${view}${controls}${note}</main>` +
-    `<div class="modal-layer">${modals.join('')}</div>`
+    `<div class="modal-layer">${modals.join('')}</div>${why}`
   );
 }
 
@@ -213,11 +320,96 @@ function restoreFocus(memory: FocusMemory | null): void {
   }
 }
 
+/** How long a figure takes to walk from one station to the next [TUNE]. */
+const FIGURE_SLIDE_MS = 800;
+
+interface Point {
+  x: number;
+  y: number;
+}
+
+/** Who is walking where, and when he set off. The view is rebuilt from the state many times a
+ *  second, so the walk has to be remembered here or it would start again from nothing on every
+ *  rebuild and never finish (CLAUDE.md T2 3.3). */
+const slides = new Map<string, { from: Point; to: Point; startedAt: number }>();
+
+function translateOf(point: Point): string {
+  return `translate(${Math.round(point.x)},${Math.round(point.y)})`;
+}
+
+function pointOf(transform: string): Point | null {
+  const found = /translate\(\s*(-?[\d.]+)[\s,]+(-?[\d.]+)\s*\)/.exec(transform);
+  const x = Number(found?.[1]);
+  const y = Number(found?.[2]);
+  if (found === null || Number.isNaN(x) || Number.isNaN(y)) return null;
+  return { x, y };
+}
+
+/** How far along the walk he is now. */
+function positionAt(slide: { from: Point; to: Point; startedAt: number }, now: number): Point {
+  const part = Math.min(1, Math.max(0, (now - slide.startedAt) / FIGURE_SLIDE_MS));
+  return {
+    x: slide.from.x + (slide.to.x - slide.from.x) * part,
+    y: slide.from.y + (slide.to.y - slide.from.y) * part,
+  };
+}
+
+function nowMs(): number {
+  return typeof performance === 'undefined' ? 0 : performance.now();
+}
+
+/** Puts every figure back where he had actually got to, and lets the browser carry him the rest
+ *  of the way in what is left of the 0.8 s. */
+function slideFigures(now: number): void {
+  if (!root) return;
+  const moving: Array<{ node: Element; to: Point }> = [];
+  const seen = new Set<string>();
+  for (const node of Array.from(root.querySelectorAll('[data-figure]'))) {
+    const key = node.getAttribute('data-figure');
+    const to = pointOf(node.getAttribute('transform') ?? '');
+    if (key === null || to === null) continue;
+    seen.add(key);
+    const walking = slides.get(key);
+    if (walking === undefined) {
+      // First sight of him: he is where he is, and nothing is left to walk.
+      slides.set(key, { from: to, to, startedAt: now - FIGURE_SLIDE_MS });
+      continue;
+    }
+    const at = positionAt(walking, now);
+    if (walking.to.x !== to.x || walking.to.y !== to.y) {
+      // He has been sent somewhere else, and he sets off from wherever he had got to.
+      slides.set(key, { from: at, to, startedAt: now });
+    } else if (at.x === to.x && at.y === to.y) {
+      continue;
+    }
+    const started = slides.get(key)?.startedAt ?? now;
+    const left = Math.max(0, FIGURE_SLIDE_MS - (now - started));
+    if (node instanceof SVGElement || node instanceof HTMLElement) {
+      node.style.transitionDuration = `${Math.round(left)}ms`;
+    }
+    node.setAttribute('transform', translateOf(at));
+    moving.push({ node, to });
+  }
+  for (const key of Array.from(slides.keys())) {
+    if (!seen.has(key)) slides.delete(key);
+  }
+  if (moving.length === 0) return;
+  const step = (): void => {
+    for (const entry of moving) entry.node.setAttribute('transform', translateOf(entry.to));
+  };
+  if (typeof requestAnimationFrame === 'function') {
+    requestAnimationFrame(step);
+  } else {
+    step();
+  }
+}
+
 export function render(): void {
   if (!root) return;
   const memory = ui.focusNext === null ? captureFocus() : { key: ui.focusNext, start: null };
   ui.focusNext = null;
   root.innerHTML = screenHtml();
+  slideFigures(nowMs());
   restoreFocus(memory);
 }
 
@@ -227,7 +419,9 @@ export function render(): void {
 
 function openModal(id: ModalId, anchor: { x: number; y: number } | null): void {
   ui.modal = id;
-  ui.modalPosition = anchor === null ? null : clampToViewport(anchor.x + 24, anchor.y - 40);
+  // The board fills the page, so it is always centred (CLAUDE.md T2 3.2).
+  const beside = anchor === null || id === 'board' ? null : clampToViewport(anchor.x + 24, anchor.y - 40);
+  ui.modalPosition = beside;
   ui.menuOpen = false;
 }
 
@@ -288,6 +482,7 @@ function handleAction(element: DataElement, point: { x: number; y: number }): vo
         difficulty: ui.difficulty,
         playerName: ui.playerName.trim() === '' ? 'Piotr' : ui.playerName.trim(),
         companyName: ui.companyName.trim() === '' ? 'Woodwork Empire' : ui.companyName.trim(),
+        showWhy: ui.showWhy,
       });
       ui.screen = 'game';
       accumulator = 0;
@@ -301,22 +496,52 @@ function handleAction(element: DataElement, point: { x: number; y: number }): vo
       return;
     case 'setView':
       ui.view = element.dataset.view === 'office' ? 'office' : 'hall';
+      if (ui.view !== 'hall') endSetup();
       break;
+    case 'startSetup':
+      ui.setup = true;
+      ui.drag = null;
+      ui.speedBeforeSetup = game().speed;
+      dispatch({ type: 'SET_SPEED', speed: 0 });
+      return;
+    case 'endSetup':
+      endSetup();
+      return;
     case 'toggleMenu':
       ui.menuOpen = !ui.menuOpen;
+      break;
+    case 'toggleWhy':
+      ui.showWhy = !game().showWhy;
+      ui.menuOpen = false;
+      ui.why = null;
+      dispatch({ type: 'SET_SHOW_WHY', on: ui.showWhy });
+      return;
+    case 'showWhy':
+      ui.why =
+        ui.why !== null && ui.why.key === id
+          ? null
+          : { key: id, left: Math.round(point.x), top: Math.round(point.y) };
+      break;
+    case 'closeWhy':
+      ui.why = null;
       break;
     case 'openModal':
       openModal((element.dataset.modal ?? 'board') as ModalId, null);
       break;
-    case 'closeModal':
-      if (game().activeEvent && game().activeEvent?.choices.length === 1) {
-        const choice = game().activeEvent?.choices[0];
+    case 'closeModal': {
+      // The cross on the event modal is the one choice it has. The cross on anything else just
+      // shuts that modal: the event is still there behind it.
+      const inEvent = element.closest('[data-modal]')?.getAttribute('data-modal') === 'event';
+      const event = game().activeEvent;
+      if (inEvent && event !== null && event.choices.length === 1) {
+        const choice = event.choices[0];
         dispatch({ type: 'RESOLVE_EVENT', choiceId: choice ? choice.id : 'ok' });
         return;
       }
       ui.modal = null;
       ui.modalPosition = null;
       break;
+    }
     case 'clearFilter': {
       const key = element.dataset.key ?? '';
       ui.filters[key] = '';
@@ -354,6 +579,21 @@ function handleAction(element: DataElement, point: { x: number; y: number }): vo
     case 'buyStock':
       dispatch({ type: 'BUY_STOCK', sheets: Number(element.dataset.sheets ?? '0') });
       return;
+    case 'orderTransport':
+      dispatch({ type: 'ORDER_TRANSPORT', jobId: id });
+      return;
+    case 'startProduction':
+      // Straight to the bench: the laptop closes and the hall comes up (CLAUDE.md T2 3.3).
+      ui.modal = null;
+      ui.modalPosition = null;
+      ui.view = 'hall';
+      dispatch({ type: 'WORK_HERE', jobId: id });
+      return;
+    case 'payArrears': {
+      const typed = element.dataset.amount ?? 'all';
+      dispatch({ type: 'PAY_ARREARS', amount: typed === 'all' ? null : Number(typed) });
+      return;
+    }
     case 'setMaterialMode':
       dispatch({
         type: 'SET_MATERIAL_MODE',
@@ -379,8 +619,11 @@ function handleAction(element: DataElement, point: { x: number; y: number }): vo
     case 'startCleaning':
       dispatch({ type: 'START_CLEANING' });
       return;
-    case 'repairExtractor':
-      dispatch({ type: 'REPAIR_EXTRACTOR' });
+    case 'repairMachine':
+      dispatch({ type: 'REPAIR_MACHINE', equipmentId: id });
+      return;
+    case 'serviceMachine':
+      dispatch({ type: 'SERVICE_MACHINE', equipmentId: id });
       return;
     case 'resolveEvent':
       ui.eventPosition = null;
@@ -389,11 +632,83 @@ function handleAction(element: DataElement, point: { x: number; y: number }): vo
     case 'copyState':
       copyState();
       break;
+    case 'signIn':
+      void runCloud(async () => (await sendMagicLink(ui.cloud.email)).note);
+      break;
+    case 'signOut':
+      void runCloud(async () => {
+        await signOut();
+        return 'Signed out.';
+      });
+      break;
+    case 'saveGame':
+      ui.menuOpen = false;
+      void runCloud(async () => (await saveGame(game())).note);
+      break;
+    case 'loadGame':
+      ui.menuOpen = false;
+      void runCloud(async () => {
+        const result = await loadGame();
+        if (result.state !== null) {
+          state = result.state;
+          ui.screen = 'game';
+        }
+        return result.note;
+      });
+      break;
+    case 'continueGame':
+      void runCloud(async () => {
+        const result = await loadGame();
+        if (result.state !== null) {
+          state = result.state;
+          ui.screen = 'game';
+          accumulator = 0;
+        }
+        return result.note;
+      });
+      break;
     default:
       break;
   }
   void point;
   render();
+}
+
+/** Every cloud call goes through here: it runs, it leaves a line, and it renders again. */
+async function runCloud(work: () => Promise<string>): Promise<void> {
+  if (!ui.cloud.available) return;
+  ui.cloud.note = 'Working.';
+  render();
+  try {
+    ui.cloud.note = await work();
+  } catch {
+    ui.cloud.note = 'The save service did not answer. Try again in a moment.';
+  }
+  await refreshCloud();
+  render();
+}
+
+/** Who is signed in, and is there anything to come back to. */
+async function refreshCloud(): Promise<void> {
+  if (!ui.cloud.available) return;
+  try {
+    ui.cloud.signedIn = await signedInEmail();
+    ui.cloud.hasSave = ui.cloud.signedIn === null ? false : await hasSave();
+  } catch {
+    ui.cloud.signedIn = null;
+    ui.cloud.hasSave = false;
+  }
+}
+
+/** Slot 1 keeps up with the end of every day, once the player is signed in (T2 3.14). */
+let autosavedDay = 0;
+
+function autosave(): void {
+  if (!ui.cloud.available || ui.cloud.signedIn === null || state === null) return;
+  if (state.activeEvent?.kind !== 'dayEnd') return;
+  if (autosavedDay === state.clock.day) return;
+  autosavedDay = state.clock.day;
+  void runCloud(async () => (await saveGame(game())).note);
 }
 
 function newSeed(): number {
@@ -412,6 +727,8 @@ function copyState(): void {
 }
 
 function handleSceneClick(element: DataElement, point: { x: number; y: number }): boolean {
+  // In setup mode a click on the kit is a drag, not a question about the bag.
+  if (ui.setup) return true;
   const room = element.dataset.room;
   if (room !== undefined) {
     if (room === 'office') {
@@ -489,16 +806,43 @@ function onInput(event: Event): void {
     return;
   }
   const field = target.dataset.field;
+  if (field === 'cloudEmail') {
+    ui.cloud.email = target.value;
+    return;
+  }
+  if (field === 'showWhy') {
+    ui.showWhy = target.checked;
+    render();
+    return;
+  }
   if (field === 'playerName') ui.playerName = target.value;
   if (field === 'companyName') ui.companyName = target.value;
   if (field === 'stockSheets') {
     ui.stockSheets = target.value;
     render();
   }
+  if (field === 'arrearsAmount') {
+    ui.arrearsAmount = target.value;
+    render();
+  }
+}
+
+/** Leaving setup mode always starts the clock again at the speed it was stopped at. */
+function endSetup(): void {
+  if (!ui.setup) return;
+  ui.setup = false;
+  ui.drag = null;
+  dispatch({ type: 'SET_SPEED', speed: ui.speedBeforeSetup });
 }
 
 function onKeyDown(event: KeyboardEvent): void {
   if (event.key !== 'Escape') return;
+  // Escape drops whatever is in hand before it closes anything (CLAUDE.md T2 3.10).
+  if (ui.drag !== null) {
+    ui.drag = null;
+    render();
+    return;
+  }
   if (ui.modal !== null) {
     ui.modal = null;
     ui.modalPosition = null;
@@ -506,8 +850,75 @@ function onKeyDown(event: KeyboardEvent): void {
   }
 }
 
+/** The tile under the mouse, read through the hall SVG's own view box. */
+function tileUnder(event: MouseEvent): { x: number; y: number } | null {
+  if (!root) return null;
+  const svg = root.querySelector('.hall-view');
+  if (!(svg instanceof SVGSVGElement)) return null;
+  const viewBox = (svg.getAttribute('viewBox') ?? '').split(' ').map(Number);
+  const [minX, minY, width, height] = viewBox;
+  if (minX === undefined || minY === undefined || width === undefined || height === undefined) {
+    return null;
+  }
+  const rect = svg.getBoundingClientRect();
+  if (rect.width === 0 || rect.height === 0) return null;
+  const userX = ((event.clientX - rect.left) / rect.width) * width + minX;
+  const userY = ((event.clientY - rect.top) / rect.height) * height + minY;
+  const tile = screenToTile(userX, userY);
+  return { x: Math.floor(tile.x), y: Math.floor(tile.y) };
+}
+
+/** Dragging a machine about while the hall is being set out (CLAUDE.md T2 3.10). */
+function onSetupPointerDown(event: MouseEvent): boolean {
+  if (!ui.setup || state === null) return false;
+  const target = event.target;
+  if (!(target instanceof Element)) return false;
+  const kit = target.closest('[data-kit]');
+  if (kit === null) return false;
+  const itemId = kit.getAttribute('data-kit');
+  if (itemId === null) return false;
+  const item = state.equipment.find((entry) => entry.id === itemId);
+  if (item === undefined) return false;
+  const at = tileUnder(event);
+  if (at === null) return false;
+  // He has hold of it where he took hold of it, not by its corner.
+  const offsetX = item.anchorX - at.x;
+  const offsetY = item.anchorY - at.y;
+  let moved = false;
+  ui.drag = { itemId, x: item.anchorX, y: item.anchorY };
+  const move = (moveEvent: MouseEvent): void => {
+    if (ui.drag === null) return;
+    const tile = tileUnder(moveEvent);
+    if (tile === null) return;
+    const x = tile.x + offsetX;
+    const y = tile.y + offsetY;
+    if (x === ui.drag.x && y === ui.drag.y) return;
+    moved = true;
+    ui.drag = { itemId: ui.drag.itemId, x, y };
+    render();
+  };
+  const up = (): void => {
+    window.removeEventListener('mousemove', move);
+    window.removeEventListener('mouseup', up);
+    const drag = ui.drag;
+    ui.drag = null;
+    // A click that never moved is not a move: it leaves the hall exactly as it was.
+    if (drag === null || !moved) {
+      render();
+      return;
+    }
+    dispatch({ type: 'MOVE_ITEM', itemId: drag.itemId, x: drag.x, y: drag.y });
+  };
+  window.addEventListener('mousemove', move);
+  window.addEventListener('mouseup', up);
+  event.preventDefault();
+  render();
+  return true;
+}
+
 /** Modals are dragged by their header (CLAUDE.md 3.9). */
 function onPointerDown(event: MouseEvent): void {
+  if (onSetupPointerDown(event)) return;
   const target = event.target;
   if (!(target instanceof Element)) return;
   const head = target.closest('[data-drag]');
@@ -542,11 +953,15 @@ function onPointerDown(event: MouseEvent): void {
 }
 
 /** One step of the loop: whole game minutes into the engine, fractions stay in the UI
- *  (CLAUDE.md 4). The frame callback and the smoke test both come through here. */
-export function advanceMinutes(wholeMinutes: number): void {
-  if (state === null || wholeMinutes <= 0) return;
-  state = tick(state, wholeMinutes);
+ *  (CLAUDE.md 4). The frame callback and the smoke test both come through here. Hands back the
+ *  minutes that actually ran, so an event opening part way through loses none. */
+export function advanceMinutes(wholeMinutes: number): number {
+  if (state === null || wholeMinutes <= 0) return 0;
+  const result = runMinutes(state, wholeMinutes);
+  state = result.state;
+  autosave();
   render();
+  return result.minutesRun;
 }
 
 function frame(now: number): void {
@@ -557,10 +972,8 @@ function frame(now: number): void {
     if (perSecond > 0 && state.activeEvent === null) {
       accumulator += (elapsed / 1000) * perSecond;
       const whole = Math.floor(accumulator);
-      if (whole > 0) {
-        accumulator -= whole;
-        advanceMinutes(whole);
-      }
+      // Only what the engine actually ran leaves the accumulator: the rest waits for the modal.
+      if (whole > 0) accumulator -= advanceMinutes(whole);
     }
   }
   requestAnimationFrame(frame);
@@ -568,6 +981,7 @@ function frame(now: number): void {
 
 export function mount(element: HTMLElement): void {
   root = element;
+  void refreshCloud().then(render);
   element.addEventListener('click', onClick);
   element.addEventListener('input', onInput);
   element.addEventListener('mousedown', onPointerDown);
