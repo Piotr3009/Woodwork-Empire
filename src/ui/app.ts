@@ -29,7 +29,7 @@ interface Drag {
   x: number;
   y: number;
 }
-import { boxOf, canPlace } from '../engine/index';
+import { WHY, boxOf, canPlace } from '../engine/index';
 import { renderHall } from '../render/hall';
 import { screenToTile } from '../render/iso';
 import { renderOffice } from '../render/office';
@@ -70,6 +70,9 @@ interface Ui {
   setup: boolean;
   speedBeforeSetup: Speed;
   drag: Drag | null;
+  showWhy: boolean;
+  /** The real life note the player has open, and where he clicked for it. */
+  why: { key: string; left: number; top: number } | null;
   difficulty: Difficulty;
   playerName: string;
   companyName: string;
@@ -106,6 +109,8 @@ function freshUi(): Ui {
     setup: false,
     speedBeforeSetup: 0,
     drag: null,
+    showWhy: true,
+    why: null,
     difficulty: 'easy',
     playerName: 'Piotr',
     companyName: 'Woodwork Empire',
@@ -202,12 +207,27 @@ function hallControls(current: GameState): string {
   );
 }
 
+/** The little popover behind an "i" link (CLAUDE.md T2 3.12). */
+function renderWhy(): string {
+  const open = ui.why;
+  if (open === null) return '';
+  const text = WHY[open.key];
+  if (text === undefined) return '';
+  const left = Math.max(8, Math.min(open.left, 1280 - 340));
+  return (
+    `<div class="why-pop" style="left:${left}px;top:${open.top + 16}px">` +
+    `<p>${escapeHtml(text)}</p>` +
+    '<button class="btn" data-do="closeWhy">Right</button></div>'
+  );
+}
+
 function screenHtml(): string {
   if (ui.screen === 'start' || state === null) {
     return renderStart({
       difficulty: ui.difficulty,
       playerName: ui.playerName,
       companyName: ui.companyName,
+      showWhy: ui.showWhy,
     });
   }
   const current = state;
@@ -233,7 +253,7 @@ function screenHtml(): string {
         {
           id: 'event',
           title: event.title,
-          body: event.kind === 'dayEnd' ? renderDayEnd(current) : renderEvent(event),
+          body: event.kind === 'dayEnd' ? renderDayEnd(current) : renderEvent(current, event),
           footer: renderEventFooter(event),
           closable: event.choices.length === 1,
           wide: event.kind === 'dayEnd',
@@ -249,11 +269,12 @@ function screenHtml(): string {
   const view = ui.view === 'hall' ? renderHall(current, ghostFor(current)) : renderOffice(current);
   const controls = ui.view === 'hall' ? hallControls(current) : '';
   const note = ui.note === '' ? '' : `<p class="view-note">${escapeHtml(ui.note)}</p>`;
+  const why = renderWhy();
   return (
     renderTopbar(current, ui.view) +
     (ui.menuOpen ? renderMenu(current) : '') +
     `<main class="view">${view}${controls}${note}</main>` +
-    `<div class="modal-layer">${modals.join('')}</div>`
+    `<div class="modal-layer">${modals.join('')}</div>${why}`
   );
 }
 
@@ -396,6 +417,7 @@ function handleAction(element: DataElement, point: { x: number; y: number }): vo
         difficulty: ui.difficulty,
         playerName: ui.playerName.trim() === '' ? 'Piotr' : ui.playerName.trim(),
         companyName: ui.companyName.trim() === '' ? 'Woodwork Empire' : ui.companyName.trim(),
+        showWhy: ui.showWhy,
       });
       ui.screen = 'game';
       accumulator = 0;
@@ -423,6 +445,21 @@ function handleAction(element: DataElement, point: { x: number; y: number }): vo
       return;
     case 'toggleMenu':
       ui.menuOpen = !ui.menuOpen;
+      break;
+    case 'toggleWhy':
+      ui.showWhy = !game().showWhy;
+      ui.menuOpen = false;
+      ui.why = null;
+      dispatch({ type: 'SET_SHOW_WHY', on: ui.showWhy });
+      return;
+    case 'showWhy':
+      ui.why =
+        ui.why !== null && ui.why.key === id
+          ? null
+          : { key: id, left: Math.round(point.x), top: Math.round(point.y) };
+      break;
+    case 'closeWhy':
+      ui.why = null;
       break;
     case 'openModal':
       openModal((element.dataset.modal ?? 'board') as ModalId, null);
@@ -628,6 +665,11 @@ function onInput(event: Event): void {
     return;
   }
   const field = target.dataset.field;
+  if (field === 'showWhy') {
+    ui.showWhy = target.checked;
+    render();
+    return;
+  }
   if (field === 'playerName') ui.playerName = target.value;
   if (field === 'companyName') ui.companyName = target.value;
   if (field === 'stockSheets') {

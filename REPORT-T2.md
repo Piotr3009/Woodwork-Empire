@@ -54,6 +54,10 @@ T2-12 Audit fixes. The hall and the office draw at one screen pixel per unit wit
 so no label is ever scaled down; the job name is printed once on every row; and there is one plural
 helper in the engine that the UI re-exports.
 
+T2-13 Why strings. Twelve real life notes live in engine/constants.ts as WHY, reachable from an "i"
+text link on the event modal and on the Accounting rows that have one, with a small popover. The
+start screen carries a "Show real-life notes" checkbox, on by default, and the Menu toggles it.
+
 ## 2. Not done or partial
 
 ## 3. Tests

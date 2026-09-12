@@ -18,6 +18,7 @@ const sample: GameState = createGame({
   difficulty: 'easy',
   playerName: 'Piotr',
   companyName: 'Woodwork Empire',
+  showWhy: true,
 });
 
 describe('GameState', () => {

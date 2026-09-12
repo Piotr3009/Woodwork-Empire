@@ -16,6 +16,7 @@ export const DEFAULT_OPTIONS: NewGameOptions = {
   difficulty: 'easy',
   playerName: 'Piotr',
   companyName: 'Woodwork Empire',
+  showWhy: true,
 };
 
 export function newGame(options: Partial<NewGameOptions> = {}): GameState {

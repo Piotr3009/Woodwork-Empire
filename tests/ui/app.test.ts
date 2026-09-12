@@ -36,6 +36,8 @@ beforeAll(() => {
 describe('the first ten minutes', () => {
   it('1. shows the start screen with the three difficulties', () => {
     expect(html()).toContain('Woodwork Empire');
+    expect(html()).toContain('Show real-life notes');
+    expect(html()).toContain('data-field="showWhy"');
     expect(html()).toContain('You quit your job');
     expect(html()).toContain('data-id="veryEasy"');
     expect(html()).toContain('data-id="easy"');
@@ -316,6 +318,37 @@ describe('setting the hall out', () => {
     expect(html()).toContain('data-do="startSetup"');
     click('[data-do="setSpeed"][data-speed="0"]');
     click('[data-do="setView"][data-view="office"]');
+  });
+});
+
+describe('why it is like this in real life', () => {
+  it('offers an i link on the accounting rows and opens the note', () => {
+    click('[data-office="accounting"]');
+    expect(html()).toContain('data-do="showWhy"');
+    expect(html()).toContain('data-id="rent"');
+    click('[data-do="showWhy"][data-id="rent"]');
+    expect(html()).toContain('class="why-pop"');
+    expect(html()).toContain('Rent is agreed by the month');
+    click('[data-do="closeWhy"]');
+    expect(html()).not.toContain('class="why-pop"');
+    click('[data-do="closeModal"]');
+  });
+
+  it('takes the links away when the notes are turned off, and brings them back', () => {
+    click('[data-do="toggleMenu"]');
+    expect(html()).toContain('Hide real-life notes');
+    click('[data-do="toggleWhy"]');
+    expect(currentState()?.showWhy).toBe(false);
+    click('[data-office="accounting"]');
+    expect(html()).not.toContain('data-do="showWhy"');
+    click('[data-do="closeModal"]');
+    click('[data-do="toggleMenu"]');
+    expect(html()).toContain('Show real-life notes');
+    click('[data-do="toggleWhy"]');
+    expect(currentState()?.showWhy).toBe(true);
+    click('[data-office="accounting"]');
+    expect(html()).toContain('data-do="showWhy"');
+    click('[data-do="closeModal"]');
   });
 });
 

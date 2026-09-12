@@ -14,15 +14,30 @@ import {
   weeklyWageBill,
 } from '../engine/index';
 import type { GameState, PeriodTotals } from '../engine/index';
-import { button, escapeHtml, money, plural, primaryButton } from './modal';
+import { button, escapeHtml, money, plural, primaryButton, whyLink } from './modal';
 
-function totalsBlock(title: string, totals: PeriodTotals): string {
+/** The ledger categories that carry a real life note (CLAUDE.md T2 3.12). */
+const WHY_BY_CATEGORY: Record<string, string> = {
+  unitDeposit: 'unitDeposit',
+  rent: 'rent',
+  rates: 'rates',
+  jobDeposit: 'jobDeposit',
+  jobBalance: 'finishedGoods',
+  transport: 'finishedGoods',
+  interest: 'arrearsInterest',
+  accounts: 'lateAccounts',
+  seizure: 'bailiff',
+  repair: 'service',
+};
+
+function totalsBlock(state: GameState, title: string, totals: PeriodTotals): string {
   const lines = Object.entries(totals.byCategory)
     .filter(([, amount]) => amount !== 0)
     .sort((left, right) => left[1] - right[1])
     .map(
       ([category, amount]) =>
-        `<div class="row"><span class="row-main">${escapeHtml(category)}</span>` +
+        `<div class="row"><span class="row-main">${escapeHtml(category)}` +
+        `${whyLink(state, WHY_BY_CATEGORY[category] ?? '')}</span>` +
         `<span class="row-figure ${amount < 0 ? 'bad' : 'good'}">${money(amount)}</span></div>`,
     )
     .join('');
@@ -51,7 +66,7 @@ function arrearsBlock(state: GameState, typed: string): string {
   const wanted = Number(typed) || 0;
   return (
     `<p class="warn">Arrears ${money(finance.arrearsAmount)}, ${months}. ` +
-    `Three months brings the bailiff.${interest}</p>` +
+    `Three months brings the bailiff.${interest}${whyLink(state, 'arrearsInterest')}</p>` +
     '<div class="row"><span class="row-main">' +
     '<input type="number" class="num" data-field="arrearsAmount" data-focus-key="arrearsAmount" ' +
     `value="${escapeHtml(typed)}" min="1" /> to pay</span>` +
@@ -86,18 +101,21 @@ export function renderAccounting(state: GameState, arrearsTyped: string): string
     .join('');
   return (
     `<p class="figures"><strong>${money(state.cash)}</strong> in the bank. ` +
-    `Overdraft limit ${money(state.finance.overdraftLimit)}.</p>` +
+    `Overdraft limit ${money(state.finance.overdraftLimit)}. ` +
+    `Deposit held by the landlord ${money(state.unit.depositHeld)}` +
+    `${whyLink(state, 'depositReturn')}</p>` +
     banner +
     arrears +
     '<div class="cols">' +
-    totalsBlock('Today', books.day) +
-    totalsBlock('This week', books.week) +
-    totalsBlock('This month', books.month) +
+    totalsBlock(state, 'Today', books.day) +
+    totalsBlock(state, 'This week', books.week) +
+    totalsBlock(state, 'This month', books.month) +
     '</div>' +
     '<h3>What is coming</h3>' +
-    `<div class="row"><span class="row-main">Rent, every day</span>` +
+    `<div class="row"><span class="row-main">Rent, every day${whyLink(state, 'rent')}</span>` +
     `<span class="row-figure">${money(dailyRent(state))}</span></div>` +
-    `<div class="row"><span class="row-main">Business rates, every day</span>` +
+    '<div class="row"><span class="row-main">Business rates, every day' +
+    `${whyLink(state, 'rates')}</span>` +
     `<span class="row-figure">${money(dailyRates(state))}</span></div>` +
     `<div class="row"><span class="row-main">Power, every day</span>` +
     `<span class="row-figure">${money(dailyPower(state))}</span></div>` +

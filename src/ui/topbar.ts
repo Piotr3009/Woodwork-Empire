@@ -64,6 +64,9 @@ export function renderMenu(state: GameState): string {
     '<div class="menu-pop">' +
     '<button class="btn" data-do="endDay">End day</button>' +
     stayHome +
+    `<button class="btn" data-do="toggleWhy">${
+      state.showWhy ? 'Hide real-life notes' : 'Show real-life notes'
+    }</button>` +
     '</div>'
   );
 }

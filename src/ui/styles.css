@@ -460,6 +460,47 @@ input.num {
 }
 
 /* --------------------------------------------------------------------------
+   Why it is like this in real life
+   -------------------------------------------------------------------------- */
+
+.why-link {
+  background: none;
+  border: none;
+  color: var(--accent);
+  cursor: pointer;
+  font: inherit;
+  font-style: italic;
+  padding: 0 4px;
+  text-decoration: underline;
+}
+
+.why-pop {
+  background: var(--panel);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  max-width: 340px;
+  padding: 10px 12px;
+  position: fixed;
+  z-index: 80;
+}
+
+.why-pop p {
+  font-size: 13px;
+  margin: 0 0 8px;
+}
+
+.check-row {
+  align-items: center;
+  display: flex;
+  gap: 6px;
+}
+
+.check-row input {
+  margin: 0;
+}
+
+/* --------------------------------------------------------------------------
    The order board tiles
    -------------------------------------------------------------------------- */
 

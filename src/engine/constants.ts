@@ -1143,3 +1143,60 @@ export const HELPER_CLEAN_WEEKDAY = 4;
 export const LEDGER_VISIBLE_ENTRIES = 50;
 /** [TUNE] the state keeps this many ledger entries so it stays small. */
 export const LEDGER_MAX_ENTRIES = 200;
+
+// ---------------------------------------------------------------------------
+// 3.12 Why it is like this in real life
+// ---------------------------------------------------------------------------
+
+/** Two or three sentences per decision, in plain English. The player can turn them off, and they
+ *  never carry a number the engine might change (CLAUDE.md T2 3.12). */
+export const WHY: Record<string, string> = {
+  unitDeposit:
+    'A landlord wants a deposit before he hands over the keys, and it is usually one month of ' +
+    'rent. It sits in his account for the whole tenancy and does nothing for you. Budget for it ' +
+    'as money you will not see again until you leave.',
+  depositReturn:
+    'The deposit comes back when you hand the unit over in the state you took it in. Anything ' +
+    'the landlord has to put right comes out of it first. Most people get a good part of it back ' +
+    'and nobody should count on all of it.',
+  rent:
+    'Rent is agreed by the month but it is really a daily cost: every day the doors are shut is ' +
+    'a day you paid for and did not use. Working out the daily figure is the quickest way to see ' +
+    'what a slow week costs you.',
+  rates:
+    'Business rates are a tax on the property, paid to the council whether you make anything or ' +
+    'not. Small units often get relief, larger ones do not. They arrive as a yearly bill you pay ' +
+    'in monthly instalments.',
+  jobDeposit:
+    'A deposit on acceptance is normal in joinery and it is what pays for the material. Without ' +
+    'it you are lending the client the cost of his own kitchen. Half on order and half on ' +
+    'delivery is the usual arrangement.',
+  arrearsInterest:
+    'Once a bill goes unpaid it starts to cost extra. Suppliers and landlords add interest to ' +
+    'what you owe, so a debt you ignore grows on its own. The longer it runs the harder it is ' +
+    'to get out from under it.',
+  bailiff:
+    'After a few months of arrears a creditor can send enforcement agents to take goods to the ' +
+    'value of the debt. They take what they can sell, and they credit you a fraction of what it ' +
+    'cost you. Losing a machine you still owe money on is how a workshop stops being a workshop.',
+  lateAccounts:
+    'Books that are not written up have to be reconstructed by somebody else, and accountants ' +
+    'charge by the hour for that. The longer you leave it the more there is to untangle. It is ' +
+    'the cheapest work in the business to do yourself and the dearest to put off.',
+  extractor:
+    'Dust extraction is not optional in a workshop. Without it the machines clog, the air is ' +
+    'dangerous to breathe, and an inspector will stop you. With the extractor down you can still ' +
+    'work, but slowly, and the mess builds up three times as fast.',
+  service:
+    'A machine that is serviced runs for years and one that is not gives up in the middle of a ' +
+    'job. Blades, bearings and filters all have a life. A monthly check costs a fraction of a ' +
+    'breakdown and it never happens on a quiet day.',
+  finishedGoods:
+    'A finished piece is not money until the client has it. It stands by the door taking up ' +
+    'floor space and getting in the way of the next job. Booking the transport the day it is ' +
+    'finished is what keeps the workshop moving.',
+  lowStock:
+    'Material is ordered days before it is needed and arrives when the supplier feels like it. ' +
+    'An empty rack means joiners standing around on full wages. Keeping a small buffer costs ' +
+    'cash but it costs less than a stopped bench.',
+};

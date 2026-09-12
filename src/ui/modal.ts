@@ -4,7 +4,7 @@
 // One escape and one money format for the whole game: the renderers and the engine own them,
 // because both layers sit below the modals.
 
-import { formatMoney, plural } from '../engine/index';
+import { WHY, formatMoney, plural } from '../engine/index';
 import { escapeText } from '../render/hall';
 
 export const escapeHtml = escapeText;
@@ -88,6 +88,15 @@ export function primaryButton(action: string, text: string, extra = ''): string 
 /** The one allowed disabled button: a locked catalogue line with its reason (CLAUDE.md 9.2). */
 export function lockedButton(text: string, reason: string): string {
   return `<button class="btn" disabled title="${escapeHtml(reason)}">${escapeHtml(text)}</button>`;
+}
+
+/** The optional real life note beside a decision: a text link, never an icon (CLAUDE.md T2 3.12). */
+export function whyLink(state: { showWhy: boolean }, key: string): string {
+  if (!state.showWhy || WHY[key] === undefined) return '';
+  return (
+    `<button class="why-link" data-do="showWhy" data-id="${key}" ` +
+    'title="Why it is like this in real life">i</button>'
+  );
 }
 
 /** Everywhere else, a reason the player can read instead of a control he cannot press. */

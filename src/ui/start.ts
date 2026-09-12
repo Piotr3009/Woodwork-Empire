@@ -7,6 +7,7 @@ export interface StartChoice {
   difficulty: string;
   playerName: string;
   companyName: string;
+  showWhy: boolean;
 }
 
 const UNIT_SKETCH =
@@ -39,6 +40,9 @@ export function renderStart(choice: StartChoice): string {
     '<label class="field-row">Company name' +
     `<input type="text" data-field="companyName" data-focus-key="companyName" ` +
     `value="${escapeHtml(choice.companyName)}" /></label>` +
+    '<label class="field-row check-row">' +
+    `<input type="checkbox" data-field="showWhy"${choice.showWhy ? ' checked' : ''} />` +
+    ' Show real-life notes</label>' +
     '<button class="btn btn-primary btn-big" data-do="startGame">Start</button>' +
     '</div></div>'
   );

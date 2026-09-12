@@ -1,10 +1,30 @@
 // The decision modal. The clock is stopped while it is open (CLAUDE.md 6.2).
 
-import type { GameEvent } from '../engine/index';
-import { escapeHtml } from './modal';
+import type { GameEvent, GameState } from '../engine/index';
+import { escapeHtml, whyLink } from './modal';
 
-export function renderEvent(event: GameEvent): string {
-  return `<p class="event-body">${escapeHtml(event.body)}</p>`;
+/** The real life note that belongs with each kind of decision (CLAUDE.md T2 3.12). */
+const WHY_BY_EVENT: Partial<Record<GameEvent['kind'], string>> = {
+  arrearsWarning: 'arrearsInterest',
+  arrearsFinalWarning: 'arrearsInterest',
+  bailiff: 'bailiff',
+  lateAccounts: 'lateAccounts',
+  lowStock: 'lowStock',
+  noMaterial: 'lowStock',
+  serviceDue: 'service',
+  machineBroken: 'extractor',
+  jobAtGate: 'finishedGoods',
+  monthlyBills: 'rates',
+};
+
+export function whyKeyForEvent(kind: GameEvent['kind']): string | null {
+  return WHY_BY_EVENT[kind] ?? null;
+}
+
+export function renderEvent(state: GameState, event: GameEvent): string {
+  const key = whyKeyForEvent(event.kind);
+  const note = key === null ? '' : ` ${whyLink(state, key)}`;
+  return `<p class="event-body">${escapeHtml(event.body)}${note}</p>`;
 }
 
 export function renderEventFooter(event: GameEvent): string {

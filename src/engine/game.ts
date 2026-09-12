@@ -154,6 +154,8 @@ export interface NewGameOptions {
   difficulty: Difficulty;
   playerName: string;
   companyName: string;
+  /** The real life notes are on unless the player turned them off on the start screen. */
+  showWhy: boolean;
 }
 
 export function clone(state: GameState): GameState {
@@ -176,6 +178,7 @@ export function createGame(options: NewGameOptions): GameState {
     difficulty: options.difficulty,
     playerName: options.playerName,
     companyName: options.companyName,
+    showWhy: options.showWhy,
     clock: { day: 1, minute: 0 },
     speed: 0,
     cash: spec.startingCash,
@@ -978,6 +981,9 @@ export function applyAction(state: GameState, action: GameAction): GameState {
       break;
     case 'PAY_ARREARS':
       payArrears(next, action.amount);
+      break;
+    case 'SET_SHOW_WHY':
+      next.showWhy = action.on;
       break;
     case 'MOVE_ITEM':
       moveItem(next, action.itemId, action.x, action.y);

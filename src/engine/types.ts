@@ -445,6 +445,8 @@ export interface GameState {
   difficulty: Difficulty;
   playerName: string;
   companyName: string;
+  /** The optional real life notes under decisions are on. */
+  showWhy: boolean;
   clock: Clock;
   speed: Speed;
   cash: number;
@@ -490,6 +492,7 @@ export type GameAction =
   | { type: 'PAY_ARREARS'; amount: number | null }
   | { type: 'ORDER_TRANSPORT'; jobId: string }
   | { type: 'MOVE_ITEM'; itemId: string; x: number; y: number }
+  | { type: 'SET_SHOW_WHY'; on: boolean }
   | { type: 'WORK_HERE'; jobId: string | null }
   | { type: 'ASSIGN_JOB'; jobId: string; workerId: string | null }
   | { type: 'HIRE'; role: WorkerRole; tier: WorkerTier | null }
