@@ -56,6 +56,9 @@ them except the first cut of T1-06, which is named in section 5 below.
    `NotImplementedError` anywhere in the repo.
 3. The "why it is like this in real life" explanation strings were not written. The night went on the
    14 tasks and this report.
+4. Caught in my own audit after the report was first written: `ASSIGN_JOB` had no clickable way in,
+   which rule 3.5 forbids. The job card in the laptop now carries the manual override of 9.4: a chip
+   for the owner and one for every joiner on the floor.
 
 ## 3. Tests
 

@@ -3,6 +3,7 @@
 
 import {
   findJob,
+  joiners,
   minutesRemainingFor,
   openJobs,
   openTasks,
@@ -59,11 +60,26 @@ function labourCostLine(state: GameState, job: Job): string {
     `${money(left * workerMinuteCost(worker.weeklyWage))} of wages`;
 }
 
+/** Automatic assignment can always be overridden from the job card (CLAUDE.md 9.4). */
+function assignControls(state: GameState, job: Job): string {
+  if (job.stage !== 'ready' && job.stage !== 'inProduction') return '';
+  const chip = (workerId: string, label: string): string =>
+    `<button class="chip${job.assignedTo === workerId ? ' is-on' : ''}" data-do="assignJob" ` +
+    `data-id="${job.id}" data-worker="${workerId}">${escapeHtml(label)}</button>`;
+  const crew = joiners(state)
+    .filter((worker) => worker.startDay <= state.clock.day && worker.absentDaysRemaining === 0)
+    .map((worker) => chip(worker.id, worker.name))
+    .join('');
+  return `<span class="row-action">${chip('owner', 'You')}${crew}</span>`;
+}
+
 function jobRow(state: GameState, job: Job): string {
   return (
     `<div class="row"><span class="row-main">${escapeHtml(job.name)} ${money(job.price)}</span>` +
     `<span class="row-figure">${escapeHtml(job.stage)} \u00b7 due day ${job.dueDay}</span>` +
-    `<span class="row-figure">${labourCostLine(state, job)}</span></div>`
+    `<span class="row-figure">${labourCostLine(state, job)}</span>` +
+    assignControls(state, job) +
+    '</div>'
   );
 }
 

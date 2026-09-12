@@ -180,6 +180,20 @@ describe('the modals', () => {
   });
 });
 
+describe('assigning work by hand', () => {
+  it('offers the owner on the job card, which is the override of CLAUDE.md 9.4', () => {
+    // Push the job to the bench so the card shows its assign controls.
+    const state = currentState();
+    expect(state?.jobs[0]).toBeDefined();
+    if (state && state.jobs[0]) state.jobs[0].stage = 'ready';
+    click('[data-office="laptop"]');
+    expect(html()).toContain('data-do="assignJob"');
+    click('[data-do="assignJob"][data-worker="owner"]');
+    expect(currentState()?.jobs[0]?.assignedTo).toBe('owner');
+    click('[data-do="closeModal"]');
+  });
+});
+
 describe('accounting', () => {
   it('shows the day 1 deposit and the daily costs', () => {
     click('[data-office="accounting"]');

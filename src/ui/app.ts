@@ -371,6 +371,9 @@ function handleAction(element: DataElement, point: { x: number; y: number }): vo
     case 'workHere':
       dispatch({ type: 'WORK_HERE', jobId: null });
       return;
+    case 'assignJob':
+      dispatch({ type: 'ASSIGN_JOB', jobId: id, workerId: element.dataset.worker ?? 'owner' });
+      return;
     case 'startCleaning':
       dispatch({ type: 'START_CLEANING' });
       return;
