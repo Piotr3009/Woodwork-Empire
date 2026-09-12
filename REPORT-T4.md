@@ -132,10 +132,14 @@ finding was checked against the code before it counted. What was fixed:
    carry it (`assignWorkerTask`), and one is sent automatically when the owner is not in, but there
    is no control for the player to choose. The brief names who may do it, not a decision to be made;
    adding a chooser would be a new event, which was not asked for.
-2. **No browser check.** Everything is verified in jsdom and by the build. The room's scale, the
-   hover overlay on a region and the seven-segment font stack have not been looked at in a real
-   browser: the environment has Chromium but no art review was asked for tonight, and the layout
-   numbers the scale uses are asserted against the stylesheet in code, not on screen.
+2. **Browser check: done for the room, not for the rest.** The office was driven in the Chromium
+   this environment ships, over the DevTools protocol and with no new dependency, at a 1440 by 900
+   window. The three layers stack and show the art, the stack comes out at 1322 by 744 inside a
+   1416 by 751 box so it is letterboxed and never cropped, the page does not scroll in either
+   direction, the clock reads 08:00 in amber on its casing, the region under the middle of the
+   laptop hit tests as the laptop through the transform, the Work Plan board opens the Work Plan
+   modal and the door goes back to the hall. What was not looked at: the hall at other window
+   sizes, and the hover overlay, which needs a real pointer.
 
 ---
 
@@ -351,7 +355,11 @@ placeholder box; the sprite check page lists it.
 4. **One bench per man.** With one bench the owner and a joiner cannot both make something. The
    hiring rule already asks for a bench per joiner, so the only case is the owner joining in on a
    one bench hall. Is that the rule you want?
-5. **The Work Plan board and the Orders board both open a list.** The room's Work Plan board is the
+5. **"Woodwork Empire" does not fit the company name box.** SPRITES.md 8.3 gives the name 170 px
+   at 22 px of marker lettering, and the default company name is drawn as "Woodwork E..." on the
+   board. The game is doing what the contract says (one line, ellipsis if longer), and the contract
+   is yours to change: a wider box, a smaller size, or a shorter default name.
+6. **The Work Plan board and the Orders board both open a list.** The room's Work Plan board is the
    jobs on the books and the Orders board is the enquiries. The names on the artwork and the names
    in the game agree, but they are two boards a foot apart doing different things.
 
