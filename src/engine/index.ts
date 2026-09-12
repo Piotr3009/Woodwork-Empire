@@ -45,11 +45,13 @@ export {
 
 // Money
 export {
+  arrearsCarryInterest,
   canAfford,
   dailyPower,
   formatMoney,
   dailyRates,
   dailyRent,
+  monthlyFixedCosts,
   monthlySalaryBill,
   netOf,
   nextDueDays,
@@ -57,8 +59,14 @@ export {
 } from './economy';
 
 // The board and the catalogue
-export { boardSizeRange, canAccept } from './board';
-export { availableFinishes, findTemplate, lockReasonFor, template } from './catalog';
+export { boardSizeRange, canAccept, expressProbability } from './board';
+export {
+  availableFinishes,
+  findTemplate,
+  lockReasonFor,
+  marketPriceFactor,
+  template,
+} from './catalog';
 
 // Jobs
 export {
@@ -116,4 +124,4 @@ export {
 } from './materials';
 
 // Reputation
-export { clampReputation, ratingFor, reputationTier } from './reputation';
+export { clampReputation, formatReputation, ratingFor, reputationTier } from './reputation';

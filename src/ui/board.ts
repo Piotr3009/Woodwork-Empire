@@ -1,8 +1,17 @@
 // The order board: the enquiries waiting, with what is greyed out and why (CLAUDE.md 10.1).
 
-import { canAccept, has } from '../engine/index';
+import { canAccept, formatReputation, has } from '../engine/index';
 import type { Enquiry, GameState } from '../engine/index';
-import { button, days, emptyLine, escapeHtml, filterField, money, reasonLabel } from './modal';
+import {
+  button,
+  days,
+  emptyLine,
+  escapeHtml,
+  filterField,
+  money,
+  plural,
+  reasonLabel,
+} from './modal';
 
 function expiryLine(state: GameState, enquiry: Enquiry): string {
   const left = enquiry.expiresOnDay - state.clock.day;
@@ -64,8 +73,8 @@ export function renderBoard(state: GameState, filter: string): string {
       : shown.map((enquiry) => row(state, enquiry)).join('');
   return (
     filterField('board', filter, 'Filter by name') +
-    `<p class="hint">Reputation ${state.reputation.toFixed(2)}. ` +
-    `${state.enquiries.length} enquiries waiting.</p>` +
+    `<p class="hint">Reputation ${formatReputation(state.reputation)}. ` +
+    `${plural(state.enquiries.length, 'enquiry', 'enquiries')} waiting.</p>` +
     list
   );
 }

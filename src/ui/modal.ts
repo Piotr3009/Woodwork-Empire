@@ -29,8 +29,13 @@ export function minutes(value: number): string {
   return `${Math.max(0, Math.round(value))} min`;
 }
 
+/** The one plural in the game: "1 day", "2 days", "1 enquiry", "3 enquiries" (CLAUDE.md T2 3.11). */
+export function plural(count: number, one: string, many: string): string {
+  return `${count} ${count === 1 ? one : many}`;
+}
+
 export function days(value: number): string {
-  return `${Math.round(value)} days`;
+  return plural(Math.round(value), 'day', 'days');
 }
 
 export function renderModal(spec: ModalSpec, position: ModalPosition | null): string {

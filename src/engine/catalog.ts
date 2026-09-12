@@ -1,6 +1,12 @@
 // The product catalogue: what the workshop can be asked to make, and whether it has the tools.
 
-import { PRICE_ROUNDING, PRODUCT_TEMPLATES, SOLID_WOOD_EQUIPMENT } from './constants';
+import {
+  LOW_REPUTATION_BAND,
+  LOW_REPUTATION_PRICE_FACTOR,
+  PRICE_ROUNDING,
+  PRODUCT_TEMPLATES,
+  SOLID_WOOD_EQUIPMENT,
+} from './constants';
 import { findSpec, has, hasAll } from './machines';
 import type { Finish, GameState, ProductTemplate } from './types';
 
@@ -44,8 +50,19 @@ export function availableFinishes(state: GameState, entry: ProductTemplate): Fin
   });
 }
 
+/** A company nobody wants to deal with is only offered barely profitable work (CLAUDE.md T2 3.4).
+ *  [TUNE band and factor.] */
+export function marketPriceFactor(reputation: number): number {
+  return reputation < LOW_REPUTATION_BAND ? LOW_REPUTATION_PRICE_FACTOR : 1;
+}
+
 /** Price of a size variant, rounded to the nearest 10 (CLAUDE.md 8.8). */
-export function priceFor(basePrice: number, sizeMultiplier: number, expressUplift: number): number {
-  const raw = basePrice * sizeMultiplier * (1 + expressUplift);
+export function priceFor(
+  basePrice: number,
+  sizeMultiplier: number,
+  expressUplift: number,
+  marketFactor: number,
+): number {
+  const raw = basePrice * sizeMultiplier * (1 + expressUplift) * marketFactor;
   return Math.round(raw / PRICE_ROUNDING) * PRICE_ROUNDING;
 }

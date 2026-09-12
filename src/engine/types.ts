@@ -128,6 +128,8 @@ export interface UnitState {
   ratesMonthly: number;
   benchSlots: number;
   sheetCapacity: number;
+  /** One month of rent the landlord holds. Returned on a move, which is parked. */
+  depositHeld: number;
 }
 
 export interface Worker {
@@ -167,7 +169,10 @@ export interface Enquiry {
   templateId: string;
   name: string;
   sizeMultiplier: number;
+  /** What the client pays. An express job carries the 20% uplift here and nowhere else. */
   price: number;
+  /** The price the material and the labour are worked out from: no express uplift. */
+  basePrice: number;
   finish: Finish;
   materialKind: MaterialKind;
   deadlineDays: number;
@@ -197,6 +202,8 @@ export interface Job {
   templateId: string;
   name: string;
   price: number;
+  /** The price the material and the labour were worked out from: no express uplift. */
+  basePrice: number;
   sizeMultiplier: number;
   finish: Finish;
   materialKind: MaterialKind;
@@ -326,6 +333,7 @@ export type LedgerCategory =
   | 'storage'
   | 'taxi'
   | 'pellets'
+  | 'arrears'
   | 'seizure';
 
 export interface LedgerEntry {
@@ -411,6 +419,8 @@ export interface GameState {
   eventQueue: GameEvent[];
   activeEvent: GameEvent | null;
   dayStats: DayStats;
+  /** Day the last express enquiry reached the board. One a week is the cap. */
+  lastExpressDay: number | null;
   /** Production minutes since the 1st, for pellet sales. */
   productionMinutesMonth: number;
   gameOver: GameOver | null;
@@ -425,6 +435,7 @@ export type GameAction =
   | { type: 'PAUSE_TASK' }
   | { type: 'SET_MATERIAL_MODE'; jobId: string; mode: MaterialMode }
   | { type: 'BUY_STOCK'; sheets: number }
+  | { type: 'PAY_ARREARS'; amount: number | null }
   | { type: 'WORK_HERE'; jobId: string | null }
   | { type: 'ASSIGN_JOB'; jobId: string; workerId: string | null }
   | { type: 'HIRE'; role: WorkerRole; tier: WorkerTier | null }

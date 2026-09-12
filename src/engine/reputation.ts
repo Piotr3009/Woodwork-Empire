@@ -26,6 +26,12 @@ export function clampReputation(value: number): number {
   return Math.min(REPUTATION_MAX, Math.max(REPUTATION_MIN, value));
 }
 
+/** Reputation as the player reads it: a whole number on the minus 50 to 100 scale, one decimal
+ *  only when the emails cost a job part of its rating (CLAUDE.md T2 3.4, 3.5). */
+export function formatReputation(value: number): string {
+  return String(Math.round(value * 10) / 10);
+}
+
 /** What the client thinks of the job that just landed (CLAUDE.md 8.11). */
 export function ratingFor(job: Job): number {
   let rating = job.daysLate > 0 ? 0 : job.express ? RATING_EXPRESS_ON_TIME : RATING_ON_TIME;

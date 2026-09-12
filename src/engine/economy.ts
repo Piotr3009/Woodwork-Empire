@@ -2,11 +2,13 @@
 // Every movement of money in the game goes through `pay` or `receive`, so the ledger is complete.
 
 import {
+  ARREARS_INTEREST_THRESHOLD_MONTHS,
+  ARREARS_MONTHLY_INTEREST,
   ARREARS_MONTHS_BAILIFF,
   ARREARS_MONTHS_FINAL_WARNING,
   ARREARS_MONTHS_WARNING,
   BAILIFF_SEIZURE_FRACTION,
-  BANKRUPTCY_OVERDRAFT,
+  BANKRUPTCY_OVERDRAFT_MULTIPLIER,
   DAYS_PER_MONTH,
   DUST_WASTE_MONTHLY,
   LEDGER_MAX_ENTRIES,
@@ -17,7 +19,8 @@ import {
   POWER_BASE_DAILY,
   POWER_PER_MACHINE_DAILY,
   SOFTWARE_SUBSCRIPTION_MONTHLY,
-  UNIT_DEPOSIT,
+  WORKING_DAYS_PER_MONTH,
+  unitDepositFor,
 } from './constants';
 import { isFirstOfMonth, isFriday, isWorkingDay, weekday } from './clock';
 import { queueEvent } from './events';
@@ -144,6 +147,44 @@ export function dailyPower(state: GameState): number {
   return POWER_BASE_DAILY + POWER_PER_MACHINE_DAILY * poweredMachines(state).length;
 }
 
+/** One month of the costs that arrive whether or not a single job is made. The arrears interest
+ *  threshold is measured against this [TUNE]. */
+export function monthlyFixedCosts(state: GameState): number {
+  return (
+    state.unit.rentMonthly +
+    state.unit.ratesMonthly +
+    dailyPower(state) * DAYS_PER_MONTH +
+    LIVING_COST_PER_WORKING_DAY * WORKING_DAYS_PER_MONTH
+  );
+}
+
+/** Arrears carry interest only while they are large (CLAUDE.md T2 3.4). */
+export function arrearsCarryInterest(state: GameState): boolean {
+  return (
+    state.finance.arrearsAmount >
+    monthlyFixedCosts(state) * ARREARS_INTEREST_THRESHOLD_MONTHS
+  );
+}
+
+/** The player pays what he owes, all of it or a typed amount. Nothing goes past the overdraft
+ *  floor, and clearing the debt resets the ladder (CLAUDE.md T2 3.4). */
+export function payArrears(state: GameState, amount: number | null): number {
+  const finance = state.finance;
+  if (finance.arrearsAmount <= 0) return 0;
+  const wanted = amount === null ? finance.arrearsAmount : Math.min(finance.arrearsAmount, amount);
+  const room = state.cash - finance.overdraftLimit;
+  const paid = Math.round(Math.min(wanted, Math.max(0, room)) * 100) / 100;
+  if (paid <= 0) return 0;
+  pay(state, 'arrears', 'Arrears paid off', paid);
+  finance.arrearsAmount = Math.round((finance.arrearsAmount - paid) * 100) / 100;
+  if (finance.arrearsAmount <= 0) {
+    finance.arrearsAmount = 0;
+    finance.arrearsMonths = 0;
+    finance.firstArrearsDay = null;
+  }
+  return paid;
+}
+
 export function weeklyWageBill(state: GameState): number {
   return state.workers
     .filter((worker) => worker.weeklyWage > 0 && worker.startDay <= state.clock.day)
@@ -162,6 +203,10 @@ function runMonthlyItems(state: GameState): void {
   if (state.cash < 0) {
     const interest = -state.cash * OVERDRAFT_MONTHLY_INTEREST;
     chargeUnavoidable(state, 'interest', 'Overdraft interest', interest);
+  }
+  if (arrearsCarryInterest(state)) {
+    const interest = state.finance.arrearsAmount * ARREARS_MONTHLY_INTEREST;
+    chargeUnavoidable(state, 'interest', 'Interest on the arrears', interest);
   }
   const salaries = monthlySalaryBill(state);
   if (salaries > 0) chargeUnavoidable(state, 'salaries', 'Office salaries', salaries);
@@ -219,7 +264,8 @@ export function noteLoss(
   addLedger(state, category, label, -amount, true);
 }
 
-/** Three months of arrears: the dearest machine goes, credited at half its purchase price. */
+/** Three months of arrears: the cheapest machine goes, credited at half its purchase price.
+ *  Everything slows down, but the company carries on (PIOTR, Turn 2). */
 export function runBailiff(state: GameState): void {
   const target = seizableMachines(state)[0];
   if (!target) {
@@ -261,9 +307,14 @@ export function declareBankruptcy(state: GameState, reason: string): void {
   });
 }
 
+/** Twice the overdraft limit, whatever the difficulty set it to [TUNE]. */
+export function bankruptcyFloor(state: GameState): number {
+  return state.finance.overdraftLimit * BANKRUPTCY_OVERDRAFT_MULTIPLIER;
+}
+
 export function checkBankruptcy(state: GameState): void {
   if (state.gameOver) return;
-  if (state.cash <= BANKRUPTCY_OVERDRAFT) {
+  if (state.cash <= bankruptcyFloor(state)) {
     declareBankruptcy(state, 'The bank pulled the overdraft.');
   }
 }
@@ -280,7 +331,9 @@ export function runDayCosts(state: GameState, day: number): void {
   }
   runArrearsEscalation(state, day);
   if (day === 1) {
-    chargeUnavoidable(state, 'unitDeposit', 'Unit deposit', UNIT_DEPOSIT);
+    const deposit = unitDepositFor(state.unit.rentMonthly);
+    state.unit.depositHeld = deposit;
+    chargeUnavoidable(state, 'unitDeposit', 'Unit deposit, one month of rent', deposit);
   }
   chargeUnavoidable(state, 'rent', 'Rent', dailyRent(state));
   chargeUnavoidable(state, 'rates', 'Business rates', dailyRates(state));

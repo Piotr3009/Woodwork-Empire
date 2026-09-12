@@ -31,6 +31,11 @@ export function isFriday(day: number): boolean {
   return weekday(day) === WORKING_DAYS_PER_WEEK - 1;
 }
 
+/** 1-based week of the game calendar. Day 1 to day 7 is week 1. */
+export function weekOfDay(day: number): number {
+  return Math.floor((day - 1) / DAYS_PER_WEEK) + 1;
+}
+
 /** 1-based month of the game calendar. */
 export function monthOfDay(day: number): number {
   return Math.floor((day - 1) / DAYS_PER_MONTH) + 1;

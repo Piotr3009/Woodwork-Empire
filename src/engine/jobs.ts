@@ -112,13 +112,15 @@ export function acceptEnquiry(state: GameState, enquiryId: string, byHand: boole
   }
   const madeByHand = locked;
   const entry = template(enquiry.templateId);
-  const materialCost = materialCostFor(enquiry.price, enquiry.bespokeMaterial);
-  const labourValue = labourValueFor(enquiry.price);
+  // Material and labour come off the base price, so the express uplift is pure profit (T2 3.4).
+  const materialCost = materialCostFor(enquiry.basePrice, enquiry.bespokeMaterial);
+  const labourValue = labourValueFor(enquiry.basePrice);
   const job: Job = {
     id: makeId(state, 'job'),
     templateId: enquiry.templateId,
     name: enquiry.name,
     price: enquiry.price,
+    basePrice: enquiry.basePrice,
     sizeMultiplier: enquiry.sizeMultiplier,
     finish: enquiry.finish,
     materialKind: enquiry.materialKind,

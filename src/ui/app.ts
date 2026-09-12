@@ -46,6 +46,7 @@ interface Ui {
   /** Field to put the caret back in after the next render. */
   focusNext: string | null;
   stockSheets: string;
+  arrearsAmount: string;
   difficulty: Difficulty;
   playerName: string;
   companyName: string;
@@ -78,6 +79,7 @@ function freshUi(): Ui {
     filters: { board: '', catalogue: '' },
     focusNext: null,
     stockSheets: '6',
+    arrearsAmount: '500',
     difficulty: 'easy',
     playerName: 'Piotr',
     companyName: 'Woodwork Empire',
@@ -105,7 +107,7 @@ function modalBody(id: ModalId, current: GameState): string {
     case 'laptop':
       return renderLaptop(current);
     case 'accounting':
-      return renderAccounting(current);
+      return renderAccounting(current, ui.arrearsAmount);
     case 'catalogue':
       return renderCatalogue(current, ui.filters.catalogue ?? '');
     case 'hiring':
@@ -354,6 +356,11 @@ function handleAction(element: DataElement, point: { x: number; y: number }): vo
     case 'buyStock':
       dispatch({ type: 'BUY_STOCK', sheets: Number(element.dataset.sheets ?? '0') });
       return;
+    case 'payArrears': {
+      const typed = element.dataset.amount ?? 'all';
+      dispatch({ type: 'PAY_ARREARS', amount: typed === 'all' ? null : Number(typed) });
+      return;
+    }
     case 'setMaterialMode':
       dispatch({
         type: 'SET_MATERIAL_MODE',
@@ -493,6 +500,10 @@ function onInput(event: Event): void {
   if (field === 'companyName') ui.companyName = target.value;
   if (field === 'stockSheets') {
     ui.stockSheets = target.value;
+    render();
+  }
+  if (field === 'arrearsAmount') {
+    ui.arrearsAmount = target.value;
     render();
   }
 }

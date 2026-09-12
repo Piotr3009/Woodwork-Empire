@@ -8,6 +8,11 @@ Branch `claude/turn-2-playability-fblsuo`, one commit per task, `npm run check` 
 T2-01 Clock. One game minute per real second at 1x (`REAL_SECONDS_PER_DAY_AT_1X = 480`), the loop
 audited so no minute is dropped, and a day off with an empty hall jumps straight to the summary.
 
+T2-02 Balance. Every row of the Turn 2 table: rent at 12 per m2, the deposit as one month held,
+overdrafts by difficulty, PAY_ARREARS with interest on large arrears, the cheapest machine first,
+the software bundle, express uplift as pure profit with one a week, the minus 50 to 100 reputation
+scale with its new gates, and pro rata fatigue.
+
 ## 2. Not done or partial
 
 ## 3. Tests

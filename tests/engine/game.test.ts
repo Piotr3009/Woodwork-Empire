@@ -5,7 +5,7 @@ import {
   DAYS_PER_MONTH,
   LIVING_COST_PER_WORKING_DAY,
   POWER_BASE_DAILY,
-  UNIT_DEPOSIT,
+  unitDepositFor,
 } from '../../src/engine/constants';
 import { createTask } from '../../src/engine/tasks';
 import { DEFAULT_OPTIONS as OPTIONS, clearEvents, nextDay, withLicence } from '../helpers';
@@ -13,7 +13,7 @@ import { DEFAULT_OPTIONS as OPTIONS, clearEvents, nextDay, withLicence } from '.
 /** What day 1 takes out before the player does anything: deposit, rent, rates, power, living. */
 function dayOneCosts(rentMonthly: number, ratesMonthly: number): number {
   return (
-    UNIT_DEPOSIT +
+    unitDepositFor(rentMonthly) +
     rentMonthly / DAYS_PER_MONTH +
     ratesMonthly / DAYS_PER_MONTH +
     POWER_BASE_DAILY +
@@ -26,18 +26,18 @@ describe('createGame', () => {
     const state = createGame(OPTIONS);
     expect(state.clock).toEqual({ day: 1, minute: 0 });
     expect(state.speed).toBe(0);
-    expect(state.cash).toBeCloseTo(20000 - dayOneCosts(1200, 450), 6);
+    expect(state.cash).toBeCloseTo(20000 - dayOneCosts(720, 450), 6);
     expect(state.difficulty).toBe('easy');
     expect(state.activeEvent).toBeNull();
   });
 
   it('gives each difficulty its cash and unit', () => {
     expect(createGame({ ...OPTIONS, difficulty: 'veryEasy' }).cash).toBeCloseTo(
-      50000 - dayOneCosts(1000, 450),
+      50000 - dayOneCosts(1080, 450),
       6,
     );
     expect(createGame({ ...OPTIONS, difficulty: 'hard' }).cash).toBeCloseTo(
-      -dayOneCosts(1200, 450),
+      -dayOneCosts(720, 450),
       6,
     );
     expect(createGame({ ...OPTIONS, difficulty: 'veryEasy' }).unit.benchSlots).toBe(6);

@@ -8,7 +8,10 @@ import {
   EXPIRY_STANDARD_DAYS,
   EXPRESS_PRICE_UPLIFT,
   EXPRESS_PROBABILITY_BASE,
-  EXPRESS_PROBABILITY_PER_REPUTATION,
+  EXPRESS_PROBABILITY_MAX,
+  EXPRESS_PROBABILITY_MIN,
+  EXPRESS_PROBABILITY_PER_REPUTATION_STEP,
+  EXPRESS_PROBABILITY_REPUTATION_STEP,
   SIZE_MULTIPLIER_MAX,
   SIZE_MULTIPLIER_MIN,
 } from './constants';
@@ -16,9 +19,11 @@ import {
   availableFinishes,
   findTemplate,
   lockReasonFor,
+  marketPriceFactor,
   priceFor,
   templatesForReputation,
 } from './catalog';
+import { weekOfDay } from './clock';
 import { reputationTier } from './reputation';
 import { chance, float, int, makeId, pickWeighted } from './rng';
 import type { Enquiry, GameState, ProductTemplate } from './types';
@@ -29,10 +34,18 @@ export function boardSizeRange(state: GameState): [number, number] {
   return BOARD_SIZE_BY_TIER[Math.min(tier, BOARD_SIZE_BY_TIER.length - 1)] ?? [1, 2];
 }
 
-/** Chance the next enquiry is an express job [TUNE]. */
+/** Chance the next enquiry is an express job: base plus a step per whole ten points of
+ *  reputation, floored and capped [TUNE mapping]. */
 export function expressProbability(reputation: number): number {
-  const whole = Math.floor(reputation);
-  return EXPRESS_PROBABILITY_BASE + EXPRESS_PROBABILITY_PER_REPUTATION * whole;
+  const steps = Math.floor(reputation / EXPRESS_PROBABILITY_REPUTATION_STEP);
+  const raw = EXPRESS_PROBABILITY_BASE + EXPRESS_PROBABILITY_PER_REPUTATION_STEP * steps;
+  return Math.min(EXPRESS_PROBABILITY_MAX, Math.max(EXPRESS_PROBABILITY_MIN, raw));
+}
+
+/** One express enquiry a week and no more (PIOTR). */
+export function expressAllowed(state: GameState): boolean {
+  if (state.lastExpressDay === null) return true;
+  return weekOfDay(state.lastExpressDay) !== weekOfDay(state.clock.day);
 }
 
 function drawTemplate(state: GameState): ProductTemplate | null {
@@ -42,9 +55,14 @@ function drawTemplate(state: GameState): ProductTemplate | null {
 }
 
 function buildEnquiry(state: GameState, entry: ProductTemplate): Enquiry | null {
-  const express = chance(state, expressProbability(state.reputation));
+  // The roll always runs, so the weekly cap never shifts the rest of the random stream.
+  const express = chance(state, expressProbability(state.reputation)) && expressAllowed(state);
   const sizeMultiplier = float(state, SIZE_MULTIPLIER_MIN, SIZE_MULTIPLIER_MAX);
-  const price = priceFor(entry.basePrice, sizeMultiplier, express ? EXPRESS_PRICE_UPLIFT : 0);
+  const market = marketPriceFactor(state.reputation);
+  const basePrice = priceFor(entry.basePrice, sizeMultiplier, 0, market);
+  const price = express
+    ? priceFor(entry.basePrice, sizeMultiplier, EXPRESS_PRICE_UPLIFT, market)
+    : basePrice;
   const finishes = availableFinishes(state, entry);
   const finish = finishes[int(state, 0, Math.max(0, finishes.length - 1))];
   if (!finish) return null;
@@ -57,6 +75,7 @@ function buildEnquiry(state: GameState, entry: ProductTemplate): Enquiry | null 
     name: entry.name,
     sizeMultiplier: Math.round(sizeMultiplier * 100) / 100,
     price,
+    basePrice,
     finish,
     materialKind: entry.material,
     deadlineDays,
@@ -97,6 +116,7 @@ function drawInto(state: GameState): boolean {
   const enquiry = generateEnquiry(state);
   if (!enquiry) return false;
   state.enquiries.push(enquiry);
+  if (enquiry.express) state.lastExpressDay = state.clock.day;
   return true;
 }
 

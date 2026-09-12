@@ -122,12 +122,14 @@ export function buyStartingKit(state: GameState): GameState {
 
 /** Puts an exact enquiry on the board, so a test can work with round numbers. */
 export function placeEnquiry(state: GameState, partial: Partial<Enquiry> = {}): Enquiry {
+  const price = partial.price ?? 400;
   const enquiry: Enquiry = {
     id: `enq-fixed-${state.enquiries.length + 1}`,
     templateId: 'garageShelves',
     name: 'Garage shelves',
     sizeMultiplier: 1,
-    price: 400,
+    price,
+    basePrice: price,
     finish: 'laminate',
     materialKind: 'sheet',
     deadlineDays: 15,

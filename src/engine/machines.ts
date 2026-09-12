@@ -51,11 +51,12 @@ export function poweredMachines(state: GameState): Equipment[] {
   });
 }
 
-/** What the bailiff can take: machines and extraction kit, dearest first (CLAUDE.md 8.3). */
+/** What the bailiff can take: machines and extraction kit, cheapest first (CLAUDE.md T2 3.4).
+ *  Everything slows down, but the company is not finished off in one visit. */
 export function seizableMachines(state: GameState): Equipment[] {
   return poweredMachines(state)
     .slice()
-    .sort((left, right) => right.purchasePrice - left.purchasePrice);
+    .sort((left, right) => left.purchasePrice - right.purchasePrice);
 }
 
 /** Which dust band the hall is in (CLAUDE.md 9.7). */

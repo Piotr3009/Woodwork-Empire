@@ -172,11 +172,11 @@ describe('the game over screen', () => {
   it('says what happened, how long the company lasted, and offers a fresh start', () => {
     const state = newGame();
     state.gameOver = { reason: 'Three months of arrears and nothing left to seize.', day: 97 };
-    state.reputation = 1.25;
+    state.reputation = 12.5;
     const html = renderGameOver(state);
     expect(html).toContain('Three months of arrears');
     expect(html).toContain('97 days');
-    expect(html).toContain('1.25');
+    expect(html).toContain('12.5');
     expect(html).toContain('data-do="restart"');
   });
 });

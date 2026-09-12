@@ -63,11 +63,11 @@ export function spendOwnerMinute(state: GameState, category: 'admin' | 'design' 
   if (state.clock.minute >= MINUTES_PER_WORKING_DAY) owner.overtimeMinutes += 1;
 }
 
-/** Called when the day closes: each whole overtime hour worked today costs efficiency tomorrow
- *  (CLAUDE.md 7.2). A part hour is not charged. */
+/** Called when the day closes: every overtime minute worked today costs efficiency tomorrow, pro
+ *  rata, so half an hour costs half an hour's worth (CLAUDE.md T2 3.4). */
 export function setTomorrowFatigue(state: GameState): void {
-  const hours = Math.floor(state.owner.overtimeMinutes / 60);
-  state.owner.fatigue = hours * FATIGUE_PER_OVERTIME_HOUR;
+  const hours = state.owner.overtimeMinutes / 60;
+  state.owner.fatigue = Math.round(hours * FATIGUE_PER_OVERTIME_HOUR * 10000) / 10000;
 }
 
 /** Sick leave lands once per game year, on a random working day (CLAUDE.md 7.3). */

@@ -12,7 +12,6 @@ import {
   HELPER_CLEAN_WEEKDAY,
   LOCKER_SLOT_LAYOUT,
   MINUTES_PER_WORKING_DAY,
-  OVERDRAFT_LIMIT,
   OWNER_LABOUR_PER_MINUTE,
   REPUTATION_START,
   SOFTWARE_ONE_OFF_JOBS,
@@ -24,7 +23,14 @@ import {
 } from './constants';
 import { expireEnquiries, refillBoard, refreshLocks } from './board';
 import { daysBetween, isDayExhausted, isOvertime, isWorkingDay, weekday } from './clock';
-import { canAfford, emptyTotals, formatMoney, pay, runDayCosts } from './economy';
+import {
+  canAfford,
+  emptyTotals,
+  formatMoney,
+  pay,
+  payArrears,
+  runDayCosts,
+} from './economy';
 import { isPaused, openNextEvent, queueEvent } from './events';
 import {
   accidentRisk,
@@ -152,6 +158,7 @@ export function createGame(options: NewGameOptions): GameState {
       ratesMonthly: spec.ratesMonthly,
       benchSlots: spec.benchSlots,
       sheetCapacity: spec.sheetCapacity,
+      depositHeld: 0,
     },
     owner: {
       present: true,
@@ -174,7 +181,7 @@ export function createGame(options: NewGameOptions): GameState {
     tasks: [],
     deliveries: [],
     finance: {
-      overdraftLimit: OVERDRAFT_LIMIT,
+      overdraftLimit: spec.overdraftLimit,
       arrearsAmount: 0,
       arrearsMonths: 0,
       firstArrearsDay: null,
@@ -186,6 +193,7 @@ export function createGame(options: NewGameOptions): GameState {
     eventQueue: [],
     activeEvent: null,
     dayStats: { jobsAdvanced: [], jobsCompleted: [], dustAtStart: 0 },
+    lastExpressDay: null,
     productionMinutesMonth: 0,
     gameOver: null,
   };
@@ -719,6 +727,9 @@ export function applyAction(state: GameState, action: GameAction): GameState {
       break;
     case 'BUY_STOCK':
       buyStock(next, action.sheets);
+      break;
+    case 'PAY_ARREARS':
+      payArrears(next, action.amount);
       break;
     case 'RESOLVE_EVENT':
       resolveEvent(next, action.choiceId);

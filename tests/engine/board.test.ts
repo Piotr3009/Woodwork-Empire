@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   BOARD_SIZE_BY_TIER,
+  EXPRESS_PRICE_UPLIFT,
   EXPRESS_PROBABILITY_BASE,
-  EXPRESS_PROBABILITY_PER_REPUTATION,
+  EXPRESS_PROBABILITY_MAX,
+  EXPRESS_PROBABILITY_MIN,
+  EXPRESS_PROBABILITY_PER_REPUTATION_STEP,
   SIZE_MULTIPLIER_MAX,
   SIZE_MULTIPLIER_MIN,
 } from '../../src/engine/constants';
@@ -10,6 +13,7 @@ import {
   boardSizeRange,
   canAccept,
   expireEnquiries,
+  expressAllowed,
   expressProbability,
   generateEnquiry,
   refillBoard,
@@ -43,7 +47,7 @@ describe('enquiry generation', () => {
 
   it('offers the dearer work once the reputation is there', () => {
     const state = newGame();
-    state.reputation = 2.5;
+    state.reputation = 40;
     state.enquiries = [];
     const names = new Set(draw(state, 600).map((enquiry) => enquiry.templateId));
     expect(names.has('wardrobe')).toBe(true);
@@ -88,13 +92,14 @@ describe('enquiry generation', () => {
     }
   });
 
-  it('raises the express chance with the reputation', () => {
+  it('raises the express chance per whole ten points of reputation, capped at 0.30', () => {
     expect(expressProbability(0)).toBeCloseTo(EXPRESS_PROBABILITY_BASE, 10);
-    expect(expressProbability(0.9)).toBeCloseTo(EXPRESS_PROBABILITY_BASE, 10);
-    expect(expressProbability(2)).toBeCloseTo(
-      EXPRESS_PROBABILITY_BASE + 2 * EXPRESS_PROBABILITY_PER_REPUTATION,
+    expect(expressProbability(9)).toBeCloseTo(EXPRESS_PROBABILITY_BASE, 10);
+    expect(expressProbability(20)).toBeCloseTo(
+      EXPRESS_PROBABILITY_BASE + 2 * EXPRESS_PROBABILITY_PER_REPUTATION_STEP,
       10,
     );
+    expect(expressProbability(100)).toBe(EXPRESS_PROBABILITY_MAX);
   });
 
   it('draws express jobs about as often as the chance says', () => {
@@ -117,16 +122,17 @@ describe('enquiry generation', () => {
 describe('the board over time', () => {
   it('reads its size range off the reputation tier', () => {
     const state = newGame();
+    state.reputation = -10;
     expect(boardSizeRange(state)).toEqual(BOARD_SIZE_BY_TIER[0]);
-    state.reputation = 1;
+    state.reputation = 0;
     expect(boardSizeRange(state)).toEqual(BOARD_SIZE_BY_TIER[1]);
-    state.reputation = 4;
+    state.reputation = 30;
     expect(boardSizeRange(state)).toEqual(BOARD_SIZE_BY_TIER[2]);
   });
 
-  it('starts day 1 with one or two enquiries, all greyed out', () => {
+  it('starts day 1 with two or three enquiries, all greyed out', () => {
     const state = newGame();
-    const [min, max] = BOARD_SIZE_BY_TIER[0] ?? [1, 2];
+    const [min, max] = BOARD_SIZE_BY_TIER[1] ?? [2, 3];
     expect(state.enquiries.length).toBeGreaterThanOrEqual(min);
     expect(state.enquiries.length).toBeLessThanOrEqual(max);
     for (const enquiry of state.enquiries) {
@@ -154,6 +160,7 @@ describe('the board over time', () => {
       name: 'Oak dining table',
       sizeMultiplier: 1,
       price: 12000,
+      basePrice: 12000,
       finish: 'laminate',
       materialKind: 'solidWood',
       deadlineDays: 50,
@@ -180,6 +187,7 @@ describe('the board over time', () => {
       name: 'Garage shelves',
       sizeMultiplier: 1,
       price: 480,
+      basePrice: 400,
       finish: 'laminate',
       materialKind: 'sheet',
       deadlineDays: 12,
@@ -222,7 +230,7 @@ describe('the board over time', () => {
 
   it('refills the board every morning without letting it grow past the tier', () => {
     let state = newGame();
-    const [, max] = BOARD_SIZE_BY_TIER[0] ?? [1, 2];
+    const [, max] = BOARD_SIZE_BY_TIER[1] ?? [2, 3];
     for (let day = 0; day < 10; day += 1) {
       state = clearEvents(tick(state, 600));
       expect(state.enquiries.length).toBeLessThanOrEqual(max);
@@ -231,22 +239,62 @@ describe('the board over time', () => {
 });
 
 describe('board size and the express chance follow the reputation', () => {
-  it('gives 3 to 5 enquiries from reputation 2, as CLAUDE.md 8.8 says', () => {
+  it('gives 3 to 5 enquiries above reputation 20', () => {
     const state = newGame();
-    state.reputation = 2;
+    state.reputation = 20;
     expect(boardSizeRange(state)).toEqual(BOARD_SIZE_BY_TIER[2]);
-    state.reputation = 1.9;
+    state.reputation = 19;
     expect(boardSizeRange(state)).toEqual(BOARD_SIZE_BY_TIER[1]);
   });
 
-  it('lowers the express chance when the reputation is negative', () => {
-    expect(expressProbability(-1)).toBeCloseTo(
-      EXPRESS_PROBABILITY_BASE - EXPRESS_PROBABILITY_PER_REPUTATION,
+  it('lowers the express chance when the reputation is negative, with a floor', () => {
+    expect(expressProbability(-10)).toBeCloseTo(
+      EXPRESS_PROBABILITY_BASE - EXPRESS_PROBABILITY_PER_REPUTATION_STEP,
       10,
     );
-    expect(expressProbability(-3)).toBeCloseTo(
-      EXPRESS_PROBABILITY_BASE - 3 * EXPRESS_PROBABILITY_PER_REPUTATION,
-      10,
-    );
+    expect(expressProbability(-30)).toBe(EXPRESS_PROBABILITY_MIN);
+  });
+});
+
+describe('express, the Turn 2 rules', () => {
+  it('puts the 20% uplift on the price only, leaving the base price for material and labour', () => {
+    const state = newGame();
+    state.enquiries = [];
+    state.reputation = 100;
+    const drawn = draw(state, 400).filter((enquiry) => enquiry.express);
+    expect(drawn.length).toBeGreaterThan(0);
+    for (const enquiry of drawn) {
+      expect(enquiry.price).toBeGreaterThan(enquiry.basePrice);
+      expect(enquiry.price / enquiry.basePrice).toBeCloseTo(1 + EXPRESS_PRICE_UPLIFT, 1);
+    }
+    const plain = draw(state, 100).filter((enquiry) => !enquiry.express);
+    for (const enquiry of plain) expect(enquiry.price).toBe(enquiry.basePrice);
+  });
+
+  it('lets one express enquiry onto the board a week and no more', () => {
+    const state = newGame();
+    expect(expressAllowed(state)).toBe(true);
+    state.lastExpressDay = 1;
+    expect(expressAllowed(state)).toBe(false);
+    state.clock.day = 7;
+    expect(expressAllowed(state)).toBe(false);
+    state.clock.day = 8;
+    expect(expressAllowed(state)).toBe(true);
+  });
+
+  it('never fills the board with express work, however high the reputation', () => {
+    const state = newGame();
+    state.reputation = 100;
+    state.enquiries = [];
+    state.lastExpressDay = null;
+    // A whole week of refills: the cap allows one express enquiry in it.
+    let express = 0;
+    for (let day = 1; day <= 7; day += 1) {
+      state.clock.day = day;
+      state.enquiries = [];
+      refillBoard(state);
+      express += state.enquiries.filter((enquiry) => enquiry.express).length;
+    }
+    expect(express).toBeLessThanOrEqual(1);
   });
 });

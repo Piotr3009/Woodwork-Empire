@@ -22,17 +22,16 @@ describe('30 days on Easy, working the board', () => {
     expect(state.finance.arrearsAmount).toBe(0);
   });
 
-  it('ends with a reputation above 0.5', () => {
-    expect(state.reputation).toBeGreaterThan(0.5);
+  it('ends well above the reputation it started on', () => {
+    expect(state.reputation).toBeGreaterThan(10);
   });
 
-  it('took shelves, a bookcase and a TV unit, and finished most of them', () => {
+  it('took bookcases and TV units, and finished most of them', () => {
     const done = state.jobs.filter((job) => job.stage === 'completed');
     expect(done.length).toBeGreaterThanOrEqual(3);
     const taken = new Set(state.jobs.map((job) => job.templateId));
-    expect(taken.has('garageShelves')).toBe(true);
     expect(taken.has('bookcase')).toBe(true);
-    // A TV unit needs a reputation of 0.5, so it can only come after the first jobs landed.
+    // A TV unit needs a reputation of 5, so it can only come after the first jobs landed.
     expect(taken.has('tvUnit')).toBe(true);
     // Nothing dearer was touched: the script only takes what it is told to take.
     expect(taken.has('wardrobe')).toBe(false);
@@ -54,13 +53,12 @@ describe('30 days on Easy, working the board', () => {
 });
 
 describe('30 days on Hard, doing nothing', () => {
-  it('is deep in the overdraft, with the arrears still ahead', () => {
-    // With the placeholder costs of CLAUDE.md 8.1 and the overdraft limit of 8.3, a Hard game that
-    // buys nothing at all does not reach arrears inside 30 days. Noted in REPORT-T1 section 5.
+  it('is flat on the 5000 overdraft with the arrears already running', () => {
+    // The Turn 2 overdraft limit of 5000 brings the first missed bill forward to day 23.
     const state = playUntilDay(newGame({ seed: SEED, difficulty: 'hard' }), 31, IDLE);
     expect(state.clock.day).toBe(31);
-    expect(state.cash).toBeLessThan(-8000);
-    expect(state.finance.arrearsAmount).toBe(0);
+    expect(state.cash).toBeLessThan(-4900);
+    expect(state.finance.arrearsAmount).toBeGreaterThan(0);
     expect(state.gameOver).toBeNull();
   });
 

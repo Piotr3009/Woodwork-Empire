@@ -38,8 +38,10 @@ import {
 } from '../helpers';
 
 /** A workshop with the day 1 kit and a 400 job already at the bench. */
-function atTheBench(options: { price?: number } = {}): GameState {
-  const state = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
+function atTheBench(options: { price?: number; seed?: number } = {}): GameState {
+  const state = buyStartingKit(
+    newGame({ difficulty: 'veryEasy', ...(options.seed === undefined ? {} : { seed: options.seed }) }),
+  );
   state.enquiries = [];
   const enquiry = placeEnquiry(state, { price: options.price ?? 4000, deadlineDays: 90 });
   const accepted = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
@@ -296,26 +298,29 @@ describe('dust', () => {
   });
 
   it('puts a joiner off for three days when the hall is dangerous', () => {
-    const state = atTheBench();
-    state.dust = 95;
-    state.workers.push({
-      id: 'staff-1',
-      name: 'Ben',
-      role: 'joiner',
-      tier: 'normal',
-      rate: 0.8,
-      weeklyWage: 640,
-      monthlyWage: 0,
-      startDay: 1,
-      jobId: null,
-      taskId: null,
-      absentDaysRemaining: 0,
-      anchorX: 0,
-      anchorY: 4,
-    });
-    // 2% a day: over 60 working days somebody gets hurt.
-    const run = runToDay(state, 60);
-    const accidents = eventsOfKind(run.events, 'accident');
+    // 2% a day. One seed is a coin toss over two months, so four of them are run and the test
+    // asks only that somebody gets hurt somewhere in them.
+    const accidents: GameEvent[] = [];
+    for (const seed of [1, 2, 3, 4]) {
+      const state = atTheBench({ seed });
+      state.dust = 95;
+      state.workers.push({
+        id: 'staff-1',
+        name: 'Ben',
+        role: 'joiner',
+        tier: 'normal',
+        rate: 0.8,
+        weeklyWage: 640,
+        monthlyWage: 0,
+        startDay: 1,
+        jobId: null,
+        taskId: null,
+        absentDaysRemaining: 0,
+        anchorX: 0,
+        anchorY: 4,
+      });
+      accidents.push(...eventsOfKind(runToDay(state, 60).events, 'accident'));
+    }
     expect(accidents.length).toBeGreaterThanOrEqual(1);
     expect(accidents[0]?.data.days).toBe(ACCIDENT_DAYS_OFF);
   });
@@ -365,10 +370,13 @@ describe('the extractor', () => {
   });
 
   it('does break down eventually on its own', () => {
-    const state = atTheBench();
-    state.dust = 80;
-    const run = runToDay(state, 100);
-    expect(eventsOfKind(run.events, 'extractorBroken').length).toBeGreaterThanOrEqual(1);
+    let broken = 0;
+    for (const seed of [1, 2, 3, 4]) {
+      const state = atTheBench({ seed });
+      state.dust = 80;
+      broken += eventsOfKind(runToDay(state, 100).events, 'extractorBroken').length;
+    }
+    expect(broken).toBeGreaterThanOrEqual(1);
   });
 });
 

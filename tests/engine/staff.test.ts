@@ -47,11 +47,15 @@ describe('the hiring pool', () => {
       hiringOptions({ ...state, reputation })
         .filter((option) => option.blockReason.startsWith('Nobody'))
         .map((option) => option.label);
+    expect(byLabel(-50)).toContain('Office admin');
+    expect(byLabel(-50)).not.toContain('Joiner, poor');
+    expect(byLabel(-50)).not.toContain('Helper');
     expect(byLabel(0)).toContain('Joiner, normal');
-    expect(byLabel(0)).toContain('Office admin');
-    expect(byLabel(1)).not.toContain('Joiner, normal');
-    expect(byLabel(1)).toContain('Joiner, super');
-    expect(byLabel(2.5)).toHaveLength(0);
+    expect(byLabel(5)).not.toContain('Office admin');
+    expect(byLabel(10)).not.toContain('Joiner, normal');
+    expect(byLabel(10)).toContain('Joiner, super');
+    expect(byLabel(15)).not.toContain('Salesman');
+    expect(byLabel(40)).toHaveLength(0);
   });
 
   it('names what has to be bought before a joiner can start', () => {
@@ -108,7 +112,7 @@ describe('the hiring pool', () => {
 
   it('hires office staff without any bench kit', () => {
     let state = newGame();
-    state.reputation = 1.5;
+    state.reputation = 15;
     state = act(state, { type: 'HIRE', role: 'salesman', tier: null });
     expect(state.workers[0]?.role).toBe('salesman');
     expect(state.workers[0]?.monthlyWage).toBe(2200);
@@ -117,7 +121,7 @@ describe('the hiring pool', () => {
 
 function jobReadyWith(price: number, tier: Worker['tier']): GameState {
   let state = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
-  state.reputation = 2.5;
+  state.reputation = 40;
   state = withCrew(state, 1, tier);
   const enquiry = placeEnquiry(state, {
     templateId: 'wardrobe',
@@ -190,7 +194,7 @@ describe('the saw ratio', () => {
 
   it('shows up in what the fourth joiner produces', () => {
     let state = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
-    state.reputation = 1;
+    state.reputation = 10;
     state = withCrew(state, 4, 'normal');
     for (let index = 0; index < 4; index += 1) {
       const enquiry = placeEnquiry(state, {

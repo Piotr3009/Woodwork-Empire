@@ -84,6 +84,17 @@ describe('fatigue', () => {
     const day3 = nextDay(day2);
     expect(day3.owner.fatigue).toBe(0);
   });
+
+  it('charges a part hour pro rata: 30 minutes of overtime cost 0.025', () => {
+    let state = withLicence(newGame());
+    const task = createTask(state, { kind: 'design', label: 'Long drawing', minutes: 900 });
+    state = act(state, { type: 'START_TASK', taskId: task.id });
+    state = tick(state, 510);
+    expect(state.owner.overtimeMinutes).toBe(30);
+    const day2 = clearEvents(act(state, { type: 'END_DAY' }));
+    expect(day2.owner.fatigue).toBeCloseTo(FATIGUE_PER_OVERTIME_HOUR / 2, 10);
+    expect(day2.owner.fatigue).toBe(0.025);
+  });
 });
 
 describe('absence', () => {

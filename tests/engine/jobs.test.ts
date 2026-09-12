@@ -268,8 +268,8 @@ describe('production', () => {
     const job = state.jobs[0];
     expect(job?.balancePaid).toBe(200);
     expect(job?.penalty).toBe(0);
-    expect(job?.rating).toBe(0.3);
-    expect(state.reputation).toBe(0.3);
+    expect(job?.rating).toBe(3);
+    expect(state.reputation).toBe(3);
     expect(state.cash).toBeCloseTo(afterDeposit + 200, 6);
     expect(state.activeEvent?.kind).toBe('jobPaid');
     expect(ownerJob(state)).toBeNull();
@@ -299,7 +299,7 @@ describe('late delivery', () => {
     expect(job?.daysLate).toBe(3);
     expect(job?.penalty).toBeCloseTo(3 * LATE_PENALTY_PER_DAY * 400, 6);
     expect(job?.balancePaid).toBeCloseTo(140, 6);
-    expect(job?.rating).toBe(-0.3);
+    expect(job?.rating).toBe(-3);
   });
 
   it('takes 30% a day on an express job', () => {
@@ -354,8 +354,8 @@ describe('scenario: garage shelves on Easy', () => {
     expect(job?.stage).toBe('completed');
     expect(job?.completedDay).toBe(2);
     expect(job?.daysLate).toBe(0);
-    expect(job?.rating).toBe(0.3);
-    expect(state.reputation).toBe(0.3);
+    expect(job?.rating).toBe(3);
+    expect(state.reputation).toBe(3);
     // 200 deposit in, 160 material out, 200 balance in: 240 of the 400 stays in the till.
     const jobMoves = state.ledger
       .filter((entry) => ['jobDeposit', 'jobBalance', 'material'].includes(entry.category))
@@ -414,5 +414,25 @@ describe('machine reductions act on the minutes, every minute', () => {
   it('still takes 240 minutes for a 400 job in a workshop with no reductions', () => {
     const state = accept(ready());
     expect(minutesRemainingFor(state, firstJob(state), 1)).toBeCloseTo(240, 6);
+  });
+});
+
+describe('an express job, on the Turn 2 rules', () => {
+  it('charges material and labour against the base price, so the uplift is pure profit', () => {
+    // A 400 shelves job taken as express: the client pays 480, the workshop still spends 400.
+    const state = accept(ready(), 480, { express: true, basePrice: 400 });
+    const job = firstJob(state);
+    expect(job.price).toBe(480);
+    expect(job.basePrice).toBe(400);
+    expect(job.materialCost).toBe(400 * MATERIAL_FRACTION);
+    expect(job.labourValue).toBe(400 * LABOUR_FRACTION);
+    // The deposit, and later the balance, come off the full price the client agreed to.
+    expect(job.depositPaid).toBe(480 * DEPOSIT_FRACTION);
+  });
+
+  it('leaves a standard job with the base price it came in on', () => {
+    const job = firstJob(accept(ready(), 900));
+    expect(job.basePrice).toBe(900);
+    expect(job.materialCost).toBe(900 * MATERIAL_FRACTION);
   });
 });

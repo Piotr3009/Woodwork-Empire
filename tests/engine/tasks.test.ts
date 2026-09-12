@@ -115,6 +115,7 @@ describe('the daily list', () => {
       templateId: 'garageShelves',
       name: 'Garage shelves',
       price: 400,
+      basePrice: 400,
       sizeMultiplier: 1,
       finish: 'laminate',
       materialKind: 'sheet',

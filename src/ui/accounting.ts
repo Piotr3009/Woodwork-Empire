@@ -3,6 +3,7 @@
 
 import { LEDGER_VISIBLE_ENTRIES } from '../engine/constants';
 import {
+  arrearsCarryInterest,
   dailyPower,
   dailyRates,
   dailyRent,
@@ -11,7 +12,7 @@ import {
   weeklyWageBill,
 } from '../engine/index';
 import type { GameState, PeriodTotals } from '../engine/index';
-import { button, escapeHtml, money } from './modal';
+import { button, escapeHtml, money, plural, primaryButton } from './modal';
 
 function totalsBlock(title: string, totals: PeriodTotals): string {
   const lines = Object.entries(totals.byCategory)
@@ -37,13 +38,30 @@ function totalsBlock(title: string, totals: PeriodTotals): string {
   );
 }
 
-export function renderAccounting(state: GameState): string {
+/** Paying the arrears off is the one way out of the ladder to the bailiff (CLAUDE.md T2 3.4). */
+function arrearsBlock(state: GameState, typed: string): string {
+  const finance = state.finance;
+  if (finance.arrearsAmount <= 0) return '';
+  const months = plural(finance.arrearsMonths, 'month', 'months');
+  const interest = arrearsCarryInterest(state)
+    ? ' They are large enough to carry 1% interest a month.'
+    : '';
+  const wanted = Number(typed) || 0;
+  return (
+    `<p class="warn">Arrears ${money(finance.arrearsAmount)}, ${months}. ` +
+    `Three months brings the bailiff.${interest}</p>` +
+    '<div class="row"><span class="row-main">' +
+    '<input type="number" class="num" data-field="arrearsAmount" data-focus-key="arrearsAmount" ' +
+    `value="${escapeHtml(typed)}" min="1" /> to pay</span>` +
+    `<span class="row-figure">${money(Math.min(wanted, finance.arrearsAmount))}</span>` +
+    `<span class="row-action">${button('payArrears', 'Pay', `data-amount="${wanted}"`)}` +
+    `${primaryButton('payArrears', 'Pay all', 'data-amount="all"')}</span></div>`
+  );
+}
+
+export function renderAccounting(state: GameState, arrearsTyped: string): string {
   const due = nextDueDays(state);
-  const arrears =
-    state.finance.arrearsAmount > 0
-      ? `<p class="warn">Arrears ${money(state.finance.arrearsAmount)}, ` +
-        `${state.finance.arrearsMonths} months. Three months brings the bailiff.</p>`
-      : '';
+  const arrears = arrearsBlock(state, arrearsTyped);
   const ledger = state.ledger
     .slice(-LEDGER_VISIBLE_ENTRIES)
     .reverse()
