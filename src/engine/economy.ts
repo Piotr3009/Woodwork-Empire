@@ -24,7 +24,7 @@ import {
 } from './constants';
 import { isFirstOfMonth, isFriday, isWorkingDay, previousWorkingDay, weekday } from './clock';
 import { queueEvent } from './events';
-import { has, machinePowerPerDay, seizableMachines } from './machines';
+import { has, hasCentralExtraction, machinePowerPerDay, seizableMachines } from './machines';
 import { makeId } from './rng';
 import { plural } from './text';
 import type { BookedTotals, GameState, LedgerCategory, PeriodTotals } from './types';
@@ -266,7 +266,7 @@ function runMonthlyItems(state: GameState): void {
   if (state.software.mode === 'subscription') {
     chargeUnavoidable(state, 'software', 'Software subscription', SOFTWARE_SUBSCRIPTION_MONTHLY);
   }
-  if (has(state, 'dustSystem') && !has(state, 'pelletiser')) {
+  if (hasCentralExtraction(state) && !has(state, 'pelletiser')) {
     chargeUnavoidable(state, 'waste', 'Dust waste collection', DUST_WASTE_MONTHLY);
   }
   if (has(state, 'pelletiser')) {

@@ -57,8 +57,7 @@
   font-size: 12px;
 }
 
-.hall-view,
-.office-view {
+.hall-view {
   display: block;
   flex: 1 1 0;
   width: 100%;
@@ -993,4 +992,141 @@ input.num {
 
 .field-clear:hover {
   color: var(--text);
+}
+
+/* The four tabs of the laptop (CLAUDE.md T4 3.1). */
+.tabs {
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 10px;
+  padding: 0 0 10px;
+}
+
+/* --------------------------------------------------------------------------
+   The office room (docs/art/SPRITES.md 8)
+   -------------------------------------------------------------------------- */
+
+/* The room is letterboxed on the page background: one uniform scale, centred, never cropped. */
+.office-room {
+  background: var(--page);
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
+}
+
+.office-stack {
+  left: 50%;
+  position: absolute;
+  top: 50%;
+  transform-origin: 50% 50%;
+}
+
+.office-layer {
+  height: 100%;
+  left: 0;
+  position: absolute;
+  top: 0;
+  user-select: none;
+  width: 100%;
+}
+
+/* No art yet: a flat rectangle per layer with its name on it, so the room still works. */
+.office-placeholder {
+  align-items: flex-start;
+  box-sizing: border-box;
+  color: rgb(255 255 255 / 65%);
+  display: flex;
+  font-size: 28px;
+  justify-content: flex-end;
+  letter-spacing: 1px;
+  padding: 16px 24px;
+}
+
+.office-placeholder-1 {
+  background: #3d4450;
+}
+
+.office-placeholder-2 {
+  background: rgb(96 74 52 / 55%);
+}
+
+.office-placeholder-3 {
+  background: rgb(40 46 56 / 45%);
+}
+
+/* Transparent: the room carries no drawn buttons. Hover lightens it, nothing more. */
+.office-region {
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  margin: 0;
+  padding: 0;
+  position: absolute;
+}
+
+.office-region:hover,
+.office-region:focus-visible {
+  background: rgb(255 255 255 / 12%);
+  outline: none;
+}
+
+.office-region.is-quiet {
+  pointer-events: none;
+}
+
+/* The two live texts sit in the blank areas the artwork leaves for them. */
+.office-clock,
+.office-company {
+  align-items: center;
+  display: flex;
+  overflow: hidden;
+  pointer-events: none;
+  position: absolute;
+  white-space: nowrap;
+}
+
+.office-clock {
+  color: #ffb02e;
+  font-family: 'DSEG7 Classic', 'Seven Segment', ui-monospace, 'Courier New', monospace;
+  font-weight: 700;
+  justify-content: center;
+  letter-spacing: 2px;
+  text-shadow: 0 0 8px rgb(255 176 46 / 45%);
+}
+
+.office-company {
+  color: #3a3a38;
+  font-family: 'Segoe Script', 'Bradley Hand', cursive, sans-serif;
+  font-weight: 600;
+}
+
+/* A flex container cannot ellipsise its own text, so the name is a block inside it. */
+.office-company > span {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The office layers are full width pictures, not sprites on a tile (CLAUDE.md T4 4). */
+.sprite-wide-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.sprite-cell.is-wide {
+  width: 100%;
+}
+
+.office-preview img {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  display: block;
+  height: auto;
+  width: 100%;
 }

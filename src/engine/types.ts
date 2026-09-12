@@ -16,6 +16,10 @@ export type SoftwareMode = 'none' | 'oneOff' | 'subscription';
 
 export type TaskCategory = 'admin' | 'design' | 'workshop';
 
+/** How often the player wants the end of day summary in front of him. A preference, not an
+ *  engine number: the day ends the same way whatever it says (CLAUDE.md T4 3.6). */
+export type SummaryCadence = 'daily' | 'weekly' | 'monthly';
+
 export type WorkerRole = 'joiner' | 'helper' | 'officeAdmin' | 'purchasingClerk' | 'salesman';
 
 export type WorkerTier = 'poor' | 'normal' | 'super';
@@ -83,6 +87,8 @@ export interface EquipmentSpec {
   stackable: boolean;
   /** Other catalogue ids that must be owned first. */
   requires: string[];
+  /** Catalogue ids of which at least one must be owned first. Empty means no such condition. */
+  requiresOneOf: string[];
   effect: string;
   /** What this family can be bought as, cheapest first. The catalogue price is the first one. */
   variants: EquipmentVariant[];
@@ -147,6 +153,8 @@ export interface OwnerState {
   fatigue: number;
   wentHome: boolean;
   currentTaskId: string | null;
+  /** What the phone interrupted, so he goes back to it when the call is over (T4 3.3). */
+  resumeTaskId: string | null;
   sickDaysRemaining: number;
   /** Absolute day the next sick leave starts. */
   sickStartDay: number | null;
@@ -276,9 +284,15 @@ export interface Job {
   finishedDay: number | null;
   /** Transport is booked and the piece leaves on this day. Null while nothing is booked. */
   deliverOnDay: number | null;
-  callsRemaining: number;
+  /** The calls the client makes about this job, in the diary (CLAUDE.md T4 3.3). */
+  calls: ClientCall[];
+  /** Calls nobody picked up. The first is free, every one after it costs. */
+  callsMissed: number;
   designMinutesRemaining: number;
   assignedTo: string | null;
+  /** When this job took a bench, so the benches are held by the men who got to them first and
+   *  nobody is turned off one he is standing at (CLAUDE.md T4 3.4). Null while it holds none. */
+  benchSince: number | null;
   completedDay: number | null;
   daysLate: number;
   depositPaid: number;
@@ -288,6 +302,25 @@ export interface Job {
   emailsUnanswered: number;
   rating: number | null;
   overdueWarned: boolean;
+}
+
+/** One call from the client: when he rings, and what happened when he did. */
+export interface ClientCall {
+  /** Absolute day he rings on. */
+  day: number;
+  /** Minute of the working day he rings at. */
+  minute: number;
+  state: 'waiting' | 'taken' | 'missed';
+  /** The second attempt after a missed call. The same call trying again, not a call of its own. */
+  retry: boolean;
+}
+
+/** One item the player has dragged, and the tile it stood on before he started. An item put back
+ *  exactly where it was is taken off this list: it was never moved (CLAUDE.md T4 3.5). */
+export interface MovedItem {
+  itemId: string;
+  fromX: number;
+  fromY: number;
 }
 
 export interface Delivery {
@@ -317,7 +350,8 @@ export type TaskKind =
   | 'fetchStorage'
   | 'deliver'
   | 'service'
-  | 'repair';
+  | 'repair'
+  | 'moveMachines';
 
 export interface TaskInstance {
   id: string;
@@ -359,7 +393,8 @@ export type GameEventKind =
   | 'jobOverdue'
   | 'lateAccounts'
   | 'jobAtGate'
-  | 'jobPaid';
+  | 'jobPaid'
+  | 'clientCall';
 
 export interface GameEventChoice {
   id: string;
@@ -395,6 +430,7 @@ export type LedgerCategory =
   | 'jobBalance'
   | 'interest'
   | 'repair'
+  | 'ducting'
   | 'storage'
   | 'taxi'
   | 'transport'
@@ -508,6 +544,12 @@ export interface GameState {
   lateAccountsMonths: number;
   /** Production minutes since the 1st, for pellet sales. */
   productionMinutesMonth: number;
+  /** Kit the player has dragged about and not yet paid for in time and ducting (T4 3.5). */
+  movedItems: MovedItem[];
+  /** The speed the clock was on before the move forced itself to 4x. Null while none is on. */
+  speedBeforeMove: Speed | null;
+  /** How often the end of day summary is put in front of the player (CLAUDE.md T4 3.6). */
+  summaryCadence: SummaryCadence;
   gameOver: GameOver | null;
 }
 
@@ -523,6 +565,8 @@ export type GameAction =
   | { type: 'PAY_ARREARS'; amount: number | null }
   | { type: 'ORDER_TRANSPORT'; jobId: string }
   | { type: 'MOVE_ITEM'; itemId: string; x: number; y: number }
+  | { type: 'END_SETUP'; speed: Speed }
+  | { type: 'SET_SUMMARY_CADENCE'; cadence: SummaryCadence }
   | { type: 'SET_SHOW_WHY'; on: boolean }
   | { type: 'WORK_HERE'; jobId: string | null }
   | { type: 'ASSIGN_JOB'; jobId: string; workerId: string | null }

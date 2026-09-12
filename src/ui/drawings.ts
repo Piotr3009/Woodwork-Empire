@@ -1,17 +1,9 @@
 // The roll of drawings on the desk: the design queue and what has already been drawn. Design used
 // to sit in the laptop, and one thing belongs in one place (CLAUDE.md T3 3.3).
 
-import {
-  findJob,
-  jobTasks,
-  openJobs,
-  ownerIsAvailable,
-  softwareActive,
-  staffMinutesLeft,
-  workerById,
-} from '../engine/index';
+import { findJob, jobTasks, openJobs, staffMinutesLeft, workerById } from '../engine/index';
 import type { GameState, TaskInstance } from '../engine/index';
-import { button, emptyLine, escapeHtml, minutes, money, reasonLabel } from './modal';
+import { emptyLine, escapeHtml, minutes, money, taskStartAction } from './modal';
 
 /** What the workshop is licensed to draw with, in words (CLAUDE.md 9.2). */
 export function licenceLine(state: GameState): string {
@@ -38,16 +30,7 @@ function designRow(state: GameState, task: TaskInstance): string {
   const staffLine = onItLine(state, task);
   const job = task.jobId === null ? null : findJob(state, task.jobId);
   const jobLine = job === null ? '' : ` · ${money(job.price)}`;
-  let action: string;
-  if (running) {
-    action = button('pauseTask', 'Pause');
-  } else if (!softwareActive(state)) {
-    action = reasonLabel('No software licence');
-  } else if (!ownerIsAvailable(state)) {
-    action = reasonLabel('The owner is not in today');
-  } else {
-    action = button('startTask', started ? 'Continue' : 'Start', `data-id="${task.id}"`);
-  }
+  const action = taskStartAction(state, task, started ? 'Continue' : 'Start');
   return (
     `<div class="row${running ? ' is-running' : ''}">` +
     `<span class="row-main">${escapeHtml(task.label)}${jobLine}</span>` +

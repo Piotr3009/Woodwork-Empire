@@ -97,6 +97,20 @@ export function runToDay(state: GameState, day: number): Run {
   return { state: next, events };
 }
 
+/** Runs the clock, answering whatever the day throws up with its first choice, until the first
+ *  job on the books has reached this stage. The client rings while the work goes on now, so a
+ *  plain tick of the right number of minutes no longer finishes a job (CLAUDE.md T4 3.3). */
+export function runToStage(state: GameState, stage: Job['stage'], most = 2000): GameState {
+  let next = clearEvents(state);
+  let guard = 0;
+  while (next.jobs[0] !== undefined && next.jobs[0].stage !== stage && guard < most) {
+    next = clearEvents(tick(next, 1));
+    if (next.gameOver) break;
+    guard += 1;
+  }
+  return next;
+}
+
 export function eventsOfKind(events: GameEvent[], kind: GameEvent['kind']): GameEvent[] {
   return events.filter((event) => event.kind === kind);
 }

@@ -47,8 +47,6 @@ function ready(difficulty: 'easy' | 'veryEasy' = 'easy'): GameState {
 function upToMaterial(state: GameState, extra = {}): GameState {
   const enquiry = placeEnquiry(state, { price: 400, deadlineDays: 30, ...extra });
   let next = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
-  next = doTask(next, 'clientCall');
-  next = doTask(next, 'clientCall');
   next = doTask(next, 'design');
   return next;
 }
@@ -249,9 +247,6 @@ describe('what stock cannot cover', () => {
       lockReason: 'Needs solid wood tools',
     });
     state = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: table.id, byHand: true });
-    state = doTask(state, 'clientCall');
-    state = doTask(state, 'clientCall');
-    state = doTask(state, 'clientCall');
     state = doTask(state, 'design');
     state = act(state, { type: 'SET_MATERIAL_MODE', jobId: firstJob(state).id, mode: 'stock' });
     state = doTask(state, 'materialOrder');

@@ -69,7 +69,7 @@ describe('the first ten minutes', () => {
 
   it('3. walks into the office and buys the day 1 kit from the catalogue', () => {
     click('[data-do="setView"][data-view="office"]');
-    expect(html()).toContain('office-view');
+    expect(html()).toContain('office-room');
     expect(html()).toContain('data-office="catalogue"');
     click('[data-office="catalogue"]');
     expect(html()).toContain('Equipment catalogue');
@@ -106,26 +106,25 @@ describe('the first ten minutes', () => {
     expect(state?.jobs[0]?.depositPaid).toBeGreaterThan(0);
   });
 
-  it('5. finds the calls in the laptop and the drawing on the roll beside it', () => {
+  it('5. finds the desk work in the laptop and the drawing on the roll beside it', () => {
     click('[data-do="closeModal"]');
     // Still standing in the office, so the laptop is right there on the desk.
     click('[data-office="laptop"]');
     expect(html()).toContain('Laptop');
     const name = currentState()?.jobs[0]?.name ?? '';
-    expect(html()).toContain('Client call 1 of');
+    // The calls are in the client's diary now, not on the desk (CLAUDE.md T4 3.3).
+    expect(html()).not.toContain('Client call');
+    expect((currentState()?.jobs[0]?.calls ?? []).length).toBeGreaterThan(0);
     expect(html()).toContain('Email 1 of');
     expect(html()).toContain('Bookkeeping');
-    // The drawings moved out of the laptop and onto the desk (CLAUDE.md T3 3.3).
+    // The drawings are a tab of the laptop, not the Tasks tab (CLAUDE.md T4 3.1).
     expect(html()).not.toContain('Design queue');
     expect(html()).not.toContain(`Design: ${name}`);
-    click('[data-do="closeModal"]');
-    click('[data-office="drawings"]');
-    expect(html()).toContain('Drawings');
+    click('[data-do="laptopTab"][data-id="drawings"]');
     expect(html()).toContain('Design queue');
     expect(html()).toContain(`Design: ${name}`);
     expect(html()).toContain('Finished drawings');
-    click('[data-do="closeModal"]');
-    click('[data-office="laptop"]');
+    click('[data-do="laptopTab"][data-id="tasks"]');
     click('[data-do="startTask"]');
     expect(currentState()?.owner.currentTaskId).not.toBeNull();
     expect(html()).toContain('Pause');
@@ -241,23 +240,36 @@ describe('the order board as tiles', () => {
 });
 
 describe('the modals', () => {
-  it('open from the office desk, one per object', () => {
+  it('open from the regions of the room, one per region', () => {
     click('[data-do="setView"][data-view="office"]');
-    for (const [object, title] of [
-      ['accounting', 'Accounting'],
-      ['materials', 'Materials and stock'],
-      ['hiring', 'Team board'],
-      ['phone', 'Order board'],
+    for (const [region, modal, title] of [
+      ['binder', 'accounting', 'Accounting'],
+      ['orders', 'board', 'Order board'],
+      ['workPlan', 'workPlan', 'Work Plan'],
+      ['catalogue', 'catalogue', 'Equipment catalogue'],
+      ['laptop', 'laptop', 'Laptop'],
     ]) {
-      click(`[data-office="${object}"]`);
-      expect(html()).toContain(`data-modal="${object === 'phone' ? 'board' : object}"`);
+      click(`[data-office="${region}"]`);
+      expect(html()).toContain(`data-modal="${modal}"`);
       expect(html()).toContain(title ?? '');
       click('[data-do="closeModal"]');
     }
+    // The three modals that lost their desk item are tabs of the laptop now (T4 3.1).
+    click('[data-office="laptop"]');
+    for (const [tab, title] of [
+      ['materials', 'sheets on the rack'],
+      ['team', 'Taking somebody on'],
+      ['drawings', 'Design queue'],
+    ]) {
+      click(`[data-do="laptopTab"][data-id="${tab}"]`);
+      expect(html(), tab).toContain(title ?? '');
+    }
+    click('[data-do="laptopTab"][data-id="tasks"]');
+    click('[data-do="closeModal"]');
   });
 
   it('all carry a close cross and a draggable header', () => {
-    click('[data-office="accounting"]');
+    click('[data-office="binder"]');
     expect(html()).toContain('class="modal-close"');
     expect(html()).toContain('data-drag="1"');
     expect(html()).toContain('class="modal-body"');
@@ -277,10 +289,10 @@ describe('the modals', () => {
   });
 
   it('close on Escape', () => {
-    click('[data-office="hiring"]');
-    expect(html()).toContain('data-modal="hiring"');
+    click('[data-office="laptop"]');
+    expect(html()).toContain('data-modal="laptop"');
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
-    expect(html()).not.toContain('data-modal="hiring"');
+    expect(html()).not.toContain('data-modal="laptop"');
   });
 });
 
@@ -290,7 +302,7 @@ describe('assigning work by hand', () => {
     const state = currentState();
     expect(state?.jobs[0]).toBeDefined();
     if (state && state.jobs[0]) state.jobs[0].stage = 'ready';
-    click('[data-office="laptop"]');
+    click('[data-office="workPlan"]');
     expect(html()).toContain('data-do="assignJob"');
     click('[data-do="assignJob"][data-worker="owner"]');
     expect(currentState()?.jobs[0]?.assignedTo).toBe('owner');
@@ -307,10 +319,10 @@ describe('start production', () => {
       state.jobs[0].assignedTo = null;
       state.stock.sheets = 20;
     }
-    click('[data-office="laptop"]');
+    click('[data-office="workPlan"]');
     expect(html()).toContain('data-do="startProduction"');
     click('[data-do="startProduction"]');
-    expect(html()).not.toContain('data-modal="laptop"');
+    expect(html()).not.toContain('data-modal="workPlan"');
     expect(html()).toContain('hall-view');
     expect(currentState()?.jobs[0]?.assignedTo).toBe('owner');
     expect(currentState()?.jobs[0]?.stage).toBe('inProduction');
@@ -354,7 +366,7 @@ describe('setting the hall out', () => {
 
 describe('why it is like this in real life', () => {
   it('offers an i link on the accounting rows and opens the note', () => {
-    click('[data-office="accounting"]');
+    click('[data-office="binder"]');
     expect(html()).toContain('data-do="showWhy"');
     expect(html()).toContain('data-id="rent"');
     click('[data-do="showWhy"][data-id="rent"]');
@@ -370,14 +382,14 @@ describe('why it is like this in real life', () => {
     expect(html()).toContain('Hide real-life notes');
     click('[data-do="toggleWhy"]');
     expect(currentState()?.showWhy).toBe(false);
-    click('[data-office="accounting"]');
+    click('[data-office="binder"]');
     expect(html()).not.toContain('data-do="showWhy"');
     click('[data-do="closeModal"]');
     click('[data-do="toggleMenu"]');
     expect(html()).toContain('Show real-life notes');
     click('[data-do="toggleWhy"]');
     expect(currentState()?.showWhy).toBe(true);
-    click('[data-office="accounting"]');
+    click('[data-office="binder"]');
     expect(html()).toContain('data-do="showWhy"');
     click('[data-do="closeModal"]');
   });
@@ -385,7 +397,7 @@ describe('why it is like this in real life', () => {
 
 describe('accounting', () => {
   it('plays blind while the books are behind, and shows everything once they are written up', () => {
-    click('[data-office="accounting"]');
+    click('[data-office="binder"]');
     expect(html()).toContain('Books not up to date since day 1');
     expect(html()).toContain('? today');
     expect(html()).not.toContain('Unit deposit');
@@ -393,7 +405,7 @@ describe('accounting', () => {
     // The bookkeeping task catches every day up at once.
     const state = currentState();
     if (state) state.booksUpToDay = state.clock.day;
-    click('[data-office="accounting"]');
+    click('[data-office="binder"]');
     expect(html()).not.toContain('Books not up to date');
     expect(html()).toContain('Unit deposit');
     expect(html()).toContain('Rent');
@@ -411,7 +423,7 @@ describe('accounting', () => {
       state.finance.arrearsMonths = 1;
       state.finance.firstArrearsDay = 1;
     }
-    click('[data-office="accounting"]');
+    click('[data-office="binder"]');
     expect(html()).toContain('Arrears');
     expect(html()).toContain('1 month');
     expect(html()).toContain('data-do="payArrears"');
@@ -425,7 +437,7 @@ describe('accounting', () => {
   });
 
   it('names every line in plain English, never the engine key', () => {
-    click('[data-office="accounting"]');
+    click('[data-office="binder"]');
     expect(html()).toContain('Business rates');
     expect(html()).toContain('Living costs');
     expect(html()).toContain('Deposit on the unit');
@@ -436,7 +448,7 @@ describe('accounting', () => {
   });
 
   it('leaves a question open when the cross belongs to a desk modal', () => {
-    click('[data-office="accounting"]');
+    click('[data-office="binder"]');
     const state = currentState();
     if (state) {
       state.activeEvent = {
@@ -496,11 +508,17 @@ describe('the style rules of 10.4', () => {
     expect(html()).not.toMatch(/£\d+\.\d/);
   });
 
-  it('opens a desk modal beside the object that was clicked', () => {
+  it('centres a modal the room opened, and lets it be dragged off centre', () => {
     click('[data-do="setView"][data-view="office"]');
-    click('[data-office="hiring"]');
+    click('[data-office="laptop"]');
     const modal = root().querySelector('.modal');
     if (!(modal instanceof HTMLElement)) throw new Error('no modal');
+    // The room fills the page, so there is no small object for the modal to sit beside.
+    expect(modal.className).toContain('modal-centred');
+    const head = modal.querySelector('[data-drag="1"]');
+    head?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, clientX: 400, clientY: 200 }));
+    window.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: 520, clientY: 300 }));
+    window.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
     expect(modal.style.left).toMatch(/^\d+px$/);
     expect(modal.style.top).toMatch(/^\d+px$/);
     expect(modal.className).not.toContain('modal-centred');

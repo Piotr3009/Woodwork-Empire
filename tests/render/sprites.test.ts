@@ -32,8 +32,15 @@ describe('which file an object is drawn with', () => {
   });
 
   it('asks the manifest and never the network', () => {
-    // The folder is empty tonight, so every object in the game falls back to its box.
-    expect(spriteFiles()).toEqual([]);
+    // The loader knows what has been delivered from the files on disk, through the manifest the
+    // build writes, and by no other route.
+    expect(spriteFiles()).toEqual(spriteFilesIn('public/sprites'));
+    for (const name of spriteFilesIn('public/sprites')) {
+      const key = name.replace(/\.png$/i, '');
+      expect(spriteUrl(key), key).toBe(`/sprites/${name}`);
+    }
+    // Nothing has been delivered for the saw, so it still falls back to its box.
+    expect(spriteFilesIn('public/sprites')).not.toContain('tableSaw.png');
     expect(spriteUrl('tableSaw', 'used')).toBeNull();
   });
 });
@@ -112,9 +119,8 @@ describe('the manifest the build writes', () => {
     expect(pickPngs([])).toEqual([]);
   });
 
-  it('reads an empty folder as an empty manifest, and a missing one too', () => {
-    expect(spriteFilesIn('public/sprites')).toEqual([]);
+  it('writes what is on disk, and reads a missing folder as an empty one', () => {
+    expect(spriteFilesIn('public/sprites')).toEqual(manifest);
     expect(spriteFilesIn('public/sprites/not-a-folder')).toEqual([]);
-    expect(manifest).toEqual([]);
   });
 });

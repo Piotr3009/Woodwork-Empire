@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { renderHall } from '../../src/render/hall';
-import { renderOffice } from '../../src/render/office';
 import { renderLaptop } from '../../src/ui/laptop';
 import { TILE_HEIGHT, TILE_WIDTH } from '../../src/render/iso';
 import { act, buyStartingKit, firstJob, newGame, placeEnquiry } from '../helpers';
@@ -28,12 +27,6 @@ describe('the views retain intrinsic scene dimensions for viewport scaling', () 
     }
   });
 
-  it('gives the office the same treatment', () => {
-    const size = box(renderOffice(newGame()));
-    expect(size.width).toBe(size.boxWidth);
-    expect(size.height).toBe(size.boxHeight);
-  });
-
   it('fits the biggest hall on a 1280 px page, which is what the tile size is for', () => {
     expect(TILE_WIDTH).toBe(48);
     expect(TILE_HEIGHT).toBe(24);
@@ -52,7 +45,7 @@ describe('a job name is printed once', () => {
     const enquiry = placeEnquiry(state, { price: 580, name: 'Garage shelves' });
     state = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
     firstJob(state).stage = 'ready';
-    const html = renderLaptop(state);
+    const html = renderLaptop(state, { tab: 'tasks', stockSheets: '6' });
     // Every row carries the name at most once.
     for (const row of html.split('<div class="row"').slice(1)) {
       const hits = row.split('Garage shelves').length - 1;

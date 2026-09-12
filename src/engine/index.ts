@@ -14,6 +14,7 @@ export {
   createGame,
   machineInUse,
   runMinutes,
+  summaryTotals,
   tick,
 } from './game';
 export type { BuyCheck, NewGameOptions, TickResult } from './game';
@@ -25,7 +26,10 @@ export {
   EQUIPMENT_SPECS,
   MACHINE_ENDURANCE_HOURS,
   MACHINE_ENDURANCE_HOURS_DEFAULT,
+  DUCTING_RECONNECT_COST,
   MINUTES_PER_WORKING_DAY,
+  MOVE_MINUTES_PER_ITEM,
+  MOVING_SPEED,
   STATE_VERSION,
   WHY,
   SHEET_PRICE_STOCK,
@@ -43,7 +47,10 @@ export {
   formatTime,
   gameMinutesPerRealSecond,
   isFriday,
+  isLastWorkingDayOfMonth,
   isWorkingDay,
+  monthOfDay,
+  weekOfDay,
   weekday,
   weekdayName,
 } from './clock';
@@ -106,21 +113,34 @@ export {
 } from './jobs';
 export type { LifecycleStep, StartCheck, StepState } from './jobs';
 
+// Client calls
+export {
+  callRinging,
+  callsForPrice,
+  callsScheduled,
+  callsTaken,
+  dueCall,
+  nextDueCall,
+  penalisedMisses,
+} from './calls';
+
 // Tasks
 export {
-  callsForPrice,
-  clientCallMinutes,
   designMinutes,
   emailsForPrice,
   findTask,
   jobTasks,
   materialOrderMinutes,
+  movePending,
+  movingMachines,
   openTasks,
   softwareActive,
   staffManagementMinutes,
+  startTaskCheck,
   tasksOfKind,
   unloadMinutes,
 } from './tasks';
+export type { TaskStartCheck } from './tasks';
 
 // Staff
 export {
@@ -144,12 +164,17 @@ export {
   countOf,
   enduranceHoursFor,
   findVariant,
+  freeBenches,
+  hasBenchFor,
   machineOutputFactor,
   machinePowerPerDay,
   machinesUsedFor,
   pastEndurance,
   variantFor,
   variantOf,
+  ductedMoves,
+  ductingDue,
+  ductingIsFree,
   dustBand,
   findSpec,
   gateIsCrowded,
@@ -157,8 +182,10 @@ export {
   brokenMachines,
   extractorBroken,
   serviceIsDue,
+  hasCentralExtraction,
   hasExtraction,
   machineLabourFactor,
+  needsDucting,
   machinesDueService,
   overdueBreakdownChance,
   owned,
@@ -202,6 +229,7 @@ export {
   STATION_BENCH,
   STATION_GATE,
   STATION_IDLE,
+  STATION_NO_BENCH,
   STATION_OFFICE,
   STATION_RACK,
   cycleStation,
@@ -216,6 +244,7 @@ export { plural } from './text';
 
 // Reputation
 export {
+  callRatingFactor,
   clampReputation,
   emailRatingFactor,
   formatReputation,

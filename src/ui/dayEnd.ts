@@ -1,9 +1,43 @@
 // The end of day summary, and the game over screen (CLAUDE.md 10.1).
 
 import { MINUTES_PER_WORKING_DAY } from '../engine/constants';
-import { deliveriesArrivingOn, dustBand, findJob, formatReputation, netOf } from '../engine/index';
-import type { GameState } from '../engine/index';
+import {
+  deliveriesArrivingOn,
+  dustBand,
+  findJob,
+  formatReputation,
+  netOf,
+  summaryTotals,
+} from '../engine/index';
+import type { GameState, SummaryCadence } from '../engine/index';
 import { days, escapeHtml, minutes, money, plural } from './modal';
+
+/** The three cadences in the words the player reads, in the order they are offered. */
+const CADENCES: Array<[SummaryCadence, string]> = [
+  ['daily', 'every day'],
+  ['weekly', 'every week'],
+  ['monthly', 'every month'],
+];
+
+/** The one control for how often this summary is put in front of him. It lives here and in the
+ *  Menu, which are two entries to the same preference (CLAUDE.md T4 3.6). */
+export function cadenceControl(state: GameState): string {
+  const chips = CADENCES.map(
+    ([cadence, label]) =>
+      `<button class="chip${state.summaryCadence === cadence ? ' is-on' : ''}" ` +
+      `data-do="setCadence" data-id="${cadence}">${escapeHtml(label)}</button>`,
+  ).join('');
+  return `<p class="hint">Show this: ${chips}</p>`;
+}
+
+/** What the money column is headed. Which figures it carries is the engine's to say, not the
+ *  UI's; the owner's minutes and the day's work are a day's figures whatever the cadence, and
+ *  their headings say so, because the state keeps no weekly count of them (T4 3.6). */
+const SPAN_LABELS: Record<SummaryCadence, string> = {
+  daily: 'today',
+  weekly: 'this week',
+  monthly: 'this month',
+};
 
 export function renderDayEnd(state: GameState): string {
   const used = state.owner.minutesByCategory;
@@ -15,10 +49,12 @@ export function renderDayEnd(state: GameState): string {
   const tomorrow = deliveriesArrivingOn(state, state.clock.day + 1)
     .map((delivery) => plural(delivery.sheets, 'sheet', 'sheets'))
     .join(', ');
-  const net = netOf(state.finance.day);
+  const totals = summaryTotals(state);
+  const label = SPAN_LABELS[state.summaryCadence];
+  const net = netOf(totals);
   return (
     '<div class="cols">' +
-    '<div class="col"><h3>Your minutes</h3>' +
+    '<div class="col"><h3>Your minutes today</h3>' +
     row('Admin', minutes(used.admin)) +
     row('Design', minutes(used.design)) +
     row('Workshop', minutes(used.workshop)) +
@@ -27,13 +63,13 @@ export function renderDayEnd(state: GameState): string {
       ? row('Overtime', minutes(state.owner.overtimeMinutes))
       : '') +
     '</div>' +
-    '<div class="col"><h3>Money</h3>' +
-    row('In', money(state.finance.day.income)) +
-    row('Out', money(-state.finance.day.costs)) +
+    `<div class="col"><h3>Money ${escapeHtml(label)}</h3>` +
+    row('In', money(totals.income)) +
+    row('Out', money(-totals.costs)) +
     row('Net', money(net)) +
     row('In the bank', money(state.cash)) +
     '</div>' +
-    '<div class="col"><h3>The hall</h3>' +
+    '<div class="col"><h3>The hall today</h3>' +
     row('Jobs moved on', String(advanced)) +
     row('Jobs finished', jobs === '' ? 'none' : jobs) +
     row(
@@ -45,7 +81,8 @@ export function renderDayEnd(state: GameState): string {
     (state.owner.fatigue > 0
       ? `<p class="warn">Tomorrow starts ${(state.owner.fatigue * 100).toFixed(0)}% down on ` +
         'efficiency after that overtime.</p>'
-      : '')
+      : '') +
+    cadenceControl(state)
   );
 }
 

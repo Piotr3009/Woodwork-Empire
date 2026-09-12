@@ -6,15 +6,11 @@ import {
   BOOKKEEPING_MINUTES,
   EMAIL_MINUTES,
   OWN_DELIVERY_MINUTES,
-  CALLS_ABOVE_BREAKS,
-  CALLS_PRICE_BREAKS,
   CLEANING_MINUTES,
   CLERK_ORDERS_PER_DAY,
-  CLIENT_CALL_BASE_MINUTES,
-  CLIENT_CALL_MINUTES_CAP,
-  CLIENT_CALL_MINUTES_PER_1000,
-  CLIENT_CALL_PRICE_STEP,
+  CLIENT_CALL_ANSWER_MINUTES,
   DAILY_ORDERING_MINUTES,
+  MOVE_MINUTES_PER_ITEM,
   EMAIL_ABOVE_BREAKS,
   EMAIL_ABOVE_PRICE,
   EMAIL_ABOVE_PRICE_STEP,
@@ -84,6 +80,7 @@ const TASK_DEFINITIONS: Record<TaskKind, TaskDefinition> = {
   deliver: { category: 'workshop', eligibleRoles: ['joiner', 'helper'], autoRoles: [] },
   service: { category: 'workshop', eligibleRoles: ['joiner'], autoRoles: [] },
   repair: { category: 'workshop', eligibleRoles: ['joiner'], autoRoles: [] },
+  moveMachines: { category: 'workshop', eligibleRoles: ['joiner', 'helper'], autoRoles: [] },
 };
 
 /** Float guard, not a game number: work this small is finished work. */
@@ -92,23 +89,6 @@ export const WORK_EPSILON = 1e-9;
 // ---------------------------------------------------------------------------
 // Minute curves
 // ---------------------------------------------------------------------------
-
-/** 2 calls up to 1000, 3 up to 3000, 4 above (CLAUDE.md 8.10). */
-export function callsForPrice(price: number): number {
-  for (const [max, calls] of CALLS_PRICE_BREAKS) {
-    if (price <= max) return calls;
-  }
-  return CALLS_ABOVE_BREAKS;
-}
-
-/** 15 minutes a call up to 1000, then 15 more per further 1000, capped at 200 [TUNE curve]. */
-export function clientCallMinutes(price: number): number {
-  const steps = Math.max(0, Math.ceil(price / CLIENT_CALL_PRICE_STEP) - 1);
-  return Math.min(
-    CLIENT_CALL_MINUTES_CAP,
-    CLIENT_CALL_BASE_MINUTES + steps * CLIENT_CALL_MINUTES_PER_1000,
-  );
-}
 
 /** 30 minutes up to a price of 10000, 200 at 100000, linear between (CLAUDE.md 8.10). */
 export function materialOrderMinutes(price: number): number {
@@ -205,6 +185,23 @@ export function openTasks(state: GameState): TaskInstance[] {
   return state.tasks.filter((task) => !task.done);
 }
 
+/** A move of the hall that has been asked for and not finished, whoever is or is not on it. The
+ *  hall cannot be set out again until it is done, or the second batch of moves would ride on the
+ *  first one's minutes (CLAUDE.md T4 3.5). */
+export function movePending(state: GameState): TaskInstance | null {
+  return state.tasks.find((task) => task.kind === 'moveMachines' && !task.done) ?? null;
+}
+
+/** The move of the hall somebody is actually doing this minute, or null. While one is running
+ *  the clock is forced to 4x and every bench waits (CLAUDE.md T4 3.5). */
+export function movingMachines(state: GameState): TaskInstance | null {
+  return (
+    state.tasks.find(
+      (task) => task.kind === 'moveMachines' && !task.done && task.doneBy !== null,
+    ) ?? null
+  );
+}
+
 export function tasksOfKind(state: GameState, kind: TaskKind): TaskInstance[] {
   return state.tasks.filter((task) => task.kind === kind && !task.done);
 }
@@ -278,16 +275,44 @@ export function assignStaffTasks(state: GameState): TaskInstance[] {
 // The runner
 // ---------------------------------------------------------------------------
 
-export function startTask(state: GameState, taskId: string): boolean {
+/** Why the owner cannot pick this one up, or that he can. The one place the refusals are
+ *  written down: `startTask` asks this and nothing else, and every row that offers a Start asks
+ *  it too, so a button the engine would refuse is never drawn (CLAUDE.md T4 3.2). */
+export interface TaskStartCheck {
+  ok: boolean;
+  reason: string;
+  /** What he is holding, so the row can offer to put that down where the player is standing. */
+  blockingTaskId: string | null;
+}
+
+const CAN_START_TASK: TaskStartCheck = { ok: true, reason: '', blockingTaskId: null };
+
+function refused(reason: string, blockingTaskId: string | null = null): TaskStartCheck {
+  return { ok: false, reason, blockingTaskId };
+}
+
+export function startTaskCheck(state: GameState, taskId: string): TaskStartCheck {
   const task = findTask(state, taskId);
-  if (!task || task.done) return false;
-  if (!ownerIsAvailable(state)) return false;
+  if (!task) return refused('That job of work has gone');
+  if (task.done) return refused('Done');
+  if (!ownerIsAvailable(state)) return refused('The owner is not in today');
   // One thing at a time: the current task has to be finished or paused first (CLAUDE.md 10.1).
-  if (state.owner.currentTaskId !== null && state.owner.currentTaskId !== task.id) return false;
+  const current = state.owner.currentTaskId;
+  if (current !== null && current !== task.id) {
+    const held = findTask(state, current);
+    return refused(`Busy with ${held ? held.label : 'something else'}`, current);
+  }
   // No drawing without a licence for the software (CLAUDE.md 9.2).
-  if (task.kind === 'design' && !softwareActive(state)) return false;
+  if (task.kind === 'design' && !softwareActive(state)) return refused('No software licence');
   // Nothing comes off the lorry until there is shelving to put it on (CLAUDE.md T2 3.6).
-  if (task.kind === 'unload' && !canUnload(state)) return false;
+  if (task.kind === 'unload' && !canUnload(state)) return refused('Nowhere to put it');
+  return CAN_START_TASK;
+}
+
+export function startTask(state: GameState, taskId: string): boolean {
+  if (!startTaskCheck(state, taskId).ok) return false;
+  const task = findTask(state, taskId);
+  if (!task) return false;
   // Every refusal is behind us, so it is safe to take the task off whoever was holding it. The
   // work he did on it stays done.
   for (const worker of state.workers) {
@@ -305,6 +330,32 @@ export function pauseOwnerTask(state: GameState): void {
     if (task && !task.done) task.doneBy = null;
   }
   state.owner.currentTaskId = null;
+  // Putting something down on purpose ends whatever the phone was going to send him back to.
+  state.owner.resumeTaskId = null;
+}
+
+/** The phone goes and the owner picks it up. This is the one thing that comes before the checks
+ *  in `startTaskCheck`: a call is an interruption, so whatever he was holding waits those minutes
+ *  and he goes back to it when the call is over (CLAUDE.md T4 3.3). */
+export function interruptOwnerWith(state: GameState, task: TaskInstance): void {
+  const held = state.owner.currentTaskId;
+  // What he was on stays his, unlike a task he put down on purpose: he is coming back to it, and
+  // until then nobody else may pick it up. Holding nothing is written down too, or the last
+  // interruption's task would be resumed after this one.
+  state.owner.resumeTaskId = held !== null && held !== task.id ? held : null;
+  for (const worker of state.workers) {
+    if (worker.taskId === task.id) worker.taskId = null;
+  }
+  state.owner.currentTaskId = task.id;
+  task.doneBy = 'owner';
+}
+
+/** Back to whatever the phone interrupted. A man at the bench was holding nothing, so he simply
+ *  walks back to the bench. */
+export function resumeOwnerTask(state: GameState): void {
+  const resume = state.owner.resumeTaskId;
+  state.owner.resumeTaskId = null;
+  if (resume !== null) startTask(state, resume);
 }
 
 /** Works one minute into a task. True when it finished. One path for the owner and for staff.
@@ -350,6 +401,8 @@ export function assignWorkerTask(state: GameState, workerId: string, taskId: str
 
 export const AD_HOC_TASK_MINUTES = {
   bagChange: BAG_CHANGE_MINUTES,
+  clientCall: CLIENT_CALL_ANSWER_MINUTES,
+  moveMachines: MOVE_MINUTES_PER_ITEM,
   cleaning: CLEANING_MINUTES,
   deliver: OWN_DELIVERY_MINUTES,
   fetchStorage: FETCH_STORAGE_MINUTES,

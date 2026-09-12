@@ -18,7 +18,7 @@ import type {
 /** Bumped in Turn 3: a machine now carries its class, its hours and the hours it has in it, and
  *  a task carries the day it was finished. A Turn 2 save has none of those, so the loader refuses
  *  it rather than opening a game with half a workshop in it (CLAUDE.md T3 3.5, 3.3). */
-export const STATE_VERSION = 2;
+export const STATE_VERSION = 3;
 
 // ---------------------------------------------------------------------------
 // 6. Time
@@ -301,11 +301,13 @@ export const LATE_ACCOUNTS_CHARGE = 100;
 export const DAILY_ORDERING_MINUTES = 60;
 /** 10 minutes per joiner per day (PIOTR). */
 export const STAFF_MANAGEMENT_MINUTES_PER_JOINER = 10;
-/** [TUNE curve] 15 minutes per call up to a price of 1000, then 15 more per further 1000, capped. */
-export const CLIENT_CALL_BASE_MINUTES = 15;
-export const CLIENT_CALL_MINUTES_PER_1000 = 15;
-export const CLIENT_CALL_MINUTES_CAP = 200;
-export const CLIENT_CALL_PRICE_STEP = 1000;
+/** A call is 15 minutes of whoever takes it, whatever the job is worth (PIOTR, T4 3.3). */
+export const CLIENT_CALL_ANSWER_MINUTES = 15;
+/** The first call a job loses is free. From the second on, each takes a tenth off what the client
+ *  will say about the job (PIOTR) and a point off the rating itself [TUNE]. */
+export const CALL_MISSES_FREE = 1;
+export const CALL_SATISFACTION_PENALTY = 0.1;
+export const CALL_RATING_PENALTY = 1;
 /** 2 to 3 calls per job (PIOTR): 2 up to 1000, 3 up to 3000, 4 above. */
 export const CALLS_PRICE_BREAKS: Array<[number, number]> = [
   [1000, 2],
@@ -327,6 +329,16 @@ export const SITE_MEASURE_TAXI_COST = 40;
 export const UNLOAD_BASE_MINUTES = 45;
 /** Bag change (PIOTR). */
 export const BAG_CHANGE_MINUTES = 15;
+/** Moving the kit about is a job of work: an hour a machine or a bench [TUNE]. */
+export const MOVE_MINUTES_PER_ITEM = 60;
+/** Reconnecting one machine's ducting to the extraction, every time it is moved (PIOTR). */
+export const DUCTING_RECONNECT_COST = 800;
+/** Every machine family is ducted into the extraction except the compressor. The hand tools are
+ *  not machines at all, so they never appear here (PIOTR). */
+export const NO_DUCTING_SPECS = ['compressor'];
+/** The clock runs itself at 4x while the hall is being moved about, and the player cannot touch
+ *  it until it is done (PIOTR). */
+export const MOVING_SPEED = 4;
 /** Weekly clean (PIOTR). */
 export const CLEANING_MINUTES = 120;
 /** Fetch from temporary storage the next morning (PIOTR). */
@@ -590,6 +602,7 @@ const BASE_SPEC = {
   perWorker: false,
   stackable: false,
   requires: [] as string[],
+  requiresOneOf: [] as string[],
   height: 1,
 };
 
@@ -931,6 +944,21 @@ const SPEC_DRAFTS: SpecDraft[] = [
   },
   {
     ...BASE_SPEC,
+    id: 'flexiSystem',
+    name: 'Flexi extraction system',
+    price: 50000,
+    category: 'extraction',
+    width: 3,
+    depth: 3,
+    height: 4,
+    spriteKey: 'flexiSystem',
+    effect:
+      'Everything the central system does, and flexible ducting on every machine: move the hall ' +
+      'about as often as you like and the reconnection never costs again. Waste collection 400 ' +
+      'per month.',
+  },
+  {
+    ...BASE_SPEC,
     id: 'pelletiser',
     name: 'Pelletiser',
     price: 15000,
@@ -939,7 +967,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
     depth: 2,
     height: 3,
     spriteKey: 'pelletiser',
-    requires: ['dustSystem'],
+    requiresOneOf: ['dustSystem', 'flexiSystem'],
     effect: 'No waste cost and pellet sales that rise with production.',
   },
 ];
@@ -994,13 +1022,14 @@ export const ROOM_LAYOUT = [
   },
 ] as const;
 
-/** Hall placement. The office furniture is placed by DESK_LAYOUT instead, and the chair is bought
- *  but never drawn: 10.1 puts nothing on the office screen but the desk and what is on it. */
+/** Hall placement. The office furniture is not placed at all: the office is a photoreal room and
+ *  the desk, the chair and the laptop are in the artwork, not on a tile (CLAUDE.md T4 3.1). */
 export const STARTING_LAYOUT: Record<string, LayoutSlot> = {
   sheetRack: { x: 20, y: 0 },
   sheetRackBetter: { x: 20, y: 2 },
   extractor: { x: 15, y: 1 },
   dustSystem: { x: 15, y: 1 },
+  flexiSystem: { x: 15, y: 1 },
   tableSaw: { x: 0, y: 7 },
   edgebander: { x: 5, y: 7 },
   compressor: { x: 9, y: 7 },
@@ -1053,82 +1082,6 @@ export const GATE_LANE_TILES = 2;
 export const FINISHED_GOODS_LAYOUT = { x: 0, y: 6, yard: true, width: 3, depth: 1, height: 1 };
 export const DELIVERY_VAN_SPRITE = 'deliveryVan';
 
-/** The office desk and everything on it. Fixed placement, like the hall (CLAUDE.md 10.3). */
-export interface DeskObjectSpec {
-  id: string;
-  name: string;
-  x: number;
-  y: number;
-  width: number;
-  depth: number;
-  height: number;
-  spriteKey: string;
-  /** Catalogue item that has to be owned before the object is usable. */
-  needs: string | null;
-}
-
-export const OFFICE_TILES = 12;
-
-export const DESK_LAYOUT: DeskObjectSpec[] = [
-  { id: 'desk', name: 'Desk', x: 3, y: 4, width: 5, depth: 3, height: 1, spriteKey: 'desk', needs: 'desk' },
-  { id: 'laptop', name: 'Laptop', x: 4, y: 5, width: 2, depth: 1, height: 1, spriteKey: 'laptop', needs: 'laptop' },
-  {
-    id: 'accounting',
-    name: 'Accounting',
-    x: 6,
-    y: 5,
-    width: 1,
-    depth: 1,
-    height: 1,
-    spriteKey: 'ledgerFolder',
-    needs: 'laptop',
-  },
-  {
-    id: 'materials',
-    name: 'Materials',
-    x: 1,
-    y: 5,
-    width: 1,
-    depth: 2,
-    height: 1,
-    spriteKey: 'materialsBinder',
-    needs: null,
-  },
-  {
-    id: 'drawings',
-    name: 'Drawings',
-    x: 4,
-    y: 6,
-    width: 2,
-    depth: 1,
-    height: 1,
-    spriteKey: 'drawings',
-    needs: 'desk',
-  },
-  {
-    id: 'catalogue',
-    name: 'Catalogue',
-    x: 1,
-    y: 2,
-    width: 2,
-    depth: 1,
-    height: 1,
-    spriteKey: 'catalogue',
-    needs: null,
-  },
-  {
-    id: 'hiring',
-    name: 'Team board',
-    x: 8,
-    y: 0,
-    width: 3,
-    depth: 1,
-    height: 3,
-    spriteKey: 'teamBoard',
-    needs: null,
-  },
-  { id: 'phone', name: 'Phone', x: 7, y: 7, width: 1, depth: 1, height: 1, spriteKey: 'phone', needs: 'laptop' },
-];
 /** Width of the yard strip drawn to the right of the unit, in tiles. */
 export const YARD_WIDTH_TILES = 5;
 

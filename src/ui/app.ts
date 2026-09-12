@@ -9,15 +9,20 @@ import {
   brokenMachines,
   findSpec,
   machinesDueService,
+  ductingDue,
+  movePending,
+  movingMachines,
   oldestReadyJob,
   ownerJob,
   runMinutes,
+  startProductionCheck,
 } from '../engine/index';
 import type {
   Difficulty,
   GameAction,
   GameState,
   Speed,
+  SummaryCadence,
   WorkerRole,
   WorkerTier,
 } from '../engine/index';
@@ -32,23 +37,23 @@ interface Drag {
 import { WHY, boxOf, canPlace } from '../engine/index';
 import { renderHall } from '../render/hall';
 import { screenToTile } from '../render/iso';
-import { renderOffice } from '../render/office';
+import { fitOfficeStack, renderOffice } from '../render/office';
 import { renderAccounting } from './accounting';
 import { renderBoard } from './board';
 import { renderCatalogue } from './catalogue';
 import { renderDayEnd, renderGameOver } from './dayEnd';
-import { renderDrawings } from './drawings';
 import { renderEvent, renderEventFooter } from './eventModal';
-import { renderHiring } from './hiring';
-import { renderLaptop } from './laptop';
+import { type LaptopTab, laptopTabFrom, renderLaptop } from './laptop';
 import { renderMachine } from './machine';
 import { renderSpriteCheck } from './spriteCheck';
-import { renderMaterials } from './materials';
+import { renderWorkPlan } from './workPlan';
 import {
   type ModalPosition,
   type ModalSpec,
   escapeHtml,
   minutes,
+  money,
+  plural,
   reasonLabel,
   syncModals,
 } from './modal';
@@ -57,14 +62,9 @@ import { cloudAvailable } from '../cloud/supabase';
 import { hasSave, loadGame, saveGame, sendMagicLink, signOut, signedInEmail } from '../cloud/saves';
 import { renderMenu, renderTopbar, speedFromString } from './topbar';
 
-type ModalId =
-  | 'board'
-  | 'laptop'
-  | 'drawings'
-  | 'accounting'
-  | 'catalogue'
-  | 'hiring'
-  | 'materials';
+/** The modals the room can open. Materials, Team and Drawings are tabs inside the laptop now:
+ *  one path per modal, only the entry moved (docs/art/SPRITES.md 8.4). */
+type ModalId = 'board' | 'laptop' | 'workPlan' | 'accounting' | 'catalogue';
 
 interface Ui {
   screen: 'start' | 'game';
@@ -80,6 +80,10 @@ interface Ui {
   focusNext: string | null;
   stockSheets: string;
   arrearsAmount: string;
+  /** Which tab of the laptop is on top (CLAUDE.md T4 3.1). */
+  laptopTab: LaptopTab;
+  /** A new tab is new content, not the same list a minute later: it starts at the top. */
+  scrollModalTop: boolean;
   /** The family whose classes are on screen, over whatever else is open (CLAUDE.md T3 3.5). */
   machine: string | null;
   machinePosition: ModalPosition | null;
@@ -105,11 +109,9 @@ interface Ui {
 const MODAL_TITLES: Record<ModalId, string> = {
   board: 'Order board',
   laptop: 'Laptop',
-  drawings: 'Drawings',
+  workPlan: 'Work Plan',
   accounting: 'Accounting',
   catalogue: 'Equipment catalogue',
-  hiring: 'Team board',
-  materials: 'Materials and stock',
 };
 
 let ui: Ui = freshUi();
@@ -131,6 +133,8 @@ function freshUi(): Ui {
     focusNext: null,
     stockSheets: '6',
     arrearsAmount: '500',
+    laptopTab: 'tasks',
+    scrollModalTop: false,
     machine: null,
     machinePosition: null,
     setup: false,
@@ -171,17 +175,13 @@ function modalBody(id: ModalId, current: GameState): string {
     case 'board':
       return renderBoard(current, ui.filters.board ?? '');
     case 'laptop':
-      return renderLaptop(current);
-    case 'drawings':
-      return renderDrawings(current);
+      return renderLaptop(current, { tab: ui.laptopTab, stockSheets: ui.stockSheets });
+    case 'workPlan':
+      return renderWorkPlan(current);
     case 'accounting':
       return renderAccounting(current, ui.arrearsAmount);
     case 'catalogue':
       return renderCatalogue(current, ui.filters.catalogue ?? '');
-    case 'hiring':
-      return renderHiring(current);
-    case 'materials':
-      return renderMaterials(current, ui.stockSheets);
   }
 }
 
@@ -196,25 +196,46 @@ function ghostFor(current: GameState): Ghost | null {
   return { x: box.x, y: box.y, width: box.width, depth: box.depth, ok: check.ok, reason: check.reason };
 }
 
-function setupControls(): string {
+function setupControls(current: GameState): string {
+  // What the moves made so far will cost to reconnect, before he presses Done (T4 3.5).
+  const due = ductingDue(current);
+  const bill =
+    due.machines === 0
+      ? ''
+      : `<span class="reason">Ducting to reconnect: ${plural(due.machines, 'machine', 'machines')}, ` +
+        `${money(due.cost)}</span>`;
   return (
     '<div class="view-controls">' +
     '<button class="btn btn-primary" data-do="endSetup">Done</button>' +
+    bill +
     '<span class="reason">Drag the machines, the benches and the shelving where you want them. ' +
-    'The rooms and the gate stay where they are.</span>' +
+    'The rooms and the gate stay where they are. Every item moved is an hour of somebody\'s ' +
+    'time.</span>' +
     '</div>'
   );
 }
 
 function hallControls(current: GameState): string {
-  if (ui.setup) return setupControls();
+  if (ui.setup) return setupControls(current);
+  // Somebody is carrying the kit: nothing else happens in the hall until it is down (T4 3.5).
+  if (movingMachines(current) !== null) {
+    return (
+      '<div class="view-controls">' +
+      '<span class="reason">Moving machines. Nothing gets made until the kit is back down and ' +
+      'the ducting is on.</span></div>'
+    );
+  }
   const ready = oldestReadyJob(current);
   const working = ownerJob(current) !== null;
+  // The hall says exactly what the job card says, out of the one check (CLAUDE.md T4 3.4).
+  const check = ready === null ? null : startProductionCheck(current, ready);
   const workHere = working
     ? reasonLabel('You are at the bench')
-    : ready
-      ? '<button class="btn btn-primary" data-do="workHere">Work here</button>'
-      : reasonLabel('No job has its material in the hall yet');
+    : check === null
+      ? reasonLabel('No job has its material in the hall yet')
+      : check.ok
+        ? '<button class="btn btn-primary" data-do="workHere">Work here</button>'
+        : reasonLabel(`Cannot work here, ${check.reason}`);
   const name = (specId: string): string =>
     (findSpec(specId)?.name ?? specId).toLowerCase();
   const fix = brokenMachines(current)
@@ -237,11 +258,37 @@ function hallControls(current: GameState): string {
     workHere +
     '<button class="btn" data-do="startCleaning">Clean up · ' +
     `${minutes(CLEANING_MINUTES)}</button>` +
-    '<button class="btn" data-do="startSetup">Set up hall</button>' +
+    setupButton(current) +
     fix +
     service +
     '</div>'
   );
+}
+
+/** A first guess at the room the office has, for the one render before it is on the page and can
+ *  be measured. `VIEW_PADDING` is the padding of `.view` in styles.css; `TOPBAR_HEIGHT` is what the
+ *  top bar comes to with that stylesheet's padding and type, and it is a guess, not a declared
+ *  number. `fitOfficeStack` takes the real box a moment later, so neither has to be right. */
+const TOPBAR_HEIGHT = 45;
+const VIEW_PADDING = 12;
+
+/** The room the office has under the top bar, in CSS pixels, before it has been measured. */
+function officeViewport(): { width: number; height: number } {
+  const width = typeof window === 'undefined' ? 1280 : window.innerWidth;
+  const height = typeof window === 'undefined' ? 800 : window.innerHeight;
+  return {
+    width: Math.max(1, width - VIEW_PADDING * 2),
+    height: Math.max(1, height - TOPBAR_HEIGHT - VIEW_PADDING * 2),
+  };
+}
+
+/** The hall cannot be set out again while a move is still on the list, carried or waiting, or the
+ *  second batch would ride on the first one's minutes (CLAUDE.md T4 3.5). */
+function setupButton(current: GameState): string {
+  if (movePending(current) !== null) {
+    return reasonLabel('The kit is half shifted. Finish the move first.');
+  }
+  return '<button class="btn" data-do="startSetup">Set up hall</button>';
 }
 
 /** The little popover behind an "i" link (CLAUDE.md T2 3.12). */
@@ -269,7 +316,7 @@ function modalSpecs(): ModalSpec[] {
       id: ui.modal,
       title: MODAL_TITLES[ui.modal],
       body: modalBody(ui.modal, current),
-      wide: ui.modal === 'accounting',
+      wide: ui.modal === 'accounting' || ui.modal === 'workPlan',
       full: ui.modal === 'board',
       position: ui.modalPosition,
     });
@@ -318,7 +365,7 @@ function pageHtml(): string {
       ? renderSpriteCheck()
       : ui.view === 'hall'
         ? renderHall(current, ghostFor(current))
-        : renderOffice(current);
+        : renderOffice(current, officeViewport());
   const controls = ui.view === 'hall' ? hallControls(current) : '';
   const note = ui.note === '' ? '' : `<p class="view-note">${escapeHtml(ui.note)}</p>`;
   return (
@@ -458,6 +505,13 @@ export function render(): void {
   ui.focusNext = null;
   parts.page.innerHTML = pageHtml();
   syncModals(parts.layer, modalSpecs());
+  if (ui.scrollModalTop) {
+    ui.scrollModalTop = false;
+    const body = parts.layer.querySelector('.modal-body');
+    if (body) body.scrollTop = 0;
+  }
+  // The stylesheet is the authority on how much room the office has (docs/art/SPRITES.md 8.1).
+  fitOfficeStack(parts.page);
   slideFigures(nowMs());
   restoreFocus(memory);
 }
@@ -466,21 +520,12 @@ export function render(): void {
 // Actions
 // ---------------------------------------------------------------------------
 
-function openModal(id: ModalId, anchor: { x: number; y: number } | null): void {
+/** The room fills the page, so there is no small object for a modal to sit beside any more: every
+ *  modal opens centred, and the player drags it where he wants it (CLAUDE.md T4 3.1). */
+function openModal(id: ModalId): void {
   ui.modal = id;
-  // The board fills the page, so it is always centred (CLAUDE.md T2 3.2).
-  const beside = anchor === null || id === 'board' ? null : clampToViewport(anchor.x + 24, anchor.y - 40);
-  ui.modalPosition = beside;
+  ui.modalPosition = null;
   ui.menuOpen = false;
-}
-
-function clampToViewport(x: number, y: number): ModalPosition {
-  const width = typeof window === 'undefined' ? 1280 : window.innerWidth;
-  const height = typeof window === 'undefined' ? 800 : window.innerHeight;
-  return {
-    left: Math.max(8, Math.min(x, width - 520)),
-    top: Math.max(56, Math.min(y, height - 220)),
-  };
 }
 
 /** Clicking the van at the gate opens the unloading choice again (CLAUDE.md 10.1). */
@@ -488,25 +533,15 @@ function askUnload(deliveryId: string): void {
   dispatch({ type: 'ASK_UNLOAD', deliveryId });
 }
 
-/** Objects on the desk open their modal beside where the player clicked (CLAUDE.md 10.4). */
-const OFFICE_MODALS: Record<string, ModalId> = {
+/** What each region of the room opens (docs/art/SPRITES.md 8.2 and 8.4). The door is the one
+ *  region that is not a modal: it is the way back into the hall. */
+const OFFICE_REGION_MODALS: Record<string, ModalId> = {
+  workPlan: 'workPlan',
+  orders: 'board',
   laptop: 'laptop',
-  drawings: 'drawings',
-  accounting: 'accounting',
-  materials: 'materials',
   catalogue: 'catalogue',
-  hiring: 'hiring',
-  phone: 'board',
+  binder: 'accounting',
 };
-
-function officeTarget(id: string, point: { x: number; y: number }): void {
-  const modal = OFFICE_MODALS[id];
-  if (modal !== undefined) {
-    openModal(modal, point);
-    return;
-  }
-  if (id === 'desk') ui.note = 'The desk. The laptop goes on it.';
-}
 
 /** Elements in the SVG views are SVGElement, not HTMLElement, but both carry a dataset. */
 type DataElement = HTMLElement | SVGElement;
@@ -555,6 +590,8 @@ function handleAction(element: DataElement, point: { x: number; y: number }): vo
       ui.menuOpen = false;
       break;
     case 'startSetup':
+      // Nothing is dragged while the last move is still on the list, carried or waiting.
+      if (movePending(game()) !== null) break;
       ui.setup = true;
       ui.drag = null;
       ui.speedBeforeSetup = game().speed;
@@ -582,7 +619,21 @@ function handleAction(element: DataElement, point: { x: number; y: number }): vo
       ui.why = null;
       break;
     case 'openModal':
-      openModal((element.dataset.modal ?? 'board') as ModalId, null);
+      openModal((element.dataset.modal ?? 'board') as ModalId);
+      break;
+    case 'officeRegion': {
+      const region = element.dataset.office ?? '';
+      if (region === 'door') {
+        ui.view = 'hall';
+        break;
+      }
+      const modal = OFFICE_REGION_MODALS[region];
+      if (modal !== undefined) openModal(modal);
+      break;
+    }
+    case 'laptopTab':
+      ui.laptopTab = laptopTabFrom(id);
+      ui.scrollModalTop = true;
       break;
     case 'openMachine':
       // The classes of a family fill the page, over the catalogue that sent the player here.
@@ -622,6 +673,9 @@ function handleAction(element: DataElement, point: { x: number; y: number }): vo
     case 'endDay':
       ui.menuOpen = false;
       dispatch({ type: 'END_DAY' });
+      return;
+    case 'setCadence':
+      dispatch({ type: 'SET_SUMMARY_CADENCE', cadence: id as SummaryCadence });
       return;
     case 'skipDay':
       ui.menuOpen = false;
@@ -770,12 +824,12 @@ async function refreshCloud(): Promise<void> {
   }
 }
 
-/** Slot 1 keeps up with the end of every day, once the player is signed in (T2 3.14). */
+/** Slot 1 keeps up with every day, once the player is signed in (T2 3.14). The summary modal can
+ *  be turned down to weekly or monthly, so the save follows the day and not the modal (T4 3.6). */
 let autosavedDay = 0;
 
 function autosave(): void {
   if (!ui.cloud.available || ui.cloud.signedIn === null || state === null) return;
-  if (state.activeEvent?.kind !== 'dayEnd') return;
   if (autosavedDay === state.clock.day) return;
   autosavedDay = state.clock.day;
   void runCloud(async () => (await saveGame(game())).note);
@@ -796,7 +850,7 @@ function copyState(): void {
   ui.note = 'State copied as JSON.';
 }
 
-function handleSceneClick(element: DataElement, point: { x: number; y: number }): boolean {
+function handleSceneClick(element: DataElement): boolean {
   // In setup mode a click on the kit is a drag, not a question about the bag.
   if (ui.setup) return true;
   const room = element.dataset.room;
@@ -831,18 +885,6 @@ function handleSceneClick(element: DataElement, point: { x: number; y: number })
     render();
     return true;
   }
-  const office = element.dataset.office;
-  if (office !== undefined) {
-    const lock = element.dataset.lock;
-    if (lock !== undefined) {
-      ui.note = `${lock} first.`;
-      render();
-      return true;
-    }
-    officeTarget(office, point);
-    render();
-    return true;
-  }
   return false;
 }
 
@@ -860,9 +902,9 @@ function onClick(event: MouseEvent): void {
     handleAction(doer, point);
     return;
   }
-  const scene = dataElement(target.closest('[data-room],[data-van],[data-kit],[data-office]'));
+  const scene = dataElement(target.closest('[data-room],[data-van],[data-kit]'));
   if (scene && state !== null) {
-    handleSceneClick(scene, point);
+    handleSceneClick(scene);
   }
 }
 
@@ -897,12 +939,13 @@ function onInput(event: Event): void {
   }
 }
 
-/** Leaving setup mode always starts the clock again at the speed it was stopped at. */
+/** Leaving setup mode starts the clock again at the speed it was stopped at, and hands the moves
+ *  to the engine: they are an hour an item and a ducting bill (CLAUDE.md T4 3.5). */
 function endSetup(): void {
   if (!ui.setup) return;
   ui.setup = false;
   ui.drag = null;
-  dispatch({ type: 'SET_SPEED', speed: ui.speedBeforeSetup });
+  dispatch({ type: 'END_SETUP', speed: ui.speedBeforeSetup });
 }
 
 function onKeyDown(event: KeyboardEvent): void {
@@ -1062,6 +1105,9 @@ export function mount(element: HTMLElement): void {
   element.addEventListener('input', onInput);
   element.addEventListener('mousedown', onPointerDown);
   window.addEventListener('keydown', onKeyDown);
+  // The office room is scaled in code, so a resized window has to be drawn again for it, and the
+  // clock may be stopped (docs/art/SPRITES.md 8.1).
+  window.addEventListener('resize', render);
   render();
   lastFrame = typeof performance === 'undefined' ? 0 : performance.now();
   if (typeof requestAnimationFrame === 'function') requestAnimationFrame(frame);

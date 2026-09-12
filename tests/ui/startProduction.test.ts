@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
 // The visible path to work: Start production is on the job card from the day the job is accepted,
-// and it says the one thing that is in the way (CLAUDE.md T3 3.1).
+// and it says the one thing that is in the way (CLAUDE.md T3 3.1). The cards hang on the Work Plan
+// board on the office wall now (CLAUDE.md T4 3.1).
 
 import { describe, expect, it } from 'vitest';
-import { renderLaptop } from '../../src/ui/laptop';
+import { renderWorkPlan } from '../../src/ui/workPlan';
 import type { GameState } from '../../src/engine/index';
 import {
   act,
@@ -18,7 +19,7 @@ import {
 
 function card(state: GameState): HTMLElement {
   const holder = document.createElement('div');
-  holder.innerHTML = renderLaptop(state);
+  holder.innerHTML = renderWorkPlan(state);
   const rows = Array.from(holder.querySelectorAll('.row'));
   const row = rows.find((entry) => entry.querySelector('[data-do="startProduction"], .btn[disabled]'));
   if (!(row instanceof HTMLElement)) throw new Error('no job card with a Start production button');
@@ -55,10 +56,7 @@ describe('the Start production button through the lifecycle', () => {
   it('names the one thing in the way, in the order the lifecycle blocks it', () => {
     const seen: string[] = [];
     let state = withJob();
-    seen.push(startButton(state).text);
-    state = doTask(state, 'clientCall');
-    seen.push(startButton(state).text);
-    state = doTask(state, 'clientCall');
+    // The calls are not in this list any more: they interrupt, they do not block (T4 3.3).
     seen.push(startButton(state).text);
     state = doTask(state, 'design');
     seen.push(startButton(state).text);
@@ -70,8 +68,6 @@ describe('the Start production button through the lifecycle', () => {
     state = clearEvents(state);
     seen.push(startButton(state).text);
     expect(seen).toEqual([
-      'Start production, 2 calls to make',
-      'Start production, 1 call to make',
       'Start production, design not done',
       'Start production, material not ordered',
       'Start production, material arrives tomorrow',
@@ -85,7 +81,7 @@ describe('the Start production button through the lifecycle', () => {
     const state = withJob();
     const button = startButton(state);
     expect(button.enabled).toBe(false);
-    expect(button.title).toBe('2 calls to make');
+    expect(button.title).toBe('design not done');
   });
 
   it('says the rack is empty before it says anything about the hall', () => {
@@ -105,13 +101,26 @@ describe('the Start production button through the lifecycle', () => {
     expect(startButton(state).text).toBe('Start production, no free hands');
   });
 
+  it('turns the Calls step amber while the client is actually on the line, and back', () => {
+    const state = withJob();
+    expect(steps(state)[0]).toBe('Calls:done');
+    const call = state.jobs[0]?.calls[0];
+    if (!call) throw new Error('no call in the diary');
+    // The client is ringing this minute: the step is the one in hand and the drawing waits.
+    call.day = state.clock.day;
+    call.minute = state.clock.minute;
+    call.state = 'waiting';
+    expect(steps(state)[0]).toBe('Calls:now');
+    expect(steps(state)[1]).toBe('Design:todo');
+    // He picks it up, and it is behind him again.
+    call.state = 'taken';
+    expect(steps(state)[0]).toBe('Calls:done');
+    expect(steps(state)[1]).toBe('Design:now');
+  });
+
   it('fills the five steps as the job goes through them', () => {
     let state = withJob();
-    expect(steps(state)).toEqual([
-      'Calls:now', 'Design:todo', 'Material:todo', 'Delivery:todo', 'Production:todo',
-    ]);
-    state = doTask(state, 'clientCall');
-    state = doTask(state, 'clientCall');
+    // The Calls step is only ever amber while the client is actually on the line (T4 3.3).
     expect(steps(state)).toEqual([
       'Calls:done', 'Design:now', 'Material:todo', 'Delivery:todo', 'Production:todo',
     ]);
@@ -134,8 +143,6 @@ describe('the Start production button through the lifecycle', () => {
 /** A job with its material on the rack and nobody on it. */
 function readyToMake(): GameState {
   let state = withJob();
-  state = doTask(state, 'clientCall');
-  state = doTask(state, 'clientCall');
   state = doTask(state, 'design');
   const job = firstJob(state);
   job.stage = 'ready';

@@ -6,11 +6,13 @@ import {
   ACCIDENT_DAYS_OFF,
   BENCH_SLOT_LAYOUT,
   CANTEEN_SLOT_LAYOUT,
-  DESK_LAYOUT,
   DIFFICULTIES,
   HELPER_CLEAN_WEEKDAY,
   LOCKER_SLOT_LAYOUT,
+  DUCTING_RECONNECT_COST,
   MINUTES_PER_WORKING_DAY,
+  MOVE_MINUTES_PER_ITEM,
+  MOVING_SPEED,
   OWNER_LABOUR_PER_MINUTE,
   REPUTATION_START,
   SERVICE_INTERVAL_DAYS,
@@ -22,8 +24,19 @@ import {
   STATE_VERSION,
 } from './constants';
 import { expireEnquiries, refillBoard, refreshLocks } from './board';
+import { missCall, nextDueCall, takeCall } from './calls';
 import { canPlaceSpec, firstFreeTile, moveItem } from './layout';
-import { daysBetween, isDayExhausted, isOvertime, isWorkingDay, weekOfDay, weekday } from './clock';
+import {
+  daysBetween,
+  isDayExhausted,
+  isFriday,
+  isLastWorkingDayOfMonth,
+  isOvertime,
+  isWorkingDay,
+  monthOfDay,
+  weekOfDay,
+  weekday,
+} from './clock';
 import {
   canAfford,
   emptyBooked,
@@ -47,9 +60,12 @@ import {
   breakMachine,
   extractorBreakdownChance,
   extractorBroken,
+  ductedMoves,
   findSpec,
+  freeBenches,
   hallProductivityFactor,
   has,
+  hasBenchFor,
   machinesDueService,
   overdueBreakdownChance,
   repairCostFor,
@@ -109,6 +125,7 @@ import { chance, int, makeId } from './rng';
 import { plural } from './text';
 import {
   STATION_IDLE,
+  STATION_NO_BENCH,
   stationForProduction,
   stationForTask,
 } from './stations';
@@ -133,7 +150,11 @@ import {
   createDailyTasks,
   createTask,
   findTask,
+  interruptOwnerWith,
+  movePending,
+  movingMachines,
   pauseOwnerTask,
+  resumeOwnerTask,
   startTask,
 } from './tasks';
 import type {
@@ -145,8 +166,10 @@ import type {
   MaterialKind,
   GameAction,
   GameState,
+  PeriodTotals,
   Speed,
   TaskInstance,
+  Worker,
 } from './types';
 
 
@@ -202,6 +225,7 @@ export function createGame(options: NewGameOptions): GameState {
       fatigue: 0,
       wentHome: false,
       currentTaskId: null,
+      resumeTaskId: null,
       sickDaysRemaining: 0,
       sickStartDay: null,
       stayHome: false,
@@ -235,6 +259,9 @@ export function createGame(options: NewGameOptions): GameState {
     booksUpToDay: 0,
     lateAccountsMonths: 0,
     productionMinutesMonth: 0,
+    movedItems: [],
+    speedBeforeMove: null,
+    summaryCadence: 'daily',
     gameOver: null,
   };
   startDay(state);
@@ -258,6 +285,20 @@ function hallIsEmpty(state: GameState): boolean {
   return !state.workers.some((worker) => isWorkingToday(state, worker));
 }
 
+/** A move the day ended in the middle of is picked up again in the morning, or the hall would be
+ *  half shifted for ever and could never be set out again (CLAUDE.md T4 3.5). */
+function resumeMove(state: GameState): void {
+  const move = movePending(state);
+  if (move === null || move.doneBy !== null) return;
+  if (ownerIsAvailable(state)) {
+    startTask(state, move.id);
+    return;
+  }
+  const hand =
+    availableJoiners(state)[0] ?? helpers(state).find((worker) => isWorkingToday(state, worker));
+  if (hand) assignWorkerTask(state, hand.id, move.id);
+}
+
 /** Resets everything that is scoped to one day and charges what the new day owes. */
 function startDay(state: GameState): void {
   const owner = state.owner;
@@ -265,6 +306,7 @@ function startDay(state: GameState): void {
   owner.minutesWorked = 0;
   owner.wentHome = false;
   owner.currentTaskId = null;
+  owner.resumeTaskId = null;
   owner.present = true;
   owner.stayHome = false;
   state.dayStats = {
@@ -276,6 +318,7 @@ function startDay(state: GameState): void {
   runDayCosts(state, state.clock.day);
   runOwnerDayStart(state);
   runStaffDayStart(state);
+  resumeMove(state);
   expireEnquiries(state);
   refillBoard(state);
   const lost = writeOffSheetsLeftOutside(state);
@@ -441,7 +484,31 @@ function queueDeliveryEvents(state: GameState, arriving: Delivery[]): void {
   }
 }
 
-/** Ends the working day and opens the summary. The player clicks on to the next day. */
+/** Whether today's summary is one the player asked to see. Daily is every day, weekly is Friday
+ *  and monthly is the last working day of the month (CLAUDE.md T4 3.6). */
+export function showsDaySummary(state: GameState): boolean {
+  if (state.summaryCadence === 'weekly') return isFriday(state.clock.day);
+  if (state.summaryCadence === 'monthly') return isLastWorkingDayOfMonth(state.clock.day);
+  return true;
+}
+
+/** The figures the summary carries: the day, the week or the month (CLAUDE.md T4 3.6). The one
+ *  place the cadence is turned into a span of money. */
+export function summaryTotals(state: GameState): PeriodTotals {
+  if (state.summaryCadence === 'weekly') return state.finance.week;
+  if (state.summaryCadence === 'monthly') return state.finance.month;
+  return state.finance.day;
+}
+
+/** The title the summary carries, which says what span of figures is in it. */
+export function summaryTitle(state: GameState): string {
+  if (state.summaryCadence === 'weekly') return `End of week ${weekOfDay(state.clock.day)}`;
+  if (state.summaryCadence === 'monthly') return `End of month ${monthOfDay(state.clock.day)}`;
+  return `End of day ${state.clock.day}`;
+}
+
+/** Ends the working day. The summary is put in front of the player as often as he asked for it,
+ *  and the day ends the same way either way: only the modal is skipped (CLAUDE.md T4 3.6). */
 function finishDay(state: GameState): void {
   const ending =
     state.activeEvent?.kind === 'dayEnd' || state.eventQueue.some((event) => event.kind === 'dayEnd');
@@ -449,9 +516,13 @@ function finishDay(state: GameState): void {
   pauseOwnerTask(state);
   setTomorrowFatigue(state);
   state.owner.wentHome = true;
+  if (!showsDaySummary(state)) {
+    advanceToNextDay(state);
+    return;
+  }
   queueEvent(state, {
     kind: 'dayEnd',
-    title: `End of day ${state.clock.day}`,
+    title: summaryTitle(state),
     body: 'The day is over.',
     choices: [{ id: 'next', label: 'Next day' }],
   });
@@ -522,6 +593,9 @@ function applyTaskCompletion(state: GameState, task: TaskInstance): void {
   const job = task.jobId ? findJob(state, task.jobId) : null;
   switch (task.kind) {
     case 'clientCall':
+      // The phone is down: back to whatever it took him off (CLAUDE.md T4 3.3).
+      resumeOwnerTask(state);
+      break;
     case 'design':
       if (job) refreshJob(state, job);
       break;
@@ -539,6 +613,11 @@ function applyTaskCompletion(state: GameState, task: TaskInstance): void {
       break;
     case 'cleaning':
       clearDust(state);
+      break;
+    case 'moveMachines':
+      chargeDucting(state);
+      // The same as a call: he goes back to whatever the move took him off.
+      resumeOwnerTask(state);
       break;
     case 'bookkeeping':
       writeUpBooks(state);
@@ -588,6 +667,64 @@ function applyTaskCompletion(state: GameState, task: TaskInstance): void {
   }
 }
 
+/** A drag is a move only while the item is not standing where it started. Dragging it out and
+ *  back again, however many drags it takes, costs nothing (CLAUDE.md T4 3.5). */
+function recordMove(state: GameState, item: Equipment, stood: { x: number; y: number }): void {
+  const index = state.movedItems.findIndex((moved) => moved.itemId === item.id);
+  if (index < 0) {
+    if (item.anchorX === stood.x && item.anchorY === stood.y) return;
+    state.movedItems.push({ itemId: item.id, fromX: stood.x, fromY: stood.y });
+    return;
+  }
+  const start = state.movedItems[index];
+  if (start && item.anchorX === start.fromX && item.anchorY === start.fromY) {
+    state.movedItems.splice(index, 1);
+  }
+}
+
+/** Every moved machine that is ducted into the extraction has to be reconnected, and that is
+ *  paid for when the move is finished. The flexi system never needs it (CLAUDE.md T4 3.5). */
+function chargeDucting(state: GameState): void {
+  for (const item of ductedMoves(state)) {
+    const name = findSpec(item.specId)?.name ?? item.specId;
+    pay(
+      state,
+      'ducting',
+      `Ducting reconnection: ${name.toLowerCase()}`,
+      DUCTING_RECONNECT_COST,
+    );
+  }
+  state.movedItems = [];
+  // The clock goes back to the speed the player left it on before the move took it (T4 3.5).
+  if (state.speedBeforeMove !== null) {
+    state.speed = state.speedBeforeMove;
+    state.speedBeforeMove = null;
+  }
+}
+
+/** Leaving setup mode with the kit moved: the move is a job of work in the hall, an hour an item,
+ *  and the clock runs itself at 4x until it is done (CLAUDE.md T4 3.5). */
+function endSetup(state: GameState, speed: Speed): void {
+  state.speed = speed;
+  if (state.movedItems.length === 0) return;
+  if (movePending(state) !== null) return;
+  state.speedBeforeMove = speed;
+  const task = createTask(state, {
+    kind: 'moveMachines',
+    label: `Moving machines: ${plural(state.movedItems.length, 'item', 'items')}`,
+    minutes: state.movedItems.length * MOVE_MINUTES_PER_ITEM,
+  });
+  // The owner moved the kit, so the owner shifts it, whatever else he was holding. A joiner or
+  // the helper can be sent instead while the owner is not in.
+  if (ownerIsAvailable(state)) {
+    interruptOwnerWith(state, task);
+    return;
+  }
+  const hand =
+    availableJoiners(state)[0] ?? helpers(state).find((worker) => isWorkingToday(state, worker));
+  if (hand) assignWorkerTask(state, hand.id, task.id);
+}
+
 /** One minute of work, at the clock's current minute, before time moves on. */
 function runMinute(state: GameState): void {
   const owner = state.owner;
@@ -617,7 +754,11 @@ function updateStations(state: GameState): void {
     const task = findTask(state, owner.currentTaskId);
     owner.station = task ? stationForTask(state, task) : STATION_IDLE;
   } else if (ownerJob(state) !== null) {
-    owner.station = stationForProduction(state, owner.productionMinutes);
+    const job = ownerJob(state);
+    owner.station =
+      job !== null && !hasBenchFor(state, job.id)
+        ? STATION_NO_BENCH
+        : stationForProduction(state, owner.productionMinutes);
   } else {
     owner.station = STATION_IDLE;
   }
@@ -632,15 +773,23 @@ function updateStations(state: GameState): void {
       continue;
     }
     const job = worker.jobId ? findJob(state, worker.jobId) : null;
-    worker.station =
-      job && job.stage === 'inProduction'
+    if (job && job.stage === 'inProduction') {
+      worker.station = hasBenchFor(state, job.id)
         ? stationForProduction(state, worker.productionMinutes)
-        : STATION_IDLE;
+        : STATION_NO_BENCH;
+      continue;
+    }
+    // A joiner with work waiting and nowhere to do it stands at the canteen door (T4 3.4).
+    const stuck =
+      worker.role === 'joiner' && freeBenches(state) === 0 && oldestReadyJob(state) !== null;
+    worker.station = stuck ? STATION_NO_BENCH : STATION_IDLE;
   }
 }
 
 function settle(state: GameState): void {
   refreshLocks(state);
+  // Nothing else happens while the hall is being moved, and the clock runs itself (T4 3.5).
+  if (movingMachines(state) !== null) state.speed = MOVING_SPEED;
   delegateTasks(state);
   autoAssignJobs(state);
   updateStations(state);
@@ -725,7 +874,10 @@ function runProductionMinute(state: GameState, ownerOnTask: boolean): void {
   const hall = hallProductivityFactor(state);
   let worked = false;
   const materials = new Set<MaterialKind>();
-  const atTheBench = !ownerOnTask && state.owner.currentTaskId === null ? ownerJob(state) : null;
+  // Every bench waits while the machines are being shifted about (CLAUDE.md T4 3.5).
+  const moving = movingMachines(state) !== null;
+  const atTheBench =
+    !ownerOnTask && !moving && state.owner.currentTaskId === null ? ownerJob(state) : null;
   if (atTheBench && ownerIsAvailable(state) && canWorkOn(state, atTheBench)) {
     spendOwnerMinute(state, 'workshop');
     state.owner.productionMinutes += 1;
@@ -744,6 +896,7 @@ function runProductionMinute(state: GameState, ownerOnTask: boolean): void {
         runWorkerTaskMinute(state, worker.id, worker.taskId);
         continue;
       }
+      if (moving) continue;
       if (worker.role !== 'joiner' || worker.jobId === null) continue;
       const job = findJob(state, worker.jobId);
       if (!job || job.stage !== 'inProduction') {
@@ -830,7 +983,68 @@ function raiseBagFull(state: GameState, machine: Equipment): void {
   });
 }
 
+/** The minutes a call takes out of whoever answers it. */
+function createCallTask(state: GameState, job: Job): TaskInstance {
+  return createTask(state, {
+    kind: 'clientCall',
+    label: `Client call: ${job.name}`,
+    minutes: AD_HOC_TASK_MINUTES.clientCall,
+    jobId: job.id,
+  });
+}
+
+/** A salesman on the books and with a day left in him takes every call without being asked
+ *  (CLAUDE.md T4 3.3). */
+function callTaker(state: GameState): Worker | null {
+  return (
+    state.workers.find(
+      (worker) =>
+        worker.role === 'salesman' &&
+        isWorkingToday(state, worker) &&
+        // Enough of his day left to see the call out, or the owner is asked instead.
+        staffMinutesLeft(worker) >= AD_HOC_TASK_MINUTES.clientCall,
+    ) ?? null
+  );
+}
+
+/** The client rings. Nothing is held up by it: the phone simply goes, and the owner answers or
+ *  lets it ring (CLAUDE.md T4 3.3). Nobody in the office means nobody to ring: the call waits for
+ *  a day somebody is in, rather than being missed behind the player's back. */
+function ringDueCalls(state: GameState): void {
+  if (state.activeEvent !== null) return;
+  // He is already on the phone. The next client rings when he is off it, or the call he is on
+  // would be what he goes back to instead of the work it interrupted.
+  const held = state.owner.currentTaskId;
+  if (held !== null && findTask(state, held)?.kind === 'clientCall') return;
+  const due = nextDueCall(state);
+  if (due === null) return;
+  const salesman = callTaker(state);
+  if (salesman) {
+    takeCall(due.job, due.index);
+    createCallTask(state, due.job);
+    return;
+  }
+  if (!ownerIsAvailable(state)) return;
+  const missedLine =
+    due.job.callsMissed > 0
+      ? ` You have already let ${plural(due.job.callsMissed, 'call', 'calls')} ring out on this one.`
+      : '';
+  queueEvent(state, {
+    kind: 'clientCall',
+    title: `Client calling: ${due.job.name}`,
+    body:
+      'The client is on the phone about his job. Whatever you are on waits while you talk to ' +
+      `him.${missedLine}`,
+    choices: [
+      { id: 'answer', label: `Answer, ${AD_HOC_TASK_MINUTES.clientCall} min` },
+      { id: 'ignore', label: 'Let it ring' },
+    ],
+    data: { jobId: due.job.id, call: due.index },
+  });
+}
+
 function advanceMinute(state: GameState): void {
+  ringDueCalls(state);
   // He cannot be on the laptop and at the bench in the same minute, so a task that finishes this
   // minute keeps him off production until the next one.
   const onTask = state.owner.currentTaskId !== null;
@@ -895,6 +1109,20 @@ function resolveEvent(state: GameState, choiceId: string): void {
       if (task) delegateAdHocTask(state, task, choiceId);
       break;
     }
+    case 'clientCall': {
+      const jobId = event.data.jobId;
+      const index = event.data.call;
+      const job = typeof jobId === 'string' ? findJob(state, jobId) : null;
+      if (!job || typeof index !== 'number') break;
+      if (choiceId === 'answer') {
+        takeCall(job, index);
+        // A call comes before whatever he is holding: that is what an interruption is.
+        interruptOwnerWith(state, createCallTask(state, job));
+      } else {
+        missCall(state, job, index);
+      }
+      break;
+    }
     case 'bagFull':
     case 'serviceDue':
     case 'machineBroken': {
@@ -912,7 +1140,14 @@ export function applyAction(state: GameState, action: GameAction): GameState {
   const next = clone(state);
   switch (action.type) {
     case 'SET_SPEED':
-      next.speed = action.speed as Speed;
+      // The speed is not the player's while the hall is being moved (CLAUDE.md T4 3.5).
+      if (movingMachines(next) === null) next.speed = action.speed as Speed;
+      break;
+    case 'END_SETUP':
+      endSetup(next, action.speed as Speed);
+      break;
+    case 'SET_SUMMARY_CADENCE':
+      next.summaryCadence = action.cadence;
       break;
     case 'END_DAY':
       if (next.clock.minute >= MINUTES_PER_WORKING_DAY) {
@@ -1003,9 +1238,13 @@ export function applyAction(state: GameState, action: GameAction): GameState {
     case 'SET_SHOW_WHY':
       next.showWhy = action.on;
       break;
-    case 'MOVE_ITEM':
+    case 'MOVE_ITEM': {
+      const item = next.equipment.find((entry) => entry.id === action.itemId);
+      const stood = item ? { x: item.anchorX, y: item.anchorY } : null;
       moveItem(next, action.itemId, action.x, action.y);
+      if (item && stood) recordMove(next, item, stood);
       break;
+    }
     case 'ORDER_TRANSPORT': {
       const job = findJob(next, action.jobId);
       if (!job || job.stage !== 'awaitingTransport' || job.deliverOnDay !== null) break;
@@ -1084,6 +1323,10 @@ export function canBuy(state: GameState, specId: string, variantId?: string): Bu
       return { ok: false, reason: `Needs ${name} first` };
     }
   }
+  if (spec.requiresOneOf.length > 0 && !spec.requiresOneOf.some((id) => has(state, id))) {
+    const names = spec.requiresOneOf.map((id) => findSpec(id)?.name ?? id).join(' or ');
+    return { ok: false, reason: `Needs ${names} first` };
+  }
   if (!spec.stackable && has(state, specId)) return { ok: false, reason: 'Already owned' };
   if (specId === 'workbench' && countOf(state, 'workbench') >= state.unit.benchSlots) {
     return { ok: false, reason: 'No free bench slot in this unit' };
@@ -1103,8 +1346,6 @@ function defaultAnchor(state: GameState, specId: string): { x: number; y: number
   if (specId === 'workbench') return slotFrom(BENCH_SLOT_LAYOUT, index);
   if (specId === 'locker') return slotFrom(LOCKER_SLOT_LAYOUT, index);
   if (specId === 'canteenSeat') return slotFrom(CANTEEN_SLOT_LAYOUT, index);
-  const desk = DESK_LAYOUT.find((object) => object.id === specId);
-  if (desk) return { x: desk.x, y: desk.y };
   const slot = STARTING_LAYOUT[specId];
   return slot
     ? { x: slot.yard === true ? state.unit.widthTiles + slot.x : slot.x, y: slot.y }

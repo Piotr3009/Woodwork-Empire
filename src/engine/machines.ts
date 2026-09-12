@@ -2,6 +2,7 @@
 // ownership and power side that the economy needs.
 
 import {
+  DUCTING_RECONNECT_COST,
   DUST_BANDS,
   EXTRACTOR_BROKEN_OUTPUT_FACTOR,
   GATE_CROWD_FACTOR,
@@ -19,6 +20,7 @@ import {
   EXTRACTOR_BREAKDOWN_CHANCE_HIGH_DUST,
   EXTRACTOR_BROKEN_DUST_MULTIPLIER,
   HELPER_REQUIRED_FROM_JOINERS,
+  NO_DUCTING_SPECS,
   NO_HELPER_DUST_MULTIPLIER,
   NO_HELPER_PRODUCTIVITY_FACTOR,
 } from './constants';
@@ -95,6 +97,30 @@ export function hasAll(state: GameState, specIds: readonly string[]): boolean {
 
 export function countOf(state: GameState, specId: string): number {
   return owned(state, specId).length;
+}
+
+/** The jobs standing at a bench this minute, oldest first by the minute they went to one, so a
+ *  job that starts later never turns a man off the bench he is already at (CLAUDE.md T4 3.4). */
+function jobsAtBenches(state: GameState): string[] {
+  return state.jobs
+    .filter((job) => job.stage === 'inProduction' && job.assignedTo !== null)
+    .slice()
+    .sort((left, right) => (left.benchSince ?? 0) - (right.benchSince ?? 0))
+    .map((job) => job.id);
+}
+
+/** Without a bench there is no way to start production, and two men cannot share one
+ *  (CLAUDE.md T4 3.4). A job already standing at a bench keeps it. */
+export function hasBenchFor(state: GameState, jobId: string | null): boolean {
+  const benches = countOf(state, 'workbench');
+  const standing = jobsAtBenches(state);
+  const index = jobId === null ? -1 : standing.indexOf(jobId);
+  return index >= 0 ? index < benches : standing.length < benches;
+}
+
+/** Benches nobody is standing at. */
+export function freeBenches(state: GameState): number {
+  return Math.max(0, countOf(state, 'workbench') - jobsAtBenches(state).length);
 }
 
 /** What the machines in the hall draw in a day. A dearer class pulls more (CLAUDE.md T3 3.5). */
@@ -197,7 +223,44 @@ export function extractorBroken(state: GameState): boolean {
 
 /** Extraction of some kind is in the hall. Without it no machine will run at all (PIOTR). */
 export function hasExtraction(state: GameState): boolean {
-  return has(state, 'extractor') || has(state, 'dustSystem');
+  return has(state, 'extractor') || hasCentralExtraction(state);
+}
+
+/** Ducted extraction for the whole hall: the central system, or the flexi one that never needs
+ *  reconnecting (CLAUDE.md T4 3.5). Everything the central system does, the flexi one does. */
+export function hasCentralExtraction(state: GameState): boolean {
+  return has(state, 'dustSystem') || has(state, 'flexiSystem');
+}
+
+/** With the flexi system every machine stays connected wherever it is put. */
+export function ductingIsFree(state: GameState): boolean {
+  return has(state, 'flexiSystem');
+}
+
+/** True for a machine that is ducted into the extraction and has to be reconnected when it is
+ *  moved. A bench, a rack, a locker or a seat is simply carried (CLAUDE.md T4 3.5). */
+export function needsDucting(specId: string): boolean {
+  if (NO_DUCTING_SPECS.includes(specId)) return false;
+  return findSpec(specId)?.category === 'machine';
+}
+
+/** The machines the player has moved that have to be reconnected, in the order he moved them.
+ *  The one place that says which move is charged: the bill in setup mode and the ledger lines when
+ *  the kit is down both read it (CLAUDE.md T4 3.5). */
+export function ductedMoves(state: GameState): Equipment[] {
+  if (ductingIsFree(state)) return [];
+  const moved: Equipment[] = [];
+  for (const entry of state.movedItems) {
+    const item = state.equipment.find((kit) => kit.id === entry.itemId);
+    if (item && needsDucting(item.specId)) moved.push(item);
+  }
+  return moved;
+}
+
+/** What the moves the player has made will cost in ducting, and on how many machines. */
+export function ductingDue(state: GameState): { machines: number; cost: number } {
+  const machines = ductedMoves(state).length;
+  return { machines, cost: machines * DUCTING_RECONNECT_COST };
 }
 
 /** Machines with a bag or a blade, the ones that are serviced and can break down. */
@@ -256,7 +319,7 @@ export function brokenMachineFor(state: GameState, material: MaterialKind): Equi
 
 /** With the central system there are no bags at all (CLAUDE.md 9.2). */
 export function bagsExist(state: GameState): boolean {
-  if (has(state, 'dustSystem')) return false;
+  if (hasCentralExtraction(state)) return false;
   return has(state, 'extractor');
 }
 
@@ -331,7 +394,7 @@ export function clearDust(state: GameState): void {
 
 /** Chance the extractor gives up today, higher when the hall is filthy [TUNE]. */
 export function extractorBreakdownChance(state: GameState): number {
-  if (has(state, 'dustSystem')) return 0;
+  if (hasCentralExtraction(state)) return 0;
   if (!has(state, 'extractor')) return 0;
   // Past the messy band, which is the same edge dustBand uses.
   return state.dust > DUST_HIGH_THRESHOLD

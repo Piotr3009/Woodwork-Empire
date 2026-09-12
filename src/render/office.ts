@@ -1,69 +1,173 @@
-// The office desk, drawn from the fixed layout in constants. Every object on it is a way into one
-// modal, and nothing else is on the screen (CLAUDE.md 10.1).
+// The office is a room, not a desk. Three photoreal layers on one 1672 by 941 canvas, scaled to
+// whatever room the page has under the top bar and centred, with the click regions and the live
+// text laid over them in canvas coordinates (docs/art/SPRITES.md 8).
+//
+// One scale value carries the stack, the regions and the text, so nothing can drift out of line.
+// The hall stays isometric; the two views never share a screen.
 
-import { DESK_LAYOUT, OFFICE_TILES } from '../engine/constants';
-import { findSpec, has } from '../engine/machines';
+import { formatTime } from '../engine/clock';
 import type { GameState } from '../engine/types';
-import { escapeText, objectArt, polygon } from './hall';
-import { depthKey, footprintPolygon, gridBounds } from './iso';
+import { escapeText } from './hall';
+import { pickSprite, spriteFiles } from './sprites';
 
-const FILLS: Record<string, [string, string]> = {
-  desk: ['var(--kit-furniture)', 'var(--kit-furniture-dark)'],
-  laptop: ['var(--kit-tools)', 'var(--kit-tools-dark)'],
-  drawings: ['var(--kit-furniture)', 'var(--kit-furniture-dark)'],
-  accounting: ['var(--kit-stock)', 'var(--kit-stock-dark)'],
-  materials: ['var(--kit-bench)', 'var(--kit-bench-dark)'],
-  catalogue: ['var(--kit-vehicle)', 'var(--kit-vehicle-dark)'],
-  hiring: ['var(--room)', 'var(--room-dark)'],
-  phone: ['var(--kit-welfare)', 'var(--kit-welfare-dark)'],
+/** The canvas every office layer is drawn on (docs/art/SPRITES.md 8.1). */
+export const OFFICE_CANVAS = { width: 1672, height: 941 };
+
+export interface OfficeLayer {
+  /** The sprite key, which is the file name in public/sprites. */
+  key: string;
+  /** What a flat placeholder rectangle says while the art is not there yet. */
+  name: string;
+}
+
+/** Back to front (docs/art/SPRITES.md 8.1). */
+export const OFFICE_LAYERS: OfficeLayer[] = [
+  { key: 'officeBackground', name: 'Office background' },
+  { key: 'officeDesk', name: 'Office desk' },
+  { key: 'officeLaptop', name: 'Office laptop' },
+];
+
+export interface OfficeRegion {
+  id: string;
+  name: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  /** The clock is the live clock and opens nothing (docs/art/SPRITES.md 8.2). */
+  opens: boolean;
+}
+
+/** The rectangles of docs/art/SPRITES.md 8.2, in canvas pixels before any scaling. */
+export const OFFICE_REGIONS: OfficeRegion[] = [
+  { id: 'workPlan', name: 'Work Plan board', x: 20, y: 10, width: 365, height: 515, opens: true },
+  { id: 'orders', name: 'Orders board', x: 1290, y: 20, width: 372, height: 500, opens: true },
+  { id: 'door', name: 'Door to the hall', x: 640, y: 15, width: 305, height: 585, opens: true },
+  { id: 'clock', name: 'Clock', x: 1040, y: 88, width: 122, height: 58, opens: false },
+  { id: 'laptop', name: 'Laptop', x: 558, y: 449, width: 557, height: 443, opens: true },
+  {
+    id: 'catalogue',
+    name: 'Equipment catalogue',
+    x: 60,
+    y: 680,
+    width: 445,
+    height: 210,
+    opens: true,
+  },
+  { id: 'binder', name: 'Accounting binder', x: 1170, y: 620, width: 435, height: 280, opens: true },
+];
+
+export interface OfficeTextBox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  /** Pixels at scale 1. The stack's own scale carries it from there. */
+  fontSize: number;
+}
+
+/** The two texts the artwork leaves blank for the game to fill (docs/art/SPRITES.md 8.3). */
+export const OFFICE_TEXTS: Record<'clock' | 'company', OfficeTextBox> = {
+  clock: { x: 1050, y: 96, width: 102, height: 40, fontSize: 28 },
+  company: { x: 200, y: 92, width: 170, height: 46, fontSize: 22 },
 };
 
-export function renderOffice(state: GameState): string {
-  const bounds = gridBounds(OFFICE_TILES, OFFICE_TILES, 4);
-  const pad = 24;
-  const parts: string[] = [
-    polygon(footprintPolygon(0, 0, OFFICE_TILES, OFFICE_TILES), 'var(--room-floor)'),
-  ];
-  const drawables = DESK_LAYOUT.map((object) => {
-    const missing = object.needs !== null && !has(state, object.needs);
-    const lockReason = missing ? `Buy a ${(findSpec(object.needs ?? '')?.name ?? '').toLowerCase()}` : '';
-    const [fill, shade] = FILLS[object.id] ?? ['var(--room)', 'var(--room-dark)'];
-    const attrs =
-      `data-office="${object.id}" data-sprite="${object.spriteKey}" ` +
-      `class="clickable${missing ? ' locked' : ''}"` +
-      (missing ? ` data-lock="${escapeText(lockReason)}"` : '');
-    const text = missing ? `${object.name}: ${lockReason}` : object.name;
-    return {
-      depth: depthKey(object.x, object.y),
-      svg:
-        `<g ${attrs}><title>${escapeText(text)}</title>` +
-        objectArt({
-          // Nothing the workshop has not bought carries its picture: it is a locked box.
-          spriteKey: missing ? '' : object.spriteKey,
-          x: object.x,
-          y: object.y,
-          width: object.width,
-          depth: object.depth,
-          height: object.height,
-          fill: missing ? 'var(--locked)' : fill,
-          shade: missing ? 'var(--locked-dark)' : shade,
-          label: text,
-        }) +
-        '</g>',
-    };
-  }).sort((left, right) => left.depth - right.depth);
-  parts.push(drawables.map((drawable) => drawable.svg).join(''));
-  const size = {
-    x: Math.round(bounds.minX - pad),
-    y: Math.round(bounds.minY - pad),
-    width: Math.round(bounds.width + pad * 2),
-    height: Math.round(bounds.height + pad * 2),
-  };
-  const viewBox = [size.x, size.y, size.width, size.height].join(' ');
+export interface Viewport {
+  width: number;
+  height: number;
+}
+
+/** The one scale value: the biggest the whole canvas can be drawn without cropping it. */
+export function officeScale(viewport: Viewport): number {
+  return Math.min(
+    viewport.width / OFFICE_CANVAS.width,
+    viewport.height / OFFICE_CANVAS.height,
+  );
+}
+
+function round(value: number): number {
+  return Math.round(value * 10000) / 10000;
+}
+
+function boxStyle(box: { x: number; y: number; width: number; height: number }): string {
+  return `left:${box.x}px;top:${box.y}px;width:${box.width}px;height:${box.height}px`;
+}
+
+/** One layer: the delivered PNG, or a flat rectangle with the layer's name on it so the room is
+ *  usable and testable before the art side has delivered (CLAUDE.md T4 3.1). */
+function layerHtml(layer: OfficeLayer, index: number, files: readonly string[]): string {
+  const url = pickSprite(files, layer.key);
+  if (url !== null) {
+    return (
+      `<img class="office-layer" data-layer="${layer.key}" src="${url}" alt="" ` +
+      'draggable="false" />'
+    );
+  }
   return (
-    `<svg class="office-view" viewBox="${viewBox}" width="${size.width}" ` +
-    `height="${size.height}" xmlns="http://www.w3.org/2000/svg" ` +
-    `role="img" aria-label="Office desk">${parts.join('')}</svg>` +
-    `<p class="view-note">The desk. Everything on it opens something.</p>`
+    `<div class="office-layer office-placeholder office-placeholder-${index + 1}" ` +
+    `data-layer="${layer.key}"><span>${escapeText(layer.name)}</span></div>`
+  );
+}
+
+/** A region is a transparent rectangle over the artwork: no frame, no button drawn on the room.
+ *  Hover lightens it and shows the name (docs/art/SPRITES.md 8.2). */
+function regionHtml(region: OfficeRegion): string {
+  const style = boxStyle(region);
+  if (!region.opens) {
+    return `<div class="office-region is-quiet" data-office="${region.id}" style="${style}"></div>`;
+  }
+  return (
+    `<button class="office-region" data-do="officeRegion" data-office="${region.id}" ` +
+    `title="${escapeText(region.name)}" style="${style}"></button>`
+  );
+}
+
+/** The clock and the company name, drawn by the game over the blank areas of the artwork. */
+function liveText(state: GameState): string {
+  const clock = OFFICE_TEXTS.clock;
+  const company = OFFICE_TEXTS.company;
+  return (
+    `<span class="office-clock" data-office-text="clock" ` +
+    `style="${boxStyle(clock)};font-size:${clock.fontSize}px">` +
+    `${escapeText(formatTime(state.clock.minute))}</span>` +
+    `<span class="office-company" data-office-text="company" ` +
+    `style="${boxStyle(company)};font-size:${company.fontSize}px">` +
+    `<span>${escapeText(state.companyName)}</span></span>`
+  );
+}
+
+/** The scale the renderer works out is taken from the window, because the room has to be drawn
+ *  before it can be measured. Once it is on the page its own box is the authority, so the scale is
+ *  re-taken from it: no copy of the stylesheet's numbers can then be wrong. In a headless DOM the
+ *  box measures zero and the computed value stands. */
+export function fitOfficeStack(page: ParentNode): void {
+  const room = page.querySelector('.office-room');
+  const stack = room === null ? null : room.querySelector('.office-stack');
+  if (!(room instanceof HTMLElement) || !(stack instanceof HTMLElement)) return;
+  const box = room.getBoundingClientRect();
+  if (box.width <= 0 || box.height <= 0) return;
+  const scale = round(officeScale({ width: box.width, height: box.height }));
+  if (stack.dataset.scale === String(scale)) return;
+  stack.dataset.scale = String(scale);
+  stack.style.transform = `translate(-50%,-50%) scale(${scale})`;
+}
+
+/** `files` is what the art side has delivered. It is a parameter so a test can ask what the room
+ *  looks like before the art arrives, which is what the placeholders are for (T4 3.1). */
+export function renderOffice(
+  state: GameState,
+  viewport: Viewport,
+  files: readonly string[] = spriteFiles(),
+): string {
+  const scale = round(officeScale(viewport));
+  return (
+    '<div class="office-room">' +
+    `<div class="office-stack" data-scale="${scale}" ` +
+    `style="width:${OFFICE_CANVAS.width}px;height:${OFFICE_CANVAS.height}px;` +
+    `transform:translate(-50%,-50%) scale(${scale})">` +
+    OFFICE_LAYERS.map((layer, index) => layerHtml(layer, index, files)).join('') +
+    OFFICE_REGIONS.map(regionHtml).join('') +
+    liveText(state) +
+    '</div></div>'
   );
 }

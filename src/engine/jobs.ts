@@ -18,8 +18,9 @@ import {
   WORKER_MINUTE_RATE_DIVISOR,
 } from './constants';
 import { canAccept, findEnquiry, removeEnquiry } from './board';
+import { callRinging, scheduleCalls } from './calls';
 import { template } from './catalog';
-import { nextWorkingDay } from './clock';
+import { minuteStamp, nextWorkingDay } from './clock';
 import { chargeUnavoidable, formatMoney, receive } from './economy';
 import { queueEvent } from './events';
 import {
@@ -27,6 +28,7 @@ import {
   brokenMachineFor,
   findSpec,
   has,
+  hasBenchFor,
   hasExtraction,
   machineLabourFactor,
   machineOutputFactor,
@@ -45,8 +47,6 @@ import { plural } from './text';
 import {
   AD_HOC_TASK_MINUTES,
   WORK_EPSILON,
-  callsForPrice,
-  clientCallMinutes,
   createTask,
   designMinutes,
   emailMinutes,
@@ -171,9 +171,11 @@ export function acceptEnquiry(state: GameState, enquiryId: string, byHand: boole
     stage: 'accepted',
     finishedDay: null,
     deliverOnDay: null,
-    callsRemaining: callsForPrice(enquiry.price),
+    calls: [],
+    callsMissed: 0,
     designMinutesRemaining: designMinutes(entry, enquiry.sizeMultiplier, state.software.tier),
     assignedTo: null,
+    benchSince: null,
     completedDay: null,
     daysLate: 0,
     depositPaid: 0,
@@ -195,18 +197,11 @@ export function acceptEnquiry(state: GameState, enquiryId: string, byHand: boole
   return { ok: true, reason: '', job };
 }
 
-/** The calls, the emails, the drawing and the site visit the job needs from the owner. */
+/** The emails, the drawing and the site visit the job needs from the owner, and the diary of the
+ *  calls the client will make. The calls are not tasks any more: they interrupt (T4 3.3). */
 export function createJobTasks(state: GameState, job: Job): void {
-  const minutes = clientCallMinutes(job.price);
-  for (let index = 0; index < job.callsRemaining; index += 1) {
-    createTask(state, {
-      kind: 'clientCall',
-      label: `Client call ${index + 1} of ${job.callsRemaining}: ${job.name}`,
-      minutes,
-      jobId: job.id,
-    });
-  }
-  // Emails ride with the job, in any order with the calls and the drawing, and hold nothing up.
+  scheduleCalls(state, job);
+  // Emails ride with the job, in any order with the drawing, and hold nothing up.
   const emails = emailsForPrice(job.price);
   for (let index = 0; index < emails; index += 1) {
     createTask(state, {
@@ -236,10 +231,6 @@ export function createJobTasks(state: GameState, job: Job): void {
 // The stages
 // ---------------------------------------------------------------------------
 
-function callsOutstanding(state: GameState, job: Job): number {
-  return jobTasks(state, job.id).filter((task) => task.kind === 'clientCall' && !task.done).length;
-}
-
 /** Emails the client never got an answer to. They hold nothing up, they just cost at the end. */
 export function emailsOutstanding(state: GameState, job: Job): number {
   return jobTasks(state, job.id).filter((task) => task.kind === 'emails' && !task.done).length;
@@ -253,17 +244,15 @@ function measureOutstanding(state: GameState, job: Job): boolean {
   return jobTasks(state, job.id).some((task) => task.kind === 'siteMeasure' && !task.done);
 }
 
-/** True once the drawings exist and the client has been spoken to (CLAUDE.md 9.5). */
+/** True once the drawings exist (CLAUDE.md 9.5). The calls used to be in this list and are not
+ *  any more: nothing waits on the phone (CLAUDE.md T4 3.3). */
 export function readyToOrderMaterial(state: GameState, job: Job): boolean {
-  return (
-    callsOutstanding(state, job) === 0 && !designOutstanding(state, job) && !measureOutstanding(state, job)
-  );
+  return !designOutstanding(state, job) && !measureOutstanding(state, job);
 }
 
 /** Keeps the job stage and its task list in step after anything finishes. */
 export function refreshJob(state: GameState, job: Job): void {
   if (job.stage !== 'accepted' && job.stage !== 'materialPending') return;
-  job.callsRemaining = callsOutstanding(state, job);
   if (designOutstanding(state, job)) {
     const design = jobTasks(state, job.id).find((task) => task.kind === 'design');
     job.designMinutesRemaining = design ? Math.max(0, Math.ceil(design.minutesRemaining)) : 0;
@@ -344,6 +333,8 @@ export function setMaterialMode(state: GameState, jobId: string, mode: MaterialM
  *  while the job is free to be worked on (CLAUDE.md T2 3.9). */
 export function hallBlock(state: GameState, job: Job): string {
   if (!job.byHand && !hasExtraction(state)) return 'no extraction';
+  // A bench is the one thing a piece cannot be made without, by hand or not (CLAUDE.md T4 3.4).
+  if (!hasBenchFor(state, job.id)) return 'no bench';
   const broken = brokenMachineFor(state, job.materialKind);
   if (broken && !job.byHand) {
     return `${(findSpec(broken.specId)?.name ?? 'a machine').toLowerCase()} is broken`;
@@ -396,8 +387,6 @@ export function startProductionCheck(state: GameState, job: Job): StartCheck {
   // The stage is the job's place in the lifecycle, so the desk work is only in the way while the
   // job is still standing at the desk.
   if (job.stage === 'accepted') {
-    const calls = callsOutstanding(state, job);
-    if (calls > 0) return blocked(plural(calls, 'call to make', 'calls to make'));
     if (designOutstanding(state, job)) return blocked('design not done');
     if (measureOutstanding(state, job)) return blocked('site measure not done');
   }
@@ -427,7 +416,9 @@ const LIFECYCLE_LABELS = ['Calls', 'Design', 'Material', 'Delivery', 'Production
 export function lifecycleSteps(state: GameState, job: Job): LifecycleStep[] {
   const ordered = job.stage !== 'accepted' && job.stage !== 'materialPending';
   const done = [
-    ordered || callsOutstanding(state, job) === 0,
+    // Calls hold nothing up any more, so this step is only ever amber while the client is
+    // actually on the line (CLAUDE.md T4 3.3).
+    !callRinging(state, job),
     ordered || (!designOutstanding(state, job) && !measureOutstanding(state, job)),
     ordered,
     job.stage === 'ready' ||
@@ -479,6 +470,7 @@ export function assignJob(state: GameState, jobId: string, workerId: string | nu
   }
   job.assignedTo = workerId;
   job.stage = 'inProduction';
+  job.benchSince = minuteStamp(state.clock);
   return true;
 }
 
@@ -487,6 +479,7 @@ export function releaseJob(state: GameState, job: Job): void {
   const worker = state.workers.find((entry) => entry.jobId === job.id);
   if (worker) worker.jobId = null;
   job.assignedTo = null;
+  job.benchSince = null;
   if (job.stage === 'inProduction') job.stage = 'ready';
 }
 
@@ -581,12 +574,17 @@ export function deliverJob(state: GameState, job: Job): void {
     job.emailsUnanswered > 0
       ? ` ${plural(job.emailsUnanswered, 'email', 'emails')} never got an answer.`
       : '';
+  const callLine =
+    job.callsMissed > 0
+      ? ` ${plural(job.callsMissed, 'call', 'calls')} rang out.`
+      : '';
   const penaltyLine = penalty > 0 ? ` Penalty ${formatMoney(penalty)}.` : '';
   queueEvent(state, {
     kind: 'jobPaid',
     title: `${job.name} delivered`,
     body:
-      `Balance ${formatMoney(job.balancePaid)} in.${lateLine}${emailLine}${penaltyLine} ` +
+      `Balance ${formatMoney(job.balancePaid)} in.${lateLine}${emailLine}${callLine}` +
+      `${penaltyLine} ` +
       `The client rates the job ${rating >= 0 ? '+' : ''}${rating}.`,
     data: { jobId: job.id, rating, balance: Math.round(job.balancePaid), late: job.daysLate },
   });

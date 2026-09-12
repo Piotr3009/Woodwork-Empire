@@ -1,13 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   BOOKKEEPING_MINUTES,
-  CLIENT_CALL_MINUTES_CAP,
   SOFTWARE_DESIGN_FACTOR,
 } from '../../src/engine/constants';
 import { PRODUCT_TEMPLATES } from '../../src/engine/constants';
 import {
-  callsForPrice,
-  clientCallMinutes,
   createDailyTasks,
   createTask,
   designMinutes,
@@ -52,25 +49,6 @@ function staff(id: string, role: Worker['role'], monthlyWage: number): Worker {
 }
 
 describe('minute curves', () => {
-  it('gives 2 calls up to 1000, 3 up to 3000 and 4 above', () => {
-    expect(callsForPrice(400)).toBe(2);
-    expect(callsForPrice(1000)).toBe(2);
-    expect(callsForPrice(1001)).toBe(3);
-    expect(callsForPrice(3000)).toBe(3);
-    expect(callsForPrice(3001)).toBe(4);
-    expect(callsForPrice(12000)).toBe(4);
-  });
-
-  it('charges 15 minutes a call up to 1000 and 15 more per further 1000, capped at 200', () => {
-    expect(clientCallMinutes(400)).toBe(15);
-    expect(clientCallMinutes(1000)).toBe(15);
-    expect(clientCallMinutes(1001)).toBe(30);
-    expect(clientCallMinutes(2000)).toBe(30);
-    expect(clientCallMinutes(3000)).toBe(45);
-    expect(clientCallMinutes(12000)).toBe(180);
-    expect(clientCallMinutes(100000)).toBe(CLIENT_CALL_MINUTES_CAP);
-  });
-
   it('runs the material order curve from 30 at 10000 to 200 at 100000', () => {
     expect(materialOrderMinutes(400)).toBe(30);
     expect(materialOrderMinutes(10000)).toBe(30);
@@ -145,9 +123,11 @@ describe('the daily list', () => {
       deliverOnDay: null,
       dueDay: 11,
       stage: 'accepted',
-      callsRemaining: 2,
+      calls: [],
+      callsMissed: 0,
       designMinutesRemaining: 30,
       assignedTo: null,
+      benchSince: null,
       completedDay: null,
       daysLate: 0,
       depositPaid: 200,
@@ -309,7 +289,8 @@ describe('emails scale with what the job is worth (CLAUDE.md T3 3.2)', () => {
     const emails = state.tasks.filter((task) => task.kind === 'emails');
     expect(emails).toHaveLength(1);
     expect(emails.every((task) => task.minutesTotal === 10)).toBe(true);
-    // The calls still follow their own curve, which is not this one.
-    expect(state.tasks.filter((task) => task.kind === 'clientCall')).toHaveLength(2);
+    // The calls are not tasks any more: they sit in the diary and ring (CLAUDE.md T4 3.3).
+    expect(state.tasks.filter((task) => task.kind === 'clientCall')).toHaveLength(0);
+    expect(state.jobs[0]?.calls).toHaveLength(2);
   });
 });

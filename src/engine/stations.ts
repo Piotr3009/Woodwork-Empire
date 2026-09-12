@@ -11,6 +11,8 @@ export const STATION_RACK = 'rack';
 export const STATION_GATE = 'gate';
 export const STATION_OFFICE = 'office';
 export const STATION_IDLE = 'idle';
+/** Standing at the canteen door because there is no bench to work at (CLAUDE.md T4 3.4). */
+export const STATION_NO_BENCH = 'noBench';
 
 export function machineStation(specId: string): string {
   return `machine:${specId}`;

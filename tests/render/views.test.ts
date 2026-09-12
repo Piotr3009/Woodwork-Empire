@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { renderHall } from '../../src/render/hall';
-import { renderOffice } from '../../src/render/office';
 import { renderGameOver } from '../../src/ui/dayEnd';
 import { renderLaptop } from '../../src/ui/laptop';
 import { findSpec } from '../../src/engine/machines';
@@ -184,34 +183,6 @@ describe('the hall on day 1', () => {
   });
 });
 
-describe('the office', () => {
-  it('offers the catalogue from the first minute, and locks what needs buying', () => {
-    const svg = renderOffice(newGame());
-    expect(svg).toContain('data-office="catalogue"');
-    expect(svg).toContain('data-office="hiring"');
-    expect(svg).toContain('data-office="phone"');
-    expect(svg).toContain('data-office="materials"');
-    expect(svg).toContain('Laptop: Buy a laptop');
-    expect(svg).toContain('Accounting: Buy a laptop');
-    expect(svg).toContain('Desk: Buy a desk');
-    expect(svg).toContain('var(--locked)');
-  });
-
-  it('unlocks the laptop and the accounting folder once they are there', () => {
-    const svg = renderOffice(buyStartingKit(newGame()));
-    expect(svg).toContain('>Laptop<');
-    expect(svg).toContain('>Accounting<');
-    expect(svg).not.toContain('Buy a laptop');
-    expect(svg).not.toContain('var(--locked)');
-  });
-
-  it('is one svg with a view box', () => {
-    const svg = renderOffice(newGame());
-    expect(svg.match(/<svg/g)).toHaveLength(1);
-    expect(svg).toMatch(/viewBox="/);
-  });
-});
-
 describe('the game over screen', () => {
   it('says what happened, how long the company lasted, and offers a fresh start', () => {
     const state = newGame();
@@ -321,9 +292,6 @@ describe('the placeholder art rules of 10.3', () => {
     const svg = renderHall(buyStartingKit(newGame()));
     expect(svg).toContain('data-sprite="tableSaw"');
     expect(svg).toContain('data-sprite="extractor"');
-    const office = renderOffice(newGame());
-    expect(office).toContain('data-sprite="catalogue"');
-    expect(office).toContain('data-sprite="teamBoard"');
   });
 });
 
@@ -351,15 +319,16 @@ describe('the laptop', () => {
     });
     const books = state.tasks.find((task) => task.kind === 'bookkeeping');
     if (books) books.doneBy = 'a1';
-    const html = renderLaptop(state);
+    const html = renderLaptop(state, { tab: 'tasks', stockSheets: '6' });
     expect(html).toContain('Ben is on it, 300 min of his day left');
     expect(html).toContain('Take it on');
   });
 
   it('lists what is standing at the gate with a way to order transport', () => {
     const state = newGame();
-    expect(renderLaptop(state)).toContain('At the gate, 0 pieces');
-    expect(renderLaptop(state)).toContain('Nothing waiting to go out.');
+    const html = renderLaptop(state, { tab: 'tasks', stockSheets: '6' });
+    expect(html).toContain('At the gate, 0 pieces');
+    expect(html).toContain('Nothing waiting to go out.');
   });
 });
 
