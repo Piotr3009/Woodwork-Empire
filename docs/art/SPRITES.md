@@ -123,3 +123,88 @@ office desk items (`laptop`, `ledgerFolder`, `materialsBinder`, `catalogue`, `te
    sinking and matches the neighbours in scale.
 
 A sprite that fails 3, 4 or 5 is regenerated, not edited around in code.
+
+---
+
+## 8. Office view (approved by Piotr, 12.09.2026): a room, not a sprite
+
+The office is the one exception to the isometric contract. It is a full-screen photoreal room seen
+from the owner's chair, in the spirit of the room screens of Airline Tycoon. The hall stays isometric.
+The two never share a screen, so the two styles never meet.
+
+### 8.1 Layers
+
+Three PNG layers on one shared canvas, **1672 × 941 px**, aligned at origin (0, 0), stacked in this
+order. The game scales the whole stack uniformly to fit the viewport below the top bar, keeping the
+aspect ratio, letterboxed on the page background.
+
+| Layer | File in `public/sprites/` | Format | Contents |
+|---|---|---|---|
+| 1 | `officeBackground.png` | RGB, opaque | walls, floor, door, Work Plan whiteboard with the Joinery Core sign, Orders corkboard, clock casing |
+| 2 | `officeDesk.png` | RGBA | desk top, product catalogue (left), blue Accounting binder (right) |
+| 3 | `officeLaptop.png` | RGBA | laptop with a blank screen |
+
+GPT's delivery names (`office-background.png`, `office-desk.png`, `office-laptop.png`) are renamed
+to the keys above before they enter the repository. `office-preview.png` is a review composite and
+does not go into `public/sprites/`.
+
+The desk, catalogue and binder upgrade together (one layer). The laptop upgrades on its own. A later
+office (bigger, nicer, as the company grows) is a new set of three files with a suffix
+(`officeBackground.large.png` and so on) and the same canvas size and regions unless this section
+is updated.
+
+### 8.2 Click regions (in canvas pixels, before scaling)
+
+The game draws no visible buttons on the room. Hover lightens the region a little and shows the
+name; click opens the modal. Regions are simple rectangles in canvas coordinates; the game converts
+them through the same scale it applies to the layers.
+
+| Region | Rectangle (x, y, w, h) | Opens |
+|---|---|---|
+| Work Plan board | 20, 10, 365, 515 | jobs in progress modal (every job with its five-step row and Start production) |
+| Orders board | 1290, 20, 372, 500 | order board modal (enquiries) |
+| Door | 640, 15, 305, 585 | the hall view |
+| Clock | 1040, 88, 122, 58 | nothing; it is the live clock (8.3) |
+| Laptop | 558, 449, 557, 443 | laptop modal: tabs Tasks, Materials, Team, Drawings |
+| Catalogue | 60, 680, 445, 210 | equipment catalogue |
+| Accounting binder | 1170, 620, 435, 280 | accounting modal |
+
+The desk itself and the floor are not clickable. The Joinery Core sign is part of the Work Plan
+board region and is not a separate control: it is the brand of the management software the player
+buys in the game (Piotr's decision: it is the advert).
+
+### 8.3 Live text drawn by the game over the layers
+
+Two texts are rendered by the game as HTML positioned in canvas coordinates and scaled with the
+stack. The artwork leaves these areas blank on purpose.
+
+| Text | Rectangle (x, y, w, h) | Content and style |
+|---|---|---|
+| Clock digits | 1050, 96, 102, 40 | game time `HH:MM`, seven-segment look, amber on the dark casing, 28 px at scale 1 |
+| Company name | 200, 92, 170, 46 | the player's company name, dark grey marker lettering, right of the "Work Plan" title, 22 px at scale 1, one line, ellipsis if longer |
+
+Everything else on the boards (the Gantt bars, the pinned sheets, the catalogue and binder labels)
+is illustrative artwork and stays static. Live job data lives in the modals the boards open.
+
+### 8.4 What moved where (compared to the Turn 3 desk)
+
+The Turn 3 office had seven desk items. The room has four clickable objects, two boards and a door.
+Mapping approved by Piotr:
+
+- Laptop: office tasks (as before) **plus Materials, Team and Drawings as tabs inside the laptop**.
+  The separate desk items `materialsBinder`, `teamBoard`, `drawings` and `phone` go away with the
+  room; their modals stay and open from the laptop tabs (one path per modal, only the entry moves).
+- Catalogue: the equipment catalogue (as before).
+- Blue binder: Accounting (as before; `ledgerFolder`).
+- Work Plan board: jobs in progress (the laptop's "Jobs on the books" list moves here).
+- Orders board: the order board (the same modal the top bar Board button opens).
+- Door: back to the hall (the same view switch the top bar toggle does).
+
+### 8.5 Acceptance for office layers
+
+1. Exactly 1672 × 941, all three files; layers 2 and 3 with real alpha (no baked checkerboard).
+2. Stacked at origin they reproduce `office-preview.png`.
+3. The clock face and the strip right of "Work Plan" are free of baked text.
+4. No people, no real brand except the Joinery Core sign.
+5. On the game's office view at 1280 px wide, every region in 8.2 opens the right modal and the
+   two live texts sit inside their blank areas.
