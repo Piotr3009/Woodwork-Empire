@@ -1,7 +1,7 @@
 // The one slim top bar every view shares (CLAUDE.md 10.1). Nothing else lives here.
 
 import { MINUTES_PER_WORKING_DAY, SPEEDS } from '../engine/constants';
-import { formatDate, ownerMinutesLeft } from '../engine/index';
+import { formatDate } from '../engine/index';
 import type { GameState, Speed } from '../engine/index';
 import { escapeHtml, money } from './modal';
 
@@ -36,11 +36,6 @@ function minuteBar(state: GameState): string {
 export function renderTopbar(state: GameState, view: 'hall' | 'office'): string {
   const net = state.finance.day.income - state.finance.day.costs;
   const netClass = net > 0 ? 'good' : net < 0 ? 'bad' : 'flat';
-  const away = !state.owner.present
-    ? '<span class="chip is-warn">Owner away</span>'
-    : state.owner.wentHome
-      ? '<span class="chip is-warn">Owner gone home</span>'
-      : '';
   return (
     '<div class="topbar">' +
     `<span class="cash">${money(state.cash)}</span>` +
@@ -48,8 +43,6 @@ export function renderTopbar(state: GameState, view: 'hall' | 'office'): string 
     `<span class="date">${escapeHtml(formatDate(state.clock))}</span>` +
     `<span class="speeds">${speedButtons(state)}</span>` +
     minuteBar(state) +
-    `<span class="left">${ownerMinutesLeft(state)} min of the day left</span>` +
-    away +
     '<span class="spacer"></span>' +
     '<button class="chip" data-do="openModal" data-modal="board">Board</button>' +
     `<button class="chip" data-do="setView" data-view="${view === 'hall' ? 'office' : 'hall'}">` +
@@ -67,7 +60,6 @@ export function renderMenu(state: GameState): string {
     '<div class="menu-pop">' +
     '<button class="btn" data-do="endDay">End day</button>' +
     stayHome +
-    '<button class="btn" data-do="openModal" data-modal="accounting">Accounting</button>' +
     '</div>'
   );
 }

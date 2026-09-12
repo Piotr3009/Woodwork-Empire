@@ -121,6 +121,7 @@ describe('the hall on day 1', () => {
     expect(renderHall(state)).toContain('Ben (off)');
     state = act(state, { type: 'SKIP_DAY' });
     expect(renderHall(state)).not.toContain('data-owner="1"');
+    expect(renderHall(state)).toContain('The owner is not in today');
   });
 
   it('keeps the bigger unit bigger', () => {

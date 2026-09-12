@@ -115,7 +115,6 @@ describe('the first ten minutes', () => {
     // Before 16:00 the button means going home: the rest of the day runs without the owner.
     click('[data-do="endDay"]');
     expect(currentState()?.owner.wentHome).toBe(true);
-    expect(html()).toContain('Owner gone home');
     advanceMinutes(480);
     expect(html()).toContain('End of day 1');
     expect(html()).toContain('Your minutes');

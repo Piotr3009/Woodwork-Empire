@@ -246,9 +246,14 @@ export function renderHall(state: GameState): string {
     Math.round(bounds.width + pad * 2),
     Math.round(bounds.height + pad * 2),
   ].join(' ');
+  const ownerLine = !state.owner.present
+    ? '. The owner is not in today, so everyone works at 0.7'
+    : state.owner.wentHome
+      ? '. The owner has gone home, so everyone works at 0.7'
+      : '';
   const stateLine = machinesStopped(state)
-    ? 'Hall: everything stopped, the extractor is broken'
-    : `Hall: ${dustBand(state.dust).label}`;
+    ? `Hall: everything stopped, the extractor is broken${ownerLine}`
+    : `Hall: ${dustBand(state.dust).label}${ownerLine}`;
   return (
     `<svg class="hall-view" viewBox="${viewBox}" xmlns="http://www.w3.org/2000/svg" ` +
     `role="img" aria-label="Workshop hall">${parts.join('')}</svg>` +
