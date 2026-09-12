@@ -203,6 +203,13 @@ function shouldFinishDay(state: GameState): boolean {
   return !ownerIsAvailable(state);
 }
 
+/** Nobody is left to work the rest of the day: the owner is at home and no member of staff is on
+ *  the books and fit today (Turn 2 brief 3.1). */
+function hallIsEmpty(state: GameState): boolean {
+  if (ownerIsAvailable(state)) return false;
+  return !state.workers.some((worker) => isWorkingToday(state, worker));
+}
+
 /** Resets everything that is scoped to one day and charges what the new day owes. */
 function startDay(state: GameState): void {
   const owner = state.owner;
@@ -579,15 +586,27 @@ function advanceMinute(state: GameState): void {
   settle(state);
 }
 
-/** One tick is one game minute (CLAUDE.md 4). Minutes left over when an event opens are dropped:
- *  the UI recomputes them from elapsed real time on the next frame. */
-export function tick(state: GameState, minutes: number): GameState {
+export interface TickResult {
+  state: GameState;
+  /** Minutes actually advanced. Fewer than asked when an event opened or the company ended. */
+  minutesRun: number;
+}
+
+/** One tick is one game minute (CLAUDE.md 4). An event that opens part way through stops the run
+ *  and the caller is told how many minutes went in, so the rest is not lost (Turn 2 brief 3.1). */
+export function runMinutes(state: GameState, minutes: number): TickResult {
   const next = clone(state);
+  let minutesRun = 0;
   for (let i = 0; i < minutes; i += 1) {
     if (isPaused(next)) break;
     advanceMinute(next);
+    minutesRun += 1;
   }
-  return next;
+  return { state: next, minutesRun };
+}
+
+export function tick(state: GameState, minutes: number): GameState {
+  return runMinutes(state, minutes).state;
 }
 
 function resolveEvent(state: GameState, choiceId: string): void {
@@ -641,6 +660,8 @@ export function applyAction(state: GameState, action: GameAction): GameState {
       next.owner.present = false;
       next.owner.stayHome = true;
       pauseOwnerTask(next);
+      // A day off with nobody in the hall is not worth watching: straight to the summary.
+      if (hallIsEmpty(next)) finishDay(next);
       break;
     case 'START_TASK':
       startTask(next, action.taskId);

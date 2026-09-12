@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyAction, createGame, tick } from '../../src/engine/index';
+import { applyAction, createGame, gameMinutesPerRealSecond, runMinutes, tick } from '../../src/engine/index';
 import type { GameState } from '../../src/engine/index';
 import {
   DAYS_PER_MONTH,
@@ -135,6 +135,79 @@ describe('day boundary', () => {
     state = tick(state, 900);
     expect(state.clock.minute).toBe(720);
     expect(state.activeEvent?.kind).toBe('dayEnd');
+  });
+});
+
+describe('the loop the UI drives', () => {
+  it('advances exactly 4000 game minutes in 1000 real seconds at 4x, across day boundaries', () => {
+    const perSecond = gameMinutesPerRealSecond(4);
+    let state = createGame(OPTIONS);
+    let accumulator = 0;
+    let minutesRun = 0;
+    for (let second = 0; second < 1000; second += 1) {
+      accumulator += perSecond;
+      let whole = Math.floor(accumulator);
+      accumulator -= whole;
+      let guard = 0;
+      while (whole > 0 && state.gameOver === null && guard < 50) {
+        guard += 1;
+        const result = runMinutes(state, whole);
+        state = result.state;
+        minutesRun += result.minutesRun;
+        // What the engine could not run stays in hand: the modal is answered and the rest goes in.
+        whole -= result.minutesRun;
+        if (whole > 0) state = clearEvents(state);
+      }
+    }
+    // Nothing was dropped on the way, and the accumulator never carried a whole minute over.
+    expect(minutesRun).toBe(4000);
+    expect(accumulator).toBe(0);
+    expect(state.clock.day).toBeGreaterThan(5);
+  });
+
+  it('stops on the minute an event fires and hands the rest of the batch back', () => {
+    // The twelve hour wall is at minute 720, so a 800 minute batch from minute 0 stops there.
+    let state = withLicence(createGame(OPTIONS));
+    const design = createTask(state, { kind: 'design', label: 'Endless drawing', minutes: 2000 });
+    state = applyAction(state, { type: 'START_TASK', taskId: design.id });
+    const result = runMinutes(state, 800);
+    expect(result.minutesRun).toBe(720);
+    expect(result.state.clock.minute).toBe(720);
+    expect(result.state.activeEvent?.kind).toBe('dayEnd');
+    expect(runMinutes(result.state, 80).minutesRun).toBe(0);
+  });
+});
+
+describe('a day off with nobody in the hall', () => {
+  it('jumps straight to the summary and on to the next morning at 08:00', () => {
+    const state = applyAction(createGame(OPTIONS), { type: 'SKIP_DAY' });
+    expect(state.clock.minute).toBe(0);
+    expect(state.activeEvent?.kind).toBe('dayEnd');
+    const tomorrow = clearEvents(state);
+    expect(tomorrow.clock).toEqual({ day: 2, minute: 0 });
+  });
+
+  it('runs the day at the selected speed while staff are working', () => {
+    let state = createGame(OPTIONS);
+    state.workers.push({
+      id: 'staff-1',
+      name: 'Ben',
+      role: 'joiner',
+      tier: 'poor',
+      rate: 0.6,
+      weeklyWage: 480,
+      monthlyWage: 0,
+      startDay: 1,
+      jobId: null,
+      taskId: null,
+      absentDaysRemaining: 0,
+      anchorX: 0,
+      anchorY: 4,
+    });
+    state = applyAction(state, { type: 'SKIP_DAY' });
+    expect(state.activeEvent).toBeNull();
+    state = tick(state, 100);
+    expect(state.clock.minute).toBe(100);
   });
 });
 

@@ -9,7 +9,7 @@ import {
   machinesStopped,
   oldestReadyJob,
   ownerJob,
-  tick,
+  runMinutes,
 } from '../engine/index';
 import type { Difficulty, GameAction, GameState, WorkerRole, WorkerTier } from '../engine/index';
 import { renderHall } from '../render/hall';
@@ -542,11 +542,14 @@ function onPointerDown(event: MouseEvent): void {
 }
 
 /** One step of the loop: whole game minutes into the engine, fractions stay in the UI
- *  (CLAUDE.md 4). The frame callback and the smoke test both come through here. */
-export function advanceMinutes(wholeMinutes: number): void {
-  if (state === null || wholeMinutes <= 0) return;
-  state = tick(state, wholeMinutes);
+ *  (CLAUDE.md 4). The frame callback and the smoke test both come through here. Hands back the
+ *  minutes that actually ran, so an event opening part way through loses none. */
+export function advanceMinutes(wholeMinutes: number): number {
+  if (state === null || wholeMinutes <= 0) return 0;
+  const result = runMinutes(state, wholeMinutes);
+  state = result.state;
   render();
+  return result.minutesRun;
 }
 
 function frame(now: number): void {
@@ -557,10 +560,8 @@ function frame(now: number): void {
     if (perSecond > 0 && state.activeEvent === null) {
       accumulator += (elapsed / 1000) * perSecond;
       const whole = Math.floor(accumulator);
-      if (whole > 0) {
-        accumulator -= whole;
-        advanceMinutes(whole);
-      }
+      // Only what the engine actually ran leaves the accumulator: the rest waits for the modal.
+      if (whole > 0) accumulator -= advanceMinutes(whole);
     }
   }
   requestAnimationFrame(frame);

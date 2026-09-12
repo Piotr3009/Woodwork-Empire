@@ -24,8 +24,9 @@ export const STATE_VERSION = 1;
 export const MINUTES_PER_WORKING_DAY = 480;
 /** Clock starts at 08:00 (PIOTR). */
 export const DAY_START_HOUR = 8;
-/** One game day at 1x speed, in real seconds (PIOTR, "for testing, maybe 4 or 5"). */
-export const REAL_SECONDS_PER_DAY_AT_1X = 180;
+/** One game day at 1x speed, in real seconds (PIOTR, Turn 2: one game minute per real second).
+ *  8 real minutes at 1x, 4 at 2x, 2 at 4x. */
+export const REAL_SECONDS_PER_DAY_AT_1X = 480;
 export const SPEEDS = [0, 1, 2, 4] as const;
 export const DAYS_PER_WEEK = 7;
 /** [TUNE] simplification for Turn 1: every month is 30 days. */

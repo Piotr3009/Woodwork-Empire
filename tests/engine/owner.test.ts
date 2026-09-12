@@ -107,9 +107,8 @@ describe('absence', () => {
     const task = createTask(state, { kind: 'emails', label: 'Emails', minutes: 60 });
     state = act(state, { type: 'START_TASK', taskId: task.id });
     expect(state.owner.currentTaskId).toBeNull();
-    state = tick(state, 500);
-    // Nobody is there to work the overtime, so the day closes itself at 16:00.
-    expect(state.clock.minute).toBe(480);
+    // Nobody is in the hall, so the day is over the moment it is taken off (Turn 2 brief 3.1).
+    expect(state.clock.minute).toBe(0);
     expect(state.activeEvent?.kind).toBe('dayEnd');
     const day2 = clearEvents(state);
     expect(day2.owner.present).toBe(true);
