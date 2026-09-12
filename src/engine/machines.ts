@@ -3,6 +3,8 @@
 
 import {
   DUST_BANDS,
+  GATE_CROWD_FACTOR,
+  GATE_CROWD_LIMIT,
   DUST_HIGH_THRESHOLD,
   DUST_MAX,
   DUST_PER_PRODUCTION_MINUTE,
@@ -78,10 +80,19 @@ export function helperMissing(state: GameState): boolean {
   return joiners >= HELPER_REQUIRED_FROM_JOINERS && helpers === 0;
 }
 
+/** Finished pieces waiting for transport. Counted here rather than imported from jobs.ts, which
+ *  already imports this module. */
+export function gateIsCrowded(state: GameState): boolean {
+  const waiting = state.jobs.filter((job) => job.stage === 'awaitingTransport').length;
+  return waiting > GATE_CROWD_LIMIT;
+}
+
 /** What the state of the hall does to every minute of production. */
 export function hallProductivityFactor(state: GameState): number {
   let factor = dustFactor(state.dust);
   if (helperMissing(state)) factor *= NO_HELPER_PRODUCTIVITY_FACTOR;
+  // Nowhere to put anything down with four finished pieces in the way (CLAUDE.md T2 3.7).
+  if (gateIsCrowded(state)) factor *= GATE_CROWD_FACTOR;
   return factor;
 }
 

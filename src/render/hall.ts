@@ -1,9 +1,16 @@
 // The hall, drawn from the state as flat placeholder boxes. No memory of its own: give it a state
 // and it hands back an SVG string (CLAUDE.md 10.3).
 
-import { DELIVERY_VAN_SPRITE, GATE_LAYOUT, ROOM_LAYOUT, YARD_WIDTH_TILES } from '../engine/constants';
-import { dustBand, findSpec, machinesStopped } from '../engine/machines';
-import { ownerJob } from '../engine/jobs';
+import {
+  DELIVERY_VAN_SPRITE,
+  FINISHED_GOODS_LAYOUT,
+  GATE_CROWD_LIMIT,
+  GATE_LAYOUT,
+  ROOM_LAYOUT,
+  YARD_WIDTH_TILES,
+} from '../engine/constants';
+import { dustBand, findSpec, gateIsCrowded, machinesStopped } from '../engine/machines';
+import { jobsAtGate, ownerJob } from '../engine/jobs';
 import { rackCapacity, stockIsLow } from '../engine/materials';
 import { ownerIsAvailable, staffOutputFactor } from '../engine/owner';
 import type { GameState } from '../engine/types';
@@ -249,6 +256,32 @@ export function renderHall(state: GameState): string {
     });
   }
 
+  // Finished pieces stand on the apron beside the gate until transport is ordered.
+  const waitingPieces = jobsAtGate(state);
+  if (waitingPieces.length > 0) {
+    const apron = FINISHED_GOODS_LAYOUT;
+    const apronX = unit.widthTiles + apron.x;
+    const shown = Math.min(waitingPieces.length, apron.width);
+    for (let index = 0; index < shown; index += 1) {
+      const x = apronX + index;
+      const faces = boxPolygons(x, apron.y, 1, apron.depth, apron.height);
+      drawables.push({
+        depth: depthKey(x, apron.y),
+        svg:
+          `<g data-finished="${index}"><title>Finished, waiting for transport</title>` +
+          box(faces, 'var(--kit-stock)', 'var(--kit-stock-dark)') +
+          '</g>',
+      });
+    }
+    drawables.push({
+      depth: depthKey(apronX, apron.y) + 0.3,
+      svg: label(
+        centreOf(apronX, apron.y, apron.width, apron.depth, apron.height),
+        `At the gate: ${waitingPieces.length}`,
+      ),
+    });
+  }
+
   drawables.push(...sawdust(state));
   drawables.sort((left, right) => left.depth - right.depth);
   parts.push(drawables.map((drawable) => drawable.svg).join(''));
@@ -272,6 +305,11 @@ export function renderHall(state: GameState): string {
   const stateLine = machinesStopped(state)
     ? `Hall: everything stopped, the extractor is broken${ownerLine}`
     : `Hall: ${band.label}${riskLine}${ownerLine}`;
+  const gateLine = gateIsCrowded(state)
+    ? `<p class="view-note warn">Order transport, no room at the gate: ${jobsAtGate(state).length}` +
+      ` finished pieces against a limit of ${GATE_CROWD_LIMIT}. Everything in the hall is 30% ` +
+      'slower.</p>'
+    : '';
   const lowStock = stockIsLow(state)
     ? `<p class="view-note warn">The rack is nearly empty: ${state.stock.sheets} of ` +
       `${rackCapacity(state)} sheets left.</p>`
@@ -281,7 +319,7 @@ export function renderHall(state: GameState): string {
   return (
     `<svg class="hall-view" viewBox="${viewBox}" xmlns="http://www.w3.org/2000/svg" ` +
     `role="img" aria-label="Workshop hall">${parts.join('')}</svg>` +
-    `<p class="view-note">${escapeText(stateLine)}</p>${lowStock}`
+    `<p class="view-note">${escapeText(stateLine)}</p>${gateLine}${lowStock}`
   );
 }
 

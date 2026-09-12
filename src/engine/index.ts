@@ -73,12 +73,14 @@ export {
 export {
   findJob,
   jobLabourCost,
+  jobsAtGate,
   minutesRemainingFor,
   oldestReadyJob,
   jobProgress,
   jobSpeedFactor,
   openJobs,
   ownerJob,
+  transportLabel,
 } from './jobs';
 
 // Tasks
@@ -106,6 +108,7 @@ export {
   countOf,
   dustBand,
   findSpec,
+  gateIsCrowded,
   has,
   machineLabourFactor,
   machinesStopped,

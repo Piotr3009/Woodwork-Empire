@@ -55,16 +55,19 @@ import {
   assignJob,
   chargeSiteMeasure,
   checkOverdueJobs,
+  deliverJob,
   findJob,
   jobProgress,
   jobSpeedFactor,
   oldestReadyJob,
   onDeliveryArrived,
+  orderTransport,
   ownerJob,
   onDeliveryUnloaded,
   onMaterialOrdered,
   refreshJob,
   releaseJob,
+  runBookedTransport,
   setMaterialMode,
 } from './jobs';
 import {
@@ -266,6 +269,7 @@ function startDay(state: GameState): void {
     });
   }
   const arriving = arriveDeliveries(state);
+  runBookedTransport(state);
   checkOverdueJobs(state);
   for (const delivery of arriving) onDeliveryArrived(state, delivery.jobId);
   createDailyTasks(state);
@@ -455,6 +459,9 @@ function applyTaskCompletion(state: GameState, task: TaskInstance): void {
       break;
     case 'fetchStorage':
       fetchFromStorage(state);
+      break;
+    case 'deliver':
+      if (job) deliverJob(state, job);
       break;
     case 'unload': {
       const delivery = task.deliveryId ? findDelivery(state, task.deliveryId) : null;
@@ -706,6 +713,18 @@ function resolveEvent(state: GameState, choiceId: string): void {
       if (delivery && choiceId === 'storage') moveOverflowToStorage(state, delivery);
       break;
     }
+    case 'jobAtGate': {
+      const jobId = event.data.jobId;
+      if (choiceId === 'transport' && typeof jobId === 'string') {
+        if (orderTransport(state, jobId)) {
+          const task = state.tasks.find(
+            (entry) => entry.kind === 'deliver' && entry.jobId === jobId && !entry.done,
+          );
+          if (task) startTask(state, task.id);
+        }
+      }
+      break;
+    }
     case 'bagFull':
     case 'extractorBroken': {
       const taskId = event.data.taskId;
@@ -800,6 +819,15 @@ export function applyAction(state: GameState, action: GameAction): GameState {
     case 'PAY_ARREARS':
       payArrears(next, action.amount);
       break;
+    case 'ORDER_TRANSPORT': {
+      if (orderTransport(next, action.jobId)) {
+        const task = next.tasks.find(
+          (entry) => entry.kind === 'deliver' && entry.jobId === action.jobId && !entry.done,
+        );
+        if (task) startTask(next, task.id);
+      }
+      break;
+    }
     case 'RESOLVE_EVENT':
       resolveEvent(next, action.choiceId);
       break;

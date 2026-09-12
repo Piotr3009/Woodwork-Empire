@@ -17,6 +17,10 @@ T2-03 Materials as sheets. A sheet is 200 of material value, the rack is shelvin
 catalogue (50 or 75 sheets), every delivery lands on it, and the sheets come off it as the job is
 made, with the empty rack stopping the bench and the low stock alarm in the morning.
 
+T2-04 Finished goods and transport. A made piece stands at the gate until transport is ordered,
+the balance is paid only when the client has it, a courier costs 120 and comes the next working
+day, the van costs 90 minutes and goes today, and a fourth piece at the gate slows the hall to 0.7.
+
 ## 2. Not done or partial
 
 ## 3. Tests

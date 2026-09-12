@@ -4,6 +4,7 @@
 
 import {
   BY_HAND_DURATION_FACTOR,
+  COURIER_COST,
   DEPOSIT_FRACTION,
   LABOUR_FRACTION,
   LATE_PENALTY_PER_DAY,
@@ -15,6 +16,7 @@ import {
 } from './constants';
 import { canAccept, findEnquiry, removeEnquiry } from './board';
 import { template } from './catalog';
+import { nextWorkingDay } from './clock';
 import { chargeUnavoidable, formatMoney, receive } from './economy';
 import { queueEvent } from './events';
 import { has, machineLabourFactor } from './machines';
@@ -23,6 +25,7 @@ import { ownerIsAvailable } from './owner';
 import { applyRating } from './reputation';
 import { makeId } from './rng';
 import {
+  AD_HOC_TASK_MINUTES,
   WORK_EPSILON,
   callsForPrice,
   clientCallMinutes,
@@ -138,6 +141,8 @@ export function acceptEnquiry(state: GameState, enquiryId: string, byHand: boole
     acceptedDay: state.clock.day,
     dueDay: state.clock.day + enquiry.deadlineDays,
     stage: 'accepted',
+    finishedDay: null,
+    deliverOnDay: null,
     callsRemaining: callsForPrice(enquiry.price),
     designMinutesRemaining: designMinutes(entry, enquiry.sizeMultiplier, state.software.tier),
     assignedTo: null,
@@ -349,10 +354,70 @@ export function addLabour(state: GameState, job: Job, labour: number): boolean {
   return true;
 }
 
-/** Late penalties come out of the balance, and the client always pays the rest (CLAUDE.md 8.7). */
+/** The piece is made. It stands in front of the gate until somebody takes it to the client, and
+ *  nothing is paid until it gets there (CLAUDE.md T2 3.7). */
 export function completeJob(state: GameState, job: Job): void {
+  releaseJob(state, job);
+  job.assignedTo = null;
+  job.stage = 'awaitingTransport';
+  job.finishedDay = state.clock.day;
+  state.dayStats.jobsCompleted.push(job.id);
+  queueEvent(state, {
+    kind: 'jobAtGate',
+    title: `${job.name} is finished`,
+    body:
+      'It is standing in front of the gate. The balance is paid when the client has it. ' +
+      `${transportLabel(state)}.`,
+    choices: [
+      { id: 'transport', label: transportLabel(state) },
+      { id: 'later', label: 'Leave it at the gate' },
+    ],
+    data: { jobId: job.id },
+  });
+}
+
+/** Everything made and not yet taken away. */
+export function jobsAtGate(state: GameState): Job[] {
+  return state.jobs.filter((job) => job.stage === 'awaitingTransport');
+}
+
+/** What ordering transport costs today: a courier, or 90 minutes of somebody with the van. */
+export function transportLabel(state: GameState): string {
+  return has(state, 'van')
+    ? `Take it in the van, ${AD_HOC_TASK_MINUTES.deliver} min`
+    : `Courier ${formatMoney(COURIER_COST)}, next working day`;
+}
+
+/** Books the piece out: the van goes today, a courier comes tomorrow (CLAUDE.md T2 3.7). */
+export function orderTransport(state: GameState, jobId: string): boolean {
+  const job = findJob(state, jobId);
+  if (!job || job.stage !== 'awaitingTransport' || job.deliverOnDay !== null) return false;
+  if (has(state, 'van')) {
+    const open = state.tasks.find(
+      (task) => task.kind === 'deliver' && task.jobId === job.id && !task.done,
+    );
+    if (!open) {
+      createTask(state, {
+        kind: 'deliver',
+        label: `Deliver ${job.name}`,
+        minutes: AD_HOC_TASK_MINUTES.deliver,
+        jobId: job.id,
+      });
+    }
+    return true;
+  }
+  chargeUnavoidable(state, 'transport', `Courier for ${job.name}`, COURIER_COST);
+  job.deliverOnDay = nextWorkingDay(state.clock.day);
+  return true;
+}
+
+/** Late penalties come out of the balance, and the client always pays the rest (CLAUDE.md 8.7).
+ *  The clock on lateness runs to the day the client actually gets the piece. */
+export function deliverJob(state: GameState, job: Job): void {
+  if (job.stage !== 'awaitingTransport') return;
   job.stage = 'completed';
   job.completedDay = state.clock.day;
+  job.deliverOnDay = null;
   job.daysLate = Math.max(0, state.clock.day - job.dueDay);
   const rate = job.express ? LATE_PENALTY_PER_DAY_EXPRESS : LATE_PENALTY_PER_DAY;
   const balanceDue = Math.round(job.price * (1 - DEPOSIT_FRACTION) * 100) / 100;
@@ -360,13 +425,12 @@ export function completeJob(state: GameState, job: Job): void {
   job.penalty = penalty;
   job.balancePaid = Math.round((balanceDue - penalty) * 100) / 100;
   receive(state, 'jobBalance', `Balance for ${job.name}`, job.balancePaid);
-  releaseJob(state, job);
-  job.assignedTo = null;
-  job.stage = 'completed';
-  state.dayStats.jobsCompleted.push(job.id);
   const rating = applyRating(state, job);
   const lateLine =
-    job.daysLate > 0 ? ` ${job.daysLate} days late, penalty ${formatMoney(penalty)}.` : '';
+    job.daysLate > 0
+      ? ` ${job.daysLate === 1 ? '1 day' : `${job.daysLate} days`} late, penalty ` +
+        `${formatMoney(penalty)}.`
+      : '';
   queueEvent(state, {
     kind: 'jobPaid',
     title: `${job.name} delivered`,
@@ -375,6 +439,13 @@ export function completeJob(state: GameState, job: Job): void {
       `${rating >= 0 ? '+' : ''}${rating}.`,
     data: { jobId: job.id, rating, balance: Math.round(job.balancePaid), late: job.daysLate },
   });
+}
+
+/** The couriers that were booked yesterday turn up. Runs at the start of the day. */
+export function runBookedTransport(state: GameState): void {
+  for (const job of jobsAtGate(state)) {
+    if (job.deliverOnDay !== null && job.deliverOnDay <= state.clock.day) deliverJob(state, job);
+  }
 }
 
 /** Warns once per job when the deadline has gone by. Runs at the start of the day. */

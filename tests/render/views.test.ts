@@ -105,6 +105,29 @@ describe('the hall on day 1', () => {
     expect(svg).toContain('Delivery: 4 sheets');
   });
 
+  it('stands the finished pieces on the apron beside the gate, with the count', () => {
+    const state = buyStartingKit(newGame());
+    state.enquiries = [];
+    expect(renderHall(state)).not.toContain('data-finished=');
+    for (let index = 0; index < 4; index += 1) {
+      const enquiry = placeEnquiry(state, { price: 400 + index * 10 });
+      state.jobs.push({
+        ...firstJob(act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false })),
+        id: `job-gate-${index}`,
+        stage: 'awaitingTransport',
+      });
+      state.enquiries = [];
+    }
+    const svg = renderHall(state);
+    expect(svg).toContain('data-finished="0"');
+    expect(svg).toContain('data-finished="2"');
+    // Three tiles of apron, so the fourth piece shows in the count and not as a box.
+    expect(svg).not.toContain('data-finished="3"');
+    expect(svg).toContain('At the gate: 4');
+    expect(svg).toContain('var(--kit-stock)');
+    expect(svg).toContain('Order transport, no room at the gate');
+  });
+
   it('shows the owner, and the crew with their names', () => {
     let state = buyStartingKit(newGame());
     expect(renderHall(state)).toContain('data-owner="1"');

@@ -356,6 +356,9 @@ function handleAction(element: DataElement, point: { x: number; y: number }): vo
     case 'buyStock':
       dispatch({ type: 'BUY_STOCK', sheets: Number(element.dataset.sheets ?? '0') });
       return;
+    case 'orderTransport':
+      dispatch({ type: 'ORDER_TRANSPORT', jobId: id });
+      return;
     case 'payArrears': {
       const typed = element.dataset.amount ?? 'all';
       dispatch({ type: 'PAY_ARREARS', amount: typed === 'all' ? null : Number(typed) });

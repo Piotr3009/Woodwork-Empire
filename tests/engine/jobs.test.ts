@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   BY_HAND_DURATION_FACTOR,
+  COURIER_COST,
   DEPOSIT_FRACTION,
+  GATE_CROWD_FACTOR,
+  OWN_DELIVERY_MINUTES,
   LABOUR_FRACTION,
   LATE_PENALTY_PER_DAY,
   LATE_PENALTY_PER_DAY_EXPRESS,
@@ -10,7 +13,11 @@ import {
   OWNER_LABOUR_PER_MINUTE,
   SITE_MEASURE_TAXI_COST,
 } from '../../src/engine/constants';
-import { machineLabourFactor } from '../../src/engine/machines';
+import {
+  gateIsCrowded,
+  hallProductivityFactor,
+  machineLabourFactor,
+} from '../../src/engine/machines';
 import { findJob, jobSpeedFactor, minutesRemainingFor, ownerJob } from '../../src/engine/jobs';
 import { materialCostFor, sheetsForCost } from '../../src/engine/materials';
 import { tick } from '../../src/engine/index';
@@ -18,6 +25,7 @@ import type { GameEvent, GameState, Job } from '../../src/engine/index';
 import {
   act,
   buyStartingKit,
+  clearEvents,
   doTask,
   fillRack,
   eventsOfKind,
@@ -25,6 +33,7 @@ import {
   newGame,
   nextDay,
   placeEnquiry,
+  runToDay,
 } from '../helpers';
 
 /** An Easy game with the day 1 kit bought, a clean board and a full rack. */
@@ -256,24 +265,32 @@ describe('production', () => {
     state = tick(state, 239);
     expect(state.jobs[0]?.stage).toBe('inProduction');
     state = tick(state, 1);
-    expect(state.jobs[0]?.stage).toBe('completed');
+    // Made, not delivered: it stands at the gate until transport is ordered (CLAUDE.md T2 3.7).
+    expect(state.jobs[0]?.stage).toBe('awaitingTransport');
     expect(state.owner.minutesByCategory.workshop).toBe(240);
   });
 
-  it('pays the balance and takes the rating when the job lands', () => {
+  it('pays nothing until the client has it, then the balance and the rating', () => {
     let state = accept(ready());
     const afterDeposit = state.cash;
     firstJob(state).stage = 'ready';
     state = act(state, { type: 'WORK_HERE', jobId: null });
     state = tick(state, 240);
-    const job = state.jobs[0];
+    expect(firstJob(state).stage).toBe('awaitingTransport');
+    expect(state.cash).toBeCloseTo(afterDeposit, 6);
+    expect(state.activeEvent?.kind).toBe('jobAtGate');
+    expect(ownerJob(state)).toBeNull();
+    // No van, so the courier takes it and the client has it the next working day.
+    state = act(clearEvents(state), { type: 'ORDER_TRANSPORT', jobId: firstJob(state).id });
+    expect(state.cash).toBeCloseTo(afterDeposit - COURIER_COST, 6);
+    const run = runToDay(clearEvents(state), 2);
+    const job = run.state.jobs[0];
+    expect(job?.stage).toBe('completed');
     expect(job?.balancePaid).toBe(200);
     expect(job?.penalty).toBe(0);
     expect(job?.rating).toBe(3);
-    expect(state.reputation).toBe(3);
-    expect(state.cash).toBeCloseTo(afterDeposit + 200, 6);
-    expect(state.activeEvent?.kind).toBe('jobPaid');
-    expect(ownerJob(state)).toBeNull();
+    expect(run.state.reputation).toBe(3);
+    expect(eventsOfKind(run.events, 'jobPaid')).toHaveLength(1);
   });
 
   it('works at 0.6667 of job value a minute, so 800 of job value fills a day', () => {
@@ -284,14 +301,20 @@ describe('production', () => {
 });
 
 describe('late delivery', () => {
+  /** With a van the piece goes out the same day, so the lateness is the day it was made. */
   function lateJob(express: boolean, daysLate: number): GameState {
-    let state = accept(ready(), 400, { express, deadlineDays: 1 });
+    let state = accept(act(ready(), { type: 'BUY_EQUIPMENT', specId: 'van' }), 400, {
+      express,
+      deadlineDays: 1,
+    });
     const job = firstJob(state);
     job.stage = 'ready';
     job.dueDay = 1;
     state.clock.day = 1 + daysLate;
     state = act(state, { type: 'WORK_HERE', jobId: null });
-    return tick(state, 240);
+    state = clearEvents(tick(state, 240));
+    state = act(state, { type: 'ORDER_TRANSPORT', jobId: firstJob(state).id });
+    return clearEvents(tick(state, OWN_DELIVERY_MINUTES));
   }
 
   it('takes 5% of the price a day out of the balance', () => {
@@ -351,27 +374,33 @@ describe('scenario: garage shelves on Easy', () => {
     expect(state.jobs[0]?.stage).toBe('ready');
     state = act(state, { type: 'WORK_HERE', jobId: null });
     state = tick(state, 240);
-    const job = findJob(state, state.jobs[0]?.id ?? '');
+    expect(state.jobs[0]?.stage).toBe('awaitingTransport');
+    // Day 2: the courier is booked, and the client has it on day 3.
+    state = act(clearEvents(state), { type: 'ORDER_TRANSPORT', jobId: state.jobs[0]?.id ?? '' });
+    const day3 = runToDay(clearEvents(state), 3).state;
+    const job = findJob(day3, day3.jobs[0]?.id ?? '');
     expect(job?.stage).toBe('completed');
-    expect(job?.completedDay).toBe(2);
+    expect(job?.completedDay).toBe(3);
     expect(job?.daysLate).toBe(0);
     expect(job?.rating).toBe(3);
-    expect(state.reputation).toBe(3);
-    // 200 deposit in, 160 material out, 200 balance in: 240 of the 400 stays in the till.
-    const jobMoves = state.ledger
-      .filter((entry) => ['jobDeposit', 'jobBalance', 'material'].includes(entry.category))
+    expect(day3.reputation).toBe(3);
+    // 200 deposit in, 160 material out, 120 courier out, 200 balance in: 120 of the 400 is left.
+    const jobMoves = day3.ledger
+      .filter((entry) =>
+        ['jobDeposit', 'jobBalance', 'material', 'transport'].includes(entry.category),
+      )
       .map((entry) => entry.amount);
-    expect(jobMoves).toEqual([200, -160, 200]);
-    expect(jobMoves.reduce((total, value) => total + value, 0)).toBe(240);
-    // The daily costs quietly took a large slice of the profit on a job this size.
-    const day2Costs = state.ledger
+    expect(jobMoves).toEqual([200, -160, -COURIER_COST, 200]);
+    expect(jobMoves.reduce((total, value) => total + value, 0)).toBe(120);
+    // The daily costs quietly took more than the job left behind.
+    const laterCosts = day3.ledger
       .filter(
         (entry) =>
-          entry.day === 2 && ['rent', 'rates', 'power', 'living'].includes(entry.category),
+          entry.day >= 2 && ['rent', 'rates', 'power', 'living'].includes(entry.category),
       )
       .reduce((total, entry) => total + entry.amount, 0);
-    expect(day2Costs).toBeLessThan(-250);
-    expect(state.cash).toBeCloseTo(cashBefore + 240 + day2Costs, 6);
+    expect(laterCosts).toBeLessThan(-450);
+    expect(day3.cash).toBeCloseTo(cashBefore + 120 + laterCosts, 6);
   });
 });
 
@@ -435,5 +464,63 @@ describe('an express job, on the Turn 2 rules', () => {
     const job = firstJob(accept(ready(), 900));
     expect(job.basePrice).toBe(900);
     expect(job.materialCost).toBe(900 * MATERIAL_FRACTION);
+  });
+});
+
+describe('the piece at the gate', () => {
+  function finished(count = 1): GameState {
+    let state = ready();
+    for (let index = 0; index < count; index += 1) {
+      const enquiry = placeEnquiry(state, { price: 400 + index * 10, deadlineDays: 60 });
+      state = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+      const job = state.jobs[index];
+      if (job) {
+        job.stage = 'awaitingTransport';
+        job.finishedDay = 1;
+      }
+    }
+    return state;
+  }
+
+  it('pays the courier and delivers on the next working day without a van', () => {
+    let state = finished();
+    const before = state.cash;
+    state = act(state, { type: 'ORDER_TRANSPORT', jobId: firstJob(state).id });
+    expect(before - state.cash).toBe(COURIER_COST);
+    expect(firstJob(state).deliverOnDay).toBe(2);
+    expect(firstJob(state).stage).toBe('awaitingTransport');
+    const run = runToDay(clearEvents(state), 2);
+    expect(run.state.jobs[0]?.stage).toBe('completed');
+    expect(run.state.jobs[0]?.balancePaid).toBe(200);
+  });
+
+  it('costs 90 minutes and no money with a van, and goes the same day', () => {
+    let state = act(finished(), { type: 'BUY_EQUIPMENT', specId: 'van' });
+    const before = state.cash;
+    state = act(state, { type: 'ORDER_TRANSPORT', jobId: firstJob(state).id });
+    expect(state.cash).toBe(before);
+    const task = state.tasks.find((entry) => entry.kind === 'deliver' && !entry.done);
+    expect(task?.minutesTotal).toBe(OWN_DELIVERY_MINUTES);
+    expect(state.owner.currentTaskId).toBe(task?.id);
+    state = tick(state, OWN_DELIVERY_MINUTES);
+    expect(firstJob(state).stage).toBe('completed');
+    expect(firstJob(state).completedDay).toBe(1);
+    expect(state.owner.minutesByCategory.workshop).toBe(OWN_DELIVERY_MINUTES);
+  });
+
+  it('slows the whole hall to 0.7 above three pieces at the gate', () => {
+    expect(gateIsCrowded(finished(3))).toBe(false);
+    const crowded = finished(4);
+    expect(gateIsCrowded(crowded)).toBe(true);
+    expect(hallProductivityFactor(crowded)).toBeCloseTo(GATE_CROWD_FACTOR, 6);
+    expect(hallProductivityFactor(finished(3))).toBeCloseTo(1, 6);
+  });
+
+  it('never books the same piece out twice', () => {
+    let state = finished();
+    state = act(state, { type: 'ORDER_TRANSPORT', jobId: firstJob(state).id });
+    const cash = state.cash;
+    state = act(state, { type: 'ORDER_TRANSPORT', jobId: firstJob(state).id });
+    expect(state.cash).toBe(cash);
   });
 });

@@ -4,6 +4,7 @@
 import {
   BAG_CHANGE_MINUTES,
   BOOKKEEPING_MINUTES,
+  OWN_DELIVERY_MINUTES,
   CALLS_ABOVE_BREAKS,
   CALLS_PRICE_BREAKS,
   CLEANING_MINUTES,
@@ -74,6 +75,7 @@ const TASK_DEFINITIONS: Record<TaskKind, TaskDefinition> = {
     eligibleRoles: ['joiner', 'helper'],
     autoRoles: ['helper'],
   },
+  deliver: { category: 'workshop', eligibleRoles: ['joiner', 'helper'], autoRoles: [] },
   repairExtractor: { category: 'workshop', eligibleRoles: ['joiner'], autoRoles: [] },
 };
 
@@ -303,6 +305,7 @@ export function assignWorkerTask(state: GameState, workerId: string, taskId: str
 export const AD_HOC_TASK_MINUTES = {
   bagChange: BAG_CHANGE_MINUTES,
   cleaning: CLEANING_MINUTES,
+  deliver: OWN_DELIVERY_MINUTES,
   fetchStorage: FETCH_STORAGE_MINUTES,
   repairExtractor: EXTRACTOR_REPAIR_MINUTES,
   siteMeasure: SITE_MEASURE_MINUTES,

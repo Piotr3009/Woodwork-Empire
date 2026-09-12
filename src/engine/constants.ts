@@ -194,6 +194,12 @@ export const PROFIT_FRACTION = 0.2;
 export const STOCK_MATERIAL_FRACTION = 0.34;
 /** Deposit on acceptance, balance on delivery (PIOTR). */
 export const DEPOSIT_FRACTION = 0.5;
+/** A finished piece stands at the gate until it is taken to the client (PIOTR). */
+export const COURIER_COST = 120;
+export const OWN_DELIVERY_MINUTES = 90;
+/** More than three pieces at the gate and the hall is in its own way (PIOTR: 30% slower). */
+export const GATE_CROWD_LIMIT = 3;
+export const GATE_CROWD_FACTOR = 0.7;
 /** Late penalty per day, as a fraction of the price (PIOTR). */
 export const LATE_PENALTY_PER_DAY = 0.05;
 export const LATE_PENALTY_PER_DAY_EXPRESS = 0.3;
@@ -892,6 +898,8 @@ export const CANTEEN_SLOT_LAYOUT: LayoutSlot[] = [
 
 /** Where a waiting delivery van stands, and how big it is. */
 export const GATE_LAYOUT = { x: 0, y: 4, yard: true, width: 4, depth: 2, height: 2 };
+/** The apron beside the gate where finished pieces stand, outside the floor (CLAUDE.md T2 3.13). */
+export const FINISHED_GOODS_LAYOUT = { x: 0, y: 6, yard: true, width: 3, depth: 1, height: 1 };
 export const DELIVERY_VAN_SPRITE = 'deliveryVan';
 
 /** The office desk and everything on it. Fixed placement, like the hall (CLAUDE.md 10.3). */

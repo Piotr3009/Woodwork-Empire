@@ -7,10 +7,12 @@ import {
   joiners,
   jobLabourCost,
   jobProgress,
+  jobsAtGate,
   openJobs,
   openTasks,
   ownerIsAvailable,
   softwareActive,
+  transportLabel,
   workerById,
 } from '../engine/index';
 import type { GameState, Job, TaskInstance } from '../engine/index';
@@ -20,6 +22,8 @@ import {
   escapeHtml,
   minutes,
   money,
+  plural,
+  primaryButton,
   reasonLabel,
 } from './modal';
 
@@ -70,15 +74,60 @@ function assignControls(state: GameState, job: Job): string {
   return `<span class="row-action">${chip('owner', 'You')}${crew}</span>`;
 }
 
+/** Plain English for a job stage. The stage id is never printed at the player. */
+const STAGE_LABELS: Record<Job['stage'], string> = {
+  accepted: 'calls and drawing',
+  materialPending: 'material to order',
+  materialOrdered: 'material ordered',
+  materialInYard: 'material at the gate',
+  ready: 'ready for production',
+  inProduction: 'in production',
+  awaitingTransport: 'awaiting transport',
+  completed: 'delivered',
+};
+
+/** The accent button of a job card: start the work, or get the finished piece away. */
+function jobAction(job: Job): string {
+  if (job.stage === 'awaitingTransport') {
+    if (job.deliverOnDay !== null) {
+      return reasonLabel(`Booked out, leaves day ${job.deliverOnDay}`);
+    }
+    return primaryButton('orderTransport', 'Order transport', `data-id="${job.id}"`);
+  }
+  return '';
+}
+
 function jobRow(state: GameState, job: Job): string {
   const done = Math.round(jobProgress(job) * 100);
+  const waiting = job.waitingForMaterial ? ' \u00b7 waiting for material' : '';
+  const action = jobAction(job);
   return (
     `<div class="row"><span class="row-main">${escapeHtml(job.name)} ${money(job.price)}</span>` +
-    `<span class="row-figure">${escapeHtml(job.stage)} \u00b7 due day ${job.dueDay}` +
-    `${job.stage === 'inProduction' ? ` \u00b7 ${done}% made` : ''}</span>` +
+    `<span class="row-figure">${escapeHtml(STAGE_LABELS[job.stage])} \u00b7 due day ` +
+    `${job.dueDay}${job.stage === 'inProduction' ? ` \u00b7 ${done}% made` : ''}` +
+    `${escapeHtml(waiting)}</span>` +
     `<span class="row-figure">${labourCostLine(state, job)}</span>` +
-    assignControls(state, job) +
+    (action === '' ? assignControls(state, job) : `<span class="row-action">${action}</span>`) +
     '</div>'
+  );
+}
+
+/** Everything made and standing in front of the gate (CLAUDE.md T2 3.7). */
+function gateSection(state: GameState): string {
+  const waiting = jobsAtGate(state);
+  if (waiting.length === 0) return emptyLine('Nothing waiting to go out.');
+  return (
+    `<p class="hint">${escapeHtml(transportLabel(state))}.</p>` +
+    waiting
+      .map(
+        (job) =>
+          `<div class="row"><span class="row-main">${escapeHtml(job.name)} ` +
+          `${money(job.price)}</span>` +
+          `<span class="row-figure">finished day ${job.finishedDay ?? '?'} \u00b7 due day ` +
+          `${job.dueDay}</span>` +
+          `<span class="row-action">${jobAction(job)}</span></div>`,
+      )
+      .join('')
   );
 }
 
@@ -106,6 +155,8 @@ export function renderLaptop(state: GameState): string {
     (workshop.length === 0
       ? emptyLine('Nothing waiting in the hall.')
       : workshop.map((task) => taskRow(state, task)).join('')) +
+    `<h3>At the gate, ${plural(jobsAtGate(state).length, 'piece', 'pieces')}</h3>` +
+    gateSection(state) +
     '<h3>Jobs on the books</h3>' +
     (jobLines === '' ? emptyLine('No jobs yet. Open the board.') : jobLines)
   );

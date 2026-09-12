@@ -45,6 +45,8 @@ function job(partial: Partial<Job>): Job {
     labourValue: 160,
     labourRemaining: 0,
     acceptedDay: 1,
+    finishedDay: null,
+    deliverOnDay: null,
     dueDay: 11,
     stage: 'completed',
     callsRemaining: 0,

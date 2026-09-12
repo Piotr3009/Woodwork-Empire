@@ -195,6 +195,7 @@ export type JobStage =
   | 'materialInYard'
   | 'ready'
   | 'inProduction'
+  | 'awaitingTransport'
   | 'completed';
 
 export type MaterialMode = 'perJob' | 'stock';
@@ -228,6 +229,10 @@ export interface Job {
   acceptedDay: number;
   dueDay: number;
   stage: JobStage;
+  /** Day the piece was finished and stood at the gate. */
+  finishedDay: number | null;
+  /** Transport is booked and the piece leaves on this day. Null while nothing is booked. */
+  deliverOnDay: number | null;
   callsRemaining: number;
   designMinutesRemaining: number;
   assignedTo: string | null;
@@ -265,6 +270,7 @@ export type TaskKind =
   | 'bagChange'
   | 'cleaning'
   | 'fetchStorage'
+  | 'deliver'
   | 'repairExtractor';
 
 export interface TaskInstance {
@@ -302,6 +308,7 @@ export type GameEventKind =
   | 'bankruptcy'
   | 'ownerSick'
   | 'jobOverdue'
+  | 'jobAtGate'
   | 'jobPaid';
 
 export interface GameEventChoice {
@@ -340,6 +347,7 @@ export type LedgerCategory =
   | 'repair'
   | 'storage'
   | 'taxi'
+  | 'transport'
   | 'pellets'
   | 'arrears'
   | 'seizure';
@@ -448,6 +456,7 @@ export type GameAction =
   | { type: 'SET_MATERIAL_MODE'; jobId: string; mode: MaterialMode }
   | { type: 'BUY_STOCK'; sheets: number }
   | { type: 'PAY_ARREARS'; amount: number | null }
+  | { type: 'ORDER_TRANSPORT'; jobId: string }
   | { type: 'WORK_HERE'; jobId: string | null }
   | { type: 'ASSIGN_JOB'; jobId: string; workerId: string | null }
   | { type: 'HIRE'; role: WorkerRole; tier: WorkerTier | null }
