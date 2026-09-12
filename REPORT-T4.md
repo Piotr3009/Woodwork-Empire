@@ -84,8 +84,9 @@ row primitives, which broke an import cycle between the laptop and the drawings,
 region's tooltip now says what it opens.
 
 T4-11 This report, and the defects that came out of writing it and of putting the whole diff
-through a five way adversarial review (contract, correctness, UI, tests, conventions). Every
-finding was checked against the code before it counted. What was fixed:
+through a five way adversarial review (contract, correctness, UI, tests, conventions). Nothing was
+taken on the review's word: every finding was reproduced against the code first, most of them by
+mutating the line the finding names and watching the suite stay green. What was fixed:
 
 1. A move the day ended in the middle of was never picked up again: `finishDay` takes the owner off
    what he is holding, nothing re-assigned it, and because the hall cannot be set out while a move
