@@ -15,7 +15,10 @@ import type {
   WorkerTier,
 } from './types';
 
-export const STATE_VERSION = 1;
+/** Bumped in Turn 3: a machine now carries its class, its hours and the hours it has in it, and
+ *  a task carries the day it was finished. A Turn 2 save has none of those, so the loader refuses
+ *  it rather than opening a game with half a workshop in it (CLAUDE.md T3 3.5, 3.3). */
+export const STATE_VERSION = 2;
 
 // ---------------------------------------------------------------------------
 // 6. Time
