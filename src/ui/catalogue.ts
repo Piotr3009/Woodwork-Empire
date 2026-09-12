@@ -3,12 +3,14 @@
 import { EQUIPMENT_SPECS, SOFTWARE_ONE_OFF_PRICE, SOFTWARE_SUBSCRIPTION_MONTHLY } from '../engine/constants';
 import { canBuy, canBuySoftware, countOf, hasExtraction, rackCapacity } from '../engine/index';
 import type { GameState } from '../engine/index';
+import { isMachineFamily } from './machine';
 import {
   emptyLine,
   escapeHtml,
   filterField,
   lockedButton,
   money,
+  plural,
   button,
 } from './modal';
 
@@ -21,15 +23,24 @@ export function renderCatalogue(state: GameState, filter: string): string {
       const check = canBuy(state, spec.id);
       const count = countOf(state, spec.id);
       const owned = count > 0 ? `<span class="badge">Owned ${count}</span>` : '';
-      const action = check.ok
-        ? button('buyEquipment', 'Buy', `data-id="${spec.id}"`)
-        : lockedButton('Buy', check.reason);
+      // A machine is a family: the classes it comes in, and the money, are in its own modal
+      // (CLAUDE.md T3 3.5). Everything else is bought off the line itself.
+      const family = isMachineFamily(spec);
+      const classes = family
+        ? ` · ${plural(spec.variants.length, 'class', 'classes')}`
+        : '';
+      const action = family
+        ? button('openMachine', 'Choose', `data-id="${spec.id}"`)
+        : check.ok
+          ? button('buyEquipment', 'Buy', `data-id="${spec.id}"`)
+          : lockedButton('Buy', check.reason);
+      const locked = !family && !check.ok;
       return (
-        `<div class="card${check.ok ? '' : ' is-locked'}">` +
+        `<div class="card${locked ? ' is-locked' : ''}">` +
         `<div class="card-main"><h3>${escapeHtml(spec.name)} ${owned}</h3>` +
-        `<p class="figures"><strong>${money(spec.price)}</strong> · ` +
-        `${escapeHtml(spec.effect)}</p>` +
-        (check.ok ? '' : `<p class="lock">${escapeHtml(check.reason)}</p>`) +
+        `<p class="figures"><strong>${family ? 'from ' : ''}${money(spec.price)}</strong>` +
+        `${classes} · ${escapeHtml(spec.effect)}</p>` +
+        (locked ? `<p class="lock">${escapeHtml(check.reason)}</p>` : '') +
         `</div><div class="card-action">${action}</div></div>`
       );
     })

@@ -591,6 +591,41 @@ input.num {
   padding-top: 8px;
 }
 
+/* Two or three lines about what a class of machine is (CLAUDE.md T3 3.5). */
+.tile-text {
+  color: var(--text);
+  font-size: 12px;
+  margin: 6px 0;
+}
+
+/* Where the sprite of this class goes, and the box that stands in while there is no file. */
+.tile-picture {
+  align-items: center;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  display: flex;
+  height: 120px;
+  justify-content: center;
+  margin: 4px 0;
+  overflow: hidden;
+}
+
+.tile-picture img {
+  display: block;
+  max-height: 100%;
+  max-width: 100%;
+}
+
+.tile-picture-box {
+  background: var(--kit-machine);
+  border-bottom: 10px solid var(--kit-machine-dark);
+  display: block;
+  height: 60px;
+  transform: skewY(-26.57deg);
+  width: 90px;
+}
+
 /* --------------------------------------------------------------------------
    The five steps of a job (CLAUDE.md T3 3.1)
    -------------------------------------------------------------------------- */

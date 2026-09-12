@@ -41,6 +41,7 @@ import { renderDrawings } from './drawings';
 import { renderEvent, renderEventFooter } from './eventModal';
 import { renderHiring } from './hiring';
 import { renderLaptop } from './laptop';
+import { renderMachine } from './machine';
 import { renderMaterials } from './materials';
 import {
   type ModalPosition,
@@ -77,6 +78,9 @@ interface Ui {
   focusNext: string | null;
   stockSheets: string;
   arrearsAmount: string;
+  /** The family whose classes are on screen, over whatever else is open (CLAUDE.md T3 3.5). */
+  machine: string | null;
+  machinePosition: ModalPosition | null;
   /** Setting the hall out: the clock is stopped and the kit can be dragged about. */
   setup: boolean;
   speedBeforeSetup: Speed;
@@ -125,6 +129,8 @@ function freshUi(): Ui {
     focusNext: null,
     stockSheets: '6',
     arrearsAmount: '500',
+    machine: null,
+    machinePosition: null,
     setup: false,
     speedBeforeSetup: 0,
     drag: null,
@@ -264,6 +270,16 @@ function modalSpecs(): ModalSpec[] {
       wide: ui.modal === 'accounting',
       full: ui.modal === 'board',
       position: ui.modalPosition,
+    });
+  }
+  if (ui.machine !== null) {
+    const spec = findSpec(ui.machine);
+    specs.push({
+      id: 'machine',
+      title: spec === null ? 'Machine' : spec.name,
+      body: renderMachine(current, ui.machine),
+      full: true,
+      position: ui.machinePosition,
     });
   }
   const event = current.activeEvent;
@@ -555,15 +571,29 @@ function handleAction(element: DataElement, point: { x: number; y: number }): vo
     case 'openModal':
       openModal((element.dataset.modal ?? 'board') as ModalId, null);
       break;
+    case 'openMachine':
+      // The classes of a family fill the page, over the catalogue that sent the player here.
+      ui.machine = id;
+      ui.machinePosition = null;
+      break;
+    case 'closeMachine':
+      ui.machine = null;
+      ui.machinePosition = null;
+      break;
     case 'closeModal': {
       // The cross on the event modal is the one choice it has. The cross on anything else just
-      // shuts that modal: the event is still there behind it.
-      const inEvent = element.closest('[data-modal]')?.getAttribute('data-modal') === 'event';
+      // shuts that modal: whatever is behind it is still there.
+      const which = element.closest('[data-modal]')?.getAttribute('data-modal');
       const event = game().activeEvent;
-      if (inEvent && event !== null && event.choices.length === 1) {
+      if (which === 'event' && event !== null && event.choices.length === 1) {
         const choice = event.choices[0];
         dispatch({ type: 'RESOLVE_EVENT', choiceId: choice ? choice.id : 'ok' });
         return;
+      }
+      if (which === 'machine') {
+        ui.machine = null;
+        ui.machinePosition = null;
+        break;
       }
       ui.modal = null;
       ui.modalPosition = null;
@@ -598,7 +628,7 @@ function handleAction(element: DataElement, point: { x: number; y: number }): vo
       dispatch({ type: 'PAUSE_TASK' });
       return;
     case 'buyEquipment':
-      dispatch({ type: 'BUY_EQUIPMENT', specId: id });
+      dispatch({ type: 'BUY_EQUIPMENT', specId: id, variantId: element.dataset.variant });
       return;
     case 'buySoftware':
       dispatch({ type: 'BUY_SOFTWARE', mode: id === 'subscription' ? 'subscription' : 'oneOff' });
@@ -870,6 +900,12 @@ function onKeyDown(event: KeyboardEvent): void {
     render();
     return;
   }
+  if (ui.machine !== null) {
+    ui.machine = null;
+    ui.machinePosition = null;
+    render();
+    return;
+  }
   if (ui.modal !== null) {
     ui.modal = null;
     ui.modalPosition = null;
@@ -953,14 +989,16 @@ function onPointerDown(event: MouseEvent): void {
   const rect = modal.getBoundingClientRect();
   const grabX = event.clientX - rect.left;
   const grabY = event.clientY - rect.top;
-  const isEvent = modal.dataset.modal === 'event';
+  const which = modal.dataset.modal;
   const move = (moveEvent: MouseEvent): void => {
     const position = {
       left: Math.max(0, moveEvent.clientX - grabX),
       top: Math.max(0, moveEvent.clientY - grabY),
     };
-    if (isEvent) {
+    if (which === 'event') {
       ui.eventPosition = position;
+    } else if (which === 'machine') {
+      ui.machinePosition = position;
     } else {
       ui.modalPosition = position;
     }

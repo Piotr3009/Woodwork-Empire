@@ -73,8 +73,12 @@ Run `npm run dev` and work through this. It is the same path the jsdom smoke tes
 2. Day 1, 08:00, hall view. An empty unit with three small rooms along the back wall. There is no
    shelving yet, and the line under the hall says so.
 3. Press Office in the top bar, or click the office room in the hall. Click the catalogue and buy:
-   desk, chair, laptop, table saw, cordless drill, hand edgebander, small compressor, extractor,
-   one workbench and the cheap shelving. Then buy the one off software bundle. Watch the cash drop.
+   desk, chair, laptop, cordless drill, one workbench and the cheap shelving. The machines are
+   families: press Choose on the table saw and the page fills with its five classes, from a used
+   one at 1,800 to an industrial one at 25,000, each with what it does to the speed of the bench,
+   to the bag, to the life of the machine and to the meter. Buy the used saw, then the edgebander,
+   the compressor and the extractor the same way. Then buy the one off software bundle. Watch the
+   cash drop.
 4. Close the catalogue and press Board. It fills the page with a tile per enquiry: the price, the
    sheets it takes, about how many of your own days, and what it needs. Accept one. Half the price
    lands as a deposit.

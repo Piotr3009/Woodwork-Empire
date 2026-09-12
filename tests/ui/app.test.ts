@@ -75,7 +75,16 @@ describe('the first ten minutes', () => {
     expect(html()).toContain('Equipment catalogue');
     const before = currentState()?.cash ?? 0;
     for (const specId of STARTING_KIT) {
-      click(`[data-do="buyEquipment"][data-id="${specId}"]`);
+      // A machine is a family: the catalogue offers its classes, and the money is spent there
+      // (CLAUDE.md T3 3.5).
+      const choose = root().querySelector(`[data-do="openMachine"][data-id="${specId}"]`);
+      if (choose === null) {
+        click(`[data-do="buyEquipment"][data-id="${specId}"]`);
+        continue;
+      }
+      click(`[data-do="openMachine"][data-id="${specId}"]`);
+      click(`[data-modal="machine"] [data-do="buyEquipment"][data-id="${specId}"]`);
+      click('[data-modal="machine"] [data-do="closeModal"]');
     }
     click('[data-do="buySoftware"][data-id="oneOff"]');
     const state = currentState();
