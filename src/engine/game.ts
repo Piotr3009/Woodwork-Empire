@@ -19,7 +19,6 @@ import {
   LOCKER_SLOT_LAYOUT,
   DUCTING_RECONNECT_COST,
   MOVE_MINUTES_PER_ITEM,
-  MOVING_SPEED,
   SKIP_SPEED,
   OVERTIME_DEBT_PER_DAY,
   REPUTATION_START,
@@ -83,6 +82,7 @@ import {
   extractorBroken,
   OWNER,
   ductedMoves,
+  ductingDue,
   deliveryDaysFor,
   findSpec,
   itemIsHeavy,
@@ -321,7 +321,6 @@ export function createGame(options: NewGameOptions): GameState {
     lateAccountsMonths: 0,
     productionMinutesMonth: 0,
     movedItems: [],
-    speedBeforeMove: null,
     skipTaskId: null,
     speedBeforeSkip: null,
     summaryCadence: 'daily',
@@ -873,20 +872,50 @@ function chargeDucting(state: GameState): void {
     );
   }
   state.movedItems = [];
-  // The clock goes back to the speed the player left it on before the move took it (T4 3.5).
-  if (state.speedBeforeMove !== null) {
-    state.speed = state.speedBeforeMove;
-    state.speedBeforeMove = null;
-  }
 }
 
-/** Leaving setup mode with the kit moved: the move is a job of work in the hall, an hour an item,
- *  and the clock runs itself at 4x until it is done (CLAUDE.md T4 3.5). */
+/** Two hours reads as "2 h", and an odd half hour says so. */
+function hoursText(minutes: number): string {
+  const hours = Math.floor(minutes / 60);
+  const rest = Math.round(minutes - hours * 60);
+  if (hours <= 0) return `${rest} min`;
+  return rest === 0 ? `${hours} h` : `${hours} h ${rest} min`;
+}
+
+/** Leaving setup mode. A bench, a rack, a tool cabinet, a locker or a seat is simply where the
+ *  player dropped it: no time and no money. Anything heavy is asked about first, because it is
+ *  two hours and a ducting bill (PIOTR, 13.09; CLAUDE.md T8 3.4). */
 function endSetup(state: GameState, speed: Speed): void {
   state.speed = speed;
   if (state.movedItems.length === 0) return;
   if (movePending(state) !== null) return;
-  state.speedBeforeMove = speed;
+  const heavy = state.movedItems.filter((moved) => {
+    const item = state.equipment.find((kit) => kit.id === moved.itemId);
+    return item !== undefined && itemIsHeavy(item);
+  });
+  state.movedItems = heavy;
+  if (heavy.length === 0) return;
+  const due = ductingDue(state);
+  const bill = due.cost > 0 ? ` and ${formatMoney(due.cost)} of ducting` : '';
+  queueEvent(state, {
+    kind: 'moveConfirm',
+    title: 'Moving the hall',
+    body:
+      `Moving ${plural(heavy.length, 'machine', 'machines')} takes ` +
+      `${hoursText(heavy.length * MOVE_MINUTES_PER_ITEM)}${bill}. Do it?`,
+    choices: [
+      { id: 'do', label: 'Do it' },
+      { id: 'back', label: 'Put them back' },
+    ],
+    data: { machines: heavy.length, cost: Math.round(due.cost) },
+  });
+}
+
+/** Do it: the move is a job of work in the hall, an hour an item, and the clock is run through it
+ *  so the player sees the day advance rather than a frozen screen (CLAUDE.md T8 3.4). */
+function startTheMove(state: GameState): void {
+  if (state.movedItems.length === 0) return;
+  if (movePending(state) !== null) return;
   const task = createTask(state, {
     kind: 'moveMachines',
     label: `Moving machines: ${plural(state.movedItems.length, 'item', 'items')}`,
@@ -896,11 +925,24 @@ function endSetup(state: GameState, speed: Speed): void {
   // the helper can be sent instead while the owner is not in.
   if (ownerIsAvailable(state)) {
     interruptOwnerWith(state, task);
-    return;
+  } else {
+    const hand =
+      availableJoiners(state)[0] ?? helpers(state).find((worker) => isWorkingToday(state, worker));
+    if (hand) assignWorkerTask(state, hand.id, task.id);
   }
-  const hand =
-    availableJoiners(state)[0] ?? helpers(state).find((worker) => isWorkingToday(state, worker));
-  if (hand) assignWorkerTask(state, hand.id, task.id);
+  startSkip(state, task.id);
+}
+
+/** Put them back: every machine he shifted goes back exactly where it stood, and not a minute or
+ *  a penny is charged (CLAUDE.md T8 3.4). */
+function putThemBack(state: GameState): void {
+  for (const moved of state.movedItems) {
+    const item = state.equipment.find((kit) => kit.id === moved.itemId);
+    if (!item) continue;
+    item.anchorX = moved.fromX;
+    item.anchorY = moved.fromY;
+  }
+  state.movedItems = [];
 }
 
 // ---------------------------------------------------------------------------
@@ -1037,9 +1079,9 @@ function settle(state: GameState): void {
   // Nobody holds a machine he is not standing at (CLAUDE.md T7 3.1).
   releaseIdleMachines(state);
   keepTheMoveHonest(state);
-  // Nothing else happens while the hall is being moved, and the clock runs itself (T4 3.5).
-  if (movingMachines(state) !== null) state.speed = MOVING_SPEED;
-  // And the clock the player asked to be run for him, until the task he asked about is over.
+  // Nothing else happens while the hall is being moved. The clock it used to force to 4x is the
+  // Skip ahead run now, which the player asks for on the confirm (CLAUDE.md T8 3.4).
+  // The clock the player asked to be run for him, until the task he asked about is over.
   runSkip(state);
   // The helper needs no minutes, so he would clear a bag change in the middle of his dinner. He
   // gets his break like everybody else, and the list is there for him when he is back.
@@ -1444,6 +1486,10 @@ function resolveEvent(state: GameState, choiceId: string): void {
       break;
     case 'dayEnd':
       advanceToNextDay(state);
+      break;
+    case 'moveConfirm':
+      if (choiceId === 'do') startTheMove(state);
+      else putThemBack(state);
       break;
     case 'deliveryArrived':
       if (choiceId === 'unload') {

@@ -6,6 +6,8 @@ import {
   CLEANING_MINUTES,
   applyAction,
   createGame,
+  finishTimeFor,
+  formatTime,
   gameMinutesPerRealSecond,
   brokenMachines,
   findSpec,
@@ -448,6 +450,18 @@ function sceneFor(current: GameState): Scene | null {
     return hallScene(current, { ghost: ghostFor(current), setup: ui.setup });
   }
   return officeScene(current, officeViewport());
+}
+
+/** When the move he has just said yes to will be finished, in the words the toast wants: the rest
+ *  of it is done tomorrow morning if the day runs out (CLAUDE.md T8 3.4). */
+function moveFinishNote(current: GameState): string {
+  const move = movePending(current);
+  if (move === null) return '';
+  const at = finishTimeFor(current, move.minutesRemaining);
+  const clock = formatTime(at.minute);
+  if (at.day === current.clock.day) return `Finished by ${clock}.`;
+  if (at.day === current.clock.day + 1) return `Finished tomorrow by ${clock}.`;
+  return `Finished on day ${at.day} by ${clock}.`;
 }
 
 /** The build in the bottom right corner of every screen, the start screen included. Muted, and
@@ -1030,10 +1044,17 @@ function handleAction(element: DataElement, point: { x: number; y: number }): vo
     case 'serviceMachine':
       dispatch({ type: 'SERVICE_MACHINE', equipmentId: id });
       return;
-    case 'resolveEvent':
+    case 'resolveEvent': {
       ui.eventPosition = null;
+      const kind = game().activeEvent?.kind;
       dispatch({ type: 'RESOLVE_EVENT', choiceId: id });
+      // He has said yes to the move: the clock is run through it, so he is told when it lands.
+      if (kind === 'moveConfirm' && id === 'do') {
+        ui.toast = moveFinishNote(game());
+        render();
+      }
       return;
+    }
     case 'copyState':
       copyState();
       break;

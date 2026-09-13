@@ -33,7 +33,7 @@ import {
   MINUTES_PER_WORKING_DAY,
   DEADLINE_DAYS_MIN,
   MOVE_MINUTES_PER_ITEM,
-  MOVING_SPEED,
+  SKIP_SPEED,
   OVERTIME_DEBT_PER_DAY,
   TOOL_CABINET,
   OVERTIME_END_MINUTE,
@@ -396,23 +396,31 @@ describe('a month that shifts two machines on day 3', () => {
 
   const day3 = clearEvents(playUntilDay(newGame({ seed: SEED, difficulty: 'easy' }), 3, CAREFUL));
   const cashBefore = day3.cash;
-  // Two things on the move, of which one is ducted into the extraction: the hand edgebander is
-  // in a tool cabinet now, so the shelving is the second thing the owner shifts (T4 3.5, T6 3.5).
-  const shifted = act(drag(drag(day3, 'tableSaw'), 'sheetRack'), {
+  // Two things dragged, of which one is a machine: the shelving is carried and costs nothing, so
+  // only the saw is asked about and only the saw is charged (PIOTR, 13.09; CLAUDE.md T8 3.4).
+  const asked = act(drag(drag(day3, 'tableSaw'), 'sheetRack'), {
     type: 'END_SETUP',
     speed: 1,
   });
+  const shifted = act(asked, { type: 'RESOLVE_EVENT', choiceId: 'do' });
 
-  it('starts on day 3 with two things on the move and an hour each to shift them', () => {
+  it('asks before it books it, and only about the machine', () => {
     expect(day3.clock.day).toBe(3);
-    expect(shifted.movedItems).toHaveLength(2);
-    expect(movingMachines(shifted)?.minutesTotal).toBe(2 * MOVE_MINUTES_PER_ITEM);
+    expect(asked.activeEvent?.kind).toBe('moveConfirm');
+    expect(asked.activeEvent?.body).toBe('Moving 1 machine takes 1 h and £800 of ducting. Do it?');
+    expect(asked.movedItems).toHaveLength(1);
+    expect(movingMachines(asked)).toBeNull();
+  });
+
+  it('starts on day 3 with an hour to shift it once he has said so', () => {
+    expect(shifted.movedItems).toHaveLength(1);
+    expect(movingMachines(shifted)?.minutesTotal).toBe(MOVE_MINUTES_PER_ITEM);
     expect(shifted.owner.currentTaskId).toBe(movingMachines(shifted)?.id);
   });
 
   it('runs the clock at 4x for the whole span, and will not let the player change it', () => {
-    expect(shifted.speed).toBe(MOVING_SPEED);
-    expect(act(shifted, { type: 'SET_SPEED', speed: 1 }).speed).toBe(MOVING_SPEED);
+    expect(shifted.speed).toBe(SKIP_SPEED);
+    expect(act(shifted, { type: 'SET_SPEED', speed: 1 }).speed).toBe(SKIP_SPEED);
     const speeds = new Set<number>();
     const madeAtFirst = shifted.jobs.map((job) => job.labourRemaining);
     const deskBefore = shifted.owner.minutesByCategory.admin;
@@ -424,11 +432,11 @@ describe('a month that shifts two machines on day 3', () => {
       if (!isBreak(at.clock.minute)) minutes += 1;
       at = clearEvents(tick(at, 1));
     }
-    // Nothing but 4x for the whole of it, and the span is the 120 minutes the move was given
+    // Nothing but 4x for the whole of it, and the span is the 60 minutes the move was given
     // plus whatever the phone took out of him inside it, to the minute.
-    expect(Array.from(speeds)).toEqual([MOVING_SPEED]);
+    expect(Array.from(speeds)).toEqual([SKIP_SPEED]);
     const onThePhone = at.owner.minutesByCategory.admin - deskBefore;
-    expect(minutes).toBe(2 * MOVE_MINUTES_PER_ITEM + onThePhone);
+    expect(minutes).toBe(MOVE_MINUTES_PER_ITEM + onThePhone);
     // Every bench stood still while the kit was up in the air.
     expect(at.jobs.map((job) => job.labourRemaining)).toEqual(madeAtFirst);
     // And the clock is the player's again.

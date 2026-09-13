@@ -181,6 +181,10 @@ describe('setting the hall out', () => {
     // of them ducted: the shelving has nothing to reconnect (CLAUDE.md T6 3.5).
     expect(html()).toContain('Ducting to reconnect: 1 machine, £800');
     click('[data-do="endSetup"]');
+    // The machine is asked about before it is booked, and the shelving is carried for nothing
+    // (PIOTR, 13.09; CLAUDE.md T8 3.4).
+    expect(html()).toContain('Moving 1 machine takes 1 h and £800 of ducting. Do it?');
+    click('[data-do="resolveEvent"][data-id="do"]');
     expect(html()).toContain('Moving machines');
     // Back to a hall that is being shifted, so the kit cannot be dragged again.
     expect(html()).not.toContain('data-do="startSetup"');

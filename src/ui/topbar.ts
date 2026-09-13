@@ -6,7 +6,6 @@ import {
   formatDate,
   has,
   isBreak,
-  movingMachines,
   netOf,
   ownerMinutesToday,
   shoppingList,
@@ -32,12 +31,9 @@ function speedChips(state: GameState, pulse: boolean): string {
 }
 
 function speedButtons(state: GameState, pulse: boolean): string {
-  // The hall is being shifted about: the clock runs itself and the player cannot touch it
-  // until it is done (CLAUDE.md T4 3.5).
-  if (movingMachines(state) !== null) {
-    return '<span class="reason">Moving machines</span>';
-  }
-  // Or the clock is being run for him until the owner is back (CLAUDE.md T8 3.3).
+  // The clock is being run for the player, through the trip he is out on or through the move of
+  // the hall he asked for: the speed is not his until it is over (CLAUDE.md T8 3.3, 3.4). This is
+  // the one thing that ever takes the clock off him; the Turn 4 forced 4x of a move is this.
   if (skippedTask(state) !== null) {
     return '<span class="reason">Skipping ahead</span>';
   }

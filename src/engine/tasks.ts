@@ -35,6 +35,8 @@ import {
   UNLOAD_BASE_MINUTES,
   WORK_EPSILON,
 } from './constants';
+import { DAY_END_MINUTE } from './constants';
+import { isBreak, nextWorkingDay } from './clock';
 import { findSpec } from './machines';
 import { canUnload } from './materials';
 import { ownerIsAvailable } from './owner';
@@ -242,6 +244,32 @@ export function movingMachines(state: GameState): TaskInstance | null {
       (task) => task.kind === 'moveMachines' && !task.done && task.doneBy !== null,
     ) ?? null
   );
+}
+
+/** When a job of work of this many minutes, started now and worked at a minute a minute, is
+ *  finished: the working day it lands on and the clock reading it lands at. The dinner hour is not
+ *  worked and the day stops at 17:00 and picks up at 08:00, so a move started at four o'clock is
+ *  finished tomorrow morning (CLAUDE.md T8 3.4). A projection for the toast, never a rule. */
+export function finishTimeFor(state: GameState, minutes: number): { day: number; minute: number } {
+  let day = state.clock.day;
+  let minute = state.clock.minute;
+  let left = minutes;
+  let guard = 0;
+  while (left > WORK_EPSILON && guard < 20000) {
+    guard += 1;
+    if (minute >= DAY_END_MINUTE) {
+      day = nextWorkingDay(day);
+      minute = 0;
+      continue;
+    }
+    if (isBreak(minute) && !state.owner.breakSkipped) {
+      minute += 1;
+      continue;
+    }
+    minute += 1;
+    left -= 1;
+  }
+  return { day, minute };
 }
 
 /** The kinds of task that take the owner out of the workshop, or stand him in the middle of it

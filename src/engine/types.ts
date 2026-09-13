@@ -512,6 +512,9 @@ export type GameEventKind =
   | 'lowStock'
   | 'accident'
   | 'dayEnd'
+  /** Leaving setup mode with heavy machines moved: it is two hours and a ducting bill, so it is
+   *  asked about before it is booked (CLAUDE.md T8 3.4). */
+  | 'moveConfirm'
   | 'weekend'
   | 'wagesPaid'
   | 'monthlyBills'
@@ -714,8 +717,6 @@ export interface GameState {
   productionMinutesMonth: number;
   /** Kit the player has dragged about and not yet paid for in time and ducting (T4 3.5). */
   movedItems: MovedItem[];
-  /** The speed the clock was on before the move forced itself to 4x. Null while none is on. */
-  speedBeforeMove: Speed | null;
   /** The task the player asked the clock to be run through at 4x, and the speed to give him back
    *  when it is over. Null while he is driving the clock himself (CLAUDE.md T8 3.3). */
   skipTaskId: string | null;
