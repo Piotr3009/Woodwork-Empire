@@ -1,160 +1,181 @@
-// The Work Plan board: every job on the books as a bar per stage, what has been done of each and
-// what is still to come (CLAUDE.md T7 3.2).
+// The Work Plan board, the simple one: one row a job, one bar, a blue line for now and a red tick
+// for the deadline (PIOTR, the mockup of 13.09: "the Work Plan modal is too complicated. One bar,
+// minutes under it, a blue line for now, a red line for the deadline"; CLAUDE.md T9 3.6).
 //
-// Nothing here decides anything. It reads the runs the engine wrote as the work went in, and it
-// projects the rest from the minutes that are left at the rate of the man who is on it.
+// Nothing here decides anything. It reads what the engine wrote as the work went in and projects
+// the rest from the minutes that are left, at the rate of the man who is on it or at the rate the
+// workshop averages when nobody is.
 
-import { GANTT_STAGES, MINUTES_PER_WORKING_DAY } from './constants';
+import { MINUTES_PER_WORKING_DAY } from './constants';
 import { workedMinutesOfDay } from './clock';
 import { OWNER } from './machines';
-import { labourDone, stageMinutes, stagePlanFor } from './stages';
-import type { GameState, Job, StageId, StageRun } from './types';
-
-/** How wide the Delivery bar is drawn: the piece stands at the gate for a day before it goes
- *  [TUNE]. It carries no labour, so nothing else would give it a width (CLAUDE.md T7 3.1). */
-export const DELIVERY_BAR_DAYS = 1;
+import {
+  designOutstanding,
+  jobProgress,
+  jobStage,
+  meetingOutstanding,
+  minutesRemainingFor,
+} from './jobs';
+import { ownerIsAvailable } from './owner';
+import { isWorkingToday, joiners } from './staff';
+import type { GameState, Job } from './types';
 
 /** Days past the deadline the board still draws, so a late job has somewhere to run to
  *  (CLAUDE.md T7 3.2). */
 export const BOARD_DAYS_PAST_DUE = 3;
-
-/** One stage of one job on the board. Days are fractions: a day and a half is the middle of the
- *  second one. */
-export interface StageBar {
-  stage: StageId;
-  label: string;
-  from: number;
-  to: number;
-  /** How much of the bar is worked off, 0 to 1. The rest is drawn hatched. */
-  done: number;
-  /** True while nothing has been worked into this stage yet: the bar is a projection. */
-  projected: boolean;
-}
-
-/** A gap in a row: the stage is standing still and the hover says why (CLAUDE.md T7 3.2). */
-export interface StageGap {
-  from: number;
-  to: number;
-  reason: string;
-}
-
-export interface JobGantt {
-  jobId: string;
-  name: string;
-  /** The days the row runs between: from the day the job was accepted to its deadline plus
-   *  three (CLAUDE.md T7 3.2). */
-  fromDay: number;
-  toDay: number;
-  dueDay: number;
-  today: number;
-  bars: StageBar[];
-  gap: StageGap | null;
-}
 
 /** A day and a minute of the working day as one number, so a bar can be part of a day wide. */
 export function dayPoint(day: number, minute: number): number {
   return day + Math.min(1, workedMinutesOfDay(minute) / MINUTES_PER_WORKING_DAY);
 }
 
-/** What a man of this job's is worth against the owner at his best. An unassigned job is drawn at
- *  the owner's own rate, because he is who would pick it up. */
-export function jobRate(state: GameState, job: Job): number {
-  if (job.assignedTo === null || job.assignedTo === OWNER) return 1;
-  return state.workers.find((worker) => worker.id === job.assignedTo)?.rate ?? 1;
+/** What the hands the workshop has today average, against the owner at his best. He is one of
+ *  them, at 1.0: a job nobody is on is drawn at what this workshop does to it, not at what the
+ *  owner alone would do to it (CLAUDE.md T9 3.6). */
+export function workshopRate(state: GameState): number {
+  const rates: number[] = [];
+  if (ownerIsAvailable(state)) rates.push(1);
+  for (const worker of joiners(state)) {
+    if (isWorkingToday(state, worker) && worker.rate > 0) rates.push(worker.rate);
+  }
+  if (rates.length === 0) return 1;
+  const total = rates.reduce((sum, rate) => sum + rate, 0);
+  return Math.round((total / rates.length) * 10000) / 10000;
 }
 
-/** The first and last minute anybody spent at this stage, out of the runs the engine wrote. */
-function runsOf(job: Job, stage: StageId): { from: number; to: number | null } | null {
-  const runs = job.stageRuns.filter((run: StageRun) => run.stage === stage);
-  const first = runs[0];
-  if (!first) return null;
-  const last = runs[runs.length - 1];
+/** The rate this job's bar is drawn at, and what the board calls it. */
+export function rateFor(state: GameState, job: Job): { rate: number; label: string } {
+  if (job.assignedTo === OWNER) return { rate: 1, label: 'for you' };
+  const worker =
+    job.assignedTo === null
+      ? undefined
+      : state.workers.find((entry) => entry.id === job.assignedTo);
+  if (worker && worker.rate > 0) return { rate: worker.rate, label: `for ${worker.name}` };
+  return { rate: workshopRate(state), label: 'at workshop average' };
+}
+
+/** Where the job is standing, in the words the board says it in. No stage colours and no five
+ *  bars: a stage is a word (CLAUDE.md T9 3.6). */
+export function stageText(state: GameState, job: Job): string {
+  switch (job.stage) {
+    case 'accepted':
+      if (meetingOutstanding(state, job)) return 'client not seen yet';
+      return designOutstanding(state, job) ? 'drawings not done' : 'drawing to do';
+    case 'materialPending':
+      return 'material to order';
+    case 'materialOrdered':
+      return 'material ordered';
+    case 'materialInYard':
+      return 'material at the gate';
+    case 'ready':
+      return 'ready for production';
+    case 'awaitingTransport':
+      return 'waiting for transport';
+    case 'completed':
+      return 'delivered';
+    default: {
+      const stage = jobStage(state, job);
+      const where = stage?.label ?? 'In production';
+      return job.blockedBy === '' ? where : `${where}, ${job.blockedBy}`;
+    }
+  }
+}
+
+/** The day the bench can pick this job up: the day it was picked up if it has been, the day the
+ *  material lands if it is still on the road, and today if it is standing there ready. */
+function productionStart(state: GameState, job: Job): number {
+  const first = job.stageRuns[0];
+  if (first) return dayPoint(first.startDay, first.startMinute);
+  const now = dayPoint(state.clock.day, state.clock.minute);
+  const delivery = state.deliveries.find((entry) => entry.jobId === job.id && !entry.unloaded);
+  if (delivery) return Math.max(now, dayPoint(delivery.arriveDay, 0));
+  return now;
+}
+
+export interface PlanRow {
+  jobId: string;
+  name: string;
+  price: number;
+  /** Who is on it, in plain words. */
+  who: string;
+  /** Where it stands, as text and nothing else. */
+  stage: string;
+  /** True while nothing has been worked into it: the bar is then a projection of what it takes. */
+  notStarted: boolean;
+  /** The bar, in day points. */
+  from: number;
+  to: number;
+  dueDay: number;
+  /** The share of the bar filled green from the left, 0 to 1. */
+  done: number;
+  minutesDone: number;
+  minutesTotal: number;
+  /** The last day this one can be started and still be on time. Null once it is started. */
+  latestStart: number | null;
+  /** True when that day has gone: the tick is drawn at Now, in red (CLAUDE.md T9 3.6). */
+  late: boolean;
+  /** "at workshop average", "for Tom" or "for you". */
+  rateLabel: string;
+}
+
+export interface WorkPlan {
+  /** The axis: from the earliest acceptance to the latest deadline plus three. */
+  fromDay: number;
+  toDay: number;
+  /** Where the blue line goes. */
+  now: number;
+  rows: PlanRow[];
+}
+
+function rowFor(state: GameState, job: Job): PlanRow {
+  const now = dayPoint(state.clock.day, state.clock.minute);
+  const { rate, label } = rateFor(state, job);
+  const left = minutesRemainingFor(state, job, rate);
+  const whole = minutesRemainingFor(state, { ...job, labourRemaining: job.labourValue }, rate);
+  const total = Math.max(whole, left);
+  const from = productionStart(state, job);
+  const notStarted = job.stageRuns.length === 0;
+  const length = total / MINUTES_PER_WORKING_DAY;
+  const latestStart = notStarted ? Math.round((job.dueDay - length) * 100) / 100 : null;
+  const worker =
+    job.assignedTo === null || job.assignedTo === OWNER
+      ? null
+      : state.workers.find((entry) => entry.id === job.assignedTo);
   return {
-    from: dayPoint(first.startDay, first.startMinute),
-    to: last && last.endDay !== null ? dayPoint(last.endDay, last.endMinute ?? 0) : null,
+    jobId: job.id,
+    name: job.name,
+    price: job.price,
+    who: job.assignedTo === OWNER ? 'you' : worker ? worker.name : 'nobody yet',
+    stage: stageText(state, job),
+    notStarted,
+    from,
+    // Started, it runs to its deadline; not started, it is as long as the work in it
+    // (CLAUDE.md T9 3.6).
+    to: notStarted ? from + length : Math.max(job.dueDay, from),
+    dueDay: job.dueDay,
+    done: jobProgress(job),
+    minutesDone: Math.max(0, total - left),
+    minutesTotal: total,
+    latestStart,
+    late: latestStart !== null && latestStart < now,
+    rateLabel: label,
   };
 }
 
-/** The bars of one job: what was done when, and what the rest of it will take. */
-export function barsFor(state: GameState, job: Job): StageBar[] {
-  const now = dayPoint(state.clock.day, state.clock.minute);
-  const rate = jobRate(state, job);
-  const worked = labourDone(job);
-  const bars: StageBar[] = [];
-  let cursor = now;
-  for (const stage of stagePlanFor(state, job)) {
-    const span = stage.to - stage.from;
-    const into = Math.min(span, Math.max(0, worked - stage.from));
-    const left = Math.max(0, span - into);
-    const days = stageMinutes(left, rate, stage.speed) / MINUTES_PER_WORKING_DAY;
-    const run = runsOf(job, stage.id);
-    const from = run ? run.from : cursor;
-    // A stage that is finished is drawn where it actually happened; one still to come is drawn
-    // from where the job has got to, at the minutes it has left in it.
-    const finished = left <= 0 && run !== null && run.to !== null;
-    const to = finished && run.to !== null ? run.to : Math.max(from, cursor) + days;
-    bars.push({
-      stage: stage.id,
-      label: stage.label,
-      from,
-      to,
-      done: span > 0 ? into / span : 0,
-      projected: run === null,
-    });
-    if (left > 0) cursor = Math.max(cursor, to);
-  }
-  // The piece leaving. It carries no labour, so it is drawn a day wide after the last stage, or
-  // on the day it was finished once it is standing at the gate (CLAUDE.md T7 3.1).
-  const delivery = GANTT_STAGES.find((stage) => stage.id === 'delivery');
-  if (delivery) {
-    const finished = job.finishedDay === null ? null : dayPoint(job.finishedDay, 0);
-    const from = finished ?? cursor;
-    const out = job.completedDay === null ? from + DELIVERY_BAR_DAYS : dayPoint(job.completedDay, 0);
-    bars.push({
-      stage: delivery.id,
-      label: delivery.label,
-      from,
-      to: Math.max(from + DELIVERY_BAR_DAYS, out),
-      done: job.stage === 'completed' ? 1 : 0,
-      projected: finished === null,
-    });
-  }
-  return bars;
-}
-
-/** The grey gap of a row: the job is standing still and this is how long it has been standing and
- *  what is in its way (CLAUDE.md T7 3.2). Null while nothing is in its way. */
-export function gapFor(state: GameState, job: Job): StageGap | null {
-  if (job.stage !== 'inProduction' || job.blockedBy === '') return null;
-  const now = dayPoint(state.clock.day, state.clock.minute);
-  const open = job.stageRuns[job.stageRuns.length - 1];
-  // From the last minute anybody worked on it, or from this morning when nobody ever has: a man
-  // who has stood at a machine all day has stood there all day (CLAUDE.md T7 3.2).
-  const from = open
-    ? dayPoint(open.endDay ?? open.startDay, open.endMinute ?? open.startMinute)
-    : dayPoint(state.clock.day, 0);
-  return { from: Math.min(from, now), to: now, reason: job.blockedBy };
-}
-
-/** Every job on the books as a row of the board, the nearest deadline first. */
-export function workPlanGantt(state: GameState): JobGantt[] {
-  return state.jobs
+/** Every job on the books as a row of the board, the nearest deadline first (CLAUDE.md T9 3.6). */
+export function workPlan(state: GameState): WorkPlan {
+  const open = state.jobs
     .filter((job) => job.stage !== 'completed')
     .slice()
-    .sort((left, right) => left.dueDay - right.dueDay || left.id.localeCompare(right.id))
-    .map((job) => {
-      const bars = barsFor(state, job);
-      const last = bars[bars.length - 1];
-      return {
-        jobId: job.id,
-        name: job.name,
-        fromDay: job.acceptedDay,
-        // To the deadline and three days past it, and further when the work runs further.
-        toDay: Math.max(job.dueDay + BOARD_DAYS_PAST_DUE, Math.ceil(last ? last.to : 0)),
-        dueDay: job.dueDay,
-        today: state.clock.day,
-        bars,
-        gap: gapFor(state, job),
-      };
-    });
+    .sort((left, right) => left.dueDay - right.dueDay || left.id.localeCompare(right.id));
+  const rows = open.map((job) => rowFor(state, job));
+  const now = dayPoint(state.clock.day, state.clock.minute);
+  const accepted = open.map((job) => job.acceptedDay);
+  const fromDay = Math.min(state.clock.day, ...(accepted.length > 0 ? accepted : [state.clock.day]));
+  const toDay = Math.max(
+    fromDay + 1,
+    Math.ceil(now) + 1,
+    ...rows.map((row) => Math.max(row.dueDay + BOARD_DAYS_PAST_DUE, Math.ceil(row.to))),
+  );
+  return { fromDay, toDay, now, rows };
 }

@@ -336,7 +336,7 @@ export function emailsOutstanding(state: GameState, job: Job): number {
   return jobTasks(state, job.id).filter((task) => task.kind === 'emails' && !task.done).length;
 }
 
-function designOutstanding(state: GameState, job: Job): boolean {
+export function designOutstanding(state: GameState, job: Job): boolean {
   return jobTasks(state, job.id).some((task) => task.kind === 'design' && !task.done);
 }
 

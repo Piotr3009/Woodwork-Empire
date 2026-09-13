@@ -175,14 +175,13 @@ export {
 export type { StageOptions, StagePlan, StagedJob } from './stages';
 export {
   BOARD_DAYS_PAST_DUE,
-  DELIVERY_BAR_DAYS,
-  barsFor,
   dayPoint,
-  gapFor,
-  jobRate,
-  workPlanGantt,
+  rateFor,
+  stageText,
+  workPlan,
+  workshopRate,
 } from './plan';
-export type { JobGantt, StageBar, StageGap } from './plan';
+export type { PlanRow, WorkPlan } from './plan';
 
 // Client calls
 export {
