@@ -1,0 +1,43 @@
+{
+  "cellWidth": 173,
+  "cellHeight": 160,
+  "anchorX": 86.5,
+  "anchorY": 152,
+  "frames": 8,
+  "fps": 3.4286,
+  "rows": {
+    "sw": 0,
+    "se": 1,
+    "nw": 2,
+    "ne": 3
+  },
+  "spriteKey": "character.owner",
+  "animation": "carry",
+  "loop": true,
+  "directions": [
+    "sw",
+    "se",
+    "nw",
+    "ne"
+  ],
+  "padding": 8,
+  "metresPerCell": {
+    "width": 1,
+    "depth": 1,
+    "height": 1.8
+  },
+  "scaleFromSource": 0.1957,
+  "source": {
+    "file": "Woodwork-Empire-boss-animation-pack.zip",
+    "role": "boss",
+    "shirt": "black",
+    "canvas": {
+      "width": 800,
+      "height": 736
+    },
+    "anchorPixels": {
+      "x": 400,
+      "y": 560
+    }
+  }
+}

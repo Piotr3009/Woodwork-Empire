@@ -34,9 +34,15 @@ tiles, the 2x canvas is:
 - plus 8 px of transparent padding on every side, so the file is `W + 16` by `H + 16`.
 
 The **anchor** is the bottom corner of the footprint diamond: the lowest point of the object's floor
-outline. It sits at pixel `(W / 2 + 8, H + 8)` counted from the top-left of the file, i.e. horizontally
-centred, 8 px above the bottom edge. The loader places that pixel on the tile corner. If the object
+outline. It sits at pixel `(8 + w × 48, H + 8)` counted from the top-left of the file: `w × 48` from
+the left edge of the diamond (the diamond runs `d × 48` to the left of the anchor and `w × 48` to the
+right, so the anchor is centred only when `w = d`), 8 px above the bottom edge. Corrected 14.09:
+the earlier text said "horizontally centred", which is wrong for every `w ≠ d` object and put
+2 × 1 and 3 × 1 machines 24 to 48 px off their tiles. The loader places that pixel on the tile
+corner (`spriteBox` in `render/sprites.ts` is corrected in Turn 10 to the same rule). If the object
 is drawn off-centre, it will stand in the wrong place in the hall; check this before delivering.
+The 4x templates of 14.09 (`*.template.4x.png`, corrected by GPT) carry the anchor at exactly this
+point; paint on them and the anchor is right by construction.
 
 The floor outline of the object must fill its footprint diamond: a 4 × 2 machine occupies a diamond
 that is 4 tiles along one edge and 2 along the other, with the long side running down-right. Objects
@@ -358,6 +364,13 @@ rest is on record for the art side. `npm run sprites:manifest` folds every `char
 | `character.joiner.idle` | sw, se, nw, ne | 2 | 1 | 112 × 151 | 56, 143 |
 | `character.joiner.bench` | sw, se, nw, ne | 8 | 5 | 112 × 151 | 56, 143 |
 | `character.joiner.carry` | sw, se, nw, ne | 8 | 3.43 | 173 × 160 | 86.5, 152 |
+
+| `character.owner.walk / idle / bench / carry` | as the joiner's, black shirt | | | | |
+| `character.owner.phone` | sw, se, nw, ne | 8 | 4 | 112 × 151 | 56, 143 |
+
+The owner's sheets (GPT boss pack, black shirt, 14.09) mirror the joiner's, plus `phone` for the
+client calls the owner answers; the loader plays `phone` while the owner is on a call once the code
+knows the animation (Turn 11), and falls back to `idle` until then.
 
 `carry` includes the sheet the joiner carries (GPT painted it into the frames), so its cell is wider
 than the standard one; the manifest carries the cell and the anchor, and the loader reads them
