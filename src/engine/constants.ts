@@ -1400,6 +1400,8 @@ export const HELPER_CLEAN_WEEKDAY = 4;
 /** The accounting modal shows the last 50 entries (CLAUDE.md 10.1). */
 export const LEDGER_VISIBLE_ENTRIES = 50;
 /** [TUNE] the state keeps this many ledger entries so it stays small. */
+/** How many end of day summaries the state carries: three months of working days [TUNE]. */
+export const DAY_SUMMARIES_MAX = 90;
 export const LEDGER_MAX_ENTRIES = 200;
 
 // ---------------------------------------------------------------------------

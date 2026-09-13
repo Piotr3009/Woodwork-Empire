@@ -22,14 +22,82 @@ import {
   WORKING_DAYS_PER_MONTH,
   unitDepositFor,
 } from './constants';
-import { isFirstOfMonth, isFriday, isWorkingDay, previousWorkingDay, weekday } from './clock';
+import {
+  isFirstOfMonth,
+  isFriday,
+  isWorkingDay,
+  monthOfDay,
+  previousWorkingDay,
+  weekOfDay,
+  weekday,
+} from './clock';
 import { queueEvent } from './events';
 import { has, hasCentralExtraction, machinePowerPerDay, seizableMachines } from './machines';
 import { makeId } from './rng';
 import { plural } from './text';
-import type { BookedTotals, GameState, LedgerCategory, PeriodTotals } from './types';
+import type {
+  BookedTotals,
+  DaySummary,
+  GameState,
+  LedgerCategory,
+  LedgerEntry,
+  PeriodTotals,
+} from './types';
 
 /** What a period came to: money in less money out. */
+/** Labour value produced against the people hours that produced it, over a span of days. The
+ *  machines are in it, because the labour a minute puts in already has them in it, and the hours
+ *  are the ones actually spent at a bench, not the ones the day held (CLAUDE.md T6 3.8). */
+export function earnedRate(state: GameState, span: 'day' | 'week' | 'month'): number {
+  let value = state.dayStats.labourValue;
+  let minutes = state.dayStats.workMinutes;
+  if (span !== 'day') {
+    const inSpan = (day: number): boolean =>
+      span === 'week' ? weekOfDay(day) === weekOfDay(state.clock.day) : monthOfDay(day) === monthOfDay(state.clock.day);
+    for (const summary of state.days) {
+      if (summary.day === state.clock.day || !inSpan(summary.day)) continue;
+      value += summary.labourValue;
+      minutes += summary.workMinutes;
+    }
+  }
+  if (minutes <= 0) return 0;
+  return Math.round(((value * 60) / minutes) * 100) / 100;
+}
+
+/** One row of the Days tab: what the ledger says the day came to (CLAUDE.md T6 3.9). */
+export interface DayMoney {
+  day: number;
+  income: number;
+  costs: number;
+  net: number;
+}
+
+/** The days of the month the ledger still carries, oldest first. The rows are the ledger added
+ *  up, so they cannot say anything the ledger does not. */
+export function daysOfMonth(state: GameState): DayMoney[] {
+  const month = monthOfDay(state.clock.day);
+  const byDay = new Map<number, DayMoney>();
+  for (const entry of state.ledger) {
+    if (monthOfDay(entry.day) !== month) continue;
+    const row = byDay.get(entry.day) ?? { day: entry.day, income: 0, costs: 0, net: 0 };
+    if (entry.amount >= 0) row.income += entry.amount;
+    else row.costs += -entry.amount;
+    row.net = Math.round((row.income - row.costs) * 100) / 100;
+    byDay.set(entry.day, row);
+  }
+  return Array.from(byDay.values()).sort((left, right) => left.day - right.day);
+}
+
+/** The lines of one day, newest last, the way the ledger holds them. */
+export function ledgerOfDay(state: GameState, day: number): LedgerEntry[] {
+  return state.ledger.filter((entry) => entry.day === day);
+}
+
+/** The summary of a day the state still carries, or null once it has fallen off the back. */
+export function summaryOfDay(state: GameState, day: number): DaySummary | null {
+  return state.days.find((summary) => summary.day === day) ?? null;
+}
+
 export function netOf(totals: PeriodTotals): number {
   return totals.income - totals.costs;
 }

@@ -34,7 +34,7 @@ interface Drag {
   x: number;
   y: number;
 }
-import { WHY, boxOf, canPlace } from '../engine/index';
+import { WHY, boxOf, canPlace, summaryOfDay } from '../engine/index';
 import {
   type Frame,
   type HallCamera,
@@ -52,10 +52,10 @@ import {
 import { type RoomId, roomById } from '../engine/constants';
 import { centreOf, screenToTile } from '../render/iso';
 import { fitOfficeStack, officeScene } from '../render/office';
-import { renderAccounting } from './accounting';
+import { type AccountingTab, accountingTabFrom, renderAccounting } from './accounting';
 import { renderBoard } from './board';
 import { type CatalogueTab, CATALOGUE_FIRST_TAB, catalogueTabFrom, renderCatalogue } from './catalogue';
-import { renderDayEnd, renderGameOver } from './dayEnd';
+import { renderDayEnd, renderDaySummary, renderGameOver } from './dayEnd';
 import { renderEvent, renderEventFooter } from './eventModal';
 import { type LaptopTab, laptopTabFrom, renderLaptop } from './laptop';
 import { renderMachine } from './machine';
@@ -98,6 +98,10 @@ interface Ui {
   laptopTab: LaptopTab;
   /** Which tab of the equipment catalogue is on top (CLAUDE.md T6 3.6). */
   catalogueTab: CatalogueTab;
+  /** Which tab of the books is on top, and the past day whose summary is open over them
+   *  (CLAUDE.md T6 3.9). */
+  accountingTab: AccountingTab;
+  daySummary: number | null;
   /** A new tab is new content, not the same list a minute later: it starts at the top. */
   scrollModalTop: boolean;
   /** The family whose classes are on screen, over whatever else is open (CLAUDE.md T3 3.5). */
@@ -156,6 +160,8 @@ function freshUi(): Ui {
     arrearsAmount: '500',
     laptopTab: 'tasks',
     catalogueTab: CATALOGUE_FIRST_TAB,
+    accountingTab: 'days',
+    daySummary: null,
     scrollModalTop: false,
     machine: null,
     machinePosition: null,
@@ -203,7 +209,7 @@ function modalBody(id: ModalId, current: GameState): string {
     case 'workPlan':
       return renderWorkPlan(current);
     case 'accounting':
-      return renderAccounting(current, ui.arrearsAmount);
+      return renderAccounting(current, ui.arrearsAmount, ui.accountingTab);
     case 'catalogue':
       return renderCatalogue(current, ui.filters.catalogue ?? '', ui.catalogueTab);
   }
@@ -357,6 +363,20 @@ function modalSpecs(): ModalSpec[] {
       wide: ui.modal === 'accounting' || ui.modal === 'workPlan',
       full: ui.modal === 'board',
       position: ui.modalPosition,
+    });
+  }
+  if (ui.daySummary !== null) {
+    const past = summaryOfDay(current, ui.daySummary);
+    specs.push({
+      id: 'daySummary',
+      title: past === null ? `Day ${ui.daySummary}` : past.title,
+      body:
+        past === null
+          ? '<p class="empty">That day is off the back of the books now.</p>'
+          : renderDaySummary(past),
+      closable: true,
+      wide: true,
+      position: null,
     });
   }
   if (ui.machine !== null) {
@@ -790,6 +810,17 @@ function handleAction(element: DataElement, point: { x: number; y: number }): vo
       ui.catalogueTab = catalogueTabFrom(id);
       ui.scrollModalTop = true;
       break;
+    case 'accountingTab':
+      ui.accountingTab = accountingTabFrom(id);
+      ui.scrollModalTop = true;
+      break;
+    case 'openDaySummary':
+      // The evening's own summary, put back in front of him from the books (CLAUDE.md T6 3.9).
+      ui.daySummary = Number(id);
+      break;
+    case 'closeDaySummary':
+      ui.daySummary = null;
+      break;
     case 'openMachine':
       // The classes of a family fill the page, over the catalogue that sent the player here.
       ui.machine = id;
@@ -812,6 +843,10 @@ function handleAction(element: DataElement, point: { x: number; y: number }): vo
       if (which === 'machine') {
         ui.machine = null;
         ui.machinePosition = null;
+        break;
+      }
+      if (which === 'daySummary') {
+        ui.daySummary = null;
         break;
       }
       ui.modal = null;
@@ -1129,6 +1164,11 @@ function onKeyDown(event: KeyboardEvent): void {
   // Escape drops whatever is in hand before it closes anything (CLAUDE.md T2 3.10).
   if (ui.drag !== null) {
     ui.drag = null;
+    render();
+    return;
+  }
+  if (ui.daySummary !== null) {
+    ui.daySummary = null;
     render();
     return;
   }

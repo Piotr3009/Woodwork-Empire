@@ -92,7 +92,7 @@ describe('a week at the weekly cadence', () => {
     expect(formatMoney(week.costs)).not.toBe(formatMoney(friday.finance.day.costs));
     // The owner's minutes and the day's work are a day's figures whatever the cadence, and the
     // headings say so rather than letting the week's title speak for them.
-    expect(html).toContain('Your minutes today');
-    expect(html).toContain('The hall today');
+    expect(html).toContain(`Your minutes, day ${friday.clock.day}`);
+    expect(html).toContain(`The hall, day ${friday.clock.day}`);
   });
 });

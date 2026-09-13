@@ -522,6 +522,34 @@ export interface SoftwareState {
   jobsRemaining: number;
 }
 
+/** What the end of day summary says, kept per day so the Days tab can open a past one and get
+ *  the same component the evening did (CLAUDE.md T6 3.9). Plain JSON, like everything in the
+ *  state. */
+export interface DaySummary {
+  day: number;
+  title: string;
+  minutesByCategory: Record<TaskCategory, number>;
+  minutesWorked: number;
+  minutesAvailable: number;
+  overtimeMinutes: number;
+  /** What tomorrow starts at, 1 when nothing is owed. */
+  tomorrowFactor: number;
+  breakSkipped: boolean;
+  /** The money column and the heading it carries, as the cadence had it that evening. */
+  spanLabel: string;
+  income: number;
+  costs: number;
+  cash: number;
+  jobsAdvanced: number;
+  jobsCompleted: string[];
+  dustAtStart: number;
+  dustAtEnd: number;
+  deliveriesTomorrow: number[];
+  /** Labour value produced and the people minutes that produced it (CLAUDE.md T6 3.8). */
+  labourValue: number;
+  workMinutes: number;
+}
+
 export interface DayStats {
   jobsAdvanced: string[];
   jobsCompleted: string[];
@@ -529,6 +557,10 @@ export interface DayStats {
   dustAtStart: number;
   /** The empty rack is reported once a day and no more. */
   noMaterialWarned: boolean;
+  /** Labour value produced today, and the people minutes that went into it: the two halves of
+   *  the earned labour rate (CLAUDE.md T6 3.8). */
+  labourValue: number;
+  workMinutes: number;
 }
 
 export interface GameOver {
@@ -567,6 +599,8 @@ export interface GameState {
   eventQueue: GameEvent[];
   activeEvent: GameEvent | null;
   dayStats: DayStats;
+  /** The last few months of end of day summaries, newest last (CLAUDE.md T6 3.9). */
+  days: DaySummary[];
   /** Day the last express enquiry reached the board. One a week is the cap. */
   lastExpressDay: number | null;
   /** Day the last low stock warning went out. One a week is the cap. */

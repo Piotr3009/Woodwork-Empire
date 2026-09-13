@@ -383,6 +383,8 @@ describe('setting the hall out', () => {
 describe('why it is like this in real life', () => {
   it('offers an i link on the accounting rows and opens the note', () => {
     click('[data-office="binder"]');
+    // The books open on the Days tab; the totals with their notes are on the Summary one.
+    click('[data-do="accountingTab"][data-id="summary"]');
     expect(html()).toContain('data-do="showWhy"');
     expect(html()).toContain('data-id="rent"');
     click('[data-do="showWhy"][data-id="rent"]');
@@ -414,15 +416,22 @@ describe('why it is like this in real life', () => {
 describe('accounting', () => {
   it('plays blind while the books are behind, and shows everything once they are written up', () => {
     click('[data-office="binder"]');
+    click('[data-do="accountingTab"][data-id="ledger"]');
     expect(html()).toContain('Books not up to date since day 1');
     expect(html()).toContain('? today');
     expect(html()).not.toContain('Unit deposit');
+    // Nothing on the Days tab either: the month has not been written up.
+    click('[data-do="accountingTab"][data-id="days"]');
+    expect(html()).toContain('Nothing has moved this month yet.');
     click('[data-do="closeModal"]');
     // The bookkeeping task catches every day up at once.
     const state = currentState();
     if (state) state.booksUpToDay = state.clock.day;
     click('[data-office="binder"]');
     expect(html()).not.toContain('Books not up to date');
+    // The month a day at a time, out of the ledger itself (CLAUDE.md T6 3.9).
+    expect(html()).toContain('data-day="1"');
+    click('[data-do="accountingTab"][data-id="ledger"]');
     expect(html()).toContain('Unit deposit');
     expect(html()).toContain('Rent');
     expect(html()).toContain('Living costs');
@@ -454,6 +463,7 @@ describe('accounting', () => {
 
   it('names every line in plain English, never the engine key', () => {
     click('[data-office="binder"]');
+    click('[data-do="accountingTab"][data-id="summary"]');
     expect(html()).toContain('Business rates');
     expect(html()).toContain('Living costs');
     expect(html()).toContain('Deposit on the unit');

@@ -9,6 +9,7 @@ import {
   BREAK_SKIP_FACTOR,
   BREAK_START_MINUTE,
   CABINET_SLOT_LAYOUT,
+  DAY_SUMMARIES_MAX,
   CANTEEN_SLOT_LAYOUT,
   DAY_END_MINUTE,
   DIFFICULTIES,
@@ -111,6 +112,7 @@ import {
   arriveDeliveries,
   buyStock,
   canUnload,
+  deliveriesArrivingOn,
   drawSheetsFor,
   fetchFromStorage,
   findDelivery,
@@ -123,9 +125,11 @@ import {
 import {
   chargeOvertimeDebt,
   countOvertimeMinute,
+  labourFactorFor,
   ownerEfficiency,
   ownerIsAvailable,
   ownerMinutesLeft,
+  ownerMinutesToday,
   runOwnerDayStart,
   spendOwnerMinute,
   staffOutputFactor,
@@ -167,6 +171,7 @@ import {
   startTask,
 } from './tasks';
 import type {
+  DaySummary,
   Delivery,
   Difficulty,
   Equipment,
@@ -266,7 +271,15 @@ export function createGame(options: NewGameOptions): GameState {
     ledger: [],
     eventQueue: [],
     activeEvent: null,
-    dayStats: { jobsAdvanced: [], jobsCompleted: [], dustAtStart: 0, noMaterialWarned: false },
+    dayStats: {
+      jobsAdvanced: [],
+      jobsCompleted: [],
+      dustAtStart: 0,
+      noMaterialWarned: false,
+      labourValue: 0,
+      workMinutes: 0,
+    },
+    days: [],
     lastExpressDay: null,
     lastLowStockDay: null,
     booksUpToDay: 0,
@@ -327,6 +340,8 @@ function startDay(state: GameState): void {
     jobsCompleted: [],
     dustAtStart: state.dust,
     noMaterialWarned: false,
+    labourValue: 0,
+    workMinutes: 0,
   };
   runDayCosts(state, state.clock.day);
   runOwnerDayStart(state);
@@ -520,6 +535,48 @@ export function summaryTitle(state: GameState): string {
   return `End of day ${state.clock.day}`;
 }
 
+/** The day as the summary reads it: the evening writes one of these into the state and the modal
+ *  is built from it, so what the Days tab opens is what the player saw (CLAUDE.md T6 3.9). */
+export function daySummaryOf(state: GameState): DaySummary {
+  const owner = state.owner;
+  const totals = summaryTotals(state);
+  return {
+    day: state.clock.day,
+    title: summaryTitle(state),
+    minutesByCategory: { ...owner.minutesByCategory },
+    minutesWorked: owner.minutesWorked,
+    minutesAvailable: ownerMinutesToday(state),
+    overtimeMinutes: owner.overtimeMinutes,
+    tomorrowFactor: labourFactorFor(owner.overtimeDebt, owner.breakSkipped),
+    breakSkipped: owner.breakSkipped,
+    spanLabel: state.summaryCadence,
+    income: totals.income,
+    costs: totals.costs,
+    cash: state.cash,
+    jobsAdvanced: state.dayStats.jobsAdvanced.length,
+    jobsCompleted: state.dayStats.jobsCompleted.map(
+      (jobId) => findJob(state, jobId)?.name ?? jobId,
+    ),
+    dustAtStart: state.dayStats.dustAtStart,
+    dustAtEnd: state.dust,
+    deliveriesTomorrow: deliveriesArrivingOn(state, state.clock.day + 1).map(
+      (delivery) => delivery.sheets,
+    ),
+    labourValue: state.dayStats.labourValue,
+    workMinutes: state.dayStats.workMinutes,
+  };
+}
+
+/** Written once, when the day closes, whether the summary is put in front of him or not. */
+function recordDay(state: GameState): void {
+  const summary = daySummaryOf(state);
+  state.days = state.days.filter((entry) => entry.day !== summary.day);
+  state.days.push(summary);
+  if (state.days.length > DAY_SUMMARIES_MAX) {
+    state.days.splice(0, state.days.length - DAY_SUMMARIES_MAX);
+  }
+}
+
 /** Ends the working day. The summary is put in front of the player as often as he asked for it,
  *  and the day ends the same way either way: only the modal is skipped (CLAUDE.md T4 3.6). */
 function finishDay(state: GameState): void {
@@ -529,6 +586,7 @@ function finishDay(state: GameState): void {
   pauseOwnerTask(state);
   chargeOvertimeDebt(state);
   state.owner.wentHome = true;
+  recordDay(state);
   if (!showsDaySummary(state)) {
     advanceToNextDay(state);
     return;
@@ -893,6 +951,13 @@ function checkLowStock(state: GameState): void {
   });
 }
 
+/** One person, one minute at a bench, and what it put into the job. The two halves of the earned
+ *  labour rate are booked here and nowhere else (CLAUDE.md T6 3.8). */
+function recordWork(state: GameState, labour: number): void {
+  state.dayStats.workMinutes += 1;
+  state.dayStats.labourValue = Math.round((state.dayStats.labourValue + labour) * 10000) / 10000;
+}
+
 function runProductionMinute(state: GameState, ownerOnTask: boolean): void {
   const hall = hallProductivityFactor(state);
   let worked = false;
@@ -913,6 +978,7 @@ function runProductionMinute(state: GameState, ownerOnTask: boolean): void {
     usedBy(atTheBench.materialKind);
     const minute = (OWNER_LABOUR_PER_MINUTE * ownerEfficiency(state) * hall) /
       jobSpeedFactor(state, atTheBench);
+    recordWork(state, minute);
     if (addLabour(state, atTheBench, minute)) raiseJobAtGate(state, atTheBench);
   }
   // Staff work the normal day only: nobody but the owner does overtime, and they always take
@@ -939,6 +1005,7 @@ function runProductionMinute(state: GameState, ownerOnTask: boolean): void {
       const rate = worker.rate * sawRatioFactor(state, worker);
       const minute = (OWNER_LABOUR_PER_MINUTE * rate * hall * staffFactor) /
         jobSpeedFactor(state, job);
+      recordWork(state, minute);
       if (addLabour(state, job, minute)) raiseJobAtGate(state, job);
     }
   }
