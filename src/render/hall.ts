@@ -7,7 +7,7 @@ import {
   GATE_CROWD_LIMIT,
   GATE_LAYOUT,
   ROOM_LAYOUT,
-  YARD_WIDTH_TILES,
+  YARD_WIDTH_CELLS,
 } from '../engine/constants';
 import {
   brokenMachines,
@@ -220,7 +220,7 @@ function sawdust(state: GameState): Drawable[] {
     const spec = machine ? findSpec(machine.specId) : null;
     const x = machine && spec
       ? machine.anchorX + (index % spec.width)
-      : 1 + ((index * 7) % Math.max(1, state.unit.widthTiles - 2));
+      : 1 + ((index * 7) % Math.max(1, state.unit.widthCells - 2));
     const y = machine && spec ? machine.anchorY + spec.depth : 6 + (index % 3);
     const at = centreOf(x, y, 1, 1);
     const radius = 8 + state.dust / 12;
@@ -236,7 +236,7 @@ function sawdust(state: GameState): Drawable[] {
 
 /** The tile a station puts a figure on. Anything the workshop has not bought falls back to the
  *  middle of the floor (CLAUDE.md T2 3.3). */
-export function stationTile(
+export function stationCell(
   state: GameState,
   station: string,
   bench: { x: number; y: number },
@@ -253,7 +253,7 @@ export function stationTile(
     if (rack && spec) return { x: rack.anchorX, y: rack.anchorY + spec.depth };
   }
   if (station === STATION_GATE) {
-    return { x: state.unit.widthTiles + GATE_LAYOUT.x + 1, y: GATE_LAYOUT.y + GATE_LAYOUT.depth };
+    return { x: state.unit.widthCells + GATE_LAYOUT.x + 1, y: GATE_LAYOUT.y + GATE_LAYOUT.depth };
   }
   if (station === STATION_OFFICE) {
     const office = ROOM_LAYOUT[0];
@@ -314,27 +314,27 @@ export interface Ghost {
 
 export function renderHall(state: GameState, ghost: Ghost | null = null): string {
   const unit = state.unit;
-  const bounds = gridBounds(unit.widthTiles + YARD_WIDTH_TILES, unit.depthTiles, 5);
+  const bounds = gridBounds(unit.widthCells + YARD_WIDTH_CELLS, unit.depthCells, 5);
   const pad = 24;
   const parts: string[] = [];
 
   // Floor, yard and the grid.
-  parts.push(polygon(footprintPolygon(0, 0, unit.widthTiles, unit.depthTiles), 'var(--concrete)'));
+  parts.push(polygon(footprintPolygon(0, 0, unit.widthCells, unit.depthCells), 'var(--concrete)'));
   parts.push(
     polygon(
-      footprintPolygon(unit.widthTiles, 0, YARD_WIDTH_TILES, unit.depthTiles),
+      footprintPolygon(unit.widthCells, 0, YARD_WIDTH_CELLS, unit.depthCells),
       'var(--yard)',
     ),
   );
   const lines: string[] = [];
-  for (let x = 0; x <= unit.widthTiles; x += 1) {
+  for (let x = 0; x <= unit.widthCells; x += 1) {
     lines.push(
-      `<line ${lineAttrs(x, 0, x, unit.depthTiles)} stroke="var(--grid)" stroke-width="1" />`,
+      `<line ${lineAttrs(x, 0, x, unit.depthCells)} stroke="var(--grid)" stroke-width="1" />`,
     );
   }
-  for (let y = 0; y <= unit.depthTiles; y += 1) {
+  for (let y = 0; y <= unit.depthCells; y += 1) {
     lines.push(
-      `<line ${lineAttrs(0, y, unit.widthTiles, y)} stroke="var(--grid)" stroke-width="1" />`,
+      `<line ${lineAttrs(0, y, unit.widthCells, y)} stroke="var(--grid)" stroke-width="1" />`,
     );
   }
   parts.push(lines.join(''));
@@ -419,7 +419,7 @@ export function renderHall(state: GameState, ghost: Ghost | null = null): string
     drawables.push(
       figure(
         `worker-${worker.id}`,
-        stationTile(state, worker.station, bench),
+        stationCell(state, worker.station, bench),
         away ? `${worker.name} (off)` : `${worker.name}, ${where}`,
         false,
         `data-worker="${worker.id}"`,
@@ -432,7 +432,7 @@ export function renderHall(state: GameState, ghost: Ghost | null = null): string
     drawables.push(
       figure(
         'owner',
-        stationTile(state, state.owner.station, ownerBench),
+        stationCell(state, state.owner.station, ownerBench),
         `${state.playerName}, ${stationLabel(state.owner.station)}`,
         true,
         'data-owner="1"',
@@ -444,7 +444,7 @@ export function renderHall(state: GameState, ghost: Ghost | null = null): string
   const waiting = state.deliveries.find((delivery) => delivery.arrived && !delivery.unloaded);
   if (waiting) {
     const gate = GATE_LAYOUT;
-    const gateX = unit.widthTiles + gate.x;
+    const gateX = unit.widthCells + gate.x;
     drawables.push({
       depth: depthKey(gateX, gate.y),
       svg:
@@ -469,7 +469,7 @@ export function renderHall(state: GameState, ghost: Ghost | null = null): string
   const waitingPieces = jobsAtGate(state);
   if (waitingPieces.length > 0) {
     const apron = FINISHED_GOODS_LAYOUT;
-    const apronX = unit.widthTiles + apron.x;
+    const apronX = unit.widthCells + apron.x;
     const shown = Math.min(waitingPieces.length, apron.width);
     for (let index = 0; index < shown; index += 1) {
       const x = apronX + index;

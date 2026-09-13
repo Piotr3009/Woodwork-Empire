@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { GATE_LANE_TILES, ROOM_LAYOUT } from '../../src/engine/constants';
+import { GATE_LANE_CELLS, ROOM_LAYOUT } from '../../src/engine/constants';
+import { findSpec } from '../../src/engine/machines';
 import {
   canPlace,
   canPlaceSpec,
-  firstFreeTile,
+  firstFreeCell,
   gateLane,
   hallItems,
 } from '../../src/engine/layout';
@@ -20,12 +21,17 @@ describe('setting the hall out', () => {
   it('keeps everything inside the floor', () => {
     const state = buyStartingKit(newGame());
     const saw = itemOf(state, 'tableSaw');
-    const free = firstFreeTile(state, 'tableSaw');
+    const free = firstFreeCell(state, 'tableSaw');
     expect(free).not.toBeNull();
     expect(canPlace(state, saw, free?.x ?? 0, free?.y ?? 0).ok).toBe(true);
     expect(canPlace(state, saw, -1, 6)).toEqual({ ok: false, reason: 'Off the floor' });
-    expect(canPlace(state, saw, state.unit.widthTiles - 1, 6).reason).toBe('Off the floor');
-    expect(canPlace(state, saw, 2, state.unit.depthTiles - 1).reason).toBe('Off the floor');
+    // One cell short of the room the saw needs, on each side in turn. Taken from its own
+    // footprint, so the assertion survives a footprint or a hall that changes size.
+    const spec = findSpec('tableSaw');
+    const width = spec?.width ?? 1;
+    const depth = spec?.depth ?? 1;
+    expect(canPlace(state, saw, state.unit.widthCells - width + 1, 6).reason).toBe('Off the floor');
+    expect(canPlace(state, saw, 2, state.unit.depthCells - depth + 1).reason).toBe('Off the floor');
   });
 
   it('refuses to drop a bench on the office', () => {
@@ -64,9 +70,9 @@ describe('setting the hall out', () => {
   it('keeps the way to the gate clear, and says so', () => {
     const state = buyStartingKit(newGame());
     const lane = gateLane(state);
-    expect(lane.width).toBe(GATE_LANE_TILES);
+    expect(lane.width).toBe(GATE_LANE_CELLS);
     const saw = itemOf(state, 'tableSaw');
-    const check = canPlace(state, saw, state.unit.widthTiles - 4, lane.y);
+    const check = canPlace(state, saw, lane.x, lane.y);
     expect(check.ok).toBe(false);
     expect(check.reason).toBe('Blocking the way to the gate');
   });
@@ -93,7 +99,7 @@ describe('setting the hall out', () => {
       anchorX: bench?.anchorX ?? 0,
       anchorY: bench?.anchorY ?? 0,
     });
-    const free = firstFreeTile(state, 'workbench');
+    const free = firstFreeCell(state, 'workbench');
     expect(free).not.toBeNull();
     const moved = act(state, {
       type: 'MOVE_ITEM',
@@ -126,7 +132,7 @@ describe('setting the hall out', () => {
     expect(saws).toHaveLength(2);
     const second = saws[1];
     expect(second?.anchorX !== first?.anchorX || second?.anchorY !== first?.anchorY).toBe(true);
-    const free = firstFreeTile(buyStartingKit(newGame()), 'tableSaw');
+    const free = firstFreeCell(buyStartingKit(newGame()), 'tableSaw');
     expect(second?.anchorX).toBe(free?.x);
     expect(second?.anchorY).toBe(free?.y);
     expect(canPlaceSpec(state, 'tableSaw', second?.anchorX ?? 0, second?.anchorY ?? 0, second?.id ?? null).ok)

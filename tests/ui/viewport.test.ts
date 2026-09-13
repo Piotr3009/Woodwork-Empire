@@ -20,8 +20,8 @@ it('keeps equipment dragging on its tile when the scene is scaled and centred', 
   render();
   const bench = required(state.equipment.find((item) => item.specId === 'workbench'));
   let target: { x: number; y: number } | null = null;
-  for (let y = 0; y < state.unit.depthTiles && target === null; y += 1) {
-    for (let x = 0; x < state.unit.widthTiles; x += 1) {
+  for (let y = 0; y < state.unit.depthCells && target === null; y += 1) {
+    for (let x = 0; x < state.unit.widthCells; x += 1) {
       if (x !== bench.anchorX && canPlace(state, bench.id, x, y).ok) {
         target = { x, y };
         break;

@@ -2,7 +2,12 @@
 // placeholder box, and the picture beside it when the art side has delivered one. This page is
 // the acceptance tool of docs/art/SPRITES.md item 7 (CLAUDE.md T3 3.6).
 
-import { DELIVERY_VAN_SPRITE, EQUIPMENT_SPECS, ROOM_LAYOUT } from '../engine/constants';
+import {
+  DELIVERY_VAN_SPRITE,
+  EQUIPMENT_SPECS,
+  GATE_LAYOUT,
+  ROOM_LAYOUT,
+} from '../engine/constants';
 import { box, escapeText, label, polygon } from '../render/hall';
 import { OFFICE_CANVAS, OFFICE_LAYERS } from '../render/office';
 import { boxPolygons, centreOf, footprintPolygon, gridBounds, tileToScreen } from '../render/iso';
@@ -70,9 +75,10 @@ export function spriteTargets(): SpriteTarget[] {
     name: DELIVERY_VAN_SPRITE,
     spriteKey: DELIVERY_VAN_SPRITE,
     tier: null,
-    width: 4,
-    depth: 2,
-    height: 2,
+    // The lorry is not in the catalogue, so its size comes from where it stands.
+    width: GATE_LAYOUT.width,
+    depth: GATE_LAYOUT.depth,
+    height: GATE_LAYOUT.height,
     where: 'at the gate',
   });
   return targets;
@@ -134,7 +140,7 @@ function cell(target: SpriteTarget): string {
     `<div class="sprite-cell" data-sprite-target="${escapeHtml(target.name)}">` +
     `<div class="sprite-pair">${proof(target)}${shot(target)}</div>` +
     `<p class="sprite-key">${escapeHtml(`${target.name}.png`)}</p>` +
-    `<p class="sprite-figures">${target.width} by ${target.depth} by ${target.height} tiles · ` +
+    `<p class="sprite-figures">${target.width} by ${target.depth} by ${target.height} m · ` +
     `${escapeHtml(target.where)}</p>` +
     `<p class="sprite-figures">canvas ${canvas.width} by ${canvas.height} · ` +
     `file ${file.width} by ${file.height}</p>` +

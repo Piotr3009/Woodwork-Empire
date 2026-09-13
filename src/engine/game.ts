@@ -25,7 +25,7 @@ import {
 } from './constants';
 import { expireEnquiries, refillBoard, refreshLocks } from './board';
 import { missCall, nextDueCall, takeCall } from './calls';
-import { canPlaceSpec, firstFreeTile, moveItem } from './layout';
+import { canPlaceSpec, firstFreeCell, moveItem } from './layout';
 import {
   daysBetween,
   isDayExhausted,
@@ -210,8 +210,8 @@ export function createGame(options: NewGameOptions): GameState {
     dust: 0,
     unit: {
       areaM2: spec.areaM2,
-      widthTiles: spec.widthTiles,
-      depthTiles: spec.depthTiles,
+      widthCells: spec.widthCells,
+      depthCells: spec.depthCells,
       rentMonthly: spec.rentMonthly,
       ratesMonthly: spec.ratesMonthly,
       benchSlots: spec.benchSlots,
@@ -1348,7 +1348,7 @@ function defaultAnchor(state: GameState, specId: string): { x: number; y: number
   if (specId === 'canteenSeat') return slotFrom(CANTEEN_SLOT_LAYOUT, index);
   const slot = STARTING_LAYOUT[specId];
   return slot
-    ? { x: slot.yard === true ? state.unit.widthTiles + slot.x : slot.x, y: slot.y }
+    ? { x: slot.yard === true ? state.unit.widthCells + slot.x : slot.x, y: slot.y }
     : { x: 0, y: 6 };
 }
 
@@ -1362,7 +1362,7 @@ function anchorFor(state: GameState, specId: string): { x: number; y: number } {
     return preferred;
   }
   if (canPlaceSpec(state, specId, preferred.x, preferred.y, null).ok) return preferred;
-  return firstFreeTile(state, specId) ?? preferred;
+  return firstFreeCell(state, specId) ?? preferred;
 }
 
 export function buyEquipment(state: GameState, specId: string, variantId?: string): BuyCheck {

@@ -9,6 +9,7 @@ vi.mock('../../public/sprites/manifest.json', () => ({
 
 const { renderHall } = await import('../../src/render/hall');
 const { spriteBox } = await import('../../src/render/sprites');
+const { findSpec } = await import('../../src/engine/machines');
 const { act, buyStartingKit, newGame } = await import('../helpers');
 
 function hall(sawVariant: string): string {
@@ -21,7 +22,16 @@ describe('an object with a file is a picture, not a box', () => {
     const saw = act(buyStartingKit(newGame(), { sawVariant: 'pro' }), { type: 'SET_SPEED', speed: 0 })
       .equipment.find((item) => item.specId === 'tableSaw');
     expect(saw?.variantId).toBe('pro');
-    const at = spriteBox(saw?.anchorX ?? 0, saw?.anchorY ?? 0, 4, 2, 2);
+    // The footprint comes from the catalogue, in metres, so the assertion does not carry a
+    // second copy of it (docs/art/SPRITES.md 9.1).
+    const spec = findSpec('tableSaw');
+    const at = spriteBox(
+      saw?.anchorX ?? 0,
+      saw?.anchorY ?? 0,
+      spec?.width ?? 1,
+      spec?.depth ?? 1,
+      spec?.height ?? 1,
+    );
     expect(svg).toContain('<image href="/sprites/tableSaw.pro.png"');
     expect(svg).toContain(`width="${at.width}" height="${at.height}"`);
     expect(svg).toContain(`x="${at.x}" y="${at.y}"`);

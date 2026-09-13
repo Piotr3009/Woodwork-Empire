@@ -216,7 +216,7 @@ export {
   boxOf,
   canPlace,
   canPlaceSpec,
-  firstFreeTile,
+  firstFreeCell,
   gateLane,
   hallItems,
 } from './layout';

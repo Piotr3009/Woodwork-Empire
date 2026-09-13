@@ -70,10 +70,11 @@ describe('the sprite check page', () => {
     const page = parse(renderSpriteCheck());
     const saw = page.querySelector('[data-sprite-target="tableSaw"]');
     expect(saw?.textContent).toContain('tableSaw.png');
-    expect(saw?.textContent).toContain('4 by 2 by 2 tiles');
-    // 288 by 240 plus 8 px of padding on every side (docs/art/SPRITES.md 6).
-    expect(saw?.textContent).toContain('canvas 288 by 240');
-    expect(saw?.textContent).toContain('file 304 by 256');
+    // Metres now, and half the tiles of Turns 1 to 4 (docs/art/SPRITES.md 9.1).
+    expect(saw?.textContent).toContain('2 by 1 by 1 m');
+    // The canvas formula of docs/art/SPRITES.md 2, in metres, plus 8 px of padding a side.
+    expect(saw?.textContent).toContain('canvas 144 by 120');
+    expect(saw?.textContent).toContain('file 160 by 136');
   });
 
   it('says so plainly where there is no file yet', () => {

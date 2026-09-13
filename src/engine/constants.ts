@@ -107,8 +107,8 @@ export const PELLET_INCOME_PER_1000_PRODUCTION_MINUTES = 40;
 export const WORKING_DAYS_PER_MONTH = (DAYS_PER_MONTH * WORKING_DAYS_PER_WEEK) / DAYS_PER_WEEK;
 
 /** Unit geometry in tiles. One tile is 0.5 m by 0.5 m [TUNE proportions]. */
-export const UNIT_WIDTH_TILES = 24;
-export const UNIT_DEPTH_TILES = 10;
+export const UNIT_WIDTH_CELLS = 24;
+export const UNIT_DEPTH_CELLS = 10;
 
 // ---------------------------------------------------------------------------
 // 8.2 Difficulty
@@ -122,8 +122,8 @@ export interface DifficultySpec {
   rentMonthly: number;
   ratesMonthly: number;
   benchSlots: number;
-  widthTiles: number;
-  depthTiles: number;
+  widthCells: number;
+  depthCells: number;
   /** Negative: how far the bank lets the company go (PIOTR for Hard, [TUNE] for the other two). */
   overdraftLimit: number;
 }
@@ -138,8 +138,8 @@ export const DIFFICULTIES: DifficultySpec[] = [
     rentMonthly: 90 * RENT_PER_M2_MONTHLY,
     ratesMonthly: UNIT_RATES_MONTHLY,
     benchSlots: 6,
-    widthTiles: 30,
-    depthTiles: 12,
+    widthCells: 30,
+    depthCells: 12,
     overdraftLimit: -10000,
   },
   {
@@ -150,8 +150,8 @@ export const DIFFICULTIES: DifficultySpec[] = [
     rentMonthly: UNIT_RENT_MONTHLY,
     ratesMonthly: UNIT_RATES_MONTHLY,
     benchSlots: BENCH_SLOTS,
-    widthTiles: UNIT_WIDTH_TILES,
-    depthTiles: UNIT_DEPTH_TILES,
+    widthCells: UNIT_WIDTH_CELLS,
+    depthCells: UNIT_DEPTH_CELLS,
     overdraftLimit: -10000,
   },
   {
@@ -162,8 +162,8 @@ export const DIFFICULTIES: DifficultySpec[] = [
     rentMonthly: UNIT_RENT_MONTHLY,
     ratesMonthly: UNIT_RATES_MONTHLY,
     benchSlots: BENCH_SLOTS,
-    widthTiles: UNIT_WIDTH_TILES,
-    depthTiles: UNIT_DEPTH_TILES,
+    widthCells: UNIT_WIDTH_CELLS,
+    depthCells: UNIT_DEPTH_CELLS,
     overdraftLimit: -5000,
   },
 ];
@@ -635,6 +635,9 @@ function withVariants(draft: SpecDraft): EquipmentSpec {
   };
 }
 
+// Footprints are in metres, one grid cell each way. They were written in the 0.5 m tiles of
+// Turns 1 to 4 and are half of those figures here, never below the one cell an object has to
+// stand on: the table saw that was 4 by 2 by 2 tiles is 2 by 1 by 1 m (docs/art/SPRITES.md 9.1).
 const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
@@ -642,8 +645,8 @@ const SPEC_DRAFTS: SpecDraft[] = [
     name: 'Desk',
     price: 150,
     category: 'furniture',
-    width: 3,
-    depth: 2,
+    width: 2,
+    depth: 1,
     height: 1,
     spriteKey: 'desk',
     effect: 'Required to use the laptop.',
@@ -679,9 +682,9 @@ const SPEC_DRAFTS: SpecDraft[] = [
     name: 'Table saw',
     price: 1800,
     category: 'machine',
-    width: 4,
-    depth: 2,
-    height: 2,
+    width: 2,
+    depth: 1,
+    height: 1,
     spriteKey: 'tableSaw',
     bagInterval: 2400,
     usedOn: 'sheet',
@@ -706,9 +709,9 @@ const SPEC_DRAFTS: SpecDraft[] = [
     name: 'Hand edgebander',
     price: 900,
     category: 'machine',
-    width: 3,
-    depth: 2,
-    height: 2,
+    width: 2,
+    depth: 1,
+    height: 1,
     spriteKey: 'edgebander',
     bagInterval: 4800,
     usedOn: 'sheet',
@@ -720,8 +723,8 @@ const SPEC_DRAFTS: SpecDraft[] = [
     name: 'Small compressor',
     price: 350,
     category: 'machine',
-    width: 2,
-    depth: 2,
+    width: 1,
+    depth: 1,
     height: 1,
     spriteKey: 'compressor',
     effect: 'Air for nailers and clamps.',
@@ -732,9 +735,9 @@ const SPEC_DRAFTS: SpecDraft[] = [
     name: 'Extractor',
     price: 600,
     category: 'extraction',
-    width: 2,
-    depth: 2,
-    height: 3,
+    width: 1,
+    depth: 1,
+    height: 2,
     spriteKey: 'extractor',
     effect: 'Serves every machine. Without it there are no bags. Can break down.',
   },
@@ -744,8 +747,8 @@ const SPEC_DRAFTS: SpecDraft[] = [
     name: 'Workbench',
     price: 250,
     category: 'bench',
-    width: 3,
-    depth: 2,
+    width: 2,
+    depth: 1,
     height: 1,
     spriteKey: 'workbench',
     perWorker: true,
@@ -758,9 +761,9 @@ const SPEC_DRAFTS: SpecDraft[] = [
     name: 'Cheap shelving',
     price: 400,
     category: 'storage',
-    width: 4,
+    width: 2,
     depth: 1,
-    height: 2,
+    height: 1,
     spriteKey: 'sheetRack',
     sheetCapacity: 50,
     effect: 'Holds 50 sheets. Nothing can be unloaded without somewhere to put it.',
@@ -771,9 +774,9 @@ const SPEC_DRAFTS: SpecDraft[] = [
     name: 'Better shelving',
     price: 900,
     category: 'storage',
-    width: 4,
+    width: 2,
     depth: 1,
-    height: 2,
+    height: 1,
     spriteKey: 'sheetRackBetter',
     sheetCapacity: 75,
     effect: 'Holds 75 sheets. More than that needs a bigger unit.',
@@ -786,7 +789,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
     category: 'welfare',
     width: 1,
     depth: 1,
-    height: 2,
+    height: 1,
     spriteKey: 'locker',
     perWorker: true,
     stackable: true,
@@ -826,9 +829,9 @@ const SPEC_DRAFTS: SpecDraft[] = [
     name: 'Van',
     price: 9000,
     category: 'vehicle',
-    width: 4,
-    depth: 2,
-    height: 2,
+    width: 2,
+    depth: 1,
+    height: 1,
     spriteKey: 'van',
     effect: 'Removes taxi and transport costs.',
   },
@@ -838,9 +841,9 @@ const SPEC_DRAFTS: SpecDraft[] = [
     name: 'Forklift',
     price: 6000,
     category: 'vehicle',
-    width: 2,
-    depth: 2,
-    height: 2,
+    width: 1,
+    depth: 1,
+    height: 1,
     spriteKey: 'forklift',
     unloadFactor: 0.5,
     effect: 'Unloading takes half the time.',
@@ -851,9 +854,9 @@ const SPEC_DRAFTS: SpecDraft[] = [
     name: 'Better forklift',
     price: 12000,
     category: 'vehicle',
-    width: 2,
-    depth: 2,
-    height: 2,
+    width: 1,
+    depth: 1,
+    height: 1,
     spriteKey: 'forkliftBetter',
     unloadFactor: 0.2,
     effect: 'Unloading takes a fifth of the time.',
@@ -864,9 +867,9 @@ const SPEC_DRAFTS: SpecDraft[] = [
     name: 'Thicknesser',
     price: 2500,
     category: 'machine',
-    width: 3,
-    depth: 2,
-    height: 2,
+    width: 2,
+    depth: 1,
+    height: 1,
     spriteKey: 'thicknesser',
     bagInterval: 480,
     usedOn: 'solidWood',
@@ -878,9 +881,9 @@ const SPEC_DRAFTS: SpecDraft[] = [
     name: 'Planer, router, sander, clamps',
     price: 2200,
     category: 'machine',
-    width: 3,
-    depth: 2,
-    height: 2,
+    width: 2,
+    depth: 1,
+    height: 1,
     spriteKey: 'solidWoodTools',
     usedOn: 'solidWood',
     effect: 'Solid wood tools, part 2. With the thicknesser this unlocks solid wood.',
@@ -891,9 +894,9 @@ const SPEC_DRAFTS: SpecDraft[] = [
     name: 'CNC',
     price: 45000,
     category: 'machine',
-    width: 5,
-    depth: 3,
-    height: 2,
+    width: 3,
+    depth: 2,
+    height: 1,
     spriteKey: 'cnc',
     labourFactor: 0.8,
     locked: true,
@@ -922,9 +925,9 @@ const SPEC_DRAFTS: SpecDraft[] = [
     name: 'Spray booth',
     price: 18000,
     category: 'machine',
-    width: 5,
-    depth: 3,
-    height: 3,
+    width: 3,
+    depth: 2,
+    height: 2,
     spriteKey: 'sprayBooth',
     locked: true,
     lockReason: 'Coming in a later stage.',
@@ -936,9 +939,9 @@ const SPEC_DRAFTS: SpecDraft[] = [
     name: 'Central dust extraction system',
     price: 35000,
     category: 'extraction',
-    width: 3,
-    depth: 3,
-    height: 4,
+    width: 2,
+    depth: 2,
+    height: 2,
     spriteKey: 'dustSystem',
     effect: 'No more bags and no breakdown. Waste collection 400 per month.',
   },
@@ -948,9 +951,9 @@ const SPEC_DRAFTS: SpecDraft[] = [
     name: 'Flexi extraction system',
     price: 50000,
     category: 'extraction',
-    width: 3,
-    depth: 3,
-    height: 4,
+    width: 2,
+    depth: 2,
+    height: 2,
     spriteKey: 'flexiSystem',
     effect:
       'Everything the central system does, and flexible ducting on every machine: move the hall ' +
@@ -963,9 +966,9 @@ const SPEC_DRAFTS: SpecDraft[] = [
     name: 'Pelletiser',
     price: 15000,
     category: 'extraction',
-    width: 2,
-    depth: 2,
-    height: 3,
+    width: 1,
+    depth: 1,
+    height: 2,
     spriteKey: 'pelletiser',
     requiresOneOf: ['dustSystem', 'flexiSystem'],
     effect: 'No waste cost and pellet sales that rise with production.',
@@ -1077,13 +1080,13 @@ export const CANTEEN_SLOT_LAYOUT: LayoutSlot[] = [
 /** Where a waiting delivery van stands, and how big it is. */
 export const GATE_LAYOUT = { x: 0, y: 4, yard: true, width: 4, depth: 2, height: 2 };
 /** The tile rows in front of the gate that have to stay clear [TUNE]. */
-export const GATE_LANE_TILES = 2;
+export const GATE_LANE_CELLS = 2;
 /** The apron beside the gate where finished pieces stand, outside the floor (CLAUDE.md T2 3.13). */
 export const FINISHED_GOODS_LAYOUT = { x: 0, y: 6, yard: true, width: 3, depth: 1, height: 1 };
 export const DELIVERY_VAN_SPRITE = 'deliveryVan';
 
 /** Width of the yard strip drawn to the right of the unit, in tiles. */
-export const YARD_WIDTH_TILES = 5;
+export const YARD_WIDTH_CELLS = 5;
 
 // ---------------------------------------------------------------------------
 // 9.3 Hiring pool (PIOTR: tiers and gating; wages [TUNE])
