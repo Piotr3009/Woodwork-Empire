@@ -3,8 +3,8 @@
 
 export type Difficulty = 'veryEasy' | 'easy' | 'hard';
 
-/** 0 is paused. Nothing above 4x exists (CLAUDE.md 6.1). */
-export type Speed = 0 | 1 | 2 | 4;
+/** 0 is paused. Ten is the fastest there is (PIOTR, 13.09; CLAUDE.md T9 3.11). */
+export type Speed = 0 | 1 | 2 | 4 | 10;
 
 export type MaterialKind = 'sheet' | 'solidWood';
 

@@ -137,8 +137,11 @@ describe('clock time of day', () => {
     expect(gameMinutesPerRealSecond(1)).toBe(1);
     expect(gameMinutesPerRealSecond(2)).toBe(2);
     expect(gameMinutesPerRealSecond(4)).toBe(4);
+    // Piotr's fifth chip: a working day in 48 real seconds (CLAUDE.md T9 3.11).
+    expect(gameMinutesPerRealSecond(10)).toBe(10);
     expect(MINUTES_PER_WORKING_DAY / gameMinutesPerRealSecond(1) / 60).toBe(8);
     expect(MINUTES_PER_WORKING_DAY / gameMinutesPerRealSecond(4) / 60).toBe(2);
+    expect(MINUTES_PER_WORKING_DAY / gameMinutesPerRealSecond(10)).toBe(48);
   });
 });
 

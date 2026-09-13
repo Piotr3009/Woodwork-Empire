@@ -15,7 +15,7 @@ import type { GameState, Speed } from '../engine/index';
 import { cadenceControl } from './dayEnd';
 import { escapeHtml, money } from './modal';
 
-/** The four speed chips. One place builds them, whatever else the top bar has to say. The Pause
+/** The five speed chips. One place builds them, whatever else the top bar has to say. The Pause
  *  chip pulses once when the player asks for something stopped time will not give him
  *  (CLAUDE.md T7 3.10). */
 function speedChips(state: GameState, pulse: boolean): string {
@@ -135,6 +135,6 @@ export function renderMenu(state: GameState, cloud: MenuCloud): string {
 
 export function speedFromString(value: string): Speed {
   const parsed = Number(value);
-  if (parsed === 1 || parsed === 2 || parsed === 4) return parsed;
+  if (parsed === 1 || parsed === 2 || parsed === 4 || parsed === 10) return parsed;
   return 0;
 }

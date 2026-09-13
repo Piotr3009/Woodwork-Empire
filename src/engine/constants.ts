@@ -72,7 +72,9 @@ export const HOURS_PER_WORKING_DAY = MINUTES_PER_WORKING_DAY / 60;
 /** One game day at 1x speed, in real seconds (PIOTR, Turn 2: one game minute per real second).
  *  8 real minutes at 1x, 4 at 2x, 2 at 4x. */
 export const REAL_SECONDS_PER_DAY_AT_1X = 480;
-export const SPEEDS = [0, 1, 2, 4] as const;
+/** The chips the player drives the clock with. Ten is Piotr's: a month of trading is long and he
+ *  asked for a speed that gets through it (PIOTR, 13.09; CLAUDE.md T9 3.11). */
+export const SPEEDS = [0, 1, 2, 4, 10] as const;
 export const DAYS_PER_WEEK = 7;
 /** [TUNE] simplification for Turn 1: every month is 30 days. */
 export const DAYS_PER_MONTH = 30;
@@ -457,7 +459,9 @@ export const NO_DUCTING_SPECS = ['compressor'];
  *  the task he is out on is over (PIOTR, 13.09; CLAUDE.md T8 3.3). The Turn 4 forced 4x of a move
  *  of the hall is this same run now, so there is one speed the clock is ever taken to and one
  *  thing that takes it there (CLAUDE.md T8 3.4). */
-export const SKIP_SPEED = 4;
+/** The one speed the game ever takes the clock to for the player: through a trip out or a move of
+ *  the hall. It is the fastest chip there is (CLAUDE.md T8 3.3, T9 3.11). */
+export const SKIP_SPEED = 10;
 /** Weekly clean (PIOTR). */
 export const CLEANING_MINUTES = 120;
 /** Fetch from temporary storage the next morning (PIOTR). */
