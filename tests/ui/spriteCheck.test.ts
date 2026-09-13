@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { DELIVERY_VAN_SPRITE, EQUIPMENT_SPECS } from '../../src/engine/constants';
 import { HALL_LAYERS } from '../../src/render/hall';
 import { OFFICE_LAYERS } from '../../src/render/office';
+import { standsInTheHall } from '../../src/engine/layout';
 import { renderSpriteCheck, spriteTargets } from '../../src/ui/spriteCheck';
 
 function parse(html: string): HTMLElement {
@@ -17,19 +18,21 @@ describe('the sprite check page', () => {
   it('lists every key the game can draw, exactly once', () => {
     const names = spriteTargets().map((target) => target.name);
     expect(new Set(names).size).toBe(names.length);
-    for (const spec of EQUIPMENT_SPECS) expect(names, spec.id).toContain(spec.spriteKey);
+    const drawn = EQUIPMENT_SPECS.filter((spec) => standsInTheHall(spec.id));
+    for (const spec of drawn) expect(names, spec.id).toContain(spec.spriteKey);
     expect(names).toContain(DELIVERY_VAN_SPRITE);
     // The page asks for the catalogue families and their classes and the lorry, and for nothing
-    // else: the office desk items went with the desk (CLAUDE.md T4 3.1), and the rooms are the
-    // hall layers now, which the page shows full width in their own section
-    // (docs/art/SPRITES.md 9.3).
+    // else: the office desk items went with the desk (CLAUDE.md T4 3.1), the rooms are the hall
+    // layers now (docs/art/SPRITES.md 9.3), and nothing that holds no cell of the floor is asked
+    // for at all, because the game never draws it (CLAUDE.md T6 3.5).
     const wanted = new Set<string>([DELIVERY_VAN_SPRITE]);
-    for (const spec of EQUIPMENT_SPECS) {
+    for (const spec of drawn) {
       wanted.add(spec.spriteKey);
       if (spec.variants.length < 2) continue;
       for (const variant of spec.variants) wanted.add(`${spec.spriteKey}.${variant.id}`);
     }
     expect(new Set(names)).toEqual(wanted);
+    expect(names).not.toContain('edgebander');
     for (const key of ['roomWc', 'roomOffice', 'roomCanteen']) {
       expect(names, key).not.toContain(key);
     }

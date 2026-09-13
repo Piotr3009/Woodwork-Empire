@@ -151,6 +151,7 @@ export const STARTING_KIT = [
   'laptop',
   'tableSaw',
   'drill',
+  'toolCabinet',
   'edgebander',
   'compressor',
   'extractor',

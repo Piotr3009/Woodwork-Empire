@@ -7,6 +7,7 @@ import { HALL_CANVAS, HALL_LAYERS, box, escapeText, label, polygon } from '../re
 import { OFFICE_CANVAS, OFFICE_LAYERS } from '../render/office';
 import { boxPolygons, centreOf, footprintPolygon, gridBounds, tileToScreen } from '../render/iso';
 import { SPRITE_SCALE, spriteCanvas, spriteFileSize, spriteUrl } from '../render/sprites';
+import { standsInTheHall } from '../engine/layout';
 import { escapeHtml } from './modal';
 
 export interface SpriteTarget {
@@ -33,6 +34,9 @@ export function spriteTargets(): SpriteTarget[] {
     targets.push(target);
   };
   for (const spec of EQUIPMENT_SPECS) {
+    // Nothing the game never stands on the floor is asked of the art side: the hand edgebander
+    // lives in a tool cabinet now and is never drawn (CLAUDE.md T6 3.5).
+    if (!standsInTheHall(spec.id)) continue;
     add({
       name: spec.spriteKey,
       spriteKey: spec.spriteKey,

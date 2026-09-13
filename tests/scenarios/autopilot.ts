@@ -105,6 +105,7 @@ export const DAY_ONE_KIT = [
   'laptop',
   'tableSaw',
   'drill',
+  'toolCabinet',
   'edgebander',
   'compressor',
   'extractor',
@@ -125,7 +126,7 @@ function buyKit(state: GameState, policy: Policy): GameState {
 }
 
 /** What a joiner has to have before he can start (CLAUDE.md 9.3). */
-export const JOINER_KIT = ['workbench', 'locker', 'canteenSeat', 'handToolSet'];
+export const JOINER_KIT = ['workbench', 'locker', 'canteenSeat', 'toolCabinet', 'handToolSet'];
 
 function takeOnJoiner(state: GameState): GameState {
   if (state.workers.some((worker) => worker.role === 'joiner')) return state;

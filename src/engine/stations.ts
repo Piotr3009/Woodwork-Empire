@@ -4,6 +4,7 @@
 // 'gate', 'office' or 'idle'.
 
 import { has } from './machines';
+import { standsInTheHall } from './layout';
 import type { GameState, TaskInstance } from './types';
 
 export const STATION_BENCH = 'bench';
@@ -49,13 +50,13 @@ export function cycleStation(minuteIndex: number): string {
   return STATION_BENCH;
 }
 
-/** The station after this many minutes of production. A machine the workshop has not bought
- *  leaves the figure at the bench. */
+/** The station after this many minutes of production. A machine the workshop has not bought, or
+ *  one that holds no cell of the floor, leaves the figure at the bench (CLAUDE.md T6 3.5). */
 export function stationForProduction(state: GameState, minutesProduced: number): string {
   if (minutesProduced <= 0) return STATION_BENCH;
   const station = cycleStation(minutesProduced - 1);
   const specId = stationMachine(station);
-  if (specId !== null && !has(state, specId)) return STATION_BENCH;
+  if (specId !== null && (!has(state, specId) || !standsInTheHall(specId))) return STATION_BENCH;
   return station;
 }
 
@@ -73,7 +74,8 @@ export function stationForTask(state: GameState, task: TaskInstance): string {
       const machine = task.equipmentId
         ? state.equipment.find((item) => item.id === task.equipmentId)
         : null;
-      return machine ? machineStation(machine.specId) : STATION_BENCH;
+      if (!machine || !standsInTheHall(machine.specId)) return STATION_BENCH;
+      return machineStation(machine.specId);
     }
     case 'cleaning':
       return STATION_BENCH;

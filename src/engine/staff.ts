@@ -7,6 +7,7 @@ import {
   HIRING_SPECS,
   JOINERS_PER_TABLE_SAW,
   JOINER_PREREQUISITES,
+  TOOL_CABINET,
   OVER_SAW_RATIO_FACTOR,
   WORKER_NAMES,
   WORKER_RATES,
@@ -58,11 +59,20 @@ export function availableJoiners(state: GameState): Worker[] {
   );
 }
 
+/** How many tool cabinets the workshop owes: one for every joiner and one for the owner, and one
+ *  more when somebody is about to be taken on (CLAUDE.md T6 3.5). */
+export function cabinetsNeeded(state: GameState, hiring = 0): number {
+  return joiners(state).length + hiring + 1;
+}
+
 /** Kit the workshop is short of before this hire can start. */
 export function missingForHire(state: GameState, role: WorkerRole): string[] {
   if (role !== 'joiner') return [];
   const needed = joiners(state).length + 1;
-  return JOINER_PREREQUISITES.filter((specId) => countOf(state, specId) < needed);
+  return JOINER_PREREQUISITES.filter((specId) => {
+    const wanted = specId === TOOL_CABINET ? cabinetsNeeded(state, 1) : needed;
+    return countOf(state, specId) < wanted;
+  });
 }
 
 export function missingCost(missing: string[]): number {

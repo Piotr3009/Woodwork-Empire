@@ -74,7 +74,6 @@ describe('footprints in metres', () => {
       laptop: [1, 1, 1],
       tableSaw: [4, 2, 2],
       drill: [1, 1, 1],
-      edgebander: [3, 2, 2],
       compressor: [2, 2, 1],
       extractor: [2, 2, 3],
       workbench: [3, 2, 1],
@@ -95,14 +94,33 @@ describe('footprints in metres', () => {
       flexiSystem: [3, 3, 4],
       pelletiser: [2, 2, 3],
     };
-    // Every line of the catalogue is in the table above: a new family cannot slip in unmeasured.
-    expect(EQUIPMENT_SPECS.map((spec) => spec.id).sort()).toEqual(Object.keys(tiles).sort());
+    // What Turn 6 added, given in metres from the start: it was never measured in tiles.
+    const metres: Record<string, [number, number, number]> = {
+      toolCabinet: [1, 1, 1],
+    };
+    // And the one thing that holds no cell of the floor at all: it lives in a tool cabinet and
+    // comes out to the bench (CLAUDE.md T6 3.5).
+    const noFootprint = ['edgebander'];
+    // Every line of the catalogue is in one of the three lists: nothing slips in unmeasured.
+    expect(EQUIPMENT_SPECS.map((spec) => spec.id).sort()).toEqual(
+      [...Object.keys(tiles), ...Object.keys(metres), ...noFootprint].sort(),
+    );
+    const half = (value: number): number => Math.max(1, Math.ceil(value / 2));
     for (const spec of EQUIPMENT_SPECS) {
+      const size = { width: spec.width, depth: spec.depth, height: spec.height };
+      if (noFootprint.includes(spec.id)) {
+        expect(size, spec.id).toEqual({ width: 0, depth: 0, height: 0 });
+        continue;
+      }
+      const given = metres[spec.id];
+      if (given) {
+        expect(size, spec.id).toEqual({ width: given[0], depth: given[1], height: given[2] });
+        continue;
+      }
       const was = tiles[spec.id];
       expect(was, spec.id).toBeDefined();
       if (!was) continue;
-      const half = (value: number): number => Math.max(1, Math.ceil(value / 2));
-      expect({ width: spec.width, depth: spec.depth, height: spec.height }, spec.id).toEqual({
+      expect(size, spec.id).toEqual({
         width: half(was[0]),
         depth: half(was[1]),
         height: half(was[2]),

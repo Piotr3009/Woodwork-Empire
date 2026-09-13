@@ -19,6 +19,13 @@ export interface Box {
 
 const OK: PlaceCheck = { ok: true, reason: '' };
 
+/** Does this kind of thing hold cells of the floor at all? The hand edgebander does not: it is
+ *  kept in a tool cabinet and used at the bench (CLAUDE.md T6 3.5). */
+export function standsInTheHall(specId: string): boolean {
+  const spec = findSpec(specId);
+  return spec !== null && spec.width > 0 && spec.depth > 0;
+}
+
 function overlaps(left: Box, right: Box): boolean {
   return (
     left.x < right.x + right.width &&
@@ -40,6 +47,7 @@ export function hallItems(state: GameState): Equipment[] {
   return state.equipment.filter((item) => {
     const spec = findSpec(item.specId);
     if (!spec || spec.category === 'furniture') return false;
+    if (!standsInTheHall(item.specId)) return false;
     return item.anchorX < state.unit.widthCells;
   });
 }
@@ -60,6 +68,7 @@ export function canPlaceSpec(
 ): PlaceCheck {
   const spec = findSpec(specId);
   if (!spec) return { ok: false, reason: 'Not in the catalogue' };
+  if (!standsInTheHall(specId)) return { ok: false, reason: 'It lives in a tool cabinet' };
   const box = boxOf(specId, x, y);
   if (
     x < 0 ||

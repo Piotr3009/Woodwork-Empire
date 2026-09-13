@@ -728,13 +728,16 @@ const SPEC_DRAFTS: SpecDraft[] = [
     name: 'Hand edgebander',
     price: 900,
     category: 'machine',
-    width: 2,
-    depth: 1,
-    height: 1,
+    // It stands in a tool cabinet and comes out to the bench, so it holds no cell of the floor
+    // and nothing can be dropped on it in setup mode (CLAUDE.md T6 3.5).
+    width: 0,
+    depth: 0,
+    height: 0,
     spriteKey: 'edgebander',
     bagInterval: 4800,
     usedOn: 'sheet',
-    effect: 'Edges sheet goods. Bag every 4800 minutes.',
+    requires: ['toolCabinet'],
+    effect: 'Edges sheet goods at the bench. Lives in a tool cabinet. Bag every 4800 minutes.',
   },
   {
     ...BASE_SPEC,
@@ -802,6 +805,22 @@ const SPEC_DRAFTS: SpecDraft[] = [
   },
   {
     ...BASE_SPEC,
+    id: 'toolCabinet',
+    name: 'Tool cabinet',
+    price: 350,
+    category: 'storage',
+    width: 1,
+    depth: 1,
+    height: 1,
+    spriteKey: 'toolCabinet',
+    perWorker: true,
+    stackable: true,
+    effect:
+      'Holds one man\u0027s hand tools and the hand edgebander. One for every worker and one ' +
+      'for you.',
+  },
+  {
+    ...BASE_SPEC,
     id: 'locker',
     name: 'Locker',
     price: 80,
@@ -840,7 +859,8 @@ const SPEC_DRAFTS: SpecDraft[] = [
     spriteKey: 'handToolSet',
     perWorker: true,
     stackable: true,
-    effect: 'One per worker, bought by the owner.',
+    requires: ['toolCabinet'],
+    effect: 'One per worker, bought by the owner. Kept in his tool cabinet.',
   },
   {
     ...BASE_SPEC,
@@ -1081,7 +1101,6 @@ export const PERSONNEL_DOOR = { y: 4.5, width: 1 };
  *  and nothing is ever laid on the gate lane. */
 export const STARTING_LAYOUT: Record<string, LayoutSlot> = {
   tableSaw: { x: 6, y: 1 },
-  edgebander: { x: 9, y: 1 },
   thicknesser: { x: 12, y: 1 },
   solidWoodTools: { x: 15, y: 1 },
   compressor: { x: 18, y: 1 },
@@ -1128,6 +1147,18 @@ export const CANTEEN_SLOT_LAYOUT: LayoutSlot[] = [
   { x: 15, y: 4 },
   { x: 16, y: 4 },
   { x: 17, y: 4 },
+];
+
+/** Tool cabinets stand along the rear wall past the machines: one for the owner and one for every
+ *  worker (CLAUDE.md T6 3.5). */
+export const CABINET_SLOT_LAYOUT: LayoutSlot[] = [
+  { x: 6, y: 0 },
+  { x: 7, y: 0 },
+  { x: 8, y: 0 },
+  { x: 9, y: 0 },
+  { x: 10, y: 0 },
+  { x: 11, y: 0 },
+  { x: 12, y: 0 },
 ];
 
 /** Where a waiting delivery lorry stands: inside the shutter, on the lane. */
@@ -1227,8 +1258,17 @@ export const HIRING_SPECS: HiringSpec[] = [
   },
 ];
 
-/** Every joiner needs all of these before he can be hired (PIOTR). */
-export const JOINER_PREREQUISITES = ['workbench', 'locker', 'canteenSeat', 'handToolSet'];
+/** Every joiner needs all of these before he can be hired (PIOTR). The tool cabinet is counted
+ *  one higher than the rest, because the owner keeps his own tools in one too (T6 3.5). */
+export const JOINER_PREREQUISITES = [
+  'workbench',
+  'locker',
+  'canteenSeat',
+  'handToolSet',
+  'toolCabinet',
+];
+/** The item every worker and the owner each need one of. */
+export const TOOL_CABINET = 'toolCabinet';
 /** [TUNE] a new hire starts the next working day. */
 export const HIRE_START_DELAY_DAYS = 1;
 /** From five joiners a helper is required (PIOTR). */

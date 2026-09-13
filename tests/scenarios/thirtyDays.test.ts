@@ -297,13 +297,14 @@ describe('a month that shifts two machines on day 3', () => {
 
   const day3 = clearEvents(playUntilDay(newGame({ seed: SEED, difficulty: 'easy' }), 3, CAREFUL));
   const cashBefore = day3.cash;
-  // The saw and the edgebander are both ducted into the extraction (CLAUDE.md T4 3.5).
-  const shifted = act(drag(drag(day3, 'tableSaw'), 'edgebander'), {
+  // Two things on the move, of which one is ducted into the extraction: the hand edgebander is
+  // in a tool cabinet now, so the shelving is the second thing the owner shifts (T4 3.5, T6 3.5).
+  const shifted = act(drag(drag(day3, 'tableSaw'), 'sheetRack'), {
     type: 'END_SETUP',
     speed: 1,
   });
 
-  it('starts on day 3 with two machines on the move and an hour each to shift them', () => {
+  it('starts on day 3 with two things on the move and an hour each to shift them', () => {
     expect(day3.clock.day).toBe(3);
     expect(shifted.movedItems).toHaveLength(2);
     expect(movingMachines(shifted)?.minutesTotal).toBe(2 * MOVE_MINUTES_PER_ITEM);
@@ -335,7 +336,7 @@ describe('a month that shifts two machines on day 3', () => {
     expect(act(at, { type: 'SET_SPEED', speed: 1 }).speed).toBe(1);
   });
 
-  it('charges 1,600 of ducting when the kit is back down, one line a machine', () => {
+  it('charges the ducting when the kit is back down, one line a ducted machine', () => {
     let at = shifted;
     let guard = 0;
     while (movingMachines(at) !== null && guard < 600) {
@@ -343,19 +344,11 @@ describe('a month that shifts two machines on day 3', () => {
       guard += 1;
     }
     const lines = at.ledger.filter((entry) => entry.category === 'ducting');
-    expect(lines).toHaveLength(2);
-    expect(lines.map((entry) => entry.label)).toEqual([
-      'Ducting reconnection: table saw',
-      'Ducting reconnection: hand edgebander',
-    ]);
-    expect(lines.reduce((total, entry) => total - entry.amount, 0)).toBe(
-      2 * DUCTING_RECONNECT_COST,
-    );
+    expect(lines).toHaveLength(1);
+    expect(lines.map((entry) => entry.label)).toEqual(['Ducting reconnection: table saw']);
     // The ducting is the whole of what the move cost: no other money moved in those two hours.
-    expect(lines.reduce((total, entry) => total - entry.amount, 0)).toBe(
-      2 * DUCTING_RECONNECT_COST,
-    );
-    expect(cashBefore - at.cash).toBe(2 * DUCTING_RECONNECT_COST);
+    expect(lines.reduce((total, entry) => total - entry.amount, 0)).toBe(DUCTING_RECONNECT_COST);
+    expect(cashBefore - at.cash).toBe(DUCTING_RECONNECT_COST);
     expect(at.movedItems).toEqual([]);
   });
 
@@ -364,7 +357,7 @@ describe('a month that shifts two machines on day 3', () => {
     expect(month.gameOver).toBeNull();
     expect(month.clock.day).toBe(31);
     expect(month.cash).toBeGreaterThan(0);
-    expect(month.ledger.filter((entry) => entry.category === 'ducting')).toHaveLength(2);
+    expect(month.ledger.filter((entry) => entry.category === 'ducting')).toHaveLength(1);
     expect(month.jobs.filter((job) => job.stage === 'completed').length).toBeGreaterThanOrEqual(2);
   });
 });

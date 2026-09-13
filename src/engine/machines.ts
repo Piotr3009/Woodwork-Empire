@@ -241,7 +241,11 @@ export function ductingIsFree(state: GameState): boolean {
  *  moved. A bench, a rack, a locker or a seat is simply carried (CLAUDE.md T4 3.5). */
 export function needsDucting(specId: string): boolean {
   if (NO_DUCTING_SPECS.includes(specId)) return false;
-  return findSpec(specId)?.category === 'machine';
+  const spec = findSpec(specId);
+  // Nothing that holds no cell of the floor is ducted: it never stood anywhere to be unplugged
+  // from (CLAUDE.md T6 3.5).
+  if (spec === null || spec.width <= 0 || spec.depth <= 0) return false;
+  return spec.category === 'machine';
 }
 
 /** The machines the player has moved that have to be reconnected, in the order he moved them.

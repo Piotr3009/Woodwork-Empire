@@ -76,8 +76,11 @@ describe('where the owner stands', () => {
     expect(twenty.owner.station).toBe(machineStation('tableSaw'));
     const thirtyFive = tick(state, 35);
     expect(thirtyFive.owner.station).toBe(STATION_BENCH);
+    // The cycle still gives five minutes to the edging, but the edgebander holds no cell of the
+    // floor now: it comes out of a tool cabinet and is used at the bench (CLAUDE.md T6 3.5).
     const forty = tick(state, 40);
-    expect(forty.owner.station).toBe(machineStation('edgebander'));
+    expect(cycleStation(39)).toBe(machineStation('edgebander'));
+    expect(forty.owner.station).toBe(STATION_BENCH);
   });
 
   it('stands at the office door on a desk task, and at the gate unloading', () => {

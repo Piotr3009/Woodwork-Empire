@@ -41,8 +41,14 @@ import {
 /** Buys exactly what the engine says is missing for one more joiner. */
 function withJoinerKit(state: GameState): GameState {
   let next = state;
-  for (const specId of missingForHire(next, 'joiner')) {
-    next = act(next, { type: 'BUY_EQUIPMENT', specId });
+  // A tool cabinet is wanted one deeper than the rest, the owner keeping his tools in one too,
+  // so the list is bought out until nothing is short (CLAUDE.md T6 3.5).
+  let guard = 0;
+  while (missingForHire(next, 'joiner').length > 0 && guard < 20) {
+    for (const specId of missingForHire(next, 'joiner')) {
+      next = act(next, { type: 'BUY_EQUIPMENT', specId });
+    }
+    guard += 1;
   }
   return next;
 }
@@ -80,7 +86,7 @@ describe('the hiring pool', () => {
     expect(missingForHire(state, 'joiner')).toEqual(JOINER_PREREQUISITES);
     const option = hiringOptions(state).find((entry) => entry.tier === 'poor');
     expect(option?.available).toBe(false);
-    expect(option?.missingCost).toBe(250 + 80 + 40 + 400);
+    expect(option?.missingCost).toBe(250 + 80 + 40 + 400 + 350);
     expect(option?.blockReason).toContain('Workbench');
   });
 

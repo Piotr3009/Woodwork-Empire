@@ -145,6 +145,7 @@ describe('the board over time', () => {
     let state = newGame();
     state = act(state, { type: 'BUY_EQUIPMENT', specId: 'tableSaw' });
     state = act(state, { type: 'BUY_EQUIPMENT', specId: 'drill' });
+    state = act(state, { type: 'BUY_EQUIPMENT', specId: 'toolCabinet' });
     state = act(state, { type: 'BUY_EQUIPMENT', specId: 'edgebander' });
     for (const enquiry of state.enquiries) {
       expect(enquiry.lockReason).toBeNull();

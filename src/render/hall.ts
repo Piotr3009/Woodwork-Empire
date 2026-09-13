@@ -22,6 +22,7 @@ import {
   serviceIsDue,
 } from '../engine/machines';
 import { jobsAtGate } from '../engine/jobs';
+import { standsInTheHall } from '../engine/layout';
 import { machineInUse } from '../engine/game';
 import { rackCapacity, stockIsLow } from '../engine/materials';
 import {
@@ -705,10 +706,12 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
     });
   }
 
-  // Everything the player has bought, except the office furniture, which lives in the office view.
+  // Everything the player has bought, except the office furniture, which lives in the office
+  // view, and the hand edgebander, which lives in a tool cabinet (CLAUDE.md T6 3.5).
   for (const item of state.equipment) {
     const spec = findSpec(item.specId);
     if (!spec || spec.category === 'furniture') continue;
+    if (!standsInTheHall(item.specId)) continue;
     const broken = item.broken;
     const fill = broken ? 'var(--stopped)' : CATEGORY_FILL[spec.category] ?? 'var(--kit-machine)';
     const shade = broken

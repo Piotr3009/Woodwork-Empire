@@ -113,13 +113,14 @@ describe('setting the hall out', () => {
     expect(html()).not.toContain('Ducting to reconnect');
     const state = currentState();
     const saw = state?.equipment.find((item) => item.specId === 'tableSaw');
-    const bander = state?.equipment.find((item) => item.specId === 'edgebander');
-    if (!saw || !bander) throw new Error('no machines in the hall');
-    for (const item of [saw, bander]) {
+    const rack = state?.equipment.find((item) => item.specId === 'sheetRack');
+    if (!saw || !rack) throw new Error('no kit in the hall');
+    for (const item of [saw, rack]) {
       moveItem(item.id, item.anchorX, item.anchorY + 1);
     }
-    // The exact words CLAUDE.md T4 3.5 asks for, with the running total.
-    expect(html()).toContain('Ducting to reconnect: 2 machines, £1,600');
+    // The exact words CLAUDE.md T4 3.5 asks for, with the running total. Two things moved and one
+    // of them ducted: the shelving has nothing to reconnect (CLAUDE.md T6 3.5).
+    expect(html()).toContain('Ducting to reconnect: 1 machine, £800');
     click('[data-do="endSetup"]');
     expect(html()).toContain('Moving machines');
     // Back to a hall that is being shifted, so the kit cannot be dragged again.
