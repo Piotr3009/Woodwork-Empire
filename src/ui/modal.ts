@@ -4,7 +4,7 @@
 // One escape and one money format for the whole game: the renderers and the engine own them,
 // because both layers sit below the modals.
 
-import { WHY, formatMoney, ownerOutTask, plural, startTaskCheck } from '../engine/index';
+import { WHY, formatMoney, interviewTask, plural, startTaskCheck } from '../engine/index';
 import type { GameState, TaskInstance } from '../engine/index';
 import { escapeText } from '../render/hall';
 
@@ -194,12 +194,11 @@ export function reasonLabel(reason: string): string {
  *  left the drawings unable to be drawn (CLAUDE.md T4 3.2). */
 /** The interview the owner is in, over the modal that started it. Nobody is taken on until the
  *  hour is spent (CLAUDE.md T7 3.10). Buying is no longer a trip: it costs him nothing and he
- *  never leaves the workshop for it (CLAUDE.md T9 3.1). */
-export function tripLine(state: GameState, kind: 'hiring'): string {
-  // The same selector the "Owner is out" component outside the modal reads, so the two cannot
-  // disagree about what he is doing (CLAUDE.md T8 3.3).
-  const task = ownerOutTask(state);
-  if (task === null || task.kind !== kind) return '';
+ *  never leaves the workshop for it (CLAUDE.md T9 3.1), and an interview is not one of the three
+ *  things the "Owner is out" line is for, so it has its own selector (CLAUDE.md T9 3.3). */
+export function tripLine(state: GameState): string {
+  const task = interviewTask(state);
+  if (task === null) return '';
   const spent = Math.round(task.minutesTotal - task.minutesRemaining);
   return (
     `<p class="warn trip">Interview: ${spent} of ${Math.round(task.minutesTotal)} min. ` +

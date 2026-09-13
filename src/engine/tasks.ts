@@ -269,13 +269,24 @@ export function finishTimeFor(state: GameState, minutes: number): { day: number;
 }
 
 /** The kinds of task that take the owner out of the workshop, or stand him in the middle of it
- *  where nothing else can go on: what the "Owner is out" line is drawn from (CLAUDE.md T8 3.3). */
+ *  where nothing else can go on: what the "Owner is out" line is drawn from (CLAUDE.md T8 3.3).
+ *  Measure, meeting and move only: an order takes him nowhere, and an interview is an hour in his
+ *  own office with its own line inside the hiring card (CLAUDE.md T9 3.3). */
 export const OWNER_OUT_KINDS: ReadonlyArray<TaskKind> = [
-  'hiring',
   'siteMeasure',
   'clientMeeting',
   'moveMachines',
 ];
+
+/** The interview the owner is sitting in, if he is. Its own selector, because the hiring card
+ *  says so on its face and the "Owner is out" line does not (CLAUDE.md T9 3.3). */
+export function interviewTask(state: GameState): TaskInstance | null {
+  const id = state.owner.currentTaskId;
+  if (id === null) return null;
+  const task = findTask(state, id);
+  if (task === null || task.done) return null;
+  return task.kind === 'hiring' ? task : null;
+}
 
 /** The interview, the site measure, the client meeting or the move of the hall the owner is on
  *  this minute, or null. The one selector for it: the line inside the modal and the component

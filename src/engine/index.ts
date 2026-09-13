@@ -202,6 +202,7 @@ export {
   equipmentUnloadMinutes,
   finishTimeFor,
   movePending,
+  interviewTask,
   ownerOutTask,
   skippedTask,
   movingMachines,

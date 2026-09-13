@@ -8,7 +8,7 @@ import {
   SITE_MEASURE_MINUTES,
   SKIP_SPEED,
 } from '../../src/engine/constants';
-import { ownerOutTask, skippedTask } from '../../src/engine/tasks';
+import { OWNER_OUT_KINDS, ownerOutTask, skippedTask } from '../../src/engine/tasks';
 import { renderTopbar } from '../../src/ui/topbar';
 import { renderOwnerOut } from '../../src/ui/ownerOut';
 import type { GameState, TaskInstance } from '../../src/engine/index';
@@ -68,6 +68,12 @@ describe('what the owner is out on', () => {
 
   it('covers a site measure', () => {
     expect(ownerOutTask(measuring())?.kind).toBe('siteMeasure');
+  });
+
+  it('is the measure, the meeting and the move, and nothing else', () => {
+    // An interview is an hour in his own office with its own line inside the hiring card, and the
+    // component is for the three things that take him out of the workshop (CLAUDE.md T9 3.3).
+    expect([...OWNER_OUT_KINDS]).toEqual(['siteMeasure', 'clientMeeting', 'moveMachines']);
   });
 });
 

@@ -8,7 +8,6 @@ import {
   GATE_LAYOUT,
   ROOM_DOOR,
   ROOM_LAYOUT,
-  roomById,
   YARD_WIDTH_CELLS,
   roomDoorCell,
 } from '../engine/constants';
@@ -107,6 +106,14 @@ export function label(at: Point, text: string, extra = ''): string {
  *  down: the letters keep their height and lean with the wall. */
 export function wallMatrix(at: Point): string {
   return `matrix(1,0.5,0,1,${round(at.x)},${round(at.y)})`;
+}
+
+/** The same for the left wall, which runs along world y: one metre of it is (-24, +12) on the
+ *  screen, so a pixel of the box goes (1, -0.5) across and (0, 1) down and the lettering leans the
+ *  other way. Local x therefore runs towards falling y, which is why anything drawn with it is
+ *  anchored at the high y end of its span (CLAUDE.md T9 3.2). */
+export function leftWallMatrix(at: Point): string {
+  return `matrix(1,-0.5,0,1,${round(at.x)},${round(at.y)})`;
 }
 
 /** Text the game letters onto the painting: the room names and the company name. Its own class,
@@ -619,19 +626,21 @@ function figure(
   };
 }
 
-/** The pin board beside the office door, on the office front face: how many things are on order,
- *  and a click on it opens the list (PIOTR, 13.09; CLAUDE.md T8 3.2). Its own small board rather
- *  than a control drawn over the painting, so the hall keeps its one style. */
-export const PIN_BOARD = { along: 0.15, z: 1.2, width: 1.1, height: 0.7 };
+/** The board by the entrance door of the hall, not on the office (PIOTR, 13.09; CLAUDE.md T9
+ *  3.2). The personnel door is in the left wall at y 4.5 to 5.5, and the board hangs beside it at
+ *  y 3 to 4.5, 1.5 m up (docs/art/SPRITES.md 9.3). Its own small board rather than a control
+ *  drawn over the painting, so the hall keeps its one style. */
+export const PIN_BOARD = { fromY: 3, toY: 4.5, z: 1.5, height: 0.7 };
 
 export function pinBoard(count: number): string {
-  const room = roomById('office');
-  const at = tileToScreen(room.x + PIN_BOARD.along, room.y + room.depth, PIN_BOARD.z);
-  const width = PIN_BOARD.width * TILE_RISE;
+  // Anchored at the far end of the span, because a local metre to the right along this wall is a
+  // metre of falling y (see leftWallMatrix).
+  const at = tileToScreen(0, PIN_BOARD.toY, PIN_BOARD.z);
+  const width = (PIN_BOARD.toY - PIN_BOARD.fromY) * TILE_RISE;
   const height = PIN_BOARD.height * TILE_RISE;
   return (
     '<g data-do="openModal" data-modal="shopping" data-pinboard="1" ' +
-    `class="clickable pin-board" transform="${wallMatrix(at)}">` +
+    `class="clickable pin-board" transform="${leftWallMatrix(at)}">` +
     '<title>What is on order. Click for the list.</title>' +
     `<rect x="0" y="${-height}" width="${width}" height="${height}" class="pin-board-face" />` +
     `<text x="${round(width / 2)}" y="${round(-height / 2 + 4)}" text-anchor="middle" ` +
@@ -855,9 +864,10 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
     });
   }
 
-  // The pin board on the office wall, beside its door (PIOTR, 13.09).
+  // The Orders board by the entrance door of the hall, on the left wall (PIOTR, 13.09). It hangs
+  // on the wall, so it is drawn behind everything standing in front of it.
   drawables.push({
-    depth: depthKey(roomById('office').x, roomById('office').y + roomById('office').depth) + 0.02,
+    depth: depthKey(0, PIN_BOARD.fromY) - 0.01,
     svg: pinBoard(shoppingList(state).length),
   });
 
