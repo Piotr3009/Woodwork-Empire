@@ -1,7 +1,7 @@
 {
   "spriteKey": "character.joiner",
-  "animation": "walk",
-  "fps": 3.4286,
+  "animation": "idle",
+  "fps": 1,
   "loop": true,
   "cell": {
     "width": 112,
@@ -30,7 +30,7 @@
     "nw": 2,
     "ne": 3
   },
-  "frames": 8,
+  "frames": 2,
   "source": {
     "file": "Woodwork-Empire-joiner-animation-pack.zip",
     "canvas": {

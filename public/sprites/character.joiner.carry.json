@@ -1,15 +1,15 @@
 {
   "spriteKey": "character.joiner",
-  "animation": "walk",
+  "animation": "carry",
   "fps": 3.4286,
   "loop": true,
   "cell": {
-    "width": 112,
-    "height": 151
+    "width": 173,
+    "height": 160
   },
   "anchor": {
-    "x": 56.0,
-    "y": 143
+    "x": 86.5,
+    "y": 152
   },
   "padding": 8,
   "scaleFromSource": 0.1957,
@@ -34,12 +34,12 @@
   "source": {
     "file": "Woodwork-Empire-joiner-animation-pack.zip",
     "canvas": {
-      "width": 480,
-      "height": 660
+      "width": 800,
+      "height": 736
     },
     "anchorPixels": {
-      "x": 240,
-      "y": 545
+      "x": 400,
+      "y": 560
     }
   }
 }

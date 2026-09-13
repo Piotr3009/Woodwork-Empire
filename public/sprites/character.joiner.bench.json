@@ -1,7 +1,7 @@
 {
   "spriteKey": "character.joiner",
-  "animation": "walk",
-  "fps": 3.4286,
+  "animation": "bench",
+  "fps": 5,
   "loop": true,
   "cell": {
     "width": 112,

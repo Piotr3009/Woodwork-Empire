@@ -338,11 +338,21 @@ hands; the game draws the sheet). No run.
   production stage at a bench, `carry` while it fetches sheets or unloads, `idle` otherwise. A
   missing animation falls back to `idle`, then to frame 0 of `walk`, then to the capsule.
 - Playback at the manifest's fps in real time, independent of game speed (a man does not walk faster
-  at 4x; he covers ground faster because the move is shorter in real seconds).
+  at 4x; he covers ground faster because the move is shorter in real seconds). Each sheet has its
+  own fps and its own cell size: the loader never assumes them.
 - The figure's name label and status line stay under the anchor as today.
 - The Sprite check page shows every character sheet as a strip with the anchor marked.
 
-### 10.5 Delivered
+### 10.5 Delivered (13.09, GPT batch 3 normalised by Claude)
 
-- `character.joiner.walk`: `sw` row only, 8 frames picked evenly from GPT's 56, normalised by Claude
-  on 13.09. The other three rows, `idle`, `bench` and `carry` are ordered from GPT (batch 3).
+| Sheet | Rows | Frames | fps | Cell | Anchor |
+|---|---|---|---|---|---|
+| `character.joiner.walk` | sw, se, nw, ne | 8 | 3.43 | 112 × 151 | 56, 143 |
+| `character.joiner.idle` | sw, se, nw, ne | 2 | 1 | 112 × 151 | 56, 143 |
+| `character.joiner.bench` | sw, se, nw, ne | 8 | 5 | 112 × 151 | 56, 143 |
+| `character.joiner.carry` | sw, se, nw, ne | 8 | 3.43 | 173 × 160 | 86.5, 152 |
+
+`carry` includes the sheet the joiner carries (GPT painted it into the frames), so its cell is wider
+than the standard one; the manifest carries the cell and the anchor, and the loader reads them
+rather than assuming 112 × 151. The fps values come from GPT's timing (walk and carry 8 frames per
+7/3 s, bench 5 fps, idle 1 fps); the game plays each sheet at its own fps.
