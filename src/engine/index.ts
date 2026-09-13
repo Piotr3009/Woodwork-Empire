@@ -12,8 +12,13 @@ export {
   bootLaptop,
   canBuy,
   canBuySoftware,
+  cancelOrder,
+  canSell,
   createGame,
+  sellMachine,
+  landOrder,
   machineInUse,
+  moveConfirmPending,
   orderCheck,
   placeOrder,
   onOrder,
@@ -28,6 +33,7 @@ export * from './types';
 
 // Numbers the UI is allowed to print
 export {
+  APP_VERSION,
   CLEANING_MINUTES,
   EQUIPMENT_SPECS,
   GANTT_STAGES,
@@ -35,9 +41,10 @@ export {
   MACHINE_ENDURANCE_HOURS_DEFAULT,
   PRODUCTION_STAGES,
   DUCTING_RECONNECT_COST,
+  EQUIPMENT_UNLOAD_MINUTES,
   MINUTES_PER_WORKING_DAY,
   MOVE_MINUTES_PER_ITEM,
-  MOVING_SPEED,
+  SKIP_SPEED,
   HIRING_MINUTES,
   LAPTOP_BOOT_MINUTES,
   SHOPPING_MINUTES,
@@ -101,6 +108,8 @@ export {
   dailyRent,
   monthlyFixedCosts,
   monthlySalaryBill,
+  overtimePayFor,
+  overtimeWageBill,
   netOf,
   nextDueDays,
   visibleTotals,
@@ -191,8 +200,12 @@ export {
   findTask,
   jobTasks,
   materialOrderMinutes,
+  equipmentUnloadMinutes,
+  finishTimeFor,
   movePending,
   orderMinutes,
+  ownerOutTask,
+  skippedTask,
   shoppingLabel,
   shoppingTask,
   movingMachines,
@@ -210,6 +223,8 @@ export type { TaskStartCheck } from './tasks';
 export {
   availableJoiners,
   hasWorkingDay,
+  staysForOvertime,
+  worksOvertime,
   helpers,
   hiringOptions,
   isWorkingToday,
@@ -233,7 +248,12 @@ export {
   freeMachines,
   heldMachine,
   heldMachines,
+  itemIsHeavy,
   itemStandsInTheHall,
+  isHeavy,
+  isSellableFamily,
+  isSold,
+  salePriceFor,
   machineIsShared,
   sheetCapacityOf,
   zoneOf,
@@ -247,6 +267,7 @@ export {
   pastEndurance,
   variantFor,
   variantOf,
+  deliveryDaysFor,
   ductedMoves,
   ductingDue,
   ductingIsFree,
@@ -284,6 +305,20 @@ export {
 } from './production';
 export type { Hand, StationCheck } from './production';
 
+// What is bought, paid for and not here yet (CLAUDE.md T8 3.2)
+export {
+  dueDayFor,
+  findOnOrder,
+  shoppingList,
+  onOrderCount,
+  orderName,
+  orderProgress,
+  ordersDueOn,
+  ordersOnTheWay,
+  reservedItems,
+} from './orders';
+export type { OrderLine } from './orders';
+
 // Material and deliveries
 export {
   canUnload,
@@ -309,6 +344,7 @@ export {
   firstFreeCell,
   gateLane,
   hallItems,
+  reservationById,
 } from './layout';
 export type { Box, PlaceCheck } from './layout';
 

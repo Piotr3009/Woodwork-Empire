@@ -7,7 +7,8 @@ import {
   PRODUCT_TEMPLATES,
   SOLID_WOOD_EQUIPMENT,
 } from './constants';
-import { findSpec, has, hasAll } from './machines';
+import { findSpec, has } from './machines';
+import { hasOrOnOrder } from './orders';
 import type { Finish, GameState, ProductTemplate } from './types';
 
 export function findTemplate(templateId: string): ProductTemplate | null {
@@ -25,16 +26,18 @@ export function templatesForReputation(reputation: number): ProductTemplate[] {
   return PRODUCT_TEMPLATES.filter((entry) => entry.minReputation <= reputation);
 }
 
-/** Tools the workshop is short of for this template. */
+/** Tools the workshop is short of for this template. Kit that is bought and on its way counts:
+ *  the company is equipped, and the drawing and the material take days of their own
+ *  (CLAUDE.md T8 3.2). */
 export function missingEquipment(state: GameState, entry: ProductTemplate): string[] {
-  return entry.requiredEquipment.filter((specId) => !has(state, specId));
+  return entry.requiredEquipment.filter((specId) => !hasOrOnOrder(state, specId));
 }
 
 /** The greyed out reason on the board, or null when the job can be taken as it stands. */
 export function lockReasonFor(state: GameState, entry: ProductTemplate): string | null {
   const missing = missingEquipment(state, entry);
   if (missing.length === 0) return null;
-  if (entry.material === 'solidWood' && !hasAll(state, SOLID_WOOD_EQUIPMENT)) {
+  if (entry.material === 'solidWood' && !SOLID_WOOD_EQUIPMENT.every((id) => hasOrOnOrder(state, id))) {
     return 'Needs solid wood tools';
   }
   const names = missing.map((specId) => findSpec(specId)?.name ?? specId);

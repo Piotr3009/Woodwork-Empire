@@ -14,8 +14,10 @@ function setupMove(state: GameState): GameState {
   const saw = s.equipment.find((e) => e.specId === 'tableSaw');
   if (!saw) throw new Error('no saw');
   s = act(s, { type: 'MOVE_ITEM', itemId: saw.id, x: saw.anchorX + 4, y: saw.anchorY });
+  // A machine is asked about before it is booked, and the answer here is always yes
+  // (CLAUDE.md T8 3.4).
   s = act(s, { type: 'END_SETUP', speed: 1 });
-  return s;
+  return choose(s, 'do');
 }
 
 function runUntilMoved(state: GameState, steps = 60): GameState {
@@ -25,6 +27,7 @@ function runUntilMoved(state: GameState, steps = 60): GameState {
     if (s.activeEvent?.kind === 'goingHome') s = choose(s, 'home');
     if (s.activeEvent?.kind === 'dayEnd') s = choose(s, 'next');
     if (s.activeEvent?.kind === 'breakTime') s = choose(s, 'take');
+    if (s.activeEvent?.kind === 'moveConfirm') s = choose(s, 'do');
     if (movePending(s) === null) break;
   }
   return s;
@@ -70,7 +73,7 @@ describe('a move of the hall always ends', () => {
     const saw = s.equipment.find((e) => e.specId === 'tableSaw');
     if (!saw) throw new Error('no saw');
     s = act(s, { type: 'MOVE_ITEM', itemId: saw.id, x: saw.anchorX + 4, y: saw.anchorY });
-    s = act(s, { type: 'END_SETUP', speed: 1 });
+    s = choose(act(s, { type: 'END_SETUP', speed: 1 }), 'do');
     s = runUntilMoved(s, 120);
     expect(movePending(s)).toBeNull();
     expect(movingMachines(s)).toBeNull();

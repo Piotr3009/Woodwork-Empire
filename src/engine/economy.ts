@@ -19,6 +19,8 @@ import {
   PELLET_INCOME_PER_1000_PRODUCTION_MINUTES,
   POWER_BASE_DAILY,
   SOFTWARE_SUBSCRIPTION_MONTHLY,
+  STAFF_OVERTIME_RATE,
+  WORKER_HOURS_PER_WEEK,
   WORKING_DAYS_PER_MONTH,
   unitDepositFor,
 } from './constants';
@@ -43,6 +45,7 @@ import type {
   LedgerCategory,
   LedgerEntry,
   PeriodTotals,
+  Worker,
 } from './types';
 
 /** What a period came to: money in less money out. */
@@ -331,6 +334,25 @@ export function weeklyWageBill(state: GameState): number {
     .reduce((total, worker) => total + worker.weeklyWage, 0);
 }
 
+/** What one man is owed for the evenings since the last wages went out: his hourly wage, which is
+ *  his week over forty, and half as much again on top (PIOTR, CLAUDE.md T8 3.6). */
+export function overtimePayFor(worker: Worker): number {
+  if (worker.overtimeMinutesWeek <= 0) return 0;
+  const hourly = worker.weeklyWage / WORKER_HOURS_PER_WEEK;
+  return Math.round(hourly * (worker.overtimeMinutesWeek / 60) * STAFF_OVERTIME_RATE * 100) / 100;
+}
+
+/** The Friday line for the evenings the crew stayed for (CLAUDE.md T8 3.6). */
+export function overtimeWageBill(state: GameState): number {
+  const total = state.workers.reduce((sum, worker) => sum + overtimePayFor(worker), 0);
+  return Math.round(total * 100) / 100;
+}
+
+/** Paid for: the slate is clean for the week that follows. */
+export function clearOvertimeWeek(state: GameState): void {
+  for (const worker of state.workers) worker.overtimeMinutesWeek = 0;
+}
+
 export function monthlySalaryBill(state: GameState): number {
   return state.workers
     .filter((worker) => worker.monthlyWage > 0 && worker.startDay <= state.clock.day)
@@ -515,13 +537,22 @@ export function runDayCosts(state: GameState, day: number): void {
   }
   if (isFriday(day)) {
     const wages = weeklyWageBill(state);
+    // The evenings the crew stayed for, at one and a half times the hour (CLAUDE.md T8 3.6).
+    const overtime = overtimeWageBill(state);
+    if (overtime > 0) {
+      chargeUnavoidable(state, 'wages', 'Overtime', overtime);
+      clearOvertimeWeek(state);
+    }
     if (wages > 0) {
       chargeUnavoidable(state, 'wages', 'Weekly wages', wages);
       queueEvent(state, {
         kind: 'wagesPaid',
         title: 'Wages',
-        body: 'Friday. The weekly wages have gone out.',
-        data: { amount: Math.round(wages) },
+        body:
+          overtime > 0
+            ? `Friday. The weekly wages have gone out, with ${formatMoney(overtime)} of overtime.`
+            : 'Friday. The weekly wages have gone out.',
+        data: { amount: Math.round(wages + overtime), overtime: Math.round(overtime) },
       });
     }
   }

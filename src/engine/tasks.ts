@@ -12,6 +12,7 @@ import {
   CLEANING_MINUTES,
   CLERK_ORDERS_PER_DAY,
   CLIENT_CALL_ANSWER_MINUTES,
+  EQUIPMENT_UNLOAD_MINUTES,
   DAILY_ORDERING_MINUTES,
   MOVE_MINUTES_PER_ITEM,
   EMAIL_ABOVE_BREAKS,
@@ -34,6 +35,8 @@ import {
   UNLOAD_BASE_MINUTES,
   WORK_EPSILON,
 } from './constants';
+import { DAY_END_MINUTE } from './constants';
+import { isBreak, nextWorkingDay } from './clock';
 import { findSpec } from './machines';
 import { canUnload } from './materials';
 import { ownerIsAvailable } from './owner';
@@ -139,14 +142,26 @@ export function designMinutes(
   return Math.round(template.designMinutes * sizeMultiplier * SOFTWARE_DESIGN_FACTOR[tier]);
 }
 
-/** Unloading, halved by a forklift and cut to a fifth by the better one (CLAUDE.md 8.10). */
-export function unloadMinutes(state: GameState): number {
+/** What the handling kit in the hall does to a load at the gate: halved by a forklift and cut to
+ *  a fifth by the better one (CLAUDE.md 8.10). One factor, whatever is on the lorry. */
+function unloadFactor(state: GameState): number {
   let factor = 1;
   for (const item of state.equipment) {
     const spec = findSpec(item.specId);
     if (spec && spec.unloadFactor < factor) factor = spec.unloadFactor;
   }
-  return Math.round(UNLOAD_BASE_MINUTES * factor);
+  return factor;
+}
+
+/** Unloading a load of sheets (CLAUDE.md 8.10). */
+export function unloadMinutes(state: GameState): number {
+  return Math.round(UNLOAD_BASE_MINUTES * unloadFactor(state));
+}
+
+/** Getting a heavy machine off the lorry: the forklift, or two hours by hand [TUNE]
+ *  (CLAUDE.md T8 3.2). Furniture and hand tools need nobody and never get here. */
+export function equipmentUnloadMinutes(state: GameState): number {
+  return Math.round(EQUIPMENT_UNLOAD_MINUTES * unloadFactor(state));
 }
 
 /** Emails a job carries: 1 up to 3000, 2 up to 10000, 3 up to 20000, then one more for every
@@ -178,6 +193,7 @@ export interface TaskDraft {
   jobId?: string | null;
   equipmentId?: string | null;
   deliveryId?: string | null;
+  orderId?: string | null;
   orders?: TaskOrder[];
 }
 
@@ -193,6 +209,7 @@ export function createTask(state: GameState, draft: TaskDraft): TaskInstance {
     jobId: draft.jobId ?? null,
     equipmentId: draft.equipmentId ?? null,
     deliveryId: draft.deliveryId ?? null,
+    orderId: draft.orderId ?? null,
     day: state.clock.day,
     done: false,
     doneDay: null,
@@ -227,6 +244,60 @@ export function movingMachines(state: GameState): TaskInstance | null {
       (task) => task.kind === 'moveMachines' && !task.done && task.doneBy !== null,
     ) ?? null
   );
+}
+
+/** When a job of work of this many minutes, started now and worked at a minute a minute, is
+ *  finished: the working day it lands on and the clock reading it lands at. The dinner hour is not
+ *  worked and the day stops at 17:00 and picks up at 08:00, so a move started at four o'clock is
+ *  finished tomorrow morning (CLAUDE.md T8 3.4). A projection for the toast, never a rule. */
+export function finishTimeFor(state: GameState, minutes: number): { day: number; minute: number } {
+  let day = state.clock.day;
+  let minute = state.clock.minute;
+  let left = minutes;
+  let guard = 0;
+  while (left > WORK_EPSILON && guard < 20000) {
+    guard += 1;
+    if (minute >= DAY_END_MINUTE) {
+      day = nextWorkingDay(day);
+      minute = 0;
+      continue;
+    }
+    if (isBreak(minute) && !state.owner.breakSkipped) {
+      minute += 1;
+      continue;
+    }
+    minute += 1;
+    left -= 1;
+  }
+  return { day, minute };
+}
+
+/** The kinds of task that take the owner out of the workshop, or stand him in the middle of it
+ *  where nothing else can go on: what the "Owner is out" line is drawn from (CLAUDE.md T8 3.3). */
+export const OWNER_OUT_KINDS: ReadonlyArray<TaskKind> = [
+  'shopping',
+  'hiring',
+  'siteMeasure',
+  'clientMeeting',
+  'moveMachines',
+];
+
+/** The trip, the interview, the site measure, the client meeting or the move of the hall the
+ *  owner is on this minute, or null. The one selector for it: the line inside the catalogue and
+ *  the component outside it both read this (CLAUDE.md T8 3.3). */
+export function ownerOutTask(state: GameState): TaskInstance | null {
+  const id = state.owner.currentTaskId;
+  if (id === null) return null;
+  const task = findTask(state, id);
+  if (task === null || task.done) return null;
+  return OWNER_OUT_KINDS.includes(task.kind) ? task : null;
+}
+
+/** The task the clock is being run through for the player, or null (CLAUDE.md T8 3.3). */
+export function skippedTask(state: GameState): TaskInstance | null {
+  if (state.skipTaskId === null) return null;
+  const task = findTask(state, state.skipTaskId);
+  return task === null || task.done ? null : task;
 }
 
 /** The trip to the shops the owner is on, if there is one. Everything he buys while it is still
@@ -334,7 +405,7 @@ export function assignStaffTasks(state: GameState): TaskInstance[] {
   if (started.length === 0) return cleared;
   for (const task of state.tasks) {
     if (task.done || task.doneBy !== null) continue;
-    if (task.kind === 'unload' && !canUnload(state)) continue;
+    if (task.kind === 'unload' && task.deliveryId !== null && !canUnload(state)) continue;
     const staff = bestTakerOf(state, started, task);
     if (!staff) continue;
     if (hasWorkingDay(staff.role)) {
@@ -391,7 +462,9 @@ export function startTaskCheck(state: GameState, taskId: string): TaskStartCheck
     if (open) return refused('The client meeting comes first');
   }
   // Nothing comes off the lorry until there is shelving to put it on (CLAUDE.md T2 3.6).
-  if (task.kind === 'unload' && !canUnload(state)) return refused('Nowhere to put it');
+  if (task.kind === 'unload' && task.deliveryId !== null && !canUnload(state)) {
+    return refused('Nowhere to put it');
+  }
   return CAN_START_TASK;
 }
 

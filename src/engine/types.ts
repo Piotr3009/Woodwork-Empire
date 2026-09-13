@@ -90,6 +90,9 @@ export interface EquipmentVariant {
    *  floor edgebander wants extraction where a hand one wants a cabinet (CLAUDE.md T7 3.6). */
   requires?: string[];
   requiresOneOf?: string[];
+  /** Working days between the click and the lorry. Filled in for every class the catalogue
+   *  hands out, from the class ladder or the family's own figure (CLAUDE.md T8 3.2). */
+  deliveryDays?: number;
 }
 
 /** One line of the day 1 catalogue (CLAUDE.md 9.2). A catalogue line is a family: the modal
@@ -150,6 +153,9 @@ export interface EquipmentSpec {
   /** Catalogue ids of which at least one must be owned first. Empty means no such condition. */
   requiresOneOf: string[];
   effect: string;
+  /** Working days between the click and the lorry for a class that does not say its own
+   *  (CLAUDE.md T8 3.2). Zero means it comes back with the owner from the trip. */
+  deliveryDays: number;
   /** What this family can be bought as, cheapest first. The catalogue price is the first one. */
   variants: EquipmentVariant[];
   /** Hours of use a standard one of these has in it [TUNE]. */
@@ -180,6 +186,27 @@ export interface Equipment {
    *  one person at a time (CLAUDE.md T7 3.1). */
   takenBy: string | null;
   purchasePrice: number;
+  /** The working day the buyer's van comes for it. Null while it is the company's. A machine
+   *  that is sold stops working the moment the sale is made (CLAUDE.md T8 3.5). */
+  soldOnDay: number | null;
+}
+
+/** Something bought and paid for that is not here yet: the cash left at the click, the item is
+ *  not in the hall, and the cells it will stand on are held for it (CLAUDE.md T8 3.2). */
+export interface OnOrderItem {
+  id: string;
+  specId: string;
+  variantId: string;
+  /** What left the bank at the click, which is what a cancellation gives back in full. */
+  pricePaid: number;
+  /** The day he ordered it, and the working day it lands on at 08:00. */
+  orderedDay: number;
+  dueDay: number;
+  /** The corner of the floor held for it, read exactly as a machine's anchor is. */
+  anchorX: number;
+  anchorY: number;
+  /** True from 08:00 of the due day until somebody has it off the lorry. */
+  arrived: boolean;
 }
 
 export interface ProductTemplate {
@@ -262,6 +289,15 @@ export interface Worker {
   taskId: string | null;
   /** Minutes of his own day spent so far. Office roles have 480 of them (CLAUDE.md T2 3.8). */
   minutesWorked: number;
+  /** Minutes past 17:00 he has stood in the hall today, and since the last wages went out: the
+   *  first says when he has had his two hours, the second is what Friday pays him for
+   *  (CLAUDE.md T8 3.6). */
+  overtimeMinutes: number;
+  overtimeMinutesWeek: number;
+  /** Working days in a row with any overtime in them, and the flag three of them set. A tired
+   *  man may hand his notice in at the month end (CLAUDE.md T8 3.6). */
+  overtimeDays: number;
+  tiredOfOvertime: boolean;
   /** Per job material orders this clerk has put through today. */
   ordersToday: number;
   /** Where he is standing: bench, machine:<specId>, rack, gate, office or idle. */
@@ -401,6 +437,10 @@ export interface Delivery {
   id: string;
   jobId: string | null;
   sheets: number;
+  /** The day it was ordered and what it cost, so the shopping list can draw the wait and say
+   *  what was paid (CLAUDE.md T8 3.2). */
+  orderedDay: number;
+  pricePaid: number;
   arriveDay: number;
   arrived: boolean;
   unloaded: boolean;
@@ -454,6 +494,8 @@ export interface TaskInstance {
   jobId: string | null;
   equipmentId: string | null;
   deliveryId: string | null;
+  /** The kit on the lorry this unloading is for, or null for a load of sheets (T8 3.2). */
+  orderId: string | null;
   /** Day the task belongs to. Daily tasks are created fresh each working day. */
   day: number;
   done: boolean;
@@ -480,6 +522,11 @@ export type GameEventKind =
   | 'lowStock'
   | 'accident'
   | 'dayEnd'
+  /** Leaving setup mode with heavy machines moved: it is two hours and a ducting bill, so it is
+   *  asked about before it is booked (CLAUDE.md T8 3.4). */
+  | 'moveConfirm'
+  /** The buyer's van came for a machine that was sold (CLAUDE.md T8 3.5). */
+  | 'machineCollected'
   | 'weekend'
   | 'wagesPaid'
   | 'monthlyBills'
@@ -492,7 +539,9 @@ export type GameEventKind =
   | 'lateAccounts'
   | 'jobAtGate'
   | 'jobPaid'
-  | 'clientCall';
+  | 'clientCall'
+  /** A worker who has had enough of the evenings has handed his notice in (CLAUDE.md T8 3.6). */
+  | 'workerQuit';
 
 export interface GameEventChoice {
   id: string;
@@ -656,6 +705,8 @@ export interface GameState {
   laptopBootedOnDay: number | null;
   stock: StockState;
   equipment: Equipment[];
+  /** Bought, paid for, and still on its way (CLAUDE.md T8 3.2). */
+  onOrder: OnOrderItem[];
   workers: Worker[];
   enquiries: Enquiry[];
   jobs: Job[];
@@ -676,12 +727,17 @@ export interface GameState {
   booksUpToDay: number;
   /** Consecutive months the books were behind on the 1st. */
   lateAccountsMonths: number;
+  /** The month the notices were last read. Nobody hands his notice in twice for one month, and a
+   *  month that opens on a weekend still has its 1st (CLAUDE.md T8 3.6). */
+  lastQuitMonth: number;
   /** Production minutes since the 1st, for pellet sales. */
   productionMinutesMonth: number;
   /** Kit the player has dragged about and not yet paid for in time and ducting (T4 3.5). */
   movedItems: MovedItem[];
-  /** The speed the clock was on before the move forced itself to 4x. Null while none is on. */
-  speedBeforeMove: Speed | null;
+  /** The task the player asked the clock to be run through at 4x, and the speed to give him back
+   *  when it is over. Null while he is driving the clock himself (CLAUDE.md T8 3.3). */
+  skipTaskId: string | null;
+  speedBeforeSkip: Speed | null;
   /** How often the end of day summary is put in front of the player (CLAUDE.md T4 3.6). */
   summaryCadence: SummaryCadence;
   gameOver: GameOver | null;
@@ -689,8 +745,14 @@ export interface GameState {
 
 export type GameAction =
   | { type: 'SET_SPEED'; speed: Speed }
+  /** Run the clock at 4x until the task the owner is out on is over (CLAUDE.md T8 3.3). */
+  | { type: 'SKIP_AHEAD' }
   | { type: 'BUY_EQUIPMENT'; specId: string; variantId?: string }
   | { type: 'BUY_SOFTWARE'; mode: 'oneOff' | 'subscription' }
+  /** Calls an order off before the lorry, in full (CLAUDE.md T8 3.5). */
+  | { type: 'CANCEL_ORDER'; orderId: string }
+  /** Sells a machine standing in the hall. The buyer comes in the morning (CLAUDE.md T8 3.5). */
+  | { type: 'SELL_MACHINE'; equipmentId: string }
   | { type: 'ACCEPT_ENQUIRY'; enquiryId: string; byHand: boolean }
   | { type: 'START_TASK'; taskId: string }
   | { type: 'PAUSE_TASK' }

@@ -60,10 +60,15 @@ export function renderHiring(state: GameState): string {
         worker.weeklyWage > 0
           ? `${money(worker.weeklyWage)} a week`
           : `${money(worker.monthlyWage)} a month`;
+      // Three evenings on the trot and he has had enough of them (CLAUDE.md T8 3.6).
+      const tired = worker.tiredOfOvertime
+        ? '<span class="row-figure warn">Tired of overtime</span>'
+        : '';
       return (
         `<div class="row"><span class="row-main">${escapeHtml(worker.name)}, ` +
         `${escapeHtml(worker.role)}${worker.tier === null ? '' : ` (${worker.tier})`}</span>` +
         `<span class="row-figure">${escapeHtml(doing)}</span>` +
+        tired +
         `<span class="row-figure">${escapeHtml(wage)}</span></div>`
       );
     })

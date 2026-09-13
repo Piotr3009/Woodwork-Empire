@@ -5,6 +5,7 @@ import {
   orderCheck,
   ordersOnTheList,
   countOf,
+  deliveryDaysFor,
   enduranceHoursFor,
   findSpec,
   footprintOf,
@@ -47,6 +48,13 @@ function lifeLine(spec: EquipmentSpec, variant: EquipmentVariant): string {
 
 function powerLine(variant: EquipmentVariant): string {
   return `Power ${variant.powerPerDay} a day`;
+}
+
+/** How long the player waits for this one after he has paid for it (CLAUDE.md T8 3.2). */
+function deliveryLine(spec: EquipmentSpec, variant: EquipmentVariant): string {
+  const days = deliveryDaysFor(spec.id, variant.id);
+  if (days <= 0) return 'You bring it back with you the same day';
+  return `Delivered in ${plural(days, 'working day', 'working days')}`;
 }
 
 /** Where the picture of this class goes: the file the art side delivered for this very class,
@@ -113,6 +121,7 @@ function tile(
     lifeLine(spec, variant),
     powerLine(variant),
     floorLine(spec.id, variant.id),
+    deliveryLine(spec, variant),
   ]
     .map((line) => `<p class="tile-figures">${escapeHtml(line)}</p>`)
     .join('');
