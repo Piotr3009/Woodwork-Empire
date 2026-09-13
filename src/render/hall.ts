@@ -458,9 +458,12 @@ export function footprintIn(item: Equipment): {
 } {
   const stands = footprintOf(item.specId, item.variantId);
   const zone = zoneOf(item.specId, item.variantId);
+  // A class that holds no floor is kept in a tool cabinet: its picture stands on the cell the
+  // cabinet stands on, with nothing to centre it in (CLAUDE.md T7 3.6).
+  const inZone = zone.width > 0 && zone.depth > 0;
   return {
-    x: item.anchorX + (zone.width - stands.width) / 2,
-    y: item.anchorY + (zone.depth - stands.depth) / 2,
+    x: item.anchorX + (inZone ? (zone.width - stands.width) / 2 : 0),
+    y: item.anchorY + (inZone ? (zone.depth - stands.depth) / 2 : 0),
     width: stands.width,
     depth: stands.depth,
     height: stands.height,

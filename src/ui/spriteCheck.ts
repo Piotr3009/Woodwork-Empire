@@ -7,7 +7,7 @@ import { HALL_CANVAS, HALL_LAYERS, box, escapeText, label, polygon } from '../re
 import { OFFICE_CANVAS, OFFICE_LAYERS } from '../render/office';
 import { boxPolygons, centreOf, footprintPolygon, gridBounds, tileToScreen } from '../render/iso';
 import { SPRITE_SCALE, spriteCanvas, spriteFileSize, spriteUrl } from '../render/sprites';
-import { footprintOf, standsInTheHall } from '../engine/machines';
+import { footprintOf, standsInTheHall, zoneOf } from '../engine/machines';
 import { escapeHtml } from './modal';
 
 export interface SpriteTarget {
@@ -18,6 +18,10 @@ export interface SpriteTarget {
   width: number;
   depth: number;
   height: number;
+  /** The floor this class reserves, which contains the footprint (CLAUDE.md T7 3.3). Zero when
+   *  the class holds no floor at all, because it is kept in a tool cabinet. */
+  zoneWidth: number;
+  zoneDepth: number;
   /** Where in the game this object is drawn. */
   where: string;
 }
@@ -40,6 +44,7 @@ export function spriteTargets(): SpriteTarget[] {
     if (spec.variants.length > 1) {
       for (const variant of spec.variants) {
         const stands = footprintOf(spec.id, variant.id);
+        const zone = zoneOf(spec.id, variant.id);
         add({
           name: `${spec.spriteKey}.${variant.id}`,
           spriteKey: spec.spriteKey,
@@ -47,6 +52,8 @@ export function spriteTargets(): SpriteTarget[] {
           width: stands.width,
           depth: stands.depth,
           height: stands.height,
+          zoneWidth: zone.width,
+          zoneDepth: zone.depth,
           where: variant.name.toLowerCase(),
         });
       }
@@ -60,6 +67,8 @@ export function spriteTargets(): SpriteTarget[] {
       width: spec.width,
       depth: spec.depth,
       height: spec.height,
+      zoneWidth: spec.zoneWidth,
+      zoneDepth: spec.zoneDepth,
       where: 'catalogue',
     });
   }
@@ -71,31 +80,41 @@ export function spriteTargets(): SpriteTarget[] {
     width: GATE_LAYOUT.width,
     depth: GATE_LAYOUT.depth,
     height: GATE_LAYOUT.height,
+    zoneWidth: GATE_LAYOUT.width,
+    zoneDepth: GATE_LAYOUT.depth,
     where: 'at the gate',
   });
   return targets;
 }
 
-/** The footprint diamond on a tile grid with the placeholder box standing on it. */
+/** The working zone on a tile grid, with the footprint diamond centred inside it and the
+ *  placeholder box standing on that: the two things a class says about the floor, drawn together
+ *  (CLAUDE.md T7 3.3). A class that holds no floor is drawn on its footprint alone. */
 function proof(target: SpriteTarget): string {
   const pad = 14;
-  const bounds = gridBounds(target.width, target.depth, target.height);
+  const zone = {
+    width: target.zoneWidth > 0 ? target.zoneWidth : target.width,
+    depth: target.zoneDepth > 0 ? target.zoneDepth : target.depth,
+  };
+  // The picture stands in the middle of the room the class reserves.
+  const at = { x: (zone.width - target.width) / 2, y: (zone.depth - target.depth) / 2 };
+  const bounds = gridBounds(zone.width, zone.depth, target.height);
   const lines: string[] = [];
-  for (let x = 0; x <= target.width; x += 1) {
+  for (let x = 0; x <= zone.width; x += 1) {
     const from = tileToScreen(x, 0);
-    const to = tileToScreen(x, target.depth);
+    const to = tileToScreen(x, zone.depth);
     lines.push(
       `<line x1="${from.x}" y1="${from.y}" x2="${to.x}" y2="${to.y}" stroke="var(--grid)" />`,
     );
   }
-  for (let y = 0; y <= target.depth; y += 1) {
+  for (let y = 0; y <= zone.depth; y += 1) {
     const from = tileToScreen(0, y);
-    const to = tileToScreen(target.width, y);
+    const to = tileToScreen(zone.width, y);
     lines.push(
       `<line x1="${from.x}" y1="${from.y}" x2="${to.x}" y2="${to.y}" stroke="var(--grid)" />`,
     );
   }
-  const faces = boxPolygons(0, 0, target.width, target.depth, target.height);
+  const faces = boxPolygons(at.x, at.y, target.width, target.depth, target.height);
   const viewBox = [
     Math.round(bounds.minX - pad),
     Math.round(bounds.minY - pad),
@@ -104,11 +123,16 @@ function proof(target: SpriteTarget): string {
   ].join(' ');
   return (
     `<svg class="sprite-proof" viewBox="${viewBox}" xmlns="http://www.w3.org/2000/svg" ` +
-    `role="img" aria-label="${escapeText(target.name)} footprint">` +
-    polygon(footprintPolygon(0, 0, target.width, target.depth), 'var(--concrete)') +
+    `role="img" aria-label="${escapeText(target.name)} footprint and zone">` +
+    polygon(footprintPolygon(0, 0, zone.width, zone.depth), 'var(--zone)', 'data-zone="1"') +
     lines.join('') +
+    polygon(
+      footprintPolygon(at.x, at.y, target.width, target.depth),
+      'var(--concrete)',
+      'data-footprint="1"',
+    ) +
     box(faces, 'var(--kit-machine)', 'var(--kit-machine-dark)') +
-    label(centreOf(0, 0, target.width, target.depth, target.height), target.name) +
+    label(centreOf(at.x, at.y, target.width, target.depth, target.height), target.name) +
     '</svg>'
   );
 }
@@ -124,6 +148,12 @@ function shot(target: SpriteTarget): string {
   );
 }
 
+/** What the class says about the floor, in the words the catalogue uses (CLAUDE.md T7 3.7). */
+function zoneLine(target: SpriteTarget): string {
+  if (target.zoneWidth <= 0 || target.zoneDepth <= 0) return 'kept in a tool cabinet';
+  return `on a ${target.zoneWidth} by ${target.zoneDepth} m zone`;
+}
+
 function cell(target: SpriteTarget): string {
   const canvas = spriteCanvas(target.width, target.depth, target.height);
   const file = spriteFileSize(target.width, target.depth, target.height);
@@ -133,7 +163,7 @@ function cell(target: SpriteTarget): string {
     `<div class="sprite-pair">${proof(target)}${shot(target)}</div>` +
     `<p class="sprite-key">${escapeHtml(`${target.name}.png`)}</p>` +
     `<p class="sprite-figures">${target.width} by ${target.depth} by ${target.height} m · ` +
-    `${escapeHtml(target.where)}</p>` +
+    `${zoneLine(target)} · ${escapeHtml(target.where)}</p>` +
     `<p class="sprite-figures">canvas ${canvas.width} by ${canvas.height} · ` +
     `file ${file.width} by ${file.height}</p>` +
     `<p class="sprite-figures">${url === null ? 'no file yet' : escapeHtml(url)}</p>` +

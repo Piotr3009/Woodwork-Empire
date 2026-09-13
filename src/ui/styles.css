@@ -14,6 +14,8 @@
   --concrete: #8f9298;
   --yard: #6f7278;
   --grid: #7f8288;
+  /* The working room a class reserves on the floor (CLAUDE.md T7 3.3). */
+  --zone: #6d7a6d;
   --room: #b0a79a;
   --room-dark: #8d857a;
   --room-floor: #9c948a;
