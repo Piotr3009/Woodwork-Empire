@@ -921,6 +921,8 @@ function handleAction(element: DataElement, point: { x: number; y: number }): vo
       return;
     case 'catalogueTab':
       ui.catalogueTab = catalogueTabFrom(id);
+      // A sale meant on the second click is not meant on another tab (CLAUDE.md T8 3.5).
+      ui.sellConfirm = null;
       // A new tab is a new set of folders, with none of them open and no filter left over.
       ui.catalogueFolder = null;
       ui.filters.catalogue = '';
@@ -973,6 +975,7 @@ function handleAction(element: DataElement, point: { x: number; y: number }): vo
       }
       ui.modal = null;
       ui.modalPosition = null;
+      ui.sellConfirm = null;
       break;
     }
     case 'clearFilter': {
