@@ -107,6 +107,8 @@ export {
   dailyRent,
   monthlyFixedCosts,
   monthlySalaryBill,
+  overtimePayFor,
+  overtimeWageBill,
   netOf,
   nextDueDays,
   visibleTotals,
@@ -220,8 +222,6 @@ export type { TaskStartCheck } from './tasks';
 export {
   availableJoiners,
   hasWorkingDay,
-  overtimePayFor,
-  overtimeWageBill,
   staysForOvertime,
   worksOvertime,
   helpers,

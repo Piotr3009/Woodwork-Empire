@@ -10,12 +10,8 @@ import {
   STAFF_OVERTIME_RATE,
   WORKER_HOURS_PER_WEEK,
 } from '../../src/engine/constants';
-import {
-  overtimePayFor,
-  overtimeWageBill,
-  staysForOvertime,
-  worksOvertime,
-} from '../../src/engine/staff';
+import { overtimePayFor, overtimeWageBill } from '../../src/engine/economy';
+import { staysForOvertime, worksOvertime } from '../../src/engine/staff';
 import { runOvertimeQuits } from '../../src/engine/game';
 import { next } from '../../src/engine/rng';
 import { renderHiring } from '../../src/ui/hiring';

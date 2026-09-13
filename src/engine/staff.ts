@@ -6,8 +6,6 @@ import {
   MINUTES_PER_WORKING_DAY,
   OVERTIME_TIRED_DAYS,
   STAFF_OVERTIME_MAX_MINUTES,
-  STAFF_OVERTIME_RATE,
-  WORKER_HOURS_PER_WEEK,
   HIRING_SPECS,
   JOINER_PREREQUISITES,
   TOOL_CABINET,
@@ -85,24 +83,6 @@ export function countStaffOvertimeMinute(state: GameState): void {
     worker.overtimeMinutes += 1;
     worker.overtimeMinutesWeek += 1;
   }
-}
-
-/** What one man is owed for the evenings since the last wages went out: his hourly wage, which is
- *  his week over forty, and half as much again on top (PIOTR, CLAUDE.md T8 3.6). */
-export function overtimePayFor(worker: Worker): number {
-  if (worker.overtimeMinutesWeek <= 0) return 0;
-  const hourly = worker.weeklyWage / WORKER_HOURS_PER_WEEK;
-  return Math.round(hourly * (worker.overtimeMinutesWeek / 60) * STAFF_OVERTIME_RATE * 100) / 100;
-}
-
-/** The Friday line, and what it clears (CLAUDE.md T8 3.6). */
-export function overtimeWageBill(state: GameState): number {
-  const total = state.workers.reduce((sum, worker) => sum + overtimePayFor(worker), 0);
-  return Math.round(total * 100) / 100;
-}
-
-export function clearOvertimeWeek(state: GameState): void {
-  for (const worker of state.workers) worker.overtimeMinutesWeek = 0;
 }
 
 /** Written at the end of every working day: a man who stayed adds an evening to his run, a man
