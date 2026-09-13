@@ -22,6 +22,7 @@ import {
   serviceIsDue,
 } from '../engine/machines';
 import { jobsAtGate } from '../engine/jobs';
+import { orderName, reservedItems } from '../engine/orders';
 import {
   footprintOf,
   itemStandsInTheHall,
@@ -43,7 +44,7 @@ import {
 import { ownerIsAvailable, staffOutputFactor } from '../engine/owner';
 import { plural } from '../engine/text';
 import type { RoomId } from '../engine/constants';
-import type { Equipment, EquipmentSpec, GameState } from '../engine/types';
+import type { Equipment, EquipmentSpec, GameState, OnOrderItem } from '../engine/types';
 import {
   type BoxFaces,
   type Point,
@@ -617,6 +618,30 @@ function figure(
   };
 }
 
+/** The outline of something bought and not here yet, on the cells held for it (T8 3.2). */
+export function reservedOutline(item: OnOrderItem): string {
+  const zone = zoneOf(item.specId, item.variantId);
+  const stands = footprintOf(item.specId, item.variantId);
+  const inset = {
+    x: item.anchorX + Math.max(0, (zone.width - stands.width) / 2),
+    y: item.anchorY + Math.max(0, (zone.depth - stands.depth) / 2),
+  };
+  const name = orderName(item);
+  return (
+    `<g data-kit="${item.id}" data-order="${item.id}" class="clickable reserved">` +
+    `<title>${escapeText(`${name}, on order, due day ${item.dueDay}`)}</title>` +
+    `<polygon points="${points(footprintPolygon(item.anchorX, item.anchorY, zone.width, zone.depth))}" ` +
+    'class="reserved-zone" />' +
+    `<polygon points="${points(footprintPolygon(inset.x, inset.y, stands.width, stands.depth))}" ` +
+    'class="reserved-floor" />' +
+    label(
+      centreOf(item.anchorX, item.anchorY, zone.width, zone.depth),
+      `${name}, due day ${item.dueDay}`,
+    ) +
+    '</g>'
+  );
+}
+
 /** What the player is dragging, and whether it can go where the mouse is (CLAUDE.md T2 3.10). */
 export interface Ghost {
   x: number;
@@ -805,6 +830,16 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
         }) +
         fx.svg +
         '</g>',
+    });
+  }
+
+  // The floor held for what is bought and not here yet: a grey outline of the zone it reserves
+  // with the footprint it will stand on inside it, and the day it is due under them. Setup mode
+  // drags it about like a machine, because it carries the same data-kit hook (T8 3.2).
+  for (const item of reservedItems(state)) {
+    drawables.push({
+      depth: depthKey(item.anchorX, item.anchorY) - 0.01,
+      svg: reservedOutline(item),
     });
   }
 

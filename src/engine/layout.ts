@@ -3,7 +3,8 @@
 
 import { GATE_LANE, ROOM_LAYOUT } from './constants';
 import { findSpec, itemStandsInTheHall, standsInTheHall, zoneOf } from './machines';
-import type { Equipment, GameState } from './types';
+import { reservedItems } from './orders';
+import type { Equipment, GameState, OnOrderItem } from './types';
 
 export interface PlaceCheck {
   ok: boolean;
@@ -94,11 +95,31 @@ export function canPlaceSpec(
       return { ok: false, reason: `On the ${other.name.toLowerCase()}` };
     }
   }
+  // The cells held for what is bought and not here yet are taken as surely as the cells a machine
+  // stands on: it is coming, and it has to have somewhere to stand (CLAUDE.md T8 3.2).
+  for (const item of reservedItems(state)) {
+    if (item.id === ignoreItemId) continue;
+    const other = findSpec(item.specId);
+    if (!other) continue;
+    if (overlaps(box, boxOf(item.specId, item.anchorX, item.anchorY, item.variantId))) {
+      return { ok: false, reason: `On the ${other.name.toLowerCase()} that is on order` };
+    }
+  }
   return OK;
 }
 
-/** Can this item stand here? */
+/** The outline of something on order, which setup mode drags about like a machine. */
+export function reservationById(state: GameState, itemId: string): OnOrderItem | null {
+  return reservedItems(state).find((entry) => entry.id === itemId) ?? null;
+}
+
+/** Can this item stand here? An outline held for a delivery answers exactly as the machine it is
+ *  holding the floor for would (CLAUDE.md T8 3.2). */
 export function canPlace(state: GameState, itemId: string, x: number, y: number): PlaceCheck {
+  const reserved = reservationById(state, itemId);
+  if (reserved !== null) {
+    return canPlaceSpec(state, reserved.specId, x, y, reserved.id, reserved.variantId);
+  }
   const item = state.equipment.find((entry) => entry.id === itemId);
   if (!item) return { ok: false, reason: 'Nothing to move' };
   const spec = findSpec(item.specId);
@@ -111,6 +132,13 @@ export function canPlace(state: GameState, itemId: string, x: number, y: number)
 export function moveItem(state: GameState, itemId: string, x: number, y: number): PlaceCheck {
   const check = canPlace(state, itemId, x, y);
   if (!check.ok) return check;
+  const reserved = reservationById(state, itemId);
+  if (reserved !== null) {
+    // Nothing is carried and nothing is unplugged: the floor held for it is held somewhere else.
+    reserved.anchorX = x;
+    reserved.anchorY = y;
+    return OK;
+  }
   const item = state.equipment.find((entry) => entry.id === itemId);
   if (!item) return check;
   const fromX = item.anchorX;

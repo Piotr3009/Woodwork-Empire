@@ -36,7 +36,7 @@ interface Drag {
   x: number;
   y: number;
 }
-import { WHY, boxOf, canPlace, summaryOfDay } from '../engine/index';
+import { WHY, boxOf, canPlace, reservationById, summaryOfDay } from '../engine/index';
 import {
   type Frame,
   type HallCamera,
@@ -240,13 +240,22 @@ function modalBody(id: ModalId, current: GameState): string {
   }
 }
 
+/** What is under the mouse in the hall: a machine standing in it, or the outline held for
+ *  something that is bought and on its way (CLAUDE.md T8 3.2). One lookup for both. */
+function kitOf(current: GameState, itemId: string): { specId: string; variantId: string } | null {
+  const item = current.equipment.find((entry) => entry.id === itemId);
+  if (item) return { specId: item.specId, variantId: item.variantId };
+  const reserved = reservationById(current, itemId);
+  return reserved === null ? null : { specId: reserved.specId, variantId: reserved.variantId };
+}
+
 /** The ghost of the item being dragged, with the engine's verdict on the cell under the mouse. */
 function ghostFor(current: GameState): Ghost | null {
   const drag = ui.drag;
   if (drag === null) return null;
-  const item = current.equipment.find((entry) => entry.id === drag.itemId);
-  if (!item) return null;
-  const box = boxOf(item.specId, drag.x, drag.y);
+  const kit = kitOf(current, drag.itemId);
+  if (kit === null) return null;
+  const box = boxOf(kit.specId, drag.x, drag.y, kit.variantId);
   const check = canPlace(current, drag.itemId, drag.x, drag.y);
   return { x: box.x, y: box.y, width: box.width, depth: box.depth, ok: check.ok, reason: check.reason };
 }
@@ -1137,7 +1146,15 @@ function handleSceneClick(element: DataElement): boolean {
   const kit = element.dataset.kit;
   if (kit !== undefined) {
     const item = game().equipment.find((entry) => entry.id === kit);
-    if (item === undefined) return true;
+    if (item === undefined) {
+      // The outline of something bought and not here yet: it says when the lorry is due.
+      const reserved = reservationById(game(), kit);
+      if (reserved !== null) {
+        ui.note = `On order, due day ${reserved.dueDay} at 08:00.`;
+        render();
+      }
+      return true;
+    }
     if (item.bagFull) {
       // The machine is stopped: clicking it asks again who changes the bag.
       dispatch({ type: 'ASK_BAG_CHANGE', equipmentId: item.id });
@@ -1315,12 +1332,14 @@ function onDoubleClick(event: MouseEvent): void {
 function objectCentreUnder(event: MouseEvent): { x: number; y: number } | null {
   const target = event.target;
   if (!(target instanceof Element) || state === null) return null;
-  const kit = target.closest('[data-kit]')?.getAttribute('data-kit') ?? null;
-  if (kit !== null) {
-    const item = state.equipment.find((entry) => entry.id === kit);
-    const spec = item ? findSpec(item.specId) : null;
-    if (item && spec) {
-      return centreOf(item.anchorX, item.anchorY, spec.width, spec.depth, spec.height);
+  const kitId = target.closest('[data-kit]')?.getAttribute('data-kit') ?? null;
+  if (kitId !== null) {
+    const at =
+      state.equipment.find((entry) => entry.id === kitId) ?? reservationById(state, kitId);
+    const kit = kitOf(state, kitId);
+    const spec = kit ? findSpec(kit.specId) : null;
+    if (at && spec) {
+      return centreOf(at.anchorX, at.anchorY, spec.width, spec.depth, spec.height);
     }
   }
   const local = contentPointUnder(event);
@@ -1377,8 +1396,9 @@ function onSetupPointerDown(event: MouseEvent): boolean {
   if (kit === null) return false;
   const itemId = kit.getAttribute('data-kit');
   if (itemId === null) return false;
-  const item = state.equipment.find((entry) => entry.id === itemId);
-  if (item === undefined) return false;
+  const item =
+    state.equipment.find((entry) => entry.id === itemId) ?? reservationById(state, itemId);
+  if (item === null || item === undefined) return false;
   const at = cellUnder(event);
   if (at === null) return false;
   // He has hold of it where he took hold of it, not by its corner.

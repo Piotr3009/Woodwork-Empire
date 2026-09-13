@@ -37,6 +37,14 @@ import { expireEnquiries, refillBoard, refreshLocks } from './board';
 import { missCall, nextDueCall, takeCall } from './calls';
 import { canPlaceSpec, firstFreeCell, moveItem } from './layout';
 import {
+  createOnOrder,
+  findOnOrder,
+  onOrderCount,
+  orderName,
+  ordersDueOn,
+  removeOnOrder,
+} from './orders';
+import {
   daysBetween,
   isDayExhausted,
   isFriday,
@@ -74,7 +82,9 @@ import {
   extractorBroken,
   OWNER,
   ductedMoves,
+  deliveryDaysFor,
   findSpec,
+  itemIsHeavy,
   freeBenches,
   hallProductivityFactor,
   has,
@@ -176,6 +186,7 @@ import {
   assignWorkerTask,
   createDailyTasks,
   createTask,
+  equipmentUnloadMinutes,
   findTask,
   interruptOwnerWith,
   movePending,
@@ -197,6 +208,7 @@ import type {
   Job,
   GameAction,
   GameState,
+  OnOrderItem,
   PeriodTotals,
   Speed,
   TaskInstance,
@@ -272,6 +284,7 @@ export function createGame(options: NewGameOptions): GameState {
     laptopBootedOnDay: null,
     stock: { sheets: 0, tempStorageSheets: 0 },
     equipment: [],
+    onOrder: [],
     workers: [],
     enquiries: [],
     jobs: [],
@@ -388,6 +401,7 @@ function startDay(state: GameState): void {
     });
   }
   const arriving = arriveDeliveries(state);
+  const kit = arriveEquipmentOrders(state);
   runBookedTransport(state);
   checkOverdueJobs(state);
   for (const delivery of arriving) onDeliveryArrived(state, delivery.jobId);
@@ -400,6 +414,51 @@ function startDay(state: GameState): void {
   runHelperClean(state);
   delegateTasks(state);
   queueDeliveryEvents(state, arriving);
+  queueKitDeliveryEvents(state, kit);
+}
+
+/** 08:00 on the due day: the lorries with the kit on them. Furniture, hand tools and anything
+ *  else two men simply carry is brought in and stands on the cells that were held for it;
+ *  anything heavy is a job of work at the gate and hands back for the event to ask about
+ *  (CLAUDE.md T8 3.2). */
+function arriveEquipmentOrders(state: GameState): OnOrderItem[] {
+  const waiting: OnOrderItem[] = [];
+  for (const item of ordersDueOn(state, state.clock.day)) {
+    item.arrived = true;
+    if (!itemIsHeavy(item)) {
+      landOrder(state, item);
+      continue;
+    }
+    createTask(state, {
+      kind: 'unload',
+      label: `Unload the ${orderName(item).toLowerCase()}`,
+      minutes: equipmentUnloadMinutes(state),
+      orderId: item.id,
+    });
+    waiting.push(item);
+  }
+  return waiting;
+}
+
+/** The same question the sheets ask: unload it now, or leave it standing at the gate
+ *  (CLAUDE.md T8 3.2). A helper takes it off the list without being asked, as he always does. */
+function queueKitDeliveryEvents(state: GameState, arriving: readonly OnOrderItem[]): void {
+  for (const item of arriving) {
+    const task = state.tasks.find((entry) => entry.orderId === item.id && !entry.done);
+    if (!task) continue;
+    queueEvent(state, {
+      kind: 'deliveryArrived',
+      title: 'Delivery at the gate',
+      body:
+        `The ${orderName(item).toLowerCase()} has arrived. It is no use to anybody on the back ` +
+        'of a lorry.',
+      choices: [
+        { id: 'unload', label: `Unload now, ${task.minutesTotal} min` },
+        { id: 'later', label: 'Leave it at the gate' },
+      ],
+      data: { orderId: item.id, taskId: task.id },
+    });
+  }
 }
 
 /** Who can be sent at a job of work, as choices on the event that raised it. Nobody who is not
@@ -756,6 +815,12 @@ function applyTaskCompletion(state: GameState, task: TaskInstance): void {
       if (job) deliverJob(state, job);
       break;
     case 'unload': {
+      // A machine off the lorry stands on the cells that were held for it (CLAUDE.md T8 3.2).
+      if (task.orderId !== null) {
+        const item = findOnOrder(state, task.orderId);
+        if (item) landOrder(state, item);
+        break;
+      }
       const delivery = task.deliveryId ? findDelivery(state, task.deliveryId) : null;
       if (delivery) {
         delivery.unloaded = true;
@@ -1625,7 +1690,9 @@ function slotFrom(slots: readonly { x: number; y: number }[], index: number): { 
 
 /** The tile the catalogue would like to put a new item on. */
 function defaultAnchor(state: GameState, specId: string): { x: number; y: number } {
-  const index = countOf(state, specId);
+  // What is on its way already has a slot of its own held for it, so the next bench of the row is
+  // the next one nobody has been promised (CLAUDE.md T8 3.2).
+  const index = countOf(state, specId) + onOrderCount(state, specId);
   if (specId === 'workbench') return slotFrom(BENCH_SLOT_LAYOUT, index);
   if (specId === 'locker') return slotFrom(LOCKER_SLOT_LAYOUT, index);
   if (specId === 'canteenSeat') return slotFrom(CANTEEN_SLOT_LAYOUT, index);
@@ -1650,6 +1717,38 @@ function anchorFor(state: GameState, specId: string, variantId: string): { x: nu
   return firstFreeCell(state, specId, variantId) ?? preferred;
 }
 
+/** Stands a thing in the hall on the tile it is given. Every refusal is behind the caller: this
+ *  is the one write that puts a machine on the floor, whether it came back in the owner's hands
+ *  or off a lorry days later (CLAUDE.md T8 3.2). */
+function standItem(
+  state: GameState,
+  specId: string,
+  variantId: string,
+  at: { x: number; y: number },
+  prepaid: boolean,
+): void {
+  const spec = specOf(specId);
+  const variant = variantOf(spec, variantId);
+  if (!prepaid) pay(state, 'equipment', variant.name, variant.price);
+  state.equipment.push({
+    id: makeId(state, 'kit'),
+    specId,
+    variantId: variant.id,
+    spriteKey: spec.spriteKey,
+    anchorX: at.x,
+    anchorY: at.y,
+    minutesUsed: 0,
+    bagFull: false,
+    broken: false,
+    serviceHours: 0,
+    enduranceHours: enduranceHoursFor(specId, variant.id),
+    hoursUsed: 0,
+    takenBy: null,
+    purchasePrice: variant.price,
+    soldOnDay: null,
+  });
+}
+
 export function buyEquipment(
   state: GameState,
   specId: string,
@@ -1660,25 +1759,16 @@ export function buyEquipment(
   if (!check.ok) return check;
   const spec = specOf(specId);
   const variant = variantOf(spec, variantId ?? spec.variants[0]?.id ?? '');
-  const anchor = anchorFor(state, specId, variant.id);
-  if (!prepaid) pay(state, 'equipment', variant.name, variant.price);
-  state.equipment.push({
-    id: makeId(state, 'kit'),
-    specId,
-    variantId: variant.id,
-    spriteKey: spec.spriteKey,
-    anchorX: anchor.x,
-    anchorY: anchor.y,
-    minutesUsed: 0,
-    bagFull: false,
-    broken: false,
-    serviceHours: 0,
-    enduranceHours: enduranceHoursFor(specId, variant.id),
-    hoursUsed: 0,
-    takenBy: null,
-    purchasePrice: variant.price,
-  });
+  standItem(state, specId, variant.id, anchorFor(state, specId, variant.id), prepaid);
   return OK;
+}
+
+/** The delivery is off the lorry: the outline goes and the machine stands where it stood
+ *  (CLAUDE.md T8 3.2). The cells were held for it, so there is nothing left to refuse. */
+export function landOrder(state: GameState, item: OnOrderItem): void {
+  const at = { x: item.anchorX, y: item.anchorY };
+  removeOnOrder(state, item.id);
+  standItem(state, item.specId, item.variantId, at, true);
 }
 
 /** Management software: one-off for 30 jobs, or a subscription billed on the 1st (CLAUDE.md 9.2). */
@@ -1728,13 +1818,18 @@ export function buySoftware(
  *  standing in: the tool cabinet he has just put on the list is in by the time the hand bander
  *  he wants to keep in it arrives, and the cash for both is gone (CLAUDE.md T7 3.10). */
 function afterTheTrips(state: GameState): GameState {
-  // Nothing on the list: the hall he is standing in is the hall he will come back to, and the
-  // catalogue asks this question of every tile it draws, every minute.
-  if (!state.tasks.some((task) => !task.done && task.orders.length > 0)) return state;
+  // Nothing on the list and nothing on its way: the hall he is standing in is the hall he will
+  // come back to, and the catalogue asks this question of every tile it draws, every minute.
+  const trips = state.tasks.some((task) => !task.done && task.orders.length > 0);
+  if (!trips && state.onOrder.length === 0) return state;
   const after = clone(state);
   for (const task of after.tasks) {
     if (!task.done) settleOrders(after, task);
   }
+  // And the hall once every lorry has been and gone. The cash for all of it is already spent, so
+  // the extraction he ordered on Monday is what Tuesday's floor edgebander is allowed against
+  // (CLAUDE.md T7 3.10, T8 3.2).
+  for (const item of after.onOrder.slice()) landOrder(after, item);
   return after;
 }
 
@@ -1843,10 +1938,38 @@ function settleOrders(state: GameState, task: TaskInstance): void {
   const orders = task.orders;
   task.orders = [];
   for (const order of orders) {
-    if (order.kind === 'equipment') buyEquipment(state, order.specId, order.variantId, order.paid === true);
+    if (order.kind === 'equipment') settleEquipmentOrder(state, order);
     else if (order.kind === 'software') buySoftware(state, order.mode, order.paid === true);
     else hire(state, order.role, order.tier);
   }
+}
+
+/** What the owner came back with. A hand tool, a cabinet or a desk is in the boot of the car and
+ *  stands in the hall tonight; anything that has to be ordered in is booked as a delivery and the
+ *  floor it will stand on is held for it (CLAUDE.md T8 3.2). */
+function settleEquipmentOrder(
+  state: GameState,
+  order: { kind: 'equipment'; specId: string; variantId: string; paid?: boolean },
+): void {
+  const prepaid = order.paid === true;
+  const days = deliveryDaysFor(order.specId, order.variantId);
+  if (days <= 0) {
+    buyEquipment(state, order.specId, order.variantId, prepaid);
+    return;
+  }
+  // The same question the click asked, of the hall he has actually come back to: anything the
+  // world made impossible while he was out is simply not ordered (CLAUDE.md T7 3.10).
+  if (!canBuy(state, order.specId, order.variantId, prepaid).ok) return;
+  const spec = specOf(order.specId);
+  const variant = variantOf(spec, order.variantId);
+  const at = anchorFor(state, order.specId, variant.id);
+  createOnOrder(state, {
+    specId: order.specId,
+    variantId: variant.id,
+    pricePaid: variant.price,
+    anchorX: at.x,
+    anchorY: at.y,
+  });
 }
 
 /** True while this class is on an open trip's list: ordered, paid for, not yet in the hall. */

@@ -95,6 +95,28 @@
 
 /* The game draws the shadow, never the sprite: a sprite with its own would give a double one
    (docs/art/SPRITES.md 1). */
+/* The floor held for something bought and not here yet: a grey outline of the working zone with
+   the footprint it will stand on inside it (CLAUDE.md T8 3.2). */
+.reserved-zone {
+  fill: none;
+  stroke: var(--text-dim);
+  stroke-width: 2;
+  stroke-dasharray: 6 4;
+  opacity: 0.75;
+}
+
+.reserved-floor {
+  fill: var(--text-dim);
+  fill-opacity: 0.12;
+  stroke: var(--text-dim);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+
+.reserved .iso-label {
+  fill: var(--text-dim);
+}
+
 .contact-shadow {
   fill: #000;
   opacity: 0.18;

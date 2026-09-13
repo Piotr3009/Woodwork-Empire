@@ -12,6 +12,7 @@ import {
   CLEANING_MINUTES,
   CLERK_ORDERS_PER_DAY,
   CLIENT_CALL_ANSWER_MINUTES,
+  EQUIPMENT_UNLOAD_MINUTES,
   DAILY_ORDERING_MINUTES,
   MOVE_MINUTES_PER_ITEM,
   EMAIL_ABOVE_BREAKS,
@@ -139,14 +140,26 @@ export function designMinutes(
   return Math.round(template.designMinutes * sizeMultiplier * SOFTWARE_DESIGN_FACTOR[tier]);
 }
 
-/** Unloading, halved by a forklift and cut to a fifth by the better one (CLAUDE.md 8.10). */
-export function unloadMinutes(state: GameState): number {
+/** What the handling kit in the hall does to a load at the gate: halved by a forklift and cut to
+ *  a fifth by the better one (CLAUDE.md 8.10). One factor, whatever is on the lorry. */
+function unloadFactor(state: GameState): number {
   let factor = 1;
   for (const item of state.equipment) {
     const spec = findSpec(item.specId);
     if (spec && spec.unloadFactor < factor) factor = spec.unloadFactor;
   }
-  return Math.round(UNLOAD_BASE_MINUTES * factor);
+  return factor;
+}
+
+/** Unloading a load of sheets (CLAUDE.md 8.10). */
+export function unloadMinutes(state: GameState): number {
+  return Math.round(UNLOAD_BASE_MINUTES * unloadFactor(state));
+}
+
+/** Getting a heavy machine off the lorry: the forklift, or two hours by hand [TUNE]
+ *  (CLAUDE.md T8 3.2). Furniture and hand tools need nobody and never get here. */
+export function equipmentUnloadMinutes(state: GameState): number {
+  return Math.round(EQUIPMENT_UNLOAD_MINUTES * unloadFactor(state));
 }
 
 /** Emails a job carries: 1 up to 3000, 2 up to 10000, 3 up to 20000, then one more for every
@@ -178,6 +191,7 @@ export interface TaskDraft {
   jobId?: string | null;
   equipmentId?: string | null;
   deliveryId?: string | null;
+  orderId?: string | null;
   orders?: TaskOrder[];
 }
 
@@ -193,6 +207,7 @@ export function createTask(state: GameState, draft: TaskDraft): TaskInstance {
     jobId: draft.jobId ?? null,
     equipmentId: draft.equipmentId ?? null,
     deliveryId: draft.deliveryId ?? null,
+    orderId: draft.orderId ?? null,
     day: state.clock.day,
     done: false,
     doneDay: null,
@@ -334,7 +349,7 @@ export function assignStaffTasks(state: GameState): TaskInstance[] {
   if (started.length === 0) return cleared;
   for (const task of state.tasks) {
     if (task.done || task.doneBy !== null) continue;
-    if (task.kind === 'unload' && !canUnload(state)) continue;
+    if (task.kind === 'unload' && task.deliveryId !== null && !canUnload(state)) continue;
     const staff = bestTakerOf(state, started, task);
     if (!staff) continue;
     if (hasWorkingDay(staff.role)) {
@@ -391,7 +406,9 @@ export function startTaskCheck(state: GameState, taskId: string): TaskStartCheck
     if (open) return refused('The client meeting comes first');
   }
   // Nothing comes off the lorry until there is shelving to put it on (CLAUDE.md T2 3.6).
-  if (task.kind === 'unload' && !canUnload(state)) return refused('Nowhere to put it');
+  if (task.kind === 'unload' && task.deliveryId !== null && !canUnload(state)) {
+    return refused('Nowhere to put it');
+  }
   return CAN_START_TASK;
 }
 

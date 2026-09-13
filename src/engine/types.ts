@@ -90,6 +90,9 @@ export interface EquipmentVariant {
    *  floor edgebander wants extraction where a hand one wants a cabinet (CLAUDE.md T7 3.6). */
   requires?: string[];
   requiresOneOf?: string[];
+  /** Working days between the click and the lorry. Filled in for every class the catalogue
+   *  hands out, from the class ladder or the family's own figure (CLAUDE.md T8 3.2). */
+  deliveryDays?: number;
 }
 
 /** One line of the day 1 catalogue (CLAUDE.md 9.2). A catalogue line is a family: the modal
@@ -150,6 +153,9 @@ export interface EquipmentSpec {
   /** Catalogue ids of which at least one must be owned first. Empty means no such condition. */
   requiresOneOf: string[];
   effect: string;
+  /** Working days between the click and the lorry for a class that does not say its own
+   *  (CLAUDE.md T8 3.2). Zero means it comes back with the owner from the trip. */
+  deliveryDays: number;
   /** What this family can be bought as, cheapest first. The catalogue price is the first one. */
   variants: EquipmentVariant[];
   /** Hours of use a standard one of these has in it [TUNE]. */
@@ -180,6 +186,27 @@ export interface Equipment {
    *  one person at a time (CLAUDE.md T7 3.1). */
   takenBy: string | null;
   purchasePrice: number;
+  /** The working day the buyer's van comes for it. Null while it is the company's. A machine
+   *  that is sold stops working the moment the sale is made (CLAUDE.md T8 3.5). */
+  soldOnDay: number | null;
+}
+
+/** Something bought and paid for that is not here yet: the cash left at the click, the item is
+ *  not in the hall, and the cells it will stand on are held for it (CLAUDE.md T8 3.2). */
+export interface OnOrderItem {
+  id: string;
+  specId: string;
+  variantId: string;
+  /** What left the bank at the click, which is what a cancellation gives back in full. */
+  pricePaid: number;
+  /** The day he ordered it, and the working day it lands on at 08:00. */
+  orderedDay: number;
+  dueDay: number;
+  /** The corner of the floor held for it, read exactly as a machine's anchor is. */
+  anchorX: number;
+  anchorY: number;
+  /** True from 08:00 of the due day until somebody has it off the lorry. */
+  arrived: boolean;
 }
 
 export interface ProductTemplate {
@@ -453,6 +480,8 @@ export interface TaskInstance {
   jobId: string | null;
   equipmentId: string | null;
   deliveryId: string | null;
+  /** The kit on the lorry this unloading is for, or null for a load of sheets (T8 3.2). */
+  orderId: string | null;
   /** Day the task belongs to. Daily tasks are created fresh each working day. */
   day: number;
   done: boolean;
@@ -655,6 +684,8 @@ export interface GameState {
   laptopBootedOnDay: number | null;
   stock: StockState;
   equipment: Equipment[];
+  /** Bought, paid for, and still on its way (CLAUDE.md T8 3.2). */
+  onOrder: OnOrderItem[];
   workers: Worker[];
   enquiries: Enquiry[];
   jobs: Job[];

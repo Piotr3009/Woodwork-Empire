@@ -12,7 +12,8 @@ import {
 } from './constants';
 import { addWorkingDays } from './clock';
 import { assignJob, oldestReadyJob } from './jobs';
-import { countOf, findSpec } from './machines';
+import { findSpec } from './machines';
+import { countOwnedOrOnOrder } from './orders';
 import { int, makeId } from './rng';
 import { STATION_IDLE } from './stations';
 import type { GameState, HiringOption, Worker, WorkerRole, WorkerTier } from './types';
@@ -75,7 +76,9 @@ export function shortfallForHire(
   const short: Array<{ specId: string; count: number }> = [];
   for (const specId of JOINER_PREREQUISITES) {
     const wanted = specId === TOOL_CABINET ? cabinetsNeeded(state, 1) : needed;
-    const count = wanted - countOf(state, specId);
+    // A bench that is bought and on the lorry is a bench: the man starts the next working day and
+    // it lands at 08:00 that morning (CLAUDE.md T8 3.2).
+    const count = wanted - countOwnedOrOnOrder(state, specId);
     if (count > 0) short.push({ specId, count });
   }
   return short;

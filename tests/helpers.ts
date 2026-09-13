@@ -262,6 +262,7 @@ export function placeEquipment(
     hoursUsed: 0,
     takenBy: null,
     purchasePrice: variant ? variant.price : spec.price,
+    soldOnDay: null,
   };
   state.equipment.push(item);
   return item;

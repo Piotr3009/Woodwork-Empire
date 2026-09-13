@@ -99,13 +99,15 @@ describe('30 days on Easy, working the board', () => {
     expect(state.reputation).toBeLessThan(10);
   });
 
-  it('took bookcases and shelves, and finished most of them', () => {
+  it('took bookcases and finished most of them', () => {
     const done = state.jobs.filter((job) => job.stage === 'completed');
     expect(done.length).toBeGreaterThanOrEqual(3);
     const taken = new Set(state.jobs.map((job) => job.templateId));
     expect(taken.has('bookcase')).toBe(true);
-    // A TV unit needs a reputation of 5, which the late deliveries keep him under all month.
-    expect(taken.has('tvUnit')).toBe(false);
+    // Turn 7 said a TV unit was out of reach all month, at a reputation the late deliveries kept
+    // him under. The hall fills a day later now, so the month rolls differently and the score
+    // does reach 5 part way through it: the assertion was about that one roll, not about a rule,
+    // and it is gone (REPORT-T8).
     // Nothing dearer was touched: the script only takes what it is told to take.
     expect(taken.has('wardrobe')).toBe(false);
     expect(taken.has('oakDiningTable')).toBe(false);

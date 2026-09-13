@@ -10,7 +10,7 @@ import {
   SHOPPING_MINUTES,
   SHOPPING_NEXT_MINUTES,
 } from '../../src/engine/constants';
-import { findSpec } from '../../src/engine/machines';
+import { deliveryDaysFor, findSpec } from '../../src/engine/machines';
 import { STARTING_CLASS, STARTING_KIT } from '../helpers';
 
 function root(): HTMLElement {
@@ -42,6 +42,34 @@ function dismissEvents(): void {
   while (root().querySelector('[data-do="resolveEvent"]') !== null && guard < 50) {
     click('[data-do="resolveEvent"]');
     guard += 1;
+  }
+}
+
+/** Works the lorries at the gate off the laptop's list until nothing is left on order. A heavy
+ *  machine is two hours at the gate and the owner can only be at one of them at a time, so the
+ *  rest wait on the list the way every other job of work does (CLAUDE.md T8 3.2). */
+function unloadTheKit(): void {
+  if (root().querySelector('[data-do="setView"][data-view="office"]') !== null) {
+    click('[data-do="setView"][data-view="office"]');
+  }
+  click('[data-office="laptop"]');
+  advanceMinutes(LAPTOP_BOOT_MINUTES);
+  let guard = 0;
+  while ((currentState()?.onOrder.length ?? 0) > 0 && guard < 120) {
+    guard += 1;
+    dismissEvents();
+    const state = currentState();
+    const task = state?.tasks.find((entry) => entry.kind === 'unload' && !entry.done);
+    const waiting =
+      task === undefined ? null : root().querySelector(`[data-do="startTask"][data-id="${task.id}"]`);
+    if (waiting !== null) {
+      waiting.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      continue;
+    }
+    advanceMinutes(30);
+  }
+  if (root().querySelector('[data-modal="laptop"] [data-do="closeModal"]') !== null) {
+    click('[data-modal="laptop"] [data-do="closeModal"]');
   }
 }
 
@@ -120,7 +148,14 @@ describe('the first ten minutes', () => {
     click('[data-do="closeFolder"]');
     advanceMinutes(SHOPPING_MINUTES + SHOPPING_NEXT_MINUTES * STARTING_KIT.length);
     const state = currentState();
-    expect(state?.equipment).toHaveLength(STARTING_KIT.length);
+    // He comes back with what the shop had on the shelf: the desk, the chair, the laptop, the
+    // drill, the tool cabinet and the hand edgebander. The saw, the compressor, the extractor,
+    // the bench and the rack are ordered in and land at 08:00 tomorrow (CLAUDE.md T8 3.2).
+    const carried = STARTING_KIT.filter((specId) => deliveryDaysFor(specId, STARTING_CLASS[specId]) === 0);
+    expect(carried).toHaveLength(6);
+    expect(state?.equipment).toHaveLength(carried.length);
+    expect(state?.onOrder).toHaveLength(STARTING_KIT.length - carried.length);
+    expect(state?.onOrder.every((item) => item.dueDay === 2)).toBe(true);
     expect(state?.software.mode).toBe('oneOff');
     // Landing costs nothing more: what left at the click is all that leaves.
     expect(before - (state?.cash ?? 0)).toBe(paid);
@@ -199,6 +234,10 @@ describe('the first ten minutes', () => {
   });
 
   it('8. shows the hall with the kit, the owner and the rooms', () => {
+    // Day 2 at 08:00 is when the saw, the compressor, the extractor, the bench and the rack turn
+    // up. The light ones are carried in; the heavy ones are two hours each (CLAUDE.md T8 3.2).
+    unloadTheKit();
+    expect(currentState()?.onOrder).toHaveLength(0);
     click('[data-do="setView"][data-view="hall"]');
     expect(html()).toContain('hall-view');
     expect(html()).toContain('Table saw');

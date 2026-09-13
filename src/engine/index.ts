@@ -13,6 +13,7 @@ export {
   canBuy,
   canBuySoftware,
   createGame,
+  landOrder,
   machineInUse,
   orderCheck,
   placeOrder,
@@ -36,6 +37,7 @@ export {
   MACHINE_ENDURANCE_HOURS_DEFAULT,
   PRODUCTION_STAGES,
   DUCTING_RECONNECT_COST,
+  EQUIPMENT_UNLOAD_MINUTES,
   MINUTES_PER_WORKING_DAY,
   MOVE_MINUTES_PER_ITEM,
   MOVING_SPEED,
@@ -192,6 +194,7 @@ export {
   findTask,
   jobTasks,
   materialOrderMinutes,
+  equipmentUnloadMinutes,
   movePending,
   orderMinutes,
   shoppingLabel,
@@ -234,7 +237,10 @@ export {
   freeMachines,
   heldMachine,
   heldMachines,
+  itemIsHeavy,
   itemStandsInTheHall,
+  isHeavy,
+  isSold,
   machineIsShared,
   sheetCapacityOf,
   zoneOf,
@@ -248,6 +254,7 @@ export {
   pastEndurance,
   variantFor,
   variantOf,
+  deliveryDaysFor,
   ductedMoves,
   ductingDue,
   ductingIsFree,
@@ -285,6 +292,18 @@ export {
 } from './production';
 export type { Hand, StationCheck } from './production';
 
+// What is bought, paid for and not here yet (CLAUDE.md T8 3.2)
+export {
+  dueDayFor,
+  findOnOrder,
+  onOrderCount,
+  orderName,
+  orderProgress,
+  ordersDueOn,
+  ordersOnTheWay,
+  reservedItems,
+} from './orders';
+
 // Material and deliveries
 export {
   canUnload,
@@ -310,6 +329,7 @@ export {
   firstFreeCell,
   gateLane,
   hallItems,
+  reservationById,
 } from './layout';
 export type { Box, PlaceCheck } from './layout';
 
