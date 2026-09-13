@@ -1370,3 +1370,23 @@ input.num {
   max-height: 120px;
   max-width: 100%;
 }
+
+/* The catalogue on the floor by the door, before there is a desk to put it on. There is no
+   picture of it yet, so the game draws the object with the word on its cover (CLAUDE.md T7 3.8). */
+.office-floor-catalogue {
+  align-items: flex-end;
+  background: var(--kit-furniture);
+  border: 2px solid var(--kit-furniture-dark);
+  border-radius: 4px;
+  color: var(--page);
+  display: flex;
+  font-size: 28px;
+  font-weight: 600;
+  justify-content: center;
+  letter-spacing: 1px;
+  padding-bottom: 16px;
+}
+
+.office-floor-catalogue:hover {
+  background: var(--accent);
+}

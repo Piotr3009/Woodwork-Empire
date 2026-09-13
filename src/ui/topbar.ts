@@ -4,6 +4,7 @@ import { SPEEDS } from '../engine/constants';
 import {
   booksBehind,
   formatDate,
+  has,
   isBreak,
   movingMachines,
   netOf,
@@ -86,7 +87,10 @@ export function renderTopbar(
     minuteBar(state) +
     outputChip(state) +
     '<span class="spacer"></span>' +
-    '<button class="chip" data-do="openModal" data-modal="board">Board</button>' +
+    // The order board is the management software's: no laptop, no board (CLAUDE.md T7 3.8).
+    (has(state, 'laptop')
+      ? '<button class="chip" data-do="openModal" data-modal="board">Board</button>'
+      : '<span class="reason">Board: buy a laptop</span>') +
     `<button class="chip" data-do="setView" data-view="${view === 'hall' ? 'office' : 'hall'}">` +
     `${view === 'hall' ? 'Office' : 'Hall'}</button>` +
     '<button class="chip" data-do="toggleMenu">Menu</button>' +
