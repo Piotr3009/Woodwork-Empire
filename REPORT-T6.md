@@ -4,7 +4,7 @@ The rest of Turn 5, and a hall you can zoom into.
 
 Branch `claude/turn-6-execution-4c7j9o` (the cloud environment names the branch; the turn ritual
 would have called it `turn-6-rest-of-five`). Base: Piotr's commit `edf2ffa`, which put this brief
-and `docs/turn-5-brief.md` into the repository. 637 tests green, `npm run check` clean on its own
+and `docs/turn-5-brief.md` into the repository. 650 tests green, `npm run check` clean on its own
 exit code before every commit.
 
 ---
@@ -25,7 +25,7 @@ exit code before every commit.
 | T6-10 Earned rate and Accounting by day | `faaeeb4` | `earnedRate(state, span)`, the Days tab, and one summary component for the evening and the past day alike. |
 | T6-11 Leftovers | `c1f8734` | The Menu cadence driven through the page in a test; the office board name shrinks before it is cut. |
 | T6-12 Scenarios | `8484d30` | The seven months answer to the new day, the cabinets and the deadlines, and month (h) follows the labour factor down and back. |
-| T6-13 Report and PR | this commit | This file, then the PR. |
+| T6-13 Review, report and PR | `104b6b4`, `4b9615b`, `9d3cc88`, `d5bef88`, `bdd44d1`, this commit | Four readers over the whole diff and a refuter on every finding: twelve real bugs fixed, five duplications closed, four tests made to prove what they claim (section 6), then this file and the PR. |
 
 ---
 
@@ -119,7 +119,84 @@ answer for every pixel of the hall.
 
 ## 6. What the review of the whole diff turned up
 
-REVIEW_SECTION
+Four readers went over the whole of tonight's diff at once, each with one question: does it do what
+the contract says (contract), is it right (correctness), does it say each thing once (paths), and do
+the tests prove what they claim (tests). They came back with forty four findings, and every one was
+then put to a reader whose job was to refute it against the head of the branch. Seven survived that,
+and the twelve below were already fixed by the time the refuters read them.
+
+**Twelve were real and are fixed, in four commits (T6-13a to T6-13d).**
+
+| What was wrong | Where | What it cost |
+|---|---|---|
+| The Ledger tab showed the last 50 | `accounting.ts` | 3.9 asks for 200; three quarters of a busy month were unreachable |
+| The hand edgebander wore at half rate | `constants.ts` | It had inherited the capacity of two that 3.5 says does not apply to it |
+| The Owned tab gave the extractor a service day | `catalogue.ts` | Its hours never move, so the day was a number that never arrived |
+| The service projection counted jobs, not men | `machines.ts` | Two joiners on one job read as one man on the machine |
+| A pan rebuilt the whole page on every mousemove | `app.ts` | The one thing Turn 5 spent a task removing |
+| A pan started on any mouse button | `app.ts` | 3.3 says the left one |
+| Friday's summary promised a penalty Monday wipes | `game.ts` | The evening said 0.80 and the morning gave 1.00 |
+| A machine serving every material was booked once per material | `machines.ts` | Men on sheet and on solid wood put sixteen hours a day on the compressor |
+| The next service day counted calendar days | `machines.ts` | Hours are only gained on working days, so every date was a weekend or two early |
+| The hiring card asked for one tool cabinet | `staff.ts` | The first hire needs two, so buying to the figure left the hire blocked |
+| The hiring card printed catalogue ids at the player | `staff.ts` | "toolCabinet, handToolSet" where it should say "Tool cabinet x 2" |
+| The evening summary was built a second time | `dayEnd.ts` | Money moving behind the modal could make the evening disagree with the record |
+
+**Five more were housekeeping and went with them** (T6-13d): the rule for what holds a cell of the
+floor was written twice, three tab bars carried the same markup, the zoom clamp was written in three
+places, a close action on the day summary was never emitted, and a line drew a lamp on a machine
+that is no longer drawn at all. And one test clicked a room on a page with no screen matrix and so
+proved nothing by the click: it now says what it does prove and points at the test that drives the
+real one.
+
+**Four tests said more than they proved, and one field outlived its job** (T6-13e). The reader on
+the tests found fourteen things and the refuters let five of them stand.
+
+| What the test claimed | What it did | What it does now |
+|---|---|---|
+| The rate weights by the hours each man worked | Wrote the two figures and divided them | Drives a hall with the owner at one bench and a poor joiner at the other: 120 people minutes in an hour of the clock, and 33.60 an hour |
+| Two men and three men on a saw | Handed the head count to a helper | The engine works the count out of the men at the benches: two thirds of an hour on the saw for an hour of the clock |
+| Staff always take the dinner the owner skips | Nothing tested it at all | The owner works the hour through and the joiner sits through all of it with his job untouched |
+| A row of the Days tab stays open across a render | Called a pure function twice | Driven through the page, a game minute at a time, which is the thing that would shut it |
+
+The fifth is `lastServiceDay`, which the service leaving the calendar left behind: written on every
+purchase and every service and read by nothing, so two service clocks sat on `Equipment` with
+nothing to say which was real. It is gone, and the hours are the only clock. Removing it changes the
+shape of a save, which tonight's rule 5 would otherwise forbid, but the shape has already changed
+this turn and `STATE_VERSION` is already 5, so no save reaches the new code that could miss it.
+
+**Seven findings I did not act on, and why.**
+
+1. **A click on the WC's front face opens the office.** The contract's own acceptance test cannot be
+   met at this camera: the office block stands in front of the WC. Deviation 1 in section 5.
+2. **Hit testing uses block silhouettes, not flat footprints.** Deviation 2 in section 5: a flat
+   footprint would put the WC's answer under the office's floor and give the canteen bug back.
+3. **The company name is not inside the SPRITES 9.5 box.** Deviation in section 5: that box is over
+   the dark sky beside the left wall on the delivered painting.
+4. **The deadline formula floors where the brief rounds.** Deviation 3 in section 5, and rounding
+   breaks the brief's own test.
+5. **Staff overtime at 1.5x is nowhere in the code.** The brief calls it a Turn 1 rule "kept". No
+   such code has ever existed in this repository, so nothing was lost tonight. Section 2 lists it as
+   not done and open question 4 asks Piotr for the rule he wants.
+6. **A helper is hired without a tool cabinet.** 3.5 says "one per worker". A helper also gets no
+   bench, no locker, no seat and no hand tools: every kit prerequisite in the game since Turn 1 is a
+   joiner's. Reading "worker" as "joiner" keeps that one rule, and open question 7 puts it to Piotr.
+7. **`PRODUCTION_CYCLE` still names the edgebander station**, and `closeMachine` in the action
+   switch is dead. The first is right in behaviour: the leg falls through to the bench, which is
+   where 3.5 says the hand edgebander is used. The second is a Turn 3 line and not tonight's to
+   remove.
+
+One finding I disagree with outright. The reader called the `<g data-room>` group dead now that the
+click goes through the geometry. It is not: its transparent polygon is what carries the room's
+tooltip and the pointer cursor over the block. The room's answer no longer comes from it, and that
+is all that moved.
+
+**One thing worth knowing about the review itself.** The refuters work by mutation, in the
+repository: they break a line on purpose to see whether a test notices. Two of them were still at it
+while a `npm run check` of mine was running, and that run's failures (the deadline spread, the
+scripted month) were their mutations and not the tree's. Nothing of theirs was committed: every
+probe file is deleted, `git status` is clean of them, no commit of tonight touches `jobs.ts`, and
+the head of this branch has been run green six times over since the last of them finished.
 
 ---
 
@@ -134,15 +211,19 @@ REVIEW_SECTION
 | Measure a day's work | 1 | `workedMinutesOfDay`, which now takes the skipped break as well. |
 | Say when the working day is over | 1 | `isOvertime` on the clock, and `isDayExhausted` for seven o'clock. |
 | Say what today's work is multiplied by | 1 | `labourFactorFor`, read through `ownerEfficiency`. |
-| Wear a machine out | 1 | `accumulateBagMinutes` with the capacity share: the hours, the bag minutes and the service all come off it. |
+| Wear a machine out | 1 | `accumulateMachineMinute` with the capacity share: the hours, the bag minutes and the service all come off it, once a minute per machine however many materials went through it. |
 | Say whether a service is due | 1 | `serviceIsDue` on the hours since the last one. The hall line, the Owned tab and the daily roll all ask it. |
 | Say how long the client gives | 1 | `deadlineDaysFor`. The templates carry no ranges to disagree with it. |
 | Say how many of his own days a job is | 1 | `ownerDaysFor`, machines and all. The board tile and the deadline read the same number. |
 | Say what a machine costs in minutes | 1 | `speedFactorFor`; `jobSpeedFactor` is it, with a job's own material and by-hand. |
-| Build the summary of a day | 1 | `daySummaryOf`. The evening's modal and the record the Days tab opens come out of it. |
+| Build the summary of a day | 1 | `daySummaryOf`, written into the state when the day closes. The evening's modal reads that record, so it cannot drift from what the Days tab opens. |
 | Draw the summary of a day | 1 | `renderDaySummary`. |
 | Say what a day came to in money | 1 | `daysOfMonth`, which is the ledger added up, so a row cannot say what the ledger does not. |
-| Decide whether a thing holds cells of the floor | 1 | `standsInTheHall`. Placement, collision, the hall painting, the ducting and the sprite page all ask it. |
+| Decide whether a thing holds cells of the floor | 1 | `standsInTheHall`. Placement, collision, the hall painting, the stations, the ducting and the sprite page all ask it. |
+| Say what tomorrow's output will be | 1 | `debtOnMorningOf`, which the morning applies and the evening asks about the next working day. |
+| Count how many of a thing a hire is short of | 1 | `shortfallForHire`. The block, the bill and the words on the card all read it. |
+| Draw a row of tabs | 1 | `tabBar` in `modal.ts`, for the laptop, the catalogue and the books. |
+| Hold the zoom between its two ends | 1 | `clampScale`, inside `clampCamera`, `zoomAt` and `zoomTo`. |
 
 ---
 
@@ -217,6 +298,13 @@ the `deadlineMinDays` and `deadlineMaxDays` of all six templates.
 6. **The WC is behind the office.** The office block hides all but the top of the WC's front face,
    so its name is lettered on a face the camera cannot see and its roof is the only part of it you
    can click. Does the WC want moving, or a sign on the office wall instead?
+7. **Does a helper need a tool cabinet?** 3.5 says one per worker. A helper gets no bench, no
+   locker, no seat and no hand tools either: every kit prerequisite since Turn 1 belongs to a
+   joiner, so tonight a cabinet does too. Should a helper need one as well?
+8. **Where do the desk and the chair belong?** Your eleven tabs have no furniture tab, so the desk
+   and the chair sit under Computers with the laptop they stand under, and the locker and the
+   canteen seat sit under Storage. Two tabs, Sanding and CNC centre, are empty and say so. Is that
+   the shape you want, or is there a twelfth tab?
 
 ---
 
@@ -254,13 +342,14 @@ the `deadlineMinDays` and `deadlineMaxDays` of all six templates.
 | T6-10 | 13 | 632 | 80 |
 | T6-11 | 5 | 80 | 20 |
 | T6-12 | 2 | 149 | 7 |
-| Whole turn | 62 | 3,636 | 631 |
+| T6-13 | 30 | 512 | 147 |
+| Whole turn | 65 | 4,096 | 674 |
 
 ---
 
 ## 13. Tests
 
-637 green, up from 562. New files:
+650 green, up from 562. New files:
 
 - `tests/ui/hallRooms.test.ts`: a click at the projected centre of a room's front face opens the
   right thing, through the real app.
@@ -280,6 +369,14 @@ the `deadlineMinDays` and `deadlineMaxDays` of all six templates.
   summary opens from its row.
 
 Rewritten: the break, the day boundary, the service, the room labels and the office board name.
+
+Added by the review (T6-13): a machine that serves every material never gains more than eight hours
+in a day and counts the men on both materials together; Friday evening's summary says what Monday
+will really give him; the next service day steps over the weekends; the first hire is short two tool
+cabinets and the card names them; the evening summary is the record the day wrote, not the books as
+they stand while the modal is open; two men at the benches in the same minute are two people minutes
+and two thirds of an hour on a saw that serves three; and the joiner sits through the dinner his
+owner works through.
 
 ---
 
