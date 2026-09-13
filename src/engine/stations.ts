@@ -3,7 +3,7 @@
 // A station is a string so the state stays plain JSON: 'bench', 'machine:<specId>', 'rack',
 // 'gate', 'office' or 'idle'.
 
-import { standsInTheHall } from './machines';
+import { itemStandsInTheHall } from './machines';
 import type { GameState, TaskInstance } from './types';
 
 export const STATION_BENCH = 'bench';
@@ -49,7 +49,7 @@ export function stationForTask(state: GameState, task: TaskInstance): string {
       const machine = task.equipmentId
         ? state.equipment.find((item) => item.id === task.equipmentId)
         : null;
-      if (!machine || !standsInTheHall(machine.specId)) return STATION_BENCH;
+      if (!machine || !itemStandsInTheHall(machine)) return STATION_BENCH;
       return machineStation(machine.specId);
     }
     case 'cleaning':

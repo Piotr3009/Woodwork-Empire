@@ -303,10 +303,22 @@ describe('the rack the sheets live on', () => {
     const bare = newGame();
     expect(rackCapacity(bare)).toBe(0);
     expect(canBuy(bare, 'sheetRack').ok).toBe(true);
-    const cheap = act(bare, { type: 'BUY_EQUIPMENT', specId: 'sheetRack' });
-    expect(rackCapacity(cheap)).toBe(50);
-    const better = act(cheap, { type: 'BUY_EQUIPMENT', specId: 'sheetRackBetter' });
-    expect(rackCapacity(better)).toBe(75);
+    // The classes of the one rack family, in Piotr's table (CLAUDE.md T7 3.6).
+    const used = act(bare, { type: 'BUY_EQUIPMENT', specId: 'sheetRack' });
+    expect(rackCapacity(used)).toBe(30);
+    // A second rack is a second rack: what the hall holds is what the two of them hold.
+    const two = act(used, {
+      type: 'BUY_EQUIPMENT',
+      specId: 'sheetRack',
+      variantId: 'standard',
+    });
+    expect(rackCapacity(two)).toBe(30 + 75);
+    const big = act(bare, {
+      type: 'BUY_EQUIPMENT',
+      specId: 'sheetRack',
+      variantId: 'industrial',
+    });
+    expect(rackCapacity(big)).toBe(160);
   });
 
   it('leaves a delivery at the gate while there is nowhere to put it', () => {

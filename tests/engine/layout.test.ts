@@ -61,7 +61,7 @@ describe('setting the hall out', () => {
     expect(rack).toBeDefined();
     const check = canPlace(state, saw, rack?.anchorX ?? 0, rack?.anchorY ?? 0);
     expect(check.ok).toBe(false);
-    expect(check.reason).toBe('On the cheap shelving');
+    expect(check.reason).toBe('On the sheet rack');
     // The move is refused, so the saw stays where it was.
     const before = state.equipment.find((item) => item.id === saw);
     state = act(state, {

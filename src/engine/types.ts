@@ -63,7 +63,8 @@ export interface EquipmentVariant {
   id: string;
   name: string;
   price: number;
-  /** Multiplies the production speed of every job that goes through this machine. */
+  /** Multiplies the production speed of the stage this machine does, and of no other
+   *  (CLAUDE.md T7 3.1). */
   outputFactor: number;
   /** Multiplies the family's base bag interval. Below 1 means the bag fills sooner. */
   bagIntervalFactor: number;
@@ -73,6 +74,22 @@ export interface EquipmentVariant {
   powerPerDay: number;
   /** Two or three lines of plain English about what this class of machine is. */
   description: string;
+  /** What the picture stands on, in metres. Left out means the family's own footprint
+   *  (CLAUDE.md T7 3.3). */
+  width?: number;
+  depth?: number;
+  height?: number;
+  /** The floor this class reserves, in metres: the working room around it, which contains the
+   *  footprint. Left out means the family's own zone. Zero means it holds no floor at all,
+   *  because it is kept in a tool cabinet (CLAUDE.md T7 3.3, 3.6). */
+  zoneWidth?: number;
+  zoneDepth?: number;
+  /** Sheets this class holds. Left out means the family's own (CLAUDE.md T7 3.6). */
+  sheetCapacity?: number;
+  /** What must be owned before this class can be bought. Left out means the family's own: a
+   *  floor edgebander wants extraction where a hand one wants a cabinet (CLAUDE.md T7 3.6). */
+  requires?: string[];
+  requiresOneOf?: string[];
 }
 
 /** One line of the day 1 catalogue (CLAUDE.md 9.2). A catalogue line is a family: the modal
@@ -103,6 +120,10 @@ export interface EquipmentSpec {
   width: number;
   depth: number;
   height: number;
+  /** The floor the family reserves by default, in metres. A class may say its own
+   *  (CLAUDE.md T7 3.3). */
+  zoneWidth: number;
+  zoneDepth: number;
   spriteKey: string;
   /** Minutes of use before the bag is full. 0 means the item has no bag. */
   bagInterval: number;

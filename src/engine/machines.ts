@@ -42,12 +42,62 @@ export function findSpec(specId: string): EquipmentSpec | null {
   return EQUIPMENT_SPECS.find((entry) => entry.id === specId) ?? null;
 }
 
-/** Does this kind of thing hold cells of the floor at all? The hand edgebander does not: it is
- *  kept in a tool cabinet and used at the bench (CLAUDE.md T6 3.5). The one place that is asked:
- *  the floor plan, the painting, the stations and the ducting all read it. */
-export function standsInTheHall(specId: string): boolean {
+/** What a class of a family stands on, in metres: the picture's own footprint. A class that says
+ *  nothing takes the family's (CLAUDE.md T7 3.3). */
+export function footprintOf(
+  specId: string,
+  variantId?: string,
+): { width: number; depth: number; height: number } {
   const spec = findSpec(specId);
-  return spec !== null && spec.width > 0 && spec.depth > 0;
+  if (!spec) return { width: 1, depth: 1, height: 1 };
+  const variant = variantOf(spec, variantId ?? spec.variants[0]?.id ?? '');
+  return {
+    width: variant.width ?? spec.width,
+    depth: variant.depth ?? spec.depth,
+    height: variant.height ?? spec.height,
+  };
+}
+
+/** The floor a class reserves, in metres: the working room around it, which contains the
+ *  footprint. Nothing may be built on it (CLAUDE.md T7 3.3). */
+export function zoneOf(specId: string, variantId?: string): { width: number; depth: number } {
+  const spec = findSpec(specId);
+  if (!spec) return { width: 1, depth: 1 };
+  const variant = variantOf(spec, variantId ?? spec.variants[0]?.id ?? '');
+  return {
+    width: variant.zoneWidth ?? spec.zoneWidth,
+    depth: variant.zoneDepth ?? spec.zoneDepth,
+  };
+}
+
+/** Does this class hold cells of the floor at all? A hand edgebander does not: it is kept in a
+ *  tool cabinet and used at the bench (CLAUDE.md T6 3.5, T7 3.6). The one place that is asked:
+ *  the floor plan, the painting, the stations and the ducting all read it. */
+export function standsInTheHall(specId: string, variantId?: string): boolean {
+  const zone = zoneOf(specId, variantId);
+  return zone.width > 0 && zone.depth > 0;
+}
+
+/** The same question of a machine that is already in the hall. */
+export function itemStandsInTheHall(item: { specId: string; variantId: string }): boolean {
+  return standsInTheHall(item.specId, item.variantId);
+}
+
+/** Sheets this one holds: its class, or the family's own figure. */
+export function sheetCapacityOf(item: { specId: string; variantId: string }): number {
+  const spec = findSpec(item.specId);
+  if (!spec) return 0;
+  return variantOf(spec, item.variantId).sheetCapacity ?? spec.sheetCapacity;
+}
+
+/** What must be owned before a class can be bought. A class may say its own, which is how a floor
+ *  edgebander wants extraction where a hand one wants a cabinet (CLAUDE.md T7 3.6). */
+export function requiresFor(spec: EquipmentSpec, variant: EquipmentVariant): string[] {
+  return variant.requires ?? spec.requires;
+}
+
+export function requiresOneOfFor(spec: EquipmentSpec, variant: EquipmentVariant): string[] {
+  return variant.requiresOneOf ?? spec.requiresOneOf;
 }
 
 // ---------------------------------------------------------------------------
@@ -59,15 +109,26 @@ export function standsInTheHall(specId: string): boolean {
 /** Who a machine is taken by, when it is the owner. A worker is his own id. */
 export const OWNER = 'owner';
 
-/** A tool kept in a cabinet is never taken by anybody: it comes out to the bench in whoever's
- *  hands want it, and two men can use the same kind at once (CLAUDE.md T7 3.6). */
-export function machineIsShared(specId: string): boolean {
-  return !standsInTheHall(specId);
+/** True when the hall has nothing of this family to queue for: either it owns none at all, or
+ *  everything it owns is kept in a cabinet and comes out to the bench in whoever's hands want it
+ *  (CLAUDE.md T7 3.6). */
+export function machineIsShared(state: GameState, specId: string): boolean {
+  return floorMachines(state, specId).length === 0;
+}
+
+/** Machines of this family that stand on the floor: the ones there can be a queue for. */
+export function floorMachines(state: GameState, specId: string): Equipment[] {
+  return owned(state, specId).filter((item) => itemStandsInTheHall(item));
+}
+
+/** Tools of this family that live in a cabinet: two men can have one out at once. */
+export function cabinetTools(state: GameState, specId: string): Equipment[] {
+  return owned(state, specId).filter((item) => !itemStandsInTheHall(item));
 }
 
 /** Machines of this family nobody is standing at. */
 export function freeMachines(state: GameState, specId: string): Equipment[] {
-  return owned(state, specId).filter((item) => item.takenBy === null && !item.broken);
+  return floorMachines(state, specId).filter((item) => item.takenBy === null && !item.broken);
 }
 
 /** The machine of this family this man is standing at, or null. */
@@ -318,11 +379,11 @@ export function ductingIsFree(state: GameState): boolean {
 
 /** True for a machine that is ducted into the extraction and has to be reconnected when it is
  *  moved. A bench, a rack, a locker or a seat is simply carried (CLAUDE.md T4 3.5). */
-export function needsDucting(specId: string): boolean {
+export function needsDucting(specId: string, variantId?: string): boolean {
   if (NO_DUCTING_SPECS.includes(specId)) return false;
   // Nothing that holds no cell of the floor is ducted: it never stood anywhere to be unplugged
   // from (CLAUDE.md T6 3.5).
-  if (!standsInTheHall(specId)) return false;
+  if (!standsInTheHall(specId, variantId)) return false;
   return findSpec(specId)?.category === 'machine';
 }
 
@@ -334,7 +395,7 @@ export function ductedMoves(state: GameState): Equipment[] {
   const moved: Equipment[] = [];
   for (const entry of state.movedItems) {
     const item = state.equipment.find((kit) => kit.id === entry.itemId);
-    if (item && needsDucting(item.specId)) moved.push(item);
+    if (item && needsDucting(item.specId, item.variantId)) moved.push(item);
   }
   return moved;
 }

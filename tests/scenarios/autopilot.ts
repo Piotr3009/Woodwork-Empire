@@ -127,13 +127,21 @@ export const DAY_ONE_KIT = [
   'sheetRack',
 ];
 
+/** The class of each family the script buys: the budget ones, which are the Turn 1 items those
+ *  families hold as a class (CLAUDE.md T7 3.6). The saw is the policy's, or the used one. */
+export const DAY_ONE_CLASS: Record<string, string> = {
+  workbench: 'budget',
+  sheetRack: 'budget',
+  edgebander: 'budget',
+};
+
 function buyKit(state: GameState, policy: Policy): GameState {
   let next = state;
   for (const specId of DAY_ONE_KIT) {
     next = applyAction(next, {
       type: 'BUY_EQUIPMENT',
       specId,
-      variantId: specId === 'tableSaw' ? policy.sawVariant : undefined,
+      variantId: specId === 'tableSaw' ? policy.sawVariant : DAY_ONE_CLASS[specId],
     });
   }
   return applyAction(next, { type: 'BUY_SOFTWARE', mode: 'oneOff' });
@@ -146,7 +154,7 @@ function takeOnJoiner(state: GameState): GameState {
   if (state.workers.some((worker) => worker.role === 'joiner')) return state;
   let next = state;
   for (const specId of JOINER_KIT) {
-    next = applyAction(next, { type: 'BUY_EQUIPMENT', specId });
+    next = applyAction(next, { type: 'BUY_EQUIPMENT', specId, variantId: DAY_ONE_CLASS[specId] });
   }
   return applyAction(next, { type: 'HIRE', role: 'joiner', tier: 'poor' });
 }

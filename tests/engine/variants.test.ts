@@ -16,12 +16,15 @@ import {
   dailyPower,
   enduranceHoursFor,
   findSpec,
+  findVariant,
+  footprintOf,
   minutesRemainingFor,
   stageSpeed,
   overdueBreakdownChance,
   pastEndurance,
   tick,
   variantFor,
+  zoneOf,
 } from '../../src/engine/index';
 import type { Equipment, GameState } from '../../src/engine/index';
 import {
@@ -65,6 +68,30 @@ describe('every catalogue line is a family', () => {
     }
   });
 
+  it('gives four families their five classes, and everything else one standard', () => {
+    for (const family of ['tableSaw', 'workbench', 'sheetRack', 'edgebander']) {
+      expect(findSpec(family)?.variants.map((variant) => variant.id), family).toEqual([
+        'used',
+        'budget',
+        'standard',
+        'pro',
+        'industrial',
+      ]);
+    }
+    // Every class says what it stands on and what floor it reserves (CLAUDE.md T7 3.3, 3.6).
+    for (const family of ['tableSaw', 'workbench', 'sheetRack', 'edgebander']) {
+      for (const variant of findSpec(family)?.variants ?? []) {
+        const stands = footprintOf(family, variant.id);
+        const zone = zoneOf(family, variant.id);
+        expect(stands.width, `${family}.${variant.id}`).toBeGreaterThan(0);
+        expect(zone.width >= stands.width || zone.width === 0).toBe(true);
+        expect(zone.depth >= stands.depth || zone.depth === 0).toBe(true);
+      }
+    }
+    // The better shelving is a class of the rack now, not a family of its own.
+    expect(findSpec('sheetRackBetter')).toBeNull();
+  });
+
   it('gives the table saw its five classes and everything else one standard', () => {
     expect(findSpec('tableSaw')?.variants.map((variant) => variant.id)).toEqual([
       'used',
@@ -82,11 +109,19 @@ describe('every catalogue line is a family', () => {
   });
 
   it('keeps the Turn 1 price of every family that has one class', () => {
-    expect(findSpec('edgebander')?.price).toBe(900);
     expect(findSpec('extractor')?.price).toBe(600);
     expect(findSpec('van')?.price).toBe(9000);
-    // The saw's cheapest class is the used one at the Turn 1 price (CLAUDE.md T3 3.5).
+    // The saw's cheapest class is the used one at the Turn 1 price (CLAUDE.md T3 3.5), and the
+    // Turn 1 items of the three families that got their classes tonight are the budget ones
+    // (CLAUDE.md T7 3.6).
     expect(findSpec('tableSaw')?.price).toBe(1800);
+    expect(findVariant('edgebander', 'budget')?.price).toBe(900);
+    expect(findVariant('workbench', 'budget')?.price).toBe(250);
+    expect(findVariant('sheetRack', 'budget')?.price).toBe(400);
+    // The line carries the cheapest way into the family.
+    expect(findSpec('edgebander')?.price).toBe(500);
+    expect(findSpec('workbench')?.price).toBe(120);
+    expect(findSpec('sheetRack')?.price).toBe(200);
   });
 });
 

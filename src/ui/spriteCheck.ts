@@ -7,7 +7,7 @@ import { HALL_CANVAS, HALL_LAYERS, box, escapeText, label, polygon } from '../re
 import { OFFICE_CANVAS, OFFICE_LAYERS } from '../render/office';
 import { boxPolygons, centreOf, footprintPolygon, gridBounds, tileToScreen } from '../render/iso';
 import { SPRITE_SCALE, spriteCanvas, spriteFileSize, spriteUrl } from '../render/sprites';
-import { standsInTheHall } from '../engine/machines';
+import { footprintOf, standsInTheHall } from '../engine/machines';
 import { escapeHtml } from './modal';
 
 export interface SpriteTarget {
@@ -34,8 +34,24 @@ export function spriteTargets(): SpriteTarget[] {
     targets.push(target);
   };
   for (const spec of EQUIPMENT_SPECS) {
-    // Nothing the game never stands on the floor is asked of the art side: the hand edgebander
-    // lives in a tool cabinet now and is never drawn (CLAUDE.md T6 3.5).
+    // Every class of every family is a picture of its own, at its own footprint: the classes are
+    // what the loader asks for (CLAUDE.md T7 3.5). A hand tool holds no cell of the floor and is
+    // still drawn, in the cabinet it is kept in (CLAUDE.md T7 3.6).
+    if (spec.variants.length > 1) {
+      for (const variant of spec.variants) {
+        const stands = footprintOf(spec.id, variant.id);
+        add({
+          name: `${spec.spriteKey}.${variant.id}`,
+          spriteKey: spec.spriteKey,
+          tier: variant.id,
+          width: stands.width,
+          depth: stands.depth,
+          height: stands.height,
+          where: variant.name.toLowerCase(),
+        });
+      }
+      continue;
+    }
     if (!standsInTheHall(spec.id)) continue;
     add({
       name: spec.spriteKey,
@@ -46,18 +62,6 @@ export function spriteTargets(): SpriteTarget[] {
       height: spec.height,
       where: 'catalogue',
     });
-    if (spec.variants.length < 2) continue;
-    for (const variant of spec.variants) {
-      add({
-        name: `${spec.spriteKey}.${variant.id}`,
-        spriteKey: spec.spriteKey,
-        tier: variant.id,
-        width: spec.width,
-        depth: spec.depth,
-        height: spec.height,
-        where: variant.name.toLowerCase(),
-      });
-    }
   }
   add({
     name: DELIVERY_VAN_SPRITE,

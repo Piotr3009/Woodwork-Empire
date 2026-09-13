@@ -10,17 +10,16 @@ import { findJob } from './jobs';
 import {
   BENCH,
   OWNER,
+  cabinetTools,
   claimMachine,
   countOf,
   findSpec,
   has,
   heldMachine,
   machineIsShared,
-  owned,
   releaseMachines,
   releaseMachinesExcept,
   serviceDueIn,
-  standsInTheHall,
 } from './machines';
 import { ownerEfficiency, ownerIsAvailable } from './owner';
 import { isWorkingToday } from './staff';
@@ -72,7 +71,7 @@ export function familiesWanted(state: GameState, job: Job): string[] {
   if (family === null || family === BENCH) return wanted;
   // A family the workshop does not own at all is done by hand, and a tool kept in a cabinet is
   // never taken off anybody: neither is queued for (CLAUDE.md T7 3.1, 3.6).
-  if (!has(state, family) || machineIsShared(family)) return wanted;
+  if (!has(state, family) || machineIsShared(state, family)) return wanted;
   wanted.push(family);
   return wanted;
 }
@@ -93,7 +92,7 @@ export function takeMachines(state: GameState, hand: Hand): StationCheck {
   }
   const stage = currentStage(state, hand.job);
   const family = stage?.family ?? null;
-  if (family === null || !has(state, family) || machineIsShared(family)) {
+  if (family === null || !has(state, family) || machineIsShared(state, family)) {
     return { machine: sharedTool(state, family), waitingFor: null };
   }
   return { machine: heldMachine(state, hand.who, family), waitingFor: null };
@@ -102,8 +101,8 @@ export function takeMachines(state: GameState, hand: Hand): StationCheck {
 /** The hand tool a stage is done with when its family is kept in a cabinet: there is no queue for
  *  it, and its bag and its hours still count the minutes it is out of the cabinet. */
 function sharedTool(state: GameState, family: string | null): Equipment | null {
-  if (family === null || !machineIsShared(family)) return null;
-  return owned(state, family)[0] ?? null;
+  if (family === null || !machineIsShared(state, family)) return null;
+  return cabinetTools(state, family)[0] ?? null;
 }
 
 /** Where a man on a job is standing: at the machine of the stage he is at, waiting at one
@@ -113,7 +112,7 @@ export function stationForProduction(state: GameState, who: string, job: Job): s
   const family = stage?.family ?? null;
   if (family === null || family === BENCH) return STATION_BENCH;
   // By hand, or out of a cabinet: either way he does it at his bench.
-  if (!has(state, family) || !standsInTheHall(family)) return STATION_BENCH;
+  if (!has(state, family) || machineIsShared(state, family)) return STATION_BENCH;
   return heldMachine(state, who, family) === null
     ? waitingStation(family)
     : machineStation(family);

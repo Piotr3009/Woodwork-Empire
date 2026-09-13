@@ -13,7 +13,7 @@ import {
 } from './constants';
 import { addWorkingDays } from './clock';
 import { canAfford, chargeUnavoidable, noteLoss, pay } from './economy';
-import { findSpec } from './machines';
+import { sheetCapacityOf } from './machines';
 import { makeId } from './rng';
 import { createTask, unloadMinutes } from './tasks';
 import { plural } from './text';
@@ -24,13 +24,11 @@ export function sheetsForCost(cost: number): number {
   return Math.max(1, Math.ceil(cost / SHEET_VALUE));
 }
 
-/** What the shelving in the hall can hold. No shelving, no room for a delivery (PIOTR). */
+/** What the shelving in the hall can hold: every rack in it, by its class. Two racks hold what
+ *  the two of them hold (PIOTR, CLAUDE.md T7 3.6). */
 export function rackCapacity(state: GameState): number {
   let capacity = 0;
-  for (const item of state.equipment) {
-    const spec = findSpec(item.specId);
-    if (spec && spec.sheetCapacity > capacity) capacity = spec.sheetCapacity;
-  }
+  for (const item of state.equipment) capacity += sheetCapacityOf(item);
   return capacity;
 }
 

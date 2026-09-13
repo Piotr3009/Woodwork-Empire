@@ -231,7 +231,8 @@ describe('setting the hall out at a zoom', () => {
     press('[data-do="zoomIn"]');
     const state = required(currentState());
     const bench = required(state.equipment.find((item) => item.specId === 'workbench'));
-    const target = { x: 11, y: 5 };
+    // A free corner of the hall: a bench reserves a 2 by 2 zone now (CLAUDE.md T7 3.3).
+    const target = { x: 14, y: 4 };
     const on = camera();
     const mouse = (type: string, cell: { x: number; y: number }): MouseEvent => {
       const point = tileToScreen(cell.x + 0.25, cell.y + 0.25);

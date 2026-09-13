@@ -103,7 +103,7 @@ describe('tool gating', () => {
     state = act(state, { type: 'BUY_EQUIPMENT', specId: 'drill' });
     expect(lockReasonFor(state, template('garageShelves'))).toBeNull();
     // The bookcase still needs the edgebander.
-    expect(lockReasonFor(state, template('bookcase'))).toBe('Needs hand edgebander');
+    expect(lockReasonFor(state, template('bookcase'))).toBe('Needs edgebander');
   });
 
   it('locks solid wood behind the solid wood tools', () => {

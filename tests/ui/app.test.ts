@@ -293,14 +293,14 @@ describe('the modals', () => {
     click('[data-do="catalogueTab"][data-id="handTools"]');
     expect(html()).not.toContain('data-do="clearFilter"');
     expect(html()).toContain('Cordless drill');
-    type('[data-filter="catalogue"]', 'edge');
+    type('[data-filter="catalogue"]', 'compress');
     expect(html()).toContain('data-do="clearFilter"');
-    expect(html()).toContain('Hand edgebander');
+    expect(html()).toContain('Small compressor');
     expect(html()).not.toContain('Cordless drill');
     // A tab with nothing matching says so, and never borrows a line from another tab.
     click('[data-do="catalogueTab"][data-id="storage"]');
     expect(html()).toContain('Nothing matches that.');
-    expect(html()).not.toContain('Hand edgebander');
+    expect(html()).not.toContain('Small compressor');
     click('[data-do="clearFilter"]');
     expect(html()).toContain('Tool cabinet');
     click('[data-do="closeModal"]');
@@ -510,7 +510,8 @@ describe('the sprite check page', () => {
     expect(html()).toContain('data-do="showSprites"');
     click('[data-do="showSprites"]');
     expect(html()).toContain('sprite-grid');
-    expect(html()).toContain('tableSaw.png');
+    // Every class of every family is a picture of its own now (CLAUDE.md T7 3.5).
+    expect(html()).toContain('tableSaw.used.png');
     expect(html()).toContain('no file');
     expect(html()).not.toContain('hall-view');
     click('[data-do="setView"][data-view="hall"]');

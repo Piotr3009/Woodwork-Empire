@@ -3,9 +3,10 @@
 // projection still puts a cell where the painted hall expects it.
 
 import { describe, expect, it } from 'vitest';
-import { EQUIPMENT_SPECS, findSpec } from '../../src/engine/index';
+import { EQUIPMENT_SPECS, findSpec, standsInTheHall, zoneOf } from '../../src/engine/index';
 import {
   BENCH_SLOT_LAYOUT,
+  CABINET_SLOT_LAYOUT,
   CANTEEN_SLOT_LAYOUT,
   GATE_LANE,
   LOCKER_SLOT_LAYOUT,
@@ -72,13 +73,9 @@ describe('footprints in metres', () => {
       desk: [3, 2, 1],
       chair: [1, 1, 1],
       laptop: [1, 1, 1],
-      tableSaw: [4, 2, 2],
       drill: [1, 1, 1],
       compressor: [2, 2, 1],
       extractor: [2, 2, 3],
-      workbench: [3, 2, 1],
-      sheetRack: [4, 1, 2],
-      sheetRackBetter: [4, 1, 2],
       locker: [1, 1, 2],
       canteenSeat: [1, 1, 1],
       handToolSet: [1, 1, 1],
@@ -89,29 +86,29 @@ describe('footprints in metres', () => {
       solidWoodTools: [3, 2, 2],
       cnc: [5, 3, 2],
       cncHead: [1, 1, 1],
-      sprayBooth: [5, 3, 3],
       dustSystem: [3, 3, 4],
       flexiSystem: [3, 3, 4],
-      pelletiser: [2, 2, 3],
     };
-    // What Turn 6 added, given in metres from the start: it was never measured in tiles.
+    // What Turn 6 added, and the four families Piotr measured himself in metres tonight: the
+    // cheapest class of each is what the catalogue line carries (CLAUDE.md T7 3.3, 3.6).
     const metres: Record<string, [number, number, number]> = {
       toolCabinet: [1, 1, 1],
+      tableSaw: [2, 1, 1],
+      workbench: [2, 1, 0.9],
+      sheetRack: [2, 1, 1.5],
+      edgebander: [1, 1, 0.5],
+      // The spray booth and the pelletiser were measured in metres tonight as well, and both
+      // came down in height (CLAUDE.md T7 3.3).
+      sprayBooth: [3, 2, 1.5],
+      pelletiser: [1, 1, 1.5],
     };
-    // And the one thing that holds no cell of the floor at all: it lives in a tool cabinet and
-    // comes out to the bench (CLAUDE.md T6 3.5).
-    const noFootprint = ['edgebander'];
-    // Every line of the catalogue is in one of the three lists: nothing slips in unmeasured.
+    // Every line of the catalogue is in one of the two lists: nothing slips in unmeasured.
     expect(EQUIPMENT_SPECS.map((spec) => spec.id).sort()).toEqual(
-      [...Object.keys(tiles), ...Object.keys(metres), ...noFootprint].sort(),
+      [...Object.keys(tiles), ...Object.keys(metres)].sort(),
     );
     const half = (value: number): number => Math.max(1, Math.ceil(value / 2));
     for (const spec of EQUIPMENT_SPECS) {
       const size = { width: spec.width, depth: spec.depth, height: spec.height };
-      if (noFootprint.includes(spec.id)) {
-        expect(size, spec.id).toEqual({ width: 0, depth: 0, height: 0 });
-        continue;
-      }
       const given = metres[spec.id];
       if (given) {
         expect(size, spec.id).toEqual({ width: given[0], depth: given[1], height: given[2] });
@@ -125,6 +122,15 @@ describe('footprints in metres', () => {
         depth: half(was[1]),
         height: half(was[2]),
       });
+    }
+    // And the two hand classes of the edgebander reserve no floor at all: they live in a tool
+    // cabinet and come out to the bench (CLAUDE.md T6 3.5, T7 3.6).
+    for (const id of ['used', 'budget']) {
+      expect(zoneOf('edgebander', id), id).toEqual({ width: 0, depth: 0 });
+      expect(standsInTheHall('edgebander', id), id).toBe(false);
+    }
+    for (const id of ['standard', 'pro', 'industrial']) {
+      expect(standsInTheHall('edgebander', id), id).toBe(true);
     }
   });
 
@@ -196,14 +202,21 @@ describe('the 200 square metre hall', () => {
     const state = newGame();
     for (const [specId, slot] of Object.entries(STARTING_LAYOUT)) {
       if (slot.yard === true) continue;
-      const check = canPlaceSpec(state, specId, slot.x, slot.y, null);
+      // The class the slot is meant for is the cheapest one that stands on the floor: the two
+      // hand classes of the edgebander hold no cell of it at all (CLAUDE.md T7 3.6).
+      const variant = findSpec(specId)?.variants.find((entry) =>
+        standsInTheHall(specId, entry.id),
+      );
+      const check = canPlaceSpec(state, specId, slot.x, slot.y, null, variant?.id);
       expect(check, specId).toEqual({ ok: true, reason: '' });
     }
-    // The bench, locker and canteen seat slots of a full hall fit too.
+    // The bench, locker, canteen seat and tool cabinet slots of a full hall fit too, and they
+    // fit beside each other: a zone is floor nothing else may stand on (CLAUDE.md T7 3.3).
     const slots: Array<[string, typeof BENCH_SLOT_LAYOUT]> = [
       ['workbench', BENCH_SLOT_LAYOUT],
       ['locker', LOCKER_SLOT_LAYOUT],
       ['canteenSeat', CANTEEN_SLOT_LAYOUT],
+      ['toolCabinet', CABINET_SLOT_LAYOUT],
     ];
     for (const [specId, layout] of slots) {
       for (const slot of layout) {

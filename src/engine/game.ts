@@ -81,6 +81,10 @@ import {
   releaseMachines,
   releaseMachinesExcept,
   repairMachine,
+  requiresFor,
+  requiresOneOfFor,
+  standsInTheHall,
+  zoneOf,
   serviceCostFor,
   serviceMachine,
   serviceableMachines,
@@ -1498,14 +1502,17 @@ export function canBuy(state: GameState, specId: string, variantId?: string): Bu
   if (state.reputation < spec.minReputation) {
     return { ok: false, reason: `Needs reputation ${spec.minReputation}` };
   }
-  for (const required of spec.requires) {
+  // A class may want something the family does not: a floor edgebander wants extraction where a
+  // hand one wants a tool cabinet (CLAUDE.md T7 3.6).
+  for (const required of requiresFor(spec, variant)) {
     if (!has(state, required)) {
       const name = findSpec(required)?.name ?? required;
       return { ok: false, reason: `Needs ${name} first` };
     }
   }
-  if (spec.requiresOneOf.length > 0 && !spec.requiresOneOf.some((id) => has(state, id))) {
-    const names = spec.requiresOneOf.map((id) => findSpec(id)?.name ?? id).join(' or ');
+  const oneOf = requiresOneOfFor(spec, variant);
+  if (oneOf.length > 0 && !oneOf.some((id) => has(state, id))) {
+    const names = oneOf.map((id) => findSpec(id)?.name ?? id).join(' or ');
     return { ok: false, reason: `Needs ${names} first` };
   }
   if (!spec.stackable && has(state, specId)) return { ok: false, reason: 'Already owned' };
@@ -1513,6 +1520,12 @@ export function canBuy(state: GameState, specId: string, variantId?: string): Bu
     return { ok: false, reason: 'No free bench slot in this unit' };
   }
   if (!canAfford(state, variant.price)) return { ok: false, reason: 'Not enough cash' };
+  // A machine wants its working room as well as its price: a floor edgebander needs a free 5 by
+  // 3 of hall and there is no point selling him one he cannot stand anywhere (T7 3.3, 3.6).
+  if (standsInTheHall(specId, variant.id) && firstFreeCell(state, specId, variant.id) === null) {
+    const zone = zoneOf(specId, variant.id);
+    return { ok: false, reason: `No free ${zone.width} by ${zone.depth} m in the hall` };
+  }
   return OK;
 }
 
@@ -1537,15 +1550,15 @@ function defaultAnchor(state: GameState, specId: string): { x: number; y: number
 
 /** A new purchase lands on its default tile, or on the first free one when that is taken. The
  *  player moves it wherever he likes afterwards (CLAUDE.md T2 3.10). */
-function anchorFor(state: GameState, specId: string): { x: number; y: number } {
+function anchorFor(state: GameState, specId: string, variantId: string): { x: number; y: number } {
   const spec = findSpec(specId);
   const preferred = defaultAnchor(state, specId);
   // The office furniture and anything in the yard are not on the hall floor.
   if (!spec || spec.category === 'furniture' || STARTING_LAYOUT[specId]?.yard === true) {
     return preferred;
   }
-  if (canPlaceSpec(state, specId, preferred.x, preferred.y, null).ok) return preferred;
-  return firstFreeCell(state, specId) ?? preferred;
+  if (canPlaceSpec(state, specId, preferred.x, preferred.y, null, variantId).ok) return preferred;
+  return firstFreeCell(state, specId, variantId) ?? preferred;
 }
 
 export function buyEquipment(state: GameState, specId: string, variantId?: string): BuyCheck {
@@ -1553,7 +1566,7 @@ export function buyEquipment(state: GameState, specId: string, variantId?: strin
   if (!check.ok) return check;
   const spec = specOf(specId);
   const variant = variantOf(spec, variantId ?? spec.variants[0]?.id ?? '');
-  const anchor = anchorFor(state, specId);
+  const anchor = anchorFor(state, specId, variant.id);
   pay(state, 'equipment', variant.name, variant.price);
   state.equipment.push({
     id: makeId(state, 'kit'),

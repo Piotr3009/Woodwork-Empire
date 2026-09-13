@@ -32,7 +32,7 @@ describe('the hall on day 1', () => {
     state.stock.sheets = 12;
     const svg = renderHall(state);
     expect(svg).toContain('data-rack="1"');
-    expect(svg).toContain('Cheap shelving: 12 / 50');
+    expect(svg).toContain('Sheet rack: 12 / 50');
     expect(renderHall(state)).not.toContain('No shelving in the hall');
   });
 

@@ -4,6 +4,7 @@
 
 import { readFileSync } from 'node:fs';
 import { beforeAll, describe, expect, it } from 'vitest';
+import { firstFreeCell } from '../../src/engine/layout';
 import { currentState, mount, render } from '../../src/ui/app';
 import { applyAction } from '../../src/engine/index';
 import { OFFICE_REGIONS } from '../../src/render/office';
@@ -120,8 +121,14 @@ describe('setting the hall out', () => {
     const saw = state?.equipment.find((item) => item.specId === 'tableSaw');
     const rack = state?.equipment.find((item) => item.specId === 'sheetRack');
     if (!saw || !rack) throw new Error('no kit in the hall');
+    // A tile down the hall is no longer a move that always lands: a class reserves the room
+    // around it, so the test asks the engine where the thing will go (CLAUDE.md T7 3.3).
     for (const item of [saw, rack]) {
-      moveItem(item.id, item.anchorX, item.anchorY + 1);
+      const now = currentState();
+      if (!now) throw new Error('no game running');
+      const to = firstFreeCell(now, item.specId, item.variantId);
+      if (!to) throw new Error(`nowhere to drag the ${item.specId}`);
+      moveItem(item.id, to.x, to.y);
     }
     // The exact words CLAUDE.md T4 3.5 asks for, with the running total. Two things moved and one
     // of them ducted: the shelving has nothing to reconnect (CLAUDE.md T6 3.5).

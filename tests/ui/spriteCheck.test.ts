@@ -19,27 +19,34 @@ describe('the sprite check page', () => {
   it('lists every key the game can draw, exactly once', () => {
     const names = spriteTargets().map((target) => target.name);
     expect(new Set(names).size).toBe(names.length);
-    const drawn = EQUIPMENT_SPECS.filter((spec) => standsInTheHall(spec.id));
-    for (const spec of drawn) expect(names, spec.id).toContain(spec.spriteKey);
     expect(names).toContain(DELIVERY_VAN_SPRITE);
-    // The page asks for the catalogue families and their classes and the lorry, and for nothing
-    // else: the office desk items went with the desk (CLAUDE.md T4 3.1), the rooms are the hall
-    // layers now (docs/art/SPRITES.md 9.3), and nothing that holds no cell of the floor is asked
-    // for at all, because the game never draws it (CLAUDE.md T6 3.5).
+    // A family with classes is asked for one picture per class, because the loader asks for the
+    // class and a class has its own footprint (CLAUDE.md T7 3.5). A family with one class is
+    // asked for once, by the family key. The office desk items went with the desk (T4 3.1) and
+    // the rooms are the hall layers now (docs/art/SPRITES.md 9.3).
     const wanted = new Set<string>([DELIVERY_VAN_SPRITE]);
-    for (const spec of drawn) {
-      wanted.add(spec.spriteKey);
-      if (spec.variants.length < 2) continue;
-      for (const variant of spec.variants) wanted.add(`${spec.spriteKey}.${variant.id}`);
+    for (const spec of EQUIPMENT_SPECS) {
+      if (spec.variants.length > 1) {
+        for (const variant of spec.variants) wanted.add(`${spec.spriteKey}.${variant.id}`);
+        continue;
+      }
+      if (standsInTheHall(spec.id)) wanted.add(spec.spriteKey);
     }
     expect(new Set(names)).toEqual(wanted);
+    // The family key of a family with classes is not asked for on its own any more.
+    expect(names).not.toContain('tableSaw');
     expect(names).not.toContain('edgebander');
     for (const key of ['roomWc', 'roomOffice', 'roomCanteen']) {
       expect(names, key).not.toContain(key);
     }
-    // The five classes of saw (CLAUDE.md T3 3.5).
+    // The five classes of saw (CLAUDE.md T3 3.5) and of the three families of T7 3.6.
     expect(names).toContain('tableSaw.used');
     expect(names).toContain('tableSaw.industrial');
+    expect(names).toContain('workbench.industrial');
+    expect(names).toContain('sheetRack.pro');
+    // The hand classes of the edgebander are drawn too, in the cabinet they are kept in.
+    expect(names).toContain('edgebander.budget');
+    expect(names).toContain('edgebander.industrial');
     // A family with one class gets no class cell of its own.
     expect(names).not.toContain('compressor.standard');
   });
@@ -90,13 +97,18 @@ describe('the sprite check page', () => {
 
   it('prints the key, the footprint and the canvas the art side has to hit', () => {
     const page = parse(renderSpriteCheck());
-    const saw = page.querySelector('[data-sprite-target="tableSaw"]');
-    expect(saw?.textContent).toContain('tableSaw.png');
+    const saw = page.querySelector('[data-sprite-target="tableSaw.used"]');
+    expect(saw?.textContent).toContain('tableSaw.used.png');
     // Metres now, and half the tiles of Turns 1 to 4 (docs/art/SPRITES.md 9.1).
     expect(saw?.textContent).toContain('2 by 1 by 1 m');
-    // The canvas formula of docs/art/SPRITES.md 2, in metres, plus 8 px of padding a side.
+    // The canvas formula of docs/art/SPRITES.md 2, in metres, plus 8 px of padding a side, which
+    // is the 160 by 136 of CLAUDE.md T7 3.5.
     expect(saw?.textContent).toContain('canvas 144 by 120');
     expect(saw?.textContent).toContain('file 160 by 136');
+    // And a class with its own footprint gets its own canvas: the pro saw is 3 by 2 by 1 m.
+    const pro = page.querySelector('[data-sprite-target="tableSaw.pro"]');
+    expect(pro?.textContent).toContain('3 by 2 by 1 m');
+    expect(pro?.textContent).toContain('file 256 by 184');
   });
 
   it('counts what has been delivered and says so plainly where there is not', () => {

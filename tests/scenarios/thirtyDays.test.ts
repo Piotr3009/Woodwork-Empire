@@ -46,7 +46,7 @@ import {
   ownerMinutesToday,
   tick,
 } from '../../src/engine/index';
-import { hallItems } from '../../src/engine/layout';
+import { firstFreeCell, hallItems } from '../../src/engine/layout';
 import { missingForHire } from '../../src/engine/staff';
 import type { Equipment, GameEvent, GameState } from '../../src/engine/index';
 
@@ -337,15 +337,14 @@ describe('a month short handed, with a joiner and one small rack', () => {
 });
 
 describe('a month that shifts two machines on day 3', () => {
-  /** Drags one item of this kind one tile down the hall, the way setup mode does. */
+  /** Drags one item of this kind to the first cell of the hall its working zone fits in, the way
+   *  setup mode does. A tile down the hall is no longer a move that always lands: a class
+   *  reserves the room around it (CLAUDE.md T7 3.3). */
   function drag(state: GameState, specId: string): GameState {
     const item = machineOf(state, specId);
-    return act(state, {
-      type: 'MOVE_ITEM',
-      itemId: item.id,
-      x: item.anchorX,
-      y: item.anchorY + 1,
-    });
+    const to = firstFreeCell(state, item.specId, item.variantId);
+    if (!to) throw new Error(`nowhere to drag the ${specId}`);
+    return act(state, { type: 'MOVE_ITEM', itemId: item.id, x: to.x, y: to.y });
   }
 
   const day3 = clearEvents(playUntilDay(newGame({ seed: SEED, difficulty: 'easy' }), 3, CAREFUL));

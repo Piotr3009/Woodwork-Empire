@@ -160,9 +160,17 @@ export const STARTING_KIT = [
   'sheetRack',
 ];
 
-/** The day 1 shopping. The saw it buys is the used one at 1800, which is what the catalogue
- *  offers first; a test about the labour figures of CLAUDE.md 8.5 asks for the budget saw, whose
- *  factors are all 1.0 and which is therefore the baseline those figures describe. */
+/** The class of each family the day 1 shopping buys. The bench, the rack and the edgebander are
+ *  the budget ones, which are the Turn 1 items those families now hold as a class and whose
+ *  factors are all 1.0 (CLAUDE.md T7 3.6). The saw is the used one at 1800, which is what the
+ *  catalogue offers first; a test about the labour figures of CLAUDE.md 8.5 asks for the budget
+ *  saw, which is the baseline those figures describe. */
+const STARTING_CLASS: Record<string, string> = {
+  workbench: 'budget',
+  sheetRack: 'budget',
+  edgebander: 'budget',
+};
+
 export function buyStartingKit(
   state: GameState,
   options: { sawVariant?: string } = {},
@@ -172,7 +180,7 @@ export function buyStartingKit(
     next = applyAction(next, {
       type: 'BUY_EQUIPMENT',
       specId,
-      variantId: specId === 'tableSaw' ? options.sawVariant : undefined,
+      variantId: specId === 'tableSaw' ? options.sawVariant : STARTING_CLASS[specId],
     });
   }
   return applyAction(next, { type: 'BUY_SOFTWARE', mode: 'oneOff' });

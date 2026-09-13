@@ -22,7 +22,12 @@ import {
   serviceIsDue,
 } from '../engine/machines';
 import { jobsAtGate } from '../engine/jobs';
-import { standsInTheHall } from '../engine/machines';
+import {
+  footprintOf,
+  itemStandsInTheHall,
+  sheetCapacityOf,
+  zoneOf,
+} from '../engine/machines';
 import { machineInUse } from '../engine/game';
 import { rackCapacity, stockIsLow } from '../engine/materials';
 import {
@@ -441,9 +446,31 @@ export interface MachineFx {
 
 const NO_FX: MachineFx = { className: '', svg: '' };
 
+/** Where a machine's picture actually stands: its class's footprint, centred inside the working
+ *  zone it reserves (CLAUDE.md T7 3.3). The anchor cell is the zone's corner, so everything that
+ *  draws an object comes through here. */
+export function footprintIn(item: Equipment): {
+  x: number;
+  y: number;
+  width: number;
+  depth: number;
+  height: number;
+} {
+  const stands = footprintOf(item.specId, item.variantId);
+  const zone = zoneOf(item.specId, item.variantId);
+  return {
+    x: item.anchorX + (zone.width - stands.width) / 2,
+    y: item.anchorY + (zone.depth - stands.depth) / 2,
+    width: stands.width,
+    depth: stands.depth,
+    height: stands.height,
+  };
+}
+
 export function machineFx(state: GameState, item: Equipment, spec: EquipmentSpec): MachineFx {
   // The top of the object, where a lamp or a blade would sit on the real thing.
-  const point = centreOf(item.anchorX, item.anchorY, spec.width, spec.depth, spec.height);
+  const stands = footprintIn(item);
+  const point = centreOf(stands.x, stands.y, stands.width, stands.depth, stands.height);
   if (spec.category === 'extraction') {
     if (item.broken) return { className: '', svg: lamp(point, 'red') };
     return machineInUse(state, item) ? { className: ' fx-breathe', svg: '' } : NO_FX;
@@ -453,8 +480,9 @@ export function machineFx(state: GameState, item: Equipment, spec: EquipmentSpec
     return { className: '', svg: blade(point) + chipStream(point) };
   }
   if (item.specId === 'thicknesser') return { className: '', svg: chipStream(point) };
-  // No line for the hand edgebander: it holds no cell of the floor, so it is never drawn
-  // (CLAUDE.md T6 3.5).
+  // A floor edgebander throws chips off its trimmer; a hand one holds no cell of the floor and
+  // is never drawn at all (CLAUDE.md T6 3.5, T7 3.6).
+  if (item.specId === 'edgebander') return { className: '', svg: chipStream(point) };
   return NO_FX;
 }
 
@@ -720,7 +748,10 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
   for (const item of state.equipment) {
     const spec = findSpec(item.specId);
     if (!spec || spec.category === 'furniture') continue;
-    if (!standsInTheHall(item.specId)) continue;
+    if (!itemStandsInTheHall(item)) continue;
+    // What the picture stands on is the class's own footprint, centred inside the working zone
+    // the class reserves (CLAUDE.md T7 3.3).
+    const stands = footprintIn(item);
     const broken = item.broken;
     const fill = broken ? 'var(--stopped)' : CATEGORY_FILL[spec.category] ?? 'var(--kit-machine)';
     const shade = broken
@@ -729,7 +760,7 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
     const bagLine = item.bagFull ? ' (bag full)' : '';
     const serviceLine = !item.broken && serviceIsDue(item) ? ' (service due)' : '';
     const rackLine =
-      spec.category === 'storage' ? `: ${state.stock.sheets} / ${rackCapacity(state)}` : '';
+      sheetCapacityOf(item) > 0 ? `: ${state.stock.sheets} / ${rackCapacity(state)}` : '';
     const atThisBench =
       spec.category === 'bench'
         ? state.workers.find(
@@ -750,11 +781,11 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
         objectArt({
           spriteKey: item.spriteKey,
           tier: item.variantId,
-          x: item.anchorX,
-          y: item.anchorY,
-          width: spec.width,
-          depth: spec.depth,
-          height: spec.height,
+          x: stands.x,
+          y: stands.y,
+          width: stands.width,
+          depth: stands.depth,
+          height: stands.height,
           fill,
           shade,
           label: name,

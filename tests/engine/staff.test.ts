@@ -90,7 +90,9 @@ describe('the hiring pool', () => {
     expect(shortfallForHire(state, 'joiner')).toContainEqual({ specId: TOOL_CABINET, count: 2 });
     const option = hiringOptions(state).find((entry) => entry.tier === 'poor');
     expect(option?.available).toBe(false);
-    expect(option?.missingCost).toBe(250 + 80 + 40 + 400 + 350 * 2);
+    // The bill is the cheapest way into each family, which for the bench is the used one at 120
+    // (CLAUDE.md T7 3.6).
+    expect(option?.missingCost).toBe(120 + 80 + 40 + 400 + 350 * 2);
     // Named, never the catalogue id: nothing of the engine's own reaches the card (CLAUDE.md 3).
     expect(option?.missing).toContain('Tool cabinet x 2');
     expect(option?.missing.join(' ')).not.toContain(TOOL_CABINET);
