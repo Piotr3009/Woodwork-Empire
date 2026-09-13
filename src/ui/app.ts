@@ -185,7 +185,7 @@ function modalBody(id: ModalId, current: GameState): string {
   }
 }
 
-/** The ghost of the item being dragged, with the engine's verdict on the tile under the mouse. */
+/** The ghost of the item being dragged, with the engine's verdict on the cell under the mouse. */
 function ghostFor(current: GameState): Ghost | null {
   const drag = ui.drag;
   if (drag === null) return null;
@@ -969,8 +969,8 @@ function onKeyDown(event: KeyboardEvent): void {
   }
 }
 
-/** The tile under the mouse, read through the hall SVG's own view box. */
-function tileUnder(event: MouseEvent): { x: number; y: number } | null {
+/** The cell under the mouse, read through the hall SVG's own view box. */
+function cellUnder(event: MouseEvent): { x: number; y: number } | null {
   if (!root) return null;
   const svg = root.querySelector('.hall-view');
   if (!(svg instanceof SVGSVGElement)) return null;
@@ -981,8 +981,8 @@ function tileUnder(event: MouseEvent): { x: number; y: number } | null {
   point.y = event.clientY;
   // Include the centred margins introduced by the SVG's uniform viewport scaling.
   const local = point.matrixTransform(matrix.inverse());
-  const tile = screenToTile(local.x, local.y);
-  return { x: Math.floor(tile.x), y: Math.floor(tile.y) };
+  const cell = screenToTile(local.x, local.y);
+  return { x: Math.floor(cell.x), y: Math.floor(cell.y) };
 }
 
 /** Dragging a machine about while the hall is being set out (CLAUDE.md T2 3.10). */
@@ -996,7 +996,7 @@ function onSetupPointerDown(event: MouseEvent): boolean {
   if (itemId === null) return false;
   const item = state.equipment.find((entry) => entry.id === itemId);
   if (item === undefined) return false;
-  const at = tileUnder(event);
+  const at = cellUnder(event);
   if (at === null) return false;
   // He has hold of it where he took hold of it, not by its corner.
   const offsetX = item.anchorX - at.x;
@@ -1005,10 +1005,10 @@ function onSetupPointerDown(event: MouseEvent): boolean {
   ui.drag = { itemId, x: item.anchorX, y: item.anchorY };
   const move = (moveEvent: MouseEvent): void => {
     if (ui.drag === null) return;
-    const tile = tileUnder(moveEvent);
-    if (tile === null) return;
-    const x = tile.x + offsetX;
-    const y = tile.y + offsetY;
+    const cell = cellUnder(moveEvent);
+    if (cell === null) return;
+    const x = cell.x + offsetX;
+    const y = cell.y + offsetY;
     if (x === ui.drag.x && y === ui.drag.y) return;
     moved = true;
     ui.drag = { itemId: ui.drag.itemId, x, y };

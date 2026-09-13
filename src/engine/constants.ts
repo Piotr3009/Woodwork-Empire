@@ -1122,7 +1122,7 @@ export const GATE_LANE_CELLS = GATE_LANE.width;
 
 /** Where finished pieces stand until transport is ordered: at the far end of the lane, in front of
  *  the shutter, which is why too many of them slow the whole hall down (CLAUDE.md T2 3.7). */
-export const FINISHED_GOODS_LAYOUT = { x: 0, y: 9, width: 3, depth: 1, height: 1 };
+export const FINISHED_GOODS_LAYOUT = { x: 0, y: 9, width: 2, depth: 1, height: 1 };
 export const DELIVERY_VAN_SPRITE = 'deliveryVan';
 
 /** Width of the apron drawn beyond the front kerb, where the company van is parked, in cells. */
