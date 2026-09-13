@@ -651,6 +651,8 @@ export interface GameState {
   unit: UnitState;
   owner: OwnerState;
   software: SoftwareState;
+  /** The day the laptop was last booted: it is up for the rest of that day (PIOTR, 13.09). */
+  laptopBootedOnDay: number | null;
   stock: StockState;
   equipment: Equipment[];
   workers: Worker[];

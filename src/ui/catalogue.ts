@@ -20,7 +20,7 @@ import {
 } from '../engine/index';
 import { serviceDueIn, variantFor } from '../engine/machines';
 import type { Equipment, GameState } from '../engine/index';
-import { renderMachine } from './machine';
+import { pictureSlot, renderMachine } from './machine';
 import {
   emptyLine,
   escapeHtml,
@@ -35,7 +35,7 @@ import {
 
 /** The tab the catalogue opens on, and the one the Owned list lives under. */
 export type CatalogueTab = EquipmentTab | 'owned';
-export const CATALOGUE_FIRST_TAB: CatalogueTab = 'sheetMachines';
+export const CATALOGUE_FIRST_TAB: CatalogueTab = 'computers';
 export const OWNED_TAB: CatalogueTab = 'owned';
 
 /** The tab a string names, or the first one. Nothing else can reach the renderer. */
@@ -56,6 +56,7 @@ export function renderCatalogue(
   filter: string,
   tab: CatalogueTab,
   folder: string | null = null,
+  ownedTab: string = 'all',
 ): string {
   const warnings =
     (hasExtraction(state)
@@ -69,7 +70,7 @@ export function renderCatalogue(
   // every tab of the catalogue (CLAUDE.md T6 3.6).
   const body =
     tab === OWNED_TAB
-      ? renderOwned(state, filter)
+      ? renderOwned(state, filter, ownedTab)
       : open !== null && open.tab === tab
         ? renderOpenFolder(state, open, filter)
         : renderFolders(state, filter, tab) + (tab === 'computers' ? renderSoftware(state) : '');
@@ -139,46 +140,59 @@ function hours(value: number): string {
   return `${Math.round(value * 10) / 10} h`;
 }
 
-function renderOwned(state: GameState, filter: string): string {
+/** What is standing in the hall, laid out like the shop: the same category tabs underneath, one
+ *  tile per machine with its class, its picture, its hours, its service and its state, framed as
+ *  owned (PIOTR, 13.09: "not a list, like shopping"). */
+function renderOwned(state: GameState, filter: string, ownedTab: string): string {
   const needle = filter.trim().toLowerCase();
-  const rows = state.equipment
+  const subTabs: Array<[string, string]> = [
+    ['all', 'All'],
+    ...EQUIPMENT_TABS.map((entry): [string, string] => [entry.id, entry.label]),
+  ];
+  const bar = tabBar('ownedTab', subTabs, ownedTab);
+  if (state.equipment.length === 0) return bar + emptyLine('Nothing here yet.');
+  const tiles = state.equipment
     .map((item) => ({ item, spec: findSpec(item.specId) }))
-    .filter((entry) => entry.spec !== null)
-    .filter((entry) => needle === '' || (entry.spec?.name ?? '').toLowerCase().includes(needle))
-    .map(({ item, spec }) => {
-      if (!spec) return '';
-      const variant = variantFor(item);
-      const className = variant?.name ?? 'standard';
-      // The hours and the service belong to the machines the hours are booked on. An extractor
-      // is repaired and never serviced, so it shows its state and no clock (CLAUDE.md T6 3.6).
-      const machine = spec.category === 'machine';
-      const due = serviceDueOn(state, item);
-      const service = !machine
-        ? ''
-        : serviceIsDue(item)
-          ? ' · service due now'
-          : due === null
-            ? ' · no service due while it stands idle'
-            : ` · service on day ${due}, ${hours(serviceDueIn(item))} of use away`;
-      const life = machine
-        ? ` · ${hours(item.hoursUsed)} of ${hours(item.enduranceHours)}`
-        : '';
-      const action = item.broken
-        ? button('repairMachine', 'Repair', `data-id="${item.id}"`)
-        : machine && serviceIsDue(item)
-          ? button('serviceMachine', 'Service', `data-id="${item.id}"`)
-          : '';
-      return (
-        `<div class="card" data-owned="${item.id}">` +
-        `<div class="card-main"><h3>${escapeHtml(spec.name)}</h3>` +
-        `<p class="figures">${escapeHtml(className)}${life}${service} · ` +
-        `${escapeHtml(ownedState(state, item))}</p>` +
-        `</div><div class="card-action">${action}</div></div>`
-      );
-    })
+    .filter((entry): entry is { item: Equipment; spec: EquipmentSpec } => entry.spec !== null)
+    .filter(({ spec }) => ownedTab === 'all' || spec.tab === ownedTab)
+    .filter(({ spec }) => needle === '' || spec.name.toLowerCase().includes(needle))
+    .map(({ item, spec }) => ownedTile(state, item, spec))
     .join('');
-  if (state.equipment.length === 0) return emptyLine('Nothing here yet.');
-  return rows === '' ? emptyLine('Nothing matches that.') : rows;
+  return bar + (tiles === '' ? emptyLine('Nothing matches that.') : `<div class="tile-grid">${tiles}</div>`);
+}
+
+function ownedTile(state: GameState, item: Equipment, spec: EquipmentSpec): string {
+  const variant = variantFor(item);
+  const className = variant?.name ?? 'standard';
+  // The hours and the service belong to the machines the hours are booked on. An extractor
+  // is repaired and never serviced, so it shows its state and no clock (CLAUDE.md T6 3.6).
+  const machine = spec.category === 'machine';
+  const due = serviceDueOn(state, item);
+  const service = !machine
+    ? ''
+    : serviceIsDue(item)
+      ? 'service due now'
+      : due === null
+        ? 'no service due while it stands idle'
+        : `service on day ${due}, ${hours(serviceDueIn(item))} of use away`;
+  const life = machine ? `${hours(item.hoursUsed)} of ${hours(item.enduranceHours)}` : '';
+  const action = item.broken
+    ? button('repairMachine', 'Repair', `data-id="${item.id}"`)
+    : machine && serviceIsDue(item)
+      ? button('serviceMachine', 'Service', `data-id="${item.id}"`)
+      : '';
+  const lines = [className, life, service, ownedState(state, item)]
+    .filter((line) => line !== '')
+    .map((line) => `<p class="tile-figures">${escapeHtml(line)}</p>`)
+    .join('');
+  return (
+    `<div class="tile is-owned" data-owned="${item.id}">` +
+    `<h3 class="tile-name">${escapeHtml(spec.name)} <span class="badge badge-owned">Owned</span></h3>` +
+    pictureSlot(spec.spriteKey, item.variantId) +
+    lines +
+    `<div class="tile-action">${action}</div>` +
+    '</div>'
+  );
 }
 
 function renderSoftware(state: GameState): string {

@@ -103,6 +103,8 @@ interface Ui {
    *  (CLAUDE.md T6 3.6, T7 3.7). */
   catalogueTab: CatalogueTab;
   catalogueFolder: string | null;
+  /** The category the Owned tab is narrowed to, or all of the hall (PIOTR, 13.09). */
+  ownedTab: string;
   /** Which tab of the books is on top, and the past day whose summary is open over them
    *  (CLAUDE.md T6 3.9). */
   accountingTab: AccountingTab;
@@ -169,6 +171,7 @@ function freshUi(): Ui {
     laptopTab: 'tasks',
     catalogueTab: CATALOGUE_FIRST_TAB,
     catalogueFolder: null,
+    ownedTab: 'all',
     accountingTab: 'days',
     accountingMonth: null,
     openDays: [],
@@ -231,6 +234,7 @@ function modalBody(id: ModalId, current: GameState): string {
         ui.filters.catalogue ?? '',
         ui.catalogueTab,
         ui.catalogueFolder,
+        ui.ownedTab,
       );
   }
 }
@@ -849,6 +853,9 @@ function handleAction(element: DataElement, point: { x: number; y: number }): vo
       ui.laptopTab = laptopTabFrom(id);
       ui.scrollModalTop = true;
       break;
+    case 'ownedTab':
+      ui.ownedTab = id;
+      return;
     case 'catalogueTab':
       ui.catalogueTab = catalogueTabFrom(id);
       // A new tab is a new set of folders, with none of them open and no filter left over.

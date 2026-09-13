@@ -37,13 +37,13 @@ function shop(state: GameState, tab: string, filter = '', folder: string | null 
 describe('the tabs', () => {
   it('are the eleven Piotr named, in his order, with Owned after them', () => {
     expect(EQUIPMENT_TABS.map((tab) => tab.label)).toEqual([
+      'Office',
       'Sheet machines',
       'Timber machines',
       'Spraying',
       'Sanding',
       'Hand tools',
       'Extraction',
-      'Computers',
       'CNC',
       'CNC centre',
       'Handling',
@@ -165,8 +165,8 @@ describe('the tabs', () => {
   });
 
   it('falls back to the first tab when asked for one that does not exist', () => {
-    expect(catalogueTabFrom(undefined)).toBe('sheetMachines');
-    expect(catalogueTabFrom('nonsense')).toBe('sheetMachines');
+    expect(catalogueTabFrom(undefined)).toBe('computers');
+    expect(catalogueTabFrom('nonsense')).toBe('computers');
     expect(catalogueTabFrom('owned')).toBe('owned');
     expect(catalogueTabFrom('storage')).toBe('storage');
   });

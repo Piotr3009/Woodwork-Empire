@@ -35,7 +35,7 @@ import type {
  *
  *  Bumped in Turn 3: a machine carries its class, its hours and the hours it has in it, and a task
  *  carries the day it was finished (CLAUDE.md T3 3.5, 3.3). */
-export const STATE_VERSION = 7;
+export const STATE_VERSION = 8;
 
 // ---------------------------------------------------------------------------
 // 6. Time
@@ -1520,13 +1520,15 @@ export interface LayoutSlot {
 /** The tabs of the equipment catalogue, in Piotr's order, with what the player reads
  *  (CLAUDE.md T6 3.6). A tab with nothing in it says so rather than being hidden. */
 export const EQUIPMENT_TABS: Array<{ id: EquipmentTab; label: string }> = [
+  // Office first: the desk, the chair, the laptop and the software are what a new game buys
+  // before anything else (PIOTR, 13.09). The id stays `computers` so nothing else moves.
+  { id: 'computers', label: 'Office' },
   { id: 'sheetMachines', label: 'Sheet machines' },
   { id: 'timberMachines', label: 'Timber machines' },
   { id: 'spraying', label: 'Spraying' },
   { id: 'sanding', label: 'Sanding' },
   { id: 'handTools', label: 'Hand tools' },
   { id: 'extraction', label: 'Extraction' },
-  { id: 'computers', label: 'Computers' },
   { id: 'cnc', label: 'CNC' },
   { id: 'cncCentre', label: 'CNC centre' },
   { id: 'handling', label: 'Handling' },

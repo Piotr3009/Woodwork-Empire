@@ -269,6 +269,7 @@ export function createGame(options: NewGameOptions): GameState {
       productionMinutes: 0,
     },
     software: { mode: 'none', tier: 'basic', jobsRemaining: 0 },
+    laptopBootedOnDay: null,
     stock: { sheets: 0, tempStorageSheets: 0 },
     equipment: [],
     workers: [],
@@ -719,7 +720,8 @@ function applyTaskCompletion(state: GameState, task: TaskInstance): void {
       if (!startNextTrip(state)) resumeOwnerTask(state);
       break;
     case 'booting':
-      // The laptop is up: back to whatever he put down to open it.
+      // The laptop is up for the rest of the day: back to whatever he put down to open it.
+      state.laptopBootedOnDay = state.clock.day;
       resumeOwnerTask(state);
       break;
     case 'bookkeeping':
@@ -828,6 +830,33 @@ function endSetup(state: GameState, speed: Speed): void {
   if (hand) assignWorkerTask(state, hand.id, task.id);
 }
 
+/** A move is "running" only while somebody is actually on it. A call, the end of the day or a
+ *  day at home can leave the task marked as the owner's while he is not holding it; then the clock
+ *  stayed forced to 4x with nobody shifting anything and the player could not get it back (bug,
+ *  13.09). The mark comes off, and the owner picks the move up again the moment he is free. */
+function keepTheMoveHonest(state: GameState): void {
+  const move = movePending(state);
+  if (move === null) return;
+  if (move.doneBy === 'owner') {
+    // Holding it, or holding the call that interrupted it and coming straight back to it.
+    const holding =
+      ownerIsAvailable(state) &&
+      (state.owner.currentTaskId === move.id || state.owner.resumeTaskId === move.id);
+    if (!holding) move.doneBy = null;
+  } else if (move.doneBy !== null) {
+    const hand = state.workers.find((worker) => worker.id === move.doneBy);
+    if (!hand || hand.taskId !== move.id || !isWorkingToday(state, hand)) move.doneBy = null;
+  }
+  if (
+    move.doneBy === null &&
+    ownerIsAvailable(state) &&
+    state.owner.currentTaskId === null &&
+    !isBreak(state.clock.minute)
+  ) {
+    startTask(state, move.id);
+  }
+}
+
 /** One minute of work, at the clock's current minute, before time moves on. */
 function runMinute(state: GameState): void {
   const owner = state.owner;
@@ -903,6 +932,7 @@ function settle(state: GameState): void {
   refreshLocks(state);
   // Nobody holds a machine he is not standing at (CLAUDE.md T7 3.1).
   releaseIdleMachines(state);
+  keepTheMoveHonest(state);
   // Nothing else happens while the hall is being moved, and the clock runs itself (T4 3.5).
   if (movingMachines(state) !== null) state.speed = MOVING_SPEED;
   // The helper needs no minutes, so he would clear a bag change in the middle of his dinner. He
@@ -1855,6 +1885,8 @@ export function bootLaptop(state: GameState): BuyCheck {
   if (!has(state, 'laptop')) return { ok: false, reason: 'Needs a laptop first' };
   // Lifting the lid starts the clock if it was stopped (PIOTR, 13.09).
   if (timeIsPaused(state)) state.speed = 1;
+  // Booted once today: it stays up, and opening it again costs nothing (PIOTR, 13.09).
+  if (state.laptopBootedOnDay === state.clock.day) return OK;
   if (state.tasks.some((task) => task.kind === 'booting' && !task.done)) return OK;
   const task = createTask(state, {
     kind: 'booting',
