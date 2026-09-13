@@ -26,6 +26,7 @@ import {
   NO_HELPER_DUST_MULTIPLIER,
   NO_HELPER_PRODUCTIVITY_FACTOR,
 } from './constants';
+import { addWorkingDays } from './clock';
 import type {
   Equipment,
   EquipmentSpec,
@@ -293,7 +294,9 @@ export function serviceIsDue(item: Equipment): boolean {
 export function serviceDueOn(state: GameState, item: Equipment): number | null {
   const perDay = machineHoursPerDay(state, item);
   if (perDay <= 0) return null;
-  return state.clock.day + Math.max(1, Math.ceil(serviceDueIn(item) / perDay));
+  // Hours are gained on the days the workshop is open, so the days counted off are working days:
+  // counting calendar days would put every service a weekend or two too early.
+  return addWorkingDays(state.clock.day, Math.max(1, Math.ceil(serviceDueIn(item) / perDay)));
 }
 
 export function machinesDueService(state: GameState): Equipment[] {
@@ -415,26 +418,43 @@ export function machineUsersNow(state: GameState, item: Equipment): number {
   return users;
 }
 
-/** Books one minute of use on every machine the job runs through: the hours that wear it out,
- *  and the minutes that fill its bag, both by the share of the machine's capacity the workshop
- *  is putting through it (CLAUDE.md 9.6, T3 3.5, T6 3.6). Returns the bags that just filled. */
-export function accumulateBagMinutes(
-  state: GameState,
-  material: MaterialKind,
-  users = 1,
-): Equipment[] {
-  for (const item of machinesUsedFor(state, material)) {
-    const share = capacityShare(item.specId, users);
-    // Six places, not four: a third of a minute rounded to four drifts by a whole hour over the
-    // fifteen hundred minutes it takes to wear a saw in.
-    item.hoursUsed = Math.round((item.hoursUsed + share / 60) * 1000000) / 1000000;
+/** Six places, not four: a third of a minute rounded to four drifts by a whole hour over the
+ *  fifteen hundred minutes it takes to wear a saw in. */
+function round6(value: number): number {
+  return Math.round(value * 1000000) / 1000000;
+}
+
+/** How many of this minute's workers a machine is serving: everybody on its material, and
+ *  everybody on any material at all when it serves them all, the way the compressor and the
+ *  booth do. Counted once for the machine, never once per material. */
+function usersOfMachine(spec: EquipmentSpec, byMaterial: ReadonlyMap<MaterialKind, number>): number {
+  let users = 0;
+  for (const [material, count] of byMaterial) {
+    if (spec.usedOn === null || spec.usedOn === material) users += count;
   }
-  if (!bagsExist(state)) return [];
+  return users;
+}
+
+/** Books one minute of use on every machine the workshop put work through this minute: the hours
+ *  that wear it out, and the minutes that fill its bag, both by the share of the machine's
+ *  capacity being used (CLAUDE.md 9.6, T3 3.5, T6 3.6). One booking per machine however many
+ *  materials went through it, so eight hours is all a day can ever give it. Returns the bags that
+ *  just filled. */
+export function accumulateMachineMinute(
+  state: GameState,
+  byMaterial: ReadonlyMap<MaterialKind, number>,
+): Equipment[] {
+  const bags = bagsExist(state);
   const filled: Equipment[] = [];
-  for (const item of bagMachinesFor(state, material)) {
-    if (item.bagFull) continue;
-    item.minutesUsed =
-      Math.round((item.minutesUsed + capacityShare(item.specId, users)) * 1000000) / 1000000;
+  for (const item of state.equipment) {
+    const spec = findSpec(item.specId);
+    if (!spec) continue;
+    const users = usersOfMachine(spec, byMaterial);
+    if (users <= 0) continue;
+    const share = capacityShare(item.specId, users);
+    if (spec.category === 'machine') item.hoursUsed = round6(item.hoursUsed + share / 60);
+    if (!bags || spec.bagInterval <= 0 || item.bagFull) continue;
+    item.minutesUsed = round6(item.minutesUsed + share);
     if (item.minutesUsed >= bagIntervalFor(item)) {
       item.bagFull = true;
       filled.push(item);

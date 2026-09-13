@@ -10,7 +10,7 @@ import {
 } from '../../src/engine/constants';
 import { EQUIPMENT_SPECS } from '../../src/engine/constants';
 import {
-  accumulateBagMinutes,
+  accumulateMachineMinute,
   capacityOf,
   capacityShare,
   findSpec,
@@ -23,7 +23,20 @@ import { buyStartingKit, newGame, placeEquipment } from '../helpers';
 /** Runs `minutes` of production through the hall with this many men on the material. */
 function work(state: GameState, minutes: number, users: number): void {
   for (let minute = 0; minute < minutes; minute += 1) {
-    accumulateBagMinutes(state, 'sheet', users);
+    accumulateMachineMinute(state, new Map([['sheet', users]]));
+  }
+}
+
+/** The same, with men on both materials at once, the way a hall with a joiner in it runs. */
+function workBoth(state: GameState, minutes: number, sheet: number, solidWood: number): void {
+  for (let minute = 0; minute < minutes; minute += 1) {
+    accumulateMachineMinute(
+      state,
+      new Map([
+        ['sheet', sheet],
+        ['solidWood', solidWood],
+      ]),
+    );
   }
 }
 
@@ -118,5 +131,34 @@ describe('a machine nobody uses', () => {
     work(state, MINUTES_PER_WORKING_DAY * 5, 3);
     // Sheet work never touches the solid wood machine.
     expect(thicknesser.hoursUsed).toBe(0);
+  });
+});
+
+describe('a machine that serves every material', () => {
+  it('is booked once a minute, so a day can never give it more than eight hours', () => {
+    const state = newGame({ difficulty: 'veryEasy' });
+    placeEquipment(state, 'extractor');
+    const compressor = placeEquipment(state, 'compressor', { x: 12, y: 1 });
+    const thicknesser = placeEquipment(state, 'thicknesser', { x: 14, y: 1 });
+    // Two men on sheet work and two on solid wood: the compressor serves all four, which is more
+    // than its capacity, so it is flat out and a day of that is eight hours and not sixteen.
+    workBoth(state, MINUTES_PER_WORKING_DAY, 2, 2);
+    expect(compressor.hoursUsed).toBeCloseTo(HOURS_PER_WORKING_DAY, 2);
+    expect(thicknesser.hoursUsed).toBeCloseTo(HOURS_PER_WORKING_DAY, 2);
+  });
+
+  it('counts the men on both materials together, not one material at a time', () => {
+    const state = newGame({ difficulty: 'veryEasy' });
+    placeEquipment(state, 'extractor');
+    const compressor = placeEquipment(state, 'compressor', { x: 12, y: 1 });
+    // One man on each material is two men on the compressor, which serves two: all of it.
+    workBoth(state, MINUTES_PER_WORKING_DAY, 1, 1);
+    expect(compressor.hoursUsed).toBeCloseTo(HOURS_PER_WORKING_DAY, 2);
+    // And one man on his own is half of it, whichever material he is on.
+    const quiet = newGame({ difficulty: 'veryEasy' });
+    placeEquipment(quiet, 'extractor');
+    const alone = placeEquipment(quiet, 'compressor', { x: 12, y: 1 });
+    work(quiet, MINUTES_PER_WORKING_DAY, 1);
+    expect(alone.hoursUsed).toBeCloseTo(HOURS_PER_WORKING_DAY / 2, 2);
   });
 });

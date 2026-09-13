@@ -18,6 +18,7 @@ import {
   REPAIR_MINUTES,
   NO_HELPER_DUST_MULTIPLIER,
 } from '../../src/engine/constants';
+import { addWorkingDays } from '../../src/engine/clock';
 import {
   accidentRisk,
   bagBlocked,
@@ -634,7 +635,10 @@ describe('the service, counted on the machine\u0027s own clock', () => {
     // One man on a saw that serves three: a third of eight hours a day.
     expect(machineHoursPerDay(state, saw as Equipment)).toBeCloseTo(8 / 3, 6);
     const days = Math.ceil(SERVICE_INTERVAL_HOURS / (8 / 3));
-    expect(serviceDueOn(state, saw as Equipment)).toBe(state.clock.day + days);
+    // Working days, not days of the calendar: the saw gains nothing over a weekend, so counting
+    // the weekends in would put every service a fortnight too early.
+    expect(serviceDueOn(state, saw as Equipment)).toBe(addWorkingDays(state.clock.day, days));
+    expect(serviceDueOn(state, saw as Equipment)).toBeGreaterThan(state.clock.day + days);
     // Nothing on the bench and nothing wears out.
     const quiet = { ...state, jobs: [] };
     expect(machineHoursPerDay(quiet, saw as Equipment)).toBe(0);

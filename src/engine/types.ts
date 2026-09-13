@@ -241,7 +241,7 @@ export interface HiringOption {
   minReputation: number;
   available: boolean;
   blockReason: string;
-  /** Catalogue ids that must be bought before this hire is possible. */
+  /** What must be bought before this hire is possible, named and counted for the card. */
   missing: string[];
   missingCost: number;
 }

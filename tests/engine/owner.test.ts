@@ -191,6 +191,23 @@ describe('what a day costs the next one', () => {
     expect(state.owner.labourFactor).toBe(1);
   });
 
+  it("does not promise Monday a penalty the weekend has already wiped", () => {
+    let state = newGame();
+    state = playDay(state);
+    state = playDay(state);
+    state = playDay(state);
+    // Thursday on overtime: Friday is a working day, so the evening says what Friday will cost.
+    state = playDay(state, { overtime: 60 });
+    expect(state.clock.day).toBe(5);
+    expect(state.days.find((entry) => entry.day === 4)?.tomorrowFactor).toBe(0.9);
+    // Friday on overtime: the next working day is Monday, which starts clean, and the summary
+    // Piotr reads on Friday evening says so instead of threatening him with 0.8.
+    state = playDay(state, { overtime: 60 });
+    expect(state.clock.day).toBe(8);
+    expect(state.days.find((entry) => entry.day === 5)?.tomorrowFactor).toBe(1);
+    expect(state.owner.labourFactor).toBe(1);
+  });
+
   it('puts the day to him at 17:00 and never lets the clock past 19:00', () => {
     const asked = runTo(newGame(), 'goingHome');
     expect(asked.clock.minute).toBe(DAY_END_MINUTE);

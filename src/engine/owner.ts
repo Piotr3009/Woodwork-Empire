@@ -14,7 +14,14 @@ import {
   SICK_DAYS_MAX,
   SICK_DAYS_MIN,
 } from './constants';
-import { isMonday, isOvertime, isWorkingDay, workedMinutesOfDay, yearOfDay } from './clock';
+import {
+  isMonday,
+  isOvertime,
+  isWorkingDay,
+  nextWorkingDay,
+  workedMinutesOfDay,
+  yearOfDay,
+} from './clock';
 import { queueEvent } from './events';
 import { int } from './rng';
 import type { GameState } from './types';
@@ -30,6 +37,22 @@ function round4(value: number): number {
 export function labourFactorFor(overtimeDebt: number, breakSkipped: boolean): number {
   const factor = (1 - overtimeDebt) * (breakSkipped ? BREAK_SKIP_FACTOR : 1);
   return Math.max(LABOUR_FACTOR_FLOOR, round4(factor));
+}
+
+/** The overtime debt a morning opens with. Monday starts clean, whatever last week cost him
+ *  (PIOTR: reset at the weekend). The one place that rule is written, so the evening summary
+ *  cannot promise a morning something the morning will not do (CLAUDE.md T6 3.4). */
+export function debtOnMorningOf(day: number, overtimeDebt: number): number {
+  return isMonday(day) ? 0 : overtimeDebt;
+}
+
+/** The factor the next working day will open on, as the evening can already see it. */
+export function nextDayLabourFactor(state: GameState): number {
+  const owner = state.owner;
+  return labourFactorFor(
+    debtOnMorningOf(nextWorkingDay(state.clock.day), owner.overtimeDebt),
+    owner.breakSkipped,
+  );
 }
 
 /** Work done per clock minute the owner spends. An overtime minute is worth as much as any other:
@@ -110,8 +133,7 @@ export function scheduleSickLeave(state: GameState): void {
 export function runOwnerDayStart(state: GameState): void {
   const owner = state.owner;
   owner.overtimeMinutes = 0;
-  // The week starts clean, whatever last week cost him (PIOTR: reset at the weekend).
-  if (isMonday(state.clock.day)) owner.overtimeDebt = 0;
+  owner.overtimeDebt = debtOnMorningOf(state.clock.day, owner.overtimeDebt);
   owner.labourFactor = labourFactorFor(owner.overtimeDebt, owner.breakSkipped);
   owner.breakSkipped = false;
   owner.breakAsked = false;

@@ -65,24 +65,49 @@ export function cabinetsNeeded(state: GameState, hiring = 0): number {
   return joiners(state).length + hiring + 1;
 }
 
-/** Kit the workshop is short of before this hire can start. */
-export function missingForHire(state: GameState, role: WorkerRole): string[] {
+/** Kit the workshop is short of before this hire can start, and how many of each: the first hire
+ *  needs two cabinets, one for the new man and one for the owner (CLAUDE.md T6 3.5). The one
+ *  count the block, the bill and the words on the card are all read off. */
+export function shortfallForHire(
+  state: GameState,
+  role: WorkerRole,
+): Array<{ specId: string; count: number }> {
   if (role !== 'joiner') return [];
   const needed = joiners(state).length + 1;
-  return JOINER_PREREQUISITES.filter((specId) => {
+  const short: Array<{ specId: string; count: number }> = [];
+  for (const specId of JOINER_PREREQUISITES) {
     const wanted = specId === TOOL_CABINET ? cabinetsNeeded(state, 1) : needed;
-    return countOf(state, specId) < wanted;
-  });
+    const count = wanted - countOf(state, specId);
+    if (count > 0) short.push({ specId, count });
+  }
+  return short;
 }
 
-export function missingCost(missing: string[]): number {
-  return missing.reduce((total, specId) => total + (findSpec(specId)?.price ?? 0), 0);
+/** The catalogue ids the hire is waiting on, one entry each however many are short. */
+export function missingForHire(state: GameState, role: WorkerRole): string[] {
+  return shortfallForHire(state, role).map((entry) => entry.specId);
+}
+
+/** What buying the shortfall comes to, every unit of it counted. */
+export function missingCost(state: GameState, role: WorkerRole): number {
+  return shortfallForHire(state, role).reduce(
+    (total, entry) => total + entry.count * (findSpec(entry.specId)?.price ?? 0),
+    0,
+  );
+}
+
+/** The shortfall in plain English, so no catalogue id ever reaches the card (CLAUDE.md 3). */
+export function missingLabelsForHire(state: GameState, role: WorkerRole): string[] {
+  return shortfallForHire(state, role).map((entry) => {
+    const name = findSpec(entry.specId)?.name ?? entry.specId;
+    return entry.count > 1 ? `${name} x ${entry.count}` : name;
+  });
 }
 
 /** Everything the hiring modal needs, one row per role and tier. */
 export function hiringOptions(state: GameState): HiringOption[] {
   return HIRING_SPECS.map((spec) => {
-    const missing = missingForHire(state, spec.role);
+    const missing = missingLabelsForHire(state, spec.role);
     const benchSlotsUsed = spec.role === 'joiner' ? joiners(state).length + 1 : 0;
     let blockReason = '';
     if (state.reputation < spec.minReputation) {
@@ -90,7 +115,7 @@ export function hiringOptions(state: GameState): HiringOption[] {
     } else if (spec.role === 'joiner' && benchSlotsUsed > state.unit.benchSlots) {
       blockReason = 'No free bench slot in this unit';
     } else if (missing.length > 0) {
-      blockReason = `Buy first: ${missing.map((id) => findSpec(id)?.name ?? id).join(', ')}`;
+      blockReason = `Buy first: ${missing.join(', ')}`;
     }
     return {
       role: spec.role,
@@ -103,7 +128,7 @@ export function hiringOptions(state: GameState): HiringOption[] {
       available: blockReason === '',
       blockReason,
       missing,
-      missingCost: missingCost(missing),
+      missingCost: missingCost(state, spec.role),
     };
   });
 }

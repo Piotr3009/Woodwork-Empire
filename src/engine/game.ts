@@ -59,7 +59,7 @@ import {
 import { isPaused, openNextEvent, queueEvent } from './events';
 import {
   accidentRisk,
-  accumulateBagMinutes,
+  accumulateMachineMinute,
   addDust,
   breakExtractor,
   clearDust,
@@ -125,7 +125,7 @@ import {
 import {
   chargeOvertimeDebt,
   countOvertimeMinute,
-  labourFactorFor,
+  nextDayLabourFactor,
   ownerEfficiency,
   ownerIsAvailable,
   ownerMinutesLeft,
@@ -547,7 +547,7 @@ export function daySummaryOf(state: GameState): DaySummary {
     minutesWorked: owner.minutesWorked,
     minutesAvailable: ownerMinutesToday(state),
     overtimeMinutes: owner.overtimeMinutes,
-    tomorrowFactor: labourFactorFor(owner.overtimeDebt, owner.breakSkipped),
+    tomorrowFactor: nextDayLabourFactor(state),
     breakSkipped: owner.breakSkipped,
     spanLabel: state.summaryCadence,
     income: totals.income,
@@ -1003,10 +1003,8 @@ function runProductionMinute(state: GameState, ownerOnTask: boolean): void {
   if (!worked) return;
   state.productionMinutesMonth += 1;
   addDust(state, 1);
-  for (const [material, users] of materials) {
-    for (const machine of accumulateBagMinutes(state, material, users)) {
-      raiseBagFull(state, machine);
-    }
+  for (const machine of accumulateMachineMinute(state, materials)) {
+    raiseBagFull(state, machine);
   }
 }
 
