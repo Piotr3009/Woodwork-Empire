@@ -279,3 +279,70 @@ positioned in canvas coordinates.
 2. Registration to the template: floor corners, walls, rooms, shutter within 3 px. Passed.
 3. No text, logo, people, machines. Passed.
 4. Style matches section 4 (realistic, muted, upper-left light). Passed.
+
+---
+
+## 10. Characters (accepted by Piotr, 13.09.2026): frame sheets from the 3D model
+
+People are not isometric boxes any more. A character is a **frame sheet** rendered from Piotr's rigged
+model in the hall camera (orthographic, azimuth 45, elevation 30, 2:1). GPT renders the frames from
+the GLB; Claude normalises them to the sheet below. The game plays the sheet.
+
+### 10.1 Files
+
+Per character and animation, two files in `public/sprites/`:
+- `character.<role>.<animation>.sheet.png`, RGBA, straight alpha, no shadow, no floor.
+- `character.<role>.<animation>.json`, the manifest (10.3).
+
+Roles tonight: `joiner` (green shirt). Later: `owner`, `helper`, `admin`, `clerk`, `salesman`, each a
+recolour or a different model through the same pipeline. Animations: `walk` (8 frames), `idle`
+(2 frames), `bench` (8 frames, working at a bench), `carry` (8 frames, walking with a sheet in both
+hands; the game draws the sheet). No run.
+
+### 10.2 The cell (same contract as a 1 × 1 × 1.8 m object, section 2)
+
+- One cell per frame: 96 × 135 px plus 8 px of padding on every side = **112 × 151** at 2x.
+- The figure stands 1.8 m tall, so about 86 to 93 px in the cell; scale from the source render is
+  0.1957 (520 source px per model unit, model 0.98 units for 1.8 m, elevation 30).
+- **Anchor** = the projection of the model's ground origin, at (56, 143) in the cell (bottom centre,
+  8 px above the bottom edge). It is the same pixel in every frame: the source anchor (240, 545) on
+  the 480 × 660 render, never the silhouette's bottom. The game places the anchor on the figure's
+  tile point and scales the cell by 0.5 like every sprite.
+- Sheet layout: **one row per direction, one column per frame**. Row order: `sw`, `se`, `nw`, `ne`
+  (down-left, down-right, up-left, up-right on screen). A sheet may carry fewer rows; the manifest
+  says which. The game mirrors `sw` for a missing `se` and `ne` for a missing `nw` (the light flips
+  sides; at this size it is accepted).
+
+### 10.3 Manifest
+
+```
+{
+  "spriteKey": "character.joiner",
+  "animation": "walk",
+  "fps": 8,
+  "loop": true,
+  "cell": { "width": 112, "height": 151 },
+  "anchor": { "x": 56, "y": 143 },
+  "padding": 8,
+  "metresPerCell": { "width": 1, "depth": 1, "height": 1.8 },
+  "directions": ["sw"],
+  "rows": { "sw": 0 },
+  "frames": 8
+}
+```
+
+### 10.4 What the game does with it (the loader contract for the code side)
+
+- A figure with a sheet for its role replaces the capsule: `walk` while its station changes
+  (direction from the screen vector of the move, held until the next move), `bench` while it is on a
+  production stage at a bench, `carry` while it fetches sheets or unloads, `idle` otherwise. A
+  missing animation falls back to `idle`, then to frame 0 of `walk`, then to the capsule.
+- Playback at the manifest's fps in real time, independent of game speed (a man does not walk faster
+  at 4x; he covers ground faster because the move is shorter in real seconds).
+- The figure's name label and status line stay under the anchor as today.
+- The Sprite check page shows every character sheet as a strip with the anchor marked.
+
+### 10.5 Delivered
+
+- `character.joiner.walk`: `sw` row only, 8 frames picked evenly from GPT's 56, normalised by Claude
+  on 13.09. The other three rows, `idle`, `bench` and `carry` are ordered from GPT (batch 3).
