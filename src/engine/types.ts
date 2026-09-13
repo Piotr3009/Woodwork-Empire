@@ -54,11 +54,28 @@ export interface EquipmentVariant {
 
 /** One line of the day 1 catalogue (CLAUDE.md 9.2). A catalogue line is a family: the modal
  *  behind it shows one tile per variant (CLAUDE.md T3 3.5). */
+/** The tabs the equipment catalogue is laid out in, in the order Piotr gave them
+ *  (CLAUDE.md T6 3.6). */
+export type EquipmentTab =
+  | 'sheetMachines'
+  | 'timberMachines'
+  | 'spraying'
+  | 'sanding'
+  | 'handTools'
+  | 'extraction'
+  | 'computers'
+  | 'cnc'
+  | 'cncCentre'
+  | 'handling'
+  | 'storage';
+
 export interface EquipmentSpec {
   id: string;
   name: string;
   price: number;
   category: EquipmentCategory;
+  /** Which tab of the catalogue it is under. Every line has one (CLAUDE.md T6 3.6). */
+  tab: EquipmentTab;
   /** Footprint in tiles. */
   width: number;
   depth: number;

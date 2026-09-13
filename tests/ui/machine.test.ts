@@ -25,15 +25,18 @@ function text(node: Element | null): string {
 
 describe('the catalogue lists families', () => {
   it('sends a machine to its own modal and buys everything else off the line', () => {
-    const shop = parse(renderCatalogue(newGame({ difficulty: 'veryEasy' }), ''));
-    expect(shop.querySelector('[data-do="openMachine"][data-id="tableSaw"]')).not.toBeNull();
-    expect(shop.querySelector('[data-do="openMachine"][data-id="extractor"]')).not.toBeNull();
-    expect(shop.querySelector('[data-do="buyEquipment"][data-id="tableSaw"]')).toBeNull();
+    const state = newGame({ difficulty: 'veryEasy' });
+    const saws = parse(renderCatalogue(state, '', 'sheetMachines'));
+    expect(saws.querySelector('[data-do="openMachine"][data-id="tableSaw"]')).not.toBeNull();
+    expect(saws.querySelector('[data-do="buyEquipment"][data-id="tableSaw"]')).toBeNull();
+    expect(saws.innerHTML).toContain('from £1,800');
+    expect(saws.innerHTML).toContain('5 classes');
+    const extraction = parse(renderCatalogue(state, '', 'extraction'));
+    expect(extraction.querySelector('[data-do="openMachine"][data-id="extractor"]')).not.toBeNull();
     // A locker has no classes and never will.
-    expect(shop.querySelector('[data-do="buyEquipment"][data-id="locker"]')).not.toBeNull();
-    expect(shop.querySelector('[data-do="openMachine"][data-id="locker"]')).toBeNull();
-    expect(shop.innerHTML).toContain('from £1,800');
-    expect(shop.innerHTML).toContain('5 classes');
+    const storage = parse(renderCatalogue(state, '', 'storage'));
+    expect(storage.querySelector('[data-do="buyEquipment"][data-id="locker"]')).not.toBeNull();
+    expect(storage.querySelector('[data-do="openMachine"][data-id="locker"]')).toBeNull();
   });
 });
 

@@ -54,7 +54,7 @@ import { centreOf, screenToTile } from '../render/iso';
 import { fitOfficeStack, officeScene } from '../render/office';
 import { renderAccounting } from './accounting';
 import { renderBoard } from './board';
-import { renderCatalogue } from './catalogue';
+import { type CatalogueTab, CATALOGUE_FIRST_TAB, catalogueTabFrom, renderCatalogue } from './catalogue';
 import { renderDayEnd, renderGameOver } from './dayEnd';
 import { renderEvent, renderEventFooter } from './eventModal';
 import { type LaptopTab, laptopTabFrom, renderLaptop } from './laptop';
@@ -96,6 +96,8 @@ interface Ui {
   arrearsAmount: string;
   /** Which tab of the laptop is on top (CLAUDE.md T4 3.1). */
   laptopTab: LaptopTab;
+  /** Which tab of the equipment catalogue is on top (CLAUDE.md T6 3.6). */
+  catalogueTab: CatalogueTab;
   /** A new tab is new content, not the same list a minute later: it starts at the top. */
   scrollModalTop: boolean;
   /** The family whose classes are on screen, over whatever else is open (CLAUDE.md T3 3.5). */
@@ -153,6 +155,7 @@ function freshUi(): Ui {
     stockSheets: '6',
     arrearsAmount: '500',
     laptopTab: 'tasks',
+    catalogueTab: CATALOGUE_FIRST_TAB,
     scrollModalTop: false,
     machine: null,
     machinePosition: null,
@@ -202,7 +205,7 @@ function modalBody(id: ModalId, current: GameState): string {
     case 'accounting':
       return renderAccounting(current, ui.arrearsAmount);
     case 'catalogue':
-      return renderCatalogue(current, ui.filters.catalogue ?? '');
+      return renderCatalogue(current, ui.filters.catalogue ?? '', ui.catalogueTab);
   }
 }
 
@@ -781,6 +784,10 @@ function handleAction(element: DataElement, point: { x: number; y: number }): vo
     }
     case 'laptopTab':
       ui.laptopTab = laptopTabFrom(id);
+      ui.scrollModalTop = true;
+      break;
+    case 'catalogueTab':
+      ui.catalogueTab = catalogueTabFrom(id);
       ui.scrollModalTop = true;
       break;
     case 'openMachine':

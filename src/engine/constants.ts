@@ -7,6 +7,7 @@ import type {
   Difficulty,
   EquipmentSpec,
   EquipmentVariant,
+  EquipmentTab,
   Finish,
   MaterialKind,
   ProductTemplate,
@@ -673,6 +674,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'desk',
+    tab: 'computers',
     name: 'Desk',
     price: 150,
     category: 'furniture',
@@ -685,6 +687,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'chair',
+    tab: 'computers',
     name: 'Chair',
     price: 60,
     category: 'furniture',
@@ -697,6 +700,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'laptop',
+    tab: 'computers',
     name: 'Laptop',
     price: 700,
     category: 'furniture',
@@ -710,6 +714,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'tableSaw',
+    tab: 'sheetMachines',
     name: 'Table saw',
     capacity: 3,
     price: 1800,
@@ -726,6 +731,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'drill',
+    tab: 'handTools',
     name: 'Cordless drill',
     price: 120,
     category: 'tools',
@@ -738,6 +744,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'edgebander',
+    tab: 'handTools',
     name: 'Hand edgebander',
     price: 900,
     category: 'machine',
@@ -755,6 +762,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'compressor',
+    tab: 'handTools',
     name: 'Small compressor',
     price: 350,
     category: 'machine',
@@ -767,6 +775,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'extractor',
+    tab: 'extraction',
     name: 'Extractor',
     price: 600,
     category: 'extraction',
@@ -779,6 +788,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'workbench',
+    tab: 'handTools',
     name: 'Workbench',
     price: 250,
     category: 'bench',
@@ -793,6 +803,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'sheetRack',
+    tab: 'storage',
     name: 'Cheap shelving',
     price: 400,
     category: 'storage',
@@ -806,6 +817,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'sheetRackBetter',
+    tab: 'storage',
     name: 'Better shelving',
     price: 900,
     category: 'storage',
@@ -819,6 +831,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'toolCabinet',
+    tab: 'storage',
     name: 'Tool cabinet',
     price: 350,
     category: 'storage',
@@ -835,6 +848,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'locker',
+    tab: 'storage',
     name: 'Locker',
     price: 80,
     category: 'welfare',
@@ -849,6 +863,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'canteenSeat',
+    tab: 'storage',
     name: 'Canteen seat',
     price: 40,
     category: 'welfare',
@@ -863,6 +878,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'handToolSet',
+    tab: 'handTools',
     name: 'Hand tool set for a worker',
     price: 400,
     category: 'tools',
@@ -878,6 +894,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'van',
+    tab: 'handling',
     name: 'Van',
     price: 9000,
     category: 'vehicle',
@@ -890,6 +907,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'forklift',
+    tab: 'handling',
     name: 'Forklift',
     price: 6000,
     category: 'vehicle',
@@ -903,6 +921,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'forkliftBetter',
+    tab: 'handling',
     name: 'Better forklift',
     price: 12000,
     category: 'vehicle',
@@ -916,6 +935,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'thicknesser',
+    tab: 'timberMachines',
     name: 'Thicknesser',
     price: 2500,
     category: 'machine',
@@ -930,6 +950,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'solidWoodTools',
+    tab: 'timberMachines',
     name: 'Planer, router, sander, clamps',
     price: 2200,
     category: 'machine',
@@ -943,6 +964,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'cnc',
+    tab: 'cnc',
     name: 'CNC',
     price: 45000,
     category: 'machine',
@@ -958,6 +980,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'cncHead',
+    tab: 'cnc',
     name: 'CNC tool changer head',
     price: 9000,
     category: 'machine',
@@ -974,6 +997,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'sprayBooth',
+    tab: 'spraying',
     name: 'Spray booth',
     price: 18000,
     category: 'machine',
@@ -988,6 +1012,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'dustSystem',
+    tab: 'extraction',
     name: 'Central dust extraction system',
     price: 35000,
     category: 'extraction',
@@ -1000,6 +1025,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'flexiSystem',
+    tab: 'extraction',
     name: 'Flexi extraction system',
     price: 50000,
     category: 'extraction',
@@ -1015,6 +1041,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'pelletiser',
+    tab: 'extraction',
     name: 'Pelletiser',
     price: 15000,
     category: 'extraction',
@@ -1046,6 +1073,22 @@ export interface LayoutSlot {
  *  order along the rear wall and all three are 2.7 m high, which is what the art is drawn at.
  *  A room has no sprite key: it is painted by its hall layer, or drawn as a placeholder box while
  *  that layer is missing (docs/art/SPRITES.md 9.3). */
+/** The tabs of the equipment catalogue, in Piotr's order, with what the player reads
+ *  (CLAUDE.md T6 3.6). A tab with nothing in it says so rather than being hidden. */
+export const EQUIPMENT_TABS: Array<{ id: EquipmentTab; label: string }> = [
+  { id: 'sheetMachines', label: 'Sheet machines' },
+  { id: 'timberMachines', label: 'Timber machines' },
+  { id: 'spraying', label: 'Spraying' },
+  { id: 'sanding', label: 'Sanding' },
+  { id: 'handTools', label: 'Hand tools' },
+  { id: 'extraction', label: 'Extraction' },
+  { id: 'computers', label: 'Computers' },
+  { id: 'cnc', label: 'CNC' },
+  { id: 'cncCentre', label: 'CNC centre' },
+  { id: 'handling', label: 'Handling' },
+  { id: 'storage', label: 'Storage' },
+];
+
 export const ROOM_LAYOUT = [
   {
     id: 'wc',

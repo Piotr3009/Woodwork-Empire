@@ -7,6 +7,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { currentState, mount, render } from '../../src/ui/app';
 import { applyAction } from '../../src/engine/index';
 import { OFFICE_REGIONS } from '../../src/render/office';
+import { findSpec } from '../../src/engine/machines';
 import { STARTING_KIT } from '../helpers';
 
 function root(): HTMLElement {
@@ -45,6 +46,9 @@ beforeAll(() => {
   click('[data-do="setView"][data-view="office"]');
   click('[data-office="catalogue"]');
   for (const specId of STARTING_KIT) {
+    // The catalogue is in tabs from Turn 6, so the shopping walks them (CLAUDE.md T6 3.6).
+    const tab = findSpec(specId)?.tab;
+    if (tab !== undefined) click(`[data-do="catalogueTab"][data-id="${tab}"]`);
     const choose = root().querySelector(`[data-do="openMachine"][data-id="${specId}"]`);
     if (choose === null) {
       click(`[data-do="buyEquipment"][data-id="${specId}"]`);
@@ -54,6 +58,7 @@ beforeAll(() => {
     click(`[data-modal="machine"] [data-do="buyEquipment"][data-id="${specId}"]`);
     click('[data-modal="machine"] [data-do="closeModal"]');
   }
+  click('[data-do="catalogueTab"][data-id="computers"]');
   click('[data-do="buySoftware"][data-id="oneOff"]');
   click('[data-do="closeModal"]');
   // A job on the books, or the tests below would pass on an empty board.

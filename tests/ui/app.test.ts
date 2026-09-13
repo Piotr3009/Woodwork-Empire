@@ -4,6 +4,7 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { advanceMinutes, currentState, mount } from '../../src/ui/app';
 import { BREAK_MINUTES } from '../../src/engine/constants';
+import { findSpec } from '../../src/engine/machines';
 import { STARTING_KIT } from '../helpers';
 
 function root(): HTMLElement {
@@ -76,6 +77,10 @@ describe('the first ten minutes', () => {
     expect(html()).toContain('Equipment catalogue');
     const before = currentState()?.cash ?? 0;
     for (const specId of STARTING_KIT) {
+      // The catalogue is in tabs from Turn 6, so the shopping walks them until it finds the line
+      // (CLAUDE.md T6 3.6).
+      const tab = findSpec(specId)?.tab;
+      if (tab !== undefined) click(`[data-do="catalogueTab"][data-id="${tab}"]`);
       // A machine is a family: the catalogue offers its classes, and the money is spent there
       // (CLAUDE.md T3 3.5).
       const choose = root().querySelector(`[data-do="openMachine"][data-id="${specId}"]`);
@@ -87,6 +92,8 @@ describe('the first ten minutes', () => {
       click(`[data-modal="machine"] [data-do="buyEquipment"][data-id="${specId}"]`);
       click('[data-modal="machine"] [data-do="closeModal"]');
     }
+    // The software sits under whatever tab is open: any of them but Owned carries it.
+    click('[data-do="catalogueTab"][data-id="computers"]');
     click('[data-do="buySoftware"][data-id="oneOff"]');
     const state = currentState();
     expect(state?.equipment).toHaveLength(STARTING_KIT.length);
@@ -280,13 +287,20 @@ describe('the modals', () => {
   it('give every filter field a clear cross once it has text', () => {
     click('[data-do="closeModal"]');
     click('[data-office="catalogue"]');
+    // The filter works inside the tab that is open and nowhere else (CLAUDE.md T6 3.6).
+    click('[data-do="catalogueTab"][data-id="handTools"]');
     expect(html()).not.toContain('data-do="clearFilter"');
-    type('[data-filter="catalogue"]', 'saw');
-    expect(html()).toContain('data-do="clearFilter"');
-    expect(html()).toContain('Table saw');
-    expect(html()).not.toContain('Cordless drill');
-    click('[data-do="clearFilter"]');
     expect(html()).toContain('Cordless drill');
+    type('[data-filter="catalogue"]', 'edge');
+    expect(html()).toContain('data-do="clearFilter"');
+    expect(html()).toContain('Hand edgebander');
+    expect(html()).not.toContain('Cordless drill');
+    // A tab with nothing matching says so, and never borrows a line from another tab.
+    click('[data-do="catalogueTab"][data-id="storage"]');
+    expect(html()).toContain('Nothing matches that.');
+    expect(html()).not.toContain('Hand edgebander');
+    click('[data-do="clearFilter"]');
+    expect(html()).toContain('Tool cabinet');
     click('[data-do="closeModal"]');
   });
 
