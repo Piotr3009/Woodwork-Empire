@@ -229,15 +229,6 @@ export interface FaceBox {
   top: number;
 }
 
-export function faceBoxesOverlap(one: FaceBox, other: FaceBox): boolean {
-  return (
-    one.from < other.from + other.across &&
-    other.from < one.from + one.across &&
-    one.bottom < other.top &&
-    other.bottom < one.top
-  );
-}
-
 /** The door in a room's front face, centred on it (docs/art/SPRITES.md 9.3). */
 export function roomDoorBox(room: { width: number }): FaceBox {
   return {
@@ -252,7 +243,7 @@ export function roomDoorBox(room: { width: number }): FaceBox {
  *  the same number of pixels across it as up it, so both sides of the box divide by one number. */
 export function roomLabelBox(room: { name: string; width: number }): FaceBox {
   const across = (room.name.length * LETTER_WIDTH * ROOM_LABEL_SIZE) / TILE_RISE;
-  const bottom = ROOM_DOOR.height + ROOM_LABEL_CLEARANCE;
+  const bottom = roomDoorBox(room).top + ROOM_LABEL_CLEARANCE;
   return {
     across,
     from: room.width / 2 - across / 2,

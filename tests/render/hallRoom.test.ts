@@ -9,7 +9,6 @@ import {
   HALL_NAME_WALL,
   HALL_NAME_WIDTH,
   type Scene,
-  faceBoxesOverlap,
   fitName,
   hallLayerBox,
   hallScene,
@@ -237,7 +236,13 @@ describe('the text the game letters on the painting', () => {
     for (const room of ROOM_LAYOUT) {
       const label = roomLabelBox(room);
       const door = roomDoorBox(room);
-      expect(faceBoxesOverlap(label, door), room.id).toBe(false);
+      // Nothing of the lettering is anywhere near the door: the two rectangles do not meet.
+      const meets =
+        label.from < door.from + door.across &&
+        door.from < label.from + label.across &&
+        label.bottom < door.top &&
+        door.bottom < label.top;
+      expect(meets, room.id).toBe(false);
       // The top third of the face, and inside it.
       expect(label.bottom, room.id).toBeGreaterThanOrEqual((room.height * 2) / 3);
       expect(label.top, room.id).toBeLessThanOrEqual(room.height);
