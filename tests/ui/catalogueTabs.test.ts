@@ -3,11 +3,17 @@
 // what state it is in (CLAUDE.md T6 3.6).
 
 import { describe, expect, it } from 'vitest';
-import { EQUIPMENT_SPECS, EQUIPMENT_TABS, SERVICE_INTERVAL_HOURS } from '../../src/engine/constants';
+import {
+  EQUIPMENT_SPECS,
+  EQUIPMENT_TABS,
+  HOURS_PER_WORKING_DAY,
+  SERVICE_INTERVAL_HOURS,
+} from '../../src/engine/constants';
 import { catalogueTabFrom, ownedState, renderCatalogue } from '../../src/ui/catalogue';
 import { findSpec } from '../../src/engine/machines';
 import { addWorkingDays } from '../../src/engine/clock';
-import type { GameState } from '../../src/engine/index';
+import { machineHoursPerDay } from '../../src/engine/production';
+import type { Equipment, GameState } from '../../src/engine/index';
 import { act, buyStartingKit, fillRack, firstJob, newGame, placeEnquiry } from '../helpers';
 
 function parse(html: string): HTMLElement {
@@ -112,10 +118,13 @@ describe('the Owned tab', () => {
     const working = act(taken, { type: 'WORK_HERE', jobId: null });
     const saw = working.equipment.find((item) => item.specId === 'tableSaw');
     const card = shop(working, 'owned').querySelector(`[data-owned="${saw?.id}"]`);
-    // One man on a saw that serves three: eighty hours of use is thirty working days away, and
-    // the weekends in between are counted out, because a saw gains nothing over a weekend.
-    const due = addWorkingDays(working.clock.day, 30);
-    expect(due).toBe(43);
+    // One man, and only the cutting quarter of his job goes through the saw, so eighty hours of
+    // use is a long way off. The weekends in between are counted out, because a saw gains nothing
+    // over a weekend (CLAUDE.md T6 3.6, T7 3.1).
+    const perDay = machineHoursPerDay(working, saw as Equipment);
+    expect(perDay).toBeGreaterThan(0);
+    expect(perDay).toBeLessThan(HOURS_PER_WORKING_DAY / 3);
+    const due = addWorkingDays(working.clock.day, Math.ceil(SERVICE_INTERVAL_HOURS / perDay));
     expect(card?.textContent).toContain(`service on day ${due}`);
     expect(card?.textContent).toContain('80 h of use away');
   });

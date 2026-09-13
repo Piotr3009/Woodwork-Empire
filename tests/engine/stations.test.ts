@@ -1,17 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import {
-  PRODUCTION_CYCLE_MINUTES,
   STATION_BENCH,
   STATION_GATE,
   STATION_IDLE,
   STATION_OFFICE,
   STATION_RACK,
-  cycleStation,
   machineStation,
-  stationForProduction,
   stationForTask,
   stationMachine,
+  stationWaitingFor,
+  waitingStation,
 } from '../../src/engine/stations';
+import { stationForProduction } from '../../src/engine/production';
+import { OWNER } from '../../src/engine/machines';
 import { createTask } from '../../src/engine/tasks';
 import { tick } from '../../src/engine/index';
 import type { GameState } from '../../src/engine/index';
@@ -37,50 +38,38 @@ function atTheBench(): GameState {
   return act(state, { type: 'WORK_HERE', jobId: null });
 }
 
-describe('the cycle a figure works to', () => {
-  it('is 15 at the bench, 5 at the saw, 15 at the bench, 5 at the edgebander', () => {
-    expect(PRODUCTION_CYCLE_MINUTES).toBe(40);
-    expect(cycleStation(0)).toBe(STATION_BENCH);
-    expect(cycleStation(14)).toBe(STATION_BENCH);
-    expect(cycleStation(15)).toBe(machineStation('tableSaw'));
-    expect(cycleStation(19)).toBe(machineStation('tableSaw'));
-    expect(cycleStation(20)).toBe(STATION_BENCH);
-    expect(cycleStation(34)).toBe(STATION_BENCH);
-    expect(cycleStation(35)).toBe(machineStation('edgebander'));
-    expect(cycleStation(39)).toBe(machineStation('edgebander'));
-    // And round again.
-    expect(cycleStation(40)).toBe(STATION_BENCH);
-    expect(cycleStation(55)).toBe(machineStation('tableSaw'));
-  });
-
-  it('reads a machine station back', () => {
+describe('the station of a stage', () => {
+  it('reads a machine station and a waiting one back', () => {
     expect(stationMachine(machineStation('tableSaw'))).toBe('tableSaw');
     expect(stationMachine(STATION_BENCH)).toBeNull();
+    expect(stationWaitingFor(waitingStation('tableSaw'))).toBe('tableSaw');
+    expect(stationWaitingFor(machineStation('tableSaw'))).toBeNull();
   });
 
   it('keeps a figure at the bench when the workshop has not bought the machine', () => {
-    const bare = newGame();
-    expect(stationForProduction(bare, 20)).toBe(STATION_BENCH);
-    const kitted = buyStartingKit(newGame());
-    expect(stationForProduction(kitted, 20)).toBe(machineStation('tableSaw'));
-    expect(stationForProduction(kitted, 0)).toBe(STATION_BENCH);
+    // One minute of work is what puts him at a machine: until then he has taken nothing.
+    const state = tick(atTheBench(), 1);
+    const job = firstJob(state);
+    // The job opens on its cutting, which is the saw the day 1 kit bought.
+    expect(stationForProduction(state, OWNER, job)).toBe(machineStation('tableSaw'));
+    const bare = { ...state, equipment: [] };
+    expect(stationForProduction(bare, OWNER, job)).toBe(STATION_BENCH);
   });
 });
 
 describe('where the owner stands', () => {
-  it('walks to the saw after 20 minutes of production and back to the bench by 35', () => {
+  it('stands at the saw for the cutting and at his bench for the assembly', () => {
     const state = atTheBench();
-    expect(state.owner.station).toBe(STATION_BENCH);
-    const twenty = tick(state, 20);
-    expect(twenty.owner.productionMinutes).toBe(20);
-    expect(twenty.owner.station).toBe(machineStation('tableSaw'));
-    const thirtyFive = tick(state, 35);
-    expect(thirtyFive.owner.station).toBe(STATION_BENCH);
-    // The cycle still gives five minutes to the edging, but the edgebander holds no cell of the
-    // floor now: it comes out of a tool cabinet and is used at the bench (CLAUDE.md T6 3.5).
-    const forty = tick(state, 40);
-    expect(cycleStation(39)).toBe(machineStation('edgebander'));
-    expect(forty.owner.station).toBe(STATION_BENCH);
+    // The stage is what puts him somewhere, not a cycle of minutes (CLAUDE.md T7 3.1).
+    expect(tick(state, 1).owner.station).toBe(machineStation('tableSaw'));
+    const job = firstJob(state);
+    job.labourRemaining = job.labourValue * 0.5;
+    const assembling = tick(state, 1);
+    expect(assembling.owner.station).toBe(STATION_BENCH);
+    // The edgebander comes out of a tool cabinet, so the machining is done at the bench too
+    // (CLAUDE.md T6 3.5).
+    job.labourRemaining = job.labourValue * 0.7;
+    expect(tick(state, 1).owner.station).toBe(STATION_BENCH);
   });
 
   it('stands at the office door on a desk task, and at the gate unloading', () => {

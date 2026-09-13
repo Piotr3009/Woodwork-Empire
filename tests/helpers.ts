@@ -202,6 +202,7 @@ export function placeEquipment(
     serviceHours: 0,
     enduranceHours: enduranceHoursFor(specId, variantId),
     hoursUsed: 0,
+    takenBy: null,
     purchasePrice: variant ? variant.price : spec.price,
   };
   state.equipment.push(item);
@@ -282,7 +283,9 @@ export function withLicence(state: GameState): GameState {
 /** Two men producing in the same minutes: the owner at one bench and a poor joiner at another,
  *  each on a job of sheet work. The one place a two man minute is set up, so the tests that ask
  *  what two men do to the books and to the machines both drive the same hall. */
-export function twoMenOnSheetWork(options: { sawVariant?: string } = {}): GameState {
+export function twoMenOnSheetWork(
+  options: { sawVariant?: string; saws?: number } = {},
+): GameState {
   const state = fillRack(
     buyStartingKit(newGame({ difficulty: 'veryEasy' }), {
       sawVariant: options.sawVariant ?? 'standard',
@@ -290,6 +293,17 @@ export function twoMenOnSheetWork(options: { sawVariant?: string } = {}): GameSt
     60,
   );
   placeEquipment(state, 'workbench', { x: 6, y: 6 });
+  // A saw each by default: one machine takes one man at a time, so with one saw between them the
+  // second would stand and wait, and this helper would be about the queue and not about two men
+  // producing. A test about the queue asks for one saw (CLAUDE.md T7 3.1).
+  for (let extra = 1; extra < (options.saws ?? 2); extra += 1) {
+    placeEquipment(state, 'tableSaw', {
+      variantId: options.sawVariant ?? 'standard',
+      x: 10,
+      y: 1,
+      id: `kit-saw-${extra + 1}`,
+    });
+  }
   state.enquiries = [];
   const first = placeEnquiry(state, { price: 40000, deadlineDays: 90 });
   const second = placeEnquiry(state, { price: 40000, deadlineDays: 90 });

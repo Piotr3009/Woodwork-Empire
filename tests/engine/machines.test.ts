@@ -20,16 +20,20 @@ import {
 } from '../../src/engine/constants';
 import { addWorkingDays } from '../../src/engine/clock';
 import {
+  familyShareOfJob,
+  machineHoursPerDay,
+  serviceDueOn,
+} from '../../src/engine/production';
+import {
   accidentRisk,
   bagBlocked,
   brokenMachineFor,
   hasExtraction,
   overdueBreakdownChance,
   serviceCostFor,
-  machineHoursPerDay,
+
   machinesDueService,
   serviceDueIn,
-  serviceDueOn,
   serviceIsDue,
   bagIntervalFor,
   bagMachinesFor,
@@ -123,11 +127,11 @@ describe('bags', () => {
     // The used saw fills a bag twice as fast as a budget one: 2400 minutes halved (T3 3.5).
     const interval = bagIntervalFor(saw as Equipment);
     expect(interval).toBe(1200);
-    // The saw serves three and one man is on it, so an hour at the bench is twenty minutes on
-    // the bag (CLAUDE.md T6 3.6).
+    // He stands at the saw for the whole of the cutting, so an hour of it is an hour on the bag:
+    // the bag counts the minutes somebody was at the machine (CLAUDE.md T7 2).
     const hour = tick(state, 60).equipment.find((item) => item.specId === 'tableSaw');
-    expect(hour?.minutesUsed).toBeCloseTo(20, 1);
-    if (saw) saw.minutesUsed = interval - 1 / 3;
+    expect(hour?.minutesUsed).toBeCloseTo(60, 1);
+    if (saw) saw.minutesUsed = interval - 1;
     state = tick(state, 1);
     expect(state.activeEvent?.kind).toBe('bagFull');
     expect(state.activeEvent?.title).toBe('Bag full: table saw');
@@ -576,7 +580,10 @@ describe('no bench in the hall', () => {
     // The owner keeps the bench he is standing at; the joiner is the one with nowhere to work.
     expect(hasBenchFor(state, second.id)).toBe(true);
     expect(hasBenchFor(state, first.id)).toBe(false);
-    expect((state.jobs[1]?.benchSince ?? 0) < (state.jobs[0]?.benchSince ?? 0)).toBe(true);
+    // And what holds it is the claim on the bench itself, not a minute written on the job
+    // (CLAUDE.md T7 3.1).
+    const bench = state.equipment.find((item) => item.specId === 'workbench');
+    expect(bench?.takenBy).toBe('owner');
   });
 
   it('stands a joiner with nowhere to work at the canteen door', () => {
@@ -631,9 +638,12 @@ describe('the service, counted on the machine\u0027s own clock', () => {
   it('says which day it lands on at the rate the machine is used, or that it never will', () => {
     const state = atTheBench();
     const saw = state.equipment.find((item) => item.specId === 'tableSaw');
-    // One man on a saw that serves three: a third of eight hours a day.
-    expect(machineHoursPerDay(state, saw as Equipment)).toBeCloseTo(8 / 3, 6);
-    const days = Math.ceil(SERVICE_INTERVAL_HOURS / (8 / 3));
+    const job = state.jobs.find((entry) => entry.stage === 'inProduction');
+    if (!job) throw new Error('nobody at a bench');
+    // One man, and the cutting is the only stage of his job that wants the saw (T7 3.1).
+    const perDay = familyShareOfJob(state, job, 'tableSaw') * 8;
+    expect(machineHoursPerDay(state, saw as Equipment)).toBeCloseTo(perDay, 6);
+    const days = Math.ceil(SERVICE_INTERVAL_HOURS / perDay);
     // Working days, not days of the calendar: the saw gains nothing over a weekend, so counting
     // the weekends in would put every service a fortnight too early.
     expect(serviceDueOn(state, saw as Equipment)).toBe(addWorkingDays(state.clock.day, days));

@@ -188,8 +188,13 @@ export {
   accidentRisk,
   bagBlocked,
   bagIntervalFor,
+  OWNER,
   bagsExist,
+  claimMachine,
   countOf,
+  freeMachines,
+  heldMachine,
+  heldMachines,
   enduranceHoursFor,
   findVariant,
   freeBenches,
@@ -219,8 +224,20 @@ export {
   owned,
   repairCostFor,
   serviceCostFor,
-  serviceDueOn,
 } from './machines';
+
+// Who is standing at which machine (CLAUDE.md T7 3.1)
+export {
+  familiesWanted,
+  familyShareOfJob,
+  hands,
+  jobOf,
+  machineHoursPerDay,
+  serviceDueOn,
+  stationForProduction,
+  takeMachines,
+} from './production';
+export type { Hand, StationCheck } from './production';
 
 // Material and deliveries
 export {
@@ -252,19 +269,17 @@ export type { Box, PlaceCheck } from './layout';
 
 // Where everybody is standing
 export {
-  PRODUCTION_CYCLE,
-  PRODUCTION_CYCLE_MINUTES,
   STATION_BENCH,
   STATION_GATE,
   STATION_IDLE,
   STATION_NO_BENCH,
   STATION_OFFICE,
   STATION_RACK,
-  cycleStation,
   machineStation,
-  stationForProduction,
   stationForTask,
   stationMachine,
+  stationWaitingFor,
+  waitingStation,
 } from './stations';
 
 // Text

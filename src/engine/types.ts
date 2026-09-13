@@ -104,8 +104,6 @@ export interface EquipmentSpec {
   depth: number;
   height: number;
   spriteKey: string;
-  /** How many men one of these can serve in a day (CLAUDE.md T6 3.6). */
-  capacity: number;
   /** Minutes of use before the bag is full. 0 means the item has no bag. */
   bagInterval: number;
   /** The machine only runs on jobs of this material. null means every job. */
@@ -158,6 +156,9 @@ export interface Equipment {
   enduranceHours: number;
   /** Hours of use it has had. Past its endurance it starts giving up. */
   hoursUsed: number;
+  /** The one man standing at it: 'owner', a worker id, or null while it is free. A machine serves
+   *  one person at a time (CLAUDE.md T7 3.1). */
+  takenBy: string | null;
   purchasePrice: number;
 }
 
@@ -342,9 +343,6 @@ export interface Job {
   assignedTo: string | null;
   /** What was worked when, one entry per run at a stage, for the Work Plan (CLAUDE.md T7 3.2). */
   stageRuns: StageRun[];
-  /** When this job took a bench, so the benches are held by the men who got to them first and
-   *  nobody is turned off one he is standing at (CLAUDE.md T4 3.4). Null while it holds none. */
-  benchSince: number | null;
   completedDay: number | null;
   daysLate: number;
   depositPaid: number;

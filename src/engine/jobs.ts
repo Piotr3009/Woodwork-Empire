@@ -27,7 +27,7 @@ import {
 import { canAccept, findEnquiry, removeEnquiry } from './board';
 import { callRinging, scheduleCalls } from './calls';
 import { template } from './catalog';
-import { minuteStamp, nextWorkingDay } from './clock';
+import { nextWorkingDay } from './clock';
 import { chargeUnavoidable, formatMoney, receive } from './economy';
 import { queueEvent } from './events';
 import {
@@ -37,6 +37,7 @@ import {
   has,
   hasBenchFor,
   hasExtraction,
+  releaseMachines,
 } from './machines';
 import {
   materialCostFor,
@@ -235,7 +236,6 @@ export function acceptEnquiry(state: GameState, enquiryId: string, byHand: boole
     designMinutesRemaining: designMinutes(entry, enquiry.sizeMultiplier, state.software.tier),
     assignedTo: null,
     stageRuns: [],
-    benchSince: null,
     completedDay: null,
     daysLate: 0,
     depositPaid: 0,
@@ -538,16 +538,17 @@ export function assignJob(state: GameState, jobId: string, workerId: string | nu
   }
   job.assignedTo = workerId;
   job.stage = 'inProduction';
-  job.benchSince = minuteStamp(state.clock);
   return true;
 }
 
-/** Takes whoever is on the job off it, leaving the work done in place. */
+/** Takes whoever is on the job off it, leaving the work done in place. He walks away from every
+ *  machine he was standing at, so the next man can have it (CLAUDE.md T7 3.1). */
 export function releaseJob(state: GameState, job: Job): void {
   const worker = state.workers.find((entry) => entry.jobId === job.id);
   if (worker) worker.jobId = null;
+  if (job.assignedTo !== null) releaseMachines(state, job.assignedTo);
   job.assignedTo = null;
-  job.benchSince = null;
+  closeStageRun(state, job);
   if (job.stage === 'inProduction') job.stage = 'ready';
 }
 

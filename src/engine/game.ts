@@ -68,6 +68,7 @@ import {
   breakMachine,
   extractorBreakdownChance,
   extractorBroken,
+  OWNER,
   ductedMoves,
   findSpec,
   freeBenches,
@@ -77,6 +78,8 @@ import {
   machinesDueService,
   overdueBreakdownChance,
   repairCostFor,
+  releaseMachines,
+  releaseMachinesExcept,
   repairMachine,
   serviceCostFor,
   serviceMachine,
@@ -136,12 +139,14 @@ import {
 import { chance, int, makeId } from './rng';
 import { labourPerMinute } from './stages';
 import { plural } from './text';
+import { STATION_IDLE, STATION_NO_BENCH, stationForTask } from './stations';
 import {
-  STATION_IDLE,
-  STATION_NO_BENCH,
+  type Hand,
+  jobOf,
+  releaseIdleMachines,
   stationForProduction,
-  stationForTask,
-} from './stations';
+  takeMachines,
+} from './production';
 import {
   autoAssignJobs,
   availableJoiners,
@@ -151,7 +156,6 @@ import {
   isWorkingToday,
   joiners,
   runStaffDayStart,
-  sawRatioFactor,
   staffMinutesLeft,
 } from './staff';
 import {
@@ -177,7 +181,6 @@ import type {
   Equipment,
   GameEventChoice,
   Job,
-  MaterialKind,
   GameAction,
   GameState,
   PeriodTotals,
@@ -343,6 +346,9 @@ function startDay(state: GameState): void {
     labourValue: 0,
     workMinutes: 0,
   };
+  // Nobody stands at a machine overnight: the hall starts the day with every one of them free
+  // (CLAUDE.md T7 3.1).
+  releaseMachinesExcept(state, []);
   runDayCosts(state, state.clock.day);
   runOwnerDayStart(state);
   runStaffDayStart(state);
@@ -835,9 +841,11 @@ function updateStations(state: GameState): void {
   } else if (ownerJob(state) !== null) {
     const job = ownerJob(state);
     owner.station =
-      job !== null && !hasBenchFor(state, job.id)
-        ? STATION_NO_BENCH
-        : stationForProduction(state, owner.productionMinutes);
+      job === null
+        ? STATION_IDLE
+        : hasBenchFor(state, job.id)
+          ? stationForProduction(state, OWNER, job)
+          : STATION_NO_BENCH;
   } else {
     owner.station = STATION_IDLE;
   }
@@ -854,7 +862,7 @@ function updateStations(state: GameState): void {
     const job = worker.jobId ? findJob(state, worker.jobId) : null;
     if (job && job.stage === 'inProduction') {
       worker.station = hasBenchFor(state, job.id)
-        ? stationForProduction(state, worker.productionMinutes)
+        ? stationForProduction(state, worker.id, job)
         : STATION_NO_BENCH;
       continue;
     }
@@ -867,6 +875,8 @@ function updateStations(state: GameState): void {
 
 function settle(state: GameState): void {
   refreshLocks(state);
+  // Nobody holds a machine he is not standing at (CLAUDE.md T7 3.1).
+  releaseIdleMachines(state);
   // Nothing else happens while the hall is being moved, and the clock runs itself (T4 3.5).
   if (movingMachines(state) !== null) state.speed = MOVING_SPEED;
   // The helper needs no minutes, so he would clear a bag change in the middle of his dinner. He
@@ -951,61 +961,89 @@ function checkLowStock(state: GameState): void {
   });
 }
 
-function runProductionMinute(state: GameState, ownerOnTask: boolean): void {
-  const hall = hallProductivityFactor(state);
-  let worked = false;
-  // How many people put work through each material this minute: the share of a machine's
-  // capacity the workshop is using is what wears it out (CLAUDE.md T6 3.6).
-  const materials = new Map<MaterialKind, number>();
-  const usedBy = (kind: MaterialKind): void => {
-    materials.set(kind, (materials.get(kind) ?? 0) + 1);
-  };
-  // Every bench waits while the machines are being shifted about (CLAUDE.md T4 3.5).
-  const moving = movingMachines(state) !== null;
+/** Everybody who could put a minute into a job this minute, the owner first. The staff minute
+ *  goes on their own jobs of work first, because a man on a bag change is not at his bench
+ *  (CLAUDE.md T2 3.8). */
+function handsAtWork(state: GameState, ownerOnTask: boolean, moving: boolean): Hand[] {
+  const list: Hand[] = [];
   const atTheBench =
-    !ownerOnTask && !moving && state.owner.currentTaskId === null ? ownerJob(state) : null;
-  const ownerStage = atTheBench === null ? null : jobStage(state, atTheBench);
-  if (atTheBench && ownerStage && ownerIsAvailable(state) && canWorkOn(state, atTheBench)) {
-    spendOwnerMinute(state, 'workshop');
-    state.owner.productionMinutes += 1;
-    worked = true;
-    usedBy(atTheBench.materialKind);
-    // A machine speeds up its own stage and nothing else, and only for the man on it (T7 3.1).
-    const minute = labourPerMinute(ownerEfficiency(state), ownerStage.speed) * hall;
-    if (addLabour(state, atTheBench, minute, ownerStage.id)) raiseJobAtGate(state, atTheBench);
+    !ownerOnTask && !moving && state.owner.currentTaskId === null ? jobOf(state, OWNER) : null;
+  if (atTheBench && ownerIsAvailable(state)) {
+    list.push({ who: OWNER, job: atTheBench, rate: ownerEfficiency(state) });
   }
   // Staff work the normal day only: nobody but the owner does overtime, and they always take
   // their dinner even on a day the owner works through his (CLAUDE.md T6 3.4).
-  if (!isOvertime(state.clock.minute) && !isBreak(state.clock.minute)) {
-    const staffFactor = staffOutputFactor(state);
-    for (const worker of state.workers) {
-      if (!isWorkingToday(state, worker)) continue;
-      if (worker.taskId !== null) {
-        runWorkerTaskMinute(state, worker.id, worker.taskId);
-        continue;
-      }
-      if (moving) continue;
-      if (worker.role !== 'joiner' || worker.jobId === null) continue;
-      const job = findJob(state, worker.jobId);
-      if (!job || job.stage !== 'inProduction') {
-        worker.jobId = null;
-        continue;
-      }
-      if (!canWorkOn(state, job)) continue;
-      const stage = jobStage(state, job);
-      if (stage === null) continue;
-      worker.productionMinutes += 1;
-      worked = true;
-      usedBy(job.materialKind);
-      const rate = worker.rate * sawRatioFactor(state, worker) * staffFactor;
-      const minute = labourPerMinute(rate, stage.speed) * hall;
-      if (addLabour(state, job, minute, stage.id)) raiseJobAtGate(state, job);
+  if (isOvertime(state.clock.minute) || isBreak(state.clock.minute)) return list;
+  const staffFactor = staffOutputFactor(state);
+  for (const worker of state.workers) {
+    if (!isWorkingToday(state, worker)) continue;
+    if (worker.taskId !== null) {
+      runWorkerTaskMinute(state, worker.id, worker.taskId);
+      continue;
     }
+    if (moving) continue;
+    if (worker.role !== 'joiner' || worker.jobId === null) continue;
+    const job = findJob(state, worker.jobId);
+    if (!job || job.stage !== 'inProduction') {
+      worker.jobId = null;
+      continue;
+    }
+    list.push({ who: worker.id, job, rate: worker.rate * staffFactor });
+  }
+  return list;
+}
+
+/** What the hall says a man is waiting for, in the words the job card and the Work Plan use. */
+function waitingLine(specId: string): string {
+  return `waiting for ${(findSpec(specId)?.name ?? specId).toLowerCase()}`;
+}
+
+function runProductionMinute(state: GameState, ownerOnTask: boolean): void {
+  const hall = hallProductivityFactor(state);
+  // Every bench waits while the machines are being shifted about (CLAUDE.md T4 3.5).
+  const moving = movingMachines(state) !== null;
+  const working = handsAtWork(state, ownerOnTask, moving);
+  // Anybody who is not at a job this minute walks away from whatever he was standing at, so the
+  // next man can have it (CLAUDE.md T7 3.1).
+  releaseMachinesExcept(state, working.map((hand) => hand.who));
+  let worked = false;
+  // The minutes somebody actually stood at each machine: that, and nothing else, is what wears
+  // it out and fills its bag (CLAUDE.md T7 2).
+  const used = new Map<string, number>();
+  for (const hand of working) {
+    if (!canWorkOn(state, hand.job)) {
+      releaseMachines(state, hand.who);
+      continue;
+    }
+    const stage = jobStage(state, hand.job);
+    if (stage === null) continue;
+    const at = takeMachines(state, hand);
+    if (at.waitingFor !== null) {
+      // He stands at the machine until the man on it is done with it (CLAUDE.md T7 3.1).
+      hand.job.blockedBy = waitingLine(at.waitingFor);
+      continue;
+    }
+    const worker = state.workers.find((entry) => entry.id === hand.who);
+    if (worker) {
+      worker.productionMinutes += 1;
+    } else {
+      spendOwnerMinute(state, 'workshop');
+      state.owner.productionMinutes += 1;
+    }
+    worked = true;
+    if (at.machine !== null) used.set(at.machine.id, (used.get(at.machine.id) ?? 0) + 1);
+    // A machine speeds up its own stage and nothing else, and only for the man on it, so the
+    // speed is the class of the machine he actually got (CLAUDE.md T7 3.1).
+    const speed = at.machine === null
+      ? stage.speed
+      : variantOf(specOf(at.machine.specId), at.machine.variantId).outputFactor;
+    const minute = labourPerMinute(hand.rate, speed) * hall;
+    if (addLabour(state, hand.job, minute, stage.id)) raiseJobAtGate(state, hand.job);
   }
   if (!worked) return;
   state.productionMinutesMonth += 1;
   addDust(state, 1);
-  for (const machine of accumulateMachineMinute(state, materials)) {
+  for (const machine of accumulateMachineMinute(state, used)) {
     raiseBagFull(state, machine);
   }
 }
@@ -1427,32 +1465,21 @@ export function applyAction(state: GameState, action: GameAction): GameState {
 // ---------------------------------------------------------------------------
 
 
-/** Somebody is actually standing at this job this minute, rather than the job merely being open
- *  and assigned to a man who has gone home or gone to the desk. */
-function someoneIsOnIt(state: GameState, job: Job): boolean {
-  if (job.assignedTo === null) return false;
-  if (job.assignedTo === 'owner') {
-    return ownerIsAvailable(state) && state.owner.currentTaskId === null;
-  }
-  const worker = state.workers.find((entry) => entry.id === job.assignedTo);
-  if (!worker) return false;
-  return isWorkingToday(state, worker) && worker.taskId === null;
-}
-
-/** True when something that runs through this machine is being made this minute. The hall reads
- *  it to spin the blade and throw the dust: nothing in the engine turns on it (CLAUDE.md T3 3.7). */
+/** True when somebody is standing at this machine this minute. The hall reads it to spin the
+ *  blade and throw the dust: nothing in the engine turns on it (CLAUDE.md T3 3.7). A machine is
+ *  taken by one man or by nobody, so this is the one question there is to ask (T7 3.1). */
 export function machineInUse(state: GameState, item: Equipment): boolean {
   const spec = findSpec(item.specId);
   if (!spec || item.broken) return false;
-  if (spec.category !== 'machine' && spec.category !== 'extraction') return false;
-  if (spec.category === 'machine' && item.bagFull) return false;
-  return state.jobs.some((job) => {
-    if (job.stage !== 'inProduction' || job.blockedBy !== '') return false;
-    if (!someoneIsOnIt(state, job)) return false;
-    // The extraction serves whatever is running, so anything at the bench sets it going.
-    if (spec.category === 'extraction') return true;
-    return spec.usedOn === null || spec.usedOn === job.materialKind;
-  });
+  if (spec.category === 'extraction') {
+    // The extraction serves whatever is running, so any machine at work sets it going.
+    return state.equipment.some((other) => {
+      const otherSpec = findSpec(other.specId);
+      return otherSpec?.category === 'machine' && other.takenBy !== null && !other.broken;
+    });
+  }
+  if (spec.category !== 'machine') return false;
+  return item.takenBy !== null && !item.bagFull;
 }
 
 export interface BuyCheck {
@@ -1541,6 +1568,7 @@ export function buyEquipment(state: GameState, specId: string, variantId?: strin
     serviceHours: 0,
     enduranceHours: enduranceHoursFor(specId, variant.id),
     hoursUsed: 0,
+    takenBy: null,
     purchasePrice: variant.price,
   });
   return OK;

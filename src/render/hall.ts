@@ -33,6 +33,7 @@ import {
   STATION_OFFICE,
   STATION_RACK,
   stationMachine,
+  stationWaitingFor,
 } from '../engine/stations';
 import { ownerIsAvailable, staffOutputFactor } from '../engine/owner';
 import { plural } from '../engine/text';
@@ -514,7 +515,8 @@ export function stationCell(
   station: string,
   bench: { x: number; y: number },
 ): { x: number; y: number } {
-  const specId = stationMachine(station);
+  // A man waiting for a machine stands at it, which is what waiting at one looks like (T7 3.1).
+  const specId = stationMachine(station) ?? stationWaitingFor(station);
   if (specId !== null) {
     const item = state.equipment.find((entry) => entry.specId === specId);
     const spec = item ? findSpec(item.specId) : null;
@@ -538,6 +540,10 @@ export function stationCell(
 function stationLabel(station: string): string {
   const specId = stationMachine(station);
   if (specId !== null) return (findSpec(specId)?.name ?? specId).toLowerCase();
+  const waiting = stationWaitingFor(station);
+  if (waiting !== null) {
+    return `waiting for ${(findSpec(waiting)?.name ?? waiting).toLowerCase()}`;
+  }
   if (station === STATION_RACK) return 'the rack';
   if (station === STATION_GATE) return 'the gate';
   if (station === STATION_OFFICE) return 'the office';

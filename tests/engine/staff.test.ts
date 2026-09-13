@@ -6,7 +6,6 @@ import {
   JOINER_PREREQUISITES,
   LABOUR_FRACTION,
   MINUTES_PER_WORKING_DAY,
-  OVER_SAW_RATIO_FACTOR,
   OWNER_LABOUR_PER_MINUTE,
   TOOL_CABINET,
   WORKER_RATES,
@@ -20,9 +19,9 @@ import {
   joiners,
   missingForHire,
   shortfallForHire,
-  sawRatioFactor,
   staffMinutesLeft,
 } from '../../src/engine/staff';
+import { waitingStation } from '../../src/engine/stations';
 import { createTask } from '../../src/engine/tasks';
 import { minutesRemainingFor, ownerJob } from '../../src/engine/jobs';
 import { weeklyWageBill } from '../../src/engine/economy';
@@ -212,19 +211,9 @@ describe('joiners at the bench', () => {
   });
 });
 
-describe('the saw ratio', () => {
-  it('slows every joiner above one saw per three', () => {
-    const state = withCrew(buyStartingKit(newGame({ difficulty: 'veryEasy' })), 4, 'poor');
-    const crew = joiners(state);
-    expect(crew).toHaveLength(4);
-    expect(sawRatioFactor(state, crew[0] as Worker)).toBe(1);
-    expect(sawRatioFactor(state, crew[2] as Worker)).toBe(1);
-    expect(sawRatioFactor(state, crew[3] as Worker)).toBe(OVER_SAW_RATIO_FACTOR);
-    const withSecondSaw = act(state, { type: 'BUY_EQUIPMENT', specId: 'tableSaw' });
-    expect(sawRatioFactor(withSecondSaw, crew[3] as Worker)).toBe(1);
-  });
-
-  it('shows up in what the fourth joiner produces', () => {
+describe('the queue at the saw', () => {
+  /** Four joiners, each on a wardrobe of his own, every one of them at the cutting. */
+  function fourAtTheCutting(): GameState {
     let state = buyStartingKit(newGame({ difficulty: 'veryEasy' }), { sawVariant: 'budget' });
     state.reputation = 10;
     state = withCrew(state, 4, 'normal');
@@ -237,17 +226,37 @@ describe('the saw ratio', () => {
       });
       state = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
     }
-    fillRack(state);
+    fillRack(state, 60);
     for (const job of state.jobs) job.stage = 'ready';
-    state = clearEvents(runToDay(state, 2).state);
-    const assigned = state.jobs.filter((job) => job.stage === 'inProduction');
-    expect(assigned).toHaveLength(4);
+    return clearEvents(runToDay(state, 2).state);
+  }
+
+  it('lets one man cut and stands the other three at the saw', () => {
+    const state = fourAtTheCutting();
+    expect(state.jobs.filter((job) => job.stage === 'inProduction')).toHaveLength(4);
     const before = state.jobs.map((job) => job.labourRemaining);
-    const after = tick(state, 60).jobs.map((job) => job.labourRemaining);
-    const done = before.map((value, index) => value - (after[index] ?? 0));
+    const worked = tick(state, 60);
+    const done = before.map((value, index) => value - (worked.jobs[index]?.labourRemaining ?? 0));
+    // One saw, one man on it: the ratio is not a multiplier on anybody's speed now, it is three
+    // men standing and waiting (CLAUDE.md T7 3.1).
     const full = 60 * OWNER_LABOUR_PER_MINUTE * WORKER_RATES.normal;
-    expect(done.filter((value) => Math.abs(value - full) < 1e-6)).toHaveLength(3);
-    expect(done.filter((value) => Math.abs(value - full * OVER_SAW_RATIO_FACTOR) < 1e-6)).toHaveLength(1);
+    expect(done.filter((value) => Math.abs(value - full) < 1e-6)).toHaveLength(1);
+    expect(done.filter((value) => value === 0)).toHaveLength(3);
+    expect(
+      worked.workers.filter((worker) => worker.station === waitingStation('tableSaw')),
+    ).toHaveLength(3);
+    expect(worked.jobs.filter((job) => job.blockedBy === 'waiting for table saw')).toHaveLength(3);
+  });
+
+  it('puts a second man to work the moment a second saw is bought', () => {
+    const state = act(fourAtTheCutting(), { type: 'BUY_EQUIPMENT', specId: 'tableSaw' });
+    const before = state.jobs.map((job) => job.labourRemaining);
+    const worked = tick(state, 60);
+    const done = before.map((value, index) => value - (worked.jobs[index]?.labourRemaining ?? 0));
+    expect(done.filter((value) => value > 0)).toHaveLength(2);
+    expect(
+      worked.workers.filter((worker) => worker.station === waitingStation('tableSaw')),
+    ).toHaveLength(2);
   });
 });
 

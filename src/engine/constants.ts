@@ -638,13 +638,7 @@ const VARIANTS_BY_FAMILY: Record<string, EquipmentVariant[]> = {
   tableSaw: TABLE_SAW_VARIANTS,
 };
 
-/** How many men one machine of a family can serve in a day. Two unless the family says otherwise
- *  [TUNE]; the table saw serves three [PIOTR]. The hours a machine wears out by are the share of
- *  that capacity the workshop actually puts through it (CLAUDE.md T6 3.6). */
-export const MACHINE_CAPACITY_DEFAULT = 2;
-
 const BASE_SPEC = {
-  capacity: MACHINE_CAPACITY_DEFAULT,
   bagInterval: 0,
   usedOn: null as MaterialKind | null,
   labourFactor: 1,
@@ -739,7 +733,6 @@ const SPEC_DRAFTS: SpecDraft[] = [
     id: 'tableSaw',
     tab: 'sheetMachines',
     name: 'Table saw',
-    capacity: 3,
     price: 1800,
     category: 'machine',
     width: 2,
@@ -749,7 +742,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
     bagInterval: 2400,
     usedOn: 'sheet',
     stackable: true,
-    effect: 'Cuts sheets. Bag every 2400 minutes. One saw per three joiners.',
+    effect: 'Cuts sheets and timber. One man at a time. Bag every 2400 minutes.',
   },
   {
     ...BASE_SPEC,
@@ -771,9 +764,6 @@ const SPEC_DRAFTS: SpecDraft[] = [
     name: 'Hand edgebander',
     price: 900,
     category: 'machine',
-    // A hand tool serves the man holding it and nobody else, so no ratio applies to it and its
-    // bag and its hours count whole minutes as they always did (CLAUDE.md T6 3.5).
-    capacity: 1,
     // It stands in a tool cabinet and comes out to the bench, so it holds no cell of the floor
     // and nothing can be dropped on it in setup mode (CLAUDE.md T6 3.5).
     width: 0,
@@ -1359,10 +1349,6 @@ export const HELPER_REQUIRED_FROM_JOINERS = 5;
 export const NO_HELPER_DUST_MULTIPLIER = 2;
 /** [TUNE] and productivity drops. */
 export const NO_HELPER_PRODUCTIVITY_FACTOR = 0.9;
-/** One table saw per three joiners (PIOTR). */
-export const JOINERS_PER_TABLE_SAW = 3;
-/** [TUNE] joiners above the saw ratio queue and work slower. */
-export const OVER_SAW_RATIO_FACTOR = 0.8;
 /** [TUNE] names for generated staff. */
 export const WORKER_NAMES = [
   'Adam',

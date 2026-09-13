@@ -54,7 +54,6 @@ function job(partial: Partial<Job>): Job {
     designMinutesRemaining: 0,
     assignedTo: null,
     stageRuns: [],
-    benchSince: null,
     completedDay: 11,
     daysLate: 0,
     depositPaid: 200,

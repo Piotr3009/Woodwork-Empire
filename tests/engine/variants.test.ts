@@ -182,10 +182,10 @@ describe('what a class of saw does to the bag and the life of the machine', () =
     const saw = machineOf(state, 'tableSaw');
     expect(saw.hoursUsed).toBe(0);
     expect(saw.enduranceHours).toBe(750);
-    // An hour at the bench with one man on a saw that serves three is a third of an hour on the
-    // saw's own clock (CLAUDE.md T6 3.6).
+    // An hour of cutting is an hour on the saw's own clock: its hours are the minutes somebody
+    // stood at it (CLAUDE.md T7 2).
     const worked = machineOf(tick(state, 60), 'tableSaw');
-    expect(worked.hoursUsed).toBeCloseTo(1 / 3, 2);
+    expect(worked.hoursUsed).toBeCloseTo(1, 2);
     expect(pastEndurance(worked)).toBe(false);
     worked.hoursUsed = 750;
     expect(pastEndurance(worked)).toBe(true);
