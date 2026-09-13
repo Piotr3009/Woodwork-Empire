@@ -304,12 +304,9 @@ export const CNC_ASSEMBLY_FACTOR = 2;
  *  [TUNE: default on] (CLAUDE.md T7 3.4). */
 export const SAW_FALLBACK_DEFAULT = true;
 
-/** The last bar of the Work Plan. It carries no labour: it is the Turn 2 transport, not work at a
- *  bench (CLAUDE.md T7 3.1). */
+/** The piece leaving. It carries no labour: it is the Turn 2 transport, not work at a bench
+ *  (CLAUDE.md T7 3.1). The Work Plan drew a bar for it until Turn 9 took the bars away. */
 export const DELIVERY_STAGE: StageSpec = { id: 'delivery', label: 'Delivery', share: 0 };
-
-/** Every bar the Work Plan draws for a job, the piece leaving included (CLAUDE.md T7 3.2). */
-export const GANTT_STAGES: StageSpec[] = [...PRODUCTION_STAGES, DELIVERY_STAGE];
 /** Worker speed as a fraction of the owner. Nobody matches the owner (PIOTR). */
 export const WORKER_RATES: Record<WorkerTier, number> = {
   poor: 0.6,
