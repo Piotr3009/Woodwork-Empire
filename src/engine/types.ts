@@ -54,16 +54,35 @@ export interface EquipmentVariant {
 
 /** One line of the day 1 catalogue (CLAUDE.md 9.2). A catalogue line is a family: the modal
  *  behind it shows one tile per variant (CLAUDE.md T3 3.5). */
+/** The tabs the equipment catalogue is laid out in, in the order Piotr gave them
+ *  (CLAUDE.md T6 3.6). */
+export type EquipmentTab =
+  | 'sheetMachines'
+  | 'timberMachines'
+  | 'spraying'
+  | 'sanding'
+  | 'handTools'
+  | 'extraction'
+  | 'computers'
+  | 'cnc'
+  | 'cncCentre'
+  | 'handling'
+  | 'storage';
+
 export interface EquipmentSpec {
   id: string;
   name: string;
   price: number;
   category: EquipmentCategory;
+  /** Which tab of the catalogue it is under. Every line has one (CLAUDE.md T6 3.6). */
+  tab: EquipmentTab;
   /** Footprint in tiles. */
   width: number;
   depth: number;
   height: number;
   spriteKey: string;
+  /** How many men one of these can serve in a day (CLAUDE.md T6 3.6). */
+  capacity: number;
   /** Minutes of use before the bag is full. 0 means the item has no bag. */
   bagInterval: number;
   /** The machine only runs on jobs of this material. null means every job. */
@@ -105,12 +124,13 @@ export interface Equipment {
   spriteKey: string;
   anchorX: number;
   anchorY: number;
-  /** Minutes of production since the last bag change. */
+  /** Minutes of this machine's own use since the last bag change (CLAUDE.md T6 3.6). */
   minutesUsed: number;
   bagFull: boolean;
   broken: boolean;
-  /** Day of the last service. A machine is bought serviced. */
-  lastServiceDay: number;
+  /** Hours on the machine's own clock at the last service: the service is due by its hours, not
+   *  by the calendar (CLAUDE.md T6 3.6). */
+  serviceHours: number;
   /** Hours of use it has in it, family base times the variant factor. */
   enduranceHours: number;
   /** Hours of use it has had. Past its endurance it starts giving up. */
@@ -125,8 +145,6 @@ export interface ProductTemplate {
   material: MaterialKind;
   designMinutes: number;
   calls: number;
-  deadlineMinDays: number;
-  deadlineMaxDays: number;
   needsMeasure: boolean;
   requiredEquipment: string[];
   allowedFinishes: Finish[];
@@ -139,7 +157,8 @@ export interface ProductTemplate {
 export interface Clock {
   /** 1-based absolute day. Day 1 is a Monday. */
   day: number;
-  /** Minutes since 08:00. 480 is 16:00. Overtime runs above 480. */
+  /** Minutes since 08:00. 540 is 17:00, the end of the working day; overtime runs above it and
+   *  the clock never passes 660, which is 19:00. */
   minute: number;
 }
 
@@ -147,10 +166,18 @@ export interface OwnerState {
   present: boolean;
   minutesByCategory: Record<TaskCategory, number>;
   minutesWorked: number;
-  /** Overtime minutes worked today. Drives tomorrow's fatigue. */
+  /** Overtime minutes worked today. Any at all costs him tomorrow. */
   overtimeMinutes: number;
-  /** Efficiency penalty carried from yesterday's overtime, 0 to 1. */
-  fatigue: number;
+  /** What today's work is multiplied by: 1 less the overtime debt, and 3% off again if he worked
+   *  through yesterday's dinner. Floored (CLAUDE.md T6 3.4). */
+  labourFactor: number;
+  /** 0.10 for every day with overtime in it, cumulative, back to zero on Monday morning. */
+  overtimeDebt: number;
+  /** He worked through dinner on the last day he worked: 60 minutes more then, 3% off after. */
+  breakSkipped: boolean;
+  /** The two questions the day puts to him, so neither is put twice. */
+  breakAsked: boolean;
+  homeAsked: boolean;
   wentHome: boolean;
   currentTaskId: string | null;
   /** What the phone interrupted, so he goes back to it when the call is over (T4 3.3). */
@@ -212,7 +239,7 @@ export interface HiringOption {
   minReputation: number;
   available: boolean;
   blockReason: string;
-  /** Catalogue ids that must be bought before this hire is possible. */
+  /** What must be bought before this hire is possible, named and counted for the card. */
   missing: string[];
   missingCost: number;
 }
@@ -373,6 +400,10 @@ export interface TaskInstance {
 }
 
 export type GameEventKind =
+  /** Noon: take the hour or work through it (CLAUDE.md T6 3.4). */
+  | 'breakTime'
+  /** 17:00: home, or two more hours. */
+  | 'goingHome'
   | 'deliveryArrived'
   | 'stockOverflow'
   | 'bagFull'
@@ -489,6 +520,34 @@ export interface SoftwareState {
   jobsRemaining: number;
 }
 
+/** What the end of day summary says, kept per day so the Days tab can open a past one and get
+ *  the same component the evening did (CLAUDE.md T6 3.9). Plain JSON, like everything in the
+ *  state. */
+export interface DaySummary {
+  day: number;
+  title: string;
+  minutesByCategory: Record<TaskCategory, number>;
+  minutesWorked: number;
+  minutesAvailable: number;
+  overtimeMinutes: number;
+  /** What tomorrow starts at, 1 when nothing is owed. */
+  tomorrowFactor: number;
+  breakSkipped: boolean;
+  /** The money column and the heading it carries, as the cadence had it that evening. */
+  spanLabel: string;
+  income: number;
+  costs: number;
+  cash: number;
+  jobsAdvanced: number;
+  jobsCompleted: string[];
+  dustAtStart: number;
+  dustAtEnd: number;
+  deliveriesTomorrow: number[];
+  /** Labour value produced and the people minutes that produced it (CLAUDE.md T6 3.8). */
+  labourValue: number;
+  workMinutes: number;
+}
+
 export interface DayStats {
   jobsAdvanced: string[];
   jobsCompleted: string[];
@@ -496,6 +555,10 @@ export interface DayStats {
   dustAtStart: number;
   /** The empty rack is reported once a day and no more. */
   noMaterialWarned: boolean;
+  /** Labour value produced today, and the people minutes that went into it: the two halves of
+   *  the earned labour rate (CLAUDE.md T6 3.8). */
+  labourValue: number;
+  workMinutes: number;
 }
 
 export interface GameOver {
@@ -534,6 +597,8 @@ export interface GameState {
   eventQueue: GameEvent[];
   activeEvent: GameEvent | null;
   dayStats: DayStats;
+  /** The last few months of end of day summaries, newest last (CLAUDE.md T6 3.9). */
+  days: DaySummary[];
   /** Day the last express enquiry reached the board. One a week is the cap. */
   lastExpressDay: number | null;
   /** Day the last low stock warning went out. One a week is the cap. */

@@ -10,7 +10,9 @@ import {
   MACHINE_REPAIR_COST_FRACTION,
   OVERDUE_BREAKDOWN_CHANCE,
   SERVICE_COST_FRACTION,
-  SERVICE_INTERVAL_DAYS,
+  HOURS_PER_WORKING_DAY,
+  MACHINE_CAPACITY_DEFAULT,
+  SERVICE_INTERVAL_HOURS,
   DUST_HIGH_THRESHOLD,
   DUST_MAX,
   DUST_PER_PRODUCTION_MINUTE,
@@ -24,6 +26,7 @@ import {
   NO_HELPER_DUST_MULTIPLIER,
   NO_HELPER_PRODUCTIVITY_FACTOR,
 } from './constants';
+import { addWorkingDays } from './clock';
 import type {
   Equipment,
   EquipmentSpec,
@@ -40,6 +43,14 @@ export function specOf(specId: string): EquipmentSpec {
 
 export function findSpec(specId: string): EquipmentSpec | null {
   return EQUIPMENT_SPECS.find((entry) => entry.id === specId) ?? null;
+}
+
+/** Does this kind of thing hold cells of the floor at all? The hand edgebander does not: it is
+ *  kept in a tool cabinet and used at the bench (CLAUDE.md T6 3.5). The one place that is asked:
+ *  the floor plan, the painting, the stations and the ducting all read it. */
+export function standsInTheHall(specId: string): boolean {
+  const spec = findSpec(specId);
+  return spec !== null && spec.width > 0 && spec.depth > 0;
 }
 
 /** The class of machine this is, or the cheapest one in the family when the id is unknown. */
@@ -241,6 +252,9 @@ export function ductingIsFree(state: GameState): boolean {
  *  moved. A bench, a rack, a locker or a seat is simply carried (CLAUDE.md T4 3.5). */
 export function needsDucting(specId: string): boolean {
   if (NO_DUCTING_SPECS.includes(specId)) return false;
+  // Nothing that holds no cell of the floor is ducted: it never stood anywhere to be unplugged
+  // from (CLAUDE.md T6 3.5).
+  if (!standsInTheHall(specId)) return false;
   return findSpec(specId)?.category === 'machine';
 }
 
@@ -268,16 +282,32 @@ export function serviceableMachines(state: GameState): Equipment[] {
   return state.equipment.filter((item) => findSpec(item.specId)?.category === 'machine');
 }
 
-export function serviceDueOn(item: Equipment): number {
-  return item.lastServiceDay + SERVICE_INTERVAL_DAYS;
+/** Hours the machine has run since it was last serviced. */
+export function hoursSinceService(item: Equipment): number {
+  return Math.max(0, Math.round((item.hoursUsed - item.serviceHours) * 1000000) / 1000000);
 }
 
-export function serviceIsDue(state: GameState, item: Equipment): boolean {
-  return state.clock.day >= serviceDueOn(item);
+/** Hours of use still to go before the next service is due. */
+export function serviceDueIn(item: Equipment): number {
+  return Math.max(0, Math.round((SERVICE_INTERVAL_HOURS - hoursSinceService(item)) * 100) / 100);
+}
+
+export function serviceIsDue(item: Equipment): boolean {
+  return hoursSinceService(item) >= SERVICE_INTERVAL_HOURS;
+}
+
+/** The day the next service lands on if the machine keeps being used the way it is used today.
+ *  Null when nobody is putting anything through it, because then it never comes due. */
+export function serviceDueOn(state: GameState, item: Equipment): number | null {
+  const perDay = machineHoursPerDay(state, item);
+  if (perDay <= 0) return null;
+  // Hours are gained on the days the workshop is open, so the days counted off are working days:
+  // counting calendar days would put every service a weekend or two too early.
+  return addWorkingDays(state.clock.day, Math.max(1, Math.ceil(serviceDueIn(item) / perDay)));
 }
 
 export function machinesDueService(state: GameState): Equipment[] {
-  return serviceableMachines(state).filter((item) => serviceIsDue(state, item));
+  return serviceableMachines(state).filter((item) => serviceIsDue(item));
 }
 
 /** 2% of what the machine cost [TUNE]. */
@@ -291,12 +321,12 @@ export function repairCostFor(item: Equipment): number {
   return Math.round(item.purchasePrice * MACHINE_REPAIR_COST_FRACTION * 100) / 100;
 }
 
-/** A machine that has gone past its service date can give up on any working day, and so can one
- *  that is past its endurance. The two stack (CLAUDE.md T3 3.5) [TUNE]. */
-export function overdueBreakdownChance(state: GameState, item: Equipment): number {
+/** A machine that is past its service hours can give up on any working day, and so can one that
+ *  is past its endurance. The two stack (CLAUDE.md T3 3.5) [TUNE]. */
+export function overdueBreakdownChance(item: Equipment): number {
   if (item.broken) return 0;
   let chance = 0;
-  if (serviceIsDue(state, item)) chance += OVERDUE_BREAKDOWN_CHANCE;
+  if (serviceIsDue(item)) chance += OVERDUE_BREAKDOWN_CHANCE;
   if (pastEndurance(item)) chance += OVERDUE_BREAKDOWN_CHANCE;
   return chance;
 }
@@ -348,18 +378,90 @@ export function machinesUsedFor(state: GameState, material: MaterialKind): Equip
   });
 }
 
-/** Books one minute of use on every machine the job runs through: the hours that wear it out,
- *  and the minutes that fill its bag. Returns the bags that just filled, so the caller can raise
- *  the event (CLAUDE.md 9.6, T3 3.5). */
-export function accumulateBagMinutes(state: GameState, material: MaterialKind): Equipment[] {
-  for (const item of machinesUsedFor(state, material)) {
-    item.hoursUsed = Math.round((item.hoursUsed + 1 / 60) * 10000) / 10000;
+/** How many men one of these can serve in a day. */
+export function capacityOf(specId: string): number {
+  return Math.max(1, findSpec(specId)?.capacity ?? MACHINE_CAPACITY_DEFAULT);
+}
+
+/** The share of its capacity the workshop is putting through a machine: one man of three is a
+ *  third of it, three men or four are all of it (CLAUDE.md T6 3.6). */
+export function capacityShare(specId: string, users: number): number {
+  const capacity = capacityOf(specId);
+  return Math.min(Math.max(0, users), capacity) / capacity;
+}
+
+/** The hours a machine of this family gains in a whole day with this many men on it. Eight hours
+ *  at full capacity, pro rata below it [PIOTR]. */
+export function machineHoursInDay(specId: string, users: number): number {
+  return capacityShare(specId, users) * HOURS_PER_WORKING_DAY;
+}
+
+/** The hours this machine gains today at the rate the workshop is using it now. Only the machines
+ *  the hours are booked on gain any: an extractor runs all day and wears out on dust, not on
+ *  hours, and saying it has a service coming would be saying something untrue. */
+export function machineHoursPerDay(state: GameState, item: Equipment): number {
+  if (findSpec(item.specId)?.category !== 'machine') return 0;
+  return machineHoursInDay(item.specId, machineUsersNow(state, item));
+}
+
+/** How many people are putting work through this machine at this moment: the owner if he is at a
+ *  bench on a job of the material it serves, and every joiner who is. People, not jobs: two men on
+ *  one job are two men on the machine (CLAUDE.md T6 3.6). */
+export function machineUsersNow(state: GameState, item: Equipment): number {
+  const spec = findSpec(item.specId);
+  if (!spec) return 0;
+  const serves = (jobId: string | null): boolean => {
+    const job = state.jobs.find((entry) => entry.id === jobId);
+    if (!job || job.stage !== 'inProduction') return false;
+    return spec.usedOn === null || spec.usedOn === job.materialKind;
+  };
+  const owner = state.jobs.find((job) => job.assignedTo === 'owner') ?? null;
+  let users = owner !== null && serves(owner.id) ? 1 : 0;
+  for (const worker of state.workers) {
+    if (worker.role !== 'joiner' || worker.absentDaysRemaining > 0) continue;
+    if (worker.startDay > state.clock.day) continue;
+    if (serves(worker.jobId)) users += 1;
   }
-  if (!bagsExist(state)) return [];
+  return users;
+}
+
+/** Six places, not four: a third of a minute rounded to four drifts by a whole hour over the
+ *  fifteen hundred minutes it takes to wear a saw in. */
+function round6(value: number): number {
+  return Math.round(value * 1000000) / 1000000;
+}
+
+/** How many of this minute's workers a machine is serving: everybody on its material, and
+ *  everybody on any material at all when it serves them all, the way the compressor and the
+ *  booth do. Counted once for the machine, never once per material. */
+function usersOfMachine(spec: EquipmentSpec, byMaterial: ReadonlyMap<MaterialKind, number>): number {
+  let users = 0;
+  for (const [material, count] of byMaterial) {
+    if (spec.usedOn === null || spec.usedOn === material) users += count;
+  }
+  return users;
+}
+
+/** Books one minute of use on every machine the workshop put work through this minute: the hours
+ *  that wear it out, and the minutes that fill its bag, both by the share of the machine's
+ *  capacity being used (CLAUDE.md 9.6, T3 3.5, T6 3.6). One booking per machine however many
+ *  materials went through it, so eight hours is all a day can ever give it. Returns the bags that
+ *  just filled. */
+export function accumulateMachineMinute(
+  state: GameState,
+  byMaterial: ReadonlyMap<MaterialKind, number>,
+): Equipment[] {
+  const bags = bagsExist(state);
   const filled: Equipment[] = [];
-  for (const item of bagMachinesFor(state, material)) {
-    if (item.bagFull) continue;
-    item.minutesUsed += 1;
+  for (const item of state.equipment) {
+    const spec = findSpec(item.specId);
+    if (!spec) continue;
+    const users = usersOfMachine(spec, byMaterial);
+    if (users <= 0) continue;
+    const share = capacityShare(item.specId, users);
+    if (spec.category === 'machine') item.hoursUsed = round6(item.hoursUsed + share / 60);
+    if (!bags || spec.bagInterval <= 0 || item.bagFull) continue;
+    item.minutesUsed = round6(item.minutesUsed + share);
     if (item.minutesUsed >= bagIntervalFor(item)) {
       item.bagFull = true;
       filled.push(item);
@@ -429,7 +531,7 @@ export function repairMachine(state: GameState, equipmentId: string): Equipment 
 export function serviceMachine(state: GameState, equipmentId: string): Equipment | null {
   const item = state.equipment.find((entry) => entry.id === equipmentId);
   if (!item) return null;
-  item.lastServiceDay = state.clock.day;
+  item.serviceHours = item.hoursUsed;
   return item;
 }
 

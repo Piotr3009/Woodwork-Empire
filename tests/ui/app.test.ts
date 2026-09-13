@@ -3,7 +3,8 @@
 
 import { beforeAll, describe, expect, it } from 'vitest';
 import { advanceMinutes, currentState, mount } from '../../src/ui/app';
-import { BREAK_MINUTES } from '../../src/engine/constants';
+import { BREAK_MINUTES, LEDGER_VISIBLE_ENTRIES } from '../../src/engine/constants';
+import { findSpec } from '../../src/engine/machines';
 import { STARTING_KIT } from '../helpers';
 
 function root(): HTMLElement {
@@ -76,6 +77,10 @@ describe('the first ten minutes', () => {
     expect(html()).toContain('Equipment catalogue');
     const before = currentState()?.cash ?? 0;
     for (const specId of STARTING_KIT) {
+      // The catalogue is in tabs from Turn 6, so the shopping walks them until it finds the line
+      // (CLAUDE.md T6 3.6).
+      const tab = findSpec(specId)?.tab;
+      if (tab !== undefined) click(`[data-do="catalogueTab"][data-id="${tab}"]`);
       // A machine is a family: the catalogue offers its classes, and the money is spent there
       // (CLAUDE.md T3 3.5).
       const choose = root().querySelector(`[data-do="openMachine"][data-id="${specId}"]`);
@@ -87,6 +92,8 @@ describe('the first ten minutes', () => {
       click(`[data-modal="machine"] [data-do="buyEquipment"][data-id="${specId}"]`);
       click('[data-modal="machine"] [data-do="closeModal"]');
     }
+    // The software sits under whatever tab is open: any of them but Owned carries it.
+    click('[data-do="catalogueTab"][data-id="computers"]');
     click('[data-do="buySoftware"][data-id="oneOff"]');
     const state = currentState();
     expect(state?.equipment).toHaveLength(STARTING_KIT.length);
@@ -163,8 +170,10 @@ describe('the first ten minutes', () => {
     expect(html()).toContain('Table saw');
     expect(html()).toContain('data-owner="1"');
     expect(html()).toContain('data-room="wc"');
-    click('[data-room="wc"]');
-    expect(html()).toContain('The WC.');
+    // The block carries its own tooltip. Walking into a room is driven off the footprints and
+    // needs a screen matrix, which this page has none of, so it is proved where the matrix is
+    // stubbed: tests/ui/hallRooms.test.ts.
+    expect(html()).toContain('<title>The WC.');
     // Nothing has its material in the hall yet, so the hall says why instead of a dead button.
     expect(html()).toContain('No job has its material in the hall yet');
     expect(html()).toContain('Clean up');
@@ -280,13 +289,20 @@ describe('the modals', () => {
   it('give every filter field a clear cross once it has text', () => {
     click('[data-do="closeModal"]');
     click('[data-office="catalogue"]');
+    // The filter works inside the tab that is open and nowhere else (CLAUDE.md T6 3.6).
+    click('[data-do="catalogueTab"][data-id="handTools"]');
     expect(html()).not.toContain('data-do="clearFilter"');
-    type('[data-filter="catalogue"]', 'saw');
-    expect(html()).toContain('data-do="clearFilter"');
-    expect(html()).toContain('Table saw');
-    expect(html()).not.toContain('Cordless drill');
-    click('[data-do="clearFilter"]');
     expect(html()).toContain('Cordless drill');
+    type('[data-filter="catalogue"]', 'edge');
+    expect(html()).toContain('data-do="clearFilter"');
+    expect(html()).toContain('Hand edgebander');
+    expect(html()).not.toContain('Cordless drill');
+    // A tab with nothing matching says so, and never borrows a line from another tab.
+    click('[data-do="catalogueTab"][data-id="storage"]');
+    expect(html()).toContain('Nothing matches that.');
+    expect(html()).not.toContain('Hand edgebander');
+    click('[data-do="clearFilter"]');
+    expect(html()).toContain('Tool cabinet');
     click('[data-do="closeModal"]');
   });
 
@@ -369,6 +385,8 @@ describe('setting the hall out', () => {
 describe('why it is like this in real life', () => {
   it('offers an i link on the accounting rows and opens the note', () => {
     click('[data-office="binder"]');
+    // The books open on the Days tab; the totals with their notes are on the Summary one.
+    click('[data-do="accountingTab"][data-id="summary"]');
     expect(html()).toContain('data-do="showWhy"');
     expect(html()).toContain('data-id="rent"');
     click('[data-do="showWhy"][data-id="rent"]');
@@ -400,19 +418,26 @@ describe('why it is like this in real life', () => {
 describe('accounting', () => {
   it('plays blind while the books are behind, and shows everything once they are written up', () => {
     click('[data-office="binder"]');
+    click('[data-do="accountingTab"][data-id="ledger"]');
     expect(html()).toContain('Books not up to date since day 1');
     expect(html()).toContain('? today');
     expect(html()).not.toContain('Unit deposit');
+    // Nothing on the Days tab either: the month has not been written up.
+    click('[data-do="accountingTab"][data-id="days"]');
+    expect(html()).toContain('Nothing has moved this month yet.');
     click('[data-do="closeModal"]');
     // The bookkeeping task catches every day up at once.
     const state = currentState();
     if (state) state.booksUpToDay = state.clock.day;
     click('[data-office="binder"]');
     expect(html()).not.toContain('Books not up to date');
+    // The month a day at a time, out of the ledger itself (CLAUDE.md T6 3.9).
+    expect(html()).toContain('data-day="1"');
+    click('[data-do="accountingTab"][data-id="ledger"]');
     expect(html()).toContain('Unit deposit');
     expect(html()).toContain('Rent');
     expect(html()).toContain('Living costs');
-    expect(html()).toContain('Ledger, last 50');
+    expect(html()).toContain(`Ledger, last ${LEDGER_VISIBLE_ENTRIES}`);
     expect(html()).toContain('Copy state as JSON');
     click('[data-do="closeModal"]');
   });
@@ -440,6 +465,7 @@ describe('accounting', () => {
 
   it('names every line in plain English, never the engine key', () => {
     click('[data-office="binder"]');
+    click('[data-do="accountingTab"][data-id="summary"]');
     expect(html()).toContain('Business rates');
     expect(html()).toContain('Living costs');
     expect(html()).toContain('Deposit on the unit');

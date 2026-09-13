@@ -1,7 +1,14 @@
 // The one slim top bar every view shares (CLAUDE.md 10.1). Nothing else lives here.
 
-import { MINUTES_PER_WORKING_DAY, SPEEDS } from '../engine/constants';
-import { booksBehind, formatDate, isBreak, movingMachines, netOf } from '../engine/index';
+import { SPEEDS } from '../engine/constants';
+import {
+  booksBehind,
+  formatDate,
+  isBreak,
+  movingMachines,
+  netOf,
+  ownerMinutesToday,
+} from '../engine/index';
 import type { GameState, Speed } from '../engine/index';
 import { cadenceControl } from './dayEnd';
 import { escapeHtml, money } from './modal';
@@ -25,14 +32,28 @@ function speedButtons(state: GameState): string {
     return '<span class="reason">Moving machines</span>';
   }
   // At dinner. The speeds stay as they are, so the player can run the clock through it.
-  const dinner = isBreak(state.clock.minute) ? '<span class="reason">Break</span>' : '';
+  const dinner = isBreak(state.clock.minute)
+    ? `<span class="reason">${state.owner.breakSkipped ? 'Working through' : 'Break'}</span>`
+    : '';
   return dinner + speedChips(state);
+}
+
+/** What today's work is multiplied by, shown only when the owner is paying for something: the
+ *  overtime this week, or a dinner he worked through (CLAUDE.md T6 3.4). */
+function outputChip(state: GameState): string {
+  const factor = state.owner.labourFactor;
+  if (factor >= 1) return '';
+  return (
+    `<span class="output warn" title="Overtime and skipped breaks come off tomorrow">` +
+    `Output ${factor.toFixed(2)}</span>`
+  );
 }
 
 /** Admin grey, design purple, workshop green, the rest free (CLAUDE.md 7.1). */
 function minuteBar(state: GameState): string {
   const used = state.owner.minutesByCategory;
-  const total = MINUTES_PER_WORKING_DAY;
+  // The hour he worked through is an hour more he has to spend (CLAUDE.md T6 3.4).
+  const total = ownerMinutesToday(state);
   const width = (value: number): string => `${Math.min(100, (value / total) * 100)}%`;
   return (
     '<div class="minutes" title="Owner minutes today">' +
@@ -63,6 +84,7 @@ export function renderTopbar(
     `<span class="date">${escapeHtml(formatDate(state.clock))}</span>` +
     `<span class="speeds">${speedButtons(state)}</span>` +
     minuteBar(state) +
+    outputChip(state) +
     '<span class="spacer"></span>' +
     '<button class="chip" data-do="openModal" data-modal="board">Board</button>' +
     `<button class="chip" data-do="setView" data-view="${view === 'hall' ? 'office' : 'hall'}">` +

@@ -39,7 +39,8 @@ describe('the hall on day 1', () => {
   it('draws what has been bought, and leaves the office furniture in the office', () => {
     const svg = renderHall(buyStartingKit(newGame()));
     expect(svg).toContain('Table saw');
-    expect(svg).toContain('Hand edgebander');
+    // The hand edgebander is in a tool cabinet now, so the hall never draws it (T6 3.5).
+    expect(svg).not.toContain('Hand edgebander');
     expect(svg).toContain('Extractor');
     expect(svg).toContain('Workbench');
     // The desk, the chair and the laptop belong to the office view.

@@ -7,10 +7,12 @@ import {
   OFFICE_CANVAS,
   OFFICE_LAYERS,
   OFFICE_REGIONS,
+  OFFICE_NAME_SIZE_MIN,
   OFFICE_TEXTS,
   officeScale,
   renderOffice,
 } from '../../src/render/office';
+import { fitName } from '../../src/render/hall';
 import { formatTime } from '../../src/engine/clock';
 import { tick } from '../../src/engine/index';
 import { newGame } from '../helpers';
@@ -146,22 +148,40 @@ describe('the live text', () => {
     );
     const company = holder.querySelector('[data-office-text="company"]');
     expect(company?.textContent).toBe(state.companyName);
-    expect(company?.getAttribute('style')).toContain('font-size:22px');
+    // The board is lettered at whatever holds the name, up to the 22 px of the contract.
+    const fitted = fitName(state.companyName, OFFICE_TEXTS.company.width, {
+      max: OFFICE_TEXTS.company.fontSize,
+      min: OFFICE_NAME_SIZE_MIN,
+    });
+    expect(fitted.fontSize).toBeLessThanOrEqual(OFFICE_TEXTS.company.fontSize);
+    expect(company?.getAttribute('style')).toContain(`font-size:${fitted.fontSize}px`);
   });
 
-  it('keeps the company name on one line, with an ellipsis when it does not fit', () => {
+  it('shrinks the company name to fit the board, and only then cuts it', () => {
+    const long = 'A very long joinery company name indeed';
     const holder = document.createElement('div');
-    holder.innerHTML = renderOffice(
-      newGame({ companyName: 'A very long joinery company name indeed' }),
-      { width: 1280, height: 800 },
-    );
+    holder.innerHTML = renderOffice(newGame({ companyName: long }), {
+      width: 1280,
+      height: 800,
+    });
     const company = holder.querySelector('[data-office-text="company"]');
-    // The ellipsis is drawn on a block inside the box, because a flex container cannot
-    // ellipsise its own text.
+    // The name is on a block inside the box, which is what keeps it to one line.
     const line = company?.firstElementChild;
     expect(line?.tagName.toLowerCase()).toBe('span');
-    expect(line?.textContent).toBe('A very long joinery company name indeed');
-    expect(company?.textContent).toBe('A very long joinery company name indeed');
+    // It went down to the smallest the board allows before anything was cut, and what is cut is
+    // cut by the same helper the hall wall uses (CLAUDE.md T6 3.10).
+    const fitted = fitName(long, OFFICE_TEXTS.company.width, {
+      max: OFFICE_TEXTS.company.fontSize,
+      min: OFFICE_NAME_SIZE_MIN,
+    });
+    expect(fitted.fontSize).toBe(OFFICE_NAME_SIZE_MIN);
+    expect(fitted.text.endsWith('...')).toBe(true);
+    expect(line?.textContent).toBe(fitted.text);
+    expect(company?.getAttribute('style')).toContain(`font-size:${OFFICE_NAME_SIZE_MIN}px`);
+    // A name that fits is not touched at all.
+    const short = document.createElement('div');
+    short.innerHTML = renderOffice(newGame({ companyName: 'WE' }), { width: 1280, height: 800 });
+    expect(short.querySelector('[data-office-text="company"]')?.textContent).toBe('WE');
   });
 
   it('prints the company the player named, whatever it is', () => {

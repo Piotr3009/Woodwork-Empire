@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from 'vitest';
 import {
-  BREAK_MINUTES,
+  OVERTIME_END_MINUTE,
   DUCTING_RECONNECT_COST,
   MOVE_MINUTES_PER_ITEM,
   MOVING_SPEED,
@@ -31,10 +31,13 @@ import {
   placeEquipment,
 } from '../helpers';
 
-/** A hall with the day 1 kit, the clock stopped the way setup mode stops it. */
+/** A hall with the day 1 kit and a thicknesser stood in it, the clock stopped the way setup mode
+ *  stops it. The thicknesser is the second ducted machine: the hand edgebander holds no cell of
+ *  the floor any more and cannot be moved at all (CLAUDE.md T6 3.5). */
 function inSetup(): GameState {
   const state = fillRack(buyStartingKit(newGame({ difficulty: 'veryEasy' })));
   state.enquiries = [];
+  placeEquipment(state, 'thicknesser', { x: 12, y: 1 });
   return act(state, { type: 'SET_SPEED', speed: 0 });
 }
 
@@ -53,7 +56,8 @@ function drag(state: GameState, specId: string): GameState {
 describe('which items are ducted', () => {
   it('is every machine family but the compressor, and nothing that is not a machine', () => {
     expect(needsDucting('tableSaw')).toBe(true);
-    expect(needsDucting('edgebander')).toBe(true);
+    // It holds no cell of the floor, so there is nothing to unplug it from (T6 3.5).
+    expect(needsDucting('edgebander')).toBe(false);
     expect(needsDucting('thicknesser')).toBe(true);
     expect(needsDucting('cnc')).toBe(true);
     expect(needsDucting('compressor')).toBe(false);
@@ -68,7 +72,7 @@ describe('which items are ducted', () => {
 
 describe('a move of two machines', () => {
   it('charges 1,600 and takes 120 minutes with the clock forced to 4x', () => {
-    let state = drag(drag(inSetup(), 'tableSaw'), 'edgebander');
+    let state = drag(drag(inSetup(), 'tableSaw'), 'thicknesser');
     expect(state.movedItems).toHaveLength(2);
     expect(ductingDue(state)).toEqual({ machines: 2, cost: 2 * DUCTING_RECONNECT_COST });
     const cash = state.cash;
@@ -91,7 +95,7 @@ describe('a move of two machines', () => {
     const lines = state.ledger.filter((entry) => entry.category === 'ducting');
     expect(lines.map((entry) => entry.label)).toEqual([
       'Ducting reconnection: table saw',
-      'Ducting reconnection: hand edgebander',
+      'Ducting reconnection: thicknesser',
     ]);
     expect(state.movedItems).toEqual([]);
     // And the clock is the player's again.
@@ -124,14 +128,15 @@ describe('a move of two machines', () => {
 
 describe('a move the day ended in the middle of', () => {
   it('is picked up again in the morning, and charged when it is finished', () => {
-    let state = drag(drag(inSetup(), 'tableSaw'), 'edgebander');
+    let state = drag(drag(inSetup(), 'tableSaw'), 'thicknesser');
     const cash = state.cash;
     state = act(state, { type: 'END_SETUP', speed: 1 });
     const move = movePending(state);
     expect(move).not.toBeNull();
-    // Near the twelve hour wall, which the clock reads half an hour past for the break, so the day
-    // ends with the kit still up in the air.
-    state.clock.minute = 700 + BREAK_MINUTES;
+    // Near seven o'clock, where the tools go down whatever anybody wants, so the day ends with
+    // the kit still up in the air.
+    state.clock.minute = OVERTIME_END_MINUTE - 20;
+    state.owner.homeAsked = true;
     state = clearEvents(tick(state, 30));
     expect(state.clock.day).toBe(2);
     expect(movePending(state)?.id).toBe(move?.id);
@@ -196,7 +201,7 @@ describe('the flexi extraction system', () => {
     let state = inSetup();
     placeEquipment(state, 'flexiSystem');
     expect(hasCentralExtraction(state)).toBe(true);
-    state = drag(drag(state, 'tableSaw'), 'edgebander');
+    state = drag(drag(state, 'tableSaw'), 'thicknesser');
     expect(ductingDue(state)).toEqual({ machines: 0, cost: 0 });
     const cash = state.cash;
     state = act(state, { type: 'END_SETUP', speed: 1 });

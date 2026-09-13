@@ -11,9 +11,12 @@ import { missingForHire } from '../../src/engine/staff';
 import type { GameState } from '../../src/engine/index';
 import {
   BREAK_MINUTES,
+  BREAK_START_MINUTE,
   DAYS_PER_MONTH,
+  DAY_END_MINUTE,
   LIVING_COST_PER_WORKING_DAY,
   MINUTES_PER_WORKING_DAY,
+  OVERTIME_END_MINUTE,
   POWER_BASE_DAILY,
   unitDepositFor,
 } from '../../src/engine/constants';
@@ -78,26 +81,31 @@ describe('createGame', () => {
 });
 
 describe('day boundary', () => {
-  it('keeps the clock running past 16:00 while the owner is still in', () => {
-    const state = tick(createGame(OPTIONS), 600);
-    expect(state.clock.minute).toBe(600);
+  it('keeps the clock running past 17:00 once the owner has said he is staying', () => {
+    let state = clearEvents(tick(createGame(OPTIONS), BREAK_START_MINUTE + 1));
+    state = tick(state, DAY_END_MINUTE);
+    expect(state.activeEvent?.kind).toBe('goingHome');
+    state = tick(applyAction(state, { type: 'RESOLVE_EVENT', choiceId: 'overtime' }), 60);
+    expect(state.clock.minute).toBe(DAY_END_MINUTE + 60);
     expect(state.activeEvent).toBeNull();
   });
 
   it('ends the day when the owner says so, any time after his 480 are in', () => {
-    const state = applyAction(tick(createGame(OPTIONS), 500 + BREAK_MINUTES), { type: 'END_DAY' });
+    let state = clearEvents(tick(createGame(OPTIONS), BREAK_START_MINUTE + 1));
+    state = applyAction(tick(state, DAY_END_MINUTE), { type: 'RESOLVE_EVENT', choiceId: 'overtime' });
+    state = applyAction(tick(state, 20), { type: 'END_DAY' });
     expect(state.activeEvent?.kind).toBe('dayEnd');
   });
 
-  it('ends the day at 16:30 once the owner has gone home', () => {
+  it('ends the day at 17:00 once the owner has gone home', () => {
     let state = applyAction(tick(createGame(OPTIONS), 100), { type: 'END_DAY' });
     expect(state.activeEvent).toBeNull();
-    state = tick(state, 379 + BREAK_MINUTES);
+    state = tick(state, DAY_END_MINUTE - 101);
     expect(state.activeEvent).toBeNull();
     state = tick(state, 1);
-    // The 480 minutes of work are in, and the clock reads half an hour further for the break.
-    expect(state.clock.minute).toBe(480 + BREAK_MINUTES);
-    expect(formatTime(state.clock.minute)).toBe('16:30');
+    // The 480 minutes of work are in, and the clock reads an hour further for the dinner.
+    expect(state.clock.minute).toBe(DAY_END_MINUTE);
+    expect(formatTime(state.clock.minute)).toBe('17:00');
     expect(state.activeEvent?.kind).toBe('dayEnd');
   });
 
@@ -119,7 +127,8 @@ describe('day boundary', () => {
   it('reports the weekend once, not twice', () => {
     let state = createGame(OPTIONS);
     for (let day = 1; day <= 4; day += 1) state = nextDay(state);
-    const friday = applyAction(tick(state, 480 + BREAK_MINUTES), { type: 'END_DAY' });
+    const noon = clearEvents(tick(state, BREAK_START_MINUTE + 1));
+    const friday = applyAction(tick(noon, DAY_END_MINUTE), { type: 'RESOLVE_EVENT', choiceId: 'home' });
     const afterDayEnd = applyAction(friday, { type: 'RESOLVE_EVENT', choiceId: 'next' });
     expect(afterDayEnd.activeEvent?.kind).toBe('weekend');
     expect(afterDayEnd.activeEvent?.data.days).toBe(2);
@@ -135,7 +144,8 @@ describe('day boundary', () => {
   });
 
   it('freezes the clock while an event is open', () => {
-    const state = applyAction(tick(createGame(OPTIONS), 480 + BREAK_MINUTES), { type: 'END_DAY' });
+    const noon = clearEvents(tick(createGame(OPTIONS), BREAK_START_MINUTE + 1));
+    const state = applyAction(tick(noon, DAY_END_MINUTE), { type: 'RESOLVE_EVENT', choiceId: 'home' });
     expect(state.activeEvent?.kind).toBe('dayEnd');
     const again = tick(state, 100);
     expect(again.clock.minute).toBe(state.clock.minute);
@@ -149,17 +159,19 @@ describe('day boundary', () => {
     state = tick(state, 100);
     expect(state.clock.minute).toBe(200);
     state = tick(state, 400);
-    expect(state.clock.minute).toBe(480 + BREAK_MINUTES);
+    expect(state.clock.minute).toBe(DAY_END_MINUTE);
     expect(state.activeEvent?.kind).toBe('dayEnd');
   });
 
-  it('stops the day at the 12 hour hard stop', () => {
+  it('stops the day at 19:00 whatever the owner wants', () => {
     let state = withLicence(createGame(OPTIONS));
-    // A drawing far too long for one day keeps the owner in past 16:00. Twelve hours is the wall.
+    // A drawing far too long for one day keeps the owner in past five. Seven is the wall.
     const design = createTask(state, { kind: 'design', label: 'Endless drawing', minutes: 2000 });
     state = applyAction(state, { type: 'START_TASK', taskId: design.id });
+    state = clearEvents(tick(state, BREAK_START_MINUTE + 1));
+    state = applyAction(tick(state, DAY_END_MINUTE), { type: 'RESOLVE_EVENT', choiceId: 'overtime' });
     state = tick(state, 900);
-    expect(state.clock.minute).toBe(720 + BREAK_MINUTES);
+    expect(state.clock.minute).toBe(OVERTIME_END_MINUTE);
     expect(state.activeEvent?.kind).toBe('dayEnd');
   });
 });
@@ -192,16 +204,22 @@ describe('the loop the UI drives', () => {
   });
 
   it('stops on the minute an event fires and hands the rest of the batch back', () => {
-    // The twelve hour wall is twelve hours of work, which the clock reads as 750 with the break
-    // in it, so an 800 minute batch from minute 0 stops there.
+    // Noon is the first question of the day, so a 400 minute batch from 08:00 stops there with
+    // 160 of it still in hand, and the batch after it stops at five.
     let state = withLicence(createGame(OPTIONS));
     const design = createTask(state, { kind: 'design', label: 'Endless drawing', minutes: 2000 });
     state = applyAction(state, { type: 'START_TASK', taskId: design.id });
-    const result = runMinutes(state, 800);
-    expect(result.minutesRun).toBe(720 + BREAK_MINUTES);
-    expect(result.state.clock.minute).toBe(720 + BREAK_MINUTES);
-    expect(result.state.activeEvent?.kind).toBe('dayEnd');
-    expect(runMinutes(result.state, 80).minutesRun).toBe(0);
+    const noon = runMinutes(state, 400);
+    expect(noon.minutesRun).toBe(BREAK_START_MINUTE);
+    expect(noon.state.activeEvent?.kind).toBe('breakTime');
+    expect(runMinutes(noon.state, 80).minutesRun).toBe(0);
+    const afternoon = runMinutes(
+      applyAction(noon.state, { type: 'RESOLVE_EVENT', choiceId: 'take' }),
+      600,
+    );
+    expect(afternoon.minutesRun).toBe(DAY_END_MINUTE - BREAK_START_MINUTE);
+    expect(afternoon.state.clock.minute).toBe(DAY_END_MINUTE);
+    expect(afternoon.state.activeEvent?.kind).toBe('goingHome');
   });
 });
 

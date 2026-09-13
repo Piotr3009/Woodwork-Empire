@@ -1,14 +1,23 @@
 // A scripted player, so a whole month can be played the same way twice. It makes the decisions a
 // careful owner would make: advance the jobs, get the material in, then stand at the bench.
 
-import { applyAction, isOvertime, tick } from '../../src/engine/index';
+import { DAY_END_MINUTE } from '../../src/engine/constants';
+import { applyAction, tick } from '../../src/engine/index';
 import type { GameEvent, GameState, TaskInstance } from '../../src/engine/index';
 
 /** What the script answers when the clock stops for a decision. */
-export function answer(state: GameState): string {
+export function answer(state: GameState, policy?: Policy): string {
   const event = state.activeEvent;
   if (!event) return 'ok';
   const ids = event.choices.map((choice) => choice.id);
+  // The two questions the day puts. The script takes its dinner and goes home at five unless the
+  // month it is playing says otherwise (CLAUDE.md T6 3.4).
+  if (event.kind === 'breakTime') {
+    return policy?.skipBreakOn?.includes(state.clock.day) === true ? 'skip' : 'take';
+  }
+  if (event.kind === 'goingHome') {
+    return policy?.overtimeOn?.includes(state.clock.day) === true ? 'overtime' : 'home';
+  }
   // The scripted owner is a careful one: he picks the phone up (CLAUDE.md T4 3.3).
   for (const preferred of ['answer', 'unload', 'owner', 'storage', 'next', 'ok']) {
     if (ids.includes(preferred)) return preferred;
@@ -54,6 +63,11 @@ export interface Policy {
   stockSheets: number;
   /** The class of table saw to buy on day 1. Undefined takes the cheapest, the used one. */
   sawVariant?: string;
+  /** Days the owner works through his dinner (CLAUDE.md T6 3.4). */
+  skipBreakOn?: number[];
+  /** Days he stays on after five, and how long for. */
+  overtimeOn?: number[];
+  overtimeMinutes?: number;
 }
 
 export const CAREFUL: Policy = {
@@ -105,6 +119,7 @@ export const DAY_ONE_KIT = [
   'laptop',
   'tableSaw',
   'drill',
+  'toolCabinet',
   'edgebander',
   'compressor',
   'extractor',
@@ -125,7 +140,7 @@ function buyKit(state: GameState, policy: Policy): GameState {
 }
 
 /** What a joiner has to have before he can start (CLAUDE.md 9.3). */
-export const JOINER_KIT = ['workbench', 'locker', 'canteenSeat', 'handToolSet'];
+export const JOINER_KIT = ['workbench', 'locker', 'canteenSeat', 'toolCabinet', 'handToolSet'];
 
 function takeOnJoiner(state: GameState): GameState {
   if (state.workers.some((worker) => worker.role === 'joiner')) return state;
@@ -188,7 +203,7 @@ export function playDay(
     guard += 1;
     if (next.activeEvent) {
       seen.push(next.activeEvent);
-      next = applyAction(next, { type: 'RESOLVE_EVENT', choiceId: answer(next) });
+      next = applyAction(next, { type: 'RESOLVE_EVENT', choiceId: answer(next, policy) });
       continue;
     }
     next = takeWork(next, policy);
@@ -208,9 +223,13 @@ export function playDay(
     const step = options.step ?? 30;
     options.watch?.(next);
     next = tick(next, step);
-    // Nothing left worth the overtime: go home once the 480 minutes of work are in. The clock
-    // reads past 16:00 by the length of the break, so this asks the engine and not the hands.
-    if (next.clock.day === day && isOvertime(next.clock.minute) && next.activeEvent === null) {
+    // Home once the day is in, unless the month says he stays on, and then home when the hours
+    // it asked for are behind him too (CLAUDE.md T6 3.4).
+    const stayUntil =
+      policy.overtimeOn?.includes(day) === true
+        ? DAY_END_MINUTE + (policy.overtimeMinutes ?? 60)
+        : DAY_END_MINUTE;
+    if (next.clock.day === day && next.clock.minute >= stayUntil && next.activeEvent === null) {
       options.watch?.(next);
       next = applyAction(next, { type: 'END_DAY' });
       next = tick(next, step);

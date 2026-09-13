@@ -6,6 +6,7 @@ import {
   FINISHED_GOODS_LAYOUT,
   GATE_CROWD_LIMIT,
   GATE_LAYOUT,
+  ROOM_DOOR,
   ROOM_LAYOUT,
   YARD_WIDTH_CELLS,
   roomDoorCell,
@@ -21,6 +22,7 @@ import {
   serviceIsDue,
 } from '../engine/machines';
 import { jobsAtGate } from '../engine/jobs';
+import { standsInTheHall } from '../engine/machines';
 import { machineInUse } from '../engine/game';
 import { rackCapacity, stockIsLow } from '../engine/materials';
 import {
@@ -40,11 +42,14 @@ import {
   type BoxFaces,
   type Point,
   type Polygon,
+  TILE_RISE,
+  blockSilhouette,
   boxPolygons,
   centreOf,
   depthKey,
   footprintPolygon,
   gridBounds,
+  pointInPolygon,
   tileToScreen,
 } from './iso';
 import {
@@ -88,8 +93,17 @@ export function label(at: Point, text: string, extra = ''): string {
   );
 }
 
-/** Text the game letters over the painting: the room names and the company name. Its own class,
- *  because the painting is not the flat grey the placeholder boxes are (docs/art/SPRITES.md 9.5). */
+/** The matrix that lays lettering into a wall that runs along world x, which is the rear wall and
+ *  every room front (CLAUDE.md T6 3.2). One metre along that wall is (+24, +12) on the screen and
+ *  one metre of height is (0, -24), so a pixel of the text box goes (1, 0.5) across and (0, 1)
+ *  down: the letters keep their height and lean with the wall. */
+export function wallMatrix(at: Point): string {
+  return `matrix(1,0.5,0,1,${round(at.x)},${round(at.y)})`;
+}
+
+/** Text the game letters onto the painting: the room names and the company name. Its own class,
+ *  because the painting is not the flat grey the placeholder boxes are (docs/art/SPRITES.md 9.5).
+ *  `at` is where the middle of the baseline sits, projected from the wall it is painted on. */
 export function paintedText(
   at: Point,
   text: string,
@@ -97,7 +111,7 @@ export function paintedText(
   fontSize: number,
 ): string {
   return (
-    `<text x="${round(at.x)}" y="${round(at.y)}" text-anchor="middle" ` +
+    `<text x="0" y="0" text-anchor="middle" transform="${wallMatrix(at)}" ` +
     `class="${className}" font-size="${round(fontSize)}">${escapeText(text)}</text>`
   );
 }
@@ -177,8 +191,17 @@ export const HALL_LAYERS: HallLayer[] = [
 ];
 
 /** The box docs/art/SPRITES.md 9.5 leaves on the wall for the company name, given there in
- *  canvas pixels at 2x: x 300 to 560, y 130 to 200. */
+ *  canvas pixels at 2x: x 300 to 560, y 130 to 200. Its width is what the name is fitted to. */
 export const HALL_NAME_BOX = { x: 300, y: 130, width: 260, height: 70 };
+
+/** Where the name is lettered on the rear wall: the middle of the lettering, in metres along the
+ *  wall and up it. The run of blockwork past the canteen block is the only clear one, and 2 m up
+ *  is clear of everything standing in front of it [TUNE: both].
+ *
+ *  The box of 9.5 does not place it. Measured on the delivered background, canvas x 300 to 560 is
+ *  beside the left wall, not the rear one, and y 130 to 200 is above its roofline: the strip is
+ *  the dark sky over the building, which is REPORT-T5 open question 1, still unanswered. */
+export const HALL_NAME_WALL = { x: 9, z: 2 };
 
 /** The biggest and the smallest the name is ever lettered, in scene pixels. The floor is the
  *  repository's readable minimum (CLAUDE.md T2 3.11), so a long name shrinks to it and is cut
@@ -190,20 +213,42 @@ const LETTER_WIDTH = 0.55;
 
 /** Room names are small text on the face that looks into the hall (docs/art/SPRITES.md 9.5). */
 const ROOM_LABEL_SIZE = 11;
+/** How far the name stands above the door head, in metres [TUNE]. */
+const ROOM_LABEL_CLEARANCE = 0.1;
 
-/** A canvas rectangle, in the hall's own coordinates. The art is 2x and the scene is 1x, so the
- *  box halves, and then it shifts by the same origin the layers are laid down on. */
-export function canvasBoxInHall(box: {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}): { x: number; y: number; width: number; height: number } {
+/** How wide the name may be lettered, in scene pixels: the box of docs/art/SPRITES.md 9.5 is
+ *  given at 2x and the scene is 1x. */
+export const HALL_NAME_WIDTH = HALL_NAME_BOX.width / SPRITE_SCALE;
+
+/** A box on a wall, in metres across the face and up it. The two the hall cares about are the
+ *  door and the name over it, which must not touch (CLAUDE.md T6 3.2). */
+export interface FaceBox {
+  across: number;
+  from: number;
+  bottom: number;
+  top: number;
+}
+
+/** The door in a room's front face, centred on it (docs/art/SPRITES.md 9.3). */
+export function roomDoorBox(room: { width: number }): FaceBox {
   return {
-    x: box.x / SPRITE_SCALE - HALL_CANVAS.originX,
-    y: box.y / SPRITE_SCALE - HALL_CANVAS.originY,
-    width: box.width / SPRITE_SCALE,
-    height: box.height / SPRITE_SCALE,
+    across: ROOM_DOOR.width,
+    from: room.width / 2 - ROOM_DOOR.width / 2,
+    bottom: 0,
+    top: ROOM_DOOR.height,
+  };
+}
+
+/** The name over it: the top third of the face, clear of the door head. A metre of the face is
+ *  the same number of pixels across it as up it, so both sides of the box divide by one number. */
+export function roomLabelBox(room: { name: string; width: number }): FaceBox {
+  const across = (room.name.length * LETTER_WIDTH * ROOM_LABEL_SIZE) / TILE_RISE;
+  const bottom = roomDoorBox(room).top + ROOM_LABEL_CLEARANCE;
+  return {
+    across,
+    from: room.width / 2 - across / 2,
+    bottom,
+    top: bottom + ROOM_LABEL_SIZE / TILE_RISE,
   };
 }
 
@@ -212,16 +257,48 @@ export interface FittedName {
   fontSize: number;
 }
 
-/** The company name lettered to fit the wall: it shrinks before it is cut, and it is only cut
- *  when even the smallest readable lettering will not hold it. */
-export function fitName(name: string, boxWidth: number): FittedName {
+/** The company name lettered to fit a box: it shrinks before it is cut, and it is only cut when
+ *  even the smallest readable lettering will not hold it. The hall's wall and the office board
+ *  both come through here, at their own sizes (CLAUDE.md T6 3.10). */
+export function fitName(
+  name: string,
+  boxWidth: number,
+  sizes: { max: number; min: number } = { max: NAME_SIZE_MAX, min: NAME_SIZE_MIN },
+): FittedName {
   const trimmed = name.trim();
-  if (trimmed === '') return { text: '', fontSize: NAME_SIZE_MAX };
+  if (trimmed === '') return { text: '', fontSize: sizes.max };
   const wanted = Math.floor(boxWidth / (LETTER_WIDTH * trimmed.length));
-  const fontSize = Math.min(NAME_SIZE_MAX, Math.max(NAME_SIZE_MIN, wanted));
+  const fontSize = Math.min(sizes.max, Math.max(sizes.min, wanted));
   const fits = Math.floor(boxWidth / (LETTER_WIDTH * fontSize));
   if (trimmed.length <= fits) return { text: trimmed, fontSize };
   return { text: `${trimmed.slice(0, Math.max(1, fits - 3))}...`, fontSize };
+}
+
+/** The shape a room block covers on the screen. A room is 2.7 m high, so what the player sees of
+ *  it reaches well above the cells it stands on: the canteen block is painted over the middle of
+ *  the office's floor, and the office block over the WC's front face. */
+export function roomSilhouette(room: {
+  x: number;
+  y: number;
+  width: number;
+  depth: number;
+  height: number;
+}): Polygon {
+  return blockSilhouette(room.x, room.y, room.width, room.depth, room.height);
+}
+
+/** Which room the player clicked, from the room footprints alone: never from the layer images,
+ *  which are one full canvas each and would answer for every pixel of the hall (CLAUDE.md T6 3.1).
+ *  The rooms are tried nearest first, in the reverse of the order they are painted in, so the
+ *  block in front takes the click the way it takes the pixel. */
+export function roomAtScenePoint(point: Point): RoomId | null {
+  const nearestFirst = [...ROOM_LAYOUT].sort(
+    (left, right) => depthKey(right.x, right.y) - depthKey(left.x, left.y),
+  );
+  for (const room of nearestFirst) {
+    if (pointInPolygon(point, roomSilhouette(room))) return room.id;
+  }
+  return null;
 }
 
 /** Where a layer goes in the hall's own coordinates: the canvas, shifted so its origin pixel
@@ -233,6 +310,86 @@ export function hallLayerBox(): { x: number; y: number; width: number; height: n
     width: HALL_CANVAS.width,
     height: HALL_CANVAS.height,
   };
+}
+
+// ---------------------------------------------------------------------------
+// The camera over the hall (CLAUDE.md T6 3.3). One transform on one group, over the painting, the
+// sprites, the figures, the effects and the text: nothing is laid out again when it changes, and
+// the same numbers answer where a click landed.
+// ---------------------------------------------------------------------------
+
+export interface HallCamera {
+  /** Multiples of the letterboxed fit the view box already gives. */
+  scale: number;
+  /** Where the scene is pushed to, in view box units. */
+  x: number;
+  y: number;
+}
+
+/** The whole hall on the screen, which is where every visit starts. */
+export const HALL_CAMERA_FIT: HallCamera = { scale: 1, x: 0, y: 0 };
+export const HALL_ZOOM_MIN = 1;
+export const HALL_ZOOM_MAX = 4;
+/** One notch of the wheel [PIOTR: steps of 1.2]. */
+export const HALL_ZOOM_STEP = 1.2;
+
+/** A rectangle in view box units: the frame the scene is seen through. */
+export interface Frame {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export function cameraTransform(camera: HallCamera): string {
+  return `translate(${round(camera.x)},${round(camera.y)}) scale(${round(camera.scale)})`;
+}
+
+/** How far in the player is allowed to be: from the fit to four times it (CLAUDE.md T6 3.3). The
+ *  one place the two ends are applied, so no way in can land outside them. */
+function clampScale(scale: number): number {
+  return Math.min(HALL_ZOOM_MAX, Math.max(HALL_ZOOM_MIN, scale));
+}
+
+/** The scene never comes off the frame: at the fit there is nowhere to go, and the further in the
+ *  player is the more he may push it about. */
+export function clampCamera(camera: HallCamera, frame: Frame): HallCamera {
+  const scale = clampScale(camera.scale);
+  const slack = 1 - scale;
+  return {
+    scale,
+    x: Math.min(frame.x * slack, Math.max((frame.x + frame.width) * slack, camera.x)),
+    y: Math.min(frame.y * slack, Math.max((frame.y + frame.height) * slack, camera.y)),
+  };
+}
+
+/** A point of the frame, back to the point of the scene under it. Hit testing goes through here,
+ *  so it reads the same transform the picture is drawn with. */
+export function sceneToContent(camera: HallCamera, at: Point): Point {
+  return { x: (at.x - camera.x) / camera.scale, y: (at.y - camera.y) / camera.scale };
+}
+
+/** Zoom about a point of the frame: whatever is under the pointer stays under it. */
+export function zoomAt(camera: HallCamera, frame: Frame, at: Point, factor: number): HallCamera {
+  const scale = clampScale(camera.scale * factor);
+  const taken = scale / camera.scale;
+  return clampCamera(
+    { scale, x: at.x - taken * (at.x - camera.x), y: at.y - taken * (at.y - camera.y) },
+    frame,
+  );
+}
+
+/** Zoom to a scale with a point of the scene in the middle of the frame. */
+export function zoomTo(frame: Frame, centre: Point, scale: number): HallCamera {
+  const wanted = clampScale(scale);
+  return clampCamera(
+    {
+      scale: wanted,
+      x: frame.x + frame.width / 2 - wanted * centre.x,
+      y: frame.y + frame.height / 2 - wanted * centre.y,
+    },
+    frame,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -295,7 +452,8 @@ export function machineFx(state: GameState, item: Equipment, spec: EquipmentSpec
     return { className: '', svg: blade(point) + chipStream(point) };
   }
   if (item.specId === 'thicknesser') return { className: '', svg: chipStream(point) };
-  if (item.specId === 'edgebander') return { className: '', svg: lamp(point, 'amber') };
+  // No line for the hand edgebander: it holds no cell of the floor, so it is never drawn
+  // (CLAUDE.md T6 3.5).
   return NO_FX;
 }
 
@@ -530,15 +688,16 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
         `<g data-room="${room.id}" class="clickable">` +
         `<title>${escapeText(room.tooltip)}</title>` +
         (drawn
-          ? polygon(
-              footprintPolygon(room.x, room.y, room.width, room.depth),
-              'transparent',
-              'class="room-hit"',
-            ) +
+          ? polygon(roomSilhouette(room), 'transparent', 'class="room-hit"') +
             // The art leaves the face blank, so the game letters it (docs/art/SPRITES.md 9.5).
+            // Over the door, not on it, and skewed into the face the door is in (T6 3.2).
             // A boxed room already carries its name in the middle: one name per room either way.
             paintedText(
-              tileToScreen(room.x + room.width / 2, room.y + room.depth, room.height / 2),
+              tileToScreen(
+                room.x + room.width / 2,
+                room.y + room.depth,
+                roomLabelBox(room).bottom,
+              ),
               room.name,
               'painted-text room-label',
               ROOM_LABEL_SIZE,
@@ -550,17 +709,19 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
     });
   }
 
-  // Everything the player has bought, except the office furniture, which lives in the office view.
+  // Everything the player has bought, except the office furniture, which lives in the office
+  // view, and the hand edgebander, which lives in a tool cabinet (CLAUDE.md T6 3.5).
   for (const item of state.equipment) {
     const spec = findSpec(item.specId);
     if (!spec || spec.category === 'furniture') continue;
+    if (!standsInTheHall(item.specId)) continue;
     const broken = item.broken;
     const fill = broken ? 'var(--stopped)' : CATEGORY_FILL[spec.category] ?? 'var(--kit-machine)';
     const shade = broken
       ? 'var(--stopped-dark)'
       : CATEGORY_SHADE[spec.category] ?? 'var(--kit-machine-dark)';
     const bagLine = item.bagFull ? ' (bag full)' : '';
-    const serviceLine = !item.broken && serviceIsDue(state, item) ? ' (service due)' : '';
+    const serviceLine = !item.broken && serviceIsDue(item) ? ' (service due)' : '';
     const rackLine =
       spec.category === 'storage' ? `: ${state.stock.sheets} / ${rackCapacity(state)}` : '';
     const atThisBench =
@@ -694,19 +855,15 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
   // Everything from here on is the live part: it changes with the state, minute by minute.
   const live: string[] = [];
 
-  // The name on the wall. The art leaves the strip blank on purpose, so there is nowhere sensible
-  // to put it until the wall is painted (docs/art/SPRITES.md 9.5). It is live text and not part of
-  // the shell: the company the player typed in is state, and a new game has a new one.
+  // The name on the rear wall, lettered into the wall plane so it leans with the blockwork
+  // (CLAUDE.md T6 3.2). It is live text and not part of the shell: the company the player typed
+  // in is state, and a new game has a new one.
   if (painted) {
-    const nameBox = canvasBoxInHall(HALL_NAME_BOX);
-    const fitted = fitName(state.companyName, nameBox.width);
+    const fitted = fitName(state.companyName, HALL_NAME_WIDTH);
     if (fitted.text !== '') {
       live.push(
         paintedText(
-          {
-            x: nameBox.x + nameBox.width / 2,
-            y: nameBox.y + nameBox.height / 2 + fitted.fontSize / 3,
-          },
+          tileToScreen(HALL_NAME_WALL.x, 0, HALL_NAME_WALL.z),
           fitted.text,
           'painted-text hall-company',
           fitted.fontSize,
@@ -812,7 +969,11 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
       `<svg class="hall-view" data-scene="${key}" viewBox="${viewBox}" ` +
       `width="${size.width}" height="${size.height}" ` +
       `xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Workshop hall">` +
-      `${parts.join('')}${LIVE_SLOT}</svg>`,
+      // Everything the player sees hangs off one group, so the camera is one attribute and no
+      // part of the hall is laid out again when it moves. It leaves here at the fit; the page
+      // writes the camera it is holding onto the group (CLAUDE.md T6 3.3).
+      `<g class="hall-scene" data-camera="1" transform="${cameraTransform(HALL_CAMERA_FIT)}">` +
+      `${parts.join('')}${LIVE_SLOT}</g></svg>`,
     live: live.join(''),
     notes:
       `<p class="view-note">${escapeText(stateLine)}</p>` +

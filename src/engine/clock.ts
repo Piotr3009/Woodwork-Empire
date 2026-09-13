@@ -1,6 +1,7 @@
-// Game time. The clock covers the working day only: 08:00 until the 480 minutes of work are done,
-// plus overtime up to 12 hours of work. The break is the one part of the day nobody works through,
-// so the clock reads half an hour further on than the work done, and 16:00 became 16:30.
+// Game time. The clock covers the working day only: 08:00 to 17:00, which is the 480 minutes of
+// work with the hour of dinner between them, and then overtime to 19:00 at the latest. The break
+// is the one part of the day nobody works through, unless the owner says he will, and then the
+// hour is his and nobody else's.
 // Weekends are skipped by the day advance in game.ts, which still charges their calendar costs.
 
 import {
@@ -8,11 +9,12 @@ import {
   BREAK_START_MINUTE,
   DAYS_PER_MONTH,
   DAYS_PER_WEEK,
+  DAY_END_MINUTE,
   DAY_START_HOUR,
   MAX_CLOCK_MINUTES_PER_DAY,
-  MAX_MINUTES_PER_DAY,
   MINUTES_PER_WORKING_DAY,
   MONTHS_PER_YEAR,
+  OVERTIME_END_MINUTE,
   REAL_SECONDS_PER_DAY_AT_1X,
   WEEKDAY_NAMES,
   WORKING_DAYS_PER_WEEK,
@@ -34,6 +36,11 @@ export function isWorkingDay(day: number): boolean {
 
 export function isFriday(day: number): boolean {
   return weekday(day) === WORKING_DAYS_PER_WEEK - 1;
+}
+
+/** Monday morning, when the week starts clean (PIOTR: the overtime debt resets at the weekend). */
+export function isMonday(day: number): boolean {
+  return weekday(day) === 0;
 }
 
 /** 1-based week of the game calendar. Day 1 to day 7 is week 1. */
@@ -90,25 +97,21 @@ export function breakMinutesBefore(minute: number): number {
 }
 
 /** The minutes of work the day has had by this point of the clock. Everything that measures a
- *  day's work, the hour bands, the pool, the hard stop, counts in these and not in clock minutes,
- *  so the break costs the work nothing and only moves the end of the day later. */
-export function workedMinutesOfDay(minute: number): number {
-  return minute - breakMinutesBefore(minute);
+ *  day's work counts in these and not in clock minutes, so a break that is taken costs the work
+ *  nothing and only moves the end of the day later. A break that is skipped is worked, which is
+ *  the 60 minutes the owner buys himself (CLAUDE.md T6 3.4). */
+export function workedMinutesOfDay(minute: number, breakSkipped = false): number {
+  return breakSkipped ? minute : minute - breakMinutesBefore(minute);
 }
 
-/** Whole hours of work done so far. 0 for the first hour. */
-export function hourIndex(minute: number): number {
-  return Math.floor(workedMinutesOfDay(minute) / 60);
-}
-
-/** True once the owner has done his 8 hours of work. */
+/** True from 17:00 on: the working day is behind everybody, break or no break. */
 export function isOvertime(minute: number): boolean {
-  return workedMinutesOfDay(minute) >= MINUTES_PER_WORKING_DAY;
+  return minute >= DAY_END_MINUTE;
 }
 
-/** True when the owner has to go home: 12 hours of work is the hard stop. */
+/** True at 19:00: the tools go down whoever wants what. */
 export function isDayExhausted(minute: number): boolean {
-  return workedMinutesOfDay(minute) >= MAX_MINUTES_PER_DAY;
+  return minute >= OVERTIME_END_MINUTE;
 }
 
 export function formatTime(minute: number): string {

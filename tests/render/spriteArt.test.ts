@@ -49,8 +49,8 @@ describe('an object with a file is a picture, not a box', () => {
     // The workbench has a file, so its name is a title and not text over the art.
     expect(svg).toContain('<title>Workbench (free). One per worker.');
     expect(svg).not.toContain('>Workbench (free)<');
-    // The edgebander has none, so it keeps its label.
-    expect(svg).toContain('>Hand edgebander<');
+    // The cheap shelving has none, so it keeps its label.
+    expect(svg).toContain('>Cheap shelving: 0 / 50<');
   });
 
   it('draws the contact shadow under both the pictures and the boxes', () => {
@@ -58,8 +58,8 @@ describe('an object with a file is a picture, not a box', () => {
     const shadows = svg.split('class="contact-shadow"').length - 1;
     // Three rooms, the kit in the hall, and never fewer than one per object drawn.
     expect(shadows).toBeGreaterThanOrEqual(10);
-    // The saw has a picture and the edgebander has not: both stand on a shadow.
+    // The saw has a picture and the shelving has not: both stand on a shadow.
     expect(svg).toContain('<image href="/sprites/tableSaw.pro.png"');
-    expect(svg).toContain('>Hand edgebander<');
+    expect(svg).toContain('>Cheap shelving: 0 / 50<');
   });
 });

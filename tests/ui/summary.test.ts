@@ -5,9 +5,10 @@
 import { describe, expect, it } from 'vitest';
 import { renderDayEnd } from '../../src/ui/dayEnd';
 import { renderMenu } from '../../src/ui/topbar';
-import { formatMoney } from '../../src/engine/index';
+import { currentState, mount } from '../../src/ui/app';
+import { formatMoney, summaryOfDay, tick } from '../../src/engine/index';
 import type { GameEvent, GameState } from '../../src/engine/index';
-import { act, buyStartingKit, eventsOfKind, newGame, runDays } from '../helpers';
+import { act, buyStartingKit, choose, eventsOfKind, newGame, runDays } from '../helpers';
 
 function parse(html: string): HTMLElement {
   const holder = document.createElement('div');
@@ -37,6 +38,49 @@ describe('the cadence control', () => {
     state = act(state, { type: 'SET_SUMMARY_CADENCE', cadence: 'weekly' });
     expect(state.summaryCadence).toBe('weekly');
     expect(parse(renderDayEnd(state)).querySelector('.chip.is-on')?.textContent).toBe('every week');
+  });
+});
+
+describe('the cadence in the Menu, driven through the page', () => {
+  it('is offered there as well as on the summary, and changing it there sticks', () => {
+    document.body.innerHTML = '<div id="app"></div>';
+    const root = document.querySelector('#app');
+    if (!(root instanceof HTMLElement)) throw new Error('no root');
+    mount(root);
+    const click = (selector: string): void => {
+      const element = root.querySelector(selector);
+      if (element === null) throw new Error(`nothing to click: ${selector}`);
+      element.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    };
+    click('[data-do="startGame"]');
+    expect(currentState()?.summaryCadence).toBe('daily');
+    click('[data-do="toggleMenu"]');
+    expect(root.innerHTML).toContain('Show this:');
+    for (const cadence of ['weekly', 'monthly', 'daily'] as const) {
+      click(`[data-do="setCadence"][data-id="${cadence}"]`);
+      expect(currentState()?.summaryCadence).toBe(cadence);
+      // The Menu stays open, so the three chips are still there to change his mind with.
+      const on = root.querySelector('.menu-pop .chip.is-on');
+      expect(on).not.toBeNull();
+    }
+  });
+});
+
+describe('the evening summary and the record of the day', () => {
+  it('is the one that was written down, not the books as they stand now', () => {
+    // Run the first day out to the modal it ends on.
+    let state = buyStartingKit(newGame());
+    for (let guard = 0; guard < 400 && state.activeEvent?.kind !== 'dayEnd'; guard += 1) {
+      state = state.activeEvent === null ? tick(state, 15) : choose(state, 'ok');
+    }
+    expect(state.activeEvent?.kind).toBe('dayEnd');
+    const recorded = summaryOfDay(state, state.clock.day);
+    expect(recorded).not.toBeNull();
+    // Money moves behind the modal, the way a bill paid off the Accounting screen does. The
+    // evening still shows the day that closed, which is what the Days tab will open later.
+    const later = { ...state, cash: state.cash - 1234 };
+    expect(renderDayEnd(later)).toContain(formatMoney(recorded?.cash ?? 0));
+    expect(renderDayEnd(later)).not.toContain(formatMoney(later.cash));
   });
 });
 
@@ -92,7 +136,7 @@ describe('a week at the weekly cadence', () => {
     expect(formatMoney(week.costs)).not.toBe(formatMoney(friday.finance.day.costs));
     // The owner's minutes and the day's work are a day's figures whatever the cadence, and the
     // headings say so rather than letting the week's title speak for them.
-    expect(html).toContain('Your minutes today');
-    expect(html).toContain('The hall today');
+    expect(html).toContain(`Your minutes, day ${friday.clock.day}`);
+    expect(html).toContain(`The hall, day ${friday.clock.day}`);
   });
 });

@@ -17,6 +17,7 @@ export {
   summaryTotals,
   tick,
 } from './game';
+export { daySummaryOf } from './game';
 export type { BuyCheck, NewGameOptions, TickResult } from './game';
 export * from './types';
 
@@ -60,10 +61,11 @@ export {
 
 // The owner
 export {
-  hourEfficiency,
+  labourFactorFor,
   ownerEfficiency,
   ownerIsAvailable,
   ownerMinutesLeft,
+  ownerMinutesToday,
   staffOutputFactor,
 } from './owner';
 
@@ -72,6 +74,10 @@ export {
   arrearsCarryInterest,
   booksBehind,
   canAfford,
+  daysOfMonth,
+  earnedRate,
+  ledgerOfDay,
+  summaryOfDay,
   dailyPower,
   formatMoney,
   dailyRates,

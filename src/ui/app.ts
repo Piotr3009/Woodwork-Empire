@@ -34,14 +34,28 @@ interface Drag {
   x: number;
   y: number;
 }
-import { WHY, boxOf, canPlace } from '../engine/index';
-import { type Scene, hallScene } from '../render/hall';
-import { screenToTile } from '../render/iso';
+import { WHY, boxOf, canPlace, summaryOfDay } from '../engine/index';
+import {
+  type Frame,
+  type HallCamera,
+  HALL_CAMERA_FIT,
+  HALL_ZOOM_STEP,
+  type Scene,
+  cameraTransform,
+  clampCamera,
+  hallScene,
+  roomAtScenePoint,
+  sceneToContent,
+  zoomAt,
+  zoomTo,
+} from '../render/hall';
+import { type RoomId, roomById } from '../engine/constants';
+import { centreOf, screenToTile } from '../render/iso';
 import { fitOfficeStack, officeScene } from '../render/office';
-import { renderAccounting } from './accounting';
+import { type AccountingTab, accountingTabFrom, renderAccounting } from './accounting';
 import { renderBoard } from './board';
-import { renderCatalogue } from './catalogue';
-import { renderDayEnd, renderGameOver } from './dayEnd';
+import { type CatalogueTab, CATALOGUE_FIRST_TAB, catalogueTabFrom, renderCatalogue } from './catalogue';
+import { renderDayEnd, renderDaySummary, renderGameOver } from './dayEnd';
 import { renderEvent, renderEventFooter } from './eventModal';
 import { type LaptopTab, laptopTabFrom, renderLaptop } from './laptop';
 import { renderMachine } from './machine';
@@ -82,6 +96,14 @@ interface Ui {
   arrearsAmount: string;
   /** Which tab of the laptop is on top (CLAUDE.md T4 3.1). */
   laptopTab: LaptopTab;
+  /** Which tab of the equipment catalogue is on top (CLAUDE.md T6 3.6). */
+  catalogueTab: CatalogueTab;
+  /** Which tab of the books is on top, and the past day whose summary is open over them
+   *  (CLAUDE.md T6 3.9). */
+  accountingTab: AccountingTab;
+  /** The days of the books the player has opened on their lines. */
+  openDays: number[];
+  daySummary: number | null;
   /** A new tab is new content, not the same list a minute later: it starts at the top. */
   scrollModalTop: boolean;
   /** The family whose classes are on screen, over whatever else is open (CLAUDE.md T3 3.5). */
@@ -91,6 +113,11 @@ interface Ui {
   setup: boolean;
   speedBeforeSetup: Speed;
   drag: Drag | null;
+  /** Where the player has the hall pushed to and how far in. UI state, never game state: a save
+   *  carries the workshop, not where somebody was looking (CLAUDE.md T6 3.3). */
+  camera: HallCamera;
+  /** A pan that moved is not a click on what it started on. */
+  panned: boolean;
   showWhy: boolean;
   /** The real life note the player has open, and where he clicked for it. */
   why: { key: string; left: number; top: number } | null;
@@ -134,12 +161,18 @@ function freshUi(): Ui {
     stockSheets: '6',
     arrearsAmount: '500',
     laptopTab: 'tasks',
+    catalogueTab: CATALOGUE_FIRST_TAB,
+    accountingTab: 'days',
+    openDays: [],
+    daySummary: null,
     scrollModalTop: false,
     machine: null,
     machinePosition: null,
     setup: false,
     speedBeforeSetup: 0,
     drag: null,
+    camera: { ...HALL_CAMERA_FIT },
+    panned: false,
     showWhy: true,
     why: null,
     cloud: {
@@ -179,9 +212,9 @@ function modalBody(id: ModalId, current: GameState): string {
     case 'workPlan':
       return renderWorkPlan(current);
     case 'accounting':
-      return renderAccounting(current, ui.arrearsAmount);
+      return renderAccounting(current, ui.arrearsAmount, ui.accountingTab, ui.openDays);
     case 'catalogue':
-      return renderCatalogue(current, ui.filters.catalogue ?? '');
+      return renderCatalogue(current, ui.filters.catalogue ?? '', ui.catalogueTab);
   }
 }
 
@@ -265,6 +298,20 @@ function hallControls(current: GameState): string {
   );
 }
 
+/** The camera under the hall. It is here in setup mode as well: the player sets the hall out at
+ *  whatever he can see (CLAUDE.md T6 3.3). */
+function hallZoomControls(): string {
+  const at = `${Math.round(ui.camera.scale * 100)}%`;
+  return (
+    '<div class="view-controls">' +
+    '<button class="btn" data-do="zoomFit">Fit</button>' +
+    '<button class="btn" data-do="zoomIn">+</button>' +
+    '<button class="btn" data-do="zoomOut">-</button>' +
+    `<span class="reason">Wheel to zoom, drag the floor to move. Now at ${at}.</span>` +
+    '</div>'
+  );
+}
+
 /** A first guess at the room the office has, for the one render before it is on the page and can
  *  be measured. `VIEW_PADDING` is the padding of `.view` in styles.css; `TOPBAR_HEIGHT` is what the
  *  top bar comes to with that stylesheet's padding and type, and it is a guess, not a declared
@@ -319,6 +366,20 @@ function modalSpecs(): ModalSpec[] {
       wide: ui.modal === 'accounting' || ui.modal === 'workPlan',
       full: ui.modal === 'board',
       position: ui.modalPosition,
+    });
+  }
+  if (ui.daySummary !== null) {
+    const past = summaryOfDay(current, ui.daySummary);
+    specs.push({
+      id: 'daySummary',
+      title: past === null ? `Day ${ui.daySummary}` : past.title,
+      body:
+        past === null
+          ? '<p class="empty">That day is off the back of the books now.</p>'
+          : renderDaySummary(past),
+      closable: true,
+      wide: true,
+      position: null,
     });
   }
   if (ui.machine !== null) {
@@ -379,7 +440,7 @@ function pageHtml(scene: Scene | null): string {
   // The last word the company gets is the bankruptcy event, over the game over screen.
   if (current.gameOver) return renderGameOver(current);
   const notes = scene?.notes ?? '';
-  const controls = ui.view === 'hall' ? hallControls(current) : '';
+  const controls = ui.view === 'hall' ? hallControls(current) + hallZoomControls() : '';
   const note = ui.note === '' ? '' : `<p class="view-note">${escapeHtml(ui.note)}</p>`;
   return (
     renderTopbar(current, ui.view) +
@@ -557,6 +618,45 @@ function mountScene(page: Element, wanted: Scene | null): void {
   slot.replaceWith(scene.node);
 }
 
+/** The frame the hall is seen through, read off the scene's own view box so there is one number
+ *  for it and it cannot drift from what is drawn. */
+function hallFrame(): Frame | null {
+  if (!root) return null;
+  const svg = root.querySelector('.hall-view');
+  if (svg === null) return null;
+  const parts = (svg.getAttribute('viewBox') ?? '').split(/\s+/).map(Number);
+  const [x, y, width, height] = parts;
+  if (parts.length !== 4 || [x, y, width, height].some((value) => !Number.isFinite(value))) {
+    return null;
+  }
+  return { x: x ?? 0, y: y ?? 0, width: width ?? 0, height: height ?? 0 };
+}
+
+/** The camera is one attribute on one group, written after the page is put together: it must not
+ *  go into the scene key, or a wheel notch would build the shell again and fetch the painting. */
+function applyCamera(): void {
+  if (!root) return;
+  const group = root.querySelector('.hall-scene');
+  if (group === null) return;
+  const frame = hallFrame();
+  if (frame !== null) ui.camera = clampCamera(ui.camera, frame);
+  group.setAttribute('transform', cameraTransform(ui.camera));
+}
+
+/** Pushing the hall about writes one attribute on one group and nothing else: rebuilding the page
+ *  under the pointer at the rate a mouse moves is what the whole of T5 3.1 was about. Only the
+ *  readout under the hall needs the page again, and only when it changes. */
+function moveCamera(next: HallCamera): void {
+  const before = Math.round(ui.camera.scale * 100);
+  ui.camera = next;
+  applyCamera();
+  if (Math.round(ui.camera.scale * 100) !== before) render();
+}
+
+function resetCamera(): void {
+  ui.camera = { ...HALL_CAMERA_FIT };
+}
+
 export function render(): void {
   const parts = halves();
   if (parts === null) return;
@@ -567,6 +667,7 @@ export function render(): void {
     : null;
   parts.page.innerHTML = pageHtml(wanted);
   mountScene(parts.page, wanted);
+  applyCamera();
   syncModals(parts.layer, modalSpecs());
   if (ui.scrollModalTop) {
     ui.scrollModalTop = false;
@@ -645,7 +746,22 @@ function handleAction(element: DataElement, point: { x: number; y: number }): vo
     case 'setView':
       ui.view = element.dataset.view === 'office' ? 'office' : 'hall';
       if (ui.view !== 'hall') endSetup();
+      // Walking out of the hall and back in shows the whole hall again
+      // [TUNE: reset or remember; REPORT-T6 says which was chosen].
+      resetCamera();
       break;
+    case 'zoomFit':
+      resetCamera();
+      break;
+    case 'zoomIn':
+    case 'zoomOut': {
+      const frame = hallFrame();
+      if (frame === null) break;
+      const middle = { x: frame.x + frame.width / 2, y: frame.y + frame.height / 2 };
+      const step = what === 'zoomIn' ? HALL_ZOOM_STEP : 1 / HALL_ZOOM_STEP;
+      ui.camera = zoomAt(ui.camera, frame, middle, step);
+      break;
+    }
     case 'showSprites':
       // The acceptance page for the art side, always one click away (CLAUDE.md T3 3.6).
       endSetup();
@@ -698,6 +814,25 @@ function handleAction(element: DataElement, point: { x: number; y: number }): vo
       ui.laptopTab = laptopTabFrom(id);
       ui.scrollModalTop = true;
       break;
+    case 'catalogueTab':
+      ui.catalogueTab = catalogueTabFrom(id);
+      ui.scrollModalTop = true;
+      break;
+    case 'accountingTab':
+      ui.accountingTab = accountingTabFrom(id);
+      ui.scrollModalTop = true;
+      break;
+    case 'toggleDay': {
+      const day = Number(id);
+      ui.openDays = ui.openDays.includes(day)
+        ? ui.openDays.filter((entry) => entry !== day)
+        : [...ui.openDays, day];
+      break;
+    }
+    case 'openDaySummary':
+      // The evening's own summary, put back in front of him from the books (CLAUDE.md T6 3.9).
+      ui.daySummary = Number(id);
+      break;
     case 'openMachine':
       // The classes of a family fill the page, over the catalogue that sent the player here.
       ui.machine = id;
@@ -720,6 +855,10 @@ function handleAction(element: DataElement, point: { x: number; y: number }): vo
       if (which === 'machine') {
         ui.machine = null;
         ui.machinePosition = null;
+        break;
+      }
+      if (which === 'daySummary') {
+        ui.daySummary = null;
         break;
       }
       ui.modal = null;
@@ -913,21 +1052,23 @@ function copyState(): void {
   ui.note = 'State copied as JSON.';
 }
 
+/** Walking into a room. The office is a view of its own; the other two are a line under the
+ *  hall (CLAUDE.md T6 3.1). */
+function handleRoomClick(room: RoomId): void {
+  if (room === 'office') {
+    ui.view = 'office';
+    resetCamera();
+  } else if (room === 'wc') {
+    ui.note = roomById('wc').tooltip;
+  } else {
+    ui.note = roomById('canteen').tooltip;
+  }
+  render();
+}
+
 function handleSceneClick(element: DataElement): boolean {
   // In setup mode a click on the kit is a drag, not a question about the bag.
   if (ui.setup) return true;
-  const room = element.dataset.room;
-  if (room !== undefined) {
-    if (room === 'office') {
-      ui.view = 'office';
-    } else if (room === 'wc') {
-      ui.note = 'The WC. Cold tap, one towel.';
-    } else {
-      ui.note = 'The canteen. Tea, and somewhere to eat out of the dust.';
-    }
-    render();
-    return true;
-  }
   const van = element.dataset.van;
   if (van !== undefined) {
     askUnload(van);
@@ -958,6 +1099,11 @@ function handleSceneClick(element: DataElement): boolean {
 function onClick(event: MouseEvent): void {
   const target = event.target;
   if (!(target instanceof Element)) return;
+  if (ui.panned) {
+    // The pointer travelled: that was the player moving the hall, not pressing what it started on.
+    ui.panned = false;
+    return;
+  }
   const point = { x: event.clientX, y: event.clientY };
   const doer = dataElement(target.closest('[data-do]'));
   if (doer) {
@@ -965,10 +1111,19 @@ function onClick(event: MouseEvent): void {
     handleAction(doer, point);
     return;
   }
-  const scene = dataElement(target.closest('[data-room],[data-van],[data-kit]'));
-  if (scene && state !== null) {
+  if (state === null) return;
+  const scene = dataElement(target.closest('[data-van],[data-kit]'));
+  if (scene) {
     handleSceneClick(scene);
+    return;
   }
+  // A room is not an element the pointer can land on: its block is painted, and the painting is
+  // three images that answer for every pixel of the hall. The footprints decide instead.
+  if (ui.setup || target.closest('.hall-view') === null) return;
+  const local = contentPointUnder(event);
+  if (local === null) return;
+  const room = roomAtScenePoint(local);
+  if (room !== null) handleRoomClick(room);
 }
 
 function onInput(event: Event): void {
@@ -1011,11 +1166,21 @@ function endSetup(): void {
   dispatch({ type: 'END_SETUP', speed: ui.speedBeforeSetup });
 }
 
+function onKeyUp(event: KeyboardEvent): void {
+  if (event.key === ' ') spaceHeld = false;
+}
+
 function onKeyDown(event: KeyboardEvent): void {
+  if (event.key === ' ') spaceHeld = true;
   if (event.key !== 'Escape') return;
   // Escape drops whatever is in hand before it closes anything (CLAUDE.md T2 3.10).
   if (ui.drag !== null) {
     ui.drag = null;
+    render();
+    return;
+  }
+  if (ui.daySummary !== null) {
+    ui.daySummary = null;
     render();
     return;
   }
@@ -1032,20 +1197,121 @@ function onKeyDown(event: KeyboardEvent): void {
   }
 }
 
-/** The cell under the mouse, read through the hall SVG's own view box. */
-function cellUnder(event: MouseEvent): { x: number; y: number } | null {
+/** Where the mouse is in the hall's own coordinates, read through the SVG's own view box. One
+ *  conversion for everything the hall is asked about: the cell under the pointer and the room the
+ *  player clicked come off the same number. */
+function scenePointUnder(event: MouseEvent): { x: number; y: number } | null {
   if (!root) return null;
   const svg = root.querySelector('.hall-view');
   if (!(svg instanceof SVGSVGElement)) return null;
+  // A tree that is not on a painted page has no screen matrix, and the same guard is what the
+  // frame loop and the clipboard already use here.
+  if (typeof svg.getScreenCTM !== 'function') return null;
   const matrix = svg.getScreenCTM();
   if (matrix === null) return null;
   const point = svg.createSVGPoint();
   point.x = event.clientX;
   point.y = event.clientY;
   // Include the centred margins introduced by the SVG's uniform viewport scaling.
-  const local = point.matrixTransform(matrix.inverse());
+  return point.matrixTransform(matrix.inverse());
+}
+
+/** Where the mouse is in the scene, with the camera taken back out: the cell under the pointer
+ *  and the room he clicked are the same at every zoom (CLAUDE.md T6 3.3). */
+function contentPointUnder(event: MouseEvent): { x: number; y: number } | null {
+  const local = scenePointUnder(event);
+  return local === null ? null : sceneToContent(ui.camera, local);
+}
+
+/** The cell under the mouse. */
+function cellUnder(event: MouseEvent): { x: number; y: number } | null {
+  const local = contentPointUnder(event);
+  if (local === null) return null;
   const cell = screenToTile(local.x, local.y);
   return { x: Math.floor(cell.x), y: Math.floor(cell.y) };
+}
+
+/** True while the space bar is down: the player is asking to push the hall about, whatever the
+ *  pointer is over (CLAUDE.md T6 3.3). */
+let spaceHeld = false;
+
+/** The wheel over the hall zooms about the pointer, from the fit to four times it. */
+function onWheel(event: WheelEvent): void {
+  const target = event.target;
+  if (!(target instanceof Element) || target.closest('.hall-view') === null) return;
+  const frame = hallFrame();
+  const at = scenePointUnder(event);
+  if (frame === null || at === null) return;
+  event.preventDefault();
+  const step = event.deltaY < 0 ? HALL_ZOOM_STEP : 1 / HALL_ZOOM_STEP;
+  moveCamera(zoomAt(ui.camera, frame, at, step));
+}
+
+/** A double click on something in the hall brings it up to twice the fit, in the middle. */
+function onDoubleClick(event: MouseEvent): void {
+  const target = event.target;
+  if (!(target instanceof Element) || target.closest('.hall-view') === null) return;
+  const frame = hallFrame();
+  const centre = objectCentreUnder(event);
+  if (frame === null || centre === null) return;
+  moveCamera(zoomTo(frame, centre, 2));
+}
+
+/** The middle of whatever the player double clicked: a machine, the lorry, or a room block. */
+function objectCentreUnder(event: MouseEvent): { x: number; y: number } | null {
+  const target = event.target;
+  if (!(target instanceof Element) || state === null) return null;
+  const kit = target.closest('[data-kit]')?.getAttribute('data-kit') ?? null;
+  if (kit !== null) {
+    const item = state.equipment.find((entry) => entry.id === kit);
+    const spec = item ? findSpec(item.specId) : null;
+    if (item && spec) {
+      return centreOf(item.anchorX, item.anchorY, spec.width, spec.depth, spec.height);
+    }
+  }
+  const local = contentPointUnder(event);
+  if (local === null) return null;
+  const room = roomAtScenePoint(local);
+  if (room === null) return null;
+  const block = roomById(room);
+  return centreOf(block.x, block.y, block.width, block.depth, block.height);
+}
+
+/** Pushing the hall about: the left button on empty floor, or the space bar anywhere in it. */
+function onPanPointerDown(event: MouseEvent): boolean {
+  // The left button and no other: the right one belongs to the browser (CLAUDE.md T6 3.3).
+  if (state === null || event.button !== 0) return false;
+  const target = event.target;
+  if (!(target instanceof Element) || target.closest('.hall-view') === null) return false;
+  const frame = hallFrame();
+  const start = scenePointUnder(event);
+  if (frame === null || start === null) return false;
+  if (!spaceHeld) {
+    // Empty floor: nothing of the workshop under the pointer, and no room block either.
+    if (target.closest('[data-kit],[data-van]') !== null) return false;
+    if (roomAtScenePoint(sceneToContent(ui.camera, start)) !== null) return false;
+  }
+  const from = { ...ui.camera };
+  let moved = false;
+  const move = (moveEvent: MouseEvent): void => {
+    const at = scenePointUnder(moveEvent);
+    if (at === null) return;
+    const next = { scale: from.scale, x: from.x + (at.x - start.x), y: from.y + (at.y - start.y) };
+    if (next.x === ui.camera.x && next.y === ui.camera.y) return;
+    moved = true;
+    ui.panned = true;
+    moveCamera(clampCamera(next, frame));
+  };
+  const up = (): void => {
+    window.removeEventListener('mousemove', move);
+    window.removeEventListener('mouseup', up);
+    if (!moved) ui.panned = false;
+    moved = false;
+  };
+  window.addEventListener('mousemove', move);
+  window.addEventListener('mouseup', up);
+  event.preventDefault();
+  return true;
 }
 
 /** Dragging a machine about while the hall is being set out (CLAUDE.md T2 3.10). */
@@ -1098,7 +1364,12 @@ function onSetupPointerDown(event: MouseEvent): boolean {
 
 /** Modals are dragged by their header (CLAUDE.md 3.9). */
 function onPointerDown(event: MouseEvent): void {
+  // Every press starts clean: a pan swallows the click that ends it, and nothing after that.
+  ui.panned = false;
+  // The space bar wins: setting the hall out at 3x means pushing it about between drops.
+  if (spaceHeld && onPanPointerDown(event)) return;
   if (onSetupPointerDown(event)) return;
+  if (onPanPointerDown(event)) return;
   const target = event.target;
   if (!(target instanceof Element)) return;
   const head = target.closest('[data-drag]');
@@ -1167,7 +1438,10 @@ export function mount(element: HTMLElement): void {
   element.addEventListener('click', onClick);
   element.addEventListener('input', onInput);
   element.addEventListener('mousedown', onPointerDown);
+  element.addEventListener('wheel', onWheel, { passive: false });
+  element.addEventListener('dblclick', onDoubleClick);
   window.addEventListener('keydown', onKeyDown);
+  window.addEventListener('keyup', onKeyUp);
   // The office room is scaled in code, so a resized window has to be drawn again for it, and the
   // clock may be stopped (docs/art/SPRITES.md 8.1).
   window.addEventListener('resize', render);

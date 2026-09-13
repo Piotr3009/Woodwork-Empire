@@ -69,11 +69,14 @@ describe('the blade only spins while something is being cut', () => {
 });
 
 describe('the other machines', () => {
-  it('blinks an amber lamp on the edgebander and breathes the extractor', () => {
+  it('breathes the extractor, and shows nothing for a machine off the floor', () => {
     const svg = renderHall(working());
-    expect(svg).toContain('fx-amber');
     expect(svg).toContain('fx-breathe');
     expect(svg).not.toContain('fx-red');
+    // The edgebander is in a tool cabinet: it is never drawn, so its lamp is never drawn
+    // either (CLAUDE.md T6 3.5).
+    expect(svg).not.toContain('fx-amber');
+    expect(svg).not.toContain('data-kit="kit-edgebander');
   });
 
   it('puts a red lamp on a broken extractor and stops it breathing', () => {

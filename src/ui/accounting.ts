@@ -1,5 +1,5 @@
-// Accounting: today, this week, this month, what is due next, and the running ledger
-// (CLAUDE.md 10.1). Nothing arrives as a letter, it is all here.
+// Accounting in three tabs: the month day by day, the totals with the earned labour rate, and the
+// running ledger (CLAUDE.md 10.1, T6 3.9). Nothing arrives as a letter, it is all here.
 
 import { LEDGER_VISIBLE_ENTRIES } from '../engine/constants';
 import {
@@ -8,13 +8,30 @@ import {
   dailyPower,
   dailyRates,
   dailyRent,
+  daysOfMonth,
+  earnedRate,
+  ledgerOfDay,
   netOf,
   nextDueDays,
+  summaryOfDay,
   visibleTotals,
   weeklyWageBill,
 } from '../engine/index';
-import type { GameState, LedgerCategory, PeriodTotals } from '../engine/index';
-import { button, escapeHtml, money, plural, primaryButton, whyLink } from './modal';
+import type { GameState, LedgerCategory, LedgerEntry, PeriodTotals } from '../engine/index';
+import { button, escapeHtml, money, plural, primaryButton, tabBar, whyLink } from './modal';
+
+/** The three ways of looking at the books (CLAUDE.md T6 3.9). */
+export type AccountingTab = 'days' | 'summary' | 'ledger';
+const TABS: Array<[AccountingTab, string]> = [
+  ['days', 'Days'],
+  ['summary', 'Summary'],
+  ['ledger', 'Ledger'],
+];
+
+export function accountingTabFrom(value: string | undefined): AccountingTab {
+  const found = TABS.find(([id]) => id === value);
+  return found ? found[0] : 'days';
+}
 
 /** Plain English for every ledger category. The engine's own key is never printed (CLAUDE.md 3). */
 const CATEGORY_LABELS: Record<LedgerCategory, string> = {
@@ -107,7 +124,67 @@ function arrearsBlock(state: GameState, typed: string): string {
   );
 }
 
-export function renderAccounting(state: GameState, arrearsTyped: string): string {
+function ledgerRow(entry: LedgerEntry): string {
+  return (
+    `<div class="row"><span class="row-main">day ${entry.day} ` +
+    `${escapeHtml(entry.label)}${entry.unpaid ? ' (no cash moved)' : ''}</span>` +
+    `<span class="row-figure ${entry.amount < 0 ? 'bad' : 'good'}">${money(entry.amount)}` +
+    `</span><span class="row-figure dim">${money(entry.balance)}</span></div>`
+  );
+}
+
+/** The month a day at a time: in, out, and what the day came to, out of the ledger itself so the
+ *  two can never disagree. Every row opens on its own lines, and on the evening's summary when
+ *  the state still carries it (CLAUDE.md T6 3.9).
+ *
+ *  Which rows are open is UI state and not a browser detail: the modal body is written again every
+ *  game minute, and a `details` element would snap shut under the player every time (T3 3.4). */
+function daysTab(state: GameState, entries: LedgerEntry[], open: number[]): string {
+  const rows = daysOfMonth({ ...state, ledger: entries });
+  if (rows.length === 0) return '<p class="empty">Nothing has moved this month yet.</p>';
+  return rows
+    .reverse()
+    .map((row) => {
+      const isOpen = open.includes(row.day);
+      const lines = isOpen
+        ? ledgerOfDay({ ...state, ledger: entries }, row.day).slice().reverse().map(ledgerRow).join('')
+        : '';
+      const summary =
+        summaryOfDay(state, row.day) === null
+          ? ''
+          : button('openDaySummary', 'The day', `data-id="${row.day}"`);
+      return (
+        `<div class="day-row${isOpen ? ' is-open' : ''}" data-day="${row.day}">` +
+        `<div class="row day-head"><button class="day-toggle" data-do="toggleDay" ` +
+        `data-id="${row.day}" aria-expanded="${isOpen ? 'true' : 'false'}">` +
+        `<span class="row-main">${isOpen ? '-' : '+'} Day ${row.day}</span>` +
+        `<span class="row-figure good">${money(row.income)}</span>` +
+        `<span class="row-figure bad">${money(-row.costs)}</span>` +
+        `<span class="row-figure ${row.net < 0 ? 'bad' : 'good'}">${money(row.net)}</span>` +
+        '</button>' +
+        `<span class="row-action">${summary}</span></div>` +
+        lines +
+        '</div>'
+      );
+    })
+    .join('');
+}
+
+/** What the workshop earns for an hour of somebody's time, machines and all (CLAUDE.md T6 3.8). */
+function earnedRateLine(state: GameState): string {
+  return (
+    '<p class="figures">Earned labour rate: today ' +
+    `${money(earnedRate(state, 'day'))} / h, this week ${money(earnedRate(state, 'week'))} / h, ` +
+    `this month ${money(earnedRate(state, 'month'))} / h</p>`
+  );
+}
+
+export function renderAccounting(
+  state: GameState,
+  arrearsTyped: string,
+  tab: AccountingTab,
+  openDays: number[] = [],
+): string {
   const due = nextDueDays(state);
   const arrears = arrearsBlock(state, arrearsTyped);
   const behind = booksBehind(state);
@@ -119,29 +196,14 @@ export function renderAccounting(state: GameState, arrearsTyped: string): string
   const entries = behind
     ? state.ledger.filter((entry) => entry.day <= state.booksUpToDay)
     : state.ledger;
-  const ledger = entries
-    .slice(-LEDGER_VISIBLE_ENTRIES)
-    .reverse()
-    .map(
-      (entry) =>
-        `<div class="row"><span class="row-main">day ${entry.day} ` +
-        `${escapeHtml(entry.label)}${entry.unpaid ? ' (no cash moved)' : ''}</span>` +
-        `<span class="row-figure ${entry.amount < 0 ? 'bad' : 'good'}">${money(entry.amount)}` +
-        `</span><span class="row-figure dim">${money(entry.balance)}</span></div>`,
-    )
-    .join('');
-  return (
-    `<p class="figures"><strong>${money(state.cash)}</strong> in the bank. ` +
-    `Overdraft limit ${money(state.finance.overdraftLimit)}. ` +
-    `Deposit held by the landlord ${money(state.unit.depositHeld)}` +
-    `${whyLink(state, 'depositReturn')}</p>` +
-    banner +
-    arrears +
+  const ledger = entries.slice(-LEDGER_VISIBLE_ENTRIES).reverse().map(ledgerRow).join('');
+  const summaryTab =
     '<div class="cols">' +
     totalsBlock(state, 'Today', books.day) +
     totalsBlock(state, 'This week', books.week) +
     totalsBlock(state, 'This month', books.month) +
     '</div>' +
+    earnedRateLine(state) +
     '<h3>What is coming</h3>' +
     `<div class="row"><span class="row-main">Rent, every day${whyLink(state, 'rent')}</span>` +
     `<span class="row-figure">${money(dailyRent(state))}</span></div>` +
@@ -154,8 +216,19 @@ export function renderAccounting(state: GameState, arrearsTyped: string): string
     `<span class="row-figure">${money(weeklyWageBill(state))}</span></div>` +
     `<div class="row"><span class="row-main">Monthly bills, day ${due.monthly}</span>` +
     '<span class="row-figure">salaries, software, waste</span></div>' +
-    `<h3>Ledger, last ${LEDGER_VISIBLE_ENTRIES}</h3>` +
-    ledger +
+    '';
+  const ledgerTab = `<h3>Ledger, last ${LEDGER_VISIBLE_ENTRIES}</h3>` + ledger;
+  const body =
+    tab === 'days' ? daysTab(state, entries, openDays) : tab === 'ledger' ? ledgerTab : summaryTab;
+  return (
+    `<p class="figures"><strong>${money(state.cash)}</strong> in the bank. ` +
+    `Overdraft limit ${money(state.finance.overdraftLimit)}. ` +
+    `Deposit held by the landlord ${money(state.unit.depositHeld)}` +
+    `${whyLink(state, 'depositReturn')}</p>` +
+    banner +
+    arrears +
+    tabBar('accountingTab', TABS, tab) +
+    body +
     `<p class="hint">${button('copyState', 'Copy state as JSON')}</p>`
   );
 }

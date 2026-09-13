@@ -1,15 +1,7 @@
 // The end of day summary, and the game over screen (CLAUDE.md 10.1).
 
-import { MINUTES_PER_WORKING_DAY } from '../engine/constants';
-import {
-  deliveriesArrivingOn,
-  dustBand,
-  findJob,
-  formatReputation,
-  netOf,
-  summaryTotals,
-} from '../engine/index';
-import type { GameState, SummaryCadence } from '../engine/index';
+import { daySummaryOf, dustBand, earnedRate, formatReputation, summaryOfDay } from '../engine/index';
+import type { DaySummary, GameState, SummaryCadence } from '../engine/index';
 import { days, escapeHtml, minutes, money, plural } from './modal';
 
 /** The three cadences in the words the player reads, in the order they are offered. */
@@ -39,50 +31,71 @@ const SPAN_LABELS: Record<SummaryCadence, string> = {
   monthly: 'this month',
 };
 
-export function renderDayEnd(state: GameState): string {
-  const used = state.owner.minutesByCategory;
-  const jobs = state.dayStats.jobsCompleted
-    .map((jobId) => findJob(state, jobId)?.name ?? jobId)
-    .map((name) => escapeHtml(name))
+/** The one component the evening and the Days tab both put on the screen: the summary of a day,
+ *  out of the record the engine wrote when that day closed (CLAUDE.md T6 3.9). */
+export function renderDaySummary(
+  summary: DaySummary,
+  options: { earnedRate?: number; cadence?: string } = {},
+): string {
+  const used = summary.minutesByCategory;
+  const jobs = summary.jobsCompleted.map((name) => escapeHtml(name)).join(', ');
+  const tomorrow = summary.deliveriesTomorrow
+    .map((sheets) => plural(sheets, 'sheet', 'sheets'))
     .join(', ');
-  const advanced = state.dayStats.jobsAdvanced.length;
-  const tomorrow = deliveriesArrivingOn(state, state.clock.day + 1)
-    .map((delivery) => plural(delivery.sheets, 'sheet', 'sheets'))
-    .join(', ');
-  const totals = summaryTotals(state);
-  const label = SPAN_LABELS[state.summaryCadence];
-  const net = netOf(totals);
+  const label = SPAN_LABELS[summary.spanLabel as SummaryCadence] ?? 'today';
+  const net = summary.income - summary.costs;
+  const rate =
+    options.earnedRate === undefined
+      ? ''
+      : row('Earned labour rate', `${money(options.earnedRate)} / h`);
   return (
     '<div class="cols">' +
-    '<div class="col"><h3>Your minutes today</h3>' +
+    `<div class="col"><h3>Your minutes, day ${summary.day}</h3>` +
     row('Admin', minutes(used.admin)) +
     row('Design', minutes(used.design)) +
     row('Workshop', minutes(used.workshop)) +
-    row('Worked', `${minutes(state.owner.minutesWorked)} of ${minutes(MINUTES_PER_WORKING_DAY)}`) +
-    (state.owner.overtimeMinutes > 0
-      ? row('Overtime', minutes(state.owner.overtimeMinutes))
-      : '') +
+    row('Worked', `${minutes(summary.minutesWorked)} of ${minutes(summary.minutesAvailable)}`) +
+    (summary.overtimeMinutes > 0 ? row('Overtime', minutes(summary.overtimeMinutes)) : '') +
+    rate +
     '</div>' +
     `<div class="col"><h3>Money ${escapeHtml(label)}</h3>` +
-    row('In', money(totals.income)) +
-    row('Out', money(-totals.costs)) +
+    row('In', money(summary.income)) +
+    row('Out', money(-summary.costs)) +
     row('Net', money(net)) +
-    row('In the bank', money(state.cash)) +
+    row('In the bank', money(summary.cash)) +
     '</div>' +
-    '<div class="col"><h3>The hall today</h3>' +
-    row('Jobs moved on', String(advanced)) +
+    `<div class="col"><h3>The hall, day ${summary.day}</h3>` +
+    row('Jobs moved on', String(summary.jobsAdvanced)) +
     row('Jobs finished', jobs === '' ? 'none' : jobs) +
     row(
       'Dust',
-      `${dustBand(state.dust).label}, opened ${dustBand(state.dayStats.dustAtStart).label}`,
+      `${dustBand(summary.dustAtEnd).label}, opened ${dustBand(summary.dustAtStart).label}`,
     ) +
-    row('Tomorrow', tomorrow === '' ? 'no deliveries' : tomorrow) +
+    row('Next day', tomorrow === '' ? 'no deliveries' : tomorrow) +
     '</div></div>' +
-    (state.owner.fatigue > 0
-      ? `<p class="warn">Tomorrow starts ${(state.owner.fatigue * 100).toFixed(0)}% down on ` +
-        'efficiency after that overtime.</p>'
-      : '') +
-    cadenceControl(state)
+    tomorrowLine(summary) +
+    (options.cadence ?? '')
+  );
+}
+
+/** The evening's own summary. It is the record the day wrote when it closed, the same one the
+ *  Days tab opens later, so the two can never say different things (CLAUDE.md T6 3.9). The day
+ *  as it stands is only used before there is a record, which is never in play. */
+export function renderDayEnd(state: GameState): string {
+  return renderDaySummary(summaryOfDay(state, state.clock.day) ?? daySummaryOf(state), {
+    earnedRate: earnedRate(state, 'day'),
+    cadence: cadenceControl(state),
+  });
+}
+
+/** What the day cost the next one: the overtime debt and the hour he worked through, as the one
+ *  number they come to (CLAUDE.md T6 3.4). */
+function tomorrowLine(summary: DaySummary): string {
+  if (summary.tomorrowFactor >= 1) return '';
+  return (
+    `<p class="warn">The next day starts at ${summary.tomorrowFactor.toFixed(2)} of your ` +
+    `output: ${summary.overtimeMinutes > 0 ? 'that overtime' : 'the overtime this week'}` +
+    `${summary.breakSkipped ? ' and the dinner you worked through' : ''}.</p>`
   );
 }
 

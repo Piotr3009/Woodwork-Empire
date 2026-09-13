@@ -7,6 +7,7 @@ import type {
   Difficulty,
   EquipmentSpec,
   EquipmentVariant,
+  EquipmentTab,
   Finish,
   MaterialKind,
   ProductTemplate,
@@ -15,7 +16,11 @@ import type {
   WorkerTier,
 } from './types';
 
-/** Bumped in Turn 5: the unit is measured in metre cells and not half metre tiles, the hall is the
+/** Bumped in Turn 6: the owner carries a labour factor and an overtime debt where he carried a
+ *  fatigue figure, the break is an hour he can work through, and the day ends at 17:00 with
+ *  overtime to 19:00. A Turn 5 save reads its clock and its owner wrongly, so it is refused.
+ *
+ *  Bumped in Turn 5: the unit is measured in metre cells and not half metre tiles, the hall is the
  *  painted 200 m2 floor, and every anchor in a saved layout was written on the old grid, which
  *  would stand the whole workshop in the wrong place and some of it off the floor. The clock is
  *  read differently too, the break being half an hour of it. A Turn 4 save is refused rather than
@@ -23,23 +28,30 @@ import type {
  *
  *  Bumped in Turn 3: a machine carries its class, its hours and the hours it has in it, and a task
  *  carries the day it was finished (CLAUDE.md T3 3.5, 3.3). */
-export const STATE_VERSION = 4;
+export const STATE_VERSION = 5;
 
 // ---------------------------------------------------------------------------
 // 6. Time
 // ---------------------------------------------------------------------------
 
-/** 480 minutes of work in a day (PIOTR). The clock used to run them back to back, 08:00 to 16:00;
- *  a real workshop stops for dinner, so the work is unchanged and the day runs on by the length of
- *  the break, which puts the end of it at 16:30. */
+/** 480 minutes of work in a day (PIOTR). The break does not come out of them: the day runs on by
+ *  the length of it, which is what puts the end of the day at 17:00. */
 export const MINUTES_PER_WORKING_DAY = 480;
 /** Clock starts at 08:00 (PIOTR). */
 export const DAY_START_HOUR = 8;
-/** The break. Nobody works through it: no task, no production, and the clock does not count it
- *  against anybody's day. Start and length are [TUNE]: noon for half an hour is what a joinery
- *  does, and Piotr has not set either. */
+/** Dinner: noon for an hour (PIOTR). Nobody works through it unless the owner says he will, and
+ *  then it is his hour and nobody else's. */
 export const BREAK_START_MINUTE = 240;
-export const BREAK_MINUTES = 30;
+export const BREAK_MINUTES = 60;
+/** 17:00 on the clock: the 480 minutes of work and the hour of dinner between them (PIOTR). */
+export const DAY_END_MINUTE = MINUTES_PER_WORKING_DAY + BREAK_MINUTES;
+/** 19:00, and the tools go down whoever wants what (PIOTR: overtime until 19:00 at the latest). */
+export const OVERTIME_END_MINUTE = DAY_END_MINUTE + 120;
+/** The longest the clock can ever read in a day. Only for putting two moments of the game in
+ *  order. */
+export const MAX_CLOCK_MINUTES_PER_DAY = OVERTIME_END_MINUTE;
+/** Hours of work in a day: the 480 minutes, in the unit a machine's clock is read in. */
+export const HOURS_PER_WORKING_DAY = MINUTES_PER_WORKING_DAY / 60;
 /** One game day at 1x speed, in real seconds (PIOTR, Turn 2: one game minute per real second).
  *  8 real minutes at 1x, 4 at 2x, 2 at 4x. */
 export const REAL_SECONDS_PER_DAY_AT_1X = 480;
@@ -57,22 +69,13 @@ export const WEEKDAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] a
 // 7. The owner
 // ---------------------------------------------------------------------------
 
-/** Hours at full efficiency (PIOTR). */
-export const OWNER_NORMAL_HOURS = 8;
-/** Efficiency of overtime hours 9, 10, 11, 12. The fourth value is [TUNE], the rest [PIOTR]. */
-export const OVERTIME_EFFICIENCY = [0.8, 0.6, 0.4, 0.4] as const;
-/** After 12 hours the owner goes home, no way to force more (PIOTR). */
-export const MAX_HOURS_PER_DAY = 12;
-export const MAX_MINUTES_PER_DAY = MAX_HOURS_PER_DAY * 60;
-/** The longest the clock itself can read in a day: the twelve hours of work plus the break he did
- *  not work through. Only for putting two moments of the game in order. */
-export const MAX_CLOCK_MINUTES_PER_DAY = MAX_MINUTES_PER_DAY + BREAK_MINUTES;
-/** An overtime hour costs 0.05 of tomorrow's efficiency, pro rata for a part hour, recovered
- *  after one normal day ([TUNE] rate, PIOTR that it is pro rata: 30 minutes cost 0.025). */
-export const FATIGUE_PER_OVERTIME_HOUR = 0.05;
-/** [TUNE] a floor so a tired owner can never stall a task completely. With the numbers above it is
- *  never reached: the worst case is hour 12 at 0.4 less four hours of fatigue at 0.2. */
-export const MIN_OWNER_EFFICIENCY = 0.05;
+/** Working through dinner buys 60 minutes today and costs 3% of tomorrow (PIOTR). */
+export const BREAK_SKIP_FACTOR = 0.97;
+/** Any day with overtime in it, however little, adds this to the debt that comes off tomorrow's
+ *  output. Cumulative day after day, back to zero on Monday morning (PIOTR: 10% weaker). */
+export const OVERTIME_DEBT_PER_DAY = 0.1;
+/** However tired he is, half a day's work still comes out of him [TUNE]. */
+export const LABOUR_FACTOR_FLOOR = 0.5;
 /** Owner away: all staff production drops 30% (PIOTR). */
 export const ABSENCE_OUTPUT_FACTOR = 0.7;
 /** With a hired CEO the drop is 5% (PIOTR). CEO hiring is parked, the constant is modelled only. */
@@ -367,8 +370,28 @@ export const REPAIR_MINUTES = 90;
 /** [TUNE] the extractor keeps its Turn 1 parts bill; every other machine is 5% of what it cost. */
 export const EXTRACTOR_REPAIR_COST = 150;
 export const MACHINE_REPAIR_COST_FRACTION = 0.05;
-/** Every machine wants a service once a month, and it costs half an hour (PIOTR). */
-export const SERVICE_INTERVAL_DAYS = 30;
+/** The deadline a job comes with is worked out from the work in it, not from the kind of thing it
+ *  is: nine tenths of the owner's own days plus three, as whole days, never under three and never
+ *  over thirty (PIOTR). The per template ranges of Turns 1 to 5 are gone. */
+export const DEADLINE_DAYS_FACTOR = 0.9;
+export const DEADLINE_DAYS_BASE = 3;
+export const DEADLINE_DAYS_MIN = 3;
+export const DEADLINE_DAYS_MAX = 30;
+/** Up to this much the client gives a flat nought to two days of slack (PIOTR: three to five days
+ *  in total for a small job); above it he gives a tenth to a seventh of the deadline itself. */
+export const DEADLINE_SMALL_JOB_PRICE = 3000;
+export const DEADLINE_SMALL_SLACK_DAYS = 2;
+export const DEADLINE_SLACK_PERCENT_MIN = 10;
+export const DEADLINE_SLACK_PERCENT_MAX = 15;
+/** An express job wants it in six tenths of the time, and never in under three days (PIOTR). */
+export const DEADLINE_EXPRESS_FACTOR = 0.6;
+
+/** Every machine wants a service once a month, and it costs half an hour (PIOTR). From Turn 6 the
+ *  month is counted on the machine's own clock and not on the calendar: 80 hours is the month a
+ *  one man shop puts on a table saw, which serves three, so the service he is used to lands where
+ *  it always did, and a saw with three men on it is serviced three times as often
+ *  [TUNE: 80] (CLAUDE.md T6 3.6). */
+export const SERVICE_INTERVAL_HOURS = 80;
 export const SERVICE_MINUTES = 30;
 /** [TUNE] the service bill, and what an overdue machine risks every working day. */
 export const SERVICE_COST_FRACTION = 0.02;
@@ -427,8 +450,6 @@ export const PRODUCT_TEMPLATES: ProductTemplate[] = [
     material: 'sheet',
     designMinutes: 30,
     calls: 2,
-    deadlineMinDays: 10,
-    deadlineMaxDays: 20,
     needsMeasure: false,
     requiredEquipment: ['tableSaw', 'drill'],
     allowedFinishes: FINISHES_SHEET,
@@ -443,8 +464,6 @@ export const PRODUCT_TEMPLATES: ProductTemplate[] = [
     material: 'sheet',
     designMinutes: 60,
     calls: 2,
-    deadlineMinDays: 10,
-    deadlineMaxDays: 25,
     needsMeasure: false,
     requiredEquipment: ['tableSaw', 'drill', 'edgebander'],
     allowedFinishes: FINISHES_SHEET,
@@ -459,8 +478,6 @@ export const PRODUCT_TEMPLATES: ProductTemplate[] = [
     material: 'sheet',
     designMinutes: 120,
     calls: 3,
-    deadlineMinDays: 14,
-    deadlineMaxDays: 28,
     needsMeasure: false,
     requiredEquipment: ['tableSaw', 'drill', 'edgebander'],
     allowedFinishes: FINISHES_SHEET,
@@ -475,8 +492,6 @@ export const PRODUCT_TEMPLATES: ProductTemplate[] = [
     material: 'sheet',
     designMinutes: 480,
     calls: 3,
-    deadlineMinDays: 21,
-    deadlineMaxDays: 35,
     needsMeasure: false,
     requiredEquipment: ['tableSaw', 'drill', 'edgebander'],
     allowedFinishes: FINISHES_SHEET,
@@ -491,8 +506,6 @@ export const PRODUCT_TEMPLATES: ProductTemplate[] = [
     material: 'sheet',
     designMinutes: 720,
     calls: 4,
-    deadlineMinDays: 28,
-    deadlineMaxDays: 42,
     needsMeasure: true,
     requiredEquipment: ['tableSaw', 'drill', 'edgebander'],
     allowedFinishes: FINISHES_SHEET,
@@ -507,8 +520,6 @@ export const PRODUCT_TEMPLATES: ProductTemplate[] = [
     material: 'solidWood',
     designMinutes: 480,
     calls: 4,
-    deadlineMinDays: 42,
-    deadlineMaxDays: 60,
     needsMeasure: false,
     requiredEquipment: ['thicknesser', 'solidWoodTools'],
     allowedFinishes: FINISHES_SOLID,
@@ -608,7 +619,13 @@ const VARIANTS_BY_FAMILY: Record<string, EquipmentVariant[]> = {
   tableSaw: TABLE_SAW_VARIANTS,
 };
 
+/** How many men one machine of a family can serve in a day. Two unless the family says otherwise
+ *  [TUNE]; the table saw serves three [PIOTR]. The hours a machine wears out by are the share of
+ *  that capacity the workshop actually puts through it (CLAUDE.md T6 3.6). */
+export const MACHINE_CAPACITY_DEFAULT = 2;
+
 const BASE_SPEC = {
+  capacity: MACHINE_CAPACITY_DEFAULT,
   bagInterval: 0,
   usedOn: null as MaterialKind | null,
   labourFactor: 1,
@@ -661,6 +678,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'desk',
+    tab: 'computers',
     name: 'Desk',
     price: 150,
     category: 'furniture',
@@ -673,6 +691,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'chair',
+    tab: 'computers',
     name: 'Chair',
     price: 60,
     category: 'furniture',
@@ -685,6 +704,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'laptop',
+    tab: 'computers',
     name: 'Laptop',
     price: 700,
     category: 'furniture',
@@ -698,7 +718,9 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'tableSaw',
+    tab: 'sheetMachines',
     name: 'Table saw',
+    capacity: 3,
     price: 1800,
     category: 'machine',
     width: 2,
@@ -713,6 +735,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'drill',
+    tab: 'handTools',
     name: 'Cordless drill',
     price: 120,
     category: 'tools',
@@ -725,20 +748,28 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'edgebander',
+    tab: 'handTools',
     name: 'Hand edgebander',
     price: 900,
     category: 'machine',
-    width: 2,
-    depth: 1,
-    height: 1,
+    // A hand tool serves the man holding it and nobody else, so no ratio applies to it and its
+    // bag and its hours count whole minutes as they always did (CLAUDE.md T6 3.5).
+    capacity: 1,
+    // It stands in a tool cabinet and comes out to the bench, so it holds no cell of the floor
+    // and nothing can be dropped on it in setup mode (CLAUDE.md T6 3.5).
+    width: 0,
+    depth: 0,
+    height: 0,
     spriteKey: 'edgebander',
     bagInterval: 4800,
     usedOn: 'sheet',
-    effect: 'Edges sheet goods. Bag every 4800 minutes.',
+    requires: ['toolCabinet'],
+    effect: 'Edges sheet goods at the bench. Lives in a tool cabinet. Bag every 4800 minutes.',
   },
   {
     ...BASE_SPEC,
     id: 'compressor',
+    tab: 'handTools',
     name: 'Small compressor',
     price: 350,
     category: 'machine',
@@ -751,6 +782,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'extractor',
+    tab: 'extraction',
     name: 'Extractor',
     price: 600,
     category: 'extraction',
@@ -763,6 +795,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'workbench',
+    tab: 'handTools',
     name: 'Workbench',
     price: 250,
     category: 'bench',
@@ -777,6 +810,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'sheetRack',
+    tab: 'storage',
     name: 'Cheap shelving',
     price: 400,
     category: 'storage',
@@ -790,6 +824,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'sheetRackBetter',
+    tab: 'storage',
     name: 'Better shelving',
     price: 900,
     category: 'storage',
@@ -802,7 +837,25 @@ const SPEC_DRAFTS: SpecDraft[] = [
   },
   {
     ...BASE_SPEC,
+    id: 'toolCabinet',
+    tab: 'storage',
+    name: 'Tool cabinet',
+    price: 350,
+    category: 'storage',
+    width: 1,
+    depth: 1,
+    height: 1,
+    spriteKey: 'toolCabinet',
+    perWorker: true,
+    stackable: true,
+    effect:
+      'Holds one man\u0027s hand tools and the hand edgebander. One for every worker and one ' +
+      'for you.',
+  },
+  {
+    ...BASE_SPEC,
     id: 'locker',
+    tab: 'storage',
     name: 'Locker',
     price: 80,
     category: 'welfare',
@@ -817,6 +870,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'canteenSeat',
+    tab: 'storage',
     name: 'Canteen seat',
     price: 40,
     category: 'welfare',
@@ -831,6 +885,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'handToolSet',
+    tab: 'handTools',
     name: 'Hand tool set for a worker',
     price: 400,
     category: 'tools',
@@ -840,11 +895,13 @@ const SPEC_DRAFTS: SpecDraft[] = [
     spriteKey: 'handToolSet',
     perWorker: true,
     stackable: true,
-    effect: 'One per worker, bought by the owner.',
+    requires: ['toolCabinet'],
+    effect: 'One per worker, bought by the owner. Kept in his tool cabinet.',
   },
   {
     ...BASE_SPEC,
     id: 'van',
+    tab: 'handling',
     name: 'Van',
     price: 9000,
     category: 'vehicle',
@@ -857,6 +914,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'forklift',
+    tab: 'handling',
     name: 'Forklift',
     price: 6000,
     category: 'vehicle',
@@ -870,6 +928,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'forkliftBetter',
+    tab: 'handling',
     name: 'Better forklift',
     price: 12000,
     category: 'vehicle',
@@ -883,6 +942,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'thicknesser',
+    tab: 'timberMachines',
     name: 'Thicknesser',
     price: 2500,
     category: 'machine',
@@ -897,6 +957,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'solidWoodTools',
+    tab: 'timberMachines',
     name: 'Planer, router, sander, clamps',
     price: 2200,
     category: 'machine',
@@ -910,6 +971,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'cnc',
+    tab: 'cnc',
     name: 'CNC',
     price: 45000,
     category: 'machine',
@@ -925,6 +987,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'cncHead',
+    tab: 'cnc',
     name: 'CNC tool changer head',
     price: 9000,
     category: 'machine',
@@ -941,6 +1004,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'sprayBooth',
+    tab: 'spraying',
     name: 'Spray booth',
     price: 18000,
     category: 'machine',
@@ -955,6 +1019,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'dustSystem',
+    tab: 'extraction',
     name: 'Central dust extraction system',
     price: 35000,
     category: 'extraction',
@@ -967,6 +1032,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'flexiSystem',
+    tab: 'extraction',
     name: 'Flexi extraction system',
     price: 50000,
     category: 'extraction',
@@ -982,6 +1048,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'pelletiser',
+    tab: 'extraction',
     name: 'Pelletiser',
     price: 15000,
     category: 'extraction',
@@ -1013,6 +1080,22 @@ export interface LayoutSlot {
  *  order along the rear wall and all three are 2.7 m high, which is what the art is drawn at.
  *  A room has no sprite key: it is painted by its hall layer, or drawn as a placeholder box while
  *  that layer is missing (docs/art/SPRITES.md 9.3). */
+/** The tabs of the equipment catalogue, in Piotr's order, with what the player reads
+ *  (CLAUDE.md T6 3.6). A tab with nothing in it says so rather than being hidden. */
+export const EQUIPMENT_TABS: Array<{ id: EquipmentTab; label: string }> = [
+  { id: 'sheetMachines', label: 'Sheet machines' },
+  { id: 'timberMachines', label: 'Timber machines' },
+  { id: 'spraying', label: 'Spraying' },
+  { id: 'sanding', label: 'Sanding' },
+  { id: 'handTools', label: 'Hand tools' },
+  { id: 'extraction', label: 'Extraction' },
+  { id: 'computers', label: 'Computers' },
+  { id: 'cnc', label: 'CNC' },
+  { id: 'cncCentre', label: 'CNC centre' },
+  { id: 'handling', label: 'Handling' },
+  { id: 'storage', label: 'Storage' },
+];
+
 export const ROOM_LAYOUT = [
   {
     id: 'wc',
@@ -1046,6 +1129,11 @@ export const ROOM_LAYOUT = [
   },
 ] as const;
 
+/** The door in a room's front face: centred on the face, opening into the hall
+ *  (docs/art/SPRITES.md 9.3). The contract gives no size, so this is measured off the delivered
+ *  painting: the office door is 0.92 m wide and its head is 2.1 m up [TUNE]. */
+export const ROOM_DOOR = { width: 0.9, height: 2.1 };
+
 export type RoomId = (typeof ROOM_LAYOUT)[number]['id'];
 
 /** The room block by name, so nothing reaches for it by position in the array. */
@@ -1076,7 +1164,6 @@ export const PERSONNEL_DOOR = { y: 4.5, width: 1 };
  *  and nothing is ever laid on the gate lane. */
 export const STARTING_LAYOUT: Record<string, LayoutSlot> = {
   tableSaw: { x: 6, y: 1 },
-  edgebander: { x: 9, y: 1 },
   thicknesser: { x: 12, y: 1 },
   solidWoodTools: { x: 15, y: 1 },
   compressor: { x: 18, y: 1 },
@@ -1123,6 +1210,18 @@ export const CANTEEN_SLOT_LAYOUT: LayoutSlot[] = [
   { x: 15, y: 4 },
   { x: 16, y: 4 },
   { x: 17, y: 4 },
+];
+
+/** Tool cabinets stand along the rear wall past the machines: one for the owner and one for every
+ *  worker (CLAUDE.md T6 3.5). */
+export const CABINET_SLOT_LAYOUT: LayoutSlot[] = [
+  { x: 6, y: 0 },
+  { x: 7, y: 0 },
+  { x: 8, y: 0 },
+  { x: 9, y: 0 },
+  { x: 10, y: 0 },
+  { x: 11, y: 0 },
+  { x: 12, y: 0 },
 ];
 
 /** Where a waiting delivery lorry stands: inside the shutter, on the lane. */
@@ -1222,8 +1321,17 @@ export const HIRING_SPECS: HiringSpec[] = [
   },
 ];
 
-/** Every joiner needs all of these before he can be hired (PIOTR). */
-export const JOINER_PREREQUISITES = ['workbench', 'locker', 'canteenSeat', 'handToolSet'];
+/** Every joiner needs all of these before he can be hired (PIOTR). The tool cabinet is counted
+ *  one higher than the rest, because the owner keeps his own tools in one too (T6 3.5). */
+export const JOINER_PREREQUISITES = [
+  'workbench',
+  'locker',
+  'canteenSeat',
+  'handToolSet',
+  'toolCabinet',
+];
+/** The item every worker and the owner each need one of. */
+export const TOOL_CABINET = 'toolCabinet';
 /** [TUNE] a new hire starts the next working day. */
 export const HIRE_START_DELAY_DAYS = 1;
 /** From five joiners a helper is required (PIOTR). */
@@ -1293,9 +1401,13 @@ export const HELPER_CLEAN_WEEKDAY = 4;
 // ---------------------------------------------------------------------------
 
 /** The accounting modal shows the last 50 entries (CLAUDE.md 10.1). */
-export const LEDGER_VISIBLE_ENTRIES = 50;
 /** [TUNE] the state keeps this many ledger entries so it stays small. */
+/** How many end of day summaries the state carries: three months of working days [TUNE]. */
+export const DAY_SUMMARIES_MAX = 90;
 export const LEDGER_MAX_ENTRIES = 200;
+/** The Ledger tab shows every line the state carries: 200 (PIOTR, CLAUDE.md T6 3.9). It used to
+ *  show the last 50, which left three quarters of a busy month unreachable. */
+export const LEDGER_VISIBLE_ENTRIES = LEDGER_MAX_ENTRIES;
 
 // ---------------------------------------------------------------------------
 // 3.12 Why it is like this in real life

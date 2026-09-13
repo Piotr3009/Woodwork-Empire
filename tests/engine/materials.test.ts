@@ -359,7 +359,12 @@ describe('material coming off the rack as the job is made', () => {
   it('stops the job where it stands when the rack cannot cover the next slice', () => {
     const state = onTheBench(10000);
     state.stock.sheets = 2;
-    const stalled = tick(state, 3000);
+    // Days of it: the rack runs dry long before the job does, and the day keeps asking him
+    // questions on the way, all of which are answered with the first choice.
+    let stalled = state;
+    for (let guard = 0; guard < 300 && firstJob(stalled).blockedBy === ''; guard += 1) {
+      stalled = clearEvents(tick(stalled, 30));
+    }
     const job = firstJob(stalled);
     expect(job.blockedBy).toBe('waiting for material');
     expect(stalled.stock.sheets).toBe(0);

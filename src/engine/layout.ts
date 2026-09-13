@@ -2,7 +2,7 @@
 // before it drops and the catalogue can ask before it buys (CLAUDE.md T2 3.10).
 
 import { GATE_LANE, ROOM_LAYOUT } from './constants';
-import { findSpec } from './machines';
+import { findSpec, standsInTheHall } from './machines';
 import type { Equipment, GameState } from './types';
 
 export interface PlaceCheck {
@@ -40,6 +40,7 @@ export function hallItems(state: GameState): Equipment[] {
   return state.equipment.filter((item) => {
     const spec = findSpec(item.specId);
     if (!spec || spec.category === 'furniture') return false;
+    if (!standsInTheHall(item.specId)) return false;
     return item.anchorX < state.unit.widthCells;
   });
 }
@@ -60,6 +61,7 @@ export function canPlaceSpec(
 ): PlaceCheck {
   const spec = findSpec(specId);
   if (!spec) return { ok: false, reason: 'Not in the catalogue' };
+  if (!standsInTheHall(specId)) return { ok: false, reason: 'It lives in a tool cabinet' };
   const box = boxOf(specId, x, y);
   if (
     x < 0 ||

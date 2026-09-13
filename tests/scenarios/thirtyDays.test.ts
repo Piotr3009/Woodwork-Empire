@@ -1,16 +1,31 @@
 // The scripted playthroughs of CLAUDE.md T1-13.
 
 import { describe, expect, it } from 'vitest';
-import { BIG_SAW, CAREFUL, IDLE, SHORT_HANDED, playDay, playUntilDay } from './autopilot';
+import {
+  BIG_SAW,
+  CAREFUL,
+  IDLE,
+  type Policy,
+  SHORT_HANDED,
+  playDay,
+  playUntilDay,
+} from './autopilot';
 import { act, clearEvents, eventsOfKind, newGame, runToDay } from '../helpers';
 import {
   BREAK_MINUTES,
+  BREAK_SKIP_FACTOR,
   BREAK_START_MINUTE,
+  DAY_END_MINUTE,
   DUCTING_RECONNECT_COST,
+  LABOUR_FACTOR_FLOOR,
   LATE_ACCOUNTS_CHARGE,
   MINUTES_PER_WORKING_DAY,
+  DEADLINE_DAYS_MIN,
   MOVE_MINUTES_PER_ITEM,
   MOVING_SPEED,
+  OVERTIME_DEBT_PER_DAY,
+  TOOL_CABINET,
+  OVERTIME_END_MINUTE,
   POWER_BASE_DAILY,
   RENT_PER_M2_MONTHLY,
 } from '../../src/engine/constants';
@@ -27,8 +42,11 @@ import {
   machineOutputFactor,
   minutesRemainingFor,
   movingMachines,
+  ownerMinutesToday,
   tick,
 } from '../../src/engine/index';
+import { hallItems } from '../../src/engine/layout';
+import { missingForHire } from '../../src/engine/staff';
 import type { Equipment, GameEvent, GameState } from '../../src/engine/index';
 
 function machineOf(state: GameState, specId: string): Equipment {
@@ -55,17 +73,22 @@ describe('30 days on Easy, working the board', () => {
     expect(state.finance.arrearsAmount).toBe(0);
   });
 
-  it('ends well above the reputation it started on', () => {
-    expect(state.reputation).toBeGreaterThan(10);
+  it('ends above the reputation it started on, but nothing like as far above', () => {
+    // Turn 6 works the deadline out from the work in the job, and a one man shop that takes the
+    // next job the day the last one goes out delivers some of them late. The month used to end
+    // above ten and ends at a third of that: REPORT-T6 section 5 says so rather than tuning the
+    // owner's own numbers away.
+    expect(state.reputation).toBeGreaterThan(0);
+    expect(state.reputation).toBeLessThan(10);
   });
 
-  it('took bookcases and TV units, and finished most of them', () => {
+  it('took bookcases and shelves, and finished most of them', () => {
     const done = state.jobs.filter((job) => job.stage === 'completed');
     expect(done.length).toBeGreaterThanOrEqual(3);
     const taken = new Set(state.jobs.map((job) => job.templateId));
     expect(taken.has('bookcase')).toBe(true);
-    // A TV unit needs a reputation of 5, so it can only come after the first jobs landed.
-    expect(taken.has('tvUnit')).toBe(true);
+    // A TV unit needs a reputation of 5, which the late deliveries keep him under all month.
+    expect(taken.has('tvUnit')).toBe(false);
     // Nothing dearer was touched: the script only takes what it is told to take.
     expect(taken.has('wardrobe')).toBe(false);
     expect(taken.has('oakDiningTable')).toBe(false);
@@ -138,6 +161,20 @@ describe('30 days on Easy, working the board', () => {
     expect(state.tasks.some((task) => task.kind === 'clientCall' && !task.done)).toBe(false);
     // Nothing on the books was ever stopped by a call or by a missing bench.
     for (const job of state.jobs) expect(job.blockedBy, job.name).not.toBe('no bench');
+  });
+
+  it('bought the owner his tool cabinet and worked to the short deadlines', () => {
+    // One cabinet: the owner's. Nobody was taken on, so nobody else wanted one (T6 3.5).
+    expect(state.equipment.filter((item) => item.specId === TOOL_CABINET)).toHaveLength(1);
+    // And the hand edgebander he bought behind it holds no cell of the floor.
+    expect(state.equipment.some((item) => item.specId === 'edgebander')).toBe(true);
+    expect(hallItems(state).some((item) => item.specId === 'edgebander')).toBe(false);
+    // Every deadline came off the work in the job, and the small ones came off short (T6 3.7).
+    for (const job of state.jobs) {
+      const given = job.dueDay - job.acceptedDay;
+      expect(given, job.name).toBeGreaterThanOrEqual(DEADLINE_DAYS_MIN);
+      if (job.basePrice <= 600) expect(given, job.name).toBeLessThanOrEqual(5);
+    }
   });
 
   it('kept a bench under the owner all month', () => {
@@ -273,6 +310,13 @@ describe('a month short handed, with a joiner and one small rack', () => {
     expect(state.workers.every((worker) => worker.station !== STATION_NO_BENCH)).toBe(true);
   });
 
+  it('gave the joiner a cabinet of his own, and wants a third for the next man', () => {
+    // One for the owner and one for the joiner: a hire is short until there is a free one.
+    expect(state.equipment.filter((item) => item.specId === TOOL_CABINET).length)
+      .toBeGreaterThanOrEqual(2);
+    expect(missingForHire(state, 'joiner')).toContain(TOOL_CABINET);
+  });
+
   it('ends with the books behind and the accountant paid for it', () => {
     expect(state.booksUpToDay).toBe(0);
     const charges = state.ledger.filter((entry) => entry.category === 'accounts');
@@ -297,13 +341,14 @@ describe('a month that shifts two machines on day 3', () => {
 
   const day3 = clearEvents(playUntilDay(newGame({ seed: SEED, difficulty: 'easy' }), 3, CAREFUL));
   const cashBefore = day3.cash;
-  // The saw and the edgebander are both ducted into the extraction (CLAUDE.md T4 3.5).
-  const shifted = act(drag(drag(day3, 'tableSaw'), 'edgebander'), {
+  // Two things on the move, of which one is ducted into the extraction: the hand edgebander is
+  // in a tool cabinet now, so the shelving is the second thing the owner shifts (T4 3.5, T6 3.5).
+  const shifted = act(drag(drag(day3, 'tableSaw'), 'sheetRack'), {
     type: 'END_SETUP',
     speed: 1,
   });
 
-  it('starts on day 3 with two machines on the move and an hour each to shift them', () => {
+  it('starts on day 3 with two things on the move and an hour each to shift them', () => {
     expect(day3.clock.day).toBe(3);
     expect(shifted.movedItems).toHaveLength(2);
     expect(movingMachines(shifted)?.minutesTotal).toBe(2 * MOVE_MINUTES_PER_ITEM);
@@ -335,7 +380,7 @@ describe('a month that shifts two machines on day 3', () => {
     expect(act(at, { type: 'SET_SPEED', speed: 1 }).speed).toBe(1);
   });
 
-  it('charges 1,600 of ducting when the kit is back down, one line a machine', () => {
+  it('charges the ducting when the kit is back down, one line a ducted machine', () => {
     let at = shifted;
     let guard = 0;
     while (movingMachines(at) !== null && guard < 600) {
@@ -343,19 +388,11 @@ describe('a month that shifts two machines on day 3', () => {
       guard += 1;
     }
     const lines = at.ledger.filter((entry) => entry.category === 'ducting');
-    expect(lines).toHaveLength(2);
-    expect(lines.map((entry) => entry.label)).toEqual([
-      'Ducting reconnection: table saw',
-      'Ducting reconnection: hand edgebander',
-    ]);
-    expect(lines.reduce((total, entry) => total - entry.amount, 0)).toBe(
-      2 * DUCTING_RECONNECT_COST,
-    );
+    expect(lines).toHaveLength(1);
+    expect(lines.map((entry) => entry.label)).toEqual(['Ducting reconnection: table saw']);
     // The ducting is the whole of what the move cost: no other money moved in those two hours.
-    expect(lines.reduce((total, entry) => total - entry.amount, 0)).toBe(
-      2 * DUCTING_RECONNECT_COST,
-    );
-    expect(cashBefore - at.cash).toBe(2 * DUCTING_RECONNECT_COST);
+    expect(lines.reduce((total, entry) => total - entry.amount, 0)).toBe(DUCTING_RECONNECT_COST);
+    expect(cashBefore - at.cash).toBe(DUCTING_RECONNECT_COST);
     expect(at.movedItems).toEqual([]);
   });
 
@@ -364,7 +401,7 @@ describe('a month that shifts two machines on day 3', () => {
     expect(month.gameOver).toBeNull();
     expect(month.clock.day).toBe(31);
     expect(month.cash).toBeGreaterThan(0);
-    expect(month.ledger.filter((entry) => entry.category === 'ducting')).toHaveLength(2);
+    expect(month.ledger.filter((entry) => entry.category === 'ducting')).toHaveLength(1);
     expect(month.jobs.filter((job) => job.stage === 'completed').length).toBeGreaterThanOrEqual(2);
   });
 });
@@ -395,7 +432,9 @@ describe('a day with a break, played by the script', () => {
 
   it('stops the whole workshop in the middle of the day and starts it again', () => {
     const dinner = states.filter((state) => isBreak(state.clock.minute));
-    expect(dinner.length).toBe(BREAK_MINUTES);
+    // Counted by the clock, not by the observations: the minute the day puts the question is
+    // watched on both sides of the answer.
+    expect(new Set(dinner.map((state) => state.clock.minute)).size).toBe(BREAK_MINUTES);
     // Nobody is at a bench or a machine for any of it, the owner included.
     for (const state of dinner) {
       expect(state.owner.station, formatTime(state.clock.minute)).toBe(STATION_IDLE);
@@ -412,9 +451,9 @@ describe('a day with a break, played by the script', () => {
     );
   });
 
-  it('ends the day at 16:30 with his whole 480 minutes behind him', () => {
+  it('ends the day at 17:00 with his whole 480 minutes behind him', () => {
     const last = states[states.length - 1];
-    expect(formatTime(last?.clock.minute ?? -1)).toBe('16:30');
+    expect(formatTime(last?.clock.minute ?? -1)).toBe('17:00');
     expect(last?.owner.minutesWorked).toBe(MINUTES_PER_WORKING_DAY);
     expect(last?.owner.overtimeMinutes).toBe(0);
   });
@@ -423,5 +462,90 @@ describe('a day with a break, played by the script', () => {
     expect(end.unit.widthCells * end.unit.depthCells).toBe(200);
     expect(end.unit.areaM2).toBe(200);
     expect(end.unit.rentMonthly).toBe(200 * RENT_PER_M2_MONTHLY);
+  });
+});
+
+describe('a month on Easy that works through its dinner and stays late', () => {
+  /** Two dinners worked through and three evenings in the workshop, which is the path the labour
+   *  factor is built to describe (CLAUDE.md T6 3.4). */
+  const HARD_WORKER: Policy = {
+    ...CAREFUL,
+    skipBreakOn: [1, 2],
+    overtimeOn: [1, 2, 3],
+    overtimeMinutes: 60,
+  };
+
+  /** The morning of each of the first days of the month, and what the day before cost it. */
+  function mornings(): Array<{ day: number; factor: number; debt: number }> {
+    let state = newGame({ seed: SEED, difficulty: 'easy' });
+    const seen: Array<{ day: number; factor: number; debt: number }> = [];
+    for (let round = 0; round < 5; round += 1) {
+      state = playDay(state, HARD_WORKER);
+      seen.push({
+        day: state.clock.day,
+        factor: state.owner.labourFactor,
+        debt: Math.round(state.owner.overtimeDebt * 100) / 100,
+      });
+    }
+    return seen;
+  }
+
+  const seen = mornings();
+
+  it('takes 3% for the dinner and a tenth for the evening, and both at once', () => {
+    // Day 1: dinner worked through and an hour of overtime. Day 2 starts at 0.9 times 0.97.
+    expect(seen[0]?.day).toBe(2);
+    expect(seen[0]?.debt).toBe(OVERTIME_DEBT_PER_DAY);
+    expect(seen[0]?.factor).toBeCloseTo((1 - OVERTIME_DEBT_PER_DAY) * BREAK_SKIP_FACTOR, 6);
+    // Day 2 the same again: the debt is cumulative and the 3% is not.
+    expect(seen[1]?.day).toBe(3);
+    expect(seen[1]?.debt).toBeCloseTo(2 * OVERTIME_DEBT_PER_DAY, 6);
+    expect(seen[1]?.factor).toBeCloseTo((1 - 2 * OVERTIME_DEBT_PER_DAY) * BREAK_SKIP_FACTOR, 6);
+    // Day 3 he takes his dinner and still stays on: the 3% goes, the tenth stays.
+    expect(seen[2]?.day).toBe(4);
+    expect(seen[2]?.debt).toBeCloseTo(3 * OVERTIME_DEBT_PER_DAY, 6);
+    expect(seen[2]?.factor).toBeCloseTo(0.7, 6);
+  });
+
+  it('keeps the debt until the weekend and wipes it on Monday morning', () => {
+    // Day 4 is a normal day: the debt does not grow and it does not shrink either.
+    expect(seen[3]?.day).toBe(5);
+    expect(seen[3]?.debt).toBeCloseTo(3 * OVERTIME_DEBT_PER_DAY, 6);
+    expect(seen[3]?.factor).toBeCloseTo(0.7, 6);
+    // Day 5 is the Friday, and the next morning is the Monday of the next week.
+    expect(seen[4]?.day).toBe(8);
+    expect(seen[4]?.debt).toBe(0);
+    expect(seen[4]?.factor).toBe(1);
+    expect(seen.every((morning) => morning.factor >= LABOUR_FACTOR_FLOOR)).toBe(true);
+  });
+
+  it('gives him the hour he worked through, and never runs the clock past seven', () => {
+    let state = newGame({ seed: SEED, difficulty: 'easy' });
+    const clocks: number[] = [];
+    const pools = new Map<number, number>();
+    for (let round = 0; round < 3; round += 1) {
+      const day = state.clock.day;
+      state = playDay(state, HARD_WORKER, [], {
+        step: 5,
+        watch: (at) => {
+          if (at.clock.day !== day) return;
+          clocks.push(at.clock.minute);
+          if (at.clock.minute >= DAY_END_MINUTE) pools.set(day, ownerMinutesToday(at));
+        },
+      });
+    }
+    expect(Math.max(...clocks)).toBeLessThanOrEqual(OVERTIME_END_MINUTE);
+    // Days 1 and 2 gave him the dinner hour on top of his 480; day 3 did not.
+    expect(pools.get(1)).toBe(MINUTES_PER_WORKING_DAY + BREAK_MINUTES);
+    expect(pools.get(2)).toBe(MINUTES_PER_WORKING_DAY + BREAK_MINUTES);
+    expect(pools.get(3)).toBe(MINUTES_PER_WORKING_DAY);
+  });
+
+  it('finishes the month still trading, with the overtime behind it', () => {
+    const month = playUntilDay(newGame({ seed: SEED, difficulty: 'easy' }), 31, HARD_WORKER);
+    expect(month.gameOver).toBeNull();
+    expect(month.clock.day).toBe(31);
+    expect(month.owner.labourFactor).toBeGreaterThanOrEqual(LABOUR_FACTOR_FLOOR);
+    expect(month.owner.labourFactor).toBeLessThanOrEqual(1);
   });
 });

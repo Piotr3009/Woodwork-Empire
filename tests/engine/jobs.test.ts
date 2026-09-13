@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  BREAK_MINUTES,
   BY_HAND_DURATION_FACTOR,
   COURIER_COST,
   DEPOSIT_FRACTION,
@@ -37,7 +36,6 @@ import {
   act,
   buyStartingKit,
   placeEquipment,
-  choose,
   clearEvents,
   doAllEmails,
   doTask,
@@ -262,13 +260,16 @@ describe('production', () => {
     const afterEmails = state.cash;
     expect(afterEmails).toBe(afterDeposit);
     state = act(state, { type: 'WORK_HERE', jobId: null });
-    // 240 minutes of work, and the break does not count towards them.
-    state = tick(state, 240 + BREAK_MINUTES);
-    // A client rang as the workshop came back from dinner, which is where a call drawn inside the
-    // break lands. It is answered, it costs him his quarter of an hour, and the work goes on.
-    expect(state.activeEvent?.kind).toBe('clientCall');
-    state = choose(state, 'answer');
-    state = tick(state, 60);
+    // 240 minutes of work, and the dinner hour does not count towards them. The day interrupts
+    // him on the way: a client rings, the break is put to him, and the work goes on after each.
+    const seen: GameEvent[] = [];
+    for (let guard = 0; guard < 2000; guard += 1) {
+      state = tick(state, 1);
+      // The piece standing at the gate is the one question the test answers itself.
+      if (state.activeEvent?.kind === 'jobAtGate') break;
+      if (state.activeEvent !== null) state = clearEvents(state, seen);
+      if (firstJob(state).stage === 'awaitingTransport') break;
+    }
     expect(firstJob(state).stage).toBe('awaitingTransport');
     // Making it brought nothing in: the balance waits for the client to have the piece. The cash
     // itself moves on either side of this, because the hall costs money every day it stands there.

@@ -1,13 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
   BOOKKEEPING_MINUTES,
-  BREAK_MINUTES,
   CLERK_ORDERS_PER_DAY,
+  DAY_END_MINUTE,
   JOINER_PREREQUISITES,
   LABOUR_FRACTION,
   MINUTES_PER_WORKING_DAY,
   OVER_SAW_RATIO_FACTOR,
   OWNER_LABOUR_PER_MINUTE,
+  TOOL_CABINET,
   WORKER_RATES,
 } from '../../src/engine/constants';
 import {
@@ -18,6 +19,7 @@ import {
   isWorkingToday,
   joiners,
   missingForHire,
+  shortfallForHire,
   sawRatioFactor,
   staffMinutesLeft,
 } from '../../src/engine/staff';
@@ -34,14 +36,21 @@ import {
   firstJob,
   newGame,
   placeEnquiry,
+  runClock,
   runToDay,
 } from '../helpers';
 
 /** Buys exactly what the engine says is missing for one more joiner. */
 function withJoinerKit(state: GameState): GameState {
   let next = state;
-  for (const specId of missingForHire(next, 'joiner')) {
-    next = act(next, { type: 'BUY_EQUIPMENT', specId });
+  // A tool cabinet is wanted one deeper than the rest, the owner keeping his tools in one too,
+  // so the list is bought out until nothing is short (CLAUDE.md T6 3.5).
+  let guard = 0;
+  while (missingForHire(next, 'joiner').length > 0 && guard < 20) {
+    for (const specId of missingForHire(next, 'joiner')) {
+      next = act(next, { type: 'BUY_EQUIPMENT', specId });
+    }
+    guard += 1;
   }
   return next;
 }
@@ -74,12 +83,18 @@ describe('the hiring pool', () => {
     expect(byLabel(40)).toHaveLength(0);
   });
 
-  it('names what has to be bought before a joiner can start', () => {
+  it('names what has to be bought before a joiner can start, and how many of each', () => {
     const state = newGame();
     expect(missingForHire(state, 'joiner')).toEqual(JOINER_PREREQUISITES);
+    // Two cabinets on the first hire, one for the new man and one for the owner, so the bill on
+    // the card is two of them and buying to it leaves nothing still blocking (CLAUDE.md T6 3.5).
+    expect(shortfallForHire(state, 'joiner')).toContainEqual({ specId: TOOL_CABINET, count: 2 });
     const option = hiringOptions(state).find((entry) => entry.tier === 'poor');
     expect(option?.available).toBe(false);
-    expect(option?.missingCost).toBe(250 + 80 + 40 + 400);
+    expect(option?.missingCost).toBe(250 + 80 + 40 + 400 + 350 * 2);
+    // Named, never the catalogue id: nothing of the engine's own reaches the card (CLAUDE.md 3).
+    expect(option?.missing).toContain('Tool cabinet x 2');
+    expect(option?.missing.join(' ')).not.toContain(TOOL_CABINET);
     expect(option?.blockReason).toContain('Workbench');
   });
 
@@ -349,8 +364,8 @@ describe('the office working day', () => {
     }
     // One action to settle the state, so the clerk is holding his first order at 08:00.
     const morning = act(clearEvents(state), { type: 'SET_SPEED', speed: 1 });
-    // His day is the 480 minutes of work, and the clock takes the break on top of them.
-    const day = clearEvents(tick(morning, MINUTES_PER_WORKING_DAY + BREAK_MINUTES));
+    // His day is the 480 minutes of work, and the clock takes the dinner hour on top of them.
+    const day = clearEvents(runClock(morning, DAY_END_MINUTE));
     const done = day.tasks.filter((task) => task.kind === 'materialOrder' && task.done).length;
     expect(done).toBe(CLERK_ORDERS_PER_DAY);
     expect(day.workers[0]?.ordersToday).toBe(CLERK_ORDERS_PER_DAY);

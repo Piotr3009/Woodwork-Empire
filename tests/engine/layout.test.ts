@@ -57,18 +57,18 @@ describe('setting the hall out', () => {
   it('never lets two machines overlap', () => {
     let state = buyStartingKit(newGame());
     const saw = itemOf(state, 'tableSaw');
-    const bander = state.equipment.find((item) => item.specId === 'edgebander');
-    expect(bander).toBeDefined();
-    const check = canPlace(state, saw, bander?.anchorX ?? 0, bander?.anchorY ?? 0);
+    const rack = state.equipment.find((item) => item.specId === 'sheetRack');
+    expect(rack).toBeDefined();
+    const check = canPlace(state, saw, rack?.anchorX ?? 0, rack?.anchorY ?? 0);
     expect(check.ok).toBe(false);
-    expect(check.reason).toBe('On the hand edgebander');
+    expect(check.reason).toBe('On the cheap shelving');
     // The move is refused, so the saw stays where it was.
     const before = state.equipment.find((item) => item.id === saw);
     state = act(state, {
       type: 'MOVE_ITEM',
       itemId: saw,
-      x: bander?.anchorX ?? 0,
-      y: bander?.anchorY ?? 0,
+      x: rack?.anchorX ?? 0,
+      y: rack?.anchorY ?? 0,
     });
     const after = state.equipment.find((item) => item.id === saw);
     expect(after?.anchorX).toBe(before?.anchorX);

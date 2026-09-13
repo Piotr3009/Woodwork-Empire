@@ -57,20 +57,26 @@
   font-size: 12px;
 }
 
-/* The lettering the game puts on the painted hall. The art leaves these areas blank
-   (docs/art/SPRITES.md 9.5), and the size comes from the renderer, which fits it to its box. */
+/* The lettering the game paints onto the hall. The art leaves these areas blank
+   (docs/art/SPRITES.md 9.5), and the size comes from the renderer, which fits it to its box.
+   Dark warm grey with a lighter outline, so it reads on blockwork rather than sinking into it. */
 .painted-text {
-  fill: #23211d;
+  fill: #3b3630;
+  stroke: #efe6d8;
+  stroke-width: 1px;
+  stroke-linejoin: round;
+  paint-order: stroke;
   pointer-events: none;
 }
 
-.hall-company {
+/* Both are small text over a painted, textured surface, so both carry the weight. */
+.hall-company,
+.room-label {
   font-weight: 600;
-  letter-spacing: 0.04em;
 }
 
-.room-label {
-  fill: #f0ece4;
+.hall-company {
+  letter-spacing: 0.04em;
 }
 
 .hall-view {
@@ -417,6 +423,13 @@ input.num {
 
 .minute-count {
   font-size: 12px;
+}
+
+/* What today's work is multiplied by, shown only when it is below 1 (CLAUDE.md T6 3.4). */
+.output {
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
 }
 
 .menu-pop {
@@ -925,6 +938,30 @@ input.num {
   padding: 5px 0;
 }
 
+/* One day of the month in the books, which opens on its own ledger lines (CLAUDE.md T6 3.9). */
+.day-toggle {
+  align-items: center;
+  background: none;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  display: flex;
+  flex: 1 1 auto;
+  font: inherit;
+  gap: 10px;
+  justify-content: space-between;
+  padding: 0;
+  text-align: left;
+}
+
+.day-row.is-open .day-toggle {
+  font-weight: 600;
+}
+
+.day-row.is-open > .row:not(.day-head) {
+  padding-left: 18px;
+}
+
 .row.is-done {
   color: var(--text-dim);
 }
@@ -1125,12 +1162,12 @@ input.num {
   font-weight: 600;
 }
 
-/* A flex container cannot ellipsise its own text, so the name is a block inside it. */
+/* The renderer shrinks the name and cuts it if it still will not fit, so there is one place that
+   decides how a name is fitted to a box and the stylesheet only keeps it on one line. */
 .office-company > span {
   display: block;
   max-width: 100%;
   overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
