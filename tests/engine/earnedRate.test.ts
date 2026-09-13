@@ -114,3 +114,17 @@ describe('the two of them together', () => {
     expect(earnedRate(state, 'month')).toBe(33.6);
   });
 });
+
+describe('the last minute of a job', () => {
+  it('books what went into it, not what was offered', () => {
+    let state = atTheBench('standard');
+    // The job is all but done, so the rack has to cover every sheet of it before the last minute.
+    state.stock.sheets = 500;
+    const job = firstJob(state);
+    job.labourRemaining = 0.2;
+    state = tick(state, 1);
+    expect(state.dayStats.workMinutes).toBe(1);
+    expect(state.dayStats.labourValue).toBeCloseTo(0.2, 6);
+    expect(firstJob(state).labourRemaining).toBe(0);
+  });
+});

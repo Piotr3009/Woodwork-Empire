@@ -951,13 +951,6 @@ function checkLowStock(state: GameState): void {
   });
 }
 
-/** One person, one minute at a bench, and what it put into the job. The two halves of the earned
- *  labour rate are booked here and nowhere else (CLAUDE.md T6 3.8). */
-function recordWork(state: GameState, labour: number): void {
-  state.dayStats.workMinutes += 1;
-  state.dayStats.labourValue = Math.round((state.dayStats.labourValue + labour) * 10000) / 10000;
-}
-
 function runProductionMinute(state: GameState, ownerOnTask: boolean): void {
   const hall = hallProductivityFactor(state);
   let worked = false;
@@ -978,7 +971,6 @@ function runProductionMinute(state: GameState, ownerOnTask: boolean): void {
     usedBy(atTheBench.materialKind);
     const minute = (OWNER_LABOUR_PER_MINUTE * ownerEfficiency(state) * hall) /
       jobSpeedFactor(state, atTheBench);
-    recordWork(state, minute);
     if (addLabour(state, atTheBench, minute)) raiseJobAtGate(state, atTheBench);
   }
   // Staff work the normal day only: nobody but the owner does overtime, and they always take
@@ -1005,7 +997,6 @@ function runProductionMinute(state: GameState, ownerOnTask: boolean): void {
       const rate = worker.rate * sawRatioFactor(state, worker);
       const minute = (OWNER_LABOUR_PER_MINUTE * rate * hall * staffFactor) /
         jobSpeedFactor(state, job);
-      recordWork(state, minute);
       if (addLabour(state, job, minute)) raiseJobAtGate(state, job);
     }
   }

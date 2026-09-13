@@ -533,10 +533,15 @@ export function releaseJob(state: GameState, job: Job): void {
   if (job.stage === 'inProduction') job.stage = 'ready';
 }
 
-/** Work one minute of labour into a job. Returns true when the job finished. */
+/** Work one person minute of labour into a job. What actually went in is booked against the day
+ *  here, so the earned labour rate counts what was produced and not what was offered: the last
+ *  minute of a job is usually a part minute (CLAUDE.md T6 3.8). Returns true when it finished. */
 export function addLabour(state: GameState, job: Job, labour: number): boolean {
   if (labour <= 0) return false;
+  const put = Math.min(labour, Math.max(0, job.labourRemaining));
   job.labourRemaining -= labour;
+  state.dayStats.workMinutes += 1;
+  state.dayStats.labourValue = Math.round((state.dayStats.labourValue + put) * 10000) / 10000;
   if (!state.dayStats.jobsAdvanced.includes(job.id)) state.dayStats.jobsAdvanced.push(job.id);
   if (job.labourRemaining > WORK_EPSILON) return false;
   job.labourRemaining = 0;
