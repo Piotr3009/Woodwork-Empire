@@ -129,11 +129,13 @@ describe('buying sheets for stock', () => {
     let state = act(ready(), { type: 'BUY_STOCK', sheets: 6 });
     state = clearEvents(runToDay(state, 2).state);
     state = doTask(state, 'unload');
-    state = upToMaterial(state);
-    state = act(state, { type: 'SET_MATERIAL_MODE', jobId: firstJob(state).id, mode: 'stock' });
     const before = state.cash;
-    state = doTask(state, 'materialOrder');
-    expect(state.cash).toBe(before);
+    // The rack has it, so the job is ready the moment the drawing exists: no order on the desk,
+    // nothing to pay (PIOTR, 13.09: the sheets on the rack are what a workshop uses).
+    state = upToMaterial(state);
+    expect(state.tasks.some((task) => task.kind === 'materialOrder' && !task.done)).toBe(false);
+    // The only movement is the client's deposit coming in: nothing went out for material.
+    expect(state.cash).toBe(before + firstJob(state).depositPaid);
     // The sheets stay on the rack and come off it as the job is made (CLAUDE.md T2 3.6).
     expect(state.stock.sheets).toBe(6);
     expect(firstJob(state).stage).toBe('ready');

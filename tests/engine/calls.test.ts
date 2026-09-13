@@ -31,6 +31,8 @@ function withJob(price = 400): GameState {
   state.enquiries = [];
   const enquiry = placeEnquiry(state, { price, name: 'Garage shelves' });
   state = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+  // Ordered per job, so the material order is on the desk for the calls to be measured against.
+  for (const job of state.jobs) job.materialMode = 'perJob';
   return clearEvents(state);
 }
 

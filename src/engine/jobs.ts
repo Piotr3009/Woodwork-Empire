@@ -233,7 +233,7 @@ export function acceptEnquiry(state: GameState, enquiryId: string, byHand: boole
     finish: enquiry.finish,
     materialKind: enquiry.materialKind,
     materialCost,
-    materialMode: 'perJob',
+    materialMode: 'auto',
     sheets: sheetsForCost(materialCost),
     sheetsUsed: 0,
     blockedBy: '',
@@ -361,6 +361,16 @@ export function refreshJob(state: GameState, job: Job): void {
     job.stage = 'accepted';
     return;
   }
+  // The rack has it: nothing to order, nothing to wait for. The sheets come off the rack as the
+  // job is made, like every other job (PIOTR, 13.09: "it does not take from stock at all").
+  if (canDrawFromStock(state, job)) {
+    for (const task of jobTasks(state, job.id)) {
+      if (task.kind === 'materialOrder' && !task.done) task.done = true;
+    }
+    job.materialCost = stockCostFor(job.sheets);
+    job.stage = 'ready';
+    return;
+  }
   job.stage = 'materialPending';
   const hasOrderTask = jobTasks(state, job.id).some((task) => task.kind === 'materialOrder');
   if (!hasOrderTask) {
@@ -382,10 +392,26 @@ export function chargeSiteMeasure(state: GameState, job: Job): void {
 
 /** The material order task is done: the lorry is booked, or the sheets come off the rack. */
 /** Sheets off the rack only cover board jobs of standard material (CLAUDE.md 8.9). */
+/** Sheets on the rack that other stock jobs have not yet used: what this job can still count on.
+ *  Without this, three jobs would each see the same forty sheets and two of them would stand
+ *  waiting for material half way through (PIOTR, 13.09). */
+export function sheetsFreeFor(state: GameState, job: Job): number {
+  let promised = 0;
+  for (const other of state.jobs) {
+    if (other.id === job.id) continue;
+    if (other.materialMode === 'perJob' || other.materialKind !== 'sheet') continue;
+    if (other.stage !== 'ready' && other.stage !== 'inProduction') continue;
+    // Only jobs that are actually eating the rack: a per job order came off its own lorry.
+    if (other.materialCost !== stockCostFor(other.sheets)) continue;
+    promised += Math.max(0, other.sheets - other.sheetsUsed);
+  }
+  return state.stock.sheets - promised;
+}
+
 export function canDrawFromStock(state: GameState, job: Job): boolean {
-  if (job.materialMode !== 'stock') return false;
+  if (job.materialMode === 'perJob') return false;
   if (job.materialKind !== 'sheet' || job.bespokeMaterial) return false;
-  return state.stock.sheets >= job.sheets;
+  return sheetsFreeFor(state, job) >= job.sheets;
 }
 
 export function onMaterialOrdered(state: GameState, job: Job): void {

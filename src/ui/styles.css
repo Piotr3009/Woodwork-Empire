@@ -305,20 +305,6 @@
   color: var(--text-dim);
 }
 
-/* The build in the bottom right corner of every screen. It never covers a control: the pointer
-   goes straight through it (CLAUDE.md T8 3.1). */
-.app-version {
-  position: fixed;
-  right: 6px;
-  bottom: 4px;
-  margin: 0;
-  z-index: 50;
-  color: var(--text-dim);
-  font-size: 11px;
-  opacity: 0.6;
-  pointer-events: none;
-}
-
 /* --------------------------------------------------------------------------
    Page
    -------------------------------------------------------------------------- */
@@ -1526,4 +1512,15 @@ input.num {
   color: var(--warn, #c9a227);
   font-size: 12px;
   font-weight: 600;
+}
+
+/* The version in the corner: read it, never click it (PIOTR, 13.09). */
+.version-corner {
+  bottom: 6px;
+  color: var(--text-dim);
+  font-size: 11px;
+  pointer-events: none;
+  position: fixed;
+  right: 10px;
+  z-index: 5;
 }

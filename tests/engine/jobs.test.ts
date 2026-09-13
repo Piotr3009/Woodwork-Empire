@@ -58,7 +58,11 @@ function ready(): GameState {
 
 function accept(state: GameState, price = 400, extra = {}): GameState {
   const enquiry = placeEnquiry(state, { price, ...extra });
-  return act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+  const next = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+  // These tests are about the per job order and the lorry. The rack is full so that production
+  // can run afterwards; the job is told to order all the same (stock is the default since 13.09).
+  for (const job of next.jobs) job.materialMode = 'perJob';
+  return next;
 }
 
 describe('accepting an enquiry', () => {

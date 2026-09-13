@@ -356,7 +356,8 @@ export type JobStage =
   | 'awaitingTransport'
   | 'completed';
 
-export type MaterialMode = 'perJob' | 'stock';
+/** `auto`: off the rack when the rack has it, ordered per job otherwise (PIOTR, 13.09). */
+export type MaterialMode = 'auto' | 'perJob' | 'stock';
 
 export interface Job {
   id: string;

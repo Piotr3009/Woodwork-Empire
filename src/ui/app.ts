@@ -2,7 +2,6 @@
 // here, in one place (CLAUDE.md 3.5, 10.1).
 
 import {
-  APP_VERSION,
   CLEANING_MINUTES,
   applyAction,
   createGame,
@@ -54,7 +53,7 @@ import {
   zoomAt,
   zoomTo,
 } from '../render/hall';
-import { type RoomId, roomById } from '../engine/constants';
+import { APP_VERSION, type RoomId, roomById } from '../engine/constants';
 import { centreOf, screenToTile } from '../render/iso';
 import { fitOfficeStack, officeScene } from '../render/office';
 import { type AccountingTab, accountingTabFrom, renderAccounting } from './accounting';
@@ -470,15 +469,17 @@ function moveFinishNote(current: GameState): string {
   return `Finished on day ${at.day} by ${clock}.`;
 }
 
-/** The build in the bottom right corner of every screen, the start screen included. Muted, and
- *  out of the way of every control: nothing is ever clicked through it (CLAUDE.md T8 3.1). */
-function versionCorner(): string {
-  return `<p class="app-version">${escapeHtml(APP_VERSION)}</p>`;
-}
+/** The version in the corner of every screen, the start screen included (PIOTR, 13.09). It takes
+ *  no pointer, so it can never cover a control (CLAUDE.md T8 3.1). */
+const VERSION_CORNER = `<span class="version-corner">${APP_VERSION}</span>`;
 
 /** Everything on the page except the modal layer, which keeps its own DOM between renders, and the
  *  scene, which goes into the slot afterwards. */
 function pageHtml(scene: Scene | null): string {
+  return pageBody(scene) + VERSION_CORNER;
+}
+
+function pageBody(scene: Scene | null): string {
   if (ui.screen === 'start' || state === null) {
     return (
       renderStart({
@@ -487,12 +488,12 @@ function pageHtml(scene: Scene | null): string {
         companyName: ui.companyName,
         showWhy: ui.showWhy,
         cloud: ui.cloud,
-      }) + versionCorner()
+      })
     );
   }
   const current = state;
   // The last word the company gets is the bankruptcy event, over the game over screen.
-  if (current.gameOver) return renderGameOver(current) + versionCorner();
+  if (current.gameOver) return renderGameOver(current);
   const notes = scene?.notes ?? '';
   const controls = ui.view === 'hall' ? hallControls(current) + hallZoomControls() : '';
   const note = ui.note === '' ? '' : `<p class="view-note">${escapeHtml(ui.note)}</p>`;
@@ -504,8 +505,7 @@ function pageHtml(scene: Scene | null): string {
     out +
     (ui.menuOpen ? renderMenu(current, ui.cloud) : '') +
     `<main class="view">${SCENE_SLOT}${notes}${controls}${note}</main>` +
-    renderWhy() +
-    versionCorner()
+    renderWhy()
   );
 }
 
@@ -519,7 +519,7 @@ function captureFocus(): FocusMemory | null {
   if (!(active instanceof HTMLInputElement)) return null;
   const key = active.dataset.field;
   if (key === undefined) return null;
-  return { key, start: active.selectionStart };
+  return { key, start: active.selectionEnd };
 }
 
 function restoreFocus(memory: FocusMemory | null): void {
@@ -527,9 +527,12 @@ function restoreFocus(memory: FocusMemory | null): void {
   const field = root.querySelector(`[data-field="${memory.key}"]`);
   if (!(field instanceof HTMLInputElement)) return;
   field.focus();
-  if (memory.start !== null && field.type === 'text') {
-    field.setSelectionRange(memory.start, memory.start);
-  }
+  if (field.type !== 'text') return;
+  // The caret goes back where it was, and at the end when the remembered spot is stale (it was
+  // read before the last key landed): typing 15 must give 15, never 51 (bug, 13.09).
+  const end = field.value.length;
+  const at = memory.start === null ? end : Math.min(Math.max(memory.start, 0), end);
+  field.setSelectionRange(at === 0 && end > 0 ? end : at, at === 0 && end > 0 ? end : at);
 }
 
 /** How long a figure takes to walk from one station to the next [TUNE]. */

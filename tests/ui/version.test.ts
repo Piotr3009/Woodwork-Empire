@@ -39,12 +39,12 @@ describe('the version in the corner', () => {
     document.body.innerHTML = '<div id="app"></div>';
     mount(root());
     // The start screen, before a game exists at all.
-    expect(root().innerHTML).toContain(`<p class="app-version">${APP_VERSION}</p>`);
+    expect(root().innerHTML).toContain(`<span class="version-corner">${APP_VERSION}</span>`);
     const start = root().querySelector('[data-do="startGame"]');
     if (start === null) throw new Error('no start button');
     start.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     // And in the game itself.
-    expect(root().innerHTML).toContain(`<p class="app-version">${APP_VERSION}</p>`);
+    expect(root().innerHTML).toContain(`<span class="version-corner">${APP_VERSION}</span>`);
   });
 
   it('is written in constants.ts and nowhere else in the source', () => {

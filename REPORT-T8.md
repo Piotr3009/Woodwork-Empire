@@ -23,7 +23,14 @@ own exit code before every commit.
 | T8-08 Floor catalogue slot | `a2e6f38` | `catalogueFloor` through the loader, in the region the brief gives it. |
 | T8-09 Scenarios | `4da6bd7` | The months re-measured for the deliveries and the move, and the two new ones. It turned up a real fault in T8-02, below. |
 | T8-09b, c, d | `c70a4b5`, `528c9e5`, `2b0e039` | What re-reading the night's own diff found: an import cycle, a move that could be booked twice, and a sale remembered across a tab. Section 6. |
-| T8-10 Report and PR | this commit | This file. |
+| T8-10 Report and PR | this commit | This file, and `main` merged in. |
+
+`main` moved while the turn was being built: Piotr pushed a `v10` commit of his own after writing
+the brief, with an `APP_VERSION` constant, a third material mode and a typing test. It is merged
+into this branch so the pull request is a clean one. His version corner is the one that stands,
+because it is his and it is the simpler of the two: one constant appended once to the page rather
+than three call sites. Mine is deleted, with its stylesheet rule; the test that says the corner
+shows the constant and that `v10` is written in one file now says it of his.
 
 ---
 
