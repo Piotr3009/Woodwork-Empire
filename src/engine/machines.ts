@@ -7,6 +7,7 @@ import {
   HEAVY_SPECS,
   LIGHT_CLASSES,
   EXTRACTOR_BROKEN_OUTPUT_FACTOR,
+  BREAK_SKIP_FACTOR,
   GATE_CROWD_FACTOR,
   GATE_CROWD_LIMIT,
   MACHINE_REPAIR_COST_FRACTION,
@@ -354,15 +355,118 @@ export function gateIsCrowded(state: GameState): boolean {
   return waiting > GATE_CROWD_LIMIT;
 }
 
-/** What the state of the hall does to every minute of production. */
-export function hallProductivityFactor(state: GameState): number {
-  let factor = dustFactor(state.dust);
-  if (helperMissing(state)) factor *= NO_HELPER_PRODUCTIVITY_FACTOR;
+/** One line of the company output board: what it is and what it is worth (PIOTR, 13.09: "a column
+ *  for the company's output, 0.7, and why"; CLAUDE.md T9 3.10). */
+export interface OutputLine {
+  label: string;
+  /** Plus or minus, against the running total. */
+  points: number;
+  /** True when this is one of the things every minute of production in the hall is multiplied by,
+   *  which is what makes the number. The rest act on the man or the machine they belong to and
+   *  are on the board because Piotr asked to see them (REPORT-T9 deviations). */
+  hall: boolean;
+  /** Where a line that is not the hall's own acts. Empty for the hall's. */
+  where: string;
+}
+
+export interface OutputBreakdown {
+  /** Where every hall starts. */
+  base: number;
+  lines: OutputLine[];
+  /** The totals of the two columns, over the lines that make the number. */
+  plus: number;
+  minus: number;
+  /** base + plus + minus: what every minute of production in this hall is multiplied by. */
+  total: number;
+}
+
+function roundPoints(value: number): number {
+  return Math.round(value * 10000) / 10000;
+}
+
+/** What the hall is turning out and why, line by line. The one selector for it: the number the
+ *  engine multiplies production by is this list's total, so the board and the bench cannot
+ *  disagree about the state of the hall (CLAUDE.md T9 3.10). */
+export function outputBreakdown(state: GameState): OutputBreakdown {
+  const lines: OutputLine[] = [];
+  let running = 1;
+  // Each line is worth what it takes off the running total, so the lines add up to the product
+  // exactly: a second thing wrong with the hall costs less than the first one did.
+  const hallLine = (label: string, factor: number): void => {
+    const next = running * factor;
+    lines.push({ label, points: next - running, hall: true, where: '' });
+    running = next;
+  };
+  const band = dustBand(state.dust);
+  hallLine(band.label === 'clean' ? 'Hall clean' : `Hall ${band.label}`, band.factor);
+  if (helperMissing(state)) hallLine('Five joiners and no helper', NO_HELPER_PRODUCTIVITY_FACTOR);
   // Nowhere to put anything down with four finished pieces in the way (CLAUDE.md T2 3.7).
-  if (gateIsCrowded(state)) factor *= GATE_CROWD_FACTOR;
+  if (gateIsCrowded(state)) hallLine('No room at the gate', GATE_CROWD_FACTOR);
   // The extraction is down: the hall crawls rather than stopping dead (CLAUDE.md T2 3.9).
-  if (extractorBroken(state)) factor *= EXTRACTOR_BROKEN_OUTPUT_FACTOR;
-  return factor;
+  if (extractorBroken(state)) {
+    hallLine('Extraction down', EXTRACTOR_BROKEN_OUTPUT_FACTOR);
+  } else {
+    hallLine('Extraction working', 1);
+  }
+  const total = running;
+  let plus = 0;
+  let minus = 0;
+  for (const line of lines) {
+    line.points = roundPoints(line.points);
+    if (line.points > 0) plus += line.points;
+    if (line.points < 0) minus += line.points;
+  }
+  // What the owner owes the day, what the crew are worth and what the machines are worth. None of
+  // these is the hall's own factor: the owner's comes off his minutes, a man's rate comes off his
+  // and a class of machine comes off the stage it does (CLAUDE.md T6 3.4, T7 3.1).
+  const owner = state.owner;
+  if (owner.overtimeDebt > 0) {
+    lines.push({
+      label: 'Overtime, carried into today',
+      points: roundPoints(-owner.overtimeDebt),
+      hall: false,
+      where: 'your own minutes',
+    });
+  }
+  if (owner.breakSkipped) {
+    lines.push({
+      label: 'Dinner worked through',
+      points: roundPoints(BREAK_SKIP_FACTOR - 1),
+      hall: false,
+      where: 'your own minutes',
+    });
+  }
+  for (const worker of state.workers) {
+    if (worker.rate <= 0 || worker.rate >= 1) continue;
+    lines.push({
+      label: `${worker.name}, ${worker.tier ?? 'a'} ${worker.role}`,
+      points: roundPoints(worker.rate - 1),
+      hall: false,
+      where: 'his own minutes',
+    });
+  }
+  const families = new Set(
+    state.equipment
+      .filter((item) => !isSold(item) && findSpec(item.specId)?.category === 'machine')
+      .map((item) => item.specId),
+  );
+  for (const specId of Array.from(families).sort()) {
+    const factor = bestOutputFactor(state, specId);
+    const spec = findSpec(specId);
+    lines.push({
+      label: `${spec?.name ?? specId}, best in the hall`,
+      points: roundPoints(factor - 1),
+      hall: false,
+      where: 'the stage it does',
+    });
+  }
+  return { base: 1, lines, plus: roundPoints(plus), minus: roundPoints(minus), total };
+}
+
+/** What the state of the hall does to every minute of production: the total of the lines the
+ *  board shows, and nothing else (CLAUDE.md T9 3.10). */
+export function hallProductivityFactor(state: GameState): number {
+  return outputBreakdown(state).total;
 }
 
 /** What the classes of machine in the hall do to the speed of a job of this material: the best

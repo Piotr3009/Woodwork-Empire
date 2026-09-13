@@ -71,15 +71,26 @@ export function callRatingFactor(missed: number): number {
   return Math.max(0, 1 - CALL_SATISFACTION_PENALTY * penalisedMisses(missed));
 }
 
-/** Applies the rating and hands back the change, for the event body. */
+/** What the client's verdict is called on the company board (CLAUDE.md T9 3.10). */
+function ratingReason(job: Job): string {
+  if (job.daysLate > 0) {
+    return `${job.name}: ${job.daysLate} ${job.daysLate === 1 ? 'day' : 'days'} late`;
+  }
+  return `${job.name}: ${job.express ? 'express, on time' : 'on time'}`;
+}
+
+/** Applies the rating and hands back the change, for the event body. Both halves of it go on the
+ *  board: what the client thought of the job, and what the calls nobody picked up cost on top of
+ *  it (CLAUDE.md T9 3.10). */
 export function applyRating(state: GameState, job: Job): number {
   const raw = ratingFor(job);
   const share = emailRatingFactor(job.emailsUnanswered) * callRatingFactor(job.callsMissed);
-  const scaled = raw > 0 ? raw * share : raw;
+  const scaled = Math.round((raw > 0 ? raw * share : raw) * 100) / 100;
   // And every one of those missed calls is a point off in its own right [TUNE].
-  const missed = penalisedMisses(job.callsMissed) * CALL_RATING_PENALTY;
+  const missed = Math.round(penalisedMisses(job.callsMissed) * CALL_RATING_PENALTY * 100) / 100;
   const rating = Math.round((scaled - missed) * 100) / 100;
   job.rating = rating;
-  state.reputation = clampReputation(state.reputation + rating);
+  changeReputation(state, scaled, ratingReason(job));
+  if (missed > 0) changeReputation(state, -missed, `${job.name}: calls not answered`);
   return rating;
 }

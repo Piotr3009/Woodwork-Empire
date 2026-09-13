@@ -153,6 +153,7 @@ export {
 export { dropJob } from './jobs';
 export { changeReputation } from './reputation';
 export type { LifecycleStep, StartCheck, StepState } from './jobs';
+export type { OutputBreakdown, OutputLine } from './machines';
 
 // Production in stages (CLAUDE.md T7 3.1)
 export {
@@ -272,6 +273,7 @@ export {
   ductingDue,
   ductingIsFree,
   dustBand,
+  outputBreakdown,
   findSpec,
   gateIsCrowded,
   has,
