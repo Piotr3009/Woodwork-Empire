@@ -116,6 +116,9 @@ export interface EquipmentSpec {
   category: EquipmentCategory;
   /** Which tab of the catalogue it is under. Every line has one (CLAUDE.md T6 3.6). */
   tab: EquipmentTab;
+  /** The folder inside that tab, named for the family in the plural: a tab holds folders and a
+   *  folder holds the classes of one family (CLAUDE.md T7 3.7). */
+  folder: string;
   /** Footprint in tiles. */
   width: number;
   depth: number;

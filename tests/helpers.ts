@@ -165,7 +165,7 @@ export const STARTING_KIT = [
  *  factors are all 1.0 (CLAUDE.md T7 3.6). The saw is the used one at 1800, which is what the
  *  catalogue offers first; a test about the labour figures of CLAUDE.md 8.5 asks for the budget
  *  saw, which is the baseline those figures describe. */
-const STARTING_CLASS: Record<string, string> = {
+export const STARTING_CLASS: Record<string, string> = {
   workbench: 'budget',
   sheetRack: 'budget',
   edgebander: 'budget',

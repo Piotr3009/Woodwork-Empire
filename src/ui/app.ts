@@ -58,7 +58,6 @@ import { type CatalogueTab, CATALOGUE_FIRST_TAB, catalogueTabFrom, renderCatalog
 import { renderDayEnd, renderDaySummary, renderGameOver } from './dayEnd';
 import { renderEvent, renderEventFooter } from './eventModal';
 import { type LaptopTab, laptopTabFrom, renderLaptop } from './laptop';
-import { renderMachine } from './machine';
 import { renderSpriteCheck } from './spriteCheck';
 import { renderWorkPlan } from './workPlan';
 import {
@@ -96,8 +95,10 @@ interface Ui {
   arrearsAmount: string;
   /** Which tab of the laptop is on top (CLAUDE.md T4 3.1). */
   laptopTab: LaptopTab;
-  /** Which tab of the equipment catalogue is on top (CLAUDE.md T6 3.6). */
+  /** Which tab of the equipment catalogue is on top, and which family folder is open inside it
+   *  (CLAUDE.md T6 3.6, T7 3.7). */
   catalogueTab: CatalogueTab;
+  catalogueFolder: string | null;
   /** Which tab of the books is on top, and the past day whose summary is open over them
    *  (CLAUDE.md T6 3.9). */
   accountingTab: AccountingTab;
@@ -106,9 +107,6 @@ interface Ui {
   daySummary: number | null;
   /** A new tab is new content, not the same list a minute later: it starts at the top. */
   scrollModalTop: boolean;
-  /** The family whose classes are on screen, over whatever else is open (CLAUDE.md T3 3.5). */
-  machine: string | null;
-  machinePosition: ModalPosition | null;
   /** Setting the hall out: the clock is stopped and the kit can be dragged about. */
   setup: boolean;
   speedBeforeSetup: Speed;
@@ -162,12 +160,11 @@ function freshUi(): Ui {
     arrearsAmount: '500',
     laptopTab: 'tasks',
     catalogueTab: CATALOGUE_FIRST_TAB,
+    catalogueFolder: null,
     accountingTab: 'days',
     openDays: [],
     daySummary: null,
     scrollModalTop: false,
-    machine: null,
-    machinePosition: null,
     setup: false,
     speedBeforeSetup: 0,
     drag: null,
@@ -214,7 +211,12 @@ function modalBody(id: ModalId, current: GameState): string {
     case 'accounting':
       return renderAccounting(current, ui.arrearsAmount, ui.accountingTab, ui.openDays);
     case 'catalogue':
-      return renderCatalogue(current, ui.filters.catalogue ?? '', ui.catalogueTab);
+      return renderCatalogue(
+        current,
+        ui.filters.catalogue ?? '',
+        ui.catalogueTab,
+        ui.catalogueFolder,
+      );
   }
 }
 
@@ -380,16 +382,6 @@ function modalSpecs(): ModalSpec[] {
       closable: true,
       wide: true,
       position: null,
-    });
-  }
-  if (ui.machine !== null) {
-    const spec = findSpec(ui.machine);
-    specs.push({
-      id: 'machine',
-      title: spec === null ? 'Machine' : spec.name,
-      body: renderMachine(current, ui.machine),
-      full: true,
-      position: ui.machinePosition,
     });
   }
   const event = current.activeEvent;
@@ -816,6 +808,20 @@ function handleAction(element: DataElement, point: { x: number; y: number }): vo
       break;
     case 'catalogueTab':
       ui.catalogueTab = catalogueTabFrom(id);
+      // A new tab is a new set of folders, with none of them open and no filter left over.
+      ui.catalogueFolder = null;
+      ui.filters.catalogue = '';
+      ui.scrollModalTop = true;
+      break;
+    case 'openFolder':
+      // The classes of one family, inline under the tab that holds them (CLAUDE.md T7 3.7).
+      ui.catalogueFolder = id;
+      ui.filters.catalogue = '';
+      ui.scrollModalTop = true;
+      break;
+    case 'closeFolder':
+      ui.catalogueFolder = null;
+      ui.filters.catalogue = '';
       ui.scrollModalTop = true;
       break;
     case 'accountingTab':
@@ -833,15 +839,6 @@ function handleAction(element: DataElement, point: { x: number; y: number }): vo
       // The evening's own summary, put back in front of him from the books (CLAUDE.md T6 3.9).
       ui.daySummary = Number(id);
       break;
-    case 'openMachine':
-      // The classes of a family fill the page, over the catalogue that sent the player here.
-      ui.machine = id;
-      ui.machinePosition = null;
-      break;
-    case 'closeMachine':
-      ui.machine = null;
-      ui.machinePosition = null;
-      break;
     case 'closeModal': {
       // The cross on the event modal is the one choice it has. The cross on anything else just
       // shuts that modal: whatever is behind it is still there.
@@ -851,11 +848,6 @@ function handleAction(element: DataElement, point: { x: number; y: number }): vo
         const choice = event.choices[0];
         dispatch({ type: 'RESOLVE_EVENT', choiceId: choice ? choice.id : 'ok' });
         return;
-      }
-      if (which === 'machine') {
-        ui.machine = null;
-        ui.machinePosition = null;
-        break;
       }
       if (which === 'daySummary') {
         ui.daySummary = null;
@@ -1187,12 +1179,6 @@ function onKeyDown(event: KeyboardEvent): void {
     render();
     return;
   }
-  if (ui.machine !== null) {
-    ui.machine = null;
-    ui.machinePosition = null;
-    render();
-    return;
-  }
   if (ui.modal !== null) {
     ui.modal = null;
     ui.modalPosition = null;
@@ -1390,8 +1376,6 @@ function onPointerDown(event: MouseEvent): void {
     };
     if (which === 'event') {
       ui.eventPosition = position;
-    } else if (which === 'machine') {
-      ui.machinePosition = position;
     } else {
       ui.modalPosition = position;
     }

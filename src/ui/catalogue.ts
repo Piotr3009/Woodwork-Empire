@@ -7,10 +7,9 @@ import {
   SOFTWARE_ONE_OFF_PRICE,
   SOFTWARE_SUBSCRIPTION_MONTHLY,
 } from '../engine/constants';
-import type { EquipmentTab } from '../engine/types';
+import type { EquipmentSpec, EquipmentTab } from '../engine/types';
 import {
   bagsExist,
-  canBuy,
   canBuySoftware,
   countOf,
   findSpec,
@@ -21,7 +20,7 @@ import {
 } from '../engine/index';
 import { serviceDueIn, variantFor } from '../engine/machines';
 import type { Equipment, GameState } from '../engine/index';
-import { isMachineFamily } from './machine';
+import { renderMachine } from './machine';
 import {
   emptyLine,
   escapeHtml,
@@ -51,7 +50,12 @@ const TABS: Array<[string, string]> = [
   [OWNED_TAB, 'Owned'],
 ];
 
-export function renderCatalogue(state: GameState, filter: string, tab: CatalogueTab): string {
+export function renderCatalogue(
+  state: GameState,
+  filter: string,
+  tab: CatalogueTab,
+  folder: string | null = null,
+): string {
   const warnings =
     (hasExtraction(state)
       ? ''
@@ -59,49 +63,63 @@ export function renderCatalogue(state: GameState, filter: string, tab: Catalogue
     (rackCapacity(state) > 0
       ? ''
       : '<p class="warn">No shelving in the hall. Nothing can be unloaded without it.</p>');
+  const open = folder === null ? null : EQUIPMENT_SPECS.find((spec) => spec.id === folder) ?? null;
   // The management software runs on the laptop, so it is under Computers with it and not on
   // every tab of the catalogue (CLAUDE.md T6 3.6).
   const body =
     tab === OWNED_TAB
       ? renderOwned(state, filter)
-      : renderTab(state, filter, tab) + (tab === 'computers' ? renderSoftware(state) : '');
-  return warnings + tabBar('catalogueTab', TABS, tab) + filterField('catalogue', filter, 'Filter the catalogue') + body;
+      : open !== null && open.tab === tab
+        ? renderOpenFolder(state, open, filter)
+        : renderFolders(state, filter, tab) + (tab === 'computers' ? renderSoftware(state) : '');
+  return (
+    warnings +
+    tabBar('catalogueTab', TABS, tab) +
+    filterField('catalogue', filter, 'Filter the catalogue') +
+    body
+  );
 }
 
-/** One tab of the catalogue. The filter works inside it and nowhere else. */
-function renderTab(state: GameState, filter: string, tab: CatalogueTab): string {
+/** The folders of one tab: one per family, with what is in it and what the hall already has
+ *  (CLAUDE.md T7 3.7). */
+function renderFolders(state: GameState, filter: string, tab: CatalogueTab): string {
   const needle = filter.trim().toLowerCase();
   const inTab = EQUIPMENT_SPECS.filter((spec) => spec.tab === tab);
   if (inTab.length === 0) return emptyLine('Nothing here yet.');
   const rows = inTab
-    .filter((spec) => needle === '' || spec.name.toLowerCase().includes(needle))
+    .filter(
+      (spec) =>
+        needle === '' ||
+        spec.folder.toLowerCase().includes(needle) ||
+        spec.name.toLowerCase().includes(needle),
+    )
     .map((spec) => {
-      const check = canBuy(state, spec.id);
       const count = countOf(state, spec.id);
-      const owned = count > 0 ? `<span class="badge">Owned ${count}</span>` : '';
-      // A machine is a family: the classes it comes in, and the money, are in its own modal
-      // (CLAUDE.md T3 3.5). Everything else is bought off the line itself.
-      const family = isMachineFamily(spec);
-      const classes = family
-        ? ` · ${plural(spec.variants.length, 'class', 'classes')}`
-        : '';
-      const action = family
-        ? button('openMachine', 'Choose', `data-id="${spec.id}"`)
-        : check.ok
-          ? button('buyEquipment', 'Buy', `data-id="${spec.id}"`)
-          : lockedButton('Buy', check.reason);
-      const locked = !family && !check.ok;
+      const owned = count > 0 ? `<span class="badge badge-owned">Owned ${count}</span>` : '';
       return (
-        `<div class="card${locked ? ' is-locked' : ''}">` +
-        `<div class="card-main"><h3>${escapeHtml(spec.name)} ${owned}</h3>` +
-        `<p class="figures"><strong>${family ? 'from ' : ''}${money(spec.price)}</strong>` +
-        `${classes} · ${escapeHtml(spec.effect)}</p>` +
-        (locked ? `<p class="lock">${escapeHtml(check.reason)}</p>` : '') +
-        `</div><div class="card-action">${action}</div></div>`
+        `<div class="card folder" data-folder="${spec.id}">` +
+        `<div class="card-main"><h3>${escapeHtml(spec.folder)} ${owned}</h3>` +
+        `<p class="figures"><strong>from ${money(spec.price)}</strong> · ` +
+        `${plural(spec.variants.length, 'class', 'classes')} · ` +
+        `${escapeHtml(spec.effect)}</p>` +
+        `</div><div class="card-action">` +
+        button('openFolder', 'Open', `data-id="${spec.id}"`) +
+        '</div></div>'
       );
     })
     .join('');
   return rows === '' ? emptyLine('Nothing matches that.') : rows;
+}
+
+/** Inside a folder: the classes of that one family, and the way back out of it. */
+function renderOpenFolder(state: GameState, spec: EquipmentSpec, filter: string): string {
+  const label = EQUIPMENT_TABS.find((entry) => entry.id === spec.tab)?.label ?? 'the catalogue';
+  return (
+    '<div class="folder-head">' +
+    button('closeFolder', `Back to ${label}`) +
+    `<h3>${escapeHtml(spec.folder)}</h3></div>` +
+    renderMachine(state, spec.id, filter)
+  );
 }
 
 /** What is standing in the hall, in the state it is in (CLAUDE.md T6 3.6). */

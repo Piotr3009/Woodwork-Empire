@@ -1074,6 +1074,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'desk',
+    folder: 'Desks',
     tab: 'computers',
     name: 'Desk',
     price: 150,
@@ -1087,6 +1088,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'chair',
+    folder: 'Chairs',
     tab: 'computers',
     name: 'Chair',
     price: 60,
@@ -1100,6 +1102,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'laptop',
+    folder: 'Laptops',
     tab: 'computers',
     name: 'Laptop',
     price: 700,
@@ -1114,6 +1117,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'tableSaw',
+    folder: 'Table saws',
     tab: 'sheetMachines',
     name: 'Table saw',
     price: 1800,
@@ -1130,6 +1134,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'drill',
+    folder: 'Drills',
     tab: 'handTools',
     name: 'Cordless drill',
     price: 120,
@@ -1143,6 +1148,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'edgebander',
+    folder: 'Edgebanders',
     tab: 'sheetMachines',
     name: 'Edgebander',
     price: 500,
@@ -1165,6 +1171,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'compressor',
+    folder: 'Compressors',
     tab: 'handTools',
     name: 'Small compressor',
     price: 350,
@@ -1178,6 +1185,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'extractor',
+    folder: 'Extractors',
     tab: 'extraction',
     name: 'Extractor',
     price: 600,
@@ -1191,6 +1199,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'workbench',
+    folder: 'Benches',
     tab: 'storage',
     name: 'Workbench',
     price: 120,
@@ -1210,6 +1219,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'sheetRack',
+    folder: 'Racks',
     tab: 'storage',
     name: 'Sheet rack',
     price: 200,
@@ -1231,6 +1241,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'toolCabinet',
+    folder: 'Tool cabinets',
     tab: 'storage',
     name: 'Tool cabinet',
     price: 350,
@@ -1248,6 +1259,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'locker',
+    folder: 'Lockers',
     tab: 'storage',
     name: 'Locker',
     price: 80,
@@ -1263,6 +1275,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'canteenSeat',
+    folder: 'Canteen seats',
     tab: 'storage',
     name: 'Canteen seat',
     price: 40,
@@ -1278,6 +1291,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'handToolSet',
+    folder: 'Hand tool sets',
     tab: 'handTools',
     name: 'Hand tool set for a worker',
     price: 400,
@@ -1294,6 +1308,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'van',
+    folder: 'Vans',
     tab: 'handling',
     name: 'Van',
     price: 9000,
@@ -1307,6 +1322,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'forklift',
+    folder: 'Forklifts',
     tab: 'handling',
     name: 'Forklift',
     price: 6000,
@@ -1321,6 +1337,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'forkliftBetter',
+    folder: 'Better forklifts',
     tab: 'handling',
     name: 'Better forklift',
     price: 12000,
@@ -1335,6 +1352,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'thicknesser',
+    folder: 'Thicknessers',
     tab: 'timberMachines',
     name: 'Thicknesser',
     price: 2500,
@@ -1353,6 +1371,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'solidWoodTools',
+    folder: 'Timber tool sets',
     tab: 'timberMachines',
     name: 'Planer, router, sander, clamps',
     price: 2200,
@@ -1369,6 +1388,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'cnc',
+    folder: 'CNC machines',
     tab: 'cnc',
     name: 'CNC',
     price: 45000,
@@ -1387,6 +1407,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'cncHead',
+    folder: 'CNC heads',
     tab: 'cnc',
     name: 'CNC tool changer head',
     price: 9000,
@@ -1401,6 +1422,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'sprayBooth',
+    folder: 'Spray booths',
     tab: 'spraying',
     name: 'Spray booth',
     price: 18000,
@@ -1418,6 +1440,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'dustSystem',
+    folder: 'Central systems',
     tab: 'extraction',
     name: 'Central dust extraction system',
     price: 35000,
@@ -1431,6 +1454,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'flexiSystem',
+    folder: 'Flexi systems',
     tab: 'extraction',
     name: 'Flexi extraction system',
     price: 50000,
@@ -1447,6 +1471,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'pelletiser',
+    folder: 'Pelletisers',
     tab: 'extraction',
     name: 'Pelletiser',
     price: 15000,

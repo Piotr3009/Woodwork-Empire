@@ -1,7 +1,15 @@
 // The machine modal: one tile per class of a family, with what each one does to the work
 // (CLAUDE.md T3 3.5). The catalogue lists the family, this is where the money is spent.
 
-import { canBuy, countOf, enduranceHoursFor, findSpec } from '../engine/index';
+import {
+  canBuy,
+  countOf,
+  enduranceHoursFor,
+  findSpec,
+  footprintOf,
+  zoneOf,
+} from '../engine/index';
+import { spriteUrl } from '../render/sprites';
 import type { EquipmentSpec, EquipmentVariant, GameState } from '../engine/index';
 import {
   escapeHtml,
@@ -40,13 +48,37 @@ function powerLine(variant: EquipmentVariant): string {
   return `Power ${variant.powerPerDay} a day`;
 }
 
-/** Where the picture of this class goes. T3-08 puts the sprite in it when the file is there, and
- *  a box stands in until then (CLAUDE.md T3 3.6). */
+/** Where the picture of this class goes: the file the art side delivered for this very class,
+ *  through the loader, and a box while there is none (CLAUDE.md T3 3.6, T7 3.7). */
 export function pictureSlot(spriteKey: string, tier: string): string {
+  const url = spriteUrl(spriteKey, tier);
+  const inside =
+    url === null
+      ? '<span class="tile-picture-box"></span>'
+      : `<img src="${url}" alt="${escapeHtml(spriteKey)}" loading="lazy" />`;
   return (
     `<div class="tile-picture" data-sprite="${escapeHtml(spriteKey)}" ` +
-    `data-tier="${escapeHtml(tier)}"><span class="tile-picture-box"></span></div>`
+    `data-tier="${escapeHtml(tier)}">${inside}</div>`
   );
+}
+
+/** What the class takes of the hall floor, in the words Piotr asked for (CLAUDE.md T7 3.7). */
+export function floorLine(specId: string, variantId: string): string {
+  const stands = footprintOf(specId, variantId);
+  const zone = zoneOf(specId, variantId);
+  if (zone.width <= 0 || zone.depth <= 0) return 'Kept in a tool cabinet';
+  return (
+    `Takes ${stands.width} by ${stands.depth} m on a ${zone.width} by ${zone.depth} m zone`
+  );
+}
+
+/** The frame on a class the hall already has (CLAUDE.md T7 3.7). */
+export function ownedBadge(state: GameState, specId: string, variantId: string): string {
+  const count = state.equipment.filter(
+    (item) => item.specId === specId && item.variantId === variantId,
+  ).length;
+  if (count === 0) return '';
+  return `<span class="badge badge-owned">Owned${count > 1 ? ` \u00d7 ${count}` : ''}</span>`;
 }
 
 function tile(
@@ -66,12 +98,15 @@ function tile(
     bagLine(spec, variant),
     lifeLine(spec, variant),
     powerLine(variant),
+    floorLine(spec.id, variant.id),
   ]
     .map((line) => `<p class="tile-figures">${escapeHtml(line)}</p>`)
     .join('');
+  const owned = ownedBadge(state, spec.id, variant.id);
   return (
-    `<div class="tile${check.ok ? '' : ' is-locked'}" data-variant="${variant.id}">` +
-    `<h3 class="tile-name">${escapeHtml(variant.name)}</h3>` +
+    `<div class="tile${check.ok ? '' : ' is-locked'}${owned === '' ? '' : ' is-owned'}" ` +
+    `data-variant="${variant.id}">` +
+    `<h3 class="tile-name">${escapeHtml(variant.name)} ${owned}</h3>` +
     `<p class="tile-price">${money(variant.price)}</p>` +
     pictureSlot(spec.spriteKey, variant.id) +
     `<p class="tile-text">${escapeHtml(variant.description)}</p>` +
@@ -91,7 +126,9 @@ export function recommendedVariant(state: GameState, spec: EquipmentSpec): strin
   return '';
 }
 
-export function renderMachine(state: GameState, specId: string): string {
+/** The inside of a folder: one tile per class of the family, filtered by whatever is in the
+ *  filter field (CLAUDE.md T7 3.7). */
+export function renderMachine(state: GameState, specId: string, filter = ''): string {
   const spec = findSpec(specId);
   if (!spec) return '<p class="empty">Not in the catalogue.</p>';
   const owned = countOf(state, specId);
@@ -101,8 +138,11 @@ export function renderMachine(state: GameState, specId: string): string {
     `<p class="hint">${escapeHtml(spec.effect)} ` +
     `${plural(spec.variants.length, 'class', 'classes')} to choose from.${inTheHall}</p>`;
   const recommended = recommendedVariant(state, spec);
-  const grid = spec.variants
-    .map((variant) => tile(state, spec, variant, recommended))
-    .join('');
+  const needle = filter.trim().toLowerCase();
+  const classes = spec.variants.filter(
+    (variant) => needle === '' || variant.name.toLowerCase().includes(needle),
+  );
+  if (classes.length === 0) return `${head}<p class="empty">Nothing matches that.</p>`;
+  const grid = classes.map((variant) => tile(state, spec, variant, recommended)).join('');
   return `${head}<div class="tile-grid">${grid}</div>`;
 }

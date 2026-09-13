@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-// The machine modal: one tile per class, with what each one does and what it costs
-// (CLAUDE.md T3 3.5).
+// The inside of a catalogue folder: one tile per class, with what each one does, what it costs
+// and what it takes of the floor (CLAUDE.md T3 3.5, T7 3.7).
 
 import { describe, expect, it } from 'vitest';
 import { renderCatalogue } from '../../src/ui/catalogue';
@@ -23,24 +23,23 @@ function text(node: Element | null): string {
   return node?.textContent ?? '';
 }
 
-describe('the catalogue lists families', () => {
-  it('sends a machine to its own modal and buys everything else off the line', () => {
+describe('the catalogue lists folders', () => {
+  it('gives every family a folder, and the money is spent inside it', () => {
     const state = newGame({ difficulty: 'veryEasy' });
     const saws = parse(renderCatalogue(state, '', 'sheetMachines'));
-    expect(saws.querySelector('[data-do="openMachine"][data-id="tableSaw"]')).not.toBeNull();
+    expect(saws.querySelector('[data-do="openFolder"][data-id="tableSaw"]')).not.toBeNull();
     expect(saws.querySelector('[data-do="buyEquipment"][data-id="tableSaw"]')).toBeNull();
     expect(saws.innerHTML).toContain('from £1,800');
     expect(saws.innerHTML).toContain('5 classes');
-    const extraction = parse(renderCatalogue(state, '', 'extraction'));
-    expect(extraction.querySelector('[data-do="openMachine"][data-id="extractor"]')).not.toBeNull();
-    // A locker has no classes and never will.
+    // A locker has one class and it is in a folder like everything else (CLAUDE.md T7 3.7).
     const storage = parse(renderCatalogue(state, '', 'storage'));
-    expect(storage.querySelector('[data-do="buyEquipment"][data-id="locker"]')).not.toBeNull();
-    expect(storage.querySelector('[data-do="openMachine"][data-id="locker"]')).toBeNull();
+    expect(storage.querySelector('[data-do="openFolder"][data-id="locker"]')).not.toBeNull();
+    const open = parse(renderCatalogue(state, '', 'storage', 'locker'));
+    expect(open.querySelector('[data-do="buyEquipment"][data-id="locker"]')).not.toBeNull();
   });
 });
 
-describe('the machine modal', () => {
+describe('the tiles inside a folder', () => {
   it('draws five tiles for the saw and one for the compressor', () => {
     const state = newGame({ difficulty: 'veryEasy' });
     expect(tiles(state, 'tableSaw')).toHaveLength(5);
@@ -52,7 +51,7 @@ describe('the machine modal', () => {
     const state = newGame({ difficulty: 'veryEasy' });
     const used = tiles(state, 'tableSaw')[0];
     if (!used) throw new Error('no tile');
-    expect(text(used.querySelector('.tile-name'))).toBe('Used table saw');
+    expect(text(used.querySelector('.tile-name')).trim()).toBe('Used table saw');
     expect(text(used.querySelector('.tile-price'))).toBe('£1,800');
     expect(text(used.querySelector('.tile-text')).length).toBeGreaterThan(80);
     const effects = Array.from(used.querySelectorAll('.tile-figures')).map((line) =>
@@ -63,6 +62,7 @@ describe('the machine modal', () => {
       'Bag every 1,200 min of use',
       'Life about 750 hours',
       'Power 3 a day',
+      'Takes 2 by 1 m on a 3 by 3 m zone',
     ]);
     const industrial = tiles(state, 'tableSaw')[4];
     const bigEffects = Array.from(industrial?.querySelectorAll('.tile-figures') ?? []).map(
@@ -73,6 +73,7 @@ describe('the machine modal', () => {
       'Bag every 4,800 min of use',
       'Life about 6,000 hours',
       'Power 7 a day',
+      'Takes 4 by 2 m on a 5 by 4 m zone',
     ]);
   });
 
@@ -90,8 +91,14 @@ describe('the machine modal', () => {
       'industrial',
     ]);
     expect(slots.every((slot) => slot.getAttribute('data-sprite') === 'tableSaw')).toBe(true);
-    // No file yet, so the box stands in (CLAUDE.md T3 3.6).
-    expect(slots.every((slot) => slot.querySelector('.tile-picture-box') !== null)).toBe(true);
+    // Piotr delivered a picture per class of the saw, so the tile shows it rather than a box
+    // (CLAUDE.md T3 3.6, T7 3.5).
+    expect(slots.every((slot) => slot.querySelector('img') !== null)).toBe(true);
+    // And a family with no file at all still gets its box.
+    const boxes = Array.from(
+      parse(renderMachine(state, 'compressor')).querySelectorAll('.tile-picture'),
+    );
+    expect(boxes.every((slot) => slot.querySelector('.tile-picture-box') !== null)).toBe(true);
   });
 
   it('puts the one accent button on the cheapest class the workshop can pay for', () => {

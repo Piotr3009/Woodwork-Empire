@@ -1339,3 +1339,34 @@ input.num {
 .stage-delivery {
   background-color: #7a5aa8;
 }
+
+/* The equipment catalogue in folders: a tab holds folders, a folder holds the classes of one
+   family (CLAUDE.md T7 3.7). */
+.folder-head {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.folder-head h3 {
+  margin: 0;
+}
+
+.badge-owned {
+  background: var(--good);
+  color: var(--page);
+}
+
+.tile.is-owned {
+  border-color: var(--good);
+  box-shadow: inset 0 0 0 1px var(--good);
+}
+
+.tile-picture img {
+  display: block;
+  height: auto;
+  margin: 0 auto;
+  max-height: 120px;
+  max-width: 100%;
+}

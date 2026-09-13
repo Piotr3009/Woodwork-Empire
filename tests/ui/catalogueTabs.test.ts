@@ -22,8 +22,8 @@ function parse(html: string): HTMLElement {
   return holder;
 }
 
-function shop(state: GameState, tab: string, filter = ''): HTMLElement {
-  return parse(renderCatalogue(state, filter, catalogueTabFrom(tab)));
+function shop(state: GameState, tab: string, filter = '', folder: string | null = null): HTMLElement {
+  return parse(renderCatalogue(state, filter, catalogueTabFrom(tab), folder));
 }
 
 describe('the tabs', () => {
@@ -57,17 +57,90 @@ describe('the tabs', () => {
     expect(counted).toBe(EQUIPMENT_SPECS.length);
   });
 
-  it('shows only its own lines, and says so when it has none', () => {
+  it('shows only its own folders, and says so when it has none', () => {
     const state = newGame();
     const saws = shop(state, 'sheetMachines');
-    expect(saws.innerHTML).toContain('Table saw');
-    expect(saws.innerHTML).not.toContain('Cordless drill');
+    expect(saws.innerHTML).toContain('Table saws');
+    expect(saws.innerHTML).toContain('Edgebanders');
+    expect(saws.innerHTML).not.toContain('Drills');
     const hand = shop(state, 'handTools');
-    expect(hand.innerHTML).toContain('Cordless drill');
-    expect(hand.innerHTML).not.toContain('Table saw');
+    expect(hand.innerHTML).toContain('Drills');
+    expect(hand.innerHTML).not.toContain('Table saws');
     // Sanding and the CNC centre have nothing in them tonight.
     expect(shop(state, 'sanding').innerHTML).toContain('Nothing here yet.');
     expect(shop(state, 'cncCentre').innerHTML).toContain('Nothing here yet.');
+  });
+
+  it('holds the folders Piotr named, each one a family (CLAUDE.md T7 3.7)', () => {
+    const state = newGame();
+    const folders = (tab: string): string[] =>
+      Array.from(shop(state, tab).querySelectorAll('.folder')).map(
+        (node) => node.getAttribute('data-folder') ?? '',
+      );
+    expect(folders('sheetMachines')).toEqual(['tableSaw', 'edgebander']);
+    expect(folders('storage')).toEqual([
+      'workbench',
+      'sheetRack',
+      'toolCabinet',
+      'locker',
+      'canteenSeat',
+    ]);
+    expect(folders('timberMachines')).toEqual(['thicknesser', 'solidWoodTools']);
+    // Every line of the catalogue is in exactly one folder of exactly one tab.
+    const all = EQUIPMENT_TABS.flatMap((tab) => folders(tab.id));
+    expect(new Set(all).size).toBe(all.length);
+    expect(new Set(all)).toEqual(new Set(EQUIPMENT_SPECS.map((spec) => spec.id)));
+  });
+
+  it('opens a folder on the classes of that family, with the way back out', () => {
+    const state = newGame({ difficulty: 'veryEasy' });
+    const open = shop(state, 'sheetMachines', '', 'tableSaw');
+    expect(open.querySelector('[data-do="closeFolder"]')?.textContent).toBe(
+      'Back to Sheet machines',
+    );
+    const tiles = Array.from(open.querySelectorAll('.tile'));
+    expect(tiles).toHaveLength(5);
+    expect(tiles.map((tile) => tile.getAttribute('data-variant'))).toEqual([
+      'used',
+      'budget',
+      'standard',
+      'pro',
+      'industrial',
+    ]);
+    // What it takes of the floor is on the tile, in Piotr's words (CLAUDE.md T7 3.7).
+    expect(open.innerHTML).toContain('Takes 3 by 2 m on a 6 by 3 m zone');
+    const bander = shop(state, 'sheetMachines', '', 'edgebander');
+    expect(bander.innerHTML).toContain('Kept in a tool cabinet');
+    expect(bander.innerHTML).toContain('Takes 3 by 1 m on a 5 by 3 m zone');
+  });
+
+  it('frames a class the hall already has, and counts the family on its folder', () => {
+    let state = newGame({ difficulty: 'veryEasy' });
+    expect(shop(state, 'sheetMachines', '', 'tableSaw').querySelector('.tile.is-owned')).toBeNull();
+    state = act(state, { type: 'BUY_EQUIPMENT', specId: 'tableSaw', variantId: 'pro' });
+    const open = shop(state, 'sheetMachines', '', 'tableSaw');
+    const owned = Array.from(open.querySelectorAll('.tile.is-owned'));
+    expect(owned).toHaveLength(1);
+    expect(owned[0]?.getAttribute('data-variant')).toBe('pro');
+    expect(owned[0]?.textContent).toContain('Owned');
+    // A second one of the same class says how many.
+    const two = act(state, { type: 'BUY_EQUIPMENT', specId: 'tableSaw', variantId: 'pro' });
+    expect(
+      shop(two, 'sheetMachines', '', 'tableSaw').querySelector('.tile.is-owned')?.textContent,
+    ).toContain('Owned × 2');
+    // And the folder itself carries the count for the family.
+    expect(shop(two, 'sheetMachines').innerHTML).toContain('Owned 2');
+  });
+
+  it('narrows the classes inside an open folder, not the folders of the tab', () => {
+    const state = newGame({ difficulty: 'veryEasy' });
+    const filtered = shop(state, 'sheetMachines', 'industrial', 'tableSaw');
+    expect(Array.from(filtered.querySelectorAll('.tile'))).toHaveLength(1);
+    expect(filtered.innerHTML).toContain('Industrial table saw');
+    expect(filtered.innerHTML).not.toContain('Used table saw');
+    expect(filtered.querySelector('[data-do="clearFilter"]')).not.toBeNull();
+    const nothing = shop(state, 'sheetMachines', 'zzz', 'tableSaw');
+    expect(nothing.innerHTML).toContain('Nothing matches that.');
   });
 
   it('keeps the filter and its clear cross, scoped to the tab', () => {

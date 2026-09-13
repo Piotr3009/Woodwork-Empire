@@ -9,7 +9,7 @@ import { currentState, mount, render } from '../../src/ui/app';
 import { applyAction } from '../../src/engine/index';
 import { OFFICE_REGIONS } from '../../src/render/office';
 import { findSpec } from '../../src/engine/machines';
-import { STARTING_KIT } from '../helpers';
+import { STARTING_CLASS, STARTING_KIT } from '../helpers';
 
 function root(): HTMLElement {
   const element = document.querySelector('#app');
@@ -47,17 +47,18 @@ beforeAll(() => {
   click('[data-do="setView"][data-view="office"]');
   click('[data-office="catalogue"]');
   for (const specId of STARTING_KIT) {
-    // The catalogue is in tabs from Turn 6, so the shopping walks them (CLAUDE.md T6 3.6).
+    // The catalogue is tabs of folders from Turn 7: the tab, the family's folder, and the classes
+    // are inside it (CLAUDE.md T6 3.6, T7 3.7).
     const tab = findSpec(specId)?.tab;
     if (tab !== undefined) click(`[data-do="catalogueTab"][data-id="${tab}"]`);
-    const choose = root().querySelector(`[data-do="openMachine"][data-id="${specId}"]`);
-    if (choose === null) {
-      click(`[data-do="buyEquipment"][data-id="${specId}"]`);
-      continue;
-    }
-    click(`[data-do="openMachine"][data-id="${specId}"]`);
-    click(`[data-modal="machine"] [data-do="buyEquipment"][data-id="${specId}"]`);
-    click('[data-modal="machine"] [data-do="closeModal"]');
+    click(`[data-do="openFolder"][data-id="${specId}"]`);
+    const variant = STARTING_CLASS[specId];
+    click(
+      variant === undefined
+        ? `[data-do="buyEquipment"][data-id="${specId}"]`
+        : `[data-do="buyEquipment"][data-id="${specId}"][data-variant="${variant}"]`,
+    );
+    click('[data-do="closeFolder"]');
   }
   click('[data-do="catalogueTab"][data-id="computers"]');
   click('[data-do="buySoftware"][data-id="oneOff"]');
