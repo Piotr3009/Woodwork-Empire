@@ -754,6 +754,9 @@ export type GameAction =
   /** Lifting the lid: the machine has to come up before anything on it can be touched. */
   | { type: 'BOOT_LAPTOP' }
   | { type: 'SET_MATERIAL_MODE'; jobId: string; mode: MaterialMode }
+  /** Takes the job's sheets off the rack now, instead of ordering what is already there
+   *  (PIOTR, 13.09; CLAUDE.md T9 3.7). */
+  | { type: 'DRAW_FROM_STOCK'; jobId: string }
   | { type: 'SET_SAW_FALLBACK'; jobId: string; on: boolean }
   | { type: 'BUY_STOCK'; sheets: number }
   | { type: 'PAY_ARREARS'; amount: number | null }

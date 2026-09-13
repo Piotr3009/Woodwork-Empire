@@ -6,6 +6,7 @@ import { openJobs, workPlanGantt } from '../engine/index';
 import type { GameState, JobGantt, Job, StageBar } from '../engine/index';
 import {
   callsLine,
+  fromStockControl,
   jobAction,
   jobAssignControls,
   jobLabourLine,
@@ -93,6 +94,7 @@ function headHtml(state: GameState, job: Job): string {
     `<span class="row-figure">${jobLabourLine(state, job)}</span>` +
     callsLine(job) +
     jobAssignControls(state, job) +
+    fromStockControl(state, job) +
     (action === '' ? '' : `<span class="row-action">${action}</span>`) +
     '</div>'
   );

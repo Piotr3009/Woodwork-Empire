@@ -132,6 +132,7 @@ import {
   refreshJob,
   releaseJob,
   runBookedTransport,
+  drawFromStock,
   setMaterialMode,
   setSawFallback,
   transportLabel,
@@ -1703,6 +1704,11 @@ export function applyAction(state: GameState, action: GameAction): GameState {
       break;
     case 'SET_MATERIAL_MODE':
       setMaterialMode(next, action.jobId, action.mode);
+      break;
+    case 'DRAW_FROM_STOCK':
+      // The rack has it: take it, tick the order green and let him get on with it
+      // (PIOTR, 13.09; CLAUDE.md T9 3.7).
+      drawFromStock(next, action.jobId);
       break;
     case 'SET_SAW_FALLBACK':
       setSawFallback(next, action.jobId, action.on);

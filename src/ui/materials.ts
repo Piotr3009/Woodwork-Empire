@@ -13,20 +13,23 @@ import {
 } from '../engine/index';
 import type { GameState, Job } from '../engine/index';
 import { button, emptyLine, escapeHtml, money, plural } from './modal';
+import { fromStockControl } from './jobCard';
 
-function jobRow(job: Job): string {
+function jobRow(state: GameState, job: Job): string {
   const choosable = job.stage === 'accepted' || job.stage === 'materialPending';
+  // Per job is a mode, and From stock is a thing that happens: one click takes what is on the
+  // rack and the order is done (PIOTR, 13.09; CLAUDE.md T9 3.7).
   const modes = choosable
     ? `<button class="chip${job.materialMode === 'perJob' ? ' is-on' : ''}" ` +
-      `data-do="setMaterialMode" data-id="${job.id}" data-mode="perJob">Per job</button>` +
-      `<button class="chip${job.materialMode === 'stock' ? ' is-on' : ''}" ` +
-      `data-do="setMaterialMode" data-id="${job.id}" data-mode="stock">From stock</button>`
+      `data-do="setMaterialMode" data-id="${job.id}" data-mode="perJob">Per job</button>`
     : `<span class="dim">${escapeHtml(materialModeLabel(job.materialMode))}</span>`;
   return (
     `<div class="row"><span class="row-main">${escapeHtml(job.name)} ${money(job.price)}</span>` +
     `<span class="row-figure">${plural(job.sheets, 'sheet', 'sheets')} · ` +
     `${money(job.materialCost)}${job.bespokeMaterial ? ' · bespoke' : ''}</span>` +
-    `<span class="row-action">${modes}</span></div>`
+    `<span class="row-action">${modes}</span>` +
+    fromStockControl(state, job) +
+    '</div>'
   );
 }
 
@@ -56,7 +59,9 @@ export function renderMaterials(state: GameState, sheets: string): string {
     `<span class="row-action">${button('buyStock', 'Order', `data-sheets="${wanted}"`)}` +
     '</span></div>' +
     '<h3>Material for each job</h3>' +
-    (jobs.length === 0 ? emptyLine('No jobs on the books.') : jobs.map(jobRow).join('')) +
+    (jobs.length === 0
+      ? emptyLine('No jobs on the books.')
+      : jobs.map((job) => jobRow(state, job)).join('')) +
     '<h3>Deliveries</h3>' +
     (yard.length === 0 && coming.length === 0
       ? emptyLine('Nothing on the way.')

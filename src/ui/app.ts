@@ -1095,6 +1095,10 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
     case 'sawFallback':
       dispatch({ type: 'SET_SAW_FALLBACK', jobId: id, on: element.dataset.on === '1' });
       return;
+    case 'fromStock':
+      // What the rack has, taken now, with no second order for this job ever (T9 3.7).
+      dispatch({ type: 'DRAW_FROM_STOCK', jobId: id });
+      return;
     case 'setMaterialMode':
       dispatch({
         type: 'SET_MATERIAL_MODE',

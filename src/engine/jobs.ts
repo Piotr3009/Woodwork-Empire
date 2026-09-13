@@ -441,6 +441,47 @@ export function onDeliveryUnloaded(state: GameState, jobId: string | null): void
   }
 }
 
+/** What the rack can do for this job this minute, in the words the button says (PIOTR, 13.09:
+ *  "do not make me order again"; CLAUDE.md T9 3.7). One place the refusals are written: the
+ *  button asks this and the action asks this. */
+export function stockCheck(state: GameState, job: Job): { ok: boolean; reason: string } {
+  if (job.stage !== 'accepted' && job.stage !== 'materialPending') {
+    return { ok: false, reason: 'The material for this one is settled' };
+  }
+  if (job.materialKind !== 'sheet') return { ok: false, reason: 'Not sheet material' };
+  if (job.bespokeMaterial) return { ok: false, reason: 'Bespoke material is ordered in' };
+  if (!readyToOrderMaterial(state, job)) return { ok: false, reason: 'The drawing is not done' };
+  const free = Math.max(0, sheetsFreeFor(state, job));
+  if (free < job.sheets) {
+    return { ok: false, reason: `Rack has ${free} of ${job.sheets} sheets` };
+  }
+  return { ok: true, reason: '' };
+}
+
+/** Takes the job's sheets off the rack now and holds them for it. The material order is done and
+ *  green, and there is no second order for this job, ever (PIOTR, 13.09; CLAUDE.md T9 3.7). */
+export function drawFromStock(state: GameState, jobId: string): boolean {
+  const job = findJob(state, jobId);
+  if (!job) return false;
+  if (!stockCheck(state, job).ok) return false;
+  job.materialMode = 'stock';
+  // Paid for when they were bought, at the cheaper stock price (CLAUDE.md 8.9).
+  job.materialCost = stockCostFor(job.sheets);
+  // Off the rack at the click and held for this job: nobody else is promised them, and the bench
+  // never stops half way through for material that is standing right there.
+  state.stock.sheets -= job.sheets;
+  job.sheetsUsed = job.sheets;
+  for (const task of jobTasks(state, job.id)) {
+    if (task.kind !== 'materialOrder' || task.done) continue;
+    task.label = `Material from stock: ${job.name}`;
+    task.minutesRemaining = 0;
+    task.done = true;
+    task.doneDay = state.clock.day;
+  }
+  job.stage = 'ready';
+  return true;
+}
+
 export function setMaterialMode(state: GameState, jobId: string, mode: MaterialMode): boolean {
   const job = findJob(state, jobId);
   if (!job) return false;

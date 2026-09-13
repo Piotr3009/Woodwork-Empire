@@ -147,6 +147,7 @@ export {
   showsStartProduction,
   stagedJob,
   startProductionCheck,
+  stockCheck,
   transportLabel,
 } from './jobs';
 export type { LifecycleStep, StartCheck, StepState } from './jobs';

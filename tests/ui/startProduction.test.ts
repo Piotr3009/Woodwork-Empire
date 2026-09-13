@@ -28,9 +28,16 @@ function card(state: GameState): HTMLElement {
   return row;
 }
 
-/** What the button on the job card says, and whether it can be pressed. */
+/** What the button on the job card says, and whether it can be pressed. The card carries the
+ *  From stock control as well now, so the one that starts the work is picked by name
+ *  (CLAUDE.md T9 3.7). */
 function startButton(state: GameState): { text: string; enabled: boolean; title: string } {
-  const button = card(state).querySelector('.row-action .btn');
+  const buttons = Array.from(card(state).querySelectorAll('.row-action .btn'));
+  const button = buttons.find(
+    (entry) =>
+      entry.getAttribute('data-do') === 'startProduction' ||
+      (entry.textContent ?? '').startsWith('Start production'),
+  );
   if (!(button instanceof HTMLButtonElement)) throw new Error('no button on the card');
   return {
     text: button.textContent ?? '',
