@@ -422,6 +422,29 @@ export interface Ghost {
   reason: string;
 }
 
+/** A view that is expensive to build. The shell carries the pictures, which are megabytes: a
+ *  fresh <img> has to fetch and decode before it paints, so a page rebuilt every game minute made
+ *  the whole room blink. The shell is built once and kept on the page, and only the live part is
+ *  written again, which is what ui/modal.ts already does for an open modal (CLAUDE.md T3 3.4). */
+export interface Scene {
+  /** The shell is rebuilt when, and only when, this changes. */
+  key: string;
+  /** Built once. Carries exactly one empty element marked `data-live`. */
+  shell: string;
+  /** Written into that element on every render. */
+  live: string;
+  /** The lines under the view. They belong to the page, not to the scene. */
+  notes: string;
+}
+
+/** The empty element a shell leaves for its live part. */
+export const LIVE_SLOT = '<g data-live="1"></g>';
+
+/** The shell and the live part as one string, for a caller that just wants the markup. */
+export function sceneHtml(scene: Scene): string {
+  return scene.shell.replace(LIVE_SLOT, `<g data-live="1">${scene.live}</g>`) + scene.notes;
+}
+
 export interface HallOptions {
   /** The footprint following the mouse while the hall is being set out. */
   ghost?: Ghost | null;
@@ -432,7 +455,7 @@ export interface HallOptions {
   files?: readonly string[];
 }
 
-export function renderHall(state: GameState, options: HallOptions = {}): string {
+export function hallScene(state: GameState, options: HallOptions = {}): Scene {
   const unit = state.unit;
   const ghost = options.ghost ?? null;
   const files = options.files ?? spriteFiles();
@@ -485,26 +508,6 @@ export function renderHall(state: GameState, options: HallOptions = {}): string 
       );
     }
     parts.push(lines.join(''));
-  }
-
-  // The name on the wall. The art leaves the strip blank on purpose, so there is nowhere sensible
-  // to put it until the wall is painted (docs/art/SPRITES.md 9.5).
-  if (painted) {
-    const nameBox = canvasBoxInHall(HALL_NAME_BOX);
-    const fitted = fitName(state.companyName, nameBox.width);
-    if (fitted.text !== '') {
-      parts.push(
-        paintedText(
-          {
-            x: nameBox.x + nameBox.width / 2,
-            y: nameBox.y + nameBox.height / 2 + fitted.fontSize / 3,
-          },
-          fitted.text,
-          'painted-text hall-company',
-          fitted.fontSize,
-        ),
-      );
-    }
   }
 
   const drawables: Drawable[] = [];
@@ -680,12 +683,36 @@ export function renderHall(state: GameState, options: HallOptions = {}): string 
 
   drawables.push(...sawdust(state));
   drawables.sort((left, right) => left.depth - right.depth);
-  parts.push(drawables.map((drawable) => drawable.svg).join(''));
+  // Everything from here on is the live part: it changes with the state, minute by minute.
+  const live: string[] = [];
+
+  // The name on the wall. The art leaves the strip blank on purpose, so there is nowhere sensible
+  // to put it until the wall is painted (docs/art/SPRITES.md 9.5). It is live text and not part of
+  // the shell: the company the player typed in is state, and a new game has a new one.
+  if (painted) {
+    const nameBox = canvasBoxInHall(HALL_NAME_BOX);
+    const fitted = fitName(state.companyName, nameBox.width);
+    if (fitted.text !== '') {
+      live.push(
+        paintedText(
+          {
+            x: nameBox.x + nameBox.width / 2,
+            y: nameBox.y + nameBox.height / 2 + fitted.fontSize / 3,
+          },
+          fitted.text,
+          'painted-text hall-company',
+          fitted.fontSize,
+        ),
+      );
+    }
+  }
+
+  live.push(drawables.map((drawable) => drawable.svg).join(''));
 
   // The ghost footprint of whatever is being dragged, on top of everything else.
   if (ghost !== null) {
     const colour = ghost.ok ? 'var(--good)' : 'var(--bad)';
-    parts.push(
+    live.push(
       `<g data-ghost="1">` +
         `<polygon points="${points(footprintPolygon(ghost.x, ghost.y, ghost.width, ghost.depth))}" ` +
         `fill="none" stroke="${colour}" stroke-width="3" />` +
@@ -763,13 +790,32 @@ export function renderHall(state: GameState, options: HallOptions = {}): string 
     : rackCapacity(state) === 0
       ? '<p class="view-note warn">No shelving in the hall, so nothing can be unloaded.</p>'
       : '';
-  return (
-    `<svg class="hall-view" viewBox="${viewBox}" width="${size.width}" height="${size.height}" ` +
-    `xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Workshop hall">` +
-    `${parts.join('')}</svg>` +
-    `<p class="view-note">${escapeText(stateLine)}</p>` +
-    `${extractionLine}${brokenLine}${serviceLine}${gateLine}${lowStock}`
-  );
+  // The shell stands until the frame, the painting or the grid changes. Nothing else in the hall
+  // can make it wrong, so the pictures are loaded once and never again.
+  const key = [
+    'hall',
+    viewBox,
+    options.setup === true ? 'setup' : 'run',
+    HALL_LAYERS.map((layer) => layerUrl(layer.key) ?? '').join(','),
+  ].join('|');
+  return {
+    key,
+    shell:
+      `<svg class="hall-view" data-scene="${key}" viewBox="${viewBox}" ` +
+      `width="${size.width}" height="${size.height}" ` +
+      `xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Workshop hall">` +
+      `${parts.join('')}${LIVE_SLOT}</svg>`,
+    live: live.join(''),
+    notes:
+      `<p class="view-note">${escapeText(stateLine)}</p>` +
+      `${extractionLine}${brokenLine}${serviceLine}${gateLine}${lowStock}`,
+  };
+}
+
+/** The hall as one string. The app builds it from the pieces instead, so the painting survives a
+ *  render; everything that only wants to read the markup comes through here. */
+export function renderHall(state: GameState, options: HallOptions = {}): string {
+  return sceneHtml(hallScene(state, options));
 }
 
 function lineAttrs(x1: number, y1: number, x2: number, y2: number): string {

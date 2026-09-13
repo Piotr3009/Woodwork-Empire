@@ -1074,6 +1074,12 @@ input.num {
 }
 
 /* Transparent: the room carries no drawn buttons. Hover lightens it, nothing more. */
+/* The live text of the room. It holds nothing but absolutely positioned spans, so it has no box
+   of its own and the stack stays the containing block they are placed against. */
+.office-live {
+  display: contents;
+}
+
 .office-region {
   background: transparent;
   border: 0;
