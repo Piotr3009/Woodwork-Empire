@@ -22,7 +22,6 @@ import {
   emailsForPrice,
   formatTime,
   gameMinutesPerRealSecond,
-  isOvertime,
   hasBenchFor,
   isBreak,
   machineOutputFactor,
