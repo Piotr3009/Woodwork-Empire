@@ -132,6 +132,7 @@ import {
   refreshJob,
   releaseJob,
   runBookedTransport,
+  dropJob,
   drawFromStock,
   setMaterialMode,
   setSawFallback,
@@ -263,6 +264,7 @@ export function createGame(options: NewGameOptions): GameState {
     speed: 0,
     cash: spec.startingCash,
     reputation: REPUTATION_START,
+    reputationLog: [],
     dust: 0,
     unit: {
       areaM2: spec.areaM2,
@@ -1704,6 +1706,10 @@ export function applyAction(state: GameState, action: GameAction): GameState {
       break;
     case 'SET_MATERIAL_MODE':
       setMaterialMode(next, action.jobId, action.mode);
+      break;
+    case 'DROP_JOB':
+      // The client has his deposit back and the company takes the hit (CLAUDE.md T9 3.9).
+      dropJob(next, action.jobId);
       break;
     case 'DRAW_FROM_STOCK':
       // The rack has it: take it, tick the order green and let him get on with it

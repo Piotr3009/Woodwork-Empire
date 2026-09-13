@@ -6,6 +6,7 @@ import { openJobs, workPlanGantt } from '../engine/index';
 import type { GameState, JobGantt, Job, StageBar } from '../engine/index';
 import {
   callsLine,
+  dropControl,
   fromStockControl,
   jobAction,
   jobAssignControls,
@@ -84,7 +85,7 @@ function deadlineHtml(row: JobGantt): string {
 }
 
 /** Who is on the job, and what it is worth: the left hand column of the board. */
-function headHtml(state: GameState, job: Job): string {
+function headHtml(state: GameState, job: Job, dropConfirm: string | null): string {
   const action = jobAction(state, job);
   return (
     '<div class="gantt-head">' +
@@ -95,12 +96,13 @@ function headHtml(state: GameState, job: Job): string {
     callsLine(job) +
     jobAssignControls(state, job) +
     fromStockControl(state, job) +
+    dropControl(job, dropConfirm) +
     (action === '' ? '' : `<span class="row-action">${action}</span>`) +
     '</div>'
   );
 }
 
-export function renderWorkPlan(state: GameState): string {
+export function renderWorkPlan(state: GameState, dropConfirm: string | null = null): string {
   const jobs = openJobs(state);
   if (jobs.length === 0) return emptyLine('No jobs yet. Open the board.');
   const rows = workPlanGantt(state)
@@ -109,7 +111,7 @@ export function renderWorkPlan(state: GameState): string {
       if (!job) return '';
       return (
         `<div class="gantt-row" data-gantt="${row.jobId}">` +
-        headHtml(state, job) +
+        headHtml(state, job, dropConfirm) +
         '<div class="gantt-chart">' +
         scaleHtml(row) +
         gapHtml(row) +

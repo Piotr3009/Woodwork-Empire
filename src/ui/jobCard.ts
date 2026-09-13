@@ -20,6 +20,7 @@ import {
   transportLabel,
   workerById,
 } from '../engine/index';
+import { DROP_PROJECT_REPUTATION } from '../engine/constants';
 import type { GameState, Job } from '../engine/index';
 import {
   button,
@@ -92,6 +93,29 @@ export function fromStockControl(state: GameState, job: Job): string {
     ? button('fromStock', 'From stock', `data-id="${job.id}"`)
     : lockedButton('From stock', check.reason);
   return `<span class="row-action">${control}</span>`;
+}
+
+/** Dropping the project: the deposit goes back, the job goes off the plan and the company is ten
+ *  points of reputation worse off, so it is meant on the second click and inside the card itself
+ *  (PIOTR, 13.09; CLAUDE.md T9 3.9). */
+export function dropControl(job: Job, confirm: string | null): string {
+  if (job.stage === 'completed' || job.stage === 'awaitingTransport') return '';
+  if (confirm !== job.id) {
+    return (
+      '<span class="row-action">' +
+      button('dropJob', 'Drop project', `data-id="${job.id}"`) +
+      '</span>'
+    );
+  }
+  return (
+    '<span class="row-action drop-confirm">' +
+    `<span class="reason">${escapeHtml(
+      `${money(job.depositPaid)} back to the client, ${DROP_PROJECT_REPUTATION} off the ` +
+        'reputation.',
+    )}</span>` +
+    button('dropJob', 'Confirm drop', `data-id="${job.id}" data-confirm="1"`) +
+    '</span>'
+  );
 }
 
 /** With a CNC in the hall, the player says whether a sheet job goes on the saw while the CNC is

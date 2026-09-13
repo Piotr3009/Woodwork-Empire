@@ -114,6 +114,9 @@ interface Ui {
   /** The machine whose Sell button has been pressed once. A sale is meant on the second click,
    *  inside the tile itself (CLAUDE.md T8 3.5). */
   sellConfirm: string | null;
+  /** The job whose Drop project has been pressed once. The same rule: it is meant on the second
+   *  click, inside the card (CLAUDE.md T9 3.9). */
+  dropConfirm: string | null;
   /** Which tab of the books is on top, and the past day whose summary is open over them
    *  (CLAUDE.md T6 3.9). */
   accountingTab: AccountingTab;
@@ -197,6 +200,7 @@ function freshUi(): Ui {
     catalogueFolder: null,
     ownedTab: 'all',
     sellConfirm: null,
+    dropConfirm: null,
     accountingTab: 'days',
     accountingMonth: null,
     openDays: [],
@@ -274,7 +278,7 @@ function modalBody(id: ModalId, current: GameState): string {
     case 'laptop':
       return renderLaptop(current, { tab: ui.laptopTab, stockSheets: ui.stockSheets });
     case 'workPlan':
-      return renderWorkPlan(current);
+      return renderWorkPlan(current, ui.dropConfirm);
     case 'accounting':
       return renderAccounting(
         current,
@@ -1094,6 +1098,15 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
     }
     case 'sawFallback':
       dispatch({ type: 'SET_SAW_FALLBACK', jobId: id, on: element.dataset.on === '1' });
+      return;
+    case 'dropJob':
+      // The first click says what it costs, the second means it (CLAUDE.md T9 3.9).
+      if (element.dataset.confirm !== '1') {
+        ui.dropConfirm = id;
+        break;
+      }
+      ui.dropConfirm = null;
+      dispatch({ type: 'DROP_JOB', jobId: id });
       return;
     case 'fromStock':
       // What the rack has, taken now, with no second order for this job ever (T9 3.7).

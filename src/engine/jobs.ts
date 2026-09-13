@@ -16,6 +16,7 @@ import {
   DEADLINE_SMALL_JOB_PRICE,
   DEADLINE_SMALL_SLACK_DAYS,
   DEPOSIT_FRACTION,
+  DROP_PROJECT_REPUTATION,
   EMAIL_PAYMENT_PENALTY,
   EMAIL_PAYMENT_PENALTY_MAX,
   LABOUR_FRACTION,
@@ -30,7 +31,7 @@ import { canAccept, findEnquiry, removeEnquiry } from './board';
 import { callRinging, scheduleCalls } from './calls';
 import { template } from './catalog';
 import { nextWorkingDay } from './clock';
-import { chargeUnavoidable, formatMoney, receive } from './economy';
+import { chargeUnavoidable, formatMoney, noteLoss, receive } from './economy';
 import { queueEvent } from './events';
 import {
   OWNER,
@@ -45,6 +46,7 @@ import {
   materialCostFor,
   orderMaterialForJob,
   rackCanSupply,
+  sheetsDueFor,
   sheetsForCost,
   stockCostFor,
 } from './materials';
@@ -58,7 +60,7 @@ import {
   jobMinutesFor,
   minutesLeftFor,
 } from './stages';
-import { applyRating } from './reputation';
+import { applyRating, changeReputation } from './reputation';
 import { int, makeId } from './rng';
 import { plural } from './text';
 import {
@@ -439,6 +441,47 @@ export function onDeliveryUnloaded(state: GameState, jobId: string | null): void
   if (job && (job.stage === 'materialInYard' || job.stage === 'materialOrdered')) {
     job.stage = 'ready';
   }
+}
+
+/** Drops the project. The client has his deposit back, the job is off the plan, the material it
+ *  drew from the rack goes back on it and the material that was ordered in for it is written off,
+ *  and the company loses ten points of reputation at once (PIOTR, 13.09: "drastically";
+ *  CLAUDE.md T9 3.9). */
+export function dropJob(state: GameState, jobId: string): boolean {
+  const job = findJob(state, jobId);
+  if (!job) return false;
+  if (job.stage === 'completed') return false;
+  // The deposit goes back whatever the state of the bank: the client is owed it (CLAUDE.md 8.3).
+  chargeUnavoidable(state, 'jobDeposit', `Deposit returned: ${job.name}`, job.depositPaid);
+  // What the bench has not cut yet: that is what is left of the material to do anything with. A
+  // job nobody has started has cut nothing, whatever the sheet in hand rule says of one that is
+  // under way (CLAUDE.md T2 3.6).
+  const done = jobProgress(job);
+  const cut = done <= 0 ? 0 : sheetsDueFor(job, done);
+  const left = Math.max(0, job.sheetsUsed - cut);
+  if (job.materialMode === 'perJob') {
+    // Bought in for this job and this job only: the money is gone with it.
+    noteLoss(state, 'material', `Material written off: ${job.name}`, job.materialCost);
+  } else {
+    state.stock.sheets += left;
+  }
+  job.sheetsUsed = 0;
+  // Nobody is left standing on a job that is not there any more.
+  const dropped = new Set(jobTasks(state, job.id).map((task) => task.id));
+  state.tasks = state.tasks.filter((task) => task.jobId !== job.id);
+  if (state.owner.currentTaskId !== null && dropped.has(state.owner.currentTaskId)) {
+    state.owner.currentTaskId = null;
+  }
+  if (state.owner.resumeTaskId !== null && dropped.has(state.owner.resumeTaskId)) {
+    state.owner.resumeTaskId = null;
+  }
+  for (const worker of state.workers) {
+    if (worker.taskId !== null && dropped.has(worker.taskId)) worker.taskId = null;
+    if (worker.jobId === job.id) worker.jobId = null;
+  }
+  state.jobs = state.jobs.filter((entry) => entry.id !== job.id);
+  changeReputation(state, -DROP_PROJECT_REPUTATION, `Dropped: ${job.name}`);
+  return true;
 }
 
 /** What the rack can do for this job this minute, in the words the button says (PIOTR, 13.09:

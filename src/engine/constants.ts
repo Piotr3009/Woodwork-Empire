@@ -441,6 +441,12 @@ export const MOVE_MINUTES_PER_ITEM = 60;
 // The owner never goes out for what he buys: everything is an order and ordering costs him
 // nothing at all (PIOTR, 13.09; CLAUDE.md T9 3.1). The trip of Turn 7, and the three figures it
 // was measured in, are gone.
+/** What dropping a project costs the company, at once (PIOTR, 13.09: "drastically";
+ *  CLAUDE.md T9 3.9). */
+export const DROP_PROJECT_REPUTATION = 10;
+/** How many lines of the reputation log are kept. The company board reads it week by week, and a
+ *  year of trading is a few hundred lines [TUNE]. */
+export const REPUTATION_LOG_MAX = 2000;
 /** The interview, which is what taking somebody on costs the owner (PIOTR). */
 export const HIRING_MINUTES = 60;
 /** The laptop booting up before anything on it can be touched (PIOTR). */

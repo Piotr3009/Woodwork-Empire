@@ -672,6 +672,14 @@ export interface DayStats {
   workMinutes: number;
 }
 
+/** One line of the reputation log: the day, what happened, and what it was worth. The company
+ *  board is this list, week by week (PIOTR, 13.09; CLAUDE.md T9 3.10). */
+export interface ReputationEntry {
+  day: number;
+  reason: string;
+  points: number;
+}
+
 export interface GameOver {
   reason: string;
   day: number;
@@ -692,6 +700,9 @@ export interface GameState {
   speed: Speed;
   cash: number;
   reputation: number;
+  /** Every point of reputation the company has gained or lost, with the day and the reason
+   *  (CLAUDE.md T9 3.10). */
+  reputationLog: ReputationEntry[];
   dust: number;
   unit: UnitState;
   owner: OwnerState;
@@ -757,6 +768,8 @@ export type GameAction =
   /** Takes the job's sheets off the rack now, instead of ordering what is already there
    *  (PIOTR, 13.09; CLAUDE.md T9 3.7). */
   | { type: 'DRAW_FROM_STOCK'; jobId: string }
+  /** Gives the client his deposit back and takes the job off the plan (CLAUDE.md T9 3.9). */
+  | { type: 'DROP_JOB'; jobId: string }
   | { type: 'SET_SAW_FALLBACK'; jobId: string; on: boolean }
   | { type: 'BUY_STOCK'; sheets: number }
   | { type: 'PAY_ARREARS'; amount: number | null }

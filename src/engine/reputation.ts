@@ -9,6 +9,7 @@ import {
   RATING_EXPRESS_ON_TIME,
   RATING_ON_TIME,
   RATING_PER_DAY_LATE,
+  REPUTATION_LOG_MAX,
   REPUTATION_MAX,
   REPUTATION_MIN,
   REPUTATION_TIERS,
@@ -34,6 +35,20 @@ export function clampReputation(value: number): number {
  *  only when the emails cost a job part of its rating (CLAUDE.md T2 3.4, 3.5). */
 export function formatReputation(value: number): string {
   return String(Math.round(value * 10) / 10);
+}
+
+/** The one write that moves the company's reputation, and the one that writes down why. The
+ *  company board is this log read week by week, so nothing may move the number without leaving a
+ *  line behind it (PIOTR, 13.09; CLAUDE.md T9 3.10). The points written down are the points the
+ *  company actually moved: at the top or the bottom of the scale that is less than was asked for,
+ *  and the week's total then adds up to what the player can see. */
+export function changeReputation(state: GameState, points: number, reason: string): number {
+  const before = state.reputation;
+  state.reputation = clampReputation(before + points);
+  const moved = Math.round((state.reputation - before) * 100) / 100;
+  state.reputationLog.push({ day: state.clock.day, reason, points: moved });
+  if (state.reputationLog.length > REPUTATION_LOG_MAX) state.reputationLog.shift();
+  return moved;
 }
 
 /** What the client thinks of the job that just landed (CLAUDE.md 8.11). */

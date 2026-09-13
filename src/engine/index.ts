@@ -150,6 +150,8 @@ export {
   stockCheck,
   transportLabel,
 } from './jobs';
+export { dropJob } from './jobs';
+export { changeReputation } from './reputation';
 export type { LifecycleStep, StartCheck, StepState } from './jobs';
 
 // Production in stages (CLAUDE.md T7 3.1)
