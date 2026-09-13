@@ -427,6 +427,10 @@ export interface Delivery {
   id: string;
   jobId: string | null;
   sheets: number;
+  /** The day it was ordered and what it cost, so the shopping list can draw the wait and say
+   *  what was paid (CLAUDE.md T8 3.2). */
+  orderedDay: number;
+  pricePaid: number;
   arriveDay: number;
   arrived: boolean;
   unloaded: boolean;

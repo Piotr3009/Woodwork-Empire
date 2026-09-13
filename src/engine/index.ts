@@ -296,6 +296,7 @@ export type { Hand, StationCheck } from './production';
 export {
   dueDayFor,
   findOnOrder,
+  shoppingList,
   onOrderCount,
   orderName,
   orderProgress,
@@ -303,6 +304,7 @@ export {
   ordersOnTheWay,
   reservedItems,
 } from './orders';
+export type { OrderLine } from './orders';
 
 // Material and deliveries
 export {

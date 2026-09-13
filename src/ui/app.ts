@@ -72,6 +72,7 @@ import {
   reasonLabel,
   syncModals,
 } from './modal';
+import { renderShopping } from './shopping';
 import { renderStart } from './start';
 import { cloudAvailable } from '../cloud/supabase';
 import { hasSave, loadGame, saveGame, sendMagicLink, signOut, signedInEmail } from '../cloud/saves';
@@ -79,7 +80,7 @@ import { renderMenu, renderTopbar, speedFromString } from './topbar';
 
 /** The modals the room can open. Materials, Team and Drawings are tabs inside the laptop now:
  *  one path per modal, only the entry moved (docs/art/SPRITES.md 8.4). */
-type ModalId = 'board' | 'laptop' | 'workPlan' | 'accounting' | 'catalogue';
+type ModalId = 'board' | 'laptop' | 'workPlan' | 'accounting' | 'catalogue' | 'shopping';
 
 interface Ui {
   screen: 'start' | 'game';
@@ -147,6 +148,7 @@ const MODAL_TITLES: Record<ModalId, string> = {
   workPlan: 'Work Plan',
   accounting: 'Accounting',
   catalogue: 'Equipment catalogue',
+  shopping: 'On order',
 };
 
 let ui: Ui = freshUi();
@@ -237,6 +239,8 @@ function modalBody(id: ModalId, current: GameState): string {
         ui.catalogueFolder,
         ui.ownedTab,
       );
+    case 'shopping':
+      return renderShopping(current);
   }
 }
 
@@ -394,7 +398,7 @@ function modalSpecs(): ModalSpec[] {
       id: ui.modal,
       title: MODAL_TITLES[ui.modal],
       body: modalBody(ui.modal, current),
-      wide: ui.modal === 'accounting' || ui.modal === 'workPlan',
+      wide: ui.modal === 'accounting' || ui.modal === 'workPlan' || ui.modal === 'shopping',
       full: ui.modal === 'board' || ui.modal === 'catalogue',
       position: ui.modalPosition,
     });
@@ -719,7 +723,7 @@ export function render(): void {
 /** The modals that act on the world, which is every one of them but the Work Plan: nothing on
  *  them can be touched while the clock is stopped (CLAUDE.md T7 3.10). The Work Plan is a
  *  whiteboard and the Sprite check is a page of pictures: both are reading, and both open. */
-const READING_MODALS: ModalId[] = ['workPlan'];
+const READING_MODALS: ModalId[] = ['workPlan', 'shopping'];
 
 /** The one line the player gets when the world will not move for him, with the Pause button
  *  pulsing once behind it (CLAUDE.md T7 3.10). */

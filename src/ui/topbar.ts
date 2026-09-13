@@ -9,6 +9,7 @@ import {
   movingMachines,
   netOf,
   ownerMinutesToday,
+  shoppingList,
 } from '../engine/index';
 import type { GameState, Speed } from '../engine/index';
 import { cadenceControl } from './dayEnd';
@@ -91,6 +92,9 @@ export function renderTopbar(
     minuteBar(state) +
     outputChip(state) +
     '<span class="spacer"></span>' +
+    // Everything bought and not here yet, one click away from every screen (CLAUDE.md T8 3.2).
+    `<button class="chip" data-do="openModal" data-modal="shopping">Orders: ` +
+    `${shoppingList(state).length}</button>` +
     // The order board is the management software's: no laptop, no board (CLAUDE.md T7 3.8).
     (has(state, 'laptop')
       ? '<button class="chip" data-do="openModal" data-modal="board">Board</button>'

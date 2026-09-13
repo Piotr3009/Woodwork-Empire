@@ -98,6 +98,8 @@ describe('the hall on day 1', () => {
       id: 'del-1',
       jobId: firstJob(state).id,
       sheets: 4,
+      orderedDay: 1,
+      pricePaid: 0,
       arriveDay: 1,
       arrived: true,
       unloaded: false,

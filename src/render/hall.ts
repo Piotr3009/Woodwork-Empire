@@ -8,6 +8,7 @@ import {
   GATE_LAYOUT,
   ROOM_DOOR,
   ROOM_LAYOUT,
+  roomById,
   YARD_WIDTH_CELLS,
   roomDoorCell,
 } from '../engine/constants';
@@ -22,7 +23,7 @@ import {
   serviceIsDue,
 } from '../engine/machines';
 import { jobsAtGate } from '../engine/jobs';
-import { orderName, reservedItems } from '../engine/orders';
+import { orderName, reservedItems, shoppingList } from '../engine/orders';
 import {
   footprintOf,
   itemStandsInTheHall,
@@ -618,6 +619,27 @@ function figure(
   };
 }
 
+/** The pin board beside the office door, on the office front face: how many things are on order,
+ *  and a click on it opens the list (PIOTR, 13.09; CLAUDE.md T8 3.2). Its own small board rather
+ *  than a control drawn over the painting, so the hall keeps its one style. */
+export const PIN_BOARD = { along: 0.15, z: 1.2, width: 1.1, height: 0.7 };
+
+export function pinBoard(count: number): string {
+  const room = roomById('office');
+  const at = tileToScreen(room.x + PIN_BOARD.along, room.y + room.depth, PIN_BOARD.z);
+  const width = PIN_BOARD.width * TILE_RISE;
+  const height = PIN_BOARD.height * TILE_RISE;
+  return (
+    '<g data-do="openModal" data-modal="shopping" data-pinboard="1" ' +
+    `class="clickable pin-board" transform="${wallMatrix(at)}">` +
+    '<title>What is on order. Click for the list.</title>' +
+    `<rect x="0" y="${-height}" width="${width}" height="${height}" class="pin-board-face" />` +
+    `<text x="${round(width / 2)}" y="${round(-height / 2 + 4)}" text-anchor="middle" ` +
+    `class="painted-text pin-board-text" font-size="9">Orders: ${count}</text>` +
+    '</g>'
+  );
+}
+
 /** The outline of something bought and not here yet, on the cells held for it (T8 3.2). */
 export function reservedOutline(item: OnOrderItem): string {
   const zone = zoneOf(item.specId, item.variantId);
@@ -832,6 +854,12 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
         '</g>',
     });
   }
+
+  // The pin board on the office wall, beside its door (PIOTR, 13.09).
+  drawables.push({
+    depth: depthKey(roomById('office').x, roomById('office').y + roomById('office').depth) + 0.02,
+    svg: pinBoard(shoppingList(state).length),
+  });
 
   // The floor held for what is bought and not here yet: a grey outline of the zone it reserves
   // with the footprint it will stand on inside it, and the day it is due under them. Setup mode

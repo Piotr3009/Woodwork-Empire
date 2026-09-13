@@ -95,8 +95,64 @@ export function reservedItems(state: GameState): OnOrderItem[] {
 
 /** How far along the wait is, from the day of the click to the day of the lorry: 0 on the day it
  *  was ordered and 1 once it is due. Whole days, because a delivery lands at 08:00. */
-export function orderProgress(item: OnOrderItem, day: number): number {
+export function orderProgress(item: { orderedDay: number; dueDay: number }, day: number): number {
   const span = item.dueDay - item.orderedDay;
   if (span <= 0) return 1;
   return Math.max(0, Math.min(1, (day - item.orderedDay) / span));
+}
+
+/** One line of the shopping list: a machine on its way, or a load of sheets (CLAUDE.md T8 3.2).
+ *  The one selector the panel, the pin board count and the Owned tiles all read. */
+export interface OrderLine {
+  id: string;
+  kind: 'equipment' | 'material';
+  /** The class the player bought, or what the load of sheets is for. */
+  name: string;
+  detail: string;
+  pricePaid: number;
+  orderedDay: number;
+  dueDay: number;
+  /** 0 on the day of the click, 1 on the day of the lorry. */
+  progress: number;
+  /** True from 08:00 of the due day: it is at the gate, not on the road. */
+  arrived: boolean;
+  /** Only a machine can be called off, and only before the lorry (CLAUDE.md T8 3.5). */
+  canCancel: boolean;
+}
+
+/** Everything on order, whatever it is, shortest wait first (PIOTR: the shortest time first). */
+export function shoppingList(state: GameState): OrderLine[] {
+  const day = state.clock.day;
+  const lines: OrderLine[] = state.onOrder.map((item) => ({
+    id: item.id,
+    kind: 'equipment' as const,
+    name: orderName(item),
+    detail: findSpec(item.specId)?.folder ?? '',
+    pricePaid: item.pricePaid,
+    orderedDay: item.orderedDay,
+    dueDay: item.dueDay,
+    progress: orderProgress(item, day),
+    arrived: item.arrived,
+    canCancel: !item.arrived,
+  }));
+  for (const delivery of state.deliveries) {
+    if (delivery.unloaded) continue;
+    lines.push({
+      id: delivery.id,
+      kind: 'material',
+      name: `${delivery.sheets} sheets`,
+      detail: delivery.jobId === null ? 'for stock' : 'for a job',
+      pricePaid: delivery.pricePaid,
+      orderedDay: delivery.orderedDay,
+      dueDay: delivery.arriveDay,
+      progress: orderProgress({ orderedDay: delivery.orderedDay, dueDay: delivery.arriveDay }, day),
+      arrived: delivery.arrived,
+      // Material is bought from a supplier who has already loaded it (CLAUDE.md T8 3.5 is about
+      // the kit); nothing on the sheets side is called off.
+      canCancel: false,
+    });
+  }
+  return lines.sort((left, right) =>
+    left.dueDay === right.dueDay ? left.orderedDay - right.orderedDay : left.dueDay - right.dueDay,
+  );
 }

@@ -47,7 +47,7 @@ describe('the tiles inside a folder', () => {
     expect(tiles(state, 'extractor')).toHaveLength(1);
   });
 
-  it('names each class, prices it, describes it and lists its four effects', () => {
+  it('names each class, prices it, describes it and lists what it does', () => {
     const state = newGame({ difficulty: 'veryEasy' });
     const used = tiles(state, 'tableSaw')[0];
     if (!used) throw new Error('no tile');
@@ -63,6 +63,8 @@ describe('the tiles inside a folder', () => {
       'Life about 750 hours',
       'Power 3 a day',
       'Takes 2 by 1 m on a 3 by 3 m zone',
+      // What he waits for after he has paid for it (CLAUDE.md T8 3.2).
+      'Delivered in 1 working day',
     ]);
     const industrial = tiles(state, 'tableSaw')[4];
     const bigEffects = Array.from(industrial?.querySelectorAll('.tile-figures') ?? []).map(
@@ -74,6 +76,7 @@ describe('the tiles inside a folder', () => {
       'Life about 6,000 hours',
       'Power 7 a day',
       'Takes 4 by 2 m on a 5 by 4 m zone',
+      'Delivered in 12 working days',
     ]);
   });
 

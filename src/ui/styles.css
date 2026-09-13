@@ -117,6 +117,22 @@
   fill: var(--text-dim);
 }
 
+/* The pin board beside the office door: what is on order, one click away in the hall
+   (PIOTR, 13.09). */
+.pin-board-face {
+  fill: #b9924f;
+  stroke: #6f5731;
+  stroke-width: 1;
+}
+
+.pin-board-text {
+  fill: #2c2213;
+}
+
+.pin-board:hover .pin-board-face {
+  fill: #d0a862;
+}
+
 .contact-shadow {
   fill: #000;
   opacity: 0.18;
@@ -248,6 +264,29 @@
 /* What the trip to the shops has cost him so far, over the modal that started it. */
 .trip {
   margin-top: 0;
+}
+
+/* The bar from the day of the click to the day of the lorry, on the shopping list and on the
+   tiles of the Owned tab (CLAUDE.md T8 3.2). */
+.order-bar {
+  display: inline-block;
+  width: 120px;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--panel-2);
+  overflow: hidden;
+  vertical-align: middle;
+}
+
+.order-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
+.badge-ordered {
+  background: var(--panel-2);
+  color: var(--text-dim);
 }
 
 /* The build in the bottom right corner of every screen. It never covers a control: the pointer

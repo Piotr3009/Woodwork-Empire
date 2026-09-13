@@ -7,7 +7,7 @@ import {
   SOFTWARE_ONE_OFF_PRICE,
   SOFTWARE_SUBSCRIPTION_MONTHLY,
 } from '../engine/constants';
-import type { EquipmentSpec, EquipmentTab } from '../engine/types';
+import type { EquipmentSpec, EquipmentTab, OnOrderItem } from '../engine/types';
 import {
   bagsExist,
   orderCheck,
@@ -19,8 +19,10 @@ import {
   serviceIsDue,
 } from '../engine/index';
 import { serviceDueIn, variantFor } from '../engine/machines';
-import type { Equipment, GameState } from '../engine/index';
+import { orderName, orderProgress } from '../engine/orders';
+import type { Equipment, GameState, OrderLine } from '../engine/index';
 import { pictureSlot, renderMachine } from './machine';
+import { arrivalLine, progressBar } from './shopping';
 import {
   emptyLine,
   escapeHtml,
@@ -150,7 +152,18 @@ function renderOwned(state: GameState, filter: string, ownedTab: string): string
     ...EQUIPMENT_TABS.map((entry): [string, string] => [entry.id, entry.label]),
   ];
   const bar = tabBar('ownedTab', subTabs, ownedTab);
-  if (state.equipment.length === 0) return bar + emptyLine('Nothing here yet.');
+  if (state.equipment.length === 0 && state.onOrder.length === 0) {
+    return bar + emptyLine('Nothing here yet.');
+  }
+  // What is bought and not here yet is in the hall's list too, with the wait drawn on it
+  // (CLAUDE.md T8 3.2).
+  const ordered = state.onOrder
+    .map((item) => ({ item, spec: findSpec(item.specId) }))
+    .filter((entry): entry is { item: OnOrderItem; spec: EquipmentSpec } => entry.spec !== null)
+    .filter(({ spec }) => ownedTab === 'all' || spec.tab === ownedTab)
+    .filter(({ spec }) => needle === '' || spec.name.toLowerCase().includes(needle))
+    .map(({ item, spec }) => orderedTile(state, item, spec))
+    .join('');
   const tiles = state.equipment
     .map((item) => ({ item, spec: findSpec(item.specId) }))
     .filter((entry): entry is { item: Equipment; spec: EquipmentSpec } => entry.spec !== null)
@@ -158,7 +171,37 @@ function renderOwned(state: GameState, filter: string, ownedTab: string): string
     .filter(({ spec }) => needle === '' || spec.name.toLowerCase().includes(needle))
     .map(({ item, spec }) => ownedTile(state, item, spec))
     .join('');
-  return bar + (tiles === '' ? emptyLine('Nothing matches that.') : `<div class="tile-grid">${tiles}</div>`);
+  const all = ordered + tiles;
+  return bar + (all === '' ? emptyLine('Nothing matches that.') : `<div class="tile-grid">${all}</div>`);
+}
+
+/** One thing on its way, in the same frame as the kit that is here: what it is, what was paid,
+ *  and how far along the wait is (CLAUDE.md T8 3.2). */
+function orderedTile(state: GameState, item: OnOrderItem, spec: EquipmentSpec): string {
+  const line: OrderLine = {
+    id: item.id,
+    kind: 'equipment',
+    name: orderName(item),
+    detail: spec.folder,
+    pricePaid: item.pricePaid,
+    orderedDay: item.orderedDay,
+    dueDay: item.dueDay,
+    progress: orderProgress(item, state.clock.day),
+    arrived: item.arrived,
+    canCancel: !item.arrived,
+  };
+  const lines = [`On order, due day ${item.dueDay}`, arrivalLine(line, state.clock.day)]
+    .map((text) => `<p class="tile-figures">${escapeHtml(text)}</p>`)
+    .join('');
+  return (
+    `<div class="tile is-ordered" data-order="${item.id}">` +
+    `<h3 class="tile-name">${escapeHtml(spec.name)} ` +
+    '<span class="badge badge-ordered">On order</span></h3>' +
+    pictureSlot(spec.spriteKey, item.variantId) +
+    lines +
+    `<p class="tile-figures">${progressBar(line)}</p>` +
+    '</div>'
+  );
 }
 
 function ownedTile(state: GameState, item: Equipment, spec: EquipmentSpec): string {
