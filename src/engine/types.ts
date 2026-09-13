@@ -128,8 +128,6 @@ export interface Equipment {
   minutesUsed: number;
   bagFull: boolean;
   broken: boolean;
-  /** Day of the last service, for the record. A machine is bought serviced. */
-  lastServiceDay: number;
   /** Hours on the machine's own clock at the last service: the service is due by its hours, not
    *  by the calendar (CLAUDE.md T6 3.6). */
   serviceHours: number;

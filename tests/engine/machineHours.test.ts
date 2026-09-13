@@ -15,10 +15,13 @@ import {
   capacityShare,
   findSpec,
   machineHoursInDay,
+  machineHoursPerDay,
+  machineUsersNow,
   serviceIsDue,
 } from '../../src/engine/machines';
 import type { Equipment, GameState } from '../../src/engine/index';
-import { buyStartingKit, newGame, placeEquipment } from '../helpers';
+import { tick } from '../../src/engine/index';
+import { buyStartingKit, newGame, placeEquipment, twoMenOnSheetWork } from '../helpers';
 
 /** Runs `minutes` of production through the hall with this many men on the material. */
 function work(state: GameState, minutes: number, users: number): void {
@@ -160,5 +163,23 @@ describe('a machine that serves every material', () => {
     const alone = placeEquipment(quiet, 'compressor', { x: 12, y: 1 });
     work(quiet, MINUTES_PER_WORKING_DAY, 1);
     expect(alone.hoursUsed).toBeCloseTo(HOURS_PER_WORKING_DAY / 2, 2);
+  });
+});
+
+describe('the head count the engine works out for itself', () => {
+  it('puts two men on the saw when two men are at the benches, without being told', () => {
+    const state = twoMenOnSheetWork();
+    const saw = (game: GameState): Equipment => {
+      const item = game.equipment.find((entry) => entry.specId === 'tableSaw');
+      if (!item) throw new Error('no saw');
+      return item;
+    };
+    // Nobody has cut anything yet, but the projection already knows both men are on it.
+    expect(machineUsersNow(state, saw(state))).toBe(2);
+    expect(machineHoursPerDay(state, saw(state))).toBeCloseTo((2 / 3) * HOURS_PER_WORKING_DAY, 6);
+    // An hour of the clock with the two of them on it is two thirds of an hour on a saw that
+    // serves three, and the count comes off the men working, not off a number handed in.
+    const worked = tick(state, 60);
+    expect(saw(worked).hoursUsed).toBeCloseTo(2 / 3, 4);
   });
 });

@@ -1,5 +1,6 @@
 // Shared test driver. One place clicks events away, so no test file grows its own copy.
 
+import { WORKER_RATES } from '../src/engine/constants';
 import {
   applyAction,
   createGame,
@@ -198,7 +199,6 @@ export function placeEquipment(
     minutesUsed: 0,
     bagFull: false,
     broken: false,
-    lastServiceDay: state.clock.day,
     serviceHours: 0,
     enduranceHours: enduranceHoursFor(specId, variantId),
     hoursUsed: 0,
@@ -277,4 +277,47 @@ export function withLicence(state: GameState): GameState {
   let next = applyAction(state, { type: 'BUY_EQUIPMENT', specId: 'desk' });
   next = applyAction(next, { type: 'BUY_EQUIPMENT', specId: 'laptop' });
   return applyAction(next, { type: 'BUY_SOFTWARE', mode: 'oneOff' });
+}
+
+/** Two men producing in the same minutes: the owner at one bench and a poor joiner at another,
+ *  each on a job of sheet work. The one place a two man minute is set up, so the tests that ask
+ *  what two men do to the books and to the machines both drive the same hall. */
+export function twoMenOnSheetWork(options: { sawVariant?: string } = {}): GameState {
+  const state = fillRack(
+    buyStartingKit(newGame({ difficulty: 'veryEasy' }), {
+      sawVariant: options.sawVariant ?? 'standard',
+    }),
+    60,
+  );
+  placeEquipment(state, 'workbench', { x: 6, y: 6 });
+  state.enquiries = [];
+  const first = placeEnquiry(state, { price: 40000, deadlineDays: 90 });
+  const second = placeEnquiry(state, { price: 40000, deadlineDays: 90 });
+  let next = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: first.id, byHand: false });
+  next = act(next, { type: 'ACCEPT_ENQUIRY', enquiryId: second.id, byHand: false });
+  for (const job of next.jobs) job.stage = 'ready';
+  next.workers.push({
+    id: 'staff-1',
+    name: 'Ben',
+    role: 'joiner',
+    tier: 'poor',
+    rate: WORKER_RATES.poor,
+    weeklyWage: 480,
+    monthlyWage: 0,
+    startDay: 1,
+    jobId: null,
+    taskId: null,
+    minutesWorked: 0,
+    ordersToday: 0,
+    station: 'idle',
+    productionMinutes: 0,
+    absentDaysRemaining: 0,
+    anchorX: 0,
+    anchorY: 4,
+  });
+  const ownerJob = next.jobs[0];
+  const joinerJob = next.jobs[1];
+  if (!ownerJob || !joinerJob) throw new Error('two jobs are wanted here');
+  next = act(next, { type: 'ASSIGN_JOB', jobId: joinerJob.id, workerId: 'staff-1' });
+  return act(next, { type: 'WORK_HERE', jobId: ownerJob.id });
 }

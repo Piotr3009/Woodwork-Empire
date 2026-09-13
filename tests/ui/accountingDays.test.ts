@@ -3,7 +3,7 @@
 // (CLAUDE.md T6 3.9).
 
 import { beforeAll, describe, expect, it } from 'vitest';
-import { currentState, mount } from '../../src/ui/app';
+import { advanceMinutes, currentState, mount } from '../../src/ui/app';
 import { renderAccounting } from '../../src/ui/accounting';
 import { daysOfMonth, ledgerOfDay, summaryOfDay } from '../../src/engine/index';
 import type { GameState } from '../../src/engine/index';
@@ -75,12 +75,10 @@ describe('the Days tab', () => {
     expect(page.querySelector('.day-row[data-day="2"]')?.innerHTML).not.toContain('Living costs');
   });
 
-  it('keeps a row open across a render, because a browser detail would not', () => {
-    // The modal body is written again every game minute (CLAUDE.md T3 3.4), so which rows are
-    // open is state and not markup.
-    const open = renderAccounting(state, '', 'days', [1]);
-    expect(open).toBe(renderAccounting(state, '', 'days', [1]));
-    expect(open).toContain('aria-expanded="true"');
+  it('says which rows are open in the markup it writes', () => {
+    // Which rows are open is state and not a browser detail (CLAUDE.md T3 3.4). That it survives
+    // the body being written again every game minute is driven through the page below.
+    expect(renderAccounting(state, '', 'days', [1])).toContain('aria-expanded="true"');
     expect(renderAccounting(state, '', 'days', [])).toContain('aria-expanded="false"');
   });
 
@@ -120,6 +118,12 @@ describe('a past day put back on the screen', () => {
     expect(summary).not.toBeNull();
     click('[data-do="toggleDay"][data-id="1"]');
     expect(root().querySelector('.day-row[data-day="1"]')?.innerHTML).toContain('Unit deposit');
+    // The modal body is written again every game minute. A details element would snap shut under
+    // him; the row he opened is still open (CLAUDE.md T3 3.4).
+    advanceMinutes(1);
+    const stillOpen = root().querySelector('.day-row[data-day="1"]');
+    expect(stillOpen?.innerHTML).toContain('Unit deposit');
+    expect(stillOpen?.querySelector('.day-toggle')?.getAttribute('aria-expanded')).toBe('true');
     click('[data-do="openDaySummary"][data-id="1"]');
     const modal = root().querySelector('[data-modal="daySummary"]');
     expect(modal).not.toBeNull();

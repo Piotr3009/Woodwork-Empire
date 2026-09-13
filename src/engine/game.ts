@@ -1536,7 +1536,6 @@ export function buyEquipment(state: GameState, specId: string, variantId?: strin
     minutesUsed: 0,
     bagFull: false,
     broken: false,
-    lastServiceDay: state.clock.day,
     serviceHours: 0,
     enduranceHours: enduranceHoursFor(specId, variant.id),
     hoursUsed: 0,

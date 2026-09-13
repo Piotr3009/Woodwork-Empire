@@ -9,6 +9,7 @@ import {
   MINUTES_PER_WORKING_DAY,
 } from '../../src/engine/constants';
 import { formatTime, isBreak, tick } from '../../src/engine/index';
+import type { GameState } from '../../src/engine/index';
 import { createTask, findTask } from '../../src/engine/tasks';
 import { STATION_IDLE } from '../../src/engine/stations';
 import { renderTopbar } from '../../src/ui/topbar';
@@ -21,6 +22,7 @@ import {
   firstJob,
   newGame,
   placeEnquiry,
+  twoMenOnSheetWork,
   withLicence,
 } from '../helpers';
 
@@ -189,5 +191,35 @@ describe('the helper has his dinner too', () => {
     state = clearEvents(tick(state, BREAK_MINUTES));
     expect(findTask(state, task.id)?.done).toBe(true);
     expect(findTask(state, task.id)?.doneBy).toBe('help-1');
+  });
+});
+
+describe('the staff always take the hour, even when the owner does not', () => {
+  it('leaves the joiner idle through the dinner the owner works through', () => {
+    // Two men at the benches, so there is somebody to watch as well as the owner.
+    let state = twoMenOnSheetWork();
+    let guard = 0;
+    while (state.activeEvent?.kind !== 'breakTime' && guard < 400) {
+      guard += 1;
+      state = state.activeEvent === null ? tick(state, 1) : choose(state, 'ok');
+    }
+    expect(state.activeEvent?.kind).toBe('breakTime');
+    state = choose(state, 'skip');
+    const joiner = (game: GameState): number => game.workers[0]?.productionMinutes ?? -1;
+    const before = { owner: state.owner.productionMinutes, joiner: joiner(state) };
+    const jobOfTheJoiner = state.workers[0]?.jobId;
+    const leftBefore = state.jobs.find((job) => job.id === jobOfTheJoiner)?.labourRemaining ?? 0;
+    // Half way through it, with the owner still cutting, the joiner is sitting down.
+    const halfWay = clearEvents(tick(state, BREAK_MINUTES / 2));
+    expect(halfWay.workers[0]?.station).toBe(STATION_IDLE);
+    const eating = clearEvents(tick(halfWay, BREAK_MINUTES / 2));
+    // The owner worked the hour he skipped; the joiner sat through all of it and his job did not
+    // move a penny (CLAUDE.md T6 3.4).
+    expect(eating.owner.productionMinutes).toBe(before.owner + BREAK_MINUTES);
+    expect(joiner(eating)).toBe(before.joiner);
+    expect(eating.jobs.find((job) => job.id === jobOfTheJoiner)?.labourRemaining).toBe(leftBefore);
+    // And he is back on it the minute the hour is over.
+    const after = clearEvents(tick(eating, 5));
+    expect(joiner(after)).toBe(before.joiner + 5);
   });
 });

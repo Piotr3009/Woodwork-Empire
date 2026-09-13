@@ -615,7 +615,6 @@ describe('the service, counted on the machine\u0027s own clock', () => {
   it('falls due after its hours, not after a month of the calendar', () => {
     const state = atTheBench();
     const saw = state.equipment.find((item) => item.specId === 'tableSaw');
-    expect(saw?.lastServiceDay).toBe(1);
     expect(saw?.serviceHours).toBe(0);
     expect(serviceIsDue(saw as Equipment)).toBe(false);
     expect(serviceCostFor(saw as Equipment)).toBe(1800 * SERVICE_COST_FRACTION);
@@ -659,7 +658,6 @@ describe('the service, counted on the machine\u0027s own clock', () => {
     state = act(state, { type: 'SERVICE_MACHINE', equipmentId: saw?.id ?? '' });
     state = tick(state, SERVICE_MINUTES);
     const serviced = state.equipment.find((item) => item.specId === 'tableSaw');
-    expect(serviced?.lastServiceDay).toBe(state.clock.day);
     expect(serviced?.serviceHours).toBe(serviced?.hoursUsed);
     expect(serviceIsDue(serviced as Equipment)).toBe(false);
     expect(cash - state.cash).toBeCloseTo(serviceCostFor(saw as Equipment), 6);

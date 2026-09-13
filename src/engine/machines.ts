@@ -531,7 +531,6 @@ export function repairMachine(state: GameState, equipmentId: string): Equipment 
 export function serviceMachine(state: GameState, equipmentId: string): Equipment | null {
   const item = state.equipment.find((entry) => entry.id === equipmentId);
   if (!item) return null;
-  item.lastServiceDay = state.clock.day;
   item.serviceHours = item.hoursUsed;
   return item;
 }

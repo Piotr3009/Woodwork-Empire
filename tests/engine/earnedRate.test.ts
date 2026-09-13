@@ -5,7 +5,15 @@ import { WORKER_RATES } from '../../src/engine/constants';
 import { earnedRate } from '../../src/engine/economy';
 import { tick } from '../../src/engine/index';
 import type { GameState } from '../../src/engine/index';
-import { act, buyStartingKit, fillRack, firstJob, newGame, placeEnquiry } from '../helpers';
+import {
+  act,
+  buyStartingKit,
+  fillRack,
+  firstJob,
+  newGame,
+  placeEnquiry,
+  twoMenOnSheetWork,
+} from '../helpers';
 
 /** A hall with the day 1 kit and one job of work on the bench. */
 function atTheBench(sawVariant: string): GameState {
@@ -72,11 +80,22 @@ describe('a poor joiner', () => {
 });
 
 describe('the two of them together', () => {
-  it('weights by the hours each of them actually worked', () => {
-    // Four hours of the owner at 42 and eight of the joiner at 25.2 come to 30.80 an hour.
+  it('counts the two of them in the same minute as two people minutes, not one', () => {
+    // The owner at one bench and the joiner at the other, both on sheet work, for an hour of the
+    // clock. That is two hours of somebody's time, and the rate is the two of them averaged.
+    const worked = tick(twoMenOnSheetWork({ sawVariant: 'standard' }), 60);
+    expect(worked.owner.productionMinutes).toBe(60);
+    expect(worked.workers[0]?.productionMinutes).toBe(60);
+    expect(worked.dayStats.workMinutes).toBe(120);
+    expect(earnedRate(worked, 'day')).toBe((42 + 25.2) / 2);
+  });
+
+  it('weights by the hours each of them worked, four of the owner against eight of the joiner', () => {
+    // The arithmetic of 3.8 on its own: four hours at 42 and eight at 25.2 come to 30.80 an hour.
+    // What the engine puts into those two figures is the test above.
     const state = newGame();
     state.dayStats.workMinutes = 4 * 60 + 8 * 60;
-    state.dayStats.labourValue = (4 * 42 + 8 * 25.2) / 1;
+    state.dayStats.labourValue = 4 * 42 + 8 * 25.2;
     expect(earnedRate(state, 'day')).toBe(30.8);
   });
 
