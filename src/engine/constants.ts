@@ -1010,7 +1010,9 @@ export interface LayoutSlot {
 
 /** The fixed room blocks, in the cells docs/art/SPRITES.md 9.3 registers the painted layers to:
  *  the WC 2 cells, the office 8 and the canteen 8, eighteen of the two hundred. They stand in x
- *  order along the rear wall and all three are 2.7 m high, which is what the art is drawn at. */
+ *  order along the rear wall and all three are 2.7 m high, which is what the art is drawn at.
+ *  A room has no sprite key: it is painted by its hall layer, or drawn as a placeholder box while
+ *  that layer is missing (docs/art/SPRITES.md 9.3). */
 export const ROOM_LAYOUT = [
   {
     id: 'wc',
@@ -1020,7 +1022,6 @@ export const ROOM_LAYOUT = [
     width: 1,
     depth: 2,
     height: 2.7,
-    spriteKey: 'roomWc',
     tooltip: 'The WC. Cold tap, one towel.',
   },
   {
@@ -1031,7 +1032,6 @@ export const ROOM_LAYOUT = [
     width: 2,
     depth: 4,
     height: 2.7,
-    spriteKey: 'roomOffice',
     tooltip: 'The office. The desk, the laptop, the paperwork.',
   },
   {
@@ -1042,7 +1042,6 @@ export const ROOM_LAYOUT = [
     width: 2,
     depth: 4,
     height: 2.7,
-    spriteKey: 'roomCanteen',
     tooltip: 'The canteen. Tea, and somewhere to eat out of the dust.',
   },
 ] as const;

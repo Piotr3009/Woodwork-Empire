@@ -176,7 +176,7 @@ export function officeScene(
     .join('|');
   return {
     key,
-    shell:
+    shell: () =>
       `<div class="office-room" data-scene="${key}">` +
       `<div class="office-stack" data-scale="${scale}" ` +
       `style="width:${OFFICE_CANVAS.width}px;height:${OFFICE_CANVAS.height}px;` +
@@ -197,8 +197,7 @@ export function renderOffice(
   files: readonly string[] = spriteFiles(),
 ): string {
   const scene = officeScene(state, viewport, files);
-  return scene.shell.replace(
-    OFFICE_LIVE_SLOT,
-    `<div class="office-live" data-live="1">${scene.live}</div>`,
-  );
+  return scene
+    .shell()
+    .replace(OFFICE_LIVE_SLOT, `<div class="office-live" data-live="1">${scene.live}</div>`);
 }

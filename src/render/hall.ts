@@ -429,8 +429,9 @@ export interface Ghost {
 export interface Scene {
   /** The shell is rebuilt when, and only when, this changes. */
   key: string;
-  /** Built once. Carries exactly one empty element marked `data-live`. */
-  shell: string;
+  /** Built once. Carries exactly one empty element marked `data-live`. Asked for only when the key
+   *  has changed, so the markup of a scene that is already on the page is never built again. */
+  shell: () => string;
   /** Written into that element on every render. */
   live: string;
   /** The lines under the view. They belong to the page, not to the scene. */
@@ -442,7 +443,7 @@ export const LIVE_SLOT = '<g data-live="1"></g>';
 
 /** The shell and the live part as one string, for a caller that just wants the markup. */
 export function sceneHtml(scene: Scene): string {
-  return scene.shell.replace(LIVE_SLOT, `<g data-live="1">${scene.live}</g>`) + scene.notes;
+  return scene.shell().replace(LIVE_SLOT, `<g data-live="1">${scene.live}</g>`) + scene.notes;
 }
 
 export interface HallOptions {
@@ -475,6 +476,8 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
       const url = layerUrl(layer.key);
       if (url === null) continue;
       parts.push(
+        // The box is the canvas itself, so none is the honest fit: it puts every pixel of the
+        // painting exactly where the art side drew it, with nothing left for a fit rule to round.
         `<image class="hall-layer" data-layer="${layer.key}" href="${url}" ` +
           `x="${at.x}" y="${at.y}" width="${at.width}" height="${at.height}" ` +
           'preserveAspectRatio="none" />',
@@ -517,10 +520,14 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
   for (const room of ROOM_LAYOUT) {
     const layer = HALL_LAYERS.find((entry) => entry.room === room.id);
     const drawn = layer !== undefined && layerUrl(layer.key) !== null;
+    // A room is a layer of the painting or a placeholder box, and nothing else: there is no sprite
+    // of its own any more, which would be a second way to draw the same block
+    // (docs/art/SPRITES.md 9.3 replaced the room sprites of section 6).
+    const faces = boxPolygons(room.x, room.y, room.width, room.depth, room.height);
     drawables.push({
       depth: depthKey(room.x, room.y),
       svg:
-        `<g data-room="${room.id}" data-sprite="${room.spriteKey}" class="clickable">` +
+        `<g data-room="${room.id}" class="clickable">` +
         `<title>${escapeText(room.tooltip)}</title>` +
         (drawn
           ? polygon(
@@ -536,17 +543,9 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
               'painted-text room-label',
               ROOM_LABEL_SIZE,
             )
-          : objectArt({
-              spriteKey: room.spriteKey,
-              x: room.x,
-              y: room.y,
-              width: room.width,
-              depth: room.depth,
-              height: room.height,
-              fill: 'var(--room)',
-              shade: 'var(--room-dark)',
-              label: room.name,
-            })) +
+          : contactShadow(room.x, room.y, room.width, room.depth) +
+            box(faces, 'var(--room)', 'var(--room-dark)') +
+            label(centreOf(room.x, room.y, room.width, room.depth, room.height), room.name)) +
         '</g>',
     });
   }
@@ -616,7 +615,16 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
   }
   if (ownerIsAvailable(state)) {
     const bench = state.equipment.find((item) => item.specId === 'workbench');
-    const ownerBench = bench ? { x: bench.anchorX + 1, y: bench.anchorY + 2 } : { x: 2, y: 5 };
+    const benchSpec = bench ? findSpec(bench.specId) : null;
+    // At the middle of his bench's front edge, taken from the bench's own footprint: the offsets
+    // that used to be written in here were the 3 by 2 of the half metre tile.
+    const ownerBench =
+      bench && benchSpec
+        ? {
+            x: bench.anchorX + Math.floor(benchSpec.width / 2),
+            y: bench.anchorY + benchSpec.depth,
+          }
+        : { x: 2, y: 5 };
     drawables.push(
       figure(
         'owner',
@@ -800,7 +808,7 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
   ].join('|');
   return {
     key,
-    shell:
+    shell: () =>
       `<svg class="hall-view" data-scene="${key}" viewBox="${viewBox}" ` +
       `width="${size.width}" height="${size.height}" ` +
       `xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Workshop hall">` +

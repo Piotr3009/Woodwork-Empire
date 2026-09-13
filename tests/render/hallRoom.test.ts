@@ -6,12 +6,16 @@ import {
   HALL_CANVAS,
   HALL_LAYERS,
   HALL_NAME_BOX,
+  type Scene,
   canvasBoxInHall,
   fitName,
   hallLayerBox,
+  hallScene,
   renderHall,
 } from '../../src/render/hall';
-import { tileToScreen } from '../../src/render/iso';
+import { centreOf, tileToScreen } from '../../src/render/iso';
+import { findSpec } from '../../src/engine/machines';
+import { STATION_BENCH } from '../../src/engine/stations';
 import { ROOM_LAYOUT } from '../../src/engine/constants';
 import { buyStartingKit, newGame } from '../helpers';
 
@@ -161,5 +165,53 @@ describe('the text the game letters on the painting', () => {
         `class="painted-text room-label" font-size="11">${room.name}</text>`;
       expect(svg, room.id).toContain(wanted);
     }
+  });
+});
+
+describe('the shell is only built when it has to be', () => {
+  it('hands back the markup as a function, and the same key twice means the same shell', () => {
+    const state = buyStartingKit(newGame());
+    let built = 0;
+    const first = hallScene(state, { files: DELIVERED });
+    const second = hallScene(state, { files: DELIVERED });
+    // Same frame, same painting, same mode: the page can keep what it has.
+    expect(second.key).toBe(first.key);
+    // Asking for it is what builds it, so a caller that does not ask pays nothing.
+    const counted: Scene = { ...first, shell: () => { built += 1; return first.shell(); } };
+    expect(built).toBe(0);
+    expect(counted.shell()).toContain('<svg class="hall-view"');
+    expect(built).toBe(1);
+  });
+
+  it('changes the key when the frame, the painting or the mode changes', () => {
+    const state = buyStartingKit(newGame());
+    const plain = hallScene(state, { files: DELIVERED }).key;
+    expect(hallScene(state, { files: DELIVERED, setup: true }).key).not.toBe(plain);
+    expect(hallScene(state, { files: [] }).key).not.toBe(plain);
+    expect(hallScene(state, { files: ['hallBackground.png'] }).key).not.toBe(plain);
+    // And not when only the state inside it moved.
+    const later = { ...state, dust: 40, companyName: 'Someone Else' };
+    expect(hallScene(later, { files: DELIVERED }).key).toBe(plain);
+  });
+});
+
+describe('where the owner stands', () => {
+  it('puts him at the middle of his bench front, from the bench footprint', () => {
+    const state = buyStartingKit(newGame());
+    // Standing at it, which is the only time the bench is where he is.
+    state.owner.station = STATION_BENCH;
+    const bench = state.equipment.find((item) => item.specId === 'workbench');
+    const spec = findSpec('workbench');
+    expect(bench).toBeDefined();
+    const feet = centreOf(
+      (bench?.anchorX ?? 0) + Math.floor((spec?.width ?? 1) / 2),
+      (bench?.anchorY ?? 0) + (spec?.depth ?? 1),
+      1,
+      1,
+    );
+    const svg = renderHall(state, { files: DELIVERED });
+    expect(svg).toContain(
+      `data-figure="owner" transform="translate(${Math.round(feet.x)},${Math.round(feet.y)})"`,
+    );
   });
 });

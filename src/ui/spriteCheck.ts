@@ -2,12 +2,7 @@
 // placeholder box, and the picture beside it when the art side has delivered one. This page is
 // the acceptance tool of docs/art/SPRITES.md item 7 (CLAUDE.md T3 3.6).
 
-import {
-  DELIVERY_VAN_SPRITE,
-  EQUIPMENT_SPECS,
-  GATE_LAYOUT,
-  ROOM_LAYOUT,
-} from '../engine/constants';
+import { DELIVERY_VAN_SPRITE, EQUIPMENT_SPECS, GATE_LAYOUT } from '../engine/constants';
 import { HALL_CANVAS, HALL_LAYERS, box, escapeText, label, polygon } from '../render/hall';
 import { OFFICE_CANVAS, OFFICE_LAYERS } from '../render/office';
 import { boxPolygons, centreOf, footprintPolygon, gridBounds, tileToScreen } from '../render/iso';
@@ -26,9 +21,9 @@ export interface SpriteTarget {
   where: string;
 }
 
-/** Every key the game can ask for, once each: the catalogue families and their classes, the three
- *  rooms, and the lorry at the gate. The office is a room of full width layers now, which the
- *  page shows on its own below (CLAUDE.md T4 3.1). */
+/** Every key the game can ask for, once each: the catalogue families and their classes, and the
+ *  lorry at the gate. Both rooms are sets of full width layers now, which the page shows on their
+ *  own below (CLAUDE.md T4 3.1, docs/art/SPRITES.md 9.3). */
 export function spriteTargets(): SpriteTarget[] {
   const targets: SpriteTarget[] = [];
   const seen = new Set<string>();
@@ -59,17 +54,6 @@ export function spriteTargets(): SpriteTarget[] {
         where: variant.name.toLowerCase(),
       });
     }
-  }
-  for (const room of ROOM_LAYOUT) {
-    add({
-      name: room.spriteKey,
-      spriteKey: room.spriteKey,
-      tier: null,
-      width: room.width,
-      depth: room.depth,
-      height: room.height,
-      where: 'hall room',
-    });
   }
   add({
     name: DELIVERY_VAN_SPRITE,

@@ -2,11 +2,7 @@
 // The sprite check page is the acceptance tool for a batch of art (CLAUDE.md T3 3.6).
 
 import { describe, expect, it } from 'vitest';
-import {
-  DELIVERY_VAN_SPRITE,
-  EQUIPMENT_SPECS,
-  ROOM_LAYOUT,
-} from '../../src/engine/constants';
+import { DELIVERY_VAN_SPRITE, EQUIPMENT_SPECS } from '../../src/engine/constants';
 import { HALL_LAYERS } from '../../src/render/hall';
 import { OFFICE_LAYERS } from '../../src/render/office';
 import { renderSpriteCheck, spriteTargets } from '../../src/ui/spriteCheck';
@@ -22,18 +18,21 @@ describe('the sprite check page', () => {
     const names = spriteTargets().map((target) => target.name);
     expect(new Set(names).size).toBe(names.length);
     for (const spec of EQUIPMENT_SPECS) expect(names, spec.id).toContain(spec.spriteKey);
-    for (const room of ROOM_LAYOUT) expect(names, room.id).toContain(room.spriteKey);
     expect(names).toContain(DELIVERY_VAN_SPRITE);
-    // The page asks for the catalogue families and their classes, the rooms and the van, and for
-    // nothing else: the office desk items went with the desk (CLAUDE.md T4 3.1).
+    // The page asks for the catalogue families and their classes and the lorry, and for nothing
+    // else: the office desk items went with the desk (CLAUDE.md T4 3.1), and the rooms are the
+    // hall layers now, which the page shows full width in their own section
+    // (docs/art/SPRITES.md 9.3).
     const wanted = new Set<string>([DELIVERY_VAN_SPRITE]);
     for (const spec of EQUIPMENT_SPECS) {
       wanted.add(spec.spriteKey);
       if (spec.variants.length < 2) continue;
       for (const variant of spec.variants) wanted.add(`${spec.spriteKey}.${variant.id}`);
     }
-    for (const room of ROOM_LAYOUT) wanted.add(room.spriteKey);
     expect(new Set(names)).toEqual(wanted);
+    for (const key of ['roomWc', 'roomOffice', 'roomCanteen']) {
+      expect(names, key).not.toContain(key);
+    }
     // The five classes of saw (CLAUDE.md T3 3.5).
     expect(names).toContain('tableSaw.used');
     expect(names).toContain('tableSaw.industrial');

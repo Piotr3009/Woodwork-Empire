@@ -354,7 +354,8 @@ const SCENE_SLOT = '<div data-scene-slot="1"></div>';
  *  keep and the live part to write again. The sprite check page has no live part at all. */
 function sceneFor(current: GameState): Scene | null {
   if (ui.view === 'sprites') {
-    return { key: 'sprites', shell: renderSpriteCheck(), live: '', notes: '' };
+    // A page of every key in the game, which is dear to build and never changes: it is all shell.
+    return { key: 'sprites', shell: renderSpriteCheck, live: '', notes: '' };
   }
   if (ui.view === 'hall') {
     return hallScene(current, { ghost: ghostFor(current), setup: ui.setup });
@@ -543,7 +544,7 @@ function mountScene(page: Element, wanted: Scene | null): void {
     return;
   }
   if (scene === null || scene.key !== wanted.key) {
-    const node = parseOne(wanted.shell);
+    const node = parseOne(wanted.shell());
     if (node === null) {
       slot.remove();
       scene = null;

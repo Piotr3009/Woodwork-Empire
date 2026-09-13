@@ -4,7 +4,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../public/sprites/manifest.json', () => ({
-  default: ['tableSaw.pro.png', 'workbench.png', 'roomOffice.png'],
+  default: ['tableSaw.pro.png', 'workbench.png'],
 }));
 
 const { renderHall } = await import('../../src/render/hall');
@@ -58,6 +58,8 @@ describe('an object with a file is a picture, not a box', () => {
     const shadows = svg.split('class="contact-shadow"').length - 1;
     // Three rooms, the kit in the hall, and never fewer than one per object drawn.
     expect(shadows).toBeGreaterThanOrEqual(10);
-    expect(svg).toContain('<image href="/sprites/roomOffice.png"');
+    // The saw has a picture and the edgebander has not: both stand on a shadow.
+    expect(svg).toContain('<image href="/sprites/tableSaw.pro.png"');
+    expect(svg).toContain('>Hand edgebander<');
   });
 });
