@@ -131,7 +131,9 @@ function renderOwned(state: GameState, filter: string): string {
       if (!spec) return '';
       const variant = variantFor(item);
       const className = variant?.name ?? 'standard';
-      const machine = spec.category === 'machine' || spec.category === 'extraction';
+      // The hours and the service belong to the machines the hours are booked on. An extractor
+      // is repaired and never serviced, so it shows its state and no clock (CLAUDE.md T6 3.6).
+      const machine = spec.category === 'machine';
       const due = serviceDueOn(state, item);
       const service = !machine
         ? ''

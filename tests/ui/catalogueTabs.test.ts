@@ -116,6 +116,17 @@ describe('the Owned tab', () => {
     expect(card?.textContent).toContain('80 h of use away');
   });
 
+  it('gives the extractor its state and no service, because its hours never move', () => {
+    const state = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
+    const extractor = state.equipment.find((item) => item.specId === 'extractor');
+    const card = shop(state, 'owned').querySelector(`[data-owned="${extractor?.id}"]`);
+    expect(card?.textContent).toContain('Extractor');
+    expect(card?.textContent).toContain('running');
+    // It is repaired, never serviced, and no hours are ever booked on it.
+    expect(card?.textContent).not.toContain('service');
+    expect(card?.textContent).not.toContain(' h of ');
+  });
+
   it('says what has stopped a machine, and offers the same action the hall offers', () => {
     let state = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
     const saw = state.equipment.find((item) => item.specId === 'tableSaw');

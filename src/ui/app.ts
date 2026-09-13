@@ -643,9 +643,14 @@ function applyCamera(): void {
   group.setAttribute('transform', cameraTransform(ui.camera));
 }
 
+/** Pushing the hall about writes one attribute on one group and nothing else: rebuilding the page
+ *  under the pointer at the rate a mouse moves is what the whole of T5 3.1 was about. Only the
+ *  readout under the hall needs the page again, and only when it changes. */
 function moveCamera(next: HallCamera): void {
+  const before = Math.round(ui.camera.scale * 100);
   ui.camera = next;
-  render();
+  applyCamera();
+  if (Math.round(ui.camera.scale * 100) !== before) render();
 }
 
 function resetCamera(): void {
@@ -1277,7 +1282,8 @@ function objectCentreUnder(event: MouseEvent): { x: number; y: number } | null {
 
 /** Pushing the hall about: the left button on empty floor, or the space bar anywhere in it. */
 function onPanPointerDown(event: MouseEvent): boolean {
-  if (state === null) return false;
+  // The left button and no other: the right one belongs to the browser (CLAUDE.md T6 3.3).
+  if (state === null || event.button !== 0) return false;
   const target = event.target;
   if (!(target instanceof Element) || target.closest('.hall-view') === null) return false;
   const frame = hallFrame();

@@ -386,23 +386,31 @@ export function machineHoursInDay(specId: string, users: number): number {
   return capacityShare(specId, users) * HOURS_PER_WORKING_DAY;
 }
 
-/** The hours this machine gains today at the rate the workshop is using it now. */
+/** The hours this machine gains today at the rate the workshop is using it now. Only the machines
+ *  the hours are booked on gain any: an extractor runs all day and wears out on dust, not on
+ *  hours, and saying it has a service coming would be saying something untrue. */
 export function machineHoursPerDay(state: GameState, item: Equipment): number {
+  if (findSpec(item.specId)?.category !== 'machine') return 0;
   return machineHoursInDay(item.specId, machineUsersNow(state, item));
 }
 
-/** How many people are putting work through this machine at this moment: the owner and every
- *  joiner on a job of the material it serves. */
+/** How many people are putting work through this machine at this moment: the owner if he is at a
+ *  bench on a job of the material it serves, and every joiner who is. People, not jobs: two men on
+ *  one job are two men on the machine (CLAUDE.md T6 3.6). */
 export function machineUsersNow(state: GameState, item: Equipment): number {
   const spec = findSpec(item.specId);
   if (!spec) return 0;
-  const serves = (materialKind: MaterialKind | null): boolean =>
-    materialKind !== null && (spec.usedOn === null || spec.usedOn === materialKind);
-  let users = 0;
-  for (const job of state.jobs) {
-    if (job.stage !== 'inProduction') continue;
-    if (!serves(job.materialKind)) continue;
-    users += 1;
+  const serves = (jobId: string | null): boolean => {
+    const job = state.jobs.find((entry) => entry.id === jobId);
+    if (!job || job.stage !== 'inProduction') return false;
+    return spec.usedOn === null || spec.usedOn === job.materialKind;
+  };
+  const owner = state.jobs.find((job) => job.assignedTo === 'owner') ?? null;
+  let users = owner !== null && serves(owner.id) ? 1 : 0;
+  for (const worker of state.workers) {
+    if (worker.role !== 'joiner' || worker.absentDaysRemaining > 0) continue;
+    if (worker.startDay > state.clock.day) continue;
+    if (serves(worker.jobId)) users += 1;
   }
   return users;
 }

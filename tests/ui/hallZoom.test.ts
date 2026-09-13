@@ -268,3 +268,44 @@ describe('a double click', () => {
     expect(on.scale * centre.y + on.y).toBeCloseTo(frame.y + frame.height / 2, 6);
   });
 });
+
+describe('what the camera does not do', () => {
+  it('does not start a pan on a button that is not the left one', () => {
+    press('[data-do="zoomIn"]');
+    press('[data-do="zoomIn"]');
+    const before = camera();
+    const view = required(app().querySelector('.hall-view'));
+    const floor = tileToScreen(14, 8);
+    const from = { x: before.scale * floor.x + before.x, y: before.scale * floor.y + before.y };
+    view.dispatchEvent(
+      new MouseEvent('mousedown', { bubbles: true, button: 2, ...client(from) }),
+    );
+    window.dispatchEvent(
+      new MouseEvent('mousemove', { bubbles: true, ...client({ x: from.x + 40, y: from.y }) }),
+    );
+    window.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+    expect(camera()).toEqual(before);
+    press('[data-do="zoomFit"]');
+  });
+
+  it('writes the transform and nothing else while the hall is pushed about', () => {
+    press('[data-do="zoomIn"]');
+    press('[data-do="zoomIn"]');
+    const bar = required(app().querySelector('.topbar'));
+    const view = required(app().querySelector('.hall-view'));
+    const floor = tileToScreen(14, 8);
+    const on = camera();
+    const from = { x: on.scale * floor.x + on.x, y: on.scale * floor.y + on.y };
+    view.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, ...client(from) }));
+    window.dispatchEvent(
+      new MouseEvent('mousemove', { bubbles: true, ...client({ x: from.x + 20, y: from.y }) }),
+    );
+    // The page under the pointer is not rebuilt: the same top bar element is still there, and so
+    // is the same painting (CLAUDE.md T5 3.1).
+    expect(app().querySelector('.topbar')).toBe(bar);
+    expect(app().querySelector('.hall-view')).toBe(view);
+    expect(camera().x).toBeCloseTo(on.x + 20, 6);
+    window.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+    press('[data-do="zoomFit"]');
+  });
+});
