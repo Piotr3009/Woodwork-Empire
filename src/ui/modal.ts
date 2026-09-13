@@ -7,6 +7,7 @@
 import { WHY, formatMoney, interviewTask, plural, startTaskCheck } from '../engine/index';
 import type { GameState, TaskInstance } from '../engine/index';
 import { escapeText } from '../render/hall';
+import { patchInto } from './patch';
 
 export const escapeHtml = escapeText;
 export const money = formatMoney;
@@ -83,7 +84,9 @@ function fillModal(node: Element, spec: ModalSpec): void {
   const body = node.querySelector('.modal-body');
   if (body !== null) {
     const scrolled = body.scrollTop;
-    body.innerHTML = spec.body;
+    // Patched, not replaced: a control the player has his finger on keeps its node, whatever the
+    // minute does to the figures beside it (CLAUDE.md T9 3.8).
+    patchInto(body, spec.body);
     // Clamp only when the new content measures shorter. A browser clamps for itself, and the
     // measurement is zero in a headless DOM, where clamping would throw the player to the top.
     const most = body.scrollHeight - body.clientHeight;
@@ -93,10 +96,10 @@ function fillModal(node: Element, spec: ModalSpec): void {
   if (foot !== null) {
     if (spec.footer === undefined) {
       foot.setAttribute('hidden', 'hidden');
-      foot.innerHTML = '';
+      patchInto(foot, '');
     } else {
       foot.removeAttribute('hidden');
-      foot.innerHTML = spec.footer;
+      patchInto(foot, spec.footer);
     }
   }
 }
