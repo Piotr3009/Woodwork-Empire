@@ -8,6 +8,7 @@ import {
   OWNER_LABOUR_PER_MINUTE,
   PRODUCT_TEMPLATES,
   PROFIT_FRACTION,
+  STATE_VERSION,
   WORKER_RATES,
 } from '../../src/engine/constants';
 import type { GameState } from '../../src/engine/types';
@@ -26,6 +27,25 @@ describe('GameState', () => {
     const copy = JSON.parse(JSON.stringify(sample)) as GameState;
     expect(copy).toEqual(sample);
     expect(JSON.stringify(copy)).toBe(JSON.stringify(sample));
+  });
+
+  it('carries the version the loader checks, and it moved with the shape', () => {
+    // The metre grid and the painted floor changed what an anchor means, so a Turn 4 save cannot
+    // be opened: the loader refuses anything that is not this number (src/cloud/saves.ts).
+    expect(STATE_VERSION).toBe(4);
+    expect(sample.version).toBe(STATE_VERSION);
+  });
+
+  it('measures the unit in cells, with nothing left of the old tile fields', () => {
+    expect(sample.unit.widthCells).toBe(20);
+    expect(sample.unit.depthCells).toBe(10);
+    const unit = sample.unit as unknown as Record<string, unknown>;
+    expect(unit.widthTiles).toBeUndefined();
+    expect(unit.depthTiles).toBeUndefined();
+    // Every anchor in the starting layout is inside the painted floor.
+    for (const item of sample.equipment) {
+      expect(item.anchorY, item.specId).toBeLessThan(sample.unit.depthCells);
+    }
   });
 
   it('holds no non JSON values', () => {

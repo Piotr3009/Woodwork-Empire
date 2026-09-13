@@ -1,14 +1,22 @@
 // Isometric projection helpers. Pure geometry, no SVG and no DOM, so the same numbers can feed a
 // sprite renderer later (CLAUDE.md 10.3).
 //
-// 2:1 dimetric. One tile is 48 by 24 pixels on screen and half a metre by half a metre in the
-// world. The tile came down from 64 by 32 in Turn 2 so the whole hall fits on a 1280 px page at
-// one screen pixel per unit, which is what keeps the labels readable (CLAUDE.md T2 3.11).
+// 2:1 dimetric. One grid cell is 48 by 24 pixels on screen and, from Turn 5 on, one metre by one
+// metre in the world: the half metre cell of Turns 1 to 4 is gone and every footprint is half
+// what it was (docs/art/SPRITES.md 9.1). The pixel numbers did not move, so the painted hall and
+// this projection agree: at 2x the art puts a cell at 96 by 48 and the loader halves it.
+//
+// docs/art/SPRITES.md 9.2 writes the same projection from the art side, on the 2x canvas:
+// sx = 600 + (x - y) * 48, sy = 288 + (x + y) * 24 - z * 48. Halve both and take the offsets out
+// and what is left is tileToScreen below, which is why HALL_CANVAS can register the background
+// against it without a second set of numbers.
 
 export const TILE_WIDTH = 48;
 export const TILE_HEIGHT = 24;
-/** Pixels of screen height per tile of object height. */
+/** Pixels of screen height per metre of object height. */
 export const TILE_RISE = 24;
+/** Metres a grid cell measures each way (docs/art/SPRITES.md 9.1). */
+export const METRES_PER_CELL = 1;
 
 export interface Point {
   x: number;
@@ -23,7 +31,7 @@ export interface BoxFaces {
   right: Polygon;
 }
 
-/** Tile coordinates to screen pixels. z is height in tiles. */
+/** Grid coordinates in metres to screen pixels. z is height in metres. */
 export function tileToScreen(x: number, y: number, z = 0): Point {
   return {
     x: (x - y) * (TILE_WIDTH / 2),
@@ -105,17 +113,17 @@ export interface Bounds {
 
 /** The screen box a tile grid of this size needs, with room for the tallest object. */
 export function gridBounds(
-  widthTiles: number,
-  depthTiles: number,
+  widthCells: number,
+  depthCells: number,
   maxHeightTiles = 4,
 ): Bounds {
   const corners = [
     tileToScreen(0, 0),
-    tileToScreen(widthTiles, 0),
-    tileToScreen(widthTiles, depthTiles),
-    tileToScreen(0, depthTiles),
+    tileToScreen(widthCells, 0),
+    tileToScreen(widthCells, depthCells),
+    tileToScreen(0, depthCells),
     tileToScreen(0, 0, maxHeightTiles),
-    tileToScreen(widthTiles, 0, maxHeightTiles),
+    tileToScreen(widthCells, 0, maxHeightTiles),
   ];
   const xs = corners.map((point) => point.x);
   const ys = corners.map((point) => point.y);

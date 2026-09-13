@@ -3,6 +3,7 @@
 
 import { beforeAll, describe, expect, it } from 'vitest';
 import { advanceMinutes, currentState, mount } from '../../src/ui/app';
+import { BREAK_MINUTES } from '../../src/engine/constants';
 import { STARTING_KIT } from '../helpers';
 
 function root(): HTMLElement {
@@ -140,10 +141,11 @@ describe('the first ten minutes', () => {
     click('[data-do="closeModal"]');
     click('[data-do="toggleMenu"]');
     expect(html()).toContain('Stay home today');
-    // Before 16:00 the button means going home: the rest of the day runs without the owner.
+    // Before his 480 are in, the button means going home: the rest of the day runs without him.
     click('[data-do="endDay"]');
     expect(currentState()?.owner.wentHome).toBe(true);
-    advanceMinutes(480);
+    // The day is the 480 minutes of work plus the break nobody works through.
+    advanceMinutes(480 + BREAK_MINUTES);
     expect(html()).toContain('End of day 1');
     expect(html()).toContain('Your minutes');
     expect(html()).toContain('Jobs finished');

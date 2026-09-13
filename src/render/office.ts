@@ -7,8 +7,12 @@
 
 import { formatTime } from '../engine/clock';
 import type { GameState } from '../engine/types';
-import { escapeText } from './hall';
+import { type Scene, escapeText } from './hall';
 import { pickSprite, spriteFiles } from './sprites';
+
+/** The empty element the office shell leaves for its live text. The hall's slot is an SVG group
+ *  and the office is HTML, so the two are not the same element, only the same idea. */
+export const OFFICE_LIVE_SLOT = '<div class="office-live" data-live="1"></div>';
 
 /** The canvas every office layer is drawn on (docs/art/SPRITES.md 8.1). */
 export const OFFICE_CANVAS = { width: 1672, height: 941 };
@@ -152,22 +156,48 @@ export function fitOfficeStack(page: ParentNode): void {
   stack.style.transform = `translate(-50%,-50%) scale(${scale})`;
 }
 
-/** `files` is what the art side has delivered. It is a parameter so a test can ask what the room
+/** The room in two pieces: the shell with the three pictures and the seven regions, which is
+ *  built once and kept, and the live text, which is written again every minute. The pictures are
+ *  megabytes and the stack's scale is corrected from its own box once it is on the page, so
+ *  rebuilding the room every game minute made it blink and jump once a second.
+ *
+ *  `files` is what the art side has delivered. It is a parameter so a test can ask what the room
  *  looks like before the art arrives, which is what the placeholders are for (T4 3.1). */
+export function officeScene(
+  state: GameState,
+  viewport: Viewport,
+  files: readonly string[] = spriteFiles(),
+): Scene {
+  const scale = round(officeScale(viewport));
+  // Neither the scale nor the viewport belongs in the key: the stack is scaled by a style the
+  // renderer writes once and fitOfficeStack corrects on the page, so a resize does not need the
+  // pictures loaded again.
+  const key = ['office', OFFICE_LAYERS.map((layer) => pickSprite(files, layer.key) ?? '').join(',')]
+    .join('|');
+  return {
+    key,
+    shell: () =>
+      `<div class="office-room" data-scene="${key}">` +
+      `<div class="office-stack" data-scale="${scale}" ` +
+      `style="width:${OFFICE_CANVAS.width}px;height:${OFFICE_CANVAS.height}px;` +
+      `transform:translate(-50%,-50%) scale(${scale})">` +
+      OFFICE_LAYERS.map((layer, index) => layerHtml(layer, index, files)).join('') +
+      OFFICE_REGIONS.map(regionHtml).join('') +
+      OFFICE_LIVE_SLOT +
+      '</div></div>',
+    live: liveText(state),
+    notes: '',
+  };
+}
+
+/** The room as one string, for a caller that just wants the markup. */
 export function renderOffice(
   state: GameState,
   viewport: Viewport,
   files: readonly string[] = spriteFiles(),
 ): string {
-  const scale = round(officeScale(viewport));
-  return (
-    '<div class="office-room">' +
-    `<div class="office-stack" data-scale="${scale}" ` +
-    `style="width:${OFFICE_CANVAS.width}px;height:${OFFICE_CANVAS.height}px;` +
-    `transform:translate(-50%,-50%) scale(${scale})">` +
-    OFFICE_LAYERS.map((layer, index) => layerHtml(layer, index, files)).join('') +
-    OFFICE_REGIONS.map(regionHtml).join('') +
-    liveText(state) +
-    '</div></div>'
-  );
+  const scene = officeScene(state, viewport, files);
+  return scene
+    .shell()
+    .replace(OFFICE_LIVE_SLOT, `<div class="office-live" data-live="1">${scene.live}</div>`);
 }

@@ -2,11 +2,8 @@
 // The sprite check page is the acceptance tool for a batch of art (CLAUDE.md T3 3.6).
 
 import { describe, expect, it } from 'vitest';
-import {
-  DELIVERY_VAN_SPRITE,
-  EQUIPMENT_SPECS,
-  ROOM_LAYOUT,
-} from '../../src/engine/constants';
+import { DELIVERY_VAN_SPRITE, EQUIPMENT_SPECS } from '../../src/engine/constants';
+import { HALL_LAYERS } from '../../src/render/hall';
 import { OFFICE_LAYERS } from '../../src/render/office';
 import { renderSpriteCheck, spriteTargets } from '../../src/ui/spriteCheck';
 
@@ -21,18 +18,21 @@ describe('the sprite check page', () => {
     const names = spriteTargets().map((target) => target.name);
     expect(new Set(names).size).toBe(names.length);
     for (const spec of EQUIPMENT_SPECS) expect(names, spec.id).toContain(spec.spriteKey);
-    for (const room of ROOM_LAYOUT) expect(names, room.id).toContain(room.spriteKey);
     expect(names).toContain(DELIVERY_VAN_SPRITE);
-    // The page asks for the catalogue families and their classes, the rooms and the van, and for
-    // nothing else: the office desk items went with the desk (CLAUDE.md T4 3.1).
+    // The page asks for the catalogue families and their classes and the lorry, and for nothing
+    // else: the office desk items went with the desk (CLAUDE.md T4 3.1), and the rooms are the
+    // hall layers now, which the page shows full width in their own section
+    // (docs/art/SPRITES.md 9.3).
     const wanted = new Set<string>([DELIVERY_VAN_SPRITE]);
     for (const spec of EQUIPMENT_SPECS) {
       wanted.add(spec.spriteKey);
       if (spec.variants.length < 2) continue;
       for (const variant of spec.variants) wanted.add(`${spec.spriteKey}.${variant.id}`);
     }
-    for (const room of ROOM_LAYOUT) wanted.add(room.spriteKey);
     expect(new Set(names)).toEqual(wanted);
+    for (const key of ['roomWc', 'roomOffice', 'roomCanteen']) {
+      expect(names, key).not.toContain(key);
+    }
     // The five classes of saw (CLAUDE.md T3 3.5).
     expect(names).toContain('tableSaw.used');
     expect(names).toContain('tableSaw.industrial');
@@ -66,14 +66,33 @@ describe('the sprite check page', () => {
     expect(page.querySelector('.sprite-wide-grid .sprite-proof')).toBeNull();
   });
 
+  it('shows the three hall layers full width too, on their own canvas', () => {
+    const page = parse(renderSpriteCheck());
+    expect(page.innerHTML).toContain('The painted hall');
+    for (const layer of HALL_LAYERS) {
+      const cell = page.querySelector(`.sprite-wide-grid [data-sprite-target="${layer.key}"]`);
+      expect(cell, layer.key).not.toBeNull();
+      expect(cell?.textContent, layer.key).toContain(`${layer.key}.png`);
+      // The file size, which is the 2x canvas of docs/art/SPRITES.md 9.3.
+      expect(cell?.textContent, layer.key).toContain('1680 by 1128');
+      expect(cell?.textContent, layer.key).toContain(layer.name);
+    }
+    // Six wide cells in all: three of the hall and three of the office, each once.
+    const wide = Array.from(page.querySelectorAll('.sprite-wide-grid .sprite-cell'));
+    expect(wide).toHaveLength(HALL_LAYERS.length + OFFICE_LAYERS.length);
+    const keys = wide.map((cell) => cell.getAttribute('data-sprite-target'));
+    expect(new Set(keys).size).toBe(keys.length);
+  });
+
   it('prints the key, the footprint and the canvas the art side has to hit', () => {
     const page = parse(renderSpriteCheck());
     const saw = page.querySelector('[data-sprite-target="tableSaw"]');
     expect(saw?.textContent).toContain('tableSaw.png');
-    expect(saw?.textContent).toContain('4 by 2 by 2 tiles');
-    // 288 by 240 plus 8 px of padding on every side (docs/art/SPRITES.md 6).
-    expect(saw?.textContent).toContain('canvas 288 by 240');
-    expect(saw?.textContent).toContain('file 304 by 256');
+    // Metres now, and half the tiles of Turns 1 to 4 (docs/art/SPRITES.md 9.1).
+    expect(saw?.textContent).toContain('2 by 1 by 1 m');
+    // The canvas formula of docs/art/SPRITES.md 2, in metres, plus 8 px of padding a side.
+    expect(saw?.textContent).toContain('canvas 144 by 120');
+    expect(saw?.textContent).toContain('file 160 by 136');
   });
 
   it('says so plainly where there is no file yet', () => {

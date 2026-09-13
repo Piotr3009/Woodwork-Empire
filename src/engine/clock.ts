@@ -1,10 +1,15 @@
-// Game time. The clock covers the working day only, 08:00 to 16:00, plus overtime up to 12 hours.
+// Game time. The clock covers the working day only: 08:00 until the 480 minutes of work are done,
+// plus overtime up to 12 hours of work. The break is the one part of the day nobody works through,
+// so the clock reads half an hour further on than the work done, and 16:00 became 16:30.
 // Weekends are skipped by the day advance in game.ts, which still charges their calendar costs.
 
 import {
+  BREAK_MINUTES,
+  BREAK_START_MINUTE,
   DAYS_PER_MONTH,
   DAYS_PER_WEEK,
   DAY_START_HOUR,
+  MAX_CLOCK_MINUTES_PER_DAY,
   MAX_MINUTES_PER_DAY,
   MINUTES_PER_WORKING_DAY,
   MONTHS_PER_YEAR,
@@ -69,22 +74,41 @@ export function yearOfDay(day: number): number {
 /** The minute of the game so far, for putting in order two things that happened on different
  *  days. Not a clock reading the player ever sees. */
 export function minuteStamp(clock: Clock): number {
-  return clock.day * MAX_MINUTES_PER_DAY + clock.minute;
+  return clock.day * MAX_CLOCK_MINUTES_PER_DAY + clock.minute;
 }
 
-/** Whole hours of the day worked so far. 0 for the first hour. */
+/** True while the workshop is at dinner. Nothing is worked on, nothing is produced, and nobody's
+ *  day is spent. */
+export function isBreak(minute: number): boolean {
+  return minute >= BREAK_START_MINUTE && minute < BREAK_START_MINUTE + BREAK_MINUTES;
+}
+
+/** How much of the break this point of the clock is past. */
+export function breakMinutesBefore(minute: number): number {
+  if (minute <= BREAK_START_MINUTE) return 0;
+  return Math.min(BREAK_MINUTES, minute - BREAK_START_MINUTE);
+}
+
+/** The minutes of work the day has had by this point of the clock. Everything that measures a
+ *  day's work, the hour bands, the pool, the hard stop, counts in these and not in clock minutes,
+ *  so the break costs the work nothing and only moves the end of the day later. */
+export function workedMinutesOfDay(minute: number): number {
+  return minute - breakMinutesBefore(minute);
+}
+
+/** Whole hours of work done so far. 0 for the first hour. */
 export function hourIndex(minute: number): number {
-  return Math.floor(minute / 60);
+  return Math.floor(workedMinutesOfDay(minute) / 60);
 }
 
-/** True once the owner has done his 8 hours. */
+/** True once the owner has done his 8 hours of work. */
 export function isOvertime(minute: number): boolean {
-  return minute >= MINUTES_PER_WORKING_DAY;
+  return workedMinutesOfDay(minute) >= MINUTES_PER_WORKING_DAY;
 }
 
-/** True when the owner has to go home: 12 hours is the hard stop. */
+/** True when the owner has to go home: 12 hours of work is the hard stop. */
 export function isDayExhausted(minute: number): boolean {
-  return minute >= MAX_MINUTES_PER_DAY;
+  return workedMinutesOfDay(minute) >= MAX_MINUTES_PER_DAY;
 }
 
 export function formatTime(minute: number): string {

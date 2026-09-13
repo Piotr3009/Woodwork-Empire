@@ -1,9 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { GATE_LANE_TILES, ROOM_LAYOUT } from '../../src/engine/constants';
+import {
+  EQUIPMENT_SPECS,
+  FINISHED_GOODS_LAYOUT,
+  GATE_LAYOUT,
+  STARTING_LAYOUT,
+  roomById,
+} from '../../src/engine/constants';
+import { findSpec } from '../../src/engine/machines';
 import {
   canPlace,
   canPlaceSpec,
-  firstFreeTile,
+  firstFreeCell,
   gateLane,
   hallItems,
 } from '../../src/engine/layout';
@@ -20,24 +27,31 @@ describe('setting the hall out', () => {
   it('keeps everything inside the floor', () => {
     const state = buyStartingKit(newGame());
     const saw = itemOf(state, 'tableSaw');
-    const free = firstFreeTile(state, 'tableSaw');
+    const free = firstFreeCell(state, 'tableSaw');
     expect(free).not.toBeNull();
     expect(canPlace(state, saw, free?.x ?? 0, free?.y ?? 0).ok).toBe(true);
     expect(canPlace(state, saw, -1, 6)).toEqual({ ok: false, reason: 'Off the floor' });
-    expect(canPlace(state, saw, state.unit.widthTiles - 1, 6).reason).toBe('Off the floor');
-    expect(canPlace(state, saw, 2, state.unit.depthTiles - 1).reason).toBe('Off the floor');
+    // One cell short of the room the saw needs, on each side in turn. Taken from its own
+    // footprint, so the assertion survives a footprint or a hall that changes size.
+    const spec = findSpec('tableSaw');
+    const width = spec?.width ?? 1;
+    const depth = spec?.depth ?? 1;
+    expect(canPlace(state, saw, state.unit.widthCells - width + 1, 6).reason).toBe('Off the floor');
+    expect(canPlace(state, saw, 2, state.unit.depthCells - depth + 1).reason).toBe('Off the floor');
   });
 
   it('refuses to drop a bench on the office', () => {
     const state = buyStartingKit(newGame());
     const bench = itemOf(state, 'workbench');
-    const office = ROOM_LAYOUT[0];
+    const office = roomById('office');
     const check = canPlace(state, bench, office.x, office.y);
     expect(check.ok).toBe(false);
     expect(check.reason).toBe('On the office');
     // And on the canteen, and the WC.
-    expect(canPlace(state, bench, ROOM_LAYOUT[1].x, ROOM_LAYOUT[1].y).reason).toBe('On the wc');
-    expect(canPlace(state, bench, ROOM_LAYOUT[2].x, ROOM_LAYOUT[2].y).reason).toBe('On the canteen');
+    const wc = roomById('wc');
+    const canteen = roomById('canteen');
+    expect(canPlace(state, bench, wc.x, wc.y).reason).toBe('On the wc');
+    expect(canPlace(state, bench, canteen.x, canteen.y).reason).toBe('On the canteen');
   });
 
   it('never lets two machines overlap', () => {
@@ -63,10 +77,11 @@ describe('setting the hall out', () => {
 
   it('keeps the way to the gate clear, and says so', () => {
     const state = buyStartingKit(newGame());
-    const lane = gateLane(state);
-    expect(lane.width).toBe(GATE_LANE_TILES);
+    const lane = gateLane();
+    // Eight cells of the two hundred, x 0 to 2 and y 6 to 10 (docs/art/SPRITES.md 9.3).
+    expect(lane).toEqual({ x: 0, y: 6, width: 2, depth: 4 });
     const saw = itemOf(state, 'tableSaw');
-    const check = canPlace(state, saw, state.unit.widthTiles - 4, lane.y);
+    const check = canPlace(state, saw, lane.x, lane.y);
     expect(check.ok).toBe(false);
     expect(check.reason).toBe('Blocking the way to the gate');
   });
@@ -93,7 +108,7 @@ describe('setting the hall out', () => {
       anchorX: bench?.anchorX ?? 0,
       anchorY: bench?.anchorY ?? 0,
     });
-    const free = firstFreeTile(state, 'workbench');
+    const free = firstFreeCell(state, 'workbench');
     expect(free).not.toBeNull();
     const moved = act(state, {
       type: 'MOVE_ITEM',
@@ -119,17 +134,61 @@ describe('setting the hall out', () => {
     let state = buyStartingKit(newGame());
     // Something is standing exactly where the second saw would like to be.
     const first = state.equipment.find((item) => item.specId === 'tableSaw');
-    expect(first?.anchorX).toBe(0);
-    expect(first?.anchorY).toBe(7);
+    const slot = STARTING_LAYOUT.tableSaw;
+    expect(first?.anchorX).toBe(slot?.x);
+    expect(first?.anchorY).toBe(slot?.y);
     state = act(state, { type: 'BUY_EQUIPMENT', specId: 'tableSaw' });
     const saws = state.equipment.filter((item) => item.specId === 'tableSaw');
     expect(saws).toHaveLength(2);
     const second = saws[1];
     expect(second?.anchorX !== first?.anchorX || second?.anchorY !== first?.anchorY).toBe(true);
-    const free = firstFreeTile(buyStartingKit(newGame()), 'tableSaw');
+    const free = firstFreeCell(buyStartingKit(newGame()), 'tableSaw');
     expect(second?.anchorX).toBe(free?.x);
     expect(second?.anchorY).toBe(free?.y);
     expect(canPlaceSpec(state, 'tableSaw', second?.anchorX ?? 0, second?.anchorY ?? 0, second?.id ?? null).ok)
       .toBe(true);
+  });
+});
+
+describe('the whole workshop fits on the painted floor', () => {
+  it('stands the day 1 kit, a full crew and the big machines side by side', () => {
+    let state = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
+    // Everything a workshop can own, bought without caring what it costs.
+    for (const spec of EQUIPMENT_SPECS) {
+      if (spec.category === 'furniture') continue;
+      const have = state.equipment.filter((item) => item.specId === spec.id).length;
+      const want = spec.perWorker ? 6 : 1;
+      for (let index = have; index < want; index += 1) {
+        state.cash += 100000;
+        state = act(state, { type: 'BUY_EQUIPMENT', specId: spec.id });
+      }
+    }
+    // Nothing overlaps anything, nothing sits on a room and nothing blocks the lane.
+    for (const item of hallItems(state)) {
+      const check = canPlaceSpec(state, item.specId, item.anchorX, item.anchorY, item.id);
+      expect(check, `${item.specId} at ${item.anchorX},${item.anchorY}`).toEqual({
+        ok: true,
+        reason: '',
+      });
+    }
+    // And every one of them actually found room: none fell back to nowhere.
+    expect(hallItems(state).length).toBeGreaterThan(20);
+  });
+
+  it('stands the lorry on the lane, where nothing of the player is allowed', () => {
+    const state = buyStartingKit(newGame());
+    // The lorry comes in through the shutter and stands on the cells kept clear for it.
+    expect(GATE_LAYOUT.x).toBe(gateLane().x);
+    expect(GATE_LAYOUT.y).toBe(gateLane().y);
+    expect(GATE_LAYOUT.width).toBeLessThanOrEqual(gateLane().width);
+    const saw = itemOf(state, 'tableSaw');
+    expect(canPlace(state, saw, GATE_LAYOUT.x, GATE_LAYOUT.y).reason).toBe(
+      'Blocking the way to the gate',
+    );
+    // The finished pieces stand at the far end of the same lane, clear of the lorry.
+    expect(FINISHED_GOODS_LAYOUT.y).toBeGreaterThanOrEqual(GATE_LAYOUT.y + GATE_LAYOUT.depth);
+    expect(FINISHED_GOODS_LAYOUT.x + FINISHED_GOODS_LAYOUT.width).toBeLessThanOrEqual(
+      gateLane().x + gateLane().width,
+    );
   });
 });

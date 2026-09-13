@@ -1,7 +1,7 @@
 // Where things stand on the hall floor. Pure geometry over the state, so the setup view can ask
 // before it drops and the catalogue can ask before it buys (CLAUDE.md T2 3.10).
 
-import { GATE_LANE_TILES, GATE_LAYOUT, ROOM_LAYOUT } from './constants';
+import { GATE_LANE, ROOM_LAYOUT } from './constants';
 import { findSpec } from './machines';
 import type { Equipment, GameState } from './types';
 
@@ -28,14 +28,10 @@ function overlaps(left: Box, right: Box): boolean {
   );
 }
 
-/** The tiles in front of the gate that nothing may stand on (CLAUDE.md T2 3.10). */
-export function gateLane(state: GameState): Box {
-  return {
-    x: Math.max(0, state.unit.widthTiles - GATE_LANE_TILES),
-    y: GATE_LAYOUT.y,
-    width: GATE_LANE_TILES,
-    depth: GATE_LAYOUT.depth,
-  };
+/** The cells inside the shutter that nothing may stand on. Fixed geometry of the painted hall,
+ *  not worked out from the unit any more (docs/art/SPRITES.md 9.3). */
+export function gateLane(): Box {
+  return { x: GATE_LANE.x, y: GATE_LANE.y, width: GATE_LANE.width, depth: GATE_LANE.depth };
 }
 
 /** Everything standing on the hall floor: what a move can bump into. The office furniture lives
@@ -44,7 +40,7 @@ export function hallItems(state: GameState): Equipment[] {
   return state.equipment.filter((item) => {
     const spec = findSpec(item.specId);
     if (!spec || spec.category === 'furniture') return false;
-    return item.anchorX < state.unit.widthTiles;
+    return item.anchorX < state.unit.widthCells;
   });
 }
 
@@ -68,8 +64,8 @@ export function canPlaceSpec(
   if (
     x < 0 ||
     y < 0 ||
-    x + spec.width > state.unit.widthTiles ||
-    y + spec.depth > state.unit.depthTiles
+    x + spec.width > state.unit.widthCells ||
+    y + spec.depth > state.unit.depthCells
   ) {
     return { ok: false, reason: 'Off the floor' };
   }
@@ -78,7 +74,7 @@ export function canPlaceSpec(
       return { ok: false, reason: `On the ${room.name.toLowerCase()}` };
     }
   }
-  if (overlaps(box, gateLane(state))) {
+  if (overlaps(box, gateLane())) {
     return { ok: false, reason: 'Blocking the way to the gate' };
   }
   for (const item of hallItems(state)) {
@@ -98,7 +94,7 @@ export function canPlace(state: GameState, itemId: string, x: number, y: number)
   if (!item) return { ok: false, reason: 'Nothing to move' };
   const spec = findSpec(item.specId);
   if (spec?.category === 'furniture') return { ok: false, reason: 'It lives in the office' };
-  if (item.anchorX >= state.unit.widthTiles) return { ok: false, reason: 'It stands in the yard' };
+  if (item.anchorX >= state.unit.widthCells) return { ok: false, reason: 'It stands in the yard' };
   return canPlaceSpec(state, item.specId, x, y, item.id);
 }
 
@@ -121,12 +117,12 @@ export function moveItem(state: GameState, itemId: string, x: number, y: number)
   return OK;
 }
 
-/** The first tile, reading along each row in turn, where a thing of this kind fits. */
-export function firstFreeTile(state: GameState, specId: string): { x: number; y: number } | null {
+/** The first cell, reading along each row in turn, where a thing of this kind fits. */
+export function firstFreeCell(state: GameState, specId: string): { x: number; y: number } | null {
   const spec = findSpec(specId);
   if (!spec) return null;
-  for (let y = 0; y + spec.depth <= state.unit.depthTiles; y += 1) {
-    for (let x = 0; x + spec.width <= state.unit.widthTiles; x += 1) {
+  for (let y = 0; y + spec.depth <= state.unit.depthCells; y += 1) {
+    for (let x = 0; x + spec.width <= state.unit.widthCells; x += 1) {
       if (canPlaceSpec(state, specId, x, y, null).ok) return { x, y };
     }
   }

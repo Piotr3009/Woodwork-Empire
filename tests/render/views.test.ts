@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { renderHall } from '../../src/render/hall';
 import { renderGameOver } from '../../src/ui/dayEnd';
 import { renderLaptop } from '../../src/ui/laptop';
+import { FINISHED_GOODS_LAYOUT } from '../../src/engine/constants';
 import { findSpec } from '../../src/engine/machines';
 import { centreOf } from '../../src/render/iso';
 import type { GameState } from '../../src/engine/index';
@@ -127,9 +128,10 @@ describe('the hall on day 1', () => {
     }
     const svg = renderHall(state);
     expect(svg).toContain('data-finished="0"');
-    expect(svg).toContain('data-finished="2"');
-    // Three tiles of apron, so the fourth piece shows in the count and not as a box.
-    expect(svg).not.toContain('data-finished="3"');
+    // The apron is the far end of the lane, so what does not fit on it shows in the count
+    // instead of as a box (docs/art/SPRITES.md 9.3).
+    expect(svg).toContain(`data-finished="${FINISHED_GOODS_LAYOUT.width - 1}"`);
+    expect(svg).not.toContain(`data-finished="${FINISHED_GOODS_LAYOUT.width}"`);
     expect(svg).toContain('At the gate: 4');
     expect(svg).toContain('var(--kit-stock)');
     expect(svg).toContain('Order transport, no room at the gate');
@@ -168,12 +170,14 @@ describe('the hall on day 1', () => {
     expect(renderHall(state)).toContain('The owner is not in today');
   });
 
-  it('keeps the bigger unit bigger', () => {
+  it('draws the one painted hall at the same size whatever the difficulty', () => {
+    // There is one set of hall layers, registered to one 20 by 10 m floor, so every difficulty
+    // gets the same room (docs/art/SPRITES.md 9.3). What differs is the cash and the benches.
     const easy = renderHall(newGame());
     const veryEasy = renderHall(newGame({ difficulty: 'veryEasy' }));
-    const easyBox = easy.match(/viewBox="(-?\d+) (-?\d+) (\d+) (\d+)"/);
-    const bigBox = veryEasy.match(/viewBox="(-?\d+) (-?\d+) (\d+) (\d+)"/);
-    expect(Number(bigBox?.[3] ?? 0)).toBeGreaterThan(Number(easyBox?.[3] ?? 0));
+    const boxOf = (svg: string): string => svg.match(/viewBox="([^"]+)"/)?.[1] ?? '';
+    expect(boxOf(veryEasy)).toBe(boxOf(easy));
+    expect(boxOf(easy)).not.toBe('');
   });
 
   it('does not change when nothing in the state changed', () => {

@@ -35,9 +35,9 @@ interface Drag {
   y: number;
 }
 import { WHY, boxOf, canPlace } from '../engine/index';
-import { renderHall } from '../render/hall';
+import { type Scene, hallScene } from '../render/hall';
 import { screenToTile } from '../render/iso';
-import { fitOfficeStack, renderOffice } from '../render/office';
+import { fitOfficeStack, officeScene } from '../render/office';
 import { renderAccounting } from './accounting';
 import { renderBoard } from './board';
 import { renderCatalogue } from './catalogue';
@@ -185,7 +185,7 @@ function modalBody(id: ModalId, current: GameState): string {
   }
 }
 
-/** The ghost of the item being dragged, with the engine's verdict on the tile under the mouse. */
+/** The ghost of the item being dragged, with the engine's verdict on the cell under the mouse. */
 function ghostFor(current: GameState): Ghost | null {
   const drag = ui.drag;
   if (drag === null) return null;
@@ -346,8 +346,26 @@ function modalSpecs(): ModalSpec[] {
   return specs;
 }
 
-/** Everything on the page except the modal layer, which keeps its own DOM between renders. */
-function pageHtml(): string {
+/** Where the scene goes in the page. The page around it is written again every render; the scene
+ *  itself is carried across, because its pictures cost megabytes to load (see `mountScene`). */
+const SCENE_SLOT = '<div data-scene-slot="1"></div>';
+
+/** The scene for the view the player is on, in the two pieces the page needs it in: the shell to
+ *  keep and the live part to write again. The sprite check page has no live part at all. */
+function sceneFor(current: GameState): Scene | null {
+  if (ui.view === 'sprites') {
+    // A page of every key in the game, which is dear to build and never changes: it is all shell.
+    return { key: 'sprites', shell: renderSpriteCheck, live: '', notes: '' };
+  }
+  if (ui.view === 'hall') {
+    return hallScene(current, { ghost: ghostFor(current), setup: ui.setup });
+  }
+  return officeScene(current, officeViewport());
+}
+
+/** Everything on the page except the modal layer, which keeps its own DOM between renders, and the
+ *  scene, which goes into the slot afterwards. */
+function pageHtml(scene: Scene | null): string {
   if (ui.screen === 'start' || state === null) {
     return renderStart({
       difficulty: ui.difficulty,
@@ -360,18 +378,13 @@ function pageHtml(): string {
   const current = state;
   // The last word the company gets is the bankruptcy event, over the game over screen.
   if (current.gameOver) return renderGameOver(current);
-  const view =
-    ui.view === 'sprites'
-      ? renderSpriteCheck()
-      : ui.view === 'hall'
-        ? renderHall(current, ghostFor(current))
-        : renderOffice(current, officeViewport());
+  const notes = scene?.notes ?? '';
   const controls = ui.view === 'hall' ? hallControls(current) : '';
   const note = ui.note === '' ? '' : `<p class="view-note">${escapeHtml(ui.note)}</p>`;
   return (
     renderTopbar(current, ui.view) +
     (ui.menuOpen ? renderMenu(current, ui.cloud) : '') +
-    `<main class="view">${view}${controls}${note}</main>` +
+    `<main class="view">${SCENE_SLOT}${notes}${controls}${note}</main>` +
     renderWhy()
   );
 }
@@ -498,12 +511,62 @@ function halves(): { page: Element; layer: Element } | null {
   return { page, layer };
 }
 
+/** The scene on the page now, with the key that says what it was built from. */
+let scene: { key: string; node: Element } | null = null;
+
+/** Parses a piece of markup and hands back its one element. A detached div parses SVG correctly,
+ *  which is what the hall needs. */
+function parseOne(html: string): Element | null {
+  const holder = document.createElement('div');
+  holder.innerHTML = html;
+  return holder.firstElementChild;
+}
+
+/** Puts the scene into the page's slot.
+ *
+ *  This is the whole of why the screen stopped blinking. The page is rebuilt from the state every
+ *  game minute, which is once a real second at 1x and four times at 4x, and the scene holds the
+ *  painted hall or the office room: megabytes of picture. A fresh <img> has to fetch and decode
+ *  before it can paint, so every one of those rebuilds left the room blank for a frame, and the
+ *  office jumped as well, because the stack's scale is written from the window and then corrected
+ *  from its own box once it is on the page. So the scene's shell is built once, kept, and carried
+ *  into each new page; only its live part is written again. Same shape as an open modal, whose
+ *  shell has outlived a render since T3 3.4. */
+function mountScene(page: Element, wanted: Scene | null): void {
+  const slot = page.querySelector('[data-scene-slot]');
+  if (slot === null) {
+    scene = null;
+    return;
+  }
+  if (wanted === null) {
+    slot.remove();
+    scene = null;
+    return;
+  }
+  if (scene === null || scene.key !== wanted.key) {
+    const node = parseOne(wanted.shell());
+    if (node === null) {
+      slot.remove();
+      scene = null;
+      return;
+    }
+    scene = { key: wanted.key, node };
+  }
+  const live = scene.node.querySelector('[data-live]');
+  if (live !== null) live.innerHTML = wanted.live;
+  slot.replaceWith(scene.node);
+}
+
 export function render(): void {
   const parts = halves();
   if (parts === null) return;
   const memory = ui.focusNext === null ? captureFocus() : { key: ui.focusNext, start: null };
   ui.focusNext = null;
-  parts.page.innerHTML = pageHtml();
+  const wanted = ui.screen === 'game' && state !== null && state.gameOver === null
+    ? sceneFor(state)
+    : null;
+  parts.page.innerHTML = pageHtml(wanted);
+  mountScene(parts.page, wanted);
   syncModals(parts.layer, modalSpecs());
   if (ui.scrollModalTop) {
     ui.scrollModalTop = false;
@@ -969,8 +1032,8 @@ function onKeyDown(event: KeyboardEvent): void {
   }
 }
 
-/** The tile under the mouse, read through the hall SVG's own view box. */
-function tileUnder(event: MouseEvent): { x: number; y: number } | null {
+/** The cell under the mouse, read through the hall SVG's own view box. */
+function cellUnder(event: MouseEvent): { x: number; y: number } | null {
   if (!root) return null;
   const svg = root.querySelector('.hall-view');
   if (!(svg instanceof SVGSVGElement)) return null;
@@ -981,8 +1044,8 @@ function tileUnder(event: MouseEvent): { x: number; y: number } | null {
   point.y = event.clientY;
   // Include the centred margins introduced by the SVG's uniform viewport scaling.
   const local = point.matrixTransform(matrix.inverse());
-  const tile = screenToTile(local.x, local.y);
-  return { x: Math.floor(tile.x), y: Math.floor(tile.y) };
+  const cell = screenToTile(local.x, local.y);
+  return { x: Math.floor(cell.x), y: Math.floor(cell.y) };
 }
 
 /** Dragging a machine about while the hall is being set out (CLAUDE.md T2 3.10). */
@@ -996,7 +1059,7 @@ function onSetupPointerDown(event: MouseEvent): boolean {
   if (itemId === null) return false;
   const item = state.equipment.find((entry) => entry.id === itemId);
   if (item === undefined) return false;
-  const at = tileUnder(event);
+  const at = cellUnder(event);
   if (at === null) return false;
   // He has hold of it where he took hold of it, not by its corner.
   const offsetX = item.anchorX - at.x;
@@ -1005,10 +1068,10 @@ function onSetupPointerDown(event: MouseEvent): boolean {
   ui.drag = { itemId, x: item.anchorX, y: item.anchorY };
   const move = (moveEvent: MouseEvent): void => {
     if (ui.drag === null) return;
-    const tile = tileUnder(moveEvent);
-    if (tile === null) return;
-    const x = tile.x + offsetX;
-    const y = tile.y + offsetY;
+    const cell = cellUnder(moveEvent);
+    if (cell === null) return;
+    const x = cell.x + offsetX;
+    const y = cell.y + offsetY;
     if (x === ui.drag.x && y === ui.drag.y) return;
     moved = true;
     ui.drag = { itemId: ui.drag.itemId, x, y };

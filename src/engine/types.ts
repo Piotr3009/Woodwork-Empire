@@ -168,8 +168,8 @@ export interface OwnerState {
 
 export interface UnitState {
   areaM2: number;
-  widthTiles: number;
-  depthTiles: number;
+  widthCells: number;
+  depthCells: number;
   rentMonthly: number;
   ratesMonthly: number;
   benchSlots: number;

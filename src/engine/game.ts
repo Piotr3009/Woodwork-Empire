@@ -7,10 +7,10 @@ import {
   BENCH_SLOT_LAYOUT,
   CANTEEN_SLOT_LAYOUT,
   DIFFICULTIES,
+  GATE_LANE,
   HELPER_CLEAN_WEEKDAY,
   LOCKER_SLOT_LAYOUT,
   DUCTING_RECONNECT_COST,
-  MINUTES_PER_WORKING_DAY,
   MOVE_MINUTES_PER_ITEM,
   MOVING_SPEED,
   OWNER_LABOUR_PER_MINUTE,
@@ -25,12 +25,13 @@ import {
 } from './constants';
 import { expireEnquiries, refillBoard, refreshLocks } from './board';
 import { missCall, nextDueCall, takeCall } from './calls';
-import { canPlaceSpec, firstFreeTile, moveItem } from './layout';
+import { canPlaceSpec, firstFreeCell, moveItem } from './layout';
 import {
   daysBetween,
   isDayExhausted,
   isFriday,
   isLastWorkingDayOfMonth,
+  isBreak,
   isOvertime,
   isWorkingDay,
   monthOfDay,
@@ -210,8 +211,8 @@ export function createGame(options: NewGameOptions): GameState {
     dust: 0,
     unit: {
       areaM2: spec.areaM2,
-      widthTiles: spec.widthTiles,
-      depthTiles: spec.depthTiles,
+      widthCells: spec.widthCells,
+      depthCells: spec.depthCells,
       rentMonthly: spec.rentMonthly,
       ratesMonthly: spec.ratesMonthly,
       benchSlots: spec.benchSlots,
@@ -748,6 +749,12 @@ function delegateTasks(state: GameState): void {
 /** Where everybody is standing, worked out from what they are doing (CLAUDE.md T2 3.3). */
 function updateStations(state: GameState): void {
   const owner = state.owner;
+  // At dinner the whole workshop is in the canteen, the owner with them.
+  if (isBreak(state.clock.minute)) {
+    owner.station = STATION_IDLE;
+    for (const worker of state.workers) worker.station = STATION_IDLE;
+    return;
+  }
   if (!ownerIsAvailable(state)) {
     owner.station = STATION_IDLE;
   } else if (owner.currentTaskId !== null) {
@@ -790,7 +797,9 @@ function settle(state: GameState): void {
   refreshLocks(state);
   // Nothing else happens while the hall is being moved, and the clock runs itself (T4 3.5).
   if (movingMachines(state) !== null) state.speed = MOVING_SPEED;
-  delegateTasks(state);
+  // The helper needs no minutes, so he would clear a bag change in the middle of his dinner. He
+  // gets his break like everybody else, and the list is there for him when he is back.
+  if (!isBreak(state.clock.minute)) delegateTasks(state);
   autoAssignJobs(state);
   updateStations(state);
   openNextEvent(state);
@@ -1044,6 +1053,13 @@ function ringDueCalls(state: GameState): void {
 }
 
 function advanceMinute(state: GameState): void {
+  // The workshop is at dinner: the clock runs, nothing else does, and the day will end half an
+  // hour later for it (T5, the day with a break).
+  if (isBreak(state.clock.minute)) {
+    state.clock.minute += 1;
+    settle(state);
+    return;
+  }
   ringDueCalls(state);
   // He cannot be on the laptop and at the bench in the same minute, so a task that finishes this
   // minute keeps him off production until the next one.
@@ -1150,7 +1166,7 @@ export function applyAction(state: GameState, action: GameAction): GameState {
       next.summaryCadence = action.cadence;
       break;
     case 'END_DAY':
-      if (next.clock.minute >= MINUTES_PER_WORKING_DAY) {
+      if (isOvertime(next.clock.minute)) {
         finishDay(next);
       } else {
         // Going home early counts as absence for the rest of the day (CLAUDE.md 7.2).
@@ -1347,9 +1363,10 @@ function defaultAnchor(state: GameState, specId: string): { x: number; y: number
   if (specId === 'locker') return slotFrom(LOCKER_SLOT_LAYOUT, index);
   if (specId === 'canteenSeat') return slotFrom(CANTEEN_SLOT_LAYOUT, index);
   const slot = STARTING_LAYOUT[specId];
+  // Anything the layout has no opinion about starts in the front half, clear of the gate lane.
   return slot
-    ? { x: slot.yard === true ? state.unit.widthTiles + slot.x : slot.x, y: slot.y }
-    : { x: 0, y: 6 };
+    ? { x: slot.yard === true ? state.unit.widthCells + slot.x : slot.x, y: slot.y }
+    : { x: GATE_LANE.x + GATE_LANE.width, y: GATE_LANE.y };
 }
 
 /** A new purchase lands on its default tile, or on the first free one when that is taken. The
@@ -1362,7 +1379,7 @@ function anchorFor(state: GameState, specId: string): { x: number; y: number } {
     return preferred;
   }
   if (canPlaceSpec(state, specId, preferred.x, preferred.y, null).ok) return preferred;
-  return firstFreeTile(state, specId) ?? preferred;
+  return firstFreeCell(state, specId) ?? preferred;
 }
 
 export function buyEquipment(state: GameState, specId: string, variantId?: string): BuyCheck {
