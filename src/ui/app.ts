@@ -13,6 +13,7 @@ import {
   findSpec,
   machinesDueService,
   ductingDue,
+  moveConfirmPending,
   movePending,
   movingMachines,
   oldestReadyJob,
@@ -375,7 +376,7 @@ function officeViewport(): { width: number; height: number } {
 /** The hall cannot be set out again while a move is still on the list, carried or waiting, or the
  *  second batch would ride on the first one's minutes (CLAUDE.md T4 3.5). */
 function setupButton(current: GameState): string {
-  if (movePending(current) !== null) {
+  if (movePending(current) !== null || moveConfirmPending(current)) {
     return reasonLabel('The kit is half shifted. Finish the move first.');
   }
   return '<button class="btn" data-do="startSetup">Set up hall</button>';
@@ -850,8 +851,9 @@ function handleAction(element: DataElement, point: { x: number; y: number }): vo
       ui.menuOpen = false;
       break;
     case 'startSetup':
-      // Nothing is dragged while the last move is still on the list, carried or waiting.
-      if (movePending(game()) !== null) break;
+      // Nothing is dragged while the last move is still on the list, carried or waiting, or
+      // while the question about it is still in front of him (CLAUDE.md T8 3.4).
+      if (movePending(game()) !== null || moveConfirmPending(game())) break;
       // Setting the hall out is a job of work, so it cannot be started in stopped time. Once it
       // is open the clock stops on purpose, as it has since Turn 4 (CLAUDE.md T7 3.10).
       if (timeIsPaused(game())) {

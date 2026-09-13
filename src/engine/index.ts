@@ -18,6 +18,7 @@ export {
   sellMachine,
   landOrder,
   machineInUse,
+  moveConfirmPending,
   orderCheck,
   placeOrder,
   onOrder,

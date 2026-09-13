@@ -23,6 +23,7 @@ import {
 import { canBuy } from '../../src/engine/game';
 import { firstFreeCell } from '../../src/engine/layout';
 import { movePending, movingMachines } from '../../src/engine/tasks';
+import { moveConfirmPending } from '../../src/engine/game';
 import { tick } from '../../src/engine/index';
 import type { GameState } from '../../src/engine/index';
 import { renderTopbar } from '../../src/ui/topbar';
@@ -205,6 +206,21 @@ describe('the light kit', () => {
       'Moving 1 machine takes 1 h and £800 of ducting. Do it?',
     );
     expect(asked.movedItems).toHaveLength(1);
+  });
+});
+
+describe('the question itself', () => {
+  it('cannot be asked twice: the hall is not set out again over the top of it', () => {
+    const asked = act(drag(inSetup(), 'tableSaw'), { type: 'END_SETUP', speed: 1 });
+    expect(moveConfirmPending(asked)).toBe(true);
+    // Pressing Done again changes nothing at all: one question, one move.
+    const again = act(asked, { type: 'END_SETUP', speed: 1 });
+    expect(again.eventQueue.filter((event) => event.kind === 'moveConfirm')).toHaveLength(0);
+    expect(again.activeEvent?.kind).toBe('moveConfirm');
+    const done = act(again, { type: 'RESOLVE_EVENT', choiceId: 'do' });
+    expect(movePending(done)).not.toBeNull();
+    expect(movingMachines(done)?.minutesTotal).toBe(MOVE_MINUTES_PER_ITEM);
+    expect(moveConfirmPending(done)).toBe(false);
   });
 });
 

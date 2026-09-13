@@ -948,6 +948,13 @@ function chargeDucting(state: GameState): void {
   state.movedItems = [];
 }
 
+/** True while the player has been asked about a move of the hall and has not answered yet
+ *  (CLAUDE.md T8 3.4). The hall cannot be set out again over the top of the question. */
+export function moveConfirmPending(state: GameState): boolean {
+  if (state.activeEvent?.kind === 'moveConfirm') return true;
+  return state.eventQueue.some((event) => event.kind === 'moveConfirm');
+}
+
 /** Two hours reads as "2 h", and an odd half hour says so. */
 function hoursText(minutes: number): string {
   const hours = Math.floor(minutes / 60);
@@ -963,6 +970,8 @@ function endSetup(state: GameState, speed: Speed): void {
   state.speed = speed;
   if (state.movedItems.length === 0) return;
   if (movePending(state) !== null) return;
+  // The question is already in front of him: asking it twice would book the move twice.
+  if (moveConfirmPending(state)) return;
   const heavy = state.movedItems.filter((moved) => {
     const item = state.equipment.find((kit) => kit.id === moved.itemId);
     return item !== undefined && itemIsHeavy(item);
