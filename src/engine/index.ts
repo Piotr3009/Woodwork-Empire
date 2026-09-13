@@ -127,9 +127,12 @@ export type { LifecycleStep, StartCheck, StepState } from './jobs';
 
 // Production in stages (CLAUDE.md T7 3.1)
 export {
+  cncFactor,
+  cncOptions,
   currentStage,
   familyForStage,
   jobMinutesFor,
+  jobOnCnc,
   labourDone,
   labourPerMinute,
   minutesLeftFor,
@@ -139,7 +142,7 @@ export {
   stagePlanFor,
   stageSpeed,
 } from './stages';
-export type { StagePlan, StagedJob } from './stages';
+export type { StageOptions, StagePlan, StagedJob } from './stages';
 
 // Client calls
 export {
@@ -186,7 +189,6 @@ export {
 // Machines, bags and dust
 export {
   accidentRisk,
-  bagBlocked,
   bagIntervalFor,
   OWNER,
   bagsExist,
@@ -221,13 +223,13 @@ export {
   has,
   brokenMachines,
   extractorBroken,
+  familyStopped,
   requiresFor,
   requiresOneOfFor,
   standsInTheHall,
   serviceIsDue,
   hasCentralExtraction,
   hasExtraction,
-  machineLabourFactor,
   needsDucting,
   machinesDueService,
   overdueBreakdownChance,

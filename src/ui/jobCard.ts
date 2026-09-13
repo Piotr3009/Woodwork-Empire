@@ -7,6 +7,7 @@
 import {
   callsScheduled,
   callsTaken,
+  has,
   isWorkingToday,
   jobLabourCost,
   jobProgress,
@@ -79,6 +80,21 @@ function assignControls(state: GameState, job: Job): string {
   return `<span class="row-action">${chip('owner', 'You')}${crew}</span>`;
 }
 
+/** With a CNC in the hall, the player says whether a sheet job goes on the saw while the CNC is
+ *  taken or stands and waits for it (CLAUDE.md T7 3.4). */
+function cncControls(state: GameState, job: Job): string {
+  if (job.stage === 'completed' || job.byHand) return '';
+  if (job.materialKind !== 'sheet' || !has(state, 'cnc')) return '';
+  const on = job.sawFallback;
+  return (
+    '<span class="row-action">' +
+    `<button class="chip${on ? ' is-on' : ''}" data-do="sawFallback" data-id="${job.id}" ` +
+    `data-on="${on ? '0' : '1'}" ` +
+    'title="On: the saw and the edgebander do it while the CNC is taken. Off: it waits for the ' +
+    'CNC.">Saw when the CNC is busy</button></span>'
+  );
+}
+
 /** The accent button of a job card: start the work, or get the finished piece away. Start
  *  production is on the card from the day the job is accepted, and when it cannot be pressed it
  *  says what is in the way (CLAUDE.md T3 3.1). */
@@ -114,6 +130,7 @@ export function jobRow(state: GameState, job: Job): string {
     `<span class="row-figure">${labourCostLine(state, job)}</span>` +
     callsLine(job) +
     assignControls(state, job) +
+    cncControls(state, job) +
     (action === '' ? '' : `<span class="row-action">${action}</span>`) +
     '</div>'
   );

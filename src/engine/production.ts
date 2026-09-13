@@ -24,7 +24,13 @@ import {
 import { ownerEfficiency, ownerIsAvailable } from './owner';
 import { isWorkingToday } from './staff';
 import { STATION_BENCH, machineStation, waitingStation } from './stations';
-import { type StagePlan, currentStage, stageMinutes, stagePlanFor } from './stages';
+import {
+  type StagePlan,
+  cncOptions,
+  currentStage,
+  stageMinutes,
+  stagePlanFor,
+} from './stages';
 import type { Equipment, GameState, Job } from './types';
 
 /** One man who could put a minute into a job right now. */
@@ -64,9 +70,9 @@ export function hands(state: GameState, options: { owner?: boolean; staff?: bool
 
 /** The families this man needs while he is on this job: his bench, which he holds from the first
  *  minute to the last, and the machine of the stage he is at (CLAUDE.md T4 3.4, T7 3.1). */
-export function familiesWanted(state: GameState, job: Job): string[] {
+export function familiesWanted(state: GameState, job: Job, who = OWNER): string[] {
   const wanted: string[] = [BENCH];
-  const stage = currentStage(state, job);
+  const stage = currentStage(state, job, cncOptions(state, who, job));
   const family = stage?.family ?? null;
   if (family === null || family === BENCH) return wanted;
   // A family the workshop does not own at all is done by hand, and a tool kept in a cabinet is
@@ -85,12 +91,13 @@ export interface StationCheck {
 
 /** Gives this man what the stage he is at needs, and takes back whatever it does not. */
 export function takeMachines(state: GameState, hand: Hand): StationCheck {
-  const wanted = familiesWanted(state, hand.job);
+  const options = cncOptions(state, hand.who, hand.job);
+  const wanted = familiesWanted(state, hand.job, hand.who);
   releaseMachines(state, hand.who, wanted);
   for (const family of wanted) {
     if (claimMachine(state, hand.who, family) === null) return { machine: null, waitingFor: family };
   }
-  const stage = currentStage(state, hand.job);
+  const stage = currentStage(state, hand.job, options);
   const family = stage?.family ?? null;
   if (family === null || !has(state, family) || machineIsShared(state, family)) {
     return { machine: sharedTool(state, family), waitingFor: null };
@@ -108,7 +115,7 @@ function sharedTool(state: GameState, family: string | null): Equipment | null {
 /** Where a man on a job is standing: at the machine of the stage he is at, waiting at one
  *  somebody else has, or at his bench (CLAUDE.md T7 3.1). */
 export function stationForProduction(state: GameState, who: string, job: Job): string {
-  const stage = currentStage(state, job);
+  const stage = currentStage(state, job, cncOptions(state, who, job));
   const family = stage?.family ?? null;
   if (family === null || family === BENCH) return STATION_BENCH;
   // By hand, or out of a cabinet: either way he does it at his bench.

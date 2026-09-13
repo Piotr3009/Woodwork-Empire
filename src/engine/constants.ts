@@ -256,6 +256,24 @@ export const PRODUCTION_STAGES: StageSpec[] = [
   { id: 'finishing', label: 'Finishing', share: 0.15 },
 ];
 
+/** A CNC does the cutting and the machining of a sheet job as one stage, so it carries the two
+ *  shares together (CLAUDE.md T7 3.4). */
+export const CNC_STAGE: StageSpec = {
+  id: 'cnc',
+  label: 'CNC',
+  share: (PRODUCTION_STAGES[0]?.share ?? 0) + (PRODUCTION_STAGES[1]?.share ?? 0),
+};
+
+/** What the CNC does to the minutes of that one stage: it replaces three saws, which is about a
+ *  fifth off the whole job (PIOTR). The tool changer head takes it a little further [TUNE]. */
+export const CNC_STAGE_FACTOR = 2;
+export const CNC_STAGE_FACTOR_WITH_HEAD = 2.1;
+/** Parts come off a CNC cut and drilled, so the assembly takes half the minutes (PIOTR). */
+export const CNC_ASSEMBLY_FACTOR = 2;
+/** A job goes on the saw when the CNC is taken, unless the player turns it off on the job card
+ *  [TUNE: default on] (CLAUDE.md T7 3.4). */
+export const SAW_FALLBACK_DEFAULT = true;
+
 /** The last bar of the Work Plan. It carries no labour: it is the Turn 2 transport, not work at a
  *  bench (CLAUDE.md T7 3.1). */
 export const DELIVERY_STAGE: StageSpec = { id: 'delivery', label: 'Delivery', share: 0 };
@@ -990,8 +1008,6 @@ const VARIANTS_BY_FAMILY: Record<string, EquipmentVariant[]> = {
 const BASE_SPEC = {
   bagInterval: 0,
   usedOn: null as MaterialKind | null,
-  labourFactor: 1,
-  labourAppliesTo: null as MaterialKind | null,
   unloadFactor: 1,
   sheetCapacity: 0,
   minReputation: REPUTATION_MIN,
@@ -1351,10 +1367,10 @@ const SPEC_DRAFTS: SpecDraft[] = [
     zoneWidth: 5,
     zoneDepth: 4,
     spriteKey: 'cnc',
-    labourFactor: 0.8,
-    locked: true,
-    lockReason: 'Coming in a later stage.',
-    effect: 'Labour minus 20% on every job.',
+    requiresOneOf: ['extractor', 'dustSystem', 'flexiSystem'],
+    effect:
+      'Cuts and drills a sheet job in one go, in place of the saw and the edgebander, and halves ' +
+      'the assembly after it. One man at a time. Timber still goes on the saw.',
   },
   {
     ...BASE_SPEC,
@@ -1367,11 +1383,8 @@ const SPEC_DRAFTS: SpecDraft[] = [
     depth: 1,
     height: 1,
     spriteKey: 'cncHead',
-    labourFactor: 0.95,
     requires: ['cnc'],
-    locked: true,
-    lockReason: 'Coming in a later stage.',
-    effect: 'A further labour minus 5%.',
+    effect: 'A further 5% out of the CNC\u0027s own stage.',
   },
   {
     ...BASE_SPEC,

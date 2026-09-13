@@ -344,18 +344,6 @@ export function bestOutputFactor(state: GameState, specId: string): number {
   return best > 0 ? best : 1;
 }
 
-/** Machines that cut the labour of a job, multiplied together (CLAUDE.md 8.6). */
-export function machineLabourFactor(state: GameState, material: MaterialKind): number {
-  let factor = 1;
-  for (const item of state.equipment) {
-    const spec = findSpec(item.specId);
-    if (!spec || spec.labourFactor === 1) continue;
-    if (spec.labourAppliesTo !== null && spec.labourAppliesTo !== material) continue;
-    factor *= spec.labourFactor;
-  }
-  return factor;
-}
-
 /** The extractor is on the floor. The hall carries on at a quarter speed (CLAUDE.md T2 3.9). */
 export function extractorBroken(state: GameState): boolean {
   return state.equipment.some((item) => item.specId === 'extractor' && item.broken);
@@ -450,16 +438,23 @@ export function overdueBreakdownChance(item: Equipment): number {
   return chance;
 }
 
-/** A broken machine is out until it is repaired: nothing of its material gets made. */
-export function brokenMachineFor(state: GameState, material: MaterialKind): Equipment | null {
-  return (
-    serviceableMachines(state).find((item) => {
-      if (!item.broken) return false;
-      const spec = findSpec(item.specId);
-      if (!spec) return false;
-      return spec.usedOn === null || spec.usedOn === material;
-    }) ?? null
-  );
+/** What is stopping a stage that is done on this family: a machine that has given up, or one
+ *  whose bag is full, when there is no other of the family to use instead. Null while the work
+ *  can go on (CLAUDE.md 9.6, T7 3.1). The family, not the material: a broken saw stops the
+ *  cutting of anything, and a broken edgebander stops nothing but the machining. */
+export function familyStopped(
+  state: GameState,
+  specId: string,
+): { item: Equipment; why: 'broken' | 'bag' } | null {
+  const machines = owned(state, specId);
+  if (machines.length === 0) return null;
+  const bags = bagsExist(state);
+  const usable = machines.filter((item) => !item.broken && !(bags && item.bagFull));
+  if (usable.length > 0) return null;
+  const broken = machines.find((item) => item.broken);
+  if (broken) return { item: broken, why: 'broken' };
+  const full = machines.find((item) => item.bagFull);
+  return full ? { item: full, why: 'bag' } : null;
 }
 
 // ---------------------------------------------------------------------------
@@ -479,13 +474,6 @@ export function bagMachinesFor(state: GameState, material: MaterialKind): Equipm
     if (!spec || spec.bagInterval <= 0) return false;
     return spec.usedOn === null || spec.usedOn === material;
   });
-}
-
-/** A full bag stops the machine, and nothing of that kind can be made (CLAUDE.md 9.6). Once the
- *  central system is in there are no bags, so nothing is stopped by one. */
-export function bagBlocked(state: GameState, material: MaterialKind): boolean {
-  if (!bagsExist(state)) return false;
-  return bagMachinesFor(state, material).some((item) => item.bagFull);
 }
 
 /** Machines this material runs through, bag or no bag: what the hours of use are booked on. */

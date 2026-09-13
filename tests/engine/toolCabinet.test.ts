@@ -70,7 +70,6 @@ describe('the hand edgebander holds no cell of the floor', () => {
     const spec = findSpec('edgebander');
     expect(spec?.bagInterval).toBe(4800);
     expect(spec?.usedOn).toBe('sheet');
-    expect(spec?.labourFactor).toBe(1);
   });
 });
 

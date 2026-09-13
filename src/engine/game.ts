@@ -112,6 +112,7 @@ import {
   releaseJob,
   runBookedTransport,
   setMaterialMode,
+  setSawFallback,
   transportLabel,
 } from './jobs';
 import {
@@ -141,7 +142,7 @@ import {
   staffOutputFactor,
 } from './owner';
 import { chance, int, makeId } from './rng';
-import { labourPerMinute } from './stages';
+import { cncOptions, labourPerMinute } from './stages';
 import { plural } from './text';
 import { STATION_IDLE, STATION_NO_BENCH, stationForTask } from './stations';
 import {
@@ -1019,7 +1020,7 @@ function runProductionMinute(state: GameState, ownerOnTask: boolean): void {
       releaseMachines(state, hand.who);
       continue;
     }
-    const stage = jobStage(state, hand.job);
+    const stage = jobStage(state, hand.job, cncOptions(state, hand.who, hand.job));
     if (stage === null) continue;
     const at = takeMachines(state, hand);
     if (at.waitingFor !== null) {
@@ -1369,6 +1370,9 @@ export function applyAction(state: GameState, action: GameAction): GameState {
       break;
     case 'SET_MATERIAL_MODE':
       setMaterialMode(next, action.jobId, action.mode);
+      break;
+    case 'SET_SAW_FALLBACK':
+      setSawFallback(next, action.jobId, action.on);
       break;
     case 'WORK_HERE': {
       const job = action.jobId ? findJob(next, action.jobId) : oldestReadyJob(next);

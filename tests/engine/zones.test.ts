@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { EQUIPMENT_SPECS } from '../../src/engine/constants';
-import { footprintOf, standsInTheHall, zoneOf } from '../../src/engine/machines';
+import { findSpec, footprintOf, standsInTheHall, zoneOf } from '../../src/engine/machines';
 import { boxOf, canPlaceSpec, firstFreeCell } from '../../src/engine/layout';
 import { footprintIn } from '../../src/render/hall';
 import { spriteBox } from '../../src/render/sprites';
@@ -161,8 +161,11 @@ describe('the whole catalogue on one floor', () => {
     }
     for (const item of state.equipment) {
       if (!standsInTheHall(item.specId, item.variantId)) continue;
-      // The van stands on the apron outside the front kerb, which is not hall floor at all.
+      // The van stands on the apron outside the front kerb, which is not hall floor at all, and
+      // the office furniture stands in the office, which is a room and not a cell of the hall
+      // (CLAUDE.md T4 3.1).
       if (item.anchorX >= state.unit.widthCells) continue;
+      if (findSpec(item.specId)?.category === 'furniture') continue;
       const check = canPlaceSpec(
         state,
         item.specId,

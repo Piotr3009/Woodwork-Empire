@@ -920,6 +920,9 @@ function handleAction(element: DataElement, point: { x: number; y: number }): vo
       dispatch({ type: 'PAY_ARREARS', amount: typed === 'all' ? null : Number(typed) });
       return;
     }
+    case 'sawFallback':
+      dispatch({ type: 'SET_SAW_FALLBACK', jobId: id, on: element.dataset.on === '1' });
+      return;
     case 'setMaterialMode':
       dispatch({
         type: 'SET_MATERIAL_MODE',

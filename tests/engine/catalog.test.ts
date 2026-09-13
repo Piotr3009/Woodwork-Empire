@@ -41,6 +41,7 @@ function job(partial: Partial<Job>): Job {
     bespokeMaterial: false,
     express: false,
     byHand: false,
+    sawFallback: true,
     needsMeasure: false,
     labourValue: 160,
     labourRemaining: 0,

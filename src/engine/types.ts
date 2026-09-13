@@ -129,10 +129,6 @@ export interface EquipmentSpec {
   bagInterval: number;
   /** The machine only runs on jobs of this material. null means every job. */
   usedOn: MaterialKind | null;
-  /** Multiplies the labour of every job. 1 means no effect. */
-  labourFactor: number;
-  /** Only applies to jobs of this material kind. null means every job. */
-  labourAppliesTo: MaterialKind | null;
   /** Multiplies unloading minutes. 1 means no effect. */
   unloadFactor: number;
   /** Sheets this item can hold on the rack. 0 for everything that is not shelving. */
@@ -343,6 +339,9 @@ export interface Job {
   bespokeMaterial: boolean;
   express: boolean;
   byHand: boolean;
+  /** With a CNC in the hall, this job goes on the saw when the CNC is taken. Off means it waits
+   *  for the CNC instead (CLAUDE.md T7 3.4). */
+  sawFallback: boolean;
   needsMeasure: boolean;
   /** 0.40 P of the price: the labour the job carries. */
   labourValue: number;
@@ -670,6 +669,7 @@ export type GameAction =
   | { type: 'START_TASK'; taskId: string }
   | { type: 'PAUSE_TASK' }
   | { type: 'SET_MATERIAL_MODE'; jobId: string; mode: MaterialMode }
+  | { type: 'SET_SAW_FALLBACK'; jobId: string; on: boolean }
   | { type: 'BUY_STOCK'; sheets: number }
   | { type: 'PAY_ARREARS'; amount: number | null }
   | { type: 'ORDER_TRANSPORT'; jobId: string }

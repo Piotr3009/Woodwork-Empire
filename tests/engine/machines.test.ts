@@ -26,8 +26,7 @@ import {
 } from '../../src/engine/production';
 import {
   accidentRisk,
-  bagBlocked,
-  brokenMachineFor,
+  familyStopped,
   hasExtraction,
   overdueBreakdownChance,
   serviceCostFor,
@@ -79,8 +78,14 @@ function atTheBench(options: { price?: number; seed?: number } = {}): GameState 
 describe('the catalogue', () => {
   it('shows the locked machines with a reason and refuses the sale', () => {
     const state = newGame({ difficulty: 'veryEasy' });
-    expect(canBuy(state, 'cnc')).toEqual({ ok: false, reason: 'Coming in a later stage.' });
-    expect(canBuy(state, 'sprayBooth').ok).toBe(false);
+    // The CNC is unlocked from Turn 7 and wants extraction like any machine (T7 3.4).
+    expect(canBuy(state, 'cnc').reason).toBe(
+      'Needs Extractor or Central dust extraction system or Flexi extraction system first',
+    );
+    expect(canBuy(state, 'sprayBooth')).toEqual({
+      ok: false,
+      reason: 'Coming in a later stage.',
+    });
     const tried = act(state, { type: 'BUY_EQUIPMENT', specId: 'sprayBooth' });
     expect(tried.equipment).toHaveLength(0);
   });
@@ -146,7 +151,7 @@ describe('bags', () => {
     if (saw) saw.minutesUsed = 2399;
     state = tick(state, 1);
     expect(state.activeEvent?.kind).toBe('bagFull');
-    expect(bagBlocked(state, 'sheet')).toBe(true);
+    expect(familyStopped(state, 'tableSaw')?.why).toBe('bag');
     const stuck = tick(state, 10);
     expect(stuck.clock.minute).toBe(state.clock.minute);
     state = act(state, { type: 'RESOLVE_EVENT', choiceId: 'owner' });
@@ -154,7 +159,7 @@ describe('bags', () => {
     expect(task?.minutesTotal).toBe(BAG_CHANGE_MINUTES);
     expect(state.owner.currentTaskId).toBe(task?.id);
     state = tick(state, BAG_CHANGE_MINUTES);
-    expect(bagBlocked(state, 'sheet')).toBe(false);
+    expect(familyStopped(state, 'tableSaw')).toBeNull();
     const changed = state.equipment.find((item) => item.specId === 'tableSaw');
     expect(changed?.bagFull).toBe(false);
     // The owner is back at the bench the moment the bag is on, so a minute of use may be on it.
@@ -198,7 +203,7 @@ describe('bags', () => {
     // He spent the quarter of an hour on the bag, not at his bench.
     expect(firstJob(state).labourRemaining).toBe(before);
     expect(state.workers[0]?.taskId).toBeNull();
-    expect(bagBlocked(state, 'sheet')).toBe(false);
+    expect(familyStopped(state, 'tableSaw')).toBeNull();
   });
 
   it('lets a helper change it for nothing and says nothing about it', () => {
@@ -226,7 +231,7 @@ describe('bags', () => {
     if (saw) saw.minutesUsed = 2399;
     state = tick(state, 2);
     expect(state.activeEvent).toBeNull();
-    expect(bagBlocked(state, 'sheet')).toBe(false);
+    expect(familyStopped(state, 'tableSaw')).toBeNull();
     expect(state.owner.minutesByCategory.workshop).toBe(2);
   });
 
@@ -446,9 +451,9 @@ describe('the central system and a bag that was already full', () => {
     let state = atTheBench();
     const saw = state.equipment.find((item) => item.specId === 'tableSaw');
     if (saw) saw.bagFull = true;
-    expect(bagBlocked(state, 'sheet')).toBe(true);
+    expect(familyStopped(state, 'tableSaw')?.why).toBe('bag');
     state = act(state, { type: 'BUY_EQUIPMENT', specId: 'dustSystem' });
-    expect(bagBlocked(state, 'sheet')).toBe(false);
+    expect(familyStopped(state, 'tableSaw')).toBeNull();
     const working = tick(state, 30);
     expect(firstJob(working).labourRemaining).toBeLessThan(firstJob(state).labourRemaining);
   });
@@ -477,12 +482,12 @@ describe('a stopped machine can always be dealt with', () => {
     // The player puts it off, and then thinks better of it.
     state = act(state, { type: 'RESOLVE_EVENT', choiceId: 'later' });
     expect(state.activeEvent).toBeNull();
-    expect(bagBlocked(state, 'sheet')).toBe(true);
+    expect(familyStopped(state, 'tableSaw')?.why).toBe('bag');
     state = act(state, { type: 'ASK_BAG_CHANGE', equipmentId: saw?.id ?? '' });
     expect(state.activeEvent?.kind).toBe('bagFull');
     state = act(state, { type: 'RESOLVE_EVENT', choiceId: 'owner' });
     state = tick(state, BAG_CHANGE_MINUTES);
-    expect(bagBlocked(state, 'sheet')).toBe(false);
+    expect(familyStopped(state, 'tableSaw')).toBeNull();
   });
 
   it('says nothing when the machine is running', () => {
@@ -683,7 +688,7 @@ describe('the service, counted on the machine\u0027s own clock', () => {
     if (target) target.hoursUsed = SERVICE_INTERVAL_HOURS;
     expect(overdueBreakdownChance(target as Equipment)).toBe(OVERDUE_BREAKDOWN_CHANCE);
     if (target) target.broken = true;
-    expect(brokenMachineFor(broken, 'sheet')?.specId).toBe('tableSaw');
+    expect(familyStopped(broken, 'tableSaw')?.item.specId).toBe('tableSaw');
     const before = firstJob(broken).labourRemaining;
     const idle = tick(broken, 60);
     expect(firstJob(idle).labourRemaining).toBe(before);

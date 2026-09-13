@@ -4,6 +4,7 @@
 
 import {
   COURIER_COST,
+  SAW_FALLBACK_DEFAULT,
   DEADLINE_DAYS_BASE,
   DEADLINE_DAYS_FACTOR,
   DEADLINE_DAYS_MAX,
@@ -31,8 +32,8 @@ import { nextWorkingDay } from './clock';
 import { chargeUnavoidable, formatMoney, receive } from './economy';
 import { queueEvent } from './events';
 import {
-  bagBlocked,
-  brokenMachineFor,
+  OWNER,
+  familyStopped,
   findSpec,
   has,
   hasBenchFor,
@@ -48,8 +49,10 @@ import {
 } from './materials';
 import { ownerIsAvailable } from './owner';
 import {
+  type StageOptions,
   type StagePlan,
   type StagedJob,
+  cncOptions,
   currentStage,
   jobMinutesFor,
   minutesLeftFor,
@@ -170,8 +173,21 @@ export function jobProgress(job: Job): number {
 
 /** The stage this job is standing at, with the family it is done on and what that family does to
  *  its minutes. Null only for a job with no labour in it at all. */
-export function jobStage(state: GameState, job: Job): StagePlan | null {
-  return currentStage(state, job);
+export function jobStage(
+  state: GameState,
+  job: Job,
+  options: StageOptions = {},
+): StagePlan | null {
+  return currentStage(state, job, options);
+}
+
+/** The player's say over whether this job waits for the CNC or goes on the saw when the CNC is
+ *  taken (CLAUDE.md T7 3.4). */
+export function setSawFallback(state: GameState, jobId: string, on: boolean): boolean {
+  const job = findJob(state, jobId);
+  if (!job) return false;
+  job.sawFallback = on;
+  return true;
 }
 
 /** Minutes this job still needs from a worker of the given rate (1 is the owner). Every stage
@@ -223,6 +239,7 @@ export function acceptEnquiry(state: GameState, enquiryId: string, byHand: boole
     bespokeMaterial: enquiry.bespokeMaterial,
     express: enquiry.express,
     byHand: madeByHand,
+    sawFallback: SAW_FALLBACK_DEFAULT,
     needsMeasure: enquiry.needsMeasure,
     labourValue,
     labourRemaining: labourValue,
@@ -395,12 +412,16 @@ export function hallBlock(state: GameState, job: Job): string {
   if (!job.byHand && !hasExtraction(state)) return 'no extraction';
   // A bench is the one thing a piece cannot be made without, by hand or not (CLAUDE.md T4 3.4).
   if (!hasBenchFor(state, job.id)) return 'no bench';
-  const broken = brokenMachineFor(state, job.materialKind);
-  if (broken && !job.byHand) {
-    return `${(findSpec(broken.specId)?.name ?? 'a machine').toLowerCase()} is broken`;
-  }
-  if (bagBlocked(state, job.materialKind)) return 'bag full';
-  return '';
+  if (job.byHand) return '';
+  // Only the machine of the stage he is at can stop him: a broken edgebander does not stop a
+  // job that is still being cut (CLAUDE.md T7 3.1).
+  const stage = jobStage(state, job, cncOptions(state, job.assignedTo ?? OWNER, job));
+  const family = stage?.family ?? null;
+  if (family === null) return '';
+  const stopped = familyStopped(state, family);
+  if (stopped === null) return '';
+  if (stopped.why === 'bag') return 'bag full';
+  return `${(findSpec(stopped.item.specId)?.name ?? 'a machine').toLowerCase()} is broken`;
 }
 
 /** The stages a job can still be sent to the bench from. Once somebody is on it there is nothing
