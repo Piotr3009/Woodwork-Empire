@@ -109,6 +109,8 @@ export {
   hallBlock,
   labourValueFor,
   lifecycleSteps,
+  meetingOutstanding,
+  needsMeeting,
   ownerDaysFor,
   jobLabourCost,
   jobStage,
@@ -157,6 +159,7 @@ export {
 
 // Tasks
 export {
+  bestTakerOf,
   designMinutes,
   emailsForPrice,
   findTask,
@@ -168,6 +171,7 @@ export {
   softwareActive,
   staffManagementMinutes,
   startTaskCheck,
+  taskWorkRate,
   tasksOfKind,
   unloadMinutes,
 } from './tasks';

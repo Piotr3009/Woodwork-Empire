@@ -407,6 +407,8 @@ export interface Delivery {
 
 export type TaskKind =
   | 'emails'
+  /** The meeting at the client's that a job over 20,000 starts with (CLAUDE.md T7 3.11). */
+  | 'clientMeeting'
   | 'bookkeeping'
   | 'dailyOrdering'
   | 'staffManagement'

@@ -366,6 +366,18 @@ export const LATE_ACCOUNTS_CHARGE = 100;
 export const DAILY_ORDERING_MINUTES = 60;
 /** 10 minutes per joiner per day (PIOTR). */
 export const STAFF_MANAGEMENT_MINUTES_PER_JOINER = 10;
+/** A job worth more than this starts with a meeting at the client's before anything is drawn
+ *  (PIOTR). Four hours of somebody's day; the salesman goes instead of the owner once the company
+ *  is known well enough for the client to accept him [TUNE threshold] (CLAUDE.md T7 3.11). */
+export const MEETING_PRICE_THRESHOLD = 20000;
+export const CLIENT_MEETING_MINUTES = 240;
+export const MEETING_SALESMAN_REPUTATION = 40;
+
+/** An office admin covering for a specialist the company has not taken on takes twice as long
+ *  over the work: a client call is 30 minutes of his day and a per job material order is two of
+ *  the clerk's, which is about eight a day (PIOTR, CLAUDE.md T7 3.12). */
+export const ADMIN_COVER_RATE = 0.5;
+
 /** A call is 15 minutes of whoever takes it, whatever the job is worth (PIOTR, T4 3.3). */
 export const CLIENT_CALL_ANSWER_MINUTES = 15;
 /** The first call a job loses is free. From the second on, each takes a tenth off what the client

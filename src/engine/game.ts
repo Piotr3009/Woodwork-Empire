@@ -4,6 +4,7 @@
 import {
   ACCIDENT_CHANCE_PER_DAY,
   ACCIDENT_DAYS_OFF,
+  ADMIN_COVER_RATE,
   BENCH_SLOT_LAYOUT,
   BREAK_MINUTES,
   BREAK_SKIP_FACTOR,
@@ -178,6 +179,7 @@ import {
   pauseOwnerTask,
   resumeOwnerTask,
   startTask,
+  taskWorkRate,
 } from './tasks';
 import type {
   DaySummary,
@@ -909,7 +911,8 @@ function runWorkerTaskMinute(state: GameState, workerId: string, taskId: string)
     return false;
   }
   worker.minutesWorked += 1;
-  if (advanceTask(task, 1, state.clock.day)) {
+  // An office admin covering for a specialist takes twice as long over it (CLAUDE.md T7 3.12).
+  if (advanceTask(task, taskWorkRate(worker, task), state.clock.day)) {
     worker.taskId = null;
     if (task.kind === 'materialOrder' && worker.role === 'purchasingClerk') {
       worker.ordersToday += 1;
@@ -1126,17 +1129,21 @@ function createCallTask(state: GameState, job: Job): TaskInstance {
 }
 
 /** A salesman on the books and with a day left in him takes every call without being asked
- *  (CLAUDE.md T4 3.3). */
+ *  (CLAUDE.md T4 3.3). With no salesman the office admin takes it, at twice the minutes, and the
+ *  day he is taken on the salesman has it back (CLAUDE.md T7 3.12). */
 function callTaker(state: GameState): Worker | null {
-  return (
-    state.workers.find(
+  for (const role of ['salesman', 'officeAdmin'] as const) {
+    const rate = role === 'officeAdmin' ? ADMIN_COVER_RATE : 1;
+    const found = state.workers.find(
       (worker) =>
-        worker.role === 'salesman' &&
+        worker.role === role &&
         isWorkingToday(state, worker) &&
         // Enough of his day left to see the call out, or the owner is asked instead.
-        staffMinutesLeft(worker) >= AD_HOC_TASK_MINUTES.clientCall,
-    ) ?? null
-  );
+        staffMinutesLeft(worker) >= AD_HOC_TASK_MINUTES.clientCall / rate,
+    );
+    if (found) return found;
+  }
+  return null;
 }
 
 /** The client rings. Nothing is held up by it: the phone simply goes, and the owner answers or

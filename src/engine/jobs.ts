@@ -4,6 +4,7 @@
 
 import {
   COURIER_COST,
+  MEETING_PRICE_THRESHOLD,
   SAW_FALLBACK_DEFAULT,
   DEADLINE_DAYS_BASE,
   DEADLINE_DAYS_FACTOR,
@@ -276,8 +277,28 @@ export function acceptEnquiry(state: GameState, enquiryId: string, byHand: boole
 
 /** The emails, the drawing and the site visit the job needs from the owner, and the diary of the
  *  calls the client will make. The calls are not tasks any more: they interrupt (T4 3.3). */
+/** True while the meeting a big job starts with has not been held (CLAUDE.md T7 3.11). */
+export function meetingOutstanding(state: GameState, job: Job): boolean {
+  return jobTasks(state, job.id).some((task) => task.kind === 'clientMeeting' && !task.done);
+}
+
+/** A job worth more than 20,000 starts with four hours at the client's (PIOTR). */
+export function needsMeeting(price: number): boolean {
+  return price > MEETING_PRICE_THRESHOLD;
+}
+
 export function createJobTasks(state: GameState, job: Job): void {
   scheduleCalls(state, job);
+  // The meeting comes before the drawing, and the drawing cannot start until it is held
+  // (CLAUDE.md T7 3.11).
+  if (needsMeeting(job.price)) {
+    createTask(state, {
+      kind: 'clientMeeting',
+      label: `Client meeting: ${job.name}`,
+      minutes: AD_HOC_TASK_MINUTES.clientMeeting,
+      jobId: job.id,
+    });
+  }
   // Emails ride with the job, in any order with the drawing, and hold nothing up.
   const emails = emailsForPrice(job.price);
   for (let index = 0; index < emails; index += 1) {
@@ -468,6 +489,7 @@ export function startProductionCheck(state: GameState, job: Job): StartCheck {
   // The stage is the job's place in the lifecycle, so the desk work is only in the way while the
   // job is still standing at the desk.
   if (job.stage === 'accepted') {
+    if (meetingOutstanding(state, job)) return blocked('meeting not held');
     if (designOutstanding(state, job)) return blocked('design not done');
     if (measureOutstanding(state, job)) return blocked('site measure not done');
   }
@@ -491,6 +513,8 @@ export interface LifecycleStep {
 }
 
 const LIFECYCLE_LABELS = ['Calls', 'Design', 'Material', 'Delivery', 'Production'];
+/** A job over 20,000 has one step more, and it comes before the drawing (CLAUDE.md T7 3.11). */
+const MEETING_LABEL = 'Meeting';
 
 /** The Production step names the stage the piece is actually at, so the five step row answers
  *  "what is happening to it now" as well as "where is it up to" (CLAUDE.md T7 3.1). */
@@ -504,7 +528,9 @@ function productionLabel(state: GameState, job: Job): string {
  *  (CLAUDE.md T3 3.1). The first step that is not finished is the one in hand. */
 export function lifecycleSteps(state: GameState, job: Job): LifecycleStep[] {
   const ordered = job.stage !== 'accepted' && job.stage !== 'materialPending';
+  const meeting = needsMeeting(job.price);
   const done = [
+    ...(meeting ? [ordered || !meetingOutstanding(state, job)] : []),
     // Calls hold nothing up any more, so this step is only ever amber while the client is
     // actually on the line (CLAUDE.md T4 3.3).
     !callRinging(state, job),
@@ -516,9 +542,10 @@ export function lifecycleSteps(state: GameState, job: Job): LifecycleStep[] {
       job.stage === 'completed',
     job.stage === 'awaitingTransport' || job.stage === 'completed',
   ];
+  const labels = meeting ? [MEETING_LABEL, ...LIFECYCLE_LABELS] : LIFECYCLE_LABELS;
   const now = done.indexOf(false);
-  return LIFECYCLE_LABELS.map((label, index) => ({
-    label: index === LIFECYCLE_LABELS.length - 1 ? productionLabel(state, job) : label,
+  return labels.map((label, index) => ({
+    label: index === labels.length - 1 ? productionLabel(state, job) : label,
     state: done[index] === true ? 'done' : index === now ? 'now' : 'todo',
   }));
 }
