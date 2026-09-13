@@ -95,11 +95,14 @@ export function createDelivery(
   jobId: string | null,
   sheets: number,
   bespoke: boolean,
+  pricePaid = 0,
 ): Delivery {
   const delivery: Delivery = {
     id: makeId(state, 'del'),
     jobId,
     sheets,
+    orderedDay: state.clock.day,
+    pricePaid,
     arriveDay: deliveryDay(state, bespoke),
     arrived: false,
     unloaded: false,
@@ -115,7 +118,7 @@ export function orderMaterialForJob(state: GameState, job: Job): Delivery | null
   if (job.materialMode !== 'perJob') return null;
   // The lorry is booked and the supplier will be paid, overdraft or not (CLAUDE.md 8.3).
   chargeUnavoidable(state, 'material', `Material for ${job.name}`, job.materialCost);
-  return createDelivery(state, job.id, job.sheets, job.bespokeMaterial);
+  return createDelivery(state, job.id, job.sheets, job.bespokeMaterial, job.materialCost);
 }
 
 export function findDelivery(state: GameState, deliveryId: string): Delivery | null {
@@ -169,7 +172,7 @@ export function buyStock(state: GameState, sheets: number): boolean {
   const cost = stockCostFor(sheets);
   if (!canAfford(state, cost)) return false;
   pay(state, 'material', `${sheets} sheets for stock`, cost);
-  createDelivery(state, null, sheets, false);
+  createDelivery(state, null, sheets, false, cost);
   return true;
 }
 

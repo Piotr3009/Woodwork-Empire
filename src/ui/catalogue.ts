@@ -7,20 +7,26 @@ import {
   SOFTWARE_ONE_OFF_PRICE,
   SOFTWARE_SUBSCRIPTION_MONTHLY,
 } from '../engine/constants';
-import type { EquipmentSpec, EquipmentTab } from '../engine/types';
+import type { EquipmentSpec, EquipmentTab, OnOrderItem } from '../engine/types';
 import {
   bagsExist,
+  canSell,
   orderCheck,
   countOf,
   findSpec,
   hasExtraction,
+  isSellableFamily,
+  isSold,
   rackCapacity,
+  salePriceFor,
   serviceDueOn,
   serviceIsDue,
 } from '../engine/index';
 import { serviceDueIn, variantFor } from '../engine/machines';
-import type { Equipment, GameState } from '../engine/index';
+import { orderName, orderProgress } from '../engine/orders';
+import type { Equipment, GameState, OrderLine } from '../engine/index';
 import { pictureSlot, renderMachine } from './machine';
+import { arrivalLine, cancelButton, progressBar } from './shopping';
 import {
   emptyLine,
   escapeHtml,
@@ -57,6 +63,7 @@ export function renderCatalogue(
   tab: CatalogueTab,
   folder: string | null = null,
   ownedTab: string = 'all',
+  sellConfirm: string | null = null,
 ): string {
   const warnings =
     (hasExtraction(state)
@@ -70,7 +77,7 @@ export function renderCatalogue(
   // every tab of the catalogue (CLAUDE.md T6 3.6).
   const body =
     tab === OWNED_TAB
-      ? renderOwned(state, filter, ownedTab)
+      ? renderOwned(state, filter, ownedTab, sellConfirm)
       : open !== null && open.tab === tab
         ? renderOpenFolder(state, open, filter)
         : renderFolders(state, filter, tab) + (tab === 'computers' ? renderSoftware(state) : '');
@@ -129,6 +136,8 @@ function renderOpenFolder(state: GameState, spec: EquipmentSpec, filter: string)
 
 /** What is standing in the hall, in the state it is in (CLAUDE.md T6 3.6). */
 export function ownedState(state: GameState, item: Equipment): string {
+  // A machine that is sold does no more work: it stands there until the buyer comes (T8 3.5).
+  if (isSold(item)) return 'sold, and it does no more work';
   if (item.broken) return 'stopped: broken';
   if (item.bagFull && bagsExist(state)) return 'stopped: bag full';
   const spec = findSpec(item.specId);
@@ -143,25 +152,92 @@ function hours(value: number): string {
 /** What is standing in the hall, laid out like the shop: the same category tabs underneath, one
  *  tile per machine with its class, its picture, its hours, its service and its state, framed as
  *  owned (PIOTR, 13.09: "not a list, like shopping"). */
-function renderOwned(state: GameState, filter: string, ownedTab: string): string {
+function renderOwned(
+  state: GameState,
+  filter: string,
+  ownedTab: string,
+  sellConfirm: string | null,
+): string {
   const needle = filter.trim().toLowerCase();
   const subTabs: Array<[string, string]> = [
     ['all', 'All'],
     ...EQUIPMENT_TABS.map((entry): [string, string] => [entry.id, entry.label]),
   ];
   const bar = tabBar('ownedTab', subTabs, ownedTab);
-  if (state.equipment.length === 0) return bar + emptyLine('Nothing here yet.');
+  if (state.equipment.length === 0 && state.onOrder.length === 0) {
+    return bar + emptyLine('Nothing here yet.');
+  }
+  // What is bought and not here yet is in the hall's list too, with the wait drawn on it
+  // (CLAUDE.md T8 3.2).
+  const ordered = state.onOrder
+    .map((item) => ({ item, spec: findSpec(item.specId) }))
+    .filter((entry): entry is { item: OnOrderItem; spec: EquipmentSpec } => entry.spec !== null)
+    .filter(({ spec }) => ownedTab === 'all' || spec.tab === ownedTab)
+    .filter(({ spec }) => needle === '' || spec.name.toLowerCase().includes(needle))
+    .map(({ item, spec }) => orderedTile(state, item, spec))
+    .join('');
   const tiles = state.equipment
     .map((item) => ({ item, spec: findSpec(item.specId) }))
     .filter((entry): entry is { item: Equipment; spec: EquipmentSpec } => entry.spec !== null)
     .filter(({ spec }) => ownedTab === 'all' || spec.tab === ownedTab)
     .filter(({ spec }) => needle === '' || spec.name.toLowerCase().includes(needle))
-    .map(({ item, spec }) => ownedTile(state, item, spec))
+    .map(({ item, spec }) => ownedTile(state, item, spec, sellConfirm))
     .join('');
-  return bar + (tiles === '' ? emptyLine('Nothing matches that.') : `<div class="tile-grid">${tiles}</div>`);
+  const all = ordered + tiles;
+  return bar + (all === '' ? emptyLine('Nothing matches that.') : `<div class="tile-grid">${all}</div>`);
 }
 
-function ownedTile(state: GameState, item: Equipment, spec: EquipmentSpec): string {
+/** One thing on its way, in the same frame as the kit that is here: what it is, what was paid,
+ *  and how far along the wait is (CLAUDE.md T8 3.2). */
+function orderedTile(state: GameState, item: OnOrderItem, spec: EquipmentSpec): string {
+  const line: OrderLine = {
+    id: item.id,
+    kind: 'equipment',
+    name: orderName(item),
+    detail: spec.folder,
+    pricePaid: item.pricePaid,
+    orderedDay: item.orderedDay,
+    dueDay: item.dueDay,
+    progress: orderProgress(item, state.clock.day),
+    arrived: item.arrived,
+    canCancel: !item.arrived,
+  };
+  const lines = [`On order, due day ${item.dueDay}`, arrivalLine(line, state.clock.day)]
+    .map((text) => `<p class="tile-figures">${escapeHtml(text)}</p>`)
+    .join('');
+  return (
+    `<div class="tile is-ordered" data-order="${item.id}">` +
+    `<h3 class="tile-name">${escapeHtml(spec.name)} ` +
+    '<span class="badge badge-ordered">On order</span></h3>' +
+    pictureSlot(spec.spriteKey, item.variantId) +
+    lines +
+    `<p class="tile-figures">${progressBar(line)}</p>` +
+    `<div class="tile-action">${cancelButton(line)}</div>` +
+    '</div>'
+  );
+}
+
+/** The one control on a machine the hall has finished with: what the buyer pays, and a second
+ *  click to mean it (CLAUDE.md T8 3.5). */
+function sellAction(state: GameState, item: Equipment, sellConfirm: string | null): string {
+  if (isSold(item)) {
+    return `<span class="reason">Sold, collection on day ${item.soldOnDay}</span>`;
+  }
+  if (!isSellableFamily(item.specId)) return '';
+  const check = canSell(state, item.id);
+  if (!check.ok) return `<span class="reason">Cannot sell it: ${escapeHtml(check.reason)}</span>`;
+  if (sellConfirm === item.id) {
+    return button('sellMachine', 'Confirm sale', `data-id="${item.id}" data-confirm="1"`);
+  }
+  return button('sellMachine', `Sell for ${money(salePriceFor(item))}`, `data-id="${item.id}"`);
+}
+
+function ownedTile(
+  state: GameState,
+  item: Equipment,
+  spec: EquipmentSpec,
+  sellConfirm: string | null,
+): string {
   const variant = variantFor(item);
   const className = variant?.name ?? 'standard';
   // The hours and the service belong to the machines the hours are booked on. An extractor
@@ -181,6 +257,7 @@ function ownedTile(state: GameState, item: Equipment, spec: EquipmentSpec): stri
     : machine && serviceIsDue(item)
       ? button('serviceMachine', 'Service', `data-id="${item.id}"`)
       : '';
+  const sell = sellAction(state, item, sellConfirm);
   const lines = [className, life, service, ownedState(state, item)]
     .filter((line) => line !== '')
     .map((line) => `<p class="tile-figures">${escapeHtml(line)}</p>`)
@@ -190,7 +267,7 @@ function ownedTile(state: GameState, item: Equipment, spec: EquipmentSpec): stri
     `<h3 class="tile-name">${escapeHtml(spec.name)} <span class="badge badge-owned">Owned</span></h3>` +
     pictureSlot(spec.spriteKey, item.variantId) +
     lines +
-    `<div class="tile-action">${action}</div>` +
+    `<div class="tile-action">${action}${sell}</div>` +
     '</div>'
   );
 }

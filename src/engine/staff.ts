@@ -4,15 +4,19 @@
 import {
   HIRE_START_DELAY_DAYS,
   MINUTES_PER_WORKING_DAY,
+  OVERTIME_TIRED_DAYS,
+  STAFF_OVERTIME_MAX_MINUTES,
   HIRING_SPECS,
   JOINER_PREREQUISITES,
   TOOL_CABINET,
   WORKER_NAMES,
   WORKER_RATES,
 } from './constants';
-import { addWorkingDays } from './clock';
+import { addWorkingDays, isOvertime } from './clock';
 import { assignJob, oldestReadyJob } from './jobs';
-import { countOf, findSpec } from './machines';
+import { findSpec } from './machines';
+import { countOwnedOrOnOrder } from './orders';
+import { ownerIsAvailable } from './owner';
 import { int, makeId } from './rng';
 import { STATION_IDLE } from './stations';
 import type { GameState, HiringOption, Worker, WorkerRole, WorkerTier } from './types';
@@ -51,6 +55,49 @@ export function isWorkingToday(state: GameState, worker: Worker): boolean {
   return worker.startDay <= state.clock.day && worker.absentDaysRemaining === 0;
 }
 
+// ---------------------------------------------------------------------------
+// Overtime (CLAUDE.md T8 3.6). The hall stays with the owner or it goes home: nobody works an
+// evening he is not there for. Two hours is what a man will do, and three evenings in a row are
+// what he remembers at the month end.
+// ---------------------------------------------------------------------------
+
+/** The roles that stay: the men on the floor. The office goes home at five whatever happens. */
+export function worksOvertime(role: WorkerRole): boolean {
+  return role === 'joiner' || role === 'helper';
+}
+
+/** True while this man is still standing in the hall past five: on the floor, on the books today,
+ *  and under the two hours he will do (PIOTR, CLAUDE.md T8 3.6). */
+export function staysForOvertime(state: GameState, worker: Worker): boolean {
+  if (!worksOvertime(worker.role)) return false;
+  if (!isWorkingToday(state, worker)) return false;
+  return worker.overtimeMinutes < STAFF_OVERTIME_MAX_MINUTES;
+}
+
+/** Books one minute past 17:00 against every man who stayed. Nobody stays on a day the owner is
+ *  not there to stay with them (CLAUDE.md T8 3.6). */
+export function countStaffOvertimeMinute(state: GameState): void {
+  if (!isOvertime(state.clock.minute) || !ownerIsAvailable(state)) return;
+  for (const worker of state.workers) {
+    if (!staysForOvertime(state, worker)) continue;
+    worker.overtimeMinutes += 1;
+    worker.overtimeMinutesWeek += 1;
+  }
+}
+
+/** Written at the end of every working day: a man who stayed adds an evening to his run, a man
+ *  who went home at five ends it, and three in a row is what tires him (CLAUDE.md T8 3.6). */
+export function recordStaffOvertime(state: GameState): void {
+  for (const worker of state.workers) {
+    if (worker.overtimeMinutes > 0) {
+      worker.overtimeDays += 1;
+      if (worker.overtimeDays >= OVERTIME_TIRED_DAYS) worker.tiredOfOvertime = true;
+      continue;
+    }
+    worker.overtimeDays = 0;
+  }
+}
+
 export function availableJoiners(state: GameState): Worker[] {
   return joiners(state).filter(
     (worker) => isWorkingToday(state, worker) && worker.jobId === null,
@@ -75,7 +122,9 @@ export function shortfallForHire(
   const short: Array<{ specId: string; count: number }> = [];
   for (const specId of JOINER_PREREQUISITES) {
     const wanted = specId === TOOL_CABINET ? cabinetsNeeded(state, 1) : needed;
-    const count = wanted - countOf(state, specId);
+    // A bench that is bought and on the lorry is a bench: the man starts the next working day and
+    // it lands at 08:00 that morning (CLAUDE.md T8 3.2).
+    const count = wanted - countOwnedOrOnOrder(state, specId);
     if (count > 0) short.push({ specId, count });
   }
   return short;
@@ -177,6 +226,10 @@ export function hire(state: GameState, role: WorkerRole, tier: WorkerTier | null
     jobId: null,
     taskId: null,
     minutesWorked: 0,
+    overtimeMinutes: 0,
+    overtimeMinutesWeek: 0,
+    overtimeDays: 0,
+    tiredOfOvertime: false,
     ordersToday: 0,
     station: STATION_IDLE,
     productionMinutes: 0,
@@ -204,6 +257,7 @@ export function runStaffDayStart(state: GameState): void {
   for (const worker of state.workers) {
     if (worker.absentDaysRemaining > 0) worker.absentDaysRemaining -= 1;
     worker.minutesWorked = 0;
+    worker.overtimeMinutes = 0;
     worker.ordersToday = 0;
   }
 }

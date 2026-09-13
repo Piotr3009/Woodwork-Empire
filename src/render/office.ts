@@ -103,11 +103,14 @@ export const OFFICE_REGIONS: OfficeRegion[] = [
   },
 ];
 
-/** Where the catalogue lies before there is a desk to put it on: the same box, pushed down to the
- *  floor by the door (CLAUDE.md T7 3.8). The art side has no picture of it yet, so the game draws
- *  it as a labelled object with the word Equipment on its cover, which is what it is: a machine
- *  catalogue, never a table. */
-export const FLOOR_CATALOGUE = { x: 60, y: 731, width: 445, height: 210 };
+/** Where the catalogue lies before there is a desk to put it on: on the floor by the door, in the
+ *  region the brief gives it on the office canvas (CLAUDE.md T8 3.7). */
+export const FLOOR_CATALOGUE = { x: 60, y: 700, width: 440, height: 200 };
+
+/** The key the art side delivers the floor catalogue under. It goes through the loader like any
+ *  other object: the PNG when there is one, and the drawn placeholder while there is not
+ *  (CLAUDE.md T8 3.7). */
+export const FLOOR_CATALOGUE_SPRITE = 'catalogueFloor';
 
 /** The regions the room has this morning, with the catalogue on the floor while there is no desk
  *  to put it on. Nothing else works until there is (CLAUDE.md T7 3.8). */
@@ -180,16 +183,28 @@ function layerHtml(layer: OfficeLayer, index: number, files: readonly string[]):
  *  Hover lightens it and shows the name (docs/art/SPRITES.md 8.2). The catalogue on the floor is
  *  the one exception: there is no artwork under it, so the game draws the object itself with the
  *  word Equipment on its cover (CLAUDE.md T7 3.8). */
-function regionHtml(region: OfficeRegion, onTheFloor: boolean): string {
+function regionHtml(
+  region: OfficeRegion,
+  onTheFloor: boolean,
+  files: readonly string[],
+): string {
   const style = boxStyle(region);
   if (!region.opens) {
     return `<div class="office-region is-quiet" data-office="${region.id}" style="${style}"></div>`;
   }
   if (region.id === 'catalogue' && onTheFloor) {
+    // The loader first, the drawn object second: exactly as a machine is drawn in the hall
+    // (CLAUDE.md T3 3.6, T8 3.7).
+    const url = pickSprite(files, FLOOR_CATALOGUE_SPRITE);
+    const inside =
+      url === null
+        ? '<span>Equipment</span>'
+        : `<img class="office-floor-art" data-sprite="${FLOOR_CATALOGUE_SPRITE}" src="${url}" ` +
+          'alt="" draggable="false" />';
     return (
       '<button class="office-region office-floor-catalogue" data-do="officeRegion" ' +
       `data-office="${region.id}" title="${escapeText(region.name)}" style="${style}">` +
-      '<span>Equipment</span></button>'
+      `${inside}</button>`
     );
   }
   return (
@@ -258,6 +273,8 @@ export function officeScene(
     'office',
     layers.map((layer) => pickSprite(files, layer.key) ?? layer.key).join(','),
     regions.map((region) => region.id).join(','),
+    // The floor catalogue is a picture of its own: delivering it rebuilds the room once.
+    onTheFloor ? pickSprite(files, FLOOR_CATALOGUE_SPRITE) ?? 'drawn' : '',
   ].join('|');
   return {
     key,
@@ -267,7 +284,7 @@ export function officeScene(
       `style="width:${OFFICE_CANVAS.width}px;height:${OFFICE_CANVAS.height}px;` +
       `transform:translate(-50%,-50%) scale(${scale})">` +
       layers.map((layer, index) => layerHtml(layer, index, files)).join('') +
-      regions.map((region) => regionHtml(region, onTheFloor)).join('') +
+      regions.map((region) => regionHtml(region, onTheFloor, files)).join('') +
       OFFICE_LIVE_SLOT +
       '</div></div>',
     live: liveText(state),

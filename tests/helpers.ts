@@ -262,6 +262,7 @@ export function placeEquipment(
     hoursUsed: 0,
     takenBy: null,
     purchasePrice: variant ? variant.price : spec.price,
+    soldOnDay: null,
   };
   state.equipment.push(item);
   return item;
@@ -388,6 +389,10 @@ export function sixJoinersOnSheetWork(
       taskId: null,
       minutesWorked: 0,
       ordersToday: 0,
+    overtimeMinutes: 0,
+    overtimeMinutesWeek: 0,
+    overtimeDays: 0,
+    tiredOfOvertime: false,
       station: 'idle',
       productionMinutes: 0,
       absentDaysRemaining: 0,
@@ -449,6 +454,10 @@ export function twoMenOnSheetWork(
     taskId: null,
     minutesWorked: 0,
     ordersToday: 0,
+    overtimeMinutes: 0,
+    overtimeMinutesWeek: 0,
+    overtimeDays: 0,
+    tiredOfOvertime: false,
     station: 'idle',
     productionMinutes: 0,
     absentDaysRemaining: 0,

@@ -95,6 +95,44 @@
 
 /* The game draws the shadow, never the sprite: a sprite with its own would give a double one
    (docs/art/SPRITES.md 1). */
+/* The floor held for something bought and not here yet: a grey outline of the working zone with
+   the footprint it will stand on inside it (CLAUDE.md T8 3.2). */
+.reserved-zone {
+  fill: none;
+  stroke: var(--text-dim);
+  stroke-width: 2;
+  stroke-dasharray: 6 4;
+  opacity: 0.75;
+}
+
+.reserved-floor {
+  fill: var(--text-dim);
+  fill-opacity: 0.12;
+  stroke: var(--text-dim);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+
+.reserved .iso-label {
+  fill: var(--text-dim);
+}
+
+/* The pin board beside the office door: what is on order, one click away in the hall
+   (PIOTR, 13.09). */
+.pin-board-face {
+  fill: #b9924f;
+  stroke: #6f5731;
+  stroke-width: 1;
+}
+
+.pin-board-text {
+  fill: #2c2213;
+}
+
+.pin-board:hover .pin-board-face {
+  fill: #d0a862;
+}
+
 .contact-shadow {
   fill: #000;
   opacity: 0.18;
@@ -226,6 +264,45 @@
 /* What the trip to the shops has cost him so far, over the modal that started it. */
 .trip {
   margin-top: 0;
+}
+
+/* The owner is out: what he is doing, how far through it he is, and the one button that runs the
+   clock through the rest of it (CLAUDE.md T8 3.3). */
+.owner-out {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 12px;
+  background: var(--panel-2);
+  color: var(--text-dim);
+  font-size: 13px;
+}
+
+.owner-out .btn {
+  margin-left: auto;
+}
+
+/* The bar from the day of the click to the day of the lorry, on the shopping list and on the
+   tiles of the Owned tab (CLAUDE.md T8 3.2). */
+.order-bar {
+  display: inline-block;
+  width: 120px;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--panel-2);
+  overflow: hidden;
+  vertical-align: middle;
+}
+
+.order-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
+.badge-ordered {
+  background: var(--panel-2);
+  color: var(--text-dim);
 }
 
 /* --------------------------------------------------------------------------
@@ -1415,6 +1492,15 @@ input.num {
 
 .office-floor-catalogue:hover {
   background: var(--accent);
+}
+
+/* Once the art side has delivered a picture of it, the region is the picture and nothing else
+   (CLAUDE.md T8 3.7). */
+.office-floor-art {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
 .tile.is-ordered {

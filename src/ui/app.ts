@@ -5,11 +5,14 @@ import {
   CLEANING_MINUTES,
   applyAction,
   createGame,
+  finishTimeFor,
+  formatTime,
   gameMinutesPerRealSecond,
   brokenMachines,
   findSpec,
   machinesDueService,
   ductingDue,
+  moveConfirmPending,
   movePending,
   movingMachines,
   oldestReadyJob,
@@ -35,7 +38,7 @@ interface Drag {
   x: number;
   y: number;
 }
-import { WHY, boxOf, canPlace, summaryOfDay } from '../engine/index';
+import { WHY, boxOf, canPlace, reservationById, summaryOfDay } from '../engine/index';
 import {
   type Frame,
   type HallCamera,
@@ -50,9 +53,7 @@ import {
   zoomAt,
   zoomTo,
 } from '../render/hall';
-import { type RoomId, roomById,
-  APP_VERSION,
-} from '../engine/constants';
+import { APP_VERSION, type RoomId, roomById } from '../engine/constants';
 import { centreOf, screenToTile } from '../render/iso';
 import { fitOfficeStack, officeScene } from '../render/office';
 import { type AccountingTab, accountingTabFrom, renderAccounting } from './accounting';
@@ -73,6 +74,8 @@ import {
   reasonLabel,
   syncModals,
 } from './modal';
+import { renderOwnerOut } from './ownerOut';
+import { renderShopping } from './shopping';
 import { renderStart } from './start';
 import { cloudAvailable } from '../cloud/supabase';
 import { hasSave, loadGame, saveGame, sendMagicLink, signOut, signedInEmail } from '../cloud/saves';
@@ -80,7 +83,7 @@ import { renderMenu, renderTopbar, speedFromString } from './topbar';
 
 /** The modals the room can open. Materials, Team and Drawings are tabs inside the laptop now:
  *  one path per modal, only the entry moved (docs/art/SPRITES.md 8.4). */
-type ModalId = 'board' | 'laptop' | 'workPlan' | 'accounting' | 'catalogue';
+type ModalId = 'board' | 'laptop' | 'workPlan' | 'accounting' | 'catalogue' | 'shopping';
 
 interface Ui {
   screen: 'start' | 'game';
@@ -107,6 +110,9 @@ interface Ui {
   catalogueFolder: string | null;
   /** The category the Owned tab is narrowed to, or all of the hall (PIOTR, 13.09). */
   ownedTab: string;
+  /** The machine whose Sell button has been pressed once. A sale is meant on the second click,
+   *  inside the tile itself (CLAUDE.md T8 3.5). */
+  sellConfirm: string | null;
   /** Which tab of the books is on top, and the past day whose summary is open over them
    *  (CLAUDE.md T6 3.9). */
   accountingTab: AccountingTab;
@@ -148,6 +154,7 @@ const MODAL_TITLES: Record<ModalId, string> = {
   workPlan: 'Work Plan',
   accounting: 'Accounting',
   catalogue: 'Equipment catalogue',
+  shopping: 'On order',
 };
 
 let ui: Ui = freshUi();
@@ -174,6 +181,7 @@ function freshUi(): Ui {
     catalogueTab: CATALOGUE_FIRST_TAB,
     catalogueFolder: null,
     ownedTab: 'all',
+    sellConfirm: null,
     accountingTab: 'days',
     accountingMonth: null,
     openDays: [],
@@ -237,17 +245,29 @@ function modalBody(id: ModalId, current: GameState): string {
         ui.catalogueTab,
         ui.catalogueFolder,
         ui.ownedTab,
+        ui.sellConfirm,
       );
+    case 'shopping':
+      return renderShopping(current);
   }
+}
+
+/** What is under the mouse in the hall: a machine standing in it, or the outline held for
+ *  something that is bought and on its way (CLAUDE.md T8 3.2). One lookup for both. */
+function kitOf(current: GameState, itemId: string): { specId: string; variantId: string } | null {
+  const item = current.equipment.find((entry) => entry.id === itemId);
+  if (item) return { specId: item.specId, variantId: item.variantId };
+  const reserved = reservationById(current, itemId);
+  return reserved === null ? null : { specId: reserved.specId, variantId: reserved.variantId };
 }
 
 /** The ghost of the item being dragged, with the engine's verdict on the cell under the mouse. */
 function ghostFor(current: GameState): Ghost | null {
   const drag = ui.drag;
   if (drag === null) return null;
-  const item = current.equipment.find((entry) => entry.id === drag.itemId);
-  if (!item) return null;
-  const box = boxOf(item.specId, drag.x, drag.y);
+  const kit = kitOf(current, drag.itemId);
+  if (kit === null) return null;
+  const box = boxOf(kit.specId, drag.x, drag.y, kit.variantId);
   const check = canPlace(current, drag.itemId, drag.x, drag.y);
   return { x: box.x, y: box.y, width: box.width, depth: box.depth, ok: check.ok, reason: check.reason };
 }
@@ -355,7 +375,7 @@ function officeViewport(): { width: number; height: number } {
 /** The hall cannot be set out again while a move is still on the list, carried or waiting, or the
  *  second batch would ride on the first one's minutes (CLAUDE.md T4 3.5). */
 function setupButton(current: GameState): string {
-  if (movePending(current) !== null) {
+  if (movePending(current) !== null || moveConfirmPending(current)) {
     return reasonLabel('The kit is half shifted. Finish the move first.');
   }
   return '<button class="btn" data-do="startSetup">Set up hall</button>';
@@ -386,7 +406,7 @@ function modalSpecs(): ModalSpec[] {
       id: ui.modal,
       title: MODAL_TITLES[ui.modal],
       body: modalBody(ui.modal, current),
-      wide: ui.modal === 'accounting' || ui.modal === 'workPlan',
+      wide: ui.modal === 'accounting' || ui.modal === 'workPlan' || ui.modal === 'shopping',
       full: ui.modal === 'board' || ui.modal === 'catalogue',
       position: ui.modalPosition,
     });
@@ -437,24 +457,39 @@ function sceneFor(current: GameState): Scene | null {
   return officeScene(current, officeViewport());
 }
 
-/** Everything on the page except the modal layer, which keeps its own DOM between renders, and the
- *  scene, which goes into the slot afterwards. */
-/** The version in the corner of every screen, the start screen included (PIOTR, 13.09). */
+/** When the move he has just said yes to will be finished, in the words the toast wants: the rest
+ *  of it is done tomorrow morning if the day runs out (CLAUDE.md T8 3.4). */
+function moveFinishNote(current: GameState): string {
+  const move = movePending(current);
+  if (move === null) return '';
+  const at = finishTimeFor(current, move.minutesRemaining);
+  const clock = formatTime(at.minute);
+  if (at.day === current.clock.day) return `Finished by ${clock}.`;
+  if (at.day === current.clock.day + 1) return `Finished tomorrow by ${clock}.`;
+  return `Finished on day ${at.day} by ${clock}.`;
+}
+
+/** The version in the corner of every screen, the start screen included (PIOTR, 13.09). It takes
+ *  no pointer, so it can never cover a control (CLAUDE.md T8 3.1). */
 const VERSION_CORNER = `<span class="version-corner">${APP_VERSION}</span>`;
 
+/** Everything on the page except the modal layer, which keeps its own DOM between renders, and the
+ *  scene, which goes into the slot afterwards. */
 function pageHtml(scene: Scene | null): string {
   return pageBody(scene) + VERSION_CORNER;
 }
 
 function pageBody(scene: Scene | null): string {
   if (ui.screen === 'start' || state === null) {
-    return renderStart({
-      difficulty: ui.difficulty,
-      playerName: ui.playerName,
-      companyName: ui.companyName,
-      showWhy: ui.showWhy,
-      cloud: ui.cloud,
-    });
+    return (
+      renderStart({
+        difficulty: ui.difficulty,
+        playerName: ui.playerName,
+        companyName: ui.companyName,
+        showWhy: ui.showWhy,
+        cloud: ui.cloud,
+      })
+    );
   }
   const current = state;
   // The last word the company gets is the bankruptcy event, over the game over screen.
@@ -463,9 +498,11 @@ function pageBody(scene: Scene | null): string {
   const controls = ui.view === 'hall' ? hallControls(current) + hallZoomControls() : '';
   const note = ui.note === '' ? '' : `<p class="view-note">${escapeHtml(ui.note)}</p>`;
   const toast = ui.toast === '' ? '' : `<p class="toast">${escapeHtml(ui.toast)}</p>`;
+  const out = ui.view === 'sprites' ? '' : renderOwnerOut(current);
   return (
     renderTopbar(current, ui.view, ui.toast !== '') +
     toast +
+    out +
     (ui.menuOpen ? renderMenu(current, ui.cloud) : '') +
     `<main class="view">${SCENE_SLOT}${notes}${controls}${note}</main>` +
     renderWhy()
@@ -712,7 +749,7 @@ export function render(): void {
 /** The modals that act on the world, which is every one of them but the Work Plan: nothing on
  *  them can be touched while the clock is stopped (CLAUDE.md T7 3.10). The Work Plan is a
  *  whiteboard and the Sprite check is a page of pictures: both are reading, and both open. */
-const READING_MODALS: ModalId[] = ['workPlan'];
+const READING_MODALS: ModalId[] = ['workPlan', 'shopping'];
 
 /** The one line the player gets when the world will not move for him, with the Pause button
  *  pulsing once behind it (CLAUDE.md T7 3.10). */
@@ -788,6 +825,9 @@ function handleAction(element: DataElement, point: { x: number; y: number }): vo
     case 'setSpeed':
       dispatch({ type: 'SET_SPEED', speed: speedFromString(element.dataset.speed ?? '0') });
       return;
+    case 'skipAhead':
+      dispatch({ type: 'SKIP_AHEAD' });
+      return;
     case 'setView':
       ui.view = element.dataset.view === 'office' ? 'office' : 'hall';
       if (ui.view !== 'hall') endSetup();
@@ -814,8 +854,9 @@ function handleAction(element: DataElement, point: { x: number; y: number }): vo
       ui.menuOpen = false;
       break;
     case 'startSetup':
-      // Nothing is dragged while the last move is still on the list, carried or waiting.
-      if (movePending(game()) !== null) break;
+      // Nothing is dragged while the last move is still on the list, carried or waiting, or
+      // while the question about it is still in front of him (CLAUDE.md T8 3.4).
+      if (movePending(game()) !== null || moveConfirmPending(game())) break;
       // Setting the hall out is a job of work, so it cannot be started in stopped time. Once it
       // is open the clock stops on purpose, as it has since Turn 4 (CLAUDE.md T7 3.10).
       if (timeIsPaused(game())) {
@@ -867,9 +908,24 @@ function handleAction(element: DataElement, point: { x: number; y: number }): vo
       break;
     case 'ownedTab':
       ui.ownedTab = id;
+      ui.sellConfirm = null;
+      return;
+    case 'cancelOrder':
+      dispatch({ type: 'CANCEL_ORDER', orderId: id });
+      return;
+    case 'sellMachine':
+      // The first click says what the buyer pays, the second means it (CLAUDE.md T8 3.5).
+      if (element.dataset.confirm !== '1') {
+        ui.sellConfirm = id;
+        break;
+      }
+      ui.sellConfirm = null;
+      dispatch({ type: 'SELL_MACHINE', equipmentId: id });
       return;
     case 'catalogueTab':
       ui.catalogueTab = catalogueTabFrom(id);
+      // A sale meant on the second click is not meant on another tab (CLAUDE.md T8 3.5).
+      ui.sellConfirm = null;
       // A new tab is a new set of folders, with none of them open and no filter left over.
       ui.catalogueFolder = null;
       ui.filters.catalogue = '';
@@ -922,6 +978,7 @@ function handleAction(element: DataElement, point: { x: number; y: number }): vo
       }
       ui.modal = null;
       ui.modalPosition = null;
+      ui.sellConfirm = null;
       break;
     }
     case 'clearFilter': {
@@ -1013,10 +1070,17 @@ function handleAction(element: DataElement, point: { x: number; y: number }): vo
     case 'serviceMachine':
       dispatch({ type: 'SERVICE_MACHINE', equipmentId: id });
       return;
-    case 'resolveEvent':
+    case 'resolveEvent': {
       ui.eventPosition = null;
+      const kind = game().activeEvent?.kind;
       dispatch({ type: 'RESOLVE_EVENT', choiceId: id });
+      // He has said yes to the move: the clock is run through it, so he is told when it lands.
+      if (kind === 'moveConfirm' && id === 'do') {
+        ui.toast = moveFinishNote(game());
+        render();
+      }
       return;
+    }
     case 'copyState':
       copyState();
       break;
@@ -1139,7 +1203,15 @@ function handleSceneClick(element: DataElement): boolean {
   const kit = element.dataset.kit;
   if (kit !== undefined) {
     const item = game().equipment.find((entry) => entry.id === kit);
-    if (item === undefined) return true;
+    if (item === undefined) {
+      // The outline of something bought and not here yet: it says when the lorry is due.
+      const reserved = reservationById(game(), kit);
+      if (reserved !== null) {
+        ui.note = `On order, due day ${reserved.dueDay} at 08:00.`;
+        render();
+      }
+      return true;
+    }
     if (item.bagFull) {
       // The machine is stopped: clicking it asks again who changes the bag.
       dispatch({ type: 'ASK_BAG_CHANGE', equipmentId: item.id });
@@ -1317,12 +1389,14 @@ function onDoubleClick(event: MouseEvent): void {
 function objectCentreUnder(event: MouseEvent): { x: number; y: number } | null {
   const target = event.target;
   if (!(target instanceof Element) || state === null) return null;
-  const kit = target.closest('[data-kit]')?.getAttribute('data-kit') ?? null;
-  if (kit !== null) {
-    const item = state.equipment.find((entry) => entry.id === kit);
-    const spec = item ? findSpec(item.specId) : null;
-    if (item && spec) {
-      return centreOf(item.anchorX, item.anchorY, spec.width, spec.depth, spec.height);
+  const kitId = target.closest('[data-kit]')?.getAttribute('data-kit') ?? null;
+  if (kitId !== null) {
+    const at =
+      state.equipment.find((entry) => entry.id === kitId) ?? reservationById(state, kitId);
+    const kit = kitOf(state, kitId);
+    const spec = kit ? findSpec(kit.specId) : null;
+    if (at && spec) {
+      return centreOf(at.anchorX, at.anchorY, spec.width, spec.depth, spec.height);
     }
   }
   const local = contentPointUnder(event);
@@ -1379,8 +1453,9 @@ function onSetupPointerDown(event: MouseEvent): boolean {
   if (kit === null) return false;
   const itemId = kit.getAttribute('data-kit');
   if (itemId === null) return false;
-  const item = state.equipment.find((entry) => entry.id === itemId);
-  if (item === undefined) return false;
+  const item =
+    state.equipment.find((entry) => entry.id === itemId) ?? reservationById(state, itemId);
+  if (item === null || item === undefined) return false;
   const at = cellUnder(event);
   if (at === null) return false;
   // He has hold of it where he took hold of it, not by its corner.

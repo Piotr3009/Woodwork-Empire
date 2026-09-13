@@ -17,7 +17,12 @@ import type {
   WorkerTier,
 } from './types';
 
-/** Bumped in Turn 7: a job is made in stages and carries the runs at them, a machine carries the
+/** Bumped in Turn 8: the state carries what is bought and not yet delivered, every machine
+ *  carries the day it is collected once it is sold, and an unloading task carries the kit on the
+ *  lorry. A Turn 7 save has none of them, so its hall would hold cells for nothing and its
+ *  deliveries would never land; it is refused.
+ *
+ *  Bumped in Turn 7: a job is made in stages and carries the runs at them, a machine carries the
  *  one man standing at it, every family has its classes with their own footprints and working
  *  zones, and `sheetRackBetter` is a class of `sheetRack` and not a family of its own. A Turn 6
  *  save would stand the better shelving on nothing and read every job's progress as one bar of
@@ -35,7 +40,7 @@ import type {
  *
  *  Bumped in Turn 3: a machine carries its class, its hours and the hours it has in it, and a task
  *  carries the day it was finished (CLAUDE.md T3 3.5, 3.3). */
-export const STATE_VERSION = 8;
+export const STATE_VERSION = 9;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
@@ -87,6 +92,18 @@ export const BREAK_SKIP_FACTOR = 0.97;
 export const OVERTIME_DEBT_PER_DAY = 0.1;
 /** However tired he is, half a day's work still comes out of him [TUNE]. */
 export const LABOUR_FACTOR_FLOOR = 0.5;
+/** Staff overtime, the Turn 1 paper rule made real (CLAUDE.md T8 3.6). Each joiner and helper in
+ *  the hall stays with the owner from 17:00, at one and a half times his hourly wage, and his
+ *  hourly wage is his week divided by forty [TUNE: the 40]. Two hours is all he will do; past
+ *  that he goes home whatever anybody says (PIOTR). Office staff do none of it. */
+export const STAFF_OVERTIME_RATE = 1.5;
+export const STAFF_OVERTIME_MAX_MINUTES = 120;
+export const WORKER_HOURS_PER_WEEK = 40;
+/** Three evenings in a row and he has had enough: a flag that adds this much to his chance of
+ *  handing his notice in at the month end [TUNE] (CLAUDE.md T8 3.6). */
+export const OVERTIME_TIRED_DAYS = 3;
+export const OVERTIME_QUIT_CHANCE = 0.05;
+
 /** Owner away: all staff production drops 30% (PIOTR). */
 export const ABSENCE_OUTPUT_FACTOR = 0.7;
 /** With a hired CEO the drop is 5% (PIOTR). CEO hiring is parked, the constant is modelled only. */
@@ -218,6 +235,14 @@ export const ARREARS_MONTHS_FINAL_WARNING = 2;
 export const ARREARS_MONTHS_BAILIFF = 3;
 /** The bailiff credits the seized machine at half its purchase price (PIOTR). */
 export const BAILIFF_SEIZURE_FRACTION = 0.5;
+
+/** What a machine standing in the hall fetches second hand: half what it cost (PIOTR), and a
+ *  third and a bit for one that was second hand when it was bought [TUNE]
+ *  (CLAUDE.md T8 3.5). */
+export const SALE_FRACTION = 0.5;
+export const SALE_FRACTION_USED = 0.35;
+/** The class that carries the lower fraction: it was somebody else's before it was his. */
+export const USED_VARIANT = 'used';
 
 // ---------------------------------------------------------------------------
 // 8.4 to 8.7 Job value, labour, payments
@@ -428,9 +453,11 @@ export const DUCTING_RECONNECT_COST = 800;
 /** Every machine family is ducted into the extraction except the compressor. The hand tools are
  *  not machines at all, so they never appear here (PIOTR). */
 export const NO_DUCTING_SPECS = ['compressor'];
-/** The clock runs itself at 4x while the hall is being moved about, and the player cannot touch
- *  it until it is done (PIOTR). */
-export const MOVING_SPEED = 4;
+/** Skip ahead: the fastest the loop allows, run for the player while the owner is out and until
+ *  the task he is out on is over (PIOTR, 13.09; CLAUDE.md T8 3.3). The Turn 4 forced 4x of a move
+ *  of the hall is this same run now, so there is one speed the clock is ever taken to and one
+ *  thing that takes it there (CLAUDE.md T8 3.4). */
+export const SKIP_SPEED = 4;
 /** Weekly clean (PIOTR). */
 export const CLEANING_MINUTES = 120;
 /** Fetch from temporary storage the next morning (PIOTR). */
@@ -605,6 +632,49 @@ export const PRODUCT_TEMPLATES: ProductTemplate[] = [
 
 /** Every family has this one unless the table below gives it more (CLAUDE.md T3 3.5). */
 export const STANDARD_VARIANT = 'standard';
+
+/** Working days between the click and the lorry, for the three families whose classes do not all
+ *  wait the same (CLAUDE.md T8 3.2). The bands are Piotr's and the exact figures are [TUNE]: a
+ *  second hand saw is on the shop floor tomorrow, an industrial one is built to order. The two
+ *  hand edgebanders come back in the owner's hands; the three floor ones are ordered in.
+ *  Every other family waits the same however dear its class is, and says so in its own line. */
+export const DELIVERY_DAYS_BY_CLASS: Record<string, Record<string, number>> = {
+  tableSaw: { used: 1, budget: 1, standard: 5, pro: 7, industrial: 12 },
+  sheetRack: { used: 1, budget: 1, standard: 3, pro: 5, industrial: 10 },
+  edgebander: { used: 0, budget: 0, standard: 7, pro: 12, industrial: 20 },
+};
+
+/** What a lorry load of heavy kit costs somebody at the gate, before the forklift halves it
+ *  [TUNE] (CLAUDE.md T8 3.2). Furniture and hand tools are carried in and need nobody. */
+export const EQUIPMENT_UNLOAD_MINUTES = 120;
+
+/** The families two men cannot simply pick up: the ones a move of the hall is charged for and a
+ *  delivery needs somebody at the gate for (CLAUDE.md T8 3.2, 3.4) [TUNE list]. A bench, a rack,
+ *  a tool cabinet, a locker, a seat, a hand tool, a van or a forklift is carried or driven, and
+ *  costs nothing to shift. The CNC head is on the list and is not in Piotr's own words: it is
+ *  ducted into the extraction like the machine it bolts to, and a machine that has to be
+ *  reconnected is not one a man carries (REPORT-T8 deviations). */
+export const HEAVY_SPECS = [
+  'tableSaw',
+  'edgebander',
+  'thicknesser',
+  'solidWoodTools',
+  'cnc',
+  'cncHead',
+  'sprayBooth',
+  'extractor',
+  'dustSystem',
+  'flexiSystem',
+  'pelletiser',
+  'compressor',
+];
+
+/** Classes of a heavy family that are carried after all: a used or budget compressor is a small
+ *  portable thing on wheels (PIOTR: compressors above budget) (CLAUDE.md T8 3.4). A hand
+ *  edgebander needs no entry here, because it holds no cell of the floor at all. */
+export const LIGHT_CLASSES: Record<string, string[]> = {
+  compressor: ['used', 'budget'],
+};
 
 /** Hours of use a standard machine of each family has in it [TUNE]. Piotr will set the real
  *  figures per machine later, and they all live in this one table. */
@@ -1033,6 +1103,9 @@ const VARIANTS_BY_FAMILY: Record<string, EquipmentVariant[]> = {
 };
 
 const BASE_SPEC = {
+  // Hand tools, cabinets, lockers, seats and the office furniture come back with the owner from
+  // the trip: nothing is ordered in for them (PIOTR, CLAUDE.md T8 3.2).
+  deliveryDays: 0,
   bagInterval: 0,
   usedOn: null as MaterialKind | null,
   unloadFactor: 1,
@@ -1058,7 +1131,7 @@ type SpecDraft = Omit<EquipmentSpec, 'variants' | 'enduranceHours' | 'zoneWidth'
  *  A family with nothing in VARIANTS_BY_FAMILY has the one standard variant, at the Turn 1 price
  *  and with every factor at 1.0 (CLAUDE.md T3 3.5). */
 function withVariants(draft: SpecDraft): EquipmentSpec {
-  const variants = VARIANTS_BY_FAMILY[draft.id] ?? [
+  const base = VARIANTS_BY_FAMILY[draft.id] ?? [
     {
       id: STANDARD_VARIANT,
       name: draft.name,
@@ -1070,6 +1143,13 @@ function withVariants(draft: SpecDraft): EquipmentSpec {
       description: draft.effect,
     },
   ];
+  // Every class the catalogue hands out carries its own wait, off the class ladder where the
+  // family has one and off the family's own line where it has not (CLAUDE.md T8 3.2).
+  const ladder = DELIVERY_DAYS_BY_CLASS[draft.id];
+  const variants = base.map((variant) => ({
+    ...variant,
+    deliveryDays: ladder?.[variant.id] ?? draft.deliveryDays,
+  }));
   const cheapest = variants[0];
   return {
     ...draft,
@@ -1132,6 +1212,8 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'tableSaw',
+    // The class ladder above says the rest (PIOTR: 5 to 7 days, up to 25).
+    deliveryDays: 5,
     folder: 'Table saws',
     tab: 'sheetMachines',
     name: 'Table saw',
@@ -1163,6 +1245,8 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'edgebander',
+    // The class ladder above says the rest: the hand ones come back with him.
+    deliveryDays: 7,
     folder: 'Edgebanders',
     tab: 'sheetMachines',
     name: 'Edgebander',
@@ -1186,6 +1270,8 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'compressor',
+    // Off the shelf, in tomorrow (PIOTR).
+    deliveryDays: 1,
     folder: 'Compressors',
     tab: 'handTools',
     name: 'Small compressor',
@@ -1200,6 +1286,8 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'extractor',
+    // Off the shelf, in tomorrow (PIOTR).
+    deliveryDays: 1,
     folder: 'Extractors',
     tab: 'extraction',
     name: 'Extractor',
@@ -1214,6 +1302,8 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'workbench',
+    // Every class of bench is in tomorrow (PIOTR).
+    deliveryDays: 1,
     folder: 'Benches',
     tab: 'storage',
     name: 'Workbench',
@@ -1234,6 +1324,8 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'sheetRack',
+    // The class ladder above says the rest.
+    deliveryDays: 3,
     folder: 'Racks',
     tab: 'storage',
     name: 'Sheet rack',
@@ -1323,6 +1415,8 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'van',
+    // Three days for a van (PIOTR).
+    deliveryDays: 3,
     folder: 'Vans',
     tab: 'handling',
     name: 'Van',
@@ -1337,6 +1431,8 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'forklift',
+    // Five days for a forklift (PIOTR).
+    deliveryDays: 5,
     folder: 'Forklifts',
     tab: 'handling',
     name: 'Forklift',
@@ -1352,6 +1448,8 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'forkliftBetter',
+    // The five days of the forklift; Piotr named the one family [TUNE].
+    deliveryDays: 5,
     folder: 'Better forklifts',
     tab: 'handling',
     name: 'Better forklift',
@@ -1367,6 +1465,8 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'thicknesser',
+    // Five days for the solid wood machines (PIOTR).
+    deliveryDays: 5,
     folder: 'Thicknessers',
     tab: 'timberMachines',
     name: 'Thicknesser',
@@ -1386,6 +1486,8 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'solidWoodTools',
+    // Five days for the solid wood machines (PIOTR).
+    deliveryDays: 5,
     folder: 'Timber tool sets',
     tab: 'timberMachines',
     name: 'Planer, router, sander, clamps',
@@ -1403,6 +1505,8 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'cnc',
+    // Built to order (PIOTR: a CNC even 45).
+    deliveryDays: 45,
     folder: 'CNC machines',
     tab: 'cnc',
     name: 'CNC',
@@ -1422,6 +1526,8 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'cncHead',
+    // Twenty days for the tool changer head (PIOTR).
+    deliveryDays: 20,
     folder: 'CNC heads',
     tab: 'cnc',
     name: 'CNC tool changer head',
@@ -1437,6 +1543,8 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'sprayBooth',
+    // Twenty days for a booth (PIOTR).
+    deliveryDays: 20,
     folder: 'Spray booths',
     tab: 'spraying',
     name: 'Spray booth',
@@ -1455,6 +1563,8 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'dustSystem',
+    // Twenty five days for a central system (PIOTR).
+    deliveryDays: 25,
     folder: 'Central systems',
     tab: 'extraction',
     name: 'Central dust extraction system',
@@ -1469,6 +1579,8 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'flexiSystem',
+    // Twenty five days for a flexi system (PIOTR).
+    deliveryDays: 25,
     folder: 'Flexi systems',
     tab: 'extraction',
     name: 'Flexi extraction system',
@@ -1486,6 +1598,8 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'pelletiser',
+    // Twenty days for a pelletiser (PIOTR).
+    deliveryDays: 20,
     folder: 'Pelletisers',
     tab: 'extraction',
     name: 'Pelletiser',

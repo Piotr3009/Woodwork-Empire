@@ -4,7 +4,7 @@
 // One escape and one money format for the whole game: the renderers and the engine own them,
 // because both layers sit below the modals.
 
-import { WHY, formatMoney, plural, shoppingTask, startTaskCheck } from '../engine/index';
+import { WHY, formatMoney, ownerOutTask, plural, startTaskCheck } from '../engine/index';
 import type { GameState, TaskInstance } from '../engine/index';
 import { escapeText } from '../render/hall';
 
@@ -195,11 +195,10 @@ export function reasonLabel(reason: string): string {
 /** The trip the owner is on, over the modal that started it. Nothing he has ordered is his until
  *  the minutes are spent and the cash leaves (CLAUDE.md T7 3.10). */
 export function tripLine(state: GameState, kind: 'shopping' | 'hiring'): string {
-  const task =
-    kind === 'shopping'
-      ? shoppingTask(state)
-      : state.tasks.find((entry) => entry.kind === 'hiring' && !entry.done) ?? null;
-  if (task === null) return '';
+  // The same selector the "Owner is out" component outside the modal reads, so the two cannot
+  // disagree about what he is doing (CLAUDE.md T8 3.3).
+  const task = ownerOutTask(state);
+  if (task === null || task.kind !== kind) return '';
   const spent = Math.round(task.minutesTotal - task.minutesRemaining);
   const word = kind === 'shopping' ? 'Shopping' : 'Interview';
   return (

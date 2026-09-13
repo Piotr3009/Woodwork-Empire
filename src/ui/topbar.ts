@@ -6,9 +6,10 @@ import {
   formatDate,
   has,
   isBreak,
-  movingMachines,
   netOf,
   ownerMinutesToday,
+  shoppingList,
+  skippedTask,
 } from '../engine/index';
 import type { GameState, Speed } from '../engine/index';
 import { cadenceControl } from './dayEnd';
@@ -30,10 +31,11 @@ function speedChips(state: GameState, pulse: boolean): string {
 }
 
 function speedButtons(state: GameState, pulse: boolean): string {
-  // The hall is being shifted about: the clock runs itself and the player cannot touch it
-  // until it is done (CLAUDE.md T4 3.5).
-  if (movingMachines(state) !== null) {
-    return '<span class="reason">Moving machines</span>';
+  // The clock is being run for the player, through the trip he is out on or through the move of
+  // the hall he asked for: the speed is not his until it is over (CLAUDE.md T8 3.3, 3.4). This is
+  // the one thing that ever takes the clock off him; the Turn 4 forced 4x of a move is this.
+  if (skippedTask(state) !== null) {
+    return '<span class="reason">Skipping ahead</span>';
   }
   // At dinner. The speeds stay as they are, so the player can run the clock through it.
   const dinner = isBreak(state.clock.minute)
@@ -91,6 +93,9 @@ export function renderTopbar(
     minuteBar(state) +
     outputChip(state) +
     '<span class="spacer"></span>' +
+    // Everything bought and not here yet, one click away from every screen (CLAUDE.md T8 3.2).
+    `<button class="chip" data-do="openModal" data-modal="shopping">Orders: ` +
+    `${shoppingList(state).length}</button>` +
     // The order board is the management software's: no laptop, no board (CLAUDE.md T7 3.8).
     (has(state, 'laptop')
       ? '<button class="chip" data-do="openModal" data-modal="board">Board</button>'

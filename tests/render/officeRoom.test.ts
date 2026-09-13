@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 import {
   OFFICE_CANVAS,
   FLOOR_CATALOGUE,
+  FLOOR_CATALOGUE_SPRITE,
   OFFICE_LAYERS,
   OFFICE_REGIONS,
   OFFICE_NAME_SIZE_MIN,
@@ -150,6 +151,32 @@ describe('the click regions', () => {
   });
 });
 
+describe('the floor catalogue picture', () => {
+  it('is a picture once the art side has delivered one, and the drawn object until then', () => {
+    const drawn = room({ width: 1280, height: 800 }, [], newGame());
+    const before = drawn.querySelector('[data-office="catalogue"]');
+    expect(before?.textContent).toBe('Equipment');
+    expect(before?.querySelector('img')).toBeNull();
+    // The same region, through the loader, the moment the file is in the manifest.
+    const delivered = room(
+      { width: 1280, height: 800 },
+      [`${FLOOR_CATALOGUE_SPRITE}.png`],
+      newGame(),
+    );
+    const after = delivered.querySelector('[data-office="catalogue"]');
+    const picture = after?.querySelector('img');
+    expect(picture).not.toBeNull();
+    expect(picture?.getAttribute('src')).toBe(`/sprites/${FLOOR_CATALOGUE_SPRITE}.png`);
+    expect(picture?.getAttribute('data-sprite')).toBe(FLOOR_CATALOGUE_SPRITE);
+    // And it is still the one click into the catalogue, on the same box.
+    expect(after?.getAttribute('data-do')).toBe('officeRegion');
+    expect(after?.getAttribute('style')).toContain(`top:${FLOOR_CATALOGUE.y}px`);
+    // Once the desk is bought the catalogue is on it, and the floor picture is gone.
+    const onTheDesk = room({ width: 1280, height: 800 }, [`${FLOOR_CATALOGUE_SPRITE}.png`]);
+    expect(onTheDesk.querySelector('[data-office="catalogue"] img')).toBeNull();
+  });
+});
+
 describe('the office a new game starts in', () => {
   it('has no desk and no laptop in it at all', () => {
     const bare = room({ width: 1280, height: 800 }, undefined, newGame());
@@ -171,7 +198,13 @@ describe('the office a new game starts in', () => {
       `left:${FLOOR_CATALOGUE.x}px;top:${FLOOR_CATALOGUE.y}px;` +
         `width:${FLOOR_CATALOGUE.width}px;height:${FLOOR_CATALOGUE.height}px`,
     );
-    expect(FLOOR_CATALOGUE.y + FLOOR_CATALOGUE.height).toBe(OFFICE_CANVAS.height);
+    // The region the brief gives it on the office canvas: x 60 to 500, y 700 to 900
+    // (CLAUDE.md T8 3.7).
+    expect(FLOOR_CATALOGUE.x).toBe(60);
+    expect(FLOOR_CATALOGUE.x + FLOOR_CATALOGUE.width).toBe(500);
+    expect(FLOOR_CATALOGUE.y).toBe(700);
+    expect(FLOOR_CATALOGUE.y + FLOOR_CATALOGUE.height).toBe(900);
+    expect(FLOOR_CATALOGUE.y + FLOOR_CATALOGUE.height).toBeLessThan(OFFICE_CANVAS.height);
     // The door and the whiteboard are the room itself and work from the first morning.
     expect(bare.querySelector('[data-office="door"]')).not.toBeNull();
     expect(bare.querySelector('[data-office="workPlan"]')).not.toBeNull();

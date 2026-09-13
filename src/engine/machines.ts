@@ -4,6 +4,8 @@
 import {
   DUCTING_RECONNECT_COST,
   DUST_BANDS,
+  HEAVY_SPECS,
+  LIGHT_CLASSES,
   EXTRACTOR_BROKEN_OUTPUT_FACTOR,
   GATE_CROWD_FACTOR,
   GATE_CROWD_LIMIT,
@@ -23,6 +25,9 @@ import {
   NO_DUCTING_SPECS,
   NO_HELPER_DUST_MULTIPLIER,
   NO_HELPER_PRODUCTIVITY_FACTOR,
+  SALE_FRACTION,
+  SALE_FRACTION_USED,
+  USED_VARIANT,
 } from './constants';
 import type {
   Equipment,
@@ -68,6 +73,31 @@ export function zoneOf(specId: string, variantId?: string): { width: number; dep
     width: variant.zoneWidth ?? spec.zoneWidth,
     depth: variant.zoneDepth ?? spec.zoneDepth,
   };
+}
+
+/** Working days between the click and the lorry for this class (CLAUDE.md T8 3.2). Zero means it
+ *  comes back with the owner from the trip, the way everything did in Turn 7. The one place the
+ *  question is asked: the catalogue tile, the order itself and the shopping list all read it. */
+export function deliveryDaysFor(specId: string, variantId?: string): number {
+  const spec = findSpec(specId);
+  if (!spec) return 0;
+  const variant = variantOf(spec, variantId ?? spec.variants[0]?.id ?? '');
+  return variant.deliveryDays ?? spec.deliveryDays;
+}
+
+/** Heavy kit: what two men cannot pick up. The one predicate for it, asked by the unloading at
+ *  the gate and by the bill for moving the hall alike (CLAUDE.md T8 3.2, 3.4). */
+export function isHeavy(specId: string, variantId?: string): boolean {
+  if (!HEAVY_SPECS.includes(specId)) return false;
+  // Nothing that is kept in a tool cabinet is heavy: a hand edgebander is lifted onto a bench.
+  if (!standsInTheHall(specId, variantId)) return false;
+  const light = LIGHT_CLASSES[specId] ?? [];
+  return variantId === undefined || !light.includes(variantId);
+}
+
+/** The same question of something already bought, in the hall or still on its way. */
+export function itemIsHeavy(item: { specId: string; variantId: string }): boolean {
+  return isHeavy(item.specId, item.variantId);
 }
 
 /** Does this class hold cells of the floor at all? A hand edgebander does not: it is kept in a
@@ -116,14 +146,35 @@ export function machineIsShared(state: GameState, specId: string): boolean {
   return floorMachines(state, specId).length === 0;
 }
 
-/** Machines of this family that stand on the floor: the ones there can be a queue for. */
+/** Machines of this family that stand on the floor: the ones there can be a queue for. A machine
+ *  that is sold is not one of them: it stops working the minute the sale is made and stands there
+ *  until the buyer's van comes (CLAUDE.md T8 3.5). */
 export function floorMachines(state: GameState, specId: string): Equipment[] {
-  return owned(state, specId).filter((item) => itemStandsInTheHall(item));
+  return owned(state, specId).filter((item) => itemStandsInTheHall(item) && !isSold(item));
+}
+
+/** Sold, and waiting for the van at the gate. */
+export function isSold(item: Equipment): boolean {
+  return item.soldOnDay !== null;
+}
+
+/** What the buyer pays for it: half what it cost, and a third and a bit for one that was second
+ *  hand when it was bought (PIOTR, CLAUDE.md T8 3.5). */
+export function salePriceFor(item: Equipment): number {
+  const fraction = item.variantId === USED_VARIANT ? SALE_FRACTION_USED : SALE_FRACTION;
+  return Math.round(item.purchasePrice * fraction);
+}
+
+/** The families the Owned tab offers a sale on: what the game calls a machine, standing on the
+ *  hall floor (CLAUDE.md T8 3.5). A bench, a rack and a locker are fittings, not plant. */
+export function isSellableFamily(specId: string): boolean {
+  const category = findSpec(specId)?.category;
+  return category === 'machine' || category === 'extraction';
 }
 
 /** Tools of this family that live in a cabinet: two men can have one out at once. */
 export function cabinetTools(state: GameState, specId: string): Equipment[] {
-  return owned(state, specId).filter((item) => !itemStandsInTheHall(item));
+  return owned(state, specId).filter((item) => !itemStandsInTheHall(item) && !isSold(item));
 }
 
 /** Machines of this family nobody is standing at. */
@@ -321,7 +372,7 @@ export function machineOutputFactor(state: GameState, material: MaterialKind): n
   const best = new Map<string, number>();
   for (const item of state.equipment) {
     const spec = findSpec(item.specId);
-    if (!spec || spec.category !== 'machine') continue;
+    if (!spec || spec.category !== 'machine' || isSold(item)) continue;
     if (spec.usedOn !== null && spec.usedOn !== material) continue;
     const factor = variantOf(spec, item.variantId).outputFactor;
     best.set(spec.id, Math.max(best.get(spec.id) ?? 0, factor));
@@ -338,6 +389,7 @@ export function machineOutputFactor(state: GameState, material: MaterialKind): n
 export function bestOutputFactor(state: GameState, specId: string): number {
   let best = 0;
   for (const item of owned(state, specId)) {
+    if (isSold(item)) continue;
     const factor = variantFor(item)?.outputFactor ?? 1;
     if (factor > best) best = factor;
   }

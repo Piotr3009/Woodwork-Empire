@@ -19,8 +19,9 @@ import {
   LOCKER_SLOT_LAYOUT,
   DUCTING_RECONNECT_COST,
   MOVE_MINUTES_PER_ITEM,
-  MOVING_SPEED,
+  SKIP_SPEED,
   OVERTIME_DEBT_PER_DAY,
+  OVERTIME_QUIT_CHANCE,
   REPUTATION_START,
   SERVICE_INTERVAL_HOURS,
   SOFTWARE_ONE_OFF_JOBS,
@@ -37,7 +38,16 @@ import { expireEnquiries, refillBoard, refreshLocks } from './board';
 import { missCall, nextDueCall, takeCall } from './calls';
 import { canPlaceSpec, firstFreeCell, moveItem } from './layout';
 import {
+  createOnOrder,
+  findOnOrder,
+  onOrderCount,
+  orderName,
+  ordersDueOn,
+  removeOnOrder,
+} from './orders';
+import {
   daysBetween,
+  nextWorkingDay,
   isDayExhausted,
   isFriday,
   isLastWorkingDayOfMonth,
@@ -56,6 +66,7 @@ import {
   formatMoney,
   pay,
   payArrears,
+  receive,
   runDayCosts,
   writeUpBooks,
 } from './economy';
@@ -74,7 +85,14 @@ import {
   extractorBroken,
   OWNER,
   ductedMoves,
+  ductingDue,
+  deliveryDaysFor,
   findSpec,
+  itemIsHeavy,
+  isSellableFamily,
+  isSold,
+  itemStandsInTheHall,
+  salePriceFor,
   freeBenches,
   hallProductivityFactor,
   has,
@@ -160,13 +178,16 @@ import {
   autoAssignJobs,
   availableJoiners,
   canHire,
+  countStaffOvertimeMinute,
   hasWorkingDay,
   helpers,
   hire,
   isWorkingToday,
   joiners,
+  recordStaffOvertime,
   runStaffDayStart,
   staffMinutesLeft,
+  staysForOvertime,
 } from './staff';
 import {
   AD_HOC_TASK_MINUTES,
@@ -176,15 +197,18 @@ import {
   assignWorkerTask,
   createDailyTasks,
   createTask,
+  equipmentUnloadMinutes,
   findTask,
   interruptOwnerWith,
   movePending,
   movingMachines,
   orderMinutes,
+  ownerOutTask,
   pauseOwnerTask,
   resumeOwnerTask,
   shoppingLabel,
   shoppingTask,
+  skippedTask,
   startTask,
   taskWorkRate,
 } from './tasks';
@@ -197,6 +221,7 @@ import type {
   Job,
   GameAction,
   GameState,
+  OnOrderItem,
   PeriodTotals,
   Speed,
   TaskInstance,
@@ -272,6 +297,7 @@ export function createGame(options: NewGameOptions): GameState {
     laptopBootedOnDay: null,
     stock: { sheets: 0, tempStorageSheets: 0 },
     equipment: [],
+    onOrder: [],
     workers: [],
     enquiries: [],
     jobs: [],
@@ -303,9 +329,11 @@ export function createGame(options: NewGameOptions): GameState {
     lastLowStockDay: null,
     booksUpToDay: 0,
     lateAccountsMonths: 0,
+    lastQuitMonth: monthOfDay(1),
     productionMinutesMonth: 0,
     movedItems: [],
-    speedBeforeMove: null,
+    skipTaskId: null,
+    speedBeforeSkip: null,
     summaryCadence: 'daily',
     gameOver: null,
   };
@@ -388,6 +416,8 @@ function startDay(state: GameState): void {
     });
   }
   const arriving = arriveDeliveries(state);
+  const kit = arriveEquipmentOrders(state);
+  collectSoldMachines(state);
   runBookedTransport(state);
   checkOverdueJobs(state);
   for (const delivery of arriving) onDeliveryArrived(state, delivery.jobId);
@@ -397,9 +427,89 @@ function startDay(state: GameState): void {
   runOverdueBreakdowns(state);
   checkLowStock(state);
   runAccidentRoll(state);
+  runOvertimeQuits(state);
   runHelperClean(state);
   delegateTasks(state);
   queueDeliveryEvents(state, arriving);
+  queueKitDeliveryEvents(state, kit);
+}
+
+/** 08:00 on the due day: the lorries with the kit on them. Furniture, hand tools and anything
+ *  else two men simply carry is brought in and stands on the cells that were held for it;
+ *  anything heavy is a job of work at the gate and hands back for the event to ask about
+ *  (CLAUDE.md T8 3.2). */
+function arriveEquipmentOrders(state: GameState): OnOrderItem[] {
+  const waiting: OnOrderItem[] = [];
+  for (const item of ordersDueOn(state, state.clock.day)) {
+    item.arrived = true;
+    if (!itemIsHeavy(item)) {
+      landOrder(state, item);
+      continue;
+    }
+    createTask(state, {
+      kind: 'unload',
+      label: `Unload the ${orderName(item).toLowerCase()}`,
+      minutes: equipmentUnloadMinutes(state),
+      orderId: item.id,
+    });
+    waiting.push(item);
+  }
+  return waiting;
+}
+
+/** 08:00, and the buyer's van is at the gate for whatever was sold yesterday. Nobody unloads
+ *  anything: it goes, and the cash comes in (CLAUDE.md T8 3.5). */
+function collectSoldMachines(state: GameState): void {
+  const going = state.equipment.filter(
+    (item) => item.soldOnDay !== null && item.soldOnDay <= state.clock.day,
+  );
+  for (const item of going) {
+    const name = findSpec(item.specId)?.name ?? item.specId;
+    const price = salePriceFor(item);
+    state.equipment = state.equipment.filter((entry) => entry.id !== item.id);
+    // Nobody services or repairs a machine that is on the back of somebody else's lorry.
+    const orphaned = new Set(
+      state.tasks
+        .filter((task) => task.equipmentId === item.id && !task.done)
+        .map((task) => task.id),
+    );
+    state.tasks = state.tasks.filter((task) => !orphaned.has(task.id));
+    if (state.owner.currentTaskId !== null && orphaned.has(state.owner.currentTaskId)) {
+      state.owner.currentTaskId = null;
+    }
+    for (const worker of state.workers) {
+      if (worker.taskId !== null && orphaned.has(worker.taskId)) worker.taskId = null;
+    }
+    receive(state, 'equipment', `Sold: ${name}`, price);
+    queueEvent(state, {
+      kind: 'machineCollected',
+      title: `${name} collected`,
+      body: `The buyer took it away this morning. ${formatMoney(price)} in.`,
+      choices: [{ id: 'ok', label: 'Gone' }],
+      data: { specId: item.specId, price },
+    });
+  }
+}
+
+/** The same question the sheets ask: unload it now, or leave it standing at the gate
+ *  (CLAUDE.md T8 3.2). A helper takes it off the list without being asked, as he always does. */
+function queueKitDeliveryEvents(state: GameState, arriving: readonly OnOrderItem[]): void {
+  for (const item of arriving) {
+    const task = state.tasks.find((entry) => entry.orderId === item.id && !entry.done);
+    if (!task) continue;
+    queueEvent(state, {
+      kind: 'deliveryArrived',
+      title: 'Delivery at the gate',
+      body:
+        `The ${orderName(item).toLowerCase()} has arrived. It is no use to anybody on the back ` +
+        'of a lorry.',
+      choices: [
+        { id: 'unload', label: `Unload now, ${task.minutesTotal} min` },
+        { id: 'later', label: 'Leave it at the gate' },
+      ],
+      data: { orderId: item.id, taskId: task.id },
+    });
+  }
 }
 
 /** Who can be sent at a job of work, as choices on the event that raised it. Nobody who is not
@@ -497,6 +607,31 @@ function runAccidentRoll(state: GameState): void {
     body: `${worker.name} has been hurt in all that mess. He is off for ${ACCIDENT_DAYS_OFF} days.`,
     data: { workerId: worker.id, days: ACCIDENT_DAYS_OFF },
   });
+}
+
+/** The month end, and the men who have had enough of the evenings. A tired man has one chance in
+ *  twenty of handing his notice in; the rest is a bench free for somebody else
+ *  (CLAUDE.md T8 3.6). Read once a month, whatever day of the week the 1st falls on. */
+export function runOvertimeQuits(state: GameState): void {
+  const month = monthOfDay(state.clock.day);
+  if (month <= state.lastQuitMonth) return;
+  state.lastQuitMonth = month;
+  for (const worker of state.workers.slice()) {
+    if (!worker.tiredOfOvertime) continue;
+    if (!chance(state, OVERTIME_QUIT_CHANCE)) continue;
+    state.workers = state.workers.filter((entry) => entry.id !== worker.id);
+    const job = worker.jobId ? findJob(state, worker.jobId) : null;
+    if (job) releaseJob(state, job);
+    releaseMachines(state, worker.id);
+    queueEvent(state, {
+      kind: 'workerQuit',
+      title: `${worker.name} has handed his notice in`,
+      body:
+        'Too many evenings on the trot. He is gone in the morning, and there is a bench and a ' +
+        'locker free for whoever comes next.',
+      data: { workerId: worker.id, role: worker.role, name: worker.name },
+    });
+  }
 }
 
 /** A helper cleans every Friday at no cost to the owner (CLAUDE.md 9.7). */
@@ -607,6 +742,11 @@ function finishDay(state: GameState): void {
   if (ending) return;
   pauseOwnerTask(state);
   chargeOvertimeDebt(state);
+  // The evenings the crew stayed for, and the run of them that tires a man (CLAUDE.md T8 3.6).
+  recordStaffOvertime(state);
+  // A skipped run ends with the day: what is not finished is picked up in the morning and the
+  // player decides again whether to sit through it (CLAUDE.md T8 3.3).
+  endSkip(state);
   state.owner.wentHome = true;
   recordDay(state);
   if (!showsDaySummary(state)) {
@@ -756,6 +896,12 @@ function applyTaskCompletion(state: GameState, task: TaskInstance): void {
       if (job) deliverJob(state, job);
       break;
     case 'unload': {
+      // A machine off the lorry stands on the cells that were held for it (CLAUDE.md T8 3.2).
+      if (task.orderId !== null) {
+        const item = findOnOrder(state, task.orderId);
+        if (item) landOrder(state, item);
+        break;
+      }
       const delivery = task.deliveryId ? findDelivery(state, task.deliveryId) : null;
       if (delivery) {
         delivery.unloaded = true;
@@ -800,20 +946,59 @@ function chargeDucting(state: GameState): void {
     );
   }
   state.movedItems = [];
-  // The clock goes back to the speed the player left it on before the move took it (T4 3.5).
-  if (state.speedBeforeMove !== null) {
-    state.speed = state.speedBeforeMove;
-    state.speedBeforeMove = null;
-  }
 }
 
-/** Leaving setup mode with the kit moved: the move is a job of work in the hall, an hour an item,
- *  and the clock runs itself at 4x until it is done (CLAUDE.md T4 3.5). */
+/** True while the player has been asked about a move of the hall and has not answered yet
+ *  (CLAUDE.md T8 3.4). The hall cannot be set out again over the top of the question. */
+export function moveConfirmPending(state: GameState): boolean {
+  if (state.activeEvent?.kind === 'moveConfirm') return true;
+  return state.eventQueue.some((event) => event.kind === 'moveConfirm');
+}
+
+/** Two hours reads as "2 h", and an odd half hour says so. */
+function hoursText(minutes: number): string {
+  const hours = Math.floor(minutes / 60);
+  const rest = Math.round(minutes - hours * 60);
+  if (hours <= 0) return `${rest} min`;
+  return rest === 0 ? `${hours} h` : `${hours} h ${rest} min`;
+}
+
+/** Leaving setup mode. A bench, a rack, a tool cabinet, a locker or a seat is simply where the
+ *  player dropped it: no time and no money. Anything heavy is asked about first, because it is
+ *  two hours and a ducting bill (PIOTR, 13.09; CLAUDE.md T8 3.4). */
 function endSetup(state: GameState, speed: Speed): void {
   state.speed = speed;
   if (state.movedItems.length === 0) return;
   if (movePending(state) !== null) return;
-  state.speedBeforeMove = speed;
+  // The question is already in front of him: asking it twice would book the move twice.
+  if (moveConfirmPending(state)) return;
+  const heavy = state.movedItems.filter((moved) => {
+    const item = state.equipment.find((kit) => kit.id === moved.itemId);
+    return item !== undefined && itemIsHeavy(item);
+  });
+  state.movedItems = heavy;
+  if (heavy.length === 0) return;
+  const due = ductingDue(state);
+  const bill = due.cost > 0 ? ` and ${formatMoney(due.cost)} of ducting` : '';
+  queueEvent(state, {
+    kind: 'moveConfirm',
+    title: 'Moving the hall',
+    body:
+      `Moving ${plural(heavy.length, 'machine', 'machines')} takes ` +
+      `${hoursText(heavy.length * MOVE_MINUTES_PER_ITEM)}${bill}. Do it?`,
+    choices: [
+      { id: 'do', label: 'Do it' },
+      { id: 'back', label: 'Put them back' },
+    ],
+    data: { machines: heavy.length, cost: Math.round(due.cost) },
+  });
+}
+
+/** Do it: the move is a job of work in the hall, an hour an item, and the clock is run through it
+ *  so the player sees the day advance rather than a frozen screen (CLAUDE.md T8 3.4). */
+function startTheMove(state: GameState): void {
+  if (state.movedItems.length === 0) return;
+  if (movePending(state) !== null) return;
   const task = createTask(state, {
     kind: 'moveMachines',
     label: `Moving machines: ${plural(state.movedItems.length, 'item', 'items')}`,
@@ -823,11 +1008,55 @@ function endSetup(state: GameState, speed: Speed): void {
   // the helper can be sent instead while the owner is not in.
   if (ownerIsAvailable(state)) {
     interruptOwnerWith(state, task);
+  } else {
+    const hand =
+      availableJoiners(state)[0] ?? helpers(state).find((worker) => isWorkingToday(state, worker));
+    if (hand) assignWorkerTask(state, hand.id, task.id);
+  }
+  startSkip(state, task.id);
+}
+
+/** Put them back: every machine he shifted goes back exactly where it stood, and not a minute or
+ *  a penny is charged (CLAUDE.md T8 3.4). */
+function putThemBack(state: GameState): void {
+  for (const moved of state.movedItems) {
+    const item = state.equipment.find((kit) => kit.id === moved.itemId);
+    if (!item) continue;
+    item.anchorX = moved.fromX;
+    item.anchorY = moved.fromY;
+  }
+  state.movedItems = [];
+}
+
+// ---------------------------------------------------------------------------
+// Skip ahead (CLAUDE.md T8 3.3). The owner is out and the player does not want to watch the hall
+// do nothing: the clock is run at 4x for him until the task is over, and the speed he was on
+// comes back. Events stop it the way they stop everything, and so does the end of the day.
+// ---------------------------------------------------------------------------
+
+/** Hands the clock back at the speed the player left it on. */
+function endSkip(state: GameState): void {
+  if (state.speedBeforeSkip !== null) state.speed = state.speedBeforeSkip;
+  state.skipTaskId = null;
+  state.speedBeforeSkip = null;
+}
+
+/** Asks the clock to run itself until this task is done. */
+function startSkip(state: GameState, taskId: string): void {
+  if (state.skipTaskId === taskId) return;
+  if (state.skipTaskId === null) state.speedBeforeSkip = state.speed;
+  state.skipTaskId = taskId;
+  state.speed = SKIP_SPEED;
+}
+
+/** Holds the clock at 4x while the skipped task is still open, and lets it go when it is not. */
+function runSkip(state: GameState): void {
+  if (state.skipTaskId === null) return;
+  if (skippedTask(state) === null) {
+    endSkip(state);
     return;
   }
-  const hand =
-    availableJoiners(state)[0] ?? helpers(state).find((worker) => isWorkingToday(state, worker));
-  if (hand) assignWorkerTask(state, hand.id, task.id);
+  state.speed = SKIP_SPEED;
 }
 
 /** A move is "running" only while somebody is actually on it. A call, the end of the day or a
@@ -933,8 +1162,10 @@ function settle(state: GameState): void {
   // Nobody holds a machine he is not standing at (CLAUDE.md T7 3.1).
   releaseIdleMachines(state);
   keepTheMoveHonest(state);
-  // Nothing else happens while the hall is being moved, and the clock runs itself (T4 3.5).
-  if (movingMachines(state) !== null) state.speed = MOVING_SPEED;
+  // Nothing else happens while the hall is being moved. The clock it used to force to 4x is the
+  // Skip ahead run now, which the player asks for on the confirm (CLAUDE.md T8 3.4).
+  // The clock the player asked to be run for him, until the task he asked about is over.
+  runSkip(state);
   // The helper needs no minutes, so he would clear a bag change in the middle of his dinner. He
   // gets his break like everybody else, and the list is there for him when he is back.
   if (!isBreak(state.clock.minute)) delegateTasks(state);
@@ -1028,12 +1259,17 @@ function handsAtWork(state: GameState, ownerOnTask: boolean, moving: boolean): H
   if (atTheBench && ownerIsAvailable(state)) {
     list.push({ who: OWNER, job: atTheBench, rate: ownerEfficiency(state) });
   }
-  // Staff work the normal day only: nobody but the owner does overtime, and they always take
-  // their dinner even on a day the owner works through his (CLAUDE.md T6 3.4).
-  if (isOvertime(state.clock.minute) || isBreak(state.clock.minute)) return list;
+  // The crew always take their dinner, even on a day the owner works through his (T6 3.4).
+  if (isBreak(state.clock.minute)) return list;
+  // Past five the hall stays with the owner or it goes home: nobody works an evening he is not
+  // there for, the office never works one at all, and two hours is what a man will do
+  // (PIOTR, CLAUDE.md T8 3.6).
+  const overtime = isOvertime(state.clock.minute);
+  if (overtime && !ownerIsAvailable(state)) return list;
   const staffFactor = staffOutputFactor(state);
   for (const worker of state.workers) {
     if (!isWorkingToday(state, worker)) continue;
+    if (overtime && !staysForOvertime(state, worker)) continue;
     if (worker.taskId !== null) {
       runWorkerTaskMinute(state, worker.id, worker.taskId);
       continue;
@@ -1295,6 +1531,8 @@ function advanceMinute(state: GameState): boolean {
   const onTask = state.owner.currentTaskId !== null;
   runMinute(state);
   runProductionMinute(state, onTask);
+  // Booked after the minute is worked, so the two hours a man will do are two hours he did.
+  countStaffOvertimeMinute(state);
   state.clock.minute += 1;
   if (shouldFinishDay(state)) finishDay(state);
   settle(state);
@@ -1338,6 +1576,10 @@ function resolveEvent(state: GameState, choiceId: string): void {
       break;
     case 'dayEnd':
       advanceToNextDay(state);
+      break;
+    case 'moveConfirm':
+      if (choiceId === 'do') startTheMove(state);
+      else putThemBack(state);
       break;
     case 'deliveryArrived':
       if (choiceId === 'unload') {
@@ -1404,9 +1646,18 @@ export function applyAction(state: GameState, action: GameAction): GameState {
   if (timeIsPaused(next) && PAUSED_ACTIONS.includes(action.type)) return next;
   switch (action.type) {
     case 'SET_SPEED':
-      // The speed is not the player's while the hall is being moved (CLAUDE.md T4 3.5).
-      if (movingMachines(next) === null) next.speed = action.speed as Speed;
+      // The speed is not the player's while the hall is being moved (CLAUDE.md T4 3.5), nor while
+      // the clock is being run for him (CLAUDE.md T8 3.3).
+      if (movingMachines(next) === null && next.skipTaskId === null) {
+        next.speed = action.speed as Speed;
+      }
       break;
+    case 'SKIP_AHEAD': {
+      // Only the task he is out on, so a Skip ahead can never run past what it was asked about.
+      const out = ownerOutTask(next) ?? skippedTask(next);
+      if (out !== null) startSkip(next, out.id);
+      break;
+    }
     case 'END_SETUP':
       endSetup(next, action.speed as Speed);
       break;
@@ -1491,6 +1742,12 @@ export function applyAction(state: GameState, action: GameAction): GameState {
     }
     case 'BOOT_LAPTOP':
       bootLaptop(next);
+      break;
+    case 'CANCEL_ORDER':
+      cancelOrder(next, action.orderId);
+      break;
+    case 'SELL_MACHINE':
+      sellMachine(next, action.equipmentId);
       break;
     case 'PAUSE_TASK':
       pauseOwnerTask(next);
@@ -1625,7 +1882,9 @@ function slotFrom(slots: readonly { x: number; y: number }[], index: number): { 
 
 /** The tile the catalogue would like to put a new item on. */
 function defaultAnchor(state: GameState, specId: string): { x: number; y: number } {
-  const index = countOf(state, specId);
+  // What is on its way already has a slot of its own held for it, so the next bench of the row is
+  // the next one nobody has been promised (CLAUDE.md T8 3.2).
+  const index = countOf(state, specId) + onOrderCount(state, specId);
   if (specId === 'workbench') return slotFrom(BENCH_SLOT_LAYOUT, index);
   if (specId === 'locker') return slotFrom(LOCKER_SLOT_LAYOUT, index);
   if (specId === 'canteenSeat') return slotFrom(CANTEEN_SLOT_LAYOUT, index);
@@ -1650,6 +1909,38 @@ function anchorFor(state: GameState, specId: string, variantId: string): { x: nu
   return firstFreeCell(state, specId, variantId) ?? preferred;
 }
 
+/** Stands a thing in the hall on the tile it is given. Every refusal is behind the caller: this
+ *  is the one write that puts a machine on the floor, whether it came back in the owner's hands
+ *  or off a lorry days later (CLAUDE.md T8 3.2). */
+function standItem(
+  state: GameState,
+  specId: string,
+  variantId: string,
+  at: { x: number; y: number },
+  prepaid: boolean,
+): void {
+  const spec = specOf(specId);
+  const variant = variantOf(spec, variantId);
+  if (!prepaid) pay(state, 'equipment', variant.name, variant.price);
+  state.equipment.push({
+    id: makeId(state, 'kit'),
+    specId,
+    variantId: variant.id,
+    spriteKey: spec.spriteKey,
+    anchorX: at.x,
+    anchorY: at.y,
+    minutesUsed: 0,
+    bagFull: false,
+    broken: false,
+    serviceHours: 0,
+    enduranceHours: enduranceHoursFor(specId, variant.id),
+    hoursUsed: 0,
+    takenBy: null,
+    purchasePrice: variant.price,
+    soldOnDay: null,
+  });
+}
+
 export function buyEquipment(
   state: GameState,
   specId: string,
@@ -1660,25 +1951,16 @@ export function buyEquipment(
   if (!check.ok) return check;
   const spec = specOf(specId);
   const variant = variantOf(spec, variantId ?? spec.variants[0]?.id ?? '');
-  const anchor = anchorFor(state, specId, variant.id);
-  if (!prepaid) pay(state, 'equipment', variant.name, variant.price);
-  state.equipment.push({
-    id: makeId(state, 'kit'),
-    specId,
-    variantId: variant.id,
-    spriteKey: spec.spriteKey,
-    anchorX: anchor.x,
-    anchorY: anchor.y,
-    minutesUsed: 0,
-    bagFull: false,
-    broken: false,
-    serviceHours: 0,
-    enduranceHours: enduranceHoursFor(specId, variant.id),
-    hoursUsed: 0,
-    takenBy: null,
-    purchasePrice: variant.price,
-  });
+  standItem(state, specId, variant.id, anchorFor(state, specId, variant.id), prepaid);
   return OK;
+}
+
+/** The delivery is off the lorry: the outline goes and the machine stands where it stood
+ *  (CLAUDE.md T8 3.2). The cells were held for it, so there is nothing left to refuse. */
+export function landOrder(state: GameState, item: OnOrderItem): void {
+  const at = { x: item.anchorX, y: item.anchorY };
+  removeOnOrder(state, item.id);
+  standItem(state, item.specId, item.variantId, at, true);
 }
 
 /** Management software: one-off for 30 jobs, or a subscription billed on the 1st (CLAUDE.md 9.2). */
@@ -1728,13 +2010,19 @@ export function buySoftware(
  *  standing in: the tool cabinet he has just put on the list is in by the time the hand bander
  *  he wants to keep in it arrives, and the cash for both is gone (CLAUDE.md T7 3.10). */
 function afterTheTrips(state: GameState): GameState {
-  // Nothing on the list: the hall he is standing in is the hall he will come back to, and the
-  // catalogue asks this question of every tile it draws, every minute.
-  if (!state.tasks.some((task) => !task.done && task.orders.length > 0)) return state;
+  // Nothing on the list and nothing on its way: the hall he is standing in is the hall he will
+  // come back to, and the catalogue asks this question of every tile it draws, every minute.
+  const trips = state.tasks.some((task) => !task.done && task.orders.length > 0);
+  if (!trips && state.onOrder.length === 0) return state;
   const after = clone(state);
+  // Everything already on the road, landed: the cash for all of it is spent, so the extraction he
+  // ordered on Monday is what Tuesday's floor edgebander is allowed against (T7 3.10, T8 3.2).
+  for (const item of after.onOrder.slice()) landOrder(after, item);
   for (const task of after.tasks) {
-    if (!task.done) settleOrders(after, task);
+    if (!task.done) settleOrders(after, task, after);
   }
+  // And what those trips ordered in is on the road as well.
+  for (const item of after.onOrder.slice()) landOrder(after, item);
   return after;
 }
 
@@ -1839,14 +2127,89 @@ export function placeOrder(state: GameState, order: TaskOrder): BuyCheck {
 
 /** The owner is back: what he went out for is booked and the cash leaves now. Anything the world
  *  has made impossible while he was out is simply not bought (CLAUDE.md T7 3.10). */
-function settleOrders(state: GameState, task: TaskInstance): void {
+function settleOrders(state: GameState, task: TaskInstance, against?: GameState): void {
   const orders = task.orders;
   task.orders = [];
   for (const order of orders) {
-    if (order.kind === 'equipment') buyEquipment(state, order.specId, order.variantId, order.paid === true);
+    if (order.kind === 'equipment') settleEquipmentOrder(state, order, against);
     else if (order.kind === 'software') buySoftware(state, order.mode, order.paid === true);
     else hire(state, order.role, order.tier);
   }
+}
+
+/** What the owner came back with. A hand tool, a cabinet or a desk is in the boot of the car and
+ *  stands in the hall tonight; anything that has to be ordered in is booked as a delivery and the
+ *  floor it will stand on is held for it (CLAUDE.md T8 3.2). */
+function settleEquipmentOrder(
+  state: GameState,
+  order: { kind: 'equipment'; specId: string; variantId: string; paid?: boolean },
+  against?: GameState,
+): void {
+  const prepaid = order.paid === true;
+  const days = deliveryDaysFor(order.specId, order.variantId);
+  if (days <= 0) {
+    buyEquipment(state, order.specId, order.variantId, prepaid);
+    return;
+  }
+  // The very question the click asked, asked again of the hall as it will be once everything on
+  // the road has landed. Asking it of the hall he is standing in would refuse the CNC he ordered
+  // behind the extraction that is still on a lorry, and take his money for it (T7 3.10, T8 3.2).
+  // `against` is the hypothetical hall itself asking, which is where the recursion stops.
+  const hall = against ?? afterTheTrips(state);
+  if (!canBuy(hall, order.specId, order.variantId, prepaid).ok) return;
+  const spec = specOf(order.specId);
+  const variant = variantOf(spec, order.variantId);
+  const at = anchorFor(state, order.specId, variant.id);
+  createOnOrder(state, {
+    specId: order.specId,
+    variantId: variant.id,
+    pricePaid: variant.price,
+    anchorX: at.x,
+    anchorY: at.y,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Calling an order off, and selling a machine that stands in the hall (CLAUDE.md T8 3.5)
+// ---------------------------------------------------------------------------
+
+/** Calls an order off before the lorry: the cash comes back in full, the floor held for it is
+ *  free again, and the books say what happened. One click (CLAUDE.md T8 3.5). */
+export function cancelOrder(state: GameState, orderId: string): BuyCheck {
+  const item = findOnOrder(state, orderId);
+  if (!item) return { ok: false, reason: 'Nothing on order' };
+  // At the gate is too late: it is here, and somebody has to take it off the lorry.
+  if (item.arrived) return { ok: false, reason: 'It is at the gate' };
+  if (timeIsPaused(state)) state.speed = 1;
+  receive(state, 'equipment', `Order cancelled: ${orderName(item)}`, item.pricePaid);
+  removeOnOrder(state, item.id);
+  return OK;
+}
+
+/** Why this machine cannot be sold, or that it can (CLAUDE.md T8 3.5). The one place the refusals
+ *  are written: the tile asks this and the action asks this. */
+export function canSell(state: GameState, equipmentId: string): BuyCheck {
+  const item = state.equipment.find((entry) => entry.id === equipmentId);
+  if (!item) return { ok: false, reason: 'Nothing to sell' };
+  if (isSold(item)) return { ok: false, reason: 'Sold, collection tomorrow' };
+  if (!isSellableFamily(item.specId)) return { ok: false, reason: 'Nobody buys second hand fittings' };
+  if (!itemStandsInTheHall(item)) return { ok: false, reason: 'It lives in a tool cabinet' };
+  if (item.broken) return { ok: false, reason: 'It is broken. Fix it first' };
+  if (item.takenBy !== null) return { ok: false, reason: 'Somebody is standing at it' };
+  return OK;
+}
+
+/** Sells it. The buyer comes in the morning: until then it is marked sold and it does no work
+ *  (CLAUDE.md T8 3.5). */
+export function sellMachine(state: GameState, equipmentId: string): BuyCheck {
+  const check = canSell(state, equipmentId);
+  if (!check.ok) return check;
+  const item = state.equipment.find((entry) => entry.id === equipmentId);
+  if (!item) return check;
+  if (timeIsPaused(state)) state.speed = 1;
+  item.soldOnDay = nextWorkingDay(state.clock.day);
+  item.takenBy = null;
+  return OK;
 }
 
 /** True while this class is on an open trip's list: ordered, paid for, not yet in the hall. */

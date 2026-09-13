@@ -29,6 +29,42 @@ function html(): string {
   return root().innerHTML;
 }
 
+/** Answers whatever the engine is asking with the first choice. */
+function dismissEvents(): void {
+  let guard = 0;
+  while (root().querySelector('[data-do="resolveEvent"]') !== null && guard < 50) {
+    click('[data-do="resolveEvent"]');
+    guard += 1;
+  }
+}
+
+/** Works the lorries at the gate off the laptop's list until nothing is left on order: the saw,
+ *  the compressor and the extractor are two hours each at the gate the next morning, and the
+ *  bench and the rack are carried in (CLAUDE.md T8 3.2). */
+function unloadTheKit(): void {
+  click('[data-office="laptop"]');
+  let guard = 0;
+  while ((currentState()?.onOrder.length ?? 0) > 0 && guard < 120) {
+    guard += 1;
+    dismissEvents();
+    const state = currentState();
+    const task = state?.tasks.find((entry) => entry.kind === 'unload' && !entry.done);
+    const waiting =
+      task === undefined
+        ? null
+        : root().querySelector(`[data-do="startTask"][data-id="${task.id}"]`);
+    if (waiting !== null) {
+      waiting.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      continue;
+    }
+    advanceMinutes(30);
+  }
+  dismissEvents();
+  if (root().querySelector('[data-modal="laptop"] [data-do="closeModal"]') !== null) {
+    click('[data-modal="laptop"] [data-do="closeModal"]');
+  }
+}
+
 /** Drags an item to a tile, the way setup mode does through the engine. */
 function moveItem(itemId: string, x: number, y: number): void {
   const state = currentState();
@@ -70,6 +106,8 @@ beforeAll(() => {
   // The trip out has to be over before any of it is in the room: an hour for the first thing and
   // a quarter of an hour for each of the others (CLAUDE.md T7 3.10).
   advanceMinutes(SHOPPING_MINUTES + SHOPPING_NEXT_MINUTES * STARTING_KIT.length);
+  // And the lorries the next morning, or the hall would be empty (CLAUDE.md T8 3.2).
+  unloadTheKit();
   // A job on the books, or the tests below would pass on an empty board.
   click('[data-do="openModal"][data-modal="board"]');
   click('[data-do="acceptEnquiry"]');
@@ -143,6 +181,10 @@ describe('setting the hall out', () => {
     // of them ducted: the shelving has nothing to reconnect (CLAUDE.md T6 3.5).
     expect(html()).toContain('Ducting to reconnect: 1 machine, £800');
     click('[data-do="endSetup"]');
+    // The machine is asked about before it is booked, and the shelving is carried for nothing
+    // (PIOTR, 13.09; CLAUDE.md T8 3.4).
+    expect(html()).toContain('Moving 1 machine takes 1 h and £800 of ducting. Do it?');
+    click('[data-do="resolveEvent"][data-id="do"]');
     expect(html()).toContain('Moving machines');
     // Back to a hall that is being shifted, so the kit cannot be dragged again.
     expect(html()).not.toContain('data-do="startSetup"');
