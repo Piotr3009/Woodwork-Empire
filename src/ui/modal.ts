@@ -204,7 +204,7 @@ export function tripLine(state: GameState, kind: 'shopping' | 'hiring'): string 
   const word = kind === 'shopping' ? 'Shopping' : 'Interview';
   return (
     `<p class="warn trip">${word}: ${spent} of ${Math.round(task.minutesTotal)} min. ` +
-    'Nothing is paid for until you are back.</p>'
+    'Paid for at the counter; it all lands when you are back.</p>'
   );
 }
 

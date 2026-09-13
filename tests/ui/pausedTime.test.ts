@@ -53,20 +53,19 @@ beforeAll(() => {
 });
 
 describe('the clock has to be running', () => {
-  it('keeps the catalogue shut, says so in one line and beats the Pause button once', () => {
+  it('starts the clock at 1x the moment the catalogue is reached for (PIOTR, 13.09)', () => {
     expect(currentState()?.speed).toBe(0);
     click('[data-office="catalogue"]');
-    expect(openModalId()).toBeNull();
-    expect(html()).toContain('Time is paused');
-    expect(html()).toContain('chip is-on is-pulse');
-    // The next click clears both: it pulses once, not for ever.
-    run();
-    expect(html()).not.toContain('Time is paused');
-    expect(html()).not.toContain('is-pulse');
-    click('[data-office="catalogue"]');
     expect(openModalId()).toBe('catalogue');
+    expect(currentState()?.speed).toBe(1);
+    expect(html()).not.toContain('Time is paused');
     click('[data-do="closeModal"]');
     pause();
+    // The same for the laptop once there is one: it is bought further down, so here the
+    // stopped clock simply stays stopped on a reading modal.
+    click('[data-office="workPlan"]');
+    expect(currentState()?.speed).toBe(0);
+    click('[data-do="closeModal"]');
   });
 
   it('opens the Work Plan and the sprite check on a stopped clock, and nothing else', () => {
@@ -111,20 +110,22 @@ function buy(specId: string, tab: string, variantId?: string): void {
 }
 
 describe('a purchase is a trip out', () => {
-  it('takes an hour of the owner before the cash leaves', () => {
+  it('takes the cash at the click and an hour of the owner before the thing lands', () => {
     run();
     const before = currentState()?.cash ?? 0;
     click('[data-office="catalogue"]');
     buy('desk', 'computers');
     expect(currentState()?.equipment).toHaveLength(0);
-    expect(currentState()?.cash).toBe(before);
+    // Paid for at the click (PIOTR, 13.09), and not a penny more when it lands.
+    const paid = before - (currentState()?.cash ?? 0);
+    expect(paid).toBeGreaterThan(0);
     expect(html()).toContain(`Shopping: 0 of ${SHOPPING_MINUTES} min`);
     advanceMinutes(SHOPPING_MINUTES - 1);
     expect(currentState()?.equipment).toHaveLength(0);
-    expect(currentState()?.cash).toBe(before);
+    expect(before - (currentState()?.cash ?? 0)).toBe(paid);
     advanceMinutes(1);
     expect(currentState()?.equipment).toHaveLength(1);
-    expect(currentState()?.cash ?? 0).toBeLessThan(before);
+    expect(before - (currentState()?.cash ?? 0)).toBe(paid);
     expect(html()).not.toContain('Shopping:');
   });
 
@@ -178,5 +179,32 @@ describe('taking somebody on is an interview', () => {
     advanceMinutes(HIRING_MINUTES);
     expect(currentState()?.workers).toHaveLength(1);
     expect(currentState()?.workers[0]?.role).toBe('officeAdmin');
+  });
+});
+
+describe('one click is one purchase (PIOTR, 13.09)', () => {
+  it('takes the cash once, hides the button while the machine is on the list, and frames what is owned', () => {
+    // Back to the catalogue: the desk landed earlier in this file, so its tile is framed as owned.
+    click('[data-office="catalogue"]');
+    click('[data-do="catalogueTab"][data-id="computers"]');
+    click('[data-do="openFolder"][data-id="desk"]');
+    expect(html()).toContain('is-owned');
+    expect(html()).toContain('Owned');
+    click('[data-do="closeFolder"]');
+    const before = currentState()?.cash ?? 0;
+    buy('extractor', 'extraction', 'standard');
+    const paid = before - (currentState()?.cash ?? 0);
+    expect(paid).toBeGreaterThan(0);
+    click('[data-do="catalogueTab"][data-id="extraction"]');
+    click('[data-do="openFolder"][data-id="extractor"]');
+    expect(html()).toContain('Waiting for delivery');
+    expect(html()).toContain('is-ordered');
+    expect(
+      root().querySelector('[data-do="buyEquipment"][data-id="extractor"][data-variant="standard"]'),
+    ).toBeNull();
+    // Nothing more can leave for it: the click that would have bought a second one is not there.
+    expect(before - (currentState()?.cash ?? 0)).toBe(paid);
+    click('[data-do="closeFolder"]');
+    click('[data-do="closeModal"]');
   });
 });

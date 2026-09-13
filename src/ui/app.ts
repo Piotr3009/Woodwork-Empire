@@ -381,7 +381,7 @@ function modalSpecs(): ModalSpec[] {
       title: MODAL_TITLES[ui.modal],
       body: modalBody(ui.modal, current),
       wide: ui.modal === 'accounting' || ui.modal === 'workPlan',
-      full: ui.modal === 'board',
+      full: ui.modal === 'board' || ui.modal === 'catalogue',
       position: ui.modalPosition,
     });
   }
@@ -707,9 +707,10 @@ function pausedToast(): void {
 /** The room fills the page, so there is no small object for a modal to sit beside any more: every
  *  modal opens centred, and the player drags it where he wants it (CLAUDE.md T4 3.1). */
 function openModal(id: ModalId): void {
+  // Nothing happens in stopped time, so the clock starts at 1x the moment the player reaches for
+  // something that acts on the world; he asked for that instead of a refusal (PIOTR, 13.09).
   if (!READING_MODALS.includes(id) && timeIsPaused(game())) {
-    pausedToast();
-    return;
+    dispatch({ type: 'SET_SPEED', speed: 1 });
   }
   ui.modal = id;
   ui.modalPosition = null;

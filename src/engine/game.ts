@@ -1548,7 +1548,12 @@ export interface BuyCheck {
 const OK: BuyCheck = { ok: true, reason: '' };
 
 /** One reason per refusal, used by the catalogue modal and by the buy action itself. */
-export function canBuy(state: GameState, specId: string, variantId?: string): BuyCheck {
+export function canBuy(
+  state: GameState,
+  specId: string,
+  variantId?: string,
+  prepaid = false,
+): BuyCheck {
   const spec = findSpec(specId);
   if (!spec) return { ok: false, reason: 'Not in the catalogue' };
   const variant = variantOf(spec, variantId ?? spec.variants[0]?.id ?? '');
@@ -1573,7 +1578,7 @@ export function canBuy(state: GameState, specId: string, variantId?: string): Bu
   if (specId === 'workbench' && countOf(state, 'workbench') >= state.unit.benchSlots) {
     return { ok: false, reason: 'No free bench slot in this unit' };
   }
-  if (!canAfford(state, variant.price)) return { ok: false, reason: 'Not enough cash' };
+  if (!prepaid && !canAfford(state, variant.price)) return { ok: false, reason: 'Not enough cash' };
   // A machine wants its working room as well as its price: a floor edgebander needs a free 5 by
   // 3 of hall and there is no point selling him one he cannot stand anywhere (T7 3.3, 3.6).
   if (standsInTheHall(specId, variant.id) && firstFreeCell(state, specId, variant.id) === null) {
@@ -1615,13 +1620,18 @@ function anchorFor(state: GameState, specId: string, variantId: string): { x: nu
   return firstFreeCell(state, specId, variantId) ?? preferred;
 }
 
-export function buyEquipment(state: GameState, specId: string, variantId?: string): BuyCheck {
-  const check = canBuy(state, specId, variantId);
+export function buyEquipment(
+  state: GameState,
+  specId: string,
+  variantId?: string,
+  prepaid = false,
+): BuyCheck {
+  const check = canBuy(state, specId, variantId, prepaid);
   if (!check.ok) return check;
   const spec = specOf(specId);
   const variant = variantOf(spec, variantId ?? spec.variants[0]?.id ?? '');
   const anchor = anchorFor(state, specId, variant.id);
-  pay(state, 'equipment', variant.name, variant.price);
+  if (!prepaid) pay(state, 'equipment', variant.name, variant.price);
   state.equipment.push({
     id: makeId(state, 'kit'),
     specId,
@@ -1642,19 +1652,32 @@ export function buyEquipment(state: GameState, specId: string, variantId?: strin
 }
 
 /** Management software: one-off for 30 jobs, or a subscription billed on the 1st (CLAUDE.md 9.2). */
-export function canBuySoftware(state: GameState, mode: 'oneOff' | 'subscription'): BuyCheck {
+export function canBuySoftware(
+  state: GameState,
+  mode: 'oneOff' | 'subscription',
+  prepaid = false,
+): BuyCheck {
   if (!has(state, 'laptop')) return { ok: false, reason: 'Needs a laptop first' };
-  if (mode === 'oneOff' && !canAfford(state, SOFTWARE_ONE_OFF_PRICE)) {
+  if (mode === 'oneOff' && !prepaid && !canAfford(state, SOFTWARE_ONE_OFF_PRICE)) {
     return { ok: false, reason: 'Not enough cash' };
   }
   return OK;
 }
 
-export function buySoftware(state: GameState, mode: 'oneOff' | 'subscription'): BuyCheck {
-  const check = canBuySoftware(state, mode);
+/** The one off licence is paid at the click; the subscription is billed on the 1st as ever. */
+function paySoftware(state: GameState, mode: 'oneOff' | 'subscription'): void {
+  if (mode === 'oneOff') pay(state, 'software', 'Management software, one off', SOFTWARE_ONE_OFF_PRICE);
+}
+
+export function buySoftware(
+  state: GameState,
+  mode: 'oneOff' | 'subscription',
+  prepaid = false,
+): BuyCheck {
+  const check = canBuySoftware(state, mode, prepaid);
   if (!check.ok) return check;
   if (mode === 'oneOff') {
-    pay(state, 'software', 'Management software, one off', SOFTWARE_ONE_OFF_PRICE);
+    if (!prepaid) paySoftware(state, mode);
     state.software = {
       mode: 'oneOff',
       tier: SOFTWARE_TURN1_TIER,
@@ -1688,8 +1711,16 @@ function afterTheTrips(state: GameState): GameState {
 /** Can this order be placed at all: the clock has to be running, the owner has to be in, and the
  *  thing has to be one he could buy or take on once everything already on the list has landed. */
 export function orderCheck(state: GameState, order: TaskOrder): BuyCheck {
-  if (timeIsPaused(state)) return { ok: false, reason: 'Time is paused' };
   if (!state.owner.present) return { ok: false, reason: 'You are not in today' };
+  // One click is one purchase: while a class is out on the list it cannot be ordered again, so a
+  // second click cannot buy a second saw (PIOTR, 13.09).
+  if (order.kind === 'equipment' && onOrder(state, order.specId, order.variantId)) {
+    // Machines only: benches, cabinets, lockers and seats are bought in numbers on one visit.
+    const category = findSpec(order.specId)?.category;
+    if (category === 'machine' || category === 'extraction') {
+      return { ok: false, reason: 'On order' };
+    }
+  }
   const after = afterTheTrips(state);
   if (order.kind === 'equipment') return canBuy(after, order.specId, order.variantId);
   if (order.kind === 'software') return canBuySoftware(after, order.mode);
@@ -1728,6 +1759,20 @@ function startNextTrip(state: GameState): boolean {
 export function placeOrder(state: GameState, order: TaskOrder): BuyCheck {
   const check = orderCheck(state, order);
   if (!check.ok) return check;
+  // An order starts the clock if it was stopped: nothing happens in stopped time, and the player
+  // asked for the clock to run rather than for a refusal (PIOTR, 13.09).
+  if (timeIsPaused(state)) state.speed = 1;
+  // The cash leaves at the click, not when he is back: what he went out for is paid for
+  // (PIOTR, 13.09). The thing itself still lands when the trip is over.
+  if (order.kind === 'equipment') {
+    const spec = specOf(order.specId);
+    const variant = variantOf(spec, order.variantId ?? spec.variants[0]?.id ?? '');
+    pay(state, 'equipment', variant.name, variant.price);
+    order.paid = true;
+  } else if (order.kind === 'software') {
+    paySoftware(state, order.mode);
+    order.paid = true;
+  }
   if (order.kind === 'hire') {
     // An interview is its own hour and never rides on the shopping (PIOTR).
     const task = createTask(state, {
@@ -1768,17 +1813,48 @@ function settleOrders(state: GameState, task: TaskInstance): void {
   const orders = task.orders;
   task.orders = [];
   for (const order of orders) {
-    if (order.kind === 'equipment') buyEquipment(state, order.specId, order.variantId);
-    else if (order.kind === 'software') buySoftware(state, order.mode);
+    if (order.kind === 'equipment') buyEquipment(state, order.specId, order.variantId, order.paid === true);
+    else if (order.kind === 'software') buySoftware(state, order.mode, order.paid === true);
     else hire(state, order.role, order.tier);
   }
+}
+
+/** True while this class is on an open trip's list: ordered, paid for, not yet in the hall. */
+export function onOrder(state: GameState, specId: string, variantId?: string): boolean {
+  return state.tasks.some(
+    (task) =>
+      !task.done &&
+      task.orders.some(
+        (order) =>
+          order.kind === 'equipment' &&
+          order.specId === specId &&
+          (variantId === undefined || order.variantId === variantId),
+      ),
+  );
+}
+
+/** The open trips' equipment orders, for the tiles and the Owned list (PIOTR, 13.09). */
+export function ordersOnTheList(
+  state: GameState,
+): Array<{ specId: string; variantId: string | undefined; minutesLeft: number }> {
+  const out: Array<{ specId: string; variantId: string | undefined; minutesLeft: number }> = [];
+  for (const task of state.tasks) {
+    if (task.done) continue;
+    for (const order of task.orders) {
+      if (order.kind === 'equipment') {
+        out.push({ specId: order.specId, variantId: order.variantId, minutesLeft: task.minutesRemaining });
+      }
+    }
+  }
+  return out;
 }
 
 /** Lifting the lid on the laptop: it has to come up before anything on it can be touched, and
  *  the five minutes are the owner's like any other (CLAUDE.md T7 3.10). */
 export function bootLaptop(state: GameState): BuyCheck {
-  if (timeIsPaused(state)) return { ok: false, reason: 'Time is paused' };
   if (!has(state, 'laptop')) return { ok: false, reason: 'Needs a laptop first' };
+  // Lifting the lid starts the clock if it was stopped (PIOTR, 13.09).
+  if (timeIsPaused(state)) state.speed = 1;
   if (state.tasks.some((task) => task.kind === 'booting' && !task.done)) return OK;
   const task = createTask(state, {
     kind: 'booting',

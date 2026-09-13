@@ -79,15 +79,13 @@ describe('the first ten minutes', () => {
     click('[data-do="setView"][data-view="office"]');
     expect(html()).toContain('office-room');
     expect(html()).toContain('data-office="catalogue"');
-    // The game opens on a stopped clock, and nothing that changes the world can be touched
-    // until the player starts it (CLAUDE.md T7 3.10).
+    // The game opens on a stopped clock. Reaching for the catalogue starts it at 1x instead of
+    // refusing: nothing happens in stopped time, so the time runs (PIOTR, 13.09).
+    expect(currentState()?.speed).toBe(0);
     click('[data-office="catalogue"]');
-    expect(html()).toContain('Time is paused');
-    expect(html()).not.toContain('data-modal="catalogue"');
-    click('[data-do="setSpeed"][data-speed="1"]');
     expect(currentState()?.speed).toBe(1);
-    click('[data-office="catalogue"]');
     expect(html()).toContain('Equipment catalogue');
+    expect(html()).not.toContain('Time is paused');
     const before = currentState()?.cash ?? 0;
     for (const specId of STARTING_KIT) {
       // The catalogue is tabs of folders from Turn 7: the tab, then the family's folder, and the
@@ -106,16 +104,26 @@ describe('the first ten minutes', () => {
     // The software sits under whatever tab is open: any of them but Owned carries it.
     click('[data-do="catalogueTab"][data-id="computers"]');
     click('[data-do="buySoftware"][data-id="oneOff"]');
-    // Nothing is his yet: it is one trip out, an hour for the first thing and a quarter of an
-    // hour for each of the other eleven, and the cash leaves when he is back (T7 3.10).
+    // Nothing is in the hall yet: it is one trip out, an hour for the first thing and a quarter
+    // of an hour for each of the other eleven. The cash left at the click, every item is paid
+    // for, and the tiles say they are waiting (PIOTR, 13.09).
     expect(currentState()?.equipment).toHaveLength(0);
-    expect(currentState()?.cash).toBe(before);
+    expect(currentState()?.cash ?? 0).toBeLessThan(before);
+    const paid = before - (currentState()?.cash ?? 0);
     expect(html()).toContain('Shopping: 0 of 225 min');
+    // A second click on a machine that is on the list buys nothing: one click is one purchase.
+    click('[data-do="catalogueTab"][data-id="sheetMachines"]');
+    click('[data-do="openFolder"][data-id="tableSaw"]');
+    expect(html()).toContain('Waiting for delivery');
+    expect(root().querySelector('[data-do="buyEquipment"][data-id="tableSaw"][data-variant="used"]')).toBeNull();
+    expect(before - (currentState()?.cash ?? 0)).toBe(paid);
+    click('[data-do="closeFolder"]');
     advanceMinutes(SHOPPING_MINUTES + SHOPPING_NEXT_MINUTES * STARTING_KIT.length);
     const state = currentState();
     expect(state?.equipment).toHaveLength(STARTING_KIT.length);
     expect(state?.software.mode).toBe('oneOff');
-    expect(state?.cash ?? 0).toBeLessThan(before);
+    // Landing costs nothing more: what left at the click is all that leaves.
+    expect(before - (state?.cash ?? 0)).toBe(paid);
     // The folder of a family the hall has says so on its face (CLAUDE.md T7 3.7).
     expect(html()).toContain('Owned 1');
   });

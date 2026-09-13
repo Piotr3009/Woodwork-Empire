@@ -16,6 +16,8 @@ export {
   machineInUse,
   orderCheck,
   placeOrder,
+  onOrder,
+  ordersOnTheList,
   runMinutes,
   summaryTotals,
   tick,

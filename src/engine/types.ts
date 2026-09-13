@@ -436,9 +436,11 @@ export type TaskKind =
 
 /** What a trip to the shops or an interview will do once its minutes are spent. Nothing is
  *  booked until then: the cash leaves when the owner gets back (CLAUDE.md T7 3.10). */
+/** `paid` is set when the cash left at the click, so the thing is not paid for twice when it
+ *  lands (PIOTR, 13.09). */
 export type TaskOrder =
-  | { kind: 'equipment'; specId: string; variantId: string }
-  | { kind: 'software'; mode: 'oneOff' | 'subscription' }
+  | { kind: 'equipment'; specId: string; variantId: string; paid?: boolean }
+  | { kind: 'software'; mode: 'oneOff' | 'subscription'; paid?: boolean }
   | { kind: 'hire'; role: WorkerRole; tier: WorkerTier | null };
 
 export interface TaskInstance {

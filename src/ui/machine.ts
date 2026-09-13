@@ -3,6 +3,7 @@
 
 import {
   orderCheck,
+  ordersOnTheList,
   countOf,
   enduranceHoursFor,
   findSpec,
@@ -90,11 +91,22 @@ function tile(
   // The same question the buy itself asks, against the hall as it will be when he is back
   // from the trip he is already on (CLAUDE.md T7 3.10).
   const check = orderCheck(state, { kind: 'equipment', specId: spec.id, variantId: variant.id });
-  const buy = check.ok
-    ? variant.id === recommended
-      ? primaryButton('buyEquipment', 'Buy', `data-id="${spec.id}" data-variant="${variant.id}"`)
-      : button('buyEquipment', 'Buy', `data-id="${spec.id}" data-variant="${variant.id}"`)
-    : lockedButton('Buy', check.reason);
+  // One click is one purchase: while the class is on the list the button is gone and the tile
+  // says what it is waiting for (PIOTR, 13.09).
+  const onTheList = ordersOnTheList(state).find(
+    (order) => order.specId === spec.id && order.variantId === variant.id,
+  );
+  const ownedCount = state.equipment.filter(
+    (item) => item.specId === spec.id && item.variantId === variant.id,
+  ).length;
+  const label = ownedCount > 0 ? 'Buy another' : 'Buy';
+  const buy = onTheList
+    ? `<span class="tile-waiting">Waiting for delivery, ${onTheList.minutesLeft} min</span>`
+    : check.ok
+      ? variant.id === recommended
+        ? primaryButton('buyEquipment', label, `data-id="${spec.id}" data-variant="${variant.id}"`)
+        : button('buyEquipment', label, `data-id="${spec.id}" data-variant="${variant.id}"`)
+      : lockedButton(label, check.reason);
   const effects = [
     outputLine(variant),
     bagLine(spec, variant),
@@ -106,14 +118,15 @@ function tile(
     .join('');
   const owned = ownedBadge(state, spec.id, variant.id);
   return (
-    `<div class="tile${check.ok ? '' : ' is-locked'}${owned === '' ? '' : ' is-owned'}" ` +
+    `<div class="tile${check.ok || onTheList ? '' : ' is-locked'}${owned === '' ? '' : ' is-owned'}` +
+    `${onTheList ? ' is-ordered' : ''}" ` +
     `data-variant="${variant.id}">` +
     `<h3 class="tile-name">${escapeHtml(variant.name)} ${owned}</h3>` +
     `<p class="tile-price">${money(variant.price)}</p>` +
     pictureSlot(spec.spriteKey, variant.id) +
     `<p class="tile-text">${escapeHtml(variant.description)}</p>` +
     effects +
-    (check.ok ? '' : `<p class="lock">${escapeHtml(check.reason)}</p>`) +
+    (check.ok || onTheList ? '' : `<p class="lock">${escapeHtml(check.reason)}</p>`) +
     `<div class="tile-action">${buy}</div>` +
     '</div>'
   );
