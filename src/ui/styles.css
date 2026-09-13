@@ -1157,12 +1157,12 @@ input.num {
   font-weight: 600;
 }
 
-/* A flex container cannot ellipsise its own text, so the name is a block inside it. */
+/* The renderer shrinks the name and cuts it if it still will not fit, so there is one place that
+   decides how a name is fitted to a box and the stylesheet only keeps it on one line. */
 .office-company > span {
   display: block;
   max-width: 100%;
   overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
 }
 

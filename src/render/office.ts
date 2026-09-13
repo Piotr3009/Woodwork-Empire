@@ -7,7 +7,7 @@
 
 import { formatTime } from '../engine/clock';
 import type { GameState } from '../engine/types';
-import { type Scene, escapeText } from './hall';
+import { type Scene, escapeText, fitName } from './hall';
 import { pickSprite, spriteFiles } from './sprites';
 
 /** The empty element the office shell leaves for its live text. The hall's slot is an SVG group
@@ -71,6 +71,9 @@ export interface OfficeTextBox {
 }
 
 /** The two texts the artwork leaves blank for the game to fill (docs/art/SPRITES.md 8.3). */
+/** The smallest the board is ever lettered at scale 1 [TUNE] (CLAUDE.md T6 3.10). */
+export const OFFICE_NAME_SIZE_MIN = 12;
+
 export const OFFICE_TEXTS: Record<'clock' | 'company', OfficeTextBox> = {
   clock: { x: 1050, y: 96, width: 102, height: 40, fontSize: 28 },
   company: { x: 200, y: 92, width: 170, height: 46, fontSize: 22 },
@@ -130,13 +133,19 @@ function regionHtml(region: OfficeRegion): string {
 function liveText(state: GameState): string {
   const clock = OFFICE_TEXTS.clock;
   const company = OFFICE_TEXTS.company;
+  // Shrink to fit before cutting, the same helper the hall letters its wall with. The board is
+  // 22 px at scale 1 and never smaller than 12, which is readable on the artwork (T6 3.10).
+  const fitted = fitName(state.companyName, company.width, {
+    max: company.fontSize,
+    min: OFFICE_NAME_SIZE_MIN,
+  });
   return (
     `<span class="office-clock" data-office-text="clock" ` +
     `style="${boxStyle(clock)};font-size:${clock.fontSize}px">` +
     `${escapeText(formatTime(state.clock.minute))}</span>` +
     `<span class="office-company" data-office-text="company" ` +
-    `style="${boxStyle(company)};font-size:${company.fontSize}px">` +
-    `<span>${escapeText(state.companyName)}</span></span>`
+    `style="${boxStyle(company)};font-size:${fitted.fontSize}px">` +
+    `<span>${escapeText(fitted.text)}</span></span>`
   );
 }
 

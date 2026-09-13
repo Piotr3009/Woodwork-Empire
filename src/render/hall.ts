@@ -266,13 +266,18 @@ export interface FittedName {
   fontSize: number;
 }
 
-/** The company name lettered to fit the wall: it shrinks before it is cut, and it is only cut
- *  when even the smallest readable lettering will not hold it. */
-export function fitName(name: string, boxWidth: number): FittedName {
+/** The company name lettered to fit a box: it shrinks before it is cut, and it is only cut when
+ *  even the smallest readable lettering will not hold it. The hall's wall and the office board
+ *  both come through here, at their own sizes (CLAUDE.md T6 3.10). */
+export function fitName(
+  name: string,
+  boxWidth: number,
+  sizes: { max: number; min: number } = { max: NAME_SIZE_MAX, min: NAME_SIZE_MIN },
+): FittedName {
   const trimmed = name.trim();
-  if (trimmed === '') return { text: '', fontSize: NAME_SIZE_MAX };
+  if (trimmed === '') return { text: '', fontSize: sizes.max };
   const wanted = Math.floor(boxWidth / (LETTER_WIDTH * trimmed.length));
-  const fontSize = Math.min(NAME_SIZE_MAX, Math.max(NAME_SIZE_MIN, wanted));
+  const fontSize = Math.min(sizes.max, Math.max(sizes.min, wanted));
   const fits = Math.floor(boxWidth / (LETTER_WIDTH * fontSize));
   if (trimmed.length <= fits) return { text: trimmed, fontSize };
   return { text: `${trimmed.slice(0, Math.max(1, fits - 3))}...`, fontSize };

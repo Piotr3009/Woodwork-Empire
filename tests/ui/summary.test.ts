@@ -5,6 +5,7 @@
 import { describe, expect, it } from 'vitest';
 import { renderDayEnd } from '../../src/ui/dayEnd';
 import { renderMenu } from '../../src/ui/topbar';
+import { currentState, mount } from '../../src/ui/app';
 import { formatMoney } from '../../src/engine/index';
 import type { GameEvent, GameState } from '../../src/engine/index';
 import { act, buyStartingKit, eventsOfKind, newGame, runDays } from '../helpers';
@@ -37,6 +38,31 @@ describe('the cadence control', () => {
     state = act(state, { type: 'SET_SUMMARY_CADENCE', cadence: 'weekly' });
     expect(state.summaryCadence).toBe('weekly');
     expect(parse(renderDayEnd(state)).querySelector('.chip.is-on')?.textContent).toBe('every week');
+  });
+});
+
+describe('the cadence in the Menu, driven through the page', () => {
+  it('is offered there as well as on the summary, and changing it there sticks', () => {
+    document.body.innerHTML = '<div id="app"></div>';
+    const root = document.querySelector('#app');
+    if (!(root instanceof HTMLElement)) throw new Error('no root');
+    mount(root);
+    const click = (selector: string): void => {
+      const element = root.querySelector(selector);
+      if (element === null) throw new Error(`nothing to click: ${selector}`);
+      element.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    };
+    click('[data-do="startGame"]');
+    expect(currentState()?.summaryCadence).toBe('daily');
+    click('[data-do="toggleMenu"]');
+    expect(root.innerHTML).toContain('Show this:');
+    for (const cadence of ['weekly', 'monthly', 'daily'] as const) {
+      click(`[data-do="setCadence"][data-id="${cadence}"]`);
+      expect(currentState()?.summaryCadence).toBe(cadence);
+      // The Menu stays open, so the three chips are still there to change his mind with.
+      const on = root.querySelector('.menu-pop .chip.is-on');
+      expect(on).not.toBeNull();
+    }
   });
 });
 
