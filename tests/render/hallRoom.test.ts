@@ -6,16 +6,21 @@ import {
   HALL_CANVAS,
   HALL_LAYERS,
   HALL_NAME_BOX,
+  HALL_NAME_WALL,
+  HALL_NAME_WIDTH,
   type Scene,
-  canvasBoxInHall,
+  faceBoxesOverlap,
   fitName,
   hallLayerBox,
   hallScene,
   renderHall,
   roomAtScenePoint,
+  roomDoorBox,
+  roomLabelBox,
   roomSilhouette,
+  wallMatrix,
 } from '../../src/render/hall';
-import { centreOf, pointInPolygon, tileToScreen } from '../../src/render/iso';
+import { TILE_RISE, centreOf, pointInPolygon, tileToScreen } from '../../src/render/iso';
 import { roomById } from '../../src/engine/constants';
 import { findSpec } from '../../src/engine/machines';
 import { STATION_BENCH } from '../../src/engine/stations';
@@ -169,17 +174,34 @@ describe('the rooms stay the way into the office', () => {
 });
 
 describe('the text the game letters on the painting', () => {
-  it('puts the company name in the blank strip docs/art/SPRITES.md 9.5 leaves for it', () => {
-    // The contract gives the box in 2x canvas pixels: x 300 to 560, y 130 to 200.
+  it('paints the company name onto the rear wall plane', () => {
+    // The contract gives the box in 2x canvas pixels: x 300 to 560, y 130 to 200, and the scene
+    // is 1x, so 130 pixels of wall are what the name is fitted to.
     expect(HALL_NAME_BOX).toEqual({ x: 300, y: 130, width: 260, height: 70 });
-    const inHall = canvasBoxInHall(HALL_NAME_BOX);
-    expect(inHall).toEqual({ x: -150, y: -79, width: 130, height: 35 });
+    expect(HALL_NAME_WIDTH).toBe(130);
     const svg = hall();
     const name = svg.match(/<text[^>]*class="painted-text hall-company"[^>]*>([^<]*)</);
     expect(name?.[1]).toBe('Woodwork Empire');
-    // Centred in its box, so it cannot drift off the wall.
-    const x = svg.match(/<text x="(-?[\d.]+)"[^>]*class="painted-text hall-company"/)?.[1];
-    expect(Number(x)).toBe(inHall.x + inHall.width / 2);
+    // The transform is the wall: two points of the baseline, projected, land on (x, 0, z).
+    const anchor = tileToScreen(HALL_NAME_WALL.x, 0, HALL_NAME_WALL.z);
+    expect(svg).toContain(`transform="${wallMatrix(anchor)}"`);
+    const matrix = svg
+      .match(/class="painted-text hall-company"/)
+      ? wallMatrix(anchor).slice('matrix('.length, -1).split(',').map(Number)
+      : [];
+    const [a, b, c, d, e, f] = matrix as [number, number, number, number, number, number];
+    const on = (localX: number): { x: number; y: number } => ({
+      x: a * localX + e,
+      y: b * localX + f,
+    });
+    expect(c).toBe(0);
+    expect(d).toBe(1);
+    expect(on(0)).toEqual(tileToScreen(HALL_NAME_WALL.x, 0, HALL_NAME_WALL.z));
+    // Sixty pixels along the baseline is two and a half metres along the wall, and still on it.
+    expect(on(60)).toEqual(tileToScreen(HALL_NAME_WALL.x + 60 / 24, 0, HALL_NAME_WALL.z));
+    // And the wall is a wall: the name stands under the 3.5 m roofline and past the room blocks.
+    expect(HALL_NAME_WALL.z).toBeLessThan(3.5);
+    expect(HALL_NAME_WALL.x - HALL_NAME_WIDTH / 48).toBeGreaterThan(5);
   });
 
   it('shrinks a long name to the readable minimum before it cuts it', () => {
@@ -199,17 +221,34 @@ describe('the text the game letters on the painting', () => {
     expect(hall([])).not.toContain('hall-company');
   });
 
-  it('letters each room on the face that looks into the hall', () => {
+  it('letters each room on the face that looks into the hall, above its door', () => {
     const svg = hall();
-    // The renderer rounds its coordinates to two places, as every other part of the scene does.
-    const round = (value: number): number => Math.round(value * 100) / 100;
     for (const room of ROOM_LAYOUT) {
-      const at = tileToScreen(room.x + room.width / 2, room.y + room.depth, room.height / 2);
+      const label = roomLabelBox(room);
+      const at = tileToScreen(room.x + room.width / 2, room.y + room.depth, label.bottom);
       const wanted =
-        `<text x="${round(at.x)}" y="${round(at.y)}" text-anchor="middle" ` +
+        `<text x="0" y="0" text-anchor="middle" transform="${wallMatrix(at)}" ` +
         `class="painted-text room-label" font-size="11">${room.name}</text>`;
       expect(svg, room.id).toContain(wanted);
     }
+  });
+
+  it('keeps every room name clear of its door, in the top third of the face', () => {
+    for (const room of ROOM_LAYOUT) {
+      const label = roomLabelBox(room);
+      const door = roomDoorBox(room);
+      expect(faceBoxesOverlap(label, door), room.id).toBe(false);
+      // The top third of the face, and inside it.
+      expect(label.bottom, room.id).toBeGreaterThanOrEqual((room.height * 2) / 3);
+      expect(label.top, room.id).toBeLessThanOrEqual(room.height);
+      // And the name fits across the face it is painted on.
+      expect(label.from, room.id).toBeGreaterThan(0);
+      expect(label.from + label.across, room.id).toBeLessThan(room.width);
+    }
+    // The name is one line of the lettering the renderer uses, measured in metres of wall.
+    const office = roomLabelBox({ name: 'Office', width: 2 });
+    expect(office.top - office.bottom).toBeCloseTo(11 / TILE_RISE, 6);
+    expect(office.bottom).toBeGreaterThan(roomDoorBox({ width: 2 }).top);
   });
 });
 

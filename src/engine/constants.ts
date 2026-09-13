@@ -1046,6 +1046,11 @@ export const ROOM_LAYOUT = [
   },
 ] as const;
 
+/** The door in a room's front face: centred on the face, opening into the hall
+ *  (docs/art/SPRITES.md 9.3). The contract gives no size, so this is measured off the delivered
+ *  painting: the office door is 0.92 m wide and its head is 2.1 m up [TUNE]. */
+export const ROOM_DOOR = { width: 0.9, height: 2.1 };
+
 export type RoomId = (typeof ROOM_LAYOUT)[number]['id'];
 
 /** The room block by name, so nothing reaches for it by position in the array. */

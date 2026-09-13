@@ -6,6 +6,7 @@ import {
   FINISHED_GOODS_LAYOUT,
   GATE_CROWD_LIMIT,
   GATE_LAYOUT,
+  ROOM_DOOR,
   ROOM_LAYOUT,
   YARD_WIDTH_CELLS,
   roomDoorCell,
@@ -40,6 +41,7 @@ import {
   type BoxFaces,
   type Point,
   type Polygon,
+  TILE_RISE,
   blockSilhouette,
   boxPolygons,
   centreOf,
@@ -90,8 +92,17 @@ export function label(at: Point, text: string, extra = ''): string {
   );
 }
 
-/** Text the game letters over the painting: the room names and the company name. Its own class,
- *  because the painting is not the flat grey the placeholder boxes are (docs/art/SPRITES.md 9.5). */
+/** The matrix that lays lettering into a wall that runs along world x, which is the rear wall and
+ *  every room front (CLAUDE.md T6 3.2). One metre along that wall is (+24, +12) on the screen and
+ *  one metre of height is (0, -24), so a pixel of the text box goes (1, 0.5) across and (0, 1)
+ *  down: the letters keep their height and lean with the wall. */
+export function wallMatrix(at: Point): string {
+  return `matrix(1,0.5,0,1,${round(at.x)},${round(at.y)})`;
+}
+
+/** Text the game letters onto the painting: the room names and the company name. Its own class,
+ *  because the painting is not the flat grey the placeholder boxes are (docs/art/SPRITES.md 9.5).
+ *  `at` is where the middle of the baseline sits, projected from the wall it is painted on. */
 export function paintedText(
   at: Point,
   text: string,
@@ -99,7 +110,7 @@ export function paintedText(
   fontSize: number,
 ): string {
   return (
-    `<text x="${round(at.x)}" y="${round(at.y)}" text-anchor="middle" ` +
+    `<text x="0" y="0" text-anchor="middle" transform="${wallMatrix(at)}" ` +
     `class="${className}" font-size="${round(fontSize)}">${escapeText(text)}</text>`
   );
 }
@@ -179,8 +190,17 @@ export const HALL_LAYERS: HallLayer[] = [
 ];
 
 /** The box docs/art/SPRITES.md 9.5 leaves on the wall for the company name, given there in
- *  canvas pixels at 2x: x 300 to 560, y 130 to 200. */
+ *  canvas pixels at 2x: x 300 to 560, y 130 to 200. Its width is what the name is fitted to. */
 export const HALL_NAME_BOX = { x: 300, y: 130, width: 260, height: 70 };
+
+/** Where the name is lettered on the rear wall: the middle of the lettering, in metres along the
+ *  wall and up it. The run of blockwork past the canteen block is the only clear one, and 2 m up
+ *  is clear of everything standing in front of it [TUNE: both].
+ *
+ *  The box of 9.5 does not place it. Measured on the delivered background, canvas x 300 to 560 is
+ *  beside the left wall, not the rear one, and y 130 to 200 is above its roofline: the strip is
+ *  the dark sky over the building, which is REPORT-T5 open question 1, still unanswered. */
+export const HALL_NAME_WALL = { x: 9, z: 2 };
 
 /** The biggest and the smallest the name is ever lettered, in scene pixels. The floor is the
  *  repository's readable minimum (CLAUDE.md T2 3.11), so a long name shrinks to it and is cut
@@ -192,20 +212,51 @@ const LETTER_WIDTH = 0.55;
 
 /** Room names are small text on the face that looks into the hall (docs/art/SPRITES.md 9.5). */
 const ROOM_LABEL_SIZE = 11;
+/** How far the name stands above the door head, in metres [TUNE]. */
+const ROOM_LABEL_CLEARANCE = 0.1;
 
-/** A canvas rectangle, in the hall's own coordinates. The art is 2x and the scene is 1x, so the
- *  box halves, and then it shifts by the same origin the layers are laid down on. */
-export function canvasBoxInHall(box: {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}): { x: number; y: number; width: number; height: number } {
+/** How wide the name may be lettered, in scene pixels: the box of docs/art/SPRITES.md 9.5 is
+ *  given at 2x and the scene is 1x. */
+export const HALL_NAME_WIDTH = HALL_NAME_BOX.width / SPRITE_SCALE;
+
+/** A box on a wall, in metres across the face and up it. The two the hall cares about are the
+ *  door and the name over it, which must not touch (CLAUDE.md T6 3.2). */
+export interface FaceBox {
+  across: number;
+  from: number;
+  bottom: number;
+  top: number;
+}
+
+export function faceBoxesOverlap(one: FaceBox, other: FaceBox): boolean {
+  return (
+    one.from < other.from + other.across &&
+    other.from < one.from + one.across &&
+    one.bottom < other.top &&
+    other.bottom < one.top
+  );
+}
+
+/** The door in a room's front face, centred on it (docs/art/SPRITES.md 9.3). */
+export function roomDoorBox(room: { width: number }): FaceBox {
   return {
-    x: box.x / SPRITE_SCALE - HALL_CANVAS.originX,
-    y: box.y / SPRITE_SCALE - HALL_CANVAS.originY,
-    width: box.width / SPRITE_SCALE,
-    height: box.height / SPRITE_SCALE,
+    across: ROOM_DOOR.width,
+    from: room.width / 2 - ROOM_DOOR.width / 2,
+    bottom: 0,
+    top: ROOM_DOOR.height,
+  };
+}
+
+/** The name over it: the top third of the face, clear of the door head. A metre of the face is
+ *  the same number of pixels across it as up it, so both sides of the box divide by one number. */
+export function roomLabelBox(room: { name: string; width: number }): FaceBox {
+  const across = (room.name.length * LETTER_WIDTH * ROOM_LABEL_SIZE) / TILE_RISE;
+  const bottom = ROOM_DOOR.height + ROOM_LABEL_CLEARANCE;
+  return {
+    across,
+    from: room.width / 2 - across / 2,
+    bottom,
+    top: bottom + ROOM_LABEL_SIZE / TILE_RISE,
   };
 }
 
@@ -561,9 +612,14 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
         (drawn
           ? polygon(roomSilhouette(room), 'transparent', 'class="room-hit"') +
             // The art leaves the face blank, so the game letters it (docs/art/SPRITES.md 9.5).
+            // Over the door, not on it, and skewed into the face the door is in (T6 3.2).
             // A boxed room already carries its name in the middle: one name per room either way.
             paintedText(
-              tileToScreen(room.x + room.width / 2, room.y + room.depth, room.height / 2),
+              tileToScreen(
+                room.x + room.width / 2,
+                room.y + room.depth,
+                roomLabelBox(room).bottom,
+              ),
               room.name,
               'painted-text room-label',
               ROOM_LABEL_SIZE,
@@ -719,19 +775,15 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
   // Everything from here on is the live part: it changes with the state, minute by minute.
   const live: string[] = [];
 
-  // The name on the wall. The art leaves the strip blank on purpose, so there is nowhere sensible
-  // to put it until the wall is painted (docs/art/SPRITES.md 9.5). It is live text and not part of
-  // the shell: the company the player typed in is state, and a new game has a new one.
+  // The name on the rear wall, lettered into the wall plane so it leans with the blockwork
+  // (CLAUDE.md T6 3.2). It is live text and not part of the shell: the company the player typed
+  // in is state, and a new game has a new one.
   if (painted) {
-    const nameBox = canvasBoxInHall(HALL_NAME_BOX);
-    const fitted = fitName(state.companyName, nameBox.width);
+    const fitted = fitName(state.companyName, HALL_NAME_WIDTH);
     if (fitted.text !== '') {
       live.push(
         paintedText(
-          {
-            x: nameBox.x + nameBox.width / 2,
-            y: nameBox.y + nameBox.height / 2 + fitted.fontSize / 3,
-          },
+          tileToScreen(HALL_NAME_WALL.x, 0, HALL_NAME_WALL.z),
           fitted.text,
           'painted-text hall-company',
           fitted.fontSize,
