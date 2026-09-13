@@ -364,7 +364,7 @@ function pageHtml(): string {
     ui.view === 'sprites'
       ? renderSpriteCheck()
       : ui.view === 'hall'
-        ? renderHall(current, ghostFor(current))
+        ? renderHall(current, { ghost: ghostFor(current), setup: ui.setup })
         : renderOffice(current, officeViewport());
   const controls = ui.view === 'hall' ? hallControls(current) : '';
   const note = ui.note === '' ? '' : `<p class="view-note">${escapeHtml(ui.note)}</p>`;

@@ -34,6 +34,7 @@ import {
 } from '../engine/stations';
 import { ownerIsAvailable, staffOutputFactor } from '../engine/owner';
 import { plural } from '../engine/text';
+import type { RoomId } from '../engine/constants';
 import type { Equipment, EquipmentSpec, GameState } from '../engine/types';
 import {
   type BoxFaces,
@@ -45,7 +46,15 @@ import {
   footprintPolygon,
   gridBounds,
 } from './iso';
-import { contactShadow, spriteBox, spriteImage, spriteUrl } from './sprites';
+import {
+  SPRITE_SCALE,
+  contactShadow,
+  pickSprite,
+  spriteBox,
+  spriteFiles,
+  spriteImage,
+  spriteUrl,
+} from './sprites';
 
 // ---------------------------------------------------------------------------
 // SVG primitives. office.ts uses these too: one place builds the strings.
@@ -119,6 +128,48 @@ export function objectArt(art: {
 interface Drawable {
   depth: number;
   svg: string;
+}
+
+// ---------------------------------------------------------------------------
+// The painted hall (docs/art/SPRITES.md 9). Three layers on one canvas, registered to the grid by
+// where world (0, 0, 0) sits on that canvas, with the sprites and the figures on top of them.
+// ---------------------------------------------------------------------------
+
+/** The canvas every hall layer is drawn on, at the 1x scale the game draws at: the art is 2x, so
+ *  1680 by 1128 in the file is half that here. `originX` and `originY` are where world (0, 0, 0)
+ *  sits on it, which is the whole of the registration (docs/art/SPRITES.md 9.2). */
+export const HALL_CANVAS = {
+  width: 1680 / SPRITE_SCALE,
+  height: 1128 / SPRITE_SCALE,
+  originX: 600 / SPRITE_SCALE,
+  originY: 288 / SPRITE_SCALE,
+};
+
+export interface HallLayer {
+  /** The sprite key, which is the file name in public/sprites. */
+  key: string;
+  /** What a flat placeholder says while the art is not there yet. */
+  name: string;
+  /** The room block this layer paints. The WC is painted into the background. */
+  room: RoomId;
+}
+
+/** Back to front (docs/art/SPRITES.md 9.3). */
+export const HALL_LAYERS: HallLayer[] = [
+  { key: 'hallBackground', name: 'Hall background', room: 'wc' },
+  { key: 'hallOffice', name: 'Office block', room: 'office' },
+  { key: 'hallCanteen', name: 'Canteen block', room: 'canteen' },
+];
+
+/** Where a layer goes in the hall's own coordinates: the canvas, shifted so its origin pixel
+ *  lands on world (0, 0, 0). */
+export function hallLayerBox(): { x: number; y: number; width: number; height: number } {
+  return {
+    x: -HALL_CANVAS.originX,
+    y: -HALL_CANVAS.originY,
+    width: HALL_CANVAS.width,
+    height: HALL_CANVAS.height,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -308,53 +359,100 @@ export interface Ghost {
   reason: string;
 }
 
-export function renderHall(state: GameState, ghost: Ghost | null = null): string {
+export interface HallOptions {
+  /** The footprint following the mouse while the hall is being set out. */
+  ghost?: Ghost | null;
+  /** True while the hall is being set out: the grid comes out over the painting. */
+  setup?: boolean;
+  /** What the art side has delivered. A parameter so a test can ask for the hall before the art
+   *  arrived, which is what the placeholders are for. */
+  files?: readonly string[];
+}
+
+export function renderHall(state: GameState, options: HallOptions = {}): string {
   const unit = state.unit;
+  const ghost = options.ghost ?? null;
+  const files = options.files ?? spriteFiles();
+  const layerUrl = (key: string): string | null => pickSprite(files, key);
+  // The background carries the floor, the walls and the kerbs. Without it the game draws its own
+  // flat floor, so the hall is playable and testable before the art arrives.
+  const painted = layerUrl('hallBackground') !== null;
   const bounds = gridBounds(unit.widthCells + YARD_WIDTH_CELLS, unit.depthCells, 5);
   const pad = 24;
   const parts: string[] = [];
 
-  // Floor, yard and the grid.
-  parts.push(polygon(footprintPolygon(0, 0, unit.widthCells, unit.depthCells), 'var(--concrete)'));
-  parts.push(
-    polygon(
-      footprintPolygon(unit.widthCells, 0, YARD_WIDTH_CELLS, unit.depthCells),
-      'var(--yard)',
-    ),
-  );
-  const lines: string[] = [];
-  for (let x = 0; x <= unit.widthCells; x += 1) {
-    lines.push(
-      `<line ${lineAttrs(x, 0, x, unit.depthCells)} stroke="var(--grid)" stroke-width="1" />`,
+  if (painted) {
+    // The layers sit at the canvas origin, every one of them, which is what keeps the two room
+    // blocks on their own cells (docs/art/SPRITES.md 9.3).
+    const at = hallLayerBox();
+    for (const layer of HALL_LAYERS) {
+      const url = layerUrl(layer.key);
+      if (url === null) continue;
+      parts.push(
+        `<image class="hall-layer" data-layer="${layer.key}" href="${url}" ` +
+          `x="${at.x}" y="${at.y}" width="${at.width}" height="${at.height}" ` +
+          'preserveAspectRatio="none" />',
+      );
+    }
+  } else {
+    // Floor and yard.
+    parts.push(
+      polygon(footprintPolygon(0, 0, unit.widthCells, unit.depthCells), 'var(--concrete)'),
+    );
+    parts.push(
+      polygon(
+        footprintPolygon(unit.widthCells, 0, YARD_WIDTH_CELLS, unit.depthCells),
+        'var(--yard)',
+      ),
     );
   }
-  for (let y = 0; y <= unit.depthCells; y += 1) {
-    lines.push(
-      `<line ${lineAttrs(0, y, unit.widthCells, y)} stroke="var(--grid)" stroke-width="1" />`,
-    );
+
+  // The grid is the painting's business once the painting is there, except while the player is
+  // setting the hall out, when he needs to see the cells he is dropping on.
+  if (!painted || options.setup === true) {
+    const lines: string[] = [];
+    for (let x = 0; x <= unit.widthCells; x += 1) {
+      lines.push(
+        `<line ${lineAttrs(x, 0, x, unit.depthCells)} stroke="var(--grid)" stroke-width="1" />`,
+      );
+    }
+    for (let y = 0; y <= unit.depthCells; y += 1) {
+      lines.push(
+        `<line ${lineAttrs(0, y, unit.widthCells, y)} stroke="var(--grid)" stroke-width="1" />`,
+      );
+    }
+    parts.push(lines.join(''));
   }
-  parts.push(lines.join(''));
 
   const drawables: Drawable[] = [];
 
-  // The three small rooms along the back wall.
+  // The three room blocks. Each is a layer of the painting, or a placeholder box while that layer
+  // is missing; either way its footprint is what the player clicks on.
   for (const room of ROOM_LAYOUT) {
+    const layer = HALL_LAYERS.find((entry) => entry.room === room.id);
+    const drawn = layer !== undefined && layerUrl(layer.key) !== null;
     drawables.push({
       depth: depthKey(room.x, room.y),
       svg:
         `<g data-room="${room.id}" data-sprite="${room.spriteKey}" class="clickable">` +
         `<title>${escapeText(room.tooltip)}</title>` +
-        objectArt({
-          spriteKey: room.spriteKey,
-          x: room.x,
-          y: room.y,
-          width: room.width,
-          depth: room.depth,
-          height: room.height,
-          fill: 'var(--room)',
-          shade: 'var(--room-dark)',
-          label: room.name,
-        }) +
+        (drawn
+          ? polygon(
+              footprintPolygon(room.x, room.y, room.width, room.depth),
+              'transparent',
+              'class="room-hit"',
+            )
+          : objectArt({
+              spriteKey: room.spriteKey,
+              x: room.x,
+              y: room.y,
+              width: room.width,
+              depth: room.depth,
+              height: room.height,
+              fill: 'var(--room)',
+              shade: 'var(--room-dark)',
+              label: room.name,
+            })) +
         '</g>',
     });
   }
@@ -507,12 +605,22 @@ export function renderHall(state: GameState, ghost: Ghost | null = null): string
     );
   }
 
-  const size = {
-    x: Math.round(bounds.minX - pad),
-    y: Math.round(bounds.minY - pad),
-    width: Math.round(bounds.width + pad * 2),
-    height: Math.round(bounds.height + pad * 2),
-  };
+  // With the painting there, the frame is the canvas: the view box is the art's own edges, so the
+  // registration cannot drift whatever else is in the hall. Without it, the grid sets the frame.
+  const layerAt = hallLayerBox();
+  const size = painted
+    ? {
+        x: layerAt.x,
+        y: layerAt.y,
+        width: layerAt.width,
+        height: layerAt.height,
+      }
+    : {
+        x: Math.round(bounds.minX - pad),
+        y: Math.round(bounds.minY - pad),
+        width: Math.round(bounds.width + pad * 2),
+        height: Math.round(bounds.height + pad * 2),
+      };
   const viewBox = [size.x, size.y, size.width, size.height].join(' ');
   const output = `${Math.round(staffOutputFactor(state) * 100)}%`;
   const ownerLine = !state.owner.present
