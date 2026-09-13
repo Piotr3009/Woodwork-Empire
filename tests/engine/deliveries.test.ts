@@ -1,12 +1,13 @@
-// Deliveries by class: the cash leaves at the click, the trip is the owner's own minutes, and the
-// thing itself turns up days later (CLAUDE.md T8 3.2).
+// Deliveries by class: the cash leaves at the click, the delivery is booked at the click, and the
+// thing itself turns up days later. Nobody goes anywhere (CLAUDE.md T8 3.2, T9 3.1).
 
+import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   DELIVERY_DAYS_BY_CLASS,
   EQUIPMENT_UNLOAD_MINUTES,
   EQUIPMENT_SPECS,
-  SHOPPING_MINUTES,
 } from '../../src/engine/constants';
 import { canPlaceSpec, firstFreeCell } from '../../src/engine/layout';
 import { deliveryDaysFor, isHeavy } from '../../src/engine/machines';
@@ -20,10 +21,9 @@ function shop(): GameState {
   return fillRack(buyStartingKit(newGame({ difficulty: 'veryEasy' })));
 }
 
-/** Orders one thing through the shop counter and runs the trip out. */
+/** Orders one thing. It is booked at the click and costs the owner nothing (CLAUDE.md T9 3.1). */
 function order(state: GameState, specId: string, variantId?: string): GameState {
-  const out = act(state, { type: 'BUY_EQUIPMENT', specId, variantId });
-  return runClock(out, SHOPPING_MINUTES);
+  return act(state, { type: 'BUY_EQUIPMENT', specId, variantId });
 }
 
 /** Plays whole days, answering everything with its first choice and keeping what it answered,
@@ -54,19 +54,21 @@ describe('the days a class waits', () => {
     expect(deliveryDaysFor('van', 'standard')).toBe(3);
     expect(deliveryDaysFor('forklift', 'standard')).toBe(5);
     expect(deliveryDaysFor('thicknesser', 'standard')).toBe(5);
-    // The hand tools, the furniture and the storage come back with the owner from the trip.
+    // The hand tools, the furniture and the storage come the next working day: nothing comes back
+    // in the owner's hands any more (CLAUDE.md T9 3.1).
     for (const specId of ['desk', 'chair', 'laptop', 'drill', 'toolCabinet', 'locker', 'canteenSeat', 'handToolSet']) {
-      expect(deliveryDaysFor(specId, 'standard'), specId).toBe(0);
+      expect(deliveryDaysFor(specId, 'standard'), specId).toBe(1);
     }
-    // A hand edgebander is in the boot of the car; a floor one is ordered in.
-    expect(deliveryDaysFor('edgebander', 'budget')).toBe(0);
+    // A hand edgebander comes next day like a hand tool; a floor one is ordered in.
+    expect(deliveryDaysFor('edgebander', 'budget')).toBe(1);
     expect(deliveryDaysFor('edgebander', 'standard')).toBe(7);
     expect(deliveryDaysFor('edgebander', 'industrial')).toBe(20);
     // Every class of every family carries a figure of its own, and never a negative one.
     for (const spec of EQUIPMENT_SPECS) {
       for (const variant of spec.variants) {
         expect(typeof variant.deliveryDays, `${spec.id}.${variant.id}`).toBe('number');
-        expect(deliveryDaysFor(spec.id, variant.id), `${spec.id}.${variant.id}`).toBeGreaterThanOrEqual(0);
+        // Every class waits at least a day now (CLAUDE.md T9 3.1).
+        expect(deliveryDaysFor(spec.id, variant.id), `${spec.id}.${variant.id}`).toBeGreaterThanOrEqual(1);
       }
     }
     // The ladder in the table is the ladder the engine hands out.
@@ -82,11 +84,13 @@ describe('a used saw ordered on day 1', () => {
   it('leaves the cash at the click, lands nothing in the hall, and turns up on day 2', () => {
     const start = shop();
     const cash = start.cash;
+    const saws = start.equipment.filter((item) => item.specId === 'tableSaw').length;
+    const minutesBefore = start.owner.minutesWorked;
     let state = act(start, { type: 'BUY_EQUIPMENT', specId: 'tableSaw', variantId: 'used' });
-    // The cash goes at the counter (chat fix 1), and the saw is on the trip, not in the hall.
+    // The cash goes at the click (chat fix 1) and the order is booked at the click, out of the
+    // owner's day entirely (CLAUDE.md T9 3.1).
     expect(cash - state.cash).toBe(1800);
-    state = runClock(state, SHOPPING_MINUTES);
-    const saws = state.equipment.filter((item) => item.specId === 'tableSaw').length;
+    expect(state.owner.minutesWorked).toBe(minutesBefore);
     expect(state.onOrder).toHaveLength(1);
     expect(state.onOrder[0]?.specId).toBe('tableSaw');
     expect(state.onOrder[0]?.dueDay).toBe(2);
@@ -104,7 +108,7 @@ describe('a used saw ordered on day 1', () => {
     expect(gate).toBeDefined();
     expect(gate?.body).toContain('used table saw');
     // Two hours by hand, and then it stands on the cells that were held for it.
-    const task = state.tasks.find((entry) => entry.orderId !== null && !entry.done);
+    const task = state.tasks.find((entry) => entry.orderIds.length > 0 && !entry.done);
     expect(task?.minutesTotal).toBe(EQUIPMENT_UNLOAD_MINUTES);
     if (!task) throw new Error('nothing at the gate');
     state = act(state, { type: 'START_TASK', taskId: task.id });
@@ -129,10 +133,15 @@ describe('a CNC ordered on day 1', () => {
 });
 
 describe('a cabinet ordered on day 1', () => {
-  it('comes back with the owner from the trip and never goes on the list at all', () => {
+  it('is on the list like everything else and lands the next working day', () => {
     const state = order(shop(), 'toolCabinet');
-    expect(state.onOrder).toHaveLength(0);
-    expect(state.equipment.filter((item) => item.specId === 'toolCabinet').length).toBeGreaterThan(1);
+    const held = state.onOrder.find((item) => item.specId === 'toolCabinet');
+    expect(held?.dueDay).toBe(2);
+    const cabinets = state.equipment.filter((item) => item.specId === 'toolCabinet').length;
+    const next = toDay(runClock(state, 600), 2);
+    // Two men carry a cabinet in: it stands itself in the hall and asks nobody anything.
+    expect(next.equipment.filter((item) => item.specId === 'toolCabinet')).toHaveLength(cabinets + 1);
+    expect(next.onOrder.filter((item) => item.specId === 'toolCabinet')).toHaveLength(0);
   });
 });
 
@@ -186,5 +195,38 @@ describe('what needs somebody at the gate', () => {
     // The bench stood itself in the hall at 08:00 and asked nobody anything.
     expect(state.equipment.filter((item) => item.specId === 'workbench')).toHaveLength(benches + 1);
     expect(state.onOrder).toHaveLength(0);
+  });
+});
+
+/** Every .ts file under src, so the grep below reads the game and not its tests. */
+function sourceFiles(directory: string): string[] {
+  const found: string[] = [];
+  for (const name of readdirSync(directory)) {
+    const path = join(directory, name);
+    if (statSync(path).isDirectory()) {
+      found.push(...sourceFiles(path));
+      continue;
+    }
+    if (!name.endsWith('.ts')) continue;
+    found.push(path);
+  }
+  return found;
+}
+
+describe('the trip to the shops', () => {
+  it('is not in the game any more, in any of the three figures it was measured in', () => {
+    const source = sourceFiles('src').map((path) => readFileSync(path, 'utf8'));
+    for (const name of ['SHOPPING_MINUTES', 'SHOPPING_NEXT_MINUTES', 'SOFTWARE_SHOPPING_MINUTES']) {
+      expect(
+        source.filter((text) => text.includes(name)),
+        name,
+      ).toEqual([]);
+    }
+    // And the task kind itself is gone from the engine: an interview is the last errand the
+    // owner runs (CLAUDE.md T9 3.1). The word survives in the UI, where the panel of what is on
+    // order is called the shopping list, and that is a modal id and not a job of work.
+    const engine = sourceFiles('src/engine').map((path) => readFileSync(path, 'utf8'));
+    expect(engine.filter((text) => text.includes("'shopping'"))).toEqual([]);
+    expect(source.filter((text) => text.includes('shoppingTask'))).toEqual([]);
   });
 });

@@ -4,9 +4,10 @@
 // One escape and one money format for the whole game: the renderers and the engine own them,
 // because both layers sit below the modals.
 
-import { WHY, formatMoney, ownerOutTask, plural, startTaskCheck } from '../engine/index';
+import { WHY, formatMoney, interviewTask, plural, startTaskCheck } from '../engine/index';
 import type { GameState, TaskInstance } from '../engine/index';
 import { escapeText } from '../render/hall';
+import { patchInto } from './patch';
 
 export const escapeHtml = escapeText;
 export const money = formatMoney;
@@ -83,7 +84,9 @@ function fillModal(node: Element, spec: ModalSpec): void {
   const body = node.querySelector('.modal-body');
   if (body !== null) {
     const scrolled = body.scrollTop;
-    body.innerHTML = spec.body;
+    // Patched, not replaced: a control the player has his finger on keeps its node, whatever the
+    // minute does to the figures beside it (CLAUDE.md T9 3.8).
+    patchInto(body, spec.body);
     // Clamp only when the new content measures shorter. A browser clamps for itself, and the
     // measurement is zero in a headless DOM, where clamping would throw the player to the top.
     const most = body.scrollHeight - body.clientHeight;
@@ -93,10 +96,10 @@ function fillModal(node: Element, spec: ModalSpec): void {
   if (foot !== null) {
     if (spec.footer === undefined) {
       foot.setAttribute('hidden', 'hidden');
-      foot.innerHTML = '';
+      patchInto(foot, '');
     } else {
       foot.removeAttribute('hidden');
-      foot.innerHTML = spec.footer;
+      patchInto(foot, spec.footer);
     }
   }
 }
@@ -192,18 +195,17 @@ export function reasonLabel(reason: string): string {
  *  owner could start this task and the answer is shown: a button he can press, or the reason he
  *  cannot, with the way out of it. A Start the engine would refuse is never drawn, which is what
  *  left the drawings unable to be drawn (CLAUDE.md T4 3.2). */
-/** The trip the owner is on, over the modal that started it. Nothing he has ordered is his until
- *  the minutes are spent and the cash leaves (CLAUDE.md T7 3.10). */
-export function tripLine(state: GameState, kind: 'shopping' | 'hiring'): string {
-  // The same selector the "Owner is out" component outside the modal reads, so the two cannot
-  // disagree about what he is doing (CLAUDE.md T8 3.3).
-  const task = ownerOutTask(state);
-  if (task === null || task.kind !== kind) return '';
+/** The interview the owner is in, over the modal that started it. Nobody is taken on until the
+ *  hour is spent (CLAUDE.md T7 3.10). Buying is no longer a trip: it costs him nothing and he
+ *  never leaves the workshop for it (CLAUDE.md T9 3.1), and an interview is not one of the three
+ *  things the "Owner is out" line is for, so it has its own selector (CLAUDE.md T9 3.3). */
+export function tripLine(state: GameState): string {
+  const task = interviewTask(state);
+  if (task === null) return '';
   const spent = Math.round(task.minutesTotal - task.minutesRemaining);
-  const word = kind === 'shopping' ? 'Shopping' : 'Interview';
   return (
-    `<p class="warn trip">${word}: ${spent} of ${Math.round(task.minutesTotal)} min. ` +
-    'Paid for at the counter; it all lands when you are back.</p>'
+    `<p class="warn trip">Interview: ${spent} of ${Math.round(task.minutesTotal)} min. ` +
+    'Nobody is on the books until it is over.</p>'
   );
 }
 

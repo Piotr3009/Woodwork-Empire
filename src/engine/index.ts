@@ -20,9 +20,11 @@ export {
   machineInUse,
   moveConfirmPending,
   orderCheck,
-  placeOrder,
-  onOrder,
-  ordersOnTheList,
+  orderEquipmentCheck,
+  orderSoftwareCheck,
+  placeEquipmentOrder,
+  placeHireOrder,
+  placeSoftwareOrder,
   runMinutes,
   summaryTotals,
   tick,
@@ -36,7 +38,6 @@ export {
   APP_VERSION,
   CLEANING_MINUTES,
   EQUIPMENT_SPECS,
-  GANTT_STAGES,
   MACHINE_ENDURANCE_HOURS,
   MACHINE_ENDURANCE_HOURS_DEFAULT,
   PRODUCTION_STAGES,
@@ -47,9 +48,6 @@ export {
   SKIP_SPEED,
   HIRING_MINUTES,
   LAPTOP_BOOT_MINUTES,
-  SHOPPING_MINUTES,
-  SHOPPING_NEXT_MINUTES,
-  SOFTWARE_SHOPPING_MINUTES,
   STATE_VERSION,
   WHY,
   SHEET_PRICE_STOCK,
@@ -148,9 +146,13 @@ export {
   showsStartProduction,
   stagedJob,
   startProductionCheck,
+  stockCheck,
   transportLabel,
 } from './jobs';
+export { dropJob } from './jobs';
+export { changeReputation } from './reputation';
 export type { LifecycleStep, StartCheck, StepState } from './jobs';
+export type { OutputBreakdown, OutputLine } from './machines';
 
 // Production in stages (CLAUDE.md T7 3.1)
 export {
@@ -172,14 +174,13 @@ export {
 export type { StageOptions, StagePlan, StagedJob } from './stages';
 export {
   BOARD_DAYS_PAST_DUE,
-  DELIVERY_BAR_DAYS,
-  barsFor,
   dayPoint,
-  gapFor,
-  jobRate,
-  workPlanGantt,
+  rateFor,
+  stageText,
+  workPlan,
+  workshopRate,
 } from './plan';
-export type { JobGantt, StageBar, StageGap } from './plan';
+export type { PlanRow, WorkPlan } from './plan';
 
 // Client calls
 export {
@@ -203,11 +204,9 @@ export {
   equipmentUnloadMinutes,
   finishTimeFor,
   movePending,
-  orderMinutes,
+  interviewTask,
   ownerOutTask,
   skippedTask,
-  shoppingLabel,
-  shoppingTask,
   movingMachines,
   openTasks,
   softwareActive,
@@ -272,6 +271,7 @@ export {
   ductingDue,
   ductingIsFree,
   dustBand,
+  outputBreakdown,
   findSpec,
   gateIsCrowded,
   has,

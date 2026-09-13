@@ -3,8 +3,8 @@
 
 export type Difficulty = 'veryEasy' | 'easy' | 'hard';
 
-/** 0 is paused. Nothing above 4x exists (CLAUDE.md 6.1). */
-export type Speed = 0 | 1 | 2 | 4;
+/** 0 is paused. Ten is the fastest there is (PIOTR, 13.09; CLAUDE.md T9 3.11). */
+export type Speed = 0 | 1 | 2 | 4 | 10;
 
 export type MaterialKind = 'sheet' | 'solidWood';
 
@@ -468,21 +468,15 @@ export type TaskKind =
   | 'service'
   | 'repair'
   | 'moveMachines'
-  /** The trip to the shops that every purchase rides on (CLAUDE.md T7 3.10). */
-  | 'shopping'
-  /** The interview that taking somebody on costs the owner. */
+  /** The interview that taking somebody on costs the owner. Ordering a machine costs him
+   *  nothing; taking a man on is still an hour of his day (CLAUDE.md T9 3.1). */
   | 'hiring'
   /** The laptop booting up before the player can touch anything on it. */
   | 'booting';
 
-/** What a trip to the shops or an interview will do once its minutes are spent. Nothing is
- *  booked until then: the cash leaves when the owner gets back (CLAUDE.md T7 3.10). */
-/** `paid` is set when the cash left at the click, so the thing is not paid for twice when it
- *  lands (PIOTR, 13.09). */
-export type TaskOrder =
-  | { kind: 'equipment'; specId: string; variantId: string; paid?: boolean }
-  | { kind: 'software'; mode: 'oneOff' | 'subscription'; paid?: boolean }
-  | { kind: 'hire'; role: WorkerRole; tier: WorkerTier | null };
+/** What an interview will do once its hour is spent. Equipment and software are booked at the
+ *  click and ride on nothing (CLAUDE.md T9 3.1). */
+export type TaskOrder = { kind: 'hire'; role: WorkerRole; tier: WorkerTier | null };
 
 export interface TaskInstance {
   id: string;
@@ -494,8 +488,9 @@ export interface TaskInstance {
   jobId: string | null;
   equipmentId: string | null;
   deliveryId: string | null;
-  /** The kit on the lorry this unloading is for, or null for a load of sheets (T8 3.2). */
-  orderId: string | null;
+  /** The kit on the lorry this unloading is for, empty for a load of sheets. One van is one
+   *  unloading, however many machines are on it (CLAUDE.md T9 3.1). */
+  orderIds: string[];
   /** Day the task belongs to. Daily tasks are created fresh each working day. */
   day: number;
   done: boolean;
@@ -503,8 +498,8 @@ export interface TaskInstance {
   doneDay: number | null;
   /** Worker id, 'owner', or null while nobody works on it. */
   doneBy: string | null;
-  /** What this task books when it finishes. Empty for every task but a trip to the shops and an
-   *  interview (CLAUDE.md T7 3.10). */
+  /** What this task books when it finishes. Empty for every task but an interview
+   *  (CLAUDE.md T9 3.1). */
   orders: TaskOrder[];
 }
 
@@ -677,6 +672,14 @@ export interface DayStats {
   workMinutes: number;
 }
 
+/** One line of the reputation log: the day, what happened, and what it was worth. The company
+ *  board is this list, week by week (PIOTR, 13.09; CLAUDE.md T9 3.10). */
+export interface ReputationEntry {
+  day: number;
+  reason: string;
+  points: number;
+}
+
 export interface GameOver {
   reason: string;
   day: number;
@@ -697,6 +700,9 @@ export interface GameState {
   speed: Speed;
   cash: number;
   reputation: number;
+  /** Every point of reputation the company has gained or lost, with the day and the reason
+   *  (CLAUDE.md T9 3.10). */
+  reputationLog: ReputationEntry[];
   dust: number;
   unit: UnitState;
   owner: OwnerState;
@@ -759,6 +765,11 @@ export type GameAction =
   /** Lifting the lid: the machine has to come up before anything on it can be touched. */
   | { type: 'BOOT_LAPTOP' }
   | { type: 'SET_MATERIAL_MODE'; jobId: string; mode: MaterialMode }
+  /** Takes the job's sheets off the rack now, instead of ordering what is already there
+   *  (PIOTR, 13.09; CLAUDE.md T9 3.7). */
+  | { type: 'DRAW_FROM_STOCK'; jobId: string }
+  /** Gives the client his deposit back and takes the job off the plan (CLAUDE.md T9 3.9). */
+  | { type: 'DROP_JOB'; jobId: string }
   | { type: 'SET_SAW_FALLBACK'; jobId: string; on: boolean }
   | { type: 'BUY_STOCK'; sheets: number }
   | { type: 'PAY_ARREARS'; amount: number | null }

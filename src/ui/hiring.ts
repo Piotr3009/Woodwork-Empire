@@ -77,7 +77,7 @@ export function renderHiring(state: GameState): string {
   return (
     // The interview he is sitting in, and that the man is not on the books until it is over
     // (CLAUDE.md T7 3.10).
-    tripLine(state, 'hiring') +
+    tripLine(state) +
     '<h3>The crew</h3>' +
     (crew === '' ? emptyLine('Nobody yet. Every hour is your own hour.') : crew) +
     (management > 0

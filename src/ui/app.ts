@@ -74,7 +74,16 @@ import {
   reasonLabel,
   syncModals,
 } from './modal';
+import {
+  type Animation,
+  faceCharacter,
+  facingFromScreen,
+  playCharacters,
+  setCharacterAnimation,
+} from '../render/characters';
+import { patchInto } from './patch';
 import { renderOwnerOut } from './ownerOut';
+import { renderCompany } from './company';
 import { renderShopping } from './shopping';
 import { renderStart } from './start';
 import { cloudAvailable } from '../cloud/supabase';
@@ -83,7 +92,14 @@ import { renderMenu, renderTopbar, speedFromString } from './topbar';
 
 /** The modals the room can open. Materials, Team and Drawings are tabs inside the laptop now:
  *  one path per modal, only the entry moved (docs/art/SPRITES.md 8.4). */
-type ModalId = 'board' | 'laptop' | 'workPlan' | 'accounting' | 'catalogue' | 'shopping';
+type ModalId =
+  | 'board'
+  | 'laptop'
+  | 'workPlan'
+  | 'accounting'
+  | 'catalogue'
+  | 'shopping'
+  | 'company';
 
 interface Ui {
   screen: 'start' | 'game';
@@ -113,6 +129,9 @@ interface Ui {
   /** The machine whose Sell button has been pressed once. A sale is meant on the second click,
    *  inside the tile itself (CLAUDE.md T8 3.5). */
   sellConfirm: string | null;
+  /** The job whose Drop project has been pressed once. The same rule: it is meant on the second
+   *  click, inside the card (CLAUDE.md T9 3.9). */
+  dropConfirm: string | null;
   /** Which tab of the books is on top, and the past day whose summary is open over them
    *  (CLAUDE.md T6 3.9). */
   accountingTab: AccountingTab;
@@ -155,6 +174,22 @@ const MODAL_TITLES: Record<ModalId, string> = {
   accounting: 'Accounting',
   catalogue: 'Equipment catalogue',
   shopping: 'On order',
+  company: 'Company board',
+};
+
+/** How much of the page each modal takes. Anything that is a list or a board fills it; a small
+ *  modal is for an event with a decision in it, and nothing else (CLAUDE.md T9 1, 3.12). The one
+ *  table the modal layer reads, so a modal cannot be one size in one place and another in
+ *  another. */
+export const MODAL_IS_FULL: Record<ModalId, boolean> = {
+  board: true,
+  // 3.12 names six modals and the laptop is not one of them, so it keeps the size it had.
+  laptop: false,
+  workPlan: true,
+  accounting: true,
+  catalogue: true,
+  shopping: true,
+  company: true,
 };
 
 let ui: Ui = freshUi();
@@ -182,6 +217,7 @@ function freshUi(): Ui {
     catalogueFolder: null,
     ownedTab: 'all',
     sellConfirm: null,
+    dropConfirm: null,
     accountingTab: 'days',
     accountingMonth: null,
     openDays: [],
@@ -215,7 +251,37 @@ function game(): GameState {
 function dispatch(action: GameAction): void {
   state = applyAction(game(), action);
   autosave();
+  requestRender();
+}
+
+/** Renders asked for while one batch is open, and how deep the batch is. The frame loop and every
+ *  click open one: the world changes as many times as it likes and the page is written once, at
+ *  the end, so the page is never written in the middle of a gesture (CLAUDE.md T9 3.8). */
+let batchDepth = 0;
+let renderWanted = false;
+
+/** Asks for the page to be written. Inside a batch that is a note to write it when the batch is
+ *  over; outside one it is the writing itself. */
+export function requestRender(): void {
+  if (batchDepth > 0) {
+    renderWanted = true;
+    return;
+  }
   render();
+}
+
+/** Runs the work with the page held still, and writes it once afterwards if anything asked. */
+function batched(work: () => void): void {
+  batchDepth += 1;
+  try {
+    work();
+  } finally {
+    batchDepth -= 1;
+    if (batchDepth === 0 && renderWanted) {
+      renderWanted = false;
+      render();
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -229,7 +295,7 @@ function modalBody(id: ModalId, current: GameState): string {
     case 'laptop':
       return renderLaptop(current, { tab: ui.laptopTab, stockSheets: ui.stockSheets });
     case 'workPlan':
-      return renderWorkPlan(current);
+      return renderWorkPlan(current, ui.dropConfirm);
     case 'accounting':
       return renderAccounting(
         current,
@@ -249,6 +315,8 @@ function modalBody(id: ModalId, current: GameState): string {
       );
     case 'shopping':
       return renderShopping(current);
+    case 'company':
+      return renderCompany(current);
   }
 }
 
@@ -406,8 +474,7 @@ function modalSpecs(): ModalSpec[] {
       id: ui.modal,
       title: MODAL_TITLES[ui.modal],
       body: modalBody(ui.modal, current),
-      wide: ui.modal === 'accounting' || ui.modal === 'workPlan' || ui.modal === 'shopping',
-      full: ui.modal === 'board' || ui.modal === 'catalogue',
+      full: MODAL_IS_FULL[ui.modal],
       position: ui.modalPosition,
     });
   }
@@ -579,19 +646,20 @@ function slideFigures(now: number): void {
   if (!root) return;
   const moving: Array<{ node: Element; to: Point }> = [];
   const seen = new Set<string>();
+  const walking = new Set<string>();
   for (const node of Array.from(root.querySelectorAll('[data-figure]'))) {
     const key = node.getAttribute('data-figure');
     const to = pointOf(node.getAttribute('transform') ?? '');
     if (key === null || to === null) continue;
     seen.add(key);
-    const walking = slides.get(key);
-    if (walking === undefined) {
+    const slide = slides.get(key);
+    if (slide === undefined) {
       // First sight of him: he is where he is, and nothing is left to walk.
       slides.set(key, { from: to, to, startedAt: now - FIGURE_SLIDE_MS });
       continue;
     }
-    const at = positionAt(walking, now);
-    if (walking.to.x !== to.x || walking.to.y !== to.y) {
+    const at = positionAt(slide, now);
+    if (slide.to.x !== to.x || slide.to.y !== to.y) {
       // He has been sent somewhere else, and he sets off from wherever he had got to.
       slides.set(key, { from: at, to, startedAt: now });
     } else if (at.x === to.x && at.y === to.y) {
@@ -603,7 +671,24 @@ function slideFigures(now: number): void {
       node.style.transitionDuration = `${Math.round(left)}ms`;
     }
     node.setAttribute('transform', translateOf(at));
+    // He is walking, and he faces the way he is going (CLAUDE.md T9 3.13).
+    walking.add(key);
+    const art = node.querySelector('[data-character]');
+    if (art !== null) {
+      setCharacterAnimation(art, 'walk');
+      faceCharacter(art, facingFromScreen(to.x - at.x, to.y - at.y));
+    }
     moving.push({ node, to });
+  }
+  // Everybody who is not walking is doing whatever his station says, facing the way he was left
+  // facing: the direction is held after he arrives (CLAUDE.md T9 3.13).
+  for (const node of Array.from(root.querySelectorAll('[data-figure]'))) {
+    const key = node.getAttribute('data-figure');
+    if (key === null || walking.has(key)) continue;
+    const art = node.querySelector('[data-character]');
+    if (art === null) continue;
+    const rest = (node.getAttribute('data-rest') ?? 'idle') as Animation;
+    setCharacterAnimation(art, rest);
   }
   for (const key of Array.from(slides.keys())) {
     if (!seen.has(key)) slides.delete(key);
@@ -673,11 +758,16 @@ function mountScene(page: Element, wanted: Scene | null): void {
       scene = null;
       return;
     }
+    // The patch leaves anything marked as the slot alone, so the scene is carried from page to
+    // page whole, with its pictures loaded (CLAUDE.md T9 3.8).
+    node.setAttribute('data-scene-slot', '1');
     scene = { key: wanted.key, node };
   }
   const live = scene.node.querySelector('[data-live]');
-  if (live !== null) live.innerHTML = wanted.live;
-  slot.replaceWith(scene.node);
+  // The live part is patched like everything else: the board by the door is a control in it, and
+  // a control that is replaced every minute cannot be clicked (CLAUDE.md T9 3.8).
+  if (live !== null) patchInto(live, wanted.live);
+  if (slot !== scene.node) slot.replaceWith(scene.node);
 }
 
 /** The frame the hall is seen through, read off the scene's own view box so there is one number
@@ -712,7 +802,7 @@ function moveCamera(next: HallCamera): void {
   const before = Math.round(ui.camera.scale * 100);
   ui.camera = next;
   applyCamera();
-  if (Math.round(ui.camera.scale * 100) !== before) render();
+  if (Math.round(ui.camera.scale * 100) !== before) requestRender();
 }
 
 function resetCamera(): void {
@@ -727,7 +817,7 @@ export function render(): void {
   const wanted = ui.screen === 'game' && state !== null && state.gameOver === null
     ? sceneFor(state)
     : null;
-  parts.page.innerHTML = pageHtml(wanted);
+  patchInto(parts.page, pageHtml(wanted));
   mountScene(parts.page, wanted);
   applyCamera();
   syncModals(parts.layer, modalSpecs());
@@ -749,7 +839,7 @@ export function render(): void {
 /** The modals that act on the world, which is every one of them but the Work Plan: nothing on
  *  them can be touched while the clock is stopped (CLAUDE.md T7 3.10). The Work Plan is a
  *  whiteboard and the Sprite check is a page of pictures: both are reading, and both open. */
-const READING_MODALS: ModalId[] = ['workPlan', 'shopping'];
+const READING_MODALS: ModalId[] = ['workPlan', 'shopping', 'company'];
 
 /** The one line the player gets when the world will not move for him, with the Pause button
  *  pulsing once behind it (CLAUDE.md T7 3.10). */
@@ -785,6 +875,7 @@ const OFFICE_REGION_MODALS: Record<string, ModalId> = {
   laptop: 'laptop',
   catalogue: 'catalogue',
   binder: 'accounting',
+  company: 'company',
 };
 
 /** Elements in the SVG views are SVGElement, not HTMLElement, but both carry a dataset. */
@@ -796,7 +887,14 @@ function dataElement(node: Element | null): DataElement | null {
   return null;
 }
 
+/** One click, one writing of the page. The handler changes the world as many times as the click
+ *  asks for and the page is written when it is done, never in the middle of it
+ *  (CLAUDE.md T9 3.8). */
 function handleAction(element: DataElement, point: { x: number; y: number }): void {
+  batched(() => runAction(element, point));
+}
+
+function runAction(element: DataElement, point: { x: number; y: number }): void {
   const what = element.dataset.do;
   if (what === undefined) return;
   const id = element.dataset.id ?? '';
@@ -1039,6 +1137,19 @@ function handleAction(element: DataElement, point: { x: number; y: number }): vo
     case 'sawFallback':
       dispatch({ type: 'SET_SAW_FALLBACK', jobId: id, on: element.dataset.on === '1' });
       return;
+    case 'dropJob':
+      // The first click says what it costs, the second means it (CLAUDE.md T9 3.9).
+      if (element.dataset.confirm !== '1') {
+        ui.dropConfirm = id;
+        break;
+      }
+      ui.dropConfirm = null;
+      dispatch({ type: 'DROP_JOB', jobId: id });
+      return;
+    case 'fromStock':
+      // What the rack has, taken now, with no second order for this job ever (T9 3.7).
+      dispatch({ type: 'DRAW_FROM_STOCK', jobId: id });
+      return;
     case 'setMaterialMode':
       dispatch({
         type: 'SET_MATERIAL_MODE',
@@ -1077,7 +1188,7 @@ function handleAction(element: DataElement, point: { x: number; y: number }): vo
       // He has said yes to the move: the clock is run through it, so he is told when it lands.
       if (kind === 'moveConfirm' && id === 'do') {
         ui.toast = moveFinishNote(game());
-        render();
+        requestRender();
       }
       return;
     }
@@ -1123,7 +1234,7 @@ function handleAction(element: DataElement, point: { x: number; y: number }): vo
       break;
   }
   void point;
-  render();
+  requestRender();
 }
 
 /** Every cloud call goes through here: it runs, it leaves a line, and it renders again. */
@@ -1189,7 +1300,7 @@ function handleRoomClick(room: RoomId): void {
   } else {
     ui.note = roomById('canteen').tooltip;
   }
-  render();
+  requestRender();
 }
 
 function handleSceneClick(element: DataElement): boolean {
@@ -1208,7 +1319,7 @@ function handleSceneClick(element: DataElement): boolean {
       const reserved = reservationById(game(), kit);
       if (reserved !== null) {
         ui.note = `On order, due day ${reserved.dueDay} at 08:00.`;
-        render();
+        requestRender();
       }
       return true;
     }
@@ -1220,7 +1331,7 @@ function handleSceneClick(element: DataElement): boolean {
     ui.note = item.broken
       ? 'It has stopped. Nothing runs until it is fixed.'
       : `${minutes(item.minutesUsed)} of use since the last bag change.`;
-    render();
+    requestRender();
     return true;
   }
   return false;
@@ -1231,6 +1342,10 @@ function handleSceneClick(element: DataElement): boolean {
 // ---------------------------------------------------------------------------
 
 function onClick(event: MouseEvent): void {
+  batched(() => runClick(event));
+}
+
+function runClick(event: MouseEvent): void {
   const target = event.target;
   if (!(target instanceof Element)) return;
   if (ui.panned) {
@@ -1261,12 +1376,16 @@ function onClick(event: MouseEvent): void {
 }
 
 function onInput(event: Event): void {
+  batched(() => runInput(event));
+}
+
+function runInput(event: Event): void {
   const target = event.target;
   if (!(target instanceof HTMLInputElement)) return;
   const filter = target.dataset.filter;
   if (filter !== undefined) {
     ui.filters[filter] = target.value;
-    render();
+    requestRender();
     return;
   }
   const field = target.dataset.field;
@@ -1276,18 +1395,18 @@ function onInput(event: Event): void {
   }
   if (field === 'showWhy') {
     ui.showWhy = target.checked;
-    render();
+    requestRender();
     return;
   }
   if (field === 'playerName') ui.playerName = target.value;
   if (field === 'companyName') ui.companyName = target.value;
   if (field === 'stockSheets') {
     ui.stockSheets = target.value;
-    render();
+    requestRender();
   }
   if (field === 'arrearsAmount') {
     ui.arrearsAmount = target.value;
-    render();
+    requestRender();
   }
 }
 
@@ -1305,23 +1424,27 @@ function onKeyUp(event: KeyboardEvent): void {
 }
 
 function onKeyDown(event: KeyboardEvent): void {
+  batched(() => runKeyDown(event));
+}
+
+function runKeyDown(event: KeyboardEvent): void {
   if (event.key === ' ') spaceHeld = true;
   if (event.key !== 'Escape') return;
   // Escape drops whatever is in hand before it closes anything (CLAUDE.md T2 3.10).
   if (ui.drag !== null) {
     ui.drag = null;
-    render();
+    requestRender();
     return;
   }
   if (ui.daySummary !== null) {
     ui.daySummary = null;
-    render();
+    requestRender();
     return;
   }
   if (ui.modal !== null) {
     ui.modal = null;
     ui.modalPosition = null;
-    render();
+    requestRender();
   }
 }
 
@@ -1365,6 +1488,10 @@ let spaceHeld = false;
 
 /** The wheel over the hall zooms about the pointer, from the fit to four times it. */
 function onWheel(event: WheelEvent): void {
+  batched(() => runWheel(event));
+}
+
+function runWheel(event: WheelEvent): void {
   const target = event.target;
   if (!(target instanceof Element) || target.closest('.hall-view') === null) return;
   const frame = hallFrame();
@@ -1377,6 +1504,10 @@ function onWheel(event: WheelEvent): void {
 
 /** A double click on something in the hall brings it up to twice the fit, in the middle. */
 function onDoubleClick(event: MouseEvent): void {
+  batched(() => runDoubleClick(event));
+}
+
+function runDoubleClick(event: MouseEvent): void {
   const target = event.target;
   if (!(target instanceof Element) || target.closest('.hall-view') === null) return;
   const frame = hallFrame();
@@ -1472,7 +1603,7 @@ function onSetupPointerDown(event: MouseEvent): boolean {
     if (x === ui.drag.x && y === ui.drag.y) return;
     moved = true;
     ui.drag = { itemId: ui.drag.itemId, x, y };
-    render();
+    requestRender();
   };
   const up = (): void => {
     window.removeEventListener('mousemove', move);
@@ -1481,7 +1612,7 @@ function onSetupPointerDown(event: MouseEvent): boolean {
     ui.drag = null;
     // A click that never moved is not a move: it leaves the hall exactly as it was.
     if (drag === null || !moved) {
-      render();
+      requestRender();
       return;
     }
     dispatch({ type: 'MOVE_ITEM', itemId: drag.itemId, x: drag.x, y: drag.y });
@@ -1489,12 +1620,16 @@ function onSetupPointerDown(event: MouseEvent): boolean {
   window.addEventListener('mousemove', move);
   window.addEventListener('mouseup', up);
   event.preventDefault();
-  render();
+  requestRender();
   return true;
 }
 
 /** Modals are dragged by their header (CLAUDE.md 3.9). */
 function onPointerDown(event: MouseEvent): void {
+  batched(() => runPointerDown(event));
+}
+
+function runPointerDown(event: MouseEvent): void {
   // Every press starts clean: a pan swallows the click that ends it, and nothing after that.
   ui.panned = false;
   // The space bar wins: setting the hall out at 3x means pushing it about between drops.
@@ -1542,22 +1677,29 @@ export function advanceMinutes(wholeMinutes: number): number {
   const result = runMinutes(state, wholeMinutes);
   state = result.state;
   autosave();
-  render();
+  requestRender();
   return result.minutesRun;
 }
 
 function frame(now: number): void {
   const elapsed = Math.min(1000, now - lastFrame);
   lastFrame = now;
-  if (state !== null && ui.screen === 'game' && state.gameOver === null) {
-    const perSecond = gameMinutesPerRealSecond(state.speed);
-    if (perSecond > 0 && state.activeEvent === null) {
-      accumulator += (elapsed / 1000) * perSecond;
-      const whole = Math.floor(accumulator);
-      // Only what the engine actually ran leaves the accumulator: the rest waits for the modal.
-      if (whole > 0) accumulator -= advanceMinutes(whole);
+  // The figures walk in real time and not in game minutes, so they are moved on before anything
+  // else the frame does and whatever the clock is at (CLAUDE.md T9 3.13).
+  if (root !== null) playCharacters(root, now);
+  // One frame, one writing of the page, whatever the clock did inside it: ten game minutes at
+  // 10x used to be ten pages (CLAUDE.md T9 3.8, 3.11).
+  batched(() => {
+    if (state !== null && ui.screen === 'game' && state.gameOver === null) {
+      const perSecond = gameMinutesPerRealSecond(state.speed);
+      if (perSecond > 0 && state.activeEvent === null) {
+        accumulator += (elapsed / 1000) * perSecond;
+        const whole = Math.floor(accumulator);
+        // Only what the engine actually ran leaves the accumulator: the rest waits for the modal.
+        if (whole > 0) accumulator -= advanceMinutes(whole);
+      }
     }
-  }
+  });
   requestAnimationFrame(frame);
 }
 

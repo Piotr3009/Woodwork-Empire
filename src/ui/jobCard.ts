@@ -16,11 +16,14 @@ import {
   lifecycleSteps,
   showsStartProduction,
   startProductionCheck,
+  stockCheck,
   transportLabel,
   workerById,
 } from '../engine/index';
+import { DROP_PROJECT_REPUTATION } from '../engine/constants';
 import type { GameState, Job } from '../engine/index';
 import {
+  button,
   emptyLine,
   escapeHtml,
   lockedButton,
@@ -80,6 +83,41 @@ export function jobAssignControls(state: GameState, job: Job): string {
   return `<span class="row-action">${chip('owner', 'You')}${crew}</span>`;
 }
 
+/** One click takes what the rack already has and ticks the material order green. While the rack
+ *  cannot supply it, the button says why instead (PIOTR, 13.09; CLAUDE.md T9 3.7). */
+export function fromStockControl(state: GameState, job: Job): string {
+  if (job.stage !== 'accepted' && job.stage !== 'materialPending') return '';
+  if (job.materialKind !== 'sheet' || job.bespokeMaterial) return '';
+  const check = stockCheck(state, job);
+  const control = check.ok
+    ? button('fromStock', 'From stock', `data-id="${job.id}"`)
+    : lockedButton('From stock', check.reason);
+  return `<span class="row-action">${control}</span>`;
+}
+
+/** Dropping the project: the deposit goes back, the job goes off the plan and the company is ten
+ *  points of reputation worse off, so it is meant on the second click and inside the card itself
+ *  (PIOTR, 13.09; CLAUDE.md T9 3.9). */
+export function dropControl(job: Job, confirm: string | null): string {
+  if (job.stage === 'completed' || job.stage === 'awaitingTransport') return '';
+  if (confirm !== job.id) {
+    return (
+      '<span class="row-action">' +
+      button('dropJob', 'Drop project', `data-id="${job.id}"`) +
+      '</span>'
+    );
+  }
+  return (
+    '<span class="row-action drop-confirm">' +
+    `<span class="reason">${escapeHtml(
+      `${money(job.depositPaid)} back to the client, ${DROP_PROJECT_REPUTATION} off the ` +
+        'reputation.',
+    )}</span>` +
+    button('dropJob', 'Confirm drop', `data-id="${job.id}" data-confirm="1"`) +
+    '</span>'
+  );
+}
+
 /** With a CNC in the hall, the player says whether a sheet job goes on the saw while the CNC is
  *  taken or stands and waits for it (CLAUDE.md T7 3.4). */
 function cncControls(state: GameState, job: Job): string {
@@ -130,6 +168,7 @@ export function jobRow(state: GameState, job: Job): string {
     `<span class="row-figure">${jobLabourLine(state, job)}</span>` +
     callsLine(job) +
     jobAssignControls(state, job) +
+    fromStockControl(state, job) +
     cncControls(state, job) +
     (action === '' ? '' : `<span class="row-action">${action}</span>`) +
     '</div>'

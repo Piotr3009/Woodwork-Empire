@@ -9,6 +9,7 @@ import {
   RATING_EXPRESS_ON_TIME,
   RATING_ON_TIME,
   RATING_PER_DAY_LATE,
+  REPUTATION_LOG_MAX,
   REPUTATION_MAX,
   REPUTATION_MIN,
   REPUTATION_TIERS,
@@ -36,6 +37,20 @@ export function formatReputation(value: number): string {
   return String(Math.round(value * 10) / 10);
 }
 
+/** The one write that moves the company's reputation, and the one that writes down why. The
+ *  company board is this log read week by week, so nothing may move the number without leaving a
+ *  line behind it (PIOTR, 13.09; CLAUDE.md T9 3.10). The points written down are the points the
+ *  company actually moved: at the top or the bottom of the scale that is less than was asked for,
+ *  and the week's total then adds up to what the player can see. */
+export function changeReputation(state: GameState, points: number, reason: string): number {
+  const before = state.reputation;
+  state.reputation = clampReputation(before + points);
+  const moved = Math.round((state.reputation - before) * 100) / 100;
+  state.reputationLog.push({ day: state.clock.day, reason, points: moved });
+  if (state.reputationLog.length > REPUTATION_LOG_MAX) state.reputationLog.shift();
+  return moved;
+}
+
 /** What the client thinks of the job that just landed (CLAUDE.md 8.11). */
 export function ratingFor(job: Job): number {
   let rating = job.daysLate > 0 ? 0 : job.express ? RATING_EXPRESS_ON_TIME : RATING_ON_TIME;
@@ -56,15 +71,26 @@ export function callRatingFactor(missed: number): number {
   return Math.max(0, 1 - CALL_SATISFACTION_PENALTY * penalisedMisses(missed));
 }
 
-/** Applies the rating and hands back the change, for the event body. */
+/** What the client's verdict is called on the company board (CLAUDE.md T9 3.10). */
+function ratingReason(job: Job): string {
+  if (job.daysLate > 0) {
+    return `${job.name}: ${job.daysLate} ${job.daysLate === 1 ? 'day' : 'days'} late`;
+  }
+  return `${job.name}: ${job.express ? 'express, on time' : 'on time'}`;
+}
+
+/** Applies the rating and hands back the change, for the event body. Both halves of it go on the
+ *  board: what the client thought of the job, and what the calls nobody picked up cost on top of
+ *  it (CLAUDE.md T9 3.10). */
 export function applyRating(state: GameState, job: Job): number {
   const raw = ratingFor(job);
   const share = emailRatingFactor(job.emailsUnanswered) * callRatingFactor(job.callsMissed);
-  const scaled = raw > 0 ? raw * share : raw;
+  const scaled = Math.round((raw > 0 ? raw * share : raw) * 100) / 100;
   // And every one of those missed calls is a point off in its own right [TUNE].
-  const missed = penalisedMisses(job.callsMissed) * CALL_RATING_PENALTY;
+  const missed = Math.round(penalisedMisses(job.callsMissed) * CALL_RATING_PENALTY * 100) / 100;
   const rating = Math.round((scaled - missed) * 100) / 100;
   job.rating = rating;
-  state.reputation = clampReputation(state.reputation + rating);
+  changeReputation(state, scaled, ratingReason(job));
+  if (missed > 0) changeReputation(state, -missed, `${job.name}: calls not answered`);
   return rating;
 }

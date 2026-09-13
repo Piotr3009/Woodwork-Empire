@@ -2,7 +2,7 @@
 // (PIOTR, 13.09; CLAUDE.md T8 3.5).
 
 import { describe, expect, it } from 'vitest';
-import { SALE_FRACTION, SALE_FRACTION_USED, SHOPPING_MINUTES } from '../../src/engine/constants';
+import { SALE_FRACTION, SALE_FRACTION_USED } from '../../src/engine/constants';
 import { canSell, salePriceFor } from '../../src/engine/index';
 import { nextWorkingDay } from '../../src/engine/clock';
 import { shoppingList } from '../../src/engine/orders';
@@ -24,7 +24,7 @@ function untilLanded(state: GameState): GameState {
   let guard = 0;
   while (next.onOrder.length > 0 && guard < 4000) {
     guard += 1;
-    const task = next.tasks.find((entry) => entry.orderId !== null && !entry.done);
+    const task = next.tasks.find((entry) => entry.orderIds.length > 0 && !entry.done);
     if (task !== undefined && next.owner.currentTaskId === null) {
       next = act(next, { type: 'START_TASK', taskId: task.id });
     }
@@ -57,7 +57,6 @@ describe('cancelling an order', () => {
       specId: 'tableSaw',
       variantId: 'pro',
     });
-    state = runClock(state, SHOPPING_MINUTES);
     const order = state.onOrder[0];
     if (!order) throw new Error('nothing on order');
     expect(order.dueDay - order.orderedDay).toBeGreaterThanOrEqual(7);
@@ -76,8 +75,7 @@ describe('cancelling an order', () => {
   });
 
   it('is offered on the list and on the tile, and only until the lorry comes', () => {
-    let state = act(shop(), { type: 'BUY_EQUIPMENT', specId: 'cnc' });
-    state = runClock(state, SHOPPING_MINUTES);
+    const state = act(shop(), { type: 'BUY_EQUIPMENT', specId: 'cnc' });
     expect(renderShopping(state)).toContain('data-do="cancelOrder"');
     expect(renderCatalogue(state, '', 'owned', null, 'all')).toContain('data-do="cancelOrder"');
     const order = state.onOrder[0];
@@ -110,7 +108,7 @@ describe('selling a machine', () => {
   it('pays half of 5,000 the next morning and takes the machine away', () => {
     let state = shop();
     state = act(state, { type: 'BUY_EQUIPMENT', specId: 'tableSaw', variantId: 'budget' });
-    state = untilLanded(runClock(state, SHOPPING_MINUTES));
+    state = untilLanded(state);
     // The budget saw is in the hall and nobody is at it.
     const saw = state.equipment.find(
       (item) => item.specId === 'tableSaw' && item.variantId === 'budget',

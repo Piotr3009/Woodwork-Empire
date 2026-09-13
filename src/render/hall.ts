@@ -8,7 +8,6 @@ import {
   GATE_LAYOUT,
   ROOM_DOOR,
   ROOM_LAYOUT,
-  roomById,
   YARD_WIDTH_CELLS,
   roomDoorCell,
 } from '../engine/constants';
@@ -60,6 +59,13 @@ import {
   pointInPolygon,
   tileToScreen,
 } from './iso';
+import { formatTime } from '../engine/clock';
+import {
+  type CharacterOptions,
+  type Facing,
+  animationForStation,
+  characterArt,
+} from './characters';
 import {
   SPRITE_SCALE,
   contactShadow,
@@ -107,6 +113,14 @@ export function label(at: Point, text: string, extra = ''): string {
  *  down: the letters keep their height and lean with the wall. */
 export function wallMatrix(at: Point): string {
   return `matrix(1,0.5,0,1,${round(at.x)},${round(at.y)})`;
+}
+
+/** The same for the left wall, which runs along world y: one metre of it is (-24, +12) on the
+ *  screen, so a pixel of the box goes (1, -0.5) across and (0, 1) down and the lettering leans the
+ *  other way. Local x therefore runs towards falling y, which is why anything drawn with it is
+ *  anchored at the high y end of its span (CLAUDE.md T9 3.2). */
+export function leftWallMatrix(at: Point): string {
+  return `matrix(1,-0.5,0,1,${round(at.x)},${round(at.y)})`;
 }
 
 /** Text the game letters onto the painting: the room names and the company name. Its own class,
@@ -211,6 +225,13 @@ export const HALL_NAME_BOX = { x: 300, y: 130, width: 260, height: 70 };
  *  the dark sky over the building, which is REPORT-T5 open question 1, still unanswered. */
 export const HALL_NAME_WALL = { x: 9, z: 2 };
 
+/** How far the clock stands from the edge of the name's box, in metres along the wall [TUNE]. */
+const HALL_CLOCK_GAP = 0.8;
+
+/** How high the digits are lettered, in scene pixels [TUNE]: smaller than the name beside them,
+ *  because it is a clock and not the sign over the door. */
+export const HALL_CLOCK_SIZE = 12;
+
 /** The biggest and the smallest the name is ever lettered, in scene pixels. The floor is the
  *  repository's readable minimum (CLAUDE.md T2 3.11), so a long name shrinks to it and is cut
  *  short only below it [TUNE sizes]. */
@@ -227,6 +248,14 @@ const ROOM_LABEL_CLEARANCE = 0.1;
 /** How wide the name may be lettered, in scene pixels: the box of docs/art/SPRITES.md 9.5 is
  *  given at 2x and the scene is 1x. */
 export const HALL_NAME_WIDTH = HALL_NAME_BOX.width / SPRITE_SCALE;
+
+/** Where the clock is lettered on the rear wall: right of the name's box and 1.6 m up, which is
+ *  clear of everything standing in front of it (PIOTR, 13.09: "there is no clock in the hall";
+ *  CLAUDE.md T9 3.5). Taken off the name's own box, so the two cannot drift into each other. */
+export const HALL_CLOCK_WALL = {
+  x: HALL_NAME_WALL.x + HALL_NAME_WIDTH / TILE_RISE / 2 + HALL_CLOCK_GAP,
+  z: 1.6,
+};
 
 /** A box on a wall, in metres across the face and up it. The two the hall cares about are the
  *  door and the name over it, which must not touch (CLAUDE.md T6 3.2). */
@@ -595,43 +624,58 @@ function stationLabel(station: string): string {
   return 'waiting';
 }
 
-/** A worker is a capsule with his name under it. The owner is the green one. The group carries
- *  its position as a transform, so a change of station slides instead of jumping. */
+/** Which way a figure stands when nobody has told him otherwise: towards the camera's left, the
+ *  way the hall is drawn [TUNE] (CLAUDE.md T9 3.13). */
+const FIGURE_FACING: Facing = 'sw';
+
+/** A worker is his sheet if the art side has delivered one and a capsule if it has not, with his
+ *  name under him either way. The owner is the green one. The group carries its position as a
+ *  transform, so a change of station slides instead of jumping. */
 function figure(
   key: string,
   tile: { x: number; y: number },
   name: string,
   isOwner: boolean,
   extra: string,
+  art: { role: string; station: string; options: CharacterOptions } | null = null,
 ): Drawable {
   const feet = centreOf(tile.x, tile.y, 1, 1);
   const fill = isOwner ? 'var(--owner)' : 'var(--worker)';
+  // The sheet if the art side has delivered one for this role, and the capsule the game has
+  // always drawn if it has not (CLAUDE.md T9 3.13).
+  const rest = art === null ? 'idle' : animationForStation(art.station);
+  const drawn =
+    art === null ? null : characterArt(art.role, rest, FIGURE_FACING, art.options);
+  const body =
+    drawn ?? `<rect x="-6" y="-30" width="12" height="26" rx="6" fill="${fill}" />`;
   return {
     depth: depthKey(tile.x, tile.y) + 0.2,
     svg:
       `<g class="figure" data-figure="${key}" ` +
-      `transform="translate(${Math.round(feet.x)},${Math.round(feet.y)})" ${extra}>` +
+      `transform="translate(${Math.round(feet.x)},${Math.round(feet.y)})" ` +
+      `data-rest="${rest}" ${extra}>` +
       `<title>${escapeText(name)}</title>` +
-      '<rect x="-6" y="-30" width="12" height="26" rx="6" ' +
-      `fill="${fill}" />` +
+      body +
       '<text x="0" y="14" text-anchor="middle" ' +
       `class="iso-label figure-label">${escapeText(name.split(',')[0] ?? name)}</text></g>`,
   };
 }
 
-/** The pin board beside the office door, on the office front face: how many things are on order,
- *  and a click on it opens the list (PIOTR, 13.09; CLAUDE.md T8 3.2). Its own small board rather
- *  than a control drawn over the painting, so the hall keeps its one style. */
-export const PIN_BOARD = { along: 0.15, z: 1.2, width: 1.1, height: 0.7 };
+/** The board by the entrance door of the hall, not on the office (PIOTR, 13.09; CLAUDE.md T9
+ *  3.2). The personnel door is in the left wall at y 4.5 to 5.5, and the board hangs beside it at
+ *  y 3 to 4.5, 1.5 m up (docs/art/SPRITES.md 9.3). Its own small board rather than a control
+ *  drawn over the painting, so the hall keeps its one style. */
+export const PIN_BOARD = { fromY: 3, toY: 4.5, z: 1.5, height: 0.7 };
 
 export function pinBoard(count: number): string {
-  const room = roomById('office');
-  const at = tileToScreen(room.x + PIN_BOARD.along, room.y + room.depth, PIN_BOARD.z);
-  const width = PIN_BOARD.width * TILE_RISE;
+  // Anchored at the far end of the span, because a local metre to the right along this wall is a
+  // metre of falling y (see leftWallMatrix).
+  const at = tileToScreen(0, PIN_BOARD.toY, PIN_BOARD.z);
+  const width = (PIN_BOARD.toY - PIN_BOARD.fromY) * TILE_RISE;
   const height = PIN_BOARD.height * TILE_RISE;
   return (
     '<g data-do="openModal" data-modal="shopping" data-pinboard="1" ' +
-    `class="clickable pin-board" transform="${wallMatrix(at)}">` +
+    `class="clickable pin-board" transform="${leftWallMatrix(at)}">` +
     '<title>What is on order. Click for the list.</title>' +
     `<rect x="0" y="${-height}" width="${width}" height="${height}" class="pin-board-face" />` +
     `<text x="${round(width / 2)}" y="${round(-height / 2 + 4)}" text-anchor="middle" ` +
@@ -706,6 +750,9 @@ export interface HallOptions {
   /** What the art side has delivered. A parameter so a test can ask for the hall before the art
    *  arrived, which is what the placeholders are for. */
   files?: readonly string[];
+  /** The character sheets, for the same reason: a figure is his sheet where there is one and the
+   *  capsule where there is not (CLAUDE.md T9 3.13). */
+  characters?: CharacterOptions['sheets'];
 }
 
 export function hallScene(state: GameState, options: HallOptions = {}): Scene {
@@ -719,6 +766,7 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
   const bounds = gridBounds(unit.widthCells + YARD_WIDTH_CELLS, unit.depthCells, 5);
   const pad = 24;
   const parts: string[] = [];
+  const characterOptions: CharacterOptions = { files, sheets: options.characters };
 
   if (painted) {
     // The layers sit at the canvas origin, every one of them, which is what keeps the two room
@@ -855,9 +903,10 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
     });
   }
 
-  // The pin board on the office wall, beside its door (PIOTR, 13.09).
+  // The Orders board by the entrance door of the hall, on the left wall (PIOTR, 13.09). It hangs
+  // on the wall, so it is drawn behind everything standing in front of it.
   drawables.push({
-    depth: depthKey(roomById('office').x, roomById('office').y + roomById('office').depth) + 0.02,
+    depth: depthKey(0, PIN_BOARD.fromY) - 0.01,
     svg: pinBoard(shoppingList(state).length),
   });
 
@@ -884,6 +933,9 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
         away ? `${worker.name} (off)` : `${worker.name}, ${where}`,
         false,
         `data-worker="${worker.id}"`,
+        // Joiners have a sheet tonight; everybody else falls back to the capsule until his own
+        // one is delivered (CLAUDE.md T9 3.13).
+        { role: worker.role, station: worker.station, options: characterOptions },
       ),
     );
   }
@@ -975,6 +1027,17 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
         ),
       );
     }
+    // The clock the hall did not have, beside the name and in the office's own amber digits
+    // (PIOTR, 13.09; CLAUDE.md T9 3.5). Live text, so the minute is written into the text node
+    // that already holds it and the element itself is never made again (CLAUDE.md T9 3.8).
+    live.push(
+      paintedText(
+        tileToScreen(HALL_CLOCK_WALL.x, 0, HALL_CLOCK_WALL.z),
+        formatTime(state.clock.minute),
+        'painted-text hall-clock',
+        HALL_CLOCK_SIZE,
+      ),
+    );
   }
 
   live.push(drawables.map((drawable) => drawable.svg).join(''));

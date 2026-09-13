@@ -88,8 +88,10 @@ describe('the sprite check page', () => {
       expect(cell?.textContent, layer.key).toContain('1680 by 1128');
       expect(cell?.textContent, layer.key).toContain(layer.name);
     }
-    // Six wide cells in all: three of the hall and three of the office, each once.
-    const wide = Array.from(page.querySelectorAll('.sprite-wide-grid .sprite-cell'));
+    // Six layer cells in all: three of the hall and three of the office, each once. The figures
+    // have wide cells of their own beside them, keyed by the sheet and not by a sprite
+    // (CLAUDE.md T9 3.13).
+    const wide = Array.from(page.querySelectorAll('.sprite-wide-grid [data-sprite-target]'));
     expect(wide).toHaveLength(HALL_LAYERS.length + OFFICE_LAYERS.length);
     const keys = wide.map((cell) => cell.getAttribute('data-sprite-target'));
     expect(new Set(keys).size).toBe(keys.length);

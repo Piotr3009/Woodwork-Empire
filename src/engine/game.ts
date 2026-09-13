@@ -86,7 +86,6 @@ import {
   OWNER,
   ductedMoves,
   ductingDue,
-  deliveryDaysFor,
   findSpec,
   itemIsHeavy,
   isSellableFamily,
@@ -133,6 +132,8 @@ import {
   refreshJob,
   releaseJob,
   runBookedTransport,
+  dropJob,
+  drawFromStock,
   setMaterialMode,
   setSawFallback,
   transportLabel,
@@ -202,12 +203,9 @@ import {
   interruptOwnerWith,
   movePending,
   movingMachines,
-  orderMinutes,
   ownerOutTask,
   pauseOwnerTask,
   resumeOwnerTask,
-  shoppingLabel,
-  shoppingTask,
   skippedTask,
   startTask,
   taskWorkRate,
@@ -227,6 +225,8 @@ import type {
   TaskInstance,
   TaskOrder,
   Worker,
+  WorkerRole,
+  WorkerTier,
 } from './types';
 
 
@@ -264,6 +264,7 @@ export function createGame(options: NewGameOptions): GameState {
     speed: 0,
     cash: spec.startingCash,
     reputation: REPUTATION_START,
+    reputationLog: [],
     dust: 0,
     unit: {
       areaM2: spec.areaM2,
@@ -446,15 +447,26 @@ function arriveEquipmentOrders(state: GameState): OnOrderItem[] {
       landOrder(state, item);
       continue;
     }
-    createTask(state, {
-      kind: 'unload',
-      label: `Unload the ${orderName(item).toLowerCase()}`,
-      minutes: equipmentUnloadMinutes(state),
-      orderId: item.id,
-    });
     waiting.push(item);
   }
+  if (waiting.length === 0) return waiting;
+  // One van, one unloading, however many machines are on it. The minutes are still per machine:
+  // three of them off one lorry is three machines to get off (CLAUDE.md T9 3.1) [TUNE].
+  createTask(state, {
+    kind: 'unload',
+    label: unloadLabel(waiting),
+    minutes: equipmentUnloadMinutes(state) * waiting.length,
+    orderIds: waiting.map((item) => item.id),
+  });
   return waiting;
+}
+
+/** What the load at the gate is called on the task list. */
+function unloadLabel(items: readonly OnOrderItem[]): string {
+  const first = items[0];
+  if (first === undefined) return 'Unload the delivery';
+  if (items.length === 1) return `Unload the ${orderName(first).toLowerCase()}`;
+  return `Unload the delivery: ${plural(items.length, 'machine', 'machines')}`;
 }
 
 /** 08:00, and the buyer's van is at the gate for whatever was sold yesterday. Nobody unloads
@@ -494,22 +506,26 @@ function collectSoldMachines(state: GameState): void {
 /** The same question the sheets ask: unload it now, or leave it standing at the gate
  *  (CLAUDE.md T8 3.2). A helper takes it off the list without being asked, as he always does. */
 function queueKitDeliveryEvents(state: GameState, arriving: readonly OnOrderItem[]): void {
-  for (const item of arriving) {
-    const task = state.tasks.find((entry) => entry.orderId === item.id && !entry.done);
-    if (!task) continue;
-    queueEvent(state, {
-      kind: 'deliveryArrived',
-      title: 'Delivery at the gate',
-      body:
-        `The ${orderName(item).toLowerCase()} has arrived. It is no use to anybody on the back ` +
-        'of a lorry.',
-      choices: [
-        { id: 'unload', label: `Unload now, ${task.minutesTotal} min` },
-        { id: 'later', label: 'Leave it at the gate' },
-      ],
-      data: { orderId: item.id, taskId: task.id },
-    });
-  }
+  const first = arriving[0];
+  if (first === undefined) return;
+  const task = state.tasks.find(
+    (entry) => !entry.done && entry.orderIds.includes(first.id),
+  );
+  if (!task) return;
+  const what =
+    arriving.length === 1
+      ? `The ${orderName(first).toLowerCase()} has arrived`
+      : `The lorry is here with ${arriving.map((item) => orderName(item).toLowerCase()).join(', ')}`;
+  queueEvent(state, {
+    kind: 'deliveryArrived',
+    title: 'Delivery at the gate',
+    body: `${what}. It is no use to anybody on the back of a lorry.`,
+    choices: [
+      { id: 'unload', label: `Unload now, ${Math.round(task.minutesTotal)} min` },
+      { id: 'later', label: 'Leave it at the gate' },
+    ],
+    data: { orderId: first.id, taskId: task.id },
+  });
 }
 
 /** Who can be sent at a job of work, as choices on the event that raised it. Nobody who is not
@@ -852,11 +868,10 @@ function applyTaskCompletion(state: GameState, task: TaskInstance): void {
       // The same as a call: he goes back to whatever the move took him off.
       resumeOwnerTask(state);
       break;
-    case 'shopping':
     case 'hiring':
-      // He is back from the shops or out of the interview: now it is booked (CLAUDE.md T7 3.10).
+      // He is out of the interview: the man is taken on now (CLAUDE.md T7 3.10).
       settleOrders(state, task);
-      // The next errand he committed to first, and the bench only when they are all run.
+      // The next interview he committed to first, and the bench only when they are all run.
       if (!startNextTrip(state)) resumeOwnerTask(state);
       break;
     case 'booting':
@@ -896,10 +911,13 @@ function applyTaskCompletion(state: GameState, task: TaskInstance): void {
       if (job) deliverJob(state, job);
       break;
     case 'unload': {
-      // A machine off the lorry stands on the cells that were held for it (CLAUDE.md T8 3.2).
-      if (task.orderId !== null) {
-        const item = findOnOrder(state, task.orderId);
-        if (item) landOrder(state, item);
+      // One van is one unloading: everything heavy that came on it stands on the cells that were
+      // held for it (CLAUDE.md T8 3.2, T9 3.1).
+      if (task.orderIds.length > 0) {
+        for (const orderId of task.orderIds) {
+          const item = findOnOrder(state, orderId);
+          if (item) landOrder(state, item);
+        }
         break;
       }
       const delivery = task.deliveryId ? findDelivery(state, task.deliveryId) : null;
@@ -1689,6 +1707,15 @@ export function applyAction(state: GameState, action: GameAction): GameState {
     case 'SET_MATERIAL_MODE':
       setMaterialMode(next, action.jobId, action.mode);
       break;
+    case 'DROP_JOB':
+      // The client has his deposit back and the company takes the hit (CLAUDE.md T9 3.9).
+      dropJob(next, action.jobId);
+      break;
+    case 'DRAW_FROM_STOCK':
+      // The rack has it: take it, tick the order green and let him get on with it
+      // (PIOTR, 13.09; CLAUDE.md T9 3.7).
+      drawFromStock(next, action.jobId);
+      break;
     case 'SET_SAW_FALLBACK':
       setSawFallback(next, action.jobId, action.on);
       break;
@@ -1703,7 +1730,7 @@ export function applyAction(state: GameState, action: GameAction): GameState {
     case 'HIRE':
       // The interview is an hour of his own, and the man is on the books when it is over
       // (CLAUDE.md T7 3.10).
-      placeOrder(next, { kind: 'hire', role: action.role, tier: action.tier });
+      placeHireOrder(next, action.role, action.tier);
       break;
     case 'ASK_UNLOAD': {
       const delivery = findDelivery(next, action.deliveryId);
@@ -1752,19 +1779,13 @@ export function applyAction(state: GameState, action: GameAction): GameState {
     case 'PAUSE_TASK':
       pauseOwnerTask(next);
       break;
-    case 'BUY_EQUIPMENT': {
-      // Nothing is bought on the spot: he goes out for it and the cash leaves when he is back
-      // (CLAUDE.md T7 3.10).
-      const spec = findSpec(action.specId);
-      placeOrder(next, {
-        kind: 'equipment',
-        specId: action.specId,
-        variantId: action.variantId ?? spec?.variants[0]?.id ?? '',
-      });
+    case 'BUY_EQUIPMENT':
+      // Nothing is bought on the spot and nothing is fetched: the cash leaves at the click and
+      // the lorry comes in days (CLAUDE.md T9 3.1).
+      placeEquipmentOrder(next, action.specId, action.variantId);
       break;
-    }
     case 'BUY_SOFTWARE':
-      placeOrder(next, { kind: 'software', mode: action.mode });
+      placeSoftwareOrder(next, action.mode);
       break;
     case 'BUY_STOCK':
       buyStock(next, action.sheets);
@@ -2005,49 +2026,49 @@ export function buySoftware(
 // Nothing in stopped time: every purchase and every hire is a trip (T7 3.10)
 // ---------------------------------------------------------------------------
 
-/** The hall as it will be when the owner is back from every trip he is already on. A second
- *  thing bought on the same visit is checked against that and not against the hall he is
- *  standing in: the tool cabinet he has just put on the list is in by the time the hand bander
- *  he wants to keep in it arrives, and the cash for both is gone (CLAUDE.md T7 3.10). */
+/** The hall as it will be once everything on the road has landed. A second machine is checked
+ *  against that and not against the hall he is standing in: the tool cabinet he ordered this
+ *  morning is in by the time the hand bander he wants to keep in it arrives, and the cash for
+ *  both is gone (CLAUDE.md T7 3.10, T9 3.1). */
 function afterTheTrips(state: GameState): GameState {
-  // Nothing on the list and nothing on its way: the hall he is standing in is the hall he will
-  // come back to, and the catalogue asks this question of every tile it draws, every minute.
-  const trips = state.tasks.some((task) => !task.done && task.orders.length > 0);
-  if (!trips && state.onOrder.length === 0) return state;
+  // Nothing on its way: the hall he is standing in is the hall the delivery will land in, and the
+  // catalogue asks this question of every tile it draws, every minute.
+  if (state.onOrder.length === 0) return state;
   const after = clone(state);
   // Everything already on the road, landed: the cash for all of it is spent, so the extraction he
   // ordered on Monday is what Tuesday's floor edgebander is allowed against (T7 3.10, T8 3.2).
   for (const item of after.onOrder.slice()) landOrder(after, item);
-  for (const task of after.tasks) {
-    if (!task.done) settleOrders(after, task, after);
-  }
-  // And what those trips ordered in is on the road as well.
-  for (const item of after.onOrder.slice()) landOrder(after, item);
   return after;
 }
 
-/** Can this order be placed at all: the clock has to be running, the owner has to be in, and the
- *  thing has to be one he could buy or take on once everything already on the list has landed. */
-export function orderCheck(state: GameState, order: TaskOrder): BuyCheck {
+/** Can this machine be ordered at all: the owner has to be in, and it has to be one he could buy
+ *  once everything already on the road has landed (CLAUDE.md T9 3.1). */
+export function orderEquipmentCheck(
+  state: GameState,
+  specId: string,
+  variantId?: string,
+): BuyCheck {
   if (!state.owner.present) return { ok: false, reason: 'You are not in today' };
-  // One click is one purchase: while a class is out on the list it cannot be ordered again, so a
-  // second click cannot buy a second saw (PIOTR, 13.09).
-  if (order.kind === 'equipment' && onOrder(state, order.specId, order.variantId)) {
-    // Machines only: benches, cabinets, lockers and seats are bought in numbers on one visit.
-    const category = findSpec(order.specId)?.category;
-    if (category === 'machine' || category === 'extraction') {
-      return { ok: false, reason: 'On order' };
-    }
-  }
-  const after = afterTheTrips(state);
-  if (order.kind === 'equipment') return canBuy(after, order.specId, order.variantId);
-  if (order.kind === 'software') return canBuySoftware(after, order.mode);
-  return canHire(after, order.role, order.tier);
+  return canBuy(afterTheTrips(state), specId, variantId);
 }
 
-/** The errands the owner runs himself, in the order he committed to them. Nobody else can be
- *  sent on one (CLAUDE.md T7 3.10). */
-const TRIP_KINDS: ReadonlyArray<TaskInstance['kind']> = ['shopping', 'hiring'];
+/** The licence is installed the moment it is paid for, so it is asked of the hall he is standing
+ *  in and not of the one the lorries will make: there is nothing to install it on until the
+ *  laptop is on the desk (CLAUDE.md T9 3.1). */
+export function orderSoftwareCheck(state: GameState, mode: 'oneOff' | 'subscription'): BuyCheck {
+  if (!state.owner.present) return { ok: false, reason: 'You are not in today' };
+  return canBuySoftware(state, mode);
+}
+
+/** The same question for a hire, which is the one purchase that is still an hour of his day. */
+export function orderCheck(state: GameState, order: TaskOrder): BuyCheck {
+  if (!state.owner.present) return { ok: false, reason: 'You are not in today' };
+  return canHire(afterTheTrips(state), order.role, order.tier);
+}
+
+/** The errands the owner runs himself. Buying is no longer one of them: an interview is the last
+ *  thing he goes out for (CLAUDE.md T9 3.1). */
+const TRIP_KINDS: ReadonlyArray<TaskInstance['kind']> = ['hiring'];
 
 /** True while he is out on one already: the next errand waits its turn behind it, so the tool
  *  cabinet is on the floor before the man who keeps his tools in it sits down for his interview. */
@@ -2071,102 +2092,71 @@ function startNextTrip(state: GameState): boolean {
   return true;
 }
 
-/** Places an order: the owner goes out for it, and it is booked when he gets back. The whole of
- *  3.10 hangs on this one path, so the catalogue, the laptop and the team board all come through
- *  it (CLAUDE.md T7 3.10). */
-export function placeOrder(state: GameState, order: TaskOrder): BuyCheck {
-  const check = orderCheck(state, order);
+/** Orders a machine: the cash leaves at the click, the delivery is booked at the click, and the
+ *  floor it will stand on is held from the click. It costs the owner nothing at all: he never
+ *  goes out for it (PIOTR, 13.09; CLAUDE.md T9 3.1). The one path the catalogue, the laptop and
+ *  the team board all come through. */
+export function placeEquipmentOrder(
+  state: GameState,
+  specId: string,
+  variantId?: string,
+): BuyCheck {
+  const check = orderEquipmentCheck(state, specId, variantId);
   if (!check.ok) return check;
   // An order starts the clock if it was stopped: nothing happens in stopped time, and the player
   // asked for the clock to run rather than for a refusal (PIOTR, 13.09).
   if (timeIsPaused(state)) state.speed = 1;
-  // The cash leaves at the click, not when he is back: what he went out for is paid for
-  // (PIOTR, 13.09). The thing itself still lands when the trip is over.
-  if (order.kind === 'equipment') {
-    const spec = specOf(order.specId);
-    const variant = variantOf(spec, order.variantId ?? spec.variants[0]?.id ?? '');
-    pay(state, 'equipment', variant.name, variant.price);
-    order.paid = true;
-  } else if (order.kind === 'software') {
-    paySoftware(state, order.mode);
-    order.paid = true;
-  }
-  if (order.kind === 'hire') {
-    // An interview is its own hour and never rides on the shopping (PIOTR).
-    const task = createTask(state, {
-      kind: 'hiring',
-      label: 'Interview',
-      minutes: HIRING_MINUTES,
-      orders: [order],
-    });
-    // He sits down for it as soon as he is free of the errands he is already out on, and goes
-    // back to whatever he put down when the last of them is over (CLAUDE.md T4 3.3, T7 3.10).
-    if (!onATrip(state)) interruptOwnerWith(state, task);
-    return OK;
-  }
-  const open = shoppingTask(state);
-  if (open !== null) {
-    const more = orderMinutes(state, order);
-    open.minutesTotal += more;
-    open.minutesRemaining += more;
-    open.orders.push(order);
-    open.label = shoppingLabel(open.orders);
-    // He is at the counter either way: if he wandered off, he is back on it.
-    if (state.owner.currentTaskId !== open.id && !onATrip(state)) interruptOwnerWith(state, open);
-    return OK;
-  }
-  const task = createTask(state, {
-    kind: 'shopping',
-    label: shoppingLabel([order]),
-    minutes: orderMinutes(state, order),
-    orders: [order],
-  });
-  if (!onATrip(state)) interruptOwnerWith(state, task);
-  return OK;
-}
-
-/** The owner is back: what he went out for is booked and the cash leaves now. Anything the world
- *  has made impossible while he was out is simply not bought (CLAUDE.md T7 3.10). */
-function settleOrders(state: GameState, task: TaskInstance, against?: GameState): void {
-  const orders = task.orders;
-  task.orders = [];
-  for (const order of orders) {
-    if (order.kind === 'equipment') settleEquipmentOrder(state, order, against);
-    else if (order.kind === 'software') buySoftware(state, order.mode, order.paid === true);
-    else hire(state, order.role, order.tier);
-  }
-}
-
-/** What the owner came back with. A hand tool, a cabinet or a desk is in the boot of the car and
- *  stands in the hall tonight; anything that has to be ordered in is booked as a delivery and the
- *  floor it will stand on is held for it (CLAUDE.md T8 3.2). */
-function settleEquipmentOrder(
-  state: GameState,
-  order: { kind: 'equipment'; specId: string; variantId: string; paid?: boolean },
-  against?: GameState,
-): void {
-  const prepaid = order.paid === true;
-  const days = deliveryDaysFor(order.specId, order.variantId);
-  if (days <= 0) {
-    buyEquipment(state, order.specId, order.variantId, prepaid);
-    return;
-  }
-  // The very question the click asked, asked again of the hall as it will be once everything on
-  // the road has landed. Asking it of the hall he is standing in would refuse the CNC he ordered
-  // behind the extraction that is still on a lorry, and take his money for it (T7 3.10, T8 3.2).
-  // `against` is the hypothetical hall itself asking, which is where the recursion stops.
-  const hall = against ?? afterTheTrips(state);
-  if (!canBuy(hall, order.specId, order.variantId, prepaid).ok) return;
-  const spec = specOf(order.specId);
-  const variant = variantOf(spec, order.variantId);
-  const at = anchorFor(state, order.specId, variant.id);
+  const spec = specOf(specId);
+  const variant = variantOf(spec, variantId ?? spec.variants[0]?.id ?? '');
+  pay(state, 'equipment', variant.name, variant.price);
+  const at = anchorFor(state, specId, variant.id);
   createOnOrder(state, {
-    specId: order.specId,
+    specId,
     variantId: variant.id,
     pricePaid: variant.price,
     anchorX: at.x,
     anchorY: at.y,
   });
+  return OK;
+}
+
+/** The licence comes down the wire the moment it is paid for: nothing is delivered and nobody
+ *  waits (CLAUDE.md T9 3.1). */
+export function placeSoftwareOrder(state: GameState, mode: 'oneOff' | 'subscription'): BuyCheck {
+  const check = orderSoftwareCheck(state, mode);
+  if (!check.ok) return check;
+  if (timeIsPaused(state)) state.speed = 1;
+  return buySoftware(state, mode);
+}
+
+/** Taking somebody on is the one purchase that still costs the owner an hour: he interviews the
+ *  man himself, and the man is taken on when the hour is spent (CLAUDE.md T7 3.10, T9 3.1). */
+export function placeHireOrder(
+  state: GameState,
+  role: WorkerRole,
+  tier: WorkerTier | null,
+): BuyCheck {
+  const order: TaskOrder = { kind: 'hire', role, tier };
+  const check = orderCheck(state, order);
+  if (!check.ok) return check;
+  if (timeIsPaused(state)) state.speed = 1;
+  const task = createTask(state, {
+    kind: 'hiring',
+    label: 'Interview',
+    minutes: HIRING_MINUTES,
+    orders: [order],
+  });
+  // He sits down for it as soon as he is free of the interview he is already in, and goes back to
+  // whatever he put down when it is over (CLAUDE.md T4 3.3, T7 3.10).
+  if (!onATrip(state)) interruptOwnerWith(state, task);
+  return OK;
+}
+
+/** The interview is over: the man is taken on now (CLAUDE.md T7 3.10). */
+function settleOrders(state: GameState, task: TaskInstance): void {
+  const orders = task.orders;
+  task.orders = [];
+  for (const order of orders) hire(state, order.role, order.tier);
 }
 
 // ---------------------------------------------------------------------------
@@ -2210,36 +2200,6 @@ export function sellMachine(state: GameState, equipmentId: string): BuyCheck {
   item.soldOnDay = nextWorkingDay(state.clock.day);
   item.takenBy = null;
   return OK;
-}
-
-/** True while this class is on an open trip's list: ordered, paid for, not yet in the hall. */
-export function onOrder(state: GameState, specId: string, variantId?: string): boolean {
-  return state.tasks.some(
-    (task) =>
-      !task.done &&
-      task.orders.some(
-        (order) =>
-          order.kind === 'equipment' &&
-          order.specId === specId &&
-          (variantId === undefined || order.variantId === variantId),
-      ),
-  );
-}
-
-/** The open trips' equipment orders, for the tiles and the Owned list (PIOTR, 13.09). */
-export function ordersOnTheList(
-  state: GameState,
-): Array<{ specId: string; variantId: string | undefined; minutesLeft: number }> {
-  const out: Array<{ specId: string; variantId: string | undefined; minutesLeft: number }> = [];
-  for (const task of state.tasks) {
-    if (task.done) continue;
-    for (const order of task.orders) {
-      if (order.kind === 'equipment') {
-        out.push({ specId: order.specId, variantId: order.variantId, minutesLeft: task.minutesRemaining });
-      }
-    }
-  }
-  return out;
 }
 
 /** Lifting the lid on the laptop: it has to come up before anything on it can be touched, and

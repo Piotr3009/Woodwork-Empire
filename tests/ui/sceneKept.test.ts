@@ -7,7 +7,6 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { advanceMinutes, currentState, mount, render } from '../../src/ui/app';
 import { formatTime } from '../../src/engine/clock';
-import { SHOPPING_MINUTES, SHOPPING_NEXT_MINUTES } from '../../src/engine/constants';
 
 function root(): HTMLElement {
   const element = document.querySelector('#app');
@@ -46,9 +45,24 @@ beforeAll(() => {
     click('[data-do="closeFolder"]');
   }
   click('[data-do="closeModal"]');
-  // The trip out has to be over before any of it is in the room (CLAUDE.md T7 3.10).
-  advanceMinutes(SHOPPING_MINUTES + SHOPPING_NEXT_MINUTES * 2);
+  // The lorry comes at 08:00 tomorrow, so the room is furnished a day later (CLAUDE.md T9 3.1).
+  nextMorning();
 });
+
+/** Plays through to 08:00 tomorrow, answering whatever the day asks. */
+function nextMorning(): void {
+  const day = currentState()?.clock.day ?? 1;
+  let guard = 0;
+  while ((currentState()?.clock.day ?? 0) === day && guard < 200) {
+    guard += 1;
+    let events = 0;
+    while (root().querySelector('[data-do="resolveEvent"]') !== null && events < 80) {
+      click('[data-do="resolveEvent"]');
+      events += 1;
+    }
+    advanceMinutes(30);
+  }
+}
 
 function layers(): Element[] {
   return Array.from(root().querySelectorAll('[data-layer]'));

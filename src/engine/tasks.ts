@@ -26,10 +26,7 @@ import {
   MATERIAL_ORDER_PRICE_HIGH,
   MATERIAL_ORDER_PRICE_LOW,
   SERVICE_MINUTES,
-  SHOPPING_MINUTES,
-  SHOPPING_NEXT_MINUTES,
   SITE_MEASURE_MINUTES,
-  SOFTWARE_SHOPPING_MINUTES,
   SOFTWARE_DESIGN_FACTOR,
   STAFF_MANAGEMENT_MINUTES_PER_JOINER,
   UNLOAD_BASE_MINUTES,
@@ -103,9 +100,8 @@ const TASK_DEFINITIONS: Record<TaskKind, TaskDefinition> = {
   service: { category: 'workshop', eligibleRoles: ['joiner'], autoRoles: [] },
   repair: { category: 'workshop', eligibleRoles: ['joiner'], autoRoles: [] },
   moveMachines: { category: 'workshop', eligibleRoles: ['joiner', 'helper'], autoRoles: [] },
-  // The owner does his own shopping, his own interviewing and his own waiting for the laptop:
-  // there is nobody to hand any of it to (CLAUDE.md T7 3.10).
-  shopping: { category: 'admin', eligibleRoles: [], autoRoles: [] },
+  // The owner does his own interviewing and his own waiting for the laptop: there is nobody to
+  // hand either of them to (CLAUDE.md T7 3.10, T9 3.1).
   hiring: { category: 'admin', eligibleRoles: [], autoRoles: [] },
   booting: { category: 'admin', eligibleRoles: [], autoRoles: [] },
 };
@@ -193,7 +189,7 @@ export interface TaskDraft {
   jobId?: string | null;
   equipmentId?: string | null;
   deliveryId?: string | null;
-  orderId?: string | null;
+  orderIds?: string[];
   orders?: TaskOrder[];
 }
 
@@ -209,7 +205,7 @@ export function createTask(state: GameState, draft: TaskDraft): TaskInstance {
     jobId: draft.jobId ?? null,
     equipmentId: draft.equipmentId ?? null,
     deliveryId: draft.deliveryId ?? null,
-    orderId: draft.orderId ?? null,
+    orderIds: draft.orderIds ? draft.orderIds.slice() : [],
     day: state.clock.day,
     done: false,
     doneDay: null,
@@ -273,18 +269,28 @@ export function finishTimeFor(state: GameState, minutes: number): { day: number;
 }
 
 /** The kinds of task that take the owner out of the workshop, or stand him in the middle of it
- *  where nothing else can go on: what the "Owner is out" line is drawn from (CLAUDE.md T8 3.3). */
+ *  where nothing else can go on: what the "Owner is out" line is drawn from (CLAUDE.md T8 3.3).
+ *  Measure, meeting and move only: an order takes him nowhere, and an interview is an hour in his
+ *  own office with its own line inside the hiring card (CLAUDE.md T9 3.3). */
 export const OWNER_OUT_KINDS: ReadonlyArray<TaskKind> = [
-  'shopping',
-  'hiring',
   'siteMeasure',
   'clientMeeting',
   'moveMachines',
 ];
 
-/** The trip, the interview, the site measure, the client meeting or the move of the hall the
- *  owner is on this minute, or null. The one selector for it: the line inside the catalogue and
- *  the component outside it both read this (CLAUDE.md T8 3.3). */
+/** The interview the owner is sitting in, if he is. Its own selector, because the hiring card
+ *  says so on its face and the "Owner is out" line does not (CLAUDE.md T9 3.3). */
+export function interviewTask(state: GameState): TaskInstance | null {
+  const id = state.owner.currentTaskId;
+  if (id === null) return null;
+  const task = findTask(state, id);
+  if (task === null || task.done) return null;
+  return task.kind === 'hiring' ? task : null;
+}
+
+/** The interview, the site measure, the client meeting or the move of the hall the owner is on
+ *  this minute, or null. The one selector for it: the line inside the modal and the component
+ *  outside it both read this (CLAUDE.md T8 3.3, T9 3.3). */
 export function ownerOutTask(state: GameState): TaskInstance | null {
   const id = state.owner.currentTaskId;
   if (id === null) return null;
@@ -298,27 +304,6 @@ export function skippedTask(state: GameState): TaskInstance | null {
   if (state.skipTaskId === null) return null;
   const task = findTask(state, state.skipTaskId);
   return task === null || task.done ? null : task;
-}
-
-/** The trip to the shops the owner is on, if there is one. Everything he buys while it is still
- *  running rides on the same trip (CLAUDE.md T7 3.10). */
-export function shoppingTask(state: GameState): TaskInstance | null {
-  return state.tasks.find((task) => task.kind === 'shopping' && !task.done) ?? null;
-}
-
-/** What one more order adds to the owner's day: the whole trip for the first thing in the hour,
- *  half of it for software that comes down the wire, and a quarter of an hour for each further
- *  thing while the trip is still running (CLAUDE.md T7 3.10). */
-export function orderMinutes(state: GameState, order: TaskOrder): number {
-  if (shoppingTask(state) !== null) return SHOPPING_NEXT_MINUTES;
-  return order.kind === 'software' ? SOFTWARE_SHOPPING_MINUTES : SHOPPING_MINUTES;
-}
-
-/** What the trip is called on the task list: what he went out for, and how much else with it. */
-export function shoppingLabel(orders: readonly TaskOrder[]): string {
-  const more = orders.length - 1;
-  const tail = more <= 0 ? '' : more === 1 ? ' and one more thing' : ` and ${more} more things`;
-  return `Shopping${tail}`;
 }
 
 export function tasksOfKind(state: GameState, kind: TaskKind): TaskInstance[] {

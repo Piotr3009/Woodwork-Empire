@@ -39,12 +39,13 @@ import type {
  *  opened into a hall that does not fit it.
  *
  *  Bumped in Turn 3: a machine carries its class, its hours and the hours it has in it, and a task
- *  carries the day it was finished (CLAUDE.md T3 3.5, 3.3). */
-export const STATE_VERSION = 9;
+ *  carries the day it was finished (CLAUDE.md T3 3.5, 3.3). Bumped in Turn 9: a lorry load is one
+ *  unloading of several orders, so a task carries a list of them (CLAUDE.md T9 3.1). */
+export const STATE_VERSION = 10;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
-export const APP_VERSION = 'v10';
+export const APP_VERSION = 'v11';
 
 // ---------------------------------------------------------------------------
 // 6. Time
@@ -71,7 +72,9 @@ export const HOURS_PER_WORKING_DAY = MINUTES_PER_WORKING_DAY / 60;
 /** One game day at 1x speed, in real seconds (PIOTR, Turn 2: one game minute per real second).
  *  8 real minutes at 1x, 4 at 2x, 2 at 4x. */
 export const REAL_SECONDS_PER_DAY_AT_1X = 480;
-export const SPEEDS = [0, 1, 2, 4] as const;
+/** The chips the player drives the clock with. Ten is Piotr's: a month of trading is long and he
+ *  asked for a speed that gets through it (PIOTR, 13.09; CLAUDE.md T9 3.11). */
+export const SPEEDS = [0, 1, 2, 4, 10] as const;
 export const DAYS_PER_WEEK = 7;
 /** [TUNE] simplification for Turn 1: every month is 30 days. */
 export const DAYS_PER_MONTH = 30;
@@ -303,12 +306,9 @@ export const CNC_ASSEMBLY_FACTOR = 2;
  *  [TUNE: default on] (CLAUDE.md T7 3.4). */
 export const SAW_FALLBACK_DEFAULT = true;
 
-/** The last bar of the Work Plan. It carries no labour: it is the Turn 2 transport, not work at a
- *  bench (CLAUDE.md T7 3.1). */
+/** The piece leaving. It carries no labour: it is the Turn 2 transport, not work at a bench
+ *  (CLAUDE.md T7 3.1). The Work Plan drew a bar for it until Turn 9 took the bars away. */
 export const DELIVERY_STAGE: StageSpec = { id: 'delivery', label: 'Delivery', share: 0 };
-
-/** Every bar the Work Plan draws for a job, the piece leaving included (CLAUDE.md T7 3.2). */
-export const GANTT_STAGES: StageSpec[] = [...PRODUCTION_STAGES, DELIVERY_STAGE];
 /** Worker speed as a fraction of the owner. Nobody matches the owner (PIOTR). */
 export const WORKER_RATES: Record<WorkerTier, number> = {
   poor: 0.6,
@@ -437,13 +437,15 @@ export const UNLOAD_BASE_MINUTES = 45;
 export const BAG_CHANGE_MINUTES = 15;
 /** Moving the kit about is a job of work: an hour a machine or a bench [TUNE]. */
 export const MOVE_MINUTES_PER_ITEM = 60;
-/** Nothing is bought in stopped time, and a purchase is a trip out: an hour of the owner's own
- *  minutes before the cash leaves (PIOTR, "at least an hour per purchase"). */
-export const SHOPPING_MINUTES = 60;
-/** Every further thing bought in the same visit, while the first hour is still running [TUNE]. */
-export const SHOPPING_NEXT_MINUTES = 15;
-/** Software comes down the wire, so it is half the trip (PIOTR). */
-export const SOFTWARE_SHOPPING_MINUTES = 30;
+// The owner never goes out for what he buys: everything is an order and ordering costs him
+// nothing at all (PIOTR, 13.09; CLAUDE.md T9 3.1). The trip of Turn 7, and the three figures it
+// was measured in, are gone.
+/** What dropping a project costs the company, at once (PIOTR, 13.09: "drastically";
+ *  CLAUDE.md T9 3.9). */
+export const DROP_PROJECT_REPUTATION = 10;
+/** How many lines of the reputation log are kept. The company board reads it week by week, and a
+ *  year of trading is a few hundred lines [TUNE]. */
+export const REPUTATION_LOG_MAX = 2000;
 /** The interview, which is what taking somebody on costs the owner (PIOTR). */
 export const HIRING_MINUTES = 60;
 /** The laptop booting up before anything on it can be touched (PIOTR). */
@@ -457,7 +459,9 @@ export const NO_DUCTING_SPECS = ['compressor'];
  *  the task he is out on is over (PIOTR, 13.09; CLAUDE.md T8 3.3). The Turn 4 forced 4x of a move
  *  of the hall is this same run now, so there is one speed the clock is ever taken to and one
  *  thing that takes it there (CLAUDE.md T8 3.4). */
-export const SKIP_SPEED = 4;
+/** The one speed the game ever takes the clock to for the player: through a trip out or a move of
+ *  the hall. It is the fastest chip there is (CLAUDE.md T8 3.3, T9 3.11). */
+export const SKIP_SPEED = 10;
 /** Weekly clean (PIOTR). */
 export const CLEANING_MINUTES = 120;
 /** Fetch from temporary storage the next morning (PIOTR). */
@@ -641,7 +645,7 @@ export const STANDARD_VARIANT = 'standard';
 export const DELIVERY_DAYS_BY_CLASS: Record<string, Record<string, number>> = {
   tableSaw: { used: 1, budget: 1, standard: 5, pro: 7, industrial: 12 },
   sheetRack: { used: 1, budget: 1, standard: 3, pro: 5, industrial: 10 },
-  edgebander: { used: 0, budget: 0, standard: 7, pro: 12, industrial: 20 },
+  edgebander: { used: 1, budget: 1, standard: 7, pro: 12, industrial: 20 },
 };
 
 /** What a lorry load of heavy kit costs somebody at the gate, before the forklift halves it
@@ -1103,9 +1107,10 @@ const VARIANTS_BY_FAMILY: Record<string, EquipmentVariant[]> = {
 };
 
 const BASE_SPEC = {
-  // Hand tools, cabinets, lockers, seats and the office furniture come back with the owner from
-  // the trip: nothing is ordered in for them (PIOTR, CLAUDE.md T8 3.2).
-  deliveryDays: 0,
+  // Nothing comes back in the owner's hands any more: hand tools, cabinets, lockers, seats and
+  // the office furniture are ordered like everything else and come the next working day
+  // (PIOTR, 13.09; CLAUDE.md T9 3.1).
+  deliveryDays: 1,
   bagInterval: 0,
   usedOn: null as MaterialKind | null,
   unloadFactor: 1,

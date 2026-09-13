@@ -106,3 +106,13 @@ it('leaves the floor alone', () => {
   // The note the canteen left stands: an empty floor is not a room and answers nothing.
   expect(notes(root)).toContain(roomById('canteen').tooltip);
 });
+
+it('opens the list of what is on order when the board by the door is clicked', () => {
+  // The board hangs on the left wall beside the personnel door, and it is a control of its own,
+  // not a click on the painting behind it (PIOTR, 13.09; CLAUDE.md T9 3.2).
+  const root = startHall();
+  const board = required(root.querySelector<SVGElement>('[data-pinboard="1"]'));
+  board.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  expect(root.querySelector('[data-modal="shopping"]')).not.toBeNull();
+  required(root.querySelector<HTMLButtonElement>('[data-modal="shopping"] [data-do="closeModal"]')).click();
+});

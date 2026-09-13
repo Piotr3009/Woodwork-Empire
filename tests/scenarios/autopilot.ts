@@ -25,11 +25,10 @@ export function answer(state: GameState, policy?: Policy): string {
   return ids[0] ?? 'ok';
 }
 
-/** Job work first, then the material, then the hall. Emails and bookkeeping wait. The errands he
- *  has already committed to come before any of it: a trip he walked away from at five o'clock is
+/** Job work first, then the material, then the hall. Emails and bookkeeping wait. The interview
+ *  he has already committed to comes before any of it: one he walked away from at five o'clock is
  *  the first thing he picks back up in the morning (CLAUDE.md T7 3.10). */
 const TASK_ORDER: TaskInstance['kind'][] = [
-  'shopping',
   'hiring',
   'booting',
   'unload',
@@ -176,7 +175,15 @@ function buyKit(state: GameState, policy: Policy): GameState {
       variantId: specId === 'tableSaw' ? policy.sawVariant : DAY_ONE_CLASS[specId],
     });
   }
-  return applyAction(next, { type: 'BUY_SOFTWARE', mode: 'oneOff' });
+  return next;
+}
+
+/** The licence is installed on a laptop, and the laptop comes off the lorry the morning after it
+ *  is ordered: so the script buys it the day it has one to install it on (CLAUDE.md T9 3.1). */
+function buyLicence(state: GameState): GameState {
+  if (state.software.mode !== 'none') return state;
+  if (!state.equipment.some((item) => item.specId === 'laptop')) return state;
+  return applyAction(state, { type: 'BUY_SOFTWARE', mode: 'oneOff' });
 }
 
 /** What a joiner has to have before he can start (CLAUDE.md 9.3). */
@@ -245,6 +252,7 @@ export function playDay(
   let next = state;
   const day = next.clock.day;
   if (policy.buyKit && day === 1) next = buyKit(next, policy);
+  if (policy.buyKit) next = buyLicence(next);
   if (policy.hireJoiner && day === 1) next = takeOnJoiner(next, policy);
   if (policy.stockSheets > 0 && day === 1) {
     next = applyAction(next, { type: 'BUY_STOCK', sheets: policy.stockSheets });

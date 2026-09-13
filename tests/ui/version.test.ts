@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 // The build in the corner: one constant, shown on every screen, written in one place
-// (CLAUDE.md T8 3.1).
+// (CLAUDE.md T8 3.1, T9 1).
 
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
@@ -32,7 +32,7 @@ function sourceFiles(directory: string): string[] {
 describe('the version in the corner', () => {
   it('is a v number that the turn bumped', () => {
     expect(APP_VERSION).toMatch(/^v\d+$/);
-    expect(APP_VERSION).toBe('v10');
+    expect(APP_VERSION).toBe('v11');
   });
 
   it('stands in the bottom right corner of the start screen and of the game', () => {
@@ -48,7 +48,7 @@ describe('the version in the corner', () => {
   });
 
   it('is written in constants.ts and nowhere else in the source', () => {
-    const spelled = sourceFiles('src').filter((path) => readFileSync(path, 'utf8').includes("'v10'"));
+    const spelled = sourceFiles('src').filter((path) => readFileSync(path, 'utf8').includes("'v11'"));
     expect(spelled).toEqual(['src/engine/constants.ts']);
   });
 });

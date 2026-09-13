@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
-// The first ten minutes of CLAUDE.md 15, driven through the real DOM.
+// The first ten minutes of CLAUDE.md 15, driven through the real DOM. Day 1 is the ordering and
+// day 2 is the setting up: nothing the player buys is in the building the day he pays for it
+// (CLAUDE.md T9 3.1).
 
 import { beforeAll, describe, expect, it } from 'vitest';
 import { advanceMinutes, currentState, mount } from '../../src/ui/app';
@@ -7,10 +9,8 @@ import {
   BREAK_MINUTES,
   LEDGER_VISIBLE_ENTRIES,
   LAPTOP_BOOT_MINUTES,
-  SHOPPING_MINUTES,
-  SHOPPING_NEXT_MINUTES,
 } from '../../src/engine/constants';
-import { deliveryDaysFor, findSpec } from '../../src/engine/machines';
+import { findSpec } from '../../src/engine/machines';
 import { STARTING_CLASS, STARTING_KIT } from '../helpers';
 
 function root(): HTMLElement {
@@ -103,7 +103,7 @@ describe('the first ten minutes', () => {
     expect(html()).toContain('Board');
   });
 
-  it('3. walks into the office and buys the day 1 kit from the catalogue', () => {
+  it('3. walks into the office and orders the day 1 kit from the catalogue', () => {
     click('[data-do="setView"][data-view="office"]');
     expect(html()).toContain('office-room');
     expect(html()).toContain('data-office="catalogue"');
@@ -115,6 +115,7 @@ describe('the first ten minutes', () => {
     expect(html()).toContain('Equipment catalogue');
     expect(html()).not.toContain('Time is paused');
     const before = currentState()?.cash ?? 0;
+    const minutes = currentState()?.owner.minutesWorked ?? 0;
     for (const specId of STARTING_KIT) {
       // The catalogue is tabs of folders from Turn 7: the tab, then the family's folder, and the
       // classes are inside it (CLAUDE.md T6 3.6, T7 3.7).
@@ -129,41 +130,74 @@ describe('the first ten minutes', () => {
       );
       click('[data-do="closeFolder"]');
     }
-    // The software sits under whatever tab is open: any of them but Owned carries it.
-    click('[data-do="catalogueTab"][data-id="computers"]');
-    click('[data-do="buySoftware"][data-id="oneOff"]');
-    // Nothing is in the hall yet: it is one trip out, an hour for the first thing and a quarter
-    // of an hour for each of the other eleven. The cash left at the click, every item is paid
-    // for, and the tiles say they are waiting (PIOTR, 13.09).
-    expect(currentState()?.equipment).toHaveLength(0);
-    expect(currentState()?.cash ?? 0).toBeLessThan(before);
-    const paid = before - (currentState()?.cash ?? 0);
-    expect(html()).toContain('Shopping: 0 of 225 min');
-    // A second click on a machine that is on the list buys nothing: one click is one purchase.
+    // Nothing is in the hall and nothing is in the room: day 1 is the ordering and day 2 is the
+    // setting up. The cash left at every click and his day is untouched (CLAUDE.md T9 3.1).
+    const state = currentState();
+    expect(state?.equipment).toHaveLength(0);
+    expect(state?.onOrder).toHaveLength(STARTING_KIT.length);
+    expect(state?.onOrder.every((item) => item.dueDay === 2)).toBe(true);
+    expect(state?.owner.minutesWorked).toBe(minutes);
+    const paid = before - (state?.cash ?? 0);
+    expect(paid).toBeGreaterThan(0);
+    // A second click on a machine that is on the road buys nothing: one click is one machine.
     click('[data-do="catalogueTab"][data-id="sheetMachines"]');
     click('[data-do="openFolder"][data-id="tableSaw"]');
-    expect(html()).toContain('Waiting for delivery');
+    expect(html()).toContain('On order, due day 2');
     expect(root().querySelector('[data-do="buyEquipment"][data-id="tableSaw"][data-variant="used"]')).toBeNull();
     expect(before - (currentState()?.cash ?? 0)).toBe(paid);
     click('[data-do="closeFolder"]');
-    advanceMinutes(SHOPPING_MINUTES + SHOPPING_NEXT_MINUTES * STARTING_KIT.length);
-    const state = currentState();
-    // He comes back with what the shop had on the shelf: the desk, the chair, the laptop, the
-    // drill, the tool cabinet and the hand edgebander. The saw, the compressor, the extractor,
-    // the bench and the rack are ordered in and land at 08:00 tomorrow (CLAUDE.md T8 3.2).
-    const carried = STARTING_KIT.filter((specId) => deliveryDaysFor(specId, STARTING_CLASS[specId]) === 0);
-    expect(carried).toHaveLength(6);
-    expect(state?.equipment).toHaveLength(carried.length);
-    expect(state?.onOrder).toHaveLength(STARTING_KIT.length - carried.length);
-    expect(state?.onOrder.every((item) => item.dueDay === 2)).toBe(true);
-    expect(state?.software.mode).toBe('oneOff');
-    // Landing costs nothing more: what left at the click is all that leaves.
-    expect(before - (state?.cash ?? 0)).toBe(paid);
-    // The folder of a family the hall has says so on its face (CLAUDE.md T7 3.7).
-    expect(html()).toContain('Owned 1');
+    // And the licence waits for the machine it runs on: there is no laptop in the room yet.
+    click('[data-do="catalogueTab"][data-id="computers"]');
+    expect(html()).toContain('Needs a laptop first');
+    expect(root().querySelector('[data-do="buySoftware"][data-id="oneOff"]')).toBeNull();
   });
 
-  it('4. accepts the first job off the board', () => {
+  it('4. has no laptop and no board on day 1, and goes home at five', () => {
+    click('[data-do="closeModal"]');
+    // The order board is the software's, and the software is on the laptop that is on the road.
+    expect(html()).toContain('Board: buy a laptop');
+    expect(html()).not.toContain('data-office="laptop"');
+    click('[data-do="toggleMenu"]');
+    click('[data-do="endDay"]');
+    expect(currentState()?.owner.wentHome).toBe(true);
+    // The day is the 480 minutes of work plus the break nobody works through.
+    advanceMinutes(480 + BREAK_MINUTES);
+    expect(html()).toContain('End of day 1');
+    expect(html()).toContain('Your minutes');
+    click('[data-do="resolveEvent"][data-id="next"]');
+    expect(currentState()?.clock.day).toBe(2);
+    // Day 2 opens with the lorry at the gate: one van with everything day 1 ordered on it. The
+    // page is seeded from the clock, so a day can also open with something else in front of it;
+    // the delivery is asked of the day's events and not of whichever one is on the screen.
+    const morning = currentState();
+    const events = [morning?.activeEvent, ...(morning?.eventQueue ?? [])];
+    expect(
+      events.some((event) => event?.kind === 'deliveryArrived'),
+      JSON.stringify(events),
+    ).toBe(true);
+  });
+
+  it('5. takes the lorry off at the gate on the morning of day 2', () => {
+    // 08:00 on day 2 is when the whole of day 1's ordering turns up: one van, one unloading. The
+    // light kit stands itself in the hall and the heavy kit waits for somebody (T8 3.2, T9 3.1).
+    unloadTheKit();
+    expect(currentState()?.onOrder).toHaveLength(0);
+    const owned = currentState()?.equipment.map((item) => item.specId) ?? [];
+    for (const specId of STARTING_KIT) expect(owned, specId).toContain(specId);
+  });
+
+  it('6. buys the licence now there is a laptop to run it on', () => {
+    click('[data-office="catalogue"]');
+    click('[data-do="catalogueTab"][data-id="computers"]');
+    click('[data-do="buySoftware"][data-id="oneOff"]');
+    expect(currentState()?.software.mode).toBe('oneOff');
+    // The folder of a family the hall has says so on its face (CLAUDE.md T7 3.7).
+    click('[data-do="openFolder"][data-id="desk"]');
+    expect(html()).toContain('Owned');
+    click('[data-do="closeFolder"]');
+  });
+
+  it('7. accepts the first job off the board', () => {
     click('[data-do="closeModal"]');
     click('[data-do="openModal"][data-modal="board"]');
     expect(html()).toContain('Order board');
@@ -175,15 +209,11 @@ describe('the first ten minutes', () => {
     expect(state?.jobs[0]?.depositPaid).toBeGreaterThan(0);
   });
 
-  it('5. finds the desk work in the laptop and the drawing on the roll beside it', () => {
+  it('8. finds the desk work in the laptop and the drawing on the roll beside it', () => {
     click('[data-do="closeModal"]');
     // Still standing in the office, so the laptop is right there on the desk.
     click('[data-office="laptop"]');
     expect(html()).toContain('Laptop');
-    // Lifting the lid costs the five minutes the machine takes to come up, and nothing else on
-    // the desk can be picked up until it is up (CLAUDE.md T7 3.10).
-    expect(html()).toContain('Waiting for the laptop');
-    advanceMinutes(LAPTOP_BOOT_MINUTES);
     const name = currentState()?.jobs[0]?.name ?? '';
     // The calls are in the client's diary now, not on the desk (CLAUDE.md T4 3.3).
     expect(html()).not.toContain('Client call');
@@ -203,41 +233,14 @@ describe('the first ten minutes', () => {
     expect(html()).toContain('Pause');
   });
 
-  it('6. moves the clock at 4x and fills the minute bar', () => {
+  it('9. moves the clock at 4x and fills the minute bar', () => {
     click('[data-do="setSpeed"][data-speed="4"]');
     expect(currentState()?.speed).toBe(4);
     expect(html()).toContain('class="chip is-on" data-do="setSpeed" data-speed="4"');
   });
 
-  it('7. ends the day and shows the summary', () => {
+  it('10. shows the hall with the kit, the owner and the rooms', () => {
     click('[data-do="closeModal"]');
-    click('[data-do="toggleMenu"]');
-    expect(html()).toContain('Stay home today');
-    // Before his 480 are in, the button means going home: the rest of the day runs without him.
-    click('[data-do="endDay"]');
-    expect(currentState()?.owner.wentHome).toBe(true);
-    // The day is the 480 minutes of work plus the break nobody works through.
-    advanceMinutes(480 + BREAK_MINUTES);
-    expect(html()).toContain('End of day 1');
-    expect(html()).toContain('Your minutes');
-    expect(html()).toContain('Jobs finished');
-    click('[data-do="resolveEvent"][data-id="next"]');
-    expect(currentState()?.clock.day).toBe(2);
-    // Day 2 opens with the rack alarm: nothing has been ordered yet (CLAUDE.md T2 3.6). The page
-    // is seeded from the clock, so a day can also open with a breakdown or a service in front of
-    // it; the alarm is asked of the day's events and not of whichever one is on the screen.
-    const morning = currentState();
-    const events = [morning?.activeEvent, ...(morning?.eventQueue ?? [])];
-    expect(events.some((event) => event?.kind === 'lowStock'), JSON.stringify(events)).toBe(true);
-    dismissEvents();
-    expect(currentState()?.activeEvent).toBeNull();
-  });
-
-  it('8. shows the hall with the kit, the owner and the rooms', () => {
-    // Day 2 at 08:00 is when the saw, the compressor, the extractor, the bench and the rack turn
-    // up. The light ones are carried in; the heavy ones are two hours each (CLAUDE.md T8 3.2).
-    unloadTheKit();
-    expect(currentState()?.onOrder).toHaveLength(0);
     click('[data-do="setView"][data-view="hall"]');
     expect(html()).toContain('hall-view');
     expect(html()).toContain('Table saw');

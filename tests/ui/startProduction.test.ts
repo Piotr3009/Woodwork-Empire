@@ -20,17 +20,24 @@ import {
 function card(state: GameState): HTMLElement {
   const holder = document.createElement('div');
   holder.innerHTML = renderWorkPlan(state);
-  // The board is a Gantt now: the name, the price, the man on it and the Start production are in
-  // the head of the row, to the left of the bars (CLAUDE.md T7 3.2).
-  const rows = Array.from(holder.querySelectorAll('.gantt-head'));
+  // The name, the price, the man on it and the Start production are in the head of the row, to
+  // the left of the bar (CLAUDE.md T9 3.6).
+  const rows = Array.from(holder.querySelectorAll('.plan-head'));
   const row = rows.find((entry) => entry.querySelector('[data-do="startProduction"], .btn[disabled]'));
   if (!(row instanceof HTMLElement)) throw new Error('no job card with a Start production button');
   return row;
 }
 
-/** What the button on the job card says, and whether it can be pressed. */
+/** What the button on the job card says, and whether it can be pressed. The card carries the
+ *  From stock control as well now, so the one that starts the work is picked by name
+ *  (CLAUDE.md T9 3.7). */
 function startButton(state: GameState): { text: string; enabled: boolean; title: string } {
-  const button = card(state).querySelector('.row-action .btn');
+  const buttons = Array.from(card(state).querySelectorAll('.row-action .btn'));
+  const button = buttons.find(
+    (entry) =>
+      entry.getAttribute('data-do') === 'startProduction' ||
+      (entry.textContent ?? '').startsWith('Start production'),
+  );
   if (!(button instanceof HTMLButtonElement)) throw new Error('no button on the card');
   return {
     text: button.textContent ?? '',
