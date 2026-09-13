@@ -2,6 +2,7 @@
 // here, in one place (CLAUDE.md 3.5, 10.1).
 
 import {
+  APP_VERSION,
   CLEANING_MINUTES,
   applyAction,
   createGame,
@@ -435,21 +436,29 @@ function sceneFor(current: GameState): Scene | null {
   return officeScene(current, officeViewport());
 }
 
+/** The build in the bottom right corner of every screen, the start screen included. Muted, and
+ *  out of the way of every control: nothing is ever clicked through it (CLAUDE.md T8 3.1). */
+function versionCorner(): string {
+  return `<p class="app-version">${escapeHtml(APP_VERSION)}</p>`;
+}
+
 /** Everything on the page except the modal layer, which keeps its own DOM between renders, and the
  *  scene, which goes into the slot afterwards. */
 function pageHtml(scene: Scene | null): string {
   if (ui.screen === 'start' || state === null) {
-    return renderStart({
-      difficulty: ui.difficulty,
-      playerName: ui.playerName,
-      companyName: ui.companyName,
-      showWhy: ui.showWhy,
-      cloud: ui.cloud,
-    });
+    return (
+      renderStart({
+        difficulty: ui.difficulty,
+        playerName: ui.playerName,
+        companyName: ui.companyName,
+        showWhy: ui.showWhy,
+        cloud: ui.cloud,
+      }) + versionCorner()
+    );
   }
   const current = state;
   // The last word the company gets is the bankruptcy event, over the game over screen.
-  if (current.gameOver) return renderGameOver(current);
+  if (current.gameOver) return renderGameOver(current) + versionCorner();
   const notes = scene?.notes ?? '';
   const controls = ui.view === 'hall' ? hallControls(current) + hallZoomControls() : '';
   const note = ui.note === '' ? '' : `<p class="view-note">${escapeHtml(ui.note)}</p>`;
@@ -459,7 +468,8 @@ function pageHtml(scene: Scene | null): string {
     toast +
     (ui.menuOpen ? renderMenu(current, ui.cloud) : '') +
     `<main class="view">${SCENE_SLOT}${notes}${controls}${note}</main>` +
-    renderWhy()
+    renderWhy() +
+    versionCorner()
   );
 }
 

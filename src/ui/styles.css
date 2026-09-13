@@ -228,6 +228,20 @@
   margin-top: 0;
 }
 
+/* The build in the bottom right corner of every screen. It never covers a control: the pointer
+   goes straight through it (CLAUDE.md T8 3.1). */
+.app-version {
+  position: fixed;
+  right: 6px;
+  bottom: 4px;
+  margin: 0;
+  z-index: 50;
+  color: var(--text-dim);
+  font-size: 11px;
+  opacity: 0.6;
+  pointer-events: none;
+}
+
 /* --------------------------------------------------------------------------
    Page
    -------------------------------------------------------------------------- */

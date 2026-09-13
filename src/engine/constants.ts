@@ -37,6 +37,10 @@ import type {
  *  carries the day it was finished (CLAUDE.md T3 3.5, 3.3). */
 export const STATE_VERSION = 8;
 
+/** The build the player is looking at, in the bottom right corner of every screen. Bumped by
+ *  every delivery, and written here and nowhere else (PIOTR, 13.09). */
+export const APP_VERSION = 'v10';
+
 // ---------------------------------------------------------------------------
 // 6. Time
 // ---------------------------------------------------------------------------

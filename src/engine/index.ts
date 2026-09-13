@@ -28,6 +28,7 @@ export * from './types';
 
 // Numbers the UI is allowed to print
 export {
+  APP_VERSION,
   CLEANING_MINUTES,
   EQUIPMENT_SPECS,
   GANTT_STAGES,
