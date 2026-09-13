@@ -6,6 +6,7 @@ import {
   CAREFUL,
   IDLE,
   type Policy,
+  DAY_ONE_CLASS,
   DAY_ONE_KIT,
   SHORT_HANDED,
   playDay,
@@ -32,6 +33,7 @@ import {
   LATE_ACCOUNTS_CHARGE,
   MINUTES_PER_WORKING_DAY,
   DEADLINE_DAYS_MIN,
+  EQUIPMENT_UNLOAD_MINUTES,
   MOVE_MINUTES_PER_ITEM,
   SKIP_SPEED,
   OVERTIME_DEBT_PER_DAY,
@@ -47,6 +49,7 @@ import {
 import {
   STATION_IDLE,
   STATION_NO_BENCH,
+  addWorkingDays,
   bagIntervalFor,
   dailyPower,
   emailsForPrice,
@@ -63,6 +66,7 @@ import {
   tick,
 } from '../../src/engine/index';
 import { firstFreeCell, hallItems } from '../../src/engine/layout';
+import { deliveryDaysFor, salePriceFor } from '../../src/engine/machines';
 import { missingForHire } from '../../src/engine/staff';
 import type { Equipment, GameEvent, GameState } from '../../src/engine/index';
 
@@ -145,6 +149,38 @@ describe('30 days on Easy, working the board', () => {
     expect(saw.enduranceHours).toBe(750);
   });
 
+  it('came back from the shops with what the shop had, and had the rest delivered', () => {
+    // The trip is unchanged and the cash still leaves at the counter; what changed is that only
+    // the things with nothing to wait for come back in the car (CLAUDE.md T8 3.2).
+    const carried = DAY_ONE_KIT.filter(
+      (specId) => deliveryDaysFor(specId, DAY_ONE_CLASS[specId]) === 0,
+    );
+    expect(carried).toEqual(['desk', 'chair', 'laptop', 'drill', 'toolCabinet', 'edgebander']);
+    const ordered = DAY_ONE_KIT.filter(
+      (specId) => deliveryDaysFor(specId, DAY_ONE_CLASS[specId]) > 0,
+    );
+    // The saw, the compressor, the extractor, the bench and the rack are in tomorrow morning.
+    expect(ordered).toEqual([
+      'tableSaw',
+      'compressor',
+      'extractor',
+      'workbench',
+      'sheetRack',
+    ]);
+    for (const specId of ordered) {
+      expect(deliveryDaysFor(specId, DAY_ONE_CLASS[specId]), specId).toBe(1);
+    }
+    // By the end of the month every one of them has landed and nothing is still on the road.
+    expect(state.onOrder).toHaveLength(0);
+    for (const specId of DAY_ONE_KIT) {
+      expect(state.equipment.some((item) => item.specId === specId), specId).toBe(true);
+    }
+    // And the heavy ones cost somebody two hours at the gate on day 2.
+    const gate = state.tasks.filter((task) => task.kind === 'unload' && task.orderId !== null);
+    expect(gate.length).toBeGreaterThanOrEqual(3);
+    for (const task of gate) expect(task.minutesTotal).toBe(EQUIPMENT_UNLOAD_MINUTES);
+  });
+
   it('spent the morning of day 1 at the shops, and paid for none of it until it was over', () => {
     // Nothing is bought in stopped time and nothing is bought on the spot: one trip, an hour for
     // the first thing and a quarter of an hour for each of the other eleven (CLAUDE.md T7 3.10).
@@ -155,7 +191,8 @@ describe('30 days on Easy, working the board', () => {
     expect(wanted).toBe(225);
     expect(trips[0]?.done).toBe(true);
     expect(trips[0]?.day).toBe(1);
-    // And what he went out for is standing in the hall, paid for.
+    // And what he went out for is standing in the hall, paid for: what the shop had on the shelf
+    // that evening and what the lorry brought the next morning (CLAUDE.md T8 3.2).
     expect(state.equipment.length).toBeGreaterThanOrEqual(DAY_ONE_KIT.length);
   });
 
@@ -724,5 +761,129 @@ describe('a month of six joiners behind two saws', () => {
     // (CLAUDE.md T7 3.1, 3.2).
     expect(one.waiting).toBeGreaterThan(0);
     expect(one.longest).toBeGreaterThan(CREW_MAX_GAP);
+  });
+});
+
+describe('a month that orders a CNC on day 1 and calls it off on day 10', () => {
+  // Month (l) of CLAUDE.md T8 T8-09. A very easy start has the fifty thousand a CNC and the
+  // extraction it wants come to; nothing else is bought, because the month is about the money
+  // going out at the click and coming back in full (CLAUDE.md T8 3.2, 3.5).
+  const seen: GameEvent[] = [];
+  const start = act(newGame({ seed: SEED, difficulty: 'veryEasy' }), { type: 'SET_SPEED', speed: 1 });
+  const cashAtFirst = start.cash;
+  const ordered = act(
+    act(start, { type: 'BUY_EQUIPMENT', specId: 'extractor' }),
+    { type: 'BUY_EQUIPMENT', specId: 'cnc' },
+  );
+  const day10 = playUntilDay(ordered, 10, IDLE, seen);
+
+  it('pays for it at the counter on day 1 and stands nothing in the hall', () => {
+    expect(cashAtFirst - ordered.cash).toBe(600 + 45000);
+    expect(ordered.equipment.some((item) => item.specId === 'cnc')).toBe(false);
+  });
+
+  it('is still nine weeks away on day 10, holding its floor and nothing else', () => {
+    expect(day10.clock.day).toBe(10);
+    const cnc = day10.onOrder.find((item) => item.specId === 'cnc');
+    expect(cnc).toBeDefined();
+    expect(cnc?.dueDay).toBe(addWorkingDays(1, 45));
+    expect(day10.equipment.some((item) => item.specId === 'cnc')).toBe(false);
+    // The extractor waited a day and has been in the hall since day 2.
+    expect(day10.equipment.some((item) => item.specId === 'extractor')).toBe(true);
+  });
+
+  it('hands back every penny of the 45,000 the moment it is called off', () => {
+    const cnc = day10.onOrder.find((item) => item.specId === 'cnc');
+    if (!cnc) throw new Error('no CNC on order');
+    const before = day10.cash;
+    const cancelled = act(day10, { type: 'CANCEL_ORDER', orderId: cnc.id });
+    expect(cancelled.cash - before).toBe(45000);
+    expect(cancelled.onOrder).toHaveLength(0);
+    const line = cancelled.ledger[cancelled.ledger.length - 1];
+    expect(line?.label).toBe('Order cancelled: CNC');
+    expect(line?.amount).toBe(45000);
+    // And the floor it was holding is free for anything else.
+    expect(firstFreeCell(cancelled, 'cnc', 'standard')).not.toBeNull();
+    // The month that follows is a month with the money back in the bank.
+    const month = playUntilDay(cancelled, 31, IDLE);
+    expect(month.clock.day).toBe(31);
+    expect(month.cash).toBeGreaterThan(month.finance.overdraftLimit);
+  });
+});
+
+describe('a month that sells the used saw on day 5 after buying a standard one', () => {
+  // Month (m) of CLAUDE.md T8 T8-09. The used saw cost 1800 and the buyer pays the used class
+  // fraction of it, which is 630 and not the 900 the task line names: the contract of 3.5 is
+  // 50% and 35% for a used one, and the two do not agree. The contract wins and the deviation is
+  // in REPORT-T8 (CLAUDE.md T8 3.5).
+  const seen: GameEvent[] = [];
+  const day5 = playUntilDay(newGame({ seed: SEED, difficulty: 'veryEasy' }), 5, CAREFUL, seen);
+
+  /** Runs the clock this many minutes, answering whatever the day puts up on the way. */
+  function runOut(state: GameState, minutes: number): GameState {
+    let next = clearEvents(state);
+    for (let minute = 0; minute < minutes; minute += 1) next = clearEvents(runClock(next, 1));
+    return next;
+  }
+
+  /** Takes the owner off whatever he is at, so the saw under him is free to sell. */
+  function offTheBench(state: GameState): GameState {
+    let next = act(state, { type: 'PAUSE_TASK' });
+    for (const job of next.jobs.filter((entry) => entry.assignedTo === 'owner')) {
+      next = act(next, { type: 'ASSIGN_JOB', jobId: job.id, workerId: null });
+    }
+    return next;
+  }
+
+  // He orders it and goes out for it: the standard saw is on a lorry when he is back, and the
+  // hour at the counter is the hour Turn 7 gave him (CLAUDE.md T7 3.10, T8 3.2).
+  const replaced = offTheBench(
+    runOut(
+      act(clearEvents(day5), {
+        type: 'BUY_EQUIPMENT',
+        specId: 'tableSaw',
+        variantId: 'standard',
+      }),
+      SHOPPING_MINUTES,
+    ),
+  );
+  const used = replaced.equipment.find(
+    (item) => item.specId === 'tableSaw' && item.variantId === 'used',
+  );
+  const sold = act(replaced, { type: 'SELL_MACHINE', equipmentId: used?.id ?? '' });
+
+  it('has the used saw in the hall and a standard one on its way', () => {
+    expect(day5.clock.day).toBe(5);
+    expect(used).toBeDefined();
+    expect(used?.purchasePrice).toBe(1800);
+    const coming = replaced.onOrder.find((item) => item.specId === 'tableSaw');
+    expect(coming?.variantId).toBe('standard');
+    expect(coming?.dueDay).toBe(addWorkingDays(5, 5));
+  });
+
+  it('marks the old one sold and stops it working the same minute', () => {
+    expect(sold.equipment.find((item) => item.id === used?.id)?.soldOnDay).toBe(
+      addWorkingDays(5, 1),
+    );
+    expect(salePriceFor(used ?? ({} as Equipment))).toBe(630);
+    // It is still standing there, and nobody may stand at it.
+    expect(sold.equipment.some((item) => item.id === used?.id)).toBe(true);
+    expect(sold.equipment.find((item) => item.id === used?.id)?.takenBy).toBeNull();
+  });
+
+  it('takes it away the next morning and puts the money in the bank', () => {
+    const collected: GameEvent[] = [];
+    const morning = playUntilDay(sold, addWorkingDays(5, 1), CAREFUL, collected);
+    expect(morning.clock.day).toBe(addWorkingDays(5, 1));
+    expect(morning.equipment.some((item) => item.id === used?.id)).toBe(false);
+    const said = [...collected, morning.activeEvent, ...morning.eventQueue];
+    expect(said.some((event) => event?.kind === 'machineCollected')).toBe(true);
+    const line = morning.ledger.find((entry) => entry.label === 'Sold: Table saw');
+    expect(line?.amount).toBe(630);
+    // And the month that follows still trades, on the saw that took its place.
+    const month = playUntilDay(morning, 31, CAREFUL);
+    expect(month.gameOver).toBeNull();
+    expect(month.equipment.filter((item) => item.specId === 'tableSaw')).toHaveLength(1);
+    expect(month.equipment.find((item) => item.specId === 'tableSaw')?.variantId).toBe('standard');
   });
 });

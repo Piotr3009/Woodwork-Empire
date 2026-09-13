@@ -2006,12 +2006,13 @@ function afterTheTrips(state: GameState): GameState {
   const trips = state.tasks.some((task) => !task.done && task.orders.length > 0);
   if (!trips && state.onOrder.length === 0) return state;
   const after = clone(state);
+  // Everything already on the road, landed: the cash for all of it is spent, so the extraction he
+  // ordered on Monday is what Tuesday's floor edgebander is allowed against (T7 3.10, T8 3.2).
+  for (const item of after.onOrder.slice()) landOrder(after, item);
   for (const task of after.tasks) {
-    if (!task.done) settleOrders(after, task);
+    if (!task.done) settleOrders(after, task, after);
   }
-  // And the hall once every lorry has been and gone. The cash for all of it is already spent, so
-  // the extraction he ordered on Monday is what Tuesday's floor edgebander is allowed against
-  // (CLAUDE.md T7 3.10, T8 3.2).
+  // And what those trips ordered in is on the road as well.
   for (const item of after.onOrder.slice()) landOrder(after, item);
   return after;
 }
@@ -2117,11 +2118,11 @@ export function placeOrder(state: GameState, order: TaskOrder): BuyCheck {
 
 /** The owner is back: what he went out for is booked and the cash leaves now. Anything the world
  *  has made impossible while he was out is simply not bought (CLAUDE.md T7 3.10). */
-function settleOrders(state: GameState, task: TaskInstance): void {
+function settleOrders(state: GameState, task: TaskInstance, against?: GameState): void {
   const orders = task.orders;
   task.orders = [];
   for (const order of orders) {
-    if (order.kind === 'equipment') settleEquipmentOrder(state, order);
+    if (order.kind === 'equipment') settleEquipmentOrder(state, order, against);
     else if (order.kind === 'software') buySoftware(state, order.mode, order.paid === true);
     else hire(state, order.role, order.tier);
   }
@@ -2133,6 +2134,7 @@ function settleOrders(state: GameState, task: TaskInstance): void {
 function settleEquipmentOrder(
   state: GameState,
   order: { kind: 'equipment'; specId: string; variantId: string; paid?: boolean },
+  against?: GameState,
 ): void {
   const prepaid = order.paid === true;
   const days = deliveryDaysFor(order.specId, order.variantId);
@@ -2140,9 +2142,12 @@ function settleEquipmentOrder(
     buyEquipment(state, order.specId, order.variantId, prepaid);
     return;
   }
-  // The same question the click asked, of the hall he has actually come back to: anything the
-  // world made impossible while he was out is simply not ordered (CLAUDE.md T7 3.10).
-  if (!canBuy(state, order.specId, order.variantId, prepaid).ok) return;
+  // The very question the click asked, asked again of the hall as it will be once everything on
+  // the road has landed. Asking it of the hall he is standing in would refuse the CNC he ordered
+  // behind the extraction that is still on a lorry, and take his money for it (T7 3.10, T8 3.2).
+  // `against` is the hypothetical hall itself asking, which is where the recursion stops.
+  const hall = against ?? afterTheTrips(state);
+  if (!canBuy(hall, order.specId, order.variantId, prepaid).ok) return;
   const spec = specOf(order.specId);
   const variant = variantOf(spec, order.variantId);
   const at = anchorFor(state, order.specId, variant.id);
