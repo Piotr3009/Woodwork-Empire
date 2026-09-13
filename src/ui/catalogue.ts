@@ -63,8 +63,12 @@ export function renderCatalogue(state: GameState, filter: string, tab: Catalogue
     (rackCapacity(state) > 0
       ? ''
       : '<p class="warn">No shelving in the hall. Nothing can be unloaded without it.</p>');
+  // The management software runs on the laptop, so it is under Computers with it and not on
+  // every tab of the catalogue (CLAUDE.md T6 3.6).
   const body =
-    tab === OWNED_TAB ? renderOwned(state, filter) : renderTab(state, filter, tab) + renderSoftware(state);
+    tab === OWNED_TAB
+      ? renderOwned(state, filter)
+      : renderTab(state, filter, tab) + (tab === 'computers' ? renderSoftware(state) : '');
   return warnings + tabBar(tab) + filterField('catalogue', filter, 'Filter the catalogue') + body;
 }
 

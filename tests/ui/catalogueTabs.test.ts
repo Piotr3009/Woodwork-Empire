@@ -149,10 +149,11 @@ describe('the Owned tab', () => {
     expect(shop(state, 'owned', 'saw').innerHTML).toContain('Nothing matches that.');
   });
 
-  it('leaves the software off the Owned tab: it is a list of the hall', () => {
+  it('keeps the management software with the laptop it runs on, and nowhere else', () => {
     const state = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
+    expect(shop(state, 'computers').innerHTML).toContain('Management software');
     expect(shop(state, 'owned').innerHTML).not.toContain('Management software');
-    expect(shop(state, 'storage').innerHTML).toContain('Management software');
+    expect(shop(state, 'storage').innerHTML).not.toContain('Management software');
     expect(findSpec('toolCabinet')?.tab).toBe('storage');
   });
 });
