@@ -316,6 +316,80 @@ export function hallLayerBox(): { x: number; y: number; width: number; height: n
 }
 
 // ---------------------------------------------------------------------------
+// The camera over the hall (CLAUDE.md T6 3.3). One transform on one group, over the painting, the
+// sprites, the figures, the effects and the text: nothing is laid out again when it changes, and
+// the same numbers answer where a click landed.
+// ---------------------------------------------------------------------------
+
+export interface HallCamera {
+  /** Multiples of the letterboxed fit the view box already gives. */
+  scale: number;
+  /** Where the scene is pushed to, in view box units. */
+  x: number;
+  y: number;
+}
+
+/** The whole hall on the screen, which is where every visit starts. */
+export const HALL_CAMERA_FIT: HallCamera = { scale: 1, x: 0, y: 0 };
+export const HALL_ZOOM_MIN = 1;
+export const HALL_ZOOM_MAX = 4;
+/** One notch of the wheel [PIOTR: steps of 1.2]. */
+export const HALL_ZOOM_STEP = 1.2;
+
+/** A rectangle in view box units: the frame the scene is seen through. */
+export interface Frame {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export function cameraTransform(camera: HallCamera): string {
+  return `translate(${round(camera.x)},${round(camera.y)}) scale(${round(camera.scale)})`;
+}
+
+/** The scene never comes off the frame: at the fit there is nowhere to go, and the further in the
+ *  player is the more he may push it about. */
+export function clampCamera(camera: HallCamera, frame: Frame): HallCamera {
+  const scale = Math.min(HALL_ZOOM_MAX, Math.max(HALL_ZOOM_MIN, camera.scale));
+  const slack = 1 - scale;
+  return {
+    scale,
+    x: Math.min(frame.x * slack, Math.max((frame.x + frame.width) * slack, camera.x)),
+    y: Math.min(frame.y * slack, Math.max((frame.y + frame.height) * slack, camera.y)),
+  };
+}
+
+/** A point of the frame, back to the point of the scene under it. Hit testing goes through here,
+ *  so it reads the same transform the picture is drawn with. */
+export function sceneToContent(camera: HallCamera, at: Point): Point {
+  return { x: (at.x - camera.x) / camera.scale, y: (at.y - camera.y) / camera.scale };
+}
+
+/** Zoom about a point of the frame: whatever is under the pointer stays under it. */
+export function zoomAt(camera: HallCamera, frame: Frame, at: Point, factor: number): HallCamera {
+  const scale = Math.min(HALL_ZOOM_MAX, Math.max(HALL_ZOOM_MIN, camera.scale * factor));
+  const taken = scale / camera.scale;
+  return clampCamera(
+    { scale, x: at.x - taken * (at.x - camera.x), y: at.y - taken * (at.y - camera.y) },
+    frame,
+  );
+}
+
+/** Zoom to a scale with a point of the scene in the middle of the frame. */
+export function zoomTo(frame: Frame, centre: Point, scale: number): HallCamera {
+  const wanted = Math.min(HALL_ZOOM_MAX, Math.max(HALL_ZOOM_MIN, scale));
+  return clampCamera(
+    {
+      scale: wanted,
+      x: frame.x + frame.width / 2 - wanted * centre.x,
+      y: frame.y + frame.height / 2 - wanted * centre.y,
+    },
+    frame,
+  );
+}
+
+// ---------------------------------------------------------------------------
 // What a machine looks like while it is running (CLAUDE.md T3 3.7). All of it is presentation on
 // top of whatever the machine is drawn with, and all of it moves through CSS on SVG groups: the
 // renderer starts no timer of its own.
@@ -889,7 +963,11 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
       `<svg class="hall-view" data-scene="${key}" viewBox="${viewBox}" ` +
       `width="${size.width}" height="${size.height}" ` +
       `xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Workshop hall">` +
-      `${parts.join('')}${LIVE_SLOT}</svg>`,
+      // Everything the player sees hangs off one group, so the camera is one attribute and no
+      // part of the hall is laid out again when it moves. It leaves here at the fit; the page
+      // writes the camera it is holding onto the group (CLAUDE.md T6 3.3).
+      `<g class="hall-scene" data-camera="1" transform="${cameraTransform(HALL_CAMERA_FIT)}">` +
+      `${parts.join('')}${LIVE_SLOT}</g></svg>`,
     live: live.join(''),
     notes:
       `<p class="view-note">${escapeText(stateLine)}</p>` +
