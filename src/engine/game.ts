@@ -21,6 +21,7 @@ import {
   MOVE_MINUTES_PER_ITEM,
   SKIP_SPEED,
   OVERTIME_DEBT_PER_DAY,
+  OVERTIME_QUIT_CHANCE,
   REPUTATION_START,
   SERVICE_INTERVAL_HOURS,
   SOFTWARE_ONE_OFF_JOBS,
@@ -177,13 +178,16 @@ import {
   autoAssignJobs,
   availableJoiners,
   canHire,
+  countStaffOvertimeMinute,
   hasWorkingDay,
   helpers,
   hire,
   isWorkingToday,
   joiners,
+  recordStaffOvertime,
   runStaffDayStart,
   staffMinutesLeft,
+  staysForOvertime,
 } from './staff';
 import {
   AD_HOC_TASK_MINUTES,
@@ -325,6 +329,7 @@ export function createGame(options: NewGameOptions): GameState {
     lastLowStockDay: null,
     booksUpToDay: 0,
     lateAccountsMonths: 0,
+    lastQuitMonth: monthOfDay(1),
     productionMinutesMonth: 0,
     movedItems: [],
     skipTaskId: null,
@@ -422,6 +427,7 @@ function startDay(state: GameState): void {
   runOverdueBreakdowns(state);
   checkLowStock(state);
   runAccidentRoll(state);
+  runOvertimeQuits(state);
   runHelperClean(state);
   delegateTasks(state);
   queueDeliveryEvents(state, arriving);
@@ -603,6 +609,31 @@ function runAccidentRoll(state: GameState): void {
   });
 }
 
+/** The month end, and the men who have had enough of the evenings. A tired man has one chance in
+ *  twenty of handing his notice in; the rest is a bench free for somebody else
+ *  (CLAUDE.md T8 3.6). Read once a month, whatever day of the week the 1st falls on. */
+export function runOvertimeQuits(state: GameState): void {
+  const month = monthOfDay(state.clock.day);
+  if (month <= state.lastQuitMonth) return;
+  state.lastQuitMonth = month;
+  for (const worker of state.workers.slice()) {
+    if (!worker.tiredOfOvertime) continue;
+    if (!chance(state, OVERTIME_QUIT_CHANCE)) continue;
+    state.workers = state.workers.filter((entry) => entry.id !== worker.id);
+    const job = worker.jobId ? findJob(state, worker.jobId) : null;
+    if (job) releaseJob(state, job);
+    releaseMachines(state, worker.id);
+    queueEvent(state, {
+      kind: 'workerQuit',
+      title: `${worker.name} has handed his notice in`,
+      body:
+        'Too many evenings on the trot. He is gone in the morning, and there is a bench and a ' +
+        'locker free for whoever comes next.',
+      data: { workerId: worker.id, role: worker.role, name: worker.name },
+    });
+  }
+}
+
 /** A helper cleans every Friday at no cost to the owner (CLAUDE.md 9.7). */
 function runHelperClean(state: GameState): void {
   if (helpers(state).length === 0) return;
@@ -711,6 +742,8 @@ function finishDay(state: GameState): void {
   if (ending) return;
   pauseOwnerTask(state);
   chargeOvertimeDebt(state);
+  // The evenings the crew stayed for, and the run of them that tires a man (CLAUDE.md T8 3.6).
+  recordStaffOvertime(state);
   // A skipped run ends with the day: what is not finished is picked up in the morning and the
   // player decides again whether to sit through it (CLAUDE.md T8 3.3).
   endSkip(state);
@@ -1217,12 +1250,17 @@ function handsAtWork(state: GameState, ownerOnTask: boolean, moving: boolean): H
   if (atTheBench && ownerIsAvailable(state)) {
     list.push({ who: OWNER, job: atTheBench, rate: ownerEfficiency(state) });
   }
-  // Staff work the normal day only: nobody but the owner does overtime, and they always take
-  // their dinner even on a day the owner works through his (CLAUDE.md T6 3.4).
-  if (isOvertime(state.clock.minute) || isBreak(state.clock.minute)) return list;
+  // The crew always take their dinner, even on a day the owner works through his (T6 3.4).
+  if (isBreak(state.clock.minute)) return list;
+  // Past five the hall stays with the owner or it goes home: nobody works an evening he is not
+  // there for, the office never works one at all, and two hours is what a man will do
+  // (PIOTR, CLAUDE.md T8 3.6).
+  const overtime = isOvertime(state.clock.minute);
+  if (overtime && !ownerIsAvailable(state)) return list;
   const staffFactor = staffOutputFactor(state);
   for (const worker of state.workers) {
     if (!isWorkingToday(state, worker)) continue;
+    if (overtime && !staysForOvertime(state, worker)) continue;
     if (worker.taskId !== null) {
       runWorkerTaskMinute(state, worker.id, worker.taskId);
       continue;
@@ -1484,6 +1522,8 @@ function advanceMinute(state: GameState): boolean {
   const onTask = state.owner.currentTaskId !== null;
   runMinute(state);
   runProductionMinute(state, onTask);
+  // Booked after the minute is worked, so the two hours a man will do are two hours he did.
+  countStaffOvertimeMinute(state);
   state.clock.minute += 1;
   if (shouldFinishDay(state)) finishDay(state);
   settle(state);

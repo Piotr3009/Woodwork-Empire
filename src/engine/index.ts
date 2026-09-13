@@ -220,6 +220,10 @@ export type { TaskStartCheck } from './tasks';
 export {
   availableJoiners,
   hasWorkingDay,
+  overtimePayFor,
+  overtimeWageBill,
+  staysForOvertime,
+  worksOvertime,
   helpers,
   hiringOptions,
   isWorkingToday,

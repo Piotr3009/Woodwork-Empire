@@ -34,6 +34,7 @@ import {
 } from './clock';
 import { queueEvent } from './events';
 import { has, hasCentralExtraction, machinePowerPerDay, seizableMachines } from './machines';
+import { clearOvertimeWeek, overtimeWageBill } from './staff';
 import { makeId } from './rng';
 import { plural } from './text';
 import type {
@@ -515,13 +516,22 @@ export function runDayCosts(state: GameState, day: number): void {
   }
   if (isFriday(day)) {
     const wages = weeklyWageBill(state);
+    // The evenings the crew stayed for, at one and a half times the hour (CLAUDE.md T8 3.6).
+    const overtime = overtimeWageBill(state);
+    if (overtime > 0) {
+      chargeUnavoidable(state, 'wages', 'Overtime', overtime);
+      clearOvertimeWeek(state);
+    }
     if (wages > 0) {
       chargeUnavoidable(state, 'wages', 'Weekly wages', wages);
       queueEvent(state, {
         kind: 'wagesPaid',
         title: 'Wages',
-        body: 'Friday. The weekly wages have gone out.',
-        data: { amount: Math.round(wages) },
+        body:
+          overtime > 0
+            ? `Friday. The weekly wages have gone out, with ${formatMoney(overtime)} of overtime.`
+            : 'Friday. The weekly wages have gone out.',
+        data: { amount: Math.round(wages + overtime), overtime: Math.round(overtime) },
       });
     }
   }

@@ -289,6 +289,15 @@ export interface Worker {
   taskId: string | null;
   /** Minutes of his own day spent so far. Office roles have 480 of them (CLAUDE.md T2 3.8). */
   minutesWorked: number;
+  /** Minutes past 17:00 he has stood in the hall today, and since the last wages went out: the
+   *  first says when he has had his two hours, the second is what Friday pays him for
+   *  (CLAUDE.md T8 3.6). */
+  overtimeMinutes: number;
+  overtimeMinutesWeek: number;
+  /** Working days in a row with any overtime in them, and the flag three of them set. A tired
+   *  man may hand his notice in at the month end (CLAUDE.md T8 3.6). */
+  overtimeDays: number;
+  tiredOfOvertime: boolean;
   /** Per job material orders this clerk has put through today. */
   ordersToday: number;
   /** Where he is standing: bench, machine:<specId>, rack, gate, office or idle. */
@@ -529,7 +538,9 @@ export type GameEventKind =
   | 'lateAccounts'
   | 'jobAtGate'
   | 'jobPaid'
-  | 'clientCall';
+  | 'clientCall'
+  /** A worker who has had enough of the evenings has handed his notice in (CLAUDE.md T8 3.6). */
+  | 'workerQuit';
 
 export interface GameEventChoice {
   id: string;
@@ -715,6 +726,9 @@ export interface GameState {
   booksUpToDay: number;
   /** Consecutive months the books were behind on the 1st. */
   lateAccountsMonths: number;
+  /** The month the notices were last read. Nobody hands his notice in twice for one month, and a
+   *  month that opens on a weekend still has its 1st (CLAUDE.md T8 3.6). */
+  lastQuitMonth: number;
   /** Production minutes since the 1st, for pellet sales. */
   productionMinutesMonth: number;
   /** Kit the player has dragged about and not yet paid for in time and ducting (T4 3.5). */
