@@ -40,11 +40,13 @@ import {
   type BoxFaces,
   type Point,
   type Polygon,
+  blockSilhouette,
   boxPolygons,
   centreOf,
   depthKey,
   footprintPolygon,
   gridBounds,
+  pointInPolygon,
   tileToScreen,
 } from './iso';
 import {
@@ -222,6 +224,33 @@ export function fitName(name: string, boxWidth: number): FittedName {
   const fits = Math.floor(boxWidth / (LETTER_WIDTH * fontSize));
   if (trimmed.length <= fits) return { text: trimmed, fontSize };
   return { text: `${trimmed.slice(0, Math.max(1, fits - 3))}...`, fontSize };
+}
+
+/** The shape a room block covers on the screen. A room is 2.7 m high, so what the player sees of
+ *  it reaches well above the cells it stands on: the canteen block is painted over the middle of
+ *  the office's floor, and the office block over the WC's front face. */
+export function roomSilhouette(room: {
+  x: number;
+  y: number;
+  width: number;
+  depth: number;
+  height: number;
+}): Polygon {
+  return blockSilhouette(room.x, room.y, room.width, room.depth, room.height);
+}
+
+/** Which room the player clicked, from the room footprints alone: never from the layer images,
+ *  which are one full canvas each and would answer for every pixel of the hall (CLAUDE.md T6 3.1).
+ *  The rooms are tried nearest first, in the reverse of the order they are painted in, so the
+ *  block in front takes the click the way it takes the pixel. */
+export function roomAtScenePoint(point: Point): RoomId | null {
+  const nearestFirst = [...ROOM_LAYOUT].sort(
+    (left, right) => depthKey(right.x, right.y) - depthKey(left.x, left.y),
+  );
+  for (const room of nearestFirst) {
+    if (pointInPolygon(point, roomSilhouette(room))) return room.id;
+  }
+  return null;
 }
 
 /** Where a layer goes in the hall's own coordinates: the canvas, shifted so its origin pixel
@@ -530,11 +559,7 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
         `<g data-room="${room.id}" class="clickable">` +
         `<title>${escapeText(room.tooltip)}</title>` +
         (drawn
-          ? polygon(
-              footprintPolygon(room.x, room.y, room.width, room.depth),
-              'transparent',
-              'class="room-hit"',
-            ) +
+          ? polygon(roomSilhouette(room), 'transparent', 'class="room-hit"') +
             // The art leaves the face blank, so the game letters it (docs/art/SPRITES.md 9.5).
             // A boxed room already carries its name in the middle: one name per room either way.
             paintedText(

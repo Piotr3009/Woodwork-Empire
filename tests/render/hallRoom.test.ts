@@ -12,8 +12,11 @@ import {
   hallLayerBox,
   hallScene,
   renderHall,
+  roomAtScenePoint,
+  roomSilhouette,
 } from '../../src/render/hall';
-import { centreOf, tileToScreen } from '../../src/render/iso';
+import { centreOf, pointInPolygon, tileToScreen } from '../../src/render/iso';
+import { roomById } from '../../src/engine/constants';
 import { findSpec } from '../../src/engine/machines';
 import { STATION_BENCH } from '../../src/engine/stations';
 import { ROOM_LAYOUT } from '../../src/engine/constants';
@@ -109,6 +112,12 @@ describe('the hall without the art', () => {
   });
 });
 
+/** The middle of the face a room's door is in, which is the part of it the player aims at. */
+function frontFaceCentre(id: 'wc' | 'office' | 'canteen'): { x: number; y: number } {
+  const room = roomById(id);
+  return tileToScreen(room.x + room.width / 2, room.y + room.depth, room.height / 2);
+}
+
 describe('the rooms stay the way into the office', () => {
   it('gives every room a footprint the player can click, painted or not', () => {
     for (const files of [DELIVERED, []]) {
@@ -117,9 +126,45 @@ describe('the rooms stay the way into the office', () => {
         expect(svg, `${room.id} ${files.length}`).toContain(`data-room="${room.id}"`);
       }
     }
-    // With the art there the hit area is the footprint itself, and nothing is drawn over the room.
+    // With the art there the hit area is the block the player sees, and nothing is drawn over it.
     const painted = hall();
     expect(painted).toContain('fill="transparent" class="room-hit"');
+    for (const room of ROOM_LAYOUT) {
+      const shape = roomSilhouette(room);
+      const wanted = shape
+        .map((point) => `${Math.round(point.x * 100) / 100},${Math.round(point.y * 100) / 100}`)
+        .join(' ');
+      expect(painted, room.id).toContain(`<polygon points="${wanted}" fill="transparent"`);
+    }
+  });
+
+  it('opens the room the player clicked, not the one behind it', () => {
+    // The bug Piotr found: the canteen block is painted over the middle of the office's floor, so
+    // the office footprint took every click aimed at the canteen (CLAUDE.md T6 3.1).
+    expect(roomAtScenePoint(frontFaceCentre('canteen'))).toBe('canteen');
+    expect(roomAtScenePoint(frontFaceCentre('office'))).toBe('office');
+    // And a click on empty floor is not a room at all.
+    expect(roomAtScenePoint(tileToScreen(12, 8))).toBeNull();
+  });
+
+  it('gives the WC the part of it the camera can see', () => {
+    // The office block is 2.7 m high and stands right of the WC, so it hides all but the top of
+    // the WC's front face: what the player clicks there is the office roof, and that is what
+    // opens (REPORT-T6 section 5). The WC answers on its own roof.
+    const wc = roomById('wc');
+    expect(roomAtScenePoint(frontFaceCentre('wc'))).toBe('office');
+    expect(pointInPolygon(frontFaceCentre('wc'), roomSilhouette(roomById('office')))).toBe(true);
+    const roof = tileToScreen(wc.x + wc.width / 2, wc.y + wc.depth / 2, wc.height);
+    expect(roomAtScenePoint(roof)).toBe('wc');
+  });
+
+  it('never asks a layer image which room was clicked', () => {
+    // Each layer is the whole 1680 by 1128 canvas, so an image would answer for the whole hall.
+    const svg = hall();
+    for (const layer of HALL_LAYERS) {
+      const image = svg.match(new RegExp(`<image[^>]*data-layer="${layer.key}"[^>]*>`))?.[0] ?? '';
+      expect(image, layer.key).not.toContain('data-room');
+    }
   });
 });
 

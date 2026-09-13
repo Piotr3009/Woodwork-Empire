@@ -88,6 +88,42 @@ export function boxPolygons(
   return { top, left, right };
 }
 
+/** The outline the camera sees around a box: the three lit and shaded faces as one shape. Used
+ *  for hit testing, because a block that stands 2.7 m high covers far more of the screen than the
+ *  cells it stands on, and the player clicks what he sees. */
+export function blockSilhouette(
+  x: number,
+  y: number,
+  width: number,
+  depth: number,
+  height: number,
+): Polygon {
+  return [
+    tileToScreen(x, y + depth, height),
+    tileToScreen(x, y, height),
+    tileToScreen(x + width, y, height),
+    tileToScreen(x + width, y),
+    tileToScreen(x + width, y + depth),
+    tileToScreen(x, y + depth),
+  ];
+}
+
+/** Ray casting: is the point inside the shape? Edges count as inside on one side only, which is
+ *  all a click needs. */
+export function pointInPolygon(point: Point, shape: Polygon): boolean {
+  let inside = false;
+  for (let i = 0, j = shape.length - 1; i < shape.length; j = i, i += 1) {
+    const a = shape[i];
+    const b = shape[j];
+    if (a === undefined || b === undefined) continue;
+    const crosses = a.y > point.y !== b.y > point.y;
+    if (!crosses) continue;
+    const at = a.x + ((point.y - a.y) * (b.x - a.x)) / (b.y - a.y);
+    if (point.x < at) inside = !inside;
+  }
+  return inside;
+}
+
 /** Where a label sits: the middle of the footprint, at the given height. */
 export function centreOf(
   x: number,

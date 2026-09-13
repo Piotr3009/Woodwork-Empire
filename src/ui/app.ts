@@ -35,7 +35,8 @@ interface Drag {
   y: number;
 }
 import { WHY, boxOf, canPlace } from '../engine/index';
-import { type Scene, hallScene } from '../render/hall';
+import { type Scene, hallScene, roomAtScenePoint } from '../render/hall';
+import { type RoomId, roomById } from '../engine/constants';
 import { screenToTile } from '../render/iso';
 import { fitOfficeStack, officeScene } from '../render/office';
 import { renderAccounting } from './accounting';
@@ -913,21 +914,22 @@ function copyState(): void {
   ui.note = 'State copied as JSON.';
 }
 
+/** Walking into a room. The office is a view of its own; the other two are a line under the
+ *  hall (CLAUDE.md T6 3.1). */
+function handleRoomClick(room: RoomId): void {
+  if (room === 'office') {
+    ui.view = 'office';
+  } else if (room === 'wc') {
+    ui.note = roomById('wc').tooltip;
+  } else {
+    ui.note = roomById('canteen').tooltip;
+  }
+  render();
+}
+
 function handleSceneClick(element: DataElement): boolean {
   // In setup mode a click on the kit is a drag, not a question about the bag.
   if (ui.setup) return true;
-  const room = element.dataset.room;
-  if (room !== undefined) {
-    if (room === 'office') {
-      ui.view = 'office';
-    } else if (room === 'wc') {
-      ui.note = 'The WC. Cold tap, one towel.';
-    } else {
-      ui.note = 'The canteen. Tea, and somewhere to eat out of the dust.';
-    }
-    render();
-    return true;
-  }
   const van = element.dataset.van;
   if (van !== undefined) {
     askUnload(van);
@@ -965,10 +967,19 @@ function onClick(event: MouseEvent): void {
     handleAction(doer, point);
     return;
   }
-  const scene = dataElement(target.closest('[data-room],[data-van],[data-kit]'));
-  if (scene && state !== null) {
+  if (state === null) return;
+  const scene = dataElement(target.closest('[data-van],[data-kit]'));
+  if (scene) {
     handleSceneClick(scene);
+    return;
   }
+  // A room is not an element the pointer can land on: its block is painted, and the painting is
+  // three images that answer for every pixel of the hall. The footprints decide instead.
+  if (ui.setup || target.closest('.hall-view') === null) return;
+  const local = scenePointUnder(event);
+  if (local === null) return;
+  const room = roomAtScenePoint(local);
+  if (room !== null) handleRoomClick(room);
 }
 
 function onInput(event: Event): void {
@@ -1032,18 +1043,29 @@ function onKeyDown(event: KeyboardEvent): void {
   }
 }
 
-/** The cell under the mouse, read through the hall SVG's own view box. */
-function cellUnder(event: MouseEvent): { x: number; y: number } | null {
+/** Where the mouse is in the hall's own coordinates, read through the SVG's own view box. One
+ *  conversion for everything the hall is asked about: the cell under the pointer and the room the
+ *  player clicked come off the same number. */
+function scenePointUnder(event: MouseEvent): { x: number; y: number } | null {
   if (!root) return null;
   const svg = root.querySelector('.hall-view');
   if (!(svg instanceof SVGSVGElement)) return null;
+  // A tree that is not on a painted page has no screen matrix, and the same guard is what the
+  // frame loop and the clipboard already use here.
+  if (typeof svg.getScreenCTM !== 'function') return null;
   const matrix = svg.getScreenCTM();
   if (matrix === null) return null;
   const point = svg.createSVGPoint();
   point.x = event.clientX;
   point.y = event.clientY;
   // Include the centred margins introduced by the SVG's uniform viewport scaling.
-  const local = point.matrixTransform(matrix.inverse());
+  return point.matrixTransform(matrix.inverse());
+}
+
+/** The cell under the mouse. */
+function cellUnder(event: MouseEvent): { x: number; y: number } | null {
+  const local = scenePointUnder(event);
+  if (local === null) return null;
   const cell = screenToTile(local.x, local.y);
   return { x: Math.floor(cell.x), y: Math.floor(cell.y) };
 }
