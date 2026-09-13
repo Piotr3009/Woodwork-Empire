@@ -8,6 +8,13 @@ import { OFFICE_CANVAS, OFFICE_LAYERS } from '../render/office';
 import { boxPolygons, centreOf, footprintPolygon, gridBounds, tileToScreen } from '../render/iso';
 import { SPRITE_SCALE, spriteCanvas, spriteFileSize, spriteUrl } from '../render/sprites';
 import { footprintOf, standsInTheHall, zoneOf } from '../engine/machines';
+import {
+  type Animation,
+  ANIMATIONS,
+  characterArt,
+  characterKey,
+  characterSheet,
+} from '../render/characters';
 import { escapeHtml } from './modal';
 
 export interface SpriteTarget {
@@ -208,6 +215,67 @@ function layerSection(
   );
 }
 
+/** The roles the game draws figures for. Joiners have their sheet tonight; the rest fall back to
+ *  the capsule until theirs are delivered (CLAUDE.md T9 3.13). */
+const CHARACTER_ROLES = ['joiner', 'helper', 'owner'];
+
+/** One character sheet as a strip, with the anchor marked and the frames playing. The acceptance
+ *  page for the art side: a sheet whose anchor is wrong is obvious here (CLAUDE.md T9 3.13). */
+function characterCell(role: string, animation: Animation): string {
+  const found = characterSheet(role, animation);
+  const key = characterKey(role, animation);
+  if (found === null) {
+    return (
+      `<div class="sprite-cell" data-character-key="${escapeHtml(key)}">` +
+      '<div class="sprite-box"><span>no sheet yet</span></div>' +
+      `<p class="sprite-key">${escapeHtml(`${key}.sheet.png`)}</p>` +
+      '<p class="sprite-figures">and its numbers beside it, in ' +
+      `${escapeHtml(`${key}.json`)}</p></div>`
+    );
+  }
+  const { sheet, url } = found;
+  const directions = Object.keys(sheet.rows).join(', ');
+  // The whole strip, so every frame of the first row is on the page at once, with the anchor of
+  // the first cell marked on it.
+  const width = (sheet.cellWidth * sheet.frames) / SPRITE_SCALE;
+  const height = sheet.cellHeight / SPRITE_SCALE;
+  const anchorX = sheet.anchorX / SPRITE_SCALE;
+  const anchorY = sheet.anchorY / SPRITE_SCALE;
+  const strip =
+    `<svg class="sprite-strip" viewBox="0 0 ${width} ${height}" width="${width}" ` +
+    `height="${height}"><image href="${url}" x="0" y="0" width="${width}" height="${height}" />` +
+    `<circle class="sprite-anchor" cx="${anchorX}" cy="${anchorY}" r="2" /></svg>`;
+  const playing = characterArt(role, animation, 'sw') ?? '';
+  return (
+    `<div class="sprite-cell is-wide" data-character-key="${escapeHtml(key)}">` +
+    strip +
+    `<svg class="sprite-play" viewBox="-24 -48 48 56" width="48" height="56">` +
+    `<g transform="translate(0,0)">${playing}</g></svg>` +
+    `<p class="sprite-key">${escapeHtml(`${key}.sheet.png`)}</p>` +
+    `<p class="sprite-figures">${sheet.frames} frames at ${sheet.fps} fps · ` +
+    `cell ${sheet.cellWidth} by ${sheet.cellHeight} · anchor ${sheet.anchorX}, ` +
+    `${sheet.anchorY} · rows: ${escapeHtml(directions)}</p>` +
+    `<p class="sprite-figures">${escapeHtml(url)}</p></div>`
+  );
+}
+
+function characterSection(): string {
+  const cells = CHARACTER_ROLES.flatMap((role) =>
+    ANIMATIONS.map((animation) => characterCell(role, animation)),
+  ).join('');
+  const delivered = CHARACTER_ROLES.flatMap((role) =>
+    ANIMATIONS.map((animation) => characterSheet(role, animation)),
+  ).filter((found) => found !== null).length;
+  return (
+    `<h3>The figures, ${delivered} sheets delivered</h3>` +
+    '<p class="hint">One row a direction, one column a frame, at 2x like every sprite. The dot ' +
+    'is the anchor: it goes on the tile the figure stands on, so a sheet whose anchor is wrong ' +
+    'makes him float. A direction the sheet has no row for is mirrored from its opposite. The ' +
+    'small square beside the strip plays it at the sheet\u2019s own frames a second.</p>' +
+    `<div class="sprite-wide-grid">${cells}</div>`
+  );
+}
+
 export function renderSpriteCheck(): string {
   const targets = spriteTargets();
   const delivered = targets.filter(
@@ -234,6 +302,7 @@ export function renderSpriteCheck(): string {
       OFFICE_LAYERS,
       OFFICE_CANVAS,
     ) +
+    characterSection() +
     '</div>'
   );
 }

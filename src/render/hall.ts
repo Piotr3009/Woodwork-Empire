@@ -61,6 +61,12 @@ import {
 } from './iso';
 import { formatTime } from '../engine/clock';
 import {
+  type CharacterOptions,
+  type Facing,
+  animationForStation,
+  characterArt,
+} from './characters';
+import {
   SPRITE_SCALE,
   contactShadow,
   pickSprite,
@@ -618,25 +624,38 @@ function stationLabel(station: string): string {
   return 'waiting';
 }
 
-/** A worker is a capsule with his name under it. The owner is the green one. The group carries
- *  its position as a transform, so a change of station slides instead of jumping. */
+/** Which way a figure stands when nobody has told him otherwise: towards the camera's left, the
+ *  way the hall is drawn [TUNE] (CLAUDE.md T9 3.13). */
+const FIGURE_FACING: Facing = 'sw';
+
+/** A worker is his sheet if the art side has delivered one and a capsule if it has not, with his
+ *  name under him either way. The owner is the green one. The group carries its position as a
+ *  transform, so a change of station slides instead of jumping. */
 function figure(
   key: string,
   tile: { x: number; y: number },
   name: string,
   isOwner: boolean,
   extra: string,
+  art: { role: string; station: string; options: CharacterOptions } | null = null,
 ): Drawable {
   const feet = centreOf(tile.x, tile.y, 1, 1);
   const fill = isOwner ? 'var(--owner)' : 'var(--worker)';
+  // The sheet if the art side has delivered one for this role, and the capsule the game has
+  // always drawn if it has not (CLAUDE.md T9 3.13).
+  const rest = art === null ? 'idle' : animationForStation(art.station);
+  const drawn =
+    art === null ? null : characterArt(art.role, rest, FIGURE_FACING, art.options);
+  const body =
+    drawn ?? `<rect x="-6" y="-30" width="12" height="26" rx="6" fill="${fill}" />`;
   return {
     depth: depthKey(tile.x, tile.y) + 0.2,
     svg:
       `<g class="figure" data-figure="${key}" ` +
-      `transform="translate(${Math.round(feet.x)},${Math.round(feet.y)})" ${extra}>` +
+      `transform="translate(${Math.round(feet.x)},${Math.round(feet.y)})" ` +
+      `data-rest="${rest}" ${extra}>` +
       `<title>${escapeText(name)}</title>` +
-      '<rect x="-6" y="-30" width="12" height="26" rx="6" ' +
-      `fill="${fill}" />` +
+      body +
       '<text x="0" y="14" text-anchor="middle" ' +
       `class="iso-label figure-label">${escapeText(name.split(',')[0] ?? name)}</text></g>`,
   };
@@ -731,6 +750,9 @@ export interface HallOptions {
   /** What the art side has delivered. A parameter so a test can ask for the hall before the art
    *  arrived, which is what the placeholders are for. */
   files?: readonly string[];
+  /** The character sheets, for the same reason: a figure is his sheet where there is one and the
+   *  capsule where there is not (CLAUDE.md T9 3.13). */
+  characters?: CharacterOptions['sheets'];
 }
 
 export function hallScene(state: GameState, options: HallOptions = {}): Scene {
@@ -744,6 +766,7 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
   const bounds = gridBounds(unit.widthCells + YARD_WIDTH_CELLS, unit.depthCells, 5);
   const pad = 24;
   const parts: string[] = [];
+  const characterOptions: CharacterOptions = { files, sheets: options.characters };
 
   if (painted) {
     // The layers sit at the canvas origin, every one of them, which is what keeps the two room
@@ -910,6 +933,9 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
         away ? `${worker.name} (off)` : `${worker.name}, ${where}`,
         false,
         `data-worker="${worker.id}"`,
+        // Joiners have a sheet tonight; everybody else falls back to the capsule until his own
+        // one is delivered (CLAUDE.md T9 3.13).
+        { role: worker.role, station: worker.station, options: characterOptions },
       ),
     );
   }

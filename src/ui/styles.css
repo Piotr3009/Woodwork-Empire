@@ -1590,3 +1590,26 @@ input.num {
     grid-template-columns: 1fr;
   }
 }
+
+/* The character strips on the sprite check page: one row a direction, one column a frame, with
+   the anchor marked (CLAUDE.md T9 3.13). */
+.sprite-strip {
+  background: var(--page);
+  border: 1px solid var(--border);
+  display: block;
+  image-rendering: auto;
+  max-width: 100%;
+}
+
+.sprite-anchor {
+  fill: var(--bad);
+  stroke: #fff;
+  stroke-width: 0.5;
+}
+
+.sprite-play {
+  background: var(--page);
+  border: 1px solid var(--border);
+  display: block;
+  margin-top: 6px;
+}

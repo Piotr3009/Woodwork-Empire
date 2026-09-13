@@ -74,6 +74,13 @@ import {
   reasonLabel,
   syncModals,
 } from './modal';
+import {
+  type Animation,
+  faceCharacter,
+  facingFromScreen,
+  playCharacters,
+  setCharacterAnimation,
+} from '../render/characters';
 import { patchInto } from './patch';
 import { renderOwnerOut } from './ownerOut';
 import { renderCompany } from './company';
@@ -639,19 +646,20 @@ function slideFigures(now: number): void {
   if (!root) return;
   const moving: Array<{ node: Element; to: Point }> = [];
   const seen = new Set<string>();
+  const walking = new Set<string>();
   for (const node of Array.from(root.querySelectorAll('[data-figure]'))) {
     const key = node.getAttribute('data-figure');
     const to = pointOf(node.getAttribute('transform') ?? '');
     if (key === null || to === null) continue;
     seen.add(key);
-    const walking = slides.get(key);
-    if (walking === undefined) {
+    const slide = slides.get(key);
+    if (slide === undefined) {
       // First sight of him: he is where he is, and nothing is left to walk.
       slides.set(key, { from: to, to, startedAt: now - FIGURE_SLIDE_MS });
       continue;
     }
-    const at = positionAt(walking, now);
-    if (walking.to.x !== to.x || walking.to.y !== to.y) {
+    const at = positionAt(slide, now);
+    if (slide.to.x !== to.x || slide.to.y !== to.y) {
       // He has been sent somewhere else, and he sets off from wherever he had got to.
       slides.set(key, { from: at, to, startedAt: now });
     } else if (at.x === to.x && at.y === to.y) {
@@ -663,7 +671,24 @@ function slideFigures(now: number): void {
       node.style.transitionDuration = `${Math.round(left)}ms`;
     }
     node.setAttribute('transform', translateOf(at));
+    // He is walking, and he faces the way he is going (CLAUDE.md T9 3.13).
+    walking.add(key);
+    const art = node.querySelector('[data-character]');
+    if (art !== null) {
+      setCharacterAnimation(art, 'walk');
+      faceCharacter(art, facingFromScreen(to.x - at.x, to.y - at.y));
+    }
     moving.push({ node, to });
+  }
+  // Everybody who is not walking is doing whatever his station says, facing the way he was left
+  // facing: the direction is held after he arrives (CLAUDE.md T9 3.13).
+  for (const node of Array.from(root.querySelectorAll('[data-figure]'))) {
+    const key = node.getAttribute('data-figure');
+    if (key === null || walking.has(key)) continue;
+    const art = node.querySelector('[data-character]');
+    if (art === null) continue;
+    const rest = (node.getAttribute('data-rest') ?? 'idle') as Animation;
+    setCharacterAnimation(art, rest);
   }
   for (const key of Array.from(slides.keys())) {
     if (!seen.has(key)) slides.delete(key);
@@ -1659,6 +1684,9 @@ export function advanceMinutes(wholeMinutes: number): number {
 function frame(now: number): void {
   const elapsed = Math.min(1000, now - lastFrame);
   lastFrame = now;
+  // The figures walk in real time and not in game minutes, so they are moved on before anything
+  // else the frame does and whatever the clock is at (CLAUDE.md T9 3.13).
+  if (root !== null) playCharacters(root, now);
   // One frame, one writing of the page, whatever the clock did inside it: ten game minutes at
   // 10x used to be ten pages (CLAUDE.md T9 3.8, 3.11).
   batched(() => {
