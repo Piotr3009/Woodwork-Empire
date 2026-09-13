@@ -752,6 +752,9 @@ const SPEC_DRAFTS: SpecDraft[] = [
     name: 'Hand edgebander',
     price: 900,
     category: 'machine',
+    // A hand tool serves the man holding it and nobody else, so no ratio applies to it and its
+    // bag and its hours count whole minutes as they always did (CLAUDE.md T6 3.5).
+    capacity: 1,
     // It stands in a tool cabinet and comes out to the bench, so it holds no cell of the floor
     // and nothing can be dropped on it in setup mode (CLAUDE.md T6 3.5).
     width: 0,
@@ -1398,11 +1401,13 @@ export const HELPER_CLEAN_WEEKDAY = 4;
 // ---------------------------------------------------------------------------
 
 /** The accounting modal shows the last 50 entries (CLAUDE.md 10.1). */
-export const LEDGER_VISIBLE_ENTRIES = 50;
 /** [TUNE] the state keeps this many ledger entries so it stays small. */
 /** How many end of day summaries the state carries: three months of working days [TUNE]. */
 export const DAY_SUMMARIES_MAX = 90;
 export const LEDGER_MAX_ENTRIES = 200;
+/** The Ledger tab shows every line the state carries: 200 (PIOTR, CLAUDE.md T6 3.9). It used to
+ *  show the last 50, which left three quarters of a busy month unreachable. */
+export const LEDGER_VISIBLE_ENTRIES = LEDGER_MAX_ENTRIES;
 
 // ---------------------------------------------------------------------------
 // 3.12 Why it is like this in real life

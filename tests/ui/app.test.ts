@@ -3,7 +3,7 @@
 
 import { beforeAll, describe, expect, it } from 'vitest';
 import { advanceMinutes, currentState, mount } from '../../src/ui/app';
-import { BREAK_MINUTES } from '../../src/engine/constants';
+import { BREAK_MINUTES, LEDGER_VISIBLE_ENTRIES } from '../../src/engine/constants';
 import { findSpec } from '../../src/engine/machines';
 import { STARTING_KIT } from '../helpers';
 
@@ -435,7 +435,7 @@ describe('accounting', () => {
     expect(html()).toContain('Unit deposit');
     expect(html()).toContain('Rent');
     expect(html()).toContain('Living costs');
-    expect(html()).toContain('Ledger, last 50');
+    expect(html()).toContain(`Ledger, last ${LEDGER_VISIBLE_ENTRIES}`);
     expect(html()).toContain('Copy state as JSON');
     click('[data-do="closeModal"]');
   });

@@ -28,13 +28,28 @@ function work(state: GameState, minutes: number, users: number): void {
 }
 
 describe('what a family can serve', () => {
-  it('gives the table saw three and everything else two', () => {
+  it('gives the table saw three, the hand edgebander one, and everything else two', () => {
     expect(capacityOf('tableSaw')).toBe(3);
     expect(findSpec('tableSaw')?.capacity).toBe(3);
+    // A hand tool serves the man holding it: no ratio applies to it (CLAUDE.md T6 3.5).
+    expect(capacityOf('edgebander')).toBe(1);
+    expect(capacityShare('edgebander', 1)).toBe(1);
+    expect(capacityShare('edgebander', 3)).toBe(1);
     for (const spec of EQUIPMENT_SPECS) {
-      if (spec.id === 'tableSaw') continue;
+      if (spec.id === 'tableSaw' || spec.id === 'edgebander') continue;
       expect(spec.capacity, spec.id).toBe(MACHINE_CAPACITY_DEFAULT);
     }
+  });
+
+  it('leaves the hand edgebander counting whole minutes, bag and hours alike', () => {
+    const state = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
+    work(state, 60, 1);
+    const bander = state.equipment.find((item) => item.specId === 'edgebander');
+    expect(bander?.hoursUsed).toBeCloseTo(1, 4);
+    expect(bander?.minutesUsed).toBeCloseTo(60, 4);
+    // And the saw beside it, which serves three, gained a third of that.
+    const saw = state.equipment.find((item) => item.specId === 'tableSaw');
+    expect(saw?.hoursUsed).toBeCloseTo(1 / 3, 4);
   });
 
   it('is a share of the capacity, and never more than all of it', () => {
