@@ -1675,6 +1675,9 @@ export function buySoftware(state: GameState, mode: 'oneOff' | 'subscription'): 
  *  standing in: the tool cabinet he has just put on the list is in by the time the hand bander
  *  he wants to keep in it arrives, and the cash for both is gone (CLAUDE.md T7 3.10). */
 function afterTheTrips(state: GameState): GameState {
+  // Nothing on the list: the hall he is standing in is the hall he will come back to, and the
+  // catalogue asks this question of every tile it draws, every minute.
+  if (!state.tasks.some((task) => !task.done && task.orders.length > 0)) return state;
   const after = clone(state);
   for (const task of after.tasks) {
     if (!task.done) settleOrders(after, task);
