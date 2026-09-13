@@ -102,6 +102,9 @@ interface Ui {
   /** Which tab of the books is on top, and the past day whose summary is open over them
    *  (CLAUDE.md T6 3.9). */
   accountingTab: AccountingTab;
+  /** Which month of this year the Days tab is showing, or null for the one the clock is in
+   *  (CLAUDE.md T7 3.9). */
+  accountingMonth: number | null;
   /** The days of the books the player has opened on their lines. */
   openDays: number[];
   daySummary: number | null;
@@ -162,6 +165,7 @@ function freshUi(): Ui {
     catalogueTab: CATALOGUE_FIRST_TAB,
     catalogueFolder: null,
     accountingTab: 'days',
+    accountingMonth: null,
     openDays: [],
     daySummary: null,
     scrollModalTop: false,
@@ -209,7 +213,13 @@ function modalBody(id: ModalId, current: GameState): string {
     case 'workPlan':
       return renderWorkPlan(current);
     case 'accounting':
-      return renderAccounting(current, ui.arrearsAmount, ui.accountingTab, ui.openDays);
+      return renderAccounting(
+        current,
+        ui.arrearsAmount,
+        ui.accountingTab,
+        ui.openDays,
+        ui.accountingMonth,
+      );
     case 'catalogue':
       return renderCatalogue(
         current,
@@ -826,6 +836,11 @@ function handleAction(element: DataElement, point: { x: number; y: number }): vo
       break;
     case 'accountingTab':
       ui.accountingTab = accountingTabFrom(id);
+      ui.scrollModalTop = true;
+      break;
+    case 'accountingMonth':
+      ui.accountingMonth = Number(id);
+      ui.openDays = [];
       ui.scrollModalTop = true;
       break;
     case 'toggleDay': {

@@ -10,6 +10,9 @@ import {
   dailyRent,
   daysOfMonth,
   earnedRate,
+  monthOfDay,
+  monthsOfYear,
+  yearTotals,
   ledgerOfDay,
   netOf,
   nextDueDays,
@@ -139,9 +142,38 @@ function ledgerRow(entry: LedgerEntry): string {
  *
  *  Which rows are open is UI state and not a browser detail: the modal body is written again every
  *  game minute, and a `details` element would snap shut under the player every time (T3 3.4). */
-function daysTab(state: GameState, entries: LedgerEntry[], open: number[]): string {
-  const rows = daysOfMonth({ ...state, ledger: entries });
-  if (rows.length === 0) return '<p class="empty">Nothing has moved this month yet.</p>';
+/** The months of this year the books still carry, so a past one can be opened (T7 3.9). */
+function monthChips(state: GameState, entries: LedgerEntry[], month: number): string {
+  const months = monthsOfYear({ ...state, ledger: entries });
+  if (months.length <= 1) return '';
+  const chips = months
+    .map(
+      (row) =>
+        `<button class="chip${row.month === month ? ' is-on' : ''}" ` +
+        `data-do="accountingMonth" data-id="${row.month}">Month ${row.month}</button>`,
+    )
+    .join('');
+  return `<div class="tabs">${chips}</div>`;
+}
+
+function daysTab(
+  state: GameState,
+  entries: LedgerEntry[],
+  open: number[],
+  month: number,
+): string {
+  const chips = monthChips(state, entries, month);
+  const rows = daysOfMonth({ ...state, ledger: entries }, month);
+  if (rows.length === 0) return `${chips}<p class="empty">Nothing has moved in month ${month}.</p>`;
+  return chips + dayRows(state, entries, open, rows);
+}
+
+function dayRows(
+  state: GameState,
+  entries: LedgerEntry[],
+  open: number[],
+  rows: ReturnType<typeof daysOfMonth>,
+): string {
   return rows
     .reverse()
     .map((row) => {
@@ -184,6 +216,7 @@ export function renderAccounting(
   arrearsTyped: string,
   tab: AccountingTab,
   openDays: number[] = [],
+  month: number | null = null,
 ): string {
   const due = nextDueDays(state);
   const arrears = arrearsBlock(state, arrearsTyped);
@@ -202,6 +235,9 @@ export function renderAccounting(
     totalsBlock(state, 'Today', books.day) +
     totalsBlock(state, 'This week', books.week) +
     totalsBlock(state, 'This month', books.month) +
+    // The year is added up out of the ledger the state still carries, which is what the Days tab
+    // reads too, so the year and the months of it cannot disagree (CLAUDE.md T7 3.9).
+    totalsBlock(state, 'This year', yearTotals({ ...state, ledger: entries })) +
     '</div>' +
     earnedRateLine(state) +
     '<h3>What is coming</h3>' +
@@ -219,7 +255,11 @@ export function renderAccounting(
     '';
   const ledgerTab = `<h3>Ledger, last ${LEDGER_VISIBLE_ENTRIES}</h3>` + ledger;
   const body =
-    tab === 'days' ? daysTab(state, entries, openDays) : tab === 'ledger' ? ledgerTab : summaryTab;
+    tab === 'days'
+      ? daysTab(state, entries, openDays, month ?? monthOfDay(state.clock.day))
+      : tab === 'ledger'
+        ? ledgerTab
+        : summaryTab;
   return (
     `<p class="figures"><strong>${money(state.cash)}</strong> in the bank. ` +
     `Overdraft limit ${money(state.finance.overdraftLimit)}. ` +

@@ -56,6 +56,7 @@ export {
   isWorkingDay,
   workedMinutesOfDay,
   monthOfDay,
+  yearOfDay,
   weekOfDay,
   weekday,
   weekdayName,
@@ -78,6 +79,9 @@ export {
   canAfford,
   daysOfMonth,
   earnedRate,
+  monthsOfYear,
+  totalsOfEntries,
+  yearTotals,
   ledgerOfDay,
   summaryOfDay,
   dailyPower,
@@ -91,6 +95,7 @@ export {
   visibleTotals,
   weeklyWageBill,
 } from './economy';
+export type { DayMoney, MonthMoney } from './economy';
 
 // The board and the catalogue
 export { boardSizeRange, canAccept, expressProbability } from './board';

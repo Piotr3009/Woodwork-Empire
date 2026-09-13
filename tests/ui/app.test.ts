@@ -438,7 +438,7 @@ describe('accounting', () => {
     expect(html()).not.toContain('Unit deposit');
     // Nothing on the Days tab either: the month has not been written up.
     click('[data-do="accountingTab"][data-id="days"]');
-    expect(html()).toContain('Nothing has moved this month yet.');
+    expect(html()).toContain('Nothing has moved in month 1.');
     click('[data-do="closeModal"]');
     // The bookkeeping task catches every day up at once.
     const state = currentState();
