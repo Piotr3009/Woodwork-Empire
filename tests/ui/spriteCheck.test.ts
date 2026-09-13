@@ -7,6 +7,7 @@ import {
   EQUIPMENT_SPECS,
   ROOM_LAYOUT,
 } from '../../src/engine/constants';
+import { HALL_LAYERS } from '../../src/render/hall';
 import { OFFICE_LAYERS } from '../../src/render/office';
 import { renderSpriteCheck, spriteTargets } from '../../src/ui/spriteCheck';
 
@@ -64,6 +65,24 @@ describe('the sprite check page', () => {
     }
     // They are full width pictures, not a footprint diamond with a box on it.
     expect(page.querySelector('.sprite-wide-grid .sprite-proof')).toBeNull();
+  });
+
+  it('shows the three hall layers full width too, on their own canvas', () => {
+    const page = parse(renderSpriteCheck());
+    expect(page.innerHTML).toContain('The painted hall');
+    for (const layer of HALL_LAYERS) {
+      const cell = page.querySelector(`.sprite-wide-grid [data-sprite-target="${layer.key}"]`);
+      expect(cell, layer.key).not.toBeNull();
+      expect(cell?.textContent, layer.key).toContain(`${layer.key}.png`);
+      // The file size, which is the 2x canvas of docs/art/SPRITES.md 9.3.
+      expect(cell?.textContent, layer.key).toContain('1680 by 1128');
+      expect(cell?.textContent, layer.key).toContain(layer.name);
+    }
+    // Six wide cells in all: three of the hall and three of the office, each once.
+    const wide = Array.from(page.querySelectorAll('.sprite-wide-grid .sprite-cell'));
+    expect(wide).toHaveLength(HALL_LAYERS.length + OFFICE_LAYERS.length);
+    const keys = wide.map((cell) => cell.getAttribute('data-sprite-target'));
+    expect(new Set(keys).size).toBe(keys.length);
   });
 
   it('prints the key, the footprint and the canvas the art side has to hit', () => {
