@@ -39,8 +39,9 @@ import type {
  *  opened into a hall that does not fit it.
  *
  *  Bumped in Turn 3: a machine carries its class, its hours and the hours it has in it, and a task
- *  carries the day it was finished (CLAUDE.md T3 3.5, 3.3). */
-export const STATE_VERSION = 9;
+ *  carries the day it was finished (CLAUDE.md T3 3.5, 3.3). Bumped in Turn 9: a lorry load is one
+ *  unloading of several orders, so a task carries a list of them (CLAUDE.md T9 3.1). */
+export const STATE_VERSION = 10;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
@@ -437,13 +438,9 @@ export const UNLOAD_BASE_MINUTES = 45;
 export const BAG_CHANGE_MINUTES = 15;
 /** Moving the kit about is a job of work: an hour a machine or a bench [TUNE]. */
 export const MOVE_MINUTES_PER_ITEM = 60;
-/** Nothing is bought in stopped time, and a purchase is a trip out: an hour of the owner's own
- *  minutes before the cash leaves (PIOTR, "at least an hour per purchase"). */
-export const SHOPPING_MINUTES = 60;
-/** Every further thing bought in the same visit, while the first hour is still running [TUNE]. */
-export const SHOPPING_NEXT_MINUTES = 15;
-/** Software comes down the wire, so it is half the trip (PIOTR). */
-export const SOFTWARE_SHOPPING_MINUTES = 30;
+// The owner never goes out for what he buys: everything is an order and ordering costs him
+// nothing at all (PIOTR, 13.09; CLAUDE.md T9 3.1). The trip of Turn 7, and the three figures it
+// was measured in, are gone.
 /** The interview, which is what taking somebody on costs the owner (PIOTR). */
 export const HIRING_MINUTES = 60;
 /** The laptop booting up before anything on it can be touched (PIOTR). */
@@ -641,7 +638,7 @@ export const STANDARD_VARIANT = 'standard';
 export const DELIVERY_DAYS_BY_CLASS: Record<string, Record<string, number>> = {
   tableSaw: { used: 1, budget: 1, standard: 5, pro: 7, industrial: 12 },
   sheetRack: { used: 1, budget: 1, standard: 3, pro: 5, industrial: 10 },
-  edgebander: { used: 0, budget: 0, standard: 7, pro: 12, industrial: 20 },
+  edgebander: { used: 1, budget: 1, standard: 7, pro: 12, industrial: 20 },
 };
 
 /** What a lorry load of heavy kit costs somebody at the gate, before the forklift halves it
@@ -1103,9 +1100,10 @@ const VARIANTS_BY_FAMILY: Record<string, EquipmentVariant[]> = {
 };
 
 const BASE_SPEC = {
-  // Hand tools, cabinets, lockers, seats and the office furniture come back with the owner from
-  // the trip: nothing is ordered in for them (PIOTR, CLAUDE.md T8 3.2).
-  deliveryDays: 0,
+  // Nothing comes back in the owner's hands any more: hand tools, cabinets, lockers, seats and
+  // the office furniture are ordered like everything else and come the next working day
+  // (PIOTR, 13.09; CLAUDE.md T9 3.1).
+  deliveryDays: 1,
   bagInterval: 0,
   usedOn: null as MaterialKind | null,
   unloadFactor: 1,

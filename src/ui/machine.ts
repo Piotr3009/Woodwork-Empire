@@ -2,8 +2,7 @@
 // (CLAUDE.md T3 3.5). The catalogue lists the family, this is where the money is spent.
 
 import {
-  orderCheck,
-  ordersOnTheList,
+  orderEquipmentCheck,
   countOf,
   deliveryDaysFor,
   enduranceHoursFor,
@@ -53,7 +52,7 @@ function powerLine(variant: EquipmentVariant): string {
 /** How long the player waits for this one after he has paid for it (CLAUDE.md T8 3.2). */
 function deliveryLine(spec: EquipmentSpec, variant: EquipmentVariant): string {
   const days = deliveryDaysFor(spec.id, variant.id);
-  if (days <= 0) return 'You bring it back with you the same day';
+  if (days <= 0) return 'Down the wire, the moment you pay for it';
   return `Delivered in ${plural(days, 'working day', 'working days')}`;
 }
 
@@ -96,20 +95,21 @@ function tile(
   variant: EquipmentVariant,
   recommended: string,
 ): string {
-  // The same question the buy itself asks, against the hall as it will be when he is back
-  // from the trip he is already on (CLAUDE.md T7 3.10).
-  const check = orderCheck(state, { kind: 'equipment', specId: spec.id, variantId: variant.id });
-  // One click is one purchase: while the class is on the list the button is gone and the tile
-  // says what it is waiting for (PIOTR, 13.09).
-  const onTheList = ordersOnTheList(state).find(
-    (order) => order.specId === spec.id && order.variantId === variant.id,
+  // The same question the order itself asks, against the hall as it will be once everything on
+  // the road has landed (CLAUDE.md T7 3.10, T9 3.1).
+  const check = orderEquipmentCheck(state, spec.id, variant.id);
+  // One click is one machine: what is on the road is already in that hall, so a second one of a
+  // family that is not stackable is refused there and the tile says when this one is due
+  // (PIOTR, 13.09; CLAUDE.md T9 3.1).
+  const onTheList = state.onOrder.find(
+    (order) => order.specId === spec.id && order.variantId === variant.id && !order.arrived,
   );
   const ownedCount = state.equipment.filter(
     (item) => item.specId === spec.id && item.variantId === variant.id,
   ).length;
   const label = ownedCount > 0 ? 'Buy another' : 'Buy';
   const buy = onTheList
-    ? `<span class="tile-waiting">Waiting for delivery, ${onTheList.minutesLeft} min</span>`
+    ? `<span class="tile-waiting">On order, due day ${onTheList.dueDay}</span>`
     : check.ok
       ? variant.id === recommended
         ? primaryButton('buyEquipment', label, `data-id="${spec.id}" data-variant="${variant.id}"`)
@@ -145,9 +145,7 @@ function tile(
  *  for today is not the advice, the cheapest one he can is (CLAUDE.md T3 3.5). */
 export function recommendedVariant(state: GameState, spec: EquipmentSpec): string {
   for (const variant of spec.variants) {
-    if (orderCheck(state, { kind: 'equipment', specId: spec.id, variantId: variant.id }).ok) {
-      return variant.id;
-    }
+    if (orderEquipmentCheck(state, spec.id, variant.id).ok) return variant.id;
   }
   return '';
 }

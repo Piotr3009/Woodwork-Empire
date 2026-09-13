@@ -192,18 +192,18 @@ export function reasonLabel(reason: string): string {
  *  owner could start this task and the answer is shown: a button he can press, or the reason he
  *  cannot, with the way out of it. A Start the engine would refuse is never drawn, which is what
  *  left the drawings unable to be drawn (CLAUDE.md T4 3.2). */
-/** The trip the owner is on, over the modal that started it. Nothing he has ordered is his until
- *  the minutes are spent and the cash leaves (CLAUDE.md T7 3.10). */
-export function tripLine(state: GameState, kind: 'shopping' | 'hiring'): string {
+/** The interview the owner is in, over the modal that started it. Nobody is taken on until the
+ *  hour is spent (CLAUDE.md T7 3.10). Buying is no longer a trip: it costs him nothing and he
+ *  never leaves the workshop for it (CLAUDE.md T9 3.1). */
+export function tripLine(state: GameState, kind: 'hiring'): string {
   // The same selector the "Owner is out" component outside the modal reads, so the two cannot
   // disagree about what he is doing (CLAUDE.md T8 3.3).
   const task = ownerOutTask(state);
   if (task === null || task.kind !== kind) return '';
   const spent = Math.round(task.minutesTotal - task.minutesRemaining);
-  const word = kind === 'shopping' ? 'Shopping' : 'Interview';
   return (
-    `<p class="warn trip">${word}: ${spent} of ${Math.round(task.minutesTotal)} min. ` +
-    'Paid for at the counter; it all lands when you are back.</p>'
+    `<p class="warn trip">Interview: ${spent} of ${Math.round(task.minutesTotal)} min. ` +
+    'Nobody is on the books until it is over.</p>'
   );
 }
 

@@ -71,37 +71,46 @@ Run `npm run dev` and work through this. It is the same path the jsdom smoke tes
 
 1. Start screen: pick Easy, type your name and the company name, leave the real-life notes on,
    press Start. The top bar shows about 19,000 in the bank: 20,000 less the unit deposit of one
-   month of rent and the first day of costs.
+   month of rent and the first day of costs. Day 1 is the ordering and day 2 is the setting up:
+   nothing you buy is in the building the day you pay for it.
 2. Day 1, 08:00, hall view. An empty unit with three small rooms along the back wall. There is no
    shelving yet, and the line under the hall says so.
-3. Press Office in the top bar, or click the office room in the hall. Click the catalogue and buy:
-   desk, chair, laptop, cordless drill, one workbench and the cheap shelving. The machines are
-   families: press Choose on the table saw and the page fills with its five classes, from a used
+3. Press Office in the top bar, or click the office room in the hall. The room is bare: there is
+   no desk and no laptop yet, so the catalogue is lying on the floor by the door. Click it and
+   order: desk, chair, laptop, cordless drill, one workbench and the cheap shelving. The machines
+   are families: press Open on the table saw and the page fills with its five classes, from a used
    one at 1,800 to an industrial one at 25,000, each with what it does to the speed of the bench,
-   to the bag, to the life of the machine and to the meter. Buy the used saw, then the edgebander,
-   the compressor and the extractor the same way. Then buy the one off software bundle. Watch the
-   cash drop.
-4. Close the catalogue and press Board. It fills the page with a tile per enquiry: the price, the
-   sheets it takes, about how many of your own days, and what it needs. Accept one. Half the price
-   lands as a deposit.
-5. Click the laptop on the desk. Start the client calls and the emails, and watch the job card:
+   to the bag, to the life of the machine and to the meter. Order the used saw, then the
+   edgebander, the compressor and the extractor the same way. The cash drops at every click and
+   not one minute of your day goes with it: nobody goes out for any of it. Every tile then says
+   when its lorry is due.
+4. There is nothing else to do with day 1. There is no laptop on the desk, so there is no order
+   board and no drawing. The top bar says Orders with the count on it: press it and the list says
+   what is on the road, the shortest wait first. Open the menu, press End day and let the clock
+   run out. The summary says the day went on nothing at all, which is what a first day is.
+5. Day 2, 08:00. One van at the gate with the whole of day 1 on it. The furniture, the hand tools,
+   the bench and the shelving are carried in and stand themselves in the hall and in the office;
+   the saw, the compressor and the extractor are two hours each and the event asks who takes them
+   off. Unload them. The office now has a desk with a laptop on it.
+6. Click the catalogue again and buy the one off software bundle: it goes on the laptop the moment
+   you pay for it. Press Board. It fills the page with a tile per enquiry: the price, the sheets it
+   takes, about how many of your own days, and what it needs. Accept one. Half the price lands as a
+   deposit.
+7. Click the laptop on the desk. Start the client calls and the emails, and watch the job card:
    Start production is on it from the day the job is accepted, greyed out with the one thing in
-   its way. The drawing is on the roll of drawings beside the laptop. The minute bar fills with
-   grey and purple. Press 4x, which is two real minutes a game day. When the calls and the drawing
-   are done, the material order appears: start that too.
-6. Open the menu and press End day. Before 16:00 that means going home, so the top bar says so and
-   the rest of the day runs without you. Let the clock run out: the summary says the day went on
-   admin and nothing was made.
-7. Day 2, 08:00. A van stands at the gate and the event asks whether to unload now. Unload it
-   (45 minutes), then press Start production on the job card, or Work here in the hall. The square
-   slides between the bench and the table saw as it works.
-8. When the piece is finished it stands at the gate and nothing is paid. Order transport: without a
+   its way. The drawing is on the Drawings tab. The minute bar fills with grey and purple. Press
+   4x, which is two real minutes a game day. When the calls and the drawing are done, the material
+   order appears: start that too.
+8. The sheets come the next working day. A van stands at the gate and the event asks whether to
+   unload now. Unload it (45 minutes), then press Start production on the job card, or Work here in
+   the hall. The square slides between the bench and the table saw as it works.
+9. When the piece is finished it stands at the gate and nothing is paid. Order transport: without a
    van a courier is 120 and the client has it the next working day. Then the balance lands with the
    rating.
-9. Open Accounting. The top bar says "?" for today, because the books were never written up: the
-   Accounting modal is frozen at the last day anybody wrote them. Do the bookkeeping in the laptop
-   and everything comes back.
-10. Press Set up hall and drag the table saw somewhere else. Green means it fits, red says why not.
+10. Open Accounting. The top bar says "?" for today, because the books were never written up: the
+    Accounting modal is frozen at the last day anybody wrote them. Do the bookkeeping in the laptop
+    and everything comes back.
+11. Press Set up hall and drag the table saw somewhere else. Green means it fits, red says why not.
     Press Done and the clock starts again. That is the game.
 
 ## Sprite check

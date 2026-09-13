@@ -20,8 +20,10 @@ import {
   newGame,
   placeEnquiry,
   runClock,
+  doTask,
   runToDay,
   sixJoinersOnSheetWork,
+  withLicence,
 } from '../helpers';
 import {
   BREAK_MINUTES,
@@ -43,8 +45,6 @@ import {
   CLIENT_MEETING_MINUTES,
   MEETING_PRICE_THRESHOLD,
   RENT_PER_M2_MONTHLY,
-  SHOPPING_MINUTES,
-  SHOPPING_NEXT_MINUTES,
 } from '../../src/engine/constants';
 import {
   STATION_IDLE,
@@ -149,25 +149,10 @@ describe('30 days on Easy, working the board', () => {
     expect(saw.enduranceHours).toBe(750);
   });
 
-  it('came back from the shops with what the shop had, and had the rest delivered', () => {
-    // The trip is unchanged and the cash still leaves at the counter; what changed is that only
-    // the things with nothing to wait for come back in the car (CLAUDE.md T8 3.2).
-    const carried = DAY_ONE_KIT.filter(
-      (specId) => deliveryDaysFor(specId, DAY_ONE_CLASS[specId]) === 0,
-    );
-    expect(carried).toEqual(['desk', 'chair', 'laptop', 'drill', 'toolCabinet', 'edgebander']);
-    const ordered = DAY_ONE_KIT.filter(
-      (specId) => deliveryDaysFor(specId, DAY_ONE_CLASS[specId]) > 0,
-    );
-    // The saw, the compressor, the extractor, the bench and the rack are in tomorrow morning.
-    expect(ordered).toEqual([
-      'tableSaw',
-      'compressor',
-      'extractor',
-      'workbench',
-      'sheetRack',
-    ]);
-    for (const specId of ordered) {
+  it('had the whole of day 1 delivered on the morning of day 2', () => {
+    // Nothing comes back in the owner's hands any more: every one of the eleven is ordered and
+    // every one of them waits a working day (CLAUDE.md T9 3.1).
+    for (const specId of DAY_ONE_KIT) {
       expect(deliveryDaysFor(specId, DAY_ONE_CLASS[specId]), specId).toBe(1);
     }
     // By the end of the month every one of them has landed and nothing is still on the road.
@@ -175,24 +160,20 @@ describe('30 days on Easy, working the board', () => {
     for (const specId of DAY_ONE_KIT) {
       expect(state.equipment.some((item) => item.specId === specId), specId).toBe(true);
     }
-    // And the heavy ones cost somebody two hours at the gate on day 2.
-    const gate = state.tasks.filter((task) => task.kind === 'unload' && task.orderId !== null);
-    expect(gate.length).toBeGreaterThanOrEqual(3);
-    for (const task of gate) expect(task.minutesTotal).toBe(EQUIPMENT_UNLOAD_MINUTES);
+    // One van, one unloading: the heavy ones on it are two hours each on one task at the gate on
+    // the morning of day 2 (CLAUDE.md T9 3.1).
+    const gate = state.tasks.filter((task) => task.kind === 'unload' && task.orderIds.length > 0);
+    expect(gate).toHaveLength(1);
+    const load = gate[0];
+    expect(load?.orderIds.length).toBeGreaterThanOrEqual(3);
+    expect(load?.minutesTotal).toBe(EQUIPMENT_UNLOAD_MINUTES * (load?.orderIds.length ?? 0));
+    expect(load?.day).toBe(2);
   });
 
-  it('spent the morning of day 1 at the shops, and paid for none of it until it was over', () => {
-    // Nothing is bought in stopped time and nothing is bought on the spot: one trip, an hour for
-    // the first thing and a quarter of an hour for each of the other eleven (CLAUDE.md T7 3.10).
-    const trips = state.tasks.filter((task) => task.kind === 'shopping');
-    expect(trips).toHaveLength(1);
-    const wanted = SHOPPING_MINUTES + SHOPPING_NEXT_MINUTES * DAY_ONE_KIT.length;
-    expect(trips[0]?.minutesTotal).toBe(wanted);
-    expect(wanted).toBe(225);
-    expect(trips[0]?.done).toBe(true);
-    expect(trips[0]?.day).toBe(1);
-    // And what he went out for is standing in the hall, paid for: what the shop had on the shelf
-    // that evening and what the lorry brought the next morning (CLAUDE.md T8 3.2).
+  it('spent no minutes of day 1 on the ordering, and paid for all of it at the click', () => {
+    // Ordering costs the owner nothing: he never leaves the workshop for it (CLAUDE.md T9 3.1).
+    expect(state.tasks.some((task) => task.orders.length > 0 && task.kind !== 'hiring')).toBe(false);
+    // And what he ordered on day 1 is standing in the hall, paid for, from day 2 (T8 3.2).
     expect(state.equipment.length).toBeGreaterThanOrEqual(DAY_ONE_KIT.length);
   });
 
@@ -551,11 +532,18 @@ describe('a day with a break, played by the script', () => {
     );
   });
 
-  it('ends the day at 17:00 with his whole 480 minutes behind him', () => {
+  it('ends the day at 17:00 with all but seven of his 480 minutes behind him', () => {
     const last = states[states.length - 1];
     expect(formatTime(last?.clock.minute ?? -1)).toBe('17:00');
-    expect(last?.owner.minutesWorked).toBe(MINUTES_PER_WORKING_DAY);
+    // Day 2 is the morning at the gate and the afternoon at the bench, and it runs out of work
+    // seven minutes before five: one job at a time, and this one was finished (CLAUDE.md T9 3.1).
+    expect(last?.owner.minutesWorked).toBe(473);
+    expect(last?.owner.minutesWorked).toBeLessThanOrEqual(MINUTES_PER_WORKING_DAY);
     expect(last?.owner.overtimeMinutes).toBe(0);
+    const idle = states.filter(
+      (state) => state.clock.minute > 530 && state.owner.currentTaskId === null,
+    );
+    expect(idle.length).toBeGreaterThan(0);
   });
 
   it('rents the painted 200 square metre hall, at 12 a metre', () => {
@@ -667,16 +655,25 @@ describe('a month with a job worth twenty five thousand on the books', () => {
 
   it('sits the client down for four hours before anybody draws anything', () => {
     // A job over 20,000 starts at the client's, and the drawing waits on it (CLAUDE.md T7 3.11).
-    const early = bigJobMonth(2);
-    const job = early.jobs[0];
+    // The desk kit is stood in the room here rather than ordered: the delivery has its own
+    // months, and this one is about the meeting (CLAUDE.md T9 3.1).
+    const start = withLicence(newGame({ seed: SEED, difficulty: 'veryEasy' }));
+    start.enquiries = [];
+    const enquiry = placeEnquiry(start, { price: 25000, deadlineDays: 60 });
+    const taken = act(start, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+    const job = taken.jobs[0];
     expect(job?.price).toBeGreaterThan(MEETING_PRICE_THRESHOLD);
-    const meeting = early.tasks.find((task) => task.kind === 'clientMeeting');
+    const meeting = taken.tasks.find((task) => task.kind === 'clientMeeting');
     expect(meeting?.minutesTotal).toBe(CLIENT_MEETING_MINUTES);
     expect(CLIENT_MEETING_MINUTES).toBe(240);
-    const design = early.tasks.find((task) => task.kind === 'design');
+    const design = taken.tasks.find((task) => task.kind === 'design');
     // The drawing is on the desk and it cannot be started until the meeting has been held.
     expect(design).toBeDefined();
-    expect(startTaskCheck(early, design?.id ?? '').ok).toBe(meeting?.done === true);
+    expect(meeting?.done).toBe(false);
+    expect(startTaskCheck(taken, design?.id ?? '').ok).toBe(false);
+    const held = doTask(taken, 'clientMeeting');
+    expect(held.tasks.find((task) => task.kind === 'clientMeeting')?.done).toBe(true);
+    expect(startTaskCheck(held, design?.id ?? '').ok).toBe(true);
   });
 
   it('gets the job into production once the meeting is behind it', () => {
@@ -819,13 +816,6 @@ describe('a month that sells the used saw on day 5 after buying a standard one',
   const seen: GameEvent[] = [];
   const day5 = playUntilDay(newGame({ seed: SEED, difficulty: 'veryEasy' }), 5, CAREFUL, seen);
 
-  /** Runs the clock this many minutes, answering whatever the day puts up on the way. */
-  function runOut(state: GameState, minutes: number): GameState {
-    let next = clearEvents(state);
-    for (let minute = 0; minute < minutes; minute += 1) next = clearEvents(runClock(next, 1));
-    return next;
-  }
-
   /** Takes the owner off whatever he is at, so the saw under him is free to sell. */
   function offTheBench(state: GameState): GameState {
     let next = act(state, { type: 'PAUSE_TASK' });
@@ -835,17 +825,13 @@ describe('a month that sells the used saw on day 5 after buying a standard one',
     return next;
   }
 
-  // He orders it and goes out for it: the standard saw is on a lorry when he is back, and the
-  // hour at the counter is the hour Turn 7 gave him (CLAUDE.md T7 3.10, T8 3.2).
+  // He orders it and it is on a lorry from the click: no trip, no minutes (CLAUDE.md T9 3.1).
   const replaced = offTheBench(
-    runOut(
-      act(clearEvents(day5), {
-        type: 'BUY_EQUIPMENT',
-        specId: 'tableSaw',
-        variantId: 'standard',
-      }),
-      SHOPPING_MINUTES,
-    ),
+    act(clearEvents(day5), {
+      type: 'BUY_EQUIPMENT',
+      specId: 'tableSaw',
+      variantId: 'standard',
+    }),
   );
   const used = replaced.equipment.find(
     (item) => item.specId === 'tableSaw' && item.variantId === 'used',

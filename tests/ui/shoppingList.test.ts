@@ -3,14 +3,13 @@
 // the top bar and from the pin board on the office wall (PIOTR, 13.09; CLAUDE.md T8 3.2).
 
 import { describe, expect, it } from 'vitest';
-import { SHOPPING_MINUTES, SHOPPING_NEXT_MINUTES } from '../../src/engine/constants';
 import { shoppingList } from '../../src/engine/orders';
 import { renderHall } from '../../src/render/hall';
 import { renderCatalogue } from '../../src/ui/catalogue';
 import { renderShopping } from '../../src/ui/shopping';
 import { renderTopbar } from '../../src/ui/topbar';
 import type { GameState } from '../../src/engine/index';
-import { act, buyStartingKit, fillRack, newGame, runClock } from '../helpers';
+import { act, buyStartingKit, fillRack, newGame } from '../helpers';
 
 function parse(html: string): HTMLElement {
   const holder = document.createElement('div');
@@ -30,7 +29,7 @@ function ordered(): GameState {
     state = act(state, { type: 'BUY_EQUIPMENT', specId: specId ?? '', variantId });
   }
   state = act(state, { type: 'BUY_STOCK', sheets: 4 });
-  return runClock(state, SHOPPING_MINUTES + SHOPPING_NEXT_MINUTES * 2);
+  return state;
 }
 
 describe('the shopping list', () => {

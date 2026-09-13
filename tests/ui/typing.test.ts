@@ -21,6 +21,19 @@ function typeKey(field: HTMLInputElement, key: string): void {
   field.setSelectionRange(at + 1, at + 1);
   field.dispatchEvent(new Event('input', { bubbles: true }));
 }
+/** Plays through to 08:00 tomorrow, answering whatever the day asks on the way. */
+function nextMorning(): void {
+  for (let guard = 0; guard < 200; guard += 1) {
+    let events = 0;
+    while (root().querySelector('[data-do="resolveEvent"]') !== null && events < 80) {
+      click('[data-do="resolveEvent"]');
+      events += 1;
+    }
+    if (root().querySelector('[data-office="laptop"]') !== null) return;
+    advanceMinutes(30);
+  }
+}
+
 function field(): HTMLInputElement {
   const el = root().querySelector('[data-field="stockSheets"]');
   if (!(el instanceof HTMLInputElement)) throw new Error('no stock field');
@@ -46,7 +59,9 @@ describe('typing a number', () => {
       click('[data-do="closeFolder"]');
     }
     click('[data-do="closeModal"]');
-    advanceMinutes(120);
+    // The lorry comes at 08:00 on day 2: the desk and the laptop are on the road until then
+    // (CLAUDE.md T9 3.1).
+    nextMorning();
     click('[data-office="laptop"]');
     advanceMinutes(10);
     click('[data-do="laptopTab"][data-id="materials"]');

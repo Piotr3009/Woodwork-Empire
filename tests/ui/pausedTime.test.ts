@@ -1,17 +1,15 @@
 // @vitest-environment jsdom
-// Nothing happens in stopped time. Every purchase, hire and order is a trip the owner makes in
-// his own minutes, and the modals that act on the world do not open while the clock is stopped
-// (CLAUDE.md T7 3.10). Reading is another matter: the Work Plan and the Sprite check page open
-// on a stopped clock, because nothing on either of them changes anything.
+// Nothing happens in stopped time, and the modals that act on the world do not open while the
+// clock is stopped (CLAUDE.md T7 3.10). Reading is another matter: the Work Plan and the Sprite
+// check page open on a stopped clock, because nothing on either of them changes anything.
+// Ordering costs the owner nothing at all now: the cash leaves at the click, the lorry comes in
+// days, and the only thing he still goes out for is an interview (CLAUDE.md T9 3.1).
 
 import { beforeAll, describe, expect, it } from 'vitest';
 import { advanceMinutes, currentState, mount } from '../../src/ui/app';
 import {
   HIRING_MINUTES,
   LAPTOP_BOOT_MINUTES,
-  SHOPPING_MINUTES,
-  SHOPPING_NEXT_MINUTES,
-  SOFTWARE_SHOPPING_MINUTES,
 } from '../../src/engine/constants';
 
 function root(): HTMLElement {
@@ -36,6 +34,28 @@ function openModalId(): string | null {
 
 function run(): void {
   click('[data-do="setSpeed"][data-speed="1"]');
+}
+
+/** Answers whatever the day is asking with its first choice. */
+function dismissEvents(): void {
+  let guard = 0;
+  while (root().querySelector('[data-do="resolveEvent"]') !== null && guard < 80) {
+    click('[data-do="resolveEvent"]');
+    guard += 1;
+  }
+}
+
+/** Plays through to 08:00 tomorrow the way a player does, answering the evening and the morning.
+ *  What was ordered today is off the lorry when it comes back (CLAUDE.md T9 3.1). */
+function nextMorning(): void {
+  const day = currentState()?.clock.day ?? 1;
+  let guard = 0;
+  while ((currentState()?.clock.day ?? 0) === day && guard < 200) {
+    guard += 1;
+    dismissEvents();
+    advanceMinutes(30);
+  }
+  dismissEvents();
 }
 
 function pause(): void {
@@ -109,49 +129,54 @@ function buy(specId: string, tab: string, variantId?: string): void {
   click('[data-do="closeFolder"]');
 }
 
-describe('a purchase is a trip out', () => {
-  it('takes the cash at the click and an hour of the owner before the thing lands', () => {
+describe('an order costs the owner nothing', () => {
+  it('takes the cash at the click and books the delivery at the click', () => {
     run();
     const before = currentState()?.cash ?? 0;
+    const minutes = currentState()?.owner.minutesWorked ?? 0;
     click('[data-office="catalogue"]');
     buy('desk', 'computers');
+    // Nothing is in the hall: it is on the road (CLAUDE.md T9 3.1).
     expect(currentState()?.equipment).toHaveLength(0);
-    // Paid for at the click (PIOTR, 13.09), and not a penny more when it lands.
+    expect(currentState()?.onOrder).toHaveLength(1);
+    expect(currentState()?.onOrder[0]?.specId).toBe('desk');
+    // Paid for at the click (PIOTR, 13.09), and not a minute of his day for it.
     const paid = before - (currentState()?.cash ?? 0);
     expect(paid).toBeGreaterThan(0);
-    expect(html()).toContain(`Shopping: 0 of ${SHOPPING_MINUTES} min`);
-    advanceMinutes(SHOPPING_MINUTES - 1);
-    expect(currentState()?.equipment).toHaveLength(0);
-    expect(before - (currentState()?.cash ?? 0)).toBe(paid);
-    advanceMinutes(1);
-    expect(currentState()?.equipment).toHaveLength(1);
-    expect(before - (currentState()?.cash ?? 0)).toBe(paid);
-    expect(html()).not.toContain('Shopping:');
+    expect(currentState()?.owner.minutesWorked).toBe(minutes);
+    expect(html()).not.toContain('Owner is out');
   });
 
-  it('adds a quarter of an hour for a second thing on the same visit', () => {
-    const owned = currentState()?.equipment.length ?? 0;
+  it('puts a second and a third thing on the same list for nothing as well', () => {
+    const ordered = currentState()?.onOrder.length ?? 0;
+    const minutes = currentState()?.owner.minutesWorked ?? 0;
     buy('chair', 'computers');
     buy('laptop', 'computers');
-    const wanted = SHOPPING_MINUTES + SHOPPING_NEXT_MINUTES;
-    expect(wanted).toBe(75);
-    expect(html()).toContain(`Shopping: 0 of ${wanted} min`);
-    advanceMinutes(wanted - 1);
-    expect(currentState()?.equipment).toHaveLength(owned);
-    advanceMinutes(1);
-    expect(currentState()?.equipment).toHaveLength(owned + 2);
+    expect(currentState()?.onOrder).toHaveLength(ordered + 2);
+    expect(currentState()?.owner.minutesWorked).toBe(minutes);
   });
 
-  it('charges half a trip for software bought on its own', () => {
+  it('stands the furniture in the room at 08:00 the next working day', () => {
+    click('[data-do="closeModal"]');
+    nextMorning();
+    expect(currentState()?.clock.day).toBe(2);
+    const owned = currentState()?.equipment.map((item) => item.specId) ?? [];
+    expect(owned).toContain('desk');
+    expect(owned).toContain('chair');
+    expect(owned).toContain('laptop');
+    expect(currentState()?.onOrder).toHaveLength(0);
+  });
+
+  it('gives him the licence down the wire the moment he pays for it', () => {
+    run();
+    click('[data-office="catalogue"]');
     click('[data-do="catalogueTab"][data-id="computers"]');
     click('[data-do="buySoftware"][data-id="oneOff"]');
-    expect(html()).toContain(`Shopping: 0 of ${SOFTWARE_SHOPPING_MINUTES} min`);
-    advanceMinutes(SOFTWARE_SHOPPING_MINUTES);
     expect(currentState()?.software.mode).toBe('oneOff');
+    click('[data-do="closeModal"]');
   });
 
   it('costs five minutes to lift the lid on the laptop', () => {
-    click('[data-do="closeModal"]');
     const before = currentState()?.owner.minutesWorked ?? 0;
     click('[data-office="laptop"]');
     expect(openModalId()).toBe('laptop');
@@ -184,7 +209,8 @@ describe('taking somebody on is an interview', () => {
 
 describe('one click is one purchase (PIOTR, 13.09)', () => {
   it('takes the cash once, hides the button while the machine is on the list, and frames what is owned', () => {
-    // Back to the catalogue: the desk landed earlier in this file, so its tile is framed as owned.
+    // Back to the catalogue: the desk ordered on day 1 came off the lorry this morning, so its
+    // tile is framed as owned.
     click('[data-office="catalogue"]');
     click('[data-do="catalogueTab"][data-id="computers"]');
     click('[data-do="openFolder"][data-id="desk"]');
@@ -197,7 +223,7 @@ describe('one click is one purchase (PIOTR, 13.09)', () => {
     expect(paid).toBeGreaterThan(0);
     click('[data-do="catalogueTab"][data-id="extraction"]');
     click('[data-do="openFolder"][data-id="extractor"]');
-    expect(html()).toContain('Waiting for delivery');
+    expect(html()).toContain('On order, due day');
     expect(html()).toContain('is-ordered');
     expect(
       root().querySelector('[data-do="buyEquipment"][data-id="extractor"][data-variant="standard"]'),

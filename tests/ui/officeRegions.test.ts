@@ -8,7 +8,6 @@ import { firstFreeCell } from '../../src/engine/layout';
 import { advanceMinutes, currentState, mount, render } from '../../src/ui/app';
 import { applyAction } from '../../src/engine/index';
 import { OFFICE_REGIONS } from '../../src/render/office';
-import { SHOPPING_MINUTES, SHOPPING_NEXT_MINUTES } from '../../src/engine/constants';
 import { formatTime } from '../../src/engine/clock';
 import { findSpec } from '../../src/engine/machines';
 import { STARTING_CLASS, STARTING_KIT } from '../helpers';
@@ -38,31 +37,17 @@ function dismissEvents(): void {
   }
 }
 
-/** Works the lorries at the gate off the laptop's list until nothing is left on order: the saw,
- *  the compressor and the extractor are two hours each at the gate the next morning, and the
- *  bench and the rack are carried in (CLAUDE.md T8 3.2). */
+/** Plays through to the morning the lorry comes and takes the load off it. The whole of day 1's
+ *  ordering is on one van at 08:00 the next working day (CLAUDE.md T8 3.2, T9 3.1). */
 function unloadTheKit(): void {
-  click('[data-office="laptop"]');
   let guard = 0;
-  while ((currentState()?.onOrder.length ?? 0) > 0 && guard < 120) {
+  while ((currentState()?.onOrder.length ?? 0) > 0 && guard < 200) {
     guard += 1;
     dismissEvents();
-    const state = currentState();
-    const task = state?.tasks.find((entry) => entry.kind === 'unload' && !entry.done);
-    const waiting =
-      task === undefined
-        ? null
-        : root().querySelector(`[data-do="startTask"][data-id="${task.id}"]`);
-    if (waiting !== null) {
-      waiting.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-      continue;
-    }
+    if ((currentState()?.onOrder.length ?? 0) === 0) break;
     advanceMinutes(30);
   }
   dismissEvents();
-  if (root().querySelector('[data-modal="laptop"] [data-do="closeModal"]') !== null) {
-    click('[data-modal="laptop"] [data-do="closeModal"]');
-  }
 }
 
 /** Drags an item to a tile, the way setup mode does through the engine. */
@@ -100,14 +85,15 @@ beforeAll(() => {
     );
     click('[data-do="closeFolder"]');
   }
+  click('[data-do="closeModal"]');
+  // The lorry comes at 08:00 tomorrow with the lot of it, or the hall would be empty
+  // (CLAUDE.md T8 3.2, T9 3.1).
+  unloadTheKit();
+  // And the licence goes on the laptop once there is a laptop to put it on (CLAUDE.md T9 3.1).
+  click('[data-office="catalogue"]');
   click('[data-do="catalogueTab"][data-id="computers"]');
   click('[data-do="buySoftware"][data-id="oneOff"]');
   click('[data-do="closeModal"]');
-  // The trip out has to be over before any of it is in the room: an hour for the first thing and
-  // a quarter of an hour for each of the others (CLAUDE.md T7 3.10).
-  advanceMinutes(SHOPPING_MINUTES + SHOPPING_NEXT_MINUTES * STARTING_KIT.length);
-  // And the lorries the next morning, or the hall would be empty (CLAUDE.md T8 3.2).
-  unloadTheKit();
   // A job on the books, or the tests below would pass on an empty board.
   click('[data-do="openModal"][data-modal="board"]');
   click('[data-do="acceptEnquiry"]');
