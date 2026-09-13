@@ -199,6 +199,7 @@ export function placeEquipment(
     bagFull: false,
     broken: false,
     lastServiceDay: state.clock.day,
+    serviceHours: 0,
     enduranceHours: enduranceHoursFor(specId, variantId),
     hoursUsed: 0,
     purchasePrice: variant ? variant.price : spec.price,

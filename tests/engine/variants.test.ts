@@ -7,7 +7,7 @@ import {
   MACHINE_ENDURANCE_HOURS_DEFAULT,
   OVERDUE_BREAKDOWN_CHANCE,
   POWER_BASE_DAILY,
-  SERVICE_INTERVAL_DAYS,
+  SERVICE_INTERVAL_HOURS,
   STANDARD_VARIANT,
   TABLE_SAW_VARIANTS,
 } from '../../src/engine/constants';
@@ -170,8 +170,10 @@ describe('what a class of saw does to the bag and the life of the machine', () =
     const saw = machineOf(state, 'tableSaw');
     expect(saw.hoursUsed).toBe(0);
     expect(saw.enduranceHours).toBe(750);
+    // An hour at the bench with one man on a saw that serves three is a third of an hour on the
+    // saw's own clock (CLAUDE.md T6 3.6).
     const worked = machineOf(tick(state, 60), 'tableSaw');
-    expect(worked.hoursUsed).toBeCloseTo(1, 2);
+    expect(worked.hoursUsed).toBeCloseTo(1 / 3, 2);
     expect(pastEndurance(worked)).toBe(false);
     worked.hoursUsed = 750;
     expect(pastEndurance(worked)).toBe(true);
@@ -180,13 +182,16 @@ describe('what a class of saw does to the bag and the life of the machine', () =
   it('gives a worn out machine the same chance of giving up as an unserviced one, on top', () => {
     const state = newGame();
     const saw = placeEquipment(state, 'tableSaw', { variantId: 'used' });
-    expect(overdueBreakdownChance(state, saw)).toBe(0);
+    expect(overdueBreakdownChance(saw)).toBe(0);
+    // Worn out, and serviced the hour it wore out: one chance.
     saw.hoursUsed = saw.enduranceHours;
-    expect(overdueBreakdownChance(state, saw)).toBe(OVERDUE_BREAKDOWN_CHANCE);
-    state.clock.day = SERVICE_INTERVAL_DAYS + 1;
-    expect(overdueBreakdownChance(state, saw)).toBe(OVERDUE_BREAKDOWN_CHANCE * 2);
+    saw.serviceHours = saw.hoursUsed;
+    expect(overdueBreakdownChance(saw)).toBe(OVERDUE_BREAKDOWN_CHANCE);
+    // A service overdue on top of that: two.
+    saw.serviceHours = saw.hoursUsed - SERVICE_INTERVAL_HOURS;
+    expect(overdueBreakdownChance(saw)).toBe(OVERDUE_BREAKDOWN_CHANCE * 2);
     saw.broken = true;
-    expect(overdueBreakdownChance(state, saw)).toBe(0);
+    expect(overdueBreakdownChance(saw)).toBe(0);
   });
 });
 

@@ -21,7 +21,7 @@ import {
   OVERTIME_DEBT_PER_DAY,
   OWNER_LABOUR_PER_MINUTE,
   REPUTATION_START,
-  SERVICE_INTERVAL_DAYS,
+  SERVICE_INTERVAL_HOURS,
   SOFTWARE_ONE_OFF_JOBS,
   SOFTWARE_ONE_OFF_PRICE,
   SOFTWARE_TURN1_TIER,
@@ -426,7 +426,7 @@ function runServiceDue(state: GameState): void {
       kind: 'serviceDue',
       title: `Service due: ${name.toLowerCase()}`,
       body:
-        `It has been ${SERVICE_INTERVAL_DAYS} days. The parts and the oil come to ` +
+        `It has ${SERVICE_INTERVAL_HOURS} hours on it since the last one. The parts and the oil come to ` +
         `${formatMoney(serviceCostFor(machine))}. Left alone it will give up in the middle of a ` +
         'job.',
       choices: adHocChoices(state, task.minutesTotal, 'Do it yourself'),
@@ -437,7 +437,7 @@ function runServiceDue(state: GameState): void {
 
 function runOverdueBreakdowns(state: GameState): void {
   for (const machine of serviceableMachines(state)) {
-    if (!chance(state, overdueBreakdownChance(state, machine))) continue;
+    if (!chance(state, overdueBreakdownChance(machine))) continue;
     const broken = breakMachine(state, machine.id);
     if (broken) raiseMachineBroken(state, broken);
   }
@@ -896,7 +896,12 @@ function checkLowStock(state: GameState): void {
 function runProductionMinute(state: GameState, ownerOnTask: boolean): void {
   const hall = hallProductivityFactor(state);
   let worked = false;
-  const materials = new Set<MaterialKind>();
+  // How many people put work through each material this minute: the share of a machine's
+  // capacity the workshop is using is what wears it out (CLAUDE.md T6 3.6).
+  const materials = new Map<MaterialKind, number>();
+  const usedBy = (kind: MaterialKind): void => {
+    materials.set(kind, (materials.get(kind) ?? 0) + 1);
+  };
   // Every bench waits while the machines are being shifted about (CLAUDE.md T4 3.5).
   const moving = movingMachines(state) !== null;
   const atTheBench =
@@ -905,7 +910,7 @@ function runProductionMinute(state: GameState, ownerOnTask: boolean): void {
     spendOwnerMinute(state, 'workshop');
     state.owner.productionMinutes += 1;
     worked = true;
-    materials.add(atTheBench.materialKind);
+    usedBy(atTheBench.materialKind);
     const minute = (OWNER_LABOUR_PER_MINUTE * ownerEfficiency(state) * hall) /
       jobSpeedFactor(state, atTheBench);
     if (addLabour(state, atTheBench, minute)) raiseJobAtGate(state, atTheBench);
@@ -930,7 +935,7 @@ function runProductionMinute(state: GameState, ownerOnTask: boolean): void {
       if (!canWorkOn(state, job)) continue;
       worker.productionMinutes += 1;
       worked = true;
-      materials.add(job.materialKind);
+      usedBy(job.materialKind);
       const rate = worker.rate * sawRatioFactor(state, worker);
       const minute = (OWNER_LABOUR_PER_MINUTE * rate * hall * staffFactor) /
         jobSpeedFactor(state, job);
@@ -940,8 +945,10 @@ function runProductionMinute(state: GameState, ownerOnTask: boolean): void {
   if (!worked) return;
   state.productionMinutesMonth += 1;
   addDust(state, 1);
-  for (const material of materials) {
-    for (const machine of accumulateBagMinutes(state, material)) raiseBagFull(state, machine);
+  for (const [material, users] of materials) {
+    for (const machine of accumulateBagMinutes(state, material, users)) {
+      raiseBagFull(state, machine);
+    }
   }
 }
 
@@ -1474,6 +1481,7 @@ export function buyEquipment(state: GameState, specId: string, variantId?: strin
     bagFull: false,
     broken: false,
     lastServiceDay: state.clock.day,
+    serviceHours: 0,
     enduranceHours: enduranceHoursFor(specId, variant.id),
     hoursUsed: 0,
     purchasePrice: variant.price,

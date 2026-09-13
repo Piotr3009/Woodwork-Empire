@@ -64,6 +64,8 @@ export interface EquipmentSpec {
   depth: number;
   height: number;
   spriteKey: string;
+  /** How many men one of these can serve in a day (CLAUDE.md T6 3.6). */
+  capacity: number;
   /** Minutes of use before the bag is full. 0 means the item has no bag. */
   bagInterval: number;
   /** The machine only runs on jobs of this material. null means every job. */
@@ -105,12 +107,15 @@ export interface Equipment {
   spriteKey: string;
   anchorX: number;
   anchorY: number;
-  /** Minutes of production since the last bag change. */
+  /** Minutes of this machine's own use since the last bag change (CLAUDE.md T6 3.6). */
   minutesUsed: number;
   bagFull: boolean;
   broken: boolean;
-  /** Day of the last service. A machine is bought serviced. */
+  /** Day of the last service, for the record. A machine is bought serviced. */
   lastServiceDay: number;
+  /** Hours on the machine's own clock at the last service: the service is due by its hours, not
+   *  by the calendar (CLAUDE.md T6 3.6). */
+  serviceHours: number;
   /** Hours of use it has in it, family base times the variant factor. */
   enduranceHours: number;
   /** Hours of use it has had. Past its endurance it starts giving up. */

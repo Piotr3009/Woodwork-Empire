@@ -49,6 +49,8 @@ export const OVERTIME_END_MINUTE = DAY_END_MINUTE + 120;
 /** The longest the clock can ever read in a day. Only for putting two moments of the game in
  *  order. */
 export const MAX_CLOCK_MINUTES_PER_DAY = OVERTIME_END_MINUTE;
+/** Hours of work in a day: the 480 minutes, in the unit a machine's clock is read in. */
+export const HOURS_PER_WORKING_DAY = MINUTES_PER_WORKING_DAY / 60;
 /** One game day at 1x speed, in real seconds (PIOTR, Turn 2: one game minute per real second).
  *  8 real minutes at 1x, 4 at 2x, 2 at 4x. */
 export const REAL_SECONDS_PER_DAY_AT_1X = 480;
@@ -367,8 +369,12 @@ export const REPAIR_MINUTES = 90;
 /** [TUNE] the extractor keeps its Turn 1 parts bill; every other machine is 5% of what it cost. */
 export const EXTRACTOR_REPAIR_COST = 150;
 export const MACHINE_REPAIR_COST_FRACTION = 0.05;
-/** Every machine wants a service once a month, and it costs half an hour (PIOTR). */
-export const SERVICE_INTERVAL_DAYS = 30;
+/** Every machine wants a service once a month, and it costs half an hour (PIOTR). From Turn 6 the
+ *  month is counted on the machine's own clock and not on the calendar: 80 hours is the month a
+ *  one man shop puts on a table saw, which serves three, so the service he is used to lands where
+ *  it always did, and a saw with three men on it is serviced three times as often
+ *  [TUNE: 80] (CLAUDE.md T6 3.6). */
+export const SERVICE_INTERVAL_HOURS = 80;
 export const SERVICE_MINUTES = 30;
 /** [TUNE] the service bill, and what an overdue machine risks every working day. */
 export const SERVICE_COST_FRACTION = 0.02;
@@ -608,7 +614,13 @@ const VARIANTS_BY_FAMILY: Record<string, EquipmentVariant[]> = {
   tableSaw: TABLE_SAW_VARIANTS,
 };
 
+/** How many men one machine of a family can serve in a day. Two unless the family says otherwise
+ *  [TUNE]; the table saw serves three [PIOTR]. The hours a machine wears out by are the share of
+ *  that capacity the workshop actually puts through it (CLAUDE.md T6 3.6). */
+export const MACHINE_CAPACITY_DEFAULT = 2;
+
 const BASE_SPEC = {
+  capacity: MACHINE_CAPACITY_DEFAULT,
   bagInterval: 0,
   usedOn: null as MaterialKind | null,
   labourFactor: 1,
@@ -699,6 +711,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
     ...BASE_SPEC,
     id: 'tableSaw',
     name: 'Table saw',
+    capacity: 3,
     price: 1800,
     category: 'machine',
     width: 2,

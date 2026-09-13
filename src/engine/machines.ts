@@ -10,7 +10,9 @@ import {
   MACHINE_REPAIR_COST_FRACTION,
   OVERDUE_BREAKDOWN_CHANCE,
   SERVICE_COST_FRACTION,
-  SERVICE_INTERVAL_DAYS,
+  HOURS_PER_WORKING_DAY,
+  MACHINE_CAPACITY_DEFAULT,
+  SERVICE_INTERVAL_HOURS,
   DUST_HIGH_THRESHOLD,
   DUST_MAX,
   DUST_PER_PRODUCTION_MINUTE,
@@ -272,16 +274,30 @@ export function serviceableMachines(state: GameState): Equipment[] {
   return state.equipment.filter((item) => findSpec(item.specId)?.category === 'machine');
 }
 
-export function serviceDueOn(item: Equipment): number {
-  return item.lastServiceDay + SERVICE_INTERVAL_DAYS;
+/** Hours the machine has run since it was last serviced. */
+export function hoursSinceService(item: Equipment): number {
+  return Math.max(0, Math.round((item.hoursUsed - item.serviceHours) * 1000000) / 1000000);
 }
 
-export function serviceIsDue(state: GameState, item: Equipment): boolean {
-  return state.clock.day >= serviceDueOn(item);
+/** Hours of use still to go before the next service is due. */
+export function serviceDueIn(item: Equipment): number {
+  return Math.max(0, Math.round((SERVICE_INTERVAL_HOURS - hoursSinceService(item)) * 100) / 100);
+}
+
+export function serviceIsDue(item: Equipment): boolean {
+  return hoursSinceService(item) >= SERVICE_INTERVAL_HOURS;
+}
+
+/** The day the next service lands on if the machine keeps being used the way it is used today.
+ *  Null when nobody is putting anything through it, because then it never comes due. */
+export function serviceDueOn(state: GameState, item: Equipment): number | null {
+  const perDay = machineHoursPerDay(state, item);
+  if (perDay <= 0) return null;
+  return state.clock.day + Math.max(1, Math.ceil(serviceDueIn(item) / perDay));
 }
 
 export function machinesDueService(state: GameState): Equipment[] {
-  return serviceableMachines(state).filter((item) => serviceIsDue(state, item));
+  return serviceableMachines(state).filter((item) => serviceIsDue(item));
 }
 
 /** 2% of what the machine cost [TUNE]. */
@@ -295,12 +311,12 @@ export function repairCostFor(item: Equipment): number {
   return Math.round(item.purchasePrice * MACHINE_REPAIR_COST_FRACTION * 100) / 100;
 }
 
-/** A machine that has gone past its service date can give up on any working day, and so can one
- *  that is past its endurance. The two stack (CLAUDE.md T3 3.5) [TUNE]. */
-export function overdueBreakdownChance(state: GameState, item: Equipment): number {
+/** A machine that is past its service hours can give up on any working day, and so can one that
+ *  is past its endurance. The two stack (CLAUDE.md T3 3.5) [TUNE]. */
+export function overdueBreakdownChance(item: Equipment): number {
   if (item.broken) return 0;
   let chance = 0;
-  if (serviceIsDue(state, item)) chance += OVERDUE_BREAKDOWN_CHANCE;
+  if (serviceIsDue(item)) chance += OVERDUE_BREAKDOWN_CHANCE;
   if (pastEndurance(item)) chance += OVERDUE_BREAKDOWN_CHANCE;
   return chance;
 }
@@ -352,18 +368,65 @@ export function machinesUsedFor(state: GameState, material: MaterialKind): Equip
   });
 }
 
+/** How many men one of these can serve in a day. */
+export function capacityOf(specId: string): number {
+  return Math.max(1, findSpec(specId)?.capacity ?? MACHINE_CAPACITY_DEFAULT);
+}
+
+/** The share of its capacity the workshop is putting through a machine: one man of three is a
+ *  third of it, three men or four are all of it (CLAUDE.md T6 3.6). */
+export function capacityShare(specId: string, users: number): number {
+  const capacity = capacityOf(specId);
+  return Math.min(Math.max(0, users), capacity) / capacity;
+}
+
+/** The hours a machine of this family gains in a whole day with this many men on it. Eight hours
+ *  at full capacity, pro rata below it [PIOTR]. */
+export function machineHoursInDay(specId: string, users: number): number {
+  return capacityShare(specId, users) * HOURS_PER_WORKING_DAY;
+}
+
+/** The hours this machine gains today at the rate the workshop is using it now. */
+export function machineHoursPerDay(state: GameState, item: Equipment): number {
+  return machineHoursInDay(item.specId, machineUsersNow(state, item));
+}
+
+/** How many people are putting work through this machine at this moment: the owner and every
+ *  joiner on a job of the material it serves. */
+export function machineUsersNow(state: GameState, item: Equipment): number {
+  const spec = findSpec(item.specId);
+  if (!spec) return 0;
+  const serves = (materialKind: MaterialKind | null): boolean =>
+    materialKind !== null && (spec.usedOn === null || spec.usedOn === materialKind);
+  let users = 0;
+  for (const job of state.jobs) {
+    if (job.stage !== 'inProduction') continue;
+    if (!serves(job.materialKind)) continue;
+    users += 1;
+  }
+  return users;
+}
+
 /** Books one minute of use on every machine the job runs through: the hours that wear it out,
- *  and the minutes that fill its bag. Returns the bags that just filled, so the caller can raise
- *  the event (CLAUDE.md 9.6, T3 3.5). */
-export function accumulateBagMinutes(state: GameState, material: MaterialKind): Equipment[] {
+ *  and the minutes that fill its bag, both by the share of the machine's capacity the workshop
+ *  is putting through it (CLAUDE.md 9.6, T3 3.5, T6 3.6). Returns the bags that just filled. */
+export function accumulateBagMinutes(
+  state: GameState,
+  material: MaterialKind,
+  users = 1,
+): Equipment[] {
   for (const item of machinesUsedFor(state, material)) {
-    item.hoursUsed = Math.round((item.hoursUsed + 1 / 60) * 10000) / 10000;
+    const share = capacityShare(item.specId, users);
+    // Six places, not four: a third of a minute rounded to four drifts by a whole hour over the
+    // fifteen hundred minutes it takes to wear a saw in.
+    item.hoursUsed = Math.round((item.hoursUsed + share / 60) * 1000000) / 1000000;
   }
   if (!bagsExist(state)) return [];
   const filled: Equipment[] = [];
   for (const item of bagMachinesFor(state, material)) {
     if (item.bagFull) continue;
-    item.minutesUsed += 1;
+    item.minutesUsed =
+      Math.round((item.minutesUsed + capacityShare(item.specId, users)) * 1000000) / 1000000;
     if (item.minutesUsed >= bagIntervalFor(item)) {
       item.bagFull = true;
       filled.push(item);
@@ -434,6 +497,7 @@ export function serviceMachine(state: GameState, equipmentId: string): Equipment
   const item = state.equipment.find((entry) => entry.id === equipmentId);
   if (!item) return null;
   item.lastServiceDay = state.clock.day;
+  item.serviceHours = item.hoursUsed;
   return item;
 }
 

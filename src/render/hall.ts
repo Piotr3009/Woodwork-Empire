@@ -718,7 +718,7 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
       ? 'var(--stopped-dark)'
       : CATEGORY_SHADE[spec.category] ?? 'var(--kit-machine-dark)';
     const bagLine = item.bagFull ? ' (bag full)' : '';
-    const serviceLine = !item.broken && serviceIsDue(state, item) ? ' (service due)' : '';
+    const serviceLine = !item.broken && serviceIsDue(item) ? ' (service due)' : '';
     const rackLine =
       spec.category === 'storage' ? `: ${state.stock.sheets} / ${rackCapacity(state)}` : '';
     const atThisBench =
