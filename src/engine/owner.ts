@@ -1,40 +1,53 @@
-// The owner: his minute pool, the efficiency of an overtime hour, fatigue, absence and sick leave.
+// The owner: his minute pool, what a day of overtime costs him tomorrow, absence and sick leave.
 // His 480 minutes a day are the core resource of the game (CLAUDE.md 1.3).
 
 import {
   ABSENCE_OUTPUT_FACTOR,
   ABSENCE_OUTPUT_FACTOR_EXCEPTIONAL_CEO,
   ABSENCE_OUTPUT_FACTOR_WITH_CEO,
+  BREAK_MINUTES,
+  BREAK_SKIP_FACTOR,
   DAYS_PER_YEAR,
-  FATIGUE_PER_OVERTIME_HOUR,
+  LABOUR_FACTOR_FLOOR,
   MINUTES_PER_WORKING_DAY,
-  MIN_OWNER_EFFICIENCY,
-  OVERTIME_EFFICIENCY,
-  OWNER_NORMAL_HOURS,
+  OVERTIME_DEBT_PER_DAY,
   SICK_DAYS_MAX,
   SICK_DAYS_MIN,
 } from './constants';
-import { hourIndex, isOvertime, isWorkingDay, workedMinutesOfDay, yearOfDay } from './clock';
+import { isMonday, isOvertime, isWorkingDay, workedMinutesOfDay, yearOfDay } from './clock';
 import { queueEvent } from './events';
 import { int } from './rng';
 import type { GameState } from './types';
 
-/** Hours 1 to 8 are full, then 0.8, 0.6, 0.4, 0.4 (CLAUDE.md 7.2). Hours of work, not hours on the
- *  clock: the break buys him nothing and costs him nothing. */
-export function hourEfficiency(minute: number): number {
-  if (!isOvertime(minute)) return 1;
-  return OVERTIME_EFFICIENCY[hourIndex(minute) - OWNER_NORMAL_HOURS] ?? 0.4;
+/** Round to four places, which is where every factor in the engine stops. */
+function round4(value: number): number {
+  return Math.round(value * 10000) / 10000;
 }
 
-/** Work done per clock minute the owner spends. Yesterday's overtime is subtracted. */
+/** What a morning's output is worth after last week's overtime and last night's dinner. An hour
+ *  worked through costs 3% and a day with any overtime in it costs 10%, cumulative, floored
+ *  (CLAUDE.md T6 3.4). */
+export function labourFactorFor(overtimeDebt: number, breakSkipped: boolean): number {
+  const factor = (1 - overtimeDebt) * (breakSkipped ? BREAK_SKIP_FACTOR : 1);
+  return Math.max(LABOUR_FACTOR_FLOOR, round4(factor));
+}
+
+/** Work done per clock minute the owner spends. An overtime minute is worth as much as any other:
+ *  what overtime costs is tomorrow, not tonight. */
 export function ownerEfficiency(state: GameState): number {
-  return Math.max(MIN_OWNER_EFFICIENCY, hourEfficiency(state.clock.minute) - state.owner.fatigue);
+  return state.owner.labourFactor;
 }
 
-/** Minutes of the normal working day still ahead. Overtime is not in the pool, and neither is the
- *  break: it takes nothing off him. */
+/** The minutes of work the day holds for him: his 480, and the hour of dinner as well when he has
+ *  decided to work through it. */
+export function ownerMinutesToday(state: GameState): number {
+  return MINUTES_PER_WORKING_DAY + (state.owner.breakSkipped ? BREAK_MINUTES : 0);
+}
+
+/** Minutes of the normal working day still ahead. Overtime is not in the pool. */
 export function ownerMinutesLeft(state: GameState): number {
-  return Math.max(0, MINUTES_PER_WORKING_DAY - workedMinutesOfDay(state.clock.minute));
+  const worked = workedMinutesOfDay(state.clock.minute, state.owner.breakSkipped);
+  return Math.max(0, ownerMinutesToday(state) - worked);
 }
 
 /** True while the owner can pick up work. */
@@ -61,14 +74,20 @@ export function spendOwnerMinute(state: GameState, category: 'admin' | 'design' 
   const owner = state.owner;
   owner.minutesWorked += 1;
   owner.minutesByCategory[category] += 1;
-  if (isOvertime(state.clock.minute)) owner.overtimeMinutes += 1;
 }
 
-/** Called when the day closes: every overtime minute worked today costs efficiency tomorrow, pro
- *  rata, so half an hour costs half an hour's worth (CLAUDE.md T2 3.4). */
-export function setTomorrowFatigue(state: GameState): void {
-  const hours = state.owner.overtimeMinutes / 60;
-  state.owner.fatigue = Math.round(hours * FATIGUE_PER_OVERTIME_HOUR * 10000) / 10000;
+/** Books one minute of standing in the workshop past 17:00. Staying is the overtime, not what he
+ *  fills it with: a day with any of it costs him tomorrow (CLAUDE.md T6 3.4). */
+export function countOvertimeMinute(state: GameState): void {
+  if (!isOvertime(state.clock.minute) || !ownerIsAvailable(state)) return;
+  state.owner.overtimeMinutes += 1;
+}
+
+/** Called when the day closes: a day with any overtime in it, one minute or two hours, adds its
+ *  0.10 to the debt (CLAUDE.md T6 3.4). */
+export function chargeOvertimeDebt(state: GameState): void {
+  if (state.owner.overtimeMinutes <= 0) return;
+  state.owner.overtimeDebt = round4(state.owner.overtimeDebt + OVERTIME_DEBT_PER_DAY);
 }
 
 /** Sick leave lands once per game year, on a random working day (CLAUDE.md 7.3). */
@@ -91,6 +110,12 @@ export function scheduleSickLeave(state: GameState): void {
 export function runOwnerDayStart(state: GameState): void {
   const owner = state.owner;
   owner.overtimeMinutes = 0;
+  // The week starts clean, whatever last week cost him (PIOTR: reset at the weekend).
+  if (isMonday(state.clock.day)) owner.overtimeDebt = 0;
+  owner.labourFactor = labourFactorFor(owner.overtimeDebt, owner.breakSkipped);
+  owner.breakSkipped = false;
+  owner.breakAsked = false;
+  owner.homeAsked = false;
   if (owner.sickDaysRemaining > 0) {
     owner.sickDaysRemaining -= 1;
     owner.present = false;

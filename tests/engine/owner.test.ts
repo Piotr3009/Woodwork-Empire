@@ -5,23 +5,30 @@ import {
   ABSENCE_OUTPUT_FACTOR_WITH_CEO,
   BREAK_MINUTES,
   BREAK_START_MINUTE,
-  FATIGUE_PER_OVERTIME_HOUR,
+  BREAK_SKIP_FACTOR,
+  DAY_END_MINUTE,
+  LABOUR_FACTOR_FLOOR,
   MINUTES_PER_WORKING_DAY,
+  OVERTIME_DEBT_PER_DAY,
+  OVERTIME_END_MINUTE,
 } from '../../src/engine/constants';
 import {
   absenceFactor,
-  hourEfficiency,
+  labourFactorFor,
   ownerEfficiency,
   ownerIsAvailable,
   ownerMinutesLeft,
+  ownerMinutesToday,
   scheduleSickLeave,
   staffOutputFactor,
 } from '../../src/engine/owner';
 import { createTask } from '../../src/engine/tasks';
 import { isWorkingDay, yearOfDay } from '../../src/engine/clock';
-import { applyAction, tick } from '../../src/engine/index';
+import { applyAction, runMinutes, tick } from '../../src/engine/index';
+import type { GameState } from '../../src/engine/index';
 import {
   act,
+  choose,
   clearEvents,
   eventsOfKind,
   newGame,
@@ -30,82 +37,169 @@ import {
   withLicence,
 } from '../helpers';
 
-describe('owner efficiency', () => {
-  it('is full for the first eight hours', () => {
-    for (const minute of [0, 59, 60, 300, 479]) {
-      expect(hourEfficiency(minute)).toBe(1);
-    }
-  });
-
-  it('drops through the overtime hours 0.8, 0.6, 0.4, 0.4', () => {
-    // Clock readings, which are half an hour past the work done once the break has been taken.
-    const clock = (worked: number): number => worked + BREAK_MINUTES;
-    expect(hourEfficiency(clock(479))).toBe(1);
-    expect(hourEfficiency(clock(480))).toBe(0.8);
-    expect(hourEfficiency(clock(539))).toBe(0.8);
-    expect(hourEfficiency(clock(540))).toBe(0.6);
-    expect(hourEfficiency(clock(600))).toBe(0.4);
-    expect(hourEfficiency(clock(660))).toBe(0.4);
-    expect(hourEfficiency(clock(719))).toBe(0.4);
-  });
-
-  it('subtracts the fatigue carried from yesterday', () => {
+describe('the labour factor', () => {
+  it('is the whole of the owner efficiency: an overtime minute is worth any other minute', () => {
     const state = newGame();
-    state.owner.fatigue = 0.1;
-    expect(ownerEfficiency(state)).toBeCloseTo(0.9, 10);
-    // His 480 are in once the clock reads 16:30, the break being half an hour of it.
-    state.clock.minute = 480 + BREAK_MINUTES;
-    expect(ownerEfficiency(state)).toBeCloseTo(0.7, 10);
+    expect(state.owner.labourFactor).toBe(1);
+    expect(ownerEfficiency(state)).toBe(1);
+    state.clock.minute = DAY_END_MINUTE + 60;
+    expect(ownerEfficiency(state)).toBe(1);
+    state.owner.labourFactor = 0.7;
+    expect(ownerEfficiency(state)).toBe(0.7);
   });
 
-  it('never falls to zero', () => {
-    const state = newGame();
-    state.owner.fatigue = 5;
-    expect(ownerEfficiency(state)).toBe(0.05);
+  it('takes 3% off for a dinner worked through and 10% for a day with overtime', () => {
+    expect(labourFactorFor(0, false)).toBe(1);
+    expect(labourFactorFor(0, true)).toBe(BREAK_SKIP_FACTOR);
+    expect(labourFactorFor(OVERTIME_DEBT_PER_DAY, false)).toBe(0.9);
+    expect(labourFactorFor(3 * OVERTIME_DEBT_PER_DAY, false)).toBe(0.7);
+    // Both at once multiply: the debt first, then the 3%.
+    expect(labourFactorFor(OVERTIME_DEBT_PER_DAY, true)).toBe(0.873);
   });
 
-  it('counts the minutes left in the pool', () => {
+  it('never falls through the floor', () => {
+    expect(labourFactorFor(0.9, true)).toBe(LABOUR_FACTOR_FLOOR);
+    expect(labourFactorFor(5, false)).toBe(LABOUR_FACTOR_FLOOR);
+  });
+
+  it('counts the minutes left in the pool, and the break takes none of them', () => {
     const state = newGame();
     expect(ownerMinutesLeft(state)).toBe(MINUTES_PER_WORKING_DAY);
     state.clock.minute = 318 + BREAK_MINUTES;
     expect(ownerMinutesLeft(state)).toBe(162);
-    // The break itself takes nothing off the pool: it stands still while he eats.
     state.clock.minute = BREAK_START_MINUTE;
     const atDinner = ownerMinutesLeft(state);
     state.clock.minute = BREAK_START_MINUTE + BREAK_MINUTES;
     expect(ownerMinutesLeft(state)).toBe(atDinner);
-    state.clock.minute = 600;
+    state.clock.minute = DAY_END_MINUTE;
+    expect(ownerMinutesLeft(state)).toBe(0);
+  });
+
+  it('gives him the hour when he works through it', () => {
+    const state = newGame();
+    state.owner.breakSkipped = true;
+    expect(ownerMinutesToday(state)).toBe(MINUTES_PER_WORKING_DAY + BREAK_MINUTES);
+    state.clock.minute = BREAK_START_MINUTE + BREAK_MINUTES;
+    // Every minute of it counted, so the pool has run down by the same.
+    expect(ownerMinutesLeft(state)).toBe(
+      MINUTES_PER_WORKING_DAY + BREAK_MINUTES - (BREAK_START_MINUTE + BREAK_MINUTES),
+    );
+    state.clock.minute = DAY_END_MINUTE;
     expect(ownerMinutesLeft(state)).toBe(0);
   });
 });
 
-describe('fatigue', () => {
-  it('charges 0.05 of efficiency per overtime hour worked, and recovers after a normal day', () => {
-    let state = withLicence(newGame());
-    const task = createTask(state, { kind: 'design', label: 'Long drawing', minutes: 900 });
-    state = act(state, { type: 'START_TASK', taskId: task.id });
-    state = tick(state, 800);
-    // The owner is thrown out after 12 hours: four overtime hours.
-    expect(state.owner.overtimeMinutes).toBe(240);
-    expect(state.activeEvent?.kind).toBe('dayEnd');
-    const day2 = clearEvents(state);
-    expect(day2.owner.fatigue).toBeCloseTo(4 * FATIGUE_PER_OVERTIME_HOUR, 10);
-    expect(ownerEfficiency(day2)).toBeCloseTo(0.8, 10);
-    // Day 2 with no overtime clears it.
-    const day3 = nextDay(day2);
-    expect(day3.owner.fatigue).toBe(0);
+/** Runs the day until the named question is on the table, answering everything else. */
+function runTo(state: GameState, kind: string): GameState {
+  let next = state;
+  for (let guard = 0; guard < 400; guard += 1) {
+    if (next.activeEvent?.kind === kind) return next;
+    if (next.activeEvent !== null) {
+      const choice = next.activeEvent.choices[0];
+      next = choose(next, choice ? choice.id : 'ok');
+      continue;
+    }
+    next = tick(next, 15);
+  }
+  throw new Error(`the day never asked about ${kind}`);
+}
+
+/** Plays one whole day: takes or skips the break, goes home at five or stays on. */
+function playDay(
+  state: GameState,
+  options: { skipBreak?: boolean; overtime?: number } = {},
+): GameState {
+  let next = clearEvents(state);
+  const day = next.clock.day;
+  let guard = 0;
+  while (next.clock.day === day && !next.gameOver && guard < 400) {
+    guard += 1;
+    const event = next.activeEvent;
+    if (event?.kind === 'breakTime') {
+      next = choose(next, options.skipBreak === true ? 'skip' : 'take');
+      continue;
+    }
+    if (event?.kind === 'goingHome') {
+      if ((options.overtime ?? 0) > 0) {
+        next = clearEvents(tick(choose(next, 'overtime'), options.overtime ?? 0));
+        next = clearEvents(act(next, { type: 'END_DAY' }));
+        continue;
+      }
+      next = choose(next, 'home');
+      continue;
+    }
+    if (event !== null) {
+      next = clearEvents(next);
+      continue;
+    }
+    next = tick(next, 30);
+  }
+  return next;
+}
+
+describe('what a day costs the next one', () => {
+  it('ends the day at 17:00 with the whole 480 behind him and nothing owing', () => {
+    const day2 = playDay(newGame());
+    expect(day2.clock.day).toBe(2);
+    expect(day2.owner.overtimeDebt).toBe(0);
+    expect(day2.owner.labourFactor).toBe(1);
   });
 
-  it('charges a part hour pro rata: 30 minutes of overtime cost 0.025', () => {
-    let state = withLicence(newGame());
-    const task = createTask(state, { kind: 'design', label: 'Long drawing', minutes: 900 });
-    state = act(state, { type: 'START_TASK', taskId: task.id });
-    // 510 minutes of work, plus the half hour he spent at dinner on the way.
-    state = tick(state, 510 + BREAK_MINUTES);
-    expect(state.owner.overtimeMinutes).toBe(30);
-    const day2 = clearEvents(act(state, { type: 'END_DAY' }));
-    expect(day2.owner.fatigue).toBeCloseTo(FATIGUE_PER_OVERTIME_HOUR / 2, 10);
-    expect(day2.owner.fatigue).toBe(0.025);
+  it('charges 3% for a dinner worked through, and gives it back the day after', () => {
+    const day2 = playDay(newGame(), { skipBreak: true });
+    expect(day2.owner.labourFactor).toBe(BREAK_SKIP_FACTOR);
+    const day3 = playDay(day2);
+    expect(day3.owner.labourFactor).toBe(1);
+  });
+
+  it('lets him work through the hour, and stops him dead when he takes it', () => {
+    const withTask = (): GameState => {
+      const state = withLicence(newGame());
+      const task = createTask(state, { kind: 'design', label: 'Long drawing', minutes: 900 });
+      return act(state, { type: 'START_TASK', taskId: task.id });
+    };
+    const asked = runTo(withTask(), 'breakTime');
+    const before = asked.owner.minutesWorked;
+    const eating = tick(choose(asked, 'take'), BREAK_MINUTES);
+    expect(eating.owner.minutesWorked).toBe(before);
+    expect(eating.owner.breakSkipped).toBe(false);
+    const working = tick(choose(asked, 'skip'), BREAK_MINUTES);
+    expect(working.owner.minutesWorked).toBe(before + BREAK_MINUTES);
+    expect(working.owner.breakSkipped).toBe(true);
+  });
+
+  it('gives 0.7 on the fourth morning after three days of overtime', () => {
+    let state = newGame();
+    for (let day = 0; day < 3; day += 1) state = playDay(state, { overtime: 60 });
+    expect(state.clock.day).toBe(4);
+    expect(state.owner.overtimeDebt).toBeCloseTo(0.3, 10);
+    expect(state.owner.labourFactor).toBe(0.7);
+  });
+
+  it('wipes the debt on Monday morning', () => {
+    let state = newGame();
+    // Thursday and Friday on overtime, then the weekend.
+    state = playDay(state);
+    state = playDay(state);
+    state = playDay(state);
+    state = playDay(state, { overtime: 60 });
+    expect(state.clock.day).toBe(5);
+    state = playDay(state, { overtime: 60 });
+    // Day 8 is the Monday: the weekend was walked over on the way.
+    expect(state.clock.day).toBe(8);
+    expect(state.owner.overtimeDebt).toBe(0);
+    expect(state.owner.labourFactor).toBe(1);
+  });
+
+  it('puts the day to him at 17:00 and never lets the clock past 19:00', () => {
+    const asked = runTo(newGame(), 'goingHome');
+    expect(asked.clock.minute).toBe(DAY_END_MINUTE);
+    const home = choose(asked, 'home');
+    expect(home.owner.wentHome).toBe(true);
+    const staying = runMinutes(choose(asked, 'overtime'), 400);
+    expect(staying.state.clock.minute).toBe(OVERTIME_END_MINUTE);
+    expect(staying.state.activeEvent?.kind).toBe('dayEnd');
+    expect(staying.state.owner.overtimeMinutes).toBe(OVERTIME_END_MINUTE - DAY_END_MINUTE);
   });
 });
 

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   BOOKKEEPING_MINUTES,
-  BREAK_MINUTES,
   CLERK_ORDERS_PER_DAY,
+  DAY_END_MINUTE,
   JOINER_PREREQUISITES,
   LABOUR_FRACTION,
   MINUTES_PER_WORKING_DAY,
@@ -34,6 +34,7 @@ import {
   firstJob,
   newGame,
   placeEnquiry,
+  runClock,
   runToDay,
 } from '../helpers';
 
@@ -349,8 +350,8 @@ describe('the office working day', () => {
     }
     // One action to settle the state, so the clerk is holding his first order at 08:00.
     const morning = act(clearEvents(state), { type: 'SET_SPEED', speed: 1 });
-    // His day is the 480 minutes of work, and the clock takes the break on top of them.
-    const day = clearEvents(tick(morning, MINUTES_PER_WORKING_DAY + BREAK_MINUTES));
+    // His day is the 480 minutes of work, and the clock takes the dinner hour on top of them.
+    const day = clearEvents(runClock(morning, DAY_END_MINUTE));
     const done = day.tasks.filter((task) => task.kind === 'materialOrder' && task.done).length;
     expect(done).toBe(CLERK_ORDERS_PER_DAY);
     expect(day.workers[0]?.ordersToday).toBe(CLERK_ORDERS_PER_DAY);

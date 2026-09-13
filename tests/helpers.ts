@@ -6,6 +6,7 @@ import {
   enduranceHoursFor,
   findSpec,
   isOvertime,
+  runMinutes,
   tick,
 } from '../src/engine/index';
 import type {
@@ -49,6 +50,25 @@ export function clearEvents(state: GameState, seen: GameEvent[] = []): GameState
   return next;
 }
 
+/** Runs the clock, taking the dinner hour whenever the day offers it: the break is not a decision
+ *  any test but the break's own is about. Anything else the day asks stops the run, the way it
+ *  stops the player (CLAUDE.md T6 3.4). */
+export function runClock(state: GameState, minutes: number): GameState {
+  let next = state;
+  let left = minutes;
+  let guard = 0;
+  while (left > 0 && guard < 200) {
+    guard += 1;
+    const result = runMinutes(next, left);
+    next = result.state;
+    left -= result.minutesRun;
+    if (left <= 0) break;
+    if (next.activeEvent?.kind !== 'breakTime') break;
+    next = applyAction(next, { type: 'RESOLVE_EVENT', choiceId: 'take' });
+  }
+  return next;
+}
+
 /** Answers an open event with a named choice. */
 export function choose(state: GameState, choiceId: string): GameState {
   return applyAction(state, { type: 'RESOLVE_EVENT', choiceId });
@@ -59,7 +79,7 @@ export function act(state: GameState, action: GameAction): GameState {
 }
 
 /** One step of a driven day: run the clock, and once the owner has his day in, do what a player
- *  does and go home. The clock reads past 16:00 by the length of the break, so the test driver
+ *  does and go home. The clock reads past the work by the length of the break, so the test driver
  *  asks the engine whether the work is done rather than reading the hands. */
 function step(state: GameState, events: GameEvent[]): GameState {
   const next = clearEvents(tick(state, 60), events);
@@ -69,7 +89,7 @@ function step(state: GameState, events: GameEvent[]): GameState {
   return next;
 }
 
-/** Plays to the start of the next day the way a player does: work, then End day at 16:00. */
+/** Plays to the start of the next day the way a player does: work, then home at five. */
 export function nextDay(state: GameState, events: GameEvent[] = []): GameState {
   let next = clearEvents(state, events);
   const day = next.clock.day;
@@ -226,7 +246,7 @@ export function doTask(state: GameState, kind: TaskInstance['kind']): GameState 
   if (next.owner.currentTaskId !== task.id) throw new Error(`could not start ${kind}`);
   let guard = 0;
   while (next.owner.currentTaskId === task.id && guard < 2000) {
-    next = tick(next, 1);
+    next = runClock(next, 1);
     guard += 1;
   }
   return next;

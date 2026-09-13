@@ -15,7 +15,11 @@ import type {
   WorkerTier,
 } from './types';
 
-/** Bumped in Turn 5: the unit is measured in metre cells and not half metre tiles, the hall is the
+/** Bumped in Turn 6: the owner carries a labour factor and an overtime debt where he carried a
+ *  fatigue figure, the break is an hour he can work through, and the day ends at 17:00 with
+ *  overtime to 19:00. A Turn 5 save reads its clock and its owner wrongly, so it is refused.
+ *
+ *  Bumped in Turn 5: the unit is measured in metre cells and not half metre tiles, the hall is the
  *  painted 200 m2 floor, and every anchor in a saved layout was written on the old grid, which
  *  would stand the whole workshop in the wrong place and some of it off the floor. The clock is
  *  read differently too, the break being half an hour of it. A Turn 4 save is refused rather than
@@ -23,23 +27,28 @@ import type {
  *
  *  Bumped in Turn 3: a machine carries its class, its hours and the hours it has in it, and a task
  *  carries the day it was finished (CLAUDE.md T3 3.5, 3.3). */
-export const STATE_VERSION = 4;
+export const STATE_VERSION = 5;
 
 // ---------------------------------------------------------------------------
 // 6. Time
 // ---------------------------------------------------------------------------
 
-/** 480 minutes of work in a day (PIOTR). The clock used to run them back to back, 08:00 to 16:00;
- *  a real workshop stops for dinner, so the work is unchanged and the day runs on by the length of
- *  the break, which puts the end of it at 16:30. */
+/** 480 minutes of work in a day (PIOTR). The break does not come out of them: the day runs on by
+ *  the length of it, which is what puts the end of the day at 17:00. */
 export const MINUTES_PER_WORKING_DAY = 480;
 /** Clock starts at 08:00 (PIOTR). */
 export const DAY_START_HOUR = 8;
-/** The break. Nobody works through it: no task, no production, and the clock does not count it
- *  against anybody's day. Start and length are [TUNE]: noon for half an hour is what a joinery
- *  does, and Piotr has not set either. */
+/** Dinner: noon for an hour (PIOTR). Nobody works through it unless the owner says he will, and
+ *  then it is his hour and nobody else's. */
 export const BREAK_START_MINUTE = 240;
-export const BREAK_MINUTES = 30;
+export const BREAK_MINUTES = 60;
+/** 17:00 on the clock: the 480 minutes of work and the hour of dinner between them (PIOTR). */
+export const DAY_END_MINUTE = MINUTES_PER_WORKING_DAY + BREAK_MINUTES;
+/** 19:00, and the tools go down whoever wants what (PIOTR: overtime until 19:00 at the latest). */
+export const OVERTIME_END_MINUTE = DAY_END_MINUTE + 120;
+/** The longest the clock can ever read in a day. Only for putting two moments of the game in
+ *  order. */
+export const MAX_CLOCK_MINUTES_PER_DAY = OVERTIME_END_MINUTE;
 /** One game day at 1x speed, in real seconds (PIOTR, Turn 2: one game minute per real second).
  *  8 real minutes at 1x, 4 at 2x, 2 at 4x. */
 export const REAL_SECONDS_PER_DAY_AT_1X = 480;
@@ -57,22 +66,13 @@ export const WEEKDAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] a
 // 7. The owner
 // ---------------------------------------------------------------------------
 
-/** Hours at full efficiency (PIOTR). */
-export const OWNER_NORMAL_HOURS = 8;
-/** Efficiency of overtime hours 9, 10, 11, 12. The fourth value is [TUNE], the rest [PIOTR]. */
-export const OVERTIME_EFFICIENCY = [0.8, 0.6, 0.4, 0.4] as const;
-/** After 12 hours the owner goes home, no way to force more (PIOTR). */
-export const MAX_HOURS_PER_DAY = 12;
-export const MAX_MINUTES_PER_DAY = MAX_HOURS_PER_DAY * 60;
-/** The longest the clock itself can read in a day: the twelve hours of work plus the break he did
- *  not work through. Only for putting two moments of the game in order. */
-export const MAX_CLOCK_MINUTES_PER_DAY = MAX_MINUTES_PER_DAY + BREAK_MINUTES;
-/** An overtime hour costs 0.05 of tomorrow's efficiency, pro rata for a part hour, recovered
- *  after one normal day ([TUNE] rate, PIOTR that it is pro rata: 30 minutes cost 0.025). */
-export const FATIGUE_PER_OVERTIME_HOUR = 0.05;
-/** [TUNE] a floor so a tired owner can never stall a task completely. With the numbers above it is
- *  never reached: the worst case is hour 12 at 0.4 less four hours of fatigue at 0.2. */
-export const MIN_OWNER_EFFICIENCY = 0.05;
+/** Working through dinner buys 60 minutes today and costs 3% of tomorrow (PIOTR). */
+export const BREAK_SKIP_FACTOR = 0.97;
+/** Any day with overtime in it, however little, adds this to the debt that comes off tomorrow's
+ *  output. Cumulative day after day, back to zero on Monday morning (PIOTR: 10% weaker). */
+export const OVERTIME_DEBT_PER_DAY = 0.1;
+/** However tired he is, half a day's work still comes out of him [TUNE]. */
+export const LABOUR_FACTOR_FLOOR = 0.5;
 /** Owner away: all staff production drops 30% (PIOTR). */
 export const ABSENCE_OUTPUT_FACTOR = 0.7;
 /** With a hired CEO the drop is 5% (PIOTR). CEO hiring is parked, the constant is modelled only. */

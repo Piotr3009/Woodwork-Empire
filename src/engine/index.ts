@@ -60,10 +60,11 @@ export {
 
 // The owner
 export {
-  hourEfficiency,
+  labourFactorFor,
   ownerEfficiency,
   ownerIsAvailable,
   ownerMinutesLeft,
+  ownerMinutesToday,
   staffOutputFactor,
 } from './owner';
 

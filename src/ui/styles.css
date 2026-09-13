@@ -425,6 +425,13 @@ input.num {
   font-size: 12px;
 }
 
+/* What today's work is multiplied by, shown only when it is below 1 (CLAUDE.md T6 3.4). */
+.output {
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
 .menu-pop {
   background: var(--panel);
   border: 1px solid var(--border);

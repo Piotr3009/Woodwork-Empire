@@ -5,7 +5,11 @@ import {
   ACCIDENT_CHANCE_PER_DAY,
   ACCIDENT_DAYS_OFF,
   BENCH_SLOT_LAYOUT,
+  BREAK_MINUTES,
+  BREAK_SKIP_FACTOR,
+  BREAK_START_MINUTE,
   CANTEEN_SLOT_LAYOUT,
+  DAY_END_MINUTE,
   DIFFICULTIES,
   GATE_LANE,
   HELPER_CLEAN_WEEKDAY,
@@ -13,6 +17,7 @@ import {
   DUCTING_RECONNECT_COST,
   MOVE_MINUTES_PER_ITEM,
   MOVING_SPEED,
+  OVERTIME_DEBT_PER_DAY,
   OWNER_LABOUR_PER_MINUTE,
   REPUTATION_START,
   SERVICE_INTERVAL_DAYS,
@@ -114,11 +119,12 @@ import {
   writeOffSheetsLeftOutside,
 } from './materials';
 import {
+  chargeOvertimeDebt,
+  countOvertimeMinute,
   ownerEfficiency,
   ownerIsAvailable,
   ownerMinutesLeft,
   runOwnerDayStart,
-  setTomorrowFatigue,
   spendOwnerMinute,
   staffOutputFactor,
 } from './owner';
@@ -223,7 +229,11 @@ export function createGame(options: NewGameOptions): GameState {
       minutesByCategory: { admin: 0, design: 0, workshop: 0 },
       minutesWorked: 0,
       overtimeMinutes: 0,
-      fatigue: 0,
+      labourFactor: 1,
+      overtimeDebt: 0,
+      breakSkipped: false,
+      breakAsked: false,
+      homeAsked: false,
       wentHome: false,
       currentTaskId: null,
       resumeTaskId: null,
@@ -270,9 +280,9 @@ export function createGame(options: NewGameOptions): GameState {
   return state;
 }
 
-/** The day ends at the twelve hour wall, or at 16:00 once the owner is not there to work the
- *  overtime. After 16:00 with the owner still in, it is his decision: the End day button
- *  (CLAUDE.md 7.2). */
+/** The day ends at 19:00 whoever wants what, or at 17:00 once the owner is not there to work the
+ *  overtime. Between the two it is his decision, taken on the end of day event or the End day
+ *  button (CLAUDE.md T6 3.4). */
 function shouldFinishDay(state: GameState): boolean {
   if (isDayExhausted(state.clock.minute)) return true;
   if (!isOvertime(state.clock.minute)) return false;
@@ -515,7 +525,7 @@ function finishDay(state: GameState): void {
     state.activeEvent?.kind === 'dayEnd' || state.eventQueue.some((event) => event.kind === 'dayEnd');
   if (ending) return;
   pauseOwnerTask(state);
-  setTomorrowFatigue(state);
+  chargeOvertimeDebt(state);
   state.owner.wentHome = true;
   if (!showsDaySummary(state)) {
     advanceToNextDay(state);
@@ -749,8 +759,10 @@ function delegateTasks(state: GameState): void {
 /** Where everybody is standing, worked out from what they are doing (CLAUDE.md T2 3.3). */
 function updateStations(state: GameState): void {
   const owner = state.owner;
-  // At dinner the whole workshop is in the canteen, the owner with them.
-  if (isBreak(state.clock.minute)) {
+  // At dinner the workshop is in the canteen. The owner is with them unless he said he would
+  // work through it, and then he is the only one on the floor (CLAUDE.md T6 3.4).
+  const dinner = isBreak(state.clock.minute);
+  if (dinner && !owner.breakSkipped) {
     owner.station = STATION_IDLE;
     for (const worker of state.workers) worker.station = STATION_IDLE;
     return;
@@ -770,7 +782,7 @@ function updateStations(state: GameState): void {
     owner.station = STATION_IDLE;
   }
   for (const worker of state.workers) {
-    if (!isWorkingToday(state, worker)) {
+    if (dinner || !isWorkingToday(state, worker)) {
       worker.station = STATION_IDLE;
       continue;
     }
@@ -896,8 +908,9 @@ function runProductionMinute(state: GameState, ownerOnTask: boolean): void {
       jobSpeedFactor(state, atTheBench);
     if (addLabour(state, atTheBench, minute)) raiseJobAtGate(state, atTheBench);
   }
-  // Staff work the normal day only: nobody but the owner does overtime.
-  if (!isOvertime(state.clock.minute)) {
+  // Staff work the normal day only: nobody but the owner does overtime, and they always take
+  // their dinner even on a day the owner works through his (CLAUDE.md T6 3.4).
+  if (!isOvertime(state.clock.minute) && !isBreak(state.clock.minute)) {
     const staffFactor = staffOutputFactor(state);
     for (const worker of state.workers) {
       if (!isWorkingToday(state, worker)) continue;
@@ -1052,14 +1065,64 @@ function ringDueCalls(state: GameState): void {
   });
 }
 
-function advanceMinute(state: GameState): void {
-  // The workshop is at dinner: the clock runs, nothing else does, and the day will end half an
-  // hour later for it (T5, the day with a break).
-  if (isBreak(state.clock.minute)) {
+/** Noon. Take the hour or work through it: 60 minutes more today against 3% of tomorrow
+ *  (CLAUDE.md T6 3.4). Asked once, and only of an owner who is in. */
+function askAboutBreak(state: GameState): boolean {
+  const owner = state.owner;
+  if (owner.breakAsked || state.clock.minute !== BREAK_START_MINUTE) return false;
+  owner.breakAsked = true;
+  if (!ownerIsAvailable(state)) return false;
+  queueEvent(state, {
+    kind: 'breakTime',
+    title: 'Break',
+    body:
+      'Twelve o\u0027clock and the kettle is on. The workshop stops for the hour whatever you do. ' +
+      `Work through it and you get ${BREAK_MINUTES} more minutes today and start tomorrow ` +
+      `${Math.round((1 - BREAK_SKIP_FACTOR) * 100)}% down.`,
+    choices: [
+      { id: 'take', label: 'Take it' },
+      { id: 'skip', label: 'Skip it' },
+    ],
+  });
+  settle(state);
+  return true;
+}
+
+/** Five o'clock. Home, or two more hours at the price of tomorrow (CLAUDE.md T6 3.4). */
+function askAboutGoingHome(state: GameState): boolean {
+  const owner = state.owner;
+  if (owner.homeAsked || state.clock.minute !== DAY_END_MINUTE) return false;
+  owner.homeAsked = true;
+  if (!ownerIsAvailable(state)) return false;
+  queueEvent(state, {
+    kind: 'goingHome',
+    title: 'End of day',
+    body:
+      'Five o\u0027clock and the day\u0027s work is behind you. The hall is yours until seven if ' +
+      `you want it, and any overtime at all costs ${Math.round(OVERTIME_DEBT_PER_DAY * 100)}% of ` +
+      'tomorrow, on top of whatever the week has already cost you.',
+    choices: [
+      { id: 'home', label: 'Go home' },
+      { id: 'overtime', label: 'Stay for overtime' },
+    ],
+  });
+  settle(state);
+  return true;
+}
+
+/** One minute of the day. False when the clock did not move, which is a question standing in
+ *  front of the player. */
+function advanceMinute(state: GameState): boolean {
+  if (askAboutBreak(state)) return false;
+  if (askAboutGoingHome(state)) return false;
+  // The workshop is at dinner: the clock runs and nothing else does, unless the owner said he
+  // would work through it, and then the hour is his alone (CLAUDE.md T6 3.4).
+  if (isBreak(state.clock.minute) && !state.owner.breakSkipped) {
     state.clock.minute += 1;
     settle(state);
-    return;
+    return true;
   }
+  countOvertimeMinute(state);
   ringDueCalls(state);
   // He cannot be on the laptop and at the bench in the same minute, so a task that finishes this
   // minute keeps him off production until the next one.
@@ -1069,6 +1132,7 @@ function advanceMinute(state: GameState): void {
   state.clock.minute += 1;
   if (shouldFinishDay(state)) finishDay(state);
   settle(state);
+  return true;
 }
 
 export interface TickResult {
@@ -1084,7 +1148,7 @@ export function runMinutes(state: GameState, minutes: number): TickResult {
   let minutesRun = 0;
   for (let i = 0; i < minutes; i += 1) {
     if (isPaused(next)) break;
-    advanceMinute(next);
+    if (!advanceMinute(next)) break;
     minutesRun += 1;
   }
   return { state: next, minutesRun };
@@ -1099,6 +1163,13 @@ function resolveEvent(state: GameState, choiceId: string): void {
   if (!event) return;
   state.activeEvent = null;
   switch (event.kind) {
+    case 'breakTime':
+      // Skipping is his to take: it buys him the hour and it is charged to tomorrow.
+      state.owner.breakSkipped = choiceId === 'skip';
+      break;
+    case 'goingHome':
+      if (choiceId === 'home') finishDay(state);
+      break;
     case 'dayEnd':
       advanceToNextDay(state);
       break;

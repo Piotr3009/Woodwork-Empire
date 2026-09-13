@@ -32,7 +32,7 @@ describe('GameState', () => {
   it('carries the version the loader checks, and it moved with the shape', () => {
     // The metre grid and the painted floor changed what an anchor means, so a Turn 4 save cannot
     // be opened: the loader refuses anything that is not this number (src/cloud/saves.ts).
-    expect(STATE_VERSION).toBe(4);
+    expect(STATE_VERSION).toBe(5);
     expect(sample.version).toBe(STATE_VERSION);
   });
 

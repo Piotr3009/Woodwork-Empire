@@ -209,7 +209,7 @@ export function playDay(
     options.watch?.(next);
     next = tick(next, step);
     // Nothing left worth the overtime: go home once the 480 minutes of work are in. The clock
-    // reads past 16:00 by the length of the break, so this asks the engine and not the hands.
+    // reads past the work by the length of the break, so this asks the engine, not the hands.
     if (next.clock.day === day && isOvertime(next.clock.minute) && next.activeEvent === null) {
       options.watch?.(next);
       next = applyAction(next, { type: 'END_DAY' });

@@ -395,7 +395,9 @@ describe('a day with a break, played by the script', () => {
 
   it('stops the whole workshop in the middle of the day and starts it again', () => {
     const dinner = states.filter((state) => isBreak(state.clock.minute));
-    expect(dinner.length).toBe(BREAK_MINUTES);
+    // Counted by the clock, not by the observations: the minute the day puts the question is
+    // watched on both sides of the answer.
+    expect(new Set(dinner.map((state) => state.clock.minute)).size).toBe(BREAK_MINUTES);
     // Nobody is at a bench or a machine for any of it, the owner included.
     for (const state of dinner) {
       expect(state.owner.station, formatTime(state.clock.minute)).toBe(STATION_IDLE);
@@ -412,9 +414,9 @@ describe('a day with a break, played by the script', () => {
     );
   });
 
-  it('ends the day at 16:30 with his whole 480 minutes behind him', () => {
+  it('ends the day at 17:00 with his whole 480 minutes behind him', () => {
     const last = states[states.length - 1];
-    expect(formatTime(last?.clock.minute ?? -1)).toBe('16:30');
+    expect(formatTime(last?.clock.minute ?? -1)).toBe('17:00');
     expect(last?.owner.minutesWorked).toBe(MINUTES_PER_WORKING_DAY);
     expect(last?.owner.overtimeMinutes).toBe(0);
   });

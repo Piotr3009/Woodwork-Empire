@@ -139,7 +139,8 @@ export interface ProductTemplate {
 export interface Clock {
   /** 1-based absolute day. Day 1 is a Monday. */
   day: number;
-  /** Minutes since 08:00. 480 is 16:00. Overtime runs above 480. */
+  /** Minutes since 08:00. 540 is 17:00, the end of the working day; overtime runs above it and
+   *  the clock never passes 660, which is 19:00. */
   minute: number;
 }
 
@@ -147,10 +148,18 @@ export interface OwnerState {
   present: boolean;
   minutesByCategory: Record<TaskCategory, number>;
   minutesWorked: number;
-  /** Overtime minutes worked today. Drives tomorrow's fatigue. */
+  /** Overtime minutes worked today. Any at all costs him tomorrow. */
   overtimeMinutes: number;
-  /** Efficiency penalty carried from yesterday's overtime, 0 to 1. */
-  fatigue: number;
+  /** What today's work is multiplied by: 1 less the overtime debt, and 3% off again if he worked
+   *  through yesterday's dinner. Floored (CLAUDE.md T6 3.4). */
+  labourFactor: number;
+  /** 0.10 for every day with overtime in it, cumulative, back to zero on Monday morning. */
+  overtimeDebt: number;
+  /** He worked through dinner on the last day he worked: 60 minutes more then, 3% off after. */
+  breakSkipped: boolean;
+  /** The two questions the day puts to him, so neither is put twice. */
+  breakAsked: boolean;
+  homeAsked: boolean;
   wentHome: boolean;
   currentTaskId: string | null;
   /** What the phone interrupted, so he goes back to it when the call is over (T4 3.3). */
@@ -373,6 +382,10 @@ export interface TaskInstance {
 }
 
 export type GameEventKind =
+  /** Noon: take the hour or work through it (CLAUDE.md T6 3.4). */
+  | 'breakTime'
+  /** 17:00: home, or two more hours. */
+  | 'goingHome'
   | 'deliveryArrived'
   | 'stockOverflow'
   | 'bagFull'

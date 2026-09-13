@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   BOOKKEEPING_MINUTES,
-  BREAK_MINUTES,
+  DAY_END_MINUTE,
   SOFTWARE_DESIGN_FACTOR,
 } from '../../src/engine/constants';
 import { PRODUCT_TEMPLATES } from '../../src/engine/constants';
@@ -19,7 +19,15 @@ import {
 } from '../../src/engine/tasks';
 import { tick } from '../../src/engine/index';
 import type { GameState, ProductTemplate, Worker } from '../../src/engine/index';
-import { act, clearEvents, newGame, placeEnquiry, runToDay, withLicence } from '../helpers';
+import {
+  act,
+  clearEvents,
+  newGame,
+  placeEnquiry,
+  runClock,
+  runToDay,
+  withLicence,
+} from '../helpers';
 
 function template(id: string): ProductTemplate {
   const found = PRODUCT_TEMPLATES.find((entry) => entry.id === id);
@@ -205,13 +213,12 @@ describe('the task runner', () => {
     expect(findTask(next, taskId)?.minutesRemaining).toBe(40);
   });
 
-  it('takes longer than the task says once the owner is in overtime', () => {
-    const { state, taskId } = withTask(540);
-    // 480 minutes of work at full speed, then hour 9 at 0.8: 60 units of work need 75 minutes.
-    // The clock runs half an hour further than that, for the dinner he did not work through.
-    let next = tick(act(state, { type: 'START_TASK', taskId }), 480 + BREAK_MINUTES);
-    expect(findTask(next, taskId)?.minutesRemaining).toBe(60);
-    next = tick(next, 60);
+  it('takes longer than the task says once the week has caught up with him', () => {
+    // An overtime minute is worth any other minute now: what a week of them costs is the labour
+    // factor the morning starts at (CLAUDE.md T6 3.4). At 0.8, an hour puts in 48 minutes.
+    const { state, taskId } = withTask(60);
+    state.owner.labourFactor = 0.8;
+    const next = runClock(act(state, { type: 'START_TASK', taskId }), 60);
     expect(findTask(next, taskId)?.minutesRemaining).toBeCloseTo(12, 6);
   });
 
@@ -222,8 +229,8 @@ describe('the task runner', () => {
     const design = createTask(state, { kind: 'design', label: 'Wardrobe drawing', minutes: 480 });
     let next = tick(act(state, { type: 'START_TASK', taskId: emails.id }), 60);
     expect(findTask(next, emails.id)?.done).toBe(true);
-    next = tick(act(next, { type: 'START_TASK', taskId: design.id }), 420 + BREAK_MINUTES);
-    expect(next.clock.minute).toBe(480 + BREAK_MINUTES);
+    next = runClock(act(next, { type: 'START_TASK', taskId: design.id }), DAY_END_MINUTE - 60);
+    expect(next.clock.minute).toBe(DAY_END_MINUTE);
     expect(findTask(next, design.id)?.minutesRemaining).toBe(60);
     // The owner refuses the overtime and goes home.
     next = clearEvents(act(next, { type: 'END_DAY' }));
@@ -235,9 +242,9 @@ describe('the task runner', () => {
   it('finishes the same drawing inside one day when no admin got in the way', () => {
     const state = withLicence(newGame());
     const design = createTask(state, { kind: 'design', label: 'Wardrobe drawing', minutes: 480 });
-    const next = tick(act(state, { type: 'START_TASK', taskId: design.id }), 480 + BREAK_MINUTES);
+    const next = runClock(act(state, { type: 'START_TASK', taskId: design.id }), DAY_END_MINUTE);
     expect(findTask(next, design.id)?.done).toBe(true);
-    expect(next.clock.minute).toBe(480 + BREAK_MINUTES);
+    expect(next.clock.minute).toBe(DAY_END_MINUTE);
   });
 });
 

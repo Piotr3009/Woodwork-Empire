@@ -1,12 +1,14 @@
 // The end of day summary, and the game over screen (CLAUDE.md 10.1).
 
-import { MINUTES_PER_WORKING_DAY } from '../engine/constants';
+import { OVERTIME_DEBT_PER_DAY } from '../engine/constants';
 import {
   deliveriesArrivingOn,
   dustBand,
   findJob,
   formatReputation,
+  labourFactorFor,
   netOf,
+  ownerMinutesToday,
   summaryTotals,
 } from '../engine/index';
 import type { GameState, SummaryCadence } from '../engine/index';
@@ -58,7 +60,7 @@ export function renderDayEnd(state: GameState): string {
     row('Admin', minutes(used.admin)) +
     row('Design', minutes(used.design)) +
     row('Workshop', minutes(used.workshop)) +
-    row('Worked', `${minutes(state.owner.minutesWorked)} of ${minutes(MINUTES_PER_WORKING_DAY)}`) +
+    row('Worked', `${minutes(state.owner.minutesWorked)} of ${minutes(ownerMinutesToday(state))}`) +
     (state.owner.overtimeMinutes > 0
       ? row('Overtime', minutes(state.owner.overtimeMinutes))
       : '') +
@@ -78,11 +80,22 @@ export function renderDayEnd(state: GameState): string {
     ) +
     row('Tomorrow', tomorrow === '' ? 'no deliveries' : tomorrow) +
     '</div></div>' +
-    (state.owner.fatigue > 0
-      ? `<p class="warn">Tomorrow starts ${(state.owner.fatigue * 100).toFixed(0)}% down on ` +
-        'efficiency after that overtime.</p>'
-      : '') +
+    tomorrowLine(state) +
     cadenceControl(state)
+  );
+}
+
+/** What today has cost tomorrow: the overtime debt and the hour he worked through, as the one
+ *  number they come to (CLAUDE.md T6 3.4). */
+function tomorrowLine(state: GameState): string {
+  const owner = state.owner;
+  const debt = owner.overtimeDebt + (owner.overtimeMinutes > 0 ? OVERTIME_DEBT_PER_DAY : 0);
+  const factor = labourFactorFor(debt, owner.breakSkipped);
+  if (factor >= 1) return '';
+  return (
+    `<p class="warn">Tomorrow starts at ${factor.toFixed(2)} of your output: ` +
+    `${owner.overtimeMinutes > 0 ? 'that overtime' : 'the overtime this week'}` +
+    `${owner.breakSkipped ? ' and the dinner you worked through' : ''}.</p>`
   );
 }
 
