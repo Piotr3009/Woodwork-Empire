@@ -40,18 +40,20 @@ describe('createGame', () => {
     const state = createGame(OPTIONS);
     expect(state.clock).toEqual({ day: 1, minute: 0 });
     expect(state.speed).toBe(0);
-    expect(state.cash).toBeCloseTo(20000 - dayOneCosts(720, 450), 6);
+    // One painted hall of 200 m2 at 12 a metre (docs/art/SPRITES.md 9.1).
+    expect(state.cash).toBeCloseTo(20000 - dayOneCosts(2400, 450), 6);
     expect(state.difficulty).toBe('easy');
     expect(state.activeEvent).toBeNull();
   });
 
   it('gives each difficulty its cash and unit', () => {
+    // Every difficulty rents the same hall now, so only the cash and the benches differ.
     expect(createGame({ ...OPTIONS, difficulty: 'veryEasy' }).cash).toBeCloseTo(
-      50000 - dayOneCosts(1080, 450),
+      50000 - dayOneCosts(2400, 450),
       6,
     );
     expect(createGame({ ...OPTIONS, difficulty: 'hard' }).cash).toBeCloseTo(
-      -dayOneCosts(720, 450),
+      -dayOneCosts(2400, 450),
       6,
     );
     expect(createGame({ ...OPTIONS, difficulty: 'veryEasy' }).unit.benchSlots).toBe(6);

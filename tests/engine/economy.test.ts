@@ -81,7 +81,8 @@ describe('daily costs', () => {
   it('charges one month of rent as the deposit once, on day 1, and holds it', () => {
     const day1 = newGame();
     const deposit = unitDepositFor(UNIT_RENT_MONTHLY);
-    expect(deposit).toBe(720);
+    // 200 m2 of painted hall at 12 a metre (docs/art/SPRITES.md 9.1).
+    expect(deposit).toBe(2400);
     expect(ledgerFor(day1, 'unitDeposit')).toBe(-deposit);
     expect(day1.unit.depositHeld).toBe(deposit);
     const later = runToDay(day1, 4).state;
@@ -92,8 +93,9 @@ describe('daily costs', () => {
 
   it('charges rent at 12 per m2 a month, a thirtieth every calendar day', () => {
     const state = newGame();
-    expect(state.unit.rentMonthly).toBe(720);
-    expect(newGame({ difficulty: 'veryEasy' }).unit.rentMonthly).toBe(1080);
+    expect(state.unit.rentMonthly).toBe(2400);
+    // One painted hall, so very easy rents the same floor as everybody else.
+    expect(newGame({ difficulty: 'veryEasy' }).unit.rentMonthly).toBe(2400);
     expect(dailyRent(state)).toBeCloseTo(UNIT_RENT_MONTHLY / DAYS_PER_MONTH, 8);
     expect(dailyRates(state)).toBeCloseTo(UNIT_RATES_MONTHLY / DAYS_PER_MONTH, 8);
     // Day 1 to the start of day 8 is eight charged calendar days, two of them the weekend.
@@ -223,8 +225,11 @@ describe('cash primitives', () => {
 describe('arrears, bailiff and bankruptcy', () => {
   it('turns an unpayable periodic cost into arrears and warns once', () => {
     const start = newGame({ difficulty: 'hard' });
-    const run = runToDay(start, 45);
+    // The 200 m2 hall costs 2400 a month, so Hard runs out of overdraft inside a fortnight: the
+    // first miss is on day 11 and month two is not up until day 41.
+    const run = runToDay(start, 30);
     expect(run.state.finance.arrearsAmount).toBeGreaterThan(0);
+    expect(run.state.finance.firstArrearsDay).toBe(11);
     expect(run.state.finance.arrearsMonths).toBe(1);
     expect(run.state.cash).toBeGreaterThan(run.state.finance.overdraftLimit - 300);
     expect(eventsOfKind(run.events, 'arrearsWarning')).toHaveLength(1);
@@ -237,13 +242,14 @@ describe('arrears, bailiff and bankruptcy', () => {
       type: 'BUY_EQUIPMENT',
       specId: 'tableSaw',
     });
-    // With the 5000 overdraft of Hard the first miss is on day 12, so month two lands on day 42.
-    const first = runToDay(kitted, 13);
-    expect(first.state.finance.firstArrearsDay).toBe(12);
+    // With the 5000 overdraft of Hard and 2400 of rent the first miss is on day 3, so month two
+    // lands on day 33.
+    const first = runToDay(kitted, 4);
+    expect(first.state.finance.firstArrearsDay).toBe(3);
     expect(first.state.finance.arrearsMonths).toBe(1);
-    // Day 41 is a Saturday, so the clock walks to the Monday: day 40 is the last look inside month one.
-    expect(runToDay(kitted, 40).state.finance.arrearsMonths).toBe(1);
-    const run = runToDay(kitted, 43);
+    // Day 32 is the last look inside month one.
+    expect(runToDay(kitted, 32).state.finance.arrearsMonths).toBe(1);
+    const run = runToDay(kitted, 33);
     expect(eventsOfKind(run.events, 'arrearsFinalWarning')).toHaveLength(1);
     expect(run.state.finance.arrearsMonths).toBe(2);
   });
@@ -313,8 +319,9 @@ describe('arrears, bailiff and bankruptcy', () => {
     const run = runToDay(newGame({ difficulty: 'hard' }), 100);
     expect(run.state.gameOver).not.toBeNull();
     expect(run.state.gameOver?.reason).toContain('arrears');
-    // First miss on day 23 with the 5000 overdraft, so three months are up on day 83.
-    expect(run.state.gameOver?.day).toBe(83);
+    // First miss on day 11 with the 5000 overdraft and the 200 m2 rent, so three months are up
+    // on day 71.
+    expect(run.state.gameOver?.day).toBe(71);
     expect(eventsOfKind(run.events, 'bankruptcy')).toHaveLength(1);
   });
 

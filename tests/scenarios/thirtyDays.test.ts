@@ -71,9 +71,9 @@ describe('30 days on Easy, working the board', () => {
   });
 
   it('runs on the Turn 2 balance and the Turn 2 clock', () => {
-    // 12 per m2 for the 60 m2 unit, one month of it held as the deposit.
-    expect(state.unit.rentMonthly).toBe(720);
-    expect(state.unit.depositHeld).toBe(720);
+    // 12 per m2 for the 200 m2 painted hall, one month of it held as the deposit.
+    expect(state.unit.rentMonthly).toBe(2400);
+    expect(state.unit.depositHeld).toBe(2400);
     expect(state.finance.overdraftLimit).toBe(-10000);
     // One game minute per real second at 1x, so a working day is 8 real minutes.
     expect(gameMinutesPerRealSecond(1)).toBe(1);

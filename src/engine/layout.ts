@@ -1,7 +1,7 @@
 // Where things stand on the hall floor. Pure geometry over the state, so the setup view can ask
 // before it drops and the catalogue can ask before it buys (CLAUDE.md T2 3.10).
 
-import { GATE_LANE_CELLS, GATE_LAYOUT, ROOM_LAYOUT } from './constants';
+import { GATE_LANE, ROOM_LAYOUT } from './constants';
 import { findSpec } from './machines';
 import type { Equipment, GameState } from './types';
 
@@ -28,14 +28,10 @@ function overlaps(left: Box, right: Box): boolean {
   );
 }
 
-/** The tiles in front of the gate that nothing may stand on (CLAUDE.md T2 3.10). */
-export function gateLane(state: GameState): Box {
-  return {
-    x: Math.max(0, state.unit.widthCells - GATE_LANE_CELLS),
-    y: GATE_LAYOUT.y,
-    width: GATE_LANE_CELLS,
-    depth: GATE_LAYOUT.depth,
-  };
+/** The cells inside the shutter that nothing may stand on. Fixed geometry of the painted hall,
+ *  not worked out from the unit any more (docs/art/SPRITES.md 9.3). */
+export function gateLane(): Box {
+  return { x: GATE_LANE.x, y: GATE_LANE.y, width: GATE_LANE.width, depth: GATE_LANE.depth };
 }
 
 /** Everything standing on the hall floor: what a move can bump into. The office furniture lives
@@ -78,7 +74,7 @@ export function canPlaceSpec(
       return { ok: false, reason: `On the ${room.name.toLowerCase()}` };
     }
   }
-  if (overlaps(box, gateLane(state))) {
+  if (overlaps(box, gateLane())) {
     return { ok: false, reason: 'Blocking the way to the gate' };
   }
   for (const item of hallItems(state)) {
@@ -121,7 +117,7 @@ export function moveItem(state: GameState, itemId: string, x: number, y: number)
   return OK;
 }
 
-/** The first tile, reading along each row in turn, where a thing of this kind fits. */
+/** The first cell, reading along each row in turn, where a thing of this kind fits. */
 export function firstFreeCell(state: GameState, specId: string): { x: number; y: number } | null {
   const spec = findSpec(specId);
   if (!spec) return null;

@@ -81,8 +81,9 @@ export const OWNER_LABOUR_PER_MINUTE = OWNER_LABOUR_VALUE_PER_DAY / MINUTES_PER_
 export const LIVING_COST_PER_WORKING_DAY = 200;
 /** Rent per square metre per month (PIOTR). Later stages use 15 to 20, which is parked. */
 export const RENT_PER_M2_MONTHLY = 12;
-/** The standard 60 m2 unit (PIOTR for the rate, [TUNE] for the area). */
-export const UNIT_AREA_M2 = 60;
+/** The painted hall is 20 by 10 m (docs/art/SPRITES.md 9.1), so the unit is 200 m2 and the rent
+ *  follows the rate. The 60 m2 of Turns 1 to 4 was [TUNE] and the hall art replaced it. */
+export const UNIT_AREA_M2 = 200;
 export const UNIT_RENT_MONTHLY = UNIT_AREA_M2 * RENT_PER_M2_MONTHLY;
 /** [TUNE] business rates, unchanged from Turn 1. */
 export const UNIT_RATES_MONTHLY = 450;
@@ -106,8 +107,9 @@ export const PELLET_INCOME_PER_1000_PRODUCTION_MINUTES = 40;
  *  threshold is measured against [TUNE]. */
 export const WORKING_DAYS_PER_MONTH = (DAYS_PER_MONTH * WORKING_DAYS_PER_WEEK) / DAYS_PER_WEEK;
 
-/** Unit geometry in tiles. One tile is 0.5 m by 0.5 m [TUNE proportions]. */
-export const UNIT_WIDTH_CELLS = 24;
+/** The hall in cells, which are metres now: x along the rear wall, y along the left wall, the
+ *  origin at the rear left corner (docs/art/SPRITES.md 9.1 and 9.3). 200 cells. */
+export const UNIT_WIDTH_CELLS = 20;
 export const UNIT_DEPTH_CELLS = 10;
 
 // ---------------------------------------------------------------------------
@@ -128,18 +130,20 @@ export interface DifficultySpec {
   overdraftLimit: number;
 }
 
-/** Starting cash is [PIOTR]. The bigger very easy unit is [TUNE]. */
+/** Starting cash is [PIOTR]. There is one painted hall and one set of registered room layers, so
+ *  every difficulty rents the same 200 m2 (docs/art/SPRITES.md 9.3); what very easy keeps of its
+ *  Turn 1 advantage is the cash and the bench slots [TUNE]. */
 export const DIFFICULTIES: DifficultySpec[] = [
   {
     id: 'veryEasy',
     label: 'Very easy',
     startingCash: 50000,
-    areaM2: 90,
-    rentMonthly: 90 * RENT_PER_M2_MONTHLY,
+    areaM2: UNIT_AREA_M2,
+    rentMonthly: UNIT_RENT_MONTHLY,
     ratesMonthly: UNIT_RATES_MONTHLY,
     benchSlots: 6,
-    widthCells: 30,
-    depthCells: 12,
+    widthCells: UNIT_WIDTH_CELLS,
+    depthCells: UNIT_DEPTH_CELLS,
     overdraftLimit: -10000,
   },
   {
@@ -980,113 +984,149 @@ export const EQUIPMENT_SPECS: EquipmentSpec[] = SPEC_DRAFTS.map(withVariants);
 /** Machines that must be owned before solid wood jobs can be made without the by-hand path. */
 export const SOLID_WOOD_EQUIPMENT = ['thicknesser', 'solidWoodTools'];
 
-/** Fixed placement in tiles. Free placement by the player is parked (CLAUDE.md 14.9). */
+/** Fixed placement in cells, which are metres (docs/art/SPRITES.md 9.1). Free placement by the
+ *  player is parked for the room blocks only: everything else he sets out himself (T2 3.10). */
 export interface LayoutSlot {
   x: number;
   y: number;
-  /** Placed in the yard strip to the right of the unit instead of on the floor. */
+  /** Parked outside the front kerb instead of on the hall floor. */
   yard?: boolean;
 }
 
-/** The three small rooms of 4 m2 along the back wall, with the one line each shows on hover. */
+/** The fixed room blocks, in the cells docs/art/SPRITES.md 9.3 registers the painted layers to:
+ *  the WC 2 cells, the office 8 and the canteen 8, eighteen of the two hundred. They stand in x
+ *  order along the rear wall and all three are 2.7 m high, which is what the art is drawn at. */
 export const ROOM_LAYOUT = [
-  {
-    id: 'office',
-    name: 'Office',
-    x: 0,
-    y: 0,
-    width: 4,
-    depth: 4,
-    height: 2,
-    spriteKey: 'roomOffice',
-    tooltip: 'The office. The desk, the laptop, the paperwork.',
-  },
   {
     id: 'wc',
     name: 'WC',
-    x: 5,
+    x: 0,
     y: 0,
-    width: 4,
-    depth: 4,
-    height: 2,
+    width: 1,
+    depth: 2,
+    height: 2.7,
     spriteKey: 'roomWc',
     tooltip: 'The WC. Cold tap, one towel.',
   },
   {
+    id: 'office',
+    name: 'Office',
+    x: 1,
+    y: 0,
+    width: 2,
+    depth: 4,
+    height: 2.7,
+    spriteKey: 'roomOffice',
+    tooltip: 'The office. The desk, the laptop, the paperwork.',
+  },
+  {
     id: 'canteen',
     name: 'Canteen',
-    x: 10,
+    x: 3,
     y: 0,
-    width: 4,
+    width: 2,
     depth: 4,
-    height: 2,
+    height: 2.7,
     spriteKey: 'roomCanteen',
     tooltip: 'The canteen. Tea, and somewhere to eat out of the dust.',
   },
 ] as const;
 
+export type RoomId = (typeof ROOM_LAYOUT)[number]['id'];
+
+/** The room block by name, so nothing reaches for it by position in the array. */
+export function roomById(id: RoomId): (typeof ROOM_LAYOUT)[number] {
+  const room = ROOM_LAYOUT.find((entry) => entry.id === id);
+  if (!room) throw new Error(`no room ${id}`);
+  return room;
+}
+
+/** The cell outside a room's door. The doors are centred on the faces the hall is on: y = 4 for
+ *  the office and the canteen, y = 2 for the WC (docs/art/SPRITES.md 9.3). */
+export function roomDoorCell(id: RoomId): { x: number; y: number } {
+  const room = roomById(id);
+  return { x: room.x + Math.floor(room.width / 2), y: room.y + room.depth };
+}
+
+/** The roller shutter, in the left wall: 3 m of wall from y 6, 3 m high (docs/art/SPRITES.md 9.3).
+ *  It is a far wall from where the camera stands, so a vehicle is only ever seen once it is
+ *  inside, which is what the gate lane below is kept clear for. */
+export const SHUTTER = { y: 6, width: 3, height: 3 };
+
+/** The personnel door, in the left wall between y 4.5 and 5.5 (docs/art/SPRITES.md 9.3). */
+export const PERSONNEL_DOOR = { y: 4.5, width: 1 };
+
 /** Hall placement. The office furniture is not placed at all: the office is a photoreal room and
- *  the desk, the chair and the laptop are in the artwork, not on a tile (CLAUDE.md T4 3.1). */
+ *  the desk, the chair and the laptop are in the artwork, not on a cell (CLAUDE.md T4 3.1).
+ *  Machines stand along the rear wall clear of the rooms, stock and the big kit in the front half,
+ *  and nothing is ever laid on the gate lane. */
 export const STARTING_LAYOUT: Record<string, LayoutSlot> = {
-  sheetRack: { x: 20, y: 0 },
-  sheetRackBetter: { x: 20, y: 2 },
-  extractor: { x: 15, y: 1 },
-  dustSystem: { x: 15, y: 1 },
-  flexiSystem: { x: 15, y: 1 },
-  tableSaw: { x: 0, y: 7 },
-  edgebander: { x: 5, y: 7 },
-  compressor: { x: 9, y: 7 },
-  thicknesser: { x: 12, y: 7 },
-  solidWoodTools: { x: 16, y: 7 },
-  forklift: { x: 20, y: 7 },
-  forkliftBetter: { x: 20, y: 7 },
+  tableSaw: { x: 6, y: 1 },
+  edgebander: { x: 9, y: 1 },
+  thicknesser: { x: 12, y: 1 },
+  solidWoodTools: { x: 15, y: 1 },
+  compressor: { x: 18, y: 1 },
+  extractor: { x: 18, y: 0 },
+  dustSystem: { x: 17, y: 2 },
+  flexiSystem: { x: 17, y: 2 },
+  pelletiser: { x: 15, y: 3 },
+  sheetRack: { x: 3, y: 7 },
+  sheetRackBetter: { x: 3, y: 9 },
   cnc: { x: 12, y: 7 },
   sprayBooth: { x: 16, y: 7 },
-  pelletiser: { x: 18, y: 1 },
-  drill: { x: 14, y: 5 },
-  handToolSet: { x: 15, y: 5 },
+  forklift: { x: 6, y: 9 },
+  forkliftBetter: { x: 6, y: 9 },
+  drill: { x: 8, y: 9 },
+  handToolSet: { x: 9, y: 9 },
   van: { x: 0, y: 7, yard: true },
 };
 
-/** Bench slots, in order. A unit uses the first `benchSlots` of them. */
+/** Bench slots, in order, along the middle of the hall clear of the rooms and the personnel door.
+ *  A unit uses the first `benchSlots` of them. */
 export const BENCH_SLOT_LAYOUT: LayoutSlot[] = [
-  { x: 0, y: 4 },
-  { x: 4, y: 4 },
-  { x: 8, y: 4 },
-  { x: 12, y: 4 },
-  { x: 16, y: 4 },
-  { x: 20, y: 4 },
+  { x: 3, y: 5 },
+  { x: 6, y: 5 },
+  { x: 9, y: 5 },
+  { x: 12, y: 5 },
+  { x: 15, y: 5 },
+  { x: 18, y: 5 },
 ];
 
-/** Welfare items stand along the walkway, clear of the room blocks. */
+/** Welfare items stand in the row in front of the rooms, clear of the three doors. */
 export const LOCKER_SLOT_LAYOUT: LayoutSlot[] = [
-  { x: 0, y: 6 },
-  { x: 1, y: 6 },
-  { x: 2, y: 6 },
-  { x: 3, y: 6 },
-  { x: 4, y: 6 },
-  { x: 5, y: 6 },
+  { x: 6, y: 4 },
+  { x: 7, y: 4 },
+  { x: 8, y: 4 },
+  { x: 9, y: 4 },
+  { x: 10, y: 4 },
+  { x: 11, y: 4 },
 ];
 
 export const CANTEEN_SLOT_LAYOUT: LayoutSlot[] = [
-  { x: 7, y: 6 },
-  { x: 8, y: 6 },
-  { x: 9, y: 6 },
-  { x: 10, y: 6 },
-  { x: 11, y: 6 },
-  { x: 12, y: 6 },
+  { x: 12, y: 4 },
+  { x: 13, y: 4 },
+  { x: 14, y: 4 },
+  { x: 15, y: 4 },
+  { x: 16, y: 4 },
+  { x: 17, y: 4 },
 ];
 
-/** Where a waiting delivery van stands, and how big it is. */
-export const GATE_LAYOUT = { x: 0, y: 4, yard: true, width: 4, depth: 2, height: 2 };
-/** The tile rows in front of the gate that have to stay clear [TUNE]. */
-export const GATE_LANE_CELLS = 2;
-/** The apron beside the gate where finished pieces stand, outside the floor (CLAUDE.md T2 3.13). */
-export const FINISHED_GOODS_LAYOUT = { x: 0, y: 6, yard: true, width: 3, depth: 1, height: 1 };
+/** Where a waiting delivery lorry stands: inside the shutter, on the lane. */
+export const GATE_LAYOUT = { x: 0, y: SHUTTER.y, width: 2, depth: 2, height: 1 };
+
+/** The way in from the shutter that nothing may stand on: x 0 to 2, y 6 to 10, eight of the two
+ *  hundred cells (docs/art/SPRITES.md 9.3). */
+export const GATE_LANE = { x: 0, y: SHUTTER.y, width: 2, depth: 4 };
+/** How far into the hall the lane reaches. */
+export const GATE_LANE_CELLS = GATE_LANE.width;
+
+/** Where finished pieces stand until transport is ordered: at the far end of the lane, in front of
+ *  the shutter, which is why too many of them slow the whole hall down (CLAUDE.md T2 3.7). */
+export const FINISHED_GOODS_LAYOUT = { x: 0, y: 9, width: 3, depth: 1, height: 1 };
 export const DELIVERY_VAN_SPRITE = 'deliveryVan';
 
-/** Width of the yard strip drawn to the right of the unit, in tiles. */
-export const YARD_WIDTH_CELLS = 5;
+/** Width of the apron drawn beyond the front kerb, where the company van is parked, in cells. */
+export const YARD_WIDTH_CELLS = 3;
 
 // ---------------------------------------------------------------------------
 // 9.3 Hiring pool (PIOTR: tiers and gating; wages [TUNE])

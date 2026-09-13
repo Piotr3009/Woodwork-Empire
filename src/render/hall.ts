@@ -8,6 +8,7 @@ import {
   GATE_LAYOUT,
   ROOM_LAYOUT,
   YARD_WIDTH_CELLS,
+  roomDoorCell,
 } from '../engine/constants';
 import {
   brokenMachines,
@@ -234,7 +235,7 @@ function sawdust(state: GameState): Drawable[] {
   return drawables;
 }
 
-/** The tile a station puts a figure on. Anything the workshop has not bought falls back to the
+/** The cell a station puts a figure on. Anything the workshop has not bought falls back to the
  *  middle of the floor (CLAUDE.md T2 3.3). */
 export function stationCell(
   state: GameState,
@@ -253,16 +254,11 @@ export function stationCell(
     if (rack && spec) return { x: rack.anchorX, y: rack.anchorY + spec.depth };
   }
   if (station === STATION_GATE) {
-    return { x: state.unit.widthCells + GATE_LAYOUT.x + 1, y: GATE_LAYOUT.y + GATE_LAYOUT.depth };
+    // At the back of the lorry, inside the shutter.
+    return { x: GATE_LAYOUT.x, y: GATE_LAYOUT.y + GATE_LAYOUT.depth };
   }
-  if (station === STATION_OFFICE) {
-    const office = ROOM_LAYOUT[0];
-    return { x: office.x + 2, y: office.y + office.depth };
-  }
-  if (station === STATION_IDLE || station === STATION_NO_BENCH) {
-    const canteen = ROOM_LAYOUT[2];
-    return { x: canteen.x + 2, y: canteen.y + canteen.depth };
-  }
+  if (station === STATION_OFFICE) return roomDoorCell('office');
+  if (station === STATION_IDLE || station === STATION_NO_BENCH) return roomDoorCell('canteen');
   return bench;
 }
 
@@ -444,7 +440,9 @@ export function renderHall(state: GameState, ghost: Ghost | null = null): string
   const waiting = state.deliveries.find((delivery) => delivery.arrived && !delivery.unloaded);
   if (waiting) {
     const gate = GATE_LAYOUT;
-    const gateX = unit.widthCells + gate.x;
+    // The shutter is in a far wall, so the lorry is only ever seen once it is in the hall, which
+    // is what the lane is kept clear for (docs/art/SPRITES.md 9.3).
+    const gateX = gate.x;
     drawables.push({
       depth: depthKey(gateX, gate.y),
       svg:
@@ -469,7 +467,7 @@ export function renderHall(state: GameState, ghost: Ghost | null = null): string
   const waitingPieces = jobsAtGate(state);
   if (waitingPieces.length > 0) {
     const apron = FINISHED_GOODS_LAYOUT;
-    const apronX = unit.widthCells + apron.x;
+    const apronX = apron.x;
     const shown = Math.min(waitingPieces.length, apron.width);
     for (let index = 0; index < shown; index += 1) {
       const x = apronX + index;

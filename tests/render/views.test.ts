@@ -168,12 +168,14 @@ describe('the hall on day 1', () => {
     expect(renderHall(state)).toContain('The owner is not in today');
   });
 
-  it('keeps the bigger unit bigger', () => {
+  it('draws the one painted hall at the same size whatever the difficulty', () => {
+    // There is one set of hall layers, registered to one 20 by 10 m floor, so every difficulty
+    // gets the same room (docs/art/SPRITES.md 9.3). What differs is the cash and the benches.
     const easy = renderHall(newGame());
     const veryEasy = renderHall(newGame({ difficulty: 'veryEasy' }));
-    const easyBox = easy.match(/viewBox="(-?\d+) (-?\d+) (\d+) (\d+)"/);
-    const bigBox = veryEasy.match(/viewBox="(-?\d+) (-?\d+) (\d+) (\d+)"/);
-    expect(Number(bigBox?.[3] ?? 0)).toBeGreaterThan(Number(easyBox?.[3] ?? 0));
+    const boxOf = (svg: string): string => svg.match(/viewBox="([^"]+)"/)?.[1] ?? '';
+    expect(boxOf(veryEasy)).toBe(boxOf(easy));
+    expect(boxOf(easy)).not.toBe('');
   });
 
   it('does not change when nothing in the state changed', () => {

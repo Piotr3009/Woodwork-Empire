@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { GATE_LANE_CELLS, ROOM_LAYOUT } from '../../src/engine/constants';
+import { STARTING_LAYOUT, roomById } from '../../src/engine/constants';
 import { findSpec } from '../../src/engine/machines';
 import {
   canPlace,
@@ -37,13 +37,15 @@ describe('setting the hall out', () => {
   it('refuses to drop a bench on the office', () => {
     const state = buyStartingKit(newGame());
     const bench = itemOf(state, 'workbench');
-    const office = ROOM_LAYOUT[0];
+    const office = roomById('office');
     const check = canPlace(state, bench, office.x, office.y);
     expect(check.ok).toBe(false);
     expect(check.reason).toBe('On the office');
     // And on the canteen, and the WC.
-    expect(canPlace(state, bench, ROOM_LAYOUT[1].x, ROOM_LAYOUT[1].y).reason).toBe('On the wc');
-    expect(canPlace(state, bench, ROOM_LAYOUT[2].x, ROOM_LAYOUT[2].y).reason).toBe('On the canteen');
+    const wc = roomById('wc');
+    const canteen = roomById('canteen');
+    expect(canPlace(state, bench, wc.x, wc.y).reason).toBe('On the wc');
+    expect(canPlace(state, bench, canteen.x, canteen.y).reason).toBe('On the canteen');
   });
 
   it('never lets two machines overlap', () => {
@@ -69,8 +71,9 @@ describe('setting the hall out', () => {
 
   it('keeps the way to the gate clear, and says so', () => {
     const state = buyStartingKit(newGame());
-    const lane = gateLane(state);
-    expect(lane.width).toBe(GATE_LANE_CELLS);
+    const lane = gateLane();
+    // Eight cells of the two hundred, x 0 to 2 and y 6 to 10 (docs/art/SPRITES.md 9.3).
+    expect(lane).toEqual({ x: 0, y: 6, width: 2, depth: 4 });
     const saw = itemOf(state, 'tableSaw');
     const check = canPlace(state, saw, lane.x, lane.y);
     expect(check.ok).toBe(false);
@@ -125,8 +128,9 @@ describe('setting the hall out', () => {
     let state = buyStartingKit(newGame());
     // Something is standing exactly where the second saw would like to be.
     const first = state.equipment.find((item) => item.specId === 'tableSaw');
-    expect(first?.anchorX).toBe(0);
-    expect(first?.anchorY).toBe(7);
+    const slot = STARTING_LAYOUT.tableSaw;
+    expect(first?.anchorX).toBe(slot?.x);
+    expect(first?.anchorY).toBe(slot?.y);
     state = act(state, { type: 'BUY_EQUIPMENT', specId: 'tableSaw' });
     const saws = state.equipment.filter((item) => item.specId === 'tableSaw');
     expect(saws).toHaveLength(2);
