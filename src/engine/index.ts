@@ -145,6 +145,16 @@ export {
   stageSpeed,
 } from './stages';
 export type { StageOptions, StagePlan, StagedJob } from './stages';
+export {
+  BOARD_DAYS_PAST_DUE,
+  DELIVERY_BAR_DAYS,
+  barsFor,
+  dayPoint,
+  gapFor,
+  jobRate,
+  workPlanGantt,
+} from './plan';
+export type { JobGantt, StageBar, StageGap } from './plan';
 
 // Client calls
 export {

@@ -1191,3 +1191,151 @@ input.num {
   height: auto;
   width: 100%;
 }
+
+/* The Work Plan board: a row a job, a bar a stage, in the whiteboard's colours
+   (CLAUDE.md T7 3.2). */
+.gantt {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.gantt-legend {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 6px 0;
+}
+
+.gantt-key {
+  align-items: center;
+  color: var(--text-dim);
+  display: inline-flex;
+  font-size: 12px;
+  gap: 5px;
+}
+
+.gantt-swatch {
+  border-radius: 2px;
+  display: inline-block;
+  height: 10px;
+  width: 14px;
+}
+
+.gantt-row {
+  align-items: stretch;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  gap: 12px;
+  padding: 6px 0;
+}
+
+.gantt-head {
+  align-items: center;
+  display: flex;
+  flex: 0 0 42%;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.gantt-chart {
+  background: var(--page);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  flex: 1 1 auto;
+  min-height: 34px;
+  position: relative;
+}
+
+.gantt-day {
+  background: var(--border);
+  bottom: 0;
+  position: absolute;
+  top: 0;
+  width: 1px;
+}
+
+.gantt-day.is-today {
+  background: var(--good);
+  width: 2px;
+}
+
+.gantt-due {
+  background: var(--bad);
+  bottom: 0;
+  position: absolute;
+  top: 0;
+  width: 2px;
+}
+
+.gantt-bar {
+  border-radius: 2px;
+  height: 12px;
+  opacity: 0.9;
+  position: absolute;
+  top: 6px;
+}
+
+.gantt-bar.is-projected {
+  opacity: 0.6;
+}
+
+/* The remaining part of a bar is hatched; the done part is filled over it. */
+.gantt-bar {
+  background-image: repeating-linear-gradient(
+    45deg,
+    rgba(255, 255, 255, 0.25) 0,
+    rgba(255, 255, 255, 0.25) 3px,
+    transparent 3px,
+    transparent 6px
+  );
+}
+
+.gantt-done {
+  background: inherit;
+  background-image: none;
+  border-radius: 2px;
+  display: block;
+  height: 100%;
+}
+
+.gantt-gap {
+  background: var(--text-dim);
+  height: 12px;
+  opacity: 0.45;
+  position: absolute;
+  top: 6px;
+}
+
+.gantt-span {
+  bottom: 2px;
+  color: var(--text-dim);
+  font-size: 10px;
+  left: 4px;
+  position: absolute;
+}
+
+.stage-cutting {
+  background-color: #4f9d55;
+}
+
+.stage-machining {
+  background-color: #3f76b8;
+}
+
+.stage-cnc {
+  background-color: #2f9aa0;
+}
+
+.stage-assembly {
+  background-color: #c9922f;
+}
+
+.stage-finishing {
+  background-color: #b3453f;
+}
+
+.stage-delivery {
+  background-color: #7a5aa8;
+}

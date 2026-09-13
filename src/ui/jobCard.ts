@@ -44,7 +44,7 @@ const STAGE_LABELS: Record<Job['stage'], string> = {
 
 /** The five steps of the job, so the card answers "what am I waiting for" at a glance. One
  *  helper, used by every card in the game (CLAUDE.md T3 3.1). */
-function lifecycleRow(state: GameState, job: Job): string {
+export function jobLifecycleRow(state: GameState, job: Job): string {
   const steps = lifecycleSteps(state, job)
     .map((step) => `<span class="step is-${step.state}">${escapeHtml(step.label)}</span>`)
     .join('');
@@ -60,7 +60,7 @@ export function callsLine(job: Job): string {
 }
 
 /** The informational labour cost of a job in progress comes from the engine (CLAUDE.md 8.5). */
-function labourCostLine(state: GameState, job: Job): string {
+export function jobLabourLine(state: GameState, job: Job): string {
   const { minutes: left, cost } = jobLabourCost(state, job);
   const worker = job.assignedTo === null ? null : workerById(state, job.assignedTo);
   if (!worker) return `${minutes(left)} of your own time left`;
@@ -68,7 +68,7 @@ function labourCostLine(state: GameState, job: Job): string {
 }
 
 /** Automatic assignment can always be overridden from the job card (CLAUDE.md 9.4). */
-function assignControls(state: GameState, job: Job): string {
+export function jobAssignControls(state: GameState, job: Job): string {
   if (job.stage !== 'ready' && job.stage !== 'inProduction') return '';
   const chip = (workerId: string, label: string): string =>
     `<button class="chip${job.assignedTo === workerId ? ' is-on' : ''}" data-do="assignJob" ` +
@@ -98,7 +98,7 @@ function cncControls(state: GameState, job: Job): string {
 /** The accent button of a job card: start the work, or get the finished piece away. Start
  *  production is on the card from the day the job is accepted, and when it cannot be pressed it
  *  says what is in the way (CLAUDE.md T3 3.1). */
-function jobAction(state: GameState, job: Job): string {
+export function jobAction(state: GameState, job: Job): string {
   if (job.stage === 'awaitingTransport') {
     if (job.deliverOnDay !== null) {
       return reasonLabel(`Booked out, leaves day ${job.deliverOnDay}`);
@@ -123,13 +123,13 @@ export function jobRow(state: GameState, job: Job): string {
   const action = jobAction(state, job);
   return (
     `<div class="row"><span class="row-main">${escapeHtml(job.name)} ${money(job.price)}</span>` +
-    lifecycleRow(state, job) +
+    jobLifecycleRow(state, job) +
     `<span class="row-figure">${escapeHtml(STAGE_LABELS[job.stage])} · due day ` +
     `${job.dueDay}${job.stage === 'inProduction' ? ` · ${done}% made` : ''}` +
     `${escapeHtml(waiting)}</span>` +
-    `<span class="row-figure">${labourCostLine(state, job)}</span>` +
+    `<span class="row-figure">${jobLabourLine(state, job)}</span>` +
     callsLine(job) +
-    assignControls(state, job) +
+    jobAssignControls(state, job) +
     cncControls(state, job) +
     (action === '' ? '' : `<span class="row-action">${action}</span>`) +
     '</div>'
@@ -147,7 +147,7 @@ export function gateSection(state: GameState): string {
         (job) =>
           `<div class="row"><span class="row-main">${escapeHtml(job.name)} ` +
           `${money(job.price)}</span>` +
-          lifecycleRow(state, job) +
+          jobLifecycleRow(state, job) +
           `<span class="row-figure">finished day ${job.finishedDay ?? '?'} · due day ` +
           `${job.dueDay}</span>` +
           `<span class="row-action">${jobAction(state, job)}</span></div>`,

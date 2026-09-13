@@ -158,8 +158,12 @@ describe('the first ten minutes', () => {
     expect(html()).toContain('Jobs finished');
     click('[data-do="resolveEvent"][data-id="next"]');
     expect(currentState()?.clock.day).toBe(2);
-    // Day 2 opens with the rack alarm: nothing has been ordered yet (CLAUDE.md T2 3.6).
-    expect(html()).toContain('The rack is nearly empty');
+    // Day 2 opens with the rack alarm: nothing has been ordered yet (CLAUDE.md T2 3.6). The page
+    // is seeded from the clock, so a day can also open with a breakdown or a service in front of
+    // it; the alarm is asked of the day's events and not of whichever one is on the screen.
+    const morning = currentState();
+    const events = [morning?.activeEvent, ...(morning?.eventQueue ?? [])];
+    expect(events.some((event) => event?.kind === 'lowStock'), JSON.stringify(events)).toBe(true);
     dismissEvents();
     expect(currentState()?.activeEvent).toBeNull();
   });
