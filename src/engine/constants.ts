@@ -15,10 +15,15 @@ import type {
   WorkerTier,
 } from './types';
 
-/** Bumped in Turn 3: a machine now carries its class, its hours and the hours it has in it, and
- *  a task carries the day it was finished. A Turn 2 save has none of those, so the loader refuses
- *  it rather than opening a game with half a workshop in it (CLAUDE.md T3 3.5, 3.3). */
-export const STATE_VERSION = 3;
+/** Bumped in Turn 5: the unit is measured in metre cells and not half metre tiles, the hall is the
+ *  painted 200 m2 floor, and every anchor in a saved layout was written on the old grid, which
+ *  would stand the whole workshop in the wrong place and some of it off the floor. The clock is
+ *  read differently too, the break being half an hour of it. A Turn 4 save is refused rather than
+ *  opened into a hall that does not fit it.
+ *
+ *  Bumped in Turn 3: a machine carries its class, its hours and the hours it has in it, and a task
+ *  carries the day it was finished (CLAUDE.md T3 3.5, 3.3). */
+export const STATE_VERSION = 4;
 
 // ---------------------------------------------------------------------------
 // 6. Time
