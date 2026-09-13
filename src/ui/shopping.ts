@@ -26,6 +26,16 @@ export function progressBar(line: OrderLine): string {
   );
 }
 
+/** One click calls an order off and hands the cash back in full, until the morning the lorry
+ *  comes (CLAUDE.md T8 3.5). */
+export function cancelButton(line: OrderLine): string {
+  if (line.canCancel) {
+    return `<button class="btn" data-do="cancelOrder" data-id="${line.id}">Cancel order</button>`;
+  }
+  if (line.kind === 'equipment') return '<span class="reason">At the gate, too late to call off</span>';
+  return '';
+}
+
 /** What the tile or the row says about one thing on its way. */
 function figures(line: OrderLine, day: number): string {
   const paid = line.pricePaid > 0 ? `${money(line.pricePaid)} paid · ` : '';
@@ -38,7 +48,8 @@ function row(line: OrderLine, day: number): string {
     `<div class="row order-row" data-order="${line.id}">` +
     `<span class="row-main">${escapeHtml(name)}</span>` +
     `<span class="row-figure">${escapeHtml(figures(line, day))}</span>` +
-    `<span class="row-figure">${progressBar(line)}</span></div>`
+    `<span class="row-figure">${progressBar(line)}</span>` +
+    `<span class="row-action">${cancelButton(line)}</span></div>`
   );
 }
 

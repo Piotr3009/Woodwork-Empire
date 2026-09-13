@@ -110,6 +110,9 @@ interface Ui {
   catalogueFolder: string | null;
   /** The category the Owned tab is narrowed to, or all of the hall (PIOTR, 13.09). */
   ownedTab: string;
+  /** The machine whose Sell button has been pressed once. A sale is meant on the second click,
+   *  inside the tile itself (CLAUDE.md T8 3.5). */
+  sellConfirm: string | null;
   /** Which tab of the books is on top, and the past day whose summary is open over them
    *  (CLAUDE.md T6 3.9). */
   accountingTab: AccountingTab;
@@ -178,6 +181,7 @@ function freshUi(): Ui {
     catalogueTab: CATALOGUE_FIRST_TAB,
     catalogueFolder: null,
     ownedTab: 'all',
+    sellConfirm: null,
     accountingTab: 'days',
     accountingMonth: null,
     openDays: [],
@@ -241,6 +245,7 @@ function modalBody(id: ModalId, current: GameState): string {
         ui.catalogueTab,
         ui.catalogueFolder,
         ui.ownedTab,
+        ui.sellConfirm,
       );
     case 'shopping':
       return renderShopping(current);
@@ -898,6 +903,19 @@ function handleAction(element: DataElement, point: { x: number; y: number }): vo
       break;
     case 'ownedTab':
       ui.ownedTab = id;
+      ui.sellConfirm = null;
+      return;
+    case 'cancelOrder':
+      dispatch({ type: 'CANCEL_ORDER', orderId: id });
+      return;
+    case 'sellMachine':
+      // The first click says what the buyer pays, the second means it (CLAUDE.md T8 3.5).
+      if (element.dataset.confirm !== '1') {
+        ui.sellConfirm = id;
+        break;
+      }
+      ui.sellConfirm = null;
+      dispatch({ type: 'SELL_MACHINE', equipmentId: id });
       return;
     case 'catalogueTab':
       ui.catalogueTab = catalogueTabFrom(id);

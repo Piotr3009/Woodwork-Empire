@@ -515,6 +515,8 @@ export type GameEventKind =
   /** Leaving setup mode with heavy machines moved: it is two hours and a ducting bill, so it is
    *  asked about before it is booked (CLAUDE.md T8 3.4). */
   | 'moveConfirm'
+  /** The buyer's van came for a machine that was sold (CLAUDE.md T8 3.5). */
+  | 'machineCollected'
   | 'weekend'
   | 'wagesPaid'
   | 'monthlyBills'
@@ -732,6 +734,10 @@ export type GameAction =
   | { type: 'SKIP_AHEAD' }
   | { type: 'BUY_EQUIPMENT'; specId: string; variantId?: string }
   | { type: 'BUY_SOFTWARE'; mode: 'oneOff' | 'subscription' }
+  /** Calls an order off before the lorry, in full (CLAUDE.md T8 3.5). */
+  | { type: 'CANCEL_ORDER'; orderId: string }
+  /** Sells a machine standing in the hall. The buyer comes in the morning (CLAUDE.md T8 3.5). */
+  | { type: 'SELL_MACHINE'; equipmentId: string }
   | { type: 'ACCEPT_ENQUIRY'; enquiryId: string; byHand: boolean }
   | { type: 'START_TASK'; taskId: string }
   | { type: 'PAUSE_TASK' }

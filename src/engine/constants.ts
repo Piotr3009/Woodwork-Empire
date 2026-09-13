@@ -224,6 +224,14 @@ export const ARREARS_MONTHS_BAILIFF = 3;
 /** The bailiff credits the seized machine at half its purchase price (PIOTR). */
 export const BAILIFF_SEIZURE_FRACTION = 0.5;
 
+/** What a machine standing in the hall fetches second hand: half what it cost (PIOTR), and a
+ *  third and a bit for one that was second hand when it was bought [TUNE]
+ *  (CLAUDE.md T8 3.5). */
+export const SALE_FRACTION = 0.5;
+export const SALE_FRACTION_USED = 0.35;
+/** The class that carries the lower fraction: it was somebody else's before it was his. */
+export const USED_VARIANT = 'used';
+
 // ---------------------------------------------------------------------------
 // 8.4 to 8.7 Job value, labour, payments
 // ---------------------------------------------------------------------------

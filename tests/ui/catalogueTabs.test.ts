@@ -186,8 +186,13 @@ describe('the Owned tab', () => {
     // Nothing is going through it, so no service is coming.
     expect(card).toContain('no service due while it stands idle');
     expect(card).toContain('running');
-    // Nothing is offered on a machine with nothing wrong with it.
-    expect(owned.querySelector(`[data-owned="${saw?.id}"] [data-do]`)).toBeNull();
+    // Nothing is offered on a machine with nothing wrong with it but the one thing that is
+    // always offered on a machine the hall has finished with (CLAUDE.md T8 3.5).
+    const controls = Array.from(
+      owned.querySelectorAll(`[data-owned="${saw?.id}"] [data-do]`),
+    ).map((node) => node.getAttribute('data-do'));
+    expect(controls).toEqual(['sellMachine']);
+    expect(card).toContain('Sell for £630');
   });
 
   it('names the day the service lands on once there is work going through the machine', () => {

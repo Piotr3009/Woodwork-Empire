@@ -25,6 +25,9 @@ import {
   NO_DUCTING_SPECS,
   NO_HELPER_DUST_MULTIPLIER,
   NO_HELPER_PRODUCTIVITY_FACTOR,
+  SALE_FRACTION,
+  SALE_FRACTION_USED,
+  USED_VARIANT,
 } from './constants';
 import type {
   Equipment,
@@ -153,6 +156,20 @@ export function floorMachines(state: GameState, specId: string): Equipment[] {
 /** Sold, and waiting for the van at the gate. */
 export function isSold(item: Equipment): boolean {
   return item.soldOnDay !== null;
+}
+
+/** What the buyer pays for it: half what it cost, and a third and a bit for one that was second
+ *  hand when it was bought (PIOTR, CLAUDE.md T8 3.5). */
+export function salePriceFor(item: Equipment): number {
+  const fraction = item.variantId === USED_VARIANT ? SALE_FRACTION_USED : SALE_FRACTION;
+  return Math.round(item.purchasePrice * fraction);
+}
+
+/** The families the Owned tab offers a sale on: what the game calls a machine, standing on the
+ *  hall floor (CLAUDE.md T8 3.5). A bench, a rack and a locker are fittings, not plant. */
+export function isSellableFamily(specId: string): boolean {
+  const category = findSpec(specId)?.category;
+  return category === 'machine' || category === 'extraction';
 }
 
 /** Tools of this family that live in a cabinet: two men can have one out at once. */

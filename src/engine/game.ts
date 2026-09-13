@@ -46,6 +46,7 @@ import {
 } from './orders';
 import {
   daysBetween,
+  nextWorkingDay,
   isDayExhausted,
   isFriday,
   isLastWorkingDayOfMonth,
@@ -64,6 +65,7 @@ import {
   formatMoney,
   pay,
   payArrears,
+  receive,
   runDayCosts,
   writeUpBooks,
 } from './economy';
@@ -86,6 +88,10 @@ import {
   deliveryDaysFor,
   findSpec,
   itemIsHeavy,
+  isSellableFamily,
+  isSold,
+  itemStandsInTheHall,
+  salePriceFor,
   freeBenches,
   hallProductivityFactor,
   has,
@@ -406,6 +412,7 @@ function startDay(state: GameState): void {
   }
   const arriving = arriveDeliveries(state);
   const kit = arriveEquipmentOrders(state);
+  collectSoldMachines(state);
   runBookedTransport(state);
   checkOverdueJobs(state);
   for (const delivery of arriving) onDeliveryArrived(state, delivery.jobId);
@@ -442,6 +449,40 @@ function arriveEquipmentOrders(state: GameState): OnOrderItem[] {
     waiting.push(item);
   }
   return waiting;
+}
+
+/** 08:00, and the buyer's van is at the gate for whatever was sold yesterday. Nobody unloads
+ *  anything: it goes, and the cash comes in (CLAUDE.md T8 3.5). */
+function collectSoldMachines(state: GameState): void {
+  const going = state.equipment.filter(
+    (item) => item.soldOnDay !== null && item.soldOnDay <= state.clock.day,
+  );
+  for (const item of going) {
+    const name = findSpec(item.specId)?.name ?? item.specId;
+    const price = salePriceFor(item);
+    state.equipment = state.equipment.filter((entry) => entry.id !== item.id);
+    // Nobody services or repairs a machine that is on the back of somebody else's lorry.
+    const orphaned = new Set(
+      state.tasks
+        .filter((task) => task.equipmentId === item.id && !task.done)
+        .map((task) => task.id),
+    );
+    state.tasks = state.tasks.filter((task) => !orphaned.has(task.id));
+    if (state.owner.currentTaskId !== null && orphaned.has(state.owner.currentTaskId)) {
+      state.owner.currentTaskId = null;
+    }
+    for (const worker of state.workers) {
+      if (worker.taskId !== null && orphaned.has(worker.taskId)) worker.taskId = null;
+    }
+    receive(state, 'equipment', `Sold: ${name}`, price);
+    queueEvent(state, {
+      kind: 'machineCollected',
+      title: `${name} collected`,
+      body: `The buyer took it away this morning. ${formatMoney(price)} in.`,
+      choices: [{ id: 'ok', label: 'Gone' }],
+      data: { specId: item.specId, price },
+    });
+  }
 }
 
 /** The same question the sheets ask: unload it now, or leave it standing at the gate
@@ -1653,6 +1694,12 @@ export function applyAction(state: GameState, action: GameAction): GameState {
     case 'BOOT_LAPTOP':
       bootLaptop(next);
       break;
+    case 'CANCEL_ORDER':
+      cancelOrder(next, action.orderId);
+      break;
+    case 'SELL_MACHINE':
+      sellMachine(next, action.equipmentId);
+      break;
     case 'PAUSE_TASK':
       pauseOwnerTask(next);
       break;
@@ -2066,6 +2113,49 @@ function settleEquipmentOrder(
     anchorX: at.x,
     anchorY: at.y,
   });
+}
+
+// ---------------------------------------------------------------------------
+// Calling an order off, and selling a machine that stands in the hall (CLAUDE.md T8 3.5)
+// ---------------------------------------------------------------------------
+
+/** Calls an order off before the lorry: the cash comes back in full, the floor held for it is
+ *  free again, and the books say what happened. One click (CLAUDE.md T8 3.5). */
+export function cancelOrder(state: GameState, orderId: string): BuyCheck {
+  const item = findOnOrder(state, orderId);
+  if (!item) return { ok: false, reason: 'Nothing on order' };
+  // At the gate is too late: it is here, and somebody has to take it off the lorry.
+  if (item.arrived) return { ok: false, reason: 'It is at the gate' };
+  if (timeIsPaused(state)) state.speed = 1;
+  receive(state, 'equipment', `Order cancelled: ${orderName(item)}`, item.pricePaid);
+  removeOnOrder(state, item.id);
+  return OK;
+}
+
+/** Why this machine cannot be sold, or that it can (CLAUDE.md T8 3.5). The one place the refusals
+ *  are written: the tile asks this and the action asks this. */
+export function canSell(state: GameState, equipmentId: string): BuyCheck {
+  const item = state.equipment.find((entry) => entry.id === equipmentId);
+  if (!item) return { ok: false, reason: 'Nothing to sell' };
+  if (isSold(item)) return { ok: false, reason: 'Sold, collection tomorrow' };
+  if (!isSellableFamily(item.specId)) return { ok: false, reason: 'Nobody buys second hand fittings' };
+  if (!itemStandsInTheHall(item)) return { ok: false, reason: 'It lives in a tool cabinet' };
+  if (item.broken) return { ok: false, reason: 'It is broken. Fix it first' };
+  if (item.takenBy !== null) return { ok: false, reason: 'Somebody is standing at it' };
+  return OK;
+}
+
+/** Sells it. The buyer comes in the morning: until then it is marked sold and it does no work
+ *  (CLAUDE.md T8 3.5). */
+export function sellMachine(state: GameState, equipmentId: string): BuyCheck {
+  const check = canSell(state, equipmentId);
+  if (!check.ok) return check;
+  const item = state.equipment.find((entry) => entry.id === equipmentId);
+  if (!item) return check;
+  if (timeIsPaused(state)) state.speed = 1;
+  item.soldOnDay = nextWorkingDay(state.clock.day);
+  item.takenBy = null;
+  return OK;
 }
 
 /** True while this class is on an open trip's list: ordered, paid for, not yet in the hall. */
