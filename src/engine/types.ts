@@ -716,6 +716,10 @@ export interface GameState {
   movedItems: MovedItem[];
   /** The speed the clock was on before the move forced itself to 4x. Null while none is on. */
   speedBeforeMove: Speed | null;
+  /** The task the player asked the clock to be run through at 4x, and the speed to give him back
+   *  when it is over. Null while he is driving the clock himself (CLAUDE.md T8 3.3). */
+  skipTaskId: string | null;
+  speedBeforeSkip: Speed | null;
   /** How often the end of day summary is put in front of the player (CLAUDE.md T4 3.6). */
   summaryCadence: SummaryCadence;
   gameOver: GameOver | null;
@@ -723,6 +727,8 @@ export interface GameState {
 
 export type GameAction =
   | { type: 'SET_SPEED'; speed: Speed }
+  /** Run the clock at 4x until the task the owner is out on is over (CLAUDE.md T8 3.3). */
+  | { type: 'SKIP_AHEAD' }
   | { type: 'BUY_EQUIPMENT'; specId: string; variantId?: string }
   | { type: 'BUY_SOFTWARE'; mode: 'oneOff' | 'subscription' }
   | { type: 'ACCEPT_ENQUIRY'; enquiryId: string; byHand: boolean }

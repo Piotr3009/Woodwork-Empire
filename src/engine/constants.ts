@@ -436,6 +436,9 @@ export const NO_DUCTING_SPECS = ['compressor'];
 /** The clock runs itself at 4x while the hall is being moved about, and the player cannot touch
  *  it until it is done (PIOTR). */
 export const MOVING_SPEED = 4;
+/** Skip ahead: the fastest the loop allows, run for the player while the owner is out and until
+ *  the task he is out on is over (PIOTR, 13.09; CLAUDE.md T8 3.3). */
+export const SKIP_SPEED = 4;
 /** Weekly clean (PIOTR). */
 export const CLEANING_MINUTES = 120;
 /** Fetch from temporary storage the next morning (PIOTR). */

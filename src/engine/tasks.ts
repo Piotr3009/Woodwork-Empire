@@ -244,6 +244,34 @@ export function movingMachines(state: GameState): TaskInstance | null {
   );
 }
 
+/** The kinds of task that take the owner out of the workshop, or stand him in the middle of it
+ *  where nothing else can go on: what the "Owner is out" line is drawn from (CLAUDE.md T8 3.3). */
+export const OWNER_OUT_KINDS: ReadonlyArray<TaskKind> = [
+  'shopping',
+  'hiring',
+  'siteMeasure',
+  'clientMeeting',
+  'moveMachines',
+];
+
+/** The trip, the interview, the site measure, the client meeting or the move of the hall the
+ *  owner is on this minute, or null. The one selector for it: the line inside the catalogue and
+ *  the component outside it both read this (CLAUDE.md T8 3.3). */
+export function ownerOutTask(state: GameState): TaskInstance | null {
+  const id = state.owner.currentTaskId;
+  if (id === null) return null;
+  const task = findTask(state, id);
+  if (task === null || task.done) return null;
+  return OWNER_OUT_KINDS.includes(task.kind) ? task : null;
+}
+
+/** The task the clock is being run through for the player, or null (CLAUDE.md T8 3.3). */
+export function skippedTask(state: GameState): TaskInstance | null {
+  if (state.skipTaskId === null) return null;
+  const task = findTask(state, state.skipTaskId);
+  return task === null || task.done ? null : task;
+}
+
 /** The trip to the shops the owner is on, if there is one. Everything he buys while it is still
  *  running rides on the same trip (CLAUDE.md T7 3.10). */
 export function shoppingTask(state: GameState): TaskInstance | null {

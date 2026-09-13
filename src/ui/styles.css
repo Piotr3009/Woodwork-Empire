@@ -266,6 +266,22 @@
   margin-top: 0;
 }
 
+/* The owner is out: what he is doing, how far through it he is, and the one button that runs the
+   clock through the rest of it (CLAUDE.md T8 3.3). */
+.owner-out {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 12px;
+  background: var(--panel-2);
+  color: var(--text-dim);
+  font-size: 13px;
+}
+
+.owner-out .btn {
+  margin-left: auto;
+}
+
 /* The bar from the day of the click to the day of the lorry, on the shopping list and on the
    tiles of the Owned tab (CLAUDE.md T8 3.2). */
 .order-bar {

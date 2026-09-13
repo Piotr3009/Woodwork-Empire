@@ -20,6 +20,7 @@ import {
   DUCTING_RECONNECT_COST,
   MOVE_MINUTES_PER_ITEM,
   MOVING_SPEED,
+  SKIP_SPEED,
   OVERTIME_DEBT_PER_DAY,
   REPUTATION_START,
   SERVICE_INTERVAL_HOURS,
@@ -192,10 +193,12 @@ import {
   movePending,
   movingMachines,
   orderMinutes,
+  ownerOutTask,
   pauseOwnerTask,
   resumeOwnerTask,
   shoppingLabel,
   shoppingTask,
+  skippedTask,
   startTask,
   taskWorkRate,
 } from './tasks';
@@ -319,6 +322,8 @@ export function createGame(options: NewGameOptions): GameState {
     productionMinutesMonth: 0,
     movedItems: [],
     speedBeforeMove: null,
+    skipTaskId: null,
+    speedBeforeSkip: null,
     summaryCadence: 'daily',
     gameOver: null,
   };
@@ -666,6 +671,9 @@ function finishDay(state: GameState): void {
   if (ending) return;
   pauseOwnerTask(state);
   chargeOvertimeDebt(state);
+  // A skipped run ends with the day: what is not finished is picked up in the morning and the
+  // player decides again whether to sit through it (CLAUDE.md T8 3.3).
+  endSkip(state);
   state.owner.wentHome = true;
   recordDay(state);
   if (!showsDaySummary(state)) {
@@ -895,6 +903,37 @@ function endSetup(state: GameState, speed: Speed): void {
   if (hand) assignWorkerTask(state, hand.id, task.id);
 }
 
+// ---------------------------------------------------------------------------
+// Skip ahead (CLAUDE.md T8 3.3). The owner is out and the player does not want to watch the hall
+// do nothing: the clock is run at 4x for him until the task is over, and the speed he was on
+// comes back. Events stop it the way they stop everything, and so does the end of the day.
+// ---------------------------------------------------------------------------
+
+/** Hands the clock back at the speed the player left it on. */
+function endSkip(state: GameState): void {
+  if (state.speedBeforeSkip !== null) state.speed = state.speedBeforeSkip;
+  state.skipTaskId = null;
+  state.speedBeforeSkip = null;
+}
+
+/** Asks the clock to run itself until this task is done. */
+function startSkip(state: GameState, taskId: string): void {
+  if (state.skipTaskId === taskId) return;
+  if (state.skipTaskId === null) state.speedBeforeSkip = state.speed;
+  state.skipTaskId = taskId;
+  state.speed = SKIP_SPEED;
+}
+
+/** Holds the clock at 4x while the skipped task is still open, and lets it go when it is not. */
+function runSkip(state: GameState): void {
+  if (state.skipTaskId === null) return;
+  if (skippedTask(state) === null) {
+    endSkip(state);
+    return;
+  }
+  state.speed = SKIP_SPEED;
+}
+
 /** A move is "running" only while somebody is actually on it. A call, the end of the day or a
  *  day at home can leave the task marked as the owner's while he is not holding it; then the clock
  *  stayed forced to 4x with nobody shifting anything and the player could not get it back (bug,
@@ -1000,6 +1039,8 @@ function settle(state: GameState): void {
   keepTheMoveHonest(state);
   // Nothing else happens while the hall is being moved, and the clock runs itself (T4 3.5).
   if (movingMachines(state) !== null) state.speed = MOVING_SPEED;
+  // And the clock the player asked to be run for him, until the task he asked about is over.
+  runSkip(state);
   // The helper needs no minutes, so he would clear a bag change in the middle of his dinner. He
   // gets his break like everybody else, and the list is there for him when he is back.
   if (!isBreak(state.clock.minute)) delegateTasks(state);
@@ -1469,9 +1510,18 @@ export function applyAction(state: GameState, action: GameAction): GameState {
   if (timeIsPaused(next) && PAUSED_ACTIONS.includes(action.type)) return next;
   switch (action.type) {
     case 'SET_SPEED':
-      // The speed is not the player's while the hall is being moved (CLAUDE.md T4 3.5).
-      if (movingMachines(next) === null) next.speed = action.speed as Speed;
+      // The speed is not the player's while the hall is being moved (CLAUDE.md T4 3.5), nor while
+      // the clock is being run for him (CLAUDE.md T8 3.3).
+      if (movingMachines(next) === null && next.skipTaskId === null) {
+        next.speed = action.speed as Speed;
+      }
       break;
+    case 'SKIP_AHEAD': {
+      // Only the task he is out on, so a Skip ahead can never run past what it was asked about.
+      const out = ownerOutTask(next) ?? skippedTask(next);
+      if (out !== null) startSkip(next, out.id);
+      break;
+    }
     case 'END_SETUP':
       endSetup(next, action.speed as Speed);
       break;

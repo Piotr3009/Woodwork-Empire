@@ -10,6 +10,7 @@ import {
   netOf,
   ownerMinutesToday,
   shoppingList,
+  skippedTask,
 } from '../engine/index';
 import type { GameState, Speed } from '../engine/index';
 import { cadenceControl } from './dayEnd';
@@ -35,6 +36,10 @@ function speedButtons(state: GameState, pulse: boolean): string {
   // until it is done (CLAUDE.md T4 3.5).
   if (movingMachines(state) !== null) {
     return '<span class="reason">Moving machines</span>';
+  }
+  // Or the clock is being run for him until the owner is back (CLAUDE.md T8 3.3).
+  if (skippedTask(state) !== null) {
+    return '<span class="reason">Skipping ahead</span>';
   }
   // At dinner. The speeds stay as they are, so the player can run the clock through it.
   const dinner = isBreak(state.clock.minute)

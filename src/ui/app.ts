@@ -72,6 +72,7 @@ import {
   reasonLabel,
   syncModals,
 } from './modal';
+import { renderOwnerOut } from './ownerOut';
 import { renderShopping } from './shopping';
 import { renderStart } from './start';
 import { cloudAvailable } from '../cloud/supabase';
@@ -476,9 +477,11 @@ function pageHtml(scene: Scene | null): string {
   const controls = ui.view === 'hall' ? hallControls(current) + hallZoomControls() : '';
   const note = ui.note === '' ? '' : `<p class="view-note">${escapeHtml(ui.note)}</p>`;
   const toast = ui.toast === '' ? '' : `<p class="toast">${escapeHtml(ui.toast)}</p>`;
+  const out = ui.view === 'sprites' ? '' : renderOwnerOut(current);
   return (
     renderTopbar(current, ui.view, ui.toast !== '') +
     toast +
+    out +
     (ui.menuOpen ? renderMenu(current, ui.cloud) : '') +
     `<main class="view">${SCENE_SLOT}${notes}${controls}${note}</main>` +
     renderWhy() +
@@ -798,6 +801,9 @@ function handleAction(element: DataElement, point: { x: number; y: number }): vo
       break;
     case 'setSpeed':
       dispatch({ type: 'SET_SPEED', speed: speedFromString(element.dataset.speed ?? '0') });
+      return;
+    case 'skipAhead':
+      dispatch({ type: 'SKIP_AHEAD' });
       return;
     case 'setView':
       ui.view = element.dataset.view === 'office' ? 'office' : 'hall';
