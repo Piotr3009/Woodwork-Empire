@@ -119,8 +119,8 @@ function arrearsBlock(state: GameState, typed: string): string {
     `<p class="warn">Arrears ${money(finance.arrearsAmount)}, ${months}. ` +
     `Three months brings the bailiff.${interest}${whyLink(state, 'arrearsInterest')}</p>` +
     '<div class="row"><span class="row-main">' +
-    '<input type="number" class="num" data-field="arrearsAmount" ' +
-    `value="${escapeHtml(typed)}" min="1" /> to pay</span>` +
+    '<input type="text" inputmode="numeric" pattern="[0-9]*" class="num" data-field="arrearsAmount" ' +
+    `value="${escapeHtml(typed)}" /> to pay</span>` +
     `<span class="row-figure">${money(Math.min(wanted, finance.arrearsAmount))}</span>` +
     `<span class="row-action">${button('payArrears', 'Pay', `data-amount="${wanted}"`)}` +
     `${primaryButton('payArrears', 'Pay all', 'data-amount="all"')}</span></div>`

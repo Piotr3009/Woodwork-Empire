@@ -50,8 +50,8 @@ export function renderMaterials(state: GameState, sheets: string): string {
     `<p class="hint">${money(SHEET_PRICE_STOCK)} a sheet, cheaper than ordering per job. ` +
     'They arrive the next working day and have to be unloaded.</p>' +
     '<div class="row"><span class="row-main">' +
-    '<input type="number" class="num" data-field="stockSheets" ' +
-    `value="${escapeHtml(sheets)}" min="1" max="99" /> sheets</span>` +
+    '<input type="text" inputmode="numeric" pattern="[0-9]*" class="num" data-field="stockSheets" ' +
+    `value="${escapeHtml(sheets)}" /> sheets</span>` +
     `<span class="row-figure">${money(stockCostFor(wanted))}</span>` +
     `<span class="row-action">${button('buyStock', 'Order', `data-sheets="${wanted}"`)}` +
     '</span></div>' +

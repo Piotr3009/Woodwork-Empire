@@ -38,6 +38,8 @@ function jobOf(price: number, extra: Partial<GameState> = {}): GameState {
   // Shelves, so the drawing is half an hour and the day has room for what the test is about.
   const enquiry = placeEnquiry(state, { price, deadlineDays: 90 });
   state = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+  // Ordered per job: the clerk and the admin are what these tests are about.
+  for (const job of state.jobs) job.materialMode = 'perJob';
   return state;
 }
 

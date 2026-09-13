@@ -50,7 +50,9 @@ import {
   zoomAt,
   zoomTo,
 } from '../render/hall';
-import { type RoomId, roomById } from '../engine/constants';
+import { type RoomId, roomById,
+  APP_VERSION,
+} from '../engine/constants';
 import { centreOf, screenToTile } from '../render/iso';
 import { fitOfficeStack, officeScene } from '../render/office';
 import { type AccountingTab, accountingTabFrom, renderAccounting } from './accounting';
@@ -437,7 +439,14 @@ function sceneFor(current: GameState): Scene | null {
 
 /** Everything on the page except the modal layer, which keeps its own DOM between renders, and the
  *  scene, which goes into the slot afterwards. */
+/** The version in the corner of every screen, the start screen included (PIOTR, 13.09). */
+const VERSION_CORNER = `<span class="version-corner">${APP_VERSION}</span>`;
+
 function pageHtml(scene: Scene | null): string {
+  return pageBody(scene) + VERSION_CORNER;
+}
+
+function pageBody(scene: Scene | null): string {
   if (ui.screen === 'start' || state === null) {
     return renderStart({
       difficulty: ui.difficulty,
@@ -473,7 +482,7 @@ function captureFocus(): FocusMemory | null {
   if (!(active instanceof HTMLInputElement)) return null;
   const key = active.dataset.field;
   if (key === undefined) return null;
-  return { key, start: active.selectionStart };
+  return { key, start: active.selectionEnd };
 }
 
 function restoreFocus(memory: FocusMemory | null): void {
@@ -481,9 +490,12 @@ function restoreFocus(memory: FocusMemory | null): void {
   const field = root.querySelector(`[data-field="${memory.key}"]`);
   if (!(field instanceof HTMLInputElement)) return;
   field.focus();
-  if (memory.start !== null && field.type === 'text') {
-    field.setSelectionRange(memory.start, memory.start);
-  }
+  if (field.type !== 'text') return;
+  // The caret goes back where it was, and at the end when the remembered spot is stale (it was
+  // read before the last key landed): typing 15 must give 15, never 51 (bug, 13.09).
+  const end = field.value.length;
+  const at = memory.start === null ? end : Math.min(Math.max(memory.start, 0), end);
+  field.setSelectionRange(at === 0 && end > 0 ? end : at, at === 0 && end > 0 ? end : at);
 }
 
 /** How long a figure takes to walk from one station to the next [TUNE]. */

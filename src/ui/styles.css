@@ -1427,3 +1427,14 @@ input.num {
   font-size: 12px;
   font-weight: 600;
 }
+
+/* The version in the corner: read it, never click it (PIOTR, 13.09). */
+.version-corner {
+  bottom: 6px;
+  color: var(--text-dim);
+  font-size: 11px;
+  pointer-events: none;
+  position: fixed;
+  right: 10px;
+  z-index: 5;
+}
