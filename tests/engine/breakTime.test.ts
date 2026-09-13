@@ -117,3 +117,45 @@ describe('the top bar says what is happening', () => {
     expect(renderTopbar(state, 'hall')).not.toContain('Break');
   });
 });
+
+describe('the helper has his dinner too', () => {
+  it('leaves a bag change on the list until the break is over', () => {
+    let state = fillRack(buyStartingKit(newGame({ difficulty: 'veryEasy' })));
+    state.workers.push({
+      id: 'help-1',
+      name: 'Sam',
+      role: 'helper',
+      tier: null,
+      rate: 0,
+      weeklyWage: 420,
+      monthlyWage: 0,
+      startDay: 1,
+      jobId: null,
+      taskId: null,
+      minutesWorked: 0,
+      ordersToday: 0,
+      station: 'idle',
+      productionMinutes: 0,
+      absentDaysRemaining: 0,
+      anchorX: 0,
+      anchorY: 0,
+    });
+    state = clearEvents(tick(state, BREAK_START_MINUTE));
+    expect(isBreak(state.clock.minute)).toBe(true);
+    // A bag goes as they sit down. The helper needs no minutes, so nothing but the break stops him.
+    const saw = state.equipment.find((item) => item.specId === 'tableSaw');
+    const task = createTask(state, {
+      kind: 'bagChange',
+      label: 'Bag change: table saw',
+      minutes: 15,
+      equipmentId: saw?.id ?? null,
+    });
+    state = clearEvents(tick(state, 5));
+    expect(findTask(state, task.id)?.done).toBe(false);
+    expect(findTask(state, task.id)?.doneBy).toBeNull();
+    // And he has it cleared the minute they are back at it.
+    state = clearEvents(tick(state, BREAK_MINUTES));
+    expect(findTask(state, task.id)?.done).toBe(true);
+    expect(findTask(state, task.id)?.doneBy).toBe('help-1');
+  });
+});

@@ -797,7 +797,9 @@ function settle(state: GameState): void {
   refreshLocks(state);
   // Nothing else happens while the hall is being moved, and the clock runs itself (T4 3.5).
   if (movingMachines(state) !== null) state.speed = MOVING_SPEED;
-  delegateTasks(state);
+  // The helper needs no minutes, so he would clear a bag change in the middle of his dinner. He
+  // gets his break like everybody else, and the list is there for him when he is back.
+  if (!isBreak(state.clock.minute)) delegateTasks(state);
   autoAssignJobs(state);
   updateStations(state);
   openNextEvent(state);
