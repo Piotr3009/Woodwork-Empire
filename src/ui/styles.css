@@ -1540,3 +1540,51 @@ input.num {
   font-weight: 700;
   letter-spacing: 1px;
 }
+
+/* The company board on the office wall: a dark board the game letters until the art side paints
+   one, with the live clock reading over it (PIOTR, 13.09; CLAUDE.md T9 3.10). */
+.office-company-board {
+  align-items: flex-start;
+  background: rgb(24 38 32 / 92%);
+  border: 2px solid rgb(12 20 16 / 90%);
+  border-radius: 4px;
+  box-shadow: 0 6px 14px rgb(0 0 0 / 35%);
+  color: #e8efe9;
+  display: flex;
+  font-size: 26px;
+  justify-content: center;
+  letter-spacing: 1px;
+  padding: 24px 16px;
+  text-align: center;
+}
+
+.office-company-board:hover {
+  background: rgb(30 48 40 / 94%);
+}
+
+/* Two columns on the company board modal: the weeks on the left, the output on the right. */
+.board-columns {
+  display: grid;
+  gap: 24px;
+  grid-template-columns: 1fr 1fr;
+}
+
+.board-column {
+  min-width: 0;
+}
+
+.board-week {
+  margin-bottom: 12px;
+}
+
+.board-line .row-figure:last-child {
+  font-variant-numeric: tabular-nums;
+  min-width: 64px;
+  text-align: right;
+}
+
+@media (max-width: 900px) {
+  .board-columns {
+    grid-template-columns: 1fr;
+  }
+}

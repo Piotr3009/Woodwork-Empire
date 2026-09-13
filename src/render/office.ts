@@ -101,7 +101,23 @@ export const OFFICE_REGIONS: OfficeRegion[] = [
     opens: true,
     needs: 'desk',
   },
+  // The free wall right of the door (PIOTR, 13.09; CLAUDE.md T9 3.10). It is the room's own
+  // board, like the Work Plan: it needs nothing bought before it says how the company is doing.
+  {
+    id: 'company',
+    name: 'Company board',
+    x: 970,
+    y: 60,
+    width: 310,
+    height: 460,
+    opens: true,
+  },
 ];
+
+/** The board the game draws itself until the art side paints one, with its heading lettered on it
+ *  (CLAUDE.md T9 3.10). The same idea as the catalogue on the floor: a drawn object rather than
+ *  an invisible rectangle over artwork that has nothing on it. */
+export const COMPANY_BOARD = 'company';
 
 /** Where the catalogue lies before there is a desk to put it on: on the floor by the door, in the
  *  region the brief gives it on the office canvas (CLAUDE.md T8 3.7). */
@@ -191,6 +207,14 @@ function regionHtml(
   const style = boxStyle(region);
   if (!region.opens) {
     return `<div class="office-region is-quiet" data-office="${region.id}" style="${style}"></div>`;
+  }
+  if (region.id === COMPANY_BOARD) {
+    // Nothing is painted on that wall yet, so the game draws the board and letters it.
+    return (
+      '<button class="office-region office-company-board" data-do="officeRegion" ' +
+      `data-office="${region.id}" title="${escapeText(region.name)}" style="${style}">` +
+      '<span>How the company is doing</span></button>'
+    );
   }
   if (region.id === 'catalogue' && onTheFloor) {
     // The loader first, the drawn object second: exactly as a machine is drawn in the hall

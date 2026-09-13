@@ -45,6 +45,7 @@ const OPENERS: Array<[string, string]> = [
   ['catalogue', '[data-office="catalogue"]'],
   ['accounting', '[data-office="binder"]'],
   ['shopping', '[data-do="openModal"][data-modal="shopping"]'],
+  ['company', '[data-office="company"]'],
   ['laptop', '[data-office="laptop"]'],
 ];
 
@@ -76,13 +77,14 @@ describe('the size of every modal in the game', () => {
     }
   });
 
-  it('says full for the six the brief names', () => {
+  it('says full for the six the brief names, and for nothing else', () => {
     expect(MODAL_IS_FULL).toEqual({
       board: true,
       catalogue: true,
       workPlan: true,
       shopping: true,
       accounting: true,
+      company: true,
       laptop: false,
     });
   });

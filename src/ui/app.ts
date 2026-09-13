@@ -76,6 +76,7 @@ import {
 } from './modal';
 import { patchInto } from './patch';
 import { renderOwnerOut } from './ownerOut';
+import { renderCompany } from './company';
 import { renderShopping } from './shopping';
 import { renderStart } from './start';
 import { cloudAvailable } from '../cloud/supabase';
@@ -84,7 +85,14 @@ import { renderMenu, renderTopbar, speedFromString } from './topbar';
 
 /** The modals the room can open. Materials, Team and Drawings are tabs inside the laptop now:
  *  one path per modal, only the entry moved (docs/art/SPRITES.md 8.4). */
-type ModalId = 'board' | 'laptop' | 'workPlan' | 'accounting' | 'catalogue' | 'shopping';
+type ModalId =
+  | 'board'
+  | 'laptop'
+  | 'workPlan'
+  | 'accounting'
+  | 'catalogue'
+  | 'shopping'
+  | 'company';
 
 interface Ui {
   screen: 'start' | 'game';
@@ -159,6 +167,7 @@ const MODAL_TITLES: Record<ModalId, string> = {
   accounting: 'Accounting',
   catalogue: 'Equipment catalogue',
   shopping: 'On order',
+  company: 'Company board',
 };
 
 /** How much of the page each modal takes. Anything that is a list or a board fills it; a small
@@ -173,6 +182,7 @@ export const MODAL_IS_FULL: Record<ModalId, boolean> = {
   accounting: true,
   catalogue: true,
   shopping: true,
+  company: true,
 };
 
 let ui: Ui = freshUi();
@@ -298,6 +308,8 @@ function modalBody(id: ModalId, current: GameState): string {
       );
     case 'shopping':
       return renderShopping(current);
+    case 'company':
+      return renderCompany(current);
   }
 }
 
@@ -802,7 +814,7 @@ export function render(): void {
 /** The modals that act on the world, which is every one of them but the Work Plan: nothing on
  *  them can be touched while the clock is stopped (CLAUDE.md T7 3.10). The Work Plan is a
  *  whiteboard and the Sprite check is a page of pictures: both are reading, and both open. */
-const READING_MODALS: ModalId[] = ['workPlan', 'shopping'];
+const READING_MODALS: ModalId[] = ['workPlan', 'shopping', 'company'];
 
 /** The one line the player gets when the world will not move for him, with the Pause button
  *  pulsing once behind it (CLAUDE.md T7 3.10). */
@@ -838,6 +850,7 @@ const OFFICE_REGION_MODALS: Record<string, ModalId> = {
   laptop: 'laptop',
   catalogue: 'catalogue',
   binder: 'accounting',
+  company: 'company',
 };
 
 /** Elements in the SVG views are SVGElement, not HTMLElement, but both carry a dataset. */

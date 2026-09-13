@@ -106,7 +106,7 @@ describe('the layers', () => {
 });
 
 describe('the click regions', () => {
-  it('is the seven rectangles of the contract, at the contract coordinates', () => {
+  it('is the rectangles of the contract, at the contract coordinates', () => {
     expect(OFFICE_REGIONS.map((region) => region.id)).toEqual([
       'workPlan',
       'orders',
@@ -115,6 +115,8 @@ describe('the click regions', () => {
       'laptop',
       'catalogue',
       'binder',
+      // The free wall right of the door (PIOTR, 13.09; CLAUDE.md T9 3.10).
+      'company',
     ]);
     const boxes = OFFICE_REGIONS.map((region) => [
       region.id,
@@ -131,6 +133,7 @@ describe('the click regions', () => {
       ['laptop', 558, 449, 557, 443],
       ['catalogue', 60, 680, 445, 210],
       ['binder', 1170, 620, 435, 280],
+      ['company', 970, 60, 310, 460],
     ]);
   });
 
@@ -146,7 +149,10 @@ describe('the click regions', () => {
         // The clock is the live clock and opens nothing (docs/art/SPRITES.md 8.2).
         expect(element?.getAttribute('data-do'), region.id).toBeNull();
       }
-      expect(element?.textContent, region.id).toBe('');
+      // Nothing is drawn over the artwork, with two exceptions the art side has nothing on yet:
+      // the catalogue on the floor before there is a desk, and the company board on the free wall
+      // (CLAUDE.md T8 3.7, T9 3.10).
+      if (region.id !== 'company') expect(element?.textContent, region.id).toBe('');
     }
   });
 });
