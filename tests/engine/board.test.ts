@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
   BOARD_SIZE_BY_TIER,
+  DEADLINE_DAYS_BASE,
+  DEADLINE_DAYS_FACTOR,
+  DEADLINE_DAYS_MAX,
+  DEADLINE_DAYS_MIN,
+  DEADLINE_EXPRESS_FACTOR,
+  DEADLINE_SLACK_PERCENT_MAX,
+  DEADLINE_SMALL_JOB_PRICE,
+  DEADLINE_SMALL_SLACK_DAYS,
   EXPRESS_PRICE_UPLIFT,
   EXPRESS_PROBABILITY_BASE,
   EXPRESS_PROBABILITY_MAX,
@@ -19,6 +27,7 @@ import {
   refillBoard,
   removeEnquiry,
 } from '../../src/engine/board';
+import { labourValueFor, ownerDaysFor } from '../../src/engine/jobs';
 import { tick } from '../../src/engine/index';
 import type { Enquiry, GameState } from '../../src/engine/index';
 import { act, clearEvents, newGame } from '../helpers';
@@ -81,14 +90,33 @@ describe('enquiry generation', () => {
     }
   });
 
-  it('keeps the deadline inside the template range', () => {
+  it('works the deadline out from the job and never from the kind of thing it is', () => {
     const state = newGame();
     state.enquiries = [];
     for (const enquiry of draw(state, 300)) {
-      if (enquiry.templateId === 'garageShelves') {
-        expect(enquiry.deadlineDays).toBeGreaterThanOrEqual(10);
-        expect(enquiry.deadlineDays).toBeLessThanOrEqual(20);
-      }
+      const ownerDays = ownerDaysFor(
+        state,
+        labourValueFor(enquiry.basePrice),
+        enquiry.materialKind,
+      );
+      const base = Math.min(
+        DEADLINE_DAYS_MAX,
+        Math.max(
+          DEADLINE_DAYS_MIN,
+          Math.floor(ownerDays * DEADLINE_DAYS_FACTOR + DEADLINE_DAYS_BASE),
+        ),
+      );
+      const slack =
+        enquiry.basePrice <= DEADLINE_SMALL_JOB_PRICE
+          ? DEADLINE_SMALL_SLACK_DAYS
+          : Math.round((base * DEADLINE_SLACK_PERCENT_MAX) / 100);
+      const most = enquiry.express
+        ? Math.max(DEADLINE_DAYS_MIN, Math.round((base + slack) * DEADLINE_EXPRESS_FACTOR))
+        : base + slack;
+      expect(enquiry.deadlineDays, enquiry.templateId).toBeGreaterThanOrEqual(DEADLINE_DAYS_MIN);
+      expect(enquiry.deadlineDays, enquiry.templateId).toBeLessThanOrEqual(most);
+      // A small job never gets the twelve days Piotr complained about.
+      if (enquiry.basePrice <= 600) expect(enquiry.deadlineDays).toBeLessThanOrEqual(5);
     }
   });
 

@@ -25,6 +25,7 @@ import {
   templatesForReputation,
 } from './catalog';
 import { weekOfDay } from './clock';
+import { deadlineDaysFor, labourValueFor, ownerDaysFor } from './jobs';
 import { reputationTier } from './reputation';
 import { chance, float, int, makeId, pickWeighted } from './rng';
 import type { Enquiry, GameState, ProductTemplate } from './types';
@@ -71,7 +72,13 @@ function buildEnquiry(state: GameState, entry: ProductTemplate): Enquiry | null 
   const finishes = availableFinishes(state, entry);
   const finish = finishes[int(state, 0, Math.max(0, finishes.length - 1))];
   if (!finish) return null;
-  const deadlineDays = int(state, entry.deadlineMinDays, entry.deadlineMaxDays);
+  // The deadline comes off the work in the job now, not off the kind of thing it is
+  // (CLAUDE.md T6 3.7).
+  const deadlineDays = deadlineDaysFor(state, {
+    ownerDays: ownerDaysFor(state, labourValueFor(basePrice), entry.material),
+    price: basePrice,
+    express,
+  });
   const bespokeMaterial = chance(state, BESPOKE_PROBABILITY);
   const expiryDays = express ? EXPIRY_EXPRESS_DAYS : EXPIRY_STANDARD_DAYS;
   return {

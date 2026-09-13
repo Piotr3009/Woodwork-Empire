@@ -370,6 +370,22 @@ export const REPAIR_MINUTES = 90;
 /** [TUNE] the extractor keeps its Turn 1 parts bill; every other machine is 5% of what it cost. */
 export const EXTRACTOR_REPAIR_COST = 150;
 export const MACHINE_REPAIR_COST_FRACTION = 0.05;
+/** The deadline a job comes with is worked out from the work in it, not from the kind of thing it
+ *  is: nine tenths of the owner's own days plus three, as whole days, never under three and never
+ *  over thirty (PIOTR). The per template ranges of Turns 1 to 5 are gone. */
+export const DEADLINE_DAYS_FACTOR = 0.9;
+export const DEADLINE_DAYS_BASE = 3;
+export const DEADLINE_DAYS_MIN = 3;
+export const DEADLINE_DAYS_MAX = 30;
+/** Up to this much the client gives a flat nought to two days of slack (PIOTR: three to five days
+ *  in total for a small job); above it he gives a tenth to a seventh of the deadline itself. */
+export const DEADLINE_SMALL_JOB_PRICE = 3000;
+export const DEADLINE_SMALL_SLACK_DAYS = 2;
+export const DEADLINE_SLACK_PERCENT_MIN = 10;
+export const DEADLINE_SLACK_PERCENT_MAX = 15;
+/** An express job wants it in six tenths of the time, and never in under three days (PIOTR). */
+export const DEADLINE_EXPRESS_FACTOR = 0.6;
+
 /** Every machine wants a service once a month, and it costs half an hour (PIOTR). From Turn 6 the
  *  month is counted on the machine's own clock and not on the calendar: 80 hours is the month a
  *  one man shop puts on a table saw, which serves three, so the service he is used to lands where
@@ -434,8 +450,6 @@ export const PRODUCT_TEMPLATES: ProductTemplate[] = [
     material: 'sheet',
     designMinutes: 30,
     calls: 2,
-    deadlineMinDays: 10,
-    deadlineMaxDays: 20,
     needsMeasure: false,
     requiredEquipment: ['tableSaw', 'drill'],
     allowedFinishes: FINISHES_SHEET,
@@ -450,8 +464,6 @@ export const PRODUCT_TEMPLATES: ProductTemplate[] = [
     material: 'sheet',
     designMinutes: 60,
     calls: 2,
-    deadlineMinDays: 10,
-    deadlineMaxDays: 25,
     needsMeasure: false,
     requiredEquipment: ['tableSaw', 'drill', 'edgebander'],
     allowedFinishes: FINISHES_SHEET,
@@ -466,8 +478,6 @@ export const PRODUCT_TEMPLATES: ProductTemplate[] = [
     material: 'sheet',
     designMinutes: 120,
     calls: 3,
-    deadlineMinDays: 14,
-    deadlineMaxDays: 28,
     needsMeasure: false,
     requiredEquipment: ['tableSaw', 'drill', 'edgebander'],
     allowedFinishes: FINISHES_SHEET,
@@ -482,8 +492,6 @@ export const PRODUCT_TEMPLATES: ProductTemplate[] = [
     material: 'sheet',
     designMinutes: 480,
     calls: 3,
-    deadlineMinDays: 21,
-    deadlineMaxDays: 35,
     needsMeasure: false,
     requiredEquipment: ['tableSaw', 'drill', 'edgebander'],
     allowedFinishes: FINISHES_SHEET,
@@ -498,8 +506,6 @@ export const PRODUCT_TEMPLATES: ProductTemplate[] = [
     material: 'sheet',
     designMinutes: 720,
     calls: 4,
-    deadlineMinDays: 28,
-    deadlineMaxDays: 42,
     needsMeasure: true,
     requiredEquipment: ['tableSaw', 'drill', 'edgebander'],
     allowedFinishes: FINISHES_SHEET,
@@ -514,8 +520,6 @@ export const PRODUCT_TEMPLATES: ProductTemplate[] = [
     material: 'solidWood',
     designMinutes: 480,
     calls: 4,
-    deadlineMinDays: 42,
-    deadlineMaxDays: 60,
     needsMeasure: false,
     requiredEquipment: ['thicknesser', 'solidWoodTools'],
     allowedFinishes: FINISHES_SOLID,

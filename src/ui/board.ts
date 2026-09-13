@@ -43,7 +43,12 @@ function tile(state: GameState, enquiry: Enquiry): string {
   const locked = enquiry.lockReason !== null;
   const byHand = locked && enquiry.byHandAvailable;
   const sheets = sheetsForCost(materialCostFor(enquiry.basePrice, enquiry.bespokeMaterial));
-  const ownerDays = ownerDaysFor(labourValueFor(enquiry.basePrice));
+  // Days of his own time with the machines standing in the hall now, which is the same number
+  // the deadline is worked out from (CLAUDE.md T6 3.7).
+  const ownerDays =
+    Math.round(
+      ownerDaysFor(state, labourValueFor(enquiry.basePrice), enquiry.materialKind) * 10,
+    ) / 10;
   const express = enquiry.express ? '<span class="badge badge-warn tile-flag">Express</span>' : '';
   const badges = [
     enquiry.bespokeMaterial ? '<span class="badge">Bespoke material</span>' : '',

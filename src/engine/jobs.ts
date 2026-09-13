@@ -5,14 +5,23 @@
 import {
   BY_HAND_DURATION_FACTOR,
   COURIER_COST,
+  DEADLINE_DAYS_BASE,
+  DEADLINE_DAYS_FACTOR,
+  DEADLINE_DAYS_MAX,
+  DEADLINE_DAYS_MIN,
+  DEADLINE_EXPRESS_FACTOR,
+  DEADLINE_SLACK_PERCENT_MAX,
+  DEADLINE_SLACK_PERCENT_MIN,
+  DEADLINE_SMALL_JOB_PRICE,
+  DEADLINE_SMALL_SLACK_DAYS,
   DEPOSIT_FRACTION,
   EMAIL_PAYMENT_PENALTY,
   EMAIL_PAYMENT_PENALTY_MAX,
   LABOUR_FRACTION,
   LATE_PENALTY_PER_DAY,
   LATE_PENALTY_PER_DAY_EXPRESS,
+  MINUTES_PER_WORKING_DAY,
   OWNER_LABOUR_PER_MINUTE,
-  OWNER_LABOUR_VALUE_PER_DAY,
   SITE_MEASURE_MINUTES,
   SITE_MEASURE_TAXI_COST,
   WORKER_MINUTE_RATE_DIVISOR,
@@ -42,7 +51,7 @@ import {
 } from './materials';
 import { ownerIsAvailable } from './owner';
 import { applyRating } from './reputation';
-import { makeId } from './rng';
+import { int, makeId } from './rng';
 import { plural } from './text';
 import {
   AD_HOC_TASK_MINUTES,
@@ -54,7 +63,7 @@ import {
   jobTasks,
   materialOrderMinutes,
 } from './tasks';
-import type { GameState, Job, JobStage, MaterialMode } from './types';
+import type { GameState, Job, JobStage, MaterialKind, MaterialMode } from './types';
 
 export function findJob(state: GameState, jobId: string): Job | null {
   return state.jobs.find((job) => job.id === jobId) ?? null;
@@ -73,9 +82,42 @@ export function labourValueFor(price: number): number {
   return price * LABOUR_FRACTION;
 }
 
-/** Days of the owner's own time this much labour takes, to one decimal (CLAUDE.md T2 3.2). */
-export function ownerDaysFor(labourValue: number): number {
-  return Math.round((labourValue / OWNER_LABOUR_VALUE_PER_DAY) * 10) / 10;
+/** Days of the owner's own time this much labour takes with the machines the hall has now: the
+ *  same number the board tile shows and the deadline is worked out from (CLAUDE.md T6 3.7). */
+export function ownerDaysFor(
+  state: GameState,
+  labourValue: number,
+  materialKind: MaterialKind,
+  byHand = false,
+): number {
+  const minutes =
+    (labourValue / OWNER_LABOUR_PER_MINUTE) * speedFactorFor(state, materialKind, byHand);
+  return minutes / MINUTES_PER_WORKING_DAY;
+}
+
+/** How long the client gives, worked out from the work in the job and nothing else. The slack is
+ *  one draw either way, so the seeded stream is the same shape for a small job and a big one
+ *  (CLAUDE.md T6 3.7). */
+export function deadlineDaysFor(
+  state: GameState,
+  job: { ownerDays: number; price: number; express: boolean },
+): number {
+  const base = Math.min(
+    DEADLINE_DAYS_MAX,
+    Math.max(
+      DEADLINE_DAYS_MIN,
+      Math.floor(job.ownerDays * DEADLINE_DAYS_FACTOR + DEADLINE_DAYS_BASE),
+    ),
+  );
+  const slack =
+    job.price <= DEADLINE_SMALL_JOB_PRICE
+      ? int(state, 0, DEADLINE_SMALL_SLACK_DAYS)
+      : Math.round(
+          (base * int(state, DEADLINE_SLACK_PERCENT_MIN, DEADLINE_SLACK_PERCENT_MAX)) / 100,
+        );
+  const standard = base + slack;
+  if (!job.express) return standard;
+  return Math.max(DEADLINE_DAYS_MIN, Math.round(standard * DEADLINE_EXPRESS_FACTOR));
 }
 
 /** What a worker of this rate is worth per minute, for the job card only [TUNE]. */
@@ -103,16 +145,24 @@ export function jobProgress(job: Job): number {
   return Math.min(1, Math.max(0, 1 - job.labourRemaining / job.labourValue));
 }
 
-/** What the workshop does to the minutes this job takes: the machine reductions of 8.6 multiplied
- *  together, and half again as long if it is being made by hand (CLAUDE.md 9.5). Below 1 is
- *  quicker. It is read every minute, so buying a machine speeds up work already on the books and
- *  losing one to the bailiff slows it down again. */
-export function jobSpeedFactor(state: GameState, job: Job): number {
-  const byHand = job.byHand ? BY_HAND_DURATION_FACTOR : 1;
+/** What the workshop does to the minutes work of this material takes: the machine reductions of
+ *  8.6 multiplied together, and half again as long if it is being made by hand (CLAUDE.md 9.5).
+ *  Below 1 is quicker. It is read every minute, so buying a machine speeds up work already on the
+ *  books and losing one to the bailiff slows it down again. */
+export function speedFactorFor(
+  state: GameState,
+  materialKind: MaterialKind,
+  byHand: boolean,
+): number {
+  const hand = byHand ? BY_HAND_DURATION_FACTOR : 1;
   // A better class of machine gets through the same work in fewer minutes, so its output factor
   // divides the time the labour reductions have already cut (CLAUDE.md T3 3.5).
-  const output = job.byHand ? 1 : machineOutputFactor(state, job.materialKind);
-  return (machineLabourFactor(state, job.materialKind) * byHand) / output;
+  const output = byHand ? 1 : machineOutputFactor(state, materialKind);
+  return (machineLabourFactor(state, materialKind) * hand) / output;
+}
+
+export function jobSpeedFactor(state: GameState, job: Job): number {
+  return speedFactorFor(state, job.materialKind, job.byHand);
 }
 
 /** Minutes this job still needs from a worker of the given rate (1 is the owner). */

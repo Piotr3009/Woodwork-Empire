@@ -147,8 +147,6 @@ export interface ProductTemplate {
   material: MaterialKind;
   designMinutes: number;
   calls: number;
-  deadlineMinDays: number;
-  deadlineMaxDays: number;
   needsMeasure: boolean;
   requiredEquipment: string[];
   allowedFinishes: Finish[];

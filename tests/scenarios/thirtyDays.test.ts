@@ -55,17 +55,22 @@ describe('30 days on Easy, working the board', () => {
     expect(state.finance.arrearsAmount).toBe(0);
   });
 
-  it('ends well above the reputation it started on', () => {
-    expect(state.reputation).toBeGreaterThan(10);
+  it('ends above the reputation it started on, but nothing like as far above', () => {
+    // Turn 6 works the deadline out from the work in the job, and a one man shop that takes the
+    // next job the day the last one goes out delivers some of them late. The month used to end
+    // above ten and ends at a third of that: REPORT-T6 section 5 says so rather than tuning the
+    // owner's own numbers away.
+    expect(state.reputation).toBeGreaterThan(0);
+    expect(state.reputation).toBeLessThan(10);
   });
 
-  it('took bookcases and TV units, and finished most of them', () => {
+  it('took bookcases and shelves, and finished most of them', () => {
     const done = state.jobs.filter((job) => job.stage === 'completed');
     expect(done.length).toBeGreaterThanOrEqual(3);
     const taken = new Set(state.jobs.map((job) => job.templateId));
     expect(taken.has('bookcase')).toBe(true);
-    // A TV unit needs a reputation of 5, so it can only come after the first jobs landed.
-    expect(taken.has('tvUnit')).toBe(true);
+    // A TV unit needs a reputation of 5, which the late deliveries keep him under all month.
+    expect(taken.has('tvUnit')).toBe(false);
     // Nothing dearer was touched: the script only takes what it is told to take.
     expect(taken.has('wardrobe')).toBe(false);
     expect(taken.has('oakDiningTable')).toBe(false);
