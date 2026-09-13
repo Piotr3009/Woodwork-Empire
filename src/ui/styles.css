@@ -939,21 +939,26 @@ input.num {
 }
 
 /* One day of the month in the books, which opens on its own ledger lines (CLAUDE.md T6 3.9). */
-.day-row > summary {
+.day-toggle {
   align-items: center;
-  border-bottom: 1px solid var(--border);
+  background: none;
+  border: 0;
+  color: inherit;
   cursor: pointer;
   display: flex;
+  flex: 1 1 auto;
+  font: inherit;
   gap: 10px;
   justify-content: space-between;
-  padding: 6px 0;
+  padding: 0;
+  text-align: left;
 }
 
-.day-row[open] > summary {
+.day-row.is-open .day-toggle {
   font-weight: 600;
 }
 
-.day-row > .row {
+.day-row.is-open > .row:not(.day-head) {
   padding-left: 18px;
 }
 

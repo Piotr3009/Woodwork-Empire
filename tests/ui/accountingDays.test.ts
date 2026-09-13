@@ -59,13 +59,29 @@ describe('the Days tab', () => {
     }
   });
 
-  it('opens each row on its own ledger lines', () => {
-    const page = parse(renderAccounting(state, '', 'days'));
+  it('opens a row on its own ledger lines, and only the rows the player opened', () => {
+    const shut = parse(renderAccounting(state, '', 'days', []));
+    const closed = shut.querySelector('.day-row[data-day="1"]');
+    expect(closed).not.toBeNull();
+    expect(closed?.innerHTML).not.toContain('Unit deposit');
+    expect(closed?.querySelectorAll('.row')).toHaveLength(1);
+    const page = parse(renderAccounting(state, '', 'days', [1]));
     const first = page.querySelector('.day-row[data-day="1"]');
-    expect(first).not.toBeNull();
+    // The head row plus one line per ledger entry of that day.
     const lines = Array.from(first?.querySelectorAll('.row') ?? []);
-    expect(lines.length).toBe(ledgerOfDay(state, 1).length);
+    expect(lines.length).toBe(ledgerOfDay(state, 1).length + 1);
     expect(first?.innerHTML).toContain('Unit deposit');
+    // Its neighbour stays shut.
+    expect(page.querySelector('.day-row[data-day="2"]')?.innerHTML).not.toContain('Living costs');
+  });
+
+  it('keeps a row open across a render, because a browser detail would not', () => {
+    // The modal body is written again every game minute (CLAUDE.md T3 3.4), so which rows are
+    // open is state and not markup.
+    const open = renderAccounting(state, '', 'days', [1]);
+    expect(open).toBe(renderAccounting(state, '', 'days', [1]));
+    expect(open).toContain('aria-expanded="true"');
+    expect(renderAccounting(state, '', 'days', [])).toContain('aria-expanded="false"');
   });
 
   it('offers the day its summary, and only for a day the state still carries', () => {
@@ -102,6 +118,8 @@ describe('a past day put back on the screen', () => {
     const state = currentState();
     const summary = state === null ? null : summaryOfDay(state, 1);
     expect(summary).not.toBeNull();
+    click('[data-do="toggleDay"][data-id="1"]');
+    expect(root().querySelector('.day-row[data-day="1"]')?.innerHTML).toContain('Unit deposit');
     click('[data-do="openDaySummary"][data-id="1"]');
     const modal = root().querySelector('[data-modal="daySummary"]');
     expect(modal).not.toBeNull();

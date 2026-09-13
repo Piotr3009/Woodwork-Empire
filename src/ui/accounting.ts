@@ -144,31 +144,36 @@ function ledgerRow(entry: LedgerEntry): string {
 
 /** The month a day at a time: in, out, and what the day came to, out of the ledger itself so the
  *  two can never disagree. Every row opens on its own lines, and on the evening's summary when
- *  the state still carries it (CLAUDE.md T6 3.9). */
-function daysTab(state: GameState, entries: LedgerEntry[]): string {
+ *  the state still carries it (CLAUDE.md T6 3.9).
+ *
+ *  Which rows are open is UI state and not a browser detail: the modal body is written again every
+ *  game minute, and a `details` element would snap shut under the player every time (T3 3.4). */
+function daysTab(state: GameState, entries: LedgerEntry[], open: number[]): string {
   const rows = daysOfMonth({ ...state, ledger: entries });
   if (rows.length === 0) return '<p class="empty">Nothing has moved this month yet.</p>';
   return rows
     .reverse()
     .map((row) => {
-      const lines = ledgerOfDay({ ...state, ledger: entries }, row.day)
-        .slice()
-        .reverse()
-        .map(ledgerRow)
-        .join('');
+      const isOpen = open.includes(row.day);
+      const lines = isOpen
+        ? ledgerOfDay({ ...state, ledger: entries }, row.day).slice().reverse().map(ledgerRow).join('')
+        : '';
       const summary =
         summaryOfDay(state, row.day) === null
           ? ''
           : button('openDaySummary', 'The day', `data-id="${row.day}"`);
       return (
-        `<details class="day-row" data-day="${row.day}">` +
-        `<summary><span class="row-main">Day ${row.day}</span>` +
+        `<div class="day-row${isOpen ? ' is-open' : ''}" data-day="${row.day}">` +
+        `<div class="row day-head"><button class="day-toggle" data-do="toggleDay" ` +
+        `data-id="${row.day}" aria-expanded="${isOpen ? 'true' : 'false'}">` +
+        `<span class="row-main">${isOpen ? '-' : '+'} Day ${row.day}</span>` +
         `<span class="row-figure good">${money(row.income)}</span>` +
         `<span class="row-figure bad">${money(-row.costs)}</span>` +
         `<span class="row-figure ${row.net < 0 ? 'bad' : 'good'}">${money(row.net)}</span>` +
-        `<span class="row-action">${summary}</span></summary>` +
+        '</button>' +
+        `<span class="row-action">${summary}</span></div>` +
         lines +
-        '</details>'
+        '</div>'
       );
     })
     .join('');
@@ -187,6 +192,7 @@ export function renderAccounting(
   state: GameState,
   arrearsTyped: string,
   tab: AccountingTab,
+  openDays: number[] = [],
 ): string {
   const due = nextDueDays(state);
   const arrears = arrearsBlock(state, arrearsTyped);
@@ -222,7 +228,7 @@ export function renderAccounting(
     '';
   const ledgerTab = `<h3>Ledger, last ${LEDGER_VISIBLE_ENTRIES}</h3>` + ledger;
   const body =
-    tab === 'days' ? daysTab(state, entries) : tab === 'ledger' ? ledgerTab : summaryTab;
+    tab === 'days' ? daysTab(state, entries, openDays) : tab === 'ledger' ? ledgerTab : summaryTab;
   return (
     `<p class="figures"><strong>${money(state.cash)}</strong> in the bank. ` +
     `Overdraft limit ${money(state.finance.overdraftLimit)}. ` +

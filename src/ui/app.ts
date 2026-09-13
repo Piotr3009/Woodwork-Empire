@@ -101,6 +101,8 @@ interface Ui {
   /** Which tab of the books is on top, and the past day whose summary is open over them
    *  (CLAUDE.md T6 3.9). */
   accountingTab: AccountingTab;
+  /** The days of the books the player has opened on their lines. */
+  openDays: number[];
   daySummary: number | null;
   /** A new tab is new content, not the same list a minute later: it starts at the top. */
   scrollModalTop: boolean;
@@ -161,6 +163,7 @@ function freshUi(): Ui {
     laptopTab: 'tasks',
     catalogueTab: CATALOGUE_FIRST_TAB,
     accountingTab: 'days',
+    openDays: [],
     daySummary: null,
     scrollModalTop: false,
     machine: null,
@@ -209,7 +212,7 @@ function modalBody(id: ModalId, current: GameState): string {
     case 'workPlan':
       return renderWorkPlan(current);
     case 'accounting':
-      return renderAccounting(current, ui.arrearsAmount, ui.accountingTab);
+      return renderAccounting(current, ui.arrearsAmount, ui.accountingTab, ui.openDays);
     case 'catalogue':
       return renderCatalogue(current, ui.filters.catalogue ?? '', ui.catalogueTab);
   }
@@ -814,6 +817,13 @@ function handleAction(element: DataElement, point: { x: number; y: number }): vo
       ui.accountingTab = accountingTabFrom(id);
       ui.scrollModalTop = true;
       break;
+    case 'toggleDay': {
+      const day = Number(id);
+      ui.openDays = ui.openDays.includes(day)
+        ? ui.openDays.filter((entry) => entry !== day)
+        : [...ui.openDays, day];
+      break;
+    }
     case 'openDaySummary':
       // The evening's own summary, put back in front of him from the books (CLAUDE.md T6 3.9).
       ui.daySummary = Number(id);
