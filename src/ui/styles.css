@@ -129,6 +129,10 @@
   fill: #2c2213;
 }
 
+.pin-board-face {
+  transition: fill 120ms ease;
+}
+
 .pin-board:hover .pin-board-face {
   fill: #d0a862;
 }
@@ -1229,6 +1233,9 @@ input.num {
   margin: 0;
   padding: 0;
   position: absolute;
+  /* The glow is the browser's and nothing else's: the game writes no hover state at all, so
+     there is nothing to blink with the clock (PIOTR, 13.09; CLAUDE.md T9 3.4). */
+  transition: background 120ms ease;
 }
 
 .office-region:hover,
@@ -1523,4 +1530,13 @@ input.num {
   position: fixed;
   right: 10px;
   z-index: 5;
+}
+
+/* The clock on the rear wall of the hall: the same amber seven segment digits the office has,
+   lettered into the wall plane beside the company name (PIOTR, 13.09; CLAUDE.md T9 3.5). */
+.hall-clock {
+  fill: #ffb02e;
+  font-family: 'DSEG7 Classic', 'Seven Segment', ui-monospace, 'Courier New', monospace;
+  font-weight: 700;
+  letter-spacing: 1px;
 }

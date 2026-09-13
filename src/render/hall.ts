@@ -59,6 +59,7 @@ import {
   pointInPolygon,
   tileToScreen,
 } from './iso';
+import { formatTime } from '../engine/clock';
 import {
   SPRITE_SCALE,
   contactShadow,
@@ -218,6 +219,13 @@ export const HALL_NAME_BOX = { x: 300, y: 130, width: 260, height: 70 };
  *  the dark sky over the building, which is REPORT-T5 open question 1, still unanswered. */
 export const HALL_NAME_WALL = { x: 9, z: 2 };
 
+/** How far the clock stands from the edge of the name's box, in metres along the wall [TUNE]. */
+const HALL_CLOCK_GAP = 0.8;
+
+/** How high the digits are lettered, in scene pixels [TUNE]: smaller than the name beside them,
+ *  because it is a clock and not the sign over the door. */
+export const HALL_CLOCK_SIZE = 12;
+
 /** The biggest and the smallest the name is ever lettered, in scene pixels. The floor is the
  *  repository's readable minimum (CLAUDE.md T2 3.11), so a long name shrinks to it and is cut
  *  short only below it [TUNE sizes]. */
@@ -234,6 +242,14 @@ const ROOM_LABEL_CLEARANCE = 0.1;
 /** How wide the name may be lettered, in scene pixels: the box of docs/art/SPRITES.md 9.5 is
  *  given at 2x and the scene is 1x. */
 export const HALL_NAME_WIDTH = HALL_NAME_BOX.width / SPRITE_SCALE;
+
+/** Where the clock is lettered on the rear wall: right of the name's box and 1.6 m up, which is
+ *  clear of everything standing in front of it (PIOTR, 13.09: "there is no clock in the hall";
+ *  CLAUDE.md T9 3.5). Taken off the name's own box, so the two cannot drift into each other. */
+export const HALL_CLOCK_WALL = {
+  x: HALL_NAME_WALL.x + HALL_NAME_WIDTH / TILE_RISE / 2 + HALL_CLOCK_GAP,
+  z: 1.6,
+};
 
 /** A box on a wall, in metres across the face and up it. The two the hall cares about are the
  *  door and the name over it, which must not touch (CLAUDE.md T6 3.2). */
@@ -985,6 +1001,17 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
         ),
       );
     }
+    // The clock the hall did not have, beside the name and in the office's own amber digits
+    // (PIOTR, 13.09; CLAUDE.md T9 3.5). Live text, so the minute is written into the text node
+    // that already holds it and the element itself is never made again (CLAUDE.md T9 3.8).
+    live.push(
+      paintedText(
+        tileToScreen(HALL_CLOCK_WALL.x, 0, HALL_CLOCK_WALL.z),
+        formatTime(state.clock.minute),
+        'painted-text hall-clock',
+        HALL_CLOCK_SIZE,
+      ),
+    );
   }
 
   live.push(drawables.map((drawable) => drawable.svg).join(''));
