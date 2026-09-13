@@ -1,5 +1,6 @@
-// What the hall does once the art side has delivered files. The manifest is faked here, because
-// public/sprites is empty tonight and no placeholder PNG is ever committed (CLAUDE.md T3 5.1).
+// What the hall does once the art side has delivered files. The manifest is faked here so the
+// test says what it means whatever is on disk: the real folder grows a batch at a time and no
+// placeholder PNG is ever committed (CLAUDE.md T3 5.1).
 
 import { describe, expect, it, vi } from 'vitest';
 

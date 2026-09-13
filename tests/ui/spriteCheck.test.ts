@@ -6,6 +6,7 @@ import { DELIVERY_VAN_SPRITE, EQUIPMENT_SPECS } from '../../src/engine/constants
 import { HALL_LAYERS } from '../../src/render/hall';
 import { OFFICE_LAYERS } from '../../src/render/office';
 import { standsInTheHall } from '../../src/engine/machines';
+import { spriteUrl } from '../../src/render/sprites';
 import { renderSpriteCheck, spriteTargets } from '../../src/ui/spriteCheck';
 
 function parse(html: string): HTMLElement {
@@ -98,12 +99,18 @@ describe('the sprite check page', () => {
     expect(saw?.textContent).toContain('file 160 by 136');
   });
 
-  it('says so plainly where there is no file yet', () => {
+  it('counts what has been delivered and says so plainly where there is not', () => {
     const page = parse(renderSpriteCheck());
+    const targets = spriteTargets();
+    const delivered = targets.filter(
+      (target) => spriteUrl(target.spriteKey, target.tier) !== null,
+    );
+    // Piotr delivered a batch with this brief, so the page is no longer all placeholders.
+    expect(delivered.length).toBeGreaterThan(0);
     expect(page.querySelectorAll('.sprite-grid .sprite-shot.is-missing')).toHaveLength(
-      spriteTargets().length,
+      targets.length - delivered.length,
     );
     expect(page.innerHTML).toContain('no file');
-    expect(page.innerHTML).toContain(`${spriteTargets().length} keys, 0 with a file`);
+    expect(page.innerHTML).toContain(`${targets.length} keys, ${delivered.length} with a file`);
   });
 });
