@@ -5,6 +5,9 @@ import { describe, expect, it } from 'vitest';
 import {
   HALL_CANVAS,
   HALL_LAYERS,
+  HALL_NAME_BOX,
+  canvasBoxInHall,
+  fitName,
   hallLayerBox,
   renderHall,
 } from '../../src/render/hall';
@@ -93,10 +96,12 @@ describe('the hall without the art', () => {
     const svg = hall(['hallBackground.png', 'hallOffice.png']);
     expect(svg).toContain('data-layer="hallOffice"');
     expect(svg).not.toContain('data-layer="hallCanteen"');
-    // The WC and the office are painted, so neither is boxed; the canteen still is.
-    expect(svg).not.toContain('>WC<');
-    expect(svg).not.toContain('>Office<');
-    expect(svg).toContain('>Canteen<');
+    // The WC and the office are painted, so their names are lettered on the face; the canteen is
+    // still a box, which carries its own name in the middle.
+    expect(svg).toContain('class="painted-text room-label" font-size="11">WC<');
+    expect(svg).toContain('class="painted-text room-label" font-size="11">Office<');
+    expect(svg).not.toContain('class="painted-text room-label" font-size="11">Canteen<');
+    expect(svg).toContain('class="iso-label">Canteen<');
   });
 });
 
@@ -111,5 +116,50 @@ describe('the rooms stay the way into the office', () => {
     // With the art there the hit area is the footprint itself, and nothing is drawn over the room.
     const painted = hall();
     expect(painted).toContain('fill="transparent" class="room-hit"');
+  });
+});
+
+describe('the text the game letters on the painting', () => {
+  it('puts the company name in the blank strip docs/art/SPRITES.md 9.5 leaves for it', () => {
+    // The contract gives the box in 2x canvas pixels: x 300 to 560, y 130 to 200.
+    expect(HALL_NAME_BOX).toEqual({ x: 300, y: 130, width: 260, height: 70 });
+    const inHall = canvasBoxInHall(HALL_NAME_BOX);
+    expect(inHall).toEqual({ x: -150, y: -79, width: 130, height: 35 });
+    const svg = hall();
+    const name = svg.match(/<text[^>]*class="painted-text hall-company"[^>]*>([^<]*)</);
+    expect(name?.[1]).toBe('Woodwork Empire');
+    // Centred in its box, so it cannot drift off the wall.
+    const x = svg.match(/<text x="(-?[\d.]+)"[^>]*class="painted-text hall-company"/)?.[1];
+    expect(Number(x)).toBe(inHall.x + inHall.width / 2);
+  });
+
+  it('shrinks a long name to the readable minimum before it cuts it', () => {
+    // The default fits whole, which is what open question 5 of REPORT-T4 was about.
+    expect(fitName('Woodwork Empire', 130)).toEqual({ text: 'Woodwork Empire', fontSize: 15 });
+    // A short one is lettered as large as the wall allows and no larger.
+    expect(fitName('WE', 130)).toEqual({ text: 'WE', fontSize: 18 });
+    // A name no lettering will hold is cut, and only then.
+    const long = fitName('The Joinery Company of Great Britain Limited', 130);
+    expect(long.fontSize).toBe(11);
+    expect(long.text.endsWith('...')).toBe(true);
+    expect(long.text.length).toBeLessThan('The Joinery Company of Great Britain Limited'.length);
+    expect(fitName('   ', 130).text).toBe('');
+  });
+
+  it('letters the name only once the wall is painted', () => {
+    expect(hall([])).not.toContain('hall-company');
+  });
+
+  it('letters each room on the face that looks into the hall', () => {
+    const svg = hall();
+    // The renderer rounds its coordinates to two places, as every other part of the scene does.
+    const round = (value: number): number => Math.round(value * 100) / 100;
+    for (const room of ROOM_LAYOUT) {
+      const at = tileToScreen(room.x + room.width / 2, room.y + room.depth, room.height / 2);
+      const wanted =
+        `<text x="${round(at.x)}" y="${round(at.y)}" text-anchor="middle" ` +
+        `class="painted-text room-label" font-size="11">${room.name}</text>`;
+      expect(svg, room.id).toContain(wanted);
+    }
   });
 });

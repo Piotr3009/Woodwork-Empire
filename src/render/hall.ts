@@ -45,6 +45,7 @@ import {
   depthKey,
   footprintPolygon,
   gridBounds,
+  tileToScreen,
 } from './iso';
 import {
   SPRITE_SCALE,
@@ -84,6 +85,20 @@ export function label(at: Point, text: string, extra = ''): string {
   return (
     `<text x="${round(at.x)}" y="${round(at.y)}" text-anchor="middle" class="iso-label"` +
     `${extra ? ` ${extra}` : ''}>${escapeText(text)}</text>`
+  );
+}
+
+/** Text the game letters over the painting: the room names and the company name. Its own class,
+ *  because the painting is not the flat grey the placeholder boxes are (docs/art/SPRITES.md 9.5). */
+export function paintedText(
+  at: Point,
+  text: string,
+  className: string,
+  fontSize: number,
+): string {
+  return (
+    `<text x="${round(at.x)}" y="${round(at.y)}" text-anchor="middle" ` +
+    `class="${className}" font-size="${round(fontSize)}">${escapeText(text)}</text>`
   );
 }
 
@@ -160,6 +175,54 @@ export const HALL_LAYERS: HallLayer[] = [
   { key: 'hallOffice', name: 'Office block', room: 'office' },
   { key: 'hallCanteen', name: 'Canteen block', room: 'canteen' },
 ];
+
+/** The box docs/art/SPRITES.md 9.5 leaves on the wall for the company name, given there in
+ *  canvas pixels at 2x: x 300 to 560, y 130 to 200. */
+export const HALL_NAME_BOX = { x: 300, y: 130, width: 260, height: 70 };
+
+/** The biggest and the smallest the name is ever lettered, in scene pixels. The floor is the
+ *  repository's readable minimum (CLAUDE.md T2 3.11), so a long name shrinks to it and is cut
+ *  short only below it [TUNE sizes]. */
+const NAME_SIZE_MAX = 18;
+const NAME_SIZE_MIN = 11;
+/** Rough width of a letter as a share of its size, for fitting a name to its box. */
+const LETTER_WIDTH = 0.55;
+
+/** Room names are small text on the face that looks into the hall (docs/art/SPRITES.md 9.5). */
+const ROOM_LABEL_SIZE = 11;
+
+/** A canvas rectangle, in the hall's own coordinates. The art is 2x and the scene is 1x, so the
+ *  box halves, and then it shifts by the same origin the layers are laid down on. */
+export function canvasBoxInHall(box: {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}): { x: number; y: number; width: number; height: number } {
+  return {
+    x: box.x / SPRITE_SCALE - HALL_CANVAS.originX,
+    y: box.y / SPRITE_SCALE - HALL_CANVAS.originY,
+    width: box.width / SPRITE_SCALE,
+    height: box.height / SPRITE_SCALE,
+  };
+}
+
+export interface FittedName {
+  text: string;
+  fontSize: number;
+}
+
+/** The company name lettered to fit the wall: it shrinks before it is cut, and it is only cut
+ *  when even the smallest readable lettering will not hold it. */
+export function fitName(name: string, boxWidth: number): FittedName {
+  const trimmed = name.trim();
+  if (trimmed === '') return { text: '', fontSize: NAME_SIZE_MAX };
+  const wanted = Math.floor(boxWidth / (LETTER_WIDTH * trimmed.length));
+  const fontSize = Math.min(NAME_SIZE_MAX, Math.max(NAME_SIZE_MIN, wanted));
+  const fits = Math.floor(boxWidth / (LETTER_WIDTH * fontSize));
+  if (trimmed.length <= fits) return { text: trimmed, fontSize };
+  return { text: `${trimmed.slice(0, Math.max(1, fits - 3))}...`, fontSize };
+}
 
 /** Where a layer goes in the hall's own coordinates: the canvas, shifted so its origin pixel
  *  lands on world (0, 0, 0). */
@@ -424,6 +487,26 @@ export function renderHall(state: GameState, options: HallOptions = {}): string 
     parts.push(lines.join(''));
   }
 
+  // The name on the wall. The art leaves the strip blank on purpose, so there is nowhere sensible
+  // to put it until the wall is painted (docs/art/SPRITES.md 9.5).
+  if (painted) {
+    const nameBox = canvasBoxInHall(HALL_NAME_BOX);
+    const fitted = fitName(state.companyName, nameBox.width);
+    if (fitted.text !== '') {
+      parts.push(
+        paintedText(
+          {
+            x: nameBox.x + nameBox.width / 2,
+            y: nameBox.y + nameBox.height / 2 + fitted.fontSize / 3,
+          },
+          fitted.text,
+          'painted-text hall-company',
+          fitted.fontSize,
+        ),
+      );
+    }
+  }
+
   const drawables: Drawable[] = [];
 
   // The three room blocks. Each is a layer of the painting, or a placeholder box while that layer
@@ -441,6 +524,14 @@ export function renderHall(state: GameState, options: HallOptions = {}): string 
               footprintPolygon(room.x, room.y, room.width, room.depth),
               'transparent',
               'class="room-hit"',
+            ) +
+            // The art leaves the face blank, so the game letters it (docs/art/SPRITES.md 9.5).
+            // A boxed room already carries its name in the middle: one name per room either way.
+            paintedText(
+              tileToScreen(room.x + room.width / 2, room.y + room.depth, room.height / 2),
+              room.name,
+              'painted-text room-label',
+              ROOM_LABEL_SIZE,
             )
           : objectArt({
               spriteKey: room.spriteKey,
