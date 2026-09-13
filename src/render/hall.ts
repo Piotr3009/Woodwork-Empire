@@ -539,6 +539,15 @@ function sawdust(state: GameState): Drawable[] {
   return drawables;
 }
 
+/** The cell in front of an object, along its own footprint: where a man stands to use it. */
+function frontOf(item: Equipment, along: number): { x: number; y: number } {
+  const stands = footprintIn(item);
+  return {
+    x: Math.floor(stands.x) + Math.min(along, Math.max(0, Math.ceil(stands.width) - 1)),
+    y: Math.floor(stands.y + stands.depth),
+  };
+}
+
 /** The cell a station puts a figure on. Anything the workshop has not bought falls back to the
  *  middle of the floor (CLAUDE.md T2 3.3). */
 export function stationCell(
@@ -547,16 +556,17 @@ export function stationCell(
   bench: { x: number; y: number },
 ): { x: number; y: number } {
   // A man waiting for a machine stands at it, which is what waiting at one looks like (T7 3.1).
-  const specId = stationMachine(station) ?? stationWaitingFor(station);
+  const waitingFor = stationWaitingFor(station);
+  const specId = stationMachine(station) ?? waitingFor;
   if (specId !== null) {
+    // At the front edge of the machine itself, not of the working zone around it, and one step
+    // along it when he is waiting for somebody else to finish with it (CLAUDE.md T7 3.1).
     const item = state.equipment.find((entry) => entry.specId === specId);
-    const spec = item ? findSpec(item.specId) : null;
-    if (item && spec) return { x: item.anchorX, y: item.anchorY + spec.depth };
+    if (item) return frontOf(item, waitingFor === null ? 0 : 1);
   }
   if (station === STATION_RACK) {
-    const rack = state.equipment.find((entry) => findSpec(entry.specId)?.sheetCapacity ?? 0);
-    const spec = rack ? findSpec(rack.specId) : null;
-    if (rack && spec) return { x: rack.anchorX, y: rack.anchorY + spec.depth };
+    const rack = state.equipment.find((entry) => sheetCapacityOf(entry) > 0);
+    if (rack) return frontOf(rack, 0);
   }
   if (station === STATION_GATE) {
     // At the back of the lorry, inside the shutter.
@@ -816,16 +826,8 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
   }
   if (ownerIsAvailable(state)) {
     const bench = state.equipment.find((item) => item.specId === 'workbench');
-    const benchSpec = bench ? findSpec(bench.specId) : null;
-    // At the middle of his bench's front edge, taken from the bench's own footprint: the offsets
-    // that used to be written in here were the 3 by 2 of the half metre tile.
-    const ownerBench =
-      bench && benchSpec
-        ? {
-            x: bench.anchorX + Math.floor(benchSpec.width / 2),
-            y: bench.anchorY + benchSpec.depth,
-          }
-        : { x: 2, y: 5 };
+    // At his bench's own front edge, taken from the class's footprint inside its working zone.
+    const ownerBench = bench ? frontOf(bench, 0) : { x: 2, y: 5 };
     drawables.push(
       figure(
         'owner',
