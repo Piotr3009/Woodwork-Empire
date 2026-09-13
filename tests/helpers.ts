@@ -336,6 +336,76 @@ export function withLicence(state: GameState): GameState {
   return softwareNow(buyNow(buyNow(state, 'desk'), 'laptop'), 'oneOff');
 }
 
+/** A crew of six poor joiners, each at his own bench and his own job of sheet work, behind the
+ *  number of saws the caller asks for. Piotr's claim of CLAUDE.md T7 3.1 in one hall: a machine
+ *  serves one man at a time, so six men behind one saw stand at it. The office is not in the way
+ *  here, because the queue at the saw is what the month is about: the jobs are drawn and ready
+ *  and the rack is full. */
+export function sixJoinersOnSheetWork(
+  options: { saws?: number; price?: number; sawVariant?: string } = {},
+): GameState {
+  const sawVariant = options.sawVariant ?? 'standard';
+  const state = fillRack(buyStartingKit(newGame({ difficulty: 'veryEasy' }), { sawVariant }), 400);
+  for (let bench = 1; bench < CREW; bench += 1) {
+    placeEquipment(state, 'workbench', { variantId: 'budget', x: 4 + bench * 2, y: 6 });
+  }
+  for (let extra = 1; extra < (options.saws ?? 2); extra += 1) {
+    placeEquipment(state, 'tableSaw', {
+      variantId: sawVariant,
+      x: 2 + extra * 4,
+      y: 1,
+      id: `kit-saw-${extra + 1}`,
+    });
+  }
+  state.enquiries = [];
+  let next = state;
+  // Six jobs of different sizes, because six of the same size started in the same minute would
+  // reach the saw in the same minute all month and the hall would be a lock step and not a
+  // workshop. A real book of work is never in step.
+  for (let man = 0; man < CREW; man += 1) {
+    const price = (options.price ?? 6000) + man * (options.price ?? 6000) * 0.2;
+    const enquiry = placeEnquiry(next, { price, deadlineDays: 40 });
+    next = act(next, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+  }
+  // Six jobs at six different points of their making, which is what a workshop with a book of
+  // work looks like on any given morning. Six jobs started in the same minute would reach the
+  // saw in the same minute all month, and the month would be about that and not about the saws.
+  next.jobs.forEach((job, index) => {
+    job.stage = 'ready';
+    job.labourRemaining = job.labourValue * (1 - index / CREW);
+  });
+  for (let man = 0; man < CREW; man += 1) {
+    next.workers.push({
+      id: `staff-${man + 1}`,
+      name: `Joiner ${man + 1}`,
+      role: 'joiner',
+      tier: 'poor',
+      rate: WORKER_RATES.poor,
+      weeklyWage: 480,
+      monthlyWage: 0,
+      startDay: 1,
+      jobId: null,
+      taskId: null,
+      minutesWorked: 0,
+      ordersToday: 0,
+      station: 'idle',
+      productionMinutes: 0,
+      absentDaysRemaining: 0,
+      anchorX: 4 + man * 2,
+      anchorY: 6,
+    });
+  }
+  for (let man = 0; man < CREW; man += 1) {
+    const job = next.jobs[man];
+    if (!job) throw new Error('a job each is wanted here');
+    next = act(next, { type: 'ASSIGN_JOB', jobId: job.id, workerId: `staff-${man + 1}` });
+  }
+  return next;
+}
+
+/** The crew Piotr's saw question is asked about (CLAUDE.md T7 3.1). */
+export const CREW = 6;
+
 /** Two men producing in the same minutes: the owner at one bench and a poor joiner at another,
  *  each on a job of sheet work. The one place a two man minute is set up, so the tests that ask
  *  what two men do to the books and to the machines both drive the same hall. */

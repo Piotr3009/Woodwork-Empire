@@ -6,11 +6,22 @@ import {
   CAREFUL,
   IDLE,
   type Policy,
+  DAY_ONE_KIT,
   SHORT_HANDED,
   playDay,
   playUntilDay,
 } from './autopilot';
-import { act, clearEvents, eventsOfKind, newGame, runToDay } from '../helpers';
+import {
+  CREW,
+  act,
+  clearEvents,
+  eventsOfKind,
+  newGame,
+  placeEnquiry,
+  runClock,
+  runToDay,
+  sixJoinersOnSheetWork,
+} from '../helpers';
 import {
   BREAK_MINUTES,
   BREAK_SKIP_FACTOR,
@@ -27,7 +38,11 @@ import {
   TOOL_CABINET,
   OVERTIME_END_MINUTE,
   POWER_BASE_DAILY,
+  CLIENT_MEETING_MINUTES,
+  MEETING_PRICE_THRESHOLD,
   RENT_PER_M2_MONTHLY,
+  SHOPPING_MINUTES,
+  SHOPPING_NEXT_MINUTES,
 } from '../../src/engine/constants';
 import {
   STATION_IDLE,
@@ -44,6 +59,7 @@ import {
   minutesRemainingFor,
   movingMachines,
   ownerMinutesToday,
+  startTaskCheck,
   tick,
 } from '../../src/engine/index';
 import { firstFreeCell, hallItems } from '../../src/engine/layout';
@@ -125,6 +141,35 @@ describe('30 days on Easy, working the board', () => {
     // And it wore its hours down as the month went on.
     expect(saw.hoursUsed).toBeGreaterThan(0);
     expect(saw.enduranceHours).toBe(750);
+  });
+
+  it('spent the morning of day 1 at the shops, and paid for none of it until it was over', () => {
+    // Nothing is bought in stopped time and nothing is bought on the spot: one trip, an hour for
+    // the first thing and a quarter of an hour for each of the other eleven (CLAUDE.md T7 3.10).
+    const trips = state.tasks.filter((task) => task.kind === 'shopping');
+    expect(trips).toHaveLength(1);
+    const wanted = SHOPPING_MINUTES + SHOPPING_NEXT_MINUTES * DAY_ONE_KIT.length;
+    expect(trips[0]?.minutesTotal).toBe(wanted);
+    expect(wanted).toBe(225);
+    expect(trips[0]?.done).toBe(true);
+    expect(trips[0]?.day).toBe(1);
+    // And what he went out for is standing in the hall, paid for.
+    expect(state.equipment.length).toBeGreaterThanOrEqual(DAY_ONE_KIT.length);
+  });
+
+  it('wrote down every stage of every job it finished, in the order of the whiteboard', () => {
+    // Production is stages now, each on its own machine, and each one writes down when it began
+    // and when it was over, which is what the Gantt draws (CLAUDE.md T7 3.1, 3.2).
+    const finished = state.jobs.filter((job) => job.stage === 'completed');
+    expect(finished.length).toBeGreaterThanOrEqual(3);
+    for (const job of finished) {
+      const stages = job.stageRuns.map((run) => run.stage);
+      // Sheet work with a laminate finish: four of the five, and delivery carries no labour.
+      expect(stages, job.name).toEqual(['cutting', 'machining', 'assembly', 'finishing']);
+      for (const run of job.stageRuns) {
+        expect(run.endDay, job.name).not.toBeNull();
+      }
+    }
   });
 
   it('sent one email per small job, not one per call', () => {
@@ -555,5 +600,119 @@ describe('a month on Easy that works through its dinner and stays late', () => {
     expect(month.clock.day).toBe(31);
     expect(month.owner.labourFactor).toBeGreaterThanOrEqual(LABOUR_FACTOR_FLOOR);
     expect(month.owner.labourFactor).toBeLessThanOrEqual(1);
+  });
+});
+
+
+describe('a month with a job worth twenty five thousand on the books', () => {
+  /** A board with one job on it, big enough that the client wants sitting down with first. */
+  function bigJobMonth(days: number): GameState {
+    const start = newGame({ seed: SEED, difficulty: 'veryEasy' });
+    start.enquiries = [];
+    placeEnquiry(start, { price: 25000, deadlineDays: 60 });
+    return playUntilDay(start, days, {
+      ...CAREFUL,
+      wanted: ['garageShelves'],
+      maxOpenJobs: 1,
+      hireJoiner: false,
+    });
+  }
+
+  it('sits the client down for four hours before anybody draws anything', () => {
+    // A job over 20,000 starts at the client's, and the drawing waits on it (CLAUDE.md T7 3.11).
+    const early = bigJobMonth(2);
+    const job = early.jobs[0];
+    expect(job?.price).toBeGreaterThan(MEETING_PRICE_THRESHOLD);
+    const meeting = early.tasks.find((task) => task.kind === 'clientMeeting');
+    expect(meeting?.minutesTotal).toBe(CLIENT_MEETING_MINUTES);
+    expect(CLIENT_MEETING_MINUTES).toBe(240);
+    const design = early.tasks.find((task) => task.kind === 'design');
+    // The drawing is on the desk and it cannot be started until the meeting has been held.
+    expect(design).toBeDefined();
+    expect(startTaskCheck(early, design?.id ?? '').ok).toBe(meeting?.done === true);
+  });
+
+  it('gets the job into production once the meeting is behind it', () => {
+    const month = bigJobMonth(12);
+    const meeting = month.tasks.find((task) => task.kind === 'clientMeeting');
+    expect(meeting?.done).toBe(true);
+    expect(meeting?.doneBy).toBe('owner');
+    expect(month.jobs[0]?.stage).not.toBe('accepted');
+  });
+});
+
+/** The longest anybody may stand at a taken machine in the two saw month (CLAUDE.md T7 3.1). */
+const CREW_MAX_GAP = 10;
+
+/** Sheets on the rack every morning of the crew month. The rack is never the thing that stops
+ *  them there: the month is about the queue at the saw and about nothing else. */
+const CREW_RACK = 400;
+
+interface CrewMonth {
+  /** Minutes of somebody's day spent standing at a machine that was taken. */
+  waiting: number;
+  /** The longest run of them one man had in a row. */
+  longest: number;
+  state: GameState;
+}
+
+/** A month of six joiners behind the saws the hall has, minute by minute. Piotr's claim in one
+ *  run: a machine serves one man at a time, so the crew behind one saw stands at it and the crew
+ *  behind two does not (CLAUDE.md T7 3.1). */
+function crewMonth(saws: number): CrewMonth {
+  let state = sixJoinersOnSheetWork({ saws });
+  let waiting = 0;
+  let longest = 0;
+  const standing = new Map<string, number>();
+  let guard = 0;
+  while (state.clock.day < 31 && state.gameOver === null && guard < 30000) {
+    guard += 1;
+    state.stock.sheets = CREW_RACK;
+    state = clearEvents(runClock(state, 1));
+    for (const worker of state.workers) {
+      if (!String(worker.station).startsWith('waiting')) {
+        standing.set(worker.id, 0);
+        continue;
+      }
+      waiting += 1;
+      const run = (standing.get(worker.id) ?? 0) + 1;
+      standing.set(worker.id, run);
+      if (run > longest) longest = run;
+    }
+  }
+  return { waiting, longest, state };
+}
+
+describe('a month of six joiners behind two saws', () => {
+  const two = crewMonth(2);
+  const one = crewMonth(1);
+
+  it('has six men at six benches, each on his own job of sheet work', () => {
+    expect(two.state.workers).toHaveLength(CREW);
+    expect(two.state.equipment.filter((item) => item.specId === 'workbench')).toHaveLength(CREW);
+    expect(two.state.equipment.filter((item) => item.specId === 'tableSaw')).toHaveLength(2);
+    expect(one.state.equipment.filter((item) => item.specId === 'tableSaw')).toHaveLength(1);
+  });
+
+  it('keeps the crew cutting, with no gap longer than ten minutes in the month', () => {
+    // Piotr: with six joiners you need two saws or they stand (CLAUDE.md T7 3.1). Nobody in this
+    // month stands at a taken saw for more than ten minutes together.
+    expect(two.longest).toBeLessThanOrEqual(CREW_MAX_GAP);
+    expect(two.waiting).toBeLessThan(one.waiting / 4);
+  });
+
+  it('gets more work out of the same six men, and ends the month with more money', () => {
+    const done = (month: CrewMonth): number =>
+      month.state.jobs.filter((job) => job.stage === 'completed').length;
+    expect(done(two)).toBeGreaterThan(done(one));
+    // The second saw is 1800 and it has paid for itself inside the month (CLAUDE.md T7 3.1).
+    expect(two.state.cash).toBeGreaterThan(one.state.cash);
+  });
+
+  it('stands the one saw crew at the saw for hours at a time, and says which machine', () => {
+    // The station carries the family, which is what the hall draws and the Gantt greys out
+    // (CLAUDE.md T7 3.1, 3.2).
+    expect(one.waiting).toBeGreaterThan(0);
+    expect(one.longest).toBeGreaterThan(CREW_MAX_GAP);
   });
 });

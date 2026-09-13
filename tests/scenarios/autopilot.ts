@@ -25,8 +25,13 @@ export function answer(state: GameState, policy?: Policy): string {
   return ids[0] ?? 'ok';
 }
 
-/** Job work first, then the material, then the hall. Emails and bookkeeping wait. */
+/** Job work first, then the material, then the hall. Emails and bookkeeping wait. The errands he
+ *  has already committed to come before any of it: a trip he walked away from at five o'clock is
+ *  the first thing he picks back up in the morning (CLAUDE.md T7 3.10). */
 const TASK_ORDER: TaskInstance['kind'][] = [
+  'shopping',
+  'hiring',
+  'booting',
   'unload',
   'bagChange',
   'repair',
@@ -35,6 +40,9 @@ const TASK_ORDER: TaskInstance['kind'][] = [
   'clientCall',
   'emails',
   'siteMeasure',
+  // The client will not have a drawing done until he has been sat down with, on a job of this
+  // size (CLAUDE.md T7 3.11).
+  'clientMeeting',
   'design',
   'materialOrder',
   'cleaning',
@@ -59,6 +67,11 @@ export interface Policy {
   wanted: string[];
   /** Take one poor joiner on, with the kit he needs, on day 1. */
   hireJoiner: boolean;
+  /** Take this many poor joiners on instead of one, each with his own kit (CLAUDE.md T7 3.1). */
+  joiners?: number;
+  /** Saws to stand in the hall beyond the one in the day 1 kit. A machine serves one man at a
+   *  time, so this is what says whether the crew cuts or queues (CLAUDE.md T7 3.1). */
+  extraSaws?: number;
   /** Sheets to buy in advance on day 1. Jobs then try to draw from the rack. */
   stockSheets: number;
   /** The class of table saw to buy on day 1. Undefined takes the cheapest, the used one. */
@@ -100,6 +113,25 @@ export const SHORT_HANDED: Policy = {
   wanted: ['bookcase', 'garageShelves'],
   hireJoiner: true,
   stockSheets: 8,
+};
+
+/** Six joiners and the saws to keep them cutting. One saw serves one man at a time, so the same
+ *  crew behind one saw stands at it (CLAUDE.md T7 3.1). Very easy, because six men and their kit
+ *  is a lot of money on day 1 and the month is about the queue, not the overdraft. */
+export const SIX_JOINERS_TWO_SAWS: Policy = {
+  maxOpenJobs: 6,
+  buyKit: true,
+  cleanAbove: 60,
+  wanted: ['bookcase', 'garageShelves', 'tvUnit'],
+  hireJoiner: true,
+  joiners: 6,
+  extraSaws: 1,
+  stockSheets: 40,
+};
+
+export const SIX_JOINERS_ONE_SAW: Policy = {
+  ...SIX_JOINERS_TWO_SAWS,
+  extraSaws: 0,
 };
 
 /** A month that spends the money on the best saw there is, to see what it buys (CLAUDE.md T3 4). */
@@ -150,13 +182,26 @@ function buyKit(state: GameState, policy: Policy): GameState {
 /** What a joiner has to have before he can start (CLAUDE.md 9.3). */
 export const JOINER_KIT = ['workbench', 'locker', 'canteenSeat', 'toolCabinet', 'handToolSet'];
 
-function takeOnJoiner(state: GameState): GameState {
-  if (state.workers.some((worker) => worker.role === 'joiner')) return state;
+function takeOnJoiner(state: GameState, policy: Policy): GameState {
+  const wanted = policy.joiners ?? 1;
+  if (state.workers.filter((worker) => worker.role === 'joiner').length >= wanted) return state;
   let next = state;
-  for (const specId of JOINER_KIT) {
-    next = applyAction(next, { type: 'BUY_EQUIPMENT', specId, variantId: DAY_ONE_CLASS[specId] });
+  // Extra saws first: a machine serves one man at a time, and a crew with one saw queues at it
+  // (CLAUDE.md T7 3.1).
+  for (let index = 0; index < (policy.extraSaws ?? 0); index += 1) {
+    next = applyAction(next, {
+      type: 'BUY_EQUIPMENT',
+      specId: 'tableSaw',
+      variantId: policy.sawVariant,
+    });
   }
-  return applyAction(next, { type: 'HIRE', role: 'joiner', tier: 'poor' });
+  for (let man = 0; man < wanted; man += 1) {
+    for (const specId of JOINER_KIT) {
+      next = applyAction(next, { type: 'BUY_EQUIPMENT', specId, variantId: DAY_ONE_CLASS[specId] });
+    }
+    next = applyAction(next, { type: 'HIRE', role: 'joiner', tier: 'poor' });
+  }
+  return next;
 }
 
 /** Works down the wanted list: the dearest template the workshop can make today. */
@@ -200,7 +245,7 @@ export function playDay(
   let next = state;
   const day = next.clock.day;
   if (policy.buyKit && day === 1) next = buyKit(next, policy);
-  if (policy.hireJoiner && day === 1) next = takeOnJoiner(next);
+  if (policy.hireJoiner && day === 1) next = takeOnJoiner(next, policy);
   if (policy.stockSheets > 0 && day === 1) {
     next = applyAction(next, { type: 'BUY_STOCK', sheets: policy.stockSheets });
   }
