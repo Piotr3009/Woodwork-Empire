@@ -313,23 +313,30 @@ hands; the game draws the sheet). No run.
   says which. The game mirrors `sw` for a missing `se` and `ne` for a missing `nw` (the light flips
   sides; at this size it is accepted).
 
-### 10.3 Manifest
+### 10.3 Manifest (the shape `src/render/characters.ts` reads; flat fields)
 
 ```
 {
+  "cellWidth": 112,
+  "cellHeight": 151,
+  "anchorX": 56,
+  "anchorY": 143,
+  "frames": 8,
+  "fps": 3.43,
+  "rows": { "sw": 0, "se": 1, "nw": 2, "ne": 3 },
   "spriteKey": "character.joiner",
   "animation": "walk",
-  "fps": 8,
   "loop": true,
-  "cell": { "width": 112, "height": 151 },
-  "anchor": { "x": 56, "y": 143 },
+  "directions": ["sw", "se", "nw", "ne"],
   "padding": 8,
   "metresPerCell": { "width": 1, "depth": 1, "height": 1.8 },
-  "directions": ["sw"],
-  "rows": { "sw": 0 },
-  "frames": 8
+  "scaleFromSource": 0.1957
 }
 ```
+
+The loader reads `cellWidth`, `cellHeight`, `anchorX`, `anchorY`, `frames`, `fps` and `rows`; the
+rest is on record for the art side. `npm run sprites:manifest` folds every `character.*.json` into
+`public/sprites/characters.json` keyed by file name without the extension.
 
 ### 10.4 What the game does with it (the loader contract for the code side)
 

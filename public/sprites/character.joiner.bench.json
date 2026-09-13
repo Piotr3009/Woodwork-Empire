@@ -1,36 +1,32 @@
 {
-  "spriteKey": "character.joiner",
-  "animation": "bench",
+  "cellWidth": 112,
+  "cellHeight": 151,
+  "anchorX": 56.0,
+  "anchorY": 143,
+  "frames": 8,
   "fps": 5,
-  "loop": true,
-  "cell": {
-    "width": 112,
-    "height": 151
-  },
-  "anchor": {
-    "x": 56.0,
-    "y": 143
-  },
-  "padding": 8,
-  "scaleFromSource": 0.1957,
-  "metresPerCell": {
-    "width": 1,
-    "depth": 1,
-    "height": 1.8
-  },
-  "directions": [
-    "sw",
-    "se",
-    "nw",
-    "ne"
-  ],
   "rows": {
     "sw": 0,
     "se": 1,
     "nw": 2,
     "ne": 3
   },
-  "frames": 8,
+  "spriteKey": "character.joiner",
+  "animation": "bench",
+  "loop": true,
+  "directions": [
+    "sw",
+    "se",
+    "nw",
+    "ne"
+  ],
+  "padding": 8,
+  "metresPerCell": {
+    "width": 1,
+    "depth": 1,
+    "height": 1.8
+  },
+  "scaleFromSource": 0.1957,
   "source": {
     "file": "Woodwork-Empire-joiner-animation-pack.zip",
     "canvas": {

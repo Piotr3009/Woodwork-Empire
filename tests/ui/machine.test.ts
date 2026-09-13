@@ -97,9 +97,10 @@ describe('the tiles inside a folder', () => {
     // Piotr delivered a picture per class of the saw, so the tile shows it rather than a box
     // (CLAUDE.md T3 3.6, T7 3.5).
     expect(slots.every((slot) => slot.querySelector('img') !== null)).toBe(true);
-    // And a family with no file at all still gets its box.
+    // And a family with no file at all still gets its box. The compressor has a picture since
+    // 13.09, so the family with none is the pelletiser's neighbour that has no art yet: the CNC.
     const boxes = Array.from(
-      parse(renderMachine(state, 'compressor')).querySelectorAll('.tile-picture'),
+      parse(renderMachine(state, 'cnc')).querySelectorAll('.tile-picture'),
     );
     expect(boxes.every((slot) => slot.querySelector('.tile-picture-box') !== null)).toBe(true);
   });

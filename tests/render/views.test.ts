@@ -77,7 +77,9 @@ describe('the hall on day 1', () => {
     const state = buyStartingKit(newGame());
     const extractor = state.equipment.find((item) => item.specId === 'extractor');
     if (extractor) extractor.broken = true;
-    const svg = renderHall(state);
+    // The red box is the placeholder's; with a sprite delivered the picture carries the state
+    // instead, so the test draws the hall as if no file had landed (art lands without code).
+    const svg = renderHall(state, { files: [] });
     expect(svg).toContain('var(--stopped)');
     expect(svg).toContain('the extractor is broken');
   });

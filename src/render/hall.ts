@@ -161,9 +161,12 @@ export function objectArt(art: {
   fill: string;
   shade: string;
   label: string;
+  /** What the art side has delivered; the manifest when not given, so a test can draw the hall
+   *  as if a file had not landed yet (the placeholders are for exactly that). */
+  files?: readonly string[];
 }): string {
   const shadow = contactShadow(art.x, art.y, art.width, art.depth);
-  const url = spriteUrl(art.spriteKey, art.tier);
+  const url = art.files === undefined ? spriteUrl(art.spriteKey, art.tier) : pickSprite(art.files, art.spriteKey, art.tier);
   if (url !== null) {
     const at = spriteBox(art.x, art.y, art.width, art.depth, art.height);
     return shadow + spriteImage(url, at);
@@ -887,6 +890,7 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
         `class="clickable${fx.className}">` +
         `<title>${escapeText(`${name}. ${spec.effect}`)}</title>` +
         objectArt({
+          files,
           spriteKey: item.spriteKey,
           tier: item.variantId,
           x: stands.x,
@@ -967,6 +971,7 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
         `<g data-van="${waiting.id}" data-sprite="${DELIVERY_VAN_SPRITE}" class="clickable">` +
         '<title>Click the van to decide who unloads it</title>' +
         objectArt({
+          files,
           spriteKey: DELIVERY_VAN_SPRITE,
           x: gateX,
           y: gate.y,
