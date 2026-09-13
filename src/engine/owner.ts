@@ -14,16 +14,16 @@ import {
   SICK_DAYS_MAX,
   SICK_DAYS_MIN,
 } from './constants';
-import { hourIndex, isWorkingDay, yearOfDay } from './clock';
+import { hourIndex, isOvertime, isWorkingDay, workedMinutesOfDay, yearOfDay } from './clock';
 import { queueEvent } from './events';
 import { int } from './rng';
 import type { GameState } from './types';
 
-/** Hours 1 to 8 are full, then 0.8, 0.6, 0.4, 0.4 (CLAUDE.md 7.2). */
+/** Hours 1 to 8 are full, then 0.8, 0.6, 0.4, 0.4 (CLAUDE.md 7.2). Hours of work, not hours on the
+ *  clock: the break buys him nothing and costs him nothing. */
 export function hourEfficiency(minute: number): number {
-  const hour = hourIndex(minute);
-  if (minute < MINUTES_PER_WORKING_DAY) return 1;
-  return OVERTIME_EFFICIENCY[hour - OWNER_NORMAL_HOURS] ?? 0.4;
+  if (!isOvertime(minute)) return 1;
+  return OVERTIME_EFFICIENCY[hourIndex(minute) - OWNER_NORMAL_HOURS] ?? 0.4;
 }
 
 /** Work done per clock minute the owner spends. Yesterday's overtime is subtracted. */
@@ -31,9 +31,10 @@ export function ownerEfficiency(state: GameState): number {
   return Math.max(MIN_OWNER_EFFICIENCY, hourEfficiency(state.clock.minute) - state.owner.fatigue);
 }
 
-/** Minutes of the normal working day still ahead. Overtime is not in the pool. */
+/** Minutes of the normal working day still ahead. Overtime is not in the pool, and neither is the
+ *  break: it takes nothing off him. */
 export function ownerMinutesLeft(state: GameState): number {
-  return Math.max(0, MINUTES_PER_WORKING_DAY - state.clock.minute);
+  return Math.max(0, MINUTES_PER_WORKING_DAY - workedMinutesOfDay(state.clock.minute));
 }
 
 /** True while the owner can pick up work. */
@@ -60,7 +61,7 @@ export function spendOwnerMinute(state: GameState, category: 'admin' | 'design' 
   const owner = state.owner;
   owner.minutesWorked += 1;
   owner.minutesByCategory[category] += 1;
-  if (state.clock.minute >= MINUTES_PER_WORKING_DAY) owner.overtimeMinutes += 1;
+  if (isOvertime(state.clock.minute)) owner.overtimeMinutes += 1;
 }
 
 /** Called when the day closes: every overtime minute worked today costs efficiency tomorrow, pro

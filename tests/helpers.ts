@@ -1,6 +1,13 @@
 // Shared test driver. One place clicks events away, so no test file grows its own copy.
 
-import { applyAction, createGame, enduranceHoursFor, findSpec, tick } from '../src/engine/index';
+import {
+  applyAction,
+  createGame,
+  enduranceHoursFor,
+  findSpec,
+  isOvertime,
+  tick,
+} from '../src/engine/index';
 import type {
   Enquiry,
   Equipment,
@@ -51,10 +58,12 @@ export function act(state: GameState, action: GameAction): GameState {
   return applyAction(state, action);
 }
 
-/** One step of a driven day: run the clock, and at 16:00 do what a player does and go home. */
+/** One step of a driven day: run the clock, and once the owner has his day in, do what a player
+ *  does and go home. The clock reads past 16:00 by the length of the break, so the test driver
+ *  asks the engine whether the work is done rather than reading the hands. */
 function step(state: GameState, events: GameEvent[]): GameState {
   const next = clearEvents(tick(state, 60), events);
-  if (next.clock.minute >= 480 && next.activeEvent === null && !next.owner.wentHome) {
+  if (isOvertime(next.clock.minute) && next.activeEvent === null && !next.owner.wentHome) {
     return clearEvents(applyAction(next, { type: 'END_DAY' }), events);
   }
   return next;

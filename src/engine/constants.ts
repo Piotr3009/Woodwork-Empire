@@ -24,10 +24,17 @@ export const STATE_VERSION = 3;
 // 6. Time
 // ---------------------------------------------------------------------------
 
-/** 08:00 to 16:00 (PIOTR). */
+/** 480 minutes of work in a day (PIOTR). The clock used to run them back to back, 08:00 to 16:00;
+ *  a real workshop stops for dinner, so the work is unchanged and the day runs on by the length of
+ *  the break, which puts the end of it at 16:30. */
 export const MINUTES_PER_WORKING_DAY = 480;
 /** Clock starts at 08:00 (PIOTR). */
 export const DAY_START_HOUR = 8;
+/** The break. Nobody works through it: no task, no production, and the clock does not count it
+ *  against anybody's day. Start and length are [TUNE]: noon for half an hour is what a joinery
+ *  does, and Piotr has not set either. */
+export const BREAK_START_MINUTE = 240;
+export const BREAK_MINUTES = 30;
 /** One game day at 1x speed, in real seconds (PIOTR, Turn 2: one game minute per real second).
  *  8 real minutes at 1x, 4 at 2x, 2 at 4x. */
 export const REAL_SECONDS_PER_DAY_AT_1X = 480;
@@ -52,6 +59,9 @@ export const OVERTIME_EFFICIENCY = [0.8, 0.6, 0.4, 0.4] as const;
 /** After 12 hours the owner goes home, no way to force more (PIOTR). */
 export const MAX_HOURS_PER_DAY = 12;
 export const MAX_MINUTES_PER_DAY = MAX_HOURS_PER_DAY * 60;
+/** The longest the clock itself can read in a day: the twelve hours of work plus the break he did
+ *  not work through. Only for putting two moments of the game in order. */
+export const MAX_CLOCK_MINUTES_PER_DAY = MAX_MINUTES_PER_DAY + BREAK_MINUTES;
 /** An overtime hour costs 0.05 of tomorrow's efficiency, pro rata for a part hour, recovered
  *  after one normal day ([TUNE] rate, PIOTR that it is pro rata: 30 minutes cost 0.025). */
 export const FATIGUE_PER_OVERTIME_HOUR = 0.05;

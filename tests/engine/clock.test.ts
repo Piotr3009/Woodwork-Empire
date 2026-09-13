@@ -7,6 +7,7 @@ import {
   formatTime,
   gameMinutesPerRealSecond,
   hourIndex,
+  isBreak,
   isDayExhausted,
   isFirstOfMonth,
   isFriday,
@@ -17,9 +18,12 @@ import {
   nextWorkingDay,
   weekday,
   weekdayName,
+  workedMinutesOfDay,
   yearOfDay,
 } from '../../src/engine/clock';
 import {
+  BREAK_MINUTES,
+  BREAK_START_MINUTE,
   DAYS_PER_MONTH,
   MINUTES_PER_WORKING_DAY,
   REAL_SECONDS_PER_DAY_AT_1X,
@@ -91,19 +95,40 @@ describe('clock time of day', () => {
     expect(formatDate({ day: 6, minute: 162 })).toBe('Sat, day 6 · 10:42');
   });
 
-  it('counts hours of the day', () => {
+  it('counts hours of work done, and the break is not work', () => {
     expect(hourIndex(0)).toBe(0);
     expect(hourIndex(59)).toBe(0);
     expect(hourIndex(60)).toBe(1);
-    expect(hourIndex(479)).toBe(7);
-    expect(hourIndex(480)).toBe(8);
+    // The break runs from 240 to 270, so the clock is half an hour ahead of the work from there.
+    expect(hourIndex(BREAK_START_MINUTE - 1)).toBe(3);
+    expect(hourIndex(BREAK_START_MINUTE + BREAK_MINUTES)).toBe(4);
+    expect(hourIndex(479 + BREAK_MINUTES)).toBe(7);
+    expect(hourIndex(480 + BREAK_MINUTES)).toBe(8);
   });
 
-  it('marks overtime and the hard stop', () => {
+  it('stops the workshop for the break, and counts it against nobody', () => {
+    expect(isBreak(BREAK_START_MINUTE - 1)).toBe(false);
+    expect(isBreak(BREAK_START_MINUTE)).toBe(true);
+    expect(isBreak(BREAK_START_MINUTE + BREAK_MINUTES - 1)).toBe(true);
+    expect(isBreak(BREAK_START_MINUTE + BREAK_MINUTES)).toBe(false);
+    // Work done, minute by minute: it stands still through the break and picks up after it.
+    expect(workedMinutesOfDay(BREAK_START_MINUTE)).toBe(BREAK_START_MINUTE);
+    expect(workedMinutesOfDay(BREAK_START_MINUTE + 10)).toBe(BREAK_START_MINUTE);
+    expect(workedMinutesOfDay(BREAK_START_MINUTE + BREAK_MINUTES)).toBe(BREAK_START_MINUTE);
+    expect(workedMinutesOfDay(BREAK_START_MINUTE + BREAK_MINUTES + 1)).toBe(
+      BREAK_START_MINUTE + 1,
+    );
+  });
+
+  it('marks overtime and the hard stop by the work, so the day ends at 16:30', () => {
     expect(isOvertime(479)).toBe(false);
-    expect(isOvertime(480)).toBe(true);
-    expect(isDayExhausted(719)).toBe(false);
-    expect(isDayExhausted(720)).toBe(true);
+    // 16:00 on the clock is no longer the end of the 480: the break is in the way.
+    expect(isOvertime(480)).toBe(false);
+    expect(isOvertime(479 + BREAK_MINUTES)).toBe(false);
+    expect(isOvertime(480 + BREAK_MINUTES)).toBe(true);
+    expect(formatTime(480 + BREAK_MINUTES)).toBe('16:30');
+    expect(isDayExhausted(719 + BREAK_MINUTES)).toBe(false);
+    expect(isDayExhausted(720 + BREAK_MINUTES)).toBe(true);
   });
 
   it('runs one game minute per real second at 1x, so a day is 8 real minutes', () => {

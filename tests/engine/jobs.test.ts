@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  BREAK_MINUTES,
   BY_HAND_DURATION_FACTOR,
   COURIER_COST,
   DEPOSIT_FRACTION,
@@ -36,6 +37,7 @@ import {
   act,
   buyStartingKit,
   placeEquipment,
+  choose,
   clearEvents,
   doAllEmails,
   doTask,
@@ -260,14 +262,24 @@ describe('production', () => {
     const afterEmails = state.cash;
     expect(afterEmails).toBe(afterDeposit);
     state = act(state, { type: 'WORK_HERE', jobId: null });
-    state = tick(state, 240);
+    // 240 minutes of work, and the break does not count towards them.
+    state = tick(state, 240 + BREAK_MINUTES);
+    // A client rang as the workshop came back from dinner, which is where a call drawn inside the
+    // break lands. It is answered, it costs him his quarter of an hour, and the work goes on.
+    expect(state.activeEvent?.kind).toBe('clientCall');
+    state = choose(state, 'answer');
+    state = tick(state, 60);
     expect(firstJob(state).stage).toBe('awaitingTransport');
-    expect(state.cash).toBeCloseTo(afterDeposit, 6);
+    // Making it brought nothing in: the balance waits for the client to have the piece. The cash
+    // itself moves on either side of this, because the hall costs money every day it stands there.
+    expect(firstJob(state).balancePaid).toBe(0);
+    expect(state.ledger.filter((entry) => entry.category === 'jobBalance')).toHaveLength(0);
     expect(state.activeEvent?.kind).toBe('jobAtGate');
     expect(ownerJob(state)).toBeNull();
     // No van, so the courier takes it and the client has it the next working day.
+    const beforeCourier = state.cash;
     state = act(clearEvents(state), { type: 'ORDER_TRANSPORT', jobId: firstJob(state).id });
-    expect(state.cash).toBeCloseTo(afterDeposit - COURIER_COST, 6);
+    expect(state.cash).toBeCloseTo(beforeCourier - COURIER_COST, 6);
     const run = runToDay(clearEvents(state), 2);
     const job = run.state.jobs[0];
     expect(job?.stage).toBe('completed');

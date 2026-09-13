@@ -136,7 +136,10 @@ describe('30 days on Easy, working the board', () => {
   it('kept a bench under the owner all month', () => {
     expect(state.equipment.filter((item) => item.specId === 'workbench').length)
       .toBeGreaterThanOrEqual(1);
-    expect(hasBenchFor(state, null)).toBe(true);
+    // Whatever he is standing at on the last day has a bench under it. Asking for a spare bench
+    // instead would only say whether the month happened to stop between two jobs.
+    const onTheBench = state.jobs.find((job) => job.stage === 'inProduction') ?? null;
+    expect(hasBenchFor(state, onTheBench === null ? null : onTheBench.id)).toBe(true);
   });
 });
 

@@ -11,7 +11,6 @@ import {
   HELPER_CLEAN_WEEKDAY,
   LOCKER_SLOT_LAYOUT,
   DUCTING_RECONNECT_COST,
-  MINUTES_PER_WORKING_DAY,
   MOVE_MINUTES_PER_ITEM,
   MOVING_SPEED,
   OWNER_LABOUR_PER_MINUTE,
@@ -32,6 +31,7 @@ import {
   isDayExhausted,
   isFriday,
   isLastWorkingDayOfMonth,
+  isBreak,
   isOvertime,
   isWorkingDay,
   monthOfDay,
@@ -749,6 +749,12 @@ function delegateTasks(state: GameState): void {
 /** Where everybody is standing, worked out from what they are doing (CLAUDE.md T2 3.3). */
 function updateStations(state: GameState): void {
   const owner = state.owner;
+  // At dinner the whole workshop is in the canteen, the owner with them.
+  if (isBreak(state.clock.minute)) {
+    owner.station = STATION_IDLE;
+    for (const worker of state.workers) worker.station = STATION_IDLE;
+    return;
+  }
   if (!ownerIsAvailable(state)) {
     owner.station = STATION_IDLE;
   } else if (owner.currentTaskId !== null) {
@@ -1045,6 +1051,13 @@ function ringDueCalls(state: GameState): void {
 }
 
 function advanceMinute(state: GameState): void {
+  // The workshop is at dinner: the clock runs, nothing else does, and the day will end half an
+  // hour later for it (T5, the day with a break).
+  if (isBreak(state.clock.minute)) {
+    state.clock.minute += 1;
+    settle(state);
+    return;
+  }
   ringDueCalls(state);
   // He cannot be on the laptop and at the bench in the same minute, so a task that finishes this
   // minute keeps him off production until the next one.
@@ -1151,7 +1164,7 @@ export function applyAction(state: GameState, action: GameAction): GameState {
       next.summaryCadence = action.cadence;
       break;
     case 'END_DAY':
-      if (next.clock.minute >= MINUTES_PER_WORKING_DAY) {
+      if (isOvertime(next.clock.minute)) {
         finishDay(next);
       } else {
         // Going home early counts as absence for the rest of the day (CLAUDE.md 7.2).

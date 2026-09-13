@@ -3,6 +3,8 @@ import {
   ABSENCE_OUTPUT_FACTOR,
   ABSENCE_OUTPUT_FACTOR_EXCEPTIONAL_CEO,
   ABSENCE_OUTPUT_FACTOR_WITH_CEO,
+  BREAK_MINUTES,
+  BREAK_START_MINUTE,
   FATIGUE_PER_OVERTIME_HOUR,
   MINUTES_PER_WORKING_DAY,
 } from '../../src/engine/constants';
@@ -36,19 +38,23 @@ describe('owner efficiency', () => {
   });
 
   it('drops through the overtime hours 0.8, 0.6, 0.4, 0.4', () => {
-    expect(hourEfficiency(480)).toBe(0.8);
-    expect(hourEfficiency(539)).toBe(0.8);
-    expect(hourEfficiency(540)).toBe(0.6);
-    expect(hourEfficiency(600)).toBe(0.4);
-    expect(hourEfficiency(660)).toBe(0.4);
-    expect(hourEfficiency(719)).toBe(0.4);
+    // Clock readings, which are half an hour past the work done once the break has been taken.
+    const clock = (worked: number): number => worked + BREAK_MINUTES;
+    expect(hourEfficiency(clock(479))).toBe(1);
+    expect(hourEfficiency(clock(480))).toBe(0.8);
+    expect(hourEfficiency(clock(539))).toBe(0.8);
+    expect(hourEfficiency(clock(540))).toBe(0.6);
+    expect(hourEfficiency(clock(600))).toBe(0.4);
+    expect(hourEfficiency(clock(660))).toBe(0.4);
+    expect(hourEfficiency(clock(719))).toBe(0.4);
   });
 
   it('subtracts the fatigue carried from yesterday', () => {
     const state = newGame();
     state.owner.fatigue = 0.1;
     expect(ownerEfficiency(state)).toBeCloseTo(0.9, 10);
-    state.clock.minute = 480;
+    // His 480 are in once the clock reads 16:30, the break being half an hour of it.
+    state.clock.minute = 480 + BREAK_MINUTES;
     expect(ownerEfficiency(state)).toBeCloseTo(0.7, 10);
   });
 
@@ -61,8 +67,13 @@ describe('owner efficiency', () => {
   it('counts the minutes left in the pool', () => {
     const state = newGame();
     expect(ownerMinutesLeft(state)).toBe(MINUTES_PER_WORKING_DAY);
-    state.clock.minute = 318;
+    state.clock.minute = 318 + BREAK_MINUTES;
     expect(ownerMinutesLeft(state)).toBe(162);
+    // The break itself takes nothing off the pool: it stands still while he eats.
+    state.clock.minute = BREAK_START_MINUTE;
+    const atDinner = ownerMinutesLeft(state);
+    state.clock.minute = BREAK_START_MINUTE + BREAK_MINUTES;
+    expect(ownerMinutesLeft(state)).toBe(atDinner);
     state.clock.minute = 600;
     expect(ownerMinutesLeft(state)).toBe(0);
   });
@@ -89,7 +100,8 @@ describe('fatigue', () => {
     let state = withLicence(newGame());
     const task = createTask(state, { kind: 'design', label: 'Long drawing', minutes: 900 });
     state = act(state, { type: 'START_TASK', taskId: task.id });
-    state = tick(state, 510);
+    // 510 minutes of work, plus the half hour he spent at dinner on the way.
+    state = tick(state, 510 + BREAK_MINUTES);
     expect(state.owner.overtimeMinutes).toBe(30);
     const day2 = clearEvents(act(state, { type: 'END_DAY' }));
     expect(day2.owner.fatigue).toBeCloseTo(FATIGUE_PER_OVERTIME_HOUR / 2, 10);

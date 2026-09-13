@@ -1,7 +1,7 @@
 // A scripted player, so a whole month can be played the same way twice. It makes the decisions a
 // careful owner would make: advance the jobs, get the material in, then stand at the bench.
 
-import { applyAction, tick } from '../../src/engine/index';
+import { applyAction, isOvertime, tick } from '../../src/engine/index';
 import type { GameEvent, GameState, TaskInstance } from '../../src/engine/index';
 
 /** What the script answers when the clock stops for a decision. */
@@ -74,16 +74,17 @@ export const IDLE: Policy = {
   stockSheets: 0,
 };
 
-/** One joiner on the books and two jobs on the go: the crew runs the rack dry (CLAUDE.md T2 4). */
+/** One joiner on the books and more work on the books than he can be fed: the crew runs the rack
+ *  dry (CLAUDE.md T2 4). Four jobs, not the two of Turns 2 to 4: a scripted owner who does the
+ *  material order the moment it appears keeps two jobs supplied without trying, so two stopped
+ *  proving anything. Taking on more than the rack can carry is what a short handed workshop
+ *  actually does, and it is the rule that is turned here, not the size of the pallet. */
 export const SHORT_HANDED: Policy = {
-  maxOpenJobs: 2,
+  maxOpenJobs: 4,
   buyKit: true,
   cleanAbove: 60,
   wanted: ['bookcase', 'garageShelves'],
   hireJoiner: true,
-  // Two jobs drawing off one small rack is how a workshop runs itself dry. Eight sheets, not the
-  // ten of Turn 3: the calls no longer hold the material order up, so every job reaches the rack
-  // sooner and ten sheets lasted it out (CLAUDE.md T4 3.3).
   stockSheets: 8,
 };
 
@@ -191,8 +192,9 @@ export function playDay(state: GameState, policy: Policy, seen: GameEvent[] = []
       }
     }
     next = tick(next, 30);
-    if (next.clock.day === day && next.clock.minute >= 480 && next.activeEvent === null) {
-      // Nothing left worth the overtime: go home.
+    // Nothing left worth the overtime: go home once the 480 minutes of work are in. The clock
+    // reads past 16:00 by the length of the break, so this asks the engine and not the hands.
+    if (next.clock.day === day && isOvertime(next.clock.minute) && next.activeEvent === null) {
       next = applyAction(next, { type: 'END_DAY' });
       next = tick(next, 30);
     }

@@ -3,6 +3,7 @@
 
 import { describe, expect, it } from 'vitest';
 import {
+  BREAK_MINUTES,
   DUCTING_RECONNECT_COST,
   MOVE_MINUTES_PER_ITEM,
   MOVING_SPEED,
@@ -128,8 +129,9 @@ describe('a move the day ended in the middle of', () => {
     state = act(state, { type: 'END_SETUP', speed: 1 });
     const move = movePending(state);
     expect(move).not.toBeNull();
-    // Near the twelve hour wall, so the day ends with the kit still up in the air.
-    state.clock.minute = 700;
+    // Near the twelve hour wall, which the clock reads half an hour past for the break, so the day
+    // ends with the kit still up in the air.
+    state.clock.minute = 700 + BREAK_MINUTES;
     state = clearEvents(tick(state, 30));
     expect(state.clock.day).toBe(2);
     expect(movePending(state)?.id).toBe(move?.id);

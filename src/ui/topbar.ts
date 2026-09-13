@@ -1,17 +1,13 @@
 // The one slim top bar every view shares (CLAUDE.md 10.1). Nothing else lives here.
 
 import { MINUTES_PER_WORKING_DAY, SPEEDS } from '../engine/constants';
-import { booksBehind, formatDate, movingMachines, netOf } from '../engine/index';
+import { booksBehind, formatDate, isBreak, movingMachines, netOf } from '../engine/index';
 import type { GameState, Speed } from '../engine/index';
 import { cadenceControl } from './dayEnd';
 import { escapeHtml, money } from './modal';
 
-function speedButtons(state: GameState): string {
-  // The hall is being shifted about: the clock runs itself and the player cannot touch it
-  // until it is done (CLAUDE.md T4 3.5).
-  if (movingMachines(state) !== null) {
-    return '<span class="reason">Moving machines</span>';
-  }
+/** The four speed chips. One place builds them, whatever else the top bar has to say. */
+function speedChips(state: GameState): string {
   return SPEEDS.map((speed) => {
     const label = speed === 0 ? 'Pause' : `${speed}x`;
     const active = state.speed === speed ? ' is-on' : '';
@@ -20,6 +16,17 @@ function speedButtons(state: GameState): string {
       `${escapeHtml(label)}</button>`
     );
   }).join('');
+}
+
+function speedButtons(state: GameState): string {
+  // The hall is being shifted about: the clock runs itself and the player cannot touch it
+  // until it is done (CLAUDE.md T4 3.5).
+  if (movingMachines(state) !== null) {
+    return '<span class="reason">Moving machines</span>';
+  }
+  // At dinner. The speeds stay as they are, so the player can run the clock through it.
+  const dinner = isBreak(state.clock.minute) ? '<span class="reason">Break</span>' : '';
+  return dinner + speedChips(state);
 }
 
 /** Admin grey, design purple, workshop green, the rest free (CLAUDE.md 7.1). */
