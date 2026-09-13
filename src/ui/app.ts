@@ -157,6 +157,20 @@ const MODAL_TITLES: Record<ModalId, string> = {
   shopping: 'On order',
 };
 
+/** How much of the page each modal takes. Anything that is a list or a board fills it; a small
+ *  modal is for an event with a decision in it, and nothing else (CLAUDE.md T9 1, 3.12). The one
+ *  table the modal layer reads, so a modal cannot be one size in one place and another in
+ *  another. */
+export const MODAL_IS_FULL: Record<ModalId, boolean> = {
+  board: true,
+  // 3.12 names six modals and the laptop is not one of them, so it keeps the size it had.
+  laptop: false,
+  workPlan: true,
+  accounting: true,
+  catalogue: true,
+  shopping: true,
+};
+
 let ui: Ui = freshUi();
 let state: GameState | null = null;
 let root: HTMLElement | null = null;
@@ -406,8 +420,7 @@ function modalSpecs(): ModalSpec[] {
       id: ui.modal,
       title: MODAL_TITLES[ui.modal],
       body: modalBody(ui.modal, current),
-      wide: ui.modal === 'accounting' || ui.modal === 'workPlan' || ui.modal === 'shopping',
-      full: ui.modal === 'board' || ui.modal === 'catalogue',
+      full: MODAL_IS_FULL[ui.modal],
       position: ui.modalPosition,
     });
   }
