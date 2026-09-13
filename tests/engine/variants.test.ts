@@ -16,8 +16,8 @@ import {
   dailyPower,
   enduranceHoursFor,
   findSpec,
-  machineOutputFactor,
   minutesRemainingFor,
+  stageSpeed,
   overdueBreakdownChance,
   pastEndurance,
   tick,
@@ -123,27 +123,39 @@ describe('buying a class of machine', () => {
 });
 
 describe('what a class of saw does to the work', () => {
-  it('takes 5% longer on a used one and 30% less on an industrial one', () => {
+  /** The cutting quarter of a 400 job, at this class of saw, and the three quarters after it. */
+  function minutesWithSaw(factor: number): number {
+    return 240 * (0.25 / factor + 0.75);
+  }
+
+  it('moves the cutting quarter and leaves the other three alone', () => {
     const budget = withSaw('budget');
-    const plain = minutesRemainingFor(budget, firstJob(budget), 1);
-    expect(plain).toBeCloseTo(240, 6);
+    expect(minutesRemainingFor(budget, firstJob(budget), 1)).toBeCloseTo(240, 6);
     const used = withSaw('used');
-    expect(minutesRemainingFor(used, firstJob(used), 1)).toBeCloseTo(240 / 0.95, 6);
-    expect(machineOutputFactor(used, 'sheet')).toBeCloseTo(0.95, 10);
+    expect(stageSpeed(used, firstJob(used), 'cutting').speed).toBeCloseTo(0.95, 10);
+    expect(minutesRemainingFor(used, firstJob(used), 1)).toBeCloseTo(minutesWithSaw(0.95), 6);
     const industrial = withSaw('industrial');
-    expect(minutesRemainingFor(industrial, firstJob(industrial), 1)).toBeCloseTo(240 / 1.3, 6);
-    expect(machineOutputFactor(industrial, 'sheet')).toBeCloseTo(1.3, 10);
+    expect(stageSpeed(industrial, firstJob(industrial), 'cutting').speed).toBeCloseTo(1.3, 10);
+    expect(minutesRemainingFor(industrial, firstJob(industrial), 1)).toBeCloseTo(
+      minutesWithSaw(1.3),
+      6,
+    );
+    // The assembly of the same job is the bench's business and the saw never touches it.
+    expect(stageSpeed(industrial, firstJob(industrial), 'assembly').speed).toBeCloseTo(1, 10);
   });
 
   it('counts only the better of two saws, not both', () => {
     const state = withSaw('used');
     placeEquipment(state, 'tableSaw', { variantId: 'pro', x: 10, y: 8 });
-    expect(machineOutputFactor(state, 'sheet')).toBeCloseTo(1.15, 10);
+    expect(stageSpeed(state, firstJob(state), 'cutting').speed).toBeCloseTo(1.15, 10);
   });
 
-  it('leaves a solid wood job alone, because the saw is not in its way', () => {
+  it('cuts a solid wood job too, and leaves its machining to the timber tools', () => {
     const state = withSaw('industrial');
-    expect(machineOutputFactor(state, 'solidWood')).toBe(1);
+    const table = { ...firstJob(state), materialKind: 'solidWood' as const };
+    // Every job is cut on the saw (CLAUDE.md T7 3.1); only the machining takes the material.
+    expect(stageSpeed(state, table, 'cutting').speed).toBeCloseTo(1.3, 10);
+    expect(stageSpeed(state, table, 'machining').byHand).toBe(true);
   });
 });
 

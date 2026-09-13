@@ -20,7 +20,6 @@ import {
   MOVE_MINUTES_PER_ITEM,
   MOVING_SPEED,
   OVERTIME_DEBT_PER_DAY,
-  OWNER_LABOUR_PER_MINUTE,
   REPUTATION_START,
   SERVICE_INTERVAL_HOURS,
   SOFTWARE_ONE_OFF_JOBS,
@@ -95,7 +94,7 @@ import {
   findJob,
   hallBlock,
   jobProgress,
-  jobSpeedFactor,
+  jobStage,
   oldestReadyJob,
   onDeliveryArrived,
   orderTransport,
@@ -135,6 +134,7 @@ import {
   staffOutputFactor,
 } from './owner';
 import { chance, int, makeId } from './rng';
+import { labourPerMinute } from './stages';
 import { plural } from './text';
 import {
   STATION_IDLE,
@@ -964,14 +964,15 @@ function runProductionMinute(state: GameState, ownerOnTask: boolean): void {
   const moving = movingMachines(state) !== null;
   const atTheBench =
     !ownerOnTask && !moving && state.owner.currentTaskId === null ? ownerJob(state) : null;
-  if (atTheBench && ownerIsAvailable(state) && canWorkOn(state, atTheBench)) {
+  const ownerStage = atTheBench === null ? null : jobStage(state, atTheBench);
+  if (atTheBench && ownerStage && ownerIsAvailable(state) && canWorkOn(state, atTheBench)) {
     spendOwnerMinute(state, 'workshop');
     state.owner.productionMinutes += 1;
     worked = true;
     usedBy(atTheBench.materialKind);
-    const minute = (OWNER_LABOUR_PER_MINUTE * ownerEfficiency(state) * hall) /
-      jobSpeedFactor(state, atTheBench);
-    if (addLabour(state, atTheBench, minute)) raiseJobAtGate(state, atTheBench);
+    // A machine speeds up its own stage and nothing else, and only for the man on it (T7 3.1).
+    const minute = labourPerMinute(ownerEfficiency(state), ownerStage.speed) * hall;
+    if (addLabour(state, atTheBench, minute, ownerStage.id)) raiseJobAtGate(state, atTheBench);
   }
   // Staff work the normal day only: nobody but the owner does overtime, and they always take
   // their dinner even on a day the owner works through his (CLAUDE.md T6 3.4).
@@ -991,13 +992,14 @@ function runProductionMinute(state: GameState, ownerOnTask: boolean): void {
         continue;
       }
       if (!canWorkOn(state, job)) continue;
+      const stage = jobStage(state, job);
+      if (stage === null) continue;
       worker.productionMinutes += 1;
       worked = true;
       usedBy(job.materialKind);
-      const rate = worker.rate * sawRatioFactor(state, worker);
-      const minute = (OWNER_LABOUR_PER_MINUTE * rate * hall * staffFactor) /
-        jobSpeedFactor(state, job);
-      if (addLabour(state, job, minute)) raiseJobAtGate(state, job);
+      const rate = worker.rate * sawRatioFactor(state, worker) * staffFactor;
+      const minute = labourPerMinute(rate, stage.speed) * hall;
+      if (addLabour(state, job, minute, stage.id)) raiseJobAtGate(state, job);
     }
   }
   if (!worked) return;

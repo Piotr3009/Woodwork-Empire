@@ -10,6 +10,29 @@ export type MaterialKind = 'sheet' | 'solidWood';
 
 export type Finish = 'laminate' | 'lacquer' | 'veneer';
 
+/** The stages a job goes through in the hall (CLAUDE.md T7 3.1). `cnc` is the one stage a CNC
+ *  does instead of Cutting and Machining; `delivery` carries no labour at all. */
+export type StageId = 'cutting' | 'machining' | 'cnc' | 'assembly' | 'finishing' | 'delivery';
+
+/** One stage of the work, as the catalogue of stages holds it. */
+export interface StageSpec {
+  id: StageId;
+  label: string;
+  /** Share of the job's labour it carries. */
+  share: number;
+}
+
+/** One run at one stage: when somebody started it and when it was finished. The Work Plan draws
+ *  its bars from these, so a gap in them is a gap the player can see (CLAUDE.md T7 3.2). */
+export interface StageRun {
+  stage: StageId;
+  startDay: number;
+  startMinute: number;
+  /** Null while the stage is still in hand. */
+  endDay: number | null;
+  endMinute: number | null;
+}
+
 export type SoftwareTier = 'basic' | 'standard' | 'pro';
 
 export type SoftwareMode = 'none' | 'oneOff' | 'subscription';
@@ -317,6 +340,8 @@ export interface Job {
   callsMissed: number;
   designMinutesRemaining: number;
   assignedTo: string | null;
+  /** What was worked when, one entry per run at a stage, for the Work Plan (CLAUDE.md T7 3.2). */
+  stageRuns: StageRun[];
   /** When this job took a bench, so the benches are held by the men who got to them first and
    *  nobody is turned off one he is standing at (CLAUDE.md T4 3.4). Null while it holds none. */
   benchSince: number | null;

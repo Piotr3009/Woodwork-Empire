@@ -26,6 +26,7 @@ import {
   SOFTWARE_DESIGN_FACTOR,
   STAFF_MANAGEMENT_MINUTES_PER_JOINER,
   UNLOAD_BASE_MINUTES,
+  WORK_EPSILON,
 } from './constants';
 import { findSpec } from './machines';
 import { canUnload } from './materials';
@@ -83,8 +84,9 @@ const TASK_DEFINITIONS: Record<TaskKind, TaskDefinition> = {
   moveMachines: { category: 'workshop', eligibleRoles: ['joiner', 'helper'], autoRoles: [] },
 };
 
-/** Float guard, not a game number: work this small is finished work. */
-export const WORK_EPSILON = 1e-9;
+/** Float guard, not a game number: work this small is finished work. It lives in constants.ts
+ *  with every other figure and is handed on from here, where it has always been imported from. */
+export { WORK_EPSILON };
 
 // ---------------------------------------------------------------------------
 // Minute curves

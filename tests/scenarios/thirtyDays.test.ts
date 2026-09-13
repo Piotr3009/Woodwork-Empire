@@ -39,7 +39,8 @@ import {
   gameMinutesPerRealSecond,
   hasBenchFor,
   isBreak,
-  machineOutputFactor,
+  stageSpeed,
+  stagedJob,
   minutesRemainingFor,
   movingMachines,
   ownerMinutesToday,
@@ -117,8 +118,9 @@ describe('30 days on Easy, working the board', () => {
     const saw = machineOf(state, 'tableSaw');
     expect(saw.variantId).toBe('used');
     expect(saw.purchasePrice).toBe(1800);
-    // Five per cent slower than a new one and the bag fills twice as often (CLAUDE.md T3 3.5).
-    expect(machineOutputFactor(state, 'sheet')).toBeCloseTo(0.95, 10);
+    // Five per cent slower than a new one on the cutting, and the bag fills twice as often
+    // (CLAUDE.md T3 3.5, T7 3.1).
+    expect(stageSpeed(state, stagedJob(1, 'sheet', false), 'cutting').speed).toBeCloseTo(0.95, 10);
     expect(bagIntervalFor(saw)).toBe(1200);
     // And it wore its hours down as the month went on.
     expect(saw.hoursUsed).toBeGreaterThan(0);
@@ -238,17 +240,24 @@ describe('30 days on Very easy behind the best saw money can buy', () => {
     ).toBe(true);
   });
 
-  it('gets 30% more out of every minute at the bench', () => {
-    expect(machineOutputFactor(state, 'sheet')).toBeCloseTo(1.3, 10);
+  it('gets 30% more out of every minute of the cutting, and of no other stage', () => {
     const taken = state.jobs[0];
     if (!taken) throw new Error('no jobs in the month');
     // Measured on the whole job, because the month finished the ones it started.
     const job = { ...taken, labourRemaining: taken.labourValue };
     expect(job.labourValue).toBeGreaterThan(0);
+    expect(stageSpeed(state, job, 'cutting').speed).toBeCloseTo(1.3, 10);
+    expect(stageSpeed(state, job, 'assembly').speed).toBeCloseTo(1, 10);
     const minutes = minutesRemainingFor(state, job, 1);
-    // A workshop with no saw at all is the 1.0 baseline: this one is 1.3 times quicker.
-    const bare = { ...state, equipment: [] };
-    expect(minutesRemainingFor(bare, job, 1) / minutes).toBeCloseTo(1.3, 6);
+    // The same hall with a saw of standard speed in it: only the cutting quarter moves, so the
+    // whole job is 6% quicker and not 30% (CLAUDE.md T7 3.1).
+    const budget = {
+      ...state,
+      equipment: state.equipment.map((item) =>
+        item.specId === 'tableSaw' ? { ...item, variantId: 'budget' } : item,
+      ),
+    };
+    expect(minutesRemainingFor(budget, job, 1) / minutes).toBeCloseTo(1 / (0.25 / 1.3 + 0.75), 6);
   });
 
   it('empties the bag half as often and draws more off the meter', () => {

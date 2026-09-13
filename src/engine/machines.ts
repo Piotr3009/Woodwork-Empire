@@ -215,6 +215,19 @@ export function machineOutputFactor(state: GameState, material: MaterialKind): n
   return product;
 }
 
+/** The best class of this family standing in the hall: what the projection of a job's minutes is
+ *  worked out from before anybody knows which one of them he will actually get. 1 when the
+ *  workshop owns none, so a caller that has not asked `has` first is never told a job is quicker
+ *  than it is (CLAUDE.md T7 3.1). */
+export function bestOutputFactor(state: GameState, specId: string): number {
+  let best = 0;
+  for (const item of owned(state, specId)) {
+    const factor = variantFor(item)?.outputFactor ?? 1;
+    if (factor > best) best = factor;
+  }
+  return best > 0 ? best : 1;
+}
+
 /** Machines that cut the labour of a job, multiplied together (CLAUDE.md 8.6). */
 export function machineLabourFactor(state: GameState, material: MaterialKind): number {
   let factor = 1;

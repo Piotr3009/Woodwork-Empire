@@ -25,8 +25,10 @@ export * from './types';
 export {
   CLEANING_MINUTES,
   EQUIPMENT_SPECS,
+  GANTT_STAGES,
   MACHINE_ENDURANCE_HOURS,
   MACHINE_ENDURANCE_HOURS_DEFAULT,
+  PRODUCTION_STAGES,
   DUCTING_RECONNECT_COST,
   MINUTES_PER_WORKING_DAY,
   MOVE_MINUTES_PER_ITEM,
@@ -109,18 +111,35 @@ export {
   lifecycleSteps,
   ownerDaysFor,
   jobLabourCost,
+  jobStage,
   jobsAtGate,
   minutesRemainingFor,
   oldestReadyJob,
   jobProgress,
-  jobSpeedFactor,
   openJobs,
   ownerJob,
   showsStartProduction,
+  stagedJob,
   startProductionCheck,
   transportLabel,
 } from './jobs';
 export type { LifecycleStep, StartCheck, StepState } from './jobs';
+
+// Production in stages (CLAUDE.md T7 3.1)
+export {
+  currentStage,
+  familyForStage,
+  jobMinutesFor,
+  labourDone,
+  labourPerMinute,
+  minutesLeftFor,
+  stageAt,
+  stageLabel,
+  stageMinutes,
+  stagePlanFor,
+  stageSpeed,
+} from './stages';
+export type { StagePlan, StagedJob } from './stages';
 
 // Client calls
 export {

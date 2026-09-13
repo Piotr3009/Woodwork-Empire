@@ -12,6 +12,7 @@ import type {
   MaterialKind,
   ProductTemplate,
   SoftwareTier,
+  StageSpec,
   WorkerRole,
   WorkerTier,
 } from './types';
@@ -237,6 +238,24 @@ export const EXPRESS_PRICE_UPLIFT = 0.2;
 export const EXPRESS_MAX_PER_WEEK = 1;
 /** A job made by hand takes half again as long (PIOTR). */
 export const BY_HAND_DURATION_FACTOR = 1.5;
+/** Float guard, not a game number: work this small is finished work. */
+export const WORK_EPSILON = 1e-9;
+
+/** What a job is made of, in the order the workshop does it, and what share of the labour each
+ *  stage carries [TUNE]. They add up to 1 (CLAUDE.md T7 3.1). */
+export const PRODUCTION_STAGES: StageSpec[] = [
+  { id: 'cutting', label: 'Cutting', share: 0.25 },
+  { id: 'machining', label: 'Machining', share: 0.15 },
+  { id: 'assembly', label: 'Assembly', share: 0.45 },
+  { id: 'finishing', label: 'Finishing', share: 0.15 },
+];
+
+/** The last bar of the Work Plan. It carries no labour: it is the Turn 2 transport, not work at a
+ *  bench (CLAUDE.md T7 3.1). */
+export const DELIVERY_STAGE: StageSpec = { id: 'delivery', label: 'Delivery', share: 0 };
+
+/** Every bar the Work Plan draws for a job, the piece leaving included (CLAUDE.md T7 3.2). */
+export const GANTT_STAGES: StageSpec[] = [...PRODUCTION_STAGES, DELIVERY_STAGE];
 /** Worker speed as a fraction of the owner. Nobody matches the owner (PIOTR). */
 export const WORKER_RATES: Record<WorkerTier, number> = {
   poor: 0.6,

@@ -49,14 +49,17 @@ describe('what the client gives', () => {
   });
 
   it('gives a 15,000 kitchen eighteen to twenty three days, and eleven to fourteen express', () => {
-    for (const state of [newGame(), buyStartingKit(newGame({ difficulty: 'veryEasy' }))]) {
-      const standard = spread(state, 15000, false);
-      expect(standard[0], `${standard.join(',')}`).toBeGreaterThanOrEqual(18);
-      expect(standard[standard.length - 1], `${standard.join(',')}`).toBeLessThanOrEqual(23);
-      const express = spread(state, 15000, true);
-      expect(express[0], `${express.join(',')}`).toBeGreaterThanOrEqual(11);
-      expect(express[express.length - 1], `${express.join(',')}`).toBeLessThanOrEqual(14);
-    }
+    const state = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
+    const standard = spread(state, 15000, false);
+    expect(standard[0], `${standard.join(',')}`).toBeGreaterThanOrEqual(18);
+    expect(standard[standard.length - 1], `${standard.join(',')}`).toBeLessThanOrEqual(23);
+    const express = spread(state, 15000, true);
+    expect(express[0], `${express.join(',')}`).toBeGreaterThanOrEqual(11);
+    expect(express[express.length - 1], `${express.join(',')}`).toBeLessThanOrEqual(14);
+    // A hall with no saw and no edgebander cuts and machines by hand, which is two fifths of the
+    // job at half again as long, so the client is told a longer date (CLAUDE.md T7 3.1).
+    const bare = spread(newGame(), 15000, false);
+    expect(bare[0], `${bare.join(',')}`).toBeGreaterThan(standard[standard.length - 1] ?? 0);
   });
 
   it('never goes under three days or over thirty, whatever the job', () => {
@@ -77,9 +80,13 @@ describe('what the client gives', () => {
     const kitted = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
     const labour = labourValueFor(15000);
     expect(labour).toBe(15000 * LABOUR_FRACTION);
-    expect(ownerDaysFor(bare, labour, 'sheet')).toBeCloseTo(labour / OWNER_LABOUR_VALUE_PER_DAY, 6);
-    // The used saw gets through less in a day than a hall with nothing in it is assumed to.
-    expect(ownerDaysFor(kitted, labour, 'sheet')).toBeGreaterThan(ownerDaysFor(bare, labour, 'sheet'));
+    const flat = labour / OWNER_LABOUR_VALUE_PER_DAY;
+    // Nothing in the hall: the cutting and the machining are done by hand, which is two fifths of
+    // the job at half again as long (CLAUDE.md T7 3.1).
+    expect(ownerDaysFor(bare, labour, 'sheet')).toBeCloseTo(flat * (0.4 * 1.5 + 0.6), 6);
+    // The day 1 kit does the whole job on machines, and its used saw is 5% slow on the cutting.
+    expect(ownerDaysFor(kitted, labour, 'sheet')).toBeCloseTo(flat * (0.25 / 0.95 + 0.75), 6);
+    expect(ownerDaysFor(kitted, labour, 'sheet')).toBeLessThan(ownerDaysFor(bare, labour, 'sheet'));
   });
 });
 

@@ -3,7 +3,6 @@
 // in production, completed, paid and rated (CLAUDE.md 9.5).
 
 import {
-  BY_HAND_DURATION_FACTOR,
   COURIER_COST,
   DEADLINE_DAYS_BASE,
   DEADLINE_DAYS_FACTOR,
@@ -21,7 +20,6 @@ import {
   LATE_PENALTY_PER_DAY,
   LATE_PENALTY_PER_DAY_EXPRESS,
   MINUTES_PER_WORKING_DAY,
-  OWNER_LABOUR_PER_MINUTE,
   SITE_MEASURE_MINUTES,
   SITE_MEASURE_TAXI_COST,
   WORKER_MINUTE_RATE_DIVISOR,
@@ -39,8 +37,6 @@ import {
   has,
   hasBenchFor,
   hasExtraction,
-  machineLabourFactor,
-  machineOutputFactor,
 } from './machines';
 import {
   materialCostFor,
@@ -50,6 +46,13 @@ import {
   stockCostFor,
 } from './materials';
 import { ownerIsAvailable } from './owner';
+import {
+  type StagePlan,
+  type StagedJob,
+  currentStage,
+  jobMinutesFor,
+  minutesLeftFor,
+} from './stages';
 import { applyRating } from './reputation';
 import { int, makeId } from './rng';
 import { plural } from './text';
@@ -63,7 +66,15 @@ import {
   jobTasks,
   materialOrderMinutes,
 } from './tasks';
-import type { GameState, Job, JobStage, MaterialKind, MaterialMode } from './types';
+import type {
+  Finish,
+  GameState,
+  Job,
+  JobStage,
+  MaterialKind,
+  MaterialMode,
+  StageId,
+} from './types';
 
 export function findJob(state: GameState, jobId: string): Job | null {
   return state.jobs.find((job) => job.id === jobId) ?? null;
@@ -82,16 +93,27 @@ export function labourValueFor(price: number): number {
   return price * LABOUR_FRACTION;
 }
 
-/** Days of the owner's own time this much labour takes with the machines the hall has now: the
- *  same number the board tile shows and the deadline is worked out from (CLAUDE.md T6 3.7). */
+/** A job as the stages read it. Everything that asks what a piece of work will take comes through
+ *  here, an enquiry nobody has accepted included (CLAUDE.md T7 3.1). */
+export function stagedJob(
+  labourValue: number,
+  materialKind: MaterialKind,
+  byHand: boolean,
+  finish: Finish = 'laminate',
+): StagedJob {
+  return { labourValue, materialKind, finish, byHand };
+}
+
+/** Days of the owner's own time this much labour takes with the machines the hall has now: every
+ *  stage at the speed of the best machine of its family, added up (CLAUDE.md T7 3.1). The same
+ *  number the board tile shows and the deadline is worked out from (CLAUDE.md T6 3.7). */
 export function ownerDaysFor(
   state: GameState,
   labourValue: number,
   materialKind: MaterialKind,
   byHand = false,
 ): number {
-  const minutes =
-    (labourValue / OWNER_LABOUR_PER_MINUTE) * speedFactorFor(state, materialKind, byHand);
+  const minutes = jobMinutesFor(state, stagedJob(labourValue, materialKind, byHand), 1);
   return minutes / MINUTES_PER_WORKING_DAY;
 }
 
@@ -145,30 +167,17 @@ export function jobProgress(job: Job): number {
   return Math.min(1, Math.max(0, 1 - job.labourRemaining / job.labourValue));
 }
 
-/** What the workshop does to the minutes work of this material takes: the machine reductions of
- *  8.6 multiplied together, and half again as long if it is being made by hand (CLAUDE.md 9.5).
- *  Below 1 is quicker. It is read every minute, so buying a machine speeds up work already on the
- *  books and losing one to the bailiff slows it down again. */
-export function speedFactorFor(
-  state: GameState,
-  materialKind: MaterialKind,
-  byHand: boolean,
-): number {
-  const hand = byHand ? BY_HAND_DURATION_FACTOR : 1;
-  // A better class of machine gets through the same work in fewer minutes, so its output factor
-  // divides the time the labour reductions have already cut (CLAUDE.md T3 3.5).
-  const output = byHand ? 1 : machineOutputFactor(state, materialKind);
-  return (machineLabourFactor(state, materialKind) * hand) / output;
+/** The stage this job is standing at, with the family it is done on and what that family does to
+ *  its minutes. Null only for a job with no labour in it at all. */
+export function jobStage(state: GameState, job: Job): StagePlan | null {
+  return currentStage(state, job);
 }
 
-export function jobSpeedFactor(state: GameState, job: Job): number {
-  return speedFactorFor(state, job.materialKind, job.byHand);
-}
-
-/** Minutes this job still needs from a worker of the given rate (1 is the owner). */
+/** Minutes this job still needs from a worker of the given rate (1 is the owner). Every stage
+ *  still ahead of him at its own machine's speed (CLAUDE.md T7 3.1). */
 export function minutesRemainingFor(state: GameState, job: Job, rate: number): number {
   if (rate <= 0) return Infinity;
-  return (job.labourRemaining / (OWNER_LABOUR_PER_MINUTE * rate)) * jobSpeedFactor(state, job);
+  return minutesLeftFor(state, job, rate);
 }
 
 // ---------------------------------------------------------------------------
@@ -225,6 +234,7 @@ export function acceptEnquiry(state: GameState, enquiryId: string, byHand: boole
     callsMissed: 0,
     designMinutesRemaining: designMinutes(entry, enquiry.sizeMultiplier, state.software.tier),
     assignedTo: null,
+    stageRuns: [],
     benchSince: null,
     completedDay: null,
     daysLate: 0,
@@ -461,6 +471,14 @@ export interface LifecycleStep {
 
 const LIFECYCLE_LABELS = ['Calls', 'Design', 'Material', 'Delivery', 'Production'];
 
+/** The Production step names the stage the piece is actually at, so the five step row answers
+ *  "what is happening to it now" as well as "where is it up to" (CLAUDE.md T7 3.1). */
+function productionLabel(state: GameState, job: Job): string {
+  if (job.stage !== 'inProduction') return 'Production';
+  const stage = jobStage(state, job);
+  return stage === null ? 'Production' : `Production: ${stage.label}`;
+}
+
 /** The five steps of a job, so the card answers "what am I waiting for" without being read
  *  (CLAUDE.md T3 3.1). The first step that is not finished is the one in hand. */
 export function lifecycleSteps(state: GameState, job: Job): LifecycleStep[] {
@@ -479,7 +497,7 @@ export function lifecycleSteps(state: GameState, job: Job): LifecycleStep[] {
   ];
   const now = done.indexOf(false);
   return LIFECYCLE_LABELS.map((label, index) => ({
-    label,
+    label: index === LIFECYCLE_LABELS.length - 1 ? productionLabel(state, job) : label,
     state: done[index] === true ? 'done' : index === now ? 'now' : 'todo',
   }));
 }
@@ -533,11 +551,37 @@ export function releaseJob(state: GameState, job: Job): void {
   if (job.stage === 'inProduction') job.stage = 'ready';
 }
 
+/** Writes down that somebody worked this stage this minute. A run is opened when the stage is not
+ *  the one already open, and the one before it is closed at that moment: the Work Plan's bars and
+ *  its grey gaps are read off these and off nothing else (CLAUDE.md T7 3.2). */
+export function noteStageWork(state: GameState, job: Job, stage: StageId): void {
+  const open = job.stageRuns[job.stageRuns.length - 1];
+  if (open && open.endDay === null && open.stage === stage) return;
+  if (open && open.endDay === null) closeStageRun(state, job);
+  job.stageRuns.push({
+    stage,
+    startDay: state.clock.day,
+    startMinute: state.clock.minute,
+    endDay: null,
+    endMinute: null,
+  });
+}
+
+/** Closes whatever run is open, at this minute. */
+export function closeStageRun(state: GameState, job: Job): void {
+  const open = job.stageRuns[job.stageRuns.length - 1];
+  if (!open || open.endDay !== null) return;
+  open.endDay = state.clock.day;
+  open.endMinute = state.clock.minute;
+}
+
 /** Work one person minute of labour into a job. What actually went in is booked against the day
  *  here, so the earned labour rate counts what was produced and not what was offered: the last
- *  minute of a job is usually a part minute (CLAUDE.md T6 3.8). Returns true when it finished. */
-export function addLabour(state: GameState, job: Job, labour: number): boolean {
+ *  minute of a job is usually a part minute (CLAUDE.md T6 3.8). The stage it went into is written
+ *  down with it (CLAUDE.md T7 3.2). Returns true when it finished. */
+export function addLabour(state: GameState, job: Job, labour: number, stage: StageId): boolean {
   if (labour <= 0) return false;
+  noteStageWork(state, job, stage);
   const put = Math.min(labour, Math.max(0, job.labourRemaining));
   job.labourRemaining -= labour;
   state.dayStats.workMinutes += 1;
@@ -553,6 +597,7 @@ export function addLabour(state: GameState, job: Job, labour: number): boolean {
  *  nothing is paid until it gets there (CLAUDE.md T2 3.7). Who takes it there is a decision, so
  *  the event that asks is raised by game.ts, the only module that can send a man. */
 export function completeJob(state: GameState, job: Job): void {
+  closeStageRun(state, job);
   releaseJob(state, job);
   job.assignedTo = null;
   job.stage = 'awaitingTransport';

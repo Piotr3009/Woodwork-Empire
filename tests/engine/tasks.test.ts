@@ -136,6 +136,7 @@ describe('the daily list', () => {
       callsMissed: 0,
       designMinutesRemaining: 30,
       assignedTo: null,
+      stageRuns: [],
       benchSince: null,
       completedDay: null,
       daysLate: 0,
