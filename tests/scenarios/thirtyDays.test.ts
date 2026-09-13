@@ -43,6 +43,7 @@ import {
   OVERTIME_END_MINUTE,
   POWER_BASE_DAILY,
   CLIENT_MEETING_MINUTES,
+  DROP_PROJECT_REPUTATION,
   MEETING_PRICE_THRESHOLD,
   RENT_PER_M2_MONTHLY,
 } from '../../src/engine/constants';
@@ -64,10 +65,12 @@ import {
   ownerMinutesToday,
   startTaskCheck,
   tick,
+  workPlan,
 } from '../../src/engine/index';
 import { firstFreeCell, hallItems } from '../../src/engine/layout';
 import { deliveryDaysFor, salePriceFor } from '../../src/engine/machines';
 import { missingForHire } from '../../src/engine/staff';
+import { weeksOf } from '../../src/ui/company';
 import type { Equipment, GameEvent, GameState } from '../../src/engine/index';
 
 function machineOf(state: GameState, specId: string): Equipment {
@@ -871,5 +874,60 @@ describe('a month that sells the used saw on day 5 after buying a standard one',
     expect(month.gameOver).toBeNull();
     expect(month.equipment.filter((item) => item.specId === 'tableSaw')).toHaveLength(1);
     expect(month.equipment.find((item) => item.specId === 'tableSaw')?.variantId).toBe('standard');
+  });
+});
+
+describe('a month that drops a job on day 8', () => {
+  // Month (n) of CLAUDE.md T9 T9-13. A careful month to day 8, and then the owner changes his
+  // mind about the job on the books: the client has his deposit back, the plan is empty and the
+  // company is ten points of reputation worse off (CLAUDE.md T9 3.9).
+  const seen: GameEvent[] = [];
+  const day8 = playUntilDay(newGame({ seed: SEED, difficulty: 'veryEasy' }), 8, CAREFUL, seen);
+  const job = day8.jobs.find((entry) => entry.stage !== 'completed');
+  const cashBefore = day8.cash;
+  const reputationBefore = day8.reputation;
+  const dropped = job === undefined ? day8 : act(day8, { type: 'DROP_JOB', jobId: job.id });
+
+  it('has a job on the books on day 8 with a deposit paid on it', () => {
+    expect(day8.clock.day).toBe(8);
+    expect(job).toBeDefined();
+    expect(job?.depositPaid ?? 0).toBeGreaterThan(0);
+  });
+
+  it('gives the client his deposit back, to the penny', () => {
+    expect(cashBefore - dropped.cash).toBe(job?.depositPaid ?? 0);
+    const line = dropped.ledger.find(
+      (entry) => entry.label === `Deposit returned: ${job?.name}`,
+    );
+    expect(line?.amount).toBe(-(job?.depositPaid ?? 0));
+    // The material was ordered in for this job, so it is written off beside it: a line in the
+    // books and not a payment, because the cash went when it was ordered (CLAUDE.md T9 3.9).
+    const loss = dropped.ledger.find(
+      (entry) => entry.label === `Material written off: ${job?.name}`,
+    );
+    expect(loss?.unpaid).toBe(true);
+  });
+
+  it('takes the job off the plan and everything on its list with it', () => {
+    expect(dropped.jobs.some((entry) => entry.id === job?.id)).toBe(false);
+    expect(dropped.tasks.some((task) => task.jobId === job?.id)).toBe(false);
+    expect(workPlan(dropped).rows.some((row) => row.jobId === job?.id)).toBe(false);
+  });
+
+  it('takes ten points of reputation at once, with a line on the company board', () => {
+    expect(dropped.reputation).toBe(reputationBefore - DROP_PROJECT_REPUTATION);
+    const logged = dropped.reputationLog[dropped.reputationLog.length - 1];
+    expect(logged?.reason).toBe(`Dropped: ${job?.name}`);
+    expect(logged?.points).toBe(-DROP_PROJECT_REPUTATION);
+    expect(logged?.day).toBe(8);
+    // And the board reads it back under the week it happened in.
+    const week = weeksOf(dropped)[0];
+    expect(week?.entries.some((entry) => entry.reason === `Dropped: ${job?.name}`)).toBe(true);
+  });
+
+  it('still trades to the end of the month, on the work that comes after it', () => {
+    const month = playUntilDay(dropped, 31, CAREFUL);
+    expect(month.clock.day).toBe(31);
+    expect(month.gameOver).toBeNull();
   });
 });
