@@ -16,6 +16,7 @@ import {
   ownerJob,
   runMinutes,
   startProductionCheck,
+  timeIsPaused,
 } from '../engine/index';
 import type {
   Difficulty,
@@ -88,6 +89,9 @@ interface Ui {
   eventPosition: ModalPosition | null;
   menuOpen: boolean;
   note: string;
+  /** The one line that says why a click did nothing, and the pulse on the Pause button that goes
+   *  with it. Both last one render (CLAUDE.md T7 3.10). */
+  toast: string;
   filters: Record<string, string>;
   /** Field to put the caret back in after the next render. */
   focusNext: string | null;
@@ -157,6 +161,7 @@ function freshUi(): Ui {
     eventPosition: null,
     menuOpen: false,
     note: '',
+    toast: '',
     filters: { board: '', catalogue: '' },
     focusNext: null,
     stockSheets: '6',
@@ -444,8 +449,10 @@ function pageHtml(scene: Scene | null): string {
   const notes = scene?.notes ?? '';
   const controls = ui.view === 'hall' ? hallControls(current) + hallZoomControls() : '';
   const note = ui.note === '' ? '' : `<p class="view-note">${escapeHtml(ui.note)}</p>`;
+  const toast = ui.toast === '' ? '' : `<p class="toast">${escapeHtml(ui.toast)}</p>`;
   return (
-    renderTopbar(current, ui.view) +
+    renderTopbar(current, ui.view, ui.toast !== '') +
+    toast +
     (ui.menuOpen ? renderMenu(current, ui.cloud) : '') +
     `<main class="view">${SCENE_SLOT}${notes}${controls}${note}</main>` +
     renderWhy()
@@ -686,12 +693,29 @@ export function render(): void {
 // Actions
 // ---------------------------------------------------------------------------
 
+/** The modals that act on the world, which is every one of them but the Work Plan: nothing on
+ *  them can be touched while the clock is stopped (CLAUDE.md T7 3.10). The Work Plan is a
+ *  whiteboard and the Sprite check is a page of pictures: both are reading, and both open. */
+const READING_MODALS: ModalId[] = ['workPlan'];
+
+/** The one line the player gets when the world will not move for him, with the Pause button
+ *  pulsing once behind it (CLAUDE.md T7 3.10). */
+function pausedToast(): void {
+  ui.toast = 'Time is paused';
+}
+
 /** The room fills the page, so there is no small object for a modal to sit beside any more: every
  *  modal opens centred, and the player drags it where he wants it (CLAUDE.md T4 3.1). */
 function openModal(id: ModalId): void {
+  if (!READING_MODALS.includes(id) && timeIsPaused(game())) {
+    pausedToast();
+    return;
+  }
   ui.modal = id;
   ui.modalPosition = null;
   ui.menuOpen = false;
+  // Lifting the lid costs him the five minutes the machine takes to come up (CLAUDE.md T7 3.10).
+  if (id === 'laptop') dispatch({ type: 'BOOT_LAPTOP' });
 }
 
 /** Clicking the van at the gate opens the unloading choice again (CLAUDE.md 10.1). */
@@ -723,6 +747,8 @@ function handleAction(element: DataElement, point: { x: number; y: number }): vo
   if (what === undefined) return;
   const id = element.dataset.id ?? '';
   ui.note = '';
+  // The toast and its pulse last one click (CLAUDE.md T7 3.10).
+  ui.toast = '';
   switch (what) {
     case 'pickDifficulty':
       ui.difficulty = id as Difficulty;
@@ -773,6 +799,12 @@ function handleAction(element: DataElement, point: { x: number; y: number }): vo
     case 'startSetup':
       // Nothing is dragged while the last move is still on the list, carried or waiting.
       if (movePending(game()) !== null) break;
+      // Setting the hall out is a job of work, so it cannot be started in stopped time. Once it
+      // is open the clock stops on purpose, as it has since Turn 4 (CLAUDE.md T7 3.10).
+      if (timeIsPaused(game())) {
+        pausedToast();
+        break;
+      }
       ui.setup = true;
       ui.drag = null;
       ui.speedBeforeSetup = game().speed;

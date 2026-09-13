@@ -17,14 +17,14 @@ import { fitName } from '../../src/render/hall';
 import { formatTime } from '../../src/engine/clock';
 import { tick } from '../../src/engine/index';
 import type { GameState } from '../../src/engine/index';
-import { act, newGame } from '../helpers';
+import { buyNow, newGame } from '../helpers';
 
 /** A game with the desk, the chair and the laptop bought: the room as it is once the office has
  *  been furnished. A new game starts with none of them (CLAUDE.md T7 3.8). */
 function furnished(): GameState {
   let state = newGame({ difficulty: 'veryEasy' });
   for (const specId of ['desk', 'chair', 'laptop']) {
-    state = act(state, { type: 'BUY_EQUIPMENT', specId });
+    state = buyNow(state, specId);
   }
   return state;
 }
@@ -178,10 +178,7 @@ describe('the office a new game starts in', () => {
   });
 
   it('puts the desk layer in the room the moment the desk is bought', () => {
-    const withDesk = act(newGame({ difficulty: 'veryEasy' }), {
-      type: 'BUY_EQUIPMENT',
-      specId: 'desk',
-    });
+    const withDesk = buyNow(newGame({ difficulty: 'veryEasy' }), 'desk');
     const node = room({ width: 1280, height: 800 }, undefined, withDesk);
     const layers = Array.from(node.querySelectorAll('.office-layer'));
     expect(layers.map((layer) => layer.getAttribute('data-layer'))).toEqual([

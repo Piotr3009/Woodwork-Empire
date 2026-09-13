@@ -35,7 +35,7 @@ import type {
  *
  *  Bumped in Turn 3: a machine carries its class, its hours and the hours it has in it, and a task
  *  carries the day it was finished (CLAUDE.md T3 3.5, 3.3). */
-export const STATE_VERSION = 6;
+export const STATE_VERSION = 7;
 
 // ---------------------------------------------------------------------------
 // 6. Time
@@ -408,6 +408,17 @@ export const UNLOAD_BASE_MINUTES = 45;
 export const BAG_CHANGE_MINUTES = 15;
 /** Moving the kit about is a job of work: an hour a machine or a bench [TUNE]. */
 export const MOVE_MINUTES_PER_ITEM = 60;
+/** Nothing is bought in stopped time, and a purchase is a trip out: an hour of the owner's own
+ *  minutes before the cash leaves (PIOTR, "at least an hour per purchase"). */
+export const SHOPPING_MINUTES = 60;
+/** Every further thing bought in the same visit, while the first hour is still running [TUNE]. */
+export const SHOPPING_NEXT_MINUTES = 15;
+/** Software comes down the wire, so it is half the trip (PIOTR). */
+export const SOFTWARE_SHOPPING_MINUTES = 30;
+/** The interview, which is what taking somebody on costs the owner (PIOTR). */
+export const HIRING_MINUTES = 60;
+/** The laptop booting up before anything on it can be touched (PIOTR). */
+export const LAPTOP_BOOT_MINUTES = 5;
 /** Reconnecting one machine's ducting to the extraction, every time it is moved (PIOTR). */
 export const DUCTING_RECONNECT_COST = 800;
 /** Every machine family is ducted into the extraction except the compressor. The hand tools are

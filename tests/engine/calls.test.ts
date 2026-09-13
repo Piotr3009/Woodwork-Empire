@@ -19,6 +19,7 @@ import {
   doTask,
   fillRack,
   firstJob,
+  hireNow,
   newGame,
   placeEnquiry,
   runToStage,
@@ -276,7 +277,7 @@ describe('a salesman on the books', () => {
   it('takes every call himself, and the owner is never asked', () => {
     let state = withJob();
     state.reputation = 20;
-    state = act(state, { type: 'HIRE', role: 'salesman', tier: null });
+    state = hireNow(state, 'salesman', null);
     const salesman = state.workers[0];
     if (!salesman) throw new Error('nobody was hired');
     salesman.startDay = state.clock.day;
@@ -298,7 +299,7 @@ describe('a salesman on the books', () => {
   it('leaves the call to the owner once his day is too short to see it out', () => {
     let state = withJob();
     state.reputation = 20;
-    state = act(state, { type: 'HIRE', role: 'salesman', tier: null });
+    state = hireNow(state, 'salesman', null);
     const salesman = state.workers[0];
     if (!salesman) throw new Error('nobody was hired');
     salesman.startDay = state.clock.day;

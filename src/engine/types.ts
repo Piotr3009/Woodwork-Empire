@@ -426,7 +426,20 @@ export type TaskKind =
   | 'deliver'
   | 'service'
   | 'repair'
-  | 'moveMachines';
+  | 'moveMachines'
+  /** The trip to the shops that every purchase rides on (CLAUDE.md T7 3.10). */
+  | 'shopping'
+  /** The interview that taking somebody on costs the owner. */
+  | 'hiring'
+  /** The laptop booting up before the player can touch anything on it. */
+  | 'booting';
+
+/** What a trip to the shops or an interview will do once its minutes are spent. Nothing is
+ *  booked until then: the cash leaves when the owner gets back (CLAUDE.md T7 3.10). */
+export type TaskOrder =
+  | { kind: 'equipment'; specId: string; variantId: string }
+  | { kind: 'software'; mode: 'oneOff' | 'subscription' }
+  | { kind: 'hire'; role: WorkerRole; tier: WorkerTier | null };
 
 export interface TaskInstance {
   id: string;
@@ -445,6 +458,9 @@ export interface TaskInstance {
   doneDay: number | null;
   /** Worker id, 'owner', or null while nobody works on it. */
   doneBy: string | null;
+  /** What this task books when it finishes. Empty for every task but a trip to the shops and an
+   *  interview (CLAUDE.md T7 3.10). */
+  orders: TaskOrder[];
 }
 
 export type GameEventKind =
@@ -673,6 +689,8 @@ export type GameAction =
   | { type: 'ACCEPT_ENQUIRY'; enquiryId: string; byHand: boolean }
   | { type: 'START_TASK'; taskId: string }
   | { type: 'PAUSE_TASK' }
+  /** Lifting the lid: the machine has to come up before anything on it can be touched. */
+  | { type: 'BOOT_LAPTOP' }
   | { type: 'SET_MATERIAL_MODE'; jobId: string; mode: MaterialMode }
   | { type: 'SET_SAW_FALLBACK'; jobId: string; on: boolean }
   | { type: 'BUY_STOCK'; sheets: number }

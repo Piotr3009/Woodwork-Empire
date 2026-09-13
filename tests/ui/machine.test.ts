@@ -7,7 +7,7 @@ import { renderCatalogue } from '../../src/ui/catalogue';
 import { recommendedVariant, renderMachine } from '../../src/ui/machine';
 import { findSpec } from '../../src/engine/index';
 import type { GameState } from '../../src/engine/index';
-import { act, newGame } from '../helpers';
+import { buyNow, newGame } from '../helpers';
 
 function parse(html: string): HTMLElement {
   const holder = document.createElement('div');
@@ -123,11 +123,7 @@ describe('the tiles inside a folder', () => {
   });
 
   it('says how many of the family are already in the hall', () => {
-    const state = act(newGame({ difficulty: 'veryEasy' }), {
-      type: 'BUY_EQUIPMENT',
-      specId: 'tableSaw',
-      variantId: 'pro',
-    });
+    const state = buyNow(newGame({ difficulty: 'veryEasy' }), 'tableSaw', 'pro');
     expect(parse(renderMachine(state, 'tableSaw')).innerHTML).toContain('One is in the hall already.');
   });
 });

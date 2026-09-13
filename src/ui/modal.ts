@@ -4,7 +4,7 @@
 // One escape and one money format for the whole game: the renderers and the engine own them,
 // because both layers sit below the modals.
 
-import { WHY, formatMoney, plural, startTaskCheck } from '../engine/index';
+import { WHY, formatMoney, plural, shoppingTask, startTaskCheck } from '../engine/index';
 import type { GameState, TaskInstance } from '../engine/index';
 import { escapeText } from '../render/hall';
 
@@ -192,6 +192,22 @@ export function reasonLabel(reason: string): string {
  *  owner could start this task and the answer is shown: a button he can press, or the reason he
  *  cannot, with the way out of it. A Start the engine would refuse is never drawn, which is what
  *  left the drawings unable to be drawn (CLAUDE.md T4 3.2). */
+/** The trip the owner is on, over the modal that started it. Nothing he has ordered is his until
+ *  the minutes are spent and the cash leaves (CLAUDE.md T7 3.10). */
+export function tripLine(state: GameState, kind: 'shopping' | 'hiring'): string {
+  const task =
+    kind === 'shopping'
+      ? shoppingTask(state)
+      : state.tasks.find((entry) => entry.kind === 'hiring' && !entry.done) ?? null;
+  if (task === null) return '';
+  const spent = Math.round(task.minutesTotal - task.minutesRemaining);
+  const word = kind === 'shopping' ? 'Shopping' : 'Interview';
+  return (
+    `<p class="warn trip">${word}: ${spent} of ${Math.round(task.minutesTotal)} min. ` +
+    'Nothing is paid for until you are back.</p>'
+  );
+}
+
 export function taskStartAction(state: GameState, task: TaskInstance, startLabel: string): string {
   if (task.done) return '<span class="done">Done</span>';
   if (state.owner.currentTaskId === task.id) return button('pauseTask', 'Pause');

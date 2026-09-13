@@ -14,7 +14,7 @@ import {
   gateLane,
   hallItems,
 } from '../../src/engine/layout';
-import { act, buyStartingKit, newGame } from '../helpers';
+import { act, buyNow, buyStartingKit, newGame } from '../helpers';
 import type { GameState } from '../../src/engine/index';
 
 function itemOf(state: GameState, specId: string): string {
@@ -122,7 +122,7 @@ describe('setting the hall out', () => {
   });
 
   it('leaves the office furniture and the yard alone', () => {
-    const state = act(buyStartingKit(newGame()), { type: 'BUY_EQUIPMENT', specId: 'van' });
+    const state = buyNow(buyStartingKit(newGame()), 'van');
     expect(canPlace(state, itemOf(state, 'desk'), 2, 6).reason).toBe('It lives in the office');
     expect(canPlace(state, itemOf(state, 'van'), 2, 6).reason).toBe('It stands in the yard');
     expect(hallItems(state).some((item) => item.specId === 'desk')).toBe(false);
@@ -137,7 +137,7 @@ describe('setting the hall out', () => {
     const slot = STARTING_LAYOUT.tableSaw;
     expect(first?.anchorX).toBe(slot?.x);
     expect(first?.anchorY).toBe(slot?.y);
-    state = act(state, { type: 'BUY_EQUIPMENT', specId: 'tableSaw' });
+    state = buyNow(state, 'tableSaw');
     const saws = state.equipment.filter((item) => item.specId === 'tableSaw');
     expect(saws).toHaveLength(2);
     const second = saws[1];
@@ -160,7 +160,7 @@ describe('the whole workshop fits on the painted floor', () => {
       const want = spec.perWorker ? 6 : 1;
       for (let index = have; index < want; index += 1) {
         state.cash += 100000;
-        state = act(state, { type: 'BUY_EQUIPMENT', specId: spec.id });
+        state = buyNow(state, spec.id);
       }
     }
     // Nothing overlaps anything, nothing sits on a room and nothing blocks the lane.

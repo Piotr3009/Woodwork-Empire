@@ -25,7 +25,10 @@ import {
   MATERIAL_ORDER_PRICE_HIGH,
   MATERIAL_ORDER_PRICE_LOW,
   SERVICE_MINUTES,
+  SHOPPING_MINUTES,
+  SHOPPING_NEXT_MINUTES,
   SITE_MEASURE_MINUTES,
+  SOFTWARE_SHOPPING_MINUTES,
   SOFTWARE_DESIGN_FACTOR,
   STAFF_MANAGEMENT_MINUTES_PER_JOINER,
   UNLOAD_BASE_MINUTES,
@@ -44,6 +47,7 @@ import type {
   TaskCategory,
   TaskInstance,
   TaskKind,
+  TaskOrder,
   WorkerRole,
 } from './types';
 
@@ -96,6 +100,11 @@ const TASK_DEFINITIONS: Record<TaskKind, TaskDefinition> = {
   service: { category: 'workshop', eligibleRoles: ['joiner'], autoRoles: [] },
   repair: { category: 'workshop', eligibleRoles: ['joiner'], autoRoles: [] },
   moveMachines: { category: 'workshop', eligibleRoles: ['joiner', 'helper'], autoRoles: [] },
+  // The owner does his own shopping, his own interviewing and his own waiting for the laptop:
+  // there is nobody to hand any of it to (CLAUDE.md T7 3.10).
+  shopping: { category: 'admin', eligibleRoles: [], autoRoles: [] },
+  hiring: { category: 'admin', eligibleRoles: [], autoRoles: [] },
+  booting: { category: 'admin', eligibleRoles: [], autoRoles: [] },
 };
 
 /** Float guard, not a game number: work this small is finished work. It lives in constants.ts
@@ -169,6 +178,7 @@ export interface TaskDraft {
   jobId?: string | null;
   equipmentId?: string | null;
   deliveryId?: string | null;
+  orders?: TaskOrder[];
 }
 
 export function createTask(state: GameState, draft: TaskDraft): TaskInstance {
@@ -187,6 +197,7 @@ export function createTask(state: GameState, draft: TaskDraft): TaskInstance {
     done: false,
     doneDay: null,
     doneBy: null,
+    orders: draft.orders ? draft.orders.slice() : [],
   };
   state.tasks.push(task);
   return task;
@@ -216,6 +227,27 @@ export function movingMachines(state: GameState): TaskInstance | null {
       (task) => task.kind === 'moveMachines' && !task.done && task.doneBy !== null,
     ) ?? null
   );
+}
+
+/** The trip to the shops the owner is on, if there is one. Everything he buys while it is still
+ *  running rides on the same trip (CLAUDE.md T7 3.10). */
+export function shoppingTask(state: GameState): TaskInstance | null {
+  return state.tasks.find((task) => task.kind === 'shopping' && !task.done) ?? null;
+}
+
+/** What one more order adds to the owner's day: the whole trip for the first thing in the hour,
+ *  half of it for software that comes down the wire, and a quarter of an hour for each further
+ *  thing while the trip is still running (CLAUDE.md T7 3.10). */
+export function orderMinutes(state: GameState, order: TaskOrder): number {
+  if (shoppingTask(state) !== null) return SHOPPING_NEXT_MINUTES;
+  return order.kind === 'software' ? SOFTWARE_SHOPPING_MINUTES : SHOPPING_MINUTES;
+}
+
+/** What the trip is called on the task list: what he went out for, and how much else with it. */
+export function shoppingLabel(orders: readonly TaskOrder[]): string {
+  const more = orders.length - 1;
+  const tail = more <= 0 ? '' : more === 1 ? ' and one more thing' : ` and ${more} more things`;
+  return `Shopping${tail}`;
 }
 
 export function tasksOfKind(state: GameState, kind: TaskKind): TaskInstance[] {

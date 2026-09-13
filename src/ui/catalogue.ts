@@ -10,7 +10,7 @@ import {
 import type { EquipmentSpec, EquipmentTab } from '../engine/types';
 import {
   bagsExist,
-  canBuySoftware,
+  orderCheck,
   countOf,
   findSpec,
   hasExtraction,
@@ -30,6 +30,7 @@ import {
   plural,
   button,
   tabBar,
+  tripLine,
 } from './modal';
 
 /** The tab the catalogue opens on, and the one the Owned list lives under. */
@@ -73,6 +74,9 @@ export function renderCatalogue(
         ? renderOpenFolder(state, open, filter)
         : renderFolders(state, filter, tab) + (tab === 'computers' ? renderSoftware(state) : '');
   return (
+    // What the trip out is costing him so far, and that nothing is his until it is over
+    // (CLAUDE.md T7 3.10).
+    tripLine(state, 'shopping') +
     warnings +
     tabBar('catalogueTab', TABS, tab) +
     filterField('catalogue', filter, 'Filter the catalogue') +
@@ -178,8 +182,8 @@ function renderOwned(state: GameState, filter: string): string {
 }
 
 function renderSoftware(state: GameState): string {
-  const oneOff = canBuySoftware(state, 'oneOff');
-  const subscription = canBuySoftware(state, 'subscription');
+  const oneOff = orderCheck(state, { kind: 'software', mode: 'oneOff' });
+  const subscription = orderCheck(state, { kind: 'software', mode: 'subscription' });
   const current =
     state.software.mode === 'none'
       ? 'No licence'

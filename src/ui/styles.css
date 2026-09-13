@@ -202,6 +202,32 @@
   font-size: 12px;
 }
 
+/* One line under the top bar when the world will not move for a stopped clock, and the single
+   beat on the Pause chip that goes with it (CLAUDE.md T7 3.10). */
+.toast {
+  margin: 0;
+  padding: 6px 12px;
+  background: var(--panel-2);
+  color: var(--accent);
+  font-size: 13px;
+  text-align: center;
+}
+
+.chip.is-pulse {
+  animation: chip-pulse 600ms ease-out 1;
+}
+
+@keyframes chip-pulse {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.25); }
+  100% { transform: scale(1); }
+}
+
+/* What the trip to the shops has cost him so far, over the modal that started it. */
+.trip {
+  margin-top: 0;
+}
+
 /* --------------------------------------------------------------------------
    Page
    -------------------------------------------------------------------------- */

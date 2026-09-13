@@ -21,7 +21,7 @@ import {
 import { clampReputation, ratingFor, reputationTier } from '../../src/engine/reputation';
 import { callsForPrice } from '../../src/engine/calls';
 import type { Job } from '../../src/engine/index';
-import { act, newGame } from '../helpers';
+import { buyNow, newGame } from '../helpers';
 
 function job(partial: Partial<Job>): Job {
   return {
@@ -100,8 +100,8 @@ describe('tool gating', () => {
 
   it('clears the lock once the tools are bought', () => {
     let state = newGame();
-    state = act(state, { type: 'BUY_EQUIPMENT', specId: 'tableSaw' });
-    state = act(state, { type: 'BUY_EQUIPMENT', specId: 'drill' });
+    state = buyNow(state, 'tableSaw');
+    state = buyNow(state, 'drill');
     expect(lockReasonFor(state, template('garageShelves'))).toBeNull();
     // The bookcase still needs the edgebander.
     expect(lockReasonFor(state, template('bookcase'))).toBe('Needs edgebander');

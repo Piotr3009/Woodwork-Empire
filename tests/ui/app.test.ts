@@ -3,7 +3,13 @@
 
 import { beforeAll, describe, expect, it } from 'vitest';
 import { advanceMinutes, currentState, mount } from '../../src/ui/app';
-import { BREAK_MINUTES, LEDGER_VISIBLE_ENTRIES } from '../../src/engine/constants';
+import {
+  BREAK_MINUTES,
+  LEDGER_VISIBLE_ENTRIES,
+  LAPTOP_BOOT_MINUTES,
+  SHOPPING_MINUTES,
+  SHOPPING_NEXT_MINUTES,
+} from '../../src/engine/constants';
 import { findSpec } from '../../src/engine/machines';
 import { STARTING_CLASS, STARTING_KIT } from '../helpers';
 
@@ -73,6 +79,13 @@ describe('the first ten minutes', () => {
     click('[data-do="setView"][data-view="office"]');
     expect(html()).toContain('office-room');
     expect(html()).toContain('data-office="catalogue"');
+    // The game opens on a stopped clock, and nothing that changes the world can be touched
+    // until the player starts it (CLAUDE.md T7 3.10).
+    click('[data-office="catalogue"]');
+    expect(html()).toContain('Time is paused');
+    expect(html()).not.toContain('data-modal="catalogue"');
+    click('[data-do="setSpeed"][data-speed="1"]');
+    expect(currentState()?.speed).toBe(1);
     click('[data-office="catalogue"]');
     expect(html()).toContain('Equipment catalogue');
     const before = currentState()?.cash ?? 0;
@@ -93,6 +106,12 @@ describe('the first ten minutes', () => {
     // The software sits under whatever tab is open: any of them but Owned carries it.
     click('[data-do="catalogueTab"][data-id="computers"]');
     click('[data-do="buySoftware"][data-id="oneOff"]');
+    // Nothing is his yet: it is one trip out, an hour for the first thing and a quarter of an
+    // hour for each of the other eleven, and the cash leaves when he is back (T7 3.10).
+    expect(currentState()?.equipment).toHaveLength(0);
+    expect(currentState()?.cash).toBe(before);
+    expect(html()).toContain('Shopping: 0 of 225 min');
+    advanceMinutes(SHOPPING_MINUTES + SHOPPING_NEXT_MINUTES * STARTING_KIT.length);
     const state = currentState();
     expect(state?.equipment).toHaveLength(STARTING_KIT.length);
     expect(state?.software.mode).toBe('oneOff');
@@ -118,6 +137,10 @@ describe('the first ten minutes', () => {
     // Still standing in the office, so the laptop is right there on the desk.
     click('[data-office="laptop"]');
     expect(html()).toContain('Laptop');
+    // Lifting the lid costs the five minutes the machine takes to come up, and nothing else on
+    // the desk can be picked up until it is up (CLAUDE.md T7 3.10).
+    expect(html()).toContain('Waiting for the laptop');
+    advanceMinutes(LAPTOP_BOOT_MINUTES);
     const name = currentState()?.jobs[0]?.name ?? '';
     // The calls are in the client's diary now, not on the desk (CLAUDE.md T4 3.3).
     expect(html()).not.toContain('Client call');
@@ -391,7 +414,8 @@ describe('setting the hall out', () => {
     click('[data-do="endSetup"]');
     expect(currentState()?.speed).toBe(2);
     expect(html()).toContain('data-do="startSetup"');
-    click('[data-do="setSpeed"][data-speed="0"]');
+    // Back to a running clock: nothing in the office opens on a stopped one (T7 3.10).
+    click('[data-do="setSpeed"][data-speed="1"]');
     click('[data-do="setView"][data-view="office"]');
   });
 });

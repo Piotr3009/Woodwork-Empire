@@ -1,6 +1,11 @@
 // Shared test driver. One place clicks events away, so no test file grows its own copy.
 
 import { WORKER_RATES } from '../src/engine/constants';
+// Straight off the modules, not through the public API: these are the engine's own writes, and
+// the tests use them to stand kit in the hall without sending the owner out for it.
+import { buyEquipment, buySoftware } from '../src/engine/game';
+import { hire } from '../src/engine/staff';
+import type { WorkerRole, WorkerTier } from '../src/engine/types';
 import {
   applyAction,
   createGame,
@@ -30,7 +35,12 @@ export const DEFAULT_OPTIONS: NewGameOptions = {
 };
 
 export function newGame(options: Partial<NewGameOptions> = {}): GameState {
-  return createGame({ ...DEFAULT_OPTIONS, ...options });
+  // The clock runs from the first line of every test: nothing the player buys, orders or pays
+  // for happens in stopped time, and a test about a stopped clock stops it itself (T7 3.10).
+  return applyAction(createGame({ ...DEFAULT_OPTIONS, ...options }), {
+    type: 'SET_SPEED',
+    speed: 1,
+  });
 }
 
 export interface Run {
@@ -171,19 +181,59 @@ export const STARTING_CLASS: Record<string, string> = {
   edgebander: 'budget',
 };
 
+/** A copy of the state, so a helper that writes to the engine's own functions leaves the caller's
+ *  state alone, the way `applyAction` does. */
+function copyOf(state: GameState): GameState {
+  return JSON.parse(JSON.stringify(state)) as GameState;
+}
+
+/** Lets the engine tidy up after a helper wrote to it: locks, stations and the rest of what
+ *  `applyAction` does once the action itself is over. Setting the speed it is already on is the
+ *  one action that changes nothing. */
+function settled(state: GameState): GameState {
+  return applyAction(state, { type: 'SET_SPEED', speed: state.speed });
+}
+
+/** Buys the way the shop books it once the owner is back, with no trip out. The trip is the rule
+ *  of CLAUDE.md T7 3.10 and it has its own tests and its own scenarios; a test that only wants
+ *  the saw standing in the hall should not have to spend an hour of the owner's day on it. */
+export function buyNow(state: GameState, specId: string, variantId?: string): GameState {
+  const next = copyOf(state);
+  buyEquipment(next, specId, variantId);
+  return settled(next);
+}
+
+/** The same short cut for the management software. */
+export function softwareNow(state: GameState, mode: 'oneOff' | 'subscription'): GameState {
+  const next = copyOf(state);
+  buySoftware(next, mode);
+  return settled(next);
+}
+
+/** And for taking somebody on, without the interview. */
+export function hireNow(
+  state: GameState,
+  role: WorkerRole,
+  tier: WorkerTier | null,
+): GameState {
+  const next = copyOf(state);
+  hire(next, role, tier);
+  return settled(next);
+}
+
 export function buyStartingKit(
   state: GameState,
   options: { sawVariant?: string } = {},
 ): GameState {
   let next = state;
   for (const specId of STARTING_KIT) {
-    next = applyAction(next, {
-      type: 'BUY_EQUIPMENT',
+    next = buyNow(
+      next,
       specId,
-      variantId: specId === 'tableSaw' ? options.sawVariant : STARTING_CLASS[specId],
-    });
+      specId === 'tableSaw' ? options.sawVariant : STARTING_CLASS[specId],
+    );
   }
-  return applyAction(next, { type: 'BUY_SOFTWARE', mode: 'oneOff' });
+  return softwareNow(next, 'oneOff');
 }
 
 /** Stands a machine in the hall without paying for it or looking for a free tile, for tests that
@@ -283,9 +333,7 @@ export function firstJob(state: GameState): Job {
 
 /** A desk, a laptop and a one off licence: the minimum to be allowed to draw. */
 export function withLicence(state: GameState): GameState {
-  let next = applyAction(state, { type: 'BUY_EQUIPMENT', specId: 'desk' });
-  next = applyAction(next, { type: 'BUY_EQUIPMENT', specId: 'laptop' });
-  return applyAction(next, { type: 'BUY_SOFTWARE', mode: 'oneOff' });
+  return softwareNow(buyNow(buyNow(state, 'desk'), 'laptop'), 'oneOff');
 }
 
 /** Two men producing in the same minutes: the owner at one bench and a poor joiner at another,

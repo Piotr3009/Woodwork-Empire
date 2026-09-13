@@ -24,6 +24,8 @@ import {
   REPUTATION_START,
   SERVICE_INTERVAL_HOURS,
   SOFTWARE_ONE_OFF_JOBS,
+  HIRING_MINUTES,
+  LAPTOP_BOOT_MINUTES,
   SOFTWARE_ONE_OFF_PRICE,
   SOFTWARE_TURN1_TIER,
   STARTING_LAYOUT,
@@ -43,6 +45,7 @@ import {
   isOvertime,
   isWorkingDay,
   monthOfDay,
+  timeIsPaused,
   weekOfDay,
   weekday,
 } from './clock';
@@ -156,6 +159,7 @@ import {
 import {
   autoAssignJobs,
   availableJoiners,
+  canHire,
   hasWorkingDay,
   helpers,
   hire,
@@ -176,8 +180,11 @@ import {
   interruptOwnerWith,
   movePending,
   movingMachines,
+  orderMinutes,
   pauseOwnerTask,
   resumeOwnerTask,
+  shoppingLabel,
+  shoppingTask,
   startTask,
   taskWorkRate,
 } from './tasks';
@@ -193,6 +200,7 @@ import type {
   PeriodTotals,
   Speed,
   TaskInstance,
+  TaskOrder,
   Worker,
 } from './types';
 
@@ -701,6 +709,17 @@ function applyTaskCompletion(state: GameState, task: TaskInstance): void {
     case 'moveMachines':
       chargeDucting(state);
       // The same as a call: he goes back to whatever the move took him off.
+      resumeOwnerTask(state);
+      break;
+    case 'shopping':
+    case 'hiring':
+      // He is back from the shops or out of the interview: now it is booked (CLAUDE.md T7 3.10).
+      settleOrders(state, task);
+      // The next errand he committed to first, and the bench only when they are all run.
+      if (!startNextTrip(state)) resumeOwnerTask(state);
+      break;
+    case 'booting':
+      // The laptop is up: back to whatever he put down to open it.
       resumeOwnerTask(state);
       break;
     case 'bookkeeping':
@@ -1340,8 +1359,19 @@ function resolveEvent(state: GameState, choiceId: string): void {
   }
 }
 
+/** Everything that changes the world outside the workshop and so cannot happen while the clock
+ *  is stopped (CLAUDE.md T7 3.10). The purchases and the hire carry the rule themselves, through
+ *  `placeOrder`; these are the rest of the shop counter. Dragging the kit about is not on the
+ *  list: setting the hall out stops the clock on purpose, and the Turn 4 move costs stand. */
+const PAUSED_ACTIONS: ReadonlyArray<GameAction['type']> = [
+  'BUY_STOCK',
+  'ORDER_TRANSPORT',
+  'PAY_ARREARS',
+];
+
 export function applyAction(state: GameState, action: GameAction): GameState {
   const next = clone(state);
+  if (timeIsPaused(next) && PAUSED_ACTIONS.includes(action.type)) return next;
   switch (action.type) {
     case 'SET_SPEED':
       // The speed is not the player's while the hall is being moved (CLAUDE.md T4 3.5).
@@ -1390,7 +1420,9 @@ export function applyAction(state: GameState, action: GameAction): GameState {
       assignJob(next, action.jobId, action.workerId);
       break;
     case 'HIRE':
-      hire(next, action.role, action.tier);
+      // The interview is an hour of his own, and the man is on the books when it is over
+      // (CLAUDE.md T7 3.10).
+      placeOrder(next, { kind: 'hire', role: action.role, tier: action.tier });
       break;
     case 'ASK_UNLOAD': {
       const delivery = findDelivery(next, action.deliveryId);
@@ -1427,14 +1459,25 @@ export function applyAction(state: GameState, action: GameAction): GameState {
       }
       break;
     }
+    case 'BOOT_LAPTOP':
+      bootLaptop(next);
+      break;
     case 'PAUSE_TASK':
       pauseOwnerTask(next);
       break;
-    case 'BUY_EQUIPMENT':
-      buyEquipment(next, action.specId, action.variantId);
+    case 'BUY_EQUIPMENT': {
+      // Nothing is bought on the spot: he goes out for it and the cash leaves when he is back
+      // (CLAUDE.md T7 3.10).
+      const spec = findSpec(action.specId);
+      placeOrder(next, {
+        kind: 'equipment',
+        specId: action.specId,
+        variantId: action.variantId ?? spec?.variants[0]?.id ?? '',
+      });
       break;
+    }
     case 'BUY_SOFTWARE':
-      buySoftware(next, action.mode);
+      placeOrder(next, { kind: 'software', mode: action.mode });
       break;
     case 'BUY_STOCK':
       buyStock(next, action.sheets);
@@ -1620,5 +1663,125 @@ export function buySoftware(state: GameState, mode: 'oneOff' | 'subscription'): 
     return OK;
   }
   state.software = { mode: 'subscription', tier: SOFTWARE_TURN1_TIER, jobsRemaining: 0 };
+  return OK;
+}
+
+// ---------------------------------------------------------------------------
+// Nothing in stopped time: every purchase and every hire is a trip (T7 3.10)
+// ---------------------------------------------------------------------------
+
+/** The hall as it will be when the owner is back from every trip he is already on. A second
+ *  thing bought on the same visit is checked against that and not against the hall he is
+ *  standing in: the tool cabinet he has just put on the list is in by the time the hand bander
+ *  he wants to keep in it arrives, and the cash for both is gone (CLAUDE.md T7 3.10). */
+function afterTheTrips(state: GameState): GameState {
+  const after = clone(state);
+  for (const task of after.tasks) {
+    if (!task.done) settleOrders(after, task);
+  }
+  return after;
+}
+
+/** Can this order be placed at all: the clock has to be running, the owner has to be in, and the
+ *  thing has to be one he could buy or take on once everything already on the list has landed. */
+export function orderCheck(state: GameState, order: TaskOrder): BuyCheck {
+  if (timeIsPaused(state)) return { ok: false, reason: 'Time is paused' };
+  if (!state.owner.present) return { ok: false, reason: 'You are not in today' };
+  const after = afterTheTrips(state);
+  if (order.kind === 'equipment') return canBuy(after, order.specId, order.variantId);
+  if (order.kind === 'software') return canBuySoftware(after, order.mode);
+  return canHire(after, order.role, order.tier);
+}
+
+/** The errands the owner runs himself, in the order he committed to them. Nobody else can be
+ *  sent on one (CLAUDE.md T7 3.10). */
+const TRIP_KINDS: ReadonlyArray<TaskInstance['kind']> = ['shopping', 'hiring'];
+
+/** True while he is out on one already: the next errand waits its turn behind it, so the tool
+ *  cabinet is on the floor before the man who keeps his tools in it sits down for his interview. */
+function onATrip(state: GameState): boolean {
+  const current = state.owner.currentTaskId;
+  if (current === null) return false;
+  const task = findTask(state, current);
+  return task !== null && !task.done && TRIP_KINDS.includes(task.kind);
+}
+
+/** The next errand he has committed to and not yet run. He finishes them before he goes back to
+ *  whatever the first one took him off. */
+function startNextTrip(state: GameState): boolean {
+  const trip = state.tasks.find((task) => !task.done && TRIP_KINDS.includes(task.kind));
+  if (!trip) return false;
+  // What he put down for the first errand is still what he goes back to after the last one.
+  const resume = state.owner.resumeTaskId;
+  state.owner.currentTaskId = trip.id;
+  trip.doneBy = 'owner';
+  state.owner.resumeTaskId = resume;
+  return true;
+}
+
+/** Places an order: the owner goes out for it, and it is booked when he gets back. The whole of
+ *  3.10 hangs on this one path, so the catalogue, the laptop and the team board all come through
+ *  it (CLAUDE.md T7 3.10). */
+export function placeOrder(state: GameState, order: TaskOrder): BuyCheck {
+  const check = orderCheck(state, order);
+  if (!check.ok) return check;
+  if (order.kind === 'hire') {
+    // An interview is its own hour and never rides on the shopping (PIOTR).
+    const task = createTask(state, {
+      kind: 'hiring',
+      label: 'Interview',
+      minutes: HIRING_MINUTES,
+      orders: [order],
+    });
+    // He sits down for it as soon as he is free of the errands he is already out on, and goes
+    // back to whatever he put down when the last of them is over (CLAUDE.md T4 3.3, T7 3.10).
+    if (!onATrip(state)) interruptOwnerWith(state, task);
+    return OK;
+  }
+  const open = shoppingTask(state);
+  if (open !== null) {
+    const more = orderMinutes(state, order);
+    open.minutesTotal += more;
+    open.minutesRemaining += more;
+    open.orders.push(order);
+    open.label = shoppingLabel(open.orders);
+    // He is at the counter either way: if he wandered off, he is back on it.
+    if (state.owner.currentTaskId !== open.id && !onATrip(state)) interruptOwnerWith(state, open);
+    return OK;
+  }
+  const task = createTask(state, {
+    kind: 'shopping',
+    label: shoppingLabel([order]),
+    minutes: orderMinutes(state, order),
+    orders: [order],
+  });
+  if (!onATrip(state)) interruptOwnerWith(state, task);
+  return OK;
+}
+
+/** The owner is back: what he went out for is booked and the cash leaves now. Anything the world
+ *  has made impossible while he was out is simply not bought (CLAUDE.md T7 3.10). */
+function settleOrders(state: GameState, task: TaskInstance): void {
+  const orders = task.orders;
+  task.orders = [];
+  for (const order of orders) {
+    if (order.kind === 'equipment') buyEquipment(state, order.specId, order.variantId);
+    else if (order.kind === 'software') buySoftware(state, order.mode);
+    else hire(state, order.role, order.tier);
+  }
+}
+
+/** Lifting the lid on the laptop: it has to come up before anything on it can be touched, and
+ *  the five minutes are the owner's like any other (CLAUDE.md T7 3.10). */
+export function bootLaptop(state: GameState): BuyCheck {
+  if (timeIsPaused(state)) return { ok: false, reason: 'Time is paused' };
+  if (!has(state, 'laptop')) return { ok: false, reason: 'Needs a laptop first' };
+  if (state.tasks.some((task) => task.kind === 'booting' && !task.done)) return OK;
+  const task = createTask(state, {
+    kind: 'booting',
+    label: 'Waiting for the laptop',
+    minutes: LAPTOP_BOOT_MINUTES,
+  });
+  interruptOwnerWith(state, task);
   return OK;
 }

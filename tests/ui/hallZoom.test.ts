@@ -78,6 +78,10 @@ beforeAll(() => {
   document.body.innerHTML = '<div id="app"></div>';
   mount(app());
   required(app().querySelector<HTMLButtonElement>('[data-do="startGame"]')).click();
+  // The hall cannot be set out on a stopped clock (CLAUDE.md T7 3.10).
+  required(
+    app().querySelector<HTMLButtonElement>('[data-do="setSpeed"][data-speed="1"]'),
+  ).click();
   const state = required(currentState());
   Object.assign(state, buyStartingKit(state));
   render();

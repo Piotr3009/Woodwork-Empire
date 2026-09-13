@@ -14,7 +14,15 @@ import { findSpec } from '../../src/engine/machines';
 import { addWorkingDays } from '../../src/engine/clock';
 import { machineHoursPerDay } from '../../src/engine/production';
 import type { Equipment, GameState } from '../../src/engine/index';
-import { act, buyStartingKit, fillRack, firstJob, newGame, placeEnquiry } from '../helpers';
+import {
+  act,
+  buyNow,
+  buyStartingKit,
+  fillRack,
+  firstJob,
+  newGame,
+  placeEnquiry,
+} from '../helpers';
 
 function parse(html: string): HTMLElement {
   const holder = document.createElement('div');
@@ -117,14 +125,14 @@ describe('the tabs', () => {
   it('frames a class the hall already has, and counts the family on its folder', () => {
     let state = newGame({ difficulty: 'veryEasy' });
     expect(shop(state, 'sheetMachines', '', 'tableSaw').querySelector('.tile.is-owned')).toBeNull();
-    state = act(state, { type: 'BUY_EQUIPMENT', specId: 'tableSaw', variantId: 'pro' });
+    state = buyNow(state, 'tableSaw', 'pro');
     const open = shop(state, 'sheetMachines', '', 'tableSaw');
     const owned = Array.from(open.querySelectorAll('.tile.is-owned'));
     expect(owned).toHaveLength(1);
     expect(owned[0]?.getAttribute('data-variant')).toBe('pro');
     expect(owned[0]?.textContent).toContain('Owned');
     // A second one of the same class says how many.
-    const two = act(state, { type: 'BUY_EQUIPMENT', specId: 'tableSaw', variantId: 'pro' });
+    const two = buyNow(state, 'tableSaw', 'pro');
     expect(
       shop(two, 'sheetMachines', '', 'tableSaw').querySelector('.tile.is-owned')?.textContent,
     ).toContain('Owned × 2');
@@ -241,7 +249,7 @@ describe('the Owned tab', () => {
 
   it('says so when the hall is empty, and filters by name', () => {
     expect(shop(newGame(), 'owned').innerHTML).toContain('Nothing here yet.');
-    const state = act(newGame(), { type: 'BUY_EQUIPMENT', specId: 'toolCabinet' });
+    const state = buyNow(newGame(), 'toolCabinet');
     expect(shop(state, 'owned', 'cabinet').innerHTML).toContain('Tool cabinet');
     expect(shop(state, 'owned', 'saw').innerHTML).toContain('Nothing matches that.');
   });

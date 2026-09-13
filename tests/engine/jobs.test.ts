@@ -30,18 +30,21 @@ import { tick } from '../../src/engine/index';
 import type { GameEvent, GameState, Job } from '../../src/engine/index';
 import {
   act,
+  buyNow,
   buyStartingKit,
   clearEvents,
   doAllEmails,
   doTask,
-  fillRack,
   eventsOfKind,
+  fillRack,
   firstJob,
+  hireNow,
   newGame,
   nextDay,
   placeEnquiry,
   runToDay,
   runToStage,
+  softwareNow,
 } from '../helpers';
 
 /** An Easy game with the day 1 kit bought, a clean board and a full rack. The saw is the budget
@@ -118,14 +121,14 @@ describe('accepting an enquiry', () => {
   it('refuses to start a drawing with no licence', () => {
     let state = newGame();
     for (const specId of ['desk', 'laptop', 'tableSaw', 'drill']) {
-      state = act(state, { type: 'BUY_EQUIPMENT', specId });
+      state = buyNow(state, specId);
     }
     state.enquiries = [];
     state = accept(state);
     const design = state.tasks.find((task) => task.kind === 'design');
     const tried = act(state, { type: 'START_TASK', taskId: design?.id ?? '' });
     expect(tried.owner.currentTaskId).toBeNull();
-    const licensed = act(tried, { type: 'BUY_SOFTWARE', mode: 'oneOff' });
+    const licensed = softwareNow(tried, 'oneOff');
     const started = act(licensed, { type: 'START_TASK', taskId: design?.id ?? '' });
     expect(started.owner.currentTaskId).toBe(design?.id);
   });
@@ -164,8 +167,8 @@ describe('the by hand path', () => {
 
   it('does not flag a job as by hand when the tools are there', () => {
     let state = ready();
-    state = act(state, { type: 'BUY_EQUIPMENT', specId: 'thicknesser' });
-    state = act(state, { type: 'BUY_EQUIPMENT', specId: 'solidWoodTools' });
+    state = buyNow(state, 'thicknesser');
+    state = buyNow(state, 'solidWoodTools');
     const table = placeEnquiry(state, {
       templateId: 'oakDiningTable',
       name: 'Oak dining table',
@@ -289,7 +292,7 @@ describe('production', () => {
 describe('late delivery', () => {
   /** With a van the piece goes out the same day, so the lateness is the day it was made. */
   function lateJob(express: boolean, daysLate: number): GameState {
-    let state = accept(act(ready(), { type: 'BUY_EQUIPMENT', specId: 'van' }), 400, {
+    let state = accept(buyNow(ready(), 'van'), 400, {
       express,
       deadlineDays: 1,
     });
@@ -442,7 +445,7 @@ describe('the piece at the gate', () => {
   });
 
   it('costs 90 minutes and no money with a van, and goes the same day', () => {
-    let state = clearEvents(act(finished(), { type: 'BUY_EQUIPMENT', specId: 'van' }));
+    let state = clearEvents(buyNow(finished(), 'van'));
     const before = state.cash;
     state = act(state, { type: 'ORDER_TRANSPORT', jobId: firstJob(state).id });
     expect(state.cash).toBe(before);
@@ -467,11 +470,11 @@ describe('the piece at the gate', () => {
   });
 
   it('lets a joiner take the van run instead of the owner', () => {
-    let state = clearEvents(act(finished(), { type: 'BUY_EQUIPMENT', specId: 'van' }));
+    let state = clearEvents(buyNow(finished(), 'van'));
     for (const specId of missingForHire(state, 'joiner')) {
-      state = act(state, { type: 'BUY_EQUIPMENT', specId });
+      state = buyNow(state, specId);
     }
-    state = clearEvents(act(state, { type: 'HIRE', role: 'joiner', tier: 'poor' }));
+    state = clearEvents(hireNow(state, 'joiner', 'poor'));
     const joiner = state.workers[0];
     if (joiner) joiner.startDay = state.clock.day;
     state = act(state, { type: 'ORDER_TRANSPORT', jobId: firstJob(state).id });
@@ -504,7 +507,7 @@ describe('emails nobody answered', () => {
     const job = firstJob(state);
     job.stage = 'awaitingTransport';
     job.finishedDay = 1;
-    state = clearEvents(act(state, { type: 'BUY_EQUIPMENT', specId: 'van' }));
+    state = clearEvents(buyNow(state, 'van'));
     state = act(state, { type: 'ORDER_TRANSPORT', jobId: job.id });
     state = act(state, { type: 'RESOLVE_EVENT', choiceId: 'owner' });
     return clearEvents(tick(state, OWN_DELIVERY_MINUTES));

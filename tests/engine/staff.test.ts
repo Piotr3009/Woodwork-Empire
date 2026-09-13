@@ -29,10 +29,12 @@ import { tick } from '../../src/engine/index';
 import type { GameState, Worker } from '../../src/engine/index';
 import {
   act,
+  buyNow,
   buyStartingKit,
   clearEvents,
   fillRack,
   firstJob,
+  hireNow,
   newGame,
   placeEnquiry,
   runClock,
@@ -47,7 +49,7 @@ function withJoinerKit(state: GameState): GameState {
   let guard = 0;
   while (missingForHire(next, 'joiner').length > 0 && guard < 20) {
     for (const specId of missingForHire(next, 'joiner')) {
-      next = act(next, { type: 'BUY_EQUIPMENT', specId });
+      next = buyNow(next, specId);
     }
     guard += 1;
   }
@@ -59,7 +61,7 @@ function withCrew(state: GameState, count: number, tier: Worker['tier']): GameSt
   let next = state;
   for (let index = 0; index < count; index += 1) {
     next = withJoinerKit(next);
-    next = act(next, { type: 'HIRE', role: 'joiner', tier });
+    next = hireNow(next, 'joiner', tier);
   }
   return next;
 }
@@ -102,11 +104,11 @@ describe('the hiring pool', () => {
   it('blocks the hire while the kit is missing and lets it through once it is there', () => {
     let state = buyStartingKit(newGame());
     expect(canHire(state, 'joiner', 'poor').ok).toBe(false);
-    state = act(state, { type: 'HIRE', role: 'joiner', tier: 'poor' });
+    state = hireNow(state, 'joiner', 'poor');
     expect(state.workers).toHaveLength(0);
     state = withJoinerKit(state);
     expect(canHire(state, 'joiner', 'poor').ok).toBe(true);
-    state = act(state, { type: 'HIRE', role: 'joiner', tier: 'poor' });
+    state = hireNow(state, 'joiner', 'poor');
     expect(state.workers).toHaveLength(1);
     expect(state.workers[0]?.rate).toBe(WORKER_RATES.poor);
     expect(state.workers[0]?.weeklyWage).toBe(480);
@@ -145,7 +147,7 @@ describe('the hiring pool', () => {
   it('hires office staff without any bench kit', () => {
     let state = newGame();
     state.reputation = 15;
-    state = act(state, { type: 'HIRE', role: 'salesman', tier: null });
+    state = hireNow(state, 'salesman', null);
     expect(state.workers[0]?.role).toBe('salesman');
     expect(state.workers[0]?.monthlyWage).toBe(2200);
   });
@@ -251,7 +253,7 @@ describe('the queue at the saw', () => {
   });
 
   it('puts a second man to work the moment a second saw is bought', () => {
-    const state = act(fourAtTheCutting(), { type: 'BUY_EQUIPMENT', specId: 'tableSaw' });
+    const state = buyNow(fourAtTheCutting(), 'tableSaw');
     const before = state.jobs.map((job) => job.labourRemaining);
     const worked = tick(state, 60);
     const done = before.map((value, index) => value - (worked.jobs[index]?.labourRemaining ?? 0));

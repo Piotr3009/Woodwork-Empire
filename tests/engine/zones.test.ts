@@ -10,7 +10,7 @@ import { spriteBox } from '../../src/render/sprites';
 import { tileToScreen } from '../../src/render/iso';
 import { canBuy } from '../../src/engine/game';
 import type { GameState } from '../../src/engine/index';
-import { act, newGame, placeEquipment } from '../helpers';
+import { buyNow, newGame, placeEquipment } from '../helpers';
 
 /** An empty 200 m2 hall with money in the bank. */
 function emptyHall(): GameState {
@@ -81,7 +81,7 @@ describe('two things on the floor', () => {
 
   it('refuses a machine the hall has no room for, and says how much room it wants', () => {
     let state = emptyHall();
-    state = act(state, { type: 'BUY_EQUIPMENT', specId: 'extractor' });
+    state = buyNow(state, 'extractor');
     // A floor edgebander wants extraction and a free 5 by 3 (CLAUDE.md T7 3.6).
     expect(canBuy(state, 'edgebander', 'standard').ok).toBe(true);
     const full = { ...state, equipment: [...state.equipment] };
@@ -152,7 +152,7 @@ describe('the whole catalogue on one floor', () => {
     const forSale = EQUIPMENT_SPECS.filter((spec) => !spec.locked);
     for (let pass = 0; pass < 2; pass += 1) {
       for (const spec of forSale) {
-        state = act(state, { type: 'BUY_EQUIPMENT', specId: spec.id });
+        state = buyNow(state, spec.id);
       }
     }
     // Everything the catalogue sells is in the hall, and nothing is standing on anything else.

@@ -51,11 +51,13 @@ import type { Equipment, GameEvent, GameState } from '../../src/engine/index';
 import { renderHall } from '../../src/render/hall';
 import {
   act,
+  buyNow,
   buyStartingKit,
   clearEvents,
   eventsOfKind,
   fillRack,
   firstJob,
+  hireNow,
   newGame,
   placeEnquiry,
   runToDay,
@@ -86,7 +88,7 @@ describe('the catalogue', () => {
       ok: false,
       reason: 'Coming in a later stage.',
     });
-    const tried = act(state, { type: 'BUY_EQUIPMENT', specId: 'sprayBooth' });
+    const tried = buyNow(state, 'sprayBooth');
     expect(tried.equipment).toHaveLength(0);
   });
 
@@ -100,7 +102,7 @@ describe('the catalogue', () => {
   });
 
   it('refuses a second one of something that stands alone', () => {
-    const state = act(newGame(), { type: 'BUY_EQUIPMENT', specId: 'extractor' });
+    const state = buyNow(newGame(), 'extractor');
     expect(canBuy(state, 'extractor')).toEqual({ ok: false, reason: 'Already owned' });
     expect(canBuy(state, 'tableSaw').ok).toBe(true);
   });
@@ -110,15 +112,15 @@ describe('bags', () => {
   it('only exist with an extractor, and not with the central system', () => {
     const plain = newGame({ difficulty: 'veryEasy' });
     expect(bagsExist(plain)).toBe(false);
-    const withExtractor = act(plain, { type: 'BUY_EQUIPMENT', specId: 'extractor' });
+    const withExtractor = buyNow(plain, 'extractor');
     expect(bagsExist(withExtractor)).toBe(true);
-    const withSystem = act(withExtractor, { type: 'BUY_EQUIPMENT', specId: 'dustSystem' });
+    const withSystem = buyNow(withExtractor, 'dustSystem');
     expect(bagsExist(withSystem)).toBe(false);
   });
 
   it('belongs to the machines the material runs through', () => {
     let state = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
-    state = act(state, { type: 'BUY_EQUIPMENT', specId: 'thicknesser' });
+    state = buyNow(state, 'thicknesser');
     expect(bagMachinesFor(state, 'sheet').map((item) => item.specId)).toEqual([
       'tableSaw',
       'edgebander',
@@ -237,7 +239,7 @@ describe('bags', () => {
 
   it('never fills a bag once the central system is in', () => {
     let state = atTheBench();
-    state = act(state, { type: 'BUY_EQUIPMENT', specId: 'dustSystem' });
+    state = buyNow(state, 'dustSystem');
     const saw = state.equipment.find((item) => item.specId === 'tableSaw');
     if (saw) saw.minutesUsed = 2399;
     const events: GameEvent[] = [];
@@ -391,14 +393,11 @@ describe('dust', () => {
 
 describe('the extractor', () => {
   it('breaks down more often when the hall is filthy', () => {
-    const state = act(newGame({ difficulty: 'veryEasy' }), {
-      type: 'BUY_EQUIPMENT',
-      specId: 'extractor',
-    });
+    const state = buyNow(newGame({ difficulty: 'veryEasy' }), 'extractor');
     expect(extractorBreakdownChance(state)).toBe(EXTRACTOR_BREAKDOWN_CHANCE);
     state.dust = 80;
     expect(extractorBreakdownChance(state)).toBe(EXTRACTOR_BREAKDOWN_CHANCE_HIGH_DUST);
-    const withSystem = act(state, { type: 'BUY_EQUIPMENT', specId: 'dustSystem' });
+    const withSystem = buyNow(state, 'dustSystem');
     expect(extractorBreakdownChance(withSystem)).toBe(0);
   });
 
@@ -429,7 +428,7 @@ describe('the extractor', () => {
 
   it('cannot break down when the central system is in', () => {
     let state = atTheBench();
-    state = act(state, { type: 'BUY_EQUIPMENT', specId: 'dustSystem' });
+    state = buyNow(state, 'dustSystem');
     expect(has(state, 'dustSystem')).toBe(true);
     const run = runToDay(state, 40);
     expect(eventsOfKind(run.events, 'machineBroken')).toHaveLength(0);
@@ -452,17 +451,14 @@ describe('the central system and a bag that was already full', () => {
     const saw = state.equipment.find((item) => item.specId === 'tableSaw');
     if (saw) saw.bagFull = true;
     expect(familyStopped(state, 'tableSaw')?.why).toBe('bag');
-    state = act(state, { type: 'BUY_EQUIPMENT', specId: 'dustSystem' });
+    state = buyNow(state, 'dustSystem');
     expect(familyStopped(state, 'tableSaw')).toBeNull();
     const working = tick(state, 30);
     expect(firstJob(working).labourRemaining).toBeLessThan(firstJob(state).labourRemaining);
   });
 
   it('reads the messy to dirty edge the same way everywhere', () => {
-    const state = act(newGame({ difficulty: 'veryEasy' }), {
-      type: 'BUY_EQUIPMENT',
-      specId: 'extractor',
-    });
+    const state = buyNow(newGame({ difficulty: 'veryEasy' }), 'extractor');
     state.dust = 70;
     expect(dustBand(state.dust).label).toBe('messy');
     expect(extractorBreakdownChance(state)).toBe(EXTRACTOR_BREAKDOWN_CHANCE);
@@ -510,7 +506,7 @@ describe('no extraction at all', () => {
     expect(firstJob(state).blockedBy).toBe('no extraction');
     expect(renderHall(state)).toContain('No extraction in the hall');
     // Buy one and the bench starts again.
-    const fixed = tick(act(state, { type: 'BUY_EQUIPMENT', specId: 'extractor' }), 10);
+    const fixed = tick(buyNow(state, 'extractor'), 10);
     expect(firstJob(fixed).labourRemaining).toBeLessThan(before);
     expect(firstJob(fixed).blockedBy).toBe('');
   });
@@ -539,7 +535,7 @@ describe('no bench in the hall', () => {
     expect(firstJob(state).blockedBy).toBe('no bench');
     // The extraction comes first in the list, so the bench is the next thing it names.
     expect(startProductionCheck(state, firstJob(state)).reason).toBe('no bench');
-    const bought = tick(act(state, { type: 'BUY_EQUIPMENT', specId: 'workbench' }), 10);
+    const bought = tick(buyNow(state, 'workbench'), 10);
     expect(firstJob(bought).labourRemaining).toBeLessThan(before);
     expect(firstJob(bought).blockedBy).toBe('');
   });
@@ -556,9 +552,9 @@ describe('no bench in the hall', () => {
     let state = fillRack(buyStartingKit(newGame({ difficulty: 'veryEasy' })));
     state.enquiries = [];
     for (const specId of ['locker', 'canteenSeat', 'toolCabinet', 'handToolSet']) {
-      state = act(state, { type: 'BUY_EQUIPMENT', specId });
+      state = buyNow(state, specId);
     }
-    state = act(state, { type: 'HIRE', role: 'joiner', tier: 'poor' });
+    state = hireNow(state, 'joiner', 'poor');
     const joiner = state.workers[0];
     if (!joiner) throw new Error('nobody was hired');
     joiner.startDay = state.clock.day;
@@ -595,9 +591,9 @@ describe('no bench in the hall', () => {
     let state = atTheBench();
     // He is taken on while there is a bench, with the kit a joiner has to have, and starts today.
     for (const specId of ['locker', 'canteenSeat', 'toolCabinet', 'handToolSet']) {
-      state = act(state, { type: 'BUY_EQUIPMENT', specId });
+      state = buyNow(state, specId);
     }
-    state = act(state, { type: 'HIRE', role: 'joiner', tier: 'poor' });
+    state = hireNow(state, 'joiner', 'poor');
     const joiner = state.workers[0];
     if (!joiner) throw new Error('nobody was hired');
     joiner.startDay = state.clock.day;

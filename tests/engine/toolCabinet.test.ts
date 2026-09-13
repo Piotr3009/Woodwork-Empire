@@ -10,7 +10,7 @@ import { standsInTheHall } from '../../src/engine/machines';
 import { cabinetsNeeded, canHire, missingForHire } from '../../src/engine/staff';
 import { needsDucting } from '../../src/engine/machines';
 import { renderHall } from '../../src/render/hall';
-import { act, buyStartingKit, newGame, placeEquipment } from '../helpers';
+import { buyNow, buyStartingKit, hireNow, newGame, placeEquipment } from '../helpers';
 
 function countOf(state: ReturnType<typeof newGame>, specId: string): number {
   return state.equipment.filter((item) => item.specId === specId).length;
@@ -38,14 +38,14 @@ describe('what cannot be bought without one', () => {
     expect(canBuy(state, 'edgebander').reason).toBe('Needs Tool cabinet first');
     expect(canBuy(state, 'handToolSet').ok).toBe(false);
     expect(canBuy(state, 'handToolSet').reason).toBe('Needs Tool cabinet first');
-    state = act(state, { type: 'BUY_EQUIPMENT', specId: TOOL_CABINET });
+    state = buyNow(state, TOOL_CABINET);
     expect(countOf(state, TOOL_CABINET)).toBe(1);
     expect(canBuy(state, 'edgebander').ok).toBe(true);
     expect(canBuy(state, 'handToolSet').ok).toBe(true);
   });
 
   it('leaves the buy undone, not half done, while the cabinet is missing', () => {
-    const state = act(newGame(), { type: 'BUY_EQUIPMENT', specId: 'edgebander' });
+    const state = buyNow(newGame(), 'edgebander');
     expect(countOf(state, 'edgebander')).toBe(0);
   });
 });
@@ -87,15 +87,15 @@ describe('hiring wants a free cabinet', () => {
     expect(countOf(state, TOOL_CABINET)).toBe(1);
     expect(missingForHire(state, 'joiner')).toContain(TOOL_CABINET);
     for (const specId of ['locker', 'canteenSeat', 'handToolSet']) {
-      state = act(state, { type: 'BUY_EQUIPMENT', specId });
+      state = buyNow(state, specId);
     }
     expect(canHire(state, 'joiner', 'poor').ok).toBe(false);
     expect(canHire(state, 'joiner', 'poor').reason).toContain('Tool cabinet');
-    state = act(state, { type: 'BUY_EQUIPMENT', specId: TOOL_CABINET });
+    state = buyNow(state, TOOL_CABINET);
     expect(countOf(state, TOOL_CABINET)).toBe(2);
     expect(missingForHire(state, 'joiner')).toEqual([]);
     expect(canHire(state, 'joiner', 'poor').ok).toBe(true);
-    state = act(state, { type: 'HIRE', role: 'joiner', tier: 'poor' });
+    state = hireNow(state, 'joiner', 'poor');
     expect(state.workers).toHaveLength(1);
     // And the next man wants a third.
     expect(missingForHire(state, 'joiner')).toContain(TOOL_CABINET);
@@ -103,7 +103,7 @@ describe('hiring wants a free cabinet', () => {
 
   it('stands the cabinets along the rear wall, clear of everything else', () => {
     let state = buyStartingKit(newGame());
-    state = act(state, { type: 'BUY_EQUIPMENT', specId: TOOL_CABINET });
+    state = buyNow(state, TOOL_CABINET);
     const cabinets = state.equipment.filter((item) => item.specId === TOOL_CABINET);
     expect(cabinets).toHaveLength(2);
     const places = cabinets.map((item) => `${item.anchorX},${item.anchorY}`);

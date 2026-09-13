@@ -2,7 +2,7 @@
 // (CLAUDE.md T3 3.5). The catalogue lists the family, this is where the money is spent.
 
 import {
-  canBuy,
+  orderCheck,
   countOf,
   enduranceHoursFor,
   findSpec,
@@ -87,7 +87,9 @@ function tile(
   variant: EquipmentVariant,
   recommended: string,
 ): string {
-  const check = canBuy(state, spec.id, variant.id);
+  // The same question the buy itself asks, against the hall as it will be when he is back
+  // from the trip he is already on (CLAUDE.md T7 3.10).
+  const check = orderCheck(state, { kind: 'equipment', specId: spec.id, variantId: variant.id });
   const buy = check.ok
     ? variant.id === recommended
       ? primaryButton('buyEquipment', 'Buy', `data-id="${spec.id}" data-variant="${variant.id}"`)
@@ -121,7 +123,9 @@ function tile(
  *  for today is not the advice, the cheapest one he can is (CLAUDE.md T3 3.5). */
 export function recommendedVariant(state: GameState, spec: EquipmentSpec): string {
   for (const variant of spec.variants) {
-    if (canBuy(state, spec.id, variant.id).ok) return variant.id;
+    if (orderCheck(state, { kind: 'equipment', specId: spec.id, variantId: variant.id }).ok) {
+      return variant.id;
+    }
   }
   return '';
 }

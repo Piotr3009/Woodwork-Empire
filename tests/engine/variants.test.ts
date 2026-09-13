@@ -29,6 +29,7 @@ import {
 import type { Equipment, GameState } from '../../src/engine/index';
 import {
   act,
+  buyNow,
   buyStartingKit,
   fillRack,
   firstJob,
@@ -128,11 +129,7 @@ describe('every catalogue line is a family', () => {
 describe('buying a class of machine', () => {
   it('pays that class and stands that class in the hall', () => {
     const before = newGame({ difficulty: 'veryEasy' });
-    const bought = act(before, {
-      type: 'BUY_EQUIPMENT',
-      specId: 'tableSaw',
-      variantId: 'industrial',
-    });
+    const bought = buyNow(before, 'tableSaw', 'industrial');
     const saw = required(bought.equipment[0]);
     expect(saw.variantId).toBe('industrial');
     expect(saw.purchasePrice).toBe(25000);
@@ -141,18 +138,14 @@ describe('buying a class of machine', () => {
   });
 
   it('buys the cheapest class when none is named, which is the used saw', () => {
-    const bought = act(newGame(), { type: 'BUY_EQUIPMENT', specId: 'tableSaw' });
+    const bought = buyNow(newGame(), 'tableSaw');
     expect(bought.equipment[0]?.variantId).toBe('used');
     expect(bought.equipment[0]?.purchasePrice).toBe(1800);
   });
 
   it('refuses a class the workshop cannot pay for, and names the reason', () => {
     const poor = newGame({ difficulty: 'hard' });
-    const tried = act(poor, {
-      type: 'BUY_EQUIPMENT',
-      specId: 'tableSaw',
-      variantId: 'industrial',
-    });
+    const tried = buyNow(poor, 'tableSaw', 'industrial');
     expect(tried.equipment).toHaveLength(0);
   });
 });

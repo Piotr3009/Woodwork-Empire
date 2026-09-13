@@ -19,7 +19,7 @@ import {
   WEEKDAY_NAMES,
   WORKING_DAYS_PER_WEEK,
 } from './constants';
-import type { Clock, Speed } from './types';
+import type { Clock, GameState, Speed } from './types';
 
 /** 0 is Monday. Day 1 is a Monday (CLAUDE.md 6.1). */
 export function weekday(day: number): number {
@@ -159,4 +159,11 @@ export function daysBetween(from: number, to: number): number[] {
 export function gameMinutesPerRealSecond(speed: Speed): number {
   if (speed === 0) return 0;
   return (MINUTES_PER_WORKING_DAY / REAL_SECONDS_PER_DAY_AT_1X) * speed;
+}
+
+/** Time is stopped, so nothing that changes the world can be started: no purchase, no hire, no
+ *  order, no sale and no setting the hall out. Reading what is already written down is another
+ *  matter, and the Work Plan opens on a stopped clock (CLAUDE.md T7 3.10, PIOTR). */
+export function timeIsPaused(state: GameState): boolean {
+  return state.speed === 0;
 }
