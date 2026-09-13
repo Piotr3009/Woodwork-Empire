@@ -833,9 +833,6 @@ function handleAction(element: DataElement, point: { x: number; y: number }): vo
       // The evening's own summary, put back in front of him from the books (CLAUDE.md T6 3.9).
       ui.daySummary = Number(id);
       break;
-    case 'closeDaySummary':
-      ui.daySummary = null;
-      break;
     case 'openMachine':
       // The classes of a family fill the page, over the catalogue that sent the player here.
       ui.machine = id;

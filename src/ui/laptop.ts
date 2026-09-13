@@ -9,7 +9,15 @@ import { renderDrawings } from './drawings';
 import { renderHiring } from './hiring';
 import { gateSection } from './jobCard';
 import { renderMaterials } from './materials';
-import { emptyLine, escapeHtml, minutes, money, plural, taskStartAction } from './modal';
+import {
+  emptyLine,
+  escapeHtml,
+  minutes,
+  money,
+  plural,
+  tabBar,
+  taskStartAction,
+} from './modal';
 
 /** The four tabs, in the order the contract names them (docs/art/SPRITES.md 8.2). */
 export type LaptopTab = 'tasks' | 'materials' | 'team' | 'drawings';
@@ -75,15 +83,6 @@ function tasksTab(state: GameState): string {
   );
 }
 
-function tabBar(tab: LaptopTab): string {
-  const chips = TABS.map(
-    ([id, label]) =>
-      `<button class="chip${id === tab ? ' is-on' : ''}" data-do="laptopTab" data-id="${id}">` +
-      `${escapeHtml(label)}</button>`,
-  ).join('');
-  return `<div class="tabs">${chips}</div>`;
-}
-
 export interface LaptopView {
   tab: LaptopTab;
   /** What the player has typed into the sheet count on the Materials tab. */
@@ -99,5 +98,5 @@ export function renderLaptop(state: GameState, view: LaptopView): string {
         : view.tab === 'drawings'
           ? renderDrawings(state)
           : tasksTab(state);
-  return tabBar(view.tab) + body;
+  return tabBar('laptopTab', TABS, view.tab) + body;
 }

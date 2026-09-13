@@ -30,6 +30,7 @@ import {
   money,
   plural,
   button,
+  tabBar,
 } from './modal';
 
 /** The tab the catalogue opens on, and the one the Owned list lives under. */
@@ -44,16 +45,11 @@ export function catalogueTabFrom(value: string | undefined): CatalogueTab {
   return found ? found.id : CATALOGUE_FIRST_TAB;
 }
 
-function tabBar(tab: CatalogueTab): string {
-  const chips = [...EQUIPMENT_TABS, { id: OWNED_TAB, label: 'Owned' }]
-    .map(
-      (entry) =>
-        `<button class="chip${entry.id === tab ? ' is-on' : ''}" data-do="catalogueTab" ` +
-        `data-id="${entry.id}">${escapeHtml(entry.label)}</button>`,
-    )
-    .join('');
-  return `<div class="tabs">${chips}</div>`;
-}
+/** Every tab of the catalogue in the order Piotr gave, with Owned on the end (CLAUDE.md T6 3.6). */
+const TABS: Array<[string, string]> = [
+  ...EQUIPMENT_TABS.map((entry): [string, string] => [entry.id, entry.label]),
+  [OWNED_TAB, 'Owned'],
+];
 
 export function renderCatalogue(state: GameState, filter: string, tab: CatalogueTab): string {
   const warnings =
@@ -69,7 +65,7 @@ export function renderCatalogue(state: GameState, filter: string, tab: Catalogue
     tab === OWNED_TAB
       ? renderOwned(state, filter)
       : renderTab(state, filter, tab) + (tab === 'computers' ? renderSoftware(state) : '');
-  return warnings + tabBar(tab) + filterField('catalogue', filter, 'Filter the catalogue') + body;
+  return warnings + tabBar('catalogueTab', TABS, tab) + filterField('catalogue', filter, 'Filter the catalogue') + body;
 }
 
 /** One tab of the catalogue. The filter works inside it and nowhere else. */

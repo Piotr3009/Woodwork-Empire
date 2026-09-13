@@ -22,7 +22,7 @@ import {
   serviceIsDue,
 } from '../engine/machines';
 import { jobsAtGate } from '../engine/jobs';
-import { standsInTheHall } from '../engine/layout';
+import { standsInTheHall } from '../engine/machines';
 import { machineInUse } from '../engine/game';
 import { rackCapacity, stockIsLow } from '../engine/materials';
 import {
@@ -345,10 +345,16 @@ export function cameraTransform(camera: HallCamera): string {
   return `translate(${round(camera.x)},${round(camera.y)}) scale(${round(camera.scale)})`;
 }
 
+/** How far in the player is allowed to be: from the fit to four times it (CLAUDE.md T6 3.3). The
+ *  one place the two ends are applied, so no way in can land outside them. */
+function clampScale(scale: number): number {
+  return Math.min(HALL_ZOOM_MAX, Math.max(HALL_ZOOM_MIN, scale));
+}
+
 /** The scene never comes off the frame: at the fit there is nowhere to go, and the further in the
  *  player is the more he may push it about. */
 export function clampCamera(camera: HallCamera, frame: Frame): HallCamera {
-  const scale = Math.min(HALL_ZOOM_MAX, Math.max(HALL_ZOOM_MIN, camera.scale));
+  const scale = clampScale(camera.scale);
   const slack = 1 - scale;
   return {
     scale,
@@ -365,7 +371,7 @@ export function sceneToContent(camera: HallCamera, at: Point): Point {
 
 /** Zoom about a point of the frame: whatever is under the pointer stays under it. */
 export function zoomAt(camera: HallCamera, frame: Frame, at: Point, factor: number): HallCamera {
-  const scale = Math.min(HALL_ZOOM_MAX, Math.max(HALL_ZOOM_MIN, camera.scale * factor));
+  const scale = clampScale(camera.scale * factor);
   const taken = scale / camera.scale;
   return clampCamera(
     { scale, x: at.x - taken * (at.x - camera.x), y: at.y - taken * (at.y - camera.y) },
@@ -375,7 +381,7 @@ export function zoomAt(camera: HallCamera, frame: Frame, at: Point, factor: numb
 
 /** Zoom to a scale with a point of the scene in the middle of the frame. */
 export function zoomTo(frame: Frame, centre: Point, scale: number): HallCamera {
-  const wanted = Math.min(HALL_ZOOM_MAX, Math.max(HALL_ZOOM_MIN, scale));
+  const wanted = clampScale(scale);
   return clampCamera(
     {
       scale: wanted,
@@ -446,7 +452,8 @@ export function machineFx(state: GameState, item: Equipment, spec: EquipmentSpec
     return { className: '', svg: blade(point) + chipStream(point) };
   }
   if (item.specId === 'thicknesser') return { className: '', svg: chipStream(point) };
-  if (item.specId === 'edgebander') return { className: '', svg: lamp(point, 'amber') };
+  // No line for the hand edgebander: it holds no cell of the floor, so it is never drawn
+  // (CLAUDE.md T6 3.5).
   return NO_FX;
 }
 

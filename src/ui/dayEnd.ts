@@ -1,6 +1,6 @@
 // The end of day summary, and the game over screen (CLAUDE.md 10.1).
 
-import { daySummaryOf, dustBand, earnedRate, formatReputation } from '../engine/index';
+import { daySummaryOf, dustBand, earnedRate, formatReputation, summaryOfDay } from '../engine/index';
 import type { DaySummary, GameState, SummaryCadence } from '../engine/index';
 import { days, escapeHtml, minutes, money, plural } from './modal';
 
@@ -78,10 +78,11 @@ export function renderDaySummary(
   );
 }
 
-/** The evening's own summary: the day as it stands, out of the same builder that writes the
- *  record the Days tab opens (CLAUDE.md T6 3.9). */
+/** The evening's own summary. It is the record the day wrote when it closed, the same one the
+ *  Days tab opens later, so the two can never say different things (CLAUDE.md T6 3.9). The day
+ *  as it stands is only used before there is a record, which is never in play. */
 export function renderDayEnd(state: GameState): string {
-  return renderDaySummary(daySummaryOf(state), {
+  return renderDaySummary(summaryOfDay(state, state.clock.day) ?? daySummaryOf(state), {
     earnedRate: earnedRate(state, 'day'),
     cadence: cadenceControl(state),
   });

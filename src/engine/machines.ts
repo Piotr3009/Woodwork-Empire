@@ -45,6 +45,14 @@ export function findSpec(specId: string): EquipmentSpec | null {
   return EQUIPMENT_SPECS.find((entry) => entry.id === specId) ?? null;
 }
 
+/** Does this kind of thing hold cells of the floor at all? The hand edgebander does not: it is
+ *  kept in a tool cabinet and used at the bench (CLAUDE.md T6 3.5). The one place that is asked:
+ *  the floor plan, the painting, the stations and the ducting all read it. */
+export function standsInTheHall(specId: string): boolean {
+  const spec = findSpec(specId);
+  return spec !== null && spec.width > 0 && spec.depth > 0;
+}
+
 /** The class of machine this is, or the cheapest one in the family when the id is unknown. */
 export function variantOf(spec: EquipmentSpec, variantId: string): EquipmentVariant {
   const found = spec.variants.find((entry) => entry.id === variantId);
@@ -244,11 +252,10 @@ export function ductingIsFree(state: GameState): boolean {
  *  moved. A bench, a rack, a locker or a seat is simply carried (CLAUDE.md T4 3.5). */
 export function needsDucting(specId: string): boolean {
   if (NO_DUCTING_SPECS.includes(specId)) return false;
-  const spec = findSpec(specId);
   // Nothing that holds no cell of the floor is ducted: it never stood anywhere to be unplugged
   // from (CLAUDE.md T6 3.5).
-  if (spec === null || spec.width <= 0 || spec.depth <= 0) return false;
-  return spec.category === 'machine';
+  if (!standsInTheHall(specId)) return false;
+  return findSpec(specId)?.category === 'machine';
 }
 
 /** The machines the player has moved that have to be reconnected, in the order he moved them.

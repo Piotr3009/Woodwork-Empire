@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { DELIVERY_VAN_SPRITE, EQUIPMENT_SPECS } from '../../src/engine/constants';
 import { HALL_LAYERS } from '../../src/render/hall';
 import { OFFICE_LAYERS } from '../../src/render/office';
-import { standsInTheHall } from '../../src/engine/layout';
+import { standsInTheHall } from '../../src/engine/machines';
 import { renderSpriteCheck, spriteTargets } from '../../src/ui/spriteCheck';
 
 function parse(html: string): HTMLElement {

@@ -7,7 +7,7 @@ import { HALL_CANVAS, HALL_LAYERS, box, escapeText, label, polygon } from '../re
 import { OFFICE_CANVAS, OFFICE_LAYERS } from '../render/office';
 import { boxPolygons, centreOf, footprintPolygon, gridBounds, tileToScreen } from '../render/iso';
 import { SPRITE_SCALE, spriteCanvas, spriteFileSize, spriteUrl } from '../render/sprites';
-import { standsInTheHall } from '../engine/layout';
+import { standsInTheHall } from '../engine/machines';
 import { escapeHtml } from './modal';
 
 export interface SpriteTarget {

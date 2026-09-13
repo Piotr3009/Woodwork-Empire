@@ -2,7 +2,7 @@
 // before it drops and the catalogue can ask before it buys (CLAUDE.md T2 3.10).
 
 import { GATE_LANE, ROOM_LAYOUT } from './constants';
-import { findSpec } from './machines';
+import { findSpec, standsInTheHall } from './machines';
 import type { Equipment, GameState } from './types';
 
 export interface PlaceCheck {
@@ -18,13 +18,6 @@ export interface Box {
 }
 
 const OK: PlaceCheck = { ok: true, reason: '' };
-
-/** Does this kind of thing hold cells of the floor at all? The hand edgebander does not: it is
- *  kept in a tool cabinet and used at the bench (CLAUDE.md T6 3.5). */
-export function standsInTheHall(specId: string): boolean {
-  const spec = findSpec(specId);
-  return spec !== null && spec.width > 0 && spec.depth > 0;
-}
 
 function overlaps(left: Box, right: Box): boolean {
   return (

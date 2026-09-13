@@ -6,9 +6,9 @@ import { describe, expect, it } from 'vitest';
 import { renderDayEnd } from '../../src/ui/dayEnd';
 import { renderMenu } from '../../src/ui/topbar';
 import { currentState, mount } from '../../src/ui/app';
-import { formatMoney } from '../../src/engine/index';
+import { formatMoney, summaryOfDay, tick } from '../../src/engine/index';
 import type { GameEvent, GameState } from '../../src/engine/index';
-import { act, buyStartingKit, eventsOfKind, newGame, runDays } from '../helpers';
+import { act, buyStartingKit, choose, eventsOfKind, newGame, runDays } from '../helpers';
 
 function parse(html: string): HTMLElement {
   const holder = document.createElement('div');
@@ -63,6 +63,24 @@ describe('the cadence in the Menu, driven through the page', () => {
       const on = root.querySelector('.menu-pop .chip.is-on');
       expect(on).not.toBeNull();
     }
+  });
+});
+
+describe('the evening summary and the record of the day', () => {
+  it('is the one that was written down, not the books as they stand now', () => {
+    // Run the first day out to the modal it ends on.
+    let state = buyStartingKit(newGame());
+    for (let guard = 0; guard < 400 && state.activeEvent?.kind !== 'dayEnd'; guard += 1) {
+      state = state.activeEvent === null ? tick(state, 15) : choose(state, 'ok');
+    }
+    expect(state.activeEvent?.kind).toBe('dayEnd');
+    const recorded = summaryOfDay(state, state.clock.day);
+    expect(recorded).not.toBeNull();
+    // Money moves behind the modal, the way a bill paid off the Accounting screen does. The
+    // evening still shows the day that closed, which is what the Days tab will open later.
+    const later = { ...state, cash: state.cash - 1234 };
+    expect(renderDayEnd(later)).toContain(formatMoney(recorded?.cash ?? 0));
+    expect(renderDayEnd(later)).not.toContain(formatMoney(later.cash));
   });
 });
 

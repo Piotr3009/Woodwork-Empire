@@ -141,6 +141,19 @@ export function filterField(key: string, value: string, placeholder: string): st
   );
 }
 
+/** The row of chips a modal is read in tabs by. One shape for all of them: the laptop, the
+ *  catalogue and the books all put their own action and their own list through here. */
+export function tabBar(action: string, tabs: Array<[string, string]>, current: string): string {
+  const chips = tabs
+    .map(
+      ([id, label]) =>
+        `<button class="chip${id === current ? ' is-on' : ''}" data-do="${action}" ` +
+        `data-id="${id}">${escapeHtml(label)}</button>`,
+    )
+    .join('');
+  return `<div class="tabs">${chips}</div>`;
+}
+
 export function emptyLine(text: string): string {
   return `<p class="empty">${escapeHtml(text)}</p>`;
 }

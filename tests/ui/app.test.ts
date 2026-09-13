@@ -170,8 +170,10 @@ describe('the first ten minutes', () => {
     expect(html()).toContain('Table saw');
     expect(html()).toContain('data-owner="1"');
     expect(html()).toContain('data-room="wc"');
-    click('[data-room="wc"]');
-    expect(html()).toContain('The WC.');
+    // The block carries its own tooltip. Walking into a room is driven off the footprints and
+    // needs a screen matrix, which this page has none of, so it is proved where the matrix is
+    // stubbed: tests/ui/hallRooms.test.ts.
+    expect(html()).toContain('<title>The WC.');
     // Nothing has its material in the hall yet, so the hall says why instead of a dead button.
     expect(html()).toContain('No job has its material in the hall yet');
     expect(html()).toContain('Clean up');

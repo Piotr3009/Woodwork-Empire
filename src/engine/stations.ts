@@ -3,8 +3,7 @@
 // A station is a string so the state stays plain JSON: 'bench', 'machine:<specId>', 'rack',
 // 'gate', 'office' or 'idle'.
 
-import { has } from './machines';
-import { standsInTheHall } from './layout';
+import { has, standsInTheHall } from './machines';
 import type { GameState, TaskInstance } from './types';
 
 export const STATION_BENCH = 'bench';

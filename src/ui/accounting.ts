@@ -18,7 +18,7 @@ import {
   weeklyWageBill,
 } from '../engine/index';
 import type { GameState, LedgerCategory, LedgerEntry, PeriodTotals } from '../engine/index';
-import { button, escapeHtml, money, plural, primaryButton, whyLink } from './modal';
+import { button, escapeHtml, money, plural, primaryButton, tabBar, whyLink } from './modal';
 
 /** The three ways of looking at the books (CLAUDE.md T6 3.9). */
 export type AccountingTab = 'days' | 'summary' | 'ledger';
@@ -31,15 +31,6 @@ const TABS: Array<[AccountingTab, string]> = [
 export function accountingTabFrom(value: string | undefined): AccountingTab {
   const found = TABS.find(([id]) => id === value);
   return found ? found[0] : 'days';
-}
-
-function tabBar(tab: AccountingTab): string {
-  const chips = TABS.map(
-    ([id, label]) =>
-      `<button class="chip${id === tab ? ' is-on' : ''}" data-do="accountingTab" ` +
-      `data-id="${id}">${escapeHtml(label)}</button>`,
-  ).join('');
-  return `<div class="tabs">${chips}</div>`;
 }
 
 /** Plain English for every ledger category. The engine's own key is never printed (CLAUDE.md 3). */
@@ -236,7 +227,7 @@ export function renderAccounting(
     `${whyLink(state, 'depositReturn')}</p>` +
     banner +
     arrears +
-    tabBar(tab) +
+    tabBar('accountingTab', TABS, tab) +
     body +
     `<p class="hint">${button('copyState', 'Copy state as JSON')}</p>`
   );
