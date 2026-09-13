@@ -459,8 +459,10 @@ export function dropJob(state: GameState, jobId: string): boolean {
   const done = jobProgress(job);
   const cut = done <= 0 ? 0 : sheetsDueFor(job, done);
   const left = Math.max(0, job.sheetsUsed - cut);
-  if (job.materialMode === 'perJob') {
-    // Bought in for this job and this job only: the money is gone with it.
+  // Ordered in for this job and this job only: the money is gone with it. A job whose material
+  // was never ordered has nothing to write off, whatever mode it was set to.
+  const orderedIn = state.deliveries.some((delivery) => delivery.jobId === job.id);
+  if (orderedIn) {
     noteLoss(state, 'material', `Material written off: ${job.name}`, job.materialCost);
   } else {
     state.stock.sheets += left;

@@ -69,6 +69,20 @@ describe('Drop project', () => {
     job.materialMode = 'perJob';
     job.sheetsUsed = job.sheets;
     state.stock.sheets -= job.sheets;
+    // A lorry was booked for this job: that is what makes it the job's own material and not the
+    // company's (CLAUDE.md T9 3.9).
+    state.deliveries.push({
+      id: 'del-test',
+      jobId: job.id,
+      sheets: job.sheets,
+      orderedDay: state.clock.day,
+      pricePaid: job.materialCost,
+      arriveDay: state.clock.day + 1,
+      arrived: true,
+      unloaded: true,
+      bespoke: false,
+      overflowSheets: 0,
+    });
     const onTheRack = state.stock.sheets;
     const cash = state.cash;
     const dropped = act(state, { type: 'DROP_JOB', jobId: job.id });
