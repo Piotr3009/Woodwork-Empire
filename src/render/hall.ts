@@ -22,7 +22,12 @@ import {
   serviceIsDue,
 } from '../engine/machines';
 import { jobsAtGate } from '../engine/jobs';
-import { standsInTheHall } from '../engine/machines';
+import {
+  footprintOf,
+  itemStandsInTheHall,
+  sheetCapacityOf,
+  zoneOf,
+} from '../engine/machines';
 import { machineInUse } from '../engine/game';
 import { rackCapacity, stockIsLow } from '../engine/materials';
 import {
@@ -33,6 +38,7 @@ import {
   STATION_OFFICE,
   STATION_RACK,
   stationMachine,
+  stationWaitingFor,
 } from '../engine/stations';
 import { ownerIsAvailable, staffOutputFactor } from '../engine/owner';
 import { plural } from '../engine/text';
@@ -440,9 +446,34 @@ export interface MachineFx {
 
 const NO_FX: MachineFx = { className: '', svg: '' };
 
+/** Where a machine's picture actually stands: its class's footprint, centred inside the working
+ *  zone it reserves (CLAUDE.md T7 3.3). The anchor cell is the zone's corner, so everything that
+ *  draws an object comes through here. */
+export function footprintIn(item: Equipment): {
+  x: number;
+  y: number;
+  width: number;
+  depth: number;
+  height: number;
+} {
+  const stands = footprintOf(item.specId, item.variantId);
+  const zone = zoneOf(item.specId, item.variantId);
+  // A class that holds no floor is kept in a tool cabinet: its picture stands on the cell the
+  // cabinet stands on, with nothing to centre it in (CLAUDE.md T7 3.6).
+  const inZone = zone.width > 0 && zone.depth > 0;
+  return {
+    x: item.anchorX + (inZone ? (zone.width - stands.width) / 2 : 0),
+    y: item.anchorY + (inZone ? (zone.depth - stands.depth) / 2 : 0),
+    width: stands.width,
+    depth: stands.depth,
+    height: stands.height,
+  };
+}
+
 export function machineFx(state: GameState, item: Equipment, spec: EquipmentSpec): MachineFx {
   // The top of the object, where a lamp or a blade would sit on the real thing.
-  const point = centreOf(item.anchorX, item.anchorY, spec.width, spec.depth, spec.height);
+  const stands = footprintIn(item);
+  const point = centreOf(stands.x, stands.y, stands.width, stands.depth, stands.height);
   if (spec.category === 'extraction') {
     if (item.broken) return { className: '', svg: lamp(point, 'red') };
     return machineInUse(state, item) ? { className: ' fx-breathe', svg: '' } : NO_FX;
@@ -452,8 +483,9 @@ export function machineFx(state: GameState, item: Equipment, spec: EquipmentSpec
     return { className: '', svg: blade(point) + chipStream(point) };
   }
   if (item.specId === 'thicknesser') return { className: '', svg: chipStream(point) };
-  // No line for the hand edgebander: it holds no cell of the floor, so it is never drawn
-  // (CLAUDE.md T6 3.5).
+  // A floor edgebander throws chips off its trimmer; a hand one holds no cell of the floor and
+  // is never drawn at all (CLAUDE.md T6 3.5, T7 3.6).
+  if (item.specId === 'edgebander') return { className: '', svg: chipStream(point) };
   return NO_FX;
 }
 
@@ -507,6 +539,15 @@ function sawdust(state: GameState): Drawable[] {
   return drawables;
 }
 
+/** The cell in front of an object, along its own footprint: where a man stands to use it. */
+function frontOf(item: Equipment, along: number): { x: number; y: number } {
+  const stands = footprintIn(item);
+  return {
+    x: Math.floor(stands.x) + Math.min(along, Math.max(0, Math.ceil(stands.width) - 1)),
+    y: Math.floor(stands.y + stands.depth),
+  };
+}
+
 /** The cell a station puts a figure on. Anything the workshop has not bought falls back to the
  *  middle of the floor (CLAUDE.md T2 3.3). */
 export function stationCell(
@@ -514,16 +555,18 @@ export function stationCell(
   station: string,
   bench: { x: number; y: number },
 ): { x: number; y: number } {
-  const specId = stationMachine(station);
+  // A man waiting for a machine stands at it, which is what waiting at one looks like (T7 3.1).
+  const waitingFor = stationWaitingFor(station);
+  const specId = stationMachine(station) ?? waitingFor;
   if (specId !== null) {
+    // At the front edge of the machine itself, not of the working zone around it, and one step
+    // along it when he is waiting for somebody else to finish with it (CLAUDE.md T7 3.1).
     const item = state.equipment.find((entry) => entry.specId === specId);
-    const spec = item ? findSpec(item.specId) : null;
-    if (item && spec) return { x: item.anchorX, y: item.anchorY + spec.depth };
+    if (item) return frontOf(item, waitingFor === null ? 0 : 1);
   }
   if (station === STATION_RACK) {
-    const rack = state.equipment.find((entry) => findSpec(entry.specId)?.sheetCapacity ?? 0);
-    const spec = rack ? findSpec(rack.specId) : null;
-    if (rack && spec) return { x: rack.anchorX, y: rack.anchorY + spec.depth };
+    const rack = state.equipment.find((entry) => sheetCapacityOf(entry) > 0);
+    if (rack) return frontOf(rack, 0);
   }
   if (station === STATION_GATE) {
     // At the back of the lorry, inside the shutter.
@@ -538,6 +581,10 @@ export function stationCell(
 function stationLabel(station: string): string {
   const specId = stationMachine(station);
   if (specId !== null) return (findSpec(specId)?.name ?? specId).toLowerCase();
+  const waiting = stationWaitingFor(station);
+  if (waiting !== null) {
+    return `waiting for ${(findSpec(waiting)?.name ?? waiting).toLowerCase()}`;
+  }
   if (station === STATION_RACK) return 'the rack';
   if (station === STATION_GATE) return 'the gate';
   if (station === STATION_OFFICE) return 'the office';
@@ -714,7 +761,10 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
   for (const item of state.equipment) {
     const spec = findSpec(item.specId);
     if (!spec || spec.category === 'furniture') continue;
-    if (!standsInTheHall(item.specId)) continue;
+    if (!itemStandsInTheHall(item)) continue;
+    // What the picture stands on is the class's own footprint, centred inside the working zone
+    // the class reserves (CLAUDE.md T7 3.3).
+    const stands = footprintIn(item);
     const broken = item.broken;
     const fill = broken ? 'var(--stopped)' : CATEGORY_FILL[spec.category] ?? 'var(--kit-machine)';
     const shade = broken
@@ -723,7 +773,7 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
     const bagLine = item.bagFull ? ' (bag full)' : '';
     const serviceLine = !item.broken && serviceIsDue(item) ? ' (service due)' : '';
     const rackLine =
-      spec.category === 'storage' ? `: ${state.stock.sheets} / ${rackCapacity(state)}` : '';
+      sheetCapacityOf(item) > 0 ? `: ${state.stock.sheets} / ${rackCapacity(state)}` : '';
     const atThisBench =
       spec.category === 'bench'
         ? state.workers.find(
@@ -744,11 +794,11 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
         objectArt({
           spriteKey: item.spriteKey,
           tier: item.variantId,
-          x: item.anchorX,
-          y: item.anchorY,
-          width: spec.width,
-          depth: spec.depth,
-          height: spec.height,
+          x: stands.x,
+          y: stands.y,
+          width: stands.width,
+          depth: stands.depth,
+          height: stands.height,
           fill,
           shade,
           label: name,
@@ -776,16 +826,8 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
   }
   if (ownerIsAvailable(state)) {
     const bench = state.equipment.find((item) => item.specId === 'workbench');
-    const benchSpec = bench ? findSpec(bench.specId) : null;
-    // At the middle of his bench's front edge, taken from the bench's own footprint: the offsets
-    // that used to be written in here were the 3 by 2 of the half metre tile.
-    const ownerBench =
-      bench && benchSpec
-        ? {
-            x: bench.anchorX + Math.floor(benchSpec.width / 2),
-            y: bench.anchorY + benchSpec.depth,
-          }
-        : { x: 2, y: 5 };
+    // At his bench's own front edge, taken from the class's footprint inside its working zone.
+    const ownerBench = bench ? frontOf(bench, 0) : { x: 2, y: 5 };
     drawables.push(
       figure(
         'owner',

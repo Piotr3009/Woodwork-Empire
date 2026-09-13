@@ -14,39 +14,37 @@ import {
   RATING_ON_TIME,
   SITE_MEASURE_TAXI_COST,
 } from '../../src/engine/constants';
-import {
-  gateIsCrowded,
-  hallProductivityFactor,
-  machineLabourFactor,
-} from '../../src/engine/machines';
+import { gateIsCrowded, hallProductivityFactor } from '../../src/engine/machines';
 import { emailRatingFactor } from '../../src/engine/reputation';
 import { callsForPrice } from '../../src/engine/calls';
 import {
   emailPaymentPenalty,
   findJob,
-  jobSpeedFactor,
   minutesRemainingFor,
   ownerJob,
 } from '../../src/engine/jobs';
+import { stagePlanFor } from '../../src/engine/stages';
 import { materialCostFor, sheetsForCost } from '../../src/engine/materials';
 import { missingForHire } from '../../src/engine/staff';
 import { tick } from '../../src/engine/index';
 import type { GameEvent, GameState, Job } from '../../src/engine/index';
 import {
   act,
+  buyNow,
   buyStartingKit,
-  placeEquipment,
   clearEvents,
   doAllEmails,
   doTask,
-  fillRack,
   eventsOfKind,
+  fillRack,
   firstJob,
+  hireNow,
   newGame,
   nextDay,
   placeEnquiry,
   runToDay,
   runToStage,
+  softwareNow,
 } from '../helpers';
 
 /** An Easy game with the day 1 kit bought, a clean board and a full rack. The saw is the budget
@@ -123,14 +121,14 @@ describe('accepting an enquiry', () => {
   it('refuses to start a drawing with no licence', () => {
     let state = newGame();
     for (const specId of ['desk', 'laptop', 'tableSaw', 'drill']) {
-      state = act(state, { type: 'BUY_EQUIPMENT', specId });
+      state = buyNow(state, specId);
     }
     state.enquiries = [];
     state = accept(state);
     const design = state.tasks.find((task) => task.kind === 'design');
     const tried = act(state, { type: 'START_TASK', taskId: design?.id ?? '' });
     expect(tried.owner.currentTaskId).toBeNull();
-    const licensed = act(tried, { type: 'BUY_SOFTWARE', mode: 'oneOff' });
+    const licensed = softwareNow(tried, 'oneOff');
     const started = act(licensed, { type: 'START_TASK', taskId: design?.id ?? '' });
     expect(started.owner.currentTaskId).toBe(design?.id);
   });
@@ -155,8 +153,12 @@ describe('the by hand path', () => {
     const job = state.jobs[0];
     expect(job?.byHand).toBe(true);
     expect(job?.labourValue).toBe(12000 * LABOUR_FRACTION);
-    // The penalty is on the minutes it takes, not on the labour the job carries (CLAUDE.md 9.5).
-    expect(jobSpeedFactor(state, job as Job)).toBe(BY_HAND_DURATION_FACTOR);
+    // The penalty is on the minutes it takes, not on the labour the job carries (CLAUDE.md 9.5),
+    // and it is on every stage of it, because a job made by hand touches no machine at all.
+    for (const stage of stagePlanFor(state, job as Job)) {
+      expect(stage.byHand, stage.id).toBe(true);
+      expect(stage.speed, stage.id).toBeCloseTo(1 / BY_HAND_DURATION_FACTOR, 10);
+    }
     expect(minutesRemainingFor(state, job as Job, 1)).toBeCloseTo(
       ((12000 * LABOUR_FRACTION) / OWNER_LABOUR_PER_MINUTE) * BY_HAND_DURATION_FACTOR,
       6,
@@ -165,8 +167,8 @@ describe('the by hand path', () => {
 
   it('does not flag a job as by hand when the tools are there', () => {
     let state = ready();
-    state = act(state, { type: 'BUY_EQUIPMENT', specId: 'thicknesser' });
-    state = act(state, { type: 'BUY_EQUIPMENT', specId: 'solidWoodTools' });
+    state = buyNow(state, 'thicknesser');
+    state = buyNow(state, 'solidWoodTools');
     const table = placeEnquiry(state, {
       templateId: 'oakDiningTable',
       name: 'Oak dining table',
@@ -177,17 +179,6 @@ describe('the by hand path', () => {
     });
     state = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: table.id, byHand: true });
     expect(state.jobs[0]?.byHand).toBe(false);
-  });
-});
-
-describe('machine labour reductions', () => {
-  it('multiplies the reductions of the machines that are there', () => {
-    const state = newGame();
-    expect(machineLabourFactor(state, 'sheet')).toBe(1);
-    placeEquipment(state, 'cnc');
-    expect(machineLabourFactor(state, 'sheet')).toBeCloseTo(0.8, 10);
-    placeEquipment(state, 'cncHead');
-    expect(machineLabourFactor(state, 'sheet')).toBeCloseTo(0.8 * 0.95, 10);
   });
 });
 
@@ -301,7 +292,7 @@ describe('production', () => {
 describe('late delivery', () => {
   /** With a van the piece goes out the same day, so the lateness is the day it was made. */
   function lateJob(express: boolean, daysLate: number): GameState {
-    let state = accept(act(ready(), { type: 'BUY_EQUIPMENT', specId: 'van' }), 400, {
+    let state = accept(buyNow(ready(), 'van'), 400, {
       express,
       deadlineDays: 1,
     });
@@ -405,39 +396,6 @@ describe('scenario: garage shelves on Easy', () => {
   });
 });
 
-describe('machine reductions act on the minutes, every minute', () => {
-  function cncInto(state: GameState): GameState {
-    placeEquipment(state, 'cnc', { x: 12, y: 7 });
-    return state;
-  }
-
-  it('shortens a job that is already on the books', () => {
-    const state = accept(ready());
-    firstJob(state).stage = 'ready';
-    const working = act(state, { type: 'WORK_HERE', jobId: null });
-    const plain = tick(working, 60);
-    const withCnc = tick(cncInto(act(state, { type: 'WORK_HERE', jobId: null })), 60);
-    const plainDone = 160 - firstJob(plain).labourRemaining;
-    const cncDone = 160 - firstJob(withCnc).labourRemaining;
-    // A CNC cuts the labour of every job by 20%, so the same hour gets 25% more of it done.
-    expect(cncDone).toBeCloseTo(plainDone / 0.8, 6);
-    expect(jobSpeedFactor(withCnc, firstJob(withCnc))).toBeCloseTo(0.8, 10);
-  });
-
-  it('lengthens it again when the bailiff takes the machine away', () => {
-    const state = cncInto(accept(ready()));
-    const job = firstJob(state);
-    const fast = minutesRemainingFor(state, job, 1);
-    state.equipment = state.equipment.filter((item) => item.specId !== 'cnc');
-    expect(minutesRemainingFor(state, job, 1)).toBeCloseTo(fast / 0.8, 6);
-  });
-
-  it('still takes 240 minutes for a 400 job in a workshop with no reductions', () => {
-    const state = accept(ready());
-    expect(minutesRemainingFor(state, firstJob(state), 1)).toBeCloseTo(240, 6);
-  });
-});
-
 describe('an express job, on the Turn 2 rules', () => {
   it('charges material and labour against the base price, so the uplift is pure profit', () => {
     // A 400 shelves job taken as express: the client pays 480, the workshop still spends 400.
@@ -487,7 +445,7 @@ describe('the piece at the gate', () => {
   });
 
   it('costs 90 minutes and no money with a van, and goes the same day', () => {
-    let state = clearEvents(act(finished(), { type: 'BUY_EQUIPMENT', specId: 'van' }));
+    let state = clearEvents(buyNow(finished(), 'van'));
     const before = state.cash;
     state = act(state, { type: 'ORDER_TRANSPORT', jobId: firstJob(state).id });
     expect(state.cash).toBe(before);
@@ -512,11 +470,11 @@ describe('the piece at the gate', () => {
   });
 
   it('lets a joiner take the van run instead of the owner', () => {
-    let state = clearEvents(act(finished(), { type: 'BUY_EQUIPMENT', specId: 'van' }));
+    let state = clearEvents(buyNow(finished(), 'van'));
     for (const specId of missingForHire(state, 'joiner')) {
-      state = act(state, { type: 'BUY_EQUIPMENT', specId });
+      state = buyNow(state, specId);
     }
-    state = clearEvents(act(state, { type: 'HIRE', role: 'joiner', tier: 'poor' }));
+    state = clearEvents(hireNow(state, 'joiner', 'poor'));
     const joiner = state.workers[0];
     if (joiner) joiner.startDay = state.clock.day;
     state = act(state, { type: 'ORDER_TRANSPORT', jobId: firstJob(state).id });
@@ -549,7 +507,7 @@ describe('emails nobody answered', () => {
     const job = firstJob(state);
     job.stage = 'awaitingTransport';
     job.finishedDay = 1;
-    state = clearEvents(act(state, { type: 'BUY_EQUIPMENT', specId: 'van' }));
+    state = clearEvents(buyNow(state, 'van'));
     state = act(state, { type: 'ORDER_TRANSPORT', jobId: job.id });
     state = act(state, { type: 'RESOLVE_EVENT', choiceId: 'owner' });
     return clearEvents(tick(state, OWN_DELIVERY_MINUTES));

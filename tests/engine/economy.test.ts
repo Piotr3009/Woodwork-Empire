@@ -40,6 +40,7 @@ import type { GameState, Worker } from '../../src/engine/index';
 import { createTask } from '../../src/engine/tasks';
 import {
   act,
+  buyNow,
   clearEvents,
   doTask,
   eventsOfKind,
@@ -47,6 +48,7 @@ import {
   nextDay,
   runDays,
   runToDay,
+  softwareNow,
 } from '../helpers';
 
 function ledgerFor(state: GameState, category: string): number {
@@ -113,12 +115,12 @@ describe('daily costs', () => {
   it('charges power per machine on top of the base', () => {
     const empty = newGame();
     expect(dailyPower(empty)).toBe(POWER_BASE_DAILY);
-    const withSaw = act(empty, { type: 'BUY_EQUIPMENT', specId: 'tableSaw' });
+    const withSaw = buyNow(empty, 'tableSaw');
     expect(dailyPower(withSaw)).toBe(POWER_BASE_DAILY + POWER_PER_MACHINE_DAILY);
-    const withExtractor = act(withSaw, { type: 'BUY_EQUIPMENT', specId: 'extractor' });
+    const withExtractor = buyNow(withSaw, 'extractor');
     expect(dailyPower(withExtractor)).toBe(POWER_BASE_DAILY + 2 * POWER_PER_MACHINE_DAILY);
     // A drill is not a machine that draws power.
-    const withDrill = act(withExtractor, { type: 'BUY_EQUIPMENT', specId: 'drill' });
+    const withDrill = buyNow(withExtractor, 'drill');
     expect(dailyPower(withDrill)).toBe(POWER_BASE_DAILY + 2 * POWER_PER_MACHINE_DAILY);
   });
 });
@@ -149,15 +151,12 @@ describe('weekly and monthly cadences', () => {
   });
 
   it('bills the software subscription monthly and the one off never again', () => {
-    const subscription = act(
-      act(newGame(), { type: 'BUY_EQUIPMENT', specId: 'desk' }),
-      { type: 'BUY_EQUIPMENT', specId: 'laptop' },
-    );
-    const subscribed = act(subscription, { type: 'BUY_SOFTWARE', mode: 'subscription' });
+    const subscription = buyNow(buyNow(newGame(), 'desk'), 'laptop');
+    const subscribed = softwareNow(subscription, 'subscription');
     expect(subscribed.software.mode).toBe('subscription');
     const nextMonth = runToDay(subscribed, 31).state;
     expect(ledgerFor(nextMonth, 'software')).toBe(-SOFTWARE_SUBSCRIPTION_MONTHLY);
-    const oneOff = act(subscription, { type: 'BUY_SOFTWARE', mode: 'oneOff' });
+    const oneOff = softwareNow(subscription, 'oneOff');
     expect(oneOff.software.jobsRemaining).toBe(30);
     const oneOffNextMonth = runToDay(oneOff, 31).state;
     // The law of CLAUDE.md T2 3.4: 150 a month, and the one off is two years of it.
@@ -168,7 +167,7 @@ describe('weekly and monthly cadences', () => {
 
   it('charges dust waste collection only with the dust system', () => {
     const state = newGame({ difficulty: 'veryEasy' });
-    const withSystem = act(state, { type: 'BUY_EQUIPMENT', specId: 'dustSystem' });
+    const withSystem = buyNow(state, 'dustSystem');
     expect(withSystem.equipment).toHaveLength(1);
     const nextMonth = runToDay(withSystem, 31).state;
     expect(ledgerFor(nextMonth, 'waste')).toBe(-DUST_WASTE_MONTHLY);
@@ -212,7 +211,7 @@ describe('cash primitives', () => {
     const state = newGame({ difficulty: 'hard' });
     expect(canAfford(state, 100)).toBe(true);
     expect(canAfford(state, 50000)).toBe(false);
-    const tooDear = act(state, { type: 'BUY_EQUIPMENT', specId: 'cnc' });
+    const tooDear = buyNow(state, 'cnc');
     expect(tooDear.equipment).toHaveLength(0);
   });
 
@@ -238,10 +237,7 @@ describe('arrears, bailiff and bankruptcy', () => {
   });
 
   it('counts months of arrears from the day the first bill went unpaid', () => {
-    const kitted = act(newGame({ difficulty: 'hard' }), {
-      type: 'BUY_EQUIPMENT',
-      specId: 'tableSaw',
-    });
+    const kitted = buyNow(newGame({ difficulty: 'hard' }), 'tableSaw');
     // With the 5000 overdraft of Hard and 2400 of rent the first miss is on day 3, so month two
     // lands on day 33.
     const first = runToDay(kitted, 4);
@@ -255,10 +251,7 @@ describe('arrears, bailiff and bankruptcy', () => {
   });
 
   it('sends the bailiff for the cheapest machine at three months, within 90 days', () => {
-    const kitted = act(newGame({ difficulty: 'hard' }), {
-      type: 'BUY_EQUIPMENT',
-      specId: 'tableSaw',
-    });
+    const kitted = buyNow(newGame({ difficulty: 'hard' }), 'tableSaw');
     const run = runToDay(kitted, 90);
     const bailiff = eventsOfKind(run.events, 'bailiff');
     expect(bailiff).toHaveLength(1);
@@ -273,10 +266,7 @@ describe('arrears, bailiff and bankruptcy', () => {
 
   it('takes the cheapest machine first, so the company can carry on', () => {
     const state = newGame();
-    const withKit = act(act(state, { type: 'BUY_EQUIPMENT', specId: 'tableSaw' }), {
-      type: 'BUY_EQUIPMENT',
-      specId: 'thicknesser',
-    });
+    const withKit = buyNow(buyNow(state, 'tableSaw'), 'thicknesser');
     const copy = { ...withKit, equipment: withKit.equipment.map((item) => ({ ...item })) };
     copy.finance = { ...copy.finance, arrearsAmount: 5000, arrearsMonths: 3, firstArrearsDay: 1 };
     runBailiff(copy);
@@ -285,7 +275,7 @@ describe('arrears, bailiff and bankruptcy', () => {
   });
 
   it('takes the seized machine off everybody who was working on it', () => {
-    const withKit = act(newGame(), { type: 'BUY_EQUIPMENT', specId: 'tableSaw' });
+    const withKit = buyNow(newGame(), 'tableSaw');
     const saw = withKit.equipment[0];
     const service = createTask(withKit, {
       kind: 'service',
@@ -305,7 +295,7 @@ describe('arrears, bailiff and bankruptcy', () => {
   });
 
   it('clears the arrears when the seizure covers them', () => {
-    const withKit = act(newGame(), { type: 'BUY_EQUIPMENT', specId: 'tableSaw' });
+    const withKit = buyNow(newGame(), 'tableSaw');
     withKit.finance.arrearsAmount = 500;
     withKit.finance.arrearsMonths = 3;
     withKit.finance.firstArrearsDay = 1;
@@ -363,10 +353,7 @@ describe('speed and pausing', () => {
 describe('the pelletiser', () => {
   it('pays the base and a bonus that rises with the month just gone', () => {
     const state = newGame({ difficulty: 'veryEasy' });
-    const withSystem = act(act(state, { type: 'BUY_EQUIPMENT', specId: 'dustSystem' }), {
-      type: 'BUY_EQUIPMENT',
-      specId: 'pelletiser',
-    });
+    const withSystem = buyNow(buyNow(state, 'dustSystem'), 'pelletiser');
     withSystem.productionMinutesMonth = 5000;
     const nextMonth = runToDay(withSystem, 31).state;
     const pellets = ledgerFor(nextMonth, 'pellets');

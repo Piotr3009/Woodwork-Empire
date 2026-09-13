@@ -4,6 +4,7 @@ import { SPEEDS } from '../engine/constants';
 import {
   booksBehind,
   formatDate,
+  has,
   isBreak,
   movingMachines,
   netOf,
@@ -13,19 +14,22 @@ import type { GameState, Speed } from '../engine/index';
 import { cadenceControl } from './dayEnd';
 import { escapeHtml, money } from './modal';
 
-/** The four speed chips. One place builds them, whatever else the top bar has to say. */
-function speedChips(state: GameState): string {
+/** The four speed chips. One place builds them, whatever else the top bar has to say. The Pause
+ *  chip pulses once when the player asks for something stopped time will not give him
+ *  (CLAUDE.md T7 3.10). */
+function speedChips(state: GameState, pulse: boolean): string {
   return SPEEDS.map((speed) => {
     const label = speed === 0 ? 'Pause' : `${speed}x`;
     const active = state.speed === speed ? ' is-on' : '';
+    const beat = speed === 0 && pulse ? ' is-pulse' : '';
     return (
-      `<button class="chip${active}" data-do="setSpeed" data-speed="${speed}">` +
+      `<button class="chip${active}${beat}" data-do="setSpeed" data-speed="${speed}">` +
       `${escapeHtml(label)}</button>`
     );
   }).join('');
 }
 
-function speedButtons(state: GameState): string {
+function speedButtons(state: GameState, pulse: boolean): string {
   // The hall is being shifted about: the clock runs itself and the player cannot touch it
   // until it is done (CLAUDE.md T4 3.5).
   if (movingMachines(state) !== null) {
@@ -35,7 +39,7 @@ function speedButtons(state: GameState): string {
   const dinner = isBreak(state.clock.minute)
     ? `<span class="reason">${state.owner.breakSkipped ? 'Working through' : 'Break'}</span>`
     : '';
-  return dinner + speedChips(state);
+  return dinner + speedChips(state, pulse);
 }
 
 /** What today's work is multiplied by, shown only when the owner is paying for something: the
@@ -70,6 +74,7 @@ function minuteBar(state: GameState): string {
 export function renderTopbar(
   state: GameState,
   view: 'hall' | 'office' | 'sprites',
+  pulse = false,
 ): string {
   const net = netOf(state.finance.day);
   const blind = booksBehind(state);
@@ -82,11 +87,14 @@ export function renderTopbar(
     `<span class="net ${netClass}" title="${blind ? 'The books are behind' : 'Today'}">` +
     `${escapeHtml(netText)}</span>` +
     `<span class="date">${escapeHtml(formatDate(state.clock))}</span>` +
-    `<span class="speeds">${speedButtons(state)}</span>` +
+    `<span class="speeds">${speedButtons(state, pulse)}</span>` +
     minuteBar(state) +
     outputChip(state) +
     '<span class="spacer"></span>' +
-    '<button class="chip" data-do="openModal" data-modal="board">Board</button>' +
+    // The order board is the management software's: no laptop, no board (CLAUDE.md T7 3.8).
+    (has(state, 'laptop')
+      ? '<button class="chip" data-do="openModal" data-modal="board">Board</button>'
+      : '<span class="reason">Board: buy a laptop</span>') +
     `<button class="chip" data-do="setView" data-view="${view === 'hall' ? 'office' : 'hall'}">` +
     `${view === 'hall' ? 'Office' : 'Hall'}</button>` +
     '<button class="chip" data-do="toggleMenu">Menu</button>' +

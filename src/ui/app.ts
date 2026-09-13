@@ -16,6 +16,7 @@ import {
   ownerJob,
   runMinutes,
   startProductionCheck,
+  timeIsPaused,
 } from '../engine/index';
 import type {
   Difficulty,
@@ -58,7 +59,6 @@ import { type CatalogueTab, CATALOGUE_FIRST_TAB, catalogueTabFrom, renderCatalog
 import { renderDayEnd, renderDaySummary, renderGameOver } from './dayEnd';
 import { renderEvent, renderEventFooter } from './eventModal';
 import { type LaptopTab, laptopTabFrom, renderLaptop } from './laptop';
-import { renderMachine } from './machine';
 import { renderSpriteCheck } from './spriteCheck';
 import { renderWorkPlan } from './workPlan';
 import {
@@ -89,6 +89,9 @@ interface Ui {
   eventPosition: ModalPosition | null;
   menuOpen: boolean;
   note: string;
+  /** The one line that says why a click did nothing, and the pulse on the Pause button that goes
+   *  with it. Both last one render (CLAUDE.md T7 3.10). */
+  toast: string;
   filters: Record<string, string>;
   /** Field to put the caret back in after the next render. */
   focusNext: string | null;
@@ -96,19 +99,21 @@ interface Ui {
   arrearsAmount: string;
   /** Which tab of the laptop is on top (CLAUDE.md T4 3.1). */
   laptopTab: LaptopTab;
-  /** Which tab of the equipment catalogue is on top (CLAUDE.md T6 3.6). */
+  /** Which tab of the equipment catalogue is on top, and which family folder is open inside it
+   *  (CLAUDE.md T6 3.6, T7 3.7). */
   catalogueTab: CatalogueTab;
+  catalogueFolder: string | null;
   /** Which tab of the books is on top, and the past day whose summary is open over them
    *  (CLAUDE.md T6 3.9). */
   accountingTab: AccountingTab;
+  /** Which month of this year the Days tab is showing, or null for the one the clock is in
+   *  (CLAUDE.md T7 3.9). */
+  accountingMonth: number | null;
   /** The days of the books the player has opened on their lines. */
   openDays: number[];
   daySummary: number | null;
   /** A new tab is new content, not the same list a minute later: it starts at the top. */
   scrollModalTop: boolean;
-  /** The family whose classes are on screen, over whatever else is open (CLAUDE.md T3 3.5). */
-  machine: string | null;
-  machinePosition: ModalPosition | null;
   /** Setting the hall out: the clock is stopped and the kit can be dragged about. */
   setup: boolean;
   speedBeforeSetup: Speed;
@@ -156,18 +161,19 @@ function freshUi(): Ui {
     eventPosition: null,
     menuOpen: false,
     note: '',
+    toast: '',
     filters: { board: '', catalogue: '' },
     focusNext: null,
     stockSheets: '6',
     arrearsAmount: '500',
     laptopTab: 'tasks',
     catalogueTab: CATALOGUE_FIRST_TAB,
+    catalogueFolder: null,
     accountingTab: 'days',
+    accountingMonth: null,
     openDays: [],
     daySummary: null,
     scrollModalTop: false,
-    machine: null,
-    machinePosition: null,
     setup: false,
     speedBeforeSetup: 0,
     drag: null,
@@ -212,9 +218,20 @@ function modalBody(id: ModalId, current: GameState): string {
     case 'workPlan':
       return renderWorkPlan(current);
     case 'accounting':
-      return renderAccounting(current, ui.arrearsAmount, ui.accountingTab, ui.openDays);
+      return renderAccounting(
+        current,
+        ui.arrearsAmount,
+        ui.accountingTab,
+        ui.openDays,
+        ui.accountingMonth,
+      );
     case 'catalogue':
-      return renderCatalogue(current, ui.filters.catalogue ?? '', ui.catalogueTab);
+      return renderCatalogue(
+        current,
+        ui.filters.catalogue ?? '',
+        ui.catalogueTab,
+        ui.catalogueFolder,
+      );
   }
 }
 
@@ -382,16 +399,6 @@ function modalSpecs(): ModalSpec[] {
       position: null,
     });
   }
-  if (ui.machine !== null) {
-    const spec = findSpec(ui.machine);
-    specs.push({
-      id: 'machine',
-      title: spec === null ? 'Machine' : spec.name,
-      body: renderMachine(current, ui.machine),
-      full: true,
-      position: ui.machinePosition,
-    });
-  }
   const event = current.activeEvent;
   if (event) {
     specs.push({
@@ -442,8 +449,10 @@ function pageHtml(scene: Scene | null): string {
   const notes = scene?.notes ?? '';
   const controls = ui.view === 'hall' ? hallControls(current) + hallZoomControls() : '';
   const note = ui.note === '' ? '' : `<p class="view-note">${escapeHtml(ui.note)}</p>`;
+  const toast = ui.toast === '' ? '' : `<p class="toast">${escapeHtml(ui.toast)}</p>`;
   return (
-    renderTopbar(current, ui.view) +
+    renderTopbar(current, ui.view, ui.toast !== '') +
+    toast +
     (ui.menuOpen ? renderMenu(current, ui.cloud) : '') +
     `<main class="view">${SCENE_SLOT}${notes}${controls}${note}</main>` +
     renderWhy()
@@ -684,12 +693,29 @@ export function render(): void {
 // Actions
 // ---------------------------------------------------------------------------
 
+/** The modals that act on the world, which is every one of them but the Work Plan: nothing on
+ *  them can be touched while the clock is stopped (CLAUDE.md T7 3.10). The Work Plan is a
+ *  whiteboard and the Sprite check is a page of pictures: both are reading, and both open. */
+const READING_MODALS: ModalId[] = ['workPlan'];
+
+/** The one line the player gets when the world will not move for him, with the Pause button
+ *  pulsing once behind it (CLAUDE.md T7 3.10). */
+function pausedToast(): void {
+  ui.toast = 'Time is paused';
+}
+
 /** The room fills the page, so there is no small object for a modal to sit beside any more: every
  *  modal opens centred, and the player drags it where he wants it (CLAUDE.md T4 3.1). */
 function openModal(id: ModalId): void {
+  if (!READING_MODALS.includes(id) && timeIsPaused(game())) {
+    pausedToast();
+    return;
+  }
   ui.modal = id;
   ui.modalPosition = null;
   ui.menuOpen = false;
+  // Lifting the lid costs him the five minutes the machine takes to come up (CLAUDE.md T7 3.10).
+  if (id === 'laptop') dispatch({ type: 'BOOT_LAPTOP' });
 }
 
 /** Clicking the van at the gate opens the unloading choice again (CLAUDE.md 10.1). */
@@ -721,6 +747,8 @@ function handleAction(element: DataElement, point: { x: number; y: number }): vo
   if (what === undefined) return;
   const id = element.dataset.id ?? '';
   ui.note = '';
+  // The toast and its pulse last one click (CLAUDE.md T7 3.10).
+  ui.toast = '';
   switch (what) {
     case 'pickDifficulty':
       ui.difficulty = id as Difficulty;
@@ -771,6 +799,12 @@ function handleAction(element: DataElement, point: { x: number; y: number }): vo
     case 'startSetup':
       // Nothing is dragged while the last move is still on the list, carried or waiting.
       if (movePending(game()) !== null) break;
+      // Setting the hall out is a job of work, so it cannot be started in stopped time. Once it
+      // is open the clock stops on purpose, as it has since Turn 4 (CLAUDE.md T7 3.10).
+      if (timeIsPaused(game())) {
+        pausedToast();
+        break;
+      }
       ui.setup = true;
       ui.drag = null;
       ui.speedBeforeSetup = game().speed;
@@ -816,10 +850,29 @@ function handleAction(element: DataElement, point: { x: number; y: number }): vo
       break;
     case 'catalogueTab':
       ui.catalogueTab = catalogueTabFrom(id);
+      // A new tab is a new set of folders, with none of them open and no filter left over.
+      ui.catalogueFolder = null;
+      ui.filters.catalogue = '';
+      ui.scrollModalTop = true;
+      break;
+    case 'openFolder':
+      // The classes of one family, inline under the tab that holds them (CLAUDE.md T7 3.7).
+      ui.catalogueFolder = id;
+      ui.filters.catalogue = '';
+      ui.scrollModalTop = true;
+      break;
+    case 'closeFolder':
+      ui.catalogueFolder = null;
+      ui.filters.catalogue = '';
       ui.scrollModalTop = true;
       break;
     case 'accountingTab':
       ui.accountingTab = accountingTabFrom(id);
+      ui.scrollModalTop = true;
+      break;
+    case 'accountingMonth':
+      ui.accountingMonth = Number(id);
+      ui.openDays = [];
       ui.scrollModalTop = true;
       break;
     case 'toggleDay': {
@@ -833,15 +886,6 @@ function handleAction(element: DataElement, point: { x: number; y: number }): vo
       // The evening's own summary, put back in front of him from the books (CLAUDE.md T6 3.9).
       ui.daySummary = Number(id);
       break;
-    case 'openMachine':
-      // The classes of a family fill the page, over the catalogue that sent the player here.
-      ui.machine = id;
-      ui.machinePosition = null;
-      break;
-    case 'closeMachine':
-      ui.machine = null;
-      ui.machinePosition = null;
-      break;
     case 'closeModal': {
       // The cross on the event modal is the one choice it has. The cross on anything else just
       // shuts that modal: whatever is behind it is still there.
@@ -851,11 +895,6 @@ function handleAction(element: DataElement, point: { x: number; y: number }): vo
         const choice = event.choices[0];
         dispatch({ type: 'RESOLVE_EVENT', choiceId: choice ? choice.id : 'ok' });
         return;
-      }
-      if (which === 'machine') {
-        ui.machine = null;
-        ui.machinePosition = null;
-        break;
       }
       if (which === 'daySummary') {
         ui.daySummary = null;
@@ -920,6 +959,9 @@ function handleAction(element: DataElement, point: { x: number; y: number }): vo
       dispatch({ type: 'PAY_ARREARS', amount: typed === 'all' ? null : Number(typed) });
       return;
     }
+    case 'sawFallback':
+      dispatch({ type: 'SET_SAW_FALLBACK', jobId: id, on: element.dataset.on === '1' });
+      return;
     case 'setMaterialMode':
       dispatch({
         type: 'SET_MATERIAL_MODE',
@@ -1184,12 +1226,6 @@ function onKeyDown(event: KeyboardEvent): void {
     render();
     return;
   }
-  if (ui.machine !== null) {
-    ui.machine = null;
-    ui.machinePosition = null;
-    render();
-    return;
-  }
   if (ui.modal !== null) {
     ui.modal = null;
     ui.modalPosition = null;
@@ -1387,8 +1423,6 @@ function onPointerDown(event: MouseEvent): void {
     };
     if (which === 'event') {
       ui.eventPosition = position;
-    } else if (which === 'machine') {
-      ui.machinePosition = position;
     } else {
       ui.modalPosition = position;
     }

@@ -10,6 +10,7 @@ import {
   HALL_NAME_WIDTH,
   type Scene,
   fitName,
+  footprintIn,
   hallLayerBox,
   hallScene,
   renderHall,
@@ -21,7 +22,6 @@ import {
 } from '../../src/render/hall';
 import { TILE_RISE, centreOf, pointInPolygon, tileToScreen } from '../../src/render/iso';
 import { roomById } from '../../src/engine/constants';
-import { findSpec } from '../../src/engine/machines';
 import { STATION_BENCH } from '../../src/engine/stations';
 import { ROOM_LAYOUT } from '../../src/engine/constants';
 import { buyStartingKit, newGame } from '../helpers';
@@ -290,14 +290,11 @@ describe('where the owner stands', () => {
     // Standing at it, which is the only time the bench is where he is.
     state.owner.station = STATION_BENCH;
     const bench = state.equipment.find((item) => item.specId === 'workbench');
-    const spec = findSpec('workbench');
-    expect(bench).toBeDefined();
-    const feet = centreOf(
-      (bench?.anchorX ?? 0) + Math.floor((spec?.width ?? 1) / 2),
-      (bench?.anchorY ?? 0) + (spec?.depth ?? 1),
-      1,
-      1,
-    );
+    if (!bench) throw new Error('no bench in the hall');
+    // At the front edge of the bench itself, inside the 2 by 2 of floor its class reserves
+    // (CLAUDE.md T7 3.3).
+    const stands = footprintIn(bench);
+    const feet = centreOf(Math.floor(stands.x), Math.floor(stands.y + stands.depth), 1, 1);
     const svg = renderHall(state, { files: DELIVERED });
     expect(svg).toContain(
       `data-figure="owner" transform="translate(${Math.round(feet.x)},${Math.round(feet.y)})"`,

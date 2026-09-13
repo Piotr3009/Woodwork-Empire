@@ -40,6 +40,8 @@ beforeAll(() => {
   mount(root());
   click('[data-do="pickDifficulty"][data-id="easy"]');
   click('[data-do="startGame"]');
+  // Nothing in the office opens on a stopped clock (CLAUDE.md T7 3.10).
+  click('[data-do="setSpeed"][data-speed="1"]');
   dismissEvents();
   // The laptop is what the board and the accounting come in on, so the desk is furnished first.
   const state = currentState();

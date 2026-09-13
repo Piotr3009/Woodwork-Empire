@@ -5,10 +5,8 @@ import {
   HIRE_START_DELAY_DAYS,
   MINUTES_PER_WORKING_DAY,
   HIRING_SPECS,
-  JOINERS_PER_TABLE_SAW,
   JOINER_PREREQUISITES,
   TOOL_CABINET,
-  OVER_SAW_RATIO_FACTOR,
   WORKER_NAMES,
   WORKER_RATES,
 } from './constants';
@@ -188,15 +186,6 @@ export function hire(state: GameState, role: WorkerRole, tier: WorkerTier | null
   };
   state.workers.push(worker);
   return worker;
-}
-
-/** One table saw per three joiners. Above that they queue and work slower (CLAUDE.md 9.3). */
-export function sawRatioFactor(state: GameState, worker: Worker): number {
-  if (worker.role !== 'joiner') return 1;
-  const capacity = countOf(state, 'tableSaw') * JOINERS_PER_TABLE_SAW;
-  const index = joiners(state).findIndex((entry) => entry.id === worker.id);
-  if (index < 0) return 1;
-  return index < capacity ? 1 : OVER_SAW_RATIO_FACTOR;
 }
 
 /** A free joiner takes the oldest job whose material has arrived (CLAUDE.md 9.4). The assignment

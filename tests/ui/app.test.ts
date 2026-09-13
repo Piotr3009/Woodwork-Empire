@@ -3,9 +3,15 @@
 
 import { beforeAll, describe, expect, it } from 'vitest';
 import { advanceMinutes, currentState, mount } from '../../src/ui/app';
-import { BREAK_MINUTES, LEDGER_VISIBLE_ENTRIES } from '../../src/engine/constants';
+import {
+  BREAK_MINUTES,
+  LEDGER_VISIBLE_ENTRIES,
+  LAPTOP_BOOT_MINUTES,
+  SHOPPING_MINUTES,
+  SHOPPING_NEXT_MINUTES,
+} from '../../src/engine/constants';
 import { findSpec } from '../../src/engine/machines';
-import { STARTING_KIT } from '../helpers';
+import { STARTING_CLASS, STARTING_KIT } from '../helpers';
 
 function root(): HTMLElement {
   const element = document.querySelector('#app');
@@ -73,32 +79,44 @@ describe('the first ten minutes', () => {
     click('[data-do="setView"][data-view="office"]');
     expect(html()).toContain('office-room');
     expect(html()).toContain('data-office="catalogue"');
+    // The game opens on a stopped clock, and nothing that changes the world can be touched
+    // until the player starts it (CLAUDE.md T7 3.10).
+    click('[data-office="catalogue"]');
+    expect(html()).toContain('Time is paused');
+    expect(html()).not.toContain('data-modal="catalogue"');
+    click('[data-do="setSpeed"][data-speed="1"]');
+    expect(currentState()?.speed).toBe(1);
     click('[data-office="catalogue"]');
     expect(html()).toContain('Equipment catalogue');
     const before = currentState()?.cash ?? 0;
     for (const specId of STARTING_KIT) {
-      // The catalogue is in tabs from Turn 6, so the shopping walks them until it finds the line
-      // (CLAUDE.md T6 3.6).
+      // The catalogue is tabs of folders from Turn 7: the tab, then the family's folder, and the
+      // classes are inside it (CLAUDE.md T6 3.6, T7 3.7).
       const tab = findSpec(specId)?.tab;
       if (tab !== undefined) click(`[data-do="catalogueTab"][data-id="${tab}"]`);
-      // A machine is a family: the catalogue offers its classes, and the money is spent there
-      // (CLAUDE.md T3 3.5).
-      const choose = root().querySelector(`[data-do="openMachine"][data-id="${specId}"]`);
-      if (choose === null) {
-        click(`[data-do="buyEquipment"][data-id="${specId}"]`);
-        continue;
-      }
-      click(`[data-do="openMachine"][data-id="${specId}"]`);
-      click(`[data-modal="machine"] [data-do="buyEquipment"][data-id="${specId}"]`);
-      click('[data-modal="machine"] [data-do="closeModal"]');
+      click(`[data-do="openFolder"][data-id="${specId}"]`);
+      const variant = STARTING_CLASS[specId];
+      click(
+        variant === undefined
+          ? `[data-do="buyEquipment"][data-id="${specId}"]`
+          : `[data-do="buyEquipment"][data-id="${specId}"][data-variant="${variant}"]`,
+      );
+      click('[data-do="closeFolder"]');
     }
     // The software sits under whatever tab is open: any of them but Owned carries it.
     click('[data-do="catalogueTab"][data-id="computers"]');
     click('[data-do="buySoftware"][data-id="oneOff"]');
+    // Nothing is his yet: it is one trip out, an hour for the first thing and a quarter of an
+    // hour for each of the other eleven, and the cash leaves when he is back (T7 3.10).
+    expect(currentState()?.equipment).toHaveLength(0);
+    expect(currentState()?.cash).toBe(before);
+    expect(html()).toContain('Shopping: 0 of 225 min');
+    advanceMinutes(SHOPPING_MINUTES + SHOPPING_NEXT_MINUTES * STARTING_KIT.length);
     const state = currentState();
     expect(state?.equipment).toHaveLength(STARTING_KIT.length);
     expect(state?.software.mode).toBe('oneOff');
     expect(state?.cash ?? 0).toBeLessThan(before);
+    // The folder of a family the hall has says so on its face (CLAUDE.md T7 3.7).
     expect(html()).toContain('Owned 1');
   });
 
@@ -119,6 +137,10 @@ describe('the first ten minutes', () => {
     // Still standing in the office, so the laptop is right there on the desk.
     click('[data-office="laptop"]');
     expect(html()).toContain('Laptop');
+    // Lifting the lid costs the five minutes the machine takes to come up, and nothing else on
+    // the desk can be picked up until it is up (CLAUDE.md T7 3.10).
+    expect(html()).toContain('Waiting for the laptop');
+    advanceMinutes(LAPTOP_BOOT_MINUTES);
     const name = currentState()?.jobs[0]?.name ?? '';
     // The calls are in the client's diary now, not on the desk (CLAUDE.md T4 3.3).
     expect(html()).not.toContain('Client call');
@@ -158,8 +180,12 @@ describe('the first ten minutes', () => {
     expect(html()).toContain('Jobs finished');
     click('[data-do="resolveEvent"][data-id="next"]');
     expect(currentState()?.clock.day).toBe(2);
-    // Day 2 opens with the rack alarm: nothing has been ordered yet (CLAUDE.md T2 3.6).
-    expect(html()).toContain('The rack is nearly empty');
+    // Day 2 opens with the rack alarm: nothing has been ordered yet (CLAUDE.md T2 3.6). The page
+    // is seeded from the clock, so a day can also open with a breakdown or a service in front of
+    // it; the alarm is asked of the day's events and not of whichever one is on the screen.
+    const morning = currentState();
+    const events = [morning?.activeEvent, ...(morning?.eventQueue ?? [])];
+    expect(events.some((event) => event?.kind === 'lowStock'), JSON.stringify(events)).toBe(true);
     dismissEvents();
     expect(currentState()?.activeEvent).toBeNull();
   });
@@ -292,17 +318,28 @@ describe('the modals', () => {
     // The filter works inside the tab that is open and nowhere else (CLAUDE.md T6 3.6).
     click('[data-do="catalogueTab"][data-id="handTools"]');
     expect(html()).not.toContain('data-do="clearFilter"');
-    expect(html()).toContain('Cordless drill');
-    type('[data-filter="catalogue"]', 'edge');
+    expect(html()).toContain('Drills');
+    type('[data-filter="catalogue"]', 'compress');
     expect(html()).toContain('data-do="clearFilter"');
-    expect(html()).toContain('Hand edgebander');
-    expect(html()).not.toContain('Cordless drill');
-    // A tab with nothing matching says so, and never borrows a line from another tab.
+    expect(html()).toContain('Compressors');
+    expect(html()).not.toContain('Drills');
+    // A tab with nothing matching says so, and never borrows a folder from another tab.
     click('[data-do="catalogueTab"][data-id="storage"]');
+    expect(html()).toContain('Tool cabinets');
+    type('[data-filter="catalogue"]', 'compress');
     expect(html()).toContain('Nothing matches that.');
-    expect(html()).not.toContain('Hand edgebander');
+    expect(html()).not.toContain('Compressors');
     click('[data-do="clearFilter"]');
-    expect(html()).toContain('Tool cabinet');
+    expect(html()).toContain('Tool cabinets');
+    // And inside a folder it narrows the classes of that one family (CLAUDE.md T7 3.7).
+    click('[data-do="openFolder"][data-id="sheetRack"]');
+    expect(html()).toContain('Cheap shelving');
+    expect(html()).toContain('Industrial rack');
+    type('[data-filter="catalogue"]', 'industrial');
+    expect(html()).toContain('Industrial rack');
+    expect(html()).not.toContain('Cheap shelving');
+    click('[data-do="clearFilter"]');
+    click('[data-do="closeFolder"]');
     click('[data-do="closeModal"]');
   });
 
@@ -377,7 +414,8 @@ describe('setting the hall out', () => {
     click('[data-do="endSetup"]');
     expect(currentState()?.speed).toBe(2);
     expect(html()).toContain('data-do="startSetup"');
-    click('[data-do="setSpeed"][data-speed="0"]');
+    // Back to a running clock: nothing in the office opens on a stopped one (T7 3.10).
+    click('[data-do="setSpeed"][data-speed="1"]');
     click('[data-do="setView"][data-view="office"]');
   });
 });
@@ -424,7 +462,7 @@ describe('accounting', () => {
     expect(html()).not.toContain('Unit deposit');
     // Nothing on the Days tab either: the month has not been written up.
     click('[data-do="accountingTab"][data-id="days"]');
-    expect(html()).toContain('Nothing has moved this month yet.');
+    expect(html()).toContain('Nothing has moved in month 1.');
     click('[data-do="closeModal"]');
     // The bookkeeping task catches every day up at once.
     const state = currentState();
@@ -510,7 +548,8 @@ describe('the sprite check page', () => {
     expect(html()).toContain('data-do="showSprites"');
     click('[data-do="showSprites"]');
     expect(html()).toContain('sprite-grid');
-    expect(html()).toContain('tableSaw.png');
+    // Every class of every family is a picture of its own now (CLAUDE.md T7 3.5).
+    expect(html()).toContain('tableSaw.used.png');
     expect(html()).toContain('no file');
     expect(html()).not.toContain('hall-view');
     click('[data-do="setView"][data-view="hall"]');

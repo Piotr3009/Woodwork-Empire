@@ -17,6 +17,7 @@ import {
   needsDucting,
 } from '../../src/engine/machines';
 import { canBuy } from '../../src/engine/game';
+import { firstFreeCell } from '../../src/engine/layout';
 import { movePending, movingMachines } from '../../src/engine/tasks';
 import { tick } from '../../src/engine/index';
 import type { GameState } from '../../src/engine/index';
@@ -41,16 +42,15 @@ function inSetup(): GameState {
   return act(state, { type: 'SET_SPEED', speed: 0 });
 }
 
-/** Drags an item of this kind one tile down the hall. */
+/** Drags an item of this kind to the first cell of the hall its working zone fits in. A tile down
+ *  the hall is no longer a move that always lands: a class reserves the room around it, so the
+ *  test asks the engine where the thing will go (CLAUDE.md T7 3.3). */
 function drag(state: GameState, specId: string): GameState {
   const item = state.equipment.find((entry) => entry.specId === specId);
   if (!item) throw new Error(`no ${specId} in the hall`);
-  return act(state, {
-    type: 'MOVE_ITEM',
-    itemId: item.id,
-    x: item.anchorX,
-    y: item.anchorY + 1,
-  });
+  const to = firstFreeCell(state, item.specId, item.variantId);
+  if (!to) throw new Error(`nowhere to drag the ${specId}`);
+  return act(state, { type: 'MOVE_ITEM', itemId: item.id, x: to.x, y: to.y });
 }
 
 describe('which items are ducted', () => {
@@ -267,7 +267,7 @@ describe('a bench move', () => {
     const saw = start.equipment.find((item) => item.specId === 'tableSaw');
     if (!saw) throw new Error('no saw');
     const from = { x: saw.anchorX, y: saw.anchorY };
-    const away = act(start, { type: 'MOVE_ITEM', itemId: saw.id, x: from.x, y: from.y + 1 });
+    const away = drag(start, 'tableSaw');
     expect(away.movedItems).toHaveLength(1);
     const back = act(away, { type: 'MOVE_ITEM', itemId: saw.id, x: from.x, y: from.y });
     expect(back.movedItems).toEqual([]);

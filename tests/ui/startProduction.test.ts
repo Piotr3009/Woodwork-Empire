@@ -20,7 +20,9 @@ import {
 function card(state: GameState): HTMLElement {
   const holder = document.createElement('div');
   holder.innerHTML = renderWorkPlan(state);
-  const rows = Array.from(holder.querySelectorAll('.row'));
+  // The board is a Gantt now: the name, the price, the man on it and the Start production are in
+  // the head of the row, to the left of the bars (CLAUDE.md T7 3.2).
+  const rows = Array.from(holder.querySelectorAll('.gantt-head'));
   const row = rows.find((entry) => entry.querySelector('[data-do="startProduction"], .btn[disabled]'));
   if (!(row instanceof HTMLElement)) throw new Error('no job card with a Start production button');
   return row;

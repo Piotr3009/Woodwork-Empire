@@ -30,6 +30,7 @@ import {
   previousWorkingDay,
   weekOfDay,
   weekday,
+  yearOfDay,
 } from './clock';
 import { queueEvent } from './events';
 import { has, hasCentralExtraction, machinePowerPerDay, seizableMachines } from './machines';
@@ -72,10 +73,19 @@ export interface DayMoney {
   net: number;
 }
 
-/** The days of the month the ledger still carries, oldest first. The rows are the ledger added
- *  up, so they cannot say anything the ledger does not. */
-export function daysOfMonth(state: GameState): DayMoney[] {
-  const month = monthOfDay(state.clock.day);
+/** One month of the year as the ledger has it (CLAUDE.md T7 3.9). */
+export interface MonthMoney {
+  month: number;
+  income: number;
+  costs: number;
+  net: number;
+}
+
+/** The days of a month the ledger still carries, oldest first. The rows are the ledger added
+ *  up, so they cannot say anything the ledger does not. The month is this one unless the player
+ *  has picked another off the selector (CLAUDE.md T6 3.9, T7 3.9). */
+export function daysOfMonth(state: GameState, wanted?: number): DayMoney[] {
+  const month = wanted ?? monthOfDay(state.clock.day);
   const byDay = new Map<number, DayMoney>();
   for (const entry of state.ledger) {
     if (monthOfDay(entry.day) !== month) continue;
@@ -86,6 +96,36 @@ export function daysOfMonth(state: GameState): DayMoney[] {
     byDay.set(entry.day, row);
   }
   return Array.from(byDay.values()).sort((left, right) => left.day - right.day);
+}
+
+/** The months of a year the ledger still carries, oldest first (CLAUDE.md T7 3.9). */
+export function monthsOfYear(state: GameState, wanted?: number): MonthMoney[] {
+  const year = wanted ?? yearOfDay(state.clock.day);
+  const byMonth = new Map<number, MonthMoney>();
+  for (const entry of state.ledger) {
+    if (yearOfDay(entry.day) !== year) continue;
+    const month = monthOfDay(entry.day);
+    const row = byMonth.get(month) ?? { month, income: 0, costs: 0, net: 0 };
+    if (entry.amount >= 0) row.income += entry.amount;
+    else row.costs += -entry.amount;
+    row.net = Math.round((row.income - row.costs) * 100) / 100;
+    byMonth.set(month, row);
+  }
+  return Array.from(byMonth.values()).sort((left, right) => left.month - right.month);
+}
+
+/** What a run of ledger lines came to, by category: the one place a span of the books is added
+ *  up out of the lines themselves (CLAUDE.md T7 3.9). */
+export function totalsOfEntries(entries: readonly LedgerEntry[]): PeriodTotals {
+  const totals = emptyTotals();
+  for (const entry of entries) addToTotals(totals, entry.category, entry.amount);
+  return totals;
+}
+
+/** The year so far, out of the ledger the state still carries (CLAUDE.md T7 3.9). */
+export function yearTotals(state: GameState, wanted?: number): PeriodTotals {
+  const year = wanted ?? yearOfDay(state.clock.day);
+  return totalsOfEntries(state.ledger.filter((entry) => yearOfDay(entry.day) === year));
 }
 
 /** The lines of one day, newest last, the way the ledger holds them. */

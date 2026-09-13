@@ -1,5 +1,6 @@
-// What the hall does once the art side has delivered files. The manifest is faked here, because
-// public/sprites is empty tonight and no placeholder PNG is ever committed (CLAUDE.md T3 5.1).
+// What the hall does once the art side has delivered files. The manifest is faked here so the
+// test says what it means whatever is on disk: the real folder grows a batch at a time and no
+// placeholder PNG is ever committed (CLAUDE.md T3 5.1).
 
 import { describe, expect, it, vi } from 'vitest';
 
@@ -9,7 +10,7 @@ vi.mock('../../public/sprites/manifest.json', () => ({
 
 const { renderHall } = await import('../../src/render/hall');
 const { spriteBox } = await import('../../src/render/sprites');
-const { findSpec } = await import('../../src/engine/machines');
+const { footprintIn } = await import('../../src/render/hall');
 const { act, buyStartingKit, newGame } = await import('../helpers');
 
 function hall(sawVariant: string): string {
@@ -22,16 +23,11 @@ describe('an object with a file is a picture, not a box', () => {
     const saw = act(buyStartingKit(newGame(), { sawVariant: 'pro' }), { type: 'SET_SPEED', speed: 0 })
       .equipment.find((item) => item.specId === 'tableSaw');
     expect(saw?.variantId).toBe('pro');
-    // The footprint comes from the catalogue, in metres, so the assertion does not carry a
-    // second copy of it (docs/art/SPRITES.md 9.1).
-    const spec = findSpec('tableSaw');
-    const at = spriteBox(
-      saw?.anchorX ?? 0,
-      saw?.anchorY ?? 0,
-      spec?.width ?? 1,
-      spec?.depth ?? 1,
-      spec?.height ?? 1,
-    );
+    // The footprint comes from the class, in metres, and it stands centred inside the working
+    // zone the class reserves, whose corner is the anchor (docs/art/SPRITES.md 9.1, T7 3.3).
+    if (!saw) throw new Error('no saw in the hall');
+    const stands = footprintIn(saw);
+    const at = spriteBox(stands.x, stands.y, stands.width, stands.depth, stands.height);
     expect(svg).toContain('<image href="/sprites/tableSaw.pro.png"');
     expect(svg).toContain(`width="${at.width}" height="${at.height}"`);
     expect(svg).toContain(`x="${at.x}" y="${at.y}"`);
@@ -47,10 +43,10 @@ describe('an object with a file is a picture, not a box', () => {
   it('takes the name off the picture and leaves it in the tooltip', () => {
     const svg = hall('pro');
     // The workbench has a file, so its name is a title and not text over the art.
-    expect(svg).toContain('<title>Workbench (free). One per worker.');
+    expect(svg).toContain('<title>Workbench (free). One per worker,');
     expect(svg).not.toContain('>Workbench (free)<');
     // The cheap shelving has none, so it keeps its label.
-    expect(svg).toContain('>Cheap shelving: 0 / 50<');
+    expect(svg).toContain('>Sheet rack: 0 / 50<');
   });
 
   it('draws the contact shadow under both the pictures and the boxes', () => {
@@ -60,6 +56,6 @@ describe('an object with a file is a picture, not a box', () => {
     expect(shadows).toBeGreaterThanOrEqual(10);
     // The saw has a picture and the shelving has not: both stand on a shadow.
     expect(svg).toContain('<image href="/sprites/tableSaw.pro.png"');
-    expect(svg).toContain('>Cheap shelving: 0 / 50<');
+    expect(svg).toContain('>Sheet rack: 0 / 50<');
   });
 });

@@ -6,7 +6,6 @@ import {
   JOINER_PREREQUISITES,
   LABOUR_FRACTION,
   MINUTES_PER_WORKING_DAY,
-  OVER_SAW_RATIO_FACTOR,
   OWNER_LABOUR_PER_MINUTE,
   TOOL_CABINET,
   WORKER_RATES,
@@ -20,9 +19,9 @@ import {
   joiners,
   missingForHire,
   shortfallForHire,
-  sawRatioFactor,
   staffMinutesLeft,
 } from '../../src/engine/staff';
+import { waitingStation } from '../../src/engine/stations';
 import { createTask } from '../../src/engine/tasks';
 import { minutesRemainingFor, ownerJob } from '../../src/engine/jobs';
 import { weeklyWageBill } from '../../src/engine/economy';
@@ -30,10 +29,12 @@ import { tick } from '../../src/engine/index';
 import type { GameState, Worker } from '../../src/engine/index';
 import {
   act,
+  buyNow,
   buyStartingKit,
   clearEvents,
   fillRack,
   firstJob,
+  hireNow,
   newGame,
   placeEnquiry,
   runClock,
@@ -48,7 +49,7 @@ function withJoinerKit(state: GameState): GameState {
   let guard = 0;
   while (missingForHire(next, 'joiner').length > 0 && guard < 20) {
     for (const specId of missingForHire(next, 'joiner')) {
-      next = act(next, { type: 'BUY_EQUIPMENT', specId });
+      next = buyNow(next, specId);
     }
     guard += 1;
   }
@@ -60,7 +61,7 @@ function withCrew(state: GameState, count: number, tier: Worker['tier']): GameSt
   let next = state;
   for (let index = 0; index < count; index += 1) {
     next = withJoinerKit(next);
-    next = act(next, { type: 'HIRE', role: 'joiner', tier });
+    next = hireNow(next, 'joiner', tier);
   }
   return next;
 }
@@ -91,7 +92,9 @@ describe('the hiring pool', () => {
     expect(shortfallForHire(state, 'joiner')).toContainEqual({ specId: TOOL_CABINET, count: 2 });
     const option = hiringOptions(state).find((entry) => entry.tier === 'poor');
     expect(option?.available).toBe(false);
-    expect(option?.missingCost).toBe(250 + 80 + 40 + 400 + 350 * 2);
+    // The bill is the cheapest way into each family, which for the bench is the used one at 120
+    // (CLAUDE.md T7 3.6).
+    expect(option?.missingCost).toBe(120 + 80 + 40 + 400 + 350 * 2);
     // Named, never the catalogue id: nothing of the engine's own reaches the card (CLAUDE.md 3).
     expect(option?.missing).toContain('Tool cabinet x 2');
     expect(option?.missing.join(' ')).not.toContain(TOOL_CABINET);
@@ -101,11 +104,11 @@ describe('the hiring pool', () => {
   it('blocks the hire while the kit is missing and lets it through once it is there', () => {
     let state = buyStartingKit(newGame());
     expect(canHire(state, 'joiner', 'poor').ok).toBe(false);
-    state = act(state, { type: 'HIRE', role: 'joiner', tier: 'poor' });
+    state = hireNow(state, 'joiner', 'poor');
     expect(state.workers).toHaveLength(0);
     state = withJoinerKit(state);
     expect(canHire(state, 'joiner', 'poor').ok).toBe(true);
-    state = act(state, { type: 'HIRE', role: 'joiner', tier: 'poor' });
+    state = hireNow(state, 'joiner', 'poor');
     expect(state.workers).toHaveLength(1);
     expect(state.workers[0]?.rate).toBe(WORKER_RATES.poor);
     expect(state.workers[0]?.weeklyWage).toBe(480);
@@ -144,7 +147,7 @@ describe('the hiring pool', () => {
   it('hires office staff without any bench kit', () => {
     let state = newGame();
     state.reputation = 15;
-    state = act(state, { type: 'HIRE', role: 'salesman', tier: null });
+    state = hireNow(state, 'salesman', null);
     expect(state.workers[0]?.role).toBe('salesman');
     expect(state.workers[0]?.monthlyWage).toBe(2200);
   });
@@ -212,19 +215,9 @@ describe('joiners at the bench', () => {
   });
 });
 
-describe('the saw ratio', () => {
-  it('slows every joiner above one saw per three', () => {
-    const state = withCrew(buyStartingKit(newGame({ difficulty: 'veryEasy' })), 4, 'poor');
-    const crew = joiners(state);
-    expect(crew).toHaveLength(4);
-    expect(sawRatioFactor(state, crew[0] as Worker)).toBe(1);
-    expect(sawRatioFactor(state, crew[2] as Worker)).toBe(1);
-    expect(sawRatioFactor(state, crew[3] as Worker)).toBe(OVER_SAW_RATIO_FACTOR);
-    const withSecondSaw = act(state, { type: 'BUY_EQUIPMENT', specId: 'tableSaw' });
-    expect(sawRatioFactor(withSecondSaw, crew[3] as Worker)).toBe(1);
-  });
-
-  it('shows up in what the fourth joiner produces', () => {
+describe('the queue at the saw', () => {
+  /** Four joiners, each on a wardrobe of his own, every one of them at the cutting. */
+  function fourAtTheCutting(): GameState {
     let state = buyStartingKit(newGame({ difficulty: 'veryEasy' }), { sawVariant: 'budget' });
     state.reputation = 10;
     state = withCrew(state, 4, 'normal');
@@ -237,17 +230,37 @@ describe('the saw ratio', () => {
       });
       state = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
     }
-    fillRack(state);
+    fillRack(state, 60);
     for (const job of state.jobs) job.stage = 'ready';
-    state = clearEvents(runToDay(state, 2).state);
-    const assigned = state.jobs.filter((job) => job.stage === 'inProduction');
-    expect(assigned).toHaveLength(4);
+    return clearEvents(runToDay(state, 2).state);
+  }
+
+  it('lets one man cut and stands the other three at the saw', () => {
+    const state = fourAtTheCutting();
+    expect(state.jobs.filter((job) => job.stage === 'inProduction')).toHaveLength(4);
     const before = state.jobs.map((job) => job.labourRemaining);
-    const after = tick(state, 60).jobs.map((job) => job.labourRemaining);
-    const done = before.map((value, index) => value - (after[index] ?? 0));
+    const worked = tick(state, 60);
+    const done = before.map((value, index) => value - (worked.jobs[index]?.labourRemaining ?? 0));
+    // One saw, one man on it: the ratio is not a multiplier on anybody's speed now, it is three
+    // men standing and waiting (CLAUDE.md T7 3.1).
     const full = 60 * OWNER_LABOUR_PER_MINUTE * WORKER_RATES.normal;
-    expect(done.filter((value) => Math.abs(value - full) < 1e-6)).toHaveLength(3);
-    expect(done.filter((value) => Math.abs(value - full * OVER_SAW_RATIO_FACTOR) < 1e-6)).toHaveLength(1);
+    expect(done.filter((value) => Math.abs(value - full) < 1e-6)).toHaveLength(1);
+    expect(done.filter((value) => value === 0)).toHaveLength(3);
+    expect(
+      worked.workers.filter((worker) => worker.station === waitingStation('tableSaw')),
+    ).toHaveLength(3);
+    expect(worked.jobs.filter((job) => job.blockedBy === 'waiting for table saw')).toHaveLength(3);
+  });
+
+  it('puts a second man to work the moment a second saw is bought', () => {
+    const state = buyNow(fourAtTheCutting(), 'tableSaw');
+    const before = state.jobs.map((job) => job.labourRemaining);
+    const worked = tick(state, 60);
+    const done = before.map((value, index) => value - (worked.jobs[index]?.labourRemaining ?? 0));
+    expect(done.filter((value) => value > 0)).toHaveLength(2);
+    expect(
+      worked.workers.filter((worker) => worker.station === waitingStation('tableSaw')),
+    ).toHaveLength(2);
   });
 });
 

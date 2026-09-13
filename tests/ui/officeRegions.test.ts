@@ -4,11 +4,14 @@
 
 import { readFileSync } from 'node:fs';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { currentState, mount, render } from '../../src/ui/app';
+import { firstFreeCell } from '../../src/engine/layout';
+import { advanceMinutes, currentState, mount, render } from '../../src/ui/app';
 import { applyAction } from '../../src/engine/index';
 import { OFFICE_REGIONS } from '../../src/render/office';
+import { SHOPPING_MINUTES, SHOPPING_NEXT_MINUTES } from '../../src/engine/constants';
+import { formatTime } from '../../src/engine/clock';
 import { findSpec } from '../../src/engine/machines';
-import { STARTING_KIT } from '../helpers';
+import { STARTING_CLASS, STARTING_KIT } from '../helpers';
 
 function root(): HTMLElement {
   const element = document.querySelector('#app');
@@ -43,24 +46,30 @@ beforeAll(() => {
   document.body.innerHTML = '<div id="app"></div>';
   mount(root());
   click('[data-do="startGame"]');
+  // Nothing in the office opens, and nothing is bought, on a stopped clock (CLAUDE.md T7 3.10).
+  click('[data-do="setSpeed"][data-speed="1"]');
   click('[data-do="setView"][data-view="office"]');
   click('[data-office="catalogue"]');
   for (const specId of STARTING_KIT) {
-    // The catalogue is in tabs from Turn 6, so the shopping walks them (CLAUDE.md T6 3.6).
+    // The catalogue is tabs of folders from Turn 7: the tab, the family's folder, and the classes
+    // are inside it (CLAUDE.md T6 3.6, T7 3.7).
     const tab = findSpec(specId)?.tab;
     if (tab !== undefined) click(`[data-do="catalogueTab"][data-id="${tab}"]`);
-    const choose = root().querySelector(`[data-do="openMachine"][data-id="${specId}"]`);
-    if (choose === null) {
-      click(`[data-do="buyEquipment"][data-id="${specId}"]`);
-      continue;
-    }
-    click(`[data-do="openMachine"][data-id="${specId}"]`);
-    click(`[data-modal="machine"] [data-do="buyEquipment"][data-id="${specId}"]`);
-    click('[data-modal="machine"] [data-do="closeModal"]');
+    click(`[data-do="openFolder"][data-id="${specId}"]`);
+    const variant = STARTING_CLASS[specId];
+    click(
+      variant === undefined
+        ? `[data-do="buyEquipment"][data-id="${specId}"]`
+        : `[data-do="buyEquipment"][data-id="${specId}"][data-variant="${variant}"]`,
+    );
+    click('[data-do="closeFolder"]');
   }
   click('[data-do="catalogueTab"][data-id="computers"]');
   click('[data-do="buySoftware"][data-id="oneOff"]');
   click('[data-do="closeModal"]');
+  // The trip out has to be over before any of it is in the room: an hour for the first thing and
+  // a quarter of an hour for each of the others (CLAUDE.md T7 3.10).
+  advanceMinutes(SHOPPING_MINUTES + SHOPPING_NEXT_MINUTES * STARTING_KIT.length);
   // A job on the books, or the tests below would pass on an empty board.
   click('[data-do="openModal"][data-modal="board"]');
   click('[data-do="acceptEnquiry"]');
@@ -104,7 +113,8 @@ describe('what each region of the room opens', () => {
     const state = currentState();
     const clock = root().querySelector('[data-office-text="clock"]');
     const company = root().querySelector('[data-office-text="company"]');
-    expect(clock?.textContent).toBe('08:00');
+    // Whatever the morning's shopping has cost him, the wall clock says what the engine says.
+    expect(clock?.textContent).toBe(formatTime(state?.clock.minute ?? -1));
     expect(company?.textContent).toBe(state?.companyName ?? '');
   });
 });
@@ -120,8 +130,14 @@ describe('setting the hall out', () => {
     const saw = state?.equipment.find((item) => item.specId === 'tableSaw');
     const rack = state?.equipment.find((item) => item.specId === 'sheetRack');
     if (!saw || !rack) throw new Error('no kit in the hall');
+    // A tile down the hall is no longer a move that always lands: a class reserves the room
+    // around it, so the test asks the engine where the thing will go (CLAUDE.md T7 3.3).
     for (const item of [saw, rack]) {
-      moveItem(item.id, item.anchorX, item.anchorY + 1);
+      const now = currentState();
+      if (!now) throw new Error('no game running');
+      const to = firstFreeCell(now, item.specId, item.variantId);
+      if (!to) throw new Error(`nowhere to drag the ${item.specId}`);
+      moveItem(item.id, to.x, to.y);
     }
     // The exact words CLAUDE.md T4 3.5 asks for, with the running total. Two things moved and one
     // of them ducted: the shelving has nothing to reconnect (CLAUDE.md T6 3.5).

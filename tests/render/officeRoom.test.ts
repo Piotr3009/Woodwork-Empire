@@ -5,6 +5,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   OFFICE_CANVAS,
+  FLOOR_CATALOGUE,
   OFFICE_LAYERS,
   OFFICE_REGIONS,
   OFFICE_NAME_SIZE_MIN,
@@ -15,11 +16,26 @@ import {
 import { fitName } from '../../src/render/hall';
 import { formatTime } from '../../src/engine/clock';
 import { tick } from '../../src/engine/index';
-import { newGame } from '../helpers';
+import type { GameState } from '../../src/engine/index';
+import { buyNow, newGame } from '../helpers';
 
-function room(viewport = { width: 1280, height: 800 }, files?: string[]): HTMLElement {
+/** A game with the desk, the chair and the laptop bought: the room as it is once the office has
+ *  been furnished. A new game starts with none of them (CLAUDE.md T7 3.8). */
+function furnished(): GameState {
+  let state = newGame({ difficulty: 'veryEasy' });
+  for (const specId of ['desk', 'chair', 'laptop']) {
+    state = buyNow(state, specId);
+  }
+  return state;
+}
+
+function room(
+  viewport = { width: 1280, height: 800 },
+  files?: string[],
+  state: GameState = furnished(),
+): HTMLElement {
   const holder = document.createElement('div');
-  holder.innerHTML = renderOffice(newGame(), viewport, files);
+  holder.innerHTML = renderOffice(state, viewport, files);
   return holder;
 }
 
@@ -131,6 +147,58 @@ describe('the click regions', () => {
       }
       expect(element?.textContent, region.id).toBe('');
     }
+  });
+});
+
+describe('the office a new game starts in', () => {
+  it('has no desk and no laptop in it at all', () => {
+    const bare = room({ width: 1280, height: 800 }, undefined, newGame());
+    const layers = Array.from(bare.querySelectorAll('.office-layer'));
+    expect(layers.map((layer) => layer.getAttribute('data-layer'))).toEqual(['officeBackground']);
+    expect(bare.querySelector('[data-office="laptop"]')).toBeNull();
+    expect(bare.querySelector('[data-office="binder"]')).toBeNull();
+    expect(bare.querySelector('[data-office="orders"]')).toBeNull();
+  });
+
+  it('lies the catalogue on the floor by the door, with Equipment on its cover', () => {
+    const bare = room({ width: 1280, height: 800 }, undefined, newGame());
+    const catalogue = bare.querySelector('[data-office="catalogue"]');
+    expect(catalogue).not.toBeNull();
+    expect(catalogue?.getAttribute('data-do')).toBe('officeRegion');
+    expect(catalogue?.textContent).toBe('Equipment');
+    // The same box as on the desk, pushed down to the floor (CLAUDE.md T7 3.8).
+    expect(catalogue?.getAttribute('style')).toBe(
+      `left:${FLOOR_CATALOGUE.x}px;top:${FLOOR_CATALOGUE.y}px;` +
+        `width:${FLOOR_CATALOGUE.width}px;height:${FLOOR_CATALOGUE.height}px`,
+    );
+    expect(FLOOR_CATALOGUE.y + FLOOR_CATALOGUE.height).toBe(OFFICE_CANVAS.height);
+    // The door and the whiteboard are the room itself and work from the first morning.
+    expect(bare.querySelector('[data-office="door"]')).not.toBeNull();
+    expect(bare.querySelector('[data-office="workPlan"]')).not.toBeNull();
+  });
+
+  it('puts the desk layer in the room the moment the desk is bought', () => {
+    const withDesk = buyNow(newGame({ difficulty: 'veryEasy' }), 'desk');
+    const node = room({ width: 1280, height: 800 }, undefined, withDesk);
+    const layers = Array.from(node.querySelectorAll('.office-layer'));
+    expect(layers.map((layer) => layer.getAttribute('data-layer'))).toEqual([
+      'officeBackground',
+      'officeDesk',
+    ]);
+    // The catalogue is on the desk now, where the contract puts it, and the binder is with it.
+    const catalogue = node.querySelector('[data-office="catalogue"]');
+    expect(catalogue?.textContent).toBe('');
+    expect(catalogue?.getAttribute('style')).toContain('top:680px');
+    expect(node.querySelector('[data-office="binder"]')).not.toBeNull();
+    // And still no laptop, so still no order board.
+    expect(node.querySelector('[data-office="laptop"]')).toBeNull();
+    expect(node.querySelector('[data-office="orders"]')).toBeNull();
+  });
+
+  it('opens the order board and the laptop the moment the laptop is bought', () => {
+    const node = room({ width: 1280, height: 800 }, undefined, furnished());
+    expect(node.querySelector('[data-office="laptop"]')).not.toBeNull();
+    expect(node.querySelector('[data-office="orders"]')).not.toBeNull();
   });
 });
 

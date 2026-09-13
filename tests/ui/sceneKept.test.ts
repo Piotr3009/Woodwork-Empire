@@ -7,6 +7,7 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { advanceMinutes, currentState, mount, render } from '../../src/ui/app';
 import { formatTime } from '../../src/engine/clock';
+import { SHOPPING_MINUTES, SHOPPING_NEXT_MINUTES } from '../../src/engine/constants';
 
 function root(): HTMLElement {
   const element = document.querySelector('#app');
@@ -32,6 +33,21 @@ beforeAll(() => {
   document.body.innerHTML = '<div id="app"></div>';
   mount(root());
   click('[data-do="startGame"]');
+  // The hall cannot be set out on a stopped clock (CLAUDE.md T7 3.10).
+  click('[data-do="setSpeed"][data-speed="1"]');
+  // The office starts empty: no desk, no laptop, and the catalogue on the floor. This file is
+  // about the room surviving a render, so it furnishes it first (CLAUDE.md T7 3.8).
+  show('office');
+  click('[data-office="catalogue"]');
+  for (const specId of ['desk', 'chair', 'laptop']) {
+    click('[data-do="catalogueTab"][data-id="computers"]');
+    click(`[data-do="openFolder"][data-id="${specId}"]`);
+    click(`[data-do="buyEquipment"][data-id="${specId}"]`);
+    click('[data-do="closeFolder"]');
+  }
+  click('[data-do="closeModal"]');
+  // The trip out has to be over before any of it is in the room (CLAUDE.md T7 3.10).
+  advanceMinutes(SHOPPING_MINUTES + SHOPPING_NEXT_MINUTES * 2);
 });
 
 function layers(): Element[] {

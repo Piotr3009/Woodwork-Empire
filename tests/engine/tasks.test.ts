@@ -21,6 +21,7 @@ import { tick } from '../../src/engine/index';
 import type { GameState, ProductTemplate, Worker } from '../../src/engine/index';
 import {
   act,
+  buyNow,
   clearEvents,
   newGame,
   placeEnquiry,
@@ -78,9 +79,9 @@ describe('minute curves', () => {
   it('cuts unloading with a forklift', () => {
     const plain = newGame({ difficulty: 'veryEasy' });
     expect(unloadMinutes(plain)).toBe(45);
-    const forklift = act(plain, { type: 'BUY_EQUIPMENT', specId: 'forklift' });
+    const forklift = buyNow(plain, 'forklift');
     expect(unloadMinutes(forklift)).toBe(23);
-    const better = act(forklift, { type: 'BUY_EQUIPMENT', specId: 'forkliftBetter' });
+    const better = buyNow(forklift, 'forkliftBetter');
     expect(unloadMinutes(better)).toBe(9);
   });
 
@@ -124,6 +125,7 @@ describe('the daily list', () => {
       bespokeMaterial: false,
       express: false,
       byHand: false,
+      sawFallback: true,
       needsMeasure: false,
       labourValue: 160,
       labourRemaining: 160,
@@ -136,7 +138,7 @@ describe('the daily list', () => {
       callsMissed: 0,
       designMinutesRemaining: 30,
       assignedTo: null,
-      benchSince: null,
+      stageRuns: [],
       completedDay: null,
       daysLate: 0,
       depositPaid: 200,

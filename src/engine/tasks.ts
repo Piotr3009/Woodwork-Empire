@@ -2,7 +2,10 @@
 // spends the owner's minutes on the one he started.
 
 import {
+  ADMIN_COVER_RATE,
   BAG_CHANGE_MINUTES,
+  CLIENT_MEETING_MINUTES,
+  MEETING_SALESMAN_REPUTATION,
   BOOKKEEPING_MINUTES,
   EMAIL_MINUTES,
   OWN_DELIVERY_MINUTES,
@@ -22,10 +25,14 @@ import {
   MATERIAL_ORDER_PRICE_HIGH,
   MATERIAL_ORDER_PRICE_LOW,
   SERVICE_MINUTES,
+  SHOPPING_MINUTES,
+  SHOPPING_NEXT_MINUTES,
   SITE_MEASURE_MINUTES,
+  SOFTWARE_SHOPPING_MINUTES,
   SOFTWARE_DESIGN_FACTOR,
   STAFF_MANAGEMENT_MINUTES_PER_JOINER,
   UNLOAD_BASE_MINUTES,
+  WORK_EPSILON,
 } from './constants';
 import { findSpec } from './machines';
 import { canUnload } from './materials';
@@ -40,6 +47,7 @@ import type {
   TaskCategory,
   TaskInstance,
   TaskKind,
+  TaskOrder,
   WorkerRole,
 } from './types';
 
@@ -61,12 +69,23 @@ const TASK_DEFINITIONS: Record<TaskKind, TaskDefinition> = {
     autoRoles: ['purchasingClerk', 'officeAdmin'],
   },
   staffManagement: { category: 'admin', eligibleRoles: [], autoRoles: [] },
-  clientCall: { category: 'admin', eligibleRoles: ['salesman'], autoRoles: ['salesman'] },
+  // The salesman first, and the office admin behind him at half the speed when there is no
+  // salesman on the books (CLAUDE.md T7 3.12).
+  clientCall: {
+    category: 'admin',
+    eligibleRoles: ['salesman', 'officeAdmin'],
+    autoRoles: ['salesman', 'officeAdmin'],
+  },
+  clientMeeting: {
+    category: 'admin',
+    eligibleRoles: ['salesman'],
+    autoRoles: ['salesman'],
+  },
   design: { category: 'design', eligibleRoles: [], autoRoles: [] },
   materialOrder: {
     category: 'admin',
-    eligibleRoles: ['purchasingClerk'],
-    autoRoles: ['purchasingClerk'],
+    eligibleRoles: ['purchasingClerk', 'officeAdmin'],
+    autoRoles: ['purchasingClerk', 'officeAdmin'],
   },
   siteMeasure: { category: 'admin', eligibleRoles: [], autoRoles: [] },
   unload: { category: 'workshop', eligibleRoles: ['joiner', 'helper'], autoRoles: ['helper'] },
@@ -81,10 +100,16 @@ const TASK_DEFINITIONS: Record<TaskKind, TaskDefinition> = {
   service: { category: 'workshop', eligibleRoles: ['joiner'], autoRoles: [] },
   repair: { category: 'workshop', eligibleRoles: ['joiner'], autoRoles: [] },
   moveMachines: { category: 'workshop', eligibleRoles: ['joiner', 'helper'], autoRoles: [] },
+  // The owner does his own shopping, his own interviewing and his own waiting for the laptop:
+  // there is nobody to hand any of it to (CLAUDE.md T7 3.10).
+  shopping: { category: 'admin', eligibleRoles: [], autoRoles: [] },
+  hiring: { category: 'admin', eligibleRoles: [], autoRoles: [] },
+  booting: { category: 'admin', eligibleRoles: [], autoRoles: [] },
 };
 
-/** Float guard, not a game number: work this small is finished work. */
-export const WORK_EPSILON = 1e-9;
+/** Float guard, not a game number: work this small is finished work. It lives in constants.ts
+ *  with every other figure and is handed on from here, where it has always been imported from. */
+export { WORK_EPSILON };
 
 // ---------------------------------------------------------------------------
 // Minute curves
@@ -153,6 +178,7 @@ export interface TaskDraft {
   jobId?: string | null;
   equipmentId?: string | null;
   deliveryId?: string | null;
+  orders?: TaskOrder[];
 }
 
 export function createTask(state: GameState, draft: TaskDraft): TaskInstance {
@@ -171,6 +197,7 @@ export function createTask(state: GameState, draft: TaskDraft): TaskInstance {
     done: false,
     doneDay: null,
     doneBy: null,
+    orders: draft.orders ? draft.orders.slice() : [],
   };
   state.tasks.push(task);
   return task;
@@ -200,6 +227,27 @@ export function movingMachines(state: GameState): TaskInstance | null {
       (task) => task.kind === 'moveMachines' && !task.done && task.doneBy !== null,
     ) ?? null
   );
+}
+
+/** The trip to the shops the owner is on, if there is one. Everything he buys while it is still
+ *  running rides on the same trip (CLAUDE.md T7 3.10). */
+export function shoppingTask(state: GameState): TaskInstance | null {
+  return state.tasks.find((task) => task.kind === 'shopping' && !task.done) ?? null;
+}
+
+/** What one more order adds to the owner's day: the whole trip for the first thing in the hour,
+ *  half of it for software that comes down the wire, and a quarter of an hour for each further
+ *  thing while the trip is still running (CLAUDE.md T7 3.10). */
+export function orderMinutes(state: GameState, order: TaskOrder): number {
+  if (shoppingTask(state) !== null) return SHOPPING_NEXT_MINUTES;
+  return order.kind === 'software' ? SOFTWARE_SHOPPING_MINUTES : SHOPPING_MINUTES;
+}
+
+/** What the trip is called on the task list: what he went out for, and how much else with it. */
+export function shoppingLabel(orders: readonly TaskOrder[]): string {
+  const more = orders.length - 1;
+  const tail = more <= 0 ? '' : more === 1 ? ' and one more thing' : ` and ${more} more things`;
+  return `Shopping${tail}`;
 }
 
 export function tasksOfKind(state: GameState, kind: TaskKind): TaskInstance[] {
@@ -234,10 +282,20 @@ export function createDailyTasks(state: GameState): void {
   }
 }
 
+/** How fast this man works this task off. One a minute for the man whose job it is; half that
+ *  for an office admin covering for a specialist the company has not taken on, which is what
+ *  "twice the minutes" means (CLAUDE.md T7 3.12). */
+export function taskWorkRate(worker: Worker, task: TaskInstance): number {
+  const covering = task.kind === 'clientCall' || task.kind === 'materialOrder';
+  return worker.role === 'officeAdmin' && covering ? ADMIN_COVER_RATE : 1;
+}
+
 /** Can this man take this task on today? Office roles work it off minute by minute out of their
  *  own 480, a helper still clears his workshop jobs on the spot (CLAUDE.md T2 3.8). */
-function canTakeOn(worker: Worker, task: TaskInstance): boolean {
+function canTakeOn(state: GameState, worker: Worker, task: TaskInstance): boolean {
   if (!TASK_DEFINITIONS[task.kind].autoRoles.includes(worker.role)) return false;
+  // The client will not sit down with a salesman until the company is known (CLAUDE.md T7 3.11).
+  if (task.kind === 'clientMeeting' && state.reputation < MEETING_SALESMAN_REPUTATION) return false;
   if (!hasWorkingDay(worker.role)) return true;
   if (worker.taskId !== null) return false;
   if (staffMinutesLeft(worker) <= 0) return false;
@@ -245,6 +303,27 @@ function canTakeOn(worker: Worker, task: TaskInstance): boolean {
     return worker.ordersToday < CLERK_ORDERS_PER_DAY;
   }
   return true;
+}
+
+/** Who takes a task the company has more than one kind of man for: the one whose job it is, and
+ *  the man covering for him only when he is not there (CLAUDE.md T7 3.12). */
+export function bestTakerOf(
+  state: GameState,
+  workers: readonly Worker[],
+  task: TaskInstance,
+): Worker | null {
+  const order = TASK_DEFINITIONS[task.kind].autoRoles;
+  let best: Worker | null = null;
+  let bestRank = order.length;
+  for (const worker of workers) {
+    if (!canTakeOn(state, worker, task)) continue;
+    const rank = order.indexOf(worker.role);
+    if (rank >= 0 && rank < bestRank) {
+      best = worker;
+      bestRank = rank;
+    }
+  }
+  return best;
 }
 
 /** A worker on the books takes the tasks his role covers, and the owner never sees them.
@@ -256,7 +335,7 @@ export function assignStaffTasks(state: GameState): TaskInstance[] {
   for (const task of state.tasks) {
     if (task.done || task.doneBy !== null) continue;
     if (task.kind === 'unload' && !canUnload(state)) continue;
-    const staff = started.find((worker) => canTakeOn(worker, task));
+    const staff = bestTakerOf(state, started, task);
     if (!staff) continue;
     if (hasWorkingDay(staff.role)) {
       // He picks it up and works it off as the clock runs, like the owner does.
@@ -302,8 +381,15 @@ export function startTaskCheck(state: GameState, taskId: string): TaskStartCheck
     const held = findTask(state, current);
     return refused(`Busy with ${held ? held.label : 'something else'}`, current);
   }
-  // No drawing without a licence for the software (CLAUDE.md 9.2).
-  if (task.kind === 'design' && !softwareActive(state)) return refused('No software licence');
+  // No drawing without a licence for the software (CLAUDE.md 9.2), and none before the client
+  // has been sat down with on a job that wants a meeting (CLAUDE.md T7 3.11).
+  if (task.kind === 'design') {
+    if (!softwareActive(state)) return refused('No software licence');
+    const open = state.tasks.some(
+      (entry) => entry.kind === 'clientMeeting' && entry.jobId === task.jobId && !entry.done,
+    );
+    if (open) return refused('The client meeting comes first');
+  }
   // Nothing comes off the lorry until there is shelving to put it on (CLAUDE.md T2 3.6).
   if (task.kind === 'unload' && !canUnload(state)) return refused('Nowhere to put it');
   return CAN_START_TASK;
@@ -402,6 +488,7 @@ export function assignWorkerTask(state: GameState, workerId: string, taskId: str
 export const AD_HOC_TASK_MINUTES = {
   bagChange: BAG_CHANGE_MINUTES,
   clientCall: CLIENT_CALL_ANSWER_MINUTES,
+  clientMeeting: CLIENT_MEETING_MINUTES,
   moveMachines: MOVE_MINUTES_PER_ITEM,
   cleaning: CLEANING_MINUTES,
   deliver: OWN_DELIVERY_MINUTES,

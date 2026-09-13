@@ -23,16 +23,18 @@ import { jobProgress, tick } from '../../src/engine/index';
 import type { GameEvent, GameState } from '../../src/engine/index';
 import {
   act,
+  buyNow,
   buyStartingKit,
   choose,
   clearEvents,
   doTask,
   eventsOfKind,
-  firstJob,
   fillRack,
+  firstJob,
   newGame,
   placeEnquiry,
   runToDay,
+  softwareNow,
 } from '../helpers';
 
 function ready(difficulty: 'easy' | 'veryEasy' = 'easy'): GameState {
@@ -303,10 +305,14 @@ describe('the rack the sheets live on', () => {
     const bare = newGame();
     expect(rackCapacity(bare)).toBe(0);
     expect(canBuy(bare, 'sheetRack').ok).toBe(true);
-    const cheap = act(bare, { type: 'BUY_EQUIPMENT', specId: 'sheetRack' });
-    expect(rackCapacity(cheap)).toBe(50);
-    const better = act(cheap, { type: 'BUY_EQUIPMENT', specId: 'sheetRackBetter' });
-    expect(rackCapacity(better)).toBe(75);
+    // The classes of the one rack family, in Piotr's table (CLAUDE.md T7 3.6).
+    const used = buyNow(bare, 'sheetRack');
+    expect(rackCapacity(used)).toBe(30);
+    // A second rack is a second rack: what the hall holds is what the two of them hold.
+    const two = buyNow(used, 'sheetRack', 'standard');
+    expect(rackCapacity(two)).toBe(30 + 75);
+    const big = buyNow(bare, 'sheetRack', 'industrial');
+    expect(rackCapacity(big)).toBe(160);
   });
 
   it('leaves a delivery at the gate while there is nowhere to put it', () => {
@@ -314,9 +320,9 @@ describe('the rack the sheets live on', () => {
     state.enquiries = [];
     // Everything but the shelving, so the job can be taken and ordered.
     for (const specId of ['desk', 'laptop', 'tableSaw', 'drill', 'edgebander', 'extractor']) {
-      state = act(state, { type: 'BUY_EQUIPMENT', specId });
+      state = buyNow(state, specId);
     }
-    state = act(state, { type: 'BUY_SOFTWARE', mode: 'oneOff' });
+    state = softwareNow(state, 'oneOff');
     state = doTask(upToMaterial(state), 'materialOrder');
     state = clearEvents(runToDay(state, 2).state);
     const task = state.tasks.find((entry) => entry.kind === 'unload' && !entry.done);
@@ -324,7 +330,7 @@ describe('the rack the sheets live on', () => {
     const tried = act(state, { type: 'START_TASK', taskId: task?.id ?? '' });
     expect(tried.owner.currentTaskId).toBeNull();
     // Buy the shelving and the same task goes through.
-    const withRack = act(state, { type: 'BUY_EQUIPMENT', specId: 'sheetRack' });
+    const withRack = buyNow(state, 'sheetRack');
     const started = act(withRack, { type: 'START_TASK', taskId: task?.id ?? '' });
     expect(started.owner.currentTaskId).toBe(task?.id);
   });

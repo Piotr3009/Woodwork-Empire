@@ -10,6 +10,29 @@ export type MaterialKind = 'sheet' | 'solidWood';
 
 export type Finish = 'laminate' | 'lacquer' | 'veneer';
 
+/** The stages a job goes through in the hall (CLAUDE.md T7 3.1). `cnc` is the one stage a CNC
+ *  does instead of Cutting and Machining; `delivery` carries no labour at all. */
+export type StageId = 'cutting' | 'machining' | 'cnc' | 'assembly' | 'finishing' | 'delivery';
+
+/** One stage of the work, as the catalogue of stages holds it. */
+export interface StageSpec {
+  id: StageId;
+  label: string;
+  /** Share of the job's labour it carries. */
+  share: number;
+}
+
+/** One run at one stage: when somebody started it and when it was finished. The Work Plan draws
+ *  its bars from these, so a gap in them is a gap the player can see (CLAUDE.md T7 3.2). */
+export interface StageRun {
+  stage: StageId;
+  startDay: number;
+  startMinute: number;
+  /** Null while the stage is still in hand. */
+  endDay: number | null;
+  endMinute: number | null;
+}
+
 export type SoftwareTier = 'basic' | 'standard' | 'pro';
 
 export type SoftwareMode = 'none' | 'oneOff' | 'subscription';
@@ -40,7 +63,8 @@ export interface EquipmentVariant {
   id: string;
   name: string;
   price: number;
-  /** Multiplies the production speed of every job that goes through this machine. */
+  /** Multiplies the production speed of the stage this machine does, and of no other
+   *  (CLAUDE.md T7 3.1). */
   outputFactor: number;
   /** Multiplies the family's base bag interval. Below 1 means the bag fills sooner. */
   bagIntervalFactor: number;
@@ -50,6 +74,22 @@ export interface EquipmentVariant {
   powerPerDay: number;
   /** Two or three lines of plain English about what this class of machine is. */
   description: string;
+  /** What the picture stands on, in metres. Left out means the family's own footprint
+   *  (CLAUDE.md T7 3.3). */
+  width?: number;
+  depth?: number;
+  height?: number;
+  /** The floor this class reserves, in metres: the working room around it, which contains the
+   *  footprint. Left out means the family's own zone. Zero means it holds no floor at all,
+   *  because it is kept in a tool cabinet (CLAUDE.md T7 3.3, 3.6). */
+  zoneWidth?: number;
+  zoneDepth?: number;
+  /** Sheets this class holds. Left out means the family's own (CLAUDE.md T7 3.6). */
+  sheetCapacity?: number;
+  /** What must be owned before this class can be bought. Left out means the family's own: a
+   *  floor edgebander wants extraction where a hand one wants a cabinet (CLAUDE.md T7 3.6). */
+  requires?: string[];
+  requiresOneOf?: string[];
 }
 
 /** One line of the day 1 catalogue (CLAUDE.md 9.2). A catalogue line is a family: the modal
@@ -76,21 +116,22 @@ export interface EquipmentSpec {
   category: EquipmentCategory;
   /** Which tab of the catalogue it is under. Every line has one (CLAUDE.md T6 3.6). */
   tab: EquipmentTab;
+  /** The folder inside that tab, named for the family in the plural: a tab holds folders and a
+   *  folder holds the classes of one family (CLAUDE.md T7 3.7). */
+  folder: string;
   /** Footprint in tiles. */
   width: number;
   depth: number;
   height: number;
+  /** The floor the family reserves by default, in metres. A class may say its own
+   *  (CLAUDE.md T7 3.3). */
+  zoneWidth: number;
+  zoneDepth: number;
   spriteKey: string;
-  /** How many men one of these can serve in a day (CLAUDE.md T6 3.6). */
-  capacity: number;
   /** Minutes of use before the bag is full. 0 means the item has no bag. */
   bagInterval: number;
   /** The machine only runs on jobs of this material. null means every job. */
   usedOn: MaterialKind | null;
-  /** Multiplies the labour of every job. 1 means no effect. */
-  labourFactor: number;
-  /** Only applies to jobs of this material kind. null means every job. */
-  labourAppliesTo: MaterialKind | null;
   /** Multiplies unloading minutes. 1 means no effect. */
   unloadFactor: number;
   /** Sheets this item can hold on the rack. 0 for everything that is not shelving. */
@@ -135,6 +176,9 @@ export interface Equipment {
   enduranceHours: number;
   /** Hours of use it has had. Past its endurance it starts giving up. */
   hoursUsed: number;
+  /** The one man standing at it: 'owner', a worker id, or null while it is free. A machine serves
+   *  one person at a time (CLAUDE.md T7 3.1). */
+  takenBy: string | null;
   purchasePrice: number;
 }
 
@@ -298,6 +342,9 @@ export interface Job {
   bespokeMaterial: boolean;
   express: boolean;
   byHand: boolean;
+  /** With a CNC in the hall, this job goes on the saw when the CNC is taken. Off means it waits
+   *  for the CNC instead (CLAUDE.md T7 3.4). */
+  sawFallback: boolean;
   needsMeasure: boolean;
   /** 0.40 P of the price: the labour the job carries. */
   labourValue: number;
@@ -317,9 +364,8 @@ export interface Job {
   callsMissed: number;
   designMinutesRemaining: number;
   assignedTo: string | null;
-  /** When this job took a bench, so the benches are held by the men who got to them first and
-   *  nobody is turned off one he is standing at (CLAUDE.md T4 3.4). Null while it holds none. */
-  benchSince: number | null;
+  /** What was worked when, one entry per run at a stage, for the Work Plan (CLAUDE.md T7 3.2). */
+  stageRuns: StageRun[];
   completedDay: number | null;
   daysLate: number;
   depositPaid: number;
@@ -364,6 +410,8 @@ export interface Delivery {
 
 export type TaskKind =
   | 'emails'
+  /** The meeting at the client's that a job over 20,000 starts with (CLAUDE.md T7 3.11). */
+  | 'clientMeeting'
   | 'bookkeeping'
   | 'dailyOrdering'
   | 'staffManagement'
@@ -378,7 +426,20 @@ export type TaskKind =
   | 'deliver'
   | 'service'
   | 'repair'
-  | 'moveMachines';
+  | 'moveMachines'
+  /** The trip to the shops that every purchase rides on (CLAUDE.md T7 3.10). */
+  | 'shopping'
+  /** The interview that taking somebody on costs the owner. */
+  | 'hiring'
+  /** The laptop booting up before the player can touch anything on it. */
+  | 'booting';
+
+/** What a trip to the shops or an interview will do once its minutes are spent. Nothing is
+ *  booked until then: the cash leaves when the owner gets back (CLAUDE.md T7 3.10). */
+export type TaskOrder =
+  | { kind: 'equipment'; specId: string; variantId: string }
+  | { kind: 'software'; mode: 'oneOff' | 'subscription' }
+  | { kind: 'hire'; role: WorkerRole; tier: WorkerTier | null };
 
 export interface TaskInstance {
   id: string;
@@ -397,6 +458,9 @@ export interface TaskInstance {
   doneDay: number | null;
   /** Worker id, 'owner', or null while nobody works on it. */
   doneBy: string | null;
+  /** What this task books when it finishes. Empty for every task but a trip to the shops and an
+   *  interview (CLAUDE.md T7 3.10). */
+  orders: TaskOrder[];
 }
 
 export type GameEventKind =
@@ -625,7 +689,10 @@ export type GameAction =
   | { type: 'ACCEPT_ENQUIRY'; enquiryId: string; byHand: boolean }
   | { type: 'START_TASK'; taskId: string }
   | { type: 'PAUSE_TASK' }
+  /** Lifting the lid: the machine has to come up before anything on it can be touched. */
+  | { type: 'BOOT_LAPTOP' }
   | { type: 'SET_MATERIAL_MODE'; jobId: string; mode: MaterialMode }
+  | { type: 'SET_SAW_FALLBACK'; jobId: string; on: boolean }
   | { type: 'BUY_STOCK'; sheets: number }
   | { type: 'PAY_ARREARS'; amount: number | null }
   | { type: 'ORDER_TRANSPORT'; jobId: string }

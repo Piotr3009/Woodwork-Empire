@@ -4,6 +4,7 @@
 import {
   ACCIDENT_CHANCE_PER_DAY,
   ACCIDENT_DAYS_OFF,
+  ADMIN_COVER_RATE,
   BENCH_SLOT_LAYOUT,
   BREAK_MINUTES,
   BREAK_SKIP_FACTOR,
@@ -20,10 +21,11 @@ import {
   MOVE_MINUTES_PER_ITEM,
   MOVING_SPEED,
   OVERTIME_DEBT_PER_DAY,
-  OWNER_LABOUR_PER_MINUTE,
   REPUTATION_START,
   SERVICE_INTERVAL_HOURS,
   SOFTWARE_ONE_OFF_JOBS,
+  HIRING_MINUTES,
+  LAPTOP_BOOT_MINUTES,
   SOFTWARE_ONE_OFF_PRICE,
   SOFTWARE_TURN1_TIER,
   STARTING_LAYOUT,
@@ -43,6 +45,7 @@ import {
   isOvertime,
   isWorkingDay,
   monthOfDay,
+  timeIsPaused,
   weekOfDay,
   weekday,
 } from './clock';
@@ -69,6 +72,7 @@ import {
   breakMachine,
   extractorBreakdownChance,
   extractorBroken,
+  OWNER,
   ductedMoves,
   findSpec,
   freeBenches,
@@ -78,7 +82,13 @@ import {
   machinesDueService,
   overdueBreakdownChance,
   repairCostFor,
+  releaseMachines,
+  releaseMachinesExcept,
   repairMachine,
+  requiresFor,
+  requiresOneOfFor,
+  standsInTheHall,
+  zoneOf,
   serviceCostFor,
   serviceMachine,
   serviceableMachines,
@@ -95,7 +105,7 @@ import {
   findJob,
   hallBlock,
   jobProgress,
-  jobSpeedFactor,
+  jobStage,
   oldestReadyJob,
   onDeliveryArrived,
   orderTransport,
@@ -106,6 +116,7 @@ import {
   releaseJob,
   runBookedTransport,
   setMaterialMode,
+  setSawFallback,
   transportLabel,
 } from './jobs';
 import {
@@ -135,23 +146,26 @@ import {
   staffOutputFactor,
 } from './owner';
 import { chance, int, makeId } from './rng';
+import { cncOptions, labourPerMinute } from './stages';
 import { plural } from './text';
+import { STATION_IDLE, STATION_NO_BENCH, stationForTask } from './stations';
 import {
-  STATION_IDLE,
-  STATION_NO_BENCH,
+  type Hand,
+  jobOf,
+  releaseIdleMachines,
   stationForProduction,
-  stationForTask,
-} from './stations';
+  takeMachines,
+} from './production';
 import {
   autoAssignJobs,
   availableJoiners,
+  canHire,
   hasWorkingDay,
   helpers,
   hire,
   isWorkingToday,
   joiners,
   runStaffDayStart,
-  sawRatioFactor,
   staffMinutesLeft,
 } from './staff';
 import {
@@ -166,9 +180,13 @@ import {
   interruptOwnerWith,
   movePending,
   movingMachines,
+  orderMinutes,
   pauseOwnerTask,
   resumeOwnerTask,
+  shoppingLabel,
+  shoppingTask,
   startTask,
+  taskWorkRate,
 } from './tasks';
 import type {
   DaySummary,
@@ -177,12 +195,12 @@ import type {
   Equipment,
   GameEventChoice,
   Job,
-  MaterialKind,
   GameAction,
   GameState,
   PeriodTotals,
   Speed,
   TaskInstance,
+  TaskOrder,
   Worker,
 } from './types';
 
@@ -343,6 +361,9 @@ function startDay(state: GameState): void {
     labourValue: 0,
     workMinutes: 0,
   };
+  // Nobody stands at a machine overnight: the hall starts the day with every one of them free
+  // (CLAUDE.md T7 3.1).
+  releaseMachinesExcept(state, []);
   runDayCosts(state, state.clock.day);
   runOwnerDayStart(state);
   runStaffDayStart(state);
@@ -690,6 +711,17 @@ function applyTaskCompletion(state: GameState, task: TaskInstance): void {
       // The same as a call: he goes back to whatever the move took him off.
       resumeOwnerTask(state);
       break;
+    case 'shopping':
+    case 'hiring':
+      // He is back from the shops or out of the interview: now it is booked (CLAUDE.md T7 3.10).
+      settleOrders(state, task);
+      // The next errand he committed to first, and the bench only when they are all run.
+      if (!startNextTrip(state)) resumeOwnerTask(state);
+      break;
+    case 'booting':
+      // The laptop is up: back to whatever he put down to open it.
+      resumeOwnerTask(state);
+      break;
     case 'bookkeeping':
       writeUpBooks(state);
       break;
@@ -835,9 +867,11 @@ function updateStations(state: GameState): void {
   } else if (ownerJob(state) !== null) {
     const job = ownerJob(state);
     owner.station =
-      job !== null && !hasBenchFor(state, job.id)
-        ? STATION_NO_BENCH
-        : stationForProduction(state, owner.productionMinutes);
+      job === null
+        ? STATION_IDLE
+        : hasBenchFor(state, job.id)
+          ? stationForProduction(state, OWNER, job)
+          : STATION_NO_BENCH;
   } else {
     owner.station = STATION_IDLE;
   }
@@ -854,7 +888,7 @@ function updateStations(state: GameState): void {
     const job = worker.jobId ? findJob(state, worker.jobId) : null;
     if (job && job.stage === 'inProduction') {
       worker.station = hasBenchFor(state, job.id)
-        ? stationForProduction(state, worker.productionMinutes)
+        ? stationForProduction(state, worker.id, job)
         : STATION_NO_BENCH;
       continue;
     }
@@ -867,6 +901,8 @@ function updateStations(state: GameState): void {
 
 function settle(state: GameState): void {
   refreshLocks(state);
+  // Nobody holds a machine he is not standing at (CLAUDE.md T7 3.1).
+  releaseIdleMachines(state);
   // Nothing else happens while the hall is being moved, and the clock runs itself (T4 3.5).
   if (movingMachines(state) !== null) state.speed = MOVING_SPEED;
   // The helper needs no minutes, so he would clear a bag change in the middle of his dinner. He
@@ -894,7 +930,8 @@ function runWorkerTaskMinute(state: GameState, workerId: string, taskId: string)
     return false;
   }
   worker.minutesWorked += 1;
-  if (advanceTask(task, 1, state.clock.day)) {
+  // An office admin covering for a specialist takes twice as long over it (CLAUDE.md T7 3.12).
+  if (advanceTask(task, taskWorkRate(worker, task), state.clock.day)) {
     worker.taskId = null;
     if (task.kind === 'materialOrder' && worker.role === 'purchasingClerk') {
       worker.ordersToday += 1;
@@ -951,59 +988,89 @@ function checkLowStock(state: GameState): void {
   });
 }
 
-function runProductionMinute(state: GameState, ownerOnTask: boolean): void {
-  const hall = hallProductivityFactor(state);
-  let worked = false;
-  // How many people put work through each material this minute: the share of a machine's
-  // capacity the workshop is using is what wears it out (CLAUDE.md T6 3.6).
-  const materials = new Map<MaterialKind, number>();
-  const usedBy = (kind: MaterialKind): void => {
-    materials.set(kind, (materials.get(kind) ?? 0) + 1);
-  };
-  // Every bench waits while the machines are being shifted about (CLAUDE.md T4 3.5).
-  const moving = movingMachines(state) !== null;
+/** Everybody who could put a minute into a job this minute, the owner first. The staff minute
+ *  goes on their own jobs of work first, because a man on a bag change is not at his bench
+ *  (CLAUDE.md T2 3.8). */
+function handsAtWork(state: GameState, ownerOnTask: boolean, moving: boolean): Hand[] {
+  const list: Hand[] = [];
   const atTheBench =
-    !ownerOnTask && !moving && state.owner.currentTaskId === null ? ownerJob(state) : null;
-  if (atTheBench && ownerIsAvailable(state) && canWorkOn(state, atTheBench)) {
-    spendOwnerMinute(state, 'workshop');
-    state.owner.productionMinutes += 1;
-    worked = true;
-    usedBy(atTheBench.materialKind);
-    const minute = (OWNER_LABOUR_PER_MINUTE * ownerEfficiency(state) * hall) /
-      jobSpeedFactor(state, atTheBench);
-    if (addLabour(state, atTheBench, minute)) raiseJobAtGate(state, atTheBench);
+    !ownerOnTask && !moving && state.owner.currentTaskId === null ? jobOf(state, OWNER) : null;
+  if (atTheBench && ownerIsAvailable(state)) {
+    list.push({ who: OWNER, job: atTheBench, rate: ownerEfficiency(state) });
   }
   // Staff work the normal day only: nobody but the owner does overtime, and they always take
   // their dinner even on a day the owner works through his (CLAUDE.md T6 3.4).
-  if (!isOvertime(state.clock.minute) && !isBreak(state.clock.minute)) {
-    const staffFactor = staffOutputFactor(state);
-    for (const worker of state.workers) {
-      if (!isWorkingToday(state, worker)) continue;
-      if (worker.taskId !== null) {
-        runWorkerTaskMinute(state, worker.id, worker.taskId);
-        continue;
-      }
-      if (moving) continue;
-      if (worker.role !== 'joiner' || worker.jobId === null) continue;
-      const job = findJob(state, worker.jobId);
-      if (!job || job.stage !== 'inProduction') {
-        worker.jobId = null;
-        continue;
-      }
-      if (!canWorkOn(state, job)) continue;
-      worker.productionMinutes += 1;
-      worked = true;
-      usedBy(job.materialKind);
-      const rate = worker.rate * sawRatioFactor(state, worker);
-      const minute = (OWNER_LABOUR_PER_MINUTE * rate * hall * staffFactor) /
-        jobSpeedFactor(state, job);
-      if (addLabour(state, job, minute)) raiseJobAtGate(state, job);
+  if (isOvertime(state.clock.minute) || isBreak(state.clock.minute)) return list;
+  const staffFactor = staffOutputFactor(state);
+  for (const worker of state.workers) {
+    if (!isWorkingToday(state, worker)) continue;
+    if (worker.taskId !== null) {
+      runWorkerTaskMinute(state, worker.id, worker.taskId);
+      continue;
     }
+    if (moving) continue;
+    if (worker.role !== 'joiner' || worker.jobId === null) continue;
+    const job = findJob(state, worker.jobId);
+    if (!job || job.stage !== 'inProduction') {
+      worker.jobId = null;
+      continue;
+    }
+    list.push({ who: worker.id, job, rate: worker.rate * staffFactor });
+  }
+  return list;
+}
+
+/** What the hall says a man is waiting for, in the words the job card and the Work Plan use. */
+function waitingLine(specId: string): string {
+  return `waiting for ${(findSpec(specId)?.name ?? specId).toLowerCase()}`;
+}
+
+function runProductionMinute(state: GameState, ownerOnTask: boolean): void {
+  const hall = hallProductivityFactor(state);
+  // Every bench waits while the machines are being shifted about (CLAUDE.md T4 3.5).
+  const moving = movingMachines(state) !== null;
+  const working = handsAtWork(state, ownerOnTask, moving);
+  // Anybody who is not at a job this minute walks away from whatever he was standing at, so the
+  // next man can have it (CLAUDE.md T7 3.1).
+  releaseMachinesExcept(state, working.map((hand) => hand.who));
+  let worked = false;
+  // The minutes somebody actually stood at each machine: that, and nothing else, is what wears
+  // it out and fills its bag (CLAUDE.md T7 2).
+  const used = new Map<string, number>();
+  for (const hand of working) {
+    if (!canWorkOn(state, hand.job)) {
+      releaseMachines(state, hand.who);
+      continue;
+    }
+    const stage = jobStage(state, hand.job, cncOptions(state, hand.who, hand.job));
+    if (stage === null) continue;
+    const at = takeMachines(state, hand);
+    if (at.waitingFor !== null) {
+      // He stands at the machine until the man on it is done with it (CLAUDE.md T7 3.1).
+      hand.job.blockedBy = waitingLine(at.waitingFor);
+      continue;
+    }
+    const worker = state.workers.find((entry) => entry.id === hand.who);
+    if (worker) {
+      worker.productionMinutes += 1;
+    } else {
+      spendOwnerMinute(state, 'workshop');
+      state.owner.productionMinutes += 1;
+    }
+    worked = true;
+    if (at.machine !== null) used.set(at.machine.id, (used.get(at.machine.id) ?? 0) + 1);
+    // A machine speeds up its own stage and nothing else, and only for the man on it, so the
+    // speed is the class of the machine he actually got (CLAUDE.md T7 3.1).
+    const speed = at.machine === null
+      ? stage.speed
+      : variantOf(specOf(at.machine.specId), at.machine.variantId).outputFactor;
+    const minute = labourPerMinute(hand.rate, speed) * hall;
+    if (addLabour(state, hand.job, minute, stage.id)) raiseJobAtGate(state, hand.job);
   }
   if (!worked) return;
   state.productionMinutesMonth += 1;
   addDust(state, 1);
-  for (const machine of accumulateMachineMinute(state, materials)) {
+  for (const machine of accumulateMachineMinute(state, used)) {
     raiseBagFull(state, machine);
   }
 }
@@ -1081,17 +1148,21 @@ function createCallTask(state: GameState, job: Job): TaskInstance {
 }
 
 /** A salesman on the books and with a day left in him takes every call without being asked
- *  (CLAUDE.md T4 3.3). */
+ *  (CLAUDE.md T4 3.3). With no salesman the office admin takes it, at twice the minutes, and the
+ *  day he is taken on the salesman has it back (CLAUDE.md T7 3.12). */
 function callTaker(state: GameState): Worker | null {
-  return (
-    state.workers.find(
+  for (const role of ['salesman', 'officeAdmin'] as const) {
+    const rate = role === 'officeAdmin' ? ADMIN_COVER_RATE : 1;
+    const found = state.workers.find(
       (worker) =>
-        worker.role === 'salesman' &&
+        worker.role === role &&
         isWorkingToday(state, worker) &&
         // Enough of his day left to see the call out, or the owner is asked instead.
-        staffMinutesLeft(worker) >= AD_HOC_TASK_MINUTES.clientCall,
-    ) ?? null
-  );
+        staffMinutesLeft(worker) >= AD_HOC_TASK_MINUTES.clientCall / rate,
+    );
+    if (found) return found;
+  }
+  return null;
 }
 
 /** The client rings. Nothing is held up by it: the phone simply goes, and the owner answers or
@@ -1288,8 +1359,19 @@ function resolveEvent(state: GameState, choiceId: string): void {
   }
 }
 
+/** Everything that changes the world outside the workshop and so cannot happen while the clock
+ *  is stopped (CLAUDE.md T7 3.10). The purchases and the hire carry the rule themselves, through
+ *  `placeOrder`; these are the rest of the shop counter. Dragging the kit about is not on the
+ *  list: setting the hall out stops the clock on purpose, and the Turn 4 move costs stand. */
+const PAUSED_ACTIONS: ReadonlyArray<GameAction['type']> = [
+  'BUY_STOCK',
+  'ORDER_TRANSPORT',
+  'PAY_ARREARS',
+];
+
 export function applyAction(state: GameState, action: GameAction): GameState {
   const next = clone(state);
+  if (timeIsPaused(next) && PAUSED_ACTIONS.includes(action.type)) return next;
   switch (action.type) {
     case 'SET_SPEED':
       // The speed is not the player's while the hall is being moved (CLAUDE.md T4 3.5).
@@ -1326,6 +1408,9 @@ export function applyAction(state: GameState, action: GameAction): GameState {
     case 'SET_MATERIAL_MODE':
       setMaterialMode(next, action.jobId, action.mode);
       break;
+    case 'SET_SAW_FALLBACK':
+      setSawFallback(next, action.jobId, action.on);
+      break;
     case 'WORK_HERE': {
       const job = action.jobId ? findJob(next, action.jobId) : oldestReadyJob(next);
       if (job) assignJob(next, job.id, 'owner');
@@ -1335,7 +1420,9 @@ export function applyAction(state: GameState, action: GameAction): GameState {
       assignJob(next, action.jobId, action.workerId);
       break;
     case 'HIRE':
-      hire(next, action.role, action.tier);
+      // The interview is an hour of his own, and the man is on the books when it is over
+      // (CLAUDE.md T7 3.10).
+      placeOrder(next, { kind: 'hire', role: action.role, tier: action.tier });
       break;
     case 'ASK_UNLOAD': {
       const delivery = findDelivery(next, action.deliveryId);
@@ -1372,14 +1459,25 @@ export function applyAction(state: GameState, action: GameAction): GameState {
       }
       break;
     }
+    case 'BOOT_LAPTOP':
+      bootLaptop(next);
+      break;
     case 'PAUSE_TASK':
       pauseOwnerTask(next);
       break;
-    case 'BUY_EQUIPMENT':
-      buyEquipment(next, action.specId, action.variantId);
+    case 'BUY_EQUIPMENT': {
+      // Nothing is bought on the spot: he goes out for it and the cash leaves when he is back
+      // (CLAUDE.md T7 3.10).
+      const spec = findSpec(action.specId);
+      placeOrder(next, {
+        kind: 'equipment',
+        specId: action.specId,
+        variantId: action.variantId ?? spec?.variants[0]?.id ?? '',
+      });
       break;
+    }
     case 'BUY_SOFTWARE':
-      buySoftware(next, action.mode);
+      placeOrder(next, { kind: 'software', mode: action.mode });
       break;
     case 'BUY_STOCK':
       buyStock(next, action.sheets);
@@ -1425,32 +1523,21 @@ export function applyAction(state: GameState, action: GameAction): GameState {
 // ---------------------------------------------------------------------------
 
 
-/** Somebody is actually standing at this job this minute, rather than the job merely being open
- *  and assigned to a man who has gone home or gone to the desk. */
-function someoneIsOnIt(state: GameState, job: Job): boolean {
-  if (job.assignedTo === null) return false;
-  if (job.assignedTo === 'owner') {
-    return ownerIsAvailable(state) && state.owner.currentTaskId === null;
-  }
-  const worker = state.workers.find((entry) => entry.id === job.assignedTo);
-  if (!worker) return false;
-  return isWorkingToday(state, worker) && worker.taskId === null;
-}
-
-/** True when something that runs through this machine is being made this minute. The hall reads
- *  it to spin the blade and throw the dust: nothing in the engine turns on it (CLAUDE.md T3 3.7). */
+/** True when somebody is standing at this machine this minute. The hall reads it to spin the
+ *  blade and throw the dust: nothing in the engine turns on it (CLAUDE.md T3 3.7). A machine is
+ *  taken by one man or by nobody, so this is the one question there is to ask (T7 3.1). */
 export function machineInUse(state: GameState, item: Equipment): boolean {
   const spec = findSpec(item.specId);
   if (!spec || item.broken) return false;
-  if (spec.category !== 'machine' && spec.category !== 'extraction') return false;
-  if (spec.category === 'machine' && item.bagFull) return false;
-  return state.jobs.some((job) => {
-    if (job.stage !== 'inProduction' || job.blockedBy !== '') return false;
-    if (!someoneIsOnIt(state, job)) return false;
-    // The extraction serves whatever is running, so anything at the bench sets it going.
-    if (spec.category === 'extraction') return true;
-    return spec.usedOn === null || spec.usedOn === job.materialKind;
-  });
+  if (spec.category === 'extraction') {
+    // The extraction serves whatever is running, so any machine at work sets it going.
+    return state.equipment.some((other) => {
+      const otherSpec = findSpec(other.specId);
+      return otherSpec?.category === 'machine' && other.takenBy !== null && !other.broken;
+    });
+  }
+  if (spec.category !== 'machine') return false;
+  return item.takenBy !== null && !item.bagFull;
 }
 
 export interface BuyCheck {
@@ -1469,14 +1556,17 @@ export function canBuy(state: GameState, specId: string, variantId?: string): Bu
   if (state.reputation < spec.minReputation) {
     return { ok: false, reason: `Needs reputation ${spec.minReputation}` };
   }
-  for (const required of spec.requires) {
+  // A class may want something the family does not: a floor edgebander wants extraction where a
+  // hand one wants a tool cabinet (CLAUDE.md T7 3.6).
+  for (const required of requiresFor(spec, variant)) {
     if (!has(state, required)) {
       const name = findSpec(required)?.name ?? required;
       return { ok: false, reason: `Needs ${name} first` };
     }
   }
-  if (spec.requiresOneOf.length > 0 && !spec.requiresOneOf.some((id) => has(state, id))) {
-    const names = spec.requiresOneOf.map((id) => findSpec(id)?.name ?? id).join(' or ');
+  const oneOf = requiresOneOfFor(spec, variant);
+  if (oneOf.length > 0 && !oneOf.some((id) => has(state, id))) {
+    const names = oneOf.map((id) => findSpec(id)?.name ?? id).join(' or ');
     return { ok: false, reason: `Needs ${names} first` };
   }
   if (!spec.stackable && has(state, specId)) return { ok: false, reason: 'Already owned' };
@@ -1484,6 +1574,12 @@ export function canBuy(state: GameState, specId: string, variantId?: string): Bu
     return { ok: false, reason: 'No free bench slot in this unit' };
   }
   if (!canAfford(state, variant.price)) return { ok: false, reason: 'Not enough cash' };
+  // A machine wants its working room as well as its price: a floor edgebander needs a free 5 by
+  // 3 of hall and there is no point selling him one he cannot stand anywhere (T7 3.3, 3.6).
+  if (standsInTheHall(specId, variant.id) && firstFreeCell(state, specId, variant.id) === null) {
+    const zone = zoneOf(specId, variant.id);
+    return { ok: false, reason: `No free ${zone.width} by ${zone.depth} m in the hall` };
+  }
   return OK;
 }
 
@@ -1508,15 +1604,15 @@ function defaultAnchor(state: GameState, specId: string): { x: number; y: number
 
 /** A new purchase lands on its default tile, or on the first free one when that is taken. The
  *  player moves it wherever he likes afterwards (CLAUDE.md T2 3.10). */
-function anchorFor(state: GameState, specId: string): { x: number; y: number } {
+function anchorFor(state: GameState, specId: string, variantId: string): { x: number; y: number } {
   const spec = findSpec(specId);
   const preferred = defaultAnchor(state, specId);
   // The office furniture and anything in the yard are not on the hall floor.
   if (!spec || spec.category === 'furniture' || STARTING_LAYOUT[specId]?.yard === true) {
     return preferred;
   }
-  if (canPlaceSpec(state, specId, preferred.x, preferred.y, null).ok) return preferred;
-  return firstFreeCell(state, specId) ?? preferred;
+  if (canPlaceSpec(state, specId, preferred.x, preferred.y, null, variantId).ok) return preferred;
+  return firstFreeCell(state, specId, variantId) ?? preferred;
 }
 
 export function buyEquipment(state: GameState, specId: string, variantId?: string): BuyCheck {
@@ -1524,7 +1620,7 @@ export function buyEquipment(state: GameState, specId: string, variantId?: strin
   if (!check.ok) return check;
   const spec = specOf(specId);
   const variant = variantOf(spec, variantId ?? spec.variants[0]?.id ?? '');
-  const anchor = anchorFor(state, specId);
+  const anchor = anchorFor(state, specId, variant.id);
   pay(state, 'equipment', variant.name, variant.price);
   state.equipment.push({
     id: makeId(state, 'kit'),
@@ -1539,6 +1635,7 @@ export function buyEquipment(state: GameState, specId: string, variantId?: strin
     serviceHours: 0,
     enduranceHours: enduranceHoursFor(specId, variant.id),
     hoursUsed: 0,
+    takenBy: null,
     purchasePrice: variant.price,
   });
   return OK;
@@ -1566,5 +1663,128 @@ export function buySoftware(state: GameState, mode: 'oneOff' | 'subscription'): 
     return OK;
   }
   state.software = { mode: 'subscription', tier: SOFTWARE_TURN1_TIER, jobsRemaining: 0 };
+  return OK;
+}
+
+// ---------------------------------------------------------------------------
+// Nothing in stopped time: every purchase and every hire is a trip (T7 3.10)
+// ---------------------------------------------------------------------------
+
+/** The hall as it will be when the owner is back from every trip he is already on. A second
+ *  thing bought on the same visit is checked against that and not against the hall he is
+ *  standing in: the tool cabinet he has just put on the list is in by the time the hand bander
+ *  he wants to keep in it arrives, and the cash for both is gone (CLAUDE.md T7 3.10). */
+function afterTheTrips(state: GameState): GameState {
+  // Nothing on the list: the hall he is standing in is the hall he will come back to, and the
+  // catalogue asks this question of every tile it draws, every minute.
+  if (!state.tasks.some((task) => !task.done && task.orders.length > 0)) return state;
+  const after = clone(state);
+  for (const task of after.tasks) {
+    if (!task.done) settleOrders(after, task);
+  }
+  return after;
+}
+
+/** Can this order be placed at all: the clock has to be running, the owner has to be in, and the
+ *  thing has to be one he could buy or take on once everything already on the list has landed. */
+export function orderCheck(state: GameState, order: TaskOrder): BuyCheck {
+  if (timeIsPaused(state)) return { ok: false, reason: 'Time is paused' };
+  if (!state.owner.present) return { ok: false, reason: 'You are not in today' };
+  const after = afterTheTrips(state);
+  if (order.kind === 'equipment') return canBuy(after, order.specId, order.variantId);
+  if (order.kind === 'software') return canBuySoftware(after, order.mode);
+  return canHire(after, order.role, order.tier);
+}
+
+/** The errands the owner runs himself, in the order he committed to them. Nobody else can be
+ *  sent on one (CLAUDE.md T7 3.10). */
+const TRIP_KINDS: ReadonlyArray<TaskInstance['kind']> = ['shopping', 'hiring'];
+
+/** True while he is out on one already: the next errand waits its turn behind it, so the tool
+ *  cabinet is on the floor before the man who keeps his tools in it sits down for his interview. */
+function onATrip(state: GameState): boolean {
+  const current = state.owner.currentTaskId;
+  if (current === null) return false;
+  const task = findTask(state, current);
+  return task !== null && !task.done && TRIP_KINDS.includes(task.kind);
+}
+
+/** The next errand he has committed to and not yet run. He finishes them before he goes back to
+ *  whatever the first one took him off. */
+function startNextTrip(state: GameState): boolean {
+  const trip = state.tasks.find((task) => !task.done && TRIP_KINDS.includes(task.kind));
+  if (!trip) return false;
+  // What he put down for the first errand is still what he goes back to after the last one.
+  const resume = state.owner.resumeTaskId;
+  state.owner.currentTaskId = trip.id;
+  trip.doneBy = 'owner';
+  state.owner.resumeTaskId = resume;
+  return true;
+}
+
+/** Places an order: the owner goes out for it, and it is booked when he gets back. The whole of
+ *  3.10 hangs on this one path, so the catalogue, the laptop and the team board all come through
+ *  it (CLAUDE.md T7 3.10). */
+export function placeOrder(state: GameState, order: TaskOrder): BuyCheck {
+  const check = orderCheck(state, order);
+  if (!check.ok) return check;
+  if (order.kind === 'hire') {
+    // An interview is its own hour and never rides on the shopping (PIOTR).
+    const task = createTask(state, {
+      kind: 'hiring',
+      label: 'Interview',
+      minutes: HIRING_MINUTES,
+      orders: [order],
+    });
+    // He sits down for it as soon as he is free of the errands he is already out on, and goes
+    // back to whatever he put down when the last of them is over (CLAUDE.md T4 3.3, T7 3.10).
+    if (!onATrip(state)) interruptOwnerWith(state, task);
+    return OK;
+  }
+  const open = shoppingTask(state);
+  if (open !== null) {
+    const more = orderMinutes(state, order);
+    open.minutesTotal += more;
+    open.minutesRemaining += more;
+    open.orders.push(order);
+    open.label = shoppingLabel(open.orders);
+    // He is at the counter either way: if he wandered off, he is back on it.
+    if (state.owner.currentTaskId !== open.id && !onATrip(state)) interruptOwnerWith(state, open);
+    return OK;
+  }
+  const task = createTask(state, {
+    kind: 'shopping',
+    label: shoppingLabel([order]),
+    minutes: orderMinutes(state, order),
+    orders: [order],
+  });
+  if (!onATrip(state)) interruptOwnerWith(state, task);
+  return OK;
+}
+
+/** The owner is back: what he went out for is booked and the cash leaves now. Anything the world
+ *  has made impossible while he was out is simply not bought (CLAUDE.md T7 3.10). */
+function settleOrders(state: GameState, task: TaskInstance): void {
+  const orders = task.orders;
+  task.orders = [];
+  for (const order of orders) {
+    if (order.kind === 'equipment') buyEquipment(state, order.specId, order.variantId);
+    else if (order.kind === 'software') buySoftware(state, order.mode);
+    else hire(state, order.role, order.tier);
+  }
+}
+
+/** Lifting the lid on the laptop: it has to come up before anything on it can be touched, and
+ *  the five minutes are the owner's like any other (CLAUDE.md T7 3.10). */
+export function bootLaptop(state: GameState): BuyCheck {
+  if (timeIsPaused(state)) return { ok: false, reason: 'Time is paused' };
+  if (!has(state, 'laptop')) return { ok: false, reason: 'Needs a laptop first' };
+  if (state.tasks.some((task) => task.kind === 'booting' && !task.done)) return OK;
+  const task = createTask(state, {
+    kind: 'booting',
+    label: 'Waiting for the laptop',
+    minutes: LAPTOP_BOOT_MINUTES,
+  });
+  interruptOwnerWith(state, task);
   return OK;
 }

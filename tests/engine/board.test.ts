@@ -30,7 +30,7 @@ import {
 import { labourValueFor, ownerDaysFor } from '../../src/engine/jobs';
 import { tick } from '../../src/engine/index';
 import type { Enquiry, GameState } from '../../src/engine/index';
-import { act, clearEvents, newGame } from '../helpers';
+import { buyNow, clearEvents, newGame } from '../helpers';
 
 /** Draws n enquiries onto the board, exactly as a long game would. */
 function draw(state: GameState, count: number): Enquiry[] {
@@ -171,10 +171,10 @@ describe('the board over time', () => {
 
   it('lifts the lock the moment the tools are on the floor', () => {
     let state = newGame();
-    state = act(state, { type: 'BUY_EQUIPMENT', specId: 'tableSaw' });
-    state = act(state, { type: 'BUY_EQUIPMENT', specId: 'drill' });
-    state = act(state, { type: 'BUY_EQUIPMENT', specId: 'toolCabinet' });
-    state = act(state, { type: 'BUY_EQUIPMENT', specId: 'edgebander' });
+    state = buyNow(state, 'tableSaw');
+    state = buyNow(state, 'drill');
+    state = buyNow(state, 'toolCabinet');
+    state = buyNow(state, 'edgebander');
     for (const enquiry of state.enquiries) {
       expect(enquiry.lockReason).toBeNull();
       expect(canAccept(state, enquiry).ok).toBe(true);

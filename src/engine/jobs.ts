@@ -3,8 +3,9 @@
 // in production, completed, paid and rated (CLAUDE.md 9.5).
 
 import {
-  BY_HAND_DURATION_FACTOR,
   COURIER_COST,
+  MEETING_PRICE_THRESHOLD,
+  SAW_FALLBACK_DEFAULT,
   DEADLINE_DAYS_BASE,
   DEADLINE_DAYS_FACTOR,
   DEADLINE_DAYS_MAX,
@@ -21,7 +22,6 @@ import {
   LATE_PENALTY_PER_DAY,
   LATE_PENALTY_PER_DAY_EXPRESS,
   MINUTES_PER_WORKING_DAY,
-  OWNER_LABOUR_PER_MINUTE,
   SITE_MEASURE_MINUTES,
   SITE_MEASURE_TAXI_COST,
   WORKER_MINUTE_RATE_DIVISOR,
@@ -29,18 +29,17 @@ import {
 import { canAccept, findEnquiry, removeEnquiry } from './board';
 import { callRinging, scheduleCalls } from './calls';
 import { template } from './catalog';
-import { minuteStamp, nextWorkingDay } from './clock';
+import { nextWorkingDay } from './clock';
 import { chargeUnavoidable, formatMoney, receive } from './economy';
 import { queueEvent } from './events';
 import {
-  bagBlocked,
-  brokenMachineFor,
+  OWNER,
+  familyStopped,
   findSpec,
   has,
   hasBenchFor,
   hasExtraction,
-  machineLabourFactor,
-  machineOutputFactor,
+  releaseMachines,
 } from './machines';
 import {
   materialCostFor,
@@ -50,6 +49,15 @@ import {
   stockCostFor,
 } from './materials';
 import { ownerIsAvailable } from './owner';
+import {
+  type StageOptions,
+  type StagePlan,
+  type StagedJob,
+  cncOptions,
+  currentStage,
+  jobMinutesFor,
+  minutesLeftFor,
+} from './stages';
 import { applyRating } from './reputation';
 import { int, makeId } from './rng';
 import { plural } from './text';
@@ -63,7 +71,15 @@ import {
   jobTasks,
   materialOrderMinutes,
 } from './tasks';
-import type { GameState, Job, JobStage, MaterialKind, MaterialMode } from './types';
+import type {
+  Finish,
+  GameState,
+  Job,
+  JobStage,
+  MaterialKind,
+  MaterialMode,
+  StageId,
+} from './types';
 
 export function findJob(state: GameState, jobId: string): Job | null {
   return state.jobs.find((job) => job.id === jobId) ?? null;
@@ -82,16 +98,27 @@ export function labourValueFor(price: number): number {
   return price * LABOUR_FRACTION;
 }
 
-/** Days of the owner's own time this much labour takes with the machines the hall has now: the
- *  same number the board tile shows and the deadline is worked out from (CLAUDE.md T6 3.7). */
+/** A job as the stages read it. Everything that asks what a piece of work will take comes through
+ *  here, an enquiry nobody has accepted included (CLAUDE.md T7 3.1). */
+export function stagedJob(
+  labourValue: number,
+  materialKind: MaterialKind,
+  byHand: boolean,
+  finish: Finish = 'laminate',
+): StagedJob {
+  return { labourValue, materialKind, finish, byHand };
+}
+
+/** Days of the owner's own time this much labour takes with the machines the hall has now: every
+ *  stage at the speed of the best machine of its family, added up (CLAUDE.md T7 3.1). The same
+ *  number the board tile shows and the deadline is worked out from (CLAUDE.md T6 3.7). */
 export function ownerDaysFor(
   state: GameState,
   labourValue: number,
   materialKind: MaterialKind,
   byHand = false,
 ): number {
-  const minutes =
-    (labourValue / OWNER_LABOUR_PER_MINUTE) * speedFactorFor(state, materialKind, byHand);
+  const minutes = jobMinutesFor(state, stagedJob(labourValue, materialKind, byHand), 1);
   return minutes / MINUTES_PER_WORKING_DAY;
 }
 
@@ -145,30 +172,30 @@ export function jobProgress(job: Job): number {
   return Math.min(1, Math.max(0, 1 - job.labourRemaining / job.labourValue));
 }
 
-/** What the workshop does to the minutes work of this material takes: the machine reductions of
- *  8.6 multiplied together, and half again as long if it is being made by hand (CLAUDE.md 9.5).
- *  Below 1 is quicker. It is read every minute, so buying a machine speeds up work already on the
- *  books and losing one to the bailiff slows it down again. */
-export function speedFactorFor(
+/** The stage this job is standing at, with the family it is done on and what that family does to
+ *  its minutes. Null only for a job with no labour in it at all. */
+export function jobStage(
   state: GameState,
-  materialKind: MaterialKind,
-  byHand: boolean,
-): number {
-  const hand = byHand ? BY_HAND_DURATION_FACTOR : 1;
-  // A better class of machine gets through the same work in fewer minutes, so its output factor
-  // divides the time the labour reductions have already cut (CLAUDE.md T3 3.5).
-  const output = byHand ? 1 : machineOutputFactor(state, materialKind);
-  return (machineLabourFactor(state, materialKind) * hand) / output;
+  job: Job,
+  options: StageOptions = {},
+): StagePlan | null {
+  return currentStage(state, job, options);
 }
 
-export function jobSpeedFactor(state: GameState, job: Job): number {
-  return speedFactorFor(state, job.materialKind, job.byHand);
+/** The player's say over whether this job waits for the CNC or goes on the saw when the CNC is
+ *  taken (CLAUDE.md T7 3.4). */
+export function setSawFallback(state: GameState, jobId: string, on: boolean): boolean {
+  const job = findJob(state, jobId);
+  if (!job) return false;
+  job.sawFallback = on;
+  return true;
 }
 
-/** Minutes this job still needs from a worker of the given rate (1 is the owner). */
+/** Minutes this job still needs from a worker of the given rate (1 is the owner). Every stage
+ *  still ahead of him at its own machine's speed (CLAUDE.md T7 3.1). */
 export function minutesRemainingFor(state: GameState, job: Job, rate: number): number {
   if (rate <= 0) return Infinity;
-  return (job.labourRemaining / (OWNER_LABOUR_PER_MINUTE * rate)) * jobSpeedFactor(state, job);
+  return minutesLeftFor(state, job, rate);
 }
 
 // ---------------------------------------------------------------------------
@@ -213,6 +240,7 @@ export function acceptEnquiry(state: GameState, enquiryId: string, byHand: boole
     bespokeMaterial: enquiry.bespokeMaterial,
     express: enquiry.express,
     byHand: madeByHand,
+    sawFallback: SAW_FALLBACK_DEFAULT,
     needsMeasure: enquiry.needsMeasure,
     labourValue,
     labourRemaining: labourValue,
@@ -225,7 +253,7 @@ export function acceptEnquiry(state: GameState, enquiryId: string, byHand: boole
     callsMissed: 0,
     designMinutesRemaining: designMinutes(entry, enquiry.sizeMultiplier, state.software.tier),
     assignedTo: null,
-    benchSince: null,
+    stageRuns: [],
     completedDay: null,
     daysLate: 0,
     depositPaid: 0,
@@ -249,8 +277,28 @@ export function acceptEnquiry(state: GameState, enquiryId: string, byHand: boole
 
 /** The emails, the drawing and the site visit the job needs from the owner, and the diary of the
  *  calls the client will make. The calls are not tasks any more: they interrupt (T4 3.3). */
+/** True while the meeting a big job starts with has not been held (CLAUDE.md T7 3.11). */
+export function meetingOutstanding(state: GameState, job: Job): boolean {
+  return jobTasks(state, job.id).some((task) => task.kind === 'clientMeeting' && !task.done);
+}
+
+/** A job worth more than 20,000 starts with four hours at the client's (PIOTR). */
+export function needsMeeting(price: number): boolean {
+  return price > MEETING_PRICE_THRESHOLD;
+}
+
 export function createJobTasks(state: GameState, job: Job): void {
   scheduleCalls(state, job);
+  // The meeting comes before the drawing, and the drawing cannot start until it is held
+  // (CLAUDE.md T7 3.11).
+  if (needsMeeting(job.price)) {
+    createTask(state, {
+      kind: 'clientMeeting',
+      label: `Client meeting: ${job.name}`,
+      minutes: AD_HOC_TASK_MINUTES.clientMeeting,
+      jobId: job.id,
+    });
+  }
   // Emails ride with the job, in any order with the drawing, and hold nothing up.
   const emails = emailsForPrice(job.price);
   for (let index = 0; index < emails; index += 1) {
@@ -385,12 +433,16 @@ export function hallBlock(state: GameState, job: Job): string {
   if (!job.byHand && !hasExtraction(state)) return 'no extraction';
   // A bench is the one thing a piece cannot be made without, by hand or not (CLAUDE.md T4 3.4).
   if (!hasBenchFor(state, job.id)) return 'no bench';
-  const broken = brokenMachineFor(state, job.materialKind);
-  if (broken && !job.byHand) {
-    return `${(findSpec(broken.specId)?.name ?? 'a machine').toLowerCase()} is broken`;
-  }
-  if (bagBlocked(state, job.materialKind)) return 'bag full';
-  return '';
+  if (job.byHand) return '';
+  // Only the machine of the stage he is at can stop him: a broken edgebander does not stop a
+  // job that is still being cut (CLAUDE.md T7 3.1).
+  const stage = jobStage(state, job, cncOptions(state, job.assignedTo ?? OWNER, job));
+  const family = stage?.family ?? null;
+  if (family === null) return '';
+  const stopped = familyStopped(state, family);
+  if (stopped === null) return '';
+  if (stopped.why === 'bag') return 'bag full';
+  return `${(findSpec(stopped.item.specId)?.name ?? 'a machine').toLowerCase()} is broken`;
 }
 
 /** The stages a job can still be sent to the bench from. Once somebody is on it there is nothing
@@ -437,6 +489,7 @@ export function startProductionCheck(state: GameState, job: Job): StartCheck {
   // The stage is the job's place in the lifecycle, so the desk work is only in the way while the
   // job is still standing at the desk.
   if (job.stage === 'accepted') {
+    if (meetingOutstanding(state, job)) return blocked('meeting not held');
     if (designOutstanding(state, job)) return blocked('design not done');
     if (measureOutstanding(state, job)) return blocked('site measure not done');
   }
@@ -460,12 +513,24 @@ export interface LifecycleStep {
 }
 
 const LIFECYCLE_LABELS = ['Calls', 'Design', 'Material', 'Delivery', 'Production'];
+/** A job over 20,000 has one step more, and it comes before the drawing (CLAUDE.md T7 3.11). */
+const MEETING_LABEL = 'Meeting';
+
+/** The Production step names the stage the piece is actually at, so the five step row answers
+ *  "what is happening to it now" as well as "where is it up to" (CLAUDE.md T7 3.1). */
+function productionLabel(state: GameState, job: Job): string {
+  if (job.stage !== 'inProduction') return 'Production';
+  const stage = jobStage(state, job);
+  return stage === null ? 'Production' : `Production: ${stage.label}`;
+}
 
 /** The five steps of a job, so the card answers "what am I waiting for" without being read
  *  (CLAUDE.md T3 3.1). The first step that is not finished is the one in hand. */
 export function lifecycleSteps(state: GameState, job: Job): LifecycleStep[] {
   const ordered = job.stage !== 'accepted' && job.stage !== 'materialPending';
+  const meeting = needsMeeting(job.price);
   const done = [
+    ...(meeting ? [ordered || !meetingOutstanding(state, job)] : []),
     // Calls hold nothing up any more, so this step is only ever amber while the client is
     // actually on the line (CLAUDE.md T4 3.3).
     !callRinging(state, job),
@@ -477,9 +542,10 @@ export function lifecycleSteps(state: GameState, job: Job): LifecycleStep[] {
       job.stage === 'completed',
     job.stage === 'awaitingTransport' || job.stage === 'completed',
   ];
+  const labels = meeting ? [MEETING_LABEL, ...LIFECYCLE_LABELS] : LIFECYCLE_LABELS;
   const now = done.indexOf(false);
-  return LIFECYCLE_LABELS.map((label, index) => ({
-    label,
+  return labels.map((label, index) => ({
+    label: index === labels.length - 1 ? productionLabel(state, job) : label,
     state: done[index] === true ? 'done' : index === now ? 'now' : 'todo',
   }));
 }
@@ -520,24 +586,51 @@ export function assignJob(state: GameState, jobId: string, workerId: string | nu
   }
   job.assignedTo = workerId;
   job.stage = 'inProduction';
-  job.benchSince = minuteStamp(state.clock);
   return true;
 }
 
-/** Takes whoever is on the job off it, leaving the work done in place. */
+/** Takes whoever is on the job off it, leaving the work done in place. He walks away from every
+ *  machine he was standing at, so the next man can have it (CLAUDE.md T7 3.1). */
 export function releaseJob(state: GameState, job: Job): void {
   const worker = state.workers.find((entry) => entry.jobId === job.id);
   if (worker) worker.jobId = null;
+  if (job.assignedTo !== null) releaseMachines(state, job.assignedTo);
   job.assignedTo = null;
-  job.benchSince = null;
+  closeStageRun(state, job);
   if (job.stage === 'inProduction') job.stage = 'ready';
+}
+
+/** Writes down that somebody worked this stage this minute. A run is opened when the stage is not
+ *  the one already open, and the one before it is closed at that moment: the Work Plan's bars and
+ *  its grey gaps are read off these and off nothing else (CLAUDE.md T7 3.2). */
+export function noteStageWork(state: GameState, job: Job, stage: StageId): void {
+  const open = job.stageRuns[job.stageRuns.length - 1];
+  if (open && open.endDay === null && open.stage === stage) return;
+  if (open && open.endDay === null) closeStageRun(state, job);
+  job.stageRuns.push({
+    stage,
+    startDay: state.clock.day,
+    startMinute: state.clock.minute,
+    endDay: null,
+    endMinute: null,
+  });
+}
+
+/** Closes whatever run is open, at this minute. */
+export function closeStageRun(state: GameState, job: Job): void {
+  const open = job.stageRuns[job.stageRuns.length - 1];
+  if (!open || open.endDay !== null) return;
+  open.endDay = state.clock.day;
+  open.endMinute = state.clock.minute;
 }
 
 /** Work one person minute of labour into a job. What actually went in is booked against the day
  *  here, so the earned labour rate counts what was produced and not what was offered: the last
- *  minute of a job is usually a part minute (CLAUDE.md T6 3.8). Returns true when it finished. */
-export function addLabour(state: GameState, job: Job, labour: number): boolean {
+ *  minute of a job is usually a part minute (CLAUDE.md T6 3.8). The stage it went into is written
+ *  down with it (CLAUDE.md T7 3.2). Returns true when it finished. */
+export function addLabour(state: GameState, job: Job, labour: number, stage: StageId): boolean {
   if (labour <= 0) return false;
+  noteStageWork(state, job, stage);
   const put = Math.min(labour, Math.max(0, job.labourRemaining));
   job.labourRemaining -= labour;
   state.dayStats.workMinutes += 1;
@@ -553,6 +646,7 @@ export function addLabour(state: GameState, job: Job, labour: number): boolean {
  *  nothing is paid until it gets there (CLAUDE.md T2 3.7). Who takes it there is a decision, so
  *  the event that asks is raised by game.ts, the only module that can send a man. */
 export function completeJob(state: GameState, job: Job): void {
+  closeStageRun(state, job);
   releaseJob(state, job);
   job.assignedTo = null;
   job.stage = 'awaitingTransport';

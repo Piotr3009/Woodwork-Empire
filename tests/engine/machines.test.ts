@@ -20,16 +20,19 @@ import {
 } from '../../src/engine/constants';
 import { addWorkingDays } from '../../src/engine/clock';
 import {
+  familyShareOfJob,
+  machineHoursPerDay,
+  serviceDueOn,
+} from '../../src/engine/production';
+import {
   accidentRisk,
-  bagBlocked,
-  brokenMachineFor,
+  familyStopped,
   hasExtraction,
   overdueBreakdownChance,
   serviceCostFor,
-  machineHoursPerDay,
+
   machinesDueService,
   serviceDueIn,
-  serviceDueOn,
   serviceIsDue,
   bagIntervalFor,
   bagMachinesFor,
@@ -48,11 +51,13 @@ import type { Equipment, GameEvent, GameState } from '../../src/engine/index';
 import { renderHall } from '../../src/render/hall';
 import {
   act,
+  buyNow,
   buyStartingKit,
   clearEvents,
   eventsOfKind,
   fillRack,
   firstJob,
+  hireNow,
   newGame,
   placeEnquiry,
   runToDay,
@@ -75,9 +80,15 @@ function atTheBench(options: { price?: number; seed?: number } = {}): GameState 
 describe('the catalogue', () => {
   it('shows the locked machines with a reason and refuses the sale', () => {
     const state = newGame({ difficulty: 'veryEasy' });
-    expect(canBuy(state, 'cnc')).toEqual({ ok: false, reason: 'Coming in a later stage.' });
-    expect(canBuy(state, 'sprayBooth').ok).toBe(false);
-    const tried = act(state, { type: 'BUY_EQUIPMENT', specId: 'sprayBooth' });
+    // The CNC is unlocked from Turn 7 and wants extraction like any machine (T7 3.4).
+    expect(canBuy(state, 'cnc').reason).toBe(
+      'Needs Extractor or Central dust extraction system or Flexi extraction system first',
+    );
+    expect(canBuy(state, 'sprayBooth')).toEqual({
+      ok: false,
+      reason: 'Coming in a later stage.',
+    });
+    const tried = buyNow(state, 'sprayBooth');
     expect(tried.equipment).toHaveLength(0);
   });
 
@@ -91,7 +102,7 @@ describe('the catalogue', () => {
   });
 
   it('refuses a second one of something that stands alone', () => {
-    const state = act(newGame(), { type: 'BUY_EQUIPMENT', specId: 'extractor' });
+    const state = buyNow(newGame(), 'extractor');
     expect(canBuy(state, 'extractor')).toEqual({ ok: false, reason: 'Already owned' });
     expect(canBuy(state, 'tableSaw').ok).toBe(true);
   });
@@ -101,15 +112,15 @@ describe('bags', () => {
   it('only exist with an extractor, and not with the central system', () => {
     const plain = newGame({ difficulty: 'veryEasy' });
     expect(bagsExist(plain)).toBe(false);
-    const withExtractor = act(plain, { type: 'BUY_EQUIPMENT', specId: 'extractor' });
+    const withExtractor = buyNow(plain, 'extractor');
     expect(bagsExist(withExtractor)).toBe(true);
-    const withSystem = act(withExtractor, { type: 'BUY_EQUIPMENT', specId: 'dustSystem' });
+    const withSystem = buyNow(withExtractor, 'dustSystem');
     expect(bagsExist(withSystem)).toBe(false);
   });
 
   it('belongs to the machines the material runs through', () => {
     let state = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
-    state = act(state, { type: 'BUY_EQUIPMENT', specId: 'thicknesser' });
+    state = buyNow(state, 'thicknesser');
     expect(bagMachinesFor(state, 'sheet').map((item) => item.specId)).toEqual([
       'tableSaw',
       'edgebander',
@@ -123,11 +134,11 @@ describe('bags', () => {
     // The used saw fills a bag twice as fast as a budget one: 2400 minutes halved (T3 3.5).
     const interval = bagIntervalFor(saw as Equipment);
     expect(interval).toBe(1200);
-    // The saw serves three and one man is on it, so an hour at the bench is twenty minutes on
-    // the bag (CLAUDE.md T6 3.6).
+    // He stands at the saw for the whole of the cutting, so an hour of it is an hour on the bag:
+    // the bag counts the minutes somebody was at the machine (CLAUDE.md T7 2).
     const hour = tick(state, 60).equipment.find((item) => item.specId === 'tableSaw');
-    expect(hour?.minutesUsed).toBeCloseTo(20, 1);
-    if (saw) saw.minutesUsed = interval - 1 / 3;
+    expect(hour?.minutesUsed).toBeCloseTo(60, 1);
+    if (saw) saw.minutesUsed = interval - 1;
     state = tick(state, 1);
     expect(state.activeEvent?.kind).toBe('bagFull');
     expect(state.activeEvent?.title).toBe('Bag full: table saw');
@@ -142,7 +153,7 @@ describe('bags', () => {
     if (saw) saw.minutesUsed = 2399;
     state = tick(state, 1);
     expect(state.activeEvent?.kind).toBe('bagFull');
-    expect(bagBlocked(state, 'sheet')).toBe(true);
+    expect(familyStopped(state, 'tableSaw')?.why).toBe('bag');
     const stuck = tick(state, 10);
     expect(stuck.clock.minute).toBe(state.clock.minute);
     state = act(state, { type: 'RESOLVE_EVENT', choiceId: 'owner' });
@@ -150,7 +161,7 @@ describe('bags', () => {
     expect(task?.minutesTotal).toBe(BAG_CHANGE_MINUTES);
     expect(state.owner.currentTaskId).toBe(task?.id);
     state = tick(state, BAG_CHANGE_MINUTES);
-    expect(bagBlocked(state, 'sheet')).toBe(false);
+    expect(familyStopped(state, 'tableSaw')).toBeNull();
     const changed = state.equipment.find((item) => item.specId === 'tableSaw');
     expect(changed?.bagFull).toBe(false);
     // The owner is back at the bench the moment the bag is on, so a minute of use may be on it.
@@ -194,7 +205,7 @@ describe('bags', () => {
     // He spent the quarter of an hour on the bag, not at his bench.
     expect(firstJob(state).labourRemaining).toBe(before);
     expect(state.workers[0]?.taskId).toBeNull();
-    expect(bagBlocked(state, 'sheet')).toBe(false);
+    expect(familyStopped(state, 'tableSaw')).toBeNull();
   });
 
   it('lets a helper change it for nothing and says nothing about it', () => {
@@ -222,13 +233,13 @@ describe('bags', () => {
     if (saw) saw.minutesUsed = 2399;
     state = tick(state, 2);
     expect(state.activeEvent).toBeNull();
-    expect(bagBlocked(state, 'sheet')).toBe(false);
+    expect(familyStopped(state, 'tableSaw')).toBeNull();
     expect(state.owner.minutesByCategory.workshop).toBe(2);
   });
 
   it('never fills a bag once the central system is in', () => {
     let state = atTheBench();
-    state = act(state, { type: 'BUY_EQUIPMENT', specId: 'dustSystem' });
+    state = buyNow(state, 'dustSystem');
     const saw = state.equipment.find((item) => item.specId === 'tableSaw');
     if (saw) saw.minutesUsed = 2399;
     const events: GameEvent[] = [];
@@ -382,14 +393,11 @@ describe('dust', () => {
 
 describe('the extractor', () => {
   it('breaks down more often when the hall is filthy', () => {
-    const state = act(newGame({ difficulty: 'veryEasy' }), {
-      type: 'BUY_EQUIPMENT',
-      specId: 'extractor',
-    });
+    const state = buyNow(newGame({ difficulty: 'veryEasy' }), 'extractor');
     expect(extractorBreakdownChance(state)).toBe(EXTRACTOR_BREAKDOWN_CHANCE);
     state.dust = 80;
     expect(extractorBreakdownChance(state)).toBe(EXTRACTOR_BREAKDOWN_CHANCE_HIGH_DUST);
-    const withSystem = act(state, { type: 'BUY_EQUIPMENT', specId: 'dustSystem' });
+    const withSystem = buyNow(state, 'dustSystem');
     expect(extractorBreakdownChance(withSystem)).toBe(0);
   });
 
@@ -420,7 +428,7 @@ describe('the extractor', () => {
 
   it('cannot break down when the central system is in', () => {
     let state = atTheBench();
-    state = act(state, { type: 'BUY_EQUIPMENT', specId: 'dustSystem' });
+    state = buyNow(state, 'dustSystem');
     expect(has(state, 'dustSystem')).toBe(true);
     const run = runToDay(state, 40);
     expect(eventsOfKind(run.events, 'machineBroken')).toHaveLength(0);
@@ -442,18 +450,15 @@ describe('the central system and a bag that was already full', () => {
     let state = atTheBench();
     const saw = state.equipment.find((item) => item.specId === 'tableSaw');
     if (saw) saw.bagFull = true;
-    expect(bagBlocked(state, 'sheet')).toBe(true);
-    state = act(state, { type: 'BUY_EQUIPMENT', specId: 'dustSystem' });
-    expect(bagBlocked(state, 'sheet')).toBe(false);
+    expect(familyStopped(state, 'tableSaw')?.why).toBe('bag');
+    state = buyNow(state, 'dustSystem');
+    expect(familyStopped(state, 'tableSaw')).toBeNull();
     const working = tick(state, 30);
     expect(firstJob(working).labourRemaining).toBeLessThan(firstJob(state).labourRemaining);
   });
 
   it('reads the messy to dirty edge the same way everywhere', () => {
-    const state = act(newGame({ difficulty: 'veryEasy' }), {
-      type: 'BUY_EQUIPMENT',
-      specId: 'extractor',
-    });
+    const state = buyNow(newGame({ difficulty: 'veryEasy' }), 'extractor');
     state.dust = 70;
     expect(dustBand(state.dust).label).toBe('messy');
     expect(extractorBreakdownChance(state)).toBe(EXTRACTOR_BREAKDOWN_CHANCE);
@@ -473,12 +478,12 @@ describe('a stopped machine can always be dealt with', () => {
     // The player puts it off, and then thinks better of it.
     state = act(state, { type: 'RESOLVE_EVENT', choiceId: 'later' });
     expect(state.activeEvent).toBeNull();
-    expect(bagBlocked(state, 'sheet')).toBe(true);
+    expect(familyStopped(state, 'tableSaw')?.why).toBe('bag');
     state = act(state, { type: 'ASK_BAG_CHANGE', equipmentId: saw?.id ?? '' });
     expect(state.activeEvent?.kind).toBe('bagFull');
     state = act(state, { type: 'RESOLVE_EVENT', choiceId: 'owner' });
     state = tick(state, BAG_CHANGE_MINUTES);
-    expect(bagBlocked(state, 'sheet')).toBe(false);
+    expect(familyStopped(state, 'tableSaw')).toBeNull();
   });
 
   it('says nothing when the machine is running', () => {
@@ -501,7 +506,7 @@ describe('no extraction at all', () => {
     expect(firstJob(state).blockedBy).toBe('no extraction');
     expect(renderHall(state)).toContain('No extraction in the hall');
     // Buy one and the bench starts again.
-    const fixed = tick(act(state, { type: 'BUY_EQUIPMENT', specId: 'extractor' }), 10);
+    const fixed = tick(buyNow(state, 'extractor'), 10);
     expect(firstJob(fixed).labourRemaining).toBeLessThan(before);
     expect(firstJob(fixed).blockedBy).toBe('');
   });
@@ -530,7 +535,7 @@ describe('no bench in the hall', () => {
     expect(firstJob(state).blockedBy).toBe('no bench');
     // The extraction comes first in the list, so the bench is the next thing it names.
     expect(startProductionCheck(state, firstJob(state)).reason).toBe('no bench');
-    const bought = tick(act(state, { type: 'BUY_EQUIPMENT', specId: 'workbench' }), 10);
+    const bought = tick(buyNow(state, 'workbench'), 10);
     expect(firstJob(bought).labourRemaining).toBeLessThan(before);
     expect(firstJob(bought).blockedBy).toBe('');
   });
@@ -547,9 +552,9 @@ describe('no bench in the hall', () => {
     let state = fillRack(buyStartingKit(newGame({ difficulty: 'veryEasy' })));
     state.enquiries = [];
     for (const specId of ['locker', 'canteenSeat', 'toolCabinet', 'handToolSet']) {
-      state = act(state, { type: 'BUY_EQUIPMENT', specId });
+      state = buyNow(state, specId);
     }
-    state = act(state, { type: 'HIRE', role: 'joiner', tier: 'poor' });
+    state = hireNow(state, 'joiner', 'poor');
     const joiner = state.workers[0];
     if (!joiner) throw new Error('nobody was hired');
     joiner.startDay = state.clock.day;
@@ -576,16 +581,19 @@ describe('no bench in the hall', () => {
     // The owner keeps the bench he is standing at; the joiner is the one with nowhere to work.
     expect(hasBenchFor(state, second.id)).toBe(true);
     expect(hasBenchFor(state, first.id)).toBe(false);
-    expect((state.jobs[1]?.benchSince ?? 0) < (state.jobs[0]?.benchSince ?? 0)).toBe(true);
+    // And what holds it is the claim on the bench itself, not a minute written on the job
+    // (CLAUDE.md T7 3.1).
+    const bench = state.equipment.find((item) => item.specId === 'workbench');
+    expect(bench?.takenBy).toBe('owner');
   });
 
   it('stands a joiner with nowhere to work at the canteen door', () => {
     let state = atTheBench();
     // He is taken on while there is a bench, with the kit a joiner has to have, and starts today.
     for (const specId of ['locker', 'canteenSeat', 'toolCabinet', 'handToolSet']) {
-      state = act(state, { type: 'BUY_EQUIPMENT', specId });
+      state = buyNow(state, specId);
     }
-    state = act(state, { type: 'HIRE', role: 'joiner', tier: 'poor' });
+    state = hireNow(state, 'joiner', 'poor');
     const joiner = state.workers[0];
     if (!joiner) throw new Error('nobody was hired');
     joiner.startDay = state.clock.day;
@@ -631,9 +639,12 @@ describe('the service, counted on the machine\u0027s own clock', () => {
   it('says which day it lands on at the rate the machine is used, or that it never will', () => {
     const state = atTheBench();
     const saw = state.equipment.find((item) => item.specId === 'tableSaw');
-    // One man on a saw that serves three: a third of eight hours a day.
-    expect(machineHoursPerDay(state, saw as Equipment)).toBeCloseTo(8 / 3, 6);
-    const days = Math.ceil(SERVICE_INTERVAL_HOURS / (8 / 3));
+    const job = state.jobs.find((entry) => entry.stage === 'inProduction');
+    if (!job) throw new Error('nobody at a bench');
+    // One man, and the cutting is the only stage of his job that wants the saw (T7 3.1).
+    const perDay = familyShareOfJob(state, job, 'tableSaw') * 8;
+    expect(machineHoursPerDay(state, saw as Equipment)).toBeCloseTo(perDay, 6);
+    const days = Math.ceil(SERVICE_INTERVAL_HOURS / perDay);
     // Working days, not days of the calendar: the saw gains nothing over a weekend, so counting
     // the weekends in would put every service a fortnight too early.
     expect(serviceDueOn(state, saw as Equipment)).toBe(addWorkingDays(state.clock.day, days));
@@ -673,7 +684,7 @@ describe('the service, counted on the machine\u0027s own clock', () => {
     if (target) target.hoursUsed = SERVICE_INTERVAL_HOURS;
     expect(overdueBreakdownChance(target as Equipment)).toBe(OVERDUE_BREAKDOWN_CHANCE);
     if (target) target.broken = true;
-    expect(brokenMachineFor(broken, 'sheet')?.specId).toBe('tableSaw');
+    expect(familyStopped(broken, 'tableSaw')?.item.specId).toBe('tableSaw');
     const before = firstJob(broken).labourRemaining;
     const idle = tick(broken, 60);
     expect(firstJob(idle).labourRemaining).toBe(before);

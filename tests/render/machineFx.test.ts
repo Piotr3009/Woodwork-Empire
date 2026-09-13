@@ -7,6 +7,7 @@ import { machineInUse, tick } from '../../src/engine/index';
 import type { Equipment, GameState } from '../../src/engine/index';
 import {
   act,
+  buyNow,
   buyStartingKit,
   clearEvents,
   fillRack,
@@ -92,7 +93,7 @@ describe('the other machines', () => {
     const state = working();
     expect(state.equipment.some((item) => item.specId === 'thicknesser')).toBe(false);
     // A saw job never sets a thicknesser going, because the wood never goes near it.
-    const withThicknesser = act(state, { type: 'BUY_EQUIPMENT', specId: 'thicknesser' });
+    const withThicknesser = buyNow(state, 'thicknesser');
     expect(machineInUse(withThicknesser, machineOf(withThicknesser, 'thicknesser'))).toBe(false);
   });
 });

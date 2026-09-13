@@ -21,7 +21,7 @@ import {
 import { clampReputation, ratingFor, reputationTier } from '../../src/engine/reputation';
 import { callsForPrice } from '../../src/engine/calls';
 import type { Job } from '../../src/engine/index';
-import { act, newGame } from '../helpers';
+import { buyNow, newGame } from '../helpers';
 
 function job(partial: Partial<Job>): Job {
   return {
@@ -41,6 +41,7 @@ function job(partial: Partial<Job>): Job {
     bespokeMaterial: false,
     express: false,
     byHand: false,
+    sawFallback: true,
     needsMeasure: false,
     labourValue: 160,
     labourRemaining: 0,
@@ -53,7 +54,7 @@ function job(partial: Partial<Job>): Job {
     callsMissed: 0,
     designMinutesRemaining: 0,
     assignedTo: null,
-    benchSince: null,
+    stageRuns: [],
     completedDay: 11,
     daysLate: 0,
     depositPaid: 200,
@@ -99,11 +100,11 @@ describe('tool gating', () => {
 
   it('clears the lock once the tools are bought', () => {
     let state = newGame();
-    state = act(state, { type: 'BUY_EQUIPMENT', specId: 'tableSaw' });
-    state = act(state, { type: 'BUY_EQUIPMENT', specId: 'drill' });
+    state = buyNow(state, 'tableSaw');
+    state = buyNow(state, 'drill');
     expect(lockReasonFor(state, template('garageShelves'))).toBeNull();
     // The bookcase still needs the edgebander.
-    expect(lockReasonFor(state, template('bookcase'))).toBe('Needs hand edgebander');
+    expect(lockReasonFor(state, template('bookcase'))).toBe('Needs edgebander');
   });
 
   it('locks solid wood behind the solid wood tools', () => {

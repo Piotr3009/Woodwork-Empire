@@ -39,9 +39,11 @@ describe('which file an object is drawn with', () => {
       const key = name.replace(/\.png$/i, '');
       expect(spriteUrl(key), key).toBe(`/sprites/${name}`);
     }
-    // Nothing has been delivered for the saw, so it still falls back to its box.
+    // The classes arrived with Turn 7 and the family file did not: a class file answers for its
+    // own class, and the family key on its own still falls back to the box (SPRITES.md 3).
     expect(spriteFilesIn('public/sprites')).not.toContain('tableSaw.png');
-    expect(spriteUrl('tableSaw', 'used')).toBeNull();
+    expect(spriteUrl('tableSaw', 'used')).toBe('/sprites/tableSaw.used.png');
+    expect(spriteUrl('tableSaw')).toBeNull();
   });
 });
 

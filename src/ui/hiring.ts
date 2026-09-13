@@ -11,6 +11,7 @@ import {
   button,
   plural,
   reasonLabel,
+  tripLine,
 } from './modal';
 
 function optionRow(option: HiringOption): string {
@@ -69,6 +70,9 @@ export function renderHiring(state: GameState): string {
     .join('');
   const management = staffManagementMinutes(state);
   return (
+    // The interview he is sitting in, and that the man is not on the books until it is over
+    // (CLAUDE.md T7 3.10).
+    tripLine(state, 'hiring') +
     '<h3>The crew</h3>' +
     (crew === '' ? emptyLine('Nobody yet. Every hour is your own hour.') : crew) +
     (management > 0

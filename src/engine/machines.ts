@@ -10,8 +10,6 @@ import {
   MACHINE_REPAIR_COST_FRACTION,
   OVERDUE_BREAKDOWN_CHANCE,
   SERVICE_COST_FRACTION,
-  HOURS_PER_WORKING_DAY,
-  MACHINE_CAPACITY_DEFAULT,
   SERVICE_INTERVAL_HOURS,
   DUST_HIGH_THRESHOLD,
   DUST_MAX,
@@ -26,7 +24,6 @@ import {
   NO_HELPER_DUST_MULTIPLIER,
   NO_HELPER_PRODUCTIVITY_FACTOR,
 } from './constants';
-import { addWorkingDays } from './clock';
 import type {
   Equipment,
   EquipmentSpec,
@@ -45,12 +42,136 @@ export function findSpec(specId: string): EquipmentSpec | null {
   return EQUIPMENT_SPECS.find((entry) => entry.id === specId) ?? null;
 }
 
-/** Does this kind of thing hold cells of the floor at all? The hand edgebander does not: it is
- *  kept in a tool cabinet and used at the bench (CLAUDE.md T6 3.5). The one place that is asked:
- *  the floor plan, the painting, the stations and the ducting all read it. */
-export function standsInTheHall(specId: string): boolean {
+/** What a class of a family stands on, in metres: the picture's own footprint. A class that says
+ *  nothing takes the family's (CLAUDE.md T7 3.3). */
+export function footprintOf(
+  specId: string,
+  variantId?: string,
+): { width: number; depth: number; height: number } {
   const spec = findSpec(specId);
-  return spec !== null && spec.width > 0 && spec.depth > 0;
+  if (!spec) return { width: 1, depth: 1, height: 1 };
+  const variant = variantOf(spec, variantId ?? spec.variants[0]?.id ?? '');
+  return {
+    width: variant.width ?? spec.width,
+    depth: variant.depth ?? spec.depth,
+    height: variant.height ?? spec.height,
+  };
+}
+
+/** The floor a class reserves, in metres: the working room around it, which contains the
+ *  footprint. Nothing may be built on it (CLAUDE.md T7 3.3). */
+export function zoneOf(specId: string, variantId?: string): { width: number; depth: number } {
+  const spec = findSpec(specId);
+  if (!spec) return { width: 1, depth: 1 };
+  const variant = variantOf(spec, variantId ?? spec.variants[0]?.id ?? '');
+  return {
+    width: variant.zoneWidth ?? spec.zoneWidth,
+    depth: variant.zoneDepth ?? spec.zoneDepth,
+  };
+}
+
+/** Does this class hold cells of the floor at all? A hand edgebander does not: it is kept in a
+ *  tool cabinet and used at the bench (CLAUDE.md T6 3.5, T7 3.6). The one place that is asked:
+ *  the floor plan, the painting, the stations and the ducting all read it. */
+export function standsInTheHall(specId: string, variantId?: string): boolean {
+  const zone = zoneOf(specId, variantId);
+  return zone.width > 0 && zone.depth > 0;
+}
+
+/** The same question of a machine that is already in the hall. */
+export function itemStandsInTheHall(item: { specId: string; variantId: string }): boolean {
+  return standsInTheHall(item.specId, item.variantId);
+}
+
+/** Sheets this one holds: its class, or the family's own figure. */
+export function sheetCapacityOf(item: { specId: string; variantId: string }): number {
+  const spec = findSpec(item.specId);
+  if (!spec) return 0;
+  return variantOf(spec, item.variantId).sheetCapacity ?? spec.sheetCapacity;
+}
+
+/** What must be owned before a class can be bought. A class may say its own, which is how a floor
+ *  edgebander wants extraction where a hand one wants a cabinet (CLAUDE.md T7 3.6). */
+export function requiresFor(spec: EquipmentSpec, variant: EquipmentVariant): string[] {
+  return variant.requires ?? spec.requires;
+}
+
+export function requiresOneOfFor(spec: EquipmentSpec, variant: EquipmentVariant): string[] {
+  return variant.requiresOneOf ?? spec.requiresOneOf;
+}
+
+// ---------------------------------------------------------------------------
+// One person per machine (CLAUDE.md T7 3.1). A machine is free or it is taken by one man. He
+// keeps it while he needs it and lets it go the moment he does not, and anybody who wants a
+// machine of that family while it is taken stands and waits at it.
+// ---------------------------------------------------------------------------
+
+/** Who a machine is taken by, when it is the owner. A worker is his own id. */
+export const OWNER = 'owner';
+
+/** True when the hall has nothing of this family to queue for: either it owns none at all, or
+ *  everything it owns is kept in a cabinet and comes out to the bench in whoever's hands want it
+ *  (CLAUDE.md T7 3.6). */
+export function machineIsShared(state: GameState, specId: string): boolean {
+  return floorMachines(state, specId).length === 0;
+}
+
+/** Machines of this family that stand on the floor: the ones there can be a queue for. */
+export function floorMachines(state: GameState, specId: string): Equipment[] {
+  return owned(state, specId).filter((item) => itemStandsInTheHall(item));
+}
+
+/** Tools of this family that live in a cabinet: two men can have one out at once. */
+export function cabinetTools(state: GameState, specId: string): Equipment[] {
+  return owned(state, specId).filter((item) => !itemStandsInTheHall(item));
+}
+
+/** Machines of this family nobody is standing at. */
+export function freeMachines(state: GameState, specId: string): Equipment[] {
+  return floorMachines(state, specId).filter((item) => item.takenBy === null && !item.broken);
+}
+
+/** The machine of this family this man is standing at, or null. */
+export function heldMachine(state: GameState, who: string, specId: string): Equipment | null {
+  return owned(state, specId).find((item) => item.takenBy === who) ?? null;
+}
+
+/** Everything this man is standing at. */
+export function heldMachines(state: GameState, who: string): Equipment[] {
+  return state.equipment.filter((item) => item.takenBy === who);
+}
+
+/** Gives this man a machine of the family, or says there is none to be had. He keeps the one he
+ *  is already at; otherwise he takes the best of the free ones, which is what a joiner would do
+ *  and what the projection on his job card assumes he will get. */
+export function claimMachine(state: GameState, who: string, specId: string): Equipment | null {
+  const held = heldMachine(state, who, specId);
+  if (held) return held;
+  const free = freeMachines(state, specId);
+  let best: Equipment | null = null;
+  for (const item of free) {
+    const factor = variantFor(item)?.outputFactor ?? 1;
+    if (best === null || factor > (variantFor(best)?.outputFactor ?? 1)) best = item;
+  }
+  if (best === null) return null;
+  best.takenBy = who;
+  return best;
+}
+
+/** He walks away from everything he is standing at, except the families named. */
+export function releaseMachines(state: GameState, who: string, keep: readonly string[] = []): void {
+  for (const item of state.equipment) {
+    if (item.takenBy !== who) continue;
+    if (keep.includes(item.specId)) continue;
+    item.takenBy = null;
+  }
+}
+
+/** Everybody who is not in this list walks away from whatever he was standing at. */
+export function releaseMachinesExcept(state: GameState, working: readonly string[]): void {
+  for (const item of state.equipment) {
+    if (item.takenBy !== null && !working.includes(item.takenBy)) item.takenBy = null;
+  }
 }
 
 /** The class of machine this is, or the cheapest one in the family when the id is unknown. */
@@ -110,28 +231,23 @@ export function countOf(state: GameState, specId: string): number {
   return owned(state, specId).length;
 }
 
-/** The jobs standing at a bench this minute, oldest first by the minute they went to one, so a
- *  job that starts later never turns a man off the bench he is already at (CLAUDE.md T4 3.4). */
-function jobsAtBenches(state: GameState): string[] {
-  return state.jobs
-    .filter((job) => job.stage === 'inProduction' && job.assignedTo !== null)
-    .slice()
-    .sort((left, right) => (left.benchSince ?? 0) - (right.benchSince ?? 0))
-    .map((job) => job.id);
-}
+/** The bench family. A man on a job holds one from the minute he starts it to the minute it is
+ *  finished, whatever stage he is at, which is the Turn 4 rule that nobody is turned off a bench
+ *  he is standing at (CLAUDE.md T4 3.4). */
+export const BENCH = 'workbench';
 
 /** Without a bench there is no way to start production, and two men cannot share one
- *  (CLAUDE.md T4 3.4). A job already standing at a bench keeps it. */
+ *  (CLAUDE.md T4 3.4). A job whose man is already at a bench keeps it. */
 export function hasBenchFor(state: GameState, jobId: string | null): boolean {
-  const benches = countOf(state, 'workbench');
-  const standing = jobsAtBenches(state);
-  const index = jobId === null ? -1 : standing.indexOf(jobId);
-  return index >= 0 ? index < benches : standing.length < benches;
+  const job = jobId === null ? null : state.jobs.find((entry) => entry.id === jobId) ?? null;
+  const who = job?.assignedTo ?? null;
+  if (who !== null && heldMachine(state, who, BENCH) !== null) return true;
+  return freeMachines(state, BENCH).length > 0;
 }
 
 /** Benches nobody is standing at. */
 export function freeBenches(state: GameState): number {
-  return Math.max(0, countOf(state, 'workbench') - jobsAtBenches(state).length);
+  return freeMachines(state, BENCH).length;
 }
 
 /** What the machines in the hall draw in a day. A dearer class pulls more (CLAUDE.md T3 3.5). */
@@ -215,16 +331,17 @@ export function machineOutputFactor(state: GameState, material: MaterialKind): n
   return product;
 }
 
-/** Machines that cut the labour of a job, multiplied together (CLAUDE.md 8.6). */
-export function machineLabourFactor(state: GameState, material: MaterialKind): number {
-  let factor = 1;
-  for (const item of state.equipment) {
-    const spec = findSpec(item.specId);
-    if (!spec || spec.labourFactor === 1) continue;
-    if (spec.labourAppliesTo !== null && spec.labourAppliesTo !== material) continue;
-    factor *= spec.labourFactor;
+/** The best class of this family standing in the hall: what the projection of a job's minutes is
+ *  worked out from before anybody knows which one of them he will actually get. 1 when the
+ *  workshop owns none, so a caller that has not asked `has` first is never told a job is quicker
+ *  than it is (CLAUDE.md T7 3.1). */
+export function bestOutputFactor(state: GameState, specId: string): number {
+  let best = 0;
+  for (const item of owned(state, specId)) {
+    const factor = variantFor(item)?.outputFactor ?? 1;
+    if (factor > best) best = factor;
   }
-  return factor;
+  return best > 0 ? best : 1;
 }
 
 /** The extractor is on the floor. The hall carries on at a quarter speed (CLAUDE.md T2 3.9). */
@@ -250,11 +367,11 @@ export function ductingIsFree(state: GameState): boolean {
 
 /** True for a machine that is ducted into the extraction and has to be reconnected when it is
  *  moved. A bench, a rack, a locker or a seat is simply carried (CLAUDE.md T4 3.5). */
-export function needsDucting(specId: string): boolean {
+export function needsDucting(specId: string, variantId?: string): boolean {
   if (NO_DUCTING_SPECS.includes(specId)) return false;
   // Nothing that holds no cell of the floor is ducted: it never stood anywhere to be unplugged
   // from (CLAUDE.md T6 3.5).
-  if (!standsInTheHall(specId)) return false;
+  if (!standsInTheHall(specId, variantId)) return false;
   return findSpec(specId)?.category === 'machine';
 }
 
@@ -266,7 +383,7 @@ export function ductedMoves(state: GameState): Equipment[] {
   const moved: Equipment[] = [];
   for (const entry of state.movedItems) {
     const item = state.equipment.find((kit) => kit.id === entry.itemId);
-    if (item && needsDucting(item.specId)) moved.push(item);
+    if (item && needsDucting(item.specId, item.variantId)) moved.push(item);
   }
   return moved;
 }
@@ -296,16 +413,6 @@ export function serviceIsDue(item: Equipment): boolean {
   return hoursSinceService(item) >= SERVICE_INTERVAL_HOURS;
 }
 
-/** The day the next service lands on if the machine keeps being used the way it is used today.
- *  Null when nobody is putting anything through it, because then it never comes due. */
-export function serviceDueOn(state: GameState, item: Equipment): number | null {
-  const perDay = machineHoursPerDay(state, item);
-  if (perDay <= 0) return null;
-  // Hours are gained on the days the workshop is open, so the days counted off are working days:
-  // counting calendar days would put every service a weekend or two too early.
-  return addWorkingDays(state.clock.day, Math.max(1, Math.ceil(serviceDueIn(item) / perDay)));
-}
-
 export function machinesDueService(state: GameState): Equipment[] {
   return serviceableMachines(state).filter((item) => serviceIsDue(item));
 }
@@ -331,16 +438,23 @@ export function overdueBreakdownChance(item: Equipment): number {
   return chance;
 }
 
-/** A broken machine is out until it is repaired: nothing of its material gets made. */
-export function brokenMachineFor(state: GameState, material: MaterialKind): Equipment | null {
-  return (
-    serviceableMachines(state).find((item) => {
-      if (!item.broken) return false;
-      const spec = findSpec(item.specId);
-      if (!spec) return false;
-      return spec.usedOn === null || spec.usedOn === material;
-    }) ?? null
-  );
+/** What is stopping a stage that is done on this family: a machine that has given up, or one
+ *  whose bag is full, when there is no other of the family to use instead. Null while the work
+ *  can go on (CLAUDE.md 9.6, T7 3.1). The family, not the material: a broken saw stops the
+ *  cutting of anything, and a broken edgebander stops nothing but the machining. */
+export function familyStopped(
+  state: GameState,
+  specId: string,
+): { item: Equipment; why: 'broken' | 'bag' } | null {
+  const machines = owned(state, specId);
+  if (machines.length === 0) return null;
+  const bags = bagsExist(state);
+  const usable = machines.filter((item) => !item.broken && !(bags && item.bagFull));
+  if (usable.length > 0) return null;
+  const broken = machines.find((item) => item.broken);
+  if (broken) return { item: broken, why: 'broken' };
+  const full = machines.find((item) => item.bagFull);
+  return full ? { item: full, why: 'bag' } : null;
 }
 
 // ---------------------------------------------------------------------------
@@ -362,13 +476,6 @@ export function bagMachinesFor(state: GameState, material: MaterialKind): Equipm
   });
 }
 
-/** A full bag stops the machine, and nothing of that kind can be made (CLAUDE.md 9.6). Once the
- *  central system is in there are no bags, so nothing is stopped by one. */
-export function bagBlocked(state: GameState, material: MaterialKind): boolean {
-  if (!bagsExist(state)) return false;
-  return bagMachinesFor(state, material).some((item) => item.bagFull);
-}
-
 /** Machines this material runs through, bag or no bag: what the hours of use are booked on. */
 export function machinesUsedFor(state: GameState, material: MaterialKind): Equipment[] {
   return state.equipment.filter((item) => {
@@ -378,90 +485,31 @@ export function machinesUsedFor(state: GameState, material: MaterialKind): Equip
   });
 }
 
-/** How many men one of these can serve in a day. */
-export function capacityOf(specId: string): number {
-  return Math.max(1, findSpec(specId)?.capacity ?? MACHINE_CAPACITY_DEFAULT);
-}
-
-/** The share of its capacity the workshop is putting through a machine: one man of three is a
- *  third of it, three men or four are all of it (CLAUDE.md T6 3.6). */
-export function capacityShare(specId: string, users: number): number {
-  const capacity = capacityOf(specId);
-  return Math.min(Math.max(0, users), capacity) / capacity;
-}
-
-/** The hours a machine of this family gains in a whole day with this many men on it. Eight hours
- *  at full capacity, pro rata below it [PIOTR]. */
-export function machineHoursInDay(specId: string, users: number): number {
-  return capacityShare(specId, users) * HOURS_PER_WORKING_DAY;
-}
-
-/** The hours this machine gains today at the rate the workshop is using it now. Only the machines
- *  the hours are booked on gain any: an extractor runs all day and wears out on dust, not on
- *  hours, and saying it has a service coming would be saying something untrue. */
-export function machineHoursPerDay(state: GameState, item: Equipment): number {
-  if (findSpec(item.specId)?.category !== 'machine') return 0;
-  return machineHoursInDay(item.specId, machineUsersNow(state, item));
-}
-
-/** How many people are putting work through this machine at this moment: the owner if he is at a
- *  bench on a job of the material it serves, and every joiner who is. People, not jobs: two men on
- *  one job are two men on the machine (CLAUDE.md T6 3.6). */
-export function machineUsersNow(state: GameState, item: Equipment): number {
-  const spec = findSpec(item.specId);
-  if (!spec) return 0;
-  const serves = (jobId: string | null): boolean => {
-    const job = state.jobs.find((entry) => entry.id === jobId);
-    if (!job || job.stage !== 'inProduction') return false;
-    return spec.usedOn === null || spec.usedOn === job.materialKind;
-  };
-  const owner = state.jobs.find((job) => job.assignedTo === 'owner') ?? null;
-  let users = owner !== null && serves(owner.id) ? 1 : 0;
-  for (const worker of state.workers) {
-    if (worker.role !== 'joiner' || worker.absentDaysRemaining > 0) continue;
-    if (worker.startDay > state.clock.day) continue;
-    if (serves(worker.jobId)) users += 1;
-  }
-  return users;
-}
-
 /** Six places, not four: a third of a minute rounded to four drifts by a whole hour over the
  *  fifteen hundred minutes it takes to wear a saw in. */
 function round6(value: number): number {
   return Math.round(value * 1000000) / 1000000;
 }
 
-/** How many of this minute's workers a machine is serving: everybody on its material, and
- *  everybody on any material at all when it serves them all, the way the compressor and the
- *  booth do. Counted once for the machine, never once per material. */
-function usersOfMachine(spec: EquipmentSpec, byMaterial: ReadonlyMap<MaterialKind, number>): number {
-  let users = 0;
-  for (const [material, count] of byMaterial) {
-    if (spec.usedOn === null || spec.usedOn === material) users += count;
-  }
-  return users;
-}
-
-/** Books one minute of use on every machine the workshop put work through this minute: the hours
- *  that wear it out, and the minutes that fill its bag, both by the share of the machine's
- *  capacity being used (CLAUDE.md 9.6, T3 3.5, T6 3.6). One booking per machine however many
- *  materials went through it, so eight hours is all a day can ever give it. Returns the bags that
- *  just filled. */
+/** Books the minutes somebody actually stood at a machine this minute: the hours that wear it
+ *  out and the minutes that fill its bag, and nothing else. A machine nobody is at gains nothing,
+ *  which is what "hours are the minutes somebody stood at it" means (CLAUDE.md T7 2). The map is
+ *  person minutes per machine: one for a machine one man is standing at, more for a hand tool
+ *  two men have out of their cabinets at once. Returns the bags that just filled. */
 export function accumulateMachineMinute(
   state: GameState,
-  byMaterial: ReadonlyMap<MaterialKind, number>,
+  minutesByItem: ReadonlyMap<string, number>,
 ): Equipment[] {
   const bags = bagsExist(state);
   const filled: Equipment[] = [];
   for (const item of state.equipment) {
+    const minutes = minutesByItem.get(item.id) ?? 0;
+    if (minutes <= 0) continue;
     const spec = findSpec(item.specId);
     if (!spec) continue;
-    const users = usersOfMachine(spec, byMaterial);
-    if (users <= 0) continue;
-    const share = capacityShare(item.specId, users);
-    if (spec.category === 'machine') item.hoursUsed = round6(item.hoursUsed + share / 60);
+    if (spec.category === 'machine') item.hoursUsed = round6(item.hoursUsed + minutes / 60);
     if (!bags || spec.bagInterval <= 0 || item.bagFull) continue;
-    item.minutesUsed = round6(item.minutesUsed + share);
+    item.minutesUsed = round6(item.minutesUsed + minutes);
     if (item.minutesUsed >= bagIntervalFor(item)) {
       item.bagFull = true;
       filled.push(item);

@@ -6,6 +6,7 @@
 // The hall stays isometric; the two views never share a screen.
 
 import { formatTime } from '../engine/clock';
+import { has } from '../engine/machines';
 import type { GameState } from '../engine/types';
 import { type Scene, escapeText, fitName } from './hall';
 import { pickSprite, spriteFiles } from './sprites';
@@ -22,14 +23,23 @@ export interface OfficeLayer {
   key: string;
   /** What a flat placeholder rectangle says while the art is not there yet. */
   name: string;
+  /** The catalogue line that has to be bought before this layer is in the room. Null for the
+   *  room itself, which is there from the first morning (CLAUDE.md T7 3.8). */
+  needs: string | null;
 }
 
-/** Back to front (docs/art/SPRITES.md 8.1). */
+/** Back to front (docs/art/SPRITES.md 8.1). The desk, the catalogue on it and the binder come
+ *  with the desk; the laptop comes on its own (CLAUDE.md T7 3.8). */
 export const OFFICE_LAYERS: OfficeLayer[] = [
-  { key: 'officeBackground', name: 'Office background' },
-  { key: 'officeDesk', name: 'Office desk' },
-  { key: 'officeLaptop', name: 'Office laptop' },
+  { key: 'officeBackground', name: 'Office background', needs: null },
+  { key: 'officeDesk', name: 'Office desk', needs: 'desk' },
+  { key: 'officeLaptop', name: 'Office laptop', needs: 'laptop' },
 ];
+
+/** The layers the room actually has this morning. */
+export function officeLayersOf(state: GameState): OfficeLayer[] {
+  return OFFICE_LAYERS.filter((layer) => layer.needs === null || has(state, layer.needs));
+}
 
 export interface OfficeRegion {
   id: string;
@@ -40,15 +50,38 @@ export interface OfficeRegion {
   height: number;
   /** The clock is the live clock and opens nothing (docs/art/SPRITES.md 8.2). */
   opens: boolean;
+  /** The catalogue line that has to be bought before this region does anything. Null for the
+   *  door, the clock and the whiteboard, which are the room itself (CLAUDE.md T7 3.8). */
+  needs?: string | null;
 }
 
 /** The rectangles of docs/art/SPRITES.md 8.2, in canvas pixels before any scaling. */
 export const OFFICE_REGIONS: OfficeRegion[] = [
   { id: 'workPlan', name: 'Work Plan board', x: 20, y: 10, width: 365, height: 515, opens: true },
-  { id: 'orders', name: 'Orders board', x: 1290, y: 20, width: 372, height: 500, opens: true },
+  // The order board is the management software's, so it wants the laptop the software runs on
+  // (CLAUDE.md T7 3.8).
+  {
+    id: 'orders',
+    name: 'Orders board',
+    x: 1290,
+    y: 20,
+    width: 372,
+    height: 500,
+    opens: true,
+    needs: 'laptop',
+  },
   { id: 'door', name: 'Door to the hall', x: 640, y: 15, width: 305, height: 585, opens: true },
   { id: 'clock', name: 'Clock', x: 1040, y: 88, width: 122, height: 58, opens: false },
-  { id: 'laptop', name: 'Laptop', x: 558, y: 449, width: 557, height: 443, opens: true },
+  {
+    id: 'laptop',
+    name: 'Laptop',
+    x: 558,
+    y: 449,
+    width: 557,
+    height: 443,
+    opens: true,
+    needs: 'laptop',
+  },
   {
     id: 'catalogue',
     name: 'Equipment catalogue',
@@ -58,8 +91,35 @@ export const OFFICE_REGIONS: OfficeRegion[] = [
     height: 210,
     opens: true,
   },
-  { id: 'binder', name: 'Accounting binder', x: 1170, y: 620, width: 435, height: 280, opens: true },
+  {
+    id: 'binder',
+    name: 'Accounting binder',
+    x: 1170,
+    y: 620,
+    width: 435,
+    height: 280,
+    opens: true,
+    needs: 'desk',
+  },
 ];
+
+/** Where the catalogue lies before there is a desk to put it on: the same box, pushed down to the
+ *  floor by the door (CLAUDE.md T7 3.8). The art side has no picture of it yet, so the game draws
+ *  it as a labelled object with the word Equipment on its cover, which is what it is: a machine
+ *  catalogue, never a table. */
+export const FLOOR_CATALOGUE = { x: 60, y: 731, width: 445, height: 210 };
+
+/** The regions the room has this morning, with the catalogue on the floor while there is no desk
+ *  to put it on. Nothing else works until there is (CLAUDE.md T7 3.8). */
+export function officeRegionsOf(state: GameState): OfficeRegion[] {
+  return OFFICE_REGIONS.filter(
+    (region) => region.needs === undefined || region.needs === null || has(state, region.needs),
+  ).map((region) =>
+    region.id === 'catalogue' && !has(state, 'desk')
+      ? { ...region, ...FLOOR_CATALOGUE, name: 'Equipment catalogue, on the floor' }
+      : region,
+  );
+}
 
 export interface OfficeTextBox {
   x: number;
@@ -117,11 +177,20 @@ function layerHtml(layer: OfficeLayer, index: number, files: readonly string[]):
 }
 
 /** A region is a transparent rectangle over the artwork: no frame, no button drawn on the room.
- *  Hover lightens it and shows the name (docs/art/SPRITES.md 8.2). */
-function regionHtml(region: OfficeRegion): string {
+ *  Hover lightens it and shows the name (docs/art/SPRITES.md 8.2). The catalogue on the floor is
+ *  the one exception: there is no artwork under it, so the game draws the object itself with the
+ *  word Equipment on its cover (CLAUDE.md T7 3.8). */
+function regionHtml(region: OfficeRegion, onTheFloor: boolean): string {
   const style = boxStyle(region);
   if (!region.opens) {
     return `<div class="office-region is-quiet" data-office="${region.id}" style="${style}"></div>`;
+  }
+  if (region.id === 'catalogue' && onTheFloor) {
+    return (
+      '<button class="office-region office-floor-catalogue" data-do="officeRegion" ' +
+      `data-office="${region.id}" title="${escapeText(region.name)}" style="${style}">` +
+      '<span>Equipment</span></button>'
+    );
   }
   return (
     `<button class="office-region" data-do="officeRegion" data-office="${region.id}" ` +
@@ -178,11 +247,18 @@ export function officeScene(
   files: readonly string[] = spriteFiles(),
 ): Scene {
   const scale = round(officeScale(viewport));
+  const layers = officeLayersOf(state);
+  const regions = officeRegionsOf(state);
+  const onTheFloor = !has(state, 'desk');
   // Neither the scale nor the viewport belongs in the key: the stack is scaled by a style the
   // renderer writes once and fitOfficeStack corrects on the page, so a resize does not need the
-  // pictures loaded again.
-  const key = ['office', OFFICE_LAYERS.map((layer) => pickSprite(files, layer.key) ?? '').join(',')]
-    .join('|');
+  // pictures loaded again. What the room has in it does belong in it: buying the desk puts a
+  // whole layer into the room (CLAUDE.md T7 3.8).
+  const key = [
+    'office',
+    layers.map((layer) => pickSprite(files, layer.key) ?? layer.key).join(','),
+    regions.map((region) => region.id).join(','),
+  ].join('|');
   return {
     key,
     shell: () =>
@@ -190,8 +266,8 @@ export function officeScene(
       `<div class="office-stack" data-scale="${scale}" ` +
       `style="width:${OFFICE_CANVAS.width}px;height:${OFFICE_CANVAS.height}px;` +
       `transform:translate(-50%,-50%) scale(${scale})">` +
-      OFFICE_LAYERS.map((layer, index) => layerHtml(layer, index, files)).join('') +
-      OFFICE_REGIONS.map(regionHtml).join('') +
+      layers.map((layer, index) => layerHtml(layer, index, files)).join('') +
+      regions.map((region) => regionHtml(region, onTheFloor)).join('') +
       OFFICE_LIVE_SLOT +
       '</div></div>',
     live: liveText(state),

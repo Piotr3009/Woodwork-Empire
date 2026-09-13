@@ -9,10 +9,13 @@
 
 export {
   applyAction,
+  bootLaptop,
   canBuy,
   canBuySoftware,
   createGame,
   machineInUse,
+  orderCheck,
+  placeOrder,
   runMinutes,
   summaryTotals,
   tick,
@@ -25,12 +28,19 @@ export * from './types';
 export {
   CLEANING_MINUTES,
   EQUIPMENT_SPECS,
+  GANTT_STAGES,
   MACHINE_ENDURANCE_HOURS,
   MACHINE_ENDURANCE_HOURS_DEFAULT,
+  PRODUCTION_STAGES,
   DUCTING_RECONNECT_COST,
   MINUTES_PER_WORKING_DAY,
   MOVE_MINUTES_PER_ITEM,
   MOVING_SPEED,
+  HIRING_MINUTES,
+  LAPTOP_BOOT_MINUTES,
+  SHOPPING_MINUTES,
+  SHOPPING_NEXT_MINUTES,
+  SOFTWARE_SHOPPING_MINUTES,
   STATE_VERSION,
   WHY,
   SHEET_PRICE_STOCK,
@@ -47,6 +57,7 @@ export {
   formatDate,
   formatTime,
   gameMinutesPerRealSecond,
+  timeIsPaused,
   isBreak,
   isFriday,
   isLastWorkingDayOfMonth,
@@ -54,6 +65,7 @@ export {
   isWorkingDay,
   workedMinutesOfDay,
   monthOfDay,
+  yearOfDay,
   weekOfDay,
   weekday,
   weekdayName,
@@ -76,6 +88,9 @@ export {
   canAfford,
   daysOfMonth,
   earnedRate,
+  monthsOfYear,
+  totalsOfEntries,
+  yearTotals,
   ledgerOfDay,
   summaryOfDay,
   dailyPower,
@@ -89,6 +104,7 @@ export {
   visibleTotals,
   weeklyWageBill,
 } from './economy';
+export type { DayMoney, MonthMoney } from './economy';
 
 // The board and the catalogue
 export { boardSizeRange, canAccept, expressProbability } from './board';
@@ -107,20 +123,52 @@ export {
   hallBlock,
   labourValueFor,
   lifecycleSteps,
+  meetingOutstanding,
+  needsMeeting,
   ownerDaysFor,
   jobLabourCost,
+  jobStage,
   jobsAtGate,
   minutesRemainingFor,
   oldestReadyJob,
   jobProgress,
-  jobSpeedFactor,
   openJobs,
   ownerJob,
   showsStartProduction,
+  stagedJob,
   startProductionCheck,
   transportLabel,
 } from './jobs';
 export type { LifecycleStep, StartCheck, StepState } from './jobs';
+
+// Production in stages (CLAUDE.md T7 3.1)
+export {
+  cncFactor,
+  cncOptions,
+  currentStage,
+  familyForStage,
+  jobMinutesFor,
+  jobOnCnc,
+  labourDone,
+  labourPerMinute,
+  minutesLeftFor,
+  stageAt,
+  stageLabel,
+  stageMinutes,
+  stagePlanFor,
+  stageSpeed,
+} from './stages';
+export type { StageOptions, StagePlan, StagedJob } from './stages';
+export {
+  BOARD_DAYS_PAST_DUE,
+  DELIVERY_BAR_DAYS,
+  barsFor,
+  dayPoint,
+  gapFor,
+  jobRate,
+  workPlanGantt,
+} from './plan';
+export type { JobGantt, StageBar, StageGap } from './plan';
 
 // Client calls
 export {
@@ -135,17 +183,22 @@ export {
 
 // Tasks
 export {
+  bestTakerOf,
   designMinutes,
   emailsForPrice,
   findTask,
   jobTasks,
   materialOrderMinutes,
   movePending,
+  orderMinutes,
+  shoppingLabel,
+  shoppingTask,
   movingMachines,
   openTasks,
   softwareActive,
   staffManagementMinutes,
   startTaskCheck,
+  taskWorkRate,
   tasksOfKind,
   unloadMinutes,
 } from './tasks';
@@ -167,10 +220,21 @@ export {
 // Machines, bags and dust
 export {
   accidentRisk,
-  bagBlocked,
   bagIntervalFor,
+  OWNER,
   bagsExist,
+  cabinetTools,
+  claimMachine,
   countOf,
+  floorMachines,
+  footprintOf,
+  freeMachines,
+  heldMachine,
+  heldMachines,
+  itemStandsInTheHall,
+  machineIsShared,
+  sheetCapacityOf,
+  zoneOf,
   enduranceHoursFor,
   findVariant,
   freeBenches,
@@ -190,18 +254,33 @@ export {
   has,
   brokenMachines,
   extractorBroken,
+  familyStopped,
+  requiresFor,
+  requiresOneOfFor,
+  standsInTheHall,
   serviceIsDue,
   hasCentralExtraction,
   hasExtraction,
-  machineLabourFactor,
   needsDucting,
   machinesDueService,
   overdueBreakdownChance,
   owned,
   repairCostFor,
   serviceCostFor,
-  serviceDueOn,
 } from './machines';
+
+// Who is standing at which machine (CLAUDE.md T7 3.1)
+export {
+  familiesWanted,
+  familyShareOfJob,
+  hands,
+  jobOf,
+  machineHoursPerDay,
+  serviceDueOn,
+  stationForProduction,
+  takeMachines,
+} from './production';
+export type { Hand, StationCheck } from './production';
 
 // Material and deliveries
 export {
@@ -233,19 +312,17 @@ export type { Box, PlaceCheck } from './layout';
 
 // Where everybody is standing
 export {
-  PRODUCTION_CYCLE,
-  PRODUCTION_CYCLE_MINUTES,
   STATION_BENCH,
   STATION_GATE,
   STATION_IDLE,
   STATION_NO_BENCH,
   STATION_OFFICE,
   STATION_RACK,
-  cycleStation,
   machineStation,
-  stationForProduction,
   stationForTask,
   stationMachine,
+  stationWaitingFor,
+  waitingStation,
 } from './stations';
 
 // Text

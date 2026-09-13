@@ -1,9 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { renderHall } from '../../src/render/hall';
+import { footprintIn, renderHall } from '../../src/render/hall';
 import { renderGameOver } from '../../src/ui/dayEnd';
 import { renderLaptop } from '../../src/ui/laptop';
 import { FINISHED_GOODS_LAYOUT } from '../../src/engine/constants';
-import { findSpec } from '../../src/engine/machines';
 import { centreOf } from '../../src/render/iso';
 import type { GameState } from '../../src/engine/index';
 import { tick } from '../../src/engine/index';
@@ -32,7 +31,7 @@ describe('the hall on day 1', () => {
     state.stock.sheets = 12;
     const svg = renderHall(state);
     expect(svg).toContain('data-rack="1"');
-    expect(svg).toContain('Cheap shelving: 12 / 50');
+    expect(svg).toContain('Sheet rack: 12 / 50');
     expect(renderHall(state)).not.toContain('No shelving in the hall');
   });
 
@@ -348,8 +347,11 @@ describe('the figures that move', () => {
     const state = atTheSaw();
     const saw = state.equipment.find((item) => item.specId === 'tableSaw');
     expect(saw).toBeDefined();
-    const spec = findSpec('tableSaw');
-    const feet = centreOf(saw?.anchorX ?? 0, (saw?.anchorY ?? 0) + (spec?.depth ?? 0), 1, 1);
+    // At the front edge of the saw itself, inside the working zone the class reserves
+    // (CLAUDE.md T7 3.3).
+    if (!saw) throw new Error('no saw in the hall');
+    const stands = footprintIn(saw);
+    const feet = centreOf(Math.floor(stands.x), Math.floor(stands.y + stands.depth), 1, 1);
     const svg = renderHall(state);
     expect(svg).toContain('data-figure="owner"');
     expect(svg).toContain(

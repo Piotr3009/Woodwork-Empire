@@ -12,11 +12,18 @@ import type {
   MaterialKind,
   ProductTemplate,
   SoftwareTier,
+  StageSpec,
   WorkerRole,
   WorkerTier,
 } from './types';
 
-/** Bumped in Turn 6: the owner carries a labour factor and an overtime debt where he carried a
+/** Bumped in Turn 7: a job is made in stages and carries the runs at them, a machine carries the
+ *  one man standing at it, every family has its classes with their own footprints and working
+ *  zones, and `sheetRackBetter` is a class of `sheetRack` and not a family of its own. A Turn 6
+ *  save would stand the better shelving on nothing and read every job's progress as one bar of
+ *  work, so it is refused.
+ *
+ *  Bumped in Turn 6: the owner carries a labour factor and an overtime debt where he carried a
  *  fatigue figure, the break is an hour he can work through, and the day ends at 17:00 with
  *  overtime to 19:00. A Turn 5 save reads its clock and its owner wrongly, so it is refused.
  *
@@ -28,7 +35,7 @@ import type {
  *
  *  Bumped in Turn 3: a machine carries its class, its hours and the hours it has in it, and a task
  *  carries the day it was finished (CLAUDE.md T3 3.5, 3.3). */
-export const STATE_VERSION = 5;
+export const STATE_VERSION = 7;
 
 // ---------------------------------------------------------------------------
 // 6. Time
@@ -237,6 +244,42 @@ export const EXPRESS_PRICE_UPLIFT = 0.2;
 export const EXPRESS_MAX_PER_WEEK = 1;
 /** A job made by hand takes half again as long (PIOTR). */
 export const BY_HAND_DURATION_FACTOR = 1.5;
+/** Float guard, not a game number: work this small is finished work. */
+export const WORK_EPSILON = 1e-9;
+
+/** What a job is made of, in the order the workshop does it, and what share of the labour each
+ *  stage carries [TUNE]. They add up to 1 (CLAUDE.md T7 3.1). */
+export const PRODUCTION_STAGES: StageSpec[] = [
+  { id: 'cutting', label: 'Cutting', share: 0.25 },
+  { id: 'machining', label: 'Machining', share: 0.15 },
+  { id: 'assembly', label: 'Assembly', share: 0.45 },
+  { id: 'finishing', label: 'Finishing', share: 0.15 },
+];
+
+/** A CNC does the cutting and the machining of a sheet job as one stage, so it carries the two
+ *  shares together (CLAUDE.md T7 3.4). */
+export const CNC_STAGE: StageSpec = {
+  id: 'cnc',
+  label: 'CNC',
+  share: (PRODUCTION_STAGES[0]?.share ?? 0) + (PRODUCTION_STAGES[1]?.share ?? 0),
+};
+
+/** What the CNC does to the minutes of that one stage: it replaces three saws, which is about a
+ *  fifth off the whole job (PIOTR). The tool changer head takes it a little further [TUNE]. */
+export const CNC_STAGE_FACTOR = 2;
+export const CNC_STAGE_FACTOR_WITH_HEAD = 2.1;
+/** Parts come off a CNC cut and drilled, so the assembly takes half the minutes (PIOTR). */
+export const CNC_ASSEMBLY_FACTOR = 2;
+/** A job goes on the saw when the CNC is taken, unless the player turns it off on the job card
+ *  [TUNE: default on] (CLAUDE.md T7 3.4). */
+export const SAW_FALLBACK_DEFAULT = true;
+
+/** The last bar of the Work Plan. It carries no labour: it is the Turn 2 transport, not work at a
+ *  bench (CLAUDE.md T7 3.1). */
+export const DELIVERY_STAGE: StageSpec = { id: 'delivery', label: 'Delivery', share: 0 };
+
+/** Every bar the Work Plan draws for a job, the piece leaving included (CLAUDE.md T7 3.2). */
+export const GANTT_STAGES: StageSpec[] = [...PRODUCTION_STAGES, DELIVERY_STAGE];
 /** Worker speed as a fraction of the owner. Nobody matches the owner (PIOTR). */
 export const WORKER_RATES: Record<WorkerTier, number> = {
   poor: 0.6,
@@ -323,6 +366,18 @@ export const LATE_ACCOUNTS_CHARGE = 100;
 export const DAILY_ORDERING_MINUTES = 60;
 /** 10 minutes per joiner per day (PIOTR). */
 export const STAFF_MANAGEMENT_MINUTES_PER_JOINER = 10;
+/** A job worth more than this starts with a meeting at the client's before anything is drawn
+ *  (PIOTR). Four hours of somebody's day; the salesman goes instead of the owner once the company
+ *  is known well enough for the client to accept him [TUNE threshold] (CLAUDE.md T7 3.11). */
+export const MEETING_PRICE_THRESHOLD = 20000;
+export const CLIENT_MEETING_MINUTES = 240;
+export const MEETING_SALESMAN_REPUTATION = 40;
+
+/** An office admin covering for a specialist the company has not taken on takes twice as long
+ *  over the work: a client call is 30 minutes of his day and a per job material order is two of
+ *  the clerk's, which is about eight a day (PIOTR, CLAUDE.md T7 3.12). */
+export const ADMIN_COVER_RATE = 0.5;
+
 /** A call is 15 minutes of whoever takes it, whatever the job is worth (PIOTR, T4 3.3). */
 export const CLIENT_CALL_ANSWER_MINUTES = 15;
 /** The first call a job loses is free. From the second on, each takes a tenth off what the client
@@ -353,6 +408,17 @@ export const UNLOAD_BASE_MINUTES = 45;
 export const BAG_CHANGE_MINUTES = 15;
 /** Moving the kit about is a job of work: an hour a machine or a bench [TUNE]. */
 export const MOVE_MINUTES_PER_ITEM = 60;
+/** Nothing is bought in stopped time, and a purchase is a trip out: an hour of the owner's own
+ *  minutes before the cash leaves (PIOTR, "at least an hour per purchase"). */
+export const SHOPPING_MINUTES = 60;
+/** Every further thing bought in the same visit, while the first hour is still running [TUNE]. */
+export const SHOPPING_NEXT_MINUTES = 15;
+/** Software comes down the wire, so it is half the trip (PIOTR). */
+export const SOFTWARE_SHOPPING_MINUTES = 30;
+/** The interview, which is what taking somebody on costs the owner (PIOTR). */
+export const HIRING_MINUTES = 60;
+/** The laptop booting up before anything on it can be touched (PIOTR). */
+export const LAPTOP_BOOT_MINUTES = 5;
 /** Reconnecting one machine's ducting to the extraction, every time it is moved (PIOTR). */
 export const DUCTING_RECONNECT_COST = 800;
 /** Every machine family is ducted into the extraction except the compressor. The hand tools are
@@ -552,6 +618,11 @@ export const TABLE_SAW_VARIANTS: EquipmentVariant[] = [
     id: 'used',
     name: 'Used table saw',
     price: 1800,
+    width: 2,
+    depth: 1,
+    height: 1,
+    zoneWidth: 3,
+    zoneDepth: 3,
     outputFactor: 0.95,
     bagIntervalFactor: 0.5,
     enduranceFactor: 0.25,
@@ -565,6 +636,11 @@ export const TABLE_SAW_VARIANTS: EquipmentVariant[] = [
     id: 'budget',
     name: 'Budget table saw',
     price: 5000,
+    width: 2,
+    depth: 1,
+    height: 1,
+    zoneWidth: 3,
+    zoneDepth: 3,
     outputFactor: 1,
     bagIntervalFactor: 1,
     enduranceFactor: 1,
@@ -578,6 +654,11 @@ export const TABLE_SAW_VARIANTS: EquipmentVariant[] = [
     id: 'standard',
     name: 'Standard table saw',
     price: 7000,
+    width: 3,
+    depth: 1,
+    height: 1,
+    zoneWidth: 4,
+    zoneDepth: 3,
     outputFactor: 1.05,
     bagIntervalFactor: 1.2,
     enduranceFactor: 1.2,
@@ -591,6 +672,11 @@ export const TABLE_SAW_VARIANTS: EquipmentVariant[] = [
     id: 'pro',
     name: 'Professional table saw',
     price: 15000,
+    width: 3,
+    depth: 2,
+    height: 1,
+    zoneWidth: 6,
+    zoneDepth: 3,
     outputFactor: 1.15,
     bagIntervalFactor: 1.5,
     enduranceFactor: 1.5,
@@ -604,6 +690,11 @@ export const TABLE_SAW_VARIANTS: EquipmentVariant[] = [
     id: 'industrial',
     name: 'Industrial table saw',
     price: 25000,
+    width: 4,
+    depth: 2,
+    height: 1.2,
+    zoneWidth: 5,
+    zoneDepth: 4,
     outputFactor: 1.3,
     bagIntervalFactor: 2,
     enduranceFactor: 2,
@@ -615,21 +706,331 @@ export const TABLE_SAW_VARIANTS: EquipmentVariant[] = [
   },
 ];
 
-const VARIANTS_BY_FAMILY: Record<string, EquipmentVariant[]> = {
-  tableSaw: TABLE_SAW_VARIANTS,
+/** The tool cabinet a hand tool is kept in. The exported name for it is in 9.3 with the hiring
+ *  rules; the classes above are declared before that, so the id is named here once. */
+const TOOL_CABINET_ID = 'toolCabinet';
+
+/** The endurance ladder every family with five classes uses: a worn out one has a quarter of the
+ *  hours in it and an industrial one twice them (CLAUDE.md T7 3.6, as the saw's). */
+const ENDURANCE_BY_CLASS: Record<string, number> = {
+  used: 0.25,
+  budget: 1,
+  standard: 1.2,
+  pro: 1.5,
+  industrial: 2,
 };
 
-/** How many men one machine of a family can serve in a day. Two unless the family says otherwise
- *  [TUNE]; the table saw serves three [PIOTR]. The hours a machine wears out by are the share of
- *  that capacity the workshop actually puts through it (CLAUDE.md T6 3.6). */
-export const MACHINE_CAPACITY_DEFAULT = 2;
+/** The same ladder for the bag: a worn out machine fills one twice as fast (CLAUDE.md T7 3.6). */
+const BAG_BY_CLASS: Record<string, number> = {
+  used: 0.5,
+  budget: 1,
+  standard: 1.2,
+  pro: 1.5,
+  industrial: 2,
+};
+
+/** The five classes of workbench. Prices, output and footprints are Piotr's table; the endurance
+ *  and the power are [TUNE] (CLAUDE.md T7 3.6). A bench is not a machine, so its hours never
+ *  move: the ladder is there so the family reads like every other one. */
+export const WORKBENCH_VARIANTS: EquipmentVariant[] = [
+  {
+    id: 'used',
+    name: 'Used workbench',
+    price: 120,
+    width: 2,
+    depth: 1,
+    height: 0.9,
+    zoneWidth: 2,
+    zoneDepth: 2,
+    outputFactor: 0.95,
+    bagIntervalFactor: BAG_BY_CLASS.used ?? 1,
+    enduranceFactor: ENDURANCE_BY_CLASS.used ?? 1,
+    powerPerDay: 1,
+    description:
+      'Somebody else\u0027s bench, bought out of a workshop that shut. The top is scarred and ' +
+      'one leg has been packed up with a wedge, but it holds a vice and it holds a cabinet ' +
+      'while you glue it. It is a bench, and a bench is the one thing you cannot work without.',
+  },
+  {
+    id: 'budget',
+    name: 'Workbench',
+    price: 250,
+    width: 2,
+    depth: 1,
+    height: 0.9,
+    zoneWidth: 2,
+    zoneDepth: 2,
+    outputFactor: 1,
+    bagIntervalFactor: BAG_BY_CLASS.budget ?? 1,
+    enduranceFactor: ENDURANCE_BY_CLASS.budget ?? 1,
+    powerPerDay: 1,
+    description:
+      'A new bench at the bottom of the trade range: softwood frame, ply top, a front vice that ' +
+      'locks square. It will take everything a one man shop puts on it and it is what most ' +
+      'workshops have four of.',
+  },
+  {
+    id: 'standard',
+    name: 'Standard workbench',
+    price: 450,
+    width: 2,
+    depth: 1,
+    height: 0.9,
+    zoneWidth: 2,
+    zoneDepth: 2,
+    outputFactor: 1.02,
+    bagIntervalFactor: BAG_BY_CLASS.standard ?? 1,
+    enduranceFactor: ENDURANCE_BY_CLASS.standard ?? 1,
+    powerPerDay: 1,
+    description:
+      'Beech top, two vices and a row of dog holes down it, so a carcass can be held square ' +
+      'while it is screwed. The clamping is what saves the minutes, not the timber.',
+  },
+  {
+    id: 'pro',
+    name: 'Professional workbench',
+    price: 900,
+    width: 2,
+    depth: 1,
+    height: 0.9,
+    zoneWidth: 2,
+    zoneDepth: 2,
+    outputFactor: 1.05,
+    bagIntervalFactor: BAG_BY_CLASS.pro ?? 1,
+    enduranceFactor: ENDURANCE_BY_CLASS.pro ?? 1,
+    powerPerDay: 1,
+    description:
+      'A cabinetmaker\u0027s bench: laminated top, tail vice, an assembly rack under it and power ' +
+      'and air brought to the end of it. Everything a man needs is within reach of where he is ' +
+      'standing, which is where the time goes in an assembly.',
+  },
+  {
+    id: 'industrial',
+    name: 'Industrial assembly bench',
+    price: 2200,
+    width: 3,
+    depth: 1,
+    height: 0.9,
+    zoneWidth: 3,
+    zoneDepth: 2,
+    outputFactor: 1.08,
+    bagIntervalFactor: BAG_BY_CLASS.industrial ?? 1,
+    enduranceFactor: ENDURANCE_BY_CLASS.industrial ?? 1,
+    powerPerDay: 2,
+    description:
+      'A three metre assembly station on a steel frame, with a roller bed at one end and clamps ' +
+      'built into the top. A full height wardrobe can be built on it lying down and stood up ' +
+      'without carrying it anywhere.',
+  },
+];
+
+/** The five classes of sheet rack. Prices and capacities are Piotr's table; the footprints and
+ *  the zones are his too (CLAUDE.md T7 3.6). A rack is not a machine: it has no output and no
+ *  bag, and what it has is sheets. */
+export const SHEET_RACK_VARIANTS: EquipmentVariant[] = [
+  {
+    id: 'used',
+    name: 'Used sheet rack',
+    price: 200,
+    width: 2,
+    depth: 1,
+    height: 1.5,
+    zoneWidth: 2,
+    zoneDepth: 2,
+    sheetCapacity: 30,
+    outputFactor: 1,
+    bagIntervalFactor: 1,
+    enduranceFactor: ENDURANCE_BY_CLASS.used ?? 1,
+    powerPerDay: 1,
+    description:
+      'An A frame somebody welded up themselves and painted with whatever was left in the tin. ' +
+      'It leans a little and it holds thirty sheets, which is a fortnight of a one man shop.',
+  },
+  {
+    id: 'budget',
+    name: 'Cheap shelving',
+    price: 400,
+    width: 2,
+    depth: 1,
+    height: 1.5,
+    zoneWidth: 2,
+    zoneDepth: 2,
+    sheetCapacity: 50,
+    outputFactor: 1,
+    bagIntervalFactor: 1,
+    enduranceFactor: ENDURANCE_BY_CLASS.budget ?? 1,
+    powerPerDay: 1,
+    description:
+      'Galvanised A frame shelving, bought new and bolted to the floor. Fifty sheets on edge, ' +
+      'which is what a small shop turns over in a month. Nothing can be unloaded without it.',
+  },
+  {
+    id: 'standard',
+    name: 'Better shelving',
+    price: 900,
+    width: 2,
+    depth: 1,
+    height: 1.8,
+    zoneWidth: 2,
+    zoneDepth: 2,
+    sheetCapacity: 75,
+    outputFactor: 1,
+    bagIntervalFactor: 1,
+    enduranceFactor: ENDURANCE_BY_CLASS.standard ?? 1,
+    powerPerDay: 1,
+    description:
+      'Heavier uprights and a deeper foot, so the sheets stand nearer vertical and take less ' +
+      'floor. Seventy five sheets, and it will not walk when a full sheet is pulled off it.',
+  },
+  {
+    id: 'pro',
+    name: 'Cantilever rack',
+    price: 1800,
+    width: 3,
+    depth: 1,
+    height: 2,
+    zoneWidth: 3,
+    zoneDepth: 2,
+    sheetCapacity: 110,
+    outputFactor: 1,
+    bagIntervalFactor: 1,
+    enduranceFactor: ENDURANCE_BY_CLASS.pro ?? 1,
+    powerPerDay: 1,
+    description:
+      'A proper cantilever rack with labelled bays, so the board you want is not behind the ' +
+      'three you do not. A hundred and ten sheets, and the material stops being a daily row.',
+  },
+  {
+    id: 'industrial',
+    name: 'Industrial rack',
+    price: 4500,
+    width: 4,
+    depth: 1,
+    height: 2.2,
+    zoneWidth: 4,
+    zoneDepth: 2,
+    sheetCapacity: 160,
+    outputFactor: 1,
+    bagIntervalFactor: 1,
+    enduranceFactor: ENDURANCE_BY_CLASS.industrial ?? 1,
+    powerPerDay: 1,
+    description:
+      'Four metres of bolted steel rated for a full pack of board. A hundred and sixty sheets ' +
+      'means buying by the pack, which is where the material price actually falls.',
+  },
+];
+
+/** The five classes of edgebander. The first two are hand tools kept in a tool cabinet and used
+ *  at the bench, and they never queue; the other three stand on the floor, want extraction, and
+ *  take one man at a time like any other machine (CLAUDE.md T7 3.6). */
+export const EDGEBANDER_VARIANTS: EquipmentVariant[] = [
+  {
+    id: 'used',
+    name: 'Used hand edgebander',
+    price: 500,
+    width: 1,
+    depth: 1,
+    height: 0.5,
+    zoneWidth: 0,
+    zoneDepth: 0,
+    requires: [TOOL_CABINET_ID],
+    outputFactor: 0.95,
+    bagIntervalFactor: BAG_BY_CLASS.used ?? 1,
+    enduranceFactor: ENDURANCE_BY_CLASS.used ?? 1,
+    powerPerDay: 1,
+    description:
+      'A bench top hand bander that has been round the trade twice. The glue pot runs hot and ' +
+      'the trimmer wants watching, so the edges need more cleaning up than they should.',
+  },
+  {
+    id: 'budget',
+    name: 'Hand edgebander',
+    price: 900,
+    width: 1,
+    depth: 1,
+    height: 0.5,
+    zoneWidth: 0,
+    zoneDepth: 0,
+    requires: [TOOL_CABINET_ID],
+    outputFactor: 1,
+    bagIntervalFactor: BAG_BY_CLASS.budget ?? 1,
+    enduranceFactor: ENDURANCE_BY_CLASS.budget ?? 1,
+    powerPerDay: 1,
+    description:
+      'A new hand bander that lives in a tool cabinet and comes out to the bench. It edges a ' +
+      'kitchen\u0027s worth of parts a day without complaining, and two men can be using one each.',
+  },
+  {
+    id: 'standard',
+    name: 'Floor edgebander',
+    price: 7500,
+    width: 3,
+    depth: 1,
+    height: 1.2,
+    zoneWidth: 5,
+    zoneDepth: 3,
+    requires: [],
+    requiresOneOf: ['extractor', 'dustSystem', 'flexiSystem'],
+    outputFactor: 1.1,
+    bagIntervalFactor: BAG_BY_CLASS.standard ?? 1,
+    enduranceFactor: ENDURANCE_BY_CLASS.standard ?? 1,
+    powerPerDay: 4,
+    description:
+      'A single sided floor machine with a glue pot, a pressure roller and an end trimmer. The ' +
+      'parts go in one end and come out banded, which is a different job from standing at a ' +
+      'bench with an iron. It takes one man at a time and it wants extraction on it.',
+  },
+  {
+    id: 'pro',
+    name: 'Professional edgebander',
+    price: 16000,
+    width: 3,
+    depth: 1,
+    height: 1.3,
+    zoneWidth: 5,
+    zoneDepth: 3,
+    requires: [],
+    requiresOneOf: ['extractor', 'dustSystem', 'flexiSystem'],
+    outputFactor: 1.2,
+    bagIntervalFactor: BAG_BY_CLASS.pro ?? 1,
+    enduranceFactor: ENDURANCE_BY_CLASS.pro ?? 1,
+    powerPerDay: 5,
+    description:
+      'Pre milling, glue, trim, scrape and buff in one pass, so the edge comes off the machine ' +
+      'finished and nobody stands over it with a block. It holds its settings between batches.',
+  },
+  {
+    id: 'industrial',
+    name: 'Industrial edgebander',
+    price: 32000,
+    width: 4,
+    depth: 1,
+    height: 1.4,
+    zoneWidth: 6,
+    zoneDepth: 3,
+    requires: [],
+    requiresOneOf: ['extractor', 'dustSystem', 'flexiSystem'],
+    outputFactor: 1.35,
+    bagIntervalFactor: BAG_BY_CLASS.industrial ?? 1,
+    enduranceFactor: ENDURANCE_BY_CLASS.industrial ?? 1,
+    powerPerDay: 6,
+    description:
+      'A production bander with a return conveyor, meant to run all day with one man loading ' +
+      'it. It is more machine than most workshops need and it pays for itself in a shop that ' +
+      'is never short of work.',
+  },
+];
+
+const VARIANTS_BY_FAMILY: Record<string, EquipmentVariant[]> = {
+  tableSaw: TABLE_SAW_VARIANTS,
+  workbench: WORKBENCH_VARIANTS,
+  sheetRack: SHEET_RACK_VARIANTS,
+  edgebander: EDGEBANDER_VARIANTS,
+};
 
 const BASE_SPEC = {
-  capacity: MACHINE_CAPACITY_DEFAULT,
   bagInterval: 0,
   usedOn: null as MaterialKind | null,
-  labourFactor: 1,
-  labourAppliesTo: null as MaterialKind | null,
   unloadFactor: 1,
   sheetCapacity: 0,
   minReputation: REPUTATION_MIN,
@@ -642,8 +1043,12 @@ const BASE_SPEC = {
   height: 1,
 };
 
-/** A catalogue line before its variants are worked out. */
-type SpecDraft = Omit<EquipmentSpec, 'variants' | 'enduranceHours'>;
+/** A catalogue line before its variants are worked out. A family that says nothing about its
+ *  working zone reserves exactly what it stands on (CLAUDE.md T7 3.3). */
+type SpecDraft = Omit<EquipmentSpec, 'variants' | 'enduranceHours' | 'zoneWidth' | 'zoneDepth'> & {
+  zoneWidth?: number;
+  zoneDepth?: number;
+};
 
 /** Every family gets its variants and its endurance here, so the table above stays a table.
  *  A family with nothing in VARIANTS_BY_FAMILY has the one standard variant, at the Turn 1 price
@@ -664,6 +1069,8 @@ function withVariants(draft: SpecDraft): EquipmentSpec {
   const cheapest = variants[0];
   return {
     ...draft,
+    zoneWidth: draft.zoneWidth ?? draft.width,
+    zoneDepth: draft.zoneDepth ?? draft.depth,
     variants,
     // The catalogue line carries the price of the cheapest way into the family.
     price: cheapest ? cheapest.price : draft.price,
@@ -678,6 +1085,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'desk',
+    folder: 'Desks',
     tab: 'computers',
     name: 'Desk',
     price: 150,
@@ -691,6 +1099,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'chair',
+    folder: 'Chairs',
     tab: 'computers',
     name: 'Chair',
     price: 60,
@@ -704,6 +1113,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'laptop',
+    folder: 'Laptops',
     tab: 'computers',
     name: 'Laptop',
     price: 700,
@@ -718,9 +1128,9 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'tableSaw',
+    folder: 'Table saws',
     tab: 'sheetMachines',
     name: 'Table saw',
-    capacity: 3,
     price: 1800,
     category: 'machine',
     width: 2,
@@ -730,11 +1140,12 @@ const SPEC_DRAFTS: SpecDraft[] = [
     bagInterval: 2400,
     usedOn: 'sheet',
     stackable: true,
-    effect: 'Cuts sheets. Bag every 2400 minutes. One saw per three joiners.',
+    effect: 'Cuts sheets and timber. One man at a time. Bag every 2400 minutes.',
   },
   {
     ...BASE_SPEC,
     id: 'drill',
+    folder: 'Drills',
     tab: 'handTools',
     name: 'Cordless drill',
     price: 120,
@@ -748,27 +1159,30 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'edgebander',
-    tab: 'handTools',
-    name: 'Hand edgebander',
-    price: 900,
+    folder: 'Edgebanders',
+    tab: 'sheetMachines',
+    name: 'Edgebander',
+    price: 500,
     category: 'machine',
-    // A hand tool serves the man holding it and nobody else, so no ratio applies to it and its
-    // bag and its hours count whole minutes as they always did (CLAUDE.md T6 3.5).
-    capacity: 1,
-    // It stands in a tool cabinet and comes out to the bench, so it holds no cell of the floor
-    // and nothing can be dropped on it in setup mode (CLAUDE.md T6 3.5).
-    width: 0,
-    depth: 0,
-    height: 0,
+    // The two hand classes are kept in a tool cabinet and come out to the bench, so they hold no
+    // cell of the floor; the three floor classes stand on it and say their own zone
+    // (CLAUDE.md T6 3.5, T7 3.6).
+    width: 1,
+    depth: 1,
+    height: 0.5,
+    zoneWidth: 0,
+    zoneDepth: 0,
     spriteKey: 'edgebander',
     bagInterval: 4800,
     usedOn: 'sheet',
-    requires: ['toolCabinet'],
-    effect: 'Edges sheet goods at the bench. Lives in a tool cabinet. Bag every 4800 minutes.',
+    effect:
+      'Edges sheet goods. The two hand classes live in a tool cabinet; the floor ones take one ' +
+      'man at a time and want extraction. Bag every 4800 minutes.',
   },
   {
     ...BASE_SPEC,
     id: 'compressor',
+    folder: 'Compressors',
     tab: 'handTools',
     name: 'Small compressor',
     price: 350,
@@ -782,6 +1196,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'extractor',
+    folder: 'Extractors',
     tab: 'extraction',
     name: 'Extractor',
     price: 600,
@@ -795,49 +1210,49 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'workbench',
-    tab: 'handTools',
+    folder: 'Benches',
+    tab: 'storage',
     name: 'Workbench',
-    price: 250,
+    price: 120,
     category: 'bench',
     width: 2,
     depth: 1,
-    height: 1,
+    height: 0.9,
+    zoneWidth: 2,
+    zoneDepth: 2,
     spriteKey: 'workbench',
     perWorker: true,
     stackable: true,
-    effect: 'One per worker. The unit has a fixed number of bench slots.',
+    effect:
+      'One per worker, and the assembly of every job is done at one. The unit has a fixed ' +
+      'number of bench slots.',
   },
   {
     ...BASE_SPEC,
     id: 'sheetRack',
+    folder: 'Racks',
     tab: 'storage',
-    name: 'Cheap shelving',
-    price: 400,
+    name: 'Sheet rack',
+    price: 200,
     category: 'storage',
     width: 2,
     depth: 1,
-    height: 1,
+    height: 1.5,
+    zoneWidth: 2,
+    zoneDepth: 2,
     spriteKey: 'sheetRack',
     sheetCapacity: 50,
-    effect: 'Holds 50 sheets. Nothing can be unloaded without somewhere to put it.',
-  },
-  {
-    ...BASE_SPEC,
-    id: 'sheetRackBetter',
-    tab: 'storage',
-    name: 'Better shelving',
-    price: 900,
-    category: 'storage',
-    width: 2,
-    depth: 1,
-    height: 1,
-    spriteKey: 'sheetRackBetter',
-    sheetCapacity: 75,
-    effect: 'Holds 75 sheets. More than that needs a bigger unit.',
+    // The better shelving of Turns 1 to 6 is a class of this family now, not a family of its own
+    // (CLAUDE.md T7 3.6). More than one rack may stand in the hall and the sheets add up.
+    stackable: true,
+    effect:
+      'Holds sheets on edge, thirty to a hundred and sixty by its class. Nothing can be ' +
+      'unloaded without somewhere to put it.',
   },
   {
     ...BASE_SPEC,
     id: 'toolCabinet',
+    folder: 'Tool cabinets',
     tab: 'storage',
     name: 'Tool cabinet',
     price: 350,
@@ -855,6 +1270,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'locker',
+    folder: 'Lockers',
     tab: 'storage',
     name: 'Locker',
     price: 80,
@@ -870,6 +1286,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'canteenSeat',
+    folder: 'Canteen seats',
     tab: 'storage',
     name: 'Canteen seat',
     price: 40,
@@ -885,6 +1302,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'handToolSet',
+    folder: 'Hand tool sets',
     tab: 'handTools',
     name: 'Hand tool set for a worker',
     price: 400,
@@ -901,6 +1319,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'van',
+    folder: 'Vans',
     tab: 'handling',
     name: 'Van',
     price: 9000,
@@ -914,6 +1333,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'forklift',
+    folder: 'Forklifts',
     tab: 'handling',
     name: 'Forklift',
     price: 6000,
@@ -928,6 +1348,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'forkliftBetter',
+    folder: 'Better forklifts',
     tab: 'handling',
     name: 'Better forklift',
     price: 12000,
@@ -942,6 +1363,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'thicknesser',
+    folder: 'Thicknessers',
     tab: 'timberMachines',
     name: 'Thicknesser',
     price: 2500,
@@ -949,6 +1371,9 @@ const SPEC_DRAFTS: SpecDraft[] = [
     width: 2,
     depth: 1,
     height: 1,
+    // Infeed and outfeed: a board twice the length of the machine goes through it [TUNE].
+    zoneWidth: 4,
+    zoneDepth: 2,
     spriteKey: 'thicknesser',
     bagInterval: 480,
     usedOn: 'solidWood',
@@ -957,6 +1382,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'solidWoodTools',
+    folder: 'Timber tool sets',
     tab: 'timberMachines',
     name: 'Planer, router, sander, clamps',
     price: 2200,
@@ -964,6 +1390,8 @@ const SPEC_DRAFTS: SpecDraft[] = [
     width: 2,
     depth: 1,
     height: 1,
+    zoneWidth: 3,
+    zoneDepth: 2,
     spriteKey: 'solidWoodTools',
     usedOn: 'solidWood',
     effect: 'Solid wood tools, part 2. With the thicknesser this unlocks solid wood.',
@@ -971,6 +1399,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'cnc',
+    folder: 'CNC machines',
     tab: 'cnc',
     name: 'CNC',
     price: 45000,
@@ -978,15 +1407,18 @@ const SPEC_DRAFTS: SpecDraft[] = [
     width: 3,
     depth: 2,
     height: 1,
+    zoneWidth: 5,
+    zoneDepth: 4,
     spriteKey: 'cnc',
-    labourFactor: 0.8,
-    locked: true,
-    lockReason: 'Coming in a later stage.',
-    effect: 'Labour minus 20% on every job.',
+    requiresOneOf: ['extractor', 'dustSystem', 'flexiSystem'],
+    effect:
+      'Cuts and drills a sheet job in one go, in place of the saw and the edgebander, and halves ' +
+      'the assembly after it. One man at a time. Timber still goes on the saw.',
   },
   {
     ...BASE_SPEC,
     id: 'cncHead',
+    folder: 'CNC heads',
     tab: 'cnc',
     name: 'CNC tool changer head',
     price: 9000,
@@ -995,22 +1427,22 @@ const SPEC_DRAFTS: SpecDraft[] = [
     depth: 1,
     height: 1,
     spriteKey: 'cncHead',
-    labourFactor: 0.95,
     requires: ['cnc'],
-    locked: true,
-    lockReason: 'Coming in a later stage.',
-    effect: 'A further labour minus 5%.',
+    effect: 'A further 5% out of the CNC\u0027s own stage.',
   },
   {
     ...BASE_SPEC,
     id: 'sprayBooth',
+    folder: 'Spray booths',
     tab: 'spraying',
     name: 'Spray booth',
     price: 18000,
     category: 'machine',
     width: 3,
     depth: 2,
-    height: 2,
+    height: 1.5,
+    zoneWidth: 4,
+    zoneDepth: 3,
     spriteKey: 'sprayBooth',
     locked: true,
     lockReason: 'Coming in a later stage.',
@@ -1019,6 +1451,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'dustSystem',
+    folder: 'Central systems',
     tab: 'extraction',
     name: 'Central dust extraction system',
     price: 35000,
@@ -1032,6 +1465,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'flexiSystem',
+    folder: 'Flexi systems',
     tab: 'extraction',
     name: 'Flexi extraction system',
     price: 50000,
@@ -1048,13 +1482,16 @@ const SPEC_DRAFTS: SpecDraft[] = [
   {
     ...BASE_SPEC,
     id: 'pelletiser',
+    folder: 'Pelletisers',
     tab: 'extraction',
     name: 'Pelletiser',
     price: 15000,
     category: 'extraction',
     width: 1,
     depth: 1,
-    height: 2,
+    height: 1.5,
+    zoneWidth: 2,
+    zoneDepth: 2,
     spriteKey: 'pelletiser',
     requiresOneOf: ['dustSystem', 'flexiSystem'],
     effect: 'No waste cost and pellet sales that rise with production.',
@@ -1162,66 +1599,71 @@ export const PERSONNEL_DOOR = { y: 4.5, width: 1 };
  *  the desk, the chair and the laptop are in the artwork, not on a cell (CLAUDE.md T4 3.1).
  *  Machines stand along the rear wall clear of the rooms, stock and the big kit in the front half,
  *  and nothing is ever laid on the gate lane. */
+/** Every anchor is the corner of the thing's working zone, not of the thing itself, and the two
+ *  bands of the hall are laid out so the zones of a whole catalogue fit side by side: the rear
+ *  three rows take the machines, the front four take the big kit and the storage, and the rows
+ *  between them are the benches and the welfare (CLAUDE.md T7 3.3). */
 export const STARTING_LAYOUT: Record<string, LayoutSlot> = {
-  tableSaw: { x: 6, y: 1 },
-  thicknesser: { x: 12, y: 1 },
-  solidWoodTools: { x: 15, y: 1 },
-  compressor: { x: 18, y: 1 },
-  extractor: { x: 18, y: 0 },
-  dustSystem: { x: 17, y: 2 },
-  flexiSystem: { x: 17, y: 2 },
-  pelletiser: { x: 15, y: 3 },
-  sheetRack: { x: 3, y: 7 },
-  sheetRackBetter: { x: 3, y: 9 },
-  cnc: { x: 12, y: 7 },
-  sprayBooth: { x: 16, y: 7 },
-  forklift: { x: 6, y: 9 },
-  forkliftBetter: { x: 6, y: 9 },
-  drill: { x: 8, y: 9 },
-  handToolSet: { x: 9, y: 9 },
+  tableSaw: { x: 5, y: 0 },
+  thicknesser: { x: 8, y: 0 },
+  solidWoodTools: { x: 12, y: 0 },
+  dustSystem: { x: 15, y: 0 },
+  flexiSystem: { x: 17, y: 0 },
+  extractor: { x: 19, y: 0 },
+  compressor: { x: 19, y: 1 },
+  pelletiser: { x: 8, y: 2 },
+  cnc: { x: 2, y: 6 },
+  sprayBooth: { x: 7, y: 6 },
+  sheetRack: { x: 11, y: 6 },
+  edgebander: { x: 13, y: 6 },
+  forklift: { x: 18, y: 6 },
+  forkliftBetter: { x: 18, y: 7 },
+  drill: { x: 19, y: 6 },
+  handToolSet: { x: 19, y: 7 },
   van: { x: 0, y: 7, yard: true },
 };
 
 /** Bench slots, in order, along the middle of the hall clear of the rooms and the personnel door.
  *  A unit uses the first `benchSlots` of them. */
 export const BENCH_SLOT_LAYOUT: LayoutSlot[] = [
-  { x: 3, y: 5 },
-  { x: 6, y: 5 },
-  { x: 9, y: 5 },
-  { x: 12, y: 5 },
-  { x: 15, y: 5 },
-  { x: 18, y: 5 },
+  { x: 8, y: 4 },
+  { x: 10, y: 4 },
+  { x: 12, y: 4 },
+  { x: 14, y: 4 },
+  { x: 16, y: 4 },
+  { x: 18, y: 4 },
 ];
 
-/** Welfare items stand in the row in front of the rooms, clear of the three doors. */
+/** Welfare items stand along the front edge, clear of the gate lane and of the three room
+ *  doors that open into the hall (CLAUDE.md T7 3.3). */
 export const LOCKER_SLOT_LAYOUT: LayoutSlot[] = [
-  { x: 6, y: 4 },
-  { x: 7, y: 4 },
-  { x: 8, y: 4 },
-  { x: 9, y: 4 },
-  { x: 10, y: 4 },
-  { x: 11, y: 4 },
+  { x: 13, y: 9 },
+  { x: 14, y: 9 },
+  { x: 15, y: 9 },
+  { x: 16, y: 9 },
+  { x: 17, y: 9 },
+  { x: 18, y: 9 },
 ];
 
 export const CANTEEN_SLOT_LAYOUT: LayoutSlot[] = [
-  { x: 12, y: 4 },
-  { x: 13, y: 4 },
-  { x: 14, y: 4 },
-  { x: 15, y: 4 },
-  { x: 16, y: 4 },
-  { x: 17, y: 4 },
+  { x: 7, y: 9 },
+  { x: 8, y: 9 },
+  { x: 9, y: 9 },
+  { x: 10, y: 9 },
+  { x: 11, y: 9 },
+  { x: 12, y: 9 },
 ];
 
-/** Tool cabinets stand along the rear wall past the machines: one for the owner and one for every
- *  worker (CLAUDE.md T6 3.5). */
+/** Tool cabinets stand in the row between the rear machines and the benches: one for the owner
+ *  and one for every worker (CLAUDE.md T6 3.5). */
 export const CABINET_SLOT_LAYOUT: LayoutSlot[] = [
-  { x: 6, y: 0 },
-  { x: 7, y: 0 },
-  { x: 8, y: 0 },
-  { x: 9, y: 0 },
-  { x: 10, y: 0 },
-  { x: 11, y: 0 },
-  { x: 12, y: 0 },
+  { x: 5, y: 3 },
+  { x: 6, y: 3 },
+  { x: 7, y: 3 },
+  { x: 10, y: 3 },
+  { x: 11, y: 3 },
+  { x: 12, y: 3 },
+  { x: 13, y: 3 },
 ];
 
 /** Where a waiting delivery lorry stands: inside the shutter, on the lane. */
@@ -1331,7 +1773,7 @@ export const JOINER_PREREQUISITES = [
   'toolCabinet',
 ];
 /** The item every worker and the owner each need one of. */
-export const TOOL_CABINET = 'toolCabinet';
+export const TOOL_CABINET = TOOL_CABINET_ID;
 /** [TUNE] a new hire starts the next working day. */
 export const HIRE_START_DELAY_DAYS = 1;
 /** From five joiners a helper is required (PIOTR). */
@@ -1340,10 +1782,6 @@ export const HELPER_REQUIRED_FROM_JOINERS = 5;
 export const NO_HELPER_DUST_MULTIPLIER = 2;
 /** [TUNE] and productivity drops. */
 export const NO_HELPER_PRODUCTIVITY_FACTOR = 0.9;
-/** One table saw per three joiners (PIOTR). */
-export const JOINERS_PER_TABLE_SAW = 3;
-/** [TUNE] joiners above the saw ratio queue and work slower. */
-export const OVER_SAW_RATIO_FACTOR = 0.8;
 /** [TUNE] names for generated staff. */
 export const WORKER_NAMES = [
   'Adam',

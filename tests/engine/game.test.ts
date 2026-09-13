@@ -24,11 +24,13 @@ import { createTask } from '../../src/engine/tasks';
 import {
   DEFAULT_OPTIONS as OPTIONS,
   act,
+  buyNow,
   buyStartingKit,
   choose,
   clearEvents,
   fillRack,
   firstJob,
+  hireNow,
   newGame,
   nextDay,
   placeEnquiry,
@@ -336,9 +338,9 @@ describe('who can be sent at a job of work', () => {
   it('never offers a man who is not in the hall today', () => {
     let state = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
     for (const specId of missingForHire(state, 'joiner')) {
-      state = act(state, { type: 'BUY_EQUIPMENT', specId });
+      state = buyNow(state, specId);
     }
-    state = clearEvents(act(state, { type: 'HIRE', role: 'joiner', tier: 'poor' }));
+    state = clearEvents(hireNow(state, 'joiner', 'poor'));
     expect(state.workers).toHaveLength(1);
     // He does not start for a few days yet, so sending him would do nothing at all.
     const saw = state.equipment.find((item) => item.specId === 'tableSaw');

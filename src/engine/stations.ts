@@ -3,7 +3,7 @@
 // A station is a string so the state stays plain JSON: 'bench', 'machine:<specId>', 'rack',
 // 'gate', 'office' or 'idle'.
 
-import { has, standsInTheHall } from './machines';
+import { itemStandsInTheHall } from './machines';
 import type { GameState, TaskInstance } from './types';
 
 export const STATION_BENCH = 'bench';
@@ -23,40 +23,16 @@ export function stationMachine(station: string): string | null {
   return station.startsWith('machine:') ? station.slice('machine:'.length) : null;
 }
 
-/** [TUNE cycle] 15 minutes at the bench, 5 at the saw, 15 at the bench, 5 at the edgebander,
- *  round and round while the job is being made. */
-export const PRODUCTION_CYCLE: Array<{ station: string; minutes: number }> = [
-  { station: STATION_BENCH, minutes: 15 },
-  { station: machineStation('tableSaw'), minutes: 5 },
-  { station: STATION_BENCH, minutes: 15 },
-  { station: machineStation('edgebander'), minutes: 5 },
-];
-
-export const PRODUCTION_CYCLE_MINUTES = PRODUCTION_CYCLE.reduce(
-  (total, step) => total + step.minutes,
-  0,
-);
-
-/** Where the cycle puts a figure on the given minute of it. */
-export function cycleStation(minuteIndex: number): string {
-  const into = ((minuteIndex % PRODUCTION_CYCLE_MINUTES) + PRODUCTION_CYCLE_MINUTES) %
-    PRODUCTION_CYCLE_MINUTES;
-  let passed = 0;
-  for (const step of PRODUCTION_CYCLE) {
-    passed += step.minutes;
-    if (into < passed) return step.station;
-  }
-  return STATION_BENCH;
+/** Standing at a machine somebody else has, waiting for him to finish with it. The Turn 2 cycle
+ *  of fifteen minutes at the bench and five at the saw is gone: a man is at the station of the
+ *  stage he is working, for as long as that stage takes (CLAUDE.md T7 3.1). */
+export function waitingStation(specId: string): string {
+  return `waiting:${specId}`;
 }
 
-/** The station after this many minutes of production. A machine the workshop has not bought, or
- *  one that holds no cell of the floor, leaves the figure at the bench (CLAUDE.md T6 3.5). */
-export function stationForProduction(state: GameState, minutesProduced: number): string {
-  if (minutesProduced <= 0) return STATION_BENCH;
-  const station = cycleStation(minutesProduced - 1);
-  const specId = stationMachine(station);
-  if (specId !== null && (!has(state, specId) || !standsInTheHall(specId))) return STATION_BENCH;
-  return station;
+/** The machine a man is waiting for, or null when he is not waiting for one. */
+export function stationWaitingFor(station: string): string | null {
+  return station.startsWith('waiting:') ? station.slice('waiting:'.length) : null;
 }
 
 /** Where a job of work puts the figure doing it. */
@@ -73,7 +49,7 @@ export function stationForTask(state: GameState, task: TaskInstance): string {
       const machine = task.equipmentId
         ? state.equipment.find((item) => item.id === task.equipmentId)
         : null;
-      if (!machine || !standsInTheHall(machine.specId)) return STATION_BENCH;
+      if (!machine || !itemStandsInTheHall(machine)) return STATION_BENCH;
       return machineStation(machine.specId);
     }
     case 'cleaning':

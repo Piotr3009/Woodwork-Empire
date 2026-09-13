@@ -2,7 +2,7 @@
 // before it drops and the catalogue can ask before it buys (CLAUDE.md T2 3.10).
 
 import { GATE_LANE, ROOM_LAYOUT } from './constants';
-import { findSpec, standsInTheHall } from './machines';
+import { findSpec, itemStandsInTheHall, standsInTheHall, zoneOf } from './machines';
 import type { Equipment, GameState } from './types';
 
 export interface PlaceCheck {
@@ -40,14 +40,16 @@ export function hallItems(state: GameState): Equipment[] {
   return state.equipment.filter((item) => {
     const spec = findSpec(item.specId);
     if (!spec || spec.category === 'furniture') return false;
-    if (!standsInTheHall(item.specId)) return false;
+    if (!itemStandsInTheHall(item)) return false;
     return item.anchorX < state.unit.widthCells;
   });
 }
 
-export function boxOf(specId: string, x: number, y: number): Box {
-  const spec = findSpec(specId);
-  return { x, y, width: spec?.width ?? 1, depth: spec?.depth ?? 1 };
+/** The floor a thing of this class takes up where it is put: its working zone, which is what
+ *  nothing else may stand on (CLAUDE.md T7 3.3). */
+export function boxOf(specId: string, x: number, y: number, variantId?: string): Box {
+  const zone = zoneOf(specId, variantId);
+  return { x, y, width: zone.width, depth: zone.depth };
 }
 
 /** Can a thing of this kind stand here? `ignoreItemId` is the item being moved, which never
@@ -58,16 +60,19 @@ export function canPlaceSpec(
   x: number,
   y: number,
   ignoreItemId: string | null,
+  variantId?: string,
 ): PlaceCheck {
   const spec = findSpec(specId);
   if (!spec) return { ok: false, reason: 'Not in the catalogue' };
-  if (!standsInTheHall(specId)) return { ok: false, reason: 'It lives in a tool cabinet' };
-  const box = boxOf(specId, x, y);
+  if (!standsInTheHall(specId, variantId)) {
+    return { ok: false, reason: 'It lives in a tool cabinet' };
+  }
+  const box = boxOf(specId, x, y, variantId);
   if (
     x < 0 ||
     y < 0 ||
-    x + spec.width > state.unit.widthCells ||
-    y + spec.depth > state.unit.depthCells
+    x + box.width > state.unit.widthCells ||
+    y + box.depth > state.unit.depthCells
   ) {
     return { ok: false, reason: 'Off the floor' };
   }
@@ -83,7 +88,9 @@ export function canPlaceSpec(
     if (item.id === ignoreItemId) continue;
     const other = findSpec(item.specId);
     if (!other) continue;
-    if (overlaps(box, { x: item.anchorX, y: item.anchorY, width: other.width, depth: other.depth })) {
+    // Zone against zone: two saws whose working room would overlap cannot both stand there, even
+    // where the machines themselves would not touch (CLAUDE.md T7 3.3).
+    if (overlaps(box, boxOf(item.specId, item.anchorX, item.anchorY, item.variantId))) {
       return { ok: false, reason: `On the ${other.name.toLowerCase()}` };
     }
   }
@@ -97,7 +104,7 @@ export function canPlace(state: GameState, itemId: string, x: number, y: number)
   const spec = findSpec(item.specId);
   if (spec?.category === 'furniture') return { ok: false, reason: 'It lives in the office' };
   if (item.anchorX >= state.unit.widthCells) return { ok: false, reason: 'It stands in the yard' };
-  return canPlaceSpec(state, item.specId, x, y, item.id);
+  return canPlaceSpec(state, item.specId, x, y, item.id, item.variantId);
 }
 
 /** Moves it, or says why not. The man at a bench goes with his bench. */
@@ -120,12 +127,16 @@ export function moveItem(state: GameState, itemId: string, x: number, y: number)
 }
 
 /** The first cell, reading along each row in turn, where a thing of this kind fits. */
-export function firstFreeCell(state: GameState, specId: string): { x: number; y: number } | null {
-  const spec = findSpec(specId);
-  if (!spec) return null;
-  for (let y = 0; y + spec.depth <= state.unit.depthCells; y += 1) {
-    for (let x = 0; x + spec.width <= state.unit.widthCells; x += 1) {
-      if (canPlaceSpec(state, specId, x, y, null).ok) return { x, y };
+export function firstFreeCell(
+  state: GameState,
+  specId: string,
+  variantId?: string,
+): { x: number; y: number } | null {
+  const zone = zoneOf(specId, variantId);
+  if (zone.width <= 0 || zone.depth <= 0) return null;
+  for (let y = 0; y + zone.depth <= state.unit.depthCells; y += 1) {
+    for (let x = 0; x + zone.width <= state.unit.widthCells; x += 1) {
+      if (canPlaceSpec(state, specId, x, y, null, variantId).ok) return { x, y };
     }
   }
   return null;

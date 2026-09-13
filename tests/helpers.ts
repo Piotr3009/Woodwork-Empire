@@ -1,6 +1,11 @@
 // Shared test driver. One place clicks events away, so no test file grows its own copy.
 
 import { WORKER_RATES } from '../src/engine/constants';
+// Straight off the modules, not through the public API: these are the engine's own writes, and
+// the tests use them to stand kit in the hall without sending the owner out for it.
+import { buyEquipment, buySoftware } from '../src/engine/game';
+import { hire } from '../src/engine/staff';
+import type { WorkerRole, WorkerTier } from '../src/engine/types';
 import {
   applyAction,
   createGame,
@@ -30,7 +35,12 @@ export const DEFAULT_OPTIONS: NewGameOptions = {
 };
 
 export function newGame(options: Partial<NewGameOptions> = {}): GameState {
-  return createGame({ ...DEFAULT_OPTIONS, ...options });
+  // The clock runs from the first line of every test: nothing the player buys, orders or pays
+  // for happens in stopped time, and a test about a stopped clock stops it itself (T7 3.10).
+  return applyAction(createGame({ ...DEFAULT_OPTIONS, ...options }), {
+    type: 'SET_SPEED',
+    speed: 1,
+  });
 }
 
 export interface Run {
@@ -160,22 +170,70 @@ export const STARTING_KIT = [
   'sheetRack',
 ];
 
-/** The day 1 shopping. The saw it buys is the used one at 1800, which is what the catalogue
- *  offers first; a test about the labour figures of CLAUDE.md 8.5 asks for the budget saw, whose
- *  factors are all 1.0 and which is therefore the baseline those figures describe. */
+/** The class of each family the day 1 shopping buys. The bench, the rack and the edgebander are
+ *  the budget ones, which are the Turn 1 items those families now hold as a class and whose
+ *  factors are all 1.0 (CLAUDE.md T7 3.6). The saw is the used one at 1800, which is what the
+ *  catalogue offers first; a test about the labour figures of CLAUDE.md 8.5 asks for the budget
+ *  saw, which is the baseline those figures describe. */
+export const STARTING_CLASS: Record<string, string> = {
+  workbench: 'budget',
+  sheetRack: 'budget',
+  edgebander: 'budget',
+};
+
+/** A copy of the state, so a helper that writes to the engine's own functions leaves the caller's
+ *  state alone, the way `applyAction` does. */
+function copyOf(state: GameState): GameState {
+  return JSON.parse(JSON.stringify(state)) as GameState;
+}
+
+/** Lets the engine tidy up after a helper wrote to it: locks, stations and the rest of what
+ *  `applyAction` does once the action itself is over. Setting the speed it is already on is the
+ *  one action that changes nothing. */
+function settled(state: GameState): GameState {
+  return applyAction(state, { type: 'SET_SPEED', speed: state.speed });
+}
+
+/** Buys the way the shop books it once the owner is back, with no trip out. The trip is the rule
+ *  of CLAUDE.md T7 3.10 and it has its own tests and its own scenarios; a test that only wants
+ *  the saw standing in the hall should not have to spend an hour of the owner's day on it. */
+export function buyNow(state: GameState, specId: string, variantId?: string): GameState {
+  const next = copyOf(state);
+  buyEquipment(next, specId, variantId);
+  return settled(next);
+}
+
+/** The same short cut for the management software. */
+export function softwareNow(state: GameState, mode: 'oneOff' | 'subscription'): GameState {
+  const next = copyOf(state);
+  buySoftware(next, mode);
+  return settled(next);
+}
+
+/** And for taking somebody on, without the interview. */
+export function hireNow(
+  state: GameState,
+  role: WorkerRole,
+  tier: WorkerTier | null,
+): GameState {
+  const next = copyOf(state);
+  hire(next, role, tier);
+  return settled(next);
+}
+
 export function buyStartingKit(
   state: GameState,
   options: { sawVariant?: string } = {},
 ): GameState {
   let next = state;
   for (const specId of STARTING_KIT) {
-    next = applyAction(next, {
-      type: 'BUY_EQUIPMENT',
+    next = buyNow(
+      next,
       specId,
-      variantId: specId === 'tableSaw' ? options.sawVariant : undefined,
-    });
+      specId === 'tableSaw' ? options.sawVariant : STARTING_CLASS[specId],
+    );
   }
-  return applyAction(next, { type: 'BUY_SOFTWARE', mode: 'oneOff' });
+  return softwareNow(next, 'oneOff');
 }
 
 /** Stands a machine in the hall without paying for it or looking for a free tile, for tests that
@@ -202,6 +260,7 @@ export function placeEquipment(
     serviceHours: 0,
     enduranceHours: enduranceHoursFor(specId, variantId),
     hoursUsed: 0,
+    takenBy: null,
     purchasePrice: variant ? variant.price : spec.price,
   };
   state.equipment.push(item);
@@ -274,15 +333,85 @@ export function firstJob(state: GameState): Job {
 
 /** A desk, a laptop and a one off licence: the minimum to be allowed to draw. */
 export function withLicence(state: GameState): GameState {
-  let next = applyAction(state, { type: 'BUY_EQUIPMENT', specId: 'desk' });
-  next = applyAction(next, { type: 'BUY_EQUIPMENT', specId: 'laptop' });
-  return applyAction(next, { type: 'BUY_SOFTWARE', mode: 'oneOff' });
+  return softwareNow(buyNow(buyNow(state, 'desk'), 'laptop'), 'oneOff');
 }
+
+/** A crew of six poor joiners, each at his own bench and his own job of sheet work, behind the
+ *  number of saws the caller asks for. Piotr's claim of CLAUDE.md T7 3.1 in one hall: a machine
+ *  serves one man at a time, so six men behind one saw stand at it. The office is not in the way
+ *  here, because the queue at the saw is what the month is about: the jobs are drawn and ready
+ *  and the rack is full. */
+export function sixJoinersOnSheetWork(
+  options: { saws?: number; price?: number; sawVariant?: string } = {},
+): GameState {
+  const sawVariant = options.sawVariant ?? 'standard';
+  const state = fillRack(buyStartingKit(newGame({ difficulty: 'veryEasy' }), { sawVariant }), 400);
+  for (let bench = 1; bench < CREW; bench += 1) {
+    placeEquipment(state, 'workbench', { variantId: 'budget', x: 4 + bench * 2, y: 6 });
+  }
+  for (let extra = 1; extra < (options.saws ?? 2); extra += 1) {
+    placeEquipment(state, 'tableSaw', {
+      variantId: sawVariant,
+      x: 2 + extra * 4,
+      y: 1,
+      id: `kit-saw-${extra + 1}`,
+    });
+  }
+  state.enquiries = [];
+  let next = state;
+  // Six jobs of different sizes, because six of the same size started in the same minute would
+  // reach the saw in the same minute all month and the hall would be a lock step and not a
+  // workshop. A real book of work is never in step.
+  for (let man = 0; man < CREW; man += 1) {
+    const price = (options.price ?? 6000) + man * (options.price ?? 6000) * 0.2;
+    const enquiry = placeEnquiry(next, { price, deadlineDays: 40 });
+    next = act(next, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+  }
+  // Six jobs at six different points of their making, which is what a workshop with a book of
+  // work looks like on any given morning. Six jobs started in the same minute would reach the
+  // saw in the same minute all month, and the month would be about that and not about the saws.
+  next.jobs.forEach((job, index) => {
+    job.stage = 'ready';
+    job.labourRemaining = job.labourValue * (1 - index / CREW);
+  });
+  for (let man = 0; man < CREW; man += 1) {
+    next.workers.push({
+      id: `staff-${man + 1}`,
+      name: `Joiner ${man + 1}`,
+      role: 'joiner',
+      tier: 'poor',
+      rate: WORKER_RATES.poor,
+      weeklyWage: 480,
+      monthlyWage: 0,
+      startDay: 1,
+      jobId: null,
+      taskId: null,
+      minutesWorked: 0,
+      ordersToday: 0,
+      station: 'idle',
+      productionMinutes: 0,
+      absentDaysRemaining: 0,
+      anchorX: 4 + man * 2,
+      anchorY: 6,
+    });
+  }
+  for (let man = 0; man < CREW; man += 1) {
+    const job = next.jobs[man];
+    if (!job) throw new Error('a job each is wanted here');
+    next = act(next, { type: 'ASSIGN_JOB', jobId: job.id, workerId: `staff-${man + 1}` });
+  }
+  return next;
+}
+
+/** The crew Piotr's saw question is asked about (CLAUDE.md T7 3.1). */
+export const CREW = 6;
 
 /** Two men producing in the same minutes: the owner at one bench and a poor joiner at another,
  *  each on a job of sheet work. The one place a two man minute is set up, so the tests that ask
  *  what two men do to the books and to the machines both drive the same hall. */
-export function twoMenOnSheetWork(options: { sawVariant?: string } = {}): GameState {
+export function twoMenOnSheetWork(
+  options: { sawVariant?: string; saws?: number } = {},
+): GameState {
   const state = fillRack(
     buyStartingKit(newGame({ difficulty: 'veryEasy' }), {
       sawVariant: options.sawVariant ?? 'standard',
@@ -290,6 +419,17 @@ export function twoMenOnSheetWork(options: { sawVariant?: string } = {}): GameSt
     60,
   );
   placeEquipment(state, 'workbench', { x: 6, y: 6 });
+  // A saw each by default: one machine takes one man at a time, so with one saw between them the
+  // second would stand and wait, and this helper would be about the queue and not about two men
+  // producing. A test about the queue asks for one saw (CLAUDE.md T7 3.1).
+  for (let extra = 1; extra < (options.saws ?? 2); extra += 1) {
+    placeEquipment(state, 'tableSaw', {
+      variantId: options.sawVariant ?? 'standard',
+      x: 10,
+      y: 1,
+      id: `kit-saw-${extra + 1}`,
+    });
+  }
   state.enquiries = [];
   const first = placeEnquiry(state, { price: 40000, deadlineDays: 90 });
   const second = placeEnquiry(state, { price: 40000, deadlineDays: 90 });
