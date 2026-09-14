@@ -2068,8 +2068,10 @@ export const STARTING_LAYOUT: Record<string, LayoutSlot> = {
   tableSaw: { x: 5, y: 0 },
   thicknesser: { x: 8, y: 0 },
   solidWoodTools: { x: 12, y: 0 },
-  dustSystem: { x: 15, y: 0 },
-  flexiSystem: { x: 17, y: 0 },
+  // The two central systems are plant, not machines: they stand outside on the apron by the
+  // shutter, like the van, and draw their ducting along the rear wall (PIOTR, CLAUDE.md T10 3.4).
+  dustSystem: { x: 0, y: 1, yard: true },
+  flexiSystem: { x: 0, y: 4, yard: true },
   extractor: { x: 19, y: 0 },
   compressor: { x: 19, y: 1 },
   pelletiser: { x: 8, y: 2 },
@@ -2141,8 +2143,22 @@ export const GATE_LANE_CELLS = GATE_LANE.width;
 export const FINISHED_GOODS_LAYOUT = { x: 0, y: 9, width: 2, depth: 1, height: 1 };
 export const DELIVERY_VAN_SPRITE = 'deliveryVan';
 
-/** Width of the apron drawn beyond the front kerb, where the company van is parked, in cells. */
+/** Width of the apron drawn beyond the front kerb, where the company van and the two central
+ *  extraction systems stand, in cells. */
 export const YARD_WIDTH_CELLS = 3;
+
+/** The ducting a central system draws along the rear wall (PIOTR, CLAUDE.md T10 3.4). One length
+ *  of the `.ducts` sprite every four metres, three metres up, which is exactly the 4 by 0.5 by 0.5
+ *  object the art side drew: 232 by 148 in the file. A thin line drops from it to every ducted
+ *  machine, and a small ring marks the port it lands on. */
+export const DUCT_SPAN = 4;
+export const DUCT_HEIGHT = 3;
+export const DUCT_WIDTH = 4;
+export const DUCT_DEPTH = 0.5;
+export const DUCT_THICKNESS = 0.5;
+/** The families whose sprite carries a length of ducting. */
+export const DUCT_SYSTEMS = ['dustSystem', 'flexiSystem'];
+export const DUCT_SPRITE_SUFFIX = 'ducts';
 
 // ---------------------------------------------------------------------------
 // 9.3 Hiring pool (PIOTR: tiers and gating; wages [TUNE])

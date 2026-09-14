@@ -3,6 +3,13 @@
 
 import {
   DELIVERY_VAN_SPRITE,
+  DUCT_DEPTH,
+  DUCT_HEIGHT,
+  DUCT_SPAN,
+  DUCT_SPRITE_SUFFIX,
+  DUCT_SYSTEMS,
+  DUCT_THICKNESS,
+  DUCT_WIDTH,
   FINISHED_GOODS_LAYOUT,
   GATE_CROWD_LIMIT,
   GATE_LAYOUT,
@@ -25,7 +32,9 @@ import { jobsAtGate } from '../engine/jobs';
 import { orderName, reservedItems, shoppingList } from '../engine/orders';
 import {
   footprintOf,
+  isSold,
   itemStandsInTheHall,
+  needsDucting,
   sheetCapacityOf,
   zoneOf,
 } from '../engine/machines';
@@ -183,6 +192,83 @@ export function objectArt(art: {
 interface Drawable {
   depth: number;
   svg: string;
+}
+
+// ---------------------------------------------------------------------------
+// The ducting a central system draws along the rear wall (PIOTR, CLAUDE.md T10 3.4). The plant
+// itself stands outside on the apron by the shutter, like the van; what the player sees in the
+// hall is the run above the machines and a drop to every one of them.
+// ---------------------------------------------------------------------------
+
+/** The central system the hall runs on, or null. The flexi one wins where both are owned: it is
+ *  the dearer of the two and it is the one whose reconnection is free (CLAUDE.md T4 3.5). */
+export function ductSystemOf(state: GameState): string | null {
+  for (const specId of DUCT_SYSTEMS.slice().reverse()) {
+    if (state.equipment.some((item) => item.specId === specId && !isSold(item))) return specId;
+  }
+  return null;
+}
+
+/** One length of ducting every four metres along the rear wall, three metres up. The sprite is a
+ *  4 by 0.5 by 0.5 object, so it is placed by the same rule as every other picture in the hall
+ *  and then lifted by its three metres. */
+export function ductRun(
+  state: GameState,
+  files: readonly string[],
+  widthCells: number,
+): string {
+  const system = ductSystemOf(state);
+  if (system === null) return '';
+  const url = pickSprite(files, system, DUCT_SPRITE_SUFFIX);
+  const lengths: string[] = [];
+  for (let x = 0; x + DUCT_SPAN <= widthCells; x += DUCT_SPAN) {
+    if (url === null) {
+      // No picture yet: a plain bar on the wall, so the run is still there to be seen.
+      const from = tileToScreen(x, 0, DUCT_HEIGHT);
+      const to = tileToScreen(x + DUCT_SPAN, 0, DUCT_HEIGHT);
+      lengths.push(
+        `<line class="duct-run" x1="${round(from.x)}" y1="${round(from.y)}" ` +
+          `x2="${round(to.x)}" y2="${round(to.y)}" />`,
+      );
+      continue;
+    }
+    const at = spriteBox(x, 0, DUCT_WIDTH, DUCT_DEPTH, DUCT_THICKNESS);
+    lengths.push(
+      spriteImage(url, { ...at, y: at.y - DUCT_HEIGHT * TILE_RISE }),
+    );
+  }
+  return `<g data-ducts="${system}">${lengths.join('')}</g>`;
+}
+
+/** The drop from the run to one machine, and the ring at the port it lands on. With the flexi
+ *  system the ring is green: the reconnection is free for ever (Turn 4 3.5; T10 3.4). */
+export function ductDrop(system: string, item: Equipment): string {
+  const stands = footprintIn(item);
+  const port = centreOf(stands.x, stands.y, stands.width, stands.depth, stands.height);
+  const above = tileToScreen(stands.x + stands.width / 2, 0, DUCT_HEIGHT);
+  const green = system === 'flexiSystem' ? ' is-flexi' : '';
+  return (
+    `<g class="duct-drop${green}" data-duct="${item.id}">` +
+    `<line x1="${round(above.x)}" y1="${round(above.y)}" ` +
+    `x2="${round(port.x)}" y2="${round(port.y)}" />` +
+    `<circle class="duct-port" cx="${round(port.x)}" cy="${round(port.y)}" r="3" /></g>`
+  );
+}
+
+/** Every machine on the ducting, with its drop. Empty while the hall has no central system. */
+export function ductDrops(state: GameState): string {
+  const system = ductSystemOf(state);
+  if (system === null) return '';
+  return state.equipment
+    .filter(
+      (item) =>
+        !isSold(item) &&
+        itemStandsInTheHall(item) &&
+        needsDucting(item.specId, item.variantId) &&
+        item.anchorX < state.unit.widthCells,
+    )
+    .map((item) => ductDrop(system, item))
+    .join('');
 }
 
 // ---------------------------------------------------------------------------
@@ -825,6 +911,9 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
     parts.push(lines.join(''));
   }
 
+  // The ducting runs along the rear wall, behind everything that stands in front of it.
+  parts.push(ductRun(state, files, unit.widthCells));
+
   const drawables: Drawable[] = [];
 
   // The three room blocks. Each is a layer of the painting, or a placeholder box while that layer
@@ -1055,6 +1144,10 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
   }
 
   live.push(drawables.map((drawable) => drawable.svg).join(''));
+
+  // The drop to every ducted machine, over the machines so the port is on the picture and not
+  // behind it (CLAUDE.md T10 3.4).
+  live.push(ductDrops(state));
 
   // The ghost footprint of whatever is being dragged, on top of everything else.
   if (ghost !== null) {
