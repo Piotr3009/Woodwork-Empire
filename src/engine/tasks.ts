@@ -41,6 +41,7 @@ import { ownerIsAvailable } from './owner';
 import { makeId } from './rng';
 import { hasWorkingDay, isWorkingToday, joiners, staffMinutesLeft } from './staff';
 import type {
+  DayCategory,
   GameState,
   ProductTemplate,
   Worker,
@@ -108,6 +109,40 @@ const TASK_DEFINITIONS: Record<TaskKind, TaskDefinition> = {
   hiring: { category: 'admin', eligibleRoles: [], autoRoles: [] },
   booting: { category: 'admin', eligibleRoles: [], autoRoles: [] },
 };
+
+/** Which of the seven bands of the owner's day a task falls in. Every kind of task in the game
+ *  is on this one table, so a minute cannot be workshop time on the bar and office time in the
+ *  summary (CLAUDE.md T11 3.1). The engine's own `category` stays what it always was: it is the
+ *  three way admin, design and workshop split the minute pool is kept in, and this is the
+ *  seven way split the player reads. */
+export const DAY_CATEGORY_OF_TASK: Record<TaskKind, DayCategory> = {
+  emails: 'emails',
+  clientMeeting: 'meetings',
+  bookkeeping: 'office',
+  dailyOrdering: 'office',
+  staffManagement: 'office',
+  clientCall: 'calls',
+  design: 'office',
+  materialOrder: 'office',
+  siteMeasure: 'siteMeasure',
+  unload: 'fixing',
+  bagChange: 'fixing',
+  cleaning: 'fixing',
+  fetchStorage: 'fixing',
+  // Taking the piece to the client is the work of the shop, not of the office or the spanner.
+  deliver: 'workshop',
+  service: 'fixing',
+  repair: 'fixing',
+  moveMachines: 'fixing',
+  // An interview is an hour sitting down with somebody, which is a meeting.
+  hiring: 'meetings',
+  booting: 'office',
+};
+
+/** The band this task falls in. The one lookup: the runner and the tests both ask it. */
+export function dayCategoryOf(kind: TaskKind): DayCategory {
+  return DAY_CATEGORY_OF_TASK[kind];
+}
 
 /** Float guard, not a game number: work this small is finished work. It lives in constants.ts
  *  with every other figure and is handed on from here, where it has always been imported from. */

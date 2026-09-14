@@ -12,6 +12,7 @@ import {
   BOARD_MIDDAY_MINUTE,
   BREAK_START_MINUTE,
   CABINET_SLOT_LAYOUT,
+  DAY_LOGS_KEPT,
   DAY_SUMMARIES_MAX,
   CANTEEN_SLOT_LAYOUT,
   DAY_END_MINUTE,
@@ -209,6 +210,7 @@ import {
   assignWorkerTask,
   createDailyTasks,
   createTask,
+  dayCategoryOf,
   equipmentUnloadMinutes,
   findTask,
   interruptOwnerWith,
@@ -276,6 +278,7 @@ export function createGame(options: NewGameOptions): GameState {
     cash: spec.startingCash,
     reputation: REPUTATION_START,
     reputationLog: [],
+    dayLogs: [],
     dust: 0,
     unit: {
       areaM2: spec.areaM2,
@@ -289,6 +292,7 @@ export function createGame(options: NewGameOptions): GameState {
     owner: {
       present: true,
       minutesByCategory: { admin: 0, design: 0, workshop: 0 },
+      dayLog: [],
       minutesWorked: 0,
       overtimeMinutes: 0,
       labourFactor: 1,
@@ -388,6 +392,8 @@ function resumeMove(state: GameState): void {
 function startDay(state: GameState): void {
   const owner = state.owner;
   owner.minutesByCategory = { admin: 0, design: 0, workshop: 0 };
+  // A new day is a blank bar: what he did yesterday is on yesterday's log (CLAUDE.md T11 3.1).
+  owner.dayLog = [];
   owner.minutesWorked = 0;
   owner.wentHome = false;
   owner.currentTaskId = null;
@@ -748,6 +754,7 @@ export function daySummaryOf(state: GameState): DaySummary {
     ),
     labourValue: state.dayStats.labourValue,
     workMinutes: state.dayStats.workMinutes,
+    dayLog: owner.dayLog.map((entry) => ({ ...entry })),
   };
 }
 
@@ -758,6 +765,13 @@ function recordDay(state: GameState): void {
   state.days.push(summary);
   if (state.days.length > DAY_SUMMARIES_MAX) {
     state.days.splice(0, state.days.length - DAY_SUMMARIES_MAX);
+  }
+  // The week the company board adds up: the last seven days of the owner's own day, and no more
+  // (CLAUDE.md T11 3.1).
+  state.dayLogs = state.dayLogs.filter((entry) => entry.day !== summary.day);
+  state.dayLogs.push({ day: summary.day, segments: summary.dayLog.map((entry) => ({ ...entry })) });
+  if (state.dayLogs.length > DAY_LOGS_KEPT) {
+    state.dayLogs.splice(0, state.dayLogs.length - DAY_LOGS_KEPT);
   }
 }
 
@@ -1124,7 +1138,7 @@ function runMinute(state: GameState): void {
     owner.currentTaskId = null;
     return;
   }
-  spendOwnerMinute(state, task.category);
+  spendOwnerMinute(state, task.category, dayCategoryOf(task.kind));
   const finished = advanceOwnerTask(state, ownerEfficiency(state));
   if (finished) applyTaskCompletion(state, finished);
 }
@@ -1370,7 +1384,7 @@ function runProductionMinute(state: GameState, ownerOnTask: boolean): void {
     if (worker) {
       worker.productionMinutes += 1;
     } else {
-      spendOwnerMinute(state, 'workshop');
+      spendOwnerMinute(state, 'workshop', 'workshop');
       state.owner.productionMinutes += 1;
     }
     // What the piece itself was made in: the minutes it took and how many of them were dusty

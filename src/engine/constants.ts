@@ -4,6 +4,7 @@
 // Nothing in this file is exposed to the player as a setting (CLAUDE.md rule 3.4).
 
 import type {
+  DayCategory,
   Difficulty,
   EquipmentSpec,
   EquipmentVariant,
@@ -47,12 +48,43 @@ import type {
  *
  *  Bumped in Turn 3: a machine carries its class, its hours and the hours it has in it, and a task
  *  carries the day it was finished (CLAUDE.md T3 3.5, 3.3). Bumped in Turn 9: a lorry load is one
- *  unloading of several orders, so a task carries a list of them (CLAUDE.md T9 3.1). */
-export const STATE_VERSION = 11;
+ *  unloading of several orders, so a task carries a list of them (CLAUDE.md T9 3.1).
+ *
+ *  Bumped in Turn 11: the owner carries the log of his day and the state carries the last week of
+ *  them, which is what the top bar's meter and the company board are drawn from (T11 3.1). */
+export const STATE_VERSION = 12;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
 export const APP_VERSION = 'v18';
+
+// ---------------------------------------------------------------------------
+// The owner's day, in the seven things it is made of
+// ---------------------------------------------------------------------------
+
+/** The order the segments are painted in when a day is summed up, and the order the tooltip and
+ *  the day end plate read in. The bar itself is drawn in the order the minutes happened
+ *  (CLAUDE.md T11 3.1). */
+export const DAY_CATEGORIES: readonly DayCategory[] = [
+  'workshop',
+  'calls',
+  'emails',
+  'meetings',
+  'siteMeasure',
+  'office',
+  'fixing',
+];
+
+/** What each one is called on the tooltip, on the day end plate and on the company board. */
+export const DAY_CATEGORY_LABELS: Record<DayCategory, string> = {
+  workshop: 'Workshop',
+  calls: 'Calls',
+  emails: 'Emails',
+  meetings: 'Meetings',
+  siteMeasure: 'Site measure',
+  office: 'Office',
+  fixing: 'Fixing and bags',
+};
 
 // ---------------------------------------------------------------------------
 // 6. Time
@@ -2345,6 +2377,9 @@ export const HELPER_CLEAN_WEEKDAY = 4;
 /** [TUNE] the state keeps this many ledger entries so it stays small. */
 /** How many end of day summaries the state carries: three months of working days [TUNE]. */
 export const DAY_SUMMARIES_MAX = 90;
+/** How many days of the owner's day log the state carries. A week is what the company board
+ *  shows, and the brief asks for no more (CLAUDE.md T11 3.1). */
+export const DAY_LOGS_KEPT = 7;
 export const LEDGER_MAX_ENTRIES = 200;
 /** The Ledger tab shows every line the state carries: 200 (PIOTR, CLAUDE.md T6 3.9). It used to
  *  show the last 50, which left three quarters of a busy month unreachable. */

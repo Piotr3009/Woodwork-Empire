@@ -131,6 +131,7 @@ describe('the two of them together', () => {
         deliveriesTomorrow: [],
         labourValue: 42 * 8,
         workMinutes: 480,
+        dayLog: [],
       },
     ];
     state.dayStats.workMinutes = 480;

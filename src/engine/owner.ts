@@ -7,6 +7,7 @@ import {
   ABSENCE_OUTPUT_FACTOR_WITH_CEO,
   BREAK_MINUTES,
   BREAK_SKIP_FACTOR,
+  DAY_CATEGORIES,
   DAYS_PER_YEAR,
   LABOUR_FACTOR_FLOOR,
   MINUTES_PER_WORKING_DAY,
@@ -24,7 +25,7 @@ import {
 } from './clock';
 import { queueEvent } from './events';
 import { int } from './rng';
-import type { GameState } from './types';
+import type { DayCategory, DayLogEntry, GameState } from './types';
 
 /** Round to four places, which is where every factor in the engine stops. */
 function round4(value: number): number {
@@ -92,11 +93,78 @@ export function staffOutputFactor(state: GameState): number {
   return absenceFactor(false, false);
 }
 
-/** Books one worked clock minute against the pool. */
-export function spendOwnerMinute(state: GameState, category: 'admin' | 'design' | 'workshop'): void {
+/** Writes one minute onto the end of a day log, joined to the run before it when it is the same
+ *  thing. The log is the day in the order it happened, so a morning of drawing is one segment
+ *  (CLAUDE.md T11 3.1). */
+export function logDayMinute(log: DayLogEntry[], category: DayCategory): void {
+  const last = log[log.length - 1];
+  if (last !== undefined && last.category === category) {
+    last.minutes += 1;
+    return;
+  }
+  log.push({ category, minutes: 1 });
+}
+
+/** Books one worked clock minute against the pool, and onto the day the top bar draws. The three
+ *  way category is the minute pool's; the seven way one is what the player reads (T11 3.1). */
+export function spendOwnerMinute(
+  state: GameState,
+  category: 'admin' | 'design' | 'workshop',
+  dayCategory: DayCategory,
+): void {
   const owner = state.owner;
   owner.minutesWorked += 1;
   owner.minutesByCategory[category] += 1;
+  logDayMinute(owner.dayLog, dayCategory);
+}
+
+/** The minutes of a day log added up per band. Bands with no minutes in them are not in the
+ *  answer: an empty band is not a zero on the plate, it is nothing at all. */
+export function dayMinutesByCategory(
+  logs: readonly DayLogEntry[],
+): Array<{ category: DayCategory; minutes: number }> {
+  const totals = new Map<DayCategory, number>();
+  for (const entry of logs) {
+    totals.set(entry.category, (totals.get(entry.category) ?? 0) + entry.minutes);
+  }
+  const answer: Array<{ category: DayCategory; minutes: number }> = [];
+  for (const category of DAY_CATEGORIES) {
+    const minutes = totals.get(category);
+    if (minutes !== undefined && minutes > 0) answer.push({ category, minutes });
+  }
+  return answer;
+}
+
+/** The same figures as percentages of the minutes that were worked, which is what the day end
+ *  plate and the company board show. They add up to exactly 100: the rounding is shared out by
+ *  largest remainder, so nobody reads a day that comes to 99 (CLAUDE.md T11 3.1). */
+export function dayPercentages(
+  logs: readonly DayLogEntry[],
+): Array<{ category: DayCategory; minutes: number; percent: number }> {
+  const parts = dayMinutesByCategory(logs);
+  const total = parts.reduce((sum, part) => sum + part.minutes, 0);
+  if (total <= 0) return [];
+  const shares = parts.map((part) => {
+    const exact = (part.minutes / total) * 100;
+    const floor = Math.floor(exact);
+    return { ...part, percent: floor, remainder: exact - floor };
+  });
+  let left = 100 - shares.reduce((sum, share) => sum + share.percent, 0);
+  const order = shares
+    .map((share, index) => ({ index, remainder: share.remainder }))
+    .sort((a, b) => b.remainder - a.remainder || a.index - b.index);
+  for (const entry of order) {
+    if (left <= 0) break;
+    const share = shares[entry.index];
+    if (share === undefined) continue;
+    share.percent += 1;
+    left -= 1;
+  }
+  return shares.map((share) => ({
+    category: share.category,
+    minutes: share.minutes,
+    percent: share.percent,
+  }));
 }
 
 /** Books one minute of standing in the workshop past 17:00. Staying is the overtime, not what he

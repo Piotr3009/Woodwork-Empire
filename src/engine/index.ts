@@ -38,6 +38,8 @@ export * from './types';
 export {
   APP_VERSION,
   CLEANING_MINUTES,
+  DAY_CATEGORIES,
+  DAY_CATEGORY_LABELS,
   EQUIPMENT_SPECS,
   MACHINE_ENDURANCE_HOURS,
   MACHINE_ENDURANCE_HOURS_DEFAULT,
@@ -84,7 +86,10 @@ export {
 
 // The owner
 export {
+  dayMinutesByCategory,
+  dayPercentages,
   labourFactorFor,
+  logDayMinute,
   ownerEfficiency,
   ownerIsAvailable,
   ownerMinutesLeft,
@@ -228,6 +233,8 @@ export {
 // Tasks
 export {
   bestTakerOf,
+  DAY_CATEGORY_OF_TASK,
+  dayCategoryOf,
   designMinutes,
   emailsForPrice,
   findTask,
