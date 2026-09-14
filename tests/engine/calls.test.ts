@@ -279,10 +279,11 @@ describe('a salesman on the books', () => {
   it('takes every call himself, and the owner is never asked', () => {
     let state = withJob();
     state.reputation = 20;
-    state = hireNow(state, 'salesman', null);
-    const salesman = state.workers[0];
+    // The office admin comes first, and the salesman behind her (CLAUDE.md T10 3.6).
+    state = hireNow(hireNow(state, 'officeAdmin', null), 'salesman', null);
+    const salesman = state.workers.find((worker) => worker.role === 'salesman');
     if (!salesman) throw new Error('nobody was hired');
-    salesman.startDay = state.clock.day;
+    for (const worker of state.workers) worker.startDay = state.clock.day;
     const design = state.tasks.find((task) => task.kind === 'design');
     if (!design) throw new Error('no design task');
     state = act(state, { type: 'START_TASK', taskId: design.id });
@@ -301,12 +302,17 @@ describe('a salesman on the books', () => {
   it('leaves the call to the owner once his day is too short to see it out', () => {
     let state = withJob();
     state.reputation = 20;
-    state = hireNow(state, 'salesman', null);
-    const salesman = state.workers[0];
+    // The office admin comes first, and the salesman behind her (CLAUDE.md T10 3.6).
+    state = hireNow(hireNow(state, 'officeAdmin', null), 'salesman', null);
+    const salesman = state.workers.find((worker) => worker.role === 'salesman');
     if (!salesman) throw new Error('nobody was hired');
-    salesman.startDay = state.clock.day;
-    // Ten minutes of his day left is not enough for a fifteen minute call.
+    for (const worker of state.workers) worker.startDay = state.clock.day;
+    // Ten minutes of his day left is not enough for a fifteen minute call, and the admin behind
+    // him has no day left at all to cover it with (CLAUDE.md T7 3.12, T10 3.6).
     salesman.minutesWorked = MINUTES_PER_WORKING_DAY - 10;
+    for (const worker of state.workers) {
+      if (worker.role === 'officeAdmin') worker.minutesWorked = MINUTES_PER_WORKING_DAY;
+    }
     state = ring(state);
     expect(state.activeEvent?.kind).toBe('clientCall');
     expect(state.tasks.some((task) => task.kind === 'clientCall')).toBe(false);

@@ -23,7 +23,17 @@ import type { GameState, HiringOption, Worker, WorkerRole, WorkerTier } from './
 
 /** The roles that have a working day of their own, the way the owner does (CLAUDE.md T2 3.8).
  *  A helper still clears his workshop jobs at no cost, as in Turn 1. */
-const OFFICE_ROLES: WorkerRole[] = ['officeAdmin', 'purchasingClerk', 'salesman'];
+const OFFICE_ROLES: WorkerRole[] = ['officeAdmin', 'purchasingClerk', 'salesman', 'draftsman'];
+
+/** The office role every other one is hired behind. She is the base office person: emails,
+ *  bookkeeping, the daily ordering, and every specialist's work at double time until he is taken
+ *  on (PIOTR, CLAUDE.md T10 3.6, T7 3.12). */
+export const BASE_OFFICE_ROLE: WorkerRole = 'officeAdmin';
+
+/** True while the company has somebody on the books, or starting, who does the office. */
+export function hasOfficeAdmin(state: GameState): boolean {
+  return state.workers.some((worker) => worker.role === BASE_OFFICE_ROLE);
+}
 
 export function hasWorkingDay(role: WorkerRole): boolean {
   return OFFICE_ROLES.includes(role);
@@ -159,6 +169,13 @@ export function hiringOptions(state: GameState): HiringOption[] {
     let blockReason = '';
     if (state.reputation < spec.minReputation) {
       blockReason = `Nobody of this standing answers yet, reputation ${spec.minReputation}`;
+    } else if (
+      hasWorkingDay(spec.role) &&
+      spec.role !== BASE_OFFICE_ROLE &&
+      !hasOfficeAdmin(state)
+    ) {
+      // Nobody in the office before the one who runs it (PIOTR, CLAUDE.md T10 3.6).
+      blockReason = 'Hire an office admin first';
     } else if (spec.role === 'joiner' && benchSlotsUsed > state.unit.benchSlots) {
       blockReason = 'No free bench slot in this unit';
     } else if (missing.length > 0) {

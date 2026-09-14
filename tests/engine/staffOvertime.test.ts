@@ -14,7 +14,7 @@ import { overtimePayFor, overtimeWageBill } from '../../src/engine/economy';
 import { staysForOvertime, worksOvertime } from '../../src/engine/staff';
 import { runOvertimeQuits } from '../../src/engine/game';
 import { next } from '../../src/engine/rng';
-import { renderHiring } from '../../src/ui/hiring';
+import { renderTeam } from '../../src/ui/team';
 import type { GameState, Worker } from '../../src/engine/index';
 import {
   act,
@@ -212,7 +212,7 @@ describe('three evenings in a row', () => {
     const worker = joinersOf(state)[0];
     expect(worker?.overtimeDays).toBeGreaterThanOrEqual(OVERTIME_TIRED_DAYS);
     expect(worker?.tiredOfOvertime).toBe(true);
-    expect(renderHiring(state)).toContain('Tired of overtime');
+    expect(renderTeam(state, 'workshop')).toContain('Tired of overtime');
   });
 
   it('are broken by one evening at home', () => {

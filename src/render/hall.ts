@@ -255,6 +255,33 @@ export function ductDrop(system: string, item: Equipment): string {
   );
 }
 
+/** The door in the office block's face, as a control: the Team board is behind it
+ *  (CLAUDE.md T10 3.6). The face is the one the hall is on, and the door is centred in it, which
+ *  is the same box the room's own lettering is measured from. */
+export function officeDoor(room: {
+  x: number;
+  y: number;
+  width: number;
+  depth: number;
+}): string {
+  const door = roomDoorBox(room);
+  const face = room.y + room.depth;
+  const from = room.x + door.from;
+  const to = from + door.across;
+  const shape: Polygon = [
+    tileToScreen(from, face, door.bottom),
+    tileToScreen(to, face, door.bottom),
+    tileToScreen(to, face, door.top),
+    tileToScreen(from, face, door.top),
+  ];
+  return (
+    '<g data-door="office" class="clickable office-door">' +
+    '<title>The team</title>' +
+    `<polygon points="${points(shape)}" class="door-hit" />` +
+    '</g>'
+  );
+}
+
 /** Every machine on the ducting, with its drop. Empty while the hall has no central system. */
 export function ductDrops(state: GameState): string {
   const system = ductSystemOf(state);
@@ -948,7 +975,10 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
           : contactShadow(room.x, room.y, room.width, room.depth) +
             box(faces, 'var(--room)', 'var(--room-dark)') +
             label(centreOf(room.x, room.y, room.width, room.depth, room.height), room.name)) +
-        '</g>',
+        '</g>' +
+        // The office door is a control of its own: knock on it and the team is behind it. The
+        // rest of the block is still the way into the office view (PIOTR, CLAUDE.md T10 3.6).
+        (room.id === 'office' ? officeDoor(room) : ''),
     });
   }
 

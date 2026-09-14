@@ -413,6 +413,13 @@ export const MEETING_SALESMAN_REPUTATION = 40;
  *  the clerk's, which is about eight a day (PIOTR, CLAUDE.md T7 3.12). */
 export const ADMIN_COVER_RATE = 0.5;
 
+/** What a draftsman is worth against the owner at his own screen, and what he costs [TUNE]. The
+ *  minutes of a drawing already carry the software's own factor, so his rate is the 0.8 and
+ *  nothing else: the licence is counted once, where it is written down (CLAUDE.md T10 3.6). */
+export const DRAFTSMAN_RATE = 0.8;
+export const DRAFTSMAN_MONTHLY_WAGE = 2400;
+export const DRAFTSMAN_REPUTATION = 15;
+
 /** A call is 15 minutes of whoever takes it, whatever the job is worth (PIOTR, T4 3.3). */
 export const CLIENT_CALL_ANSWER_MINUTES = 15;
 /** The first call a job loses is free. From the second on, each takes a tenth off what the client
@@ -2228,6 +2235,15 @@ export const HIRING_SPECS: HiringSpec[] = [
     monthlyWage: 1700,
     minReputation: 10,
     duties: 'Per job material orders, about 16 a day.',
+  },
+  {
+    role: 'draftsman',
+    tier: null,
+    label: 'Draftsman',
+    weeklyWage: 0,
+    monthlyWage: DRAFTSMAN_MONTHLY_WAGE,
+    minReputation: DRAFTSMAN_REPUTATION,
+    duties: 'Drawings, at 0.8 of your own speed.',
   },
   {
     role: 'salesman',

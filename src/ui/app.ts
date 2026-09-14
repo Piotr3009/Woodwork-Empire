@@ -62,6 +62,7 @@ import { type CatalogueTab, CATALOGUE_FIRST_TAB, catalogueTabFrom, renderCatalog
 import { renderDayEnd, renderDaySummary, renderGameOver } from './dayEnd';
 import { renderEvent, renderEventFooter } from './eventModal';
 import { type LaptopTab, laptopTabFrom, renderLaptop } from './laptop';
+import { type TeamTab, renderTeam, teamTabFrom } from './team';
 import { renderSpriteCheck } from './spriteCheck';
 import { renderWorkPlan } from './workPlan';
 import {
@@ -99,7 +100,9 @@ type ModalId =
   | 'accounting'
   | 'catalogue'
   | 'shopping'
-  | 'company';
+  | 'company'
+  /** The team, in tabs by trade (PIOTR, 13.09; CLAUDE.md T10 3.6). */
+  | 'team';
 
 interface Ui {
   screen: 'start' | 'game';
@@ -120,6 +123,7 @@ interface Ui {
   arrearsAmount: string;
   /** Which tab of the laptop is on top (CLAUDE.md T4 3.1). */
   laptopTab: LaptopTab;
+  teamTab: TeamTab;
   /** Which tab of the equipment catalogue is on top, and which family folder is open inside it
    *  (CLAUDE.md T6 3.6, T7 3.7). */
   catalogueTab: CatalogueTab;
@@ -175,6 +179,7 @@ const MODAL_TITLES: Record<ModalId, string> = {
   catalogue: 'Equipment catalogue',
   shopping: 'On order',
   company: 'Company board',
+  team: 'Team',
 };
 
 /** How much of the page each modal takes. Anything that is a list or a board fills it; a small
@@ -190,6 +195,8 @@ export const MODAL_IS_FULL: Record<ModalId, boolean> = {
   catalogue: true,
   shopping: true,
   company: true,
+  // The team is a page of the game now, not a tab of the laptop (CLAUDE.md T10 3.6).
+  team: true,
 };
 
 let ui: Ui = freshUi();
@@ -213,6 +220,7 @@ function freshUi(): Ui {
     stockSheets: '6',
     arrearsAmount: '500',
     laptopTab: 'tasks',
+    teamTab: 'workshop',
     catalogueTab: CATALOGUE_FIRST_TAB,
     catalogueFolder: null,
     ownedTab: 'all',
@@ -304,6 +312,8 @@ function modalBody(id: ModalId, current: GameState): string {
         ui.openDays,
         ui.accountingMonth,
       );
+    case 'team':
+      return renderTeam(current, ui.teamTab);
     case 'catalogue':
       return renderCatalogue(
         current,
@@ -1001,6 +1011,12 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
       break;
     }
     case 'laptopTab':
+      // The Team tab of the laptop is the Team board now: the chip opens the page rather than
+      // switching to a tab inside the laptop (PIOTR, 13.09; CLAUDE.md T10 3.6).
+      if (id === 'team') {
+        openModal('team');
+        break;
+      }
       ui.laptopTab = laptopTabFrom(id);
       ui.scrollModalTop = true;
       break;
@@ -1026,6 +1042,10 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
       dispatch({ type: 'ASSIGN_AIR', equipmentId: id, compressorId });
       return;
     }
+    case 'teamTab':
+      ui.teamTab = teamTabFrom(id);
+      ui.scrollModalTop = true;
+      break;
     case 'catalogueTab':
       ui.catalogueTab = catalogueTabFrom(id);
       // A sale meant on the second click is not meant on another tab (CLAUDE.md T8 3.5).
@@ -1312,6 +1332,11 @@ function handleRoomClick(room: RoomId): void {
 function handleSceneClick(element: DataElement): boolean {
   // In setup mode a click on the kit is a drag, not a question about the bag.
   if (ui.setup) return true;
+  // The office door of the hall: the team is behind it (CLAUDE.md T10 3.6).
+  if (element.dataset.door === 'office') {
+    openModal('team');
+    return true;
+  }
   const van = element.dataset.van;
   if (van !== undefined) {
     askUnload(van);
@@ -1367,7 +1392,7 @@ function runClick(event: MouseEvent): void {
     return;
   }
   if (state === null) return;
-  const scene = dataElement(target.closest('[data-van],[data-kit]'));
+  const scene = dataElement(target.closest('[data-van],[data-kit],[data-door]'));
   if (scene) {
     handleSceneClick(scene);
     return;

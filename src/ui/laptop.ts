@@ -6,7 +6,6 @@
 import { findJob, jobsAtGate, openTasks, staffMinutesLeft, workerById } from '../engine/index';
 import type { GameState, TaskInstance } from '../engine/index';
 import { renderDrawings } from './drawings';
-import { renderHiring } from './hiring';
 import { gateSection } from './jobCard';
 import { renderMaterials } from './materials';
 import {
@@ -19,7 +18,9 @@ import {
   taskStartAction,
 } from './modal';
 
-/** The four tabs, in the order the contract names them (docs/art/SPRITES.md 8.2). */
+/** The four tabs, in the order the contract names them (docs/art/SPRITES.md 8.2). Team is a chip
+ *  that opens the Team board, which is a page of the game now and not a tab inside the laptop
+ *  (PIOTR, 13.09; CLAUDE.md T10 3.6): the laptop never renders a body for it. */
 export type LaptopTab = 'tasks' | 'materials' | 'team' | 'drawings';
 
 const TABS: Array<[LaptopTab, string]> = [
@@ -93,10 +94,8 @@ export function renderLaptop(state: GameState, view: LaptopView): string {
   const body =
     view.tab === 'materials'
       ? renderMaterials(state, view.stockSheets)
-      : view.tab === 'team'
-        ? renderHiring(state)
-        : view.tab === 'drawings'
-          ? renderDrawings(state)
-          : tasksTab(state);
+      : view.tab === 'drawings'
+        ? renderDrawings(state)
+        : tasksTab(state);
   return tabBar('laptopTab', TABS, view.tab) + body;
 }

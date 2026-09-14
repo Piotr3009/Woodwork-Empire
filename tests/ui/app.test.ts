@@ -341,16 +341,21 @@ describe('the modals', () => {
       expect(html()).toContain(title ?? '');
       click('[data-do="closeModal"]');
     }
-    // The three modals that lost their desk item are tabs of the laptop now (T4 3.1).
+    // The modals that lost their desk item are tabs of the laptop now (T4 3.1), and the team is
+    // a page of its own off the laptop's Team chip (CLAUDE.md T10 3.6).
     click('[data-office="laptop"]');
     for (const [tab, title] of [
       ['materials', 'sheets on the rack'],
-      ['team', 'Taking somebody on'],
       ['drawings', 'Design queue'],
     ]) {
       click(`[data-do="laptopTab"][data-id="${tab}"]`);
       expect(html(), tab).toContain(title ?? '');
     }
+    click('[data-do="laptopTab"][data-id="team"]');
+    expect(html()).toContain('data-modal="team"');
+    expect(html()).toContain('Taking somebody on');
+    click('[data-do="closeModal"]');
+    click('[data-office="laptop"]');
     click('[data-do="laptopTab"][data-id="tasks"]');
     click('[data-do="closeModal"]');
   });

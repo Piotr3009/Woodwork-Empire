@@ -3,6 +3,7 @@
 
 import {
   ADMIN_COVER_RATE,
+  DRAFTSMAN_RATE,
   BAG_CHANGE_MINUTES,
   CLIENT_MEETING_MINUTES,
   MEETING_SALESMAN_REPUTATION,
@@ -81,7 +82,9 @@ const TASK_DEFINITIONS: Record<TaskKind, TaskDefinition> = {
     eligibleRoles: ['salesman'],
     autoRoles: ['salesman'],
   },
-  design: { category: 'design', eligibleRoles: [], autoRoles: [] },
+  // The draftsman takes the drawings off the owner, in laptop order, and the owner may still
+  // draw beside him (PIOTR, CLAUDE.md T10 3.6).
+  design: { category: 'design', eligibleRoles: ['draftsman'], autoRoles: ['draftsman'] },
   materialOrder: {
     category: 'admin',
     eligibleRoles: ['purchasingClerk', 'officeAdmin'],
@@ -343,7 +346,11 @@ export function createDailyTasks(state: GameState): void {
  *  "twice the minutes" means (CLAUDE.md T7 3.12). */
 export function taskWorkRate(worker: Worker, task: TaskInstance): number {
   const covering = task.kind === 'clientCall' || task.kind === 'materialOrder';
-  return worker.role === 'officeAdmin' && covering ? ADMIN_COVER_RATE : 1;
+  if (worker.role === 'officeAdmin' && covering) return ADMIN_COVER_RATE;
+  // A draftsman draws at 0.8 of the owner's own speed. The software's factor is already in the
+  // minutes of the drawing, so it is not counted again here (CLAUDE.md T10 3.6).
+  if (worker.role === 'draftsman' && task.kind === 'design') return DRAFTSMAN_RATE;
+  return 1;
 }
 
 /** Can this man take this task on today? Office roles work it off minute by minute out of their

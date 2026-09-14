@@ -43,7 +43,14 @@ export type TaskCategory = 'admin' | 'design' | 'workshop';
  *  engine number: the day ends the same way whatever it says (CLAUDE.md T4 3.6). */
 export type SummaryCadence = 'daily' | 'weekly' | 'monthly';
 
-export type WorkerRole = 'joiner' | 'helper' | 'officeAdmin' | 'purchasingClerk' | 'salesman';
+export type WorkerRole =
+  | 'joiner'
+  | 'helper'
+  | 'officeAdmin'
+  | 'purchasingClerk'
+  | 'salesman'
+  /** The one who draws, at 0.8 of the owner's own speed (PIOTR; CLAUDE.md T10 3.6). */
+  | 'draftsman';
 
 export type WorkerTier = 'poor' | 'normal' | 'super';
 

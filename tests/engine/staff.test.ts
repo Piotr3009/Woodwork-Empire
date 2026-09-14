@@ -145,12 +145,19 @@ describe('the hiring pool', () => {
     expect(new Set(names).size).toBe(names.length);
   });
 
-  it('hires office staff without any bench kit', () => {
+  it('hires office staff without any bench kit, behind the office admin', () => {
     let state = newGame();
     state.reputation = 15;
+    // Nobody in the office before the one who runs it (PIOTR, CLAUDE.md T10 3.6).
+    expect(canHire(state, 'salesman', null)).toEqual({
+      ok: false,
+      reason: 'Hire an office admin first',
+    });
+    state = hireNow(state, 'officeAdmin', null);
     state = hireNow(state, 'salesman', null);
-    expect(state.workers[0]?.role).toBe('salesman');
-    expect(state.workers[0]?.monthlyWage).toBe(2200);
+    expect(state.workers[0]?.role).toBe('officeAdmin');
+    expect(state.workers[1]?.role).toBe('salesman');
+    expect(state.workers[1]?.monthlyWage).toBe(2200);
   });
 });
 

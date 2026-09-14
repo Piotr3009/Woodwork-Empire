@@ -1646,3 +1646,12 @@ input.num {
 .duct-drop.is-flexi .duct-port {
   stroke: var(--good, #3f9d55);
 }
+
+/* The door in the office block: a control, drawn as nothing until it is hovered. */
+.door-hit {
+  fill: transparent;
+  stroke: none;
+}
+.office-door:hover .door-hit {
+  fill: rgba(255, 255, 255, 0.18);
+}
