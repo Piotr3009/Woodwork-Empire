@@ -1671,8 +1671,6 @@ input.num {
   border: 0;
   box-shadow: none;
   padding: 0;
-  transform: perspective(1400px) rotateY(-24deg);
-  transform-origin: right center;
 }
 
 .office-company-board.is-art:hover {

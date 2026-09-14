@@ -52,7 +52,7 @@ export const STATE_VERSION = 11;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
-export const APP_VERSION = 'v15';
+export const APP_VERSION = 'v16';
 
 // ---------------------------------------------------------------------------
 // 6. Time

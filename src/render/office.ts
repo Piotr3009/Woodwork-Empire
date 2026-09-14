@@ -106,11 +106,12 @@ export const OFFICE_REGIONS: OfficeRegion[] = [
   {
     id: 'company',
     name: 'Company board',
-    // Under the clock (which sits at y 88..146), so the digits stay free (PIOTR, 14.09).
-    x: 985,
-    y: 170,
-    width: 300,
-    height: 350,
+    // Flat on the rear wall between the door and the corner, under the clock (which sits at
+    // y 88..146), square like the picture (PIOTR, 14.09: not in the corner, on the wall).
+    x: 1000,
+    y: 168,
+    width: 280,
+    height: 280,
     opens: true,
   },
 ];
