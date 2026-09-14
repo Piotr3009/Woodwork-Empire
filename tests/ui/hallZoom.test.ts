@@ -6,9 +6,11 @@ import { currentState, mount, render } from '../../src/ui/app';
 import {
   HALL_ZOOM_MAX,
   HALL_ZOOM_MIN,
+  HALL_ZOOM_START,
   HALL_ZOOM_STEP,
   cameraTransform,
   hallLayerBox,
+  hallStartCamera,
 } from '../../src/render/hall';
 import { ROOM_DOOR, roomById } from '../../src/engine/constants';
 import { centreOf, tileToScreen } from '../../src/render/iso';
@@ -98,7 +100,7 @@ beforeEach(() => {
 });
 
 describe('the camera', () => {
-  it('starts at the fit, with the whole hall on the screen', () => {
+  it('comes back to the fit on the Fit button, with the whole hall on the screen', () => {
     expect(camera()).toEqual({ scale: 1, x: 0, y: 0 });
     expect(group().getAttribute('transform')).toBe(
       cameraTransform({ scale: 1, x: 0, y: 0 }),
@@ -223,8 +225,12 @@ describe('what the player clicks at a zoom', () => {
     clickAt(frontFace('office'));
     expect(app().querySelector('.hall-view')).toBeNull();
     press('[data-do="setView"][data-view="hall"]');
-    // Leaving the hall and coming back shows the whole hall again.
-    expect(camera()).toEqual({ scale: 1, x: 0, y: 0 });
+    // Leaving the hall and coming back opens it where it always opens: a fifth past the fit,
+    // with the middle of it in the middle of the frame (PIOTR; CLAUDE.md T10 3.9).
+    expect(camera().scale).toBeCloseTo(HALL_ZOOM_START, 6);
+    const opens = hallStartCamera(hallLayerBox());
+    expect(camera().x).toBeCloseTo(opens.x, 1);
+    expect(camera().y).toBeCloseTo(opens.y, 1);
   });
 });
 
@@ -312,5 +318,37 @@ describe('what the camera does not do', () => {
     expect(camera().x).toBeCloseTo(on.x + 20, 6);
     window.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
     press('[data-do="zoomFit"]');
+  });
+});
+
+describe('where the hall opens (CLAUDE.md T10 3.9)', () => {
+  it('is a fifth past the fit, in the middle of the frame, on the way in', () => {
+    // The Fit button is pressed before every test in this file, so the camera has to be sent back
+    // in the way the player sends it: out of the hall and in again.
+    press('[data-do="setView"][data-view="office"]');
+    press('[data-do="setView"][data-view="hall"]');
+    expect(camera().scale).toBeCloseTo(HALL_ZOOM_START, 6);
+    expect(HALL_ZOOM_START).toBe(1.2);
+    const frame = hallLayerBox();
+    const opens = hallStartCamera(frame);
+    expect(camera().x).toBeCloseTo(opens.x, 1);
+    expect(camera().y).toBeCloseTo(opens.y, 1);
+    // The middle of the hall is in the middle of the frame.
+    const middle = { x: frame.x + frame.width / 2, y: frame.y + frame.height / 2 };
+    const at = camera();
+    expect(at.x + at.scale * middle.x).toBeCloseTo(middle.x, 1);
+    expect(at.y + at.scale * middle.y).toBeCloseTo(middle.y, 1);
+    // And it is still inside the two ends the wheel works between.
+    expect(HALL_ZOOM_START).toBeGreaterThan(HALL_ZOOM_MIN);
+    expect(HALL_ZOOM_START).toBeLessThan(HALL_ZOOM_MAX);
+  });
+
+  it('goes back to the fit on the Fit button and stays there', () => {
+    press('[data-do="setView"][data-view="office"]');
+    press('[data-do="setView"][data-view="hall"]');
+    press('[data-do="zoomFit"]');
+    expect(camera()).toEqual({ scale: 1, x: 0, y: 0 });
+    render();
+    expect(camera()).toEqual({ scale: 1, x: 0, y: 0 });
   });
 });

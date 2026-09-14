@@ -494,8 +494,12 @@ export interface HallCamera {
   y: number;
 }
 
-/** The whole hall on the screen, which is where every visit starts. */
+/** The whole hall on the screen: what the Fit button comes back to. */
 export const HALL_CAMERA_FIT: HallCamera = { scale: 1, x: 0, y: 0 };
+/** How far in the hall opens: a fifth past the fit, so the machines read at a glance (PIOTR,
+ *  13.09; CLAUDE.md T10 3.9). The wheel still goes out to the fit and in to four times it. */
+export const HALL_ZOOM_START = 1.2;
+export const HALL_CAMERA_START: HallCamera = { scale: HALL_ZOOM_START, x: 0, y: 0 };
 export const HALL_ZOOM_MIN = 1;
 export const HALL_ZOOM_MAX = 4;
 /** One notch of the wheel [PIOTR: steps of 1.2]. */
@@ -544,6 +548,16 @@ export function zoomAt(camera: HallCamera, frame: Frame, at: Point, factor: numb
   return clampCamera(
     { scale, x: at.x - taken * (at.x - camera.x), y: at.y - taken * (at.y - camera.y) },
     frame,
+  );
+}
+
+/** Where the hall opens: a fifth past the fit, with the middle of it in the middle of the frame
+ *  (PIOTR, 13.09; CLAUDE.md T10 3.9). */
+export function hallStartCamera(frame: Frame): HallCamera {
+  return zoomTo(
+    frame,
+    { x: frame.x + frame.width / 2, y: frame.y + frame.height / 2 },
+    HALL_ZOOM_START,
   );
 }
 

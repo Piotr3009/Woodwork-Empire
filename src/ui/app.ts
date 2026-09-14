@@ -43,6 +43,8 @@ import {
   type Frame,
   type HallCamera,
   HALL_CAMERA_FIT,
+  HALL_CAMERA_START,
+  hallStartCamera,
   HALL_ZOOM_STEP,
   type Scene,
   cameraTransform,
@@ -156,6 +158,9 @@ interface Ui {
   /** Where the player has the hall pushed to and how far in. UI state, never game state: a save
    *  carries the workshop, not where somebody was looking (CLAUDE.md T6 3.3). */
   camera: HallCamera;
+  /** False until the hall has been measured once and opened at its 1.2 of the fit: the frame is
+   *  not known until the scene is on the page (CLAUDE.md T10 3.9). */
+  cameraStarted: boolean;
   /** A pan that moved is not a click on what it started on. */
   panned: boolean;
   showWhy: boolean;
@@ -237,7 +242,8 @@ function freshUi(): Ui {
     rotate: false,
     speedBeforeSetup: 0,
     drag: null,
-    camera: { ...HALL_CAMERA_FIT },
+    camera: { ...HALL_CAMERA_START },
+    cameraStarted: false,
     panned: false,
     showWhy: true,
     why: null,
@@ -823,6 +829,13 @@ function applyCamera(): void {
   const group = root.querySelector('.hall-scene');
   if (group === null) return;
   const frame = hallFrame();
+  if (frame !== null && !ui.cameraStarted) {
+    // The hall opens a fifth past the fit, in the middle of the frame. The frame is not known
+    // until the scene is on the page, so this is the first render after every way in
+    // (CLAUDE.md T10 3.9).
+    ui.camera = hallStartCamera(frame);
+    ui.cameraStarted = true;
+  }
   if (frame !== null) ui.camera = clampCamera(ui.camera, frame);
   group.setAttribute('transform', cameraTransform(ui.camera));
 }
@@ -833,12 +846,21 @@ function applyCamera(): void {
 function moveCamera(next: HallCamera): void {
   const before = Math.round(ui.camera.scale * 100);
   ui.camera = next;
+  ui.cameraStarted = true;
   applyCamera();
   if (Math.round(ui.camera.scale * 100) !== before) requestRender();
 }
 
+/** Back to where the hall opens: a fifth past the fit (CLAUDE.md T10 3.9). */
 function resetCamera(): void {
+  ui.camera = { ...HALL_CAMERA_START };
+  ui.cameraStarted = false;
+}
+
+/** The Fit button: the whole hall on the screen, and it stays there (CLAUDE.md T6 3.3). */
+function fitCamera(): void {
   ui.camera = { ...HALL_CAMERA_FIT };
+  ui.cameraStarted = true;
 }
 
 export function render(): void {
@@ -966,7 +988,7 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
       resetCamera();
       break;
     case 'zoomFit':
-      resetCamera();
+      fitCamera();
       break;
     case 'zoomIn':
     case 'zoomOut': {
@@ -975,6 +997,7 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
       const middle = { x: frame.x + frame.width / 2, y: frame.y + frame.height / 2 };
       const step = what === 'zoomIn' ? HALL_ZOOM_STEP : 1 / HALL_ZOOM_STEP;
       ui.camera = zoomAt(ui.camera, frame, middle, step);
+      ui.cameraStarted = true;
       break;
     }
     case 'showSprites':

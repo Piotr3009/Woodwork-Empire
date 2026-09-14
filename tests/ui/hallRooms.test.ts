@@ -46,11 +46,15 @@ beforeAll(() => {
   stubCtm();
 });
 
-/** Back in the hall, whatever the last test walked into. */
+/** Back in the hall, whatever the last test walked into, and at the fit. The hall opens a fifth
+ *  past the fit from Turn 10 (CLAUDE.md T10 3.9), and these tests aim at points of the scene by
+ *  hand, so they press Fit and aim at the scene as it is drawn at 1.0. */
 function startHall(): HTMLElement {
   const root = required(document.querySelector<HTMLElement>('#app'));
   const back = root.querySelector<HTMLButtonElement>('[data-do="setView"][data-view="hall"]');
   if (back !== null) back.click();
+  const fit = root.querySelector<HTMLButtonElement>('[data-do="zoomFit"]');
+  if (fit !== null) fit.click();
   return root;
 }
 
@@ -76,6 +80,14 @@ function frontFaceCentre(id: 'wc' | 'office' | 'canteen'): { x: number; y: numbe
   return tileToScreen(room.x + room.width / 2, room.y + room.depth, room.height / 2);
 }
 
+/** A point high on a room's front face, clear of the door in the middle of it. The office door is
+ *  a control of its own from Turn 10: it opens the Team board, and the block around it is still
+ *  the way into the office view (CLAUDE.md T10 3.6). */
+function frontFaceAboveTheDoor(id: 'wc' | 'office' | 'canteen'): { x: number; y: number } {
+  const room = roomById(id);
+  return tileToScreen(room.x + room.width / 2, room.y + room.depth, room.height - 0.2);
+}
+
 /** The line the hall writes under itself when the player looks into a room. The tooltips inside
  *  the scene carry the same words, so the note is read from its own element. */
 function notes(root: HTMLElement): string {
@@ -91,11 +103,20 @@ it('opens the canteen, not the office, where the canteen is painted', () => {
   expect(notes(root)).toContain(roomById('canteen').tooltip);
 });
 
-it('walks into the office where the office is painted', () => {
+it('walks into the office where the office is painted, clear of its door', () => {
   const root = startHall();
-  clickScene(root, frontFaceCentre('office'));
+  clickScene(root, frontFaceAboveTheDoor('office'));
   expect(root.querySelector('.hall-view')).toBeNull();
   expect(root.querySelector('.office-layer')).not.toBeNull();
+});
+
+it('opens the team on the office door itself, and stays in the hall', () => {
+  // The door is a control of its own: the team is behind it (PIOTR; CLAUDE.md T10 3.6).
+  const root = startHall();
+  const door = required(root.querySelector<SVGElement>('[data-door="office"]'));
+  door.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  expect(root.querySelector('.hall-view')).not.toBeNull();
+  expect(root.querySelector('[data-modal="team"]')).not.toBeNull();
 });
 
 it('leaves the floor alone', () => {
