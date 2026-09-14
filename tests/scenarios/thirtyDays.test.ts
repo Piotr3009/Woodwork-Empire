@@ -98,14 +98,15 @@ describe('30 days on Easy, working the board', () => {
     expect(state.finance.arrearsAmount).toBe(0);
   });
 
-  it('ends above the reputation it started on, and above ten now the weekends are off', () => {
+  it('ends above the reputation it started on, on four jobs out of the door', () => {
     // Turn 6 works the deadline out from the work in the job, and a one man shop that takes the
-    // next job the day the last one goes out delivers some of them late. Turn 6 to Turn 9 ended
-    // the month at a third of ten because of it. Counting the deadline in working days gives
-    // every job the weekends back, so the late deliveries of this month are fewer and shorter and
-    // the month ends at eleven (PIOTR; CLAUDE.md T10 3.5). Measured, not tuned.
-    expect(state.reputation).toBeGreaterThan(10);
-    expect(state.reputation).toBeCloseTo(11, 6);
+    // next job the day the last one goes out delivers some of them late. Counting the deadline in
+    // working days gives every job the weekends back (T10 3.5), and the board is a quarter
+    // express at 0.6 of the standard deadline (T10 3.7), which takes some of that back again.
+    // The month ends at eight on four jobs where Turn 9 ended under ten on three. Measured.
+    expect(state.reputation).toBeGreaterThan(0);
+    expect(state.reputation).toBeCloseTo(8, 6);
+    expect(state.jobs.filter((job) => job.stage === 'completed')).toHaveLength(4);
   });
 
   it('took bookcases and finished most of them', () => {
@@ -894,21 +895,21 @@ describe('a month that sells the used saw on day 5 after buying a standard one',
   });
 });
 
-describe('a month that drops a job on day 10', () => {
+describe('a month that drops a job on day 15', () => {
   // Month (n) of CLAUDE.md T9 T9-13. A careful month, and then the owner changes his mind about
   // the job on the books: the client has his deposit back, the plan is empty and the company is
   // ten points of reputation worse off (CLAUDE.md T9 3.9). It was day 8 through Turn 9; the board
   // is drawn differently in Turn 10, with the express uplift and the greyed enquiries in the same
-  // seeded stream, and the second job of this month reaches the books on day 10 instead.
+  // seeded stream, and the second job of this month is on the books on the Monday of week 3.
   const seen: GameEvent[] = [];
-  const day8 = playUntilDay(newGame({ seed: SEED, difficulty: 'veryEasy' }), 10, CAREFUL, seen);
+  const day8 = playUntilDay(newGame({ seed: SEED, difficulty: 'veryEasy' }), 15, CAREFUL, seen);
   const job = day8.jobs.find((entry) => entry.stage !== 'completed');
   const cashBefore = day8.cash;
   const reputationBefore = day8.reputation;
   const dropped = job === undefined ? day8 : act(day8, { type: 'DROP_JOB', jobId: job.id });
 
-  it('has a job on the books on day 10 with a deposit paid on it', () => {
-    expect(day8.clock.day).toBe(10);
+  it('has a job on the books on day 15 with a deposit paid on it', () => {
+    expect(day8.clock.day).toBe(15);
     expect(job).toBeDefined();
     expect(job?.depositPaid ?? 0).toBeGreaterThan(0);
   });
@@ -938,7 +939,7 @@ describe('a month that drops a job on day 10', () => {
     const logged = dropped.reputationLog[dropped.reputationLog.length - 1];
     expect(logged?.reason).toBe(`Dropped: ${job?.name}`);
     expect(logged?.points).toBe(-DROP_PROJECT_REPUTATION);
-    expect(logged?.day).toBe(10);
+    expect(logged?.day).toBe(15);
     // And the board reads it back under the week it happened in.
     const week = weeksOf(dropped)[0];
     expect(week?.entries.some((entry) => entry.reason === `Dropped: ${job?.name}`)).toBe(true);

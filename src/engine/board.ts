@@ -162,14 +162,10 @@ export interface BoardBlock {
   where: '' | 'catalogue' | 'team';
 }
 
-/** Why this template is out of the company's reach, or null while it is not. The first thing in
- *  the way, in the order the player would meet it: the standing, then the kit, then the hands. */
-export function blockFor(
-  state: GameState,
-  entry: ProductTemplate,
-  deadlineDays: number,
-  basePrice: number,
-): BoardBlock | null {
+/** What the company is short of for this template before any deadline is drawn: its standing and
+ *  its kit. Null while it has both. The first thing in the way, in the order the player would
+ *  meet it (CLAUDE.md T10 3.7). */
+export function kitBlockFor(state: GameState, entry: ProductTemplate): BoardBlock | null {
   if (state.reputation < entry.minReputation) {
     return { reason: `reputation too low (needs ${entry.minReputation})`, where: '' };
   }
@@ -184,6 +180,19 @@ export function blockFor(
     const names = missing.map((specId) => findSpec(specId)?.name ?? specId);
     return { reason: `no ${names.join(', ').toLowerCase()}`, where: 'catalogue' };
   }
+  return null;
+}
+
+/** Why this template is out of the company's reach, or null while it is not: what it is short of,
+ *  and then the hands it has against the days the client gives. */
+export function blockFor(
+  state: GameState,
+  entry: ProductTemplate,
+  deadlineDays: number,
+  basePrice: number,
+): BoardBlock | null {
+  const short = kitBlockFor(state, entry);
+  if (short !== null) return short;
   // The Turn 9 latest start arithmetic: what this workshop averages against the days the client
   // gives (CLAUDE.md T9 3.6, T10 3.7).
   const minutes = jobMinutesFor(
@@ -199,18 +208,25 @@ export function blockFor(
 
 /** One enquiry the company cannot take, or null when everything on the catalogue is within its
  *  reach. Drawn from the whole product catalogue and not from the reputation band, because being
- *  under the band is one of the reasons (CLAUDE.md T10 3.7). */
+ *  under the band is one of the reasons. The templates it is short of are picked out first, so a
+ *  workshop that is short of one thing is not asked to roll for it (CLAUDE.md T10 3.7). */
 export function generateUnreachable(state: GameState): Enquiry | null {
+  const already = new Set(
+    state.enquiries.filter((other) => other.unreachable).map((other) => other.templateId),
+  );
+  const left = PRODUCT_TEMPLATES.filter((entry) => !already.has(entry.id));
+  if (left.length === 0) return null;
+  const short = left.filter((entry) => kitBlockFor(state, entry) !== null);
+  // Where it is short of nothing, the only reason left is the hands against the deadline, and
+  // that one is not known until the enquiry is drawn.
+  const pool = short.length > 0 ? short : left;
   for (let attempt = 0; attempt < DRAW_ATTEMPTS; attempt += 1) {
-    const entry = PRODUCT_TEMPLATES[int(state, 0, PRODUCT_TEMPLATES.length - 1)];
+    const entry = pool[int(state, 0, pool.length - 1)];
     if (!entry) return null;
     const candidate = buildEnquiry(state, entry);
     if (!candidate) return null;
     const block = blockFor(state, entry, candidate.deadlineDays, candidate.basePrice);
     if (block === null) continue;
-    if (state.enquiries.some((other) => other.unreachable && other.templateId === entry.id)) {
-      continue;
-    }
     return { ...candidate, unreachable: true, blockReason: block.reason, blockWhere: block.where };
   }
   return null;
