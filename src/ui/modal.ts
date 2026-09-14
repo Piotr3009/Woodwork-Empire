@@ -46,14 +46,37 @@ const CROSS =
   '<button class="modal-close" data-do="closeModal" title="Close" aria-label="Close">' +
   '×</button>';
 
-/** The paper family: the catalogue is a kraft folder with cream paper under a bulldog clip
- *  (SPRITES.md 11, the GPT asset ui.folder.png; PIOTR, 14.09). Other modals join it in Turn 11. */
-const FOLDER_MODALS: ReadonlySet<string> = new Set(['catalogue']);
+/** Two families and nothing else (CLAUDE.md T11 1). `folder` is paper on a kraft folder
+ *  (SPRITES.md 11, the GPT asset ui.folder.png): the catalogue, the books, the team, the desk and
+ *  every event. `board` is cards on a board: the Work Plan and the shopping list on steel with
+ *  magnets, the company board on its own felt picture. */
+export type ModalSkin = 'folder' | 'board';
+
+/** Every modal id in the game with the skin it wears. One table, so a modal cannot be paper in
+ *  one place and steel in another, and a modal that is on neither family is a test failure
+ *  (CLAUDE.md T11 1, 3.5). */
+export const MODAL_SKINS: Record<string, ModalSkin> = {
+  board: 'folder',
+  laptop: 'folder',
+  accounting: 'folder',
+  catalogue: 'folder',
+  team: 'folder',
+  event: 'folder',
+  daySummary: 'folder',
+  workPlan: 'board',
+  shopping: 'board',
+  company: 'board',
+};
+
+/** The one board of the three that is a picture and not CSS: green felt in an oak frame, with the
+ *  live text over it (SPRITES.md 11; CLAUDE.md T11 3.5). */
+const FELT_MODALS: ReadonlySet<string> = new Set(['company']);
 
 function modalClass(spec: ModalSpec): string {
   const size = spec.full === true ? ' modal-full' : spec.wide === true ? ' modal-wide' : '';
-  const skin = FOLDER_MODALS.has(spec.id) ? ' modal-folder' : '';
-  return `modal${size}${skin}${spec.position ? '' : ' modal-centred'}`;
+  const skin = (MODAL_SKINS[spec.id] ?? 'folder') === 'board' ? ' modal-board' : ' modal-folder';
+  const felt = FELT_MODALS.has(spec.id) ? ' modal-felt' : '';
+  return `modal${size}${skin}${felt}${spec.position ? '' : ' modal-centred'}`;
 }
 
 /** The shell of a modal: a head, an empty body and an empty foot. Content goes in through

@@ -6,7 +6,7 @@ a pure simulation engine plus an intentionally ugly SVG prototype of the views.
 The design contract for the current stage is `CLAUDE.md`. The briefs of the finished stages are
 archived in `docs`: `docs/turn-1-brief.md`, `docs/turn-2-brief.md`, `docs/turn-3-brief.md`,
 `docs/turn-4-brief.md`, `docs/turn-5-brief.md`, `docs/turn-6-brief.md`, `docs/turn-7-brief.md`,
-`docs/turn-8-brief.md` and `docs/turn-9-brief.md`.
+`docs/turn-8-brief.md`, `docs/turn-9-brief.md` and `docs/turn-10-brief.md`.
 The build reports are `REPORT-T1.md` to `REPORT-T10.md`.
 
 The sprite contract between the art side and the game is `docs/art/SPRITES.md`.
