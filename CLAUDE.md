@@ -1,273 +1,273 @@
-# Turn 10: air and dust that have to add up, a team in tabs, and a board worth reading twice a day
+# Turn 11: a cabinet for a top bar, a day you can read, and a shop that looks like paper
 
 Woodwork Empire. Autonomous session brief for Claude Code (Opus 5, effort ultracode, cloud).
-Owner: Piotr. Programmer: Claude. Spec author: Claude (chat), 14.09.2026, from Piotr's decisions of
-13 and 14.09 (Petros: software/woodwork-empire, STAN "Tura 10" points 1 to 7, the rule entries on
-weekends, single clicks and the media tables).
+Owner: Piotr. Programmer: Claude. Spec author: Claude (chat), 15.09.2026, from Piotr's play of
+Turn 10 and the chat fixes v14 to v17 (Petros: software/woodwork-empire, STAN "Tura 11" points 1
+to 15, the rule entries on UI style, single clicks, the top bar spec).
 
-Read this whole file (first line must say "Turn 10"; if the root `CLAUDE.md` does not, stop and
-report), then `docs/art/SPRITES.md` in full, then `REPORT-T9.md`, then the archived briefs in
-`docs/`. Where files disagree, this one wins. All standing rules apply (no em or en dashes, scope
-1:1, one code path, constants never in the UI, retag `[TUNE]` to `[PIOTR]`, kill background
-processes, PR without merge, end the session, no PR watching, `npm run check` gated on its own exit
-code, every click single).
+Read this whole file (first line must say "Turn 11"; if the root `CLAUDE.md` does not, stop and
+report), then `docs/art/SPRITES.md` in full (sections 10 and 11 are the character and UI art
+contracts), then `REPORT-T10.md`, then the archived briefs in `docs/`. Where files disagree, this
+one wins. All standing rules apply (no em or en dashes, scope 1:1, one code path, constants never
+in the UI, retag `[TUNE]` to `[PIOTR]`, kill background processes, PR without merge, end the
+session, no PR watching, `npm run check` gated on its own exit code, every click single, one
+`APP_VERSION` bump).
 
-State of `main`: Turn 9 merged plus the post-merge fix of 13.09 (flat character manifests, the
-`files` option on `objectArt`, two file-independent tests). 850 tests green, `APP_VERSION` `v11`.
-Sprites on `main`: 21 machines of Turn 7, 15 extraction and air sprites (all five classes of
-extractor and compressor, both systems with duct segments, the pelletiser), the joiner's four
-sheets. Machine sprites are being repainted on templates by the art side; nothing to do about that
-in code.
+State of `main`: Turn 10 plus chat fixes v14 to v17 (board picture under the clock, book on the
+floor and on the desk, the folder skin on the catalogue, save to file and load from file, Patrick
+Hand as the title font, warnings at the foot of the catalogue, paper cards). 947 tests green,
+`APP_VERSION` `v17`. UI art on `main`: `ui.folder.png`, `officeCompanyBoard.png`,
+`catalogueFloor.png`, `public/fonts/PatrickHand-Regular.ttf`.
 
 ---
 
-## 0. What this turn is for
+## 0. What this turn is for (Piotr, 14 and 15.09)
 
-1. Piotr's tables for extraction and compressed air (13.09): every machine has a demand, every
-   extractor and compressor has a capacity, and the sums decide whether the hall runs clean. (3.1,
-   3.2, 3.3)
-2. The five classes of extractors and compressors as data, with their sprites and the ducts along
-   the walls. (3.4)
-3. "Deadlines never count weekends, that makes no sense." (3.5)
-4. "The team in big tabs by trade; the office admin is the one who must be there; the boss draws
-   until he hires a draftsman." (3.6)
-5. "More express jobs, properly profitable; the board changes twice a day; show the jobs we cannot
-   take and say why." (3.7)
-6. "Machines stand at an angle to the walls": a machine can be rotated in setup. (3.8)
-7. "The hall opens one zoom step closer." (3.9)
-8. Bug: production started on a saw that was only on order. (3.10)
-9. `APP_VERSION = 'v12'`, the single-click test on every new control. (3.11)
+1. "The top bar: bigger, in the style of the game, dark green, readable. The boss's bar should
+   show the whole day: what he did in the workshop, calls, emails, meetings, quotes, office; at
+   the end of the day a percentage summary." (3.1)
+2. "When I refresh the page my game should be there." (3.2)
+3. "A started job's bar turns all green to the deadline. It should stay the length of the work
+   and fill green as the work is done; if the work stopped it should stretch." (3.3)
+4. "With a helper, I and the joiners stop unloading, cleaning and changing bags. And I cannot see
+   him." (3.4)
+5. The paper family on the other modals, the boards in the magnet style, the company board with
+   its text. (3.5)
+6. "At the top of the catalogue, a list of what to buy on day one." (3.6)
+7. "The white squares on the laptop and the door still show." (3.7)
+8. Piotr's answers to the Turn 10 risks: air for every bench, lacquer products, free rotation of
+   light items, extraction on day 1 stays tight, Management stays empty. (3.8 to 3.10)
+9. The owner's `phone` animation; cancel for material orders. (3.11, 3.12)
 
 ---
 
 ## 1. Rules restated (short)
 
-Everything from Turns 1 to 9 and the chat fixes. Tonight in addition:
+Everything from Turns 1 to 10 and the chat fixes. Tonight in addition:
 
-- **A machine on order is a drawing on the floor, nothing more.** It does not cut, extract,
-  compress, unload or count for anything but the board's "you could take this" locks.
-- **Media are sums of what is running this minute.** Nothing is pre-booked; the check is per
-  minute, per family, one selector each for extraction and air.
+- **`APP_VERSION = 'v18'`.**
+- **Two UI families and nothing else.** Paper on a folder (`.modal-folder`, `ui.folder.png`):
+  catalogue, Team, Accounting, Drawings, every event modal. Cards on a steel magnet board
+  (`.modal-board`, CSS only, no picture): Work Plan, Orders (the shopping list), the company board
+  modal is the felt picture. A test asserts every modal id has exactly one of the two skins.
+- **The title hand** (`--font-title`, Patrick Hand) on every title: modal heads, tile and card
+  names, board titles, the top bar's cash, date and buttons. Numbers and running text stay in the
+  body font.
 
 ---
 
 ## 3. Changes to the design (the contract)
 
-### 3.1 Extraction demand and capacity `[PIOTR: bands]` `[TUNE: class figures]`
+### 3.1 The top bar: a machine cabinet `[PIOTR: the spec of 15.09]`
 
-Demand in m³/h while the machine is taken by a worker (Turn 7 stages), per class
-used / budget / standard / pro / industrial:
-- tableSaw 800 / 900 / 1,100 / 1,400 / 2,200
-- edgebander floor classes: standard 1,400 / pro 1,800 / industrial 2,400 (hand classes 0)
-- thicknesser 1,200 / 1,300 / 1,500 / 1,700 / 1,800 (one class tonight: 1,500)
-- solidWoodTools 1,100 / 1,200 / 1,300 / 1,400 / 1,500 (one class tonight: 1,300)
-- cnc standard 1,600 / pro 2,000 / industrial 2,400 (one class tonight: 1,600)
-- sprayBooth: its own extraction, not counted here.
+- Height about 70 px. Background the darkest machine green of the mockups, `#102518` to
+  `#0a1a10`, a lighter top edge, a dark bottom edge, a rivet in each corner (CSS, no picture).
+- Left: a cream **name plate** (gradient `#f3ecdc` to `#d9d1bd`, dark border, two rivet dots) with
+  the cash in the title hand, 26 px, dark green, and "−£2,699 today" under it in red.
+- Next: date and time in the title hand, 20 px, cream; under it the speed **knobs**: dark
+  rounded buttons, the active one the game's orange (`--accent`) with a soft glow; Pause, 1x, 2x,
+  4x, 10x.
+- Middle: **the boss's day meter**, a dark inset panel with a small lamp (orange while he is on
+  something, green when idle, grey when he is out or home), the text "Piotr's day · client call, 6
+  min left" and "117 / 480 min" right aligned, and under it the **segment bar**: the 480 minutes
+  (plus overtime when it runs) as coloured segments in the order they happened, one per task
+  category: workshop `#2e9e5b`, calls `#378add`, emails `#7f77dd`, meetings `#c9a227`, site
+  measure `#8e6a3a`, office (bookkeeping, ordering, design) `#e0731e`, fixing and bags `#d84a4a`,
+  break and idle unpainted. **No legend under the bar.** Hovering the bar shows a tooltip (a small
+  cream plate) with the legend and the minutes per category so far; every category the engine
+  already has (`TASK_RULES.category` and the owner's production minutes) maps onto one of these
+  seven, in one table.
+- Right: **push buttons** (cream plates with a hard shadow, title hand, 16 px): Orders with a
+  count, Board with a count, Hall or Office (whichever is not current), Menu. A button with
+  something new for the player (new enquiries since last opened, a delivery landed) is orange.
+- The version stays in the bottom right corner of the page.
+- **Day end:** the day summary (the existing modal) gets a plate at the top: "Day 1 done" and the
+  percentages per category ("Workshop 52% · Calls 8% · ..."), plus "480 of 480 min · overtime 0";
+  the company board keeps the same percentages per week (3.5).
+- Engine: the day meter needs `state.owner.dayLog`: an ordered list of `{category, minutes}`
+  segments for today (merged when consecutive), reset at day start; the percentages come from it;
+  the week's percentages are the sum of the days' logs kept in `reputationLog`'s neighbour
+  `dayLogs` (last 7 days is enough). `STATE_VERSION` bump.
+- Tests: the meter draws seven categories in the right order from a scripted day; the tooltip
+  holds the minutes; the day end plate shows percentages that sum to 100; the bar is 70 px high;
+  every button is on the single click list.
 
-Capacity in m³/h: extractor used and budget 1,000 (one bag), standard 2,000 (two bags), pro 3,600
-(four), industrial 8,000 (ten); dustSystem 12,000; flexiSystem 15,000. Several extractors add up.
+### 3.2 Browser autosave and Continue `[PIOTR]`
 
-Rule, every minute: sum of the demand of taken machines <= capacity × 0.83 `[PIOTR: 20% margin]`.
-Above it the hall is **under-extracted** for that minute: dust rises at 3× (Turn 2), the hall
-productivity factor carries minus 0.30 (through `outputBreakdown`, one path), and every job delivered
-while the minute count of under-extraction on it exceeds 10% of its production minutes loses 1
-point of rating ("dusty workshop") `[TUNE]`. The hall says "Extraction short: 2,500 of 1,660" under
-the hall and on the company board. No machine stops.
+- One save module `src/cloud/store.ts` with a `SaveStore` interface (`write(text)`, `read()`,
+  `clear()`) and one implementation tonight: the browser's local storage under one key
+  (`woodwork-empire.save`). The file save of v15 and the cloud save of Turn 2 use the same
+  encoder (`encodeSaveFile`) so every store holds the same bytes.
+- Autosave: at every day start (after the morning settle), after every purchase, hire, accepted
+  enquiry, completed move, and on every modal close. Never more than once a second (coalesced).
+- Start screen: **Continue** (the saved company name and day on it) when a save exists and its
+  version matches; **New game** asks "Start over? The saved game will be lost" once (a second
+  button, not a double click) and clears the store. A save from another build is shown as "A
+  saved game from an older build was found; it cannot be continued" and offered to be cleared.
+- Menu: "Save to file" and "Load from file" stay; "Load from file" also writes the store.
+- The Turn 1 rule against local storage is withdrawn by the owner (14.09) for exactly this module;
+  nothing else in the code touches storage.
+- Tests (jsdom): a purchase writes the store; reload with a store shows Continue and restores the
+  clock; a mismatched version shows the notice and Continue is absent; New game clears it.
 
-### 3.2 Compressed air demand and capacity `[PIOTR: bands from the trade]` `[TUNE]`
+### 3.3 The Work Plan bar that fills `[PIOTR]`
 
-Demand (bar needed / l per minute while running): bench work per joiner (nailer, driver) 6 / 30;
-pneumatic sanding at Finishing per joiner 6 / 200; edgebander floor classes standard 7 / 250, pro
-7 / 350, industrial 10 / 500 `[PIOTR: 10 bar for the big one]`; cnc 6.5 / 650; sprayBooth 7 / 350
-(the gun itself at 4 bar); solid wood press later.
+- A job's bar is the length of its work at the rate it will get (the "at workshop average" or
+  "for Tom" arithmetic of Turn 9) from its start day; before the start it is a dashed outline
+  (as today); after the start the **outline stays** and the done minutes **fill it green from the
+  left**. The outline's right edge is the projected end, never the deadline.
+- When the job's clock does not move (waiting for a machine, the owner's day at home, the break,
+  overtime debt, under extraction) the outline **stretches** by the lost time, so the projected
+  end walks towards DL. Past DL the outline turns red and the label says "late by N days".
+- DL stays its own red tick; "Latest start" stays for jobs not started.
+- Tests: a started job's bar length equals its work minutes at its rate; 60 minutes of waiting
+  stretch it by 60; a job past DL has a red outline.
 
-Compressors, class used / budget / standard / pro / industrial: bar 8 / 8 / 10 / 10 / 13; l per
-minute 150 / 250 / 450 / 1,100 / 2,300; endurance in running minutes 60,000 / 120,000 / 200,000 /
-400,000 / 800,000; prices from the Turn 8 table `[TUNE]`. Every compressor is **assigned** to
-machines (default: all; the machine modal and the Owned tab show "Air: compressor 2"); a machine
-draws from its compressor only.
+### 3.4 The helper's chores, and the helper you can see `[PIOTR]`
 
-Rules, every minute:
-1. **Bar:** a machine whose bar exceeds its compressor's cannot run: status "needs 10 bar, compressor
-   gives 8". The catalogue says it on the tile before the purchase.
-2. **Litres:** for each compressor, sum of the l/min of its running consumers × 0.6 `[PIOTR: the
-   trade's diversity factor 0.5 to 0.6]` <= its l/min × 0.85. Above it, every pneumatic consumer on
-   that compressor runs at 0.7 for the minute ("low air"), shown as a lamp on the compressor sprite
-   and a line under the hall.
-3. A compressor's hours run only while a consumer draws from it.
+- When a helper is employed and present, **unloading, bag changes and cleaning are his and only
+  his**: the owner's "never idle" queue skips them, joiners are never assigned them, the van and
+  the bags wait for him (the status says "waiting for the helper"). The player can still send the
+  owner with the explicit "Work here" / "Unload it yourself" buttons; that is an override for that
+  one task.
+- Without a helper everything stays as today.
+- The helper's figure: fix whatever hides him (reproduce with a hired helper on day 2: his anchor,
+  his station cell, the depth sort against the office block). His home station is the extractor
+  when there is one, else the gate lane cell (2, 8); he is always inside the painted floor.
+  Capsule until his sheet lands (`character.helper.*`).
+- Tests: with a helper present the owner's next-task choice skips an unload; a joiner never gets a
+  bag change; the helper's figure renders inside the floor polygon on day 2.
 
-### 3.3 The air dryer `[PIOTR]`
+### 3.5 The two UI families, the boards, the company board text
 
-- New item `airDryer`, Extraction tab (renamed "Extraction and air"), 1 × 1 × 1.5 m, 1,500 `[TUNE]`,
-  assigned to one compressor. The industrial compressor has one built in.
-- CNC needs dry air: without a dryer on its compressor it does not run ("needs dry air"). The spray
-  booth without dry air still runs, but Finishing takes 1.5× the minutes and the job loses 1 point
-  of rating ("finish defects") `[TUNE]`.
+- **Folder skin** (`.modal-folder`, already on the catalogue): Team, Accounting, Drawings, the
+  hiring modal, and every event modal (the folder scaled down, as in the mockup). Tabs, cards,
+  buttons and locked buttons per the v17 CSS; the day end summary too.
+- **Board skin** (`.modal-board`, new, CSS only): dark steel (`#4a4f54` to `#3a3f44`, inner frame
+  `#24282c`), a red magnet in the head, tabs as magnet strips, content as **cream cards held by a
+  blue magnet at the top, tilted −1 to 1.5 degrees, with a shadow**; primary button light yellow
+  `#f5e27a`, secondary cream, danger salmon `#ff8a80`, locked grey. Applied to Work Plan and the
+  shopping list. Hover orange everywhere.
+- **Company board:** the felt picture gets live text: on the felt above the sheet the company
+  name and "Week 2 · +3" in the title hand (cream); on the pinned sheet the company output and
+  its two column breakdown; **under both, in larger letters: "Reputation 5" and "Output 0.72"**
+  (the totals, `[PIOTR]`). The wall board in the office shows the two totals only. The modal opens
+  on the same picture full page.
+- The office **hover rectangles** (laptop, door, boards, binder, catalogue): no fill at all, no
+  border at rest; on hover a 2 px orange outline with 4 px radius, nothing else. The white boxes
+  of today are gone `[PIOTR]`.
+- Tests: the skin test of section 1; a hovered region has no fill in its computed style; the
+  company board modal contains both totals.
 
-### 3.4 Extractor and compressor classes, ducts
+### 3.6 The day one checklist `[PIOTR]`
 
-- Extractor family: five classes used / budget / standard / pro / industrial with the Turn 8 prices
-  where set, else `[TUNE]` 400 / 600 / 1,400 / 3,200 / 7,500; footprints 1 × 1 × 2, 1 × 1 × 2,
-  2 × 1 × 2, 3 × 1 × 2.5, 5 × 1 × 2.5; zones = footprint; bag intervals per class factor as the saw's.
-- Compressor family: five classes, footprints 1 × 1 × 1, 1 × 1 × 1, 2 × 1 × 1.5, 2 × 1 × 1.5,
-  2 × 2 × 2.5; prices `[TUNE]` 300 / 1,200 / 3,500 / 9,000 / 22,000.
-- The dust system and the flexi system stand **outside** on the apron by the shutter (like the van)
-  and draw **ducts** along the rear wall with the `dustSystem.ducts` / `flexiSystem.ducts` sprites
-  repeated every 4 m at 3 m height, with a drop to each ducted machine (a thin line). Decoration
-  and status: a machine on ducting shows a small ring at its port; with the flexi system the ring is
-  green (reconnection free, Turn 4).
-- The Sprite check page lists every class.
-- Tests: demand and capacity sums for a two-man shop with a saw and a floor edgebander on a standard
-  extractor are short and on a pro extractor are fine; a bar shortfall stops the edgebander; a litre
-  shortfall slows to 0.7; the dryer gates the CNC; the ducts render with the system.
+- At the top of the catalogue (Office tab and every tab, until done): "Day one" card with the
+  items a workshop needs first: desk, chair, laptop, software licence, table saw, cordless drill,
+  hand edgebander, compressor, extractor, workbench, tool cabinet, sheet rack; each with a tick
+  once bought or on order; clicking an item opens its folder. When every item is ticked the card
+  collapses to one line "Day one kit complete" and stays collapsed. One constant lists the items.
+- Test: the card lists twelve items, ticks a bought one, opens a folder on click, collapses when
+  all are owned.
 
-### 3.5 Working-day deadlines `[PIOTR: never count weekends]`
+### 3.7 Lacquered products `[PIOTR: air rules that are alive]`
 
-- Deadlines, slack, "Latest start", late penalties (5% and 30% per day) and delivery days count
-  **working days only**. A job accepted on Friday with a 3 day deadline is due Wednesday. The Work
-  Plan's time axis shows working days only (Monday after Friday, no gap).
-- One helper `addWorkingDays` / `workingDaysBetween` used by all of them; the Turn 8 delivery code
-  already has one, so it is the one.
-- Tests: Friday plus 3 is Wednesday; a job late over a weekend is one day late, not three; the Work
-  Plan axis skips Saturday and Sunday.
+- Two templates with `finish: 'lacquer'`: "Lacquered kitchen" (sheet, 12,000 to 20,000) and
+  "Lacquered wardrobe" (sheet, 3,500 to 6,000); they need the spray booth (else the board shows
+  the reason "needs a spray booth"); Finishing runs at the booth; the Turn 10 dry air rule
+  applies.
+- Test: a lacquered job without a booth is greyed on the board; with a booth and no dryer the
+  Finishing is 1.5× and the rating loses 1.
 
-### 3.6 The team in tabs, the admin, the draftsman `[PIOTR]`
+### 3.8 Air for every bench `[PIOTR]`
 
-- The Team tab of the laptop becomes a **full page Team modal** (reachable from the laptop tab and
-  from the office door of the hall) with tabs by trade: **Workshop** (joiners poor / normal / super,
-  helper), **Office** (office admin, purchasing clerk, salesman, draftsman), **Management** (empty:
-  "Nothing here yet", the CEO is parked). Candidates as tiles like the shop: role, class, rate,
-  weekly or monthly wage, "available from reputation N", Hire (single click, the interview as in
-  Turn 7). Owned frame on the roles the company has, with count.
-- **Office admin** is the base office person: at least one before any other office role can be
-  hired ("Hire an office admin first"). She does everything office: emails, bookkeeping, daily
-  ordering, calls at 30 minutes and per-job orders at double time when no specialist exists (Turn
-  7 3.4). Never design.
-- **Draftsman**: new role, Office tab, monthly wage 2,400 `[TUNE]`, available from reputation 15
-  `[TUNE]`, rate 0.8 of the owner's design speed × the software factor `[TUNE]`. He takes Design
-  tasks off the owner in laptop order; the owner may still draw beside him (assign in the Drawings
-  tab). Until he is hired, design is the owner's, as today.
-- Tests: the Team modal has three tabs; the clerk cannot be hired before an admin; the draftsman
-  takes a design task at 0.8 and the owner's queue shrinks.
+- Bench work (Assembly) uses the joiner's nailer and driver: 6 bar, 30 l/min per man while
+  assembling (already in the Turn 10 demand table). With **no compressor** in the hall, or the
+  bench's compressor short of litres, Assembly runs at 0.67 (`[TUNE]`, "no air: screws by hand")
+  and the status says so; the catalogue says on the compressor tiles "benches and edgebanders
+  need air".
+- Test: two joiners assembling with no compressor run at 0.67; with a budget compressor at 1.0.
 
-### 3.7 The board, livelier `[PIOTR]`
+### 3.9 Free rotation of light items `[PIOTR]`
 
-- Express: price +30% to +50% `[PIOTR]` (draw uniformly), penalty 30% per working day late, deadline
-  0.6× standard (minimum 3 working days), drawn with probability 0.25 `[TUNE]` at every refresh.
-- The board **refreshes twice a day**, at 08:00 and 13:00: expired enquiries go, new ones come, up
-  to the band size (Turn 3), independent of whether something was taken.
-- **Unreachable enquiries are on the board** (2 to 3 of them at a time `[TUNE]`), greyed, with the
-  reason in plain words: "no timber machines", "needs a spray booth", "too few people for the
-  deadline" (the workshop's average rate against the deadline, the "Latest start" arithmetic of
-  Turn 9), "reputation too low (needs 20)". Accepting is disabled; the tile's reason links to the
-  catalogue or the Team modal where it applies.
-- Tests: two refreshes a day; express within the band and with the short deadline; an unreachable
-  tile carries its reason and no Accept.
+- In setup, R on a light item (bench, rack, cabinet, locker, seat, small compressors) turns it in
+  place with no minutes and no ducting; on a heavy machine it is a move as today (the Turn 10
+  behaviour). Test: rotating a bench costs nothing; rotating a saw books a move.
 
-### 3.8 Rotating machines in setup `[PIOTR]`
+### 3.10 What stays as is `[PIOTR]`
 
-- In setup mode, R (and a "Rotate" button on the ghost) turns the dragged item by 90 degrees:
-  footprint and zone swap width and depth, the sprite is drawn mirrored horizontally (a
-  `transform="scale(-1, 1)"` around the anchor) when no `family.class.r.png` exists in the manifest;
-  when it does, that file is used unmirrored. `canPlace` checks the rotated zone. A rotated item
-  keeps `rotated: true` in the state.
-- Tests: rotating a 3 × 1 saw needs a free 1 × 3; the sprite is mirrored without an `.r` file and
-  not with one.
+Extraction on day 1 stays tight (used saw 800 against 830); the Management tab stays empty with
+"Nothing here yet". No change, noted so nobody "fixes" them.
 
-### 3.9 Default zoom `[PIOTR]`
+### 3.11 The owner on the phone
 
-The hall opens at 1.2× fit; the wheel zooms out to fit and in to 4× fit as before; Fit returns to fit.
-Test: the initial camera scale is 1.2 × fit.
+The `phone` animation from `character.owner.phone` plays while the owner's current task is a
+client call; `idle` otherwise. Test: on a call the owner's image points at the phone sheet.
 
-### 3.10 On-order kit does not work `[PIOTR: bug]`
+### 3.12 Cancel for material and for orders in transit
 
-- `hasMachine`, stage stations, extraction and air sums, unloading with the forklift and every
-  other "is it in the hall" question ignore on-order items. Only the board's locks ("you could take
-  this") may count them. Cutting on a job whose only saw is on order shows "waiting for table saw
-  (on order, due day 2)".
-- If a chat fix of 13/14.09 already did this on `main`, keep it and only add the test.
-- Test: with a saw on order and none in the hall, a sheet job's Cutting stage waits with that text.
-
-### 3.12 The sprite anchor of asymmetric footprints (bug, found 14.09)
-
-`spriteBox` in `render/sprites.ts` centres the image on the footprint's bottom corner. The corner of a
-`w × d` diamond is not at the image's centre unless `w = d`: it is `w × 48` (at 2x) from the left
-edge of the diamond, `d × 48` from the right. So every 2 × 1 and 3 × 1 machine stands 12 to 24 px
-(at 1x) off its tile, part of what Piotr saw as machines "sinking into the floor". Fix:
-`x = anchor.x - (SPRITE_PADDING + w × TILE_WIDTH) / SPRITE_SCALE` at 1x, one line, plus the same
-rule in the Sprite check page's anchor mark. `docs/art/SPRITES.md` section 2 already states the
-corrected rule. Test: a 3 × 1 sprite's image left edge sits `d × 24` left of the corner at 1x, and a
-1 × 1 sprite is unchanged.
-
-### 3.11 Version and the single-click test
-
-`APP_VERSION = 'v12'`. Every new control of this turn (Rotate, Hire tiles, the reason links, the
-compressor assignment) is covered by the 200-clicks-in-200-ticks test of Turn 9 (extend its list of
-selectors).
+- The shopping list's Cancel works for material orders until the morning they land (full refund)
+  and for equipment orders in transit (Turn 8 already; the "in transit" gap from REPORT-T8 closes).
+- Test: cancelling a material order on the evening before delivery refunds it.
 
 ---
 
 ## 4. Task queue, in order
 
-Branch `turn-10-air-and-dust` from `main`. One commit per task, `npm run check` green on its own
-exit code before each, two report lines per task.
+Branch `turn-11-cabinet-and-paper` from `main`. One commit per task, `npm run check` green on its
+own exit code before each, two report lines per task.
 
-**T10-01 Housekeeping and v12.** `docs/turn-9-brief.md` from git history; `APP_VERSION = 'v12'`.
-Done.
+**T11-01 Housekeeping and v18.** `docs/turn-10-brief.md` from git history; `APP_VERSION = 'v18'`;
+the skin table of section 1 with its test (skins may be assigned as tasks land). Done.
 
-**T10-02 On-order kit does not work, and the sprite anchor.** 3.10 and 3.12. Early, because 3.1
-and 3.2 depend on "in the hall" and every sprite depends on the anchor. Done: the tests.
+**T11-02 Day log and categories.** 3.1 engine side: `dayLog`, the seven categories, day end
+percentages, `STATE_VERSION`. Done: the engine tests.
 
-**T10-03 Working-day deadlines.** 3.5. Done: the tests.
+**T11-03 The top bar.** 3.1 UI side. Done: the tests.
 
-**T10-04 Extractor and compressor classes.** 3.4 data, sprites, the dryer item. Done: the class
-tests, Sprite check.
+**T11-04 Autosave and Continue.** 3.2. Done: the tests.
 
-**T10-05 Extraction sums.** 3.1. Done: the tests.
+**T11-05 The helper's chores and his figure.** 3.4. Done: the tests.
 
-**T10-06 Air sums, bar, litres, assignment, the dryer gates.** 3.2 and 3.3. Done: the tests.
+**T11-06 The Work Plan bar that fills.** 3.3. Done: the tests.
 
-**T10-07 Ducts.** 3.4 render side. Done: the render test.
+**T11-07 Folder skin on the rest, board skin, hover outlines.** 3.5 except the company board
+text. Done: the skin test, the hover test.
 
-**T10-08 The Team modal, the admin rule, the draftsman.** 3.6. Done: the tests.
+**T11-08 Company board text and totals.** 3.5 company board. Done: the test.
 
-**T10-09 The board, livelier.** 3.7. Done: the tests.
+**T11-09 Day one checklist.** 3.6. Done: the test.
 
-**T10-10 Rotating machines.** 3.8. Done: the tests.
+**T11-10 Lacquer, air for benches, free rotation.** 3.7, 3.8, 3.9. Done: the tests.
 
-**T10-11 Default zoom.** 3.9. Done: the test.
+**T11-11 Phone and cancel.** 3.11, 3.12. Done: the tests.
 
-**T10-12 Single-click coverage.** 3.11. Done: the extended test passes.
+**T11-12 Scenarios.** Update the sixteen months for the day log and the bench air rule; add (q) a
+month with a helper that asserts the owner never unloads and (r) a lacquered wardrobe with a booth
+and no dryer.
 
-**T10-13 Scenarios.** Update the fourteen months for working-day deadlines, the media sums and the
-board refresh; add (o) a month with two joiners, a saw and a floor edgebander on a standard
-extractor that asserts under-extraction minutes and the rating hit, and (p) the same on a pro
-extractor with none.
-
-**T10-14 Report and PR.** `REPORT-T10.md` in the usual structure plus "Media numbers chosen" (every
-`[TUNE]` of 3.1 to 3.4 with its value). Kill background processes, push, PR titled `Turn 10: air and
-dust that have to add up, a team in tabs, and a board worth reading twice a day`, do not merge, end
-the session.
+**T11-13 Report and PR.** `REPORT-T11.md` in the usual structure plus "Numbers chosen" (every
+`[TUNE]`) and "Skins" (every modal id with its skin). Kill background processes, push, PR titled
+`Turn 11: a cabinet for a top bar, a day you can read, and a shop that looks like paper`, do not
+merge, end the session.
 
 ---
 
 ## 5. Do not (tonight)
 
-1. No touching `docs/art/SPRITES.md`, `CLAUDE.md`, the archived briefs, or the sprite files.
-2. No new templates (the house and the villa stay parked), no sanding machines, no CEO.
-3. No sprites drawn in code.
+1. No touching `docs/art/SPRITES.md`, `CLAUDE.md`, the archived briefs, the sprite files or the
+   font file.
+2. No new machine families, no sanding, no CEO, no Steam or Electron work.
+3. No storage access outside `src/cloud/store.ts`.
 4. No PixiJS, sound, mobile.
-5. No persistence changes other than `STATE_VERSION`.
-6. No watch loops, nothing left running.
+5. No watch loops, nothing left running.
 
 ---
 
 ## 6. Parked
 
-1. Sanding machines and the Finishing stage on them; the solid wood press.
-2. Second orientation sprites (`.r`) from the art side; machine sprites repainted on templates.
-3. Owner, helper and office staff character sheets; the floor catalogue picture; the company board
-   picture.
-4. House 100 k and villa 500 k, 180 degree view, movable rooms, rates and power for 200 m², morale.
+1. Turn 12: the machine sprites repainted on templates (art), the helper and office staff sheets,
+   sound, the "two turns of fixes and balance" before the Kickstarter demo, the Supabase cloud save
+   switched on (SQL and keys), the Electron shell.
+2. House 100 k and villa 500 k, 180 degree view, movable rooms, rates and power for 200 m².
 
 End of brief.
