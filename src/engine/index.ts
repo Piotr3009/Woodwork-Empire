@@ -175,6 +175,18 @@ export {
   stageSpeed,
 } from './stages';
 export type { StageOptions, StagePlan, StagedJob } from './stages';
+// Air and dust that have to add up (CLAUDE.md T10 3.1, 3.2, 3.3)
+export {
+  extractingMachines,
+  extractionCapacityOf,
+  extractionCheck,
+  extractionDemandOf,
+  extractionKit,
+  mediaFigure,
+  underExtracted,
+} from './media';
+export type { ExtractionCheck } from './media';
+
 export {
   BOARD_DAYS_PAST_DUE,
   dayOfPoint,
@@ -376,6 +388,7 @@ export {
   clampReputation,
   emailRatingFactor,
   formatReputation,
+  madeInADustyWorkshop,
   ratingFor,
   reputationTier,
 } from './reputation';

@@ -60,6 +60,7 @@ import {
   tileToScreen,
 } from './iso';
 import { formatTime } from '../engine/clock';
+import { extractionCheck } from '../engine/media';
 import {
   type CharacterOptions,
   type Facing,
@@ -1097,6 +1098,13 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
       ? '<p class="view-note warn">No extraction in the hall, so no machine will run. ' +
         'Buy an extractor.</p>'
       : '';
+  // The fans are too small for what is running this minute: nothing stops, the hall just turns
+  // out less and fills with dust (PIOTR, CLAUDE.md T10 3.1).
+  const extraction = extractionCheck(state);
+  const shortLine = extraction.short
+    ? `<p class="view-note warn">${escapeText(extraction.line)} m3/h. Everything in the hall is ` +
+      '30% slower and the dust rises three times as fast. Nothing stops.</p>'
+    : '';
   const brokenLine =
     brokenMachines(state).length > 0
       ? '<p class="view-note warn">Broken: ' +
@@ -1150,7 +1158,7 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
     live: live.join(''),
     notes:
       `<p class="view-note">${escapeText(stateLine)}</p>` +
-      `${extractionLine}${brokenLine}${serviceLine}${gateLine}${lowStock}`,
+      `${extractionLine}${shortLine}${brokenLine}${serviceLine}${gateLine}${lowStock}`,
   };
 }
 

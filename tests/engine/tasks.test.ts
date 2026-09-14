@@ -149,6 +149,8 @@ describe('the daily list', () => {
       balancePaid: 0,
       penalty: 0,
       emailsUnanswered: 0,
+      productionMinutes: 0,
+      dustyMinutes: 0,
       rating: null,
       overdueWarned: false,
     });

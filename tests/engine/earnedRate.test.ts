@@ -8,6 +8,7 @@ import type { GameState } from '../../src/engine/index';
 import {
   act,
   buyStartingKit,
+  withExtraction,
   fillRack,
   firstJob,
   newGame,
@@ -17,8 +18,11 @@ import {
 
 /** A hall with the day 1 kit and one job of work on the bench. */
 function atTheBench(sawVariant: string): GameState {
-  const state = fillRack(
-    buyStartingKit(newGame({ difficulty: 'veryEasy' }), { sawVariant }),
+  // A fan big enough for the saw: this file is about what an hour earns, not about the extraction
+  // sums, and a budget or standard saw on the cheapest extractor is short of air
+  // (CLAUDE.md T10 3.1).
+  const state = withExtraction(
+    fillRack(buyStartingKit(newGame({ difficulty: 'veryEasy' }), { sawVariant })),
   );
   state.enquiries = [];
   const enquiry = placeEnquiry(state, { price: 40000, deadlineDays: 90 });

@@ -4,6 +4,8 @@
 import {
   CALL_RATING_PENALTY,
   CALL_SATISFACTION_PENALTY,
+  DUSTY_JOB_RATING,
+  DUSTY_JOB_SHARE,
   EMAIL_RATING_PENALTY,
   RATING_BY_HAND,
   RATING_EXPRESS_ON_TIME,
@@ -51,6 +53,14 @@ export function changeReputation(state: GameState, points: number, reason: strin
   return moved;
 }
 
+/** True when this piece was made in a hall whose fans were too small for what was running, for
+ *  more than a tenth of the minutes that went into it. The client can see it on the finish
+ *  [TUNE] (PIOTR, CLAUDE.md T10 3.1). */
+export function madeInADustyWorkshop(job: Job): boolean {
+  if (job.productionMinutes <= 0) return false;
+  return job.dustyMinutes > job.productionMinutes * DUSTY_JOB_SHARE;
+}
+
 /** What the client thinks of the job that just landed (CLAUDE.md 8.11). */
 export function ratingFor(job: Job): number {
   let rating = job.daysLate > 0 ? 0 : job.express ? RATING_EXPRESS_ON_TIME : RATING_ON_TIME;
@@ -88,9 +98,13 @@ export function applyRating(state: GameState, job: Job): number {
   const scaled = Math.round((raw > 0 ? raw * share : raw) * 100) / 100;
   // And every one of those missed calls is a point off in its own right [TUNE].
   const missed = Math.round(penalisedMisses(job.callsMissed) * CALL_RATING_PENALTY * 100) / 100;
-  const rating = Math.round((scaled - missed) * 100) / 100;
+  // A piece made in a dusty workshop costs a point of its own, and says so on the board
+  // (PIOTR, CLAUDE.md T10 3.1).
+  const dusty = madeInADustyWorkshop(job) ? DUSTY_JOB_RATING : 0;
+  const rating = Math.round((scaled - missed - dusty) * 100) / 100;
   job.rating = rating;
   changeReputation(state, scaled, ratingReason(job));
   if (missed > 0) changeReputation(state, -missed, `${job.name}: calls not answered`);
+  if (dusty > 0) changeReputation(state, -dusty, `${job.name}: dusty workshop`);
   return rating;
 }

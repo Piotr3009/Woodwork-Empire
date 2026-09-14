@@ -18,7 +18,15 @@ import {
 import type { StagedJob } from '../../src/engine/stages';
 import { tick } from '../../src/engine/index';
 import type { GameState } from '../../src/engine/index';
-import { act, buyStartingKit, firstJob, fillRack, newGame, placeEnquiry } from '../helpers';
+import {
+  act,
+  buyStartingKit,
+  firstJob,
+  fillRack,
+  newGame,
+  placeEnquiry,
+  withExtraction,
+} from '../helpers';
 
 /** A job whose whole labour is this many minutes of the owner's own time, so the arithmetic of
  *  CLAUDE.md T7 3.1 can be read straight off the assertions. */
@@ -34,7 +42,11 @@ function jobOfMinutes(minutes: number, options: Partial<StagedJob> = {}): Staged
 
 /** A very easy game with the day 1 kit and the named class of saw standing in the hall. */
 function hallWithSaw(variantId: string): GameState {
-  const state = buyStartingKit(newGame({ difficulty: 'veryEasy' }), { sawVariant: variantId });
+  // With a fan big enough for whatever class of saw the test asks for: this file is about the
+  // stages and not about the extraction sums (CLAUDE.md T10 3.1).
+  const state = withExtraction(
+    buyStartingKit(newGame({ difficulty: 'veryEasy' }), { sawVariant: variantId }),
+  );
   state.enquiries = [];
   return fillRack(state);
 }

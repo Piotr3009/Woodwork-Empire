@@ -32,6 +32,7 @@ import {
   act,
   buyNow,
   buyStartingKit,
+  withExtraction,
   clearEvents,
   doAllEmails,
   doTask,
@@ -51,7 +52,9 @@ import {
  *  one, whose factors are all 1.0: these are the labour figures of CLAUDE.md 8.5, not a test of
  *  what a class of machine does to them (CLAUDE.md T3 3.5). */
 function ready(): GameState {
-  const state = buyStartingKit(newGame(), { sawVariant: 'budget' });
+  // A fan big enough for the budget saw: these tests are about the life of a job and not about
+  // the extraction sums, which have their own file (CLAUDE.md T10 3.1).
+  const state = withExtraction(buyStartingKit(newGame(), { sawVariant: 'budget' }));
   state.enquiries = [];
   return fillRack(state);
 }

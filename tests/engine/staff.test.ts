@@ -31,6 +31,7 @@ import {
   act,
   buyNow,
   buyStartingKit,
+  withExtraction,
   clearEvents,
   fillRack,
   firstJob,
@@ -154,8 +155,12 @@ describe('the hiring pool', () => {
 });
 
 function jobReadyWith(price: number, tier: Worker['tier']): GameState {
-  // The budget saw, whose factors are 1.0: these are the worker rates of CLAUDE.md 8.5.
-  let state = buyStartingKit(newGame({ difficulty: 'veryEasy' }), { sawVariant: 'budget' });
+  // The budget saw, whose factors are 1.0: these are the worker rates of CLAUDE.md 8.5. And a
+  // fan big enough for it, so the rates are the rates and not the under extraction penalty
+  // (CLAUDE.md T10 3.1).
+  let state = withExtraction(
+    buyStartingKit(newGame({ difficulty: 'veryEasy' }), { sawVariant: 'budget' }),
+  );
   state.reputation = 40;
   state = withCrew(state, 1, tier);
   const enquiry = placeEnquiry(state, {
@@ -218,7 +223,9 @@ describe('joiners at the bench', () => {
 describe('the queue at the saw', () => {
   /** Four joiners, each on a wardrobe of his own, every one of them at the cutting. */
   function fourAtTheCutting(): GameState {
-    let state = buyStartingKit(newGame({ difficulty: 'veryEasy' }), { sawVariant: 'budget' });
+    let state = withExtraction(
+      buyStartingKit(newGame({ difficulty: 'veryEasy' }), { sawVariant: 'budget' }),
+    );
     state.reputation = 10;
     state = withCrew(state, 4, 'normal');
     for (let index = 0; index < 4; index += 1) {

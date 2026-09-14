@@ -28,9 +28,12 @@ import {
   NO_HELPER_DUST_MULTIPLIER,
   NO_HELPER_PRODUCTIVITY_FACTOR,
   SALE_FRACTION,
+  UNDER_EXTRACTION_DUST_MULTIPLIER,
+  UNDER_EXTRACTION_OUTPUT_PENALTY,
   SALE_FRACTION_USED,
   USED_VARIANT,
 } from './constants';
+import { extractionCheck, underExtracted } from './media';
 import type {
   Equipment,
   EquipmentSpec,
@@ -414,6 +417,12 @@ export function outputBreakdown(state: GameState): OutputBreakdown {
   } else {
     hallLine('Extraction working', 1);
   }
+  // The fans are there and they are too small for what is running: nothing stops, the hall just
+  // turns out less of everything and fills with dust (PIOTR, CLAUDE.md T10 3.1).
+  const extraction = extractionCheck(state);
+  if (extraction.short) {
+    hallLine(extraction.line, 1 - UNDER_EXTRACTION_OUTPUT_PENALTY);
+  }
   const total = running;
   let plus = 0;
   let minus = 0;
@@ -687,11 +696,13 @@ export function emptyBag(state: GameState, equipmentId: string): void {
   item.minutesUsed = 0;
 }
 
-/** Dust gained per minute of production, tripled by a broken extractor and doubled when the crew
- *  is too big for no helper (CLAUDE.md 9.6, 9.7). */
+/** Dust gained per minute of production, tripled by a broken extractor or by a hall whose
+ *  machines are asking for more air than its fans will move, and doubled when the crew is too big
+ *  for no helper (CLAUDE.md 9.6, 9.7, T10 3.1). */
 export function dustGainPerMinute(state: GameState): number {
   let gain = DUST_PER_PRODUCTION_MINUTE;
   if (extractorBroken(state)) gain *= EXTRACTOR_BROKEN_DUST_MULTIPLIER;
+  if (underExtracted(state)) gain *= UNDER_EXTRACTION_DUST_MULTIPLIER;
   if (helperMissing(state)) gain *= NO_HELPER_DUST_MULTIPLIER;
   return gain;
 }

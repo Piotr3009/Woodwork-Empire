@@ -1301,6 +1301,33 @@ export const EXTRACTION_CAPACITY: Record<string, Record<string, number>> = {
   flexiSystem: { standard: 15000 },
 };
 
+/** What each class of machine pulls out of the air while a worker is standing at it, in cubic
+ *  metres an hour (PIOTR's bands, CLAUDE.md T10 3.1). The ladders are written out in full even
+ *  where the family has one class tonight, so the figures are here the day the classes land. The
+ *  two hand classes of the edgebander want none: they are used at a bench. The spray booth has
+ *  extraction of its own and is not on this table at all. */
+export const EXTRACTION_DEMAND: Record<string, Record<string, number>> = {
+  tableSaw: { used: 800, budget: 900, standard: 1100, pro: 1400, industrial: 2200 },
+  edgebander: { used: 0, budget: 0, standard: 1400, pro: 1800, industrial: 2400 },
+  thicknesser: { used: 1200, budget: 1300, standard: 1500, pro: 1700, industrial: 1800 },
+  solidWoodTools: { used: 1100, budget: 1200, standard: 1300, pro: 1400, industrial: 1500 },
+  cnc: { standard: 1600, pro: 2000, industrial: 2400 },
+};
+
+/** Piotr's margin on the extraction: the sums have to leave a fifth of the fan spare, so a hall
+ *  may be worked to 0.83 of what it pulls and no further (PIOTR: 20% margin; CLAUDE.md T10 3.1). */
+export const EXTRACTION_MARGIN = 0.83;
+/** What a minute of under extraction does. The dust rises at the same 3x a broken extractor makes
+ *  it rise at (Turn 2 3.9), and every minute of production in the hall is worth 0.30 less
+ *  (PIOTR, CLAUDE.md T10 3.1). No machine stops. */
+export const UNDER_EXTRACTION_DUST_MULTIPLIER = 3;
+export const UNDER_EXTRACTION_OUTPUT_PENALTY = 0.3;
+/** A job made in a hall that was under extracted for more than a tenth of its own production
+ *  minutes loses a point of rating when it is delivered: the client can see the dust on it
+ *  [TUNE] (CLAUDE.md T10 3.1). */
+export const DUSTY_JOB_SHARE = 0.1;
+export const DUSTY_JOB_RATING = 1;
+
 /** What a compressor gives: the pressure at the outlet and the free air it will make, a minute
  *  (PIOTR's bands from the trade, CLAUDE.md T10 3.2). A machine that wants more bar than its
  *  compressor gives cannot run at all; litres are a sum over everything drawing on it. */

@@ -165,7 +165,8 @@ import {
   staffOutputFactor,
 } from './owner';
 import { chance, int, makeId } from './rng';
-import { cncOptions, labourPerMinute } from './stages';
+import { type StagePlan, cncOptions, labourPerMinute } from './stages';
+import { underExtracted } from './media';
 import { plural } from './text';
 import { STATION_IDLE, STATION_NO_BENCH, stationForTask } from './stations';
 import {
@@ -1309,18 +1310,25 @@ function waitingLine(specId: string): string {
   return `waiting for ${(findSpec(specId)?.name ?? specId).toLowerCase()}`;
 }
 
+/** One man putting one minute into one job, with the machine he got for it. Gathered before the
+ *  hall is measured, because the extraction and the air sums are the sums of the machines running
+ *  this very minute and not of last minute's (CLAUDE.md T10 3.1, 3.2). */
+interface AtWork {
+  hand: Hand;
+  stage: StagePlan;
+  machine: Equipment | null;
+}
+
 function runProductionMinute(state: GameState, ownerOnTask: boolean): void {
-  const hall = hallProductivityFactor(state);
   // Every bench waits while the machines are being shifted about (CLAUDE.md T4 3.5).
   const moving = movingMachines(state) !== null;
   const working = handsAtWork(state, ownerOnTask, moving);
   // Anybody who is not at a job this minute walks away from whatever he was standing at, so the
   // next man can have it (CLAUDE.md T7 3.1).
   releaseMachinesExcept(state, working.map((hand) => hand.who));
-  let worked = false;
-  // The minutes somebody actually stood at each machine: that, and nothing else, is what wears
-  // it out and fills its bag (CLAUDE.md T7 2).
-  const used = new Map<string, number>();
+  // Who actually stands at what this minute. Nothing is worked off the job yet: the machines have
+  // to be taken before the hall can be asked what its media add up to.
+  const atWork: AtWork[] = [];
   for (const hand of working) {
     if (!canWorkOn(state, hand.job)) {
       releaseMachines(state, hand.who);
@@ -1334,6 +1342,17 @@ function runProductionMinute(state: GameState, ownerOnTask: boolean): void {
       hand.job.blockedBy = waitingLine(at.waitingFor);
       continue;
     }
+    atWork.push({ hand, stage, machine: at.machine });
+  }
+  if (atWork.length === 0) return;
+  // The hall as it is with those machines running: the dust band, the missing helper, the crowded
+  // gate, the broken extractor and the extraction sum, all through the one breakdown.
+  const hall = hallProductivityFactor(state);
+  const dusty = underExtracted(state);
+  // The minutes somebody actually stood at each machine: that, and nothing else, is what wears
+  // it out and fills its bag (CLAUDE.md T7 2).
+  const used = new Map<string, number>();
+  for (const { hand, stage, machine } of atWork) {
     const worker = state.workers.find((entry) => entry.id === hand.who);
     if (worker) {
       worker.productionMinutes += 1;
@@ -1341,17 +1360,19 @@ function runProductionMinute(state: GameState, ownerOnTask: boolean): void {
       spendOwnerMinute(state, 'workshop');
       state.owner.productionMinutes += 1;
     }
-    worked = true;
-    if (at.machine !== null) used.set(at.machine.id, (used.get(at.machine.id) ?? 0) + 1);
+    // What the piece itself was made in: the minutes it took and how many of them were dusty
+    // ones, which is what the client sees when it lands (CLAUDE.md T10 3.1).
+    hand.job.productionMinutes += 1;
+    if (dusty) hand.job.dustyMinutes += 1;
+    if (machine !== null) used.set(machine.id, (used.get(machine.id) ?? 0) + 1);
     // A machine speeds up its own stage and nothing else, and only for the man on it, so the
     // speed is the class of the machine he actually got (CLAUDE.md T7 3.1).
-    const speed = at.machine === null
+    const speed = machine === null
       ? stage.speed
-      : variantOf(specOf(at.machine.specId), at.machine.variantId).outputFactor;
+      : variantOf(specOf(machine.specId), machine.variantId).outputFactor;
     const minute = labourPerMinute(hand.rate, speed) * hall;
     if (addLabour(state, hand.job, minute, stage.id)) raiseJobAtGate(state, hand.job);
   }
-  if (!worked) return;
   state.productionMinutesMonth += 1;
   addDust(state, 1);
   for (const machine of accumulateMachineMinute(state, used)) {

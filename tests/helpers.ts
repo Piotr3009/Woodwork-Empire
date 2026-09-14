@@ -268,6 +268,17 @@ export function placeEquipment(
   return item;
 }
 
+/** Extraction enough for whatever this hall is running, for a test that is about something else.
+ *  A used or budget extractor pulls 1,000 m3/h and the sums leave a fifth of it spare, so a
+ *  budget saw at 900 is already short of it and a standard one at 1,100 more so (PIOTR's tables,
+ *  CLAUDE.md T10 3.1). A test about the earned rate, the minutes of a job or the queue at the saw
+ *  should not be measuring the under extraction penalty by accident: it stands a big enough fan
+ *  in the hall here, and the tests that are about the sums ask for too small a one on purpose. */
+export function withExtraction(state: GameState, variantId = 'industrial'): GameState {
+  placeEquipment(state, 'extractor', { variantId, x: 19, y: 0, id: `kit-extraction-${variantId}` });
+  return state;
+}
+
 /** Puts sheets on the rack, so a job pushed straight to the bench has material to work with. */
 export function fillRack(state: GameState, sheets = 20): GameState {
   state.stock.sheets = sheets;
@@ -346,7 +357,9 @@ export function sixJoinersOnSheetWork(
   options: { saws?: number; price?: number; sawVariant?: string } = {},
 ): GameState {
   const sawVariant = options.sawVariant ?? 'standard';
-  const state = fillRack(buyStartingKit(newGame({ difficulty: 'veryEasy' }), { sawVariant }), 400);
+  const state = withExtraction(
+    fillRack(buyStartingKit(newGame({ difficulty: 'veryEasy' }), { sawVariant }), 400),
+  );
   for (let bench = 1; bench < CREW; bench += 1) {
     placeEquipment(state, 'workbench', { variantId: 'budget', x: 4 + bench * 2, y: 6 });
   }
@@ -417,11 +430,13 @@ export const CREW = 6;
 export function twoMenOnSheetWork(
   options: { sawVariant?: string; saws?: number } = {},
 ): GameState {
-  const state = fillRack(
-    buyStartingKit(newGame({ difficulty: 'veryEasy' }), {
-      sawVariant: options.sawVariant ?? 'standard',
-    }),
-    60,
+  const state = withExtraction(
+    fillRack(
+      buyStartingKit(newGame({ difficulty: 'veryEasy' }), {
+        sawVariant: options.sawVariant ?? 'standard',
+      }),
+      60,
+    ),
   );
   placeEquipment(state, 'workbench', { x: 6, y: 6 });
   // A saw each by default: one machine takes one man at a time, so with one saw between them the

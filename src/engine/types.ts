@@ -410,6 +410,11 @@ export interface Job {
   penalty: number;
   /** Emails still unanswered when the client took delivery. */
   emailsUnanswered: number;
+  /** Minutes of production somebody has actually put into this piece, and how many of them the
+   *  hall was under extracted for. A job delivered out of a dusty workshop loses a point of
+   *  rating (CLAUDE.md T10 3.1). */
+  productionMinutes: number;
+  dustyMinutes: number;
   rating: number | null;
   overdueWarned: boolean;
 }
