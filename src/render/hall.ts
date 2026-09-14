@@ -60,7 +60,7 @@ import {
   tileToScreen,
 } from './iso';
 import { formatTime } from '../engine/clock';
-import { extractionCheck } from '../engine/media';
+import { compressorIsLow, extractionCheck, hallAirCheck } from '../engine/media';
 import {
   type CharacterOptions,
   type Facing,
@@ -509,6 +509,14 @@ export function machineFx(state: GameState, item: Equipment, spec: EquipmentSpec
   // The top of the object, where a lamp or a blade would sit on the real thing.
   const stands = footprintIn(item);
   const point = centreOf(stands.x, stands.y, stands.width, stands.depth, stands.height);
+  // An amber lamp on a compressor that is short of litres, which is what the player sees before
+  // he reads the line under the hall (PIOTR, CLAUDE.md T10 3.2).
+  if (item.specId === 'compressor') {
+    if (item.broken) return { className: '', svg: lamp(point, 'red') };
+    return compressorIsLow(hallAirCheck(state), item.id)
+      ? { className: '', svg: lamp(point, 'amber') }
+      : NO_FX;
+  }
   if (spec.category === 'extraction') {
     if (item.broken) return { className: '', svg: lamp(point, 'red') };
     return machineInUse(state, item) ? { className: ' fx-breathe', svg: '' } : NO_FX;
@@ -1105,6 +1113,12 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
     ? `<p class="view-note warn">${escapeText(extraction.line)} m3/h. Everything in the hall is ` +
       '30% slower and the dust rises three times as fast. Nothing stops.</p>'
     : '';
+  // A compressor with more drawn on it than the pipe will carry: everything on it runs at 0.7
+  // for the minute (PIOTR, CLAUDE.md T10 3.2).
+  const airLines = hallAirCheck(state)
+    .lines.map((line) => `<p class="view-note warn">${escapeText(line)}. Everything on it runs at ` +
+      '70% until something is turned off.</p>')
+    .join('');
   const brokenLine =
     brokenMachines(state).length > 0
       ? '<p class="view-note warn">Broken: ' +
@@ -1158,7 +1172,7 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
     live: live.join(''),
     notes:
       `<p class="view-note">${escapeText(stateLine)}</p>` +
-      `${extractionLine}${shortLine}${brokenLine}${serviceLine}${gateLine}${lowStock}`,
+      `${extractionLine}${shortLine}${airLines}${brokenLine}${serviceLine}${gateLine}${lowStock}`,
   };
 }
 

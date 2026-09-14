@@ -34,7 +34,7 @@ describe('GameState', () => {
     // be opened: the loader refuses anything that is not this number (src/cloud/saves.ts). Turn 8
     // added the list of what is bought and not yet delivered, so a Turn 7 save goes the same way,
     // and Turn 9 made a lorry load one unloading of several orders (CLAUDE.md T9 3.1).
-    expect(STATE_VERSION).toBe(10);
+    expect(STATE_VERSION).toBe(11);
     expect(sample.version).toBe(STATE_VERSION);
   });
 

@@ -1020,6 +1020,12 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
       ui.sellConfirm = null;
       dispatch({ type: 'SELL_MACHINE', equipmentId: id });
       return;
+    case 'assignAir': {
+      // One click puts a machine or a dryer on a compressor (CLAUDE.md T10 3.2).
+      const compressorId = element.dataset.compressor ?? null;
+      dispatch({ type: 'ASSIGN_AIR', equipmentId: id, compressorId });
+      return;
+    }
     case 'catalogueTab':
       ui.catalogueTab = catalogueTabFrom(id);
       // A sale meant on the second click is not meant on another tab (CLAUDE.md T8 3.5).

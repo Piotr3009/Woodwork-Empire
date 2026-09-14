@@ -263,6 +263,7 @@ export function placeEquipment(
     takenBy: null,
     purchasePrice: variant ? variant.price : spec.price,
     soldOnDay: null,
+    compressorId: null,
   };
   state.equipment.push(item);
   return item;
@@ -276,6 +277,31 @@ export function placeEquipment(
  *  in the hall here, and the tests that are about the sums ask for too small a one on purpose. */
 export function withExtraction(state: GameState, variantId = 'industrial'): GameState {
   placeEquipment(state, 'extractor', { variantId, x: 19, y: 0, id: `kit-extraction-${variantId}` });
+  return state;
+}
+
+/** Air enough for whatever this hall is running, for a test that is about something else. The
+ *  compressor the day 1 shopping buys is the used class at 150 l/min, which holds a couple of men
+ *  at their benches and not one doing pneumatic sanding beside them (PIOTR's tables, CLAUDE.md
+ *  T10 3.2). A test about the saws should not be measuring the low air penalty by accident. */
+export function withAir(state: GameState, variantId = 'pro'): GameState {
+  // The men at the benches draw on the first compressor in the hall, so a bigger second one
+  // beside it would help nobody: the one they are on is the one that has to be big enough.
+  const first = state.equipment.find((item) => item.specId === 'compressor');
+  if (first) {
+    first.variantId = variantId;
+    first.enduranceHours = enduranceHoursFor('compressor', variantId);
+    return state;
+  }
+  placeEquipment(state, 'compressor', { variantId, x: 19, y: 4, id: `kit-air-${variantId}` });
+  return state;
+}
+
+/** Dry air for the whole hall: an air dryer on the first compressor, for a test that stands a CNC
+ *  in the hall and is not about the dryer (CLAUDE.md T10 3.3). A CNC will not run on wet air at
+ *  all, and the test that is about that rule leaves the dryer out on purpose. */
+export function withDryAir(state: GameState): GameState {
+  placeEquipment(state, 'airDryer', { x: 19, y: 2, id: 'kit-dryer' });
   return state;
 }
 
@@ -357,8 +383,10 @@ export function sixJoinersOnSheetWork(
   options: { saws?: number; price?: number; sawVariant?: string } = {},
 ): GameState {
   const sawVariant = options.sawVariant ?? 'standard';
-  const state = withExtraction(
-    fillRack(buyStartingKit(newGame({ difficulty: 'veryEasy' }), { sawVariant }), 400),
+  const state = withAir(
+    withExtraction(
+      fillRack(buyStartingKit(newGame({ difficulty: 'veryEasy' }), { sawVariant }), 400),
+    ),
   );
   for (let bench = 1; bench < CREW; bench += 1) {
     placeEquipment(state, 'workbench', { variantId: 'budget', x: 4 + bench * 2, y: 6 });
@@ -430,12 +458,14 @@ export const CREW = 6;
 export function twoMenOnSheetWork(
   options: { sawVariant?: string; saws?: number } = {},
 ): GameState {
-  const state = withExtraction(
-    fillRack(
-      buyStartingKit(newGame({ difficulty: 'veryEasy' }), {
-        sawVariant: options.sawVariant ?? 'standard',
-      }),
-      60,
+  const state = withAir(
+    withExtraction(
+      fillRack(
+        buyStartingKit(newGame({ difficulty: 'veryEasy' }), {
+          sawVariant: options.sawVariant ?? 'standard',
+        }),
+        60,
+      ),
     ),
   );
   placeEquipment(state, 'workbench', { x: 6, y: 6 });

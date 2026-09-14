@@ -6,6 +6,7 @@ import {
   CALL_SATISFACTION_PENALTY,
   DUSTY_JOB_RATING,
   DUSTY_JOB_SHARE,
+  WET_AIR_FINISH_RATING,
   EMAIL_RATING_PENALTY,
   RATING_BY_HAND,
   RATING_EXPRESS_ON_TIME,
@@ -101,10 +102,14 @@ export function applyRating(state: GameState, job: Job): number {
   // A piece made in a dusty workshop costs a point of its own, and says so on the board
   // (PIOTR, CLAUDE.md T10 3.1).
   const dusty = madeInADustyWorkshop(job) ? DUSTY_JOB_RATING : 0;
-  const rating = Math.round((scaled - missed - dusty) * 100) / 100;
+  // And a piece sprayed on wet air comes out of the booth with defects in the finish
+  // (PIOTR, CLAUDE.md T10 3.3).
+  const wet = job.wetFinish ? WET_AIR_FINISH_RATING : 0;
+  const rating = Math.round((scaled - missed - dusty - wet) * 100) / 100;
   job.rating = rating;
   changeReputation(state, scaled, ratingReason(job));
   if (missed > 0) changeReputation(state, -missed, `${job.name}: calls not answered`);
   if (dusty > 0) changeReputation(state, -dusty, `${job.name}: dusty workshop`);
+  if (wet > 0) changeReputation(state, -wet, `${job.name}: finish defects`);
   return rating;
 }

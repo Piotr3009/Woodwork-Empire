@@ -17,7 +17,13 @@ import type {
   WorkerTier,
 } from './types';
 
-/** Bumped in Turn 8: the state carries what is bought and not yet delivered, every machine
+/** Bumped in Turn 10: every machine carries the compressor it draws its air from, every job
+ *  carries the minutes of production that went into it and how many of them the hall was under
+ *  extracted for, and a job carries whether its finish was sprayed on wet air. A Turn 9 save has
+ *  none of them, so its air would come from nowhere and every piece would read as made in a clean
+ *  hall; it is refused (CLAUDE.md T10 3.1, 3.2, 3.3).
+ *
+ *  Bumped in Turn 8: the state carries what is bought and not yet delivered, every machine
  *  carries the day it is collected once it is sold, and an unloading task carries the kit on the
  *  lorry. A Turn 7 save has none of them, so its hall would hold cells for nothing and its
  *  deliveries would never land; it is refused.
@@ -41,7 +47,7 @@ import type {
  *  Bumped in Turn 3: a machine carries its class, its hours and the hours it has in it, and a task
  *  carries the day it was finished (CLAUDE.md T3 3.5, 3.3). Bumped in Turn 9: a lorry load is one
  *  unloading of several orders, so a task carries a list of them (CLAUDE.md T9 3.1). */
-export const STATE_VERSION = 10;
+export const STATE_VERSION = 11;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
@@ -1338,6 +1344,39 @@ export const COMPRESSOR_AIR: Record<string, { bar: number; litres: number }> = {
   pro: { bar: 10, litres: 1100 },
   industrial: { bar: 13, litres: 2300 },
 };
+
+/** What a machine wants of the air while it runs: the pressure it will not start under and the
+ *  free air it draws, a minute (PIOTR's bands from the trade, CLAUDE.md T10 3.2). The ladders are
+ *  written out in full even where the family has one class tonight. The two hand classes of the
+ *  edgebander run on no air at all; the solid wood press is later. */
+export const AIR_DEMAND: Record<string, Record<string, { bar: number; litres: number }>> = {
+  edgebander: {
+    standard: { bar: 7, litres: 250 },
+    pro: { bar: 7, litres: 350 },
+    industrial: { bar: 10, litres: 500 },
+  },
+  cnc: { standard: { bar: 6.5, litres: 650 } },
+  // The gun itself is at 4 bar; the booth wants 7 at the wall (PIOTR).
+  sprayBooth: { standard: { bar: 7, litres: 350 } },
+};
+
+/** What one man at a bench draws for his nailer and his driver, and what one man doing pneumatic
+ *  sanding at Finishing draws, a minute (PIOTR, CLAUDE.md T10 3.2). */
+export const AIR_BENCH_DEMAND = { bar: 6, litres: 30 };
+export const AIR_SANDING_DEMAND = { bar: 6, litres: 200 };
+
+/** The trade's diversity factor: nothing on the line draws its full figure all the time, so the
+ *  sum is worked at 0.6 of it (PIOTR: the trade's 0.5 to 0.6). And the pipe is worked to 0.85 of
+ *  what the compressor makes, which is the headroom a receiver needs (CLAUDE.md T10 3.2). */
+export const AIR_DIVERSITY = 0.6;
+export const AIR_HEADROOM = 0.85;
+/** What every pneumatic consumer on a compressor that is short of litres runs at, for that minute
+ *  (PIOTR, CLAUDE.md T10 3.2). */
+export const LOW_AIR_FACTOR = 0.7;
+/** A spray booth on wet air still runs, and the Finishing takes half as long again over it and
+ *  the job loses a point of rating for the defects in the finish [TUNE] (CLAUDE.md T10 3.3). */
+export const WET_AIR_FINISH_FACTOR = 1.5;
+export const WET_AIR_FINISH_RATING = 1;
 
 /** A compressor's life is written in the minutes it actually runs, not in the hours of a bench
  *  machine (PIOTR, CLAUDE.md T10 3.2). The one table that overrides the family's hours and the

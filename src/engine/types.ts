@@ -189,6 +189,10 @@ export interface Equipment {
   /** The working day the buyer's van comes for it. Null while it is the company's. A machine
    *  that is sold stops working the moment the sale is made (CLAUDE.md T8 3.5). */
   soldOnDay: number | null;
+  /** The compressor this one draws its air from, for a machine that wants air and for an air
+   *  dryer, which is fitted to one compressor. Null means the first compressor in the hall, which
+   *  is what "default: all" means (CLAUDE.md T10 3.2, 3.3). */
+  compressorId: string | null;
 }
 
 /** Something bought and paid for that is not here yet: the cash left at the click, the item is
@@ -410,6 +414,9 @@ export interface Job {
   penalty: number;
   /** Emails still unanswered when the client took delivery. */
   emailsUnanswered: number;
+  /** True once a minute of this job's Finishing was sprayed on wet air: the client sees the
+   *  defects in it and takes a point off (CLAUDE.md T10 3.3). */
+  wetFinish: boolean;
   /** Minutes of production somebody has actually put into this piece, and how many of them the
    *  hall was under extracted for. A job delivered out of a dusty workshop loses a point of
    *  rating (CLAUDE.md T10 3.1). */
@@ -785,6 +792,8 @@ export type GameAction =
   | { type: 'SET_SHOW_WHY'; on: boolean }
   | { type: 'WORK_HERE'; jobId: string | null }
   | { type: 'ASSIGN_JOB'; jobId: string; workerId: string | null }
+  /** Puts a machine, or an air dryer, on one of the compressors in the hall (CLAUDE.md T10 3.2). */
+  | { type: 'ASSIGN_AIR'; equipmentId: string; compressorId: string | null }
   | { type: 'HIRE'; role: WorkerRole; tier: WorkerTier | null }
   | { type: 'ASK_UNLOAD'; deliveryId: string }
   | { type: 'ASK_BAG_CHANGE'; equipmentId: string }

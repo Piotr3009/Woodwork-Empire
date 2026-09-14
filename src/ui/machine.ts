@@ -2,6 +2,11 @@
 // (CLAUDE.md T3 3.5). The catalogue lists the family, this is where the money is spent.
 
 import {
+  airDemandOf,
+  compressorAirOf,
+  compressors,
+  extractionCapacityOf,
+  extractionDemandOf,
   orderEquipmentCheck,
   countOf,
   deliveryDaysFor,
@@ -10,6 +15,7 @@ import {
   footprintOf,
   zoneOf,
 } from '../engine/index';
+import { COMPRESSOR, COMPRESSOR_AIR, COMPRESSOR_WITH_DRYER } from '../engine/constants';
 import { spriteUrl } from '../render/sprites';
 import type { EquipmentSpec, EquipmentVariant, GameState } from '../engine/index';
 import {
@@ -47,6 +53,35 @@ function lifeLine(spec: EquipmentSpec, variant: EquipmentVariant): string {
 
 function powerLine(variant: EquipmentVariant): string {
   return `Power ${variant.powerPerDay} a day`;
+}
+
+/** What this class asks of the air, and what the hall would give it. The catalogue says it before
+ *  the money is spent, so nobody buys a bander his compressor will not start (PIOTR,
+ *  CLAUDE.md T10 3.2). */
+function airLine(state: GameState, spec: EquipmentSpec, variant: EquipmentVariant): string {
+  if (spec.id === COMPRESSOR) {
+    const gives = COMPRESSOR_AIR[variant.id];
+    if (!gives) return '';
+    return `Gives ${gives.bar} bar, ${gives.litres.toLocaleString('en-GB')} l/min` +
+      `${variant.id === COMPRESSOR_WITH_DRYER ? ', dryer built in' : ''}`;
+  }
+  const wants = airDemandOf({ specId: spec.id, variantId: variant.id });
+  if (wants === null) return '';
+  const best = compressors(state).reduce(
+    (bar, item) => Math.max(bar, compressorAirOf(item).bar),
+    0,
+  );
+  const short = best > 0 && wants.bar > best ? `, compressor gives ${best}` : '';
+  const none = best === 0 ? ', no compressor in the hall' : '';
+  return `Needs ${wants.bar} bar, ${wants.litres} l/min${short}${none}`;
+}
+
+/** What this class pulls out of the air, so the two sums read the same on the tile. */
+function extractionLine(spec: EquipmentSpec, variant: EquipmentVariant): string {
+  const pulls = extractionCapacityOf({ specId: spec.id, variantId: variant.id });
+  if (pulls > 0) return `Pulls ${pulls.toLocaleString('en-GB')} m3/h`;
+  const wants = extractionDemandOf({ specId: spec.id, variantId: variant.id });
+  return wants > 0 ? `Extraction ${wants.toLocaleString('en-GB')} m3/h while it runs` : '';
 }
 
 /** How long the player waits for this one after he has paid for it (CLAUDE.md T8 3.2). */
@@ -120,9 +155,12 @@ function tile(
     bagLine(spec, variant),
     lifeLine(spec, variant),
     powerLine(variant),
+    extractionLine(spec, variant),
+    airLine(state, spec, variant),
     floorLine(spec.id, variant.id),
     deliveryLine(spec, variant),
   ]
+    .filter((line) => line !== '')
     .map((line) => `<p class="tile-figures">${escapeHtml(line)}</p>`)
     .join('');
   const owned = ownedBadge(state, spec.id, variant.id);

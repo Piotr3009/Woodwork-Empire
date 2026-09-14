@@ -50,6 +50,7 @@ import {
   sheetsForCost,
   stockCostFor,
 } from './materials';
+import { familyAirBlock } from './media';
 import { firstOnOrder } from './orders';
 import { ownerIsAvailable } from './owner';
 import {
@@ -265,6 +266,7 @@ export function acceptEnquiry(state: GameState, enquiryId: string, byHand: boole
     balancePaid: 0,
     penalty: 0,
     emailsUnanswered: 0,
+    wetFinish: false,
     productionMinutes: 0,
     dustyMinutes: 0,
     rating: null,
@@ -570,6 +572,10 @@ export function hallBlock(state: GameState, job: Job): string {
   if (family === null) return '';
   const coming = onOrderBlock(state, family);
   if (coming !== '') return coming;
+  // A machine that wants more bar than its compressor gives, or dry air where there is none, does
+  // not run at all (PIOTR, CLAUDE.md T10 3.2 rule 1, 3.3).
+  const air = familyAirBlock(state, family);
+  if (air !== '') return `${(findSpec(family)?.name ?? family).toLowerCase()} ${air}`;
   const stopped = familyStopped(state, family);
   if (stopped === null) return '';
   if (stopped.why === 'bag') return 'bag full';

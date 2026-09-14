@@ -8,6 +8,7 @@
 // The UI never computes economics. Everything it needs to show is a selector exported here.
 
 export {
+  assignAir,
   applyAction,
   bootLaptop,
   canBuy,
@@ -177,15 +178,30 @@ export {
 export type { StageOptions, StagePlan, StagedJob } from './stages';
 // Air and dust that have to add up (CLAUDE.md T10 3.1, 3.2, 3.3)
 export {
+  airBlockFor,
+  airCheck,
+  airConsumers,
+  airDemandOf,
+  airHands,
+  compressorAirOf,
+  compressorFor,
+  compressorHasDryer,
+  compressorIsLow,
+  compressorLabel,
+  compressors,
   extractingMachines,
   extractionCapacityOf,
   extractionCheck,
   extractionDemandOf,
   extractionKit,
+  familyAirBlock,
+  hallAirCheck,
   mediaFigure,
+  needsDryAir,
+  sprayingOnWetAir,
   underExtracted,
 } from './media';
-export type { ExtractionCheck } from './media';
+export type { AirCheck, AirHands, CompressorLine, ExtractionCheck } from './media';
 
 export {
   BOARD_DAYS_PAST_DUE,

@@ -61,6 +61,7 @@ function job(partial: Partial<Job>): Job {
     balancePaid: 200,
     penalty: 0,
     emailsUnanswered: 0,
+    wetFinish: false,
     productionMinutes: 0,
     dustyMinutes: 0,
     rating: null,

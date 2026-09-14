@@ -65,6 +65,8 @@ describe('the tiles inside a folder', () => {
       'Bag every 1,200 min of use',
       'Life about 750 hours',
       'Power 3 a day',
+      // What it pulls out of the air while somebody is standing at it (CLAUDE.md T10 3.1).
+      'Extraction 800 m3/h while it runs',
       'Takes 2 by 1 m on a 3 by 3 m zone',
       // What he waits for after he has paid for it (CLAUDE.md T8 3.2).
       'Delivered in 1 working day',
@@ -78,6 +80,7 @@ describe('the tiles inside a folder', () => {
       'Bag every 4,800 min of use',
       'Life about 6,000 hours',
       'Power 7 a day',
+      'Extraction 2,200 m3/h while it runs',
       'Takes 4 by 2 m on a 5 by 4 m zone',
       'Delivered in 12 working days',
     ]);
