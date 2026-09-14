@@ -6,7 +6,7 @@ import { EQUIPMENT_SPECS } from '../../src/engine/constants';
 import { findSpec, footprintOf, standsInTheHall, zoneOf } from '../../src/engine/machines';
 import { boxOf, canPlaceSpec, firstFreeCell } from '../../src/engine/layout';
 import { footprintIn } from '../../src/render/hall';
-import { spriteBox } from '../../src/render/sprites';
+import { spriteAnchorIn, spriteBox } from '../../src/render/sprites';
 import { tileToScreen } from '../../src/render/iso';
 import { canBuy } from '../../src/engine/game';
 import type { GameState } from '../../src/engine/index';
@@ -120,10 +120,15 @@ describe('where the picture stands', () => {
     expect(stands.x).toBeGreaterThanOrEqual(saw.anchorX);
     expect(stands.x + stands.width).toBeLessThanOrEqual(saw.anchorX + zone.width);
     expect(stands.y + stands.depth).toBeLessThanOrEqual(saw.anchorY + zone.depth);
-    // And the picture's anchor pixel is the bottom corner of that footprint diamond.
+    // And the picture's anchor pixel is the bottom corner of that footprint diamond: `w x 48`
+    // from the left edge of the file, past the padding, and never its middle for a 3 by 2
+    // (CLAUDE.md T10 3.12).
     const box = spriteBox(stands.x, stands.y, stands.width, stands.depth, stands.height);
     const anchor = tileToScreen(stands.x + stands.width, stands.y + stands.depth);
-    expect(box.x + box.width / 2).toBeCloseTo(anchor.x, 6);
+    expect(box.x + spriteAnchorIn(stands.width, stands.depth, stands.height).x).toBeCloseTo(
+      anchor.x,
+      6,
+    );
     expect(box.y + box.height - 4).toBeCloseTo(anchor.y, 6);
   });
 

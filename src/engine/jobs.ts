@@ -50,6 +50,7 @@ import {
   sheetsForCost,
   stockCostFor,
 } from './materials';
+import { firstOnOrder } from './orders';
 import { ownerIsAvailable } from './owner';
 import {
   type StageOptions,
@@ -539,6 +540,18 @@ export function setMaterialMode(state: GameState, jobId: string, mode: MaterialM
 // Production
 // ---------------------------------------------------------------------------
 
+/** A machine that is bought and still on the road is a drawing on the floor: the stage that wants
+ *  it stands and waits for the lorry rather than falling back to a pair of hands, and says which
+ *  day the lorry is (CLAUDE.md T10 1, 3.10). The board's lock is the one question on-order kit
+ *  may answer, and it asked it days ago, when the job was taken. */
+function onOrderBlock(state: GameState, family: string): string {
+  if (has(state, family)) return '';
+  const coming = firstOnOrder(state, family);
+  if (coming === null) return '';
+  const name = (findSpec(family)?.name ?? family).toLowerCase();
+  return `waiting for ${name} (on order, due day ${coming.dueDay})`;
+}
+
 /** Everything in the hall that can stop a job, in the order the player would notice it. Empty
  *  while the job is free to be worked on (CLAUDE.md T2 3.9). */
 export function hallBlock(state: GameState, job: Job): string {
@@ -551,6 +564,8 @@ export function hallBlock(state: GameState, job: Job): string {
   const stage = jobStage(state, job, cncOptions(state, job.assignedTo ?? OWNER, job));
   const family = stage?.family ?? null;
   if (family === null) return '';
+  const coming = onOrderBlock(state, family);
+  if (coming !== '') return coming;
   const stopped = familyStopped(state, family);
   if (stopped === null) return '';
   if (stopped.why === 'bag') return 'bag full';

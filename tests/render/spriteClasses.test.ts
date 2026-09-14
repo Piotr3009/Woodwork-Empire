@@ -5,7 +5,7 @@
 import { describe, expect, it } from 'vitest';
 import { EQUIPMENT_SPECS } from '../../src/engine/constants';
 import { footprintOf, zoneOf } from '../../src/engine/machines';
-import { SPRITE_PADDING, SPRITE_SCALE, spriteBox, spriteFiles, spriteFileSize, spriteUrl } from '../../src/render/sprites';
+import { SPRITE_PADDING, SPRITE_SCALE, spriteAnchorIn, spriteBox, spriteFiles, spriteFileSize, spriteUrl } from '../../src/render/sprites';
 import { footprintIn } from '../../src/render/hall';
 import { tileToScreen } from '../../src/render/iso';
 import { CABINET_SLOT_LAYOUT } from '../../src/engine/constants';
@@ -89,11 +89,13 @@ describe('the file the art side owes for a class', () => {
 });
 
 describe('the anchor of a class', () => {
-  /** The bottom corner of the footprint diamond, which is the pixel the anchor sits on. */
+  /** The bottom corner of the footprint diamond, which is the pixel the anchor sits on: the file
+   *  carries it `8 + w x 48` from its left edge and 8 px above its bottom, and the loader halves
+   *  both. It is the middle of the file only for a square footprint (CLAUDE.md T10 3.12). */
   function anchorOf(x: number, y: number, width: number, depth: number, height: number): void {
     const at = spriteBox(x, y, width, depth, height);
     const corner = tileToScreen(x + width, y + depth);
-    expect(at.x + at.width / 2).toBeCloseTo(corner.x, 6);
+    expect(at.x + spriteAnchorIn(width, depth, height).x).toBeCloseTo(corner.x, 6);
     expect(at.y + at.height - SPRITE_PADDING / SPRITE_SCALE).toBeCloseTo(corner.y, 6);
   }
 

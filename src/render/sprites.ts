@@ -71,6 +71,22 @@ export function spriteFileSize(width: number, depth: number, height: number): Sp
   };
 }
 
+/** Where the anchor pixel sits inside the image, at the scale the game draws it. The file carries
+ *  it at `8 + w x 48` from the left edge and 8 px above the bottom (docs/art/SPRITES.md 2): the
+ *  diamond runs `w x 48` to the left of the anchor and `d x 48` to the right of it, so the anchor
+ *  is centred in the file only when `w` equals `d`. Corrected 14.09: `spriteBox` centred it, which
+ *  stood every 2 by 1 and 3 by 1 machine 12 to 24 px off its tile (CLAUDE.md T10 3.12). The one
+ *  rule the hall places a sprite by and the Sprite check page marks. */
+export function spriteAnchorIn(width: number, depth: number, height: number): SpriteBox {
+  const file = spriteFileSize(width, depth, height);
+  return {
+    x: (SPRITE_PADDING + width * TILE_WIDTH) / SPRITE_SCALE,
+    y: (file.height - SPRITE_PADDING) / SPRITE_SCALE,
+    width: file.width / SPRITE_SCALE,
+    height: file.height / SPRITE_SCALE,
+  };
+}
+
 /** Where the image goes: halved, with its anchor pixel on the bottom corner of the footprint. */
 export function spriteBox(
   x: number,
@@ -79,16 +95,14 @@ export function spriteBox(
   depth: number,
   height: number,
 ): SpriteBox {
-  const file = spriteFileSize(width, depth, height);
-  const box = { width: file.width / SPRITE_SCALE, height: file.height / SPRITE_SCALE };
-  const padding = SPRITE_PADDING / SPRITE_SCALE;
+  const at = spriteAnchorIn(width, depth, height);
   // The lowest point of the floor outline, which is the corner furthest from the camera's left.
   const anchor = tileToScreen(x + width, y + depth);
   return {
-    x: anchor.x - box.width / 2,
-    y: anchor.y - (box.height - padding),
-    width: box.width,
-    height: box.height,
+    x: anchor.x - at.x,
+    y: anchor.y - at.y,
+    width: at.width,
+    height: at.height,
   };
 }
 

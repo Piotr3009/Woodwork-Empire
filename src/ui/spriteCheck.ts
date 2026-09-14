@@ -6,7 +6,7 @@ import { DELIVERY_VAN_SPRITE, EQUIPMENT_SPECS, GATE_LAYOUT } from '../engine/con
 import { HALL_CANVAS, HALL_LAYERS, box, escapeText, label, polygon } from '../render/hall';
 import { OFFICE_CANVAS, OFFICE_LAYERS } from '../render/office';
 import { boxPolygons, centreOf, footprintPolygon, gridBounds, tileToScreen } from '../render/iso';
-import { SPRITE_SCALE, spriteCanvas, spriteFileSize, spriteUrl } from '../render/sprites';
+import { SPRITE_SCALE, spriteAnchorIn, spriteCanvas, spriteFileSize, spriteUrl } from '../render/sprites';
 import { footprintOf, standsInTheHall, zoneOf } from '../engine/machines';
 import {
   type Animation,
@@ -144,14 +144,21 @@ function proof(target: SpriteTarget): string {
   );
 }
 
+/** The delivered picture with the anchor marked on it, by the same rule the hall places it with:
+ *  `8 + w x 48` from the left edge of the file and 8 px above the bottom, halved
+ *  (docs/art/SPRITES.md 2; CLAUDE.md T10 3.12). A file whose object does not sit on that dot is
+ *  the file that makes a machine stand off its tile in the hall. */
 function shot(target: SpriteTarget): string {
   const url = spriteUrl(target.spriteKey, target.tier);
   if (url === null) return '<div class="sprite-shot is-missing"><span>no file</span></div>';
-  const file = spriteFileSize(target.width, target.depth, target.height);
+  const at = spriteAnchorIn(target.width, target.depth, target.height);
   return (
     '<div class="sprite-shot">' +
-    `<img src="${url}" alt="${escapeHtml(target.name)}" ` +
-    `width="${file.width / 2}" height="${file.height / 2}" /></div>`
+    `<svg class="sprite-shot-art" viewBox="0 0 ${at.width} ${at.height}" ` +
+    `width="${at.width}" height="${at.height}" role="img" ` +
+    `aria-label="${escapeText(target.name)}">` +
+    `<image href="${url}" x="0" y="0" width="${at.width}" height="${at.height}" />` +
+    `<circle class="sprite-anchor" cx="${at.x}" cy="${at.y}" r="2" /></svg></div>`
   );
 }
 
