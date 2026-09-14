@@ -32,9 +32,11 @@ function furnished(): GameState {
 
 function room(
   viewport = { width: 1280, height: 800 },
-  files?: string[],
+  files: string[] = [],
   state: GameState = furnished(),
 ): HTMLElement {
+  // No files unless a test says so: these tests describe the room before the art lands, whatever
+  // the folder holds on the day they run (the board and the book are pictures since 14.09).
   const holder = document.createElement('div');
   holder.innerHTML = renderOffice(state, viewport, files);
   return holder;
@@ -133,7 +135,7 @@ describe('the click regions', () => {
       ['laptop', 558, 449, 557, 443],
       ['catalogue', 60, 680, 445, 210],
       ['binder', 1170, 620, 435, 280],
-      ['company', 970, 60, 310, 460],
+      ['company', 985, 170, 300, 350],
     ]);
   });
 
@@ -177,15 +179,17 @@ describe('the floor catalogue picture', () => {
     // And it is still the one click into the catalogue, on the same box.
     expect(after?.getAttribute('data-do')).toBe('officeRegion');
     expect(after?.getAttribute('style')).toContain(`top:${FLOOR_CATALOGUE.y}px`);
-    // Once the desk is bought the catalogue is on it, and the floor picture is gone.
+    // Once the desk is bought the same book lies on it, smaller (PIOTR, 14.09).
     const onTheDesk = room({ width: 1280, height: 800 }, [`${FLOOR_CATALOGUE_SPRITE}.png`]);
-    expect(onTheDesk.querySelector('[data-office="catalogue"] img')).toBeNull();
+    const deskBook = onTheDesk.querySelector('[data-office="catalogue"]');
+    expect(deskBook?.querySelector('img')).not.toBeNull();
+    expect(deskBook?.className).toContain('on-desk');
   });
 });
 
 describe('the office a new game starts in', () => {
   it('has no desk and no laptop in it at all', () => {
-    const bare = room({ width: 1280, height: 800 }, undefined, newGame());
+    const bare = room({ width: 1280, height: 800 }, [], newGame());
     const layers = Array.from(bare.querySelectorAll('.office-layer'));
     expect(layers.map((layer) => layer.getAttribute('data-layer'))).toEqual(['officeBackground']);
     expect(bare.querySelector('[data-office="laptop"]')).toBeNull();
@@ -194,7 +198,7 @@ describe('the office a new game starts in', () => {
   });
 
   it('lies the catalogue on the floor by the door, with Equipment on its cover', () => {
-    const bare = room({ width: 1280, height: 800 }, undefined, newGame());
+    const bare = room({ width: 1280, height: 800 }, [], newGame());
     const catalogue = bare.querySelector('[data-office="catalogue"]');
     expect(catalogue).not.toBeNull();
     expect(catalogue?.getAttribute('data-do')).toBe('officeRegion');

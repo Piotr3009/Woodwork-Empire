@@ -106,10 +106,11 @@ export const OFFICE_REGIONS: OfficeRegion[] = [
   {
     id: 'company',
     name: 'Company board',
-    x: 970,
-    y: 60,
-    width: 310,
-    height: 460,
+    // Under the clock (which sits at y 88..146), so the digits stay free (PIOTR, 14.09).
+    x: 985,
+    y: 170,
+    width: 300,
+    height: 350,
     opens: true,
   },
 ];
@@ -127,6 +128,8 @@ export const FLOOR_CATALOGUE = { x: 60, y: 700, width: 440, height: 200 };
  *  other object: the PNG when there is one, and the drawn placeholder while there is not
  *  (CLAUDE.md T8 3.7). */
 export const FLOOR_CATALOGUE_SPRITE = 'catalogueFloor';
+/** The board on the wall right of the door: GPT's felt board when delivered (SPRITES.md 11). */
+export const COMPANY_BOARD_SPRITE = 'officeCompanyBoard';
 
 /** The regions the room has this morning, with the catalogue on the floor while there is no desk
  *  to put it on. Nothing else works until there is (CLAUDE.md T7 3.8). */
@@ -209,27 +212,43 @@ function regionHtml(
     return `<div class="office-region is-quiet" data-office="${region.id}" style="${style}"></div>`;
   }
   if (region.id === COMPANY_BOARD) {
-    // Nothing is painted on that wall yet, so the game draws the board and letters it.
+    // The painted board when the art side has delivered it, the drawn one while it has not
+    // (SPRITES.md 11; PIOTR, 14.09: the drawn square goes once the picture is there).
+    const url = pickSprite(files, COMPANY_BOARD_SPRITE);
+    if (url !== null) {
+      return (
+        '<button class="office-region office-company-board is-art" data-do="officeRegion" ' +
+        `data-office="${region.id}" title="${escapeText(region.name)}" style="${style}">` +
+        `<img class="office-floor-art" data-sprite="${COMPANY_BOARD_SPRITE}" src="${url}" ` +
+        'alt="" draggable="false" /></button>'
+      );
+    }
     return (
       '<button class="office-region office-company-board" data-do="officeRegion" ' +
       `data-office="${region.id}" title="${escapeText(region.name)}" style="${style}">` +
       '<span>How the company is doing</span></button>'
     );
   }
-  if (region.id === 'catalogue' && onTheFloor) {
-    // The loader first, the drawn object second: exactly as a machine is drawn in the hall
-    // (CLAUDE.md T3 3.6, T8 3.7).
+  if (region.id === 'catalogue') {
+    // The same book on the floor before the desk and on the desk after it (PIOTR, 14.09): the
+    // loader first, the drawn object second, exactly as a machine is drawn in the hall
+    // (CLAUDE.md T3 3.6, T8 3.7). With the picture there is no drawn box under it.
     const url = pickSprite(files, FLOOR_CATALOGUE_SPRITE);
-    const inside =
-      url === null
-        ? '<span>Equipment</span>'
-        : `<img class="office-floor-art" data-sprite="${FLOOR_CATALOGUE_SPRITE}" src="${url}" ` +
-          'alt="" draggable="false" />';
-    return (
-      '<button class="office-region office-floor-catalogue" data-do="officeRegion" ' +
-      `data-office="${region.id}" title="${escapeText(region.name)}" style="${style}">` +
-      `${inside}</button>`
-    );
+    if (url !== null) {
+      return (
+        `<button class="office-region office-floor-catalogue is-art${onTheFloor ? '' : ' on-desk'}" ` +
+        `data-do="officeRegion" data-office="${region.id}" title="${escapeText(region.name)}" ` +
+        `style="${style}"><img class="office-floor-art" data-sprite="${FLOOR_CATALOGUE_SPRITE}" ` +
+        `src="${url}" alt="" draggable="false" /></button>`
+      );
+    }
+    if (onTheFloor) {
+      return (
+        '<button class="office-region office-floor-catalogue" data-do="officeRegion" ' +
+        `data-office="${region.id}" title="${escapeText(region.name)}" style="${style}">` +
+        '<span>Equipment</span></button>'
+      );
+    }
   }
   return (
     `<button class="office-region" data-do="officeRegion" data-office="${region.id}" ` +

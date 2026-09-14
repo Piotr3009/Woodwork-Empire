@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { footprintIn, renderHall } from '../../src/render/hall';
+import { renderOffice } from '../../src/render/office';
 import { renderGameOver } from '../../src/ui/dayEnd';
 import { renderLaptop } from '../../src/ui/laptop';
 import { FINISHED_GOODS_LAYOUT } from '../../src/engine/constants';
@@ -409,5 +410,25 @@ describe('the figures that move', () => {
     }
     // Four different stations, four different places to stand.
     expect(seen.size).toBe(places.length);
+  });
+});
+
+describe('the office once the art side has painted the board and the book (chat fix v14, 14.09)', () => {
+  it('draws the board and the book as their pictures with no drawn box, and the drawn ones without files', () => {
+    const state = newGame();
+    const viewport = { width: 1280, height: 720 };
+    const painted = renderOffice(state, viewport, [
+      'officeCompanyBoard.png',
+      'catalogueFloor.png',
+      'officeBackground.png',
+    ]);
+    expect(painted).toContain('data-sprite="officeCompanyBoard"');
+    expect(painted).toContain('office-company-board is-art');
+    expect(painted).not.toContain('How the company is doing');
+    expect(painted).toContain('office-floor-catalogue is-art');
+    expect(painted).not.toContain('<span>Equipment</span>');
+    const drawn = renderOffice(state, viewport, []);
+    expect(drawn).toContain('How the company is doing');
+    expect(drawn).toContain('<span>Equipment</span>');
   });
 });

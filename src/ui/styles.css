@@ -1662,3 +1662,221 @@ input.num {
   opacity: 0.72;
   filter: grayscale(0.5);
 }
+
+/* With the picture delivered, the board and the book are the picture and nothing else
+   (PIOTR, 14.09). The board is skewed into the wall right of the door; the book on the desk is
+   a smaller version of the one on the floor. */
+.office-company-board.is-art {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  padding: 0;
+  transform: perspective(1400px) rotateY(-24deg);
+  transform-origin: right center;
+}
+
+.office-company-board.is-art:hover {
+  background: transparent;
+  filter: drop-shadow(0 0 6px var(--accent));
+}
+
+.office-floor-catalogue.is-art {
+  background: transparent;
+  border: 0;
+  padding: 0;
+}
+
+.office-floor-catalogue.is-art:hover {
+  background: transparent;
+  filter: drop-shadow(0 0 6px var(--accent));
+}
+
+.office-floor-catalogue.is-art.on-desk {
+  transform: scale(0.72);
+  transform-origin: left bottom;
+}
+
+/* ------------------------------------------------------------------------------------------
+   The paper family: a kraft folder with cream paper (SPRITES.md 11). The folder is the picture
+   ui.folder.png, kept at 3:2 and letterboxed inside the full page area; the content sits in the
+   paper rectangle (x 6.7% to 93%, y 3% to 93%). Tabs and buttons are machine green on cream;
+   hover is the game's orange; locked is grey. Tonight: the catalogue (PIOTR, 14.09). */
+.modal-folder {
+  background: transparent url('/sprites/ui.folder.png') no-repeat center / 100% 100%;
+  border: 0;
+  box-shadow: none;
+  /* A fixed 3:2 box: the body scrolls inside the paper rather than the paper growing. */
+  box-sizing: border-box;
+  height: min(92vh, 880px);
+  max-height: min(92vh, 880px);
+  /* The paper ends 7% above the folder's bottom edge: the column stops there too. */
+  padding-bottom: 6.5%;
+  width: min(96vw, calc(min(92vh, 880px) * 1.5));
+  --paper: #f5efe2;
+  --paper-2: #fbf8f1;
+  --paper-line: #cdbf9f;
+  --ink: #1d2a22;
+  --ink-2: #4d5a52;
+  --green: #1f5a3a;
+  --green-dark: #123822;
+}
+
+.modal-folder .modal-head,
+.modal-folder .modal-body,
+.modal-folder .modal-foot {
+  background: transparent;
+  border: 0;
+  color: var(--ink);
+}
+
+.modal-folder .modal-head {
+  margin: 4% 7% 0 7.5%;
+  padding: 8px 0 6px;
+}
+
+.modal-folder .modal-head h2 {
+  color: var(--green);
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.modal-folder .modal-close {
+  color: #444;
+}
+
+.modal-folder .modal-body {
+  flex: 1;
+  margin: 0 7% 0 7.5%;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 6px 4px 6px 0;
+}
+
+.modal-folder .tile-picture {
+  background: #efe7d6;
+  border: 1px solid var(--paper-line);
+}
+
+.modal-folder .modal-foot {
+  border-top: 1px solid var(--paper-line);
+  color: #6a6355;
+  margin: 0 7% 0 7.5%;
+  padding: 6px 0;
+}
+
+.modal-folder .modal-foot:empty {
+  border: 0;
+  padding: 0;
+}
+
+.modal-folder .chip {
+  background: #eadfca;
+  border: 1px solid #c9b791;
+  border-bottom: 0;
+  border-radius: 6px 6px 0 0;
+  color: #3a4a40;
+  font-weight: 700;
+}
+
+.modal-folder .chip.is-on {
+  background: var(--green);
+  border-color: var(--green);
+  color: var(--paper);
+}
+
+.modal-folder .chip:hover:not([disabled]) {
+  color: var(--accent);
+}
+
+.modal-folder .chip.is-on:hover:not([disabled]) {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--paper);
+}
+
+.modal-folder .tile,
+.modal-folder .folder-row,
+.modal-folder .checklist {
+  background: var(--paper-2);
+  border: 1px solid var(--paper-line);
+  border-radius: 10px;
+  color: var(--ink);
+}
+
+.modal-folder .tile-name,
+.modal-folder .tile-price {
+  color: var(--ink);
+}
+
+.modal-folder .tile-price {
+  color: var(--green);
+}
+
+.modal-folder .tile-figures,
+.modal-folder .tile-meta,
+.modal-folder .lock,
+.modal-folder p {
+  color: var(--ink-2);
+}
+
+.modal-folder .tile.is-owned {
+  border-color: #1f8a4c;
+  box-shadow: inset 0 0 0 1px #1f8a4c;
+}
+
+.modal-folder .badge-owned {
+  background: rgba(255, 255, 255, 0.7);
+  border: 2px solid #1f8a4c;
+  border-radius: 3px;
+  color: #1f8a4c;
+  display: inline-block;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  padding: 0 6px;
+  transform: rotate(-6deg);
+}
+
+.modal-folder button:not(.chip):not(.modal-close),
+.modal-folder .button {
+  background: var(--paper);
+  border: 2px solid var(--green);
+  border-radius: 8px;
+  box-shadow: none;
+  color: var(--green);
+  font-weight: 700;
+}
+
+.modal-folder button.primary:not(.chip),
+.modal-folder .button.primary {
+  background: var(--green);
+  box-shadow: 0 2px 0 var(--green-dark);
+  color: var(--paper);
+}
+
+.modal-folder button:not(.chip):not(.modal-close):hover:not([disabled]),
+.modal-folder .button:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+  box-shadow: 0 2px 0 #9a4c10;
+  color: var(--paper);
+}
+
+.modal-folder button[disabled]:not(.chip) {
+  background: #cfc6b2;
+  border-color: #cfc6b2;
+  box-shadow: none;
+  color: #7a7264;
+  text-decoration: line-through;
+}
+
+.modal-folder input[type='text'] {
+  background: var(--paper-2);
+  border: 1px solid var(--paper-line);
+  color: var(--ink);
+}
+
+.modal-folder .warn,
+.modal-folder .warning {
+  color: #b3261e;
+}

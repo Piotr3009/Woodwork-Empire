@@ -46,9 +46,14 @@ const CROSS =
   '<button class="modal-close" data-do="closeModal" title="Close" aria-label="Close">' +
   '×</button>';
 
+/** The paper family: the catalogue is a kraft folder with cream paper under a bulldog clip
+ *  (SPRITES.md 11, the GPT asset ui.folder.png; PIOTR, 14.09). Other modals join it in Turn 11. */
+const FOLDER_MODALS: ReadonlySet<string> = new Set(['catalogue']);
+
 function modalClass(spec: ModalSpec): string {
   const size = spec.full === true ? ' modal-full' : spec.wide === true ? ' modal-wide' : '';
-  return `modal${size}${spec.position ? '' : ' modal-centred'}`;
+  const skin = FOLDER_MODALS.has(spec.id) ? ' modal-folder' : '';
+  return `modal${size}${skin}${spec.position ? '' : ' modal-centred'}`;
 }
 
 /** The shell of a modal: a head, an empty body and an empty foot. Content goes in through

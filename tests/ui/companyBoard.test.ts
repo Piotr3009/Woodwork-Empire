@@ -58,8 +58,8 @@ describe('the board on the wall', () => {
     click('[data-do="setView"][data-view="office"]');
     const board = root().querySelector('[data-office="company"]');
     expect(board).not.toBeNull();
-    expect(board?.getAttribute('style')).toContain('left:970px');
-    expect(board?.getAttribute('style')).toContain('top:60px');
+    expect(board?.getAttribute('style')).toContain('left:985px');
+    expect(board?.getAttribute('style')).toContain('top:170px');
     click('[data-office="company"]');
     const modal = root().querySelector('.modal-layer .modal');
     expect(modal?.getAttribute('data-modal')).toBe('company');
