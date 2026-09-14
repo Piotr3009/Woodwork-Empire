@@ -47,8 +47,18 @@ describe('the sprite check page', () => {
     // The hand classes of the edgebander are drawn too, in the cabinet they are kept in.
     expect(names).toContain('edgebander.budget');
     expect(names).toContain('edgebander.industrial');
-    // A family with one class gets no class cell of its own.
-    expect(names).not.toContain('compressor.standard');
+    // The extractor and the compressor got their five classes in Turn 10, so the page lists
+    // every one of them (CLAUDE.md T10 3.4).
+    expect(names).toContain('extractor.used');
+    expect(names).toContain('extractor.industrial');
+    expect(names).toContain('compressor.used');
+    expect(names).toContain('compressor.industrial');
+    expect(names).not.toContain('compressor.standard.standard');
+    // A family with one class still gets no class cell of its own.
+    expect(names).not.toContain('thicknesser.standard');
+    expect(names).toContain('thicknesser');
+    // The air dryer is a line of the catalogue and a key the art side owes a picture for.
+    expect(names).toContain('airDryer');
   });
 
   it('draws one cell per key, each with a footprint, a box and a picture slot', () => {

@@ -2,6 +2,8 @@
 // owes is the size docs/art/SPRITES.md works out from the class footprint, and the picture stands
 // with its anchor on the bottom corner of that footprint (CLAUDE.md T7 3.5).
 
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { EQUIPMENT_SPECS } from '../../src/engine/constants';
 import { footprintOf, zoneOf } from '../../src/engine/machines';
@@ -11,8 +13,10 @@ import { tileToScreen } from '../../src/render/iso';
 import { CABINET_SLOT_LAYOUT } from '../../src/engine/constants';
 import { newGame, placeEquipment } from '../helpers';
 
-/** The families that arrived with five classes, whose files are named after the class. */
-const CLASS_FAMILIES = ['tableSaw', 'workbench', 'sheetRack', 'edgebander'];
+/** The families that arrived with five classes, whose files are named after the class. Turn 7
+ *  gave the first four theirs; Turn 10 gave the extraction and air families theirs, and the art
+ *  side delivered every one of those ten files with them (CLAUDE.md T10 3.4). */
+const CLASS_FAMILIES = ['tableSaw', 'workbench', 'sheetRack', 'edgebander', 'extractor', 'compressor'];
 
 describe('the loader tier is the class id', () => {
   it('asks for the class file of every class of every family that has one', () => {
@@ -27,7 +31,7 @@ describe('the loader tier is the class id', () => {
     }
   });
 
-  it('has a file for every class of the four families Turn 7 gave classes to', () => {
+  it('has a file for every class of every family that has them', () => {
     const files = spriteFiles();
     for (const family of CLASS_FAMILIES) {
       const spec = EQUIPMENT_SPECS.find((entry) => entry.spriteKey === family);
@@ -74,6 +78,17 @@ describe('the file the art side owes for a class', () => {
       ['edgebander', 'standard', 208, 169],
       ['edgebander', 'pro', 208, 174],
       ['edgebander', 'industrial', 256, 203],
+      // The five extractor and the five compressor classes of CLAUDE.md T10 3.4.
+      ['extractor', 'used', 112, 160],
+      ['extractor', 'budget', 112, 160],
+      ['extractor', 'standard', 160, 184],
+      ['extractor', 'pro', 208, 232],
+      ['extractor', 'industrial', 304, 280],
+      ['compressor', 'used', 112, 112],
+      ['compressor', 'budget', 112, 112],
+      ['compressor', 'standard', 160, 160],
+      ['compressor', 'pro', 160, 160],
+      ['compressor', 'industrial', 208, 232],
     ];
     for (const [family, variantId, width, height] of rows) {
       const spec = EQUIPMENT_SPECS.find((entry) => entry.spriteKey === family);
@@ -140,5 +155,40 @@ describe('the anchor of a class', () => {
     expect(stands).toEqual({ x: slot.x, y: slot.y, width: 1, depth: 1, height: 0.5 });
     anchorOf(stands.x, stands.y, stands.width, stands.depth, stands.height);
     expect(spriteUrl('edgebander', 'budget')).toBe('/sprites/edgebander.budget.png');
+  });
+});
+
+describe('the file on disk and the footprint in the engine', () => {
+  /** The width and the height a PNG declares in its own header, which is the one thing the art
+   *  side and the engine can disagree about without anybody noticing until a machine stands off
+   *  its tile in the hall (CLAUDE.md T10 3.4, 3.12). */
+  function pngSize(name: string): { width: number; height: number } {
+    const head = readFileSync(join('public/sprites', name)).subarray(16, 24);
+    return { width: head.readUInt32BE(0), height: head.readUInt32BE(4) };
+  }
+
+  it('agree on every delivered class file, to the whole pixel the art is drawn on', () => {
+    let checked = 0;
+    for (const spec of EQUIPMENT_SPECS) {
+      for (const variant of spec.variants) {
+        const name = `${spec.spriteKey}.${variant.id}.png`;
+        if (!spriteFiles().includes(name)) continue;
+        const stands = footprintOf(spec.id, variant.id);
+        const owed = spriteFileSize(stands.width, stands.depth, stands.height);
+        const real = pngSize(name);
+        expect(real.width, name).toBe(owed.width);
+        expect(real.height, name).toBe(Math.floor(owed.height));
+        checked += 1;
+      }
+    }
+    // Thirty three files: the twenty of the four families Turn 7 gave classes to, the ten of the
+    // extraction and air families of Turn 10, and the three the art side named after the one
+    // synthetic standard class of a family that has no ladder, which are the two central systems
+    // and the pelletiser. Those three were measured against what was delivered in Turn 10: the
+    // systems are 3 by 2 by 4 and the pelletiser 2 by 2 by 2.5 (CLAUDE.md T10 3.4).
+    expect(checked).toBe(33);
+    for (const name of ['dustSystem.standard.png', 'flexiSystem.standard.png', 'pelletiser.standard.png']) {
+      expect(spriteFiles(), name).toContain(name);
+    }
   });
 });

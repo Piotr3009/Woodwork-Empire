@@ -1099,11 +1099,242 @@ export const EDGEBANDER_VARIANTS: EquipmentVariant[] = [
   },
 ];
 
+/** The five classes of extractor. The footprints and the heights are Piotr's table of
+ *  CLAUDE.md T10 3.4 and the art side has drawn every one of them at exactly that size; the zone
+ *  is the footprint, because an extractor is stood against a wall and nobody works round it. The
+ *  prices are `[TUNE]` 400 / 600 / 1,400 / 3,200 / 7,500, and the budget one keeps the 600 the
+ *  single class of Turns 1 to 9 cost. What each one pulls is in `EXTRACTION_CAPACITY`, in m3/h;
+ *  the bag and endurance factors are the saw's ladder, as 3.4 asks. */
+export const EXTRACTOR_VARIANTS: EquipmentVariant[] = [
+  {
+    id: 'used',
+    name: 'Used extractor',
+    price: 400,
+    width: 1,
+    depth: 1,
+    height: 2,
+    zoneWidth: 1,
+    zoneDepth: 1,
+    outputFactor: 1,
+    bagIntervalFactor: BAG_BY_CLASS.used ?? 1,
+    enduranceFactor: ENDURANCE_BY_CLASS.used ?? 1,
+    powerPerDay: 2,
+    description:
+      'A single bag extractor on castors that somebody else wore out first. The impeller is ' +
+      'chipped and the bag has been patched, and it pulls about as much as a good vacuum. It is ' +
+      'extraction, which is what the law and the machines ask for, and it is nothing more.',
+  },
+  {
+    id: 'budget',
+    name: 'Extractor',
+    price: 600,
+    width: 1,
+    depth: 1,
+    height: 2,
+    zoneWidth: 1,
+    zoneDepth: 1,
+    outputFactor: 1,
+    bagIntervalFactor: BAG_BY_CLASS.budget ?? 1,
+    enduranceFactor: ENDURANCE_BY_CLASS.budget ?? 1,
+    powerPerDay: 3,
+    description:
+      'A new single bag extractor, wheeled from machine to machine on a length of hose. It ' +
+      'clears one saw and it does not clear two, which is what the sums under the hall say the ' +
+      'moment a second man starts cutting.',
+  },
+  {
+    id: 'standard',
+    name: 'Twin bag extractor',
+    price: 1400,
+    width: 2,
+    depth: 1,
+    height: 2,
+    zoneWidth: 2,
+    zoneDepth: 1,
+    outputFactor: 1,
+    bagIntervalFactor: BAG_BY_CLASS.standard ?? 1,
+    enduranceFactor: ENDURANCE_BY_CLASS.standard ?? 1,
+    powerPerDay: 5,
+    description:
+      'Two bags and a bigger impeller on a steel frame: the extractor a two man shop settles on. ' +
+      'It will hold a saw and a bander at once, and it is emptied half as often as a single bag.',
+  },
+  {
+    id: 'pro',
+    name: 'Four bag extractor',
+    price: 3200,
+    width: 3,
+    depth: 1,
+    height: 2.5,
+    zoneWidth: 3,
+    zoneDepth: 1,
+    outputFactor: 1,
+    bagIntervalFactor: BAG_BY_CLASS.pro ?? 1,
+    enduranceFactor: ENDURANCE_BY_CLASS.pro ?? 1,
+    powerPerDay: 8,
+    description:
+      'Four bags, a cartridge filter and three metres of machine along the wall. It keeps a ' +
+      'crew of four out of the dust band, and it is the last thing before a central system.',
+  },
+  {
+    id: 'industrial',
+    name: 'Industrial extractor',
+    price: 7500,
+    width: 5,
+    depth: 1,
+    height: 2.5,
+    zoneWidth: 5,
+    zoneDepth: 1,
+    outputFactor: 1,
+    bagIntervalFactor: BAG_BY_CLASS.industrial ?? 1,
+    enduranceFactor: ENDURANCE_BY_CLASS.industrial ?? 1,
+    powerPerDay: 14,
+    description:
+      'Ten bags on a five metre frame, three phase, and enough pull for every machine in a ' +
+      'twenty metre hall at once. It is a central system in all but the ducting.',
+  },
+];
+
+/** The five classes of compressor. Footprints, heights, bar, litres a minute and endurance are
+ *  Piotr's tables of CLAUDE.md T10 3.2 and 3.4, and the art is drawn at exactly these sizes; the
+ *  prices are `[TUNE]` 300 / 1,200 / 3,500 / 9,000 / 22,000. What each one gives is in
+ *  `COMPRESSOR_AIR`; how long it runs before it gives up is in `ENDURANCE_MINUTES_BY_CLASS`,
+ *  because a compressor's life is written in running minutes and not in the hours of a bench
+ *  machine. The used and the budget one are still light enough for two men to carry
+ *  (`LIGHT_CLASSES`, CLAUDE.md T8 3.4). */
+export const COMPRESSOR_VARIANTS: EquipmentVariant[] = [
+  {
+    id: 'used',
+    name: 'Used compressor',
+    price: 300,
+    width: 1,
+    depth: 1,
+    height: 1,
+    zoneWidth: 1,
+    zoneDepth: 1,
+    outputFactor: 1,
+    bagIntervalFactor: 1,
+    enduranceFactor: ENDURANCE_BY_CLASS.used ?? 1,
+    powerPerDay: 2,
+    description:
+      'A little direct drive compressor off a site, loud enough to talk over and hot after ten ' +
+      'minutes. Eight bar and a hundred and fifty litres a minute: a nailer and a blow gun, and ' +
+      'not both at once for long.',
+  },
+  {
+    id: 'budget',
+    name: 'Compressor',
+    price: 1200,
+    width: 1,
+    depth: 1,
+    height: 1,
+    zoneWidth: 1,
+    zoneDepth: 1,
+    outputFactor: 1,
+    bagIntervalFactor: 1,
+    enduranceFactor: ENDURANCE_BY_CLASS.budget ?? 1,
+    powerPerDay: 3,
+    description:
+      'A belt driven receiver on wheels, eight bar and two hundred and fifty litres a minute. It ' +
+      'keeps two joiners in nails and drivers all day and it will not run a floor bander.',
+  },
+  {
+    id: 'standard',
+    name: 'Workshop compressor',
+    price: 3500,
+    width: 2,
+    depth: 1,
+    height: 1.5,
+    zoneWidth: 2,
+    zoneDepth: 1,
+    outputFactor: 1,
+    bagIntervalFactor: 1,
+    enduranceFactor: ENDURANCE_BY_CLASS.standard ?? 1,
+    powerPerDay: 6,
+    description:
+      'Ten bar off a two hundred litre receiver, four hundred and fifty litres a minute. This is ' +
+      'the first compressor that will hold a floor edgebander and a bench at the same time.',
+  },
+  {
+    id: 'pro',
+    name: 'Professional compressor',
+    price: 9000,
+    width: 2,
+    depth: 1,
+    height: 1.5,
+    zoneWidth: 2,
+    zoneDepth: 1,
+    outputFactor: 1,
+    bagIntervalFactor: 1,
+    enduranceFactor: ENDURANCE_BY_CLASS.pro ?? 1,
+    powerPerDay: 10,
+    description:
+      'A screw compressor: eleven hundred litres a minute at ten bar, quiet enough to stand in ' +
+      'the hall, and built to run all day rather than to start and stop.',
+  },
+  {
+    id: 'industrial',
+    name: 'Industrial compressor',
+    price: 22000,
+    width: 2,
+    depth: 2,
+    height: 2.5,
+    zoneWidth: 2,
+    zoneDepth: 2,
+    outputFactor: 1,
+    bagIntervalFactor: 1,
+    enduranceFactor: ENDURANCE_BY_CLASS.industrial ?? 1,
+    powerPerDay: 20,
+    description:
+      'Thirteen bar and two thousand three hundred litres a minute, with a refrigerant dryer ' +
+      'built into the cabinet. It runs a CNC, a booth and a hall of benches and never notices.',
+  },
+];
+
+/** What each class of extraction pulls, in cubic metres an hour (PIOTR's bands, CLAUDE.md
+ *  T10 3.1). One bag is a thousand, two are two thousand, four are three thousand six hundred and
+ *  ten are eight thousand; a central system is twelve thousand and a flexi one fifteen. Several
+ *  extractors in one hall add up: the hall is one duct run, however many fans are on it. */
+export const EXTRACTION_CAPACITY: Record<string, Record<string, number>> = {
+  extractor: { used: 1000, budget: 1000, standard: 2000, pro: 3600, industrial: 8000 },
+  dustSystem: { standard: 12000 },
+  flexiSystem: { standard: 15000 },
+};
+
+/** What a compressor gives: the pressure at the outlet and the free air it will make, a minute
+ *  (PIOTR's bands from the trade, CLAUDE.md T10 3.2). A machine that wants more bar than its
+ *  compressor gives cannot run at all; litres are a sum over everything drawing on it. */
+export const COMPRESSOR_AIR: Record<string, { bar: number; litres: number }> = {
+  used: { bar: 8, litres: 150 },
+  budget: { bar: 8, litres: 250 },
+  standard: { bar: 10, litres: 450 },
+  pro: { bar: 10, litres: 1100 },
+  industrial: { bar: 13, litres: 2300 },
+};
+
+/** A compressor's life is written in the minutes it actually runs, not in the hours of a bench
+ *  machine (PIOTR, CLAUDE.md T10 3.2). The one table that overrides the family's hours and the
+ *  class ladder, so `enduranceHoursFor` has one answer and not two. */
+export const ENDURANCE_MINUTES_BY_CLASS: Record<string, Record<string, number>> = {
+  compressor: { used: 60000, budget: 120000, standard: 200000, pro: 400000, industrial: 800000 },
+};
+
+/** The class of compressor that comes with a dryer in the cabinet (PIOTR, CLAUDE.md T10 3.3). */
+export const COMPRESSOR_WITH_DRYER = 'industrial';
+
+/** The catalogue ids of the air side, named once so nothing spells them twice. */
+export const COMPRESSOR = 'compressor';
+export const AIR_DRYER = 'airDryer';
+/** What a dryer costs [TUNE] (CLAUDE.md T10 3.3). */
+export const AIR_DRYER_PRICE = 1500;
+
 const VARIANTS_BY_FAMILY: Record<string, EquipmentVariant[]> = {
   tableSaw: TABLE_SAW_VARIANTS,
   workbench: WORKBENCH_VARIANTS,
   sheetRack: SHEET_RACK_VARIANTS,
   edgebander: EDGEBANDER_VARIANTS,
+  extractor: EXTRACTOR_VARIANTS,
+  compressor: COMPRESSOR_VARIANTS,
 };
 
 const BASE_SPEC = {
@@ -1278,15 +1509,43 @@ const SPEC_DRAFTS: SpecDraft[] = [
     // Off the shelf, in tomorrow (PIOTR).
     deliveryDays: 1,
     folder: 'Compressors',
-    tab: 'handTools',
-    name: 'Small compressor',
-    price: 350,
+    // Air moved in beside the extraction when the tab was renamed "Extraction and air"
+    // (CLAUDE.md T10 3.3): a compressor is not a hand tool, it is what the hand tools run on.
+    tab: 'extraction',
+    name: 'Compressor',
+    price: 300,
     category: 'machine',
     width: 1,
     depth: 1,
     height: 1,
     spriteKey: 'compressor',
-    effect: 'Air for nailers and clamps.',
+    // A hall may have several, and every machine draws from the one it is assigned to
+    // (CLAUDE.md T10 3.2).
+    stackable: true,
+    effect:
+      'Air for nailers, drivers, sanding, a floor bander, a CNC and a booth. Every consumer is ' +
+      'assigned to one compressor and draws from that one only.',
+  },
+  {
+    ...BASE_SPEC,
+    id: 'airDryer',
+    // Off the shelf with the compressors (PIOTR).
+    deliveryDays: 1,
+    folder: 'Air dryers',
+    tab: 'extraction',
+    name: 'Air dryer',
+    price: AIR_DRYER_PRICE,
+    category: 'extraction',
+    width: 1,
+    depth: 1,
+    height: 1.5,
+    spriteKey: 'airDryer',
+    // One per compressor, so a hall with three compressors may want three (CLAUDE.md T10 3.3).
+    stackable: true,
+    effect:
+      'Takes the water out of the line of the compressor it is fitted to. A CNC will not run on ' +
+      'wet air at all, and a spray booth on wet air takes half as long again over the finish ' +
+      'and loses the job a point of rating. The industrial compressor has one built in.',
   },
   {
     ...BASE_SPEC,
@@ -1296,13 +1555,17 @@ const SPEC_DRAFTS: SpecDraft[] = [
     folder: 'Extractors',
     tab: 'extraction',
     name: 'Extractor',
-    price: 600,
+    price: 400,
     category: 'extraction',
     width: 1,
     depth: 1,
     height: 2,
     spriteKey: 'extractor',
-    effect: 'Serves every machine. Without it there are no bags. Can break down.',
+    // Several add up: what the hall pulls is the sum of every fan in it (CLAUDE.md T10 3.1).
+    stackable: true,
+    effect:
+      'Serves every machine. Without it there are no bags. What it pulls is in cubic metres an ' +
+      'hour, and the machines at work have to add up to less than it. Can break down.',
   },
   {
     ...BASE_SPEC,
@@ -1575,9 +1838,12 @@ const SPEC_DRAFTS: SpecDraft[] = [
     name: 'Central dust extraction system',
     price: 35000,
     category: 'extraction',
-    width: 2,
+    // Three by two of plant, four metres high, which is the size the art side drew it at. It
+    // stands outside on the apron by the shutter, like the van, and draws its ducting along the
+    // rear wall (CLAUDE.md T10 3.4).
+    width: 3,
     depth: 2,
-    height: 2,
+    height: 4,
     spriteKey: 'dustSystem',
     effect: 'No more bags and no breakdown. Waste collection 400 per month.',
   },
@@ -1591,9 +1857,11 @@ const SPEC_DRAFTS: SpecDraft[] = [
     name: 'Flexi extraction system',
     price: 50000,
     category: 'extraction',
-    width: 2,
+    // The same plant on the apron as the central system, with flexible ducting on every machine
+    // (CLAUDE.md T10 3.4).
+    width: 3,
     depth: 2,
-    height: 2,
+    height: 4,
     spriteKey: 'flexiSystem',
     effect:
       'Everything the central system does, and flexible ducting on every machine: move the hall ' +
@@ -1610,11 +1878,13 @@ const SPEC_DRAFTS: SpecDraft[] = [
     name: 'Pelletiser',
     price: 15000,
     category: 'extraction',
-    width: 1,
-    depth: 1,
-    height: 1.5,
-    zoneWidth: 2,
-    zoneDepth: 2,
+    // Two by two of machine, two and a half metres high: the size the art side delivered it at.
+    // It was 1 by 1 by 1.5 in the engine and the picture drew a third too small for its tile.
+    width: 2,
+    depth: 2,
+    height: 2.5,
+    zoneWidth: 3,
+    zoneDepth: 3,
     spriteKey: 'pelletiser',
     requiresOneOf: ['dustSystem', 'flexiSystem'],
     effect: 'No waste cost and pellet sales that rise with production.',
@@ -1651,7 +1921,7 @@ export const EQUIPMENT_TABS: Array<{ id: EquipmentTab; label: string }> = [
   { id: 'spraying', label: 'Spraying' },
   { id: 'sanding', label: 'Sanding' },
   { id: 'handTools', label: 'Hand tools' },
-  { id: 'extraction', label: 'Extraction' },
+  { id: 'extraction', label: 'Extraction and air' },
   { id: 'cnc', label: 'CNC' },
   { id: 'cncCentre', label: 'CNC centre' },
   { id: 'handling', label: 'Handling' },

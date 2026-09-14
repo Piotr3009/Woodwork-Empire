@@ -17,6 +17,7 @@ import {
   DUST_HIGH_THRESHOLD,
   DUST_MAX,
   DUST_PER_PRODUCTION_MINUTE,
+  ENDURANCE_MINUTES_BY_CLASS,
   EQUIPMENT_SPECS,
   EXTRACTOR_REPAIR_COST,
   EXTRACTOR_BREAKDOWN_CHANCE,
@@ -255,8 +256,13 @@ export function bagIntervalFor(item: Equipment): number {
   return Math.max(1, Math.round(spec.bagInterval * variant.bagIntervalFactor));
 }
 
-/** Hours of use a machine of this family and class has in it. */
+/** Hours of use a machine of this family and class has in it. A family whose life Piotr wrote in
+ *  running minutes, as the compressors' is, says so in its own table and the hours come off that;
+ *  everything else is the family's base hours stretched by its class (CLAUDE.md T10 3.2). One
+ *  answer either way, so nothing reads two. */
 export function enduranceHoursFor(specId: string, variantId: string): number {
+  const minutes = ENDURANCE_MINUTES_BY_CLASS[specId]?.[variantId];
+  if (minutes !== undefined) return minutes / 60;
   const spec = findSpec(specId);
   if (!spec) return 0;
   return Math.round(spec.enduranceHours * variantOf(spec, variantId).enduranceFactor);

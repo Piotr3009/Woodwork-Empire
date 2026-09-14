@@ -169,7 +169,12 @@ describe('30 days on Easy, working the board', () => {
     const gate = state.tasks.filter((task) => task.kind === 'unload' && task.orderIds.length > 0);
     expect(gate).toHaveLength(1);
     const load = gate[0];
-    expect(load?.orderIds.length).toBeGreaterThanOrEqual(3);
+    // Two heavy things on it: the used saw and the used extractor. The compressor the day 1
+    // shopping buys is the used class now, and a used or budget compressor is light enough for
+    // two men to carry (CLAUDE.md T8 3.4, T10 3.4), so it needs nobody at the gate. That is the
+    // Turn 8 open question about a small compressor being a two hour lorry job, answered by the
+    // class ladder rather than by a list.
+    expect(load?.orderIds.length).toBe(2);
     expect(load?.minutesTotal).toBe(EQUIPMENT_UNLOAD_MINUTES * (load?.orderIds.length ?? 0));
     expect(load?.day).toBe(2);
   });
@@ -540,8 +545,11 @@ describe('a day with a break, played by the script', () => {
     const last = states[states.length - 1];
     expect(formatTime(last?.clock.minute ?? -1)).toBe('17:00');
     // Day 2 is the morning at the gate and the afternoon at the bench, and it runs out of work
-    // seven minutes before five: one job at a time, and this one was finished (CLAUDE.md T9 3.1).
-    expect(last?.owner.minutesWorked).toBe(473);
+    // with the day still to go: one job at a time, and this one was finished (CLAUDE.md T9 3.1).
+    // It was 473 while the small compressor was a two hour lorry job; the used class the day 1
+    // shopping buys is light now, so two hours of the gate are gone and he runs out that much
+    // earlier (CLAUDE.md T10 3.4).
+    expect(last?.owner.minutesWorked).toBe(473 - EQUIPMENT_UNLOAD_MINUTES);
     expect(last?.owner.minutesWorked).toBeLessThanOrEqual(MINUTES_PER_WORKING_DAY);
     expect(last?.owner.overtimeMinutes).toBe(0);
     const idle = states.filter(
@@ -779,7 +787,8 @@ describe('a month that orders a CNC on day 1 and calls it off on day 10', () => 
   const day10 = playUntilDay(ordered, 10, IDLE, seen);
 
   it('pays for it at the counter on day 1 and stands nothing in the hall', () => {
-    expect(cashAtFirst - ordered.cash).toBe(600 + 45000);
+    // The extractor the catalogue offers first is the used class at 400 (CLAUDE.md T10 3.4).
+    expect(cashAtFirst - ordered.cash).toBe(400 + 45000);
     expect(ordered.equipment.some((item) => item.specId === 'cnc')).toBe(false);
   });
 

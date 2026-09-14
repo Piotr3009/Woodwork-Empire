@@ -40,11 +40,14 @@ describe('the catalogue lists folders', () => {
 });
 
 describe('the tiles inside a folder', () => {
-  it('draws five tiles for the saw and one for the compressor', () => {
+  it('draws five tiles for the saw, the compressor and the extractor, one for the thicknesser', () => {
     const state = newGame({ difficulty: 'veryEasy' });
     expect(tiles(state, 'tableSaw')).toHaveLength(5);
-    expect(tiles(state, 'compressor')).toHaveLength(1);
-    expect(tiles(state, 'extractor')).toHaveLength(1);
+    // The extraction and air families got their five classes in Turn 10 (CLAUDE.md T10 3.4).
+    expect(tiles(state, 'compressor')).toHaveLength(5);
+    expect(tiles(state, 'extractor')).toHaveLength(5);
+    expect(tiles(state, 'thicknesser')).toHaveLength(1);
+    expect(tiles(state, 'airDryer')).toHaveLength(1);
   });
 
   it('names each class, prices it, describes it and lists what it does', () => {

@@ -369,15 +369,17 @@ describe('the modals', () => {
     click('[data-do="catalogueTab"][data-id="handTools"]');
     expect(html()).not.toContain('data-do="clearFilter"');
     expect(html()).toContain('Drills');
-    type('[data-filter="catalogue"]', 'compress');
+    type('[data-filter="catalogue"]', 'hand tool');
     expect(html()).toContain('data-do="clearFilter"');
-    expect(html()).toContain('Compressors');
+    expect(html()).toContain('Hand tool sets');
     expect(html()).not.toContain('Drills');
     // A tab with nothing matching says so, and never borrows a folder from another tab.
     click('[data-do="catalogueTab"][data-id="storage"]');
     expect(html()).toContain('Tool cabinets');
     type('[data-filter="catalogue"]', 'compress');
     expect(html()).toContain('Nothing matches that.');
+    // Compressors are under Extraction and air from Turn 10, and the filter never borrows a
+    // folder from another tab (CLAUDE.md T10 3.3).
     expect(html()).not.toContain('Compressors');
     click('[data-do="clearFilter"]');
     expect(html()).toContain('Tool cabinets');

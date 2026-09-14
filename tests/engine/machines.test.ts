@@ -42,6 +42,7 @@ import {
   dustFactor,
   dustGainPerMinute,
   extractorBreakdownChance,
+  countOf,
   has,
 } from '../../src/engine/machines';
 import { canBuy } from '../../src/engine/game';
@@ -102,9 +103,14 @@ describe('the catalogue', () => {
   });
 
   it('refuses a second one of something that stands alone', () => {
-    const state = buyNow(newGame(), 'extractor');
-    expect(canBuy(state, 'extractor')).toEqual({ ok: false, reason: 'Already owned' });
-    expect(canBuy(state, 'tableSaw').ok).toBe(true);
+    // An extractor and a compressor may be owned several times over from Turn 10, because the
+    // hall adds their capacity up (CLAUDE.md T10 3.1, 3.2). A thicknesser still stands alone.
+    const state = buyNow(newGame(), 'thicknesser');
+    expect(canBuy(state, 'thicknesser')).toEqual({ ok: false, reason: 'Already owned' });
+    expect(canBuy(state, 'extractor').ok).toBe(true);
+    const two = buyNow(buyNow(state, 'extractor'), 'extractor');
+    expect(countOf(two, 'extractor')).toBe(2);
+    expect(canBuy(two, 'extractor').ok).toBe(true);
   });
 });
 
