@@ -38,10 +38,22 @@ function toolsLine(enquiry: Enquiry): string {
   return names.length === 0 ? 'nothing special' : names.join(', ').toLowerCase();
 }
 
+/** Where the reason on a greyed tile takes the player: the page that would put it right
+ *  (PIOTR, 13.09; CLAUDE.md T10 3.7). A reason nothing can be bought or hired for has no link. */
+function blockLink(enquiry: Enquiry): string {
+  if (enquiry.blockWhere === 'catalogue') {
+    return button('openModal', 'Open the catalogue', 'data-modal="catalogue"');
+  }
+  if (enquiry.blockWhere === 'team') {
+    return button('openModal', 'Open the team', 'data-modal="team"');
+  }
+  return '';
+}
+
 function tile(state: GameState, enquiry: Enquiry): string {
   const allowed = canAccept(state, enquiry);
   const locked = enquiry.lockReason !== null;
-  const byHand = locked && enquiry.byHandAvailable;
+  const byHand = !enquiry.unreachable && locked && enquiry.byHandAvailable;
   const sheets = sheetsForCost(materialCostFor(enquiry.basePrice, enquiry.bespokeMaterial));
   // Days of his own time with the machines standing in the hall now, which is the same number
   // the deadline is worked out from (CLAUDE.md T6 3.7).
@@ -55,17 +67,25 @@ function tile(state: GameState, enquiry: Enquiry): string {
     enquiry.needsMeasure ? '<span class="badge">Site measure</span>' : '',
     byHand ? '<span class="badge badge-warn">By hand, plus 50% time</span>' : '',
   ].join('');
-  const action = allowed.ok
-    ? button(
-        'acceptEnquiry',
-        byHand ? 'Accept, by hand, plus 50% time' : 'Accept',
-        `data-id="${enquiry.id}" data-byhand="${byHand ? '1' : '0'}"`,
-      )
-    : '';
-  const lockLine =
-    enquiry.lockReason === null ? '' : `<p class="lock">${escapeHtml(enquiry.lockReason)}</p>`;
+  // A job the company cannot take carries no Accept at all: it is on the board to be read
+  // (PIOTR, 13.09; CLAUDE.md T10 3.7).
+  const action = enquiry.unreachable
+    ? blockLink(enquiry)
+    : allowed.ok
+      ? button(
+          'acceptEnquiry',
+          byHand ? 'Accept, by hand, plus 50% time' : 'Accept',
+          `data-id="${enquiry.id}" data-byhand="${byHand ? '1' : '0'}"`,
+        )
+      : '';
+  const lockLine = enquiry.unreachable
+    ? `<p class="lock">Cannot take this: ${escapeHtml(enquiry.blockReason)}</p>`
+    : enquiry.lockReason === null
+      ? ''
+      : `<p class="lock">${escapeHtml(enquiry.lockReason)}</p>`;
   return (
-    `<div class="tile${locked ? ' is-locked' : ''}" data-enquiry="${enquiry.id}">` +
+    `<div class="tile${locked || enquiry.unreachable ? ' is-locked' : ''}` +
+    `${enquiry.unreachable ? ' is-out-of-reach' : ''}" data-enquiry="${enquiry.id}">` +
     express +
     `<h3 class="tile-name">${escapeHtml(enquiry.name)}</h3>` +
     `<p class="tile-price">${money(enquiry.price)}</p>` +
@@ -86,9 +106,13 @@ export function renderBoard(state: GameState, filter: string): string {
   if (!has(state, 'laptop')) {
     return emptyLine('The enquiries come in by email. Buy a laptop from the catalogue first.');
   }
+  const open = state.enquiries.filter((enquiry) => !enquiry.unreachable).length;
+  const greyed = state.enquiries.length - open;
   const head =
     `<p class="hint">Reputation ${formatReputation(state.reputation)} · ` +
-    `${plural(state.enquiries.length, 'enquiry', 'enquiries')} waiting.</p>`;
+    `${plural(open, 'enquiry', 'enquiries')} waiting` +
+    `${greyed === 0 ? '' : `, and ${greyed} the workshop cannot take yet`}. ` +
+    'The board is written again at 08:00 and at 13:00.</p>';
   if (state.enquiries.length === 0) {
     return head + emptyLine('Nothing on the board. Reputation brings enquiries.');
   }

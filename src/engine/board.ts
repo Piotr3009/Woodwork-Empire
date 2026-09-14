@@ -6,16 +6,18 @@ import {
   BOARD_SIZE_BY_TIER,
   EXPIRY_EXPRESS_DAYS,
   EXPIRY_STANDARD_DAYS,
-  EXPRESS_MAX_PER_WEEK,
-  EXPRESS_PRICE_UPLIFT,
-  EXPRESS_PROBABILITY_BASE,
-  EXPRESS_PROBABILITY_MAX,
-  EXPRESS_PROBABILITY_MIN,
-  EXPRESS_PROBABILITY_PER_REPUTATION_STEP,
-  EXPRESS_PROBABILITY_REPUTATION_STEP,
+  EXPRESS_PRICE_UPLIFT_MAX,
+  EXPRESS_PRICE_UPLIFT_MIN,
+  EXPRESS_PROBABILITY,
+  MINUTES_PER_WORKING_DAY,
+  PRODUCT_TEMPLATES,
   SIZE_MULTIPLIER_MAX,
   SIZE_MULTIPLIER_MIN,
+  SOLID_WOOD_EQUIPMENT,
+  UNREACHABLE_MAX,
+  UNREACHABLE_MIN,
 } from './constants';
+import { findSpec, has } from './machines';
 import {
   availableFinishes,
   findTemplate,
@@ -24,8 +26,10 @@ import {
   priceFor,
   templatesForReputation,
 } from './catalog';
-import { weekOfDay } from './clock';
-import { deadlineDaysFor, labourValueFor, ownerDaysFor } from './jobs';
+import { deadlineDaysFor, labourValueFor, ownerDaysFor, stagedJob } from './jobs';
+import { jobMinutesFor } from './stages';
+import { hasOrOnOrder } from './orders';
+import { workshopRate } from './plan';
 import { reputationTier } from './reputation';
 import { chance, float, int, makeId, pickWeighted } from './rng';
 import type { Enquiry, GameState, ProductTemplate } from './types';
@@ -36,22 +40,11 @@ export function boardSizeRange(state: GameState): [number, number] {
   return BOARD_SIZE_BY_TIER[Math.min(tier, BOARD_SIZE_BY_TIER.length - 1)] ?? [1, 2];
 }
 
-/** Chance the next enquiry is an express job: base plus a step per whole ten points of
- *  reputation, floored and capped [TUNE mapping]. */
-export function expressProbability(reputation: number): number {
-  const steps = Math.floor(reputation / EXPRESS_PROBABILITY_REPUTATION_STEP);
-  const raw = EXPRESS_PROBABILITY_BASE + EXPRESS_PROBABILITY_PER_REPUTATION_STEP * steps;
-  return Math.min(EXPRESS_PROBABILITY_MAX, Math.max(EXPRESS_PROBABILITY_MIN, raw));
-}
-
-/** One express enquiry a week and no more (PIOTR). */
-export function expressAllowed(state: GameState): boolean {
-  const alreadyThisWeek =
-    state.lastExpressDay !== null &&
-    weekOfDay(state.lastExpressDay) === weekOfDay(state.clock.day)
-      ? 1
-      : 0;
-  return alreadyThisWeek < EXPRESS_MAX_PER_WEEK;
+/** Chance the next enquiry drawn is an express job: a flat figure at every refresh of the board
+ *  (PIOTR, 13.09: "more express jobs, properly profitable"; CLAUDE.md T10 3.7). The reputation
+ *  ladder of Turns 1 to 9 and the one a week that capped it are both gone. */
+export function expressProbability(): number {
+  return EXPRESS_PROBABILITY;
 }
 
 function drawTemplate(state: GameState): ProductTemplate | null {
@@ -61,13 +54,15 @@ function drawTemplate(state: GameState): ProductTemplate | null {
 }
 
 function buildEnquiry(state: GameState, entry: ProductTemplate): Enquiry | null {
-  // The roll always runs, so the weekly cap never shifts the rest of the random stream.
-  const express = chance(state, expressProbability(state.reputation)) && expressAllowed(state);
+  const express = chance(state, expressProbability());
+  // The uplift is drawn either way, so an express job and a standard one take the same number of
+  // draws out of the seeded stream (PIOTR: 30% to 50%, uniformly; CLAUDE.md T10 3.7).
+  const uplift = float(state, EXPRESS_PRICE_UPLIFT_MIN, EXPRESS_PRICE_UPLIFT_MAX);
   const sizeMultiplier = float(state, SIZE_MULTIPLIER_MIN, SIZE_MULTIPLIER_MAX);
   const market = marketPriceFactor(state.reputation);
   const basePrice = priceFor(entry.basePrice, sizeMultiplier, 0, market);
   const price = express
-    ? priceFor(entry.basePrice, sizeMultiplier, EXPRESS_PRICE_UPLIFT, market)
+    ? priceFor(entry.basePrice, sizeMultiplier, uplift, market)
     : basePrice;
   const finishes = availableFinishes(state, entry);
   const finish = finishes[int(state, 0, Math.max(0, finishes.length - 1))];
@@ -98,6 +93,9 @@ function buildEnquiry(state: GameState, entry: ProductTemplate): Enquiry | null 
     expiresOnDay: state.clock.day + expiryDays - 1,
     lockReason: lockReasonFor(state, entry),
     byHandAvailable: entry.byHandAllowed,
+    unreachable: false,
+    blockReason: '',
+    blockWhere: '',
   };
 }
 
@@ -121,10 +119,21 @@ export function generateEnquiry(state: GameState): Enquiry | null {
   return null;
 }
 
+/** The enquiries of the band: the ones the company could take. The greyed ones stand beside the
+ *  band and are never counted into it (CLAUDE.md T10 3.7). */
+export function reachableEnquiries(state: GameState): Enquiry[] {
+  return state.enquiries.filter((enquiry) => !enquiry.unreachable);
+}
+
+/** The ones on the board to be looked at and not taken. */
+export function unreachableEnquiries(state: GameState): Enquiry[] {
+  return state.enquiries.filter((enquiry) => enquiry.unreachable);
+}
+
 /** Adds one enquiry if the board has room for it. The one place the board grows. */
 function drawInto(state: GameState): boolean {
   const [, max] = boardSizeRange(state);
-  if (state.enquiries.length >= max) return false;
+  if (reachableEnquiries(state).length >= max) return false;
   const enquiry = generateEnquiry(state);
   if (!enquiry) return false;
   state.enquiries.push(enquiry);
@@ -135,18 +144,119 @@ function drawInto(state: GameState): boolean {
 /** Tops the board up to what the reputation supports. Runs at the start of every working day. */
 export function refillBoard(state: GameState): void {
   const [min, max] = boardSizeRange(state);
-  if (state.enquiries.length >= min) return;
+  if (reachableEnquiries(state).length >= min) return;
   const target = int(state, min, max);
-  while (state.enquiries.length < target) {
+  while (reachableEnquiries(state).length < target) {
     if (!drawInto(state)) return;
   }
 }
 
-/** The lock reason follows the workshop: buy the tools and the greyed entry goes live. */
+// ---------------------------------------------------------------------------
+// The jobs the company cannot take (PIOTR, 13.09: "show the jobs we cannot take and say why";
+// CLAUDE.md T10 3.7). Two or three of them stand on the board at a time, greyed, with the reason
+// in plain words and a way to the page that would put it right.
+// ---------------------------------------------------------------------------
+
+export interface BoardBlock {
+  reason: string;
+  where: '' | 'catalogue' | 'team';
+}
+
+/** Why this template is out of the company's reach, or null while it is not. The first thing in
+ *  the way, in the order the player would meet it: the standing, then the kit, then the hands. */
+export function blockFor(
+  state: GameState,
+  entry: ProductTemplate,
+  deadlineDays: number,
+  basePrice: number,
+): BoardBlock | null {
+  if (state.reputation < entry.minReputation) {
+    return { reason: `reputation too low (needs ${entry.minReputation})`, where: '' };
+  }
+  if (entry.material === 'solidWood' && !SOLID_WOOD_EQUIPMENT.every((id) => hasOrOnOrder(state, id))) {
+    return { reason: 'no timber machines', where: 'catalogue' };
+  }
+  if (entry.allowedFinishes.includes('lacquer') && !has(state, 'sprayBooth')) {
+    return { reason: 'needs a spray booth', where: 'catalogue' };
+  }
+  const missing = entry.requiredEquipment.filter((specId) => !hasOrOnOrder(state, specId));
+  if (missing.length > 0) {
+    const names = missing.map((specId) => findSpec(specId)?.name ?? specId);
+    return { reason: `no ${names.join(', ').toLowerCase()}`, where: 'catalogue' };
+  }
+  // The Turn 9 latest start arithmetic: what this workshop averages against the days the client
+  // gives (CLAUDE.md T9 3.6, T10 3.7).
+  const minutes = jobMinutesFor(
+    state,
+    stagedJob(labourValueFor(basePrice), entry.material, false),
+    workshopRate(state),
+  );
+  if (minutes / MINUTES_PER_WORKING_DAY > deadlineDays) {
+    return { reason: 'too few people for the deadline', where: 'team' };
+  }
+  return null;
+}
+
+/** One enquiry the company cannot take, or null when everything on the catalogue is within its
+ *  reach. Drawn from the whole product catalogue and not from the reputation band, because being
+ *  under the band is one of the reasons (CLAUDE.md T10 3.7). */
+export function generateUnreachable(state: GameState): Enquiry | null {
+  for (let attempt = 0; attempt < DRAW_ATTEMPTS; attempt += 1) {
+    const entry = PRODUCT_TEMPLATES[int(state, 0, PRODUCT_TEMPLATES.length - 1)];
+    if (!entry) return null;
+    const candidate = buildEnquiry(state, entry);
+    if (!candidate) return null;
+    const block = blockFor(state, entry, candidate.deadlineDays, candidate.basePrice);
+    if (block === null) continue;
+    if (state.enquiries.some((other) => other.unreachable && other.templateId === entry.id)) {
+      continue;
+    }
+    return { ...candidate, unreachable: true, blockReason: block.reason, blockWhere: block.where };
+  }
+  return null;
+}
+
+/** Tops the greyed ones up to two or three. Runs with every refresh of the board. */
+export function refillUnreachable(state: GameState): void {
+  const target = int(state, UNREACHABLE_MIN, UNREACHABLE_MAX);
+  let guard = 0;
+  while (unreachableEnquiries(state).length < target && guard < DRAW_ATTEMPTS) {
+    guard += 1;
+    const enquiry = generateUnreachable(state);
+    if (!enquiry) return;
+    state.enquiries.push(enquiry);
+  }
+}
+
+/** The board written again: what nobody took goes, what the standing draws comes in, and the
+ *  greyed ones are topped back up. Twice a day, at 08:00 and at 13:00, whether or not anything
+ *  was taken (PIOTR, 13.09; CLAUDE.md T10 3.7). */
+export function refreshBoard(state: GameState): void {
+  expireEnquiries(state);
+  refillBoard(state);
+  refillUnreachable(state);
+}
+
+/** The lock reason follows the workshop: buy the tools and the greyed entry goes live. A greyed
+ *  enquiry the company has caught up with is no longer out of reach either, and it joins the band
+ *  where there is room for it (CLAUDE.md T10 3.7). */
 export function refreshLocks(state: GameState): void {
+  const [, max] = boardSizeRange(state);
   for (const enquiry of state.enquiries) {
     const entry = findTemplate(enquiry.templateId);
     enquiry.lockReason = entry ? lockReasonFor(state, entry) : null;
+    if (!enquiry.unreachable || entry === null) continue;
+    const block = blockFor(state, entry, enquiry.deadlineDays, enquiry.basePrice);
+    if (block === null && reachableEnquiries(state).length < max) {
+      enquiry.unreachable = false;
+      enquiry.blockReason = '';
+      enquiry.blockWhere = '';
+      continue;
+    }
+    if (block !== null) {
+      enquiry.blockReason = block.reason;
+      enquiry.blockWhere = block.where;
+    }
   }
 }
 
@@ -170,8 +280,10 @@ export function removeEnquiry(state: GameState, enquiryId: string): void {
   if (state.enquiries.length < before) drawInto(state);
 }
 
-/** Locked entries can still be taken when the template allows the by hand path (CLAUDE.md 8.8). */
+/** Locked entries can still be taken when the template allows the by hand path (CLAUDE.md 8.8).
+ *  A greyed one never can: it is on the board to be read (CLAUDE.md T10 3.7). */
 export function canAccept(state: GameState, enquiry: Enquiry): { ok: boolean; reason: string } {
+  if (enquiry.unreachable) return { ok: false, reason: enquiry.blockReason };
   if (enquiry.lockReason === null) return { ok: true, reason: '' };
   if (enquiry.byHandAvailable) return { ok: true, reason: '' };
   void state;

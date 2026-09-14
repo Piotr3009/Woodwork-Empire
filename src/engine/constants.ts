@@ -66,6 +66,9 @@ export const DAY_START_HOUR = 8;
  *  then it is his hour and nobody else's. */
 export const BREAK_START_MINUTE = 240;
 export const BREAK_MINUTES = 60;
+/** 13:00: the board is written again when the workshop comes back off its dinner, which is the
+ *  second of the day's two refreshes (PIOTR, 13.09; CLAUDE.md T10 3.7). */
+export const BOARD_MIDDAY_MINUTE = BREAK_START_MINUTE + BREAK_MINUTES;
 /** 17:00 on the clock: the 480 minutes of work and the hour of dinner between them (PIOTR). */
 export const DAY_END_MINUTE = MINUTES_PER_WORKING_DAY + BREAK_MINUTES;
 /** 19:00, and the tools go down whoever wants what (PIOTR: overtime until 19:00 at the latest). */
@@ -277,9 +280,15 @@ export const LATE_PENALTY_PER_DAY = 0.05;
 export const LATE_PENALTY_PER_DAY_EXPRESS = 0.3;
 /** Express jobs pay 20% more, and the material and the labour are still worked out from the base
  *  price, so the uplift is pure profit (PIOTR). */
-export const EXPRESS_PRICE_UPLIFT = 0.2;
+/** What an express job pays over a standard one, drawn uniformly between the two (PIOTR, 13.09:
+ *  "more express jobs, properly profitable"; CLAUDE.md T10 3.7). */
+export const EXPRESS_PRICE_UPLIFT_MIN = 0.3;
+export const EXPRESS_PRICE_UPLIFT_MAX = 0.5;
 /** At most one express enquiry reaches the board in a week (PIOTR). */
-export const EXPRESS_MAX_PER_WEEK = 1;
+/** The chance the next enquiry drawn is an express one, at every refresh of the board [TUNE]
+ *  (PIOTR, 13.09; CLAUDE.md T10 3.7). It is a flat figure now: the one a week of Turns 1 to 9 and
+ *  the reputation ladder that fed it are gone, because one a week is not "more express jobs". */
+export const EXPRESS_PROBABILITY = 0.25;
 /** A job made by hand takes half again as long (PIOTR). */
 export const BY_HAND_DURATION_FACTOR = 1.5;
 /** Float guard, not a game number: work this small is finished work. */
@@ -338,11 +347,11 @@ export const EXPIRY_STANDARD_DAYS = 3;
 export const EXPIRY_EXPRESS_DAYS = 1;
 /** Express chance: 0.10 plus 0.05 per whole ten points of reputation, floored and capped
  *  [TUNE mapping of the Turn 1 formula onto the new scale]. */
-export const EXPRESS_PROBABILITY_BASE = 0.1;
-export const EXPRESS_PROBABILITY_PER_REPUTATION_STEP = 0.05;
-export const EXPRESS_PROBABILITY_REPUTATION_STEP = 10;
-export const EXPRESS_PROBABILITY_MIN = 0.05;
-export const EXPRESS_PROBABILITY_MAX = 0.3;
+/** How many enquiries the company cannot take are kept on the board at a time, greyed, with the
+ *  reason in plain words [TUNE] (PIOTR, 13.09: "show the jobs we cannot take and say why";
+ *  CLAUDE.md T10 3.7). They are drawn beside the band and are never part of it. */
+export const UNREACHABLE_MIN = 2;
+export const UNREACHABLE_MAX = 3;
 /** Board size, minimum and maximum enquiries, by reputation tier (PIOTR: below 0, 0 to 20,
  *  above 20). */
 export const BOARD_SIZE_BY_TIER: Array<[number, number]> = [

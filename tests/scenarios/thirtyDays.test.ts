@@ -51,6 +51,7 @@ import {
   STATION_IDLE,
   STATION_NO_BENCH,
   addWorkingDays,
+  workingDaysBetween,
   bagIntervalFor,
   dailyPower,
   emailsForPrice,
@@ -246,8 +247,10 @@ describe('30 days on Easy, working the board', () => {
     expect(state.equipment.some((item) => item.specId === 'edgebander')).toBe(true);
     expect(hallItems(state).some((item) => item.specId === 'edgebander')).toBe(false);
     // Every deadline came off the work in the job, and the small ones came off short (T6 3.7).
+    // The client counts the days the workshop is open and no others, so the span is measured in
+    // those and not in calendar days (PIOTR; CLAUDE.md T10 3.5).
     for (const job of state.jobs) {
-      const given = job.dueDay - job.acceptedDay;
+      const given = workingDaysBetween(job.acceptedDay, job.dueDay);
       expect(given, job.name).toBeGreaterThanOrEqual(DEADLINE_DAYS_MIN);
       if (job.basePrice <= 600) expect(given, job.name).toBeLessThanOrEqual(5);
     }
@@ -347,7 +350,11 @@ describe('30 days on Very easy behind the best saw money can buy', () => {
   it('still trades at the end of the month after spending that much on day 1', () => {
     expect(state.gameOver).toBeNull();
     expect(state.clock.day).toBe(31);
-    expect(state.jobs.filter((job) => job.stage === 'completed').length).toBeGreaterThanOrEqual(3);
+    // Two jobs where Turns 7 to 9 finished three. The board is a quarter express now, at a
+    // deadline of 0.6 of the standard one, and a one man shop that takes them the way the script
+    // does delivers some of them late (PIOTR: more express jobs; CLAUDE.md T10 3.7). Measured,
+    // not tuned: the month is about the company still trading after a 25,000 saw.
+    expect(state.jobs.filter((job) => job.stage === 'completed').length).toBeGreaterThanOrEqual(2);
   });
 });
 
@@ -547,9 +554,9 @@ describe('a day with a break, played by the script', () => {
     // Day 2 is the morning at the gate and the afternoon at the bench, and it runs out of work
     // with the day still to go: one job at a time, and this one was finished (CLAUDE.md T9 3.1).
     // It was 473 while the small compressor was a two hour lorry job; the used class the day 1
-    // shopping buys is light now, so two hours of the gate are gone and he runs out that much
-    // earlier (CLAUDE.md T10 3.4).
-    expect(last?.owner.minutesWorked).toBe(473 - EQUIPMENT_UNLOAD_MINUTES);
+    // shopping buys is light now, so two hours of the gate are gone (CLAUDE.md T10 3.4), and the
+    // board he works from is drawn differently again (T10 3.7). Measured, not tuned.
+    expect(last?.owner.minutesWorked).toBe(368);
     expect(last?.owner.minutesWorked).toBeLessThanOrEqual(MINUTES_PER_WORKING_DAY);
     expect(last?.owner.overtimeMinutes).toBe(0);
     const idle = states.filter(
@@ -887,19 +894,21 @@ describe('a month that sells the used saw on day 5 after buying a standard one',
   });
 });
 
-describe('a month that drops a job on day 8', () => {
-  // Month (n) of CLAUDE.md T9 T9-13. A careful month to day 8, and then the owner changes his
-  // mind about the job on the books: the client has his deposit back, the plan is empty and the
-  // company is ten points of reputation worse off (CLAUDE.md T9 3.9).
+describe('a month that drops a job on day 10', () => {
+  // Month (n) of CLAUDE.md T9 T9-13. A careful month, and then the owner changes his mind about
+  // the job on the books: the client has his deposit back, the plan is empty and the company is
+  // ten points of reputation worse off (CLAUDE.md T9 3.9). It was day 8 through Turn 9; the board
+  // is drawn differently in Turn 10, with the express uplift and the greyed enquiries in the same
+  // seeded stream, and the second job of this month reaches the books on day 10 instead.
   const seen: GameEvent[] = [];
-  const day8 = playUntilDay(newGame({ seed: SEED, difficulty: 'veryEasy' }), 8, CAREFUL, seen);
+  const day8 = playUntilDay(newGame({ seed: SEED, difficulty: 'veryEasy' }), 10, CAREFUL, seen);
   const job = day8.jobs.find((entry) => entry.stage !== 'completed');
   const cashBefore = day8.cash;
   const reputationBefore = day8.reputation;
   const dropped = job === undefined ? day8 : act(day8, { type: 'DROP_JOB', jobId: job.id });
 
-  it('has a job on the books on day 8 with a deposit paid on it', () => {
-    expect(day8.clock.day).toBe(8);
+  it('has a job on the books on day 10 with a deposit paid on it', () => {
+    expect(day8.clock.day).toBe(10);
     expect(job).toBeDefined();
     expect(job?.depositPaid ?? 0).toBeGreaterThan(0);
   });
@@ -929,7 +938,7 @@ describe('a month that drops a job on day 8', () => {
     const logged = dropped.reputationLog[dropped.reputationLog.length - 1];
     expect(logged?.reason).toBe(`Dropped: ${job?.name}`);
     expect(logged?.points).toBe(-DROP_PROJECT_REPUTATION);
-    expect(logged?.day).toBe(8);
+    expect(logged?.day).toBe(10);
     // And the board reads it back under the week it happened in.
     const week = weeksOf(dropped)[0];
     expect(week?.entries.some((entry) => entry.reason === `Dropped: ${job?.name}`)).toBe(true);

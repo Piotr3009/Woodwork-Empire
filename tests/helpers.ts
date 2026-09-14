@@ -331,6 +331,9 @@ export function placeEnquiry(state: GameState, partial: Partial<Enquiry> = {}): 
     expiresOnDay: state.clock.day + 2,
     lockReason: null,
     byHandAvailable: false,
+    unreachable: false,
+    blockReason: '',
+    blockWhere: '',
     ...partial,
   };
   state.enquiries.push(enquiry);

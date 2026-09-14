@@ -303,6 +303,9 @@ describe('the order board as tiles', () => {
           expiresOnDay: state.clock.day + 2,
           lockReason: 'Needs solid wood tools',
           byHandAvailable: true,
+          unreachable: false,
+          blockReason: '',
+          blockWhere: '',
         },
       ];
     }

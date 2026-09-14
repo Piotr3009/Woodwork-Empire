@@ -1655,3 +1655,10 @@ input.num {
 .office-door:hover .door-hit {
   fill: rgba(255, 255, 255, 0.18);
 }
+
+/* A job the company cannot take: on the board to be read, and never to be pressed
+   (CLAUDE.md T10 3.7). */
+.tile.is-out-of-reach {
+  opacity: 0.72;
+  filter: grayscale(0.5);
+}

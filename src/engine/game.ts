@@ -9,6 +9,7 @@ import {
   BENCH_SLOT_LAYOUT,
   BREAK_MINUTES,
   BREAK_SKIP_FACTOR,
+  BOARD_MIDDAY_MINUTE,
   BREAK_START_MINUTE,
   CABINET_SLOT_LAYOUT,
   DAY_SUMMARIES_MAX,
@@ -35,7 +36,7 @@ import {
   TOOL_CABINET,
   STATE_VERSION,
 } from './constants';
-import { expireEnquiries, refillBoard, refreshLocks } from './board';
+import { refreshBoard, refreshLocks } from './board';
 import { missCall, nextDueCall, takeCall } from './calls';
 import { canPlaceSpec, firstFreeCell, moveItem } from './layout';
 import {
@@ -408,8 +409,8 @@ function startDay(state: GameState): void {
   runOwnerDayStart(state);
   runStaffDayStart(state);
   resumeMove(state);
-  expireEnquiries(state);
-  refillBoard(state);
+  // The board is written again at 08:00, and again at 13:00 (PIOTR, 13.09; CLAUDE.md T10 3.7).
+  refreshBoard(state);
   const lost = writeOffSheetsLeftOutside(state);
   if (lost > 0) {
     queueEvent(state, {
@@ -1584,6 +1585,7 @@ function advanceMinute(state: GameState): boolean {
   // would work through it, and then the hour is his alone (CLAUDE.md T6 3.4).
   if (isBreak(state.clock.minute) && !state.owner.breakSkipped) {
     state.clock.minute += 1;
+    refreshBoardAtMidday(state);
     settle(state);
     return true;
   }
@@ -1597,9 +1599,18 @@ function advanceMinute(state: GameState): boolean {
   // Booked after the minute is worked, so the two hours a man will do are two hours he did.
   countStaffOvertimeMinute(state);
   state.clock.minute += 1;
+  refreshBoardAtMidday(state);
   if (shouldFinishDay(state)) finishDay(state);
   settle(state);
   return true;
+}
+
+/** The board's second refresh of the day, at 13:00 on the dot, whether or not anything was taken
+ *  and whether or not anybody was at a bench for the hour before it (PIOTR, 13.09;
+ *  CLAUDE.md T10 3.7). */
+function refreshBoardAtMidday(state: GameState): void {
+  if (state.clock.minute !== BOARD_MIDDAY_MINUTE) return;
+  refreshBoard(state);
 }
 
 export interface TickResult {

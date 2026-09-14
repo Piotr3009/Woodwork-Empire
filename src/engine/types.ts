@@ -355,6 +355,15 @@ export interface Enquiry {
   expiresOnDay: number;
   lockReason: string | null;
   byHandAvailable: boolean;
+  /** True for an enquiry the company cannot take at all: it is on the board, greyed, so the
+   *  player can see what the workshop is not equipped or not known enough for, and it can never
+   *  be accepted (PIOTR, 13.09; CLAUDE.md T10 3.7). */
+  unreachable: boolean;
+  /** Why, in plain words: "no timber machines", "needs a spray booth", "too few people for the
+   *  deadline", "reputation too low (needs 20)". Empty on an enquiry that can be taken. */
+  blockReason: string;
+  /** Where the tile's reason takes the player: the catalogue, the team, or nowhere. */
+  blockWhere: '' | 'catalogue' | 'team';
 }
 
 export type JobStage =
