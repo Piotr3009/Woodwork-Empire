@@ -9,6 +9,8 @@ import {
   DAY_ONE_CLASS,
   DAY_ONE_KIT,
   SHORT_HANDED,
+  TWO_MEN_BIG_FAN,
+  TWO_MEN_ONE_FAN,
   playDay,
   playUntilDay,
 } from './autopilot';
@@ -44,6 +46,7 @@ import {
   POWER_BASE_DAILY,
   CLIENT_MEETING_MINUTES,
   DROP_PROJECT_REPUTATION,
+  DUSTY_JOB_RATING,
   MEETING_PRICE_THRESHOLD,
   RENT_PER_M2_MONTHLY,
 } from '../../src/engine/constants';
@@ -51,6 +54,8 @@ import {
   STATION_IDLE,
   STATION_NO_BENCH,
   addWorkingDays,
+  extractionCheck,
+  madeInADustyWorkshop,
   workingDaysBetween,
   bagIntervalFor,
   dailyPower,
@@ -98,15 +103,15 @@ describe('30 days on Easy, working the board', () => {
     expect(state.finance.arrearsAmount).toBe(0);
   });
 
-  it('ends above the reputation it started on, on four jobs out of the door', () => {
+  it('ends above the reputation it started on, on five jobs out of the door', () => {
     // Turn 6 works the deadline out from the work in the job, and a one man shop that takes the
     // next job the day the last one goes out delivers some of them late. Counting the deadline in
     // working days gives every job the weekends back (T10 3.5), and the board is a quarter
     // express at 0.6 of the standard deadline (T10 3.7), which takes some of that back again.
-    // The month ends at eight on four jobs where Turn 9 ended under ten on three. Measured.
+    // The month ends at six on five jobs where Turn 9 ended under ten on three. Measured.
     expect(state.reputation).toBeGreaterThan(0);
-    expect(state.reputation).toBeCloseTo(8, 6);
-    expect(state.jobs.filter((job) => job.stage === 'completed')).toHaveLength(4);
+    expect(state.reputation).toBeCloseTo(6, 6);
+    expect(state.jobs.filter((job) => job.stage === 'completed')).toHaveLength(5);
   });
 
   it('took bookcases and finished most of them', () => {
@@ -949,5 +954,91 @@ describe('a month that drops a job on day 15', () => {
     const month = playUntilDay(dropped, 31, CAREFUL);
     expect(month.clock.day).toBe(31);
     expect(month.gameOver).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Months (o) and (p) of CLAUDE.md T10 T10-13: the same two men, the same saw and the same floor
+// edgebander, on a fan that is too small for them and then on one that is not.
+// ---------------------------------------------------------------------------
+
+/** A month of two joiners behind a standard saw and a floor edgebander, on the named fan. */
+function fanMonth(policy: Policy): { state: GameState; events: GameEvent[] } {
+  const events: GameEvent[] = [];
+  const state = playUntilDay(newGame({ seed: SEED, difficulty: 'veryEasy' }), 31, policy, events);
+  return { state, events };
+}
+
+describe('a month of two men on a fan too small for them', () => {
+  const short = fanMonth(TWO_MEN_ONE_FAN);
+  const fine = fanMonth(TWO_MEN_BIG_FAN);
+
+  it('has the same two men and the same machines in both halls, and one fan apart', () => {
+    for (const month of [short, fine]) {
+      expect(month.state.clock.day).toBe(31);
+      expect(month.state.gameOver).toBeNull();
+      expect(month.state.workers.filter((worker) => worker.role === 'joiner')).toHaveLength(2);
+      expect(machineOf(month.state, 'tableSaw').variantId).toBe('standard');
+      expect(machineOf(month.state, 'edgebander').variantId).toBe('standard');
+    }
+    expect(machineOf(short.state, 'extractor').variantId).toBe('standard');
+    expect(machineOf(fine.state, 'extractor').variantId).toBe('pro');
+  });
+
+  it('is short of air the moment the saw and the bander are both running', () => {
+    // Piotr's own example: 2,500 of 1,660 (CLAUDE.md T10 3.1).
+    const running = (state: GameState): GameState => {
+      const next = { ...state, equipment: state.equipment.map((item) => ({ ...item })) };
+      for (const item of next.equipment) {
+        if (item.specId === 'tableSaw' || item.specId === 'edgebander') item.takenBy = 'owner';
+      }
+      return next;
+    };
+    const tight = extractionCheck(running(short.state));
+    expect(tight.demand).toBe(2500);
+    expect(tight.allowed).toBe(1660);
+    expect(tight.line).toBe('Extraction short: 2,500 of 1,660');
+    const roomy = extractionCheck(running(fine.state));
+    expect(roomy.demand).toBe(2500);
+    expect(roomy.allowed).toBe(2988);
+    expect(roomy.short).toBe(false);
+  });
+
+  it('counts the dusty minutes onto the pieces made in it, and none in the other hall', () => {
+    const dusty = short.state.jobs.reduce((total, job) => total + job.dustyMinutes, 0);
+    const worked = short.state.jobs.reduce((total, job) => total + job.productionMinutes, 0);
+    expect(worked).toBeGreaterThan(0);
+    expect(dusty).toBeGreaterThan(0);
+    // And the hall with the bigger fan never had one.
+    expect(fine.state.jobs.reduce((total, job) => total + job.dustyMinutes, 0)).toBe(0);
+    expect(fine.state.jobs.reduce((total, job) => total + job.productionMinutes, 0))
+      .toBeGreaterThan(0);
+  });
+
+  it('loses a point of rating on the pieces the client can see the dust on', () => {
+    const delivered = short.state.jobs.filter((job) => job.stage === 'completed');
+    expect(delivered.length).toBeGreaterThan(0);
+    const marked = delivered.filter((job) => madeInADustyWorkshop(job));
+    expect(marked.length).toBeGreaterThan(0);
+    const lines = short.state.reputationLog.filter((entry) =>
+      entry.reason.endsWith(': dusty workshop'),
+    );
+    expect(lines.length).toBe(marked.length);
+    for (const line of lines) expect(line.points).toBe(-DUSTY_JOB_RATING);
+    // The hall with the fan it wanted loses none of them.
+    expect(fine.state.jobs.filter((job) => madeInADustyWorkshop(job))).toHaveLength(0);
+    expect(
+      fine.state.reputationLog.some((entry) => entry.reason.endsWith(': dusty workshop')),
+    ).toBe(false);
+  });
+
+  it('turns out less for it, and the hall is dirtier', () => {
+    // Everything in an under extracted hall is 30% slower and the dust rises three times as fast
+    // (PIOTR; CLAUDE.md T10 3.1). Measured over the month, not asserted as a ratio: the two halls
+    // took different work off the same board.
+    const done = (state: GameState): number =>
+      state.jobs.filter((job) => job.stage === 'completed').length;
+    expect(done(fine.state)).toBeGreaterThanOrEqual(done(short.state));
+    expect(fine.state.reputation).toBeGreaterThanOrEqual(short.state.reputation);
   });
 });
