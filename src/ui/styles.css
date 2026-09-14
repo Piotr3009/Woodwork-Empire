@@ -1887,3 +1887,89 @@ input.num {
   position: absolute;
   width: 1px;
 }
+
+/* The title hand: the same lettering as Orders on the corkboard, on every title of the game
+   (PIOTR, 14.09). Self hosted so the Steam build needs no network. Patrick Hand, OFL. */
+@font-face {
+  font-family: 'Patrick Hand';
+  font-style: normal;
+  font-weight: 400;
+  src: url('/fonts/PatrickHand-Regular.ttf') format('truetype');
+  font-display: swap;
+}
+
+:root {
+  --font-title: 'Patrick Hand', 'Segoe Print', 'Comic Sans MS', cursive;
+}
+
+.modal-head h2,
+.tile-name,
+.card-main h3,
+.folder-head h3,
+.board-week h4,
+.painted-text,
+.menu-pop h3 {
+  font-family: var(--font-title);
+  font-weight: 400;
+  letter-spacing: 0.01em;
+}
+
+.modal-head h2 {
+  font-size: 30px;
+}
+
+.tile-name,
+.card-main h3 {
+  font-size: 20px;
+}
+
+/* On the folder's paper every card is paper too: cream on cream with dark ink, never the dark
+   panels of the hall (PIOTR, 14.09: the dark plates made a mess of the page). */
+.modal-folder .card {
+  background: var(--paper-2);
+  border: 1px solid var(--paper-line);
+  border-radius: 10px;
+  color: var(--ink);
+}
+
+.modal-folder .card-main h3,
+.modal-folder .card-main strong {
+  color: var(--ink);
+}
+
+.modal-folder .card .figures,
+.modal-folder .hint,
+.modal-folder .figures {
+  color: var(--ink-2);
+}
+
+.modal-folder .card-action .btn {
+  background: var(--green);
+  border-color: var(--green);
+  box-shadow: 0 2px 0 var(--green-dark);
+  color: var(--paper);
+}
+
+.modal-folder .card-action .btn:hover:not([disabled]) {
+  background: var(--accent);
+  border-color: var(--accent);
+  box-shadow: 0 2px 0 #9a4c10;
+}
+
+/* The notes at the foot of the catalogue: a pencil line, not a red shout. */
+.catalogue-notes {
+  border-top: 1px dashed var(--paper-line);
+  margin-top: 12px;
+  padding-top: 8px;
+}
+
+.catalogue-notes .warn {
+  color: #8a5a1e;
+  font-family: var(--font-title);
+  font-size: 15px;
+  margin: 2px 0;
+}
+
+.catalogue-notes .warn::before {
+  content: '! ';
+}

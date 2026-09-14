@@ -89,11 +89,13 @@ export function renderCatalogue(
       : open !== null && open.tab === tab
         ? renderOpenFolder(state, open, filter)
         : renderFolders(state, filter, tab) + (tab === 'computers' ? renderSoftware(state) : '');
+  // The warnings go under the list, as a note at the foot of the page, not as a shout over the
+  // tabs (PIOTR, 14.09).
   return (
-    warnings +
     tabBar('catalogueTab', TABS, tab) +
     filterField('catalogue', filter, 'Filter the catalogue') +
-    body
+    body +
+    (warnings === '' ? '' : `<div class="catalogue-notes">${warnings}</div>`)
   );
 }
 
