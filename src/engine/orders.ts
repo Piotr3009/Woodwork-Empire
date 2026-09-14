@@ -37,6 +37,7 @@ export function createOnOrder(
     anchorX: order.anchorX,
     anchorY: order.anchorY,
     arrived: false,
+    rotated: false,
   };
   state.onOrder.push(item);
   return item;

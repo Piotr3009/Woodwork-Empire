@@ -200,6 +200,10 @@ export interface Equipment {
    *  dryer, which is fitted to one compressor. Null means the first compressor in the hall, which
    *  is what "default: all" means (CLAUDE.md T10 3.2, 3.3). */
   compressorId: string | null;
+  /** Stood at ninety degrees to the walls: the footprint and the working zone swap their width
+   *  and their depth, and the picture is mirrored unless the art side has delivered a second
+   *  orientation for it (PIOTR, CLAUDE.md T10 3.8). */
+  rotated: boolean;
 }
 
 /** Something bought and paid for that is not here yet: the cash left at the click, the item is
@@ -218,6 +222,8 @@ export interface OnOrderItem {
   anchorY: number;
   /** True from 08:00 of the due day until somebody has it off the lorry. */
   arrived: boolean;
+  /** The outline is dragged and turned like the machine it holds the floor for (T10 3.8). */
+  rotated: boolean;
 }
 
 export interface ProductTemplate {
@@ -802,7 +808,7 @@ export type GameAction =
   | { type: 'BUY_STOCK'; sheets: number }
   | { type: 'PAY_ARREARS'; amount: number | null }
   | { type: 'ORDER_TRANSPORT'; jobId: string }
-  | { type: 'MOVE_ITEM'; itemId: string; x: number; y: number }
+  | { type: 'MOVE_ITEM'; itemId: string; x: number; y: number; rotated?: boolean }
   | { type: 'END_SETUP'; speed: Speed }
   | { type: 'SET_SUMMARY_CADENCE'; cadence: SummaryCadence }
   | { type: 'SET_SHOW_WHY'; on: boolean }

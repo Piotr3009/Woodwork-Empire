@@ -149,6 +149,8 @@ interface Ui {
   scrollModalTop: boolean;
   /** Setting the hall out: the clock is stopped and the kit can be dragged about. */
   setup: boolean;
+  /** True while the next drop stands the item at ninety degrees to the walls (T10 3.8). */
+  rotate: boolean;
   speedBeforeSetup: Speed;
   drag: Drag | null;
   /** Where the player has the hall pushed to and how far in. UI state, never game state: a save
@@ -232,6 +234,7 @@ function freshUi(): Ui {
     daySummary: null,
     scrollModalTop: false,
     setup: false,
+    rotate: false,
     speedBeforeSetup: 0,
     drag: null,
     camera: { ...HALL_CAMERA_FIT },
@@ -339,15 +342,32 @@ function kitOf(current: GameState, itemId: string): { specId: string; variantId:
   return reserved === null ? null : { specId: reserved.specId, variantId: reserved.variantId };
 }
 
-/** The ghost of the item being dragged, with the engine's verdict on the cell under the mouse. */
+/** The ghost of the item being dragged, with the engine's verdict on the cell under the mouse.
+ *  Turned the way the next drop will stand it (CLAUDE.md T10 3.8). */
 function ghostFor(current: GameState): Ghost | null {
   const drag = ui.drag;
   if (drag === null) return null;
   const kit = kitOf(current, drag.itemId);
   if (kit === null) return null;
-  const box = boxOf(kit.specId, drag.x, drag.y, kit.variantId);
-  const check = canPlace(current, drag.itemId, drag.x, drag.y);
-  return { x: box.x, y: box.y, width: box.width, depth: box.depth, ok: check.ok, reason: check.reason };
+  const box = boxOf(kit.specId, drag.x, drag.y, kit.variantId, ui.rotate);
+  const check = canPlace(current, drag.itemId, drag.x, drag.y, ui.rotate);
+  return {
+    x: box.x,
+    y: box.y,
+    width: box.width,
+    depth: box.depth,
+    ok: check.ok,
+    reason: check.reason,
+    rotated: ui.rotate,
+  };
+}
+
+/** Turns what is in hand, or arms the turn for the next thing picked up. The one write for it:
+ *  the R key and the Rotate button both come through here (CLAUDE.md T10 3.8). */
+function turnGhost(): void {
+  if (!ui.setup) return;
+  ui.rotate = !ui.rotate;
+  requestRender();
 }
 
 function setupControls(current: GameState): string {
@@ -361,10 +381,12 @@ function setupControls(current: GameState): string {
   return (
     '<div class="view-controls">' +
     '<button class="btn btn-primary" data-do="endSetup">Done</button>' +
+    `<button class="btn${ui.rotate ? ' is-on' : ''}" data-do="rotateGhost">Rotate</button>` +
     bill +
     '<span class="reason">Drag the machines, the benches and the shelving where you want them. ' +
     'The rooms and the gate stay where they are. Every item moved is an hour of somebody\'s ' +
-    'time.</span>' +
+    'time. Rotate, or the R key, stands the next one you drop at ninety degrees to the walls.' +
+    '</span>' +
     '</div>'
   );
 }
@@ -976,6 +998,9 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
       ui.speedBeforeSetup = game().speed;
       dispatch({ type: 'SET_SPEED', speed: 0 });
       return;
+    case 'rotateGhost':
+      turnGhost();
+      return;
     case 'endSetup':
       endSetup();
       return;
@@ -1460,6 +1485,12 @@ function onKeyDown(event: KeyboardEvent): void {
 
 function runKeyDown(event: KeyboardEvent): void {
   if (event.key === ' ') spaceHeld = true;
+  // R turns what is being dragged, or arms the turn for the next thing picked up
+  // (PIOTR, CLAUDE.md T10 3.8).
+  if (ui.setup && (event.key === 'r' || event.key === 'R')) {
+    turnGhost();
+    return;
+  }
   if (event.key !== 'Escape') return;
   // Escape drops whatever is in hand before it closes anything (CLAUDE.md T2 3.10).
   if (ui.drag !== null) {
@@ -1624,6 +1655,8 @@ function onSetupPointerDown(event: MouseEvent): boolean {
   const offsetX = item.anchorX - at.x;
   const offsetY = item.anchorY - at.y;
   let moved = false;
+  // He picks it up the way it is standing, and R turns it from there (CLAUDE.md T10 3.8).
+  ui.rotate = 'rotated' in item ? item.rotated === true : false;
   ui.drag = { itemId, x: item.anchorX, y: item.anchorY };
   const move = (moveEvent: MouseEvent): void => {
     if (ui.drag === null) return;
@@ -1641,12 +1674,21 @@ function onSetupPointerDown(event: MouseEvent): boolean {
     window.removeEventListener('mouseup', up);
     const drag = ui.drag;
     ui.drag = null;
-    // A click that never moved is not a move: it leaves the hall exactly as it was.
-    if (drag === null || !moved) {
+    // A click that never moved is not a move: it leaves the hall exactly as it was. Turning it
+    // where it stands is a move, though: the machine has been picked up and put down again
+    // (CLAUDE.md T10 3.8).
+    const turned = ui.rotate !== ('rotated' in item ? item.rotated === true : false);
+    if (drag === null || (!moved && !turned)) {
       requestRender();
       return;
     }
-    dispatch({ type: 'MOVE_ITEM', itemId: drag.itemId, x: drag.x, y: drag.y });
+    dispatch({
+      type: 'MOVE_ITEM',
+      itemId: drag.itemId,
+      x: drag.x,
+      y: drag.y,
+      rotated: ui.rotate,
+    });
   };
   window.addEventListener('mousemove', move);
   window.addEventListener('mouseup', up);

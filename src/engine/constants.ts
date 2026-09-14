@@ -17,11 +17,12 @@ import type {
   WorkerTier,
 } from './types';
 
-/** Bumped in Turn 10: every machine carries the compressor it draws its air from, every job
- *  carries the minutes of production that went into it and how many of them the hall was under
- *  extracted for, and a job carries whether its finish was sprayed on wet air. A Turn 9 save has
- *  none of them, so its air would come from nowhere and every piece would read as made in a clean
- *  hall; it is refused (CLAUDE.md T10 3.1, 3.2, 3.3).
+/** Bumped in Turn 10: every machine carries the compressor it draws its air from and whether it
+ *  stands at ninety degrees to the walls, every job carries the minutes of production that went
+ *  into it and how many of them the hall was under extracted for, and a job carries whether its
+ *  finish was sprayed on wet air. A Turn 9 save has none of them, so its air would come from
+ *  nowhere, every machine would read as square to the walls and every piece as made in a clean
+ *  hall; it is refused (CLAUDE.md T10 3.1, 3.2, 3.3, 3.8).
  *
  *  Bumped in Turn 8: the state carries what is bought and not yet delivered, every machine
  *  carries the day it is collected once it is sold, and an unloading task carries the kit on the

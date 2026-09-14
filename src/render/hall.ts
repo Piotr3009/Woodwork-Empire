@@ -31,12 +31,12 @@ import {
 import { jobsAtGate } from '../engine/jobs';
 import { orderName, reservedItems, shoppingList } from '../engine/orders';
 import {
-  footprintOf,
   isSold,
+  itemFootprint,
   itemStandsInTheHall,
+  itemZone,
   needsDucting,
   sheetCapacityOf,
-  zoneOf,
 } from '../engine/machines';
 import { machineInUse } from '../engine/game';
 import { rackCapacity, stockIsLow } from '../engine/materials';
@@ -79,6 +79,7 @@ import {
 import {
   SPRITE_SCALE,
   contactShadow,
+  mirrorNeeded,
   pickSprite,
   spriteBox,
   spriteFiles,
@@ -171,15 +172,28 @@ export function objectArt(art: {
   fill: string;
   shade: string;
   label: string;
+  /** Stood at ninety degrees to the walls: the second orientation the art side delivered, or the
+   *  picture mirrored about its anchor (CLAUDE.md T10 3.8). */
+  rotated?: boolean;
   /** What the art side has delivered; the manifest when not given, so a test can draw the hall
    *  as if a file had not landed yet (the placeholders are for exactly that). */
   files?: readonly string[];
 }): string {
   const shadow = contactShadow(art.x, art.y, art.width, art.depth);
-  const url = art.files === undefined ? spriteUrl(art.spriteKey, art.tier) : pickSprite(art.files, art.spriteKey, art.tier);
+  const rotated = art.rotated === true;
+  const files = art.files ?? spriteFiles();
+  const url = art.files === undefined
+    ? spriteUrl(art.spriteKey, art.tier, rotated)
+    : pickSprite(art.files, art.spriteKey, art.tier, rotated);
   if (url !== null) {
     const at = spriteBox(art.x, art.y, art.width, art.depth, art.height);
-    return shadow + spriteImage(url, at);
+    // Mirrored about the anchor, which is the corner the picture is placed by, so the object
+    // stays on its own tile while it faces the other way (CLAUDE.md T10 3.8).
+    const anchor = tileToScreen(art.x + art.width, art.y + art.depth);
+    const mirror = mirrorNeeded(files, art.spriteKey, art.tier, rotated)
+      ? ` transform="translate(${round(anchor.x * 2)},0) scale(-1, 1)"`
+      : '';
+    return shadow + spriteImage(url, at, mirror.trim());
   }
   const faces = boxPolygons(art.x, art.y, art.width, art.depth, art.height);
   return (
@@ -604,8 +618,8 @@ export function footprintIn(item: Equipment): {
   depth: number;
   height: number;
 } {
-  const stands = footprintOf(item.specId, item.variantId);
-  const zone = zoneOf(item.specId, item.variantId);
+  const stands = itemFootprint(item);
+  const zone = itemZone(item);
   // A class that holds no floor is kept in a tool cabinet: its picture stands on the cell the
   // cabinet stands on, with nothing to centre it in (CLAUDE.md T7 3.6).
   const inZone = zone.width > 0 && zone.depth > 0;
@@ -811,8 +825,8 @@ export function pinBoard(count: number): string {
 
 /** The outline of something bought and not here yet, on the cells held for it (T8 3.2). */
 export function reservedOutline(item: OnOrderItem): string {
-  const zone = zoneOf(item.specId, item.variantId);
-  const stands = footprintOf(item.specId, item.variantId);
+  const zone = itemZone(item);
+  const stands = itemFootprint(item);
   const inset = {
     x: item.anchorX + Math.max(0, (zone.width - stands.width) / 2),
     y: item.anchorY + Math.max(0, (zone.depth - stands.depth) / 2),
@@ -841,6 +855,8 @@ export interface Ghost {
   depth: number;
   ok: boolean;
   reason: string;
+  /** True while the next drop will stand it at ninety degrees to the walls (T10 3.8). */
+  rotated?: boolean;
 }
 
 /** A view that is expensive to build. The shell carries the pictures, which are megabytes: a
@@ -1021,6 +1037,7 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
           files,
           spriteKey: item.spriteKey,
           tier: item.variantId,
+          rotated: item.rotated,
           x: stands.x,
           y: stands.y,
           width: stands.width,
@@ -1189,7 +1206,9 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
         `<text x="${Math.round(centreOf(ghost.x, ghost.y, ghost.width, ghost.depth).x)}" ` +
         `y="${Math.round(centreOf(ghost.x, ghost.y, ghost.width, ghost.depth).y)}" ` +
         `text-anchor="middle" class="iso-label ghost-label" fill="${colour}">` +
-        `${escapeText(ghost.ok ? 'Drop it here' : ghost.reason)}</text></g>`,
+        `${escapeText(
+          ghost.ok ? (ghost.rotated === true ? 'Drop it here, turned' : 'Drop it here') : ghost.reason,
+        )}</text></g>`,
     );
   }
 

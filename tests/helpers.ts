@@ -241,7 +241,7 @@ export function buyStartingKit(
 export function placeEquipment(
   state: GameState,
   specId: string,
-  options: { variantId?: string; x?: number; y?: number; id?: string } = {},
+  options: { variantId?: string; x?: number; y?: number; id?: string; rotated?: boolean } = {},
 ): Equipment {
   const spec = findSpec(specId);
   if (!spec) throw new Error(`unknown equipment: ${specId}`);
@@ -264,6 +264,7 @@ export function placeEquipment(
     purchasePrice: variant ? variant.price : spec.price,
     soldOnDay: null,
     compressorId: null,
+    rotated: options.rotated ?? false,
   };
   state.equipment.push(item);
   return item;

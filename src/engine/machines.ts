@@ -57,27 +57,51 @@ export function findSpec(specId: string): EquipmentSpec | null {
 export function footprintOf(
   specId: string,
   variantId?: string,
+  rotated = false,
 ): { width: number; depth: number; height: number } {
   const spec = findSpec(specId);
   if (!spec) return { width: 1, depth: 1, height: 1 };
   const variant = variantOf(spec, variantId ?? spec.variants[0]?.id ?? '');
+  const width = variant.width ?? spec.width;
+  const depth = variant.depth ?? spec.depth;
   return {
-    width: variant.width ?? spec.width,
-    depth: variant.depth ?? spec.depth,
+    width: rotated ? depth : width,
+    depth: rotated ? width : depth,
     height: variant.height ?? spec.height,
   };
 }
 
+/** The same question of something already standing in the hall, which knows how it is turned. */
+export function itemFootprint(item: {
+  specId: string;
+  variantId: string;
+  rotated?: boolean;
+}): { width: number; depth: number; height: number } {
+  return footprintOf(item.specId, item.variantId, item.rotated === true);
+}
+
 /** The floor a class reserves, in metres: the working room around it, which contains the
  *  footprint. Nothing may be built on it (CLAUDE.md T7 3.3). */
-export function zoneOf(specId: string, variantId?: string): { width: number; depth: number } {
+export function zoneOf(
+  specId: string,
+  variantId?: string,
+  rotated = false,
+): { width: number; depth: number } {
   const spec = findSpec(specId);
   if (!spec) return { width: 1, depth: 1 };
   const variant = variantOf(spec, variantId ?? spec.variants[0]?.id ?? '');
-  return {
-    width: variant.zoneWidth ?? spec.zoneWidth,
-    depth: variant.zoneDepth ?? spec.zoneDepth,
-  };
+  const width = variant.zoneWidth ?? spec.zoneWidth;
+  const depth = variant.zoneDepth ?? spec.zoneDepth;
+  return { width: rotated ? depth : width, depth: rotated ? width : depth };
+}
+
+/** The same question of something already standing in the hall. */
+export function itemZone(item: {
+  specId: string;
+  variantId: string;
+  rotated?: boolean;
+}): { width: number; depth: number } {
+  return zoneOf(item.specId, item.variantId, item.rotated === true);
 }
 
 /** Working days between the click and the lorry for this class (CLAUDE.md T8 3.2). Zero means it

@@ -1876,7 +1876,7 @@ export function applyAction(state: GameState, action: GameAction): GameState {
     case 'MOVE_ITEM': {
       const item = next.equipment.find((entry) => entry.id === action.itemId);
       const stood = item ? { x: item.anchorX, y: item.anchorY } : null;
-      moveItem(next, action.itemId, action.x, action.y);
+      moveItem(next, action.itemId, action.x, action.y, action.rotated);
       if (item && stood) recordMove(next, item, stood);
       break;
     }
@@ -2039,6 +2039,8 @@ function standItem(
     // Everything draws on the first compressor in the hall until the player says otherwise
     // (CLAUDE.md T10 3.2).
     compressorId: null,
+    // Square to the walls until the player turns it (CLAUDE.md T10 3.8).
+    rotated: false,
   });
 }
 

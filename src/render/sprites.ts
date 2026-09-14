@@ -40,7 +40,18 @@ export function pickSprite(
   files: readonly string[],
   spriteKey: string,
   tier?: string | null,
+  rotated = false,
 ): string | null {
+  // A second orientation, where the art side has drawn one: `family.class.r.png`. Without it the
+  // hall mirrors the picture instead (CLAUDE.md T10 3.8).
+  if (rotated) {
+    if (typeof tier === 'string' && tier !== '') {
+      const turned = `${spriteKey}.${tier}.r.png`;
+      if (files.includes(turned)) return `${SPRITE_DIR}/${turned}`;
+    }
+    const turnedPlain = `${spriteKey}.r.png`;
+    if (files.includes(turnedPlain)) return `${SPRITE_DIR}/${turnedPlain}`;
+  }
   if (typeof tier === 'string' && tier !== '') {
     const tiered = `${spriteKey}.${tier}.png`;
     if (files.includes(tiered)) return `${SPRITE_DIR}/${tiered}`;
@@ -49,9 +60,23 @@ export function pickSprite(
   return files.includes(plain) ? `${SPRITE_DIR}/${plain}` : null;
 }
 
+/** True when the hall has to mirror the picture because no second orientation was delivered for
+ *  this class (CLAUDE.md T10 3.8). */
+export function mirrorNeeded(
+  files: readonly string[],
+  spriteKey: string,
+  tier: string | null | undefined,
+  rotated: boolean,
+): boolean {
+  if (!rotated) return false;
+  const turned = typeof tier === 'string' && tier !== '' ? `${spriteKey}.${tier}.r.png` : '';
+  if (turned !== '' && files.includes(turned)) return false;
+  return !files.includes(`${spriteKey}.r.png`);
+}
+
 /** The URL to draw this object with, or null while there is no file for it. */
-export function spriteUrl(spriteKey: string, tier?: string | null): string | null {
-  return pickSprite(DELIVERED, spriteKey, tier);
+export function spriteUrl(spriteKey: string, tier?: string | null, rotated = false): string | null {
+  return pickSprite(DELIVERED, spriteKey, tier, rotated);
 }
 
 /** The canvas the art side draws on, at 2x, before the padding (docs/art/SPRITES.md 2 and 6). */
