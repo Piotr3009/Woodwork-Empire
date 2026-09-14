@@ -89,6 +89,7 @@ import { renderOwnerOut } from './ownerOut';
 import { renderCompany } from './company';
 import { renderShopping } from './shopping';
 import { renderStart } from './start';
+import { decodeSaveFile, encodeSaveFile, saveFileName } from '../cloud/file';
 import { cloudAvailable } from '../cloud/supabase';
 import { hasSave, loadGame, saveGame, sendMagicLink, signOut, signedInEmail } from '../cloud/saves';
 import { renderMenu, renderTopbar, speedFromString } from './topbar';
@@ -1269,6 +1270,16 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
     case 'copyState':
       copyState();
       break;
+    case 'saveToFile':
+      ui.menuOpen = false;
+      saveToFile();
+      break;
+    case 'loadFromFile': {
+      // The picker is the browser's; the file arrives through onFileChosen.
+      const picker = root?.querySelector('[data-field="saveFile"]');
+      if (picker instanceof HTMLInputElement) picker.click();
+      break;
+    }
     case 'signIn':
       void runCloud(async () => (await sendMagicLink(ui.cloud.email)).note);
       break;
@@ -1351,6 +1362,34 @@ function autosave(): void {
 function newSeed(): number {
   // The engine needs a seed from outside: this is the one place a clock reading is allowed.
   return Math.floor(Date.now() % 2147483647);
+}
+
+/** The game as a file the browser downloads (PIOTR, 14.09). */
+function saveToFile(): void {
+  const text = encodeSaveFile(game());
+  const blob = new Blob([text], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = saveFileName(game());
+  link.click();
+  URL.revokeObjectURL(url);
+  ui.note = `Saved as ${link.download}.`;
+  requestRender();
+}
+
+/** A chosen save file, read and checked before it replaces the game. */
+export function onFileChosen(file: File): Promise<void> {
+  return file.text().then((text) => {
+    const result = decodeSaveFile(text);
+    if (result.state !== null) {
+      state = result.state;
+      ui.screen = 'game';
+      ui.menuOpen = false;
+    }
+    ui.note = result.note;
+    requestRender();
+  });
 }
 
 function copyState(): void {
@@ -1486,6 +1525,11 @@ function runInput(event: Event): void {
   if (field === 'arrearsAmount') {
     ui.arrearsAmount = target.value;
     requestRender();
+  }
+  if (field === 'saveFile') {
+    const file = target.files?.[0];
+    if (file) void onFileChosen(file);
+    target.value = '';
   }
 }
 

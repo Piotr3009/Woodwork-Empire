@@ -125,6 +125,11 @@ export function renderMenu(state: GameState, cloud: MenuCloud): string {
     }</button>` +
     '<button class="btn" data-do="showSprites">Sprite check</button>' +
     cadenceControl(state) +
+    // A save on the player's own computer: a file down, a file up (PIOTR, 14.09).
+    '<button class="btn" data-do="saveToFile">Save to file</button>' +
+    '<button class="btn" data-do="loadFromFile">Load from file</button>' +
+    '<input type="file" accept=".json" data-field="saveFile" ' +
+    'aria-label="Load a save file" />' +
     (cloud.available && cloud.signedIn !== null
       ? '<button class="btn" data-do="saveGame">Save now</button>' +
         '<button class="btn" data-do="loadGame">Load</button>'

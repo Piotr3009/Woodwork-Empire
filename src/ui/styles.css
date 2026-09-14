@@ -1880,3 +1880,12 @@ input.num {
 .modal-folder .warning {
   color: #b3261e;
 }
+
+/* The file picker behind "Load from file" is the browser's; the input itself stays out of sight. */
+.menu-pop input[type='file'] {
+  height: 1px;
+  left: -9999px;
+  opacity: 0;
+  position: absolute;
+  width: 1px;
+}

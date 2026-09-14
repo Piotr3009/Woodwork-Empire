@@ -32,7 +32,7 @@ function sourceFiles(directory: string): string[] {
 describe('the version in the corner', () => {
   it('is a v number that the turn bumped', () => {
     expect(APP_VERSION).toMatch(/^v\d+$/);
-    expect(APP_VERSION).toBe('v14');
+    expect(APP_VERSION).toBe('v15');
   });
 
   it('stands in the bottom right corner of the start screen and of the game', () => {
@@ -48,7 +48,7 @@ describe('the version in the corner', () => {
   });
 
   it('is written in constants.ts and nowhere else in the source', () => {
-    const spelled = sourceFiles('src').filter((path) => readFileSync(path, 'utf8').includes("'v14'"));
+    const spelled = sourceFiles('src').filter((path) => readFileSync(path, 'utf8').includes("'v15'"));
     expect(spelled).toEqual(['src/engine/constants.ts']);
   });
 });
