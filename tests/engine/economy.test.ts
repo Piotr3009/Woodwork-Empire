@@ -35,7 +35,7 @@ import {
   visibleTotals,
   weeklyWageBill,
 } from '../../src/engine/economy';
-import { applyAction, tick } from '../../src/engine/index';
+import { applyAction, findVariant, tick } from '../../src/engine/index';
 import type { GameState, Worker } from '../../src/engine/index';
 import { createTask } from '../../src/engine/tasks';
 import {
@@ -121,11 +121,15 @@ describe('daily costs', () => {
     expect(dailyPower(empty)).toBe(POWER_BASE_DAILY);
     const withSaw = buyNow(empty, 'tableSaw');
     expect(dailyPower(withSaw)).toBe(POWER_BASE_DAILY + POWER_PER_MACHINE_DAILY);
+    // Every class of extractor says what it draws: the used one is 2 a day where the saw's
+    // synthetic standard class is the family figure (CLAUDE.md T10 3.4).
     const withExtractor = buyNow(withSaw, 'extractor');
-    expect(dailyPower(withExtractor)).toBe(POWER_BASE_DAILY + 2 * POWER_PER_MACHINE_DAILY);
+    const extractorPower = findVariant('extractor', 'used')?.powerPerDay ?? 0;
+    expect(extractorPower).toBe(2);
+    expect(dailyPower(withExtractor)).toBe(POWER_BASE_DAILY + POWER_PER_MACHINE_DAILY + extractorPower);
     // A drill is not a machine that draws power.
     const withDrill = buyNow(withExtractor, 'drill');
-    expect(dailyPower(withDrill)).toBe(POWER_BASE_DAILY + 2 * POWER_PER_MACHINE_DAILY);
+    expect(dailyPower(withDrill)).toBe(POWER_BASE_DAILY + POWER_PER_MACHINE_DAILY + extractorPower);
   });
 });
 

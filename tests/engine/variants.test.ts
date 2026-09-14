@@ -2,6 +2,7 @@
 
 import { describe, expect, it } from 'vitest';
 import {
+  ENDURANCE_MINUTES_BY_CLASS,
   EQUIPMENT_SPECS,
   MACHINE_ENDURANCE_HOURS,
   MACHINE_ENDURANCE_HOURS_DEFAULT,
@@ -93,7 +94,7 @@ describe('every catalogue line is a family', () => {
     expect(findSpec('sheetRackBetter')).toBeNull();
   });
 
-  it('gives the table saw its five classes and everything else one standard', () => {
+  it('gives the table saw its five classes and a family with no ladder one standard', () => {
     expect(findSpec('tableSaw')?.variants.map((variant) => variant.id)).toEqual([
       'used',
       'budget',
@@ -104,13 +105,76 @@ describe('every catalogue line is a family', () => {
     expect(TABLE_SAW_VARIANTS.map((variant) => variant.price)).toEqual([
       1800, 5000, 7000, 15000, 25000,
     ]);
-    expect(findSpec('compressor')?.variants).toHaveLength(1);
-    expect(findSpec('compressor')?.variants[0]?.id).toBe(STANDARD_VARIANT);
-    expect(findSpec('compressor')?.variants[0]?.outputFactor).toBe(1);
+    // The compressor and the extractor got their five classes tonight (CLAUDE.md T10 3.4); the
+    // thicknesser is a family that still has the one synthetic standard class.
+    expect(findSpec('thicknesser')?.variants).toHaveLength(1);
+    expect(findSpec('thicknesser')?.variants[0]?.id).toBe(STANDARD_VARIANT);
+    expect(findSpec('thicknesser')?.variants[0]?.outputFactor).toBe(1);
+  });
+
+  it('gives the extractor and the compressor the five classes of Turn 10', () => {
+    for (const family of ['extractor', 'compressor']) {
+      expect(findSpec(family)?.variants.map((variant) => variant.id), family).toEqual([
+        'used',
+        'budget',
+        'standard',
+        'pro',
+        'industrial',
+      ]);
+    }
+    // Piotr's prices [TUNE] of CLAUDE.md T10 3.4.
+    expect(findSpec('extractor')?.variants.map((variant) => variant.price)).toEqual([
+      400, 600, 1400, 3200, 7500,
+    ]);
+    expect(findSpec('compressor')?.variants.map((variant) => variant.price)).toEqual([
+      300, 1200, 3500, 9000, 22000,
+    ]);
+    // The footprints of 3.4, and the zone is the footprint for both families.
+    const extractorSizes = [
+      [1, 1, 2],
+      [1, 1, 2],
+      [2, 1, 2],
+      [3, 1, 2.5],
+      [5, 1, 2.5],
+    ];
+    const compressorSizes = [
+      [1, 1, 1],
+      [1, 1, 1],
+      [2, 1, 1.5],
+      [2, 1, 1.5],
+      [2, 2, 2.5],
+    ];
+    const classes = ['used', 'budget', 'standard', 'pro', 'industrial'];
+    classes.forEach((id, index) => {
+      expect(footprintOf('extractor', id), `extractor.${id}`).toEqual({
+        width: extractorSizes[index]?.[0],
+        depth: extractorSizes[index]?.[1],
+        height: extractorSizes[index]?.[2],
+      });
+      expect(zoneOf('extractor', id), `extractor.${id} zone`).toEqual({
+        width: extractorSizes[index]?.[0],
+        depth: extractorSizes[index]?.[1],
+      });
+      expect(footprintOf('compressor', id), `compressor.${id}`).toEqual({
+        width: compressorSizes[index]?.[0],
+        depth: compressorSizes[index]?.[1],
+        height: compressorSizes[index]?.[2],
+      });
+      expect(zoneOf('compressor', id), `compressor.${id} zone`).toEqual({
+        width: compressorSizes[index]?.[0],
+        depth: compressorSizes[index]?.[1],
+      });
+    });
+    // A hall may have several of either, so neither is refused as already owned.
+    expect(findSpec('extractor')?.stackable).toBe(true);
+    expect(findSpec('compressor')?.stackable).toBe(true);
   });
 
   it('keeps the Turn 1 price of every family that has one class', () => {
-    expect(findSpec('extractor')?.price).toBe(600);
+    // The extractor's line carries its cheapest class now, the used one at 400; the Turn 1 price
+    // of 600 is what its budget class costs (CLAUDE.md T10 3.4).
+    expect(findSpec('extractor')?.price).toBe(400);
+    expect(findVariant('extractor', 'budget')?.price).toBe(600);
     expect(findSpec('van')?.price).toBe(9000);
     // The saw's cheapest class is the used one at the Turn 1 price (CLAUDE.md T3 3.5), and the
     // Turn 1 items of the three families that got their classes tonight are the budget ones
@@ -202,7 +266,14 @@ describe('what a class of saw does to the bag and the life of the machine', () =
     expect(enduranceHoursFor('tableSaw', 'used')).toBe(750);
     expect(enduranceHoursFor('tableSaw', 'budget')).toBe(3000);
     expect(enduranceHoursFor('tableSaw', 'industrial')).toBe(6000);
-    expect(enduranceHoursFor('compressor', STANDARD_VARIANT)).toBe(5000);
+    // A compressor's life is written in running minutes, and the hours come off that table and
+    // not off the family's own figure (PIOTR; CLAUDE.md T10 3.2).
+    expect(ENDURANCE_MINUTES_BY_CLASS.compressor?.standard).toBe(200000);
+    expect(enduranceHoursFor('compressor', STANDARD_VARIANT)).toBeCloseTo(200000 / 60, 6);
+    expect(enduranceHoursFor('compressor', 'used')).toBe(1000);
+    expect(enduranceHoursFor('compressor', 'industrial')).toBeCloseTo(800000 / 60, 6);
+    // A family with no minutes of its own still reads the family hours and the class ladder.
+    expect(enduranceHoursFor('thicknesser', STANDARD_VARIANT)).toBe(2500);
   });
 
   it('runs the hours down as the bench works, and calls it worn out at the end', () => {

@@ -303,6 +303,9 @@ describe('the order board as tiles', () => {
           expiresOnDay: state.clock.day + 2,
           lockReason: 'Needs solid wood tools',
           byHandAvailable: true,
+          unreachable: false,
+          blockReason: '',
+          blockWhere: '',
         },
       ];
     }
@@ -341,16 +344,21 @@ describe('the modals', () => {
       expect(html()).toContain(title ?? '');
       click('[data-do="closeModal"]');
     }
-    // The three modals that lost their desk item are tabs of the laptop now (T4 3.1).
+    // The modals that lost their desk item are tabs of the laptop now (T4 3.1), and the team is
+    // a page of its own off the laptop's Team chip (CLAUDE.md T10 3.6).
     click('[data-office="laptop"]');
     for (const [tab, title] of [
       ['materials', 'sheets on the rack'],
-      ['team', 'Taking somebody on'],
       ['drawings', 'Design queue'],
     ]) {
       click(`[data-do="laptopTab"][data-id="${tab}"]`);
       expect(html(), tab).toContain(title ?? '');
     }
+    click('[data-do="laptopTab"][data-id="team"]');
+    expect(html()).toContain('data-modal="team"');
+    expect(html()).toContain('Taking somebody on');
+    click('[data-do="closeModal"]');
+    click('[data-office="laptop"]');
     click('[data-do="laptopTab"][data-id="tasks"]');
     click('[data-do="closeModal"]');
   });
@@ -369,15 +377,17 @@ describe('the modals', () => {
     click('[data-do="catalogueTab"][data-id="handTools"]');
     expect(html()).not.toContain('data-do="clearFilter"');
     expect(html()).toContain('Drills');
-    type('[data-filter="catalogue"]', 'compress');
+    type('[data-filter="catalogue"]', 'hand tool');
     expect(html()).toContain('data-do="clearFilter"');
-    expect(html()).toContain('Compressors');
+    expect(html()).toContain('Hand tool sets');
     expect(html()).not.toContain('Drills');
     // A tab with nothing matching says so, and never borrows a folder from another tab.
     click('[data-do="catalogueTab"][data-id="storage"]');
     expect(html()).toContain('Tool cabinets');
     type('[data-filter="catalogue"]', 'compress');
     expect(html()).toContain('Nothing matches that.');
+    // Compressors are under Extraction and air from Turn 10, and the filter never borrows a
+    // folder from another tab (CLAUDE.md T10 3.3).
     expect(html()).not.toContain('Compressors');
     click('[data-do="clearFilter"]');
     expect(html()).toContain('Tool cabinets');

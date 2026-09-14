@@ -74,8 +74,6 @@ describe('footprints in metres', () => {
       chair: [1, 1, 1],
       laptop: [1, 1, 1],
       drill: [1, 1, 1],
-      compressor: [2, 2, 1],
-      extractor: [2, 2, 3],
       locker: [1, 1, 2],
       canteenSeat: [1, 1, 1],
       handToolSet: [1, 1, 1],
@@ -86,8 +84,6 @@ describe('footprints in metres', () => {
       solidWoodTools: [3, 2, 2],
       cnc: [5, 3, 2],
       cncHead: [1, 1, 1],
-      dustSystem: [3, 3, 4],
-      flexiSystem: [3, 3, 4],
     };
     // What Turn 6 added, and the four families Piotr measured himself in metres tonight: the
     // cheapest class of each is what the catalogue line carries (CLAUDE.md T7 3.3, 3.6).
@@ -100,7 +96,17 @@ describe('footprints in metres', () => {
       // The spray booth and the pelletiser were measured in metres tonight as well, and both
       // came down in height (CLAUDE.md T7 3.3).
       sprayBooth: [3, 2, 1.5],
-      pelletiser: [1, 1, 1.5],
+      // Measured again in Turn 10 against what the art side actually delivered: the two central
+      // systems are 3 by 2 of plant four metres high, standing outside on the apron, and the
+      // pelletiser is 2 by 2 and two and a half metres high (CLAUDE.md T10 3.4). The extractor
+      // and the compressor are ladders of five classes now and the line carries the cheapest
+      // (CLAUDE.md T10 3.4), so they belong in this list and not in the halved one.
+      dustSystem: [3, 2, 4],
+      flexiSystem: [3, 2, 4],
+      pelletiser: [2, 2, 2.5],
+      extractor: [1, 1, 2],
+      compressor: [1, 1, 1],
+      airDryer: [1, 1, 1.5],
     };
     // Every line of the catalogue is in one of the two lists: nothing slips in unmeasured.
     expect(EQUIPMENT_SPECS.map((spec) => spec.id).sort()).toEqual(

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  EXPRESS_PRICE_UPLIFT,
+  EXPRESS_PRICE_UPLIFT_MAX,
+  EXPRESS_PRICE_UPLIFT_MIN,
   LOW_REPUTATION_PRICE_FACTOR,
   PRODUCT_TEMPLATES,
   RATING_EXPRESS_ON_TIME,
@@ -61,6 +62,9 @@ function job(partial: Partial<Job>): Job {
     balancePaid: 200,
     penalty: 0,
     emailsUnanswered: 0,
+    wetFinish: false,
+    productionMinutes: 0,
+    dustyMinutes: 0,
     rating: null,
     overdueWarned: false,
     ...partial,
@@ -127,8 +131,12 @@ describe('prices', () => {
   });
 
   it('adds the express uplift before rounding', () => {
-    expect(priceFor(1000, 1, EXPRESS_PRICE_UPLIFT, 1)).toBe(1200);
-    expect(priceFor(400, 1, EXPRESS_PRICE_UPLIFT, 1)).toBe(480);
+    // The band is 30% to 50% from Turn 10, drawn uniformly (CLAUDE.md T10 3.7).
+    expect(EXPRESS_PRICE_UPLIFT_MIN).toBe(0.3);
+    expect(EXPRESS_PRICE_UPLIFT_MAX).toBe(0.5);
+    expect(priceFor(1000, 1, EXPRESS_PRICE_UPLIFT_MIN, 1)).toBe(1300);
+    expect(priceFor(1000, 1, EXPRESS_PRICE_UPLIFT_MAX, 1)).toBe(1500);
+    expect(priceFor(400, 1, EXPRESS_PRICE_UPLIFT_MIN, 1)).toBe(520);
   });
 
   it('offers barely profitable work below the low reputation band', () => {

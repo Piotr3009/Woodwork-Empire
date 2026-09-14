@@ -2,6 +2,8 @@
 // locked ladder on show, and an Owned tab for what the hall already has (CLAUDE.md 9.2, T6 3.6).
 
 import {
+  AIR_DRYER,
+  COMPRESSOR,
   EQUIPMENT_SPECS,
   EQUIPMENT_TABS,
   SOFTWARE_ONE_OFF_PRICE,
@@ -9,8 +11,15 @@ import {
 } from '../engine/constants';
 import type { EquipmentSpec, EquipmentTab, OnOrderItem } from '../engine/types';
 import {
+  airBlockFor,
+  airDemandOf,
   bagsExist,
   canSell,
+  compressorAirOf,
+  compressorFor,
+  compressorHasDryer,
+  compressorLabel,
+  compressors,
   orderSoftwareCheck,
   countOf,
   findSpec,
@@ -213,6 +222,45 @@ function orderedTile(state: GameState, item: OnOrderItem, spec: EquipmentSpec): 
   );
 }
 
+/** What this one has to do with the air: what a compressor gives, and what a machine or a dryer
+ *  is on (PIOTR: "Air: compressor 2"; CLAUDE.md T10 3.2, 3.3). Empty for everything the air has
+ *  nothing to do with. */
+export function airStateLine(state: GameState, item: Equipment): string {
+  if (item.specId === COMPRESSOR) {
+    const gives = compressorAirOf(item);
+    const dryer = compressorHasDryer(state, item) ? ', dry air' : ', wet air';
+    return `${compressorLabel(state, item)}: ${gives.bar} bar, ` +
+      `${gives.litres.toLocaleString('en-GB')} l/min${dryer}`;
+  }
+  const wants = airDemandOf(item);
+  if (wants === null && item.specId !== AIR_DRYER) return '';
+  const on = compressorFor(state, item);
+  const where = on === null ? 'no compressor in the hall' : compressorLabel(state, on);
+  if (item.specId === AIR_DRYER) return `Fitted to: ${where}`;
+  const block = airBlockFor(state, item);
+  const wanted = wants === null ? '' : ` · wants ${wants.bar} bar, ${wants.litres} l/min`;
+  return `Air: ${where}${wanted}${block === '' ? '' : ` · ${block}`}`;
+}
+
+/** The valve: which compressor this machine or this dryer draws from. One click each, and the
+ *  one the hall already has it on is the chip that is on (CLAUDE.md T10 3.2). */
+export function airAssign(state: GameState, item: Equipment): string {
+  if (item.specId === COMPRESSOR) return '';
+  if (airDemandOf(item) === null && item.specId !== AIR_DRYER) return '';
+  const list = compressors(state);
+  if (list.length < 2) return '';
+  const on = compressorFor(state, item);
+  const chips = list
+    .map(
+      (compressor) =>
+        `<button class="chip${on?.id === compressor.id ? ' is-on' : ''}" data-do="assignAir" ` +
+        `data-id="${item.id}" data-compressor="${compressor.id}">` +
+        `${escapeHtml(compressorLabel(state, compressor))}</button>`,
+    )
+    .join('');
+  return `<div class="tabs tabs-air">${chips}</div>`;
+}
+
 /** The one control on a machine the hall has finished with: what the buyer pays, and a second
  *  click to mean it (CLAUDE.md T8 3.5). */
 function sellAction(state: GameState, item: Equipment, sellConfirm: string | null): string {
@@ -254,7 +302,7 @@ function ownedTile(
       ? button('serviceMachine', 'Service', `data-id="${item.id}"`)
       : '';
   const sell = sellAction(state, item, sellConfirm);
-  const lines = [className, life, service, ownedState(state, item)]
+  const lines = [className, life, service, ownedState(state, item), airStateLine(state, item)]
     .filter((line) => line !== '')
     .map((line) => `<p class="tile-figures">${escapeHtml(line)}</p>`)
     .join('');
@@ -263,6 +311,7 @@ function ownedTile(
     `<h3 class="tile-name">${escapeHtml(spec.name)} <span class="badge badge-owned">Owned</span></h3>` +
     pictureSlot(spec.spriteKey, item.variantId) +
     lines +
+    airAssign(state, item) +
     `<div class="tile-action">${action}${sell}</div>` +
     '</div>'
   );

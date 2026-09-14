@@ -37,6 +37,7 @@ export function createOnOrder(
     anchorX: order.anchorX,
     anchorY: order.anchorY,
     arrived: false,
+    rotated: false,
   };
   state.onOrder.push(item);
   return item;
@@ -80,6 +81,19 @@ export function countOwnedOrOnOrder(state: GameState, specId: string): number {
  *  and the material before anybody cuts anything (CLAUDE.md T8 3.2, REPORT-T8). */
 export function hasOrOnOrder(state: GameState, specId: string): boolean {
   return countOwnedOrOnOrder(state, specId) > 0;
+}
+
+/** The first of this family that is bought and still on its way, the soonest lorry first. A
+ *  machine on order is a drawing on the floor and nothing more: it cuts nothing, extracts nothing
+ *  and compresses nothing, and the hall says so in the words of this order (CLAUDE.md T10 1,
+ *  3.10). */
+export function firstOnOrder(state: GameState, specId: string): OnOrderItem | null {
+  let soonest: OnOrderItem | null = null;
+  for (const item of state.onOrder) {
+    if (item.specId !== specId) continue;
+    if (soonest === null || item.dueDay < soonest.dueDay) soonest = item;
+  }
+  return soonest;
 }
 
 /** The orders whose lorry is due by this day and that nobody has taken off it yet. */

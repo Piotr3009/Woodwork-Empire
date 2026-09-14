@@ -85,6 +85,8 @@ describe('the size of every modal in the game', () => {
       shopping: true,
       accounting: true,
       company: true,
+      // The team is a page of the game from Turn 10, not a tab of the laptop (T10 3.6).
+      team: true,
       laptop: false,
     });
   });

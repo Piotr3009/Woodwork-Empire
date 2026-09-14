@@ -2,12 +2,14 @@
 // callers never see their input mutated. Every other engine module mutates the state it is given.
 
 import {
+  WET_AIR_FINISH_FACTOR,
   ACCIDENT_CHANCE_PER_DAY,
   ACCIDENT_DAYS_OFF,
   ADMIN_COVER_RATE,
   BENCH_SLOT_LAYOUT,
   BREAK_MINUTES,
   BREAK_SKIP_FACTOR,
+  BOARD_MIDDAY_MINUTE,
   BREAK_START_MINUTE,
   CABINET_SLOT_LAYOUT,
   DAY_SUMMARIES_MAX,
@@ -34,7 +36,7 @@ import {
   TOOL_CABINET,
   STATE_VERSION,
 } from './constants';
-import { expireEnquiries, refillBoard, refreshLocks } from './board';
+import { refreshBoard, refreshLocks } from './board';
 import { missCall, nextDueCall, takeCall } from './calls';
 import { canPlaceSpec, firstFreeCell, moveItem } from './layout';
 import {
@@ -165,7 +167,16 @@ import {
   staffOutputFactor,
 } from './owner';
 import { chance, int, makeId } from './rng';
-import { cncOptions, labourPerMinute } from './stages';
+import { type StagePlan, cncOptions, labourPerMinute } from './stages';
+import {
+  airFactorFor,
+  benchDrawsAir,
+  compressors,
+  drawingOn,
+  hallAirCheck,
+  sprayingOnWetAir,
+  underExtracted,
+} from './media';
 import { plural } from './text';
 import { STATION_IDLE, STATION_NO_BENCH, stationForTask } from './stations';
 import {
@@ -398,8 +409,8 @@ function startDay(state: GameState): void {
   runOwnerDayStart(state);
   runStaffDayStart(state);
   resumeMove(state);
-  expireEnquiries(state);
-  refillBoard(state);
+  // The board is written again at 08:00, and again at 13:00 (PIOTR, 13.09; CLAUDE.md T10 3.7).
+  refreshBoard(state);
   const lost = writeOffSheetsLeftOutside(state);
   if (lost > 0) {
     queueEvent(state, {
@@ -1309,18 +1320,25 @@ function waitingLine(specId: string): string {
   return `waiting for ${(findSpec(specId)?.name ?? specId).toLowerCase()}`;
 }
 
+/** One man putting one minute into one job, with the machine he got for it. Gathered before the
+ *  hall is measured, because the extraction and the air sums are the sums of the machines running
+ *  this very minute and not of last minute's (CLAUDE.md T10 3.1, 3.2). */
+interface AtWork {
+  hand: Hand;
+  stage: StagePlan;
+  machine: Equipment | null;
+}
+
 function runProductionMinute(state: GameState, ownerOnTask: boolean): void {
-  const hall = hallProductivityFactor(state);
   // Every bench waits while the machines are being shifted about (CLAUDE.md T4 3.5).
   const moving = movingMachines(state) !== null;
   const working = handsAtWork(state, ownerOnTask, moving);
   // Anybody who is not at a job this minute walks away from whatever he was standing at, so the
   // next man can have it (CLAUDE.md T7 3.1).
   releaseMachinesExcept(state, working.map((hand) => hand.who));
-  let worked = false;
-  // The minutes somebody actually stood at each machine: that, and nothing else, is what wears
-  // it out and fills its bag (CLAUDE.md T7 2).
-  const used = new Map<string, number>();
+  // Who actually stands at what this minute. Nothing is worked off the job yet: the machines have
+  // to be taken before the hall can be asked what its media add up to.
+  const atWork: AtWork[] = [];
   for (const hand of working) {
     if (!canWorkOn(state, hand.job)) {
       releaseMachines(state, hand.who);
@@ -1334,6 +1352,20 @@ function runProductionMinute(state: GameState, ownerOnTask: boolean): void {
       hand.job.blockedBy = waitingLine(at.waitingFor);
       continue;
     }
+    atWork.push({ hand, stage, machine: at.machine });
+  }
+  if (atWork.length === 0) return;
+  // The hall as it is with those machines running: the dust band, the missing helper, the crowded
+  // gate, the broken extractor and the extraction sum, all through the one breakdown.
+  const hall = hallProductivityFactor(state);
+  const dusty = underExtracted(state);
+  // What the men at the benches draw for their nailers and their sanders, through the one
+  // selector the hall and the board read as well (CLAUDE.md T10 3.2).
+  const air = hallAirCheck(state);
+  // The minutes somebody actually stood at each machine: that, and nothing else, is what wears
+  // it out and fills its bag (CLAUDE.md T7 2).
+  const used = new Map<string, number>();
+  for (const { hand, stage, machine } of atWork) {
     const worker = state.workers.find((entry) => entry.id === hand.who);
     if (worker) {
       worker.productionMinutes += 1;
@@ -1341,17 +1373,31 @@ function runProductionMinute(state: GameState, ownerOnTask: boolean): void {
       spendOwnerMinute(state, 'workshop');
       state.owner.productionMinutes += 1;
     }
-    worked = true;
-    if (at.machine !== null) used.set(at.machine.id, (used.get(at.machine.id) ?? 0) + 1);
+    // What the piece itself was made in: the minutes it took and how many of them were dusty
+    // ones, which is what the client sees when it lands (CLAUDE.md T10 3.1).
+    hand.job.productionMinutes += 1;
+    if (dusty) hand.job.dustyMinutes += 1;
+    if (machine !== null) used.set(machine.id, (used.get(machine.id) ?? 0) + 1);
     // A machine speeds up its own stage and nothing else, and only for the man on it, so the
     // speed is the class of the machine he actually got (CLAUDE.md T7 3.1).
-    const speed = at.machine === null
+    let speed = machine === null
       ? stage.speed
-      : variantOf(specOf(at.machine.specId), at.machine.variantId).outputFactor;
+      : variantOf(specOf(machine.specId), machine.variantId).outputFactor;
+    // A compressor that is short of litres runs every pneumatic consumer on it at 0.7 for the
+    // minute, and a booth on wet air takes half as long again over the finish and marks the
+    // piece (PIOTR, CLAUDE.md T10 3.2, 3.3).
+    const atTheBench = benchDrawsAir(stage) !== null;
+    speed *= airFactorFor(state, air, machine, atTheBench);
+    if (machine !== null && sprayingOnWetAir(state, machine)) {
+      speed /= WET_AIR_FINISH_FACTOR;
+      hand.job.wetFinish = true;
+    }
+    // A compressor's hours run only while something draws on it (CLAUDE.md T10 3.2 rule 3).
+    const compressor = drawingOn(state, machine, atTheBench);
+    if (compressor !== null) used.set(compressor.id, (used.get(compressor.id) ?? 0) + 1);
     const minute = labourPerMinute(hand.rate, speed) * hall;
     if (addLabour(state, hand.job, minute, stage.id)) raiseJobAtGate(state, hand.job);
   }
-  if (!worked) return;
   state.productionMinutesMonth += 1;
   addDust(state, 1);
   for (const machine of accumulateMachineMinute(state, used)) {
@@ -1539,6 +1585,7 @@ function advanceMinute(state: GameState): boolean {
   // would work through it, and then the hour is his alone (CLAUDE.md T6 3.4).
   if (isBreak(state.clock.minute) && !state.owner.breakSkipped) {
     state.clock.minute += 1;
+    refreshBoardAtMidday(state);
     settle(state);
     return true;
   }
@@ -1552,9 +1599,18 @@ function advanceMinute(state: GameState): boolean {
   // Booked after the minute is worked, so the two hours a man will do are two hours he did.
   countStaffOvertimeMinute(state);
   state.clock.minute += 1;
+  refreshBoardAtMidday(state);
   if (shouldFinishDay(state)) finishDay(state);
   settle(state);
   return true;
+}
+
+/** The board's second refresh of the day, at 13:00 on the dot, whether or not anything was taken
+ *  and whether or not anybody was at a bench for the hour before it (PIOTR, 13.09;
+ *  CLAUDE.md T10 3.7). */
+function refreshBoardAtMidday(state: GameState): void {
+  if (state.clock.minute !== BOARD_MIDDAY_MINUTE) return;
+  refreshBoard(state);
 }
 
 export interface TickResult {
@@ -1649,6 +1705,22 @@ function resolveEvent(state: GameState, choiceId: string): void {
   }
 }
 
+/** Puts a machine, or an air dryer, on one of the compressors in the hall. A null puts it back on
+ *  the first one, which is where everything starts (CLAUDE.md T10 3.2, 3.3). */
+export function assignAir(
+  state: GameState,
+  equipmentId: string,
+  compressorId: string | null,
+): boolean {
+  const item = state.equipment.find((entry) => entry.id === equipmentId);
+  if (!item) return false;
+  if (compressorId !== null && !compressors(state).some((entry) => entry.id === compressorId)) {
+    return false;
+  }
+  item.compressorId = compressorId;
+  return true;
+}
+
 /** Everything that changes the world outside the workshop and so cannot happen while the clock
  *  is stopped (CLAUDE.md T7 3.10). The purchases and the hire carry the rule themselves, through
  *  `placeOrder`; these are the rest of the shop counter. Dragging the kit about is not on the
@@ -1727,6 +1799,11 @@ export function applyAction(state: GameState, action: GameAction): GameState {
     case 'ASSIGN_JOB':
       assignJob(next, action.jobId, action.workerId);
       break;
+    case 'ASSIGN_AIR':
+      // Which compressor this machine, or this dryer, draws from. Nothing is bought, nothing
+      // moves and nobody's minutes are spent: it is a valve (CLAUDE.md T10 3.2).
+      assignAir(next, action.equipmentId, action.compressorId);
+      break;
     case 'HIRE':
       // The interview is an hour of his own, and the man is on the books when it is over
       // (CLAUDE.md T7 3.10).
@@ -1799,7 +1876,7 @@ export function applyAction(state: GameState, action: GameAction): GameState {
     case 'MOVE_ITEM': {
       const item = next.equipment.find((entry) => entry.id === action.itemId);
       const stood = item ? { x: item.anchorX, y: item.anchorY } : null;
-      moveItem(next, action.itemId, action.x, action.y);
+      moveItem(next, action.itemId, action.x, action.y, action.rotated);
       if (item && stood) recordMove(next, item, stood);
       break;
     }
@@ -1959,6 +2036,11 @@ function standItem(
     takenBy: null,
     purchasePrice: variant.price,
     soldOnDay: null,
+    // Everything draws on the first compressor in the hall until the player says otherwise
+    // (CLAUDE.md T10 3.2).
+    compressorId: null,
+    // Square to the walls until the player turns it (CLAUDE.md T10 3.8).
+    rotated: false,
   });
 }
 

@@ -7,7 +7,7 @@
 // workshop averages when nobody is.
 
 import { MINUTES_PER_WORKING_DAY } from './constants';
-import { workedMinutesOfDay } from './clock';
+import { dayOfWorkingIndex, isWorkingDay, workedMinutesOfDay, workingDayIndex } from './clock';
 import { OWNER } from './machines';
 import {
   designOutstanding,
@@ -24,9 +24,18 @@ import type { GameState, Job } from './types';
  *  (CLAUDE.md T7 3.2). */
 export const BOARD_DAYS_PAST_DUE = 3;
 
-/** A day and a minute of the working day as one number, so a bar can be part of a day wide. */
+/** A day and a minute of the working day as one number on the board's axis, so a bar can be part
+ *  of a day wide. The axis counts working days only: Monday comes straight after Friday and the
+ *  weekend has no column, because nothing happens on it and no deadline falls in it
+ *  (PIOTR; CLAUDE.md T10 3.5). */
 export function dayPoint(day: number, minute: number): number {
-  return day + Math.min(1, workedMinutesOfDay(minute) / MINUTES_PER_WORKING_DAY);
+  return workingDayIndex(day) + Math.min(1, workedMinutesOfDay(minute) / MINUTES_PER_WORKING_DAY);
+}
+
+/** A place on that axis, back in the calendar days the player counts a deadline in. */
+export function dayOfPoint(point: number): number {
+  const whole = Math.floor(point);
+  return Math.round((dayOfWorkingIndex(whole) + (point - whole)) * 100) / 100;
 }
 
 /** What the hands the workshop has today average, against the owner at his best. He is one of
@@ -106,24 +115,40 @@ export interface PlanRow {
   from: number;
   to: number;
   dueDay: number;
+  /** Where the deadline sits on the axis, which counts working days only. */
+  duePoint: number;
   /** The share of the bar filled green from the left, 0 to 1. */
   done: number;
   minutesDone: number;
   minutesTotal: number;
-  /** The last day this one can be started and still be on time. Null once it is started. */
+  /** The last day this one can be started and still be on time, in calendar days, so it reads
+   *  like every other day on the card. Null once it is started. */
   latestStart: number | null;
+  /** And where that day sits on the axis. */
+  latestStartPoint: number | null;
   /** True when that day has gone: the tick is drawn at Now, in red (CLAUDE.md T9 3.6). */
   late: boolean;
   /** "at workshop average", "for Tom" or "for you". */
   rateLabel: string;
 }
 
+/** One column of the axis: the working day, and where it sits on it. */
+export interface PlanDay {
+  day: number;
+  point: number;
+}
+
 export interface WorkPlan {
-  /** The axis: from the earliest acceptance to the latest deadline plus three. */
+  /** The axis in calendar days: from the earliest acceptance to the latest deadline plus three. */
   fromDay: number;
   toDay: number;
-  /** Where the blue line goes. */
+  /** The same two ends on the working day axis everything is drawn against. */
+  from: number;
+  to: number;
+  /** Where the blue line goes, on that axis. */
   now: number;
+  /** The columns: every working day of the span and no weekend (CLAUDE.md T10 3.5). */
+  days: PlanDay[];
   rows: PlanRow[];
 }
 
@@ -136,7 +161,10 @@ function rowFor(state: GameState, job: Job): PlanRow {
   const from = productionStart(state, job);
   const notStarted = job.stageRuns.length === 0;
   const length = total / MINUTES_PER_WORKING_DAY;
-  const latestStart = notStarted ? Math.round((job.dueDay - length) * 100) / 100 : null;
+  const duePoint = workingDayIndex(job.dueDay);
+  // The work takes working days, so counting back from the deadline counts back over the axis
+  // and never over a weekend (CLAUDE.md T10 3.5).
+  const latestStartPoint = notStarted ? Math.round((duePoint - length) * 100) / 100 : null;
   const worker =
     job.assignedTo === null || job.assignedTo === OWNER
       ? null
@@ -151,13 +179,15 @@ function rowFor(state: GameState, job: Job): PlanRow {
     from,
     // Started, it runs to its deadline; not started, it is as long as the work in it
     // (CLAUDE.md T9 3.6).
-    to: notStarted ? from + length : Math.max(job.dueDay, from),
+    to: notStarted ? from + length : Math.max(duePoint, from),
     dueDay: job.dueDay,
+    duePoint,
     done: jobProgress(job),
     minutesDone: Math.max(0, total - left),
     minutesTotal: total,
-    latestStart,
-    late: latestStart !== null && latestStart < now,
+    latestStart: latestStartPoint === null ? null : dayOfPoint(latestStartPoint),
+    latestStartPoint,
+    late: latestStartPoint !== null && latestStartPoint < now,
     rateLabel: label,
   };
 }
@@ -172,10 +202,17 @@ export function workPlan(state: GameState): WorkPlan {
   const now = dayPoint(state.clock.day, state.clock.minute);
   const accepted = open.map((job) => job.acceptedDay);
   const fromDay = Math.min(state.clock.day, ...(accepted.length > 0 ? accepted : [state.clock.day]));
-  const toDay = Math.max(
-    fromDay + 1,
+  const from = workingDayIndex(fromDay);
+  const to = Math.max(
+    from + 1,
     Math.ceil(now) + 1,
-    ...rows.map((row) => Math.max(row.dueDay + BOARD_DAYS_PAST_DUE, Math.ceil(row.to))),
+    ...rows.map((row) => Math.max(row.duePoint + BOARD_DAYS_PAST_DUE, Math.ceil(row.to))),
   );
-  return { fromDay, toDay, now, rows };
+  const toDay = dayOfWorkingIndex(Math.ceil(to));
+  const days: PlanDay[] = [];
+  for (let day = fromDay; day <= toDay; day += 1) {
+    if (!isWorkingDay(day)) continue;
+    days.push({ day, point: workingDayIndex(day) });
+  }
+  return { fromDay, toDay, from, to, now, days, rows };
 }

@@ -197,7 +197,10 @@ describe('taking somebody on is an interview', () => {
     const state = currentState();
     if (!state) throw new Error('no game');
     state.reputation = 20;
+    // The Team chip of the laptop opens the Team board, and the office admin is on its Office
+    // tab (CLAUDE.md T10 3.6).
     click('[data-do="laptopTab"][data-id="team"]');
+    click('[data-do="teamTab"][data-id="office"]');
     click('[data-do="hire"][data-role="officeAdmin"]');
     expect(currentState()?.workers).toHaveLength(0);
     expect(html()).toContain(`Interview: 0 of ${HIRING_MINUTES} min`);

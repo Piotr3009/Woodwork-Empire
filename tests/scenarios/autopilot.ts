@@ -75,6 +75,11 @@ export interface Policy {
   stockSheets: number;
   /** The class of table saw to buy on day 1. Undefined takes the cheapest, the used one. */
   sawVariant?: string;
+  /** The class of edgebander, extractor and compressor to buy on day 1. Undefined takes the day 1
+   *  class: the hand bander, the used fan and the used compressor (CLAUDE.md T10 3.1, 3.2). */
+  edgebanderVariant?: string;
+  extractorVariant?: string;
+  compressorVariant?: string;
   /** Days the owner works through his dinner (CLAUDE.md T6 3.4). */
   skipBreakOn?: number[];
   /** Days he stays on after five, and how long for. */
@@ -133,6 +138,30 @@ export const SIX_JOINERS_ONE_SAW: Policy = {
   extraSaws: 0,
 };
 
+/** Two joiners, a standard saw and a floor edgebander: 1,100 and 1,400 m3/h of demand the moment
+ *  both of them are running, against the 1,660 a standard extractor allows and the 2,988 a pro one
+ *  does (PIOTR's tables; CLAUDE.md T10 3.1). The compressor is the standard one, so the air is
+ *  never the thing being measured. */
+export const TWO_MEN_ONE_FAN: Policy = {
+  maxOpenJobs: 3,
+  buyKit: true,
+  cleanAbove: 60,
+  wanted: ['bookcase', 'garageShelves', 'tvUnit'],
+  hireJoiner: true,
+  joiners: 2,
+  stockSheets: 40,
+  sawVariant: 'standard',
+  edgebanderVariant: 'standard',
+  extractorVariant: 'standard',
+  compressorVariant: 'standard',
+};
+
+/** The same month with a fan big enough for it. */
+export const TWO_MEN_BIG_FAN: Policy = {
+  ...TWO_MEN_ONE_FAN,
+  extractorVariant: 'pro',
+};
+
 /** A month that spends the money on the best saw there is, to see what it buys (CLAUDE.md T3 4). */
 export const BIG_SAW: Policy = {
   maxOpenJobs: 1,
@@ -144,6 +173,8 @@ export const BIG_SAW: Policy = {
   sawVariant: 'industrial',
 };
 
+/** The extraction is ordered before the machine that wants it: a floor edgebander cannot be
+ *  bought until the hall has a fan on the way (CLAUDE.md T7 3.6, T10 3.1). */
 export const DAY_ONE_KIT = [
   'desk',
   'chair',
@@ -151,9 +182,9 @@ export const DAY_ONE_KIT = [
   'tableSaw',
   'drill',
   'toolCabinet',
-  'edgebander',
-  'compressor',
   'extractor',
+  'compressor',
+  'edgebander',
   'workbench',
   'sheetRack',
 ];
@@ -166,13 +197,22 @@ export const DAY_ONE_CLASS: Record<string, string> = {
   edgebander: 'budget',
 };
 
+/** The class the script buys for this family: what the month asked for, or the day 1 one. */
+function classFor(specId: string, policy: Policy): string | undefined {
+  if (specId === 'tableSaw') return policy.sawVariant;
+  if (specId === 'edgebander') return policy.edgebanderVariant ?? DAY_ONE_CLASS[specId];
+  if (specId === 'extractor') return policy.extractorVariant;
+  if (specId === 'compressor') return policy.compressorVariant;
+  return DAY_ONE_CLASS[specId];
+}
+
 function buyKit(state: GameState, policy: Policy): GameState {
   let next = state;
   for (const specId of DAY_ONE_KIT) {
     next = applyAction(next, {
       type: 'BUY_EQUIPMENT',
       specId,
-      variantId: specId === 'tableSaw' ? policy.sawVariant : DAY_ONE_CLASS[specId],
+      variantId: classFor(specId, policy),
     });
   }
   return next;
@@ -217,7 +257,12 @@ function takeWork(state: GameState, policy: Policy): GameState {
   if (open >= policy.maxOpenJobs) return state;
   for (const templateId of policy.wanted) {
     const pick = state.enquiries.find(
-      (enquiry) => enquiry.templateId === templateId && enquiry.lockReason === null,
+      (enquiry) =>
+        enquiry.templateId === templateId &&
+        enquiry.lockReason === null &&
+        // A job the workshop cannot take is on the board to be read and never to be taken
+        // (CLAUDE.md T10 3.7).
+        !enquiry.unreachable,
     );
     if (pick) {
       const taken = applyAction(state, {

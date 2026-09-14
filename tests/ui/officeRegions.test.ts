@@ -191,22 +191,31 @@ describe('the laptop tabs', () => {
     expect(tabs[0]?.className).toContain('is-on');
   });
 
-  it('reaches the material, the team and the drawings, one path each', () => {
+  it('reaches the material and the drawings, one path each', () => {
     for (const [tab, mark] of [
       ['tasks', 'Office tasks today'],
       ['materials', 'Buy sheets for stock'],
-      ['team', 'Taking somebody on'],
       ['drawings', 'Design queue'],
     ]) {
       click(`[data-do="laptopTab"][data-id="${tab}"]`);
       expect(html(), tab).toContain(mark ?? '');
       expect(openModalId(), tab).toBe('laptop');
     }
-    // There is no second way in: the three have no modal of their own any more.
+    // There is no second way in: the two have no modal of their own any more.
     expect(html()).not.toContain('data-modal="materials"');
     expect(html()).not.toContain('data-modal="hiring"');
     expect(html()).not.toContain('data-modal="drawings"');
     click('[data-do="laptopTab"][data-id="tasks"]');
+    click('[data-do="closeModal"]');
+  });
+
+  it('opens the Team board off the laptop chip, because the team is a page of its own', () => {
+    click('[data-office="laptop"]');
+    click('[data-do="laptopTab"][data-id="team"]');
+    // One click, and it is the Team board and not a tab inside the laptop (CLAUDE.md T10 3.6).
+    expect(openModalId()).toBe('team');
+    expect(html()).toContain('Taking somebody on');
+    expect(html()).toContain('data-do="teamTab"');
     click('[data-do="closeModal"]');
   });
 
@@ -215,7 +224,7 @@ describe('the laptop tabs', () => {
     const body = root().querySelector('.modal-layer [data-modal="laptop"] .modal-body');
     if (!(body instanceof HTMLElement)) throw new Error('no laptop body');
     body.scrollTop = 120;
-    click('[data-do="laptopTab"][data-id="team"]');
+    click('[data-do="laptopTab"][data-id="materials"]');
     expect(body.scrollTop).toBe(0);
     click('[data-do="laptopTab"][data-id="tasks"]');
     click('[data-do="closeModal"]');
@@ -241,7 +250,7 @@ describe('the laptop tabs', () => {
     click('[data-do="closeModal"]');
     // And nowhere in the laptop, on any of its four tabs.
     click('[data-office="laptop"]');
-    for (const tab of ['tasks', 'materials', 'team', 'drawings']) {
+    for (const tab of ['tasks', 'materials', 'drawings']) {
       click(`[data-do="laptopTab"][data-id="${tab}"]`);
       expect(html(), tab).not.toContain('Start production');
       expect(html(), tab).not.toContain('Calls: 0 of');

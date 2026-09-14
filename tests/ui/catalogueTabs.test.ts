@@ -43,7 +43,7 @@ describe('the tabs', () => {
       'Spraying',
       'Sanding',
       'Hand tools',
-      'Extraction',
+      'Extraction and air',
       'CNC',
       'CNC centre',
       'Handling',

@@ -43,6 +43,8 @@ import {
   type Frame,
   type HallCamera,
   HALL_CAMERA_FIT,
+  HALL_CAMERA_START,
+  hallStartCamera,
   HALL_ZOOM_STEP,
   type Scene,
   cameraTransform,
@@ -62,6 +64,7 @@ import { type CatalogueTab, CATALOGUE_FIRST_TAB, catalogueTabFrom, renderCatalog
 import { renderDayEnd, renderDaySummary, renderGameOver } from './dayEnd';
 import { renderEvent, renderEventFooter } from './eventModal';
 import { type LaptopTab, laptopTabFrom, renderLaptop } from './laptop';
+import { type TeamTab, renderTeam, teamTabFrom } from './team';
 import { renderSpriteCheck } from './spriteCheck';
 import { renderWorkPlan } from './workPlan';
 import {
@@ -99,7 +102,9 @@ type ModalId =
   | 'accounting'
   | 'catalogue'
   | 'shopping'
-  | 'company';
+  | 'company'
+  /** The team, in tabs by trade (PIOTR, 13.09; CLAUDE.md T10 3.6). */
+  | 'team';
 
 interface Ui {
   screen: 'start' | 'game';
@@ -120,6 +125,7 @@ interface Ui {
   arrearsAmount: string;
   /** Which tab of the laptop is on top (CLAUDE.md T4 3.1). */
   laptopTab: LaptopTab;
+  teamTab: TeamTab;
   /** Which tab of the equipment catalogue is on top, and which family folder is open inside it
    *  (CLAUDE.md T6 3.6, T7 3.7). */
   catalogueTab: CatalogueTab;
@@ -145,11 +151,16 @@ interface Ui {
   scrollModalTop: boolean;
   /** Setting the hall out: the clock is stopped and the kit can be dragged about. */
   setup: boolean;
+  /** True while the next drop stands the item at ninety degrees to the walls (T10 3.8). */
+  rotate: boolean;
   speedBeforeSetup: Speed;
   drag: Drag | null;
   /** Where the player has the hall pushed to and how far in. UI state, never game state: a save
    *  carries the workshop, not where somebody was looking (CLAUDE.md T6 3.3). */
   camera: HallCamera;
+  /** False until the hall has been measured once and opened at its 1.2 of the fit: the frame is
+   *  not known until the scene is on the page (CLAUDE.md T10 3.9). */
+  cameraStarted: boolean;
   /** A pan that moved is not a click on what it started on. */
   panned: boolean;
   showWhy: boolean;
@@ -175,6 +186,7 @@ const MODAL_TITLES: Record<ModalId, string> = {
   catalogue: 'Equipment catalogue',
   shopping: 'On order',
   company: 'Company board',
+  team: 'Team',
 };
 
 /** How much of the page each modal takes. Anything that is a list or a board fills it; a small
@@ -190,6 +202,8 @@ export const MODAL_IS_FULL: Record<ModalId, boolean> = {
   catalogue: true,
   shopping: true,
   company: true,
+  // The team is a page of the game now, not a tab of the laptop (CLAUDE.md T10 3.6).
+  team: true,
 };
 
 let ui: Ui = freshUi();
@@ -213,6 +227,7 @@ function freshUi(): Ui {
     stockSheets: '6',
     arrearsAmount: '500',
     laptopTab: 'tasks',
+    teamTab: 'workshop',
     catalogueTab: CATALOGUE_FIRST_TAB,
     catalogueFolder: null,
     ownedTab: 'all',
@@ -224,9 +239,11 @@ function freshUi(): Ui {
     daySummary: null,
     scrollModalTop: false,
     setup: false,
+    rotate: false,
     speedBeforeSetup: 0,
     drag: null,
-    camera: { ...HALL_CAMERA_FIT },
+    camera: { ...HALL_CAMERA_START },
+    cameraStarted: false,
     panned: false,
     showWhy: true,
     why: null,
@@ -304,6 +321,8 @@ function modalBody(id: ModalId, current: GameState): string {
         ui.openDays,
         ui.accountingMonth,
       );
+    case 'team':
+      return renderTeam(current, ui.teamTab);
     case 'catalogue':
       return renderCatalogue(
         current,
@@ -329,15 +348,32 @@ function kitOf(current: GameState, itemId: string): { specId: string; variantId:
   return reserved === null ? null : { specId: reserved.specId, variantId: reserved.variantId };
 }
 
-/** The ghost of the item being dragged, with the engine's verdict on the cell under the mouse. */
+/** The ghost of the item being dragged, with the engine's verdict on the cell under the mouse.
+ *  Turned the way the next drop will stand it (CLAUDE.md T10 3.8). */
 function ghostFor(current: GameState): Ghost | null {
   const drag = ui.drag;
   if (drag === null) return null;
   const kit = kitOf(current, drag.itemId);
   if (kit === null) return null;
-  const box = boxOf(kit.specId, drag.x, drag.y, kit.variantId);
-  const check = canPlace(current, drag.itemId, drag.x, drag.y);
-  return { x: box.x, y: box.y, width: box.width, depth: box.depth, ok: check.ok, reason: check.reason };
+  const box = boxOf(kit.specId, drag.x, drag.y, kit.variantId, ui.rotate);
+  const check = canPlace(current, drag.itemId, drag.x, drag.y, ui.rotate);
+  return {
+    x: box.x,
+    y: box.y,
+    width: box.width,
+    depth: box.depth,
+    ok: check.ok,
+    reason: check.reason,
+    rotated: ui.rotate,
+  };
+}
+
+/** Turns what is in hand, or arms the turn for the next thing picked up. The one write for it:
+ *  the R key and the Rotate button both come through here (CLAUDE.md T10 3.8). */
+function turnGhost(): void {
+  if (!ui.setup) return;
+  ui.rotate = !ui.rotate;
+  requestRender();
 }
 
 function setupControls(current: GameState): string {
@@ -351,10 +387,12 @@ function setupControls(current: GameState): string {
   return (
     '<div class="view-controls">' +
     '<button class="btn btn-primary" data-do="endSetup">Done</button>' +
+    `<button class="btn${ui.rotate ? ' is-on' : ''}" data-do="rotateGhost">Rotate</button>` +
     bill +
     '<span class="reason">Drag the machines, the benches and the shelving where you want them. ' +
     'The rooms and the gate stay where they are. Every item moved is an hour of somebody\'s ' +
-    'time.</span>' +
+    'time. Rotate, or the R key, stands the next one you drop at ninety degrees to the walls.' +
+    '</span>' +
     '</div>'
   );
 }
@@ -791,6 +829,13 @@ function applyCamera(): void {
   const group = root.querySelector('.hall-scene');
   if (group === null) return;
   const frame = hallFrame();
+  if (frame !== null && !ui.cameraStarted) {
+    // The hall opens a fifth past the fit, in the middle of the frame. The frame is not known
+    // until the scene is on the page, so this is the first render after every way in
+    // (CLAUDE.md T10 3.9).
+    ui.camera = hallStartCamera(frame);
+    ui.cameraStarted = true;
+  }
   if (frame !== null) ui.camera = clampCamera(ui.camera, frame);
   group.setAttribute('transform', cameraTransform(ui.camera));
 }
@@ -801,12 +846,21 @@ function applyCamera(): void {
 function moveCamera(next: HallCamera): void {
   const before = Math.round(ui.camera.scale * 100);
   ui.camera = next;
+  ui.cameraStarted = true;
   applyCamera();
   if (Math.round(ui.camera.scale * 100) !== before) requestRender();
 }
 
+/** Back to where the hall opens: a fifth past the fit (CLAUDE.md T10 3.9). */
 function resetCamera(): void {
+  ui.camera = { ...HALL_CAMERA_START };
+  ui.cameraStarted = false;
+}
+
+/** The Fit button: the whole hall on the screen, and it stays there (CLAUDE.md T6 3.3). */
+function fitCamera(): void {
   ui.camera = { ...HALL_CAMERA_FIT };
+  ui.cameraStarted = true;
 }
 
 export function render(): void {
@@ -934,7 +988,7 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
       resetCamera();
       break;
     case 'zoomFit':
-      resetCamera();
+      fitCamera();
       break;
     case 'zoomIn':
     case 'zoomOut': {
@@ -943,6 +997,7 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
       const middle = { x: frame.x + frame.width / 2, y: frame.y + frame.height / 2 };
       const step = what === 'zoomIn' ? HALL_ZOOM_STEP : 1 / HALL_ZOOM_STEP;
       ui.camera = zoomAt(ui.camera, frame, middle, step);
+      ui.cameraStarted = true;
       break;
     }
     case 'showSprites':
@@ -965,6 +1020,9 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
       ui.drag = null;
       ui.speedBeforeSetup = game().speed;
       dispatch({ type: 'SET_SPEED', speed: 0 });
+      return;
+    case 'rotateGhost':
+      turnGhost();
       return;
     case 'endSetup':
       endSetup();
@@ -1001,6 +1059,12 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
       break;
     }
     case 'laptopTab':
+      // The Team tab of the laptop is the Team board now: the chip opens the page rather than
+      // switching to a tab inside the laptop (PIOTR, 13.09; CLAUDE.md T10 3.6).
+      if (id === 'team') {
+        openModal('team');
+        break;
+      }
       ui.laptopTab = laptopTabFrom(id);
       ui.scrollModalTop = true;
       break;
@@ -1020,6 +1084,16 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
       ui.sellConfirm = null;
       dispatch({ type: 'SELL_MACHINE', equipmentId: id });
       return;
+    case 'assignAir': {
+      // One click puts a machine or a dryer on a compressor (CLAUDE.md T10 3.2).
+      const compressorId = element.dataset.compressor ?? null;
+      dispatch({ type: 'ASSIGN_AIR', equipmentId: id, compressorId });
+      return;
+    }
+    case 'teamTab':
+      ui.teamTab = teamTabFrom(id);
+      ui.scrollModalTop = true;
+      break;
     case 'catalogueTab':
       ui.catalogueTab = catalogueTabFrom(id);
       // A sale meant on the second click is not meant on another tab (CLAUDE.md T8 3.5).
@@ -1306,6 +1380,11 @@ function handleRoomClick(room: RoomId): void {
 function handleSceneClick(element: DataElement): boolean {
   // In setup mode a click on the kit is a drag, not a question about the bag.
   if (ui.setup) return true;
+  // The office door of the hall: the team is behind it (CLAUDE.md T10 3.6).
+  if (element.dataset.door === 'office') {
+    openModal('team');
+    return true;
+  }
   const van = element.dataset.van;
   if (van !== undefined) {
     askUnload(van);
@@ -1361,7 +1440,7 @@ function runClick(event: MouseEvent): void {
     return;
   }
   if (state === null) return;
-  const scene = dataElement(target.closest('[data-van],[data-kit]'));
+  const scene = dataElement(target.closest('[data-van],[data-kit],[data-door]'));
   if (scene) {
     handleSceneClick(scene);
     return;
@@ -1429,6 +1508,12 @@ function onKeyDown(event: KeyboardEvent): void {
 
 function runKeyDown(event: KeyboardEvent): void {
   if (event.key === ' ') spaceHeld = true;
+  // R turns what is being dragged, or arms the turn for the next thing picked up
+  // (PIOTR, CLAUDE.md T10 3.8).
+  if (ui.setup && (event.key === 'r' || event.key === 'R')) {
+    turnGhost();
+    return;
+  }
   if (event.key !== 'Escape') return;
   // Escape drops whatever is in hand before it closes anything (CLAUDE.md T2 3.10).
   if (ui.drag !== null) {
@@ -1593,6 +1678,8 @@ function onSetupPointerDown(event: MouseEvent): boolean {
   const offsetX = item.anchorX - at.x;
   const offsetY = item.anchorY - at.y;
   let moved = false;
+  // He picks it up the way it is standing, and R turns it from there (CLAUDE.md T10 3.8).
+  ui.rotate = 'rotated' in item ? item.rotated === true : false;
   ui.drag = { itemId, x: item.anchorX, y: item.anchorY };
   const move = (moveEvent: MouseEvent): void => {
     if (ui.drag === null) return;
@@ -1610,12 +1697,21 @@ function onSetupPointerDown(event: MouseEvent): boolean {
     window.removeEventListener('mouseup', up);
     const drag = ui.drag;
     ui.drag = null;
-    // A click that never moved is not a move: it leaves the hall exactly as it was.
-    if (drag === null || !moved) {
+    // A click that never moved is not a move: it leaves the hall exactly as it was. Turning it
+    // where it stands is a move, though: the machine has been picked up and put down again
+    // (CLAUDE.md T10 3.8).
+    const turned = ui.rotate !== ('rotated' in item ? item.rotated === true : false);
+    if (drag === null || (!moved && !turned)) {
       requestRender();
       return;
     }
-    dispatch({ type: 'MOVE_ITEM', itemId: drag.itemId, x: drag.x, y: drag.y });
+    dispatch({
+      type: 'MOVE_ITEM',
+      itemId: drag.itemId,
+      x: drag.x,
+      y: drag.y,
+      rotated: ui.rotate,
+    });
   };
   window.addEventListener('mousemove', move);
   window.addEventListener('mouseup', up);

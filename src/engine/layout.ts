@@ -48,9 +48,20 @@ export function hallItems(state: GameState): Equipment[] {
 
 /** The floor a thing of this class takes up where it is put: its working zone, which is what
  *  nothing else may stand on (CLAUDE.md T7 3.3). */
-export function boxOf(specId: string, x: number, y: number, variantId?: string): Box {
-  const zone = zoneOf(specId, variantId);
+export function boxOf(
+  specId: string,
+  x: number,
+  y: number,
+  variantId?: string,
+  rotated = false,
+): Box {
+  const zone = zoneOf(specId, variantId, rotated);
   return { x, y, width: zone.width, depth: zone.depth };
+}
+
+/** The floor something already in the hall takes up, turned the way it stands (T10 3.8). */
+function boxOfItem(item: { specId: string; variantId: string; rotated: boolean }, x: number, y: number): Box {
+  return boxOf(item.specId, x, y, item.variantId, item.rotated);
 }
 
 /** Can a thing of this kind stand here? `ignoreItemId` is the item being moved, which never
@@ -62,13 +73,14 @@ export function canPlaceSpec(
   y: number,
   ignoreItemId: string | null,
   variantId?: string,
+  rotated = false,
 ): PlaceCheck {
   const spec = findSpec(specId);
   if (!spec) return { ok: false, reason: 'Not in the catalogue' };
   if (!standsInTheHall(specId, variantId)) {
     return { ok: false, reason: 'It lives in a tool cabinet' };
   }
-  const box = boxOf(specId, x, y, variantId);
+  const box = boxOf(specId, x, y, variantId, rotated);
   if (
     x < 0 ||
     y < 0 ||
@@ -91,7 +103,7 @@ export function canPlaceSpec(
     if (!other) continue;
     // Zone against zone: two saws whose working room would overlap cannot both stand there, even
     // where the machines themselves would not touch (CLAUDE.md T7 3.3).
-    if (overlaps(box, boxOf(item.specId, item.anchorX, item.anchorY, item.variantId))) {
+    if (overlaps(box, boxOfItem(item, item.anchorX, item.anchorY))) {
       return { ok: false, reason: `On the ${other.name.toLowerCase()}` };
     }
   }
@@ -101,7 +113,7 @@ export function canPlaceSpec(
     if (item.id === ignoreItemId) continue;
     const other = findSpec(item.specId);
     if (!other) continue;
-    if (overlaps(box, boxOf(item.specId, item.anchorX, item.anchorY, item.variantId))) {
+    if (overlaps(box, boxOfItem(item, item.anchorX, item.anchorY))) {
       return { ok: false, reason: `On the ${other.name.toLowerCase()} that is on order` };
     }
   }
@@ -115,28 +127,49 @@ export function reservationById(state: GameState, itemId: string): OnOrderItem |
 
 /** Can this item stand here? An outline held for a delivery answers exactly as the machine it is
  *  holding the floor for would (CLAUDE.md T8 3.2). */
-export function canPlace(state: GameState, itemId: string, x: number, y: number): PlaceCheck {
+export function canPlace(
+  state: GameState,
+  itemId: string,
+  x: number,
+  y: number,
+  rotated?: boolean,
+): PlaceCheck {
   const reserved = reservationById(state, itemId);
   if (reserved !== null) {
-    return canPlaceSpec(state, reserved.specId, x, y, reserved.id, reserved.variantId);
+    return canPlaceSpec(
+      state,
+      reserved.specId,
+      x,
+      y,
+      reserved.id,
+      reserved.variantId,
+      rotated ?? reserved.rotated,
+    );
   }
   const item = state.equipment.find((entry) => entry.id === itemId);
   if (!item) return { ok: false, reason: 'Nothing to move' };
   const spec = findSpec(item.specId);
   if (spec?.category === 'furniture') return { ok: false, reason: 'It lives in the office' };
   if (item.anchorX >= state.unit.widthCells) return { ok: false, reason: 'It stands in the yard' };
-  return canPlaceSpec(state, item.specId, x, y, item.id, item.variantId);
+  return canPlaceSpec(state, item.specId, x, y, item.id, item.variantId, rotated ?? item.rotated);
 }
 
 /** Moves it, or says why not. The man at a bench goes with his bench. */
-export function moveItem(state: GameState, itemId: string, x: number, y: number): PlaceCheck {
-  const check = canPlace(state, itemId, x, y);
+export function moveItem(
+  state: GameState,
+  itemId: string,
+  x: number,
+  y: number,
+  rotated?: boolean,
+): PlaceCheck {
+  const check = canPlace(state, itemId, x, y, rotated);
   if (!check.ok) return check;
   const reserved = reservationById(state, itemId);
   if (reserved !== null) {
     // Nothing is carried and nothing is unplugged: the floor held for it is held somewhere else.
     reserved.anchorX = x;
     reserved.anchorY = y;
+    if (rotated !== undefined) reserved.rotated = rotated;
     return OK;
   }
   const item = state.equipment.find((entry) => entry.id === itemId);
@@ -145,6 +178,7 @@ export function moveItem(state: GameState, itemId: string, x: number, y: number)
   const fromY = item.anchorY;
   item.anchorX = x;
   item.anchorY = y;
+  if (rotated !== undefined) item.rotated = rotated;
   for (const worker of state.workers) {
     if (worker.anchorX === fromX && worker.anchorY === fromY) {
       worker.anchorX = x;

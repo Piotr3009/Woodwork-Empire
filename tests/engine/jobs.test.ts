@@ -26,12 +26,13 @@ import {
 import { stagePlanFor } from '../../src/engine/stages';
 import { materialCostFor, sheetsForCost } from '../../src/engine/materials';
 import { missingForHire } from '../../src/engine/staff';
-import { tick } from '../../src/engine/index';
+import { isWorkingDay, tick } from '../../src/engine/index';
 import type { GameEvent, GameState, Job } from '../../src/engine/index';
 import {
   act,
   buyNow,
   buyStartingKit,
+  withExtraction,
   clearEvents,
   doAllEmails,
   doTask,
@@ -51,7 +52,9 @@ import {
  *  one, whose factors are all 1.0: these are the labour figures of CLAUDE.md 8.5, not a test of
  *  what a class of machine does to them (CLAUDE.md T3 3.5). */
 function ready(): GameState {
-  const state = buyStartingKit(newGame(), { sawVariant: 'budget' });
+  // A fan big enough for the budget saw: these tests are about the life of a job and not about
+  // the extraction sums, which have their own file (CLAUDE.md T10 3.1).
+  const state = withExtraction(buyStartingKit(newGame(), { sawVariant: 'budget' }));
   state.enquiries = [];
   return fillRack(state);
 }
@@ -101,9 +104,12 @@ describe('accepting an enquiry', () => {
     expect(state.jobs[0]?.stage).toBe('accepted');
   });
 
-  it('counts the deadline in calendar days from acceptance', () => {
+  it('counts the deadline in working days from acceptance, never over a weekend', () => {
+    // Fifteen days the workshop is open, starting from the Monday of day 1: three whole weeks
+    // and a day, which is day 22 (PIOTR: deadlines never count weekends; CLAUDE.md T10 3.5).
     const state = accept(ready(), 400, { deadlineDays: 15 });
-    expect(state.jobs[0]?.dueDay).toBe(16);
+    expect(state.jobs[0]?.dueDay).toBe(22);
+    expect(isWorkingDay(state.jobs[0]?.dueDay ?? 0)).toBe(true);
   });
 
   it('adds the site measure and its taxi for a kitchen', () => {

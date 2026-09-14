@@ -30,7 +30,7 @@ import {
 import { canAccept, findEnquiry, removeEnquiry } from './board';
 import { callRinging, scheduleCalls } from './calls';
 import { template } from './catalog';
-import { nextWorkingDay } from './clock';
+import { addWorkingDays, nextWorkingDay, workingDaysBetween } from './clock';
 import { chargeUnavoidable, formatMoney, noteLoss, receive } from './economy';
 import { queueEvent } from './events';
 import {
@@ -50,6 +50,8 @@ import {
   sheetsForCost,
   stockCostFor,
 } from './materials';
+import { familyAirBlock } from './media';
+import { firstOnOrder } from './orders';
 import { ownerIsAvailable } from './owner';
 import {
   type StageOptions,
@@ -247,7 +249,9 @@ export function acceptEnquiry(state: GameState, enquiryId: string, byHand: boole
     labourValue,
     labourRemaining: labourValue,
     acceptedDay: state.clock.day,
-    dueDay: state.clock.day + enquiry.deadlineDays,
+    // The client counts the days his workshop is open and no others: a job taken on Friday
+    // with three days on it is due on Wednesday (PIOTR; CLAUDE.md T10 3.5).
+    dueDay: addWorkingDays(state.clock.day, enquiry.deadlineDays),
     stage: 'accepted',
     finishedDay: null,
     deliverOnDay: null,
@@ -262,6 +266,9 @@ export function acceptEnquiry(state: GameState, enquiryId: string, byHand: boole
     balancePaid: 0,
     penalty: 0,
     emailsUnanswered: 0,
+    wetFinish: false,
+    productionMinutes: 0,
+    dustyMinutes: 0,
     rating: null,
     overdueWarned: false,
   };
@@ -539,6 +546,18 @@ export function setMaterialMode(state: GameState, jobId: string, mode: MaterialM
 // Production
 // ---------------------------------------------------------------------------
 
+/** A machine that is bought and still on the road is a drawing on the floor: the stage that wants
+ *  it stands and waits for the lorry rather than falling back to a pair of hands, and says which
+ *  day the lorry is (CLAUDE.md T10 1, 3.10). The board's lock is the one question on-order kit
+ *  may answer, and it asked it days ago, when the job was taken. */
+function onOrderBlock(state: GameState, family: string): string {
+  if (has(state, family)) return '';
+  const coming = firstOnOrder(state, family);
+  if (coming === null) return '';
+  const name = (findSpec(family)?.name ?? family).toLowerCase();
+  return `waiting for ${name} (on order, due day ${coming.dueDay})`;
+}
+
 /** Everything in the hall that can stop a job, in the order the player would notice it. Empty
  *  while the job is free to be worked on (CLAUDE.md T2 3.9). */
 export function hallBlock(state: GameState, job: Job): string {
@@ -551,6 +570,12 @@ export function hallBlock(state: GameState, job: Job): string {
   const stage = jobStage(state, job, cncOptions(state, job.assignedTo ?? OWNER, job));
   const family = stage?.family ?? null;
   if (family === null) return '';
+  const coming = onOrderBlock(state, family);
+  if (coming !== '') return coming;
+  // A machine that wants more bar than its compressor gives, or dry air where there is none, does
+  // not run at all (PIOTR, CLAUDE.md T10 3.2 rule 1, 3.3).
+  const air = familyAirBlock(state, family);
+  if (air !== '') return `${(findSpec(family)?.name ?? family).toLowerCase()} ${air}`;
   const stopped = familyStopped(state, family);
   if (stopped === null) return '';
   if (stopped.why === 'bag') return 'bag full';
@@ -814,7 +839,9 @@ export function deliverJob(state: GameState, job: Job): void {
   job.stage = 'completed';
   job.completedDay = state.clock.day;
   job.deliverOnDay = null;
-  job.daysLate = Math.max(0, state.clock.day - job.dueDay);
+  // Late by the days the workshop was open: a weekend is not a day anybody was late on
+  // (PIOTR; CLAUDE.md T10 3.5).
+  job.daysLate = Math.max(0, workingDaysBetween(job.dueDay, state.clock.day));
   job.emailsUnanswered = emailsOutstanding(state, job);
   const rate = job.express ? LATE_PENALTY_PER_DAY_EXPRESS : LATE_PENALTY_PER_DAY;
   const balanceDue = Math.round(job.price * (1 - DEPOSIT_FRACTION) * 100) / 100;

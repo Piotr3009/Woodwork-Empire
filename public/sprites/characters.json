@@ -1,1 +1,381 @@
-{}
+{
+  "character.joiner.bench": {
+    "cellWidth": 112,
+    "cellHeight": 151,
+    "anchorX": 56,
+    "anchorY": 143,
+    "frames": 8,
+    "fps": 5,
+    "rows": {
+      "sw": 0,
+      "se": 1,
+      "nw": 2,
+      "ne": 3
+    },
+    "spriteKey": "character.joiner",
+    "animation": "bench",
+    "loop": true,
+    "directions": [
+      "sw",
+      "se",
+      "nw",
+      "ne"
+    ],
+    "padding": 8,
+    "metresPerCell": {
+      "width": 1,
+      "depth": 1,
+      "height": 1.8
+    },
+    "scaleFromSource": 0.1957,
+    "source": {
+      "file": "Woodwork-Empire-joiner-animation-pack.zip",
+      "canvas": {
+        "width": 480,
+        "height": 660
+      },
+      "anchorPixels": {
+        "x": 240,
+        "y": 545
+      }
+    }
+  },
+  "character.joiner.carry": {
+    "cellWidth": 173,
+    "cellHeight": 160,
+    "anchorX": 86.5,
+    "anchorY": 152,
+    "frames": 8,
+    "fps": 3.4286,
+    "rows": {
+      "sw": 0,
+      "se": 1,
+      "nw": 2,
+      "ne": 3
+    },
+    "spriteKey": "character.joiner",
+    "animation": "carry",
+    "loop": true,
+    "directions": [
+      "sw",
+      "se",
+      "nw",
+      "ne"
+    ],
+    "padding": 8,
+    "metresPerCell": {
+      "width": 1,
+      "depth": 1,
+      "height": 1.8
+    },
+    "scaleFromSource": 0.1957,
+    "source": {
+      "file": "Woodwork-Empire-joiner-animation-pack.zip",
+      "canvas": {
+        "width": 800,
+        "height": 736
+      },
+      "anchorPixels": {
+        "x": 400,
+        "y": 560
+      }
+    }
+  },
+  "character.joiner.idle": {
+    "cellWidth": 112,
+    "cellHeight": 151,
+    "anchorX": 56,
+    "anchorY": 143,
+    "frames": 2,
+    "fps": 1,
+    "rows": {
+      "sw": 0,
+      "se": 1,
+      "nw": 2,
+      "ne": 3
+    },
+    "spriteKey": "character.joiner",
+    "animation": "idle",
+    "loop": true,
+    "directions": [
+      "sw",
+      "se",
+      "nw",
+      "ne"
+    ],
+    "padding": 8,
+    "metresPerCell": {
+      "width": 1,
+      "depth": 1,
+      "height": 1.8
+    },
+    "scaleFromSource": 0.1957,
+    "source": {
+      "file": "Woodwork-Empire-joiner-animation-pack.zip",
+      "canvas": {
+        "width": 480,
+        "height": 660
+      },
+      "anchorPixels": {
+        "x": 240,
+        "y": 545
+      }
+    }
+  },
+  "character.joiner.walk": {
+    "cellWidth": 112,
+    "cellHeight": 151,
+    "anchorX": 56,
+    "anchorY": 143,
+    "frames": 8,
+    "fps": 3.4286,
+    "rows": {
+      "sw": 0,
+      "se": 1,
+      "nw": 2,
+      "ne": 3
+    },
+    "spriteKey": "character.joiner",
+    "animation": "walk",
+    "loop": true,
+    "directions": [
+      "sw",
+      "se",
+      "nw",
+      "ne"
+    ],
+    "padding": 8,
+    "metresPerCell": {
+      "width": 1,
+      "depth": 1,
+      "height": 1.8
+    },
+    "scaleFromSource": 0.1957,
+    "source": {
+      "file": "Woodwork-Empire-joiner-animation-pack.zip",
+      "canvas": {
+        "width": 480,
+        "height": 660
+      },
+      "anchorPixels": {
+        "x": 240,
+        "y": 545
+      }
+    }
+  },
+  "character.owner.bench": {
+    "cellWidth": 112,
+    "cellHeight": 151,
+    "anchorX": 56,
+    "anchorY": 143,
+    "frames": 8,
+    "fps": 5,
+    "rows": {
+      "sw": 0,
+      "se": 1,
+      "nw": 2,
+      "ne": 3
+    },
+    "spriteKey": "character.owner",
+    "animation": "bench",
+    "loop": true,
+    "directions": [
+      "sw",
+      "se",
+      "nw",
+      "ne"
+    ],
+    "padding": 8,
+    "metresPerCell": {
+      "width": 1,
+      "depth": 1,
+      "height": 1.8
+    },
+    "scaleFromSource": 0.1957,
+    "source": {
+      "file": "Woodwork-Empire-boss-animation-pack.zip",
+      "role": "boss",
+      "shirt": "black",
+      "canvas": {
+        "width": 480,
+        "height": 660
+      },
+      "anchorPixels": {
+        "x": 240,
+        "y": 545
+      }
+    }
+  },
+  "character.owner.carry": {
+    "cellWidth": 173,
+    "cellHeight": 160,
+    "anchorX": 86.5,
+    "anchorY": 152,
+    "frames": 8,
+    "fps": 3.4286,
+    "rows": {
+      "sw": 0,
+      "se": 1,
+      "nw": 2,
+      "ne": 3
+    },
+    "spriteKey": "character.owner",
+    "animation": "carry",
+    "loop": true,
+    "directions": [
+      "sw",
+      "se",
+      "nw",
+      "ne"
+    ],
+    "padding": 8,
+    "metresPerCell": {
+      "width": 1,
+      "depth": 1,
+      "height": 1.8
+    },
+    "scaleFromSource": 0.1957,
+    "source": {
+      "file": "Woodwork-Empire-boss-animation-pack.zip",
+      "role": "boss",
+      "shirt": "black",
+      "canvas": {
+        "width": 800,
+        "height": 736
+      },
+      "anchorPixels": {
+        "x": 400,
+        "y": 560
+      }
+    }
+  },
+  "character.owner.idle": {
+    "cellWidth": 112,
+    "cellHeight": 151,
+    "anchorX": 56,
+    "anchorY": 143,
+    "frames": 2,
+    "fps": 1,
+    "rows": {
+      "sw": 0,
+      "se": 1,
+      "nw": 2,
+      "ne": 3
+    },
+    "spriteKey": "character.owner",
+    "animation": "idle",
+    "loop": true,
+    "directions": [
+      "sw",
+      "se",
+      "nw",
+      "ne"
+    ],
+    "padding": 8,
+    "metresPerCell": {
+      "width": 1,
+      "depth": 1,
+      "height": 1.8
+    },
+    "scaleFromSource": 0.1957,
+    "source": {
+      "file": "Woodwork-Empire-boss-animation-pack.zip",
+      "role": "boss",
+      "shirt": "black",
+      "canvas": {
+        "width": 480,
+        "height": 660
+      },
+      "anchorPixels": {
+        "x": 240,
+        "y": 545
+      }
+    }
+  },
+  "character.owner.phone": {
+    "cellWidth": 112,
+    "cellHeight": 151,
+    "anchorX": 56,
+    "anchorY": 143,
+    "frames": 8,
+    "fps": 4,
+    "rows": {
+      "sw": 0,
+      "se": 1,
+      "nw": 2,
+      "ne": 3
+    },
+    "spriteKey": "character.owner",
+    "animation": "phone",
+    "loop": true,
+    "directions": [
+      "sw",
+      "se",
+      "nw",
+      "ne"
+    ],
+    "padding": 8,
+    "metresPerCell": {
+      "width": 1,
+      "depth": 1,
+      "height": 1.8
+    },
+    "scaleFromSource": 0.1957,
+    "source": {
+      "file": "Woodwork-Empire-boss-animation-pack.zip",
+      "role": "boss",
+      "shirt": "black",
+      "canvas": {
+        "width": 480,
+        "height": 660
+      },
+      "anchorPixels": {
+        "x": 240,
+        "y": 545
+      }
+    }
+  },
+  "character.owner.walk": {
+    "cellWidth": 112,
+    "cellHeight": 151,
+    "anchorX": 56,
+    "anchorY": 143,
+    "frames": 8,
+    "fps": 3.4286,
+    "rows": {
+      "sw": 0,
+      "se": 1,
+      "nw": 2,
+      "ne": 3
+    },
+    "spriteKey": "character.owner",
+    "animation": "walk",
+    "loop": true,
+    "directions": [
+      "sw",
+      "se",
+      "nw",
+      "ne"
+    ],
+    "padding": 8,
+    "metresPerCell": {
+      "width": 1,
+      "depth": 1,
+      "height": 1.8
+    },
+    "scaleFromSource": 0.1957,
+    "source": {
+      "file": "Woodwork-Empire-boss-animation-pack.zip",
+      "role": "boss",
+      "shirt": "black",
+      "canvas": {
+        "width": 480,
+        "height": 660
+      },
+      "anchorPixels": {
+        "x": 240,
+        "y": 545
+      }
+    }
+  }
+}

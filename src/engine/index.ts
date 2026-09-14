@@ -8,6 +8,7 @@
 // The UI never computes economics. Everything it needs to show is a selector exported here.
 
 export {
+  assignAir,
   applyAction,
   bootLaptop,
   canBuy,
@@ -60,6 +61,7 @@ export {
 // Time
 export {
   addWorkingDays,
+  dayOfWorkingIndex,
   dayOfMonth,
   formatDate,
   formatTime,
@@ -76,6 +78,8 @@ export {
   weekOfDay,
   weekday,
   weekdayName,
+  workingDayIndex,
+  workingDaysBetween,
 } from './clock';
 
 // The owner
@@ -172,15 +176,43 @@ export {
   stageSpeed,
 } from './stages';
 export type { StageOptions, StagePlan, StagedJob } from './stages';
+// Air and dust that have to add up (CLAUDE.md T10 3.1, 3.2, 3.3)
+export {
+  airBlockFor,
+  airCheck,
+  airConsumers,
+  airDemandOf,
+  airHands,
+  compressorAirOf,
+  compressorFor,
+  compressorHasDryer,
+  compressorIsLow,
+  compressorLabel,
+  compressors,
+  extractingMachines,
+  extractionCapacityOf,
+  extractionCheck,
+  extractionDemandOf,
+  extractionKit,
+  familyAirBlock,
+  hallAirCheck,
+  mediaFigure,
+  needsDryAir,
+  sprayingOnWetAir,
+  underExtracted,
+} from './media';
+export type { AirCheck, AirHands, CompressorLine, ExtractionCheck } from './media';
+
 export {
   BOARD_DAYS_PAST_DUE,
+  dayOfPoint,
   dayPoint,
   rateFor,
   stageText,
   workPlan,
   workshopRate,
 } from './plan';
-export type { PlanRow, WorkPlan } from './plan';
+export type { PlanDay, PlanRow, WorkPlan } from './plan';
 
 // Client calls
 export {
@@ -372,6 +404,7 @@ export {
   clampReputation,
   emailRatingFactor,
   formatReputation,
+  madeInADustyWorkshop,
   ratingFor,
   reputationTier,
 } from './reputation';

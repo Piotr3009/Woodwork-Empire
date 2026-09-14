@@ -17,6 +17,7 @@ import {
   DUST_HIGH_THRESHOLD,
   DUST_MAX,
   DUST_PER_PRODUCTION_MINUTE,
+  ENDURANCE_MINUTES_BY_CLASS,
   EQUIPMENT_SPECS,
   EXTRACTOR_REPAIR_COST,
   EXTRACTOR_BREAKDOWN_CHANCE,
@@ -27,9 +28,12 @@ import {
   NO_HELPER_DUST_MULTIPLIER,
   NO_HELPER_PRODUCTIVITY_FACTOR,
   SALE_FRACTION,
+  UNDER_EXTRACTION_DUST_MULTIPLIER,
+  UNDER_EXTRACTION_OUTPUT_PENALTY,
   SALE_FRACTION_USED,
   USED_VARIANT,
 } from './constants';
+import { extractionCheck, underExtracted } from './media';
 import type {
   Equipment,
   EquipmentSpec,
@@ -53,27 +57,51 @@ export function findSpec(specId: string): EquipmentSpec | null {
 export function footprintOf(
   specId: string,
   variantId?: string,
+  rotated = false,
 ): { width: number; depth: number; height: number } {
   const spec = findSpec(specId);
   if (!spec) return { width: 1, depth: 1, height: 1 };
   const variant = variantOf(spec, variantId ?? spec.variants[0]?.id ?? '');
+  const width = variant.width ?? spec.width;
+  const depth = variant.depth ?? spec.depth;
   return {
-    width: variant.width ?? spec.width,
-    depth: variant.depth ?? spec.depth,
+    width: rotated ? depth : width,
+    depth: rotated ? width : depth,
     height: variant.height ?? spec.height,
   };
 }
 
+/** The same question of something already standing in the hall, which knows how it is turned. */
+export function itemFootprint(item: {
+  specId: string;
+  variantId: string;
+  rotated?: boolean;
+}): { width: number; depth: number; height: number } {
+  return footprintOf(item.specId, item.variantId, item.rotated === true);
+}
+
 /** The floor a class reserves, in metres: the working room around it, which contains the
  *  footprint. Nothing may be built on it (CLAUDE.md T7 3.3). */
-export function zoneOf(specId: string, variantId?: string): { width: number; depth: number } {
+export function zoneOf(
+  specId: string,
+  variantId?: string,
+  rotated = false,
+): { width: number; depth: number } {
   const spec = findSpec(specId);
   if (!spec) return { width: 1, depth: 1 };
   const variant = variantOf(spec, variantId ?? spec.variants[0]?.id ?? '');
-  return {
-    width: variant.zoneWidth ?? spec.zoneWidth,
-    depth: variant.zoneDepth ?? spec.zoneDepth,
-  };
+  const width = variant.zoneWidth ?? spec.zoneWidth;
+  const depth = variant.zoneDepth ?? spec.zoneDepth;
+  return { width: rotated ? depth : width, depth: rotated ? width : depth };
+}
+
+/** The same question of something already standing in the hall. */
+export function itemZone(item: {
+  specId: string;
+  variantId: string;
+  rotated?: boolean;
+}): { width: number; depth: number } {
+  return zoneOf(item.specId, item.variantId, item.rotated === true);
 }
 
 /** Working days between the click and the lorry for this class (CLAUDE.md T8 3.2). Zero means it
@@ -255,8 +283,13 @@ export function bagIntervalFor(item: Equipment): number {
   return Math.max(1, Math.round(spec.bagInterval * variant.bagIntervalFactor));
 }
 
-/** Hours of use a machine of this family and class has in it. */
+/** Hours of use a machine of this family and class has in it. A family whose life Piotr wrote in
+ *  running minutes, as the compressors' is, says so in its own table and the hours come off that;
+ *  everything else is the family's base hours stretched by its class (CLAUDE.md T10 3.2). One
+ *  answer either way, so nothing reads two. */
 export function enduranceHoursFor(specId: string, variantId: string): number {
+  const minutes = ENDURANCE_MINUTES_BY_CLASS[specId]?.[variantId];
+  if (minutes !== undefined) return minutes / 60;
   const spec = findSpec(specId);
   if (!spec) return 0;
   return Math.round(spec.enduranceHours * variantOf(spec, variantId).enduranceFactor);
@@ -407,6 +440,12 @@ export function outputBreakdown(state: GameState): OutputBreakdown {
     hallLine('Extraction down', EXTRACTOR_BROKEN_OUTPUT_FACTOR);
   } else {
     hallLine('Extraction working', 1);
+  }
+  // The fans are there and they are too small for what is running: nothing stops, the hall just
+  // turns out less of everything and fills with dust (PIOTR, CLAUDE.md T10 3.1).
+  const extraction = extractionCheck(state);
+  if (extraction.short) {
+    hallLine(extraction.line, 1 - UNDER_EXTRACTION_OUTPUT_PENALTY);
   }
   const total = running;
   let plus = 0;
@@ -681,11 +720,13 @@ export function emptyBag(state: GameState, equipmentId: string): void {
   item.minutesUsed = 0;
 }
 
-/** Dust gained per minute of production, tripled by a broken extractor and doubled when the crew
- *  is too big for no helper (CLAUDE.md 9.6, 9.7). */
+/** Dust gained per minute of production, tripled by a broken extractor or by a hall whose
+ *  machines are asking for more air than its fans will move, and doubled when the crew is too big
+ *  for no helper (CLAUDE.md 9.6, 9.7, T10 3.1). */
 export function dustGainPerMinute(state: GameState): number {
   let gain = DUST_PER_PRODUCTION_MINUTE;
   if (extractorBroken(state)) gain *= EXTRACTOR_BROKEN_DUST_MULTIPLIER;
+  if (underExtracted(state)) gain *= UNDER_EXTRACTION_DUST_MULTIPLIER;
   if (helperMissing(state)) gain *= NO_HELPER_DUST_MULTIPLIER;
   return gain;
 }

@@ -3,6 +3,13 @@
 
 import {
   DELIVERY_VAN_SPRITE,
+  DUCT_DEPTH,
+  DUCT_HEIGHT,
+  DUCT_SPAN,
+  DUCT_SPRITE_SUFFIX,
+  DUCT_SYSTEMS,
+  DUCT_THICKNESS,
+  DUCT_WIDTH,
   FINISHED_GOODS_LAYOUT,
   GATE_CROWD_LIMIT,
   GATE_LAYOUT,
@@ -24,10 +31,12 @@ import {
 import { jobsAtGate } from '../engine/jobs';
 import { orderName, reservedItems, shoppingList } from '../engine/orders';
 import {
-  footprintOf,
+  isSold,
+  itemFootprint,
   itemStandsInTheHall,
+  itemZone,
+  needsDucting,
   sheetCapacityOf,
-  zoneOf,
 } from '../engine/machines';
 import { machineInUse } from '../engine/game';
 import { rackCapacity, stockIsLow } from '../engine/materials';
@@ -60,6 +69,7 @@ import {
   tileToScreen,
 } from './iso';
 import { formatTime } from '../engine/clock';
+import { compressorIsLow, extractionCheck, hallAirCheck } from '../engine/media';
 import {
   type CharacterOptions,
   type Facing,
@@ -69,6 +79,7 @@ import {
 import {
   SPRITE_SCALE,
   contactShadow,
+  mirrorNeeded,
   pickSprite,
   spriteBox,
   spriteFiles,
@@ -161,15 +172,28 @@ export function objectArt(art: {
   fill: string;
   shade: string;
   label: string;
+  /** Stood at ninety degrees to the walls: the second orientation the art side delivered, or the
+   *  picture mirrored about its anchor (CLAUDE.md T10 3.8). */
+  rotated?: boolean;
   /** What the art side has delivered; the manifest when not given, so a test can draw the hall
    *  as if a file had not landed yet (the placeholders are for exactly that). */
   files?: readonly string[];
 }): string {
   const shadow = contactShadow(art.x, art.y, art.width, art.depth);
-  const url = art.files === undefined ? spriteUrl(art.spriteKey, art.tier) : pickSprite(art.files, art.spriteKey, art.tier);
+  const rotated = art.rotated === true;
+  const files = art.files ?? spriteFiles();
+  const url = art.files === undefined
+    ? spriteUrl(art.spriteKey, art.tier, rotated)
+    : pickSprite(art.files, art.spriteKey, art.tier, rotated);
   if (url !== null) {
     const at = spriteBox(art.x, art.y, art.width, art.depth, art.height);
-    return shadow + spriteImage(url, at);
+    // Mirrored about the anchor, which is the corner the picture is placed by, so the object
+    // stays on its own tile while it faces the other way (CLAUDE.md T10 3.8).
+    const anchor = tileToScreen(art.x + art.width, art.y + art.depth);
+    const mirror = mirrorNeeded(files, art.spriteKey, art.tier, rotated)
+      ? ` transform="translate(${round(anchor.x * 2)},0) scale(-1, 1)"`
+      : '';
+    return shadow + spriteImage(url, at, mirror.trim());
   }
   const faces = boxPolygons(art.x, art.y, art.width, art.depth, art.height);
   return (
@@ -182,6 +206,110 @@ export function objectArt(art: {
 interface Drawable {
   depth: number;
   svg: string;
+}
+
+// ---------------------------------------------------------------------------
+// The ducting a central system draws along the rear wall (PIOTR, CLAUDE.md T10 3.4). The plant
+// itself stands outside on the apron by the shutter, like the van; what the player sees in the
+// hall is the run above the machines and a drop to every one of them.
+// ---------------------------------------------------------------------------
+
+/** The central system the hall runs on, or null. The flexi one wins where both are owned: it is
+ *  the dearer of the two and it is the one whose reconnection is free (CLAUDE.md T4 3.5). */
+export function ductSystemOf(state: GameState): string | null {
+  for (const specId of DUCT_SYSTEMS.slice().reverse()) {
+    if (state.equipment.some((item) => item.specId === specId && !isSold(item))) return specId;
+  }
+  return null;
+}
+
+/** One length of ducting every four metres along the rear wall, three metres up. The sprite is a
+ *  4 by 0.5 by 0.5 object, so it is placed by the same rule as every other picture in the hall
+ *  and then lifted by its three metres. */
+export function ductRun(
+  state: GameState,
+  files: readonly string[],
+  widthCells: number,
+): string {
+  const system = ductSystemOf(state);
+  if (system === null) return '';
+  const url = pickSprite(files, system, DUCT_SPRITE_SUFFIX);
+  const lengths: string[] = [];
+  for (let x = 0; x + DUCT_SPAN <= widthCells; x += DUCT_SPAN) {
+    if (url === null) {
+      // No picture yet: a plain bar on the wall, so the run is still there to be seen.
+      const from = tileToScreen(x, 0, DUCT_HEIGHT);
+      const to = tileToScreen(x + DUCT_SPAN, 0, DUCT_HEIGHT);
+      lengths.push(
+        `<line class="duct-run" x1="${round(from.x)}" y1="${round(from.y)}" ` +
+          `x2="${round(to.x)}" y2="${round(to.y)}" />`,
+      );
+      continue;
+    }
+    const at = spriteBox(x, 0, DUCT_WIDTH, DUCT_DEPTH, DUCT_THICKNESS);
+    lengths.push(
+      spriteImage(url, { ...at, y: at.y - DUCT_HEIGHT * TILE_RISE }),
+    );
+  }
+  return `<g data-ducts="${system}">${lengths.join('')}</g>`;
+}
+
+/** The drop from the run to one machine, and the ring at the port it lands on. With the flexi
+ *  system the ring is green: the reconnection is free for ever (Turn 4 3.5; T10 3.4). */
+export function ductDrop(system: string, item: Equipment): string {
+  const stands = footprintIn(item);
+  const port = centreOf(stands.x, stands.y, stands.width, stands.depth, stands.height);
+  const above = tileToScreen(stands.x + stands.width / 2, 0, DUCT_HEIGHT);
+  const green = system === 'flexiSystem' ? ' is-flexi' : '';
+  return (
+    `<g class="duct-drop${green}" data-duct="${item.id}">` +
+    `<line x1="${round(above.x)}" y1="${round(above.y)}" ` +
+    `x2="${round(port.x)}" y2="${round(port.y)}" />` +
+    `<circle class="duct-port" cx="${round(port.x)}" cy="${round(port.y)}" r="3" /></g>`
+  );
+}
+
+/** The door in the office block's face, as a control: the Team board is behind it
+ *  (CLAUDE.md T10 3.6). The face is the one the hall is on, and the door is centred in it, which
+ *  is the same box the room's own lettering is measured from. */
+export function officeDoor(room: {
+  x: number;
+  y: number;
+  width: number;
+  depth: number;
+}): string {
+  const door = roomDoorBox(room);
+  const face = room.y + room.depth;
+  const from = room.x + door.from;
+  const to = from + door.across;
+  const shape: Polygon = [
+    tileToScreen(from, face, door.bottom),
+    tileToScreen(to, face, door.bottom),
+    tileToScreen(to, face, door.top),
+    tileToScreen(from, face, door.top),
+  ];
+  return (
+    '<g data-door="office" class="clickable office-door">' +
+    '<title>The team</title>' +
+    `<polygon points="${points(shape)}" class="door-hit" />` +
+    '</g>'
+  );
+}
+
+/** Every machine on the ducting, with its drop. Empty while the hall has no central system. */
+export function ductDrops(state: GameState): string {
+  const system = ductSystemOf(state);
+  if (system === null) return '';
+  return state.equipment
+    .filter(
+      (item) =>
+        !isSold(item) &&
+        itemStandsInTheHall(item) &&
+        needsDucting(item.specId, item.variantId) &&
+        item.anchorX < state.unit.widthCells,
+    )
+    .map((item) => ductDrop(system, item))
+    .join('');
 }
 
 // ---------------------------------------------------------------------------
@@ -366,8 +494,12 @@ export interface HallCamera {
   y: number;
 }
 
-/** The whole hall on the screen, which is where every visit starts. */
+/** The whole hall on the screen: what the Fit button comes back to. */
 export const HALL_CAMERA_FIT: HallCamera = { scale: 1, x: 0, y: 0 };
+/** How far in the hall opens: a fifth past the fit, so the machines read at a glance (PIOTR,
+ *  13.09; CLAUDE.md T10 3.9). The wheel still goes out to the fit and in to four times it. */
+export const HALL_ZOOM_START = 1.2;
+export const HALL_CAMERA_START: HallCamera = { scale: HALL_ZOOM_START, x: 0, y: 0 };
 export const HALL_ZOOM_MIN = 1;
 export const HALL_ZOOM_MAX = 4;
 /** One notch of the wheel [PIOTR: steps of 1.2]. */
@@ -416,6 +548,16 @@ export function zoomAt(camera: HallCamera, frame: Frame, at: Point, factor: numb
   return clampCamera(
     { scale, x: at.x - taken * (at.x - camera.x), y: at.y - taken * (at.y - camera.y) },
     frame,
+  );
+}
+
+/** Where the hall opens: a fifth past the fit, with the middle of it in the middle of the frame
+ *  (PIOTR, 13.09; CLAUDE.md T10 3.9). */
+export function hallStartCamera(frame: Frame): HallCamera {
+  return zoomTo(
+    frame,
+    { x: frame.x + frame.width / 2, y: frame.y + frame.height / 2 },
+    HALL_ZOOM_START,
   );
 }
 
@@ -490,8 +632,8 @@ export function footprintIn(item: Equipment): {
   depth: number;
   height: number;
 } {
-  const stands = footprintOf(item.specId, item.variantId);
-  const zone = zoneOf(item.specId, item.variantId);
+  const stands = itemFootprint(item);
+  const zone = itemZone(item);
   // A class that holds no floor is kept in a tool cabinet: its picture stands on the cell the
   // cabinet stands on, with nothing to centre it in (CLAUDE.md T7 3.6).
   const inZone = zone.width > 0 && zone.depth > 0;
@@ -508,6 +650,14 @@ export function machineFx(state: GameState, item: Equipment, spec: EquipmentSpec
   // The top of the object, where a lamp or a blade would sit on the real thing.
   const stands = footprintIn(item);
   const point = centreOf(stands.x, stands.y, stands.width, stands.depth, stands.height);
+  // An amber lamp on a compressor that is short of litres, which is what the player sees before
+  // he reads the line under the hall (PIOTR, CLAUDE.md T10 3.2).
+  if (item.specId === 'compressor') {
+    if (item.broken) return { className: '', svg: lamp(point, 'red') };
+    return compressorIsLow(hallAirCheck(state), item.id)
+      ? { className: '', svg: lamp(point, 'amber') }
+      : NO_FX;
+  }
   if (spec.category === 'extraction') {
     if (item.broken) return { className: '', svg: lamp(point, 'red') };
     return machineInUse(state, item) ? { className: ' fx-breathe', svg: '' } : NO_FX;
@@ -689,8 +839,8 @@ export function pinBoard(count: number): string {
 
 /** The outline of something bought and not here yet, on the cells held for it (T8 3.2). */
 export function reservedOutline(item: OnOrderItem): string {
-  const zone = zoneOf(item.specId, item.variantId);
-  const stands = footprintOf(item.specId, item.variantId);
+  const zone = itemZone(item);
+  const stands = itemFootprint(item);
   const inset = {
     x: item.anchorX + Math.max(0, (zone.width - stands.width) / 2),
     y: item.anchorY + Math.max(0, (zone.depth - stands.depth) / 2),
@@ -719,6 +869,8 @@ export interface Ghost {
   depth: number;
   ok: boolean;
   reason: string;
+  /** True while the next drop will stand it at ninety degrees to the walls (T10 3.8). */
+  rotated?: boolean;
 }
 
 /** A view that is expensive to build. The shell carries the pictures, which are megabytes: a
@@ -816,6 +968,9 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
     parts.push(lines.join(''));
   }
 
+  // The ducting runs along the rear wall, behind everything that stands in front of it.
+  parts.push(ductRun(state, files, unit.widthCells));
+
   const drawables: Drawable[] = [];
 
   // The three room blocks. Each is a layer of the painting, or a placeholder box while that layer
@@ -850,7 +1005,10 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
           : contactShadow(room.x, room.y, room.width, room.depth) +
             box(faces, 'var(--room)', 'var(--room-dark)') +
             label(centreOf(room.x, room.y, room.width, room.depth, room.height), room.name)) +
-        '</g>',
+        '</g>' +
+        // The office door is a control of its own: knock on it and the team is behind it. The
+        // rest of the block is still the way into the office view (PIOTR, CLAUDE.md T10 3.6).
+        (room.id === 'office' ? officeDoor(room) : ''),
     });
   }
 
@@ -893,6 +1051,7 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
           files,
           spriteKey: item.spriteKey,
           tier: item.variantId,
+          rotated: item.rotated,
           x: stands.x,
           y: stands.y,
           width: stands.width,
@@ -1047,6 +1206,10 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
 
   live.push(drawables.map((drawable) => drawable.svg).join(''));
 
+  // The drop to every ducted machine, over the machines so the port is on the picture and not
+  // behind it (CLAUDE.md T10 3.4).
+  live.push(ductDrops(state));
+
   // The ghost footprint of whatever is being dragged, on top of everything else.
   if (ghost !== null) {
     const colour = ghost.ok ? 'var(--good)' : 'var(--bad)';
@@ -1057,7 +1220,9 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
         `<text x="${Math.round(centreOf(ghost.x, ghost.y, ghost.width, ghost.depth).x)}" ` +
         `y="${Math.round(centreOf(ghost.x, ghost.y, ghost.width, ghost.depth).y)}" ` +
         `text-anchor="middle" class="iso-label ghost-label" fill="${colour}">` +
-        `${escapeText(ghost.ok ? 'Drop it here' : ghost.reason)}</text></g>`,
+        `${escapeText(
+          ghost.ok ? (ghost.rotated === true ? 'Drop it here, turned' : 'Drop it here') : ghost.reason,
+        )}</text></g>`,
     );
   }
 
@@ -1097,6 +1262,19 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
       ? '<p class="view-note warn">No extraction in the hall, so no machine will run. ' +
         'Buy an extractor.</p>'
       : '';
+  // The fans are too small for what is running this minute: nothing stops, the hall just turns
+  // out less and fills with dust (PIOTR, CLAUDE.md T10 3.1).
+  const extraction = extractionCheck(state);
+  const shortLine = extraction.short
+    ? `<p class="view-note warn">${escapeText(extraction.line)} m3/h. Everything in the hall is ` +
+      '30% slower and the dust rises three times as fast. Nothing stops.</p>'
+    : '';
+  // A compressor with more drawn on it than the pipe will carry: everything on it runs at 0.7
+  // for the minute (PIOTR, CLAUDE.md T10 3.2).
+  const airLines = hallAirCheck(state)
+    .lines.map((line) => `<p class="view-note warn">${escapeText(line)}. Everything on it runs at ` +
+      '70% until something is turned off.</p>')
+    .join('');
   const brokenLine =
     brokenMachines(state).length > 0
       ? '<p class="view-note warn">Broken: ' +
@@ -1150,7 +1328,7 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
     live: live.join(''),
     notes:
       `<p class="view-note">${escapeText(stateLine)}</p>` +
-      `${extractionLine}${brokenLine}${serviceLine}${gateLine}${lowStock}`,
+      `${extractionLine}${shortLine}${airLines}${brokenLine}${serviceLine}${gateLine}${lowStock}`,
   };
 }
 

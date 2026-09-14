@@ -1613,3 +1613,52 @@ input.num {
   display: block;
   margin-top: 6px;
 }
+
+/* The valve on an owned machine: which compressor it draws from (CLAUDE.md T10 3.2). */
+.tabs-air {
+  margin: 6px 0 0;
+  gap: 4px;
+}
+.tabs-air .chip {
+  font-size: 11px;
+  padding: 2px 6px;
+}
+
+/* The ducting a central system draws along the rear wall (CLAUDE.md T10 3.4). Decoration and
+   status: the ring is green while the reconnection is free. */
+.duct-run {
+  stroke: var(--kit-machine-dark, #6b6f76);
+  stroke-width: 5;
+  stroke-linecap: round;
+  opacity: 0.8;
+}
+.duct-drop line {
+  stroke: var(--kit-machine-dark, #6b6f76);
+  stroke-width: 1;
+  opacity: 0.65;
+}
+.duct-port {
+  fill: none;
+  stroke: var(--kit-machine-dark, #6b6f76);
+  stroke-width: 1.5;
+  opacity: 0.85;
+}
+.duct-drop.is-flexi .duct-port {
+  stroke: var(--good, #3f9d55);
+}
+
+/* The door in the office block: a control, drawn as nothing until it is hovered. */
+.door-hit {
+  fill: transparent;
+  stroke: none;
+}
+.office-door:hover .door-hit {
+  fill: rgba(255, 255, 255, 0.18);
+}
+
+/* A job the company cannot take: on the board to be read, and never to be pressed
+   (CLAUDE.md T10 3.7). */
+.tile.is-out-of-reach {
+  opacity: 0.72;
+  filter: grayscale(0.5);
+}

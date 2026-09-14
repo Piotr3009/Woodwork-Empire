@@ -6,6 +6,7 @@ import {
   SPRITE_PADDING,
   SPRITE_SCALE,
   pickSprite,
+  spriteAnchorIn,
   spriteBox,
   spriteCanvas,
   spriteFileSize,
@@ -13,7 +14,7 @@ import {
   spriteImage,
   spriteUrl,
 } from '../../src/render/sprites';
-import { tileToScreen } from '../../src/render/iso';
+import { TILE_WIDTH, tileToScreen } from '../../src/render/iso';
 import { pickPngs, spriteFilesIn } from '../../scripts/sprites-manifest.mjs';
 import manifest from '../../public/sprites/manifest.json';
 
@@ -88,10 +89,11 @@ describe('where the image goes', () => {
     expect(at.height).toBe(128);
     const anchor = tileToScreen(4, 9);
     expect(anchor).toEqual({ x: -120, y: 156 });
-    // Horizontally centred on the anchor, and the anchor sits 4 px above the bottom edge.
-    expect(at.x + at.width / 2).toBe(anchor.x);
+    // The anchor pixel of the file goes on that corner: `8 + w x 48` from the left edge and 8 px
+    // above the bottom, both halved (docs/art/SPRITES.md 2).
+    expect(at.x + (SPRITE_PADDING + 4 * TILE_WIDTH) / SPRITE_SCALE).toBe(anchor.x);
     expect(at.y + at.height - SPRITE_PADDING / SPRITE_SCALE).toBe(anchor.y);
-    expect(at).toEqual({ x: -196, y: 32, width: 152, height: 128 });
+    expect(at).toEqual({ x: -220, y: 32, width: 152, height: 128 });
   });
 
   it('puts a one tile object on its own tile the same way', () => {
@@ -99,8 +101,33 @@ describe('where the image goes', () => {
     expect(at.width).toBe(56);
     expect(at.height).toBe(56);
     const anchor = tileToScreen(4, 4);
+    // A square object is the one case where the anchor is the middle of the file, which is why
+    // the old centred rule looked right for so long.
     expect(at.x + at.width / 2).toBe(anchor.x);
+    expect(at.x + (SPRITE_PADDING + TILE_WIDTH) / SPRITE_SCALE).toBe(anchor.x);
     expect(at.y + at.height - 4).toBe(anchor.y);
+  });
+
+  it('stands an asymmetric footprint on its corner and not on the middle of its file', () => {
+    // A 3 by 1 object: the diamond runs 3 x 48 left of the anchor and 1 x 48 right of it, so the
+    // anchor is 48 px right of the middle of the file at 2x and 24 at 1x. Centring the image put
+    // every 2 by 1 and 3 by 1 machine 12 to 24 px off its tile, which is what Piotr saw as
+    // machines sinking into the floor (CLAUDE.md T10 3.12).
+    const at = spriteBox(5, 2, 3, 1, 1);
+    const anchor = tileToScreen(8, 3);
+    expect(at.x).toBe(anchor.x - (SPRITE_PADDING + 3 * TILE_WIDTH) / SPRITE_SCALE);
+    // The left edge of the image is the halved padding outside the left corner of the diamond.
+    const leftCorner = tileToScreen(5, 3);
+    expect(at.x).toBe(leftCorner.x - SPRITE_PADDING / SPRITE_SCALE);
+    // The centred rule would have drawn it 24 px, `12 x (w - d)`, to the right of that.
+    expect(anchor.x - at.width / 2 - at.x).toBe(24);
+    // And a 2 by 1 is out by 12, the other end of the range the brief names.
+    const two = spriteBox(0, 0, 2, 1, 1);
+    const twoAnchor = tileToScreen(2, 1);
+    expect(twoAnchor.x - two.width / 2 - two.x).toBe(12);
+    // The anchor pixel inside the file is the one rule, and the hall and the Sprite check page
+    // both read it from here.
+    expect(spriteAnchorIn(3, 1, 1)).toEqual({ x: 76, y: 76, width: 104, height: 80 });
   });
 
   it('writes an image element the browser can draw', () => {

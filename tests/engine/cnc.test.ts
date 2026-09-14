@@ -29,6 +29,8 @@ import {
   placeEnquiry,
   placeEquipment,
   twoMenOnSheetWork,
+  withDryAir,
+  withExtraction,
 } from '../helpers';
 
 /** A job whose whole labour is this many minutes of the owner's own time. */
@@ -38,7 +40,9 @@ function jobOfMinutes(minutes: number, material: 'sheet' | 'solidWood' = 'sheet'
 
 /** The day 1 kit with a CNC standing in the hall beside it. */
 function withCnc(): GameState {
-  const state = buyStartingKit(newGame({ difficulty: 'veryEasy' }), { sawVariant: 'budget' });
+  const state = withDryAir(
+    withExtraction(buyStartingKit(newGame({ difficulty: 'veryEasy' }), { sawVariant: 'budget' })),
+  );
   placeEquipment(state, 'cnc', { x: 2, y: 6 });
   state.enquiries = [];
   return fillRack(state, 80);
@@ -98,7 +102,8 @@ describe('what a CNC does to a sheet job', () => {
 describe('one man per CNC', () => {
   /** Two men, each on a sheet job, in a hall with one CNC. */
   function twoOnOneCnc(): GameState {
-    const state = twoMenOnSheetWork({ saws: 1 });
+    // A CNC will not run on wet air at all, and this is about the queue at it (T10 3.3).
+    const state = withDryAir(twoMenOnSheetWork({ saws: 1 }));
     placeEquipment(state, 'cnc', { x: 2, y: 6, id: 'kit-cnc' });
     return state;
   }

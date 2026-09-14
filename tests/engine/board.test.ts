@@ -9,11 +9,11 @@ import {
   DEADLINE_SLACK_PERCENT_MAX,
   DEADLINE_SMALL_JOB_PRICE,
   DEADLINE_SMALL_SLACK_DAYS,
-  EXPRESS_PRICE_UPLIFT,
-  EXPRESS_PROBABILITY_BASE,
-  EXPRESS_PROBABILITY_MAX,
-  EXPRESS_PROBABILITY_MIN,
-  EXPRESS_PROBABILITY_PER_REPUTATION_STEP,
+  EXPRESS_PRICE_UPLIFT_MAX,
+  EXPRESS_PRICE_UPLIFT_MIN,
+  EXPRESS_PROBABILITY,
+  UNREACHABLE_MAX,
+  UNREACHABLE_MIN,
   SIZE_MULTIPLIER_MAX,
   SIZE_MULTIPLIER_MIN,
 } from '../../src/engine/constants';
@@ -21,11 +21,13 @@ import {
   boardSizeRange,
   canAccept,
   expireEnquiries,
-  expressAllowed,
   expressProbability,
   generateEnquiry,
+  reachableEnquiries,
   refillBoard,
+  refreshBoard,
   removeEnquiry,
+  unreachableEnquiries,
 } from '../../src/engine/board';
 import { labourValueFor, ownerDaysFor } from '../../src/engine/jobs';
 import { tick } from '../../src/engine/index';
@@ -120,14 +122,9 @@ describe('enquiry generation', () => {
     }
   });
 
-  it('raises the express chance per whole ten points of reputation, capped at 0.30', () => {
-    expect(expressProbability(0)).toBeCloseTo(EXPRESS_PROBABILITY_BASE, 10);
-    expect(expressProbability(9)).toBeCloseTo(EXPRESS_PROBABILITY_BASE, 10);
-    expect(expressProbability(20)).toBeCloseTo(
-      EXPRESS_PROBABILITY_BASE + 2 * EXPRESS_PROBABILITY_PER_REPUTATION_STEP,
-      10,
-    );
-    expect(expressProbability(100)).toBe(EXPRESS_PROBABILITY_MAX);
+  it('is a flat quarter, whatever the reputation (CLAUDE.md T10 3.7)', () => {
+    expect(expressProbability()).toBe(EXPRESS_PROBABILITY);
+    expect(EXPRESS_PROBABILITY).toBe(0.25);
   });
 
   it('draws express jobs about as often as the chance says', () => {
@@ -135,7 +132,7 @@ describe('enquiry generation', () => {
     state.enquiries = [];
     const drawn = draw(state, 2000);
     const express = drawn.filter((enquiry) => enquiry.express).length;
-    expect(express / drawn.length).toBeCloseTo(EXPRESS_PROBABILITY_BASE, 1);
+    expect(express / drawn.length).toBeCloseTo(EXPRESS_PROBABILITY, 1);
   });
 
   it('gives express one day and everything else three', () => {
@@ -161,9 +158,10 @@ describe('the board over time', () => {
   it('starts day 1 with two or three enquiries, all greyed out', () => {
     const state = newGame();
     const [min, max] = BOARD_SIZE_BY_TIER[1] ?? [2, 3];
-    expect(state.enquiries.length).toBeGreaterThanOrEqual(min);
-    expect(state.enquiries.length).toBeLessThanOrEqual(max);
-    for (const enquiry of state.enquiries) {
+    const open = reachableEnquiries(state);
+    expect(open.length).toBeGreaterThanOrEqual(min);
+    expect(open.length).toBeLessThanOrEqual(max);
+    for (const enquiry of open) {
       expect(enquiry.lockReason).not.toBeNull();
       expect(canAccept(state, enquiry).ok).toBe(false);
     }
@@ -175,7 +173,7 @@ describe('the board over time', () => {
     state = buyNow(state, 'drill');
     state = buyNow(state, 'toolCabinet');
     state = buyNow(state, 'edgebander');
-    for (const enquiry of state.enquiries) {
+    for (const enquiry of reachableEnquiries(state)) {
       expect(enquiry.lockReason).toBeNull();
       expect(canAccept(state, enquiry).ok).toBe(true);
     }
@@ -200,6 +198,9 @@ describe('the board over time', () => {
       expiresOnDay: 3,
       lockReason: 'Needs solid wood tools',
       byHandAvailable: true,
+      unreachable: false,
+      blockReason: '',
+      blockWhere: '',
     };
     expect(canAccept(state, table).ok).toBe(true);
     const shelves = { ...table, templateId: 'garageShelves', byHandAvailable: false };
@@ -227,6 +228,9 @@ describe('the board over time', () => {
       expiresOnDay: 1,
       lockReason: null,
       byHandAvailable: false,
+      unreachable: false,
+      blockReason: '',
+      blockWhere: '',
     };
     const standard = { ...express, id: 'enq-s', express: false, expiresOnDay: 3 };
     state.enquiries = [express, standard];
@@ -242,7 +246,7 @@ describe('the board over time', () => {
   it('draws a new enquiry the moment one is taken', () => {
     const state = newGame();
     const before = state.enquiries.length;
-    const first = state.enquiries[0];
+    const first = reachableEnquiries(state)[0];
     expect(first).toBeDefined();
     removeEnquiry(state, first?.id ?? '');
     // CLAUDE.md 8.8: after an enquiry is taken or expires, the board draws a new one.
@@ -254,7 +258,7 @@ describe('the board over time', () => {
     const state = newGame();
     state.enquiries = [];
     refillBoard(state);
-    expect(state.enquiries.length).toBeGreaterThanOrEqual(1);
+    expect(reachableEnquiries(state).length).toBeGreaterThanOrEqual(1);
   });
 
   it('refills the board every morning without letting it grow past the tier', () => {
@@ -262,7 +266,39 @@ describe('the board over time', () => {
     const [, max] = BOARD_SIZE_BY_TIER[1] ?? [2, 3];
     for (let day = 0; day < 10; day += 1) {
       state = clearEvents(tick(state, 600));
-      expect(state.enquiries.length).toBeLessThanOrEqual(max);
+      expect(reachableEnquiries(state).length).toBeLessThanOrEqual(max);
+    }
+  });
+
+  it('keeps two or three the workshop cannot take beside the band, and never in it', () => {
+    const state = newGame();
+    refreshBoard(state);
+    const greyed = unreachableEnquiries(state);
+    expect(greyed.length).toBeGreaterThanOrEqual(UNREACHABLE_MIN);
+    expect(greyed.length).toBeLessThanOrEqual(UNREACHABLE_MAX);
+    for (const enquiry of greyed) {
+      expect(enquiry.blockReason, enquiry.templateId).not.toBe('');
+      expect(canAccept(state, enquiry)).toEqual({ ok: false, reason: enquiry.blockReason });
+      expect(['', 'catalogue', 'team'], enquiry.templateId).toContain(enquiry.blockWhere);
+    }
+    // And the band is still the band: the greyed ones are not counted into it.
+    const [, max] = BOARD_SIZE_BY_TIER[1] ?? [2, 3];
+    expect(reachableEnquiries(state).length).toBeLessThanOrEqual(max);
+  });
+
+  it('says why in the plain words Piotr asked for', () => {
+    const state = newGame();
+    refreshBoard(state);
+    const reasons = new Set(unreachableEnquiries(state).map((enquiry) => enquiry.blockReason));
+    for (const reason of reasons) {
+      expect(
+        reason.startsWith('reputation too low (needs ') ||
+          reason === 'no timber machines' ||
+          reason === 'needs a spray booth' ||
+          reason === 'too few people for the deadline' ||
+          reason.startsWith('no '),
+        reason,
+      ).toBe(true);
     }
   });
 });
@@ -276,54 +312,75 @@ describe('board size and the express chance follow the reputation', () => {
     expect(boardSizeRange(state)).toEqual(BOARD_SIZE_BY_TIER[1]);
   });
 
-  it('lowers the express chance when the reputation is negative, with a floor', () => {
-    expect(expressProbability(-10)).toBeCloseTo(
-      EXPRESS_PROBABILITY_BASE - EXPRESS_PROBABILITY_PER_REPUTATION_STEP,
-      10,
-    );
-    expect(expressProbability(-30)).toBe(EXPRESS_PROBABILITY_MIN);
-  });
 });
 
-describe('express, the Turn 2 rules', () => {
-  it('puts the 20% uplift on the price only, leaving the base price for material and labour', () => {
+describe('express, properly profitable (CLAUDE.md T10 3.7)', () => {
+  it('puts an uplift of 30% to 50% on the price only, drawn uniformly', () => {
     const state = newGame();
     state.enquiries = [];
     state.reputation = 100;
     const drawn = draw(state, 400).filter((enquiry) => enquiry.express);
     expect(drawn.length).toBeGreaterThan(0);
+    const uplifts: number[] = [];
     for (const enquiry of drawn) {
       expect(enquiry.price).toBeGreaterThan(enquiry.basePrice);
-      expect(enquiry.price / enquiry.basePrice).toBeCloseTo(1 + EXPRESS_PRICE_UPLIFT, 1);
+      const uplift = enquiry.price / enquiry.basePrice - 1;
+      // The price is rounded to the nearest ten, so a small job's uplift lands a little either
+      // side of the band; the band itself is what is drawn.
+      expect(uplift, String(enquiry.price)).toBeGreaterThan(EXPRESS_PRICE_UPLIFT_MIN - 0.05);
+      expect(uplift, String(enquiry.price)).toBeLessThan(EXPRESS_PRICE_UPLIFT_MAX + 0.05);
+      uplifts.push(uplift);
     }
+    // Uniformly: both ends of the band are drawn, not just the middle of it.
+    expect(Math.min(...uplifts)).toBeLessThan(0.35);
+    expect(Math.max(...uplifts)).toBeGreaterThan(0.45);
     const plain = draw(state, 100).filter((enquiry) => !enquiry.express);
     for (const enquiry of plain) expect(enquiry.price).toBe(enquiry.basePrice);
   });
 
-  it('lets one express enquiry onto the board a week and no more', () => {
-    const state = newGame();
-    expect(expressAllowed(state)).toBe(true);
-    state.lastExpressDay = 1;
-    expect(expressAllowed(state)).toBe(false);
-    state.clock.day = 7;
-    expect(expressAllowed(state)).toBe(false);
-    state.clock.day = 8;
-    expect(expressAllowed(state)).toBe(true);
-  });
-
-  it('never fills the board with express work, however high the reputation', () => {
+  it('has no weekly cap left, so a quarter of the board can be express', () => {
     const state = newGame();
     state.reputation = 100;
-    state.enquiries = [];
-    state.lastExpressDay = null;
-    // A whole week of refills: the cap allows one express enquiry in it.
     let express = 0;
+    let total = 0;
     for (let day = 1; day <= 7; day += 1) {
       state.clock.day = day;
       state.enquiries = [];
       refillBoard(state);
-      express += state.enquiries.filter((enquiry) => enquiry.express).length;
+      const open = reachableEnquiries(state);
+      express += open.filter((enquiry) => enquiry.express).length;
+      total += open.length;
     }
-    expect(express).toBeLessThanOrEqual(1);
+    expect(total).toBeGreaterThan(7);
+    expect(express).toBeGreaterThan(1);
+  });
+
+  it('gives an express job the shorter deadline and the heavier penalty', () => {
+    const state = newGame();
+    state.enquiries = [];
+    for (const enquiry of draw(state, 400)) {
+      if (!enquiry.express) continue;
+      expect(enquiry.deadlineDays).toBeGreaterThanOrEqual(DEADLINE_DAYS_MIN);
+      const ownerDays = ownerDaysFor(
+        state,
+        labourValueFor(enquiry.basePrice),
+        enquiry.materialKind,
+      );
+      const base = Math.min(
+        DEADLINE_DAYS_MAX,
+        Math.max(
+          DEADLINE_DAYS_MIN,
+          Math.floor(ownerDays * DEADLINE_DAYS_FACTOR + DEADLINE_DAYS_BASE),
+        ),
+      );
+      const slack =
+        enquiry.basePrice <= DEADLINE_SMALL_JOB_PRICE
+          ? DEADLINE_SMALL_SLACK_DAYS
+          : Math.round((base * DEADLINE_SLACK_PERCENT_MAX) / 100);
+      expect(enquiry.deadlineDays).toBeLessThanOrEqual(
+        Math.max(DEADLINE_DAYS_MIN, Math.round((base + slack) * DEADLINE_EXPRESS_FACTOR)),
+      );
+    }
+    expect(DEADLINE_EXPRESS_FACTOR).toBe(0.6);
   });
 });

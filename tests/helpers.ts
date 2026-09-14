@@ -241,7 +241,7 @@ export function buyStartingKit(
 export function placeEquipment(
   state: GameState,
   specId: string,
-  options: { variantId?: string; x?: number; y?: number; id?: string } = {},
+  options: { variantId?: string; x?: number; y?: number; id?: string; rotated?: boolean } = {},
 ): Equipment {
   const spec = findSpec(specId);
   if (!spec) throw new Error(`unknown equipment: ${specId}`);
@@ -263,9 +263,47 @@ export function placeEquipment(
     takenBy: null,
     purchasePrice: variant ? variant.price : spec.price,
     soldOnDay: null,
+    compressorId: null,
+    rotated: options.rotated ?? false,
   };
   state.equipment.push(item);
   return item;
+}
+
+/** Extraction enough for whatever this hall is running, for a test that is about something else.
+ *  A used or budget extractor pulls 1,000 m3/h and the sums leave a fifth of it spare, so a
+ *  budget saw at 900 is already short of it and a standard one at 1,100 more so (PIOTR's tables,
+ *  CLAUDE.md T10 3.1). A test about the earned rate, the minutes of a job or the queue at the saw
+ *  should not be measuring the under extraction penalty by accident: it stands a big enough fan
+ *  in the hall here, and the tests that are about the sums ask for too small a one on purpose. */
+export function withExtraction(state: GameState, variantId = 'industrial'): GameState {
+  placeEquipment(state, 'extractor', { variantId, x: 19, y: 0, id: `kit-extraction-${variantId}` });
+  return state;
+}
+
+/** Air enough for whatever this hall is running, for a test that is about something else. The
+ *  compressor the day 1 shopping buys is the used class at 150 l/min, which holds a couple of men
+ *  at their benches and not one doing pneumatic sanding beside them (PIOTR's tables, CLAUDE.md
+ *  T10 3.2). A test about the saws should not be measuring the low air penalty by accident. */
+export function withAir(state: GameState, variantId = 'pro'): GameState {
+  // The men at the benches draw on the first compressor in the hall, so a bigger second one
+  // beside it would help nobody: the one they are on is the one that has to be big enough.
+  const first = state.equipment.find((item) => item.specId === 'compressor');
+  if (first) {
+    first.variantId = variantId;
+    first.enduranceHours = enduranceHoursFor('compressor', variantId);
+    return state;
+  }
+  placeEquipment(state, 'compressor', { variantId, x: 19, y: 4, id: `kit-air-${variantId}` });
+  return state;
+}
+
+/** Dry air for the whole hall: an air dryer on the first compressor, for a test that stands a CNC
+ *  in the hall and is not about the dryer (CLAUDE.md T10 3.3). A CNC will not run on wet air at
+ *  all, and the test that is about that rule leaves the dryer out on purpose. */
+export function withDryAir(state: GameState): GameState {
+  placeEquipment(state, 'airDryer', { x: 19, y: 2, id: 'kit-dryer' });
+  return state;
 }
 
 /** Puts sheets on the rack, so a job pushed straight to the bench has material to work with. */
@@ -294,6 +332,9 @@ export function placeEnquiry(state: GameState, partial: Partial<Enquiry> = {}): 
     expiresOnDay: state.clock.day + 2,
     lockReason: null,
     byHandAvailable: false,
+    unreachable: false,
+    blockReason: '',
+    blockWhere: '',
     ...partial,
   };
   state.enquiries.push(enquiry);
@@ -346,7 +387,11 @@ export function sixJoinersOnSheetWork(
   options: { saws?: number; price?: number; sawVariant?: string } = {},
 ): GameState {
   const sawVariant = options.sawVariant ?? 'standard';
-  const state = fillRack(buyStartingKit(newGame({ difficulty: 'veryEasy' }), { sawVariant }), 400);
+  const state = withAir(
+    withExtraction(
+      fillRack(buyStartingKit(newGame({ difficulty: 'veryEasy' }), { sawVariant }), 400),
+    ),
+  );
   for (let bench = 1; bench < CREW; bench += 1) {
     placeEquipment(state, 'workbench', { variantId: 'budget', x: 4 + bench * 2, y: 6 });
   }
@@ -417,11 +462,15 @@ export const CREW = 6;
 export function twoMenOnSheetWork(
   options: { sawVariant?: string; saws?: number } = {},
 ): GameState {
-  const state = fillRack(
-    buyStartingKit(newGame({ difficulty: 'veryEasy' }), {
-      sawVariant: options.sawVariant ?? 'standard',
-    }),
-    60,
+  const state = withAir(
+    withExtraction(
+      fillRack(
+        buyStartingKit(newGame({ difficulty: 'veryEasy' }), {
+          sawVariant: options.sawVariant ?? 'standard',
+        }),
+        60,
+      ),
+    ),
   );
   placeEquipment(state, 'workbench', { x: 6, y: 6 });
   // A saw each by default: one machine takes one man at a time, so with one saw between them the
