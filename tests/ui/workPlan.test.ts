@@ -4,7 +4,8 @@
 
 import { describe, expect, it } from 'vitest';
 import { MINUTES_PER_WORKING_DAY, WORKER_RATES } from '../../src/engine/constants';
-import { BOARD_DAYS_PAST_DUE, workPlan, workshopRate } from '../../src/engine/plan';
+import { BOARD_DAYS_PAST_DUE, dayOfPoint, workPlan, workshopRate } from '../../src/engine/plan';
+import { isWorkingDay, workingDayIndex } from '../../src/engine/clock';
 import { minutesRemainingFor } from '../../src/engine/jobs';
 import { renderWorkPlan } from '../../src/ui/workPlan';
 import type { GameState } from '../../src/engine/index';
@@ -43,10 +44,31 @@ describe('the rows of the board', () => {
     const state = boardWith({ deadlineDays: 10 });
     const plan = workPlan(state);
     expect(plan.fromDay).toBe(1);
-    expect(plan.rows[0]?.dueDay).toBe(11);
-    expect(plan.toDay).toBeGreaterThanOrEqual(11 + BOARD_DAYS_PAST_DUE);
+    // Ten working days from the Monday of day 1 is the Monday a fortnight later, day 15
+    // (CLAUDE.md T10 3.5).
+    expect(plan.rows[0]?.dueDay).toBe(15);
+    expect(plan.rows[0]?.duePoint).toBe(workingDayIndex(15));
+    expect(plan.to).toBeGreaterThanOrEqual((plan.rows[0]?.duePoint ?? 0) + BOARD_DAYS_PAST_DUE);
     expect(plan.now).toBeGreaterThanOrEqual(1);
     expect(plan.now).toBeLessThan(2);
+  });
+
+  it('draws a column for every working day of the span and none for a weekend', () => {
+    const plan = workPlan(boardWith({ deadlineDays: 10 }));
+    expect(plan.days.every((entry) => isWorkingDay(entry.day))).toBe(true);
+    // Day 5 is a Friday and day 8 the Monday after it: on this axis they are neighbours, one
+    // apart, with no gap where Saturday and Sunday were (PIOTR; CLAUDE.md T10 3.5).
+    const friday = plan.days.find((entry) => entry.day === 5);
+    const monday = plan.days.find((entry) => entry.day === 8);
+    expect((monday?.point ?? 0) - (friday?.point ?? 0)).toBe(1);
+    expect(plan.days.some((entry) => entry.day === 6 || entry.day === 7)).toBe(false);
+    const page = parse(renderWorkPlan(boardWith({ deadlineDays: 10 })));
+    const columns = Array.from(page.querySelectorAll('.plan-day')).map((mark) =>
+      Number(mark.getAttribute('data-day')),
+    );
+    expect(columns).toEqual(plan.days.map((entry) => entry.day));
+    expect(columns).not.toContain(6);
+    expect(columns).not.toContain(7);
   });
 
   it('puts the nearest deadline first', () => {
@@ -84,7 +106,10 @@ describe('a job nobody has started', () => {
     // The bar is as long as the work, and the yellow tick is the day it wants starting.
     const days = minutes / MINUTES_PER_WORKING_DAY;
     expect((row?.to ?? 0) - (row?.from ?? 0)).toBeCloseTo(days, 6);
-    expect(row?.latestStart).toBeCloseTo(job.dueDay - days, 2);
+    // The days counted back from the deadline are working days, so the tick is on the axis and
+    // never in a weekend (CLAUDE.md T10 3.5).
+    expect(row?.latestStartPoint).toBeCloseTo(workingDayIndex(job.dueDay) - days, 2);
+    expect(row?.latestStart).toBe(dayOfPoint(row?.latestStartPoint ?? 0));
     expect(row?.late).toBe(false);
   });
 
@@ -116,7 +141,7 @@ describe('a job nobody has started', () => {
     const state = boardWith({ deadlineDays: 1 });
     const row = workPlan(state).rows[0];
     expect(row?.late).toBe(true);
-    expect((row?.latestStart ?? 0) < workPlan(state).now).toBe(true);
+    expect((row?.latestStartPoint ?? 0) < workPlan(state).now).toBe(true);
     const page = parse(renderWorkPlan(state));
     const tick = page.querySelector('.plan-start');
     expect(tick?.classList.contains('is-late')).toBe(true);
@@ -137,8 +162,9 @@ describe('a job somebody has started', () => {
     expect(row?.done).toBeCloseTo(0.75, 6);
     expect(row?.minutesDone ?? 0).toBeGreaterThan(0);
     expect(row?.latestStart).toBeNull();
+    expect(row?.latestStartPoint).toBeNull();
     // It runs to its deadline, from the day it was picked up.
-    expect(row?.to).toBe(job.dueDay);
+    expect(row?.to).toBe(workingDayIndex(job.dueDay));
     const page = parse(renderWorkPlan(state));
     const done = page.querySelector('.plan-bar .plan-done');
     expect(done?.getAttribute('style')).toBe('width:75%');
@@ -154,7 +180,7 @@ describe('what the board draws', () => {
     expect(rows).toHaveLength(1);
     const row = rows[0];
     expect(row?.querySelectorAll('.plan-bar')).toHaveLength(1);
-    expect(row?.querySelector('.plan-due')?.getAttribute('data-due')).toBe('11');
+    expect(row?.querySelector('.plan-due')?.getAttribute('data-due')).toBe('15');
     expect(row?.querySelectorAll('.plan-now')).toHaveLength(1);
     // The name, the price and the man on it are to the left of the bar.
     expect(row?.querySelector('.plan-head')?.textContent).toContain('Garage shelves');
@@ -170,8 +196,8 @@ describe('what the board draws', () => {
     const plan = workPlan(state);
     const page = parse(renderWorkPlan(state));
     const due = page.querySelector('.plan-due');
-    const span = plan.toDay - plan.fromDay;
-    const wanted = ((plan.rows[0]?.dueDay ?? 0) - plan.fromDay) / span * 100;
+    const span = plan.to - plan.from;
+    const wanted = ((plan.rows[0]?.duePoint ?? 0) - plan.from) / span * 100;
     expect(due?.getAttribute('style')).toContain(`left:${Math.round(wanted * 100) / 100}%`);
   });
 

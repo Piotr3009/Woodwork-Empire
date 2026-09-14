@@ -14,11 +14,12 @@ import {
 } from './jobCard';
 import { emptyLine, escapeHtml, money } from './modal';
 
-/** Where a day sits across the axis, as a percentage of it. One axis for every row, so the blue
- *  line is the same line on all of them. */
-function across(plan: WorkPlan, day: number): number {
-  const span = Math.max(1, plan.toDay - plan.fromDay);
-  return Math.min(100, Math.max(0, ((day - plan.fromDay) / span) * 100));
+/** Where a point of the axis sits across it, as a percentage. One axis for every row, so the blue
+ *  line is the same line on all of them. The axis is in working days: Monday comes straight after
+ *  Friday and no column is drawn for a weekend (CLAUDE.md T10 3.5). */
+function across(plan: WorkPlan, point: number): number {
+  const span = Math.max(1, plan.to - plan.from);
+  return Math.min(100, Math.max(0, ((point - plan.from) / span) * 100));
 }
 
 function round(value: number): number {
@@ -69,10 +70,10 @@ function barHtml(plan: WorkPlan, row: PlanRow): string {
 function ticksHtml(plan: WorkPlan, row: PlanRow): string {
   const due =
     `<div class="plan-due" data-due="${row.dueDay}" ` +
-    `style="left:${round(across(plan, row.dueDay))}%" ` +
+    `style="left:${round(across(plan, row.duePoint))}%" ` +
     `title="Due day ${row.dueDay}"><span>DL</span></div>`;
-  if (row.latestStart === null) return due;
-  const at = row.late ? plan.now : row.latestStart;
+  if (row.latestStart === null || row.latestStartPoint === null) return due;
+  const at = row.late ? plan.now : row.latestStartPoint;
   const label = row.late ? 'late' : 'Latest start';
   const title = row.late
     ? `Already late: it wanted starting on day ${row.latestStart}, ${row.rateLabel}`
@@ -89,14 +90,14 @@ function nowHtml(plan: WorkPlan): string {
   return `<div class="plan-now" style="left:${round(across(plan, plan.now))}%"></div>`;
 }
 
-/** The days across the top, and the one Now label the blue line carries. */
+/** The days across the top, and the one Now label the blue line carries. Working days only: a
+ *  Saturday and a Sunday are not columns of this board (CLAUDE.md T10 3.5). */
 function scaleHtml(plan: WorkPlan): string {
-  const days: string[] = [];
-  for (let day = plan.fromDay; day <= plan.toDay; day += 1) {
-    days.push(
-      `<span class="plan-day" data-day="${day}" style="left:${round(across(plan, day))}%"></span>`,
-    );
-  }
+  const days = plan.days.map(
+    (entry) =>
+      `<span class="plan-day" data-day="${entry.day}" ` +
+      `style="left:${round(across(plan, entry.point))}%"></span>`,
+  );
   return (
     '<div class="plan-row plan-scale-row"><div class="plan-head">' +
     `<span class="row-figure">Day ${plan.fromDay} to day ${plan.toDay}</span></div>` +
@@ -129,7 +130,8 @@ export function renderWorkPlan(state: GameState, dropConfirm: string | null = nu
   return (
     '<p class="hint">One row a job, the nearest deadline first. The blue line is now and the red ' +
     'tick is the day it is due. A job nobody has started yet is drawn as long as the work in it, ' +
-    'with the yellow tick on the last day it can be started and still be on time.</p>' +
+    'with the yellow tick on the last day it can be started and still be on time. The axis is ' +
+    'working days: Monday follows Friday and no deadline falls at a weekend.</p>' +
     `<div class="plan">${scaleHtml(plan)}${rows}</div>`
   );
 }

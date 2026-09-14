@@ -148,6 +148,39 @@ export function addWorkingDays(day: number, count: number): number {
   return result;
 }
 
+/** Working days from `from` to `to`: how many times the day has to be moved on to a working day
+ *  to get there, which is the inverse of `addWorkingDays`. Negative when `to` is behind `from`.
+ *  Saturday and Sunday are not days a workshop is late on: a job due on Friday and delivered on
+ *  Monday is one day late and not three (PIOTR: deadlines never count weekends; CLAUDE.md
+ *  T10 3.5). */
+export function workingDaysBetween(from: number, to: number): number {
+  if (to === from) return 0;
+  let count = 0;
+  if (to > from) {
+    for (let day = from + 1; day <= to; day += 1) if (isWorkingDay(day)) count += 1;
+    return count;
+  }
+  for (let day = from; day > to; day -= 1) if (isWorkingDay(day)) count += 1;
+  return -count;
+}
+
+/** Where a calendar day sits on an axis of working days only, counting from day 1: Monday follows
+ *  Friday with no gap in it. A weekend day reads as the Friday before it, because nothing happens
+ *  on it and the Work Plan draws no column for it (CLAUDE.md T10 3.5). */
+export function workingDayIndex(day: number): number {
+  const weeks = Math.floor((day - 1) / DAYS_PER_WEEK);
+  const rest = day - 1 - weeks * DAYS_PER_WEEK;
+  return weeks * WORKING_DAYS_PER_WEEK + Math.min(rest + 1, WORKING_DAYS_PER_WEEK);
+}
+
+/** The calendar day a place on that axis is: the inverse of `workingDayIndex` for every working
+ *  day. Only the whole part is a day; a fraction is the part of that day. */
+export function dayOfWorkingIndex(index: number): number {
+  const weeks = Math.floor((index - 1) / WORKING_DAYS_PER_WEEK);
+  const rest = index - 1 - weeks * WORKING_DAYS_PER_WEEK;
+  return weeks * DAYS_PER_WEEK + rest + 1;
+}
+
 /** Every calendar day strictly between `from` and `to`. */
 export function daysBetween(from: number, to: number): number[] {
   const days: number[] = [];

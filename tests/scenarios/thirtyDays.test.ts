@@ -97,13 +97,14 @@ describe('30 days on Easy, working the board', () => {
     expect(state.finance.arrearsAmount).toBe(0);
   });
 
-  it('ends above the reputation it started on, but nothing like as far above', () => {
+  it('ends above the reputation it started on, and above ten now the weekends are off', () => {
     // Turn 6 works the deadline out from the work in the job, and a one man shop that takes the
-    // next job the day the last one goes out delivers some of them late. The month used to end
-    // above ten and ends at a third of that: REPORT-T6 section 5 says so rather than tuning the
-    // owner's own numbers away.
-    expect(state.reputation).toBeGreaterThan(0);
-    expect(state.reputation).toBeLessThan(10);
+    // next job the day the last one goes out delivers some of them late. Turn 6 to Turn 9 ended
+    // the month at a third of ten because of it. Counting the deadline in working days gives
+    // every job the weekends back, so the late deliveries of this month are fewer and shorter and
+    // the month ends at eleven (PIOTR; CLAUDE.md T10 3.5). Measured, not tuned.
+    expect(state.reputation).toBeGreaterThan(10);
+    expect(state.reputation).toBeCloseTo(11, 6);
   });
 
   it('took bookcases and finished most of them', () => {

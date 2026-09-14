@@ -60,6 +60,7 @@ export {
 // Time
 export {
   addWorkingDays,
+  dayOfWorkingIndex,
   dayOfMonth,
   formatDate,
   formatTime,
@@ -76,6 +77,8 @@ export {
   weekOfDay,
   weekday,
   weekdayName,
+  workingDayIndex,
+  workingDaysBetween,
 } from './clock';
 
 // The owner
@@ -174,13 +177,14 @@ export {
 export type { StageOptions, StagePlan, StagedJob } from './stages';
 export {
   BOARD_DAYS_PAST_DUE,
+  dayOfPoint,
   dayPoint,
   rateFor,
   stageText,
   workPlan,
   workshopRate,
 } from './plan';
-export type { PlanRow, WorkPlan } from './plan';
+export type { PlanDay, PlanRow, WorkPlan } from './plan';
 
 // Client calls
 export {

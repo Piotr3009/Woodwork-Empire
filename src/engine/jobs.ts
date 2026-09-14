@@ -30,7 +30,7 @@ import {
 import { canAccept, findEnquiry, removeEnquiry } from './board';
 import { callRinging, scheduleCalls } from './calls';
 import { template } from './catalog';
-import { nextWorkingDay } from './clock';
+import { addWorkingDays, nextWorkingDay, workingDaysBetween } from './clock';
 import { chargeUnavoidable, formatMoney, noteLoss, receive } from './economy';
 import { queueEvent } from './events';
 import {
@@ -248,7 +248,9 @@ export function acceptEnquiry(state: GameState, enquiryId: string, byHand: boole
     labourValue,
     labourRemaining: labourValue,
     acceptedDay: state.clock.day,
-    dueDay: state.clock.day + enquiry.deadlineDays,
+    // The client counts the days his workshop is open and no others: a job taken on Friday
+    // with three days on it is due on Wednesday (PIOTR; CLAUDE.md T10 3.5).
+    dueDay: addWorkingDays(state.clock.day, enquiry.deadlineDays),
     stage: 'accepted',
     finishedDay: null,
     deliverOnDay: null,
@@ -829,7 +831,9 @@ export function deliverJob(state: GameState, job: Job): void {
   job.stage = 'completed';
   job.completedDay = state.clock.day;
   job.deliverOnDay = null;
-  job.daysLate = Math.max(0, state.clock.day - job.dueDay);
+  // Late by the days the workshop was open: a weekend is not a day anybody was late on
+  // (PIOTR; CLAUDE.md T10 3.5).
+  job.daysLate = Math.max(0, workingDaysBetween(job.dueDay, state.clock.day));
   job.emailsUnanswered = emailsOutstanding(state, job);
   const rate = job.express ? LATE_PENALTY_PER_DAY_EXPRESS : LATE_PENALTY_PER_DAY;
   const balanceDue = Math.round(job.price * (1 - DEPOSIT_FRACTION) * 100) / 100;

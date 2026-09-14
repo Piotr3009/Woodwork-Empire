@@ -26,7 +26,7 @@ import {
 import { stagePlanFor } from '../../src/engine/stages';
 import { materialCostFor, sheetsForCost } from '../../src/engine/materials';
 import { missingForHire } from '../../src/engine/staff';
-import { tick } from '../../src/engine/index';
+import { isWorkingDay, tick } from '../../src/engine/index';
 import type { GameEvent, GameState, Job } from '../../src/engine/index';
 import {
   act,
@@ -101,9 +101,12 @@ describe('accepting an enquiry', () => {
     expect(state.jobs[0]?.stage).toBe('accepted');
   });
 
-  it('counts the deadline in calendar days from acceptance', () => {
+  it('counts the deadline in working days from acceptance, never over a weekend', () => {
+    // Fifteen days the workshop is open, starting from the Monday of day 1: three whole weeks
+    // and a day, which is day 22 (PIOTR: deadlines never count weekends; CLAUDE.md T10 3.5).
     const state = accept(ready(), 400, { deadlineDays: 15 });
-    expect(state.jobs[0]?.dueDay).toBe(16);
+    expect(state.jobs[0]?.dueDay).toBe(22);
+    expect(isWorkingDay(state.jobs[0]?.dueDay ?? 0)).toBe(true);
   });
 
   it('adds the site measure and its taxi for a kitchen', () => {
