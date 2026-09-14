@@ -48,7 +48,9 @@ describe('the hall on day 1', () => {
   });
 
   it('is a valid single svg with a view box', () => {
-    const svg = renderHall(newGame());
+    // A figure drawn from a sheet clips its cell inside a nested svg (T9 3.13); the hall as
+    // delivered before any art is the one root svg, so the test draws it without files.
+    const svg = renderHall(newGame(), { files: [], characters: {} });
     expect(svg.startsWith('<svg')).toBe(true);
     expect(svg.match(/<svg/g)).toHaveLength(1);
     expect(svg).toMatch(/viewBox="-?\d+ -?\d+ \d+ \d+"/);
@@ -60,8 +62,9 @@ describe('the hall on day 1', () => {
     expect(clean).toContain('Hall: clean');
     const dirty = newGame();
     dirty.dust = 75;
-    expect(renderHall(dirty)).toContain('Hall: dirty');
-    expect(renderHall(dirty)).not.toContain('75');
+    const drawn = renderHall(dirty, { files: [], characters: {} });
+    expect(drawn).toContain('Hall: dirty');
+    expect(drawn).not.toContain('75');
   });
 
   it('grows a sawdust pile for every ten points of dust', () => {

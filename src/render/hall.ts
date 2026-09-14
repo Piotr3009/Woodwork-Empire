@@ -1113,6 +1113,9 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
         `${state.playerName}, ${stationLabel(state.owner.station)}`,
         true,
         'data-owner="1"',
+        // The owner is his sheet where the art side has delivered one (character.owner.*, the
+        // boss pack of 14.09), and the capsule where it has not, like every worker.
+        { role: 'owner', station: state.owner.station, options: characterOptions },
       ),
     );
   }

@@ -194,3 +194,25 @@ describe('what he is doing', () => {
     );
   });
 });
+
+describe('the owner as his sheet (chat fix v13, 14.09)', () => {
+  it('draws the owner from character.owner.* when it is delivered, and the capsule when it is not', () => {
+    const state = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
+    const sheets = {
+      'character.owner.idle': {
+        cellWidth: 112, cellHeight: 151, anchorX: 56, anchorY: 143, frames: 2, fps: 1,
+        rows: { sw: 0, se: 1, nw: 2, ne: 3 },
+      },
+    };
+    const files = ['character.owner.idle.sheet.png'];
+    const withSheet = renderHall(state, { characters: sheets, files });
+    const holder = document.createElement('div');
+    holder.innerHTML = `<svg>${withSheet}</svg>`;
+    const owner = holder.querySelector('[data-figure="owner"]');
+    expect(owner?.querySelector('image')?.getAttribute('href')).toContain('character.owner.idle');
+    const without = renderHall(state, { characters: {}, files: [] });
+    holder.innerHTML = `<svg>${without}</svg>`;
+    expect(holder.querySelector('[data-figure="owner"] image')).toBeNull();
+    expect(holder.querySelector('[data-figure="owner"] rect')).not.toBeNull();
+  });
+});
