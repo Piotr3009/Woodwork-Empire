@@ -3,7 +3,8 @@
 // player asked for, and only the modal is skipped (CLAUDE.md T4 3.6).
 
 import { describe, expect, it } from 'vitest';
-import { renderDayEnd, renderDaySummary } from '../../src/ui/dayEnd';
+import { houseLineFor, renderDayEnd, renderDaySummary } from '../../src/ui/dayEnd';
+import { signedMoney } from '../../src/ui/modal';
 import { renderMenu } from '../../src/ui/topbar';
 import { currentState, mount } from '../../src/ui/app';
 import { daySummaryOf, formatMoney, summaryOfDay, tick } from '../../src/engine/index';
@@ -138,18 +139,54 @@ describe('a week at the weekly cadence', () => {
       row.querySelector('.row-main')?.textContent,
       row.querySelector('.row-figure')?.textContent,
     ]);
+    // The three signed lines carry their sign and its colour (CLAUDE.md T13 3.1); the balance
+    // is plain.
     expect(figures).toEqual([
-      ['In', formatMoney(week.income)],
-      ['Out', formatMoney(-week.costs)],
-      ['Net', formatMoney(week.income - week.costs)],
+      ['In', signedMoney(week.income)],
+      ['Out', signedMoney(-week.costs)],
+      ['Net', signedMoney(week.income - week.costs)],
       ['In the bank', formatMoney(friday.cash)],
+      // And what the money has bought him, off the ledger (CLAUDE.md T13 3.18).
+      ['Home', houseLineFor(friday)],
     ]);
+    expect(money?.querySelector('.row-figure .bad')?.textContent).toBe(signedMoney(-week.costs));
     // And they are not the day's, which is the whole point of the cadence.
     expect(formatMoney(week.costs)).not.toBe(formatMoney(friday.finance.day.costs));
     // The owner's minutes and the day's work are a day's figures whatever the cadence, and the
     // headings say so rather than letting the week's title speak for them.
     expect(html).toContain(`Your minutes, day ${friday.clock.day}`);
     expect(html).toContain(`The hall, day ${friday.clock.day}`);
+  });
+});
+
+describe('the efficiency line on the summary', () => {
+  it('carries the number and what mostly pulled it down, and the night minutes when there were any', () => {
+    const state = buyStartingKit(newGame());
+    const summary = {
+      ...daySummaryOf(state),
+      efficiency: {
+        possible: 480,
+        worked: 350,
+        lost: { noPeople: 10, noMachine: 100, noMaterial: 20, ownerAway: 0 },
+      },
+    };
+    const html = renderDaySummary(summary);
+    const rows = Array.from(parse(html).querySelectorAll('.row')).map((row) => [
+      row.querySelector('.row-main')?.textContent,
+      row.querySelector('.row-figure')?.textContent,
+    ]);
+    expect(rows).toContainEqual(['Efficiency', '73%, mostly no machine free']);
+    expect(html).not.toContain('Night shift');
+    const night = renderDaySummary({ ...summary, nightMinutes: 120 });
+    expect(parse(night).textContent).toContain('Night shift');
+    expect(parse(night).textContent).toContain('120 min');
+    // Nothing lost, nothing to blame.
+    const clean = renderDaySummary({
+      ...summary,
+      efficiency: { possible: 480, worked: 480, lost: { noPeople: 0, noMachine: 0, noMaterial: 0, ownerAway: 0 } },
+    });
+    expect(parse(clean).textContent).toContain('Efficiency100%');
+    expect(parse(clean).textContent).not.toContain('mostly');
   });
 });
 
