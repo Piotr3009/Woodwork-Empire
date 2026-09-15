@@ -73,7 +73,7 @@ import { renderBoard } from './board';
 import { type CatalogueTab, CATALOGUE_FIRST_TAB, catalogueTabFrom, renderCatalogue } from './catalogue';
 import { renderDayEnd, renderDaySummary, renderGameOver } from './dayEnd';
 import { renderEvent, renderEventFooter } from './eventModal';
-import { type LaptopTab, laptopTabFrom, renderLaptop } from './laptop';
+import { type LaptopPage, laptopPageFrom, renderLaptop } from './laptop';
 import { type TeamTab, renderTeam, teamTabFrom } from './team';
 import { renderSpriteCheck } from './spriteCheck';
 import { renderWorkPlan } from './workPlan';
@@ -168,8 +168,9 @@ interface Ui {
   /** The house card is up at the end of the day, since this real time (CLAUDE.md T13 3.18). */
   houseCardSince: number | null;
   houseCardDone: boolean;
-  /** Which tab of the laptop is on top (CLAUDE.md T4 3.1). */
-  laptopTab: LaptopTab;
+  /** Which page of the laptop is on its screen. It opens on home every time, with no memory of
+   *  the last page (CLAUDE.md T14 2.1). */
+  laptopPage: LaptopPage;
   teamTab: TeamTab;
   /** Which tab of the equipment catalogue is on top, and which family folder is open inside it
    *  (CLAUDE.md T6 3.6, T7 3.7). */
@@ -249,8 +250,8 @@ const MODAL_TITLES: Record<ModalId, string> = {
  *  another. */
 export const MODAL_IS_FULL: Record<ModalId, boolean> = {
   board: true,
-  // 3.12 names six modals and the laptop is not one of them, so it keeps the size it had.
-  laptop: false,
+  // The laptop is a computer, and its screen fills the page (CLAUDE.md T14 2.1).
+  laptop: true,
   workPlan: true,
   accounting: true,
   catalogue: true,
@@ -286,7 +287,7 @@ function freshUi(): Ui {
     boardTab: 'enquiries',
     houseCardSince: null,
     houseCardDone: false,
-    laptopTab: 'tasks',
+    laptopPage: 'home',
     teamTab: 'workshop',
     catalogueTab: CATALOGUE_FIRST_TAB,
     catalogueFolder: null,
@@ -398,7 +399,7 @@ function modalBody(id: ModalId, current: GameState): string {
           : renderBoard(current, ui.filters.board ?? ''))
       );
     case 'laptop':
-      return renderLaptop(current, { tab: ui.laptopTab, stockSheets: ui.stockSheets });
+      return renderLaptop(current, { page: ui.laptopPage, stockSheets: ui.stockSheets });
     case 'workPlan':
       return renderWorkPlan(current, ui.dropConfirm);
     case 'accounting':
@@ -433,10 +434,10 @@ function modalBody(id: ModalId, current: GameState): string {
   }
 }
 
-/** The first use bubble of a laptop tab, keyed by the tab (CLAUDE.md T13 3.22). */
-function laptopTipKey(tab: LaptopTab): string {
-  if (tab === 'materials') return 'stock';
-  return tab;
+/** The first use bubble of a laptop page, keyed by the page (CLAUDE.md T13 3.22, T14 2.1): the
+ *  laptop's own on home, and each page's own behind its tile. */
+function laptopTipKey(page: LaptopPage): string {
+  return page === 'home' ? 'laptop' : page;
 }
 
 /** What is under the mouse in the hall: a machine standing in it, or the outline held for
@@ -610,7 +611,7 @@ function modalSpecs(): ModalSpec[] {
   if (ui.modal !== null) {
     // The first use bubble of the screen, over its body, until it is dismissed (T13 3.22).
     const tipKey =
-      ui.modal === 'laptop' ? laptopTipKey(ui.laptopTab) : TIP_KEY_OF_MODAL[ui.modal] ?? '';
+      ui.modal === 'laptop' ? laptopTipKey(ui.laptopPage) : TIP_KEY_OF_MODAL[ui.modal] ?? '';
     specs.push({
       id: ui.modal,
       title: MODAL_TITLES[ui.modal],
@@ -1058,8 +1059,12 @@ function openModal(id: ModalId): void {
   // Opening one of the two lists is seeing it: the push button goes back to cream (T11 3.1).
   if (id === 'board') ui.seenEnquiries = game().enquiries.map((enquiry) => enquiry.id);
   if (id === 'shopping') ui.seenOrders = shoppingList(game()).map((line) => line.id);
-  // Lifting the lid costs him the five minutes the machine takes to come up (CLAUDE.md T7 3.10).
-  if (id === 'laptop') dispatch({ type: 'BOOT_LAPTOP' });
+  if (id === 'laptop') {
+    // The screen comes up on home every time, with no memory of the last page (T14 2.1).
+    ui.laptopPage = 'home';
+    // Lifting the lid costs him the five minutes the machine takes to come up (CLAUDE.md T7 3.10).
+    dispatch({ type: 'BOOT_LAPTOP' });
+  }
 }
 
 /** Shutting a modal, however it was shut: the cross, Escape, or a Start production that takes the
@@ -1268,14 +1273,10 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
       if (modal !== undefined) openModal(modal);
       break;
     }
-    case 'laptopTab':
-      // The Team tab of the laptop is the Team board now: the chip opens the page rather than
-      // switching to a tab inside the laptop (PIOTR, 13.09; CLAUDE.md T10 3.6).
-      if (id === 'team') {
-        openModal('team');
-        break;
-      }
-      ui.laptopTab = laptopTabFrom(id);
+    case 'laptopPage':
+      // A tile opens its page full screen inside the laptop, and the back arrow is the same
+      // click with home for a page (CLAUDE.md T14 2.1).
+      ui.laptopPage = laptopPageFrom(id);
       ui.scrollModalTop = true;
       break;
     case 'ownedTab':
@@ -1305,6 +1306,9 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
     case 'teamTab':
       ui.teamTab = teamTabFrom(id);
       ui.scrollModalTop = true;
+      // Off the laptop's Joinery Core tile the chip opens the board on its Technical tab, where
+      // Turn 13 put the software line (CLAUDE.md T14 2.1); inside the board it is the tab.
+      if (ui.modal !== 'team') openModal('team');
       break;
     case 'catalogueTab':
       ui.catalogueTab = catalogueTabFrom(id);

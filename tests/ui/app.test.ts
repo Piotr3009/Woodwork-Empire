@@ -54,6 +54,8 @@ function unloadTheKit(): void {
   }
   click('[data-office="laptop"]');
   advanceMinutes(LAPTOP_BOOT_MINUTES);
+  // The desk is behind the Tasks tile of the home screen (CLAUDE.md T14 2.1).
+  click('[data-modal="laptop"] [data-tile="tasks"]');
   let guard = 0;
   while ((currentState()?.onOrder.length ?? 0) > 0 && guard < 120) {
     guard += 1;
@@ -223,19 +225,24 @@ describe('the first ten minutes', () => {
     click('[data-office="laptop"]');
     expect(html()).toContain('Laptop');
     const name = currentState()?.jobs[0]?.name ?? '';
+    // The laptop opens on its home screen, and the desk is behind the Tasks tile (T14 2.1).
+    expect(root().querySelector('[data-laptop-page="home"]')).not.toBeNull();
+    click('[data-modal="laptop"] [data-tile="tasks"]');
     // The calls are in the client's diary now, not on the desk (CLAUDE.md T4 3.3).
     expect(html()).not.toContain('Client call');
     expect((currentState()?.jobs[0]?.calls ?? []).length).toBeGreaterThan(0);
     expect(html()).toContain('Email 1 of');
     expect(html()).toContain('Bookkeeping');
-    // The drawings are a tab of the laptop, not the Tasks tab (CLAUDE.md T4 3.1).
+    // The drawings are a page of the laptop, not the Tasks page (CLAUDE.md T4 3.1).
     expect(html()).not.toContain('Design queue');
     expect(html()).not.toContain(`Design: ${name}`);
-    click('[data-do="laptopTab"][data-id="drawings"]');
+    click('[data-modal="laptop"] [data-tile="home"]');
+    click('[data-modal="laptop"] [data-tile="drawings"]');
     expect(html()).toContain('Design queue');
     expect(html()).toContain(`Design: ${name}`);
     expect(html()).toContain('Finished drawings');
-    click('[data-do="laptopTab"][data-id="tasks"]');
+    click('[data-modal="laptop"] [data-tile="home"]');
+    click('[data-modal="laptop"] [data-tile="tasks"]');
     click('[data-do="startTask"]');
     expect(currentState()?.owner.currentTaskId).not.toBeNull();
     expect(html()).toContain('Pause');
@@ -356,22 +363,23 @@ describe('the modals', () => {
       expect(html()).toContain(title ?? '');
       click('[data-do="closeModal"]');
     }
-    // The modals that lost their desk item are tabs of the laptop now (T4 3.1), and the team is
-    // a page of its own off the laptop's Team chip (CLAUDE.md T10 3.6).
+    // The modals that lost their desk item are pages of the laptop now, behind its tiles (T4
+    // 3.1, T14 2.1), and the team is a page of its own off the Office tile (CLAUDE.md T10 3.6).
     click('[data-office="laptop"]');
-    for (const [tab, title] of [
-      ['materials', 'data-stock='],
+    for (const [tile, title] of [
+      ['stock', 'data-stock='],
       ['drawings', 'Design queue'],
     ]) {
-      click(`[data-do="laptopTab"][data-id="${tab}"]`);
-      expect(html(), tab).toContain(title ?? '');
+      click(`[data-modal="laptop"] [data-tile="${tile}"]`);
+      expect(html(), tile).toContain(title ?? '');
+      click('[data-modal="laptop"] [data-tile="home"]');
     }
-    click('[data-do="laptopTab"][data-id="team"]');
+    click('[data-modal="laptop"] [data-tile="team"]');
     expect(html()).toContain('data-modal="team"');
     expect(html()).toContain('Taking somebody on');
     click('[data-do="closeModal"]');
     click('[data-office="laptop"]');
-    click('[data-do="laptopTab"][data-id="tasks"]');
+    click('[data-modal="laptop"] [data-tile="tasks"]');
     click('[data-do="closeModal"]');
   });
 

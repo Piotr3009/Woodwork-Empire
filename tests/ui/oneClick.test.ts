@@ -199,7 +199,7 @@ describe('the controls Turn 10 added take one click each', () => {
     game().reputation = 40;
     render();
     click('[data-office="laptop"]');
-    click('[data-do="laptopTab"][data-id="team"]');
+    click('[data-modal="laptop"] [data-tile="team"]');
     const office = node('[data-do="teamTab"][data-id="office"]');
     advanceMinutes(1);
     press(office);

@@ -80,7 +80,7 @@ describe('the store under the hall', () => {
     Object.assign(game(), choose(game(), 'later'));
     render();
     expect(game().activeEvent).toBeNull();
-    const tasks = renderLaptop(game(), { tab: 'tasks', stockSheets: '' });
+    const tasks = renderLaptop(game(), { page: 'tasks', stockSheets: '' });
     expect(tasks).toContain(`Empty the bags (1 bag, ${BAG_CHANGE_MINUTES} min)`);
   });
 

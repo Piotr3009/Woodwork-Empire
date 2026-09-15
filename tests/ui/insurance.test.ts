@@ -100,9 +100,10 @@ describe('the alarm line and the gate', () => {
     expect(payout?.querySelector('.row-figure')?.textContent).toBe('+£500 a day');
   });
 
-  it('is the laptop tab under Admin', () => {
-    const page = parse(renderLaptop(hall(), { tab: 'insurance', stockSheets: '' }));
-    expect(page.querySelector('[data-do="laptopTab"][data-id="insurance"]')?.className).toContain('is-on');
+  it('is a page of the laptop, behind the Insurance tile of its Office group', () => {
+    const page = parse(renderLaptop(hall(), { page: 'insurance', stockSheets: '' }));
+    expect(page.querySelector('.laptop-screen[data-laptop-page="insurance"]')).not.toBeNull();
+    expect(page.querySelector('[data-tile="home"]')).not.toBeNull();
     expect(page.querySelectorAll('.insurance-line')).toHaveLength(2);
   });
 });

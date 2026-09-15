@@ -703,3 +703,5 @@ export {
   STOCK_LINE_NAME,
   TAKE_OFF_BUTTON_LABEL,
 } from './constants';
+export { laptopHome } from './laptop';
+export type { LaptopHome } from './laptop';

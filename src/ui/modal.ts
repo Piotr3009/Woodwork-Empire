@@ -70,18 +70,21 @@ const CROSS =
   '<button class="modal-close" data-do="closeModal" title="Close" aria-label="Close">' +
   '×</button>';
 
-/** Two families and nothing else (CLAUDE.md T11 1). `folder` is paper on a kraft folder
- *  (SPRITES.md 11, the GPT asset ui.folder.png): the catalogue, the books, the team, the desk and
- *  every event. `board` is cards on a board: the Work Plan and the shopping list on steel with
- *  magnets, the company board on its own felt picture. */
-export type ModalSkin = 'folder' | 'board';
+/** Three families and nothing else (CLAUDE.md T11 1, T14 2.1). `folder` is paper on a kraft
+ *  folder (SPRITES.md 11, the GPT asset ui.folder.png): the catalogue, the books, the team, the
+ *  desk and every event. `board` is cards on a board: the Work Plan and the shopping list on
+ *  steel with magnets, the company board on its own felt picture. `screen` is software: the
+ *  laptop, and only the laptop, a bezel drawn in CSS with a cool light screen inside it, the
+ *  system font, flat tiles, and nothing of paper across the bezel (PIOTR, 15.09). */
+export type ModalSkin = 'folder' | 'board' | 'screen';
 
 /** Every modal id in the game with the skin it wears. One table, so a modal cannot be paper in
- *  one place and steel in another, and a modal that is on neither family is a test failure
- *  (CLAUDE.md T11 1, 3.5). */
+ *  one place and steel in another, and a modal that is on none of the families is a test failure
+ *  (CLAUDE.md T11 1, 3.5, T14 2.1). */
 export const MODAL_SKINS: Record<string, ModalSkin> = {
   board: 'folder',
-  laptop: 'folder',
+  // The one screen in the game: the laptop is a computer (CLAUDE.md T14 2.1).
+  laptop: 'screen',
   accounting: 'folder',
   catalogue: 'folder',
   team: 'folder',
@@ -100,7 +103,7 @@ const FELT_MODALS: ReadonlySet<string> = new Set(['company']);
 
 function modalClass(spec: ModalSpec): string {
   const size = spec.full === true ? ' modal-full' : spec.wide === true ? ' modal-wide' : '';
-  const skin = (MODAL_SKINS[spec.id] ?? 'folder') === 'board' ? ' modal-board' : ' modal-folder';
+  const skin = ` modal-${MODAL_SKINS[spec.id] ?? 'folder'}`;
   const felt = FELT_MODALS.has(spec.id) ? ' modal-felt' : '';
   return `modal${size}${skin}${felt}${spec.position ? '' : ' modal-centred'}`;
 }
