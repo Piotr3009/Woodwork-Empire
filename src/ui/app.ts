@@ -91,6 +91,13 @@ import { renderCompany } from './company';
 import { renderShopping } from './shopping';
 import { renderStart } from './start';
 import { decodeSaveFile, encodeSaveFile, saveFileName } from '../cloud/file';
+import {
+  NO_STORED_SAVE,
+  type StoredSave,
+  peekSave,
+  readStore,
+  saveStore,
+} from '../cloud/store';
 import { cloudAvailable } from '../cloud/supabase';
 import { hasSave, loadGame, saveGame, sendMagicLink, signOut, signedInEmail } from '../cloud/saves';
 import { type TopbarNews, renderMenu, renderTopbar, speedFromString } from './topbar';
@@ -182,6 +189,10 @@ interface Ui {
   difficulty: Difficulty;
   playerName: string;
   companyName: string;
+  /** What is waiting in the browser's store, and whether New game has asked its one question
+   *  (CLAUDE.md T11 3.2). */
+  saved: StoredSave;
+  startOverAsked: boolean;
 }
 
 const MODAL_TITLES: Record<ModalId, string> = {
@@ -265,6 +276,8 @@ function freshUi(): Ui {
     difficulty: 'easy',
     playerName: 'Piotr',
     companyName: 'Woodwork Empire',
+    saved: NO_STORED_SAVE,
+    startOverAsked: false,
   };
 }
 
@@ -276,6 +289,8 @@ function game(): GameState {
 function dispatch(action: GameAction): void {
   state = applyAction(game(), action);
   autosave();
+  if (AUTOSAVE_ACTIONS.includes(action.type)) autosaveLocal();
+  autosaveWatch();
   requestRender();
 }
 
@@ -611,6 +626,8 @@ function pageBody(scene: Scene | null): string {
         companyName: ui.companyName,
         showWhy: ui.showWhy,
         cloud: ui.cloud,
+        saved: ui.saved,
+        startOverAsked: ui.startOverAsked,
       })
     );
   }
@@ -980,7 +997,34 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
     case 'pickDifficulty':
       ui.difficulty = id as Difficulty;
       break;
+    case 'askStartOver':
+      // The one question, on a button of its own (CLAUDE.md T11 3.2).
+      ui.startOverAsked = true;
+      break;
+    case 'keepSaved':
+      ui.startOverAsked = false;
+      break;
+    case 'clearSaved':
+      saveStore.clear();
+      ui.saved = peekSave();
+      ui.startOverAsked = false;
+      break;
+    case 'continueSaved': {
+      const stored = readStore();
+      if (stored.state === null) {
+        ui.saved = peekSave();
+        ui.note = stored.note;
+        break;
+      }
+      state = stored.state;
+      ui.screen = 'game';
+      accumulator = 0;
+      startedStore();
+      break;
+    }
     case 'startGame':
+      // A new company is the end of the old one: the store is cleared before the first minute.
+      saveStore.clear();
       state = createGame({
         seed: newSeed(),
         difficulty: ui.difficulty,
@@ -989,10 +1033,14 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
         showWhy: ui.showWhy,
       });
       ui.screen = 'game';
+      ui.startOverAsked = false;
       accumulator = 0;
+      startedStore();
+      autosaveLocal();
       break;
     case 'restart':
       ui = freshUi();
+      ui.saved = peekSave();
       state = null;
       break;
     case 'setSpeed':
@@ -1172,6 +1220,8 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
       ui.modal = null;
       ui.modalPosition = null;
       ui.sellConfirm = null;
+      // Shutting a modal is a moment worth keeping: whatever he did behind it is done (T11 3.2).
+      autosaveLocal();
       break;
     }
     case 'clearFilter': {
@@ -1320,6 +1370,9 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
         if (result.state !== null) {
           state = result.state;
           ui.screen = 'game';
+          startedStore();
+          writeStore();
+          ui.saved = peekSave();
         }
         return result.note;
       });
@@ -1379,6 +1432,66 @@ function autosave(): void {
   void runCloud(async () => (await saveGame(game())).note);
 }
 
+/** The browser's own store, written as the game is played so a refreshed page is still the same
+ *  company (PIOTR, 14.09; CLAUDE.md T11 3.2). Never more than once a second: the write itself is
+ *  the whole state, and a morning of clicks would otherwise write it fifty times. */
+export const AUTOSAVE_MIN_MS = 1000;
+let storedAt = -Infinity;
+let storePending: ReturnType<typeof setTimeout> | null = null;
+
+function writeStore(): void {
+  if (state === null) return;
+  storedAt = nowMs();
+  saveStore.write(encodeSaveFile(state));
+}
+
+function autosaveLocal(): void {
+  if (state === null) return;
+  if (storePending !== null) return;
+  const since = nowMs() - storedAt;
+  if (since >= AUTOSAVE_MIN_MS || typeof setTimeout !== 'function') {
+    writeStore();
+    return;
+  }
+  storePending = setTimeout(() => {
+    storePending = null;
+    writeStore();
+  }, AUTOSAVE_MIN_MS - since);
+}
+
+/** The actions that are worth a save of their own: what he bought, who he took on and what he
+ *  took off the board (CLAUDE.md T11 3.2). */
+const AUTOSAVE_ACTIONS: ReadonlyArray<GameAction['type']> = [
+  'BUY_EQUIPMENT',
+  'BUY_SOFTWARE',
+  'BUY_STOCK',
+  'ACCEPT_ENQUIRY',
+  'HIRE',
+];
+
+/** The two things that are not actions at all: the morning, once the day has settled, and a move
+ *  of the hall that has just finished (CLAUDE.md T11 3.2). */
+let storedDay = 0;
+let wasMoving = false;
+
+/** A game just opened: the watchers start from where it is, so the first minute of it is not
+ *  mistaken for a new morning or a finished move. */
+function startedStore(): void {
+  storedDay = state === null ? 0 : state.clock.day;
+  wasMoving = state !== null && movePending(state) !== null;
+  storedAt = -Infinity;
+}
+
+function autosaveWatch(): void {
+  if (state === null) return;
+  const moving = movePending(state) !== null;
+  const newDay = state.clock.day !== storedDay;
+  const moveDone = wasMoving && !moving;
+  storedDay = state.clock.day;
+  wasMoving = moving;
+  if (newDay || moveDone) autosaveLocal();
+}
+
 function newSeed(): number {
   // The engine needs a seed from outside: this is the one place a clock reading is allowed.
   return Math.floor(Date.now() % 2147483647);
@@ -1406,6 +1519,10 @@ export function onFileChosen(file: File): Promise<void> {
       state = result.state;
       ui.screen = 'game';
       ui.menuOpen = false;
+      // A file loaded is the game from now on, so the browser's store holds it too (T11 3.2).
+      startedStore();
+      writeStore();
+      ui.saved = peekSave();
     }
     ui.note = result.note;
     requestRender();
@@ -1837,6 +1954,7 @@ export function advanceMinutes(wholeMinutes: number): number {
   const result = runMinutes(state, wholeMinutes);
   state = result.state;
   autosave();
+  autosaveWatch();
   requestRender();
   return result.minutesRun;
 }
@@ -1865,6 +1983,12 @@ function frame(now: number): void {
 
 export function mount(element: HTMLElement): void {
   root = element;
+  // A page that has just been opened holds no game and nothing the player has clicked: the only
+  // thing it knows is what the browser kept for him (CLAUDE.md T11 3.2).
+  ui = freshUi();
+  state = null;
+  accumulator = 0;
+  ui.saved = peekSave();
   void refreshCloud().then(render);
   element.addEventListener('click', onClick);
   element.addEventListener('input', onInput);

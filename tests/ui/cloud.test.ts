@@ -6,6 +6,7 @@ import { cloudAvailable, cloudKey, cloudUrl } from '../../src/cloud/supabase';
 import { hasSave, loadGame, saveGame, sendMagicLink } from '../../src/cloud/saves';
 import { renderStart } from '../../src/ui/start';
 import { renderMenu } from '../../src/ui/topbar';
+import { NO_STORED_SAVE } from '../../src/cloud/store';
 import { newGame } from '../helpers';
 
 const DARK = {
@@ -38,6 +39,8 @@ describe('saving with no Supabase in the build', () => {
       companyName: 'Woodwork Empire',
       showWhy: true,
       cloud: DARK,
+      saved: NO_STORED_SAVE,
+      startOverAsked: false,
     });
     expect(html).not.toContain('Sign in to save');
     expect(html).not.toContain('data-do="continueGame"');
@@ -62,6 +65,8 @@ describe('saving when the build has Supabase', () => {
       companyName: 'Woodwork Empire',
       showWhy: true,
       cloud: { ...DARK, available: true },
+      saved: NO_STORED_SAVE,
+      startOverAsked: false,
     });
     expect(signedOut).toContain('Sign in to save');
     expect(signedOut).not.toContain('data-do="continueGame"');
@@ -72,6 +77,8 @@ describe('saving when the build has Supabase', () => {
       companyName: 'Woodwork Empire',
       showWhy: true,
       cloud: { ...DARK, available: true, signedIn: 'piotr@example.com', hasSave: true },
+      saved: NO_STORED_SAVE,
+      startOverAsked: false,
     });
     expect(signedIn).toContain('Signed in as piotr@example.com');
     expect(signedIn).toContain('data-do="continueGame"');

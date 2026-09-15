@@ -4,6 +4,7 @@
 
 import { STATE_VERSION } from '../engine/index';
 import type { GameState } from '../engine/index';
+import { decodeSaveFile, encodeSaveFile } from './file';
 import { cloud, cloudAvailable } from './supabase';
 
 /** The autosave slot. More slots are parked. */
@@ -57,11 +58,13 @@ export async function saveGame(state: GameState): Promise<SaveResult> {
   const { data } = await client.auth.getSession();
   const userId = data.session?.user.id;
   if (userId === undefined) return { ok: false, note: 'Sign in first.' };
+  // The same bytes the file save and the browser's store hold: one encoder for every store
+  // (CLAUDE.md T11 3.2).
   const { error } = await client.from('saves').upsert(
     {
       user_id: userId,
       slot: SAVE_SLOT,
-      state: state as unknown as Record<string, unknown>,
+      state: encodeSaveFile(state),
       state_version: STATE_VERSION,
       updated_at: new Date().toISOString(),
     },
@@ -89,7 +92,14 @@ export async function loadGame(): Promise<LoadResult> {
   if (row.state_version !== STATE_VERSION) {
     return { state: null, note: 'That save is from an older build of the game.' };
   }
-  return { state: row.state as GameState, note: 'Loaded.' };
+  // The same decoder the file load uses, so a save cannot be good in one store and bad in
+  // another (CLAUDE.md T11 3.2). A row written before Turn 11 holds the state itself.
+  if (typeof row.state !== 'string') {
+    return { state: null, note: 'That save is from an older build of the game.' };
+  }
+  const opened = decodeSaveFile(row.state);
+  if (opened.state === null) return { state: null, note: opened.note };
+  return { state: opened.state, note: 'Loaded.' };
 }
 
 export async function hasSave(): Promise<boolean> {
