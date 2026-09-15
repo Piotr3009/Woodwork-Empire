@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  ANSWER_MAX,
+  ANSWER_MIN,
+  ANSWER_SKEW_MAX,
+  ANSWER_SKEW_PER_REPUTATION_TIER,
   BOARD_SIZE_BY_TIER,
   ENQUIRIES_PER_DAY_BY_REPUTATION_TIER,
   DEADLINE_DAYS_BASE,
@@ -19,8 +23,13 @@ import {
   SIZE_MULTIPLIER_MIN,
 } from '../../src/engine/constants';
 import {
+  ANSWER_SKEW_NEUTRAL_TIER,
+  answerSkew,
   boardSizeRange,
   canAccept,
+  drawOffer,
+  enquiriesDueToday,
+  enquiryQualityTier,
   expireEnquiries,
   expressProbability,
   generateEnquiry,
@@ -28,12 +37,43 @@ import {
   arriveEnquiries,
   refreshBoard,
   removeEnquiry,
+  skewed,
   unreachableEnquiries,
+  websiteEnquiriesOn,
 } from '../../src/engine/board';
 import { labourValueFor, ownerDaysFor } from '../../src/engine/jobs';
 import { tick } from '../../src/engine/index';
-import type { Enquiry, GameState } from '../../src/engine/index';
-import { buyNow, clearEvents, newGame } from '../helpers';
+import type { Enquiry, GameState, WorkerRole } from '../../src/engine/index';
+import { buyNow, clearEvents, newGame, nextDay, placeEnquiry } from '../helpers';
+
+/** Somebody of this role on the books, without the interview: the skew asks only who is hired. */
+function withRole(state: GameState, role: WorkerRole): void {
+  state.workers.push({
+    id: `staff-${role}`,
+    name: role,
+    role,
+    tier: null,
+    rate: 0,
+    weeklyWage: 0,
+    monthlyWage: 2000,
+    startDay: 1,
+    jobId: null,
+    taskId: null,
+    minutesWorked: 0,
+    ordersToday: 0,
+    overtimeMinutes: 0,
+    overtimeMinutesWeek: 0,
+    overtimeDays: 0,
+    tiredOfOvertime: false,
+    station: 'idle',
+    productionMinutes: 0,
+    absentDaysRemaining: 0,
+    shift: 'day',
+    dayLog: [],
+    anchorX: 1,
+    anchorY: 1,
+  });
+}
 
 /** Draws n enquiries onto the board, exactly as a long game would. */
 function draw(state: GameState, count: number): Enquiry[] {
@@ -390,5 +430,189 @@ describe('express, properly profitable (CLAUDE.md T10 3.7)', () => {
       );
     }
     expect(DEADLINE_EXPRESS_FACTOR).toBe(0.6);
+  });
+});
+
+describe('the day\'s post (CLAUDE.md T13 3.4, 3.7)', () => {
+  it('brings one a day at the start and two at the top tier, off the one table', () => {
+    expect(ENQUIRIES_PER_DAY_BY_REPUTATION_TIER).toEqual([1, 1, 2]);
+    const state = newGame();
+    // The template site adds and takes nothing: the table alone.
+    state.website.level = 2;
+    for (let day = 1; day <= 5; day += 1) {
+      state.clock.day = day;
+      expect(enquiriesDueToday(state), `day ${day}`).toBe(1);
+    }
+    state.reputation = 30;
+    expect(enquiriesDueToday(state)).toBe(2);
+    state.reputation = -20;
+    expect(enquiriesDueToday(state)).toBe(1);
+    // No post on a weekend.
+    state.clock.day = 6;
+    expect(enquiriesDueToday(state)).toBe(0);
+  });
+
+  it('arrives at the open and never after an acceptance: one a day, not three', () => {
+    let state = newGame();
+    state.website.level = 2;
+    state.enquiries = [];
+    arriveEnquiries(state);
+    expect(reachableEnquiries(state)).toHaveLength(1);
+    // Taking it draws nothing in its place, at the open or at the 13:00 rewrite.
+    removeEnquiry(state, reachableEnquiries(state)[0]?.id ?? '');
+    refreshBoard(state);
+    expect(reachableEnquiries(state)).toHaveLength(0);
+    state = clearEvents(tick(state, 600));
+    expect(reachableEnquiries(state)).toHaveLength(0);
+    // The next morning brings the next one.
+    state = clearEvents(nextDay(state));
+    expect(state.clock.day).toBe(2);
+    expect(reachableEnquiries(state)).toHaveLength(1);
+  });
+
+  it('spreads the website\'s weekly figure over the working week as whole enquiries', () => {
+    const state = newGame();
+    const week = (): number => {
+      let sum = 0;
+      for (let day = 1; day <= 7; day += 1) {
+        state.clock.day = day;
+        const due = enquiriesDueToday(state);
+        expect(Number.isInteger(due)).toBe(true);
+        expect(due).toBeGreaterThanOrEqual(0);
+        expect(due).toBeLessThanOrEqual(2);
+        sum += due;
+      }
+      return sum;
+    };
+    state.website.level = 2;
+    expect(week()).toBe(5);
+    // Do it yourself: one fewer, off the Friday.
+    state.website.level = 1;
+    expect(week()).toBe(4);
+    state.website.level = 3;
+    expect(week()).toBe(6);
+    state.website.level = 4;
+    expect(week()).toBe(7);
+    state.website.level = 5;
+    expect(week()).toBe(8);
+    // A plus lands Monday first, a minus Friday first, nothing on the weekend.
+    expect(websiteEnquiriesOn(1, 3)).toBe(1);
+    expect(websiteEnquiriesOn(3, 3)).toBe(1);
+    expect(websiteEnquiriesOn(4, 3)).toBe(0);
+    expect(websiteEnquiriesOn(5, -1)).toBe(-1);
+    expect(websiteEnquiriesOn(4, -1)).toBe(0);
+    expect(websiteEnquiriesOn(6, 3)).toBe(0);
+    expect(websiteEnquiriesOn(7, -1)).toBe(0);
+  });
+
+  it('moves the enquiries drawn a tier up or down the ladder with the website, never off it', () => {
+    const state = newGame();
+    state.reputation = 0;
+    state.website.level = 2;
+    expect(enquiryQualityTier(state)).toBe(1);
+    state.website.level = 1;
+    expect(enquiryQualityTier(state)).toBe(0);
+    state.website.level = 4;
+    expect(enquiryQualityTier(state)).toBe(2);
+    state.reputation = 40;
+    state.website.level = 5;
+    expect(enquiryQualityTier(state)).toBe(2);
+    state.reputation = -30;
+    state.website.level = 1;
+    expect(enquiryQualityTier(state)).toBe(0);
+    // Measured: with the top agency the dearer work of the band comes up more often, and the
+    // band itself is still the reputation's (no wardrobe for a company nobody knows).
+    const shelvesShare = (level: number): number => {
+      const drawnFrom = newGame();
+      drawnFrom.reputation = 0;
+      drawnFrom.website.level = level;
+      drawnFrom.enquiries = [];
+      const drawn = draw(drawnFrom, 600);
+      expect(new Set(drawn.map((enquiry) => enquiry.templateId))).toEqual(
+        new Set(['garageShelves', 'bookcase']),
+      );
+      return drawn.filter((enquiry) => enquiry.templateId === 'garageShelves').length / drawn.length;
+    };
+    expect(shelvesShare(1)).toBeGreaterThan(shelvesShare(4));
+  });
+});
+
+describe('the client\'s answer (CLAUDE.md T13 3.24)', () => {
+  it('builds the skew a quarter at a time around the neutral tier, and caps it', () => {
+    expect(ANSWER_SKEW_NEUTRAL_TIER).toBe(1);
+    const state = newGame();
+    state.website.level = 2;
+    state.reputation = 0;
+    expect(answerSkew(state)).toBe(0);
+    state.reputation = -30;
+    expect(answerSkew(state)).toBe(-ANSWER_SKEW_PER_REPUTATION_TIER);
+    state.reputation = 40;
+    expect(answerSkew(state)).toBeCloseTo(ANSWER_SKEW_PER_REPUTATION_TIER);
+    withRole(state, 'estimator');
+    expect(answerSkew(state)).toBeCloseTo(0.5);
+    withRole(state, 'salesman');
+    expect(answerSkew(state)).toBeCloseTo(0.75);
+    expect(answerSkew(state)).toBeLessThanOrEqual(ANSWER_SKEW_MAX);
+    // The bend itself: uniform at nothing, towards the top for a plus, the bottom for a minus.
+    expect(skewed(0.5, 0)).toBe(0.5);
+    expect(skewed(0.25, 1)).toBeCloseTo(0.5);
+    expect(skewed(0.75, -1)).toBeCloseTo(0.5);
+    expect(skewed(0, 1)).toBe(0);
+    expect(skewed(1, -1)).toBe(1);
+  });
+
+  it('lands inside the band over a thousand draws, whatever the team', () => {
+    expect([ANSWER_MIN, ANSWER_MAX]).toEqual([0.9, 1.15]);
+    for (const reputation of [-30, 0, 40]) {
+      const state = newGame();
+      state.website.level = 2;
+      state.reputation = reputation;
+      if (reputation > 20) {
+        withRole(state, 'estimator');
+        withRole(state, 'salesman');
+      }
+      // A big budget, so the rounding to ten is a hair and not a tenth.
+      const enquiry = placeEnquiry(state, { price: 100000 });
+      for (let i = 0; i < 1000; i += 1) {
+        const offer = drawOffer(state, enquiry);
+        const factor = offer / enquiry.budget;
+        expect(factor, String(reputation)).toBeGreaterThanOrEqual(ANSWER_MIN - 0.0001);
+        expect(factor, String(reputation)).toBeLessThanOrEqual(ANSWER_MAX + 0.0001);
+        expect(offer % 10).toBe(0);
+      }
+    }
+  });
+
+  it('shifts the odds up with a good team and down with a poor one, and guarantees nothing', () => {
+    const draws = 3000;
+    const factors = (setup: (state: GameState) => void): number[] => {
+      const state = newGame();
+      state.website.level = 2;
+      setup(state);
+      const enquiry = placeEnquiry(state, { price: 100000 });
+      const out: number[] = [];
+      for (let i = 0; i < draws; i += 1) out.push(drawOffer(state, enquiry) / enquiry.budget);
+      return out;
+    };
+    const mean = (values: number[]): number => values.reduce((a, b) => a + b, 0) / values.length;
+    const plain = factors((state) => {
+      state.reputation = 0;
+    });
+    const poor = factors((state) => {
+      state.reputation = -30;
+    });
+    const good = factors((state) => {
+      state.reputation = 40;
+      withRole(state, 'estimator');
+      withRole(state, 'salesman');
+    });
+    // A new company with nobody: uniform in the band, so the middle of it.
+    expect(Math.abs(mean(plain) - (ANSWER_MIN + ANSWER_MAX) / 2)).toBeLessThan(0.01);
+    expect(mean(poor)).toBeLessThan(mean(plain) - 0.01);
+    expect(mean(good)).toBeGreaterThan(mean(plain) + 0.03);
+    // Nothing guaranteed: the good team still hears a poor number now and then, and the poor
+    // team a good one.
+    expect(good.some((factor) => factor < 0.95)).toBe(true);
+    expect(poor.some((factor) => factor > 1.1)).toBe(true);
   });
 });

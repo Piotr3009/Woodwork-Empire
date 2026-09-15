@@ -10,7 +10,8 @@ and 3.24 of CLAUDE.md T13. Files owned: `src/engine/orders.ts`, `src/engine/boar
 
 | Task | Commit | What went in | Proved by |
 |---|---|---|---|
-| T13-B3a Stock page and the reservation rule | this commit | The Stock tab rebuilt in the style of Joinery Core: one `stockLines(state)` selector in `materials.ts` (kind, name, stock number, free, reserved, total, capacity, low) drawn as `.stock-line` rows with a placeholder thumbnail, the name and the `MFC-18-WHT-875` number, Free, Reserved and Total, and the Low stock badge; one Restock button at the top off `restockCheck(state)`, which brings the low line back to `RESTOCK_TO_SHEETS`, counts the sheets already on the road for stock so a second click buys nothing, and never orders more than the rack has room for; the projects under it with the material line green when held and red with the shortfall and Order for this job at the ad hoc price; the deliveries. The Turn 11 free form "buy sheets for stock" is gone (3.2 names one button; 3.3 says Restock and Order for this job are the only ways to clear a shortfall). The shopping list names the job a load is for. `materialLine` says "1 of 1 sheet in hand". | `tests/engine/materials.test.ts` ("the reservation rule and Restock": reserve on accept, short by what the rack could not spare and cleared by a restock, back to the figure at the stock price and no more, nothing when nothing is low, never past the rack's room, 175 and 200, the stock number stable across a save); `tests/ui/materials.test.ts` (one line per kind with thumbnail, name and number; free, reserved, total; the badge under the figure and not at it; one Restock button at the top with what it buys; greyed with the reason when nothing is low and while a load is on the way; projects green and red with the order button; no per project question, no free form order, none of the software's detail; no shelving) |
+| T13-B3a Stock page and the reservation rule | `daa8360` | The Stock tab rebuilt in the style of Joinery Core: one `stockLines(state)` selector in `materials.ts` (kind, name, stock number, free, reserved, total, capacity, low) drawn as `.stock-line` rows with a placeholder thumbnail, the name and the `MFC-18-WHT-875` number, Free, Reserved and Total, and the Low stock badge; one Restock button at the top off `restockCheck(state)`, which brings the low line back to `RESTOCK_TO_SHEETS`, counts the sheets already on the road for stock so a second click buys nothing, and never orders more than the rack has room for; the projects under it with the material line green when held and red with the shortfall and Order for this job at the ad hoc price; the deliveries. The Turn 11 free form "buy sheets for stock" is gone (3.2 names one button; 3.3 says Restock and Order for this job are the only ways to clear a shortfall). The shopping list names the job a load is for. `materialLine` says "1 of 1 sheet in hand". | `tests/engine/materials.test.ts` ("the reservation rule and Restock": reserve on accept, short by what the rack could not spare and cleared by a restock, back to the figure at the stock price and no more, nothing when nothing is low, never past the rack's room, 175 and 200, the stock number stable across a save); `tests/ui/materials.test.ts` (one line per kind with thumbnail, name and number; free, reserved, total; the badge under the figure and not at it; one Restock button at the top with what it buys; greyed with the reason when nothing is low and while a load is on the way; projects green and red with the order button; no per project question, no free form order, none of the software's detail; no shelving) |
+| T13-B3b Enquiry flow and the budget answer | this commit | The day's post off the one table plus the website's share: `websiteEnquiriesOn(day, weekly)` spreads the weekly figure over the working week as whole enquiries (a plus Monday first, a minus Friday first, nothing on a weekend), `enquiriesDueToday` adds it to the tier's figure; `enquiryQualityTier` moves the template weights a tier up or down with the website and never off the ladder, on the templates the reputation allows; the automatic refill after an acceptance is gone (phase A) and proved. The client's answer: `answerSkew` is a quarter per reputation tier either side of the neutral tier (`ANSWER_SKEW_NEUTRAL_TIER` 1, a new company), a quarter for an estimator, a quarter for the salesman, capped; `drawOffer` bends a uniform draw with it and never leaves the band; the offer is the price, the budget is kept on the job, declining costs nothing but the enquiry. The effective reputation (`effectiveReputation` in `reputation.ts`, earned plus the website bonus, clamped) is what every read on the board and the company totals use. The board tile says "Budget" and carries `data-kind`; the head prints the effective reputation and the website's share of it in green. | `tests/engine/board.test.ts` ("the day's post": one a day at the start and two at the top tier, arrives at the open and never after an acceptance, the weekly figure lands as whole enquiries over a week, the quality tier moves and stays on the ladder and is measured; "the client's answer": the skew a quarter at a time and capped, inside the band over a thousand draws at three skews, a good team up and a poor one down over three thousand draws with nothing guaranteed); `tests/engine/jobs.test.ts` ("the client answers with a number": the offer is the price and the budget is kept and the deposit follows the offer, declining costs nothing, asked once); `tests/engine/reputation.test.ts` (the effective figure per level, never past the scale, what the tiers and the company board read); `tests/ui/board.test.ts` (Budget on the tile, the kind, the head with the bonus) |
 
 ## 2. Numbers chosen
 
@@ -19,6 +20,8 @@ and 3.24 of CLAUDE.md T13. Files owned: `src/engine/orders.ts`, `src/engine/boar
 | `STOCK_LINE_NAME` | sheet: "MFC 18 mm, white"; solidWood: "Oak, 27 mm" | `src/engine/materials.ts`, marked `T13-C1: move to constants.ts` | wording, to match the `MFC-18-WHT` and `OAK-27` prefixes phase A chose |
 | `STOCK_LINE_KINDS` | `['sheet']` | same | the kinds held on the rack as stock; solid wood and bespoke material are ordered per job and never held (3.3), so tonight the page has one line and a second kind is one entry in this list |
 | Restock room cap | the rack's free spaces less what is on the road | `restockSheets` | a rule and not a figure: a Restock never orders past the rack, because a lorry that cannot be unloaded is the Turn 2 overflow question and a button should not walk the player into it |
+| `ANSWER_SKEW_NEUTRAL_TIER` | 1 | `src/engine/board.ts`, marked `T13-C1: move to constants.ts` | the reputation tier the client's answer is uniform at (a new company at reputation 0); under it the skew goes negative, which the brief's literal `0.25 * reputationTier` never does although it asks for a skew in [-1, +1] and for a poor team landing nearer 0.90 more often (see Not done) |
+| the website's weekly spread | a plus on the first days of the week, a minus on the last | `websiteEnquiriesOn` | a rule and not a figure: one whole enquiry a day either way, so a week always carries exactly the weekly figure; the week is five working days and the post never lands on a weekend |
 
 ## 3. Notes for phase C
 
@@ -30,11 +33,30 @@ Add to the `// Material and deliveries` export block from `./materials`:
 Then drop the `// T13-C1: export from index.ts` import in `src/ui/materials.ts` and import from
 `'../engine/index'`.
 
+Add to the `./board` export block: `enquiryQualityTier`, `websiteEnquiriesOn`; and to the
+`./reputation` block: `effectiveReputation`. Then drop the `// T13-C1: export from index.ts`
+import of `effectiveReputation` in `src/ui/board.ts`.
+
 ### `src/engine/constants.ts`
 
 Move `STOCK_LINE_NAME` and `STOCK_LINE_KINDS` from `src/engine/materials.ts` (they sit under the
 `stockIsLow` function, each marked `// T13-C1: move to constants.ts`) into the 8.9 Materials block
 next to `STOCK_NUMBER_PREFIX`, keeping their comments and the `[TUNE]` tag.
+
+Move `ANSWER_SKEW_NEUTRAL_TIER` from `src/engine/board.ts` (above `answerSkew`, marked
+`// T13-C1: move to constants.ts`) to the 8.8 block under `ANSWER_SKEW_MAX`.
+
+### The other readers of `state.reputation` (not B3's files; optional, for one set of rules)
+
+`effectiveReputation(state)` is the figure the board, the tier tables and the company totals
+read now. Three gates outside B3's files still read the earned figure: the hiring pool
+(`src/engine/staff.ts` 218, `state.reputation < spec.minReputation`), the equipment the
+catalogue gates by standing (`src/engine/game.ts` 2289) and the salesman's meeting
+(`src/engine/tasks.ts` 457). The brief says the tier tables read the effective figure and says
+nothing of these gates, so B3 left them; if phase C wants one figure everywhere, each is a one
+word change to `effectiveReputation(state)`. `src/ui/dayEnd.ts` 150 prints the earned figure on
+the game over card; `formatReputation(effectiveReputation(state))` would print the one the
+player has been reading.
 
 ### `src/ui/app.ts` and `src/ui/laptop.ts` (dead code the stock page left behind)
 
@@ -88,6 +110,15 @@ frame (`thumb.sheet`, 64 by 48), code side, as CLAUDE.md T13 9.8 says.
 
 ## 6. Not done
 
+- The skew formula is built around a neutral tier and not literally `0.25 * reputationTier`:
+  with tiers 0, 1 and 2 the literal formula never goes under nothing, so a poor company with a
+  poor team would draw uniformly in the band and never "nearer 0.90 more often" as 3.24 asks, and
+  the brief's own range for k is [-1, +1]. `k = 0.25 * (reputationTier - 1) + 0.25 * estimator +
+  0.25 * salesman`, so a company under zero reputation is skewed down a quarter, a new company at
+  zero is uniform, and the coefficients are the brief's. The salesman is one tier tonight
+  (`HIRING_SPECS`), so "salesmanTier" is one when he is on the books.
+- The offer event's body reads "The budget was £9,000. The client offers £9,400. Accept?" (phase
+  A's wording, one sentence more than the brief's, so the player sees what the number is against).
 - The Turn 11 free form "buy sheets for stock" field is removed rather than kept: the brief names
   one button (3.2) and says the only ways to clear a shortfall are Restock and Order for this job
   (3.3). A player who wants stock before anything is low has no button for it tonight; Restock

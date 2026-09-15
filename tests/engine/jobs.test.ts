@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  ANSWER_MAX,
+  ANSWER_MIN,
   BY_HAND_DURATION_FACTOR,
   COURIER_COST,
   DEPOSIT_FRACTION,
@@ -15,6 +17,7 @@ import {
   SHEET_PRICE_AD_HOC,
   SITE_MEASURE_TAXI_COST,
 } from '../../src/engine/constants';
+import { formatMoney } from '../../src/engine/economy';
 import { gateIsCrowded, hallProductivityFactor } from '../../src/engine/machines';
 import { emailRatingFactor } from '../../src/engine/reputation';
 import { callsForPrice } from '../../src/engine/calls';
@@ -36,6 +39,7 @@ import {
   buyNow,
   buyStartingKit,
   withExtraction,
+  choose,
   clearEvents,
   doAllEmails,
   doTask,
@@ -586,5 +590,62 @@ describe('emails nobody answered', () => {
     state = doTask(doTask(state, 'design'), 'materialTakeOff');
     expect(firstJob(state).stage).toBe('ready');
     expect(state.tasks.some((task) => task.kind === 'emails' && !task.done)).toBe(true);
+  });
+});
+
+describe('the client answers with a number (CLAUDE.md T13 3.24)', () => {
+  it('makes the offer the price, keeps the budget, and the deposit follows the offer', () => {
+    let state = ready();
+    const enquiry = placeEnquiry(state, { price: 10000, deadlineDays: 60 });
+    state = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+    // Nothing is booked until the number is answered.
+    expect(state.jobs).toHaveLength(0);
+    expect(state.activeEvent?.kind).toBe('clientOffer');
+    const offer = state.enquiries.find((entry) => entry.id === enquiry.id)?.offer ?? null;
+    expect(offer).not.toBeNull();
+    expect(state.activeEvent?.body).toContain(
+      `The client offers ${formatMoney(offer ?? 0)}. Accept?`,
+    );
+    expect(state.activeEvent?.choices.map((choice) => choice.id)).toEqual(['accept', 'decline']);
+    const cash = state.cash;
+    state = choose(state, 'accept');
+    const job = firstJob(state);
+    expect(job.price).toBe(offer);
+    expect(job.budget).toBe(10000);
+    expect(job.price / job.budget).toBeGreaterThanOrEqual(ANSWER_MIN - 0.001);
+    expect(job.price / job.budget).toBeLessThanOrEqual(ANSWER_MAX + 0.001);
+    // Material and labour still come off the base price; the deposit is on what he offered.
+    expect(job.materialCost).toBe(materialCostFor(10000, false));
+    expect(job.depositPaid).toBe(Math.round(job.price * DEPOSIT_FRACTION * 100) / 100);
+    expect(state.cash - cash).toBeCloseTo(job.depositPaid, 6);
+    expect(state.enquiries.some((entry) => entry.id === enquiry.id)).toBe(false);
+    expect(state.activeEvent).toBeNull();
+  });
+
+  it('costs nothing but the enquiry to decline', () => {
+    let state = ready();
+    const enquiry = placeEnquiry(state, { price: 10000, deadlineDays: 60 });
+    state = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+    const cash = state.cash;
+    const lines = state.ledger.length;
+    const reputation = state.reputation;
+    state = choose(state, 'decline');
+    expect(state.jobs).toHaveLength(0);
+    expect(state.enquiries.some((entry) => entry.id === enquiry.id)).toBe(false);
+    expect(state.cash).toBe(cash);
+    expect(state.ledger).toHaveLength(lines);
+    expect(state.reputation).toBe(reputation);
+    expect(state.activeEvent).toBeNull();
+  });
+
+  it('asks once: the number stands until it is answered', () => {
+    let state = ready();
+    const enquiry = placeEnquiry(state, { price: 10000, deadlineDays: 60 });
+    state = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+    const offer = state.enquiries.find((entry) => entry.id === enquiry.id)?.offer;
+    state = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+    expect(state.enquiries.find((entry) => entry.id === enquiry.id)?.offer).toBe(offer);
+    expect(state.eventQueue.filter((event) => event.kind === 'clientOffer')).toHaveLength(0);
+    expect(state.activeEvent?.kind).toBe('clientOffer');
   });
 });

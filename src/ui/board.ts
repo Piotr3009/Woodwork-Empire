@@ -11,7 +11,10 @@ import {
   ownerDaysFor,
   sheetsForCost,
   template,
+  websiteReputationBonus,
 } from '../engine/index';
+// T13-C1: export from index.ts
+import { effectiveReputation } from '../engine/reputation';
 import type { Enquiry, GameState } from '../engine/index';
 import {
   button,
@@ -21,6 +24,7 @@ import {
   filterField,
   money,
   plural,
+  signedFigure,
 } from './modal';
 
 function expiryLine(state: GameState, enquiry: Enquiry): string {
@@ -83,12 +87,15 @@ function tile(state: GameState, enquiry: Enquiry): string {
     : enquiry.lockReason === null
       ? ''
       : `<p class="lock">${escapeHtml(enquiry.lockReason)}</p>`;
+  // The figure on the tile is the client's budget; what he offers when the job is taken is a
+  // number drawn inside the band, and that becomes the price (CLAUDE.md T13 3.24).
   return (
     `<div class="tile${locked || enquiry.unreachable ? ' is-locked' : ''}` +
-    `${enquiry.unreachable ? ' is-out-of-reach' : ''}" data-enquiry="${enquiry.id}">` +
+    `${enquiry.unreachable ? ' is-out-of-reach' : ''}" data-enquiry="${enquiry.id}" ` +
+    `data-kind="${enquiry.kind}">` +
     express +
     `<h3 class="tile-name">${escapeHtml(enquiry.name)}</h3>` +
-    `<p class="tile-price">${money(enquiry.price)}</p>` +
+    `<p class="tile-price">Budget ${money(enquiry.budget)}</p>` +
     `<p class="tile-figures">${escapeHtml(enquiry.finish)} · deadline ` +
     `${days(enquiry.deadlineDays)} · ${escapeHtml(expiryLine(state, enquiry))}</p>` +
     `<p class="tile-figures">${plural(sheets, 'sheet', 'sheets')} of material · about ` +
@@ -108,11 +115,16 @@ export function renderBoard(state: GameState, filter: string): string {
   }
   const open = state.enquiries.filter((enquiry) => !enquiry.unreachable).length;
   const greyed = state.enquiries.length - open;
+  // The reputation the board reads is the effective one, with the website's bonus in it while
+  // the level is held (CLAUDE.md T13 3.7).
+  const bonus = websiteReputationBonus(state);
+  const website =
+    bonus === 0 ? '' : ` The website holds ${signedFigure(`+${bonus}`, bonus)} of that.`;
   const head =
-    `<p class="hint">Reputation ${formatReputation(state.reputation)} · ` +
+    `<p class="hint">Reputation ${formatReputation(effectiveReputation(state))} · ` +
     `${plural(open, 'enquiry', 'enquiries')} waiting` +
     `${greyed === 0 ? '' : `, and ${greyed} the workshop cannot take yet`}. ` +
-    'The board is written again at 08:00 and at 13:00.</p>';
+    `The board is written again at 08:00 and at 13:00.${website}</p>`;
   if (state.enquiries.length === 0) {
     return head + emptyLine('Nothing on the board. Reputation brings enquiries.');
   }

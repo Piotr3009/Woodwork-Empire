@@ -24,11 +24,13 @@ import {
   EXPRESS_PROBABILITY,
   MINUTES_PER_WORKING_DAY,
   PRODUCT_TEMPLATES,
+  REPUTATION_TIERS,
   SIZE_MULTIPLIER_MAX,
   SIZE_MULTIPLIER_MIN,
   SOLID_WOOD_EQUIPMENT,
   UNREACHABLE_MAX,
   UNREACHABLE_MIN,
+  WORKING_DAYS_PER_WEEK,
 } from './constants';
 import { findSpec } from './machines';
 import {
@@ -43,7 +45,7 @@ import { deadlineDaysFor, labourValueFor, ownerDaysFor, stagedJob } from './jobs
 import { jobMinutesFor } from './stages';
 import { hasOrOnOrder } from './orders';
 import { workshopRate } from './plan';
-import { reputationTier } from './reputation';
+import { effectiveReputation, reputationTier } from './reputation';
 import { chance, float, int, makeId, pickWeighted } from './rng';
 import { websiteEnquiriesPerWeek, websiteQualityShift } from './website';
 import { coversHeld } from './insurance';
@@ -52,7 +54,7 @@ import { isWorkingDay, weekday } from './clock';
 
 /** How many enquiries a company of this standing has waiting [TUNE]. */
 export function boardSizeRange(state: GameState): [number, number] {
-  const tier = reputationTier(state.reputation);
+  const tier = reputationTier(effectiveReputation(state));
   return BOARD_SIZE_BY_TIER[Math.min(tier, BOARD_SIZE_BY_TIER.length - 1)] ?? [1, 2];
 }
 
@@ -63,11 +65,19 @@ export function expressProbability(): number {
   return EXPRESS_PROBABILITY;
 }
 
+/** The tier of the template weights the day's enquiries are drawn with: the reputation tier,
+ *  moved up or down by the website's quality shift and never off the ladder (CLAUDE.md T13 3.7).
+ *  The templates themselves stay the ones the reputation allows: a better website brings the
+ *  dearer work of the band more often, not work the company is not known for yet. */
+export function enquiryQualityTier(state: GameState): number {
+  const top = REPUTATION_TIERS.length - 1;
+  const tier = reputationTier(effectiveReputation(state)) + websiteQualityShift(state);
+  return Math.max(0, Math.min(top, tier));
+}
+
 function drawTemplate(state: GameState): ProductTemplate | null {
-  // The website moves the enquiries drawn up or down the template ladder by a tier, and never
-  // off it (CLAUDE.md T13 3.7).
-  const tier = Math.max(0, Math.min(2, reputationTier(state.reputation) + websiteQualityShift(state)));
-  const candidates = templatesForReputation(state.reputation);
+  const tier = enquiryQualityTier(state);
+  const candidates = templatesForReputation(effectiveReputation(state));
   return pickWeighted(state, candidates, (entry) => entry.weightsByTier[tier] ?? 0);
 }
 
@@ -75,7 +85,8 @@ function drawTemplate(state: GameState): ProductTemplate | null {
  *  (PIOTR; CLAUDE.md T13 3.15). Whether it can take it is the insurance gate's question. */
 export function qualifiesForCommercial(state: GameState): boolean {
   return (
-    state.reputation > COMMERCIAL_MIN_REPUTATION && state.workers.length >= COMMERCIAL_MIN_STAFF
+    effectiveReputation(state) > COMMERCIAL_MIN_REPUTATION &&
+    state.workers.length >= COMMERCIAL_MIN_STAFF
   );
 }
 
@@ -86,13 +97,23 @@ function drawKind(state: GameState): EnquiryKind {
   return commercial && qualifiesForCommercial(state) ? 'commercial' : 'residential';
 }
 
-/** The skew the team puts on the client's answer: a quarter each for the reputation tier, an
- *  estimator on the books and a salesman, capped (CLAUDE.md T13 3.24). */
+// T13-C1: move to constants.ts
+/** The reputation tier the client's answer is neutral at: at it the draw is uniform in the band,
+ *  under it the skew is negative and the offers land nearer the bottom of the band more often,
+ *  over it nearer the top [TUNE 1, the tier of a new company at reputation 0]
+ *  (CLAUDE.md T13 3.24). */
+export const ANSWER_SKEW_NEUTRAL_TIER = 1;
+
+/** The skew the team puts on the client's answer: a quarter for every reputation tier over the
+ *  neutral one and a quarter off for every tier under it, a quarter for an estimator on the books
+ *  and a quarter for the salesman (one tier tonight), capped either side (CLAUDE.md T13 3.24).
+ *  It shifts the odds and never the band. */
 export function answerSkew(state: GameState): number {
   const estimator = state.workers.some((worker) => worker.role === 'estimator') ? 1 : 0;
   const salesman = state.workers.some((worker) => worker.role === 'salesman') ? 1 : 0;
+  const tiers = reputationTier(effectiveReputation(state)) - ANSWER_SKEW_NEUTRAL_TIER;
   const skew =
-    reputationTier(state.reputation) * ANSWER_SKEW_PER_REPUTATION_TIER +
+    tiers * ANSWER_SKEW_PER_REPUTATION_TIER +
     estimator * ANSWER_SKEW_ESTIMATOR +
     salesman * ANSWER_SKEW_SALESMAN;
   return Math.max(-ANSWER_SKEW_MAX, Math.min(ANSWER_SKEW_MAX, skew));
@@ -121,7 +142,7 @@ function buildEnquiry(state: GameState, entry: ProductTemplate): Enquiry | null 
   // draws out of the seeded stream (PIOTR: 30% to 50%, uniformly; CLAUDE.md T10 3.7).
   const uplift = float(state, EXPRESS_PRICE_UPLIFT_MIN, EXPRESS_PRICE_UPLIFT_MAX);
   const sizeMultiplier = float(state, SIZE_MULTIPLIER_MIN, SIZE_MULTIPLIER_MAX);
-  const market = marketPriceFactor(state.reputation);
+  const market = marketPriceFactor(effectiveReputation(state));
   const basePrice = priceFor(entry.basePrice, sizeMultiplier, 0, market);
   const price = express
     ? priceFor(entry.basePrice, sizeMultiplier, uplift, market)
@@ -218,20 +239,28 @@ function drawInto(state: GameState): boolean {
   return true;
 }
 
-/** New enquiries a day: the reputation tier's figure, and the website's weekly figure spread over
- *  the working week, so a level that takes one off the week takes it off one day of it and a
- *  level that adds three adds them on three (CLAUDE.md T13 3.4, 3.7). Never under nothing. */
+/** The website's share of one day's post: its weekly figure spread over the working week, one
+ *  whole enquiry a day and never a fraction. A plus lands on the first days of the week, Monday
+ *  first; a minus on the last, Friday first; so a working week always carries exactly the weekly
+ *  figure, one a day either way at most (CLAUDE.md T13 3.7). Nothing on a weekend. */
+export function websiteEnquiriesOn(day: number, weekly: number): number {
+  if (weekly === 0 || !isWorkingDay(day)) return 0;
+  const index = weekday(day);
+  if (weekly > 0) return index < weekly ? 1 : 0;
+  return index >= WORKING_DAYS_PER_WEEK + weekly ? -1 : 0;
+}
+
+/** New enquiries a day: the reputation tier's figure and the website's share, drawn at the day's
+ *  open and never under nothing; no post on a weekend (PIOTR: one at the start, two at most;
+ *  CLAUDE.md T13 3.4, 3.7). */
 export function enquiriesDueToday(state: GameState): number {
-  const tier = reputationTier(state.reputation);
-  const base = ENQUIRIES_PER_DAY_BY_REPUTATION_TIER[
-    Math.min(tier, ENQUIRIES_PER_DAY_BY_REPUTATION_TIER.length - 1)
-  ] ?? 1;
-  const weekly = websiteEnquiriesPerWeek(state);
-  if (weekly === 0 || !isWorkingDay(state.clock.day)) return base;
-  // Monday is day 0 of the week: a weekly plus lands on the first N days, a minus on the last.
-  const dayOfWeek = weekday(state.clock.day);
-  if (weekly > 0) return base + (dayOfWeek < weekly ? 1 : 0);
-  return Math.max(0, base - (dayOfWeek >= 5 + weekly ? 1 : 0));
+  if (!isWorkingDay(state.clock.day)) return 0;
+  const tier = reputationTier(effectiveReputation(state));
+  const base =
+    ENQUIRIES_PER_DAY_BY_REPUTATION_TIER[
+      Math.min(tier, ENQUIRIES_PER_DAY_BY_REPUTATION_TIER.length - 1)
+    ] ?? 1;
+  return Math.max(0, base + websiteEnquiriesOn(state.clock.day, websiteEnquiriesPerWeek(state)));
 }
 
 /** The day's enquiries arrive at the open: so many, drawn into the room the board has. Nothing
@@ -258,7 +287,7 @@ export interface BoardBlock {
  *  its kit. Null while it has both. The first thing in the way, in the order the player would
  *  meet it (CLAUDE.md T10 3.7). */
 export function kitBlockFor(state: GameState, entry: ProductTemplate): BoardBlock | null {
-  if (state.reputation < entry.minReputation) {
+  if (effectiveReputation(state) < entry.minReputation) {
     return { reason: `reputation too low (needs ${entry.minReputation})`, where: '' };
   }
 
