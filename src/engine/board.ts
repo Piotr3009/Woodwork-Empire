@@ -41,7 +41,7 @@ import {
   priceFor,
   templatesForReputation,
 } from './catalog';
-import { deadlineDaysFor, labourValueFor, ownerDaysFor, stagedJob } from './jobs';
+import { deadlineDaysFrom, drawDeadline, labourValueFor, ownerDaysFor, stagedJob } from './jobs';
 import { jobMinutesFor } from './stages';
 import { hasOrOnOrder } from './orders';
 import { workshopRate } from './plan';
@@ -154,28 +154,34 @@ function buildEnquiry(state: GameState, entry: ProductTemplate): Enquiry | null 
   const finishes = offered.length > 0 ? offered : entry.allowedFinishes;
   const finish = finishes[int(state, 0, Math.max(0, finishes.length - 1))];
   if (!finish) return null;
-  // The deadline comes off the work in the job now, not off the kind of thing it is
-  // (CLAUDE.md T6 3.7).
-  const deadlineDays = deadlineDaysFor(state, {
-    ownerDays: ownerDaysFor(state, labourValueFor(basePrice), entry.material),
-    price: basePrice,
-    express,
-  });
+  // The deadline's one draw is taken here, before the kind of client is known, so the seeded
+  // stream is the same shape for residential and commercial work; the days are read off it
+  // below, once the size of the work is known (CLAUDE.md T6 3.7, T13 3.15).
+  const deadlineDraw = drawDeadline(state);
   const bespokeMaterial = chance(state, BESPOKE_PROBABILITY);
   const expiryDays = express ? EXPIRY_EXPRESS_DAYS : EXPIRY_STANDARD_DAYS;
-  // Commercial work is two to three times the residential budget (CLAUDE.md T13 3.15). The
-  // factor is drawn either way, like the express uplift, so the stream is the same shape.
+  // Commercial work is two to three times the residential budget, and two to three times the
+  // work with it (CLAUDE.md T13 3.15). The factor is drawn either way, like the express uplift,
+  // so the stream is the same shape.
   const kind = drawKind(state);
   const commercial = float(state, COMMERCIAL_BUDGET_FACTOR_MIN, COMMERCIAL_BUDGET_FACTOR_MAX);
   const scale = kind === 'commercial' ? commercial : 1;
+  const scaledBase = priceFor(basePrice * scale, 1, 0, 1);
   const budget = priceFor(price * scale, 1, 0, 1);
+  // The deadline comes off the work in the job now, not off the kind of thing it is
+  // (CLAUDE.md T6 3.7): the larger work of a commercial job gets the days it takes.
+  const deadlineDays = deadlineDaysFrom(deadlineDraw, {
+    ownerDays: ownerDaysFor(state, labourValueFor(scaledBase), entry.material),
+    price: scaledBase,
+    express,
+  });
   return {
     id: makeId(state, 'enq'),
     templateId: entry.id,
     name: kind === 'commercial' ? `${entry.name}, commercial` : entry.name,
     sizeMultiplier: Math.round(sizeMultiplier * 100) / 100,
     price: budget,
-    basePrice: priceFor(basePrice * scale, 1, 0, 1),
+    basePrice: scaledBase,
     kind,
     budget,
     offer: null,
@@ -380,39 +386,45 @@ export function refreshBoard(state: GameState): void {
   refillUnreachable(state);
 }
 
+/** True for a commercial enquiry while the company holds neither or only one of the two covers:
+ *  the insurance gate (PIOTR; CLAUDE.md T13 3.15). */
+function insuranceGateShut(state: GameState, enquiry: Enquiry): boolean {
+  return enquiry.kind === 'commercial' && !coversHeld(state);
+}
+
 /** The lock reason follows the workshop: buy the tools and the greyed entry goes live. A greyed
  *  enquiry the company has caught up with is no longer out of reach either, and it joins the band
- *  where there is room for it (CLAUDE.md T10 3.7). */
+ *  where there is room for it (CLAUDE.md T10 3.7). What is in the way is read in the order the
+ *  player would meet it: the kit and the hands first, then, for commercial work, the two covers
+ *  (CLAUDE.md T13 3.15). The gate follows the covers both ways: held, and the commercial enquiry
+ *  joins the band; dropped, and it is greyed again with the reason. */
 export function refreshLocks(state: GameState): void {
   const [, max] = boardSizeRange(state);
   for (const enquiry of state.enquiries) {
     const entry = findTemplate(enquiry.templateId);
     enquiry.lockReason = entry ? lockReasonFor(state, entry) : null;
-    // The insurance gate follows the covers: held, and the commercial enquiry joins the band;
-    // dropped, and it is greyed again (CLAUDE.md T13 3.15).
-    if (enquiry.kind === 'commercial') {
-      if (!coversHeld(state)) {
-        enquiry.unreachable = true;
-        enquiry.blockReason = NO_INSURANCE_REASON;
-        enquiry.blockWhere = '';
-        continue;
-      }
-      if (enquiry.blockReason === NO_INSURANCE_REASON) {
-        enquiry.unreachable = false;
-        enquiry.blockReason = '';
-      }
-    }
-    if (!enquiry.unreachable || entry === null) continue;
-    const block = blockFor(state, entry, enquiry.deadlineDays, enquiry.basePrice);
-    if (block === null && reachableEnquiries(state).length < max) {
-      enquiry.unreachable = false;
-      enquiry.blockReason = '';
-      enquiry.blockWhere = '';
-      continue;
-    }
+    if (entry === null) continue;
+    // A reachable enquiry is only ever asked the insurance question again: the kit it was drawn
+    // against does not go away.
+    const block = enquiry.unreachable
+      ? blockFor(state, entry, enquiry.deadlineDays, enquiry.basePrice)
+      : null;
     if (block !== null) {
       enquiry.blockReason = block.reason;
       enquiry.blockWhere = block.where;
+      continue;
+    }
+    if (insuranceGateShut(state, enquiry)) {
+      enquiry.unreachable = true;
+      enquiry.blockReason = NO_INSURANCE_REASON;
+      enquiry.blockWhere = '';
+      continue;
+    }
+    if (!enquiry.unreachable) continue;
+    if (reachableEnquiries(state).length < max) {
+      enquiry.unreachable = false;
+      enquiry.blockReason = '';
+      enquiry.blockWhere = '';
     }
   }
 }

@@ -22,6 +22,9 @@ import { gateIsCrowded, hallProductivityFactor } from '../../src/engine/machines
 import { emailRatingFactor } from '../../src/engine/reputation';
 import { callsForPrice } from '../../src/engine/calls';
 import {
+  deadlineDaysFor,
+  deadlineDaysFrom,
+  drawDeadline,
   emailPaymentPenalty,
   findJob,
   minutesRemainingFor,
@@ -647,5 +650,29 @@ describe('the client answers with a number (CLAUDE.md T13 3.24)', () => {
     expect(state.enquiries.find((entry) => entry.id === enquiry.id)?.offer).toBe(offer);
     expect(state.eventQueue.filter((event) => event.kind === 'clientOffer')).toHaveLength(0);
     expect(state.activeEvent?.kind).toBe('clientOffer');
+  });
+});
+
+describe('the deadline\'s one draw (CLAUDE.md T6 3.7, T13 3.15)', () => {
+  it('is taken once, read as often as wanted, and reads what the draw would have given', () => {
+    const state = newGame();
+    const job = { ownerDays: 6, price: 5000, express: false };
+    // The same cursor, read straight and read through the draw: one figure.
+    const straight = deadlineDaysFor({ ...state, rng: state.rng }, job);
+    const draw = drawDeadline(state);
+    expect(deadlineDaysFrom(draw, job)).toBe(straight);
+    expect(deadlineDaysFrom(draw, job)).toBe(straight);
+    // The draw moved the stream by exactly one step, like the straight reading does.
+    const moved = { ...newGame(), rng: newGame().rng };
+    deadlineDaysFor(moved, job);
+    expect(state.rng).toBe(moved.rng);
+  });
+
+  it('gives the larger work of a commercial job more days off the same draw', () => {
+    const state = newGame();
+    const draw = drawDeadline(state);
+    const residential = deadlineDaysFrom(draw, { ownerDays: 4, price: 4000, express: false });
+    const commercial = deadlineDaysFrom(draw, { ownerDays: 10, price: 10000, express: false });
+    expect(commercial).toBeGreaterThan(residential);
   });
 });

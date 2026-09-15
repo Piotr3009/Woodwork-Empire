@@ -13,6 +13,7 @@ import {
   template,
   websiteReputationBonus,
 } from '../engine/index';
+import { NO_INSURANCE_REASON } from '../engine/constants';
 // T13-C1: export from index.ts
 import { effectiveReputation } from '../engine/reputation';
 import type { Enquiry, GameState } from '../engine/index';
@@ -51,6 +52,10 @@ function blockLink(enquiry: Enquiry): string {
   if (enquiry.blockWhere === 'team') {
     return button('openModal', 'Open the team', 'data-modal="team"');
   }
+  // The covers are bought on the laptop, under Admin (CLAUDE.md T13 3.15).
+  if (enquiry.blockReason === NO_INSURANCE_REASON) {
+    return button('openModal', 'Open the laptop', 'data-modal="laptop"');
+  }
   return '';
 }
 
@@ -67,6 +72,8 @@ function tile(state: GameState, enquiry: Enquiry): string {
     ) / 10;
   const express = enquiry.express ? '<span class="badge badge-warn tile-flag">Express</span>' : '';
   const badges = [
+    // Commercial work says so on the tile (CLAUDE.md T13 3.15).
+    enquiry.kind === 'commercial' ? '<span class="badge">Commercial</span>' : '',
     enquiry.bespokeMaterial ? '<span class="badge">Bespoke material</span>' : '',
     enquiry.needsMeasure ? '<span class="badge">Site measure</span>' : '',
     byHand ? '<span class="badge badge-warn">By hand, plus 50% time</span>' : '',

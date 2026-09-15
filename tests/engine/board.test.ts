@@ -5,7 +5,13 @@ import {
   ANSWER_SKEW_MAX,
   ANSWER_SKEW_PER_REPUTATION_TIER,
   BOARD_SIZE_BY_TIER,
+  COMMERCIAL_BUDGET_FACTOR_MAX,
+  COMMERCIAL_BUDGET_FACTOR_MIN,
+  COMMERCIAL_MIN_REPUTATION,
+  COMMERCIAL_MIN_STAFF,
+  COMMERCIAL_PROBABILITY,
   ENQUIRIES_PER_DAY_BY_REPUTATION_TIER,
+  NO_INSURANCE_REASON,
   DEADLINE_DAYS_BASE,
   DEADLINE_DAYS_FACTOR,
   DEADLINE_DAYS_MAX,
@@ -33,6 +39,7 @@ import {
   expireEnquiries,
   expressProbability,
   generateEnquiry,
+  qualifiesForCommercial,
   reachableEnquiries,
   arriveEnquiries,
   refreshBoard,
@@ -44,7 +51,16 @@ import {
 import { labourValueFor, ownerDaysFor } from '../../src/engine/jobs';
 import { tick } from '../../src/engine/index';
 import type { Enquiry, GameState, WorkerRole } from '../../src/engine/index';
-import { buyNow, clearEvents, newGame, nextDay, placeEnquiry } from '../helpers';
+import {
+  act,
+  buyNow,
+  buyStartingKit,
+  choose,
+  clearEvents,
+  newGame,
+  nextDay,
+  placeEnquiry,
+} from '../helpers';
 
 /** Somebody of this role on the books, without the interview: the skew asks only who is hired. */
 function withRole(state: GameState, role: WorkerRole): void {
@@ -614,5 +630,159 @@ describe('the client\'s answer (CLAUDE.md T13 3.24)', () => {
     // team a good one.
     expect(good.some((factor) => factor < 0.95)).toBe(true);
     expect(poor.some((factor) => factor > 1.1)).toBe(true);
+  });
+});
+
+describe('commercial enquiries and the insurance gate (CLAUDE.md T13 3.15)', () => {
+  /** A company of this standing with so many on the books, the board empty. */
+  function known(reputation: number, staff: number): GameState {
+    const state = newGame({ difficulty: 'veryEasy' });
+    state.reputation = reputation;
+    state.website.level = 2;
+    for (let index = 0; index < staff; index += 1) withRole(state, 'joiner');
+    state.workers.forEach((worker, index) => {
+      worker.id = `staff-${index + 1}`;
+    });
+    state.enquiries = [];
+    return state;
+  }
+
+  /** The day 1 kit, a standing above the gate and a joiner: a company commercial work is asked
+   *  of, with the tools to take it. */
+  function equipped(): GameState {
+    const state = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
+    state.reputation = 30;
+    state.website.level = 2;
+    withRole(state, 'joiner');
+    state.enquiries = [];
+    return state;
+  }
+
+  /** A commercial enquiry the day's post drew while the company held no cover. */
+  function commercialOnTheBoard(state: GameState, extra: Partial<Enquiry> = {}): Enquiry {
+    return placeEnquiry(state, {
+      kind: 'commercial',
+      price: 2000,
+      deadlineDays: 60,
+      unreachable: true,
+      blockReason: NO_INSURANCE_REASON,
+      ...extra,
+    });
+  }
+
+  it('is only asked of a company above reputation 20 with somebody on the books', () => {
+    expect(COMMERCIAL_MIN_REPUTATION).toBe(20);
+    expect(COMMERCIAL_MIN_STAFF).toBe(1);
+    expect(qualifiesForCommercial(known(20, 1))).toBe(false);
+    expect(qualifiesForCommercial(known(30, 0))).toBe(false);
+    expect(qualifiesForCommercial(known(30, 1))).toBe(true);
+    for (const [reputation, staff] of [
+      [30, 0],
+      [15, 1],
+    ]) {
+      const drawn = draw(known(reputation ?? 0, staff ?? 0), 300);
+      expect(drawn.length).toBe(300);
+      expect(drawn.every((enquiry) => enquiry.kind === 'residential')).toBe(true);
+    }
+    const drawn = draw(known(30, 1), 1000);
+    const commercial = drawn.filter((enquiry) => enquiry.kind === 'commercial');
+    expect(commercial.length).toBeGreaterThan(0);
+    expect(commercial.length / drawn.length).toBeCloseTo(COMMERCIAL_PROBABILITY, 1);
+  });
+
+  it('is two to three times the residential budget, and the larger work with it', () => {
+    expect([COMMERCIAL_BUDGET_FACTOR_MIN, COMMERCIAL_BUDGET_FACTOR_MAX]).toEqual([2, 3]);
+    const drawn = draw(known(30, 1), 2000);
+    const byTemplate = new Map<string, { residential: number[]; commercial: number[] }>();
+    for (const enquiry of drawn) {
+      const bucket = byTemplate.get(enquiry.templateId) ?? { residential: [], commercial: [] };
+      bucket[enquiry.kind].push(enquiry.budget);
+      byTemplate.set(enquiry.templateId, bucket);
+      // The work is scaled with the budget, so the material and the labour are the job's.
+      expect(enquiry.basePrice).toBeLessThanOrEqual(enquiry.budget);
+      if (enquiry.kind === 'commercial') expect(enquiry.name).toContain(', commercial');
+    }
+    const mean = (values: number[]): number => values.reduce((a, b) => a + b, 0) / values.length;
+    let compared = 0;
+    for (const [templateId, bucket] of byTemplate) {
+      if (bucket.residential.length < 30 || bucket.commercial.length < 30) continue;
+      compared += 1;
+      const ratio = mean(bucket.commercial) / mean(bucket.residential);
+      expect(ratio, templateId).toBeGreaterThan(COMMERCIAL_BUDGET_FACTOR_MIN * 0.9);
+      expect(ratio, templateId).toBeLessThan(COMMERCIAL_BUDGET_FACTOR_MAX * 1.1);
+    }
+    expect(compared).toBeGreaterThan(0);
+  });
+
+  it('arrives greyed with the reason "no insurance" while a cover is missing', () => {
+    const state = equipped();
+    const drawn = draw(state, 400).filter((enquiry) => enquiry.kind === 'commercial');
+    expect(drawn.length).toBeGreaterThan(0);
+    for (const enquiry of drawn) {
+      expect(enquiry.unreachable).toBe(true);
+      expect(enquiry.blockReason).toBe(NO_INSURANCE_REASON);
+      expect(canAccept(state, enquiry)).toEqual({ ok: false, reason: NO_INSURANCE_REASON });
+    }
+    // The greyed ones stand beside the band and are never counted into it.
+    state.enquiries = [];
+    arriveEnquiries(state);
+    expect(reachableEnquiries(state).every((enquiry) => enquiry.kind === 'residential')).toBe(true);
+  });
+
+  it('cannot be taken while greyed, goes live with both covers held, and greys again without', () => {
+    let state = equipped();
+    const enquiry = commercialOnTheBoard(state);
+    state = act(state, { type: 'SET_SPEED', speed: 1 });
+    const onBoard = (): Enquiry | undefined =>
+      state.enquiries.find((entry) => entry.id === enquiry.id);
+    expect(onBoard()?.unreachable).toBe(true);
+    expect(canAccept(state, onBoard() as Enquiry)).toEqual({ ok: false, reason: NO_INSURANCE_REASON });
+    // Accepting while greyed is refused: no offer, no job, nothing paid.
+    const cash = state.cash;
+    state = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+    expect(state.activeEvent).toBeNull();
+    expect(state.jobs).toHaveLength(0);
+    expect(state.cash).toBe(cash);
+    // One cover is not both.
+    state = act(state, { type: 'SET_INSURANCE', cover: 'property', on: true });
+    expect(onBoard()?.unreachable).toBe(true);
+    expect(onBoard()?.blockReason).toBe(NO_INSURANCE_REASON);
+    // Both held: it joins the band and can be taken like any other.
+    state = act(state, { type: 'SET_INSURANCE', cover: 'liability', on: true });
+    expect(onBoard()?.unreachable).toBe(false);
+    expect(onBoard()?.blockReason).toBe('');
+    expect(canAccept(state, onBoard() as Enquiry).ok).toBe(true);
+    // Dropped again: greyed again, with the reason.
+    const dropped = act(state, { type: 'SET_INSURANCE', cover: 'liability', on: false });
+    const again = dropped.enquiries.find((entry) => entry.id === enquiry.id);
+    expect(again?.unreachable).toBe(true);
+    expect(again?.blockReason).toBe(NO_INSURANCE_REASON);
+    // Taken with the covers: the client answers, and the job is commercial.
+    state = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+    expect(state.activeEvent?.kind).toBe('clientOffer');
+    state = choose(state, 'accept');
+    expect(state.jobs[0]?.kind).toBe('commercial');
+    expect(state.jobs[0]?.budget).toBe(2000);
+  });
+
+  it('keeps a kit reason ahead of the insurance one, and never lets the covers lift it', () => {
+    let state = equipped();
+    // An oak table wants the timber machines the hall has not got.
+    const table = commercialOnTheBoard(state, {
+      templateId: 'oakDiningTable',
+      name: 'Oak dining table, commercial',
+      price: 12000,
+      materialKind: 'solidWood',
+      lockReason: 'Needs solid wood tools',
+      byHandAvailable: true,
+      blockReason: 'no timber machines',
+      blockWhere: 'catalogue',
+    });
+    state = act(state, { type: 'SET_INSURANCE', cover: 'property', on: true });
+    state = act(state, { type: 'SET_INSURANCE', cover: 'liability', on: true });
+    const same = state.enquiries.find((entry) => entry.id === table.id);
+    expect(same?.unreachable).toBe(true);
+    expect(same?.blockReason).toBe('no timber machines');
+    expect(same?.blockWhere).toBe('catalogue');
   });
 });
