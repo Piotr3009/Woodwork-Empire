@@ -4,6 +4,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { renderDayEnd, renderDaySummary } from '../../src/ui/dayEnd';
+import { signedMoney } from '../../src/ui/modal';
 import { renderMenu } from '../../src/ui/topbar';
 import { currentState, mount } from '../../src/ui/app';
 import { daySummaryOf, formatMoney, summaryOfDay, tick } from '../../src/engine/index';
@@ -138,12 +139,15 @@ describe('a week at the weekly cadence', () => {
       row.querySelector('.row-main')?.textContent,
       row.querySelector('.row-figure')?.textContent,
     ]);
+    // The three signed lines carry their sign and its colour (CLAUDE.md T13 3.1); the balance
+    // is plain.
     expect(figures).toEqual([
-      ['In', formatMoney(week.income)],
-      ['Out', formatMoney(-week.costs)],
-      ['Net', formatMoney(week.income - week.costs)],
+      ['In', signedMoney(week.income)],
+      ['Out', signedMoney(-week.costs)],
+      ['Net', signedMoney(week.income - week.costs)],
       ['In the bank', formatMoney(friday.cash)],
     ]);
+    expect(money?.querySelector('.row-figure .bad')?.textContent).toBe(signedMoney(-week.costs));
     // And they are not the day's, which is the whole point of the cadence.
     expect(formatMoney(week.costs)).not.toBe(formatMoney(friday.finance.day.costs));
     // The owner's minutes and the day's work are a day's figures whatever the cadence, and the

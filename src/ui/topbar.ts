@@ -219,6 +219,9 @@ export function renderTopbar(
       false,
     ) +
     pushButton('toggleMenu', 'Menu', '', false) +
+    // The gear: the settings, which tonight are tips on and off (CLAUDE.md T13 3.22).
+    '<button class="push gear" data-do="openSettings" title="Settings" aria-label="Settings">' +
+    '&#9881;</button>' +
     '</div>' +
     '</div>'
   );
@@ -235,6 +238,10 @@ export function renderMenu(state: GameState, cloud: MenuCloud): string {
     : '<button class="btn" disabled title="Already a day off">Stay home today</button>';
   return (
     '<div class="menu-pop">' +
+    // The menu shuts on a click outside it and on this cross; it did neither before (PIOTR;
+    // CLAUDE.md T13 3.1).
+    '<button class="menu-close" data-do="closeMenu" title="Close" aria-label="Close">' +
+    '×</button>' +
     '<button class="btn" data-do="endDay">End day</button>' +
     stayHome +
     `<button class="btn" data-do="toggleWhy">${

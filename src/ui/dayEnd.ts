@@ -11,7 +11,7 @@ import {
   summaryOfDay,
 } from '../engine/index';
 import type { DaySummary, GameState, SummaryCadence } from '../engine/index';
-import { days, escapeHtml, minutes, money, plural } from './modal';
+import { days, escapeHtml, minutes, money, plural, signedFigure, signedMoney } from './modal';
 
 /** The three cadences in the words the player reads, in the order they are offered. */
 const CADENCES: Array<[SummaryCadence, string]> = [
@@ -90,9 +90,11 @@ export function renderDaySummary(
     rate +
     '</div>' +
     `<div class="col"><h3>Money ${escapeHtml(label)}</h3>` +
-    row('In', money(summary.income)) +
-    row('Out', money(-summary.costs)) +
-    row('Net', money(net)) +
+    // The three signed lines wear their sign's colour, like every plus and minus in the game
+    // (CLAUDE.md T13 3.1); the balance is a balance and wears none.
+    signedRow('In', summary.income) +
+    signedRow('Out', -summary.costs) +
+    signedRow('Net', net) +
     row('In the bank', money(summary.cash)) +
     '</div>' +
     `<div class="col"><h3>The hall, day ${summary.day}</h3>` +
@@ -136,6 +138,15 @@ function row(label: string, value: string): string {
   return (
     `<div class="row"><span class="row-main">${escapeHtml(label)}</span>` +
     `<span class="row-figure">${escapeHtml(value)}</span></div>`
+  );
+}
+
+/** A money line whose sign is the point of it: in is green, out is red, nothing is plain, through
+ *  the one helper every signed figure goes through (CLAUDE.md T13 3.1). */
+function signedRow(label: string, value: number): string {
+  return (
+    `<div class="row"><span class="row-main">${escapeHtml(label)}</span>` +
+    `<span class="row-figure">${signedFigure(signedMoney(value), value)}</span></div>`
   );
 }
 
