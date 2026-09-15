@@ -9,6 +9,9 @@ import {
   ESTIMATOR_JOBS_WITH_JOINERY_CORE,
   ESTIMATOR_RATES,
   JOINERY_CORE_EXTENSION_JOBS,
+  JOINERY_CORE_EXTENSION_PRICE_YEARLY,
+  JOINERY_CORE_MAX_EXTENSIONS,
+  JOINERY_CORE_PRICE_YEARLY,
   UNLOAD_MINUTES_BY_HANDLING,
   BAG_CHANGE_MINUTES,
   CLIENT_MEETING_MINUTES,
@@ -42,7 +45,7 @@ import { DAY_END_MINUTE } from './constants';
 import { isBreak, nextWorkingDay, weekOfDay } from './clock';
 import { has } from './machines';
 import { canUnload } from './materials';
-import { ownerIsAvailable } from './owner';
+import { managerOnDuty, ownerIsAvailable } from './owner';
 import { makeId } from './rng';
 import { plural } from './text';
 import { hasWorkingDay, helperOnDuty, isWorkingToday, joiners, staffMinutesLeft } from './staff';
@@ -126,6 +129,11 @@ const TASK_DEFINITIONS: Record<TaskKind, TaskDefinition> = {
 /** Every kind of task the runner knows about, off the runner's own table. The one list: a test
  *  that asks "every kind of task in the game" asks this and not the table it is checking. */
 export const TASK_KINDS: ReadonlyArray<TaskKind> = Object.keys(TASK_DEFINITIONS) as TaskKind[];
+
+// T13-C1: move to constants.ts
+/** What the button on a material take off says: the task is the take off, the click creates the
+ *  list (PIOTR; CLAUDE.md T13 3.8). The laptop's task row reads it (a note for phase C). */
+export const TAKE_OFF_BUTTON_LABEL = 'Create material list';
 
 /** Which of the seven bands of the owner's day a task falls in. Every kind of task in the game
  *  is on this one table, so a minute cannot be workshop time on the bar and office time in the
@@ -243,11 +251,55 @@ export function equipmentUnloadMinutes(state: GameState): number {
   return Math.round(EQUIPMENT_UNLOAD_MINUTES * unloadFactor(state));
 }
 
-/** Take offs an estimator does in a day: five, ten with Joinery Core, and five more per extension
- *  (PIOTR; CLAUDE.md T13 3.8). */
+/** Take offs an estimator does in a day: five, ten with Joinery Core, and five more per extension,
+ *  at most two of them (PIOTR; CLAUDE.md T13 3.8). The jump from five to ten is the one that is
+ *  meant to be felt. */
 export function estimatorCapacity(state: GameState): number {
   if (!state.software.joineryCore) return ESTIMATOR_JOBS_PER_DAY;
-  return ESTIMATOR_JOBS_WITH_JOINERY_CORE + state.software.joineryCoreExtensions * JOINERY_CORE_EXTENSION_JOBS;
+  const extensions = Math.min(JOINERY_CORE_MAX_EXTENSIONS, state.software.joineryCoreExtensions);
+  return ESTIMATOR_JOBS_WITH_JOINERY_CORE + extensions * JOINERY_CORE_EXTENSION_JOBS;
+}
+
+/** What the Technical tab says about Joinery Core: whether it is on the laptop, what it and its
+ *  extensions do to the estimator's day, what each costs a year, and whether the two buttons can
+ *  be pressed (CLAUDE.md T13 3.8). The refusals are the ones the action applies. */
+export interface JoineryCoreOffer {
+  held: boolean;
+  extensions: number;
+  maxExtensions: number;
+  /** Take offs a day as things stand. */
+  capacity: number;
+  baseCapacity: number;
+  coreCapacity: number;
+  extensionJobs: number;
+  yearlyPrice: number;
+  extensionYearlyPrice: number;
+  core: { ok: boolean; reason: string };
+  extension: { ok: boolean; reason: string };
+}
+
+export function joineryCoreOffer(state: GameState): JoineryCoreOffer {
+  const held = state.software.joineryCore;
+  const extensions = Math.min(JOINERY_CORE_MAX_EXTENSIONS, state.software.joineryCoreExtensions);
+  let core = { ok: true, reason: '' };
+  if (held) core = { ok: false, reason: 'On the laptop' };
+  else if (!has(state, 'laptop')) core = { ok: false, reason: 'Needs the laptop' };
+  let extension = { ok: true, reason: '' };
+  if (!held) extension = { ok: false, reason: 'Joinery Core first' };
+  else if (extensions >= JOINERY_CORE_MAX_EXTENSIONS) extension = { ok: false, reason: 'Both extensions bought' };
+  return {
+    held,
+    extensions,
+    maxExtensions: JOINERY_CORE_MAX_EXTENSIONS,
+    capacity: estimatorCapacity(state),
+    baseCapacity: ESTIMATOR_JOBS_PER_DAY,
+    coreCapacity: ESTIMATOR_JOBS_WITH_JOINERY_CORE,
+    extensionJobs: JOINERY_CORE_EXTENSION_JOBS,
+    yearlyPrice: JOINERY_CORE_PRICE_YEARLY,
+    extensionYearlyPrice: JOINERY_CORE_EXTENSION_PRICE_YEARLY,
+    core,
+    extension,
+  };
 }
 
 /** Emails a job carries: 1 up to 3000, 2 up to 10000, 3 up to 20000, then one more for every
@@ -266,6 +318,13 @@ export function emailMinutes(): number {
 
 export function staffManagementMinutes(state: GameState): number {
   return joiners(state).length * STAFF_MANAGEMENT_MINUTES_PER_JOINER;
+}
+
+/** Whose day the assigning comes off: the production manager's from the day he is in, and the
+ *  owner's until then (CLAUDE.md T13 3.9). The one answer the team page and the day meters
+ *  agree on. */
+export function staffManagementTaker(state: GameState): 'owner' | 'manager' {
+  return managerOnDuty(state) ? 'manager' : 'owner';
 }
 
 // ---------------------------------------------------------------------------

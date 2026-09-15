@@ -9,17 +9,21 @@ import {
   DRAFTSMAN_RATE,
   DRAFTSMAN_REPUTATION,
   HIRING_SPECS,
+  JOINERY_CORE_PRICE_YEARLY,
 } from '../../src/engine/constants';
 import { hiringOptions, openJobs } from '../../src/engine/index';
 import { canHire, hasWorkingDay } from '../../src/engine/staff';
 
 import { jobTasks, taskWorkRate } from '../../src/engine/tasks';
 import { renderTeam, tradeOf } from '../../src/ui/team';
+import { money } from '../../src/ui/modal';
 import { officeDoor } from '../../src/render/hall';
 import { MODAL_IS_FULL } from '../../src/ui/app';
 import type { GameState, Worker } from '../../src/engine/index';
 import {
   acceptNow,
+  act,
+  buyStartingKit,
   clearEvents,
   firstJob,
   hireNow,
@@ -209,5 +213,28 @@ describe('the draftsman', () => {
     const later = clearEvents(runClock(hired, 10));
     const after = jobTasks(later, firstJob(later).id).find((task) => task.kind === 'design');
     expect(before - (after?.minutesRemaining ?? 0)).toBeCloseTo(10 * DRAFTSMAN_RATE, 6);
+  });
+});
+
+describe('the Technical tab (CLAUDE.md T13 3.8)', () => {
+  it('sells Joinery Core beside the estimator, with the capacity and the yearly prices', () => {
+    const state = buyStartingKit(known());
+    const page = parse(renderTeam(state, 'technical'));
+    expect(page.querySelectorAll('[data-do="buyJoineryCore"]')).toHaveLength(1);
+    expect(page.textContent).toContain('5 a day, 10 with Joinery Core');
+    expect(page.textContent).toContain(`${money(JOINERY_CORE_PRICE_YEARLY)} a year`);
+    // The extension waits for the core: a reason, not a button.
+    expect(page.querySelectorAll('[data-do="buyJoineryCoreExtension"]')).toHaveLength(0);
+    expect(page.textContent).toContain('Joinery Core first');
+    const bought = parse(renderTeam(act(state, { type: 'BUY_JOINERY_CORE' }), 'technical'));
+    expect(bought.querySelectorAll('[data-do="buyJoineryCore"]')).toHaveLength(0);
+    expect(bought.querySelectorAll('[data-do="buyJoineryCoreExtension"]')).toHaveLength(1);
+    expect(bought.textContent).toContain('10 take offs a day');
+  });
+
+  it('says so when there is no laptop to put it on', () => {
+    const page = parse(renderTeam(known(), 'technical'));
+    expect(page.querySelectorAll('[data-do="buyJoineryCore"]')).toHaveLength(0);
+    expect(page.textContent).toContain('Needs the laptop');
   });
 });
