@@ -2842,7 +2842,16 @@ input.num {
 .crew-limit { font-weight: 600; margin: 4px 0 8px; }
 .shift-control .row-action { display: flex; gap: 6px; }
 .shift-chip { min-width: 56px; }
-.day-meter { font-variant-numeric: tabular-nums; }
+.crew-day { font-variant-numeric: tabular-nums; }
+/* A badge on the cream of a folder: the held rung of a ladder reads in the game's green. */
+.badge-held {
+  background: var(--good);
+  border-color: var(--good);
+  color: #f5efe2;
+}
+.row.is-on-contract .row-main {
+  font-weight: 600;
+}
 .house-card { width: 100%; text-align: center; }
 .house-picture { display: block; width: 100%; height: auto; border-radius: 6px; }
 .house-name { margin: 8px 0 2px; font-weight: 600; }

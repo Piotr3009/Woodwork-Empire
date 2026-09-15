@@ -60,6 +60,18 @@ export function teamTabFrom(value: string): TeamTab {
   return found ? found[0] : 'workshop';
 }
 
+/** What a role is called on a crew row: plain English, never the engine key (CLAUDE.md 3). */
+const ROLE_WORDS: Record<WorkerRole, string> = {
+  joiner: 'joiner',
+  helper: 'helper',
+  officeAdmin: 'office admin',
+  purchasingClerk: 'purchasing clerk',
+  salesman: 'salesman',
+  draftsman: 'draftsman',
+  estimator: 'estimator',
+  productionManager: 'production manager',
+};
+
 /** Which trade a role belongs to. The one table: the tabs and the tiles read it, and a role that
  *  is not on it is not hired from this board at all. */
 const TRADE_OF_ROLE: Record<WorkerRole, TeamTab> = {
@@ -166,7 +178,7 @@ function dayMeterLine(worker: Worker): string {
   const text = parts
     .map((part) => `${DAY_CATEGORY_LABELS[part.category]} ${minutes(part.minutes)}`)
     .join(' · ');
-  return `<span class="row-figure day-meter">Today: ${escapeHtml(text)}</span>`;
+  return `<span class="row-figure crew-day">Today: ${escapeHtml(text)}</span>`;
 }
 
 /** The crew of one trade, as a row each: who he is, what he is doing and what he costs. */
@@ -198,7 +210,7 @@ function crewRows(state: GameState, tab: TeamTab): string {
         : '';
       return (
         `<div class="row" data-crew="${worker.id}" data-shift="${shiftOf(state, worker)}">` +
-        `<span class="row-main">${escapeHtml(worker.name)}, ${escapeHtml(worker.role)}` +
+        `<span class="row-main">${escapeHtml(worker.name)}, ${escapeHtml(ROLE_WORDS[worker.role])}` +
         `${worker.tier === null ? '' : ` (${worker.tier})`}</span>` +
         `<span class="row-figure">${escapeHtml(doing)}</span>` +
         tired +

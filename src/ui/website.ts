@@ -48,7 +48,7 @@ function costsLine(rung: WebsiteRung): string {
 
 /** The one control of a rung: Held, Outgrown, or Buy at the level's price. */
 function action(rung: WebsiteRung): string {
-  if (rung.held) return '<span class="badge">Held</span>';
+  if (rung.held) return '<span class="badge badge-held">Held</span>';
   if (rung.outgrown) return reasonLabel('Outgrown');
   const label = `Buy, ${money(rung.spec.price)}`;
   if (!rung.check.ok) return lockedButton(label, rung.check.reason);

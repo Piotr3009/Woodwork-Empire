@@ -52,7 +52,7 @@ function levelCard(state: GameState, spec: SecurityLevelSpec): string {
   const check = securityCheck(state, spec.level);
   const label = spec.level > state.security.level ? 'Buy' : 'Go back to this';
   const action = held
-    ? '<span class="badge">Held</span>'
+    ? '<span class="badge badge-held">Held</span>'
     : check.ok
       ? button('setSecurityLevel', label, `data-id="${spec.level}"`)
       : lockedButton(label, check.reason);

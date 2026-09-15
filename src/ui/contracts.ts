@@ -88,7 +88,7 @@ function peopleRows(state: GameState, contract: Contract): string {
           : lockedButton('Put on it', check.reason);
       const doing = on ? 'on the contract' : worker.jobId === null ? 'free' : 'on a job';
       return (
-        `<div class="row${on ? ' is-running' : ''}"><span class="row-main">${escapeHtml(worker.name)}</span>` +
+        `<div class="row${on ? ' is-on-contract' : ''}"><span class="row-main">${escapeHtml(worker.name)}</span>` +
         `<span class="row-figure">${escapeHtml(doing)}</span>` +
         `<span class="row-action">${control}</span></div>`
       );

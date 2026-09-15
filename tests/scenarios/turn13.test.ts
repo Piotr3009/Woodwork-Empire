@@ -8,6 +8,8 @@ import { CAREFUL, IDLE, type Policy, playDay, playUntilDay } from './autopilot';
 import { act, buyNow, buyStartingKit, clearEvents, connectAll, newGame, runToDay } from '../helpers';
 import {
   BURGLARY_PAYOUT_DAYS,
+  DUST_OUTPUT_M3_PER_HOUR,
+  EQUIPMENT_SPECS,
   CONTRACT_RENEW_FULL_WEEK,
   CONTRACT_RENEW_SHORT_WEEK,
   CONTRACT_SHORT_WEEK_REPUTATION,
@@ -22,16 +24,22 @@ import {
   SHEET_VALUE,
 } from '../../src/engine/constants';
 import {
+  MONTH_LINES,
   burgle,
   claimBurglary,
   drawContract,
+  dustOutputOf,
   extractionCheck,
+  extractionDemandOf,
   extractionLoad,
   freeFloorM2,
   freeSheets,
   hasGate,
   isWorkingDay,
   managerOnDuty,
+  monthOfDay,
+  monthReport,
+  unservedMachines,
   weekOfDay,
   onHoliday,
   outputFactorOf,
@@ -427,5 +435,79 @@ describe('(x) a thicknesser and two saws on one extractor, with gates on the saw
     // Nothing in the hall was left unserved: every machine that wants a pipe has one.
     expect(month.equipment.filter((item) => item.specId === 'tableSaw' || item.specId === 'thicknesser')
       .every((item) => month.pipes.some((run) => run.equipmentId === item.id))).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The cross check of CLAUDE.md T13 section 10, asserted where a scenario can assert it
+// ---------------------------------------------------------------------------
+
+describe('10.1 one model of dust: a pipe changes connection and nothing else', () => {
+  let state = buyStartingKit(newGame({ seed: SEED, difficulty: 'veryEasy' }));
+  state = buyNow(state, 'thicknesser', 'standard');
+  state = connectAll(state);
+  const thicknesser = machinesOf(state, 'thicknesser')[0];
+  if (!thicknesser) throw new Error('no thicknesser');
+  const running = (base: GameState): GameState => {
+    const next = JSON.parse(JSON.stringify(base)) as GameState;
+    for (const item of next.equipment) item.takenBy = item.id === thicknesser.id ? 'owner' : null;
+    return next;
+  };
+
+  it('counts an unconnected machine as not served, and a connected one as served', () => {
+    const connected = running(state);
+    expect(unservedMachines(connected)).toEqual([]);
+    const served = extractionCheck(connected);
+    const cut = running({ ...state, pipes: state.pipes.filter((run) => run.equipmentId !== thicknesser.id) });
+    expect(unservedMachines(cut).map((item) => item.id)).toEqual([thicknesser.id]);
+    const unserved = extractionCheck(cut);
+    expect(unserved.short).toBe(true);
+    // The pipe moved nothing in the sums but the connection: the same demand either way, and
+    // the fan's allowance is the fan's whether the machine is on it or not.
+    expect(unserved.allowed).toBe(served.allowed);
+    // The used saw is connected and ungated, so its branch is open and it counts with the
+    // thicknesser whenever the fan runs (CLAUDE.md T13 3.11).
+    const saw = machinesOf(state, 'tableSaw')[0];
+    if (!saw) throw new Error('no saw');
+    expect(served.demand).toBe(extractionDemandOf(thicknesser) + extractionDemandOf(saw));
+  });
+
+  it('makes the same dust connected or not: the family figure, never the class or the gate', () => {
+    for (const item of state.equipment) {
+      expect(dustOutputOf(item.specId)).toBe(DUST_OUTPUT_M3_PER_HOUR[item.specId] ?? 0);
+    }
+    const gated = act(state, { type: 'BUY_GATE', equipmentId: thicknesser.id });
+    expect(gated.gates).toContain(thicknesser.id);
+    expect(dustOutputOf(thicknesser.specId)).toBe(DUST_OUTPUT_M3_PER_HOUR.thicknesser);
+    // No class of any family carries a dust figure of its own.
+    for (const spec of EQUIPMENT_SPECS) {
+      for (const variant of spec.variants) expect(variant).not.toHaveProperty('dust');
+    }
+  });
+});
+
+describe('10.2 one ledger: the month end lines sum to the cash delta of every played month', () => {
+  const months: Array<[string, GameState]> = [
+    ['Easy, careful, two months', playUntilDay(newGame({ seed: SEED, difficulty: 'easy' }), 62, CAREFUL)],
+    ['Hard, idle, one month', playUntilDay(newGame({ seed: SEED, difficulty: 'hard' }), 32, IDLE)],
+    [
+      'Very easy, a joiner and a loan, one month',
+      playUntilDay(
+        act(newGame({ seed: SEED, difficulty: 'veryEasy' }), { type: 'TAKE_LOAN', amount: 5000 }),
+        32,
+        { ...CAREFUL, hireJoiner: true },
+      ),
+    ],
+  ];
+
+  it('holds for each month of each of them', () => {
+    for (const [name, state] of months) {
+      const last = monthOfDay(state.clock.day - 1);
+      for (let month = 1; month <= last; month += 1) {
+        const report = monthReport(state, month);
+        expect(report.cashClose - report.cashOpen, `${name}, month ${month}`).toBeCloseTo(report.net, 1);
+        expect(report.lines.map((line) => line.id), name).toEqual(MONTH_LINES.map((line) => line.id));
+      }
+    }
   });
 });

@@ -101,7 +101,7 @@ describe('the second shift on the team page', () => {
     pm.dayLog = [{ category: 'assign', minutes: 30 }];
     state.workers.push(pm);
     const page = parse(renderTeam(state, 'management'));
-    expect(page.querySelector('.day-meter')?.textContent).toContain('Assigning 30 min');
+    expect(page.querySelector('.crew-day')?.textContent).toContain('Assigning 30 min');
     expect(page.textContent).toContain('The production manager assigns the crew');
     // Without him the same minutes are the owner's.
     const alone = parse(renderTeam(sixJoinersOnSheetWork(), 'workshop'));
