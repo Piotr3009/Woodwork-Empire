@@ -290,9 +290,10 @@ export function ductDrop(system: string, item: Equipment): string {
   );
 }
 
-/** The door in the office block's face, as a control: the Team board is behind it
- *  (CLAUDE.md T10 3.6). The face is the one the hall is on, and the door is centred in it, which
- *  is the same box the room's own lettering is measured from. */
+/** The door in the office block's face, as a control: it walks into the office, the same as the
+ *  top bar's Office button (PIOTR, 15.09; CLAUDE.md T14 2.3). The face is the one the hall is on,
+ *  and the door is centred in it, which is the same box the room's own lettering is measured
+ *  from. */
 export function officeDoor(room: {
   x: number;
   y: number;
@@ -311,7 +312,7 @@ export function officeDoor(room: {
   ];
   return (
     '<g data-door="office" class="clickable office-door">' +
-    '<title>The team</title>' +
+    '<title>To the office</title>' +
     `<polygon points="${points(shape)}" class="door-hit" />` +
     '</g>'
   );

@@ -1192,11 +1192,7 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
       dispatch({ type: 'SKIP_AHEAD' });
       return;
     case 'setView':
-      ui.view = element.dataset.view === 'office' ? 'office' : 'hall';
-      if (ui.view !== 'hall') endSetup();
-      // Walking out of the hall and back in shows the whole hall again
-      // [TUNE: reset or remember; REPORT-T6 says which was chosen].
-      resetCamera();
+      walkTo(element.dataset.view === 'office' ? 'office' : 'hall');
       break;
     case 'zoomFit':
       fitCamera();
@@ -1265,7 +1261,7 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
     case 'officeRegion': {
       const region = element.dataset.office ?? '';
       if (region === 'door') {
-        ui.view = 'hall';
+        walkTo('hall');
         break;
       }
       const modal = OFFICE_REGION_MODALS[region];
@@ -1513,7 +1509,7 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
     case 'startProduction':
       // Straight to the bench: the laptop closes and the hall comes up (CLAUDE.md T2 3.3).
       shutModal();
-      ui.view = 'hall';
+      walkTo('hall');
       dispatch({ type: 'WORK_HERE', jobId: id });
       return;
     case 'payArrears': {
@@ -1770,12 +1766,22 @@ function copyState(): void {
   setNote('State copied as JSON.');
 }
 
+/** The one way between the hall and the office: the top bar's button, the office block and its
+ *  door in the hall, and the door of the room itself all come through here (CLAUDE.md T14 2.3).
+ *  Leaving the hall ends setting it out, and walking out and back in shows the whole hall again
+ *  [TUNE: reset or remember; REPORT-T6 says which was chosen]. */
+function walkTo(view: 'hall' | 'office'): void {
+  ui.view = view;
+  if (view !== 'hall') endSetup();
+  resetCamera();
+  requestRender();
+}
+
 /** Walking into a room. The office is a view of its own; the other two are a line under the
  *  hall (CLAUDE.md T6 3.1). */
 function handleRoomClick(room: RoomId): void {
   if (room === 'office') {
-    ui.view = 'office';
-    resetCamera();
+    walkTo('office');
   } else if (room === 'wc') {
     setNote(roomById('wc').tooltip);
   } else {
@@ -1787,9 +1793,11 @@ function handleRoomClick(room: RoomId): void {
 function handleSceneClick(element: DataElement): boolean {
   // In setup mode a click on the kit is a drag, not a question about the bag.
   if (ui.setup) return true;
-  // The office door of the hall: the team is behind it (CLAUDE.md T10 3.6).
+  // The office door of the hall walks into the office, exactly as the top bar's Office button
+  // does and through the same function (PIOTR, 15.09; CLAUDE.md T14 2.3). The team is on the
+  // laptop's Office tile.
   if (element.dataset.door === 'office') {
-    openModal('team');
+    walkTo('office');
     return true;
   }
   const van = element.dataset.van;
