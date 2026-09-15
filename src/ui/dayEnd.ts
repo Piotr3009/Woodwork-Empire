@@ -2,6 +2,7 @@
 
 import {
   DAY_CATEGORY_LABELS,
+  HOUSE_TIER_NAMES,
   cubicMetres,
   dayPercentages,
   daySummaryOf,
@@ -9,6 +10,7 @@ import {
   earnedRate,
   efficiencyOf,
   formatReputation,
+  houseTierFor,
   summaryOfDay,
 } from '../engine/index';
 // T13-C1: export from index.ts
@@ -68,7 +70,7 @@ function dayPlate(summary: DaySummary): string {
  *  out of the record the engine wrote when that day closed (CLAUDE.md T6 3.9). */
 export function renderDaySummary(
   summary: DaySummary,
-  options: { earnedRate?: number; cadence?: string } = {},
+  options: { earnedRate?: number; cadence?: string; houseLine?: string } = {},
 ): string {
   const used = summary.minutesByCategory;
   const jobs = summary.jobsCompleted.map((name) => escapeHtml(name)).join(', ');
@@ -99,6 +101,9 @@ export function renderDaySummary(
     signedRow('Out', -summary.costs) +
     signedRow('Net', net) +
     row('In the bank', money(summary.cash)) +
+    // What the money has bought him: the house tier, off the thirty days of draw actually paid
+    // (CLAUDE.md T13 3.18). The evening knows it; a past day's record does not carry it.
+    (options.houseLine === undefined ? '' : row('Home', options.houseLine)) +
     '</div>' +
     `<div class="col"><h3>The hall, day ${summary.day}</h3>` +
     row('Jobs moved on', String(summary.jobsAdvanced)) +
@@ -126,7 +131,14 @@ export function renderDayEnd(state: GameState): string {
   return renderDaySummary(summaryOfDay(state, state.clock.day) ?? daySummaryOf(state), {
     earnedRate: earnedRate(state, 'day'),
     cadence: cadenceControl(state),
+    houseLine: houseLineFor(state),
   });
+}
+
+/** The house the owner sleeps in tonight, in the words of the tier table: the engine works the
+ *  tier out from the ledger, and this prints its name (CLAUDE.md T13 3.18). */
+export function houseLineFor(state: GameState): string {
+  return HOUSE_TIER_NAMES[houseTierFor(state) - 1] ?? HOUSE_TIER_NAMES[0] ?? '';
 }
 
 /** "73%, mostly no machine free": the number, and the cause that took the most of what was lost

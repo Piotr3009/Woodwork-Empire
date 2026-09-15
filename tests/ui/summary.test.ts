@@ -3,7 +3,7 @@
 // player asked for, and only the modal is skipped (CLAUDE.md T4 3.6).
 
 import { describe, expect, it } from 'vitest';
-import { renderDayEnd, renderDaySummary } from '../../src/ui/dayEnd';
+import { houseLineFor, renderDayEnd, renderDaySummary } from '../../src/ui/dayEnd';
 import { signedMoney } from '../../src/ui/modal';
 import { renderMenu } from '../../src/ui/topbar';
 import { currentState, mount } from '../../src/ui/app';
@@ -146,6 +146,8 @@ describe('a week at the weekly cadence', () => {
       ['Out', signedMoney(-week.costs)],
       ['Net', signedMoney(week.income - week.costs)],
       ['In the bank', formatMoney(friday.cash)],
+      // And what the money has bought him, off the ledger (CLAUDE.md T13 3.18).
+      ['Home', houseLineFor(friday)],
     ]);
     expect(money?.querySelector('.row-figure .bad')?.textContent).toBe(signedMoney(-week.costs));
     // And they are not the day's, which is the whole point of the cadence.
