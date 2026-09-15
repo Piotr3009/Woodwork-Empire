@@ -76,20 +76,54 @@ fence, cast iron top, painted steel base, extraction hood at the back. Footprint
 
 ## 7. Missing character frames
 
-The code side lists every state the character system can be in and the frame key it wants
-(CLAUDE.md T13 3.23). A missing frame falls back to `idle` rather than to nothing. What the roles
-on `main` are missing, as the code reads the delivered manifests:
+The states the character system can be in, the frame key each wants, and what is delivered on
+this branch, read off `public/sprites/manifest.json` and `public/sprites/characters.json` by
+phase C (CLAUDE.md T13 3.23). A missing sheet falls back to `idle` playing, then to the first
+frame of `walk` standing, then to the capsule the game has always drawn (`playableAnimation` in
+`src/render/characters.ts`). A `home` sheet is not wanted: the figure is off the floor.
 
-- `character.owner.*`: `walk`, `idle`, `bench`, `carry` (only `phone` exists tonight).
-- `character.helper.*`: everything (`walk`, `idle`, `bench`, `carry`).
-- `character.officeAdmin.*`, `character.purchasingClerk.*`, `character.salesman.*`,
-  `character.draftsman.*`: everything, though an office role never leaves the office block, so
-  `idle` alone would do for each.
-- `character.joiner.phone`: not wanted, a joiner never takes a call.
-- `home`: no sheet is wanted; the state exists so a figure going home is drawn as `idle` walking
-  off the floor.
+| State | Frame key | How it is drawn |
+|---|---|---|
+| idle | `character.<role>.idle` | two frames at 1 fps |
+| walk, four directions | `character.<role>.walk` | eight frames; one row per facing (sw, se, nw, ne), a missing row mirrored from its opposite |
+| work at a station (bench or machine) | `character.<role>.bench` | eight frames |
+| carry (gate or rack) | `character.<role>.carry` | eight frames |
+| phone | `character.<role>.phone` | eight frames |
+| home | none | the figure is off the floor; no sheet is wanted |
 
-The report's section on frames lists the same, updated by phase C from the code.
+| Role | idle | walk | bench | carry | phone |
+|---|---|---|---|---|---|
+| owner | delivered | delivered | delivered | delivered | delivered |
+| joiner | delivered | delivered | delivered | delivered | not wanted (a joiner takes no call) |
+| helper | missing | missing | missing | missing | not wanted |
+| officeAdmin | missing | missing (office only: idle would do) | not wanted | not wanted | not wanted |
+| purchasingClerk | missing | missing (office only: idle would do) | not wanted | not wanted | not wanted |
+| salesman | missing | missing (office only: idle would do) | not wanted | not wanted | wanted later, he sells on the phone |
+| draftsman | missing | missing (office only: idle would do) | not wanted | not wanted | not wanted |
+| estimator | missing | missing (office only: idle would do) | not wanted | not wanted | not wanted |
+| productionManager | missing | missing | missing (he stands at a machine to connect it) | not wanted | missing (he covers the owner, who takes calls) |
+
+The helper's `carry` and `walk` matter most: he unloads, empties the bags and cleans. The
+manager wants a hi vis over a shirt, the estimator office clothes with a tablet (section 5).
+
+## 7a. How the code places the pipe tiles and the collar
+
+`pipeCellArt` in `src/render/hall.ts` places a pipe file with its centre on the centre of the
+cell lifted by 3 m, in a box one cell wide and a cell and a half high (48 by 72 at 1x, 96 by
+144 in the file), so a tile is drawn at that size and anchored at its centre. The elbows are
+named by their arms: `pipe.ne` joins a north arm (world minus y, up right on screen) to an east
+arm (world plus x, down right on screen). The drop is the vertical from the run down to the
+machine's port, with the run's arm towards the next cell on it; the inlet is the run's last
+cell turning down into the unit. The collar (`gate.collar`) sits on the drop cell, half a cell
+wide, at the same height and anchor. Every one of them is on the sprite check page under "The
+pipe layer" as a placeholder until the file lands.
+
+## 7b. The pallet, the pallet truck and the spindle moulder, as placed
+
+The pallet (`pallet`, file `pallet.png`) is placed by `spriteBox` like every 1 by 1 by 1 object,
+so the file lands on the same anchor; the lorry (`deliveryVan`) is no longer drawn. The spindle
+moulder's footprints off the ladder: used, budget and standard 2 by 1 by 1 m; pro 3 by 1 by 1 m;
+industrial 3 by 2 by 1.2 m, the industrial one heavier, with a power feed.
 
 ## 8. Stock thumbnails
 
