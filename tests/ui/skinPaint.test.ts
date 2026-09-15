@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
-// The paint of the two families, and the hover rectangles of the office room. "The white squares
-// on the laptop and the door still show" (PIOTR, 15.09; CLAUDE.md T11 3.5).
+// The paint of the two families, and the regions of the office room at rest. "The white squares
+// on the laptop and the door still show" (PIOTR, 15.09; CLAUDE.md T11 3.5), and from Turn 14 no
+// rectangle of any kind lights up on the pointer either (CLAUDE.md T14 2.2).
 
 import { readFileSync } from 'node:fs';
 import { beforeAll, describe, expect, it } from 'vitest';
@@ -42,7 +43,7 @@ beforeAll(() => {
   click('[data-do="setView"][data-view="office"]');
 });
 
-describe('the hover rectangles of the office room', () => {
+describe('the regions of the office room', () => {
   it('has no fill at all and no border at rest, in the computed style', () => {
     const region = root().querySelector('.office-region');
     if (!(region instanceof HTMLElement)) throw new Error('no office region');
@@ -55,19 +56,20 @@ describe('the hover rectangles of the office room', () => {
     expect(style.outline).toBe('2px solid transparent');
   });
 
-  it('puts a 2 px orange outline with a 4 px radius on the hover, and nothing else', () => {
+  it('keeps the transparent outline at rest and the accent ring for the keyboard only', () => {
     const rest = ruleBody('.office-region');
     expect(rest).toContain('background: transparent;');
     expect(rest).toContain('outline: 2px solid transparent;');
     expect(rest).toContain('border-radius: 4px;');
-    const hover = ruleBody('.office-region:hover,\n.office-region:focus-visible');
-    expect(hover).toContain('outline-color: var(--accent);');
-    expect(hover).toContain('background: transparent;');
+    // The orange outline of Turn 11 is gone from the pointer (PIOTR, 15.09; CLAUDE.md T14 2.2);
+    // the ring stays on :focus-visible alone, because the keyboard has nothing else.
+    expect(CSS).not.toContain('.office-region:hover,\n.office-region:focus-visible');
+    expect(ruleBody('.office-region:focus-visible')).toContain('outline-color: var(--accent);');
     // The white box of Turn 10 is gone, everywhere in the stylesheet.
     expect(CSS).not.toContain('rgb(255 255 255 / 12%)');
   });
 
-  it('writes nothing about the hover into the markup', () => {
+  it('writes nothing about the pointer into the markup', () => {
     const page = root().innerHTML;
     expect(page).not.toContain('is-hover');
     for (const region of Array.from(root().querySelectorAll('[data-office]'))) {
