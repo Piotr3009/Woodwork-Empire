@@ -1438,22 +1438,28 @@ input.num {
   display: contents;
 }
 
+/* No fill at all and no border at rest: the white boxes over the laptop and the door are gone
+   (PIOTR, 15.09; CLAUDE.md T11 3.5). */
 .office-region {
   background: transparent;
   border: 0;
   cursor: pointer;
   margin: 0;
+  outline: 2px solid transparent;
+  outline-offset: -2px;
+  border-radius: 4px;
   padding: 0;
   position: absolute;
-  /* The glow is the browser's and nothing else's: the game writes no hover state at all, so
+  /* The outline is the browser's and nothing else's: the game writes no hover state at all, so
      there is nothing to blink with the clock (PIOTR, 13.09; CLAUDE.md T9 3.4). */
-  transition: background 120ms ease;
+  transition: outline-color 120ms ease;
 }
 
+/* On hover a 2 px orange outline with a 4 px radius, and nothing else at all (T11 3.5). */
 .office-region:hover,
 .office-region:focus-visible {
-  background: rgb(255 255 255 / 12%);
-  outline: none;
+  background: transparent;
+  outline-color: var(--accent);
 }
 
 .office-region.is-quiet {
@@ -2133,6 +2139,253 @@ input.num {
 .day-figures {
   color: #4d5a52;
   margin: 2px 0 0;
+}
+
+/* A small modal of the paper family is the same folder scaled down, and a wide one is between the
+   two: one picture at three sizes (SPRITES.md 11; CLAUDE.md T11 3.5). */
+.modal-folder:not(.modal-full):not(.modal-wide) {
+  height: min(62vh, 520px);
+  max-height: min(62vh, 520px);
+  width: min(92vw, calc(min(62vh, 520px) * 1.5));
+}
+
+.modal-folder.modal-wide {
+  height: min(78vh, 700px);
+  max-height: min(78vh, 700px);
+  width: min(94vw, calc(min(78vh, 700px) * 1.5));
+}
+
+/* ------------------------------------------------------------------------------------------
+   The board family: cards on a steel magnet board (PIOTR, the "I" mockup; CLAUDE.md T11 3.5).
+   CSS only, no picture: dark steel in an inner frame, a red magnet in the head, the tabs as
+   magnet strips and the content as cream cards held by a blue magnet, each tilted a degree or so.
+   ------------------------------------------------------------------------------------------ */
+.modal-board {
+  background: linear-gradient(#4a4f54, #3a3f44);
+  border: 1px solid #1b1e21;
+  box-shadow: inset 0 0 0 5px #24282c, 0 10px 30px rgba(0, 0, 0, 0.5);
+  color: #eceff1;
+  --card: #f5efe2;
+  --card-2: #fbf8f1;
+  --card-line: #cdbf9f;
+  --card-ink: #1d2a22;
+  --card-ink-2: #4d5a52;
+  --magnet-red: #c0392b;
+  --magnet-blue: #2f6fb0;
+  --steel-line: #24282c;
+}
+
+.modal-board .modal-head,
+.modal-board .modal-body,
+.modal-board .modal-foot {
+  background: transparent;
+  border: 0;
+  color: #eceff1;
+}
+
+.modal-board .modal-head {
+  border-bottom: 1px solid var(--steel-line);
+  margin: 6px 10px 0;
+  padding-left: 26px;
+  position: relative;
+}
+
+/* The red magnet that holds the head to the steel. */
+.modal-board .modal-head::before {
+  background: radial-gradient(circle at 35% 30%, #e8685a, var(--magnet-red));
+  border-radius: 50%;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+  content: '';
+  height: 14px;
+  left: 4px;
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 14px;
+}
+
+.modal-board .modal-head h2 {
+  color: #f6f8f9;
+}
+
+.modal-board .modal-close {
+  color: #cfd6da;
+}
+
+.modal-board .modal-body {
+  margin: 0 10px;
+  padding: 8px 4px;
+}
+
+.modal-board .modal-foot {
+  border-top: 1px solid var(--steel-line);
+  color: #b9c2c7;
+  margin: 0 10px;
+  padding: 6px 0;
+}
+
+.modal-board .modal-foot:empty {
+  border: 0;
+  padding: 0;
+}
+
+/* Tabs as magnet strips. */
+.modal-board .chip {
+  background: linear-gradient(#5d646a, #4a5157);
+  border: 1px solid var(--steel-line);
+  border-radius: 3px;
+  color: #eceff1;
+  font-weight: 700;
+}
+
+.modal-board .chip.is-on {
+  background: linear-gradient(#4a8fd0, var(--magnet-blue));
+  border-color: #1f4d7d;
+}
+
+.modal-board .chip:hover:not([disabled]),
+.modal-board .chip.is-on:hover:not([disabled]) {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #1c1f24;
+}
+
+/* Every piece of content is a cream card held by a blue magnet at the top, tilted a degree or so
+   and casting its own shadow. */
+.modal-board .card,
+.modal-board .row,
+.modal-board .plan-row:not(.plan-scale-row),
+.modal-board .tile {
+  background: var(--card-2);
+  border: 1px solid var(--card-line);
+  border-radius: 4px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.45);
+  color: var(--card-ink);
+  margin: 10px 4px;
+  padding: 12px 10px 8px;
+  position: relative;
+}
+
+.modal-board .card::before,
+.modal-board .row::before,
+.modal-board .plan-row:not(.plan-scale-row)::before,
+.modal-board .tile::before {
+  background: radial-gradient(circle at 35% 30%, #6fa8e0, var(--magnet-blue));
+  border-radius: 50%;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  content: '';
+  height: 12px;
+  left: 50%;
+  position: absolute;
+  top: -6px;
+  transform: translateX(-50%);
+  width: 12px;
+}
+
+/* Minus one degree to one and a half, so a board of cards is never a filing cabinet. */
+.modal-board .card:nth-of-type(3n + 1),
+.modal-board .row:nth-of-type(3n + 1),
+.modal-board .plan-row:nth-of-type(3n + 1),
+.modal-board .tile:nth-of-type(3n + 1) {
+  transform: rotate(-1deg);
+}
+
+.modal-board .card:nth-of-type(3n + 2),
+.modal-board .row:nth-of-type(3n + 2),
+.modal-board .plan-row:nth-of-type(3n + 2),
+.modal-board .tile:nth-of-type(3n + 2) {
+  transform: rotate(0.75deg);
+}
+
+.modal-board .card:nth-of-type(3n),
+.modal-board .row:nth-of-type(3n),
+.modal-board .plan-row:nth-of-type(3n),
+.modal-board .tile:nth-of-type(3n) {
+  transform: rotate(1.5deg);
+}
+
+/* The scale row of the Work Plan is the ruler over the cards, not a card of its own. */
+.modal-board .plan-scale-row {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  color: #cfd6da;
+  transform: none;
+}
+
+.modal-board .row-main,
+.modal-board .card-main h3,
+.modal-board .card-main strong,
+.modal-board .tile-name {
+  color: var(--card-ink);
+}
+
+.modal-board .row-figure,
+.modal-board .figures,
+.modal-board .hint,
+.modal-board .tile-figures,
+.modal-board p {
+  color: var(--card-ink-2);
+}
+
+.modal-board .modal-body > .hint,
+.modal-board .modal-body > .empty {
+  color: #cfd6da;
+}
+
+/* The Work Plan's own chart sits on the card, in paper colours. */
+.modal-board .plan-chart {
+  background: var(--card);
+  border: 1px solid var(--card-line);
+}
+
+.modal-board .plan-figures,
+.modal-board .plan-rate {
+  color: var(--card-ink);
+}
+
+.modal-board .order-bar {
+  background: #e2d9c4;
+}
+
+/* Light yellow for the button that does the thing, cream for the rest, salmon for the one that
+   takes something away, grey for a locked one. Hover is the game's orange everywhere. */
+.modal-board button:not(.chip):not(.modal-close) {
+  background: var(--card);
+  border: 1px solid #8a8071;
+  border-radius: 4px;
+  color: #1d2a22;
+  font-weight: 700;
+}
+
+.modal-board button.btn-primary:not(.chip) {
+  background: #f5e27a;
+  border-color: #c8ae3c;
+  color: #2a2410;
+}
+
+.modal-board button.is-danger:not(.chip),
+.modal-board .card-action .is-danger {
+  background: #ff8a80;
+  border-color: #c0392b;
+  color: #3a0f0b;
+}
+
+.modal-board button:not(.chip):not(.modal-close):hover:not([disabled]) {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #1c1f24;
+}
+
+.modal-board button[disabled]:not(.chip) {
+  background: #b9bdc1;
+  border-color: #9aa0a5;
+  color: #55595d;
+}
+
+.modal-board .reason,
+.modal-board .lock {
+  color: #6a6355;
 }
 
 /* The file picker behind "Load from file" is the browser's; the input itself stays out of sight. */
