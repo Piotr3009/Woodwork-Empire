@@ -551,7 +551,7 @@ export const ESTIMATOR_MONTHLY_WAGE: Record<WorkerTier, number> = {
   super: 2900,
 };
 export const ESTIMATOR_RATES: Record<WorkerTier, number> = { poor: 0.8, normal: 1, super: 1.2 };
-export const ESTIMATOR_REPUTATION = 5;
+export const ESTIMATOR_REPUTATION = 0;
 /** The production manager: one tier, a pure cost, and the first management role in the game
  *  [TUNE wage and standing] (CLAUDE.md T13 3.9). */
 export const PRODUCTION_MANAGER_MONTHLY_WAGE = 3400;
@@ -3391,8 +3391,8 @@ export const CONTRACT_OFFER_DAYS = 5;
 /** A term of three to six months (PIOTR), and a quantity a week in this band [TUNE]. */
 export const CONTRACT_TERM_MONTHS_MIN = 3;
 export const CONTRACT_TERM_MONTHS_MAX = 6;
-export const CONTRACT_QUANTITY_PER_WEEK_MIN = 40;
-export const CONTRACT_QUANTITY_PER_WEEK_MAX = 80;
+export const CONTRACT_QUANTITY_PER_WEEK_MIN = 20;
+export const CONTRACT_QUANTITY_PER_WEEK_MAX = 40;
 /** A short week is a point of reputation [TUNE]; at the end of the term every full week raises the
  *  offered price by this much and every short week lowers it by this much [TUNE]. */
 export const CONTRACT_SHORT_WEEK_REPUTATION = 1;
