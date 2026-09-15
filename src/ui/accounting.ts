@@ -21,10 +21,7 @@ import {
   weeklyWageBill,
 } from '../engine/index';
 import type { GameState, LedgerCategory, LedgerEntry, PeriodTotals } from '../engine/index';
-// T13-C1: export from index.ts
-import { nextInstalmentFor } from '../engine/finance';
-// T13-C1: export from index.ts
-import { monthlyPremiums } from '../engine/insurance';
+import { monthlyPremiums, nextInstalmentFor } from '../engine/index';
 import { renderFinance } from './finance';
 import { button, escapeHtml, money, plural, primaryButton, tabBar, whyLink } from './modal';
 

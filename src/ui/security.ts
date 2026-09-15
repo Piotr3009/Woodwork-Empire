@@ -4,14 +4,13 @@
 
 import { SECURITY_LEVELS, SECURITY_SCALE_AREA_M2, SECURITY_SCALE_VALUE } from '../engine/constants';
 import type { SecurityLevelSpec } from '../engine/constants';
-// T13-C1: export burglaryPaidOut, securitySubscriptionParts from index.ts
 import {
   burglaryPaidOut,
   securityCheck,
   securityLevel,
   securitySubscriptionParts,
-} from '../engine/security';
-import { trimmed } from '../engine/text';
+  trimmed,
+} from '../engine/index';
 import type { GameState } from '../engine/index';
 import { button, escapeHtml, lockedButton, money } from './modal';
 

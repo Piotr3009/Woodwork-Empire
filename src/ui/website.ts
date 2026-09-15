@@ -4,9 +4,8 @@
 // weekly upkeep), then a buy button for a level above the one held, greyed with the reason when
 // the cash is short. Bought once, only ever raised.
 
-import { websiteLadder, websiteLevel } from '../engine/website';
-import type { WebsiteRung } from '../engine/website';
-import type { GameState } from '../engine/index';
+import { websiteLadder, websiteLevel } from '../engine/index';
+import type { GameState, WebsiteRung } from '../engine/index';
 import {
   button,
   escapeHtml,

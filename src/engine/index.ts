@@ -561,3 +561,145 @@ export {
   ratingFor,
   reputationTier,
 } from './reputation';
+
+// Turn 13 phase C: what the phase B groups added to their modules, exported here so the UI
+// reads the one public surface (CLAUDE.md T13 2.1, T13-C1).
+export {
+  loanCapitalForMonth,
+  nextInstalmentFor,
+  overdraftInterestForDay,
+  repayCheck,
+} from './finance';
+export {
+  COVER_LABELS,
+  firstPremiumFor,
+  insuranceCheck,
+  insuredMachinesValue,
+  insuredStockValue,
+  monthlyPremiums,
+  premiumMonthlyFor,
+  premiumYearlyFor,
+  propertyCoverVoid,
+} from './insurance';
+export type { InsuranceCheck, InsuranceCover } from './insurance';
+export {
+  closeWeek,
+  closingReport,
+  CONTRACT_MARKER,
+  contractAssignCheck,
+  contractCounterLine,
+  contractHands,
+  contractMarker,
+  contractMen,
+  contractOfWorker,
+  contractPiece,
+  contractsAllowed,
+  contractStationFor,
+  drawContract,
+  endContract,
+  endedContracts,
+  fullWeeksOf,
+  offerCarrier,
+  renegotiatedPriceFor,
+  shortWeeksOf,
+  termWeeksFor,
+  weekOfTerm,
+  weekWanted,
+} from './contracts';
+export type { ClosingReport, ContractMinute } from './contracts';
+export {
+  websiteLadder,
+} from './website';
+export type { WebsiteRung } from './website';
+export {
+  topCause,
+} from './efficiency';
+export {
+  pendingStockSheets,
+  restockCheck,
+  stockLines,
+} from './materials';
+export type { RestockCheck, StockLine } from './materials';
+export {
+  enquiryQualityTier,
+  websiteEnquiriesOn,
+} from './board';
+export {
+  effectiveReputation,
+} from './reputation';
+export {
+  hurtWorker,
+  nightCrew,
+  nightPremiumFor,
+  onTheBooksToday,
+  rollNightAccident,
+  rollNightBreakdowns,
+  runNightShift,
+  secondShiftCheck,
+  secondShiftRuns,
+  shiftOf,
+} from './staff';
+export type { NightReport } from './staff';
+export {
+  holidayCheck,
+  houseSumFor,
+  nightQualityPenalty,
+  nightShareOf,
+  onHoliday,
+  workingDaysInHouseWindow,
+} from './owner';
+export {
+  joineryCoreOffer,
+  staffManagementTaker,
+} from './tasks';
+export type { JoineryCoreOffer } from './tasks';
+export {
+  canWorkOn,
+  WAITING_FOR_MATERIAL,
+  workMinute,
+} from './production';
+export type { MinuteReport } from './production';
+export {
+  MONTH_LINE_OF,
+  MONTH_LINES,
+  monthReport,
+} from './economy';
+export type { MonthLine, MonthLineId, MonthReport } from './economy';
+export {
+  gateCheck,
+  hasGate,
+  insuranceAddedYearly,
+  outputFactorOf,
+} from './machines';
+export {
+  extractionLoad,
+  extractionRunning,
+} from './media';
+export {
+  footprintOrigin,
+  pathBetween,
+  portCell,
+  runCells,
+  tileKeysFor,
+} from './pipes';
+export {
+  unloadLegAt,
+  unloadStation,
+  unloadTrips,
+} from './stations';
+export {
+  burglaryPaidOut,
+  burglaryTargets,
+  burgle,
+  securitySubscriptionParts,
+} from './security';
+export {
+  ANSWER_SKEW_NEUTRAL_TIER,
+  CONTRACT_CLIENTS,
+  CONTRACT_OFFER_CHANCE_PER_DAY,
+  CONTRACT_QUANTITY_STEP,
+  HOLIDAY_OPTIONS_DAYS,
+  STOCK_LINE_KINDS,
+  STOCK_LINE_NAME,
+  TAKE_OFF_BUTTON_LABEL,
+} from './constants';

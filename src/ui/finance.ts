@@ -3,14 +3,13 @@
 // the colour its sign gives it.
 
 import { LOAN_MAX, LOAN_MONTHS, LOAN_RATE_YEARLY, OVERDRAFT_RATE_YEARLY } from '../engine/constants';
-// T13-C1: export from index.ts
 import {
+  loanCapitalForMonth,
   loanCheck,
   loanInterestForMonth,
-  loanCapitalForMonth,
   nextInstalmentFor,
   repayCheck,
-} from '../engine/finance';
+} from '../engine/index';
 import type { GameState } from '../engine/index';
 import { button, escapeHtml, lockedButton, money, plural, primaryButton, signedMoney } from './modal';
 

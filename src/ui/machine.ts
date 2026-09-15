@@ -39,8 +39,7 @@ import {
   GATE_OUTPUT_BONUS,
   bagsToM3,
 } from '../engine/constants';
-// T13-C1: export from index.ts
-import { insuranceAddedYearly } from '../engine/machines';
+import { insuranceAddedYearly } from '../engine/index';
 import { spriteUrl } from '../render/sprites';
 import type { EquipmentSpec, EquipmentVariant, GameState } from '../engine/index';
 import {

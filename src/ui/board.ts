@@ -14,8 +14,7 @@ import {
   websiteReputationBonus,
 } from '../engine/index';
 import { NO_INSURANCE_REASON } from '../engine/constants';
-// T13-C1: export from index.ts
-import { effectiveReputation } from '../engine/reputation';
+import { effectiveReputation } from '../engine/index';
 import type { Enquiry, GameState } from '../engine/index';
 import {
   button,

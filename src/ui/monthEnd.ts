@@ -3,11 +3,8 @@
 // `monthReport`; this prints it, every signed figure in the colour its sign gives it, and every
 // line printed whether or not anything moved on it, so the report always has the same shape.
 
-// T13-C1: export from index.ts
-import { monthReport } from '../engine/economy';
-import type { MonthLine, MonthReport } from '../engine/economy';
-import { monthOfDay } from '../engine/index';
-import type { GameEvent, GameState } from '../engine/index';
+import { monthOfDay, monthReport } from '../engine/index';
+import type { GameEvent, GameState, MonthLine, MonthReport } from '../engine/index';
 import { escapeHtml, money, signClass, signedMoney } from './modal';
 
 function figure(value: number, tone: string): string {

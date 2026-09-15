@@ -5,8 +5,7 @@
 
 import { ownerIsAvailable, ownerOutTask, skippedTask } from '../engine/index';
 import type { GameState } from '../engine/index';
-// T13-C1: export from index.ts
-import { onHoliday } from '../engine/owner';
+import { onHoliday } from '../engine/index';
 import { escapeHtml, plural } from './modal';
 
 /** The line while the owner is on holiday: how long for, today included, and who has the hall. */

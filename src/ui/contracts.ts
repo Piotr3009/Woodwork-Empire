@@ -3,7 +3,6 @@
 // its people with the assign controls, and the renew question at the end of the term.
 
 import { CONTRACT_OFFER_DAYS } from '../engine/constants';
-// T13-C1: export from index.ts
 import {
   activeContracts,
   closingReport,
@@ -17,8 +16,8 @@ import {
   shortWeeksOf,
   weekOfTerm,
   weekWanted,
-} from '../engine/contracts';
-import { joiners } from '../engine/staff';
+  joiners,
+} from '../engine/index';
 import type { Contract, GameState } from '../engine/index';
 import {
   button,

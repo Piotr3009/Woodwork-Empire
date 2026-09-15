@@ -9,10 +9,8 @@
 // and Order for this job on the job card are the two ways material is bought (T13 3.3).
 
 import { deliveriesInYard, deliveriesOnTheWay, openJobs } from '../engine/index';
-// T13-C1: export from index.ts
-import { restockCheck, stockLines } from '../engine/materials';
-import type { StockLine } from '../engine/materials';
-import type { Delivery, GameState, Job } from '../engine/index';
+import { restockCheck, stockLines } from '../engine/index';
+import type { Delivery, GameState, Job, StockLine } from '../engine/index';
 import { placeholderSvg } from '../render/placeholder';
 import { button, emptyLine, escapeHtml, lockedButton, money, plural } from './modal';
 import { materialLine } from './jobCard';

@@ -10,7 +10,6 @@ import {
   UNINSURED_CLAIM_MAX,
   UNINSURED_CLAIM_MIN,
 } from '../engine/constants';
-// T13-C1: export from index.ts
 import {
   COVER_LABELS,
   coversHeld,
@@ -22,9 +21,8 @@ import {
   premiumMonthlyFor,
   premiumYearlyFor,
   propertyCoverVoid,
-} from '../engine/insurance';
-import type { InsuranceCover } from '../engine/insurance';
-import type { GameState } from '../engine/index';
+} from '../engine/index';
+import type { GameState, InsuranceCover } from '../engine/index';
 import { button, escapeHtml, lockedButton, money, plural, primaryButton, signedMoney } from './modal';
 
 function figureRow(label: string, value: number): string {

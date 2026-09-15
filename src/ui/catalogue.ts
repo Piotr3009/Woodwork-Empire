@@ -41,8 +41,8 @@ import {
   serviceDueOn,
   serviceIsDue,
 } from '../engine/index';
-// T13-C1: export gateCheck, hasGate from index.ts
-import { gateCheck, hasGate, serviceDueIn, variantFor } from '../engine/machines';
+import { gateCheck, hasGate, variantFor } from '../engine/index';
+import { serviceDueIn } from '../engine/machines';
 import { orderName, orderProgress } from '../engine/orders';
 import type { Equipment, GameState, OrderLine } from '../engine/index';
 import { classBadge, classFrame, isMachineFamily, pictureSlot, renderMachine } from './machine';

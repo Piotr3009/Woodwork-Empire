@@ -19,12 +19,17 @@ import {
 } from '../engine/index';
 import type { GameState, HiringOption, Worker, WorkerRole } from '../engine/index';
 import { DAY_CATEGORY_LABELS, HOUSE_TIER_NAMES, OWNER_DRAW_TIERS } from '../engine/constants';
-// T13-C1: export from index.ts
-import { HOLIDAY_OPTIONS_DAYS, holidayCheck, houseSumFor, onHoliday } from '../engine/owner';
-// T13-C1: export from index.ts
-import { secondShiftCheck, secondShiftRuns, shiftOf } from '../engine/staff';
-// T13-C1: export from index.ts
-import { joineryCoreOffer, staffManagementTaker } from '../engine/tasks';
+import {
+  HOLIDAY_OPTIONS_DAYS,
+  holidayCheck,
+  houseSumFor,
+  joineryCoreOffer,
+  onHoliday,
+  secondShiftCheck,
+  secondShiftRuns,
+  shiftOf,
+  staffManagementTaker,
+} from '../engine/index';
 import {
   button,
   emptyLine,

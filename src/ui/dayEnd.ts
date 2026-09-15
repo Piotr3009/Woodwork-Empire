@@ -13,8 +13,7 @@ import {
   houseTierFor,
   summaryOfDay,
 } from '../engine/index';
-// T13-C1: export from index.ts
-import { topCause } from '../engine/efficiency';
+import { topCause } from '../engine/index';
 import type { DaySummary, GameState, SummaryCadence } from '../engine/index';
 import { days, escapeHtml, minutes, money, plural, signedFigure, signedMoney } from './modal';
 
