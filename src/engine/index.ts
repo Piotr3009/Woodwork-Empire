@@ -401,6 +401,7 @@ export {
   STATION_IDLE,
   STATION_NO_BENCH,
   STATION_OFFICE,
+  STATION_PHONE,
   STATION_RACK,
   machineStation,
   stationForTask,

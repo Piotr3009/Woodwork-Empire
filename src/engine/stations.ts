@@ -10,6 +10,9 @@ export const STATION_BENCH = 'bench';
 export const STATION_RACK = 'rack';
 export const STATION_GATE = 'gate';
 export const STATION_OFFICE = 'office';
+/** At the desk with the phone in his hand. The same cell as the office: what it says is which
+ *  sheet the figure plays (PIOTR, 15.09; CLAUDE.md T11 3.11). */
+export const STATION_PHONE = 'phone';
 export const STATION_IDLE = 'idle';
 /** Standing at the canteen door because there is no bench to work at (CLAUDE.md T4 3.4). */
 export const STATION_NO_BENCH = 'noBench';
@@ -54,8 +57,10 @@ export function stationForTask(state: GameState, task: TaskInstance): string {
     }
     case 'cleaning':
       return STATION_BENCH;
+    case 'clientCall':
+      return STATION_PHONE;
     default:
-      // Emails, bookkeeping, ordering, calls, drawings and site measures are all desk work.
+      // Emails, bookkeeping, ordering, drawings and site measures are all desk work.
       return STATION_OFFICE;
   }
 }

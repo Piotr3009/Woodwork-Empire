@@ -32,8 +32,9 @@ export function cancelButton(line: OrderLine): string {
   if (line.canCancel) {
     return `<button class="btn" data-do="cancelOrder" data-id="${line.id}">Cancel order</button>`;
   }
-  if (line.kind === 'equipment') return '<span class="reason">At the gate, too late to call off</span>';
-  return '';
+  // A load of sheets can be called off until the morning it lands, like the kit, and says the
+  // same thing once it is standing at the gate (PIOTR, 15.09; CLAUDE.md T11 3.12).
+  return '<span class="reason">At the gate, too late to call off</span>';
 }
 
 /** What the tile or the row says about one thing on its way. */

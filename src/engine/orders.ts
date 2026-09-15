@@ -198,9 +198,9 @@ export function shoppingList(state: GameState): OrderLine[] {
       dueDay: delivery.arriveDay,
       progress: orderProgress({ orderedDay: delivery.orderedDay, dueDay: delivery.arriveDay }, day),
       arrived: delivery.arrived,
-      // Material is bought from a supplier who has already loaded it (CLAUDE.md T8 3.5 is about
-      // the kit); nothing on the sheets side is called off.
-      canCancel: false,
+      // A load of sheets can be called off until the morning it lands, in full, exactly as a
+      // machine can (PIOTR, 15.09; CLAUDE.md T11 3.12).
+      canCancel: !delivery.arrived,
     });
   }
   return lines.sort((left, right) =>

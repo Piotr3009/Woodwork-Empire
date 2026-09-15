@@ -2302,12 +2302,32 @@ function settleOrders(state: GameState, task: TaskInstance): void {
  *  free again, and the books say what happened. One click (CLAUDE.md T8 3.5). */
 export function cancelOrder(state: GameState, orderId: string): BuyCheck {
   const item = findOnOrder(state, orderId);
-  if (!item) return { ok: false, reason: 'Nothing on order' };
-  // At the gate is too late: it is here, and somebody has to take it off the lorry.
-  if (item.arrived) return { ok: false, reason: 'It is at the gate' };
+  if (item) {
+    // At the gate is too late: it is here, and somebody has to take it off the lorry.
+    if (item.arrived) return { ok: false, reason: 'It is at the gate' };
+    if (timeIsPaused(state)) state.speed = 1;
+    receive(state, 'equipment', `Order cancelled: ${orderName(item)}`, item.pricePaid);
+    removeOnOrder(state, item.id);
+    return OK;
+  }
+  // A load of sheets goes the same way: called off until the morning it lands, in full
+  // (PIOTR, 15.09; CLAUDE.md T11 3.12).
+  const delivery = findDelivery(state, orderId);
+  if (!delivery) return { ok: false, reason: 'Nothing on order' };
+  if (delivery.arrived) return { ok: false, reason: 'It is at the gate' };
   if (timeIsPaused(state)) state.speed = 1;
-  receive(state, 'equipment', `Order cancelled: ${orderName(item)}`, item.pricePaid);
-  removeOnOrder(state, item.id);
+  receive(state, 'material', `Order cancelled: ${delivery.sheets} sheets`, delivery.pricePaid);
+  state.deliveries = state.deliveries.filter((entry) => entry.id !== delivery.id);
+  const job = delivery.jobId === null ? null : findJob(state, delivery.jobId);
+  if (job !== null && job.stage === 'materialOrdered') {
+    // The job wants its material ordering again, so the old job of work goes with the lorry and
+    // `refreshJob` writes a fresh one.
+    job.stage = 'materialPending';
+    state.tasks = state.tasks.filter(
+      (task) => !(task.kind === 'materialOrder' && task.jobId === job.id),
+    );
+    refreshJob(state, job);
+  }
   return OK;
 }
 

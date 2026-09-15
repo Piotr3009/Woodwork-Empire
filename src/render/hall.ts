@@ -46,6 +46,7 @@ import {
   STATION_IDLE,
   STATION_NO_BENCH,
   STATION_OFFICE,
+  STATION_PHONE,
   STATION_RACK,
   stationMachine,
   stationWaitingFor,
@@ -757,7 +758,8 @@ export function stationCell(
     // At the back of the lorry, inside the shutter.
     return { x: GATE_LAYOUT.x, y: GATE_LAYOUT.y + GATE_LAYOUT.depth };
   }
-  if (station === STATION_OFFICE) return roomDoorCell('office');
+  // The phone is on the desk: he is in the office for a call like any other desk job (T11 3.11).
+  if (station === STATION_OFFICE || station === STATION_PHONE) return roomDoorCell('office');
   if (station === STATION_IDLE || station === STATION_NO_BENCH) return roomDoorCell('canteen');
   return bench;
 }
@@ -773,6 +775,7 @@ function stationLabel(station: string): string {
   if (station === STATION_RACK) return 'the rack';
   if (station === STATION_GATE) return 'the gate';
   if (station === STATION_OFFICE) return 'the office';
+  if (station === STATION_PHONE) return 'the phone';
   if (station === STATION_BENCH) return 'the bench';
   if (station === STATION_NO_BENCH) return 'no bench';
   return 'waiting';
