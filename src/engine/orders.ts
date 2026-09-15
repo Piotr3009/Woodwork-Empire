@@ -5,6 +5,7 @@
 // class. This module owns the third of them. The queries are pure; the two writes that need the
 // rest of the world, standing the thing in the hall and giving the money back, live in game.ts.
 
+import { DAY_ONE_KIT, DAY_ONE_SOFTWARE } from './constants';
 import { addWorkingDays } from './clock';
 import { deliveryDaysFor, findSpec, findVariant, itemStandsInTheHall } from './machines';
 import { makeId } from './rng';
@@ -81,6 +82,42 @@ export function countOwnedOrOnOrder(state: GameState, specId: string): number {
  *  and the material before anybody cuts anything (CLAUDE.md T8 3.2, REPORT-T8). */
 export function hasOrOnOrder(state: GameState, specId: string): boolean {
   return countOwnedOrOnOrder(state, specId) > 0;
+}
+
+/** One line of the day one list: what it is, what it is called and whether it is ticked. */
+export interface DayOneItem {
+  id: string;
+  label: string;
+  /** Bought, or bought and still on the road: both count (CLAUDE.md T11 3.6). */
+  done: boolean;
+  /** True for the management licence, which is not a machine and has no folder of its own. */
+  software: boolean;
+}
+
+/** The day one kit with a tick against everything the workshop has or has on order. The one
+ *  selector: the card draws it and the test reads it (CLAUDE.md T11 3.6). */
+export function dayOneKit(state: GameState): DayOneItem[] {
+  return DAY_ONE_KIT.map((id) => {
+    if (id === DAY_ONE_SOFTWARE) {
+      return {
+        id,
+        label: 'Software licence',
+        done: state.software.mode !== 'none',
+        software: true,
+      };
+    }
+    return {
+      id,
+      label: findSpec(id)?.name ?? id,
+      done: hasOrOnOrder(state, id),
+      software: false,
+    };
+  });
+}
+
+/** True once every line of it is ticked: the card collapses to one line and stays collapsed. */
+export function dayOneComplete(state: GameState): boolean {
+  return dayOneKit(state).every((item) => item.done);
 }
 
 /** The first of this family that is bought and still on its way, the soonest lorry first. A

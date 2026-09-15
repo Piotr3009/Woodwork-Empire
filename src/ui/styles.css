@@ -2634,6 +2634,87 @@ input.num {
   box-shadow: 0 2px 0 #9a4c10;
 }
 
+/* The day one list at the top of the catalogue: what a workshop needs before it can make
+   anything, ticked off as it is bought (PIOTR, 15.09; CLAUDE.md T11 3.6). */
+.checklist {
+  border-radius: 10px;
+  margin: 8px 0;
+  padding: 8px 10px;
+}
+
+.checklist h3 {
+  margin: 0 0 2px;
+}
+
+.checklist .hint {
+  margin: 0 0 6px;
+}
+
+.checklist-grid {
+  display: grid;
+  gap: 4px 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.checklist-item {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  display: flex;
+  font: inherit;
+  gap: 6px;
+  padding: 2px 4px;
+  text-align: left;
+}
+
+.checklist-tick {
+  border: 1px solid var(--paper-line, var(--border));
+  border-radius: 3px;
+  display: inline-block;
+  flex: none;
+  font-weight: 800;
+  height: 16px;
+  line-height: 14px;
+  text-align: center;
+  width: 16px;
+}
+
+.checklist-item.is-done .checklist-tick {
+  background: #1f8a4c;
+  border-color: #1f8a4c;
+  color: #f5efe2;
+}
+
+.checklist-item.is-done .checklist-name {
+  opacity: 0.7;
+  text-decoration: line-through;
+}
+
+.checklist-item:hover .checklist-name {
+  color: var(--accent);
+}
+
+.checklist.is-done {
+  padding: 6px 10px;
+}
+
+/* On the folder's paper the buttons of the list are paper too, not the green plates of the rest
+   of the page. */
+.modal-folder .checklist-item {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  color: var(--ink);
+}
+
+.modal-folder .checklist-item:hover:not([disabled]) {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  color: var(--accent);
+}
+
 /* The notes at the foot of the catalogue: a pencil line, not a red shout. */
 .catalogue-notes {
   border-top: 1px dashed var(--paper-line);

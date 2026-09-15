@@ -351,6 +351,8 @@ export type { Hand, StationCheck } from './production';
 
 // What is bought, paid for and not here yet (CLAUDE.md T8 3.2)
 export {
+  dayOneComplete,
+  dayOneKit,
   dueDayFor,
   findOnOrder,
   shoppingList,
@@ -361,7 +363,7 @@ export {
   ordersOnTheWay,
   reservedItems,
 } from './orders';
-export type { OrderLine } from './orders';
+export type { DayOneItem, OrderLine } from './orders';
 
 // Material and deliveries
 export {

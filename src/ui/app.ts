@@ -1178,6 +1178,18 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
       ui.filters.catalogue = '';
       ui.scrollModalTop = true;
       break;
+    case 'dayOneItem': {
+      // A line of the day one list opens that thing's own folder, wherever the player is standing
+      // in the catalogue. The licence is not a machine: its line opens the tab it lives on
+      // (CLAUDE.md T11 3.6).
+      ui.filters.catalogue = '';
+      ui.sellConfirm = null;
+      ui.scrollModalTop = true;
+      const spec = findSpec(id);
+      ui.catalogueTab = catalogueTabFrom(spec?.tab ?? 'computers');
+      ui.catalogueFolder = spec ? id : null;
+      break;
+    }
     case 'closeFolder':
       ui.catalogueFolder = null;
       ui.filters.catalogue = '';

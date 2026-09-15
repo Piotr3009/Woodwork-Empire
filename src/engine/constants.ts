@@ -2380,6 +2380,27 @@ export const HELPER_CLEAN_WEEKDAY = 4;
 
 /** The accounting modal shows the last 50 entries (CLAUDE.md 10.1). */
 /** [TUNE] the state keeps this many ledger entries so it stays small. */
+/** The licence is not a machine, so it carries an id of its own on the day one list. */
+export const DAY_ONE_SOFTWARE = 'software';
+
+/** What a workshop needs before it can make anything: the list the catalogue ticks off on day one,
+ *  in the order the player works down it (PIOTR, 15.09; CLAUDE.md T11 3.6). One constant, so the
+ *  card and its test cannot drift apart. */
+export const DAY_ONE_KIT: readonly string[] = [
+  'desk',
+  'chair',
+  'laptop',
+  DAY_ONE_SOFTWARE,
+  'tableSaw',
+  'drill',
+  'edgebander',
+  'compressor',
+  'extractor',
+  'workbench',
+  'toolCabinet',
+  'sheetRack',
+];
+
 /** How many end of day summaries the state carries: three months of working days [TUNE]. */
 export const DAY_SUMMARIES_MAX = 90;
 /** How many days of the owner's day log the state carries. A week is what the company board
