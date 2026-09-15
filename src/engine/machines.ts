@@ -13,6 +13,8 @@ import {
   BREAK_SKIP_FACTOR,
   GATE_CROWD_FACTOR,
   GATE_CROWD_LIMIT,
+  GATE_OUTPUT_BONUS,
+  GATE_PRICE,
   MACHINE_REPAIR_COST_FRACTION,
   OVERDUE_BREAKDOWN_CHANCE,
   SERVICE_COST_FRACTION,
@@ -37,7 +39,8 @@ import {
   SALE_FRACTION_USED,
   USED_VARIANT,
 } from './constants';
-import { extractionCheck, underExtracted } from './media';
+import { canAfford } from './economy';
+import { extractionCheck, extractionDemandOf, underExtracted } from './media';
 import { cubicMetres, trimmed } from './text';
 import type {
   Equipment,
@@ -243,8 +246,8 @@ export function claimMachine(state: GameState, who: string, specId: string): Equ
   const free = freeMachines(state, specId);
   let best: Equipment | null = null;
   for (const item of free) {
-    const factor = variantFor(item)?.outputFactor ?? 1;
-    if (best === null || factor > (variantFor(best)?.outputFactor ?? 1)) best = item;
+    const factor = outputFactorOf(state, item);
+    if (best === null || factor > outputFactorOf(state, best)) best = item;
   }
   if (best === null) return null;
   best.takenBy = who;
@@ -285,6 +288,39 @@ export function findVariant(specId: string, variantId: string): EquipmentVariant
 export function variantFor(item: Equipment): EquipmentVariant | null {
   const spec = findSpec(item.specId);
   return spec ? variantOf(spec, item.variantId) : null;
+}
+
+// ---------------------------------------------------------------------------
+// The automatic blast gate (CLAUDE.md T13 3.11): a per machine purchase on the card of a machine
+// standing in the hall, for a machine with an extraction demand. Two effects: a little more
+// output on that machine, and the hall's extraction counts it only while it runs (media.ts).
+// ---------------------------------------------------------------------------
+
+/** True when this machine has an automatic gate on its drop. */
+export function hasGate(state: GameState, item: { id: string }): boolean {
+  return state.gates.includes(item.id);
+}
+
+/** What this machine does to the speed of its own stage: its class's factor, and the gate's
+ *  bonus on top of it once one is fitted (PIOTR: +2%; CLAUDE.md T13 3.11). The one place a
+ *  machine's output factor is read: the man on it, the projection, the board and the choice of
+ *  the best free one all come through here. */
+export function outputFactorOf(state: GameState, item: Equipment): number {
+  const base = variantFor(item)?.outputFactor ?? 1;
+  if (!hasGate(state, item)) return base;
+  return Math.round(base * (1 + GATE_OUTPUT_BONUS) * 10000) / 10000;
+}
+
+/** Why a gate cannot be fitted to this machine, or that it can: only a machine with an extraction
+ *  demand takes one, once, for the price (CLAUDE.md T13 3.11). The card's button and the purchase
+ *  itself read the same refusals. */
+export function gateCheck(state: GameState, equipmentId: string): { ok: boolean; reason: string } {
+  const item = state.equipment.find((entry) => entry.id === equipmentId);
+  if (!item) return { ok: false, reason: 'No such machine' };
+  if (hasGate(state, item)) return { ok: false, reason: 'Fitted already' };
+  if (extractionDemandOf(item) <= 0) return { ok: false, reason: 'It wants no extraction' };
+  if (!canAfford(state, GATE_PRICE)) return { ok: false, reason: 'Not enough cash' };
+  return { ok: true, reason: '' };
 }
 
 /** Hours of use a machine of this family and class has in it. A family whose life Piotr wrote in
@@ -521,7 +557,7 @@ export function machineOutputFactor(state: GameState, material: MaterialKind): n
     const spec = findSpec(item.specId);
     if (!spec || spec.category !== 'machine' || isSold(item)) continue;
     if (spec.usedOn !== null && spec.usedOn !== material) continue;
-    const factor = variantOf(spec, item.variantId).outputFactor;
+    const factor = outputFactorOf(state, item);
     best.set(spec.id, Math.max(best.get(spec.id) ?? 0, factor));
   }
   let product = 1;
@@ -537,7 +573,7 @@ export function bestOutputFactor(state: GameState, specId: string): number {
   let best = 0;
   for (const item of owned(state, specId)) {
     if (isSold(item)) continue;
-    const factor = variantFor(item)?.outputFactor ?? 1;
+    const factor = outputFactorOf(state, item);
     if (factor > best) best = factor;
   }
   return best > 0 ? best : 1;

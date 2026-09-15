@@ -6,7 +6,15 @@
 import { PIPE_PRICE_PER_METRE } from './constants';
 import { canAfford, charge } from './economy';
 import { extractionCapacityOf, extractionDemandOf } from './media';
-import { findSpec, hasCentralExtraction, isSold, itemStandsInTheHall, ductingIsFree } from './machines';
+import {
+  findSpec,
+  hasCentralExtraction,
+  isSold,
+  itemFootprint,
+  itemStandsInTheHall,
+  itemZone,
+  ductingIsFree,
+} from './machines';
 import { makeId } from './rng';
 import type { Equipment, GameState, PipeRun, PipeTile, PipeTileKey } from './types';
 
@@ -26,6 +34,43 @@ export function pipeTargets(state: GameState): Equipment[] {
 /** True for a machine that wants a pipe at all: one with an extraction demand above zero. */
 export function wantsExtraction(item: { specId: string; variantId: string }): boolean {
   return extractionDemandOf(item) > 0;
+}
+
+/** Where a machine's own footprint stands: its class's footprint, centred inside the working zone
+ *  it reserves, so the anchor cell is the zone's corner and the picture is inside it
+ *  (CLAUDE.md T7 3.3). A class that holds no floor is kept in a tool cabinet: its picture stands
+ *  on the cell the cabinet stands on, with nothing to centre it in (T7 3.6). The one arithmetic
+ *  for it: the hall draws by it and the pipe drops by it. */
+export function footprintOrigin(item: {
+  specId: string;
+  variantId: string;
+  rotated?: boolean;
+  anchorX: number;
+  anchorY: number;
+}): { x: number; y: number; width: number; depth: number; height: number } {
+  const stands = itemFootprint(item);
+  const zone = itemZone(item);
+  const inZone = zone.width > 0 && zone.depth > 0;
+  return {
+    x: item.anchorX + (inZone ? (zone.width - stands.width) / 2 : 0),
+    y: item.anchorY + (inZone ? (zone.depth - stands.depth) / 2 : 0),
+    width: stands.width,
+    depth: stands.depth,
+    height: stands.height,
+  };
+}
+
+/** The cell the drop lands on: the first cell of the machine's own footprint, where its port is
+ *  (CLAUDE.md T13 3.19). The gate collar sits on the same cell (T13 3.11). */
+export function portCell(item: {
+  specId: string;
+  variantId: string;
+  rotated?: boolean;
+  anchorX: number;
+  anchorY: number;
+}): { x: number; y: number } {
+  const origin = footprintOrigin(item);
+  return { x: Math.floor(origin.x), y: Math.floor(origin.y) };
 }
 
 export function pipeRunFor(state: GameState, equipmentId: string): PipeRun | null {

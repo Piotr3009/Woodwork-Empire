@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 import {
   EQUIPMENT_SPECS,
   EQUIPMENT_TABS,
+  GATE_PRICE,
   HOURS_PER_WORKING_DAY,
   SERVICE_INTERVAL_HOURS,
 } from '../../src/engine/constants';
@@ -35,6 +36,31 @@ function parse(html: string): HTMLElement {
 function shop(state: GameState, tab: string, filter = '', folder: string | null = null): HTMLElement {
   return parse(renderCatalogue(state, filter, catalogueTabFrom(tab), folder));
 }
+
+describe('the automatic gate on the card of a machine in the hall (CLAUDE.md T13 3.11)', () => {
+  it('is a button on a machine with a drop, greyed as fitted once it is, and absent on a bench', () => {
+    let state = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
+    const saw = state.equipment.find((item) => item.specId === 'tableSaw');
+    const bench = state.equipment.find((item) => item.specId === 'workbench');
+    if (!saw || !bench) throw new Error('no kit');
+    const page = shop(state, 'owned');
+    const button = page.querySelector(`[data-do="buyGate"][data-id="${saw.id}"]`);
+    expect(button).not.toBeNull();
+    expect(button?.textContent).toBe(`Automatic gate, \u00a3${GATE_PRICE.toLocaleString('en-GB')}`);
+    // A bench wants no extraction, so its card has no gate at all.
+    expect(page.querySelector(`[data-owned="${bench.id}"] [data-do="buyGate"]`)).toBeNull();
+    expect(page.querySelector(`[data-owned="${bench.id}"]`)?.textContent).not.toContain('gate');
+    state = act(state, { type: 'BUY_GATE', equipmentId: saw.id });
+    const fitted = shop(state, 'owned').querySelector(`[data-owned="${saw.id}"]`);
+    expect(fitted?.querySelector('[data-do="buyGate"]')).toBeNull();
+    const greyed = fitted?.querySelector('button[disabled]');
+    expect(greyed?.textContent).toBe('Gate fitted');
+    // What it does is on the card, coloured by its sign (CLAUDE.md T13 1).
+    expect(fitted?.querySelector('.figure.good')?.textContent).toBe(
+      'Automatic gate fitted: output +2%',
+    );
+  });
+});
 
 describe('the tabs', () => {
   it('are the eleven Piotr named, in his order, with Owned after them', () => {
@@ -192,12 +218,13 @@ describe('the Owned tab', () => {
     // Nothing is going through it, so no service is coming.
     expect(card).toContain('no service due while it stands idle');
     expect(card).toContain('running');
-    // Nothing is offered on a machine with nothing wrong with it but the one thing that is
-    // always offered on a machine the hall has finished with (CLAUDE.md T8 3.5).
+    // Nothing is offered on a machine with nothing wrong with it but the gate it can take on its
+    // drop (CLAUDE.md T13 3.11) and the one thing that is always offered on a machine the hall
+    // has finished with (CLAUDE.md T8 3.5).
     const controls = Array.from(
       owned.querySelectorAll(`[data-owned="${saw?.id}"] [data-do]`),
     ).map((node) => node.getAttribute('data-do'));
-    expect(controls).toEqual(['sellMachine']);
+    expect(controls).toEqual(['buyGate', 'sellMachine']);
     expect(card).toContain('Sell for £630');
   });
 

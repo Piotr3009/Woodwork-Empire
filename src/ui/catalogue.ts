@@ -6,6 +6,8 @@ import {
   COMPRESSOR,
   EQUIPMENT_SPECS,
   EQUIPMENT_TABS,
+  GATE_OUTPUT_BONUS,
+  GATE_PRICE,
   SOFTWARE_ONE_OFF_PRICE,
   SOFTWARE_SUBSCRIPTION_MONTHLY,
 } from '../engine/constants';
@@ -23,6 +25,7 @@ import {
   compressorLabel,
   compressors,
   dustOutputOf,
+  extractionDemandOf,
   orderSoftwareCheck,
   countOf,
   findSpec,
@@ -34,7 +37,8 @@ import {
   serviceDueOn,
   serviceIsDue,
 } from '../engine/index';
-import { serviceDueIn, variantFor } from '../engine/machines';
+// T13-C1: export gateCheck, hasGate from index.ts
+import { gateCheck, hasGate, serviceDueIn, variantFor } from '../engine/machines';
 import { orderName, orderProgress } from '../engine/orders';
 import type { Equipment, GameState, OrderLine } from '../engine/index';
 import { classBadge, classFrame, isMachineFamily, pictureSlot, renderMachine } from './machine';
@@ -47,6 +51,7 @@ import {
   money,
   plural,
   button,
+  signedFigure,
   tabBar,
 } from './modal';
 
@@ -316,6 +321,25 @@ function sellAction(state: GameState, item: Equipment, sellConfirm: string | nul
   return button('sellMachine', `Sell for ${money(salePriceFor(item))}`, `data-id="${item.id}"`);
 }
 
+/** The automatic gate on the card of a machine standing in the hall: bought once, for machines
+ *  with an extraction demand, greyed as fitted once it is (CLAUDE.md T13 3.11). */
+export function gateAction(state: GameState, item: Equipment): string {
+  if (extractionDemandOf(item) <= 0) return '';
+  if (hasGate(state, item)) return lockedButton('Gate fitted', 'An automatic gate is on its drop');
+  const check = gateCheck(state, item.id);
+  const label = `Automatic gate, ${money(GATE_PRICE)}`;
+  return check.ok
+    ? button('buyGate', label, `data-id="${item.id}"`)
+    : lockedButton(label, check.reason);
+}
+
+/** What the gate does once it is on: the signed line, through the one helper (CLAUDE.md T13 1). */
+function gateLine(state: GameState, item: Equipment): string {
+  if (!hasGate(state, item)) return '';
+  const per = Math.round(GATE_OUTPUT_BONUS * 100);
+  return `<p class="tile-figures">${signedFigure(`Automatic gate fitted: output +${per}%`, per)}</p>`;
+}
+
 function ownedTile(
   state: GameState,
   item: Equipment,
@@ -357,8 +381,9 @@ function ownedTile(
     '<span class="badge badge-owned">Owned</span></h3>' +
     pictureSlot(spec.spriteKey, item.variantId) +
     lines +
+    gateLine(state, item) +
     airAssign(state, item) +
-    `<div class="tile-action">${action}${sell}</div>` +
+    `<div class="tile-action">${action}${gateAction(state, item)}${sell}</div>` +
     '</div>'
   );
 }

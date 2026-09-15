@@ -10,13 +10,16 @@ work went, one commit per task; phase C consolidates it into `REPORT-T13.md`.
 
 | Task | Commit | What went in | Proved by |
 |---|---|---|---|
-| T13-B4a Five classes everywhere, the spindle moulder, the badges | this commit | One layout function `classCard` in `src/ui/machine.ts` for every class card of every family: effects (output, dust, extraction and air needed, life, the class's own effects: what a fan pulls and holds, what a compressor gives, what a rack holds, that a machine with a drop takes a gate), a gap, costs (price, delivery, power, the insurance it adds a year, the floor), a gap, the description in the body font; every signed line through `signedFigure`; the badge and frame colour of the class from `CLASS_BADGE` on every card and on the Owned tile (`classBadge`, `classFrame`, a `--class-colour` custom property). `insuranceAddedYearly(price)` in `src/engine/machines.ts`. The spindle moulder's classes and the pallet truck draw as the placeholder in the hall (`objectArt`) and on the sprite check page (`PLACEHOLDER_SPRITES`, `placeholderKindFor` in `src/render/sprites.ts`). Verified: the two kitchens grey without a spindle moulder through `kitBlockFor`; `TIMBER_BRANCH_MIN_SPINDLE_CLASS` is read by nothing. | `tests/ui/machine.test.ts` (effects then costs then description on every card of every family; the badge and frame; every signed line through the helper), `tests/engine/variants.test.ts` (every ladder family has the five classes in `CLASS_ORDER` with a badge, no class carries a dust figure), `tests/engine/catalog.test.ts` (the kitchens need the spindle moulder; the timber constant is unread), `tests/ui/spriteCheck.test.ts`, `tests/render/hall.test.ts` |
+| T13-B4a Five classes everywhere, the spindle moulder, the badges | `fe143bf` | One layout function `classCard` in `src/ui/machine.ts` for every class card of every family: effects (output, dust, extraction and air needed, life, the class's own effects: what a fan pulls and holds, what a compressor gives, what a rack holds, that a machine with a drop takes a gate), a gap, costs (price, delivery, power, the insurance it adds a year, the floor), a gap, the description in the body font; every signed line through `signedFigure`; the badge and frame colour of the class from `CLASS_BADGE` on every card and on the Owned tile (`classBadge`, `classFrame`, a `--class-colour` custom property). `insuranceAddedYearly(price)` in `src/engine/machines.ts`. The spindle moulder's classes and the pallet truck draw as the placeholder in the hall (`objectArt`) and on the sprite check page (`PLACEHOLDER_SPRITES`, `placeholderKindFor` in `src/render/sprites.ts`). Verified: the two kitchens grey without a spindle moulder through `kitBlockFor`; `TIMBER_BRANCH_MIN_SPINDLE_CLASS` is read by nothing. | `tests/ui/machine.test.ts` (effects then costs then description on every card of every family; the badge and frame; every signed line through the helper), `tests/engine/variants.test.ts` (every ladder family has the five classes in `CLASS_ORDER` with a badge, no class carries a dust figure), `tests/engine/catalog.test.ts` (the kitchens need the spindle moulder; the timber constant is unread), `tests/ui/spriteCheck.test.ts`, `tests/render/hall.test.ts` |
+| T13-B4b Gates | this commit | `hasGate`, `outputFactorOf(state, item)` (the class factor times `1 + GATE_OUTPUT_BONUS` once a gate is on) and `gateCheck` in `src/engine/machines.ts`; `claimMachine`, `bestOutputFactor` and `machineOutputFactor` read the factor through it (the one place left is game.ts line 1599, a note). `extractionRunning` and `extractionLoad` in `src/engine/media.ts`: while the fan runs at all, the demand is every connected ungated machine plus every gated one a man is at; `extractionCheck` sums the load. `footprintOrigin` and `portCell` in `src/engine/pipes.ts` (the one arithmetic the hall draws by and the pipe drops by). The Owned tile carries `Automatic gate, 1,000` (`data-do="buyGate" data-id="<equipment id>"`), greyed `Gate fitted` once fitted, absent on a machine with no demand, and the signed `+2%` line (`gateAction`, `src/ui/catalogue.ts`). The collar is drawn on the drop cell above the machine at the ducting's height in the new pipe layer of `src/render/hall.ts` (`pipeCellArt`, `gateCollar`, `gateCollars`, `pipeLayer`), as `placeholder('gate.collar', ..., { dimetric: true })` until the file lands. | `tests/engine/machines.test.ts` (+2% on that machine only, through the man, the projection and the board; the gated one is preferred; refused with no demand, twice, and without cash), `tests/engine/extraction.test.ts` (an ungated connected machine counts whenever the fan runs, a gated one only while it runs, nothing counts while nothing runs, an unconnected one is unserved and never in the sum; the gate changes the air sum and not the dust), `tests/ui/catalogueTabs.test.ts` (the button, the greyed state, the bench without one), `tests/render/hall.test.ts` (the collar on the drop cell, lifted, in the live part above the equipment, the file taking its place) |
 
 ---
 
 ## 2. Numbers chosen
 
-None yet.
+| Number | Value | Where | Note |
+|---|---|---|---|
+| `GATE_COLLAR_SCALE` | 0.5 | `src/render/hall.ts` | how much smaller than a cell the collar is drawn; a render figure like `HALL_CLOCK_GAP` |
 
 ---
 
@@ -24,13 +27,57 @@ None yet.
 
 ### `src/engine/index.ts`
 
-- Export `insuranceAddedYearly` from `./machines` (imported by module path in `src/ui/machine.ts`
-  with the `T13-C1` comment).
+- Export `insuranceAddedYearly`, `gateCheck`, `hasGate`, `outputFactorOf` from `./machines`
+  (imported by module path with the `T13-C1` comment in `src/ui/machine.ts` and
+  `src/ui/catalogue.ts`).
+- Export `extractionLoad`, `extractionRunning` from `./media`.
+- Export `footprintOrigin`, `portCell` from `./pipes`.
+
+### `src/engine/game.ts` (T13-B4b, the gate's output)
+
+The one place a machine's output factor is still read off the class alone is the production
+minute. Replace, at the line that reads `variantOf(specOf(machine.specId), machine.variantId).outputFactor`
+(about line 1599):
+
+```ts
+    let speed = machine === null
+      ? stage.speed
+      : outputFactorOf(state, machine);
+```
+
+and add `outputFactorOf` to the import from `./machines`. `bestOutputFactor` (the projection,
+`stageSpeed`) and `claimMachine` already read it, so without this line the man on a gated saw
+would be projected at +2% and paid at +0%.
+
+`buyGate` in `game.ts` carries its own four refusals; `gateCheck(state, equipmentId)` in
+`machines.ts` is the same four in the same words, and the Owned tile's button reads it. One code
+path: replace the body of `buyGate` up to the payment with
+
+```ts
+  const check = gateCheck(state, equipmentId);
+  if (!check.ok) return check;
+  const item = state.equipment.find((entry) => entry.id === equipmentId);
+  if (!item) return { ok: false, reason: 'No such machine' };
+```
+
+and import `gateCheck` from `./machines` (the `extractionDemandOfItem` alias and the `GATE_PRICE`
+`canAfford` check in `buyGate` then go).
 
 ### `src/ui/styles.css`
 
 The class badge and frame (T13-B4a). The colour comes from `CLASS_BADGE` on the element as
 `--class-colour`, so the CSS carries no colour of its own:
+
+The pipe layer (T13-B4b, T13-B4c):
+
+```css
+.pipe-layer {
+  pointer-events: none;
+}
+.gate-collar .placeholder text {
+  display: none;
+}
+```
 
 ```css
 .badge-class {
@@ -92,6 +139,10 @@ In the style of `docs/art/REQUESTS-T13.md`; phase C merges these into it.
   heavier, with a power feed.
 - **Pallet truck** (`palletTruck`), 1 by 1 by 1 m, a handling item like the forklift: drawn tonight
   as `placeholder('palletTruck', size, { dimetric: true })`.
+- **Gate collar** (`gate.collar`): sits on the drop cell of a gated machine, half a cell wide,
+  drawn at the ducting's height (3 m) in the 2:1 dimetric; tonight
+  `placeholder('gate.collar', size, { dimetric: true })` through `pipeCellArt` in `hall.ts`, which
+  places the delivered file by the same anchor (the centre of the cell, lifted).
 
 ---
 
@@ -103,6 +154,17 @@ Nothing yet.
 
 ## 7. Cross check notes
 
+- **The load rule (10.1).** CLAUDE.md 3.11 says an ungated machine counts "whenever it is
+  connected". Read literally, two connected saws would make a hall short at 08:00 with nobody at
+  either, and during a pure bench minute, when the fan is not even running (`machineInUse` on the
+  extractor is "any machine at work"). `extractionLoad` therefore counts the open branches only
+  while the fan runs at all (some machine with a demand has a man at it); while it runs, every
+  connected ungated machine counts, at work or idle, and a gated one only at work. With nothing
+  running the demand is zero and the hall is not short. The sixteen months and every engine test
+  hold under it without edits; the fan month (o) gets shorter, as it should.
+- The gates change the air sum only: `extractionLoad` is read by `extractionCheck` and by nothing
+  in the dust path (`accumulateMachineMinute` reads `dustOutputOf` by family); asserted in
+  `tests/engine/extraction.test.ts`.
 - The class cards read the dust off `DUST_OUTPUT_M3_PER_HOUR` by family and nothing else; the
   variants test now asserts that no class of any ladder carries a `dust` field (10.1).
 - The insurance line on a card is `price * PROPERTY_INSURANCE_RATE_YEARLY` through

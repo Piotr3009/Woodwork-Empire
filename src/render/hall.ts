@@ -27,9 +27,11 @@ import {
   findSpec,
   gateIsCrowded,
   hasExtraction,
+  hasGate,
   machinesDueService,
   serviceIsDue,
 } from '../engine/machines';
+import { footprintOrigin, portCell } from '../engine/pipes';
 import { jobsAtGate } from '../engine/jobs';
 import { orderName, reservedItems, shoppingList } from '../engine/orders';
 import {
@@ -63,6 +65,7 @@ import {
   type Point,
   type Polygon,
   TILE_RISE,
+  TILE_WIDTH,
   blockSilhouette,
   boxPolygons,
   centreOf,
@@ -651,18 +654,73 @@ export function footprintIn(item: Equipment): {
   depth: number;
   height: number;
 } {
-  const stands = itemFootprint(item);
-  const zone = itemZone(item);
-  // A class that holds no floor is kept in a tool cabinet: its picture stands on the cell the
-  // cabinet stands on, with nothing to centre it in (CLAUDE.md T7 3.6).
-  const inZone = zone.width > 0 && zone.depth > 0;
-  return {
-    x: item.anchorX + (inZone ? (zone.width - stands.width) / 2 : 0),
-    y: item.anchorY + (inZone ? (zone.depth - stands.depth) / 2 : 0),
-    width: stands.width,
-    depth: stands.depth,
-    height: stands.height,
-  };
+  // The one arithmetic, shared with the pipe that drops onto the same footprint (T13 3.19).
+  return footprintOrigin(item);
+}
+
+// ---------------------------------------------------------------------------
+// The pipe layer (CLAUDE.md T13 3.11, 3.19): the runs the game routed and the gate collars on
+// their drops, drawn above the equipment at the height of the ducting. It occupies no cell and
+// blocks nothing under it.
+// ---------------------------------------------------------------------------
+
+/** One cell of the pipe layer as the placeholder helper draws it, in the hall's 2:1 dimetric,
+ *  lifted to the ducting's height: a diamond the size of a cell with its top corner on the cell's
+ *  own top corner, or a smaller one centred on the cell for the collar. The delivered picture,
+ *  when the art side has painted the key, is placed by the same anchor. */
+export function pipeCellArt(
+  kind: string,
+  cell: { x: number; y: number },
+  files: readonly string[],
+  scale = 1,
+): string {
+  const url = pickSprite(files, kind);
+  const width = TILE_WIDTH * scale;
+  // The dimetric placeholder is three thirds tall: the diamond is the middle third, so a cell
+  // wide box is a cell and a half high and its diamond is exactly a cell (docs/art/SPRITES.md 1).
+  const height = width * 1.5;
+  const centre = centreOf(cell.x, cell.y, 1, 1, DUCT_HEIGHT);
+  const at = { x: centre.x - width / 2, y: centre.y - height / 2 };
+  if (url !== null) {
+    return spriteImage(url, { x: at.x, y: at.y, width, height });
+  }
+  return (
+    `<g class="pipe-tile" data-pipe-tile="${escapeText(kind)}" ` +
+    `transform="translate(${round(at.x)},${round(at.y)})">` +
+    placeholder(kind, { width, height }, { dimetric: true }) +
+    '</g>'
+  );
+}
+
+/** How much smaller than a cell the collar is drawn [TUNE]. */
+const GATE_COLLAR_SCALE = 0.5;
+
+/** The automatic gate on a machine's drop: a short collar on the drop cell (CLAUDE.md T13 3.11). */
+export function gateCollar(item: Equipment, files: readonly string[]): string {
+  return (
+    `<g class="gate-collar" data-gate="${item.id}">` +
+    pipeCellArt('gate.collar', portCell(item), files, GATE_COLLAR_SCALE) +
+    '</g>'
+  );
+}
+
+/** Every gate collar in the hall, on the drop of every gated machine standing on the floor. */
+export function gateCollars(state: GameState, files: readonly string[]): string {
+  return state.equipment
+    .filter(
+      (item) =>
+        !isSold(item) &&
+        itemStandsInTheHall(item) &&
+        item.anchorX < state.unit.widthCells &&
+        hasGate(state, item),
+    )
+    .map((item) => gateCollar(item, files))
+    .join('');
+}
+
+/** The whole layer: the runs, then the collars over their drops. */
+export function pipeLayer(state: GameState, files: readonly string[]): string {
+  return `<g class="pipe-layer">${gateCollars(state, files)}</g>`;
 }
 
 export function machineFx(state: GameState, item: Equipment, spec: EquipmentSpec): MachineFx {
@@ -1243,6 +1301,10 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
   // The drop to every ducted machine, over the machines so the port is on the picture and not
   // behind it (CLAUDE.md T10 3.4).
   live.push(ductDrops(state));
+
+  // The pipes the game routed and the gate collars on their drops: a layer above the equipment
+  // (CLAUDE.md T13 3.11, 3.19).
+  live.push(pipeLayer(state, files));
 
   // The ghost footprint of whatever is being dragged, on top of everything else.
   if (ghost !== null) {
