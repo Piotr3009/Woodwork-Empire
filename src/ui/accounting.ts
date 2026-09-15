@@ -21,6 +21,10 @@ import {
   weeklyWageBill,
 } from '../engine/index';
 import type { GameState, LedgerCategory, LedgerEntry, PeriodTotals } from '../engine/index';
+// T13-C1: export from index.ts
+import { nextInstalmentFor } from '../engine/finance';
+// T13-C1: export from index.ts
+import { monthlyPremiums } from '../engine/insurance';
 import { renderFinance } from './finance';
 import { button, escapeHtml, money, plural, primaryButton, tabBar, whyLink } from './modal';
 
@@ -215,6 +219,20 @@ function dayRows(
     .join('');
 }
 
+/** What the 1st takes, in words: the standing items, and the loan and the covers when they are
+ *  on the books (CLAUDE.md T13 3.14, 3.15). */
+function monthlyBillsLine(state: GameState): string {
+  const items = ['salaries', 'software', 'waste'];
+  const loan = state.finance.loan;
+  if (loan !== null) items.push(`loan instalment ${money(nextInstalmentFor(loan))}`);
+  const premiums = monthlyPremiums(state);
+  if (premiums > 0) items.push(`insurance ${money(premiums)}`);
+  if (state.finance.overdraftInterestAccrued > 0) {
+    items.push(`overdraft interest ${money(state.finance.overdraftInterestAccrued)}`);
+  }
+  return items.join(', ');
+}
+
 /** What the workshop earns for an hour of somebody's time, machines and all (CLAUDE.md T6 3.8). */
 function earnedRateLine(state: GameState): string {
   return (
@@ -265,7 +283,7 @@ export function renderAccounting(
     `<div class="row"><span class="row-main">Wages, day ${due.wages}</span>` +
     `<span class="row-figure">${money(weeklyWageBill(state))}</span></div>` +
     `<div class="row"><span class="row-main">Monthly bills, day ${due.monthly}</span>` +
-    '<span class="row-figure">salaries, software, waste</span></div>' +
+    `<span class="row-figure">${escapeHtml(monthlyBillsLine(state))}</span></div>` +
     '';
   const ledgerTab = `<h3>Ledger, last ${LEDGER_VISIBLE_ENTRIES}</h3>` + ledger;
   const body =
