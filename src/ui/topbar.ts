@@ -157,7 +157,7 @@ function segmentBar(state: GameState, total: number): string {
 }
 
 /** The legend, on a small cream plate, with what each band has come to so far. It is behind the
- *  hover so the bar itself carries no legend under it (CLAUDE.md T11 3.1). */
+ *  pointer, so the bar itself carries no legend under it (CLAUDE.md T11 3.1). */
 function segmentTooltip(state: GameState): string {
   const found = minutesPerBand(state);
   const rows = DAY_CATEGORIES.map((category) => {

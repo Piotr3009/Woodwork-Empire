@@ -14,7 +14,7 @@ import {
   pipeCellArt,
   polygon,
 } from '../render/hall';
-import { OFFICE_CANVAS, OFFICE_LAYERS } from '../render/office';
+import { OFFICE_CANVAS, OFFICE_LAYERS, OFFICE_LIT_LAYERS } from '../render/office';
 import { boxPolygons, centreOf, footprintPolygon, gridBounds, tileToScreen } from '../render/iso';
 import {
   SPRITE_SCALE,
@@ -382,6 +382,14 @@ export function renderSpriteCheck(): string {
       'One canvas, three layers, stacked at the origin. They reproduce the review composite when ' +
         'they are laid over each other.',
       OFFICE_LAYERS,
+      OFFICE_CANVAS,
+    ) +
+    layerSection(
+      'The office, lit',
+      'One thing of the room alone on the same canvas, painted as if lit, everything else ' +
+        'transparent: the game lays it over the room while the pointer is on that thing, and ' +
+        'gives the thing a soft light spot until the file is here (docs/art/REQUESTS-T14.md).',
+      OFFICE_LIT_LAYERS,
       OFFICE_CANVAS,
     ) +
     pipeSection() +

@@ -1204,8 +1204,8 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
     // (CLAUDE.md T13 3.19).
     const pipeLine = wantsExtraction(item) && !isConnected(state, item) ? ' (no pipe)' : '';
     const name = `${spec.name}${bagLine}${serviceLine}${benchLine}${rackLine}${pipeLine}`;
-    // Hovering the extractor reads the hall's store (CLAUDE.md T12 3.3).
-    const hover =
+    // Pointing at the extractor reads the hall's store (CLAUDE.md T12 3.3).
+    const tooltip =
       item.specId === 'extractor' && store.exists
         ? `${name}. ${bagStoreLine(store)}. ${spec.effect}`
         : `${name}. ${spec.effect}`;
@@ -1216,7 +1216,7 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
         `<g data-kit="${item.id}"${spec.category === 'storage' ? ' data-rack="1"' : ''} ` +
         `data-sprite="${item.spriteKey}" data-tier="${item.variantId}" ` +
         `class="clickable${fx.className}">` +
-        `<title>${escapeText(hover)}</title>` +
+        `<title>${escapeText(tooltip)}</title>` +
         objectArt({
           files,
           spriteKey: item.spriteKey,

@@ -1465,7 +1465,8 @@ input.num {
 }
 
 /* No fill at all and no border at rest: the white boxes over the laptop and the door are gone
-   (PIOTR, 15.09; CLAUDE.md T11 3.5). */
+   (PIOTR, 15.09; CLAUDE.md T11 3.5), and so is the orange rectangle that lit up on the pointer
+   (PIOTR, 15.09; CLAUDE.md T14 2.2). */
 .office-region {
   background: transparent;
   border: 0;
@@ -1476,20 +1477,81 @@ input.num {
   border-radius: 4px;
   padding: 0;
   position: absolute;
-  /* The outline is the browser's and nothing else's: the game writes no hover state at all, so
+  /* The ring is the browser's and nothing else's: the game writes no pointer state at all, so
      there is nothing to blink with the clock (PIOTR, 13.09; CLAUDE.md T9 3.4). */
   transition: outline-color 120ms ease;
 }
 
-/* On hover a 2 px orange outline with a 4 px radius, and nothing else at all (T11 3.5). */
-.office-region:hover,
+/* The keyboard has nothing else, so on :focus-visible only, a 2 px ring in the accent. The
+   pointer gets no rectangle of any kind (CLAUDE.md T14 2.2). */
 .office-region:focus-visible {
-  background: transparent;
   outline-color: var(--accent);
 }
 
 .office-region.is-quiet {
   pointer-events: none;
+}
+
+/* The pointer on a thing in the office lights the thing and names it, and nothing else
+   (PIOTR, 15.09; CLAUDE.md T14 2.2). All of it is :hover in this file: the game writes no pointer
+   state and never did (T9 3.4), so nothing can blink with the clock. */
+
+/* The door, the two wall boards, the binder and the catalogue are painted into layers they share
+   with other things, so they get a soft light spot fitted to the region: a radial ellipse, no
+   edge, no rectangle [TUNE]. It is a background image, so a drawn placeholder keeps its colour. */
+.office-stack .office-region:hover {
+  background-image: radial-gradient(ellipse at center, rgba(245, 239, 226, 0.28), transparent 70%);
+}
+
+/* The laptop is its own layer and glows in its own shape instead (below), and a region whose
+   lit overlay has landed shows the overlay instead of the spot. */
+.office-stack .office-region[data-office="laptop"]:hover,
+.office-stack[data-lit~="door"] .office-region[data-office="door"]:hover {
+  background-image: none;
+}
+
+/* The glow: the laptop layer lights up in the shape of the laptop while its region is under the
+   pointer. The region and the layer are siblings in the stack, so the stack is asked with :has()
+   and no JavaScript [TUNE: the two shadows]. */
+.office-stack:has(.office-region[data-office="laptop"]:hover) .office-layer[data-layer="officeLaptop"] {
+  filter: drop-shadow(0 0 14px rgba(245, 239, 226, 0.75)) drop-shadow(0 0 30px rgba(224, 115, 30, 0.45));
+}
+
+/* A lit overlay, when the art side has delivered one: over the room while its region is under
+   the pointer, and nowhere otherwise (docs/art/REQUESTS-T14.md). */
+.office-lit {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+}
+
+.office-stack:has(.office-region[data-office="door"]:hover) .office-lit[data-lit="door"] {
+  opacity: 1;
+}
+
+/* The label: a handwritten pill at the top right of the region with the region's name, on the
+   pointer and nothing else. It is a child of the region every time, hidden until then, so the
+   room's markup never changes with the pointer (T14 2.2) [TUNE: the pill]. */
+.office-label {
+  background: rgba(16, 37, 24, 0.85);
+  border-radius: 999px;
+  color: var(--cream);
+  font-family: var(--font-title);
+  font-size: 26px;
+  line-height: 1;
+  opacity: 0;
+  padding: 7px 18px 9px;
+  pointer-events: none;
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  transform: rotate(-3deg);
+  transition: opacity 120ms ease;
+  white-space: nowrap;
+}
+
+.office-region:hover .office-label {
+  opacity: 1;
 }
 
 /* The two live texts sit in the blank areas the artwork leaves for them. */
@@ -1758,9 +1820,6 @@ input.num {
   padding-bottom: 16px;
 }
 
-.office-floor-catalogue:hover {
-  background: var(--accent);
-}
 
 /* Once the art side has delivered a picture of it, the region is the picture and nothing else
    (CLAUDE.md T8 3.7). */
@@ -1819,9 +1878,6 @@ input.num {
   text-align: center;
 }
 
-.office-company-board:hover {
-  background: rgb(30 48 40 / 94%);
-}
 
 /* Two columns on the company board modal: the weeks on the left, the output on the right. */
 .board-columns {
@@ -1932,10 +1988,6 @@ input.num {
   padding: 0;
 }
 
-.office-company-board.is-art:hover {
-  background: transparent;
-  filter: drop-shadow(0 0 6px var(--accent));
-}
 
 .office-floor-catalogue.is-art {
   background: transparent;
@@ -1943,10 +1995,6 @@ input.num {
   padding: 0;
 }
 
-.office-floor-catalogue.is-art:hover {
-  background: transparent;
-  filter: drop-shadow(0 0 6px var(--accent));
-}
 
 .office-floor-catalogue.is-art.on-desk {
   transform: scale(0.72);
