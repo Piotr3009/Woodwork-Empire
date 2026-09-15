@@ -11,7 +11,8 @@ work went, one commit per task; phase C consolidates it into `REPORT-T13.md`.
 | Task | Commit | What went in | Proved by |
 |---|---|---|---|
 | T13-B4a Five classes everywhere, the spindle moulder, the badges | `fe143bf` | One layout function `classCard` in `src/ui/machine.ts` for every class card of every family: effects (output, dust, extraction and air needed, life, the class's own effects: what a fan pulls and holds, what a compressor gives, what a rack holds, that a machine with a drop takes a gate), a gap, costs (price, delivery, power, the insurance it adds a year, the floor), a gap, the description in the body font; every signed line through `signedFigure`; the badge and frame colour of the class from `CLASS_BADGE` on every card and on the Owned tile (`classBadge`, `classFrame`, a `--class-colour` custom property). `insuranceAddedYearly(price)` in `src/engine/machines.ts`. The spindle moulder's classes and the pallet truck draw as the placeholder in the hall (`objectArt`) and on the sprite check page (`PLACEHOLDER_SPRITES`, `placeholderKindFor` in `src/render/sprites.ts`). Verified: the two kitchens grey without a spindle moulder through `kitBlockFor`; `TIMBER_BRANCH_MIN_SPINDLE_CLASS` is read by nothing. | `tests/ui/machine.test.ts` (effects then costs then description on every card of every family; the badge and frame; every signed line through the helper), `tests/engine/variants.test.ts` (every ladder family has the five classes in `CLASS_ORDER` with a badge, no class carries a dust figure), `tests/engine/catalog.test.ts` (the kitchens need the spindle moulder; the timber constant is unread), `tests/ui/spriteCheck.test.ts`, `tests/render/hall.test.ts` |
-| T13-B4b Gates | this commit | `hasGate`, `outputFactorOf(state, item)` (the class factor times `1 + GATE_OUTPUT_BONUS` once a gate is on) and `gateCheck` in `src/engine/machines.ts`; `claimMachine`, `bestOutputFactor` and `machineOutputFactor` read the factor through it (the one place left is game.ts line 1599, a note). `extractionRunning` and `extractionLoad` in `src/engine/media.ts`: while the fan runs at all, the demand is every connected ungated machine plus every gated one a man is at; `extractionCheck` sums the load. `footprintOrigin` and `portCell` in `src/engine/pipes.ts` (the one arithmetic the hall draws by and the pipe drops by). The Owned tile carries `Automatic gate, 1,000` (`data-do="buyGate" data-id="<equipment id>"`), greyed `Gate fitted` once fitted, absent on a machine with no demand, and the signed `+2%` line (`gateAction`, `src/ui/catalogue.ts`). The collar is drawn on the drop cell above the machine at the ducting's height in the new pipe layer of `src/render/hall.ts` (`pipeCellArt`, `gateCollar`, `gateCollars`, `pipeLayer`), as `placeholder('gate.collar', ..., { dimetric: true })` until the file lands. | `tests/engine/machines.test.ts` (+2% on that machine only, through the man, the projection and the board; the gated one is preferred; refused with no demand, twice, and without cash), `tests/engine/extraction.test.ts` (an ungated connected machine counts whenever the fan runs, a gated one only while it runs, nothing counts while nothing runs, an unconnected one is unserved and never in the sum; the gate changes the air sum and not the dust), `tests/ui/catalogueTabs.test.ts` (the button, the greyed state, the bench without one), `tests/render/hall.test.ts` (the collar on the drop cell, lifted, in the live part above the equipment, the file taking its place) |
+| T13-B4b Gates | `acad7c3` | `hasGate`, `outputFactorOf(state, item)` (the class factor times `1 + GATE_OUTPUT_BONUS` once a gate is on) and `gateCheck` in `src/engine/machines.ts`; `claimMachine`, `bestOutputFactor` and `machineOutputFactor` read the factor through it (the one place left is game.ts line 1599, a note). `extractionRunning` and `extractionLoad` in `src/engine/media.ts`: while the fan runs at all, the demand is every connected ungated machine plus every gated one a man is at; `extractionCheck` sums the load. `footprintOrigin` and `portCell` in `src/engine/pipes.ts` (the one arithmetic the hall draws by and the pipe drops by). The Owned tile carries `Automatic gate, 1,000` (`data-do="buyGate" data-id="<equipment id>"`), greyed `Gate fitted` once fitted, absent on a machine with no demand, and the signed `+2%` line (`gateAction`, `src/ui/catalogue.ts`). The collar is drawn on the drop cell above the machine at the ducting's height in the new pipe layer of `src/render/hall.ts` (`pipeCellArt`, `gateCollar`, `gateCollars`, `pipeLayer`), as `placeholder('gate.collar', ..., { dimetric: true })` until the file lands. | `tests/engine/machines.test.ts` (+2% on that machine only, through the man, the projection and the board; the gated one is preferred; refused with no demand, twice, and without cash), `tests/engine/extraction.test.ts` (an ungated connected machine counts whenever the fan runs, a gated one only while it runs, nothing counts while nothing runs, an unconnected one is unserved and never in the sum; the gate changes the air sum and not the dust), `tests/ui/catalogueTabs.test.ts` (the button, the greyed state, the bench without one), `tests/render/hall.test.ts` (the collar on the drop cell, lifted, in the live part above the equipment, the file taking its place) |
+| T13-B4c Pipes | this commit | `src/engine/pipes.ts` rewritten around a path of cells: `pathBetween` (Manhattan, the long leg first, one elbow at most, x first on a tie), `tileKeysFor` (drop, ns, ew, the four elbows by their arms, inlet or tee), `bestPath` (straight to the unit's inlet, or a tee onto the nearest cell of a run that already goes to that unit where that is shorter; a tie goes to the unit), `nearestTarget` by the walk of the pipe with tees counted, `routePipe` (signature kept), `connectCheck` and `connectExtraction` charging `metres * PIPE_PRICE_PER_METRE` on the `pipes` ledger category, `removeRun` (a branch that joined a run takes over its tail when it goes, so nothing hangs in the air; refunds nothing), `disconnectExtraction`, `dropOrphanPipes`. The pipe occupies no cell: `canPlaceSpec` and `freeFloorM2` never read `state.pipes`. `src/render/hall.ts`: `pipeRunArt`, `pipeRuns`, `pipeLayer` draw every tile of every run through `pipeCellArt` (the placeholder in the 2:1 dimetric at the ducting's height, or the delivered file by the same anchor) above the equipment, `pipe-short` on a run whose machine is running while the hall is short, and `(no pipe)` in the tooltip of an unconnected machine. The Owned tile carries `Connect to extraction, <cost>` (`data-do="connectExtraction" data-id="<equipment id>"`, the cost from `connectCheck`), greyed `Connected` with the metres once on, nothing on a bench or under a central system (`connectAction`, `src/ui/catalogue.ts`). The sprite check page lists the eight tiles and the collar in a section of their own (`PIPE_LAYER_KEYS`). | `tests/engine/pipes.test.ts` (the path: straight, the long leg first, x on a tie; the keys of every tile; routing: straight, one elbow by its arms, a tee onto an existing run to the same unit, never onto a run to another unit, the metres and the ledger line, no cell occupied and the free floor unchanged, the nearer of two extractors, no refund on a disconnection and the new length on a reconnection, the branch taking over a trunk that goes, orphans dropped, the refusals), `tests/render/hall.test.ts` (every tile key maps to a placeholder draw and to the file, the runs in the hall above the equipment, the red outline only while short and running), `tests/ui/catalogueTabs.test.ts` (the button with its cost, the greyed state with the metres, the bench without one, one click connects), `tests/ui/spriteCheck.test.ts` (the nine keys once each) |
 
 ---
 
@@ -31,7 +32,8 @@ work went, one commit per task; phase C consolidates it into `REPORT-T13.md`.
   (imported by module path with the `T13-C1` comment in `src/ui/machine.ts` and
   `src/ui/catalogue.ts`).
 - Export `extractionLoad`, `extractionRunning` from `./media`.
-- Export `footprintOrigin`, `portCell` from `./pipes`.
+- Export `footprintOrigin`, `portCell`, `pathBetween`, `tileKeysFor`, `runCells` from `./pipes`
+  (the last three are read by tests only; the render imports the first two by module path).
 
 ### `src/engine/game.ts` (T13-B4b, the gate's output)
 
@@ -67,17 +69,6 @@ and import `gateCheck` from `./machines` (the `extractionDemandOfItem` alias and
 
 The class badge and frame (T13-B4a). The colour comes from `CLASS_BADGE` on the element as
 `--class-colour`, so the CSS carries no colour of its own:
-
-The pipe layer (T13-B4b, T13-B4c):
-
-```css
-.pipe-layer {
-  pointer-events: none;
-}
-.gate-collar .placeholder text {
-  display: none;
-}
-```
 
 ```css
 .badge-class {
@@ -120,6 +111,32 @@ The pipe layer (T13-B4b, T13-B4c):
 }
 ```
 
+The pipe layer (T13-B4b, T13-B4c). The layer is a picture and never a control; the placeholder
+writes its kind on every tile, which is noise on a pipe, so the label is hidden here and shown
+on the sprite check page only; the red outline of 3.19 is a stroke on the placeholder's faces
+and a red shadow on the delivered file:
+
+```css
+.pipe-layer {
+  pointer-events: none;
+}
+.pipe-tile .placeholder text,
+.gate-collar .placeholder text {
+  display: none;
+}
+.pipe-tile .placeholder polygon {
+  stroke: #163f2a;
+  stroke-width: 0.5;
+}
+.pipe-short .pipe-tile .placeholder polygon {
+  stroke: var(--bad);
+  stroke-width: 1.5;
+}
+.pipe-short image {
+  filter: drop-shadow(0 0 1px var(--bad)) drop-shadow(0 0 1px var(--bad));
+}
+```
+
 ---
 
 ## 4. Foreign test edits
@@ -139,6 +156,17 @@ In the style of `docs/art/REQUESTS-T13.md`; phase C merges these into it.
   heavier, with a power feed.
 - **Pallet truck** (`palletTruck`), 1 by 1 by 1 m, a handling item like the forklift: drawn tonight
   as `placeholder('palletTruck', size, { dimetric: true })`.
+- **Pipe tiles, eight, plus the inlet** (`pipe.ns`, `pipe.ew`, `pipe.ne`, `pipe.nw`, `pipe.se`,
+  `pipe.sw`, `pipe.tee`, `pipe.drop`, `pipe.inlet`): one cell each, drawn at the ducting's height
+  (3 m) **in the hall's 2:1 dimetric and never straight on**, dark green steel with a lighter top
+  edge, no cast shadow. `pipeCellArt` in `hall.ts` places the file with its centre on the centre of
+  the cell lifted by 3 m, in a box one cell wide and a cell and a half high (48 by 72 at 1x, 96 by
+  144 in the file), so a tile is drawn at that size and anchored at its centre. The elbows are
+  named by their arms: `pipe.ne` joins a north arm (world minus y, up right on screen) to an east
+  arm (world plus x, down right on screen). The drop is the vertical from the run down to the
+  machine's port, with the run's arm towards the next cell on it; the inlet is the run's last cell
+  turning down into the unit. Tonight every one is `placeholder('pipe.<key>', size, { dimetric:
+  true })`, listed on the sprite check page under "The pipe layer".
 - **Gate collar** (`gate.collar`): sits on the drop cell of a gated machine, half a cell wide,
   drawn at the ducting's height (3 m) in the 2:1 dimetric; tonight
   `placeholder('gate.collar', size, { dimetric: true })` through `pipeCellArt` in `hall.ts`, which
@@ -162,6 +190,15 @@ Nothing yet.
   connected ungated machine counts, at work or idle, and a gated one only at work. With nothing
   running the demand is zero and the hall is not short. The sixteen months and every engine test
   hold under it without edits; the fan month (o) gets shorter, as it should.
+- **The pipes change nothing in the sums beyond connection (10.1):** a running machine with no
+  run is in `unservedMachines` and the hall is short with the line "not connected"; the moment
+  a run exists for it, it is in the load and counted by its demand. Both directions are asserted
+  in `tests/engine/extraction.test.ts` ("counts a machine with no pipe as not served, and never as
+  part of the sum"). Which unit a run goes to changes nothing in the sum either: the hall is one
+  duct run and every fan adds up (T10 3.1), so `nearestTarget` picks by the walk of the pipe alone.
+- **One ledger (10.2):** every metre goes through `charge(state, 'pipes', ...)` in
+  `connectExtraction`; a disconnection writes nothing and refunds nothing; a branch taking over a
+  trunk's tail writes nothing.
 - The gates change the air sum only: `extractionLoad` is read by `extractionCheck` and by nothing
   in the dust path (`accumulateMachineMinute` reads `dustOutputOf` by family); asserted in
   `tests/engine/extraction.test.ts`.

@@ -53,12 +53,50 @@ describe('the automatic gate on the card of a machine in the hall (CLAUDE.md T13
     state = act(state, { type: 'BUY_GATE', equipmentId: saw.id });
     const fitted = shop(state, 'owned').querySelector(`[data-owned="${saw.id}"]`);
     expect(fitted?.querySelector('[data-do="buyGate"]')).toBeNull();
-    const greyed = fitted?.querySelector('button[disabled]');
-    expect(greyed?.textContent).toBe('Gate fitted');
+    const greyed = Array.from(fitted?.querySelectorAll('button[disabled]') ?? []).map(
+      (node) => node.textContent,
+    );
+    expect(greyed).toContain('Gate fitted');
     // What it does is on the card, coloured by its sign (CLAUDE.md T13 1).
     expect(fitted?.querySelector('.figure.good')?.textContent).toBe(
       'Automatic gate fitted: output +2%',
     );
+  });
+});
+
+describe('connect to extraction on the card of a machine in the hall (CLAUDE.md T13 3.19)', () => {
+  it('offers the pipe at its cost, greys it once it is on, and never on a bench or under the ducts', () => {
+    let state = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
+    const saw = state.equipment.find((item) => item.specId === 'tableSaw');
+    const bench = state.equipment.find((item) => item.specId === 'workbench');
+    if (!saw || !bench) throw new Error('no kit');
+    // The day 1 kit stands connected: the button is greyed and the card says how much pipe.
+    const connected = shop(state, 'owned').querySelector(`[data-owned="${saw.id}"]`);
+    expect(connected?.querySelector('[data-do="connectExtraction"]')).toBeNull();
+    const greyed = Array.from(connected?.querySelectorAll('button[disabled]') ?? []).map(
+      (node) => node.textContent,
+    );
+    expect(greyed).toContain('Connected');
+    expect(connected?.textContent).toMatch(/\d+ m of pipe to the extraction/);
+    // Off the extraction: the button, with the cost the game would charge for the route.
+    state.pipes = [];
+    const page = shop(state, 'owned');
+    const button = page.querySelector(`[data-do="connectExtraction"][data-id="${saw.id}"]`);
+    expect(button).not.toBeNull();
+    expect(button?.textContent).toMatch(/^Connect to extraction, \u00a3[\d,]+$/);
+    expect(page.querySelector(`[data-owned="${saw.id}"]`)?.textContent).toContain(
+      'not connected to the extraction',
+    );
+    // A bench wants no pipe, and its card says nothing about one.
+    expect(page.querySelector(`[data-owned="${bench.id}"] [data-do="connectExtraction"]`)).toBeNull();
+    expect(page.querySelector(`[data-owned="${bench.id}"]`)?.textContent).not.toContain('extraction');
+    // One click connects it and the ledger carries the metres (CLAUDE.md T13 3.19).
+    state = act(state, { type: 'CONNECT_EXTRACTION', equipmentId: saw.id });
+    expect(state.pipes.some((run) => run.equipmentId === saw.id)).toBe(true);
+    expect(state.ledger[state.ledger.length - 1]?.category).toBe('pipes');
+    expect(
+      shop(state, 'owned').querySelector(`[data-owned="${saw.id}"] [data-do="connectExtraction"]`),
+    ).toBeNull();
   });
 });
 

@@ -2,8 +2,16 @@
 // placeholder box, and the picture beside it when the art side has delivered one. This page is
 // the acceptance tool of docs/art/SPRITES.md item 7 (CLAUDE.md T3 3.6).
 
-import { DELIVERY_VAN_SPRITE, EQUIPMENT_SPECS, GATE_LAYOUT } from '../engine/constants';
-import { HALL_CANVAS, HALL_LAYERS, box, escapeText, label, polygon } from '../render/hall';
+import { DELIVERY_VAN_SPRITE, EQUIPMENT_SPECS, GATE_LAYOUT, PIPE_TILE_KEYS } from '../engine/constants';
+import {
+  HALL_CANVAS,
+  HALL_LAYERS,
+  box,
+  escapeText,
+  label,
+  pipeCellArt,
+  polygon,
+} from '../render/hall';
 import { OFFICE_CANVAS, OFFICE_LAYERS } from '../render/office';
 import { boxPolygons, centreOf, footprintPolygon, gridBounds, tileToScreen } from '../render/iso';
 import {
@@ -12,6 +20,7 @@ import {
   spriteAnchorIn,
   spriteCanvas,
   spriteFileSize,
+  spriteFiles,
   spriteUrl,
 } from '../render/sprites';
 import { placeholderSvg } from '../render/placeholder';
@@ -243,6 +252,37 @@ function layerSection(
   );
 }
 
+/** The keys of the pipe layer the art side owes, each one cell (CLAUDE.md T13 3.11, 3.19;
+ *  docs/art/REQUESTS-T13.md 1 and 2). */
+export const PIPE_LAYER_KEYS: readonly string[] = [...PIPE_TILE_KEYS, 'gate.collar'];
+
+/** One key of the pipe layer as the hall draws it: the placeholder in the 2:1 dimetric, or the
+ *  delivered file, on one cell at the height of the ducting. The view box is the cell with room
+ *  above it for the lift. */
+function pipeKeyCell(key: string): string {
+  const drawn = pipeCellArt(key, { x: 0, y: 0 }, spriteFiles());
+  const url = spriteUrl(key);
+  return (
+    `<div class="sprite-cell" data-pipe-key="${escapeHtml(key)}">` +
+    `<svg class="sprite-proof" viewBox="-40 -110 80 140" width="80" height="140" ` +
+    `role="img" aria-label="${escapeText(key)}">${drawn}</svg>` +
+    `<p class="sprite-key">${escapeHtml(`${key}.png`)}</p>` +
+    `<p class="sprite-figures">${url === null ? 'no file yet, the placeholder stands' : escapeHtml(url)}</p>` +
+    '</div>'
+  );
+}
+
+function pipeSection(): string {
+  const delivered = PIPE_LAYER_KEYS.filter((key) => spriteUrl(key) !== null).length;
+  return (
+    `<h3>The pipe layer, ${delivered} of ${PIPE_LAYER_KEYS.length} tiles delivered</h3>` +
+    '<p class="hint">Eight pipe tiles and the gate collar, one cell each, drawn in the hall\u2019s ' +
+    '2:1 dimetric at the height of the ducting and never straight on. Until a file lands the ' +
+    'placeholder stands in for it, here and in the hall.</p>' +
+    `<div class="sprite-grid">${PIPE_LAYER_KEYS.map((key) => pipeKeyCell(key)).join('')}</div>`
+  );
+}
+
 /** The roles the game draws figures for. Joiners have their sheet tonight; the rest fall back to
  *  the capsule until theirs are delivered (CLAUDE.md T9 3.13). */
 const CHARACTER_ROLES = ['joiner', 'helper', 'owner'];
@@ -330,6 +370,7 @@ export function renderSpriteCheck(): string {
       OFFICE_LAYERS,
       OFFICE_CANVAS,
     ) +
+    pipeSection() +
     characterSection() +
     '</div>'
   );

@@ -7,7 +7,8 @@ import { HALL_LAYERS } from '../../src/render/hall';
 import { OFFICE_LAYERS } from '../../src/render/office';
 import { standsInTheHall } from '../../src/engine/machines';
 import { spriteUrl } from '../../src/render/sprites';
-import { renderSpriteCheck, spriteTargets } from '../../src/ui/spriteCheck';
+import { PIPE_LAYER_KEYS, renderSpriteCheck, spriteTargets } from '../../src/ui/spriteCheck';
+import { PIPE_TILE_KEYS } from '../../src/engine/constants';
 
 function parse(html: string): HTMLElement {
   const holder = document.createElement('div');
@@ -64,7 +65,7 @@ describe('the sprite check page', () => {
 
   it('draws one cell per key, each with a footprint, a box and a picture slot', () => {
     const page = parse(renderSpriteCheck());
-    const cells = Array.from(page.querySelectorAll('.sprite-grid .sprite-cell'));
+    const cells = Array.from(page.querySelectorAll('.sprite-grid .sprite-cell[data-sprite-target]'));
     expect(cells).toHaveLength(spriteTargets().length);
     const keys = cells.map((cell) => cell.getAttribute('data-sprite-target'));
     expect(new Set(keys).size).toBe(keys.length);
@@ -120,6 +121,20 @@ describe('the sprite check page', () => {
     }
     const truck = page.querySelector('[data-sprite-target="palletTruck"] [data-placeholder]');
     expect(truck?.getAttribute('data-placeholder')).toBe('palletTruck');
+  });
+
+  it('lists the eight pipe tiles and the gate collar once each, drawn as the hall draws them', () => {
+    // The pipe layer the art side owes (CLAUDE.md T13 3.11, 3.19; docs/art/REQUESTS-T13.md 1, 2).
+    expect([...PIPE_LAYER_KEYS]).toEqual([...PIPE_TILE_KEYS, 'gate.collar']);
+    const page = parse(renderSpriteCheck());
+    expect(page.innerHTML).toContain('The pipe layer');
+    const cells = Array.from(page.querySelectorAll('[data-pipe-key]'));
+    expect(cells.map((cell) => cell.getAttribute('data-pipe-key'))).toEqual([...PIPE_LAYER_KEYS]);
+    for (const cell of cells) {
+      const key = cell.getAttribute('data-pipe-key') ?? '';
+      expect(cell.querySelector(`[data-placeholder="${key}"]`), key).not.toBeNull();
+      expect(cell.textContent, key).toContain(`${key}.png`);
+    }
   });
 
   it('prints the key, the footprint and the canvas the art side has to hit', () => {

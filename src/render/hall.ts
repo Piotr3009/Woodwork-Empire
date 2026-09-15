@@ -31,7 +31,7 @@ import {
   machinesDueService,
   serviceIsDue,
 } from '../engine/machines';
-import { footprintOrigin, portCell } from '../engine/pipes';
+import { footprintOrigin, isConnected, portCell, wantsExtraction } from '../engine/pipes';
 import { jobsAtGate } from '../engine/jobs';
 import { orderName, reservedItems, shoppingList } from '../engine/orders';
 import {
@@ -718,9 +718,34 @@ export function gateCollars(state: GameState, files: readonly string[]): string 
     .join('');
 }
 
+/** One run of pipe, tile by tile in the order it was routed, as a group the page can find by
+ *  the machine it serves. A connected machine that the air rule says is not pulled hard enough
+ *  wears a thin red outline on its run (CLAUDE.md T13 3.19): the hall is short this minute and
+ *  this machine is one of the ones running in it. */
+export function pipeRunArt(
+  state: GameState,
+  run: { id: string; equipmentId: string; tiles: ReadonlyArray<{ x: number; y: number; key: string }> },
+  files: readonly string[],
+  short: boolean,
+): string {
+  const machine = state.equipment.find((item) => item.id === run.equipmentId);
+  const running = machine !== undefined && machine.takenBy !== null;
+  const tiles = run.tiles.map((tile) => pipeCellArt(tile.key, tile, files)).join('');
+  return (
+    `<g class="pipe${short && running ? ' pipe-short' : ''}" data-pipe="${escapeText(run.id)}" ` +
+    `data-pipe-for="${escapeText(run.equipmentId)}">${tiles}</g>`
+  );
+}
+
+/** Every run over the floor, in the order they were routed. */
+export function pipeRuns(state: GameState, files: readonly string[]): string {
+  const short = extractionCheck(state).short;
+  return state.pipes.map((run) => pipeRunArt(state, run, files, short)).join('');
+}
+
 /** The whole layer: the runs, then the collars over their drops. */
 export function pipeLayer(state: GameState, files: readonly string[]): string {
-  return `<g class="pipe-layer">${gateCollars(state, files)}</g>`;
+  return `<g class="pipe-layer">${pipeRuns(state, files)}${gateCollars(state, files)}</g>`;
 }
 
 export function machineFx(state: GameState, item: Equipment, spec: EquipmentSpec): MachineFx {
@@ -1120,7 +1145,10 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
         : undefined;
     const benchLine =
       spec.category !== 'bench' ? '' : atThisBench ? `: ${atThisBench.name}` : ' (free)';
-    const name = `${spec.name}${bagLine}${serviceLine}${benchLine}${rackLine}`;
+    // A machine that wants a pipe and has none is not served: the hall says so on the object
+    // (CLAUDE.md T13 3.19).
+    const pipeLine = wantsExtraction(item) && !isConnected(state, item) ? ' (no pipe)' : '';
+    const name = `${spec.name}${bagLine}${serviceLine}${benchLine}${rackLine}${pipeLine}`;
     // Hovering the extractor reads the hall's store (CLAUDE.md T12 3.3).
     const hover =
       item.specId === 'extractor' && store.exists

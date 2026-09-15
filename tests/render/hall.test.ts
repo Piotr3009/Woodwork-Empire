@@ -2,12 +2,74 @@
 // hall's 2:1 dimetric and through the one helper (CLAUDE.md T13 1, 3.13).
 
 import { describe, expect, it } from 'vitest';
-import { gateCollars, objectArt, renderHall } from '../../src/render/hall';
+import { gateCollars, objectArt, pipeCellArt, pipeRuns, renderHall } from '../../src/render/hall';
 import { PLACEHOLDER_SPRITES, placeholderKindFor } from '../../src/render/sprites';
-import { portCell } from '../../src/engine/pipes';
+import { connectExtraction, pipeRunFor, portCell } from '../../src/engine/pipes';
 import { centreOf } from '../../src/render/iso';
-import { DUCT_HEIGHT } from '../../src/engine/constants';
+import { DUCT_HEIGHT, PIPE_TILE_KEYS } from '../../src/engine/constants';
+import type { GameState } from '../../src/engine/index';
 import { newGame, placeEquipment } from '../helpers';
+
+/** A standard saw and a fan of the named class, the saw connected by the game's own route. */
+function pipedHall(fanClass: string): GameState {
+  const state = newGame({ difficulty: 'veryEasy' });
+  placeEquipment(state, 'extractor', { variantId: fanClass, x: 18, y: 3, id: 'kit-fan' });
+  placeEquipment(state, 'tableSaw', { variantId: 'standard', x: 4, y: 2, id: 'kit-saw' });
+  state.pipes = [];
+  connectExtraction(state, 'kit-saw');
+  return state;
+}
+
+describe('the pipe layer (CLAUDE.md T13 3.19)', () => {
+  it('maps every tile key to a placeholder draw in the hall dimetric, and to the file once it lands', () => {
+    for (const key of PIPE_TILE_KEYS) {
+      const drawn = pipeCellArt(key, { x: 3, y: 4 }, []);
+      expect(drawn, key).toContain(`data-placeholder="${key}"`);
+      expect(drawn, key).toContain(`data-pipe-tile="${key}"`);
+      // The 2:1 diamond of the placeholder helper, never a flat rectangle.
+      expect(drawn, key).toContain('<polygon');
+      expect(drawn, key).not.toContain('<rect');
+      expect(pipeCellArt(key, { x: 3, y: 4 }, [`${key}.png`]), key).toContain(`/sprites/${key}.png`);
+    }
+    // Lifted to the height of the ducting: the tile sits above the cell it is over.
+    const at = /translate\(([-\d.]+),([-\d.]+)\)/.exec(pipeCellArt('pipe.ew', { x: 3, y: 4 }, []));
+    expect(Number(at?.[2])).toBeLessThan(centreOf(3, 4, 1, 1).y - DUCT_HEIGHT * 24 + 1);
+  });
+
+  it('draws every run tile by tile, above the equipment, keyed by the machine it serves', () => {
+    const state = pipedHall('pro');
+    const run = pipeRunFor(state, 'kit-saw');
+    if (!run) throw new Error('no run');
+    const svg = renderHall(state, { files: [] });
+    expect(svg).toContain(`data-pipe="${run.id}"`);
+    expect(svg).toContain('data-pipe-for="kit-saw"');
+    expect((svg.match(/data-pipe-tile="/g) ?? []).length).toBe(run.tiles.length);
+    expect(svg).toContain('data-pipe-tile="pipe.drop"');
+    expect(svg).toContain('data-pipe-tile="pipe.inlet"');
+    // The layer comes after the machines in the live part, so it is over them.
+    expect(svg.indexOf('class="pipe-layer"')).toBeGreaterThan(svg.indexOf('data-kit="kit-saw"'));
+    // And the tooltip on a machine with no pipe says so.
+    const bare = pipedHall('pro');
+    bare.pipes = [];
+    expect(renderHall(bare, { files: [] })).toContain('Table saw (no pipe)');
+    expect(svg).not.toContain('(no pipe)');
+  });
+
+  it('outlines the run in red while the hall is short and this machine is one of the ones running', () => {
+    // A used fan allows 830 against the standard saw's 1,100 (CLAUDE.md T10 3.1).
+    const state = pipedHall('used');
+    const saw = state.equipment.find((item) => item.id === 'kit-saw');
+    if (!saw) throw new Error('no saw');
+    expect(pipeRuns(state, [])).not.toContain('pipe-short');
+    saw.takenBy = 'owner';
+    expect(pipeRuns(state, [])).toContain('class="pipe pipe-short"');
+    // A pro fan pulls enough: no outline while the same saw runs.
+    const fine = pipedHall('pro');
+    const other = fine.equipment.find((item) => item.id === 'kit-saw');
+    if (other) other.takenBy = 'owner';
+    expect(pipeRuns(fine, [])).not.toContain('pipe-short');
+  });
+});
 
 describe('the gate collar (CLAUDE.md T13 3.11)', () => {
   it('is drawn on the drop of a gated machine, above the floor, and on nothing else', () => {

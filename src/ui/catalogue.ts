@@ -26,6 +26,10 @@ import {
   compressors,
   dustOutputOf,
   extractionDemandOf,
+  connectCheck,
+  hasCentralExtraction,
+  pipeRunFor,
+  wantsExtraction,
   orderSoftwareCheck,
   countOf,
   findSpec,
@@ -333,6 +337,30 @@ export function gateAction(state: GameState, item: Equipment): string {
     : lockedButton(label, check.reason);
 }
 
+/** Connect to extraction on the card of a machine standing in the hall: the game routes the pipe
+ *  and the card says what the metres would cost; greyed once it is on, or where the ducts of a
+ *  central system reach it already (CLAUDE.md T13 3.19). */
+export function connectAction(state: GameState, item: Equipment): string {
+  if (!wantsExtraction(item)) return '';
+  if (hasCentralExtraction(state)) return '';
+  const run = pipeRunFor(state, item.id);
+  if (run !== null) return lockedButton('Connected', `${run.metres} m of pipe to the extraction`);
+  const check = connectCheck(state, item.id);
+  const label = `Connect to extraction, ${money(check.cost)}`;
+  return check.ok
+    ? button('connectExtraction', label, `data-id="${item.id}"`)
+    : lockedButton(label, check.reason);
+}
+
+/** The pipe on the card: how much of it there is, or that there is none (CLAUDE.md T13 3.19). */
+function pipeLine(state: GameState, item: Equipment): string {
+  if (!wantsExtraction(item) || hasCentralExtraction(state)) return '';
+  const run = pipeRunFor(state, item.id);
+  return run === null
+    ? 'not connected to the extraction'
+    : `${run.metres} m of pipe to the extraction`;
+}
+
 /** What the gate does once it is on: the signed line, through the one helper (CLAUDE.md T13 1). */
 function gateLine(state: GameState, item: Equipment): string {
   if (!hasGate(state, item)) return '';
@@ -366,7 +394,14 @@ function ownedTile(
       ? button('serviceMachine', 'Service', `data-id="${item.id}"`)
       : '';
   const sell = sellAction(state, item, sellConfirm);
-  const lines = [className, life, service, ownedState(state, item), airStateLine(state, item)]
+  const lines = [
+    className,
+    life,
+    service,
+    ownedState(state, item),
+    pipeLine(state, item),
+    airStateLine(state, item),
+  ]
     .filter((line) => line !== '')
     .map((line) => `<p class="tile-figures">${escapeHtml(line)}</p>`)
     .join('');
@@ -383,7 +418,7 @@ function ownedTile(
     lines +
     gateLine(state, item) +
     airAssign(state, item) +
-    `<div class="tile-action">${action}${gateAction(state, item)}${sell}</div>` +
+    `<div class="tile-action">${action}${connectAction(state, item)}${gateAction(state, item)}${sell}</div>` +
     '</div>'
   );
 }
