@@ -181,7 +181,7 @@ import {
   sprayingOnWetAir,
   underExtracted,
 } from './media';
-import { plural } from './text';
+import { cubicMetres, plural } from './text';
 import { STATION_IDLE, STATION_NO_BENCH, stationForTask } from './stations';
 import {
   type Hand,
@@ -1412,7 +1412,7 @@ function runProductionMinute(state: GameState, ownerOnTask: boolean): void {
   // selector the hall and the board read as well (CLAUDE.md T10 3.2).
   const air = hallAirCheck(state);
   // The minutes somebody actually stood at each machine: that, and nothing else, is what wears
-  // it out (CLAUDE.md T7 2).
+  // it out and what fills the hall's bags (CLAUDE.md T7 2, T12 2.3).
   const used = new Map<string, number>();
   for (const { hand, stage, machine } of atWork) {
     const worker = state.workers.find((entry) => entry.id === hand.who);
@@ -1449,7 +1449,8 @@ function runProductionMinute(state: GameState, ownerOnTask: boolean): void {
   }
   state.productionMinutesMonth += 1;
   addDust(state, 1);
-  accumulateMachineMinute(state, used);
+  // The minute the store fills, the workshop is told once, not once a machine (CLAUDE.md T12 2.3).
+  if (accumulateMachineMinute(state, used)) raiseBagsFull(state);
 }
 
 /** The piece is made and standing in front of the gate. Nothing is paid until the client has it,
@@ -1521,7 +1522,7 @@ function raiseBagsFull(state: GameState): void {
     kind: 'bagsFull',
     title: 'Bags full in the workshop',
     body:
-      `The bags on the extractor hold ${bagStore(state).capacityM3} m\u00b3 and they are full. ` +
+      `The bags on the extractor hold ${cubicMetres(store.capacityM3)} and they are full. ` +
       'Nothing that makes dust gets made until they are emptied.',
     choices: adHocChoices(
       state,

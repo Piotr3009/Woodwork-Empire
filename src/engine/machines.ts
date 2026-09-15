@@ -635,12 +635,18 @@ export function overdueBreakdownChance(item: Equipment): number {
 export function familyStopped(
   state: GameState,
   specId: string,
-): { item: Equipment; why: 'broken' } | null {
+): { item: Equipment; why: 'broken' | 'bags' } | null {
   const machines = owned(state, specId);
   if (machines.length === 0) return null;
-  if (machines.some((item) => !item.broken)) return null;
-  const broken = machines.find((item) => item.broken);
-  return broken ? { item: broken, why: 'broken' } : null;
+  if (!machines.some((item) => !item.broken)) {
+    const broken = machines.find((item) => item.broken);
+    return broken ? { item: broken, why: 'broken' } : null;
+  }
+  // The hall's bags are full: nothing that puts dust into them runs, whatever its class and
+  // however many of the family stand in the hall, until they are emptied (CLAUDE.md T12 2.3).
+  const first = machines[0];
+  if (first && dustOutputOf(specId) > 0 && bagsFull(state)) return { item: first, why: 'bags' };
+  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -660,21 +666,34 @@ function round6(value: number): number {
 }
 
 /** Books the minutes somebody actually stood at a machine this minute: the hours that wear it
- *  out, and nothing else. A machine nobody is at gains nothing, which is what "hours are the
- *  minutes somebody stood at it" means (CLAUDE.md T7 2). The map is person minutes per machine:
- *  one for a machine one man is standing at, more for a hand tool two men have out of their
- *  cabinets at once. */
+ *  out and the cubic metres of dust it made, and nothing else. A machine nobody is at gains
+ *  nothing, which is what "hours are the minutes somebody stood at it" means (CLAUDE.md T7 2).
+ *  The map is person minutes per machine: one for a machine one man is standing at, more for a
+ *  hand tool two men have out of their cabinets at once. The dust is the family's figure an hour
+ *  (CLAUDE.md T12 2.1): every machine's goes on the day's total, and into the hall's one bag
+ *  store while the hall keeps its dust in bags. A central system takes it away and a hall with no
+ *  fan has no bag to put it in, and the figure is still counted for the day (CLAUDE.md T12 2.3).
+ *  Returns true the minute the store fills. */
 export function accumulateMachineMinute(
   state: GameState,
   minutesByItem: ReadonlyMap<string, number>,
-): void {
+): boolean {
+  let madeM3 = 0;
   for (const item of state.equipment) {
     const minutes = minutesByItem.get(item.id) ?? 0;
     if (minutes <= 0) continue;
     const spec = findSpec(item.specId);
     if (!spec) continue;
     if (spec.category === 'machine') item.hoursUsed = round6(item.hoursUsed + minutes / 60);
+    madeM3 += (dustOutputOf(item.specId) / 60) * minutes;
   }
+  if (madeM3 <= 0) return false;
+  state.dayStats.dustM3 = round6(state.dayStats.dustM3 + madeM3);
+  const store = bagStore(state);
+  if (!store.exists || store.bags <= 0 || store.full) return false;
+  // The store holds what it holds: a minute that would fill it past the brim fills it to the brim.
+  state.bagFillM3 = round6(Math.min(store.capacityM3, store.fillM3 + madeM3));
+  return bagsFull(state);
 }
 
 /** Cubic metres of sawdust an hour that somebody stands at a machine of this family, off
