@@ -2,6 +2,7 @@
 // ownership and power side that the economy needs.
 
 import {
+  CENTRAL_EXTRACTION_SPECS,
   DUCTING_RECONNECT_COST,
   DUST_BANDS,
   DUST_OUTPUT_M3_PER_HOUR,
@@ -547,7 +548,7 @@ export function hasExtraction(state: GameState): boolean {
 /** Ducted extraction for the whole hall: the central system, or the flexi one that never needs
  *  reconnecting (CLAUDE.md T4 3.5). Everything the central system does, the flexi one does. */
 export function hasCentralExtraction(state: GameState): boolean {
-  return has(state, 'dustSystem') || has(state, 'flexiSystem');
+  return CENTRAL_EXTRACTION_SPECS.some((specId) => has(state, specId));
 }
 
 /** With the flexi system every machine stays connected wherever it is put. */

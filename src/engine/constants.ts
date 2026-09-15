@@ -195,6 +195,10 @@ export const POWER_PER_MACHINE_DAILY = 3;
 export const BENCH_SLOTS = 4;
 /** Waste collection once the central dust system exists (PIOTR). */
 export const DUST_WASTE_MONTHLY = 400;
+
+/** The systems that take the dust away by duct and pay the waste man instead of filling bags.
+ *  Everything the central system does, the flexi one does (CLAUDE.md T4 3.5, T12 2.3). */
+export const CENTRAL_EXTRACTION_SPECS: readonly string[] = ['dustSystem', 'flexiSystem'];
 /** Pellet sales with a pelletiser, rising with production (PIOTR). */
 export const PELLET_INCOME_MONTHLY_BASE = 600;
 /** [TUNE] extra pellet income per 1000 minutes of production in the month. */
@@ -1970,7 +1974,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
     depth: 2,
     height: 4,
     spriteKey: 'dustSystem',
-    effect: 'No more bags and no breakdown. Waste collection 400 per month.',
+    effect: `No more bags and no breakdown. Waste collection ${DUST_WASTE_MONTHLY} per month.`,
   },
   {
     ...BASE_SPEC,
@@ -1990,8 +1994,8 @@ const SPEC_DRAFTS: SpecDraft[] = [
     spriteKey: 'flexiSystem',
     effect:
       'Everything the central system does, and flexible ducting on every machine: move the hall ' +
-      'about as often as you like and the reconnection never costs again. Waste collection 400 ' +
-      'per month.',
+      'about as often as you like and the reconnection never costs again. Waste collection ' +
+      `${DUST_WASTE_MONTHLY} per month.`,
   },
   {
     ...BASE_SPEC,

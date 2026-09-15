@@ -1279,7 +1279,7 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
   // out less and fills with dust (PIOTR, CLAUDE.md T10 3.1).
   const extraction = extractionCheck(state);
   const shortLine = extraction.short
-    ? `<p class="view-note warn">${escapeText(extraction.line)} m3/h. Everything in the hall is ` +
+    ? `<p class="view-note warn">${escapeText(extraction.line)} m\u00b3/h. Everything in the hall is ` +
       '30% slower and the dust rises three times as fast. Nothing stops.</p>'
     : '';
   // A compressor with more drawn on it than the pipe will carry: everything on it runs at 0.7

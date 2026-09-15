@@ -17,3 +17,10 @@ export function trimmed(value: number, places: number): string {
 export function cubicMetres(value: number, places = 1): string {
   return `${trimmed(value, places)} m\u00b3`;
 }
+
+/** Metres of floor, both figures with their unit: "3 m by 1 m". The one formatter for a
+ *  footprint or a zone anywhere in the game, because nobody knows what 4 by 3 is (PIOTR, 15.09;
+ *  CLAUDE.md T12 3.1). */
+export function metresBy(size: { width: number; depth: number }): string {
+  return `${size.width} m by ${size.depth} m`;
+}

@@ -80,7 +80,7 @@ Run `npm run dev` and work through this. It is the same path the jsdom smoke tes
    order: desk, chair, laptop, cordless drill, one workbench and the cheap shelving. The machines
    are families: press Open on the table saw and the page fills with its five classes, from a used
    one at 1,800 to an industrial one at 25,000, each with what it does to the speed of the bench,
-   to the bag, to the life of the machine and to the meter. Order the used saw, then the
+   to the dust it makes, to the life of the machine and to the meter. Order the used saw, then the
    edgebander, the compressor and the extractor the same way. The cash drops at every click and
    not one minute of your day goes with it: nobody goes out for any of it. Every tile then says
    when its lorry is due.

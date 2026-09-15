@@ -417,7 +417,7 @@ export {
 } from './stations';
 
 // Text
-export { cubicMetres, plural, trimmed } from './text';
+export { cubicMetres, metresBy, plural, trimmed } from './text';
 
 // Reputation
 export {

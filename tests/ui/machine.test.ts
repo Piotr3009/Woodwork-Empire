@@ -5,8 +5,10 @@
 import { describe, expect, it } from 'vitest';
 import { renderCatalogue } from '../../src/ui/catalogue';
 import { recommendedVariant, renderMachine } from '../../src/ui/machine';
-import { findSpec } from '../../src/engine/index';
+import { deliveryDaysFor, enduranceHoursFor, findSpec, plural } from '../../src/engine/index';
+import { DUST_WASTE_MONTHLY } from '../../src/engine/constants';
 import type { GameState } from '../../src/engine/index';
+import { money } from '../../src/ui/modal';
 import { buyNow, newGame } from '../helpers';
 
 function parse(html: string): HTMLElement {
@@ -21,6 +23,19 @@ function tiles(state: GameState, specId: string): HTMLElement[] {
 
 function text(node: Element | null): string {
   return node?.textContent ?? '';
+}
+
+/** The lines of figures on a tile, top to bottom. */
+function figures(tile: Element | undefined): string[] {
+  return Array.from(tile?.querySelectorAll('.tile-figures') ?? []).map((line) => text(line));
+}
+
+function lifeLine(specId: string, variantId: string): string {
+  return `Life about ${enduranceHoursFor(specId, variantId).toLocaleString('en-GB')} hours`;
+}
+
+function deliveryLine(specId: string, variantId: string): string {
+  return `Delivered in ${plural(deliveryDaysFor(specId, variantId), 'working day', 'working days')}`;
 }
 
 describe('the catalogue lists folders', () => {
@@ -60,28 +75,89 @@ describe('the tiles inside a folder', () => {
     const effects = Array.from(used.querySelectorAll('.tile-figures')).map((line) =>
       text(line),
     );
+    // In Piotr's order: what it does to the work, what it makes, what it needs of the air, how
+    // long it lasts, what it draws, what it takes of the floor (CLAUDE.md T12 3.1).
     expect(effects).toEqual([
       'Output -5%',
+      'Dust 0.015 m\u00b3/h of use',
+      // What it asks of the fans while somebody is standing at it (CLAUDE.md T10 3.1).
+      'Needs 800 m\u00b3/h of extraction',
       'Life about 750 hours',
       'Power 3 a day',
-      // What it pulls out of the air while somebody is standing at it (CLAUDE.md T10 3.1).
-      'Extraction 800 m3/h while it runs',
-      'Takes 2 by 1 m on a 3 by 3 m zone',
+      'Takes 2 m by 1 m, works in 3 m by 3 m',
       // What he waits for after he has paid for it (CLAUDE.md T8 3.2).
       'Delivered in 1 working day',
     ]);
     const industrial = tiles(state, 'tableSaw')[4];
-    const bigEffects = Array.from(industrial?.querySelectorAll('.tile-figures') ?? []).map(
-      (line) => text(line),
-    );
-    expect(bigEffects).toEqual([
+    expect(figures(industrial)).toEqual([
       'Output +30%',
+      'Dust 0.015 m\u00b3/h of use',
+      'Needs 2,200 m\u00b3/h of extraction',
       'Life about 6,000 hours',
       'Power 7 a day',
-      'Extraction 2,200 m3/h while it runs',
-      'Takes 4 by 2 m on a 5 by 4 m zone',
+      'Takes 4 m by 2 m, works in 5 m by 4 m',
       'Delivered in 12 working days',
     ]);
+  });
+
+  it('writes the dust in cubic metres an hour of use, the same on every class of the family', () => {
+    // A dearer saw does not make more dust: the material makes the dust, not the price of the
+    // machine (PIOTR, CLAUDE.md T12 2.1). The line is the family's and it is on every card.
+    const state = newGame({ difficulty: 'veryEasy' });
+    for (const card of tiles(state, 'tableSaw')) {
+      expect(figures(card)[1], card.getAttribute('data-variant') ?? '').toBe(
+        'Dust 0.015 m\u00b3/h of use',
+      );
+    }
+    const standard = figures(tiles(state, 'tableSaw')[2]);
+    expect(standard[0]).toBe('Output +5%');
+    expect(standard[1]).toBe('Dust 0.015 m\u00b3/h of use');
+    expect(standard[2]).toBe('Needs 1,100 m\u00b3/h of extraction');
+    expect(standard[3]).toBe(lifeLine('tableSaw', 'standard'));
+    expect(standard[4]).toMatch(/^Power \d+ a day$/);
+    expect(standard[5]).toBe('Takes 3 m by 1 m, works in 4 m by 3 m');
+    // Three decimals with the trailing zeros trimmed, and "none" where the family makes nothing.
+    expect(figures(tiles(state, 'thicknesser')[0])[1]).toBe('Dust 0.25 m\u00b3/h of use');
+    expect(figures(tiles(state, 'cnc')[0])[1]).toBe('Dust 0.06 m\u00b3/h of use');
+    expect(figures(tiles(state, 'compressor')[0])[1]).toBe('Dust none');
+  });
+
+  it('colours the output line by its sign, and nothing else on the card', () => {
+    const cards = tiles(newGame({ difficulty: 'veryEasy' }), 'tableSaw');
+    const outputLine = (card: Element | undefined): string =>
+      card?.querySelector('.tile-figures')?.className ?? '';
+    // Used at -5%, budget as a standard machine, industrial at +30%: red, the body colour, green.
+    expect(outputLine(cards[0])).toBe('tile-figures bad');
+    expect(figures(cards[1])[0]).toBe('Output as a standard machine');
+    expect(outputLine(cards[1])).toBe('tile-figures');
+    expect(outputLine(cards[4])).toBe('tile-figures good');
+    for (const card of cards) {
+      const rest = Array.from(card.querySelectorAll('.tile-figures')).slice(1);
+      expect(rest.every((line) => line.className === 'tile-figures')).toBe(true);
+    }
+  });
+
+  it('says what a fan holds, in bags and in cubic metres, and that a central system holds nothing', () => {
+    const state = newGame({ difficulty: 'veryEasy' });
+    const pro = tiles(state, 'extractor')[3];
+    expect(pro?.getAttribute('data-variant')).toBe('pro');
+    // A fan has no output of its own and makes nothing: what it pulls, what its bags hold, then
+    // the life, the power and the floor as on every card (CLAUDE.md T12 3.2).
+    expect(figures(pro)).toEqual([
+      'Pulls 3,600 m\u00b3/h',
+      'Bags 4, holds 4 m\u00b3',
+      lifeLine('extractor', 'pro'),
+      'Power 8 a day',
+      'Takes 3 m by 1 m, works in 3 m by 1 m',
+      deliveryLine('extractor', 'pro'),
+    ]);
+    expect(figures(tiles(state, 'extractor')[4])).toContain('Bags 10, holds 10 m\u00b3');
+    expect(figures(tiles(state, 'extractor')[0])).toContain('Bags 1, holds 1 m\u00b3');
+    const central = figures(tiles(state, 'dustSystem')[0]);
+    expect(central[0]).toBe('Pulls 12,000 m\u00b3/h');
+    expect(central[1]).toBe(`No bags. Waste collection ${money(DUST_WASTE_MONTHLY)} a month`);
+    expect(central[1]).toBe('No bags. Waste collection \u00a3400 a month');
+    expect(figures(tiles(state, 'flexiSystem')[0])[1]).toBe(central[1]);
   });
 
   it('gives every tile a picture slot with the family key and the class as the tier', () => {

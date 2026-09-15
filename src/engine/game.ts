@@ -181,7 +181,7 @@ import {
   sprayingOnWetAir,
   underExtracted,
 } from './media';
-import { cubicMetres, plural } from './text';
+import { cubicMetres, metresBy, plural } from './text';
 import { STATION_IDLE, STATION_NO_BENCH, stationForTask } from './stations';
 import {
   type Hand,
@@ -2039,7 +2039,7 @@ export function canBuy(
   // 3 of hall and there is no point selling him one he cannot stand anywhere (T7 3.3, 3.6).
   if (standsInTheHall(specId, variant.id) && firstFreeCell(state, specId, variant.id) === null) {
     const zone = zoneOf(specId, variant.id);
-    return { ok: false, reason: `No free ${zone.width} by ${zone.depth} m in the hall` };
+    return { ok: false, reason: `No free ${metresBy(zone)} in the hall` };
   }
   return OK;
 }

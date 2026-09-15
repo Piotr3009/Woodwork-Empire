@@ -3,10 +3,15 @@
 
 import {
   airDemandOf,
+  bagsOf,
   compressorAirOf,
   compressors,
+  cubicMetres,
+  dustOutputOf,
   extractionCapacityOf,
   extractionDemandOf,
+  mediaFigure,
+  metresBy,
   orderEquipmentCheck,
   countOf,
   deliveryDaysFor,
@@ -15,7 +20,14 @@ import {
   footprintOf,
   zoneOf,
 } from '../engine/index';
-import { COMPRESSOR, COMPRESSOR_AIR, COMPRESSOR_WITH_DRYER } from '../engine/constants';
+import {
+  CENTRAL_EXTRACTION_SPECS,
+  COMPRESSOR,
+  COMPRESSOR_AIR,
+  COMPRESSOR_WITH_DRYER,
+  DUST_WASTE_MONTHLY,
+  bagsToM3,
+} from '../engine/constants';
 import { spriteUrl } from '../render/sprites';
 import type { EquipmentSpec, EquipmentVariant, GameState } from '../engine/index';
 import {
@@ -25,6 +37,7 @@ import {
   plural,
   primaryButton,
   button,
+  signClass,
 } from './modal';
 
 /** The families the player chooses a class for. Everything else is bought off the catalogue line
@@ -33,11 +46,31 @@ export function isMachineFamily(spec: EquipmentSpec): boolean {
   return spec.category === 'machine' || spec.category === 'extraction';
 }
 
-/** Above 1.0 is quicker than a standard machine, below it is slower. */
-function outputLine(variant: EquipmentVariant): string {
+/** One line of figures on a class card, and the colour its sign gives it when it has one. */
+interface Figure {
+  text: string;
+  tone: string;
+}
+
+function figure(text: string, tone = ''): Figure {
+  return { text, tone };
+}
+
+/** Above 1.0 is quicker than a standard machine, below it is slower: green, red or the body
+ *  colour by the sign, through the one helper every signed line on a card goes through
+ *  (CLAUDE.md T12 3.1). */
+function outputLine(variant: EquipmentVariant): Figure {
   const per = Math.round((variant.outputFactor - 1) * 100);
-  if (per === 0) return 'Output as a standard machine';
-  return `Output ${per > 0 ? '+' : ''}${per}%`;
+  if (per === 0) return figure('Output as a standard machine');
+  return figure(`Output ${per > 0 ? '+' : ''}${per}%`, signClass(per));
+}
+
+/** What a machine of this family makes, in the one unit dust is written in. It is the family's
+ *  figure and so the same on every class, and that is the point: the material makes the dust and
+ *  not the price of the machine (PIOTR, CLAUDE.md T12 2.1, 3.1). */
+function dustLine(spec: EquipmentSpec): string {
+  const dust = dustOutputOf(spec.id);
+  return dust > 0 ? `Dust ${cubicMetres(dust, 3)}/h of use` : 'Dust none';
 }
 
 function lifeLine(spec: EquipmentSpec, variant: EquipmentVariant): string {
@@ -73,12 +106,24 @@ function airLine(state: GameState, spec: EquipmentSpec, variant: EquipmentVarian
   return `Needs ${wants.bar} bar, ${wants.litres} l/min${short}${none}`;
 }
 
-/** What this class pulls out of the air, so the two sums read the same on the tile. */
+/** What this class pulls out of the air, or asks of the hall's fans, so the two sums read the
+ *  same on the tile (CLAUDE.md T10 3.1, T12 3.1). */
 function extractionLine(spec: EquipmentSpec, variant: EquipmentVariant): string {
   const pulls = extractionCapacityOf({ specId: spec.id, variantId: variant.id });
-  if (pulls > 0) return `Pulls ${pulls.toLocaleString('en-GB')} m3/h`;
+  if (pulls > 0) return `Pulls ${mediaFigure(pulls)} m\u00b3/h`;
   const wants = extractionDemandOf({ specId: spec.id, variantId: variant.id });
-  return wants > 0 ? `Extraction ${wants.toLocaleString('en-GB')} m3/h while it runs` : '';
+  return wants > 0 ? `Needs ${mediaFigure(wants)} m\u00b3/h of extraction` : '';
+}
+
+/** The bags on a class of extractor and what they hold, a cubic metre each; the central systems
+ *  have none and pay the waste man instead, off the same constant the books charge
+ *  (CLAUDE.md T12 3.2). */
+function bagsLine(spec: EquipmentSpec, variant: EquipmentVariant): string {
+  if (CENTRAL_EXTRACTION_SPECS.includes(spec.id)) {
+    return `No bags. Waste collection ${money(DUST_WASTE_MONTHLY)} a month`;
+  }
+  const bags = bagsOf({ specId: spec.id, variantId: variant.id });
+  return bags > 0 ? `Bags ${bags}, holds ${cubicMetres(bagsToM3(bags))}` : '';
 }
 
 /** How long the player waits for this one after he has paid for it (CLAUDE.md T8 3.2). */
@@ -102,14 +147,13 @@ export function pictureSlot(spriteKey: string, tier: string): string {
   );
 }
 
-/** What the class takes of the hall floor, in the words Piotr asked for (CLAUDE.md T7 3.7). */
+/** What the class takes of the hall floor, in the words Piotr asked for: both figures with
+ *  their unit, through the one formatter (CLAUDE.md T7 3.7, T12 3.1). */
 export function floorLine(specId: string, variantId: string): string {
   const stands = footprintOf(specId, variantId);
   const zone = zoneOf(specId, variantId);
   if (zone.width <= 0 || zone.depth <= 0) return 'Kept in a tool cabinet';
-  return (
-    `Takes ${stands.width} by ${stands.depth} m on a ${zone.width} by ${zone.depth} m zone`
-  );
+  return `Takes ${metresBy(stands)}, works in ${metresBy(zone)}`;
 }
 
 /** The frame on a class the hall already has (CLAUDE.md T7 3.7). */
@@ -147,17 +191,28 @@ function tile(
         ? primaryButton('buyEquipment', label, `data-id="${spec.id}" data-variant="${variant.id}"`)
         : button('buyEquipment', label, `data-id="${spec.id}" data-variant="${variant.id}"`)
       : lockedButton(label, check.reason);
-  const effects = [
-    outputLine(variant),
-    lifeLine(spec, variant),
-    powerLine(variant),
-    extractionLine(spec, variant),
-    airLine(state, spec, variant),
-    floorLine(spec.id, variant.id),
-    deliveryLine(spec, variant),
-  ]
-    .filter((line) => line !== '')
-    .map((line) => `<p class="tile-figures">${escapeHtml(line)}</p>`)
+  // The order Piotr set: what it does to the work, what it makes, what it needs of the air, how
+  // long it lasts, what it draws, what it takes of the floor (CLAUDE.md T12 3.1). A fan has no
+  // output of its own and makes nothing: its lines are what it pulls and what its bags hold
+  // (T12 3.2). The compressed air and the lorry follow, as they did.
+  const machine = spec.category === 'machine';
+  const figures: Figure[] = [
+    ...(machine ? [outputLine(variant), figure(dustLine(spec))] : []),
+    figure(extractionLine(spec, variant)),
+    figure(bagsLine(spec, variant)),
+    figure(lifeLine(spec, variant)),
+    figure(powerLine(variant)),
+    figure(floorLine(spec.id, variant.id)),
+    figure(airLine(state, spec, variant)),
+    figure(deliveryLine(spec, variant)),
+  ];
+  const effects = figures
+    .filter((line) => line.text !== '')
+    .map(
+      (line) =>
+        `<p class="tile-figures${line.tone === '' ? '' : ` ${line.tone}`}">` +
+        `${escapeHtml(line.text)}</p>`,
+    )
     .join('');
   const owned = ownedBadge(state, spec.id, variant.id);
   return (
