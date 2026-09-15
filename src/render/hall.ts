@@ -85,11 +85,13 @@ import {
   contactShadow,
   mirrorNeeded,
   pickSprite,
+  placeholderKindFor,
   spriteBox,
   spriteFiles,
   spriteImage,
   spriteUrl,
 } from './sprites';
+import { placeholder } from './placeholder';
 
 // ---------------------------------------------------------------------------
 // SVG primitives. office.ts uses these too: one place builds the strings.
@@ -198,6 +200,19 @@ export function objectArt(art: {
       ? ` transform="translate(${round(anchor.x * 2)},0) scale(-1, 1)"`
       : '';
     return shadow + spriteImage(url, at, mirror.trim());
+  }
+  // A Turn 13 picture the art side has not painted yet is drawn by the one placeholder helper,
+  // in the hall's 2:1 dimetric, where its file will go (CLAUDE.md T13 1, 3.13, 3.21).
+  const kind = placeholderKindFor(art.spriteKey, art.tier);
+  if (kind !== null) {
+    const at = spriteBox(art.x, art.y, art.width, art.depth, art.height);
+    return (
+      shadow +
+      `<g class="placeholder-art" transform="translate(${round(at.x)},${round(at.y)})">` +
+      placeholder(kind, { width: at.width, height: at.height }, { dimetric: true }) +
+      '</g>' +
+      label(centreOf(art.x, art.y, art.width, art.depth, art.height), art.label)
+    );
   }
   const faces = boxPolygons(art.x, art.y, art.width, art.depth, art.height);
   return (

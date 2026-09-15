@@ -30,6 +30,7 @@ import {
   NO_DUCTING_SPECS,
   NO_HELPER_DUST_MULTIPLIER,
   NO_HELPER_PRODUCTIVITY_FACTOR,
+  PROPERTY_INSURANCE_RATE_YEARLY,
   SALE_FRACTION,
   UNDER_EXTRACTION_DUST_MULTIPLIER,
   UNDER_EXTRACTION_OUTPUT_PENALTY,
@@ -126,6 +127,14 @@ export function isHeavy(specId: string, variantId?: string): boolean {
   if (!standsInTheHall(specId, variantId)) return false;
   const light = LIGHT_CLASSES[specId] ?? [];
   return variantId === undefined || !light.includes(variantId);
+}
+
+/** What one class adds to the property premium a year, at the rate the cover is written at: the
+ *  insurance line of its card (CLAUDE.md T13 3.1, 3.15). B1's `propertyPremiumYearly` reads the
+ *  whole hall off the same constant; this is the one rate on one price, so the card and the
+ *  Insurance tab cannot disagree about what a machine costs to cover. */
+export function insuranceAddedYearly(price: number): number {
+  return Math.round(price * PROPERTY_INSURANCE_RATE_YEARLY * 100) / 100;
 }
 
 /** The same question of something already bought, in the hall or still on its way. */

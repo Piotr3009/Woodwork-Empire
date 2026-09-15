@@ -1,4 +1,7 @@
+import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { kitBlockFor } from '../../src/engine/board';
 import {
   EXPRESS_PRICE_UPLIFT_MAX,
   EXPRESS_PRICE_UPLIFT_MIN,
@@ -8,6 +11,7 @@ import {
   RATING_ON_TIME,
   REPUTATION_MAX,
   REPUTATION_MIN,
+  TIMBER_BRANCH_MIN_SPINDLE_CLASS,
 } from '../../src/engine/constants';
 import {
   availableFinishes,
@@ -22,7 +26,7 @@ import {
 import { clampReputation, ratingFor, reputationTier } from '../../src/engine/reputation';
 import { callsForPrice } from '../../src/engine/calls';
 import type { Job } from '../../src/engine/index';
-import { buyNow, newGame } from '../helpers';
+import { buyNow, newGame, placeEquipment } from '../helpers';
 
 function job(partial: Partial<Job>): Job {
   return {
@@ -123,6 +127,48 @@ describe('tool gating', () => {
   it('offers laminate only while there is no spray booth', () => {
     const state = newGame();
     expect(availableFinishes(state, template('wardrobe'))).toEqual(['laminate']);
+  });
+
+  it('locks the lacquered and the handleless kitchen behind the spindle moulder', () => {
+    // The shared family both kitchens need: a J profile and shaker fronts are moulded
+    // (PIOTR; CLAUDE.md T13 3.13). The board greys them without it, through the one kit check.
+    const state = newGame();
+    state.reputation = 100;
+    for (const specId of ['tableSaw', 'drill', 'edgebander', 'sprayBooth', 'extractor']) {
+      placeEquipment(state, specId, { variantId: 'standard' });
+    }
+    for (const id of ['lacqueredKitchen', 'handlelessKitchen']) {
+      expect(template(id).requiredEquipment, id).toContain('spindleMoulder');
+      expect(lockReasonFor(state, template(id)), id).toBe('Needs spindle moulder');
+      expect(kitBlockFor(state, template(id))?.reason, id).toBe('no spindle moulder');
+    }
+    placeEquipment(state, 'spindleMoulder', { variantId: 'used' });
+    for (const id of ['lacqueredKitchen', 'handlelessKitchen']) {
+      expect(lockReasonFor(state, template(id)), id).toBeNull();
+      expect(kitBlockFor(state, template(id)), id).toBeNull();
+    }
+  });
+
+  it('writes the future timber gate in the constants, and nothing reads it', () => {
+    // Class 3 or above on the spindle moulder is the gate to timber production; the branch
+    // choice is parked, so the constant exists and nothing reads it (CLAUDE.md T13 3.13, 8).
+    expect(TIMBER_BRANCH_MIN_SPINDLE_CLASS).toBe('standard');
+    const files: string[] = [];
+    const walk = (dir: string): void => {
+      for (const entry of readdirSync(dir)) {
+        const path = join(dir, entry);
+        if (statSync(path).isDirectory()) walk(path);
+        else if (path.endsWith('.ts')) files.push(path);
+      }
+    };
+    // Vitest runs from the repository root, the way the deliveries test reads the source too.
+    walk('src');
+    const readers = files.filter(
+      (path) =>
+        !path.endsWith('constants.ts') &&
+        readFileSync(path, 'utf8').includes('TIMBER_BRANCH_MIN_SPINDLE_CLASS'),
+    );
+    expect(readers).toEqual([]);
   });
 });
 

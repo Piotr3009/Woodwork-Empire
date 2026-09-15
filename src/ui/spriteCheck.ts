@@ -6,7 +6,15 @@ import { DELIVERY_VAN_SPRITE, EQUIPMENT_SPECS, GATE_LAYOUT } from '../engine/con
 import { HALL_CANVAS, HALL_LAYERS, box, escapeText, label, polygon } from '../render/hall';
 import { OFFICE_CANVAS, OFFICE_LAYERS } from '../render/office';
 import { boxPolygons, centreOf, footprintPolygon, gridBounds, tileToScreen } from '../render/iso';
-import { SPRITE_SCALE, spriteAnchorIn, spriteCanvas, spriteFileSize, spriteUrl } from '../render/sprites';
+import {
+  SPRITE_SCALE,
+  placeholderKindFor,
+  spriteAnchorIn,
+  spriteCanvas,
+  spriteFileSize,
+  spriteUrl,
+} from '../render/sprites';
+import { placeholderSvg } from '../render/placeholder';
 import { footprintOf, standsInTheHall, zoneOf } from '../engine/machines';
 import { metresBy } from '../engine/text';
 import {
@@ -151,8 +159,20 @@ function proof(target: SpriteTarget): string {
  *  the file that makes a machine stand off its tile in the hall. */
 function shot(target: SpriteTarget): string {
   const url = spriteUrl(target.spriteKey, target.tier);
-  if (url === null) return '<div class="sprite-shot is-missing"><span>no file</span></div>';
   const at = spriteAnchorIn(target.width, target.depth, target.height);
+  if (url === null) {
+    // A Turn 13 picture the art side owes is shown as the placeholder the hall draws for it, at
+    // the size of the file that will replace it (CLAUDE.md T13 1, 3.13).
+    const kind = placeholderKindFor(target.spriteKey, target.tier);
+    if (kind !== null) {
+      return (
+        '<div class="sprite-shot is-placeholder">' +
+        placeholderSvg(kind, { width: at.width, height: at.height }, { dimetric: true }) +
+        '</div>'
+      );
+    }
+    return '<div class="sprite-shot is-missing"><span>no file</span></div>';
+  }
   return (
     '<div class="sprite-shot">' +
     `<svg class="sprite-shot-art" viewBox="0 0 ${at.width} ${at.height}" ` +

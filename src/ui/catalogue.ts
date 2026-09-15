@@ -37,7 +37,7 @@ import {
 import { serviceDueIn, variantFor } from '../engine/machines';
 import { orderName, orderProgress } from '../engine/orders';
 import type { Equipment, GameState, OrderLine } from '../engine/index';
-import { pictureSlot, renderMachine } from './machine';
+import { classBadge, classFrame, isMachineFamily, pictureSlot, renderMachine } from './machine';
 import { arrivalLine, cancelButton, progressBar } from './shopping';
 import {
   emptyLine,
@@ -346,9 +346,15 @@ function ownedTile(
     .filter((line) => line !== '')
     .map((line) => `<p class="tile-figures">${escapeHtml(line)}</p>`)
     .join('');
+  // The card of a class the hall has wears the class badge and frame every class card wears, the
+  // same across families (CLAUDE.md T13 3.12).
+  const ladder = isMachineFamily(spec);
+  const frame = ladder ? classFrame(item.variantId) : { className: '', style: '' };
+  const badge = ladder ? classBadge(item.variantId) : '';
   return (
-    `<div class="tile is-owned" data-owned="${item.id}">` +
-    `<h3 class="tile-name">${escapeHtml(spec.name)} <span class="badge badge-owned">Owned</span></h3>` +
+    `<div class="tile is-owned${frame.className}"${frame.style} data-owned="${item.id}">` +
+    `<h3 class="tile-name">${escapeHtml(spec.name)} ${badge}` +
+    '<span class="badge badge-owned">Owned</span></h3>' +
     pictureSlot(spec.spriteKey, item.variantId) +
     lines +
     airAssign(state, item) +

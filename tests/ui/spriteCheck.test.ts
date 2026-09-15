@@ -108,6 +108,20 @@ describe('the sprite check page', () => {
     expect(new Set(keys).size).toBe(keys.length);
   });
 
+  it('draws the spindle moulder classes as placeholders in the hall dimetric until they are painted', () => {
+    const page = parse(renderSpriteCheck());
+    for (const classId of ['used', 'budget', 'standard', 'pro', 'industrial']) {
+      const cell = page.querySelector(`[data-sprite-target="spindleMoulder.${classId}"]`);
+      expect(cell, classId).not.toBeNull();
+      const drawn = cell?.querySelector('.sprite-shot.is-placeholder [data-placeholder]');
+      expect(drawn?.getAttribute('data-placeholder'), classId).toBe(`spindleMoulder.${classId}`);
+      // The 2:1 diamond, never straight on (docs/art/REQUESTS-T13.md).
+      expect(drawn?.querySelectorAll('polygon').length, classId).toBeGreaterThanOrEqual(3);
+    }
+    const truck = page.querySelector('[data-sprite-target="palletTruck"] [data-placeholder]');
+    expect(truck?.getAttribute('data-placeholder')).toBe('palletTruck');
+  });
+
   it('prints the key, the footprint and the canvas the art side has to hit', () => {
     const page = parse(renderSpriteCheck());
     const saw = page.querySelector('[data-sprite-target="tableSaw.used"]');
@@ -133,8 +147,12 @@ describe('the sprite check page', () => {
     );
     // Piotr delivered a batch with this brief, so the page is no longer all placeholders.
     expect(delivered.length).toBeGreaterThan(0);
+    // A Turn 13 picture the art side owes is drawn as its placeholder rather than as "no file":
+    // the spindle moulder's five classes and the pallet truck (CLAUDE.md T13 3.13, 3.21).
+    const placeholders = Array.from(page.querySelectorAll('.sprite-grid .sprite-shot.is-placeholder'));
+    expect(placeholders).toHaveLength(6);
     expect(page.querySelectorAll('.sprite-grid .sprite-shot.is-missing')).toHaveLength(
-      targets.length - delivered.length,
+      targets.length - delivered.length - placeholders.length,
     );
     expect(page.innerHTML).toContain('no file');
     expect(page.innerHTML).toContain(`${targets.length} keys, ${delivered.length} with a file`);
