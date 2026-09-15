@@ -12,7 +12,8 @@ work went, one commit per task; phase C consolidates it into `REPORT-T13.md`.
 |---|---|---|---|
 | T13-B4a Five classes everywhere, the spindle moulder, the badges | `fe143bf` | One layout function `classCard` in `src/ui/machine.ts` for every class card of every family: effects (output, dust, extraction and air needed, life, the class's own effects: what a fan pulls and holds, what a compressor gives, what a rack holds, that a machine with a drop takes a gate), a gap, costs (price, delivery, power, the insurance it adds a year, the floor), a gap, the description in the body font; every signed line through `signedFigure`; the badge and frame colour of the class from `CLASS_BADGE` on every card and on the Owned tile (`classBadge`, `classFrame`, a `--class-colour` custom property). `insuranceAddedYearly(price)` in `src/engine/machines.ts`. The spindle moulder's classes and the pallet truck draw as the placeholder in the hall (`objectArt`) and on the sprite check page (`PLACEHOLDER_SPRITES`, `placeholderKindFor` in `src/render/sprites.ts`). Verified: the two kitchens grey without a spindle moulder through `kitBlockFor`; `TIMBER_BRANCH_MIN_SPINDLE_CLASS` is read by nothing. | `tests/ui/machine.test.ts` (effects then costs then description on every card of every family; the badge and frame; every signed line through the helper), `tests/engine/variants.test.ts` (every ladder family has the five classes in `CLASS_ORDER` with a badge, no class carries a dust figure), `tests/engine/catalog.test.ts` (the kitchens need the spindle moulder; the timber constant is unread), `tests/ui/spriteCheck.test.ts`, `tests/render/hall.test.ts` |
 | T13-B4b Gates | `acad7c3` | `hasGate`, `outputFactorOf(state, item)` (the class factor times `1 + GATE_OUTPUT_BONUS` once a gate is on) and `gateCheck` in `src/engine/machines.ts`; `claimMachine`, `bestOutputFactor` and `machineOutputFactor` read the factor through it (the one place left is game.ts line 1599, a note). `extractionRunning` and `extractionLoad` in `src/engine/media.ts`: while the fan runs at all, the demand is every connected ungated machine plus every gated one a man is at; `extractionCheck` sums the load. `footprintOrigin` and `portCell` in `src/engine/pipes.ts` (the one arithmetic the hall draws by and the pipe drops by). The Owned tile carries `Automatic gate, 1,000` (`data-do="buyGate" data-id="<equipment id>"`), greyed `Gate fitted` once fitted, absent on a machine with no demand, and the signed `+2%` line (`gateAction`, `src/ui/catalogue.ts`). The collar is drawn on the drop cell above the machine at the ducting's height in the new pipe layer of `src/render/hall.ts` (`pipeCellArt`, `gateCollar`, `gateCollars`, `pipeLayer`), as `placeholder('gate.collar', ..., { dimetric: true })` until the file lands. | `tests/engine/machines.test.ts` (+2% on that machine only, through the man, the projection and the board; the gated one is preferred; refused with no demand, twice, and without cash), `tests/engine/extraction.test.ts` (an ungated connected machine counts whenever the fan runs, a gated one only while it runs, nothing counts while nothing runs, an unconnected one is unserved and never in the sum; the gate changes the air sum and not the dust), `tests/ui/catalogueTabs.test.ts` (the button, the greyed state, the bench without one), `tests/render/hall.test.ts` (the collar on the drop cell, lifted, in the live part above the equipment, the file taking its place) |
-| T13-B4c Pipes | this commit | `src/engine/pipes.ts` rewritten around a path of cells: `pathBetween` (Manhattan, the long leg first, one elbow at most, x first on a tie), `tileKeysFor` (drop, ns, ew, the four elbows by their arms, inlet or tee), `bestPath` (straight to the unit's inlet, or a tee onto the nearest cell of a run that already goes to that unit where that is shorter; a tie goes to the unit), `nearestTarget` by the walk of the pipe with tees counted, `routePipe` (signature kept), `connectCheck` and `connectExtraction` charging `metres * PIPE_PRICE_PER_METRE` on the `pipes` ledger category, `removeRun` (a branch that joined a run takes over its tail when it goes, so nothing hangs in the air; refunds nothing), `disconnectExtraction`, `dropOrphanPipes`. The pipe occupies no cell: `canPlaceSpec` and `freeFloorM2` never read `state.pipes`. `src/render/hall.ts`: `pipeRunArt`, `pipeRuns`, `pipeLayer` draw every tile of every run through `pipeCellArt` (the placeholder in the 2:1 dimetric at the ducting's height, or the delivered file by the same anchor) above the equipment, `pipe-short` on a run whose machine is running while the hall is short, and `(no pipe)` in the tooltip of an unconnected machine. The Owned tile carries `Connect to extraction, <cost>` (`data-do="connectExtraction" data-id="<equipment id>"`, the cost from `connectCheck`), greyed `Connected` with the metres once on, nothing on a bench or under a central system (`connectAction`, `src/ui/catalogue.ts`). The sprite check page lists the eight tiles and the collar in a section of their own (`PIPE_LAYER_KEYS`). | `tests/engine/pipes.test.ts` (the path: straight, the long leg first, x on a tie; the keys of every tile; routing: straight, one elbow by its arms, a tee onto an existing run to the same unit, never onto a run to another unit, the metres and the ledger line, no cell occupied and the free floor unchanged, the nearer of two extractors, no refund on a disconnection and the new length on a reconnection, the branch taking over a trunk that goes, orphans dropped, the refusals), `tests/render/hall.test.ts` (every tile key maps to a placeholder draw and to the file, the runs in the hall above the equipment, the red outline only while short and running), `tests/ui/catalogueTabs.test.ts` (the button with its cost, the greyed state with the metres, the bench without one, one click connects), `tests/ui/spriteCheck.test.ts` (the nine keys once each) |
+| T13-B4c Pipes | `372b9d4` | `src/engine/pipes.ts` rewritten around a path of cells: `pathBetween` (Manhattan, the long leg first, one elbow at most, x first on a tie), `tileKeysFor` (drop, ns, ew, the four elbows by their arms, inlet or tee), `bestPath` (straight to the unit's inlet, or a tee onto the nearest cell of a run that already goes to that unit where that is shorter; a tie goes to the unit), `nearestTarget` by the walk of the pipe with tees counted, `routePipe` (signature kept), `connectCheck` and `connectExtraction` charging `metres * PIPE_PRICE_PER_METRE` on the `pipes` ledger category, `removeRun` (a branch that joined a run takes over its tail when it goes, so nothing hangs in the air; refunds nothing), `disconnectExtraction`, `dropOrphanPipes`. The pipe occupies no cell: `canPlaceSpec` and `freeFloorM2` never read `state.pipes`. `src/render/hall.ts`: `pipeRunArt`, `pipeRuns`, `pipeLayer` draw every tile of every run through `pipeCellArt` (the placeholder in the 2:1 dimetric at the ducting's height, or the delivered file by the same anchor) above the equipment, `pipe-short` on a run whose machine is running while the hall is short, and `(no pipe)` in the tooltip of an unconnected machine. The Owned tile carries `Connect to extraction, <cost>` (`data-do="connectExtraction" data-id="<equipment id>"`, the cost from `connectCheck`), greyed `Connected` with the metres once on, nothing on a bench or under a central system (`connectAction`, `src/ui/catalogue.ts`). The sprite check page lists the eight tiles and the collar in a section of their own (`PIPE_LAYER_KEYS`). | `tests/engine/pipes.test.ts` (the path: straight, the long leg first, x on a tie; the keys of every tile; routing: straight, one elbow by its arms, a tee onto an existing run to the same unit, never onto a run to another unit, the metres and the ledger line, no cell occupied and the free floor unchanged, the nearer of two extractors, no refund on a disconnection and the new length on a reconnection, the branch taking over a trunk that goes, orphans dropped, the refusals), `tests/render/hall.test.ts` (every tile key maps to a placeholder draw and to the file, the runs in the hall above the equipment, the red outline only while short and running), `tests/ui/catalogueTabs.test.ts` (the button with its cost, the greyed state with the metres, the bench without one, one click connects), `tests/ui/spriteCheck.test.ts` (the nine keys once each) |
+| T13-B4d Security | this commit | `src/engine/security.ts`: `securitySubscriptionParts` (the base, the area factor, the value factor and the monthly, so the tab prints the formula in words with this hall's figures; `securitySubscriptionMonthly` reads it), `burglaryPaidOut` (property cover held and at least level 1, the two conditions `claimBurglary` books on), `burglaryTargets` (the company's machines standing in the hall, dearest first; the fan, the compressor and the fittings stay), `burgle` (one or two of them by the seeded count, their pipe, gate and open jobs of work with them, and the free stock, the reserved sheets being what is left; the loss on the `burglary` ledger category through `noteLoss`, no cash moved; `lastBurglaryDay`; the `burglary` event naming what went, the value, and whether the insurer pays; returns the lost value for `claimBurglary`). `rollBurglary` unchanged: level 5 never rolls. `src/ui/security.ts`: the ladder of six cards (`.security-level`, `is-held`), name, cost in words (once, a month, both, or the scaled figure at this hall), the risk a month, a `Buy` or `Go back to this` button (`data-do="setSecurityLevel" data-id="<level>"`) greyed with the reason, the formula spelled out for levels 4 and 5, and the insurer's warning at level 0 with property cover held. | `tests/engine/security.test.ts` (the ladder; the one off price on the way up, nothing down, the monthly on the 1st; the subscription scales by the formula with the area and the insured value; level 5 never burgles over 10,000 rolls with the stream advancing, level 0 does and level 1 less; the dearest first, one or two, never the fan; the free stock goes and the reserved sheets stay, the pipe and the gate go with the machine, the ledger line, the event; level 0 pays nothing with property cover, level 1 books the payout over ten days), `tests/ui/security.test.ts` (the Admin tab, the six cards with the one held, the costs and risks in words, the formula on the firms only, the way back down, the greyed button, the insurer's warning) |
 
 ---
 
@@ -34,6 +35,25 @@ work went, one commit per task; phase C consolidates it into `REPORT-T13.md`.
 - Export `extractionLoad`, `extractionRunning` from `./media`.
 - Export `footprintOrigin`, `portCell`, `pathBetween`, `tileKeysFor`, `runCells` from `./pipes`
   (the last three are read by tests only; the render imports the first two by module path).
+
+- Export `burglaryPaidOut`, `burglaryTargets`, `burgle`, `securitySubscriptionParts` from
+  `./security` (imported by module path with the `T13-C1` comment in `src/ui/security.ts`).
+
+### `src/engine/game.ts` (T13-B4d, the burglary)
+
+`runBurglary` rolls and takes nothing. Replace its body with:
+
+```ts
+function runBurglary(state: GameState): void {
+  if (!rollBurglary(state)) return;
+  const lost = burgle(state);
+  claimBurglary(state, lost);
+}
+```
+
+and add `burgle` to the import from `./security`. `burgle` sets `security.lastBurglaryDay`
+itself and queues the `burglary` event (choices `ok`; `resolveEvent` needs no handler for it).
+The insured value is refreshed by `settle` after the tick, as for every other change of the hall.
 
 ### `src/engine/game.ts` (T13-B4b, the gate's output)
 
@@ -108,6 +128,15 @@ The class badge and frame (T13-B4a). The colour comes from `CLASS_BADGE` on the 
   display: flex;
   align-items: flex-end;
   justify-content: center;
+}
+```
+
+The security ladder (T13-B4d):
+
+```css
+.security-level.is-held {
+  border-color: var(--good);
+  box-shadow: inset 0 0 0 1px var(--good);
 }
 ```
 
@@ -196,6 +225,13 @@ Nothing yet.
   in `tests/engine/extraction.test.ts` ("counts a machine with no pipe as not served, and never as
   part of the sum"). Which unit a run goes to changes nothing in the sum either: the hall is one
   duct run and every fan adds up (T10 3.1), so `nearestTarget` picks by the walk of the pipe alone.
+- **The burglary and the ledger (10.2):** what a burglary takes is a `burglary` line through
+  `noteLoss` with `unpaid: true` and no cash moved, the way a written off delivery is booked;
+  the payout comes back through B1's `claim` lines. B1's month end should show the burglary
+  line as a loss and not count it in the cash delta (its `unpaid` flag is what says so).
+- **One rule in two places:** `burglaryPaidOut` in `security.ts` and the guard inside B1's
+  `claimBurglary` both say "property cover held and level at least 1". Phase C may export a
+  predicate from `insurance.ts` and have both read it.
 - **One ledger (10.2):** every metre goes through `charge(state, 'pipes', ...)` in
   `connectExtraction`; a disconnection writes nothing and refunds nothing; a branch taking over a
   trunk's tail writes nothing.
