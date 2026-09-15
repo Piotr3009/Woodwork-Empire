@@ -12,6 +12,7 @@ import {
   BOARD_MIDDAY_MINUTE,
   BREAK_START_MINUTE,
   CABINET_SLOT_LAYOUT,
+  DAY_LOGS_KEPT,
   DAY_SUMMARIES_MAX,
   CANTEEN_SLOT_LAYOUT,
   DAY_END_MINUTE,
@@ -69,6 +70,7 @@ import {
   pay,
   payArrears,
   receive,
+  refund,
   runDayCosts,
   writeUpBooks,
 } from './economy';
@@ -192,6 +194,7 @@ import {
   canHire,
   countStaffOvertimeMinute,
   hasWorkingDay,
+  helperOnDuty,
   helpers,
   hire,
   isWorkingToday,
@@ -209,6 +212,7 @@ import {
   assignWorkerTask,
   createDailyTasks,
   createTask,
+  dayCategoryOf,
   equipmentUnloadMinutes,
   findTask,
   interruptOwnerWith,
@@ -276,6 +280,7 @@ export function createGame(options: NewGameOptions): GameState {
     cash: spec.startingCash,
     reputation: REPUTATION_START,
     reputationLog: [],
+    dayLogs: [],
     dust: 0,
     unit: {
       areaM2: spec.areaM2,
@@ -289,6 +294,7 @@ export function createGame(options: NewGameOptions): GameState {
     owner: {
       present: true,
       minutesByCategory: { admin: 0, design: 0, workshop: 0 },
+      dayLog: [],
       minutesWorked: 0,
       overtimeMinutes: 0,
       labourFactor: 1,
@@ -388,6 +394,8 @@ function resumeMove(state: GameState): void {
 function startDay(state: GameState): void {
   const owner = state.owner;
   owner.minutesByCategory = { admin: 0, design: 0, workshop: 0 };
+  // A new day is a blank bar: what he did yesterday is on yesterday's log (CLAUDE.md T11 3.1).
+  owner.dayLog = [];
   owner.minutesWorked = 0;
   owner.wentHome = false;
   owner.currentTaskId = null;
@@ -515,7 +523,9 @@ function collectSoldMachines(state: GameState): void {
 }
 
 /** The same question the sheets ask: unload it now, or leave it standing at the gate
- *  (CLAUDE.md T8 3.2). A helper takes it off the list without being asked, as he always does. */
+ *  (CLAUDE.md T8 3.2). A helper takes it off the list without being asked, as he always does, and
+ *  the van is then never a question the owner is put: it is his job of work and he has done it
+ *  before anybody is asked about it (CLAUDE.md T11 3.4). */
 function queueKitDeliveryEvents(state: GameState, arriving: readonly OnOrderItem[]): void {
   const first = arriving[0];
   if (first === undefined) return;
@@ -663,7 +673,7 @@ export function runOvertimeQuits(state: GameState): void {
 
 /** A helper cleans every Friday at no cost to the owner (CLAUDE.md 9.7). */
 function runHelperClean(state: GameState): void {
-  if (helpers(state).length === 0) return;
+  if (!helperOnDuty(state)) return;
   if (weekday(state.clock.day) !== HELPER_CLEAN_WEEKDAY) return;
   ensureTask(state, 'cleaning', 'Weekly clean', null);
 }
@@ -748,6 +758,7 @@ export function daySummaryOf(state: GameState): DaySummary {
     ),
     labourValue: state.dayStats.labourValue,
     workMinutes: state.dayStats.workMinutes,
+    dayLog: owner.dayLog.map((entry) => ({ ...entry })),
   };
 }
 
@@ -758,6 +769,13 @@ function recordDay(state: GameState): void {
   state.days.push(summary);
   if (state.days.length > DAY_SUMMARIES_MAX) {
     state.days.splice(0, state.days.length - DAY_SUMMARIES_MAX);
+  }
+  // The week the company board adds up: the last seven days of the owner's own day, and no more
+  // (CLAUDE.md T11 3.1).
+  state.dayLogs = state.dayLogs.filter((entry) => entry.day !== summary.day);
+  state.dayLogs.push({ day: summary.day, segments: summary.dayLog.map((entry) => ({ ...entry })) });
+  if (state.dayLogs.length > DAY_LOGS_KEPT) {
+    state.dayLogs.splice(0, state.dayLogs.length - DAY_LOGS_KEPT);
   }
 }
 
@@ -838,7 +856,8 @@ function ensureTask(
 /** Hands a task to the owner, or to a joiner at the cost of his production minutes. */
 function delegateAdHocTask(state: GameState, task: TaskInstance, choiceId: string): void {
   if (choiceId === 'owner') {
-    startTask(state, task.id);
+    // The player pressed the button himself: that is the override (CLAUDE.md T11 3.4).
+    startTask(state, task.id, true);
     return;
   }
   if (choiceId === 'joiner') {
@@ -947,17 +966,36 @@ function applyTaskCompletion(state: GameState, task: TaskInstance): void {
   }
 }
 
-/** A drag is a move only while the item is not standing where it started. Dragging it out and
- *  back again, however many drags it takes, costs nothing (CLAUDE.md T4 3.5). */
-function recordMove(state: GameState, item: Equipment, stood: { x: number; y: number }): void {
+/** A drag is a move only while the item is not standing where it started, and standing the way it
+ *  started. Dragging it out and back again, however many drags it takes, costs nothing
+ *  (CLAUDE.md T4 3.5); turning it where it stands is a move of its own, which for a bench or a
+ *  rack costs nothing either, because `endSetup` only ever books the heavy ones
+ *  (PIOTR, 15.09; CLAUDE.md T11 3.9). */
+function recordMove(
+  state: GameState,
+  item: Equipment,
+  stood: { x: number; y: number; rotated: boolean },
+): void {
   const index = state.movedItems.findIndex((moved) => moved.itemId === item.id);
   if (index < 0) {
-    if (item.anchorX === stood.x && item.anchorY === stood.y) return;
-    state.movedItems.push({ itemId: item.id, fromX: stood.x, fromY: stood.y });
+    if (item.anchorX === stood.x && item.anchorY === stood.y && item.rotated === stood.rotated) {
+      return;
+    }
+    state.movedItems.push({
+      itemId: item.id,
+      fromX: stood.x,
+      fromY: stood.y,
+      fromRotated: stood.rotated,
+    });
     return;
   }
   const start = state.movedItems[index];
-  if (start && item.anchorX === start.fromX && item.anchorY === start.fromY) {
+  if (
+    start &&
+    item.anchorX === start.fromX &&
+    item.anchorY === start.fromY &&
+    item.rotated === start.fromRotated
+  ) {
     state.movedItems.splice(index, 1);
   }
 }
@@ -1053,6 +1091,9 @@ function putThemBack(state: GameState): void {
     if (!item) continue;
     item.anchorX = moved.fromX;
     item.anchorY = moved.fromY;
+    // Exactly where it stood means the way it stood as well, now that a turn is a move
+    // (CLAUDE.md T11 3.9).
+    item.rotated = moved.fromRotated;
   }
   state.movedItems = [];
 }
@@ -1124,7 +1165,7 @@ function runMinute(state: GameState): void {
     owner.currentTaskId = null;
     return;
   }
-  spendOwnerMinute(state, task.category);
+  spendOwnerMinute(state, task.category, dayCategoryOf(task.kind));
   const finished = advanceOwnerTask(state, ownerEfficiency(state));
   if (finished) applyTaskCompletion(state, finished);
 }
@@ -1370,7 +1411,7 @@ function runProductionMinute(state: GameState, ownerOnTask: boolean): void {
     if (worker) {
       worker.productionMinutes += 1;
     } else {
-      spendOwnerMinute(state, 'workshop');
+      spendOwnerMinute(state, 'workshop', 'workshop');
       state.owner.productionMinutes += 1;
     }
     // What the piece itself was made in: the minutes it took and how many of them were dusty
@@ -1448,8 +1489,10 @@ function raiseStockOverflow(state: GameState, delivery: Delivery, overflow: numb
 function raiseBagFull(state: GameState, machine: Equipment): void {
   const name = findSpec(machine.specId)?.name ?? machine.specId;
   const task = ensureTask(state, 'bagChange', `Bag change: ${name}`, machine.id);
-  if (helpers(state).length > 0) {
-    // The helper takes it, free and without asking.
+  // The helper takes it, free and without asking, while he is actually in the hall. A man on the
+  // books who is off today takes nothing, and the question is put to the owner as it always was
+  // (CLAUDE.md T11 3.4).
+  if (helperOnDuty(state)) {
     delegateTasks(state);
     return;
   }
@@ -1657,8 +1700,9 @@ function resolveEvent(state: GameState, choiceId: string): void {
       break;
     case 'deliveryArrived':
       if (choiceId === 'unload') {
+        // "Unload it yourself" is the override, so it lands even with a helper in the hall.
         const taskId = event.data.taskId;
-        if (typeof taskId === 'string') startTask(state, taskId);
+        if (typeof taskId === 'string') startTask(state, taskId, true);
       }
       break;
     case 'stockOverflow': {
@@ -1822,8 +1866,10 @@ export function applyAction(state: GameState, action: GameAction): GameState {
       break;
     }
     case 'START_CLEANING': {
+      // The Clean up button under the hall is the player saying he will do it himself, helper or
+      // no helper (CLAUDE.md T11 3.4).
       const task = ensureTask(next, 'cleaning', 'Clean the hall', null);
-      startTask(next, task.id);
+      startTask(next, task.id, true);
       break;
     }
     case 'REPAIR_MACHINE': {
@@ -1875,7 +1921,9 @@ export function applyAction(state: GameState, action: GameAction): GameState {
       break;
     case 'MOVE_ITEM': {
       const item = next.equipment.find((entry) => entry.id === action.itemId);
-      const stood = item ? { x: item.anchorX, y: item.anchorY } : null;
+      const stood = item
+        ? { x: item.anchorX, y: item.anchorY, rotated: item.rotated }
+        : null;
       moveItem(next, action.itemId, action.x, action.y, action.rotated);
       if (item && stood) recordMove(next, item, stood);
       break;
@@ -2249,12 +2297,32 @@ function settleOrders(state: GameState, task: TaskInstance): void {
  *  free again, and the books say what happened. One click (CLAUDE.md T8 3.5). */
 export function cancelOrder(state: GameState, orderId: string): BuyCheck {
   const item = findOnOrder(state, orderId);
-  if (!item) return { ok: false, reason: 'Nothing on order' };
-  // At the gate is too late: it is here, and somebody has to take it off the lorry.
-  if (item.arrived) return { ok: false, reason: 'It is at the gate' };
+  if (item) {
+    // At the gate is too late: it is here, and somebody has to take it off the lorry.
+    if (item.arrived) return { ok: false, reason: 'It is at the gate' };
+    if (timeIsPaused(state)) state.speed = 1;
+    receive(state, 'equipment', `Order cancelled: ${orderName(item)}`, item.pricePaid);
+    removeOnOrder(state, item.id);
+    return OK;
+  }
+  // A load of sheets goes the same way: called off until the morning it lands, in full
+  // (PIOTR, 15.09; CLAUDE.md T11 3.12).
+  const delivery = findDelivery(state, orderId);
+  if (!delivery) return { ok: false, reason: 'Nothing on order' };
+  if (delivery.arrived) return { ok: false, reason: 'It is at the gate' };
   if (timeIsPaused(state)) state.speed = 1;
-  receive(state, 'equipment', `Order cancelled: ${orderName(item)}`, item.pricePaid);
-  removeOnOrder(state, item.id);
+  refund(state, 'material', `Order cancelled: ${delivery.sheets} sheets`, delivery.pricePaid);
+  state.deliveries = state.deliveries.filter((entry) => entry.id !== delivery.id);
+  const job = delivery.jobId === null ? null : findJob(state, delivery.jobId);
+  if (job !== null && job.stage === 'materialOrdered') {
+    // The job wants its material ordering again, so the old job of work goes with the lorry and
+    // `refreshJob` writes a fresh one.
+    job.stage = 'materialPending';
+    state.tasks = state.tasks.filter(
+      (task) => !(task.kind === 'materialOrder' && task.jobId === job.id),
+    );
+    refreshJob(state, job);
+  }
   return OK;
 }
 

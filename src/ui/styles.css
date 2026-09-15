@@ -9,6 +9,8 @@
   --accent: #c98a3b;
   --good: #6ba368;
   --bad: #c05a4e;
+  /* The cream of the paper family, on the dark green cabinet of the top bar (T11 3.1). */
+  --cream: #f3ecdc;
 
   /* Placeholder art, section 10.3. Flat colours, no gradients. */
   --concrete: #8f9298;
@@ -460,37 +462,75 @@ input.num {
    Top bar
    -------------------------------------------------------------------------- */
 
+/* The bar is a machine cabinet: the darkest green of the workshop, a lighter edge along the top
+   and a dark one along the bottom, and a rivet in each corner, all of it drawn in CSS and none of
+   it a picture (CLAUDE.md T11 3.1). */
 .topbar {
   align-items: center;
-  background: var(--panel);
-  border-bottom: 1px solid var(--border);
+  background:
+    radial-gradient(circle at 10px 12px, #46584c 0 2px, transparent 2.5px),
+    radial-gradient(circle at calc(100% - 10px) 12px, #46584c 0 2px, transparent 2.5px),
+    radial-gradient(circle at 10px calc(100% - 12px), #46584c 0 2px, transparent 2.5px),
+    radial-gradient(circle at calc(100% - 10px) calc(100% - 12px), #46584c 0 2px, transparent 2.5px),
+    linear-gradient(#102518, #0a1a10);
+  border-bottom: 2px solid #050d08;
+  border-top: 1px solid #2b4436;
+  color: var(--cream);
   display: flex;
   gap: 14px;
-  padding: 6px 12px;
+  height: 70px;
+  padding: 0 14px;
+}
+
+/* The cream name plate the money is screwed to, with a rivet dot at each end. */
+.name-plate {
+  background:
+    radial-gradient(circle at 7px 50%, #a79d87 0 2px, transparent 2.5px),
+    radial-gradient(circle at calc(100% - 7px) 50%, #a79d87 0 2px, transparent 2.5px),
+    linear-gradient(#f3ecdc, #d9d1bd);
+  border: 1px solid #5b5446;
+  border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  line-height: 1.1;
+  padding: 4px 16px;
 }
 
 .topbar .cash {
-  font-size: 16px;
-  font-weight: 600;
+  color: #12301f;
+  font-family: var(--font-title);
+  font-size: 26px;
+  font-weight: 400;
 }
 
-.topbar .net.good {
-  color: var(--good);
-}
-
-.topbar .net.bad {
-  color: var(--bad);
-}
-
-.topbar .net,
-.topbar .left,
-.topbar .date {
-  color: var(--text-dim);
+.topbar .net {
+  color: #5b5446;
   font-size: 12px;
 }
 
+.topbar .net.good {
+  color: #1d6b39;
+}
+
+.topbar .net.bad {
+  color: #b3261e;
+}
+
+/* The date over the knobs. */
+.clock-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  justify-content: center;
+}
+
 .topbar .date {
-  color: var(--text);
+  color: var(--cream);
+  font-family: var(--font-title);
+  font-size: 20px;
+  line-height: 1;
+  white-space: nowrap;
 }
 
 .topbar .speeds {
@@ -498,40 +538,212 @@ input.num {
   gap: 4px;
 }
 
+/* The speed knobs: dark rounded buttons, the one that is on in the game's orange with a glow. */
+.topbar .knob {
+  background: #16301f;
+  border: 1px solid #2b4436;
+  border-radius: 9px;
+  color: #cfd8cf;
+  font-size: 11px;
+  padding: 2px 8px;
+}
+
+.topbar .knob:hover:not([disabled]) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.topbar .knob.is-on {
+  background: var(--accent);
+  border-color: var(--accent);
+  box-shadow: 0 0 8px rgba(201, 138, 59, 0.75);
+  color: #1c1f24;
+}
+
 .topbar .spacer {
   flex: 1;
 }
 
-.minutes {
+.topbar .reason {
+  color: #9fb0a3;
+  font-size: 12px;
+}
+
+/* The boss's day: a dark inset panel with a lamp, what he is on, how much of the day has gone,
+   and the day itself in bands underneath (CLAUDE.md T11 3.1). */
+.day-meter {
+  background: #0a1a10;
+  border: 1px solid #23392c;
+  border-radius: 5px;
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.6);
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  justify-content: center;
+  min-width: 340px;
+  padding: 6px 10px;
+  position: relative;
+}
+
+.day-head {
   align-items: center;
   display: flex;
   gap: 8px;
 }
 
-.minute-bar {
-  background: var(--page);
-  border: 1px solid var(--border);
+.day-line {
+  color: var(--cream);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.day-count {
+  color: #9fb0a3;
+  font-size: 12px;
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.lamp {
+  border-radius: 50%;
+  flex: none;
+  height: 8px;
+  width: 8px;
+}
+
+.lamp.is-busy {
+  background: var(--accent);
+  box-shadow: 0 0 6px rgba(201, 138, 59, 0.9);
+}
+
+.lamp.is-idle {
+  background: #2e9e5b;
+  box-shadow: 0 0 6px rgba(46, 158, 91, 0.8);
+}
+
+.lamp.is-away {
+  background: #6a706b;
+}
+
+/* The day itself. Break and idle are simply not painted (CLAUDE.md T11 3.1). */
+.day-bar {
+  background: #05100a;
+  border: 1px solid #23392c;
   border-radius: 2px;
   display: flex;
   height: 12px;
   overflow: hidden;
-  width: 220px;
+  width: 100%;
 }
 
-.seg-admin {
-  background: #8a8f96;
-}
-
-.seg-design {
-  background: #7a6a9c;
+.day-bar .seg {
+  display: block;
+  height: 100%;
 }
 
 .seg-workshop {
-  background: #5f9c5f;
+  background: #2e9e5b;
 }
 
-.minute-count {
+.seg-calls {
+  background: #378add;
+}
+
+.seg-emails {
+  background: #7f77dd;
+}
+
+.seg-meetings {
+  background: #c9a227;
+}
+
+.seg-siteMeasure {
+  background: #8e6a3a;
+}
+
+.seg-office {
+  background: #e0731e;
+}
+
+.seg-fixing {
+  background: #d84a4a;
+}
+
+/* No legend under the bar: it is on a small cream plate behind the hover (CLAUDE.md T11 3.1). */
+.day-tip {
+  background: linear-gradient(#f5efe2, #e3dcc9);
+  border: 1px solid #5b5446;
+  border-radius: 4px;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.45);
+  color: #1d2a22;
+  display: none;
+  left: 0;
+  padding: 6px 8px;
+  position: absolute;
+  top: calc(100% + 6px);
+  white-space: nowrap;
+  z-index: 50;
+}
+
+.day-meter:hover .day-tip {
+  display: block;
+}
+
+.tip-row {
+  align-items: center;
+  display: flex;
   font-size: 12px;
+  gap: 6px;
+}
+
+.tip-key {
+  border: 1px solid rgba(0, 0, 0, 0.35);
+  border-radius: 2px;
+  display: block;
+  height: 9px;
+  width: 14px;
+}
+
+.tip-name {
+  min-width: 96px;
+}
+
+.tip-min {
+  margin-left: auto;
+}
+
+/* The push buttons on the right: cream plates with a hard shadow, orange when there is something
+   behind them the player has not seen yet (CLAUDE.md T11 3.1). */
+.push-block {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
+.push {
+  background: linear-gradient(#f3ecdc, #ddd5c1);
+  border: 1px solid #5b5446;
+  border-radius: 4px;
+  box-shadow: 0 3px 0 #0a1a10;
+  color: #12301f;
+  cursor: pointer;
+  font-family: var(--font-title);
+  font-size: 16px;
+  padding: 4px 12px;
+}
+
+.push:hover:not([disabled]) {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #12301f;
+}
+
+.push.is-new {
+  background: linear-gradient(#e8964a, var(--accent));
+  border-color: #8a4f13;
+  color: #1c1f24;
 }
 
 /* What today's work is multiplied by, shown only when it is below 1 (CLAUDE.md T6 3.4). */
@@ -1226,22 +1438,28 @@ input.num {
   display: contents;
 }
 
+/* No fill at all and no border at rest: the white boxes over the laptop and the door are gone
+   (PIOTR, 15.09; CLAUDE.md T11 3.5). */
 .office-region {
   background: transparent;
   border: 0;
   cursor: pointer;
   margin: 0;
+  outline: 2px solid transparent;
+  outline-offset: -2px;
+  border-radius: 4px;
   padding: 0;
   position: absolute;
-  /* The glow is the browser's and nothing else's: the game writes no hover state at all, so
+  /* The outline is the browser's and nothing else's: the game writes no hover state at all, so
      there is nothing to blink with the clock (PIOTR, 13.09; CLAUDE.md T9 3.4). */
-  transition: background 120ms ease;
+  transition: outline-color 120ms ease;
 }
 
+/* On hover a 2 px orange outline with a 4 px radius, and nothing else at all (T11 3.5). */
 .office-region:hover,
 .office-region:focus-visible {
-  background: rgb(255 255 255 / 12%);
-  outline: none;
+  background: transparent;
+  outline-color: var(--accent);
 }
 
 .office-region.is-quiet {
@@ -1414,19 +1632,26 @@ input.num {
   background: transparent;
 }
 
+/* The outline is the length of the work at the rate the job will get, and it stretches by every
+   minute the job stands still. The green inside it is the work that is done, so a started job is
+   never all green to the deadline (PIOTR, 15.09; CLAUDE.md T11 3.3). */
 .plan-bar {
-  background: #4f9d55;
+  background: transparent;
+  border: 1px solid var(--text-dim);
   border-radius: 2px;
   height: 12px;
-  opacity: 0.9;
   position: absolute;
   top: 6px;
 }
 
-/* A job nobody has started is drawn empty: it is a projection of what the work takes. */
+/* A job nobody has started is drawn dashed: it is a projection of what the work takes. */
 .plan-bar.is-projected {
-  background: transparent;
-  border: 1px dashed var(--text-dim);
+  border-style: dashed;
+}
+
+/* The projected end has walked past the deadline. */
+.plan-bar.is-late {
+  border-color: var(--bad);
 }
 
 .plan-done {
@@ -1434,6 +1659,14 @@ input.num {
   border-radius: 2px;
   display: block;
   height: 100%;
+}
+
+.plan-late {
+  color: var(--bad);
+  font-size: 10px;
+  position: absolute;
+  top: 20px;
+  white-space: nowrap;
 }
 
 .plan-figures {
@@ -1879,6 +2112,450 @@ input.num {
   color: #b3261e;
 }
 
+/* The plate at the top of the evening's summary: the day, what it went on and what it came to
+   (CLAUDE.md T11 3.1). */
+.day-plate {
+  background: linear-gradient(#f5efe2, #e3dcc9);
+  border: 1px solid #5b5446;
+  border-radius: 4px;
+  color: #1d2a22;
+  margin-bottom: 10px;
+  padding: 8px 12px;
+}
+
+.day-plate h3 {
+  color: #12301f;
+  font-family: var(--font-title);
+  font-size: 22px;
+  font-weight: 400;
+  margin: 0;
+}
+
+.day-shares {
+  font-weight: 600;
+  margin: 2px 0 0;
+}
+
+.day-figures {
+  color: #4d5a52;
+  margin: 2px 0 0;
+}
+
+/* A small modal of the paper family is the same folder scaled down, and a wide one is between the
+   two: one picture at three sizes (SPRITES.md 11; CLAUDE.md T11 3.5). */
+.modal-folder:not(.modal-full):not(.modal-wide) {
+  height: min(62vh, 520px);
+  max-height: min(62vh, 520px);
+  width: min(92vw, calc(min(62vh, 520px) * 1.5));
+}
+
+.modal-folder.modal-wide {
+  height: min(78vh, 700px);
+  max-height: min(78vh, 700px);
+  width: min(94vw, calc(min(78vh, 700px) * 1.5));
+}
+
+/* ------------------------------------------------------------------------------------------
+   The board family: cards on a steel magnet board (PIOTR, the "I" mockup; CLAUDE.md T11 3.5).
+   CSS only, no picture: dark steel in an inner frame, a red magnet in the head, the tabs as
+   magnet strips and the content as cream cards held by a blue magnet, each tilted a degree or so.
+   ------------------------------------------------------------------------------------------ */
+.modal-board {
+  background: linear-gradient(#4a4f54, #3a3f44);
+  border: 1px solid #1b1e21;
+  box-shadow: inset 0 0 0 5px #24282c, 0 10px 30px rgba(0, 0, 0, 0.5);
+  color: #eceff1;
+  --card: #f5efe2;
+  --card-2: #fbf8f1;
+  --card-line: #cdbf9f;
+  --card-ink: #1d2a22;
+  --card-ink-2: #4d5a52;
+  --magnet-red: #c0392b;
+  --magnet-blue: #2f6fb0;
+  --steel-line: #24282c;
+}
+
+.modal-board .modal-head,
+.modal-board .modal-body,
+.modal-board .modal-foot {
+  background: transparent;
+  border: 0;
+  color: #eceff1;
+}
+
+.modal-board .modal-head {
+  border-bottom: 1px solid var(--steel-line);
+  margin: 6px 10px 0;
+  padding-left: 26px;
+  position: relative;
+}
+
+/* The red magnet that holds the head to the steel. */
+.modal-board .modal-head::before {
+  background: radial-gradient(circle at 35% 30%, #e8685a, var(--magnet-red));
+  border-radius: 50%;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+  content: '';
+  height: 14px;
+  left: 4px;
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 14px;
+}
+
+.modal-board .modal-head h2 {
+  color: #f6f8f9;
+}
+
+.modal-board .modal-close {
+  color: #cfd6da;
+}
+
+.modal-board .modal-body {
+  margin: 0 10px;
+  padding: 8px 4px;
+}
+
+.modal-board .modal-foot {
+  border-top: 1px solid var(--steel-line);
+  color: #b9c2c7;
+  margin: 0 10px;
+  padding: 6px 0;
+}
+
+.modal-board .modal-foot:empty {
+  border: 0;
+  padding: 0;
+}
+
+/* Tabs as magnet strips. */
+.modal-board .chip {
+  background: linear-gradient(#5d646a, #4a5157);
+  border: 1px solid var(--steel-line);
+  border-radius: 3px;
+  color: #eceff1;
+  font-weight: 700;
+}
+
+.modal-board .chip.is-on {
+  background: linear-gradient(#4a8fd0, var(--magnet-blue));
+  border-color: #1f4d7d;
+}
+
+.modal-board .chip:hover:not([disabled]),
+.modal-board .chip.is-on:hover:not([disabled]) {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #1c1f24;
+}
+
+/* Every piece of content is a cream card held by a blue magnet at the top, tilted a degree or so
+   and casting its own shadow. */
+.modal-board .card,
+.modal-board .row,
+.modal-board .plan-row:not(.plan-scale-row),
+.modal-board .tile {
+  background: var(--card-2);
+  border: 1px solid var(--card-line);
+  border-radius: 4px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.45);
+  color: var(--card-ink);
+  margin: 10px 4px;
+  padding: 12px 10px 8px;
+  position: relative;
+}
+
+.modal-board .card::before,
+.modal-board .row::before,
+.modal-board .plan-row:not(.plan-scale-row)::before,
+.modal-board .tile::before {
+  background: radial-gradient(circle at 35% 30%, #6fa8e0, var(--magnet-blue));
+  border-radius: 50%;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  content: '';
+  height: 12px;
+  left: 50%;
+  position: absolute;
+  top: -6px;
+  transform: translateX(-50%);
+  width: 12px;
+}
+
+/* Minus one degree to one and a half, so a board of cards is never a filing cabinet. */
+.modal-board .card:nth-of-type(3n + 1),
+.modal-board .row:nth-of-type(3n + 1),
+.modal-board .plan-row:not(.plan-scale-row):nth-of-type(3n + 1),
+.modal-board .tile:nth-of-type(3n + 1) {
+  transform: rotate(-1deg);
+}
+
+.modal-board .card:nth-of-type(3n + 2),
+.modal-board .row:nth-of-type(3n + 2),
+.modal-board .plan-row:not(.plan-scale-row):nth-of-type(3n + 2),
+.modal-board .tile:nth-of-type(3n + 2) {
+  transform: rotate(0.75deg);
+}
+
+.modal-board .card:nth-of-type(3n),
+.modal-board .row:nth-of-type(3n),
+.modal-board .plan-row:not(.plan-scale-row):nth-of-type(3n),
+.modal-board .tile:nth-of-type(3n) {
+  transform: rotate(1.5deg);
+}
+
+/* The scale row of the Work Plan is the ruler over the cards, not a card of its own. */
+.modal-board .plan-scale-row {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  color: #cfd6da;
+}
+
+.modal-board .row-main,
+.modal-board .card-main h3,
+.modal-board .card-main strong,
+.modal-board .tile-name {
+  color: var(--card-ink);
+}
+
+.modal-board .row-figure,
+.modal-board .figures,
+.modal-board .hint,
+.modal-board .tile-figures,
+.modal-board p {
+  color: var(--card-ink-2);
+}
+
+.modal-board .modal-body > .hint,
+.modal-board .modal-body > .empty {
+  color: #cfd6da;
+}
+
+/* The Work Plan's own chart sits on the card, in paper colours. */
+.modal-board .plan-chart {
+  background: var(--card);
+  border: 1px solid var(--card-line);
+}
+
+.modal-board .plan-figures,
+.modal-board .plan-rate {
+  color: var(--card-ink);
+}
+
+.modal-board .order-bar {
+  background: #e2d9c4;
+}
+
+/* Light yellow for the button that does the thing, cream for the rest, salmon for the one that
+   takes something away, grey for a locked one. Hover is the game's orange everywhere. */
+.modal-board button:not(.chip):not(.modal-close) {
+  background: var(--card);
+  border: 1px solid #8a8071;
+  border-radius: 4px;
+  color: #1d2a22;
+  font-weight: 700;
+}
+
+.modal-board button.btn-primary:not(.chip) {
+  background: #f5e27a;
+  border-color: #c8ae3c;
+  color: #2a2410;
+}
+
+.modal-board button.is-danger:not(.chip),
+.modal-board .card-action .is-danger {
+  background: #ff8a80;
+  border-color: #c0392b;
+  color: #3a0f0b;
+}
+
+.modal-board button:not(.chip):not(.modal-close):hover:not([disabled]) {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #1c1f24;
+}
+
+.modal-board button[disabled]:not(.chip) {
+  background: #b9bdc1;
+  border-color: #9aa0a5;
+  color: #55595d;
+}
+
+.modal-board .reason,
+.modal-board .lock {
+  color: #6a6355;
+}
+
+/* ------------------------------------------------------------------------------------------
+   The company board: the one board of the family that is a picture. Green felt in an oak frame
+   with a cream sheet pinned to it (officeCompanyBoard.png, 1254 square; SPRITES.md 11). The
+   company name and the week go on the felt above the sheet, the output and its two columns on
+   the sheet, and the two totals under both (PIOTR, 15.09; CLAUDE.md T11 3.5).
+   ------------------------------------------------------------------------------------------ */
+.modal-board.modal-felt {
+  background: transparent url('/sprites/officeCompanyBoard.png') no-repeat center / 100% 100%;
+  border: 0;
+  box-shadow: none;
+  height: min(92vh, 900px);
+  max-height: min(92vh, 900px);
+  width: min(96vw, min(92vh, 900px));
+}
+
+.modal-felt .modal-head {
+  border: 0;
+  left: 0;
+  margin: 0;
+  padding: 6px 10px 0 12px;
+  position: absolute;
+  right: 0;
+  top: 0;
+}
+
+.modal-felt .modal-head::before {
+  display: none;
+}
+
+.modal-felt .modal-head h2 {
+  color: #f0e9d8;
+  font-size: 20px;
+}
+
+.modal-felt .modal-body {
+  inset: 0;
+  margin: 0;
+  overflow: hidden;
+  padding: 0;
+  position: absolute;
+}
+
+.felt {
+  height: 100%;
+  position: relative;
+  width: 100%;
+}
+
+/* The felt above the sheet: the picture leaves y 0 to 40.7% of it clear. */
+.felt-head {
+  color: #f0e9d8;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  height: 33%;
+  left: 14%;
+  position: absolute;
+  right: 14%;
+  top: 6%;
+  text-align: center;
+}
+
+.felt-name {
+  font-family: var(--font-title);
+  font-size: 30px;
+  line-height: 1.1;
+}
+
+.felt-week {
+  font-family: var(--font-title);
+  font-size: 22px;
+}
+
+.felt-shares {
+  font-size: 12px;
+  opacity: 0.85;
+}
+
+.felt-weeks {
+  flex: 1 1 auto;
+  margin-top: 4px;
+  min-height: 0;
+  overflow-y: auto;
+  text-align: left;
+}
+
+.felt-weeks .board-week h4,
+.felt-weeks .row-main,
+.felt-weeks .row-figure {
+  color: #f0e9d8;
+}
+
+.felt-weeks .empty {
+  color: #d8d2c0;
+}
+
+/* The pinned sheet: x 19.4% to 80.6%, y 40.7% to 80.9% of the picture (SPRITES.md 11). */
+.felt-sheet {
+  color: #1d2a22;
+  height: 40.2%;
+  left: 19.4%;
+  overflow-y: auto;
+  padding: 6px 10px;
+  position: absolute;
+  right: 19.4%;
+  top: 40.7%;
+}
+
+.felt-sheet h3,
+.felt-sheet h4 {
+  color: #12301f;
+  margin-top: 4px;
+}
+
+.felt-sheet .row-main,
+.felt-sheet .figures strong {
+  color: #1d2a22;
+}
+
+.felt-sheet .row-figure,
+.felt-sheet .hint,
+.felt-sheet .figures {
+  color: #4d5a52;
+}
+
+.felt-sheet .board-columns {
+  display: flex;
+  gap: 12px;
+}
+
+.felt-sheet .board-column {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+/* Under both, in letters you can read across the room (PIOTR, 15.09). */
+.felt-totals {
+  bottom: 6%;
+  color: #f0e9d8;
+  display: flex;
+  gap: 24px;
+  justify-content: center;
+  left: 10%;
+  position: absolute;
+  right: 10%;
+}
+
+.felt-total {
+  font-family: var(--font-title);
+  font-size: 34px;
+  line-height: 1.1;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+/* The same two totals on the board on the office wall, on its own pinned sheet and nothing else
+   on it (CLAUDE.md T11 3.5). */
+.office-board-totals {
+  align-items: center;
+  color: #1d2a22;
+  display: flex;
+  flex-direction: column;
+  font-family: var(--font-title);
+  justify-content: center;
+  line-height: 1.2;
+  pointer-events: none;
+  position: absolute;
+  text-align: center;
+}
+
 /* The file picker behind "Load from file" is the browser's; the input itself stays out of sight. */
 .menu-pop input[type='file'] {
   height: 1px;
@@ -1954,6 +2631,87 @@ input.num {
   background: var(--accent);
   border-color: var(--accent);
   box-shadow: 0 2px 0 #9a4c10;
+}
+
+/* The day one list at the top of the catalogue: what a workshop needs before it can make
+   anything, ticked off as it is bought (PIOTR, 15.09; CLAUDE.md T11 3.6). */
+.checklist {
+  border-radius: 10px;
+  margin: 8px 0;
+  padding: 8px 10px;
+}
+
+.checklist h3 {
+  margin: 0 0 2px;
+}
+
+.checklist .hint {
+  margin: 0 0 6px;
+}
+
+.checklist-grid {
+  display: grid;
+  gap: 4px 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.checklist-item {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  display: flex;
+  font: inherit;
+  gap: 6px;
+  padding: 2px 4px;
+  text-align: left;
+}
+
+.checklist-tick {
+  border: 1px solid var(--paper-line, var(--border));
+  border-radius: 3px;
+  display: inline-block;
+  flex: none;
+  font-weight: 800;
+  height: 16px;
+  line-height: 14px;
+  text-align: center;
+  width: 16px;
+}
+
+.checklist-item.is-done .checklist-tick {
+  background: #1f8a4c;
+  border-color: #1f8a4c;
+  color: #f5efe2;
+}
+
+.checklist-item.is-done .checklist-name {
+  opacity: 0.7;
+  text-decoration: line-through;
+}
+
+.checklist-item:hover .checklist-name {
+  color: var(--accent);
+}
+
+.checklist.is-done {
+  padding: 6px 10px;
+}
+
+/* On the folder's paper the buttons of the list are paper too, not the green plates of the rest
+   of the page. */
+.modal-folder .checklist-item {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  color: var(--ink);
+}
+
+.modal-folder .checklist-item:hover:not([disabled]) {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  color: var(--accent);
 }
 
 /* The notes at the foot of the catalogue: a pencil line, not a red shout. */

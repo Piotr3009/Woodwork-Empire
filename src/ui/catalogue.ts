@@ -15,6 +15,8 @@ import {
   airDemandOf,
   bagsExist,
   canSell,
+  dayOneComplete,
+  dayOneKit,
   compressorAirOf,
   compressorFor,
   compressorHasDryer,
@@ -65,6 +67,36 @@ const TABS: Array<[string, string]> = [
   [OWNED_TAB, 'Owned'],
 ];
 
+/** The list a workshop works down on its first day, at the top of every tab until it is done.
+ *  Each line is a click into its own folder; the licence is not a machine, so its line opens the
+ *  Office tab it lives on (PIOTR, 15.09; CLAUDE.md T11 3.6). */
+function renderDayOne(state: GameState): string {
+  const items = dayOneKit(state);
+  if (dayOneComplete(state)) {
+    return (
+      '<div class="checklist is-done" data-checklist="dayOne">' +
+      '<h3>Day one kit complete</h3></div>'
+    );
+  }
+  const left = items.filter((item) => !item.done).length;
+  const lines = items
+    .map((item) => {
+      return (
+        `<button class="checklist-item${item.done ? ' is-done' : ''}" ` +
+        `data-do="dayOneItem" data-id="${item.id}" data-kit="${item.id}">` +
+        `<span class="checklist-tick">${item.done ? '&#10003;' : ''}</span>` +
+        `<span class="checklist-name">${escapeHtml(item.label)}</span></button>`
+      );
+    })
+    .join('');
+  return (
+    '<div class="checklist" data-checklist="dayOne">' +
+    `<h3>Day one</h3><p class="hint">What a workshop needs before it can make anything. ` +
+    `${plural(left, 'item', 'items')} to go.</p>` +
+    `<div class="checklist-grid">${lines}</div></div>`
+  );
+}
+
 export function renderCatalogue(
   state: GameState,
   filter: string,
@@ -93,6 +125,9 @@ export function renderCatalogue(
   // tabs (PIOTR, 14.09).
   return (
     tabBar('catalogueTab', TABS, tab) +
+    // The day one list stands over every tab, on the Office one and on the rest alike, until the
+    // last of it is ticked (CLAUDE.md T11 3.6).
+    renderDayOne(state) +
     filterField('catalogue', filter, 'Filter the catalogue') +
     body +
     (warnings === '' ? '' : `<div class="catalogue-notes">${warnings}</div>`)

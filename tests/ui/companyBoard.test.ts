@@ -98,8 +98,9 @@ describe('week by week', () => {
     expect(text).toContain('+3');
     expect(text).toContain('Dropped: Garage shelves');
     expect(text).toContain('−10');
-    expect(text).toContain(`Reputation now ${state.reputation}`);
-    expect(text).toContain(`started at ${REPUTATION_START}`);
+    // The total is the big one under both now, on the felt (CLAUDE.md T11 3.5).
+    expect(text).toContain(`Reputation ${state.reputation}`);
+    expect(text).toContain(`Reputation started at ${REPUTATION_START}`);
   });
 
   it('says so plainly when nothing has moved the reputation yet', () => {

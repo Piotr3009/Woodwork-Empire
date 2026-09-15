@@ -9,6 +9,8 @@
 import {
   AIR_BENCH_DEMAND,
   LOW_AIR_FACTOR,
+  NO_AIR_FACTOR,
+  NO_AIR_LINE,
   AIR_DEMAND,
   AIR_DIVERSITY,
   AIR_DRYER,
@@ -265,18 +267,16 @@ export function airCheck(state: GameState, hands: AirHands = { bench: 0, sanding
     });
   }
   const lowAir = lines.filter((line) => line.low).map((line) => line.id);
-  return {
-    compressors: lines,
-    stopped,
-    lowAir,
-    lines: lines
-      .filter((line) => line.low)
-      .map(
-        (line) =>
-          `Low air on ${line.label}: ${mediaFigure(line.demand)} of ` +
-          `${mediaFigure(line.allowed)} l/min`,
-      ),
-  };
+  const said = lines
+    .filter((line) => line.low)
+    .map(
+      (line) =>
+        `Low air on ${line.label}: ${mediaFigure(line.demand)} of ` +
+        `${mediaFigure(line.allowed)} l/min`,
+    );
+  // Nobody to draw on at all, and men at the benches: the hall says so (CLAUDE.md T11 3.8).
+  if (list.length === 0 && hands.bench + hands.sanding > 0) said.push(NO_AIR_LINE);
+  return { compressors: lines, stopped, lowAir, lines: said };
 }
 
 /** True while this compressor is short of litres, which is what makes the lamp on its sprite and
@@ -328,7 +328,9 @@ export function drawingOn(
 }
 
 /** What the air does to one man's minute: 0.7 while the compressor he is drawing on is short of
- *  litres, and 1 otherwise (PIOTR, CLAUDE.md T10 3.2 rule 2). */
+ *  litres (PIOTR, CLAUDE.md T10 3.2 rule 2), and 0.67 at a bench in a hall with no compressor at
+ *  all, where the nailer and the driver are no use and it is screwed together by hand
+ *  (PIOTR, 15.09; CLAUDE.md T11 3.8). A machine that wants no air is never touched by either. */
 export function airFactorFor(
   state: GameState,
   check: AirCheck,
@@ -336,7 +338,7 @@ export function airFactorFor(
   atTheBench: boolean,
 ): number {
   const compressor = drawingOn(state, machine, atTheBench);
-  if (compressor === null) return 1;
+  if (compressor === null) return atTheBench ? NO_AIR_FACTOR : 1;
   return compressorIsLow(check, compressor.id) ? LOW_AIR_FACTOR : 1;
 }
 

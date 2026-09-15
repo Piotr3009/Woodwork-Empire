@@ -18,6 +18,7 @@ import {
   oldestReadyJob,
   ownerJob,
   runMinutes,
+  shoppingList,
   startProductionCheck,
   timeIsPaused,
 } from '../engine/index';
@@ -90,9 +91,16 @@ import { renderCompany } from './company';
 import { renderShopping } from './shopping';
 import { renderStart } from './start';
 import { decodeSaveFile, encodeSaveFile, saveFileName } from '../cloud/file';
+import {
+  NO_STORED_SAVE,
+  type StoredSave,
+  peekSave,
+  readStore,
+  saveStore,
+} from '../cloud/store';
 import { cloudAvailable } from '../cloud/supabase';
 import { hasSave, loadGame, saveGame, sendMagicLink, signOut, signedInEmail } from '../cloud/saves';
-import { renderMenu, renderTopbar, speedFromString } from './topbar';
+import { type TopbarNews, renderMenu, renderTopbar, speedFromString } from './topbar';
 
 /** The modals the room can open. Materials, Team and Drawings are tabs inside the laptop now:
  *  one path per modal, only the entry moved (docs/art/SPRITES.md 8.4). */
@@ -165,6 +173,10 @@ interface Ui {
   /** A pan that moved is not a click on what it started on. */
   panned: boolean;
   showWhy: boolean;
+  /** What was on the order board and on the shopping list when the player last opened them. A
+   *  push button with something new behind it lights orange (CLAUDE.md T11 3.1). */
+  seenEnquiries: string[];
+  seenOrders: string[];
   /** The real life note the player has open, and where he clicked for it. */
   why: { key: string; left: number; top: number } | null;
   cloud: {
@@ -177,6 +189,10 @@ interface Ui {
   difficulty: Difficulty;
   playerName: string;
   companyName: string;
+  /** What is waiting in the browser's store, and whether New game has asked its one question
+   *  (CLAUDE.md T11 3.2). */
+  saved: StoredSave;
+  startOverAsked: boolean;
 }
 
 const MODAL_TITLES: Record<ModalId, string> = {
@@ -247,6 +263,8 @@ function freshUi(): Ui {
     cameraStarted: false,
     panned: false,
     showWhy: true,
+    seenEnquiries: [],
+    seenOrders: [],
     why: null,
     cloud: {
       available: cloudAvailable(),
@@ -258,6 +276,8 @@ function freshUi(): Ui {
     difficulty: 'easy',
     playerName: 'Piotr',
     companyName: 'Woodwork Empire',
+    saved: NO_STORED_SAVE,
+    startOverAsked: false,
   };
 }
 
@@ -269,7 +289,20 @@ function game(): GameState {
 function dispatch(action: GameAction): void {
   state = applyAction(game(), action);
   autosave();
+  if (AUTOSAVE_ACTIONS.includes(action.type)) autosaveLocal();
+  autosaveWatch();
+  noteOrders();
   requestRender();
+}
+
+/** The player knows about an order he has just placed: what lights the Orders button is something
+ *  landing while he was not looking, not something he bought himself (CLAUDE.md T11 3.1). So the
+ *  list he has seen takes in everything added to it, and stops the moment one of them has gone. */
+function noteOrders(): void {
+  if (state === null) return;
+  const waiting = shoppingList(state).map((line) => line.id);
+  if (ui.seenOrders.some((id) => !waiting.includes(id))) return;
+  ui.seenOrders = waiting;
 }
 
 /** Renders asked for while one batch is open, and how deep the batch is. The frame loop and every
@@ -466,7 +499,7 @@ function hallZoomControls(): string {
  *  be measured. `VIEW_PADDING` is the padding of `.view` in styles.css; `TOPBAR_HEIGHT` is what the
  *  top bar comes to with that stylesheet's padding and type, and it is a guess, not a declared
  *  number. `fitOfficeStack` takes the real box a moment later, so neither has to be right. */
-const TOPBAR_HEIGHT = 45;
+const TOPBAR_HEIGHT = 70;
 const VIEW_PADDING = 12;
 
 /** The room the office has under the top bar, in CSS pixels, before it has been measured. */
@@ -585,6 +618,16 @@ function pageHtml(scene: Scene | null): string {
   return pageBody(scene) + VERSION_CORNER;
 }
 
+/** What the player has not looked at yet: an enquiry that was not on the board when he last
+ *  opened it, and an order that has landed since he last looked at the list (T11 3.1). */
+function topbarNews(current: GameState): TopbarNews {
+  const waiting = shoppingList(current).map((line) => line.id);
+  return {
+    board: current.enquiries.some((enquiry) => !ui.seenEnquiries.includes(enquiry.id)),
+    orders: ui.seenOrders.some((id) => !waiting.includes(id)),
+  };
+}
+
 function pageBody(scene: Scene | null): string {
   if (ui.screen === 'start' || state === null) {
     return (
@@ -594,6 +637,8 @@ function pageBody(scene: Scene | null): string {
         companyName: ui.companyName,
         showWhy: ui.showWhy,
         cloud: ui.cloud,
+        saved: ui.saved,
+        startOverAsked: ui.startOverAsked,
       })
     );
   }
@@ -606,7 +651,7 @@ function pageBody(scene: Scene | null): string {
   const toast = ui.toast === '' ? '' : `<p class="toast">${escapeHtml(ui.toast)}</p>`;
   const out = ui.view === 'sprites' ? '' : renderOwnerOut(current);
   return (
-    renderTopbar(current, ui.view, ui.toast !== '') +
+    renderTopbar(current, ui.view, ui.toast !== '', topbarNews(current)) +
     toast +
     out +
     (ui.menuOpen ? renderMenu(current, ui.cloud) : '') +
@@ -913,8 +958,20 @@ function openModal(id: ModalId): void {
   ui.modal = id;
   ui.modalPosition = null;
   ui.menuOpen = false;
+  // Opening one of the two lists is seeing it: the push button goes back to cream (T11 3.1).
+  if (id === 'board') ui.seenEnquiries = game().enquiries.map((enquiry) => enquiry.id);
+  if (id === 'shopping') ui.seenOrders = shoppingList(game()).map((line) => line.id);
   // Lifting the lid costs him the five minutes the machine takes to come up (CLAUDE.md T7 3.10).
   if (id === 'laptop') dispatch({ type: 'BOOT_LAPTOP' });
+}
+
+/** Shutting a modal, however it was shut: the cross, Escape, or a Start production that takes the
+ *  player straight to the bench. One path, so the game is written down every time (T11 3.2). */
+function shutModal(): void {
+  ui.modal = null;
+  ui.modalPosition = null;
+  ui.sellConfirm = null;
+  autosaveLocal();
 }
 
 /** Clicking the van at the gate opens the unloading choice again (CLAUDE.md 10.1). */
@@ -960,7 +1017,35 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
     case 'pickDifficulty':
       ui.difficulty = id as Difficulty;
       break;
+    case 'askStartOver':
+      // The one question, on a button of its own (CLAUDE.md T11 3.2).
+      ui.startOverAsked = true;
+      break;
+    case 'keepSaved':
+      ui.startOverAsked = false;
+      break;
+    case 'clearSaved':
+      saveStore.clear();
+      ui.saved = peekSave();
+      ui.startOverAsked = false;
+      break;
+    case 'continueSaved': {
+      const stored = readStore();
+      if (stored.state === null) {
+        ui.saved = peekSave();
+        ui.note = stored.note;
+        break;
+      }
+      state = stored.state;
+      ui.screen = 'game';
+      accumulator = 0;
+      startedStore();
+      noteOrders();
+      break;
+    }
     case 'startGame':
+      // A new company is the end of the old one: the store is cleared before the first minute.
+      saveStore.clear();
       state = createGame({
         seed: newSeed(),
         difficulty: ui.difficulty,
@@ -969,10 +1054,15 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
         showWhy: ui.showWhy,
       });
       ui.screen = 'game';
+      ui.startOverAsked = false;
       accumulator = 0;
+      startedStore();
+      noteOrders();
+      autosaveLocal();
       break;
     case 'restart':
       ui = freshUi();
+      ui.saved = peekSave();
       state = null;
       break;
     case 'setSpeed':
@@ -1075,6 +1165,8 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
       return;
     case 'cancelOrder':
       dispatch({ type: 'CANCEL_ORDER', orderId: id });
+      // He called it off himself, so its going is not news to him (CLAUDE.md T11 3.1).
+      ui.seenOrders = shoppingList(game()).map((line) => line.id);
       return;
     case 'sellMachine':
       // The first click says what the buyer pays, the second means it (CLAUDE.md T8 3.5).
@@ -1110,6 +1202,18 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
       ui.filters.catalogue = '';
       ui.scrollModalTop = true;
       break;
+    case 'dayOneItem': {
+      // A line of the day one list opens that thing's own folder, wherever the player is standing
+      // in the catalogue. The licence is not a machine: its line opens the tab it lives on
+      // (CLAUDE.md T11 3.6).
+      ui.filters.catalogue = '';
+      ui.sellConfirm = null;
+      ui.scrollModalTop = true;
+      const spec = findSpec(id);
+      ui.catalogueTab = catalogueTabFrom(spec?.tab ?? 'computers');
+      ui.catalogueFolder = spec ? id : null;
+      break;
+    }
     case 'closeFolder':
       ui.catalogueFolder = null;
       ui.filters.catalogue = '';
@@ -1149,9 +1253,7 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
         ui.daySummary = null;
         break;
       }
-      ui.modal = null;
-      ui.modalPosition = null;
-      ui.sellConfirm = null;
+      shutModal();
       break;
     }
     case 'clearFilter': {
@@ -1199,8 +1301,7 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
       return;
     case 'startProduction':
       // Straight to the bench: the laptop closes and the hall comes up (CLAUDE.md T2 3.3).
-      ui.modal = null;
-      ui.modalPosition = null;
+      shutModal();
       ui.view = 'hall';
       dispatch({ type: 'WORK_HERE', jobId: id });
       return;
@@ -1300,6 +1401,9 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
         if (result.state !== null) {
           state = result.state;
           ui.screen = 'game';
+          startedStore();
+          writeStore();
+          ui.saved = peekSave();
         }
         return result.note;
       });
@@ -1359,6 +1463,66 @@ function autosave(): void {
   void runCloud(async () => (await saveGame(game())).note);
 }
 
+/** The browser's own store, written as the game is played so a refreshed page is still the same
+ *  company (PIOTR, 14.09; CLAUDE.md T11 3.2). Never more than once a second: the write itself is
+ *  the whole state, and a morning of clicks would otherwise write it fifty times. */
+export const AUTOSAVE_MIN_MS = 1000;
+let storedAt = -Infinity;
+let storePending: ReturnType<typeof setTimeout> | null = null;
+
+function writeStore(): void {
+  if (state === null) return;
+  storedAt = nowMs();
+  saveStore.write(encodeSaveFile(state));
+}
+
+function autosaveLocal(): void {
+  if (state === null) return;
+  if (storePending !== null) return;
+  const since = nowMs() - storedAt;
+  if (since >= AUTOSAVE_MIN_MS || typeof setTimeout !== 'function') {
+    writeStore();
+    return;
+  }
+  storePending = setTimeout(() => {
+    storePending = null;
+    writeStore();
+  }, AUTOSAVE_MIN_MS - since);
+}
+
+/** The actions that are worth a save of their own: what he bought, who he took on and what he
+ *  took off the board (CLAUDE.md T11 3.2). */
+const AUTOSAVE_ACTIONS: ReadonlyArray<GameAction['type']> = [
+  'BUY_EQUIPMENT',
+  'BUY_SOFTWARE',
+  'BUY_STOCK',
+  'ACCEPT_ENQUIRY',
+  'HIRE',
+];
+
+/** The two things that are not actions at all: the morning, once the day has settled, and a move
+ *  of the hall that has just finished (CLAUDE.md T11 3.2). */
+let storedDay = 0;
+let wasMoving = false;
+
+/** A game just opened: the watchers start from where it is, so the first minute of it is not
+ *  mistaken for a new morning or a finished move. */
+function startedStore(): void {
+  storedDay = state === null ? 0 : state.clock.day;
+  wasMoving = state !== null && movePending(state) !== null;
+  storedAt = -Infinity;
+}
+
+function autosaveWatch(): void {
+  if (state === null) return;
+  const moving = movePending(state) !== null;
+  const newDay = state.clock.day !== storedDay;
+  const moveDone = wasMoving && !moving;
+  storedDay = state.clock.day;
+  wasMoving = moving;
+  if (newDay || moveDone) autosaveLocal();
+}
+
 function newSeed(): number {
   // The engine needs a seed from outside: this is the one place a clock reading is allowed.
   return Math.floor(Date.now() % 2147483647);
@@ -1386,6 +1550,10 @@ export function onFileChosen(file: File): Promise<void> {
       state = result.state;
       ui.screen = 'game';
       ui.menuOpen = false;
+      // A file loaded is the game from now on, so the browser's store holds it too (T11 3.2).
+      startedStore();
+      writeStore();
+      ui.saved = peekSave();
     }
     ui.note = result.note;
     requestRender();
@@ -1571,8 +1739,7 @@ function runKeyDown(event: KeyboardEvent): void {
     return;
   }
   if (ui.modal !== null) {
-    ui.modal = null;
-    ui.modalPosition = null;
+    shutModal();
     requestRender();
   }
 }
@@ -1817,6 +1984,7 @@ export function advanceMinutes(wholeMinutes: number): number {
   const result = runMinutes(state, wholeMinutes);
   state = result.state;
   autosave();
+  autosaveWatch();
   requestRender();
   return result.minutesRun;
 }
@@ -1845,6 +2013,12 @@ function frame(now: number): void {
 
 export function mount(element: HTMLElement): void {
   root = element;
+  // A page that has just been opened holds no game and nothing the player has clicked: the only
+  // thing it knows is what the browser kept for him (CLAUDE.md T11 3.2).
+  ui = freshUi();
+  state = null;
+  accumulator = 0;
+  ui.saved = peekSave();
   void refreshCloud().then(render);
   element.addEventListener('click', onClick);
   element.addEventListener('input', onInput);

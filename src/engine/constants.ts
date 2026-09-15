@@ -4,6 +4,7 @@
 // Nothing in this file is exposed to the player as a setting (CLAUDE.md rule 3.4).
 
 import type {
+  DayCategory,
   Difficulty,
   EquipmentSpec,
   EquipmentVariant,
@@ -47,12 +48,43 @@ import type {
  *
  *  Bumped in Turn 3: a machine carries its class, its hours and the hours it has in it, and a task
  *  carries the day it was finished (CLAUDE.md T3 3.5, 3.3). Bumped in Turn 9: a lorry load is one
- *  unloading of several orders, so a task carries a list of them (CLAUDE.md T9 3.1). */
-export const STATE_VERSION = 11;
+ *  unloading of several orders, so a task carries a list of them (CLAUDE.md T9 3.1).
+ *
+ *  Bumped in Turn 11: the owner carries the log of his day and the state carries the last week of
+ *  them, which is what the top bar's meter and the company board are drawn from (T11 3.1). */
+export const STATE_VERSION = 12;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
-export const APP_VERSION = 'v17';
+export const APP_VERSION = 'v18';
+
+// ---------------------------------------------------------------------------
+// The owner's day, in the seven things it is made of
+// ---------------------------------------------------------------------------
+
+/** The order the segments are painted in when a day is summed up, and the order the tooltip and
+ *  the day end plate read in. The bar itself is drawn in the order the minutes happened
+ *  (CLAUDE.md T11 3.1). */
+export const DAY_CATEGORIES: readonly DayCategory[] = [
+  'workshop',
+  'calls',
+  'emails',
+  'meetings',
+  'siteMeasure',
+  'office',
+  'fixing',
+];
+
+/** What each one is called on the tooltip, on the day end plate and on the company board. */
+export const DAY_CATEGORY_LABELS: Record<DayCategory, string> = {
+  workshop: 'Workshop',
+  calls: 'Calls',
+  emails: 'Emails',
+  meetings: 'Meetings',
+  siteMeasure: 'Site measure',
+  office: 'Office',
+  fixing: 'Fixing and bags',
+};
 
 // ---------------------------------------------------------------------------
 // 6. Time
@@ -565,6 +597,9 @@ export const REPUTATION_TIERS = [REPUTATION_MIN, 0, 20] as const;
 
 export const FINISHES_SHEET: Finish[] = ['laminate'];
 export const FINISHES_SOLID: Finish[] = ['laminate'];
+/** The two products that are sprayed rather than laminated: they need a booth and nothing else
+ *  will do (PIOTR, 15.09; CLAUDE.md T11 3.7). */
+export const FINISHES_LACQUER: Finish[] = ['lacquer'];
 
 export const PRODUCT_TEMPLATES: ProductTemplate[] = [
   {
@@ -635,6 +670,42 @@ export const PRODUCT_TEMPLATES: ProductTemplate[] = [
     allowedFinishes: FINISHES_SHEET,
     minReputation: 20,
     weightsByTier: [0, 8, 25],
+    byHandAllowed: false,
+  },
+  // The two sprayed products (PIOTR, 15.09; CLAUDE.md T11 3.7). The board greys them until there
+  // is a booth in the hall, the Finishing is done at the booth, and a booth on wet air takes half
+  // as long again over it and marks the piece (CLAUDE.md T10 3.3).
+  {
+    id: 'lacqueredWardrobe',
+    name: 'Lacquered wardrobe',
+    // 3,500 at the smallest size the board draws, which is the bottom of Piotr's band; the size
+    // multiplier takes it up from there [PIOTR: 3,500 to 6,000].
+    basePrice: 4375,
+    material: 'sheet',
+    designMinutes: 300,
+    // The calls come off the price curve of 8.10, like every other template.
+    calls: 4,
+    needsMeasure: true,
+    requiredEquipment: ['tableSaw', 'drill', 'edgebander', 'sprayBooth'],
+    allowedFinishes: FINISHES_LACQUER,
+    minReputation: 10,
+    weightsByTier: [0, 10, 18],
+    byHandAllowed: false,
+  },
+  {
+    id: 'lacqueredKitchen',
+    name: 'Lacquered kitchen',
+    // The same rule at the top of the ladder [PIOTR: 12,000 to 20,000].
+    basePrice: 15000,
+    material: 'sheet',
+    designMinutes: 900,
+    calls: 4,
+    needsMeasure: true,
+    requiredEquipment: ['tableSaw', 'drill', 'edgebander', 'sprayBooth'],
+    allowedFinishes: FINISHES_LACQUER,
+    // The same standing the small kitchen wants: the booth is the real gate on this one.
+    minReputation: 20,
+    weightsByTier: [0, 0, 12],
     byHandAllowed: false,
   },
   {
@@ -1389,6 +1460,13 @@ export const AIR_DIVERSITY = 0.6;
 export const AIR_HEADROOM = 0.85;
 /** What every pneumatic consumer on a compressor that is short of litres runs at, for that minute
  *  (PIOTR, CLAUDE.md T10 3.2). */
+/** What a bench is worth with no compressor in the hall at all: the nailer and the driver are no
+ *  use and the assembly is screwed together by hand [TUNE] (PIOTR, 15.09; CLAUDE.md T11 3.8). */
+export const NO_AIR_FACTOR = 0.67;
+
+/** What the hall says while there is no air in the hose at all. */
+export const NO_AIR_LINE = 'No air: screws by hand';
+
 export const LOW_AIR_FACTOR = 0.7;
 /** A spray booth on wet air still runs, and the Finishing takes half as long again over it and
  *  the job loses a point of rating for the defects in the finish [TUNE] (CLAUDE.md T10 3.3). */
@@ -1907,9 +1985,8 @@ const SPEC_DRAFTS: SpecDraft[] = [
     zoneWidth: 4,
     zoneDepth: 3,
     spriteKey: 'sprayBooth',
-    locked: true,
-    lockReason: 'Coming in a later stage.',
-    effect: 'Unlocks the lacquer finish.',
+    // Unlocked in Turn 11: two products ask for a sprayed finish now (CLAUDE.md T11 3.7).
+    effect: 'Unlocks the lacquer finish. Its own extraction, and dry air for a clean finish.',
   },
   {
     ...BASE_SPEC,
@@ -2152,6 +2229,11 @@ export const GATE_LAYOUT = { x: 0, y: SHUTTER.y, width: 2, depth: 2, height: 1 }
 /** The way in from the shutter that nothing may stand on: x 0 to 2, y 6 to 10, eight of the two
  *  hundred cells (docs/art/SPRITES.md 9.3). */
 export const GATE_LANE = { x: 0, y: SHUTTER.y, width: 2, depth: 4 };
+
+/** Where the helper stands when the hall has nothing for him and there is no fan to stand by: in
+ *  the gate lane, where the van and the bags are. Inside the painted floor and out of the office
+ *  block, which is where every man who is not a joiner used to be put (CLAUDE.md T11 3.4). */
+export const HELPER_HOME_CELL = { x: 2, y: 8 };
 /** How far into the hall the lane reaches. */
 export const GATE_LANE_CELLS = GATE_LANE.width;
 
@@ -2343,8 +2425,32 @@ export const HELPER_CLEAN_WEEKDAY = 4;
 
 /** The accounting modal shows the last 50 entries (CLAUDE.md 10.1). */
 /** [TUNE] the state keeps this many ledger entries so it stays small. */
+/** The licence is not a machine, so it carries an id of its own on the day one list. */
+export const DAY_ONE_SOFTWARE = 'software';
+
+/** What a workshop needs before it can make anything: the list the catalogue ticks off on day one,
+ *  in the order the player works down it (PIOTR, 15.09; CLAUDE.md T11 3.6). One constant, so the
+ *  card and its test cannot drift apart. */
+export const DAY_ONE_KIT: readonly string[] = [
+  'desk',
+  'chair',
+  'laptop',
+  DAY_ONE_SOFTWARE,
+  'tableSaw',
+  'drill',
+  'edgebander',
+  'compressor',
+  'extractor',
+  'workbench',
+  'toolCabinet',
+  'sheetRack',
+];
+
 /** How many end of day summaries the state carries: three months of working days [TUNE]. */
 export const DAY_SUMMARIES_MAX = 90;
+/** How many days of the owner's day log the state carries. A week is what the company board
+ *  shows, and the brief asks for no more (CLAUDE.md T11 3.1). */
+export const DAY_LOGS_KEPT = 7;
 export const LEDGER_MAX_ENTRIES = 200;
 /** The Ledger tab shows every line the state carries: 200 (PIOTR, CLAUDE.md T6 3.9). It used to
  *  show the last 50, which left three quarters of a busy month unreachable. */

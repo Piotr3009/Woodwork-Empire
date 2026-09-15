@@ -1,22 +1,28 @@
-// The one slim top bar every view shares (CLAUDE.md 10.1). Nothing else lives here.
+// The one top bar every view shares: a machine cabinet in the darkest green of the workshop, with
+// the money on a name plate, the clock and the knobs beside it, the boss's day in the middle and
+// the push buttons on the right (CLAUDE.md T11 3.1). Nothing else lives here.
 
-import { SPEEDS } from '../engine/constants';
+import { DAY_CATEGORIES, DAY_CATEGORY_LABELS, SPEEDS } from '../engine/constants';
 import {
   booksBehind,
+  dayMinutesByCategory,
+  findTask,
   formatDate,
   has,
   isBreak,
   netOf,
+  ownerIsAvailable,
+  ownerJob,
   ownerMinutesToday,
   shoppingList,
   skippedTask,
 } from '../engine/index';
-import type { GameState, Speed } from '../engine/index';
+import type { DayCategory, GameState, Speed } from '../engine/index';
 import { cadenceControl } from './dayEnd';
 import { escapeHtml, money } from './modal';
 
-/** The five speed chips. One place builds them, whatever else the top bar has to say. The Pause
- *  chip pulses once when the player asks for something stopped time will not give him
+/** The five speed knobs. One place builds them, whatever else the top bar has to say. The Pause
+ *  knob pulses once when the player asks for something stopped time will not give him
  *  (CLAUDE.md T7 3.10). */
 function speedChips(state: GameState, pulse: boolean): string {
   return SPEEDS.map((speed) => {
@@ -24,7 +30,7 @@ function speedChips(state: GameState, pulse: boolean): string {
     const active = state.speed === speed ? ' is-on' : '';
     const beat = speed === 0 && pulse ? ' is-pulse' : '';
     return (
-      `<button class="chip${active}${beat}" data-do="setSpeed" data-speed="${speed}">` +
+      `<button class="chip knob${active}${beat}" data-do="setSpeed" data-speed="${speed}">` +
       `${escapeHtml(label)}</button>`
     );
   }).join('');
@@ -55,54 +61,165 @@ function outputChip(state: GameState): string {
   );
 }
 
-/** Admin grey, design purple, workshop green, the rest free (CLAUDE.md 7.1). */
-function minuteBar(state: GameState): string {
-  const used = state.owner.minutesByCategory;
-  // The hour he worked through is an hour more he has to spend (CLAUDE.md T6 3.4).
-  const total = ownerMinutesToday(state);
-  const width = (value: number): string => `${Math.min(100, (value / total) * 100)}%`;
-  return (
-    '<div class="minutes" title="Owner minutes today">' +
-    '<div class="minute-bar">' +
-    `<span class="seg seg-admin" style="width:${width(used.admin)}"></span>` +
-    `<span class="seg seg-design" style="width:${width(used.design)}"></span>` +
-    `<span class="seg seg-workshop" style="width:${width(used.workshop)}"></span>` +
-    '</div>' +
-    `<span class="minute-count">${state.owner.minutesWorked} / ${total} min</span>` +
-    '</div>'
-  );
-}
-
-export function renderTopbar(
-  state: GameState,
-  view: 'hall' | 'office' | 'sprites',
-  pulse = false,
-): string {
+/** The cream plate on the left: what is in the bank, and what today has come to under it. */
+function namePlate(state: GameState): string {
   const net = netOf(state.finance.day);
   const blind = booksBehind(state);
   const netClass = blind ? 'flat' : net > 0 ? 'good' : net < 0 ? 'bad' : 'flat';
   // Books behind, so nobody knows what today came to (CLAUDE.md T2 3.5).
   const netText = blind ? '? today' : `${net >= 0 ? '+' : ''}${money(net)} today`;
   return (
-    '<div class="topbar">' +
+    '<div class="name-plate">' +
     `<span class="cash">${money(state.cash)}</span>` +
     `<span class="net ${netClass}" title="${blind ? 'The books are behind' : 'Today'}">` +
     `${escapeHtml(netText)}</span>` +
+    '</div>'
+  );
+}
+
+/** The lamp over the meter: orange while he is on something, green while he is in and idle, grey
+ *  while he is out or gone home (CLAUDE.md T11 3.1). */
+function ownerLamp(state: GameState): string {
+  if (!ownerIsAvailable(state)) return 'is-away';
+  if (state.owner.currentTaskId !== null || ownerJob(state) !== null) return 'is-busy';
+  return 'is-idle';
+}
+
+/** What he is doing, in the words the meter says it in. One line, whatever the day is like. */
+function ownerDayLine(state: GameState): string {
+  const owner = state.owner;
+  if (!owner.present) return 'not in today';
+  if (owner.wentHome) return 'gone home';
+  if (isBreak(state.clock.minute) && !owner.breakSkipped) return 'at dinner';
+  if (owner.currentTaskId !== null) {
+    const task = findTask(state, owner.currentTaskId);
+    if (task !== null && !task.done) {
+      return `${task.label}, ${Math.max(0, Math.ceil(task.minutesRemaining))} min left`;
+    }
+  }
+  const job = ownerJob(state);
+  if (job !== null) return `at the bench, ${job.name}`;
+  return 'idle';
+}
+
+/** The minutes of the day so far, per band, as a lookup the bar and its tooltip both read. */
+function minutesPerBand(state: GameState): Map<DayCategory, number> {
+  const found = new Map<DayCategory, number>();
+  for (const part of dayMinutesByCategory(state.owner.dayLog)) {
+    found.set(part.category, part.minutes);
+  }
+  return found;
+}
+
+/** The day itself: the 480 minutes, and the overtime beyond them once it runs, painted in the
+ *  order they happened. Break and idle are left unpainted (CLAUDE.md T11 3.1). */
+function segmentBar(state: GameState, total: number): string {
+  const segments = state.owner.dayLog
+    .map((entry) => {
+      const width = (entry.minutes / total) * 100;
+      return (
+        `<span class="seg seg-${entry.category}" data-band="${entry.category}" ` +
+        `style="width:${width.toFixed(4)}%"></span>`
+      );
+    })
+    .join('');
+  return `<div class="day-bar">${segments}</div>`;
+}
+
+/** The legend, on a small cream plate, with what each band has come to so far. It is behind the
+ *  hover so the bar itself carries no legend under it (CLAUDE.md T11 3.1). */
+function segmentTooltip(state: GameState): string {
+  const found = minutesPerBand(state);
+  const rows = DAY_CATEGORIES.map((category) => {
+    const minutes = found.get(category) ?? 0;
+    return (
+      `<span class="tip-row" data-band="${category}">` +
+      `<span class="tip-key seg-${category}"></span>` +
+      `<span class="tip-name">${escapeHtml(DAY_CATEGORY_LABELS[category])}</span>` +
+      `<span class="tip-min">${minutes} min</span></span>`
+    );
+  }).join('');
+  return `<div class="day-tip">${rows}</div>`;
+}
+
+/** The boss's day, which is the middle of the bar and the point of it: a lamp, what he is on, how
+ *  much of his day has gone, and the day itself in bands (CLAUDE.md T11 3.1). */
+function dayMeter(state: GameState): string {
+  const available = ownerMinutesToday(state);
+  // Overtime runs past the pool, so the bar grows to hold it rather than clipping the evening.
+  const total = Math.max(available, state.owner.minutesWorked, 1);
+  return (
+    '<div class="day-meter" data-day-meter="1">' +
+    '<div class="day-head">' +
+    `<span class="lamp ${ownerLamp(state)}"></span>` +
+    `<span class="day-line">${escapeHtml(state.playerName)}'s day · ` +
+    `${escapeHtml(ownerDayLine(state))}</span>` +
+    outputChip(state) +
+    `<span class="day-count">${state.owner.minutesWorked} / ${available} min</span>` +
+    '</div>' +
+    segmentBar(state, total) +
+    segmentTooltip(state) +
+    '</div>'
+  );
+}
+
+/** A push button of the right hand block: a cream plate with a hard shadow, orange when there is
+ *  something on it the player has not seen (CLAUDE.md T11 3.1). */
+function pushButton(action: string, label: string, extra: string, fresh: boolean): string {
+  return (
+    `<button class="push${fresh ? ' is-new' : ''}" data-do="${action}"${extra}>` +
+    `${escapeHtml(label)}</button>`
+  );
+}
+
+/** What the player has not looked at yet: the enquiries he has not seen on the board, and the
+ *  orders that landed while the list was shut (CLAUDE.md T11 3.1). */
+export interface TopbarNews {
+  board: boolean;
+  orders: boolean;
+}
+
+export function renderTopbar(
+  state: GameState,
+  view: 'hall' | 'office' | 'sprites',
+  pulse = false,
+  news: TopbarNews = { board: false, orders: false },
+): string {
+  const orders = shoppingList(state).length;
+  return (
+    '<div class="topbar">' +
+    namePlate(state) +
+    '<div class="clock-block">' +
     `<span class="date">${escapeHtml(formatDate(state.clock))}</span>` +
     `<span class="speeds">${speedButtons(state, pulse)}</span>` +
-    minuteBar(state) +
-    outputChip(state) +
+    '</div>' +
+    dayMeter(state) +
     '<span class="spacer"></span>' +
+    '<div class="push-block">' +
     // Everything bought and not here yet, one click away from every screen (CLAUDE.md T8 3.2).
-    `<button class="chip" data-do="openModal" data-modal="shopping">Orders: ` +
-    `${shoppingList(state).length}</button>` +
+    pushButton(
+      'openModal',
+      `Orders: ${orders}`,
+      ' data-modal="shopping"',
+      news.orders,
+    ) +
     // The order board is the management software's: no laptop, no board (CLAUDE.md T7 3.8).
     (has(state, 'laptop')
-      ? '<button class="chip" data-do="openModal" data-modal="board">Board</button>'
+      ? pushButton(
+          'openModal',
+          `Board: ${state.enquiries.length}`,
+          ' data-modal="board"',
+          news.board,
+        )
       : '<span class="reason">Board: buy a laptop</span>') +
-    `<button class="chip" data-do="setView" data-view="${view === 'hall' ? 'office' : 'hall'}">` +
-    `${view === 'hall' ? 'Office' : 'Hall'}</button>` +
-    '<button class="chip" data-do="toggleMenu">Menu</button>' +
+    pushButton(
+      'setView',
+      view === 'hall' ? 'Office' : 'Hall',
+      ` data-view="${view === 'hall' ? 'office' : 'hall'}"`,
+      false,
+    ) +
+    pushButton('toggleMenu', 'Menu', '', false) +
+    '</div>' +
     '</div>'
   );
 }

@@ -66,7 +66,7 @@ describe('the fifth chip', () => {
     expect(root().querySelector('[data-do="setSpeed"][data-speed="10"]')).not.toBeNull();
     click('[data-do="setSpeed"][data-speed="10"]');
     expect(currentState()?.speed).toBe(10);
-    expect(root().innerHTML).toContain('class="chip is-on" data-do="setSpeed" data-speed="10"');
+    expect(root().innerHTML).toContain('class="chip knob is-on" data-do="setSpeed" data-speed="10"');
   });
 
   it('runs a thousand minutes in a hundred real seconds, across the day boundaries', () => {

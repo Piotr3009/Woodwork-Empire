@@ -2,6 +2,7 @@
 // of tools, exactly as in life (CLAUDE.md 9.3).
 
 import {
+  HELPER_HOME_CELL,
   HIRE_START_DELAY_DAYS,
   MINUTES_PER_WORKING_DAY,
   OVERTIME_TIRED_DAYS,
@@ -14,7 +15,7 @@ import {
 } from './constants';
 import { addWorkingDays, isOvertime } from './clock';
 import { assignJob, oldestReadyJob } from './jobs';
-import { findSpec } from './machines';
+import { findSpec, itemStandsInTheHall } from './machines';
 import { countOwnedOrOnOrder } from './orders';
 import { ownerIsAvailable } from './owner';
 import { int, makeId } from './rng';
@@ -54,6 +55,25 @@ export function joiners(state: GameState): Worker[] {
 
 export function helpers(state: GameState): Worker[] {
   return state.workers.filter((worker) => worker.role === 'helper');
+}
+
+/** A helper on the books and in the hall today. The unloading, the bags and the cleaning are his
+ *  and nobody else's while this is true (PIOTR, 14.09; CLAUDE.md T11 3.4). */
+export function helperOnDuty(state: GameState): boolean {
+  return helpers(state).some((worker) => isWorkingToday(state, worker));
+}
+
+/** Where a man stands when the hall has nothing else for him. A joiner has his own bench; the
+ *  helper stands at the fan when there is one and in the gate lane when there is not, because the
+ *  bags and the van are his. Both are on the painted floor: (1, 1), where every man who is not a
+ *  joiner used to be put, is inside the office block (CLAUDE.md T11 3.4). */
+export function homeCellOf(state: GameState, worker: Worker): { x: number; y: number } {
+  if (worker.role !== 'helper') return { x: worker.anchorX, y: worker.anchorY };
+  const fan = state.equipment.find(
+    (item) => item.specId === 'extractor' && itemStandsInTheHall(item),
+  );
+  if (fan) return { x: fan.anchorX, y: fan.anchorY };
+  return { ...HELPER_HOME_CELL };
 }
 
 export function workerById(state: GameState, workerId: string): Worker | null {
@@ -217,6 +237,8 @@ function nameFor(state: GameState): string {
 }
 
 function benchAnchor(state: GameState, role: WorkerRole): { x: number; y: number } {
+  // The helper's own corner of the hall, and the office door for everybody else (T11 3.4).
+  if (role === 'helper') return { ...HELPER_HOME_CELL };
   if (role !== 'joiner') return { x: 1, y: 1 };
   const index = joiners(state).length;
   const bench = state.equipment.filter((item) => item.specId === 'workbench')[index];

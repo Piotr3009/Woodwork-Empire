@@ -214,6 +214,34 @@ describe('the controls Turn 10 added take one click each', () => {
     closeModals();
   });
 
+  it('takes the four push buttons of the new top bar, one click each', () => {
+    closeModals();
+    inTheHall();
+    // Orders, Board, the view toggle and the Menu: the whole right hand block of the cabinet
+    // (CLAUDE.md T11 3.1).
+    for (const selector of [
+      '[data-do="openModal"][data-modal="shopping"]',
+      '[data-do="openModal"][data-modal="board"]',
+    ]) {
+      const button = node(selector);
+      advanceMinutes(1);
+      expect(root().querySelector(selector)).toBe(button);
+      press(button);
+      expect(root().querySelector('.modal-layer .modal')).not.toBeNull();
+      closeModals();
+    }
+    const toOffice = node('[data-do="setView"][data-view="office"]');
+    advanceMinutes(1);
+    press(toOffice);
+    expect(root().querySelector('.office-room')).not.toBeNull();
+    const menu = node('[data-do="toggleMenu"]');
+    advanceMinutes(1);
+    press(menu);
+    expect(root().querySelector('.menu-pop')).not.toBeNull();
+    press(node('[data-do="toggleMenu"]'));
+    expect(root().querySelector('.menu-pop')).toBeNull();
+  });
+
   it('puts a machine on the other compressor, off the chip in the Owned tab', () => {
     closeModals();
     const state = game();

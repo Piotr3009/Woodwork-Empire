@@ -63,7 +63,10 @@ function airLine(state: GameState, spec: EquipmentSpec, variant: EquipmentVarian
     const gives = COMPRESSOR_AIR[variant.id];
     if (!gives) return '';
     return `Gives ${gives.bar} bar, ${gives.litres.toLocaleString('en-GB')} l/min` +
-      `${variant.id === COMPRESSOR_WITH_DRYER ? ', dryer built in' : ''}`;
+      `${variant.id === COMPRESSOR_WITH_DRYER ? ', dryer built in' : ''}` +
+      // What the money is really for: the nailers at the benches as well as the machines
+      // (PIOTR, 15.09; CLAUDE.md T11 3.8).
+      '. Benches and edgebanders need air';
   }
   const wants = airDemandOf({ specId: spec.id, variantId: variant.id });
   if (wants === null) return '';

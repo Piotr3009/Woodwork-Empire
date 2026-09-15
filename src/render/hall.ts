@@ -46,11 +46,13 @@ import {
   STATION_IDLE,
   STATION_NO_BENCH,
   STATION_OFFICE,
+  STATION_PHONE,
   STATION_RACK,
   stationMachine,
   stationWaitingFor,
 } from '../engine/stations';
 import { ownerIsAvailable, staffOutputFactor } from '../engine/owner';
+import { homeCellOf } from '../engine/staff';
 import { plural } from '../engine/text';
 import type { RoomId } from '../engine/constants';
 import type { Equipment, EquipmentSpec, GameState, OnOrderItem } from '../engine/types';
@@ -756,7 +758,8 @@ export function stationCell(
     // At the back of the lorry, inside the shutter.
     return { x: GATE_LAYOUT.x, y: GATE_LAYOUT.y + GATE_LAYOUT.depth };
   }
-  if (station === STATION_OFFICE) return roomDoorCell('office');
+  // The phone is on the desk: he is in the office for a call like any other desk job (T11 3.11).
+  if (station === STATION_OFFICE || station === STATION_PHONE) return roomDoorCell('office');
   if (station === STATION_IDLE || station === STATION_NO_BENCH) return roomDoorCell('canteen');
   return bench;
 }
@@ -772,6 +775,7 @@ function stationLabel(station: string): string {
   if (station === STATION_RACK) return 'the rack';
   if (station === STATION_GATE) return 'the gate';
   if (station === STATION_OFFICE) return 'the office';
+  if (station === STATION_PHONE) return 'the phone';
   if (station === STATION_BENCH) return 'the bench';
   if (station === STATION_NO_BENCH) return 'no bench';
   return 'waiting';
@@ -1087,7 +1091,9 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
   for (const worker of state.workers) {
     if (worker.startDay > state.clock.day) continue;
     const away = worker.absentDaysRemaining > 0;
-    const bench = { x: worker.anchorX, y: worker.anchorY };
+    // Where he stands when the hall has nothing else for him. The helper's own corner is the fan
+    // or the gate lane, never the inside of the office block (CLAUDE.md T11 3.4).
+    const bench = homeCellOf(state, worker);
     const where = stationLabel(worker.station);
     drawables.push(
       figure(

@@ -39,6 +39,30 @@ export type SoftwareMode = 'none' | 'oneOff' | 'subscription';
 
 export type TaskCategory = 'admin' | 'design' | 'workshop';
 
+/** The seven things a working day of the owner's is made of, as the top bar paints them
+ *  (CLAUDE.md T11 3.1). Break and idle are not on the list: unpainted is unpainted. */
+export type DayCategory =
+  | 'workshop'
+  | 'calls'
+  | 'emails'
+  | 'meetings'
+  | 'siteMeasure'
+  | 'office'
+  | 'fixing';
+
+/** One run of minutes on one thing. Consecutive minutes on the same thing are one segment, so a
+ *  morning of drawing is one entry and not two hundred (CLAUDE.md T11 3.1). */
+export interface DayLogEntry {
+  category: DayCategory;
+  minutes: number;
+}
+
+/** A day of the owner's, kept after it closed so the week can be added up (CLAUDE.md T11 3.1). */
+export interface DayLog {
+  day: number;
+  segments: DayLogEntry[];
+}
+
 /** How often the player wants the end of day summary in front of him. A preference, not an
  *  engine number: the day ends the same way whatever it says (CLAUDE.md T4 3.6). */
 export type SummaryCadence = 'daily' | 'weekly' | 'monthly';
@@ -279,6 +303,9 @@ export interface OwnerState {
   station: string;
   /** Minutes of production worked, which drives the bench and machine cycle. */
   productionMinutes: number;
+  /** Today's day, in the order it happened: one segment per run of minutes on the same thing.
+   *  Emptied every morning (CLAUDE.md T11 3.1). */
+  dayLog: DayLogEntry[];
 }
 
 export interface UnitState {
@@ -465,6 +492,9 @@ export interface MovedItem {
   itemId: string;
   fromX: number;
   fromY: number;
+  /** Which way it was standing before the player picked it up. Turning a heavy machine where it
+   *  stands is a move like any other; turning a bench costs nothing (CLAUDE.md T11 3.9). */
+  fromRotated: boolean;
 }
 
 export interface Delivery {
@@ -691,6 +721,8 @@ export interface DaySummary {
   /** Labour value produced and the people minutes that produced it (CLAUDE.md T6 3.8). */
   labourValue: number;
   workMinutes: number;
+  /** The owner's day as it happened, for the plate at the top of the summary (T11 3.1). */
+  dayLog: DayLogEntry[];
 }
 
 export interface DayStats {
@@ -737,6 +769,9 @@ export interface GameState {
   /** Every point of reputation the company has gained or lost, with the day and the reason
    *  (CLAUDE.md T9 3.10). */
   reputationLog: ReputationEntry[];
+  /** The last few days of the owner's day log, newest last, for the week on the company board
+   *  (CLAUDE.md T11 3.1). */
+  dayLogs: DayLog[];
   dust: number;
   unit: UnitState;
   owner: OwnerState;

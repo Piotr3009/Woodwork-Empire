@@ -6,9 +6,9 @@
 // first; the right one is the output breakdown, plus in one column and minus in the other, with
 // the line that adds them up.
 
-import { REPUTATION_START } from '../engine/constants';
-import { formatReputation, outputBreakdown, weekOfDay } from '../engine/index';
-import type { GameState, OutputLine, ReputationEntry } from '../engine/index';
+import { DAY_CATEGORY_LABELS, REPUTATION_START } from '../engine/constants';
+import { companyTotals, dayPercentages, outputBreakdown, weekOfDay } from '../engine/index';
+import type { DayLogEntry, GameState, OutputLine, ReputationEntry } from '../engine/index';
 import { emptyLine, escapeHtml } from './modal';
 
 /** Points as the board writes them: a sign on every one of them, and never more than two places. */
@@ -76,6 +76,30 @@ function outputRow(line: OutputLine): string {
   );
 }
 
+/** The week the clock is in, and what the reputation has done in it, off the same fold the week
+ *  by week list is drawn from: two counts of one week could never disagree. */
+function thisWeek(state: GameState, weeks: readonly Week[]): { week: number; total: number } {
+  const week = weekOfDay(state.clock.day);
+  return { week, total: weeks.find((entry) => entry.week === week)?.total ?? 0 };
+}
+
+/** How the week went, in the same seven bands as the top bar and the evening's plate. The state
+ *  carries the last seven days of the owner's own day (CLAUDE.md T11 3.1, 3.5). */
+function weekShares(state: GameState): string {
+  const segments: DayLogEntry[] = [];
+  for (const day of state.dayLogs) segments.push(...day.segments);
+  // The day in progress, unless the evening has already written it down: between the day closing
+  // and the next morning emptying the log it is on both, and counting it twice would weight it
+  // twice (CLAUDE.md T11 3.1).
+  const closed = state.dayLogs.some((day) => day.day === state.clock.day);
+  if (!closed) segments.push(...state.owner.dayLog);
+  const shares = dayPercentages(segments);
+  if (shares.length === 0) return '';
+  return shares
+    .map((share) => `${DAY_CATEGORY_LABELS[share.category]} ${share.percent}%`)
+    .join(' · ');
+}
+
 export function renderCompany(state: GameState): string {
   const weeks = weeksOf(state);
   const breakdown = outputBreakdown(state);
@@ -84,27 +108,45 @@ export function renderCompany(state: GameState): string {
   const sum =
     `${breakdown.base.toFixed(2)} base ${points(breakdown.plus)} ${points(breakdown.minus)} = ` +
     `${breakdown.total.toFixed(2)}`;
+  const week = thisWeek(state, weeks);
+  const shares = weekShares(state);
+  const totals = companyTotals(state);
+  // The picture is the modal (SPRITES.md 11): the company name and the week on the felt above the
+  // sheet, the output and its two columns on the pinned sheet, and the two totals under both in
+  // letters you can read across the room (PIOTR, 15.09; CLAUDE.md T11 3.5).
   return (
-    '<div class="board-columns">' +
-    '<section class="board-column"><h3>Week by week</h3>' +
-    '<p class="hint">Every point of reputation the company has gained or lost, and what for.</p>' +
+    '<div class="felt">' +
+    '<div class="felt-head">' +
+    `<span class="felt-name">${escapeHtml(state.companyName)}</span>` +
+    `<span class="felt-week">Week ${week.week} · ${escapeHtml(points(week.total))}</span>` +
+    (shares === '' ? '' : `<span class="felt-shares">${escapeHtml(shares)}</span>`) +
+    '<div class="felt-weeks">' +
     (weeks.length === 0
       ? emptyLine('Nothing has moved the reputation yet.')
       : weeks.map(weekHtml).join('')) +
-    `<p class="figures"><strong>Reputation now ${escapeHtml(formatReputation(state.reputation))}` +
-    `</strong> (started at ${REPUTATION_START})</p>` +
-    '</section>' +
-    '<section class="board-column"><h3>Company output</h3>' +
+    '</div></div>' +
+    '<div class="felt-sheet">' +
+    '<h3>Company output</h3>' +
     `<p class="figures"><strong>${breakdown.total.toFixed(2)}</strong> of a hall with nothing ` +
     'wrong with it. Every minute of production is multiplied by it.</p>' +
+    '<div class="board-columns">' +
+    '<section class="board-column">' +
     hall.map(outputRow).join('') +
     `<p class="figures">${escapeHtml(sum)}</p>` +
+    '</section>' +
+    '<section class="board-column">' +
     '<h4>And what the men and the machines are worth</h4>' +
     '<p class="hint">These act where they are: on his minutes, or on the stage that machine ' +
     'does. They are not in the number above and are never counted twice.</p>' +
     (elsewhere.length === 0
       ? emptyLine('Nobody on the books and no machines in the hall.')
       : elsewhere.map(outputRow).join('')) +
-    '</section></div>'
+    '</section></div>' +
+    `<p class="hint">Reputation started at ${REPUTATION_START}.</p>` +
+    '</div>' +
+    '<div class="felt-totals">' +
+    `<span class="felt-total" data-total="reputation">${escapeHtml(totals.reputation)}</span>` +
+    `<span class="felt-total" data-total="output">${escapeHtml(totals.output)}</span>` +
+    '</div></div>'
   );
 }

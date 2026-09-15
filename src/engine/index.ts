@@ -38,6 +38,8 @@ export * from './types';
 export {
   APP_VERSION,
   CLEANING_MINUTES,
+  DAY_CATEGORIES,
+  DAY_CATEGORY_LABELS,
   EQUIPMENT_SPECS,
   MACHINE_ENDURANCE_HOURS,
   MACHINE_ENDURANCE_HOURS_DEFAULT,
@@ -84,7 +86,10 @@ export {
 
 // The owner
 export {
+  dayMinutesByCategory,
+  dayPercentages,
   labourFactorFor,
+  logDayMinute,
   ownerEfficiency,
   ownerIsAvailable,
   ownerMinutesLeft,
@@ -154,7 +159,7 @@ export {
   transportLabel,
 } from './jobs';
 export { dropJob } from './jobs';
-export { changeReputation } from './reputation';
+export { changeReputation, companyTotals } from './reputation';
 export type { LifecycleStep, StartCheck, StepState } from './jobs';
 export type { OutputBreakdown, OutputLine } from './machines';
 
@@ -228,7 +233,13 @@ export {
 // Tasks
 export {
   bestTakerOf,
+  DAY_CATEGORY_OF_TASK,
+  HELPER_ONLY_KINDS,
+  TASK_KINDS,
+  WAITING_FOR_HELPER,
+  dayCategoryOf,
   designMinutes,
+  isHelperTask,
   emailsForPrice,
   findTask,
   jobTasks,
@@ -254,6 +265,8 @@ export type { TaskStartCheck } from './tasks';
 export {
   availableJoiners,
   hasWorkingDay,
+  helperOnDuty,
+  homeCellOf,
   staysForOvertime,
   worksOvertime,
   helpers,
@@ -339,6 +352,8 @@ export type { Hand, StationCheck } from './production';
 
 // What is bought, paid for and not here yet (CLAUDE.md T8 3.2)
 export {
+  dayOneComplete,
+  dayOneKit,
   dueDayFor,
   findOnOrder,
   shoppingList,
@@ -349,7 +364,7 @@ export {
   ordersOnTheWay,
   reservedItems,
 } from './orders';
-export type { OrderLine } from './orders';
+export type { DayOneItem, OrderLine } from './orders';
 
 // Material and deliveries
 export {
@@ -387,6 +402,7 @@ export {
   STATION_IDLE,
   STATION_NO_BENCH,
   STATION_OFFICE,
+  STATION_PHONE,
   STATION_RACK,
   machineStation,
   stationForTask,

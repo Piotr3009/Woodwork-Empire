@@ -50,18 +50,28 @@ function headHtml(state: GameState, job: Job, row: PlanRow, dropConfirm: string 
   );
 }
 
-/** The one bar of a row, with the done share filled from the left. */
+/** The one bar of a row: as long as the work in it at the rate it will get, with the minutes that
+ *  are done filled green from the left. It is an outline before the job is started and an outline
+ *  after it: what stretches is the outline, and what fills is the green (CLAUDE.md T11 3.3). */
 function barHtml(plan: WorkPlan, row: PlanRow): string {
   const left = across(plan, row.from);
   const right = across(plan, row.to);
   const width = Math.max(0.8, right - left);
+  const lost = row.lostMinutes > 0 ? `, ${row.lostMinutes} min lost` : '';
   const title = row.notStarted
     ? `${Math.round(row.minutesTotal)} min of work, ${row.rateLabel}`
-    : `${Math.round(row.minutesDone)} of ${Math.round(row.minutesTotal)} min`;
+    : `${Math.round(row.minutesDone)} of ${Math.round(row.minutesTotal)} min${lost}`;
+  const classes =
+    `plan-bar${row.notStarted ? ' is-projected' : ''}${row.overdue ? ' is-late' : ''}`;
+  const label = row.overdue
+    ? `<span class="plan-late" style="left:${round(Math.min(99, right))}%">` +
+      `late by ${row.lateDays} ${row.lateDays === 1 ? 'day' : 'days'}</span>`
+    : '';
   return (
-    `<div class="plan-bar${row.notStarted ? ' is-projected' : ''}" ` +
+    `<div class="${classes}" ` +
     `style="left:${round(left)}%;width:${round(width)}%" title="${escapeHtml(title)}">` +
-    `<span class="plan-done" style="width:${round(row.done * 100)}%"></span></div>`
+    `<span class="plan-done" style="width:${round(row.done * 100)}%"></span></div>` +
+    label
   );
 }
 
@@ -129,9 +139,12 @@ export function renderWorkPlan(state: GameState, dropConfirm: string | null = nu
     .join('');
   return (
     '<p class="hint">One row a job, the nearest deadline first. The blue line is now and the red ' +
-    'tick is the day it is due. A job nobody has started yet is drawn as long as the work in it, ' +
-    'with the yellow tick on the last day it can be started and still be on time. The axis is ' +
-    'working days: Monday follows Friday and no deadline falls at a weekend.</p>' +
+    'tick is the day it is due. A bar is as long as the work in it at the rate it will get, and ' +
+    'the green inside it is the work that is done. Every minute the job stands still stretches ' +
+    'the outline, so its right edge is the day it will really be finished; past the deadline it ' +
+    'turns red. A job nobody has started yet carries the yellow tick on the last day it can be ' +
+    'started and still be on time. The axis is working days: Monday follows Friday and no ' +
+    'deadline falls at a weekend.</p>' +
     `<div class="plan">${scaleHtml(plan)}${rows}</div>`
   );
 }

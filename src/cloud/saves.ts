@@ -4,6 +4,7 @@
 
 import { STATE_VERSION } from '../engine/index';
 import type { GameState } from '../engine/index';
+import { decodeSaveFile, encodeSaveFile } from './file';
 import { cloud, cloudAvailable } from './supabase';
 
 /** The autosave slot. More slots are parked. */
@@ -57,11 +58,13 @@ export async function saveGame(state: GameState): Promise<SaveResult> {
   const { data } = await client.auth.getSession();
   const userId = data.session?.user.id;
   if (userId === undefined) return { ok: false, note: 'Sign in first.' };
+  // The same bytes the file save and the browser's store hold: one encoder for every store
+  // (CLAUDE.md T11 3.2).
   const { error } = await client.from('saves').upsert(
     {
       user_id: userId,
       slot: SAVE_SLOT,
-      state: state as unknown as Record<string, unknown>,
+      state: encodeSaveFile(state),
       state_version: STATE_VERSION,
       updated_at: new Date().toISOString(),
     },
@@ -69,6 +72,18 @@ export async function saveGame(state: GameState): Promise<SaveResult> {
   );
   if (error) return { ok: false, note: describe(error) };
   return { ok: true, note: `Saved on day ${state.clock.day}.` };
+}
+
+/** What a row of the saves table opens into. The row holds the same bytes the file save and the
+ *  browser's store hold, so it goes through the one decoder; a row written before Turn 11 holds
+ *  the state itself and is refused the way a save from any older build is (CLAUDE.md T11 3.2). */
+export function openSavedRow(row: { state: unknown; state_version: number }): LoadResult {
+  const stale = { state: null, note: 'That save is from an older build of the game.' };
+  if (row.state_version !== STATE_VERSION) return stale;
+  if (typeof row.state !== 'string') return stale;
+  const opened = decodeSaveFile(row.state);
+  if (opened.state === null) return { state: null, note: opened.note };
+  return { state: opened.state, note: 'Loaded.' };
 }
 
 export async function loadGame(): Promise<LoadResult> {
@@ -85,11 +100,7 @@ export async function loadGame(): Promise<LoadResult> {
     .maybeSingle();
   if (error) return { state: null, note: describe(error) };
   if (!data) return { state: null, note: 'Nothing saved yet.' };
-  const row = data as { state: unknown; state_version: number };
-  if (row.state_version !== STATE_VERSION) {
-    return { state: null, note: 'That save is from an older build of the game.' };
-  }
-  return { state: row.state as GameState, note: 'Loaded.' };
+  return openSavedRow(data as { state: unknown; state_version: number });
 }
 
 export async function hasSave(): Promise<boolean> {

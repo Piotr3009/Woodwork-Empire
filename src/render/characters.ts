@@ -13,7 +13,7 @@
 // flip. No sheet, or no animation, and the game draws the capsule it has always drawn.
 
 import sheets from '../../public/sprites/characters.json';
-import { STATION_BENCH, STATION_GATE, STATION_RACK } from '../engine/stations';
+import { STATION_BENCH, STATION_GATE, STATION_PHONE, STATION_RACK } from '../engine/stations';
 import { pickSprite, spriteFiles, SPRITE_SCALE } from './sprites';
 
 /** The four ways a figure can face on a 2:1 isometric floor. */
@@ -21,9 +21,9 @@ export type Facing = 'sw' | 'se' | 'nw' | 'ne';
 
 /** What a figure can be doing. Tonight the art side has none of them; the code is ready for all
  *  four (CLAUDE.md T9 3.13). */
-export type Animation = 'walk' | 'bench' | 'carry' | 'idle';
+export type Animation = 'walk' | 'bench' | 'carry' | 'idle' | 'phone';
 
-export const ANIMATIONS: readonly Animation[] = ['walk', 'bench', 'carry', 'idle'];
+export const ANIMATIONS: readonly Animation[] = ['walk', 'bench', 'carry', 'idle', 'phone'];
 
 /** Where a missing direction is mirrored from (CLAUDE.md T9 3.13). */
 const MIRROR: Record<Facing, Facing> = { se: 'sw', sw: 'se', nw: 'ne', ne: 'nw' };
@@ -248,5 +248,8 @@ export function playCharacters(root: ParentNode, nowMs: number): void {
 export function animationForStation(station: string): Animation {
   if (station === STATION_BENCH || station.startsWith('machine:')) return 'bench';
   if (station === STATION_GATE || station === STATION_RACK) return 'carry';
+  // The phone is in his hand for as long as the call lasts, and idle the moment it is down
+  // (PIOTR, 15.09; CLAUDE.md T11 3.11).
+  if (station === STATION_PHONE) return 'phone';
   return 'idle';
 }

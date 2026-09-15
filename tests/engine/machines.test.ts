@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   ACCIDENT_DAYS_OFF,
   BAG_CHANGE_MINUTES,
+  EQUIPMENT_SPECS,
   CLEANING_MINUTES,
   DUST_BANDS,
   DUST_PER_PRODUCTION_MINUTE,
@@ -79,18 +80,19 @@ function atTheBench(options: { price?: number; seed?: number } = {}): GameState 
 }
 
 describe('the catalogue', () => {
-  it('shows the locked machines with a reason and refuses the sale', () => {
+  it('locks nothing in the catalogue any more, and still asks for what a machine needs', () => {
     const state = newGame({ difficulty: 'veryEasy' });
     // The CNC is unlocked from Turn 7 and wants extraction like any machine (T7 3.4).
     expect(canBuy(state, 'cnc').reason).toBe(
       'Needs Extractor or Central dust extraction system or Flexi extraction system first',
     );
-    expect(canBuy(state, 'sprayBooth')).toEqual({
-      ok: false,
-      reason: 'Coming in a later stage.',
-    });
-    const tried = buyNow(state, 'sprayBooth');
-    expect(tried.equipment).toHaveLength(0);
+    // The booth is unlocked in Turn 11: there are two products that ask for a sprayed finish now
+    // (CLAUDE.md T11 3.7).
+    expect(canBuy(state, 'sprayBooth').ok).toBe(true);
+    const bought = buyNow(state, 'sprayBooth');
+    expect(bought.equipment.some((item) => item.specId === 'sprayBooth')).toBe(true);
+    // And nothing at all in the catalogue is behind a "coming later" now.
+    expect(EQUIPMENT_SPECS.filter((spec) => spec.locked)).toEqual([]);
   });
 
   it('asks for the thing a machine needs first', () => {

@@ -7,6 +7,7 @@
 
 import { formatTime } from '../engine/clock';
 import { has } from '../engine/machines';
+import { companyTotals } from '../engine/reputation';
 import type { GameState } from '../engine/types';
 import { type Scene, escapeText, fitName } from './hall';
 import { pickSprite, spriteFiles } from './sprites';
@@ -157,9 +158,14 @@ export interface OfficeTextBox {
 /** The smallest the board is ever lettered at scale 1 [TUNE] (CLAUDE.md T6 3.10). */
 export const OFFICE_NAME_SIZE_MIN = 12;
 
-export const OFFICE_TEXTS: Record<'clock' | 'company', OfficeTextBox> = {
+export const OFFICE_TEXTS: Record<'clock' | 'company' | 'companyTotals', OfficeTextBox> = {
   clock: { x: 1050, y: 96, width: 102, height: 40, fontSize: 28 },
   company: { x: 200, y: 92, width: 170, height: 46, fontSize: 22 },
+  // The pinned sheet of the felt board, in office canvas pixels: the board region is 280 square
+  // at (1000, 168) and the sheet sits at 19.4% to 80.6% across it and 40.7% to 80.9% down it
+  // (docs/art/SPRITES.md 11). The wall board carries the two totals and nothing else
+  // (PIOTR, 15.09; CLAUDE.md T11 3.5).
+  companyTotals: { x: 1054, y: 282, width: 172, height: 113, fontSize: 18 },
 };
 
 export interface Viewport {
@@ -267,13 +273,20 @@ function liveText(state: GameState): string {
     max: company.fontSize,
     min: OFFICE_NAME_SIZE_MIN,
   });
+  const totals = companyTotals(state);
+  const board = OFFICE_TEXTS.companyTotals;
   return (
     `<span class="office-clock" data-office-text="clock" ` +
     `style="${boxStyle(clock)};font-size:${clock.fontSize}px">` +
     `${escapeText(formatTime(state.clock.minute))}</span>` +
     `<span class="office-company" data-office-text="company" ` +
     `style="${boxStyle(company)};font-size:${fitted.fontSize}px">` +
-    `<span>${escapeText(fitted.text)}</span></span>`
+    `<span>${escapeText(fitted.text)}</span></span>` +
+    // The two totals on the pinned sheet of the board on the wall, and nothing else on it.
+    `<span class="office-board-totals" data-office-text="companyTotals" ` +
+    `style="${boxStyle(board)};font-size:${board.fontSize}px">` +
+    `<span data-total="reputation">${escapeText(totals.reputation)}</span>` +
+    `<span data-total="output">${escapeText(totals.output)}</span></span>`
   );
 }
 

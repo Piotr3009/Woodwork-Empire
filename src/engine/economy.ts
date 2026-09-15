@@ -242,6 +242,21 @@ export function receive(
   addLedger(state, category, label, amount, false);
 }
 
+/** Money handed back for something that never came. A bill the company could not pay went to the
+ *  arrears and never left the bank, so what comes back goes against the arrears first and only
+ *  what is left of it reaches the cash (CLAUDE.md T11 3.12). One path: the arrears are paid down
+ *  by the one function that pays them down. */
+export function refund(
+  state: GameState,
+  category: LedgerCategory,
+  label: string,
+  amount: number,
+): void {
+  if (amount <= 0) return;
+  receive(state, category, label, amount);
+  payArrears(state, amount);
+}
+
 /** The overdraft is the floor for anything the player buys. */
 export function canAfford(state: GameState, amount: number): boolean {
   return state.cash - amount >= state.finance.overdraftLimit;

@@ -87,11 +87,12 @@ describe('the clock on the hall wall', () => {
   });
 });
 
-describe('the glow on the things that can be clicked', () => {
+describe('the outline on the things that can be clicked', () => {
   it('is in the stylesheet, as :hover with a 120 ms transition', () => {
     const css = readFileSync('src/ui/styles.css', 'utf8');
     expect(css).toContain('.office-region:hover');
-    expect(css).toContain('transition: background 120ms ease;');
+    // The white box is gone: an orange outline and nothing else (PIOTR, 15.09; T11 3.5).
+    expect(css).toContain('transition: outline-color 120ms ease;');
     expect(css).toContain('transition: fill 120ms ease;');
   });
 

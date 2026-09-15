@@ -2,7 +2,7 @@
 // careful owner would make: advance the jobs, get the material in, then stand at the bench.
 
 import { DAY_END_MINUTE } from '../../src/engine/constants';
-import { applyAction, tick } from '../../src/engine/index';
+import { applyAction, helperOnDuty, startTaskCheck, tick } from '../../src/engine/index';
 import type { GameEvent, GameState, TaskInstance } from '../../src/engine/index';
 
 /** What the script answers when the clock stops for a decision. */
@@ -17,6 +17,11 @@ export function answer(state: GameState, policy?: Policy): string {
   }
   if (event.kind === 'goingHome') {
     return policy?.overtimeOn?.includes(state.clock.day) === true ? 'overtime' : 'home';
+  }
+  // He has taken somebody on to do the unloading: he lets him do it (CLAUDE.md T11 3.4). The
+  // button that sends the owner instead is still there and he simply does not press it.
+  if (event.kind === 'deliveryArrived' && helperOnDuty(state) && ids.includes('later')) {
+    return 'later';
   }
   // The scripted owner is a careful one: he picks the phone up (CLAUDE.md T4 3.3).
   for (const preferred of ['answer', 'unload', 'owner', 'storage', 'next', 'ok']) {
@@ -49,7 +54,12 @@ const TASK_ORDER: TaskInstance['kind'][] = [
 
 function nextTask(state: GameState): TaskInstance | null {
   for (const kind of TASK_ORDER) {
-    const task = state.tasks.find((entry) => entry.kind === kind && !entry.done);
+    // He does not reach for what the engine would refuse him: with a helper in the hall the
+    // unloading, the bags and the cleaning are the helper's, and the script walks past them
+    // (CLAUDE.md T11 3.4).
+    const task = state.tasks.find(
+      (entry) => entry.kind === kind && !entry.done && startTaskCheck(state, entry.id).ok,
+    );
     if (task) return task;
   }
   return null;
@@ -80,6 +90,13 @@ export interface Policy {
   edgebanderVariant?: string;
   extractorVariant?: string;
   compressorVariant?: string;
+  /** Take a helper on on day 1: the unloading, the bags and the cleaning become his and nobody
+   *  else's (PIOTR, 14.09; CLAUDE.md T11 3.4). */
+  hireHelper?: boolean;
+  /** Anything beyond the day 1 list to buy on day 1: a spray booth, say (CLAUDE.md T11 3.7). */
+  extraKit?: string[];
+  /** The standing the company opens the month on, for work that is out of a new company's reach. */
+  reputation?: number;
   /** Days the owner works through his dinner (CLAUDE.md T6 3.4). */
   skipBreakOn?: number[];
   /** Days he stays on after five, and how long for. */
@@ -173,9 +190,35 @@ export const BIG_SAW: Policy = {
   sawVariant: 'industrial',
 };
 
-/** The extraction is ordered before the machine that wants it: a floor edgebander cannot be
- *  bought until the hall has a fan on the way (CLAUDE.md T7 3.6, T10 3.1). */
-export const DAY_ONE_KIT = [
+/** A month with somebody to take the unloading, the bags and the cleaning off the owner
+ *  (PIOTR, 14.09; CLAUDE.md T11 3.4). */
+export const WITH_HELPER: Policy = {
+  maxOpenJobs: 2,
+  buyKit: true,
+  cleanAbove: 55,
+  wanted: ['tvUnit', 'bookcase', 'garageShelves'],
+  hireJoiner: false,
+  hireHelper: true,
+  stockSheets: 0,
+};
+
+/** A month that buys a booth and takes the sprayed wardrobe off the board. No dryer is bought, so
+ *  the booth runs on wet air and the finish takes half as long again (CLAUDE.md T11 3.7). */
+export const LACQUER_NO_DRYER: Policy = {
+  maxOpenJobs: 1,
+  buyKit: true,
+  cleanAbove: 55,
+  wanted: ['lacqueredWardrobe'],
+  hireJoiner: false,
+  stockSheets: 20,
+  extraKit: ['sprayBooth'],
+  reputation: 40,
+};
+
+/** The eleven machines of the engine's own day one list (`DAY_ONE_KIT` in constants.ts), in an
+ *  order the prerequisites allow: the tool cabinet before the hand edgebander that lives in it,
+ *  and the extraction before the machine that wants it (CLAUDE.md T7 3.6, T10 3.1, T11 3.6). */
+export const DAY_ONE_BUY_ORDER = [
   'desk',
   'chair',
   'laptop',
@@ -208,12 +251,15 @@ function classFor(specId: string, policy: Policy): string | undefined {
 
 function buyKit(state: GameState, policy: Policy): GameState {
   let next = state;
-  for (const specId of DAY_ONE_KIT) {
+  for (const specId of DAY_ONE_BUY_ORDER) {
     next = applyAction(next, {
       type: 'BUY_EQUIPMENT',
       specId,
       variantId: classFor(specId, policy),
     });
+  }
+  for (const specId of policy.extraKit ?? []) {
+    next = applyAction(next, { type: 'BUY_EQUIPMENT', specId });
   }
   return next;
 }
@@ -296,9 +342,14 @@ export function playDay(
 ): GameState {
   let next = state;
   const day = next.clock.day;
+  if (day === 1 && policy.reputation !== undefined) next.reputation = policy.reputation;
   if (policy.buyKit && day === 1) next = buyKit(next, policy);
   if (policy.buyKit) next = buyLicence(next);
   if (policy.hireJoiner && day === 1) next = takeOnJoiner(next, policy);
+  // Somebody to take the unloading, the bags and the cleaning (CLAUDE.md T11 3.4).
+  if (policy.hireHelper === true && day === 1) {
+    next = applyAction(next, { type: 'HIRE', role: 'helper', tier: null });
+  }
   if (policy.stockSheets > 0 && day === 1) {
     next = applyAction(next, { type: 'BUY_STOCK', sheets: policy.stockSheets });
   }

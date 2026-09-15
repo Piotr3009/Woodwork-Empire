@@ -1,6 +1,7 @@
 // The start screen: an empty unit seen from outside, and the three decisions (CLAUDE.md 10.1).
 
 import { DIFFICULTIES } from '../engine/constants';
+import type { StoredSave } from '../cloud/store';
 import { escapeHtml, money } from './modal';
 
 export interface StartChoice {
@@ -16,6 +17,10 @@ export interface StartChoice {
     hasSave: boolean;
     note: string;
   };
+  /** What is waiting in the browser's own store, and whether the player has been asked yet
+   *  whether he really means to lose it (CLAUDE.md T11 3.2). */
+  saved: StoredSave;
+  startOverAsked: boolean;
 }
 
 const UNIT_SKETCH =
@@ -53,6 +58,40 @@ function cloudBlock(choice: StartChoice): string {
   );
 }
 
+/** Continue, and the one question a New game asks before it throws the save away. A save from a
+ *  build that is gone is said so and offered to be cleared (CLAUDE.md T11 3.2). */
+function savedBlock(choice: StartChoice): string {
+  const saved = choice.saved;
+  if (saved.kind === 'stale') {
+    return (
+      '<p class="hint">A saved game from an older build was found; it cannot be continued.</p>' +
+      '<button class="btn" data-do="clearSaved">Clear the old save</button>'
+    );
+  }
+  if (saved.kind !== 'ready') return '';
+  const where = `${saved.companyName}, day ${saved.day}`;
+  return (
+    '<button class="btn btn-primary btn-big" data-do="continueSaved">' +
+    `Continue · ${escapeHtml(where)}</button>`
+  );
+}
+
+/** The button that starts a new company. With a game in the store it asks once, on a second
+ *  button of its own: a double click is never a decision (CLAUDE.md T11 3.2, T9 3.9). */
+function startBlock(choice: StartChoice): string {
+  if (choice.saved.kind !== 'ready') {
+    return '<button class="btn btn-primary btn-big" data-do="startGame">Start</button>';
+  }
+  if (!choice.startOverAsked) {
+    return '<button class="btn btn-big" data-do="askStartOver">New game</button>';
+  }
+  return (
+    '<p class="hint">Start over? The saved game will be lost.</p>' +
+    '<button class="btn btn-primary btn-big" data-do="startGame">Start over</button>' +
+    '<button class="btn" data-do="keepSaved">Keep it</button>'
+  );
+}
+
 export function renderStart(choice: StartChoice): string {
   const options = DIFFICULTIES.map(
     (spec) =>
@@ -76,7 +115,8 @@ export function renderStart(choice: StartChoice): string {
     '<label class="field-row check-row">' +
     `<input type="checkbox" data-field="showWhy"${choice.showWhy ? ' checked' : ''} />` +
     ' Show real-life notes</label>' +
-    '<button class="btn btn-primary btn-big" data-do="startGame">Start</button>' +
+    savedBlock(choice) +
+    startBlock(choice) +
     cloudBlock(choice) +
     '</div></div>'
   );

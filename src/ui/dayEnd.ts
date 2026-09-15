@@ -1,6 +1,14 @@
 // The end of day summary, and the game over screen (CLAUDE.md 10.1).
 
-import { daySummaryOf, dustBand, earnedRate, formatReputation, summaryOfDay } from '../engine/index';
+import {
+  DAY_CATEGORY_LABELS,
+  dayPercentages,
+  daySummaryOf,
+  dustBand,
+  earnedRate,
+  formatReputation,
+  summaryOfDay,
+} from '../engine/index';
 import type { DaySummary, GameState, SummaryCadence } from '../engine/index';
 import { days, escapeHtml, minutes, money, plural } from './modal';
 
@@ -31,6 +39,27 @@ const SPAN_LABELS: Record<SummaryCadence, string> = {
   monthly: 'this month',
 };
 
+/** The plate at the top of the summary: the day, what it went on, and what the day came to in
+ *  minutes (CLAUDE.md T11 3.1). The shares are the same seven bands the top bar paints, and they
+ *  always come to a hundred. */
+function dayPlate(summary: DaySummary): string {
+  const shares = dayPercentages(summary.dayLog);
+  const line =
+    shares.length === 0
+      ? 'Nothing on the clock today'
+      : shares
+          .map((share) => `${DAY_CATEGORY_LABELS[share.category]} ${share.percent}%`)
+          .join(' · ');
+  return (
+    '<div class="day-plate">' +
+    `<h3>Day ${summary.day} done</h3>` +
+    `<p class="day-shares">${escapeHtml(line)}</p>` +
+    `<p class="day-figures">${summary.minutesWorked} of ${summary.minutesAvailable} min · ` +
+    `overtime ${summary.overtimeMinutes}</p>` +
+    '</div>'
+  );
+}
+
 /** The one component the evening and the Days tab both put on the screen: the summary of a day,
  *  out of the record the engine wrote when that day closed (CLAUDE.md T6 3.9). */
 export function renderDaySummary(
@@ -49,6 +78,7 @@ export function renderDaySummary(
       ? ''
       : row('Earned labour rate', `${money(options.earnedRate)} / h`);
   return (
+    dayPlate(summary) +
     '<div class="cols">' +
     `<div class="col"><h3>Your minutes, day ${summary.day}</h3>` +
     row('Admin', minutes(used.admin)) +

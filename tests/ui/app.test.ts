@@ -233,10 +233,10 @@ describe('the first ten minutes', () => {
     expect(html()).toContain('Pause');
   });
 
-  it('9. moves the clock at 4x and fills the minute bar', () => {
+  it('9. moves the clock at 4x and fills the day meter', () => {
     click('[data-do="setSpeed"][data-speed="4"]');
     expect(currentState()?.speed).toBe(4);
-    expect(html()).toContain('class="chip is-on" data-do="setSpeed" data-speed="4"');
+    expect(html()).toContain('class="chip knob is-on" data-do="setSpeed" data-speed="4"');
   });
 
   it('10. shows the hall with the kit, the owner and the rooms', () => {
@@ -259,7 +259,8 @@ describe('the first ten minutes', () => {
 describe('the order board as tiles', () => {
   it('fills the page with one tile per enquiry, and says what each one is', () => {
     click('[data-do="openModal"][data-modal="board"]');
-    expect(html()).toContain('class="modal modal-full modal-centred"');
+    // The board is a full page modal of the paper family (CLAUDE.md T11 1).
+    expect(html()).toContain('class="modal modal-full modal-folder modal-centred"');
     expect(html()).toContain('class="tile-grid"');
     const state = currentState();
     const enquiries = state?.enquiries ?? [];
