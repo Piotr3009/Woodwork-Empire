@@ -57,12 +57,9 @@ describe('the blade only spins while something is being cut', () => {
     expect(renderHall(away)).not.toContain('fx-blade');
   });
 
-  it('stops it when the bag is full or the machine has given up', () => {
+  it('stops it when the machine has given up', () => {
     const state = working();
     expect(machineInUse(state, machineOf(state, 'tableSaw'))).toBe(true);
-    const full = { ...state, equipment: state.equipment.map((item) => ({ ...item })) };
-    machineOf(full, 'tableSaw').bagFull = true;
-    expect(machineInUse(full, machineOf(full, 'tableSaw'))).toBe(false);
     const broken = { ...state, equipment: state.equipment.map((item) => ({ ...item })) };
     machineOf(broken, 'tableSaw').broken = true;
     expect(machineInUse(broken, machineOf(broken, 'tableSaw'))).toBe(false);

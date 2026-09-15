@@ -18,6 +18,7 @@ import {
   act,
   buyNow,
   buyStartingKit,
+  fillBags,
   fillRack,
   firstJob,
   newGame,
@@ -230,10 +231,11 @@ describe('the Owned tab', () => {
     let state = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
     const saw = state.equipment.find((item) => item.specId === 'tableSaw');
     if (!saw) throw new Error('no saw');
-    saw.bagFull = true;
-    expect(ownedState(state, saw)).toBe('stopped: bag full');
-    expect(shop(state, 'owned').innerHTML).toContain('stopped: bag full');
-    saw.bagFull = false;
+    // The bags are the hall's: a full store stops the saw, and the Owned tab says so (T12 2.3).
+    fillBags(state);
+    expect(ownedState(state, saw)).toBe('stopped: bags full');
+    expect(shop(state, 'owned').innerHTML).toContain('stopped: bags full');
+    state.bagFillM3 = 0;
     saw.broken = true;
     expect(ownedState(state, saw)).toBe('stopped: broken');
     const broken = shop(state, 'owned');

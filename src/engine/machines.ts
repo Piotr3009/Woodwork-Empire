@@ -4,6 +4,9 @@
 import {
   DUCTING_RECONNECT_COST,
   DUST_BANDS,
+  DUST_OUTPUT_M3_PER_HOUR,
+  EXTRACTOR_BAGS,
+  bagsToM3,
   HEAVY_SPECS,
   LIGHT_CLASSES,
   EXTRACTOR_BROKEN_OUTPUT_FACTOR,
@@ -34,6 +37,7 @@ import {
   USED_VARIANT,
 } from './constants';
 import { extractionCheck, underExtracted } from './media';
+import { cubicMetres, trimmed } from './text';
 import type {
   Equipment,
   EquipmentSpec,
@@ -624,23 +628,19 @@ export function overdueBreakdownChance(item: Equipment): number {
   return chance;
 }
 
-/** What is stopping a stage that is done on this family: a machine that has given up, or one
- *  whose bag is full, when there is no other of the family to use instead. Null while the work
- *  can go on (CLAUDE.md 9.6, T7 3.1). The family, not the material: a broken saw stops the
- *  cutting of anything, and a broken edgebander stops nothing but the machining. */
+/** What is stopping a stage that is done on this family: a machine that has given up, when there
+ *  is no other of the family to use instead. Null while the work can go on (CLAUDE.md 9.6,
+ *  T7 3.1). The family, not the material: a broken saw stops the cutting of anything, and a
+ *  broken edgebander stops nothing but the machining. */
 export function familyStopped(
   state: GameState,
   specId: string,
-): { item: Equipment; why: 'broken' | 'bag' } | null {
+): { item: Equipment; why: 'broken' } | null {
   const machines = owned(state, specId);
   if (machines.length === 0) return null;
-  const bags = bagsExist(state);
-  const usable = machines.filter((item) => !item.broken && !(bags && item.bagFull));
-  if (usable.length > 0) return null;
+  if (machines.some((item) => !item.broken)) return null;
   const broken = machines.find((item) => item.broken);
-  if (broken) return { item: broken, why: 'broken' };
-  const full = machines.find((item) => item.bagFull);
-  return full ? { item: full, why: 'bag' } : null;
+  return broken ? { item: broken, why: 'broken' } : null;
 }
 
 // ---------------------------------------------------------------------------
@@ -677,11 +677,59 @@ export function accumulateMachineMinute(
   }
 }
 
-export function emptyBag(state: GameState, equipmentId: string): void {
-  const item = state.equipment.find((entry) => entry.id === equipmentId);
-  if (!item) return;
-  item.bagFull = false;
-  item.minutesUsed = 0;
+/** Cubic metres of sawdust an hour that somebody stands at a machine of this family, off
+ *  Piotr's table. Zero for anything that is not on it (CLAUDE.md T12 2.1). */
+export function dustOutputOf(specId: string): number {
+  return DUST_OUTPUT_M3_PER_HOUR[specId] ?? 0;
+}
+
+/** The bags on this class of extractor, and none on anything else (CLAUDE.md T12 2.3). */
+export function bagsOf(item: { specId: string; variantId: string }): number {
+  if (item.specId !== 'extractor') return 0;
+  return EXTRACTOR_BAGS[item.variantId] ?? 0;
+}
+
+/** The hall's one bag store (CLAUDE.md T12 2.3). */
+export interface BagStore {
+  /** True while the hall keeps its dust in bags at all: an extractor and no central system. */
+  exists: boolean;
+  /** Bags in the store: every extractor standing in the hall added up, because the hall is one
+   *  duct run however many fans are on it. */
+  bags: number;
+  capacityM3: number;
+  fillM3: number;
+  /** True while the store is at its capacity: nothing that makes dust runs until it is emptied. */
+  full: boolean;
+}
+
+/** How full is this hall's store: the one place that is read. The floor, the Owned tab, the
+ *  chore and the full rule all come through here (CLAUDE.md T12 2.3). */
+export function bagStore(state: GameState): BagStore {
+  const exists = bagsExist(state);
+  let bags = 0;
+  for (const item of state.equipment) {
+    if (isSold(item) || !itemStandsInTheHall(item)) continue;
+    bags += bagsOf(item);
+  }
+  const capacityM3 = bagsToM3(bags);
+  const fillM3 = state.bagFillM3;
+  return { exists, bags, capacityM3, fillM3, full: exists && bags > 0 && fillM3 >= capacityM3 };
+}
+
+/** True while the hall's bags are full (CLAUDE.md T12 2.3). */
+export function bagsFull(state: GameState): boolean {
+  return bagStore(state).full;
+}
+
+/** What the store reads on the floor, on the Owned tab and under the hall: "Bags 4.6 / 10 m3",
+ *  with the unit once (CLAUDE.md T12 3.3). */
+export function bagStoreLine(store: BagStore): string {
+  return `Bags ${trimmed(store.fillM3, 1)} / ${cubicMetres(store.capacityM3)}`;
+}
+
+/** Emptied: the store is back to nothing (CLAUDE.md T12 2.3). */
+export function emptyBags(state: GameState): void {
+  state.bagFillM3 = 0;
 }
 
 /** Dust gained per minute of production, tripled by a broken extractor or by a hall whose

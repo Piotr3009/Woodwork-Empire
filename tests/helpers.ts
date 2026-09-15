@@ -8,6 +8,7 @@ import { hire } from '../src/engine/staff';
 import type { WorkerRole, WorkerTier } from '../src/engine/types';
 import {
   applyAction,
+  bagStore,
   createGame,
   enduranceHoursFor,
   findSpec,
@@ -254,8 +255,6 @@ export function placeEquipment(
     spriteKey: spec.spriteKey,
     anchorX: options.x ?? 0,
     anchorY: options.y ?? 0,
-    minutesUsed: 0,
-    bagFull: false,
     broken: false,
     serviceHours: 0,
     enduranceHours: enduranceHoursFor(specId, variantId),
@@ -303,6 +302,13 @@ export function withAir(state: GameState, variantId = 'pro'): GameState {
  *  all, and the test that is about that rule leaves the dryer out on purpose. */
 export function withDryAir(state: GameState): GameState {
   placeEquipment(state, 'airDryer', { x: 19, y: 2, id: 'kit-dryer' });
+  return state;
+}
+
+/** Fills the hall's bags to the brim, so a test can start from a stopped workshop without
+ *  running the saw for a month (CLAUDE.md T12 2.3). */
+export function fillBags(state: GameState): GameState {
+  state.bagFillM3 = bagStore(state).capacityM3;
   return state;
 }
 

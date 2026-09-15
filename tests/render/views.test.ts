@@ -7,7 +7,16 @@ import { FINISHED_GOODS_LAYOUT } from '../../src/engine/constants';
 import { centreOf } from '../../src/render/iso';
 import type { GameState } from '../../src/engine/index';
 import { tick } from '../../src/engine/index';
-import { act, buyStartingKit, clearEvents, firstJob, newGame, placeEnquiry, runToDay } from '../helpers';
+import {
+  act,
+  buyStartingKit,
+  clearEvents,
+  fillBags,
+  firstJob,
+  newGame,
+  placeEnquiry,
+  runToDay,
+} from '../helpers';
 
 describe('the hall on day 1', () => {
   it('draws the three rooms and the floor, and nothing that was not bought', () => {
@@ -88,11 +97,11 @@ describe('the hall on day 1', () => {
     expect(svg).toContain('the extractor is broken');
   });
 
-  it('marks a machine whose bag is full', () => {
-    const state = buyStartingKit(newGame());
-    const saw = state.equipment.find((item) => item.specId === 'tableSaw');
-    if (saw) saw.bagFull = true;
-    expect(renderHall(state)).toContain('Table saw (bag full)');
+  it('marks the extractor when the bags on it are full, and no machine', () => {
+    // The full state is worn where the bags are (CLAUDE.md T12 3.3).
+    const state = fillBags(buyStartingKit(newGame()));
+    expect(renderHall(state)).toContain('Extractor (bags full)');
+    expect(renderHall(state)).not.toContain('Table saw (bag');
   });
 
   it('puts a van at the gate while a delivery waits', () => {

@@ -18,7 +18,13 @@ import type {
   WorkerTier,
 } from './types';
 
-/** Bumped in Turn 10: every machine carries the compressor it draws its air from and whether it
+/** Bumped in Turn 12: the bags came off the machines and onto the extractor. The state carries
+ *  the hall's one bag store in cubic metres, the day carries the dust it made and every summary
+ *  carries the same, a machine carries no bag of its own any more, and the bag change is the
+ *  emptying of the bags. A Turn 11 save is lifted into that shape by the migration, so a v18
+ *  game opens (CLAUDE.md T12 2.3).
+ *
+ *  Bumped in Turn 10: every machine carries the compressor it draws its air from and whether it
  *  stands at ninety degrees to the walls, every job carries the minutes of production that went
  *  into it and how many of them the hall was under extracted for, and a job carries whether its
  *  finish was sprayed on wet air. A Turn 9 save has none of them, so its air would come from
@@ -52,7 +58,7 @@ import type {
  *
  *  Bumped in Turn 11: the owner carries the log of his day and the state carries the last week of
  *  them, which is what the top bar's meter and the company board are drawn from (T11 3.1). */
-export const STATE_VERSION = 12;
+export const STATE_VERSION = 13;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */

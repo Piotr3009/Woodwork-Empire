@@ -28,6 +28,7 @@ import {
   buyStartingKit,
   choose,
   clearEvents,
+  fillBags,
   fillRack,
   firstJob,
   hireNow,
@@ -346,29 +347,17 @@ describe('who can be sent at a job of work', () => {
     }
     state = clearEvents(hireNow(state, 'joiner', 'poor'));
     expect(state.workers).toHaveLength(1);
-    // He does not start for a few days yet, so sending him would do nothing at all.
-    const saw = state.equipment.find((item) => item.specId === 'tableSaw');
-    if (saw) saw.bagFull = true;
-    const sawId = saw?.id ?? '';
+    // The hall's bags are full, and the question is who empties them (CLAUDE.md T12 2.3).
+    fillBags(state);
     const ids = (next: GameState): string[] =>
       (next.activeEvent?.choices ?? []).map((choice) => choice.id);
     // He does not start for a few days yet, so sending him would do nothing at all.
-    expect(ids(act(state, { type: 'ASK_BAG_CHANGE', equipmentId: sawId }))).toEqual([
-      'owner',
-      'later',
-    ]);
+    expect(ids(act(state, { type: 'ASK_EMPTY_BAGS' }))).toEqual(['owner', 'later']);
     const joiner = state.workers[0];
     if (joiner) joiner.startDay = state.clock.day;
-    expect(ids(act(state, { type: 'ASK_BAG_CHANGE', equipmentId: sawId }))).toEqual([
-      'owner',
-      'joiner',
-      'later',
-    ]);
+    expect(ids(act(state, { type: 'ASK_EMPTY_BAGS' }))).toEqual(['owner', 'joiner', 'later']);
     // Hurt in the hall and off for three days: he is not offered again either.
     if (joiner) joiner.absentDaysRemaining = 3;
-    expect(ids(act(state, { type: 'ASK_BAG_CHANGE', equipmentId: sawId }))).toEqual([
-      'owner',
-      'later',
-    ]);
+    expect(ids(act(state, { type: 'ASK_EMPTY_BAGS' }))).toEqual(['owner', 'later']);
   });
 });

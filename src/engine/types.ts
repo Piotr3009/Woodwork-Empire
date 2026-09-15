@@ -198,9 +198,6 @@ export interface Equipment {
   spriteKey: string;
   anchorX: number;
   anchorY: number;
-  /** Minutes of this machine's own use since the last bag change (CLAUDE.md T6 3.6). */
-  minutesUsed: number;
-  bagFull: boolean;
   broken: boolean;
   /** Hours on the machine's own clock at the last service: the service is due by its hours, not
    *  by the calendar (CLAUDE.md T6 3.6). */
@@ -521,7 +518,8 @@ export type TaskKind =
   | 'materialOrder'
   | 'siteMeasure'
   | 'unload'
-  | 'bagChange'
+  /** Emptying the bags on the extractor, all of them at once (CLAUDE.md T12 2.3). */
+  | 'emptyBags'
   | 'cleaning'
   | 'fetchStorage'
   | 'deliver'
@@ -570,7 +568,8 @@ export type GameEventKind =
   | 'goingHome'
   | 'deliveryArrived'
   | 'stockOverflow'
-  | 'bagFull'
+  /** The hall's bags are full: nothing that makes dust runs until they are emptied (T12 2.3). */
+  | 'bagsFull'
   | 'machineBroken'
   | 'serviceDue'
   | 'noMaterial'
@@ -719,6 +718,8 @@ export interface DaySummary {
   workMinutes: number;
   /** The owner's day as it happened, for the plate at the top of the summary (T11 3.1). */
   dayLog: DayLogEntry[];
+  /** Cubic metres of sawdust the hall made that day (CLAUDE.md T12 3.4). */
+  dustMadeM3: number;
 }
 
 export interface DayStats {
@@ -732,6 +733,8 @@ export interface DayStats {
    *  the earned labour rate (CLAUDE.md T6 3.8). */
   labourValue: number;
   workMinutes: number;
+  /** Cubic metres of sawdust the hall made today, bags or no bags (CLAUDE.md T12 3.4). */
+  dustM3: number;
 }
 
 /** One line of the reputation log: the day, what happened, and what it was worth. The company
@@ -769,6 +772,9 @@ export interface GameState {
    *  (CLAUDE.md T11 3.1). */
   dayLogs: DayLog[];
   dust: number;
+  /** Cubic metres of sawdust in the hall's bags. One store for the hall, however many fans are
+   *  on the duct run, fed by every machine somebody stands at (CLAUDE.md T12 2.3). */
+  bagFillM3: number;
   unit: UnitState;
   owner: OwnerState;
   software: SoftwareState;
@@ -849,7 +855,8 @@ export type GameAction =
   | { type: 'ASSIGN_AIR'; equipmentId: string; compressorId: string | null }
   | { type: 'HIRE'; role: WorkerRole; tier: WorkerTier | null }
   | { type: 'ASK_UNLOAD'; deliveryId: string }
-  | { type: 'ASK_BAG_CHANGE'; equipmentId: string }
+  /** Asks again who empties the bags, from the extractor on the floor (CLAUDE.md T12 2.3). */
+  | { type: 'ASK_EMPTY_BAGS' }
   | { type: 'START_CLEANING' }
   | { type: 'REPAIR_MACHINE'; equipmentId: string }
   | { type: 'SERVICE_MACHINE'; equipmentId: string }

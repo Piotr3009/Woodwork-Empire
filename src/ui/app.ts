@@ -8,6 +8,9 @@ import {
   finishTimeFor,
   formatTime,
   gameMinutesPerRealSecond,
+  bagStore,
+  bagStoreLine,
+  bagsFull,
   brokenMachines,
   findSpec,
   machinesDueService,
@@ -974,6 +977,11 @@ function shutModal(): void {
   autosaveLocal();
 }
 
+/** Hours on a machine's own clock, as the note under the hall says them. */
+function hoursOfUse(hours: number): string {
+  return `${Math.round(hours * 10) / 10} h`;
+}
+
 /** Clicking the van at the gate opens the unloading choice again (CLAUDE.md 10.1). */
 function askUnload(deliveryId: string): void {
   dispatch({ type: 'ASK_UNLOAD', deliveryId });
@@ -1609,14 +1617,16 @@ function handleSceneClick(element: DataElement): boolean {
       }
       return true;
     }
-    if (item.bagFull) {
-      // The machine is stopped: clicking it asks again who changes the bag.
-      dispatch({ type: 'ASK_BAG_CHANGE', equipmentId: item.id });
+    if (item.specId === 'extractor' && bagsFull(game())) {
+      // The bags are full: clicking the extractor asks again who empties them (T12 2.3).
+      dispatch({ type: 'ASK_EMPTY_BAGS' });
       return true;
     }
     ui.note = item.broken
       ? 'It has stopped. Nothing runs until it is fixed.'
-      : `${minutes(item.minutesUsed)} of use since the last bag change.`;
+      : item.specId === 'extractor'
+        ? bagStoreLine(bagStore(game()))
+        : `${hoursOfUse(item.hoursUsed)} of use on the clock.`;
     requestRender();
     return true;
   }

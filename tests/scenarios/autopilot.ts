@@ -37,7 +37,7 @@ const TASK_ORDER: TaskInstance['kind'][] = [
   'hiring',
   'booting',
   'unload',
-  'bagChange',
+  'emptyBags',
   'repair',
   'service',
   'fetchStorage',

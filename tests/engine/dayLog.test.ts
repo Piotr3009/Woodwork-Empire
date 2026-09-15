@@ -70,7 +70,7 @@ describe('the seven bands', () => {
     expect(dayCategoryOf('bookkeeping')).toBe('office');
     expect(dayCategoryOf('clientMeeting')).toBe('meetings');
     expect(dayCategoryOf('siteMeasure')).toBe('siteMeasure');
-    expect(dayCategoryOf('bagChange')).toBe('fixing');
+    expect(dayCategoryOf('emptyBags')).toBe('fixing');
     expect(dayCategoryOf('cleaning')).toBe('fixing');
     expect(dayCategoryOf('unload')).toBe('fixing');
   });

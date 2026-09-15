@@ -166,6 +166,7 @@ describe('the plate at the top of the day end summary', () => {
       jobsCompleted: [],
       dustAtStart: 0,
       dustAtEnd: 0,
+      dustMadeM3: 0,
       deliveriesTomorrow: [],
       labourValue: 0,
       workMinutes: 0,

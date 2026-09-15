@@ -46,7 +46,13 @@ export function stationForTask(state: GameState, task: TaskInstance): string {
       return STATION_GATE;
     case 'fetchStorage':
       return STATION_RACK;
-    case 'bagChange':
+    case 'emptyBags': {
+      // The bags are on the extractor: he stands at the first fan in the hall (T12 2.3).
+      const fan = state.equipment.find(
+        (item) => item.specId === 'extractor' && itemStandsInTheHall(item),
+      );
+      return fan ? machineStation(fan.specId) : STATION_BENCH;
+    }
     case 'service':
     case 'repair': {
       const machine = task.equipmentId

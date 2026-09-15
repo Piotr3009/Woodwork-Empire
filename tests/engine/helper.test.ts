@@ -22,6 +22,7 @@ import type { GameState, TaskInstance, Worker } from '../../src/engine/index';
 import {
   act,
   buyStartingKit,
+  fillBags,
   fillRack,
   hireNow,
   newGame,
@@ -66,7 +67,7 @@ function onTheFloor(state: GameState, cell: { x: number; y: number }): boolean {
 
 describe('the three jobs of work that are the helper s', () => {
   it('is the unloading, the bags and the cleaning, and nothing else', () => {
-    expect([...HELPER_ONLY_KINDS]).toEqual(['unload', 'bagChange', 'cleaning']);
+    expect([...HELPER_ONLY_KINDS]).toEqual(['unload', 'emptyBags', 'cleaning']);
   });
 
   it('belongs to nobody in particular while there is no helper in the hall', () => {
@@ -170,15 +171,12 @@ describe('a helper who is on the books but not in the hall today', () => {
     // He starts tomorrow, so today he is on the books and nowhere near the hall.
     expect(helper.startDay).toBeGreaterThan(hired.clock.day);
     expect(helperOnDuty(hired)).toBe(false);
-    expect(isHelperTask(hired, taskOfKind(hired, 'bagChange'))).toBe(false);
-    // The saw fills its bag: the question is put, because there is nobody to take it.
-    const saw = hired.equipment.find((item) => item.specId === 'tableSaw');
-    if (saw === undefined) throw new Error('no saw in the hall');
-    const asked = act(hired, { type: 'ASK_BAG_CHANGE', equipmentId: saw.id });
-    saw.bagFull = true;
-    const again = act({ ...hired }, { type: 'ASK_BAG_CHANGE', equipmentId: saw.id });
-    expect(again.activeEvent?.kind ?? again.eventQueue[0]?.kind).toBe('bagFull');
-    void asked;
+    expect(isHelperTask(hired, taskOfKind(hired, 'emptyBags'))).toBe(false);
+    // The bags fill: the question is put, because there is nobody to take it (T12 2.3).
+    const asked = act(hired, { type: 'ASK_EMPTY_BAGS' });
+    expect(asked.activeEvent).toBeNull();
+    const again = act(fillBags({ ...hired }), { type: 'ASK_EMPTY_BAGS' });
+    expect(again.activeEvent?.kind ?? again.eventQueue[0]?.kind).toBe('bagsFull');
   });
 });
 
@@ -194,15 +192,15 @@ describe('a joiner with a helper in the hall', () => {
     // The helper himself may always be sent at his own work.
     const helper = state.workers.find((worker) => worker.role === 'helper');
     if (helper === undefined) throw new Error('no helper');
-    const bag = taskOfKind(state, 'bagChange');
-    expect(assignWorkerTask(state, helper.id, bag.id)).toBe(true);
+    const bags = taskOfKind(state, 'emptyBags');
+    expect(assignWorkerTask(state, helper.id, bags.id)).toBe(true);
   });
 
   it('may still be sent at one when there is no helper', () => {
     const state = quietHall();
     const joiner = addJoiner(state);
-    const bag = taskOfKind(state, 'bagChange');
-    expect(assignWorkerTask(state, joiner.id, bag.id)).toBe(true);
+    const bags = taskOfKind(state, 'emptyBags');
+    expect(assignWorkerTask(state, joiner.id, bags.id)).toBe(true);
   });
 
   it('is still sent at the repairs and the moves, which were never the helper s', () => {

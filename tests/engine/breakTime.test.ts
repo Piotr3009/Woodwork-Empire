@@ -180,13 +180,12 @@ describe('the helper has his dinner too', () => {
     });
     state = clearEvents(tick(clearEvents(tick(state, BREAK_START_MINUTE)), 1));
     expect(isBreak(state.clock.minute)).toBe(true);
-    // A bag goes as they sit down. The helper needs no minutes, so nothing but the break stops him.
-    const saw = state.equipment.find((item) => item.specId === 'tableSaw');
+    // The bags fill as they sit down. The helper needs no minutes, so nothing but the break stops
+    // him.
     const task = createTask(state, {
-      kind: 'bagChange',
-      label: 'Bag change: table saw',
+      kind: 'emptyBags',
+      label: 'Empty the bags (1 bag, 15 min)',
       minutes: 15,
-      equipmentId: saw?.id ?? null,
     });
     state = clearEvents(tick(state, 5));
     expect(findTask(state, task.id)?.done).toBe(false);

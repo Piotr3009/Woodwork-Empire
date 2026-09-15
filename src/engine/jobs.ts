@@ -578,7 +578,6 @@ export function hallBlock(state: GameState, job: Job): string {
   if (air !== '') return `${(findSpec(family)?.name ?? family).toLowerCase()} ${air}`;
   const stopped = familyStopped(state, family);
   if (stopped === null) return '';
-  if (stopped.why === 'bag') return 'bag full';
   return `${(findSpec(stopped.item.specId)?.name ?? 'a machine').toLowerCase()} is broken`;
 }
 

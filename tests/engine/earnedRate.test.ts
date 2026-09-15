@@ -128,6 +128,7 @@ describe('the two of them together', () => {
         jobsCompleted: [],
         dustAtStart: 0,
         dustAtEnd: 0,
+        dustMadeM3: 0,
         deliveriesTomorrow: [],
         labourValue: 42 * 8,
         workMinutes: 480,

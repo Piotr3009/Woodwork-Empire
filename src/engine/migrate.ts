@@ -1,0 +1,88 @@
+// A saved game from the build before this one, lifted into the shape the engine runs on now.
+//
+// The loader used to refuse every save that was not this build's, and a company was lost at every
+// delivery. From Turn 12 a save one bump behind is opened: the fields the bump added are zeroed,
+// the fields it took away are dropped, and nothing about the game is guessed. Anything older is
+// refused as it always was (CLAUDE.md T12 2.3). Written against the plain JSON a save is and not
+// against the types, because the whole point is that the file does not match them yet.
+
+import { STATE_VERSION } from './constants';
+import type { GameState } from './types';
+
+/** The oldest save this build opens: Turn 11's v18, which is state version 12. */
+export const OLDEST_SAVE_VERSION = 12;
+
+/** True for a save this build can open as it is or lift into its own shape. */
+export function canOpenVersion(version: number): boolean {
+  return version >= OLDEST_SAVE_VERSION && version <= STATE_VERSION;
+}
+
+type Raw = Record<string, unknown>;
+
+function isRecord(value: unknown): value is Raw {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function records(value: unknown): Raw[] {
+  return Array.isArray(value) ? value.filter(isRecord) : [];
+}
+
+/** Version 12 to 13: the bags came off the machines and onto the extractor (CLAUDE.md T12 2.3).
+ *  The hall's store starts empty, the day and every summary start with no dust made, and a machine
+ *  carries no bag of its own any more. */
+function liftToVersion13(state: Raw): void {
+  state.bagFillM3 = 0;
+  if (isRecord(state.dayStats)) state.dayStats.dustM3 = 0;
+  for (const day of records(state.days)) day.dustMadeM3 = 0;
+  for (const item of records(state.equipment)) {
+    delete item.minutesUsed;
+    delete item.bagFull;
+  }
+  // The bag change of one machine is gone. An open one is dropped, and whoever was holding it is
+  // free; a finished one stays on the record under the name the chore has now.
+  const dropped = new Set<string>();
+  state.tasks = records(state.tasks).filter((task) => {
+    if (task.kind !== 'bagChange') return true;
+    if (task.done === true) {
+      task.kind = 'emptyBags';
+      task.equipmentId = null;
+      return true;
+    }
+    if (typeof task.id === 'string') dropped.add(task.id);
+    return false;
+  });
+  if (isRecord(state.owner)) {
+    const owner = state.owner;
+    if (typeof owner.currentTaskId === 'string' && dropped.has(owner.currentTaskId)) {
+      owner.currentTaskId = null;
+    }
+    if (typeof owner.resumeTaskId === 'string' && dropped.has(owner.resumeTaskId)) {
+      owner.resumeTaskId = null;
+    }
+  }
+  for (const worker of records(state.workers)) {
+    if (typeof worker.taskId === 'string' && dropped.has(worker.taskId)) worker.taskId = null;
+  }
+  // And the question that was asked about that bag: the store is empty now, so there is nothing
+  // to ask. The next event in the queue opens on the first settle, as it always does.
+  if (isRecord(state.activeEvent) && state.activeEvent.kind === 'bagFull') state.activeEvent = null;
+  state.eventQueue = records(state.eventQueue).filter((event) => event.kind !== 'bagFull');
+  state.version = 13;
+}
+
+/** One lift per bump, keyed by the version it lifts from. */
+const LIFTS: Record<number, (state: Raw) => void> = { 12: liftToVersion13 };
+
+/** The state a save holds, lifted bump by bump into this build's shape, or null when the save is
+ *  older than anything this build can lift or is not a state at all. The save itself is left as
+ *  it was: the lifts work on a copy. */
+export function migrateState(raw: unknown, version: number): GameState | null {
+  if (!canOpenVersion(version) || !isRecord(raw)) return null;
+  const state = JSON.parse(JSON.stringify(raw)) as Raw;
+  for (let at = version; at < STATE_VERSION; at += 1) {
+    const lift = LIFTS[at];
+    if (lift === undefined) return null;
+    lift(state);
+  }
+  return state as unknown as GameState;
+}

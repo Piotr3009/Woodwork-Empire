@@ -19,6 +19,7 @@ import {
   roomDoorCell,
 } from '../engine/constants';
 import {
+  bagStore,
   brokenMachines,
   dustBand,
   extractorBroken,
@@ -1016,6 +1017,9 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
     });
   }
 
+  // The hall's bag store, read once: the full state is worn by the extractor the bags are on,
+  // which is where the full bag used to be worn by the machine (CLAUDE.md T12 3.3).
+  const store = bagStore(state);
   // Everything the player has bought, except the office furniture, which lives in the office
   // view, and the hand edgebander, which lives in a tool cabinet (CLAUDE.md T6 3.5).
   for (const item of state.equipment) {
@@ -1030,7 +1034,7 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
     const shade = broken
       ? 'var(--stopped-dark)'
       : CATEGORY_SHADE[spec.category] ?? 'var(--kit-machine-dark)';
-    const bagLine = item.bagFull ? ' (bag full)' : '';
+    const bagLine = item.specId === 'extractor' && store.full ? ' (bags full)' : '';
     const serviceLine = !item.broken && serviceIsDue(item) ? ' (service due)' : '';
     const rackLine =
       sheetCapacityOf(item) > 0 ? `: ${state.stock.sheets} / ${rackCapacity(state)}` : '';
