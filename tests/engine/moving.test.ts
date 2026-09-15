@@ -6,7 +6,6 @@ import { describe, expect, it } from 'vitest';
 import {
   DAY_END_MINUTE,
   OVERTIME_END_MINUTE,
-  DUCTING_RECONNECT_COST,
   MOVE_MINUTES_PER_ITEM,
   SKIP_SPEED,
 } from '../../src/engine/constants';
@@ -28,6 +27,7 @@ import { tick } from '../../src/engine/index';
 import type { GameState } from '../../src/engine/index';
 import { renderTopbar } from '../../src/ui/topbar';
 import {
+  acceptNow,
   act,
   buyStartingKit,
   clearEvents,
@@ -87,11 +87,12 @@ describe('leaving setup with two machines moved', () => {
   it('asks the question in the words of the brief before anything is booked', () => {
     const dragged = drag(drag(inSetup(), 'tableSaw'), 'thicknesser');
     expect(dragged.movedItems).toHaveLength(2);
-    expect(ductingDue(dragged)).toEqual({ machines: 2, cost: 2 * DUCTING_RECONNECT_COST });
+    expect(ductingDue(dragged)).toEqual({ machines: 2 });
     const asked = act(dragged, { type: 'END_SETUP', speed: 1 });
     expect(asked.activeEvent?.kind).toBe('moveConfirm');
     expect(asked.activeEvent?.body).toBe(
-      'Moving 2 machines takes 2 h and £1,600 of ducting. Do it?',
+      'Moving 2 machines takes 2 h and the extraction pipe of 2 machines run again at the new ' +
+        'length. Do it?',
     );
     expect(asked.activeEvent?.choices.map((choice) => choice.label)).toEqual([
       'Do it',
@@ -102,7 +103,7 @@ describe('leaving setup with two machines moved', () => {
     expect(asked.cash).toBe(dragged.cash);
   });
 
-  it('charges 1,600 and takes 120 minutes with the clock run through it', () => {
+  it('runs both pipes again at the new length, and takes 120 minutes with the clock run through it', () => {
     const dragged = drag(drag(inSetup(), 'tableSaw'), 'thicknesser');
     const cash = dragged.cash;
     let state = doIt(dragged);
@@ -119,12 +120,16 @@ describe('leaving setup with two machines moved', () => {
     expect(movingMachines(state)).not.toBeNull();
     state = tick(state, 1);
     expect(movingMachines(state)).toBeNull();
-    expect(cash - state.cash).toBe(2 * DUCTING_RECONNECT_COST);
-    const lines = state.ledger.filter((entry) => entry.category === 'ducting');
-    expect(lines.map((entry) => entry.label)).toEqual([
-      'Ducting reconnection: table saw',
-      'Ducting reconnection: thicknesser',
+    // Moving a machine disconnects it and refunds nothing; reconnecting charges the new length,
+    // by the metre (CLAUDE.md T13 3.19). The first line is the day 1 connection of the saw.
+    const lines = state.ledger.filter((entry) => entry.category === 'pipes');
+    expect(lines.map((entry) => entry.label.split(',')[0])).toEqual([
+      'Extraction pipe: table saw',
+      'Extraction pipe: table saw',
+      'Extraction pipe: thicknesser',
     ]);
+    expect(cash - state.cash).toBe(lines.slice(1).reduce((total, entry) => total - entry.amount, 0));
+    expect(cash - state.cash).toBeGreaterThan(0);
     expect(state.movedItems).toEqual([]);
     // And the clock is the player's again, at the speed he pressed Done on.
     expect(renderTopbar(state, 'hall')).toContain('data-do="setSpeed"');
@@ -160,7 +165,7 @@ describe('leaving setup with two machines moved', () => {
   it('stops every bench while the kit is being shifted', () => {
     let state = inSetup();
     const enquiry = placeEnquiry(state, { price: 4000, deadlineDays: 90 });
-    state = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+    state = acceptNow(state, enquiry.id, false);
     const job = state.jobs[0];
     if (!job) throw new Error('no job');
     job.stage = 'ready';
@@ -203,7 +208,8 @@ describe('the light kit', () => {
       speed: 1,
     });
     expect(asked.activeEvent?.body).toBe(
-      'Moving 1 machine takes 1 h and £800 of ducting. Do it?',
+      'Moving 1 machine takes 1 h and the extraction pipe of 1 machine run again at the new ' +
+        'length. Do it?',
     );
     expect(asked.movedItems).toHaveLength(1);
   });
@@ -261,7 +267,9 @@ describe('a move the day ended in the middle of', () => {
       state = clearEvents(tick(state, 1));
       guard += 1;
     }
-    expect(cash - state.cash).toBeGreaterThanOrEqual(2 * DUCTING_RECONNECT_COST);
+    // The day 1 connection of the saw, and the two runs of the move (CLAUDE.md T13 3.19).
+    expect(state.ledger.filter((entry) => entry.category === 'pipes').length).toBe(3);
+    expect(cash - state.cash).toBeGreaterThan(0);
     expect(state.movedItems).toEqual([]);
   });
 });
@@ -281,7 +289,7 @@ describe('a client ringing in the middle of a move', () => {
   it('takes the fifteen minutes and leaves the clock run through the whole of it', () => {
     let state = inSetup();
     const enquiry = placeEnquiry(state, { price: 4000, deadlineDays: 90 });
-    state = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+    state = acceptNow(state, enquiry.id, false);
     state = doIt(drag(state, 'tableSaw'));
     const move = movingMachines(state);
     expect(move).not.toBeNull();
@@ -314,8 +322,9 @@ describe('the flexi extraction system', () => {
     placeEquipment(state, 'flexiSystem');
     expect(hasCentralExtraction(state)).toBe(true);
     state = drag(drag(state, 'tableSaw'), 'thicknesser');
-    expect(ductingDue(state)).toEqual({ machines: 0, cost: 0 });
+    expect(ductingDue(state)).toEqual({ machines: 0 });
     const cash = state.cash;
+    const pipeLines = state.ledger.filter((entry) => entry.category === 'pipes').length;
     const asked = act(state, { type: 'END_SETUP', speed: 1 });
     // Still two hours of somebody's day, and not a penny of ducting in the question.
     expect(asked.activeEvent?.body).toBe('Moving 2 machines takes 2 h. Do it?');
@@ -324,7 +333,7 @@ describe('the flexi extraction system', () => {
     state = tick(state, 120);
     expect(movingMachines(state)).toBeNull();
     expect(state.cash).toBe(cash);
-    expect(state.ledger.some((entry) => entry.category === 'ducting')).toBe(false);
+    expect(state.ledger.filter((entry) => entry.category === 'pipes')).toHaveLength(pipeLines);
   });
 
   it('has everything the central system has, and the pelletiser works off it', () => {
@@ -374,7 +383,7 @@ describe('a drag that changes nothing', () => {
     expect(away.movedItems).toHaveLength(1);
     const back = act(away, { type: 'MOVE_ITEM', itemId: saw.id, x: from.x, y: from.y });
     expect(back.movedItems).toEqual([]);
-    expect(ductingDue(back)).toEqual({ machines: 0, cost: 0 });
+    expect(ductingDue(back)).toEqual({ machines: 0 });
     // Nothing to carry and nothing to pay for.
     const done = act(back, { type: 'END_SETUP', speed: 1 });
     expect(movePending(done)).toBeNull();

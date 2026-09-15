@@ -20,11 +20,14 @@ import {
 } from './modal';
 
 /** The three tabs, in the order Piotr named them. */
-export type TeamTab = 'workshop' | 'office' | 'management';
+export type TeamTab = 'workshop' | 'office' | 'technical' | 'management';
 
 const TABS: Array<[TeamTab, string]> = [
   ['workshop', 'Workshop'],
   ['office', 'Office'],
+  // The estimator's tab: in this game the price arrives with the enquiry and this person only
+  // makes the list (CLAUDE.md T13 3.8).
+  ['technical', 'Technical'],
   ['management', 'Management'],
 ];
 
@@ -42,6 +45,8 @@ const TRADE_OF_ROLE: Record<WorkerRole, TeamTab> = {
   purchasingClerk: 'office',
   salesman: 'office',
   draftsman: 'office',
+  estimator: 'technical',
+  productionManager: 'management',
 };
 
 export function tradeOf(role: WorkerRole): TeamTab {
@@ -65,6 +70,10 @@ const DUTIES: Record<WorkerRole, string> = {
   purchasingClerk: 'Per job material orders, about sixteen a day.',
   salesman: 'Client calls, and the meeting a big job starts with.',
   draftsman: 'The drawings, at 0.8 of your own speed, in the order the laptop has them.',
+  estimator: 'Reads the drawing and counts the sheets: the material take off, so many a day.',
+  productionManager:
+    'Runs the second shift, assigns the crew, connects the machines, and covers the hall while ' +
+    'you are away. He makes nothing.',
 };
 
 function wageLine(option: HiringOption): string {
@@ -152,15 +161,11 @@ function crewRows(state: GameState, tab: TeamTab): string {
 }
 
 function tabBody(state: GameState, tab: TeamTab): string {
-  if (tab === 'management') {
-    // The chief executive is parked (CLAUDE.md T10 5.2).
-    return emptyLine('Nothing here yet.');
-  }
   const options = hiringOptions(state).filter((option) => tradeOf(option.role) === tab);
   const crew = crewRows(state, tab);
   const management = tab === 'workshop' ? staffManagementMinutes(state) : 0;
   return (
-    `<h3>${tab === 'workshop' ? 'On the floor' : 'At the desks'}</h3>` +
+    `<h3>${tab === 'workshop' ? 'On the floor' : tab === 'management' ? 'Running it' : 'At the desks'}</h3>` +
     (crew === '' ? emptyLine('Nobody yet. Every hour is your own hour.') : crew) +
     (management > 0
       ? `<p class="hint">Managing them costs you ${minutes(management)} a day.</p>`

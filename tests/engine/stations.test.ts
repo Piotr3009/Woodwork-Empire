@@ -17,6 +17,7 @@ import { createTask } from '../../src/engine/tasks';
 import { tick } from '../../src/engine/index';
 import type { GameState } from '../../src/engine/index';
 import {
+  acceptNow,
   act,
   buyStartingKit,
   clearEvents,
@@ -32,7 +33,7 @@ function atTheBench(): GameState {
   let state = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
   state.enquiries = [];
   const enquiry = placeEnquiry(state, { price: 4000, deadlineDays: 90 });
-  state = fillRack(act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false }));
+  state = fillRack(acceptNow(state, enquiry.id, false));
   state = doAllEmails(state);
   firstJob(state).stage = 'ready';
   return act(state, { type: 'WORK_HERE', jobId: null });
@@ -76,7 +77,7 @@ describe('where the owner stands', () => {
     let state = buyStartingKit(newGame());
     state.enquiries = [];
     const enquiry = placeEnquiry(state, { price: 400, deadlineDays: 30 });
-    state = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+    state = acceptNow(state, enquiry.id, false);
     const email = state.tasks.find((task) => task.kind === 'emails');
     state = act(state, { type: 'START_TASK', taskId: email?.id ?? '' });
     expect(state.owner.station).toBe(STATION_OFFICE);

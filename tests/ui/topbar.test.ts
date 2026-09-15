@@ -171,6 +171,8 @@ describe('the plate at the top of the day end summary', () => {
       labourValue: 0,
       workMinutes: 0,
       dayLog: state.owner.dayLog,
+      efficiency: { possible: 0, worked: 0, lost: { noPeople: 0, noMachine: 0, noMaterial: 0, ownerAway: 0 } },
+      nightMinutes: 0,
     });
     expect(html).toContain('Day 3 done');
     expect(html).toContain('370 of 480 min · overtime 0');
@@ -198,8 +200,8 @@ describe('the Orders button, in the game itself', () => {
     press('[data-do="startGame"]');
     press('[data-do="setSpeed"][data-speed="1"]');
     let guard = 0;
-    while (root.querySelector('[data-do="resolveEvent"]') !== null && guard < 50) {
-      press('[data-do="resolveEvent"]');
+    while (root.querySelector('[data-do="closeHouseCard"], [data-do="resolveEvent"]') !== null && guard < 50) {
+      press('[data-do="closeHouseCard"], [data-do="resolveEvent"]');
       guard += 1;
     }
     press('[data-do="openModal"][data-modal="shopping"]');

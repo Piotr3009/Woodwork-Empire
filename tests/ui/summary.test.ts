@@ -9,6 +9,7 @@ import { currentState, mount } from '../../src/ui/app';
 import { daySummaryOf, formatMoney, summaryOfDay, tick } from '../../src/engine/index';
 import type { GameEvent, GameState } from '../../src/engine/index';
 import {
+  acceptNow,
   act,
   buyStartingKit,
   choose,
@@ -170,7 +171,7 @@ describe('the dust the day made', () => {
     const state = fillRack(buyStartingKit(newGame({ difficulty: 'veryEasy' })));
     state.enquiries = [];
     const enquiry = placeEnquiry(state, { price: 4000, deadlineDays: 90 });
-    const accepted = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+    const accepted = acceptNow(state, enquiry.id, false);
     firstJob(accepted).stage = 'ready';
     const cutting = act(accepted, { type: 'WORK_HERE', jobId: firstJob(accepted).id });
     const morning = nextDay(cutting);

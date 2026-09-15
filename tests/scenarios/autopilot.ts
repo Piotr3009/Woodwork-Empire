@@ -2,7 +2,14 @@
 // careful owner would make: advance the jobs, get the material in, then stand at the bench.
 
 import { DAY_END_MINUTE, SOLID_WOOD_EQUIPMENT } from '../../src/engine/constants';
-import { applyAction, helperOnDuty, startTaskCheck, tick } from '../../src/engine/index';
+import {
+  applyAction,
+  helperOnDuty,
+  shortfallOf,
+  startTaskCheck,
+  tick,
+  unconnectedMachines,
+} from '../../src/engine/index';
 import type { GameEvent, GameState, TaskInstance } from '../../src/engine/index';
 
 /** What the script answers when the clock stops for a decision. */
@@ -23,8 +30,9 @@ export function answer(state: GameState, policy?: Policy): string {
   if (event.kind === 'deliveryArrived' && helperOnDuty(state) && ids.includes('later')) {
     return 'later';
   }
-  // The scripted owner is a careful one: he picks the phone up (CLAUDE.md T4 3.3).
-  for (const preferred of ['answer', 'unload', 'owner', 'storage', 'next', 'ok']) {
+  // The scripted owner is a careful one: he picks the phone up (CLAUDE.md T4 3.3), and he takes
+  // the client's number, whatever it is (CLAUDE.md T13 3.24).
+  for (const preferred of ['accept', 'answer', 'unload', 'owner', 'storage', 'next', 'ok']) {
     if (ids.includes(preferred)) return preferred;
   }
   return ids[0] ?? 'ok';
@@ -48,7 +56,7 @@ const TASK_ORDER: TaskInstance['kind'][] = [
   // size (CLAUDE.md T7 3.11).
   'clientMeeting',
   'design',
-  'materialOrder',
+  'materialTakeOff',
   'cleaning',
 ];
 
@@ -256,6 +264,10 @@ export const DAY_ONE_CLASS: Record<string, string> = {
   edgebander: 'budget',
 };
 
+/** The class of anything a month buys beyond the day 1 list: the standard one, which is the one
+ *  class those families had before every family got its five (CLAUDE.md T13 3.12). */
+export const EXTRA_KIT_CLASS = 'standard';
+
 /** The class the script buys for this family: what the month asked for, or the day 1 one. */
 function classFor(specId: string, policy: Policy): string | undefined {
   if (specId === 'tableSaw') return policy.sawVariant;
@@ -275,7 +287,19 @@ function buyKit(state: GameState, policy: Policy): GameState {
     });
   }
   for (const specId of policy.extraKit ?? []) {
-    next = applyAction(next, { type: 'BUY_EQUIPMENT', specId });
+    next = applyAction(next, { type: 'BUY_EQUIPMENT', specId, variantId: EXTRA_KIT_CLASS });
+  }
+  return next;
+}
+
+/** A job whose sheets the rack could not hold is short until they are ordered for it: the careful
+ *  owner presses Order for this job the moment the list is made (CLAUDE.md T13 3.3). */
+function orderShortfalls(state: GameState): GameState {
+  let next = state;
+  for (const job of next.jobs) {
+    if (job.stage !== 'materialPending' || shortfallOf(job) <= 0) continue;
+    if (next.deliveries.some((delivery) => delivery.jobId === job.id && !delivery.unloaded)) continue;
+    next = applyAction(next, { type: 'ORDER_FOR_JOB', jobId: job.id });
   }
   return next;
 }
@@ -313,6 +337,16 @@ function takeOnJoiner(state: GameState, policy: Policy): GameState {
   return next;
 }
 
+/** Every machine off the lorry is put on the extraction the morning it lands, the way a careful
+ *  owner clicks Connect on its card: an unconnected machine is not served (CLAUDE.md T13 3.19). */
+function connectMachines(state: GameState): GameState {
+  let next = state;
+  for (const item of unconnectedMachines(next)) {
+    next = applyAction(next, { type: 'CONNECT_EXTRACTION', equipmentId: item.id });
+  }
+  return next;
+}
+
 /** Works down the wanted list: the dearest template the workshop can make today. */
 function takeWork(state: GameState, policy: Policy): GameState {
   const open = state.jobs.filter((job) => job.stage !== 'completed').length;
@@ -327,15 +361,12 @@ function takeWork(state: GameState, policy: Policy): GameState {
         !enquiry.unreachable,
     );
     if (pick) {
-      const taken = applyAction(state, {
+      // The client answers with a number and the script takes it (CLAUDE.md T13 3.24).
+      return applyAction(state, {
         type: 'ACCEPT_ENQUIRY',
         enquiryId: pick.id,
         byHand: false,
       });
-      if (policy.stockSheets <= 0) return taken;
-      const job = taken.jobs[taken.jobs.length - 1];
-      if (!job) return taken;
-      return applyAction(taken, { type: 'SET_MATERIAL_MODE', jobId: job.id, mode: 'stock' });
     }
   }
   return state;
@@ -379,7 +410,9 @@ export function playDay(
       next = applyAction(next, { type: 'RESOLVE_EVENT', choiceId: answer(next, policy) });
       continue;
     }
+    next = connectMachines(next);
     next = takeWork(next, policy);
+    next = orderShortfalls(next);
     if (next.owner.present && !next.owner.wentHome && next.owner.currentTaskId === null) {
       const onBench = next.jobs.some((job) => job.assignedTo === 'owner');
       if (next.dust > policy.cleanAbove) {

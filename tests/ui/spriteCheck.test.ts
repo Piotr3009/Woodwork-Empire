@@ -54,9 +54,10 @@ describe('the sprite check page', () => {
     expect(names).toContain('compressor.used');
     expect(names).toContain('compressor.industrial');
     expect(names).not.toContain('compressor.standard.standard');
-    // A family with one class still gets no class cell of its own.
-    expect(names).not.toContain('thicknesser.standard');
-    expect(names).toContain('thicknesser');
+    // Every machine family has its five classes from Turn 13 (CLAUDE.md T13 3.12); a line with
+    // one class still gets no class cell of its own.
+    expect(names).toContain('thicknesser.standard');
+    expect(names).not.toContain('airDryer.standard');
     // The air dryer is a line of the catalogue and a key the art side owes a picture for.
     expect(names).toContain('airDryer');
   });

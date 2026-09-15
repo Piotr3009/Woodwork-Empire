@@ -3,7 +3,6 @@
 
 import {
   CENTRAL_EXTRACTION_SPECS,
-  DUCTING_RECONNECT_COST,
   DUST_BANDS,
   DUST_OUTPUT_M3_PER_HOUR,
   EXTRACTOR_BAGS,
@@ -579,10 +578,10 @@ export function ductedMoves(state: GameState): Equipment[] {
   return moved;
 }
 
-/** What the moves the player has made will cost in ducting, and on how many machines. */
-export function ductingDue(state: GameState): { machines: number; cost: number } {
-  const machines = ductedMoves(state).length;
-  return { machines, cost: machines * DUCTING_RECONNECT_COST };
+/** How many of the moves the player has made will want their pipe run again when the kit is
+ *  down: the length is charged at the reconnection, by the metre (CLAUDE.md T13 3.19). */
+export function ductingDue(state: GameState): { machines: number } {
+  return { machines: ductedMoves(state).length };
 }
 
 /** Machines with a bag or a blade, the ones that are serviced and can break down. */

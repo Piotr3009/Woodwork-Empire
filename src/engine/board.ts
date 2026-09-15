@@ -2,9 +2,22 @@
 // (CLAUDE.md 8.8). Reputation decides how many and how dear, tools decide what is greyed out.
 
 import {
+  ANSWER_MAX,
+  ANSWER_MIN,
+  ANSWER_SKEW_ESTIMATOR,
+  ANSWER_SKEW_MAX,
+  ANSWER_SKEW_PER_REPUTATION_TIER,
+  ANSWER_SKEW_SALESMAN,
   BESPOKE_PROBABILITY,
   BOARD_SIZE_BY_TIER,
+  COMMERCIAL_BUDGET_FACTOR_MAX,
+  COMMERCIAL_BUDGET_FACTOR_MIN,
+  COMMERCIAL_MIN_REPUTATION,
+  COMMERCIAL_MIN_STAFF,
+  COMMERCIAL_PROBABILITY,
+  ENQUIRIES_PER_DAY_BY_REPUTATION_TIER,
   EXPIRY_EXPRESS_DAYS,
+  NO_INSURANCE_REASON,
   EXPIRY_STANDARD_DAYS,
   EXPRESS_PRICE_UPLIFT_MAX,
   EXPRESS_PRICE_UPLIFT_MIN,
@@ -32,7 +45,10 @@ import { hasOrOnOrder } from './orders';
 import { workshopRate } from './plan';
 import { reputationTier } from './reputation';
 import { chance, float, int, makeId, pickWeighted } from './rng';
-import type { Enquiry, GameState, ProductTemplate } from './types';
+import { websiteEnquiriesPerWeek, websiteQualityShift } from './website';
+import { coversHeld } from './insurance';
+import type { Enquiry, EnquiryKind, GameState, ProductTemplate } from './types';
+import { isWorkingDay, weekday } from './clock';
 
 /** How many enquiries a company of this standing has waiting [TUNE]. */
 export function boardSizeRange(state: GameState): [number, number] {
@@ -48,9 +64,55 @@ export function expressProbability(): number {
 }
 
 function drawTemplate(state: GameState): ProductTemplate | null {
-  const tier = reputationTier(state.reputation);
+  // The website moves the enquiries drawn up or down the template ladder by a tier, and never
+  // off it (CLAUDE.md T13 3.7).
+  const tier = Math.max(0, Math.min(2, reputationTier(state.reputation) + websiteQualityShift(state)));
   const candidates = templatesForReputation(state.reputation);
   return pickWeighted(state, candidates, (entry) => entry.weightsByTier[tier] ?? 0);
+}
+
+/** A company known well enough, with somebody on the books, is asked about commercial work
+ *  (PIOTR; CLAUDE.md T13 3.15). Whether it can take it is the insurance gate's question. */
+export function qualifiesForCommercial(state: GameState): boolean {
+  return (
+    state.reputation > COMMERCIAL_MIN_REPUTATION && state.workers.length >= COMMERCIAL_MIN_STAFF
+  );
+}
+
+/** The kind an enquiry is drawn as: commercial now and then for a company that qualifies, drawn
+ *  either way so the seeded stream is the same shape (CLAUDE.md T13 3.15). */
+function drawKind(state: GameState): EnquiryKind {
+  const commercial = chance(state, COMMERCIAL_PROBABILITY);
+  return commercial && qualifiesForCommercial(state) ? 'commercial' : 'residential';
+}
+
+/** The skew the team puts on the client's answer: a quarter each for the reputation tier, an
+ *  estimator on the books and a salesman, capped (CLAUDE.md T13 3.24). */
+export function answerSkew(state: GameState): number {
+  const estimator = state.workers.some((worker) => worker.role === 'estimator') ? 1 : 0;
+  const salesman = state.workers.some((worker) => worker.role === 'salesman') ? 1 : 0;
+  const skew =
+    reputationTier(state.reputation) * ANSWER_SKEW_PER_REPUTATION_TIER +
+    estimator * ANSWER_SKEW_ESTIMATOR +
+    salesman * ANSWER_SKEW_SALESMAN;
+  return Math.max(-ANSWER_SKEW_MAX, Math.min(ANSWER_SKEW_MAX, skew));
+}
+
+/** A uniform draw bent towards the top of the band by a positive skew and towards the bottom by
+ *  a negative one, never leaving [0, 1]: u to the power of one over (1 + k) for k above zero
+ *  (CLAUDE.md T13 3.24). The odds shift; nothing is guaranteed. */
+export function skewed(u: number, k: number): number {
+  const clamped = Math.max(0, Math.min(1, u));
+  if (k >= 0) return Math.pow(clamped, 1 / (1 + k));
+  return 1 - Math.pow(1 - clamped, 1 / (1 - k));
+}
+
+/** The client's answer: the budget times a factor drawn in the band, skewed by the team, rounded
+ *  to the nearest ten like every price (PIOTR: minus 10% to plus 15%; CLAUDE.md T13 3.24). */
+export function drawOffer(state: GameState, enquiry: Enquiry): number {
+  const u = float(state, 0, 1);
+  const factor = ANSWER_MIN + (ANSWER_MAX - ANSWER_MIN) * skewed(u, answerSkew(state));
+  return priceFor(enquiry.budget * factor, 1, 0, 1);
 }
 
 function buildEnquiry(state: GameState, entry: ProductTemplate): Enquiry | null {
@@ -80,13 +142,22 @@ function buildEnquiry(state: GameState, entry: ProductTemplate): Enquiry | null 
   });
   const bespokeMaterial = chance(state, BESPOKE_PROBABILITY);
   const expiryDays = express ? EXPIRY_EXPRESS_DAYS : EXPIRY_STANDARD_DAYS;
+  // Commercial work is two to three times the residential budget (CLAUDE.md T13 3.15). The
+  // factor is drawn either way, like the express uplift, so the stream is the same shape.
+  const kind = drawKind(state);
+  const commercial = float(state, COMMERCIAL_BUDGET_FACTOR_MIN, COMMERCIAL_BUDGET_FACTOR_MAX);
+  const scale = kind === 'commercial' ? commercial : 1;
+  const budget = priceFor(price * scale, 1, 0, 1);
   return {
     id: makeId(state, 'enq'),
     templateId: entry.id,
-    name: entry.name,
+    name: kind === 'commercial' ? `${entry.name}, commercial` : entry.name,
     sizeMultiplier: Math.round(sizeMultiplier * 100) / 100,
-    price,
-    basePrice,
+    price: budget,
+    basePrice: priceFor(basePrice * scale, 1, 0, 1),
+    kind,
+    budget,
+    offer: null,
     finish,
     materialKind: entry.material,
     deadlineDays,
@@ -97,8 +168,10 @@ function buildEnquiry(state: GameState, entry: ProductTemplate): Enquiry | null 
     expiresOnDay: state.clock.day + expiryDays - 1,
     lockReason: lockReasonFor(state, entry),
     byHandAvailable: entry.byHandAllowed,
-    unreachable: false,
-    blockReason: '',
+    // Commercial work wants both covers held; without them it is on the board greyed, with the
+    // reason (CLAUDE.md T13 3.15).
+    unreachable: kind === 'commercial' && !coversHeld(state),
+    blockReason: kind === 'commercial' && !coversHeld(state) ? NO_INSURANCE_REASON : '',
     blockWhere: '',
   };
 }
@@ -145,12 +218,27 @@ function drawInto(state: GameState): boolean {
   return true;
 }
 
-/** Tops the board up to what the reputation supports. Runs at the start of every working day. */
-export function refillBoard(state: GameState): void {
-  const [min, max] = boardSizeRange(state);
-  if (reachableEnquiries(state).length >= min) return;
-  const target = int(state, min, max);
-  while (reachableEnquiries(state).length < target) {
+/** New enquiries a day: the reputation tier's figure, and the website's weekly figure spread over
+ *  the working week, so a level that takes one off the week takes it off one day of it and a
+ *  level that adds three adds them on three (CLAUDE.md T13 3.4, 3.7). Never under nothing. */
+export function enquiriesDueToday(state: GameState): number {
+  const tier = reputationTier(state.reputation);
+  const base = ENQUIRIES_PER_DAY_BY_REPUTATION_TIER[
+    Math.min(tier, ENQUIRIES_PER_DAY_BY_REPUTATION_TIER.length - 1)
+  ] ?? 1;
+  const weekly = websiteEnquiriesPerWeek(state);
+  if (weekly === 0 || !isWorkingDay(state.clock.day)) return base;
+  // Monday is day 0 of the week: a weekly plus lands on the first N days, a minus on the last.
+  const dayOfWeek = weekday(state.clock.day);
+  if (weekly > 0) return base + (dayOfWeek < weekly ? 1 : 0);
+  return Math.max(0, base - (dayOfWeek >= 5 + weekly ? 1 : 0));
+}
+
+/** The day's enquiries arrive at the open: so many, drawn into the room the board has. Nothing
+ *  refills the board after an acceptance any more (PIOTR; CLAUDE.md T13 3.4). */
+export function arriveEnquiries(state: GameState): void {
+  const due = enquiriesDueToday(state);
+  for (let drawn = 0; drawn < due; drawn += 1) {
     if (!drawInto(state)) return;
   }
 }
@@ -173,6 +261,7 @@ export function kitBlockFor(state: GameState, entry: ProductTemplate): BoardBloc
   if (state.reputation < entry.minReputation) {
     return { reason: `reputation too low (needs ${entry.minReputation})`, where: '' };
   }
+
   if (entry.material === 'solidWood' && !SOLID_WOOD_EQUIPMENT.every((id) => hasOrOnOrder(state, id))) {
     return { reason: 'no timber machines', where: 'catalogue' };
   }
@@ -254,12 +343,11 @@ export function refillUnreachable(state: GameState): void {
   }
 }
 
-/** The board written again: what nobody took goes, what the standing draws comes in, and the
- *  greyed ones are topped back up. Twice a day, at 08:00 and at 13:00, whether or not anything
- *  was taken (PIOTR, 13.09; CLAUDE.md T10 3.7). */
+/** The board written again: what nobody took goes, and the greyed ones are topped back up. Twice
+ *  a day, at 08:00 and at 13:00 (PIOTR, 13.09; CLAUDE.md T10 3.7). The new enquiries of the day
+ *  arrive at the open through `arriveEnquiries` and not here (CLAUDE.md T13 3.4). */
 export function refreshBoard(state: GameState): void {
   expireEnquiries(state);
-  refillBoard(state);
   refillUnreachable(state);
 }
 
@@ -271,6 +359,20 @@ export function refreshLocks(state: GameState): void {
   for (const enquiry of state.enquiries) {
     const entry = findTemplate(enquiry.templateId);
     enquiry.lockReason = entry ? lockReasonFor(state, entry) : null;
+    // The insurance gate follows the covers: held, and the commercial enquiry joins the band;
+    // dropped, and it is greyed again (CLAUDE.md T13 3.15).
+    if (enquiry.kind === 'commercial') {
+      if (!coversHeld(state)) {
+        enquiry.unreachable = true;
+        enquiry.blockReason = NO_INSURANCE_REASON;
+        enquiry.blockWhere = '';
+        continue;
+      }
+      if (enquiry.blockReason === NO_INSURANCE_REASON) {
+        enquiry.unreachable = false;
+        enquiry.blockReason = '';
+      }
+    }
     if (!enquiry.unreachable || entry === null) continue;
     const block = blockFor(state, entry, enquiry.deadlineDays, enquiry.basePrice);
     if (block === null && reachableEnquiries(state).length < max) {
@@ -286,24 +388,20 @@ export function refreshLocks(state: GameState): void {
   }
 }
 
-/** Drops what nobody took in time, and draws a replacement for each (CLAUDE.md 8.8). */
+/** Drops what nobody took in time. Nothing is drawn in its place: the next ones come in the
+ *  morning (CLAUDE.md T13 3.4). */
 export function expireEnquiries(state: GameState): void {
-  const before = state.enquiries.length;
   state.enquiries = state.enquiries.filter((enquiry) => enquiry.expiresOnDay >= state.clock.day);
-  for (let gone = state.enquiries.length; gone < before; gone += 1) {
-    if (!drawInto(state)) return;
-  }
 }
 
 export function findEnquiry(state: GameState, enquiryId: string): Enquiry | null {
   return state.enquiries.find((enquiry) => enquiry.id === enquiryId) ?? null;
 }
 
-/** Takes an enquiry off the board and draws a new one in its place (CLAUDE.md 8.8). */
+/** Takes an enquiry off the board. Nothing is drawn in its place: the automatic third enquiry
+ *  that refilled the board after an acceptance is gone (PIOTR; CLAUDE.md T13 3.4). */
 export function removeEnquiry(state: GameState, enquiryId: string): void {
-  const before = state.enquiries.length;
   state.enquiries = state.enquiries.filter((enquiry) => enquiry.id !== enquiryId);
-  if (state.enquiries.length < before) drawInto(state);
 }
 
 /** Locked entries can still be taken when the template allows the by hand path (CLAUDE.md 8.8).

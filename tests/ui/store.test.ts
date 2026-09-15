@@ -28,8 +28,8 @@ function has(selector: string): boolean {
 
 function dismissEvents(): void {
   let guard = 0;
-  while (has('[data-do="resolveEvent"]') && guard < 50) {
-    click('[data-do="resolveEvent"]');
+  while (has('[data-do="closeHouseCard"], [data-do="resolveEvent"]') && guard < 50) {
+    click('[data-do="closeHouseCard"], [data-do="resolveEvent"]');
     guard += 1;
   }
 }

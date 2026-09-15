@@ -28,6 +28,7 @@ import {
 } from '../../src/engine/index';
 import type { Equipment, GameState } from '../../src/engine/index';
 import {
+  acceptNow,
   act,
   buyNow,
   buyStartingKit,
@@ -52,7 +53,7 @@ function withSaw(variantId: string): GameState {
   let state = buyStartingKit(newGame({ difficulty: 'veryEasy' }), { sawVariant: variantId });
   state.enquiries = [];
   const enquiry = placeEnquiry(state, { price: 400, name: 'Garage shelves' });
-  state = fillRack(act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false }));
+  state = fillRack(acceptNow(state, enquiry.id, false));
   firstJob(state).stage = 'ready';
   return state;
 }
@@ -104,11 +105,12 @@ describe('every catalogue line is a family', () => {
     expect(TABLE_SAW_VARIANTS.map((variant) => variant.price)).toEqual([
       1800, 5000, 7000, 15000, 25000,
     ]);
-    // The compressor and the extractor got their five classes tonight (CLAUDE.md T10 3.4); the
-    // thicknesser is a family that still has the one synthetic standard class.
-    expect(findSpec('thicknesser')?.variants).toHaveLength(1);
-    expect(findSpec('thicknesser')?.variants[0]?.id).toBe(STANDARD_VARIANT);
-    expect(findSpec('thicknesser')?.variants[0]?.outputFactor).toBe(1);
+    // Every machine family has its five classes from Turn 13 (CLAUDE.md T13 3.12); a line that
+    // is not a machine family, like the air dryer, still has the one synthetic standard class.
+    expect(findSpec('thicknesser')?.variants).toHaveLength(5);
+    expect(findSpec('airDryer')?.variants).toHaveLength(1);
+    expect(findSpec('airDryer')?.variants[0]?.id).toBe(STANDARD_VARIANT);
+    expect(findSpec('airDryer')?.variants[0]?.outputFactor).toBe(1);
   });
 
   it('gives the extractor and the compressor the five classes of Turn 10', () => {
@@ -263,8 +265,9 @@ describe('what a class of saw does to the life of the machine', () => {
     expect(enduranceHoursFor('compressor', STANDARD_VARIANT)).toBeCloseTo(200000 / 60, 6);
     expect(enduranceHoursFor('compressor', 'used')).toBe(1000);
     expect(enduranceHoursFor('compressor', 'industrial')).toBeCloseTo(800000 / 60, 6);
-    // A family with no minutes of its own still reads the family hours and the class ladder.
-    expect(enduranceHoursFor('thicknesser', STANDARD_VARIANT)).toBe(2500);
+    // A family with no minutes of its own still reads the family hours and the class ladder,
+    // which follows the saw's: the standard class has 1.2 of the family's hours (T13 3.12).
+    expect(enduranceHoursFor('thicknesser', STANDARD_VARIANT)).toBe(2500 * 1.2);
   });
 
   it('runs the hours down as the bench works, and calls it worn out at the end', () => {

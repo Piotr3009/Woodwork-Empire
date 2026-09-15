@@ -20,6 +20,7 @@ import {
 import { tick } from '../../src/engine/index';
 import type { GameState, ProductTemplate, Worker } from '../../src/engine/index';
 import {
+  acceptNow,
   act,
   buyNow,
   clearEvents,
@@ -57,6 +58,8 @@ function staff(id: string, role: Worker['role'], monthlyWage: number): Worker {
     station: 'idle',
     productionMinutes: 0,
     absentDaysRemaining: 0,
+    shift: 'day',
+    dayLog: [],
     anchorX: 0,
     anchorY: 0,
   };
@@ -83,10 +86,14 @@ describe('minute curves', () => {
   it('cuts unloading with a forklift', () => {
     const plain = newGame({ difficulty: 'veryEasy' });
     expect(unloadMinutes(plain)).toBe(45);
+    // PIOTR's three figures of CLAUDE.md T13 3.21: 45 by hand, about 30 with a pallet truck,
+    // about 15 with a forklift; the better forklift is [TUNE].
+    const truck = buyNow(plain, 'palletTruck');
+    expect(unloadMinutes(truck)).toBe(30);
     const forklift = buyNow(plain, 'forklift');
-    expect(unloadMinutes(forklift)).toBe(23);
+    expect(unloadMinutes(forklift)).toBe(15);
     const better = buyNow(forklift, 'forkliftBetter');
-    expect(unloadMinutes(better)).toBe(9);
+    expect(unloadMinutes(better)).toBe(10);
   });
 
   it('charges 10 minutes a joiner a day for management', () => {
@@ -104,13 +111,14 @@ describe('the daily list', () => {
     // Emails belong to a job now, so an empty order book means no emails (CLAUDE.md T2 3.5).
     expect(tasksOfKind(state, 'emails')).toHaveLength(0);
     expect(tasksOfKind(state, 'bookkeeping')).toHaveLength(1);
-    expect(tasksOfKind(state, 'dailyOrdering')).toHaveLength(0);
+    // The consumables and materials chore lands every day, projects or none (CLAUDE.md T13 3.3).
+    expect(tasksOfKind(state, 'dailyOrdering')).toHaveLength(1);
     const day2 = clearEvents(tick(state, 600));
     expect(tasksOfKind(day2, 'bookkeeping')).toHaveLength(1);
     expect(day2.tasks.filter((task) => task.kind === 'bookkeeping')).toHaveLength(1);
   });
 
-  it('adds the daily ordering only while there are jobs on the books', () => {
+  it('puts the consumables and materials chore on the desk with a job on the books too', () => {
     const state = newGame();
     state.jobs.push({
       id: 'job-test',
@@ -122,9 +130,13 @@ describe('the daily list', () => {
       finish: 'laminate',
       materialKind: 'sheet',
       materialCost: 160,
-      materialMode: 'perJob',
       sheets: 2,
       sheetsUsed: 0,
+      sheetsReserved: 0,
+      kind: 'residential',
+      budget: 400,
+      nightMinutes: 0,
+      needsSpindle: false,
       blockedBy: '',
       bespokeMaterial: false,
       express: false,
@@ -303,7 +315,7 @@ describe('emails scale with what the job is worth (CLAUDE.md T3 3.2)', () => {
     let state = withLicence(newGame());
     state.enquiries = [];
     const enquiry = placeEnquiry(state, { price: 900, name: 'Bookcase' });
-    state = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+    state = acceptNow(state, enquiry.id, false);
     const emails = state.tasks.filter((task) => task.kind === 'emails');
     expect(emails).toHaveLength(1);
     expect(emails.every((task) => task.minutesTotal === 10)).toBe(true);

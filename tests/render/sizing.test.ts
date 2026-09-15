@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { renderHall } from '../../src/render/hall';
 import { renderLaptop } from '../../src/ui/laptop';
 import { TILE_HEIGHT, TILE_WIDTH } from '../../src/render/iso';
-import { act, buyStartingKit, firstJob, newGame, placeEnquiry } from '../helpers';
+import { acceptNow, buyStartingKit, firstJob, newGame, placeEnquiry } from '../helpers';
 
 function box(svg: string): { width: number; height: number; boxWidth: number; boxHeight: number } {
   const viewBox = svg.match(/viewBox="(-?\d+) (-?\d+) (\d+) (\d+)"/);
@@ -43,7 +43,7 @@ describe('a job name is printed once', () => {
     let state = buyStartingKit(newGame());
     state.enquiries = [];
     const enquiry = placeEnquiry(state, { price: 580, name: 'Garage shelves' });
-    state = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+    state = acceptNow(state, enquiry.id, false);
     firstJob(state).stage = 'ready';
     const html = renderLaptop(state, { tab: 'tasks', stockSheets: '6' });
     // Every row carries the name at most once.

@@ -6,6 +6,7 @@ import { renderHall } from '../../src/render/hall';
 import { machineInUse, tick } from '../../src/engine/index';
 import type { Equipment, GameState } from '../../src/engine/index';
 import {
+  acceptNow,
   act,
   buyNow,
   buyStartingKit,
@@ -27,7 +28,7 @@ function ready(): GameState {
   let state = buyStartingKit(newGame({ difficulty: 'veryEasy' }), { sawVariant: 'budget' });
   state.enquiries = [];
   const enquiry = placeEnquiry(state, { price: 400, name: 'Garage shelves' });
-  state = fillRack(act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false }));
+  state = fillRack(acceptNow(state, enquiry.id, false));
   firstJob(state).stage = 'ready';
   return clearEvents(state);
 }

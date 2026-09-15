@@ -19,6 +19,7 @@ import type { StagedJob } from '../../src/engine/stages';
 import { tick } from '../../src/engine/index';
 import type { GameState } from '../../src/engine/index';
 import {
+  acceptNow,
   act,
   buyStartingKit,
   firstJob,
@@ -36,6 +37,7 @@ function jobOfMinutes(minutes: number, options: Partial<StagedJob> = {}): Staged
     materialKind: 'sheet',
     finish: 'laminate',
     byHand: false,
+    needsSpindle: false,
     ...options,
   };
 }
@@ -153,7 +155,7 @@ describe('where a job has got to', () => {
   function jobInHall(): GameState {
     const state = hallWithSaw('budget');
     const enquiry = placeEnquiry(state, { price: 400, name: 'Garage shelves' });
-    const next = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+    const next = acceptNow(state, enquiry.id, false);
     firstJob(next).stage = 'ready';
     return next;
   }

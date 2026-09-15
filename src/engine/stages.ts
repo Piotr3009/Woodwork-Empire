@@ -26,6 +26,9 @@ export interface StagedJob {
   materialKind: MaterialKind;
   finish: Finish;
   byHand: boolean;
+  /** The machining is done on the spindle moulder: a handleless kitchen's J profile, a sprayed
+   *  kitchen's fronts (CLAUDE.md T13 3.13). */
+  needsSpindle: boolean;
 }
 
 /** One stage of one job: the share of the labour it carries, where that share sits in the job,
@@ -91,7 +94,10 @@ export function cncOptions(
 export function familyForStage(job: StagedJob, stage: StageId): string | null {
   if (stage === 'cnc') return 'cnc';
   if (stage === 'cutting') return 'tableSaw';
-  if (stage === 'machining') return job.materialKind === 'sheet' ? 'edgebander' : 'solidWoodTools';
+  if (stage === 'machining') {
+    if (job.needsSpindle) return 'spindleMoulder';
+    return job.materialKind === 'sheet' ? 'edgebander' : 'solidWoodTools';
+  }
   if (stage === 'assembly') return 'workbench';
   if (stage === 'finishing') return job.finish === 'lacquer' ? 'sprayBooth' : null;
   return null;

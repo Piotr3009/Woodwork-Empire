@@ -19,6 +19,7 @@ import {
   playUntilDay,
 } from './autopilot';
 import {
+  acceptNow,
   CREW,
   act,
   clearEvents,
@@ -36,7 +37,6 @@ import {
   BREAK_SKIP_FACTOR,
   BREAK_START_MINUTE,
   DAY_END_MINUTE,
-  DUCTING_RECONNECT_COST,
   LABOUR_FACTOR_FLOOR,
   LATE_ACCOUNTS_CHARGE,
   MINUTES_PER_WORKING_DAY,
@@ -157,15 +157,17 @@ describe('30 days on Easy, working the board', () => {
     expect(state.finance.arrearsAmount).toBe(0);
   });
 
-  it('ends above the reputation it started on, on five jobs out of the door', () => {
+  it('ends above the reputation it started on, on seven jobs out of the door', () => {
     // Turn 6 works the deadline out from the work in the job, and a one man shop that takes the
     // next job the day the last one goes out delivers some of them late. Counting the deadline in
     // working days gives every job the weekends back (T10 3.5), and the board is a quarter
     // express at 0.6 of the standard deadline (T10 3.7), which takes some of that back again.
-    // The month ends at six on five jobs where Turn 9 ended under ten on three. Measured.
+    // Turn 13 brings one enquiry a day and takes the client's number (T13 3.4, 3.24): the script
+    // takes what the post brings, none of it express in this seed, and delivers seven on time
+    // where Turn 12 delivered five with some of them late. Measured, not tuned.
     expect(state.reputation).toBeGreaterThan(0);
-    expect(state.reputation).toBeCloseTo(6, 6);
-    expect(state.jobs.filter((job) => job.stage === 'completed')).toHaveLength(5);
+    expect(state.reputation).toBeCloseTo(21, 6);
+    expect(state.jobs.filter((job) => job.stage === 'completed')).toHaveLength(7);
   });
 
   it('took bookcases and finished most of them', () => {
@@ -461,7 +463,10 @@ describe('a month short handed, with a joiner and one small rack', () => {
   it('reaches the end of the month still trading', () => {
     expect(state.gameOver).toBeNull();
     expect(state.clock.day).toBe(32);
-    expect(state.cash).toBeGreaterThan(0);
+    // Under zero and inside the overdraft: every sheet the eight in stock could not hold for a
+    // job was bought for it at the ad hoc price, and whole sheets at 200 cost more than the 0.40
+    // of the price they used to (CLAUDE.md T13 3.3). Measured, not tuned.
+    expect(state.cash).toBeGreaterThan(state.finance.overdraftLimit);
   });
 
   it('took a poor joiner on and bought the shelving', () => {
@@ -471,12 +476,15 @@ describe('a month short handed, with a joiner and one small rack', () => {
     expect(state.equipment.some((item) => item.specId === 'sheetRack')).toBe(true);
   });
 
-  it('ran the rack dry and the joiners stood around laughing', () => {
-    const laughing = eventsOfKind(seen, 'noMaterial');
-    expect(laughing.length).toBeGreaterThanOrEqual(1);
-    expect(laughing[0]?.body).toContain('standing around laughing');
-    // Once a day and no more, so it cannot outnumber the days that were played.
-    expect(laughing.length).toBeLessThanOrEqual(eventsOfKind(seen, 'dayEnd').length);
+  it('never ran the rack dry, because a job only starts with its sheets held for it', () => {
+    // The stock question is gone: a job holds its sheets from the free stock when it is taken,
+    // and what the rack cannot hold is red on the card until it is ordered for the job. Nobody
+    // stands at a bench with nothing to cut (CLAUDE.md T13 3.3, 3.6).
+    expect(eventsOfKind(seen, 'noMaterial')).toHaveLength(0);
+    const held = state.jobs.reduce((total, job) => total + job.sheetsReserved, 0);
+    expect(held).toBeLessThanOrEqual(state.stock.sheets);
+    expect(state.ledger.filter((entry) => entry.label.startsWith('Material for')).length)
+      .toBeGreaterThan(0);
   });
 
   it('ordered transport more than twice and was paid for what went out', () => {
@@ -537,7 +545,10 @@ describe('a month that shifts two machines on day 3', () => {
   it('asks before it books it, and only about the machine', () => {
     expect(day3.clock.day).toBe(3);
     expect(asked.activeEvent?.kind).toBe('moveConfirm');
-    expect(asked.activeEvent?.body).toBe('Moving 1 machine takes 1 h and £800 of ducting. Do it?');
+    expect(asked.activeEvent?.body).toBe(
+      'Moving 1 machine takes 1 h and the extraction pipe of 1 machine run again at the new ' +
+        'length. Do it?',
+    );
     expect(asked.movedItems).toHaveLength(1);
     expect(movingMachines(asked)).toBeNull();
   });
@@ -573,19 +584,22 @@ describe('a month that shifts two machines on day 3', () => {
     expect(act(at, { type: 'SET_SPEED', speed: 1 }).speed).toBe(1);
   });
 
-  it('charges the ducting when the kit is back down, one line a ducted machine', () => {
+  it('runs the pipe again when the kit is back down, one line a ducted machine', () => {
     let at = shifted;
     let guard = 0;
     while (movingMachines(at) !== null && guard < 600) {
       at = clearEvents(tick(at, 1));
       guard += 1;
     }
-    const lines = at.ledger.filter((entry) => entry.category === 'ducting');
+    const before = shifted.ledger.filter((entry) => entry.category === 'pipes').length;
+    const lines = at.ledger.filter((entry) => entry.category === 'pipes').slice(before);
     expect(lines).toHaveLength(1);
-    expect(lines.map((entry) => entry.label)).toEqual(['Ducting reconnection: table saw']);
-    // The ducting is the whole of what the move cost: no other money moved in those two hours.
-    expect(lines.reduce((total, entry) => total - entry.amount, 0)).toBe(DUCTING_RECONNECT_COST);
-    expect(cashBefore - at.cash).toBe(DUCTING_RECONNECT_COST);
+    expect(lines[0]?.label.startsWith('Extraction pipe: table saw')).toBe(true);
+    // The pipe is the whole of what the move cost: no other money moved in those two hours
+    // (CLAUDE.md T13 3.19).
+    const cost = lines.reduce((total, entry) => total - entry.amount, 0);
+    expect(cost).toBeGreaterThan(0);
+    expect(cashBefore - at.cash).toBe(cost);
     expect(at.movedItems).toEqual([]);
   });
 
@@ -594,7 +608,8 @@ describe('a month that shifts two machines on day 3', () => {
     expect(month.gameOver).toBeNull();
     expect(month.clock.day).toBe(31);
     expect(month.cash).toBeGreaterThan(0);
-    expect(month.ledger.filter((entry) => entry.category === 'ducting')).toHaveLength(1);
+    // The saw's pipe on the morning it landed, and again after the move.
+    expect(month.ledger.filter((entry) => entry.category === 'pipes')).toHaveLength(2);
     expect(month.jobs.filter((job) => job.stage === 'completed').length).toBeGreaterThanOrEqual(2);
   });
 });
@@ -651,8 +666,9 @@ describe('a day with a break, played by the script', () => {
     // with the day still to go: one job at a time, and this one was finished (CLAUDE.md T9 3.1).
     // It was 473 while the small compressor was a two hour lorry job; the used class the day 1
     // shopping buys is light now, so two hours of the gate are gone (CLAUDE.md T10 3.4), and the
-    // board he works from is drawn differently again (T10 3.7). Measured, not tuned.
-    expect(last?.owner.minutesWorked).toBe(368);
+    // board he works from is drawn differently again (T10 3.7), and differently again with one
+    // enquiry a day and the client's number (T13 3.4, 3.24). Measured, not tuned.
+    expect(last?.owner.minutesWorked).toBe(332);
     expect(last?.owner.minutesWorked).toBeLessThanOrEqual(MINUTES_PER_WORKING_DAY);
     expect(last?.owner.overtimeMinutes).toBe(0);
     const idle = states.filter(
@@ -775,7 +791,7 @@ describe('a month with a job worth twenty five thousand on the books', () => {
     const start = withLicence(newGame({ seed: SEED, difficulty: 'veryEasy' }));
     start.enquiries = [];
     const enquiry = placeEnquiry(start, { price: 25000, deadlineDays: 60 });
-    const taken = act(start, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+    const taken = acceptNow(start, enquiry.id, false);
     const job = taken.jobs[0];
     expect(job?.price).toBeGreaterThan(MEETING_PRICE_THRESHOLD);
     const meeting = taken.tasks.find((task) => task.kind === 'clientMeeting');
@@ -889,7 +905,7 @@ describe('a month of six joiners behind two saws', () => {
   });
 });
 
-describe('a month of six joiners behind two saws on the day 1 fan alone', () => {
+describe('a month of a full crew behind two saws on the day 1 fan alone', () => {
   const seen: GameEvent[] = [];
   const state = playUntilDay(
     newGame({ seed: SEED, difficulty: 'veryEasy' }),
@@ -898,14 +914,23 @@ describe('a month of six joiners behind two saws on the day 1 fan alone', () => 
     seen,
   );
 
-  it('fills the one bag more than once in the month, and the owner empties it himself each time', () => {
+  it('is three joiners and not six, because the floor has no room for more', () => {
+    // The script asks for six and the hall says no: two saws, their zones and every man's bench
+    // and cabinets leave floor for the owner and three (PIOTR; CLAUDE.md T13 3.10).
+    expect(state.workers.filter((worker) => worker.role === 'joiner')).toHaveLength(3);
+    expect(missingForHire(state, 'joiner')).toEqual([]);
+    const blocked = state.workers.length;
+    expect(blocked).toBeLessThan(6);
+  });
+
+  it('fills the one bag in the month, and the owner empties it himself each time', () => {
     // No helper in this hall, so the question comes to the owner, once a fill and never once a
     // machine, and the careful owner takes it (CLAUDE.md T12 2.3). One bag, both saws feeding it.
     const store = bagStore(state);
     expect(store).toMatchObject({ exists: true, bags: 1, capacityM3: 1 });
     expect(store.fillM3).toBeLessThanOrEqual(store.capacityM3);
     const fills = seen.filter((event) => event.kind === 'bagsFull');
-    expect(fills.length).toBeGreaterThan(1);
+    expect(fills.length).toBeGreaterThanOrEqual(1);
     for (const event of fills) expect(event.title).toBe('Bags full in the workshop');
     const emptied = state.tasks.filter((task) => task.kind === 'emptyBags');
     expect(emptied).toHaveLength(fills.length);
@@ -927,9 +952,10 @@ describe('a month that orders a CNC on day 1 and calls it off on day 10', () => 
   const seen: GameEvent[] = [];
   const start = act(newGame({ seed: SEED, difficulty: 'veryEasy' }), { type: 'SET_SPEED', speed: 1 });
   const cashAtFirst = start.cash;
+  // The standard CNC: the family has its five classes from Turn 13 (CLAUDE.md T13 3.12).
   const ordered = act(
     act(start, { type: 'BUY_EQUIPMENT', specId: 'extractor' }),
-    { type: 'BUY_EQUIPMENT', specId: 'cnc' },
+    { type: 'BUY_EQUIPMENT', specId: 'cnc', variantId: 'standard' },
   );
   const day10 = playUntilDay(ordered, 10, IDLE, seen);
 
@@ -957,7 +983,7 @@ describe('a month that orders a CNC on day 1 and calls it off on day 10', () => 
     expect(cancelled.cash - before).toBe(45000);
     expect(cancelled.onOrder).toHaveLength(0);
     const line = cancelled.ledger[cancelled.ledger.length - 1];
-    expect(line?.label).toBe('Order cancelled: CNC');
+    expect(line?.label).toBe('Order cancelled: Standard CNC');
     expect(line?.amount).toBe(45000);
     // And the floor it was holding is free for anything else.
     expect(firstFreeCell(cancelled, 'cnc', 'standard')).not.toBeNull();
@@ -1041,14 +1067,19 @@ describe('a month that drops a job on day 15', () => {
   // is drawn differently in Turn 10, with the express uplift and the greyed enquiries in the same
   // seeded stream, and the second job of this month is on the books on the Monday of week 3.
   const seen: GameEvent[] = [];
-  const day8 = playUntilDay(newGame({ seed: SEED, difficulty: 'veryEasy' }), 15, CAREFUL, seen);
+  let day8 = playUntilDay(newGame({ seed: SEED, difficulty: 'veryEasy' }), 15, CAREFUL, seen);
+  // One enquiry a day now, and the careful script takes one job at a time, so the books can be
+  // bare on the fifteenth: the month plays on to the first morning with a job on them (T13 3.4).
+  while (!day8.jobs.some((entry) => entry.stage !== 'completed') && day8.clock.day < 30) {
+    day8 = playDay(day8, CAREFUL, seen);
+  }
   const job = day8.jobs.find((entry) => entry.stage !== 'completed');
   const cashBefore = day8.cash;
   const reputationBefore = day8.reputation;
   const dropped = job === undefined ? day8 : act(day8, { type: 'DROP_JOB', jobId: job.id });
 
-  it('has a job on the books on day 15 with a deposit paid on it', () => {
-    expect(day8.clock.day).toBe(15);
+  it('has a job on the books in the second half of the month with a deposit paid on it', () => {
+    expect(day8.clock.day).toBeGreaterThanOrEqual(15);
     expect(job).toBeDefined();
     expect(job?.depositPaid ?? 0).toBeGreaterThan(0);
   });
@@ -1078,7 +1109,7 @@ describe('a month that drops a job on day 15', () => {
     const logged = dropped.reputationLog[dropped.reputationLog.length - 1];
     expect(logged?.reason).toBe(`Dropped: ${job?.name}`);
     expect(logged?.points).toBe(-DROP_PROJECT_REPUTATION);
-    expect(logged?.day).toBe(15);
+    expect(logged?.day).toBe(day8.clock.day);
     // And the board reads it back under the week it happened in.
     const week = weeksOf(dropped)[0];
     expect(week?.entries.some((entry) => entry.reason === `Dropped: ${job?.name}`)).toBe(true);
@@ -1143,8 +1174,11 @@ describe('a month of two men on a fan too small for them', () => {
     const worked = short.state.jobs.reduce((total, job) => total + job.productionMinutes, 0);
     expect(worked).toBeGreaterThan(0);
     expect(dusty).toBeGreaterThan(0);
-    // And the hall with the bigger fan never had one.
-    expect(fine.state.jobs.reduce((total, job) => total + job.dustyMinutes, 0)).toBe(0);
+    // And the hall with the bigger fan never had one, bar the minutes between a machine coming
+    // off the lorry and the click that puts it on the extraction: an unconnected machine is not
+    // served, and the script clicks once a step (CLAUDE.md T13 3.19).
+    expect(fine.state.jobs.reduce((total, job) => total + job.dustyMinutes, 0))
+      .toBeLessThanOrEqual(30);
     expect(fine.state.jobs.reduce((total, job) => total + job.productionMinutes, 0))
       .toBeGreaterThan(0);
   });
@@ -1210,11 +1244,16 @@ describe('a month with a helper, where the owner never unloads', () => {
       expect(task.doneBy, `${task.kind} ${task.label}`).not.toBe('owner');
       if (task.doneBy !== null) expect(task.doneBy, task.kind).toBe(helper?.id);
     }
-    // And not a minute of his day went on any of them, on any day of the month.
+    // And not a minute of his day went on any of them, on any day of the month: the spanner
+    // minutes in his log are the repair of the extractor, which is nobody's but his.
     const fixing = state.days
       .flatMap((day) => day.dayLog)
-      .filter((entry) => entry.category === 'fixing');
-    expect(fixing).toEqual([]);
+      .filter((entry) => entry.category === 'fixing')
+      .reduce((total, entry) => total + entry.minutes, 0);
+    const spanner = state.tasks
+      .filter((task) => task.doneBy === 'owner' && (task.kind === 'repair' || task.kind === 'service'))
+      .reduce((total, task) => total + task.minutesTotal, 0);
+    expect(fixing).toBe(spanner);
   });
 
   it('never put the van in front of him at all, because it was dealt with first', () => {

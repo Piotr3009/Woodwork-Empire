@@ -20,7 +20,7 @@ import { startTaskCheck } from '../../src/engine/tasks';
 import { tick } from '../../src/engine/index';
 import type { GameState, Worker, WorkerRole } from '../../src/engine/index';
 import {
-  act,
+  acceptNow,
   buyStartingKit,
   clearEvents,
   doTask,
@@ -37,9 +37,8 @@ function jobOf(price: number, extra: Partial<GameState> = {}): GameState {
   Object.assign(state, extra);
   // Shelves, so the drawing is half an hour and the day has room for what the test is about.
   const enquiry = placeEnquiry(state, { price, deadlineDays: 90 });
-  state = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+  state = acceptNow(state, enquiry.id, false);
   // Ordered per job: the clerk and the admin are what these tests are about.
-  for (const job of state.jobs) job.materialMode = 'perJob';
   return state;
 }
 
@@ -82,6 +81,8 @@ function staff(role: WorkerRole, id: string): Worker {
     station: 'idle',
     productionMinutes: 0,
     absentDaysRemaining: 0,
+    shift: 'day',
+    dayLog: [],
     anchorX: 1,
     anchorY: 1,
   };
@@ -191,29 +192,27 @@ describe('the office admin covering for a specialist', () => {
     expect(done.workers[1]?.minutesWorked).toBe(CLIENT_CALL_ANSWER_MINUTES);
   });
 
-  it('puts a per job material order through at twice the clerk minutes', () => {
+  it('leaves the material take off to the owner: it is not office work she covers', () => {
+    // The take off is the estimator's job, and the owner's until one is hired (CLAUDE.md T13 3.8).
     let state = onlyJobOf(4000);
     state.workers.push(staff('officeAdmin', 'admin-1'));
     state = doTask(state, 'design');
-    const order = state.tasks.find((task) => task.kind === 'materialOrder');
-    expect(order?.minutesTotal).toBe(MATERIAL_ORDER_MINUTES_LOW);
-    const before = state.workers[0]?.minutesWorked ?? 0;
-    const worked = run(state, MATERIAL_ORDER_MINUTES_LOW / ADMIN_COVER_RATE + 60);
-    expect(worked.tasks.find((task) => task.kind === 'materialOrder')?.done).toBe(true);
-    // Thirty clerk minutes is sixty of his, which is about eight orders in a day of 480.
-    expect((worked.workers[0]?.minutesWorked ?? 0) - before).toBeGreaterThanOrEqual(
-      MATERIAL_ORDER_MINUTES_LOW / ADMIN_COVER_RATE,
-    );
-    expect(Math.floor(480 / (MATERIAL_ORDER_MINUTES_LOW / ADMIN_COVER_RATE))).toBe(8);
+    const takeOff = state.tasks.find((task) => task.kind === 'materialTakeOff');
+    expect(takeOff?.minutesTotal).toBe(MATERIAL_ORDER_MINUTES_LOW);
+    const worked = run(state, 60);
+    const later = worked.tasks.find((task) => task.kind === 'materialTakeOff');
+    expect(later?.doneBy).toBeNull();
+    expect(later?.done).toBe(false);
+    expect(startTaskCheck(worked, later?.id ?? '').ok).toBe(true);
   });
 
-  it('gives the order back to the purchasing clerk the day he is taken on', () => {
+  it('gives the take off to the estimator the day he is taken on', () => {
     let state = onlyJobOf(4000);
     state.workers.push(staff('officeAdmin', 'admin-1'));
-    state.workers.push(staff('purchasingClerk', 'clerk-1'));
+    state.workers.push(staff('estimator', 'est-1'));
     state = doTask(state, 'design');
     state = clearEvents(tick(state, 1));
-    const order = state.tasks.find((task) => task.kind === 'materialOrder');
-    expect(order?.doneBy).toBe('clerk-1');
+    const takeOff = state.tasks.find((task) => task.kind === 'materialTakeOff');
+    expect(takeOff?.doneBy).toBe('est-1');
   });
 });

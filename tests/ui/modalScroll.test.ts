@@ -29,8 +29,8 @@ function body(modalId: string): HTMLElement {
 /** Answers whatever the engine is asking, the way a player clicks on. */
 function dismissEvents(): void {
   let guard = 0;
-  while (root().querySelector('[data-do="resolveEvent"]') !== null && guard < 50) {
-    click('[data-do="resolveEvent"]');
+  while (root().querySelector('[data-do="closeHouseCard"], [data-do="resolveEvent"]') !== null && guard < 50) {
+    click('[data-do="closeHouseCard"], [data-do="resolveEvent"]');
     guard += 1;
   }
 }

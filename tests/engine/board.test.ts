@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   BOARD_SIZE_BY_TIER,
+  ENQUIRIES_PER_DAY_BY_REPUTATION_TIER,
   DEADLINE_DAYS_BASE,
   DEADLINE_DAYS_FACTOR,
   DEADLINE_DAYS_MAX,
@@ -24,7 +25,7 @@ import {
   expressProbability,
   generateEnquiry,
   reachableEnquiries,
-  refillBoard,
+  arriveEnquiries,
   refreshBoard,
   removeEnquiry,
   unreachableEnquiries,
@@ -155,12 +156,12 @@ describe('the board over time', () => {
     expect(boardSizeRange(state)).toEqual(BOARD_SIZE_BY_TIER[2]);
   });
 
-  it('starts day 1 with two or three enquiries, all greyed out', () => {
+  it('starts day 1 with the morning post of the lowest tier, greyed out', () => {
     const state = newGame();
-    const [min, max] = BOARD_SIZE_BY_TIER[1] ?? [2, 3];
+    // One a day at the very start: the board is no longer filled to its size (PIOTR; CLAUDE.md
+    // T13 3.4).
     const open = reachableEnquiries(state);
-    expect(open.length).toBeGreaterThanOrEqual(min);
-    expect(open.length).toBeLessThanOrEqual(max);
+    expect(open.length).toBe(ENQUIRIES_PER_DAY_BY_REPUTATION_TIER[1]);
     for (const enquiry of open) {
       expect(enquiry.lockReason).not.toBeNull();
       expect(canAccept(state, enquiry).ok).toBe(false);
@@ -188,6 +189,9 @@ describe('the board over time', () => {
       sizeMultiplier: 1,
       price: 12000,
       basePrice: 12000,
+      kind: 'residential',
+      budget: 12000,
+      offer: null,
       finish: 'laminate',
       materialKind: 'solidWood',
       deadlineDays: 50,
@@ -218,6 +222,9 @@ describe('the board over time', () => {
       sizeMultiplier: 1,
       price: 480,
       basePrice: 400,
+      kind: 'residential',
+      budget: 480,
+      offer: null,
       finish: 'laminate',
       materialKind: 'sheet',
       deadlineDays: 12,
@@ -249,15 +256,16 @@ describe('the board over time', () => {
     const first = reachableEnquiries(state)[0];
     expect(first).toBeDefined();
     removeEnquiry(state, first?.id ?? '');
-    // CLAUDE.md 8.8: after an enquiry is taken or expires, the board draws a new one.
-    expect(state.enquiries.length).toBe(before);
+    // The automatic third enquiry that refilled the board after an acceptance is gone: the next
+    // ones come in the morning (PIOTR; CLAUDE.md T13 3.4).
+    expect(state.enquiries.length).toBe(before - 1);
     expect(state.enquiries.some((enquiry) => enquiry.id === first?.id)).toBe(false);
   });
 
   it('tops an empty board back up in the morning', () => {
     const state = newGame();
     state.enquiries = [];
-    refillBoard(state);
+    arriveEnquiries(state);
     expect(reachableEnquiries(state).length).toBeGreaterThanOrEqual(1);
   });
 
@@ -346,7 +354,7 @@ describe('express, properly profitable (CLAUDE.md T10 3.7)', () => {
     for (let day = 1; day <= 7; day += 1) {
       state.clock.day = day;
       state.enquiries = [];
-      refillBoard(state);
+      arriveEnquiries(state);
       const open = reachableEnquiries(state);
       express += open.filter((enquiry) => enquiry.express).length;
       total += open.length;

@@ -1,7 +1,7 @@
 // Where things stand on the hall floor. Pure geometry over the state, so the setup view can ask
 // before it drops and the catalogue can ask before it buys (CLAUDE.md T2 3.10).
 
-import { GATE_LANE, ROOM_LAYOUT } from './constants';
+import { GATE_LANE, M2_PER_PERSON, ROOM_LAYOUT } from './constants';
 import { findSpec, itemStandsInTheHall, standsInTheHall, zoneOf } from './machines';
 import { reservedItems } from './orders';
 import type { Equipment, GameState, OnOrderItem } from './types';
@@ -186,6 +186,30 @@ export function moveItem(
     }
   }
   return OK;
+}
+
+/** The floor nothing stands on: the hall's area less every room, the gate lane and the working
+ *  zone of everything placed or held for a delivery, in square metres (CLAUDE.md T13 3.10). */
+export function freeFloorM2(state: GameState): number {
+  let taken = 0;
+  for (const room of ROOM_LAYOUT) taken += room.width * room.depth;
+  const lane = gateLane();
+  taken += lane.width * lane.depth;
+  for (const item of hallItems(state)) {
+    const box = boxOfItem(item, item.anchorX, item.anchorY);
+    taken += box.width * box.depth;
+  }
+  for (const item of reservedItems(state)) {
+    const box = boxOfItem(item, item.anchorX, item.anchorY);
+    taken += box.width * box.depth;
+  }
+  return Math.max(0, state.unit.widthCells * state.unit.depthCells - taken);
+}
+
+/** How many people the floor has room for, the owner among them: one per so many square metres
+ *  of free floor (PIOTR; CLAUDE.md T13 3.10). */
+export function crewLimit(state: GameState): number {
+  return Math.floor(freeFloorM2(state) / M2_PER_PERSON);
 }
 
 /** The first cell, reading along each row in turn, where a thing of this kind fits. */

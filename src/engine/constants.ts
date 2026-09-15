@@ -10,15 +10,24 @@ import type {
   EquipmentVariant,
   EquipmentTab,
   Finish,
+  LostMinuteCause,
   MaterialKind,
   ProductTemplate,
   SoftwareTier,
+  StageId,
   StageSpec,
   WorkerRole,
   WorkerTier,
 } from './types';
 
-/** Bumped in Turn 12: the bags came off the machines and onto the extractor. The state carries
+/** Bumped in Turn 13: the state carries the loan and the overdraft interest, the insurance covers,
+ *  the security and website levels, the standing contracts, the owner's draw tier, the pipe runs,
+ *  the gates, the settings, the tips seen and the second shift; a worker carries his shift and his
+ *  own day log; an enquiry carries its kind, its budget and the client's answer; a job carries its
+ *  kind, its budget, the sheets held for it and its night minutes; the per project question is
+ *  gone with it. A Turn 12 save is lifted into that shape (CLAUDE.md T13 section 4).
+ *
+ *  Bumped in Turn 12: the bags came off the machines and onto the extractor. The state carries
  *  the hall's one bag store in cubic metres, the day carries the dust it made and every summary
  *  carries the same, a machine carries no bag of its own any more, and the bag change is the
  *  emptying of the bags. A Turn 11 save is lifted into that shape by the migration, so a v18
@@ -58,7 +67,7 @@ import type {
  *
  *  Bumped in Turn 11: the owner carries the log of his day and the state carries the last week of
  *  them, which is what the top bar's meter and the company board are drawn from (T11 3.1). */
-export const STATE_VERSION = 13;
+export const STATE_VERSION = 14;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
@@ -79,6 +88,7 @@ export const DAY_CATEGORIES: readonly DayCategory[] = [
   'siteMeasure',
   'office',
   'fixing',
+  'assign',
 ];
 
 /** What each one is called on the tooltip, on the day end plate and on the company board. */
@@ -90,6 +100,7 @@ export const DAY_CATEGORY_LABELS: Record<DayCategory, string> = {
   siteMeasure: 'Site measure',
   office: 'Office',
   fixing: 'Fixing and bags',
+  assign: 'Assigning',
 };
 
 // ---------------------------------------------------------------------------
@@ -155,12 +166,14 @@ export const WORKER_HOURS_PER_WEEK = 40;
 export const OVERTIME_TIRED_DAYS = 3;
 export const OVERTIME_QUIT_CHANCE = 0.05;
 
-/** Owner away: all staff production drops 30% (PIOTR). */
-export const ABSENCE_OUTPUT_FACTOR = 0.7;
-/** With a hired CEO the drop is 5% (PIOTR). CEO hiring is parked, the constant is modelled only. */
-export const ABSENCE_OUTPUT_FACTOR_WITH_CEO = 0.95;
-/** A rare exceptional CEO gives plus 15% (PIOTR). Parked. */
-export const ABSENCE_OUTPUT_FACTOR_EXCEPTIONAL_CEO = 1.15;
+/** Owner away: all staff production drops by this much (PIOTR: 30%). With a production manager
+ *  on the books the drop is this much instead (PIOTR: 0.05 to 0.10, the session uses 0.08). The
+ *  manager adds nothing while the owner is in the hall; this is the day the player stops being
+ *  the bottleneck (CLAUDE.md T13 3.9). The Turn 1 chief executive is not a role in this game.  */
+export const OWNER_AWAY_PENALTY = 0.3;
+export const OWNER_AWAY_PENALTY_WITH_PM = 0.08;
+/** The longest holiday the button offers, in working days [TUNE] (CLAUDE.md T13 3.9). */
+export const HOLIDAY_MAX_DAYS = 10;
 /** Sick leave once per game year, 4 to 5 days, random day (PIOTR). */
 export const SICK_DAYS_MIN = 4;
 export const SICK_DAYS_MAX = 5;
@@ -174,8 +187,31 @@ export const OWNER_LABOUR_PER_MINUTE = OWNER_LABOUR_VALUE_PER_DAY / MINUTES_PER_
 // 8.1 Fixed costs and the unit
 // ---------------------------------------------------------------------------
 
-/** Family living costs, every working day (PIOTR). */
-export const LIVING_COST_PER_WORKING_DAY = 200;
+/** The owner's daily draw: what he pays himself, every working day, one of eight thresholds and
+ *  nothing in between (PIOTR: 200, 400, 800, 1,500, 3,000, then up to about 10,000; the three
+ *  upper steps are [TUNE] interpolation). It stays daily: money leaks every day, with no bump at
+ *  the month end (CLAUDE.md T13 3.18). Index 0 is where every game starts, which is the Turn 1
+ *  living cost of 200 (PIOTR). */
+export const OWNER_DRAW_TIERS: readonly number[] = [200, 400, 800, 1500, 3000, 5000, 7500, 10000];
+export const OWNER_DRAW_PER_DAY = OWNER_DRAW_TIERS[0] ?? 200;
+/** What the owner is living in at each tier, from a run down flat in the middle of nowhere to a
+ *  villa (PIOTR: the two ends; the six between are [TUNE]). Eight lines, one per tier. */
+export const HOUSE_TIER_NAMES: readonly string[] = [
+  'A bedsit over a shop, in the middle of nowhere',
+  'A rented flat',
+  'A two bed terrace',
+  'A semi with a garden',
+  'A detached house',
+  'A house with a double garage',
+  'A house in the country',
+  'A villa',
+];
+/** The house tier is the highest threshold whose thirty day sum the owner has actually paid
+ *  himself over the last thirty calendar days, off the ledger (CLAUDE.md T13 3.18). */
+export const HOUSE_WINDOW_DAYS = 30;
+/** How long the house card stays up at the end of the day before the summary, unless it is
+ *  clicked [TUNE] (CLAUDE.md T13 3.18). */
+export const HOUSE_CARD_SECONDS = 3;
 /** Rent per square metre per month (PIOTR). Later stages use 15 to 20, which is parked. */
 export const RENT_PER_M2_MONTHLY = 12;
 /** The painted hall is 20 by 10 m (docs/art/SPRITES.md 9.1), so the unit is 200 m2 and the rent
@@ -277,8 +313,17 @@ export const DIFFICULTIES: DifficultySpec[] = [
 // 8.3 Debt, arrears, bailiff, bankruptcy
 // ---------------------------------------------------------------------------
 
-/** [TUNE] 2% per month on a negative balance, charged on the 1st. */
-export const OVERDRAFT_MONTHLY_INTEREST = 0.02;
+/** The overdraft costs what it costs: a yearly rate on the negative balance, accrued day by day
+ *  while the account is below zero and charged monthly, interest only; the balance stays negative
+ *  until the player brings it up (PIOTR: 0.25; CLAUDE.md T13 3.14). */
+export const OVERDRAFT_RATE_YEARLY = 0.25;
+/** The one loan: up to this much [TUNE], at Piotr's yearly rate, over sixty monthly instalments
+ *  (PIOTR: 5 years), interest on the outstanding balance charged monthly with the instalment.
+ *  Early repayment costs nothing [TUNE] (CLAUDE.md T13 3.14). */
+export const LOAN_MAX = 50000;
+export const LOAN_RATE_YEARLY = 0.15;
+export const LOAN_MONTHS = 60;
+export const LOAN_EARLY_REPAYMENT_PENALTY = 0;
 /** 1% per month on the arrears balance while the arrears are large (PIOTR). */
 export const ARREARS_MONTHLY_INTEREST = 0.01;
 /** [TUNE] "large arrears" means more than this many months of fixed costs. */
@@ -307,8 +352,6 @@ export const USED_VARIANT = 'used';
 export const MATERIAL_FRACTION = 0.4;
 export const LABOUR_FRACTION = 0.4;
 export const PROFIT_FRACTION = 0.2;
-/** Buying sheets in advance is cheaper per job [TUNE]. */
-export const STOCK_MATERIAL_FRACTION = 0.34;
 /** Deposit on acceptance, balance on delivery (PIOTR). */
 export const DEPOSIT_FRACTION = 0.5;
 /** A finished piece stands at the gate until it is taken to the client (PIOTR). The courier bill
@@ -395,6 +438,29 @@ export const EXPIRY_EXPRESS_DAYS = 1;
  *  CLAUDE.md T10 3.7). They are drawn beside the band and are never part of it. */
 export const UNREACHABLE_MIN = 2;
 export const UNREACHABLE_MAX = 3;
+/** New enquiries a day, by reputation tier, drawn at the day's open (PIOTR: one at the start,
+ *  two at most; CLAUDE.md T13 3.4). The website adds to or takes from the week (T13 3.7). The
+ *  automatic third enquiry that refilled the board after an acceptance is gone. */
+export const ENQUIRIES_PER_DAY_BY_REPUTATION_TIER: readonly number[] = [1, 1, 2];
+/** The client's answer: the budget times a factor drawn in this band (PIOTR: minus 10% to plus
+ *  15%), skewed by the team and never leaving it. The skew is a quarter each for the reputation
+ *  tier, an estimator on the books and the salesman [TUNE] (CLAUDE.md T13 3.24). */
+export const ANSWER_MIN = 0.9;
+export const ANSWER_MAX = 1.15;
+export const ANSWER_SKEW_PER_REPUTATION_TIER = 0.25;
+export const ANSWER_SKEW_ESTIMATOR = 0.25;
+export const ANSWER_SKEW_SALESMAN = 0.25;
+export const ANSWER_SKEW_MAX = 1;
+/** Commercial enquiries: two to three times the residential budget [TUNE], a standing above 20
+ *  (PIOTR) and at least one hired person (PIOTR), and both covers of insurance held
+ *  (CLAUDE.md T13 3.15). The chance an enquiry drawn for a company that qualifies is a
+ *  commercial one [TUNE]. */
+export const COMMERCIAL_BUDGET_FACTOR_MIN = 2;
+export const COMMERCIAL_BUDGET_FACTOR_MAX = 3;
+export const COMMERCIAL_MIN_REPUTATION = 20;
+export const COMMERCIAL_MIN_STAFF = 1;
+export const COMMERCIAL_PROBABILITY = 0.3;
+export const NO_INSURANCE_REASON = 'no insurance';
 /** Board size, minimum and maximum enquiries, by reputation tier (PIOTR: below 0, 0 to 20,
  *  above 20). */
 export const BOARD_SIZE_BY_TIER: Array<[number, number]> = [
@@ -412,10 +478,21 @@ export const BESPOKE_PROBABILITY = 0.15;
 /** A sheet is a storage unit worth 200 of material value and stands for everything a job needs:
  *  boards, edging, screws (PIOTR). Job sheet counts come from the material cost. */
 export const SHEET_VALUE = 200;
-/** [TUNE] sheets bought for stock are cheaper, which gives the 0.34 P per job. */
-export const SHEET_PRICE_STOCK = SHEET_VALUE * (STOCK_MATERIAL_FRACTION / MATERIAL_FRACTION);
-/** Under this fraction of the rack the player is warned (PIOTR: under 10%). */
-export const LOW_STOCK_FRACTION = 0.1;
+/** A sheet bought for stock, and a sheet bought ad hoc for one job: the two prices, and nothing
+ *  between them (PIOTR: 175, in his band of 170 to 180; 200 ad hoc; CLAUDE.md T13 3.3). */
+export const SHEET_PRICE_STOCK = 175;
+export const SHEET_PRICE_AD_HOC = 200;
+/** A stock line whose free count is under this many sheets wears the Low stock badge, and
+ *  Restock brings every low line back up to this many [TUNE] (CLAUDE.md T13 3.2). */
+export const LOW_STOCK_SHEETS = 4;
+export const RESTOCK_TO_SHEETS = 12;
+/** The stock number a line carries, in the style of the software the player is meant to
+ *  recognise: the prefix per material kind, and three digits off the seed [TUNE wording]
+ *  (CLAUDE.md T13 3.2). */
+export const STOCK_NUMBER_PREFIX: Record<MaterialKind, string> = {
+  sheet: 'MFC-18-WHT',
+  solidWood: 'OAK-27-PAR',
+};
 /** Material always arrives the next working day (PIOTR). */
 export const DELIVERY_WORKING_DAYS_STANDARD = 1;
 /** [TUNE] bespoke material takes three working days and costs 15% more. */
@@ -450,7 +527,46 @@ export const EMAIL_RATING_PENALTY = 0.2;
 export const BOOKKEEPING_MINUTES = 60;
 /** Books behind on the 1st: 100 per consecutive month behind (PIOTR). */
 export const LATE_ACCOUNTS_CHARGE = 100;
-export const DAILY_ORDERING_MINUTES = 60;
+/** The daily consumables and materials chore, thirty minutes a day whatever the number of
+ *  projects, the admin's when there is one (PIOTR; CLAUDE.md T13 3.3). */
+export const DAILY_ORDERING_MINUTES = 30;
+export const CONSUMABLES_LABEL = 'Consumables and materials';
+/** The material take off: reading the drawing and counting the sheets for one accepted job. The
+ *  owner does it until an estimator is taken on; an estimator does this many a day (PIOTR: 5),
+ *  ten with Joinery Core on the laptop (PIOTR: 10), and five more per extension, at most two
+ *  [TUNE the extension figures] (CLAUDE.md T13 3.8). */
+export const ESTIMATOR_JOBS_PER_DAY = 5;
+export const ESTIMATOR_JOBS_WITH_JOINERY_CORE = 10;
+export const JOINERY_CORE_EXTENSION_JOBS = 5;
+export const JOINERY_CORE_MAX_EXTENSIONS = 2;
+/** Joinery Core and its extensions are bought by the year [TUNE], charged as a twelfth each
+ *  month like every other subscription (CLAUDE.md T13 3.8). */
+export const JOINERY_CORE_PRICE_YEARLY = 1200;
+export const JOINERY_CORE_EXTENSION_PRICE_YEARLY = 600;
+/** What an estimator costs a month, three tiers like the joiners [TUNE], what each tier is worth
+ *  against the owner at the take off [TUNE], and the standing he answers from [TUNE]. */
+export const ESTIMATOR_MONTHLY_WAGE: Record<WorkerTier, number> = {
+  poor: 2400,
+  normal: 2600,
+  super: 2900,
+};
+export const ESTIMATOR_RATES: Record<WorkerTier, number> = { poor: 0.8, normal: 1, super: 1.2 };
+export const ESTIMATOR_REPUTATION = 5;
+/** The production manager: one tier, a pure cost, and the first management role in the game
+ *  [TUNE wage and standing] (CLAUDE.md T13 3.9). */
+export const PRODUCTION_MANAGER_MONTHLY_WAGE = 3400;
+export const PRODUCTION_MANAGER_REPUTATION = 10;
+/** The second shift: this many minutes after the day shift [TUNE], at this much of salary for
+ *  those hours [TUNE], the owner absent from the hall: quality a tier down for work done at
+ *  night [TUNE] and the error chance doubled [TUNE] (CLAUDE.md T13 3.9). */
+export const SECOND_SHIFT_MINUTES = 480;
+export const NIGHT_RATE = 1.25;
+export const NIGHT_QUALITY_TIER_DROP = 1;
+export const NIGHT_ERROR_FACTOR = 2;
+/** The floor limits the crew: one person per this many square metres of free floor [TUNE], set so
+ *  that a 200 m2 hall with a normal set of machines and racks lands at the owner plus four, five
+ *  at most (PIOTR; CLAUDE.md T13 3.10). */
+export const M2_PER_PERSON = 24;
 /** 10 minutes per joiner per day (PIOTR). */
 export const STAFF_MANAGEMENT_MINUTES_PER_JOINER = 10;
 /** A job worth more than this starts with a meeting at the client's before anything is drawn
@@ -517,8 +633,27 @@ export const REPUTATION_LOG_MAX = 2000;
 export const HIRING_MINUTES = 60;
 /** The laptop booting up before anything on it can be touched (PIOTR). */
 export const LAPTOP_BOOT_MINUTES = 5;
-/** Reconnecting one machine's ducting to the extraction, every time it is moved (PIOTR). */
-export const DUCTING_RECONNECT_COST = 800;
+/** The extraction pipe the game routes for the player, charged by the metre [TUNE]. Moving a
+ *  machine disconnects it and refunds nothing; reconnecting charges the new length. This is the
+ *  reconnection the Turn 4 flat ducting charge was, and it replaces it (CLAUDE.md T13 3.19). */
+export const PIPE_PRICE_PER_METRE = 45;
+/** The eight tiles a pipe run is drawn from (CLAUDE.md T13 3.19). */
+export const PIPE_TILE_KEYS = [
+  'pipe.ns',
+  'pipe.ew',
+  'pipe.ne',
+  'pipe.nw',
+  'pipe.se',
+  'pipe.sw',
+  'pipe.tee',
+  'pipe.drop',
+  'pipe.inlet',
+] as const;
+/** An automatic blast gate on a machine's drop: fitted for this much (PIOTR: 800 the kit, 1,000
+ *  fitted), worth this much output on that machine (PIOTR), and the hall's extraction demand
+ *  counts a gated machine only while it is actually running (CLAUDE.md T13 3.11). */
+export const GATE_PRICE = 1000;
+export const GATE_OUTPUT_BONUS = 0.02;
 /** Every machine family is ducted into the extraction except the compressor. The hand tools are
  *  not machines at all, so they never appear here (PIOTR). */
 export const NO_DUCTING_SPECS = ['compressor'];
@@ -602,6 +737,39 @@ export const LOW_REPUTATION_PRICE_FACTOR = 0.85;
 /** Reputation tier thresholds for the board and the template weights (PIOTR: below 0, 0 to 20,
  *  above 20). The hiring pool has its own gate per role in 9.3. */
 export const REPUTATION_TIERS = [REPUTATION_MIN, 0, 20] as const;
+
+// ---------------------------------------------------------------------------
+// T13 3.7 The company website, five levels
+// ---------------------------------------------------------------------------
+
+export interface WebsiteLevelSpec {
+  level: number;
+  name: string;
+  /** Bought once; the level can only be raised. */
+  price: number;
+  /** Enquiries a week the level adds to the board, or takes off it. */
+  enquiriesPerWeek: number;
+  /** Tiers the enquiries drawn are moved up or down the template ladder. */
+  qualityTier: number;
+  /** A small reputation bonus, held while the level is held. Levels 1 to 3 have none. */
+  reputation: number;
+  /** Minutes a week the owner or the admin spends keeping it. */
+  upkeepMinutes: number;
+}
+
+/** Levels 1 to 3 move only the number and the quality of enquiries; 4 and 5 add a small
+ *  reputation bonus, small on purpose, so reputation cannot be bought instead of earned (PIOTR:
+ *  the prices 500 and 15,000, the 7,500 to 10,000 band at level 4, the bonus of 2 to 3, the upkeep
+ *  of 10 to 20 minutes; the effects and the level 3 price are [TUNE]; CLAUDE.md T13 3.7). */
+export const WEBSITE_LEVELS: readonly WebsiteLevelSpec[] = [
+  { level: 1, name: 'Do it yourself', price: 0, enquiriesPerWeek: -1, qualityTier: -1, reputation: 0, upkeepMinutes: 0 },
+  { level: 2, name: 'Template site', price: 500, enquiriesPerWeek: 0, qualityTier: 0, reputation: 0, upkeepMinutes: 10 },
+  { level: 3, name: 'Agency site', price: 2500, enquiriesPerWeek: 1, qualityTier: 0, reputation: 0, upkeepMinutes: 13 },
+  { level: 4, name: 'Good agency', price: 8500, enquiriesPerWeek: 2, qualityTier: 1, reputation: 2, upkeepMinutes: 17 },
+  { level: 5, name: 'Top agency', price: 15000, enquiriesPerWeek: 3, qualityTier: 1, reputation: 3, upkeepMinutes: 20 },
+];
+/** Where every game starts (CLAUDE.md T13 section 4). */
+export const WEBSITE_START_LEVEL = 1;
 
 // ---------------------------------------------------------------------------
 // 9.1 Product catalogue (PIOTR: products, prices, design minutes, calls)
@@ -713,11 +881,28 @@ export const PRODUCT_TEMPLATES: ProductTemplate[] = [
     designMinutes: 900,
     calls: 4,
     needsMeasure: true,
-    requiredEquipment: ['tableSaw', 'drill', 'edgebander', 'sprayBooth'],
+    // A sprayed kitchen has its fronts moulded on the spindle moulder as well (T13 3.13).
+    requiredEquipment: ['tableSaw', 'drill', 'edgebander', 'sprayBooth', 'spindleMoulder'],
     allowedFinishes: FINISHES_LACQUER,
     // The same standing the small kitchen wants: the booth is the real gate on this one.
     minReputation: 20,
     weightsByTier: [0, 0, 12],
+    byHandAllowed: false,
+  },
+  // A handleless kitchen: the J profile on the fronts wants the spindle moulder, and it is the
+  // second product that does (CLAUDE.md T13 3.13) [TUNE price, four stages like every sheet job].
+  {
+    id: 'handlelessKitchen',
+    name: 'Handleless kitchen',
+    basePrice: 9000,
+    material: 'sheet',
+    designMinutes: 800,
+    calls: 4,
+    needsMeasure: true,
+    requiredEquipment: ['tableSaw', 'drill', 'edgebander', 'spindleMoulder'],
+    allowedFinishes: FINISHES_SHEET,
+    minReputation: 20,
+    weightsByTier: [0, 0, 14],
     byHandAllowed: false,
   },
   {
@@ -752,11 +937,34 @@ export const DELIVERY_DAYS_BY_CLASS: Record<string, Record<string, number>> = {
   tableSaw: { used: 1, budget: 1, standard: 5, pro: 7, industrial: 12 },
   sheetRack: { used: 1, budget: 1, standard: 3, pro: 5, industrial: 10 },
   edgebander: { used: 1, budget: 1, standard: 7, pro: 12, industrial: 20 },
+  // The Turn 13 ladders [TUNE]: a used CNC is on a lorry in a week, an industrial one is built.
+  cnc: { used: 5, budget: 20, standard: 45, pro: 45, industrial: 60 },
+  spindleMoulder: { used: 1, budget: 3, standard: 7, pro: 12, industrial: 20 },
+  sprayBooth: { used: 5, budget: 10, standard: 20, pro: 25, industrial: 30 },
+  thicknesser: { used: 1, budget: 5, standard: 5, pro: 7, industrial: 12 },
+  solidWoodTools: { used: 1, budget: 5, standard: 5, pro: 7, industrial: 12 },
+  drill: { used: 1, budget: 1, standard: 1, pro: 1, industrial: 1 },
 };
 
-/** What a lorry load of heavy kit costs somebody at the gate, before the forklift halves it
- *  [TUNE] (CLAUDE.md T8 3.2). Furniture and hand tools are carried in and need nobody. */
+/** What a lorry load of heavy kit costs somebody at the gate, before the handling kit shortens
+ *  the walk [TUNE] (CLAUDE.md T8 3.2). Furniture and hand tools are carried in and need nobody. */
 export const EQUIPMENT_UNLOAD_MINUTES = 120;
+
+/** Unloading a load of sheets is a walk between the pallet at the gate and the racks, and the
+ *  handling kit shortens it: 45 minutes by hand (PIOTR: first 30, then corrected to 45, because
+ *  this is the room for the upgrade), about 30 with a pallet truck (PIOTR), about 15 with a
+ *  forklift (PIOTR), and 10 with the better forklift [TUNE]. One table; the old per item factors
+ *  are gone (CLAUDE.md T13 3.21). The key is the handling spec, `none` for bare hands. */
+export const UNLOAD_MINUTES_BY_HANDLING: Record<string, number> = {
+  none: 45,
+  palletTruck: 30,
+  forklift: 15,
+  forkliftBetter: 10,
+};
+/** Sheets carried per trip between the pallet and the rack [TUNE] (CLAUDE.md T13 3.21). */
+export const SHEETS_PER_TRIP = 2;
+/** The hand pallet truck [TUNE] (CLAUDE.md T13 3.21). */
+export const PALLET_TRUCK_PRICE = 450;
 
 /** The families two men cannot simply pick up: the ones a move of the hall is charged for and a
  *  delivery needs somebody at the gate for (CLAUDE.md T8 3.2, 3.4) [TUNE list]. A bench, a rack,
@@ -792,7 +1000,45 @@ export const MACHINE_ENDURANCE_HOURS: Record<string, number> = {
   tableSaw: 3000,
   edgebander: 4000,
   thicknesser: 2500,
+  spindleMoulder: 3500,
 };
+
+/** The five classes every ladder in this game has, in order: class 5 is always the industrial one
+ *  (PIOTR; CLAUDE.md T13 1). */
+export const CLASS_ORDER: readonly string[] = ['used', 'budget', 'standard', 'pro', 'industrial'];
+
+/** The badge every class card wears, the same across families, so the player reads the class at
+ *  a glance: one table, five entries (CLAUDE.md T13 3.12). The colours are [TUNE]. */
+export const CLASS_BADGE: Record<string, { label: string; colour: string }> = {
+  used: { label: 'Used', colour: '#8a8f96' },
+  budget: { label: 'Budget', colour: '#6b7f9c' },
+  standard: { label: 'Standard', colour: '#1f5a3a' },
+  pro: { label: 'Pro', colour: '#c98a3b' },
+  industrial: { label: 'Industrial', colour: '#7a6a9c' },
+};
+
+/** The families the player chooses a class for: every one of them has exactly five classes in
+ *  the order above (CLAUDE.md T13 3.12). Everything else is bought off the catalogue line itself:
+ *  a locker, an air dryer, a central system or a tool changer head has one class and never will
+ *  have more. */
+export const CLASS_LADDER_FAMILIES: readonly string[] = [
+  'tableSaw',
+  'edgebander',
+  'thicknesser',
+  'solidWoodTools',
+  'cnc',
+  'sprayBooth',
+  'spindleMoulder',
+  'drill',
+  'extractor',
+  'compressor',
+  'workbench',
+  'sheetRack',
+];
+
+/** Class 3 or above on the spindle moulder is the future gate to timber production. The branch
+ *  choice itself is parked: the constant exists and nothing reads it (CLAUDE.md T13 3.13). */
+export const TIMBER_BRANCH_MIN_SPINDLE_CLASS = 'standard';
 export const MACHINE_ENDURANCE_HOURS_DEFAULT = 5000;
 
 /** The five classes of table saw. Prices and the used saw's three effects are (PIOTR), the rest
@@ -1379,7 +1625,10 @@ export const EXTRACTION_DEMAND: Record<string, Record<string, number>> = {
   edgebander: { used: 0, budget: 0, standard: 1400, pro: 1800, industrial: 2400 },
   thicknesser: { used: 1200, budget: 1300, standard: 1500, pro: 1700, industrial: 1800 },
   solidWoodTools: { used: 1100, budget: 1200, standard: 1300, pro: 1400, industrial: 1500 },
-  cnc: { standard: 1600, pro: 2000, industrial: 2400 },
+  // The two classes the CNC gained in Turn 13, and the spindle moulder's whole ladder [TUNE]
+  // (CLAUDE.md T13 3.12, 3.13).
+  cnc: { used: 1400, budget: 1500, standard: 1600, pro: 2000, industrial: 2400 },
+  spindleMoulder: { used: 900, budget: 1000, standard: 1300, pro: 1600, industrial: 2200 },
 };
 
 /** Piotr's margin on the extraction: the sums have to leave a fifth of the fan spare, so a hall
@@ -1417,9 +1666,23 @@ export const AIR_DEMAND: Record<string, Record<string, { bar: number; litres: nu
     pro: { bar: 7, litres: 350 },
     industrial: { bar: 10, litres: 500 },
   },
-  cnc: { standard: { bar: 6.5, litres: 650 } },
+  // Every class of CNC wants the same air as the standard one, and every booth the same as the
+  // standard booth: the classes of Turn 13 change the speed and the price, not the hose [TUNE].
+  cnc: {
+    used: { bar: 6.5, litres: 650 },
+    budget: { bar: 6.5, litres: 650 },
+    standard: { bar: 6.5, litres: 650 },
+    pro: { bar: 6.5, litres: 650 },
+    industrial: { bar: 6.5, litres: 650 },
+  },
   // The gun itself is at 4 bar; the booth wants 7 at the wall (PIOTR).
-  sprayBooth: { standard: { bar: 7, litres: 350 } },
+  sprayBooth: {
+    used: { bar: 7, litres: 350 },
+    budget: { bar: 7, litres: 350 },
+    standard: { bar: 7, litres: 350 },
+    pro: { bar: 7, litres: 350 },
+    industrial: { bar: 7, litres: 350 },
+  },
 };
 
 /** What one man at a bench draws for his nailer and his driver, and what one man doing pneumatic
@@ -1463,6 +1726,533 @@ export const AIR_DRYER = 'airDryer';
 /** What a dryer costs [TUNE] (CLAUDE.md T10 3.3). */
 export const AIR_DRYER_PRICE = 1500;
 
+/** The five classes of thicknesser (CLAUDE.md T13 3.12). Prices are [TUNE]; the output, the endurance
+ *  and the power follow the saw's ladder; the extraction demand is Piotr's Turn 10 band. */
+export const THICKNESSER_VARIANTS: EquipmentVariant[] = [
+  {
+    id: 'used',
+    name: 'Used thicknesser',
+    price: 900,
+    width: 2,
+    depth: 1,
+    height: 1,
+    zoneWidth: 4,
+    zoneDepth: 2,
+    outputFactor: 0.95,
+    enduranceFactor: 0.25,
+    powerPerDay: 3,
+    description:
+      'A planer thicknesser somebody else ran hard. The tables are scored and the cutter ' +
+      'block has been ground once too often, but it still takes a board down to size. It ' +
+      'rumbles.',
+  },
+  {
+    id: 'budget',
+    name: 'Budget thicknesser',
+    price: 2500,
+    width: 2,
+    depth: 1,
+    height: 1,
+    zoneWidth: 4,
+    zoneDepth: 2,
+    outputFactor: 1,
+    enduranceFactor: 1,
+    powerPerDay: 3,
+    description:
+      'A new machine at the bottom of the trade range: cast tables, a two knife block and a ' +
+      'hand wheel for the height. It planes oak all day if the knives are kept sharp.',
+  },
+  {
+    id: 'standard',
+    name: 'Standard thicknesser',
+    price: 5500,
+    width: 2,
+    depth: 1,
+    height: 1,
+    zoneWidth: 4,
+    zoneDepth: 2,
+    outputFactor: 1.05,
+    enduranceFactor: 1.2,
+    powerPerDay: 4,
+    description:
+      'The one a working timber shop settles on. Longer tables, a spiral block that leaves ' +
+      'less to sand, and an extraction hood that actually pulls the chips off the cutters.',
+  },
+  {
+    id: 'pro',
+    name: 'Professional thicknesser',
+    price: 11000,
+    width: 3,
+    depth: 1,
+    height: 1,
+    zoneWidth: 5,
+    zoneDepth: 2,
+    outputFactor: 1.15,
+    enduranceFactor: 1.5,
+    powerPerDay: 5,
+    description:
+      'Built for a shop where the timber runs all week. Powered rise and fall, a digital ' +
+      'height stop, and a feed that does not stall on a wide board. It holds its setting ' +
+      'between jobs.',
+  },
+  {
+    id: 'industrial',
+    name: 'Industrial thicknesser',
+    price: 22000,
+    width: 3,
+    depth: 2,
+    height: 1.2,
+    zoneWidth: 5,
+    zoneDepth: 3,
+    outputFactor: 1.3,
+    enduranceFactor: 2,
+    powerPerDay: 7,
+    description:
+      'A heavy three phase machine with a wide bed and a feed you could lean on. It takes the ' +
+      'whole day without complaining and it takes a third off every board that goes through ' +
+      'it.',
+  },
+];
+
+/** The five classes of the timber tool set (CLAUDE.md T13 3.12). Prices [TUNE]; the factors follow
+ *  the saw's ladder. */
+export const SOLID_WOOD_TOOLS_VARIANTS: EquipmentVariant[] = [
+  {
+    id: 'used',
+    name: 'Used timber tool set',
+    price: 800,
+    width: 2,
+    depth: 1,
+    height: 1,
+    zoneWidth: 3,
+    zoneDepth: 2,
+    outputFactor: 0.95,
+    enduranceFactor: 0.25,
+    powerPerDay: 3,
+    description:
+      'A router table with a tired router, a belt sander that wanders and a rack of sash ' +
+      'clamps with the threads half gone. It machines timber, slowly, and it needs coaxing.',
+  },
+  {
+    id: 'budget',
+    name: 'Budget timber tool set',
+    price: 2200,
+    width: 2,
+    depth: 1,
+    height: 1,
+    zoneWidth: 3,
+    zoneDepth: 2,
+    outputFactor: 1,
+    enduranceFactor: 1,
+    powerPerDay: 3,
+    description:
+      'A new router table, a hand router, a belt sander and a set of clamps: what a workshop ' +
+      'buys the first time it takes an oak table on. Everything works and nothing is fast.',
+  },
+  {
+    id: 'standard',
+    name: 'Standard timber tool set',
+    price: 4500,
+    width: 2,
+    depth: 1,
+    height: 1,
+    zoneWidth: 3,
+    zoneDepth: 2,
+    outputFactor: 1.05,
+    enduranceFactor: 1.2,
+    powerPerDay: 4,
+    description:
+      'A proper router table with a fence that locks square, a dust hood on the sander and ' +
+      'enough clamps to glue two tops at once. It saves a few minutes on every piece.',
+  },
+  {
+    id: 'pro',
+    name: 'Professional timber tool set',
+    price: 9000,
+    width: 3,
+    depth: 1,
+    height: 1,
+    zoneWidth: 4,
+    zoneDepth: 2,
+    outputFactor: 1.15,
+    enduranceFactor: 1.5,
+    powerPerDay: 5,
+    description:
+      'A lift and a fence with stops on the router table, a stroke sander, and clamps on a ' +
+      'rack of their own. The timber comes off it cleaner, which is less sanding later.',
+  },
+  {
+    id: 'industrial',
+    name: 'Industrial timber tool set',
+    price: 16000,
+    width: 3,
+    depth: 2,
+    height: 1.2,
+    zoneWidth: 5,
+    zoneDepth: 3,
+    outputFactor: 1.3,
+    enduranceFactor: 2,
+    powerPerDay: 7,
+    description:
+      'The timber station of a production shop: a router with a power feed, a wide stroke ' +
+      'sander and a clamp carrier. It eats oak and it costs more than most small workshops ' +
+      'make in a month.',
+  },
+];
+
+/** The five classes of CNC (CLAUDE.md T13 3.12). The standard one is Piotr's 45,000; the rest of the
+ *  prices are [TUNE], and the factors follow the saw's ladder. Every class wants an extractor and dry
+ *  air, like the family. */
+export const CNC_VARIANTS: EquipmentVariant[] = [
+  {
+    id: 'used',
+    name: 'Used CNC',
+    price: 18000,
+    width: 3,
+    depth: 2,
+    height: 1,
+    zoneWidth: 5,
+    zoneDepth: 4,
+    outputFactor: 0.95,
+    enduranceFactor: 0.25,
+    powerPerDay: 8,
+    description:
+      'A flatbed router that has done ten years in somebody else\u0027s shop. The gantry is ' +
+      'true enough and the controller still boots, but the bearings are noisy and it loses a ' +
+      'step now and then.',
+  },
+  {
+    id: 'budget',
+    name: 'Budget CNC',
+    price: 30000,
+    width: 3,
+    depth: 2,
+    height: 1,
+    zoneWidth: 5,
+    zoneDepth: 4,
+    outputFactor: 1,
+    enduranceFactor: 1,
+    powerPerDay: 8,
+    description:
+      'A new machine at the bottom of the range: a full sheet bed, a single spindle and a ' +
+      'vacuum table that holds a board if the board is flat. It nests and it drills, and it ' +
+      'earns its keep.',
+  },
+  {
+    id: 'standard',
+    name: 'Standard CNC',
+    price: 45000,
+    width: 3,
+    depth: 2,
+    height: 1,
+    zoneWidth: 5,
+    zoneDepth: 4,
+    outputFactor: 1.05,
+    enduranceFactor: 1.2,
+    powerPerDay: 10,
+    description:
+      'The machine a sheet workshop grows into: a heavier gantry, a faster spindle and a ' +
+      'vacuum that holds an offcut. It cuts and drills a kitchen in the time the saw takes ' +
+      'over a wardrobe.',
+  },
+  {
+    id: 'pro',
+    name: 'Professional CNC',
+    price: 75000,
+    width: 4,
+    depth: 2,
+    height: 1.2,
+    zoneWidth: 6,
+    zoneDepth: 4,
+    outputFactor: 1.15,
+    enduranceFactor: 1.5,
+    powerPerDay: 12,
+    description:
+      'Built for a shop that nests all day: a drilling block, a labelling printer and a bed ' +
+      'that loads while the last sheet is still being cut. It holds its calibration for ' +
+      'months.',
+  },
+  {
+    id: 'industrial',
+    name: 'Industrial CNC',
+    price: 120000,
+    width: 4,
+    depth: 3,
+    height: 1.2,
+    zoneWidth: 6,
+    zoneDepth: 5,
+    outputFactor: 1.3,
+    enduranceFactor: 2,
+    powerPerDay: 16,
+    description:
+      'A nesting cell with automatic loading, a second spindle and an offload table. It runs ' +
+      'a shift with one man watching it, and it costs what a small factory costs.',
+  },
+];
+
+/** The five classes of spray booth (CLAUDE.md T13 3.12). The standard one is the Turn 1 booth; the
+ *  rest of the prices are [TUNE], and the factors follow the saw's ladder. Its own extraction, so it
+ *  is on no demand table (CLAUDE.md T10 3.1). */
+export const SPRAY_BOOTH_VARIANTS: EquipmentVariant[] = [
+  {
+    id: 'used',
+    name: 'Used spray booth',
+    price: 6000,
+    width: 3,
+    depth: 2,
+    height: 1.5,
+    zoneWidth: 4,
+    zoneDepth: 3,
+    outputFactor: 0.95,
+    enduranceFactor: 0.25,
+    powerPerDay: 4,
+    description:
+      'A dry filter booth out of a closed down shop. The fan pulls, the filters want changing ' +
+      'more often than they should, and the lights are dim. It sprays a lacquer finish, ' +
+      'slowly.',
+  },
+  {
+    id: 'budget',
+    name: 'Budget spray booth',
+    price: 11000,
+    width: 3,
+    depth: 2,
+    height: 1.5,
+    zoneWidth: 4,
+    zoneDepth: 3,
+    outputFactor: 1,
+    enduranceFactor: 1,
+    powerPerDay: 4,
+    description:
+      'A new open front booth with a dry filter wall and a fan sized for a small shop. Enough ' +
+      'to spray a wardrobe cleanly if the air is dry and the filters are fresh.',
+  },
+  {
+    id: 'standard',
+    name: 'Standard spray booth',
+    price: 18000,
+    width: 3,
+    depth: 2,
+    height: 1.5,
+    zoneWidth: 4,
+    zoneDepth: 3,
+    outputFactor: 1.05,
+    enduranceFactor: 1.2,
+    powerPerDay: 5,
+    description:
+      'A proper booth with a deeper filter bank, better lights and a fan that keeps the ' +
+      'overspray off the work. The finish comes out cleaner, which is less rubbing down ' +
+      'between coats.',
+  },
+  {
+    id: 'pro',
+    name: 'Professional spray booth',
+    price: 32000,
+    width: 4,
+    depth: 2,
+    height: 1.8,
+    zoneWidth: 5,
+    zoneDepth: 3,
+    outputFactor: 1.15,
+    enduranceFactor: 1.5,
+    powerPerDay: 7,
+    description:
+      'A pressurised booth with a heated air supply and a drying area behind it. Coats go on ' +
+      'faster and dry faster, and a kitchen goes through it in a day.',
+  },
+  {
+    id: 'industrial',
+    name: 'Industrial spray booth',
+    price: 55000,
+    width: 4,
+    depth: 3,
+    height: 2,
+    zoneWidth: 6,
+    zoneDepth: 4,
+    outputFactor: 1.3,
+    enduranceFactor: 2,
+    powerPerDay: 10,
+    description:
+      'A spray line with a conveyor, a flash off tunnel and a drying oven. It finishes fronts ' +
+      'by the hundred and it wants a building of its own to breathe in.',
+  },
+];
+
+/** The five classes of cordless drill (CLAUDE.md T13 3.12). Prices [TUNE]. It is a hand tool in a
+ *  cabinet, so it holds no floor and wants no extraction; the endurance is in the batteries. */
+export const DRILL_VARIANTS: EquipmentVariant[] = [
+  {
+    id: 'used',
+    name: 'Used cordless drill',
+    price: 40,
+    width: 1,
+    depth: 1,
+    height: 1,
+    zoneWidth: 1,
+    zoneDepth: 1,
+    outputFactor: 0.95,
+    enduranceFactor: 0.25,
+    powerPerDay: 1,
+    description:
+      'A drill with one tired battery and a chuck that slips. It drives a screw if you lean ' +
+      'on it.',
+  },
+  {
+    id: 'budget',
+    name: 'Budget cordless drill',
+    price: 120,
+    width: 1,
+    depth: 1,
+    height: 1,
+    zoneWidth: 1,
+    zoneDepth: 1,
+    outputFactor: 1,
+    enduranceFactor: 1,
+    powerPerDay: 1,
+    description:
+      'A new drill with two batteries and a charger: the basic assembly tool every joiner ' +
+      'starts with.',
+  },
+  {
+    id: 'standard',
+    name: 'Standard cordless drill',
+    price: 220,
+    width: 1,
+    depth: 1,
+    height: 1,
+    zoneWidth: 1,
+    zoneDepth: 1,
+    outputFactor: 1.05,
+    enduranceFactor: 1.2,
+    powerPerDay: 1,
+    description:
+      'A trade drill with a brushless motor and a clutch that stops before it strips a hole. ' +
+      'Screws go in a little faster and the batteries last the day.',
+  },
+  {
+    id: 'pro',
+    name: 'Professional cordless drill',
+    price: 400,
+    width: 1,
+    depth: 1,
+    height: 1,
+    zoneWidth: 1,
+    zoneDepth: 1,
+    outputFactor: 1.15,
+    enduranceFactor: 1.5,
+    powerPerDay: 1,
+    description:
+      'A drill and an impact driver as a pair, with big batteries and a fast charger. ' +
+      'Assembly moves along when the driver never waits for the drill.',
+  },
+  {
+    id: 'industrial',
+    name: 'Industrial cordless drill',
+    price: 700,
+    width: 1,
+    depth: 1,
+    height: 1,
+    zoneWidth: 1,
+    zoneDepth: 1,
+    outputFactor: 1.3,
+    enduranceFactor: 2,
+    powerPerDay: 1,
+    description:
+      'The top of the range in a case with four batteries, a hammer function nobody in a ' +
+      'joinery needs and a warranty the rep signs on the spot. It never stops for a charge.',
+  },
+];
+
+/** The five classes of spindle moulder, the new family two trades share (CLAUDE.md T13 3.13). Prices
+ *  [TUNE: 1,500 to 28,000], footprint 2 by 1 in a 3 by 3 zone [TUNE]; the factors follow the saw's
+ *  ladder. */
+export const SPINDLE_MOULDER_VARIANTS: EquipmentVariant[] = [
+  {
+    id: 'used',
+    name: 'Used spindle moulder',
+    price: 1500,
+    width: 2,
+    depth: 1,
+    height: 1,
+    zoneWidth: 3,
+    zoneDepth: 3,
+    outputFactor: 0.95,
+    enduranceFactor: 0.25,
+    powerPerDay: 3,
+    description:
+      'A moulder that has run for years in somebody else\u0027s shop. The spindle is true ' +
+      'enough and the fence still locks, but the rise and fall is stiff and the table is ' +
+      'scored. It moulds a J profile, carefully.',
+  },
+  {
+    id: 'budget',
+    name: 'Budget spindle moulder',
+    price: 4000,
+    width: 2,
+    depth: 1,
+    height: 1,
+    zoneWidth: 3,
+    zoneDepth: 3,
+    outputFactor: 1,
+    enduranceFactor: 1,
+    powerPerDay: 3,
+    description:
+      'A new machine at the bottom of the trade range: a cast table, a sliding carriage and a ' +
+      'fence with two halves that line up if you look at them. It moulds fronts all day.',
+  },
+  {
+    id: 'standard',
+    name: 'Standard spindle moulder',
+    price: 9000,
+    width: 2,
+    depth: 1,
+    height: 1,
+    zoneWidth: 3,
+    zoneDepth: 3,
+    outputFactor: 1.05,
+    enduranceFactor: 1.2,
+    powerPerDay: 4,
+    description:
+      'The moulder a working shop settles on: a tilting spindle, a power feed on an arm, and ' +
+      'an extraction hood that pulls the chips off the cutter. It saves minutes on every ' +
+      'front.',
+  },
+  {
+    id: 'pro',
+    name: 'Professional spindle moulder',
+    price: 16000,
+    width: 3,
+    depth: 1,
+    height: 1,
+    zoneWidth: 4,
+    zoneDepth: 3,
+    outputFactor: 1.15,
+    enduranceFactor: 1.5,
+    powerPerDay: 5,
+    description:
+      'Built for a shop that moulds all week: a digital fence, a quick change spindle and a ' +
+      'feed that does not mark the timber. The profile comes off cleaner, which is less ' +
+      'sanding.',
+  },
+  {
+    id: 'industrial',
+    name: 'Industrial spindle moulder',
+    price: 28000,
+    width: 3,
+    depth: 2,
+    height: 1.2,
+    zoneWidth: 5,
+    zoneDepth: 3,
+    outputFactor: 1.3,
+    enduranceFactor: 2,
+    powerPerDay: 7,
+    description:
+      'A heavy three phase machine with a double spindle and a feed that takes a stack of ' +
+      'fronts. It runs a shift on its own and it is where the timber branch of the business ' +
+      'starts.',
+  },
+];
+
 const VARIANTS_BY_FAMILY: Record<string, EquipmentVariant[]> = {
   tableSaw: TABLE_SAW_VARIANTS,
   workbench: WORKBENCH_VARIANTS,
@@ -1470,6 +2260,12 @@ const VARIANTS_BY_FAMILY: Record<string, EquipmentVariant[]> = {
   edgebander: EDGEBANDER_VARIANTS,
   extractor: EXTRACTOR_VARIANTS,
   compressor: COMPRESSOR_VARIANTS,
+  thicknesser: THICKNESSER_VARIANTS,
+  solidWoodTools: SOLID_WOOD_TOOLS_VARIANTS,
+  cnc: CNC_VARIANTS,
+  sprayBooth: SPRAY_BOOTH_VARIANTS,
+  drill: DRILL_VARIANTS,
+  spindleMoulder: SPINDLE_MOULDER_VARIANTS,
 };
 
 const BASE_SPEC = {
@@ -1477,8 +2273,8 @@ const BASE_SPEC = {
   // the office furniture are ordered like everything else and come the next working day
   // (PIOTR, 13.09; CLAUDE.md T9 3.1).
   deliveryDays: 1,
+  sharedTab: null as EquipmentTab | null,
   usedOn: null as MaterialKind | null,
-  unloadFactor: 1,
   sheetCapacity: 0,
   minReputation: REPUTATION_MIN,
   locked: false,
@@ -1841,8 +2637,23 @@ const SPEC_DRAFTS: SpecDraft[] = [
     depth: 1,
     height: 1,
     spriteKey: 'forklift',
-    unloadFactor: 0.5,
-    effect: 'Unloading takes half the time.',
+    effect: 'A load of sheets is off the lorry in about fifteen minutes.',
+  },
+  {
+    ...BASE_SPEC,
+    id: 'palletTruck',
+    // Off the shelf, in tomorrow, like the compressors [TUNE].
+    deliveryDays: 1,
+    folder: 'Pallet trucks',
+    tab: 'handling',
+    name: 'Pallet truck',
+    price: PALLET_TRUCK_PRICE,
+    category: 'vehicle',
+    width: 1,
+    depth: 1,
+    height: 1,
+    spriteKey: 'palletTruck',
+    effect: 'A load of sheets is off the lorry in about thirty minutes instead of forty five.',
   },
   {
     ...BASE_SPEC,
@@ -1858,8 +2669,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
     depth: 1,
     height: 1,
     spriteKey: 'forkliftBetter',
-    unloadFactor: 0.2,
-    effect: 'Unloading takes a fifth of the time.',
+    effect: 'A load of sheets is off the lorry in ten minutes.',
   },
   {
     ...BASE_SPEC,
@@ -1899,6 +2709,30 @@ const SPEC_DRAFTS: SpecDraft[] = [
     spriteKey: 'solidWoodTools',
     usedOn: 'solidWood',
     effect: 'Solid wood tools, part 2. With the thicknesser this unlocks solid wood.',
+  },
+  {
+    ...BASE_SPEC,
+    id: 'spindleMoulder',
+    // The class ladder above says the rest.
+    deliveryDays: 7,
+    folder: 'Spindle moulders',
+    tab: 'sheetMachines',
+    // Shared: handleless kitchens with a J profile and shaker fronts need it on the sheet side
+    // too (PIOTR; CLAUDE.md T13 3.13).
+    sharedTab: 'timberMachines',
+    name: 'Spindle moulder',
+    price: 1500,
+    category: 'machine',
+    width: 2,
+    depth: 1,
+    height: 1,
+    zoneWidth: 3,
+    zoneDepth: 3,
+    spriteKey: 'spindleMoulder',
+    stackable: true,
+    effect:
+      'Moulds a profile on an edge: the J profile of a handleless kitchen and the fronts of a ' +
+      'sprayed one on the sheet side, and every moulding on the timber side. One man at a time.',
   },
   {
     ...BASE_SPEC,
@@ -2315,6 +3149,44 @@ export const HIRING_SPECS: HiringSpec[] = [
     minReputation: 15,
     duties: 'Client calls.',
   },
+  // The estimator, three tiers like the joiners, and the production manager, one tier
+  // (CLAUDE.md T13 3.8, 3.9).
+  {
+    role: 'estimator',
+    tier: 'poor',
+    label: 'Estimator, poor',
+    weeklyWage: 0,
+    monthlyWage: ESTIMATOR_MONTHLY_WAGE.poor,
+    minReputation: ESTIMATOR_REPUTATION,
+    duties: 'Material take offs, at 0.8 of your own speed.',
+  },
+  {
+    role: 'estimator',
+    tier: 'normal',
+    label: 'Estimator, normal',
+    weeklyWage: 0,
+    monthlyWage: ESTIMATOR_MONTHLY_WAGE.normal,
+    minReputation: ESTIMATOR_REPUTATION,
+    duties: 'Material take offs, at your own speed.',
+  },
+  {
+    role: 'estimator',
+    tier: 'super',
+    label: 'Estimator, super',
+    weeklyWage: 0,
+    monthlyWage: ESTIMATOR_MONTHLY_WAGE.super,
+    minReputation: ESTIMATOR_REPUTATION,
+    duties: 'Material take offs, faster than you.',
+  },
+  {
+    role: 'productionManager',
+    tier: null,
+    label: 'Production manager',
+    weeklyWage: 0,
+    monthlyWage: PRODUCTION_MANAGER_MONTHLY_WAGE,
+    minReputation: PRODUCTION_MANAGER_REPUTATION,
+    duties: 'The second shift, the assigning, the extraction connections, and the hall while you are away.',
+  },
 ];
 
 /** Every joiner needs all of these before he can be hired (PIOTR). The tool cabinet is counted
@@ -2393,6 +3265,7 @@ export const DUST_OUTPUT_M3_PER_HOUR: Record<string, number> = {
   solidWoodTools: 0, // the helper sweeps up after hand tools
   sprayBooth: 0, // its own extraction, off this table
   drill: 0, // a drill makes nothing a bag notices
+  spindleMoulder: 0.12, // a bag a day, the figure the Turn 12 comment kept for it (PIOTR)
   // A compressor moves air and makes no chips. Not on Piotr's list: a zero so that every family
   // of the machine category is on this table and the test can hold it to that [TUNE].
   compressor: 0,
@@ -2465,10 +3338,131 @@ export const DAY_SUMMARIES_MAX = 90;
 /** How many days of the owner's day log the state carries. A week is what the company board
  *  shows, and the brief asks for no more (CLAUDE.md T11 3.1). */
 export const DAY_LOGS_KEPT = 7;
-export const LEDGER_MAX_ENTRIES = 200;
-/** The Ledger tab shows every line the state carries: 200 (PIOTR, CLAUDE.md T6 3.9). It used to
- *  show the last 50, which left three quarters of a busy month unreachable. */
-export const LEDGER_VISIBLE_ENTRIES = LEDGER_MAX_ENTRIES;
+/** The state keeps this many ledger lines [TUNE]. It was 200, which a busy month outran; the month
+ *  end report and the house tier are sums over dated lines and want the whole month and the
+ *  thirty days before it in the state (CLAUDE.md T13 3.18, 3.20). */
+export const LEDGER_MAX_ENTRIES = 2000;
+/** The Ledger tab shows the last 200 lines (PIOTR, CLAUDE.md T6 3.9). */
+export const LEDGER_VISIBLE_ENTRIES = 200;
+
+// ---------------------------------------------------------------------------
+// T13 3.15 Insurance
+// ---------------------------------------------------------------------------
+
+/** Property cover: this much of the value of every machine and the stock, a year (PIOTR),
+ *  recomputed on every purchase and every stock change, charged as a twelfth each month. Public
+ *  liability: a base a year plus this much per hired person [TUNE both], charged monthly
+ *  (CLAUDE.md T13 3.15). */
+export const PROPERTY_INSURANCE_RATE_YEARLY = 0.02;
+export const LIABILITY_BASE_YEARLY = 600;
+export const LIABILITY_PER_EMPLOYEE_YEARLY = 180;
+/** The accident with no liability cover: a claim drawn once in this band [TUNE]. */
+export const UNINSURED_CLAIM_MIN = 8000;
+export const UNINSURED_CLAIM_MAX = 25000;
+/** A burglary with property cover and an alarm is paid out over this many days [TUNE]
+ *  (CLAUDE.md T13 3.17). With no alarm the property cover pays nothing (T13 3.15). */
+export const BURGLARY_PAYOUT_DAYS = 10;
+
+// ---------------------------------------------------------------------------
+// T13 3.16 Standing contracts
+// ---------------------------------------------------------------------------
+
+export interface ContractPieceSpec {
+  id: string;
+  name: string;
+  /** The stages the piece goes through, a subset of the production stages. */
+  stages: StageId[];
+  /** Owner minutes a piece. */
+  minutes: number;
+  /** What the client pays a piece, and what the material in it costs. */
+  price: number;
+  material: number;
+}
+
+/** The pieces a contract can be for. One tonight [TUNE]: cut sheet packs for a shop, cutting
+ *  only, 45 minutes, sold at 38 with 30 of material in it (CLAUDE.md T13 3.16). */
+export const CONTRACT_PIECES: readonly ContractPieceSpec[] = [
+  { id: 'cutSheetPack', name: 'Cut sheet pack', stages: ['cutting'], minutes: 45, price: 38, material: 30 },
+];
+/** Contracts arrive from this reputation tier up [TUNE: the second tier, reputation 0], one on
+ *  the board at a time, and an offer stands for this many days [TUNE]. */
+export const CONTRACT_MIN_TIER = 1;
+export const CONTRACT_OFFER_DAYS = 5;
+/** A term of three to six months (PIOTR), and a quantity a week in this band [TUNE]. */
+export const CONTRACT_TERM_MONTHS_MIN = 3;
+export const CONTRACT_TERM_MONTHS_MAX = 6;
+export const CONTRACT_QUANTITY_PER_WEEK_MIN = 40;
+export const CONTRACT_QUANTITY_PER_WEEK_MAX = 80;
+/** A short week is a point of reputation [TUNE]; at the end of the term every full week raises the
+ *  offered price by this much and every short week lowers it by this much [TUNE]. */
+export const CONTRACT_SHORT_WEEK_REPUTATION = 1;
+export const CONTRACT_RENEW_FULL_WEEK = 0.01;
+export const CONTRACT_RENEW_SHORT_WEEK = 0.02;
+
+// ---------------------------------------------------------------------------
+// T13 3.17 Security, five levels
+// ---------------------------------------------------------------------------
+
+export interface SecurityLevelSpec {
+  level: number;
+  name: string;
+  /** Paid once, on the click. */
+  price: number;
+  /** Paid every month. Levels 4 and 5 scale with the hall and the insured value. */
+  monthly: number;
+  scaled: boolean;
+  /** Risk of a burglary a month. Level 5 is zero: zero means zero (PIOTR). */
+  risk: number;
+}
+
+/** From nothing to a firm that takes the risk to zero, so the player feels fixed costs (PIOTR:
+ *  the alarm at 500 once, level 5 at zero risk; the rest [TUNE]; CLAUDE.md T13 3.17). */
+export const SECURITY_LEVELS: readonly SecurityLevelSpec[] = [
+  { level: 0, name: 'Nothing', price: 0, monthly: 0, scaled: false, risk: 0.04 },
+  { level: 1, name: 'Alarm', price: 500, monthly: 0, scaled: false, risk: 0.02 },
+  { level: 2, name: 'Bars', price: 1500, monthly: 0, scaled: false, risk: 0.012 },
+  { level: 3, name: 'Bars and dogs', price: 2500, monthly: 150, scaled: false, risk: 0.006 },
+  { level: 4, name: 'Security firm, basic', price: 0, monthly: 250, scaled: true, risk: 0.002 },
+  { level: 5, name: 'Security firm, good', price: 0, monthly: 600, scaled: true, risk: 0 },
+];
+/** The subscription of a scaled level: base times area over this, times one plus the insured
+ *  value over this [TUNE] (CLAUDE.md T13 3.17). */
+export const SECURITY_SCALE_AREA_M2 = 200;
+export const SECURITY_SCALE_VALUE = 100000;
+/** A burglary takes one or two machines at random, the dearest first, and the free stock [TUNE]. */
+export const BURGLARY_MACHINES_MIN = 1;
+export const BURGLARY_MACHINES_MAX = 2;
+
+// ---------------------------------------------------------------------------
+// T13 3.5 Efficiency, T13 3.22 Tips and the warning strip
+// ---------------------------------------------------------------------------
+
+/** The four lines of the efficiency plate, in the order they are printed, each a percentage of
+ *  the lost minutes (PIOTR; CLAUDE.md T13 3.5). */
+export const EFFICIENCY_CAUSES: ReadonlyArray<{ id: LostMinuteCause; label: string }> = [
+  { id: 'noPeople', label: 'No people' },
+  { id: 'noMachine', label: 'No machine free' },
+  { id: 'noMaterial', label: 'No material' },
+  { id: 'ownerAway', label: 'Owner away' },
+];
+
+/** The first use bubbles, one sentence each, keyed by the screen they open on [TUNE wording]
+ *  (CLAUDE.md T13 3.22). Dismissed by a click, remembered in the save. */
+export const TIPS: Record<string, string> = {
+  catalogue:
+    'Every machine family has five classes: the effects come first, then the costs, then what it is.',
+  workPlan: 'One row a job. A red figure on a job is material it does not have yet.',
+  stock: 'Free is what a new job can have; reserved is what accepted jobs will use. Restock fills the low lines.',
+  board: 'Every enquiry comes with a budget. Say yes and the client answers with a number.',
+  finance: 'A loan costs what it costs: sixty instalments and the interest on what is left.',
+  insurance: 'You can go without, but an accident then costs what an accident costs.',
+  security: 'A firm takes the risk to zero. That is what fixed costs feel like.',
+  contracts: 'Repeat work, low margin, steady money. Only people are assigned to it.',
+  website: 'People buy with their eyes. Levels 1 to 3 change the enquiries; 4 and 5 add a little standing.',
+  house: 'What you pay yourself every day is the house you sleep in.',
+  team: 'The floor limits the crew: one person per so many square metres of free hall.',
+  settings: 'Tips on or off. Nothing else here tonight.',
+};
 
 // ---------------------------------------------------------------------------
 // 3.12 Why it is like this in real life

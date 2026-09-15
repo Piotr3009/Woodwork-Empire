@@ -155,6 +155,8 @@ function addJoiner(state: GameState): Worker {
     station: 'idle',
     productionMinutes: 0,
     absentDaysRemaining: 0,
+    shift: 'day',
+    dayLog: [],
     anchorX: 6,
     anchorY: 6,
   };

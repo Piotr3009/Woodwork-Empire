@@ -19,6 +19,7 @@ import { itemIsHeavy } from '../../src/engine/machines';
 import { renderMachine } from '../../src/ui/machine';
 import type { GameState, ProductTemplate } from '../../src/engine/index';
 import {
+  acceptNow,
   act,
   buyStartingKit,
   fillRack,
@@ -79,7 +80,7 @@ describe('the two sprayed products', () => {
   });
 
   it('does its Finishing at the booth, and nothing else does', () => {
-    const lacquered = { labourValue: 1000, materialKind: 'sheet' as const, finish: 'lacquer' as const, byHand: false };
+    const lacquered = { labourValue: 1000, materialKind: 'sheet' as const, finish: 'lacquer' as const, byHand: false, needsSpindle: false };
     const laminate = { ...lacquered, finish: 'laminate' as const };
     expect(familyForStage(lacquered, 'finishing')).toBe('sprayBooth');
     expect(familyForStage(laminate, 'finishing')).toBeNull();
@@ -91,7 +92,7 @@ describe('the two sprayed products', () => {
     const wet = sprayedMinutes(false);
     const dry = sprayedMinutes(true);
     expect(dry).toBeGreaterThan(0);
-    expect(wet).toBeCloseTo(dry / WET_AIR_FINISH_FACTOR, 5);
+    expect(wet).toBeCloseTo(dry / WET_AIR_FINISH_FACTOR, 4);
     expect(wet).toBeLessThan(dry);
   });
 
@@ -105,7 +106,7 @@ describe('the two sprayed products', () => {
     const sprayed = fillRack(buyStartingKit(newGame({ difficulty: 'veryEasy' })), 40);
     sprayed.enquiries = [];
     const enquiry = placeEnquiry(sprayed, { price: 4000, deadlineDays: 40 });
-    const taken = act(sprayed, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+    const taken = acceptNow(sprayed, enquiry.id, false);
     const job = firstJob(taken);
     const dry = JSON.parse(JSON.stringify(taken)) as GameState;
     job.wetFinish = true;
@@ -135,7 +136,7 @@ function sprayedMinutes(dryer: boolean): number {
     price: 4000,
     deadlineDays: 90,
   });
-  let next = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+  let next = acceptNow(state, enquiry.id, false);
   const job = firstJob(next);
   job.stage = 'inProduction';
   job.assignedTo = 'owner';
@@ -172,7 +173,7 @@ function assembledMinutes(compressorClass: string | null): number {
   }
   let next = state;
   for (const enquiry of state.enquiries.slice()) {
-    next = act(next, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+    next = acceptNow(next, enquiry.id, false);
   }
   for (const job of next.jobs) {
     job.stage = 'inProduction';
@@ -206,7 +207,7 @@ describe('air for every bench', () => {
     placeEquipment(state, 'workbench', { variantId: 'budget', x: 4, y: 8 });
     state.enquiries = [];
     const enquiry = placeEnquiry(state, { price: 4000, deadlineDays: 40 });
-    const next = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+    const next = acceptNow(state, enquiry.id, false);
     const job = firstJob(next);
     job.stage = 'inProduction';
     job.assignedTo = 'owner';

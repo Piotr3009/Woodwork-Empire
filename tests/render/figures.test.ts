@@ -8,6 +8,7 @@ import { STATION_BENCH, machineStation, waitingStation } from '../../src/engine/
 import { tick } from '../../src/engine/index';
 import type { GameState } from '../../src/engine/index';
 import {
+  acceptNow,
   act,
   buyStartingKit,
   fillRack,
@@ -25,7 +26,7 @@ function atWork(): GameState {
   );
   state.enquiries = [];
   const enquiry = placeEnquiry(state, { price: 40000, deadlineDays: 90 });
-  state = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+  state = acceptNow(state, enquiry.id, false);
   firstJob(state).stage = 'ready';
   return act(state, { type: 'WORK_HERE', jobId: null });
 }

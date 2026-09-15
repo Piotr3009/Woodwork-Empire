@@ -26,7 +26,7 @@ import { dustGainPerMinute, hallProductivityFactor } from '../../src/engine/mach
 import { applyRating } from '../../src/engine/reputation';
 import { renderHall } from '../../src/render/hall';
 import type { GameState, Job } from '../../src/engine/index';
-import { act, fillRack, firstJob, newGame, placeEnquiry, placeEquipment, runClock } from '../helpers';
+import { acceptNow, act, fillRack, firstJob, newGame, placeEnquiry, placeEquipment, runClock } from '../helpers';
 
 /** A two man shop: a standard saw and a floor edgebander, both with a man at them, and one
  *  extractor of the class the test names. Piotr's own example (CLAUDE.md T10 3.1). */
@@ -163,7 +163,7 @@ describe('a job made in a dusty workshop', () => {
     const state = newGame();
     state.enquiries = [];
     const enquiry = placeEnquiry(state, { price: 4000 });
-    const next = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+    const next = acceptNow(state, enquiry.id, false);
     const made = firstJob(next);
     made.productionMinutes = productionMinutes;
     made.dustyMinutes = dustyMinutes;
@@ -182,7 +182,7 @@ describe('a job made in a dusty workshop', () => {
     const state = newGame();
     state.enquiries = [];
     const enquiry = placeEnquiry(state, { price: 4000 });
-    const next = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+    const next = acceptNow(state, enquiry.id, false);
     const made = firstJob(next);
     made.productionMinutes = 600;
     made.dustyMinutes = 300;
@@ -203,7 +203,7 @@ describe('the bench in an under extracted hall', () => {
     placeEquipment(state, 'workbench', { variantId: 'budget', x: 2, y: 8 });
     state.enquiries = [];
     const enquiry = placeEnquiry(state, { price: 4000, deadlineDays: 40 });
-    let next = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+    let next = acceptNow(state, enquiry.id, false);
     firstJob(next).stage = 'ready';
     next = act(next, { type: 'WORK_HERE', jobId: firstJob(next).id });
     next = runClock(next, 30);

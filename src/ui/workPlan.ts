@@ -4,13 +4,14 @@
 
 import { workPlan } from '../engine/index';
 import type { GameState, Job, PlanRow, WorkPlan } from '../engine/index';
+import { renderContractBar } from './contracts';
 import {
   callsLine,
   dropControl,
-  fromStockControl,
   jobAction,
   jobAssignControls,
   jobLifecycleRow,
+  materialLine,
 } from './jobCard';
 import { emptyLine, escapeHtml, money } from './modal';
 
@@ -42,8 +43,8 @@ function headHtml(state: GameState, job: Job, row: PlanRow, dropConfirm: string 
     `<span class="row-figure">${escapeHtml(row.stage)}</span>` +
     `<span class="row-figure">on it: ${escapeHtml(row.who)} · due day ${row.dueDay}</span>` +
     callsLine(job) +
+    materialLine(state, job) +
     jobAssignControls(state, job) +
-    fromStockControl(state, job) +
     dropControl(job, dropConfirm) +
     (action === '' ? '' : `<span class="row-action">${action}</span>`) +
     '</div>'
@@ -119,7 +120,9 @@ function scaleHtml(plan: WorkPlan): string {
 
 export function renderWorkPlan(state: GameState, dropConfirm: string | null = null): string {
   const plan = workPlan(state);
-  if (plan.rows.length === 0) return emptyLine('No jobs yet. Open the board.');
+  // The standing contracts have a bar of their own, apart from the jobs (CLAUDE.md T13 3.16).
+  const contracts = renderContractBar(state);
+  if (plan.rows.length === 0) return contracts + emptyLine('No jobs yet. Open the board.');
   const rows = plan.rows
     .map((row) => {
       const job = state.jobs.find((entry) => entry.id === row.jobId);
@@ -145,6 +148,7 @@ export function renderWorkPlan(state: GameState, dropConfirm: string | null = nu
     'turns red. A job nobody has started yet carries the yellow tick on the last day it can be ' +
     'started and still be on time. The axis is working days: Monday follows Friday and no ' +
     'deadline falls at a weekend.</p>' +
+    contracts +
     `<div class="plan">${scaleHtml(plan)}${rows}</div>`
   );
 }

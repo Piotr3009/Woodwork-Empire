@@ -22,6 +22,7 @@ import {
 } from '../engine/index';
 import {
   CENTRAL_EXTRACTION_SPECS,
+  CLASS_LADDER_FAMILIES,
   COMPRESSOR,
   COMPRESSOR_AIR,
   COMPRESSOR_WITH_DRYER,
@@ -43,7 +44,7 @@ import {
 /** The families the player chooses a class for. Everything else is bought off the catalogue line
  *  itself: a locker has no classes and never will (CLAUDE.md T3 3.5). */
 export function isMachineFamily(spec: EquipmentSpec): boolean {
-  return spec.category === 'machine' || spec.category === 'extraction';
+  return CLASS_LADDER_FAMILIES.includes(spec.id);
 }
 
 /** One line of figures on a class card, and the colour its sign gives it when it has one. */

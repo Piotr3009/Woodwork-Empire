@@ -61,11 +61,13 @@ describe('the board is written again twice a day', () => {
     expect(marked(state).length).toBeGreaterThan(before.length);
   });
 
-  it('tops the greyed ones back up as well as the band', () => {
+  it('tops the greyed ones back up, and leaves the band to the morning post', () => {
     const state = withBoard();
     state.enquiries = [];
     refreshBoard(state);
-    expect(reachableEnquiries(state).length).toBeGreaterThan(0);
+    // The band is no longer refilled by the rewrite: the enquiries the workshop can take arrive
+    // one or two a day at the day's open (CLAUDE.md T13 3.4).
+    expect(reachableEnquiries(state).length).toBe(0);
     expect(unreachableEnquiries(state).length).toBeGreaterThanOrEqual(UNREACHABLE_MIN);
     expect(unreachableEnquiries(state).length).toBeLessThanOrEqual(UNREACHABLE_MAX);
   });

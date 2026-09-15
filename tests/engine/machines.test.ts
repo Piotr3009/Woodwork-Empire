@@ -49,6 +49,7 @@ import { STATION_NO_BENCH, tick } from '../../src/engine/index';
 import type { Equipment, GameEvent, GameState } from '../../src/engine/index';
 import { renderHall } from '../../src/render/hall';
 import {
+  acceptNow,
   act,
   buyNow,
   buyStartingKit,
@@ -69,7 +70,7 @@ function atTheBench(options: { price?: number; seed?: number } = {}): GameState 
   state.enquiries = [];
   const enquiry = placeEnquiry(state, { price: options.price ?? 4000, deadlineDays: 90 });
   const accepted = fillRack(
-    act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false }),
+    acceptNow(state, enquiry.id, false),
   );
   firstJob(accepted).stage = 'ready';
   return act(accepted, { type: 'WORK_HERE', jobId: null });
@@ -181,6 +182,8 @@ describe('dust', () => {
         station: 'idle',
         productionMinutes: 0,
         absentDaysRemaining: 0,
+        shift: 'day',
+        dayLog: [],
         anchorX: 0,
         anchorY: 4,
       });
@@ -224,6 +227,8 @@ describe('dust', () => {
       station: 'idle',
       productionMinutes: 0,
       absentDaysRemaining: 0,
+      shift: 'day',
+      dayLog: [],
       anchorX: 0,
       anchorY: 4,
     });
@@ -267,6 +272,8 @@ describe('dust', () => {
         station: 'idle',
         productionMinutes: 0,
         absentDaysRemaining: 0,
+        shift: 'day',
+        dayLog: [],
         anchorX: 0,
         anchorY: 4,
       });
@@ -410,7 +417,7 @@ describe('no bench in the hall', () => {
     // Two jobs, in the order they were accepted, and one bench in the hall.
     for (const name of ['Accepted first', 'Accepted second']) {
       const enquiry = placeEnquiry(state, { price: 400, name, deadlineDays: 90 });
-      state = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+      state = acceptNow(state, enquiry.id, false);
     }
     const first = state.jobs[0];
     const second = state.jobs[1];
@@ -448,7 +455,7 @@ describe('no bench in the hall', () => {
     joiner.startDay = state.clock.day;
     // A second job with its material in the hall, and then the bailiff takes the bench.
     const second = placeEnquiry(state, { price: 400, name: 'Garage shelves' });
-    state = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: second.id, byHand: false });
+    state = acceptNow(state, second.id, false);
     const waiting = state.jobs[1];
     if (!waiting) throw new Error('no second job');
     waiting.stage = 'ready';

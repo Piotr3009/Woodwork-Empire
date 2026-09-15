@@ -119,7 +119,7 @@ export function renderCatalogue(
   const body =
     tab === OWNED_TAB
       ? renderOwned(state, filter, ownedTab, sellConfirm)
-      : open !== null && open.tab === tab
+      : open !== null && (open.tab === tab || open.sharedTab === tab)
         ? renderOpenFolder(state, open, filter)
         : renderFolders(state, filter, tab) + (tab === 'computers' ? renderSoftware(state) : '');
   // The warnings go under the list, as a note at the foot of the page, not as a shout over the
@@ -139,7 +139,8 @@ export function renderCatalogue(
  *  (CLAUDE.md T7 3.7). */
 function renderFolders(state: GameState, filter: string, tab: CatalogueTab): string {
   const needle = filter.trim().toLowerCase();
-  const inTab = EQUIPMENT_SPECS.filter((spec) => spec.tab === tab);
+  // A family two trades share is a folder under both tabs (CLAUDE.md T13 3.13).
+  const inTab = EQUIPMENT_SPECS.filter((spec) => spec.tab === tab || spec.sharedTab === tab);
   if (inTab.length === 0) return emptyLine('Nothing here yet.');
   const rows = inTab
     .filter(

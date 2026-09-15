@@ -27,7 +27,7 @@ import {
   SITE_MEASURE_TAXI_COST,
   WORKER_MINUTE_RATE_DIVISOR,
 } from './constants';
-import { canAccept, findEnquiry, removeEnquiry } from './board';
+import { canAccept, drawOffer, findEnquiry, removeEnquiry } from './board';
 import { callRinging, scheduleCalls } from './calls';
 import { template } from './catalog';
 import { addWorkingDays, nextWorkingDay, workingDaysBetween } from './clock';
@@ -44,11 +44,13 @@ import {
 } from './machines';
 import {
   materialCostFor,
-  orderMaterialForJob,
+  orderForJob,
   rackCanSupply,
+  releaseReservation,
+  reserveSheetsFor,
   sheetsDueFor,
   sheetsForCost,
-  stockCostFor,
+  shortfallOf,
 } from './materials';
 import { familyAirBlock } from './media';
 import { firstOnOrder } from './orders';
@@ -75,15 +77,7 @@ import {
   jobTasks,
   materialOrderMinutes,
 } from './tasks';
-import type {
-  Finish,
-  GameState,
-  Job,
-  JobStage,
-  MaterialKind,
-  MaterialMode,
-  StageId,
-} from './types';
+import type { Finish, GameState, Job, JobStage, JsonValue, MaterialKind, StageId } from './types';
 
 export function findJob(state: GameState, jobId: string): Job | null {
   return state.jobs.find((job) => job.id === jobId) ?? null;
@@ -109,8 +103,9 @@ export function stagedJob(
   materialKind: MaterialKind,
   byHand: boolean,
   finish: Finish = 'laminate',
+  needsSpindle = false,
 ): StagedJob {
-  return { labourValue, materialKind, finish, byHand };
+  return { labourValue, materialKind, finish, byHand, needsSpindle };
 }
 
 /** Days of the owner's own time this much labour takes with the machines the hall has now: every
@@ -212,8 +207,62 @@ export interface AcceptResult {
   job: Job | null;
 }
 
-/** Takes an enquiry off the board and turns it into a job with its owner tasks. */
+/** Saying yes to an enquiry: the client answers with a number, the budget times a factor drawn
+ *  inside the band, and the player takes it or leaves it on the event that follows. The draw is
+ *  random on purpose: the team shifts the odds and never guarantees (PIOTR; CLAUDE.md T13 3.24).
+ *  The job itself is made by `takeEnquiry` once the number is accepted. */
 export function acceptEnquiry(state: GameState, enquiryId: string, byHand: boolean): AcceptResult {
+  const enquiry = findEnquiry(state, enquiryId);
+  if (!enquiry) return { ok: false, reason: 'That enquiry has gone', job: null };
+  const allowed = canAccept(state, enquiry);
+  if (!allowed.ok) return { ok: false, reason: allowed.reason, job: null };
+  const locked = enquiry.lockReason !== null;
+  if (locked && !byHand) {
+    return { ok: false, reason: 'Only as a by hand job', job: null };
+  }
+  // Asked once: the number stands until it is answered.
+  if (enquiry.offer === null) enquiry.offer = drawOffer(state, enquiry);
+  const already =
+    state.activeEvent?.kind === 'clientOffer' && state.activeEvent.data.enquiryId === enquiry.id;
+  const queued = state.eventQueue.some(
+    (event) => event.kind === 'clientOffer' && event.data.enquiryId === enquiry.id,
+  );
+  if (!already && !queued) {
+    queueEvent(state, {
+      kind: 'clientOffer',
+      title: `${enquiry.name}: the client answers`,
+      body:
+        `The budget was ${formatMoney(enquiry.budget)}. The client offers ` +
+        `${formatMoney(enquiry.offer)}. Accept?`,
+      choices: [
+        { id: 'accept', label: `Accept ${formatMoney(enquiry.offer)}` },
+        { id: 'decline', label: 'Decline' },
+      ],
+      data: { enquiryId: enquiry.id, byHand, offer: enquiry.offer },
+    });
+  }
+  return { ok: true, reason: '', job: null };
+}
+
+/** The answer on the offer event: taken at the number, or left, which costs nothing but the
+ *  enquiry (CLAUDE.md T13 3.24). */
+export function resolveClientOffer(
+  state: GameState,
+  choiceId: string,
+  data: Record<string, JsonValue>,
+): AcceptResult {
+  const enquiryId = data.enquiryId;
+  if (typeof enquiryId !== 'string') return { ok: false, reason: 'That enquiry has gone', job: null };
+  if (choiceId !== 'accept') {
+    removeEnquiry(state, enquiryId);
+    return { ok: false, reason: 'Declined', job: null };
+  }
+  return takeEnquiry(state, enquiryId, data.byHand === true);
+}
+
+/** Takes an enquiry off the board and turns it into a job with its owner tasks, at the price the
+ *  client offered. Its sheets are held from the free stock at once (CLAUDE.md T13 3.3). */
+export function takeEnquiry(state: GameState, enquiryId: string, byHand: boolean): AcceptResult {
   const enquiry = findEnquiry(state, enquiryId);
   if (!enquiry) return { ok: false, reason: 'That enquiry has gone', job: null };
   const allowed = canAccept(state, enquiry);
@@ -224,22 +273,28 @@ export function acceptEnquiry(state: GameState, enquiryId: string, byHand: boole
   }
   const madeByHand = locked;
   const entry = template(enquiry.templateId);
-  // Material and labour come off the base price, so the express uplift is pure profit (T2 3.4).
+  // What the client offered is the price; the budget is remembered. Material and labour come off
+  // the base price, so the express uplift is pure profit (T2 3.4, T13 3.24).
+  const price = enquiry.offer ?? enquiry.price;
   const materialCost = materialCostFor(enquiry.basePrice, enquiry.bespokeMaterial);
   const labourValue = labourValueFor(enquiry.basePrice);
   const job: Job = {
     id: makeId(state, 'job'),
     templateId: enquiry.templateId,
     name: enquiry.name,
-    price: enquiry.price,
+    price,
     basePrice: enquiry.basePrice,
     sizeMultiplier: enquiry.sizeMultiplier,
     finish: enquiry.finish,
     materialKind: enquiry.materialKind,
     materialCost,
-    materialMode: 'auto',
     sheets: sheetsForCost(materialCost),
     sheetsUsed: 0,
+    sheetsReserved: 0,
+    kind: enquiry.kind,
+    budget: enquiry.budget,
+    nightMinutes: 0,
+    needsSpindle: entry.requiredEquipment.includes('spindleMoulder'),
     blockedBy: '',
     bespokeMaterial: enquiry.bespokeMaterial,
     express: enquiry.express,
@@ -280,6 +335,8 @@ export function acceptEnquiry(state: GameState, enquiryId: string, byHand: boole
   const deposit = Math.round(job.price * DEPOSIT_FRACTION * 100) / 100;
   job.depositPaid = deposit;
   receive(state, 'jobDeposit', `Deposit for ${job.name}`, deposit);
+  // Reserved from the free stock at once; what it could not have is its shortfall (T13 3.3).
+  reserveSheetsFor(state, job);
   createJobTasks(state, job);
   return { ok: true, reason: '', job };
 }
@@ -324,6 +381,14 @@ export function createJobTasks(state: GameState, job: Job): void {
     minutes: job.designMinutesRemaining,
     jobId: job.id,
   });
+  // The material take off: reading the drawing and counting the sheets. The owner's until an
+  // estimator is taken on, and never before the drawing (CLAUDE.md T13 3.8).
+  createTask(state, {
+    kind: 'materialTakeOff',
+    label: `Material take off: ${job.name}`,
+    minutes: Math.round(materialOrderMinutes(job.price)),
+    jobId: job.id,
+  });
   if (job.needsMeasure) {
     createTask(state, {
       kind: 'siteMeasure',
@@ -351,13 +416,25 @@ function measureOutstanding(state: GameState, job: Job): boolean {
   return jobTasks(state, job.id).some((task) => task.kind === 'siteMeasure' && !task.done);
 }
 
-/** True once the drawings exist (CLAUDE.md 9.5). The calls used to be in this list and are not
- *  any more: nothing waits on the phone (CLAUDE.md T4 3.3). */
-export function readyToOrderMaterial(state: GameState, job: Job): boolean {
-  return !designOutstanding(state, job) && !measureOutstanding(state, job);
+/** True while the take off has not been done (CLAUDE.md T13 3.8). */
+export function takeOffOutstanding(state: GameState, job: Job): boolean {
+  return jobTasks(state, job.id).some((task) => task.kind === 'materialTakeOff' && !task.done);
 }
 
-/** Keeps the job stage and its task list in step after anything finishes. */
+/** True once the drawing, the site measure and the take off are done: the desk work is behind the
+ *  job (CLAUDE.md 9.5, T13 3.8). The calls are not in this list: nothing waits on the phone
+ *  (CLAUDE.md T4 3.3). */
+export function paperworkDone(state: GameState, job: Job): boolean {
+  return (
+    !designOutstanding(state, job) &&
+    !measureOutstanding(state, job) &&
+    !takeOffOutstanding(state, job)
+  );
+}
+
+/** Keeps the job stage and its task list in step after anything finishes. Ready when the desk
+ *  work is done and every sheet is held; waiting on material while there is a shortfall, on the
+ *  lorry while an order for this job is on its way (CLAUDE.md T13 3.3). */
 export function refreshJob(state: GameState, job: Job): void {
   if (job.stage !== 'accepted' && job.stage !== 'materialPending') return;
   if (designOutstanding(state, job)) {
@@ -366,30 +443,18 @@ export function refreshJob(state: GameState, job: Job): void {
   } else {
     job.designMinutesRemaining = 0;
   }
-  if (!readyToOrderMaterial(state, job)) {
+  if (!paperworkDone(state, job)) {
     job.stage = 'accepted';
     return;
   }
-  // The rack has it: nothing to order, nothing to wait for. The sheets come off the rack as the
-  // job is made, like every other job (PIOTR, 13.09: "it does not take from stock at all").
-  if (canDrawFromStock(state, job)) {
-    for (const task of jobTasks(state, job.id)) {
-      if (task.kind === 'materialOrder' && !task.done) task.done = true;
-    }
-    job.materialCost = stockCostFor(job.sheets);
+  // Anything free that has come onto the rack since it was taken is held for it now.
+  reserveSheetsFor(state, job);
+  if (shortfallOf(job) === 0) {
     job.stage = 'ready';
     return;
   }
-  job.stage = 'materialPending';
-  const hasOrderTask = jobTasks(state, job.id).some((task) => task.kind === 'materialOrder');
-  if (!hasOrderTask) {
-    createTask(state, {
-      kind: 'materialOrder',
-      label: `Material order: ${job.name}`,
-      minutes: Math.round(materialOrderMinutes(job.price)),
-      jobId: job.id,
-    });
-  }
+  const coming = state.deliveries.some((delivery) => delivery.jobId === job.id && !delivery.unloaded);
+  job.stage = coming ? 'materialOrdered' : 'materialPending';
 }
 
 /** The site measure costs a taxi while there is no van (CLAUDE.md 8.10). */
@@ -399,41 +464,30 @@ export function chargeSiteMeasure(state: GameState, job: Job): void {
   }
 }
 
-/** The material order task is done: the lorry is booked, or the sheets come off the rack. */
-/** Sheets off the rack only cover board jobs of standard material (CLAUDE.md 8.9). */
-/** Sheets on the rack that other stock jobs have not yet used: what this job can still count on.
- *  Without this, three jobs would each see the same forty sheets and two of them would stand
- *  waiting for material half way through (PIOTR, 13.09). */
-export function sheetsFreeFor(state: GameState, job: Job): number {
-  let promised = 0;
-  for (const other of state.jobs) {
-    if (other.id === job.id) continue;
-    if (other.materialMode === 'perJob' || other.materialKind !== 'sheet') continue;
-    if (other.stage !== 'ready' && other.stage !== 'inProduction') continue;
-    // Only jobs that are actually eating the rack: a per job order came off its own lorry.
-    if (other.materialCost !== stockCostFor(other.sheets)) continue;
-    promised += Math.max(0, other.sheets - other.sheetsUsed);
-  }
-  return state.stock.sheets - promised;
+/** The take off is done: the job moves on, ready or waiting on its shortfall (CLAUDE.md T13 3.8). */
+export function onTakeOffDone(state: GameState, job: Job): void {
+  refreshJob(state, job);
 }
 
-export function canDrawFromStock(state: GameState, job: Job): boolean {
-  if (job.materialMode === 'perJob') return false;
-  if (job.materialKind !== 'sheet' || job.bespokeMaterial) return false;
-  return sheetsFreeFor(state, job) >= job.sheets;
+/** Why the shortfall cannot be ordered for this job, or that it can (CLAUDE.md T13 3.3). */
+export function orderForJobCheck(state: GameState, job: Job): { ok: boolean; reason: string } {
+  if (shortfallOf(job) <= 0) return { ok: false, reason: 'Nothing short' };
+  if (state.deliveries.some((delivery) => delivery.jobId === job.id && !delivery.unloaded)) {
+    return { ok: false, reason: 'On its way already' };
+  }
+  return { ok: true, reason: '' };
 }
 
-export function onMaterialOrdered(state: GameState, job: Job): void {
-  if (canDrawFromStock(state, job)) {
-    // The sheets were paid for when they were bought, at the cheaper stock price. They stay on
-    // the rack and come off it as the job is made, like every other job (CLAUDE.md T2 3.6).
-    job.materialCost = stockCostFor(job.sheets);
-    job.stage = 'ready';
-    return;
-  }
-  job.materialMode = 'perJob';
-  orderMaterialForJob(state, job);
-  job.stage = 'materialOrdered';
+/** The job's own Order for this job button: buys the shortfall at the ad hoc price, on a lorry for
+ *  this job (CLAUDE.md T13 3.3). */
+export function orderShortfall(state: GameState, jobId: string): boolean {
+  const job = findJob(state, jobId);
+  if (!job) return false;
+  if (!orderForJobCheck(state, job).ok) return false;
+  const delivery = orderForJob(state, job);
+  if (delivery === null) return false;
+  if (job.stage === 'materialPending') job.stage = 'materialOrdered';
+  return true;
 }
 
 export function onDeliveryArrived(state: GameState, jobId: string | null): void {
@@ -442,11 +496,22 @@ export function onDeliveryArrived(state: GameState, jobId: string | null): void 
   if (job && job.stage === 'materialOrdered') job.stage = 'materialInYard';
 }
 
+/** A lorry is unloaded: every job that was waiting on material and has it now is ready, this
+ *  one first (CLAUDE.md T13 3.3). */
 export function onDeliveryUnloaded(state: GameState, jobId: string | null): void {
-  if (!jobId) return;
-  const job = findJob(state, jobId);
-  if (job && (job.stage === 'materialInYard' || job.stage === 'materialOrdered')) {
-    job.stage = 'ready';
+  for (const job of state.jobs) {
+    if (job.stage === 'materialInYard' || job.stage === 'materialOrdered') {
+      if (job.id === jobId || shortfallOf(job) === 0) job.stage = 'materialPending';
+    }
+    if (job.stage === 'materialPending') refreshJob(state, job);
+  }
+}
+
+/** Every job with a shortfall holds what the rack can spare now, and moves on when it is whole:
+ *  after a restock and after every unloading (CLAUDE.md T13 3.3). */
+export function refreshMaterial(state: GameState): void {
+  for (const job of state.jobs) {
+    if (job.stage === 'materialPending') refreshJob(state, job);
   }
 }
 
@@ -475,6 +540,8 @@ export function dropJob(state: GameState, jobId: string): boolean {
     state.stock.sheets += left;
   }
   job.sheetsUsed = 0;
+  // What it held goes back to the free stock (CLAUDE.md T13 3.3).
+  releaseReservation(job);
   // Nobody is left standing on a job that is not there any more.
   const dropped = new Set(jobTasks(state, job.id).map((task) => task.id));
   state.tasks = state.tasks.filter((task) => task.jobId !== job.id);
@@ -490,55 +557,6 @@ export function dropJob(state: GameState, jobId: string): boolean {
   }
   state.jobs = state.jobs.filter((entry) => entry.id !== job.id);
   changeReputation(state, -DROP_PROJECT_REPUTATION, `Dropped: ${job.name}`);
-  return true;
-}
-
-/** What the rack can do for this job this minute, in the words the button says (PIOTR, 13.09:
- *  "do not make me order again"; CLAUDE.md T9 3.7). One place the refusals are written: the
- *  button asks this and the action asks this. */
-export function stockCheck(state: GameState, job: Job): { ok: boolean; reason: string } {
-  if (job.stage !== 'accepted' && job.stage !== 'materialPending') {
-    return { ok: false, reason: 'The material for this one is settled' };
-  }
-  if (job.materialKind !== 'sheet') return { ok: false, reason: 'Not sheet material' };
-  if (job.bespokeMaterial) return { ok: false, reason: 'Bespoke material is ordered in' };
-  if (!readyToOrderMaterial(state, job)) return { ok: false, reason: 'The drawing is not done' };
-  const free = Math.max(0, sheetsFreeFor(state, job));
-  if (free < job.sheets) {
-    return { ok: false, reason: `Rack has ${free} of ${job.sheets} sheets` };
-  }
-  return { ok: true, reason: '' };
-}
-
-/** Takes the job's sheets off the rack now and holds them for it. The material order is done and
- *  green, and there is no second order for this job, ever (PIOTR, 13.09; CLAUDE.md T9 3.7). */
-export function drawFromStock(state: GameState, jobId: string): boolean {
-  const job = findJob(state, jobId);
-  if (!job) return false;
-  if (!stockCheck(state, job).ok) return false;
-  job.materialMode = 'stock';
-  // Paid for when they were bought, at the cheaper stock price (CLAUDE.md 8.9).
-  job.materialCost = stockCostFor(job.sheets);
-  // Off the rack at the click and held for this job: nobody else is promised them, and the bench
-  // never stops half way through for material that is standing right there.
-  state.stock.sheets -= job.sheets;
-  job.sheetsUsed = job.sheets;
-  for (const task of jobTasks(state, job.id)) {
-    if (task.kind !== 'materialOrder' || task.done) continue;
-    task.label = `Material from stock: ${job.name}`;
-    task.minutesRemaining = 0;
-    task.done = true;
-    task.doneDay = state.clock.day;
-  }
-  job.stage = 'ready';
-  return true;
-}
-
-export function setMaterialMode(state: GameState, jobId: string, mode: MaterialMode): boolean {
-  const job = findJob(state, jobId);
-  if (!job) return false;
-  if (job.stage !== 'accepted' && job.stage !== 'materialPending') return false;
-  job.materialMode = mode;
   return true;
 }
 
@@ -630,9 +648,11 @@ export function startProductionCheck(state: GameState, job: Job): StartCheck {
     if (meetingOutstanding(state, job)) return blocked('meeting not held');
     if (designOutstanding(state, job)) return blocked('design not done');
     if (measureOutstanding(state, job)) return blocked('site measure not done');
+    if (takeOffOutstanding(state, job)) return blocked('material take off not done');
   }
   if (job.stage === 'accepted' || job.stage === 'materialPending') {
-    return blocked('material not ordered');
+    const short = shortfallOf(job);
+    return blocked(short > 0 ? `${plural(short, 'sheet', 'sheets')} short` : 'material not settled');
   }
   if (job.stage === 'materialOrdered') return blocked(arrivalReason(state, job));
   if (job.stage === 'materialInYard') return blocked('unload the delivery');
@@ -673,7 +693,9 @@ export function lifecycleSteps(state: GameState, job: Job): LifecycleStep[] {
     // actually on the line (CLAUDE.md T4 3.3).
     !callRinging(state, job),
     ordered || (!designOutstanding(state, job) && !measureOutstanding(state, job)),
-    ordered,
+    // The Material step is the take off (CLAUDE.md T13 3.8); the Delivery step is every sheet
+    // in hand (T13 3.3).
+    ordered || !takeOffOutstanding(state, job),
     job.stage === 'ready' ||
       job.stage === 'inProduction' ||
       job.stage === 'awaitingTransport' ||

@@ -6,6 +6,7 @@ import { earnedRate } from '../../src/engine/economy';
 import { tick } from '../../src/engine/index';
 import type { GameState } from '../../src/engine/index';
 import {
+  acceptNow,
   act,
   buyStartingKit,
   withExtraction,
@@ -26,7 +27,7 @@ function atTheBench(sawVariant: string): GameState {
   );
   state.enquiries = [];
   const enquiry = placeEnquiry(state, { price: 40000, deadlineDays: 90 });
-  const taken = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+  const taken = acceptNow(state, enquiry.id, false);
   firstJob(taken).stage = 'ready';
   return act(taken, { type: 'WORK_HERE', jobId: null });
 }
@@ -53,6 +54,8 @@ function withJoiner(state: GameState): GameState {
     station: 'idle',
     productionMinutes: 0,
     absentDaysRemaining: 0,
+    shift: 'day',
+    dayLog: [],
     anchorX: 0,
     anchorY: 4,
   });
@@ -133,6 +136,8 @@ describe('the two of them together', () => {
         labourValue: 42 * 8,
         workMinutes: 480,
         dayLog: [],
+        efficiency: { possible: 0, worked: 0, lost: { noPeople: 0, noMachine: 0, noMaterial: 0, ownerAway: 0 } },
+        nightMinutes: 0,
       },
     ];
     state.dayStats.workMinutes = 480;

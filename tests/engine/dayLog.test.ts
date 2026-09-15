@@ -14,6 +14,7 @@ import {
 } from '../../src/engine/index';
 import type { DayCategory, DayLogEntry } from '../../src/engine/index';
 import {
+  acceptNow,
   act,
   buyStartingKit,
   doTask,
@@ -47,8 +48,10 @@ describe('the seven bands', () => {
     }
   });
 
-  it('is seven bands and no more, each with a name the player reads', () => {
-    expect(DAY_CATEGORIES).toHaveLength(7);
+  it('is eight bands and no more, each with a name the player reads', () => {
+    // The eighth is the assigning of people, which a production manager takes off the owner
+    // (CLAUDE.md T13 3.9).
+    expect(DAY_CATEGORIES).toHaveLength(8);
     expect([...DAY_CATEGORIES]).toEqual([
       'workshop',
       'calls',
@@ -57,6 +60,7 @@ describe('the seven bands', () => {
       'siteMeasure',
       'office',
       'fixing',
+      'assign',
     ]);
     for (const category of DAY_CATEGORIES) {
       expect(DAY_CATEGORY_LABELS[category]).not.toBe('');
@@ -152,7 +156,7 @@ describe('the owner writing his own day', () => {
       withExtraction(fillRack(buyStartingKit(newGame({ difficulty: 'veryEasy' })), 40)),
     );
     const enquiry = placeEnquiry(start, { price: 6000, deadlineDays: 40 });
-    let state = act(start, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+    let state = acceptNow(start, enquiry.id, false);
     const job = state.jobs[0];
     if (job === undefined) throw new Error('no job on the books');
     job.stage = 'ready';

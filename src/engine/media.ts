@@ -23,7 +23,7 @@ import {
   EXTRACTION_DEMAND,
   EXTRACTION_MARGIN,
 } from './constants';
-import { BENCH, floorMachines, isSold, itemStandsInTheHall } from './machines';
+import { BENCH, floorMachines, hasCentralExtraction, isSold, itemStandsInTheHall } from './machines';
 import { cncOptions, currentStage } from './stages';
 import type { Equipment, GameState } from './types';
 
@@ -68,6 +68,24 @@ export function extractionKit(state: GameState): Equipment[] {
   );
 }
 
+/** Connected to the extraction: a run of pipe to a unit, or a hall on a central system whose
+ *  ducts reach everything. A machine that wants no extraction is never unconnected. Asked here
+ *  and not in pipes.ts, which imports this module (CLAUDE.md T13 3.19). */
+export function isConnectedToExtraction(state: GameState, item: Equipment): boolean {
+  if (extractionDemandOf(item) <= 0) return true;
+  if (hasCentralExtraction(state)) return true;
+  // A gate on the drop counts the machine only while it runs; without one the duct is open
+  // through the branch whenever it is connected (CLAUDE.md T13 3.11). The demand rule reads
+  // this list; phase B4 writes the gated counting.
+  return state.pipes.some((run) => run.equipmentId === item.id);
+}
+
+/** The machines at work this minute that have no pipe to the extraction: they are not served, and
+ *  the hall is short for that minute (CLAUDE.md T13 3.19, 10.1). */
+export function unservedMachines(state: GameState): Equipment[] {
+  return extractingMachines(state).filter((item) => !isConnectedToExtraction(state, item));
+}
+
 export interface ExtractionCheck {
   /** What the machines at work are asking for, m3/h. */
   demand: number;
@@ -88,14 +106,17 @@ export function extractionCheck(state: GameState): ExtractionCheck {
   let capacity = 0;
   for (const item of extractionKit(state)) capacity += extractionCapacityOf(item);
   const allowed = Math.round(capacity * EXTRACTION_MARGIN);
-  const short = demand > allowed;
-  return {
-    demand,
-    capacity,
-    allowed,
-    short,
-    line: short ? `Extraction short: ${mediaFigure(demand)} of ${mediaFigure(allowed)}` : '',
-  };
+  // A machine running with no pipe to a unit is not served at all, whatever the fans could
+  // pull: the hall is short for that minute (CLAUDE.md T13 3.19).
+  const unserved = unservedMachines(state);
+  const short = demand > allowed || unserved.length > 0;
+  const line =
+    unserved.length > 0
+      ? `Extraction: ${unserved.length === 1 ? 'a machine is' : `${unserved.length} machines are`} not connected`
+      : short
+        ? `Extraction short: ${mediaFigure(demand)} of ${mediaFigure(allowed)}`
+        : '';
+  return { demand, capacity, allowed, short, line };
 }
 
 /** True while the hall is under extracted: the one predicate the dust, the output and the job's

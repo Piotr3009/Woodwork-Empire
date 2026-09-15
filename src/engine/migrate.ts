@@ -1,4 +1,4 @@
-// A saved game from the build before this one, lifted into the shape the engine runs on now.
+// A saved game from the builds before this one, lifted into the shape the engine runs on now.
 //
 // The loader used to refuse every save that was not this build's, and a company was lost at every
 // delivery. From Turn 12 a save one bump behind is opened: the fields the bump added are zeroed,
@@ -6,7 +6,7 @@
 // refused as it always was (CLAUDE.md T12 2.3). Written against the plain JSON a save is and not
 // against the types, because the whole point is that the file does not match them yet.
 
-import { STATE_VERSION } from './constants';
+import { STATE_VERSION, WEBSITE_START_LEVEL } from './constants';
 import type { GameState } from './types';
 
 /** The oldest save this build opens: Turn 11's v18, which is state version 12. */
@@ -70,8 +70,77 @@ function liftToVersion13(state: Raw): void {
   state.version = 13;
 }
 
+/** The empty efficiency tally a day opens with (CLAUDE.md T13 3.5). */
+function emptyEfficiency(): Raw {
+  return { possible: 0, worked: 0, lost: { noPeople: 0, noMachine: 0, noMaterial: 0, ownerAway: 0 } };
+}
+
+/** Version 13 to 14: the workshop grows up (CLAUDE.md T13 section 4). Every v19 save loads:
+ *  finance empty, no covers, security 0, website 1, no contracts, draw tier 1 at 200 a day, no
+ *  pipes, gates none, tips on, second shift off; the per project question is gone off every job,
+ *  the per job material order is the material take off, and the living cost is the owner's draw. */
+function liftToVersion14(state: Raw): void {
+  if (isRecord(state.finance)) {
+    state.finance.loan = null;
+    state.finance.overdraftInterestAccrued = 0;
+  }
+  state.insurance = { property: false, liability: false, insuredValue: 0, payouts: [] };
+  state.security = { level: 0, lastBurglaryDay: null };
+  state.website = { level: WEBSITE_START_LEVEL, lastUpkeepDay: null };
+  state.contracts = [];
+  state.ownerDraw = { tier: 0 };
+  state.pipes = [];
+  state.gates = [];
+  state.settings = { tips: true };
+  state.tips = { seen: [] };
+  state.shift = { second: false };
+  state.monthEndShownFor = 0;
+  if (isRecord(state.software)) {
+    state.software.joineryCore = false;
+    state.software.joineryCoreExtensions = 0;
+  }
+  if (isRecord(state.owner)) state.owner.holidayDaysRemaining = 0;
+  if (isRecord(state.dayStats)) {
+    state.dayStats.efficiency = emptyEfficiency();
+    state.dayStats.nightMinutes = 0;
+  }
+  for (const day of records(state.days)) {
+    day.efficiency = emptyEfficiency();
+    day.nightMinutes = 0;
+  }
+  for (const worker of records(state.workers)) {
+    worker.shift = 'day';
+    worker.dayLog = [];
+  }
+  for (const enquiry of records(state.enquiries)) {
+    enquiry.kind = 'residential';
+    enquiry.budget = typeof enquiry.price === 'number' ? enquiry.price : 0;
+    enquiry.offer = null;
+  }
+  for (const job of records(state.jobs)) {
+    delete job.materialMode;
+    job.kind = 'residential';
+    job.budget = typeof job.price === 'number' ? job.price : 0;
+    // Nothing was held for a job before tonight: what it needs it reserves at the next restock.
+    job.sheetsReserved = 0;
+    job.nightMinutes = 0;
+    job.needsSpindle = false;
+  }
+  for (const task of records(state.tasks)) {
+    if (task.kind === 'materialOrder') {
+      task.kind = 'materialTakeOff';
+      if (typeof task.label === 'string') task.label = task.label.replace('Material order', 'Material take off');
+    }
+  }
+  for (const entry of records(state.ledger)) {
+    if (entry.category === 'living') entry.category = 'ownerDraw';
+    if (entry.category === 'ducting') entry.category = 'pipes';
+  }
+  state.version = 14;
+}
+
 /** One lift per bump, keyed by the version it lifts from. */
-const LIFTS: Record<number, (state: Raw) => void> = { 12: liftToVersion13 };
+const LIFTS: Record<number, (state: Raw) => void> = { 12: liftToVersion13, 13: liftToVersion14 };
 
 /** The state a save holds, lifted bump by bump into this build's shape, or null when the save is
  *  older than anything this build can lift or is not a state at all. The save itself is left as

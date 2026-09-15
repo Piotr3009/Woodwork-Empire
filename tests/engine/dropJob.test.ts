@@ -6,6 +6,7 @@ import { DROP_PROJECT_REPUTATION } from '../../src/engine/constants';
 import { renderWorkPlan } from '../../src/ui/workPlan';
 import type { GameState, Job } from '../../src/engine/index';
 import {
+  acceptNow,
   act,
   buyStartingKit,
   clearEvents,
@@ -19,7 +20,7 @@ function withJob(price: number, options: { sheets?: number } = {}): { state: Gam
   let state = fillRack(buyStartingKit(newGame({ difficulty: 'veryEasy' })), options.sheets ?? 0);
   state.enquiries = [];
   const enquiry = placeEnquiry(state, { price, deadlineDays: 30 });
-  state = clearEvents(act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false }));
+  state = clearEvents(acceptNow(state, enquiry.id, false));
   const job = state.jobs[0];
   if (job === undefined) throw new Error('no job');
   return { state, job };
@@ -56,7 +57,6 @@ describe('Drop project', () => {
   it('puts material that came off the rack back on it', () => {
     const { state, job } = withJob(1600, { sheets: 40 });
     // Off the rack and held for the job, as From stock leaves it (CLAUDE.md T9 3.7).
-    job.materialMode = 'stock';
     job.sheetsUsed = job.sheets;
     state.stock.sheets -= job.sheets;
     const onTheRack = state.stock.sheets;
@@ -66,7 +66,6 @@ describe('Drop project', () => {
 
   it('writes off material that was ordered in for that job and nothing else', () => {
     const { state, job } = withJob(1600, { sheets: 40 });
-    job.materialMode = 'perJob';
     job.sheetsUsed = job.sheets;
     state.stock.sheets -= job.sheets;
     // A lorry was booked for this job: that is what makes it the job's own material and not the

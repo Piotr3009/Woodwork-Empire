@@ -3,10 +3,12 @@ import {
   ARREARS_MONTHLY_INTEREST,
   BAILIFF_SEIZURE_FRACTION,
   LATE_ACCOUNTS_CHARGE,
+  LEDGER_MAX_ENTRIES,
   DAYS_PER_MONTH,
   DUST_WASTE_MONTHLY,
-  LIVING_COST_PER_WORKING_DAY,
-  OVERDRAFT_MONTHLY_INTEREST,
+  OWNER_DRAW_PER_DAY,
+  OVERDRAFT_RATE_YEARLY,
+  DAYS_PER_YEAR,
   PELLET_INCOME_MONTHLY_BASE,
   PELLET_INCOME_PER_1000_PRODUCTION_MINUTES,
   POWER_BASE_DAILY,
@@ -78,6 +80,8 @@ function joiner(id: string, weeklyWage: number): Worker {
     station: 'idle',
     productionMinutes: 0,
     absentDaysRemaining: 0,
+    shift: 'day',
+    dayLog: [],
     anchorX: 0,
     anchorY: 4,
   };
@@ -113,7 +117,7 @@ describe('daily costs', () => {
   it('charges living costs on working days only', () => {
     // Days 1 to 5 and day 8: six working days, no charge on the Saturday or the Sunday.
     const week = runToDay(newGame(), 8).state;
-    expect(ledgerFor(week, 'living')).toBeCloseTo(-6 * LIVING_COST_PER_WORKING_DAY, 6);
+    expect(ledgerFor(week, 'ownerDraw')).toBeCloseTo(-6 * OWNER_DRAW_PER_DAY, 6);
   });
 
   it('charges power per machine on top of the base', () => {
@@ -183,16 +187,17 @@ describe('weekly and monthly cadences', () => {
     expect(ledgerFor(plain, 'waste')).toBe(0);
   });
 
-  it('charges overdraft interest on the 1st when cash is negative', () => {
+  it('accrues overdraft interest day by day below zero and charges it on the 1st', () => {
     const state = newGame();
     // Deep enough in the red for the interest to bite, with room left before the floor.
     state.cash = -2000;
     const nextMonth = runToDay(state, 31);
-    const interest = ledgerFor(nextMonth.state, 'interest');
+    const interest = ledgerFor(nextMonth.state, 'overdraftInterest');
     expect(interest).toBeLessThan(0);
-    const balanceOnThe31st =
-      nextMonth.state.ledger.find((entry) => entry.category === 'interest')?.balance ?? 0;
-    expect(-interest).toBeCloseTo((balanceOnThe31st - interest) * -OVERDRAFT_MONTHLY_INTEREST, 4);
+    // At least what the opening balance alone would have accrued over the days to the 1st, at
+    // the yearly rate a day (CLAUDE.md T13 3.14), and reset once charged.
+    expect(-interest).toBeGreaterThanOrEqual((2000 * OVERDRAFT_RATE_YEARLY * 29) / DAYS_PER_YEAR);
+    expect(nextMonth.state.finance.overdraftInterestAccrued).toBeGreaterThanOrEqual(0);
     expect(eventsOfKind(nextMonth.events, 'monthlyBills').length).toBeGreaterThan(0);
   });
 
@@ -225,7 +230,7 @@ describe('cash primitives', () => {
 
   it('keeps the ledger bounded', () => {
     const state = runToDay(newGame(), 60).state;
-    expect(state.ledger.length).toBeLessThanOrEqual(200);
+    expect(state.ledger.length).toBeLessThanOrEqual(LEDGER_MAX_ENTRIES);
   });
 });
 
@@ -274,7 +279,8 @@ describe('arrears, bailiff and bankruptcy', () => {
 
   it('takes the cheapest machine first, so the company can carry on', () => {
     const state = newGame();
-    const withKit = buyNow(buyNow(state, 'tableSaw'), 'thicknesser');
+    // The standard thicknesser, so the used saw at 1800 is the cheapest thing in the hall.
+    const withKit = buyNow(buyNow(state, 'tableSaw'), 'thicknesser', 'standard');
     const copy = { ...withKit, equipment: withKit.equipment.map((item) => ({ ...item })) };
     copy.finance = { ...copy.finance, arrearsAmount: 5000, arrearsMonths: 3, firstArrearsDay: 1 };
     runBailiff(copy);

@@ -6,8 +6,11 @@
 import { findJob, jobsAtGate, openTasks, staffMinutesLeft, workerById } from '../engine/index';
 import type { GameState, TaskInstance } from '../engine/index';
 import { renderDrawings } from './drawings';
+import { renderInsurance } from './insurance';
 import { gateSection } from './jobCard';
 import { renderMaterials } from './materials';
+import { renderSecurity } from './security';
+import { renderWebsite } from './website';
 import {
   emptyLine,
   escapeHtml,
@@ -21,13 +24,28 @@ import {
 /** The four tabs, in the order the contract names them (docs/art/SPRITES.md 8.2). Team is a chip
  *  that opens the Team board, which is a page of the game now and not a tab inside the laptop
  *  (PIOTR, 13.09; CLAUDE.md T10 3.6): the laptop never renders a body for it. */
-export type LaptopTab = 'tasks' | 'materials' | 'team' | 'drawings';
+export type LaptopTab =
+  | 'tasks'
+  | 'materials'
+  | 'team'
+  | 'drawings'
+  | 'website'
+  | 'insurance'
+  | 'security';
+
+/** The Admin group: the three tabs Turn 13 added, built once (CLAUDE.md T13 3.7, 3.15, 3.17). */
+export const ADMIN_TABS: Array<[LaptopTab, string]> = [
+  ['website', 'Website'],
+  ['insurance', 'Insurance'],
+  ['security', 'Security'],
+];
 
 const TABS: Array<[LaptopTab, string]> = [
   ['tasks', 'Tasks'],
-  ['materials', 'Materials'],
+  ['materials', 'Stock'],
   ['team', 'Team'],
   ['drawings', 'Drawings'],
+  ...ADMIN_TABS,
 ];
 
 export function laptopTabFrom(value: string): LaptopTab {
@@ -96,6 +114,12 @@ export function renderLaptop(state: GameState, view: LaptopView): string {
       ? renderMaterials(state, view.stockSheets)
       : view.tab === 'drawings'
         ? renderDrawings(state)
-        : tasksTab(state);
+        : view.tab === 'website'
+          ? renderWebsite(state)
+          : view.tab === 'insurance'
+            ? renderInsurance(state)
+            : view.tab === 'security'
+              ? renderSecurity(state)
+              : tasksTab(state);
   return tabBar('laptopTab', TABS, view.tab) + body;
 }

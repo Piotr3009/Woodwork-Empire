@@ -2,10 +2,11 @@
 // His 480 minutes a day are the core resource of the game (CLAUDE.md 1.3).
 
 import {
-  ABSENCE_OUTPUT_FACTOR,
-  ABSENCE_OUTPUT_FACTOR_EXCEPTIONAL_CEO,
-  ABSENCE_OUTPUT_FACTOR_WITH_CEO,
   BREAK_MINUTES,
+  HOUSE_WINDOW_DAYS,
+  OWNER_AWAY_PENALTY,
+  OWNER_AWAY_PENALTY_WITH_PM,
+  OWNER_DRAW_TIERS,
   BREAK_SKIP_FACTOR,
   DAY_CATEGORIES,
   DAYS_PER_YEAR,
@@ -79,18 +80,71 @@ export function ownerIsAvailable(state: GameState): boolean {
   return state.owner.present && !state.owner.wentHome;
 }
 
-/** What an absent owner costs the company. CEO hiring is parked (CLAUDE.md 14.2), so Turn 1 always
- *  asks for the no CEO case, but the modelled numbers are here for the later turn. */
-export function absenceFactor(hasCeo: boolean, exceptionalCeo: boolean): number {
-  if (exceptionalCeo) return ABSENCE_OUTPUT_FACTOR_EXCEPTIONAL_CEO;
-  if (hasCeo) return ABSENCE_OUTPUT_FACTOR_WITH_CEO;
-  return ABSENCE_OUTPUT_FACTOR;
+/** What an absent owner costs the company: 30% off every staff minute, or 8% with a production
+ *  manager on the books to cover him (PIOTR; CLAUDE.md 7.3, T13 3.9). */
+export function absenceFactor(hasManager: boolean): number {
+  return 1 - (hasManager ? OWNER_AWAY_PENALTY_WITH_PM : OWNER_AWAY_PENALTY);
 }
 
-/** Staff output when the owner is not in the workshop (CLAUDE.md 7.3). */
+/** True while a production manager is on the books and in today (CLAUDE.md T13 3.9). Written
+ *  here and not in staff.ts, which imports this module. */
+export function managerOnDuty(state: GameState): boolean {
+  return state.workers.some(
+    (worker) =>
+      worker.role === 'productionManager' &&
+      worker.startDay <= state.clock.day &&
+      worker.absentDaysRemaining === 0,
+  );
+}
+
+/** Staff output when the owner is not in the workshop (CLAUDE.md 7.3, T13 3.9). */
 export function staffOutputFactor(state: GameState): number {
   if (ownerIsAvailable(state)) return 1;
-  return absenceFactor(false, false);
+  return absenceFactor(managerOnDuty(state));
+}
+
+/** What the owner pays himself a day, at the tier he chose (CLAUDE.md T13 3.18). */
+export function ownerDrawPerDay(state: GameState): number {
+  return OWNER_DRAW_TIERS[state.ownerDraw.tier] ?? OWNER_DRAW_TIERS[0] ?? 0;
+}
+
+/** What the owner has actually paid himself over the last thirty calendar days, off the ledger
+ *  (CLAUDE.md T13 3.18). */
+export function ownerDrawPaidInWindow(state: GameState): number {
+  const from = state.clock.day - HOUSE_WINDOW_DAYS + 1;
+  let paid = 0;
+  for (const entry of state.ledger) {
+    if (entry.category !== 'ownerDraw' || entry.unpaid || entry.day < from) continue;
+    paid += -entry.amount;
+  }
+  return Math.round(paid * 100) / 100;
+}
+
+/** The house tier, 1 to 8: the highest threshold whose thirty day sum the owner has actually paid
+ *  himself, so a raised draw shows the new house only once the money has really gone
+ *  (CLAUDE.md T13 3.18). The thirty day sum of a tier is its daily figure over the working days
+ *  of the window, which is what the draw is charged on. Phase B2 owns this; phase A gives the
+ *  rule so the card and the team page can read it. */
+export function houseTierFor(state: GameState): number {
+  const paid = ownerDrawPaidInWindow(state);
+  const workingDaysInWindow = Math.round((HOUSE_WINDOW_DAYS * 5) / 7);
+  let tier = 1;
+  OWNER_DRAW_TIERS.forEach((draw, index) => {
+    if (paid >= draw * workingDaysInWindow - 0.01) tier = index + 1;
+  });
+  return tier;
+}
+
+/** A holiday: the owner is away for so many working days, living costs continue, the absence
+ *  penalty applies (CLAUDE.md T13 3.9). Only with a production manager; phase B2 owns the button
+ *  and the refusal, phase A the field. */
+export function startHoliday(state: GameState, days: number): { ok: boolean; reason: string } {
+  if (!managerOnDuty(state)) return { ok: false, reason: 'No production manager to cover' };
+  if (days <= 0) return { ok: false, reason: 'No days asked for' };
+  state.owner.holidayDaysRemaining = days;
+  state.owner.present = false;
+  state.owner.stayHome = true;
+  return { ok: true, reason: '' };
 }
 
 /** Writes one minute onto the end of a day log, joined to the run before it when it is the same
@@ -209,6 +263,13 @@ export function runOwnerDayStart(state: GameState): void {
   if (owner.sickDaysRemaining > 0) {
     owner.sickDaysRemaining -= 1;
     owner.present = false;
+    return;
+  }
+  // On holiday: away today, with the penalty the manager softens (CLAUDE.md T13 3.9).
+  if (owner.holidayDaysRemaining > 0) {
+    owner.holidayDaysRemaining -= 1;
+    owner.present = false;
+    owner.stayHome = true;
     return;
   }
   if (owner.sickStartDay === state.clock.day) {

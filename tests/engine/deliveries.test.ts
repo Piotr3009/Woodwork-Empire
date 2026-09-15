@@ -123,7 +123,9 @@ describe('a used saw ordered on day 1', () => {
 
 describe('a CNC ordered on day 1', () => {
   it('lands 45 working days later, which is nine weeks of the calendar', () => {
-    const state = order(shop(), 'cnc');
+    // The standard class: the CNC has its five classes from Turn 13 and a used one is on a lorry
+    // inside the week (CLAUDE.md T13 3.12).
+    const state = order(shop(), 'cnc', 'standard');
     const cnc = state.onOrder.find((item) => item.specId === 'cnc');
     expect(cnc).toBeDefined();
     expect(cnc?.dueDay).toBe(addWorkingDays(1, 45));

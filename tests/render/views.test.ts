@@ -8,6 +8,7 @@ import { centreOf } from '../../src/render/iso';
 import type { GameState } from '../../src/engine/index';
 import { tick } from '../../src/engine/index';
 import {
+  acceptNow,
   act,
   buyStartingKit,
   clearEvents,
@@ -112,7 +113,7 @@ describe('the hall on day 1', () => {
     let state = buyStartingKit(newGame());
     state.enquiries = [];
     const enquiry = placeEnquiry(state, { price: 400 });
-    state = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+    state = acceptNow(state, enquiry.id, false);
     state.deliveries.push({
       id: 'del-1',
       jobId: firstJob(state).id,
@@ -141,7 +142,7 @@ describe('the hall on day 1', () => {
     for (let index = 0; index < 4; index += 1) {
       const enquiry = placeEnquiry(state, { price: 400 + index * 10 });
       state.jobs.push({
-        ...firstJob(act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false })),
+        ...firstJob(acceptNow(state, enquiry.id, false)),
         id: `job-gate-${index}`,
         stage: 'awaitingTransport',
       });
@@ -182,6 +183,8 @@ describe('the hall on day 1', () => {
       station: 'idle',
       productionMinutes: 0,
       absentDaysRemaining: 0,
+      shift: 'day',
+      dayLog: [],
       anchorX: 4,
       anchorY: 4,
     });
@@ -261,6 +264,8 @@ describe('the placeholder art rules of 10.3', () => {
       station: 'idle',
       productionMinutes: 0,
       absentDaysRemaining: 0,
+      shift: 'day',
+      dayLog: [],
       anchorX: 0,
       anchorY: 4,
     });
@@ -312,6 +317,8 @@ describe('the placeholder art rules of 10.3', () => {
       station: 'idle',
       productionMinutes: 0,
       absentDaysRemaining: 0,
+      shift: 'day',
+      dayLog: [],
       anchorX: bench?.anchorX ?? 0,
       anchorY: bench?.anchorY ?? 0,
     });
@@ -355,6 +362,8 @@ describe('the laptop', () => {
       station: 'idle',
       productionMinutes: 0,
       absentDaysRemaining: 0,
+      shift: 'day',
+      dayLog: [],
       anchorX: 1,
       anchorY: 1,
     });

@@ -13,8 +13,8 @@ import {
   DUST_WASTE_MONTHLY,
   LATE_ACCOUNTS_CHARGE,
   LEDGER_MAX_ENTRIES,
-  LIVING_COST_PER_WORKING_DAY,
-  OVERDRAFT_MONTHLY_INTEREST,
+  JOINERY_CORE_EXTENSION_PRICE_YEARLY,
+  JOINERY_CORE_PRICE_YEARLY,
   PELLET_INCOME_MONTHLY_BASE,
   PELLET_INCOME_PER_1000_PRODUCTION_MINUTES,
   POWER_BASE_DAILY,
@@ -36,6 +36,7 @@ import {
 } from './clock';
 import { queueEvent } from './events';
 import { has, hasCentralExtraction, machinePowerPerDay, seizableMachines } from './machines';
+import { ownerDrawPerDay } from './owner';
 import { makeId } from './rng';
 import { plural } from './text';
 import type {
@@ -191,11 +192,12 @@ function addLedger(
   label: string,
   amount: number,
   unpaid: boolean,
+  when: { day: number; minute: number } = state.clock,
 ): void {
   state.ledger.push({
     id: makeId(state, 'ledger'),
-    day: state.clock.day,
-    minute: state.clock.minute,
+    day: when.day,
+    minute: when.minute,
     category,
     label,
     amount,
@@ -220,6 +222,38 @@ function record(state: GameState, category: LedgerCategory, amount: number): voi
   addToTotals(state.finance.day, category, amount);
   addToTotals(state.finance.week, category, amount);
   addToTotals(state.finance.month, category, amount);
+}
+
+/** The one signed entry every pound in or out of Turn 13 goes through: a positive amount is money
+ *  in, a negative one is money out, dated `when`, which is the clock unless the caller says
+ *  otherwise, as the night shift's wages booked at the end of the day do (CLAUDE.md T13 2.3,
+ *  10.2). Money out that the player chose obeys the overdraft floor and is refused past it; a cost
+ *  marked unavoidable becomes arrears past it, like the rent. True when the money moved. */
+export function charge(
+  state: GameState,
+  category: LedgerCategory,
+  label: string,
+  amount: number,
+  options: { unavoidable?: boolean; when?: { day: number; minute: number } } = {},
+): boolean {
+  const when = options.when ?? state.clock;
+  if (amount === 0) return false;
+  if (amount > 0) {
+    state.cash += amount;
+    record(state, category, amount);
+    addLedger(state, category, label, amount, false, when);
+    return true;
+  }
+  const out = -amount;
+  if (canAfford(state, out)) {
+    state.cash -= out;
+    record(state, category, -out);
+    addLedger(state, category, label, -out, false, when);
+    return true;
+  }
+  if (options.unavoidable !== true) return false;
+  chargeUnavoidable(state, category, label, out);
+  return true;
 }
 
 /** Money out that the player chose: purchases. Call `canAfford` first. */
@@ -312,8 +346,18 @@ export function monthlyFixedCosts(state: GameState): number {
     state.unit.rentMonthly +
     state.unit.ratesMonthly +
     dailyPower(state) * DAYS_PER_MONTH +
-    LIVING_COST_PER_WORKING_DAY * WORKING_DAYS_PER_MONTH
+    ownerDrawPerDay(state) * WORKING_DAYS_PER_MONTH
   );
+}
+
+/** Joinery Core and its extensions, bought by the year and charged as a twelfth each month
+ *  (CLAUDE.md T13 3.8). */
+export function joineryCoreMonthly(state: GameState): number {
+  if (!state.software.joineryCore) return 0;
+  const yearly =
+    JOINERY_CORE_PRICE_YEARLY +
+    state.software.joineryCoreExtensions * JOINERY_CORE_EXTENSION_PRICE_YEARLY;
+  return Math.round((yearly / 12) * 100) / 100;
 }
 
 /** Arrears carry interest only while they are large (CLAUDE.md T2 3.4). */
@@ -398,10 +442,10 @@ function runMonthlyItems(state: GameState): void {
   const before = state.cash;
   const entriesBefore = state.ledger.length;
   runLateAccounts(state);
-  if (state.cash < 0) {
-    const interest = -state.cash * OVERDRAFT_MONTHLY_INTEREST;
-    chargeUnavoidable(state, 'interest', 'Overdraft interest', interest);
-  }
+  // The overdraft's interest accrued day by day below zero and goes out now, interest only; the
+  // loan's instalment and its interest with it (CLAUDE.md T13 3.14). Both live in finance.ts and
+  // are called from the day's open in game.ts, so this is the one place the monthly items run
+  // and the finance month runs with them.
   if (arrearsCarryInterest(state)) {
     const interest = state.finance.arrearsAmount * ARREARS_MONTHLY_INTEREST;
     chargeUnavoidable(state, 'interest', 'Interest on the arrears', interest);
@@ -411,6 +455,8 @@ function runMonthlyItems(state: GameState): void {
   if (state.software.mode === 'subscription') {
     chargeUnavoidable(state, 'software', 'Software subscription', SOFTWARE_SUBSCRIPTION_MONTHLY);
   }
+  const joineryCore = joineryCoreMonthly(state);
+  if (joineryCore > 0) chargeUnavoidable(state, 'software', 'Joinery Core', joineryCore);
   if (hasCentralExtraction(state) && !has(state, 'pelletiser')) {
     chargeUnavoidable(state, 'waste', 'Dust waste collection', DUST_WASTE_MONTHLY);
   }
@@ -548,7 +594,8 @@ export function runDayCosts(state: GameState, day: number): void {
   chargeUnavoidable(state, 'rates', 'Business rates', dailyRates(state));
   chargeUnavoidable(state, 'power', 'Power', dailyPower(state));
   if (isWorkingDay(day)) {
-    chargeUnavoidable(state, 'living', 'Living costs', LIVING_COST_PER_WORKING_DAY);
+    // What he pays himself, every working day, at the tier he chose (CLAUDE.md T13 3.18).
+    chargeUnavoidable(state, 'ownerDraw', 'Owner\u0027s draw', ownerDrawPerDay(state));
   }
   if (isFriday(day)) {
     const wages = weeklyWageBill(state);

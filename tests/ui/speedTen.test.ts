@@ -86,7 +86,7 @@ describe('the fifth chip', () => {
       const step = advanceMinutes(Math.min(10, 1000 - ran));
       ran += step;
       // Whatever the day puts up stops the clock until it is answered (CLAUDE.md T7 3.10).
-      const asking = root().querySelector('[data-do="resolveEvent"]');
+      const asking = root().querySelector('[data-do="closeHouseCard"], [data-do="resolveEvent"]');
       if (asking !== null) asking.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     }
     expect(ran).toBe(1000);
@@ -112,7 +112,7 @@ describe('the fifth chip', () => {
     // The frame loop runs no minutes at all while something is being asked (CLAUDE.md 6.1).
     expect(advanceMinutes(30)).toBe(0);
     expect(currentState()?.clock.minute).toBe(before);
-    click('[data-do="resolveEvent"]');
+    click('[data-do="closeHouseCard"], [data-do="resolveEvent"]');
   });
 });
 

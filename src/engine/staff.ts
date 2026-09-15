@@ -15,6 +15,7 @@ import {
 } from './constants';
 import { addWorkingDays, isOvertime } from './clock';
 import { assignJob, oldestReadyJob } from './jobs';
+import { crewLimit } from './layout';
 import { findSpec, itemStandsInTheHall } from './machines';
 import { countOwnedOrOnOrder } from './orders';
 import { ownerIsAvailable } from './owner';
@@ -24,7 +25,34 @@ import type { GameState, HiringOption, Worker, WorkerRole, WorkerTier } from './
 
 /** The roles that have a working day of their own, the way the owner does (CLAUDE.md T2 3.8).
  *  A helper still clears his workshop jobs at no cost, as in Turn 1. */
-const OFFICE_ROLES: WorkerRole[] = ['officeAdmin', 'purchasingClerk', 'salesman', 'draftsman'];
+const OFFICE_ROLES: WorkerRole[] = [
+  'officeAdmin',
+  'purchasingClerk',
+  'salesman',
+  'draftsman',
+  'estimator',
+  'productionManager',
+];
+
+/** The roles that stand on the hall floor and so count against it: the crew the floor limits
+ *  (CLAUDE.md T13 3.10). The office is in the office block. */
+const FLOOR_ROLES: WorkerRole[] = ['joiner', 'helper', 'productionManager'];
+
+/** The crew on the floor, the owner among them (CLAUDE.md T13 3.10). */
+export function crewCount(state: GameState): number {
+  return 1 + state.workers.filter((worker) => FLOOR_ROLES.includes(worker.role)).length;
+}
+
+/** True when the floor has no room for one more of this role (CLAUDE.md T13 3.10). */
+export function crewFull(state: GameState, role: WorkerRole): boolean {
+  if (!FLOOR_ROLES.includes(role)) return false;
+  return crewCount(state) + 1 > crewLimit(state);
+}
+
+/** "Crew 4 / 5, floor limited": what the team page says (CLAUDE.md T13 3.10). */
+export function crewLine(state: GameState): string {
+  return `Crew ${crewCount(state)} / ${crewLimit(state)}, floor limited`;
+}
 
 /** The office role every other one is hired behind. She is the base office person: emails,
  *  bookkeeping, the daily ordering, and every specialist's work at double time until he is taken
@@ -198,6 +226,10 @@ export function hiringOptions(state: GameState): HiringOption[] {
       blockReason = 'Hire an office admin first';
     } else if (spec.role === 'joiner' && benchSlotsUsed > state.unit.benchSlots) {
       blockReason = 'No free bench slot in this unit';
+    } else if (crewFull(state, spec.role)) {
+      // The floor limits the crew: one person per so many square metres of free floor
+      // (PIOTR; CLAUDE.md T13 3.10).
+      blockReason = crewLine(state);
     } else if (missing.length > 0) {
       blockReason = `Buy first: ${missing.join(', ')}`;
     }
@@ -275,6 +307,8 @@ export function hire(state: GameState, role: WorkerRole, tier: WorkerTier | null
     absentDaysRemaining: 0,
     anchorX: anchor.x,
     anchorY: anchor.y,
+    shift: 'day',
+    dayLog: [],
   };
   state.workers.push(worker);
   return worker;
@@ -298,5 +332,13 @@ export function runStaffDayStart(state: GameState): void {
     worker.minutesWorked = 0;
     worker.overtimeMinutes = 0;
     worker.ordersToday = 0;
+    worker.dayLog = [];
   }
+}
+
+/** The second shift: the men on it work after the day, at the night rate, with the owner absent
+ *  from the hall, only while a production manager is on the books (CLAUDE.md T13 3.9). Phase B2
+ *  writes it; phase A hands the day end the hook. */
+export function runNightShift(state: GameState): void {
+  void state;
 }

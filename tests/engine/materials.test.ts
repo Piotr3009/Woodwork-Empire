@@ -1,19 +1,21 @@
 import { describe, expect, it } from 'vitest';
 import {
   BESPOKE_COST_UPLIFT,
+  LOW_STOCK_SHEETS,
   MATERIAL_FRACTION,
   SHEET_PRICE_STOCK,
   SHEET_VALUE,
-  STOCK_MATERIAL_FRACTION,
   TEMP_STORAGE_COST,
   TEMP_STORAGE_FETCH_MINUTES,
 } from '../../src/engine/constants';
 import {
   deliveryDay,
   materialCostFor,
+  orderForJobCost,
   rackCapacity,
   sheetsDueFor,
   sheetsForCost,
+  shortfallOf,
   stockCostFor,
   stockFree,
   stockIsLow,
@@ -22,6 +24,7 @@ import { canBuy } from '../../src/engine/game';
 import { jobProgress, tick } from '../../src/engine/index';
 import type { GameEvent, GameState } from '../../src/engine/index';
 import {
+  acceptNow,
   act,
   buyNow,
   buyStartingKit,
@@ -45,12 +48,19 @@ function ready(difficulty: 'easy' | 'veryEasy' = 'easy'): GameState {
   return state;
 }
 
-/** Accepts a job and clears its calls and drawing, ready for the material order. */
+/** Accepts a job and clears its calls and drawing, ready for the material take off. */
 function upToMaterial(state: GameState, extra = {}): GameState {
   const enquiry = placeEnquiry(state, { price: 400, deadlineDays: 30, ...extra });
-  let next = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+  let next = acceptNow(state, enquiry.id, false);
   next = doTask(next, 'design');
   return next;
+}
+
+/** The take off done and the shortfall ordered for the job, the way the player clicks it when
+ *  the rack has nothing to hold for it (CLAUDE.md T13 3.3). */
+function ordered(state: GameState): GameState {
+  const next = doTask(state, 'materialTakeOff');
+  return act(next, { type: 'ORDER_FOR_JOB', jobId: firstJob(next).id });
 }
 
 describe('what material costs', () => {
@@ -63,7 +73,7 @@ describe('what material costs', () => {
   it('is 0.34 of the price when the sheets were bought for stock', () => {
     const perJob = materialCostFor(1000, false);
     const sheets = sheetsForCost(perJob);
-    expect(stockCostFor(sheets)).toBeCloseTo(1000 * STOCK_MATERIAL_FRACTION, 6);
+    expect(stockCostFor(sheets)).toBeCloseTo(sheets * SHEET_PRICE_STOCK, 6);
     expect(SHEET_PRICE_STOCK).toBeLessThan(SHEET_VALUE);
   });
 
@@ -94,8 +104,12 @@ describe('when the lorry comes', () => {
   });
 
   it('books the bespoke job three days out and charges the uplift', () => {
-    const state = doTask(upToMaterial(ready(), { bespokeMaterial: true }), 'materialOrder');
+    let state = doTask(upToMaterial(ready(), { bespokeMaterial: true }), 'materialTakeOff');
     expect(firstJob(state).materialCost).toBe(184);
+    // Bespoke material never comes off the rack: it is ordered for the job (CLAUDE.md T13 3.3).
+    expect(shortfallOf(firstJob(state))).toBe(1);
+    expect(orderForJobCost(firstJob(state))).toBe(230);
+    state = act(state, { type: 'ORDER_FOR_JOB', jobId: firstJob(state).id });
     expect(state.deliveries[0]?.arriveDay).toBe(4);
     expect(state.deliveries[0]?.bespoke).toBe(true);
     const day2 = runToDay(state, 2).state;
@@ -133,23 +147,30 @@ describe('buying sheets for stock', () => {
     // The rack has it, so the job is ready the moment the drawing exists: no order on the desk,
     // nothing to pay (PIOTR, 13.09: the sheets on the rack are what a workshop uses).
     state = upToMaterial(state);
-    expect(state.tasks.some((task) => task.kind === 'materialOrder' && !task.done)).toBe(false);
+    // The sheets were held for it the moment it was taken (CLAUDE.md T13 3.3); the take off is
+    // paperwork and not an order.
+    expect(firstJob(state).sheetsReserved).toBe(1);
+    expect(shortfallOf(firstJob(state))).toBe(0);
+    state = doTask(state, 'materialTakeOff');
     // The only movement is the client's deposit coming in: nothing went out for material.
     expect(state.cash).toBe(before + firstJob(state).depositPaid);
     // The sheets stay on the rack and come off it as the job is made (CLAUDE.md T2 3.6).
     expect(state.stock.sheets).toBe(6);
     expect(firstJob(state).stage).toBe('ready');
-    expect(firstJob(state).materialCost).toBeCloseTo(stockCostFor(1), 6);
     // No lorry, so nothing to unload.
     expect(state.deliveries.filter((delivery) => delivery.jobId !== null)).toHaveLength(0);
   });
 
-  it('falls back to a per job order when the rack is too empty', () => {
+  it('is short when the rack is empty, until the shortfall is ordered for the job', () => {
     let state = upToMaterial(ready());
-    state = act(state, { type: 'SET_MATERIAL_MODE', jobId: firstJob(state).id, mode: 'stock' });
-    state = doTask(state, 'materialOrder');
+    expect(shortfallOf(firstJob(state))).toBe(1);
+    state = doTask(state, 'materialTakeOff');
+    expect(firstJob(state).stage).toBe('materialPending');
+    const before = state.cash;
+    state = act(state, { type: 'ORDER_FOR_JOB', jobId: firstJob(state).id });
     expect(firstJob(state).stage).toBe('materialOrdered');
-    expect(firstJob(state).materialMode).toBe('perJob');
+    expect(before - state.cash).toBe(orderForJobCost(firstJob(state)));
+    expect(state.deliveries[0]?.jobId).toBe(firstJob(state).id);
   });
 });
 
@@ -219,7 +240,7 @@ describe('a rack that is too small', () => {
 
 describe('unloading', () => {
   it('has to happen before anything can be made', () => {
-    let state = doTask(upToMaterial(ready()), 'materialOrder');
+    let state = ordered(upToMaterial(ready()));
     state = clearEvents(runToDay(state, 2).state);
     expect(firstJob(state).stage).toBe('materialInYard');
     const tried = act(state, { type: 'WORK_HERE', jobId: null });
@@ -250,23 +271,26 @@ describe('what stock cannot cover', () => {
       byHandAvailable: true,
       lockReason: 'Needs solid wood tools',
     });
-    state = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: table.id, byHand: true });
+    state = acceptNow(state, table.id, true);
     state = doTask(state, 'design');
-    state = act(state, { type: 'SET_MATERIAL_MODE', jobId: firstJob(state).id, mode: 'stock' });
-    state = doTask(state, 'materialOrder');
-    // Solid wood is ordered, not taken off the board rack.
+    state = doTask(state, 'materialTakeOff');
+    // Solid wood is ordered, not taken off the board rack (CLAUDE.md T13 3.3).
+    expect(firstJob(state).sheetsReserved).toBe(0);
+    expect(firstJob(state).stage).toBe('materialPending');
+    state = act(state, { type: 'ORDER_FOR_JOB', jobId: firstJob(state).id });
     expect(firstJob(state).stage).toBe('materialOrdered');
     expect(state.stock.sheets).toBe(20);
   });
 
-  it('charges material against the overdraft floor and books it as arrears when there is no room', () => {
+  it('refuses an order for the job past the overdraft floor, and the job stays short', () => {
     let state = upToMaterial(ready());
     state.cash = state.finance.overdraftLimit + 10;
-    state = doTask(state, 'materialOrder');
-    expect(state.cash).toBeGreaterThanOrEqual(state.finance.overdraftLimit);
-    expect(state.finance.arrearsAmount).toBeGreaterThan(0);
-    const unpaid = state.ledger.filter((entry) => entry.unpaid && entry.category === 'material');
-    expect(unpaid).toHaveLength(1);
+    state = doTask(state, 'materialTakeOff');
+    const cash = state.cash;
+    state = act(state, { type: 'ORDER_FOR_JOB', jobId: firstJob(state).id });
+    expect(state.cash).toBe(cash);
+    expect(firstJob(state).stage).toBe('materialPending');
+    expect(state.deliveries).toHaveLength(0);
   });
 
   it('puts the write off through the ledger like every other line', () => {
@@ -284,7 +308,7 @@ describe('what stock cannot cover', () => {
 
 describe('the van at the gate', () => {
   it('asks again who unloads it when it is clicked (CLAUDE.md 10.1)', () => {
-    let state = doTask(upToMaterial(ready()), 'materialOrder');
+    let state = ordered(upToMaterial(ready()));
     state = clearEvents(runToDay(state, 2).state);
     const delivery = state.deliveries[0];
     expect(delivery?.arrived).toBe(true);
@@ -325,7 +349,7 @@ describe('the rack the sheets live on', () => {
       state = buyNow(state, specId);
     }
     state = softwareNow(state, 'oneOff');
-    state = doTask(upToMaterial(state), 'materialOrder');
+    state = ordered(upToMaterial(state));
     state = clearEvents(runToDay(state, 2).state);
     const task = state.tasks.find((entry) => entry.kind === 'unload' && !entry.done);
     expect(task).toBeDefined();
@@ -342,7 +366,7 @@ describe('material coming off the rack as the job is made', () => {
   function onTheBench(price: number): GameState {
     let state = ready('veryEasy');
     const enquiry = placeEnquiry(state, { price, deadlineDays: 90 });
-    state = fillRack(act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false }));
+    state = fillRack(acceptNow(state, enquiry.id, false));
     firstJob(state).stage = 'ready';
     return act(state, { type: 'WORK_HERE', jobId: null });
   }
@@ -395,13 +419,19 @@ describe('material coming off the rack as the job is made', () => {
 });
 
 describe('the low stock alarm', () => {
-  it('reads under a tenth of the rack as low', () => {
+  it('reads a free count under the low figure as low, whatever the rack holds', () => {
     const state = ready();
     expect(rackCapacity(state)).toBe(50);
-    state.stock.sheets = 4;
+    // The figure is the free sheets, not a share of the rack (CLAUDE.md T13 3.2).
+    state.stock.sheets = LOW_STOCK_SHEETS - 1;
     expect(stockIsLow(state)).toBe(true);
-    state.stock.sheets = 5;
+    state.stock.sheets = LOW_STOCK_SHEETS;
     expect(stockIsLow(state)).toBe(false);
+    // Sheets held for a job are not free: the badge reads what a new job could have.
+    const enquiry = placeEnquiry(state, { price: 400, deadlineDays: 90 });
+    const held = acceptNow(state, enquiry.id, false);
+    expect(firstJob(held).sheetsReserved).toBe(1);
+    expect(stockIsLow(held)).toBe(true);
     // No shelving, no alarm: the hall says there is no shelving instead.
     const bare = newGame();
     expect(stockIsLow(bare)).toBe(false);
@@ -410,7 +440,7 @@ describe('the low stock alarm', () => {
   it('says it once a week in the morning, with work on the books', () => {
     let state = ready();
     const enquiry = placeEnquiry(state, { price: 400, deadlineDays: 90 });
-    state = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+    state = acceptNow(state, enquiry.id, false);
     state.stock.sheets = 0;
     const week = runToDay(state, 5);
     expect(eventsOfKind(week.events, 'lowStock')).toHaveLength(1);

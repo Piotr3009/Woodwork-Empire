@@ -20,7 +20,12 @@ import {
   GATE_LANE,
   HELPER_CLEAN_WEEKDAY,
   LOCKER_SLOT_LAYOUT,
-  DUCTING_RECONNECT_COST,
+  GATE_PRICE,
+  HOLIDAY_MAX_DAYS,
+  JOINERY_CORE_EXTENSION_PRICE_YEARLY,
+  JOINERY_CORE_MAX_EXTENSIONS,
+  JOINERY_CORE_PRICE_YEARLY,
+  OWNER_DRAW_TIERS,
   MOVE_MINUTES_PER_ITEM,
   SKIP_SPEED,
   OVERTIME_DEBT_PER_DAY,
@@ -36,8 +41,31 @@ import {
   TEMP_STORAGE_COST,
   TOOL_CABINET,
   STATE_VERSION,
+  WEBSITE_START_LEVEL,
 } from './constants';
-import { refreshBoard, refreshLocks } from './board';
+import { arriveEnquiries, refreshBoard, refreshLocks } from './board';
+import {
+  acceptContract,
+  assignContract,
+  declineContract,
+  offerContract,
+  renewContract,
+  runContractDay,
+  runContractMinute,
+} from './contracts';
+import { emptyEfficiency } from './efficiency';
+import { accrueOverdraftInterest, repayLoan, runFinanceMonth, takeLoan } from './finance';
+import {
+  claimBurglary,
+  onAccident,
+  refreshInsuredValue,
+  runInsuranceDay,
+  runInsuranceMonth,
+  setInsurance,
+} from './insurance';
+import { connectExtraction, disconnectExtraction, dropOrphanPipes } from './pipes';
+import { rollBurglary, runSecurityMonth, setSecurityLevel } from './security';
+import { setWebsiteLevel } from './website';
 import { missCall, nextDueCall, takeCall } from './calls';
 import { canPlaceSpec, firstFreeCell, moveItem } from './layout';
 import {
@@ -64,6 +92,7 @@ import {
 } from './clock';
 import {
   canAfford,
+  charge,
   emptyBooked,
   emptyTotals,
   formatMoney,
@@ -134,13 +163,14 @@ import {
   orderTransport,
   ownerJob,
   onDeliveryUnloaded,
-  onMaterialOrdered,
+  onTakeOffDone,
+  orderShortfall,
   refreshJob,
+  refreshMaterial,
   releaseJob,
+  resolveClientOffer,
   runBookedTransport,
   dropJob,
-  drawFromStock,
-  setMaterialMode,
   setSawFallback,
   transportLabel,
 } from './jobs';
@@ -154,6 +184,7 @@ import {
   findDelivery,
   moveOverflowToStorage,
   rackCapacity,
+  restockSheets,
   stockIsLow,
   unloadIntoStock,
   writeOffSheetsLeftOutside,
@@ -161,6 +192,8 @@ import {
 import {
   chargeOvertimeDebt,
   countOvertimeMinute,
+  logDayMinute,
+  managerOnDuty,
   nextDayLabourFactor,
   ownerEfficiency,
   ownerIsAvailable,
@@ -169,14 +202,17 @@ import {
   runOwnerDayStart,
   spendOwnerMinute,
   staffOutputFactor,
+  startHoliday,
 } from './owner';
 import { chance, int, makeId } from './rng';
+import { isFirstOfMonth as firstOfMonth } from './clock';
 import { type StagePlan, cncOptions, labourPerMinute } from './stages';
 import {
   airFactorFor,
   benchDrawsAir,
   compressors,
   drawingOn,
+  extractionDemandOf as extractionDemandOfItem,
   hallAirCheck,
   sprayingOnWetAir,
   underExtracted,
@@ -202,6 +238,7 @@ import {
   isWorkingToday,
   joiners,
   recordStaffOvertime,
+  runNightShift,
   runStaffDayStart,
   staffMinutesLeft,
   staysForOvertime,
@@ -238,6 +275,7 @@ import type {
   Job,
   GameAction,
   GameState,
+  LostMinuteCause,
   OnOrderItem,
   PeriodTotals,
   Speed,
@@ -313,10 +351,11 @@ export function createGame(options: NewGameOptions): GameState {
       sickDaysRemaining: 0,
       sickStartDay: null,
       stayHome: false,
+      holidayDaysRemaining: 0,
       station: STATION_IDLE,
       productionMinutes: 0,
     },
-    software: { mode: 'none', tier: 'basic', jobsRemaining: 0 },
+    software: { mode: 'none', tier: 'basic', jobsRemaining: 0, joineryCore: false, joineryCoreExtensions: 0 },
     laptopBootedOnDay: null,
     stock: { sheets: 0, tempStorageSheets: 0 },
     equipment: [],
@@ -328,6 +367,8 @@ export function createGame(options: NewGameOptions): GameState {
     deliveries: [],
     finance: {
       overdraftLimit: spec.overdraftLimit,
+      loan: null,
+      overdraftInterestAccrued: 0,
       arrearsAmount: 0,
       arrearsMonths: 0,
       firstArrearsDay: null,
@@ -336,6 +377,20 @@ export function createGame(options: NewGameOptions): GameState {
       month: emptyTotals(),
       booked: emptyBooked(),
     },
+    // Where every company starts (CLAUDE.md T13 section 4): no covers, no security, a do it
+    // yourself website, no contracts, the draw at the first tier, no pipes, no gates, tips on and
+    // the second shift off.
+    insurance: { property: false, liability: false, insuredValue: 0, payouts: [] },
+    security: { level: 0, lastBurglaryDay: null },
+    website: { level: WEBSITE_START_LEVEL, lastUpkeepDay: null },
+    contracts: [],
+    ownerDraw: { tier: 0 },
+    pipes: [],
+    gates: [],
+    settings: { tips: true },
+    tips: { seen: [] },
+    shift: { second: false },
+    monthEndShownFor: 0,
     ledger: [],
     eventQueue: [],
     activeEvent: null,
@@ -347,6 +402,8 @@ export function createGame(options: NewGameOptions): GameState {
       labourValue: 0,
       workMinutes: 0,
       dustM3: 0,
+      efficiency: emptyEfficiency(),
+      nightMinutes: 0,
     },
     days: [],
     lastExpressDay: null,
@@ -416,16 +473,33 @@ function startDay(state: GameState): void {
     labourValue: 0,
     workMinutes: 0,
     dustM3: 0,
+    efficiency: emptyEfficiency(),
+    nightMinutes: 0,
   };
   // Nobody stands at a machine overnight: the hall starts the day with every one of them free
   // (CLAUDE.md T7 3.1).
   releaseMachinesExcept(state, []);
+  // The month's paper before the day's: the loan, the covers and the security run with the
+  // monthly items, and the report is put in front of the player before the board (T13 3.20).
+  if (firstOfMonth(state.clock.day)) {
+    runFinanceMonth(state);
+    runInsuranceMonth(state);
+    runSecurityMonth(state);
+  }
   runDayCosts(state, state.clock.day);
+  accrueOverdraftInterest(state);
+  raiseMonthEnd(state);
   runOwnerDayStart(state);
   runStaffDayStart(state);
   resumeMove(state);
-  // The board is written again at 08:00, and again at 13:00 (PIOTR, 13.09; CLAUDE.md T10 3.7).
+  // The board is written again at 08:00, and again at 13:00 (PIOTR, 13.09; CLAUDE.md T10 3.7),
+  // and the day's new enquiries arrive with it (CLAUDE.md T13 3.4).
   refreshBoard(state);
+  arriveEnquiries(state);
+  offerContract(state);
+  runContractDay(state);
+  runInsuranceDay(state);
+  runBurglary(state);
   const lost = writeOffSheetsLeftOutside(state);
   if (lost > 0) {
     queueEvent(state, {
@@ -459,6 +533,31 @@ function startDay(state: GameState): void {
   delegateTasks(state);
   queueDeliveryEvents(state, arriving);
   queueKitDeliveryEvents(state, kit);
+}
+
+/** The first working day of the month, before the board: the month's report, once per month
+ *  (CLAUDE.md T13 3.20). The lines are phase B1's; the event is raised here. */
+function raiseMonthEnd(state: GameState): void {
+  const month = monthOfDay(state.clock.day);
+  if (month <= 1 || state.monthEndShownFor >= month) return;
+  state.monthEndShownFor = month;
+  queueEvent(state, {
+    kind: 'monthEnd',
+    title: `Month ${month - 1}: the report`,
+    body: 'The month is over. Every line is the ledger added up.',
+    choices: [{ id: 'ok', label: 'Right' }],
+    data: { month: month - 1 },
+  });
+}
+
+/** The burglary, when the roll lands: one or two machines, the dearest first, and the free stock;
+ *  paid out by the property cover with an alarm, and not otherwise (CLAUDE.md T13 3.17, 3.15).
+ *  Phase B4 owns what is taken; phase A rolls and takes nothing until then. */
+function runBurglary(state: GameState): void {
+  if (!rollBurglary(state)) return;
+  state.security.lastBurglaryDay = state.clock.day;
+  const paid = claimBurglary(state, 0);
+  void paid;
 }
 
 /** 08:00 on the due day: the lorries with the kit on them. Furniture, hand tools and anything
@@ -651,6 +750,8 @@ function runAccidentRoll(state: GameState): void {
     body: `${worker.name} has been hurt in all that mess. He is off for ${ACCIDENT_DAYS_OFF} days.`,
     data: { workerId: worker.id, days: ACCIDENT_DAYS_OFF },
   });
+  // With no liability cover, the claim follows (CLAUDE.md T13 3.15).
+  onAccident(state, worker.name);
 }
 
 /** The month end, and the men who have had enough of the evenings. A tired man has one chance in
@@ -767,6 +868,8 @@ export function daySummaryOf(state: GameState): DaySummary {
     workMinutes: state.dayStats.workMinutes,
     dayLog: owner.dayLog.map((entry) => ({ ...entry })),
     dustMadeM3: state.dayStats.dustM3,
+    efficiency: JSON.parse(JSON.stringify(state.dayStats.efficiency)) as DaySummary['efficiency'],
+    nightMinutes: state.dayStats.nightMinutes,
   };
 }
 
@@ -801,6 +904,8 @@ function finishDay(state: GameState): void {
   // player decides again whether to sit through it (CLAUDE.md T8 3.3).
   endSkip(state);
   state.owner.wentHome = true;
+  // The second shift works after the day, with the owner gone (CLAUDE.md T13 3.9).
+  runNightShift(state);
   recordDay(state);
   if (!showsDaySummary(state)) {
     advanceToNextDay(state);
@@ -824,6 +929,7 @@ function advanceToNextDay(state: GameState): void {
     state.clock.day = weekendDay;
     const before = state.cash;
     runDayCosts(state, weekendDay);
+    accrueOverdraftInterest(state);
     weekendCosts += before - state.cash;
   }
   state.clock.day = day;
@@ -892,8 +998,8 @@ function applyTaskCompletion(state: GameState, task: TaskInstance): void {
         refreshJob(state, job);
       }
       break;
-    case 'materialOrder':
-      if (job) onMaterialOrdered(state, job);
+    case 'materialTakeOff':
+      if (job) onTakeOffDone(state, job);
       break;
     case 'emptyBags':
       emptyBags(state);
@@ -902,7 +1008,7 @@ function applyTaskCompletion(state: GameState, task: TaskInstance): void {
       clearDust(state);
       break;
     case 'moveMachines':
-      chargeDucting(state);
+      reconnectMoved(state);
       // The same as a call: he goes back to whatever the move took him off.
       resumeOwnerTask(state);
       break;
@@ -1008,17 +1114,14 @@ function recordMove(
   }
 }
 
-/** Every moved machine that is ducted into the extraction has to be reconnected, and that is
- *  paid for when the move is finished. The flexi system never needs it (CLAUDE.md T4 3.5). */
-function chargeDucting(state: GameState): void {
+/** Every moved machine that was on the extraction is disconnected by the move and reconnected
+ *  when it is finished, at the new length, refunding nothing: the pipe run is the reconnection
+ *  the Turn 4 ducting charge was (CLAUDE.md T4 3.5, T13 3.19). The flexi system's is free. */
+function reconnectMoved(state: GameState): void {
   for (const item of ductedMoves(state)) {
-    const name = findSpec(item.specId)?.name ?? item.specId;
-    pay(
-      state,
-      'ducting',
-      `Ducting reconnection: ${name.toLowerCase()}`,
-      DUCTING_RECONNECT_COST,
-    );
+    const wasConnected = state.pipes.some((run) => run.equipmentId === item.id);
+    disconnectExtraction(state, item.id);
+    if (wasConnected) connectExtraction(state, item.id);
   }
   state.movedItems = [];
 }
@@ -1054,7 +1157,10 @@ function endSetup(state: GameState, speed: Speed): void {
   state.movedItems = heavy;
   if (heavy.length === 0) return;
   const due = ductingDue(state);
-  const bill = due.cost > 0 ? ` and ${formatMoney(due.cost)} of ducting` : '';
+  const bill =
+    due.machines > 0
+      ? ` and the extraction pipe of ${plural(due.machines, 'machine', 'machines')} run again at the new length`
+      : '';
   queueEvent(state, {
     kind: 'moveConfirm',
     title: 'Moving the hall',
@@ -1065,7 +1171,7 @@ function endSetup(state: GameState, speed: Speed): void {
       { id: 'do', label: 'Do it' },
       { id: 'back', label: 'Put them back' },
     ],
-    data: { machines: heavy.length, cost: Math.round(due.cost) },
+    data: { machines: heavy.length },
   });
 }
 
@@ -1237,6 +1343,11 @@ function updateStations(state: GameState): void {
 
 function settle(state: GameState): void {
   refreshLocks(state);
+  // What the property cover is written on follows every purchase and every stock change
+  // (CLAUDE.md T13 3.15); a run whose machine has gone goes with it (T13 3.19).
+  refreshInsuredValue(state);
+  dropOrphanPipes(state);
+  refreshMaterial(state);
   // Nobody holds a machine he is not standing at (CLAUDE.md T7 3.1).
   releaseIdleMachines(state);
   keepTheMoveHonest(state);
@@ -1269,10 +1380,13 @@ function runWorkerTaskMinute(state: GameState, workerId: string, taskId: string)
     return false;
   }
   worker.minutesWorked += 1;
+  // His own day meter: the production manager's shows the assigning (CLAUDE.md T13 3.9).
+  if (hasWorkingDay(worker.role)) logDayMinute(worker.dayLog, dayCategoryOf(task.kind));
   // An office admin covering for a specialist takes twice as long over it (CLAUDE.md T7 3.12).
   if (advanceTask(task, taskWorkRate(worker, task), state.clock.day)) {
     worker.taskId = null;
-    if (task.kind === 'materialOrder' && worker.role === 'purchasingClerk') {
+    // So many take offs a day for an estimator (CLAUDE.md T13 3.8).
+    if (task.kind === 'materialTakeOff' && worker.role === 'estimator') {
       worker.ordersToday += 1;
     }
     applyTaskCompletion(state, task);
@@ -1378,6 +1492,46 @@ interface AtWork {
   machine: Equipment | null;
 }
 
+/** The seats the workshop could have worked this minute: every hired man on the floor and in
+ *  today, and the owner while he is in the workshop (CLAUDE.md T13 3.5). Nobody at dinner. */
+function possibleSeats(state: GameState): { owner: boolean; joiners: number } {
+  const dinner = isBreak(state.clock.minute);
+  const owner = ownerIsAvailable(state) && (!dinner || state.owner.breakSkipped);
+  if (dinner) return { owner, joiners: 0 };
+  const overtime = isOvertime(state.clock.minute);
+  if (overtime && !ownerIsAvailable(state)) return { owner, joiners: 0 };
+  let count = 0;
+  for (const worker of state.workers) {
+    if (worker.role !== 'joiner' || !isWorkingToday(state, worker)) continue;
+    if (overtime && !staysForOvertime(state, worker)) continue;
+    count += 1;
+  }
+  return { owner, joiners: count };
+}
+
+/** Books the minute against the day's efficiency: what could have been worked, what was, and
+ *  where the rest went (CLAUDE.md T13 3.5). One tally, read by one function. */
+function tallyEfficiency(
+  state: GameState,
+  worked: number,
+  lost: Partial<Record<LostMinuteCause, number>>,
+): void {
+  const seats = possibleSeats(state);
+  const possible = (seats.owner ? 1 : 0) + seats.joiners;
+  const stats = state.dayStats.efficiency;
+  stats.possible += possible;
+  stats.worked = Math.round((stats.worked + Math.min(worked, possible)) * 10000) / 10000;
+  let explained = 0;
+  for (const cause of ['noMachine', 'noMaterial', 'ownerAway'] as const) {
+    const minutes = Math.min(lost[cause] ?? 0, Math.max(0, possible - worked - explained));
+    stats.lost[cause] = Math.round((stats.lost[cause] + minutes) * 10000) / 10000;
+    explained += minutes;
+  }
+  // Whatever is left of the seats was nobody at a station.
+  const rest = Math.max(0, possible - worked - explained);
+  stats.lost.noPeople = Math.round((stats.lost.noPeople + rest) * 10000) / 10000;
+}
+
 function runProductionMinute(state: GameState, ownerOnTask: boolean): void {
   // Every bench waits while the machines are being shifted about (CLAUDE.md T4 3.5).
   const moving = movingMachines(state) !== null;
@@ -1388,9 +1542,14 @@ function runProductionMinute(state: GameState, ownerOnTask: boolean): void {
   // Who actually stands at what this minute. Nothing is worked off the job yet: the machines have
   // to be taken before the hall can be asked what its media add up to.
   const atWork: AtWork[] = [];
+  const lost: Partial<Record<LostMinuteCause, number>> = {};
+  const lose = (cause: LostMinuteCause, minutes = 1): void => {
+    lost[cause] = (lost[cause] ?? 0) + minutes;
+  };
   for (const hand of working) {
     if (!canWorkOn(state, hand.job)) {
       releaseMachines(state, hand.who);
+      lose(hand.job.blockedBy === 'waiting for material' ? 'noMaterial' : 'noMachine');
       continue;
     }
     const stage = jobStage(state, hand.job, cncOptions(state, hand.who, hand.job));
@@ -1399,11 +1558,17 @@ function runProductionMinute(state: GameState, ownerOnTask: boolean): void {
     if (at.waitingFor !== null) {
       // He stands at the machine until the man on it is done with it (CLAUDE.md T7 3.1).
       hand.job.blockedBy = waitingLine(at.waitingFor);
+      lose('noMachine');
       continue;
     }
     atWork.push({ hand, stage, machine: at.machine });
   }
-  if (atWork.length === 0) return;
+  // The men on a standing contract put their minute in beside the jobs (CLAUDE.md T13 3.16).
+  runContractMinute(state);
+  if (atWork.length === 0) {
+    tallyEfficiency(state, 0, lost);
+    return;
+  }
   // The hall as it is with those machines running: the dust band, the missing helper, the crowded
   // gate, the broken extractor and the extraction sum, all through the one breakdown.
   const hall = hallProductivityFactor(state);
@@ -1447,6 +1612,19 @@ function runProductionMinute(state: GameState, ownerOnTask: boolean): void {
     const minute = labourPerMinute(hand.rate, speed) * hall;
     if (addLabour(state, hand.job, minute, stage.id)) raiseJobAtGate(state, hand.job);
   }
+  // What the owner's absence took off every staff minute this minute is the owner away line of
+  // the efficiency breakdown (CLAUDE.md T13 3.5, 3.9).
+  const away = staffOutputFactor(state);
+  let worked = 0;
+  for (const { hand } of atWork) {
+    if (hand.who === OWNER) {
+      worked += 1;
+      continue;
+    }
+    worked += away;
+    if (away < 1) lose('ownerAway', 1 - away);
+  }
+  tallyEfficiency(state, worked, lost);
   state.productionMinutesMonth += 1;
   addDust(state, 1);
   // The minute the store fills, the workshop is told once, not once a machine (CLAUDE.md T12 2.3).
@@ -1768,6 +1946,10 @@ function resolveEvent(state: GameState, choiceId: string): void {
       if (task) delegateAdHocTask(state, task, choiceId);
       break;
     }
+    case 'clientOffer':
+      // The client's number, taken or left (CLAUDE.md T13 3.24).
+      resolveClientOffer(state, choiceId, event.data);
+      break;
     default:
       break;
   }
@@ -1844,17 +2026,17 @@ export function applyAction(state: GameState, action: GameAction): GameState {
     case 'ACCEPT_ENQUIRY':
       acceptEnquiry(next, action.enquiryId, action.byHand);
       break;
-    case 'SET_MATERIAL_MODE':
-      setMaterialMode(next, action.jobId, action.mode);
+    case 'ORDER_FOR_JOB':
+      // The job's shortfall, bought at the ad hoc price for that job (CLAUDE.md T13 3.3).
+      orderShortfall(next, action.jobId);
+      break;
+    case 'RESTOCK':
+      // Every low line back up to the restock figure (CLAUDE.md T13 3.2).
+      buyStock(next, restockSheets(next));
       break;
     case 'DROP_JOB':
       // The client has his deposit back and the company takes the hit (CLAUDE.md T9 3.9).
       dropJob(next, action.jobId);
-      break;
-    case 'DRAW_FROM_STOCK':
-      // The rack has it: take it, tick the order green and let him get on with it
-      // (PIOTR, 13.09; CLAUDE.md T9 3.7).
-      drawFromStock(next, action.jobId);
       break;
     case 'SET_SAW_FALLBACK':
       setSawFallback(next, action.jobId, action.on);
@@ -1965,11 +2147,101 @@ export function applyAction(state: GameState, action: GameAction): GameState {
     case 'RESOLVE_EVENT':
       resolveEvent(next, action.choiceId);
       break;
+    // Turn 13 (CLAUDE.md T13 section 3). Each case routes to its group's module; the refusals
+    // are written there.
+    case 'TAKE_LOAN':
+      takeLoan(next, action.amount);
+      break;
+    case 'REPAY_LOAN':
+      repayLoan(next, action.amount);
+      break;
+    case 'SET_INSURANCE':
+      setInsurance(next, action.cover, action.on);
+      break;
+    case 'ACCEPT_CONTRACT':
+      acceptContract(next, action.contractId);
+      break;
+    case 'DECLINE_CONTRACT':
+      declineContract(next, action.contractId);
+      break;
+    case 'ASSIGN_CONTRACT':
+      assignContract(next, action.contractId, action.workerId, action.on);
+      break;
+    case 'RENEW_CONTRACT':
+      renewContract(next, action.contractId, action.accept);
+      break;
+    case 'SET_SECOND_SHIFT':
+      // No manager, no second shift (CLAUDE.md T13 3.9).
+      if (managerOnDuty(next) || !action.on) next.shift.second = action.on;
+      break;
+    case 'ASSIGN_SHIFT': {
+      const worker = next.workers.find((entry) => entry.id === action.workerId);
+      if (worker && worker.role === 'joiner' && (next.shift.second || action.shift === 'day')) {
+        worker.shift = action.shift;
+      }
+      break;
+    }
+    case 'TAKE_HOLIDAY':
+      startHoliday(next, Math.min(HOLIDAY_MAX_DAYS, action.days));
+      break;
+    case 'SET_OWNER_DRAW':
+      // Eight thresholds and nothing in between (CLAUDE.md T13 3.18).
+      if (action.tier >= 0 && action.tier < OWNER_DRAW_TIERS.length) next.ownerDraw.tier = action.tier;
+      break;
+    case 'BUY_JOINERY_CORE':
+      if (!next.software.joineryCore && has(next, 'laptop')) {
+        // Bought by the year and charged monthly: the click switches it on (CLAUDE.md T13 3.8).
+        if (charge(next, 'software', 'Joinery Core, first month', -JOINERY_CORE_PRICE_YEARLY / 12)) {
+          next.software.joineryCore = true;
+        }
+      }
+      break;
+    case 'BUY_JOINERY_CORE_EXTENSION':
+      if (next.software.joineryCore && next.software.joineryCoreExtensions < JOINERY_CORE_MAX_EXTENSIONS) {
+        if (
+          charge(next, 'software', 'Joinery Core extension, first month', -JOINERY_CORE_EXTENSION_PRICE_YEARLY / 12)
+        ) {
+          next.software.joineryCoreExtensions += 1;
+        }
+      }
+      break;
+    case 'SET_WEBSITE_LEVEL':
+      setWebsiteLevel(next, action.level);
+      break;
+    case 'CONNECT_EXTRACTION':
+      connectExtraction(next, action.equipmentId);
+      break;
+    case 'BUY_GATE':
+      buyGate(next, action.equipmentId);
+      break;
+    case 'SET_SECURITY_LEVEL':
+      setSecurityLevel(next, action.level);
+      break;
+    case 'SET_TIPS':
+      next.settings.tips = action.on;
+      break;
+    case 'DISMISS_TIP':
+      if (!next.tips.seen.includes(action.key)) next.tips.seen.push(action.key);
+      break;
     default:
       break;
   }
   settle(next);
   return next;
+}
+
+/** An automatic blast gate on a machine's drop: only for a machine with an extraction demand,
+ *  once, fitted for the price (CLAUDE.md T13 3.11). What it does is phase B4's. */
+export function buyGate(state: GameState, equipmentId: string): BuyCheck {
+  const item = state.equipment.find((entry) => entry.id === equipmentId);
+  if (!item) return { ok: false, reason: 'No such machine' };
+  if (state.gates.includes(item.id)) return { ok: false, reason: 'Fitted already' };
+  if (extractionDemandOfItem(item) <= 0) return { ok: false, reason: 'It wants no extraction' };
+  if (!canAfford(state, GATE_PRICE)) return { ok: false, reason: 'Not enough cash' };
+  const name = findSpec(item.specId)?.name ?? item.specId;
+  pay(state, 'equipment', `Automatic gate: ${name.toLowerCase()}`, GATE_PRICE);
+  state.gates.push(item.id);
+  return OK;
 }
 
 
@@ -2111,6 +2383,10 @@ function standItem(
     // Square to the walls until the player turns it (CLAUDE.md T10 3.8).
     rotated: false,
   });
+  // With a production manager a newly placed machine is connected to the nearest extractor
+  // with spare air automatically (CLAUDE.md T13 3.9, 3.19); without one the player clicks it.
+  const placed = state.equipment[state.equipment.length - 1];
+  if (placed && managerOnDuty(state)) connectExtraction(state, placed.id);
 }
 
 export function buyEquipment(
@@ -2163,13 +2439,14 @@ export function buySoftware(
   if (mode === 'oneOff') {
     if (!prepaid) paySoftware(state, mode);
     state.software = {
+      ...state.software,
       mode: 'oneOff',
       tier: SOFTWARE_TURN1_TIER,
       jobsRemaining: SOFTWARE_ONE_OFF_JOBS,
     };
     return OK;
   }
-  state.software = { mode: 'subscription', tier: SOFTWARE_TURN1_TIER, jobsRemaining: 0 };
+  state.software = { ...state.software, mode: 'subscription', tier: SOFTWARE_TURN1_TIER, jobsRemaining: 0 };
   return OK;
 }
 
@@ -2336,12 +2613,8 @@ export function cancelOrder(state: GameState, orderId: string): BuyCheck {
   state.deliveries = state.deliveries.filter((entry) => entry.id !== delivery.id);
   const job = delivery.jobId === null ? null : findJob(state, delivery.jobId);
   if (job !== null && job.stage === 'materialOrdered') {
-    // The job wants its material ordering again, so the old job of work goes with the lorry and
-    // `refreshJob` writes a fresh one.
+    // The job is short again: Restock or another order for it (CLAUDE.md T13 3.3).
     job.stage = 'materialPending';
-    state.tasks = state.tasks.filter(
-      (task) => !(task.kind === 'materialOrder' && task.jobId === job.id),
-    );
     refreshJob(state, job);
   }
   return OK;
@@ -2370,6 +2643,8 @@ export function sellMachine(state: GameState, equipmentId: string): BuyCheck {
   if (timeIsPaused(state)) state.speed = 1;
   item.soldOnDay = nextWorkingDay(state.clock.day);
   item.takenBy = null;
+  // Off the extraction the day it is sold; the buyer's van takes the machine, not the pipe.
+  disconnectExtraction(state, item.id);
   return OK;
 }
 

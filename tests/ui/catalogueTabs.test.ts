@@ -15,6 +15,7 @@ import { addWorkingDays } from '../../src/engine/clock';
 import { machineHoursPerDay } from '../../src/engine/production';
 import type { Equipment, GameState } from '../../src/engine/index';
 import {
+  acceptNow,
   act,
   buyNow,
   buyStartingKit,
@@ -86,7 +87,8 @@ describe('the tabs', () => {
       Array.from(shop(state, tab).querySelectorAll('.folder')).map(
         (node) => node.getAttribute('data-folder') ?? '',
       );
-    expect(folders('sheetMachines')).toEqual(['tableSaw', 'edgebander']);
+    // The spindle moulder is shared with the timber side (CLAUDE.md T13 3.13).
+    expect(folders('sheetMachines')).toEqual(['tableSaw', 'edgebander', 'spindleMoulder']);
     expect(folders('storage')).toEqual([
       'workbench',
       'sheetRack',
@@ -94,10 +96,13 @@ describe('the tabs', () => {
       'locker',
       'canteenSeat',
     ]);
-    expect(folders('timberMachines')).toEqual(['thicknesser', 'solidWoodTools']);
-    // Every line of the catalogue is in exactly one folder of exactly one tab.
+    expect(folders('timberMachines')).toEqual(['thicknesser', 'solidWoodTools', 'spindleMoulder']);
+    // Every line of the catalogue is in exactly one folder of exactly one tab, except the shared
+    // spindle moulder, which is in both machine tabs (CLAUDE.md T13 3.13).
     const all = EQUIPMENT_TABS.flatMap((tab) => folders(tab.id));
-    expect(new Set(all).size).toBe(all.length);
+    expect(all.filter((id) => id === 'spindleMoulder')).toHaveLength(2);
+    const once = all.filter((id) => id !== 'spindleMoulder');
+    expect(new Set(once).size).toBe(once.length);
     expect(new Set(all)).toEqual(new Set(EQUIPMENT_SPECS.map((spec) => spec.id)));
   });
 
@@ -200,7 +205,7 @@ describe('the Owned tab', () => {
     const state = fillRack(buyStartingKit(newGame({ difficulty: 'veryEasy' })));
     state.enquiries = [];
     const enquiry = placeEnquiry(state, { price: 4000, deadlineDays: 90 });
-    const taken = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+    const taken = acceptNow(state, enquiry.id, false);
     firstJob(taken).stage = 'ready';
     const working = act(taken, { type: 'WORK_HERE', jobId: null });
     const saw = working.equipment.find((item) => item.specId === 'tableSaw');

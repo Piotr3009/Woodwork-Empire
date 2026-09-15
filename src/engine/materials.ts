@@ -5,19 +5,22 @@ import {
   BESPOKE_COST_UPLIFT,
   DELIVERY_WORKING_DAYS_BESPOKE,
   DELIVERY_WORKING_DAYS_STANDARD,
-  LOW_STOCK_FRACTION,
+  LOW_STOCK_SHEETS,
   MATERIAL_FRACTION,
+  RESTOCK_TO_SHEETS,
+  SHEET_PRICE_AD_HOC,
   SHEET_PRICE_STOCK,
   SHEET_VALUE,
+  STOCK_NUMBER_PREFIX,
   TEMP_STORAGE_COST,
 } from './constants';
 import { addWorkingDays } from './clock';
-import { canAfford, chargeUnavoidable, noteLoss, pay } from './economy';
+import { canAfford, noteLoss, pay } from './economy';
 import { sheetCapacityOf } from './machines';
 import { makeId } from './rng';
 import { createTask, unloadMinutes } from './tasks';
 import { plural } from './text';
-import type { Delivery, GameState, Job, MaterialMode } from './types';
+import type { Delivery, GameState, Job, MaterialKind } from './types';
 
 /** Sheets a job needs: one sheet is 200 of material value (PIOTR). */
 export function sheetsForCost(cost: number): number {
@@ -37,11 +40,79 @@ export function canUnload(state: GameState): boolean {
   return rackCapacity(state) > 0;
 }
 
-/** The rack is nearly empty and the joiners are about to run out (CLAUDE.md T2 3.6). */
+/** Sheets on the rack held for accepted jobs and not yet cut (CLAUDE.md T13 3.2). */
+export function reservedSheets(state: GameState): number {
+  let reserved = 0;
+  for (const job of state.jobs) {
+    if (job.stage === 'completed') continue;
+    reserved += job.sheetsReserved;
+  }
+  return reserved;
+}
+
+/** Sheets on the rack nobody has a claim on: what a new job can have (CLAUDE.md T13 3.2). */
+export function freeSheets(state: GameState): number {
+  return Math.max(0, state.stock.sheets - reservedSheets(state));
+}
+
+/** Sheets this job still needs and has not got: red on the card until Restock or an order for
+ *  this job clears it (CLAUDE.md T13 3.3, 3.6). */
+export function shortfallOf(job: Job): number {
+  return Math.max(0, job.sheets - job.sheetsUsed - job.sheetsReserved);
+}
+
+/** Holds what the rack can spare for this job, up to what it needs. Bespoke material never comes
+ *  off the rack: it is ordered in (CLAUDE.md 8.9, T13 3.3). Returns what was held. */
+export function reserveSheetsFor(state: GameState, job: Job): number {
+  if (job.materialKind !== 'sheet' || job.bespokeMaterial) return 0;
+  const wanted = shortfallOf(job);
+  const held = Math.min(wanted, freeSheets(state));
+  if (held <= 0) return 0;
+  job.sheetsReserved += held;
+  return held;
+}
+
+/** After a restock lands: every job with a shortfall holds what it can, in the order the jobs
+ *  were accepted, and a job that is now whole is ready (CLAUDE.md T13 3.3). */
+export function reserveShortfalls(state: GameState): void {
+  for (const job of state.jobs) {
+    if (job.stage === 'completed' || job.stage === 'awaitingTransport') continue;
+    reserveSheetsFor(state, job);
+  }
+}
+
+/** Every sheet a job held goes back to the free stock: it was dropped, or it is over. */
+export function releaseReservation(job: Job): void {
+  job.sheetsReserved = 0;
+}
+
+/** The stock number a line carries, generated once per material kind off the seed and stable
+ *  across saves (CLAUDE.md T13 3.2). */
+export function stockNumberFor(state: GameState, kind: MaterialKind): string {
+  const prefix = STOCK_NUMBER_PREFIX[kind];
+  const digits = String(((state.seed % 997) + (kind === 'sheet' ? 1 : 2)) % 1000).padStart(3, '0');
+  return `${prefix}-${digits}`;
+}
+
+/** A line whose free count is under the low figure wears the badge (CLAUDE.md T13 3.2). The rack
+ *  has to exist for the question to mean anything. */
 export function stockIsLow(state: GameState): boolean {
-  const capacity = rackCapacity(state);
-  if (capacity <= 0) return false;
-  return state.stock.sheets < capacity * LOW_STOCK_FRACTION;
+  if (rackCapacity(state) <= 0) return false;
+  return freeSheets(state) < LOW_STOCK_SHEETS;
+}
+
+/** What Restock would buy: every low line brought back up to the restock figure, which tonight is
+ *  the one line of sheets (CLAUDE.md T13 3.2). Zero when nothing is low. */
+export function restockSheets(state: GameState): number {
+  if (!stockIsLow(state)) return 0;
+  return Math.max(0, RESTOCK_TO_SHEETS - freeSheets(state));
+}
+
+/** What buying the shortfall of one job ad hoc costs: the ad hoc price, and the bespoke uplift
+ *  where the material is bespoke (CLAUDE.md T13 3.3). */
+export function orderForJobCost(job: Job): number {
+  const base = shortfallOf(job) * SHEET_PRICE_AD_HOC;
+  return Math.round((job.bespokeMaterial ? base * (1 + BESPOKE_COST_UPLIFT) : base) * 100) / 100;
 }
 
 /** Whole sheets the job should have taken off the rack by the progress it has reached. A job on
@@ -71,6 +142,8 @@ export function drawSheetsFor(state: GameState, job: Job, progress: number): boo
   if (!rackCanSupply(state, job, progress)) return false;
   state.stock.sheets -= due;
   job.sheetsUsed += due;
+  // What it cuts comes out of what was held for it first (CLAUDE.md T13 3.3).
+  job.sheetsReserved = Math.max(0, job.sheetsReserved - due);
   return true;
 }
 
@@ -113,12 +186,18 @@ export function createDelivery(
   return delivery;
 }
 
-/** The per job order: pay for the material and book the lorry (CLAUDE.md 8.9). */
-export function orderMaterialForJob(state: GameState, job: Job): Delivery | null {
-  if (job.materialMode !== 'perJob') return null;
-  // The lorry is booked and the supplier will be paid, overdraft or not (CLAUDE.md 8.3).
-  chargeUnavoidable(state, 'material', `Material for ${job.name}`, job.materialCost);
-  return createDelivery(state, job.id, job.sheets, job.bespokeMaterial, job.materialCost);
+/** The order for this job: the shortfall bought at the ad hoc price, on a lorry for this job
+ *  (CLAUDE.md T13 3.3). The cash leaves at the click, so it is refused past the overdraft. */
+export function orderForJob(state: GameState, job: Job): Delivery | null {
+  const sheets = shortfallOf(job);
+  if (sheets <= 0) return null;
+  if (state.deliveries.some((delivery) => delivery.jobId === job.id && !delivery.unloaded)) {
+    return null;
+  }
+  const cost = orderForJobCost(job);
+  if (!canAfford(state, cost)) return null;
+  pay(state, 'material', `Material for ${job.name}`, cost);
+  return createDelivery(state, job.id, sheets, job.bespokeMaterial, cost);
 }
 
 export function findDelivery(state: GameState, deliveryId: string): Delivery | null {
@@ -157,10 +236,6 @@ export function arriveDeliveries(state: GameState): Delivery[] {
   return arriving;
 }
 
-export function materialModeLabel(mode: MaterialMode): string {
-  return mode === 'stock' ? 'from stock' : 'ordered per job';
-}
-
 /** Room left on the sheet rack. */
 export function stockFree(state: GameState): number {
   return Math.max(0, rackCapacity(state) - state.stock.sheets);
@@ -176,13 +251,22 @@ export function buyStock(state: GameState, sheets: number): boolean {
   return true;
 }
 
-/** Sheets come off the lorry. What does not fit on the rack needs a decision (CLAUDE.md 8.9). */
+/** Sheets come off the lorry. What does not fit on the rack needs a decision (CLAUDE.md 8.9).
+ *  A load for one job is held for that job first; whatever else lands is free for every job with
+ *  a shortfall, in the order they were accepted (CLAUDE.md T13 3.3). */
 export function unloadIntoStock(state: GameState, delivery: Delivery): number {
   const room = stockFree(state);
   const fitted = Math.min(delivery.sheets, room);
   state.stock.sheets += fitted;
   const overflow = delivery.sheets - fitted;
   delivery.overflowSheets = overflow;
+  const job = delivery.jobId === null ? null : state.jobs.find((entry) => entry.id === delivery.jobId);
+  if (job) {
+    // The job's own sheets come off its own lorry: reserved for it, bespoke or not.
+    const held = Math.min(fitted, job.sheets - job.sheetsUsed - job.sheetsReserved);
+    if (held > 0) job.sheetsReserved += held;
+  }
+  reserveShortfalls(state);
   return overflow;
 }
 

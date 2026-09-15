@@ -2754,3 +2754,110 @@ input.num {
 .catalogue-notes .warn::before {
   content: '! ';
 }
+
+/* ---------------------------------------------------------------------------
+   Turn 13 (CLAUDE.md T13 2.1): the class names phase A declares, empty, for phase B's notes.
+   Phase C fills them from the notes. Nothing below this line is styled tonight on purpose.
+   --------------------------------------------------------------------------- */
+.stock-line {
+}
+.stock-thumb {
+}
+.stock-number {
+}
+.stock-free {
+}
+.stock-reserved {
+}
+.badge-low {
+}
+.badge-class {
+}
+.class-used {
+}
+.class-budget {
+}
+.class-standard {
+}
+.class-pro {
+}
+.class-industrial {
+}
+.card-effects {
+}
+.card-costs {
+}
+.card-description {
+}
+.efficiency {
+}
+.efficiency-plate {
+}
+.efficiency-line {
+}
+.warning-strip {
+}
+.tip-bubble {
+}
+.tip-close {
+}
+.house-card {
+}
+.house-picture {
+}
+.house-line {
+}
+.shortfall {
+}
+.sheets-reserved {
+}
+.contract-bar {
+}
+.contract-count {
+}
+.month-end {
+}
+.finance-loan {
+}
+.finance-overdraft {
+}
+.insurance-line {
+}
+.security-level {
+}
+.website-level {
+}
+.settings {
+}
+.shift-chip {
+}
+.crew-limit {
+}
+.holiday {
+}
+.draw-tier {
+}
+.pipe {
+}
+.pipe-tile {
+}
+.pipe-short {
+}
+.gate-collar {
+}
+.pallet {
+}
+.pallet-truck {
+}
+.offer-line {
+}
+.placeholder {
+}
+.seg-assign {
+}
+.tip-key.seg-assign {
+}
+.menu-close {
+}
+.gear {
+}
