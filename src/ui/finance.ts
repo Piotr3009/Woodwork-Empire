@@ -1,31 +1,105 @@
-// The Finance tab of the accounting binder: the loan and the overdraft (CLAUDE.md T13 3.14).
-// Phase A: a stub that renders the state; phase B1 builds the tab.
+// The Finance tab of the accounting binder: the loan and the overdraft (CLAUDE.md T13 3.14). The
+// engine says what is owed and what the next 1st takes; this prints it, every signed figure in
+// the colour its sign gives it.
 
-import { LOAN_MAX } from '../engine/constants';
+import { LOAN_MAX, LOAN_MONTHS, LOAN_RATE_YEARLY, OVERDRAFT_RATE_YEARLY } from '../engine/constants';
+// T13-C1: export from index.ts
+import {
+  loanCheck,
+  loanInterestForMonth,
+  loanCapitalForMonth,
+  nextInstalmentFor,
+  repayCheck,
+} from '../engine/finance';
 import type { GameState } from '../engine/index';
-import { button, escapeHtml, money } from './modal';
+import { button, escapeHtml, lockedButton, money, plural, primaryButton, signedMoney } from './modal';
+
+function percent(rate: number): string {
+  return `${Math.round(rate * 100)}%`;
+}
+
+/** A row of the tab: the words on the left, the figure on the right in its sign's colour. */
+function line(label: string, value: number, extra = ''): string {
+  const tone = value < 0 ? ' bad' : value > 0 ? ' good' : '';
+  return (
+    `<div class="row"><span class="row-main">${escapeHtml(label)}</span>` +
+    `<span class="row-figure${tone}">${signedMoney(value)}</span>` +
+    `${extra === '' ? '' : `<span class="row-action">${extra}</span>`}</div>`
+  );
+}
+
+function amountField(typed: string, after: string): string {
+  return (
+    '<input type="text" inputmode="numeric" pattern="[0-9]*" class="num" data-field="loanAmount" ' +
+    `value="${escapeHtml(typed)}" /> ${escapeHtml(after)}`
+  );
+}
+
+/** Nothing borrowed: the terms and the one control that borrows. */
+function offerBlock(state: GameState, typed: string): string {
+  const wanted = Math.round(Number(typed) || 0);
+  const check = loanCheck(state, wanted);
+  const control = check.ok
+    ? primaryButton('takeLoan', 'Take the loan', `data-amount="${wanted}"`)
+    : lockedButton('Take the loan', check.reason);
+  return (
+    `<p class="hint">Up to ${money(LOAN_MAX)} at ${percent(LOAN_RATE_YEARLY)} a year, ` +
+    `${LOAN_MONTHS} monthly instalments on the 1st, the interest on what is still owed with each ` +
+    'one. Repaid early at no penalty.</p>' +
+    `<div class="row"><span class="row-main">${amountField(typed, 'to borrow')}</span>` +
+    `<span class="row-action">${control}</span></div>`
+  );
+}
+
+/** A loan on the books: what is owed, what the next 1st takes, and the way out of it early. */
+function loanBlock(state: GameState, typed: string): string {
+  const loan = state.finance.loan;
+  if (loan === null) return offerBlock(state, typed);
+  const wanted = Math.round(Number(typed) || 0);
+  const part = repayCheck(state, wanted);
+  const all = repayCheck(state, null);
+  const partButton = part.ok
+    ? button('repayLoan', 'Repay', `data-amount="${wanted}"`)
+    : lockedButton('Repay', part.reason);
+  const allButton = all.ok
+    ? primaryButton('repayLoan', 'Repay it all', 'data-amount="all"')
+    : lockedButton('Repay it all', all.reason);
+  return (
+    `<p class="hint">${money(loan.principal)} borrowed on day ${loan.startDay} at ` +
+    `${percent(LOAN_RATE_YEARLY)} a year.</p>` +
+    line('Balance owed', -loan.balance) +
+    line(
+      `Next instalment, capital ${money(loanCapitalForMonth(loan))} and interest ` +
+        `${money(loanInterestForMonth(loan))}`,
+      -nextInstalmentFor(loan),
+    ) +
+    line('Interest paid so far', -loan.interestPaid) +
+    `<div class="row"><span class="row-main">Months left</span>` +
+    `<span class="row-figure">${plural(loan.monthsLeft, 'month', 'months')}</span></div>` +
+    `<div class="row"><span class="row-main">${amountField(typed, 'to repay early')}</span>` +
+    `<span class="row-action">${partButton}${allButton}</span></div>`
+  );
+}
+
+function overdraftBlock(state: GameState): string {
+  const below = state.cash < 0;
+  const running = below
+    ? `<p class="warn">The account is ${money(-state.cash)} below zero. Interest is running on ` +
+      'it every day, and it stays below zero until you bring it up.</p>'
+    : '';
+  return (
+    `<p class="hint">Below zero the bank charges ${percent(OVERDRAFT_RATE_YEARLY)} a year on the ` +
+    'balance, accrued every day and charged on the 1st, interest only.</p>' +
+    `<div class="row"><span class="row-main">Overdraft limit</span>` +
+    `<span class="row-figure">${money(state.finance.overdraftLimit)}</span></div>` +
+    line('Interest accrued this month', -state.finance.overdraftInterestAccrued) +
+    running
+  );
+}
 
 export function renderFinance(state: GameState, loanTyped = '10000'): string {
-  const loan = state.finance.loan;
-  const wanted = Number(loanTyped) || 0;
-  const loanBlock =
-    loan === null
-      ? '<h3>Loan</h3>' +
-        `<p class="hint">Up to ${money(LOAN_MAX)}, sixty monthly instalments.</p>` +
-        '<div class="row"><span class="row-main">' +
-        '<input type="text" inputmode="numeric" pattern="[0-9]*" class="num" ' +
-        `data-field="loanAmount" value="${escapeHtml(loanTyped)}" /> to borrow</span>` +
-        `<span class="row-action">${button('takeLoan', 'Take the loan', `data-amount="${wanted}"`)}</span></div>`
-      : '<h3>Loan</h3>' +
-        `<div class="row"><span class="row-main">Balance</span><span class="row-figure bad">${money(-loan.balance)}</span></div>` +
-        `<div class="row"><span class="row-main">Months left</span><span class="row-figure">${loan.monthsLeft}</span></div>` +
-        `<div class="row"><span class="row-main">Interest paid</span><span class="row-figure bad">${money(-loan.interestPaid)}</span></div>` +
-        `<div class="row"><span class="row-action">${button('repayLoan', 'Repay it all', 'data-amount="all"')}</span></div>`;
   return (
-    loanBlock +
-    '<h3>Overdraft</h3>' +
-    `<div class="row"><span class="row-main">Limit</span><span class="row-figure">${money(state.finance.overdraftLimit)}</span></div>` +
-    `<div class="row"><span class="row-main">Interest accrued this month</span>` +
-    `<span class="row-figure bad">${money(-state.finance.overdraftInterestAccrued)}</span></div>`
+    `<div class="finance-loan"><h3>Loan</h3>${loanBlock(state, loanTyped)}</div>` +
+    `<div class="finance-overdraft"><h3>Overdraft</h3>${overdraftBlock(state)}</div>`
   );
 }

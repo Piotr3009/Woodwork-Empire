@@ -36,6 +36,14 @@ export function liabilityPremiumYearly(state: GameState): number {
   return LIABILITY_BASE_YEARLY + state.workers.length * LIABILITY_PER_EMPLOYEE_YEARLY;
 }
 
+/** What the 1st takes for the covers held: a twelfth of each yearly premium. */
+export function monthlyPremiums(state: GameState): number {
+  let total = 0;
+  if (state.insurance.property) total += propertyPremiumYearly(state) / 12;
+  if (state.insurance.liability) total += liabilityPremiumYearly(state) / 12;
+  return Math.round(total * 100) / 100;
+}
+
 /** Both covers held: the gate to commercial work (CLAUDE.md T13 3.15). */
 export function coversHeld(state: GameState): boolean {
   return state.insurance.property && state.insurance.liability;
@@ -52,8 +60,21 @@ export function refreshInsuredValue(state: GameState): void {
   state.insurance.insuredValue = insuredValue(state);
 }
 
-/** The 1st: a twelfth of each yearly premium (CLAUDE.md T13 3.15). */
+/** True once a premium has gone out today: the month's premium is charged once however many
+ *  times the day's hooks ask for it. */
+function premiumChargedToday(state: GameState): boolean {
+  for (let index = state.ledger.length - 1; index >= 0; index -= 1) {
+    const entry = state.ledger[index];
+    if (!entry || entry.day !== state.clock.day) return false;
+    if (entry.category === 'insurance' && entry.amount < 0) return true;
+  }
+  return false;
+}
+
+/** The 1st: a twelfth of each yearly premium (CLAUDE.md T13 3.15). Runs with the monthly items
+ *  in economy.ts, so a 1st on a weekend is charged too. */
 export function runInsuranceMonth(state: GameState): void {
+  if (premiumChargedToday(state)) return;
   if (state.insurance.property) {
     const premium = Math.round((propertyPremiumYearly(state) / 12) * 100) / 100;
     charge(state, 'insurance', 'Property insurance', -premium, { unavoidable: true });
