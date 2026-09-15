@@ -10,6 +10,8 @@ import {
   DAY_ONE_BUY_ORDER,
   LACQUER_NO_DRYER,
   SHORT_HANDED,
+  SIX_JOINERS_TWO_SAWS,
+  THICKNESSER_ONE_BAG,
   WITH_HELPER,
   TWO_MEN_BIG_FAN,
   TWO_MEN_ONE_FAN,
@@ -58,13 +60,13 @@ import {
   STATION_IDLE,
   STATION_NO_BENCH,
   addWorkingDays,
+  bagStore,
   dayPercentages,
   helperOnDuty,
   homeCellOf,
   extractionCheck,
   madeInADustyWorkshop,
   workingDaysBetween,
-  bagIntervalFor,
   dailyPower,
   emailsForPrice,
   formatTime,
@@ -83,8 +85,11 @@ import {
 import {
   DAY_ONE_KIT,
   DAY_ONE_SOFTWARE,
+  DUST_OUTPUT_M3_PER_HOUR,
+  EXTRACTOR_BAGS,
   NO_AIR_LINE,
   PRODUCT_TEMPLATES,
+  SOLID_WOOD_EQUIPMENT,
 } from '../../src/engine/constants';
 import { jobProgress } from '../../src/engine/jobs';
 import { kitBlockFor } from '../../src/engine/board';
@@ -109,6 +114,22 @@ function machineOf(state: GameState, specId: string): Equipment {
 }
 
 const SEED = 20260911;
+
+/** What the month's machines made, off every day record and the day in hand: the one figure the
+ *  hall's store is fed from (CLAUDE.md T12 2.3, 3.4). */
+function dustMade(state: GameState): number {
+  return state.days.reduce((total, day) => total + day.dustMadeM3, 0) + state.dayStats.dustM3;
+}
+
+/** The same dust read off the machines' own clocks, at the family's figure an hour each, whatever
+ *  class they are: a dearer saw makes no more (PIOTR, CLAUDE.md T12 2.1). The two sums are booked
+ *  a minute at a time to six places, so over a month they agree to a few thousandths. */
+function dustOffTheClocks(state: GameState): number {
+  return state.equipment.reduce(
+    (total, item) => total + (DUST_OUTPUT_M3_PER_HOUR[item.specId] ?? 0) * item.hoursUsed,
+    0,
+  );
+}
 
 /** Day 1 to the start of day 31: thirty game days. */
 function easyMonth(seen: GameEvent[] = []): GameState {
@@ -184,13 +205,26 @@ describe('30 days on Easy, working the board', () => {
     const saw = machineOf(state, 'tableSaw');
     expect(saw.variantId).toBe('used');
     expect(saw.purchasePrice).toBe(1800);
-    // Five per cent slower than a new one on the cutting, and the bag fills twice as often
-    // (CLAUDE.md T3 3.5, T7 3.1).
+    // Five per cent slower than a new one on the cutting (CLAUDE.md T3 3.5, T7 3.1).
     expect(stageSpeed(state, stagedJob(1, 'sheet', false), 'cutting').speed).toBeCloseTo(0.95, 10);
-    expect(bagIntervalFor(saw)).toBe(1200);
     // And it wore its hours down as the month went on.
     expect(saw.hoursUsed).toBeGreaterThan(0);
     expect(saw.enduranceHours).toBe(750);
+  });
+
+  it('fed the hall s one bag store at the family s figure, and never filled it off one saw', () => {
+    // The bag is the extractor's and not the saw's: the used fan holds one, and what is in it is
+    // the saw's and the bander's hours at their families' figures (CLAUDE.md T12 2.1, 2.3).
+    const store = bagStore(state);
+    expect(store).toMatchObject({ exists: true, bags: 1, capacityM3: 1, full: false });
+    expect(store.fillM3).toBeGreaterThan(0);
+    expect(store.fillM3).toBeCloseTo(dustOffTheClocks(state), 2);
+    // Nothing was emptied, so the month's dust is what is in the bag, and every day wrote its own
+    // figure down (CLAUDE.md T12 3.4).
+    expect(state.tasks.filter((task) => task.kind === 'emptyBags')).toHaveLength(0);
+    expect(dustMade(state)).toBeCloseTo(store.fillM3, 6);
+    expect(state.days.length).toBeGreaterThan(0);
+    expect(state.days.some((day) => day.dustMadeM3 > 0)).toBe(true);
   });
 
   it('had the whole of day 1 delivered on the morning of day 2', () => {
@@ -391,14 +425,22 @@ describe('30 days on Very easy behind the best saw money can buy', () => {
     expect(minutesRemainingFor(budget, job, 1) / minutes).toBeCloseTo(1 / (0.25 / 1.3 + 0.75), 6);
   });
 
-  it('empties the bag half as often and draws more off the meter', () => {
+  it('has twice the hours in it and draws more off the meter', () => {
     const saw = machineOf(state, 'tableSaw');
-    expect(bagIntervalFor(saw)).toBe(4800);
     expect(saw.enduranceHours).toBe(6000);
     // Seven a day for the industrial saw where the used one draws three (CLAUDE.md T3 3.5).
     const machines = state.equipment.filter((item) => item.id !== saw.id);
     const others = dailyPower({ ...state, equipment: machines }) - POWER_BASE_DAILY;
     expect(dailyPower(state) - POWER_BASE_DAILY - others).toBe(7);
+  });
+
+  it('makes no more dust an hour than the used one: the store is fed at the family s figure', () => {
+    // A dearer saw does not make more dust; the material does (PIOTR, CLAUDE.md T12 2.1). The
+    // fan is the day 1 one, so the store is the same one bag the used saw month has.
+    const store = bagStore(state);
+    expect(store).toMatchObject({ exists: true, bags: 1, capacityM3: 1 });
+    expect(store.fillM3).toBeLessThanOrEqual(store.capacityM3);
+    expect(dustMade(state)).toBeCloseTo(dustOffTheClocks(state), 2);
   });
 
   it('still trades at the end of the month after spending that much on day 1', () => {
@@ -832,6 +874,50 @@ describe('a month of six joiners behind two saws', () => {
     expect(one.waiting).toBeGreaterThan(0);
     expect(one.longest).toBeGreaterThan(CREW_MAX_GAP);
   });
+
+  it('keeps one store for the hall, the two fans added up, fed by both saws', () => {
+    // The crew hall stands the industrial fan beside the day 1 one, and a hall is one duct run:
+    // eleven bags in one store, which six men cutting do not fill inside a month, and nobody's
+    // saw carries a bag of its own any more (CLAUDE.md T12 2.3).
+    const store = bagStore(two.state);
+    expect(store.bags).toBe((EXTRACTOR_BAGS.used ?? 0) + (EXTRACTOR_BAGS.industrial ?? 0));
+    expect(store.full).toBe(false);
+    expect(store.fillM3).toBeGreaterThan(0);
+    expect(store.fillM3).toBeCloseTo(dustOffTheClocks(two.state), 2);
+    expect(dustMade(two.state)).toBeCloseTo(store.fillM3, 6);
+    expect(two.state.tasks.filter((task) => task.kind === 'emptyBags')).toHaveLength(0);
+  });
+});
+
+describe('a month of six joiners behind two saws on the day 1 fan alone', () => {
+  const seen: GameEvent[] = [];
+  const state = playUntilDay(
+    newGame({ seed: SEED, difficulty: 'veryEasy' }),
+    31,
+    SIX_JOINERS_TWO_SAWS,
+    seen,
+  );
+
+  it('fills the one bag more than once in the month, and the owner empties it himself each time', () => {
+    // No helper in this hall, so the question comes to the owner, once a fill and never once a
+    // machine, and the careful owner takes it (CLAUDE.md T12 2.3). One bag, both saws feeding it.
+    const store = bagStore(state);
+    expect(store).toMatchObject({ exists: true, bags: 1, capacityM3: 1 });
+    expect(store.fillM3).toBeLessThanOrEqual(store.capacityM3);
+    const fills = seen.filter((event) => event.kind === 'bagsFull');
+    expect(fills.length).toBeGreaterThan(1);
+    for (const event of fills) expect(event.title).toBe('Bags full in the workshop');
+    const emptied = state.tasks.filter((task) => task.kind === 'emptyBags');
+    expect(emptied).toHaveLength(fills.length);
+    for (const task of emptied) {
+      expect(task.done).toBe(true);
+      expect(task.doneBy).toBe('owner');
+      expect(task.label).toBe('Empty the bags (1 bag, 15 min)');
+      expect(task.equipmentId).toBeNull();
+    }
+    expect(dustMade(state)).toBeGreaterThan(fills.length * store.capacityM3);
+    expect(dustMade(state)).toBeCloseTo(dustOffTheClocks(state), 2);
+  });
 });
 
 describe('a month that orders a CNC on day 1 and calls it off on day 10', () => {
@@ -1233,4 +1319,54 @@ describe('a month that sprays a wardrobe on wet air', () => {
     );
     expect(marked.length).toBeGreaterThan(0);
   });
+});
+
+// ---------------------------------------------------------------------------
+// (s) A thicknesser on a single bag, with a helper to empty it (CLAUDE.md T12 T12-07)
+// ---------------------------------------------------------------------------
+
+describe('a month with a thicknesser on a single bag and a helper', () => {
+  const seen: GameEvent[] = [];
+  const state = playUntilDay(
+    newGame({ seed: SEED, difficulty: 'veryEasy' }),
+    31,
+    THICKNESSER_ONE_BAG,
+    seen,
+  );
+
+  it('stands the thicknesser and the tools behind the one bag fan, with the oak table on the books', () => {
+    expect(state.gameOver).toBeNull();
+    expect(state.clock.day).toBe(31);
+    for (const specId of SOLID_WOOD_EQUIPMENT) {
+      expect(state.equipment.some((item) => item.specId === specId), specId).toBe(true);
+    }
+    expect(bagStore(state)).toMatchObject({ exists: true, bags: 1, capacityM3: 1 });
+    expect(helperOnDuty(state)).toBe(true);
+    const tables = state.jobs.filter((job) => job.templateId === 'oakDiningTable');
+    expect(tables.length).toBeGreaterThan(0);
+    expect(tables.some((job) => job.assignedTo === 'owner' || job.stage === 'completed')).toBe(true);
+  });
+
+  it('never stood a man at the thicknesser, so its two bags a day never reached the store', () => {
+    // The blocker at the top of REPORT-T12.md: the machining of timber is done with the solid
+    // wood tools, and no stage of any job stands a man at the thicknesser, so a played month
+    // cannot fill a bag off it. What the store was fed is the saw's and the bander's, at their
+    // figures, and one saw does not fill a bag in a month (CLAUDE.md T12 2.1, 2.3).
+    const table = state.jobs.find((job) => job.templateId === 'oakDiningTable');
+    if (table === undefined) throw new Error('no oak table on the books');
+    expect(familyForStage(table, 'machining')).toBe('solidWoodTools');
+    expect(machineOf(state, 'thicknesser').hoursUsed).toBe(0);
+    expect(DUST_OUTPUT_M3_PER_HOUR.thicknesser).toBe(0.25);
+    const store = bagStore(state);
+    expect(store.fillM3).toBeGreaterThan(0);
+    expect(store.fillM3).toBeCloseTo(dustOffTheClocks(state), 2);
+    expect(store.full).toBe(false);
+    expect(seen.filter((event) => event.kind === 'bagsFull')).toHaveLength(0);
+    expect(state.tasks.filter((task) => task.kind === 'emptyBags')).toHaveLength(0);
+  });
+
+  it.todo(
+    'has the helper empty the bag more than once a day, once a stage of some job stands a man at ' +
+      'the thicknesser (the blocker at the top of REPORT-T12.md)',
+  );
 });

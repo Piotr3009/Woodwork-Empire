@@ -94,16 +94,14 @@ describe('where the owner stands', () => {
     expect(stationForTask(state, fetch)).toBe(STATION_RACK);
   });
 
-  it('stands at the machine it is changing a bag on', () => {
+  it('stands at the extractor to empty the bags, which is where the bags are', () => {
     const state = buyStartingKit(newGame());
-    const saw = state.equipment.find((item) => item.specId === 'tableSaw');
-    const bag = createTask(state, {
-      kind: 'bagChange',
-      label: 'Bag change',
+    const bags = createTask(state, {
+      kind: 'emptyBags',
+      label: 'Empty the bags (1 bag, 15 min)',
       minutes: 15,
-      equipmentId: saw?.id ?? null,
     });
-    expect(stationForTask(state, bag)).toBe(machineStation('tableSaw'));
+    expect(stationForTask(state, bags)).toBe(machineStation('extractor'));
   });
 
   it('puts a day off figure nowhere at all', () => {

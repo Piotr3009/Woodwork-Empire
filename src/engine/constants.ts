@@ -18,7 +18,13 @@ import type {
   WorkerTier,
 } from './types';
 
-/** Bumped in Turn 10: every machine carries the compressor it draws its air from and whether it
+/** Bumped in Turn 12: the bags came off the machines and onto the extractor. The state carries
+ *  the hall's one bag store in cubic metres, the day carries the dust it made and every summary
+ *  carries the same, a machine carries no bag of its own any more, and the bag change is the
+ *  emptying of the bags. A Turn 11 save is lifted into that shape by the migration, so a v18
+ *  game opens (CLAUDE.md T12 2.3).
+ *
+ *  Bumped in Turn 10: every machine carries the compressor it draws its air from and whether it
  *  stands at ninety degrees to the walls, every job carries the minutes of production that went
  *  into it and how many of them the hall was under extracted for, and a job carries whether its
  *  finish was sprayed on wet air. A Turn 9 save has none of them, so its air would come from
@@ -52,11 +58,11 @@ import type {
  *
  *  Bumped in Turn 11: the owner carries the log of his day and the state carries the last week of
  *  them, which is what the top bar's meter and the company board are drawn from (T11 3.1). */
-export const STATE_VERSION = 12;
+export const STATE_VERSION = 13;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
-export const APP_VERSION = 'v18';
+export const APP_VERSION = 'v19';
 
 // ---------------------------------------------------------------------------
 // The owner's day, in the seven things it is made of
@@ -189,6 +195,10 @@ export const POWER_PER_MACHINE_DAILY = 3;
 export const BENCH_SLOTS = 4;
 /** Waste collection once the central dust system exists (PIOTR). */
 export const DUST_WASTE_MONTHLY = 400;
+
+/** The systems that take the dust away by duct and pay the waste man instead of filling bags.
+ *  Everything the central system does, the flexi one does (CLAUDE.md T4 3.5, T12 2.3). */
+export const CENTRAL_EXTRACTION_SPECS: readonly string[] = ['dustSystem', 'flexiSystem'];
 /** Pellet sales with a pelletiser, rising with production (PIOTR). */
 export const PELLET_INCOME_MONTHLY_BASE = 600;
 /** [TUNE] extra pellet income per 1000 minutes of production in the month. */
@@ -488,7 +498,9 @@ export const SITE_MEASURE_MINUTES = 240;
 export const SITE_MEASURE_TAXI_COST = 40;
 /** [TUNE] base minutes to unload a delivery, before forklift factors. */
 export const UNLOAD_BASE_MINUTES = 45;
-/** Bag change (PIOTR). */
+/** Emptying one bag (PIOTR). The bags are on the extractor and nowhere else, and emptying the
+ *  hall's store takes this long for every bag in it: ten bags take ten times as long as one
+ *  (CLAUDE.md T12 2.3). */
 export const BAG_CHANGE_MINUTES = 15;
 /** Moving the kit about is a job of work: an hour a machine or a bench [TUNE]. */
 export const MOVE_MINUTES_PER_ITEM = 60;
@@ -796,7 +808,6 @@ export const TABLE_SAW_VARIANTS: EquipmentVariant[] = [
     zoneWidth: 3,
     zoneDepth: 3,
     outputFactor: 0.95,
-    bagIntervalFactor: 0.5,
     enduranceFactor: 0.25,
     powerPerDay: 3,
     description:
@@ -814,7 +825,6 @@ export const TABLE_SAW_VARIANTS: EquipmentVariant[] = [
     zoneWidth: 3,
     zoneDepth: 3,
     outputFactor: 1,
-    bagIntervalFactor: 1,
     enduranceFactor: 1,
     powerPerDay: 3,
     description:
@@ -832,7 +842,6 @@ export const TABLE_SAW_VARIANTS: EquipmentVariant[] = [
     zoneWidth: 4,
     zoneDepth: 3,
     outputFactor: 1.05,
-    bagIntervalFactor: 1.2,
     enduranceFactor: 1.2,
     powerPerDay: 4,
     description:
@@ -850,7 +859,6 @@ export const TABLE_SAW_VARIANTS: EquipmentVariant[] = [
     zoneWidth: 6,
     zoneDepth: 3,
     outputFactor: 1.15,
-    bagIntervalFactor: 1.5,
     enduranceFactor: 1.5,
     powerPerDay: 5,
     description:
@@ -868,7 +876,6 @@ export const TABLE_SAW_VARIANTS: EquipmentVariant[] = [
     zoneWidth: 5,
     zoneDepth: 4,
     outputFactor: 1.3,
-    bagIntervalFactor: 2,
     enduranceFactor: 2,
     powerPerDay: 7,
     description:
@@ -892,15 +899,6 @@ const ENDURANCE_BY_CLASS: Record<string, number> = {
   industrial: 2,
 };
 
-/** The same ladder for the bag: a worn out machine fills one twice as fast (CLAUDE.md T7 3.6). */
-const BAG_BY_CLASS: Record<string, number> = {
-  used: 0.5,
-  budget: 1,
-  standard: 1.2,
-  pro: 1.5,
-  industrial: 2,
-};
-
 /** The five classes of workbench. Prices, output and footprints are Piotr's table; the endurance
  *  and the power are [TUNE] (CLAUDE.md T7 3.6). A bench is not a machine, so its hours never
  *  move: the ladder is there so the family reads like every other one. */
@@ -915,7 +913,6 @@ export const WORKBENCH_VARIANTS: EquipmentVariant[] = [
     zoneWidth: 2,
     zoneDepth: 2,
     outputFactor: 0.95,
-    bagIntervalFactor: BAG_BY_CLASS.used ?? 1,
     enduranceFactor: ENDURANCE_BY_CLASS.used ?? 1,
     powerPerDay: 1,
     description:
@@ -933,7 +930,6 @@ export const WORKBENCH_VARIANTS: EquipmentVariant[] = [
     zoneWidth: 2,
     zoneDepth: 2,
     outputFactor: 1,
-    bagIntervalFactor: BAG_BY_CLASS.budget ?? 1,
     enduranceFactor: ENDURANCE_BY_CLASS.budget ?? 1,
     powerPerDay: 1,
     description:
@@ -951,7 +947,6 @@ export const WORKBENCH_VARIANTS: EquipmentVariant[] = [
     zoneWidth: 2,
     zoneDepth: 2,
     outputFactor: 1.02,
-    bagIntervalFactor: BAG_BY_CLASS.standard ?? 1,
     enduranceFactor: ENDURANCE_BY_CLASS.standard ?? 1,
     powerPerDay: 1,
     description:
@@ -968,7 +963,6 @@ export const WORKBENCH_VARIANTS: EquipmentVariant[] = [
     zoneWidth: 2,
     zoneDepth: 2,
     outputFactor: 1.05,
-    bagIntervalFactor: BAG_BY_CLASS.pro ?? 1,
     enduranceFactor: ENDURANCE_BY_CLASS.pro ?? 1,
     powerPerDay: 1,
     description:
@@ -986,7 +980,6 @@ export const WORKBENCH_VARIANTS: EquipmentVariant[] = [
     zoneWidth: 3,
     zoneDepth: 2,
     outputFactor: 1.08,
-    bagIntervalFactor: BAG_BY_CLASS.industrial ?? 1,
     enduranceFactor: ENDURANCE_BY_CLASS.industrial ?? 1,
     powerPerDay: 2,
     description:
@@ -1011,7 +1004,6 @@ export const SHEET_RACK_VARIANTS: EquipmentVariant[] = [
     zoneDepth: 2,
     sheetCapacity: 30,
     outputFactor: 1,
-    bagIntervalFactor: 1,
     enduranceFactor: ENDURANCE_BY_CLASS.used ?? 1,
     powerPerDay: 1,
     description:
@@ -1029,7 +1021,6 @@ export const SHEET_RACK_VARIANTS: EquipmentVariant[] = [
     zoneDepth: 2,
     sheetCapacity: 50,
     outputFactor: 1,
-    bagIntervalFactor: 1,
     enduranceFactor: ENDURANCE_BY_CLASS.budget ?? 1,
     powerPerDay: 1,
     description:
@@ -1047,7 +1038,6 @@ export const SHEET_RACK_VARIANTS: EquipmentVariant[] = [
     zoneDepth: 2,
     sheetCapacity: 75,
     outputFactor: 1,
-    bagIntervalFactor: 1,
     enduranceFactor: ENDURANCE_BY_CLASS.standard ?? 1,
     powerPerDay: 1,
     description:
@@ -1065,7 +1055,6 @@ export const SHEET_RACK_VARIANTS: EquipmentVariant[] = [
     zoneDepth: 2,
     sheetCapacity: 110,
     outputFactor: 1,
-    bagIntervalFactor: 1,
     enduranceFactor: ENDURANCE_BY_CLASS.pro ?? 1,
     powerPerDay: 1,
     description:
@@ -1083,7 +1072,6 @@ export const SHEET_RACK_VARIANTS: EquipmentVariant[] = [
     zoneDepth: 2,
     sheetCapacity: 160,
     outputFactor: 1,
-    bagIntervalFactor: 1,
     enduranceFactor: ENDURANCE_BY_CLASS.industrial ?? 1,
     powerPerDay: 1,
     description:
@@ -1107,7 +1095,6 @@ export const EDGEBANDER_VARIANTS: EquipmentVariant[] = [
     zoneDepth: 0,
     requires: [TOOL_CABINET_ID],
     outputFactor: 0.95,
-    bagIntervalFactor: BAG_BY_CLASS.used ?? 1,
     enduranceFactor: ENDURANCE_BY_CLASS.used ?? 1,
     powerPerDay: 1,
     description:
@@ -1125,7 +1112,6 @@ export const EDGEBANDER_VARIANTS: EquipmentVariant[] = [
     zoneDepth: 0,
     requires: [TOOL_CABINET_ID],
     outputFactor: 1,
-    bagIntervalFactor: BAG_BY_CLASS.budget ?? 1,
     enduranceFactor: ENDURANCE_BY_CLASS.budget ?? 1,
     powerPerDay: 1,
     description:
@@ -1144,7 +1130,6 @@ export const EDGEBANDER_VARIANTS: EquipmentVariant[] = [
     requires: [],
     requiresOneOf: ['extractor', 'dustSystem', 'flexiSystem'],
     outputFactor: 1.1,
-    bagIntervalFactor: BAG_BY_CLASS.standard ?? 1,
     enduranceFactor: ENDURANCE_BY_CLASS.standard ?? 1,
     powerPerDay: 4,
     description:
@@ -1164,7 +1149,6 @@ export const EDGEBANDER_VARIANTS: EquipmentVariant[] = [
     requires: [],
     requiresOneOf: ['extractor', 'dustSystem', 'flexiSystem'],
     outputFactor: 1.2,
-    bagIntervalFactor: BAG_BY_CLASS.pro ?? 1,
     enduranceFactor: ENDURANCE_BY_CLASS.pro ?? 1,
     powerPerDay: 5,
     description:
@@ -1183,7 +1167,6 @@ export const EDGEBANDER_VARIANTS: EquipmentVariant[] = [
     requires: [],
     requiresOneOf: ['extractor', 'dustSystem', 'flexiSystem'],
     outputFactor: 1.35,
-    bagIntervalFactor: BAG_BY_CLASS.industrial ?? 1,
     enduranceFactor: ENDURANCE_BY_CLASS.industrial ?? 1,
     powerPerDay: 6,
     description:
@@ -1198,7 +1181,8 @@ export const EDGEBANDER_VARIANTS: EquipmentVariant[] = [
  *  is the footprint, because an extractor is stood against a wall and nobody works round it. The
  *  prices are `[TUNE]` 400 / 600 / 1,400 / 3,200 / 7,500, and the budget one keeps the 600 the
  *  single class of Turns 1 to 9 cost. What each one pulls is in `EXTRACTION_CAPACITY`, in m3/h;
- *  the bag and endurance factors are the saw's ladder, as 3.4 asks. */
+ *  the endurance factors are the saw's ladder, as 3.4 asks, and the bags each class holds are in
+ *  `EXTRACTOR_BAGS` (CLAUDE.md T12 2.3). */
 export const EXTRACTOR_VARIANTS: EquipmentVariant[] = [
   {
     id: 'used',
@@ -1210,7 +1194,6 @@ export const EXTRACTOR_VARIANTS: EquipmentVariant[] = [
     zoneWidth: 1,
     zoneDepth: 1,
     outputFactor: 1,
-    bagIntervalFactor: BAG_BY_CLASS.used ?? 1,
     enduranceFactor: ENDURANCE_BY_CLASS.used ?? 1,
     powerPerDay: 2,
     description:
@@ -1228,7 +1211,6 @@ export const EXTRACTOR_VARIANTS: EquipmentVariant[] = [
     zoneWidth: 1,
     zoneDepth: 1,
     outputFactor: 1,
-    bagIntervalFactor: BAG_BY_CLASS.budget ?? 1,
     enduranceFactor: ENDURANCE_BY_CLASS.budget ?? 1,
     powerPerDay: 3,
     description:
@@ -1246,7 +1228,6 @@ export const EXTRACTOR_VARIANTS: EquipmentVariant[] = [
     zoneWidth: 2,
     zoneDepth: 1,
     outputFactor: 1,
-    bagIntervalFactor: BAG_BY_CLASS.standard ?? 1,
     enduranceFactor: ENDURANCE_BY_CLASS.standard ?? 1,
     powerPerDay: 5,
     description:
@@ -1263,7 +1244,6 @@ export const EXTRACTOR_VARIANTS: EquipmentVariant[] = [
     zoneWidth: 3,
     zoneDepth: 1,
     outputFactor: 1,
-    bagIntervalFactor: BAG_BY_CLASS.pro ?? 1,
     enduranceFactor: ENDURANCE_BY_CLASS.pro ?? 1,
     powerPerDay: 8,
     description:
@@ -1280,7 +1260,6 @@ export const EXTRACTOR_VARIANTS: EquipmentVariant[] = [
     zoneWidth: 5,
     zoneDepth: 1,
     outputFactor: 1,
-    bagIntervalFactor: BAG_BY_CLASS.industrial ?? 1,
     enduranceFactor: ENDURANCE_BY_CLASS.industrial ?? 1,
     powerPerDay: 14,
     description:
@@ -1307,7 +1286,6 @@ export const COMPRESSOR_VARIANTS: EquipmentVariant[] = [
     zoneWidth: 1,
     zoneDepth: 1,
     outputFactor: 1,
-    bagIntervalFactor: 1,
     enduranceFactor: ENDURANCE_BY_CLASS.used ?? 1,
     powerPerDay: 2,
     description:
@@ -1325,7 +1303,6 @@ export const COMPRESSOR_VARIANTS: EquipmentVariant[] = [
     zoneWidth: 1,
     zoneDepth: 1,
     outputFactor: 1,
-    bagIntervalFactor: 1,
     enduranceFactor: ENDURANCE_BY_CLASS.budget ?? 1,
     powerPerDay: 3,
     description:
@@ -1342,7 +1319,6 @@ export const COMPRESSOR_VARIANTS: EquipmentVariant[] = [
     zoneWidth: 2,
     zoneDepth: 1,
     outputFactor: 1,
-    bagIntervalFactor: 1,
     enduranceFactor: ENDURANCE_BY_CLASS.standard ?? 1,
     powerPerDay: 6,
     description:
@@ -1359,7 +1335,6 @@ export const COMPRESSOR_VARIANTS: EquipmentVariant[] = [
     zoneWidth: 2,
     zoneDepth: 1,
     outputFactor: 1,
-    bagIntervalFactor: 1,
     enduranceFactor: ENDURANCE_BY_CLASS.pro ?? 1,
     powerPerDay: 10,
     description:
@@ -1376,7 +1351,6 @@ export const COMPRESSOR_VARIANTS: EquipmentVariant[] = [
     zoneWidth: 2,
     zoneDepth: 2,
     outputFactor: 1,
-    bagIntervalFactor: 1,
     enduranceFactor: ENDURANCE_BY_CLASS.industrial ?? 1,
     powerPerDay: 20,
     description:
@@ -1503,7 +1477,6 @@ const BASE_SPEC = {
   // the office furniture are ordered like everything else and come the next working day
   // (PIOTR, 13.09; CLAUDE.md T9 3.1).
   deliveryDays: 1,
-  bagInterval: 0,
   usedOn: null as MaterialKind | null,
   unloadFactor: 1,
   sheetCapacity: 0,
@@ -1534,7 +1507,6 @@ function withVariants(draft: SpecDraft): EquipmentSpec {
       name: draft.name,
       price: draft.price,
       outputFactor: 1,
-      bagIntervalFactor: 1,
       enduranceFactor: 1,
       powerPerDay: POWER_PER_MACHINE_DAILY,
       description: draft.effect,
@@ -1620,10 +1592,9 @@ const SPEC_DRAFTS: SpecDraft[] = [
     depth: 1,
     height: 1,
     spriteKey: 'tableSaw',
-    bagInterval: 2400,
     usedOn: 'sheet',
     stackable: true,
-    effect: 'Cuts sheets and timber. One man at a time. Bag every 2400 minutes.',
+    effect: 'Cuts sheets and timber. One man at a time.',
   },
   {
     ...BASE_SPEC,
@@ -1658,11 +1629,10 @@ const SPEC_DRAFTS: SpecDraft[] = [
     zoneWidth: 0,
     zoneDepth: 0,
     spriteKey: 'edgebander',
-    bagInterval: 4800,
     usedOn: 'sheet',
     effect:
       'Edges sheet goods. The two hand classes live in a tool cabinet; the floor ones take one ' +
-      'man at a time and want extraction. Bag every 4800 minutes.',
+      'man at a time and want extraction.',
   },
   {
     ...BASE_SPEC,
@@ -1908,9 +1878,8 @@ const SPEC_DRAFTS: SpecDraft[] = [
     zoneWidth: 4,
     zoneDepth: 2,
     spriteKey: 'thicknesser',
-    bagInterval: 480,
     usedOn: 'solidWood',
-    effect: 'Solid wood tools, part 1. Bag every 480 minutes.',
+    effect: 'Solid wood tools, part 1.',
   },
   {
     ...BASE_SPEC,
@@ -2005,7 +1974,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
     depth: 2,
     height: 4,
     spriteKey: 'dustSystem',
-    effect: 'No more bags and no breakdown. Waste collection 400 per month.',
+    effect: `No more bags and no breakdown. Waste collection ${DUST_WASTE_MONTHLY} per month.`,
   },
   {
     ...BASE_SPEC,
@@ -2025,8 +1994,8 @@ const SPEC_DRAFTS: SpecDraft[] = [
     spriteKey: 'flexiSystem',
     effect:
       'Everything the central system does, and flexible ducting on every machine: move the hall ' +
-      'about as often as you like and the reconnection never costs again. Waste collection 400 ' +
-      'per month.',
+      'about as often as you like and the reconnection never costs again. Waste collection ' +
+      `${DUST_WASTE_MONTHLY} per month.`,
   },
   {
     ...BASE_SPEC,
@@ -2394,6 +2363,51 @@ export const WORKER_NAMES = [
 // ---------------------------------------------------------------------------
 // 9.6 and 9.7 Machines, bags, extractor, dust
 // ---------------------------------------------------------------------------
+
+/** A bag is one cubic metre (PIOTR, 15.09). The one constant every place that turns bags into
+ *  cubic metres, or back, reads (CLAUDE.md T12 1). */
+export const BAG_M3 = 1;
+
+/** Bags into cubic metres: the one place the conversion is done, so a capacity is never written
+ *  out twice (CLAUDE.md T12 2.3). */
+export function bagsToM3(bags: number): number {
+  return bags * BAG_M3;
+}
+
+/** Cubic metres of sawdust a machine of each family makes in an hour that somebody stands at it
+ *  (PIOTR, 15.09; CLAUDE.md T12 2.1). One figure per family: a dearer saw does not make more
+ *  dust, because the material makes the dust and not the price of the machine. The point of
+ *  reference is a CNC cutting all day filling half a bag and a saw four times less, a bag of one
+ *  cubic metre and a day of eight hours.
+ *
+ *  Families that do not exist yet, written here in full so the figures are in place the day the
+ *  classes land, the way EXTRACTION_DEMAND does it: spindle moulder 0.12 (a bag a day), planer
+ *  0.12 (one face, a bag a day), four sided planer 0.5 (four times the spindle moulder), wide
+ *  belt sander 0.03, brush sander 0.03. None of them is a family tonight. */
+export const DUST_OUTPUT_M3_PER_HOUR: Record<string, number> = {
+  tableSaw: 0.015, // an eighth of a bag a day
+  edgebander: 0.01, // a bag in about two weeks of use
+  thicknesser: 0.25, // two bags a day, it takes 6 to 8 mm off two faces
+  cnc: 0.06, // half a bag a day, Piotr's point of reference
+  cncHead: 0.06, // the same head, the same chips
+  solidWoodTools: 0, // the helper sweeps up after hand tools
+  sprayBooth: 0, // its own extraction, off this table
+  drill: 0, // a drill makes nothing a bag notices
+  // A compressor moves air and makes no chips. Not on Piotr's list: a zero so that every family
+  // of the machine category is on this table and the test can hold it to that [TUNE].
+  compressor: 0,
+};
+
+/** The bags on each class of extractor, off the descriptions that were on the shelf already: a
+ *  single bag, a single bag, twin bags, four bags and ten (PIOTR, CLAUDE.md T12 2.3). The hall's
+ *  store is the sum of these over every extractor in it, in cubic metres through `bagsToM3`. */
+export const EXTRACTOR_BAGS: Record<string, number> = {
+  used: 1,
+  budget: 1,
+  standard: 2,
+  pro: 4,
+  industrial: 10,
+};
 
 /** [TUNE] extractor breakdown chance per working day, and when dust is high. */
 export const EXTRACTOR_BREAKDOWN_CHANCE = 0.01;

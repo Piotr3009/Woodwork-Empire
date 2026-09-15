@@ -2,8 +2,12 @@
 // ownership and power side that the economy needs.
 
 import {
+  CENTRAL_EXTRACTION_SPECS,
   DUCTING_RECONNECT_COST,
   DUST_BANDS,
+  DUST_OUTPUT_M3_PER_HOUR,
+  EXTRACTOR_BAGS,
+  bagsToM3,
   HEAVY_SPECS,
   LIGHT_CLASSES,
   EXTRACTOR_BROKEN_OUTPUT_FACTOR,
@@ -34,6 +38,7 @@ import {
   USED_VARIANT,
 } from './constants';
 import { extractionCheck, underExtracted } from './media';
+import { cubicMetres, trimmed } from './text';
 import type {
   Equipment,
   EquipmentSpec,
@@ -272,15 +277,6 @@ export function findVariant(specId: string, variantId: string): EquipmentVariant
 export function variantFor(item: Equipment): EquipmentVariant | null {
   const spec = findSpec(item.specId);
   return spec ? variantOf(spec, item.variantId) : null;
-}
-
-/** Minutes of use this one takes before its bag is full: the family's interval stretched or cut
- *  by its class (CLAUDE.md T3 3.5). */
-export function bagIntervalFor(item: Equipment): number {
-  const spec = findSpec(item.specId);
-  if (!spec || spec.bagInterval <= 0) return 0;
-  const variant = variantOf(spec, item.variantId);
-  return Math.max(1, Math.round(spec.bagInterval * variant.bagIntervalFactor));
 }
 
 /** Hours of use a machine of this family and class has in it. A family whose life Piotr wrote in
@@ -552,7 +548,7 @@ export function hasExtraction(state: GameState): boolean {
 /** Ducted extraction for the whole hall: the central system, or the flexi one that never needs
  *  reconnecting (CLAUDE.md T4 3.5). Everything the central system does, the flexi one does. */
 export function hasCentralExtraction(state: GameState): boolean {
-  return has(state, 'dustSystem') || has(state, 'flexiSystem');
+  return CENTRAL_EXTRACTION_SPECS.some((specId) => has(state, specId));
 }
 
 /** With the flexi system every machine stays connected wherever it is put. */
@@ -633,23 +629,25 @@ export function overdueBreakdownChance(item: Equipment): number {
   return chance;
 }
 
-/** What is stopping a stage that is done on this family: a machine that has given up, or one
- *  whose bag is full, when there is no other of the family to use instead. Null while the work
- *  can go on (CLAUDE.md 9.6, T7 3.1). The family, not the material: a broken saw stops the
- *  cutting of anything, and a broken edgebander stops nothing but the machining. */
+/** What is stopping a stage that is done on this family: a machine that has given up, when there
+ *  is no other of the family to use instead. Null while the work can go on (CLAUDE.md 9.6,
+ *  T7 3.1). The family, not the material: a broken saw stops the cutting of anything, and a
+ *  broken edgebander stops nothing but the machining. */
 export function familyStopped(
   state: GameState,
   specId: string,
-): { item: Equipment; why: 'broken' | 'bag' } | null {
+): { item: Equipment; why: 'broken' | 'bags' } | null {
   const machines = owned(state, specId);
   if (machines.length === 0) return null;
-  const bags = bagsExist(state);
-  const usable = machines.filter((item) => !item.broken && !(bags && item.bagFull));
-  if (usable.length > 0) return null;
-  const broken = machines.find((item) => item.broken);
-  if (broken) return { item: broken, why: 'broken' };
-  const full = machines.find((item) => item.bagFull);
-  return full ? { item: full, why: 'bag' } : null;
+  if (!machines.some((item) => !item.broken)) {
+    const broken = machines.find((item) => item.broken);
+    return broken ? { item: broken, why: 'broken' } : null;
+  }
+  // The hall's bags are full: nothing that puts dust into them runs, whatever its class and
+  // however many of the family stand in the hall, until they are emptied (CLAUDE.md T12 2.3).
+  const first = machines[0];
+  if (first && dustOutputOf(specId) > 0 && bagsFull(state)) return { item: first, why: 'bags' };
+  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -662,24 +660,6 @@ export function bagsExist(state: GameState): boolean {
   return has(state, 'extractor');
 }
 
-/** Machines with a bag that this material runs through. */
-export function bagMachinesFor(state: GameState, material: MaterialKind): Equipment[] {
-  return state.equipment.filter((item) => {
-    const spec = findSpec(item.specId);
-    if (!spec || spec.bagInterval <= 0) return false;
-    return spec.usedOn === null || spec.usedOn === material;
-  });
-}
-
-/** Machines this material runs through, bag or no bag: what the hours of use are booked on. */
-export function machinesUsedFor(state: GameState, material: MaterialKind): Equipment[] {
-  return state.equipment.filter((item) => {
-    const spec = findSpec(item.specId);
-    if (!spec || spec.category !== 'machine') return false;
-    return spec.usedOn === null || spec.usedOn === material;
-  });
-}
-
 /** Six places, not four: a third of a minute rounded to four drifts by a whole hour over the
  *  fifteen hundred minutes it takes to wear a saw in. */
 function round6(value: number): number {
@@ -687,37 +667,89 @@ function round6(value: number): number {
 }
 
 /** Books the minutes somebody actually stood at a machine this minute: the hours that wear it
- *  out and the minutes that fill its bag, and nothing else. A machine nobody is at gains nothing,
- *  which is what "hours are the minutes somebody stood at it" means (CLAUDE.md T7 2). The map is
- *  person minutes per machine: one for a machine one man is standing at, more for a hand tool
- *  two men have out of their cabinets at once. Returns the bags that just filled. */
+ *  out and the cubic metres of dust it made, and nothing else. A machine nobody is at gains
+ *  nothing, which is what "hours are the minutes somebody stood at it" means (CLAUDE.md T7 2).
+ *  The map is person minutes per machine: one for a machine one man is standing at, more for a
+ *  hand tool two men have out of their cabinets at once. The dust is the family's figure an hour
+ *  (CLAUDE.md T12 2.1): every machine's goes on the day's total, and into the hall's one bag
+ *  store while the hall keeps its dust in bags. A central system takes it away and a hall with no
+ *  fan has no bag to put it in, and the figure is still counted for the day (CLAUDE.md T12 2.3).
+ *  Returns true the minute the store fills. */
 export function accumulateMachineMinute(
   state: GameState,
   minutesByItem: ReadonlyMap<string, number>,
-): Equipment[] {
-  const bags = bagsExist(state);
-  const filled: Equipment[] = [];
+): boolean {
+  let madeM3 = 0;
   for (const item of state.equipment) {
     const minutes = minutesByItem.get(item.id) ?? 0;
     if (minutes <= 0) continue;
     const spec = findSpec(item.specId);
     if (!spec) continue;
     if (spec.category === 'machine') item.hoursUsed = round6(item.hoursUsed + minutes / 60);
-    if (!bags || spec.bagInterval <= 0 || item.bagFull) continue;
-    item.minutesUsed = round6(item.minutesUsed + minutes);
-    if (item.minutesUsed >= bagIntervalFor(item)) {
-      item.bagFull = true;
-      filled.push(item);
-    }
+    madeM3 += (dustOutputOf(item.specId) / 60) * minutes;
   }
-  return filled;
+  if (madeM3 <= 0) return false;
+  state.dayStats.dustM3 = round6(state.dayStats.dustM3 + madeM3);
+  const store = bagStore(state);
+  if (!store.exists || store.bags <= 0 || store.full) return false;
+  // The store holds what it holds: a minute that would fill it past the brim fills it to the brim.
+  state.bagFillM3 = round6(Math.min(store.capacityM3, store.fillM3 + madeM3));
+  return bagsFull(state);
 }
 
-export function emptyBag(state: GameState, equipmentId: string): void {
-  const item = state.equipment.find((entry) => entry.id === equipmentId);
-  if (!item) return;
-  item.bagFull = false;
-  item.minutesUsed = 0;
+/** Cubic metres of sawdust an hour that somebody stands at a machine of this family, off
+ *  Piotr's table. Zero for anything that is not on it (CLAUDE.md T12 2.1). */
+export function dustOutputOf(specId: string): number {
+  return DUST_OUTPUT_M3_PER_HOUR[specId] ?? 0;
+}
+
+/** The bags on this class of extractor, and none on anything else (CLAUDE.md T12 2.3). */
+export function bagsOf(item: { specId: string; variantId: string }): number {
+  if (item.specId !== 'extractor') return 0;
+  return EXTRACTOR_BAGS[item.variantId] ?? 0;
+}
+
+/** The hall's one bag store (CLAUDE.md T12 2.3). */
+export interface BagStore {
+  /** True while the hall keeps its dust in bags at all: an extractor and no central system. */
+  exists: boolean;
+  /** Bags in the store: every extractor standing in the hall added up, because the hall is one
+   *  duct run however many fans are on it. */
+  bags: number;
+  capacityM3: number;
+  fillM3: number;
+  /** True while the store is at its capacity: nothing that makes dust runs until it is emptied. */
+  full: boolean;
+}
+
+/** How full is this hall's store: the one place that is read. The floor, the Owned tab, the
+ *  chore and the full rule all come through here (CLAUDE.md T12 2.3). */
+export function bagStore(state: GameState): BagStore {
+  const exists = bagsExist(state);
+  let bags = 0;
+  for (const item of state.equipment) {
+    if (isSold(item) || !itemStandsInTheHall(item)) continue;
+    bags += bagsOf(item);
+  }
+  const capacityM3 = bagsToM3(bags);
+  const fillM3 = state.bagFillM3;
+  return { exists, bags, capacityM3, fillM3, full: exists && bags > 0 && fillM3 >= capacityM3 };
+}
+
+/** True while the hall's bags are full (CLAUDE.md T12 2.3). */
+export function bagsFull(state: GameState): boolean {
+  return bagStore(state).full;
+}
+
+/** What the store reads on the floor, on the Owned tab and under the hall: "Bags 4.6 / 10 m3",
+ *  with the unit once (CLAUDE.md T12 3.3). */
+export function bagStoreLine(store: BagStore): string {
+  return `Bags ${trimmed(store.fillM3, 1)} / ${cubicMetres(store.capacityM3)}`;
+}
+
+/** Emptied: the store is back to nothing (CLAUDE.md T12 2.3). */
+export function emptyBags(state: GameState): void {
+  state.bagFillM3 = 0;
 }
 
 /** Dust gained per minute of production, tripled by a broken extractor or by a hall whose

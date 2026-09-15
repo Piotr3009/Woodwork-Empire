@@ -5,7 +5,7 @@
 // it; Piotr withdrew that for exactly this module on 14.09, and for nothing else.
 
 import { decodeSaveFile } from './file';
-import { STATE_VERSION } from '../engine/index';
+import { canOpenVersion } from '../engine/migrate';
 
 /** The key the browser keeps the game under. One slot: more are parked. */
 export const SAVE_KEY = 'woodwork-empire.save';
@@ -86,7 +86,10 @@ export function peekSave(store: SaveStore = saveStore): StoredSave {
   if (file.game !== 'Woodwork Empire') return NO_STORED_SAVE;
   const companyName = typeof file.state?.companyName === 'string' ? file.state.companyName : '';
   const day = typeof file.state?.clock?.day === 'number' ? file.state.clock.day : 0;
-  if (file.stateVersion !== STATE_VERSION) return { kind: 'stale', companyName, day };
+  // A save the migration can lift is a save this build can open (CLAUDE.md T12 2.3).
+  if (typeof file.stateVersion !== 'number' || !canOpenVersion(file.stateVersion)) {
+    return { kind: 'stale', companyName, day };
+  }
   return { kind: 'ready', companyName, day };
 }
 

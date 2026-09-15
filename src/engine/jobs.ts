@@ -578,7 +578,8 @@ export function hallBlock(state: GameState, job: Job): string {
   if (air !== '') return `${(findSpec(family)?.name ?? family).toLowerCase()} ${air}`;
   const stopped = familyStopped(state, family);
   if (stopped === null) return '';
-  if (stopped.why === 'bag') return 'bag full';
+  // The hall's bags are full: one block for every machine that makes dust (CLAUDE.md T12 2.3).
+  if (stopped.why === 'bags') return 'bags full';
   return `${(findSpec(stopped.item.specId)?.name ?? 'a machine').toLowerCase()} is broken`;
 }
 

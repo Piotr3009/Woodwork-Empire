@@ -6,8 +6,8 @@ a pure simulation engine plus an intentionally ugly SVG prototype of the views.
 The design contract for the current stage is `CLAUDE.md`. The briefs of the finished stages are
 archived in `docs`: `docs/turn-1-brief.md`, `docs/turn-2-brief.md`, `docs/turn-3-brief.md`,
 `docs/turn-4-brief.md`, `docs/turn-5-brief.md`, `docs/turn-6-brief.md`, `docs/turn-7-brief.md`,
-`docs/turn-8-brief.md`, `docs/turn-9-brief.md` and `docs/turn-10-brief.md`.
-The build reports are `REPORT-T1.md` to `REPORT-T11.md`.
+`docs/turn-8-brief.md`, `docs/turn-9-brief.md`, `docs/turn-10-brief.md` and `docs/turn-11-brief.md`.
+The build reports are `REPORT-T1.md` to `REPORT-T12.md`.
 
 The sprite contract between the art side and the game is `docs/art/SPRITES.md`.
 
@@ -80,7 +80,7 @@ Run `npm run dev` and work through this. It is the same path the jsdom smoke tes
    order: desk, chair, laptop, cordless drill, one workbench and the cheap shelving. The machines
    are families: press Open on the table saw and the page fills with its five classes, from a used
    one at 1,800 to an industrial one at 25,000, each with what it does to the speed of the bench,
-   to the bag, to the life of the machine and to the meter. Order the used saw, then the
+   to the dust it makes, to the life of the machine and to the meter. Order the used saw, then the
    edgebander, the compressor and the extractor the same way. The cash drops at every click and
    not one minute of your day goes with it: nobody goes out for any of it. Every tile then says
    when its lorry is due.

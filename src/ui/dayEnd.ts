@@ -2,6 +2,7 @@
 
 import {
   DAY_CATEGORY_LABELS,
+  cubicMetres,
   dayPercentages,
   daySummaryOf,
   dustBand,
@@ -101,6 +102,8 @@ export function renderDaySummary(
       'Dust',
       `${dustBand(summary.dustAtEnd).label}, opened ${dustBand(summary.dustAtStart).label}`,
     ) +
+    // What the machines made that day, in the one unit dust is written in (CLAUDE.md T12 3.4).
+    row('Dust made today', cubicMetres(summary.dustMadeM3, 2)) +
     row('Next day', tomorrow === '' ? 'no deliveries' : tomorrow) +
     '</div></div>' +
     tomorrowLine(summary) +

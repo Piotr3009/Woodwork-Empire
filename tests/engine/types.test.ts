@@ -34,8 +34,10 @@ describe('GameState', () => {
     // be opened: the loader refuses anything that is not this number (src/cloud/saves.ts). Turn 8
     // added the list of what is bought and not yet delivered, so a Turn 7 save goes the same way,
     // and Turn 9 made a lorry load one unloading of several orders (CLAUDE.md T9 3.1). Turn 11
-    // put the owner's own day on the state, and the last week of them (CLAUDE.md T11 3.1).
-    expect(STATE_VERSION).toBe(12);
+    // put the owner's own day on the state, and the last week of them (CLAUDE.md T11 3.1). Turn 12
+    // moved the bags onto the extractor, and a Turn 11 save is lifted rather than refused
+    // (CLAUDE.md T12 2.3).
+    expect(STATE_VERSION).toBe(13);
     expect(sample.version).toBe(STATE_VERSION);
   });
 

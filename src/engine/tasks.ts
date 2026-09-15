@@ -39,6 +39,7 @@ import { findSpec } from './machines';
 import { canUnload } from './materials';
 import { ownerIsAvailable } from './owner';
 import { makeId } from './rng';
+import { plural } from './text';
 import { hasWorkingDay, helperOnDuty, isWorkingToday, joiners, staffMinutesLeft } from './staff';
 import type {
   DayCategory,
@@ -93,7 +94,7 @@ const TASK_DEFINITIONS: Record<TaskKind, TaskDefinition> = {
   },
   siteMeasure: { category: 'admin', eligibleRoles: [], autoRoles: [] },
   unload: { category: 'workshop', eligibleRoles: ['joiner', 'helper'], autoRoles: ['helper'] },
-  bagChange: { category: 'workshop', eligibleRoles: ['joiner', 'helper'], autoRoles: ['helper'] },
+  emptyBags: { category: 'workshop', eligibleRoles: ['joiner', 'helper'], autoRoles: ['helper'] },
   cleaning: { category: 'workshop', eligibleRoles: ['helper'], autoRoles: ['helper'] },
   fetchStorage: {
     category: 'workshop',
@@ -130,7 +131,7 @@ export const DAY_CATEGORY_OF_TASK: Record<TaskKind, DayCategory> = {
   materialOrder: 'office',
   siteMeasure: 'siteMeasure',
   unload: 'fixing',
-  bagChange: 'fixing',
+  emptyBags: 'fixing',
   cleaning: 'fixing',
   fetchStorage: 'fixing',
   // Taking the piece to the client is the work of the shop, not of the office or the spanner.
@@ -151,7 +152,7 @@ export function dayCategoryOf(kind: TaskKind): DayCategory {
 /** The three jobs of work that are the helper's and nobody else's the moment there is a helper in
  *  the hall: "with a helper, I and the joiners stop unloading, cleaning and changing bags"
  *  (PIOTR, 14.09; CLAUDE.md T11 3.4). */
-export const HELPER_ONLY_KINDS: ReadonlyArray<TaskKind> = ['unload', 'bagChange', 'cleaning'];
+export const HELPER_ONLY_KINDS: ReadonlyArray<TaskKind> = ['unload', 'emptyBags', 'cleaning'];
 
 /** True while this job of work is the helper's. Without a helper it is nobody's in particular and
  *  everything stays as it was. The one selector: the refusal, the joiner and the events read it. */
@@ -618,8 +619,19 @@ export function assignWorkerTask(state: GameState, workerId: string, taskId: str
   return true;
 }
 
+/** Emptying the hall's store: fifteen minutes a bag, so ten bags take ten times as long as one
+ *  (PIOTR; CLAUDE.md T12 2.3). */
+export function emptyBagsMinutes(bags: number): number {
+  return BAG_CHANGE_MINUTES * bags;
+}
+
+/** What the chore is called on the helper's list and on the owner's: "Empty the bags (10 bags,
+ *  150 min)" (CLAUDE.md T12 3.3). */
+export function emptyBagsLabel(bags: number): string {
+  return `Empty the bags (${plural(bags, 'bag', 'bags')}, ${emptyBagsMinutes(bags)} min)`;
+}
+
 export const AD_HOC_TASK_MINUTES = {
-  bagChange: BAG_CHANGE_MINUTES,
   clientCall: CLIENT_CALL_ANSWER_MINUTES,
   clientMeeting: CLIENT_MEETING_MINUTES,
   moveMachines: MOVE_MINUTES_PER_ITEM,

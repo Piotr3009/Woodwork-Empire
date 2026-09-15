@@ -161,7 +161,7 @@ export {
 export { dropJob } from './jobs';
 export { changeReputation, companyTotals } from './reputation';
 export type { LifecycleStep, StartCheck, StepState } from './jobs';
-export type { OutputBreakdown, OutputLine } from './machines';
+export type { BagStore, OutputBreakdown, OutputLine } from './machines';
 
 // Production in stages (CLAUDE.md T7 3.1)
 export {
@@ -239,6 +239,8 @@ export {
   WAITING_FOR_HELPER,
   dayCategoryOf,
   designMinutes,
+  emptyBagsLabel,
+  emptyBagsMinutes,
   isHelperTask,
   emailsForPrice,
   findTask,
@@ -281,9 +283,13 @@ export {
 // Machines, bags and dust
 export {
   accidentRisk,
-  bagIntervalFor,
   OWNER,
+  bagStore,
+  bagStoreLine,
   bagsExist,
+  bagsFull,
+  bagsOf,
+  dustOutputOf,
   cabinetTools,
   claimMachine,
   countOf,
@@ -307,7 +313,6 @@ export {
   hasBenchFor,
   machineOutputFactor,
   machinePowerPerDay,
-  machinesUsedFor,
   pastEndurance,
   variantFor,
   variantOf,
@@ -412,7 +417,7 @@ export {
 } from './stations';
 
 // Text
-export { plural } from './text';
+export { cubicMetres, metresBy, plural, trimmed } from './text';
 
 // Reputation
 export {

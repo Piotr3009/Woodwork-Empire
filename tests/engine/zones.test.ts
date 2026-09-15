@@ -96,7 +96,7 @@ describe('two things on the floor', () => {
     expect(firstFreeCell(full, 'edgebander', 'standard')).toBeNull();
     const refused = canBuy(full, 'edgebander', 'standard');
     expect(refused.ok).toBe(false);
-    expect(refused.reason).toBe('No free 5 by 3 m in the hall');
+    expect(refused.reason).toBe('No free 5 m by 3 m in the hall');
   });
 
   it('needs extraction before a floor edgebander, where a hand one needs a cabinet', () => {

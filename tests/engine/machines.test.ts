@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   ACCIDENT_DAYS_OFF,
-  BAG_CHANGE_MINUTES,
   EQUIPMENT_SPECS,
   CLEANING_MINUTES,
   DUST_BANDS,
@@ -35,8 +34,6 @@ import {
   machinesDueService,
   serviceDueIn,
   serviceIsDue,
-  bagIntervalFor,
-  bagMachinesFor,
   hasBenchFor,
   bagsExist,
   dustBand,
@@ -55,7 +52,6 @@ import {
   act,
   buyNow,
   buyStartingKit,
-  clearEvents,
   eventsOfKind,
   fillRack,
   firstJob,
@@ -124,144 +120,6 @@ describe('bags', () => {
     expect(bagsExist(withExtractor)).toBe(true);
     const withSystem = buyNow(withExtractor, 'dustSystem');
     expect(bagsExist(withSystem)).toBe(false);
-  });
-
-  it('belongs to the machines the material runs through', () => {
-    let state = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
-    state = buyNow(state, 'thicknesser');
-    expect(bagMachinesFor(state, 'sheet').map((item) => item.specId)).toEqual([
-      'tableSaw',
-      'edgebander',
-    ]);
-    expect(bagMachinesFor(state, 'solidWood').map((item) => item.specId)).toEqual(['thicknesser']);
-  });
-
-  it('stops the saw after its own 2400 minutes of use and asks who changes it', () => {
-    let state = atTheBench();
-    const saw = state.equipment.find((item) => item.specId === 'tableSaw');
-    // The used saw fills a bag twice as fast as a budget one: 2400 minutes halved (T3 3.5).
-    const interval = bagIntervalFor(saw as Equipment);
-    expect(interval).toBe(1200);
-    // He stands at the saw for the whole of the cutting, so an hour of it is an hour on the bag:
-    // the bag counts the minutes somebody was at the machine (CLAUDE.md T7 2).
-    const hour = tick(state, 60).equipment.find((item) => item.specId === 'tableSaw');
-    expect(hour?.minutesUsed).toBeCloseTo(60, 1);
-    if (saw) saw.minutesUsed = interval - 1;
-    state = tick(state, 1);
-    expect(state.activeEvent?.kind).toBe('bagFull');
-    expect(state.activeEvent?.title).toBe('Bag full: table saw');
-    expect(state.activeEvent?.choices.map((choice) => choice.id)).toEqual(['owner', 'later']);
-    const full = state.equipment.find((item) => item.specId === 'tableSaw');
-    expect(full?.minutesUsed).toBeGreaterThanOrEqual(interval);
-  });
-
-  it('costs the owner 15 minutes to change, and clears the machine', () => {
-    let state = atTheBench();
-    const saw = state.equipment.find((item) => item.specId === 'tableSaw');
-    if (saw) saw.minutesUsed = 2399;
-    state = tick(state, 1);
-    expect(state.activeEvent?.kind).toBe('bagFull');
-    expect(familyStopped(state, 'tableSaw')?.why).toBe('bag');
-    const stuck = tick(state, 10);
-    expect(stuck.clock.minute).toBe(state.clock.minute);
-    state = act(state, { type: 'RESOLVE_EVENT', choiceId: 'owner' });
-    const task = state.tasks.find((entry) => entry.kind === 'bagChange');
-    expect(task?.minutesTotal).toBe(BAG_CHANGE_MINUTES);
-    expect(state.owner.currentTaskId).toBe(task?.id);
-    state = tick(state, BAG_CHANGE_MINUTES);
-    expect(familyStopped(state, 'tableSaw')).toBeNull();
-    const changed = state.equipment.find((item) => item.specId === 'tableSaw');
-    expect(changed?.bagFull).toBe(false);
-    // The owner is back at the bench the moment the bag is on, so a minute of use may be on it.
-    expect(changed?.minutesUsed).toBeLessThanOrEqual(1);
-  });
-
-  it('takes 15 minutes off a joiner when the owner has no minutes left', () => {
-    let state = atTheBench();
-    state.workers.push({
-      id: 'staff-1',
-      name: 'Ben',
-      role: 'joiner',
-      tier: 'normal',
-      rate: 0.8,
-      weeklyWage: 640,
-      monthlyWage: 0,
-      startDay: 1,
-      jobId: null,
-      taskId: null,
-      minutesWorked: 0,
-      ordersToday: 0,
-    overtimeMinutes: 0,
-    overtimeMinutesWeek: 0,
-    overtimeDays: 0,
-    tiredOfOvertime: false,
-      station: 'idle',
-      productionMinutes: 0,
-      absentDaysRemaining: 0,
-      anchorX: 0,
-      anchorY: 4,
-    });
-    // The joiner is at the bench and the owner has gone home, so only the joiner can do it.
-    state = act(state, { type: 'ASSIGN_JOB', jobId: firstJob(state).id, workerId: 'staff-1' });
-    state = act(state, { type: 'END_DAY' });
-    const saw = state.equipment.find((item) => item.specId === 'tableSaw');
-    if (saw) saw.minutesUsed = 2399;
-    state = tick(state, 1);
-    expect(state.activeEvent?.kind).toBe('bagFull');
-    expect(state.activeEvent?.choices.map((choice) => choice.id)).toEqual(['joiner', 'later']);
-    state = act(state, { type: 'RESOLVE_EVENT', choiceId: 'joiner' });
-    expect(state.workers[0]?.taskId).not.toBeNull();
-    const job = firstJob(state);
-    const before = job.labourRemaining;
-    state = tick(state, 15);
-    // He spent the quarter of an hour on the bag, not at his bench.
-    expect(firstJob(state).labourRemaining).toBe(before);
-    expect(state.workers[0]?.taskId).toBeNull();
-    expect(familyStopped(state, 'tableSaw')).toBeNull();
-  });
-
-  it('lets a helper change it for nothing and says nothing about it', () => {
-    let state = atTheBench();
-    state.workers.push({
-      id: 'staff-h',
-      name: 'Wes',
-      role: 'helper',
-      tier: null,
-      rate: 0,
-      weeklyWage: 420,
-      monthlyWage: 0,
-      startDay: 1,
-      jobId: null,
-      taskId: null,
-      minutesWorked: 0,
-      ordersToday: 0,
-    overtimeMinutes: 0,
-    overtimeMinutesWeek: 0,
-    overtimeDays: 0,
-    tiredOfOvertime: false,
-      station: 'idle',
-      productionMinutes: 0,
-      absentDaysRemaining: 0,
-      anchorX: 0,
-      anchorY: 4,
-    });
-    const saw = state.equipment.find((item) => item.specId === 'tableSaw');
-    if (saw) saw.minutesUsed = 2399;
-    state = tick(state, 2);
-    expect(state.activeEvent).toBeNull();
-    expect(familyStopped(state, 'tableSaw')).toBeNull();
-    expect(state.owner.minutesByCategory.workshop).toBe(2);
-  });
-
-  it('never fills a bag once the central system is in', () => {
-    let state = atTheBench();
-    state = buyNow(state, 'dustSystem');
-    const saw = state.equipment.find((item) => item.specId === 'tableSaw');
-    if (saw) saw.minutesUsed = 2399;
-    const events: GameEvent[] = [];
-    state = clearEvents(tick(state, 300), events);
-    expect(eventsOfKind(events, 'bagFull')).toHaveLength(0);
-    expect(state.equipment.find((item) => item.specId === 'tableSaw')?.minutesUsed).toBe(2399);
   });
 });
 
@@ -473,19 +331,8 @@ describe('the extractor', () => {
   });
 });
 
-describe('the central system and a bag that was already full', () => {
-  it('unblocks the machine, because with the system there are no bags at all', () => {
-    let state = atTheBench();
-    const saw = state.equipment.find((item) => item.specId === 'tableSaw');
-    if (saw) saw.bagFull = true;
-    expect(familyStopped(state, 'tableSaw')?.why).toBe('bag');
-    state = buyNow(state, 'dustSystem');
-    expect(familyStopped(state, 'tableSaw')).toBeNull();
-    const working = tick(state, 30);
-    expect(firstJob(working).labourRemaining).toBeLessThan(firstJob(state).labourRemaining);
-  });
-
-  it('reads the messy to dirty edge the same way everywhere', () => {
+describe('the messy to dirty edge', () => {
+  it('is read the same way everywhere', () => {
     const state = buyNow(newGame({ difficulty: 'veryEasy' }), 'extractor');
     state.dust = 70;
     expect(dustBand(state.dust).label).toBe('messy');
@@ -493,32 +340,6 @@ describe('the central system and a bag that was already full', () => {
     state.dust = 70.5;
     expect(dustBand(state.dust).label).toBe('dirty');
     expect(extractorBreakdownChance(state)).toBe(EXTRACTOR_BREAKDOWN_CHANCE_HIGH_DUST);
-  });
-});
-
-describe('a stopped machine can always be dealt with', () => {
-  it('asks again who changes the bag when the machine is clicked', () => {
-    let state = atTheBench();
-    const saw = state.equipment.find((item) => item.specId === 'tableSaw');
-    if (saw) saw.minutesUsed = 2399;
-    state = tick(state, 1);
-    expect(state.activeEvent?.kind).toBe('bagFull');
-    // The player puts it off, and then thinks better of it.
-    state = act(state, { type: 'RESOLVE_EVENT', choiceId: 'later' });
-    expect(state.activeEvent).toBeNull();
-    expect(familyStopped(state, 'tableSaw')?.why).toBe('bag');
-    state = act(state, { type: 'ASK_BAG_CHANGE', equipmentId: saw?.id ?? '' });
-    expect(state.activeEvent?.kind).toBe('bagFull');
-    state = act(state, { type: 'RESOLVE_EVENT', choiceId: 'owner' });
-    state = tick(state, BAG_CHANGE_MINUTES);
-    expect(familyStopped(state, 'tableSaw')).toBeNull();
-  });
-
-  it('says nothing when the machine is running', () => {
-    const state = atTheBench();
-    const saw = state.equipment.find((item) => item.specId === 'tableSaw');
-    const asked = act(state, { type: 'ASK_BAG_CHANGE', equipmentId: saw?.id ?? '' });
-    expect(asked.activeEvent).toBeNull();
   });
 });
 

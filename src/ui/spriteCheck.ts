@@ -8,6 +8,7 @@ import { OFFICE_CANVAS, OFFICE_LAYERS } from '../render/office';
 import { boxPolygons, centreOf, footprintPolygon, gridBounds, tileToScreen } from '../render/iso';
 import { SPRITE_SCALE, spriteAnchorIn, spriteCanvas, spriteFileSize, spriteUrl } from '../render/sprites';
 import { footprintOf, standsInTheHall, zoneOf } from '../engine/machines';
+import { metresBy } from '../engine/text';
 import {
   type Animation,
   ANIMATIONS,
@@ -165,7 +166,7 @@ function shot(target: SpriteTarget): string {
 /** What the class says about the floor, in the words the catalogue uses (CLAUDE.md T7 3.7). */
 function zoneLine(target: SpriteTarget): string {
   if (target.zoneWidth <= 0 || target.zoneDepth <= 0) return 'kept in a tool cabinet';
-  return `on a ${target.zoneWidth} by ${target.zoneDepth} m zone`;
+  return `works in ${metresBy({ width: target.zoneWidth, depth: target.zoneDepth })}`;
 }
 
 function cell(target: SpriteTarget): string {
@@ -176,7 +177,7 @@ function cell(target: SpriteTarget): string {
     `<div class="sprite-cell" data-sprite-target="${escapeHtml(target.name)}">` +
     `<div class="sprite-pair">${proof(target)}${shot(target)}</div>` +
     `<p class="sprite-key">${escapeHtml(`${target.name}.png`)}</p>` +
-    `<p class="sprite-figures">${target.width} by ${target.depth} by ${target.height} m · ` +
+    `<p class="sprite-figures">${metresBy(target)}, ${target.height} m high · ` +
     `${zoneLine(target)} · ${escapeHtml(target.where)}</p>` +
     `<p class="sprite-figures">canvas ${canvas.width} by ${canvas.height} · ` +
     `file ${file.width} by ${file.height}</p>` +

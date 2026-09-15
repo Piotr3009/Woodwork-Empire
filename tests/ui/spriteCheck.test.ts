@@ -112,14 +112,15 @@ describe('the sprite check page', () => {
     const saw = page.querySelector('[data-sprite-target="tableSaw.used"]');
     expect(saw?.textContent).toContain('tableSaw.used.png');
     // Metres now, and half the tiles of Turns 1 to 4 (docs/art/SPRITES.md 9.1).
-    expect(saw?.textContent).toContain('2 by 1 by 1 m');
+    expect(saw?.textContent).toContain('2 m by 1 m, 1 m high');
     // The canvas formula of docs/art/SPRITES.md 2, in metres, plus 8 px of padding a side, which
     // is the 160 by 136 of CLAUDE.md T7 3.5.
     expect(saw?.textContent).toContain('canvas 144 by 120');
     expect(saw?.textContent).toContain('file 160 by 136');
-    // And a class with its own footprint gets its own canvas: the pro saw is 3 by 2 by 1 m.
+    // And a class with its own footprint gets its own canvas: the pro saw is 3 m by 2 m, 1 m
+    // high, written the way every footprint is (CLAUDE.md T12 3.1).
     const pro = page.querySelector('[data-sprite-target="tableSaw.pro"]');
-    expect(pro?.textContent).toContain('3 by 2 by 1 m');
+    expect(pro?.textContent).toContain('3 m by 2 m, 1 m high');
     expect(pro?.textContent).toContain('file 256 by 184');
   });
 

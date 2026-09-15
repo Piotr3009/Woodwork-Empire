@@ -19,6 +19,8 @@ import {
   roomDoorCell,
 } from '../engine/constants';
 import {
+  bagStore,
+  bagStoreLine,
   brokenMachines,
   dustBand,
   extractorBroken,
@@ -1016,6 +1018,9 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
     });
   }
 
+  // The hall's bag store, read once: the full state is worn by the extractor the bags are on,
+  // which is where the full bag used to be worn by the machine (CLAUDE.md T12 3.3).
+  const store = bagStore(state);
   // Everything the player has bought, except the office furniture, which lives in the office
   // view, and the hand edgebander, which lives in a tool cabinet (CLAUDE.md T6 3.5).
   for (const item of state.equipment) {
@@ -1030,7 +1035,7 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
     const shade = broken
       ? 'var(--stopped-dark)'
       : CATEGORY_SHADE[spec.category] ?? 'var(--kit-machine-dark)';
-    const bagLine = item.bagFull ? ' (bag full)' : '';
+    const bagLine = item.specId === 'extractor' && store.full ? ' (bags full)' : '';
     const serviceLine = !item.broken && serviceIsDue(item) ? ' (service due)' : '';
     const rackLine =
       sheetCapacityOf(item) > 0 ? `: ${state.stock.sheets} / ${rackCapacity(state)}` : '';
@@ -1043,6 +1048,11 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
     const benchLine =
       spec.category !== 'bench' ? '' : atThisBench ? `: ${atThisBench.name}` : ' (free)';
     const name = `${spec.name}${bagLine}${serviceLine}${benchLine}${rackLine}`;
+    // Hovering the extractor reads the hall's store (CLAUDE.md T12 3.3).
+    const hover =
+      item.specId === 'extractor' && store.exists
+        ? `${name}. ${bagStoreLine(store)}. ${spec.effect}`
+        : `${name}. ${spec.effect}`;
     const fx = machineFx(state, item, spec);
     drawables.push({
       depth: depthKey(item.anchorX, item.anchorY),
@@ -1050,7 +1060,7 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
         `<g data-kit="${item.id}"${spec.category === 'storage' ? ' data-rack="1"' : ''} ` +
         `data-sprite="${item.spriteKey}" data-tier="${item.variantId}" ` +
         `class="clickable${fx.className}">` +
-        `<title>${escapeText(`${name}. ${spec.effect}`)}</title>` +
+        `<title>${escapeText(hover)}</title>` +
         objectArt({
           files,
           spriteKey: item.spriteKey,
@@ -1275,7 +1285,7 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
   // out less and fills with dust (PIOTR, CLAUDE.md T10 3.1).
   const extraction = extractionCheck(state);
   const shortLine = extraction.short
-    ? `<p class="view-note warn">${escapeText(extraction.line)} m3/h. Everything in the hall is ` +
+    ? `<p class="view-note warn">${escapeText(extraction.line)} m\u00b3/h. Everything in the hall is ` +
       '30% slower and the dust rises three times as fast. Nothing stops.</p>'
     : '';
   // A compressor with more drawn on it than the pipe will carry: everything on it runs at 0.7

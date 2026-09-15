@@ -54,7 +54,6 @@ describe('the hours a machine gains', () => {
     const state = tick(oneManAtWork(), 60);
     // An hour of cutting is an hour on the saw, whole minutes, because he had it to himself.
     expect(machine(state, 'tableSaw').hoursUsed).toBeCloseTo(1, 4);
-    expect(machine(state, 'tableSaw').minutesUsed).toBeCloseTo(60, 4);
     expect(machine(state, 'tableSaw').takenBy).toBe(OWNER);
     // He is at the saw, so the edgebander in his cabinet and the compressor gained nothing.
     expect(machine(state, 'edgebander').hoursUsed).toBe(0);

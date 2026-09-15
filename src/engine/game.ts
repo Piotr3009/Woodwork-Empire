@@ -82,7 +82,9 @@ import {
   breakExtractor,
   clearDust,
   countOf,
-  emptyBag,
+  bagStore,
+  bagsFull,
+  emptyBags,
   enduranceHoursFor,
   breakMachine,
   extractorBreakdownChance,
@@ -179,7 +181,7 @@ import {
   sprayingOnWetAir,
   underExtracted,
 } from './media';
-import { plural } from './text';
+import { cubicMetres, metresBy, plural } from './text';
 import { STATION_IDLE, STATION_NO_BENCH, stationForTask } from './stations';
 import {
   type Hand,
@@ -213,6 +215,8 @@ import {
   createDailyTasks,
   createTask,
   dayCategoryOf,
+  emptyBagsLabel,
+  emptyBagsMinutes,
   equipmentUnloadMinutes,
   findTask,
   interruptOwnerWith,
@@ -282,6 +286,7 @@ export function createGame(options: NewGameOptions): GameState {
     reputationLog: [],
     dayLogs: [],
     dust: 0,
+    bagFillM3: 0,
     unit: {
       areaM2: spec.areaM2,
       widthCells: spec.widthCells,
@@ -341,6 +346,7 @@ export function createGame(options: NewGameOptions): GameState {
       noMaterialWarned: false,
       labourValue: 0,
       workMinutes: 0,
+      dustM3: 0,
     },
     days: [],
     lastExpressDay: null,
@@ -409,6 +415,7 @@ function startDay(state: GameState): void {
     noMaterialWarned: false,
     labourValue: 0,
     workMinutes: 0,
+    dustM3: 0,
   };
   // Nobody stands at a machine overnight: the hall starts the day with every one of them free
   // (CLAUDE.md T7 3.1).
@@ -759,6 +766,7 @@ export function daySummaryOf(state: GameState): DaySummary {
     labourValue: state.dayStats.labourValue,
     workMinutes: state.dayStats.workMinutes,
     dayLog: owner.dayLog.map((entry) => ({ ...entry })),
+    dustMadeM3: state.dayStats.dustM3,
   };
 }
 
@@ -837,7 +845,7 @@ function advanceToNextDay(state: GameState): void {
 /** Finds the open task of this kind for this machine, or puts one on the list. */
 function ensureTask(
   state: GameState,
-  kind: 'cleaning' | 'repair' | 'service' | 'bagChange',
+  kind: 'cleaning' | 'repair' | 'service',
   label: string,
   equipmentId: string | null,
 ): TaskInstance {
@@ -887,8 +895,8 @@ function applyTaskCompletion(state: GameState, task: TaskInstance): void {
     case 'materialOrder':
       if (job) onMaterialOrdered(state, job);
       break;
-    case 'bagChange':
-      if (task.equipmentId) emptyBag(state, task.equipmentId);
+    case 'emptyBags':
+      emptyBags(state);
       break;
     case 'cleaning':
       clearDust(state);
@@ -1404,7 +1412,7 @@ function runProductionMinute(state: GameState, ownerOnTask: boolean): void {
   // selector the hall and the board read as well (CLAUDE.md T10 3.2).
   const air = hallAirCheck(state);
   // The minutes somebody actually stood at each machine: that, and nothing else, is what wears
-  // it out and fills its bag (CLAUDE.md T7 2).
+  // it out and what fills the hall's bags (CLAUDE.md T7 2, T12 2.3).
   const used = new Map<string, number>();
   for (const { hand, stage, machine } of atWork) {
     const worker = state.workers.find((entry) => entry.id === hand.who);
@@ -1441,9 +1449,8 @@ function runProductionMinute(state: GameState, ownerOnTask: boolean): void {
   }
   state.productionMinutesMonth += 1;
   addDust(state, 1);
-  for (const machine of accumulateMachineMinute(state, used)) {
-    raiseBagFull(state, machine);
-  }
+  // The minute the store fills, the workshop is told once, not once a machine (CLAUDE.md T12 2.3).
+  if (accumulateMachineMinute(state, used)) raiseBagsFull(state);
 }
 
 /** The piece is made and standing in front of the gate. Nothing is paid until the client has it,
@@ -1484,11 +1491,25 @@ function raiseStockOverflow(state: GameState, delivery: Delivery, overflow: numb
   });
 }
 
-/** A full bag stops the machine. A helper deals with it for nothing, otherwise somebody has to
- *  give up 15 minutes (CLAUDE.md 9.6). */
-function raiseBagFull(state: GameState, machine: Equipment): void {
-  const name = findSpec(machine.specId)?.name ?? machine.specId;
-  const task = ensureTask(state, 'bagChange', `Bag change: ${name}`, machine.id);
+/** The one open chore for the hall's bags, or a fresh one sized to the store: fifteen minutes a
+ *  bag, ten bags ten times as long (CLAUDE.md T12 2.3). It carries no machine of its own, because
+ *  the store is the hall's and not one extractor's. */
+function ensureBagsTask(state: GameState): TaskInstance {
+  const open = state.tasks.find((task) => task.kind === 'emptyBags' && !task.done);
+  if (open) return open;
+  const store = bagStore(state);
+  return createTask(state, {
+    kind: 'emptyBags',
+    label: emptyBagsLabel(store.bags),
+    minutes: emptyBagsMinutes(store.bags),
+  });
+}
+
+/** The hall's bags are full: every machine that makes dust stops until they are emptied. One
+ *  event for the workshop, never one per machine. A helper deals with it for nothing, otherwise
+ *  somebody has to give up the minutes (CLAUDE.md T12 2.3). */
+function raiseBagsFull(state: GameState): void {
+  const task = ensureBagsTask(state);
   // The helper takes it, free and without asking, while he is actually in the hall. A man on the
   // books who is off today takes nothing, and the question is put to the owner as it always was
   // (CLAUDE.md T11 3.4).
@@ -1496,17 +1517,20 @@ function raiseBagFull(state: GameState, machine: Equipment): void {
     delegateTasks(state);
     return;
   }
+  const store = bagStore(state);
   queueEvent(state, {
-    kind: 'bagFull',
-    title: `Bag full: ${name.toLowerCase()}`,
-    body: 'The machine has stopped. Nothing of this kind gets made until the bag is changed.',
+    kind: 'bagsFull',
+    title: 'Bags full in the workshop',
+    body:
+      `The bags on the extractor hold ${cubicMetres(store.capacityM3)} and they are full. ` +
+      'Nothing that makes dust gets made until they are emptied.',
     choices: adHocChoices(
       state,
       task.minutesTotal,
-      'Change it yourself',
-      'Leave the machine stopped',
+      'Empty them yourself',
+      'Leave the machines stopped',
     ),
-    data: { equipmentId: machine.id, taskId: task.id },
+    data: { taskId: task.id, bags: store.bags },
   });
 }
 
@@ -1736,7 +1760,7 @@ function resolveEvent(state: GameState, choiceId: string): void {
       }
       break;
     }
-    case 'bagFull':
+    case 'bagsFull':
     case 'serviceDue':
     case 'machineBroken': {
       const taskId = event.data.taskId;
@@ -1860,11 +1884,10 @@ export function applyAction(state: GameState, action: GameAction): GameState {
       }
       break;
     }
-    case 'ASK_BAG_CHANGE': {
-      const machine = next.equipment.find((item) => item.id === action.equipmentId);
-      if (machine && machine.bagFull) raiseBagFull(next, machine);
+    case 'ASK_EMPTY_BAGS':
+      // Clicking the extractor while the bags are full asks again who empties them (T12 2.3).
+      if (bagsFull(next)) raiseBagsFull(next);
       break;
-    }
     case 'START_CLEANING': {
       // The Clean up button under the hall is the player saying he will do it himself, helper or
       // no helper (CLAUDE.md T11 3.4).
@@ -1970,7 +1993,7 @@ export function machineInUse(state: GameState, item: Equipment): boolean {
     });
   }
   if (spec.category !== 'machine') return false;
-  return item.takenBy !== null && !item.bagFull;
+  return item.takenBy !== null;
 }
 
 export interface BuyCheck {
@@ -2016,7 +2039,7 @@ export function canBuy(
   // 3 of hall and there is no point selling him one he cannot stand anywhere (T7 3.3, 3.6).
   if (standsInTheHall(specId, variant.id) && firstFreeCell(state, specId, variant.id) === null) {
     const zone = zoneOf(specId, variant.id);
-    return { ok: false, reason: `No free ${zone.width} by ${zone.depth} m in the hall` };
+    return { ok: false, reason: `No free ${metresBy(zone)} in the hall` };
   }
   return OK;
 }
@@ -2075,8 +2098,6 @@ function standItem(
     spriteKey: spec.spriteKey,
     anchorX: at.x,
     anchorY: at.y,
-    minutesUsed: 0,
-    bagFull: false,
     broken: false,
     serviceHours: 0,
     enduranceHours: enduranceHoursFor(specId, variant.id),

@@ -13,7 +13,6 @@ import {
   TABLE_SAW_VARIANTS,
 } from '../../src/engine/constants';
 import {
-  bagIntervalFor,
   dailyPower,
   enduranceHoursFor,
   findSpec,
@@ -251,15 +250,7 @@ describe('what a class of saw does to the work', () => {
   });
 });
 
-describe('what a class of saw does to the bag and the life of the machine', () => {
-  it('halves the bag interval on a used saw and doubles it on an industrial one', () => {
-    const used = withSaw('used');
-    expect(bagIntervalFor(machineOf(used, 'tableSaw'))).toBe(1200);
-    const industrial = withSaw('industrial');
-    expect(bagIntervalFor(machineOf(industrial, 'tableSaw'))).toBe(4800);
-    expect(bagIntervalFor(machineOf(used, 'edgebander'))).toBe(4800);
-  });
-
+describe('what a class of saw does to the life of the machine', () => {
   it('gives a used saw a quarter of the hours and an industrial one twice them', () => {
     expect(MACHINE_ENDURANCE_HOURS.tableSaw).toBe(3000);
     expect(MACHINE_ENDURANCE_HOURS_DEFAULT).toBe(5000);

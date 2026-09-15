@@ -1,7 +1,7 @@
 // A scripted player, so a whole month can be played the same way twice. It makes the decisions a
 // careful owner would make: advance the jobs, get the material in, then stand at the bench.
 
-import { DAY_END_MINUTE } from '../../src/engine/constants';
+import { DAY_END_MINUTE, SOLID_WOOD_EQUIPMENT } from '../../src/engine/constants';
 import { applyAction, helperOnDuty, startTaskCheck, tick } from '../../src/engine/index';
 import type { GameEvent, GameState, TaskInstance } from '../../src/engine/index';
 
@@ -37,7 +37,7 @@ const TASK_ORDER: TaskInstance['kind'][] = [
   'hiring',
   'booting',
   'unload',
-  'bagChange',
+  'emptyBags',
   'repair',
   'service',
   'fetchStorage',
@@ -200,6 +200,22 @@ export const WITH_HELPER: Policy = {
   hireJoiner: false,
   hireHelper: true,
   stockSheets: 0,
+};
+
+/** A month with a thicknesser and the solid wood tools behind the day 1 fan, which holds one
+ *  bag, and a helper to empty it: the oak table comes onto the board beside the sheet work
+ *  (CLAUDE.md T12 T12-07). The standing is the lacquer month's, which is more than the table
+ *  wants, so the board offers it from day 1. */
+export const THICKNESSER_ONE_BAG: Policy = {
+  maxOpenJobs: 2,
+  buyKit: true,
+  cleanAbove: 55,
+  wanted: ['oakDiningTable', 'tvUnit', 'bookcase', 'garageShelves'],
+  hireJoiner: false,
+  hireHelper: true,
+  stockSheets: 0,
+  extraKit: [...SOLID_WOOD_EQUIPMENT],
+  reputation: 40,
 };
 
 /** A month that buys a booth and takes the sprayed wardrobe off the board. No dryer is bought, so

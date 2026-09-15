@@ -4,6 +4,7 @@
 
 import { STATE_VERSION } from '../engine/index';
 import type { GameState } from '../engine/index';
+import { canOpenVersion } from '../engine/migrate';
 import { decodeSaveFile, encodeSaveFile } from './file';
 import { cloud, cloudAvailable } from './supabase';
 
@@ -79,7 +80,7 @@ export async function saveGame(state: GameState): Promise<SaveResult> {
  *  the state itself and is refused the way a save from any older build is (CLAUDE.md T11 3.2). */
 export function openSavedRow(row: { state: unknown; state_version: number }): LoadResult {
   const stale = { state: null, note: 'That save is from an older build of the game.' };
-  if (row.state_version !== STATE_VERSION) return stale;
+  if (!canOpenVersion(row.state_version)) return stale;
   if (typeof row.state !== 'string') return stale;
   const opened = decodeSaveFile(row.state);
   if (opened.state === null) return { state: null, note: opened.note };

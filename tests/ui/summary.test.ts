@@ -3,12 +3,23 @@
 // player asked for, and only the modal is skipped (CLAUDE.md T4 3.6).
 
 import { describe, expect, it } from 'vitest';
-import { renderDayEnd } from '../../src/ui/dayEnd';
+import { renderDayEnd, renderDaySummary } from '../../src/ui/dayEnd';
 import { renderMenu } from '../../src/ui/topbar';
 import { currentState, mount } from '../../src/ui/app';
-import { formatMoney, summaryOfDay, tick } from '../../src/engine/index';
+import { daySummaryOf, formatMoney, summaryOfDay, tick } from '../../src/engine/index';
 import type { GameEvent, GameState } from '../../src/engine/index';
-import { act, buyStartingKit, choose, eventsOfKind, newGame, runDays } from '../helpers';
+import {
+  act,
+  buyStartingKit,
+  choose,
+  eventsOfKind,
+  fillRack,
+  firstJob,
+  newGame,
+  nextDay,
+  placeEnquiry,
+  runDays,
+} from '../helpers';
 
 function parse(html: string): HTMLElement {
   const holder = document.createElement('div');
@@ -138,5 +149,35 @@ describe('a week at the weekly cadence', () => {
     // headings say so rather than letting the week's title speak for them.
     expect(html).toContain(`Your minutes, day ${friday.clock.day}`);
     expect(html).toContain(`The hall, day ${friday.clock.day}`);
+  });
+});
+
+describe('the dust the day made', () => {
+  it('is one line on the summary in cubic metres, beside the state of the hall', () => {
+    const state = buyStartingKit(newGame());
+    const summary = { ...daySummaryOf(state), dustMadeM3: 0.31 };
+    const html = renderDaySummary(summary);
+    expect(html).toContain('Dust made today');
+    expect(html).toContain('0.31 m\u00b3');
+    // The hall column is the day's whatever the cadence, so the monthly report carries the same
+    // line (CLAUDE.md T12 3.4).
+    const monthly = renderDaySummary({ ...summary, spanLabel: 'monthly' });
+    expect(monthly).toContain('Money this month');
+    expect(monthly).toContain('Dust made today');
+  });
+
+  it('is written into the record of a day the saw ran, and read back from it', () => {
+    const state = fillRack(buyStartingKit(newGame({ difficulty: 'veryEasy' })));
+    state.enquiries = [];
+    const enquiry = placeEnquiry(state, { price: 4000, deadlineDays: 90 });
+    const accepted = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+    firstJob(accepted).stage = 'ready';
+    const cutting = act(accepted, { type: 'WORK_HERE', jobId: firstJob(accepted).id });
+    const morning = nextDay(cutting);
+    const recorded = summaryOfDay(morning, cutting.clock.day);
+    expect(recorded?.dustMadeM3 ?? 0).toBeGreaterThan(0);
+    expect(renderDaySummary(recorded ?? daySummaryOf(morning))).toContain('Dust made today');
+    // A day nothing ran on says so too, as nothing rather than a blank.
+    expect(renderDaySummary(daySummaryOf(buyStartingKit(newGame())))).toContain('0 m\u00b3');
   });
 });

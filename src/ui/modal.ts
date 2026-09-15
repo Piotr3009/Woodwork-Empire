@@ -42,6 +42,15 @@ export function days(value: number): string {
   return plural(Math.round(value), 'day', 'days');
 }
 
+/** The class a signed figure is written in: the game's green above nothing, its red below it
+ *  and the body colour at nothing. The one helper for every plus and minus line on a card, so the
+ *  sign decides the colour everywhere (PIOTR, CLAUDE.md T12 3.1). */
+export function signClass(value: number): string {
+  if (value > 0) return 'good';
+  if (value < 0) return 'bad';
+  return '';
+}
+
 const CROSS =
   '<button class="modal-close" data-do="closeModal" title="Close" aria-label="Close">' +
   '×</button>';

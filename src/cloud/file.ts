@@ -2,6 +2,7 @@
 // The same JSON the cloud stores, wrapped with the state version, so a file from another build of
 // the game is refused with a note rather than loaded into an engine that no longer matches it.
 import { STATE_VERSION } from '../engine/index';
+import { migrateState } from '../engine/migrate';
 import type { GameState } from '../engine/types';
 
 export const SAVE_FILE_EXTENSION = '.woodwork.json';
@@ -38,8 +39,10 @@ export function decodeSaveFile(text: string): { state: GameState | null; note: s
   if (file.game !== 'Woodwork Empire' || typeof file.state !== 'object' || file.state === null) {
     return { state: null, note: 'That is not a Woodwork Empire save file.' };
   }
-  if (file.stateVersion !== STATE_VERSION) {
-    return { state: null, note: 'That save is from an older build of the game.' };
-  }
-  return { state: file.state, note: 'Loaded from file.' };
+  if (file.stateVersion === STATE_VERSION) return { state: file.state, note: 'Loaded from file.' };
+  // A save from the build before this one is lifted into this one's shape; anything older is
+  // refused, as it always was (CLAUDE.md T12 2.3).
+  const lifted = typeof file.stateVersion === 'number' ? migrateState(file.state, file.stateVersion) : null;
+  if (lifted === null) return { state: null, note: 'That save is from an older build of the game.' };
+  return { state: lifted, note: 'Loaded from file.' };
 }

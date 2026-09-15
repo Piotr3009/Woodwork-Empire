@@ -13,7 +13,7 @@ import type { EquipmentSpec, EquipmentTab, OnOrderItem } from '../engine/types';
 import {
   airBlockFor,
   airDemandOf,
-  bagsExist,
+  bagsFull,
   canSell,
   dayOneComplete,
   dayOneKit,
@@ -22,6 +22,7 @@ import {
   compressorHasDryer,
   compressorLabel,
   compressors,
+  dustOutputOf,
   orderSoftwareCheck,
   countOf,
   findSpec,
@@ -181,7 +182,8 @@ export function ownedState(state: GameState, item: Equipment): string {
   // A machine that is sold does no more work: it stands there until the buyer comes (T8 3.5).
   if (isSold(item)) return 'sold, and it does no more work';
   if (item.broken) return 'stopped: broken';
-  if (item.bagFull && bagsExist(state)) return 'stopped: bag full';
+  // The bags are the hall's, so what stops is everything that puts dust in them (T12 2.3).
+  if (bagsFull(state) && dustOutputOf(item.specId) > 0) return 'stopped: bags full';
   const spec = findSpec(item.specId);
   if (spec?.category === 'machine' && !hasExtraction(state)) return 'stopped: no extraction';
   return 'running';
