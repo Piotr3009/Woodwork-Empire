@@ -22,6 +22,7 @@ import type { Equipment, GameState } from '../../src/engine/index';
 // thicknesser, which no stage of any job does yet.
 import { accumulateMachineMinute } from '../../src/engine/machines';
 import {
+  acceptNow,
   act,
   buyNow,
   buyStartingKit,
@@ -65,7 +66,7 @@ function standAt(state: GameState, machines: Equipment[], minutes: number): numb
 function ownerCutting(): GameState {
   const state = fillRack(dayOneHall());
   const enquiry = placeEnquiry(state, { price: 4000, deadlineDays: 90 });
-  const accepted = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+  const accepted = acceptNow(state, enquiry.id, false);
   firstJob(accepted).stage = 'ready';
   return act(accepted, { type: 'WORK_HERE', jobId: firstJob(accepted).id });
 }

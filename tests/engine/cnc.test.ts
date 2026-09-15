@@ -21,6 +21,7 @@ import { waitingStation, machineStation } from '../../src/engine/stations';
 import { tick } from '../../src/engine/index';
 import type { GameState } from '../../src/engine/index';
 import {
+  acceptNow,
   act,
   buyStartingKit,
   fillRack,
@@ -151,7 +152,7 @@ describe('a broken machine stops its own stage and no other', () => {
     let state = buyStartingKit(newGame({ difficulty: 'veryEasy' }), { sawVariant: 'budget' });
     state.enquiries = [];
     const enquiry = placeEnquiry(state, { price: 40000, deadlineDays: 90 });
-    state = fillRack(act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false }), 80);
+    state = fillRack(acceptNow(state, enquiry.id, false), 80);
     firstJob(state).stage = 'ready';
     state = act(state, { type: 'WORK_HERE', jobId: null });
     const bander = state.equipment.find((item) => item.specId === 'edgebander');

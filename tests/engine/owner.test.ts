@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  ABSENCE_OUTPUT_FACTOR,
-  ABSENCE_OUTPUT_FACTOR_EXCEPTIONAL_CEO,
-  ABSENCE_OUTPUT_FACTOR_WITH_CEO,
+  OWNER_AWAY_PENALTY,
+  OWNER_AWAY_PENALTY_WITH_PM,
   BREAK_MINUTES,
   BREAK_START_MINUTE,
   BREAK_SKIP_FACTOR,
@@ -221,10 +220,9 @@ describe('what a day costs the next one', () => {
 });
 
 describe('absence', () => {
-  it('costs the company 30% of its output with no CEO', () => {
-    expect(absenceFactor(false, false)).toBe(ABSENCE_OUTPUT_FACTOR);
-    expect(absenceFactor(true, false)).toBe(ABSENCE_OUTPUT_FACTOR_WITH_CEO);
-    expect(absenceFactor(true, true)).toBe(ABSENCE_OUTPUT_FACTOR_EXCEPTIONAL_CEO);
+  it('costs the company 30% of its output, and 8% with a production manager to cover', () => {
+    expect(absenceFactor(false)).toBe(1 - OWNER_AWAY_PENALTY);
+    expect(absenceFactor(true)).toBe(1 - OWNER_AWAY_PENALTY_WITH_PM);
   });
 
   it('applies the penalty the moment the owner is not in', () => {
@@ -233,7 +231,7 @@ describe('absence', () => {
     const home = applyAction(state, { type: 'SKIP_DAY' });
     expect(home.owner.present).toBe(false);
     expect(ownerIsAvailable(home)).toBe(false);
-    expect(staffOutputFactor(home)).toBe(ABSENCE_OUTPUT_FACTOR);
+    expect(staffOutputFactor(home)).toBe(1 - OWNER_AWAY_PENALTY);
   });
 
   it('stops the owner taking work on a day off, and lets him back in the next day', () => {

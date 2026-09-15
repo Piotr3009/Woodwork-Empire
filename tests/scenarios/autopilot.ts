@@ -2,7 +2,14 @@
 // careful owner would make: advance the jobs, get the material in, then stand at the bench.
 
 import { DAY_END_MINUTE, SOLID_WOOD_EQUIPMENT } from '../../src/engine/constants';
-import { applyAction, helperOnDuty, startTaskCheck, tick } from '../../src/engine/index';
+import {
+  applyAction,
+  helperOnDuty,
+  shortfallOf,
+  startTaskCheck,
+  tick,
+  unconnectedMachines,
+} from '../../src/engine/index';
 import type { GameEvent, GameState, TaskInstance } from '../../src/engine/index';
 
 /** What the script answers when the clock stops for a decision. */
@@ -23,8 +30,13 @@ export function answer(state: GameState, policy?: Policy): string {
   if (event.kind === 'deliveryArrived' && helperOnDuty(state) && ids.includes('later')) {
     return 'later';
   }
-  // The scripted owner is a careful one: he picks the phone up (CLAUDE.md T4 3.3).
-  for (const preferred of ['answer', 'unload', 'owner', 'storage', 'next', 'ok']) {
+  // The scripted owner is a careful one: he picks the phone up (CLAUDE.md T4 3.3), and he takes
+  // the client's number, whatever it is, unless the month he is playing reads the margin first
+  // (CLAUDE.md T13 3.24, 10.4).
+  if (event.kind === 'clientOffer' && policy?.acceptOffer !== undefined) {
+    return policy.acceptOffer(state, event) ? 'accept' : 'decline';
+  }
+  for (const preferred of ['accept', 'answer', 'unload', 'owner', 'storage', 'next', 'ok']) {
     if (ids.includes(preferred)) return preferred;
   }
   return ids[0] ?? 'ok';
@@ -48,7 +60,7 @@ const TASK_ORDER: TaskInstance['kind'][] = [
   // size (CLAUDE.md T7 3.11).
   'clientMeeting',
   'design',
-  'materialOrder',
+  'materialTakeOff',
   'cleaning',
 ];
 
@@ -78,6 +90,10 @@ export interface Policy {
   hireJoiner: boolean;
   /** Take this many poor joiners on instead of one, each with his own kit (CLAUDE.md T7 3.1). */
   joiners?: number;
+  /** The tier of the joiners taken on; the poor one unless the month says otherwise. */
+  joinerTier?: 'poor' | 'normal' | 'super';
+  /** How the management software is paid for: outright unless the month says the subscription. */
+  licence?: 'oneOff' | 'subscription';
   /** Saws to stand in the hall beyond the one in the day 1 kit. A machine serves one man at a
    *  time, so this is what says whether the crew cuts or queues (CLAUDE.md T7 3.1). */
   extraSaws?: number;
@@ -102,6 +118,14 @@ export interface Policy {
   /** Days he stays on after five, and how long for. */
   overtimeOn?: number[];
   overtimeMinutes?: number;
+  /** Whether to take the client's number on an offer; without it the script takes every one
+   *  (CLAUDE.md T13 3.24). */
+  acceptOffer?: (state: GameState, event: GameEvent) => boolean;
+  /** Take the first standing contract offered and put the first joiner on it (T13 3.16). */
+  takeContracts?: boolean;
+  /** What the month does at the open of a day beyond the script's own list: hire, buy, switch.
+   *  Called once per day, after the day 1 shopping. */
+  onDay?: (state: GameState, day: number) => GameState;
 }
 
 export const CAREFUL: Policy = {
@@ -256,6 +280,10 @@ export const DAY_ONE_CLASS: Record<string, string> = {
   edgebander: 'budget',
 };
 
+/** The class of anything a month buys beyond the day 1 list: the standard one, which is the one
+ *  class those families had before every family got its five (CLAUDE.md T13 3.12). */
+export const EXTRA_KIT_CLASS = 'standard';
+
 /** The class the script buys for this family: what the month asked for, or the day 1 one. */
 function classFor(specId: string, policy: Policy): string | undefined {
   if (specId === 'tableSaw') return policy.sawVariant;
@@ -275,17 +303,29 @@ function buyKit(state: GameState, policy: Policy): GameState {
     });
   }
   for (const specId of policy.extraKit ?? []) {
-    next = applyAction(next, { type: 'BUY_EQUIPMENT', specId });
+    next = applyAction(next, { type: 'BUY_EQUIPMENT', specId, variantId: EXTRA_KIT_CLASS });
+  }
+  return next;
+}
+
+/** A job whose sheets the rack could not hold is short until they are ordered for it: the careful
+ *  owner presses Order for this job the moment the list is made (CLAUDE.md T13 3.3). */
+function orderShortfalls(state: GameState): GameState {
+  let next = state;
+  for (const job of next.jobs) {
+    if (job.stage !== 'materialPending' || shortfallOf(job) <= 0) continue;
+    if (next.deliveries.some((delivery) => delivery.jobId === job.id && !delivery.unloaded)) continue;
+    next = applyAction(next, { type: 'ORDER_FOR_JOB', jobId: job.id });
   }
   return next;
 }
 
 /** The licence is installed on a laptop, and the laptop comes off the lorry the morning after it
  *  is ordered: so the script buys it the day it has one to install it on (CLAUDE.md T9 3.1). */
-function buyLicence(state: GameState): GameState {
+function buyLicence(state: GameState, policy: Policy): GameState {
   if (state.software.mode !== 'none') return state;
   if (!state.equipment.some((item) => item.specId === 'laptop')) return state;
-  return applyAction(state, { type: 'BUY_SOFTWARE', mode: 'oneOff' });
+  return applyAction(state, { type: 'BUY_SOFTWARE', mode: policy.licence ?? 'oneOff' });
 }
 
 /** What a joiner has to have before he can start (CLAUDE.md 9.3). */
@@ -308,7 +348,38 @@ function takeOnJoiner(state: GameState, policy: Policy): GameState {
     for (const specId of JOINER_KIT) {
       next = applyAction(next, { type: 'BUY_EQUIPMENT', specId, variantId: DAY_ONE_CLASS[specId] });
     }
-    next = applyAction(next, { type: 'HIRE', role: 'joiner', tier: 'poor' });
+    next = applyAction(next, { type: 'HIRE', role: 'joiner', tier: policy.joinerTier ?? 'poor' });
+  }
+  return next;
+}
+
+/** Every machine off the lorry is put on the extraction the morning it lands, the way a careful
+ *  owner clicks Connect on its card: an unconnected machine is not served (CLAUDE.md T13 3.19). */
+function connectMachines(state: GameState): GameState {
+  let next = state;
+  for (const item of unconnectedMachines(next)) {
+    next = applyAction(next, { type: 'CONNECT_EXTRACTION', equipmentId: item.id });
+  }
+  return next;
+}
+
+/** The first standing contract on the board is taken, and the first joiner put on it; nobody
+ *  else is moved (CLAUDE.md T13 3.16). */
+function takeContract(state: GameState, policy: Policy): GameState {
+  if (policy.takeContracts !== true) return state;
+  // The first one offered, and no other while it runs: one standing bar on the plan.
+  if (state.contracts.some((contract) => contract.status !== 'offered')) return state;
+  const offered = state.contracts.find((contract) => contract.status === 'offered');
+  if (!offered) return state;
+  let next = applyAction(state, { type: 'ACCEPT_CONTRACT', contractId: offered.id });
+  const joiner = next.workers.find((worker) => worker.role === 'joiner');
+  if (joiner) {
+    next = applyAction(next, {
+      type: 'ASSIGN_CONTRACT',
+      contractId: offered.id,
+      workerId: joiner.id,
+      on: true,
+    });
   }
   return next;
 }
@@ -327,15 +398,12 @@ function takeWork(state: GameState, policy: Policy): GameState {
         !enquiry.unreachable,
     );
     if (pick) {
-      const taken = applyAction(state, {
+      // The client answers with a number and the script takes it (CLAUDE.md T13 3.24).
+      return applyAction(state, {
         type: 'ACCEPT_ENQUIRY',
         enquiryId: pick.id,
         byHand: false,
       });
-      if (policy.stockSheets <= 0) return taken;
-      const job = taken.jobs[taken.jobs.length - 1];
-      if (!job) return taken;
-      return applyAction(taken, { type: 'SET_MATERIAL_MODE', jobId: job.id, mode: 'stock' });
     }
   }
   return state;
@@ -360,7 +428,7 @@ export function playDay(
   const day = next.clock.day;
   if (day === 1 && policy.reputation !== undefined) next.reputation = policy.reputation;
   if (policy.buyKit && day === 1) next = buyKit(next, policy);
-  if (policy.buyKit) next = buyLicence(next);
+  if (policy.buyKit) next = buyLicence(next, policy);
   if (policy.hireJoiner && day === 1) next = takeOnJoiner(next, policy);
   // Somebody to take the unloading, the bags and the cleaning (CLAUDE.md T11 3.4).
   if (policy.hireHelper === true && day === 1) {
@@ -369,6 +437,7 @@ export function playDay(
   if (policy.stockSheets > 0 && day === 1) {
     next = applyAction(next, { type: 'BUY_STOCK', sheets: policy.stockSheets });
   }
+  if (policy.onDay !== undefined) next = policy.onDay(next, day);
   let guard = 0;
   // A minute at a time takes a whole day of iterations, so the guard is sized to the step.
   const rounds = Math.ceil((400 * 30) / (options.step ?? 30));
@@ -379,7 +448,10 @@ export function playDay(
       next = applyAction(next, { type: 'RESOLVE_EVENT', choiceId: answer(next, policy) });
       continue;
     }
+    next = connectMachines(next);
     next = takeWork(next, policy);
+    next = takeContract(next, policy);
+    next = orderShortfalls(next);
     if (next.owner.present && !next.owner.wentHome && next.owner.currentTaskId === null) {
       const onBench = next.jobs.some((job) => job.assignedTo === 'owner');
       if (next.dust > policy.cleanAbove) {

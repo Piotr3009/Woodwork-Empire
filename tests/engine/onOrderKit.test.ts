@@ -16,7 +16,7 @@ import {
 import { createOnOrder } from '../../src/engine/orders';
 import { lockReasonFor } from '../../src/engine/catalog';
 import { template } from '../../src/engine/catalog';
-import { act, fillRack, firstJob, newGame, placeEnquiry, placeEquipment, runClock } from '../helpers';
+import { acceptNow, act, fillRack, firstJob, newGame, placeEnquiry, placeEquipment, runClock } from '../helpers';
 import type { GameState } from '../../src/engine/index';
 
 /** A hall with a bench and an extractor, a sheet job ready for the bench, and a table saw that is
@@ -27,7 +27,7 @@ function sawOnTheRoad(): GameState {
   placeEquipment(state, 'workbench', { variantId: 'budget', x: 8, y: 6 });
   state.enquiries = [];
   const enquiry = placeEnquiry(state, { price: 4000, deadlineDays: 40 });
-  let next = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+  let next = acceptNow(state, enquiry.id, false);
   createOnOrder(next, {
     specId: 'tableSaw',
     variantId: 'budget',

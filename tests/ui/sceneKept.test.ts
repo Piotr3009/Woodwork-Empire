@@ -56,8 +56,8 @@ function nextMorning(): void {
   while ((currentState()?.clock.day ?? 0) === day && guard < 200) {
     guard += 1;
     let events = 0;
-    while (root().querySelector('[data-do="resolveEvent"]') !== null && events < 80) {
-      click('[data-do="resolveEvent"]');
+    while (root().querySelector('[data-do="closeHouseCard"], [data-do="resolveEvent"]') !== null && events < 80) {
+      click('[data-do="closeHouseCard"], [data-do="resolveEvent"]');
       events += 1;
     }
     advanceMinutes(30);

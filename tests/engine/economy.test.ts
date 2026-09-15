@@ -3,10 +3,12 @@ import {
   ARREARS_MONTHLY_INTEREST,
   BAILIFF_SEIZURE_FRACTION,
   LATE_ACCOUNTS_CHARGE,
+  LEDGER_MAX_ENTRIES,
   DAYS_PER_MONTH,
   DUST_WASTE_MONTHLY,
-  LIVING_COST_PER_WORKING_DAY,
-  OVERDRAFT_MONTHLY_INTEREST,
+  OWNER_DRAW_PER_DAY,
+  OVERDRAFT_RATE_YEARLY,
+  DAYS_PER_YEAR,
   PELLET_INCOME_MONTHLY_BASE,
   PELLET_INCOME_PER_1000_PRODUCTION_MINUTES,
   POWER_BASE_DAILY,
@@ -22,7 +24,9 @@ import {
   bankruptcyFloor,
   booksBehind,
   canAfford,
+  charge,
   dailyPower,
+  monthReport,
   dailyRates,
   dailyRent,
   monthlyFixedCosts,
@@ -38,6 +42,8 @@ import {
 import { applyAction, findVariant, tick } from '../../src/engine/index';
 import type { GameState, Worker } from '../../src/engine/index';
 import { createTask } from '../../src/engine/tasks';
+import { monthOfDay } from '../../src/engine/clock';
+import { buyStartingKit } from '../helpers';
 import {
   act,
   buyNow,
@@ -78,6 +84,8 @@ function joiner(id: string, weeklyWage: number): Worker {
     station: 'idle',
     productionMinutes: 0,
     absentDaysRemaining: 0,
+    shift: 'day',
+    dayLog: [],
     anchorX: 0,
     anchorY: 4,
   };
@@ -113,7 +121,7 @@ describe('daily costs', () => {
   it('charges living costs on working days only', () => {
     // Days 1 to 5 and day 8: six working days, no charge on the Saturday or the Sunday.
     const week = runToDay(newGame(), 8).state;
-    expect(ledgerFor(week, 'living')).toBeCloseTo(-6 * LIVING_COST_PER_WORKING_DAY, 6);
+    expect(ledgerFor(week, 'ownerDraw')).toBeCloseTo(-6 * OWNER_DRAW_PER_DAY, 6);
   });
 
   it('charges power per machine on top of the base', () => {
@@ -183,16 +191,17 @@ describe('weekly and monthly cadences', () => {
     expect(ledgerFor(plain, 'waste')).toBe(0);
   });
 
-  it('charges overdraft interest on the 1st when cash is negative', () => {
+  it('accrues overdraft interest day by day below zero and charges it on the 1st', () => {
     const state = newGame();
     // Deep enough in the red for the interest to bite, with room left before the floor.
     state.cash = -2000;
     const nextMonth = runToDay(state, 31);
-    const interest = ledgerFor(nextMonth.state, 'interest');
+    const interest = ledgerFor(nextMonth.state, 'overdraftInterest');
     expect(interest).toBeLessThan(0);
-    const balanceOnThe31st =
-      nextMonth.state.ledger.find((entry) => entry.category === 'interest')?.balance ?? 0;
-    expect(-interest).toBeCloseTo((balanceOnThe31st - interest) * -OVERDRAFT_MONTHLY_INTEREST, 4);
+    // At least what the opening balance alone would have accrued over the days to the 1st, at
+    // the yearly rate a day (CLAUDE.md T13 3.14), and reset once charged.
+    expect(-interest).toBeGreaterThanOrEqual((2000 * OVERDRAFT_RATE_YEARLY * 29) / DAYS_PER_YEAR);
+    expect(nextMonth.state.finance.overdraftInterestAccrued).toBeGreaterThanOrEqual(0);
     expect(eventsOfKind(nextMonth.events, 'monthlyBills').length).toBeGreaterThan(0);
   });
 
@@ -225,7 +234,7 @@ describe('cash primitives', () => {
 
   it('keeps the ledger bounded', () => {
     const state = runToDay(newGame(), 60).state;
-    expect(state.ledger.length).toBeLessThanOrEqual(200);
+    expect(state.ledger.length).toBeLessThanOrEqual(LEDGER_MAX_ENTRIES);
   });
 });
 
@@ -274,7 +283,8 @@ describe('arrears, bailiff and bankruptcy', () => {
 
   it('takes the cheapest machine first, so the company can carry on', () => {
     const state = newGame();
-    const withKit = buyNow(buyNow(state, 'tableSaw'), 'thicknesser');
+    // The standard thicknesser, so the used saw at 1800 is the cheapest thing in the hall.
+    const withKit = buyNow(buyNow(state, 'tableSaw'), 'thicknesser', 'standard');
     const copy = { ...withKit, equipment: withKit.equipment.map((item) => ({ ...item })) };
     copy.finance = { ...copy.finance, arrearsAmount: 5000, arrearsMonths: 3, firstArrearsDay: 1 };
     runBailiff(copy);
@@ -505,5 +515,72 @@ describe('the books', () => {
     expect(state.clock.day).toBeGreaterThanOrEqual(31);
     expect(state.ledger.filter((entry) => entry.category === 'accounts')).toHaveLength(0);
     expect(state.lateAccountsMonths).toBe(0);
+  });
+});
+
+describe('the month report', () => {
+  it('reads a played month off the ledger: the lines sum to the cash delta, unpaid bills apart', () => {
+    const state = runToDay(buyStartingKit(newGame({ difficulty: 'veryEasy' })), 32).state;
+    const report = monthReport(state, 1);
+    const net = report.lines.reduce((total, line) => total + line.net, 0);
+    expect(net).toBeCloseTo(report.net, 6);
+    expect(report.cashClose - report.cashOpen).toBeCloseTo(report.net, 2);
+    expect(report.unpaid).toBe(0);
+    // Every line carries its category's lines and nothing else: the rent line is the rent, the
+    // rates and the deposit, to the penny.
+    const rent = state.ledger
+      .filter((entry) => monthOfDay(entry.day) === 1 && !entry.unpaid)
+      .filter((entry) => ['rent', 'rates', 'unitDeposit'].includes(entry.category))
+      .reduce((total, entry) => total - entry.amount, 0);
+    expect(report.lines.find((line) => line.id === 'rentAndRates')?.costs).toBeCloseTo(rent, 2);
+  });
+
+  it('keeps a bill that went to the arrears out of the lines and says so apart', () => {
+    const state = newGame({ difficulty: 'hard' });
+    // Down to the overdraft floor through the ledger, the way every pound moves (T13 10.2).
+    charge(state, 'equipment', 'A machine that took the lot', -(state.cash - state.finance.overdraftLimit));
+    expect(state.cash).toBe(state.finance.overdraftLimit);
+    const played = runToDay(state, 32).state;
+    const report = monthReport(played, 1);
+    expect(report.unpaid).toBeGreaterThan(0);
+    expect(report.cashClose - report.cashOpen).toBeCloseTo(report.net, 2);
+  });
+});
+
+describe('charge with merge', () => {
+  it('adds to the line of the day with the same category and words instead of writing another', () => {
+    const state = newGame();
+    const before = state.cash;
+    const incomeBefore = state.finance.day.income;
+    const costsBefore = state.finance.day.costs;
+    expect(charge(state, 'contract', 'Packs: pieces', 38, { merge: true })).toBe(true);
+    expect(charge(state, 'contract', 'Packs: pieces', 38, { merge: true })).toBe(true);
+    expect(charge(state, 'contract', 'Packs: material', -30, { merge: true })).toBe(true);
+    expect(charge(state, 'contract', 'Packs: material', -30, { merge: true })).toBe(true);
+    const lines = state.ledger.filter((entry) => entry.category === 'contract');
+    expect(lines.map((entry) => [entry.label, entry.amount])).toEqual([
+      ['Packs: pieces', 76],
+      ['Packs: material', -60],
+    ]);
+    expect(state.cash).toBe(before + 16);
+    // The balance on a merged line is the bank after the last piece, and the totals count both.
+    expect(lines[1]?.balance).toBe(state.cash);
+    expect(state.finance.day.byCategory.contract).toBe(16);
+    expect(state.finance.day.income - incomeBefore).toBe(76);
+    expect(state.finance.day.costs - costsBefore).toBe(60);
+  });
+
+  it('starts a fresh line on a new day, and never merges into a line that went unpaid', () => {
+    const state = newGame();
+    charge(state, 'contract', 'Packs: pieces', 38, { merge: true });
+    state.clock.day += 1;
+    charge(state, 'contract', 'Packs: pieces', 38, { merge: true });
+    expect(state.ledger.filter((entry) => entry.category === 'contract')).toHaveLength(2);
+    state.cash = state.finance.overdraftLimit;
+    charge(state, 'contract', 'Packs: material', -30, { merge: true, unavoidable: true });
+    charge(state, 'contract', 'Packs: material', -30, { merge: true, unavoidable: true });
+    const unpaid = state.ledger.filter((entry) => entry.category === 'contract' && entry.unpaid);
+    expect(unpaid).toHaveLength(2);
+    expect(state.finance.arrearsAmount).toBe(60);
   });
 });

@@ -12,7 +12,7 @@ import {
   workingDaysBetween,
 } from '../../src/engine/clock';
 import { deliverJob } from '../../src/engine/jobs';
-import { act, firstJob, newGame, placeEnquiry } from '../helpers';
+import { acceptNow, firstJob, newGame, placeEnquiry } from '../helpers';
 
 /** Day 1 is a Monday, so day 5 is the Friday of the first week and day 8 the Monday after it. */
 const FRIDAY = 5;
@@ -65,7 +65,7 @@ describe('a deadline the client counts', () => {
       const state = newGame();
       state.enquiries = [];
       const enquiry = placeEnquiry(state, { deadlineDays });
-      const next = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+      const next = acceptNow(state, enquiry.id, false);
       const job = firstJob(next);
       expect(isWorkingDay(job.dueDay), `${deadlineDays} days`).toBe(true);
       expect(workingDaysBetween(next.clock.day, job.dueDay)).toBe(deadlineDays);
@@ -79,7 +79,7 @@ describe('a job that misses its deadline', () => {
     const state = newGame();
     state.enquiries = [];
     const enquiry = placeEnquiry(state, { price: 4000, deadlineDays: 4 });
-    const next = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+    const next = acceptNow(state, enquiry.id, false);
     const job = firstJob(next);
     expect(job.dueDay).toBe(FRIDAY);
     job.stage = 'awaitingTransport';

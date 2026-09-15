@@ -3,7 +3,16 @@
 
 import {
   ADMIN_COVER_RATE,
+  CONSUMABLES_LABEL,
   DRAFTSMAN_RATE,
+  ESTIMATOR_JOBS_PER_DAY,
+  ESTIMATOR_JOBS_WITH_JOINERY_CORE,
+  ESTIMATOR_RATES,
+  JOINERY_CORE_EXTENSION_JOBS,
+  JOINERY_CORE_EXTENSION_PRICE_YEARLY,
+  JOINERY_CORE_MAX_EXTENSIONS,
+  JOINERY_CORE_PRICE_YEARLY,
+  UNLOAD_MINUTES_BY_HANDLING,
   BAG_CHANGE_MINUTES,
   CLIENT_MEETING_MINUTES,
   MEETING_SALESMAN_REPUTATION,
@@ -11,7 +20,6 @@ import {
   EMAIL_MINUTES,
   OWN_DELIVERY_MINUTES,
   CLEANING_MINUTES,
-  CLERK_ORDERS_PER_DAY,
   CLIENT_CALL_ANSWER_MINUTES,
   EQUIPMENT_UNLOAD_MINUTES,
   DAILY_ORDERING_MINUTES,
@@ -34,13 +42,14 @@ import {
   WORK_EPSILON,
 } from './constants';
 import { DAY_END_MINUTE } from './constants';
-import { isBreak, nextWorkingDay } from './clock';
-import { findSpec } from './machines';
+import { isBreak, nextWorkingDay, weekOfDay } from './clock';
+import { has } from './machines';
 import { canUnload } from './materials';
-import { ownerIsAvailable } from './owner';
+import { managerOnDuty, ownerIsAvailable } from './owner';
 import { makeId } from './rng';
 import { plural } from './text';
 import { hasWorkingDay, helperOnDuty, isWorkingToday, joiners, staffMinutesLeft } from './staff';
+import { websiteUpkeepMinutes } from './website';
 import type {
   DayCategory,
   GameState,
@@ -71,7 +80,13 @@ const TASK_DEFINITIONS: Record<TaskKind, TaskDefinition> = {
     eligibleRoles: ['purchasingClerk', 'officeAdmin'],
     autoRoles: ['purchasingClerk', 'officeAdmin'],
   },
-  staffManagement: { category: 'admin', eligibleRoles: [], autoRoles: [] },
+  // Assigning the crew is the production manager's the day he is hired, and it comes off the
+  // owner's day with him (CLAUDE.md T13 3.9).
+  staffManagement: {
+    category: 'admin',
+    eligibleRoles: ['productionManager'],
+    autoRoles: ['productionManager'],
+  },
   // The salesman first, and the office admin behind him at half the speed when there is no
   // salesman on the books (CLAUDE.md T7 3.12).
   clientCall: {
@@ -87,12 +102,12 @@ const TASK_DEFINITIONS: Record<TaskKind, TaskDefinition> = {
   // The draftsman takes the drawings off the owner, in laptop order, and the owner may still
   // draw beside him (PIOTR, CLAUDE.md T10 3.6).
   design: { category: 'design', eligibleRoles: ['draftsman'], autoRoles: ['draftsman'] },
-  materialOrder: {
-    category: 'admin',
-    eligibleRoles: ['purchasingClerk', 'officeAdmin'],
-    autoRoles: ['purchasingClerk', 'officeAdmin'],
-  },
+  // The take off is the owner's until an estimator is taken on, and then his, so many a day
+  // (CLAUDE.md T13 3.8).
+  materialTakeOff: { category: 'admin', eligibleRoles: ['estimator'], autoRoles: ['estimator'] },
   siteMeasure: { category: 'admin', eligibleRoles: [], autoRoles: [] },
+  // The website's weekly minutes: the owner's, or the admin's (CLAUDE.md T13 3.7).
+  websiteUpkeep: { category: 'admin', eligibleRoles: ['officeAdmin'], autoRoles: ['officeAdmin'] },
   unload: { category: 'workshop', eligibleRoles: ['joiner', 'helper'], autoRoles: ['helper'] },
   emptyBags: { category: 'workshop', eligibleRoles: ['joiner', 'helper'], autoRoles: ['helper'] },
   cleaning: { category: 'workshop', eligibleRoles: ['helper'], autoRoles: ['helper'] },
@@ -125,11 +140,12 @@ export const DAY_CATEGORY_OF_TASK: Record<TaskKind, DayCategory> = {
   clientMeeting: 'meetings',
   bookkeeping: 'office',
   dailyOrdering: 'office',
-  staffManagement: 'office',
+  staffManagement: 'assign',
   clientCall: 'calls',
   design: 'office',
-  materialOrder: 'office',
+  materialTakeOff: 'office',
   siteMeasure: 'siteMeasure',
+  websiteUpkeep: 'office',
   unload: 'fixing',
   emptyBags: 'fixing',
   cleaning: 'fixing',
@@ -195,26 +211,90 @@ export function designMinutes(
   return Math.round(template.designMinutes * sizeMultiplier * SOFTWARE_DESIGN_FACTOR[tier]);
 }
 
-/** What the handling kit in the hall does to a load at the gate: halved by a forklift and cut to
- *  a fifth by the better one (CLAUDE.md 8.10). One factor, whatever is on the lorry. */
-function unloadFactor(state: GameState): number {
-  let factor = 1;
-  for (const item of state.equipment) {
-    const spec = findSpec(item.specId);
-    if (spec && spec.unloadFactor < factor) factor = spec.unloadFactor;
+/** The best handling kit in the hall: the key of the one table the unloading minutes are read
+ *  off, `none` for bare hands (CLAUDE.md T13 3.21). */
+export function handlingIn(state: GameState): string {
+  let best = 'none';
+  let minutes = UNLOAD_MINUTES_BY_HANDLING.none ?? UNLOAD_BASE_MINUTES;
+  for (const [specId, figure] of Object.entries(UNLOAD_MINUTES_BY_HANDLING)) {
+    if (specId === 'none' || !has(state, specId)) continue;
+    if (figure < minutes) {
+      minutes = figure;
+      best = specId;
+    }
   }
-  return factor;
+  return best;
 }
 
-/** Unloading a load of sheets (CLAUDE.md 8.10). */
+/** What the handling kit does to a walk at the gate, as a factor of the bare handed figure: the
+ *  one table, read for the sheets and for the machines alike (CLAUDE.md T13 3.21). */
+function unloadFactor(state: GameState): number {
+  const bare = UNLOAD_MINUTES_BY_HANDLING.none ?? UNLOAD_BASE_MINUTES;
+  const best = UNLOAD_MINUTES_BY_HANDLING[handlingIn(state)] ?? bare;
+  return bare > 0 ? best / bare : 1;
+}
+
+/** Unloading a load of sheets: 45 by hand, about 30 with a pallet truck, about 15 with a forklift
+ *  (PIOTR; CLAUDE.md T13 3.21). */
 export function unloadMinutes(state: GameState): number {
-  return Math.round(UNLOAD_BASE_MINUTES * unloadFactor(state));
+  return Math.round(UNLOAD_MINUTES_BY_HANDLING[handlingIn(state)] ?? UNLOAD_BASE_MINUTES);
 }
 
-/** Getting a heavy machine off the lorry: the forklift, or two hours by hand [TUNE]
- *  (CLAUDE.md T8 3.2). Furniture and hand tools need nobody and never get here. */
+/** Getting a heavy machine off the lorry: two hours by hand [TUNE], shortened by the same handling
+ *  kit (CLAUDE.md T8 3.2). Furniture and hand tools need nobody and never get here. */
 export function equipmentUnloadMinutes(state: GameState): number {
   return Math.round(EQUIPMENT_UNLOAD_MINUTES * unloadFactor(state));
+}
+
+/** Take offs an estimator does in a day: five, ten with Joinery Core, and five more per extension,
+ *  at most two of them (PIOTR; CLAUDE.md T13 3.8). The jump from five to ten is the one that is
+ *  meant to be felt. */
+export function estimatorCapacity(state: GameState): number {
+  if (!state.software.joineryCore) return ESTIMATOR_JOBS_PER_DAY;
+  const extensions = Math.min(JOINERY_CORE_MAX_EXTENSIONS, state.software.joineryCoreExtensions);
+  return ESTIMATOR_JOBS_WITH_JOINERY_CORE + extensions * JOINERY_CORE_EXTENSION_JOBS;
+}
+
+/** What the Technical tab says about Joinery Core: whether it is on the laptop, what it and its
+ *  extensions do to the estimator's day, what each costs a year, and whether the two buttons can
+ *  be pressed (CLAUDE.md T13 3.8). The refusals are the ones the action applies. */
+export interface JoineryCoreOffer {
+  held: boolean;
+  extensions: number;
+  maxExtensions: number;
+  /** Take offs a day as things stand. */
+  capacity: number;
+  baseCapacity: number;
+  coreCapacity: number;
+  extensionJobs: number;
+  yearlyPrice: number;
+  extensionYearlyPrice: number;
+  core: { ok: boolean; reason: string };
+  extension: { ok: boolean; reason: string };
+}
+
+export function joineryCoreOffer(state: GameState): JoineryCoreOffer {
+  const held = state.software.joineryCore;
+  const extensions = Math.min(JOINERY_CORE_MAX_EXTENSIONS, state.software.joineryCoreExtensions);
+  let core = { ok: true, reason: '' };
+  if (held) core = { ok: false, reason: 'On the laptop' };
+  else if (!has(state, 'laptop')) core = { ok: false, reason: 'Needs the laptop' };
+  let extension = { ok: true, reason: '' };
+  if (!held) extension = { ok: false, reason: 'Joinery Core first' };
+  else if (extensions >= JOINERY_CORE_MAX_EXTENSIONS) extension = { ok: false, reason: 'Both extensions bought' };
+  return {
+    held,
+    extensions,
+    maxExtensions: JOINERY_CORE_MAX_EXTENSIONS,
+    capacity: estimatorCapacity(state),
+    baseCapacity: ESTIMATOR_JOBS_PER_DAY,
+    coreCapacity: ESTIMATOR_JOBS_WITH_JOINERY_CORE,
+    extensionJobs: JOINERY_CORE_EXTENSION_JOBS,
+    yearlyPrice: JOINERY_CORE_PRICE_YEARLY,
+    extensionYearlyPrice: JOINERY_CORE_EXTENSION_PRICE_YEARLY,
+    core,
+    extension,
+  };
 }
 
 /** Emails a job carries: 1 up to 3000, 2 up to 10000, 3 up to 20000, then one more for every
@@ -233,6 +313,13 @@ export function emailMinutes(): number {
 
 export function staffManagementMinutes(state: GameState): number {
   return joiners(state).length * STAFF_MANAGEMENT_MINUTES_PER_JOINER;
+}
+
+/** Whose day the assigning comes off: the production manager's from the day he is in, and the
+ *  owner's until then (CLAUDE.md T13 3.9). The one answer the team page and the day meters
+ *  agree on. */
+export function staffManagementTaker(state: GameState): 'owner' | 'manager' {
+  return managerOnDuty(state) ? 'manager' : 'owner';
 }
 
 // ---------------------------------------------------------------------------
@@ -378,20 +465,26 @@ function dropDailyTasks(state: GameState): void {
   state.tasks = state.tasks.filter((task) => !daily.includes(task.kind));
 }
 
-/** The admin that lands on the desk every working day (CLAUDE.md 8.10). */
+/** The admin that lands on the desk every working day (CLAUDE.md 8.10). The consumables and
+ *  materials chore lands every day whatever the number of projects (CLAUDE.md T13 3.3), and the
+ *  website's upkeep once a week (T13 3.7). */
 export function createDailyTasks(state: GameState): void {
   dropDailyTasks(state);
   createTask(state, { kind: 'bookkeeping', label: 'Bookkeeping', minutes: BOOKKEEPING_MINUTES });
-  if (state.jobs.some((job) => job.stage !== 'completed')) {
-    createTask(state, {
-      kind: 'dailyOrdering',
-      label: 'Material ordering',
-      minutes: DAILY_ORDERING_MINUTES,
-    });
-  }
+  createTask(state, {
+    kind: 'dailyOrdering',
+    label: CONSUMABLES_LABEL,
+    minutes: DAILY_ORDERING_MINUTES,
+  });
   const management = staffManagementMinutes(state);
   if (management > 0) {
     createTask(state, { kind: 'staffManagement', label: 'Staff management', minutes: management });
+  }
+  const upkeep = websiteUpkeepMinutes(state);
+  const last = state.website.lastUpkeepDay;
+  if (upkeep > 0 && (last === null || weekOfDay(last) !== weekOfDay(state.clock.day))) {
+    createTask(state, { kind: 'websiteUpkeep', label: 'Website upkeep', minutes: upkeep });
+    state.website.lastUpkeepDay = state.clock.day;
   }
 }
 
@@ -399,11 +492,14 @@ export function createDailyTasks(state: GameState): void {
  *  for an office admin covering for a specialist the company has not taken on, which is what
  *  "twice the minutes" means (CLAUDE.md T7 3.12). */
 export function taskWorkRate(worker: Worker, task: TaskInstance): number {
-  const covering = task.kind === 'clientCall' || task.kind === 'materialOrder';
-  if (worker.role === 'officeAdmin' && covering) return ADMIN_COVER_RATE;
+  if (worker.role === 'officeAdmin' && task.kind === 'clientCall') return ADMIN_COVER_RATE;
   // A draftsman draws at 0.8 of the owner's own speed. The software's factor is already in the
   // minutes of the drawing, so it is not counted again here (CLAUDE.md T10 3.6).
   if (worker.role === 'draftsman' && task.kind === 'design') return DRAFTSMAN_RATE;
+  // An estimator's tier is his speed at the take off (CLAUDE.md T13 3.8).
+  if (worker.role === 'estimator' && task.kind === 'materialTakeOff') {
+    return ESTIMATOR_RATES[worker.tier ?? 'normal'];
+  }
   return 1;
 }
 
@@ -416,10 +512,21 @@ function canTakeOn(state: GameState, worker: Worker, task: TaskInstance): boolea
   if (!hasWorkingDay(worker.role)) return true;
   if (worker.taskId !== null) return false;
   if (staffMinutesLeft(worker) <= 0) return false;
-  if (task.kind === 'materialOrder' && worker.role === 'purchasingClerk') {
-    return worker.ordersToday < CLERK_ORDERS_PER_DAY;
+  if (task.kind === 'materialTakeOff' && worker.role === 'estimator') {
+    // So many a day, and none before the drawing it reads (CLAUDE.md T13 3.8).
+    if (worker.ordersToday >= estimatorCapacity(state)) return false;
+    return !designOutstandingFor(state, task.jobId);
   }
   return true;
+}
+
+/** True while the drawing of this job is still to be done: the take off reads the drawing, so it
+ *  waits for it (CLAUDE.md T13 3.8). Asked here of the task list, which this module owns. */
+export function designOutstandingFor(state: GameState, jobId: string | null): boolean {
+  if (jobId === null) return false;
+  return state.tasks.some(
+    (task) => task.jobId === jobId && !task.done && (task.kind === 'design' || task.kind === 'siteMeasure'),
+  );
 }
 
 /** Who takes a task the company has more than one kind of man for: the one whose job it is, and
@@ -519,6 +626,10 @@ export function startTaskCheck(
   // Nothing comes off the lorry until there is shelving to put it on (CLAUDE.md T2 3.6).
   if (task.kind === 'unload' && task.deliveryId !== null && !canUnload(state)) {
     return refused('Nowhere to put it');
+  }
+  // The take off reads the drawing (CLAUDE.md T13 3.8).
+  if (task.kind === 'materialTakeOff' && designOutstandingFor(state, task.jobId)) {
+    return refused('The drawing comes first');
   }
   return CAN_START_TASK;
 }

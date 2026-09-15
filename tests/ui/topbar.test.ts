@@ -4,13 +4,20 @@
 
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { DAY_CATEGORY_LABELS } from '../../src/engine/constants';
-import { applyAction, dayPercentages } from '../../src/engine/index';
+import { DAY_CATEGORY_LABELS, EFFICIENCY_CAUSES } from '../../src/engine/constants';
+import { applyAction, dayPercentages, netOf, workshopEfficiency } from '../../src/engine/index';
 import type { DayCategory, GameState } from '../../src/engine/index';
 import { renderTopbar } from '../../src/ui/topbar';
 import { renderDaySummary } from '../../src/ui/dayEnd';
+import { signedMoney } from '../../src/ui/modal';
 import { currentState, mount } from '../../src/ui/app';
-import { buyStartingKit, fillRack, newGame } from '../helpers';
+import { buyStartingKit, fillRack, newGame, runClock, twoMenOnSheetWork } from '../helpers';
+
+function parse(html: string): HTMLElement {
+  const holder = document.createElement('div');
+  holder.innerHTML = html;
+  return holder;
+}
 
 /** A hall with the day 1 kit and a day scripted onto the owner, so the bar has something to
  *  draw. The order of the log is the order the bar paints in. */
@@ -126,6 +133,63 @@ describe("the boss's day meter", () => {
   });
 });
 
+describe('the efficiency number next to the clock', () => {
+  it('is one live number, worked over possible, in the clock block', () => {
+    const state = runClock(twoMenOnSheetWork({ saws: 1 }), 200);
+    const html = renderTopbar(state, 'hall');
+    const clock = parse(html).querySelector('.clock-block');
+    const number = clock?.querySelector('details.efficiency > summary');
+    expect(number?.textContent).toBe('Efficiency 50%');
+    expect(clock?.querySelector('details.efficiency')?.getAttribute('data-efficiency')).toBe('50');
+    // The number is the engine's, not the bar's own arithmetic.
+    expect(workshopEfficiency(state).percent).toBe(50);
+  });
+
+  it('opens on a click, with no handler, on to the plate of the four lines', () => {
+    const state = runClock(twoMenOnSheetWork({ saws: 1 }), 200);
+    const page = parse(renderTopbar(state, 'hall'));
+    const details = page.querySelector('details.efficiency');
+    expect(details?.querySelector('summary')?.hasAttribute('data-do')).toBe(false);
+    const plate = details?.querySelector('.efficiency-plate');
+    expect(plate).not.toBeNull();
+    const lines = Array.from(plate?.querySelectorAll('.efficiency-line') ?? []);
+    expect(lines.map((line) => line.getAttribute('data-cause'))).toEqual(
+      EFFICIENCY_CAUSES.map((cause) => cause.id),
+    );
+    for (const cause of EFFICIENCY_CAUSES) {
+      expect(plate?.textContent, cause.id).toContain(cause.label);
+    }
+    // Each line is its share of the lost minutes: the man waiting for the saw is all of it.
+    const waiting = lines.find((line) => line.getAttribute('data-cause') === 'noMachine');
+    expect(waiting?.textContent).toBe('No machine free100%');
+    expect(plate?.textContent).toContain('200 min worked of 400 min, 200 min lost');
+    // A summary click toggles a details element in the browser itself; here in jsdom too.
+    details?.querySelector('summary')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(details?.hasAttribute('open')).toBe(true);
+  });
+
+  it('reads 100 before the first production minute, and erodes from there', () => {
+    const fresh = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
+    expect(parse(renderTopbar(fresh, 'hall')).querySelector('details.efficiency > summary')?.textContent)
+      .toBe('Efficiency 100%');
+  });
+});
+
+describe("the day figure on the name plate", () => {
+  it("equals the sum of that day's ledger lines, signed and coloured (CLAUDE.md T13 10.2)", () => {
+    const state = runClock(twoMenOnSheetWork(), 300);
+    const day = state.clock.day;
+    const ledger = state.ledger
+      .filter((entry) => entry.day === day && !entry.unpaid)
+      .reduce((sum, entry) => sum + entry.amount, 0);
+    expect(ledger).not.toBe(0);
+    expect(netOf(state.finance.day)).toBeCloseTo(ledger, 6);
+    const net = parse(renderTopbar(state, 'hall')).querySelector('.name-plate .net');
+    expect(net?.textContent).toBe(`${signedMoney(ledger)} today`);
+    expect(net?.classList.contains(ledger < 0 ? 'bad' : 'good')).toBe(true);
+  });
+});
+
 describe('the push buttons', () => {
   it('carries a count on the two lists, and the view that is not the one he is on', () => {
     const state = withScriptedDay(SCRIPTED);
@@ -171,6 +235,8 @@ describe('the plate at the top of the day end summary', () => {
       labourValue: 0,
       workMinutes: 0,
       dayLog: state.owner.dayLog,
+      efficiency: { possible: 0, worked: 0, lost: { noPeople: 0, noMachine: 0, noMaterial: 0, ownerAway: 0 } },
+      nightMinutes: 0,
     });
     expect(html).toContain('Day 3 done');
     expect(html).toContain('370 of 480 min · overtime 0');
@@ -198,8 +264,8 @@ describe('the Orders button, in the game itself', () => {
     press('[data-do="startGame"]');
     press('[data-do="setSpeed"][data-speed="1"]');
     let guard = 0;
-    while (root.querySelector('[data-do="resolveEvent"]') !== null && guard < 50) {
-      press('[data-do="resolveEvent"]');
+    while (root.querySelector('[data-do="closeHouseCard"], [data-do="resolveEvent"]') !== null && guard < 50) {
+      press('[data-do="closeHouseCard"], [data-do="resolveEvent"]');
       guard += 1;
     }
     press('[data-do="openModal"][data-modal="shopping"]');

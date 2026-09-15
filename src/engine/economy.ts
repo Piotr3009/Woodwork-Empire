@@ -13,8 +13,8 @@ import {
   DUST_WASTE_MONTHLY,
   LATE_ACCOUNTS_CHARGE,
   LEDGER_MAX_ENTRIES,
-  LIVING_COST_PER_WORKING_DAY,
-  OVERDRAFT_MONTHLY_INTEREST,
+  JOINERY_CORE_EXTENSION_PRICE_YEARLY,
+  JOINERY_CORE_PRICE_YEARLY,
   PELLET_INCOME_MONTHLY_BASE,
   PELLET_INCOME_PER_1000_PRODUCTION_MINUTES,
   POWER_BASE_DAILY,
@@ -35,7 +35,14 @@ import {
   yearOfDay,
 } from './clock';
 import { queueEvent } from './events';
+// The loan, the overdraft and the covers run with the other monthly items, from the one place
+// the 1st is run for every calendar day, weekends included (CLAUDE.md T13 3.14, 3.15). The two
+// modules import `charge` from here and use it inside their functions only, so the cycle is safe.
+import { runFinanceMonth } from './finance';
+import { runInsuranceMonth } from './insurance';
+import { runSecurityMonth } from './security';
 import { has, hasCentralExtraction, machinePowerPerDay, seizableMachines } from './machines';
+import { ownerDrawPerDay } from './owner';
 import { makeId } from './rng';
 import { plural } from './text';
 import type {
@@ -191,11 +198,27 @@ function addLedger(
   label: string,
   amount: number,
   unpaid: boolean,
+  when: { day: number; minute: number } = state.clock,
+  merge = false,
 ): void {
+  if (merge) {
+    // A line that grows through the day instead of a line a piece: the standing contracts put
+    // sixty pieces a week through the books and the ledger would drown in them otherwise
+    // (CLAUDE.md T13 3.16). Same day, same category, same words, cash moved both times.
+    for (let index = state.ledger.length - 1; index >= 0; index -= 1) {
+      const open = state.ledger[index];
+      if (!open || open.day !== when.day) break;
+      if (open.category !== category || open.label !== label || open.unpaid) continue;
+      open.amount = Math.round((open.amount + amount) * 100) / 100;
+      open.balance = state.cash;
+      open.minute = when.minute;
+      return;
+    }
+  }
   state.ledger.push({
     id: makeId(state, 'ledger'),
-    day: state.clock.day,
-    minute: state.clock.minute,
+    day: when.day,
+    minute: when.minute,
     category,
     label,
     amount,
@@ -220,6 +243,45 @@ function record(state: GameState, category: LedgerCategory, amount: number): voi
   addToTotals(state.finance.day, category, amount);
   addToTotals(state.finance.week, category, amount);
   addToTotals(state.finance.month, category, amount);
+}
+
+/** The one signed entry every pound in or out of Turn 13 goes through: a positive amount is money
+ *  in, a negative one is money out, dated `when`, which is the clock unless the caller says
+ *  otherwise, as the night shift's wages booked at the end of the day do (CLAUDE.md T13 2.3,
+ *  10.2). Money out that the player chose obeys the overdraft floor and is refused past it; a cost
+ *  marked unavoidable becomes arrears past it, like the rent. True when the money moved. */
+export function charge(
+  state: GameState,
+  category: LedgerCategory,
+  label: string,
+  amount: number,
+  options: {
+    unavoidable?: boolean;
+    when?: { day: number; minute: number };
+    /** Adds to today's line of the same category and words instead of writing another: for
+     *  the piece work of a standing contract, so the ledger holds a day and not a piece. */
+    merge?: boolean;
+  } = {},
+): boolean {
+  const when = options.when ?? state.clock;
+  const merge = options.merge === true;
+  if (amount === 0) return false;
+  if (amount > 0) {
+    state.cash += amount;
+    record(state, category, amount);
+    addLedger(state, category, label, amount, false, when, merge);
+    return true;
+  }
+  const out = -amount;
+  if (canAfford(state, out)) {
+    state.cash -= out;
+    record(state, category, -out);
+    addLedger(state, category, label, -out, false, when, merge);
+    return true;
+  }
+  if (options.unavoidable !== true) return false;
+  chargeUnavoidable(state, category, label, out);
+  return true;
 }
 
 /** Money out that the player chose: purchases. Call `canAfford` first. */
@@ -312,8 +374,18 @@ export function monthlyFixedCosts(state: GameState): number {
     state.unit.rentMonthly +
     state.unit.ratesMonthly +
     dailyPower(state) * DAYS_PER_MONTH +
-    LIVING_COST_PER_WORKING_DAY * WORKING_DAYS_PER_MONTH
+    ownerDrawPerDay(state) * WORKING_DAYS_PER_MONTH
   );
+}
+
+/** Joinery Core and its extensions, bought by the year and charged as a twelfth each month
+ *  (CLAUDE.md T13 3.8). */
+export function joineryCoreMonthly(state: GameState): number {
+  if (!state.software.joineryCore) return 0;
+  const yearly =
+    JOINERY_CORE_PRICE_YEARLY +
+    state.software.joineryCoreExtensions * JOINERY_CORE_EXTENSION_PRICE_YEARLY;
+  return Math.round((yearly / 12) * 100) / 100;
 }
 
 /** Arrears carry interest only while they are large (CLAUDE.md T2 3.4). */
@@ -398,10 +470,6 @@ function runMonthlyItems(state: GameState): void {
   const before = state.cash;
   const entriesBefore = state.ledger.length;
   runLateAccounts(state);
-  if (state.cash < 0) {
-    const interest = -state.cash * OVERDRAFT_MONTHLY_INTEREST;
-    chargeUnavoidable(state, 'interest', 'Overdraft interest', interest);
-  }
   if (arrearsCarryInterest(state)) {
     const interest = state.finance.arrearsAmount * ARREARS_MONTHLY_INTEREST;
     chargeUnavoidable(state, 'interest', 'Interest on the arrears', interest);
@@ -411,6 +479,8 @@ function runMonthlyItems(state: GameState): void {
   if (state.software.mode === 'subscription') {
     chargeUnavoidable(state, 'software', 'Software subscription', SOFTWARE_SUBSCRIPTION_MONTHLY);
   }
+  const joineryCore = joineryCoreMonthly(state);
+  if (joineryCore > 0) chargeUnavoidable(state, 'software', 'Joinery Core', joineryCore);
   if (hasCentralExtraction(state) && !has(state, 'pelletiser')) {
     chargeUnavoidable(state, 'waste', 'Dust waste collection', DUST_WASTE_MONTHLY);
   }
@@ -419,6 +489,13 @@ function runMonthlyItems(state: GameState): void {
       (state.productionMinutesMonth / 1000) * PELLET_INCOME_PER_1000_PRODUCTION_MINUTES;
     receive(state, 'pellets', 'Pellet sales', PELLET_INCOME_MONTHLY_BASE + bonus);
   }
+  // The loan's instalment with its interest, the overdraft's interest accrued day by day below
+  // zero, and the twelfth of each cover held (CLAUDE.md T13 3.14, 3.15). They run here and not at
+  // the day's open, because this runs for a 1st that falls on a weekend too, and because the day's
+  // and the month's totals were emptied a moment ago, so the top bar's "today" counts them.
+  runFinanceMonth(state);
+  runInsuranceMonth(state);
+  runSecurityMonth(state);
   if (state.ledger.length > entriesBefore) {
     queueEvent(state, {
       kind: 'monthlyBills',
@@ -548,7 +625,8 @@ export function runDayCosts(state: GameState, day: number): void {
   chargeUnavoidable(state, 'rates', 'Business rates', dailyRates(state));
   chargeUnavoidable(state, 'power', 'Power', dailyPower(state));
   if (isWorkingDay(day)) {
-    chargeUnavoidable(state, 'living', 'Living costs', LIVING_COST_PER_WORKING_DAY);
+    // What he pays himself, every working day, at the tier he chose (CLAUDE.md T13 3.18).
+    chargeUnavoidable(state, 'ownerDraw', 'Owner\u0027s draw', ownerDrawPerDay(state));
   }
   if (isFriday(day)) {
     const wages = weeklyWageBill(state);
@@ -583,4 +661,165 @@ export function nextDueDays(state: GameState): { wages: number; monthly: number 
   let monthly = state.clock.day + 1;
   while (!isFirstOfMonth(monthly)) monthly += 1;
   return { wages, monthly };
+}
+
+// ---------------------------------------------------------------------------
+// The month end (CLAUDE.md T13 3.20): every line a sum of the ledger's dated lines for the month,
+// nothing stored. One table puts every ledger category on exactly one line, so a pound cannot be
+// counted twice or not at all.
+// ---------------------------------------------------------------------------
+
+export type MonthLineId =
+  | 'revenue'
+  | 'material'
+  | 'transport'
+  | 'salariesDay'
+  | 'salariesNight'
+  | 'ownerDraw'
+  | 'rentAndRates'
+  | 'power'
+  | 'insurance'
+  | 'security'
+  | 'loan'
+  | 'interest'
+  | 'contract'
+  | 'waste'
+  | 'equipment'
+  | 'software'
+  | 'other';
+
+/** The lines in the order the folder prints them. */
+export const MONTH_LINES: ReadonlyArray<{ id: MonthLineId; label: string }> = [
+  { id: 'revenue', label: 'Revenue from jobs' },
+  { id: 'material', label: 'Material' },
+  { id: 'transport', label: 'Transport and trips' },
+  { id: 'salariesDay', label: 'Wages and salaries, day' },
+  { id: 'salariesNight', label: 'Wages, night shift' },
+  { id: 'ownerDraw', label: "Owner's draw" },
+  { id: 'rentAndRates', label: 'Rent and rates' },
+  { id: 'power', label: 'Power' },
+  { id: 'insurance', label: 'Insurance, premiums and payouts' },
+  { id: 'security', label: 'Security' },
+  { id: 'loan', label: 'Loan, drawn and repaid' },
+  { id: 'interest', label: 'Loan and overdraft interest' },
+  { id: 'contract', label: 'Contract work, revenue and material' },
+  { id: 'waste', label: 'Waste collection' },
+  { id: 'equipment', label: 'Equipment, pipes and repairs' },
+  { id: 'software', label: 'Software and website' },
+  { id: 'other', label: 'Everything else' },
+];
+
+/** Every ledger category on exactly one line (CLAUDE.md T13 3.20). */
+export const MONTH_LINE_OF: Record<LedgerCategory, MonthLineId> = {
+  jobDeposit: 'revenue',
+  jobBalance: 'revenue',
+  material: 'material',
+  storage: 'material',
+  taxi: 'transport',
+  transport: 'transport',
+  wages: 'salariesDay',
+  salaries: 'salariesDay',
+  wagesNight: 'salariesNight',
+  ownerDraw: 'ownerDraw',
+  rent: 'rentAndRates',
+  rates: 'rentAndRates',
+  unitDeposit: 'rentAndRates',
+  power: 'power',
+  insurance: 'insurance',
+  claim: 'insurance',
+  security: 'security',
+  burglary: 'security',
+  loan: 'loan',
+  interest: 'interest',
+  loanInterest: 'interest',
+  overdraftInterest: 'interest',
+  contract: 'contract',
+  waste: 'waste',
+  equipment: 'equipment',
+  pipes: 'equipment',
+  repair: 'equipment',
+  software: 'software',
+  website: 'software',
+  accounts: 'other',
+  pellets: 'other',
+  arrears: 'other',
+  seizure: 'other',
+};
+
+export interface MonthLine {
+  id: MonthLineId;
+  label: string;
+  income: number;
+  costs: number;
+  net: number;
+}
+
+export interface MonthReport {
+  month: number;
+  lines: MonthLine[];
+  income: number;
+  costs: number;
+  net: number;
+  /** The bank at the first line of the month and at the last. */
+  cashOpen: number;
+  cashClose: number;
+  /** Bills that went to the arrears instead of out of the bank: no cash moved, so they are not
+   *  in the lines, and the report says so beside the net. */
+  unpaid: number;
+}
+
+/** The month's report, read off the ledger the state still carries (CLAUDE.md T13 3.20). The
+ *  lines are the cash that moved, so they add up to the bank at the close less the bank at the
+ *  open; what never left the bank is counted apart. */
+export function monthReport(state: GameState, month: number): MonthReport {
+  const entries = state.ledger
+    .map((entry, index) => ({ entry, index }))
+    .filter(({ entry }) => monthOfDay(entry.day) === month)
+    .sort(
+      (left, right) =>
+        left.entry.day - right.entry.day ||
+        left.entry.minute - right.entry.minute ||
+        left.index - right.index,
+    )
+    .map(({ entry }) => entry);
+  const lines: MonthLine[] = MONTH_LINES.map((line) => ({ ...line, income: 0, costs: 0, net: 0 }));
+  const byId = new Map(lines.map((line) => [line.id, line]));
+  let unpaid = 0;
+  for (const entry of entries) {
+    if (entry.unpaid) {
+      unpaid += Math.abs(entry.amount);
+      continue;
+    }
+    const line = byId.get(MONTH_LINE_OF[entry.category]);
+    if (!line) continue;
+    if (entry.amount >= 0) line.income += entry.amount;
+    else line.costs += -entry.amount;
+  }
+  let income = 0;
+  let costs = 0;
+  for (const line of lines) {
+    line.income = Math.round(line.income * 100) / 100;
+    line.costs = Math.round(line.costs * 100) / 100;
+    line.net = Math.round((line.income - line.costs) * 100) / 100;
+    income += line.income;
+    costs += line.costs;
+  }
+  const first = entries[0];
+  const last = entries[entries.length - 1];
+  const cashOpen = first
+    ? first.unpaid
+      ? first.balance
+      : first.balance - first.amount
+    : state.cash;
+  const cashClose = last ? last.balance : state.cash;
+  return {
+    month,
+    lines,
+    income: Math.round(income * 100) / 100,
+    costs: Math.round(costs * 100) / 100,
+    net: Math.round((income - costs) * 100) / 100,
+    cashOpen: Math.round(cashOpen * 100) / 100,
+    cashClose: Math.round(cashClose * 100) / 100,
+    unpaid: Math.round(unpaid * 100) / 100,
+  };
 }

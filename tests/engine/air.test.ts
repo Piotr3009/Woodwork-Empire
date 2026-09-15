@@ -32,6 +32,7 @@ import { renderCatalogue } from '../../src/ui/catalogue';
 import { renderHall } from '../../src/render/hall';
 import type { Equipment, GameState } from '../../src/engine/index';
 import {
+  acceptNow,
   act,
   fillRack,
   firstJob,
@@ -115,7 +116,7 @@ describe('rule 1, the bar', () => {
     placeEquipment(state, 'edgebander', { variantId: 'industrial', x: 10, y: 1 });
     state.enquiries = [];
     const enquiry = placeEnquiry(state, { price: 4000, deadlineDays: 40 });
-    let next = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+    let next = acceptNow(state, enquiry.id, false);
     const job = firstJob(next);
     job.stage = 'ready';
     // Past the cutting and into the machining, which is the bander's stage: cutting is the first
@@ -173,7 +174,7 @@ describe('rule 2, the litres', () => {
       }
       let next = state;
       for (const enquiry of state.enquiries.slice()) {
-        next = act(next, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+        next = acceptNow(next, enquiry.id, false);
       }
       for (const job of next.jobs) {
         job.stage = 'inProduction';
@@ -210,7 +211,7 @@ describe('rule 2, the litres', () => {
         id: `kit-bench-${index}`,
       });
       const enquiry = placeEnquiry(state, { price: 4000, deadlineDays: 40, name: `Job ${index}` });
-      const next = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+      const next = acceptNow(state, enquiry.id, false);
       state.jobs = next.jobs;
       state.enquiries = next.enquiries;
       state.tasks = next.tasks;
@@ -234,7 +235,7 @@ describe('rule 3, the hours', () => {
     placeEquipment(state, 'tableSaw', { variantId: 'used', x: 6, y: 1 });
     state.enquiries = [];
     const enquiry = placeEnquiry(state, { price: 4000, deadlineDays: 40 });
-    let next = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+    let next = acceptNow(state, enquiry.id, false);
     const job = firstJob(next);
     job.stage = 'ready';
     // Cutting is done on the saw with no air in it at all.
@@ -313,7 +314,7 @@ describe('the dryer', () => {
     const state = newGame();
     state.enquiries = [];
     const enquiry = placeEnquiry(state, { price: 4000 });
-    const next = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+    const next = acceptNow(state, enquiry.id, false);
     const job = firstJob(next);
     expect(job.wetFinish).toBe(false);
     job.wetFinish = true;

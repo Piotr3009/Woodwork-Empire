@@ -11,7 +11,7 @@ import { workingDayIndex } from '../../src/engine/clock';
 import { minutesRemainingFor } from '../../src/engine/jobs';
 import { renderWorkPlan } from '../../src/ui/workPlan';
 import type { GameState, PlanRow } from '../../src/engine/index';
-import { act, buyStartingKit, fillRack, firstJob, newGame, placeEnquiry } from '../helpers';
+import { acceptNow, act, buyStartingKit, fillRack, firstJob, newGame, placeEnquiry } from '../helpers';
 
 function parse(html: string): HTMLElement {
   const holder = document.createElement('div');
@@ -27,7 +27,7 @@ function started(options: { deadlineDays?: number; price?: number } = {}): GameS
     price: options.price ?? 400,
     deadlineDays: options.deadlineDays ?? 10,
   });
-  state = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+  state = acceptNow(state, enquiry.id, false);
   const job = firstJob(state);
   job.stage = 'ready';
   const next = act(state, { type: 'WORK_HERE', jobId: job.id });
@@ -145,7 +145,7 @@ describe('a job nobody has started', () => {
     let state = fillRack(buyStartingKit(newGame({ difficulty: 'veryEasy' })));
     state.enquiries = [];
     const enquiry = placeEnquiry(state, { price: 400, deadlineDays: 10 });
-    state = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+    state = acceptNow(state, enquiry.id, false);
     firstJob(state).stage = 'ready';
     const entry = row(state);
     expect(entry.notStarted).toBe(true);

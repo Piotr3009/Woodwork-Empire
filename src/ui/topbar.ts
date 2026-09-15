@@ -16,10 +16,11 @@ import {
   ownerMinutesToday,
   shoppingList,
   skippedTask,
+  workshopEfficiency,
 } from '../engine/index';
 import type { DayCategory, GameState, Speed } from '../engine/index';
 import { cadenceControl } from './dayEnd';
-import { escapeHtml, money } from './modal';
+import { escapeHtml, minutes, money, signedMoney } from './modal';
 
 /** The five speed knobs. One place builds them, whatever else the top bar has to say. The Pause
  *  knob pulses once when the player asks for something stopped time will not give him
@@ -66,14 +67,43 @@ function namePlate(state: GameState): string {
   const net = netOf(state.finance.day);
   const blind = booksBehind(state);
   const netClass = blind ? 'flat' : net > 0 ? 'good' : net < 0 ? 'bad' : 'flat';
-  // Books behind, so nobody knows what today came to (CLAUDE.md T2 3.5).
-  const netText = blind ? '? today' : `${net >= 0 ? '+' : ''}${money(net)} today`;
+  // Books behind, so nobody knows what today came to (CLAUDE.md T2 3.5). The figure is the sum
+  // of the day's ledger lines, signed the one way every signed pound is (T13 3.1, 10.2).
+  const netText = blind ? '? today' : `${signedMoney(net)} today`;
   return (
     '<div class="name-plate">' +
     `<span class="cash">${money(state.cash)}</span>` +
     `<span class="net ${netClass}" title="${blind ? 'The books are behind' : 'Today'}">` +
     `${escapeHtml(netText)}</span>` +
     '</div>'
+  );
+}
+
+/** Workshop efficiency, one live number next to the clock, and behind a click on it the plate
+ *  with the four lines of what is pulling it down, each a share of the lost minutes (PIOTR;
+ *  CLAUDE.md T13 3.5). A details element, so the click needs no handler and the plate keeps its
+ *  state through the minute (the patch leaves a details' open attribute alone). The engine hands
+ *  the number and the lines; this prints them. */
+function efficiencyBlock(state: GameState): string {
+  const efficiency = workshopEfficiency(state);
+  const lines = efficiency.lines
+    .map(
+      (line) =>
+        `<span class="efficiency-line" data-cause="${line.id}">` +
+        `<span class="tip-name">${escapeHtml(line.label)}</span>` +
+        `<span class="tip-min">${line.percent}%</span></span>`,
+    )
+    .join('');
+  return (
+    `<details class="efficiency" data-efficiency="${efficiency.percent}">` +
+    '<summary class="efficiency-number" ' +
+    'title="Production minutes worked, of the minutes the workshop could have worked">' +
+    `Efficiency ${efficiency.percent}%</summary>` +
+    '<div class="efficiency-plate">' +
+    `<p class="hint">${minutes(efficiency.worked)} worked of ${minutes(efficiency.possible)}, ` +
+    `${minutes(efficiency.lost)} lost</p>` +
+    lines +
+    '</div></details>'
   );
 }
 
@@ -192,6 +222,7 @@ export function renderTopbar(
     '<div class="clock-block">' +
     `<span class="date">${escapeHtml(formatDate(state.clock))}</span>` +
     `<span class="speeds">${speedButtons(state, pulse)}</span>` +
+    efficiencyBlock(state) +
     '</div>' +
     dayMeter(state) +
     '<span class="spacer"></span>' +
@@ -219,6 +250,9 @@ export function renderTopbar(
       false,
     ) +
     pushButton('toggleMenu', 'Menu', '', false) +
+    // The gear: the settings, which tonight are tips on and off (CLAUDE.md T13 3.22).
+    '<button class="push gear" data-do="openSettings" title="Settings" aria-label="Settings">' +
+    '&#9881;</button>' +
     '</div>' +
     '</div>'
   );
@@ -235,6 +269,10 @@ export function renderMenu(state: GameState, cloud: MenuCloud): string {
     : '<button class="btn" disabled title="Already a day off">Stay home today</button>';
   return (
     '<div class="menu-pop">' +
+    // The menu shuts on a click outside it and on this cross; it did neither before (PIOTR;
+    // CLAUDE.md T13 3.1).
+    '<button class="menu-close" data-do="closeMenu" title="Close" aria-label="Close">' +
+    '×</button>' +
     '<button class="btn" data-do="endDay">End day</button>' +
     stayHome +
     `<button class="btn" data-do="toggleWhy">${

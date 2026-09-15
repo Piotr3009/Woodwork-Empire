@@ -11,7 +11,7 @@ import { advanceMinutes, currentState, mount, render } from '../../src/ui/app';
 import { applyAction } from '../../src/engine/index';
 import type { GameState } from '../../src/engine/index';
 import { refreshBoard } from '../../src/engine/board';
-import { buyStartingKit, fillRack, newGame, placeEnquiry, placeEquipment } from '../helpers';
+import { acceptNow, buyStartingKit, fillRack, newGame, placeEnquiry, placeEquipment } from '../helpers';
 
 function root(): HTMLElement {
   const element = document.querySelector('#app');
@@ -40,11 +40,7 @@ function readyHall(): GameState {
   const state = fillRack(buyStartingKit(newGame({ difficulty: 'veryEasy' })), 60);
   state.enquiries = [];
   const enquiry = placeEnquiry(state, { price: 6000, deadlineDays: 40 });
-  const next = applyAction(state, {
-    type: 'ACCEPT_ENQUIRY',
-    enquiryId: enquiry.id,
-    byHand: false,
-  });
+  const next = acceptNow(state, enquiry.id);
   const job = next.jobs[0];
   if (job === undefined) throw new Error('no job');
   job.stage = 'ready';

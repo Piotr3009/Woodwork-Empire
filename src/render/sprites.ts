@@ -17,6 +17,19 @@ export const SPRITE_DIR = '/sprites';
 
 const DELIVERED: string[] = manifest;
 
+/** The families whose picture is a Turn 13 placeholder until the art side paints it: the spindle
+ *  moulder's five classes and the pallet truck (CLAUDE.md T13 1, 3.13, 3.21; the requests are in
+ *  docs/art/REQUESTS-T13.md). Everything else with no file falls back to the flat box the hall
+ *  has always drawn. */
+export const PLACEHOLDER_SPRITES: readonly string[] = ['spindleMoulder', 'palletTruck'];
+
+/** The placeholder kind for a sprite key and its class, `spindleMoulder.used`, or null when the
+ *  family is not one the placeholder helper draws. */
+export function placeholderKindFor(spriteKey: string, tier?: string | null): string | null {
+  if (!PLACEHOLDER_SPRITES.includes(spriteKey)) return null;
+  return typeof tier === 'string' && tier !== '' ? `${spriteKey}.${tier}` : spriteKey;
+}
+
 export interface SpriteSize {
   width: number;
   height: number;

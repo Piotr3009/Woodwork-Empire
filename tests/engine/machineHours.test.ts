@@ -14,6 +14,7 @@ import { waitingStation } from '../../src/engine/stations';
 import type { Equipment, GameState } from '../../src/engine/index';
 import { tick } from '../../src/engine/index';
 import {
+  acceptNow,
   act,
   buyStartingKit,
   fillRack,
@@ -36,7 +37,7 @@ function oneManAtWork(sawVariant = 'budget'): GameState {
   let state = buyStartingKit(newGame({ difficulty: 'veryEasy' }), { sawVariant });
   state.enquiries = [];
   const enquiry = placeEnquiry(state, { price: 40000, deadlineDays: 90 });
-  state = fillRack(act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false }), 80);
+  state = fillRack(acceptNow(state, enquiry.id, false), 80);
   firstJob(state).stage = 'ready';
   return act(state, { type: 'WORK_HERE', jobId: null });
 }

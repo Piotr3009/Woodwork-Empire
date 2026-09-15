@@ -16,7 +16,7 @@ import {
   minutesRemainingFor,
 } from './jobs';
 import { ownerIsAvailable } from './owner';
-import { isWorkingToday, joiners } from './staff';
+import { isWorkingToday, joiners, shiftOf } from './staff';
 import type { GameState, Job } from './types';
 
 /** Days past the deadline the board still draws, so a late job has somewhere to run to
@@ -191,7 +191,15 @@ function rowFor(state: GameState, job: Job): PlanRow {
     jobId: job.id,
     name: job.name,
     price: job.price,
-    who: job.assignedTo === OWNER ? 'you' : worker ? worker.name : 'nobody yet',
+    // A man on the second shift is named with it: the bar moves tonight, not today (T13 3.9).
+    who:
+      job.assignedTo === OWNER
+        ? 'you'
+        : worker
+          ? shiftOf(state, worker) === 'night'
+            ? `${worker.name}, night shift`
+            : worker.name
+          : 'nobody yet',
     stage: stageText(state, job),
     notStarted,
     from,

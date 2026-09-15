@@ -2,16 +2,20 @@
 
 import {
   DAY_CATEGORY_LABELS,
+  HOUSE_TIER_NAMES,
   cubicMetres,
   dayPercentages,
   daySummaryOf,
   dustBand,
   earnedRate,
+  efficiencyOf,
   formatReputation,
+  houseTierFor,
   summaryOfDay,
 } from '../engine/index';
+import { topCause } from '../engine/index';
 import type { DaySummary, GameState, SummaryCadence } from '../engine/index';
-import { days, escapeHtml, minutes, money, plural } from './modal';
+import { days, escapeHtml, minutes, money, plural, signedFigure, signedMoney } from './modal';
 
 /** The three cadences in the words the player reads, in the order they are offered. */
 const CADENCES: Array<[SummaryCadence, string]> = [
@@ -65,7 +69,7 @@ function dayPlate(summary: DaySummary): string {
  *  out of the record the engine wrote when that day closed (CLAUDE.md T6 3.9). */
 export function renderDaySummary(
   summary: DaySummary,
-  options: { earnedRate?: number; cadence?: string } = {},
+  options: { earnedRate?: number; cadence?: string; houseLine?: string } = {},
 ): string {
   const used = summary.minutesByCategory;
   const jobs = summary.jobsCompleted.map((name) => escapeHtml(name)).join(', ');
@@ -90,10 +94,15 @@ export function renderDaySummary(
     rate +
     '</div>' +
     `<div class="col"><h3>Money ${escapeHtml(label)}</h3>` +
-    row('In', money(summary.income)) +
-    row('Out', money(-summary.costs)) +
-    row('Net', money(net)) +
+    // The three signed lines wear their sign's colour, like every plus and minus in the game
+    // (CLAUDE.md T13 3.1); the balance is a balance and wears none.
+    signedRow('In', summary.income) +
+    signedRow('Out', -summary.costs) +
+    signedRow('Net', net) +
     row('In the bank', money(summary.cash)) +
+    // What the money has bought him: the house tier, off the thirty days of draw actually paid
+    // (CLAUDE.md T13 3.18). The evening knows it; a past day's record does not carry it.
+    (options.houseLine === undefined ? '' : row('Home', options.houseLine)) +
     '</div>' +
     `<div class="col"><h3>The hall, day ${summary.day}</h3>` +
     row('Jobs moved on', String(summary.jobsAdvanced)) +
@@ -104,6 +113,9 @@ export function renderDaySummary(
     ) +
     // What the machines made that day, in the one unit dust is written in (CLAUDE.md T12 3.4).
     row('Dust made today', cubicMetres(summary.dustMadeM3, 2)) +
+    // The day's efficiency as the top bar showed it, and what mostly pulled it down (T13 3.5).
+    row('Efficiency', efficiencyLine(summary)) +
+    (summary.nightMinutes > 0 ? row('Night shift', minutes(summary.nightMinutes)) : '') +
     row('Next day', tomorrow === '' ? 'no deliveries' : tomorrow) +
     '</div></div>' +
     tomorrowLine(summary) +
@@ -118,7 +130,24 @@ export function renderDayEnd(state: GameState): string {
   return renderDaySummary(summaryOfDay(state, state.clock.day) ?? daySummaryOf(state), {
     earnedRate: earnedRate(state, 'day'),
     cadence: cadenceControl(state),
+    houseLine: houseLineFor(state),
   });
+}
+
+/** The house the owner sleeps in tonight, in the words of the tier table: the engine works the
+ *  tier out from the ledger, and this prints its name (CLAUDE.md T13 3.18). */
+export function houseLineFor(state: GameState): string {
+  return HOUSE_TIER_NAMES[houseTierFor(state) - 1] ?? HOUSE_TIER_NAMES[0] ?? '';
+}
+
+/** "73%, mostly no machine free": the number, and the cause that took the most of what was lost
+ *  (CLAUDE.md T13 3.5). The engine works both out; this prints them. */
+function efficiencyLine(summary: DaySummary): string {
+  const efficiency = efficiencyOf(summary.efficiency);
+  const top = topCause(efficiency);
+  return top === null
+    ? `${efficiency.percent}%`
+    : `${efficiency.percent}%, mostly ${top.label.toLowerCase()}`;
 }
 
 /** What the day cost the next one: the overtime debt and the hour he worked through, as the one
@@ -136,6 +165,15 @@ function row(label: string, value: string): string {
   return (
     `<div class="row"><span class="row-main">${escapeHtml(label)}</span>` +
     `<span class="row-figure">${escapeHtml(value)}</span></div>`
+  );
+}
+
+/** A money line whose sign is the point of it: in is green, out is red, nothing is plain, through
+ *  the one helper every signed figure goes through (CLAUDE.md T13 3.1). */
+function signedRow(label: string, value: number): string {
+  return (
+    `<div class="row"><span class="row-main">${escapeHtml(label)}</span>` +
+    `<span class="row-figure">${signedFigure(signedMoney(value), value)}</span></div>`
   );
 }
 

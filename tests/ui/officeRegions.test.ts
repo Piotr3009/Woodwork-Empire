@@ -31,8 +31,8 @@ function html(): string {
 /** Answers whatever the engine is asking with the first choice. */
 function dismissEvents(): void {
   let guard = 0;
-  while (root().querySelector('[data-do="resolveEvent"]') !== null && guard < 50) {
-    click('[data-do="resolveEvent"]');
+  while (root().querySelector('[data-do="closeHouseCard"], [data-do="resolveEvent"]') !== null && guard < 50) {
+    click('[data-do="closeHouseCard"], [data-do="resolveEvent"]');
     guard += 1;
   }
 }
@@ -97,6 +97,8 @@ beforeAll(() => {
   // A job on the books, or the tests below would pass on an empty board.
   click('[data-do="openModal"][data-modal="board"]');
   click('[data-do="acceptEnquiry"]');
+  // The client's number, taken (CLAUDE.md T13 3.24).
+  click('[data-do="resolveEvent"][data-id="accept"]');
   click('[data-do="closeModal"]');
 });
 
@@ -165,11 +167,13 @@ describe('setting the hall out', () => {
     }
     // The exact words CLAUDE.md T4 3.5 asks for, with the running total. Two things moved and one
     // of them ducted: the shelving has nothing to reconnect (CLAUDE.md T6 3.5).
-    expect(html()).toContain('Ducting to reconnect: 1 machine, £800');
+    expect(html()).toContain('Extraction pipe to run again: 1 machine');
     click('[data-do="endSetup"]');
     // The machine is asked about before it is booked, and the shelving is carried for nothing
     // (PIOTR, 13.09; CLAUDE.md T8 3.4).
-    expect(html()).toContain('Moving 1 machine takes 1 h and £800 of ducting. Do it?');
+    expect(html()).toContain(
+      'Moving 1 machine takes 1 h and the extraction pipe of 1 machine run again at the new length. Do it?',
+    );
     click('[data-do="resolveEvent"][data-id="do"]');
     expect(html()).toContain('Moving machines');
     // Back to a hall that is being shifted, so the kit cannot be dragged again.
@@ -179,14 +183,18 @@ describe('setting the hall out', () => {
 });
 
 describe('the laptop tabs', () => {
-  it('carries the four tabs of the contract, Tasks first', () => {
+  it('carries the four tabs of the contract and the Admin three, Tasks first', () => {
     click('[data-office="laptop"]');
     const tabs = Array.from(root().querySelectorAll('[data-do="laptopTab"]'));
+    // The four of the contract, then the Admin group of Turn 13 (CLAUDE.md T13 3.7, 3.15, 3.17).
     expect(tabs.map((tab) => tab.getAttribute('data-id'))).toEqual([
       'tasks',
       'materials',
       'team',
       'drawings',
+      'website',
+      'insurance',
+      'security',
     ]);
     expect(tabs[0]?.className).toContain('is-on');
   });
@@ -194,7 +202,7 @@ describe('the laptop tabs', () => {
   it('reaches the material and the drawings, one path each', () => {
     for (const [tab, mark] of [
       ['tasks', 'Office tasks today'],
-      ['materials', 'Buy sheets for stock'],
+      ['materials', 'data-stock='],
       ['drawings', 'Design queue'],
     ]) {
       click(`[data-do="laptopTab"][data-id="${tab}"]`);

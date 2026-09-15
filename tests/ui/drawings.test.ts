@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { renderDrawings } from '../../src/ui/drawings';
 import { renderLaptop } from '../../src/ui/laptop';
 import type { GameState } from '../../src/engine/index';
-import { act, buyStartingKit, clearEvents, doTask, newGame, placeEnquiry } from '../helpers';
+import { acceptNow, act, buyStartingKit, clearEvents, doTask, newGame, placeEnquiry } from '../helpers';
 
 function parse(html: string): HTMLElement {
   const holder = document.createElement('div');
@@ -17,7 +17,7 @@ function withJob(): GameState {
   let state = buyStartingKit(newGame());
   state.enquiries = [];
   const enquiry = placeEnquiry(state, { price: 400, name: 'Garage shelves' });
-  state = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+  state = acceptNow(state, enquiry.id, false);
   return clearEvents(state);
 }
 

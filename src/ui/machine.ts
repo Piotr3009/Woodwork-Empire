@@ -1,5 +1,12 @@
-// The machine modal: one tile per class of a family, with what each one does to the work
+// The machine modal: one card per class of a family, with what each one does to the work
 // (CLAUDE.md T3 3.5). The catalogue lists the family, this is where the money is spent.
+//
+// Every class card of every family is laid out by the one function `classCard`, top to bottom:
+// the effects (output, dust, what it needs of the air, its life, and anything its class alone
+// does), a gap, the costs (price, delivery, power, the insurance it adds a year, the floor), a
+// gap, and the description in the body font (PIOTR; CLAUDE.md T13 3.1). Every signed figure goes
+// through the one sign helper, and every card wears the badge and the frame colour of its class
+// from the one `CLASS_BADGE` table, the same across families (CLAUDE.md T13 3.12).
 
 import {
   airDemandOf,
@@ -18,16 +25,21 @@ import {
   enduranceHoursFor,
   findSpec,
   footprintOf,
+  sheetCapacityOf,
   zoneOf,
 } from '../engine/index';
 import {
   CENTRAL_EXTRACTION_SPECS,
+  CLASS_BADGE,
+  CLASS_LADDER_FAMILIES,
   COMPRESSOR,
   COMPRESSOR_AIR,
   COMPRESSOR_WITH_DRYER,
   DUST_WASTE_MONTHLY,
+  GATE_OUTPUT_BONUS,
   bagsToM3,
 } from '../engine/constants';
+import { insuranceAddedYearly } from '../engine/index';
 import { spriteUrl } from '../render/sprites';
 import type { EquipmentSpec, EquipmentVariant, GameState } from '../engine/index';
 import {
@@ -37,32 +49,32 @@ import {
   plural,
   primaryButton,
   button,
-  signClass,
+  signedFigure,
 } from './modal';
 
 /** The families the player chooses a class for. Everything else is bought off the catalogue line
- *  itself: a locker has no classes and never will (CLAUDE.md T3 3.5). */
+ *  itself: a locker has no classes and never will (CLAUDE.md T3 3.5, T13 3.12). */
 export function isMachineFamily(spec: EquipmentSpec): boolean {
-  return spec.category === 'machine' || spec.category === 'extraction';
+  return CLASS_LADDER_FAMILIES.includes(spec.id);
 }
 
-/** One line of figures on a class card, and the colour its sign gives it when it has one. */
-interface Figure {
+/** One line of figures on a class card. A line with a signed value is coloured by its sign
+ *  through the one helper; a line without one is printed in the body colour (CLAUDE.md T13 1). */
+interface Line {
   text: string;
-  tone: string;
+  value: number | null;
 }
 
-function figure(text: string, tone = ''): Figure {
-  return { text, tone };
+function line(text: string, value: number | null = null): Line {
+  return { text, value };
 }
 
 /** Above 1.0 is quicker than a standard machine, below it is slower: green, red or the body
- *  colour by the sign, through the one helper every signed line on a card goes through
- *  (CLAUDE.md T12 3.1). */
-function outputLine(variant: EquipmentVariant): Figure {
+ *  colour by the sign (CLAUDE.md T12 3.1). */
+function outputLine(variant: EquipmentVariant): Line {
   const per = Math.round((variant.outputFactor - 1) * 100);
-  if (per === 0) return figure('Output as a standard machine');
-  return figure(`Output ${per > 0 ? '+' : ''}${per}%`, signClass(per));
+  if (per === 0) return line('Output as a standard machine');
+  return line(`Output ${per > 0 ? '+' : ''}${per}%`, per);
 }
 
 /** What a machine of this family makes, in the one unit dust is written in. It is the family's
@@ -82,9 +94,15 @@ function powerLine(variant: EquipmentVariant): string {
   return `Power ${variant.powerPerDay} a day`;
 }
 
+/** What this class adds to the property premium a year, off the one rate the cover is written at
+ *  (CLAUDE.md T13 3.1, 3.15). */
+function insuranceLine(variant: EquipmentVariant): string {
+  return `Insurance ${money(insuranceAddedYearly(variant.price))} a year`;
+}
+
 /** What this class asks of the air, and what the hall would give it. The catalogue says it before
  *  the money is spent, so nobody buys a bander his compressor will not start (PIOTR,
- *  CLAUDE.md T10 3.2). */
+ *  CLAUDE.md T10 3.2). For a compressor it is what the class gives, which is its own effect. */
 function airLine(state: GameState, spec: EquipmentSpec, variant: EquipmentVariant): string {
   if (spec.id === COMPRESSOR) {
     const gives = COMPRESSOR_AIR[variant.id];
@@ -106,13 +124,17 @@ function airLine(state: GameState, spec: EquipmentSpec, variant: EquipmentVarian
   return `Needs ${wants.bar} bar, ${wants.litres} l/min${short}${none}`;
 }
 
-/** What this class pulls out of the air, or asks of the hall's fans, so the two sums read the
- *  same on the tile (CLAUDE.md T10 3.1, T12 3.1). */
+/** What this class asks of the hall's fans while somebody stands at it (CLAUDE.md T10 3.1). */
 function extractionLine(spec: EquipmentSpec, variant: EquipmentVariant): string {
-  const pulls = extractionCapacityOf({ specId: spec.id, variantId: variant.id });
-  if (pulls > 0) return `Pulls ${mediaFigure(pulls)} m\u00b3/h`;
   const wants = extractionDemandOf({ specId: spec.id, variantId: variant.id });
-  return wants > 0 ? `Needs ${mediaFigure(wants)} m\u00b3/h of extraction` : '';
+  return wants > 0 ? `Needs ${mediaFigure(wants)} m³/h of extraction` : '';
+}
+
+/** What a class of fan pulls: its own effect, and the one figure the extraction sum reads
+ *  (CLAUDE.md T10 3.1, T12 3.1). */
+function pullsLine(spec: EquipmentSpec, variant: EquipmentVariant): string {
+  const pulls = extractionCapacityOf({ specId: spec.id, variantId: variant.id });
+  return pulls > 0 ? `Pulls ${mediaFigure(pulls)} m³/h` : '';
 }
 
 /** The bags on a class of extractor and what they hold, a cubic metre each; the central systems
@@ -124,6 +146,20 @@ function bagsLine(spec: EquipmentSpec, variant: EquipmentVariant): string {
   }
   const bags = bagsOf({ specId: spec.id, variantId: variant.id });
   return bags > 0 ? `Bags ${bags}, holds ${cubicMetres(bagsToM3(bags))}` : '';
+}
+
+/** What a class of shelving holds: the rack's own effect (CLAUDE.md T7 3.6). */
+function holdsLine(spec: EquipmentSpec, variant: EquipmentVariant): string {
+  const sheets = sheetCapacityOf({ specId: spec.id, variantId: variant.id });
+  return sheets > 0 ? `Holds ${plural(sheets, 'sheet', 'sheets')}` : '';
+}
+
+/** A class with an extraction demand can take an automatic gate, which is worth this much output
+ *  on that machine once it is fitted: the class specific effect of CLAUDE.md T13 3.11. */
+function gateLine(spec: EquipmentSpec, variant: EquipmentVariant): Line {
+  if (extractionDemandOf({ specId: spec.id, variantId: variant.id }) <= 0) return line('');
+  const per = Math.round(GATE_OUTPUT_BONUS * 100);
+  return line(`Takes an automatic gate: output +${per}% once fitted`, per);
 }
 
 /** How long the player waits for this one after he has paid for it (CLAUDE.md T8 3.2). */
@@ -148,7 +184,8 @@ export function pictureSlot(spriteKey: string, tier: string): string {
 }
 
 /** What the class takes of the hall floor, in the words Piotr asked for: both figures with
- *  their unit, through the one formatter (CLAUDE.md T7 3.7, T12 3.1). */
+ *  their unit, through the one formatter (CLAUDE.md T7 3.7, T12 3.1). A cost, now that the floor
+ *  limits the crew (CLAUDE.md T13 3.10). */
 export function floorLine(specId: string, variantId: string): string {
   const stands = footprintOf(specId, variantId);
   const zone = zoneOf(specId, variantId);
@@ -162,10 +199,77 @@ export function ownedBadge(state: GameState, specId: string, variantId: string):
     (item) => item.specId === specId && item.variantId === variantId,
   ).length;
   if (count === 0) return '';
-  return `<span class="badge badge-owned">Owned${count > 1 ? ` \u00d7 ${count}` : ''}</span>`;
+  return `<span class="badge badge-owned">Owned${count > 1 ? ` × ${count}` : ''}</span>`;
 }
 
-function tile(
+/** The badge a class wears, the same on every family: the label and the colour of the one table
+ *  (CLAUDE.md T13 3.12). Empty for a class that is not one of the five. */
+export function classBadge(variantId: string): string {
+  const badge = CLASS_BADGE[variantId];
+  if (!badge) return '';
+  return (
+    `<span class="badge badge-class class-${escapeHtml(variantId)}" ` +
+    `style="--class-colour:${escapeHtml(badge.colour)}">${escapeHtml(badge.label)}</span>`
+  );
+}
+
+/** The class names and the colour a card is framed in, for the card's own element: the badge's
+ *  colour on a custom property, so the frame and the badge cannot disagree. */
+export function classFrame(variantId: string): { className: string; style: string } {
+  const badge = CLASS_BADGE[variantId];
+  if (!badge) return { className: '', style: '' };
+  return {
+    className: ` class-${variantId}`,
+    style: ` style="--class-colour:${escapeHtml(badge.colour)}"`,
+  };
+}
+
+/** The lines of a block, one paragraph each, the signed ones through the sign helper. */
+function figureLines(lines: Line[]): string {
+  return lines
+    .filter((entry) => entry.text !== '')
+    .map(
+      (entry) =>
+        '<p class="tile-figures">' +
+        `${entry.value === null ? escapeHtml(entry.text) : signedFigure(entry.text, entry.value)}` +
+        '</p>',
+    )
+    .join('');
+}
+
+/** The effects of a class, one line each: what it does to the work, what it makes, what it needs
+ *  of the air, how long it lasts, and what its class alone does (a fan pulls and holds bags, a
+ *  compressor gives air, a rack holds sheets, a machine with a drop can take a gate)
+ *  (CLAUDE.md T13 3.1). */
+function effectLines(state: GameState, spec: EquipmentSpec, variant: EquipmentVariant): Line[] {
+  const machine = spec.category === 'machine';
+  return [
+    ...(machine ? [outputLine(variant), line(dustLine(spec))] : []),
+    line(extractionLine(spec, variant)),
+    line(spec.id === COMPRESSOR ? '' : airLine(state, spec, variant)),
+    line(lifeLine(spec, variant)),
+    line(pullsLine(spec, variant)),
+    line(bagsLine(spec, variant)),
+    line(spec.id === COMPRESSOR ? airLine(state, spec, variant) : ''),
+    line(holdsLine(spec, variant)),
+    gateLine(spec, variant),
+  ];
+}
+
+/** The costs of a class: the price, the wait, the power, the insurance it adds a year, and the
+ *  floor it takes (CLAUDE.md T13 3.1). */
+function costLines(spec: EquipmentSpec, variant: EquipmentVariant): Line[] {
+  return [
+    line(deliveryLine(spec, variant)),
+    line(powerLine(variant)),
+    line(insuranceLine(variant)),
+    line(floorLine(spec.id, variant.id)),
+  ];
+}
+
+/** The one layout for every class card of every family (CLAUDE.md T13 3.1): effects, a gap,
+ *  costs, a gap, the description. */
+function classCard(
   state: GameState,
   spec: EquipmentSpec,
   variant: EquipmentVariant,
@@ -191,39 +295,19 @@ function tile(
         ? primaryButton('buyEquipment', label, `data-id="${spec.id}" data-variant="${variant.id}"`)
         : button('buyEquipment', label, `data-id="${spec.id}" data-variant="${variant.id}"`)
       : lockedButton(label, check.reason);
-  // The order Piotr set: what it does to the work, what it makes, what it needs of the air, how
-  // long it lasts, what it draws, what it takes of the floor (CLAUDE.md T12 3.1). A fan has no
-  // output of its own and makes nothing: its lines are what it pulls and what its bags hold
-  // (T12 3.2). The compressed air and the lorry follow, as they did.
-  const machine = spec.category === 'machine';
-  const figures: Figure[] = [
-    ...(machine ? [outputLine(variant), figure(dustLine(spec))] : []),
-    figure(extractionLine(spec, variant)),
-    figure(bagsLine(spec, variant)),
-    figure(lifeLine(spec, variant)),
-    figure(powerLine(variant)),
-    figure(floorLine(spec.id, variant.id)),
-    figure(airLine(state, spec, variant)),
-    figure(deliveryLine(spec, variant)),
-  ];
-  const effects = figures
-    .filter((line) => line.text !== '')
-    .map(
-      (line) =>
-        `<p class="tile-figures${line.tone === '' ? '' : ` ${line.tone}`}">` +
-        `${escapeHtml(line.text)}</p>`,
-    )
-    .join('');
   const owned = ownedBadge(state, spec.id, variant.id);
+  const frame = isMachineFamily(spec) ? classFrame(variant.id) : { className: '', style: '' };
+  const badge = isMachineFamily(spec) ? classBadge(variant.id) : '';
   return (
-    `<div class="tile${check.ok || onTheList ? '' : ' is-locked'}${owned === '' ? '' : ' is-owned'}` +
-    `${onTheList ? ' is-ordered' : ''}" ` +
+    `<div class="tile${frame.className}${check.ok || onTheList ? '' : ' is-locked'}` +
+    `${owned === '' ? '' : ' is-owned'}${onTheList ? ' is-ordered' : ''}"${frame.style} ` +
     `data-variant="${variant.id}">` +
-    `<h3 class="tile-name">${escapeHtml(variant.name)} ${owned}</h3>` +
-    `<p class="tile-price">${money(variant.price)}</p>` +
+    `<h3 class="tile-name">${escapeHtml(variant.name)} ${badge}${owned}</h3>` +
     pictureSlot(spec.spriteKey, variant.id) +
-    `<p class="tile-text">${escapeHtml(variant.description)}</p>` +
-    effects +
+    `<div class="card-effects">${figureLines(effectLines(state, spec, variant))}</div>` +
+    `<div class="card-costs"><p class="tile-price">${money(variant.price)}</p>` +
+    `${figureLines(costLines(spec, variant))}</div>` +
+    `<p class="tile-text card-description">${escapeHtml(variant.description)}</p>` +
     (check.ok || onTheList ? '' : `<p class="lock">${escapeHtml(check.reason)}</p>`) +
     `<div class="tile-action">${buy}</div>` +
     '</div>'
@@ -239,7 +323,7 @@ export function recommendedVariant(state: GameState, spec: EquipmentSpec): strin
   return '';
 }
 
-/** The inside of a folder: one tile per class of the family, filtered by whatever is in the
+/** The inside of a folder: one card per class of the family, filtered by whatever is in the
  *  filter field (CLAUDE.md T7 3.7). */
 export function renderMachine(state: GameState, specId: string, filter = ''): string {
   const spec = findSpec(specId);
@@ -256,6 +340,6 @@ export function renderMachine(state: GameState, specId: string, filter = ''): st
     (variant) => needle === '' || variant.name.toLowerCase().includes(needle),
   );
   if (classes.length === 0) return `${head}<p class="empty">Nothing matches that.</p>`;
-  const grid = classes.map((variant) => tile(state, spec, variant, recommended)).join('');
+  const grid = classes.map((variant) => classCard(state, spec, variant, recommended)).join('');
   return `${head}<div class="tile-grid">${grid}</div>`;
 }

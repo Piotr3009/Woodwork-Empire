@@ -8,6 +8,7 @@ import { centreOf } from '../../src/render/iso';
 import type { GameState } from '../../src/engine/index';
 import { tick } from '../../src/engine/index';
 import {
+  acceptNow,
   act,
   buyStartingKit,
   clearEvents,
@@ -108,11 +109,11 @@ describe('the hall on day 1', () => {
     expect(renderHall(state)).toContain('Extractor. Bags 0.4 / 1 m\u00b3.');
   });
 
-  it('puts a van at the gate while a delivery waits', () => {
+  it('puts a pallet at the gate while a delivery waits, with the lorry\u2019s own click hook', () => {
     let state = buyStartingKit(newGame());
     state.enquiries = [];
     const enquiry = placeEnquiry(state, { price: 400 });
-    state = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+    state = acceptNow(state, enquiry.id, false);
     state.deliveries.push({
       id: 'del-1',
       jobId: firstJob(state).id,
@@ -141,7 +142,7 @@ describe('the hall on day 1', () => {
     for (let index = 0; index < 4; index += 1) {
       const enquiry = placeEnquiry(state, { price: 400 + index * 10 });
       state.jobs.push({
-        ...firstJob(act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false })),
+        ...firstJob(acceptNow(state, enquiry.id, false)),
         id: `job-gate-${index}`,
         stage: 'awaitingTransport',
       });
@@ -182,6 +183,8 @@ describe('the hall on day 1', () => {
       station: 'idle',
       productionMinutes: 0,
       absentDaysRemaining: 0,
+      shift: 'day',
+      dayLog: [],
       anchorX: 4,
       anchorY: 4,
     });
@@ -261,13 +264,20 @@ describe('the placeholder art rules of 10.3', () => {
       station: 'idle',
       productionMinutes: 0,
       absentDaysRemaining: 0,
+      shift: 'day',
+      dayLog: [],
       anchorX: 0,
       anchorY: 4,
     });
     const svg = renderHall(state);
     expect(svg).not.toContain('Gradient');
     expect(svg).not.toContain('filter=');
-    expect(svg).not.toContain('opacity');
+    // The one placeholder helper of Turn 13 shades the right face of its diamond with an opacity
+    // of its own (src/render/placeholder.ts, phase A's, frozen for phase B): the pipe tiles over
+    // the floor come from it, so those groups are set aside and the rule holds for the rest of
+    // the hall (CLAUDE.md T13 1, 3.19).
+    const drawn = svg.replace(/<g class="placeholder"[\s\S]*?<\/g>/g, '');
+    expect(drawn).not.toContain('opacity');
     // The one shadow in the hall is the contact shadow the game draws under every object, which
     // is what keeps a sprite from floating (CLAUDE.md T3 3.6). It carries no colour of its own.
     expect(svg.split('shadow').length - 1).toBe(svg.split('class="contact-shadow"').length - 1);
@@ -312,6 +322,8 @@ describe('the placeholder art rules of 10.3', () => {
       station: 'idle',
       productionMinutes: 0,
       absentDaysRemaining: 0,
+      shift: 'day',
+      dayLog: [],
       anchorX: bench?.anchorX ?? 0,
       anchorY: bench?.anchorY ?? 0,
     });
@@ -355,6 +367,8 @@ describe('the laptop', () => {
       station: 'idle',
       productionMinutes: 0,
       absentDaysRemaining: 0,
+      shift: 'day',
+      dayLog: [],
       anchorX: 1,
       anchorY: 1,
     });

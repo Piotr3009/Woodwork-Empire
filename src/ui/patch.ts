@@ -41,6 +41,13 @@ function syncField(old: Element, fresh: Element): void {
   if (wanted !== null && old.value !== wanted) old.value = wanted;
 }
 
+/** The open state of a details element is the player's, like a scrolled body or a caret: the
+ *  markup never carries it, so the patch never takes it away. The efficiency plate on the top bar
+ *  is one, and it would shut every game minute otherwise (CLAUDE.md T13 3.5). */
+function isPlayersToKeep(element: Element, attribute: string): boolean {
+  return attribute === 'open' && element.tagName === 'DETAILS';
+}
+
 function patchAttributes(old: Element, fresh: Element): void {
   for (const attribute of Array.from(fresh.attributes)) {
     if (old.getAttribute(attribute.name) !== attribute.value) {
@@ -48,6 +55,7 @@ function patchAttributes(old: Element, fresh: Element): void {
     }
   }
   for (const attribute of Array.from(old.attributes)) {
+    if (isPlayersToKeep(old, attribute.name)) continue;
     if (!fresh.hasAttribute(attribute.name)) old.removeAttribute(attribute.name);
   }
   syncField(old, fresh);

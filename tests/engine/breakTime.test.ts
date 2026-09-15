@@ -14,6 +14,7 @@ import { createTask, findTask } from '../../src/engine/tasks';
 import { STATION_IDLE } from '../../src/engine/stations';
 import { renderTopbar } from '../../src/ui/topbar';
 import {
+  acceptNow,
   act,
   buyStartingKit,
   choose,
@@ -54,7 +55,7 @@ describe('nobody works through the break', () => {
     let state = fillRack(buyStartingKit(newGame({ difficulty: 'veryEasy' })));
     state.enquiries = [];
     const enquiry = placeEnquiry(state, { price: 4000, deadlineDays: 60 });
-    state = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+    state = acceptNow(state, enquiry.id, false);
     firstJob(state).stage = 'ready';
     state = clearEvents(act(state, { type: 'WORK_HERE', jobId: null }));
     state = clearEvents(tick(clearEvents(tick(state, BREAK_START_MINUTE)), 1));
@@ -71,7 +72,7 @@ describe('nobody works through the break', () => {
     let state = fillRack(buyStartingKit(newGame({ difficulty: 'veryEasy' })));
     state.enquiries = [];
     const enquiry = placeEnquiry(state, { price: 4000, deadlineDays: 60 });
-    state = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+    state = acceptNow(state, enquiry.id, false);
     firstJob(state).stage = 'ready';
     state = clearEvents(act(state, { type: 'WORK_HERE', jobId: null }));
     state = clearEvents(tick(state, BREAK_START_MINUTE - 1));
@@ -175,6 +176,8 @@ describe('the helper has his dinner too', () => {
       station: 'idle',
       productionMinutes: 0,
       absentDaysRemaining: 0,
+      shift: 'day',
+      dayLog: [],
       anchorX: 0,
       anchorY: 0,
     });

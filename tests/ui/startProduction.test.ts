@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 import { renderWorkPlan } from '../../src/ui/workPlan';
 import type { GameState } from '../../src/engine/index';
 import {
+  acceptNow,
   act,
   buyStartingKit,
   clearEvents,
@@ -57,7 +58,7 @@ function withJob(): GameState {
   let state = buyStartingKit(newGame());
   state.enquiries = [];
   const enquiry = placeEnquiry(state, { price: 400, name: 'Garage shelves' });
-  state = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+  state = acceptNow(state, enquiry.id, false);
   return clearEvents(state);
 }
 
@@ -69,7 +70,11 @@ describe('the Start production button through the lifecycle', () => {
     seen.push(startButton(state).text);
     state = doTask(state, 'design');
     seen.push(startButton(state).text);
-    state = doTask(state, 'materialOrder');
+    state = doTask(state, 'materialTakeOff');
+    seen.push(startButton(state).text);
+    // The rack is bare, so the sheets are short until they are ordered for the job
+    // (CLAUDE.md T13 3.3).
+    state = act(state, { type: 'ORDER_FOR_JOB', jobId: firstJob(state).id });
     seen.push(startButton(state).text);
     state = clearEvents(nextDay(state));
     seen.push(startButton(state).text);
@@ -78,7 +83,8 @@ describe('the Start production button through the lifecycle', () => {
     seen.push(startButton(state).text);
     expect(seen).toEqual([
       'Start production, design not done',
-      'Start production, material not ordered',
+      'Start production, material take off not done',
+      `Start production, ${firstJob(state).sheets} sheet short`,
       'Start production, material arrives tomorrow',
       'Start production, unload the delivery',
       'Start production',
@@ -137,10 +143,11 @@ describe('the Start production button through the lifecycle', () => {
     expect(steps(state)).toEqual([
       'Calls:done', 'Design:done', 'Material:now', 'Delivery:todo', 'Production:todo',
     ]);
-    state = doTask(state, 'materialOrder');
+    state = doTask(state, 'materialTakeOff');
     expect(steps(state)).toEqual([
       'Calls:done', 'Design:done', 'Material:done', 'Delivery:now', 'Production:todo',
     ]);
+    state = act(state, { type: 'ORDER_FOR_JOB', jobId: firstJob(state).id });
     state = clearEvents(nextDay(state));
     state = clearEvents(doTask(state, 'unload'));
     expect(steps(state)).toEqual([
@@ -155,6 +162,6 @@ function readyToMake(): GameState {
   state = doTask(state, 'design');
   const job = firstJob(state);
   job.stage = 'ready';
-  state.tasks = state.tasks.filter((task) => task.kind !== 'materialOrder');
+  state.tasks = state.tasks.filter((task) => task.kind !== 'materialTakeOff');
   return state;
 }

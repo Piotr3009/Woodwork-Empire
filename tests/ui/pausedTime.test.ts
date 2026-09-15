@@ -39,8 +39,8 @@ function run(): void {
 /** Answers whatever the day is asking with its first choice. */
 function dismissEvents(): void {
   let guard = 0;
-  while (root().querySelector('[data-do="resolveEvent"]') !== null && guard < 80) {
-    click('[data-do="resolveEvent"]');
+  while (root().querySelector('[data-do="closeHouseCard"], [data-do="resolveEvent"]') !== null && guard < 80) {
+    click('[data-do="closeHouseCard"], [data-do="resolveEvent"]');
     guard += 1;
   }
 }

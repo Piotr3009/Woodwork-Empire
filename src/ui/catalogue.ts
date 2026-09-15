@@ -6,6 +6,8 @@ import {
   COMPRESSOR,
   EQUIPMENT_SPECS,
   EQUIPMENT_TABS,
+  GATE_OUTPUT_BONUS,
+  GATE_PRICE,
   SOFTWARE_ONE_OFF_PRICE,
   SOFTWARE_SUBSCRIPTION_MONTHLY,
 } from '../engine/constants';
@@ -23,6 +25,11 @@ import {
   compressorLabel,
   compressors,
   dustOutputOf,
+  extractionDemandOf,
+  connectCheck,
+  hasCentralExtraction,
+  pipeRunFor,
+  wantsExtraction,
   orderSoftwareCheck,
   countOf,
   findSpec,
@@ -34,10 +41,11 @@ import {
   serviceDueOn,
   serviceIsDue,
 } from '../engine/index';
-import { serviceDueIn, variantFor } from '../engine/machines';
+import { gateCheck, hasGate, variantFor } from '../engine/index';
+import { serviceDueIn } from '../engine/machines';
 import { orderName, orderProgress } from '../engine/orders';
 import type { Equipment, GameState, OrderLine } from '../engine/index';
-import { pictureSlot, renderMachine } from './machine';
+import { classBadge, classFrame, isMachineFamily, pictureSlot, renderMachine } from './machine';
 import { arrivalLine, cancelButton, progressBar } from './shopping';
 import {
   emptyLine,
@@ -47,6 +55,7 @@ import {
   money,
   plural,
   button,
+  signedFigure,
   tabBar,
 } from './modal';
 
@@ -119,7 +128,7 @@ export function renderCatalogue(
   const body =
     tab === OWNED_TAB
       ? renderOwned(state, filter, ownedTab, sellConfirm)
-      : open !== null && open.tab === tab
+      : open !== null && (open.tab === tab || open.sharedTab === tab)
         ? renderOpenFolder(state, open, filter)
         : renderFolders(state, filter, tab) + (tab === 'computers' ? renderSoftware(state) : '');
   // The warnings go under the list, as a note at the foot of the page, not as a shout over the
@@ -139,7 +148,8 @@ export function renderCatalogue(
  *  (CLAUDE.md T7 3.7). */
 function renderFolders(state: GameState, filter: string, tab: CatalogueTab): string {
   const needle = filter.trim().toLowerCase();
-  const inTab = EQUIPMENT_SPECS.filter((spec) => spec.tab === tab);
+  // A family two trades share is a folder under both tabs (CLAUDE.md T13 3.13).
+  const inTab = EQUIPMENT_SPECS.filter((spec) => spec.tab === tab || spec.sharedTab === tab);
   if (inTab.length === 0) return emptyLine('Nothing here yet.');
   const rows = inTab
     .filter(
@@ -315,6 +325,49 @@ function sellAction(state: GameState, item: Equipment, sellConfirm: string | nul
   return button('sellMachine', `Sell for ${money(salePriceFor(item))}`, `data-id="${item.id}"`);
 }
 
+/** The automatic gate on the card of a machine standing in the hall: bought once, for machines
+ *  with an extraction demand, greyed as fitted once it is (CLAUDE.md T13 3.11). */
+export function gateAction(state: GameState, item: Equipment): string {
+  if (extractionDemandOf(item) <= 0) return '';
+  if (hasGate(state, item)) return lockedButton('Gate fitted', 'An automatic gate is on its drop');
+  const check = gateCheck(state, item.id);
+  const label = `Automatic gate, ${money(GATE_PRICE)}`;
+  return check.ok
+    ? button('buyGate', label, `data-id="${item.id}"`)
+    : lockedButton(label, check.reason);
+}
+
+/** Connect to extraction on the card of a machine standing in the hall: the game routes the pipe
+ *  and the card says what the metres would cost; greyed once it is on, or where the ducts of a
+ *  central system reach it already (CLAUDE.md T13 3.19). */
+export function connectAction(state: GameState, item: Equipment): string {
+  if (!wantsExtraction(item)) return '';
+  if (hasCentralExtraction(state)) return '';
+  const run = pipeRunFor(state, item.id);
+  if (run !== null) return lockedButton('Connected', `${run.metres} m of pipe to the extraction`);
+  const check = connectCheck(state, item.id);
+  const label = `Connect to extraction, ${money(check.cost)}`;
+  return check.ok
+    ? button('connectExtraction', label, `data-id="${item.id}"`)
+    : lockedButton(label, check.reason);
+}
+
+/** The pipe on the card: how much of it there is, or that there is none (CLAUDE.md T13 3.19). */
+function pipeLine(state: GameState, item: Equipment): string {
+  if (!wantsExtraction(item) || hasCentralExtraction(state)) return '';
+  const run = pipeRunFor(state, item.id);
+  return run === null
+    ? 'not connected to the extraction'
+    : `${run.metres} m of pipe to the extraction`;
+}
+
+/** What the gate does once it is on: the signed line, through the one helper (CLAUDE.md T13 1). */
+function gateLine(state: GameState, item: Equipment): string {
+  if (!hasGate(state, item)) return '';
+  const per = Math.round(GATE_OUTPUT_BONUS * 100);
+  return `<p class="tile-figures">${signedFigure(`Automatic gate fitted: output +${per}%`, per)}</p>`;
+}
+
 function ownedTile(
   state: GameState,
   item: Equipment,
@@ -341,17 +394,31 @@ function ownedTile(
       ? button('serviceMachine', 'Service', `data-id="${item.id}"`)
       : '';
   const sell = sellAction(state, item, sellConfirm);
-  const lines = [className, life, service, ownedState(state, item), airStateLine(state, item)]
+  const lines = [
+    className,
+    life,
+    service,
+    ownedState(state, item),
+    pipeLine(state, item),
+    airStateLine(state, item),
+  ]
     .filter((line) => line !== '')
     .map((line) => `<p class="tile-figures">${escapeHtml(line)}</p>`)
     .join('');
+  // The card of a class the hall has wears the class badge and frame every class card wears, the
+  // same across families (CLAUDE.md T13 3.12).
+  const ladder = isMachineFamily(spec);
+  const frame = ladder ? classFrame(item.variantId) : { className: '', style: '' };
+  const badge = ladder ? classBadge(item.variantId) : '';
   return (
-    `<div class="tile is-owned" data-owned="${item.id}">` +
-    `<h3 class="tile-name">${escapeHtml(spec.name)} <span class="badge badge-owned">Owned</span></h3>` +
+    `<div class="tile is-owned${frame.className}"${frame.style} data-owned="${item.id}">` +
+    `<h3 class="tile-name">${escapeHtml(spec.name)} ${badge}` +
+    '<span class="badge badge-owned">Owned</span></h3>' +
     pictureSlot(spec.spriteKey, item.variantId) +
     lines +
+    gateLine(state, item) +
     airAssign(state, item) +
-    `<div class="tile-action">${action}${sell}</div>` +
+    `<div class="tile-action">${action}${connectAction(state, item)}${gateAction(state, item)}${sell}</div>` +
     '</div>'
   );
 }

@@ -11,10 +11,11 @@ import {
 } from '../../src/engine/constants';
 import { canPlaceSpec, firstFreeCell } from '../../src/engine/layout';
 import { deliveryDaysFor, isHeavy } from '../../src/engine/machines';
+import { unloadMinutes } from '../../src/engine/tasks';
 import { addWorkingDays } from '../../src/engine/clock';
-import { renderHall } from '../../src/render/hall';
+import { PALLET_PLACEHOLDER, PALLET_SPRITE, renderHall } from '../../src/render/hall';
 import type { GameEvent, GameState } from '../../src/engine/index';
-import { act, buyStartingKit, clearEvents, fillRack, newGame, runClock } from '../helpers';
+import { act, buyNow, buyStartingKit, clearEvents, fillRack, newGame, runClock } from '../helpers';
 
 /** A hall with the day 1 kit in it and money in the bank, the way the shop leaves it. */
 function shop(): GameState {
@@ -123,7 +124,9 @@ describe('a used saw ordered on day 1', () => {
 
 describe('a CNC ordered on day 1', () => {
   it('lands 45 working days later, which is nine weeks of the calendar', () => {
-    const state = order(shop(), 'cnc');
+    // The standard class: the CNC has its five classes from Turn 13 and a used one is on a lorry
+    // inside the week (CLAUDE.md T13 3.12).
+    const state = order(shop(), 'cnc', 'standard');
     const cnc = state.onOrder.find((item) => item.specId === 'cnc');
     expect(cnc).toBeDefined();
     expect(cnc?.dueDay).toBe(addWorkingDays(1, 45));
@@ -212,6 +215,64 @@ function sourceFiles(directory: string): string[] {
   }
   return found;
 }
+
+describe('a delivery at the gate (CLAUDE.md T13 3.21)', () => {
+  it('takes 45 minutes by hand, about 30 with a pallet truck and about 15 with a forklift', () => {
+    // PIOTR's three figures, off the one table; the walk is what the handling kit shortens.
+    const plain = newGame({ difficulty: 'veryEasy' });
+    expect(unloadMinutes(plain)).toBe(45);
+    expect(unloadMinutes(buyNow(plain, 'palletTruck'))).toBe(30);
+    expect(unloadMinutes(buyNow(plain, 'forklift'))).toBe(15);
+  });
+
+  it('is a pallet of sheets at the gate from the morning it arrives until it is unloaded', () => {
+    const state = shop();
+    expect(renderHall(state, { files: [] })).not.toContain('data-van=');
+    state.deliveries.push({
+      id: 'del-1',
+      jobId: null,
+      sheets: 12,
+      orderedDay: 1,
+      pricePaid: 0,
+      arriveDay: 1,
+      arrived: true,
+      unloaded: false,
+      bespoke: false,
+      overflowSheets: 0,
+    });
+    const svg = renderHall(state, { files: [] });
+    // As what it is: the pallet, through the one placeholder helper, and no lorry.
+    expect(svg).toContain('data-van="del-1"');
+    expect(svg).toContain(`data-placeholder="${PALLET_PLACEHOLDER}"`);
+    expect(svg).toContain('class="clickable pallet"');
+    expect(svg).toContain('Delivery: 12 sheets');
+    expect(svg).not.toContain('deliveryVan');
+    // The painted pallet takes its place the day it lands.
+    expect(renderHall(state, { files: [`${PALLET_SPRITE}.png`] })).toContain(`/sprites/${PALLET_SPRITE}.png`);
+    // Unloaded: gone.
+    const delivery = state.deliveries[0];
+    if (delivery) delivery.unloaded = true;
+    const after = renderHall(state, { files: [] });
+    expect(after).not.toContain('data-van=');
+    expect(after).not.toContain(PALLET_PLACEHOLDER);
+  });
+
+  it('stands a delivered machine on the apron as that machine, new, until it is got off the lorry', () => {
+    let state = order(shop(), 'tableSaw', 'standard');
+    const dueDay = state.onOrder[0]?.dueDay ?? 0;
+    expect(renderHall(state, { files: [] })).not.toContain('data-arrived=');
+    const seen: GameEvent[] = [];
+    state = toDay(state, dueDay, seen);
+    const item = state.onOrder[0];
+    expect(item?.arrived).toBe(true);
+    const svg = renderHall(state, { files: [] });
+    expect(svg).toContain(`data-arrived="${item?.id ?? ''}"`);
+    expect(svg).toContain('data-sprite="tableSaw" data-tier="standard"');
+    expect(svg).toContain('Standard table saw (new)');
+    // And the floor held for it is still outlined, so the player sees where it will stand.
+    expect(svg).toContain(`data-order="${item?.id ?? ''}"`);
+  });
+});
 
 describe('the trip to the shops', () => {
   it('is not in the game any more, in any of the three figures it was measured in', () => {

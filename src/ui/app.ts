@@ -60,10 +60,15 @@ import {
   zoomAt,
   zoomTo,
 } from '../render/hall';
-import { APP_VERSION, type RoomId, roomById } from '../engine/constants';
+import { APP_VERSION, HOUSE_CARD_SECONDS, type RoomId, roomById } from '../engine/constants';
 import { centreOf, screenToTile } from '../render/iso';
 import { fitOfficeStack, officeScene } from '../render/office';
 import { type AccountingTab, accountingTabFrom, renderAccounting } from './accounting';
+import { renderContracts } from './contracts';
+import { renderHouseCard } from './house';
+import { renderMonthEnd } from './monthEnd';
+import { renderSettings } from './settings';
+import { renderTip, renderWarningStrip } from './tips';
 import { renderBoard } from './board';
 import { type CatalogueTab, CATALOGUE_FIRST_TAB, catalogueTabFrom, renderCatalogue } from './catalogue';
 import { renderDayEnd, renderDaySummary, renderGameOver } from './dayEnd';
@@ -77,10 +82,10 @@ import {
   type ModalSpec,
   escapeHtml,
   minutes,
-  money,
   plural,
   reasonLabel,
   syncModals,
+  tabBar,
 } from './modal';
 import {
   type Animation,
@@ -117,7 +122,25 @@ type ModalId =
   | 'shopping'
   | 'company'
   /** The team, in tabs by trade (PIOTR, 13.09; CLAUDE.md T10 3.6). */
-  | 'team';
+  | 'team'
+  /** The gear on the top bar: tips on and off (CLAUDE.md T13 3.22). */
+  | 'settings';
+
+/** The Orders page: the enquiries, and the standing contracts beside them (CLAUDE.md T13 3.16). */
+export type BoardTab = 'enquiries' | 'contracts';
+const BOARD_TABS: Array<[BoardTab, string]> = [
+  ['enquiries', 'Enquiries'],
+  ['contracts', 'Contracts'],
+];
+
+/** The screen a modal's first use bubble is keyed by (CLAUDE.md T13 3.22). */
+const TIP_KEY_OF_MODAL: Partial<Record<ModalId, string>> = {
+  catalogue: 'catalogue',
+  workPlan: 'workPlan',
+  board: 'board',
+  team: 'team',
+  settings: 'settings',
+};
 
 interface Ui {
   screen: 'start' | 'game';
@@ -138,6 +161,13 @@ interface Ui {
   focusNext: string | null;
   stockSheets: string;
   arrearsAmount: string;
+  /** What the player has typed into the loan field (CLAUDE.md T13 3.14). */
+  loanAmount: string;
+  /** Which tab of the Orders page is on top (CLAUDE.md T13 3.16). */
+  boardTab: BoardTab;
+  /** The house card is up at the end of the day, since this real time (CLAUDE.md T13 3.18). */
+  houseCardSince: number | null;
+  houseCardDone: boolean;
   /** Which tab of the laptop is on top (CLAUDE.md T4 3.1). */
   laptopTab: LaptopTab;
   teamTab: TeamTab;
@@ -210,6 +240,7 @@ const MODAL_TITLES: Record<ModalId, string> = {
   shopping: 'On order',
   company: 'Company board',
   team: 'Team',
+  settings: 'Settings',
 };
 
 /** How much of the page each modal takes. Anything that is a list or a board fills it; a small
@@ -227,6 +258,7 @@ export const MODAL_IS_FULL: Record<ModalId, boolean> = {
   company: true,
   // The team is a page of the game now, not a tab of the laptop (CLAUDE.md T10 3.6).
   team: true,
+  settings: false,
 };
 
 let ui: Ui = freshUi();
@@ -250,6 +282,10 @@ function freshUi(): Ui {
     focusNext: null,
     stockSheets: '6',
     arrearsAmount: '500',
+    loanAmount: '10000',
+    boardTab: 'enquiries',
+    houseCardSince: null,
+    houseCardDone: false,
     laptopTab: 'tasks',
     teamTab: 'workshop',
     catalogueTab: CATALOGUE_FIRST_TAB,
@@ -294,7 +330,13 @@ function game(): GameState {
 }
 
 function dispatch(action: GameAction): void {
+  const wasDayEnd = state?.activeEvent?.kind === 'dayEnd';
   state = applyAction(game(), action);
+  // The house card is shown again at the next day end (CLAUDE.md T13 3.18).
+  if (wasDayEnd && state.activeEvent?.kind !== 'dayEnd') {
+    ui.houseCardSince = null;
+    ui.houseCardDone = false;
+  }
   autosave();
   if (AUTOSAVE_ACTIONS.includes(action.type)) autosaveLocal();
   autosaveWatch();
@@ -349,18 +391,27 @@ function batched(work: () => void): void {
 function modalBody(id: ModalId, current: GameState): string {
   switch (id) {
     case 'board':
-      return renderBoard(current, ui.filters.board ?? '');
+      return (
+        tabBar('boardTab', BOARD_TABS, ui.boardTab) +
+        (ui.boardTab === 'contracts'
+          ? renderTip(current, 'contracts') + renderContracts(current)
+          : renderBoard(current, ui.filters.board ?? ''))
+      );
     case 'laptop':
       return renderLaptop(current, { tab: ui.laptopTab, stockSheets: ui.stockSheets });
     case 'workPlan':
       return renderWorkPlan(current, ui.dropConfirm);
     case 'accounting':
-      return renderAccounting(
-        current,
-        ui.arrearsAmount,
-        ui.accountingTab,
-        ui.openDays,
-        ui.accountingMonth,
+      return (
+        (ui.accountingTab === 'finance' ? renderTip(current, 'finance') : '') +
+        renderAccounting(
+          current,
+          ui.arrearsAmount,
+          ui.accountingTab,
+          ui.openDays,
+          ui.accountingMonth,
+          ui.loanAmount,
+        )
       );
     case 'team':
       return renderTeam(current, ui.teamTab);
@@ -377,7 +428,15 @@ function modalBody(id: ModalId, current: GameState): string {
       return renderShopping(current);
     case 'company':
       return renderCompany(current);
+    case 'settings':
+      return renderSettings(current);
   }
+}
+
+/** The first use bubble of a laptop tab, keyed by the tab (CLAUDE.md T13 3.22). */
+function laptopTipKey(tab: LaptopTab): string {
+  if (tab === 'materials') return 'stock';
+  return tab;
 }
 
 /** What is under the mouse in the hall: a machine standing in it, or the outline held for
@@ -418,13 +477,13 @@ function turnGhost(): void {
 }
 
 function setupControls(current: GameState): string {
-  // What the moves made so far will cost to reconnect, before he presses Done (T4 3.5).
+  // What the moves made so far will want reconnecting, before he presses Done: the pipe is run
+  // again at the new length when the kit is down (T4 3.5, T13 3.19).
   const due = ductingDue(current);
   const bill =
     due.machines === 0
       ? ''
-      : `<span class="reason">Ducting to reconnect: ${plural(due.machines, 'machine', 'machines')}, ` +
-        `${money(due.cost)}</span>`;
+      : `<span class="reason">Extraction pipe to run again: ${plural(due.machines, 'machine', 'machines')}</span>`;
   return (
     '<div class="view-controls">' +
     '<button class="btn btn-primary" data-do="endSetup">Done</button>' +
@@ -549,10 +608,13 @@ function modalSpecs(): ModalSpec[] {
   const current = state;
   const specs: ModalSpec[] = [];
   if (ui.modal !== null) {
+    // The first use bubble of the screen, over its body, until it is dismissed (T13 3.22).
+    const tipKey =
+      ui.modal === 'laptop' ? laptopTipKey(ui.laptopTab) : TIP_KEY_OF_MODAL[ui.modal] ?? '';
     specs.push({
       id: ui.modal,
       title: MODAL_TITLES[ui.modal],
-      body: modalBody(ui.modal, current),
+      body: (tipKey === '' ? '' : renderTip(current, tipKey)) + modalBody(ui.modal, current),
       full: MODAL_IS_FULL[ui.modal],
       position: ui.modalPosition,
     });
@@ -573,17 +635,38 @@ function modalSpecs(): ModalSpec[] {
   }
   const event = current.activeEvent;
   if (event) {
+    // Going home: the house card first, for a few seconds or until a click, then the summary
+    // (CLAUDE.md T13 3.18).
+    const houseCard = event.kind === 'dayEnd' && houseCardShowing();
     specs.push({
       id: 'event',
-      title: event.title,
-      body: event.kind === 'dayEnd' ? renderDayEnd(current) : renderEvent(current, event),
-      footer: renderEventFooter(event),
-      closable: event.choices.length === 1,
-      wide: event.kind === 'dayEnd',
+      title: houseCard ? 'Home' : event.title,
+      body: houseCard
+        ? renderTip(current, 'house') + renderHouseCard(current) +
+          '<p class="choices"><button class="btn" data-do="closeHouseCard">The summary</button></p>'
+        : event.kind === 'dayEnd'
+          ? renderDayEnd(current)
+          : event.kind === 'monthEnd'
+            ? renderMonthEnd(current, event)
+            : renderEvent(current, event),
+      footer: houseCard ? '' : renderEventFooter(event),
+      closable: !houseCard && event.choices.length === 1,
+      wide: event.kind === 'dayEnd' || event.kind === 'monthEnd',
       position: ui.eventPosition,
     });
   }
   return specs;
+}
+
+/** True while the house card is up on the day end: from the moment the day ends, for the card's
+ *  seconds, unless it was clicked away (CLAUDE.md T13 3.18). */
+function houseCardShowing(): boolean {
+  if (ui.houseCardDone) return false;
+  if (ui.houseCardSince === null) {
+    ui.houseCardSince = nowMs();
+    return true;
+  }
+  return nowMs() - ui.houseCardSince < HOUSE_CARD_SECONDS * 1000;
 }
 
 /** Where the scene goes in the page. The page around it is written again every render; the scene
@@ -661,8 +744,11 @@ function pageBody(scene: Scene | null): string {
       : `<p class="view-note">${escapeHtml(ui.note)}</p>`;
   const toast = ui.toast === '' ? '' : `<p class="toast">${escapeHtml(ui.toast)}</p>`;
   const out = ui.view === 'sprites' ? '' : renderOwnerOut(current);
+  // The warning strip under the top bar: one problem at a time (CLAUDE.md T13 3.22).
+  const strip = ui.view === 'sprites' ? '' : renderWarningStrip(current);
   return (
     renderTopbar(current, ui.view, ui.toast !== '', topbarNews(current)) +
+    strip +
     toast +
     out +
     (ui.menuOpen ? renderMenu(current, ui.cloud) : '') +
@@ -950,7 +1036,7 @@ export function render(): void {
 /** The modals that act on the world, which is every one of them but the Work Plan: nothing on
  *  them can be touched while the clock is stopped (CLAUDE.md T7 3.10). The Work Plan is a
  *  whiteboard and the Sprite check is a page of pictures: both are reading, and both open. */
-const READING_MODALS: ModalId[] = ['workPlan', 'shopping', 'company'];
+const READING_MODALS: ModalId[] = ['workPlan', 'shopping', 'company', 'settings'];
 
 /** The one line the player gets when the world will not move for him, with the Pause button
  *  pulsing once behind it (CLAUDE.md T7 3.10). */
@@ -1152,6 +1238,9 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
     case 'endSetup':
       endSetup();
       return;
+    case 'closeMenu':
+      ui.menuOpen = false;
+      break;
     case 'toggleMenu':
       ui.menuOpen = !ui.menuOpen;
       break;
@@ -1253,6 +1342,94 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
       ui.filters.catalogue = '';
       ui.scrollModalTop = true;
       break;
+    case 'boardTab':
+      ui.boardTab = id === 'contracts' ? 'contracts' : 'enquiries';
+      ui.scrollModalTop = true;
+      break;
+    case 'openSettings':
+      openModal('settings');
+      break;
+    case 'closeHouseCard':
+      ui.houseCardDone = true;
+      break;
+    case 'setTips':
+      dispatch({ type: 'SET_TIPS', on: element.dataset.on === '1' });
+      return;
+    case 'dismissTip':
+      dispatch({ type: 'DISMISS_TIP', key: id });
+      return;
+    case 'takeLoan':
+      dispatch({ type: 'TAKE_LOAN', amount: Number(element.dataset.amount ?? '0') });
+      return;
+    case 'repayLoan': {
+      const typed = element.dataset.amount ?? 'all';
+      dispatch({ type: 'REPAY_LOAN', amount: typed === 'all' ? null : Number(typed) });
+      return;
+    }
+    case 'setInsurance':
+      dispatch({
+        type: 'SET_INSURANCE',
+        cover: element.dataset.cover === 'liability' ? 'liability' : 'property',
+        on: element.dataset.on === '1',
+      });
+      return;
+    case 'acceptContract':
+      dispatch({ type: 'ACCEPT_CONTRACT', contractId: id });
+      return;
+    case 'declineContract':
+      dispatch({ type: 'DECLINE_CONTRACT', contractId: id });
+      return;
+    case 'assignContract':
+      dispatch({
+        type: 'ASSIGN_CONTRACT',
+        contractId: id,
+        workerId: element.dataset.worker ?? '',
+        on: element.dataset.on === '1',
+      });
+      return;
+    case 'renewContract':
+      dispatch({ type: 'RENEW_CONTRACT', contractId: id, accept: element.dataset.accept === '1' });
+      return;
+    case 'setSecondShift':
+      dispatch({ type: 'SET_SECOND_SHIFT', on: element.dataset.on === '1' });
+      return;
+    case 'assignShift':
+      dispatch({
+        type: 'ASSIGN_SHIFT',
+        workerId: id,
+        shift: element.dataset.shift === 'night' ? 'night' : 'day',
+      });
+      return;
+    case 'takeHoliday':
+      dispatch({ type: 'TAKE_HOLIDAY', days: Number(element.dataset.days ?? '5') });
+      return;
+    case 'setOwnerDraw':
+      dispatch({ type: 'SET_OWNER_DRAW', tier: Number(id) });
+      return;
+    case 'buyJoineryCore':
+      dispatch({ type: 'BUY_JOINERY_CORE' });
+      return;
+    case 'buyJoineryCoreExtension':
+      dispatch({ type: 'BUY_JOINERY_CORE_EXTENSION' });
+      return;
+    case 'setWebsiteLevel':
+      dispatch({ type: 'SET_WEBSITE_LEVEL', level: Number(id) });
+      return;
+    case 'restock':
+      dispatch({ type: 'RESTOCK' });
+      return;
+    case 'orderForJob':
+      dispatch({ type: 'ORDER_FOR_JOB', jobId: id });
+      return;
+    case 'connectExtraction':
+      dispatch({ type: 'CONNECT_EXTRACTION', equipmentId: id });
+      return;
+    case 'buyGate':
+      dispatch({ type: 'BUY_GATE', equipmentId: id });
+      return;
+    case 'setSecurityLevel':
+      dispatch({ type: 'SET_SECURITY_LEVEL', level: Number(id) });
+      return;
     case 'accountingTab':
       ui.accountingTab = accountingTabFrom(id);
       ui.scrollModalTop = true;
@@ -1355,17 +1532,6 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
       }
       ui.dropConfirm = null;
       dispatch({ type: 'DROP_JOB', jobId: id });
-      return;
-    case 'fromStock':
-      // What the rack has, taken now, with no second order for this job ever (T9 3.7).
-      dispatch({ type: 'DRAW_FROM_STOCK', jobId: id });
-      return;
-    case 'setMaterialMode':
-      dispatch({
-        type: 'SET_MATERIAL_MODE',
-        jobId: id,
-        mode: element.dataset.mode === 'stock' ? 'stock' : 'perJob',
-      });
       return;
     case 'hire':
       dispatch({
@@ -1681,6 +1847,12 @@ function runClick(event: MouseEvent): void {
   }
   const point = { x: event.clientX, y: event.clientY };
   const doer = dataElement(target.closest('[data-do]'));
+  // A click anywhere but inside the menu, or on the button that opens it, shuts the menu
+  // (PIOTR; CLAUDE.md T13 3.1).
+  if (ui.menuOpen && target.closest('.menu-pop') === null && doer?.dataset.do !== 'toggleMenu') {
+    ui.menuOpen = false;
+    requestRender();
+  }
   if (doer) {
     if (doer instanceof HTMLButtonElement && doer.disabled) return;
     handleAction(doer, point);
@@ -1732,6 +1904,10 @@ function runInput(event: Event): void {
   }
   if (field === 'arrearsAmount') {
     ui.arrearsAmount = target.value;
+    requestRender();
+  }
+  if (field === 'loanAmount') {
+    ui.loanAmount = target.value;
     requestRender();
   }
   if (field === 'saveFile') {

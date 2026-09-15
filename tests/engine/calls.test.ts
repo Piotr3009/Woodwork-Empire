@@ -11,6 +11,7 @@ import { startProductionCheck } from '../../src/engine/jobs';
 import { isWorkingDay, tick } from '../../src/engine/index';
 import type { GameState, Job } from '../../src/engine/index';
 import {
+  acceptNow,
   act,
   buyStartingKit,
   choose,
@@ -30,9 +31,8 @@ function withJob(price = 400): GameState {
   let state = fillRack(buyStartingKit(newGame()));
   state.enquiries = [];
   const enquiry = placeEnquiry(state, { price, name: 'Garage shelves' });
-  state = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+  state = acceptNow(state, enquiry.id, false);
   // Ordered per job, so the material order is on the desk for the calls to be measured against.
-  for (const job of state.jobs) job.materialMode = 'perJob';
   return clearEvents(state);
 }
 
@@ -81,7 +81,7 @@ describe('the diary of calls', () => {
     let other = fillRack(buyStartingKit(newGame({ seed: 777 })));
     other.enquiries = [];
     const enquiry = placeEnquiry(other, { price: 400, name: 'Garage shelves' });
-    other = clearEvents(act(other, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false }));
+    other = clearEvents(acceptNow(other, enquiry.id, false));
     expect(JSON.stringify(firstJob(other).calls)).not.toBe(same[0]);
   });
 });
@@ -93,7 +93,7 @@ describe('a call in the middle of the work', () => {
     expect(callsTaken(firstJob(state))).toBe(0);
     expect(startProductionCheck(state, firstJob(state)).reason).toBe('design not done');
     state = doTask(state, 'design');
-    state = doTask(state, 'materialOrder');
+    state = doTask(state, 'materialTakeOff');
     const job = firstJob(state);
     job.stage = 'ready';
     expect(callsTaken(job)).toBe(0);
@@ -184,7 +184,7 @@ describe('letting it ring', () => {
     // a point off for it.
     state = doAllEmails(state);
     state = doTask(state, 'design');
-    state = doTask(state, 'materialOrder');
+    state = doTask(state, 'materialTakeOff');
     const ready = firstJob(state);
     ready.stage = 'ready';
     expect(ratingFor(ready)).toBe(3);

@@ -23,7 +23,14 @@ import {
   EXTRACTION_DEMAND,
   EXTRACTION_MARGIN,
 } from './constants';
-import { BENCH, floorMachines, isSold, itemStandsInTheHall } from './machines';
+import {
+  BENCH,
+  floorMachines,
+  hasCentralExtraction,
+  hasGate,
+  isSold,
+  itemStandsInTheHall,
+} from './machines';
 import { cncOptions, currentStage } from './stages';
 import type { Equipment, GameState } from './types';
 
@@ -68,8 +75,46 @@ export function extractionKit(state: GameState): Equipment[] {
   );
 }
 
+/** Connected to the extraction: a run of pipe to a unit, or a hall on a central system whose
+ *  ducts reach everything. A machine that wants no extraction is never unconnected. Asked here
+ *  and not in pipes.ts, which imports this module (CLAUDE.md T13 3.19). */
+export function isConnectedToExtraction(state: GameState, item: Equipment): boolean {
+  if (extractionDemandOf(item) <= 0) return true;
+  if (hasCentralExtraction(state)) return true;
+  return state.pipes.some((run) => run.equipmentId === item.id);
+}
+
+/** True while the fan is pulling at all: some machine with a demand has a man at it. */
+export function extractionRunning(state: GameState): boolean {
+  return extractingMachines(state).length > 0;
+}
+
+/** The branches the fan is pulling through this minute, which is what the extraction demand is
+ *  the sum of (CLAUDE.md T13 3.11). While the fan runs at all, the duct is open through every
+ *  connected machine that has no gate, whether or not a man is at it, so every ungated machine
+ *  counts whenever it is connected; a machine with an automatic gate on its drop counts only
+ *  while somebody is actually standing at it. Nothing runs, nothing is pulled. */
+export function extractionLoad(state: GameState): Equipment[] {
+  if (!extractionRunning(state)) return [];
+  return state.equipment.filter(
+    (item) =>
+      !isSold(item) &&
+      itemStandsInTheHall(item) &&
+      extractionDemandOf(item) > 0 &&
+      isConnectedToExtraction(state, item) &&
+      (item.takenBy !== null || !hasGate(state, item)),
+  );
+}
+
+/** The machines at work this minute that have no pipe to the extraction: they are not served, and
+ *  the hall is short for that minute (CLAUDE.md T13 3.19, 10.1). */
+export function unservedMachines(state: GameState): Equipment[] {
+  return extractingMachines(state).filter((item) => !isConnectedToExtraction(state, item));
+}
+
 export interface ExtractionCheck {
-  /** What the machines at work are asking for, m3/h. */
+  /** What the open branches are asking for, m3/h: every ungated connected machine while the fan
+   *  runs, and every gated one a man is at (CLAUDE.md T13 3.11). */
   demand: number;
   /** What the hall has, m3/h. */
   capacity: number;
@@ -84,18 +129,21 @@ export interface ExtractionCheck {
 /** The one place the extraction sum is done (CLAUDE.md T10 3.1). */
 export function extractionCheck(state: GameState): ExtractionCheck {
   let demand = 0;
-  for (const item of extractingMachines(state)) demand += extractionDemandOf(item);
+  for (const item of extractionLoad(state)) demand += extractionDemandOf(item);
   let capacity = 0;
   for (const item of extractionKit(state)) capacity += extractionCapacityOf(item);
   const allowed = Math.round(capacity * EXTRACTION_MARGIN);
-  const short = demand > allowed;
-  return {
-    demand,
-    capacity,
-    allowed,
-    short,
-    line: short ? `Extraction short: ${mediaFigure(demand)} of ${mediaFigure(allowed)}` : '',
-  };
+  // A machine running with no pipe to a unit is not served at all, whatever the fans could
+  // pull: the hall is short for that minute (CLAUDE.md T13 3.19).
+  const unserved = unservedMachines(state);
+  const short = demand > allowed || unserved.length > 0;
+  const line =
+    unserved.length > 0
+      ? `Extraction: ${unserved.length === 1 ? 'a machine is' : `${unserved.length} machines are`} not connected`
+      : short
+        ? `Extraction short: ${mediaFigure(demand)} of ${mediaFigure(allowed)}`
+        : '';
+  return { demand, capacity, allowed, short, line };
 }
 
 /** True while the hall is under extracted: the one predicate the dust, the output and the job's

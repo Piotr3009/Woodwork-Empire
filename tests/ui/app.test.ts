@@ -39,8 +39,8 @@ function html(): string {
 /** Answers whatever the engine is asking with the first choice, the way a player clicks on. */
 function dismissEvents(): void {
   let guard = 0;
-  while (root().querySelector('[data-do="resolveEvent"]') !== null && guard < 50) {
-    click('[data-do="resolveEvent"]');
+  while (root().querySelector('[data-do="closeHouseCard"], [data-do="resolveEvent"]') !== null && guard < 50) {
+    click('[data-do="closeHouseCard"], [data-do="resolveEvent"]');
     guard += 1;
   }
 }
@@ -162,6 +162,9 @@ describe('the first ten minutes', () => {
     expect(currentState()?.owner.wentHome).toBe(true);
     // The day is the 480 minutes of work plus the break nobody works through.
     advanceMinutes(480 + BREAK_MINUTES);
+    // Home first: the house card, clicked away, then the summary (CLAUDE.md T13 3.18).
+    expect(html()).toContain('Resting at home now');
+    click('[data-do="closeHouseCard"]');
     expect(html()).toContain('End of day 1');
     expect(html()).toContain('Your minutes');
     click('[data-do="resolveEvent"][data-id="next"]');
@@ -204,6 +207,11 @@ describe('the first ten minutes', () => {
     const accept = root().querySelector('[data-do="acceptEnquiry"]');
     expect(accept).not.toBeNull();
     click('[data-do="acceptEnquiry"]');
+    // The client answers with a number first, and the job is on the books once it is taken
+    // (CLAUDE.md T13 3.24).
+    expect(html()).toContain('The client offers');
+    expect(currentState()?.jobs).toHaveLength(0);
+    click('[data-do="resolveEvent"][data-id="accept"]');
     const state = currentState();
     expect(state?.jobs).toHaveLength(1);
     expect(state?.jobs[0]?.depositPaid).toBeGreaterThan(0);
@@ -294,6 +302,9 @@ describe('the order board as tiles', () => {
           sizeMultiplier: 1,
           price: 12000,
           basePrice: 12000,
+          kind: 'residential',
+          budget: 12000,
+          offer: null,
           finish: 'laminate',
           materialKind: 'solidWood',
           deadlineDays: 50,
@@ -349,7 +360,7 @@ describe('the modals', () => {
     // a page of its own off the laptop's Team chip (CLAUDE.md T10 3.6).
     click('[data-office="laptop"]');
     for (const [tab, title] of [
-      ['materials', 'sheets on the rack'],
+      ['materials', 'data-stock='],
       ['drawings', 'Design queue'],
     ]) {
       click(`[data-do="laptopTab"][data-id="${tab}"]`);
@@ -535,7 +546,7 @@ describe('accounting', () => {
     click('[data-do="accountingTab"][data-id="ledger"]');
     expect(html()).toContain('Unit deposit');
     expect(html()).toContain('Rent');
-    expect(html()).toContain('Living costs');
+    expect(html()).toContain('s draw');
     expect(html()).toContain(`Ledger, last ${LEDGER_VISIBLE_ENTRIES}`);
     expect(html()).toContain('Copy state as JSON');
     click('[data-do="closeModal"]');
@@ -566,7 +577,7 @@ describe('accounting', () => {
     click('[data-office="binder"]');
     click('[data-do="accountingTab"][data-id="summary"]');
     expect(html()).toContain('Business rates');
-    expect(html()).toContain('Living costs');
+    expect(html()).toContain('s draw');
     expect(html()).toContain('Deposit on the unit');
     expect(html()).not.toContain('row-main">living');
     expect(html()).not.toContain('row-main">unitDeposit');

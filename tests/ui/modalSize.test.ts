@@ -20,8 +20,8 @@ function click(selector: string): void {
 
 function dismissEvents(): void {
   let guard = 0;
-  while (root().querySelector('[data-do="resolveEvent"]') !== null && guard < 50) {
-    click('[data-do="resolveEvent"]');
+  while (root().querySelector('[data-do="closeHouseCard"], [data-do="resolveEvent"]') !== null && guard < 50) {
+    click('[data-do="closeHouseCard"], [data-do="resolveEvent"]');
     guard += 1;
   }
 }
@@ -88,6 +88,8 @@ describe('the size of every modal in the game', () => {
       // The team is a page of the game from Turn 10, not a tab of the laptop (T10 3.6).
       team: true,
       laptop: false,
+      // The settings are a small plate off the gear on the top bar (CLAUDE.md T13 3.22).
+      settings: false,
     });
   });
 });

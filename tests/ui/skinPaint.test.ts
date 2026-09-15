@@ -35,8 +35,8 @@ beforeAll(() => {
   click('[data-do="startGame"]');
   click('[data-do="setSpeed"][data-speed="1"]');
   let guard = 0;
-  while (root().querySelector('[data-do="resolveEvent"]') !== null && guard < 50) {
-    click('[data-do="resolveEvent"]');
+  while (root().querySelector('[data-do="closeHouseCard"], [data-do="resolveEvent"]') !== null && guard < 50) {
+    click('[data-do="closeHouseCard"], [data-do="resolveEvent"]');
     guard += 1;
   }
   click('[data-do="setView"][data-view="office"]');

@@ -8,15 +8,17 @@ import {
   callsScheduled,
   callsTaken,
   has,
-  isWorkingToday,
+  onTheBooksToday,
   jobLabourCost,
   jobProgress,
   jobsAtGate,
   joiners,
   lifecycleSteps,
+  orderForJobCheck,
+  orderForJobCost,
   showsStartProduction,
+  shortfallOf,
   startProductionCheck,
-  stockCheck,
   transportLabel,
   workerById,
 } from '../engine/index';
@@ -29,14 +31,15 @@ import {
   lockedButton,
   minutes,
   money,
+  plural,
   primaryButton,
   reasonLabel,
 } from './modal';
 
 /** Plain English for a job stage. The stage id is never printed at the player. */
 const STAGE_LABELS: Record<Job['stage'], string> = {
-  accepted: 'drawing to do',
-  materialPending: 'material to order',
+  accepted: 'desk work to do',
+  materialPending: 'material short',
   materialOrdered: 'material ordered',
   materialInYard: 'material at the gate',
   ready: 'ready for production',
@@ -77,22 +80,31 @@ export function jobAssignControls(state: GameState, job: Job): string {
     `<button class="chip${job.assignedTo === workerId ? ' is-on' : ''}" data-do="assignJob" ` +
     `data-id="${job.id}" data-worker="${workerId}">${escapeHtml(label)}</button>`;
   const crew = joiners(state)
-    .filter((worker) => isWorkingToday(state, worker))
+    // A night man can be given a job by day: the chips offer everybody on the books today.
+    .filter((worker) => onTheBooksToday(state, worker))
     .map((worker) => chip(worker.id, worker.name))
     .join('');
   return `<span class="row-action">${chip('owner', 'You')}${crew}</span>`;
 }
 
-/** One click takes what the rack already has and ticks the material order green. While the rack
- *  cannot supply it, the button says why instead (PIOTR, 13.09; CLAUDE.md T9 3.7). */
-export function fromStockControl(state: GameState, job: Job): string {
-  if (job.stage !== 'accepted' && job.stage !== 'materialPending') return '';
-  if (job.materialKind !== 'sheet' || job.bespokeMaterial) return '';
-  const check = stockCheck(state, job);
+/** The job's material line: green when its sheets are held from stock, red with the count when
+ *  it is short, and the one button that clears a shortfall for this job alone
+ *  (CLAUDE.md T13 3.3, 3.6). The per project question is gone. */
+export function materialLine(state: GameState, job: Job): string {
+  if (job.stage === 'completed' || job.stage === 'awaitingTransport') return '';
+  const short = shortfallOf(job);
+  const held = job.sheetsReserved + job.sheetsUsed;
+  const sheets = plural(job.sheets, 'sheet', 'sheets');
+  const figure =
+    short > 0
+      ? `<span class="row-figure bad shortfall">${short} of ${sheets} short</span>`
+      : `<span class="row-figure good sheets-reserved">${held} of ${sheets} in hand</span>`;
+  if (short <= 0) return figure;
+  const check = orderForJobCheck(state, job);
   const control = check.ok
-    ? button('fromStock', 'From stock', `data-id="${job.id}"`)
-    : lockedButton('From stock', check.reason);
-  return `<span class="row-action">${control}</span>`;
+    ? button('orderForJob', `Order for this job, ${money(orderForJobCost(job))}`, `data-id="${job.id}"`)
+    : lockedButton('Order for this job', check.reason);
+  return figure + `<span class="row-action">${control}</span>`;
 }
 
 /** Dropping the project: the deposit goes back, the job goes off the plan and the company is ten
@@ -167,8 +179,8 @@ export function jobRow(state: GameState, job: Job): string {
     `${escapeHtml(waiting)}</span>` +
     `<span class="row-figure">${jobLabourLine(state, job)}</span>` +
     callsLine(job) +
+    materialLine(state, job) +
     jobAssignControls(state, job) +
-    fromStockControl(state, job) +
     cncControls(state, job) +
     (action === '' ? '' : `<span class="row-action">${action}</span>`) +
     '</div>'

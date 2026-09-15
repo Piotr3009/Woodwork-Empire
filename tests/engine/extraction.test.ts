@@ -26,7 +26,7 @@ import { dustGainPerMinute, hallProductivityFactor } from '../../src/engine/mach
 import { applyRating } from '../../src/engine/reputation';
 import { renderHall } from '../../src/render/hall';
 import type { GameState, Job } from '../../src/engine/index';
-import { act, fillRack, firstJob, newGame, placeEnquiry, placeEquipment, runClock } from '../helpers';
+import { acceptNow, act, fillRack, firstJob, newGame, placeEnquiry, placeEquipment, runClock } from '../helpers';
 
 /** A two man shop: a standard saw and a floor edgebander, both with a man at them, and one
  *  extractor of the class the test names. Piotr's own example (CLAUDE.md T10 3.1). */
@@ -103,14 +103,51 @@ describe('the sums for a two man shop', () => {
     expect(underExtracted(state)).toBe(false);
   });
 
-  it('counts a machine only while somebody is standing at it', () => {
+  it('counts an ungated machine whenever it is connected, and a gated one only while it runs', () => {
+    // The duct is open through every ungated branch, so the idle bander still pulls on the fan
+    // while the saw runs; an automatic gate on its drop shuts its branch until a man is at it
+    // (PIOTR; CLAUDE.md T13 3.11).
     const state = twoManShop('standard');
     const bander = state.equipment.find((item) => item.specId === 'edgebander');
-    if (!bander) throw new Error('no edgebander');
+    const saw = state.equipment.find((item) => item.specId === 'tableSaw');
+    if (!bander || !saw) throw new Error('no machines');
     bander.takenBy = null;
-    // The saw alone is 1,100 against the 1,660 the fan allows.
+    expect(extractionCheck(state).demand).toBe(2500);
+    expect(underExtracted(state)).toBe(true);
+    // The gate: the saw alone is 1,100 against the 1,660 the fan allows.
+    state.gates.push(bander.id);
     expect(extractionCheck(state).demand).toBe(1100);
     expect(underExtracted(state)).toBe(false);
+    // A gated machine with a man at it counts as it always did.
+    bander.takenBy = 'staff-1';
+    expect(extractionCheck(state).demand).toBe(2500);
+    expect(underExtracted(state)).toBe(true);
+    // And the gate changes the air sum only: the dust the bander makes is the family's figure,
+    // gated or not (CLAUDE.md T13 10.1).
+    expect(dustGainPerMinute(state)).toBe(DUST_PER_PRODUCTION_MINUTE * UNDER_EXTRACTION_DUST_MULTIPLIER);
+  });
+
+  it('counts nothing at all while no machine runs, gates or no gates', () => {
+    const state = twoManShop('standard');
+    for (const item of state.equipment) item.takenBy = null;
+    expect(extractionCheck(state).demand).toBe(0);
+    expect(underExtracted(state)).toBe(false);
+    expect(extractionCheck(state).line).toBe('');
+  });
+
+  it('counts a machine with no pipe as not served, and never as part of the sum', () => {
+    const state = twoManShop('pro');
+    const bander = state.equipment.find((item) => item.specId === 'edgebander');
+    if (!bander) throw new Error('no edgebander');
+    state.pipes = state.pipes.filter((run) => run.equipmentId !== bander.id);
+    const check = extractionCheck(state);
+    expect(check.demand).toBe(1100);
+    expect(check.short).toBe(true);
+    expect(check.line).toBe('Extraction: a machine is not connected');
+    // Served again the moment it is connected (CLAUDE.md T13 3.19, 10.1).
+    state.pipes.push({ id: 'pipe-b', equipmentId: bander.id, extractorId: 'x', tiles: [], metres: 1 });
+    expect(extractionCheck(state).demand).toBe(2500);
+    expect(extractionCheck(state).short).toBe(false);
   });
 
   it('counts nothing that is only on order, or sold', () => {
@@ -163,7 +200,7 @@ describe('a job made in a dusty workshop', () => {
     const state = newGame();
     state.enquiries = [];
     const enquiry = placeEnquiry(state, { price: 4000 });
-    const next = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+    const next = acceptNow(state, enquiry.id, false);
     const made = firstJob(next);
     made.productionMinutes = productionMinutes;
     made.dustyMinutes = dustyMinutes;
@@ -182,7 +219,7 @@ describe('a job made in a dusty workshop', () => {
     const state = newGame();
     state.enquiries = [];
     const enquiry = placeEnquiry(state, { price: 4000 });
-    const next = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+    const next = acceptNow(state, enquiry.id, false);
     const made = firstJob(next);
     made.productionMinutes = 600;
     made.dustyMinutes = 300;
@@ -203,7 +240,7 @@ describe('the bench in an under extracted hall', () => {
     placeEquipment(state, 'workbench', { variantId: 'budget', x: 2, y: 8 });
     state.enquiries = [];
     const enquiry = placeEnquiry(state, { price: 4000, deadlineDays: 40 });
-    let next = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+    let next = acceptNow(state, enquiry.id, false);
     firstJob(next).stage = 'ready';
     next = act(next, { type: 'WORK_HERE', jobId: firstJob(next).id });
     next = runClock(next, 30);

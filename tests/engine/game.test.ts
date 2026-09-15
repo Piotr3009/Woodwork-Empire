@@ -14,7 +14,7 @@ import {
   BREAK_START_MINUTE,
   DAYS_PER_MONTH,
   DAY_END_MINUTE,
-  LIVING_COST_PER_WORKING_DAY,
+  OWNER_DRAW_PER_DAY,
   MINUTES_PER_WORKING_DAY,
   OVERTIME_END_MINUTE,
   POWER_BASE_DAILY,
@@ -22,6 +22,7 @@ import {
 } from '../../src/engine/constants';
 import { createTask } from '../../src/engine/tasks';
 import {
+  acceptNow,
   DEFAULT_OPTIONS as OPTIONS,
   act,
   buyNow,
@@ -45,7 +46,7 @@ function dayOneCosts(rentMonthly: number, ratesMonthly: number): number {
     rentMonthly / DAYS_PER_MONTH +
     ratesMonthly / DAYS_PER_MONTH +
     POWER_BASE_DAILY +
-    LIVING_COST_PER_WORKING_DAY
+    OWNER_DRAW_PER_DAY
   );
 }
 
@@ -257,6 +258,8 @@ describe('a day off with nobody in the hall', () => {
       station: 'idle',
       productionMinutes: 0,
       absentDaysRemaining: 0,
+      shift: 'day',
+      dayLog: [],
       anchorX: 0,
       anchorY: 4,
     });
@@ -306,7 +309,7 @@ describe('the minute the owner spends', () => {
     let state = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
     state.enquiries = [];
     const enquiry = placeEnquiry(state, { price: 4000, deadlineDays: 90 });
-    state = fillRack(act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false }));
+    state = fillRack(acceptNow(state, enquiry.id, false));
     firstJob(state).stage = 'ready';
     return clearEvents(act(state, { type: 'WORK_HERE', jobId: null }));
   }

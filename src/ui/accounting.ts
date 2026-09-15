@@ -21,14 +21,18 @@ import {
   weeklyWageBill,
 } from '../engine/index';
 import type { GameState, LedgerCategory, LedgerEntry, PeriodTotals } from '../engine/index';
+import { monthlyPremiums, nextInstalmentFor } from '../engine/index';
+import { renderFinance } from './finance';
 import { button, escapeHtml, money, plural, primaryButton, tabBar, whyLink } from './modal';
 
-/** The three ways of looking at the books (CLAUDE.md T6 3.9). */
-export type AccountingTab = 'days' | 'summary' | 'ledger';
+/** The three ways of looking at the books (CLAUDE.md T6 3.9), and the loan and the overdraft
+ *  (CLAUDE.md T13 3.14). */
+export type AccountingTab = 'days' | 'summary' | 'ledger' | 'finance';
 const TABS: Array<[AccountingTab, string]> = [
   ['days', 'Days'],
   ['summary', 'Summary'],
   ['ledger', 'Ledger'],
+  ['finance', 'Finance'],
 ];
 
 export function accountingTabFrom(value: string | undefined): AccountingTab {
@@ -41,8 +45,9 @@ const CATEGORY_LABELS: Record<LedgerCategory, string> = {
   rent: 'Rent',
   rates: 'Business rates',
   power: 'Power',
-  living: 'Living costs',
+  ownerDraw: 'Owner\u0027s draw',
   wages: 'Wages',
+  wagesNight: 'Night shift wages',
   salaries: 'Salaries',
   software: 'Software',
   waste: 'Waste collection',
@@ -53,7 +58,6 @@ const CATEGORY_LABELS: Record<LedgerCategory, string> = {
   jobBalance: 'Balances from clients',
   interest: 'Interest',
   repair: 'Repairs and service',
-  ducting: 'Ducting reconnection',
   storage: 'Storage',
   taxi: 'Taxis',
   transport: 'Transport',
@@ -61,6 +65,16 @@ const CATEGORY_LABELS: Record<LedgerCategory, string> = {
   pellets: 'Pellets sold',
   arrears: 'Arrears',
   seizure: 'Seized by the bailiff',
+  insurance: 'Insurance',
+  security: 'Security',
+  loan: 'Loan',
+  loanInterest: 'Loan interest',
+  overdraftInterest: 'Overdraft interest',
+  contract: 'Contract work',
+  website: 'Website',
+  pipes: 'Extraction pipes',
+  claim: 'Insurance claims and payouts',
+  burglary: 'Burglary',
 };
 
 function categoryLabel(category: string): string {
@@ -202,6 +216,20 @@ function dayRows(
     .join('');
 }
 
+/** What the 1st takes, in words: the standing items, and the loan and the covers when they are
+ *  on the books (CLAUDE.md T13 3.14, 3.15). */
+function monthlyBillsLine(state: GameState): string {
+  const items = ['salaries', 'software', 'waste'];
+  const loan = state.finance.loan;
+  if (loan !== null) items.push(`loan instalment ${money(nextInstalmentFor(loan))}`);
+  const premiums = monthlyPremiums(state);
+  if (premiums > 0) items.push(`insurance ${money(premiums)}`);
+  if (state.finance.overdraftInterestAccrued > 0) {
+    items.push(`overdraft interest ${money(state.finance.overdraftInterestAccrued)}`);
+  }
+  return items.join(', ');
+}
+
 /** What the workshop earns for an hour of somebody's time, machines and all (CLAUDE.md T6 3.8). */
 function earnedRateLine(state: GameState): string {
   return (
@@ -217,6 +245,7 @@ export function renderAccounting(
   tab: AccountingTab,
   openDays: number[] = [],
   month: number | null = null,
+  loanTyped = '10000',
 ): string {
   const due = nextDueDays(state);
   const arrears = arrearsBlock(state, arrearsTyped);
@@ -251,7 +280,7 @@ export function renderAccounting(
     `<div class="row"><span class="row-main">Wages, day ${due.wages}</span>` +
     `<span class="row-figure">${money(weeklyWageBill(state))}</span></div>` +
     `<div class="row"><span class="row-main">Monthly bills, day ${due.monthly}</span>` +
-    '<span class="row-figure">salaries, software, waste</span></div>' +
+    `<span class="row-figure">${escapeHtml(monthlyBillsLine(state))}</span></div>` +
     '';
   const ledgerTab = `<h3>Ledger, last ${LEDGER_VISIBLE_ENTRIES}</h3>` + ledger;
   const body =
@@ -259,7 +288,9 @@ export function renderAccounting(
       ? daysTab(state, entries, openDays, month ?? monthOfDay(state.clock.day))
       : tab === 'ledger'
         ? ledgerTab
-        : summaryTab;
+        : tab === 'finance'
+          ? renderFinance(state, loanTyped)
+          : summaryTab;
   return (
     `<p class="figures"><strong>${money(state.cash)}</strong> in the bank. ` +
     `Overdraft limit ${money(state.finance.overdraftLimit)}. ` +

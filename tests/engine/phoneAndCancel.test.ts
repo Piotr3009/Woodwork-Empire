@@ -8,9 +8,11 @@ import { shoppingList } from '../../src/engine/orders';
 import { renderHall } from '../../src/render/hall';
 import { renderShopping } from '../../src/ui/shopping';
 import { createTask } from '../../src/engine/tasks';
-import { orderMaterialForJob } from '../../src/engine/materials';
+import { orderForJob } from '../../src/engine/materials';
+import { orderForJobCheck } from '../../src/engine/jobs';
 import type { GameState, TaskInstance } from '../../src/engine/index';
 import {
+  acceptNow,
   act,
   buyStartingKit,
   fillRack,
@@ -81,7 +83,7 @@ function materialOnTheRoad(): GameState {
   const state = quietHall();
   state.stock.sheets = 0;
   const enquiry = placeEnquiry(state, { price: 4000, deadlineDays: 40 });
-  const next = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+  const next = acceptNow(state, enquiry.id, false);
   const job = firstJob(next);
   for (const task of next.tasks) {
     if (task.jobId !== job.id) continue;
@@ -92,12 +94,13 @@ function materialOnTheRoad(): GameState {
     }
   }
   job.designMinutesRemaining = 0;
-  job.materialMode = 'perJob';
-  const delivery = orderMaterialForJob(next, job);
+  // Nothing held for it: the whole of its material comes on its own lorry (CLAUDE.md T13 3.3).
+  job.sheetsReserved = 0;
+  const delivery = orderForJob(next, job);
   if (delivery === null) throw new Error('no lorry booked');
   job.stage = 'materialOrdered';
   for (const task of next.tasks) {
-    if (task.kind === 'materialOrder' && task.jobId === job.id) {
+    if (task.kind === 'materialTakeOff' && task.jobId === job.id) {
       task.minutesRemaining = 0;
       task.done = true;
       task.doneDay = next.clock.day;
@@ -155,12 +158,8 @@ describe('calling an order off', () => {
     const cancelled = act(state, { type: 'CANCEL_ORDER', orderId: delivery.id });
     expect(cancelled.deliveries).toHaveLength(0);
     expect(firstJob(cancelled).stage).toBe('materialPending');
-    // And there is a job of work on the list to order it with.
-    expect(
-      cancelled.tasks.some(
-        (task) => task.kind === 'materialOrder' && task.jobId === firstJob(cancelled).id && !task.done,
-      ),
-    ).toBe(true);
+    // And the job's own button is back: it is short again (CLAUDE.md T13 3.3).
+    expect(orderForJobCheck(cancelled, firstJob(cancelled)).ok).toBe(true);
   });
 
   it('pays the arrears down first when the bill it refunds was never paid', () => {

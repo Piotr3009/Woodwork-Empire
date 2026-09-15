@@ -3,6 +3,7 @@
 // A station is a string so the state stays plain JSON: 'bench', 'machine:<specId>', 'rack',
 // 'gate', 'office' or 'idle'.
 
+import { SHEETS_PER_TRIP } from './constants';
 import { itemStandsInTheHall } from './machines';
 import type { GameState, TaskInstance } from './types';
 
@@ -38,10 +39,41 @@ export function stationWaitingFor(station: string): string | null {
   return station.startsWith('waiting:') ? station.slice('waiting:'.length) : null;
 }
 
+/** How many trips a load of sheets is between the pallet at the gate and the rack, so many
+ *  sheets a trip, and never fewer than one (CLAUDE.md T13 3.21). */
+export function unloadTrips(sheets: number): number {
+  return Math.max(1, Math.ceil(sheets / SHEETS_PER_TRIP));
+}
+
+/** Which leg of the walk the unloading man is on at this point of the task: a trip is a leg to
+ *  the rack with the sheets and a leg back to the pallet, and the task's minutes are shared out
+ *  over every leg, so the minutes still total the handling table's figure however many sheets
+ *  are on the pallet (CLAUDE.md T13 3.21). Even legs are at the gate, odd ones at the rack. */
+export function unloadLegAt(task: { minutesTotal: number; minutesRemaining: number }, sheets: number): number {
+  const legs = unloadTrips(sheets) * 2;
+  const elapsed = Math.max(0, task.minutesTotal - task.minutesRemaining);
+  if (task.minutesTotal <= 0) return 0;
+  return Math.min(legs - 1, Math.floor((elapsed / task.minutesTotal) * legs));
+}
+
+/** Where the man unloading a load of sheets stands at this point of it: the pallet at the gate
+ *  on an even leg, the rack on an odd one. The "walking in the corner" of Turn 8 is gone: he
+ *  walks the path the character system already uses, back and forth (CLAUDE.md T13 3.21). */
+export function unloadStation(task: TaskInstance, sheets: number): string {
+  return unloadLegAt(task, sheets) % 2 === 0 ? STATION_GATE : STATION_RACK;
+}
+
 /** Where a job of work puts the figure doing it. */
 export function stationForTask(state: GameState, task: TaskInstance): string {
   switch (task.kind) {
-    case 'unload':
+    case 'unload': {
+      // A load of sheets is a walk between the pallet and the rack; a machine off the lorry is
+      // got off at the gate and stands where the floor was held for it (CLAUDE.md T13 3.21).
+      const delivery = task.deliveryId
+        ? state.deliveries.find((entry) => entry.id === task.deliveryId)
+        : null;
+      return delivery ? unloadStation(task, delivery.sheets) : STATION_GATE;
+    }
     case 'deliver':
       return STATION_GATE;
     case 'fetchStorage':

@@ -13,7 +13,7 @@ import { hallProductivityFactor, outputBreakdown } from '../../src/engine/machin
 import { applyRating, changeReputation } from '../../src/engine/reputation';
 import type { GameState } from '../../src/engine/index';
 import {
-  act,
+  acceptNow,
   buyStartingKit,
   clearEvents,
   fillRack,
@@ -50,7 +50,7 @@ describe('the reputation log', () => {
     let state = hall();
     state.enquiries = [];
     const enquiry = placeEnquiry(state, { price: 1200, deadlineDays: 40 });
-    state = clearEvents(act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false }));
+    state = clearEvents(acceptNow(state, enquiry.id, false));
     const job = state.jobs[0];
     if (job === undefined) throw new Error('no job');
     job.daysLate = 0;
@@ -69,7 +69,7 @@ describe('the reputation log', () => {
     let state = hall();
     state.enquiries = [];
     const enquiry = placeEnquiry(state, { price: 1200, deadlineDays: 40 });
-    state = clearEvents(act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false }));
+    state = clearEvents(acceptNow(state, enquiry.id, false));
     const job = state.jobs[0];
     if (job === undefined) throw new Error('no job');
     job.daysLate = 3;
@@ -135,7 +135,7 @@ describe('the company output breakdown', () => {
     const before = outputBreakdown(state).total;
     for (let index = 0; index < 5; index += 1) {
       const enquiry = placeEnquiry(state, { price: 900, deadlineDays: 40 });
-      const next = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+      const next = acceptNow(state, enquiry.id, false);
       Object.assign(state, next);
     }
     for (const job of state.jobs) job.stage = 'awaitingTransport';

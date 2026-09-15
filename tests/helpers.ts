@@ -5,6 +5,7 @@ import { WORKER_RATES } from '../src/engine/constants';
 // the tests use them to stand kit in the hall without sending the owner out for it.
 import { buyEquipment, buySoftware } from '../src/engine/game';
 import { hire } from '../src/engine/staff';
+import { takeEnquiry } from '../src/engine/jobs';
 import type { WorkerRole, WorkerTier } from '../src/engine/types';
 import {
   applyAction,
@@ -15,7 +16,9 @@ import {
   isOvertime,
   runMinutes,
   tick,
+  unconnectedMachines,
 } from '../src/engine/index';
+import { connectExtraction } from '../src/engine/pipes';
 import type {
   Enquiry,
   Equipment,
@@ -88,6 +91,28 @@ export function choose(state: GameState, choiceId: string): GameState {
 
 export function act(state: GameState, action: GameAction): GameState {
   return applyAction(state, action);
+}
+
+/** Says yes to an enquiry and takes the client's number at the budget: the two clicks a job costs
+ *  now, for a test that wants the job and is not about the answer (CLAUDE.md T13 3.24). The
+ *  offer is set to the budget first so the old round prices hold, and the job is booked through
+ *  the engine's own write, so an event already on the screen stays where it is. A test that is
+ *  about the client's number dispatches `ACCEPT_ENQUIRY` itself. */
+export function acceptNow(state: GameState, enquiryId: string, byHand = false): GameState {
+  const next = copyOf(state);
+  const enquiry = next.enquiries.find((entry) => entry.id === enquiryId);
+  if (enquiry && enquiry.offer === null) enquiry.offer = enquiry.price;
+  takeEnquiry(next, enquiryId, byHand);
+  return settled(next);
+}
+
+/** Every machine in the hall that wants a pipe gets one, the way a careful owner clicks Connect
+ *  on each card, for a test that is about something else (CLAUDE.md T13 3.19). The pipe is paid
+ *  for like every purchase, out of the cash. */
+export function connectAll(state: GameState): GameState {
+  const next = copyOf(state);
+  for (const item of unconnectedMachines(next)) connectExtraction(next, item.id);
+  return settled(next);
 }
 
 /** One step of a driven day: run the clock, and once the owner has his day in, do what a player
@@ -234,7 +259,8 @@ export function buyStartingKit(
       specId === 'tableSaw' ? options.sawVariant : STARTING_CLASS[specId],
     );
   }
-  return softwareNow(next, 'oneOff');
+  // The saw is on the extraction, the way the player clicks it (CLAUDE.md T13 3.19).
+  return connectAll(softwareNow(next, 'oneOff'));
 }
 
 /** Stands a machine in the hall without paying for it or looking for a free tile, for tests that
@@ -266,6 +292,21 @@ export function placeEquipment(
     rotated: options.rotated ?? false,
   };
   state.equipment.push(item);
+  // Connected without charge: a test that stands a machine in the hall for nothing wants it on
+  // the extraction for nothing too, and the pipe rule has its own tests (CLAUDE.md T13 3.19).
+  for (const machine of unconnectedMachines(state)) {
+    const fan = state.equipment.find(
+      (entry) => entry.specId === 'extractor' && entry.soldOnDay === null,
+    );
+    if (!fan) break;
+    state.pipes.push({
+      id: `pipe-${machine.id}`,
+      equipmentId: machine.id,
+      extractorId: fan.id,
+      tiles: [],
+      metres: Math.abs(machine.anchorX - fan.anchorX) + Math.abs(machine.anchorY - fan.anchorY),
+    });
+  }
   return item;
 }
 
@@ -328,6 +369,9 @@ export function placeEnquiry(state: GameState, partial: Partial<Enquiry> = {}): 
     sizeMultiplier: 1,
     price,
     basePrice: price,
+    kind: 'residential',
+    budget: price,
+    offer: null,
     finish: 'laminate',
     materialKind: 'sheet',
     deadlineDays: 15,
@@ -417,7 +461,7 @@ export function sixJoinersOnSheetWork(
   for (let man = 0; man < CREW; man += 1) {
     const price = (options.price ?? 6000) + man * (options.price ?? 6000) * 0.2;
     const enquiry = placeEnquiry(next, { price, deadlineDays: 40 });
-    next = act(next, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+    next = acceptNow(next, enquiry.id);
   }
   // Six jobs at six different points of their making, which is what a workshop with a book of
   // work looks like on any given morning. Six jobs started in the same minute would reach the
@@ -447,6 +491,8 @@ export function sixJoinersOnSheetWork(
       station: 'idle',
       productionMinutes: 0,
       absentDaysRemaining: 0,
+      shift: 'day',
+      dayLog: [],
       anchorX: 4 + man * 2,
       anchorY: 6,
     });
@@ -493,8 +539,8 @@ export function twoMenOnSheetWork(
   state.enquiries = [];
   const first = placeEnquiry(state, { price: 40000, deadlineDays: 90 });
   const second = placeEnquiry(state, { price: 40000, deadlineDays: 90 });
-  let next = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: first.id, byHand: false });
-  next = act(next, { type: 'ACCEPT_ENQUIRY', enquiryId: second.id, byHand: false });
+  let next = acceptNow(state, first.id);
+  next = acceptNow(next, second.id);
   for (const job of next.jobs) job.stage = 'ready';
   next.workers.push({
     id: 'staff-1',
@@ -516,6 +562,8 @@ export function twoMenOnSheetWork(
     station: 'idle',
     productionMinutes: 0,
     absentDaysRemaining: 0,
+    shift: 'day',
+    dayLog: [],
     anchorX: 0,
     anchorY: 4,
   });

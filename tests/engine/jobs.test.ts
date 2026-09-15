@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  ANSWER_MAX,
+  ANSWER_MIN,
   BY_HAND_DURATION_FACTOR,
   COURIER_COST,
   DEPOSIT_FRACTION,
@@ -12,27 +14,35 @@ import {
   OWNER_JOB_VALUE_PER_DAY,
   OWNER_LABOUR_PER_MINUTE,
   RATING_ON_TIME,
+  SHEET_PRICE_AD_HOC,
   SITE_MEASURE_TAXI_COST,
 } from '../../src/engine/constants';
+import { formatMoney } from '../../src/engine/economy';
 import { gateIsCrowded, hallProductivityFactor } from '../../src/engine/machines';
 import { emailRatingFactor } from '../../src/engine/reputation';
 import { callsForPrice } from '../../src/engine/calls';
 import {
+  deadlineDaysFor,
+  deadlineDaysFrom,
+  drawDeadline,
   emailPaymentPenalty,
   findJob,
   minutesRemainingFor,
   ownerJob,
 } from '../../src/engine/jobs';
 import { stagePlanFor } from '../../src/engine/stages';
-import { materialCostFor, sheetsForCost } from '../../src/engine/materials';
+import { freeSheets, materialCostFor, sheetsForCost, shortfallOf } from '../../src/engine/materials';
+import { startTaskCheck } from '../../src/engine/tasks';
 import { missingForHire } from '../../src/engine/staff';
 import { isWorkingDay, tick } from '../../src/engine/index';
 import type { GameEvent, GameState, Job } from '../../src/engine/index';
 import {
+  acceptNow,
   act,
   buyNow,
   buyStartingKit,
   withExtraction,
+  choose,
   clearEvents,
   doAllEmails,
   doTask,
@@ -61,10 +71,9 @@ function ready(): GameState {
 
 function accept(state: GameState, price = 400, extra = {}): GameState {
   const enquiry = placeEnquiry(state, { price, ...extra });
-  const next = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+  const next = acceptNow(state, enquiry.id, false);
   // These tests are about the per job order and the lorry. The rack is full so that production
   // can run afterwards; the job is told to order all the same (stock is the default since 13.09).
-  for (const job of next.jobs) job.materialMode = 'perJob';
   return next;
 }
 
@@ -96,7 +105,8 @@ describe('accepting an enquiry', () => {
     const kinds = state.tasks.filter((task) => task.jobId !== null).map((task) => task.kind);
     // A 400 job is one email now, not one per call (CLAUDE.md T3 3.2), and the calls are no
     // longer tasks at all: they ring while the work goes on (CLAUDE.md T4 3.3).
-    expect(kinds).toEqual(['emails', 'design']);
+    // The material take off is on the list from the start, behind the drawing (T13 3.8).
+    expect(kinds).toEqual(['emails', 'design', 'materialTakeOff']);
     expect(state.tasks.filter((task) => task.kind === 'emails' && task.minutesTotal === 10))
       .toHaveLength(1);
     expect(state.jobs[0]?.calls).toHaveLength(2);
@@ -157,9 +167,9 @@ describe('the by hand path', () => {
       lockReason: 'Needs solid wood tools',
       byHandAvailable: true,
     });
-    const refused = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: table.id, byHand: false });
+    const refused = acceptNow(state, table.id, false);
     expect(refused.jobs).toHaveLength(0);
-    state = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: table.id, byHand: true });
+    state = acceptNow(state, table.id, true);
     const job = state.jobs[0];
     expect(job?.byHand).toBe(true);
     expect(job?.labourValue).toBe(12000 * LABOUR_FRACTION);
@@ -187,28 +197,44 @@ describe('the by hand path', () => {
       deadlineDays: 50,
       byHandAvailable: true,
     });
-    state = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: table.id, byHand: true });
+    state = acceptNow(state, table.id, true);
     expect(state.jobs[0]?.byHand).toBe(false);
   });
 });
 
 describe('the order of the lifecycle', () => {
-  it('keeps the material order shut until the drawing is done, and the calls do not gate it', () => {
+  it('keeps the material take off shut until the drawing is done, and the calls do not gate it', () => {
     let state = accept(ready());
-    expect(state.tasks.some((task) => task.kind === 'materialOrder')).toBe(false);
+    // The take off reads the drawing, so it is on the list and cannot be started before it
+    // (CLAUDE.md T13 3.8).
+    const takeOff = state.tasks.find((task) => task.kind === 'materialTakeOff');
+    expect(takeOff).toBeDefined();
+    expect(startTaskCheck(state, takeOff?.id ?? '').ok).toBe(false);
     // Two calls are in the diary and not one of them has been taken (CLAUDE.md T4 3.3).
     expect(state.jobs[0]?.calls).toHaveLength(2);
     state = doTask(state, 'design');
-    expect(state.jobs[0]?.stage).toBe('materialPending');
-    expect(state.tasks.some((task) => task.kind === 'materialOrder')).toBe(true);
+    expect(state.jobs[0]?.stage).toBe('accepted');
+    expect(startTaskCheck(state, takeOff?.id ?? '').ok).toBe(true);
+    // Its sheet was held from the rack when it was taken, so it is ready once the list is made.
+    state = doTask(state, 'materialTakeOff');
+    expect(state.jobs[0]?.stage).toBe('ready');
   });
 
-  it('pays for the material when the order goes in and books the lorry for tomorrow', () => {
-    let state = accept(ready());
-    state = doTask(state, 'design');
+  it('holds the sheets from the free stock at accept, and orders a shortfall for the job', () => {
+    const held = accept(ready());
+    expect(firstJob(held).sheetsReserved).toBe(1);
+    expect(freeSheets(held)).toBe(19);
+    // A bare rack: nothing to hold, and the shortfall is red until it is ordered for the job at
+    // the ad hoc price, on a lorry for tomorrow (CLAUDE.md T13 3.3).
+    const bare = ready();
+    bare.stock.sheets = 0;
+    let state = accept(bare);
+    expect(shortfallOf(firstJob(state))).toBe(1);
+    state = doTask(doTask(state, 'design'), 'materialTakeOff');
+    expect(state.jobs[0]?.stage).toBe('materialPending');
     const before = state.cash;
-    state = doTask(state, 'materialOrder');
-    expect(before - state.cash).toBe(160);
+    state = act(state, { type: 'ORDER_FOR_JOB', jobId: firstJob(state).id });
+    expect(before - state.cash).toBe(SHEET_PRICE_AD_HOC);
     expect(state.jobs[0]?.stage).toBe('materialOrdered');
     expect(state.deliveries).toHaveLength(1);
     expect(state.deliveries[0]?.arriveDay).toBe(2);
@@ -216,9 +242,11 @@ describe('the order of the lifecycle', () => {
   });
 
   it('brings the lorry in the next morning and asks for the unloading', () => {
-    let state = accept(ready());
-    state = doTask(state, 'design');
-    state = doTask(state, 'materialOrder');
+    const bare = ready();
+    bare.stock.sheets = 0;
+    let state = accept(bare);
+    state = doTask(doTask(state, 'design'), 'materialTakeOff');
+    state = act(state, { type: 'ORDER_FOR_JOB', jobId: firstJob(state).id });
     const events: GameEvent[] = [];
     const settled = nextDay(state, events);
     expect(eventsOfKind(events, 'deliveryArrived')).toHaveLength(1);
@@ -357,16 +385,19 @@ describe('late delivery', () => {
 describe('scenario: garage shelves on Easy', () => {
   it('runs from the board to the rating with the cash movements of CLAUDE.md 8.4', () => {
     const start = ready();
+    // A bare rack, so the sheet is bought for the job and the money moves (CLAUDE.md T13 3.3).
+    start.stock.sheets = 0;
     const cashBefore = start.cash;
     let state = accept(start, 400);
-    // Day 1: one email, the drawing, the material order. The calls are in the diary and ring
+    // Day 1: one email, the drawing, the material take off. The calls are in the diary and ring
     // when they ring: they are not desk work any more (CLAUDE.md T4 3.3).
     state = doAllEmails(state);
     state = doTask(state, 'design');
-    state = doTask(state, 'materialOrder');
+    state = doTask(state, 'materialTakeOff');
     expect(state.clock.minute).toBe(10 + 30 + 30);
     expect(state.owner.minutesByCategory.admin).toBe(40);
     expect(state.owner.minutesByCategory.design).toBe(30);
+    state = act(state, { type: 'ORDER_FOR_JOB', jobId: firstJob(state).id });
     // Day 2: the lorry, the unloading, then the bench.
     const events: GameEvent[] = [];
     state = nextDay(state, events);
@@ -386,23 +417,24 @@ describe('scenario: garage shelves on Easy', () => {
     expect(job?.daysLate).toBe(0);
     expect(job?.rating).toBe(3);
     expect(day3.reputation).toBe(3);
-    // 200 deposit in, 160 material out, 120 courier out, 200 balance in: 120 of the 400 is left.
+    // 200 deposit in, one sheet at the ad hoc price out, 120 courier out, 200 balance in: 80 of
+    // the 400 is left (CLAUDE.md 8.4, T13 3.3).
     const jobMoves = day3.ledger
       .filter((entry) =>
         ['jobDeposit', 'jobBalance', 'material', 'transport'].includes(entry.category),
       )
       .map((entry) => entry.amount);
-    expect(jobMoves).toEqual([200, -160, -COURIER_COST, 200]);
-    expect(jobMoves.reduce((total, value) => total + value, 0)).toBe(120);
+    expect(jobMoves).toEqual([200, -SHEET_PRICE_AD_HOC, -COURIER_COST, 200]);
+    expect(jobMoves.reduce((total, value) => total + value, 0)).toBe(80);
     // The daily costs quietly took more than the job left behind.
     const laterCosts = day3.ledger
       .filter(
         (entry) =>
-          entry.day >= 2 && ['rent', 'rates', 'power', 'living'].includes(entry.category),
+          entry.day >= 2 && ['rent', 'rates', 'power', 'ownerDraw'].includes(entry.category),
       )
       .reduce((total, entry) => total + entry.amount, 0);
     expect(laterCosts).toBeLessThan(-450);
-    expect(day3.cash).toBeCloseTo(cashBefore + 120 + laterCosts, 6);
+    expect(day3.cash).toBeCloseTo(cashBefore + 80 + laterCosts, 6);
   });
 });
 
@@ -431,7 +463,7 @@ describe('the piece at the gate', () => {
     let state = ready();
     for (let index = 0; index < count; index += 1) {
       const enquiry = placeEnquiry(state, { price: 400 + index * 10, deadlineDays: 60 });
-      state = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+      state = acceptNow(state, enquiry.id, false);
       state = doAllEmails(state);
       const job = state.jobs[index];
       if (job) {
@@ -556,10 +588,91 @@ describe('emails nobody answered', () => {
     expect(emailRatingFactor(5)).toBe(0);
   });
 
-  it('never holds the material order up', () => {
+  it('never holds the material take off up', () => {
     let state = accept(ready(), 400);
-    state = doTask(state, 'design');
-    expect(firstJob(state).stage).toBe('materialPending');
+    state = doTask(doTask(state, 'design'), 'materialTakeOff');
+    expect(firstJob(state).stage).toBe('ready');
     expect(state.tasks.some((task) => task.kind === 'emails' && !task.done)).toBe(true);
+  });
+});
+
+describe('the client answers with a number (CLAUDE.md T13 3.24)', () => {
+  it('makes the offer the price, keeps the budget, and the deposit follows the offer', () => {
+    let state = ready();
+    const enquiry = placeEnquiry(state, { price: 10000, deadlineDays: 60 });
+    state = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+    // Nothing is booked until the number is answered.
+    expect(state.jobs).toHaveLength(0);
+    expect(state.activeEvent?.kind).toBe('clientOffer');
+    const offer = state.enquiries.find((entry) => entry.id === enquiry.id)?.offer ?? null;
+    expect(offer).not.toBeNull();
+    expect(state.activeEvent?.body).toContain(
+      `The client offers ${formatMoney(offer ?? 0)}. Accept?`,
+    );
+    expect(state.activeEvent?.choices.map((choice) => choice.id)).toEqual(['accept', 'decline']);
+    const cash = state.cash;
+    state = choose(state, 'accept');
+    const job = firstJob(state);
+    expect(job.price).toBe(offer);
+    expect(job.budget).toBe(10000);
+    expect(job.price / job.budget).toBeGreaterThanOrEqual(ANSWER_MIN - 0.001);
+    expect(job.price / job.budget).toBeLessThanOrEqual(ANSWER_MAX + 0.001);
+    // Material and labour still come off the base price; the deposit is on what he offered.
+    expect(job.materialCost).toBe(materialCostFor(10000, false));
+    expect(job.depositPaid).toBe(Math.round(job.price * DEPOSIT_FRACTION * 100) / 100);
+    expect(state.cash - cash).toBeCloseTo(job.depositPaid, 6);
+    expect(state.enquiries.some((entry) => entry.id === enquiry.id)).toBe(false);
+    expect(state.activeEvent).toBeNull();
+  });
+
+  it('costs nothing but the enquiry to decline', () => {
+    let state = ready();
+    const enquiry = placeEnquiry(state, { price: 10000, deadlineDays: 60 });
+    state = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+    const cash = state.cash;
+    const lines = state.ledger.length;
+    const reputation = state.reputation;
+    state = choose(state, 'decline');
+    expect(state.jobs).toHaveLength(0);
+    expect(state.enquiries.some((entry) => entry.id === enquiry.id)).toBe(false);
+    expect(state.cash).toBe(cash);
+    expect(state.ledger).toHaveLength(lines);
+    expect(state.reputation).toBe(reputation);
+    expect(state.activeEvent).toBeNull();
+  });
+
+  it('asks once: the number stands until it is answered', () => {
+    let state = ready();
+    const enquiry = placeEnquiry(state, { price: 10000, deadlineDays: 60 });
+    state = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+    const offer = state.enquiries.find((entry) => entry.id === enquiry.id)?.offer;
+    state = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+    expect(state.enquiries.find((entry) => entry.id === enquiry.id)?.offer).toBe(offer);
+    expect(state.eventQueue.filter((event) => event.kind === 'clientOffer')).toHaveLength(0);
+    expect(state.activeEvent?.kind).toBe('clientOffer');
+  });
+});
+
+describe('the deadline\'s one draw (CLAUDE.md T6 3.7, T13 3.15)', () => {
+  it('is taken once, read as often as wanted, and reads what the draw would have given', () => {
+    const state = newGame();
+    const job = { ownerDays: 6, price: 5000, express: false };
+    // The same cursor, read straight and read through the draw: one figure.
+    const straight = deadlineDaysFor({ ...state, rng: state.rng }, job);
+    const draw = drawDeadline(state);
+    expect(deadlineDaysFrom(draw, job)).toBe(straight);
+    expect(deadlineDaysFrom(draw, job)).toBe(straight);
+    // The draw moved the stream by exactly one step, like the straight reading does.
+    const moved = { ...newGame(), rng: newGame().rng };
+    deadlineDaysFor(moved, job);
+    expect(state.rng).toBe(moved.rng);
+  });
+
+  it('gives the larger work of a commercial job more days off the same draw', () => {
+    const state = newGame();
+    const draw = drawDeadline(state);
+    const residential = deadlineDaysFrom(draw, { ownerDays: 4, price: 4000, express: false });
+    const commercial = deadlineDaysFrom(draw, { ownerDays: 10, price: 10000, express: false });
+    expect(commercial).toBeGreaterThan(residential);
   });
 });

@@ -14,6 +14,7 @@ import { minutesRemainingFor } from '../../src/engine/jobs';
 import { renderWorkPlan } from '../../src/ui/workPlan';
 import type { GameState } from '../../src/engine/index';
 import {
+  acceptNow,
   act,
   buyNow,
   buyStartingKit,
@@ -38,7 +39,7 @@ function boardWith(options: { deadlineDays?: number; price?: number } = {}): Gam
     price: options.price ?? 4000,
     deadlineDays: options.deadlineDays ?? 10,
   });
-  state = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+  state = acceptNow(state, enquiry.id, false);
   firstJob(state).stage = 'ready';
   return state;
 }
@@ -78,7 +79,7 @@ describe('the rows of the board', () => {
   it('puts the nearest deadline first', () => {
     let state = boardWith({ deadlineDays: 30 });
     const second = placeEnquiry(state, { price: 900, name: 'Bookcase', deadlineDays: 4 });
-    state = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: second.id, byHand: false });
+    state = acceptNow(state, second.id, false);
     const rows = workPlan(state).rows;
     expect(rows).toHaveLength(2);
     expect(rows[0]?.name).toBe('Bookcase');

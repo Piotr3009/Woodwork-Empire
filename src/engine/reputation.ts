@@ -19,14 +19,24 @@ import {
 } from './constants';
 import { penalisedMisses } from './calls';
 import { outputBreakdown } from './machines';
+import { nightQualityPenalty } from './owner';
+import { websiteReputationBonus } from './website';
 import type { GameState, Job } from './types';
+
+/** The reputation the player reads and the tier tables read: what the company has earned plus the
+ *  small bonus a good website holds while it is held, never past the scale (CLAUDE.md T13 3.7).
+ *  The one function. `state.reputation` is the earned figure, the one the log adds up to, and
+ *  levels 1 to 3 of the website add nothing to it. */
+export function effectiveReputation(state: GameState): number {
+  return clampReputation(state.reputation + websiteReputationBonus(state));
+}
 
 /** The company's two totals, which are what the board on the wall is really for: the reputation
  *  and what a minute of production in this hall is worth (PIOTR, 15.09; CLAUDE.md T11 3.5). One
  *  place works them out, so the board and the modal can never say different things. */
 export function companyTotals(state: GameState): { reputation: string; output: string } {
   return {
-    reputation: `Reputation ${formatReputation(state.reputation)}`,
+    reputation: `Reputation ${formatReputation(effectiveReputation(state))}`,
     output: `Output ${outputBreakdown(state).total.toFixed(2)}`,
   };
 }
@@ -116,11 +126,15 @@ export function applyRating(state: GameState, job: Job): number {
   // And a piece sprayed on wet air comes out of the booth with defects in the finish
   // (PIOTR, CLAUDE.md T10 3.3).
   const wet = job.wetFinish ? WET_AIR_FINISH_RATING : 0;
-  const rating = Math.round((scaled - missed - dusty - wet) * 100) / 100;
+  // And a piece made on the second shift comes out a tier down for the share of it that was
+  // (PIOTR, CLAUDE.md T13 3.9).
+  const night = nightQualityPenalty(job);
+  const rating = Math.round((scaled - missed - dusty - wet - night) * 100) / 100;
   job.rating = rating;
   changeReputation(state, scaled, ratingReason(job));
   if (missed > 0) changeReputation(state, -missed, `${job.name}: calls not answered`);
   if (dusty > 0) changeReputation(state, -dusty, `${job.name}: dusty workshop`);
   if (wet > 0) changeReputation(state, -wet, `${job.name}: finish defects`);
+  if (night > 0) changeReputation(state, -night, `${job.name}: made on the night shift`);
   return rating;
 }

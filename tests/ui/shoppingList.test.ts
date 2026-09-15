@@ -43,7 +43,8 @@ describe('the shopping list', () => {
       '4 sheets',
       'Van',
       'Standard table saw',
-      'CNC',
+      // The CNC has its five classes from Turn 13, so its line names the class (T13 3.12).
+      'Standard CNC',
     ]);
     const days = lines.map((line) => line.dueDay);
     expect(days).toEqual([...days].sort((left, right) => left - right));

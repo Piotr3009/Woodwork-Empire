@@ -3,11 +3,21 @@
 //
 // The jobs on the books moved out to the Work Plan board on the office wall.
 
-import { findJob, jobsAtGate, openTasks, staffMinutesLeft, workerById } from '../engine/index';
+import {
+  TAKE_OFF_BUTTON_LABEL,
+  findJob,
+  jobsAtGate,
+  openTasks,
+  staffMinutesLeft,
+  workerById,
+} from '../engine/index';
 import type { GameState, TaskInstance } from '../engine/index';
 import { renderDrawings } from './drawings';
+import { renderInsurance } from './insurance';
 import { gateSection } from './jobCard';
 import { renderMaterials } from './materials';
+import { renderSecurity } from './security';
+import { renderWebsite } from './website';
 import {
   emptyLine,
   escapeHtml,
@@ -21,13 +31,28 @@ import {
 /** The four tabs, in the order the contract names them (docs/art/SPRITES.md 8.2). Team is a chip
  *  that opens the Team board, which is a page of the game now and not a tab inside the laptop
  *  (PIOTR, 13.09; CLAUDE.md T10 3.6): the laptop never renders a body for it. */
-export type LaptopTab = 'tasks' | 'materials' | 'team' | 'drawings';
+export type LaptopTab =
+  | 'tasks'
+  | 'materials'
+  | 'team'
+  | 'drawings'
+  | 'website'
+  | 'insurance'
+  | 'security';
+
+/** The Admin group: the three tabs Turn 13 added, built once (CLAUDE.md T13 3.7, 3.15, 3.17). */
+export const ADMIN_TABS: Array<[LaptopTab, string]> = [
+  ['website', 'Website'],
+  ['insurance', 'Insurance'],
+  ['security', 'Security'],
+];
 
 const TABS: Array<[LaptopTab, string]> = [
   ['tasks', 'Tasks'],
-  ['materials', 'Materials'],
+  ['materials', 'Stock'],
   ['team', 'Team'],
   ['drawings', 'Drawings'],
+  ...ADMIN_TABS,
 ];
 
 export function laptopTabFrom(value: string): LaptopTab {
@@ -50,7 +75,14 @@ function taskRow(state: GameState, task: TaskInstance): string {
   const job = task.jobId === null ? null : findJob(state, task.jobId);
   // The task label already names the job, so the row adds the price and nothing else (T2 3.11).
   const jobLine = job === null ? '' : ` · ${money(job.price)}`;
-  const action = taskStartAction(state, task, staffLine === '' ? 'Start' : 'Take it on');
+  // The take off's button says what the click makes (PIOTR; CLAUDE.md T13 3.8).
+  const startLabel =
+    task.kind === 'materialTakeOff'
+      ? TAKE_OFF_BUTTON_LABEL
+      : staffLine === ''
+        ? 'Start'
+        : 'Take it on';
+  const action = taskStartAction(state, task, startLabel);
   return (
     `<div class="row${task.done ? ' is-done' : ''}${running ? ' is-running' : ''}">` +
     `<span class="row-main">${escapeHtml(task.label)}${jobLine}</span>` +
@@ -96,6 +128,12 @@ export function renderLaptop(state: GameState, view: LaptopView): string {
       ? renderMaterials(state, view.stockSheets)
       : view.tab === 'drawings'
         ? renderDrawings(state)
-        : tasksTab(state);
+        : view.tab === 'website'
+          ? renderWebsite(state)
+          : view.tab === 'insurance'
+            ? renderInsurance(state)
+            : view.tab === 'security'
+              ? renderSecurity(state)
+              : tasksTab(state);
   return tabBar('laptopTab', TABS, view.tab) + body;
 }

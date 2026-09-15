@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   BOOKKEEPING_MINUTES,
-  CLERK_ORDERS_PER_DAY,
+  ESTIMATOR_JOBS_PER_DAY,
   DAY_END_MINUTE,
   JOINER_PREREQUISITES,
   LABOUR_FRACTION,
@@ -21,6 +21,7 @@ import {
   shortfallForHire,
   staffMinutesLeft,
 } from '../../src/engine/staff';
+import { crewLimit } from '../../src/engine/layout';
 import { waitingStation } from '../../src/engine/stations';
 import { createTask } from '../../src/engine/tasks';
 import { minutesRemainingFor, ownerJob } from '../../src/engine/jobs';
@@ -28,6 +29,7 @@ import { weeklyWageBill } from '../../src/engine/economy';
 import { tick } from '../../src/engine/index';
 import type { GameState, Worker } from '../../src/engine/index';
 import {
+  acceptNow,
   act,
   buyNow,
   buyStartingKit,
@@ -123,11 +125,16 @@ describe('the hiring pool', () => {
     expect(canHire(state, 'joiner', 'poor').ok).toBe(true);
   });
 
-  it('stops at the bench slots of the unit', () => {
+  it('stops at the floor limit of the hall, before the bench slots of the unit', () => {
+    // One person per so many square metres of free floor, the owner among them, so a 200 m2
+    // hall with a normal set of kit holds the owner and four (PIOTR; CLAUDE.md T13 3.10).
     const state = withCrew(buyStartingKit(newGame({ difficulty: 'veryEasy' })), 6, 'poor');
-    expect(joiners(state)).toHaveLength(6);
+    expect(joiners(state)).toHaveLength(4);
+    // Every man's bench and cabinets take floor of their own, so the limit came down with the
+    // hiring: the crew is now over it and the next hire is refused with the reason.
+    expect(crewLimit(state)).toBeLessThanOrEqual(joiners(state).length + 1);
     const option = hiringOptions(state).find((entry) => entry.tier === 'poor');
-    expect(option?.blockReason).toContain('bench slot');
+    expect(option?.blockReason).toContain('floor limited');
   });
 
   it('starts the new man the next working day and pays him weekly', () => {
@@ -176,7 +183,7 @@ function jobReadyWith(price: number, tier: Worker['tier']): GameState {
     price,
     deadlineDays: 60,
   });
-  state = fillRack(act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false }));
+  state = fillRack(acceptNow(state, enquiry.id, false));
   firstJob(state).stage = 'ready';
   return state;
 }
@@ -242,7 +249,7 @@ describe('the queue at the saw', () => {
         price: 1600 + index * 10,
         deadlineDays: 60,
       });
-      state = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+      state = acceptNow(state, enquiry.id, false);
     }
     fillRack(state, 60);
     for (const job of state.jobs) job.stage = 'ready';
@@ -307,7 +314,7 @@ describe('one path for putting a man on a job', () => {
 });
 
 describe('the office working day', () => {
-  function officeWorker(id: string, role: 'officeAdmin' | 'purchasingClerk'): Worker {
+  function officeWorker(id: string, role: 'officeAdmin' | 'purchasingClerk' | 'estimator'): Worker {
     return {
       id,
       name: id,
@@ -328,6 +335,8 @@ describe('the office working day', () => {
       station: 'idle',
       productionMinutes: 0,
       absentDaysRemaining: 0,
+      shift: 'day',
+      dayLog: [],
       anchorX: 1,
       anchorY: 1,
     };
@@ -369,16 +378,18 @@ describe('the office working day', () => {
     const books = state.tasks.find((task) => task.kind === 'bookkeeping');
     expect(state.workers[0]?.taskId).toBe(books?.id);
     state = act(state, { type: 'START_TASK', taskId: books?.id ?? '' });
-    expect(state.workers[0]?.taskId).toBeNull();
+    // She moves on to the next thing on her list, and the books are the owner's.
+    expect(state.workers[0]?.taskId).not.toBe(books?.id);
     expect(state.tasks.find((task) => task.kind === 'bookkeeping')?.doneBy).toBe('owner');
   });
 
-  it('stops the purchasing clerk at 16 orders a day', () => {
+  it('stops the estimator at five take offs a day', () => {
+    // Five a day without Joinery Core (PIOTR; CLAUDE.md T13 3.8).
     let state = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
     state.enquiries = [];
-    state.workers.push(officeWorker('c1', 'purchasingClerk'));
+    state.workers.push(officeWorker('e1', 'estimator'));
     const enquiry = placeEnquiry(state, { price: 400, deadlineDays: 90 });
-    state = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+    state = acceptNow(state, enquiry.id, false);
     const first = firstJob(state);
     for (let index = 1; index < 20; index += 1) {
       state.jobs.push({ ...first, id: `job-clone-${index}` });
@@ -387,19 +398,20 @@ describe('the office working day', () => {
     for (const job of state.jobs) {
       job.stage = 'materialPending';
       createTask(state, {
-        kind: 'materialOrder',
-        label: `Material order: ${job.name}`,
+        kind: 'materialTakeOff',
+        label: `Material take off: ${job.name}`,
         minutes: 30,
         jobId: job.id,
       });
     }
-    // One action to settle the state, so the clerk is holding his first order at 08:00.
+    // One action to settle the state, so the estimator is holding his first list at 08:00.
     const morning = act(clearEvents(state), { type: 'SET_SPEED', speed: 1 });
     // His day is the 480 minutes of work, and the clock takes the dinner hour on top of them.
     const day = clearEvents(runClock(morning, DAY_END_MINUTE));
-    const done = day.tasks.filter((task) => task.kind === 'materialOrder' && task.done).length;
-    expect(done).toBe(CLERK_ORDERS_PER_DAY);
-    expect(day.workers[0]?.ordersToday).toBe(CLERK_ORDERS_PER_DAY);
-    expect(staffMinutesLeft(day.workers[0] as Worker)).toBe(0);
+    const done = day.tasks.filter((task) => task.kind === 'materialTakeOff' && task.done).length;
+    expect(done).toBe(ESTIMATOR_JOBS_PER_DAY);
+    expect(day.workers[0]?.ordersToday).toBe(ESTIMATOR_JOBS_PER_DAY);
+    // Five lists are not a day's work: the cap is the capacity, not his minutes.
+    expect(staffMinutesLeft(day.workers[0] as Worker)).toBeGreaterThan(0);
   });
 });

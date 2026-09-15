@@ -107,6 +107,10 @@ describe('footprints in metres', () => {
       extractor: [1, 1, 2],
       compressor: [1, 1, 1],
       airDryer: [1, 1, 1.5],
+      // Turn 13: the spindle moulder is 2 by 1 in a 3 by 3 zone [TUNE] and the pallet truck
+      // parks in one cell (CLAUDE.md T13 3.13, 3.21).
+      spindleMoulder: [2, 1, 1],
+      palletTruck: [1, 1, 1],
     };
     // Every line of the catalogue is in one of the two lists: nothing slips in unmeasured.
     expect(EQUIPMENT_SPECS.map((spec) => spec.id).sort()).toEqual(

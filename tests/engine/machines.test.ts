@@ -17,6 +17,8 @@ import {
   EXTRACTOR_REPAIR_COST,
   REPAIR_MINUTES,
   NO_HELPER_DUST_MULTIPLIER,
+  GATE_OUTPUT_BONUS,
+  GATE_PRICE,
 } from '../../src/engine/constants';
 import { addWorkingDays } from '../../src/engine/clock';
 import {
@@ -42,6 +44,13 @@ import {
   extractorBreakdownChance,
   countOf,
   has,
+  bestOutputFactor,
+  claimMachine,
+  gateCheck,
+  hasGate,
+  machineOutputFactor,
+  outputFactorOf,
+  variantFor,
 } from '../../src/engine/machines';
 import { canBuy } from '../../src/engine/game';
 import { startProductionCheck } from '../../src/engine/jobs';
@@ -49,6 +58,7 @@ import { STATION_NO_BENCH, tick } from '../../src/engine/index';
 import type { Equipment, GameEvent, GameState } from '../../src/engine/index';
 import { renderHall } from '../../src/render/hall';
 import {
+  acceptNow,
   act,
   buyNow,
   buyStartingKit,
@@ -58,6 +68,7 @@ import {
   hireNow,
   newGame,
   placeEnquiry,
+  placeEquipment,
   runToDay,
 } from '../helpers';
 
@@ -69,7 +80,7 @@ function atTheBench(options: { price?: number; seed?: number } = {}): GameState 
   state.enquiries = [];
   const enquiry = placeEnquiry(state, { price: options.price ?? 4000, deadlineDays: 90 });
   const accepted = fillRack(
-    act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false }),
+    acceptNow(state, enquiry.id, false),
   );
   firstJob(accepted).stage = 'ready';
   return act(accepted, { type: 'WORK_HERE', jobId: null });
@@ -109,6 +120,65 @@ describe('the catalogue', () => {
     const two = buyNow(buyNow(state, 'extractor'), 'extractor');
     expect(countOf(two, 'extractor')).toBe(2);
     expect(canBuy(two, 'extractor').ok).toBe(true);
+  });
+});
+
+describe('the automatic gate (CLAUDE.md T13 3.11)', () => {
+  /** A hall with a standard saw and a standard extractor, and money in the bank. */
+  function shop(): GameState {
+    const state = newGame({ difficulty: 'veryEasy' });
+    placeEquipment(state, 'tableSaw', { variantId: 'standard', x: 6, y: 1, id: 'kit-saw' });
+    placeEquipment(state, 'extractor', { variantId: 'standard', x: 18, y: 6 });
+    return state;
+  }
+
+  it('is worth two per cent of output on that machine and on nothing else', () => {
+    const state = shop();
+    const saw = state.equipment.find((item) => item.id === 'kit-saw');
+    if (!saw) throw new Error('no saw');
+    const base = variantFor(saw)?.outputFactor ?? 0;
+    expect(base).toBe(1.05);
+    expect(outputFactorOf(state, saw)).toBe(base);
+    expect(hasGate(state, saw)).toBe(false);
+    // Fitted through the action, which pays for it (game.ts, phase A) and marks the machine.
+    const fitted = act(state, { type: 'BUY_GATE', equipmentId: 'kit-saw' });
+    const gated = fitted.equipment.find((item) => item.id === 'kit-saw');
+    if (!gated) throw new Error('no saw');
+    expect(hasGate(fitted, gated)).toBe(true);
+    expect(fitted.cash).toBe(state.cash - GATE_PRICE);
+    expect(GATE_OUTPUT_BONUS).toBe(0.02);
+    expect(outputFactorOf(fitted, gated)).toBe(1.071);
+    // The projection and the board read the same factor as the man on it (CLAUDE.md T7 3.1).
+    expect(bestOutputFactor(fitted, 'tableSaw')).toBe(1.071);
+    expect(machineOutputFactor(fitted, 'sheet')).toBe(1.071);
+    // A second saw of the same class without a gate is the one nobody prefers.
+    placeEquipment(fitted, 'tableSaw', { variantId: 'standard', x: 10, y: 1, id: 'kit-saw-2' });
+    expect(claimMachine(fitted, 'owner', 'tableSaw')?.id).toBe('kit-saw');
+  });
+
+  it('is refused on a machine with no extraction demand, twice on one machine, and without the cash', () => {
+    const state = shop();
+    placeEquipment(state, 'workbench', { variantId: 'budget', x: 2, y: 8, id: 'kit-bench' });
+    placeEquipment(state, 'edgebander', { variantId: 'budget', x: 2, y: 4, id: 'kit-hand' });
+    expect(gateCheck(state, 'kit-bench')).toEqual({ ok: false, reason: 'It wants no extraction' });
+    // A hand edgebander is used at a bench and wants none either (CLAUDE.md T10 3.1).
+    expect(gateCheck(state, 'kit-hand')).toEqual({ ok: false, reason: 'It wants no extraction' });
+    expect(gateCheck(state, 'nothing')).toEqual({ ok: false, reason: 'No such machine' });
+    expect(gateCheck(state, 'kit-saw')).toEqual({ ok: true, reason: '' });
+    const fitted = act(state, { type: 'BUY_GATE', equipmentId: 'kit-saw' });
+    expect(gateCheck(fitted, 'kit-saw')).toEqual({ ok: false, reason: 'Fitted already' });
+    // A second click on the same button does nothing more (CLAUDE.md T13 1).
+    const again = act(fitted, { type: 'BUY_GATE', equipmentId: 'kit-saw' });
+    expect(again.cash).toBe(fitted.cash);
+    expect(again.gates).toEqual(['kit-saw']);
+    // And the bench refused by the action too, with nothing paid.
+    const bench = act(state, { type: 'BUY_GATE', equipmentId: 'kit-bench' });
+    expect(bench.cash).toBe(state.cash);
+    expect(bench.gates).toEqual([]);
+    const broke = shop();
+    broke.cash = GATE_PRICE - 1;
+    broke.finance.overdraftLimit = 0;
+    expect(gateCheck(broke, 'kit-saw')).toEqual({ ok: false, reason: 'Not enough cash' });
   });
 });
 
@@ -181,6 +251,8 @@ describe('dust', () => {
         station: 'idle',
         productionMinutes: 0,
         absentDaysRemaining: 0,
+        shift: 'day',
+        dayLog: [],
         anchorX: 0,
         anchorY: 4,
       });
@@ -224,6 +296,8 @@ describe('dust', () => {
       station: 'idle',
       productionMinutes: 0,
       absentDaysRemaining: 0,
+      shift: 'day',
+      dayLog: [],
       anchorX: 0,
       anchorY: 4,
     });
@@ -267,6 +341,8 @@ describe('dust', () => {
         station: 'idle',
         productionMinutes: 0,
         absentDaysRemaining: 0,
+        shift: 'day',
+        dayLog: [],
         anchorX: 0,
         anchorY: 4,
       });
@@ -410,7 +486,7 @@ describe('no bench in the hall', () => {
     // Two jobs, in the order they were accepted, and one bench in the hall.
     for (const name of ['Accepted first', 'Accepted second']) {
       const enquiry = placeEnquiry(state, { price: 400, name, deadlineDays: 90 });
-      state = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+      state = acceptNow(state, enquiry.id, false);
     }
     const first = state.jobs[0];
     const second = state.jobs[1];
@@ -448,7 +524,7 @@ describe('no bench in the hall', () => {
     joiner.startDay = state.clock.day;
     // A second job with its material in the hall, and then the bailiff takes the bench.
     const second = placeEnquiry(state, { price: 400, name: 'Garage shelves' });
-    state = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: second.id, byHand: false });
+    state = acceptNow(state, second.id, false);
     const waiting = state.jobs[1];
     if (!waiting) throw new Error('no second job');
     waiting.stage = 'ready';

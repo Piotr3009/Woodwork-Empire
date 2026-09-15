@@ -21,22 +21,23 @@ function typeKey(field: HTMLInputElement, key: string): void {
   field.setSelectionRange(at + 1, at + 1);
   field.dispatchEvent(new Event('input', { bubbles: true }));
 }
+
 /** Plays through to 08:00 tomorrow, answering whatever the day asks on the way. */
 function nextMorning(): void {
   for (let guard = 0; guard < 200; guard += 1) {
     let events = 0;
-    while (root().querySelector('[data-do="resolveEvent"]') !== null && events < 80) {
-      click('[data-do="resolveEvent"]');
+    while (root().querySelector('[data-do="closeHouseCard"], [data-do="resolveEvent"]') !== null && events < 80) {
+      click('[data-do="closeHouseCard"], [data-do="resolveEvent"]');
       events += 1;
     }
-    if (root().querySelector('[data-office="laptop"]') !== null) return;
+    if (root().querySelector('[data-office="binder"]') !== null) return;
     advanceMinutes(30);
   }
 }
 
 function field(): HTMLInputElement {
-  const el = root().querySelector('[data-field="stockSheets"]');
-  if (!(el instanceof HTMLInputElement)) throw new Error('no stock field');
+  const el = root().querySelector('[data-field="loanAmount"]');
+  if (!(el instanceof HTMLInputElement)) throw new Error('no loan field');
   return el;
 }
 
@@ -50,7 +51,9 @@ describe('typing a number', () => {
   });
 
   it('keeps the digits in the order they were typed across re-renders', () => {
-    // The laptop needs the day 1 kit; the Materials tab lives on it (CLAUDE.md T4 3.1).
+    // The binder sits on the desk, so the desk has to be there first (CLAUDE.md T4 3.1). The
+    // loan amount on the binder's Finance tab is the numeric field of the game: the stock page
+    // has no free form order since Restock became its one button (CLAUDE.md T13 3.2, 3.14).
     click('[data-do="setView"][data-view="office"]');
     click('[data-office="catalogue"]');
     for (const id of ['desk', 'chair', 'laptop']) {
@@ -59,12 +62,11 @@ describe('typing a number', () => {
       click('[data-do="closeFolder"]');
     }
     click('[data-do="closeModal"]');
-    // The lorry comes at 08:00 on day 2: the desk and the laptop are on the road until then
-    // (CLAUDE.md T9 3.1).
+    // The lorry comes at 08:00 on day 2: the desk is on the road until then (CLAUDE.md T9 3.1).
     nextMorning();
-    click('[data-office="laptop"]');
+    click('[data-office="binder"]');
     advanceMinutes(10);
-    click('[data-do="laptopTab"][data-id="materials"]');
+    click('[data-do="accountingTab"][data-id="finance"]');
     const input = field();
     expect(input.type).toBe('text');
     input.focus();

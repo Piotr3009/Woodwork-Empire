@@ -51,6 +51,21 @@ export function signClass(value: number): string {
   return '';
 }
 
+/** Pounds with the sign: "+\u00a3300", "-\u00a32,699", "\u00a30". The one formatter for a signed
+ *  money figure, so every plus and minus in pounds reads the same (CLAUDE.md T13 1). */
+export function signedMoney(value: number): string {
+  const rounded = Math.round(value);
+  if (rounded > 0) return `+${money(rounded)}`;
+  return money(rounded);
+}
+
+/** A signed figure as a span in the class its sign gives it: the one helper for a coloured
+ *  plus or minus in the body of a card, a modal or a tooltip (CLAUDE.md T13 3.1). */
+export function signedFigure(text: string, value: number): string {
+  const tone = signClass(value);
+  return `<span class="figure${tone === '' ? '' : ` ${tone}`}">${escapeHtml(text)}</span>`;
+}
+
 const CROSS =
   '<button class="modal-close" data-do="closeModal" title="Close" aria-label="Close">' +
   '×</button>';
@@ -75,6 +90,8 @@ export const MODAL_SKINS: Record<string, ModalSkin> = {
   workPlan: 'board',
   shopping: 'board',
   company: 'board',
+  // The settings, off the gear on the top bar, are a sheet of paper (CLAUDE.md T13 3.22).
+  settings: 'folder',
 };
 
 /** The one board of the three that is a picture and not CSS: green felt in an oak frame, with the

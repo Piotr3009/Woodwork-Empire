@@ -9,17 +9,21 @@ import {
   DRAFTSMAN_RATE,
   DRAFTSMAN_REPUTATION,
   HIRING_SPECS,
+  JOINERY_CORE_PRICE_YEARLY,
 } from '../../src/engine/constants';
 import { hiringOptions, openJobs } from '../../src/engine/index';
 import { canHire, hasWorkingDay } from '../../src/engine/staff';
 
 import { jobTasks, taskWorkRate } from '../../src/engine/tasks';
 import { renderTeam, tradeOf } from '../../src/ui/team';
+import { money } from '../../src/ui/modal';
 import { officeDoor } from '../../src/render/hall';
 import { MODAL_IS_FULL } from '../../src/ui/app';
 import type { GameState, Worker } from '../../src/engine/index';
 import {
+  acceptNow,
   act,
+  buyStartingKit,
   clearEvents,
   firstJob,
   hireNow,
@@ -42,23 +46,26 @@ function known(reputation = 40): GameState {
 }
 
 describe('the board itself', () => {
-  it('is a page of the game and has the three tabs Piotr named', () => {
+  it('is a page of the game and has the three tabs Piotr named, and the Technical one', () => {
     expect(MODAL_IS_FULL.team).toBe(true);
     const page = parse(renderTeam(known(), 'workshop'));
     const tabs = Array.from(page.querySelectorAll('[data-do="teamTab"]'));
+    // The estimator's tab joined in Turn 13 (CLAUDE.md T13 3.8).
     expect(tabs.map((tab) => tab.getAttribute('data-id'))).toEqual([
       'workshop',
       'office',
+      'technical',
       'management',
     ]);
     expect(tabs[0]?.className).toContain('is-on');
   });
 
-  it('puts every role of the hiring pool on one of the three, and none on two', () => {
+  it('puts every role of the hiring pool on one of the four, and none on two', () => {
     for (const spec of HIRING_SPECS) {
       const trade = tradeOf(spec.role);
-      expect(['workshop', 'office'], spec.role).toContain(trade);
-      expect(trade === 'office', spec.role).toBe(hasWorkingDay(spec.role));
+      expect(['workshop', 'office', 'technical', 'management'], spec.role).toContain(trade);
+      // Every desk has a working day: the office, the estimator and the manager (T13 3.8, 3.9).
+      expect(trade !== 'workshop', spec.role).toBe(hasWorkingDay(spec.role));
     }
   });
 
@@ -81,10 +88,20 @@ describe('the board itself', () => {
     ).toEqual(['officeAdmin.', 'purchasingClerk.', 'draftsman.', 'salesman.']);
   });
 
-  it('says nothing here yet on Management, because the chief executive is parked', () => {
-    const page = parse(renderTeam(known(), 'management'));
-    expect(page.textContent).toContain('Nothing here yet');
-    expect(page.querySelectorAll('[data-candidate]')).toHaveLength(0);
+  it('offers the production manager on Management, and the estimator on Technical', () => {
+    // The first management role in the game (CLAUDE.md T13 3.9); the chief executive is parked.
+    const management = parse(renderTeam(known(), 'management'));
+    expect(
+      Array.from(management.querySelectorAll('[data-candidate]')).map((tile) =>
+        tile.getAttribute('data-candidate'),
+      ),
+    ).toEqual(['productionManager.']);
+    const technical = parse(renderTeam(known(), 'technical'));
+    expect(
+      Array.from(technical.querySelectorAll('[data-candidate]')).map((tile) =>
+        tile.getAttribute('data-candidate'),
+      ),
+    ).toEqual(['estimator.poor', 'estimator.normal', 'estimator.super']);
   });
 
   it('carries the rate, the wage and the reputation on every tile, and one Hire', () => {
@@ -174,7 +191,7 @@ describe('the draftsman', () => {
     let state = withLicence(known());
     state.enquiries = [];
     const enquiry = placeEnquiry(state, { price: 4000, deadlineDays: 40 });
-    state = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+    state = acceptNow(state, enquiry.id, false);
     const design = jobTasks(state, firstJob(state).id).find((task) => task.kind === 'design');
     if (!design) throw new Error('no drawing to do');
     // Until he is hired the drawing is the owner's: nobody else has it.
@@ -196,5 +213,28 @@ describe('the draftsman', () => {
     const later = clearEvents(runClock(hired, 10));
     const after = jobTasks(later, firstJob(later).id).find((task) => task.kind === 'design');
     expect(before - (after?.minutesRemaining ?? 0)).toBeCloseTo(10 * DRAFTSMAN_RATE, 6);
+  });
+});
+
+describe('the Technical tab (CLAUDE.md T13 3.8)', () => {
+  it('sells Joinery Core beside the estimator, with the capacity and the yearly prices', () => {
+    const state = buyStartingKit(known());
+    const page = parse(renderTeam(state, 'technical'));
+    expect(page.querySelectorAll('[data-do="buyJoineryCore"]')).toHaveLength(1);
+    expect(page.textContent).toContain('5 a day, 10 with Joinery Core');
+    expect(page.textContent).toContain(`${money(JOINERY_CORE_PRICE_YEARLY)} a year`);
+    // The extension waits for the core: a reason, not a button.
+    expect(page.querySelectorAll('[data-do="buyJoineryCoreExtension"]')).toHaveLength(0);
+    expect(page.textContent).toContain('Joinery Core first');
+    const bought = parse(renderTeam(act(state, { type: 'BUY_JOINERY_CORE' }), 'technical'));
+    expect(bought.querySelectorAll('[data-do="buyJoineryCore"]')).toHaveLength(0);
+    expect(bought.querySelectorAll('[data-do="buyJoineryCoreExtension"]')).toHaveLength(1);
+    expect(bought.textContent).toContain('10 take offs a day');
+  });
+
+  it('says so when there is no laptop to put it on', () => {
+    const page = parse(renderTeam(known(), 'technical'));
+    expect(page.querySelectorAll('[data-do="buyJoineryCore"]')).toHaveLength(0);
+    expect(page.textContent).toContain('Needs the laptop');
   });
 });
