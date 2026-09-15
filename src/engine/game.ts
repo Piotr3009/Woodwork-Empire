@@ -4,7 +4,6 @@
 import {
   WET_AIR_FINISH_FACTOR,
   ACCIDENT_CHANCE_PER_DAY,
-  ACCIDENT_DAYS_OFF,
   ADMIN_COVER_RATE,
   BENCH_SLOT_LAYOUT,
   BREAK_MINUTES,
@@ -51,20 +50,20 @@ import {
   offerContract,
   renewContract,
   runContractDay,
+  contractMen,
+  contractStationFor,
   runContractMinute,
 } from './contracts';
 import { emptyEfficiency } from './efficiency';
-import { accrueOverdraftInterest, repayLoan, runFinanceMonth, takeLoan } from './finance';
+import { accrueOverdraftInterest, repayLoan, takeLoan } from './finance';
 import {
   claimBurglary,
-  onAccident,
   refreshInsuredValue,
   runInsuranceDay,
-  runInsuranceMonth,
   setInsurance,
 } from './insurance';
 import { connectExtraction, disconnectExtraction, dropOrphanPipes } from './pipes';
-import { rollBurglary, runSecurityMonth, setSecurityLevel } from './security';
+import { burgle, rollBurglary, setSecurityLevel } from './security';
 import { setWebsiteLevel } from './website';
 import { missCall, nextDueCall, takeCall } from './calls';
 import { canPlaceSpec, firstFreeCell, moveItem } from './layout';
@@ -144,6 +143,8 @@ import {
   serviceCostFor,
   serviceMachine,
   serviceableMachines,
+  gateCheck,
+  outputFactorOf,
   specOf,
   variantOf,
 } from './machines';
@@ -205,14 +206,12 @@ import {
   startHoliday,
 } from './owner';
 import { chance, int, makeId } from './rng';
-import { isFirstOfMonth as firstOfMonth } from './clock';
 import { type StagePlan, cncOptions, labourPerMinute } from './stages';
 import {
   airFactorFor,
   benchDrawsAir,
   compressors,
   drawingOn,
-  extractionDemandOf as extractionDemandOfItem,
   hallAirCheck,
   sprayingOnWetAir,
   underExtracted,
@@ -238,6 +237,8 @@ import {
   isWorkingToday,
   joiners,
   recordStaffOvertime,
+  hurtWorker,
+  rollNightBreakdowns,
   runNightShift,
   runStaffDayStart,
   staffMinutesLeft,
@@ -481,11 +482,6 @@ function startDay(state: GameState): void {
   releaseMachinesExcept(state, []);
   // The month's paper before the day's: the loan, the covers and the security run with the
   // monthly items, and the report is put in front of the player before the board (T13 3.20).
-  if (firstOfMonth(state.clock.day)) {
-    runFinanceMonth(state);
-    runInsuranceMonth(state);
-    runSecurityMonth(state);
-  }
   runDayCosts(state, state.clock.day);
   accrueOverdraftInterest(state);
   raiseMonthEnd(state);
@@ -555,9 +551,8 @@ function raiseMonthEnd(state: GameState): void {
  *  Phase B4 owns what is taken; phase A rolls and takes nothing until then. */
 function runBurglary(state: GameState): void {
   if (!rollBurglary(state)) return;
-  state.security.lastBurglaryDay = state.clock.day;
-  const paid = claimBurglary(state, 0);
-  void paid;
+  const lost = burgle(state);
+  claimBurglary(state, lost);
 }
 
 /** 08:00 on the due day: the lorries with the kit on them. Furniture, hand tools and anything
@@ -741,17 +736,8 @@ function runAccidentRoll(state: GameState): void {
   if (!chance(state, ACCIDENT_CHANCE_PER_DAY)) return;
   const worker = crew[int(state, 0, crew.length - 1)];
   if (!worker) return;
-  worker.absentDaysRemaining = ACCIDENT_DAYS_OFF;
-  const job = worker.jobId ? findJob(state, worker.jobId) : null;
-  if (job) releaseJob(state, job);
-  queueEvent(state, {
-    kind: 'accident',
-    title: 'Accident in the hall',
-    body: `${worker.name} has been hurt in all that mess. He is off for ${ACCIDENT_DAYS_OFF} days.`,
-    data: { workerId: worker.id, days: ACCIDENT_DAYS_OFF },
-  });
-  // With no liability cover, the claim follows (CLAUDE.md T13 3.15).
-  onAccident(state, worker.name);
+  // One door for a hurt man, by day and by night (CLAUDE.md T13 3.9, 3.15).
+  hurtWorker(state, worker);
 }
 
 /** The month end, and the men who have had enough of the evenings. A tired man has one chance in
@@ -904,8 +890,15 @@ function finishDay(state: GameState): void {
   // player decides again whether to sit through it (CLAUDE.md T8 3.3).
   endSkip(state);
   state.owner.wentHome = true;
-  // The second shift works after the day, with the owner gone (CLAUDE.md T13 3.9).
-  runNightShift(state);
+  // The second shift works after the day, with the owner gone (CLAUDE.md T13 3.9). What it
+  // finished stands at the gate, what it filled is the bag store, and what it wore out can
+  // give up at twice the day's chance.
+  const night = runNightShift(state);
+  for (const job of night.finished) raiseJobAtGate(state, job);
+  if (night.bagsFull) raiseBagsFull(state);
+  for (const machine of rollNightBreakdowns(state, night.usedMachineIds)) {
+    raiseMachineBroken(state, machine);
+  }
   recordDay(state);
   if (!showsDaySummary(state)) {
     advanceToNextDay(state);
@@ -1334,6 +1327,12 @@ function updateStations(state: GameState): void {
         : STATION_NO_BENCH;
       continue;
     }
+    // A man on a standing contract stands where the contract put him (CLAUDE.md T13 3.16).
+    const onContract = contractStationFor(state, worker);
+    if (onContract !== null) {
+      worker.station = onContract;
+      continue;
+    }
     // A joiner with work waiting and nowhere to do it stands at the canteen door (T4 3.4).
     const stuck =
       worker.role === 'joiner' && freeBenches(state) === 0 && oldestReadyJob(state) !== null;
@@ -1538,7 +1537,8 @@ function runProductionMinute(state: GameState, ownerOnTask: boolean): void {
   const working = handsAtWork(state, ownerOnTask, moving);
   // Anybody who is not at a job this minute walks away from whatever he was standing at, so the
   // next man can have it (CLAUDE.md T7 3.1).
-  releaseMachinesExcept(state, working.map((hand) => hand.who));
+  // The men on a standing contract keep their saw beside the jobs' men (CLAUDE.md T13 3.16).
+  releaseMachinesExcept(state, [...working.map((hand) => hand.who), ...contractMen(state)]);
   // Who actually stands at what this minute. Nothing is worked off the job yet: the machines have
   // to be taken before the hall can be asked what its media add up to.
   const atWork: AtWork[] = [];
@@ -1564,8 +1564,9 @@ function runProductionMinute(state: GameState, ownerOnTask: boolean): void {
     atWork.push({ hand, stage, machine: at.machine });
   }
   // The men on a standing contract put their minute in beside the jobs (CLAUDE.md T13 3.16).
-  runContractMinute(state);
-  if (atWork.length === 0) {
+  const contract = runContractMinute(state);
+  if (contract.bagsFilled) raiseBagsFull(state);
+  if (atWork.length === 0 && contract.worked === 0) {
     tallyEfficiency(state, 0, lost);
     return;
   }
@@ -1596,7 +1597,7 @@ function runProductionMinute(state: GameState, ownerOnTask: boolean): void {
     // speed is the class of the machine he actually got (CLAUDE.md T7 3.1).
     let speed = machine === null
       ? stage.speed
-      : variantOf(specOf(machine.specId), machine.variantId).outputFactor;
+      : outputFactorOf(state, machine);
     // A compressor that is short of litres runs every pneumatic consumer on it at 0.7 for the
     // minute, and a booth on wet air takes half as long again over the finish and marks the
     // piece (PIOTR, CLAUDE.md T10 3.2, 3.3).
@@ -1624,7 +1625,7 @@ function runProductionMinute(state: GameState, ownerOnTask: boolean): void {
     worked += away;
     if (away < 1) lose('ownerAway', 1 - away);
   }
-  tallyEfficiency(state, worked, lost);
+  tallyEfficiency(state, worked + contract.worked, lost);
   state.productionMinutesMonth += 1;
   addDust(state, 1);
   // The minute the store fills, the workshop is told once, not once a machine (CLAUDE.md T12 2.3).
@@ -2182,7 +2183,11 @@ export function applyAction(state: GameState, action: GameAction): GameState {
       break;
     }
     case 'TAKE_HOLIDAY':
-      startHoliday(next, Math.min(HOLIDAY_MAX_DAYS, action.days));
+      // A holiday with nobody in the hall is not worth watching: straight to the summary, as a
+      // day off is (CLAUDE.md T13 3.9).
+      if (startHoliday(next, Math.min(HOLIDAY_MAX_DAYS, action.days)).ok && hallIsEmpty(next)) {
+        finishDay(next);
+      }
       break;
     case 'SET_OWNER_DRAW':
       // Eight thresholds and nothing in between (CLAUDE.md T13 3.18).
@@ -2233,11 +2238,11 @@ export function applyAction(state: GameState, action: GameAction): GameState {
 /** An automatic blast gate on a machine's drop: only for a machine with an extraction demand,
  *  once, fitted for the price (CLAUDE.md T13 3.11). What it does is phase B4's. */
 export function buyGate(state: GameState, equipmentId: string): BuyCheck {
+  // The four refusals live in one place, read by the card's button too (CLAUDE.md T13 3.11).
+  const check = gateCheck(state, equipmentId);
+  if (!check.ok) return check;
   const item = state.equipment.find((entry) => entry.id === equipmentId);
   if (!item) return { ok: false, reason: 'No such machine' };
-  if (state.gates.includes(item.id)) return { ok: false, reason: 'Fitted already' };
-  if (extractionDemandOfItem(item) <= 0) return { ok: false, reason: 'It wants no extraction' };
-  if (!canAfford(state, GATE_PRICE)) return { ok: false, reason: 'Not enough cash' };
   const name = findSpec(item.specId)?.name ?? item.specId;
   pay(state, 'equipment', `Automatic gate: ${name.toLowerCase()}`, GATE_PRICE);
   state.gates.push(item.id);

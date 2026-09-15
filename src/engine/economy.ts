@@ -40,6 +40,7 @@ import { queueEvent } from './events';
 // modules import `charge` from here and use it inside their functions only, so the cycle is safe.
 import { runFinanceMonth } from './finance';
 import { runInsuranceMonth } from './insurance';
+import { runSecurityMonth } from './security';
 import { has, hasCentralExtraction, machinePowerPerDay, seizableMachines } from './machines';
 import { ownerDrawPerDay } from './owner';
 import { makeId } from './rng';
@@ -494,6 +495,7 @@ function runMonthlyItems(state: GameState): void {
   // and the month's totals were emptied a moment ago, so the top bar's "today" counts them.
   runFinanceMonth(state);
   runInsuranceMonth(state);
+  runSecurityMonth(state);
   if (state.ledger.length > entriesBefore) {
     queueEvent(state, {
       kind: 'monthlyBills',
