@@ -11,7 +11,8 @@ and the tests that match them by name. Sections 3.1 (side menu, colour audit), 3
 | Task | Commit | What went in | Proved by |
 |---|---|---|---|
 | T13-B5a Side menu, colour audit, settings | `f5e9b46` | The side menu carries its own close control (`.menu-close`, `data-do="closeMenu"`) in `renderMenu`, over the click outside phase A wired; the gear (`.gear`, `data-do="openSettings"`) joins the push block of the top bar; the day end summary's In, Out and Net lines go through `signedFigure(signedMoney())`, which was the one unsigned figure the audit found in the files of this group; `renderSettings` is the one row of two chips and a hint, and nothing else. Where: `src/ui/topbar.ts`, `src/ui/dayEnd.ts`, `src/ui/settings.ts`. | `tests/ui/menu.test.ts` (open, click outside, closed; open, close control, closed; a click on the menu keeps it); `tests/ui/modal.test.ts` (the helper's three cases; the walk over every tab, every folder and every class card of the catalogue, the day end summary of a day that cost money, and the top bar's day figure in the red and in the black: no signed figure outside `.good` or `.bad`); `tests/ui/settings.test.ts` (the lit chip follows the setting; the gear opens the folder modal with its bubble; off switches `state.settings.tips` and every `renderTip` goes empty with nothing dismissed; on brings the undismissed bubbles back); `tests/ui/summary.test.ts` (the three signed rows) |
-| T13-B5b Efficiency number and breakdown | this commit | One live number next to the clock, `Efficiency 73%`, as a `<details class="efficiency">` whose summary is the number and whose body is the plate (`.efficiency-plate`) of the four lines (`.efficiency-line`, `data-cause`), each a share of the lost minutes, with a header line of worked, possible and lost minutes: a details element needs no click handler and no `Ui` field. `patch.ts` leaves a details' `open` attribute alone, so the plate the player opened stays open through the game minute. The engine's `efficiencyOf` and `workshopEfficiency` were verified against 3.5 and kept; `topCause` joined `efficiency.ts` for the day end's line "73%, mostly no machine free", beside a Night shift row when the summary carries night minutes. The name plate's day figure goes through `signedMoney`. Where: `src/engine/efficiency.ts`, `src/ui/topbar.ts`, `src/ui/patch.ts`, `src/ui/dayEnd.ts`. | `tests/engine/efficiency.test.ts` (the number is worked over possible; 100 on a day nobody could have worked; the four lines sum to the lost minutes and the percentages to a hundred by the largest remainder, fractional minutes included; the top cause and its tie; three played days: two saws 100%, one saw books the waiting man as no machine free, the owner out drops his seat and books the absence factor as owner away); `tests/ui/patch.test.ts` (a details the player opened stays open, one he did not stays shut, markup that says open opens it, other attributes still follow the markup, a control keeps its node); `tests/ui/topbar.test.ts` (the number in the clock block, the plate's four labels and shares, the summary toggles with no handler, 100% before the first minute; the day figure equals the sum of that day's ledger lines, signed and coloured); `tests/ui/summary.test.ts` (the efficiency row, the night shift row) |
+| T13-B5b Efficiency number and breakdown | `325b2c2` | One live number next to the clock, `Efficiency 73%`, as a `<details class="efficiency">` whose summary is the number and whose body is the plate (`.efficiency-plate`) of the four lines (`.efficiency-line`, `data-cause`), each a share of the lost minutes, with a header line of worked, possible and lost minutes: a details element needs no click handler and no `Ui` field. `patch.ts` leaves a details' `open` attribute alone, so the plate the player opened stays open through the game minute. The engine's `efficiencyOf` and `workshopEfficiency` were verified against 3.5 and kept; `topCause` joined `efficiency.ts` for the day end's line "73%, mostly no machine free", beside a Night shift row when the summary carries night minutes. The name plate's day figure goes through `signedMoney`. Where: `src/engine/efficiency.ts`, `src/ui/topbar.ts`, `src/ui/patch.ts`, `src/ui/dayEnd.ts`. | `tests/engine/efficiency.test.ts` (the number is worked over possible; 100 on a day nobody could have worked; the four lines sum to the lost minutes and the percentages to a hundred by the largest remainder, fractional minutes included; the top cause and its tie; three played days: two saws 100%, one saw books the waiting man as no machine free, the owner out drops his seat and books the absence factor as owner away); `tests/ui/patch.test.ts` (a details the player opened stays open, one he did not stays shut, markup that says open opens it, other attributes still follow the markup, a control keeps its node); `tests/ui/topbar.test.ts` (the number in the clock block, the plate's four labels and shares, the summary toggles with no handler, 100% before the first minute; the day figure equals the sum of that day's ledger lines, signed and coloured); `tests/ui/summary.test.ts` (the efficiency row, the night shift row) |
+| T13-B5c Tips and the warning strip | this commit | `warnings(state)` in `src/engine/warnings.ts` is the whole list now, in `WARNING_ORDER`: the bags full (`bagStore(state).full`), a started job nobody is on, a deadline at risk off the work plan (a row `overdue` or `late` for a job not yet finished), a commercial enquiry greyed with `NO_INSURANCE_REASON`, the crew at the floor limit (`crewFull` for a joiner, in the `crewLine` words). One check per key, in a table, so the order is one list. The first use bubbles and the strip themselves were phase A's `renderTip` and `renderWarningStrip` in `src/ui/tips.ts`, verified against 3.22 and left as they were: the bubble is keyed, dismissed by `dismissTip`, remembered in `state.tips.seen`, and empty with tips off; the strip prints the first warning with `data-warning`. The twelve sentences in `TIPS` were read against the brief's list and none needed rewording. | `tests/engine/warnings.test.ts` (empty on a quiet hall; each of the five on its own, with its text; a comfortable deadline says nothing; the order as a list and as a hall with all five at once; the next one down as each is dealt with); `tests/ui/tips.test.ts` (the twelve keys have a sentence; each bubble once, dismissed, remembered, a double dismissal one entry; never with tips off; the strip empty when nothing is wrong and one line keyed when something is; through the page: the catalogue's bubble the first time and never after dismissal, the strip right under the top bar and down again when the problem goes) |
 
 ## 2. Numbers chosen
 
@@ -67,6 +68,37 @@ None so far. Every figure this group prints is the engine's.
 
 .settings .hint {
   margin-top: 8px;
+}
+
+/* The warning strip under the top bar: one line, the game's red on the cabinet's green, keyed by
+   data-warning so a problem can carry its own colour later (T13 3.22). */
+.warning-strip {
+  background: #4a1f1a;
+  border-bottom: 1px solid #0a1a10;
+  color: #f5efe2;
+  font-size: 13px;
+  padding: 4px 16px;
+}
+
+/* The first use bubble over a screen's body: a cream note with the one sentence and its Right
+   button (T13 3.22). */
+.tip-bubble {
+  align-items: center;
+  background: linear-gradient(#f5efe2, #e3dcc9);
+  border: 1px solid #5b5446;
+  border-radius: 4px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+  color: #1d2a22;
+  display: flex;
+  font-size: 13px;
+  gap: 12px;
+  justify-content: space-between;
+  margin: 0 0 10px;
+  padding: 8px 10px;
+}
+
+.tip-close {
+  flex: 0 0 auto;
 }
 
 /* The efficiency number next to the clock, and the plate behind a click on it (T13 3.5). The
