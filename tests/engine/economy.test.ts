@@ -24,6 +24,7 @@ import {
   bankruptcyFloor,
   booksBehind,
   canAfford,
+  charge,
   dailyPower,
   dailyRates,
   dailyRent,
@@ -511,5 +512,43 @@ describe('the books', () => {
     expect(state.clock.day).toBeGreaterThanOrEqual(31);
     expect(state.ledger.filter((entry) => entry.category === 'accounts')).toHaveLength(0);
     expect(state.lateAccountsMonths).toBe(0);
+  });
+});
+
+describe('charge with merge', () => {
+  it('adds to the line of the day with the same category and words instead of writing another', () => {
+    const state = newGame();
+    const before = state.cash;
+    const incomeBefore = state.finance.day.income;
+    const costsBefore = state.finance.day.costs;
+    expect(charge(state, 'contract', 'Packs: pieces', 38, { merge: true })).toBe(true);
+    expect(charge(state, 'contract', 'Packs: pieces', 38, { merge: true })).toBe(true);
+    expect(charge(state, 'contract', 'Packs: material', -30, { merge: true })).toBe(true);
+    expect(charge(state, 'contract', 'Packs: material', -30, { merge: true })).toBe(true);
+    const lines = state.ledger.filter((entry) => entry.category === 'contract');
+    expect(lines.map((entry) => [entry.label, entry.amount])).toEqual([
+      ['Packs: pieces', 76],
+      ['Packs: material', -60],
+    ]);
+    expect(state.cash).toBe(before + 16);
+    // The balance on a merged line is the bank after the last piece, and the totals count both.
+    expect(lines[1]?.balance).toBe(state.cash);
+    expect(state.finance.day.byCategory.contract).toBe(16);
+    expect(state.finance.day.income - incomeBefore).toBe(76);
+    expect(state.finance.day.costs - costsBefore).toBe(60);
+  });
+
+  it('starts a fresh line on a new day, and never merges into a line that went unpaid', () => {
+    const state = newGame();
+    charge(state, 'contract', 'Packs: pieces', 38, { merge: true });
+    state.clock.day += 1;
+    charge(state, 'contract', 'Packs: pieces', 38, { merge: true });
+    expect(state.ledger.filter((entry) => entry.category === 'contract')).toHaveLength(2);
+    state.cash = state.finance.overdraftLimit;
+    charge(state, 'contract', 'Packs: material', -30, { merge: true, unavoidable: true });
+    charge(state, 'contract', 'Packs: material', -30, { merge: true, unavoidable: true });
+    const unpaid = state.ledger.filter((entry) => entry.category === 'contract' && entry.unpaid);
+    expect(unpaid).toHaveLength(2);
+    expect(state.finance.arrearsAmount).toBe(60);
   });
 });
