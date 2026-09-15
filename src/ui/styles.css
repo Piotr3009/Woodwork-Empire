@@ -9,6 +9,8 @@
   --accent: #c98a3b;
   --good: #6ba368;
   --bad: #c05a4e;
+  /* The cream of the paper family, on the dark green cabinet of the top bar (T11 3.1). */
+  --cream: #f3ecdc;
 
   /* Placeholder art, section 10.3. Flat colours, no gradients. */
   --concrete: #8f9298;
@@ -460,37 +462,75 @@ input.num {
    Top bar
    -------------------------------------------------------------------------- */
 
+/* The bar is a machine cabinet: the darkest green of the workshop, a lighter edge along the top
+   and a dark one along the bottom, and a rivet in each corner, all of it drawn in CSS and none of
+   it a picture (CLAUDE.md T11 3.1). */
 .topbar {
   align-items: center;
-  background: var(--panel);
-  border-bottom: 1px solid var(--border);
+  background:
+    radial-gradient(circle at 10px 12px, #46584c 0 2px, transparent 2.5px),
+    radial-gradient(circle at calc(100% - 10px) 12px, #46584c 0 2px, transparent 2.5px),
+    radial-gradient(circle at 10px calc(100% - 12px), #46584c 0 2px, transparent 2.5px),
+    radial-gradient(circle at calc(100% - 10px) calc(100% - 12px), #46584c 0 2px, transparent 2.5px),
+    linear-gradient(#102518, #0a1a10);
+  border-bottom: 2px solid #050d08;
+  border-top: 1px solid #2b4436;
+  color: var(--cream);
   display: flex;
   gap: 14px;
-  padding: 6px 12px;
+  height: 70px;
+  padding: 0 14px;
+}
+
+/* The cream name plate the money is screwed to, with a rivet dot at each end. */
+.name-plate {
+  background:
+    radial-gradient(circle at 7px 50%, #a79d87 0 2px, transparent 2.5px),
+    radial-gradient(circle at calc(100% - 7px) 50%, #a79d87 0 2px, transparent 2.5px),
+    linear-gradient(#f3ecdc, #d9d1bd);
+  border: 1px solid #5b5446;
+  border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  line-height: 1.1;
+  padding: 4px 16px;
 }
 
 .topbar .cash {
-  font-size: 16px;
-  font-weight: 600;
+  color: #12301f;
+  font-family: var(--font-title);
+  font-size: 26px;
+  font-weight: 400;
 }
 
-.topbar .net.good {
-  color: var(--good);
-}
-
-.topbar .net.bad {
-  color: var(--bad);
-}
-
-.topbar .net,
-.topbar .left,
-.topbar .date {
-  color: var(--text-dim);
+.topbar .net {
+  color: #5b5446;
   font-size: 12px;
 }
 
+.topbar .net.good {
+  color: #1d6b39;
+}
+
+.topbar .net.bad {
+  color: #b3261e;
+}
+
+/* The date over the knobs. */
+.clock-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  justify-content: center;
+}
+
 .topbar .date {
-  color: var(--text);
+  color: var(--cream);
+  font-family: var(--font-title);
+  font-size: 20px;
+  line-height: 1;
+  white-space: nowrap;
 }
 
 .topbar .speeds {
@@ -498,40 +538,212 @@ input.num {
   gap: 4px;
 }
 
+/* The speed knobs: dark rounded buttons, the one that is on in the game's orange with a glow. */
+.topbar .knob {
+  background: #16301f;
+  border: 1px solid #2b4436;
+  border-radius: 9px;
+  color: #cfd8cf;
+  font-size: 11px;
+  padding: 2px 8px;
+}
+
+.topbar .knob:hover:not([disabled]) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.topbar .knob.is-on {
+  background: var(--accent);
+  border-color: var(--accent);
+  box-shadow: 0 0 8px rgba(201, 138, 59, 0.75);
+  color: #1c1f24;
+}
+
 .topbar .spacer {
   flex: 1;
 }
 
-.minutes {
+.topbar .reason {
+  color: #9fb0a3;
+  font-size: 12px;
+}
+
+/* The boss's day: a dark inset panel with a lamp, what he is on, how much of the day has gone,
+   and the day itself in bands underneath (CLAUDE.md T11 3.1). */
+.day-meter {
+  background: #0a1a10;
+  border: 1px solid #23392c;
+  border-radius: 5px;
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.6);
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  justify-content: center;
+  min-width: 340px;
+  padding: 6px 10px;
+  position: relative;
+}
+
+.day-head {
   align-items: center;
   display: flex;
   gap: 8px;
 }
 
-.minute-bar {
-  background: var(--page);
-  border: 1px solid var(--border);
+.day-line {
+  color: var(--cream);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.day-count {
+  color: #9fb0a3;
+  font-size: 12px;
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.lamp {
+  border-radius: 50%;
+  flex: none;
+  height: 8px;
+  width: 8px;
+}
+
+.lamp.is-busy {
+  background: var(--accent);
+  box-shadow: 0 0 6px rgba(201, 138, 59, 0.9);
+}
+
+.lamp.is-idle {
+  background: #2e9e5b;
+  box-shadow: 0 0 6px rgba(46, 158, 91, 0.8);
+}
+
+.lamp.is-away {
+  background: #6a706b;
+}
+
+/* The day itself. Break and idle are simply not painted (CLAUDE.md T11 3.1). */
+.day-bar {
+  background: #05100a;
+  border: 1px solid #23392c;
   border-radius: 2px;
   display: flex;
   height: 12px;
   overflow: hidden;
-  width: 220px;
+  width: 100%;
 }
 
-.seg-admin {
-  background: #8a8f96;
-}
-
-.seg-design {
-  background: #7a6a9c;
+.day-bar .seg {
+  display: block;
+  height: 100%;
 }
 
 .seg-workshop {
-  background: #5f9c5f;
+  background: #2e9e5b;
 }
 
-.minute-count {
+.seg-calls {
+  background: #378add;
+}
+
+.seg-emails {
+  background: #7f77dd;
+}
+
+.seg-meetings {
+  background: #c9a227;
+}
+
+.seg-siteMeasure {
+  background: #8e6a3a;
+}
+
+.seg-office {
+  background: #e0731e;
+}
+
+.seg-fixing {
+  background: #d84a4a;
+}
+
+/* No legend under the bar: it is on a small cream plate behind the hover (CLAUDE.md T11 3.1). */
+.day-tip {
+  background: linear-gradient(#f5efe2, #e3dcc9);
+  border: 1px solid #5b5446;
+  border-radius: 4px;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.45);
+  color: #1d2a22;
+  display: none;
+  left: 0;
+  padding: 6px 8px;
+  position: absolute;
+  top: calc(100% + 6px);
+  white-space: nowrap;
+  z-index: 50;
+}
+
+.day-meter:hover .day-tip {
+  display: block;
+}
+
+.tip-row {
+  align-items: center;
+  display: flex;
   font-size: 12px;
+  gap: 6px;
+}
+
+.tip-key {
+  border: 1px solid rgba(0, 0, 0, 0.35);
+  border-radius: 2px;
+  display: block;
+  height: 9px;
+  width: 14px;
+}
+
+.tip-name {
+  min-width: 96px;
+}
+
+.tip-min {
+  margin-left: auto;
+}
+
+/* The push buttons on the right: cream plates with a hard shadow, orange when there is something
+   behind them the player has not seen yet (CLAUDE.md T11 3.1). */
+.push-block {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
+.push {
+  background: linear-gradient(#f3ecdc, #ddd5c1);
+  border: 1px solid #5b5446;
+  border-radius: 4px;
+  box-shadow: 0 3px 0 #0a1a10;
+  color: #12301f;
+  cursor: pointer;
+  font-family: var(--font-title);
+  font-size: 16px;
+  padding: 4px 12px;
+}
+
+.push:hover:not([disabled]) {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #12301f;
+}
+
+.push.is-new {
+  background: linear-gradient(#e8964a, var(--accent));
+  border-color: #8a4f13;
+  color: #1c1f24;
 }
 
 /* What today's work is multiplied by, shown only when it is below 1 (CLAUDE.md T6 3.4). */
@@ -1877,6 +2089,35 @@ input.num {
 .modal-folder .warn,
 .modal-folder .warning {
   color: #b3261e;
+}
+
+/* The plate at the top of the evening's summary: the day, what it went on and what it came to
+   (CLAUDE.md T11 3.1). */
+.day-plate {
+  background: linear-gradient(#f5efe2, #e3dcc9);
+  border: 1px solid #5b5446;
+  border-radius: 4px;
+  color: #1d2a22;
+  margin-bottom: 10px;
+  padding: 8px 12px;
+}
+
+.day-plate h3 {
+  color: #12301f;
+  font-family: var(--font-title);
+  font-size: 22px;
+  font-weight: 400;
+  margin: 0;
+}
+
+.day-shares {
+  font-weight: 600;
+  margin: 2px 0 0;
+}
+
+.day-figures {
+  color: #4d5a52;
+  margin: 2px 0 0;
 }
 
 /* The file picker behind "Load from file" is the browser's; the input itself stays out of sight. */

@@ -18,6 +18,7 @@ import {
   oldestReadyJob,
   ownerJob,
   runMinutes,
+  shoppingList,
   startProductionCheck,
   timeIsPaused,
 } from '../engine/index';
@@ -92,7 +93,7 @@ import { renderStart } from './start';
 import { decodeSaveFile, encodeSaveFile, saveFileName } from '../cloud/file';
 import { cloudAvailable } from '../cloud/supabase';
 import { hasSave, loadGame, saveGame, sendMagicLink, signOut, signedInEmail } from '../cloud/saves';
-import { renderMenu, renderTopbar, speedFromString } from './topbar';
+import { type TopbarNews, renderMenu, renderTopbar, speedFromString } from './topbar';
 
 /** The modals the room can open. Materials, Team and Drawings are tabs inside the laptop now:
  *  one path per modal, only the entry moved (docs/art/SPRITES.md 8.4). */
@@ -165,6 +166,10 @@ interface Ui {
   /** A pan that moved is not a click on what it started on. */
   panned: boolean;
   showWhy: boolean;
+  /** What was on the order board and on the shopping list when the player last opened them. A
+   *  push button with something new behind it lights orange (CLAUDE.md T11 3.1). */
+  seenEnquiries: string[];
+  seenOrders: string[];
   /** The real life note the player has open, and where he clicked for it. */
   why: { key: string; left: number; top: number } | null;
   cloud: {
@@ -247,6 +252,8 @@ function freshUi(): Ui {
     cameraStarted: false,
     panned: false,
     showWhy: true,
+    seenEnquiries: [],
+    seenOrders: [],
     why: null,
     cloud: {
       available: cloudAvailable(),
@@ -466,7 +473,7 @@ function hallZoomControls(): string {
  *  be measured. `VIEW_PADDING` is the padding of `.view` in styles.css; `TOPBAR_HEIGHT` is what the
  *  top bar comes to with that stylesheet's padding and type, and it is a guess, not a declared
  *  number. `fitOfficeStack` takes the real box a moment later, so neither has to be right. */
-const TOPBAR_HEIGHT = 45;
+const TOPBAR_HEIGHT = 70;
 const VIEW_PADDING = 12;
 
 /** The room the office has under the top bar, in CSS pixels, before it has been measured. */
@@ -585,6 +592,16 @@ function pageHtml(scene: Scene | null): string {
   return pageBody(scene) + VERSION_CORNER;
 }
 
+/** What the player has not looked at yet: an enquiry that was not on the board when he last
+ *  opened it, and an order that has landed since he last looked at the list (T11 3.1). */
+function topbarNews(current: GameState): TopbarNews {
+  const waiting = shoppingList(current).map((line) => line.id);
+  return {
+    board: current.enquiries.some((enquiry) => !ui.seenEnquiries.includes(enquiry.id)),
+    orders: ui.seenOrders.some((id) => !waiting.includes(id)),
+  };
+}
+
 function pageBody(scene: Scene | null): string {
   if (ui.screen === 'start' || state === null) {
     return (
@@ -606,7 +623,7 @@ function pageBody(scene: Scene | null): string {
   const toast = ui.toast === '' ? '' : `<p class="toast">${escapeHtml(ui.toast)}</p>`;
   const out = ui.view === 'sprites' ? '' : renderOwnerOut(current);
   return (
-    renderTopbar(current, ui.view, ui.toast !== '') +
+    renderTopbar(current, ui.view, ui.toast !== '', topbarNews(current)) +
     toast +
     out +
     (ui.menuOpen ? renderMenu(current, ui.cloud) : '') +
@@ -913,6 +930,9 @@ function openModal(id: ModalId): void {
   ui.modal = id;
   ui.modalPosition = null;
   ui.menuOpen = false;
+  // Opening one of the two lists is seeing it: the push button goes back to cream (T11 3.1).
+  if (id === 'board') ui.seenEnquiries = game().enquiries.map((enquiry) => enquiry.id);
+  if (id === 'shopping') ui.seenOrders = shoppingList(game()).map((line) => line.id);
   // Lifting the lid costs him the five minutes the machine takes to come up (CLAUDE.md T7 3.10).
   if (id === 'laptop') dispatch({ type: 'BOOT_LAPTOP' });
 }
