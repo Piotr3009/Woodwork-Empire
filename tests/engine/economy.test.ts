@@ -26,6 +26,7 @@ import {
   canAfford,
   charge,
   dailyPower,
+  monthReport,
   dailyRates,
   dailyRent,
   monthlyFixedCosts,
@@ -41,6 +42,8 @@ import {
 import { applyAction, findVariant, tick } from '../../src/engine/index';
 import type { GameState, Worker } from '../../src/engine/index';
 import { createTask } from '../../src/engine/tasks';
+import { monthOfDay } from '../../src/engine/clock';
+import { buyStartingKit } from '../helpers';
 import {
   act,
   buyNow,
@@ -512,6 +515,35 @@ describe('the books', () => {
     expect(state.clock.day).toBeGreaterThanOrEqual(31);
     expect(state.ledger.filter((entry) => entry.category === 'accounts')).toHaveLength(0);
     expect(state.lateAccountsMonths).toBe(0);
+  });
+});
+
+describe('the month report', () => {
+  it('reads a played month off the ledger: the lines sum to the cash delta, unpaid bills apart', () => {
+    const state = runToDay(buyStartingKit(newGame({ difficulty: 'veryEasy' })), 32).state;
+    const report = monthReport(state, 1);
+    const net = report.lines.reduce((total, line) => total + line.net, 0);
+    expect(net).toBeCloseTo(report.net, 6);
+    expect(report.cashClose - report.cashOpen).toBeCloseTo(report.net, 2);
+    expect(report.unpaid).toBe(0);
+    // Every line carries its category's lines and nothing else: the rent line is the rent, the
+    // rates and the deposit, to the penny.
+    const rent = state.ledger
+      .filter((entry) => monthOfDay(entry.day) === 1 && !entry.unpaid)
+      .filter((entry) => ['rent', 'rates', 'unitDeposit'].includes(entry.category))
+      .reduce((total, entry) => total - entry.amount, 0);
+    expect(report.lines.find((line) => line.id === 'rentAndRates')?.costs).toBeCloseTo(rent, 2);
+  });
+
+  it('keeps a bill that went to the arrears out of the lines and says so apart', () => {
+    const state = newGame({ difficulty: 'hard' });
+    // Down to the overdraft floor through the ledger, the way every pound moves (T13 10.2).
+    charge(state, 'equipment', 'A machine that took the lot', -(state.cash - state.finance.overdraftLimit));
+    expect(state.cash).toBe(state.finance.overdraftLimit);
+    const played = runToDay(state, 32).state;
+    const report = monthReport(played, 1);
+    expect(report.unpaid).toBeGreaterThan(0);
+    expect(report.cashClose - report.cashOpen).toBeCloseTo(report.net, 2);
   });
 });
 

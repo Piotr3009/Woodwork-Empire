@@ -14,7 +14,8 @@ Branch `t13-b1`, from phase A's `9dcfc9a`. Sections 3.14 (finance), 3.15 (insura
 |---|---|---|---|
 | T13-B1a Finance | `af46e53` | `finance.ts`: the loan counts its instalments off the calendar (one for every 1st since it was drawn), so the month runs once however many hooks ask; the sixtieth instalment takes whatever is left, so a principal that does not divide by sixty still closes; a part repayment keeps the term and lowers the instalment, a full one closes the loan; `repayCheck` and `nextInstalmentFor` for the tab. `economy.ts`: `runFinanceMonth` and `runInsuranceMonth` now run inside `runMonthlyItems`, which runs for every calendar 1st (weekends included) and after the day's and the month's totals are emptied, so the top bar's "today" and the Summary tab count them; `charge()` takes `merge: true` (one line a day per category and label, for the contracts); `monthReport()` and its table `MONTH_LINE_OF` (for B1d). `src/ui/finance.ts`: the Finance tab: balance, next instalment (capital and interest named), interest paid, months left, Take the loan with the typed amount, Repay and Repay it all, locked with the reason when refused; the overdraft's limit, rate, accrued interest and a red line while the account is below zero. `src/ui/accounting.ts`: the "Monthly bills" line names the loan instalment, the covers and the accrued overdraft interest. `insurance.ts`: `runInsuranceMonth` charges once a day (it is called from two hooks until phase C removes one) and `monthlyPremiums()`. | `tests/engine/finance.test.ts` (sixty instalments sum to the principal and to the interest the monthly balances imply; one instalment a month however often the 1st runs and none before it; the lines dated the 1st in plain English; early repayment closes at no penalty; a part repayment re-amortises; a second loan refused; the overdraft accrues a day below zero and not above, is charged on the 1st as one line, and on a weekend 1st too); `tests/ui/finance.test.ts` (the tab's rows, colours and controls, the binder's tab and the "what is coming" line) |
 | T13-B1b Insurance | `5cf9086` | `insurance.ts`: the insured value split into the machines' share and the stock's (`insuredMachinesValue`, `insuredStockValue`); `premiumYearlyFor`, `premiumMonthlyFor`, `monthlyPremiums`; taking a cover pays the rest of the month at once (`firstPremiumFor`, pro rata by the days left, the whole twelfth on the 1st) and is refused with the reason when the cash cannot cover it (`insuranceCheck`, `setInsurance` returns the check); dropping refunds nothing; `runInsuranceMonth` charges a twelfth per cover held, once a day; `onAccident` books the uninsured claim in the band and returns it (zero with cover); `claimBurglary` books the ten day payout with cover and an alarm, nothing at level 0 (`propertyCoverVoid`); `runInsuranceDay` lands the slices. Nothing touches the reputation. `src/ui/insurance.ts`: the tab under Admin, one block per cover with the basis in words, the premium a year and the twelfth in red, Take (with the first premium on the button, locked with the reason) or Drop; the red line at level 0 with property held; the commercial gate line; the payouts coming in. | `tests/engine/insurance.test.ts` (the value and the premium follow a purchase and the stock, a sold machine drops out; liability is base plus a head; taking pays the rest of the month, dropping refunds nothing, the refusals; no reputation; the 1st charges once whatever the hooks, through the game on day 1, 31, 61 and the Sunday 91; the uninsured accident in the band with the event, nothing insured; the level 0 payout is nothing, the level 1 payout is ten slices through `runInsuranceDay` and lands a slice a day through the day start); `tests/ui/insurance.test.ts` (the blocks, the controls on and off, the locked Take, the red alarm line only at level 0 with cover, the gate line, the payout row, the laptop tab) |
-| T13-B1c Contracts | (this commit) | `contracts.ts`: the offer (`drawContract`, `offerContract`: from the second tier up, on working days, one on the board at a time, on the day's chance, standing `CONTRACT_OFFER_DAYS`); accept opens the term from today (`endDay` the term's weeks on) and the week in hand, pro rata for a first or last part week (`weekWanted`); `assignContract` puts a joiner on it and only a joiner, takes him off his job (which goes back to ready) and marks him `contract:<id>` in `jobId` so the jobs leave him alone (`contractHands` restores the marker every minute and drops a man the player put on a job); `runContractMinute` (called every production minute by phase A's hook) advances the piece in hand at the man's rate, the owner away factor, the hall factor and the class of the saw he actually got, through `claimMachine` so the saw stays in the general queue, the CNC when free through `cncOptions`, the by hand penalty through `stageSpeed` when the hall has no saw, resting at dinner and after five with the owner gone and with the bags full, wearing the saw and making dust through `accumulateMachineMinute`; a finished piece books `+price` and `-material` on the `contract` category, one line a day each through `charge(..., { merge: true })`; `closeWeek` on the Monday with the short week's reputation hit written down; `endContract` with the renegotiated price (`renegotiatedPriceFor`: a percent up a full week, two down a short one, whole pounds), the men off it and the `contractEnded` event carrying the closing report; `renewContract` opens a fresh term at the new price or lets it go; `closingReport`, `contractStationFor`, `contractMen`, `contractCounterLine`. `src/ui/contracts.ts`: the tab (the offer tile with Accept and Decline, the active contract with the counter, the people with Put on it and Take off, the delivered weeks, the ended one with the report and Renew or Let it go) and `renderContractBar` on the Work Plan ("31 / 60 this week" with a fill). `economy.test.ts`: the merge. | `tests/engine/contracts.test.ts` (the offer in the bands, one at a time, off the board after five days, never below the tier or on a weekend, declined; accept opens the term pro rata; a joiner on and off, the owner and the office refused, the job goes back to ready, the marker survives a minute of the clock and he is not handed a ready job, a man taken by a job is dropped; the pieces at the saw's class with the ledger, the wear and the station, one line a day, more on a pro saw without a click, waiting while somebody has the saw, stopped by full bags and dinner; the week closes on the Monday with the point of reputation, the renegotiation arithmetic, the closing report, the end of the term with the event, renew and let go); `tests/ui/contracts.test.ts` (the empty lines, the offer tile, the active block and its controls and history, the ended block's figures and buttons, the bar on the Work Plan); `tests/engine/economy.test.ts` (the merge: one line a day, the balance and the totals, a fresh line on a new day, never into an unpaid line) |
+| T13-B1c Contracts | `67a0dae` | `contracts.ts`: the offer (`drawContract`, `offerContract`: from the second tier up, on working days, one on the board at a time, on the day's chance, standing `CONTRACT_OFFER_DAYS`); accept opens the term from today (`endDay` the term's weeks on) and the week in hand, pro rata for a first or last part week (`weekWanted`); `assignContract` puts a joiner on it and only a joiner, takes him off his job (which goes back to ready) and marks him `contract:<id>` in `jobId` so the jobs leave him alone (`contractHands` restores the marker every minute and drops a man the player put on a job); `runContractMinute` (called every production minute by phase A's hook) advances the piece in hand at the man's rate, the owner away factor, the hall factor and the class of the saw he actually got, through `claimMachine` so the saw stays in the general queue, the CNC when free through `cncOptions`, the by hand penalty through `stageSpeed` when the hall has no saw, resting at dinner and after five with the owner gone and with the bags full, wearing the saw and making dust through `accumulateMachineMinute`; a finished piece books `+price` and `-material` on the `contract` category, one line a day each through `charge(..., { merge: true })`; `closeWeek` on the Monday with the short week's reputation hit written down; `endContract` with the renegotiated price (`renegotiatedPriceFor`: a percent up a full week, two down a short one, whole pounds), the men off it and the `contractEnded` event carrying the closing report; `renewContract` opens a fresh term at the new price or lets it go; `closingReport`, `contractStationFor`, `contractMen`, `contractCounterLine`. `src/ui/contracts.ts`: the tab (the offer tile with Accept and Decline, the active contract with the counter, the people with Put on it and Take off, the delivered weeks, the ended one with the report and Renew or Let it go) and `renderContractBar` on the Work Plan ("31 / 60 this week" with a fill). `economy.test.ts`: the merge. | `tests/engine/contracts.test.ts` (the offer in the bands, one at a time, off the board after five days, never below the tier or on a weekend, declined; accept opens the term pro rata; a joiner on and off, the owner and the office refused, the job goes back to ready, the marker survives a minute of the clock and he is not handed a ready job, a man taken by a job is dropped; the pieces at the saw's class with the ledger, the wear and the station, one line a day, more on a pro saw without a click, waiting while somebody has the saw, stopped by full bags and dinner; the week closes on the Monday with the point of reputation, the renegotiation arithmetic, the closing report, the end of the term with the event, renew and let go); `tests/ui/contracts.test.ts` (the empty lines, the offer tile, the active block and its controls and history, the ended block's figures and buttons, the bar on the Work Plan); `tests/engine/economy.test.ts` (the merge: one line a day, the balance and the totals, a fresh line on a new day, never into an unpaid line) |
+| T13-B1d Month end | (this commit) | `economy.ts` (from B1a): `monthReport(state, month)` adds the month up off the ledger's dated lines and stores nothing: seventeen lines in the brief's order (revenue from jobs, material, transport and trips, wages and salaries day, wages night, the owner's draw, rent and rates, power, insurance with payouts, security with the burglary, the loan drawn and repaid, loan and overdraft interest, contract revenue and material, waste, equipment and pipes and repairs, software and website, everything else), each with in, out and net, the totals, the cash at the first line and at the last, and what went unpaid to the arrears kept apart; `MONTH_LINE_OF` is the one table that puts every ledger category on exactly one line. `src/ui/monthEnd.ts`: `renderMonthEnd(state, event)` reads `event.data.month` and prints `renderMonthReport`: the event's line, a head row, every line printed whether or not anything moved on it (in green, out red, net by its sign), In, Out, Net for the month, cash at the open and at the close, and the unpaid line in the warn style. The modal is the folder skin through app.ts's `event` id. | `tests/ui/monthEnd.test.ts` (every literal of the `LedgerCategory` union, read off `types.ts`, is on exactly one line and every line is one the folder prints; the brief's lines are all there; a played two months sum line by line to the cash at the close less the cash at the open, month 1 closes where month 2 opens, nothing is stored; the rent, power, draw and kit land where the brief says; the event is raised on day 31 and rendered with every line, the colours and the cash rows; a plus in green and the unpaid line); `tests/engine/economy.test.ts` (a played month sums to the cash delta with the rent line to the penny; a month at the overdraft floor keeps the unpaid bills out of the lines and the delta still holds) |
 
 ---
 
@@ -294,6 +295,32 @@ exported from there.)
 }
 ```
 
+### 3.11 CSS for the month end
+
+The report's rows are the binder's `.row` family; the four columns want the same width so the
+figures line up under the head row.
+
+```css
+.month-end .row-figure {
+  min-width: 90px;
+}
+
+.month-head .row-figure {
+  color: var(--text-dim);
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.month-total.month-net {
+  border-top: 2px solid var(--border);
+  margin-top: 4px;
+}
+
+.month-cash {
+  color: var(--text-dim);
+}
+```
+
 ---
 
 ## 4. Foreign test edits
@@ -304,7 +331,9 @@ None.
 
 ## 5. Art requested
 
-Nothing drawn in B1a.
+Nothing. B1 drew no picture and used no placeholder: the Finance, Insurance and Contracts tabs
+and the month end are text on the folder skin, and the standing bar on the Work Plan is a CSS
+track. `docs/art/REQUESTS-T13.md` needs nothing from this group.
 
 ---
 
@@ -336,13 +365,29 @@ Nothing drawn in B1a.
   figures (the Easy month came out at reputation 14 on six jobs instead of 21 on seven). The
   same game still rings the same shop on the same day, and a replay is byte for byte the same.
   Phase C may fold the draw into the main stream when it re-measures for T13-C2.
+- 3.20: nothing missing. Built as the brief says with two readings made explicit: "salaries
+  (day and night separately)" is one line for the weekly wages and the office salaries
+  (`wages`, `salaries`) and one for the night shift (`wagesNight`); "contract revenue and
+  margin" is the `contract` category's in and out (revenue and material) with the net as the
+  margin before labour, the labour being in the wages line. The brief's list has no home for
+  the equipment, the software, the transport, the arrears and the pellets, so the report has
+  four lines more than the list (equipment with pipes and repairs; software with the website;
+  transport and trips; everything else), rather than a pound that appears on no line. The cash
+  at the open is the bank before the month's first line and at the close the bank after its
+  last, both off the ledger; a bill that went to the arrears moved no cash, so it is not in the
+  lines and is named under the net instead, which is what keeps the lines equal to the delta.
 
 ---
 
 ## 7. Cross check notes
 
-- `charge()` is the one write; the `cash +=` and `cash -=` in `economy.ts` are inside `charge`,
-  `pay` and `receive`. The grep of `src/` is in the final section of this report.
+- One ledger (10.2): `grep -rn "cash (+=|-=|=)" src/` finds four lines, all in `economy.ts`
+  (269 and 276 inside `charge`, 289 inside `pay`, 301 inside `receive`); nothing outside it
+  writes the cash. The month end's lines sum to the cash delta for a played month
+  (`tests/ui/monthEnd.test.ts`, `tests/engine/economy.test.ts`); phase C asserts it for every
+  scenario month (T13-C2) and checks the top bar's "today" against the day's ledger lines once
+  3.1 is applied (until then the 1st's finance and insurance lines land before the day's totals
+  are emptied, so "today" on the 1st misses them).
 - One set of rules about people (10.3): a man on a contract is not at a job (`hands()` and
   `handsAtWork` skip him because his `jobId` finds no job; `availableJoiners` skips him because
   it is not null), the minutes he works go on `dayStats.workMinutes` and his own
