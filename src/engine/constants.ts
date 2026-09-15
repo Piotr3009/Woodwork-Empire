@@ -132,8 +132,10 @@ export const HOURS_PER_WORKING_DAY = MINUTES_PER_WORKING_DAY / 60;
  *  8 real minutes at 1x, 4 at 2x, 2 at 4x. */
 export const REAL_SECONDS_PER_DAY_AT_1X = 480;
 /** The chips the player drives the clock with. Ten is Piotr's: a month of trading is long and he
- *  asked for a speed that gets through it (PIOTR, 13.09; CLAUDE.md T9 3.11). */
-export const SPEEDS = [0, 1, 2, 4, 10] as const;
+ *  asked for a speed that gets through it (PIOTR, 13.09; CLAUDE.md T9 3.11). Thirty is his too:
+ *  a working day of 480 minutes in 16 real seconds (PIOTR, 15.09; CLAUDE.md T14 2.4). The one
+ *  table: the top bar reads it, and nothing else spells a speed out. */
+export const SPEEDS = [0, 1, 2, 4, 10, 30] as const;
 export const DAYS_PER_WEEK = 7;
 /** [TUNE] simplification for Turn 1: every month is 30 days. */
 export const DAYS_PER_MONTH = 30;

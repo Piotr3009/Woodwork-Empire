@@ -8,6 +8,7 @@
 
 import { beforeAll, describe, expect, it } from 'vitest';
 import { advanceMinutes, currentState, mount, render } from '../../src/ui/app';
+import { gameMinutesPerRealSecond } from '../../src/engine/clock';
 import { applyAction } from '../../src/engine/index';
 import type { GameState } from '../../src/engine/index';
 import { refreshBoard } from '../../src/engine/board';
@@ -47,15 +48,48 @@ function readyHall(): GameState {
   return next;
 }
 
-/** Puts the job back in front of the owner, so there is a Start production to press again. */
+/** Puts the job back in front of the owner, so there is a Start production to press again. The
+ *  work he did between two clicks is put back too, so the piece is never finished under him and
+ *  the button never runs out (at thirty the day goes by under it). */
 function offTheBench(): void {
   const state = game();
   const job = state.jobs[0];
   if (job === undefined) throw new Error('no job');
   job.stage = 'ready';
   job.assignedTo = null;
+  job.labourRemaining = job.labourValue;
   state.owner.currentTaskId = null;
   render();
+}
+
+/** Answers whatever the day has put up, the house card and the summary included. */
+function dismissEvents(): void {
+  let guard = 0;
+  while (root().querySelector('[data-do="closeHouseCard"], [data-do="resolveEvent"]') !== null && guard < 50) {
+    click('[data-do="closeHouseCard"], [data-do="resolveEvent"]');
+    guard += 1;
+  }
+}
+
+/** The 200 clicks, with a render between every two: a frame's worth of minutes at the speed the
+ *  clock is on, so at thirty the render is thirty minutes and the day comes and goes under the
+ *  button (CLAUDE.md T9 3.8, T14 2.4). Hands back how many of them landed. */
+function landAll(minutesPerFrame: number): number {
+  let landed = 0;
+  for (let round = 0; round < 200; round += 1) {
+    dismissEvents();
+    offTheBench();
+    inTheOffice();
+    click('[data-office="workPlan"]');
+    const button = root().querySelector('[data-do="startProduction"]');
+    if (button === null) throw new Error(`no Start production on round ${round}`);
+    // The render that used to take the button out from under him.
+    advanceMinutes(minutesPerFrame);
+    // The very node he pressed, a frame later.
+    press(button);
+    if (game().jobs[0]?.assignedTo === 'owner') landed += 1;
+  }
+  return landed;
 }
 
 function inTheOffice(): void {
@@ -74,20 +108,18 @@ beforeAll(() => {
 
 describe('a click lands on the button the player pressed', () => {
   it('takes all 200 of them, one action each, with a render between every two', () => {
-    let landed = 0;
-    for (let round = 0; round < 200; round += 1) {
-      offTheBench();
-      inTheOffice();
-      click('[data-office="workPlan"]');
-      const button = root().querySelector('[data-do="startProduction"]');
-      if (button === null) throw new Error(`no Start production on round ${round}`);
-      // The render that used to take the button out from under him.
-      advanceMinutes(1);
-      // The very node he pressed, a minute later.
-      press(button);
-      if (game().jobs[0]?.assignedTo === 'owner') landed += 1;
-    }
-    expect(landed).toBe(200);
+    expect(landAll(1)).toBe(200);
+  });
+
+  it('takes all 200 of them at thirty as well, a frame of thirty minutes between every two', () => {
+    // The clock at its fastest: a frame runs thirty minutes, the day ends and starts again under
+    // the button, and every click still lands on the node he pressed (CLAUDE.md T14 2.4).
+    game().speed = 30;
+    render();
+    expect(gameMinutesPerRealSecond(30)).toBe(30);
+    expect(landAll(gameMinutesPerRealSecond(30))).toBe(200);
+    game().speed = 1;
+    render();
   });
 
   it('keeps the Board button the same node across 60 ticks while the count beside it changes', () => {
