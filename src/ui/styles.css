@@ -2756,108 +2756,301 @@ input.num {
 }
 
 /* ---------------------------------------------------------------------------
-   Turn 13 (CLAUDE.md T13 2.1): the class names phase A declares, empty, for phase B's notes.
-   Phase C fills them from the notes. Nothing below this line is styled tonight on purpose.
+   Turn 13 (CLAUDE.md T13 2.1): the class names phase A declared empty, filled in phase C from
+   the five groups' notes (T13-C1). The colours are the game's own.
    --------------------------------------------------------------------------- */
-.stock-line {
+
+/* Phase B1 (REPORT-T13-B1.md, section 3) */
+.finance-loan,
+.finance-overdraft,
+.insurance-line {
+  margin-bottom: 12px;
 }
-.stock-thumb {
-}
-.stock-number {
-}
-.stock-free {
-}
-.stock-reserved {
-}
-.badge-low {
-}
-.badge-class {
-}
-.class-used {
-}
-.class-budget {
-}
-.class-standard {
-}
-.class-pro {
-}
-.class-industrial {
-}
-.card-effects {
-}
-.card-costs {
-}
-.card-description {
-}
-.efficiency {
-}
-.efficiency-plate {
-}
-.efficiency-line {
-}
-.warning-strip {
-}
-.tip-bubble {
-}
-.tip-close {
-}
-.house-card {
-}
-.house-picture {
-}
-.house-line {
-}
-.shortfall {
-}
-.sheets-reserved {
+
+.insurance-line h3 .badge {
+  margin-left: 6px;
+  vertical-align: middle;
 }
 .contract-bar {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  margin-bottom: 10px;
+  padding: 6px 10px;
 }
+
 .contract-count {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
 }
-.month-end {
+
+.contract-track {
+  background: var(--border);
+  border-radius: 3px;
+  height: 6px;
+  margin: 4px 0;
+  overflow: hidden;
 }
-.finance-loan {
+
+.contract-fill {
+  background: var(--good);
+  display: block;
+  height: 100%;
 }
-.finance-overdraft {
+
+.contract-fill.is-full {
+  background: var(--good);
 }
-.insurance-line {
+
+.contract-active,
+.contract-ended {
+  margin-bottom: 14px;
 }
-.security-level {
+.month-end .row-figure {
+  min-width: 90px;
 }
-.website-level {
+
+.month-head .row-figure {
+  color: var(--text-dim);
+  font-size: 11px;
+  text-transform: uppercase;
 }
-.settings {
+
+.month-total.month-net {
+  border-top: 2px solid var(--border);
+  margin-top: 4px;
 }
-.shift-chip {
+
+.month-cash {
+  color: var(--text-dim);
 }
-.crew-limit {
-}
+
+/* Phase B2 (REPORT-T13-B2.md, section 3) */
+.owner-card { margin-bottom: 12px; }
+.draw-tiers { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+.draw-tier { min-width: 64px; }
+.house-tier { margin-top: 4px; }
 .holiday {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 8px;
 }
-.draw-tier {
+.holiday .row-action { display: flex; flex-wrap: wrap; gap: 6px; }
+.owner-out.holiday { margin-top: 0; }
+.crew-limit { font-weight: 600; margin: 4px 0 8px; }
+.shift-control .row-action { display: flex; gap: 6px; }
+.shift-chip { min-width: 56px; }
+.day-meter { font-variant-numeric: tabular-nums; }
+.house-card { width: 100%; text-align: center; }
+.house-picture { display: block; width: 100%; height: auto; border-radius: 6px; }
+.house-name { margin: 8px 0 2px; font-weight: 600; }
+.house-line { margin: 0 0 8px; }
+
+/* Phase B3 (REPORT-T13-B3.md, section 3) */
+/* The stock page (T13 3.2): a line of the software the player is meant to recognise. */
+.stock-head { align-items: center; }
+.stock-list { display: flex; flex-direction: column; gap: 6px; margin: 8px 0 4px; }
+.stock-line {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 8px 10px; background: #fff; border: 1px solid #d9d1bd; border-radius: 4px;
 }
-.pipe {
+.stock-thumb {
+  flex: 0 0 auto; display: inline-block; padding: 3px; background: #fff;
+  border: 1px solid #c9c1ad; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25); line-height: 0;
 }
-.pipe-tile {
+.stock-thumb svg { display: block; }
+.stock-line .row-main { display: flex; flex-direction: column; min-width: 160px; }
+.stock-name { font-weight: 600; }
+.stock-number { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; color: #6b6b6b; letter-spacing: 0.04em; }
+.stock-free, .stock-reserved, .stock-total { min-width: 92px; }
+.stock-free { font-weight: 600; }
+.badge-low { margin-left: auto; }
+/* The material line of a job (T13 3.6): green in hand, red short; .good and .bad carry the colour. */
+.shortfall { font-weight: 600; }
+.sheets-reserved { font-weight: 600; }
+/* The website ladder (T13 3.7): five rungs, the one held framed. */
+.website-level {
+  display: grid; grid-template-columns: 1fr auto; gap: 4px 16px; align-items: center;
+  padding: 10px 12px; margin: 6px 0; border: 1px solid #d9d1bd; border-radius: 4px; background: #fff;
 }
-.pipe-short {
+.website-level h3 { grid-column: 1; margin: 0; }
+.website-level .row-action { grid-column: 2; grid-row: 1 / span 3; justify-self: end; }
+.website-level .card-effects, .website-level .card-costs { grid-column: 1; margin: 0; display: flex; flex-wrap: wrap; gap: 4px 14px; }
+.website-level .card-costs { color: #6b6b6b; }
+.website-level.is-on { border-color: #1f5a3a; box-shadow: inset 3px 0 0 #1f5a3a; }
+
+/* Phase B4 (REPORT-T13-B4.md, section 3) */
+.badge-class {
+  background: var(--class-colour, var(--panel));
+  border-color: var(--class-colour, var(--border));
+  color: var(--page);
+  margin-right: 4px;
 }
-.gate-collar {
+.tile.class-used,
+.tile.class-budget,
+.tile.class-standard,
+.tile.class-pro,
+.tile.class-industrial {
+  border-color: var(--class-colour);
+  box-shadow: inset 0 0 0 1px var(--class-colour);
 }
-.pallet {
+.tile.is-owned.class-used,
+.tile.is-owned.class-budget,
+.tile.is-owned.class-standard,
+.tile.is-owned.class-pro,
+.tile.is-owned.class-industrial {
+  box-shadow: inset 0 0 0 1px var(--class-colour), 0 0 0 2px var(--good);
 }
-.pallet-truck {
+.card-effects,
+.card-costs {
+  margin-bottom: 10px;
 }
-.offer-line {
+.card-costs {
+  border-top: 1px solid var(--border);
+  padding-top: 6px;
 }
-.placeholder {
+.card-description {
+  border-top: 1px solid var(--border);
+  padding-top: 6px;
 }
-.seg-assign {
+.sprite-shot.is-placeholder {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
 }
-.tip-key.seg-assign {
+.pallet .placeholder text,
+.placeholder-art .placeholder text {
+  font-size: 7px;
 }
+.arrived {
+  opacity: 0.92;
+}
+.security-level.is-held {
+  border-color: var(--good);
+  box-shadow: inset 0 0 0 1px var(--good);
+}
+.pipe-layer {
+  pointer-events: none;
+}
+.pipe-tile .placeholder text,
+.gate-collar .placeholder text {
+  display: none;
+}
+.pipe-tile .placeholder polygon {
+  stroke: #163f2a;
+  stroke-width: 0.5;
+}
+.pipe-short .pipe-tile .placeholder polygon {
+  stroke: var(--bad);
+  stroke-width: 1.5;
+}
+.pipe-short image {
+  filter: drop-shadow(0 0 1px var(--bad)) drop-shadow(0 0 1px var(--bad));
+}
+
+/* Phase B5 (REPORT-T13-B5.md, section 3) */
 .menu-close {
+  background: none;
+  border: 0;
+  color: #f5efe2;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  padding: 2px 6px;
+  position: absolute;
+  right: 6px;
+  top: 6px;
 }
+
+.menu-pop {
+  position: relative; /* if it is not already: the cross sits in its top right corner */
+}
+
 .gear {
+  font-size: 18px;
+  line-height: 1;
+  min-width: 40px;
+  padding: 0 8px;
+}
+
+.settings .hint {
+  margin-top: 8px;
+}
+
+/* The warning strip under the top bar: one line, the game's red on the cabinet's green, keyed by
+   data-warning so a problem can carry its own colour later (T13 3.22). */
+.warning-strip {
+  background: #4a1f1a;
+  border-bottom: 1px solid #0a1a10;
+  color: #f5efe2;
+  font-size: 13px;
+  padding: 4px 16px;
+}
+
+/* The first use bubble over a screen's body: a cream note with the one sentence and its Right
+   button (T13 3.22). */
+.tip-bubble {
+  align-items: center;
+  background: linear-gradient(#f5efe2, #e3dcc9);
+  border: 1px solid #5b5446;
+  border-radius: 4px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+  color: #1d2a22;
+  display: flex;
+  font-size: 13px;
+  gap: 12px;
+  justify-content: space-between;
+  margin: 0 0 10px;
+  padding: 8px 10px;
+}
+
+.tip-close {
+  flex: 0 0 auto;
+}
+
+/* The efficiency number next to the clock, and the plate behind a click on it (T13 3.5). The
+   details element has no marker; the number is the whole control. */
+.efficiency {
+  position: relative;
+}
+
+.efficiency > summary {
+  color: #f5efe2;
+  cursor: pointer;
+  font-size: 12px;
+  list-style: none;
+  white-space: nowrap;
+}
+
+.efficiency > summary::-webkit-details-marker {
+  display: none;
+}
+
+.efficiency-plate {
+  background: linear-gradient(#f5efe2, #e3dcc9);
+  border: 1px solid #5b5446;
+  border-radius: 4px;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.45);
+  color: #1d2a22;
+  left: 0;
+  min-width: 200px;
+  padding: 6px 8px;
+  position: absolute;
+  top: 100%;
+  z-index: 20;
+}
+
+.efficiency-plate .hint {
+  font-size: 11px;
+  margin: 0 0 4px;
+}
+
+.efficiency-line {
+  align-items: center;
+  display: flex;
+  font-size: 12px;
+  gap: 6px;
+  justify-content: space-between;
 }
