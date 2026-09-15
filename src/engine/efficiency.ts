@@ -1,6 +1,14 @@
 // Workshop efficiency (CLAUDE.md T13 3.5): one engine function computes the number and the four
-// lines of its breakdown; the top bar prints them. Phase A: the function over the tallies the
-// production minute keeps; phase B5 finishes it and the plate.
+// lines of its breakdown; the top bar and the day end print them.
+//
+// The number is the production minutes actually worked this day over the minutes the workshop
+// could have worked with every hired person at a station, the owner counted while he is in
+// (game.ts `possibleSeats` and `tallyEfficiency`, one call a production minute). The four lines
+// are where the rest went, each a share of the lost minutes: a man waiting for a machine is "no
+// machine free", a rack that cannot supply is "no material", what the owner's absence took off
+// every staff minute is "owner away", and a seat nobody stood at is "no people". A day nobody
+// could have worked (possible 0) reads 100: nothing was lost, and the number erodes from there as
+// the first seat goes empty.
 
 import { EFFICIENCY_CAUSES } from './constants';
 import type { EfficiencyStats, GameState, LostMinuteCause } from './types';
@@ -61,4 +69,16 @@ export function efficiencyOf(stats: EfficiencyStats): Efficiency {
 
 export function workshopEfficiency(state: GameState): Efficiency {
   return efficiencyOf(state.dayStats.efficiency);
+}
+
+/** The line that took the most of the lost minutes, for the one sentence the day end says about
+ *  the number ("73%, mostly no machine free"); null when nothing was lost. Ties go to the first
+ *  in the table's order. */
+export function topCause(efficiency: Efficiency): EfficiencyLine | null {
+  let top: EfficiencyLine | null = null;
+  for (const line of efficiency.lines) {
+    if (line.minutes <= 0) continue;
+    if (top === null || line.minutes > top.minutes) top = line;
+  }
+  return top;
 }

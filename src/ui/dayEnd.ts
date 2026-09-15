@@ -7,9 +7,12 @@ import {
   daySummaryOf,
   dustBand,
   earnedRate,
+  efficiencyOf,
   formatReputation,
   summaryOfDay,
 } from '../engine/index';
+// T13-C1: export from index.ts
+import { topCause } from '../engine/efficiency';
 import type { DaySummary, GameState, SummaryCadence } from '../engine/index';
 import { days, escapeHtml, minutes, money, plural, signedFigure, signedMoney } from './modal';
 
@@ -106,6 +109,9 @@ export function renderDaySummary(
     ) +
     // What the machines made that day, in the one unit dust is written in (CLAUDE.md T12 3.4).
     row('Dust made today', cubicMetres(summary.dustMadeM3, 2)) +
+    // The day's efficiency as the top bar showed it, and what mostly pulled it down (T13 3.5).
+    row('Efficiency', efficiencyLine(summary)) +
+    (summary.nightMinutes > 0 ? row('Night shift', minutes(summary.nightMinutes)) : '') +
     row('Next day', tomorrow === '' ? 'no deliveries' : tomorrow) +
     '</div></div>' +
     tomorrowLine(summary) +
@@ -121,6 +127,16 @@ export function renderDayEnd(state: GameState): string {
     earnedRate: earnedRate(state, 'day'),
     cadence: cadenceControl(state),
   });
+}
+
+/** "73%, mostly no machine free": the number, and the cause that took the most of what was lost
+ *  (CLAUDE.md T13 3.5). The engine works both out; this prints them. */
+function efficiencyLine(summary: DaySummary): string {
+  const efficiency = efficiencyOf(summary.efficiency);
+  const top = topCause(efficiency);
+  return top === null
+    ? `${efficiency.percent}%`
+    : `${efficiency.percent}%, mostly ${top.label.toLowerCase()}`;
 }
 
 /** What the day cost the next one: the overtime debt and the hour he worked through, as the one

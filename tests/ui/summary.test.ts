@@ -157,6 +157,37 @@ describe('a week at the weekly cadence', () => {
   });
 });
 
+describe('the efficiency line on the summary', () => {
+  it('carries the number and what mostly pulled it down, and the night minutes when there were any', () => {
+    const state = buyStartingKit(newGame());
+    const summary = {
+      ...daySummaryOf(state),
+      efficiency: {
+        possible: 480,
+        worked: 350,
+        lost: { noPeople: 10, noMachine: 100, noMaterial: 20, ownerAway: 0 },
+      },
+    };
+    const html = renderDaySummary(summary);
+    const rows = Array.from(parse(html).querySelectorAll('.row')).map((row) => [
+      row.querySelector('.row-main')?.textContent,
+      row.querySelector('.row-figure')?.textContent,
+    ]);
+    expect(rows).toContainEqual(['Efficiency', '73%, mostly no machine free']);
+    expect(html).not.toContain('Night shift');
+    const night = renderDaySummary({ ...summary, nightMinutes: 120 });
+    expect(parse(night).textContent).toContain('Night shift');
+    expect(parse(night).textContent).toContain('120 min');
+    // Nothing lost, nothing to blame.
+    const clean = renderDaySummary({
+      ...summary,
+      efficiency: { possible: 480, worked: 480, lost: { noPeople: 0, noMachine: 0, noMaterial: 0, ownerAway: 0 } },
+    });
+    expect(parse(clean).textContent).toContain('Efficiency100%');
+    expect(parse(clean).textContent).not.toContain('mostly');
+  });
+});
+
 describe('the dust the day made', () => {
   it('is one line on the summary in cubic metres, beside the state of the hall', () => {
     const state = buyStartingKit(newGame());
