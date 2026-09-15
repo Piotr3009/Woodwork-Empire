@@ -66,9 +66,8 @@ describe('the hand edgebander holds no cell of the floor', () => {
     expect(needsDucting('edgebander')).toBe(false);
   });
 
-  it('keeps its bag interval and its effect', () => {
+  it('is still sheet work, whatever cabinet it is kept in', () => {
     const spec = findSpec('edgebander');
-    expect(spec?.bagInterval).toBe(4800);
     expect(spec?.usedOn).toBe('sheet');
   });
 });

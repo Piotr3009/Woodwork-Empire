@@ -97,8 +97,6 @@ export interface EquipmentVariant {
   /** Multiplies the production speed of the stage this machine does, and of no other
    *  (CLAUDE.md T7 3.1). */
   outputFactor: number;
-  /** Multiplies the family's base bag interval. Below 1 means the bag fills sooner. */
-  bagIntervalFactor: number;
   /** Multiplies the family's base endurance in hours. */
   enduranceFactor: number;
   /** Power this one draws a day. */
@@ -162,8 +160,6 @@ export interface EquipmentSpec {
   zoneWidth: number;
   zoneDepth: number;
   spriteKey: string;
-  /** Minutes of use before the bag is full. 0 means the item has no bag. */
-  bagInterval: number;
   /** The machine only runs on jobs of this material. null means every job. */
   usedOn: MaterialKind | null;
   /** Multiplies unloading minutes. 1 means no effect. */

@@ -64,7 +64,6 @@ import {
   extractionCheck,
   madeInADustyWorkshop,
   workingDaysBetween,
-  bagIntervalFor,
   dailyPower,
   emailsForPrice,
   formatTime,
@@ -184,10 +183,8 @@ describe('30 days on Easy, working the board', () => {
     const saw = machineOf(state, 'tableSaw');
     expect(saw.variantId).toBe('used');
     expect(saw.purchasePrice).toBe(1800);
-    // Five per cent slower than a new one on the cutting, and the bag fills twice as often
-    // (CLAUDE.md T3 3.5, T7 3.1).
+    // Five per cent slower than a new one on the cutting (CLAUDE.md T3 3.5, T7 3.1).
     expect(stageSpeed(state, stagedJob(1, 'sheet', false), 'cutting').speed).toBeCloseTo(0.95, 10);
-    expect(bagIntervalFor(saw)).toBe(1200);
     // And it wore its hours down as the month went on.
     expect(saw.hoursUsed).toBeGreaterThan(0);
     expect(saw.enduranceHours).toBe(750);
@@ -391,9 +388,8 @@ describe('30 days on Very easy behind the best saw money can buy', () => {
     expect(minutesRemainingFor(budget, job, 1) / minutes).toBeCloseTo(1 / (0.25 / 1.3 + 0.75), 6);
   });
 
-  it('empties the bag half as often and draws more off the meter', () => {
+  it('has twice the hours in it and draws more off the meter', () => {
     const saw = machineOf(state, 'tableSaw');
-    expect(bagIntervalFor(saw)).toBe(4800);
     expect(saw.enduranceHours).toBe(6000);
     // Seven a day for the industrial saw where the used one draws three (CLAUDE.md T3 3.5).
     const machines = state.equipment.filter((item) => item.id !== saw.id);

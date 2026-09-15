@@ -40,12 +40,6 @@ function outputLine(variant: EquipmentVariant): string {
   return `Output ${per > 0 ? '+' : ''}${per}%`;
 }
 
-function bagLine(spec: EquipmentSpec, variant: EquipmentVariant): string {
-  if (spec.bagInterval <= 0) return 'No bag to change';
-  const interval = Math.round(spec.bagInterval * variant.bagIntervalFactor);
-  return `Bag every ${interval.toLocaleString('en-GB')} min of use`;
-}
-
 function lifeLine(spec: EquipmentSpec, variant: EquipmentVariant): string {
   const hours = enduranceHoursFor(spec.id, variant.id);
   return `Life about ${hours.toLocaleString('en-GB')} hours`;
@@ -155,7 +149,6 @@ function tile(
       : lockedButton(label, check.reason);
   const effects = [
     outputLine(variant),
-    bagLine(spec, variant),
     lifeLine(spec, variant),
     powerLine(variant),
     extractionLine(spec, variant),

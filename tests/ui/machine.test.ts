@@ -62,7 +62,6 @@ describe('the tiles inside a folder', () => {
     );
     expect(effects).toEqual([
       'Output -5%',
-      'Bag every 1,200 min of use',
       'Life about 750 hours',
       'Power 3 a day',
       // What it pulls out of the air while somebody is standing at it (CLAUDE.md T10 3.1).
@@ -77,7 +76,6 @@ describe('the tiles inside a folder', () => {
     );
     expect(bigEffects).toEqual([
       'Output +30%',
-      'Bag every 4,800 min of use',
       'Life about 6,000 hours',
       'Power 7 a day',
       'Extraction 2,200 m3/h while it runs',

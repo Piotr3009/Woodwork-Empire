@@ -281,7 +281,6 @@ export {
 // Machines, bags and dust
 export {
   accidentRisk,
-  bagIntervalFor,
   OWNER,
   bagsExist,
   cabinetTools,
@@ -307,7 +306,6 @@ export {
   hasBenchFor,
   machineOutputFactor,
   machinePowerPerDay,
-  machinesUsedFor,
   pastEndurance,
   variantFor,
   variantOf,

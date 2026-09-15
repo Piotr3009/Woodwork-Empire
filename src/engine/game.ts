@@ -1404,7 +1404,7 @@ function runProductionMinute(state: GameState, ownerOnTask: boolean): void {
   // selector the hall and the board read as well (CLAUDE.md T10 3.2).
   const air = hallAirCheck(state);
   // The minutes somebody actually stood at each machine: that, and nothing else, is what wears
-  // it out and fills its bag (CLAUDE.md T7 2).
+  // it out (CLAUDE.md T7 2).
   const used = new Map<string, number>();
   for (const { hand, stage, machine } of atWork) {
     const worker = state.workers.find((entry) => entry.id === hand.who);
@@ -1441,9 +1441,7 @@ function runProductionMinute(state: GameState, ownerOnTask: boolean): void {
   }
   state.productionMinutesMonth += 1;
   addDust(state, 1);
-  for (const machine of accumulateMachineMinute(state, used)) {
-    raiseBagFull(state, machine);
-  }
+  accumulateMachineMinute(state, used);
 }
 
 /** The piece is made and standing in front of the gate. Nothing is paid until the client has it,

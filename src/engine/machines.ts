@@ -274,15 +274,6 @@ export function variantFor(item: Equipment): EquipmentVariant | null {
   return spec ? variantOf(spec, item.variantId) : null;
 }
 
-/** Minutes of use this one takes before its bag is full: the family's interval stretched or cut
- *  by its class (CLAUDE.md T3 3.5). */
-export function bagIntervalFor(item: Equipment): number {
-  const spec = findSpec(item.specId);
-  if (!spec || spec.bagInterval <= 0) return 0;
-  const variant = variantOf(spec, item.variantId);
-  return Math.max(1, Math.round(spec.bagInterval * variant.bagIntervalFactor));
-}
-
 /** Hours of use a machine of this family and class has in it. A family whose life Piotr wrote in
  *  running minutes, as the compressors' is, says so in its own table and the hours come off that;
  *  everything else is the family's base hours stretched by its class (CLAUDE.md T10 3.2). One
@@ -662,24 +653,6 @@ export function bagsExist(state: GameState): boolean {
   return has(state, 'extractor');
 }
 
-/** Machines with a bag that this material runs through. */
-export function bagMachinesFor(state: GameState, material: MaterialKind): Equipment[] {
-  return state.equipment.filter((item) => {
-    const spec = findSpec(item.specId);
-    if (!spec || spec.bagInterval <= 0) return false;
-    return spec.usedOn === null || spec.usedOn === material;
-  });
-}
-
-/** Machines this material runs through, bag or no bag: what the hours of use are booked on. */
-export function machinesUsedFor(state: GameState, material: MaterialKind): Equipment[] {
-  return state.equipment.filter((item) => {
-    const spec = findSpec(item.specId);
-    if (!spec || spec.category !== 'machine') return false;
-    return spec.usedOn === null || spec.usedOn === material;
-  });
-}
-
 /** Six places, not four: a third of a minute rounded to four drifts by a whole hour over the
  *  fifteen hundred minutes it takes to wear a saw in. */
 function round6(value: number): number {
@@ -687,30 +660,21 @@ function round6(value: number): number {
 }
 
 /** Books the minutes somebody actually stood at a machine this minute: the hours that wear it
- *  out and the minutes that fill its bag, and nothing else. A machine nobody is at gains nothing,
- *  which is what "hours are the minutes somebody stood at it" means (CLAUDE.md T7 2). The map is
- *  person minutes per machine: one for a machine one man is standing at, more for a hand tool
- *  two men have out of their cabinets at once. Returns the bags that just filled. */
+ *  out, and nothing else. A machine nobody is at gains nothing, which is what "hours are the
+ *  minutes somebody stood at it" means (CLAUDE.md T7 2). The map is person minutes per machine:
+ *  one for a machine one man is standing at, more for a hand tool two men have out of their
+ *  cabinets at once. */
 export function accumulateMachineMinute(
   state: GameState,
   minutesByItem: ReadonlyMap<string, number>,
-): Equipment[] {
-  const bags = bagsExist(state);
-  const filled: Equipment[] = [];
+): void {
   for (const item of state.equipment) {
     const minutes = minutesByItem.get(item.id) ?? 0;
     if (minutes <= 0) continue;
     const spec = findSpec(item.specId);
     if (!spec) continue;
     if (spec.category === 'machine') item.hoursUsed = round6(item.hoursUsed + minutes / 60);
-    if (!bags || spec.bagInterval <= 0 || item.bagFull) continue;
-    item.minutesUsed = round6(item.minutesUsed + minutes);
-    if (item.minutesUsed >= bagIntervalFor(item)) {
-      item.bagFull = true;
-      filled.push(item);
-    }
   }
-  return filled;
 }
 
 export function emptyBag(state: GameState, equipmentId: string): void {
