@@ -3520,3 +3520,51 @@ export const WHY: Record<string, string> = {
     'An empty rack means joiners standing around on full wages. Keeping a small buffer costs ' +
     'cash but it costs less than a stopped bench.',
 };
+
+// ---------------------------------------------------------------------------
+// Turn 13 phase C: the figures the phase B groups defined in their own modules, moved here
+// (CLAUDE.md T13 2.1). Each keeps its tag and its comment.
+// ---------------------------------------------------------------------------
+
+/** What the button on a material take off says: the task is the take off, the click creates the
+ *  list (PIOTR; CLAUDE.md T13 3.8). The laptop's task row reads it (a note for phase C). */
+export const TAKE_OFF_BUTTON_LABEL = 'Create material list';
+
+/** With no offer on the board and the reputation for one, the chance each working day that a
+ *  shop rings with a standing contract [TUNE] (CLAUDE.md T13 3.16). */
+export const CONTRACT_OFFER_CHANCE_PER_DAY = 0.15;
+
+/** The quantity a week is drawn in steps of this many pieces, so an offer reads as a round
+ *  number [TUNE]. */
+export const CONTRACT_QUANTITY_STEP = 5;
+
+/** The shops the contracts come from [TUNE: wording]. */
+export const CONTRACT_CLIENTS: readonly string[] = [
+  'Fairfield Shopfitters',
+  'Northgate Interiors',
+  'Hollis and Daughters',
+  'Brightwater Displays',
+  'Meadow Lane Kitchens',
+  'Ashcombe Retail',
+];
+
+/** What the stock lines are called on the page, in the words of the software the player is meant
+ *  to recognise [TUNE wording] (CLAUDE.md T13 3.2). */
+export const STOCK_LINE_NAME: Record<MaterialKind, string> = {
+  sheet: 'MFC 18 mm, white',
+  solidWood: 'Oak, 27 mm',
+};
+
+/** The material kinds held on the rack as stock: the sheets, and nothing else tonight. Solid wood
+ *  and bespoke material are ordered for the job and never held (CLAUDE.md T13 3.2, 3.3). */
+export const STOCK_LINE_KINDS: readonly MaterialKind[] = ['sheet'];
+
+/** The reputation tier the client's answer is neutral at: at it the draw is uniform in the band,
+ *  under it the skew is negative and the offers land nearer the bottom of the band more often,
+ *  over it nearer the top [TUNE 1, the tier of a new company at reputation 0]
+ *  (CLAUDE.md T13 3.24). */
+export const ANSWER_SKEW_NEUTRAL_TIER = 1;
+
+/** The holidays the owner's card offers, in working days, the longest of them the cap the action
+ *  applies [TUNE] (CLAUDE.md T13 3.9). */
+export const HOLIDAY_OPTIONS_DAYS: readonly number[] = [1, 3, 5, HOLIDAY_MAX_DAYS];

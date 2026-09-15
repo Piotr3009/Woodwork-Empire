@@ -31,6 +31,7 @@ import {
   UNREACHABLE_MAX,
   UNREACHABLE_MIN,
   WORKING_DAYS_PER_WEEK,
+  ANSWER_SKEW_NEUTRAL_TIER,
 } from './constants';
 import { findSpec } from './machines';
 import {
@@ -96,13 +97,6 @@ function drawKind(state: GameState): EnquiryKind {
   const commercial = chance(state, COMMERCIAL_PROBABILITY);
   return commercial && qualifiesForCommercial(state) ? 'commercial' : 'residential';
 }
-
-// T13-C1: move to constants.ts
-/** The reputation tier the client's answer is neutral at: at it the draw is uniform in the band,
- *  under it the skew is negative and the offers land nearer the bottom of the band more often,
- *  over it nearer the top [TUNE 1, the tier of a new company at reputation 0]
- *  (CLAUDE.md T13 3.24). */
-export const ANSWER_SKEW_NEUTRAL_TIER = 1;
 
 /** The skew the team puts on the client's answer: a quarter for every reputation tier over the
  *  neutral one and a quarter off for every tier under it, a quarter for an estimator on the books

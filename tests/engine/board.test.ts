@@ -27,9 +27,9 @@ import {
   UNREACHABLE_MIN,
   SIZE_MULTIPLIER_MAX,
   SIZE_MULTIPLIER_MIN,
+  ANSWER_SKEW_NEUTRAL_TIER,
 } from '../../src/engine/constants';
 import {
-  ANSWER_SKEW_NEUTRAL_TIER,
   answerSkew,
   boardSizeRange,
   canAccept,

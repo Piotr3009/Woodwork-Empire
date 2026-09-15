@@ -4,8 +4,7 @@
 // meter with the assigning on it.
 
 import { describe, expect, it } from 'vitest';
-import { PRODUCTION_MANAGER_MONTHLY_WAGE } from '../../src/engine/constants';
-import { HOLIDAY_OPTIONS_DAYS } from '../../src/engine/owner';
+import { HOLIDAY_OPTIONS_DAYS, PRODUCTION_MANAGER_MONTHLY_WAGE } from '../../src/engine/constants';
 import { renderTeam } from '../../src/ui/team';
 import type { GameState, Worker } from '../../src/engine/index';
 import { act, newGame, sixJoinersOnSheetWork } from '../helpers';

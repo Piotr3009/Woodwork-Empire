@@ -20,6 +20,9 @@ import {
   DAYS_PER_WEEK,
   HIRING_SPECS,
   WORKING_DAYS_PER_WEEK,
+  CONTRACT_OFFER_CHANCE_PER_DAY,
+  CONTRACT_QUANTITY_STEP,
+  CONTRACT_CLIENTS,
 } from './constants';
 import type { ContractPieceSpec } from './constants';
 import { isBreak, isOvertime, isWorkingDay, weekOfDay, weekday } from './clock';
@@ -44,25 +47,6 @@ import { isWorkingToday, joiners, staysForOvertime } from './staff';
 import { STATION_BENCH, machineStation, waitingStation } from './stations';
 import { cncOptions, familyForStage, jobOnCnc, stageSpeed } from './stages';
 import type { Contract, ContractWeek, GameState, StageId, Worker } from './types';
-
-// T13-C1: move to constants.ts
-/** With no offer on the board and the reputation for one, the chance each working day that a
- *  shop rings with a standing contract [TUNE] (CLAUDE.md T13 3.16). */
-export const CONTRACT_OFFER_CHANCE_PER_DAY = 0.15;
-// T13-C1: move to constants.ts
-/** The quantity a week is drawn in steps of this many pieces, so an offer reads as a round
- *  number [TUNE]. */
-export const CONTRACT_QUANTITY_STEP = 5;
-// T13-C1: move to constants.ts
-/** The shops the contracts come from [TUNE: wording]. */
-export const CONTRACT_CLIENTS: readonly string[] = [
-  'Fairfield Shopfitters',
-  'Northgate Interiors',
-  'Hollis and Daughters',
-  'Brightwater Displays',
-  'Meadow Lane Kitchens',
-  'Ashcombe Retail',
-];
 
 /** What a man on a contract carries in `jobId`, so the jobs leave him alone: not available for
  *  a job, not at one, and not a job the plan could find (CLAUDE.md T13 3.16). */

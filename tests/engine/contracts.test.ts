@@ -15,9 +15,9 @@ import {
   CONTRACT_TERM_MONTHS_MIN,
   DAYS_PER_WEEK,
   WORKER_RATES,
+  CONTRACT_QUANTITY_STEP,
 } from '../../src/engine/constants';
 import {
-  CONTRACT_QUANTITY_STEP,
   acceptContract,
   activeContracts,
   assignContract,

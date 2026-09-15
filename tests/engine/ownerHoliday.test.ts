@@ -10,9 +10,9 @@ import {
   OWNER_AWAY_PENALTY,
   OWNER_AWAY_PENALTY_WITH_PM,
   PRODUCTION_MANAGER_MONTHLY_WAGE,
+  HOLIDAY_OPTIONS_DAYS,
 } from '../../src/engine/constants';
 import {
-  HOLIDAY_OPTIONS_DAYS,
   holidayCheck,
   managerOnDuty,
   nightQualityPenalty,

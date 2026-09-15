@@ -130,11 +130,6 @@ const TASK_DEFINITIONS: Record<TaskKind, TaskDefinition> = {
  *  that asks "every kind of task in the game" asks this and not the table it is checking. */
 export const TASK_KINDS: ReadonlyArray<TaskKind> = Object.keys(TASK_DEFINITIONS) as TaskKind[];
 
-// T13-C1: move to constants.ts
-/** What the button on a material take off says: the task is the take off, the click creates the
- *  list (PIOTR; CLAUDE.md T13 3.8). The laptop's task row reads it (a note for phase C). */
-export const TAKE_OFF_BUTTON_LABEL = 'Create material list';
-
 /** Which of the seven bands of the owner's day a task falls in. Every kind of task in the game
  *  is on this one table, so a minute cannot be workshop time on the bar and office time in the
  *  summary (CLAUDE.md T11 3.1). The engine's own `category` stays what it always was: it is the

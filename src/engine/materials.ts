@@ -13,6 +13,8 @@ import {
   SHEET_VALUE,
   STOCK_NUMBER_PREFIX,
   TEMP_STORAGE_COST,
+  STOCK_LINE_NAME,
+  STOCK_LINE_KINDS,
 } from './constants';
 import { addWorkingDays } from './clock';
 import { canAfford, noteLoss, pay } from './economy';
@@ -100,18 +102,6 @@ export function stockIsLow(state: GameState): boolean {
   if (rackCapacity(state) <= 0) return false;
   return freeSheets(state) < LOW_STOCK_SHEETS;
 }
-
-// T13-C1: move to constants.ts
-/** What the stock lines are called on the page, in the words of the software the player is meant
- *  to recognise [TUNE wording] (CLAUDE.md T13 3.2). */
-export const STOCK_LINE_NAME: Record<MaterialKind, string> = {
-  sheet: 'MFC 18 mm, white',
-  solidWood: 'Oak, 27 mm',
-};
-// T13-C1: move to constants.ts
-/** The material kinds held on the rack as stock: the sheets, and nothing else tonight. Solid wood
- *  and bespoke material are ordered for the job and never held (CLAUDE.md T13 3.2, 3.3). */
-export const STOCK_LINE_KINDS: readonly MaterialKind[] = ['sheet'];
 
 /** One line of the stock page: the kind, its name and stock number, the free, reserved and total
  *  sheets, what the rack holds, and whether the line is low (CLAUDE.md T13 3.2). The one selector

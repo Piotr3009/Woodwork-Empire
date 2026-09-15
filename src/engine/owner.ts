@@ -30,11 +30,6 @@ import { queueEvent } from './events';
 import { int } from './rng';
 import type { DayCategory, DayLogEntry, GameState, Job } from './types';
 
-// T13-C1: move to constants.ts
-/** The holidays the owner's card offers, in working days, the longest of them the cap the action
- *  applies [TUNE] (CLAUDE.md T13 3.9). */
-export const HOLIDAY_OPTIONS_DAYS: readonly number[] = [1, 3, 5, HOLIDAY_MAX_DAYS];
-
 /** Round to four places, which is where every factor in the engine stops. */
 function round4(value: number): number {
   return Math.round(value * 10000) / 10000;

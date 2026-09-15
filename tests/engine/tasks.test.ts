@@ -12,10 +12,10 @@ import {
   JOINERY_CORE_MAX_EXTENSIONS,
   JOINERY_CORE_PRICE_YEARLY,
   SOFTWARE_DESIGN_FACTOR,
+  TAKE_OFF_BUTTON_LABEL,
 } from '../../src/engine/constants';
 import { PRODUCT_TEMPLATES } from '../../src/engine/constants';
 import {
-  TAKE_OFF_BUTTON_LABEL,
   createDailyTasks,
   createTask,
   designMinutes,
