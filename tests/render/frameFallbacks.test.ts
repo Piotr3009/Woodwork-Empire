@@ -58,12 +58,15 @@ describe('the states and their frame keys', () => {
 
 describe('the fallback of a missing frame', () => {
   it('plays the animation asked for wherever the art side has delivered it', () => {
-    for (const animation of ANIMATIONS) {
+    // The home frame is a Turn 13 key nobody has painted yet (CLAUDE.md T13 3.23): it falls back
+    // to idle for every role until the art side delivers it, and is listed in the art request.
+    for (const animation of ANIMATIONS.filter((entry) => entry !== 'home')) {
       expect(playableAnimation('owner', animation), animation).toEqual({ animation, frozen: false });
     }
-    for (const animation of ANIMATIONS.filter((entry) => entry !== 'phone')) {
+    for (const animation of ANIMATIONS.filter((entry) => entry !== 'phone' && entry !== 'home')) {
       expect(playableAnimation('joiner', animation), animation).toEqual({ animation, frozen: false });
     }
+    expect(playableAnimation('owner', 'home')).toEqual({ animation: 'idle', frozen: false });
   });
 
   it('falls back to idle, playing, for an animation the role has no sheet for', () => {

@@ -19,6 +19,7 @@ import {
 } from './constants';
 import { penalisedMisses } from './calls';
 import { outputBreakdown } from './machines';
+import { nightQualityPenalty } from './owner';
 import { websiteReputationBonus } from './website';
 import type { GameState, Job } from './types';
 
@@ -125,11 +126,15 @@ export function applyRating(state: GameState, job: Job): number {
   // And a piece sprayed on wet air comes out of the booth with defects in the finish
   // (PIOTR, CLAUDE.md T10 3.3).
   const wet = job.wetFinish ? WET_AIR_FINISH_RATING : 0;
-  const rating = Math.round((scaled - missed - dusty - wet) * 100) / 100;
+  // And a piece made on the second shift comes out a tier down for the share of it that was
+  // (PIOTR, CLAUDE.md T13 3.9).
+  const night = nightQualityPenalty(job);
+  const rating = Math.round((scaled - missed - dusty - wet - night) * 100) / 100;
   job.rating = rating;
   changeReputation(state, scaled, ratingReason(job));
   if (missed > 0) changeReputation(state, -missed, `${job.name}: calls not answered`);
   if (dusty > 0) changeReputation(state, -dusty, `${job.name}: dusty workshop`);
   if (wet > 0) changeReputation(state, -wet, `${job.name}: finish defects`);
+  if (night > 0) changeReputation(state, -night, `${job.name}: made on the night shift`);
   return rating;
 }

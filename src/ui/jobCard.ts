@@ -8,7 +8,7 @@ import {
   callsScheduled,
   callsTaken,
   has,
-  isWorkingToday,
+  onTheBooksToday,
   jobLabourCost,
   jobProgress,
   jobsAtGate,
@@ -80,7 +80,8 @@ export function jobAssignControls(state: GameState, job: Job): string {
     `<button class="chip${job.assignedTo === workerId ? ' is-on' : ''}" data-do="assignJob" ` +
     `data-id="${job.id}" data-worker="${workerId}">${escapeHtml(label)}</button>`;
   const crew = joiners(state)
-    .filter((worker) => isWorkingToday(state, worker))
+    // A night man can be given a job by day: the chips offer everybody on the books today.
+    .filter((worker) => onTheBooksToday(state, worker))
     .map((worker) => chip(worker.id, worker.name))
     .join('');
   return `<span class="row-action">${chip('owner', 'You')}${crew}</span>`;

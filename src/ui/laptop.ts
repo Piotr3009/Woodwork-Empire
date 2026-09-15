@@ -3,7 +3,14 @@
 //
 // The jobs on the books moved out to the Work Plan board on the office wall.
 
-import { findJob, jobsAtGate, openTasks, staffMinutesLeft, workerById } from '../engine/index';
+import {
+  TAKE_OFF_BUTTON_LABEL,
+  findJob,
+  jobsAtGate,
+  openTasks,
+  staffMinutesLeft,
+  workerById,
+} from '../engine/index';
 import type { GameState, TaskInstance } from '../engine/index';
 import { renderDrawings } from './drawings';
 import { renderInsurance } from './insurance';
@@ -68,7 +75,14 @@ function taskRow(state: GameState, task: TaskInstance): string {
   const job = task.jobId === null ? null : findJob(state, task.jobId);
   // The task label already names the job, so the row adds the price and nothing else (T2 3.11).
   const jobLine = job === null ? '' : ` · ${money(job.price)}`;
-  const action = taskStartAction(state, task, staffLine === '' ? 'Start' : 'Take it on');
+  // The take off's button says what the click makes (PIOTR; CLAUDE.md T13 3.8).
+  const startLabel =
+    task.kind === 'materialTakeOff'
+      ? TAKE_OFF_BUTTON_LABEL
+      : staffLine === ''
+        ? 'Start'
+        : 'Take it on';
+  const action = taskStartAction(state, task, startLabel);
   return (
     `<div class="row${task.done ? ' is-done' : ''}${running ? ' is-running' : ''}">` +
     `<span class="row-main">${escapeHtml(task.label)}${jobLine}</span>` +

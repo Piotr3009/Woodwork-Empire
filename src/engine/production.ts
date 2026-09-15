@@ -40,6 +40,7 @@ import {
   underExtracted,
 } from './media';
 import { ownerEfficiency, ownerIsAvailable, spendOwnerMinute, staffOutputFactor } from './owner';
+import { contractMen } from './contracts';
 import { isWorkingToday } from './staff';
 import { STATION_BENCH, machineStation, waitingStation } from './stations';
 import {
@@ -165,6 +166,8 @@ export function menAtJobs(state: GameState): string[] {
   }
   if (dinner) return atJobs;
   for (const hand of hands(state, { owner: false })) atJobs.push(hand.who);
+  // The men on a standing contract keep their saw between actions too (CLAUDE.md T13 3.16).
+  atJobs.push(...contractMen(state));
   return atJobs;
 }
 
