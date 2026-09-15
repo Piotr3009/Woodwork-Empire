@@ -170,7 +170,7 @@ describe('a job somebody has started', () => {
     state.clock.minute = Math.round(whole * 0.75);
     const row = workPlan(state).rows[0];
     expect(row?.notStarted).toBe(false);
-    expect(row?.done).toBeCloseTo(0.75, 2);
+    expect(row?.done).toBeCloseTo(0.75, 6);
     expect(row?.minutesDone ?? 0).toBeGreaterThan(0);
     expect(row?.latestStart).toBeNull();
     expect(row?.latestStartPoint).toBeNull();
@@ -178,7 +178,7 @@ describe('a job somebody has started', () => {
     expect(row?.to).toBeLessThan(workingDayIndex(job.dueDay));
     const page = parse(renderWorkPlan(state));
     const done = page.querySelector('.plan-bar .plan-done');
-    expect(done?.getAttribute('style')).toContain('width:7');
+    expect(done?.getAttribute('style')).toBe('width:75%');
     expect(page.querySelector('.plan-figures')?.textContent).toContain('min ·');
   });
 });

@@ -15,6 +15,7 @@ import {
   airDemandOf,
   bagsExist,
   canSell,
+  dayOneComplete,
   dayOneKit,
   compressorAirOf,
   compressorFor,
@@ -71,7 +72,7 @@ const TABS: Array<[string, string]> = [
  *  Office tab it lives on (PIOTR, 15.09; CLAUDE.md T11 3.6). */
 function renderDayOne(state: GameState): string {
   const items = dayOneKit(state);
-  if (items.every((item) => item.done)) {
+  if (dayOneComplete(state)) {
     return (
       '<div class="checklist is-done" data-checklist="dayOne">' +
       '<h3>Day one kit complete</h3></div>'

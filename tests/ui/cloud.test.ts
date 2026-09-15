@@ -3,11 +3,13 @@
 
 import { describe, expect, it } from 'vitest';
 import { cloudAvailable, cloudKey, cloudUrl } from '../../src/cloud/supabase';
-import { hasSave, loadGame, saveGame, sendMagicLink } from '../../src/cloud/saves';
+import { hasSave, loadGame, openSavedRow, saveGame, sendMagicLink } from '../../src/cloud/saves';
+import { encodeSaveFile } from '../../src/cloud/file';
+import { STATE_VERSION } from '../../src/engine/index';
 import { renderStart } from '../../src/ui/start';
 import { renderMenu } from '../../src/ui/topbar';
 import { NO_STORED_SAVE } from '../../src/cloud/store';
-import { newGame } from '../helpers';
+import { buyStartingKit, newGame } from '../helpers';
 
 const DARK = {
   available: false,
@@ -54,6 +56,30 @@ describe('saving with no Supabase in the build', () => {
     expect(html).not.toContain('data-do="saveGame"');
     expect(html).not.toContain('data-do="loadGame"');
     expect(html).toContain('data-do="endDay"');
+  });
+});
+
+describe('the row the cloud keeps', () => {
+  it('is the same bytes the file and the browser hold, and opens with the same decoder', () => {
+    const state = buyStartingKit(newGame({ companyName: 'Joinery Core' }));
+    const row = { state: encodeSaveFile(state), state_version: STATE_VERSION };
+    const opened = openSavedRow(row);
+    expect(opened.note).toBe('Loaded.');
+    expect(opened.state).toEqual(state);
+  });
+
+  it('refuses a row from another build, and one written before the bytes were the bytes', () => {
+    const state = newGame();
+    expect(openSavedRow({ state: encodeSaveFile(state), state_version: 1 }).state).toBeNull();
+    expect(openSavedRow({ state: encodeSaveFile(state), state_version: 1 }).note).toContain(
+      'older build',
+    );
+    // A row written before Turn 11 holds the state object itself, not the bytes.
+    const old = { state: JSON.parse(JSON.stringify(state)) as unknown, state_version: STATE_VERSION };
+    expect(openSavedRow(old).state).toBeNull();
+    expect(openSavedRow(old).note).toContain('older build');
+    // And rubbish in the column is refused by the one decoder, not by a second idea of a save.
+    expect(openSavedRow({ state: 'not json', state_version: STATE_VERSION }).state).toBeNull();
   });
 });
 

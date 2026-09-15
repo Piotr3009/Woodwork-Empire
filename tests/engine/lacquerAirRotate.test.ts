@@ -11,6 +11,7 @@ import {
   WET_AIR_FINISH_RATING,
 } from '../../src/engine/constants';
 import { blockFor, kitBlockFor } from '../../src/engine/board';
+import { lockReasonFor } from '../../src/engine/catalog';
 import { familyForStage } from '../../src/engine/stages';
 import { hallAirCheck, sprayingOnWetAir } from '../../src/engine/media';
 import { applyRating } from '../../src/engine/reputation';
@@ -66,6 +67,17 @@ describe('the two sprayed products', () => {
     expect(kitBlockFor(state, template('lacqueredWardrobe'))).toBeNull();
   });
 
+  it('counts a booth on the road, so the same product is never takeable and greyed at once', () => {
+    const state = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
+    state.reputation = 40;
+    const ordered = act(state, { type: 'BUY_EQUIPMENT', specId: 'sprayBooth' });
+    expect(ordered.onOrder.some((item) => item.specId === 'sprayBooth')).toBe(true);
+    expect(ordered.equipment.some((item) => item.specId === 'sprayBooth')).toBe(false);
+    // The board and the tile agree: on the road counts, as it does for a saw (CLAUDE.md T8 3.2).
+    expect(kitBlockFor(ordered, template('lacqueredWardrobe'))).toBeNull();
+    expect(lockReasonFor(ordered, template('lacqueredWardrobe'))).toBeNull();
+  });
+
   it('does its Finishing at the booth, and nothing else does', () => {
     const lacquered = { labourValue: 1000, materialKind: 'sheet' as const, finish: 'lacquer' as const, byHand: false };
     const laminate = { ...lacquered, finish: 'laminate' as const };
@@ -73,13 +85,22 @@ describe('the two sprayed products', () => {
     expect(familyForStage(laminate, 'finishing')).toBeNull();
   });
 
-  it('takes half as long again over the finish on wet air, and loses a point of rating', () => {
+  it('takes half as long again over the finish on wet air, minute for minute', () => {
+    // The minutes that go into a Finishing in a booth on wet air against the same minutes in a
+    // booth with a dryer on it: the wet one is worth 1 / 1.5 of the dry one (CLAUDE.md T10 3.3).
+    const wet = sprayedMinutes(false);
+    const dry = sprayedMinutes(true);
+    expect(dry).toBeGreaterThan(0);
+    expect(wet).toBeCloseTo(dry / WET_AIR_FINISH_FACTOR, 5);
+    expect(wet).toBeLessThan(dry);
+  });
+
+  it('marks the piece, and it loses a point of rating for it', () => {
     const state = withExtraction(newGame({ difficulty: 'veryEasy' }));
     placeEquipment(state, 'compressor', { variantId: 'pro', x: 18, y: 4 });
     const booth = placeEquipment(state, 'sprayBooth', { x: 7, y: 6 });
     // A pro compressor has no dryer built in and none is fitted to it (CLAUDE.md T10 3.3).
     expect(sprayingOnWetAir(state, booth)).toBe(true);
-    expect(WET_AIR_FINISH_FACTOR).toBe(1.5);
     // The rating a delivered piece carries is a point light for the defects in it.
     const sprayed = fillRack(buyStartingKit(newGame({ difficulty: 'veryEasy' })), 40);
     sprayed.enquiries = [];
@@ -93,6 +114,37 @@ describe('the two sprayed products', () => {
     expect(clean - wet).toBe(WET_AIR_FINISH_RATING);
   });
 });
+
+/** The minutes a lacquered job takes at its Finishing, in a hall whose booth has a dryer on it or
+ *  has not. Everything else about the two halls is the same. */
+function sprayedMinutes(dryer: boolean): number {
+  const state = withExtraction(newGame({ difficulty: 'veryEasy' }));
+  placeEquipment(state, 'compressor', { variantId: 'pro', x: 18, y: 4 });
+  placeEquipment(state, 'sprayBooth', { x: 7, y: 6 });
+  placeEquipment(state, 'workbench', { variantId: 'budget', x: 4, y: 8 });
+  placeEquipment(state, 'tableSaw', { variantId: 'used', x: 6, y: 1 });
+  placeEquipment(state, 'drill', { x: 16, y: 8 });
+  placeEquipment(state, 'edgebander', { variantId: 'budget', x: 14, y: 8 });
+  if (dryer) placeEquipment(state, 'airDryer', { x: 19, y: 2 });
+  fillRack(state, 200);
+  state.enquiries = [];
+  const enquiry = placeEnquiry(state, {
+    templateId: 'lacqueredWardrobe',
+    name: 'Lacquered wardrobe',
+    finish: 'lacquer',
+    price: 4000,
+    deadlineDays: 90,
+  });
+  let next = act(state, { type: 'ACCEPT_ENQUIRY', enquiryId: enquiry.id, byHand: false });
+  const job = firstJob(next);
+  job.stage = 'inProduction';
+  job.assignedTo = 'owner';
+  // Into the Finishing, which for a lacquered job is done at the booth (CLAUDE.md T11 3.7).
+  job.labourRemaining = job.labourValue * 0.1;
+  const before = firstJob(next).labourRemaining;
+  next = runClock(next, 20);
+  return Math.round((before - firstJob(next).labourRemaining) * 100000) / 100000;
+}
 
 // ---------------------------------------------------------------------------
 // 3.8 Air for every bench
@@ -217,6 +269,21 @@ describe('turning a thing where it stands', () => {
     const agreed = act(done, { type: 'RESOLVE_EVENT', choiceId: 'do' });
     const move = agreed.tasks.find((task) => task.kind === 'moveMachines' && !task.done);
     expect(move?.minutesTotal).toBe(MOVE_MINUTES_PER_ITEM);
+  });
+
+  it('puts a saw back the way it stood when the player changes his mind', () => {
+    const start = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
+    const saw = start.equipment.find((item) => item.specId === 'tableSaw');
+    if (!saw) throw new Error('no saw in the hall');
+    const stood = { x: saw.anchorX, y: saw.anchorY, rotated: saw.rotated };
+    const turned = turnedInPlace(start, saw.id);
+    const done = act(turned, { type: 'END_SETUP', speed: 1 });
+    const back = act(done, { type: 'RESOLVE_EVENT', choiceId: 'back' });
+    const same = back.equipment.find((item) => item.id === saw.id);
+    // Exactly where it stood means the way it stood as well (CLAUDE.md T11 3.9).
+    expect({ x: same?.anchorX, y: same?.anchorY, rotated: same?.rotated }).toEqual(stood);
+    expect(back.movedItems).toEqual([]);
+    expect(back.tasks.some((task) => task.kind === 'moveMachines' && !task.done)).toBe(false);
   });
 
   it('still costs nothing to turn a saw out and back again', () => {

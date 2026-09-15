@@ -6,12 +6,13 @@ import {
   DAY_CATEGORIES,
   DAY_CATEGORY_LABELS,
   DAY_CATEGORY_OF_TASK,
+  TASK_KINDS,
   dayCategoryOf,
   dayMinutesByCategory,
   dayPercentages,
   logDayMinute,
 } from '../../src/engine/index';
-import type { DayCategory, DayLogEntry, TaskKind } from '../../src/engine/index';
+import type { DayCategory, DayLogEntry } from '../../src/engine/index';
 import {
   act,
   buyStartingKit,
@@ -25,8 +26,9 @@ import {
   withExtraction,
 } from '../helpers';
 
-/** Every kind of task the engine can make, straight off the table the runner reads. */
-const EVERY_KIND = Object.keys(DAY_CATEGORY_OF_TASK) as TaskKind[];
+/** Every kind of task the engine can make, off the runner's own table and not off the one this
+ *  file is checking: a kind missing from the band table has to fail here. */
+const EVERY_KIND = TASK_KINDS;
 
 function logOf(pairs: Array<[DayCategory, number]>): DayLogEntry[] {
   const log: DayLogEntry[] = [];
@@ -39,6 +41,7 @@ function logOf(pairs: Array<[DayCategory, number]>): DayLogEntry[] {
 describe('the seven bands', () => {
   it('has one for every kind of task in the game, and each is one of the seven', () => {
     expect(EVERY_KIND.length).toBeGreaterThan(0);
+    expect(Object.keys(DAY_CATEGORY_OF_TASK).sort()).toEqual([...EVERY_KIND].sort());
     for (const kind of EVERY_KIND) {
       expect(DAY_CATEGORIES, kind).toContain(dayCategoryOf(kind));
     }

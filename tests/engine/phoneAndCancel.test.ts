@@ -163,6 +163,23 @@ describe('calling an order off', () => {
     ).toBe(true);
   });
 
+  it('pays the arrears down first when the bill it refunds was never paid', () => {
+    // A material order is booked whether the money is there or not: the supplier has loaded it
+    // (CLAUDE.md 8.3). Called off, what comes back goes against the arrears before the bank.
+    const state = materialOnTheRoad();
+    const delivery = state.deliveries[0];
+    if (delivery === undefined) throw new Error('no material on the road');
+    // Run the bank down so the bill goes to the arrears, and book it again.
+    state.cash = state.finance.overdraftLimit;
+    state.finance.arrearsAmount = delivery.pricePaid;
+    state.finance.firstArrearsDay = state.clock.day;
+    const cancelled = act(state, { type: 'CANCEL_ORDER', orderId: delivery.id });
+    expect(cancelled.finance.arrearsAmount).toBe(0);
+    expect(cancelled.finance.firstArrearsDay).toBeNull();
+    // And not a penny of it landed in a bank that never paid it.
+    expect(cancelled.cash).toBe(state.finance.overdraftLimit);
+  });
+
   it('still calls a machine off while it is in transit, and refuses one at the gate', () => {
     const state = quietHall();
     const before = state.cash;

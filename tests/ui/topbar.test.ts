@@ -5,10 +5,11 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { DAY_CATEGORY_LABELS } from '../../src/engine/constants';
-import { dayPercentages } from '../../src/engine/index';
+import { applyAction, dayPercentages } from '../../src/engine/index';
 import type { DayCategory, GameState } from '../../src/engine/index';
 import { renderTopbar } from '../../src/ui/topbar';
 import { renderDaySummary } from '../../src/ui/dayEnd';
+import { currentState, mount } from '../../src/ui/app';
 import { buyStartingKit, fillRack, newGame } from '../helpers';
 
 /** A hall with the day 1 kit and a day scripted onto the owner, so the bar has something to
@@ -179,5 +180,67 @@ describe('the plate at the top of the day end summary', () => {
         `${DAY_CATEGORY_LABELS[share.category]} ${share.percent}%`,
       );
     }
+  });
+});
+
+describe('the Orders button, in the game itself', () => {
+  it('stays cream for an order the player placed and lights when the lorry lands', () => {
+    document.body.innerHTML = '<div id="app"></div>';
+    const root = document.querySelector('#app');
+    if (!(root instanceof HTMLElement)) throw new Error('no root');
+    mount(root);
+    const press = (selector: string): void => {
+      const element = root.querySelector(selector);
+      if (element === null) throw new Error(`nothing to click: ${selector}`);
+      element.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    };
+    press('[data-do="startGame"]');
+    press('[data-do="setSpeed"][data-speed="1"]');
+    let guard = 0;
+    while (root.querySelector('[data-do="resolveEvent"]') !== null && guard < 50) {
+      press('[data-do="resolveEvent"]');
+      guard += 1;
+    }
+    press('[data-do="openModal"][data-modal="shopping"]');
+    press('[data-modal="shopping"] [data-do="closeModal"]');
+    const orders = (): Element | null =>
+      root.querySelector('[data-do="openModal"][data-modal="shopping"]');
+    expect(orders()?.className).toBe('push');
+    // He buys something himself: he knows it is on the road, so the button says nothing.
+    const state = currentState();
+    if (state === null) throw new Error('no game');
+    Object.assign(state, applyAction(state, { type: 'BUY_STOCK', sheets: 10 }));
+    press('[data-do="setSpeed"][data-speed="1"]');
+    expect(orders()?.className).toBe('push');
+    // The lorry lands while he is looking somewhere else: now it is orange.
+    const waiting = currentState();
+    if (waiting === null) throw new Error('no game');
+    waiting.deliveries.length = 0;
+    press('[data-do="setSpeed"][data-speed="1"]');
+    expect(orders()?.className).toBe('push is-new');
+    // And looking at the list puts it back to cream.
+    press('[data-do="openModal"][data-modal="shopping"]');
+    press('[data-modal="shopping"] [data-do="closeModal"]');
+    expect(orders()?.className).toBe('push');
+  });
+
+  it('says nothing about an order the player called off himself', () => {
+    const root = document.querySelector('#app');
+    if (!(root instanceof HTMLElement)) throw new Error('no root');
+    const press = (selector: string): void => {
+      const element = root.querySelector(selector);
+      if (element === null) throw new Error(`nothing to click: ${selector}`);
+      element.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    };
+    const state = currentState();
+    if (state === null) throw new Error('no game');
+    Object.assign(state, applyAction(state, { type: 'BUY_STOCK', sheets: 10 }));
+    press('[data-do="setSpeed"][data-speed="1"]');
+    press('[data-do="openModal"][data-modal="shopping"]');
+    press('[data-do="cancelOrder"]');
+    press('[data-modal="shopping"] [data-do="closeModal"]');
+    expect(
+      root.querySelector('[data-do="openModal"][data-modal="shopping"]')?.className,
+    ).toBe('push');
   });
 });

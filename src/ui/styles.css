@@ -2285,21 +2285,21 @@ input.num {
 /* Minus one degree to one and a half, so a board of cards is never a filing cabinet. */
 .modal-board .card:nth-of-type(3n + 1),
 .modal-board .row:nth-of-type(3n + 1),
-.modal-board .plan-row:nth-of-type(3n + 1),
+.modal-board .plan-row:not(.plan-scale-row):nth-of-type(3n + 1),
 .modal-board .tile:nth-of-type(3n + 1) {
   transform: rotate(-1deg);
 }
 
 .modal-board .card:nth-of-type(3n + 2),
 .modal-board .row:nth-of-type(3n + 2),
-.modal-board .plan-row:nth-of-type(3n + 2),
+.modal-board .plan-row:not(.plan-scale-row):nth-of-type(3n + 2),
 .modal-board .tile:nth-of-type(3n + 2) {
   transform: rotate(0.75deg);
 }
 
 .modal-board .card:nth-of-type(3n),
 .modal-board .row:nth-of-type(3n),
-.modal-board .plan-row:nth-of-type(3n),
+.modal-board .plan-row:not(.plan-scale-row):nth-of-type(3n),
 .modal-board .tile:nth-of-type(3n) {
   transform: rotate(1.5deg);
 }
@@ -2310,7 +2310,6 @@ input.num {
   border: 0;
   box-shadow: none;
   color: #cfd6da;
-  transform: none;
 }
 
 .modal-board .row-main,

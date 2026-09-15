@@ -3,6 +3,7 @@
 // fill green as the work is done; if the work stopped it should stretch" (PIOTR, 15.09;
 // CLAUDE.md T11 3.3).
 
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { MINUTES_PER_WORKING_DAY } from '../../src/engine/constants';
 import { workPlan } from '../../src/engine/plan';
@@ -81,7 +82,11 @@ describe('the bar of a started job', () => {
     const bar = page.querySelector('.plan-bar');
     // The outline stays: a started bar is not a solid green block (PIOTR, 15.09).
     expect(bar?.classList.contains('is-projected')).toBe(false);
-    expect(bar?.querySelector('.plan-done')?.getAttribute('style')).toContain('width:5');
+    expect(bar?.querySelector('.plan-done')?.getAttribute('style')).toBe('width:50%');
+    // And the outline itself is what the stylesheet draws, whatever the fill is doing.
+    expect(readFileSync('src/ui/styles.css', 'utf8')).toContain(
+      'border: 1px solid var(--text-dim);',
+    );
   });
 
   it('stretches by sixty minutes when sixty minutes go by with no work in them', () => {

@@ -235,6 +235,7 @@ export {
   bestTakerOf,
   DAY_CATEGORY_OF_TASK,
   HELPER_ONLY_KINDS,
+  TASK_KINDS,
   WAITING_FOR_HELPER,
   dayCategoryOf,
   designMinutes,

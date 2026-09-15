@@ -10,7 +10,12 @@ import {
   isHelperTask,
   startTaskCheck,
 } from '../../src/engine/index';
-import { HELPER_HOME_CELL, ROOM_LAYOUT, WORKER_RATES } from '../../src/engine/constants';
+import {
+  HELPER_HOME_CELL,
+  LAPTOP_BOOT_MINUTES,
+  ROOM_LAYOUT,
+  WORKER_RATES,
+} from '../../src/engine/constants';
 import { assignWorkerTask, createTask } from '../../src/engine/tasks';
 import { renderHall, stationCell } from '../../src/render/hall';
 import type { GameState, TaskInstance, Worker } from '../../src/engine/index';
@@ -22,6 +27,7 @@ import {
   newGame,
   nextDay,
   placeEquipment,
+  runClock,
 } from '../helpers';
 
 /** The day 1 kit, a full rack and a quiet board, so a test is about the helper and nothing else. */
@@ -106,6 +112,23 @@ describe('the owner s own queue with a helper in the hall', () => {
     const cleaning = next.tasks.find((task) => task.kind === 'cleaning' && !task.done);
     expect(cleaning?.doneBy).toBe('owner');
   });
+
+  it('gives him back what the phone took him off, override and all', () => {
+    // A forced job of work put down by an interruption has to come back to him. Refused on the
+    // way back it would be left marked as his and nobody could ever pick it up again.
+    const state = withHelper();
+    const cleaning = act(state, { type: 'START_CLEANING' });
+    const task = cleaning.tasks.find((entry) => entry.kind === 'cleaning' && !entry.done);
+    if (task === undefined) throw new Error('no cleaning on the list');
+    expect(cleaning.owner.currentTaskId).toBe(task.id);
+    // The laptop is lifted: the boot interrupts him and he goes back to the cleaning after it.
+    const booting = act(cleaning, { type: 'BOOT_LAPTOP' });
+    expect(booting.owner.resumeTaskId).toBe(task.id);
+    const back = runClock(booting, LAPTOP_BOOT_MINUTES + 1);
+    expect(back.owner.currentTaskId).toBe(task.id);
+    const same = back.tasks.find((entry) => entry.id === task.id);
+    expect(same?.doneBy).toBe('owner');
+  });
 });
 
 /** A joiner on the books today, without the interview: this test is about who may be sent at a
@@ -137,6 +160,27 @@ function addJoiner(state: GameState): Worker {
   state.workers.push(joiner);
   return joiner;
 }
+
+describe('a helper who is on the books but not in the hall today', () => {
+  it('is not on duty, and the bag is put to the owner as it always was', () => {
+    const state = quietHall();
+    const hired = hireNow(state, 'helper', null);
+    const helper = hired.workers.find((worker) => worker.role === 'helper');
+    if (helper === undefined) throw new Error('no helper');
+    // He starts tomorrow, so today he is on the books and nowhere near the hall.
+    expect(helper.startDay).toBeGreaterThan(hired.clock.day);
+    expect(helperOnDuty(hired)).toBe(false);
+    expect(isHelperTask(hired, taskOfKind(hired, 'bagChange'))).toBe(false);
+    // The saw fills its bag: the question is put, because there is nobody to take it.
+    const saw = hired.equipment.find((item) => item.specId === 'tableSaw');
+    if (saw === undefined) throw new Error('no saw in the hall');
+    const asked = act(hired, { type: 'ASK_BAG_CHANGE', equipmentId: saw.id });
+    saw.bagFull = true;
+    const again = act({ ...hired }, { type: 'ASK_BAG_CHANGE', equipmentId: saw.id });
+    expect(again.activeEvent?.kind ?? again.eventQueue[0]?.kind).toBe('bagFull');
+    void asked;
+  });
+});
 
 describe('a joiner with a helper in the hall', () => {
   it('is never sent at a bag change, at an unload or at the cleaning', () => {

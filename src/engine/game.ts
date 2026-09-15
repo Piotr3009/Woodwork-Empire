@@ -70,6 +70,7 @@ import {
   pay,
   payArrears,
   receive,
+  refund,
   runDayCosts,
   writeUpBooks,
 } from './economy';
@@ -193,6 +194,7 @@ import {
   canHire,
   countStaffOvertimeMinute,
   hasWorkingDay,
+  helperOnDuty,
   helpers,
   hire,
   isWorkingToday,
@@ -671,7 +673,7 @@ export function runOvertimeQuits(state: GameState): void {
 
 /** A helper cleans every Friday at no cost to the owner (CLAUDE.md 9.7). */
 function runHelperClean(state: GameState): void {
-  if (helpers(state).length === 0) return;
+  if (!helperOnDuty(state)) return;
   if (weekday(state.clock.day) !== HELPER_CLEAN_WEEKDAY) return;
   ensureTask(state, 'cleaning', 'Weekly clean', null);
 }
@@ -1089,6 +1091,9 @@ function putThemBack(state: GameState): void {
     if (!item) continue;
     item.anchorX = moved.fromX;
     item.anchorY = moved.fromY;
+    // Exactly where it stood means the way it stood as well, now that a turn is a move
+    // (CLAUDE.md T11 3.9).
+    item.rotated = moved.fromRotated;
   }
   state.movedItems = [];
 }
@@ -1484,8 +1489,10 @@ function raiseStockOverflow(state: GameState, delivery: Delivery, overflow: numb
 function raiseBagFull(state: GameState, machine: Equipment): void {
   const name = findSpec(machine.specId)?.name ?? machine.specId;
   const task = ensureTask(state, 'bagChange', `Bag change: ${name}`, machine.id);
-  if (helpers(state).length > 0) {
-    // The helper takes it, free and without asking.
+  // The helper takes it, free and without asking, while he is actually in the hall. A man on the
+  // books who is off today takes nothing, and the question is put to the owner as it always was
+  // (CLAUDE.md T11 3.4).
+  if (helperOnDuty(state)) {
     delegateTasks(state);
     return;
   }
@@ -2304,7 +2311,7 @@ export function cancelOrder(state: GameState, orderId: string): BuyCheck {
   if (!delivery) return { ok: false, reason: 'Nothing on order' };
   if (delivery.arrived) return { ok: false, reason: 'It is at the gate' };
   if (timeIsPaused(state)) state.speed = 1;
-  receive(state, 'material', `Order cancelled: ${delivery.sheets} sheets`, delivery.pricePaid);
+  refund(state, 'material', `Order cancelled: ${delivery.sheets} sheets`, delivery.pricePaid);
   state.deliveries = state.deliveries.filter((entry) => entry.id !== delivery.id);
   const job = delivery.jobId === null ? null : findJob(state, delivery.jobId);
   if (job !== null && job.stage === 'materialOrdered') {

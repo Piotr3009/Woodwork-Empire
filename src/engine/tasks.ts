@@ -110,6 +110,10 @@ const TASK_DEFINITIONS: Record<TaskKind, TaskDefinition> = {
   booting: { category: 'admin', eligibleRoles: [], autoRoles: [] },
 };
 
+/** Every kind of task the runner knows about, off the runner's own table. The one list: a test
+ *  that asks "every kind of task in the game" asks this and not the table it is checking. */
+export const TASK_KINDS: ReadonlyArray<TaskKind> = Object.keys(TASK_DEFINITIONS) as TaskKind[];
+
 /** Which of the seven bands of the owner's day a task falls in. Every kind of task in the game
  *  is on this one table, so a minute cannot be workshop time on the bar and office time in the
  *  summary (CLAUDE.md T11 3.1). The engine's own `category` stays what it always was: it is the
@@ -564,7 +568,10 @@ export function interruptOwnerWith(state: GameState, task: TaskInstance): void {
 export function resumeOwnerTask(state: GameState): void {
   const resume = state.owner.resumeTaskId;
   state.owner.resumeTaskId = null;
-  if (resume !== null) startTask(state, resume);
+  // He is going back to what the phone took him off, so the override he already exercised goes
+  // back with him: a forced job of work refused here would be left marked as his and nobody,
+  // helper or joiner, could ever pick it up again (CLAUDE.md T11 3.4).
+  if (resume !== null) startTask(state, resume, true);
 }
 
 /** Works one minute into a task. True when it finished. One path for the owner and for staff.

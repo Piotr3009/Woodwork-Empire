@@ -80,7 +80,13 @@ import {
   tick,
   workPlan,
 } from '../../src/engine/index';
-import { NO_AIR_LINE, PRODUCT_TEMPLATES, WET_AIR_FINISH_FACTOR } from '../../src/engine/constants';
+import {
+  DAY_ONE_KIT,
+  DAY_ONE_SOFTWARE,
+  NO_AIR_LINE,
+  PRODUCT_TEMPLATES,
+} from '../../src/engine/constants';
+import { jobProgress } from '../../src/engine/jobs';
 import { kitBlockFor } from '../../src/engine/board';
 import { familyForStage } from '../../src/engine/stages';
 import { hallAirCheck, sprayingOnWetAir } from '../../src/engine/media';
@@ -108,6 +114,16 @@ const SEED = 20260911;
 function easyMonth(seen: GameEvent[] = []): GameState {
   return playUntilDay(newGame({ seed: SEED, difficulty: 'easy' }), 31, CAREFUL, seen);
 }
+
+describe('the day one list the script buys', () => {
+  it('is the engine s own list, in an order the prerequisites allow', () => {
+    // The card at the top of the catalogue is the list (CLAUDE.md T11 3.6); this is only the
+    // order it is worked down in, and the two may never drift apart.
+    expect([...DAY_ONE_BUY_ORDER].sort()).toEqual(
+      [...DAY_ONE_KIT].filter((id) => id !== DAY_ONE_SOFTWARE).sort(),
+    );
+  });
+});
 
 describe('30 days on Easy, working the board', () => {
   const seen: GameEvent[] = [];
@@ -1168,7 +1184,17 @@ describe('a month that sprays a wardrobe on wet air', () => {
     if (booth !== undefined) expect(sprayingOnWetAir(state, booth)).toBe(true);
   });
 
-  it('greys the sprayed wardrobe while the booth is still on the road', () => {
+  it('greys the sprayed wardrobe for a workshop that has not bought a booth', () => {
+    // A month that never orders one: the reason stands all the way through it (T11 3.7).
+    const never = playUntilDay(newGame({ seed: SEED, difficulty: 'veryEasy' }), 10, CAREFUL, []);
+    never.reputation = 40;
+    expect(never.equipment.some((item) => item.specId === 'sprayBooth')).toBe(false);
+    expect(kitBlockFor(never, templateOf('lacqueredWardrobe'))?.reason).toBe(
+      'needs a spray booth',
+    );
+    expect(never.jobs.some((job) => job.templateId === 'lacqueredWardrobe')).toBe(false);
+    // A booth on the road is enough for the board, as a saw on the road is: the job is days of
+    // drawing and material before anybody sprays anything (CLAUDE.md T8 3.2, T10 3.7).
     const early = playUntilDay(
       newGame({ seed: SEED, difficulty: 'veryEasy' }),
       5,
@@ -1176,10 +1202,8 @@ describe('a month that sprays a wardrobe on wet air', () => {
       [],
     );
     expect(early.equipment.some((item) => item.specId === 'sprayBooth')).toBe(false);
-    const block = kitBlockFor(early, templateOf('lacqueredWardrobe'));
-    expect(block?.reason).toBe('needs a spray booth');
-    // Nothing lacquered was taken off the board in those days.
-    expect(early.jobs.some((job) => job.templateId === 'lacqueredWardrobe')).toBe(false);
+    expect(early.onOrder.some((item) => item.specId === 'sprayBooth')).toBe(true);
+    expect(kitBlockFor(early, templateOf('lacqueredWardrobe'))).toBeNull();
   });
 
   it('takes the sprayed work once the booth stands in the hall', () => {
@@ -1189,22 +1213,24 @@ describe('a month that sprays a wardrobe on wet air', () => {
     for (const job of lacquered) expect(job.finish).toBe('lacquer');
   });
 
-  it('does the finish at the booth, half as long again, and marks the piece', () => {
+  it('does the finish at the booth and marks every piece that went through it', () => {
     const lacquered = state.jobs.filter((job) => job.templateId === 'lacqueredWardrobe');
     const job = lacquered[0];
     if (job === undefined) throw new Error('no sprayed job on the books');
     // The Finishing of a lacquered job is done at the booth and nowhere else.
     expect(familyForStage(job, 'finishing')).toBe('sprayBooth');
-    expect(WET_AIR_FINISH_FACTOR).toBe(1.5);
-    // Any of them that reached the booth carries the mark, and any of them delivered lost the
-    // point of rating for it (CLAUDE.md T10 3.3).
-    const sprayed = lacquered.filter((entry) => entry.wetFinish);
-    for (const entry of sprayed) {
-      expect(entry.wetFinish).toBe(true);
-    }
+    // Every job that reached the Finishing came out of a booth running on wet air, so every one
+    // of them is marked: the mark is not a thing that happens to some of them (T10 3.3).
+    const finished = lacquered.filter(
+      (entry) => entry.stage === 'completed' || jobProgress(entry) > 0.85,
+    );
+    expect(finished.length).toBeGreaterThan(0);
+    for (const entry of finished) expect(entry.wetFinish, entry.name).toBe(true);
+    // And every one of them that went out lost its point of rating for it.
     const marked = state.reputationLog.filter((entry) => entry.reason.endsWith(': finish defects'));
     expect(marked.length).toBe(
       lacquered.filter((entry) => entry.stage === 'completed' && entry.wetFinish).length,
     );
+    expect(marked.length).toBeGreaterThan(0);
   });
 });

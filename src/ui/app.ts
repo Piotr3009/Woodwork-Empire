@@ -291,7 +291,18 @@ function dispatch(action: GameAction): void {
   autosave();
   if (AUTOSAVE_ACTIONS.includes(action.type)) autosaveLocal();
   autosaveWatch();
+  noteOrders();
   requestRender();
+}
+
+/** The player knows about an order he has just placed: what lights the Orders button is something
+ *  landing while he was not looking, not something he bought himself (CLAUDE.md T11 3.1). So the
+ *  list he has seen takes in everything added to it, and stops the moment one of them has gone. */
+function noteOrders(): void {
+  if (state === null) return;
+  const waiting = shoppingList(state).map((line) => line.id);
+  if (ui.seenOrders.some((id) => !waiting.includes(id))) return;
+  ui.seenOrders = waiting;
 }
 
 /** Renders asked for while one batch is open, and how deep the batch is. The frame loop and every
@@ -954,6 +965,15 @@ function openModal(id: ModalId): void {
   if (id === 'laptop') dispatch({ type: 'BOOT_LAPTOP' });
 }
 
+/** Shutting a modal, however it was shut: the cross, Escape, or a Start production that takes the
+ *  player straight to the bench. One path, so the game is written down every time (T11 3.2). */
+function shutModal(): void {
+  ui.modal = null;
+  ui.modalPosition = null;
+  ui.sellConfirm = null;
+  autosaveLocal();
+}
+
 /** Clicking the van at the gate opens the unloading choice again (CLAUDE.md 10.1). */
 function askUnload(deliveryId: string): void {
   dispatch({ type: 'ASK_UNLOAD', deliveryId });
@@ -1020,6 +1040,7 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
       ui.screen = 'game';
       accumulator = 0;
       startedStore();
+      noteOrders();
       break;
     }
     case 'startGame':
@@ -1036,6 +1057,7 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
       ui.startOverAsked = false;
       accumulator = 0;
       startedStore();
+      noteOrders();
       autosaveLocal();
       break;
     case 'restart':
@@ -1143,6 +1165,8 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
       return;
     case 'cancelOrder':
       dispatch({ type: 'CANCEL_ORDER', orderId: id });
+      // He called it off himself, so its going is not news to him (CLAUDE.md T11 3.1).
+      ui.seenOrders = shoppingList(game()).map((line) => line.id);
       return;
     case 'sellMachine':
       // The first click says what the buyer pays, the second means it (CLAUDE.md T8 3.5).
@@ -1229,11 +1253,7 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
         ui.daySummary = null;
         break;
       }
-      ui.modal = null;
-      ui.modalPosition = null;
-      ui.sellConfirm = null;
-      // Shutting a modal is a moment worth keeping: whatever he did behind it is done (T11 3.2).
-      autosaveLocal();
+      shutModal();
       break;
     }
     case 'clearFilter': {
@@ -1281,8 +1301,7 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
       return;
     case 'startProduction':
       // Straight to the bench: the laptop closes and the hall comes up (CLAUDE.md T2 3.3).
-      ui.modal = null;
-      ui.modalPosition = null;
+      shutModal();
       ui.view = 'hall';
       dispatch({ type: 'WORK_HERE', jobId: id });
       return;
@@ -1720,8 +1739,7 @@ function runKeyDown(event: KeyboardEvent): void {
     return;
   }
   if (ui.modal !== null) {
-    ui.modal = null;
-    ui.modalPosition = null;
+    shutModal();
     requestRender();
   }
 }

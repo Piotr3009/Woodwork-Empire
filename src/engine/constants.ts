@@ -1985,9 +1985,7 @@ const SPEC_DRAFTS: SpecDraft[] = [
     zoneWidth: 4,
     zoneDepth: 3,
     spriteKey: 'sprayBooth',
-    // Unlocked in Turn 11: there are two products that ask for a sprayed finish now, and a
-    // product that needs a booth nobody can buy is a product nobody can ever make
-    // (CLAUDE.md T11 3.7, and rule 3.5: a feature needs a way in).
+    // Unlocked in Turn 11: two products ask for a sprayed finish now (CLAUDE.md T11 3.7).
     effect: 'Unlocks the lacquer finish. Its own extraction, and dry air for a clean finish.',
   },
   {

@@ -17,7 +17,7 @@ import {
   UNREACHABLE_MAX,
   UNREACHABLE_MIN,
 } from './constants';
-import { findSpec, has } from './machines';
+import { findSpec } from './machines';
 import {
   availableFinishes,
   findTemplate,
@@ -176,7 +176,11 @@ export function kitBlockFor(state: GameState, entry: ProductTemplate): BoardBloc
   if (entry.material === 'solidWood' && !SOLID_WOOD_EQUIPMENT.every((id) => hasOrOnOrder(state, id))) {
     return { reason: 'no timber machines', where: 'catalogue' };
   }
-  if (entry.allowedFinishes.includes('lacquer') && !has(state, 'sprayBooth')) {
+  // Bought and on the road counts, the way it does for every other thing on this list: a company
+  // that has ordered a booth is a company that can take sprayed work, and the job is days of
+  // drawing and material before anybody sprays anything (CLAUDE.md T8 3.2, T10 3.7). Otherwise
+  // the same product could stand on the board takeable and greyed at once.
+  if (entry.allowedFinishes.includes('lacquer') && !hasOrOnOrder(state, 'sprayBooth')) {
     return { reason: 'needs a spray booth', where: 'catalogue' };
   }
   const missing = entry.requiredEquipment.filter((specId) => !hasOrOnOrder(state, specId));

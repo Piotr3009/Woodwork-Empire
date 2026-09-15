@@ -76,13 +76,11 @@ function outputRow(line: OutputLine): string {
   );
 }
 
-/** The week the clock is in, and what the reputation has done in it. */
-function thisWeek(state: GameState): { week: number; total: number } {
+/** The week the clock is in, and what the reputation has done in it, off the same fold the week
+ *  by week list is drawn from: two counts of one week could never disagree. */
+function thisWeek(state: GameState, weeks: readonly Week[]): { week: number; total: number } {
   const week = weekOfDay(state.clock.day);
-  const total = state.reputationLog
-    .filter((entry) => weekOfDay(entry.day) === week)
-    .reduce((sum, entry) => Math.round((sum + entry.points) * 100) / 100, 0);
-  return { week, total };
+  return { week, total: weeks.find((entry) => entry.week === week)?.total ?? 0 };
 }
 
 /** How the week went, in the same seven bands as the top bar and the evening's plate. The state
@@ -90,7 +88,11 @@ function thisWeek(state: GameState): { week: number; total: number } {
 function weekShares(state: GameState): string {
   const segments: DayLogEntry[] = [];
   for (const day of state.dayLogs) segments.push(...day.segments);
-  segments.push(...state.owner.dayLog);
+  // The day in progress, unless the evening has already written it down: between the day closing
+  // and the next morning emptying the log it is on both, and counting it twice would weight it
+  // twice (CLAUDE.md T11 3.1).
+  const closed = state.dayLogs.some((day) => day.day === state.clock.day);
+  if (!closed) segments.push(...state.owner.dayLog);
   const shares = dayPercentages(segments);
   if (shares.length === 0) return '';
   return shares
@@ -106,7 +108,7 @@ export function renderCompany(state: GameState): string {
   const sum =
     `${breakdown.base.toFixed(2)} base ${points(breakdown.plus)} ${points(breakdown.minus)} = ` +
     `${breakdown.total.toFixed(2)}`;
-  const week = thisWeek(state);
+  const week = thisWeek(state, weeks);
   const shares = weekShares(state);
   const totals = companyTotals(state);
   // The picture is the modal (SPRITES.md 11): the company name and the week on the felt above the

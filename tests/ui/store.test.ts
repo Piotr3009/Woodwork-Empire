@@ -6,7 +6,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { SAVE_KEY, localSaveStore, peekSave, readStore, saveStore } from '../../src/cloud/store';
 import { encodeSaveFile } from '../../src/cloud/file';
 import { STATE_VERSION } from '../../src/engine/index';
-import { AUTOSAVE_MIN_MS, currentState, mount, render } from '../../src/ui/app';
+import { AUTOSAVE_MIN_MS, advanceMinutes, currentState, mount, render } from '../../src/ui/app';
+import { createTask } from '../../src/engine/tasks';
 import { newGame } from '../helpers';
 
 function root(): HTMLElement {
@@ -109,9 +110,15 @@ describe('the game writing itself down as it is played', () => {
   });
 
   it('writes it again when a modal is shut, and no more than once a second', async () => {
+    // Everything this test needs it opens itself: it does not lean on what the test before it
+    // left on the page.
+    const toOffice = root().querySelector('[data-do="setView"][data-view="office"]');
+    if (toOffice !== null) toOffice.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    while (has('[data-do="closeModal"]')) click('[data-do="closeModal"]');
+    await settleAutosave();
     await settleAutosave();
     saveStore.clear();
-    click('[data-do="closeFolder"]');
+    click('[data-office="catalogue"]');
     click('[data-do="closeModal"]');
     expect(readStore().state).not.toBeNull();
     // A second shut inside the same second writes nothing new of its own.
@@ -120,6 +127,52 @@ describe('the game writing itself down as it is played', () => {
     click('[data-do="closeModal"]');
     expect(saveStore.read()).toBe(written);
   });
+
+  it('writes it at the start of a day, and when a move of the hall is finished', async () => {
+    await settleAutosave();
+    await settleAutosave();
+    const state = currentState();
+    if (state === null) throw new Error('no game');
+    // The morning, after the day has settled (CLAUDE.md T11 3.2).
+    saveStore.clear();
+    state.clock.day += 1;
+    advanceMinutes(1);
+    expect(readStore().state?.clock.day).toBe(state.clock.day);
+    // And the move of the hall, the minute it is finished.
+    await settleAutosave();
+    await settleAutosave();
+    const live = currentState();
+    if (live === null) throw new Error('no game');
+    const move = createTask(live, {
+      kind: 'moveMachines',
+      label: 'Moving machines: 1 item',
+      minutes: 60,
+    });
+    advanceMinutes(1);
+    saveStore.clear();
+    const running = currentState();
+    const same = running?.tasks.find((task) => task.id === move.id);
+    if (same === undefined) throw new Error('no move on the list');
+    same.done = true;
+    advanceMinutes(1);
+    expect(readStore().state).not.toBeNull();
+  });
+
+  it('writes it again when a modal is shut with Escape as well as with the cross', async () => {
+    // Twice: the first wait lets the trailing write of the test before this one land, and the
+    // second lets that one get old enough for the next click to write at once.
+    await settleAutosave();
+    await settleAutosave();
+    saveStore.clear();
+    const toOffice = root().querySelector('[data-do="setView"][data-view="office"]');
+    if (toOffice !== null) toOffice.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    click('[data-office="workPlan"]');
+    expect(root().querySelector('[data-modal="workPlan"]')).not.toBeNull();
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(root().querySelector('[data-modal="workPlan"]')).toBeNull();
+    expect(readStore().state).not.toBeNull();
+  });
+
 });
 
 describe('the start screen with a game in the store', () => {

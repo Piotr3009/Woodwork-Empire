@@ -118,6 +118,21 @@ describe('the felt and the sheet', () => {
     expect(percents.reduce((sum, value) => sum + value, 0)).toBe(100);
   });
 
+  it('counts the day that has just closed once, and not twice', () => {
+    // Between the evening writing the day down and the next morning emptying the log it is on
+    // both `dayLogs` and the owner: the week must not weight it twice (CLAUDE.md T11 3.1).
+    const state = traded();
+    state.dayLogs = [{ day: state.clock.day, segments: [{ category: 'workshop', minutes: 100 }] }];
+    state.owner.dayLog = [{ category: 'workshop', minutes: 100 }];
+    const shares = parse(renderCompany(state)).querySelector('.felt-shares')?.textContent ?? '';
+    expect(shares).toBe('Workshop 100%');
+    // A day still open is on the week as well as the days that closed before it.
+    state.dayLogs = [{ day: state.clock.day - 1, segments: [{ category: 'emails', minutes: 100 }] }];
+    const both = parse(renderCompany(state)).querySelector('.felt-shares')?.textContent ?? '';
+    expect(both).toContain('Workshop 50%');
+    expect(both).toContain('Emails 50%');
+  });
+
   it('puts the output and its two columns on the pinned sheet', () => {
     const state = traded();
     const sheet = parse(renderCompany(state)).querySelector('.felt-sheet');
