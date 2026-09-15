@@ -1036,7 +1036,7 @@ export function render(): void {
 /** The modals that act on the world, which is every one of them but the Work Plan: nothing on
  *  them can be touched while the clock is stopped (CLAUDE.md T7 3.10). The Work Plan is a
  *  whiteboard and the Sprite check is a page of pictures: both are reading, and both open. */
-const READING_MODALS: ModalId[] = ['workPlan', 'shopping', 'company'];
+const READING_MODALS: ModalId[] = ['workPlan', 'shopping', 'company', 'settings'];
 
 /** The one line the player gets when the world will not move for him, with the Pause button
  *  pulsing once behind it (CLAUDE.md T7 3.10). */
