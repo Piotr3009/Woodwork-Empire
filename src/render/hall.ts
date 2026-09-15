@@ -51,6 +51,7 @@ import {
   stationWaitingFor,
 } from '../engine/stations';
 import { ownerIsAvailable, staffOutputFactor } from '../engine/owner';
+import { homeCellOf } from '../engine/staff';
 import { plural } from '../engine/text';
 import type { RoomId } from '../engine/constants';
 import type { Equipment, EquipmentSpec, GameState, OnOrderItem } from '../engine/types';
@@ -1087,7 +1088,9 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
   for (const worker of state.workers) {
     if (worker.startDay > state.clock.day) continue;
     const away = worker.absentDaysRemaining > 0;
-    const bench = { x: worker.anchorX, y: worker.anchorY };
+    // Where he stands when the hall has nothing else for him. The helper's own corner is the fan
+    // or the gate lane, never the inside of the office block (CLAUDE.md T11 3.4).
+    const bench = homeCellOf(state, worker);
     const where = stationLabel(worker.station);
     drawables.push(
       figure(

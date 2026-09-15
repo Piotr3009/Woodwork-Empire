@@ -2184,6 +2184,11 @@ export const GATE_LAYOUT = { x: 0, y: SHUTTER.y, width: 2, depth: 2, height: 1 }
 /** The way in from the shutter that nothing may stand on: x 0 to 2, y 6 to 10, eight of the two
  *  hundred cells (docs/art/SPRITES.md 9.3). */
 export const GATE_LANE = { x: 0, y: SHUTTER.y, width: 2, depth: 4 };
+
+/** Where the helper stands when the hall has nothing for him and there is no fan to stand by: in
+ *  the gate lane, where the van and the bags are. Inside the painted floor and out of the office
+ *  block, which is where every man who is not a joiner used to be put (CLAUDE.md T11 3.4). */
+export const HELPER_HOME_CELL = { x: 2, y: 8 };
 /** How far into the hall the lane reaches. */
 export const GATE_LANE_CELLS = GATE_LANE.width;
 

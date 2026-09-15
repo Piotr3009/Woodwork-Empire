@@ -234,8 +234,11 @@ export {
 export {
   bestTakerOf,
   DAY_CATEGORY_OF_TASK,
+  HELPER_ONLY_KINDS,
+  WAITING_FOR_HELPER,
   dayCategoryOf,
   designMinutes,
+  isHelperTask,
   emailsForPrice,
   findTask,
   jobTasks,
@@ -261,6 +264,8 @@ export type { TaskStartCheck } from './tasks';
 export {
   availableJoiners,
   hasWorkingDay,
+  helperOnDuty,
+  homeCellOf,
   staysForOvertime,
   worksOvertime,
   helpers,

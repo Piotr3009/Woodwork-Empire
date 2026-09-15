@@ -193,6 +193,7 @@ import {
   canHire,
   countStaffOvertimeMinute,
   hasWorkingDay,
+  helperOnDuty,
   helpers,
   hire,
   isWorkingToday,
@@ -533,13 +534,20 @@ function queueKitDeliveryEvents(state: GameState, arriving: readonly OnOrderItem
     arriving.length === 1
       ? `The ${orderName(first).toLowerCase()} has arrived`
       : `The lorry is here with ${arriving.map((item) => orderName(item).toLowerCase()).join(', ')}`;
+  const helper = helperOnDuty(state);
   queueEvent(state, {
     kind: 'deliveryArrived',
     title: 'Delivery at the gate',
-    body: `${what}. It is no use to anybody on the back of a lorry.`,
+    body: helper
+      ? `${what}. The helper is on it.`
+      : `${what}. It is no use to anybody on the back of a lorry.`,
     choices: [
-      { id: 'unload', label: `Unload now, ${Math.round(task.minutesTotal)} min` },
-      { id: 'later', label: 'Leave it at the gate' },
+      {
+        id: 'unload',
+        label: `${helper ? 'Unload it yourself' : 'Unload now'}, ` +
+          `${Math.round(task.minutesTotal)} min`,
+      },
+      { id: 'later', label: helper ? 'Leave it to the helper' : 'Leave it at the gate' },
     ],
     data: { orderId: first.id, taskId: task.id },
   });
@@ -681,15 +689,21 @@ function queueDeliveryEvents(state: GameState, arriving: Delivery[]): void {
     const task = state.tasks.find((entry) => entry.deliveryId === delivery.id && !entry.done);
     if (!task) continue;
     const room = canUnload(state);
+    const helper = helperOnDuty(state);
     const choices = room
       ? [
-          { id: 'unload', label: `Unload now, ${task.minutesTotal} min` },
-          { id: 'later', label: 'Leave it at the gate' },
+          {
+            id: 'unload',
+            label: `${helper ? 'Unload it yourself' : 'Unload now'}, ${task.minutesTotal} min`,
+          },
+          { id: 'later', label: helper ? 'Leave it to the helper' : 'Leave it at the gate' },
         ]
       : [{ id: 'later', label: 'Leave it at the gate' }];
+    const waiting = helper
+      ? ' The helper is on it.'
+      : ' Nothing can be made until they are inside.';
     const body = room
-      ? `${plural(delivery.sheets, 'sheet', 'sheets')} have arrived. Nothing can be made until ` +
-        'they are inside.'
+      ? `${plural(delivery.sheets, 'sheet', 'sheets')} have arrived.${waiting}`
       : `${plural(delivery.sheets, 'sheet', 'sheets')} have arrived and there is no shelving to ` +
         'put them on. Buy some from the catalogue.';
     queueEvent(state, {
@@ -852,7 +866,8 @@ function ensureTask(
 /** Hands a task to the owner, or to a joiner at the cost of his production minutes. */
 function delegateAdHocTask(state: GameState, task: TaskInstance, choiceId: string): void {
   if (choiceId === 'owner') {
-    startTask(state, task.id);
+    // The player pressed the button himself: that is the override (CLAUDE.md T11 3.4).
+    startTask(state, task.id, true);
     return;
   }
   if (choiceId === 'joiner') {
@@ -1671,8 +1686,9 @@ function resolveEvent(state: GameState, choiceId: string): void {
       break;
     case 'deliveryArrived':
       if (choiceId === 'unload') {
+        // "Unload it yourself" is the override, so it lands even with a helper in the hall.
         const taskId = event.data.taskId;
-        if (typeof taskId === 'string') startTask(state, taskId);
+        if (typeof taskId === 'string') startTask(state, taskId, true);
       }
       break;
     case 'stockOverflow': {
@@ -1836,8 +1852,10 @@ export function applyAction(state: GameState, action: GameAction): GameState {
       break;
     }
     case 'START_CLEANING': {
+      // The Clean up button under the hall is the player saying he will do it himself, helper or
+      // no helper (CLAUDE.md T11 3.4).
       const task = ensureTask(next, 'cleaning', 'Clean the hall', null);
-      startTask(next, task.id);
+      startTask(next, task.id, true);
       break;
     }
     case 'REPAIR_MACHINE': {

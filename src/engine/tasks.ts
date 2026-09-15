@@ -39,7 +39,7 @@ import { findSpec } from './machines';
 import { canUnload } from './materials';
 import { ownerIsAvailable } from './owner';
 import { makeId } from './rng';
-import { hasWorkingDay, isWorkingToday, joiners, staffMinutesLeft } from './staff';
+import { hasWorkingDay, helperOnDuty, isWorkingToday, joiners, staffMinutesLeft } from './staff';
 import type {
   DayCategory,
   GameState,
@@ -143,6 +143,20 @@ export const DAY_CATEGORY_OF_TASK: Record<TaskKind, DayCategory> = {
 export function dayCategoryOf(kind: TaskKind): DayCategory {
   return DAY_CATEGORY_OF_TASK[kind];
 }
+
+/** The three jobs of work that are the helper's and nobody else's the moment there is a helper in
+ *  the hall: "with a helper, I and the joiners stop unloading, cleaning and changing bags"
+ *  (PIOTR, 14.09; CLAUDE.md T11 3.4). */
+export const HELPER_ONLY_KINDS: ReadonlyArray<TaskKind> = ['unload', 'bagChange', 'cleaning'];
+
+/** True while this job of work is the helper's. Without a helper it is nobody's in particular and
+ *  everything stays as it was. The one selector: the refusal, the joiner and the events read it. */
+export function isHelperTask(state: GameState, task: TaskInstance): boolean {
+  return HELPER_ONLY_KINDS.includes(task.kind) && helperOnDuty(state);
+}
+
+/** What the hall says while the van or the bag is waiting for the man whose job it is. */
+export const WAITING_FOR_HELPER = 'Waiting for the helper';
 
 /** Float guard, not a game number: work this small is finished work. It lives in constants.ts
  *  with every other figure and is handed on from here, where it has always been imported from. */
@@ -468,11 +482,20 @@ function refused(reason: string, blockingTaskId: string | null = null): TaskStar
   return { ok: false, reason, blockingTaskId };
 }
 
-export function startTaskCheck(state: GameState, taskId: string): TaskStartCheck {
+/** Why the owner cannot pick this one up. `force` is the explicit button the player pressed
+ *  himself: "Unload it yourself", "Clean up", the choice on the event. That is an override for
+ *  that one task and nothing else (CLAUDE.md T11 3.4). */
+export function startTaskCheck(
+  state: GameState,
+  taskId: string,
+  force = false,
+): TaskStartCheck {
   const task = findTask(state, taskId);
   if (!task) return refused('That job of work has gone');
   if (task.done) return refused('Done');
   if (!ownerIsAvailable(state)) return refused('The owner is not in today');
+  // The unloading, the bags and the cleaning are the helper's while he is here.
+  if (!force && isHelperTask(state, task)) return refused(WAITING_FOR_HELPER);
   // One thing at a time: the current task has to be finished or paused first (CLAUDE.md 10.1).
   const current = state.owner.currentTaskId;
   if (current !== null && current !== task.id) {
@@ -495,8 +518,8 @@ export function startTaskCheck(state: GameState, taskId: string): TaskStartCheck
   return CAN_START_TASK;
 }
 
-export function startTask(state: GameState, taskId: string): boolean {
-  if (!startTaskCheck(state, taskId).ok) return false;
+export function startTask(state: GameState, taskId: string, force = false): boolean {
+  if (!startTaskCheck(state, taskId, force).ok) return false;
   const task = findTask(state, taskId);
   if (!task) return false;
   // Every refusal is behind us, so it is safe to take the task off whoever was holding it. The
@@ -575,6 +598,9 @@ export function assignWorkerTask(state: GameState, workerId: string, taskId: str
   const worker = state.workers.find((entry) => entry.id === workerId);
   const task = findTask(state, taskId);
   if (!worker || !task || task.done) return false;
+  // A joiner is never sent at the helper's own work: that is what the helper was taken on for
+  // (PIOTR, 14.09; CLAUDE.md T11 3.4).
+  if (worker.role !== 'helper' && isHelperTask(state, task)) return false;
   // One man on a task: the owner comes off it the moment somebody else is sent.
   if (state.owner.currentTaskId === task.id) state.owner.currentTaskId = null;
   for (const other of state.workers) {
