@@ -2,10 +2,12 @@
 // placeholder box, and the picture beside it when the art side has delivered one. This page is
 // the acceptance tool of docs/art/SPRITES.md item 7 (CLAUDE.md T3 3.6).
 
-import { DELIVERY_VAN_SPRITE, EQUIPMENT_SPECS, GATE_LAYOUT, PIPE_TILE_KEYS } from '../engine/constants';
+import { EQUIPMENT_SPECS, PIPE_TILE_KEYS } from '../engine/constants';
 import {
   HALL_CANVAS,
   HALL_LAYERS,
+  PALLET_LAYOUT,
+  PALLET_SPRITE,
   box,
   escapeText,
   label,
@@ -97,16 +99,17 @@ export function spriteTargets(): SpriteTarget[] {
       where: 'catalogue',
     });
   }
+  // The pallet of sheets at the gate is not in the catalogue, so its size comes from where it
+  // stands; the lorry it replaced is gone from the hall (CLAUDE.md T13 3.21).
   add({
-    name: DELIVERY_VAN_SPRITE,
-    spriteKey: DELIVERY_VAN_SPRITE,
+    name: PALLET_SPRITE,
+    spriteKey: PALLET_SPRITE,
     tier: null,
-    // The lorry is not in the catalogue, so its size comes from where it stands.
-    width: GATE_LAYOUT.width,
-    depth: GATE_LAYOUT.depth,
-    height: GATE_LAYOUT.height,
-    zoneWidth: GATE_LAYOUT.width,
-    zoneDepth: GATE_LAYOUT.depth,
+    width: PALLET_LAYOUT.width,
+    depth: PALLET_LAYOUT.depth,
+    height: PALLET_LAYOUT.height,
+    zoneWidth: PALLET_LAYOUT.width,
+    zoneDepth: PALLET_LAYOUT.depth,
     where: 'at the gate',
   });
   return targets;
@@ -283,9 +286,20 @@ function pipeSection(): string {
   );
 }
 
-/** The roles the game draws figures for. Joiners have their sheet tonight; the rest fall back to
- *  the capsule until theirs are delivered (CLAUDE.md T9 3.13). */
-const CHARACTER_ROLES = ['joiner', 'helper', 'owner'];
+/** Every role the game draws a figure for: the owner and every WorkerRole, the two of Turn 13
+ *  among them. The joiner and the owner have their sheets; the rest fall back to the capsule
+ *  until theirs are delivered (CLAUDE.md T9 3.13, T13 3.23). */
+export const CHARACTER_ROLES: readonly string[] = [
+  'owner',
+  'joiner',
+  'helper',
+  'officeAdmin',
+  'purchasingClerk',
+  'salesman',
+  'draftsman',
+  'estimator',
+  'productionManager',
+];
 
 /** One character sheet as a strip, with the anchor marked and the frames playing. The acceptance
  *  page for the art side: a sheet whose anchor is wrong is obvious here (CLAUDE.md T9 3.13). */

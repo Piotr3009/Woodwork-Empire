@@ -2,7 +2,6 @@
 // and it hands back an SVG string (CLAUDE.md 10.3).
 
 import {
-  DELIVERY_VAN_SPRITE,
   DUCT_DEPTH,
   DUCT_HEIGHT,
   DUCT_SPAN,
@@ -941,6 +940,61 @@ export function pinBoard(count: number): string {
   );
 }
 
+/** The key the pallet of sheets is drawn from once the art side paints it; until then the
+ *  placeholder helper draws it (CLAUDE.md T13 3.21; docs/art/REQUESTS-T13.md 4). */
+export const PALLET_SPRITE = 'pallet';
+/** The placeholder kind of the pallet, a pallet of sheets one metre each way. */
+export const PALLET_PLACEHOLDER = 'pallet.sheets';
+/** The pallet stands where the lorry stood: inside the shutter, on the lane. */
+export const PALLET_LAYOUT = { x: GATE_LAYOUT.x, y: GATE_LAYOUT.y, width: 1, depth: 1, height: 1 };
+
+/** The pallet at the gate: the delivered file where there is one, the placeholder in the hall's
+ *  dimetric where there is not, with the shadow and the name every object has. */
+export function palletArt(files: readonly string[], name: string): string {
+  const at = PALLET_LAYOUT;
+  const shadow = contactShadow(at.x, at.y, at.width, at.depth);
+  const url = pickSprite(files, PALLET_SPRITE);
+  const box = spriteBox(at.x, at.y, at.width, at.depth, at.height);
+  const picture =
+    url !== null
+      ? spriteImage(url, box)
+      : `<g class="placeholder-art" transform="translate(${round(box.x)},${round(box.y)})">` +
+        placeholder(PALLET_PLACEHOLDER, { width: box.width, height: box.height }, { dimetric: true }) +
+        '</g>';
+  return shadow + picture + label(centreOf(at.x, at.y, at.width, at.depth, at.height), name);
+}
+
+/** A machine off the lorry, on the apron by the gate: its own picture, unplaced, with the new
+ *  tag, one cell further down the lane for each one waiting (CLAUDE.md T13 3.21). */
+export function arrivedKit(item: OnOrderItem, index: number, files: readonly string[]): Drawable {
+  const spec = findSpec(item.specId);
+  const stands = itemFootprint(item);
+  const x = GATE_LAYOUT.x;
+  const y = GATE_LAYOUT.y + PALLET_LAYOUT.depth + index;
+  const name = `${orderName(item)} (new)`;
+  return {
+    depth: depthKey(x, y),
+    svg:
+      `<g data-arrived="${item.id}" data-sprite="${escapeText(spec?.spriteKey ?? item.specId)}" ` +
+      `data-tier="${escapeText(item.variantId)}" class="arrived">` +
+      `<title>${escapeText(`${name}, at the gate, waiting to be unloaded`)}</title>` +
+      objectArt({
+        files,
+        spriteKey: spec?.spriteKey ?? item.specId,
+        tier: item.variantId,
+        x,
+        y,
+        width: stands.width,
+        depth: stands.depth,
+        height: stands.height,
+        fill: 'var(--kit-machine)',
+        shade: 'var(--kit-machine-dark)',
+        label: name,
+      }) +
+      '</g>',
+  };
+}
+
 /** The outline of something bought and not here yet, on the cells held for it (T8 3.2). */
 export function reservedOutline(item: OnOrderItem): string {
   const zone = itemZone(item);
@@ -1237,33 +1291,27 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
     );
   }
 
-  // A lorry at the gate while something is waiting to be unloaded.
+  // A pallet of sheets at the gate while a delivery is waiting to be unloaded: the material
+  // arrives as what it is (CLAUDE.md T13 3.21). It keeps the lorry's hook, so a click on it
+  // still asks who unloads it.
   const waiting = state.deliveries.find((delivery) => delivery.arrived && !delivery.unloaded);
   if (waiting) {
-    const gate = GATE_LAYOUT;
-    // The shutter is in a far wall, so the lorry is only ever seen once it is in the hall, which
-    // is what the lane is kept clear for (docs/art/SPRITES.md 9.3).
-    const gateX = gate.x;
     drawables.push({
-      depth: depthKey(gateX, gate.y),
+      depth: depthKey(GATE_LAYOUT.x, GATE_LAYOUT.y),
       svg:
-        `<g data-van="${waiting.id}" data-sprite="${DELIVERY_VAN_SPRITE}" class="clickable">` +
-        '<title>Click the van to decide who unloads it</title>' +
-        objectArt({
-          files,
-          spriteKey: DELIVERY_VAN_SPRITE,
-          x: gateX,
-          y: gate.y,
-          width: gate.width,
-          depth: gate.depth,
-          height: gate.height,
-          fill: 'var(--kit-vehicle)',
-          shade: 'var(--kit-vehicle-dark)',
-          label: `Delivery: ${plural(waiting.sheets, 'sheet', 'sheets')}`,
-        }) +
+        `<g data-van="${waiting.id}" data-sprite="${PALLET_SPRITE}" class="clickable pallet">` +
+        '<title>Click the pallet to decide who unloads it</title>' +
+        palletArt(files, `Delivery: ${plural(waiting.sheets, 'sheet', 'sheets')}`) +
         '</g>',
     });
   }
+
+  // A delivered machine stands on the apron by the gate as that machine, unplaced, with a new
+  // tag, until somebody gets it off the lorry and it goes to the cells held for it
+  // (CLAUDE.md T13 3.21).
+  state.onOrder
+    .filter((item) => item.arrived && itemStandsInTheHall(item))
+    .forEach((item, index) => drawables.push(arrivedKit(item, index, files)));
 
   // Finished pieces stand on the apron beside the gate until transport is ordered.
   const waitingPieces = jobsAtGate(state);

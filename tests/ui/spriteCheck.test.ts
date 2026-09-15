@@ -2,12 +2,13 @@
 // The sprite check page is the acceptance tool for a batch of art (CLAUDE.md T3 3.6).
 
 import { describe, expect, it } from 'vitest';
-import { DELIVERY_VAN_SPRITE, EQUIPMENT_SPECS } from '../../src/engine/constants';
-import { HALL_LAYERS } from '../../src/render/hall';
+import { EQUIPMENT_SPECS } from '../../src/engine/constants';
+import { HALL_LAYERS, PALLET_SPRITE } from '../../src/render/hall';
 import { OFFICE_LAYERS } from '../../src/render/office';
 import { standsInTheHall } from '../../src/engine/machines';
 import { spriteUrl } from '../../src/render/sprites';
-import { PIPE_LAYER_KEYS, renderSpriteCheck, spriteTargets } from '../../src/ui/spriteCheck';
+import { CHARACTER_ROLES, PIPE_LAYER_KEYS, renderSpriteCheck, spriteTargets } from '../../src/ui/spriteCheck';
+import { ANIMATIONS } from '../../src/render/characters';
 import { PIPE_TILE_KEYS } from '../../src/engine/constants';
 
 function parse(html: string): HTMLElement {
@@ -20,12 +21,14 @@ describe('the sprite check page', () => {
   it('lists every key the game can draw, exactly once', () => {
     const names = spriteTargets().map((target) => target.name);
     expect(new Set(names).size).toBe(names.length);
-    expect(names).toContain(DELIVERY_VAN_SPRITE);
+    // The pallet of sheets stands where the lorry stood (CLAUDE.md T13 3.21).
+    expect(names).toContain(PALLET_SPRITE);
+    expect(names).not.toContain('deliveryVan');
     // A family with classes is asked for one picture per class, because the loader asks for the
     // class and a class has its own footprint (CLAUDE.md T7 3.5). A family with one class is
     // asked for once, by the family key. The office desk items went with the desk (T4 3.1) and
     // the rooms are the hall layers now (docs/art/SPRITES.md 9.3).
-    const wanted = new Set<string>([DELIVERY_VAN_SPRITE]);
+    const wanted = new Set<string>([PALLET_SPRITE]);
     for (const spec of EQUIPMENT_SPECS) {
       if (spec.variants.length > 1) {
         for (const variant of spec.variants) wanted.add(`${spec.spriteKey}.${variant.id}`);
@@ -135,6 +138,21 @@ describe('the sprite check page', () => {
       expect(cell.querySelector(`[data-placeholder="${key}"]`), key).not.toBeNull();
       expect(cell.textContent, key).toContain(`${key}.png`);
     }
+  });
+
+  it('lists every role of the game with every frame key, the two of Turn 13 among them', () => {
+    // Every state the character system can be in has a key, home included (CLAUDE.md T13 3.23).
+    expect([...ANIMATIONS]).toEqual(['walk', 'bench', 'carry', 'idle', 'phone', 'home']);
+    expect(CHARACTER_ROLES).toContain('estimator');
+    expect(CHARACTER_ROLES).toContain('productionManager');
+    const page = parse(renderSpriteCheck());
+    const cells = Array.from(page.querySelectorAll('[data-character-key]')).map((cell) =>
+      cell.getAttribute('data-character-key'),
+    );
+    expect(cells).toHaveLength(CHARACTER_ROLES.length * ANIMATIONS.length);
+    expect(cells).toContain('character.productionManager.phone');
+    expect(cells).toContain('character.estimator.idle');
+    expect(cells).toContain('character.owner.home');
   });
 
   it('prints the key, the footprint and the canvas the art side has to hit', () => {

@@ -109,7 +109,7 @@ describe('the hall on day 1', () => {
     expect(renderHall(state)).toContain('Extractor. Bags 0.4 / 1 m\u00b3.');
   });
 
-  it('puts a van at the gate while a delivery waits', () => {
+  it('puts a pallet at the gate while a delivery waits, with the lorry\u2019s own click hook', () => {
     let state = buyStartingKit(newGame());
     state.enquiries = [];
     const enquiry = placeEnquiry(state, { price: 400 });
