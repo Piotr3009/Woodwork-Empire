@@ -11,7 +11,6 @@ import { dayOfWorkingIndex, isWorkingDay, workedMinutesOfDay, workingDayIndex } 
 import { OWNER } from './machines';
 import {
   designOutstanding,
-  jobProgress,
   jobStage,
   meetingOutstanding,
   minutesRemainingFor,
@@ -117,10 +116,18 @@ export interface PlanRow {
   dueDay: number;
   /** Where the deadline sits on the axis, which counts working days only. */
   duePoint: number;
-  /** The share of the bar filled green from the left, 0 to 1. */
+  /** The share of the bar filled green from the left, 0 to 1. The green is the work that is
+   *  done; the bare part behind the blue line is the time the job's clock did not move. */
   done: number;
   minutesDone: number;
   minutesTotal: number;
+  /** The minutes the bar has been stretched by: everything that has gone by since it was started
+   *  without a minute of work going into it (CLAUDE.md T11 3.3). */
+  lostMinutes: number;
+  /** True when the projected end has walked past the deadline: the outline turns red. */
+  overdue: boolean;
+  /** How many working days past the deadline the projected end lands, at least one. */
+  lateDays: number;
   /** The last day this one can be started and still be on time, in calendar days, so it reads
    *  like every other day on the card. Null once it is started. */
   latestStart: number | null;
@@ -169,6 +176,17 @@ function rowFor(state: GameState, job: Job): PlanRow {
     job.assignedTo === null || job.assignedTo === OWNER
       ? null
       : state.workers.find((entry) => entry.id === job.assignedTo);
+  // The bar is as long as the work in it, from the day it was picked up. Started, its right edge
+  // is the projected end and never the deadline: now plus what is left at this rate, which is the
+  // same thing as the length of the work plus every minute the job's clock did not move. An hour
+  // waiting for the saw stretches it by an hour and the end walks towards DL
+  // (PIOTR, 15.09; CLAUDE.md T11 3.3).
+  const to = notStarted
+    ? from + length
+    : Math.max(from, now + left / MINUTES_PER_WORKING_DAY);
+  const barMinutes = Math.max(1, (to - from) * MINUTES_PER_WORKING_DAY);
+  const minutesDone = Math.max(0, total - left);
+  const overdue = to > duePoint;
   return {
     jobId: job.id,
     name: job.name,
@@ -177,14 +195,15 @@ function rowFor(state: GameState, job: Job): PlanRow {
     stage: stageText(state, job),
     notStarted,
     from,
-    // Started, it runs to its deadline; not started, it is as long as the work in it
-    // (CLAUDE.md T9 3.6).
-    to: notStarted ? from + length : Math.max(duePoint, from),
+    to,
     dueDay: job.dueDay,
     duePoint,
-    done: jobProgress(job),
-    minutesDone: Math.max(0, total - left),
+    done: notStarted ? 0 : Math.min(1, minutesDone / barMinutes),
+    minutesDone,
     minutesTotal: total,
+    lostMinutes: notStarted ? 0 : Math.max(0, Math.round(barMinutes - total)),
+    overdue,
+    lateDays: overdue ? Math.max(1, Math.ceil(to - duePoint)) : 0,
     latestStart: latestStartPoint === null ? null : dayOfPoint(latestStartPoint),
     latestStartPoint,
     late: latestStartPoint !== null && latestStartPoint < now,

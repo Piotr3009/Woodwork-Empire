@@ -1626,19 +1626,26 @@ input.num {
   background: transparent;
 }
 
+/* The outline is the length of the work at the rate the job will get, and it stretches by every
+   minute the job stands still. The green inside it is the work that is done, so a started job is
+   never all green to the deadline (PIOTR, 15.09; CLAUDE.md T11 3.3). */
 .plan-bar {
-  background: #4f9d55;
+  background: transparent;
+  border: 1px solid var(--text-dim);
   border-radius: 2px;
   height: 12px;
-  opacity: 0.9;
   position: absolute;
   top: 6px;
 }
 
-/* A job nobody has started is drawn empty: it is a projection of what the work takes. */
+/* A job nobody has started is drawn dashed: it is a projection of what the work takes. */
 .plan-bar.is-projected {
-  background: transparent;
-  border: 1px dashed var(--text-dim);
+  border-style: dashed;
+}
+
+/* The projected end has walked past the deadline. */
+.plan-bar.is-late {
+  border-color: var(--bad);
 }
 
 .plan-done {
@@ -1646,6 +1653,14 @@ input.num {
   border-radius: 2px;
   display: block;
   height: 100%;
+}
+
+.plan-late {
+  color: var(--bad);
+  font-size: 10px;
+  position: absolute;
+  top: 20px;
+  white-space: nowrap;
 }
 
 .plan-figures {

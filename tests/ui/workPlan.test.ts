@@ -3,7 +3,11 @@
 // now and a red tick for the deadline (PIOTR, the mockup of 13.09; CLAUDE.md T9 3.6).
 
 import { describe, expect, it } from 'vitest';
-import { MINUTES_PER_WORKING_DAY, WORKER_RATES } from '../../src/engine/constants';
+import {
+  BREAK_START_MINUTE,
+  MINUTES_PER_WORKING_DAY,
+  WORKER_RATES,
+} from '../../src/engine/constants';
 import { BOARD_DAYS_PAST_DUE, dayOfPoint, workPlan, workshopRate } from '../../src/engine/plan';
 import { isWorkingDay, workingDayIndex } from '../../src/engine/clock';
 import { minutesRemainingFor } from '../../src/engine/jobs';
@@ -151,23 +155,30 @@ describe('a job nobody has started', () => {
 
 describe('a job somebody has started', () => {
   it('shows the minutes done of the minutes it takes, and fills the bar that far', () => {
-    const state = act(boardWith(), { type: 'WORK_HERE', jobId: null });
+    // A small job, so three quarters of its work fits inside one morning and the test can put the
+    // clock where that morning ends.
+    const state = act(boardWith({ price: 400 }), { type: 'WORK_HERE', jobId: null });
     const job = firstJob(state);
+    const whole = minutesRemainingFor(state, job, 1);
+    expect(whole * 0.75).toBeLessThan(BREAK_START_MINUTE);
+    // Three quarters of the work done, and three quarters of the work's minutes gone by: the way
+    // a real morning at the bench leaves it (CLAUDE.md T11 3.3).
     job.labourRemaining = job.labourValue * 0.25;
     job.stageRuns = [
       { stage: 'cutting', startDay: 1, startMinute: 0, endDay: null, endMinute: null },
     ];
+    state.clock.minute = Math.round(whole * 0.75);
     const row = workPlan(state).rows[0];
     expect(row?.notStarted).toBe(false);
-    expect(row?.done).toBeCloseTo(0.75, 6);
+    expect(row?.done).toBeCloseTo(0.75, 2);
     expect(row?.minutesDone ?? 0).toBeGreaterThan(0);
     expect(row?.latestStart).toBeNull();
     expect(row?.latestStartPoint).toBeNull();
-    // It runs to its deadline, from the day it was picked up.
-    expect(row?.to).toBe(workingDayIndex(job.dueDay));
+    // The right edge is the projected end, never the deadline (CLAUDE.md T11 3.3).
+    expect(row?.to).toBeLessThan(workingDayIndex(job.dueDay));
     const page = parse(renderWorkPlan(state));
     const done = page.querySelector('.plan-bar .plan-done');
-    expect(done?.getAttribute('style')).toBe('width:75%');
+    expect(done?.getAttribute('style')).toContain('width:7');
     expect(page.querySelector('.plan-figures')?.textContent).toContain('min ·');
   });
 });
