@@ -31,6 +31,7 @@ import {
   lockedButton,
   minutes,
   money,
+  plural,
   primaryButton,
   reasonLabel,
 } from './modal';
@@ -92,10 +93,11 @@ export function materialLine(state: GameState, job: Job): string {
   if (job.stage === 'completed' || job.stage === 'awaitingTransport') return '';
   const short = shortfallOf(job);
   const held = job.sheetsReserved + job.sheetsUsed;
+  const sheets = plural(job.sheets, 'sheet', 'sheets');
   const figure =
     short > 0
-      ? `<span class="row-figure bad shortfall">${short} of ${job.sheets} sheets short</span>`
-      : `<span class="row-figure good sheets-reserved">${held} of ${job.sheets} sheets in hand</span>`;
+      ? `<span class="row-figure bad shortfall">${short} of ${sheets} short</span>`
+      : `<span class="row-figure good sheets-reserved">${held} of ${sheets} in hand</span>`;
   if (short <= 0) return figure;
   const check = orderForJobCheck(state, job);
   const control = check.ok

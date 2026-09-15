@@ -3,22 +3,31 @@ import {
   BESPOKE_COST_UPLIFT,
   LOW_STOCK_SHEETS,
   MATERIAL_FRACTION,
+  RESTOCK_TO_SHEETS,
+  SHEET_PRICE_AD_HOC,
   SHEET_PRICE_STOCK,
   SHEET_VALUE,
   TEMP_STORAGE_COST,
   TEMP_STORAGE_FETCH_MINUTES,
 } from '../../src/engine/constants';
+import { decodeSaveFile, encodeSaveFile } from '../../src/cloud/file';
 import {
   deliveryDay,
+  freeSheets,
   materialCostFor,
   orderForJobCost,
   rackCapacity,
+  reservedSheets,
+  restockCheck,
+  restockSheets,
   sheetsDueFor,
   sheetsForCost,
   shortfallOf,
   stockCostFor,
   stockFree,
   stockIsLow,
+  stockLines,
+  stockNumberFor,
 } from '../../src/engine/materials';
 import { canBuy } from '../../src/engine/game';
 import { jobProgress, tick } from '../../src/engine/index';
@@ -446,5 +455,107 @@ describe('the low stock alarm', () => {
     expect(eventsOfKind(week.events, 'lowStock')).toHaveLength(1);
     const fortnight = runToDay(state, 12);
     expect(eventsOfKind(fortnight.events, 'lowStock')).toHaveLength(2);
+  });
+});
+
+describe('the reservation rule and Restock (CLAUDE.md T13 3.2, 3.3)', () => {
+  it('holds the sheets from the free stock the moment a job is taken', () => {
+    const state = fillRack(ready(), 10);
+    const enquiry = placeEnquiry(state, { price: 400, deadlineDays: 90 });
+    const held = acceptNow(state, enquiry.id, false);
+    expect(firstJob(held).sheetsReserved).toBe(1);
+    expect(shortfallOf(firstJob(held))).toBe(0);
+    expect(reservedSheets(held)).toBe(1);
+    expect(freeSheets(held)).toBe(9);
+    // The total on the rack is what the company board values: nothing left it.
+    expect(held.stock.sheets).toBe(10);
+    const line = stockLines(held)[0];
+    expect(line).toMatchObject({ kind: 'sheet', free: 9, reserved: 1, total: 10, capacity: 50 });
+  });
+
+  it('is short by what the rack could not spare, and a restock clears it once it is unloaded', () => {
+    // 800 of price is 320 of material: two sheets, and the rack has one.
+    const state = fillRack(ready(), 1);
+    const enquiry = placeEnquiry(state, { price: 800, deadlineDays: 90 });
+    let next = acceptNow(state, enquiry.id, false);
+    expect(firstJob(next).sheets).toBe(2);
+    expect(firstJob(next).sheetsReserved).toBe(1);
+    expect(shortfallOf(firstJob(next))).toBe(1);
+    expect(stockIsLow(next)).toBe(true);
+    next = act(next, { type: 'RESTOCK' });
+    expect(next.deliveries).toHaveLength(1);
+    next = clearEvents(runToDay(next, 2).state);
+    next = doTask(next, 'unload');
+    expect(shortfallOf(firstJob(next))).toBe(0);
+    expect(firstJob(next).sheetsReserved).toBe(2);
+  });
+
+  it('buys every low line back to the restock figure at the stock price, and no more', () => {
+    const state = fillRack(ready(), LOW_STOCK_SHEETS - 2);
+    expect(stockIsLow(state)).toBe(true);
+    const sheets = restockSheets(state);
+    expect(sheets).toBe(RESTOCK_TO_SHEETS - (LOW_STOCK_SHEETS - 2));
+    expect(restockCheck(state)).toEqual({
+      ok: true,
+      reason: '',
+      sheets,
+      cost: sheets * SHEET_PRICE_STOCK,
+      target: RESTOCK_TO_SHEETS,
+    });
+    const before = state.cash;
+    const bought = act(state, { type: 'RESTOCK' });
+    expect(before - bought.cash).toBeCloseTo(sheets * SHEET_PRICE_STOCK, 6);
+    expect(bought.deliveries[0]?.sheets).toBe(sheets);
+    expect(bought.deliveries[0]?.jobId).toBeNull();
+    expect(bought.ledger[bought.ledger.length - 1]?.category).toBe('material');
+    // A second click before the lorry buys nothing: the sheets on the road count as here.
+    expect(restockSheets(bought)).toBe(0);
+    expect(restockCheck(bought).reason).toContain('on the way');
+    const again = act(bought, { type: 'RESTOCK' });
+    expect(again.deliveries).toHaveLength(1);
+    expect(again.cash).toBe(bought.cash);
+  });
+
+  it('does nothing when nothing is low', () => {
+    const state = fillRack(ready(), RESTOCK_TO_SHEETS);
+    expect(restockSheets(state)).toBe(0);
+    expect(restockCheck(state)).toMatchObject({ ok: false, reason: 'Nothing is low' });
+    const same = act(state, { type: 'RESTOCK' });
+    expect(same.deliveries).toHaveLength(0);
+    expect(same.cash).toBe(state.cash);
+  });
+
+  it('never orders more than the rack has room for', () => {
+    // A rack of 50 with 48 on it, all held for three big jobs: nothing free, two spaces.
+    let state = fillRack(ready('veryEasy'), 48);
+    for (let job = 0; job < 3; job += 1) {
+      const enquiry = placeEnquiry(state, { price: 10000, deadlineDays: 90 });
+      state = acceptNow(state, enquiry.id, false);
+    }
+    expect(reservedSheets(state)).toBe(48);
+    expect(freeSheets(state)).toBe(0);
+    expect(stockFree(state)).toBe(2);
+    expect(restockSheets(state)).toBe(2);
+  });
+
+  it('charges 175 a sheet for stock and 200 ad hoc for a job, and nothing between', () => {
+    expect(SHEET_PRICE_STOCK).toBe(175);
+    expect(SHEET_PRICE_AD_HOC).toBe(200);
+    expect(stockCostFor(4)).toBe(4 * SHEET_PRICE_STOCK);
+    const state = upToMaterial(ready(), { price: 800 });
+    expect(shortfallOf(firstJob(state))).toBe(2);
+    expect(orderForJobCost(firstJob(state))).toBe(2 * SHEET_PRICE_AD_HOC);
+  });
+
+  it('gives the line a stock number in the style of the software, stable across a save', () => {
+    const state = ready();
+    const number = stockNumberFor(state, 'sheet');
+    expect(number).toMatch(/^MFC-18-WHT-\d{3}$/);
+    const opened = decodeSaveFile(encodeSaveFile(state)).state;
+    expect(opened).not.toBeNull();
+    if (opened) expect(stockNumberFor(opened, 'sheet')).toBe(number);
+    expect(stockLines(state)[0]?.number).toBe(number);
+    // A different seed, a different number: it is generated, not typed in.
+    expect(stockNumberFor(newGame({ seed: 7 }), 'sheet')).not.toBe(number);
   });
 });

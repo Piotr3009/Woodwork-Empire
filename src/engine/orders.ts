@@ -171,6 +171,11 @@ export interface OrderLine {
   canCancel: boolean;
 }
 
+/** The job a load of sheets was ordered for, by name, or 'a job' once it is off the books. */
+function jobNameFor(state: GameState, jobId: string): string {
+  return state.jobs.find((job) => job.id === jobId)?.name ?? 'a job';
+}
+
 /** Everything on order, whatever it is, shortest wait first (PIOTR: the shortest time first). */
 export function shoppingList(state: GameState): OrderLine[] {
   const day = state.clock.day;
@@ -192,7 +197,8 @@ export function shoppingList(state: GameState): OrderLine[] {
       id: delivery.id,
       kind: 'material',
       name: `${delivery.sheets} sheets`,
-      detail: delivery.jobId === null ? 'for stock' : 'for a job',
+      // For stock, or for the job it was ordered for by name (CLAUDE.md T13 3.2, 3.3).
+      detail: delivery.jobId === null ? 'for stock' : `for ${jobNameFor(state, delivery.jobId)}`,
       pricePaid: delivery.pricePaid,
       orderedDay: delivery.orderedDay,
       dueDay: delivery.arriveDay,

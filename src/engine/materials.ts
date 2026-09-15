@@ -101,11 +101,97 @@ export function stockIsLow(state: GameState): boolean {
   return freeSheets(state) < LOW_STOCK_SHEETS;
 }
 
+// T13-C1: move to constants.ts
+/** What the stock lines are called on the page, in the words of the software the player is meant
+ *  to recognise [TUNE wording] (CLAUDE.md T13 3.2). */
+export const STOCK_LINE_NAME: Record<MaterialKind, string> = {
+  sheet: 'MFC 18 mm, white',
+  solidWood: 'Oak, 27 mm',
+};
+// T13-C1: move to constants.ts
+/** The material kinds held on the rack as stock: the sheets, and nothing else tonight. Solid wood
+ *  and bespoke material are ordered for the job and never held (CLAUDE.md T13 3.2, 3.3). */
+export const STOCK_LINE_KINDS: readonly MaterialKind[] = ['sheet'];
+
+/** One line of the stock page: the kind, its name and stock number, the free, reserved and total
+ *  sheets, what the rack holds, and whether the line is low (CLAUDE.md T13 3.2). The one selector
+ *  the page draws and the test reads; the figures on it are the engine's and not the page's. */
+export interface StockLine {
+  kind: MaterialKind;
+  name: string;
+  number: string;
+  free: number;
+  reserved: number;
+  total: number;
+  capacity: number;
+  low: boolean;
+  /** The figure the badge is worn under. */
+  lowUnder: number;
+}
+
+export function stockLines(state: GameState): StockLine[] {
+  return STOCK_LINE_KINDS.map((kind) => ({
+    kind,
+    name: STOCK_LINE_NAME[kind],
+    number: stockNumberFor(state, kind),
+    free: freeSheets(state),
+    reserved: reservedSheets(state),
+    total: state.stock.sheets,
+    capacity: rackCapacity(state),
+    low: stockIsLow(state),
+    lowUnder: LOW_STOCK_SHEETS,
+  }));
+}
+
+/** Sheets bought for stock and not yet on the rack. A second Restock before the first lorry has
+ *  landed would buy the same sheets twice, so they count as if they were here: one click is one
+ *  order (CLAUDE.md T13 3.2). */
+export function pendingStockSheets(state: GameState): number {
+  let pending = 0;
+  for (const delivery of state.deliveries) {
+    if (delivery.jobId === null && !delivery.unloaded) pending += delivery.sheets;
+  }
+  return pending;
+}
+
 /** What Restock would buy: every low line brought back up to the restock figure, which tonight is
- *  the one line of sheets (CLAUDE.md T13 3.2). Zero when nothing is low. */
+ *  the one line of sheets, less what is already on the road for stock, and never more than the
+ *  rack has room for, because a lorry that cannot be unloaded is the overflow question of Turn 2
+ *  and a button should not walk the player into it (CLAUDE.md T13 3.2). Zero when nothing is low. */
 export function restockSheets(state: GameState): number {
   if (!stockIsLow(state)) return 0;
-  return Math.max(0, RESTOCK_TO_SHEETS - freeSheets(state));
+  const pending = pendingStockSheets(state);
+  const wanted = RESTOCK_TO_SHEETS - freeSheets(state) - pending;
+  const room = stockFree(state) - pending;
+  return Math.max(0, Math.min(wanted, room));
+}
+
+export interface RestockCheck {
+  ok: boolean;
+  reason: string;
+  /** What the click would buy, and what it would cost at the stock price. */
+  sheets: number;
+  cost: number;
+  /** The figure every low line is brought back to. */
+  target: number;
+}
+
+/** Whether Restock can be pressed, and why not when it cannot: the one answer the button prints
+ *  (CLAUDE.md T13 3.2). */
+export function restockCheck(state: GameState): RestockCheck {
+  const target = RESTOCK_TO_SHEETS;
+  const refused = (reason: string): RestockCheck => ({ ok: false, reason, sheets: 0, cost: 0, target });
+  if (rackCapacity(state) <= 0) return refused('No shelving yet');
+  if (!stockIsLow(state)) return refused('Nothing is low');
+  const sheets = restockSheets(state);
+  const pending = pendingStockSheets(state);
+  if (sheets <= 0 && pending > 0) {
+    return refused(`${plural(pending, 'sheet is', 'sheets are')} on the way`);
+  }
+  if (sheets <= 0) return refused('No room on the rack');
+  const cost = stockCostFor(sheets);
+  if (!canAfford(state, cost)) return { ok: false, reason: 'Not enough cash', sheets, cost, target };
+  return { ok: true, reason: '', sheets, cost, target };
 }
 
 /** What buying the shortfall of one job ad hoc costs: the ad hoc price, and the bespoke uplift
