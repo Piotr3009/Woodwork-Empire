@@ -492,6 +492,9 @@ export interface MovedItem {
   itemId: string;
   fromX: number;
   fromY: number;
+  /** Which way it was standing before the player picked it up. Turning a heavy machine where it
+   *  stands is a move like any other; turning a bench costs nothing (CLAUDE.md T11 3.9). */
+  fromRotated: boolean;
 }
 
 export interface Delivery {

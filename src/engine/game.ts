@@ -976,17 +976,36 @@ function applyTaskCompletion(state: GameState, task: TaskInstance): void {
   }
 }
 
-/** A drag is a move only while the item is not standing where it started. Dragging it out and
- *  back again, however many drags it takes, costs nothing (CLAUDE.md T4 3.5). */
-function recordMove(state: GameState, item: Equipment, stood: { x: number; y: number }): void {
+/** A drag is a move only while the item is not standing where it started, and standing the way it
+ *  started. Dragging it out and back again, however many drags it takes, costs nothing
+ *  (CLAUDE.md T4 3.5); turning it where it stands is a move of its own, which for a bench or a
+ *  rack costs nothing either, because `endSetup` only ever books the heavy ones
+ *  (PIOTR, 15.09; CLAUDE.md T11 3.9). */
+function recordMove(
+  state: GameState,
+  item: Equipment,
+  stood: { x: number; y: number; rotated: boolean },
+): void {
   const index = state.movedItems.findIndex((moved) => moved.itemId === item.id);
   if (index < 0) {
-    if (item.anchorX === stood.x && item.anchorY === stood.y) return;
-    state.movedItems.push({ itemId: item.id, fromX: stood.x, fromY: stood.y });
+    if (item.anchorX === stood.x && item.anchorY === stood.y && item.rotated === stood.rotated) {
+      return;
+    }
+    state.movedItems.push({
+      itemId: item.id,
+      fromX: stood.x,
+      fromY: stood.y,
+      fromRotated: stood.rotated,
+    });
     return;
   }
   const start = state.movedItems[index];
-  if (start && item.anchorX === start.fromX && item.anchorY === start.fromY) {
+  if (
+    start &&
+    item.anchorX === start.fromX &&
+    item.anchorY === start.fromY &&
+    item.rotated === start.fromRotated
+  ) {
     state.movedItems.splice(index, 1);
   }
 }
@@ -1907,7 +1926,9 @@ export function applyAction(state: GameState, action: GameAction): GameState {
       break;
     case 'MOVE_ITEM': {
       const item = next.equipment.find((entry) => entry.id === action.itemId);
-      const stood = item ? { x: item.anchorX, y: item.anchorY } : null;
+      const stood = item
+        ? { x: item.anchorX, y: item.anchorY, rotated: item.rotated }
+        : null;
       moveItem(next, action.itemId, action.x, action.y, action.rotated);
       if (item && stood) recordMove(next, item, stood);
       break;

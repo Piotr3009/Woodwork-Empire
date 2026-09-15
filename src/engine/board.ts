@@ -64,7 +64,11 @@ function buildEnquiry(state: GameState, entry: ProductTemplate): Enquiry | null 
   const price = express
     ? priceFor(entry.basePrice, sizeMultiplier, uplift, market)
     : basePrice;
-  const finishes = availableFinishes(state, entry);
+  // What this workshop could offer, and what the client asks for when it can offer nothing: a
+  // client who wants his kitchen sprayed still rings up, and the board greys the enquiry and says
+  // the workshop needs a booth (CLAUDE.md T10 3.7, T11 3.7).
+  const offered = availableFinishes(state, entry);
+  const finishes = offered.length > 0 ? offered : entry.allowedFinishes;
   const finish = finishes[int(state, 0, Math.max(0, finishes.length - 1))];
   if (!finish) return null;
   // The deadline comes off the work in the job now, not off the kind of thing it is
@@ -224,7 +228,9 @@ export function generateUnreachable(state: GameState): Enquiry | null {
     const entry = pool[int(state, 0, pool.length - 1)];
     if (!entry) return null;
     const candidate = buildEnquiry(state, entry);
-    if (!candidate) return null;
+    // One template that cannot be drawn is one attempt gone, not the end of the refill: the board
+    // would otherwise stop at the first awkward one and stand there half filled.
+    if (!candidate) continue;
     const block = blockFor(state, entry, candidate.deadlineDays, candidate.basePrice);
     if (block === null) continue;
     return { ...candidate, unreachable: true, blockReason: block.reason, blockWhere: block.where };

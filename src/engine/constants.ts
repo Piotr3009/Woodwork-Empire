@@ -597,6 +597,9 @@ export const REPUTATION_TIERS = [REPUTATION_MIN, 0, 20] as const;
 
 export const FINISHES_SHEET: Finish[] = ['laminate'];
 export const FINISHES_SOLID: Finish[] = ['laminate'];
+/** The two products that are sprayed rather than laminated: they need a booth and nothing else
+ *  will do (PIOTR, 15.09; CLAUDE.md T11 3.7). */
+export const FINISHES_LACQUER: Finish[] = ['lacquer'];
 
 export const PRODUCT_TEMPLATES: ProductTemplate[] = [
   {
@@ -667,6 +670,42 @@ export const PRODUCT_TEMPLATES: ProductTemplate[] = [
     allowedFinishes: FINISHES_SHEET,
     minReputation: 20,
     weightsByTier: [0, 8, 25],
+    byHandAllowed: false,
+  },
+  // The two sprayed products (PIOTR, 15.09; CLAUDE.md T11 3.7). The board greys them until there
+  // is a booth in the hall, the Finishing is done at the booth, and a booth on wet air takes half
+  // as long again over it and marks the piece (CLAUDE.md T10 3.3).
+  {
+    id: 'lacqueredWardrobe',
+    name: 'Lacquered wardrobe',
+    // 3,500 at the smallest size the board draws, which is the bottom of Piotr's band; the size
+    // multiplier takes it up from there [PIOTR: 3,500 to 6,000].
+    basePrice: 4375,
+    material: 'sheet',
+    designMinutes: 300,
+    // The calls come off the price curve of 8.10, like every other template.
+    calls: 4,
+    needsMeasure: true,
+    requiredEquipment: ['tableSaw', 'drill', 'edgebander', 'sprayBooth'],
+    allowedFinishes: FINISHES_LACQUER,
+    minReputation: 10,
+    weightsByTier: [0, 10, 18],
+    byHandAllowed: false,
+  },
+  {
+    id: 'lacqueredKitchen',
+    name: 'Lacquered kitchen',
+    // The same rule at the top of the ladder [PIOTR: 12,000 to 20,000].
+    basePrice: 15000,
+    material: 'sheet',
+    designMinutes: 900,
+    calls: 4,
+    needsMeasure: true,
+    requiredEquipment: ['tableSaw', 'drill', 'edgebander', 'sprayBooth'],
+    allowedFinishes: FINISHES_LACQUER,
+    // The same standing the small kitchen wants: the booth is the real gate on this one.
+    minReputation: 20,
+    weightsByTier: [0, 0, 12],
     byHandAllowed: false,
   },
   {
@@ -1421,6 +1460,13 @@ export const AIR_DIVERSITY = 0.6;
 export const AIR_HEADROOM = 0.85;
 /** What every pneumatic consumer on a compressor that is short of litres runs at, for that minute
  *  (PIOTR, CLAUDE.md T10 3.2). */
+/** What a bench is worth with no compressor in the hall at all: the nailer and the driver are no
+ *  use and the assembly is screwed together by hand [TUNE] (PIOTR, 15.09; CLAUDE.md T11 3.8). */
+export const NO_AIR_FACTOR = 0.67;
+
+/** What the hall says while there is no air in the hose at all. */
+export const NO_AIR_LINE = 'No air: screws by hand';
+
 export const LOW_AIR_FACTOR = 0.7;
 /** A spray booth on wet air still runs, and the Finishing takes half as long again over it and
  *  the job loses a point of rating for the defects in the finish [TUNE] (CLAUDE.md T10 3.3). */
