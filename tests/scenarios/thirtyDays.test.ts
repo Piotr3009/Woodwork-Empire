@@ -7,8 +7,10 @@ import {
   IDLE,
   type Policy,
   DAY_ONE_CLASS,
-  DAY_ONE_KIT,
+  DAY_ONE_BUY_ORDER,
+  LACQUER_NO_DRYER,
   SHORT_HANDED,
+  WITH_HELPER,
   TWO_MEN_BIG_FAN,
   TWO_MEN_ONE_FAN,
   playDay,
@@ -51,9 +53,14 @@ import {
   RENT_PER_M2_MONTHLY,
 } from '../../src/engine/constants';
 import {
+  DAY_CATEGORIES,
+  HELPER_ONLY_KINDS,
   STATION_IDLE,
   STATION_NO_BENCH,
   addWorkingDays,
+  dayPercentages,
+  helperOnDuty,
+  homeCellOf,
   extractionCheck,
   madeInADustyWorkshop,
   workingDaysBetween,
@@ -73,11 +80,21 @@ import {
   tick,
   workPlan,
 } from '../../src/engine/index';
+import { NO_AIR_LINE, PRODUCT_TEMPLATES, WET_AIR_FINISH_FACTOR } from '../../src/engine/constants';
+import { kitBlockFor } from '../../src/engine/board';
+import { familyForStage } from '../../src/engine/stages';
+import { hallAirCheck, sprayingOnWetAir } from '../../src/engine/media';
 import { firstFreeCell, hallItems } from '../../src/engine/layout';
 import { deliveryDaysFor, salePriceFor } from '../../src/engine/machines';
 import { missingForHire } from '../../src/engine/staff';
 import { weeksOf } from '../../src/ui/company';
 import type { Equipment, GameEvent, GameState } from '../../src/engine/index';
+
+function templateOf(id: string): (typeof PRODUCT_TEMPLATES)[number] {
+  const found = PRODUCT_TEMPLATES.find((entry) => entry.id === id);
+  if (!found) throw new Error(`no template ${id}`);
+  return found;
+}
 
 function machineOf(state: GameState, specId: string): Equipment {
   const item = state.equipment.find((entry) => entry.specId === specId);
@@ -163,12 +180,12 @@ describe('30 days on Easy, working the board', () => {
   it('had the whole of day 1 delivered on the morning of day 2', () => {
     // Nothing comes back in the owner's hands any more: every one of the eleven is ordered and
     // every one of them waits a working day (CLAUDE.md T9 3.1).
-    for (const specId of DAY_ONE_KIT) {
+    for (const specId of DAY_ONE_BUY_ORDER) {
       expect(deliveryDaysFor(specId, DAY_ONE_CLASS[specId]), specId).toBe(1);
     }
     // By the end of the month every one of them has landed and nothing is still on the road.
     expect(state.onOrder).toHaveLength(0);
-    for (const specId of DAY_ONE_KIT) {
+    for (const specId of DAY_ONE_BUY_ORDER) {
       expect(state.equipment.some((item) => item.specId === specId), specId).toBe(true);
     }
     // One van, one unloading: the heavy ones on it are two hours each on one task at the gate on
@@ -190,7 +207,7 @@ describe('30 days on Easy, working the board', () => {
     // Ordering costs the owner nothing: he never leaves the workshop for it (CLAUDE.md T9 3.1).
     expect(state.tasks.some((task) => task.orders.length > 0 && task.kind !== 'hiring')).toBe(false);
     // And what he ordered on day 1 is standing in the hall, paid for, from day 2 (T8 3.2).
-    expect(state.equipment.length).toBeGreaterThanOrEqual(DAY_ONE_KIT.length);
+    expect(state.equipment.length).toBeGreaterThanOrEqual(DAY_ONE_BUY_ORDER.length);
   });
 
   it('wrote down every stage of every job it finished, in the order of the whiteboard', () => {
@@ -259,6 +276,21 @@ describe('30 days on Easy, working the board', () => {
       const given = workingDaysBetween(job.acceptedDay, job.dueDay);
       expect(given, job.name).toBeGreaterThanOrEqual(DEADLINE_DAYS_MIN);
       if (job.basePrice <= 600) expect(given, job.name).toBeLessThanOrEqual(5);
+    }
+  });
+
+  it('kept the nailer in air all month, because day 1 bought a compressor', () => {
+    // A bench is a pneumatic tool from Turn 11: with no compressor in the hall the assembly is
+    // screwed together by hand at 0.67 (PIOTR, 15.09; CLAUDE.md T11 3.8). The day 1 list buys
+    // one, so this month never sees it, and the hall never said the line.
+    expect(state.equipment.some((item) => item.specId === 'compressor')).toBe(true);
+    expect(hallAirCheck(state).lines).not.toContain(NO_AIR_LINE);
+    expect(hallAirCheck(state).lowAir).toEqual([]);
+    // And the day the owner spends is on the record, band by band (CLAUDE.md T11 3.1).
+    const logged = state.days.filter((day) => day.dayLog.length > 0);
+    expect(logged.length).toBeGreaterThan(0);
+    for (const day of logged) {
+      expect(dayPercentages(day.dayLog).reduce((sum, share) => sum + share.percent, 0)).toBe(100);
     }
   });
 
@@ -1040,5 +1072,139 @@ describe('a month of two men on a fan too small for them', () => {
       state.jobs.filter((job) => job.stage === 'completed').length;
     expect(done(fine.state)).toBeGreaterThanOrEqual(done(short.state));
     expect(fine.state.reputation).toBeGreaterThanOrEqual(short.state.reputation);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// (q) A month with a helper on the books (PIOTR, 14.09; CLAUDE.md T11 3.4)
+// ---------------------------------------------------------------------------
+
+describe('a month with a helper, where the owner never unloads', () => {
+  const seen: GameEvent[] = [];
+  const state = playUntilDay(
+    newGame({ seed: SEED, difficulty: 'veryEasy' }),
+    31,
+    WITH_HELPER,
+    seen,
+  );
+
+  it('reaches day 31 with the helper on the books and in the hall', () => {
+    expect(state.gameOver).toBeNull();
+    expect(state.clock.day).toBe(31);
+    const helper = state.workers.find((worker) => worker.role === 'helper');
+    expect(helper).toBeDefined();
+    expect(helperOnDuty(state)).toBe(true);
+    // He is on the painted floor and out of the office block (CLAUDE.md T11 3.4).
+    const home = helper === undefined ? { x: -1, y: -1 } : homeCellOf(state, helper);
+    expect(home.x).toBeGreaterThanOrEqual(0);
+    expect(home.y).toBeLessThan(state.unit.depthCells);
+  });
+
+  it('never put the owner on an unload, a bag or the cleaning all month', () => {
+    const helper = state.workers.find((worker) => worker.role === 'helper');
+    const chores = state.tasks.filter((task) => HELPER_ONLY_KINDS.includes(task.kind));
+    expect(chores.length).toBeGreaterThan(0);
+    for (const task of chores) {
+      expect(task.doneBy, `${task.kind} ${task.label}`).not.toBe('owner');
+      if (task.doneBy !== null) expect(task.doneBy, task.kind).toBe(helper?.id);
+    }
+    // And not a minute of his day went on any of them, on any day of the month.
+    const fixing = state.days
+      .flatMap((day) => day.dayLog)
+      .filter((entry) => entry.category === 'fixing');
+    expect(fixing).toEqual([]);
+  });
+
+  it('never put the van in front of him at all, because it was dealt with first', () => {
+    // A helper clears his workshop jobs on the spot (CLAUDE.md T2 3.8), and the morning gives him
+    // the lorry before anybody is asked about it: the question simply does not come
+    // (CLAUDE.md T11 3.4). The same month without a helper is asked twice in the first three days.
+    expect(seen.filter((event) => event.kind === 'deliveryArrived')).toHaveLength(0);
+    const alone: GameEvent[] = [];
+    playUntilDay(newGame({ seed: SEED, difficulty: 'veryEasy' }), 4, CAREFUL, alone);
+    expect(
+      alone.filter((event) => event.kind === 'deliveryArrived').length,
+    ).toBeGreaterThan(0);
+  });
+
+  it('spent the day he got back on the work, and the log says where it went', () => {
+    // Every day of the month is on the log, in the seven bands the top bar paints, and the
+    // percentages of every one of them come to a hundred (CLAUDE.md T11 3.1).
+    expect(state.days.length).toBeGreaterThan(0);
+    for (const day of state.days) {
+      const shares = dayPercentages(day.dayLog);
+      if (shares.length === 0) continue;
+      expect(shares.reduce((sum, share) => sum + share.percent, 0), `day ${day.day}`).toBe(100);
+      for (const share of shares) expect(DAY_CATEGORIES, `day ${day.day}`).toContain(share.category);
+    }
+    // And the week the company board adds up is the last seven of them, newest last.
+    expect(state.dayLogs.length).toBeLessThanOrEqual(7);
+    const days = state.dayLogs.map((entry) => entry.day);
+    expect([...days].sort((left, right) => left - right)).toEqual(days);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// (r) A lacquered wardrobe with a booth and no dryer (CLAUDE.md T11 3.7)
+// ---------------------------------------------------------------------------
+
+describe('a month that sprays a wardrobe on wet air', () => {
+  const seen: GameEvent[] = [];
+  // The booth is twenty working days on the road, so this one runs to day 46 rather than day 31.
+  const state = playUntilDay(
+    newGame({ seed: SEED, difficulty: 'veryEasy' }),
+    46,
+    LACQUER_NO_DRYER,
+    seen,
+  );
+
+  it('ordered the booth on day 1 and stood it in the hall twenty working days later', () => {
+    expect(state.gameOver).toBeNull();
+    const booth = state.equipment.find((item) => item.specId === 'sprayBooth');
+    expect(booth).toBeDefined();
+    expect(booth?.purchasePrice).toBe(18000);
+    // And no dryer was ever bought, so the air in the booth is wet (CLAUDE.md T10 3.3).
+    expect(state.equipment.some((item) => item.specId === 'airDryer')).toBe(false);
+    if (booth !== undefined) expect(sprayingOnWetAir(state, booth)).toBe(true);
+  });
+
+  it('greys the sprayed wardrobe while the booth is still on the road', () => {
+    const early = playUntilDay(
+      newGame({ seed: SEED, difficulty: 'veryEasy' }),
+      5,
+      LACQUER_NO_DRYER,
+      [],
+    );
+    expect(early.equipment.some((item) => item.specId === 'sprayBooth')).toBe(false);
+    const block = kitBlockFor(early, templateOf('lacqueredWardrobe'));
+    expect(block?.reason).toBe('needs a spray booth');
+    // Nothing lacquered was taken off the board in those days.
+    expect(early.jobs.some((job) => job.templateId === 'lacqueredWardrobe')).toBe(false);
+  });
+
+  it('takes the sprayed work once the booth stands in the hall', () => {
+    expect(kitBlockFor(state, templateOf('lacqueredWardrobe'))).toBeNull();
+    const lacquered = state.jobs.filter((job) => job.templateId === 'lacqueredWardrobe');
+    expect(lacquered.length).toBeGreaterThan(0);
+    for (const job of lacquered) expect(job.finish).toBe('lacquer');
+  });
+
+  it('does the finish at the booth, half as long again, and marks the piece', () => {
+    const lacquered = state.jobs.filter((job) => job.templateId === 'lacqueredWardrobe');
+    const job = lacquered[0];
+    if (job === undefined) throw new Error('no sprayed job on the books');
+    // The Finishing of a lacquered job is done at the booth and nowhere else.
+    expect(familyForStage(job, 'finishing')).toBe('sprayBooth');
+    expect(WET_AIR_FINISH_FACTOR).toBe(1.5);
+    // Any of them that reached the booth carries the mark, and any of them delivered lost the
+    // point of rating for it (CLAUDE.md T10 3.3).
+    const sprayed = lacquered.filter((entry) => entry.wetFinish);
+    for (const entry of sprayed) {
+      expect(entry.wetFinish).toBe(true);
+    }
+    const marked = state.reputationLog.filter((entry) => entry.reason.endsWith(': finish defects'));
+    expect(marked.length).toBe(
+      lacquered.filter((entry) => entry.stage === 'completed' && entry.wetFinish).length,
+    );
   });
 });

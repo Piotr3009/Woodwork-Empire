@@ -193,7 +193,6 @@ import {
   canHire,
   countStaffOvertimeMinute,
   hasWorkingDay,
-  helperOnDuty,
   helpers,
   hire,
   isWorkingToday,
@@ -522,7 +521,9 @@ function collectSoldMachines(state: GameState): void {
 }
 
 /** The same question the sheets ask: unload it now, or leave it standing at the gate
- *  (CLAUDE.md T8 3.2). A helper takes it off the list without being asked, as he always does. */
+ *  (CLAUDE.md T8 3.2). A helper takes it off the list without being asked, as he always does, and
+ *  the van is then never a question the owner is put: it is his job of work and he has done it
+ *  before anybody is asked about it (CLAUDE.md T11 3.4). */
 function queueKitDeliveryEvents(state: GameState, arriving: readonly OnOrderItem[]): void {
   const first = arriving[0];
   if (first === undefined) return;
@@ -534,20 +535,13 @@ function queueKitDeliveryEvents(state: GameState, arriving: readonly OnOrderItem
     arriving.length === 1
       ? `The ${orderName(first).toLowerCase()} has arrived`
       : `The lorry is here with ${arriving.map((item) => orderName(item).toLowerCase()).join(', ')}`;
-  const helper = helperOnDuty(state);
   queueEvent(state, {
     kind: 'deliveryArrived',
     title: 'Delivery at the gate',
-    body: helper
-      ? `${what}. The helper is on it.`
-      : `${what}. It is no use to anybody on the back of a lorry.`,
+    body: `${what}. It is no use to anybody on the back of a lorry.`,
     choices: [
-      {
-        id: 'unload',
-        label: `${helper ? 'Unload it yourself' : 'Unload now'}, ` +
-          `${Math.round(task.minutesTotal)} min`,
-      },
-      { id: 'later', label: helper ? 'Leave it to the helper' : 'Leave it at the gate' },
+      { id: 'unload', label: `Unload now, ${Math.round(task.minutesTotal)} min` },
+      { id: 'later', label: 'Leave it at the gate' },
     ],
     data: { orderId: first.id, taskId: task.id },
   });
@@ -689,21 +683,15 @@ function queueDeliveryEvents(state: GameState, arriving: Delivery[]): void {
     const task = state.tasks.find((entry) => entry.deliveryId === delivery.id && !entry.done);
     if (!task) continue;
     const room = canUnload(state);
-    const helper = helperOnDuty(state);
     const choices = room
       ? [
-          {
-            id: 'unload',
-            label: `${helper ? 'Unload it yourself' : 'Unload now'}, ${task.minutesTotal} min`,
-          },
-          { id: 'later', label: helper ? 'Leave it to the helper' : 'Leave it at the gate' },
+          { id: 'unload', label: `Unload now, ${task.minutesTotal} min` },
+          { id: 'later', label: 'Leave it at the gate' },
         ]
       : [{ id: 'later', label: 'Leave it at the gate' }];
-    const waiting = helper
-      ? ' The helper is on it.'
-      : ' Nothing can be made until they are inside.';
     const body = room
-      ? `${plural(delivery.sheets, 'sheet', 'sheets')} have arrived.${waiting}`
+      ? `${plural(delivery.sheets, 'sheet', 'sheets')} have arrived. Nothing can be made until ` +
+        'they are inside.'
       : `${plural(delivery.sheets, 'sheet', 'sheets')} have arrived and there is no shelving to ` +
         'put them on. Buy some from the catalogue.';
     queueEvent(state, {
