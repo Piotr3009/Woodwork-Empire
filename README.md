@@ -7,7 +7,7 @@ The design contract for the current stage is `CLAUDE.md`. The briefs of the fini
 archived in `docs`: `docs/turn-1-brief.md`, `docs/turn-2-brief.md`, `docs/turn-3-brief.md`,
 `docs/turn-4-brief.md`, `docs/turn-5-brief.md`, `docs/turn-6-brief.md`, `docs/turn-7-brief.md`,
 `docs/turn-8-brief.md`, `docs/turn-9-brief.md`, `docs/turn-10-brief.md` and `docs/turn-11-brief.md`.
-The build reports are `REPORT-T1.md` to `REPORT-T11.md`.
+The build reports are `REPORT-T1.md` to `REPORT-T12.md`.
 
 The sprite contract between the art side and the game is `docs/art/SPRITES.md`.
 
