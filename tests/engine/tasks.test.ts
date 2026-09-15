@@ -1,19 +1,33 @@
 import { describe, expect, it } from 'vitest';
 import {
   BOOKKEEPING_MINUTES,
+  CONSUMABLES_LABEL,
+  DAILY_ORDERING_MINUTES,
   DAY_END_MINUTE,
+  ESTIMATOR_JOBS_PER_DAY,
+  ESTIMATOR_JOBS_WITH_JOINERY_CORE,
+  ESTIMATOR_RATES,
+  JOINERY_CORE_EXTENSION_JOBS,
+  JOINERY_CORE_EXTENSION_PRICE_YEARLY,
+  JOINERY_CORE_MAX_EXTENSIONS,
+  JOINERY_CORE_PRICE_YEARLY,
   SOFTWARE_DESIGN_FACTOR,
 } from '../../src/engine/constants';
 import { PRODUCT_TEMPLATES } from '../../src/engine/constants';
 import {
+  TAKE_OFF_BUTTON_LABEL,
   createDailyTasks,
   createTask,
   designMinutes,
   emailsForPrice,
+  estimatorCapacity,
   findTask,
+  jobTasks,
+  joineryCoreOffer,
   materialOrderMinutes,
   openTasks,
   staffManagementMinutes,
+  startTaskCheck,
   tasksOfKind,
   unloadMinutes,
 } from '../../src/engine/tasks';
@@ -23,11 +37,16 @@ import {
   acceptNow,
   act,
   buyNow,
+  buyStartingKit,
   clearEvents,
+  doTask,
+  firstJob,
+  hireNow,
   newGame,
   placeEnquiry,
   runClock,
   runToDay,
+  sixJoinersOnSheetWork,
   withLicence,
 } from '../helpers';
 
@@ -322,5 +341,133 @@ describe('emails scale with what the job is worth (CLAUDE.md T3 3.2)', () => {
     // The calls are not tasks any more: they sit in the diary and ring (CLAUDE.md T4 3.3).
     expect(state.tasks.filter((task) => task.kind === 'clientCall')).toHaveLength(0);
     expect(state.jobs[0]?.calls).toHaveLength(2);
+  });
+});
+
+// The estimator and the material list (PIOTR; CLAUDE.md T13 3.8). Two jobs that were one: the
+// take off, which reads the drawing and counts the sheets for one job, and the daily consumables
+// and materials chore, which is the admin's and has nothing to do with the number of projects.
+describe('the material take off', () => {
+  /** A job on the books whose drawing is still to do, in a hall that can draw. */
+  function withTakeOff(): GameState {
+    let state = withLicence(buyStartingKit(newGame({ difficulty: 'veryEasy' })));
+    state.enquiries = [];
+    state.reputation = 10;
+    const enquiry = placeEnquiry(state, { price: 4000, deadlineDays: 40 });
+    state = acceptNow(state, enquiry.id, false);
+    return state;
+  }
+
+  function takeOffOf(state: GameState) {
+    return jobTasks(state, firstJob(state).id).find((task) => task.kind === 'materialTakeOff');
+  }
+
+  it('is five a day, ten with Joinery Core, five more per extension and never more than two', () => {
+    const state = newGame();
+    expect(estimatorCapacity(state)).toBe(ESTIMATOR_JOBS_PER_DAY);
+    expect(ESTIMATOR_JOBS_PER_DAY).toBe(5);
+    state.software.joineryCore = true;
+    expect(estimatorCapacity(state)).toBe(ESTIMATOR_JOBS_WITH_JOINERY_CORE);
+    expect(ESTIMATOR_JOBS_WITH_JOINERY_CORE).toBe(10);
+    state.software.joineryCoreExtensions = 1;
+    expect(estimatorCapacity(state)).toBe(10 + JOINERY_CORE_EXTENSION_JOBS);
+    state.software.joineryCoreExtensions = 2;
+    expect(estimatorCapacity(state)).toBe(10 + 2 * JOINERY_CORE_EXTENSION_JOBS);
+    // At most two: a third counts for nothing, whatever the state says.
+    state.software.joineryCoreExtensions = 3;
+    expect(estimatorCapacity(state)).toBe(10 + JOINERY_CORE_MAX_EXTENSIONS * JOINERY_CORE_EXTENSION_JOBS);
+  });
+
+  it('is the owner’s with nobody hired, and only once the drawing is done', () => {
+    let state = withTakeOff();
+    const task = takeOffOf(state);
+    expect(task?.label).toBe(`Material take off: ${firstJob(state).name}`);
+    expect(TAKE_OFF_BUTTON_LABEL).toBe('Create material list');
+    // Nobody holds it: it is on the owner's desk.
+    expect(task?.doneBy).toBeNull();
+    expect(startTaskCheck(state, task?.id ?? '')).toMatchObject({
+      ok: false,
+      reason: 'The drawing comes first',
+    });
+    state = clearEvents(doTask(state, 'design'));
+    expect(startTaskCheck(state, takeOffOf(state)?.id ?? '').ok).toBe(true);
+    state = clearEvents(doTask(state, 'materialTakeOff'));
+    const done = takeOffOf(state);
+    expect(done?.done).toBe(true);
+    expect(done?.doneBy).toBe('owner');
+    // The job moves on: the desk work is behind it (CLAUDE.md T13 3.8).
+    expect(['ready', 'materialPending', 'materialOrdered']).toContain(firstJob(state).stage);
+  });
+
+  it('is the estimator’s from the day he is in, at the speed of his tier, and waits for the drawing too', () => {
+    let state = withTakeOff();
+    state = hireNow(state, 'estimator', 'super');
+    const estimator = state.workers.find((worker) => worker.role === 'estimator');
+    expect(estimator).toBeDefined();
+    for (const worker of state.workers) worker.startDay = state.clock.day;
+    state = clearEvents(runClock(state, 1));
+    // The drawing is still to do, so the take off waits on the desk for it.
+    expect(takeOffOf(state)?.doneBy).toBeNull();
+    state = clearEvents(doTask(state, 'design'));
+    state = clearEvents(runClock(state, 1));
+    expect(takeOffOf(state)?.doneBy).toBe(estimator?.id);
+    const before = takeOffOf(state)?.minutesRemaining ?? 0;
+    const later = clearEvents(runClock(state, 10));
+    const after = takeOffOf(later)?.minutesRemaining ?? 0;
+    // A super estimator works it off at 1.2 of a minute a minute (ESTIMATOR_RATES).
+    expect(before - after).toBeCloseTo(10 * ESTIMATOR_RATES.super, 6);
+    expect(later.owner.minutesWorked).toBe(state.owner.minutesWorked);
+  });
+
+  it('is offered Joinery Core beside him, with the prices and the refusals of the click', () => {
+    let state = newGame();
+    // No laptop yet: nothing to put it on.
+    expect(joineryCoreOffer(state).core).toEqual({ ok: false, reason: 'Needs the laptop' });
+    state = buyStartingKit(state);
+    const offer = joineryCoreOffer(state);
+    expect(offer.held).toBe(false);
+    expect(offer.core.ok).toBe(true);
+    expect(offer.extension).toEqual({ ok: false, reason: 'Joinery Core first' });
+    expect(offer.capacity).toBe(ESTIMATOR_JOBS_PER_DAY);
+    expect(offer.yearlyPrice).toBe(JOINERY_CORE_PRICE_YEARLY);
+    expect(offer.extensionYearlyPrice).toBe(JOINERY_CORE_EXTENSION_PRICE_YEARLY);
+    // The click switches it on and pays the first twelfth of the year (CLAUDE.md T13 3.8).
+    const cash = state.cash;
+    state = act(state, { type: 'BUY_JOINERY_CORE' });
+    expect(state.software.joineryCore).toBe(true);
+    expect(cash - state.cash).toBeCloseTo(JOINERY_CORE_PRICE_YEARLY / 12, 2);
+    expect(joineryCoreOffer(state).core).toEqual({ ok: false, reason: 'On the laptop' });
+    expect(joineryCoreOffer(state).capacity).toBe(ESTIMATOR_JOBS_WITH_JOINERY_CORE);
+    state = act(state, { type: 'BUY_JOINERY_CORE_EXTENSION' });
+    state = act(state, { type: 'BUY_JOINERY_CORE_EXTENSION' });
+    expect(joineryCoreOffer(state).extension).toEqual({ ok: false, reason: 'Both extensions bought' });
+    expect(joineryCoreOffer(state).capacity).toBe(
+      ESTIMATOR_JOBS_WITH_JOINERY_CORE + 2 * JOINERY_CORE_EXTENSION_JOBS,
+    );
+    // A third click buys nothing.
+    const two = state.cash;
+    state = act(state, { type: 'BUY_JOINERY_CORE_EXTENSION' });
+    expect(state.software.joineryCoreExtensions).toBe(JOINERY_CORE_MAX_EXTENSIONS);
+    expect(state.cash).toBe(two);
+  });
+
+  it('leaves the consumables and materials chore at thirty minutes whatever the project count', () => {
+    const state = newGame();
+    createDailyTasks(state);
+    const none = tasksOfKind(state, 'dailyOrdering')[0];
+    expect(none?.label).toBe(CONSUMABLES_LABEL);
+    expect(none?.minutesTotal).toBe(DAILY_ORDERING_MINUTES);
+    // Six projects on the books: the same thirty minutes (CLAUDE.md T13 3.3).
+    const busy = sixJoinersOnSheetWork();
+    createDailyTasks(busy);
+    expect(tasksOfKind(busy, 'dailyOrdering')).toHaveLength(1);
+    expect(tasksOfKind(busy, 'dailyOrdering')[0]?.minutesTotal).toBe(DAILY_ORDERING_MINUTES);
+    // And it is the admin's when there is one: she picks it up after the books, which come first
+    // on her list, and the owner never sees it.
+    const office = newGame();
+    office.workers.push(staff('a1', 'officeAdmin', 1900));
+    const day2 = clearEvents(runToDay(office, 2).state);
+    const later = clearEvents(tick(day2, BOOKKEEPING_MINUTES + 1));
+    expect(tasksOfKind(later, 'dailyOrdering')[0]?.doneBy).toBe('a1');
   });
 });
