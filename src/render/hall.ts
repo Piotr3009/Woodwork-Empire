@@ -2,7 +2,6 @@
 // and it hands back an SVG string (CLAUDE.md 10.3).
 
 import {
-  DELIVERY_VAN_SPRITE,
   DUCT_DEPTH,
   DUCT_HEIGHT,
   DUCT_SPAN,
@@ -27,9 +26,11 @@ import {
   findSpec,
   gateIsCrowded,
   hasExtraction,
+  hasGate,
   machinesDueService,
   serviceIsDue,
 } from '../engine/machines';
+import { footprintOrigin, isConnected, portCell, wantsExtraction } from '../engine/pipes';
 import { jobsAtGate } from '../engine/jobs';
 import { orderName, reservedItems, shoppingList } from '../engine/orders';
 import {
@@ -63,6 +64,7 @@ import {
   type Point,
   type Polygon,
   TILE_RISE,
+  TILE_WIDTH,
   blockSilhouette,
   boxPolygons,
   centreOf,
@@ -85,11 +87,13 @@ import {
   contactShadow,
   mirrorNeeded,
   pickSprite,
+  placeholderKindFor,
   spriteBox,
   spriteFiles,
   spriteImage,
   spriteUrl,
 } from './sprites';
+import { placeholder } from './placeholder';
 
 // ---------------------------------------------------------------------------
 // SVG primitives. office.ts uses these too: one place builds the strings.
@@ -198,6 +202,19 @@ export function objectArt(art: {
       ? ` transform="translate(${round(anchor.x * 2)},0) scale(-1, 1)"`
       : '';
     return shadow + spriteImage(url, at, mirror.trim());
+  }
+  // A Turn 13 picture the art side has not painted yet is drawn by the one placeholder helper,
+  // in the hall's 2:1 dimetric, where its file will go (CLAUDE.md T13 1, 3.13, 3.21).
+  const kind = placeholderKindFor(art.spriteKey, art.tier);
+  if (kind !== null) {
+    const at = spriteBox(art.x, art.y, art.width, art.depth, art.height);
+    return (
+      shadow +
+      `<g class="placeholder-art" transform="translate(${round(at.x)},${round(at.y)})">` +
+      placeholder(kind, { width: at.width, height: at.height }, { dimetric: true }) +
+      '</g>' +
+      label(centreOf(art.x, art.y, art.width, art.depth, art.height), art.label)
+    );
   }
   const faces = boxPolygons(art.x, art.y, art.width, art.depth, art.height);
   return (
@@ -636,18 +653,98 @@ export function footprintIn(item: Equipment): {
   depth: number;
   height: number;
 } {
-  const stands = itemFootprint(item);
-  const zone = itemZone(item);
-  // A class that holds no floor is kept in a tool cabinet: its picture stands on the cell the
-  // cabinet stands on, with nothing to centre it in (CLAUDE.md T7 3.6).
-  const inZone = zone.width > 0 && zone.depth > 0;
-  return {
-    x: item.anchorX + (inZone ? (zone.width - stands.width) / 2 : 0),
-    y: item.anchorY + (inZone ? (zone.depth - stands.depth) / 2 : 0),
-    width: stands.width,
-    depth: stands.depth,
-    height: stands.height,
-  };
+  // The one arithmetic, shared with the pipe that drops onto the same footprint (T13 3.19).
+  return footprintOrigin(item);
+}
+
+// ---------------------------------------------------------------------------
+// The pipe layer (CLAUDE.md T13 3.11, 3.19): the runs the game routed and the gate collars on
+// their drops, drawn above the equipment at the height of the ducting. It occupies no cell and
+// blocks nothing under it.
+// ---------------------------------------------------------------------------
+
+/** One cell of the pipe layer as the placeholder helper draws it, in the hall's 2:1 dimetric,
+ *  lifted to the ducting's height: a diamond the size of a cell with its top corner on the cell's
+ *  own top corner, or a smaller one centred on the cell for the collar. The delivered picture,
+ *  when the art side has painted the key, is placed by the same anchor. */
+export function pipeCellArt(
+  kind: string,
+  cell: { x: number; y: number },
+  files: readonly string[],
+  scale = 1,
+): string {
+  const url = pickSprite(files, kind);
+  const width = TILE_WIDTH * scale;
+  // The dimetric placeholder is three thirds tall: the diamond is the middle third, so a cell
+  // wide box is a cell and a half high and its diamond is exactly a cell (docs/art/SPRITES.md 1).
+  const height = width * 1.5;
+  const centre = centreOf(cell.x, cell.y, 1, 1, DUCT_HEIGHT);
+  const at = { x: centre.x - width / 2, y: centre.y - height / 2 };
+  if (url !== null) {
+    return spriteImage(url, { x: at.x, y: at.y, width, height });
+  }
+  return (
+    `<g class="pipe-tile" data-pipe-tile="${escapeText(kind)}" ` +
+    `transform="translate(${round(at.x)},${round(at.y)})">` +
+    placeholder(kind, { width, height }, { dimetric: true }) +
+    '</g>'
+  );
+}
+
+/** How much smaller than a cell the collar is drawn [TUNE]. */
+const GATE_COLLAR_SCALE = 0.5;
+
+/** The automatic gate on a machine's drop: a short collar on the drop cell (CLAUDE.md T13 3.11). */
+export function gateCollar(item: Equipment, files: readonly string[]): string {
+  return (
+    `<g class="gate-collar" data-gate="${item.id}">` +
+    pipeCellArt('gate.collar', portCell(item), files, GATE_COLLAR_SCALE) +
+    '</g>'
+  );
+}
+
+/** Every gate collar in the hall, on the drop of every gated machine standing on the floor. */
+export function gateCollars(state: GameState, files: readonly string[]): string {
+  return state.equipment
+    .filter(
+      (item) =>
+        !isSold(item) &&
+        itemStandsInTheHall(item) &&
+        item.anchorX < state.unit.widthCells &&
+        hasGate(state, item),
+    )
+    .map((item) => gateCollar(item, files))
+    .join('');
+}
+
+/** One run of pipe, tile by tile in the order it was routed, as a group the page can find by
+ *  the machine it serves. A connected machine that the air rule says is not pulled hard enough
+ *  wears a thin red outline on its run (CLAUDE.md T13 3.19): the hall is short this minute and
+ *  this machine is one of the ones running in it. */
+export function pipeRunArt(
+  state: GameState,
+  run: { id: string; equipmentId: string; tiles: ReadonlyArray<{ x: number; y: number; key: string }> },
+  files: readonly string[],
+  short: boolean,
+): string {
+  const machine = state.equipment.find((item) => item.id === run.equipmentId);
+  const running = machine !== undefined && machine.takenBy !== null;
+  const tiles = run.tiles.map((tile) => pipeCellArt(tile.key, tile, files)).join('');
+  return (
+    `<g class="pipe${short && running ? ' pipe-short' : ''}" data-pipe="${escapeText(run.id)}" ` +
+    `data-pipe-for="${escapeText(run.equipmentId)}">${tiles}</g>`
+  );
+}
+
+/** Every run over the floor, in the order they were routed. */
+export function pipeRuns(state: GameState, files: readonly string[]): string {
+  const short = extractionCheck(state).short;
+  return state.pipes.map((run) => pipeRunArt(state, run, files, short)).join('');
+}
+
+/** The whole layer: the runs, then the collars over their drops. */
+export function pipeLayer(state: GameState, files: readonly string[]): string {
+  return `<g class="pipe-layer">${pipeRuns(state, files)}${gateCollars(state, files)}</g>`;
 }
 
 export function machineFx(state: GameState, item: Equipment, spec: EquipmentSpec): MachineFx {
@@ -841,6 +938,61 @@ export function pinBoard(count: number): string {
     `class="painted-text pin-board-text" font-size="9">Orders: ${count}</text>` +
     '</g>'
   );
+}
+
+/** The key the pallet of sheets is drawn from once the art side paints it; until then the
+ *  placeholder helper draws it (CLAUDE.md T13 3.21; docs/art/REQUESTS-T13.md 4). */
+export const PALLET_SPRITE = 'pallet';
+/** The placeholder kind of the pallet, a pallet of sheets one metre each way. */
+export const PALLET_PLACEHOLDER = 'pallet.sheets';
+/** The pallet stands where the lorry stood: inside the shutter, on the lane. */
+export const PALLET_LAYOUT = { x: GATE_LAYOUT.x, y: GATE_LAYOUT.y, width: 1, depth: 1, height: 1 };
+
+/** The pallet at the gate: the delivered file where there is one, the placeholder in the hall's
+ *  dimetric where there is not, with the shadow and the name every object has. */
+export function palletArt(files: readonly string[], name: string): string {
+  const at = PALLET_LAYOUT;
+  const shadow = contactShadow(at.x, at.y, at.width, at.depth);
+  const url = pickSprite(files, PALLET_SPRITE);
+  const box = spriteBox(at.x, at.y, at.width, at.depth, at.height);
+  const picture =
+    url !== null
+      ? spriteImage(url, box)
+      : `<g class="placeholder-art" transform="translate(${round(box.x)},${round(box.y)})">` +
+        placeholder(PALLET_PLACEHOLDER, { width: box.width, height: box.height }, { dimetric: true }) +
+        '</g>';
+  return shadow + picture + label(centreOf(at.x, at.y, at.width, at.depth, at.height), name);
+}
+
+/** A machine off the lorry, on the apron by the gate: its own picture, unplaced, with the new
+ *  tag, one cell further down the lane for each one waiting (CLAUDE.md T13 3.21). */
+export function arrivedKit(item: OnOrderItem, index: number, files: readonly string[]): Drawable {
+  const spec = findSpec(item.specId);
+  const stands = itemFootprint(item);
+  const x = GATE_LAYOUT.x;
+  const y = GATE_LAYOUT.y + PALLET_LAYOUT.depth + index;
+  const name = `${orderName(item)} (new)`;
+  return {
+    depth: depthKey(x, y),
+    svg:
+      `<g data-arrived="${item.id}" data-sprite="${escapeText(spec?.spriteKey ?? item.specId)}" ` +
+      `data-tier="${escapeText(item.variantId)}" class="arrived">` +
+      `<title>${escapeText(`${name}, at the gate, waiting to be unloaded`)}</title>` +
+      objectArt({
+        files,
+        spriteKey: spec?.spriteKey ?? item.specId,
+        tier: item.variantId,
+        x,
+        y,
+        width: stands.width,
+        depth: stands.depth,
+        height: stands.height,
+        fill: 'var(--kit-machine)',
+        shade: 'var(--kit-machine-dark)',
+        label: name,
+      }) +
+      '</g>',
+  };
 }
 
 /** The outline of something bought and not here yet, on the cells held for it (T8 3.2). */
@@ -1047,7 +1199,10 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
         : undefined;
     const benchLine =
       spec.category !== 'bench' ? '' : atThisBench ? `: ${atThisBench.name}` : ' (free)';
-    const name = `${spec.name}${bagLine}${serviceLine}${benchLine}${rackLine}`;
+    // A machine that wants a pipe and has none is not served: the hall says so on the object
+    // (CLAUDE.md T13 3.19).
+    const pipeLine = wantsExtraction(item) && !isConnected(state, item) ? ' (no pipe)' : '';
+    const name = `${spec.name}${bagLine}${serviceLine}${benchLine}${rackLine}${pipeLine}`;
     // Hovering the extractor reads the hall's store (CLAUDE.md T12 3.3).
     const hover =
       item.specId === 'extractor' && store.exists
@@ -1136,33 +1291,27 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
     );
   }
 
-  // A lorry at the gate while something is waiting to be unloaded.
+  // A pallet of sheets at the gate while a delivery is waiting to be unloaded: the material
+  // arrives as what it is (CLAUDE.md T13 3.21). It keeps the lorry's hook, so a click on it
+  // still asks who unloads it.
   const waiting = state.deliveries.find((delivery) => delivery.arrived && !delivery.unloaded);
   if (waiting) {
-    const gate = GATE_LAYOUT;
-    // The shutter is in a far wall, so the lorry is only ever seen once it is in the hall, which
-    // is what the lane is kept clear for (docs/art/SPRITES.md 9.3).
-    const gateX = gate.x;
     drawables.push({
-      depth: depthKey(gateX, gate.y),
+      depth: depthKey(GATE_LAYOUT.x, GATE_LAYOUT.y),
       svg:
-        `<g data-van="${waiting.id}" data-sprite="${DELIVERY_VAN_SPRITE}" class="clickable">` +
-        '<title>Click the van to decide who unloads it</title>' +
-        objectArt({
-          files,
-          spriteKey: DELIVERY_VAN_SPRITE,
-          x: gateX,
-          y: gate.y,
-          width: gate.width,
-          depth: gate.depth,
-          height: gate.height,
-          fill: 'var(--kit-vehicle)',
-          shade: 'var(--kit-vehicle-dark)',
-          label: `Delivery: ${plural(waiting.sheets, 'sheet', 'sheets')}`,
-        }) +
+        `<g data-van="${waiting.id}" data-sprite="${PALLET_SPRITE}" class="clickable pallet">` +
+        '<title>Click the pallet to decide who unloads it</title>' +
+        palletArt(files, `Delivery: ${plural(waiting.sheets, 'sheet', 'sheets')}`) +
         '</g>',
     });
   }
+
+  // A delivered machine stands on the apron by the gate as that machine, unplaced, with a new
+  // tag, until somebody gets it off the lorry and it goes to the cells held for it
+  // (CLAUDE.md T13 3.21).
+  state.onOrder
+    .filter((item) => item.arrived && itemStandsInTheHall(item))
+    .forEach((item, index) => drawables.push(arrivedKit(item, index, files)));
 
   // Finished pieces stand on the apron beside the gate until transport is ordered.
   const waitingPieces = jobsAtGate(state);
@@ -1228,6 +1377,10 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
   // The drop to every ducted machine, over the machines so the port is on the picture and not
   // behind it (CLAUDE.md T10 3.4).
   live.push(ductDrops(state));
+
+  // The pipes the game routed and the gate collars on their drops: a layer above the equipment
+  // (CLAUDE.md T13 3.11, 3.19).
+  live.push(pipeLayer(state, files));
 
   // The ghost footprint of whatever is being dragged, on top of everything else.
   if (ghost !== null) {

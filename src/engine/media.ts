@@ -23,7 +23,14 @@ import {
   EXTRACTION_DEMAND,
   EXTRACTION_MARGIN,
 } from './constants';
-import { BENCH, floorMachines, hasCentralExtraction, isSold, itemStandsInTheHall } from './machines';
+import {
+  BENCH,
+  floorMachines,
+  hasCentralExtraction,
+  hasGate,
+  isSold,
+  itemStandsInTheHall,
+} from './machines';
 import { cncOptions, currentStage } from './stages';
 import type { Equipment, GameState } from './types';
 
@@ -74,10 +81,29 @@ export function extractionKit(state: GameState): Equipment[] {
 export function isConnectedToExtraction(state: GameState, item: Equipment): boolean {
   if (extractionDemandOf(item) <= 0) return true;
   if (hasCentralExtraction(state)) return true;
-  // A gate on the drop counts the machine only while it runs; without one the duct is open
-  // through the branch whenever it is connected (CLAUDE.md T13 3.11). The demand rule reads
-  // this list; phase B4 writes the gated counting.
   return state.pipes.some((run) => run.equipmentId === item.id);
+}
+
+/** True while the fan is pulling at all: some machine with a demand has a man at it. */
+export function extractionRunning(state: GameState): boolean {
+  return extractingMachines(state).length > 0;
+}
+
+/** The branches the fan is pulling through this minute, which is what the extraction demand is
+ *  the sum of (CLAUDE.md T13 3.11). While the fan runs at all, the duct is open through every
+ *  connected machine that has no gate, whether or not a man is at it, so every ungated machine
+ *  counts whenever it is connected; a machine with an automatic gate on its drop counts only
+ *  while somebody is actually standing at it. Nothing runs, nothing is pulled. */
+export function extractionLoad(state: GameState): Equipment[] {
+  if (!extractionRunning(state)) return [];
+  return state.equipment.filter(
+    (item) =>
+      !isSold(item) &&
+      itemStandsInTheHall(item) &&
+      extractionDemandOf(item) > 0 &&
+      isConnectedToExtraction(state, item) &&
+      (item.takenBy !== null || !hasGate(state, item)),
+  );
 }
 
 /** The machines at work this minute that have no pipe to the extraction: they are not served, and
@@ -87,7 +113,8 @@ export function unservedMachines(state: GameState): Equipment[] {
 }
 
 export interface ExtractionCheck {
-  /** What the machines at work are asking for, m3/h. */
+  /** What the open branches are asking for, m3/h: every ungated connected machine while the fan
+   *  runs, and every gated one a man is at (CLAUDE.md T13 3.11). */
   demand: number;
   /** What the hall has, m3/h. */
   capacity: number;
@@ -102,7 +129,7 @@ export interface ExtractionCheck {
 /** The one place the extraction sum is done (CLAUDE.md T10 3.1). */
 export function extractionCheck(state: GameState): ExtractionCheck {
   let demand = 0;
-  for (const item of extractingMachines(state)) demand += extractionDemandOf(item);
+  for (const item of extractionLoad(state)) demand += extractionDemandOf(item);
   let capacity = 0;
   for (const item of extractionKit(state)) capacity += extractionCapacityOf(item);
   const allowed = Math.round(capacity * EXTRACTION_MARGIN);

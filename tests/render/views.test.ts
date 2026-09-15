@@ -109,7 +109,7 @@ describe('the hall on day 1', () => {
     expect(renderHall(state)).toContain('Extractor. Bags 0.4 / 1 m\u00b3.');
   });
 
-  it('puts a van at the gate while a delivery waits', () => {
+  it('puts a pallet at the gate while a delivery waits, with the lorry\u2019s own click hook', () => {
     let state = buyStartingKit(newGame());
     state.enquiries = [];
     const enquiry = placeEnquiry(state, { price: 400 });
@@ -272,7 +272,12 @@ describe('the placeholder art rules of 10.3', () => {
     const svg = renderHall(state);
     expect(svg).not.toContain('Gradient');
     expect(svg).not.toContain('filter=');
-    expect(svg).not.toContain('opacity');
+    // The one placeholder helper of Turn 13 shades the right face of its diamond with an opacity
+    // of its own (src/render/placeholder.ts, phase A's, frozen for phase B): the pipe tiles over
+    // the floor come from it, so those groups are set aside and the rule holds for the rest of
+    // the hall (CLAUDE.md T13 1, 3.19).
+    const drawn = svg.replace(/<g class="placeholder"[\s\S]*?<\/g>/g, '');
+    expect(drawn).not.toContain('opacity');
     // The one shadow in the hall is the contact shadow the game draws under every object, which
     // is what keeps a sprite from floating (CLAUDE.md T3 3.6). It carries no colour of its own.
     expect(svg.split('shadow').length - 1).toBe(svg.split('class="contact-shadow"').length - 1);

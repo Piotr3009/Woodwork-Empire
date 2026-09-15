@@ -2,12 +2,14 @@
 // The sprite check page is the acceptance tool for a batch of art (CLAUDE.md T3 3.6).
 
 import { describe, expect, it } from 'vitest';
-import { DELIVERY_VAN_SPRITE, EQUIPMENT_SPECS } from '../../src/engine/constants';
-import { HALL_LAYERS } from '../../src/render/hall';
+import { EQUIPMENT_SPECS } from '../../src/engine/constants';
+import { HALL_LAYERS, PALLET_SPRITE } from '../../src/render/hall';
 import { OFFICE_LAYERS } from '../../src/render/office';
 import { standsInTheHall } from '../../src/engine/machines';
 import { spriteUrl } from '../../src/render/sprites';
-import { renderSpriteCheck, spriteTargets } from '../../src/ui/spriteCheck';
+import { CHARACTER_ROLES, PIPE_LAYER_KEYS, renderSpriteCheck, spriteTargets } from '../../src/ui/spriteCheck';
+import { ANIMATIONS } from '../../src/render/characters';
+import { PIPE_TILE_KEYS } from '../../src/engine/constants';
 
 function parse(html: string): HTMLElement {
   const holder = document.createElement('div');
@@ -19,12 +21,14 @@ describe('the sprite check page', () => {
   it('lists every key the game can draw, exactly once', () => {
     const names = spriteTargets().map((target) => target.name);
     expect(new Set(names).size).toBe(names.length);
-    expect(names).toContain(DELIVERY_VAN_SPRITE);
+    // The pallet of sheets stands where the lorry stood (CLAUDE.md T13 3.21).
+    expect(names).toContain(PALLET_SPRITE);
+    expect(names).not.toContain('deliveryVan');
     // A family with classes is asked for one picture per class, because the loader asks for the
     // class and a class has its own footprint (CLAUDE.md T7 3.5). A family with one class is
     // asked for once, by the family key. The office desk items went with the desk (T4 3.1) and
     // the rooms are the hall layers now (docs/art/SPRITES.md 9.3).
-    const wanted = new Set<string>([DELIVERY_VAN_SPRITE]);
+    const wanted = new Set<string>([PALLET_SPRITE]);
     for (const spec of EQUIPMENT_SPECS) {
       if (spec.variants.length > 1) {
         for (const variant of spec.variants) wanted.add(`${spec.spriteKey}.${variant.id}`);
@@ -64,7 +68,7 @@ describe('the sprite check page', () => {
 
   it('draws one cell per key, each with a footprint, a box and a picture slot', () => {
     const page = parse(renderSpriteCheck());
-    const cells = Array.from(page.querySelectorAll('.sprite-grid .sprite-cell'));
+    const cells = Array.from(page.querySelectorAll('.sprite-grid .sprite-cell[data-sprite-target]'));
     expect(cells).toHaveLength(spriteTargets().length);
     const keys = cells.map((cell) => cell.getAttribute('data-sprite-target'));
     expect(new Set(keys).size).toBe(keys.length);
@@ -108,6 +112,49 @@ describe('the sprite check page', () => {
     expect(new Set(keys).size).toBe(keys.length);
   });
 
+  it('draws the spindle moulder classes as placeholders in the hall dimetric until they are painted', () => {
+    const page = parse(renderSpriteCheck());
+    for (const classId of ['used', 'budget', 'standard', 'pro', 'industrial']) {
+      const cell = page.querySelector(`[data-sprite-target="spindleMoulder.${classId}"]`);
+      expect(cell, classId).not.toBeNull();
+      const drawn = cell?.querySelector('.sprite-shot.is-placeholder [data-placeholder]');
+      expect(drawn?.getAttribute('data-placeholder'), classId).toBe(`spindleMoulder.${classId}`);
+      // The 2:1 diamond, never straight on (docs/art/REQUESTS-T13.md).
+      expect(drawn?.querySelectorAll('polygon').length, classId).toBeGreaterThanOrEqual(3);
+    }
+    const truck = page.querySelector('[data-sprite-target="palletTruck"] [data-placeholder]');
+    expect(truck?.getAttribute('data-placeholder')).toBe('palletTruck');
+  });
+
+  it('lists the eight pipe tiles and the gate collar once each, drawn as the hall draws them', () => {
+    // The pipe layer the art side owes (CLAUDE.md T13 3.11, 3.19; docs/art/REQUESTS-T13.md 1, 2).
+    expect([...PIPE_LAYER_KEYS]).toEqual([...PIPE_TILE_KEYS, 'gate.collar']);
+    const page = parse(renderSpriteCheck());
+    expect(page.innerHTML).toContain('The pipe layer');
+    const cells = Array.from(page.querySelectorAll('[data-pipe-key]'));
+    expect(cells.map((cell) => cell.getAttribute('data-pipe-key'))).toEqual([...PIPE_LAYER_KEYS]);
+    for (const cell of cells) {
+      const key = cell.getAttribute('data-pipe-key') ?? '';
+      expect(cell.querySelector(`[data-placeholder="${key}"]`), key).not.toBeNull();
+      expect(cell.textContent, key).toContain(`${key}.png`);
+    }
+  });
+
+  it('lists every role of the game with every frame key, the two of Turn 13 among them', () => {
+    // Every state the character system can be in has a key, home included (CLAUDE.md T13 3.23).
+    expect([...ANIMATIONS]).toEqual(['walk', 'bench', 'carry', 'idle', 'phone', 'home']);
+    expect(CHARACTER_ROLES).toContain('estimator');
+    expect(CHARACTER_ROLES).toContain('productionManager');
+    const page = parse(renderSpriteCheck());
+    const cells = Array.from(page.querySelectorAll('[data-character-key]')).map((cell) =>
+      cell.getAttribute('data-character-key'),
+    );
+    expect(cells).toHaveLength(CHARACTER_ROLES.length * ANIMATIONS.length);
+    expect(cells).toContain('character.productionManager.phone');
+    expect(cells).toContain('character.estimator.idle');
+    expect(cells).toContain('character.owner.home');
+  });
+
   it('prints the key, the footprint and the canvas the art side has to hit', () => {
     const page = parse(renderSpriteCheck());
     const saw = page.querySelector('[data-sprite-target="tableSaw.used"]');
@@ -133,8 +180,12 @@ describe('the sprite check page', () => {
     );
     // Piotr delivered a batch with this brief, so the page is no longer all placeholders.
     expect(delivered.length).toBeGreaterThan(0);
+    // A Turn 13 picture the art side owes is drawn as its placeholder rather than as "no file":
+    // the spindle moulder's five classes and the pallet truck (CLAUDE.md T13 3.13, 3.21).
+    const placeholders = Array.from(page.querySelectorAll('.sprite-grid .sprite-shot.is-placeholder'));
+    expect(placeholders).toHaveLength(6);
     expect(page.querySelectorAll('.sprite-grid .sprite-shot.is-missing')).toHaveLength(
-      targets.length - delivered.length,
+      targets.length - delivered.length - placeholders.length,
     );
     expect(page.innerHTML).toContain('no file');
     expect(page.innerHTML).toContain(`${targets.length} keys, ${delivered.length} with a file`);

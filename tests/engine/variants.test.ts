@@ -2,6 +2,9 @@
 
 import { describe, expect, it } from 'vitest';
 import {
+  CLASS_BADGE,
+  CLASS_LADDER_FAMILIES,
+  CLASS_ORDER,
   ENDURANCE_MINUTES_BY_CLASS,
   EQUIPMENT_SPECS,
   MACHINE_ENDURANCE_HOURS,
@@ -67,6 +70,40 @@ describe('every catalogue line is a family', () => {
         expect(variant.description.length, `${spec.id}.${variant.id}`).toBeGreaterThan(10);
         expect(variant.powerPerDay, `${spec.id}.${variant.id}`).toBeGreaterThan(0);
       }
+    }
+  });
+
+  it('gives every family of the one ladder exactly five classes, in order, with a badge each', () => {
+    // Five is the number: used, budget, standard, pro, industrial, and class 5 is always the
+    // industrial one (PIOTR; CLAUDE.md T13 1, 3.12). The thicknesser, the CNC, the solid wood
+    // tools, the spray booth, the drill and the spindle moulder joined the ladder in Turn 13.
+    expect(CLASS_ORDER).toEqual(['used', 'budget', 'standard', 'pro', 'industrial']);
+    for (const family of [
+      'thicknesser',
+      'cnc',
+      'solidWoodTools',
+      'sprayBooth',
+      'drill',
+      'spindleMoulder',
+    ]) {
+      expect(CLASS_LADDER_FAMILIES, family).toContain(family);
+    }
+    for (const family of CLASS_LADDER_FAMILIES) {
+      const spec = findSpec(family);
+      expect(spec, family).not.toBeNull();
+      expect(spec?.variants.map((variant) => variant.id), family).toEqual([...CLASS_ORDER]);
+      for (const variant of spec?.variants ?? []) {
+        expect(CLASS_BADGE[variant.id], `${family}.${variant.id}`).toBeDefined();
+        // A class carries no dust figure of its own: the dust is the family's (CLAUDE.md T13 10.1).
+        expect('dust' in variant, `${family}.${variant.id}`).toBe(false);
+      }
+    }
+    // Every family the badge table names is one of the five, once each.
+    expect(Object.keys(CLASS_BADGE)).toEqual([...CLASS_ORDER]);
+    // And a family off the ladder has its one class and never wears a badge.
+    for (const spec of EQUIPMENT_SPECS) {
+      if (CLASS_LADDER_FAMILIES.includes(spec.id)) continue;
+      expect(spec.variants.map((variant) => variant.id), spec.id).toEqual(['standard']);
     }
   });
 

@@ -19,11 +19,12 @@ import { pickSprite, spriteFiles, SPRITE_SCALE } from './sprites';
 /** The four ways a figure can face on a 2:1 isometric floor. */
 export type Facing = 'sw' | 'se' | 'nw' | 'ne';
 
-/** What a figure can be doing. Tonight the art side has none of them; the code is ready for all
- *  four (CLAUDE.md T9 3.13). */
-export type Animation = 'walk' | 'bench' | 'carry' | 'idle' | 'phone';
+/** What a figure can be doing: every state the character system can be in has a frame key
+ *  (CLAUDE.md T9 3.13, T13 3.23). `home` is the figure going home at the end of the day; no
+ *  sheet is wanted for it, so it falls back to idle like any missing frame. */
+export type Animation = 'walk' | 'bench' | 'carry' | 'idle' | 'phone' | 'home';
 
-export const ANIMATIONS: readonly Animation[] = ['walk', 'bench', 'carry', 'idle', 'phone'];
+export const ANIMATIONS: readonly Animation[] = ['walk', 'bench', 'carry', 'idle', 'phone', 'home'];
 
 /** Where a missing direction is mirrored from (CLAUDE.md T9 3.13). */
 const MIRROR: Record<Facing, Facing> = { se: 'sw', sw: 'se', nw: 'ne', ne: 'nw' };

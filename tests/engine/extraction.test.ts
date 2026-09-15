@@ -103,14 +103,51 @@ describe('the sums for a two man shop', () => {
     expect(underExtracted(state)).toBe(false);
   });
 
-  it('counts a machine only while somebody is standing at it', () => {
+  it('counts an ungated machine whenever it is connected, and a gated one only while it runs', () => {
+    // The duct is open through every ungated branch, so the idle bander still pulls on the fan
+    // while the saw runs; an automatic gate on its drop shuts its branch until a man is at it
+    // (PIOTR; CLAUDE.md T13 3.11).
     const state = twoManShop('standard');
     const bander = state.equipment.find((item) => item.specId === 'edgebander');
-    if (!bander) throw new Error('no edgebander');
+    const saw = state.equipment.find((item) => item.specId === 'tableSaw');
+    if (!bander || !saw) throw new Error('no machines');
     bander.takenBy = null;
-    // The saw alone is 1,100 against the 1,660 the fan allows.
+    expect(extractionCheck(state).demand).toBe(2500);
+    expect(underExtracted(state)).toBe(true);
+    // The gate: the saw alone is 1,100 against the 1,660 the fan allows.
+    state.gates.push(bander.id);
     expect(extractionCheck(state).demand).toBe(1100);
     expect(underExtracted(state)).toBe(false);
+    // A gated machine with a man at it counts as it always did.
+    bander.takenBy = 'staff-1';
+    expect(extractionCheck(state).demand).toBe(2500);
+    expect(underExtracted(state)).toBe(true);
+    // And the gate changes the air sum only: the dust the bander makes is the family's figure,
+    // gated or not (CLAUDE.md T13 10.1).
+    expect(dustGainPerMinute(state)).toBe(DUST_PER_PRODUCTION_MINUTE * UNDER_EXTRACTION_DUST_MULTIPLIER);
+  });
+
+  it('counts nothing at all while no machine runs, gates or no gates', () => {
+    const state = twoManShop('standard');
+    for (const item of state.equipment) item.takenBy = null;
+    expect(extractionCheck(state).demand).toBe(0);
+    expect(underExtracted(state)).toBe(false);
+    expect(extractionCheck(state).line).toBe('');
+  });
+
+  it('counts a machine with no pipe as not served, and never as part of the sum', () => {
+    const state = twoManShop('pro');
+    const bander = state.equipment.find((item) => item.specId === 'edgebander');
+    if (!bander) throw new Error('no edgebander');
+    state.pipes = state.pipes.filter((run) => run.equipmentId !== bander.id);
+    const check = extractionCheck(state);
+    expect(check.demand).toBe(1100);
+    expect(check.short).toBe(true);
+    expect(check.line).toBe('Extraction: a machine is not connected');
+    // Served again the moment it is connected (CLAUDE.md T13 3.19, 10.1).
+    state.pipes.push({ id: 'pipe-b', equipmentId: bander.id, extractorId: 'x', tiles: [], metres: 1 });
+    expect(extractionCheck(state).demand).toBe(2500);
+    expect(extractionCheck(state).short).toBe(false);
   });
 
   it('counts nothing that is only on order, or sold', () => {
