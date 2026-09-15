@@ -65,7 +65,7 @@ import {
   minutesLeftFor,
 } from './stages';
 import { applyRating, changeReputation } from './reputation';
-import { int, makeId } from './rng';
+import { float, int, makeId } from './rng';
 import { plural } from './text';
 import {
   AD_HOC_TASK_MINUTES,
@@ -121,13 +121,31 @@ export function ownerDaysFor(
   return minutes / MINUTES_PER_WORKING_DAY;
 }
 
-/** How long the client gives, worked out from the work in the job and nothing else. The slack is
- *  one draw either way, so the seeded stream is the same shape for a small job and a big one
- *  (CLAUDE.md T6 3.7). */
-export function deadlineDaysFor(
-  state: GameState,
+/** The deadline's one draw, taken off the seeded stream now and read later: the cursor the draw
+ *  was made from. The board takes it before it knows whether the client is residential or
+ *  commercial, so the stream is the same shape either way, and reads the days off it once the
+ *  size of the work is known, through the same `int` on a copy of the cursor, which gives the
+ *  figure the draw would have given at the time (CLAUDE.md T6 3.7, T13 3.15). */
+export interface DeadlineDraw {
+  rng: number;
+}
+
+export function drawDeadline(state: GameState): DeadlineDraw {
+  const draw = { rng: state.rng };
+  // The one draw the deadline takes, whatever the size of the job.
+  float(state, 0, 1);
+  return draw;
+}
+
+/** How long the client gives, worked out from the work in the job and nothing else, read off a
+ *  draw taken with `drawDeadline`. The slack is that one draw either way, so the seeded stream
+ *  is the same shape for a small job and a big one (CLAUDE.md T6 3.7). */
+export function deadlineDaysFrom(
+  draw: DeadlineDraw,
   job: { ownerDays: number; price: number; express: boolean },
 ): number {
+  // A copy: reading the draw twice gives the same figure and moves nothing.
+  const cursor = { rng: draw.rng };
   const base = Math.min(
     DEADLINE_DAYS_MAX,
     Math.max(
@@ -137,13 +155,21 @@ export function deadlineDaysFor(
   );
   const slack =
     job.price <= DEADLINE_SMALL_JOB_PRICE
-      ? int(state, 0, DEADLINE_SMALL_SLACK_DAYS)
+      ? int(cursor, 0, DEADLINE_SMALL_SLACK_DAYS)
       : Math.round(
-          (base * int(state, DEADLINE_SLACK_PERCENT_MIN, DEADLINE_SLACK_PERCENT_MAX)) / 100,
+          (base * int(cursor, DEADLINE_SLACK_PERCENT_MIN, DEADLINE_SLACK_PERCENT_MAX)) / 100,
         );
   const standard = base + slack;
   if (!job.express) return standard;
   return Math.max(DEADLINE_DAYS_MIN, Math.round(standard * DEADLINE_EXPRESS_FACTOR));
+}
+
+/** The draw and the reading in one, for a job whose size is known when it is asked. */
+export function deadlineDaysFor(
+  state: GameState,
+  job: { ownerDays: number; price: number; express: boolean },
+): number {
+  return deadlineDaysFrom(drawDeadline(state), job);
 }
 
 /** What a worker of this rate is worth per minute, for the job card only [TUNE]. */

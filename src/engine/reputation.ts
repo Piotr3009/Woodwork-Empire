@@ -19,14 +19,23 @@ import {
 } from './constants';
 import { penalisedMisses } from './calls';
 import { outputBreakdown } from './machines';
+import { websiteReputationBonus } from './website';
 import type { GameState, Job } from './types';
+
+/** The reputation the player reads and the tier tables read: what the company has earned plus the
+ *  small bonus a good website holds while it is held, never past the scale (CLAUDE.md T13 3.7).
+ *  The one function. `state.reputation` is the earned figure, the one the log adds up to, and
+ *  levels 1 to 3 of the website add nothing to it. */
+export function effectiveReputation(state: GameState): number {
+  return clampReputation(state.reputation + websiteReputationBonus(state));
+}
 
 /** The company's two totals, which are what the board on the wall is really for: the reputation
  *  and what a minute of production in this hall is worth (PIOTR, 15.09; CLAUDE.md T11 3.5). One
  *  place works them out, so the board and the modal can never say different things. */
 export function companyTotals(state: GameState): { reputation: string; output: string } {
   return {
-    reputation: `Reputation ${formatReputation(state.reputation)}`,
+    reputation: `Reputation ${formatReputation(effectiveReputation(state))}`,
     output: `Output ${outputBreakdown(state).total.toFixed(2)}`,
   };
 }
