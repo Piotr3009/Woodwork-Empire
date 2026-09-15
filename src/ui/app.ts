@@ -26,6 +26,7 @@ import {
   timeIsPaused,
 } from '../engine/index';
 import type {
+  BagStore,
   Difficulty,
   GameAction,
   GameState,
@@ -127,6 +128,8 @@ interface Ui {
   eventPosition: ModalPosition | null;
   menuOpen: boolean;
   note: string;
+  /** The note under the hall is the hall's bag store, drawn live with its bar (T12 3.3). */
+  storeNote: boolean;
   /** The one line that says why a click did nothing, and the pulse on the Pause button that goes
    *  with it. Both last one render (CLAUDE.md T7 3.10). */
   toast: string;
@@ -241,6 +244,7 @@ function freshUi(): Ui {
     eventPosition: null,
     menuOpen: false,
     note: '',
+    storeNote: false,
     toast: '',
     filters: { board: '', catalogue: '' },
     focusNext: null,
@@ -650,7 +654,11 @@ function pageBody(scene: Scene | null): string {
   if (current.gameOver) return renderGameOver(current);
   const notes = scene?.notes ?? '';
   const controls = ui.view === 'hall' ? hallControls(current) + hallZoomControls() : '';
-  const note = ui.note === '' ? '' : `<p class="view-note">${escapeHtml(ui.note)}</p>`;
+  const note = ui.storeNote
+    ? storeNote(bagStore(current))
+    : ui.note === ''
+      ? ''
+      : `<p class="view-note">${escapeHtml(ui.note)}</p>`;
   const toast = ui.toast === '' ? '' : `<p class="toast">${escapeHtml(ui.toast)}</p>`;
   const out = ui.view === 'sprites' ? '' : renderOwnerOut(current);
   return (
@@ -978,6 +986,24 @@ function shutModal(): void {
 }
 
 /** Hours on a machine's own clock, as the note under the hall says them. */
+/** The one way a note is put under the hall, so the store's live note goes when another comes. */
+function setNote(text: string): void {
+  ui.note = text;
+  ui.storeNote = false;
+}
+
+/** The hall's bag store under the hall: the line and a small bar, red once it is full
+ *  (CLAUDE.md T12 3.3). Drawn off the state every render, so it fills as the saws run. */
+function storeNote(store: BagStore): string {
+  const percent = store.capacityM3 <= 0 ? 0 : Math.min(100, (store.fillM3 / store.capacityM3) * 100);
+  return (
+    `<p class="view-note">${escapeHtml(bagStoreLine(store))} ` +
+    `<span class="bag-gauge${store.full ? ' is-full' : ''}" role="img" ` +
+    `aria-label="${escapeHtml(bagStoreLine(store))}">` +
+    `<span class="bag-gauge-fill" style="width:${percent.toFixed(1)}%"></span></span></p>`
+  );
+}
+
 function hoursOfUse(hours: number): string {
   return `${Math.round(hours * 10) / 10} h`;
 }
@@ -1018,7 +1044,7 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
   const what = element.dataset.do;
   if (what === undefined) return;
   const id = element.dataset.id ?? '';
-  ui.note = '';
+  setNote('');
   // The toast and its pulse last one click (CLAUDE.md T7 3.10).
   ui.toast = '';
   switch (what) {
@@ -1041,7 +1067,7 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
       const stored = readStore();
       if (stored.state === null) {
         ui.saved = peekSave();
-        ui.note = stored.note;
+        setNote(stored.note);
         break;
       }
       state = stored.state;
@@ -1546,7 +1572,7 @@ function saveToFile(): void {
   link.download = saveFileName(game());
   link.click();
   URL.revokeObjectURL(url);
-  ui.note = `Saved as ${link.download}.`;
+  setNote(`Saved as ${link.download}.`);
   requestRender();
 }
 
@@ -1563,7 +1589,7 @@ export function onFileChosen(file: File): Promise<void> {
       writeStore();
       ui.saved = peekSave();
     }
-    ui.note = result.note;
+    setNote(result.note);
     requestRender();
   });
 }
@@ -1571,11 +1597,11 @@ export function onFileChosen(file: File): Promise<void> {
 function copyState(): void {
   const clipboard = typeof navigator === 'undefined' ? undefined : navigator.clipboard;
   if (!clipboard) {
-    ui.note = 'This browser gives no clipboard access.';
+    setNote('This browser gives no clipboard access.');
     return;
   }
   void clipboard.writeText(JSON.stringify(game()));
-  ui.note = 'State copied as JSON.';
+  setNote('State copied as JSON.');
 }
 
 /** Walking into a room. The office is a view of its own; the other two are a line under the
@@ -1585,9 +1611,9 @@ function handleRoomClick(room: RoomId): void {
     ui.view = 'office';
     resetCamera();
   } else if (room === 'wc') {
-    ui.note = roomById('wc').tooltip;
+    setNote(roomById('wc').tooltip);
   } else {
-    ui.note = roomById('canteen').tooltip;
+    setNote(roomById('canteen').tooltip);
   }
   requestRender();
 }
@@ -1612,7 +1638,7 @@ function handleSceneClick(element: DataElement): boolean {
       // The outline of something bought and not here yet: it says when the lorry is due.
       const reserved = reservationById(game(), kit);
       if (reserved !== null) {
-        ui.note = `On order, due day ${reserved.dueDay} at 08:00.`;
+        setNote(`On order, due day ${reserved.dueDay} at 08:00.`);
         requestRender();
       }
       return true;
@@ -1622,11 +1648,15 @@ function handleSceneClick(element: DataElement): boolean {
       dispatch({ type: 'ASK_EMPTY_BAGS' });
       return true;
     }
-    ui.note = item.broken
-      ? 'It has stopped. Nothing runs until it is fixed.'
-      : item.specId === 'extractor'
-        ? bagStoreLine(bagStore(game()))
-        : `${hoursOfUse(item.hoursUsed)} of use on the clock.`;
+    if (item.broken) {
+      setNote('It has stopped. Nothing runs until it is fixed.');
+    } else if (item.specId === 'extractor') {
+      // The hall's store, live under the hall with its bar (CLAUDE.md T12 3.3).
+      ui.note = '';
+      ui.storeNote = true;
+    } else {
+      setNote(`${hoursOfUse(item.hoursUsed)} of use on the clock.`);
+    }
     requestRender();
     return true;
   }

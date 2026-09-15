@@ -20,6 +20,7 @@ import {
 } from '../engine/constants';
 import {
   bagStore,
+  bagStoreLine,
   brokenMachines,
   dustBand,
   extractorBroken,
@@ -1047,6 +1048,11 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
     const benchLine =
       spec.category !== 'bench' ? '' : atThisBench ? `: ${atThisBench.name}` : ' (free)';
     const name = `${spec.name}${bagLine}${serviceLine}${benchLine}${rackLine}`;
+    // Hovering the extractor reads the hall's store (CLAUDE.md T12 3.3).
+    const hover =
+      item.specId === 'extractor' && store.exists
+        ? `${name}. ${bagStoreLine(store)}. ${spec.effect}`
+        : `${name}. ${spec.effect}`;
     const fx = machineFx(state, item, spec);
     drawables.push({
       depth: depthKey(item.anchorX, item.anchorY),
@@ -1054,7 +1060,7 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
         `<g data-kit="${item.id}"${spec.category === 'storage' ? ' data-rack="1"' : ''} ` +
         `data-sprite="${item.spriteKey}" data-tier="${item.variantId}" ` +
         `class="clickable${fx.className}">` +
-        `<title>${escapeText(`${name}. ${spec.effect}`)}</title>` +
+        `<title>${escapeText(hover)}</title>` +
         objectArt({
           files,
           spriteKey: item.spriteKey,

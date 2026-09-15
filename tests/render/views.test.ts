@@ -102,6 +102,10 @@ describe('the hall on day 1', () => {
     const state = fillBags(buyStartingKit(newGame()));
     expect(renderHall(state)).toContain('Extractor (bags full)');
     expect(renderHall(state)).not.toContain('Table saw (bag');
+    // And hovering the extractor reads the hall's store, full or not.
+    expect(renderHall(state)).toContain('Extractor (bags full). Bags 1 / 1 m\u00b3.');
+    state.bagFillM3 = 0.4;
+    expect(renderHall(state)).toContain('Extractor. Bags 0.4 / 1 m\u00b3.');
   });
 
   it('puts a van at the gate while a delivery waits', () => {

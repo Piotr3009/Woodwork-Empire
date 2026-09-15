@@ -246,6 +246,29 @@
   font-size: 12px;
 }
 
+/* The hall's bag store under the hall: a small bar beside the line, red once it is full
+   (CLAUDE.md T12 3.3). */
+.bag-gauge {
+  display: inline-block;
+  width: 80px;
+  height: 8px;
+  margin-left: 6px;
+  vertical-align: middle;
+  border: 1px solid var(--text-dim);
+  border-radius: 2px;
+  background: var(--page);
+}
+
+.bag-gauge-fill {
+  display: block;
+  height: 100%;
+  background: var(--good);
+}
+
+.bag-gauge.is-full .bag-gauge-fill {
+  background: var(--bad);
+}
+
 /* One line under the top bar when the world will not move for a stopped clock, and the single
    beat on the Pause chip that goes with it (CLAUDE.md T7 3.10). */
 .toast {
