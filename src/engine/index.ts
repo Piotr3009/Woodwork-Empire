@@ -159,7 +159,7 @@ export {
   transportLabel,
 } from './jobs';
 export { dropJob } from './jobs';
-export { changeReputation } from './reputation';
+export { changeReputation, companyTotals } from './reputation';
 export type { LifecycleStep, StartCheck, StepState } from './jobs';
 export type { OutputBreakdown, OutputLine } from './machines';
 

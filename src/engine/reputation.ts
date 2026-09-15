@@ -18,7 +18,18 @@ import {
   REPUTATION_TIERS,
 } from './constants';
 import { penalisedMisses } from './calls';
+import { outputBreakdown } from './machines';
 import type { GameState, Job } from './types';
+
+/** The company's two totals, which are what the board on the wall is really for: the reputation
+ *  and what a minute of production in this hall is worth (PIOTR, 15.09; CLAUDE.md T11 3.5). One
+ *  place works them out, so the board and the modal can never say different things. */
+export function companyTotals(state: GameState): { reputation: string; output: string } {
+  return {
+    reputation: `Reputation ${formatReputation(state.reputation)}`,
+    output: `Output ${outputBreakdown(state).total.toFixed(2)}`,
+  };
+}
 
 /** Index into the tier tables: 0 for a new company, then 1 and 2 as the ratings come in. */
 export function reputationTier(reputation: number): number {

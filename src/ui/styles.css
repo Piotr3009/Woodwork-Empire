@@ -2388,6 +2388,175 @@ input.num {
   color: #6a6355;
 }
 
+/* ------------------------------------------------------------------------------------------
+   The company board: the one board of the family that is a picture. Green felt in an oak frame
+   with a cream sheet pinned to it (officeCompanyBoard.png, 1254 square; SPRITES.md 11). The
+   company name and the week go on the felt above the sheet, the output and its two columns on
+   the sheet, and the two totals under both (PIOTR, 15.09; CLAUDE.md T11 3.5).
+   ------------------------------------------------------------------------------------------ */
+.modal-board.modal-felt {
+  background: transparent url('/sprites/officeCompanyBoard.png') no-repeat center / 100% 100%;
+  border: 0;
+  box-shadow: none;
+  height: min(92vh, 900px);
+  max-height: min(92vh, 900px);
+  width: min(96vw, min(92vh, 900px));
+}
+
+.modal-felt .modal-head {
+  border: 0;
+  left: 0;
+  margin: 0;
+  padding: 6px 10px 0 12px;
+  position: absolute;
+  right: 0;
+  top: 0;
+}
+
+.modal-felt .modal-head::before {
+  display: none;
+}
+
+.modal-felt .modal-head h2 {
+  color: #f0e9d8;
+  font-size: 20px;
+}
+
+.modal-felt .modal-body {
+  inset: 0;
+  margin: 0;
+  overflow: hidden;
+  padding: 0;
+  position: absolute;
+}
+
+.felt {
+  height: 100%;
+  position: relative;
+  width: 100%;
+}
+
+/* The felt above the sheet: the picture leaves y 0 to 40.7% of it clear. */
+.felt-head {
+  color: #f0e9d8;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  height: 33%;
+  left: 14%;
+  position: absolute;
+  right: 14%;
+  top: 6%;
+  text-align: center;
+}
+
+.felt-name {
+  font-family: var(--font-title);
+  font-size: 30px;
+  line-height: 1.1;
+}
+
+.felt-week {
+  font-family: var(--font-title);
+  font-size: 22px;
+}
+
+.felt-shares {
+  font-size: 12px;
+  opacity: 0.85;
+}
+
+.felt-weeks {
+  flex: 1 1 auto;
+  margin-top: 4px;
+  min-height: 0;
+  overflow-y: auto;
+  text-align: left;
+}
+
+.felt-weeks .board-week h4,
+.felt-weeks .row-main,
+.felt-weeks .row-figure {
+  color: #f0e9d8;
+}
+
+.felt-weeks .empty {
+  color: #d8d2c0;
+}
+
+/* The pinned sheet: x 19.4% to 80.6%, y 40.7% to 80.9% of the picture (SPRITES.md 11). */
+.felt-sheet {
+  color: #1d2a22;
+  height: 40.2%;
+  left: 19.4%;
+  overflow-y: auto;
+  padding: 6px 10px;
+  position: absolute;
+  right: 19.4%;
+  top: 40.7%;
+}
+
+.felt-sheet h3,
+.felt-sheet h4 {
+  color: #12301f;
+  margin-top: 4px;
+}
+
+.felt-sheet .row-main,
+.felt-sheet .figures strong {
+  color: #1d2a22;
+}
+
+.felt-sheet .row-figure,
+.felt-sheet .hint,
+.felt-sheet .figures {
+  color: #4d5a52;
+}
+
+.felt-sheet .board-columns {
+  display: flex;
+  gap: 12px;
+}
+
+.felt-sheet .board-column {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+/* Under both, in letters you can read across the room (PIOTR, 15.09). */
+.felt-totals {
+  bottom: 6%;
+  color: #f0e9d8;
+  display: flex;
+  gap: 24px;
+  justify-content: center;
+  left: 10%;
+  position: absolute;
+  right: 10%;
+}
+
+.felt-total {
+  font-family: var(--font-title);
+  font-size: 34px;
+  line-height: 1.1;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+/* The same two totals on the board on the office wall, on its own pinned sheet and nothing else
+   on it (CLAUDE.md T11 3.5). */
+.office-board-totals {
+  align-items: center;
+  color: #1d2a22;
+  display: flex;
+  flex-direction: column;
+  font-family: var(--font-title);
+  justify-content: center;
+  line-height: 1.2;
+  pointer-events: none;
+  position: absolute;
+  text-align: center;
+}
+
 /* The file picker behind "Load from file" is the browser's; the input itself stays out of sight. */
 .menu-pop input[type='file'] {
   height: 1px;
