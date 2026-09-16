@@ -71,11 +71,11 @@ const CROSS =
   '×</button>';
 
 /** Three families and nothing else (CLAUDE.md T11 1, T14 2.1). `folder` is paper on a kraft
- *  folder (SPRITES.md 11, the GPT asset ui.folder.png): the catalogue, the books, the team, the
- *  desk and every event. `board` is cards on a board: the Work Plan and the shopping list on
- *  steel with magnets, the company board on its own felt picture. `screen` is software: the
- *  laptop, and only the laptop, a bezel drawn in CSS with a cool light screen inside it, the
- *  system font, flat tiles, and nothing of paper across the bezel (PIOTR, 15.09). */
+ *  folder (SPRITES.md 11, the GPT asset ui.folder.png): the catalogue, the books, the desk and
+ *  every event. `board` is cards on a board: the Work Plan and the shopping list on steel with
+ *  magnets, the company board on its own felt. `screen` is software: the laptop, and only the
+ *  laptop, a bezel drawn in CSS with a cool light screen inside it, the system font, flat tiles,
+ *  and nothing of paper across the bezel; the Team is a page of it (PIOTR, 15.09 and 16.09). */
 export type ModalSkin = 'folder' | 'board' | 'screen';
 
 /** Every modal id in the game with the skin it wears. One table, so a modal cannot be paper in
@@ -87,7 +87,6 @@ export const MODAL_SKINS: Record<string, ModalSkin> = {
   laptop: 'screen',
   accounting: 'folder',
   catalogue: 'folder',
-  team: 'folder',
   event: 'folder',
   daySummary: 'folder',
   workPlan: 'board',

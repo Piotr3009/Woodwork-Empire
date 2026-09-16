@@ -12,6 +12,7 @@ import { renderInsurance } from '../../src/ui/insurance';
 import { renderLaptop } from '../../src/ui/laptop';
 import { renderMaterials } from '../../src/ui/materials';
 import { renderSecurity } from '../../src/ui/security';
+import { renderTeam } from '../../src/ui/team';
 import { renderWebsite } from '../../src/ui/website';
 import { acceptNow, buyStartingKit, fillRack, newGame, placeEnquiry } from '../helpers';
 
@@ -94,23 +95,27 @@ describe('the content is as Turn 13 left it', () => {
     const pages: Array<[string, string]> = [
       ['stock', renderMaterials(state, '6')],
       ['drawings', renderDrawings(state)],
+      ['team', renderTeam(state, 'workshop')],
       ['website', renderWebsite(state)],
       ['insurance', renderInsurance(state)],
       ['security', renderSecurity(state)],
     ];
     for (const [id, body] of pages) {
-      const screen = parse(renderLaptop(state, { page: id as never, stockSheets: '6' }));
+      const screen = parse(renderLaptop(state, { page: id as never, stockSheets: '6', teamTab: 'workshop' }));
       const inside = screen.querySelector(`.laptop-screen[data-laptop-page="${id}"]`);
       expect(inside, id).not.toBeNull();
-      const back = inside?.firstElementChild;
+      // The page header first, with the back arrow as its first child (CLAUDE.md T15 2.3).
+      const head = inside?.firstElementChild;
+      expect(head?.className, id).toBe('screen-page-head');
+      const back = head?.firstElementChild;
       expect(back?.className, id).toBe('screen-back');
       expect(back?.textContent, id).toBe('← Home');
-      // Everything after the arrow is the page exactly as its own renderer writes it.
-      const rest = (inside?.innerHTML ?? '').slice(back?.outerHTML.length ?? 0);
+      // Everything after the header is the page exactly as its own renderer writes it.
+      const rest = (inside?.innerHTML ?? '').slice(head?.outerHTML.length ?? 0);
       expect(rest, id).toBe(parse(body).innerHTML);
     }
     // The tasks page keeps its three headings and nothing of the jobs on the books.
-    const tasks = parse(renderLaptop(state, { page: 'tasks', stockSheets: '6' }));
+    const tasks = parse(renderLaptop(state, { page: 'tasks', stockSheets: '6', teamTab: 'workshop' }));
     expect(tasks.querySelector('.laptop-screen[data-laptop-page="tasks"] .screen-back')).not.toBeNull();
     expect(tasks.textContent).toContain('Office tasks today');
     expect(tasks.textContent).toContain('Workshop jobs of work');
@@ -121,7 +126,7 @@ describe('the content is as Turn 13 left it', () => {
 
 describe('through the page', () => {
   it('opens each page from its tile and comes back home on the arrow', () => {
-    for (const tile of ['tasks', 'stock', 'drawings', 'website', 'insurance', 'security']) {
+    for (const tile of ['tasks', 'stock', 'drawings', 'team', 'website', 'insurance', 'security']) {
       openPage(tile);
       expect(page(), tile).toBe(tile);
       expect(laptop().classList.contains('modal-screen'), tile).toBe(true);

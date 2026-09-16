@@ -374,14 +374,14 @@ describe('the laptop', () => {
     });
     const books = state.tasks.find((task) => task.kind === 'bookkeeping');
     if (books) books.doneBy = 'a1';
-    const html = renderLaptop(state, { page: 'tasks', stockSheets: '6' });
+    const html = renderLaptop(state, { page: 'tasks', stockSheets: '6', teamTab: 'workshop' });
     expect(html).toContain('Ben is on it, 300 min of his day left');
     expect(html).toContain('Take it on');
   });
 
   it('lists what is standing at the gate with a way to order transport', () => {
     const state = newGame();
-    const html = renderLaptop(state, { page: 'tasks', stockSheets: '6' });
+    const html = renderLaptop(state, { page: 'tasks', stockSheets: '6', teamTab: 'workshop' });
     expect(html).toContain('At the gate, 0 pieces');
     expect(html).toContain('Nothing waiting to go out.');
   });

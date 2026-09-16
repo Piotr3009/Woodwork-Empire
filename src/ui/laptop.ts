@@ -1,13 +1,15 @@
 // The laptop on the office desk is a computer (PIOTR, 15.09; CLAUDE.md T14 2.1): a home screen of
 // tiles behind a bezel, in the system font on a cool background, and nothing of paper inside it.
 // Home is three big tiles, Tasks, Stock and Drawings in that order, each with a live line the
-// engine counts, and under a rule the Office group of small tiles: Team, Website, Insurance,
-// Security, Joinery Core, Settings. A big tile opens its page full screen inside the laptop with
-// a back arrow to home; the tiles are the whole of the navigation, and there is no tab bar.
+// engine counts and a red count in its corner while there is something to do, and under a rule
+// the Office group of small tiles with their icons: Team, Website, Insurance, Security, Joinery
+// Core, Settings. A tile opens its page full screen inside the laptop with a back arrow to home
+// in the same place on every page; the tiles are the whole of the navigation, and there is no
+// tab bar (CLAUDE.md T15 2.3).
 //
 // The pages are the ones Turn 13 left: the tasks list, the stock page in the style of Joinery
-// Core, the drawings, and the three Admin pages, which Turn 13 built as tabs of this laptop and
-// which the small tiles open here on their own page (CLAUDE.md T14 2.1, T13 3.7, 3.15, 3.17).
+// Core, the drawings, the three Admin pages, and from tonight the Team, which was the one page
+// still outside the screen (PIOTR, 16.09: "we are in the laptop, so it does not match").
 
 import {
   TAKE_OFF_BUTTON_LABEL,
@@ -25,16 +27,19 @@ import { renderInsurance } from './insurance';
 import { gateSection } from './jobCard';
 import { renderMaterials } from './materials';
 import { renderSecurity } from './security';
+import { type TeamTab, renderTeam } from './team';
 import { renderWebsite } from './website';
 import { emptyLine, escapeHtml, minutes, money, plural, taskStartAction } from './modal';
 
-/** The pages the screen shows: home, the three behind the big tiles, and the three Admin pages
- *  behind their small tiles (CLAUDE.md T14 2.1). Home is the default, every time it opens. */
+/** The pages the screen shows: home, the three behind the big tiles, the Team and the three
+ *  Admin pages behind their small tiles (CLAUDE.md T14 2.1, T15 2.3). Home is the default, every
+ *  time it opens. */
 export type LaptopPage =
   | 'home'
   | 'tasks'
   | 'stock'
   | 'drawings'
+  | 'team'
   | 'website'
   | 'insurance'
   | 'security';
@@ -44,6 +49,7 @@ const PAGES: readonly LaptopPage[] = [
   'tasks',
   'stock',
   'drawings',
+  'team',
   'website',
   'insurance',
   'security',
@@ -56,23 +62,25 @@ export function laptopPageFrom(value: string): LaptopPage {
 /** The three big tiles and the pages behind them. */
 type HomePage = 'tasks' | 'stock' | 'drawings';
 
-/** The order is the contract: Tasks, Stock, Drawings, left to right (CLAUDE.md T14 1). */
-export const HOME_TILES: ReadonlyArray<{ page: HomePage; label: string }> = [
-  { page: 'tasks', label: 'Tasks' },
-  { page: 'stock', label: 'Stock' },
-  { page: 'drawings', label: 'Drawings' },
+/** The order is the contract: Tasks, Stock, Drawings, left to right (CLAUDE.md T14 1). The count
+ *  is the field of `laptopHome` the red corner shows while it is above zero (CLAUDE.md T15 2.3). */
+export const HOME_TILES: ReadonlyArray<{ page: HomePage; label: string; count: keyof LaptopHome }> = [
+  { page: 'tasks', label: 'Tasks', count: 'tasksOpen' },
+  { page: 'stock', label: 'Stock', count: 'lowLines' },
+  { page: 'drawings', label: 'Drawings', count: 'drawingsWaiting' },
 ];
 
-/** The Office group, in the order the brief names it, each opening what it opened in Turn 13:
- *  the Team board, the three Admin pages, the software line (which is on the Team board's
- *  Technical tab, REPORT-T13 T13-B2a) and the Settings modal (CLAUDE.md T14 2.1). */
+/** The Office group, in the order the brief names it: the Team and the three Admin pages open
+ *  inside the laptop; Joinery Core is the software line on the Team's Technical tab (REPORT-T13
+ *  T13-B2a), so it opens that page on that tab; Settings is the top bar's gear and stays a modal
+ *  of its own (CLAUDE.md T14 2.1, T15 2.3). */
 export const OFFICE_GROUP: ReadonlyArray<{
   id: string;
   label: string;
   action: string;
   extra: string;
 }> = [
-  { id: 'team', label: 'Team', action: 'openModal', extra: 'data-modal="team"' },
+  { id: 'team', label: 'Team', action: 'laptopPage', extra: 'data-id="team"' },
   { id: 'website', label: 'Website', action: 'laptopPage', extra: 'data-id="website"' },
   { id: 'insurance', label: 'Insurance', action: 'laptopPage', extra: 'data-id="insurance"' },
   { id: 'security', label: 'Security', action: 'laptopPage', extra: 'data-id="security"' },
@@ -80,21 +88,55 @@ export const OFFICE_GROUP: ReadonlyArray<{
   { id: 'settings', label: 'Settings', action: 'openSettings', extra: '' },
 ];
 
+/** What a page is called in its header, off the two tile tables and nowhere else. */
+const PAGE_TITLES: Record<Exclude<LaptopPage, 'home'>, string> = {
+  tasks: 'Tasks',
+  stock: 'Stock',
+  drawings: 'Drawings',
+  team: 'Team',
+  website: 'Website',
+  insurance: 'Insurance',
+  security: 'Security',
+};
+
+function icon(paths: string): string {
+  return (
+    '<svg class="screen-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" ' +
+    'stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+    `${paths}</svg>`
+  );
+}
+
 /** The flat line icons of the three tiles, from the mockup: a list, a rack, a drawing. Inline,
  *  drawn in the tile's own colour of ink, which the stylesheet makes white. */
 const ICONS: Record<HomePage, string> = {
-  tasks:
-    '<svg class="screen-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" ' +
-    'stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
-    '<path d="M4 6h2M10 6h10M4 12h2M10 12h10M4 18h2M10 18h10" /></svg>',
-  stock:
-    '<svg class="screen-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" ' +
-    'stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
-    '<path d="M4 3v18M20 3v18M4 9h16M4 15h16M4 21h16M7 6h10v3H7zM7 12h10v3H7z" /></svg>',
-  drawings:
-    '<svg class="screen-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" ' +
-    'stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
-    '<path d="M5 3h10l4 4v14H5z M15 3v4h4 M8 11h8v6H8z M8 11l8 6" /></svg>',
+  tasks: icon('<path d="M4 6h2M10 6h10M4 12h2M10 12h10M4 18h2M10 18h10" />'),
+  stock: icon('<path d="M4 3v18M20 3v18M4 9h16M4 15h16M4 21h16M7 6h10v3H7zM7 12h10v3H7z" />'),
+  drawings: icon('<path d="M5 3h10l4 4v14H5z M15 3v4h4 M8 11h8v6H8z M8 11l8 6" />'),
+};
+
+/** The line icons of the six Office tiles, from mockup C: people, a globe, a shield, a lock, a
+ *  monitor and a gear, in the game's green above the label (CLAUDE.md T15 2.3). */
+const OFFICE_ICONS: Record<string, string> = {
+  team: icon(
+    '<circle cx="9" cy="8" r="3.5" /><circle cx="17" cy="9" r="2.5" />' +
+      '<path d="M3 20c0-4 3-6 6-6s6 2 6 6M15 20c0-3 1.5-4.5 4-4.5s3 1.5 3 4.5" />',
+  ),
+  website: icon(
+    '<circle cx="12" cy="12" r="8.5" /><path d="M3.5 12h17M12 3.5c3 3 3 14 0 17M12 3.5c-3 3-3 14 0 17" />',
+  ),
+  insurance: icon(
+    '<path d="M12 3l8 3v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6z" /><path d="M8.5 12l2.5 2.5 4.5-5" />',
+  ),
+  security: icon(
+    '<rect x="5" y="10" width="14" height="11" rx="2" /><path d="M8 10V7a4 4 0 018 0v3" />' +
+      '<circle cx="12" cy="15.5" r="1.5" />',
+  ),
+  joineryCore: icon('<rect x="3" y="5" width="18" height="12" rx="2" /><path d="M7 20h10M12 17v3M6 9h12M6 13h7" />'),
+  settings: icon(
+    '<circle cx="12" cy="12" r="3" />' +
+      '<path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1" />',
+  ),
 };
 
 /** Who has this one, and how much of his day is left (CLAUDE.md T2 3.8). */
@@ -172,8 +214,15 @@ function drawingsLine(home: LaptopHome): string {
   return `${home.drawingsWaiting} waiting for a list`;
 }
 
+/** The red round count in the top right corner of a big tile, while there is something to do.
+ *  At zero there is no element at all, not a hidden one (CLAUDE.md T15 2.3). */
+function countBadge(page: HomePage, count: number): string {
+  if (count === 0) return '';
+  return `<span class="screen-tile-count" data-count="${page}">${count}</span>`;
+}
+
 /** Home: the company and the game's clock in one small line, the three big tiles, and the Office
- *  group under a rule. Every figure on it is the engine's (CLAUDE.md T14 2.1). */
+ *  group under a rule. Every figure on it is the engine's (CLAUDE.md T14 2.1, T15 2.3). */
 function homeScreen(state: GameState): string {
   const home = laptopHome(state);
   const lines: Record<HomePage, string> = {
@@ -185,6 +234,7 @@ function homeScreen(state: GameState): string {
     (tile) =>
       `<button class="screen-tile screen-tile-${tile.page}" data-do="laptopPage" ` +
       `data-id="${tile.page}" data-tile="${tile.page}">` +
+      countBadge(tile.page, home[tile.count]) +
       ICONS[tile.page] +
       `<span class="screen-tile-big">${tile.label}</span>` +
       `<span class="screen-tile-small" data-line="${tile.page}">${lines[tile.page]}</span>` +
@@ -194,7 +244,8 @@ function homeScreen(state: GameState): string {
     (tile) =>
       `<button class="screen-small-tile" data-do="${tile.action}"` +
       `${tile.extra === '' ? '' : ` ${tile.extra}`} data-tile="${tile.id}">` +
-      `${escapeHtml(tile.label)}</button>`,
+      (OFFICE_ICONS[tile.id] ?? '') +
+      `<span class="screen-small-label">${escapeHtml(tile.label)}</span></button>`,
   ).join('');
   return (
     '<p class="screen-status">' +
@@ -212,11 +263,22 @@ const BACK_HOME =
   '<button class="screen-back" data-do="laptopPage" data-id="home" data-tile="home">' +
   '← Home</button>';
 
+/** The header of every page but home: the back arrow first, in the same place on every page, and
+ *  the page's name (CLAUDE.md T15 2.3). */
+function pageHead(page: Exclude<LaptopPage, 'home'>): string {
+  return (
+    `<header class="screen-page-head">${BACK_HOME}` +
+    `<h2 class="screen-page-title">${PAGE_TITLES[page]}</h2></header>`
+  );
+}
+
 export interface LaptopView {
   page: LaptopPage;
   /** What the player has typed into the sheet count on the Stock page. Read by nothing since
    *  Turn 13 (REPORT-T13 section 10); the page has no free form order any more. */
   stockSheets: string;
+  /** Which of the Team's four tabs is on top (CLAUDE.md T10 3.6, T15 2.3). */
+  teamTab: TeamTab;
 }
 
 /** A page behind a tile, as Turn 13 left it: the screen skin is all it inherits (T14 2.1). */
@@ -228,6 +290,8 @@ function pageBody(state: GameState, page: Exclude<LaptopPage, 'home'>, view: Lap
       return renderMaterials(state, view.stockSheets);
     case 'drawings':
       return renderDrawings(state);
+    case 'team':
+      return renderTeam(state, view.teamTab);
     case 'website':
       return renderWebsite(state);
     case 'insurance':
@@ -239,6 +303,8 @@ function pageBody(state: GameState, page: Exclude<LaptopPage, 'home'>, view: Lap
 
 export function renderLaptop(state: GameState, view: LaptopView): string {
   const inside =
-    view.page === 'home' ? homeScreen(state) : BACK_HOME + pageBody(state, view.page, view);
+    view.page === 'home'
+      ? homeScreen(state)
+      : pageHead(view.page) + pageBody(state, view.page, view);
   return `<div class="laptop-screen" data-laptop-page="${view.page}">${inside}</div>`;
 }

@@ -196,7 +196,9 @@ describe('home first', () => {
     expect(node.querySelector('.screen-rule')).not.toBeNull();
     expect(node.querySelector('.screen-group')?.textContent).toBe('Office');
     const small = Array.from(node.querySelectorAll('.screen-small-tiles .screen-small-tile'));
-    expect(small.map((tile) => tile.textContent)).toEqual([
+    // An icon above every label, from mockup C (CLAUDE.md T15 2.3).
+    for (const tile of small) expect(tile.querySelector('svg.screen-icon'), tile.textContent ?? '').not.toBeNull();
+    expect(small.map((tile) => tile.querySelector('.screen-small-label')?.textContent)).toEqual([
       'Team',
       'Website',
       'Insurance',
@@ -216,11 +218,13 @@ describe('home first', () => {
 });
 
 describe('every Office tile opens its thing', () => {
-  it('Team opens the Team board', () => {
+  it('Team opens the Team page inside the laptop, with the back arrow', () => {
     openLaptop();
     click('[data-modal="laptop"] [data-tile="team"]');
-    expect(openModalId()).toBe('team');
-    expect(root().innerHTML).toContain('Taking somebody on');
+    expect(openModalId()).toBe('laptop');
+    expect(laptop().querySelector('.laptop-screen[data-laptop-page="team"]')).not.toBeNull();
+    expect(laptop().textContent).toContain('Taking somebody on');
+    expect(laptop().querySelector('.screen-back')?.textContent).toBe('← Home');
   });
 
   it('Website, Insurance and Security open those pages inside the laptop, with the back arrow', () => {
@@ -238,16 +242,17 @@ describe('every Office tile opens its thing', () => {
     }
   });
 
-  it('Joinery Core opens the software line, which is the Technical tab of the Team board', () => {
+  it('Joinery Core opens the software line, which is the Technical tab of the Team page', () => {
     openLaptop();
     click('[data-modal="laptop"] [data-tile="joineryCore"]');
-    expect(openModalId()).toBe('team');
-    expect(root().querySelector('[data-do="teamTab"][data-id="technical"]')?.className).toContain('is-on');
-    expect(root().innerHTML).toContain('data-do="buyJoineryCore"');
-    // Inside the board the chip is still the tab, and nothing more.
-    click('[data-do="teamTab"][data-id="office"]');
-    expect(openModalId()).toBe('team');
-    expect(root().querySelector('[data-do="teamTab"][data-id="office"]')?.className).toContain('is-on');
+    expect(openModalId()).toBe('laptop');
+    expect(laptop().querySelector('.laptop-screen[data-laptop-page="team"]')).not.toBeNull();
+    expect(laptop().querySelector('[data-do="teamTab"][data-id="technical"]')?.className).toContain('is-on');
+    expect(laptop().innerHTML).toContain('data-do="buyJoineryCore"');
+    // Inside the page the chip is still the tab, and nothing more.
+    click('[data-modal="laptop"] [data-do="teamTab"][data-id="office"]');
+    expect(openModalId()).toBe('laptop');
+    expect(laptop().querySelector('[data-do="teamTab"][data-id="office"]')?.className).toContain('is-on');
   });
 
   it('Settings opens the Settings modal', () => {
@@ -292,7 +297,7 @@ describe('the tiles are the navigation', () => {
     expect(spelled).toEqual([]);
     const tabBars = readFileSync('src/ui/laptop.ts', 'utf8');
     expect(tabBars).not.toContain('tabBar(');
-    expect(laptopPageFrom('team')).toBe('home');
+    expect(laptopPageFrom('team')).toBe('team');
     expect(laptopPageFrom('materials')).toBe('home');
     expect(laptopPageFrom('stock')).toBe('stock');
   });
@@ -305,7 +310,7 @@ describe('no handwriting inside the screen', () => {
     expect(title).toContain('Patrick Hand');
     expect(system).toContain('system-ui');
     let headings = 0;
-    for (const page of ['home', 'tasks', 'stock', 'drawings', 'website', 'insurance', 'security']) {
+    for (const page of ['home', 'tasks', 'stock', 'drawings', 'team', 'website', 'insurance', 'security']) {
       openLaptop();
       if (page !== 'home') click(`[data-modal="laptop"] [data-tile="${page}"]`);
       const inside = laptop().querySelectorAll('.laptop-screen h1, .laptop-screen h2, .laptop-screen h3, .laptop-screen h4');

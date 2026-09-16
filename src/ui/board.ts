@@ -48,8 +48,9 @@ function blockLink(enquiry: Enquiry): string {
   if (enquiry.blockWhere === 'catalogue') {
     return button('openModal', 'Open the catalogue', 'data-modal="catalogue"');
   }
+  // The team is a page of the laptop (CLAUDE.md T15 2.3).
   if (enquiry.blockWhere === 'team') {
-    return button('openModal', 'Open the team', 'data-modal="team"');
+    return button('laptopPage', 'Open the team', 'data-id="team"');
   }
   // The covers are bought on the laptop, under Admin (CLAUDE.md T13 3.15).
   if (enquiry.blockReason === NO_INSURANCE_REASON) {

@@ -24,8 +24,8 @@ function withJob(): GameState {
 describe('the drawings in the laptop', () => {
   it('is the Drawings page of the laptop, and the Tasks page has none of it', () => {
     const state = withJob();
-    const drawings = parse(renderLaptop(state, { page: 'drawings', stockSheets: '6' }));
-    const tasks = parse(renderLaptop(state, { page: 'tasks', stockSheets: '6' }));
+    const drawings = parse(renderLaptop(state, { page: 'drawings', stockSheets: '6', teamTab: 'workshop' }));
+    const tasks = parse(renderLaptop(state, { page: 'tasks', stockSheets: '6', teamTab: 'workshop' }));
     expect(drawings.innerHTML).toContain('Design queue');
     expect(drawings.innerHTML).toContain('Design: Garage shelves');
     expect(tasks.innerHTML).not.toContain('Design queue');
@@ -42,7 +42,7 @@ describe('the drawings in the laptop', () => {
     const state = withJob();
     expect(parse(renderDrawings(state)).innerHTML).toContain('One off licence');
     expect(
-      parse(renderLaptop(state, { page: 'tasks', stockSheets: '6' })).innerHTML,
+      parse(renderLaptop(state, { page: 'tasks', stockSheets: '6', teamTab: 'workshop' })).innerHTML,
     ).not.toContain('One off licence');
   });
 

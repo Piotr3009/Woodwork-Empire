@@ -3303,6 +3303,9 @@ input.num {
   --screen-dim: #5a625a;
   /* The one accent of the software: buttons that are on, links, hover [TUNE]. */
   --screen-accent: #2b6cb0;
+  /* The game's green inside the screen: the Office icons, the Team's segments and its Hire
+     buttons [TUNE]. */
+  --screen-green: #1f5a3a;
   /* The gap between the three big tiles: TILE_GAP, 24 px [TUNE]. */
   --screen-tile-gap: 24px;
   /* The three tiles: the game's green, and two of the brief [TUNE]. */
@@ -3424,7 +3427,31 @@ input.num {
   justify-content: flex-end;
   min-height: 190px;
   padding: 18px 20px;
+  position: relative;
   text-align: left;
+}
+
+/* The red round count in the top right corner of a big tile, while there is something to do:
+   TILE_COUNT 34 px tall, at least as wide, white bold at the lead size, a 2 px white ring and a
+   shadow. At zero it is not rendered at all (CLAUDE.md T15 2.3) [TUNE]. */
+.screen-tile-count {
+  align-items: center;
+  background: var(--bad);
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  border-radius: 999px;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.35);
+  color: #fff;
+  display: inline-flex;
+  font-size: var(--fs-lead);
+  font-weight: 800;
+  height: 34px;
+  justify-content: center;
+  line-height: 1;
+  min-width: 34px;
+  padding: 0 9px;
+  position: absolute;
+  right: 12px;
+  top: 12px;
 }
 
 .screen-tile:hover {
@@ -3487,17 +3514,31 @@ input.num {
 }
 
 .screen-small-tile {
+  align-items: center;
   background: #fff;
   border: 1px solid var(--screen-line);
   border-radius: 10px;
   color: var(--screen-ink);
   cursor: pointer;
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
   font-family: var(--font-ui);
   font-size: var(--fs-body);
   font-weight: 600;
+  gap: 8px;
   min-width: 132px;
-  padding: 14px 16px;
-  text-align: left;
+  padding: 14px 10px;
+  text-align: center;
+}
+
+/* The line icon of an Office tile, in the game's green above the label, 30 px (CLAUDE.md T15
+   2.3) [TUNE]. */
+.screen-small-tile .screen-icon {
+  color: var(--screen-green);
+  height: 30px;
+  margin: 0;
+  width: 30px;
 }
 
 .screen-small-tile:hover {
@@ -3505,20 +3546,38 @@ input.num {
   color: var(--screen-accent);
 }
 
-/* The back arrow at the top left of a page. */
+/* The header of every page but home: the back arrow first, at the top left, in the same place
+   on every page, and the page's name beside it (CLAUDE.md T15 2.3). */
+.screen-page-head {
+  align-items: center;
+  display: flex;
+  gap: 14px;
+  margin: 0 0 12px;
+}
+
+.screen-page-title {
+  font-size: var(--fs-lead);
+  font-weight: 600;
+  margin: 0;
+}
+
+/* The back arrow: a white button of the software with the arrow glyph. */
 .screen-back {
-  background: none;
-  border: 0;
-  color: var(--screen-accent);
+  background: #fff;
+  border: 1px solid #cfd6cf;
+  border-radius: 8px;
+  color: var(--screen-green);
   cursor: pointer;
   font-family: var(--font-ui);
   font-size: var(--fs-body);
-  margin: 0 0 10px;
-  padding: 0;
+  font-weight: 600;
+  margin: 0;
+  padding: 6px 12px;
 }
 
 .screen-back:hover {
-  text-decoration: underline;
+  border-color: var(--screen-accent);
+  color: var(--screen-accent);
 }
 
 /* The pages behind the tiles inherit the screen and nothing else: flat white cards and rows on
@@ -3616,6 +3675,65 @@ input.num {
 .modal-screen .warning,
 .modal-screen .lock {
   color: var(--bad);
+}
+
+/* The Team page inside the screen (PIOTR, 16.09: "we are in the laptop, so it does not match";
+   CLAUDE.md T15 2.3): the four tabs as the screen's segmented control, the draw chips as the
+   screen's buttons, the hire cards as white panels with Hire in the game's green. The content is
+   as Turn 13 left it. */
+.modal-screen .tabs {
+  background: #fff;
+  border: 1px solid #cfd6cf;
+  border-bottom: 1px solid #cfd6cf;
+  border-radius: 10px;
+  display: inline-flex;
+  gap: 4px;
+  margin: 0 0 16px;
+  padding: 4px;
+}
+
+.modal-screen .tabs .chip {
+  background: transparent;
+  border: 0;
+  border-radius: 7px;
+  color: #444;
+  font-weight: 600;
+  padding: 7px 16px;
+}
+
+.modal-screen .tabs .chip.is-on,
+.modal-screen .tabs .chip.is-on:hover:not([disabled]) {
+  background: var(--screen-green);
+  color: #fff;
+}
+
+.modal-screen .draw-tier,
+.modal-screen .shift-chip {
+  background: #eef2ee;
+  border: 1px solid #cfd6cf;
+  border-radius: 8px;
+  font-weight: 600;
+  padding: 7px 14px;
+}
+
+.modal-screen .draw-tier.is-on,
+.modal-screen .shift-chip.is-on {
+  background: var(--screen-green);
+  border-color: var(--screen-green);
+  color: #fff;
+}
+
+.modal-screen .tile-action .btn:not([disabled]) {
+  background: var(--screen-green);
+  border-color: var(--screen-green);
+  color: #fff;
+  font-weight: 700;
+}
+
+.modal-screen .tile-action .btn:not([disabled]):hover {
+  background: #2f6b48;
+  border-color: #2f6b48;
+  color: #fff;
 }
 
 /* The first use bubble on a screen of the laptop is a flat white panel, not a cream one, with the
