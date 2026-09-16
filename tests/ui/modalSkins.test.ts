@@ -94,7 +94,7 @@ describe('the three skins', () => {
     }
   });
 
-  it('gives the company board the felt picture, and nothing else', () => {
+  it('gives the company board the felt, and nothing else', () => {
     goTo('office');
     click('[data-office="company"]');
     dismissEvents();

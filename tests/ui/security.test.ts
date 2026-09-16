@@ -19,7 +19,7 @@ function parse(html: string): HTMLElement {
 describe('the security tab', () => {
   it('is a page of the laptop behind its Security tile, and lists the six levels with the one held marked', () => {
     const state = newGame({ difficulty: 'veryEasy' });
-    const laptop = parse(renderLaptop(state, { page: 'security', stockSheets: '' }));
+    const laptop = parse(renderLaptop(state, { page: 'security', stockSheets: '', teamTab: 'workshop' }));
     expect(laptop.querySelector('.laptop-screen[data-laptop-page="security"]')).not.toBeNull();
     expect(laptop.querySelector('[data-tile="home"]')).not.toBeNull();
     const cards = Array.from(laptop.querySelectorAll('.security-level'));

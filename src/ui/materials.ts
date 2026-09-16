@@ -30,8 +30,9 @@ function thumbnail(line: StockLine): string {
 
 /** One stock line, as the software the player is meant to recognise would show it. */
 function stockRow(line: StockLine): string {
+  // A badge is red with white text in itself (CLAUDE.md T15 2.2): no colour class beside it.
   const badge = line.low
-    ? `<span class="badge badge-low bad">Low stock, under ${line.lowUnder}</span>`
+    ? `<span class="badge badge-low">Low stock, under ${line.lowUnder}</span>`
     : '';
   return (
     `<div class="stock-line" data-stock="${line.kind}">` +

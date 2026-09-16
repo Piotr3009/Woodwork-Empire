@@ -127,7 +127,8 @@ describe('the jobs the workshop cannot take', () => {
       );
     }
     if (greyed.blockWhere === 'team') {
-      expect(tile?.querySelector('[data-do="openModal"]')?.getAttribute('data-modal')).toBe('team');
+      // The team is a page of the laptop (CLAUDE.md T15 2.3).
+      expect(tile?.querySelector('[data-do="laptopPage"]')?.getAttribute('data-id')).toBe('team');
     }
     // And the head says how many of them there are.
     expect(page.textContent).toContain('the workshop cannot take yet');

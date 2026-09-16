@@ -226,14 +226,18 @@ describe('the laptop tiles', () => {
     click('[data-do="closeModal"]');
   });
 
-  it('opens the Team board off the Office tile, because the team is a page of its own', () => {
+  it('opens the Team page inside the laptop off the Office tile', () => {
     click('[data-office="laptop"]');
     click('[data-modal="laptop"] [data-tile="team"]');
-    // One click, and it is the Team board and not a page inside the laptop (CLAUDE.md T10 3.6,
-    // T14 2.1).
-    expect(openModalId()).toBe('team');
+    // One click, and it is a page inside the laptop like every other, and no modal of its own
+    // (PIOTR, 16.09; CLAUDE.md T15 2.3).
+    expect(openModalId()).toBe('laptop');
+    expect(root().querySelector('[data-laptop-page="team"]')).not.toBeNull();
     expect(html()).toContain('Taking somebody on');
     expect(html()).toContain('data-do="teamTab"');
+    expect(html()).not.toContain('data-modal="team"');
+    click('[data-modal="laptop"] [data-tile="home"]');
+    expect(root().querySelector('[data-laptop-page="home"]')).not.toBeNull();
     click('[data-do="closeModal"]');
   });
 

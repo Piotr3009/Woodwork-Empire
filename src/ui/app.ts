@@ -74,7 +74,7 @@ import { type CatalogueTab, CATALOGUE_FIRST_TAB, catalogueTabFrom, renderCatalog
 import { renderDayEnd, renderDaySummary, renderGameOver } from './dayEnd';
 import { renderEvent, renderEventFooter } from './eventModal';
 import { type LaptopPage, laptopPageFrom, renderLaptop } from './laptop';
-import { type TeamTab, renderTeam, teamTabFrom } from './team';
+import { type TeamTab, teamTabFrom } from './team';
 import { renderSpriteCheck } from './spriteCheck';
 import { renderWorkPlan } from './workPlan';
 import {
@@ -111,8 +111,9 @@ import { cloudAvailable } from '../cloud/supabase';
 import { hasSave, loadGame, saveGame, sendMagicLink, signOut, signedInEmail } from '../cloud/saves';
 import { type TopbarNews, renderMenu, renderTopbar, speedFromString } from './topbar';
 
-/** The modals the room can open. Materials, Team and Drawings are tabs inside the laptop now:
- *  one path per modal, only the entry moved (docs/art/SPRITES.md 8.4). */
+/** The modals the room can open. Materials, Drawings and, from Turn 15, the Team are pages inside
+ *  the laptop: one path per page, only the entry moved (docs/art/SPRITES.md 8.4; CLAUDE.md T15
+ *  2.3). */
 type ModalId =
   | 'board'
   | 'laptop'
@@ -121,8 +122,6 @@ type ModalId =
   | 'catalogue'
   | 'shopping'
   | 'company'
-  /** The team, in tabs by trade (PIOTR, 13.09; CLAUDE.md T10 3.6). */
-  | 'team'
   /** The gear on the top bar: tips on and off (CLAUDE.md T13 3.22). */
   | 'settings';
 
@@ -138,7 +137,6 @@ const TIP_KEY_OF_MODAL: Partial<Record<ModalId, string>> = {
   catalogue: 'catalogue',
   workPlan: 'workPlan',
   board: 'board',
-  team: 'team',
   settings: 'settings',
 };
 
@@ -171,6 +169,7 @@ interface Ui {
   /** Which page of the laptop is on its screen. It opens on home every time, with no memory of
    *  the last page (CLAUDE.md T14 2.1). */
   laptopPage: LaptopPage;
+  /** Which of the Team's four tabs is on top, on the laptop's team page (CLAUDE.md T15 2.3). */
   teamTab: TeamTab;
   /** Which tab of the equipment catalogue is on top, and which family folder is open inside it
    *  (CLAUDE.md T6 3.6, T7 3.7). */
@@ -240,7 +239,6 @@ const MODAL_TITLES: Record<ModalId, string> = {
   catalogue: 'Equipment catalogue',
   shopping: 'On order',
   company: 'Company board',
-  team: 'Team',
   settings: 'Settings',
 };
 
@@ -257,8 +255,6 @@ export const MODAL_IS_FULL: Record<ModalId, boolean> = {
   catalogue: true,
   shopping: true,
   company: true,
-  // The team is a page of the game now, not a tab of the laptop (CLAUDE.md T10 3.6).
-  team: true,
   settings: false,
 };
 
@@ -389,33 +385,42 @@ function batched(work: () => void): void {
 // Rendering
 // ---------------------------------------------------------------------------
 
+/** The one order for a screen and its first use bubble: the body first and the bubble after it,
+ *  the last child of the body, where there is room. The top is for what matters, not for tips
+ *  (PIOTR, 16.09; CLAUDE.md T15 2.2). Every screen with a bubble comes through here, so the order
+ *  cannot differ between screens. */
+function withTip(body: string, current: GameState, key: string): string {
+  return body + renderTip(current, key);
+}
+
 function modalBody(id: ModalId, current: GameState): string {
   switch (id) {
     case 'board':
       return (
         tabBar('boardTab', BOARD_TABS, ui.boardTab) +
         (ui.boardTab === 'contracts'
-          ? renderTip(current, 'contracts') + renderContracts(current)
+          ? withTip(renderContracts(current), current, 'contracts')
           : renderBoard(current, ui.filters.board ?? ''))
       );
     case 'laptop':
-      return renderLaptop(current, { page: ui.laptopPage, stockSheets: ui.stockSheets });
+      return renderLaptop(current, {
+        page: ui.laptopPage,
+        stockSheets: ui.stockSheets,
+        teamTab: ui.teamTab,
+      });
     case 'workPlan':
       return renderWorkPlan(current, ui.dropConfirm);
-    case 'accounting':
-      return (
-        (ui.accountingTab === 'finance' ? renderTip(current, 'finance') : '') +
-        renderAccounting(
-          current,
-          ui.arrearsAmount,
-          ui.accountingTab,
-          ui.openDays,
-          ui.accountingMonth,
-          ui.loanAmount,
-        )
+    case 'accounting': {
+      const books = renderAccounting(
+        current,
+        ui.arrearsAmount,
+        ui.accountingTab,
+        ui.openDays,
+        ui.accountingMonth,
+        ui.loanAmount,
       );
-    case 'team':
-      return renderTeam(current, ui.teamTab);
+      return ui.accountingTab === 'finance' ? withTip(books, current, 'finance') : books;
+    }
     case 'catalogue':
       return renderCatalogue(
         current,
@@ -612,10 +617,11 @@ function modalSpecs(): ModalSpec[] {
     // The first use bubble of the screen, over its body, until it is dismissed (T13 3.22).
     const tipKey =
       ui.modal === 'laptop' ? laptopTipKey(ui.laptopPage) : TIP_KEY_OF_MODAL[ui.modal] ?? '';
+    const body = modalBody(ui.modal, current);
     specs.push({
       id: ui.modal,
       title: MODAL_TITLES[ui.modal],
-      body: (tipKey === '' ? '' : renderTip(current, tipKey)) + modalBody(ui.modal, current),
+      body: tipKey === '' ? body : withTip(body, current, tipKey),
       full: MODAL_IS_FULL[ui.modal],
       position: ui.modalPosition,
     });
@@ -643,8 +649,12 @@ function modalSpecs(): ModalSpec[] {
       id: 'event',
       title: houseCard ? 'Home' : event.title,
       body: houseCard
-        ? renderTip(current, 'house') + renderHouseCard(current) +
-          '<p class="choices"><button class="btn" data-do="closeHouseCard">The summary</button></p>'
+        ? withTip(
+            renderHouseCard(current) +
+              '<p class="choices"><button class="btn" data-do="closeHouseCard">The summary</button></p>',
+            current,
+            'house',
+          )
         : event.kind === 'dayEnd'
           ? renderDayEnd(current)
           : event.kind === 'monthEnd'
@@ -1067,6 +1077,16 @@ function openModal(id: ModalId): void {
   }
 }
 
+/** The one way onto a page of the laptop: a tile, the back arrow, the Joinery Core tile onto the
+ *  Team's Technical tab, and the order board's "Open the team" all come through here. The lid is
+ *  lifted first when the laptop is not open, which is what boots it (CLAUDE.md T15 2.3). A new
+ *  page starts at the top rather than where the last one was scrolled. */
+function openLaptopPage(page: LaptopPage): void {
+  if (ui.modal !== 'laptop') openModal('laptop');
+  ui.laptopPage = page;
+  ui.scrollModalTop = true;
+}
+
 /** Shutting a modal, however it was shut: the cross, Escape, or a Start production that takes the
  *  player straight to the bench. One path, so the game is written down every time (T11 3.2). */
 function shutModal(): void {
@@ -1275,9 +1295,8 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
     }
     case 'laptopPage':
       // A tile opens its page full screen inside the laptop, and the back arrow is the same
-      // click with home for a page (CLAUDE.md T14 2.1).
-      ui.laptopPage = laptopPageFrom(id);
-      ui.scrollModalTop = true;
+      // click with home for a page (CLAUDE.md T14 2.1, T15 2.3).
+      openLaptopPage(laptopPageFrom(id));
       break;
     case 'ownedTab':
       ui.ownedTab = id;
@@ -1304,11 +1323,10 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
       return;
     }
     case 'teamTab':
+      // A tab of the Team page; off the laptop's Joinery Core tile it is the Technical tab, where
+      // Turn 13 put the software line, and the page comes up with it (CLAUDE.md T14 2.1, T15 2.3).
       ui.teamTab = teamTabFrom(id);
-      ui.scrollModalTop = true;
-      // Off the laptop's Joinery Core tile the chip opens the board on its Technical tab, where
-      // Turn 13 put the software line (CLAUDE.md T14 2.1); inside the board it is the tab.
-      if (ui.modal !== 'team') openModal('team');
+      openLaptopPage('team');
       break;
     case 'catalogueTab':
       ui.catalogueTab = catalogueTabFrom(id);

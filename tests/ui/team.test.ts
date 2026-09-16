@@ -18,7 +18,7 @@ import { jobTasks, taskWorkRate } from '../../src/engine/tasks';
 import { renderTeam, tradeOf } from '../../src/ui/team';
 import { money } from '../../src/ui/modal';
 import { officeDoor } from '../../src/render/hall';
-import { MODAL_IS_FULL } from '../../src/ui/app';
+import { laptopPageFrom } from '../../src/ui/laptop';
 import type { GameState, Worker } from '../../src/engine/index';
 import {
   acceptNow,
@@ -46,8 +46,9 @@ function known(reputation = 40): GameState {
 }
 
 describe('the board itself', () => {
-  it('is a page of the game and has the three tabs Piotr named, and the Technical one', () => {
-    expect(MODAL_IS_FULL.team).toBe(true);
+  it('is a page of the laptop and has the three tabs Piotr named, and the Technical one', () => {
+    // A page inside the laptop's screen since Turn 15, not a modal (CLAUDE.md T15 2.3).
+    expect(laptopPageFrom('team')).toBe('team');
     const page = parse(renderTeam(known(), 'workshop'));
     const tabs = Array.from(page.querySelectorAll('[data-do="teamTab"]'));
     // The estimator's tab joined in Turn 13 (CLAUDE.md T13 3.8).

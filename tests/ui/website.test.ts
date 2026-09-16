@@ -42,7 +42,7 @@ describe('the Website tab', () => {
     expect(text(rungs[1])).toContain('Held');
     expect(text(rungs[0])).toContain('Outgrown');
     // And the page is the laptop's, behind the Website tile of its Office group (T14 2.1).
-    expect(renderLaptop(state, { page: 'website', stockSheets: '' })).toContain('website-level');
+    expect(renderLaptop(state, { page: 'website', stockSheets: '', teamTab: 'workshop' })).toContain('website-level');
   });
 
   it('colours every effect by its sign, and prints a reputation line only at 4 and 5', () => {

@@ -375,10 +375,10 @@ describe('the modals', () => {
       click('[data-modal="laptop"] [data-tile="home"]');
     }
     click('[data-modal="laptop"] [data-tile="team"]');
-    expect(html()).toContain('data-modal="team"');
+    expect(html()).toContain('data-laptop-page="team"');
+    expect(html()).not.toContain('data-modal="team"');
     expect(html()).toContain('Taking somebody on');
-    click('[data-do="closeModal"]');
-    click('[data-office="laptop"]');
+    click('[data-modal="laptop"] [data-tile="home"]');
     click('[data-modal="laptop"] [data-tile="tasks"]');
     click('[data-do="closeModal"]');
   });

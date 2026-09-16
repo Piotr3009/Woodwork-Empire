@@ -64,7 +64,9 @@ describe('the stock page', () => {
     const low = fillRack(ready(), LOW_STOCK_SHEETS - 1);
     const badge = parse(renderMaterials(low, '')).querySelector('.badge-low');
     expect(badge).not.toBeNull();
-    expect(badge?.className).toContain('bad');
+    // The badge is red with white text in itself (CLAUDE.md T15 2.2): no colour class beside it,
+    // which painted red on red once the plate went red.
+    expect(badge?.className).toBe('badge badge-low');
     expect(text(badge)).toBe(`Low stock, under ${LOW_STOCK_SHEETS}`);
     const fine = fillRack(ready(), LOW_STOCK_SHEETS);
     expect(parse(renderMaterials(fine, '')).querySelector('.badge-low')).toBeNull();
@@ -134,7 +136,7 @@ describe('the stock page', () => {
       expect(html, gone).not.toContain(gone);
     }
     // And it is still the laptop's Stock tab, reached the one way (CLAUDE.md T4 3.1).
-    expect(renderLaptop(state, { page: 'stock', stockSheets: '6' })).toContain(
+    expect(renderLaptop(state, { page: 'stock', stockSheets: '6', teamTab: 'workshop' })).toContain(
       'data-stock="sheet"',
     );
   });

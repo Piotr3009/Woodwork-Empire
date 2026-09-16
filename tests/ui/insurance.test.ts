@@ -101,7 +101,7 @@ describe('the alarm line and the gate', () => {
   });
 
   it('is a page of the laptop, behind the Insurance tile of its Office group', () => {
-    const page = parse(renderLaptop(hall(), { page: 'insurance', stockSheets: '' }));
+    const page = parse(renderLaptop(hall(), { page: 'insurance', stockSheets: '', teamTab: 'workshop' }));
     expect(page.querySelector('.laptop-screen[data-laptop-page="insurance"]')).not.toBeNull();
     expect(page.querySelector('[data-tile="home"]')).not.toBeNull();
     expect(page.querySelectorAll('.insurance-line')).toHaveLength(2);

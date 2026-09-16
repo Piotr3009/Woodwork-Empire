@@ -77,7 +77,7 @@ describe('the size of every modal in the game', () => {
     }
   });
 
-  it('says full for the six the brief names, the team, and the laptop screen, and for nothing else', () => {
+  it('says full for the six the brief names and the laptop screen, and for nothing else', () => {
     expect(MODAL_IS_FULL).toEqual({
       board: true,
       catalogue: true,
@@ -85,8 +85,7 @@ describe('the size of every modal in the game', () => {
       shopping: true,
       accounting: true,
       company: true,
-      // The team is a page of the game from Turn 10, not a tab of the laptop (T10 3.6).
-      team: true,
+      // The team is a page of the laptop from Turn 15 (CLAUDE.md T15 2.3).
       // The laptop is a computer, and its screen fills the page (CLAUDE.md T14 2.1).
       laptop: true,
       // The settings are a small plate off the gear on the top bar (CLAUDE.md T13 3.22).

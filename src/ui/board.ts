@@ -48,8 +48,9 @@ function blockLink(enquiry: Enquiry): string {
   if (enquiry.blockWhere === 'catalogue') {
     return button('openModal', 'Open the catalogue', 'data-modal="catalogue"');
   }
+  // The team is a page of the laptop (CLAUDE.md T15 2.3).
   if (enquiry.blockWhere === 'team') {
-    return button('openModal', 'Open the team', 'data-modal="team"');
+    return button('laptopPage', 'Open the team', 'data-id="team"');
   }
   // The covers are bought on the laptop, under Admin (CLAUDE.md T13 3.15).
   if (enquiry.blockReason === NO_INSURANCE_REASON) {
@@ -69,13 +70,18 @@ function tile(state: GameState, enquiry: Enquiry): string {
     Math.round(
       ownerDaysFor(state, labourValueFor(enquiry.basePrice), enquiry.materialKind) * 10,
     ) / 10;
-  const express = enquiry.express ? '<span class="badge badge-warn tile-flag">Express</span>' : '';
+  // A rush is not a warning: Express is the accent orange at the top right (CLAUDE.md T15 2.2).
+  const express = enquiry.express
+    ? '<span class="badge badge-express tile-flag">Express</span>'
+    : '';
   const badges = [
-    // Commercial work says so on the tile (CLAUDE.md T13 3.15).
-    enquiry.kind === 'commercial' ? '<span class="badge">Commercial</span>' : '',
+    // Commercial work says so on the tile, and it is the kind of the job, not a warning
+    // (CLAUDE.md T13 3.15, T15 2.2).
+    enquiry.kind === 'commercial' ? '<span class="badge badge-kind">Commercial</span>' : '',
+    // The warnings, in the game's red so they can be read (PIOTR, 16.09; CLAUDE.md T15 2.2).
     enquiry.bespokeMaterial ? '<span class="badge">Bespoke material</span>' : '',
     enquiry.needsMeasure ? '<span class="badge">Site measure</span>' : '',
-    byHand ? '<span class="badge badge-warn">By hand, plus 50% time</span>' : '',
+    byHand ? '<span class="badge">By hand, plus 50% time</span>' : '',
   ].join('');
   // A job the company cannot take carries no Accept at all: it is on the board to be read
   // (PIOTR, 13.09; CLAUDE.md T10 3.7).
