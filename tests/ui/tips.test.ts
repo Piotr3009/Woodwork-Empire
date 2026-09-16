@@ -23,6 +23,8 @@ const SCREENS = [
   'house',
   'team',
   'settings',
+  // The first machine with no pipe to the extraction, under the hall (CLAUDE.md T16 2.3).
+  'unconnected',
 ];
 
 function parse(html: string): HTMLElement {
@@ -44,7 +46,7 @@ function click(selector: string): void {
 }
 
 describe('the first use bubbles', () => {
-  it('have one sentence each for the twelve screens of the brief', () => {
+  it('have one sentence each for the twelve screens of the brief, and the unconnected machine', () => {
     for (const key of SCREENS) {
       expect(TIPS[key], key).toBeTypeOf('string');
       expect((TIPS[key] ?? '').length, key).toBeGreaterThan(20);

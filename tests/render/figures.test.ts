@@ -39,11 +39,17 @@ describe('the figure of a man at work', () => {
     const bench = cutting.equipment.find((item) => item.specId === 'workbench');
     if (!saw || !bench) throw new Error('no kit in the hall');
     const atSaw = stationCell(cutting, cutting.owner.station, { x: 0, y: 0 });
-    // He is at the front edge of the saw itself, not at the corner of its working zone: a used
-    // saw is 2 by 1 of machine centred on 3 by 3 of floor (CLAUDE.md T7 3.3).
+    // He is at the front edge of the saw itself, on its right cell, not at the corner of its
+    // working zone: a used saw is 2 by 1 of machine centred on 3 by 3 of floor, and the operator
+    // of a saw stands at the right end of its front, back to the camera (CLAUDE.md T7 3.3; T16
+    // 2.1).
     const stands = footprintIn(saw);
-    expect(atSaw).toEqual({ x: Math.floor(stands.x), y: Math.floor(stands.y + stands.depth) });
+    expect({ x: atSaw.x, y: atSaw.y }).toEqual({
+      x: Math.floor(stands.x) + 1,
+      y: Math.floor(stands.y + stands.depth),
+    });
     expect(atSaw.y).toBeGreaterThan(saw.anchorY);
+    expect(['ne', 'nw']).toContain(atSaw.facing);
     const job = firstJob(cutting);
     job.labourRemaining = job.labourValue * 0.5;
     const assembling = tick(cutting, 1);
@@ -62,7 +68,7 @@ describe('the figure of a man at work', () => {
     // He waits beside the man who has it rather than on top of him.
     const working = stationCell(state, machineStation('tableSaw'), { x: 0, y: 0 });
     const waiting = stationCell(state, waitingStation('tableSaw'), { x: 0, y: 0 });
-    expect(waiting).not.toEqual(working);
+    expect({ x: waiting.x, y: waiting.y }).not.toEqual({ x: working.x, y: working.y });
     expect(waiting.y).toBe(working.y);
   });
 
@@ -88,6 +94,7 @@ describe('the figure of a man at work', () => {
     const finishing = tick(state, 1);
     expect(finishing.owner.station).toBe('bench');
     // Nothing but his bench, so the cell he is given is the bench cell he was handed.
-    expect(stationCell(finishing, STATION_BENCH, { x: 7, y: 7 })).toEqual({ x: 7, y: 7 });
+    const cell = stationCell(finishing, STATION_BENCH, { x: 7, y: 7 });
+    expect({ x: cell.x, y: cell.y }).toEqual({ x: 7, y: 7 });
   });
 });

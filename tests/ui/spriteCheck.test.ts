@@ -137,7 +137,9 @@ describe('the sprite check page', () => {
     expect(cells.map((cell) => cell.getAttribute('data-pipe-key'))).toEqual([...PIPE_LAYER_KEYS]);
     for (const cell of cells) {
       const key = cell.getAttribute('data-pipe-key') ?? '';
-      expect(cell.querySelector(`[data-placeholder="${key}"]`), key).not.toBeNull();
+      // Drawn by the pipe helper, as the hall draws it, until the file lands (CLAUDE.md T16 2.3).
+      expect(cell.querySelector(`[data-pipe-tile="${key}"]`), key).not.toBeNull();
+      expect(cell.querySelector('[data-placeholder]'), key).toBeNull();
       expect(cell.textContent, key).toContain(`${key}.png`);
     }
   });

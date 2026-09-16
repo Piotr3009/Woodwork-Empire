@@ -1,5 +1,6 @@
-// What the hall draws for Turn 13: the placeholders the art side has not painted yet, in the
-// hall's 2:1 dimetric and through the one helper (CLAUDE.md T13 1, 3.13).
+// What the hall draws for Turn 13 and Turn 16: the pipes as the one vector helper draws them until
+// the art side paints the tiles, and the placeholders of the pictures still owed (CLAUDE.md T13 1,
+// 3.13; T16 2.3).
 
 import { describe, expect, it } from 'vitest';
 import { gateCollars, objectArt, pipeCellArt, pipeRuns, renderHall } from '../../src/render/hall';
@@ -21,19 +22,20 @@ function pipedHall(fanClass: string): GameState {
 }
 
 describe('the pipe layer (CLAUDE.md T13 3.19)', () => {
-  it('maps every tile key to a placeholder draw in the hall dimetric, and to the file once it lands', () => {
+  it('maps every tile key to the vector helper, up in the air, and to the file once it lands', () => {
     for (const key of PIPE_TILE_KEYS) {
       const drawn = pipeCellArt(key, { x: 3, y: 4 }, []);
-      expect(drawn, key).toContain(`data-placeholder="${key}"`);
       expect(drawn, key).toContain(`data-pipe-tile="${key}"`);
-      // The 2:1 diamond of the placeholder helper, never a flat rectangle.
-      expect(drawn, key).toContain('<polygon');
-      expect(drawn, key).not.toContain('<rect');
+      // A drawing of a pipe, never a placeholder box (CLAUDE.md T16 2.3).
+      expect(drawn, key).not.toContain('placeholder');
+      expect(drawn, key).toMatch(/pipe-bar|pipe-collar/);
       expect(pipeCellArt(key, { x: 3, y: 4 }, [`${key}.png`]), key).toContain(`/sprites/${key}.png`);
     }
-    // Lifted to the height of the ducting: the tile sits above the cell it is over.
-    const at = /translate\(([-\d.]+),([-\d.]+)\)/.exec(pipeCellArt('pipe.ew', { x: 3, y: 4 }, []));
-    expect(Number(at?.[2])).toBeLessThan(centreOf(3, 4, 1, 1).y - DUCT_HEIGHT * 24 + 1);
+    // Lifted to the height of the ducting: the bar of a straight tile sits above the cell it is
+    // over, at the pipe's height.
+    const straight = pipeCellArt('pipe.ew', { x: 3, y: 4 }, []);
+    const y1 = /pipe-bar[^>]*y1="([-\d.]+)"/.exec(straight);
+    expect(Number(y1?.[1])).toBeLessThan(centreOf(3, 4, 1, 1).y - DUCT_HEIGHT * 24 + 1);
   });
 
   it('draws every run tile by tile, above the equipment, keyed by the machine it serves', () => {
@@ -48,11 +50,13 @@ describe('the pipe layer (CLAUDE.md T13 3.19)', () => {
     expect(svg).toContain('data-pipe-tile="pipe.inlet"');
     // The layer comes after the machines in the live part, so it is over them.
     expect(svg.indexOf('class="pipe-layer"')).toBeGreaterThan(svg.indexOf('data-kit="kit-saw"'));
-    // And the tooltip on a machine with no pipe says so.
+    // And a machine with no pipe says so under its name, in words the hall never writes for a
+    // connected one (CLAUDE.md T16 2.3).
     const bare = pipedHall('pro');
     bare.pipes = [];
-    expect(renderHall(bare, { files: [] })).toContain('Table saw (no pipe)');
-    expect(svg).not.toContain('(no pipe)');
+    expect(renderHall(bare, { files: [] })).toContain('not connected');
+    expect(svg).not.toContain('not connected');
+    expect(svg).not.toContain('data-not-connected');
   });
 
   it('outlines the run in red while the hall is short and this machine is one of the ones running', () => {
@@ -82,17 +86,16 @@ describe('the gate collar (CLAUDE.md T13 3.11)', () => {
     const collars = gateCollars(state, []);
     expect(collars).toContain('class="gate-collar"');
     expect(collars).toContain('data-gate="kit-saw"');
-    expect(collars).toContain('data-placeholder="gate.collar"');
+    expect(collars).toContain('data-pipe-tile="gate.collar"');
     // On the drop cell: the first cell of the saw's own footprint inside its zone, lifted to the
     // height of the ducting so it reads as a collar on the pipe and not a thing on the floor.
     const cell = portCell(saw);
     const centre = centreOf(cell.x, cell.y, 1, 1, DUCT_HEIGHT);
     const floor = centreOf(cell.x, cell.y, 1, 1);
-    const at = /translate\(([-\d.]+),([-\d.]+)\)/.exec(collars);
+    const at = /cx="([-\d.]+)" cy="([-\d.]+)"/.exec(collars);
     expect(at).not.toBeNull();
-    const y = Number(at?.[2]);
-    expect(y).toBeLessThan(floor.y);
-    expect(Math.abs(Number(at?.[1]) + 12 - centre.x)).toBeLessThan(1);
+    expect(Number(at?.[2])).toBeLessThan(floor.y);
+    expect(Math.abs(Number(at?.[1]) - centre.x)).toBeLessThan(1);
     // It is in the hall, in the live part, above the equipment.
     const svg = renderHall(state, { files: [] });
     expect(svg.indexOf('data-gate="kit-saw"')).toBeGreaterThan(svg.indexOf('data-kit="kit-saw"'));

@@ -1,335 +1,291 @@
-# Turn 15: the boards read like a ledger
+# Turn 16: the men walk the floor
 
 Woodwork Empire. Autonomous session brief for Claude Code (Opus 5, effort ultracode, cloud).
-Owner: Piotr. Programmer: Claude. Spec author: Claude (chat), 16.09.2026, from Piotr playing v21
-with five screenshots and one page of mockups (Petros: software/woodwork-empire, STAN 16.09).
+Owner: Piotr. Programmer: Claude. Spec author: Claude (chat), 16.09.2026, from Piotr playing v22
+and correcting the hall drawing five times in one afternoon (Petros: software/woodwork-empire,
+STAN 16.09; docs/mockups/t16/).
 
-Read this whole file (first line must say "Turn 15"; if the root `CLAUDE.md` does not, stop and
-report), then `REPORT-T14.md` in full, then `docs/mockups/t15/README.md` and open the two HTML
-files it names in a browser (they are the design; the screenshots next to them are the before),
-then `docs/art/SPRITES.md` sections 8 and 11, then the archived briefs in `docs/`. Where files
+Read this whole file (first line must say "Turn 16"; if the root CLAUDE.md does not, stop and
+report), then REPORT-T15.md in full, then docs/mockups/t16/README.md and open hall-grid-1609.html
+in a browser (it is the design; the two piotr-marks-*.png are his red pen on earlier versions),
+then docs/art/SPRITES.md sections 9 and 10, then the archived briefs in docs/. Where files
 disagree, this one wins. All standing rules apply (no em or en dashes anywhere, scope 1:1, one
-code path, constants never in the UI, `[TUNE]` for every figure you choose and `[PIOTR]` for his,
-kill background processes, PR without merge, end the session, no PR watching, `npm run check`
-gated on its own exit code, every click single, one `APP_VERSION` bump).
+code path, constants never in the UI, [TUNE] for every figure you choose and [PIOTR] for his,
+kill background processes, PR without merge, end the session, no PR watching, npm run check gated
+on its own exit code, every click single, one APP_VERSION bump).
 
-**Precondition.** `main` carries Turn 14 merged: `APP_VERSION` is `'v21'`, `STATE_VERSION` is
-14, `MODAL_SKINS` has `screen` and the laptop has `laptopHome(state)` in `src/engine/laptop.ts`.
-If `APP_VERSION` is not `'v21'`, stop and report.
+Precondition. main carries Turn 15 merged: APP_VERSION is 'v22', STATE_VERSION is 14,
+src/engine/pipes.ts has pathBetween, pipeRunFor and isConnected, and src/render/characters.ts has
+the walk, carry and idle animations with facingFromScreen. If APP_VERSION is not 'v22', stop and
+report.
 
-One agent, serial. Short turn. Every piece is small and most of them touch `styles.css`,
-`company.ts`, `laptop.ts` and `app.ts`, so parallel agents would only wait on each other.
-
----
+One agent, serial. Four pieces, and the first two share hall.ts, characters.ts and stations.ts, so
+a team would wait on itself.
 
 ## 0. What this turn is for (Piotr, 16.09)
 
-Piotr played v21 for a morning and wrote five things down. Every one of them is about reading,
-not about rules of the game. His words, in order:
+Three things Piotr saw on the hall in v22, in his words:
 
-1. Company board: "I do not understand the layout. I wanted one clear column on the left and one
-   on the right. On the right every plus and minus in one column and the result at the top over a
-   line, like Excel. Why is it three columns. The close cross is tiny in the corner and does not
-   work." And the board "hangs in the corner instead of in the middle between the door and the
-   corner of the walls, exactly in the middle."
-2. Orders board: "When you underline something important do not put it in a black box, nothing
-   can be read." Tips: "add a nice graphic exclamation mark before the sentence and move it to
-   the bottom of the card where there is room. The top is for important information, not tips."
-3. Laptop: a red count in the top right corner of each big tile, gone when there is nothing to
-   do; the line at the bottom of the tile stays. "The mockup had icons on the small tiles and now
-   there are none."
-4. Team: "The page layout is great, everything clear. But it is in the catalogue style and we are
-   in the laptop, so it does not match. Every page in the laptop must have a back button."
-5. Work Plan: "This looks great, but the job cards must not be crooked. Straight, nice boxes. It
-   is an interactive board."
+- Pipes: "I cannot see whether a machine is connected or not. Sometimes there is 'connected'
+  written under it, sometimes not, so I do not know whether I have to connect it myself."
+- Unloading: "The character walks in the corner, moving his legs but not moving. Show me on the
+  grid how he walks from the unloading to the rack."
+- Machines: "Show me on the grid how the worker stands at the saw and at the other machines,
+  because right now it looks bad."
 
-And one across the whole game: "the descriptions are too small". Font up, everywhere.
+And one on the top bar: a Projects chip with the count of live jobs, opening the Work Plan, the
+same board as in the office.
 
-One thing Piotr decided **not** to change, after asking twice: what goes into the Output number.
-The hall's own lines make the number; a man's rate acts on his minutes and a class of machine on
-the stage it does; nobody is counted twice (`outputBreakdown`, `machines.ts`). The engine stays.
-The board shows both kinds, under two rules, so the player still sees why a better saw is worth
-the money. That is section 2.1 and it is a change to `company.ts` and `styles.css` only.
+The drawing in docs/mockups/t16/hall-grid-1609.html is the answer he approved, with three rules he
+added in red pen, quoted here because they are the contract:
 
----
+1. "Facing the saw, back to us." An operator faces his machine, so his back is to the camera.
+2. "The rack stands against a wall, so how is he supposed to walk between the wall and the rack?
+   When it stands against a wall you come at it from the other side." The approach cell of any
+   item is on its free side, never between the item and a wall, and the game picks the side.
+3. "It is important that the points at the individual items are joined up." The standing points
+   are nodes of one network over the free cells, and every walk is a path on it, never a jump.
 
 ## 1. Rules restated (short)
 
-Everything from Turns 1 to 14. Tonight in addition:
+Everything from Turns 1 to 15. Tonight in addition:
 
-- **`APP_VERSION = 'v22'`.** `STATE_VERSION` does not bump: nothing here changes the shape of a
-  save. If you think you need a new field on the state, stop that piece, write it in the report,
-  do the rest.
-- **The mockups are the contract for the look.** `docs/mockups/t15/fixes-1609.html` has four
-  tabs: Company, Orders, Laptop, Team. Build what they show. Where a mockup and this text
-  disagree, this text wins; where this text is silent, the mockup decides.
-- **Boards of figures are straight.** A board the player reads numbers off is not a pin board of
-  scraps. The tilt of `.modal-board` cards stays only where this brief does not remove it.
-- **One type scale.** Every `font-size` in `styles.css` reads a token from `:root`. No pixel
-  size is typed twice. Nothing in the game is below the smallest token.
-
----
+- APP_VERSION = 'v23'. STATE_VERSION does not bump. Where a figure is on the floor at this second
+  is presentation, real time, like the frame of his animation (SPRITES.md 10.4: "a man does not
+  walk faster at x10"); it is not game state and is not saved. If you think you need a field on
+  the state, stop that piece, write it in the report, do the rest.
+- The engine says where and along which cells; the renderer says when. Paths, standing cells and
+  facings are pure engine functions with tests on a small hall. The renderer moves the figure
+  along them at real seconds and never decides a cell of its own.
+- Real time, never game minutes, for the walk itself. At x30 a figure still walks at a man's
+  pace; the engine's station changes run ahead and the walker catches up (2.2 says how).
+- One drawing of a pipe. Every pipe tile, run and drop on the hall comes from one vector helper;
+  the Turn 4 grey bar and its drops to every machine are deleted, not restyled.
 
 ## 2. Changes to the design (the contract)
 
-### 2.1 The Company board, two sheets like a ledger `[PIOTR]`
+### 2.1 Where a man stands: the station table and the free side [PIOTR]
 
-The felt board in the oak frame stays (the `company` modal, `FELT_MODALS`), the week line at the
-top stays (`Week 2 · +4 · Workshop 67% · Calls 2% ...`). Everything under it is rebuilt as **two
-cream sheets side by side**, each pinned with one pin at the top centre, **straight, no rotation**
-`[TUNE: the tilt rule of .modal-board is switched off for the company sheets]`. The three columns
-and the two paragraphs of explanation are deleted.
+Today stationCell in hall.ts has one rule for every item: the first cell in front of the footprint
+(frontOf, y = stands.y + depth), and every figure faces south west (FIGURE_FACING). Tonight that
+rule is deleted and replaced by a station table in src/engine/stations.ts, one row per family, read
+by a new standingCell(state, item, role) and facingAt(state, cell, item):
 
-**Left sheet: Reputation.** Title `Reputation` in the title font. Under it the total line: the
-word `this week` small and dim on the left, the reputation figure big on the right (the display
-token, the game's green), a 2 px rule under the line. Under the rule a small dim heading row
-`Who said what · points`, then **every rating the company has had, newest first, one row each**:
-the job's name and the verdict (`Garage shelves: on time`), a second small dim line with the day
-and the client (`day 8, Mr Cole`; the client's name if the job has one, the job's id line
-otherwise), and the points on the right in bold: green above zero, red below, dim at zero. The
-carry over from the previous week is one row `Start of the week · carried over` with its figure.
-Weeks are separated by a thin dim label row `Week 2` `[TUNE]`; the sheet scrolls inside itself
-when the list is long, the total line does not scroll. At the bottom a right aligned sum line
-`+9  -3  = 6`, the three figures of this week only.
+| Family | Operator's cell | Waiting | Second place |
+|---|---|---|---|
+| Table saw (2 by 1) | front side, the right cell | front side, the left cell | none |
+| Thicknesser (2 by 1) | the left end, facing along the machine | one cell further left | none |
+| Spindle moulder (2 by 1) | front side, the left cell | front side, the right cell | none |
+| Edgebander | front side, the second cell from the infeed end (the left) | the cell to its left | none |
+| CNC (3 by 2) | panel: front side, the right cell | front side, the middle cell | loading: back side, the middle cell |
+| Spray booth (3 by 2) | front side, the middle cell | front side, the left cell | none |
+| Bench (2 by 1) | front side, the left cell | front side, the right cell | second: back side, the right cell, for a second man at the same bench |
+| Sheet rack | the free side (below) | none | none |
+| Extractor unit | the free cell on the bag side (the side away from the wall) | none | none |
+| Anything else (lockers, seats, compressor, gates) | front side, the left cell, as today | none | none |
 
-**Right sheet: Output.** Title `Output`. Total line: `every minute of production is multiplied
-by it` small and dim on the left, the figure big on the right (`0.67`), the 2 px rule. Then two
-groups:
+"Front" is the camera side, y + depth, as the code already means it. "Back" is y - 1. "Left end"
+is x - 1 on the item's first row. Every cell in the table is stated as an offset from the
+footprint's origin so the table reads without a picture; write the offsets once and the tests
+read them back.
 
-1. **The hall's lines**, the ones with `hall: true` in `outputBreakdown`: `Base 1.00` first
-   (dim), then every hall line with its points (`Hall dirty -0.15`, `Extraction working +0`,
-   `No room at the gate -0.10` and so on), each with a small dim second line where the existing
-   tips and warnings tables have matching wording (`sweep it, or hire a helper`), otherwise none.
-   Under them the Excel sum line right aligned: `+0.00  -0.15  = 0.85`, off `plus`, `minus` and
-   `total` of the breakdown.
-2. **A second rule** and a dim heading `Act where they are, not in the number above`, then every
-   line with `hall: false`: the owner's overtime and dinner, each worker with his rate, each
-   family of machine with the best class in the hall, each with its points in the same colours
-   and the `where` text as the small second line (`your own minutes`, `his own minutes`, `the
-   stage it does`). No sum line under this group.
+Facing. No table. A man at his cell faces the centre of the item's footprint, through the existing
+facingFromScreen on the screen vector from his feet to that centre. That gives "back to the
+camera" at every front cell and "along the machine" at every end cell for free. A figure that is
+walking faces the way it is going (2.2). A figure that is idle faces the way it does today.
 
-Nothing about the numbers changes: the sheet prints `outputBreakdown(state)` and computes
-nothing. The point of the second group is that Piotr, and the player, can see why a class 3 saw
-was worth buying. Do not drop it, do not fold it into the sum.
+The free side. A cell in the table is only a preference. standingCell checks it against the hall:
+a cell is free when it is inside the unit, on no footprint, in no room (ROOM_LAYOUT), and not the
+pallet's own cells. If the preferred cell is not free, the function walks the sides in a fixed
+order, front, back, left, right, and takes the first side with a free cell at the same position
+along it; for the sheet rack the order is instead the side with the most free cells in the two
+rows beyond it, which is the hall side when the rack stands against a wall or under a room.
+Piotr's own case: a rack under the canteen's face has its front cell free, so the man stands at
+y + depth facing north; a rack against the front kerb has no front cell, so he stands behind it
+facing south. A test puts a rack against each of the four sides and under the canteen and asserts
+the cell and the facing for each.
 
-**The cross.** The tiny `modal-close` in the corner of the felt is replaced on this modal by a
-big decorative one: a cream disc `CLOSE_DISC` 54 px `[TUNE]` with a 3 px oak border, a shadow,
-and a ✕ glyph in the title font at 34 px `[TUNE]`, sitting on the top right corner of the oak
-frame, half outside it. It is the same `data-do` as every other close. **It works:** today the
-cross on the company board does not close it. Find out why (the felt picture layer over the
-button, a z-index, a missing handler on this skin) and fix it at the root, not with a second
-handler; write the cause in the report.
+The pallet. The unloading man does not stand "at the back of the lorry inside the shutter" any
+more. He stands in front of the pallet on the hall side: the cell east of the pallet's first row,
+(GATE_LAYOUT.x + GATE_LAYOUT.width, GATE_LAYOUT.y + 1), facing the pallet (west). If that cell is
+not free, the cell between the pallet and the office, (GATE_LAYOUT.x + 1, GATE_LAYOUT.y - 1),
+facing south [PIOTR: "from the hall side, never from outside"].
 
-**Where it hangs.** The board picture is its own sprite (`officeCompanyBoard.png`) drawn at the
-region's box in `src/render/office.ts`. Today the region is `x 1000, y 168, width 280`, which
-runs 60 px past the corner of the two walls and hugs the door frame: that is "in the corner".
-Measured on `officeBackground.png` at y 300: the door frame's right edge is at x 970 and the
-corner of the rear and right walls at x 1220, so the free wall is 250 px wide with its centre at
-x 1095 (the clock above it is centred at 1101, which agrees). Set the region to `width 180,
-height 180, x 1005, y 168` `[TUNE]`: 35 px of wall on each side, square like the picture, under
-the clock. Put the four figures in one `COMPANY_BOARD_BOX` constant with the two measurements in
-its comment. Verify the measurement yourself before you commit (a one off script reading the
-pixel columns is fine; do not commit it) and adjust by at most 5 px if the wall says so. The
-hover glow and label of Turn 14 follow the region and need no change.
+Edgebander. Its footprint stays what it is in constants.ts tonight (1 by 1); Piotr drew it at 4 by
+1 with an infeed and an outfeed and that is a catalogue change with prices and zones, parked
+(section 6). The table's row is written for the footprint as it is and reads the width off the
+footprint, so it needs no change when the footprint grows.
 
-### 2.2 The Orders board: badges you can read, tips at the bottom `[PIOTR]`
+### 2.2 The men walk the floor [PIOTR]
 
-**Badges.** `.badge` (`Bespoke material`, `Site measure`, and the `Express` flag if it shares
-the class) is today `var(--panel)` with a 1 px border and 11 px text, which on the folder paper
-renders dark on dark. It becomes: background the game's red (`var(--bad)`), text white, bold,
-the body token, padding `4px 10px`, radius 4 px, letter spacing 0.2 px `[PIOTR: the red one of
-the three in the mockup; TUNE the metrics]`. `Express` keeps its own place at the top right of
-the card and takes the accent orange instead of red `[TUNE]`, so a rush is not a warning.
-Wherever else `.badge` is used in the game, it gets the same treatment; if a use is not a
-warning (grep first), give it its own class and leave it as it was, and list those in the
-report.
+The network. A new engine module src/engine/walk.ts: isFree(state, cell) as above, walkPath(state,
+from, to): Cell[] a breadth first search over the four neighbours on free cells (the working zones
+of machines are free, the gate lane is free, a pipe tile is free because it is in the air),
+returning the cells from from to to inclusive, or the straight Manhattan line when no free path
+exists (a boxed in man still gets somewhere, and the report lists any such case the scenarios
+hit). Tests on a small hall: round a footprint, round a room, through the gate lane, a blocked
+target falls back to the line. pathBetween in pipes.ts is for pipes over equipment and is not
+reused; say so in a comment at both.
 
-**Tips.** `renderTip` is today prepended to the modal body, so the first thing on every screen
-is the tip. It moves to the **bottom** of the body: `modalBody(...) + renderTip(...)` in
-`app.ts` (and the three other call sites: contracts, finance, house), one helper so the order
-cannot differ between screens. The bubble gets a **graphic exclamation mark** before the
-sentence: an inline SVG disc in the accent orange, 34 px `[TUNE]`, with a white `!` in the title
-font, followed by the sentence in the body token, the `Right` button on the right as a pill. The
-bubble is the last child of the body and does not float over the content; on a screen that
-scrolls, it scrolls with it. Same rule inside the laptop screen: the tip is the last child of
-the page, styled to the screen skin (white panel, system font, the same disc).
+The walker. In src/render/characters.ts (or a sibling walkers.ts), one walker per figure on the
+page: the cell it is at, the path it is on, and the real time it started that path. On every frame
+(the same real time loop the frames use) the walker advances along its path at
+WALK_CELLS_PER_SECOND 1.6 [TUNE], sets the figure's transform to the interpolated point between
+two cells, plays carry when the leg carries material and walk otherwise, and faces the way it is
+going through facingFromScreen. On arrival it plays the station's animation and faces the item
+(2.1). The CSS transition on .figure is deleted: the walker owns the transform. When the engine
+changes a figure's station, the walker computes the path from where the figure is now (mid walk
+if it must) to the new standing cell and sets off; it never jumps unless the view is rebuilt from
+scratch (a load, a scene change), in which case it starts at its station's cell.
 
-### 2.3 The laptop: counts on the tiles, icons on the small ones, every page a laptop page `[PIOTR]`
+What carries material. A leg carries material when it goes from the pallet to the rack (an unload
+trip), from the rack to a machine or a bench (fetching a sheet), or from a machine to a bench (cut
+parts). Every other leg is a walk. One function, legCarries(fromStation, toStation), says so, and
+animationForStation keeps its job for the standing animation.
 
-**Counts.** Each of the three big home tiles gets a **red round count badge** in its top right
-corner: `TILE_COUNT` 34 px tall, min width 34 px, `var(--bad)`, white bold at the lead token, a
-2 px white ring and a shadow `[TUNE]`. The figure is: Tasks, the open tasks (`tasksOpen`);
-Stock, the low lines (`lowLines`); Drawings, the jobs waiting for a list (`drawingsWaiting`), all
-off `laptopHome(state)` and nothing else. **When the figure is zero the badge is not rendered at
-all**, not hidden, not rendered: no element. The live line at the bottom of the tile stays
-exactly as Turn 14 left it.
+Unloading. While a figure's station is the gate and a delivery is being unloaded, the walker
+loops: pallet cell, rack's standing cell, pallet cell, one loop per trip, SHEETS_PER_TRIP sheets
+per trip as the engine already counts. The number of loops is ceil(sheets / SHEETS_PER_TRIP); at
+high speed the engine finishes before the walker does, and the walker finishes the loop it is on
+and then goes to the figure's new station. At the pallet he faces the pallet; at the rack, the
+rack. The test drives a delivery of ten sheets by hand and asserts five loops on the walker's log.
 
-**Icons.** The six Office tiles get the line icons of the mockup (people, globe, shield, lock,
-monitor, gear), inline SVG in the game's green, 30 px `[TUNE]`, above the label. They were in
-mockup C and Turn 14 left them out; they are not optional.
+Production. When a job's stage moves a man from the rack to the saw, or from the saw to the bench,
+his station changes as it does today; the walker carries him there along the network with carry
+on the legs 2.2 names. No new engine timing: a walk costs no game minutes tonight [PIOTR: the look
+first; minutes for walking are a later decision].
 
-**Every page a laptop page.** Turn 14 put Tasks, Stock, Drawings and the three Admin tabs inside
-the screen behind `← Home`. **Team was left as the folder modal**, opened from the Office tile:
-that is the catalogue look Piotr saw. Tonight Team becomes a laptop page like the others:
-`LaptopPage` gains `'team'`, the Team tile opens it inside the screen with `← Home` at the top
-left in the same place as on every other page, the Team renderer's output sits inside the screen
-skin, the four tabs (`Workshop`, `Office`, `Technical`, `Management`) render as the screen's
-segmented control, the draw chips as the screen's buttons, the hire cards as white panels with
-the `Hire` button in the game's green. Its content and its controls are as Turn 13 and 14 left
-them: hiring, the draw tiers, holiday, the second shift line all work from inside the screen,
-proved by the existing team tests run through the laptop page. The separate `team` modal is
-**deleted**: its `ModalSpec`, its `MODAL_SKINS` line, the `case 'team'` route and every
-`openModal('team')`; every place that opened it (the top bar's link if any, a warning strip's
-link, the hall's Start production path if it goes there) opens the laptop on the team page
-through one function `openLaptopPage('team')`. Grep for `'team'` in `src/ui` and account for
-every hit in the report.
+The waiting man. A man waiting for a machine stands at the table's waiting cell and faces the
+machine, as 2.1 says, and walks there like anybody else.
 
-**Back on every page.** A test opens every `LaptopPage` but `home` and asserts the `← Home`
-control is the first child of the page header, with the same class, and that clicking it lands
-on home. If any page is missing it, that is the bug.
+### 2.3 Pipes you can read [PIOTR]
 
-**Settings** stays a modal of its own (it is the top bar's gear, not a laptop thing); the Office
-tile opens it as today.
+One vector helper. src/render/pipes.ts: pipeTile(kind, cell) draws one tile of the run in the 2 to
+1 dimetric as a vector: a round duct of PIPE_DIAMETER 0.2 m [TUNE] drawn as a rounded bar in the
+game's duct grey (--kit-machine-dark) with a lighter top edge, for the eight kinds ns, ew, the
+four elbows, tee, drop (the vertical down to the machine, drawn as a short vertical bar ending in
+a ring on the port), and inlet (a collar at the extractor). The tiles sit in the air at
+DUCT_HEIGHT over the floor exactly where the placeholder boxes sit today, sorted with the
+equipment so a pipe over a saw draws over the saw. The placeholder green boxes for pipe tiles go:
+placeholder.ts keeps serving everything else.
 
-### 2.4 Work Plan: straight cards `[PIOTR]`
+The Turn 4 ducting is deleted. ductRun and ductDrop in hall.ts, their CSS (.duct-run, .duct-drop,
+.duct-port, .is-flexi), DUCT_SPRITE_SUFFIX and the sprite pick for it, and the tests that draw
+them. A central system (dustSystem, flexiSystem) is drawn by the same vector helper: one run along
+the rear wall at the same height, and a drop to every machine that wants extraction, because with a
+central system every machine is connected and that is what the drawing has to say. DUCT_SYSTEMS
+stays as the engine's knowledge of what is a central system.
 
-The tilt rules in `styles.css` (`.modal-board .plan-row:not(.plan-scale-row):nth-of-type(3n + 1)`
-and its two siblings) lose the `.plan-row` selector: Work Plan rows render with no transform.
-The colours, the axis, the bars, the ticks and the deadline marks are untouched. The `.card`,
-`.row` and `.tile` selectors of the same three rules **stay** for the Shopping board `[TUNE:
-Piotr named the Work Plan only; Shopping is a shop window, not a ledger]`. The Company sheets
-are straight through 2.1. A test reads the stylesheet and asserts no rule transforms
-`.plan-row`.
+Connected or not, on the hall. A machine that wants extraction (wantsExtraction) and has no run to
+it (pipeRunFor null, and no central system) gets a red ring on its port cell, PORT_RING 8 px
+[TUNE], pulsing at one second, and the label not connected in the small token under the machine's
+name on the hall, in the game's red. A connected machine gets the drop and nothing else; a
+connected word is not written anywhere on the hall. The machine card's Connected, 6 m of pipe and
+Connect to extraction, £x stay as they are; the tip table gains one sentence for the first
+unconnected machine: A red ring is a machine with no pipe to the extraction. Open its card to
+connect it, or hire a production manager and it is done for you. [TUNE the words].
 
-### 2.5 The type scale: the descriptions go up everywhere `[PIOTR]`
+A test draws a hall with one extractor and two saws, one connected and one not, and asserts: one
+drop, one red ring, one not connected label, no .duct-run, no green placeholder tile; then with a
+central system, two drops and no ring.
 
-`styles.css` has 24 places at 12 px, 11 at 11 px, 5 at 10 px, 9 at 13 px and a scatter of larger
-sizes, each typed by hand. Tonight:
+### 2.4 The Projects chip on the top bar [PIOTR]
 
-1. Define a type scale on `:root`: `--fs-tiny: 12px` (the floor: figures on a bar, axis labels),
-   `--fs-small: 13px` (second lines, meta, table heads), `--fs-body: 15px` (every description,
-   card line, row, tip sentence, button), `--fs-lead: 18px` (card titles in the system font,
-   section heads), `--fs-title: 26px`, `--fs-display: 34px` (the ledger totals) `[TUNE the
-   names, not the idea]`. Titles in the title font keep their own two or three sizes as tokens
-   too.
-2. Replace **every** `font-size` in `styles.css` with a token. Nothing below `--fs-tiny`. What
-   was 10 or 11 becomes tiny; what was 12 becomes small or body by its job (a description is
-   body, a unit under a figure is small); what was 13 becomes body. A table in the report lists
-   every old size and the token it went to, with the count.
-3. Then look. Every modal, the top bar, the day end summary, the event modal, the machine card,
-   the catalogue, the shopping board, the work plan, the laptop home and its pages, at the game's
-   minimum width of 1280 px: nothing overflows its box, nothing wraps into a third line that was
-   one, no button loses its label. Where something breaks, fix the box, not the size (a wider
-   column, a wrap, a scroll), and list it. The one exception allowed: a figure on a work plan bar
-   or a tick label may stay tiny.
-4. Twelve screenshots of the look after, in `docs/report-t15/`, one per screen named above.
-
----
+Between the day meter and Orders: N, a chip Projects: N where N is openJobs(state).length, styled
+as the other push buttons, opening the Work Plan modal (data-modal="workPlan", the same modal the
+office board opens; grep for the board's data-do and use the same one). It pulses with the news
+the other chips pulse with when a job changes stage [TUNE: or never]. Hidden until the workshop
+has its first job? No: shown from day one at Projects: 0, so the player learns where it is. Test:
+the chip's count, the modal it opens, and that it is the same modal as the office board.
 
 ## 3. State
 
-No change to the shape of the state. `STATE_VERSION` stays at 14.
-
----
+No change to the shape of the state. STATE_VERSION stays at 14. The walker's cell and path are
+render state, rebuilt from the stations on a fresh view.
 
 ## 4. Task queue, in order
 
-Branch `turn-15-the-boards-read-like-a-ledger` from `main`. One commit per task, `npm run check`
-green on its own exit code before each, two report lines per task in `REPORT-T15.md`.
+Branch turn-16-the-men-walk-the-floor from main. One commit per task, npm run check green on its
+own exit code before each, two report lines per task in REPORT-T16.md.
 
-**T15-01 Housekeeping and v22.** `docs/turn-14-brief.md` from git history, byte for byte the
-`CLAUDE.md` of the Turn 14 merge commit; the README's briefs line; `APP_VERSION = 'v22'`;
-`docs/mockups/t15/` is already in the repo through this brief's pack and is not touched. Done:
-the version test.
+T16-01 Housekeeping and v23. docs/turn-15-brief.md byte for byte from the Turn 15 merge commit;
+the README's briefs line; APP_VERSION = 'v23'. Done: the version test.
 
-**T15-02 The type scale.** 2.5 points 1 and 2 only: the tokens and the replacement, the mapping
-table in the report. Done: a test reads `styles.css` and asserts every `font-size` value is a
-`var(--fs-...)` and every token is at or above 12 px. (Looking, point 3, is done last, in
-T15-08, once every other change is in.)
+T16-02 The Projects chip. 2.4. Done: its test.
 
-**T15-03 Work Plan straight.** 2.4. Done: the stylesheet test.
+T16-03 The station table. 2.1: the table, standingCell, facingAt, the free side rule, the pallet
+cell, frontOf and FIGURE_FACING deleted, every figure on the hall placed by the table and facing
+its item. Done: the engine tests (every row of the table on a known layout, the rack on five
+placements, the pallet cell and its fallback) and the render test (each figure's transform equals
+its standing cell, its facing row is the one towards the item).
 
-**T15-04 Tips at the bottom, with the mark.** 2.2 tips. Done: a test opens three screens with
-an unseen tip and asserts the bubble is the last child of the body, has the SVG disc, and the
-`Right` button dismisses it as before.
+T16-04 The network. 2.2, walk.ts alone. Done: its tests.
 
-**T15-05 Badges.** 2.2 badges. Done: a test computes the badge's background and colour off the
-stylesheet on an enquiry card with both flags, asserts red and white and the body token, and
-that `Express` is orange.
+T16-05 The walker. 2.2, the walker in the renderer, the CSS transition gone, carry on the material
+legs, the unloading loop, the waiting man. Done: a test with a fake clock that steps real time,
+asserting the figure's transform moves along the path cell by cell, the animation on each leg, the
+five loops of a ten sheet delivery, and no jump on a station change; the sixty tick stability test
+still green.
 
-**T15-06 The Company board.** 2.1: the two sheets, the ledger totals, the two groups on the
-right, the big cross that works, the region moved. Done: tests (two sheets and no third column;
-the reputation total equals the state's; every rating present newest first with its points and
-colour; the hall lines and their sum equal `outputBreakdown` `plus`, `minus`, `total`; every
-`hall: false` line under the second rule with its `where`; the cross closes the modal from a
-real click; the region box equals `COMPANY_BOARD_BOX`; the office hover test still passes).
+T16-06 The pipes. 2.3: the vector helper, the Turn 4 ducting deleted, the ring and the label, the
+central system through the helper, the tip. Done: the test of 2.3 and the office hover test still
+green.
 
-**T15-07 The laptop.** 2.3: counts, icons, Team as a page, the modal deleted, back on every
-page. Done: tests (a badge on Tasks and Stock with a known state and none on Drawings at zero,
-as elements; six icons; Team opens inside the screen from the tile and from every former
-`openModal('team')` caller; the team tests green through the page; `'team'` gone from
-`MODAL_SKINS` and the modal routes; the back test of 2.3).
+T16-07 Look and shoot. Open the hall with: a rack under the canteen, a rack against the front kerb,
+a saw with a man at it, a bench with two men, an extractor with one connected saw and one not, a
+central system; a delivery of ten sheets unloaded by hand at x1 with the figure walking the loop.
+Ten screenshots into docs/report-t16/, and a short screen recording is not asked for (the test log
+stands in for it). Done: the pictures, npm run check green.
 
-**T15-08 Look, fix, shoot.** 2.5 points 3 and 4 across every screen, with the fixes listed.
-Done: the twelve pictures, `npm run check` green.
-
-**T15-09 Report and PR.** `REPORT-T15.md` in the usual structure plus "Numbers chosen", "Type
-scale mapping", "Deleted" and "Why the cross did not close". Kill background processes, push, PR
-titled `Turn 15: the boards read like a ledger`, do not merge, end the session.
-
----
+T16-08 Report and PR. REPORT-T16.md in the usual structure plus "Numbers chosen", "The station
+table as built" (the offsets, one row per family), "Deleted" and "Walks the scenarios hit that had
+no free path". Kill background processes, push, PR titled Turn 16: the men walk the floor, do not
+merge, end the session.
 
 ## 5. Do not (tonight)
 
-1. No change to `outputBreakdown`, `hallProductivityFactor`, the class factors of machines, the
-   rates of men, or anything else in `src/engine`: this turn has no engine task. `laptopHome` is
-   read, not changed.
-2. No `STATE_VERSION` bump. No new field on the state.
-3. No touching `docs/art/SPRITES.md`, `CLAUDE.md`, the archived briefs, the mockup files, the
-   sprite files or the font file.
-4. No change to what the Orders board says or does beyond the badges and the tip. No change to
-   the Work Plan beyond the tilt. No change to the Team page's content or controls beyond the
-   skin and the frame.
-5. No tilt back on the Company sheets or the Work Plan rows; no tilt removed from Shopping.
-6. No pixel `font-size` left in `styles.css`; no size below the tiny token anywhere.
-7. No second handler on the company cross; the root cause is fixed.
-8. No storage access outside `src/cloud/store.ts`; no PixiJS, sound, mobile, Steam, Electron.
-9. No watch loops, nothing left running.
-
----
+- No STATE_VERSION bump. No field on the state for a figure's position or path.
+- No game minutes for walking. Nothing in production.ts, tasks.ts or stages.ts changes timing.
+- No change to a footprint in constants.ts (the edgebander stays 1 by 1 tonight).
+- No second path finder: walk.ts for men, pipes.ts for pipes, each with the comment of 2.2.
+- No restyling of the Turn 4 ducting: it is deleted, and the central system is drawn by the pipe
+  helper.
+- No touching docs/art/SPRITES.md, CLAUDE.md, the archived briefs, the mockup files, the sprite
+  files, the character sheets or the font file. Art requests go in docs/art/REQUESTS-T16.md only.
+- No JavaScript hover state; the ring pulses on CSS.
+- No storage access outside src/cloud/store.ts; no PixiJS, sound, mobile, Steam, Electron.
+- No watch loops, nothing left running.
 
 ## 6. Parked
 
-1. Whether machines and men should enter the Output number at all (Piotr, 16.09: "to think
-   about"; Petros "WAZNE DO PRZEGADANIA"). Not tonight, not by you.
-2. Shopping board tilt.
-3. Everything parked by Turns 13 and 14.
-
----
+- The edgebander at 4 by 1 with an infeed and an outfeed (Piotr's drawing): a catalogue change
+  with a price, a zone and the class ladder; its own turn.
+- Minutes for walking: whether a long walk costs production time.
+- GPT's eight pipe tiles (T13 3.19): the vector helper stands until then; when the tiles land the
+  helper picks them through the sprite file check, the way every sprite does.
+- Everything parked by Turns 13 to 15.
 
 ## 7. The cross check (before the PR)
 
-- **Two sheets.** The company body has exactly two `.sheet` children and no `.col`, no third
-  block, no paragraph of explanation.
-- **The number is the engine's.** grep `company.ts` for arithmetic on points: none; every figure
-  is a field of `outputBreakdown` or a rating's points.
-- **One close.** The company cross uses the same `data-do` as every other modal close, and a
-  real click closes it in the test.
-- **One home function.** Every count on the tiles is a field of `laptopHome(state)`.
-- **Team once.** `grep -rn "'team'" src/ui` shows only the `LaptopPage` value and
-  `openLaptopPage('team')` calls; no `ModalSpec`, no skin, no route.
-- **Back everywhere.** The back test of 2.3 is green for every page.
-- **Tips last.** Every `renderTip` call site puts the tip after the body, through the one
-  helper.
-- **Type scale.** The stylesheet test of T15-02 is green; the mapping table is in the report.
-- **Straight.** No rule in `styles.css` transforms `.plan-row` or the company sheets.
-- **The look.** The twelve pictures are in `docs/report-t15/`; the Company board hangs centred
-  on the wall under the clock in the office picture.
+- One rule per family. grep hall.ts for frontOf and FIGURE_FACING: gone. Every figure's cell comes
+  from standingCell, every facing from facingAt or the walker.
+- The free side. The rack tests of 2.1 are green on all five placements.
+- One network. grep src/render for a breadth first search or a neighbour loop: none; the renderer
+  calls walkPath and nothing else.
+- No jump. The walker test asserts the transform never moves more than one cell between two frames
+  after the first.
+- Real time. The walker reads the frame clock (nowMs), never state.clock.
+- One pipe drawing. grep src/render for duct-run, duct-drop, ductRun, ductDrop and for a pipe tile
+  drawn by placeholder: none.
+- Connected reads on the hall. The 2.3 test is green; the machine card's text is unchanged.
+- The chip. Projects: N opens the same modal as the office board, proved by the test.
+- The look. The ten pictures are in docs/report-t16/.
 
----
+## 8. Art requested (contents of docs/art/REQUESTS-T16.md)
 
-## 8. Art requested
-
-None tonight. `docs/art/REQUESTS-T14.md` stands (the lit door and the optional lit boards).
+- The eight pipe tiles of T13 3.19 stand as requested; nothing new is needed for the pipes.
+- character.joiner.carry facing the four ways is delivered; if nw or ne is missing from any role's
+  carry or walk sheet, list the missing rows so the mirror rule of 3.13 is not carrying more than
+  it should.
 
 End of brief.

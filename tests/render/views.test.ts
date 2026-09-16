@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { footprintIn, renderHall } from '../../src/render/hall';
+import { footprintIn, renderHall, stationCell } from '../../src/render/hall';
 import { renderOffice } from '../../src/render/office';
 import { renderGameOver } from '../../src/ui/dayEnd';
 import { renderLaptop } from '../../src/ui/laptop';
@@ -398,11 +398,13 @@ describe('the figures that move', () => {
     const state = atTheSaw();
     const saw = state.equipment.find((item) => item.specId === 'tableSaw');
     expect(saw).toBeDefined();
-    // At the front edge of the saw itself, inside the working zone the class reserves
-    // (CLAUDE.md T7 3.3).
+    // At the front edge of the saw itself, inside the working zone the class reserves, on the
+    // cell the station table gives the saw's operator (CLAUDE.md T7 3.3; T16 2.1).
     if (!saw) throw new Error('no saw in the hall');
     const stands = footprintIn(saw);
-    const feet = centreOf(Math.floor(stands.x), Math.floor(stands.y + stands.depth), 1, 1);
+    const cell = stationCell(state, state.owner.station, { x: 0, y: 0 });
+    expect(cell.y).toBe(Math.floor(stands.y + stands.depth));
+    const feet = centreOf(cell.x, cell.y, 1, 1);
     const svg = renderHall(state);
     expect(svg).toContain('data-figure="owner"');
     expect(svg).toContain(

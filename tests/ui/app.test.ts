@@ -457,7 +457,8 @@ describe('start production', () => {
     click('[data-office="workPlan"]');
     expect(html()).toContain('data-do="startProduction"');
     click('[data-do="startProduction"]');
-    expect(html()).not.toContain('data-modal="workPlan"');
+    // The work plan is shut; the top bar's Projects chip still carries the modal's name.
+    expect(root().querySelector('.modal-layer [data-modal="workPlan"]')).toBeNull();
     expect(html()).toContain('hall-view');
     expect(currentState()?.jobs[0]?.assignedTo).toBe('owner');
     expect(currentState()?.jobs[0]?.stage).toBe('inProduction');
@@ -465,8 +466,8 @@ describe('start production', () => {
   });
 });
 
-describe('the sliding figures', () => {
-  it('puts a moved figure back where it was so the CSS transition can run', () => {
+describe('the walking figures', () => {
+  it('puts a moved figure back where he had got to, so the walker carries him from there', () => {
     click('[data-do="setView"][data-view="hall"]');
     const before = root().querySelector('[data-figure="owner"]')?.getAttribute('transform');
     expect(before).toBeTruthy();
@@ -474,7 +475,8 @@ describe('the sliding figures', () => {
     if (state) state.owner.station = 'gate';
     advanceMinutes(1);
     const after = root().querySelector('[data-figure="owner"]')?.getAttribute('transform');
-    // The new node starts at the old place: the move happens on the next animation frame.
+    // The new node starts at the old place: the walker moves him on the frames that follow
+    // (CLAUDE.md T16 2.2).
     expect(after).toBe(before);
     click('[data-do="setView"][data-view="office"]');
   });

@@ -87,13 +87,11 @@ import {
   syncModals,
   tabBar,
 } from './modal';
-import {
-  type Animation,
-  faceCharacter,
-  facingFromScreen,
-  playCharacters,
-  setCharacterAnimation,
-} from '../render/characters';
+import { playCharacters } from '../render/characters';
+import { resetWalkers, stepWalkers, syncWalkers } from '../render/walkers';
+import { walkPath } from '../engine/walk';
+import { unconnectedMachines } from '../engine/pipes';
+import { hasCentralExtraction } from '../engine/machines';
 import { patchInto } from './patch';
 import { renderOwnerOut } from './ownerOut';
 import { renderCompany } from './company';
@@ -763,7 +761,7 @@ function pageBody(scene: Scene | null): string {
     toast +
     out +
     (ui.menuOpen ? renderMenu(current, ui.cloud) : '') +
-    `<main class="view">${SCENE_SLOT}${notes}${controls}${note}</main>` +
+    `<main class="view">${SCENE_SLOT}${notes}${controls}${note}${hallTip(current)}</main>` +
     renderWhy()
   );
 }
@@ -794,106 +792,20 @@ function restoreFocus(memory: FocusMemory | null): void {
   field.setSelectionRange(at === 0 && end > 0 ? end : at, at === 0 && end > 0 ? end : at);
 }
 
-/** How long a figure takes to walk from one station to the next [TUNE]. */
-const FIGURE_SLIDE_MS = 800;
-
-interface Point {
-  x: number;
-  y: number;
-}
-
-/** Who is walking where, and when he set off. The view is rebuilt from the state many times a
- *  second, so the walk has to be remembered here or it would start again from nothing on every
- *  rebuild and never finish (CLAUDE.md T2 3.3). */
-const slides = new Map<string, { from: Point; to: Point; startedAt: number }>();
-
-function translateOf(point: Point): string {
-  return `translate(${Math.round(point.x)},${Math.round(point.y)})`;
-}
-
-function pointOf(transform: string): Point | null {
-  const found = /translate\(\s*(-?[\d.]+)[\s,]+(-?[\d.]+)\s*\)/.exec(transform);
-  const x = Number(found?.[1]);
-  const y = Number(found?.[2]);
-  if (found === null || Number.isNaN(x) || Number.isNaN(y)) return null;
-  return { x, y };
-}
-
-/** How far along the walk he is now. */
-function positionAt(slide: { from: Point; to: Point; startedAt: number }, now: number): Point {
-  const part = Math.min(1, Math.max(0, (now - slide.startedAt) / FIGURE_SLIDE_MS));
-  return {
-    x: slide.from.x + (slide.to.x - slide.from.x) * part,
-    y: slide.from.y + (slide.to.y - slide.from.y) * part,
-  };
-}
-
 function nowMs(): number {
   return typeof performance === 'undefined' ? 0 : performance.now();
 }
 
-/** Puts every figure back where he had actually got to, and lets the browser carry him the rest
- *  of the way in what is left of the 0.8 s. */
-function slideFigures(now: number): void {
+/** Gives every walker its orders off the page that has just been built, and puts every figure
+ *  back where he had actually got to: the walker owns the transform between renders
+ *  (CLAUDE.md T16 2.2). The network is the engine's: the walker asks it for the path and
+ *  decides no cell of its own. */
+function syncFigures(now: number): void {
   if (!root) return;
-  const moving: Array<{ node: Element; to: Point }> = [];
-  const seen = new Set<string>();
-  const walking = new Set<string>();
-  for (const node of Array.from(root.querySelectorAll('[data-figure]'))) {
-    const key = node.getAttribute('data-figure');
-    const to = pointOf(node.getAttribute('transform') ?? '');
-    if (key === null || to === null) continue;
-    seen.add(key);
-    const slide = slides.get(key);
-    if (slide === undefined) {
-      // First sight of him: he is where he is, and nothing is left to walk.
-      slides.set(key, { from: to, to, startedAt: now - FIGURE_SLIDE_MS });
-      continue;
-    }
-    const at = positionAt(slide, now);
-    if (slide.to.x !== to.x || slide.to.y !== to.y) {
-      // He has been sent somewhere else, and he sets off from wherever he had got to.
-      slides.set(key, { from: at, to, startedAt: now });
-    } else if (at.x === to.x && at.y === to.y) {
-      continue;
-    }
-    const started = slides.get(key)?.startedAt ?? now;
-    const left = Math.max(0, FIGURE_SLIDE_MS - (now - started));
-    if (node instanceof SVGElement || node instanceof HTMLElement) {
-      node.style.transitionDuration = `${Math.round(left)}ms`;
-    }
-    node.setAttribute('transform', translateOf(at));
-    // He is walking, and he faces the way he is going (CLAUDE.md T9 3.13).
-    walking.add(key);
-    const art = node.querySelector('[data-character]');
-    if (art !== null) {
-      setCharacterAnimation(art, 'walk');
-      faceCharacter(art, facingFromScreen(to.x - at.x, to.y - at.y));
-    }
-    moving.push({ node, to });
-  }
-  // Everybody who is not walking is doing whatever his station says, facing the way he was left
-  // facing: the direction is held after he arrives (CLAUDE.md T9 3.13).
-  for (const node of Array.from(root.querySelectorAll('[data-figure]'))) {
-    const key = node.getAttribute('data-figure');
-    if (key === null || walking.has(key)) continue;
-    const art = node.querySelector('[data-character]');
-    if (art === null) continue;
-    const rest = (node.getAttribute('data-rest') ?? 'idle') as Animation;
-    setCharacterAnimation(art, rest);
-  }
-  for (const key of Array.from(slides.keys())) {
-    if (!seen.has(key)) slides.delete(key);
-  }
-  if (moving.length === 0) return;
-  const step = (): void => {
-    for (const entry of moving) entry.node.setAttribute('transform', translateOf(entry.to));
-  };
-  if (typeof requestAnimationFrame === 'function') {
-    requestAnimationFrame(step);
-  } else {
-    step();
-  }
+  const current = state;
+  syncWalkers(root, now, (from, to) =>
+    current === null ? [from, to] : walkPath(current, from, to),
+  );
 }
 
 /** The two halves of the page: the part that is rebuilt from the state every render, and the
@@ -1036,7 +948,7 @@ export function render(): void {
   }
   // The stylesheet is the authority on how much room the office has (docs/art/SPRITES.md 8.1).
   fitOfficeStack(parts.page);
-  slideFigures(nowMs());
+  syncFigures(nowMs());
   restoreFocus(memory);
 }
 
@@ -1097,6 +1009,15 @@ function shutModal(): void {
 }
 
 /** Hours on a machine's own clock, as the note under the hall says them. */
+/** The one sentence under the hall the first time a machine stands there with no pipe to the
+ *  extraction and no central system to make one unnecessary: the same bubble every screen has,
+ *  in the same place (CLAUDE.md T16 2.3). */
+function hallTip(current: GameState): string {
+  if (ui.view !== 'hall') return '';
+  if (hasCentralExtraction(current) || unconnectedMachines(current).length === 0) return '';
+  return withTip('', current, 'unconnected');
+}
+
 /** The one way a note is put under the hall, so the store's live note goes when another comes. */
 function setNote(text: string): void {
   ui.note = text;
@@ -1126,7 +1047,9 @@ function askUnload(deliveryId: string): void {
 
 /** What each region of the room opens (docs/art/SPRITES.md 8.2 and 8.4). The door is the one
  *  region that is not a modal: it is the way back into the hall. */
-const OFFICE_REGION_MODALS: Record<string, ModalId> = {
+/** What each office region opens. Exported for the test that proves the top bar's Projects chip
+ *  opens the same board as the office wall (CLAUDE.md T16 2.4). */
+export const OFFICE_REGION_MODALS: Record<string, ModalId> = {
   workPlan: 'workPlan',
   orders: 'board',
   laptop: 'laptop',
@@ -1184,6 +1107,7 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
       state = stored.state;
       ui.screen = 'game';
       accumulator = 0;
+      resetWalkers();
       startedStore();
       noteOrders();
       break;
@@ -1201,6 +1125,7 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
       ui.screen = 'game';
       ui.startOverAsked = false;
       accumulator = 0;
+      resetWalkers();
       startedStore();
       noteOrders();
       autosaveLocal();
@@ -1619,6 +1544,7 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
         if (result.state !== null) {
           state = result.state;
           ui.screen = 'game';
+          resetWalkers();
           startedStore();
           writeStore();
           ui.saved = peekSave();
@@ -1633,6 +1559,7 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
           state = result.state;
           ui.screen = 'game';
           accumulator = 0;
+          resetWalkers();
         }
         return result.note;
       });
@@ -1768,6 +1695,7 @@ export function onFileChosen(file: File): Promise<void> {
       state = result.state;
       ui.screen = 'game';
       ui.menuOpen = false;
+      resetWalkers();
       // A file loaded is the game from now on, so the browser's store holds it too (T11 3.2).
       startedStore();
       writeStore();
@@ -2239,8 +2167,12 @@ function frame(now: number): void {
   const elapsed = Math.min(1000, now - lastFrame);
   lastFrame = now;
   // The figures walk in real time and not in game minutes, so they are moved on before anything
-  // else the frame does and whatever the clock is at (CLAUDE.md T9 3.13).
-  if (root !== null) playCharacters(root, now);
+  // else the frame does and whatever the clock is at (CLAUDE.md T9 3.13; T16 2.2): first along
+  // the floor, then on to the frame of their animation.
+  if (root !== null) {
+    stepWalkers(root, now);
+    playCharacters(root, now);
+  }
   // One frame, one writing of the page, whatever the clock did inside it: ten game minutes at
   // 10x used to be ten pages (CLAUDE.md T9 3.8, 3.11).
   batched(() => {

@@ -2,16 +2,12 @@
 // and it hands back an SVG string (CLAUDE.md 10.3).
 
 import {
-  DUCT_DEPTH,
   DUCT_HEIGHT,
-  DUCT_SPAN,
-  DUCT_SPRITE_SUFFIX,
   DUCT_SYSTEMS,
-  DUCT_THICKNESS,
-  DUCT_WIDTH,
   FINISHED_GOODS_LAYOUT,
   GATE_CROWD_LIMIT,
   GATE_LAYOUT,
+  PALLET_LAYOUT,
   ROOM_DOOR,
   ROOM_LAYOUT,
   YARD_WIDTH_CELLS,
@@ -30,7 +26,14 @@ import {
   machinesDueService,
   serviceIsDue,
 } from '../engine/machines';
-import { footprintOrigin, isConnected, portCell, wantsExtraction } from '../engine/pipes';
+import {
+  footprintOrigin,
+  isConnected,
+  pipeRunFor,
+  portCell,
+  tileKeysFor,
+  wantsExtraction,
+} from '../engine/pipes';
 import { jobsAtGate } from '../engine/jobs';
 import { orderName, reservedItems, shoppingList } from '../engine/orders';
 import {
@@ -38,7 +41,6 @@ import {
   itemFootprint,
   itemStandsInTheHall,
   itemZone,
-  needsDucting,
   sheetCapacityOf,
 } from '../engine/machines';
 import { machineInUse } from '../engine/game';
@@ -51,9 +53,16 @@ import {
   STATION_OFFICE,
   STATION_PHONE,
   STATION_RACK,
+  type Facing as StationFacing,
+  facingAt,
+  facingAtPallet,
+  facingTowards,
+  palletCell,
+  standingCell,
   stationMachine,
   stationWaitingFor,
 } from '../engine/stations';
+import { gateCollarArt, pipeTile, portRing } from './pipes';
 import { ownerIsAvailable, staffOutputFactor } from '../engine/owner';
 import { homeCellOf } from '../engine/staff';
 import { plural } from '../engine/text';
@@ -76,12 +85,7 @@ import {
 } from './iso';
 import { formatTime } from '../engine/clock';
 import { compressorIsLow, extractionCheck, hallAirCheck } from '../engine/media';
-import {
-  type CharacterOptions,
-  type Facing,
-  animationForStation,
-  characterArt,
-} from './characters';
+import { type CharacterOptions, animationForStation, characterArt } from './characters';
 import {
   SPRITE_SCALE,
   contactShadow,
@@ -123,6 +127,22 @@ export function label(at: Point, text: string, extra = ''): string {
   return (
     `<text x="${round(at.x)}" y="${round(at.y)}" text-anchor="middle" class="iso-label"` +
     `${extra ? ` ${extra}` : ''}>${escapeText(text)}</text>`
+  );
+}
+
+/** The token under a machine's name when it has no pipe to the extraction: the words in the
+ *  game's red, one line below the name (CLAUDE.md T16 2.3). */
+export function notConnectedLabel(stands: {
+  x: number;
+  y: number;
+  width: number;
+  depth: number;
+  height: number;
+}): string {
+  const at = centreOf(stands.x, stands.y, stands.width, stands.depth, stands.height);
+  return (
+    `<text x="${round(at.x)}" y="${round(at.y + 12)}" text-anchor="middle" ` +
+    'class="iso-label not-connected" data-not-connected="1">not connected</text>'
   );
 }
 
@@ -230,9 +250,11 @@ interface Drawable {
 }
 
 // ---------------------------------------------------------------------------
-// The ducting a central system draws along the rear wall (PIOTR, CLAUDE.md T10 3.4). The plant
-// itself stands outside on the apron by the shutter, like the van; what the player sees in the
-// hall is the run above the machines and a drop to every one of them.
+// The central system (PIOTR, CLAUDE.md T10 3.4; T16 2.3). The plant itself stands outside on the
+// apron by the shutter, like the van; what the player sees in the hall is one run along the rear
+// wall and a drop to every machine that wants extraction, drawn by the same vector helper as the
+// pipes the game routes, because with a central system every machine is connected and that is
+// what the drawing has to say.
 // ---------------------------------------------------------------------------
 
 /** The central system the hall runs on, or null. The flexi one wins where both are owned: it is
@@ -242,52 +264,6 @@ export function ductSystemOf(state: GameState): string | null {
     if (state.equipment.some((item) => item.specId === specId && !isSold(item))) return specId;
   }
   return null;
-}
-
-/** One length of ducting every four metres along the rear wall, three metres up. The sprite is a
- *  4 by 0.5 by 0.5 object, so it is placed by the same rule as every other picture in the hall
- *  and then lifted by its three metres. */
-export function ductRun(
-  state: GameState,
-  files: readonly string[],
-  widthCells: number,
-): string {
-  const system = ductSystemOf(state);
-  if (system === null) return '';
-  const url = pickSprite(files, system, DUCT_SPRITE_SUFFIX);
-  const lengths: string[] = [];
-  for (let x = 0; x + DUCT_SPAN <= widthCells; x += DUCT_SPAN) {
-    if (url === null) {
-      // No picture yet: a plain bar on the wall, so the run is still there to be seen.
-      const from = tileToScreen(x, 0, DUCT_HEIGHT);
-      const to = tileToScreen(x + DUCT_SPAN, 0, DUCT_HEIGHT);
-      lengths.push(
-        `<line class="duct-run" x1="${round(from.x)}" y1="${round(from.y)}" ` +
-          `x2="${round(to.x)}" y2="${round(to.y)}" />`,
-      );
-      continue;
-    }
-    const at = spriteBox(x, 0, DUCT_WIDTH, DUCT_DEPTH, DUCT_THICKNESS);
-    lengths.push(
-      spriteImage(url, { ...at, y: at.y - DUCT_HEIGHT * TILE_RISE }),
-    );
-  }
-  return `<g data-ducts="${system}">${lengths.join('')}</g>`;
-}
-
-/** The drop from the run to one machine, and the ring at the port it lands on. With the flexi
- *  system the ring is green: the reconnection is free for ever (Turn 4 3.5; T10 3.4). */
-export function ductDrop(system: string, item: Equipment): string {
-  const stands = footprintIn(item);
-  const port = centreOf(stands.x, stands.y, stands.width, stands.depth, stands.height);
-  const above = tileToScreen(stands.x + stands.width / 2, 0, DUCT_HEIGHT);
-  const green = system === 'flexiSystem' ? ' is-flexi' : '';
-  return (
-    `<g class="duct-drop${green}" data-duct="${item.id}">` +
-    `<line x1="${round(above.x)}" y1="${round(above.y)}" ` +
-    `x2="${round(port.x)}" y2="${round(port.y)}" />` +
-    `<circle class="duct-port" cx="${round(port.x)}" cy="${round(port.y)}" r="3" /></g>`
-  );
 }
 
 /** The door in the office block's face, as a control: it walks into the office, the same as the
@@ -316,22 +292,6 @@ export function officeDoor(room: {
     `<polygon points="${points(shape)}" class="door-hit" />` +
     '</g>'
   );
-}
-
-/** Every machine on the ducting, with its drop. Empty while the hall has no central system. */
-export function ductDrops(state: GameState): string {
-  const system = ductSystemOf(state);
-  if (system === null) return '';
-  return state.equipment
-    .filter(
-      (item) =>
-        !isSold(item) &&
-        itemStandsInTheHall(item) &&
-        needsDucting(item.specId, item.variantId) &&
-        item.anchorX < state.unit.widthCells,
-    )
-    .map((item) => ductDrop(system, item))
-    .join('');
 }
 
 // ---------------------------------------------------------------------------
@@ -664,10 +624,9 @@ export function footprintIn(item: Equipment): {
 // blocks nothing under it.
 // ---------------------------------------------------------------------------
 
-/** One cell of the pipe layer as the placeholder helper draws it, in the hall's 2:1 dimetric,
- *  lifted to the ducting's height: a diamond the size of a cell with its top corner on the cell's
- *  own top corner, or a smaller one centred on the cell for the collar. The delivered picture,
- *  when the art side has painted the key, is placed by the same anchor. */
+/** One cell of the pipe layer: the delivered picture where the art side has painted the key,
+ *  placed by the cell's anchor at the ducting's height, and the vector helper's own drawing of
+ *  that kind where it has not (CLAUDE.md T16 2.3). Nothing green, nothing placeholder. */
 export function pipeCellArt(
   kind: string,
   cell: { x: number; y: number },
@@ -675,21 +634,15 @@ export function pipeCellArt(
   scale = 1,
 ): string {
   const url = pickSprite(files, kind);
-  const width = TILE_WIDTH * scale;
-  // The dimetric placeholder is three thirds tall: the diamond is the middle third, so a cell
-  // wide box is a cell and a half high and its diamond is exactly a cell (docs/art/SPRITES.md 1).
-  const height = width * 1.5;
-  const centre = centreOf(cell.x, cell.y, 1, 1, DUCT_HEIGHT);
-  const at = { x: centre.x - width / 2, y: centre.y - height / 2 };
   if (url !== null) {
-    return spriteImage(url, { x: at.x, y: at.y, width, height });
+    const width = TILE_WIDTH * scale;
+    // A tile is three thirds tall: the diamond is the middle third, so a cell wide picture is a
+    // cell and a half high and its diamond is exactly a cell (docs/art/SPRITES.md 1).
+    const height = width * 1.5;
+    const centre = centreOf(cell.x, cell.y, 1, 1, DUCT_HEIGHT);
+    return spriteImage(url, { x: centre.x - width / 2, y: centre.y - height / 2, width, height });
   }
-  return (
-    `<g class="pipe-tile" data-pipe-tile="${escapeText(kind)}" ` +
-    `transform="translate(${round(at.x)},${round(at.y)})">` +
-    placeholder(kind, { width, height }, { dimetric: true }) +
-    '</g>'
-  );
+  return kind === 'gate.collar' ? gateCollarArt(cell) : pipeTile(kind, cell);
 }
 
 /** How much smaller than a cell the collar is drawn [TUNE]. */
@@ -743,9 +696,61 @@ export function pipeRuns(state: GameState, files: readonly string[]): string {
   return state.pipes.map((run) => pipeRunArt(state, run, files, short)).join('');
 }
 
-/** The whole layer: the runs, then the collars over their drops. */
+/** The machines standing on the floor that want a pipe at all. */
+function machinesWantingExtraction(state: GameState): Equipment[] {
+  return state.equipment.filter(
+    (item) =>
+      !isSold(item) &&
+      itemStandsInTheHall(item) &&
+      item.anchorX < state.unit.widthCells &&
+      wantsExtraction(item),
+  );
+}
+
+/** What a central system draws: one run along the rear wall at the pipes' height, the width of
+ *  the hall, and a run up from every machine's port to it ending in a tee, so every machine is
+ *  seen to be connected (CLAUDE.md T16 2.3). Drawn by the same helper as every routed run. */
+export function centralRunArt(state: GameState, files: readonly string[]): string {
+  const system = ductSystemOf(state);
+  if (system === null) return '';
+  const tiles: string[] = [];
+  for (let x = 0; x < state.unit.widthCells; x += 1) {
+    tiles.push(pipeCellArt('pipe.ew', { x, y: 0 }, files));
+  }
+  const drops: string[] = [];
+  for (const item of machinesWantingExtraction(state)) {
+    const port = portCell(item);
+    const cells: Array<{ x: number; y: number }> = [];
+    for (let y = port.y; y >= 0; y -= 1) cells.push({ x: port.x, y });
+    // The port is the drop, the wall the tee, and every cell between a straight length: the
+    // same key rule the routed runs use (src/engine/pipes.ts).
+    const keyed = cells.length === 1 ? [{ x: port.x, y: port.y, key: 'pipe.drop' }] : tileKeysFor(cells, 'tee');
+    drops.push(
+      `<g class="pipe central-drop" data-central-for="${escapeText(item.id)}">` +
+        keyed.map((tile) => pipeCellArt(tile.key, tile, files)).join('') +
+        '</g>',
+    );
+  }
+  return `<g class="pipe central-run" data-ducts="${system}">${tiles.join('')}</g>${drops.join('')}`;
+}
+
+/** The red ring on the port of every machine that wants a pipe and has none, and no central
+ *  system to make one unnecessary (CLAUDE.md T16 2.3). */
+export function portRings(state: GameState): string {
+  if (ductSystemOf(state) !== null) return '';
+  return machinesWantingExtraction(state)
+    .filter((item) => pipeRunFor(state, item.id) === null)
+    .map((item) => portRing(portCell(item), item.id))
+    .join('');
+}
+
+/** The whole layer: the central system's run where there is one, the runs the game routed, the
+ *  collars over their drops, and the red ring on every port without a pipe. */
 export function pipeLayer(state: GameState, files: readonly string[]): string {
-  return `<g class="pipe-layer">${pipeRuns(state, files)}${gateCollars(state, files)}</g>`;
+  return (
+    `<g class="pipe-layer">${centralRunArt(state, files)}${pipeRuns(state, files)}` +
+    `${gateCollars(state, files)}${portRings(state)}</g>`
+  );
 }
 
 export function machineFx(state: GameState, item: Equipment, spec: EquipmentSpec): MachineFx {
@@ -825,43 +830,58 @@ function sawdust(state: GameState): Drawable[] {
   return drawables;
 }
 
-/** The cell in front of an object, along its own footprint: where a man stands to use it. */
-function frontOf(item: Equipment, along: number): { x: number; y: number } {
-  const stands = footprintIn(item);
-  return {
-    x: Math.floor(stands.x) + Math.min(along, Math.max(0, Math.ceil(stands.width) - 1)),
-    y: Math.floor(stands.y + stands.depth),
-  };
+/** Where a figure stands and which way he faces: a cell and a facing. */
+export interface Standing {
+  x: number;
+  y: number;
+  facing: StationFacing;
 }
 
-/** The cell a station puts a figure on. Anything the workshop has not bought falls back to the
- *  middle of the floor (CLAUDE.md T2 3.3). */
+/** The standing cell a station puts a figure on, and the way he faces there: the station table's
+ *  cell at the item, on its free side, facing the item (CLAUDE.md T16 2.1). Anything the workshop
+ *  has not bought falls back to the middle of the floor (CLAUDE.md T2 3.3). */
 export function stationCell(
   state: GameState,
   station: string,
   bench: { x: number; y: number },
-): { x: number; y: number } {
-  // A man waiting for a machine stands at it, which is what waiting at one looks like (T7 3.1).
+): Standing {
+  // A man waiting for a machine stands at its waiting cell, which is what waiting at one looks
+  // like (T7 3.1; T16 2.1).
   const waitingFor = stationWaitingFor(station);
   const specId = stationMachine(station) ?? waitingFor;
   if (specId !== null) {
-    // At the front edge of the machine itself, not of the working zone around it, and one step
-    // along it when he is waiting for somebody else to finish with it (CLAUDE.md T7 3.1).
-    const item = state.equipment.find((entry) => entry.specId === specId);
-    if (item) return frontOf(item, waitingFor === null ? 0 : 1);
+    const item = state.equipment.find(
+      (entry) => entry.specId === specId && !isSold(entry) && itemStandsInTheHall(entry),
+    );
+    if (item) {
+      const cell = standingCell(state, item, waitingFor === null ? 'operator' : 'waiting');
+      return { ...cell, facing: facingAt(cell, item) };
+    }
   }
   if (station === STATION_RACK) {
-    const rack = state.equipment.find((entry) => sheetCapacityOf(entry) > 0);
-    if (rack) return frontOf(rack, 0);
+    const rack = state.equipment.find(
+      (entry) => sheetCapacityOf(entry) > 0 && !isSold(entry) && itemStandsInTheHall(entry),
+    );
+    if (rack) {
+      const cell = standingCell(state, rack, 'operator');
+      return { ...cell, facing: facingAt(cell, rack) };
+    }
   }
   if (station === STATION_GATE) {
-    // At the back of the lorry, inside the shutter.
-    return { x: GATE_LAYOUT.x, y: GATE_LAYOUT.y + GATE_LAYOUT.depth };
+    // In front of the pallet on the hall side, facing it, never outside (PIOTR, 16.09).
+    const cell = palletCell(state);
+    return { ...cell, facing: facingAtPallet(cell) };
   }
   // The phone is on the desk: he is in the office for a call like any other desk job (T11 3.11).
-  if (station === STATION_OFFICE || station === STATION_PHONE) return roomDoorCell('office');
-  if (station === STATION_IDLE || station === STATION_NO_BENCH) return roomDoorCell('canteen');
-  return bench;
+  if (station === STATION_OFFICE || station === STATION_PHONE) {
+    const cell = roomDoorCell('office');
+    return { ...cell, facing: facingTowards(cell, { x: cell.x, y: cell.y - 1 }) };
+  }
+  if (station === STATION_IDLE || station === STATION_NO_BENCH) {
+    const cell = roomDoorCell('canteen');
+    return { ...cell, facing: facingTowards(cell, { x: cell.x - 1, y: cell.y + 1 }) };
+  }
+  return { ...bench, facing: facingTowards(bench, { x: bench.x, y: bench.y - 1 }) };
 }
 
 /** The line under a figure's name: where he is standing, in words. */
@@ -881,20 +901,19 @@ function stationLabel(station: string): string {
   return 'waiting';
 }
 
-/** Which way a figure stands when nobody has told him otherwise: towards the camera's left, the
- *  way the hall is drawn [TUNE] (CLAUDE.md T9 3.13). */
-const FIGURE_FACING: Facing = 'sw';
-
 /** A worker is his sheet if the art side has delivered one and a capsule if it has not, with his
- *  name under him either way. The owner is the green one. The group carries its position as a
- *  transform, so a change of station slides instead of jumping. */
+ *  name under him either way. The owner is the green one. The group carries its standing cell,
+ *  its station and the way he faces there, and the walker in the renderer carries him to that
+ *  cell along the network in real time (CLAUDE.md T16 2.2): the transform written here is where
+ *  he stands when the view is built from nothing. */
 function figure(
   key: string,
-  tile: { x: number; y: number },
+  tile: Standing,
   name: string,
   isOwner: boolean,
   extra: string,
   art: { role: string; station: string; options: CharacterOptions } | null = null,
+  unloading = false,
 ): Drawable {
   const feet = centreOf(tile.x, tile.y, 1, 1);
   const fill = isOwner ? 'var(--owner)' : 'var(--worker)';
@@ -902,7 +921,7 @@ function figure(
   // always drawn if it has not (CLAUDE.md T9 3.13).
   const rest = art === null ? 'idle' : animationForStation(art.station);
   const drawn =
-    art === null ? null : characterArt(art.role, rest, FIGURE_FACING, art.options);
+    art === null ? null : characterArt(art.role, rest, tile.facing, art.options);
   const body =
     drawn ?? `<rect x="-6" y="-30" width="12" height="26" rx="6" fill="${fill}" />`;
   return {
@@ -910,6 +929,8 @@ function figure(
     svg:
       `<g class="figure" data-figure="${key}" ` +
       `transform="translate(${Math.round(feet.x)},${Math.round(feet.y)})" ` +
+      `data-cell="${tile.x},${tile.y}" data-station="${escapeText(art?.station ?? '')}" ` +
+      `data-facing-rest="${tile.facing}"${unloading ? ' data-unloading="1"' : ''} ` +
       `data-rest="${rest}" ${extra}>` +
       `<title>${escapeText(name)}</title>` +
       body +
@@ -946,8 +967,9 @@ export function pinBoard(count: number): string {
 export const PALLET_SPRITE = 'pallet';
 /** The placeholder kind of the pallet, a pallet of sheets one metre each way. */
 export const PALLET_PLACEHOLDER = 'pallet.sheets';
-/** The pallet stands where the lorry stood: inside the shutter, on the lane. */
-export const PALLET_LAYOUT = { x: GATE_LAYOUT.x, y: GATE_LAYOUT.y, width: 1, depth: 1, height: 1 };
+/** The pallet stands where the lorry stood: inside the shutter, on the lane; the constant is the
+ *  engine's, because the walking network keeps the man off it (CLAUDE.md T16 2.2). */
+export { PALLET_LAYOUT };
 
 /** The pallet at the gate: the delivered file where there is one, the placeholder in the hall's
  *  dimetric where there is not, with the shadow and the name every object has. */
@@ -1127,9 +1149,6 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
     parts.push(lines.join(''));
   }
 
-  // The ducting runs along the rear wall, behind everything that stands in front of it.
-  parts.push(ductRun(state, files, unit.widthCells));
-
   const drawables: Drawable[] = [];
 
   // The three room blocks. Each is a layer of the painting, or a placeholder box while that layer
@@ -1200,15 +1219,15 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
         : undefined;
     const benchLine =
       spec.category !== 'bench' ? '' : atThisBench ? `: ${atThisBench.name}` : ' (free)';
-    // A machine that wants a pipe and has none is not served: the hall says so on the object
-    // (CLAUDE.md T13 3.19).
-    const pipeLine = wantsExtraction(item) && !isConnected(state, item) ? ' (no pipe)' : '';
-    const name = `${spec.name}${bagLine}${serviceLine}${benchLine}${rackLine}${pipeLine}`;
+    // A machine that wants a pipe and has none is not served: the hall says so under its name, in
+    // the game's red, and never writes "connected" anywhere (CLAUDE.md T16 2.3).
+    const unconnected = wantsExtraction(item) && !isConnected(state, item);
+    const name = `${spec.name}${bagLine}${serviceLine}${benchLine}${rackLine}`;
     // Pointing at the extractor reads the hall's store (CLAUDE.md T12 3.3).
     const tooltip =
       item.specId === 'extractor' && store.exists
         ? `${name}. ${bagStoreLine(store)}. ${spec.effect}`
-        : `${name}. ${spec.effect}`;
+        : `${name}${unconnected ? ', not connected' : ''}. ${spec.effect}`;
     const fx = machineFx(state, item, spec);
     drawables.push({
       depth: depthKey(item.anchorX, item.anchorY),
@@ -1231,6 +1250,7 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
           shade,
           label: name,
         }) +
+        (unconnected ? notConnectedLabel(stands) : '') +
         fx.svg +
         '</g>',
     });
@@ -1253,6 +1273,13 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
     });
   }
 
+  // A delivery being unloaded: the man at the gate or the rack is on the loop between the pallet
+  // and the rack, and the walker keeps his legs in order instead of cutting one short
+  // (CLAUDE.md T16 2.2).
+  const unloadingNow = state.deliveries.some((delivery) => delivery.arrived && !delivery.unloaded);
+  const onTheLoop = (station: string): boolean =>
+    unloadingNow && (station === STATION_GATE || station === STATION_RACK);
+
   // The crew, and the owner, each at the station the engine put him on.
   for (const worker of state.workers) {
     if (worker.startDay > state.clock.day) continue;
@@ -1271,13 +1298,16 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
         // Joiners have a sheet tonight; everybody else falls back to the capsule until his own
         // one is delivered (CLAUDE.md T9 3.13).
         { role: worker.role, station: worker.station, options: characterOptions },
+        onTheLoop(worker.station),
       ),
     );
   }
   if (ownerIsAvailable(state)) {
-    const bench = state.equipment.find((item) => item.specId === 'workbench');
-    // At his bench's own front edge, taken from the class's footprint inside its working zone.
-    const ownerBench = bench ? frontOf(bench, 0) : { x: 2, y: 5 };
+    const bench = state.equipment.find(
+      (item) => item.specId === 'workbench' && !isSold(item) && itemStandsInTheHall(item),
+    );
+    // At his bench's own standing cell from the station table, or the middle of the floor.
+    const ownerBench = bench ? standingCell(state, bench, 'operator') : { x: 2, y: 5 };
     drawables.push(
       figure(
         'owner',
@@ -1288,6 +1318,7 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
         // The owner is his sheet where the art side has delivered one (character.owner.*, the
         // boss pack of 14.09), and the capsule where it has not, like every worker.
         { role: 'owner', station: state.owner.station, options: characterOptions },
+        onTheLoop(state.owner.station),
       ),
     );
   }
@@ -1374,10 +1405,6 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
   }
 
   live.push(drawables.map((drawable) => drawable.svg).join(''));
-
-  // The drop to every ducted machine, over the machines so the port is on the picture and not
-  // behind it (CLAUDE.md T10 3.4).
-  live.push(ductDrops(state));
 
   // The pipes the game routed and the gate collars on their drops: a layer above the equipment
   // (CLAUDE.md T13 3.11, 3.19).

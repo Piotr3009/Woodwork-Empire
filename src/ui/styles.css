@@ -256,11 +256,6 @@
 
 /* A figure slides between its stations instead of jumping (CLAUDE.md T2 3.3). How long is left of
    the slide is app.ts's to say: the view is rebuilt part way through it. */
-.figure {
-  transition-property: transform;
-  transition-timing-function: linear;
-}
-
 .view-note {
   margin: 4px 0 0;
   color: var(--text-dim);
@@ -1959,27 +1954,6 @@ input.num {
 
 /* The ducting a central system draws along the rear wall (CLAUDE.md T10 3.4). Decoration and
    status: the ring is green while the reconnection is free. */
-.duct-run {
-  stroke: var(--kit-machine-dark, #6b6f76);
-  stroke-width: 5;
-  stroke-linecap: round;
-  opacity: 0.8;
-}
-.duct-drop line {
-  stroke: var(--kit-machine-dark, #6b6f76);
-  stroke-width: 1;
-  opacity: 0.65;
-}
-.duct-port {
-  fill: none;
-  stroke: var(--kit-machine-dark, #6b6f76);
-  stroke-width: 1.5;
-  opacity: 0.85;
-}
-.duct-drop.is-flexi .duct-port {
-  stroke: var(--good, #3f9d55);
-}
-
 /* The door in the office block: a control, drawn as nothing until it is hovered. */
 .door-hit {
   fill: transparent;
@@ -3139,20 +3113,60 @@ input.num {
 .pipe-layer {
   pointer-events: none;
 }
-.pipe-tile .placeholder text,
-.gate-collar .placeholder text {
-  display: none;
+/* The pipes, one vector drawing for every tile (CLAUDE.md T16 2.3): a round duct in the duct
+   grey with a lighter top edge, the ring on the port a drop lands on, the collar at the inlet. */
+.pipe-bar {
+  stroke: var(--kit-machine-dark, #5d5178);
+  stroke-linecap: round;
+  opacity: 0.92;
 }
-.pipe-tile .placeholder polygon {
-  stroke: #163f2a;
-  stroke-width: 0.5;
-}
-.pipe-short .pipe-tile .placeholder polygon {
-  stroke: var(--bad);
+.pipe-edge {
+  stroke: #a99cc4;
   stroke-width: 1.5;
+  stroke-linecap: round;
+  opacity: 0.8;
+}
+.pipe-joint {
+  fill: var(--kit-machine-dark, #5d5178);
+  stroke: none;
+}
+.pipe-port,
+.pipe-collar {
+  fill: none;
+  stroke: var(--kit-machine-dark, #5d5178);
+  opacity: 0.9;
+}
+.pipe-short .pipe-bar {
+  stroke: var(--bad);
 }
 .pipe-short image {
   filter: drop-shadow(0 0 1px var(--bad)) drop-shadow(0 0 1px var(--bad));
+}
+
+/* A machine with no pipe to the extraction: a red ring on its port, pulsing once a second on the
+   stylesheet alone, and the words under its name (CLAUDE.md T16 2.3). */
+@keyframes port-pulse {
+  0% {
+    opacity: 0.35;
+    r: 6px;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.35;
+    r: 6px;
+  }
+}
+.port-ring circle {
+  fill: none;
+  stroke: var(--bad);
+  stroke-width: 2.5;
+  animation: port-pulse 1s ease-in-out infinite;
+}
+.not-connected {
+  fill: var(--bad);
+  font-weight: 700;
 }
 
 /* Phase B5 (REPORT-T13-B5.md, section 3) */

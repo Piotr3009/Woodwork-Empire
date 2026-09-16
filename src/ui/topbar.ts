@@ -19,6 +19,7 @@ import {
   workshopEfficiency,
 } from '../engine/index';
 import type { DayCategory, GameState, Speed } from '../engine/index';
+import { openJobs } from '../engine/jobs';
 import { cadenceControl } from './dayEnd';
 import { escapeHtml, minutes, money, signedMoney } from './modal';
 
@@ -207,6 +208,8 @@ function pushButton(action: string, label: string, extra: string, fresh: boolean
 export interface TopbarNews {
   board: boolean;
   orders: boolean;
+  /** A job changed stage: the Projects chip pulses with it [TUNE] (CLAUDE.md T16 2.4). */
+  projects?: boolean;
 }
 
 export function renderTopbar(
@@ -227,6 +230,15 @@ export function renderTopbar(
     dayMeter(state) +
     '<span class="spacer"></span>' +
     '<div class="push-block">' +
+    // The live jobs, one click away from every screen: the Work Plan, the same board as in the
+    // office, and shown from day one at zero so the player learns where it is (PIOTR;
+    // CLAUDE.md T16 2.4).
+    pushButton(
+      'openModal',
+      `Projects: ${openJobs(state).length}`,
+      ' data-modal="workPlan"',
+      news.projects === true,
+    ) +
     // Everything bought and not here yet, one click away from every screen (CLAUDE.md T8 3.2).
     pushButton(
       'openModal',

@@ -71,7 +71,7 @@ export const STATE_VERSION = 14;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
-export const APP_VERSION = 'v22';
+export const APP_VERSION = 'v23';
 
 // ---------------------------------------------------------------------------
 // The owner's day, in the seven things it is made of
@@ -3051,18 +3051,27 @@ export const DELIVERY_VAN_SPRITE = 'deliveryVan';
  *  extraction systems stand, in cells. */
 export const YARD_WIDTH_CELLS = 3;
 
-/** The ducting a central system draws along the rear wall (PIOTR, CLAUDE.md T10 3.4). One length
- *  of the `.ducts` sprite every four metres, three metres up, which is exactly the 4 by 0.5 by 0.5
- *  object the art side drew: 232 by 148 in the file. A thin line drops from it to every ducted
- *  machine, and a small ring marks the port it lands on. */
-export const DUCT_SPAN = 4;
+/** The height every pipe hangs at, in metres: the runs the game routes and the run a central
+ *  system draws along the rear wall are both up here, over the machines (CLAUDE.md T13 3.19,
+ *  T16 2.3). The Turn 4 ducting sprite and its bar are gone: one vector helper draws every pipe. */
 export const DUCT_HEIGHT = 3;
-export const DUCT_WIDTH = 4;
-export const DUCT_DEPTH = 0.5;
-export const DUCT_THICKNESS = 0.5;
-/** The families whose sprite carries a length of ducting. */
+/** The families that are a central system: with one in the hall every machine is connected and
+ *  the drawing says so with a drop to each (CLAUDE.md T16 2.3). */
 export const DUCT_SYSTEMS = ['dustSystem', 'flexiSystem'];
-export const DUCT_SPRITE_SUFFIX = 'ducts';
+/** The pipe as the vector helper draws it: a round duct this wide, in metres [TUNE]
+ *  (CLAUDE.md T16 2.3). */
+export const PIPE_DIAMETER = 0.2;
+/** The red ring on the port of a machine with no pipe to the extraction, in pixels [TUNE], pulsing
+ *  once a second (CLAUDE.md T16 2.3). */
+export const PORT_RING = 8;
+
+/** The pallet of sheets at the gate stands where the lorry stood: inside the shutter, on the lane,
+ *  one metre each way (CLAUDE.md T13 3.21). The man unloading it stands in front of it on the hall
+ *  side, never outside (PIOTR, 16.09; CLAUDE.md T16 2.1). */
+export const PALLET_LAYOUT = { x: GATE_LAYOUT.x, y: GATE_LAYOUT.y, width: 1, depth: 1, height: 1 };
+/** How fast a man walks the floor, in cells of real time a second [TUNE]: a man does not walk
+ *  faster at x10 (docs/art/SPRITES.md 10.4; CLAUDE.md T16 2.2). */
+export const WALK_CELLS_PER_SECOND = 1.6;
 
 // ---------------------------------------------------------------------------
 // 9.3 Hiring pool (PIOTR: tiers and gating; wages [TUNE])
@@ -3451,6 +3460,8 @@ export const EFFICIENCY_CAUSES: ReadonlyArray<{ id: LostMinuteCause; label: stri
 /** The first use bubbles, one sentence each, keyed by the screen they open on [TUNE wording]
  *  (CLAUDE.md T13 3.22). Dismissed by a click, remembered in the save. */
 export const TIPS: Record<string, string> = {
+  unconnected:
+    'A red ring is a machine with no pipe to the extraction. Open its card to connect it, or hire a production manager and it is done for you.',
   catalogue:
     'Every machine family has five classes: the effects come first, then the costs, then what it is.',
   workPlan: 'One row a job. A red figure on a job is material it does not have yet.',

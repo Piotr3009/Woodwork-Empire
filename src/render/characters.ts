@@ -254,3 +254,15 @@ export function animationForStation(station: string): Animation {
   if (station === STATION_PHONE) return 'phone';
   return 'idle';
 }
+
+/** Whether a leg of a walk carries material: from the pallet to the rack (an unload trip), from
+ *  the rack to a machine or a bench (fetching a sheet), or from a machine to a bench (cut parts).
+ *  Every other leg is a walk (CLAUDE.md T16 2.2). */
+export function legCarries(fromStation: string, toStation: string): boolean {
+  const toMachine = toStation.startsWith('machine:');
+  const fromMachine = fromStation.startsWith('machine:');
+  if (fromStation === STATION_GATE && toStation === STATION_RACK) return true;
+  if (fromStation === STATION_RACK && (toMachine || toStation === STATION_BENCH)) return true;
+  if (fromMachine && toStation === STATION_BENCH) return true;
+  return false;
+}

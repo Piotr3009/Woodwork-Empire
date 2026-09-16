@@ -167,9 +167,9 @@ describe('the game writing itself down as it is played', () => {
     const toOffice = root().querySelector('[data-do="setView"][data-view="office"]');
     if (toOffice !== null) toOffice.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     click('[data-office="workPlan"]');
-    expect(root().querySelector('[data-modal="workPlan"]')).not.toBeNull();
+    expect(root().querySelector('.modal-layer [data-modal="workPlan"]')).not.toBeNull();
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-    expect(root().querySelector('[data-modal="workPlan"]')).toBeNull();
+    expect(root().querySelector('.modal-layer [data-modal="workPlan"]')).toBeNull();
     expect(readStore().state).not.toBeNull();
   });
 
