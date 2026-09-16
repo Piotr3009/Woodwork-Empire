@@ -1,277 +1,335 @@
-# Turn 14: the laptop is a computer
+# Turn 15: the boards read like a ledger
 
 Woodwork Empire. Autonomous session brief for Claude Code (Opus 5, effort ultracode, cloud).
-Owner: Piotr. Programmer: Claude. Spec author: Claude (chat), 15.09.2026, from Piotr playing v19
-and choosing mockup C out of six (Petros: software/woodwork-empire, STAN entries T14-A to T14-D).
+Owner: Piotr. Programmer: Claude. Spec author: Claude (chat), 16.09.2026, from Piotr playing v21
+with five screenshots and one page of mockups (Petros: software/woodwork-empire, STAN 16.09).
 
-Read this whole file (first line must say "Turn 14"; if the root `CLAUDE.md` does not, stop and
-report), then `REPORT-T13.md` in full, then `docs/art/SPRITES.md` sections 8 and 11, then the
-archived briefs in `docs/`. Where files disagree, this one wins. All standing rules apply (no em or
-en dashes anywhere, scope 1:1, one code path, constants never in the UI, `[TUNE]` for every figure
-you choose and `[PIOTR]` for his, kill background processes, PR without merge, end the session, no
-PR watching, `npm run check` gated on its own exit code, every click single, one `APP_VERSION`
-bump).
+Read this whole file (first line must say "Turn 15"; if the root `CLAUDE.md` does not, stop and
+report), then `REPORT-T14.md` in full, then `docs/mockups/t15/README.md` and open the two HTML
+files it names in a browser (they are the design; the screenshots next to them are the before),
+then `docs/art/SPRITES.md` sections 8 and 11, then the archived briefs in `docs/`. Where files
+disagree, this one wins. All standing rules apply (no em or en dashes anywhere, scope 1:1, one
+code path, constants never in the UI, `[TUNE]` for every figure you choose and `[PIOTR]` for his,
+kill background processes, PR without merge, end the session, no PR watching, `npm run check`
+gated on its own exit code, every click single, one `APP_VERSION` bump).
 
-**Precondition.** `main` carries Turn 13 merged: `APP_VERSION` is `'v20'`, `MODAL_SKINS` exists in
-`src/ui/modal.ts`, the laptop has the Admin group (Website, Insurance, Security, the Joinery Core
-software line) and the top bar has the Settings gear. If `APP_VERSION` is not `'v20'`, stop and
-report: this brief is written against the Turn 13 model. Where this brief names a Turn 13 thing by
-the Turn 13 brief's name and `REPORT-T13.md` says it was built under another name, use the built
-one and say so in the report.
+**Precondition.** `main` carries Turn 14 merged: `APP_VERSION` is `'v21'`, `STATE_VERSION` is
+14, `MODAL_SKINS` has `screen` and the laptop has `laptopHome(state)` in `src/engine/laptop.ts`.
+If `APP_VERSION` is not `'v21'`, stop and report.
 
-This is a short turn on purpose: one evening of Piotr's notes after playing. Nothing in it is
-deep. Do every piece exactly as written and nothing more.
+One agent, serial. Short turn. Every piece is small and most of them touch `styles.css`,
+`company.ts`, `laptop.ts` and `app.ts`, so parallel agents would only wait on each other.
 
 ---
 
-## 0. What this turn is for (Piotr, 15.09)
+## 0. What this turn is for (Piotr, 16.09)
 
-Piotr opened the laptop in the office and got a paper folder. His words: "I am opening a computer,
-so everything in it should be a computer." The laptop screen is the one place in the game that is
-software and not paper, and it has to look like it. At the same time: the orange rectangles that
-light up on the laptop and the door in the office "look awful" and go; the office door on the hall
-opens the Team board instead of the office and that is wrong; and he wants a speed of x30.
+Piotr played v21 for a morning and wrote five things down. Every one of them is about reading,
+not about rules of the game. His words, in order:
 
-Four changes, one sentence each:
+1. Company board: "I do not understand the layout. I wanted one clear column on the left and one
+   on the right. On the right every plus and minus in one column and the result at the top over a
+   line, like Excel. Why is it three columns. The close cross is tiny in the corner and does not
+   work." And the board "hangs in the corner instead of in the middle between the door and the
+   corner of the walls, exactly in the middle."
+2. Orders board: "When you underline something important do not put it in a black box, nothing
+   can be read." Tips: "add a nice graphic exclamation mark before the sentence and move it to
+   the bottom of the card where there is room. The top is for important information, not tips."
+3. Laptop: a red count in the top right corner of each big tile, gone when there is nothing to
+   do; the line at the bottom of the tile stays. "The mockup had icons on the small tiles and now
+   there are none."
+4. Team: "The page layout is great, everything clear. But it is in the catalogue style and we are
+   in the laptop, so it does not match. Every page in the laptop must have a back button."
+5. Work Plan: "This looks great, but the job cards must not be crooked. Straight, nice boxes. It
+   is an interactive board."
 
-1. The laptop screen is a computer: a home screen of tiles, a system font, a cool background, and
-   no cream, no folder, no handwriting inside the screen.
-2. Hovering a thing in the office lights the thing, not a rectangle around it, and names it.
-3. The office door on the hall walks into the office.
-4. Speed x30 next to 1, 2, 4 and 10.
+And one across the whole game: "the descriptions are too small". Font up, everywhere.
 
-Plus one check: a game started fresh in this build saves and loads (Petros T12-L).
+One thing Piotr decided **not** to change, after asking twice: what goes into the Output number.
+The hall's own lines make the number; a man's rate acts on his minutes and a class of machine on
+the stage it does; nobody is counted twice (`outputBreakdown`, `machines.ts`). The engine stays.
+The board shows both kinds, under two rules, so the player still sees why a better saw is worth
+the money. That is section 2.1 and it is a change to `company.ts` and `styles.css` only.
 
 ---
 
 ## 1. Rules restated (short)
 
-Everything from Turns 1 to 13. Tonight in addition:
+Everything from Turns 1 to 14. Tonight in addition:
 
-- **`APP_VERSION = 'v21'`.** `STATE_VERSION` does **not** bump: nothing in this turn changes the
-  shape of a save. If you find you need a new field on the state, stop that piece, write it in
-  the report, and do the rest; do not bump.
-- **Two worlds, one seam.** Outside the laptop screen the game is paper and steel (the folder
-  skin, the board skin, Patrick Hand on titles). Inside the laptop screen it is software: the
-  system font stack, a cool light background, flat tiles. The seam is the laptop's bezel. Nothing
-  paper crosses it inward; nothing screen crosses it outward.
-- **Hover is CSS.** The game writes no hover state and never did (CLAUDE.md T9 3.4, T11 3.5). The
-  new glow and label are `:hover` rules and nothing else, so nothing can blink with the clock.
-- **Order is the contract.** The three big tiles are Tasks, Stock, Drawings, in that order, left
-  to right, with a gap between them. Not a different order, not four, not two.
+- **`APP_VERSION = 'v22'`.** `STATE_VERSION` does not bump: nothing here changes the shape of a
+  save. If you think you need a new field on the state, stop that piece, write it in the report,
+  do the rest.
+- **The mockups are the contract for the look.** `docs/mockups/t15/fixes-1609.html` has four
+  tabs: Company, Orders, Laptop, Team. Build what they show. Where a mockup and this text
+  disagree, this text wins; where this text is silent, the mockup decides.
+- **Boards of figures are straight.** A board the player reads numbers off is not a pin board of
+  scraps. The tilt of `.modal-board` cards stays only where this brief does not remove it.
+- **One type scale.** Every `font-size` in `styles.css` reads a token from `:root`. No pixel
+  size is typed twice. Nothing in the game is below the smallest token.
 
 ---
 
 ## 2. Changes to the design (the contract)
 
-### 2.1 The laptop screen, mockup C `[PIOTR]`
+### 2.1 The Company board, two sheets like a ledger `[PIOTR]`
 
-**The skin.** A third modal skin `screen` joins `folder` and `board` in `MODAL_SKINS`, and the
-laptop is the only modal that uses it. The screen skin is: the modal is full page (`modal-full`,
-the rule of T9 3.14 for every list and board); a dark bezel (`#1c1c1e` `[TUNE]`) with a rounded
-top and a hinge strip at the bottom, drawn in CSS; inside it the screen, background
-`#e9eee9` to `#dfe6df` `[TUNE]`, font `var(--font-ui)` (the system stack), colour `#222`.
-`--font-title` (Patrick Hand) is not used anywhere inside `.laptop-screen`; a test computes the
-font family of every heading inside the screen and asserts it is not the title font. The laptop's
-boot of five minutes once a day (T7, chat fix 2) stays exactly as it is.
+The felt board in the oak frame stays (the `company` modal, `FELT_MODALS`), the week line at the
+top stays (`Week 2 · +4 · Workshop 67% · Calls 2% ...`). Everything under it is rebuilt as **two
+cream sheets side by side**, each pinned with one pin at the top centre, **straight, no rotation**
+`[TUNE: the tilt rule of .modal-board is switched off for the company sheets]`. The three columns
+and the two paragraphs of explanation are deleted.
 
-**The home screen.** When the laptop opens it shows **home**: the company name and the game's
-date and time in one small line at the top (`Hale Joinery Ltd, Tuesday 14 March, 09:42`, from the
-state, no new formatter), then **three big tiles** in one row with a gap of `TILE_GAP` 24 px
-`[TUNE]` between them:
+**Left sheet: Reputation.** Title `Reputation` in the title font. Under it the total line: the
+word `this week` small and dim on the left, the reputation figure big on the right (the display
+token, the game's green), a 2 px rule under the line. Under the rule a small dim heading row
+`Who said what · points`, then **every rating the company has had, newest first, one row each**:
+the job's name and the verdict (`Garage shelves: on time`), a second small dim line with the day
+and the client (`day 8, Mr Cole`; the client's name if the job has one, the job's id line
+otherwise), and the points on the right in bold: green above zero, red below, dim at zero. The
+carry over from the previous week is one row `Start of the week · carried over` with its figure.
+Weeks are separated by a thin dim label row `Week 2` `[TUNE]`; the sheet scrolls inside itself
+when the list is long, the total line does not scroll. At the bottom a right aligned sum line
+`+9  -3  = 6`, the three figures of this week only.
 
-| Tile | Colour | Big line | Small line (live, from the state) |
-|---|---|---|---|
-| Tasks | the game's green | Tasks | `3 open, 1 due today` |
-| Stock | `#2c6a86` `[TUNE]` | Stock | `46 sheets free, 2 low` with the low count in the game's red when above zero, `all stocked` when zero |
-| Drawings | `#6d4c2f` `[TUNE]` | Drawings | `2 waiting for a list` (jobs accepted and without their material list yet, the Turn 13 estimator's queue), `nothing waiting` when zero |
+**Right sheet: Output.** Title `Output`. Total line: `every minute of production is multiplied
+by it` small and dim on the left, the figure big on the right (`0.67`), the 2 px rule. Then two
+groups:
 
-Each tile has a flat line icon (inline SVG, white, from the mockup: a list, a rack, a drawing).
-Under the three, a thin rule and a group headed **Office** of **small tiles** in one row: Team,
-Website, Insurance, Security, Joinery Core, Settings. Each opens what it opens in Turn 13: Team
-opens the Team modal; Website, Insurance and Security open those Admin pages; Joinery Core opens
-the software line (the purchase of the estimator's software and its extensions, 3.8 of T13);
-Settings opens the Settings modal. If Turn 13 built the Admin pages as tabs of one page, a small
-tile opens that page on that tab.
+1. **The hall's lines**, the ones with `hall: true` in `outputBreakdown`: `Base 1.00` first
+   (dim), then every hall line with its points (`Hall dirty -0.15`, `Extraction working +0`,
+   `No room at the gate -0.10` and so on), each with a small dim second line where the existing
+   tips and warnings tables have matching wording (`sweep it, or hire a helper`), otherwise none.
+   Under them the Excel sum line right aligned: `+0.00  -0.15  = 0.85`, off `plus`, `minus` and
+   `total` of the breakdown.
+2. **A second rule** and a dim heading `Act where they are, not in the number above`, then every
+   line with `hall: false`: the owner's overtime and dinner, each worker with his rate, each
+   family of machine with the best class in the hall, each with its points in the same colours
+   and the `where` text as the small second line (`your own minutes`, `his own minutes`, `the
+   stage it does`). No sum line under this group.
 
-The counts on the three tiles come from **one engine function** `laptopHome(state)` returning
-`{ tasksOpen, tasksDueToday, sheetsFree, lowLines, drawingsWaiting }`; the UI prints them and
-computes nothing. The function reads what the game already knows: the open tasks and their due
-day, the stock page's free count and its low lines (T13 3.2), the jobs without a material list
-(T13 3.8).
+Nothing about the numbers changes: the sheet prints `outputBreakdown(state)` and computes
+nothing. The point of the second group is that Piotr, and the player, can see why a class 3 saw
+was worth buying. Do not drop it, do not fold it into the sum.
 
-**Navigation.** A click on a big tile opens that page **full screen inside the laptop** with a
-back arrow at the top left (`← Home`, the arrow is a glyph, not a dash) that returns to home. The
-pages are the ones that exist today: the tasks list, the Turn 13 stock page, the drawings page.
-They are not restyled tonight beyond inheriting the screen skin (the system font, the cool
-background, no cream); their content and their controls are as Turn 13 left them. The tab bar the
-laptop has today (`tabBar('laptopTab', ...)`) is **deleted**: the tiles are the navigation, there
-is no second one. The laptop opens on home every time `[TUNE: no memory of the last page]`.
+**The cross.** The tiny `modal-close` in the corner of the felt is replaced on this modal by a
+big decorative one: a cream disc `CLOSE_DISC` 54 px `[TUNE]` with a 3 px oak border, a shadow,
+and a ✕ glyph in the title font at 34 px `[TUNE]`, sitting on the top right corner of the oak
+frame, half outside it. It is the same `data-do` as every other close. **It works:** today the
+cross on the company board does not close it. Find out why (the felt picture layer over the
+button, a z-index, a missing handler on this skin) and fix it at the root, not with a second
+handler; write the cause in the report.
 
-**Type.** `LaptopTab` becomes `LaptopPage = 'home' | 'tasks' | 'stock' | 'drawings'`, the UI
-state field renamed with it, `'home'` the default. The `'team'` value and the route in `app.ts`
-that opened the Team modal from the tab bar go: the Office tile does it.
+**Where it hangs.** The board picture is its own sprite (`officeCompanyBoard.png`) drawn at the
+region's box in `src/render/office.ts`. Today the region is `x 1000, y 168, width 280`, which
+runs 60 px past the corner of the two walls and hugs the door frame: that is "in the corner".
+Measured on `officeBackground.png` at y 300: the door frame's right edge is at x 970 and the
+corner of the rear and right walls at x 1220, so the free wall is 250 px wide with its centre at
+x 1095 (the clock above it is centred at 1101, which agrees). Set the region to `width 180,
+height 180, x 1005, y 168` `[TUNE]`: 35 px of wall on each side, square like the picture, under
+the clock. Put the four figures in one `COMPANY_BOARD_BOX` constant with the two measurements in
+its comment. Verify the measurement yourself before you commit (a one off script reading the
+pixel columns is fine; do not commit it) and adjust by at most 5 px if the wall says so. The
+hover glow and label of Turn 14 follow the region and need no change.
 
-**Tips.** Turn 13's first use bubble for the laptop (T13 3.22) fires on home; the pages behind the
-tiles keep whatever bubbles Turn 13 gave them.
+### 2.2 The Orders board: badges you can read, tips at the bottom `[PIOTR]`
 
-### 2.2 Hover in the office: light the thing, name it `[PIOTR]`
+**Badges.** `.badge` (`Bespoke material`, `Site measure`, and the `Express` flag if it shares
+the class) is today `var(--panel)` with a 1 px border and 11 px text, which on the folder paper
+renders dark on dark. It becomes: background the game's red (`var(--bad)`), text white, bold,
+the body token, padding `4px 10px`, radius 4 px, letter spacing 0.2 px `[PIOTR: the red one of
+the three in the mockup; TUNE the metrics]`. `Express` keeps its own place at the top right of
+the card and takes the accent orange instead of red `[TUNE]`, so a rush is not a warning.
+Wherever else `.badge` is used in the game, it gets the same treatment; if a use is not a
+warning (grep first), give it its own class and leave it as it was, and list those in the
+report.
 
-Today every office region is a transparent rectangle over the room photograph with a 2 px orange
-outline on hover. That outline is **deleted** from `.office-region:hover` and
-`.office-region:focus-visible` (keep the `outline: 2px solid transparent` base and a visible
-focus ring for the keyboard: on `:focus-visible` only, a 2 px ring in the accent, because the
-keyboard has nothing else). On mouse hover, two things and nothing else:
+**Tips.** `renderTip` is today prepended to the modal body, so the first thing on every screen
+is the tip. It moves to the **bottom** of the body: `modalBody(...) + renderTip(...)` in
+`app.ts` (and the three other call sites: contracts, finance, house), one helper so the order
+cannot differ between screens. The bubble gets a **graphic exclamation mark** before the
+sentence: an inline SVG disc in the accent orange, 34 px `[TUNE]`, with a white `!` in the title
+font, followed by the sentence in the body token, the `Right` button on the right as a pill. The
+bubble is the last child of the body and does not float over the content; on a screen that
+scrolls, it scrolls with it. Same rule inside the laptop screen: the tip is the last child of
+the page, styled to the screen skin (white panel, system font, the same disc).
 
-1. **The glow.** The laptop is its own PNG layer (`officeLaptop`, T4 3.1), so when the laptop
-   region is hovered, that layer gets a soft glow in the shape of the laptop:
-   `filter: drop-shadow(0 0 14px rgba(245,239,226,.75)) drop-shadow(0 0 30px rgba(224,115,30,.45))`
-   `[TUNE]`. This is CSS only: the region and the layer are siblings or the layer is inside the
-   region; pick the one that works with `:hover` or `:has()` and no JavaScript, and say which in
-   the report. The door, the two wall boards, the binder and the catalogue are painted into
-   layers they share with other things, so a shaped glow is not possible for them tonight; they
-   get a **soft light spot**: a radial gradient ellipse fitted to the region
-   (`radial-gradient(ellipse at center, rgba(245,239,226,.28), transparent 70%)` `[TUNE]`) on
-   hover, no edge, no rectangle. An art request in section 8 asks GPT for a "door lit" overlay
-   PNG; when `public/sprites/officeDoorLit.png` exists the door uses it the way the laptop uses
-   its layer, through the same file check every sprite goes through, and the spot otherwise.
-2. **The label.** A handwritten pill in the title font, dark green on cream
-   (`background rgba(16,37,24,.85)`, `color var(--cream)`, rotated `-3deg`) `[TUNE]`, appears at
-   the top right of the region on hover with the region's name: `Laptop`, `To the hall` (the
-   door), `Work plan`, `Orders`, `Company board`, `Accounts`, `Catalogue`. The label text comes
-   from the region table in `office.ts`, one place; every region has one, none is invented in
-   CSS. The label is a child of the region rendered every time, hidden until `:hover`, so the
-   60 tick stability test of `tests/ui/hallClock.test.ts` still finds every region node and its
-   markup unchanged.
+### 2.3 The laptop: counts on the tiles, icons on the small ones, every page a laptop page `[PIOTR]`
 
-A test walks every office region and asserts: the label child exists with the table's text; the
-stylesheet has no `outline-color` rule for `.office-region:hover`; and the laptop's glow rule
-targets the laptop layer.
+**Counts.** Each of the three big home tiles gets a **red round count badge** in its top right
+corner: `TILE_COUNT` 34 px tall, min width 34 px, `var(--bad)`, white bold at the lead token, a
+2 px white ring and a shadow `[TUNE]`. The figure is: Tasks, the open tasks (`tasksOpen`);
+Stock, the low lines (`lowLines`); Drawings, the jobs waiting for a list (`drawingsWaiting`), all
+off `laptopHome(state)` and nothing else. **When the figure is zero the badge is not rendered at
+all**, not hidden, not rendered: no element. The live line at the bottom of the tile stays
+exactly as Turn 14 left it.
 
-### 2.3 The office door on the hall walks into the office `[PIOTR]`
+**Icons.** The six Office tiles get the line icons of the mockup (people, globe, shield, lock,
+monitor, gear), inline SVG in the game's green, 30 px `[TUNE]`, above the label. They were in
+mockup C and Turn 14 left them out; they are not optional.
 
-Turn 10 3.6 made the office door on the hall open the Team board, and REPORT-T10 named it as a
-deviation ("the office door on the hall is the Team, next to it is the office"). Piotr reverses
-it: a click on the door with `data-door="office"` does exactly what the top bar's Office button
-does, through the same function, and nothing else. Team is reachable from the laptop's Office
-tile (2.1) and from wherever else Turn 13 left it. The door's tooltip reads `To the office`. The
-test that asserts the Team modal opens on the door is **flipped** to assert the office view
-opens, not kept beside a new one (the four laws of deletion, Petros 30.08).
+**Every page a laptop page.** Turn 14 put Tasks, Stock, Drawings and the three Admin tabs inside
+the screen behind `← Home`. **Team was left as the folder modal**, opened from the Office tile:
+that is the catalogue look Piotr saw. Tonight Team becomes a laptop page like the others:
+`LaptopPage` gains `'team'`, the Team tile opens it inside the screen with `← Home` at the top
+left in the same place as on every other page, the Team renderer's output sits inside the screen
+skin, the four tabs (`Workshop`, `Office`, `Technical`, `Management`) render as the screen's
+segmented control, the draw chips as the screen's buttons, the hire cards as white panels with
+the `Hire` button in the game's green. Its content and its controls are as Turn 13 and 14 left
+them: hiring, the draw tiers, holiday, the second shift line all work from inside the screen,
+proved by the existing team tests run through the laptop page. The separate `team` modal is
+**deleted**: its `ModalSpec`, its `MODAL_SKINS` line, the `case 'team'` route and every
+`openModal('team')`; every place that opened it (the top bar's link if any, a warning strip's
+link, the hall's Start production path if it goes there) opens the laptop on the team page
+through one function `openLaptopPage('team')`. Grep for `'team'` in `src/ui` and account for
+every hit in the report.
 
-### 2.4 Speed x30 `[PIOTR]`
+**Back on every page.** A test opens every `LaptopPage` but `home` and asserts the `← Home`
+control is the first child of the page header, with the same class, and that clicking it lands
+on home. If any page is missing it, that is the bug.
 
-`SPEEDS` becomes `[0, 1, 2, 4, 10, 30]` and the `Speed` type joins `30`. The chip on the top bar
-and the cadence control in the Menu both show it, off the one table, in the same style as x10.
-`gameMinutesPerRealSecond(30)` is 30, so a working day of 480 minutes runs in 16 real seconds.
-Everything that stops the clock (an event with a choice, the end of the day, dinner, the owner
-out modal) stops it at x30 as it does at x10: the speed test of `tests/ui/speedTen.test.ts` is
-extended to x30, and a new case runs a full day at x30 and asserts the day end summary comes up
-once and the clock stops on it. Skip ahead stays at 4x (T8) and the machine move jump stays as it
-is `[PIOTR: unchanged]`. The single click test (200 clicks with a render between every two) is
-run once at x30 as well.
+**Settings** stays a modal of its own (it is the top bar's gear, not a laptop thing); the Office
+tile opens it as today.
 
-### 2.5 The save check (Petros T12-L)
+### 2.4 Work Plan: straight cards `[PIOTR]`
 
-A fresh game started in this build (new company, difficulty Easy, day 1) saves through the
-browser store, the file and the cloud row, and loads back through Continue, Load from file and the
-cloud, at day 1 and again after thirty minutes of play. A v20 save (make a fixture from a short
-run on `main` before your first commit, `tests/fixtures/save-v20.woodwork.json`) loads too. If
-any of these is red, fix it in this turn and name the cause in the report under its own heading
-"T12-L"; if all are green, the report says so in one line.
+The tilt rules in `styles.css` (`.modal-board .plan-row:not(.plan-scale-row):nth-of-type(3n + 1)`
+and its two siblings) lose the `.plan-row` selector: Work Plan rows render with no transform.
+The colours, the axis, the bars, the ticks and the deadline marks are untouched. The `.card`,
+`.row` and `.tile` selectors of the same three rules **stay** for the Shopping board `[TUNE:
+Piotr named the Work Plan only; Shopping is a shop window, not a ledger]`. The Company sheets
+are straight through 2.1. A test reads the stylesheet and asserts no rule transforms
+`.plan-row`.
+
+### 2.5 The type scale: the descriptions go up everywhere `[PIOTR]`
+
+`styles.css` has 24 places at 12 px, 11 at 11 px, 5 at 10 px, 9 at 13 px and a scatter of larger
+sizes, each typed by hand. Tonight:
+
+1. Define a type scale on `:root`: `--fs-tiny: 12px` (the floor: figures on a bar, axis labels),
+   `--fs-small: 13px` (second lines, meta, table heads), `--fs-body: 15px` (every description,
+   card line, row, tip sentence, button), `--fs-lead: 18px` (card titles in the system font,
+   section heads), `--fs-title: 26px`, `--fs-display: 34px` (the ledger totals) `[TUNE the
+   names, not the idea]`. Titles in the title font keep their own two or three sizes as tokens
+   too.
+2. Replace **every** `font-size` in `styles.css` with a token. Nothing below `--fs-tiny`. What
+   was 10 or 11 becomes tiny; what was 12 becomes small or body by its job (a description is
+   body, a unit under a figure is small); what was 13 becomes body. A table in the report lists
+   every old size and the token it went to, with the count.
+3. Then look. Every modal, the top bar, the day end summary, the event modal, the machine card,
+   the catalogue, the shopping board, the work plan, the laptop home and its pages, at the game's
+   minimum width of 1280 px: nothing overflows its box, nothing wraps into a third line that was
+   one, no button loses its label. Where something breaks, fix the box, not the size (a wider
+   column, a wrap, a scroll), and list it. The one exception allowed: a figure on a work plan bar
+   or a tick label may stay tiny.
+4. Twelve screenshots of the look after, in `docs/report-t15/`, one per screen named above.
 
 ---
 
 ## 3. State
 
-No change to the shape of the state. `STATE_VERSION` stays. The laptop's page is UI state
-(`ui.laptopPage`), not game state, as the tab was.
+No change to the shape of the state. `STATE_VERSION` stays at 14.
 
 ---
 
 ## 4. Task queue, in order
 
-Branch `turn-14-the-laptop-is-a-computer` from `main`. One commit per task, `npm run check` green
-on its own exit code before each, two report lines per task in `REPORT-T14.md`.
+Branch `turn-15-the-boards-read-like-a-ledger` from `main`. One commit per task, `npm run check`
+green on its own exit code before each, two report lines per task in `REPORT-T15.md`.
 
-**T14-01 Housekeeping and v21.** `docs/turn-13-brief.md` from git history, byte for byte the
-`CLAUDE.md` of the Turn 13 merge commit (the typo in its line 26 stays: archives are copies);
-the README's briefs line; `APP_VERSION = 'v21'`; the v20 fixture of 2.5. Done: the version test.
+**T15-01 Housekeeping and v22.** `docs/turn-14-brief.md` from git history, byte for byte the
+`CLAUDE.md` of the Turn 14 merge commit; the README's briefs line; `APP_VERSION = 'v22'`;
+`docs/mockups/t15/` is already in the repo through this brief's pack and is not touched. Done:
+the version test.
 
-**T14-02 Speed x30.** 2.4. Done: the tests.
+**T15-02 The type scale.** 2.5 points 1 and 2 only: the tokens and the replacement, the mapping
+table in the report. Done: a test reads `styles.css` and asserts every `font-size` value is a
+`var(--fs-...)` and every token is at or above 12 px. (Looking, point 3, is done last, in
+T15-08, once every other change is in.)
 
-**T14-03 The office door.** 2.3. Done: the flipped test.
+**T15-03 Work Plan straight.** 2.4. Done: the stylesheet test.
 
-**T14-04 The screen skin and the home screen.** 2.1: the `screen` skin, the laptop on it, the home
-screen with `laptopHome(state)`, the three big tiles and the Office group, the tab bar deleted,
-`LaptopPage`. Done: the tests (home first; the three tiles in order with the counts of a known
-state; the low count red above zero and the words when zero; every Office tile opens its thing;
-back returns to home; the laptop modal carries `modal-screen` and neither `modal-folder` nor
-`modal-board`; no title font inside the screen; the `laptopTab` route and `tabBar` call gone).
+**T15-04 Tips at the bottom, with the mark.** 2.2 tips. Done: a test opens three screens with
+an unseen tip and asserts the bubble is the last child of the body, has the SVG disc, and the
+`Right` button dismisses it as before.
 
-**T14-05 The pages inherit the skin.** 2.1, the tasks, stock and drawings pages inside the screen
-with the back arrow, content untouched. Done: the tests (each page opens from its tile, the back
-arrow works, the Turn 13 stock page's controls still work inside the screen).
+**T15-05 Badges.** 2.2 badges. Done: a test computes the badge's background and colour off the
+stylesheet on an enquiry card with both flags, asserts red and white and the body token, and
+that `Express` is orange.
 
-**T14-06 Hover in the office.** 2.2. Done: the tests.
+**T15-06 The Company board.** 2.1: the two sheets, the ledger totals, the two groups on the
+right, the big cross that works, the region moved. Done: tests (two sheets and no third column;
+the reputation total equals the state's; every rating present newest first with its points and
+colour; the hall lines and their sum equal `outputBreakdown` `plus`, `minus`, `total`; every
+`hall: false` line under the second rule with its `where`; the cross closes the modal from a
+real click; the region box equals `COMPANY_BOARD_BOX`; the office hover test still passes).
 
-**T14-07 The save check.** 2.5. Done: green, or fixed and named.
+**T15-07 The laptop.** 2.3: counts, icons, Team as a page, the modal deleted, back on every
+page. Done: tests (a badge on Tasks and Stock with a known state and none on Drawings at zero,
+as elements; six icons; Team opens inside the screen from the tile and from every former
+`openModal('team')` caller; the team tests green through the page; `'team'` gone from
+`MODAL_SKINS` and the modal routes; the back test of 2.3).
 
-**T14-08 Report and PR.** `REPORT-T14.md` in the usual structure plus "Numbers chosen", "Deleted"
-and "T12-L". Kill background processes, push, PR titled `Turn 14: the laptop is a computer`, do
-not merge, end the session.
+**T15-08 Look, fix, shoot.** 2.5 points 3 and 4 across every screen, with the fixes listed.
+Done: the twelve pictures, `npm run check` green.
+
+**T15-09 Report and PR.** `REPORT-T15.md` in the usual structure plus "Numbers chosen", "Type
+scale mapping", "Deleted" and "Why the cross did not close". Kill background processes, push, PR
+titled `Turn 15: the boards read like a ledger`, do not merge, end the session.
 
 ---
 
 ## 5. Do not (tonight)
 
-1. No touching `docs/art/SPRITES.md`, `CLAUDE.md`, the archived briefs, the sprite files or the
-   font file. Art requests go in `docs/art/REQUESTS-T14.md` only.
-2. No `STATE_VERSION` bump. No new field on the game state.
-3. No restyling of the tasks, stock or drawings pages beyond the screen skin. No new controls on
-   them. No change to the Team modal, the Admin pages or the Settings modal.
-4. No JavaScript hover state. No `mouseenter`, no `mouseover`, no class toggled by the pointer.
-5. No second navigation inside the laptop: the tab bar goes, nothing replaces it but the tiles and
-   the back arrow.
-6. No change to Skip ahead, the move jump, or what stops the clock.
-7. No storage access outside `src/cloud/store.ts`; no PixiJS, sound, mobile, Steam, Electron.
-8. No watch loops, nothing left running.
+1. No change to `outputBreakdown`, `hallProductivityFactor`, the class factors of machines, the
+   rates of men, or anything else in `src/engine`: this turn has no engine task. `laptopHome` is
+   read, not changed.
+2. No `STATE_VERSION` bump. No new field on the state.
+3. No touching `docs/art/SPRITES.md`, `CLAUDE.md`, the archived briefs, the mockup files, the
+   sprite files or the font file.
+4. No change to what the Orders board says or does beyond the badges and the tip. No change to
+   the Work Plan beyond the tilt. No change to the Team page's content or controls beyond the
+   skin and the frame.
+5. No tilt back on the Company sheets or the Work Plan rows; no tilt removed from Shopping.
+6. No pixel `font-size` left in `styles.css`; no size below the tiny token anywhere.
+7. No second handler on the company cross; the root cause is fixed.
+8. No storage access outside `src/cloud/store.ts`; no PixiJS, sound, mobile, Steam, Electron.
+9. No watch loops, nothing left running.
 
 ---
 
 ## 6. Parked
 
-1. The laptop remembering its last page across opens.
-2. A shaped glow on the door, the boards, the binder and the catalogue: needs art (section 8).
-3. Everything parked by Turn 13.
+1. Whether machines and men should enter the Output number at all (Piotr, 16.09: "to think
+   about"; Petros "WAZNE DO PRZEGADANIA"). Not tonight, not by you.
+2. Shopping board tilt.
+3. Everything parked by Turns 13 and 14.
 
 ---
 
 ## 7. The cross check (before the PR)
 
-- **Three skins, one each.** `MODAL_SKINS` has `folder`, `board` and `screen`; the laptop is the
-  only `screen`; `tests/ui/modalSkins.test.ts` asserts a modal carries exactly one skin class.
-- **One home function.** Every number on the home tiles comes from `laptopHome(state)`; grep the
-  laptop UI for arithmetic on the state and there is none.
-- **One door path.** The door's click and the Office button call the same function; grep for a
-  second way into the office view and there is none.
-- **One speed table.** The chips, the Menu control and `gameMinutesPerRealSecond` read `SPEEDS`;
-  no `30` typed anywhere but the table.
-- **Hover is CSS.** grep `src/ui` and `src/render` for `mouseenter`, `mouseover`, `hover` in
-  TypeScript: nothing.
-- **The look.** Open the office, hover the laptop and the door, open the laptop, click each of the
-  nine tiles, go back: nine screenshots into the report folder. If the inside of the laptop has
-  any cream, any folder, any handwriting, it is a bug.
+- **Two sheets.** The company body has exactly two `.sheet` children and no `.col`, no third
+  block, no paragraph of explanation.
+- **The number is the engine's.** grep `company.ts` for arithmetic on points: none; every figure
+  is a field of `outputBreakdown` or a rating's points.
+- **One close.** The company cross uses the same `data-do` as every other modal close, and a
+  real click closes it in the test.
+- **One home function.** Every count on the tiles is a field of `laptopHome(state)`.
+- **Team once.** `grep -rn "'team'" src/ui` shows only the `LaptopPage` value and
+  `openLaptopPage('team')` calls; no `ModalSpec`, no skin, no route.
+- **Back everywhere.** The back test of 2.3 is green for every page.
+- **Tips last.** Every `renderTip` call site puts the tip after the body, through the one
+  helper.
+- **Type scale.** The stylesheet test of T15-02 is green; the mapping table is in the report.
+- **Straight.** No rule in `styles.css` transforms `.plan-row` or the company sheets.
+- **The look.** The twelve pictures are in `docs/report-t15/`; the Company board hangs centred
+  on the wall under the clock in the office picture.
 
 ---
 
-## 8. Art requested (contents of `docs/art/REQUESTS-T14.md`)
+## 8. Art requested
 
-For GPT, on `art/sprites`, PNG in `public/sprites/`, with alpha.
-
-1. **`officeDoorLit.png`**: the office door alone, on the office room canvas (1672 by 941, the
-   same frame as `officeBackground`), painted as if lit from inside, everything else transparent.
-   The code lays it over the room on hover and nothing else changes.
-2. The same for the two wall boards and the binder if cheap: `officeWorkPlanLit.png`,
-   `officeOrdersLit.png`, `officeBinderLit.png`. Optional; the light spot covers them until then.
+None tonight. `docs/art/REQUESTS-T14.md` stands (the lit door and the optional lit boards).
 
 End of brief.
