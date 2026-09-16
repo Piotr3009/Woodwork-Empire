@@ -130,7 +130,7 @@ describe('the other badges of the game', () => {
       'badge-express tile-flag',
       'badge-held',
       'badge-kind',
-      'badge-low bad',
+      'badge-low',
       'badge-ordered',
       'badge-owned',
     ]);

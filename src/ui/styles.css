@@ -3169,10 +3169,6 @@ input.num {
   top: 6px;
 }
 
-.menu-pop {
-  position: relative; /* if it is not already: the cross sits in its top right corner */
-}
-
 .gear {
   font-size: var(--fs-lead);
   line-height: 1;
