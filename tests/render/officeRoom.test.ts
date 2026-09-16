@@ -4,12 +4,13 @@
 
 import { describe, expect, it } from 'vitest';
 import {
-  OFFICE_CANVAS,
+  COMPANY_BOARD_BOX,
   FLOOR_CATALOGUE,
   FLOOR_CATALOGUE_SPRITE,
+  OFFICE_CANVAS,
   OFFICE_LAYERS,
-  OFFICE_REGIONS,
   OFFICE_NAME_SIZE_MIN,
+  OFFICE_REGIONS,
   OFFICE_TEXTS,
   officeScale,
   renderOffice,
@@ -135,7 +136,7 @@ describe('the click regions', () => {
       ['laptop', 558, 449, 557, 443],
       ['catalogue', 60, 680, 445, 210],
       ['binder', 1170, 620, 435, 280],
-      ['company', 1000, 168, 280, 280],
+      ['company', COMPANY_BOARD_BOX.x, COMPANY_BOARD_BOX.y, COMPANY_BOARD_BOX.width, COMPANY_BOARD_BOX.height],
     ]);
   });
 

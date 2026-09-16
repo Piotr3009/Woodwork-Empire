@@ -77,6 +77,20 @@ export interface OfficeRegion {
   needs?: string | null;
 }
 
+/** Where the company board hangs: flat on the rear wall, exactly in the middle between the door
+ *  and the corner of the walls, under the clock, square like the picture (PIOTR, 16.09; CLAUDE.md
+ *  T15 2.1). Measured on officeBackground.png at y 300: the door frame's right edge is at x 971
+ *  (the dark line of the frame is columns 970 and 971) and the corner of the rear and right walls
+ *  at x 1214 (the brightness jumps between columns 1212 and 1216, the same on every row from 200
+ *  to 450), so the free wall is 243 px wide with its centre at x 1092; the clock above it is
+ *  centred at 1101. 180 square, 31 px of wall on the left and 32 on the right, under the clock
+ *  (y 88..146) [TUNE]. */
+export const COMPANY_BOARD_BOX = { x: 1002, y: 168, width: 180, height: 180 };
+
+/** The pinned sheet of the felt picture, as fractions of the board: x 19.4% to 80.6% across it and
+ *  y 40.7% to 80.9% down it (docs/art/SPRITES.md 11). */
+const COMPANY_SHEET = { left: 0.194, right: 0.806, top: 0.407, bottom: 0.809 };
+
 /** The rectangles of docs/art/SPRITES.md 8.2, in canvas pixels before any scaling. The name is
  *  what the label says when the pointer is on the region, one place for every one of them
  *  (CLAUDE.md T14 2.2). */
@@ -127,17 +141,7 @@ export const OFFICE_REGIONS: OfficeRegion[] = [
   },
   // The free wall right of the door (PIOTR, 13.09; CLAUDE.md T9 3.10). It is the room's own
   // board, like the Work Plan: it needs nothing bought before it says how the company is doing.
-  {
-    id: 'company',
-    name: 'Company board',
-    // Flat on the rear wall between the door and the corner, under the clock (which sits at
-    // y 88..146), square like the picture (PIOTR, 14.09: not in the corner, on the wall).
-    x: 1000,
-    y: 168,
-    width: 280,
-    height: 280,
-    opens: true,
-  },
+  { id: 'company', name: 'Company board', ...COMPANY_BOARD_BOX, opens: true },
 ];
 
 /** The board the game draws itself until the art side paints one, with its heading lettered on it
@@ -184,11 +188,17 @@ export const OFFICE_NAME_SIZE_MIN = 12;
 export const OFFICE_TEXTS: Record<'clock' | 'company' | 'companyTotals', OfficeTextBox> = {
   clock: { x: 1050, y: 96, width: 102, height: 40, fontSize: 28 },
   company: { x: 200, y: 92, width: 170, height: 46, fontSize: 22 },
-  // The pinned sheet of the felt board, in office canvas pixels: the board region is 280 square
-  // at (1000, 168) and the sheet sits at 19.4% to 80.6% across it and 40.7% to 80.9% down it
-  // (docs/art/SPRITES.md 11). The wall board carries the two totals and nothing else
-  // (PIOTR, 15.09; CLAUDE.md T11 3.5).
-  companyTotals: { x: 1054, y: 282, width: 172, height: 113, fontSize: 18 },
+  // The pinned sheet of the felt board on the wall, in office canvas pixels, off the board's own
+  // box so the two cannot drift apart (COMPANY_SHEET; docs/art/SPRITES.md 11). The wall board
+  // carries the two totals and nothing else (PIOTR, 15.09; CLAUDE.md T11 3.5). The lettering
+  // scales with the board: 12 px at scale 1 on the 180 board [TUNE].
+  companyTotals: {
+    x: Math.round(COMPANY_BOARD_BOX.x + COMPANY_BOARD_BOX.width * COMPANY_SHEET.left),
+    y: Math.round(COMPANY_BOARD_BOX.y + COMPANY_BOARD_BOX.height * COMPANY_SHEET.top),
+    width: Math.round(COMPANY_BOARD_BOX.width * (COMPANY_SHEET.right - COMPANY_SHEET.left)),
+    height: Math.round(COMPANY_BOARD_BOX.height * (COMPANY_SHEET.bottom - COMPANY_SHEET.top)),
+    fontSize: 12,
+  },
 };
 
 export interface Viewport {
