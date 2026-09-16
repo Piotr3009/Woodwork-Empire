@@ -2375,24 +2375,25 @@ input.num {
   width: 12px;
 }
 
-/* Minus one degree to one and a half, so a board of cards is never a filing cabinet. */
+/* Minus one degree to one and a half, so a board of cards is never a filing cabinet. The Work
+   Plan's rows are not on these three: a board the player reads numbers off is straight
+   (PIOTR, 16.09: "the job cards must not be crooked"; CLAUDE.md T15 2.4). The Shopping board
+   keeps its tilt [TUNE: Piotr named the Work Plan only; Shopping is a shop window, not a
+   ledger]. */
 .modal-board .card:nth-of-type(3n + 1),
 .modal-board .row:nth-of-type(3n + 1),
-.modal-board .plan-row:not(.plan-scale-row):nth-of-type(3n + 1),
 .modal-board .tile:nth-of-type(3n + 1) {
   transform: rotate(-1deg);
 }
 
 .modal-board .card:nth-of-type(3n + 2),
 .modal-board .row:nth-of-type(3n + 2),
-.modal-board .plan-row:not(.plan-scale-row):nth-of-type(3n + 2),
 .modal-board .tile:nth-of-type(3n + 2) {
   transform: rotate(0.75deg);
 }
 
 .modal-board .card:nth-of-type(3n),
 .modal-board .row:nth-of-type(3n),
-.modal-board .plan-row:not(.plan-scale-row):nth-of-type(3n),
 .modal-board .tile:nth-of-type(3n) {
   transform: rotate(1.5deg);
 }
