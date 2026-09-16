@@ -17,10 +17,11 @@ function parse(html: string): HTMLElement {
 }
 
 describe('the security tab', () => {
-  it('is the Admin tab of the laptop, and lists the six levels with the one held marked', () => {
+  it('is a page of the laptop behind its Security tile, and lists the six levels with the one held marked', () => {
     const state = newGame({ difficulty: 'veryEasy' });
-    const laptop = parse(renderLaptop(state, { tab: 'security', stockSheets: '' }));
-    expect(laptop.querySelector('[data-do="laptopTab"][data-id="security"]')?.className).toContain('is-on');
+    const laptop = parse(renderLaptop(state, { page: 'security', stockSheets: '' }));
+    expect(laptop.querySelector('.laptop-screen[data-laptop-page="security"]')).not.toBeNull();
+    expect(laptop.querySelector('[data-tile="home"]')).not.toBeNull();
     const cards = Array.from(laptop.querySelectorAll('.security-level'));
     expect(cards.map((card) => card.getAttribute('data-level'))).toEqual(['0', '1', '2', '3', '4', '5']);
     expect(cards[0]?.classList.contains('is-held')).toBe(true);
