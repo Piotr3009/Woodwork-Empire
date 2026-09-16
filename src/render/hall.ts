@@ -913,7 +913,7 @@ function figure(
   isOwner: boolean,
   extra: string,
   art: { role: string; station: string; options: CharacterOptions } | null = null,
-  unloading = false,
+  loop = '',
 ): Drawable {
   const feet = centreOf(tile.x, tile.y, 1, 1);
   const fill = isOwner ? 'var(--owner)' : 'var(--worker)';
@@ -930,7 +930,7 @@ function figure(
       `<g class="figure" data-figure="${key}" ` +
       `transform="translate(${Math.round(feet.x)},${Math.round(feet.y)})" ` +
       `data-cell="${tile.x},${tile.y}" data-station="${escapeText(art?.station ?? '')}" ` +
-      `data-facing-rest="${tile.facing}"${unloading ? ' data-unloading="1"' : ''} ` +
+      `data-facing-rest="${tile.facing}"${loop === '' ? '' : ` data-loop="${loop}"`} ` +
       `data-rest="${rest}" ${extra}>` +
       `<title>${escapeText(name)}</title>` +
       body +
@@ -1274,11 +1274,17 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
   }
 
   // A delivery being unloaded: the man at the gate or the rack is on the loop between the pallet
-  // and the rack, and the walker keeps his legs in order instead of cutting one short
-  // (CLAUDE.md T16 2.2).
+  // and the rack, and he never stands on it: he touches the pallet and goes, touches the rack
+  // and comes back, for as long as the engine has him unloading (PIOTR, 16.09; CLAUDE.md T16
+  // 2.2). The page gives the walker both ends of the loop.
   const unloadingNow = state.deliveries.some((delivery) => delivery.arrived && !delivery.unloaded);
-  const onTheLoop = (station: string): boolean =>
-    unloadingNow && (station === STATION_GATE || station === STATION_RACK);
+  const loopEnds = (): string => {
+    const gate = stationCell(state, STATION_GATE, { x: 2, y: 5 });
+    const rack = stationCell(state, STATION_RACK, { x: 2, y: 5 });
+    return `${gate.x},${gate.y};${rack.x},${rack.y}`;
+  };
+  const onTheLoop = (station: string): string =>
+    unloadingNow && (station === STATION_GATE || station === STATION_RACK) ? loopEnds() : '';
 
   // The crew, and the owner, each at the station the engine put him on.
   for (const worker of state.workers) {

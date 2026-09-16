@@ -1,12 +1,18 @@
 // The walker (CLAUDE.md T16 2.2). One walker per figure on the page: the cell it is at, the path
-// it is on, and the goals still to walk to. The engine says where and along which cells (the
-// figure's standing cell, on the group as data-cell, and walkPath over the free cells); the
-// walker says when: on every frame it advances along its path at a man's pace in real seconds,
-// whatever the game's clock is doing, sets the figure's transform to the point between two
-// cells, plays carry on a leg that carries material and walk on the rest, and faces the way it
-// is going. On arrival it plays the station's animation and faces the item. A figure never
-// jumps: when the engine sends it somewhere else it sets off from wherever it had got to, and
-// only a view built from nothing (a load, a scene change) starts it at its station's cell.
+// it is on, and where it goes next. The engine says where and along which cells (the figure's
+// standing cell, on the group as data-cell, and walkPath over the free cells); the walker says
+// when: on every frame it advances along its path at a man's pace in real seconds, whatever the
+// game's clock is doing, sets the figure's transform to the point between two cells, plays carry
+// on a leg that carries material and walk on the rest, and faces the way it is going. On arrival
+// it plays the station's animation and faces the item. A figure never jumps: when the engine
+// sends it somewhere else it sets off from wherever it had got to, and only a view built from
+// nothing (a load, a scene change) starts it at its station's cell.
+//
+// An unloading is a loop he never stands on (PIOTR, 16.09): the page gives both ends, the pallet
+// and the rack, and the walker touches one and goes to the other, with the sheet on the way to
+// the rack and empty handed on the way back, for as long as the engine has him unloading. As many
+// trips as the time allows; a farther rack is fewer trips. When the engine moves him on, he
+// finishes the leg he is on and goes to his new station.
 //
 // Nothing here is game state. A rebuilt page finds the walkers still here and puts every figure
 // back where it had actually got to (the same reason the slides of Turn 2 lived in the app).
@@ -38,6 +44,12 @@ export interface Arrival {
   station: string;
 }
 
+/** The two ends of an unloading: where he touches the pallet and where he touches the rack. */
+export interface Loop {
+  gate: Cell;
+  rack: Cell;
+}
+
 export interface Walker {
   key: string;
   /** Where his feet are now, in cells, fractional between two cells while he walks. */
@@ -48,19 +60,16 @@ export interface Walker {
   station: string;
   /** The station he set off from, for the leg's animation. */
   fromStation: string;
-  /** The goals queued behind the one he is on: the legs of an unloading, kept in order. */
-  goals: Goal[];
+  /** The loop he is on, or null: while it is set he never stands. */
+  loop: Loop | null;
+  /** Where the engine wants him once the leg he is on is done: set when the loop ends mid leg. */
+  after: Goal | null;
   /** The last goal the page gave him, so a rebuilt page is not a new order. */
   lastGoal: string;
-  /** He was on the loop between the pallet and the rack when the page was last built. */
-  unloading: boolean;
-  /** The pallet's goal as the page last gave it while he was unloading, so a loop cut short by
-   *  the engine is still walked back to the pallet before he goes elsewhere. */
-  pallet: Goal | null;
   lastMs: number;
   /** Every goal he arrived at, in order: the test's log. */
   arrivals: Arrival[];
-  /** Loops of the unloading completed: arrivals at the pallet after a visit to the rack. */
+  /** Trips of the unloading completed: arrivals at the pallet after a visit to the rack. */
   loops: number;
   sawRack: boolean;
 }
@@ -84,16 +93,30 @@ function goalKey(cell: Cell, station: string): string {
   return `${cell.x},${cell.y}|${station}`;
 }
 
-function cellOf(node: Element): Cell | null {
-  const raw = node.getAttribute('data-cell') ?? '';
+function cellOf(raw: string): Cell | null {
   const [x, y] = raw.split(',').map(Number);
   if (x === undefined || y === undefined || Number.isNaN(x) || Number.isNaN(y)) return null;
   return { x, y };
 }
 
+/** The loop the page put on a figure: "px,py;rx,ry", or null. */
+function loopOf(node: Element): Loop | null {
+  const raw = node.getAttribute('data-loop');
+  if (raw === null) return null;
+  const [gateRaw, rackRaw] = raw.split(';');
+  const gate = cellOf(gateRaw ?? '');
+  const rack = cellOf(rackRaw ?? '');
+  if (gate === null || rack === null) return null;
+  return { gate, rack };
+}
+
 function translateOf(at: { x: number; y: number }): string {
   const feet = centreOf(at.x, at.y, 1, 1);
   return `translate(${Math.round(feet.x)},${Math.round(feet.y)})`;
+}
+
+function sameCell(a: Cell, b: { x: number; y: number }): boolean {
+  return a.x === b.x && a.y === b.y;
 }
 
 /** The cell to set off from: the next cell of the path he is on, so a man mid stride finishes it
@@ -110,33 +133,33 @@ function setOff(walker: Walker, goal: Goal): void {
   const cells = pathFinder(from, goal.cell);
   // The path starts on the cell he is on: nothing to walk for that one.
   const first = cells[0];
-  if (
-    first !== undefined &&
-    cells.length > 1 &&
-    first.x === walker.at.x &&
-    first.y === walker.at.y
-  ) {
-    cells.shift();
-  }
+  if (first !== undefined && cells.length > 1 && sameCell(first, walker.at)) cells.shift();
   walker.path = cells;
   walker.fromStation = walker.station;
   walker.station = goal.station;
 }
 
+/** The other end of the loop from where he is: the rack after the pallet, the pallet after the
+ *  rack, and the rack first when he is anywhere else. */
+function nextEnd(walker: Walker, loop: Loop): Goal {
+  if (walker.station === STATION_RACK) return { cell: loop.gate, station: STATION_GATE };
+  return { cell: loop.rack, station: STATION_RACK };
+}
+
 /** Reads the figures the page has just been built with and gives every walker its orders: a new
  *  figure stands where the page put it; a known one is put back where it had got to and, when the
- *  engine has sent it somewhere else, sets off from there. A figure on the loop of an unloading
- *  keeps its legs in order: a new leg goes behind the one it is on, never in front of it. */
+ *  engine has sent it somewhere else, sets off from there. A figure with a loop on it walks the
+ *  loop and nothing else until the loop is taken off. */
 export function syncWalkers(root: ParentNode, nowMs: number, pathFor: PathFinder): void {
   pathFinder = pathFor;
   const seen = new Set<string>();
   for (const node of Array.from(root.querySelectorAll('[data-figure]'))) {
     const key = node.getAttribute('data-figure');
-    const cell = cellOf(node);
+    const cell = cellOf(node.getAttribute('data-cell') ?? '');
     if (key === null || cell === null) continue;
     seen.add(key);
     const station = node.getAttribute('data-station') ?? '';
-    const unloading = node.getAttribute('data-unloading') === '1';
+    const loop = loopOf(node);
     const goal = goalKey(cell, station);
     let walker = walkers.get(key);
     if (walker === undefined) {
@@ -146,43 +169,38 @@ export function syncWalkers(root: ParentNode, nowMs: number, pathFor: PathFinder
         path: [],
         station,
         fromStation: station,
-        goals: [],
+        loop,
+        after: null,
         lastGoal: goal,
-        unloading,
-        pallet: unloading && station === STATION_GATE ? { cell, station } : null,
         lastMs: nowMs,
         arrivals: [],
         loops: 0,
         sawRack: false,
       };
       walkers.set(key, walker);
+      // Born on the loop: off he goes.
+      if (loop !== null) setOff(walker, nextEnd(walker, loop));
       continue;
     }
-    if (goal !== walker.lastGoal) {
+    if (loop !== null) {
+      // On the loop: the engine's own station changes between the gate and the rack are not
+      // orders, the loop is. A man standing still on it is sent to the other end.
+      walker.loop = loop;
+      walker.after = null;
+      walker.lastGoal = goal;
+      if (walker.path.length === 0) setOff(walker, nextEnd(walker, loop));
+    } else if (walker.loop !== null) {
+      // The loop is over: he finishes the leg he is on and then goes where the engine put him.
+      walker.loop = null;
       walker.lastGoal = goal;
       const next: Goal = { cell, station };
-      if (unloading && station === STATION_GATE) walker.pallet = next;
-      const onALoop = walker.unloading || unloading;
-      if (onALoop) {
-        if (!unloading) {
-          // The unloading is over: the engine finished before he did, so he walks the legs still
-          // queued, one loop a trip, finishes the loop he is on back at the pallet, and then goes
-          // to his new station (CLAUDE.md T16 2.2).
-          const lastStation = walker.goals[walker.goals.length - 1]?.station ?? walker.station;
-          if (lastStation !== STATION_GATE && walker.pallet !== null) walker.goals.push(walker.pallet);
-          walker.pallet = null;
-        }
-        if (walker.path.length === 0 && walker.goals.length === 0) {
-          setOff(walker, next);
-        } else {
-          walker.goals.push(next);
-        }
-      } else {
-        walker.goals = [];
-        setOff(walker, next);
-      }
+      if (walker.path.length === 0) setOff(walker, next);
+      else walker.after = next;
+    } else if (goal !== walker.lastGoal) {
+      walker.lastGoal = goal;
+      walker.after = null;
+      setOff(walker, { cell, station });
     }
-    walker.unloading = unloading;
     // The page was built with him at his station: put him back where he had actually got to.
     node.setAttribute('transform', translateOf(walker.at));
     dress(node, walker);
@@ -209,8 +227,8 @@ function dress(node: Element, walker: Walker, heading: Facing | null = null): vo
   if (facing !== null) faceCharacter(art, facing);
 }
 
-/** He has arrived at the goal he was on: the log, the loop count, and the next goal if there is
- *  one. */
+/** He has arrived at the goal he was on: the log, the trip count, and straight on to the other end
+ *  of the loop, or to where the engine wants him after it. */
 function arrive(walker: Walker): void {
   walker.arrivals.push({ cell: { x: walker.at.x, y: walker.at.y }, station: walker.station });
   if (walker.station === STATION_RACK) walker.sawRack = true;
@@ -218,8 +236,15 @@ function arrive(walker: Walker): void {
     walker.loops += 1;
     walker.sawRack = false;
   }
-  const next = walker.goals.shift();
-  if (next !== undefined) setOff(walker, next);
+  if (walker.loop !== null) {
+    setOff(walker, nextEnd(walker, walker.loop));
+    return;
+  }
+  const after = walker.after;
+  if (after !== null) {
+    walker.after = null;
+    setOff(walker, after);
+  }
 }
 
 /** Moves every walker on by the real time since the last frame, at a man's pace, never more than

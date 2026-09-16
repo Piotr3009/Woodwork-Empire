@@ -255,3 +255,28 @@ saw and not the other, and watch the ring; order sheets and unload by hand at x1
    that is walked over until the next station change.
 3. At `x30` with a big delivery the queued legs can outlast the day: he keeps walking after the
    engine has moved on, which is what the brief asked for, and a load or a scene change resets him.
+
+---
+
+## 13. Fix after Piotr played v23 (16.09, evening): the loop he never stands on
+
+Piotr saw the unloading man walking on the spot at the rack and at the pallet. Cause: the walk
+takes seconds, the engine's unloading takes 45 game minutes shared over ten legs, so at x1 he
+arrived in six seconds and then stood for four minutes playing `carry`, the standing animation
+Turn 9 gave the gate and the rack. Two changes, `APP_VERSION` `v24`:
+
+1. Standing at the rack is `bench` (hands busy, picking sheets), standing at the gate is `idle`;
+   `carry` is the walker's and only on a leg between two places. Nobody walks on the spot.
+2. An unloading is a loop the walker never stands on: the page puts both ends on the figure
+   (`data-loop="px,py;rx,ry"`, the pallet's standing cell and the rack's) and the walker touches
+   one and goes to the other, the sheet on the way to the rack, empty handed on the way back, for
+   as long as the engine has him unloading; as many trips as the time allows, a farther rack is
+   fewer trips. When the engine moves him on he finishes the leg he is on and goes to the new
+   station. The queue of engine legs, `walker.goals` and `walker.pallet`, is gone; `walker.loop`
+   and `walker.after` replace them. The "five loops for ten sheets" test is replaced by one that
+   asserts he is never standing while the loop is on, alternates the two ends, and ends the leg
+   and reaches the bench when it is taken off.
+
+Also in this commit: the pack files that landed on `main` with the Turn 16 copy (`DELETED.txt`,
+`turn-16.patch`) removed, and `README.md` restored to the game's README with the briefs line
+brought up to date.

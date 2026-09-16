@@ -122,7 +122,7 @@ describe('the walker', () => {
     expect(walkerOf(key)?.station).toBe(STATION_RACK);
   });
 
-  it('walks five loops between the pallet and the rack for ten sheets, and finishes the loop it is on', () => {
+  it('never stands on the unloading loop: touches the pallet, goes, touches the rack, comes back, then finishes the leg and goes on', () => {
     const state = hall();
     const pathFor = (from: { x: number; y: number }, to: { x: number; y: number }): Array<{ x: number; y: number }> =>
       walkPath(state, from, to);
@@ -138,38 +138,53 @@ describe('the walker', () => {
       bespoke: false,
       overflowSheets: 0,
     });
-    // The owner unloads by hand: the engine puts him at the gate, the rack, the gate, ten legs in
-    // all for five trips (CLAUDE.md T13 3.21), and the page carries the flag of the loop.
+    // The owner unloads by hand: the page puts the loop on him, both ends of it.
     state.owner.station = STATION_GATE;
     let root = page(state);
-    expect(root.querySelector('[data-owner="1"]')?.getAttribute('data-unloading')).toBe('1');
+    const loop = root.querySelector('[data-owner="1"]')?.getAttribute('data-loop') ?? '';
+    expect(loop).toMatch(/^\d+,\d+;\d+,\d+$/);
     syncWalkers(root, 0, pathFor);
     let now = 0;
-    for (let leg = 1; leg < 10; leg += 1) {
-      state.owner.station = leg % 2 === 1 ? STATION_RACK : STATION_GATE;
-      root = page(state);
-      syncWalkers(root, now, pathFor);
-      // Faster than a man walks: the legs queue up behind the one he is on.
-      now += 500;
+    // A minute of real time on the loop, the engine flipping his station as it likes: he is
+    // never standing, and he alternates the two ends.
+    for (let frame = 0; frame < 600; frame += 1) {
+      now += 100;
+      if (frame % 50 === 0) {
+        state.owner.station = frame % 100 === 0 ? STATION_RACK : STATION_GATE;
+        root = page(state);
+        syncWalkers(root, now, pathFor);
+      }
       stepWalkers(root, now);
+      expect(walkerOf('owner')?.path.length, `frame ${frame}`).toBeGreaterThan(0);
     }
-    // The unloading is over and the engine sends him to his bench.
+    const walker = walkerOf('owner');
+    if (!walker) throw new Error('no walker');
+    expect(walker.loops).toBeGreaterThanOrEqual(2);
+    const stations = walker.arrivals.map((entry) => entry.station);
+    for (let index = 1; index < stations.length; index += 1) {
+      expect(stations[index]).not.toBe(stations[index - 1]);
+    }
+    // The unloading is over and the engine sends him to his bench: he finishes the leg he is on
+    // and then goes, and stands there.
     const delivery = state.deliveries[0];
     if (!delivery) throw new Error('no delivery');
     delivery.unloaded = true;
     state.owner.station = STATION_BENCH;
     root = page(state);
+    expect(root.querySelector('[data-owner="1"]')?.getAttribute('data-loop')).toBeNull();
     syncWalkers(root, now, pathFor);
-    for (let frame = 0; frame < 2000; frame += 1) {
+    const legGoal = walker.station;
+    expect([STATION_GATE, STATION_RACK]).toContain(legGoal);
+    for (let frame = 0; frame < 1000; frame += 1) {
       now += 100;
       stepWalkers(root, now);
-      if ((walkerOf('owner')?.path.length ?? 0) === 0 && (walkerOf('owner')?.goals.length ?? 0) === 0) break;
+      if (walker.path.length === 0 && walker.after === null) break;
     }
-    const walker = walkerOf('owner');
-    expect(walker?.loops).toBe(5);
-    const stations = walker?.arrivals.map((entry) => entry.station) ?? [];
-    expect(stations[stations.length - 1]).toBe(STATION_BENCH);
-    expect(stations.filter((station) => station === STATION_RACK)).toHaveLength(5);
-    expect(stations.filter((station) => station === STATION_GATE)).toHaveLength(5);
+    const after = walker.arrivals.map((entry) => entry.station);
+    expect(after[after.length - 2]).toBe(legGoal);
+    expect(after[after.length - 1]).toBe(STATION_BENCH);
+    expect(walker.path).toHaveLength(0);
+    stepWalkers(root, now + 5000);
+    expect(walker.path).toHaveLength(0);
   });
 });

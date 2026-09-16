@@ -170,7 +170,10 @@ describe('what he is doing', () => {
   it('is read off the station he is standing at', () => {
     expect(animationForStation(STATION_BENCH)).toBe('bench');
     expect(animationForStation('machine:tableSaw')).toBe('bench');
-    expect(animationForStation(STATION_GATE)).toBe('carry');
+    // Nobody walks on the spot: the gate is a stand and the rack is hands busy; carry is the
+    // walker's, on the leg between them (CLAUDE.md T16 2.2).
+    expect(animationForStation(STATION_GATE)).toBe('idle');
+    expect(animationForStation('rack')).toBe('bench');
     expect(animationForStation(STATION_IDLE)).toBe('idle');
   });
 

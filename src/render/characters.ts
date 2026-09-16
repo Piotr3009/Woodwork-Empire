@@ -243,12 +243,15 @@ export function playCharacters(root: ParentNode, nowMs: number): void {
   }
 }
 
-/** What a figure at this station is doing, in the words the sheets are named in: at a bench he is
- *  at the bench, at the gate or the rack he is carrying, and anywhere else he is standing about.
- *  Walking is not a station: it is the slide between two of them (CLAUDE.md T9 3.13). */
+/** What a figure at this station is doing, in the words the sheets are named in: at a bench or a
+ *  machine he is at the bench, at the rack he is picking sheets (the bench sheet, hands busy), at
+ *  the gate he stands, and anywhere else he is standing about. Carrying is not a station: it is
+ *  the leg between two of them, and the walker plays it (CLAUDE.md T9 3.13; T16 2.2). A man is
+ *  never seen walking on the spot. */
 export function animationForStation(station: string): Animation {
   if (station === STATION_BENCH || station.startsWith('machine:')) return 'bench';
-  if (station === STATION_GATE || station === STATION_RACK) return 'carry';
+  if (station === STATION_RACK) return 'bench';
+  if (station === STATION_GATE) return 'idle';
   // The phone is in his hand for as long as the call lasts, and idle the moment it is down
   // (PIOTR, 15.09; CLAUDE.md T11 3.11).
   if (station === STATION_PHONE) return 'phone';

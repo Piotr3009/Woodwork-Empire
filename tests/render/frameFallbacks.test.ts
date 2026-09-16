@@ -43,8 +43,9 @@ describe('the states and their frame keys', () => {
   it('names an animation for every station a figure can stand at, all of them on the list', () => {
     expect(animationForStation(STATION_BENCH)).toBe('bench');
     expect(animationForStation('machine:tableSaw')).toBe('bench');
-    expect(animationForStation(STATION_GATE)).toBe('carry');
-    expect(animationForStation(STATION_RACK)).toBe('carry');
+    // Nobody walks on the spot: carry is the walker's, on a leg (CLAUDE.md T16 2.2).
+    expect(animationForStation(STATION_GATE)).toBe('idle');
+    expect(animationForStation(STATION_RACK)).toBe('bench');
     expect(animationForStation(STATION_PHONE)).toBe('phone');
     expect(animationForStation(STATION_IDLE)).toBe('idle');
     expect(animationForStation('office')).toBe('idle');
