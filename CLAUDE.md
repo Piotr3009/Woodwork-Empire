@@ -1,291 +1,298 @@
-# Turn 16: the men walk the floor
+# Turn 17: the workshop earns by the hour
 
-Woodwork Empire. Autonomous session brief for Claude Code (Opus 5, effort ultracode, cloud).
-Owner: Piotr. Programmer: Claude. Spec author: Claude (chat), 16.09.2026, from Piotr playing v22
-and correcting the hall drawing five times in one afternoon (Petros: software/woodwork-empire,
-STAN 16.09; docs/mockups/t16/).
+Woodwork Empire. Autonomous session brief for Claude Code (Opus 5, effort ultracode, cloud,
+agent teams allowed). Owner: Piotr. Programmer: Claude. Spec author: Claude (chat), 17.09.2026,
+from Piotr playing v23 and v24 on 16.09 and the evening's talk (Petros: software/woodwork-empire,
+STAN T17-01 to T17-29).
 
-Read this whole file (first line must say "Turn 16"; if the root CLAUDE.md does not, stop and
-report), then REPORT-T15.md in full, then docs/mockups/t16/README.md and open hall-grid-1609.html
-in a browser (it is the design; the two piotr-marks-*.png are his red pen on earlier versions),
-then docs/art/SPRITES.md sections 9 and 10, then the archived briefs in docs/. Where files
-disagree, this one wins. All standing rules apply (no em or en dashes anywhere, scope 1:1, one
-code path, constants never in the UI, [TUNE] for every figure you choose and [PIOTR] for his,
-kill background processes, PR without merge, end the session, no PR watching, npm run check gated
-on its own exit code, every click single, one APP_VERSION bump).
+Read this whole file (first line must say "Turn 17"; if the root CLAUDE.md does not, stop and
+report), then REPORT-T16.md in full (section 13 says what v24 changed), then
+docs/mockups/t17/README.md and open hall-strip-C.html in a browser, then the archived briefs in
+docs/. Where files disagree, this one wins. All standing rules apply (no em or en dashes anywhere,
+scope 1:1, one code path, constants never in the UI, [TUNE] for every figure you choose and
+[PIOTR] for his, kill background processes, PR without merge, end the session, no PR watching,
+npm run check gated on its own exit code, every click single, one APP_VERSION bump).
 
-Precondition. main carries Turn 15 merged: APP_VERSION is 'v22', STATE_VERSION is 14,
-src/engine/pipes.ts has pathBetween, pipeRunFor and isConnected, and src/render/characters.ts has
-the walk, carry and idle animations with facingFromScreen. If APP_VERSION is not 'v22', stop and
+Precondition. main carries v24: APP_VERSION is 'v24', src/render/walkers.ts has the loop he never
+stands on (data-loop), and src/render/pipes.ts exists. If APP_VERSION is not 'v24', stop and
 report.
 
-One agent, serial. Four pieces, and the first two share hall.ts, characters.ts and stations.ts, so
-a team would wait on itself.
+## 0. What this turn is for (Piotr, 16.09 and 17.09)
 
-## 0. What this turn is for (Piotr, 16.09)
+Piotr played two evenings and dictated twenty nine points. They fall into four groups, and the
+one that gives the turn its name is the last:
 
-Three things Piotr saw on the hall in v22, in his words:
-
-- Pipes: "I cannot see whether a machine is connected or not. Sometimes there is 'connected'
-  written under it, sometimes not, so I do not know whether I have to connect it myself."
-- Unloading: "The character walks in the corner, moving his legs but not moving. Show me on the
-  grid how he walks from the unloading to the rack."
-- Machines: "Show me on the grid how the worker stands at the saw and at the other machines,
-  because right now it looks bad."
-
-And one on the top bar: a Projects chip with the count of live jobs, opening the Work Plan, the
-same board as in the office.
-
-The drawing in docs/mockups/t16/hall-grid-1609.html is the answer he approved, with three rules he
-added in red pen, quoted here because they are the contract:
-
-1. "Facing the saw, back to us." An operator faces his machine, so his back is to the camera.
-2. "The rack stands against a wall, so how is he supposed to walk between the wall and the rack?
-   When it stands against a wall you come at it from the other side." The approach cell of any
-   item is on its free side, never between the item and a wall, and the game picks the side.
-3. "It is important that the points at the individual items are joined up." The standing points
-   are nodes of one network over the free cells, and every walk is a path on it, never a jump.
+1. The hall reads as a workshop: the helper is drawn, the welfare kit is in the canteen, the
+   labourer does the labourer's work, a machine opens its own card, the strip under the hall is
+   in the game's style, the pipes look like pipes.
+2. The people are real: an Our team page, two men on one job, a hiring gate you can feel,
+   overtime that is the owner's alone.
+3. The desk stops nagging: tasks carry over, calls and emails die at dusk, several tasks at
+   once, the laptop boots once, x30 comes home at x1, the stock is ordered by number.
+4. **The workshop earns by the hour.** One gross figure at the top of the Company board and at
+   the top of the month end: what the workshop earns for every hour it pays for. Piotr: "if the
+   shop stands two days and the wages are paid, the rate drops by itself; if a joiner works four
+   of the eight hours we pay him, it drops; a better saw, an express job, a clean hall all raise
+   it. That is the measure." Beside it, on the board and in the report, the machines' own column,
+   so the player sees an investment paying back in hours.
 
 ## 1. Rules restated (short)
 
-Everything from Turns 1 to 15. Tonight in addition:
+Everything from Turns 1 to 16. Tonight in addition:
 
-- APP_VERSION = 'v23'. STATE_VERSION does not bump. Where a figure is on the floor at this second
-  is presentation, real time, like the frame of his animation (SPRITES.md 10.4: "a man does not
-  walk faster at x10"); it is not game state and is not saved. If you think you need a field on
-  the state, stop that piece, write it in the report, do the rest.
-- The engine says where and along which cells; the renderer says when. Paths, standing cells and
-  facings are pure engine functions with tests on a small hall. The renderer moves the figure
-  along them at real seconds and never decides a cell of its own.
-- Real time, never game minutes, for the walk itself. At x30 a figure still walks at a man's
-  pace; the engine's station changes run ahead and the walker catches up (2.2 says how).
-- One drawing of a pipe. Every pipe tile, run and drop on the hall comes from one vector helper;
-  the Turn 4 grey bar and its drops to every machine are deleted, not restyled.
+- APP_VERSION = 'v25'. STATE_VERSION bumps to 15 in phase A, once, for the fields section 4
+  names; every v24 save loads.
+- Output stays as it is [PIOTR, 17.09]: a machine speeds its own stage, a man's rate is his own,
+  the hall's factor is the one multiplier. Efficiency stays on the top bar. Nothing in this turn
+  sums the three into one number; the workshop rate (2.26) is the one figure that sees all of
+  them, through the labour they actually earn.
+- The rate is gross [PIOTR]: labour earned over hours paid, no costs on it, no cost line beside
+  it.
+- Nobody walks on the spot, ever. Anything this turn adds that puts a figure somewhere gives him
+  a standing cell and a rest animation that is not a walk.
+- Art is not this session's: placeholders through the one helper, requests in a new
+  docs/art/REQUESTS-T17.md. docs/art/SPRITES.md is not touched.
 
 ## 2. Changes to the design (the contract)
 
-### 2.1 Where a man stands: the station table and the free side [PIOTR]
+### The hall
 
-Today stationCell in hall.ts has one rule for every item: the first cell in front of the footprint
-(frontOf, y = stands.y + depth), and every figure faces south west (FIGURE_FACING). Tonight that
-rule is deleted and replaced by a station table in src/engine/stations.ts, one row per family, read
-by a new standingCell(state, item, role) and facingAt(state, cell, item):
+**2.1 The helper is drawn [PIOTR, bug].** A yellow shirted helper shows as a stroke, not a
+figure. Find why (no character sheet for the role means the capsule; the capsule is a 12 by 26
+rounded rect, so something is scaling or clipping the group, or the figure is drawn with a
+height of nothing) and fix it at the source. Done: a render test that a hired helper on the
+floor draws a visible body, capsule or sheet, and every role without a sheet does.
 
-| Family | Operator's cell | Waiting | Second place |
-|---|---|---|---|
-| Table saw (2 by 1) | front side, the right cell | front side, the left cell | none |
-| Thicknesser (2 by 1) | the left end, facing along the machine | one cell further left | none |
-| Spindle moulder (2 by 1) | front side, the left cell | front side, the right cell | none |
-| Edgebander | front side, the second cell from the infeed end (the left) | the cell to its left | none |
-| CNC (3 by 2) | panel: front side, the right cell | front side, the middle cell | loading: back side, the middle cell |
-| Spray booth (3 by 2) | front side, the middle cell | front side, the left cell | none |
-| Bench (2 by 1) | front side, the left cell | front side, the right cell | second: back side, the right cell, for a second man at the same bench |
-| Sheet rack | the free side (below) | none | none |
-| Extractor unit | the free cell on the bag side (the side away from the wall) | none | none |
-| Anything else (lockers, seats, compressor, gates) | front side, the left cell, as today | none | none |
+**2.2 The welfare kit lives in the canteen [PIOTR].** canteenSeat and locker stand inside the
+canteen block, not on the hall floor: they are placed in the canteen (its cells, a fixed layout
+by count, first seat by the door), take no hall cell, and the man at a seat or a locker stands
+in the canteen doorway (roomDoorCell) facing in. Their effects (a seat per man, a locker per man)
+stay as they are. Placement in setup mode does not offer them a hall cell. Migration moves any
+seat or locker on the floor into the canteen.
 
-"Front" is the camera side, y + depth, as the code already means it. "Back" is y - 1. "Left end"
-is x - 1 on the item's first row. Every cell in the table is stated as an offset from the
-footprint's origin so the table reads without a picture; write the offsets once and the tests
-read them back.
+**2.3 The labourer works [PIOTR].** The helper cleans the hall and unloads deliveries without
+being asked: today `unload` and `cleaning` name him as autoRoles and he still does not. Find why
+(the auto assignment does not fire, or the tasks are created for the owner first, or the helper
+has no minutes) and fix it at the source: with a helper hired, a delivery is unloaded by him and
+a dirty hall is cleaned by him, and the owner and the joiners are not asked. He walks the loop of
+v24 for sheets and a plain walk (no sheet) for a machine off the lorry. Done: the helper tests.
 
-Facing. No table. A man at his cell faces the centre of the item's footprint, through the existing
-facingFromScreen on the screen vector from his feet to that centre. That gives "back to the
-camera" at every front cell and "along the machine" at every end cell for free. A figure that is
-walking faces the way it is going (2.2). A figure that is idle faces the way it does today.
+**2.4 A machine off the lorry is a plain walk [PIOTR].** Unloading a machine is walking about the
+hall empty handed, the walk animation, from the gate to where the floor was held for it and back,
+as many times as the unload minutes allow, on the v24 loop. Nobody stands moving his legs.
 
-The free side. A cell in the table is only a preference. standingCell checks it against the hall:
-a cell is free when it is inside the unit, on no footprint, in no room (ROOM_LAYOUT), and not the
-pallet's own cells. If the preferred cell is not free, the function walks the sides in a fixed
-order, front, back, left, right, and takes the first side with a free cell at the same position
-along it; for the sheet rack the order is instead the side with the most free cells in the two
-rows beyond it, which is the hall side when the rack stands against a wall or under a room.
-Piotr's own case: a rack under the canteen's face has its front cell free, so the man stands at
-y + depth facing north; a rack against the front kerb has no front cell, so he stands behind it
-facing south. A test puts a rack against each of the four sides and under the canteen and asserts
-the cell and the facing for each.
+**2.5 The strip under the hall, variant C [PIOTR; docs/mockups/t17].** The four lines of bare
+text and the grey buttons under the hall are replaced by floating dark chips over the floor in the
+hand font, bottom left, as drawn: one chip per thing that has to be done and nothing else: a dirty
+hall (with the Clean up button on the chip), bags to change (with Empty bags), a machine due a
+service (with its name). A clean hall with nothing to do shows no chip at all. The rack warning
+and "no job has its material" go: the rack has its number (2.8) and the warning strip under the
+top bar has the stock. The sentence about the mouse wheel becomes a tip shown once. Set up hall
+stays as a chip when the hall is not in setup. The zoom is three small chips bottom right (Fit,
+plus, minus). The black column on the left of the hall stays. Done: a render test of the chips
+for a dirty hall, a full store, a service, and nothing.
 
-The pallet. The unloading man does not stand "at the back of the lorry inside the shutter" any
-more. He stands in front of the pallet on the hall side: the cell east of the pallet's first row,
-(GATE_LAYOUT.x + GATE_LAYOUT.width, GATE_LAYOUT.y + 1), facing the pallet (west). If that cell is
-not free, the cell between the pallet and the office, (GATE_LAYOUT.x + 1, GATE_LAYOUT.y - 1),
-facing south [PIOTR: "from the hall side, never from outside"].
+**2.6 A click on a machine opens its own card [PIOTR].** Today a click on a machine writes a note
+under the hall and the card is only in the catalogue's Owned tab, so the player never found
+Connect to extraction. Tonight a click on a machine on the hall opens a modal for that one
+machine (the folder skin): its picture and class, its effects, hours used and life, service due,
+the bag store when it is the extractor, connected or not with metres of pipe, and the buttons
+the Owned card has today: Connect to extraction, Service, Sell, Move. One card, the same
+functions the Owned tab calls; the Owned tab keeps working. Done: the app test that a click opens
+it with the right machine and that Connect works from it.
 
-Edgebander. Its footprint stays what it is in constants.ts tonight (1 by 1); Piotr drew it at 4 by
-1 with an infeed and an outfeed and that is a catalogue change with prices and zones, parked
-(section 6). The table's row is written for the footprint as it is and reads the width off the
-footprint, so it needs no change when the footprint grows.
+**2.7 Pipes that look like pipes [PIOTR].** Improve the vector helper, not the placeholder: a
+wider bar with a darker underside and the lighter top edge, elbows drawn as a quarter arc and
+not two bars with a disc, the drop landing on the machine's port as a short collar over the
+footprint's top face rather than the cell's centre, the inlet a proper flange at the unit. Same
+nine kinds, same data-pipe-tile keys, so every test of Turn 16 stays. Done: the look, section 7.
 
-### 2.2 The men walk the floor [PIOTR]
+**2.8 The rack shows its sheets [PIOTR].** A large number on the rack itself (over its front
+face, hand font, the class's colour behind it): the sheets in it. Updated live. Done: a render
+test.
 
-The network. A new engine module src/engine/walk.ts: isFree(state, cell) as above, walkPath(state,
-from, to): Cell[] a breadth first search over the four neighbours on free cells (the working zones
-of machines are free, the gate lane is free, a pipe tile is free because it is in the air),
-returning the cells from from to to inclusive, or the straight Manhattan line when no free path
-exists (a boxed in man still gets somewhere, and the report lists any such case the scenarios
-hit). Tests on a small hall: round a footprint, round a room, through the gate lane, a blocked
-target falls back to the line. pathBetween in pipes.ts is for pipes over equipment and is not
-reused; say so in a comment at both.
+### The people
 
-The walker. In src/render/characters.ts (or a sibling walkers.ts), one walker per figure on the
-page: the cell it is at, the path it is on, and the real time it started that path. On every frame
-(the same real time loop the frames use) the walker advances along its path at
-WALK_CELLS_PER_SECOND 1.6 [TUNE], sets the figure's transform to the interpolated point between
-two cells, plays carry when the leg carries material and walk otherwise, and faces the way it is
-going through facingFromScreen. On arrival it plays the station's animation and faces the item
-(2.1). The CSS transition on .figure is deleted: the walker owns the transform. When the engine
-changes a figure's station, the walker computes the path from where the figure is now (mid walk
-if it must) to the new standing cell and sets off; it never jumps unless the view is rebuilt from
-scratch (a load, a scene change), in which case it starts at its station's cell.
+**2.9 Our team [PIOTR].** A new tab on the Team page of the laptop: every person, one row: name,
+role, tier, started on day N (and how long ago), monthly pay, hours worked this month, days off,
+what he is doing now. The owner is the first row. Done: its test.
 
-What carries material. A leg carries material when it goes from the pallet to the rack (an unload
-trip), from the rack to a machine or a bench (fetching a sheet), or from a machine to a bench (cut
-parts). Every other leg is a walk. One function, legCarries(fromStation, toStation), says so, and
-animationForStation keeps its job for the standing animation.
+**2.10 Two men on one job [PIOTR].** A job can have a second man assigned. Both book minutes into
+it, each at his own rate, at the stage's station; the machine stage takes one of them at the
+machine and the other at the waiting cell until his turn, the bench stage takes both at the bench
+(the bench's second place of Turn 16). The work plan shows both names and assigning the second
+is a click on the row. Done: the engine test (a job with two men finishes in about half the
+days, minus the machine stage) and the work plan test.
 
-Unloading. While a figure's station is the gate and a delivery is being unloaded, the walker
-loops: pallet cell, rack's standing cell, pallet cell, one loop per trip, SHEETS_PER_TRIP sheets
-per trip as the engine already counts. The number of loops is ceil(sheets / SHEETS_PER_TRIP); at
-high speed the engine finishes before the walker does, and the walker finishes the loop it is on
-and then goes to the figure's new station. At the pallet he faces the pallet; at the rack, the
-rack. The test drives a delivery of ten sheets by hand and asserts five loops on the walker's log.
+**2.11 The hiring gate [PIOTR].** Hiring is refused when cash is below the candidate's monthly
+pay: a 2,500 a month joiner needs 2,500 in the account. The hire card says "Not enough in the
+bank: needs 2,500". Done: its test.
 
-Production. When a job's stage moves a man from the rack to the saw, or from the saw to the bench,
-his station changes as it does today; the walker carries him there along the network with carry
-on the legs 2.2 names. No new engine timing: a walk costs no game minutes tonight [PIOTR: the look
-first; minutes for walking are a later decision].
+**2.12 Overtime is the owner's [PIOTR].** Workers go home at the end of the day, always; the owner
+alone can stay. He may take over a worker's job for the overtime by a click on the row (never
+automatically): the job's remaining hours fall by what he does, and the worker carries on with it
+next morning. Done: the engine test (a worker's job does not move after 17:00 unless the owner
+takes it; when he does, it moves and the worker resumes).
 
-The waiting man. A man waiting for a machine stands at the table's waiting cell and faces the
-machine, as 2.1 says, and walks there like anybody else.
+**2.13 The day meter grows with overtime [PIOTR, bug].** The bar ends at 540 today. It grows with
+the minutes worked: 540 to 660 as the overtime runs, the overtime segment in its own colour.
+Done: the topbar test.
 
-### 2.3 Pipes you can read [PIOTR]
+### The desk
 
-One vector helper. src/render/pipes.ts: pipeTile(kind, cell) draws one tile of the run in the 2 to
-1 dimetric as a vector: a round duct of PIPE_DIAMETER 0.2 m [TUNE] drawn as a rounded bar in the
-game's duct grey (--kit-machine-dark) with a lighter top edge, for the eight kinds ns, ew, the
-four elbows, tee, drop (the vertical down to the machine, drawn as a short vertical bar ending in
-a ring on the port), and inlet (a collar at the extractor). The tiles sit in the air at
-DUCT_HEIGHT over the floor exactly where the placeholder boxes sit today, sorted with the
-equipment so a pipe over a saw draws over the saw. The placeholder green boxes for pipe tiles go:
-placeholder.ts keeps serving everything else.
+**2.14 A started task carries over [PIOTR].** A task somebody started (drawings, bookkeeping,
+anything with minutes left) is continued next morning by the same person without being assigned
+again. Calls and emails are the exception (2.15). Done: its test.
 
-The Turn 4 ducting is deleted. ductRun and ductDrop in hall.ts, their CSS (.duct-run, .duct-drop,
-.duct-port, .is-flexi), DUCT_SPRITE_SUFFIX and the sprite pick for it, and the tests that draw
-them. A central system (dustSystem, flexiSystem) is drawn by the same vector helper: one run along
-the rear wall at the same height, and a drop to every machine that wants extraction, because with a
-central system every machine is connected and that is what the drawing has to say. DUCT_SYSTEMS
-stays as the engine's knowledge of what is a central system.
+**2.15 Calls and emails die at dusk [PIOTR].** Every clientCall and emails task is dropped at the
+end of the day, done or not; nothing carries over. The punishment is already in the client's
+rating for the unanswered call and the unread email; nothing else is added. Done: its test.
 
-Connected or not, on the hall. A machine that wants extraction (wantsExtraction) and has no run to
-it (pipeRunFor null, and no central system) gets a red ring on its port cell, PORT_RING 8 px
-[TUNE], pulsing at one second, and the label not connected in the small token under the machine's
-name on the hall, in the game's red. A connected machine gets the drop and nothing else; a
-connected word is not written anywhere on the hall. The machine card's Connected, 6 m of pipe and
-Connect to extraction, £x stay as they are; the tip table gains one sentence for the first
-unconnected machine: A red ring is a machine with no pipe to the extraction. Open its card to
-connect it, or hire a production manager and it is done for you. [TUNE the words].
+**2.16 Several tasks at once [PIOTR].** On the laptop's Tasks page the player ticks several tasks
+and presses Do these: they are queued for the owner and done one after another in the order
+ticked. Done: its test.
 
-A test draws a hall with one extractor and two saws, one connected and one not, and asserts: one
-drop, one red ring, one not connected label, no .duct-run, no green placeholder tile; then with a
-central system, two drops and no ring.
+**2.17 The laptop boots once a day [PIOTR].** laptopBootedOnDay exists; Piotr sees the boot on
+every opening. Find why (the flag is not written, or is written on a different path than the
+check reads, or the modal shows the boot without spending it) and fix it: the five minutes are
+spent once, the first opening of the day, and never again that day. Done: the app test.
 
-### 2.4 The Projects chip on the top bar [PIOTR]
+**2.18 Finished drawings go [PIOTR].** The Finished drawings list on the Drawings page is removed;
+a drawing not done stays in the open list until it is. Done: the drawings test.
 
-Between the day meter and Orders: N, a chip Projects: N where N is openJobs(state).length, styled
-as the other push buttons, opening the Work Plan modal (data-modal="workPlan", the same modal the
-office board opens; grep for the board's data-do and use the same one). It pulses with the news
-the other chips pulse with when a job changes stage [TUNE: or never]. Hidden until the workshop
-has its first job? No: shown from day one at Projects: 0, so the player learns where it is. Test:
-the chip's count, the modal it opens, and that it is the same modal as the office board.
+**2.19 x30 comes home [PIOTR].** At the start of every new day the speed is set to x1 whatever it
+was. Done: its test.
 
-## 3. State
+**2.20 Restock by number [PIOTR].** The stock page's Restock takes a number the player types
+(default: what fills the rack), capped at the free places in the rack; the delivery is next day
+for standard sheets and two working days for bespoke ones (the lead time the deliveries already
+have). RESTOCK_TO_SHEETS goes. Done: its test.
 
-No change to the shape of the state. STATE_VERSION stays at 14. The walker's cell and path are
-render state, rebuilt from the stations on a fresh view.
+**2.21 Joinery Core is charged once [PIOTR, bug].** The first month is charged on purchase and
+again at the month end. Keep the purchase charge and skip the first month end's line for it
+(the subscription starts the month after). Done: its test.
 
-## 4. Task queue, in order
+### The money
 
-Branch turn-16-the-men-walk-the-floor from main. One commit per task, npm run check green on its
-own exit code before each, two report lines per task in REPORT-T16.md.
+**2.22 Standing contracts on stock [PIOTR].** A contract's material comes off the rack like a
+job's (reserved sheets), never bought as money on the contract line. Its result is shown the
+moment a man is assigned: price a piece minus material minus his labour at his rate, so a poor
+joiner shows a thinner margin than a good one. Contracts come in different lengths of work: a
+piece may be an hour at 8 profit or three days at 40, and the board offers both kinds so the
+player chooses. The term is three to six months and the player may end it after the first month
+with no penalty but the lost work. Done: the contract tests.
 
-T16-01 Housekeeping and v23. docs/turn-15-brief.md byte for byte from the Turn 15 merge commit;
-the README's briefs line; APP_VERSION = 'v23'. Done: the version test.
+**2.23 The express deadline [PIOTR].** DEADLINE_EXPRESS_FACTOR goes from 0.6 to 0.8: an express
+job is due 20% sooner, not 40%. Everything else about express is already as Piotr wants it (the
+labour hours come from the base price, the uplift is pure profit); do not touch it.
 
-T16-02 The Projects chip. 2.4. Done: its test.
+**2.24 The Machines column on the Company board [PIOTR].** A third column, right of Output, headed
+Machines: one row per machine standing in the hall: its class and its effect (+5%), the hours it
+ran this week, and the minutes it saved (hours times its effect); a gate adds its +2% to the row;
+a machine short of air or unconnected shows its minus. The total at the bottom: "Machines saved
+us N hours this week". Informational: it multiplies nothing. Done: the company test.
 
-T16-03 The station table. 2.1: the table, standingCell, facingAt, the free side rule, the pallet
-cell, frontOf and FIGURE_FACING deleted, every figure on the hall placed by the table and facing
-its item. Done: the engine tests (every row of the table on a known layout, the rack on five
-placements, the pallet cell and its fallback) and the render test (each figure's transform equals
-its standing cell, its facing row is the one towards the item).
+**2.25 Total efficiency in the month end [PIOTR].** A section in the month end modal after the
+money: machines (hours run times effect, the saved hours, the top three by name), people (rate
+times minutes, the real work out of the paid hours), the hall (the average factor of the month:
+dust, gate, extraction, absence), waiting (the minutes lost by cause, from Efficiency), and one
+line: Total efficiency N% = real work over paid hours. Done: the month end test.
 
-T16-04 The network. 2.2, walk.ts alone. Done: its tests.
+**2.26 The workshop rate [PIOTR, the turn's figure].** One gross figure:
 
-T16-05 The walker. 2.2, the walker in the renderer, the CSS transition gone, carry on the material
-legs, the unloading loop, the waiting man. Done: a test with a fake clock that steps real time,
-asserting the figure's transform moves along the path cell by cell, the animation on each leg, the
-five loops of a ten sheet delivery, and no jump on a station change; the sixty tick stability test
-still green.
+    workshop rate = labour earned on jobs and contracts / hours paid
 
-T16-06 The pipes. 2.3: the vector helper, the Turn 4 ducting deleted, the ring and the label, the
-central system through the helper, the tip. Done: the test of 2.3 and the office hover test still
-green.
+Labour earned is the labour value booked as work is done (the dayStats.labourValue the engine
+already accumulates, plus contract pieces at their labour). Hours paid are eight for every
+worker on the books and eight for the owner for every working day, worked or not, plus the
+overtime the owner actually worked. No costs on it, nothing subtracted. The figure sits at the top
+of the Company board, big, in the hand font: "Workshop earns £28 an hour", with "last week £26"
+and "per man £9" small beside it (per man: the rate over the people on the books, the owner
+included). The same figure is the first line of the month end, for the month. Reference: the
+owner alone, at his work every minute, earns exactly OWNER_LABOUR_VALUE_PER_DAY / 8 = 40 an
+hour; everything that slows him pulls the figure under 40, express and better machines push it
+over. Done: the engine tests (the owner alone at full work for a week reads 40; two days idle
+reads 24; a poor joiner half idle pulls it down; an express job pushes it up) and the board and
+month end tests.
 
-T16-07 Look and shoot. Open the hall with: a rack under the canteen, a rack against the front kerb,
-a saw with a man at it, a bench with two men, an extractor with one connected saw and one not, a
-central system; a delivery of ten sheets unloaded by hand at x1 with the figure walking the loop.
-Ten screenshots into docs/report-t16/, and a short screen recording is not asked for (the test log
-stands in for it). Done: the pictures, npm run check green.
+## 3. How to run this session (agents)
 
-T16-08 Report and PR. REPORT-T16.md in the usual structure plus "Numbers chosen", "The station
-table as built" (the offsets, one row per family), "Deleted" and "Walks the scenarios hit that had
-no free path". Kill background processes, push, PR titled Turn 16: the men walk the floor, do not
-merge, end the session.
+Three groups touch mostly different files, so agent teams are worth it; phase A first, serial.
 
-## 5. Do not (tonight)
+- **Phase A (one agent):** section 4's fields and STATE_VERSION 15 with the migration; the
+  constants (2.23, the rate's helpers' names); the hall click routing of 2.6 stubbed to the new
+  modal id; the Tasks page action of 2.16 stubbed; every test green. The six frozen files of
+  Turn 13 (types.ts, constants.ts, index.ts, game.ts routing, app.ts routing, styles.css class
+  names) are frozen for phase B after this.
+- **Phase B (three agents):** B1 the hall: 2.1 to 2.8 (render, hall.ts, walkers.ts, pipes.ts,
+  machine card ui, catalogue.ts, stations.ts, staff.ts for the helper's auto work). B2 the people
+  and the desk: 2.9 to 2.21 (staff.ts, production.ts, tasks.ts, laptop.ts and its pages, team.ts,
+  topbar.ts, drawings.ts, materials.ts, economy.ts for 2.21). B3 the money: 2.22 to 2.26
+  (contracts.ts and its ui, jobs.ts for the factor, company.ts, monthEnd.ts, a new
+  src/engine/rate.ts for the workshop rate). A B agent that needs a frozen file writes a note for
+  phase C and carries on.
+- **Phase C (one agent):** apply the notes, the scenarios (the sixteen months with the new hiring
+  gate, restock by number and overtime rule; plus (y) a month with two men on one job and a
+  contract on stock; (z) a week that proves the rate: 40 alone, 24 with two idle days), the cross
+  check of section 7, the screenshots, the report, the PR.
 
-- No STATE_VERSION bump. No field on the state for a figure's position or path.
-- No game minutes for walking. Nothing in production.ts, tasks.ts or stages.ts changes timing.
-- No change to a footprint in constants.ts (the edgebander stays 1 by 1 tonight).
-- No second path finder: walk.ts for men, pipes.ts for pipes, each with the comment of 2.2.
-- No restyling of the Turn 4 ducting: it is deleted, and the central system is drawn by the pipe
-  helper.
+## 4. State
+
+STATE_VERSION 15. New: job.secondAssignee (string or null), task carry over needs nothing new if
+tasks already persist minutes, otherwise a `startedBy`; the laptop's queued task ids; the
+canteen's welfare layout is derived from counts (no field); the rate needs `dayStats.paidHours`
+per day and a rolling week, or is computed from the ledger's salary days: pick the one that
+survives a save and say which. Migration: every v24 save loads; seats and lockers on the floor
+move into the canteen; secondAssignee null.
+
+## 5. Task queue, in order
+
+Branch turn-17-the-workshop-earns-by-the-hour from main. One commit per task, npm run check green
+on its own exit code before each, two report lines per task in REPORT-T17.md.
+
+T17-A1 Housekeeping and v25: docs/turn-16-brief.md from the v24 commit's CLAUDE.md, the README's
+briefs line, APP_VERSION 'v25', docs/art/REQUESTS-T17.md.
+T17-A2 Phase A as section 3 says.
+T17-B1a 2.1, 2.3, 2.4. T17-B1b 2.2. T17-B1c 2.5. T17-B1d 2.6. T17-B1e 2.7, 2.8.
+T17-B2a 2.9, 2.11, 2.12, 2.13. T17-B2b 2.10. T17-B2c 2.14, 2.15, 2.16, 2.17, 2.18, 2.19.
+T17-B2d 2.20, 2.21.
+T17-B3a 2.26 (the engine first, rate.ts, its tests). T17-B3b 2.24, 2.25 and the rate on the board
+and the month end. T17-B3c 2.22, 2.23.
+T17-C1 notes, T17-C2 scenarios, T17-C3 cross check, T17-C4 look and shoot (ten pictures in
+docs/report-t17: the strip with chips and without, a machine card, the canteen with seats, two
+men on a bench, the Company board with three columns and the rate, the month end with Total
+efficiency, Our team, the day meter in overtime, the pipes), T17-C5 report and PR titled
+`Turn 17: the workshop earns by the hour`, do not merge, end the session.
+
+## 6. Do not (tonight)
+
+- No summing of Output, machines and people into one multiplier. Output's engine is untouched.
+- No cost line beside the workshop rate. Gross, one figure.
+- No change to express beyond the deadline factor.
 - No touching docs/art/SPRITES.md, CLAUDE.md, the archived briefs, the mockup files, the sprite
-  files, the character sheets or the font file. Art requests go in docs/art/REQUESTS-T16.md only.
-- No JavaScript hover state; the ring pulses on CSS.
+  files, the character sheets or the font file.
 - No storage access outside src/cloud/store.ts; no PixiJS, sound, mobile, Steam, Electron.
 - No watch loops, nothing left running.
 
-## 6. Parked
-
-- The edgebander at 4 by 1 with an infeed and an outfeed (Piotr's drawing): a catalogue change
-  with a price, a zone and the class ladder; its own turn.
-- Minutes for walking: whether a long walk costs production time.
-- GPT's eight pipe tiles (T13 3.19): the vector helper stands until then; when the tiles land the
-  helper picks them through the sprite file check, the way every sprite does.
-- Everything parked by Turns 13 to 15.
-
 ## 7. The cross check (before the PR)
 
-- One rule per family. grep hall.ts for frontOf and FIGURE_FACING: gone. Every figure's cell comes
-  from standingCell, every facing from facingAt or the walker.
-- The free side. The rack tests of 2.1 are green on all five placements.
-- One network. grep src/render for a breadth first search or a neighbour loop: none; the renderer
-  calls walkPath and nothing else.
-- No jump. The walker test asserts the transform never moves more than one cell between two frames
-  after the first.
-- Real time. The walker reads the frame clock (nowMs), never state.clock.
-- One pipe drawing. grep src/render for duct-run, duct-drop, ductRun, ductDrop and for a pipe tile
-  drawn by placeholder: none.
-- Connected reads on the hall. The 2.3 test is green; the machine card's text is unchanged.
-- The chip. Projects: N opens the same modal as the office board, proved by the test.
-- The look. The ten pictures are in docs/report-t16/.
+- The rate. The four engine tests of 2.26 read 40, 24, under 40, over 40 as written; the board
+  and the month end print the same function's number.
+- Nobody walks on the spot: grep render for a `carry` or `walk` set as a rest animation: none.
+- The helper: with one hired, a delivery and a dirty hall are his in a scenario month, and the
+  owner's day meter shows no fixing minutes for them.
+- The gate: a hire with 2,499 in the bank is refused with the sentence.
+- Dusk: after the day end no clientCall or emails task exists; a drawings task with minutes left
+  does, with its person.
+- The canteen: no seat or locker on a hall cell after the migration of a v24 save with them on
+  the floor.
+- The look: the ten pictures.
 
-## 8. Art requested (contents of docs/art/REQUESTS-T16.md)
+## 8. Art requested (docs/art/REQUESTS-T17.md)
 
-- The eight pipe tiles of T13 3.19 stand as requested; nothing new is needed for the pipes.
-- character.joiner.carry facing the four ways is delivered; if nw or ne is missing from any role's
-  carry or walk sheet, list the missing rows so the mirror rule of 3.13 is not carrying more than
-  it should.
+- A helper character sheet (idle, walk, carry, bench), the capsule stands until then.
+- Seats and lockers as they look inside the canteen (top view through the roof, or a symbol on
+  the block face), the placeholder stands until then.
+- The pipe tiles of Turn 13 stand as requested.
 
 End of brief.
