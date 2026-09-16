@@ -81,7 +81,7 @@ describe('the two totals', () => {
     // Larger than everything else on the board.
     expect(CSS).toContain('.felt-total {');
     const block = CSS.slice(CSS.indexOf('.felt-total {'));
-    expect(block.slice(0, block.indexOf('}'))).toContain('font-size: 34px;');
+    expect(block.slice(0, block.indexOf('}'))).toContain('font-size: var(--fs-display);');
   });
 
   it('are the only live text on the board on the office wall', () => {

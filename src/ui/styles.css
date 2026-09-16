@@ -14,6 +14,25 @@
   /* The system stack: the body, and the one font inside the laptop's screen (T14 2.1). */
   --font-ui: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 
+  /* The type scale (PIOTR, 16.09: "the descriptions are too small"; CLAUDE.md T15 2.5). Every
+     font-size in this file reads one of these, nothing is typed twice and nothing is below the
+     smallest. Tiny is the floor: figures on a bar, axis labels, the version in the corner. Small
+     is second lines, meta and units under a figure. Body is every description, card line, row,
+     tip sentence and button. Lead is a card title in the system font and a section head. Title
+     is the big line of a tile or a card in the system font. Display is a ledger total [TUNE the
+     names]. */
+  --fs-tiny: 12px;
+  --fs-small: 13px;
+  --fs-body: 15px;
+  --fs-lead: 18px;
+  --fs-title: 26px;
+  --fs-display: 34px;
+  /* The title hand (Patrick Hand) keeps its own three sizes: a card name or a date, a cash
+     figure or a label pill, and the head of a modal [TUNE]. */
+  --fs-hand-small: 20px;
+  --fs-hand: 26px;
+  --fs-hand-big: 30px;
+
   /* Placeholder art, section 10.3. Flat colours, no gradients. */
   --concrete: #8f9298;
   --yard: #6f7278;
@@ -50,17 +69,17 @@
 
 /* Base label sizes in scene coordinates. The scene scales uniformly with the viewport. */
 .iso-label {
-  font-size: 11px;
+  font-size: var(--fs-tiny);
   fill: #1c1f24;
   pointer-events: none;
 }
 
 .figure-label {
-  font-size: 12px;
+  font-size: var(--fs-small);
 }
 
 .ghost-label {
-  font-size: 12px;
+  font-size: var(--fs-small);
 }
 
 /* The lettering the game paints onto the hall. The art leaves these areas blank
@@ -245,7 +264,7 @@
 .view-note {
   margin: 4px 0 0;
   color: var(--text-dim);
-  font-size: 12px;
+  font-size: var(--fs-body);
 }
 
 /* The hall's bag store under the hall: a small bar beside the line, red once it is full
@@ -278,7 +297,7 @@
   padding: 6px 12px;
   background: var(--panel-2);
   color: var(--accent);
-  font-size: 13px;
+  font-size: var(--fs-body);
   text-align: center;
 }
 
@@ -306,7 +325,7 @@
   padding: 6px 12px;
   background: var(--panel-2);
   color: var(--text-dim);
-  font-size: 13px;
+  font-size: var(--fs-body);
 }
 
 .owner-out .btn {
@@ -350,7 +369,7 @@ body {
   background: var(--page);
   color: var(--text);
   font-family: var(--font-ui);
-  font-size: 14px;
+  font-size: var(--fs-body);
   line-height: 1.4;
 }
 
@@ -376,17 +395,17 @@ body {
 
 h1 {
   margin: 0 0 12px;
-  font-size: 22px;
+  font-size: var(--fs-title);
 }
 
 h2 {
   margin: 0;
-  font-size: 15px;
+  font-size: var(--fs-lead);
 }
 
 h3 {
   margin: 14px 0 6px;
-  font-size: 13px;
+  font-size: var(--fs-body);
   color: var(--text-dim);
   text-transform: none;
 }
@@ -397,7 +416,7 @@ p {
 
 small {
   display: block;
-  font-size: 11px;
+  font-size: var(--fs-tiny);
   color: var(--text-dim);
 }
 
@@ -461,14 +480,14 @@ input.num {
 }
 
 .btn-big {
-  font-size: 15px;
+  font-size: var(--fs-lead);
   margin-top: 12px;
   padding: 9px 18px;
   width: 100%;
 }
 
 .chip {
-  font-size: 12px;
+  font-size: var(--fs-body);
   padding: 3px 8px;
 }
 
@@ -525,13 +544,13 @@ input.num {
 .topbar .cash {
   color: #12301f;
   font-family: var(--font-title);
-  font-size: 26px;
+  font-size: var(--fs-hand);
   font-weight: 400;
 }
 
 .topbar .net {
   color: #5b5446;
-  font-size: 12px;
+  font-size: var(--fs-small);
 }
 
 .topbar .net.good {
@@ -553,7 +572,7 @@ input.num {
 .topbar .date {
   color: var(--cream);
   font-family: var(--font-title);
-  font-size: 20px;
+  font-size: var(--fs-hand-small);
   line-height: 1;
   white-space: nowrap;
 }
@@ -569,7 +588,7 @@ input.num {
   border: 1px solid #2b4436;
   border-radius: 9px;
   color: #cfd8cf;
-  font-size: 11px;
+  font-size: var(--fs-tiny);
   padding: 2px 8px;
 }
 
@@ -591,7 +610,7 @@ input.num {
 
 .topbar .reason {
   color: #9fb0a3;
-  font-size: 12px;
+  font-size: var(--fs-small);
 }
 
 /* The boss's day: a dark inset panel with a lamp, what he is on, how much of the day has gone,
@@ -618,7 +637,7 @@ input.num {
 
 .day-line {
   color: var(--cream);
-  font-size: 12px;
+  font-size: var(--fs-small);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -626,7 +645,7 @@ input.num {
 
 .day-count {
   color: #9fb0a3;
-  font-size: 12px;
+  font-size: var(--fs-small);
   margin-left: auto;
   white-space: nowrap;
 }
@@ -719,7 +738,7 @@ input.num {
 .tip-row {
   align-items: center;
   display: flex;
-  font-size: 12px;
+  font-size: var(--fs-small);
   gap: 6px;
 }
 
@@ -755,7 +774,7 @@ input.num {
   color: #12301f;
   cursor: pointer;
   font-family: var(--font-title);
-  font-size: 16px;
+  font-size: var(--fs-hand-small);
   padding: 4px 12px;
 }
 
@@ -773,7 +792,7 @@ input.num {
 
 /* What today's work is multiplied by, shown only when it is below 1 (CLAUDE.md T6 3.4). */
 .output {
-  font-size: 12px;
+  font-size: var(--fs-small);
   font-weight: 600;
   white-space: nowrap;
 }
@@ -857,7 +876,7 @@ input.num {
 
 .field-row {
   display: block;
-  font-size: 12px;
+  font-size: var(--fs-small);
   color: var(--text-dim);
   margin: 8px 0;
 }
@@ -944,7 +963,7 @@ input.num {
   border: none;
   color: var(--text-dim);
   cursor: pointer;
-  font-size: 18px;
+  font-size: var(--fs-lead);
   line-height: 1;
   padding: 0 4px;
 }
@@ -990,7 +1009,7 @@ input.num {
 }
 
 .why-pop p {
-  font-size: 13px;
+  font-size: var(--fs-body);
   margin: 0 0 8px;
 }
 
@@ -1032,19 +1051,19 @@ input.num {
 
 .tile-name {
   color: var(--text);
-  font-size: 17px;
+  font-size: var(--fs-lead);
   margin: 0 90px 2px 0;
 }
 
 .tile-price {
-  font-size: 24px;
+  font-size: var(--fs-title);
   font-weight: 600;
   margin: 2px 0 6px;
 }
 
 .tile-figures {
   color: var(--text-dim);
-  font-size: 12px;
+  font-size: var(--fs-body);
   margin: 2px 0;
 }
 
@@ -1064,7 +1083,7 @@ input.num {
 /* Two or three lines about what a class of machine is (CLAUDE.md T3 3.5). */
 .tile-text {
   color: var(--text);
-  font-size: 12px;
+  font-size: var(--fs-body);
   margin: 6px 0;
 }
 
@@ -1151,18 +1170,18 @@ input.num {
 .sprite-shot.is-missing {
   align-items: center;
   color: var(--text-dim);
-  font-size: 12px;
+  font-size: var(--fs-small);
 }
 
 .sprite-key {
   color: var(--text);
-  font-size: 13px;
+  font-size: var(--fs-body);
   margin: 6px 0 2px;
 }
 
 .sprite-figures {
   color: var(--text-dim);
-  font-size: 11px;
+  font-size: var(--fs-tiny);
   margin: 1px 0;
 }
 
@@ -1179,7 +1198,7 @@ input.num {
 .step {
   border: 1px solid var(--border);
   border-radius: 2px;
-  font-size: 11px;
+  font-size: var(--fs-tiny);
   padding: 1px 6px;
   white-space: nowrap;
 }
@@ -1223,7 +1242,7 @@ input.num {
 .card h3 {
   color: var(--text);
   margin: 0 0 2px;
-  font-size: 14px;
+  font-size: var(--fs-lead);
 }
 
 .card-main {
@@ -1231,7 +1250,7 @@ input.num {
 }
 
 .figures {
-  font-size: 12px;
+  font-size: var(--fs-body);
   margin: 2px 0;
 }
 
@@ -1250,7 +1269,7 @@ input.num {
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 2px;
-  font-size: 11px;
+  font-size: var(--fs-tiny);
   padding: 1px 5px;
 }
 
@@ -1261,7 +1280,7 @@ input.num {
 
 .lock {
   color: var(--bad);
-  font-size: 12px;
+  font-size: var(--fs-body);
   margin: 4px 0 0;
 }
 
@@ -1272,7 +1291,7 @@ input.num {
 .hint,
 .empty {
   color: var(--text-dim);
-  font-size: 12px;
+  font-size: var(--fs-body);
 }
 
 .row {
@@ -1325,7 +1344,7 @@ input.num {
 }
 
 .row-figure {
-  font-size: 12px;
+  font-size: var(--fs-body);
   text-align: right;
 }
 
@@ -1348,12 +1367,12 @@ input.num {
 
 .done {
   color: var(--text-dim);
-  font-size: 12px;
+  font-size: var(--fs-small);
 }
 
 .reason {
   color: var(--text-dim);
-  font-size: 12px;
+  font-size: var(--fs-body);
   text-align: right;
 }
 
@@ -1383,7 +1402,7 @@ input.num {
   border: none;
   color: var(--text-dim);
   cursor: pointer;
-  font-size: 16px;
+  font-size: var(--fs-lead);
   line-height: 1;
   position: absolute;
   right: 6px;
@@ -1439,7 +1458,7 @@ input.num {
   box-sizing: border-box;
   color: rgb(255 255 255 / 65%);
   display: flex;
-  font-size: 28px;
+  font-size: var(--fs-title);
   justify-content: flex-end;
   letter-spacing: 1px;
   padding: 16px 24px;
@@ -1537,7 +1556,7 @@ input.num {
   border-radius: 999px;
   color: var(--cream);
   font-family: var(--font-title);
-  font-size: 26px;
+  font-size: var(--fs-hand);
   line-height: 1;
   opacity: 0;
   padding: 7px 18px 9px;
@@ -1669,7 +1688,7 @@ input.num {
 
 .plan-now-label {
   color: #3f76b8;
-  font-size: 10px;
+  font-size: var(--fs-tiny);
   position: absolute;
   top: 2px;
   transform: translateX(3px);
@@ -1686,7 +1705,7 @@ input.num {
 
 .plan-due span {
   color: var(--bad);
-  font-size: 10px;
+  font-size: var(--fs-tiny);
   left: 3px;
   position: absolute;
   top: 1px;
@@ -1703,7 +1722,7 @@ input.num {
 
 .plan-start span {
   color: #d8a53a;
-  font-size: 10px;
+  font-size: var(--fs-tiny);
   left: 3px;
   position: absolute;
   top: 13px;
@@ -1751,7 +1770,7 @@ input.num {
 
 .plan-late {
   color: var(--bad);
-  font-size: 10px;
+  font-size: var(--fs-tiny);
   position: absolute;
   top: 20px;
   white-space: nowrap;
@@ -1760,7 +1779,7 @@ input.num {
 .plan-figures {
   bottom: 2px;
   color: var(--text);
-  font-size: 11px;
+  font-size: var(--fs-tiny);
   left: 4px;
   position: absolute;
 }
@@ -1768,7 +1787,7 @@ input.num {
 .plan-rate {
   bottom: 2px;
   color: var(--text-dim);
-  font-size: 10px;
+  font-size: var(--fs-tiny);
   position: absolute;
   right: 4px;
 }
@@ -1813,7 +1832,7 @@ input.num {
   border-radius: 4px;
   color: var(--page);
   display: flex;
-  font-size: 28px;
+  font-size: var(--fs-title);
   font-weight: 600;
   justify-content: center;
   letter-spacing: 1px;
@@ -1837,7 +1856,7 @@ input.num {
 
 .tile-waiting {
   color: var(--warn, #c9a227);
-  font-size: 12px;
+  font-size: var(--fs-small);
   font-weight: 600;
 }
 
@@ -1845,7 +1864,7 @@ input.num {
 .version-corner {
   bottom: 6px;
   color: var(--text-dim);
-  font-size: 11px;
+  font-size: var(--fs-tiny);
   pointer-events: none;
   position: fixed;
   right: 10px;
@@ -1871,7 +1890,7 @@ input.num {
   box-shadow: 0 6px 14px rgb(0 0 0 / 35%);
   color: #e8efe9;
   display: flex;
-  font-size: 26px;
+  font-size: var(--fs-title);
   justify-content: center;
   letter-spacing: 1px;
   padding: 24px 16px;
@@ -1935,7 +1954,7 @@ input.num {
   gap: 4px;
 }
 .tabs-air .chip {
-  font-size: 11px;
+  font-size: var(--fs-tiny);
   padding: 2px 6px;
 }
 
@@ -2041,7 +2060,7 @@ input.num {
 
 .modal-folder .modal-head h2 {
   color: var(--green);
-  font-size: 22px;
+  font-size: var(--fs-hand);
   font-weight: 800;
   letter-spacing: -0.01em;
 }
@@ -2200,7 +2219,7 @@ input.num {
 .day-plate h3 {
   color: #12301f;
   font-family: var(--font-title);
-  font-size: 22px;
+  font-size: var(--fs-hand);
   font-weight: 400;
   margin: 0;
 }
@@ -2492,7 +2511,7 @@ input.num {
 
 .modal-felt .modal-head h2 {
   color: #f0e9d8;
-  font-size: 20px;
+  font-size: var(--fs-hand-small);
 }
 
 .modal-felt .modal-body {
@@ -2525,17 +2544,17 @@ input.num {
 
 .felt-name {
   font-family: var(--font-title);
-  font-size: 30px;
+  font-size: var(--fs-hand-big);
   line-height: 1.1;
 }
 
 .felt-week {
   font-family: var(--font-title);
-  font-size: 22px;
+  font-size: var(--fs-hand);
 }
 
 .felt-shares {
-  font-size: 12px;
+  font-size: var(--fs-small);
   opacity: 0.85;
 }
 
@@ -2610,7 +2629,7 @@ input.num {
 
 .felt-total {
   font-family: var(--font-title);
-  font-size: 34px;
+  font-size: var(--fs-display);
   line-height: 1.1;
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
 }
@@ -2666,12 +2685,12 @@ input.num {
 }
 
 .modal-head h2 {
-  font-size: 30px;
+  font-size: var(--fs-hand-big);
 }
 
 .tile-name,
 .card-main h3 {
-  font-size: 20px;
+  font-size: var(--fs-hand-small);
 }
 
 /* On the folder's paper every card is paper too: cream on cream with dark ink, never the dark
@@ -2798,7 +2817,7 @@ input.num {
 .catalogue-notes .warn {
   color: #8a5a1e;
   font-family: var(--font-title);
-  font-size: 15px;
+  font-size: var(--fs-hand-small);
   margin: 2px 0;
 }
 
@@ -2863,7 +2882,7 @@ input.num {
 
 .month-head .row-figure {
   color: var(--text-dim);
-  font-size: 11px;
+  font-size: var(--fs-tiny);
   text-transform: uppercase;
 }
 
@@ -2923,7 +2942,7 @@ input.num {
 .stock-thumb svg { display: block; }
 .stock-line .row-main { display: flex; flex-direction: column; min-width: 160px; }
 .stock-name { font-weight: 600; }
-.stock-number { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; color: #6b6b6b; letter-spacing: 0.04em; }
+.stock-number { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: var(--fs-small); color: #6b6b6b; letter-spacing: 0.04em; }
 .stock-free, .stock-reserved, .stock-total { min-width: 92px; }
 .stock-free { font-weight: 600; }
 .badge-low { margin-left: auto; }
@@ -2982,7 +3001,7 @@ input.num {
 }
 .pallet .placeholder text,
 .placeholder-art .placeholder text {
-  font-size: 7px;
+  font-size: var(--fs-tiny);
 }
 .arrived {
   opacity: 0.92;
@@ -3016,7 +3035,7 @@ input.num {
   border: 0;
   color: #f5efe2;
   cursor: pointer;
-  font-size: 18px;
+  font-size: var(--fs-lead);
   line-height: 1;
   padding: 2px 6px;
   position: absolute;
@@ -3029,7 +3048,7 @@ input.num {
 }
 
 .gear {
-  font-size: 18px;
+  font-size: var(--fs-lead);
   line-height: 1;
   min-width: 40px;
   padding: 0 8px;
@@ -3045,7 +3064,7 @@ input.num {
   background: #4a1f1a;
   border-bottom: 1px solid #0a1a10;
   color: #f5efe2;
-  font-size: 13px;
+  font-size: var(--fs-body);
   padding: 4px 16px;
 }
 
@@ -3059,7 +3078,7 @@ input.num {
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
   color: #1d2a22;
   display: flex;
-  font-size: 13px;
+  font-size: var(--fs-body);
   gap: 12px;
   justify-content: space-between;
   margin: 0 0 10px;
@@ -3079,7 +3098,7 @@ input.num {
 .efficiency > summary {
   color: #f5efe2;
   cursor: pointer;
-  font-size: 12px;
+  font-size: var(--fs-small);
   list-style: none;
   white-space: nowrap;
 }
@@ -3103,14 +3122,14 @@ input.num {
 }
 
 .efficiency-plate .hint {
-  font-size: 11px;
+  font-size: var(--fs-tiny);
   margin: 0 0 4px;
 }
 
 .efficiency-line {
   align-items: center;
   display: flex;
-  font-size: 12px;
+  font-size: var(--fs-small);
   gap: 6px;
   justify-content: space-between;
 }
@@ -3218,18 +3237,18 @@ input.num {
 }
 
 .modal-screen .modal-head h2 {
-  font-size: 18px;
+  font-size: var(--fs-lead);
 }
 
 .modal-screen h3 {
   color: var(--screen-ink);
-  font-size: 15px;
+  font-size: var(--fs-lead);
 }
 
 /* The company and the clock in one small line at the top of home. */
 .screen-status {
   color: var(--screen-dim);
-  font-size: 13px;
+  font-size: var(--fs-body);
   margin: 0 0 14px;
 }
 
@@ -3286,13 +3305,13 @@ input.num {
 }
 
 .screen-tile-big {
-  font-size: 28px;
+  font-size: var(--fs-title);
   font-weight: 600;
   line-height: 1;
 }
 
 .screen-tile-small {
-  font-size: 14px;
+  font-size: var(--fs-body);
   opacity: 0.94;
 }
 
@@ -3305,7 +3324,7 @@ input.num {
 
 .screen-group {
   color: var(--screen-dim);
-  font-size: 13px;
+  font-size: var(--fs-body);
   font-weight: 600;
   margin: 0 0 10px;
 }
@@ -3323,7 +3342,7 @@ input.num {
   color: var(--screen-ink);
   cursor: pointer;
   font-family: var(--font-ui);
-  font-size: 14px;
+  font-size: var(--fs-body);
   font-weight: 600;
   min-width: 132px;
   padding: 14px 16px;
@@ -3342,7 +3361,7 @@ input.num {
   color: var(--screen-accent);
   cursor: pointer;
   font-family: var(--font-ui);
-  font-size: 14px;
+  font-size: var(--fs-body);
   margin: 0 0 10px;
   padding: 0;
 }
