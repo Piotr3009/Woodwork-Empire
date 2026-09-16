@@ -6,7 +6,12 @@
 // refused as it always was (CLAUDE.md T12 2.3). Written against the plain JSON a save is and not
 // against the types, because the whole point is that the file does not match them yet.
 
-import { STATE_VERSION, WEBSITE_START_LEVEL } from './constants';
+import {
+  CANTEEN_SLOT_LAYOUT,
+  LOCKER_SLOT_LAYOUT,
+  STATE_VERSION,
+  WEBSITE_START_LEVEL,
+} from './constants';
 import type { GameState } from './types';
 
 /** The oldest save this build opens: Turn 11's v18, which is state version 12. */
@@ -139,8 +144,82 @@ function liftToVersion14(state: Raw): void {
   state.version = 14;
 }
 
+/** Version 14 to 15: the workshop earns by the hour (CLAUDE.md T17 section 4). Every v24 save
+ *  loads: no job has a second man on it, no day has counted the hours it paid for, nothing is
+ *  queued on the laptop, and the seats and the lockers come off the hall floor and stand inside
+ *  the canteen on the slots the layout gives them, in the order they were bought. */
+function liftToVersion15(state: Raw): void {
+  for (const job of records(state.jobs)) job.secondAssignee = null;
+  state.taskQueue = [];
+  if (isRecord(state.dayStats)) state.dayStats.paidHours = 0;
+  for (const day of records(state.days)) {
+    day.paidHours = 0;
+    day.hallFactor = 1;
+  }
+  // Nobody has a month behind him on the new fields, and no machine has a week on its own clock.
+  if (isRecord(state.owner)) {
+    state.owner.monthMinutes = 0;
+    state.owner.monthDaysOff = 0;
+  }
+  for (const worker of records(state.workers)) {
+    worker.monthMinutes = 0;
+    worker.monthDaysOff = 0;
+  }
+  for (const item of records(state.equipment)) {
+    item.hoursThisWeek = 0;
+    item.hoursThisMonth = 0;
+  }
+  // A running contract holds nothing on the rack yet: it takes its sheets from the next piece on.
+  for (const contract of records(state.contracts)) {
+    contract.sheetsReserved = 0;
+    contract.sheetsUsed = 0;
+  }
+  // Joinery Core was paid for at the click and again at the first month end before tonight. What
+  // is owned now runs from this month on, and nothing is given back (CLAUDE.md T17 2.21).
+  if (isRecord(state.software)) {
+    const software = state.software;
+    software.joineryCoreFromMonth = software.joineryCore === true ? 0 : null;
+    const bought = typeof software.joineryCoreExtensions === 'number' ? software.joineryCoreExtensions : 0;
+    software.joineryCoreExtensionMonths = new Array<number>(Math.max(0, bought)).fill(0);
+  }
+  let seats = 0;
+  let lockers = 0;
+  const welfare = new Set<string>();
+  for (const item of records(state.equipment)) {
+    if (item.specId === 'canteenSeat' || item.specId === 'locker') {
+      if (typeof item.id === 'string') welfare.add(item.id);
+    }
+    if (item.soldOnDay !== null && item.soldOnDay !== undefined) continue;
+    if (item.specId === 'canteenSeat') {
+      const slot = CANTEEN_SLOT_LAYOUT[Math.min(seats, CANTEEN_SLOT_LAYOUT.length - 1)];
+      seats += 1;
+      if (slot) {
+        item.anchorX = slot.x;
+        item.anchorY = slot.y;
+      }
+    } else if (item.specId === 'locker') {
+      const slot = LOCKER_SLOT_LAYOUT[Math.min(lockers, LOCKER_SLOT_LAYOUT.length - 1)];
+      lockers += 1;
+      if (slot) {
+        item.anchorX = slot.x;
+        item.anchorY = slot.y;
+      }
+    }
+  }
+  // A seat or a locker the player was half way through shifting is not a move any more: the kit
+  // is in the canteen and the hall never had it, so nothing is owed for shifting it.
+  state.movedItems = records(state.movedItems).filter(
+    (moved) => typeof moved.itemId !== 'string' || !welfare.has(moved.itemId),
+  );
+  state.version = 15;
+}
+
 /** One lift per bump, keyed by the version it lifts from. */
-const LIFTS: Record<number, (state: Raw) => void> = { 12: liftToVersion13, 13: liftToVersion14 };
+const LIFTS: Record<number, (state: Raw) => void> = {
+  12: liftToVersion13,
+  13: liftToVersion14,
+  14: liftToVersion15,
+};
 
 /** The state a save holds, lifted bump by bump into this build's shape, or null when the save is
  *  older than anything this build can lift or is not a state at all. The save itself is left as

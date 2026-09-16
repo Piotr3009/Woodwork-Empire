@@ -9,6 +9,7 @@ import { peekSave } from '../../src/cloud/store';
 import type { SaveStore } from '../../src/cloud/store';
 import { OLDEST_SAVE_VERSION, canOpenVersion, migrateState } from '../../src/engine/migrate';
 import { STATE_VERSION, bagStore, tick } from '../../src/engine/index';
+import { CANTEEN_SLOT_LAYOUT, roomById } from '../../src/engine/constants';
 import type { GameState } from '../../src/engine/index';
 
 /** A game saved by v18 on the morning of day 2, with a full bag on the saw, the question about
@@ -106,5 +107,70 @@ describe('what is still refused', () => {
     const before = JSON.stringify(raw.state);
     migrateState(raw.state, 12);
     expect(JSON.stringify(raw.state)).toBe(before);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Turn 17: version 14 to 15 (CLAUDE.md T17 section 4)
+// ---------------------------------------------------------------------------
+
+/** A game saved by v24: state version 14, the shape the turn before this one ran on. */
+const V24_FIXTURE = 'tests/fixtures/save-v20.woodwork.json';
+const v24Text = readFileSync(V24_FIXTURE, 'utf8');
+
+/** The same save with a canteen seat and a locker standing on the hall floor, where every welfare
+ *  item stood before tonight: the front edge, clear of the gate lane. */
+function v24WithWelfareOnTheFloor(): Record<string, unknown> {
+  const parsed = JSON.parse(v24Text) as { state: Record<string, unknown> };
+  const equipment = parsed.state.equipment as Array<Record<string, unknown>>;
+  const template = equipment[0] as Record<string, unknown>;
+  equipment.push(
+    { ...template, id: 'kit-seat', specId: 'canteenSeat', spriteKey: 'canteenSeat', anchorX: 7, anchorY: 9 },
+    { ...template, id: 'kit-locker', specId: 'locker', spriteKey: 'locker', anchorX: 13, anchorY: 9 },
+  );
+  parsed.state.movedItems = [{ itemId: 'kit-seat', fromX: 8, fromY: 9, fromRotated: false }];
+  return parsed.state;
+}
+
+describe('a v24 save in this build (CLAUDE.md T17 section 4)', () => {
+  it('loads, and comes up at this build’s version with the fields the bump added zeroed', () => {
+    const opened = decodeSaveFile(v24Text);
+    expect(opened.state).not.toBeNull();
+    const state = opened.state as GameState;
+    expect(state.version).toBe(STATE_VERSION);
+    expect(STATE_VERSION).toBe(15);
+    expect(state.taskQueue).toEqual([]);
+    expect(state.dayStats.paidHours).toBe(0);
+    for (const day of state.days) expect(day.paidHours).toBe(0);
+    for (const job of state.jobs) expect(job.secondAssignee).toBeNull();
+  });
+
+  it('moves every seat and locker off the hall floor and into the canteen', () => {
+    const lifted = migrateState(v24WithWelfareOnTheFloor(), 14);
+    expect(lifted).not.toBeNull();
+    const state = lifted as GameState;
+    const canteen = roomById('canteen');
+    const inside = (item: { anchorX: number; anchorY: number }): boolean =>
+      item.anchorX >= canteen.x &&
+      item.anchorX < canteen.x + canteen.width &&
+      item.anchorY >= canteen.y &&
+      item.anchorY < canteen.y + canteen.depth;
+    const welfare = state.equipment.filter(
+      (item) => item.specId === 'canteenSeat' || item.specId === 'locker',
+    );
+    expect(welfare).toHaveLength(2);
+    for (const item of welfare) expect(inside(item), item.specId).toBe(true);
+    // The first seat is the cell just inside the door.
+    const seat = welfare.find((item) => item.specId === 'canteenSeat');
+    expect({ x: seat?.anchorX, y: seat?.anchorY }).toEqual(CANTEEN_SLOT_LAYOUT[0]);
+    // And a seat half way through a move is not a move any more: the hall never had it.
+    expect(state.movedItems).toEqual([]);
+  });
+
+  it('runs on, and round trips through the one encoder', () => {
+    const state = decodeSaveFile(v24Text).state as GameState;
+    const later = tick(state, 30);
+    const back = decodeSaveFile(encodeSaveFile(later));
+    expect(back.state).toEqual(later);
   });
 });

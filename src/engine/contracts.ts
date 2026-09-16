@@ -23,9 +23,11 @@ import {
   CONTRACT_OFFER_CHANCE_PER_DAY,
   CONTRACT_QUANTITY_STEP,
   CONTRACT_CLIENTS,
+  CONTRACT_FREE_END_DAYS,
 } from './constants';
 import type { ContractPieceSpec } from './constants';
 import { isBreak, isOvertime, isWorkingDay, weekOfDay, weekday } from './clock';
+import { plural } from './text';
 import { charge, formatMoney } from './economy';
 import { queueEvent } from './events';
 import { findJob, releaseJob, stagedJob, workerMinuteCost } from './jobs';
@@ -90,7 +92,16 @@ export function contractPiece(contract: Contract): ContractPieceSpec {
   const first = CONTRACT_PIECES[0];
   if (found) return found;
   if (first) return first;
-  return { id: contract.pieceId, name: contract.pieceId, stages: ['cutting'], minutes: 45, price: 0, material: 0 };
+  return {
+    id: contract.pieceId,
+    name: contract.pieceId,
+    stages: ['cutting'],
+    minutes: 45,
+    price: 0,
+    material: 0,
+    sheets: 0,
+    labour: 0,
+  };
 }
 
 /** The active contract this man is on, or null. */
@@ -184,6 +195,8 @@ export function drawContract(state: GameState, carrier: RngCarrier = state): Con
     piecesThisWeek: 0,
     pieceMinutes: 0,
     weeks: [],
+    sheetsReserved: 0,
+    sheetsUsed: 0,
     piecesMade: 0,
     revenue: 0,
     materialCost: 0,
@@ -536,6 +549,33 @@ export function runContractDay(state: GameState): void {
     }
     if (contract.endDay !== null && today > contract.endDay) endContract(state, contract);
   }
+}
+
+/** Why the player cannot end this contract yet, or that he can. The first month is the term he
+ *  committed to; after it he may walk away for nothing but the work he will not now do
+ *  (PIOTR, 17.09; CLAUDE.md T17 2.22). */
+export function endContractCheck(state: GameState, contractId: string): ContractCheck {
+  const contract = state.contracts.find((entry) => entry.id === contractId);
+  if (!contract) return { ok: false, reason: 'That contract has gone' };
+  if (contract.status !== 'active') return { ok: false, reason: 'It is not running' };
+  const since = state.clock.day - (contract.startDay ?? state.clock.day);
+  if (since < CONTRACT_FREE_END_DAYS) {
+    const left = CONTRACT_FREE_END_DAYS - since;
+    return { ok: false, reason: `The first month stands: ${plural(left, 'day', 'days')} to go` };
+  }
+  return OK;
+}
+
+/** The player ends a running contract himself. Nothing is charged: what he loses is the work
+ *  (CLAUDE.md T17 2.22). */
+export function endContractNow(state: GameState, contractId: string): ContractCheck {
+  const check = endContractCheck(state, contractId);
+  if (!check.ok) return check;
+  const contract = state.contracts.find((entry) => entry.id === contractId);
+  if (!contract) return { ok: false, reason: 'That contract has gone' };
+  contract.endDay = state.clock.day;
+  endContract(state, contract);
+  return OK;
 }
 
 /** The renew answer: yes opens a fresh term at the client's new price from today, no lets the

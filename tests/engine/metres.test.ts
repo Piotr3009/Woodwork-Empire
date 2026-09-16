@@ -182,14 +182,26 @@ describe('the 200 square metre hall', () => {
     expect(rooms).toBe(18);
     expect(lane).toBe(8);
     expect(state.unit.widthCells * state.unit.depthCells - rooms - lane).toBe(174);
-    // And the same number counted cell by cell through the placement rule itself.
+    // And the same number counted cell by cell through the placement rule itself. The probe is a
+    // tool cabinet and no longer a canteen seat: from Turn 17 the seat and the locker are the two
+    // families that may stand inside the canteen, so they would count its eight cells as well
+    // (CLAUDE.md T17 2.2).
     let free = 0;
     for (let y = 0; y < state.unit.depthCells; y += 1) {
       for (let x = 0; x < state.unit.widthCells; x += 1) {
-        if (canPlaceSpec(state, 'canteenSeat', x, y, null).ok) free += 1;
+        if (canPlaceSpec(state, 'toolCabinet', x, y, null).ok) free += 1;
       }
     }
     expect(free).toBe(174);
+    // The welfare kit has those eight cells of the canteen on top of the hall's own floor, and
+    // nothing else does.
+    let welfare = 0;
+    for (let y = 0; y < state.unit.depthCells; y += 1) {
+      for (let x = 0; x < state.unit.widthCells; x += 1) {
+        if (canPlaceSpec(state, 'canteenSeat', x, y, null).ok) welfare += 1;
+      }
+    }
+    expect(welfare).toBe(174 + roomById('canteen').width * roomById('canteen').depth);
   });
 
   it('puts the shutter and the personnel door in the left wall', () => {

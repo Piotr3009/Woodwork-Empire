@@ -178,6 +178,8 @@ describe('the helper has his dinner too', () => {
       absentDaysRemaining: 0,
       shift: 'day',
       dayLog: [],
+      monthMinutes: 0,
+      monthDaysOff: 0,
       anchorX: 0,
       anchorY: 0,
     });

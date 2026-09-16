@@ -97,6 +97,7 @@ import { renderOwnerOut } from './ownerOut';
 import { renderCompany } from './company';
 import { renderShopping } from './shopping';
 import { renderStart } from './start';
+import { renderMachineCard } from './machineCard';
 import { decodeSaveFile, encodeSaveFile, saveFileName } from '../cloud/file';
 import {
   NO_STORED_SAVE,
@@ -121,7 +122,11 @@ type ModalId =
   | 'shopping'
   | 'company'
   /** The gear on the top bar: tips on and off (CLAUDE.md T13 3.22). */
-  | 'settings';
+  | 'settings'
+  /** One machine on the hall, opened by a click on the machine itself: its picture and class, its
+   *  effects, its hours, its service, its extraction and the buttons the Owned tab has
+   *  (PIOTR, 17.09; CLAUDE.md T17 2.6). */
+  | 'machineCard';
 
 /** The Orders page: the enquiries, and the standing contracts beside them (CLAUDE.md T13 3.16). */
 export type BoardTab = 'enquiries' | 'contracts';
@@ -178,6 +183,11 @@ interface Ui {
   /** The machine whose Sell button has been pressed once. A sale is meant on the second click,
    *  inside the tile itself (CLAUDE.md T8 3.5). */
   sellConfirm: string | null;
+  /** The machine whose own card is open, from a click on it on the hall (CLAUDE.md T17 2.6). */
+  machineCard: string | null;
+  /** Tasks the player has ticked on the laptop's Tasks page, in the order he ticked them, waiting
+   *  for Do these (CLAUDE.md T17 2.16). */
+  tickedTasks: string[];
   /** The job whose Drop project has been pressed once. The same rule: it is meant on the second
    *  click, inside the card (CLAUDE.md T9 3.9). */
   dropConfirm: string | null;
@@ -238,6 +248,7 @@ const MODAL_TITLES: Record<ModalId, string> = {
   shopping: 'On order',
   company: 'Company board',
   settings: 'Settings',
+  machineCard: 'Machine',
 };
 
 /** How much of the page each modal takes. Anything that is a list or a board fills it; a small
@@ -254,6 +265,8 @@ export const MODAL_IS_FULL: Record<ModalId, boolean> = {
   shopping: true,
   company: true,
   settings: false,
+  // One machine's card is a card, not a list: it sits on the page like an event does (T17 2.6).
+  machineCard: false,
 };
 
 let ui: Ui = freshUi();
@@ -287,6 +300,8 @@ function freshUi(): Ui {
     catalogueFolder: null,
     ownedTab: 'all',
     sellConfirm: null,
+    machineCard: null,
+    tickedTasks: [],
     dropConfirm: null,
     accountingTab: 'days',
     accountingMonth: null,
@@ -408,6 +423,8 @@ function modalBody(id: ModalId, current: GameState): string {
       });
     case 'workPlan':
       return renderWorkPlan(current, ui.dropConfirm);
+    case 'machineCard':
+      return renderMachineCard(current, ui.machineCard, ui.sellConfirm);
     case 'accounting': {
       const books = renderAccounting(
         current,
@@ -989,6 +1006,16 @@ function openModal(id: ModalId): void {
   }
 }
 
+/** The one way onto one machine's card: a click on the machine on the hall, and from Turn 17 the
+ *  Owned tab's tile as well. The card is the same functions the Owned tab calls (T17 2.6). */
+function openMachineCard(equipmentId: string): void {
+  // The card is the answer to the click, so whatever the last click wrote under the hall goes.
+  setNote('');
+  ui.machineCard = equipmentId;
+  ui.sellConfirm = null;
+  openModal('machineCard');
+}
+
 /** The one way onto a page of the laptop: a tile, the back arrow, the Joinery Core tile onto the
  *  Team's Technical tab, and the order board's "Open the team" all come through here. The lid is
  *  lifted first when the laptop is not open, which is what boots it (CLAUDE.md T15 2.3). A new
@@ -1438,6 +1465,20 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
     case 'startTask':
       dispatch({ type: 'START_TASK', taskId: id });
       return;
+    case 'tickTask': {
+      // The tick on the laptop's Tasks page. The order he ticks them in is the order they are
+      // done in, so a tick goes on the end and a second tick takes it off (T17 2.16).
+      ui.tickedTasks = ui.tickedTasks.includes(id)
+        ? ui.tickedTasks.filter((entry) => entry !== id)
+        : [...ui.tickedTasks, id];
+      break;
+    }
+    case 'doTheseTasks':
+      if (ui.tickedTasks.length > 0) {
+        dispatch({ type: 'QUEUE_TASKS', taskIds: ui.tickedTasks });
+        ui.tickedTasks = [];
+      }
+      return;
     case 'pauseTask':
       dispatch({ type: 'PAUSE_TASK' });
       return;
@@ -1772,10 +1813,18 @@ function handleSceneClick(element: DataElement): boolean {
       dispatch({ type: 'ASK_EMPTY_BAGS' });
       return true;
     }
+    // A click on a machine opens that machine's own card, with the same buttons the Owned tab
+    // calls (PIOTR, 17.09; CLAUDE.md T17 2.6). Anything that is not a machine keeps its note.
+    if (findSpec(item.specId)?.category === 'machine' && item.specId !== 'extractor') {
+      openMachineCard(item.id);
+      requestRender();
+      return true;
+    }
     if (item.broken) {
       setNote('It has stopped. Nothing runs until it is fixed.');
     } else if (item.specId === 'extractor') {
-      // The hall's store, live under the hall with its bar (CLAUDE.md T12 3.3).
+      // The hall's store, live under the hall with its bar (CLAUDE.md T12 3.3). Phase B1 puts the
+      // store on the extractor's own card and this branch goes with it (CLAUDE.md T17 2.6).
       ui.note = '';
       ui.storeNote = true;
     } else {

@@ -46,6 +46,8 @@ function joiner(index: number): Worker {
     absentDaysRemaining: 0,
     shift: 'day',
     dayLog: [],
+    monthMinutes: 0,
+    monthDaysOff: 0,
     anchorX: 4 + index * 2,
     anchorY: 6,
   };

@@ -48,6 +48,7 @@ import {
   assignContract,
   declineContract,
   offerContract,
+  endContractNow,
   renewContract,
   runContractDay,
   contractMen,
@@ -152,6 +153,7 @@ import {
   acceptEnquiry,
   addLabour,
   assignJob,
+  assignSecond,
   chargeSiteMeasure,
   checkOverdueJobs,
   deliverJob,
@@ -173,6 +175,7 @@ import {
   runBookedTransport,
   dropJob,
   setSawFallback,
+  takeOverJob,
   transportLabel,
 } from './jobs';
 import {
@@ -264,6 +267,7 @@ import {
   pauseOwnerTask,
   resumeOwnerTask,
   skippedTask,
+  queueTasks,
   startTask,
   taskWorkRate,
 } from './tasks';
@@ -355,9 +359,20 @@ export function createGame(options: NewGameOptions): GameState {
       holidayDaysRemaining: 0,
       station: STATION_IDLE,
       productionMinutes: 0,
+      monthMinutes: 0,
+      monthDaysOff: 0,
     },
-    software: { mode: 'none', tier: 'basic', jobsRemaining: 0, joineryCore: false, joineryCoreExtensions: 0 },
+    software: {
+      mode: 'none',
+      tier: 'basic',
+      jobsRemaining: 0,
+      joineryCore: false,
+      joineryCoreExtensions: 0,
+      joineryCoreFromMonth: null,
+      joineryCoreExtensionMonths: [],
+    },
     laptopBootedOnDay: null,
+    taskQueue: [],
     stock: { sheets: 0, tempStorageSheets: 0 },
     equipment: [],
     onOrder: [],
@@ -405,6 +420,7 @@ export function createGame(options: NewGameOptions): GameState {
       dustM3: 0,
       efficiency: emptyEfficiency(),
       nightMinutes: 0,
+      paidHours: 0,
     },
     days: [],
     lastExpressDay: null,
@@ -476,6 +492,7 @@ function startDay(state: GameState): void {
     dustM3: 0,
     efficiency: emptyEfficiency(),
     nightMinutes: 0,
+    paidHours: 0,
   };
   // Nobody stands at a machine overnight: the hall starts the day with every one of them free
   // (CLAUDE.md T7 3.1).
@@ -854,6 +871,8 @@ export function daySummaryOf(state: GameState): DaySummary {
     workMinutes: state.dayStats.workMinutes,
     dayLog: owner.dayLog.map((entry) => ({ ...entry })),
     dustMadeM3: state.dayStats.dustM3,
+    paidHours: state.dayStats.paidHours,
+    hallFactor: hallProductivityFactor(state),
     efficiency: JSON.parse(JSON.stringify(state.dayStats.efficiency)) as DaySummary['efficiency'],
     nightMinutes: state.dayStats.nightMinutes,
   };
@@ -2024,6 +2043,11 @@ export function applyAction(state: GameState, action: GameAction): GameState {
     case 'START_TASK':
       startTask(next, action.taskId);
       break;
+    case 'QUEUE_TASKS':
+      // Several ticked on the laptop and done one after another, in the order they were ticked
+      // (CLAUDE.md T17 2.16).
+      queueTasks(next, action.taskIds);
+      break;
     case 'ACCEPT_ENQUIRY':
       acceptEnquiry(next, action.enquiryId, action.byHand);
       break;
@@ -2032,8 +2056,8 @@ export function applyAction(state: GameState, action: GameAction): GameState {
       orderShortfall(next, action.jobId);
       break;
     case 'RESTOCK':
-      // Every low line back up to the restock figure (CLAUDE.md T13 3.2).
-      buyStock(next, restockSheets(next));
+      // The number the player typed, capped at the free places in the rack (CLAUDE.md T17 2.20).
+      buyStock(next, restockSheets(next, action.sheets));
       break;
     case 'DROP_JOB':
       // The client has his deposit back and the company takes the hit (CLAUDE.md T9 3.9).
@@ -2049,6 +2073,15 @@ export function applyAction(state: GameState, action: GameAction): GameState {
     }
     case 'ASSIGN_JOB':
       assignJob(next, action.jobId, action.workerId);
+      break;
+    case 'ASSIGN_SECOND':
+      // The second man on the job, on it or off it (CLAUDE.md T17 2.10).
+      assignSecond(next, action.jobId, action.workerId);
+      break;
+    case 'TAKE_OVER_JOB':
+      // The evening is the owner's to give: he takes a worker's job on and the worker has it back
+      // in the morning (CLAUDE.md T17 2.12).
+      takeOverJob(next, action.jobId);
       break;
     case 'ASSIGN_AIR':
       // Which compressor this machine, or this dryer, draws from. Nothing is bought, nothing
@@ -2170,6 +2203,11 @@ export function applyAction(state: GameState, action: GameAction): GameState {
       break;
     case 'RENEW_CONTRACT':
       renewContract(next, action.contractId, action.accept);
+      break;
+    case 'END_CONTRACT':
+      // After the first month he may walk away, and it costs him nothing but the work
+      // (CLAUDE.md T17 2.22).
+      endContractNow(next, action.contractId);
       break;
     case 'SET_SECOND_SHIFT':
       // No manager, no second shift (CLAUDE.md T13 3.9).
@@ -2377,6 +2415,8 @@ function standItem(
     anchorY: at.y,
     broken: false,
     serviceHours: 0,
+    hoursThisWeek: 0,
+    hoursThisMonth: 0,
     enduranceHours: enduranceHoursFor(specId, variant.id),
     hoursUsed: 0,
     takenBy: null,

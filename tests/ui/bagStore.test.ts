@@ -91,8 +91,10 @@ describe('the store under the hall', () => {
     render();
     click(`[data-kit="${kitId('extractor')}"]`);
     expect(gauge()).not.toBeNull();
+    // From Turn 17 a click on a machine opens that machine's own card (CLAUDE.md T17 2.6), and
+    // the store goes with the click that wrote it.
     click(`[data-kit="${kitId('tableSaw')}"]`);
-    expect(notes()).toContain('of use on the clock');
+    expect(root().querySelector('.modal-layer [data-modal="machineCard"]')).not.toBeNull();
     expect(gauge()).toBeNull();
   });
 });

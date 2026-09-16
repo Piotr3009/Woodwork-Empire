@@ -1,7 +1,7 @@
 // Where things stand on the hall floor. Pure geometry over the state, so the setup view can ask
 // before it drops and the catalogue can ask before it buys (CLAUDE.md T2 3.10).
 
-import { GATE_LANE, M2_PER_PERSON, ROOM_LAYOUT } from './constants';
+import { GATE_LANE, M2_PER_PERSON, ROOM_LAYOUT, WELFARE_IN_THE_CANTEEN } from './constants';
 import { findSpec, itemStandsInTheHall, standsInTheHall, zoneOf } from './machines';
 import { reservedItems } from './orders';
 import type { Equipment, GameState, OnOrderItem } from './types';
@@ -90,9 +90,11 @@ export function canPlaceSpec(
     return { ok: false, reason: 'Off the floor' };
   }
   for (const room of ROOM_LAYOUT) {
-    if (overlaps(box, { x: room.x, y: room.y, width: room.width, depth: room.depth })) {
-      return { ok: false, reason: `On the ${room.name.toLowerCase()}` };
-    }
+    if (!overlaps(box, { x: room.x, y: room.y, width: room.width, depth: room.depth })) continue;
+    // The welfare kit lives inside the canteen and nowhere else: a seat and a locker belong out of
+    // the dust, and they take no hall cell at all (PIOTR, 17.09; CLAUDE.md T17 2.2).
+    if (room.id === 'canteen' && WELFARE_IN_THE_CANTEEN.includes(specId)) continue;
+    return { ok: false, reason: `On the ${room.name.toLowerCase()}` };
   }
   if (overlaps(box, gateLane())) {
     return { ok: false, reason: 'Blocking the way to the gate' };

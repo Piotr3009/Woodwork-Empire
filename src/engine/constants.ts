@@ -66,8 +66,13 @@ import type {
  *  unloading of several orders, so a task carries a list of them (CLAUDE.md T9 3.1).
  *
  *  Bumped in Turn 11: the owner carries the log of his day and the state carries the last week of
- *  them, which is what the top bar's meter and the company board are drawn from (T11 3.1). */
-export const STATE_VERSION = 14;
+ *  them, which is what the top bar's meter and the company board are drawn from (T11 3.1).
+ *
+ *  Bumped in Turn 17: a job may have a second man on it, the day counts the hours the company
+ *  paid for whether they were worked or not, and the laptop keeps the tasks the player ticked
+ *  to be done one after another. The welfare kit moved off the hall floor and into the canteen
+ *  with the same bump (CLAUDE.md T17 section 4). Every v24 save loads. */
+export const STATE_VERSION = 15;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
@@ -185,6 +190,20 @@ export const OWNER_LABOUR_VALUE_PER_DAY = 320;
 /** CLAUDE.md 8.5 writes this as 0.6667, which is this exact fraction rounded to four places. */
 export const OWNER_LABOUR_PER_MINUTE = OWNER_LABOUR_VALUE_PER_DAY / MINUTES_PER_WORKING_DAY;
 
+/** The hours the company pays for, per man, per working day: eight, whether they were worked or
+ *  not. The bottom of the workshop rate, and the reason a shop that stands still still pays
+ *  (PIOTR, 17.09; CLAUDE.md T17 2.26). The owner is paid for the same eight, and for the
+ *  overtime he actually stayed for on top. */
+export const PAID_HOURS_PER_WORKING_DAY = 8;
+
+/** The owner alone, at his work every minute of his eight hours, earns exactly this an hour:
+ *  the reference the workshop rate is read against. 320 over 8 is 40 (CLAUDE.md T17 2.26). */
+export const OWNER_RATE_PER_HOUR = OWNER_LABOUR_VALUE_PER_DAY / PAID_HOURS_PER_WORKING_DAY;
+
+/** Working days the workshop rate on the Company board is read over, and the week it compares
+ *  itself with [TUNE: five, one working week] (CLAUDE.md T17 2.26). */
+export const RATE_WEEK_DAYS = 5;
+
 // ---------------------------------------------------------------------------
 // 8.1 Fixed costs and the unit
 // ---------------------------------------------------------------------------
@@ -245,6 +264,11 @@ export const PELLET_INCOME_PER_1000_PRODUCTION_MINUTES = 40;
 /** Working days in a month of 30 calendar days, for the fixed cost figure the arrears interest
  *  threshold is measured against [TUNE]. */
 export const WORKING_DAYS_PER_MONTH = (DAYS_PER_MONTH * WORKING_DAYS_PER_WEEK) / DAYS_PER_WEEK;
+
+/** Weeks in one of the game's months: thirty days over seven, which is 4.2857. What a man on a
+ *  weekly wage costs in a month, so the Our team page and the hiring gate can put every man's
+ *  pay in the same column (CLAUDE.md T17 2.9, 2.11). */
+export const WEEKS_PER_MONTH = DAYS_PER_MONTH / DAYS_PER_WEEK;
 
 /** The hall in cells, which are metres now: x along the rear wall, y along the left wall, the
  *  origin at the rear left corner (docs/art/SPRITES.md 9.1 and 9.3). 200 cells. */
@@ -688,8 +712,9 @@ export const DEADLINE_SMALL_JOB_PRICE = 3000;
 export const DEADLINE_SMALL_SLACK_DAYS = 2;
 export const DEADLINE_SLACK_PERCENT_MIN = 10;
 export const DEADLINE_SLACK_PERCENT_MAX = 15;
-/** An express job wants it in six tenths of the time, and never in under three days (PIOTR). */
-export const DEADLINE_EXPRESS_FACTOR = 0.6;
+/** An express job wants it in eight tenths of the time, and never in under three days: 20% sooner
+ *  and not 40%, which is what an uplift of a fifth is worth (PIOTR, 17.09; CLAUDE.md T17 2.23). */
+export const DEADLINE_EXPRESS_FACTOR = 0.8;
 
 /** Every machine wants a service once a month, and it costs half an hour (PIOTR). From Turn 6 the
  *  month is counted on the machine's own clock and not on the calendar: 80 hours is the month a
@@ -2996,24 +3021,29 @@ export const BENCH_SLOT_LAYOUT: LayoutSlot[] = [
   { x: 18, y: 4 },
 ];
 
-/** Welfare items stand along the front edge, clear of the gate lane and of the three room
- *  doors that open into the hall (CLAUDE.md T7 3.3). */
+/** The two families that stand inside the canteen and not on the hall floor: a man's seat and his
+ *  locker (PIOTR, 17.09; CLAUDE.md T17 2.2). The one list: the placement, the render and the
+ *  migration all ask it. */
+export const WELFARE_IN_THE_CANTEEN: readonly string[] = ['canteenSeat', 'locker'];
+
+/** The welfare kit stands inside the canteen and takes no hall cell: a man eats and keeps his
+ *  coat out of the dust, not on the floor between the benches (PIOTR, 17.09; CLAUDE.md T17 2.2).
+ *  The canteen block is two cells wide and four deep at x 3, y 0, and its door is in the front
+ *  face at x 4. The lockers take the far column and the seats the door column, the first seat
+ *  the cell just inside the door; past the last cell of a column the next one stands on the same
+ *  cell, which is what `slotFrom` does everywhere else [TUNE: the two columns]. */
 export const LOCKER_SLOT_LAYOUT: LayoutSlot[] = [
-  { x: 13, y: 9 },
-  { x: 14, y: 9 },
-  { x: 15, y: 9 },
-  { x: 16, y: 9 },
-  { x: 17, y: 9 },
-  { x: 18, y: 9 },
+  { x: 3, y: 0 },
+  { x: 3, y: 1 },
+  { x: 3, y: 2 },
+  { x: 3, y: 3 },
 ];
 
 export const CANTEEN_SLOT_LAYOUT: LayoutSlot[] = [
-  { x: 7, y: 9 },
-  { x: 8, y: 9 },
-  { x: 9, y: 9 },
-  { x: 10, y: 9 },
-  { x: 11, y: 9 },
-  { x: 12, y: 9 },
+  { x: 4, y: 3 },
+  { x: 4, y: 2 },
+  { x: 4, y: 1 },
+  { x: 4, y: 0 },
 ];
 
 /** Tool cabinets stand in the row between the rear machines and the benches: one for the owner
@@ -3388,13 +3418,39 @@ export interface ContractPieceSpec {
   /** What the client pays a piece, and what the material in it costs. */
   price: number;
   material: number;
+  /** Whole sheets off the rack a piece takes. A contract's material comes off the rack like a
+   *  job's and is never bought as money on the contract line (CLAUDE.md T17 2.22). */
+  sheets: number;
+  /** The labour value in a piece, in pounds: what the workshop earns by making it, which is what
+   *  the workshop rate counts (CLAUDE.md T17 2.26). */
+  labour: number;
 }
 
-/** The pieces a contract can be for. One tonight [TUNE]: cut sheet packs for a shop, cutting
- *  only, 45 minutes, sold at 38 with 30 of material in it (CLAUDE.md T13 3.16). */
+/** The pieces a contract can be for. `minutes` is owner minutes a piece, `price` what the client
+ *  pays for one, `material` the money in its sheets, `sheets` the whole sheets it takes off the
+ *  rack, and `labour` the labour value the workshop earns by making it (CLAUDE.md T13 3.16,
+ *  T17 2.22, 2.26).
+ *
+ *  Tonight's one [TUNE]: cut sheet packs for a shop, cutting only, 45 minutes, sold at 38 with 30
+ *  of material in it, which is one sheet off the rack and 8 of labour, the margin it always
+ *  carried. Turn 17 adds the short and the long piece beside it, so the board can offer both
+ *  kinds (T17-B3c). */
 export const CONTRACT_PIECES: readonly ContractPieceSpec[] = [
-  { id: 'cutSheetPack', name: 'Cut sheet pack', stages: ['cutting'], minutes: 45, price: 38, material: 30 },
+  {
+    id: 'cutSheetPack',
+    name: 'Cut sheet pack',
+    stages: ['cutting'],
+    minutes: 45,
+    price: 38,
+    material: 30,
+    sheets: 1,
+    labour: 8,
+  },
 ];
+
+/** A contract may be ended by the player once it has run this long, and it costs nothing but the
+ *  work he will not now do [TUNE: one month, as Piotr said] (CLAUDE.md T17 2.22). */
+export const CONTRACT_FREE_END_DAYS = DAYS_PER_MONTH;
 /** Contracts arrive from this reputation tier up [TUNE: the second tier, reputation 0], one on
  *  the board at a time, and an offer stands for this many days [TUNE]. */
 export const CONTRACT_MIN_TIER = 1;

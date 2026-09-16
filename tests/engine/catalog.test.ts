@@ -63,6 +63,7 @@ function job(partial: Partial<Job>): Job {
     callsMissed: 0,
     designMinutesRemaining: 0,
     assignedTo: null,
+    secondAssignee: null,
     stageRuns: [],
     completedDay: 11,
     daysLate: 0,

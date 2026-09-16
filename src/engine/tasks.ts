@@ -742,6 +742,21 @@ export function emptyBagsLabel(bags: number): string {
   return `Empty the bags (${plural(bags, 'bag', 'bags')}, ${emptyBagsMinutes(bags)} min)`;
 }
 
+/** The tasks the player ticked on the laptop, queued for the owner in the order he ticked them:
+ *  the first is started now and the rest wait their turn (CLAUDE.md T17 2.16). Anything already
+ *  done, already queued or not the owner's to take is left out. */
+export function queueTasks(state: GameState, taskIds: readonly string[]): boolean {
+  const wanted = taskIds.filter((id) => {
+    const task = findTask(state, id);
+    return task !== null && task !== undefined && !task.done;
+  });
+  if (wanted.length === 0) return false;
+  state.taskQueue = wanted.filter((id, at) => wanted.indexOf(id) === at);
+  const first = state.taskQueue[0];
+  if (first !== undefined && state.owner.currentTaskId === null) startTask(state, first);
+  return true;
+}
+
 export const AD_HOC_TASK_MINUTES = {
   clientCall: CLIENT_CALL_ANSWER_MINUTES,
   clientMeeting: CLIENT_MEETING_MINUTES,

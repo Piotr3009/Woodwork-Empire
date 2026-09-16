@@ -381,6 +381,8 @@ export function hire(state: GameState, role: WorkerRole, tier: WorkerTier | null
     anchorY: anchor.y,
     shift: 'day',
     dayLog: [],
+    monthMinutes: 0,
+    monthDaysOff: 0,
   };
   state.workers.push(worker);
   return worker;

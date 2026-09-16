@@ -47,6 +47,8 @@ const OPENERS: Array<[string, string]> = [
   ['shopping', '[data-do="openModal"][data-modal="shopping"]'],
   ['company', '[data-office="company"]'],
   ['laptop', '[data-office="laptop"]'],
+  // One machine's own card, from a click on the machine standing in the hall (T17 2.6).
+  ['machineCard', '.hall-view [data-sprite="tableSaw"]'],
 ];
 
 beforeAll(() => {
@@ -60,14 +62,14 @@ beforeAll(() => {
   // about the size of a modal and not about how the furniture arrives.
   const state = currentState();
   if (state === null) throw new Error('no game');
-  Object.assign(state, buyNow(buyNow(state, 'desk'), 'laptop'));
+  Object.assign(state, buyNow(buyNow(buyNow(state, 'desk'), 'laptop'), 'tableSaw'));
   render();
 });
 
 describe('the size of every modal in the game', () => {
   it('fills the page for every list and board, and for nothing else', () => {
     for (const [id, opener] of OPENERS) {
-      goTo(id === 'shopping' ? 'hall' : 'office');
+      goTo(id === 'shopping' || id === 'machineCard' ? 'hall' : 'office');
       click(opener);
       dismissEvents();
       const node = openModalNode();
@@ -90,6 +92,8 @@ describe('the size of every modal in the game', () => {
       laptop: true,
       // The settings are a small plate off the gear on the top bar (CLAUDE.md T13 3.22).
       settings: false,
+      // One machine's card is a card, not a list (CLAUDE.md T17 2.6).
+      machineCard: false,
     });
   });
 });

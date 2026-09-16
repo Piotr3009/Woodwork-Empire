@@ -63,7 +63,17 @@ const PLAYTHROUGH: Policy = {
       next = act(next, { type: 'SET_INSURANCE', cover: 'property', on: true });
       next = act(next, { type: 'SET_INSURANCE', cover: 'liability', on: true });
     }
-    if (day === 61) next = act(next, { type: 'HIRE', role: 'productionManager', tier: null });
+    // From day 61 the owner takes a production manager on. The interview is an hour of his day and
+    // the day he is free to sit it is not always the 61st, so the script asks again until one is on
+    // the books and there is no interview already running (CLAUDE.md T17 5, phase A).
+    if (
+      day >= 61 &&
+      isWorkingDay(day) &&
+      !next.workers.some((worker) => worker.role === 'productionManager') &&
+      !next.tasks.some((task) => task.kind === 'hiring' && !task.done)
+    ) {
+      next = act(next, { type: 'HIRE', role: 'productionManager', tier: null });
+    }
     if (day >= HOLIDAY_FROM && !holidayTaken && isWorkingDay(day) && managerOnDuty(next)) {
       next = act(next, { type: 'TAKE_HOLIDAY', days: 5 });
       holidayTaken = onHoliday(next);

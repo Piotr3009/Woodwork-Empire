@@ -368,7 +368,10 @@ function gateLine(state: GameState, item: Equipment): string {
   return `<p class="tile-figures">${signedFigure(`Automatic gate fitted: output +${per}%`, per)}</p>`;
 }
 
-function ownedTile(
+/** One machine's card as the Owned tab draws it. From Turn 17 the machine's own modal, opened by
+ *  a click on it on the hall, is this same card: one drawing and one set of buttons, so Connect to
+ *  extraction cannot be on one and missing from the other (CLAUDE.md T17 2.6). */
+export function ownedTile(
   state: GameState,
   item: Equipment,
   spec: EquipmentSpec,

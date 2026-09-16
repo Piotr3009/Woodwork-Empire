@@ -86,6 +86,8 @@ function joiner(id: string, weeklyWage: number): Worker {
     absentDaysRemaining: 0,
     shift: 'day',
     dayLog: [],
+    monthMinutes: 0,
+    monthDaysOff: 0,
     anchorX: 0,
     anchorY: 4,
   };

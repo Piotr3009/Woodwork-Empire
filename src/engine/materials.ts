@@ -148,11 +148,13 @@ export function pendingStockSheets(state: GameState): number {
  *  the one line of sheets, less what is already on the road for stock, and never more than the
  *  rack has room for, because a lorry that cannot be unloaded is the overflow question of Turn 2
  *  and a button should not walk the player into it (CLAUDE.md T13 3.2). Zero when nothing is low. */
-export function restockSheets(state: GameState): number {
-  if (!stockIsLow(state)) return 0;
+export function restockSheets(state: GameState, asked?: number): number {
   const pending = pendingStockSheets(state);
-  const wanted = RESTOCK_TO_SHEETS - freeSheets(state) - pending;
   const room = stockFree(state) - pending;
+  // The number the player typed, capped at the free places in the rack (CLAUDE.md T17 2.20).
+  if (asked !== undefined) return Math.max(0, Math.min(Math.floor(asked), room));
+  if (!stockIsLow(state)) return 0;
+  const wanted = RESTOCK_TO_SHEETS - freeSheets(state) - pending;
   return Math.max(0, Math.min(wanted, room));
 }
 

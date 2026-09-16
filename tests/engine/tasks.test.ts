@@ -79,6 +79,8 @@ function staff(id: string, role: Worker['role'], monthlyWage: number): Worker {
     absentDaysRemaining: 0,
     shift: 'day',
     dayLog: [],
+    monthMinutes: 0,
+    monthDaysOff: 0,
     anchorX: 0,
     anchorY: 0,
   };
@@ -173,6 +175,7 @@ describe('the daily list', () => {
       callsMissed: 0,
       designMinutesRemaining: 30,
       assignedTo: null,
+      secondAssignee: null,
       stageRuns: [],
       completedDay: null,
       daysLate: 0,

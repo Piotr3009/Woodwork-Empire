@@ -237,6 +237,8 @@ describe('the plate at the top of the day end summary', () => {
       dayLog: state.owner.dayLog,
       efficiency: { possible: 0, worked: 0, lost: { noPeople: 0, noMachine: 0, noMaterial: 0, ownerAway: 0 } },
       nightMinutes: 0,
+      paidHours: 0,
+      hallFactor: 1,
     });
     expect(html).toContain('Day 3 done');
     expect(html).toContain('370 of 480 min · overtime 0');

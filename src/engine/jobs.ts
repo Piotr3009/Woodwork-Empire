@@ -340,6 +340,7 @@ export function takeEnquiry(state: GameState, enquiryId: string, byHand: boolean
     callsMissed: 0,
     designMinutesRemaining: designMinutes(entry, enquiry.sizeMultiplier, state.software.tier),
     assignedTo: null,
+    secondAssignee: null,
     stageRuns: [],
     completedDay: null,
     daysLate: 0,
@@ -771,6 +772,45 @@ export function assignJob(state: GameState, jobId: string, workerId: string | nu
     state.owner.currentTaskId = null;
   }
   job.assignedTo = workerId;
+  job.stage = 'inProduction';
+  return true;
+}
+
+/** The second man on a job, put on it or taken off it. Both book minutes into it, each at his own
+ *  rate (CLAUDE.md T17 2.10). Phase A puts the field on the job and the action on the routing;
+ *  what the two of them do at the stations is phase B2's. */
+export function assignSecond(state: GameState, jobId: string, workerId: string | null): boolean {
+  const job = findJob(state, jobId);
+  if (!job) return false;
+  if (job.stage !== 'ready' && job.stage !== 'inProduction') return false;
+  if (workerId === null) {
+    job.secondAssignee = null;
+    return true;
+  }
+  if (workerId === job.assignedTo) return false;
+  const worker = state.workers.find((entry) => entry.id === workerId) ?? null;
+  if (!worker || worker.role !== 'joiner' || worker.absentDaysRemaining > 0) return false;
+  // Nobody is on two jobs at once: he comes off whatever he was on, first man or second.
+  for (const other of state.jobs) {
+    if (other.id === job.id) continue;
+    if (other.assignedTo === workerId) releaseJob(state, other);
+    if (other.secondAssignee === workerId) other.secondAssignee = null;
+  }
+  worker.jobId = job.id;
+  job.secondAssignee = workerId;
+  if (job.assignedTo !== null) job.stage = 'inProduction';
+  return true;
+}
+
+/** The owner takes a worker's job on for the evening, by a click and never on his own. The job
+ *  keeps the man it is assigned to: he carries on with it in the morning (CLAUDE.md T17 2.12).
+ *  Phase A routes it; the overtime hours it moves are phase B2's. */
+export function takeOverJob(state: GameState, jobId: string): boolean {
+  const job = findJob(state, jobId);
+  if (!job) return false;
+  if (job.stage !== 'ready' && job.stage !== 'inProduction') return false;
+  if (!ownerIsAvailable(state)) return false;
+  state.owner.currentTaskId = null;
   job.stage = 'inProduction';
   return true;
 }

@@ -111,6 +111,8 @@ describe('setting the hall out', () => {
       absentDaysRemaining: 0,
       shift: 'day',
       dayLog: [],
+      monthMinutes: 0,
+      monthDaysOff: 0,
       anchorX: bench?.anchorX ?? 0,
       anchorY: bench?.anchorY ?? 0,
     });

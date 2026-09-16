@@ -86,6 +86,8 @@ function withRole(state: GameState, role: WorkerRole): void {
     absentDaysRemaining: 0,
     shift: 'day',
     dayLog: [],
+    monthMinutes: 0,
+    monthDaysOff: 0,
     anchorX: 1,
     anchorY: 1,
   });
@@ -445,7 +447,8 @@ describe('express, properly profitable (CLAUDE.md T10 3.7)', () => {
         Math.max(DEADLINE_DAYS_MIN, Math.round((base + slack) * DEADLINE_EXPRESS_FACTOR)),
       );
     }
-    expect(DEADLINE_EXPRESS_FACTOR).toBe(0.6);
+    // Turn 17: an express job is due 20% sooner and not 40% (PIOTR, 17.09; CLAUDE.md T17 2.23).
+    expect(DEADLINE_EXPRESS_FACTOR).toBe(0.8);
   });
 });
 
