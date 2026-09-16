@@ -3069,25 +3069,50 @@ input.num {
   padding: 4px 16px;
 }
 
-/* The first use bubble over a screen's body: a cream note with the one sentence and its Right
-   button (T13 3.22). */
+/* The first use bubble at the bottom of a screen's body: a cream note with a graphic exclamation
+   mark before the one sentence, and its Right button as a pill on the right. It is the last child
+   of the body and floats over nothing: on a screen that scrolls, it scrolls with it (T13 3.22;
+   PIOTR, 16.09; CLAUDE.md T15 2.2) [TUNE: the metrics]. */
 .tip-bubble {
   align-items: center;
   background: linear-gradient(#f5efe2, #e3dcc9);
   border: 1px solid #5b5446;
-  border-radius: 4px;
+  border-radius: 6px;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
   color: #1d2a22;
   display: flex;
   font-size: var(--fs-body);
   gap: 12px;
-  justify-content: space-between;
-  margin: 0 0 10px;
-  padding: 8px 10px;
+  margin: 16px 0 0;
+  padding: 10px 14px;
 }
 
-.tip-close {
+/* The mark: a disc in the accent orange, 34 px, with a white bang in the title hand [TUNE]. */
+.tip-mark {
+  flex: none;
+  height: 34px;
+  width: 34px;
+}
+
+.tip-mark circle {
+  fill: var(--accent);
+}
+
+.tip-mark text {
+  fill: #fff;
+  font-family: var(--font-title);
+  font-size: var(--fs-title);
+}
+
+.tip-text {
+  flex: 1 1 auto;
+}
+
+.modal .tip-bubble button.tip-close {
+  border-radius: 999px;
   flex: 0 0 auto;
+  margin-left: auto;
+  padding: 4px 14px;
 }
 
 /* The efficiency number next to the clock, and the plate behind a click on it (T13 3.5). The
@@ -3480,11 +3505,12 @@ input.num {
   color: var(--bad);
 }
 
-/* The first use bubble on a screen of the laptop is a flat note, not a cream one. */
+/* The first use bubble on a screen of the laptop is a flat white panel, not a cream one, with the
+   same disc before the sentence (CLAUDE.md T15 2.2). */
 .modal-screen .tip-bubble {
   background: #fff;
-  border: 1px solid #b9c2b9;
-  border-radius: 8px;
+  border: 1px solid #d5dcd5;
+  border-radius: 12px;
   box-shadow: none;
   color: var(--screen-ink);
 }

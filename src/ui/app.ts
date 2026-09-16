@@ -389,31 +389,38 @@ function batched(work: () => void): void {
 // Rendering
 // ---------------------------------------------------------------------------
 
+/** The one order for a screen and its first use bubble: the body first and the bubble after it,
+ *  the last child of the body, where there is room. The top is for what matters, not for tips
+ *  (PIOTR, 16.09; CLAUDE.md T15 2.2). Every screen with a bubble comes through here, so the order
+ *  cannot differ between screens. */
+function withTip(body: string, current: GameState, key: string): string {
+  return body + renderTip(current, key);
+}
+
 function modalBody(id: ModalId, current: GameState): string {
   switch (id) {
     case 'board':
       return (
         tabBar('boardTab', BOARD_TABS, ui.boardTab) +
         (ui.boardTab === 'contracts'
-          ? renderTip(current, 'contracts') + renderContracts(current)
+          ? withTip(renderContracts(current), current, 'contracts')
           : renderBoard(current, ui.filters.board ?? ''))
       );
     case 'laptop':
       return renderLaptop(current, { page: ui.laptopPage, stockSheets: ui.stockSheets });
     case 'workPlan':
       return renderWorkPlan(current, ui.dropConfirm);
-    case 'accounting':
-      return (
-        (ui.accountingTab === 'finance' ? renderTip(current, 'finance') : '') +
-        renderAccounting(
-          current,
-          ui.arrearsAmount,
-          ui.accountingTab,
-          ui.openDays,
-          ui.accountingMonth,
-          ui.loanAmount,
-        )
+    case 'accounting': {
+      const books = renderAccounting(
+        current,
+        ui.arrearsAmount,
+        ui.accountingTab,
+        ui.openDays,
+        ui.accountingMonth,
+        ui.loanAmount,
       );
+      return ui.accountingTab === 'finance' ? withTip(books, current, 'finance') : books;
+    }
     case 'team':
       return renderTeam(current, ui.teamTab);
     case 'catalogue':
@@ -612,10 +619,11 @@ function modalSpecs(): ModalSpec[] {
     // The first use bubble of the screen, over its body, until it is dismissed (T13 3.22).
     const tipKey =
       ui.modal === 'laptop' ? laptopTipKey(ui.laptopPage) : TIP_KEY_OF_MODAL[ui.modal] ?? '';
+    const body = modalBody(ui.modal, current);
     specs.push({
       id: ui.modal,
       title: MODAL_TITLES[ui.modal],
-      body: (tipKey === '' ? '' : renderTip(current, tipKey)) + modalBody(ui.modal, current),
+      body: tipKey === '' ? body : withTip(body, current, tipKey),
       full: MODAL_IS_FULL[ui.modal],
       position: ui.modalPosition,
     });
@@ -643,8 +651,12 @@ function modalSpecs(): ModalSpec[] {
       id: 'event',
       title: houseCard ? 'Home' : event.title,
       body: houseCard
-        ? renderTip(current, 'house') + renderHouseCard(current) +
-          '<p class="choices"><button class="btn" data-do="closeHouseCard">The summary</button></p>'
+        ? withTip(
+            renderHouseCard(current) +
+              '<p class="choices"><button class="btn" data-do="closeHouseCard">The summary</button></p>',
+            current,
+            'house',
+          )
         : event.kind === 'dayEnd'
           ? renderDayEnd(current)
           : event.kind === 'monthEnd'
