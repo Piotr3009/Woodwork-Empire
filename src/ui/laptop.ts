@@ -1,64 +1,101 @@
-// The laptop on the office desk. Four tabs, because four things the owner does sit inside one
-// machine: the day's jobs of work, the material, the team and the drawings (CLAUDE.md T4 3.1).
+// The laptop on the office desk is a computer (PIOTR, 15.09; CLAUDE.md T14 2.1): a home screen of
+// tiles behind a bezel, in the system font on a cool background, and nothing of paper inside it.
+// Home is three big tiles, Tasks, Stock and Drawings in that order, each with a live line the
+// engine counts, and under a rule the Office group of small tiles: Team, Website, Insurance,
+// Security, Joinery Core, Settings. A big tile opens its page full screen inside the laptop with
+// a back arrow to home; the tiles are the whole of the navigation, and there is no tab bar.
 //
-// The jobs on the books moved out to the Work Plan board on the office wall.
+// The pages are the ones Turn 13 left: the tasks list, the stock page in the style of Joinery
+// Core, the drawings, and the three Admin pages, which Turn 13 built as tabs of this laptop and
+// which the small tiles open here on their own page (CLAUDE.md T14 2.1, T13 3.7, 3.15, 3.17).
 
 import {
   TAKE_OFF_BUTTON_LABEL,
   findJob,
+  formatDate,
   jobsAtGate,
+  laptopHome,
   openTasks,
   staffMinutesLeft,
   workerById,
 } from '../engine/index';
-import type { GameState, TaskInstance } from '../engine/index';
+import type { GameState, LaptopHome, TaskInstance } from '../engine/index';
 import { renderDrawings } from './drawings';
 import { renderInsurance } from './insurance';
 import { gateSection } from './jobCard';
 import { renderMaterials } from './materials';
 import { renderSecurity } from './security';
 import { renderWebsite } from './website';
-import {
-  emptyLine,
-  escapeHtml,
-  minutes,
-  money,
-  plural,
-  tabBar,
-  taskStartAction,
-} from './modal';
+import { emptyLine, escapeHtml, minutes, money, plural, taskStartAction } from './modal';
 
-/** The four tabs, in the order the contract names them (docs/art/SPRITES.md 8.2). Team is a chip
- *  that opens the Team board, which is a page of the game now and not a tab inside the laptop
- *  (PIOTR, 13.09; CLAUDE.md T10 3.6): the laptop never renders a body for it. */
-export type LaptopTab =
+/** The pages the screen shows: home, the three behind the big tiles, and the three Admin pages
+ *  behind their small tiles (CLAUDE.md T14 2.1). Home is the default, every time it opens. */
+export type LaptopPage =
+  | 'home'
   | 'tasks'
-  | 'materials'
-  | 'team'
+  | 'stock'
   | 'drawings'
   | 'website'
   | 'insurance'
   | 'security';
 
-/** The Admin group: the three tabs Turn 13 added, built once (CLAUDE.md T13 3.7, 3.15, 3.17). */
-export const ADMIN_TABS: Array<[LaptopTab, string]> = [
-  ['website', 'Website'],
-  ['insurance', 'Insurance'],
-  ['security', 'Security'],
+const PAGES: readonly LaptopPage[] = [
+  'home',
+  'tasks',
+  'stock',
+  'drawings',
+  'website',
+  'insurance',
+  'security',
 ];
 
-const TABS: Array<[LaptopTab, string]> = [
-  ['tasks', 'Tasks'],
-  ['materials', 'Stock'],
-  ['team', 'Team'],
-  ['drawings', 'Drawings'],
-  ...ADMIN_TABS,
-];
-
-export function laptopTabFrom(value: string): LaptopTab {
-  const found = TABS.find(([tab]) => tab === value);
-  return found ? found[0] : 'tasks';
+export function laptopPageFrom(value: string): LaptopPage {
+  return PAGES.find((page) => page === value) ?? 'home';
 }
+
+/** The three big tiles and the pages behind them. */
+type HomePage = 'tasks' | 'stock' | 'drawings';
+
+/** The order is the contract: Tasks, Stock, Drawings, left to right (CLAUDE.md T14 1). */
+export const HOME_TILES: ReadonlyArray<{ page: HomePage; label: string }> = [
+  { page: 'tasks', label: 'Tasks' },
+  { page: 'stock', label: 'Stock' },
+  { page: 'drawings', label: 'Drawings' },
+];
+
+/** The Office group, in the order the brief names it, each opening what it opened in Turn 13:
+ *  the Team board, the three Admin pages, the software line (which is on the Team board's
+ *  Technical tab, REPORT-T13 T13-B2a) and the Settings modal (CLAUDE.md T14 2.1). */
+export const OFFICE_GROUP: ReadonlyArray<{
+  id: string;
+  label: string;
+  action: string;
+  extra: string;
+}> = [
+  { id: 'team', label: 'Team', action: 'openModal', extra: 'data-modal="team"' },
+  { id: 'website', label: 'Website', action: 'laptopPage', extra: 'data-id="website"' },
+  { id: 'insurance', label: 'Insurance', action: 'laptopPage', extra: 'data-id="insurance"' },
+  { id: 'security', label: 'Security', action: 'laptopPage', extra: 'data-id="security"' },
+  { id: 'joineryCore', label: 'Joinery Core', action: 'teamTab', extra: 'data-id="technical"' },
+  { id: 'settings', label: 'Settings', action: 'openSettings', extra: '' },
+];
+
+/** The flat line icons of the three tiles, from the mockup: a list, a rack, a drawing. Inline,
+ *  drawn in the tile's own colour of ink, which the stylesheet makes white. */
+const ICONS: Record<HomePage, string> = {
+  tasks:
+    '<svg class="screen-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" ' +
+    'stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+    '<path d="M4 6h2M10 6h10M4 12h2M10 12h10M4 18h2M10 18h10" /></svg>',
+  stock:
+    '<svg class="screen-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" ' +
+    'stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+    '<path d="M4 3v18M20 3v18M4 9h16M4 15h16M4 21h16M7 6h10v3H7zM7 12h10v3H7z" /></svg>',
+  drawings:
+    '<svg class="screen-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" ' +
+    'stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+    '<path d="M5 3h10l4 4v14H5z M15 3v4h4 M8 11h8v6H8z M8 11l8 6" /></svg>',
+};
 
 /** Who has this one, and how much of his day is left (CLAUDE.md T2 3.8). */
 function onItLine(state: GameState, task: TaskInstance): string {
@@ -94,7 +131,7 @@ function taskRow(state: GameState, task: TaskInstance): string {
 }
 
 /** Today's desk: everything still open, and what was finished today. Yesterday's is gone. */
-function tasksTab(state: GameState): string {
+function tasksPage(state: GameState): string {
   const office = state.tasks.filter(
     (task) =>
       task.category !== 'workshop' &&
@@ -116,24 +153,92 @@ function tasksTab(state: GameState): string {
   );
 }
 
+/** The small line under Tasks: "3 open, 1 due today". */
+function tasksLine(home: LaptopHome): string {
+  return `${home.tasksOpen} open, ${home.tasksDueToday} due today`;
+}
+
+/** The small line under Stock: "46 sheets free, 2 low", the low count in the game's red while
+ *  it is above zero, "all stocked" when it is not (CLAUDE.md T14 2.1). */
+function stockLine(home: LaptopHome): string {
+  const low =
+    home.lowLines > 0 ? `<span class="bad">${home.lowLines} low</span>` : 'all stocked';
+  return `${plural(home.sheetsFree, 'sheet', 'sheets')} free, ${low}`;
+}
+
+/** The small line under Drawings: "2 waiting for a list", or "nothing waiting". */
+function drawingsLine(home: LaptopHome): string {
+  if (home.drawingsWaiting === 0) return 'nothing waiting';
+  return `${home.drawingsWaiting} waiting for a list`;
+}
+
+/** Home: the company and the game's clock in one small line, the three big tiles, and the Office
+ *  group under a rule. Every figure on it is the engine's (CLAUDE.md T14 2.1). */
+function homeScreen(state: GameState): string {
+  const home = laptopHome(state);
+  const lines: Record<HomePage, string> = {
+    tasks: tasksLine(home),
+    stock: stockLine(home),
+    drawings: drawingsLine(home),
+  };
+  const tiles = HOME_TILES.map(
+    (tile) =>
+      `<button class="screen-tile screen-tile-${tile.page}" data-do="laptopPage" ` +
+      `data-id="${tile.page}" data-tile="${tile.page}">` +
+      ICONS[tile.page] +
+      `<span class="screen-tile-big">${tile.label}</span>` +
+      `<span class="screen-tile-small" data-line="${tile.page}">${lines[tile.page]}</span>` +
+      '</button>',
+  ).join('');
+  const office = OFFICE_GROUP.map(
+    (tile) =>
+      `<button class="screen-small-tile" data-do="${tile.action}"` +
+      `${tile.extra === '' ? '' : ` ${tile.extra}`} data-tile="${tile.id}">` +
+      `${escapeHtml(tile.label)}</button>`,
+  ).join('');
+  return (
+    '<p class="screen-status">' +
+    `<span class="screen-company">${escapeHtml(state.companyName)}</span>, ` +
+    `<span class="screen-clock">${escapeHtml(formatDate(state.clock))}</span></p>` +
+    `<div class="screen-tiles">${tiles}</div>` +
+    '<hr class="screen-rule" />' +
+    '<h3 class="screen-group">Office</h3>' +
+    `<div class="screen-small-tiles">${office}</div>`
+  );
+}
+
+/** The back arrow at the top left of every page: a glyph, not a dash (CLAUDE.md T14 2.1). */
+const BACK_HOME =
+  '<button class="screen-back" data-do="laptopPage" data-id="home" data-tile="home">' +
+  '← Home</button>';
+
 export interface LaptopView {
-  tab: LaptopTab;
-  /** What the player has typed into the sheet count on the Materials tab. */
+  page: LaptopPage;
+  /** What the player has typed into the sheet count on the Stock page. Read by nothing since
+   *  Turn 13 (REPORT-T13 section 10); the page has no free form order any more. */
   stockSheets: string;
 }
 
+/** A page behind a tile, as Turn 13 left it: the screen skin is all it inherits (T14 2.1). */
+function pageBody(state: GameState, page: Exclude<LaptopPage, 'home'>, view: LaptopView): string {
+  switch (page) {
+    case 'tasks':
+      return tasksPage(state);
+    case 'stock':
+      return renderMaterials(state, view.stockSheets);
+    case 'drawings':
+      return renderDrawings(state);
+    case 'website':
+      return renderWebsite(state);
+    case 'insurance':
+      return renderInsurance(state);
+    case 'security':
+      return renderSecurity(state);
+  }
+}
+
 export function renderLaptop(state: GameState, view: LaptopView): string {
-  const body =
-    view.tab === 'materials'
-      ? renderMaterials(state, view.stockSheets)
-      : view.tab === 'drawings'
-        ? renderDrawings(state)
-        : view.tab === 'website'
-          ? renderWebsite(state)
-          : view.tab === 'insurance'
-            ? renderInsurance(state)
-            : view.tab === 'security'
-              ? renderSecurity(state)
-              : tasksTab(state);
-  return tabBar('laptopTab', TABS, view.tab) + body;
+  const inside =
+    view.page === 'home' ? homeScreen(state) : BACK_HOME + pageBody(state, view.page, view);
+  return `<div class="laptop-screen" data-laptop-page="${view.page}">${inside}</div>`;
 }

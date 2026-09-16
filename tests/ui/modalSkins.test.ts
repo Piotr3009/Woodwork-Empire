@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
-// Two UI families and nothing else: paper on a kraft folder, or cards on a board. Every modal id
-// in the game is on the one table and wears exactly one of the two (CLAUDE.md T11 1, 3.5).
+// Three UI families and nothing else: paper on a kraft folder, cards on a board, or the one
+// screen, which is the laptop. Every modal id in the game is on the one table and wears exactly
+// one of the three (CLAUDE.md T11 1, 3.5, T14 2.1).
 
 import { beforeAll, describe, expect, it } from 'vitest';
 import { MODAL_IS_FULL, currentState, mount, render } from '../../src/ui/app';
@@ -61,31 +62,34 @@ beforeAll(() => {
   render();
 });
 
-describe('the two skins', () => {
+const SKIN_CLASSES = ['modal-folder', 'modal-board', 'modal-screen'];
+
+describe('the three skins', () => {
   it('names every modal in the game, and nothing that is not one', () => {
     const named = Object.keys(MODAL_SKINS).sort();
     const known = [...Object.keys(MODAL_IS_FULL), ...LAYER_ONLY].sort();
     expect(named).toEqual(known);
   });
 
-  it('gives every one of them exactly one of the two families', () => {
+  it('gives every one of them exactly one of the three families, and the screen to the laptop only', () => {
     for (const [id, skin] of Object.entries(MODAL_SKINS)) {
-      expect(['folder', 'board'], id).toContain(skin);
+      expect(['folder', 'board', 'screen'], id).toContain(skin);
     }
+    // The laptop is the one computer in the game (CLAUDE.md T14 2.1).
+    expect(Object.entries(MODAL_SKINS).filter(([, skin]) => skin === 'screen')).toEqual([
+      ['laptop', 'screen'],
+    ]);
   });
 
-  it('puts that family on the modal the player opens, and never both', () => {
+  it('puts that family on the modal the player opens, and exactly one skin class on it', () => {
     for (const [id, opener] of OPENERS) {
       goTo(id === 'shopping' ? 'hall' : 'office');
       click(opener);
       dismissEvents();
       const node = root().querySelector('.modal-layer .modal');
       expect(node?.getAttribute('data-modal'), id).toBe(id);
-      const folder = node?.classList.contains('modal-folder') ?? false;
-      const board = node?.classList.contains('modal-board') ?? false;
-      expect(folder, id).toBe(MODAL_SKINS[id] === 'folder');
-      expect(board, id).toBe(MODAL_SKINS[id] === 'board');
-      expect(folder && board, id).toBe(false);
+      const worn = SKIN_CLASSES.filter((name) => node?.classList.contains(name) ?? false);
+      expect(worn, id).toEqual([`modal-${MODAL_SKINS[id] ?? ''}`]);
       click(`[data-modal="${id}"] [data-do="closeModal"]`);
     }
   });

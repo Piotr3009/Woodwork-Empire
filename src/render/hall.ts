@@ -290,9 +290,10 @@ export function ductDrop(system: string, item: Equipment): string {
   );
 }
 
-/** The door in the office block's face, as a control: the Team board is behind it
- *  (CLAUDE.md T10 3.6). The face is the one the hall is on, and the door is centred in it, which
- *  is the same box the room's own lettering is measured from. */
+/** The door in the office block's face, as a control: it walks into the office, the same as the
+ *  top bar's Office button (PIOTR, 15.09; CLAUDE.md T14 2.3). The face is the one the hall is on,
+ *  and the door is centred in it, which is the same box the room's own lettering is measured
+ *  from. */
 export function officeDoor(room: {
   x: number;
   y: number;
@@ -311,7 +312,7 @@ export function officeDoor(room: {
   ];
   return (
     '<g data-door="office" class="clickable office-door">' +
-    '<title>The team</title>' +
+    '<title>To the office</title>' +
     `<polygon points="${points(shape)}" class="door-hit" />` +
     '</g>'
   );
@@ -1203,8 +1204,8 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
     // (CLAUDE.md T13 3.19).
     const pipeLine = wantsExtraction(item) && !isConnected(state, item) ? ' (no pipe)' : '';
     const name = `${spec.name}${bagLine}${serviceLine}${benchLine}${rackLine}${pipeLine}`;
-    // Hovering the extractor reads the hall's store (CLAUDE.md T12 3.3).
-    const hover =
+    // Pointing at the extractor reads the hall's store (CLAUDE.md T12 3.3).
+    const tooltip =
       item.specId === 'extractor' && store.exists
         ? `${name}. ${bagStoreLine(store)}. ${spec.effect}`
         : `${name}. ${spec.effect}`;
@@ -1215,7 +1216,7 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
         `<g data-kit="${item.id}"${spec.category === 'storage' ? ' data-rack="1"' : ''} ` +
         `data-sprite="${item.spriteKey}" data-tier="${item.variantId}" ` +
         `class="clickable${fx.className}">` +
-        `<title>${escapeText(hover)}</title>` +
+        `<title>${escapeText(tooltip)}</title>` +
         objectArt({
           files,
           spriteKey: item.spriteKey,

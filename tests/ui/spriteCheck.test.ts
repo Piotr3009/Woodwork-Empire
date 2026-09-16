@@ -4,7 +4,7 @@
 import { describe, expect, it } from 'vitest';
 import { EQUIPMENT_SPECS } from '../../src/engine/constants';
 import { HALL_LAYERS, PALLET_SPRITE } from '../../src/render/hall';
-import { OFFICE_LAYERS } from '../../src/render/office';
+import { OFFICE_LAYERS, OFFICE_LIT_LAYERS } from '../../src/render/office';
 import { standsInTheHall } from '../../src/engine/machines';
 import { spriteUrl } from '../../src/render/sprites';
 import { CHARACTER_ROLES, PIPE_LAYER_KEYS, renderSpriteCheck, spriteTargets } from '../../src/ui/spriteCheck';
@@ -103,11 +103,13 @@ describe('the sprite check page', () => {
       expect(cell?.textContent, layer.key).toContain('1680 by 1128');
       expect(cell?.textContent, layer.key).toContain(layer.name);
     }
-    // Six layer cells in all: three of the hall and three of the office, each once. The figures
-    // have wide cells of their own beside them, keyed by the sheet and not by a sprite
-    // (CLAUDE.md T9 3.13).
+    // Seven layer cells in all: three of the hall, three of the office and the lit door the art
+    // side owes (CLAUDE.md T14 2.2), each once. The figures have wide cells of their own beside
+    // them, keyed by the sheet and not by a sprite (CLAUDE.md T9 3.13).
     const wide = Array.from(page.querySelectorAll('.sprite-wide-grid [data-sprite-target]'));
-    expect(wide).toHaveLength(HALL_LAYERS.length + OFFICE_LAYERS.length);
+    expect(wide).toHaveLength(HALL_LAYERS.length + OFFICE_LAYERS.length + OFFICE_LIT_LAYERS.length);
+    expect(page.innerHTML).toContain('The office, lit');
+    expect(page.querySelector('[data-sprite-target="officeDoorLit"]')).not.toBeNull();
     const keys = wide.map((cell) => cell.getAttribute('data-sprite-target'));
     expect(new Set(keys).size).toBe(keys.length);
   });

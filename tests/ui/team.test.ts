@@ -131,10 +131,13 @@ describe('the board itself', () => {
     ).toContain('On the books × 2');
   });
 
-  it('is behind the office door of the hall as well as the laptop chip', () => {
+  it('is no longer behind the office door of the hall: that door walks into the office', () => {
+    // Turn 10 put the team behind the door; Piotr reversed it, and the team is on the laptop's
+    // Office tile (PIOTR, 15.09; CLAUDE.md T14 2.3).
     const door = officeDoor({ x: 1, y: 0, width: 2, depth: 4 });
     expect(door).toContain('data-door="office"');
-    expect(door).toContain('The team');
+    expect(door).toContain('To the office');
+    expect(door).not.toContain('The team');
     expect(door).toContain('clickable');
   });
 });

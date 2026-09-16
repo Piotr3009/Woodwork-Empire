@@ -139,22 +139,27 @@ describe('the click regions', () => {
     ]);
   });
 
-  it('gives every region that opens something a hook and a tooltip, and no visible frame', () => {
+  it('gives every region that opens something a hook and a label, and no visible frame', () => {
     const node = room();
     for (const region of OFFICE_REGIONS) {
       const element = node.querySelector(`[data-office="${region.id}"]`);
       expect(element, region.id).not.toBeNull();
       if (region.opens) {
         expect(element?.getAttribute('data-do'), region.id).toBe('officeRegion');
-        expect(element?.getAttribute('title'), region.id).toBe(region.name);
       } else {
         // The clock is the live clock and opens nothing (docs/art/SPRITES.md 8.2).
         expect(element?.getAttribute('data-do'), region.id).toBeNull();
       }
-      // Nothing is drawn over the artwork, with two exceptions the art side has nothing on yet:
-      // the catalogue on the floor before there is a desk, and the company board on the free wall
-      // (CLAUDE.md T8 3.7, T9 3.10).
-      if (region.id !== 'company') expect(element?.textContent, region.id).toBe('');
+      // The name is the label the pointer brings up, off the table, and not a tooltip
+      // (CLAUDE.md T14 2.2).
+      expect(element?.getAttribute('title'), region.id).toBeNull();
+      expect(element?.querySelector('.office-label')?.textContent, region.id).toBe(region.name);
+      // Nothing else is drawn over the artwork, with two exceptions the art side has nothing on
+      // yet: the catalogue on the floor before there is a desk, and the company board on the free
+      // wall (CLAUDE.md T8 3.7, T9 3.10).
+      if (region.id !== 'company') {
+        expect(element?.querySelectorAll(':scope > :not(.office-label)'), region.id).toHaveLength(0);
+      }
     }
   });
 });
@@ -163,7 +168,8 @@ describe('the floor catalogue picture', () => {
   it('is a picture once the art side has delivered one, and the drawn object until then', () => {
     const drawn = room({ width: 1280, height: 800 }, [], newGame());
     const before = drawn.querySelector('[data-office="catalogue"]');
-    expect(before?.textContent).toBe('Equipment');
+    expect(before?.querySelector(':scope > span:not(.office-label)')?.textContent).toBe('Equipment');
+    expect(before?.querySelector('.office-label')?.textContent).toBe('Catalogue, on the floor');
     expect(before?.querySelector('img')).toBeNull();
     // The same region, through the loader, the moment the file is in the manifest.
     const delivered = room(
@@ -202,7 +208,7 @@ describe('the office a new game starts in', () => {
     const catalogue = bare.querySelector('[data-office="catalogue"]');
     expect(catalogue).not.toBeNull();
     expect(catalogue?.getAttribute('data-do')).toBe('officeRegion');
-    expect(catalogue?.textContent).toBe('Equipment');
+    expect(catalogue?.querySelector(':scope > span:not(.office-label)')?.textContent).toBe('Equipment');
     // The same box as on the desk, pushed down to the floor (CLAUDE.md T7 3.8).
     expect(catalogue?.getAttribute('style')).toBe(
       `left:${FLOOR_CATALOGUE.x}px;top:${FLOOR_CATALOGUE.y}px;` +
@@ -230,7 +236,8 @@ describe('the office a new game starts in', () => {
     ]);
     // The catalogue is on the desk now, where the contract puts it, and the binder is with it.
     const catalogue = node.querySelector('[data-office="catalogue"]');
-    expect(catalogue?.textContent).toBe('');
+    expect(catalogue?.querySelectorAll(':scope > :not(.office-label)')).toHaveLength(0);
+    expect(catalogue?.querySelector('.office-label')?.textContent).toBe('Catalogue');
     expect(catalogue?.getAttribute('style')).toContain('top:680px');
     expect(node.querySelector('[data-office="binder"]')).not.toBeNull();
     // And still no laptop, so still no order board.

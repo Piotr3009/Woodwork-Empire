@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
-// Every region of the room does what docs/art/SPRITES.md 8.2 and 8.4 say it does, and the four
-// laptop tabs are the one path to the modals that lost their desk item (CLAUDE.md T4 3.1).
+// Every region of the room does what docs/art/SPRITES.md 8.2 and 8.4 say it does, and the tiles of
+// the laptop's home screen are the one path to the pages that lost their desk item (CLAUDE.md T4
+// 3.1, T14 2.1).
 
-import { readFileSync } from 'node:fs';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { firstFreeCell } from '../../src/engine/layout';
 import { advanceMinutes, currentState, mount, render } from '../../src/ui/app';
@@ -182,67 +182,69 @@ describe('setting the hall out', () => {
   });
 });
 
-describe('the laptop tabs', () => {
-  it('carries the four tabs of the contract and the Admin three, Tasks first', () => {
+describe('the laptop tiles', () => {
+  it('opens on home, with the three big tiles in the order of the contract and the Office group', () => {
     click('[data-office="laptop"]');
-    const tabs = Array.from(root().querySelectorAll('[data-do="laptopTab"]'));
-    // The four of the contract, then the Admin group of Turn 13 (CLAUDE.md T13 3.7, 3.15, 3.17).
-    expect(tabs.map((tab) => tab.getAttribute('data-id'))).toEqual([
-      'tasks',
-      'materials',
+    expect(root().querySelector('[data-modal="laptop"] [data-laptop-page="home"]')).not.toBeNull();
+    const big = Array.from(root().querySelectorAll('[data-modal="laptop"] .screen-tile'));
+    // Tasks, Stock, Drawings, left to right, and nothing else in the row (CLAUDE.md T14 1).
+    expect(big.map((tile) => tile.getAttribute('data-tile'))).toEqual(['tasks', 'stock', 'drawings']);
+    const small = Array.from(root().querySelectorAll('[data-modal="laptop"] .screen-small-tile'));
+    expect(small.map((tile) => tile.getAttribute('data-tile'))).toEqual([
       'team',
-      'drawings',
       'website',
       'insurance',
       'security',
+      'joineryCore',
+      'settings',
     ]);
-    expect(tabs[0]?.className).toContain('is-on');
+    // The tab bar is gone: the tiles are the navigation, and there is no second one (T14 2.1).
+    expect(root().querySelector('[data-modal="laptop"] .tabs')).toBeNull();
+    expect(html()).not.toContain('data-do="laptopTab"');
+    click('[data-do="closeModal"]');
   });
 
-  it('reaches the material and the drawings, one path each', () => {
-    for (const [tab, mark] of [
+  it('reaches the stock and the drawings off their tiles, one path each, and comes back home', () => {
+    click('[data-office="laptop"]');
+    for (const [tile, mark] of [
       ['tasks', 'Office tasks today'],
-      ['materials', 'data-stock='],
+      ['stock', 'data-stock='],
       ['drawings', 'Design queue'],
     ]) {
-      click(`[data-do="laptopTab"][data-id="${tab}"]`);
-      expect(html(), tab).toContain(mark ?? '');
-      expect(openModalId(), tab).toBe('laptop');
+      click(`[data-modal="laptop"] [data-tile="${tile}"]`);
+      expect(html(), tile).toContain(mark ?? '');
+      expect(openModalId(), tile).toBe('laptop');
+      expect(root().querySelector(`[data-laptop-page="${tile}"]`), tile).not.toBeNull();
+      // The back arrow at the top left, and home again.
+      click('[data-modal="laptop"] [data-tile="home"]');
+      expect(root().querySelector('[data-laptop-page="home"]'), tile).not.toBeNull();
     }
     // There is no second way in: the two have no modal of their own any more.
     expect(html()).not.toContain('data-modal="materials"');
     expect(html()).not.toContain('data-modal="hiring"');
     expect(html()).not.toContain('data-modal="drawings"');
-    click('[data-do="laptopTab"][data-id="tasks"]');
     click('[data-do="closeModal"]');
   });
 
-  it('opens the Team board off the laptop chip, because the team is a page of its own', () => {
+  it('opens the Team board off the Office tile, because the team is a page of its own', () => {
     click('[data-office="laptop"]');
-    click('[data-do="laptopTab"][data-id="team"]');
-    // One click, and it is the Team board and not a tab inside the laptop (CLAUDE.md T10 3.6).
+    click('[data-modal="laptop"] [data-tile="team"]');
+    // One click, and it is the Team board and not a page inside the laptop (CLAUDE.md T10 3.6,
+    // T14 2.1).
     expect(openModalId()).toBe('team');
     expect(html()).toContain('Taking somebody on');
     expect(html()).toContain('data-do="teamTab"');
     click('[data-do="closeModal"]');
   });
 
-  it('starts a new tab at the top rather than where the last one was scrolled', () => {
+  it('starts a new page at the top rather than where the last one was scrolled', () => {
     click('[data-office="laptop"]');
     const body = root().querySelector('.modal-layer [data-modal="laptop"] .modal-body');
     if (!(body instanceof HTMLElement)) throw new Error('no laptop body');
     body.scrollTop = 120;
-    click('[data-do="laptopTab"][data-id="materials"]');
+    click('[data-modal="laptop"] [data-tile="stock"]');
     expect(body.scrollTop).toBe(0);
-    click('[data-do="laptopTab"][data-id="tasks"]');
-    click('[data-do="closeModal"]');
-  });
-
-  it('gives the tab bar a rule of its own, so the four chips are laid out', () => {
-    click('[data-office="laptop"]');
-    expect(html()).toContain('class="tabs"');
-    const css = readFileSync('src/ui/styles.css', 'utf8');
-    expect(css).toContain('.tabs {');
+    click('[data-modal="laptop"] [data-tile="home"]');
     click('[data-do="closeModal"]');
   });
 
@@ -256,14 +258,14 @@ describe('the laptop tabs', () => {
     expect(html()).toContain('Start production');
     expect(html()).toContain('Calls: 0 of');
     click('[data-do="closeModal"]');
-    // And nowhere in the laptop, on any of its four tabs.
+    // And nowhere in the laptop, on any of its three pages.
     click('[data-office="laptop"]');
-    for (const tab of ['tasks', 'materials', 'drawings']) {
-      click(`[data-do="laptopTab"][data-id="${tab}"]`);
-      expect(html(), tab).not.toContain('Start production');
-      expect(html(), tab).not.toContain('Calls: 0 of');
+    for (const tile of ['tasks', 'stock', 'drawings']) {
+      click(`[data-modal="laptop"] [data-tile="${tile}"]`);
+      expect(html(), tile).not.toContain('Start production');
+      expect(html(), tile).not.toContain('Calls: 0 of');
+      click('[data-modal="laptop"] [data-tile="home"]');
     }
-    click('[data-do="laptopTab"][data-id="tasks"]');
     click('[data-do="closeModal"]');
   });
 });

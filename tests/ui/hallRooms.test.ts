@@ -81,8 +81,8 @@ function frontFaceCentre(id: 'wc' | 'office' | 'canteen'): { x: number; y: numbe
 }
 
 /** A point high on a room's front face, clear of the door in the middle of it. The office door is
- *  a control of its own from Turn 10: it opens the Team board, and the block around it is still
- *  the way into the office view (CLAUDE.md T10 3.6). */
+ *  a control of its own from Turn 10, and from Turn 14 it walks into the office like the block
+ *  around it (CLAUDE.md T10 3.6, T14 2.3). */
 function frontFaceAboveTheDoor(id: 'wc' | 'office' | 'canteen'): { x: number; y: number } {
   const room = roomById(id);
   return tileToScreen(room.x + room.width / 2, room.y + room.depth, room.height - 0.2);
@@ -110,13 +110,22 @@ it('walks into the office where the office is painted, clear of its door', () =>
   expect(root.querySelector('.office-layer')).not.toBeNull();
 });
 
-it('opens the team on the office door itself, and stays in the hall', () => {
-  // The door is a control of its own: the team is behind it (PIOTR; CLAUDE.md T10 3.6).
+it('walks into the office on the office door itself, the same as the Office button', () => {
+  // The door is a control of its own, and what is behind it is the office: Turn 10 put the Team
+  // board there and Piotr reversed it (PIOTR, 15.09; CLAUDE.md T14 2.3).
   const root = startHall();
   const door = required(root.querySelector<SVGElement>('[data-door="office"]'));
+  expect(door.querySelector('title')?.textContent).toBe('To the office');
   door.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  expect(root.querySelector('.hall-view')).toBeNull();
+  expect(root.querySelector('.office-layer')).not.toBeNull();
+  expect(root.querySelector('[data-modal="team"]')).toBeNull();
+  // Exactly what the top bar's button does: back in the hall, the button lands in the same room.
+  required(root.querySelector<HTMLButtonElement>('[data-do="setView"][data-view="hall"]')).click();
   expect(root.querySelector('.hall-view')).not.toBeNull();
-  expect(root.querySelector('[data-modal="team"]')).not.toBeNull();
+  required(root.querySelector<HTMLButtonElement>('[data-do="setView"][data-view="office"]')).click();
+  expect(root.querySelector('.hall-view')).toBeNull();
+  expect(root.querySelector('.office-layer')).not.toBeNull();
 });
 
 it('leaves the floor alone', () => {
