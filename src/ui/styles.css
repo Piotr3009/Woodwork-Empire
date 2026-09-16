@@ -350,11 +350,6 @@
   background: var(--accent);
 }
 
-.badge-ordered {
-  background: var(--panel-2);
-  color: var(--text-dim);
-}
-
 /* --------------------------------------------------------------------------
    Page
    -------------------------------------------------------------------------- */
@@ -1265,17 +1260,48 @@ input.num {
   margin: 4px 0 0;
 }
 
+/* A badge is a warning the player has to read: the game's red, white bold text at the body size
+   (PIOTR, 16.09: "do not put it in a black box, nothing can be read"; CLAUDE.md T15 2.2)
+   [PIOTR: the red one of the three in the mockup; TUNE the metrics]. */
 .badge {
-  background: var(--panel);
+  background-color: var(--bad);
+  border: 0;
+  border-radius: 4px;
+  color: #fff;
+  display: inline-block;
+  font-size: var(--fs-body);
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  padding: 4px 10px;
+}
+
+/* A rush is not a warning: Express keeps its place at the top right of the card and takes the
+   accent orange [TUNE]. */
+.badge-express {
+  background-color: var(--accent);
+}
+
+/* The badges that are not warnings keep their own class and the look they had: a small grey plate
+   for Owned, On order, a class of machine, Held and the kind of a job, each coloured by its own
+   rule (CLAUDE.md T15 2.2). */
+.badge-owned,
+.badge-ordered,
+.badge-class,
+.badge-held,
+.badge-kind {
+  background-color: var(--panel);
   border: 1px solid var(--border);
   border-radius: 2px;
+  color: inherit;
   font-size: var(--fs-tiny);
+  font-weight: 400;
+  letter-spacing: 0;
   padding: 1px 5px;
 }
 
-.badge-warn {
-  border-color: var(--accent);
-  color: var(--accent);
+.badge-ordered {
+  background-color: var(--panel-2);
+  color: var(--text-dim);
 }
 
 .lock {
@@ -3473,18 +3499,6 @@ input.num {
   border-color: #d5dcd5;
   color: #8a928a;
   opacity: 1;
-}
-
-.modal-screen .badge {
-  background: #fff;
-  border-color: #b9c2b9;
-  color: var(--screen-ink);
-}
-
-.modal-screen .badge-low {
-  background: var(--bad);
-  border-color: var(--bad);
-  color: #fff;
 }
 
 .modal-screen .badge-held {

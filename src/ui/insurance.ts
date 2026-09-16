@@ -62,9 +62,11 @@ function control(state: GameState, cover: InsuranceCover): string {
 
 function coverBlock(state: GameState, cover: InsuranceCover): string {
   const held = state.insurance[cover];
+  // Held is the green plate every held rung wears; Not held is a warning, in the red every
+  // warning badge wears (CLAUDE.md T15 2.2).
   const badge = held
-    ? '<span class="badge good">Held</span>'
-    : '<span class="badge badge-warn">Not held</span>';
+    ? '<span class="badge badge-held">Held</span>'
+    : '<span class="badge">Not held</span>';
   return (
     `<div class="insurance-line" data-cover="${cover}">` +
     `<h3>${escapeHtml(COVER_LABELS[cover])} ${badge}</h3>` +
