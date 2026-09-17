@@ -1525,6 +1525,12 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
     case 'assignJob':
       dispatch({ type: 'ASSIGN_JOB', jobId: id, workerId: element.dataset.worker ?? 'owner' });
       return;
+    // The second man on a job: both stand at it, each at his own rate (CLAUDE.md T17 2.10).
+    case 'assignSecond': {
+      const second = element.dataset.worker ?? '';
+      dispatch({ type: 'ASSIGN_SECOND', jobId: id, workerId: second === '' ? null : second });
+      return;
+    }
     // The evening is the owner's: he takes a man's job on himself and the man has it back in the
     // morning (CLAUDE.md T17 2.12).
     case 'takeOverJob':

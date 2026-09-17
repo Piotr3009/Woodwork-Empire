@@ -47,6 +47,18 @@ export function stationWaitingFor(station: string): string | null {
   return station.startsWith('waiting:') ? station.slice('waiting:'.length) : null;
 }
 
+/** The second man of a job, at the second place of the very item the first man is standing at:
+ *  two men on one bench, the first in front of it and the second behind it (CLAUDE.md T16 2.1,
+ *  T17 2.10). This one names the item and not the family, because it is that bench and no other. */
+export function secondStation(equipmentId: string): string {
+  return `second:${equipmentId}`;
+}
+
+/** The item a man is standing at as the second of two, or null when he is not. */
+export function stationSecondAt(station: string): string | null {
+  return station.startsWith('second:') ? station.slice('second:'.length) : null;
+}
+
 /** How many trips a load of sheets is between the pallet at the gate and the rack, so many
  *  sheets a trip, and never fewer than one (CLAUDE.md T13 3.21). */
 export function unloadTrips(sheets: number): number {

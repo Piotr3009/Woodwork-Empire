@@ -42,7 +42,7 @@ import {
 import { ownerEfficiency, ownerIsAvailable, spendOwnerMinute, staffOutputFactor } from './owner';
 import { contractMen } from './contracts';
 import { bookMonthMinute, isWorkingToday } from './staff';
-import { STATION_BENCH, machineStation, waitingStation } from './stations';
+import { STATION_BENCH, machineStation, secondStation, waitingStation } from './stations';
 import {
   type StagePlan,
   cncOptions,
@@ -98,7 +98,9 @@ export function hands(
 /** The families this man needs while he is on this job: his bench, which he holds from the first
  *  minute to the last, and the machine of the stage he is at (CLAUDE.md T4 3.4, T7 3.1). */
 export function familiesWanted(state: GameState, job: Job, who = OWNER): string[] {
-  const wanted: string[] = [BENCH];
+  // The second man works at the first man's bench, in its second place: he does not take a bench
+  // of his own, and one that is free is left for somebody else (CLAUDE.md T17 2.10).
+  const wanted: string[] = job.secondAssignee === who && job.assignedTo !== null ? [] : [BENCH];
   const stage = currentStage(state, job, cncOptions(state, who, job));
   const family = stage?.family ?? null;
   if (family === null || family === BENCH) return wanted;
@@ -144,9 +146,19 @@ function sharedTool(state: GameState, family: string | null): Equipment | null {
 export function stationForProduction(state: GameState, who: string, job: Job): string {
   const stage = currentStage(state, job, cncOptions(state, who, job));
   const family = stage?.family ?? null;
-  if (family === null || family === BENCH) return STATION_BENCH;
+  // The second man of the job stands at the first man's bench, in its second place, whenever the
+  // work is bench work (CLAUDE.md T17 2.10). At a machine he queues for it like anybody else.
+  const second =
+    job.secondAssignee === who && job.assignedTo !== null && job.assignedTo !== who
+      ? heldMachine(state, job.assignedTo, BENCH)
+      : null;
+  if (family === null || family === BENCH) {
+    return second === null ? STATION_BENCH : secondStation(second.id);
+  }
   // By hand, or out of a cabinet: either way he does it at his bench.
-  if (!has(state, family) || machineIsShared(state, family)) return STATION_BENCH;
+  if (!has(state, family) || machineIsShared(state, family)) {
+    return second === null ? STATION_BENCH : secondStation(second.id);
+  }
   return heldMachine(state, who, family) === null
     ? waitingStation(family)
     : machineStation(family);

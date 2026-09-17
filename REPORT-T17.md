@@ -113,3 +113,11 @@ the task queue of section 5 names them.
   runs 540 to 660 with the evening, and the evening's minutes are painted in their own colour.
   Done: `tests/ui/ourTeam.test.ts`, `tests/engine/hiringGate.test.ts`, the rewritten
   `tests/engine/staffOvertime.test.ts` and the day meter tests in `tests/ui/topbar.test.ts`.
+- **T17-B2b Two men on one job (2.10).** A job carries a second man now: a click on the work plan
+  row puts him on it and Alone takes him off, and nobody holds two jobs at once. Both men book
+  their minutes into the same job, each at his own rate, so the bar is drawn at the two of them
+  added up and the job takes about half the days. At a machine stage one of them has the machine
+  and the other stands at its waiting cell until his turn; at the bench they share the first man's
+  bench, the second in the bench's second place of Turn 16, and he takes no bench of his own.
+  Done: `tests/engine/secondMan.test.ts` (the rate doubles, the labour in an hour, the waiting
+  cell, both names on the row and the chips that put him on and take him off).

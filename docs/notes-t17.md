@@ -27,3 +27,7 @@ What each phase B group had to add to a frozen file of Turn 13, and why it could
 - `src/ui/app.ts`, the click routing switch: one new case, `takeOverJob`, which dispatches
   `TAKE_OVER_JOB`. CLAUDE.md T17 2.12 says the owner takes a man's job on by a click on the work
   plan row; phase A routed the action in the engine but nothing in the UI could reach it.
+- `src/ui/app.ts`, the click routing switch: one new case, `assignSecond`, which dispatches
+  `ASSIGN_SECOND` with the worker on the chip, or null for Alone. CLAUDE.md T17 2.10 says
+  assigning the second man is a click on the work plan row; phase A routed the action in the
+  engine and left the click to B2.

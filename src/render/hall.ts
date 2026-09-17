@@ -61,6 +61,7 @@ import {
   palletCell,
   standingCell,
   stationMachine,
+  stationSecondAt,
   stationWaitingFor,
 } from '../engine/stations';
 import { gateCollarArt, pipeTile, portRing } from './pipes';
@@ -861,6 +862,16 @@ export function stationCell(
   station: string,
   bench: { x: number; y: number },
 ): Standing {
+  // The second man of a job stands at the first man's own bench, in its second place: two men on
+  // one bench, one in front of it and one behind it (CLAUDE.md T17 2.10).
+  const secondAt = stationSecondAt(station);
+  if (secondAt !== null) {
+    const item = state.equipment.find((entry) => entry.id === secondAt && !isSold(entry));
+    if (item) {
+      const cell = standingCell(state, item, 'second');
+      return { ...cell, facing: facingAt(cell, item) };
+    }
+  }
   // A man waiting for a machine stands at its waiting cell, which is what waiting at one looks
   // like (T7 3.1; T16 2.1).
   const waitingFor = stationWaitingFor(station);
@@ -908,6 +919,7 @@ function stationLabel(station: string): string {
   if (waiting !== null) {
     return `waiting for ${(findSpec(waiting)?.name ?? waiting).toLowerCase()}`;
   }
+  if (stationSecondAt(station) !== null) return 'the bench, second place';
   if (station === STATION_RACK) return 'the rack';
   if (station === STATION_GATE) return 'the gate';
   if (station === STATION_OFFICE) return 'the office';

@@ -185,18 +185,46 @@ export function workerMinuteCost(weeklyWage: number): number {
   return weeklyWage / WORKER_MINUTE_RATE_DIVISOR;
 }
 
-/** What the rest of a job costs in wages if the man on it finishes it, for the job card only
- *  (CLAUDE.md 8.5). The owner costs nothing: his time is not a wage. */
-export function jobLabourCost(state: GameState, job: Job): { minutes: number; cost: number } {
-  const worker =
-    job.assignedTo === null || job.assignedTo === 'owner'
-      ? null
-      : state.workers.find((entry) => entry.id === job.assignedTo);
-  if (!worker || worker.rate <= 0) {
-    return { minutes: minutesRemainingFor(state, job, 1), cost: 0 };
+/** The men standing at this job: the one it is assigned to and the second one beside him, in that
+ *  order (CLAUDE.md T17 2.10). The one list: the rate, the cost and the names all read it. */
+export function jobMen(job: Job): string[] {
+  const men: string[] = [];
+  if (job.assignedTo !== null) men.push(job.assignedTo);
+  if (job.secondAssignee !== null && job.secondAssignee !== job.assignedTo) {
+    men.push(job.secondAssignee);
   }
-  const minutes = minutesRemainingFor(state, job, worker.rate);
-  return { minutes, cost: minutes * workerMinuteCost(worker.weeklyWage) };
+  return men;
+}
+
+/** What the job goes forward at with the men on it: the owner at his own speed and every joiner at
+ *  his, added up, because the two of them stand at it in the same minute (CLAUDE.md T17 2.10).
+ *  Zero when nobody is on it, which is the board's cue to draw it at the workshop average. */
+export function jobRate(state: GameState, job: Job): number {
+  let rate = 0;
+  for (const who of jobMen(job)) {
+    if (who === OWNER) {
+      rate += 1;
+      continue;
+    }
+    const worker = state.workers.find((entry) => entry.id === who);
+    if (worker && worker.rate > 0) rate += worker.rate;
+  }
+  return Math.round(rate * 10000) / 10000;
+}
+
+/** What the rest of a job costs in wages if the men on it finish it, for the job card only
+ *  (CLAUDE.md 8.5). The owner costs nothing: his time is not a wage. Two men take half the
+ *  minutes and cost both their rates for every one of them (CLAUDE.md T17 2.10). */
+export function jobLabourCost(state: GameState, job: Job): { minutes: number; cost: number } {
+  const rate = jobRate(state, job);
+  if (rate <= 0) return { minutes: minutesRemainingFor(state, job, 1), cost: 0 };
+  const minutes = minutesRemainingFor(state, job, rate);
+  let perMinute = 0;
+  for (const who of jobMen(job)) {
+    const worker = state.workers.find((entry) => entry.id === who);
+    if (worker && worker.rate > 0) perMinute += workerMinuteCost(worker.weeklyWage);
+  }
+  return { minutes, cost: minutes * perMinute };
 }
 
 /** How far through the job the bench is, 0 to 1. */
@@ -785,16 +813,26 @@ export function assignJob(state: GameState, jobId: string, workerId: string | nu
 }
 
 /** The second man on a job, put on it or taken off it. Both book minutes into it, each at his own
- *  rate (CLAUDE.md T17 2.10). Phase A puts the field on the job and the action on the routing;
- *  what the two of them do at the stations is phase B2's. */
+ *  rate, at the stage's station: one of them at the machine and the other at the waiting cell
+ *  until his turn, and both at the bench, the second in the bench's second place
+ *  (PIOTR, 16.09; CLAUDE.md T17 2.10). */
 export function assignSecond(state: GameState, jobId: string, workerId: string | null): boolean {
   const job = findJob(state, jobId);
   if (!job) return false;
   if (job.stage !== 'ready' && job.stage !== 'inProduction') return false;
   if (workerId === null) {
+    // He goes back to the list, and off the job he was standing at.
+    const second = job.secondAssignee;
+    if (second !== null) {
+      const man = state.workers.find((entry) => entry.id === second);
+      if (man && man.jobId === job.id) man.jobId = null;
+      releaseMachines(state, second);
+    }
     job.secondAssignee = null;
     return true;
   }
+  // The second man is second to somebody: a job with nobody on it is assigned, not seconded.
+  if (job.assignedTo === null) return false;
   if (workerId === job.assignedTo) return false;
   const worker = state.workers.find((entry) => entry.id === workerId) ?? null;
   if (!worker || worker.role !== 'joiner' || worker.absentDaysRemaining > 0) return false;
