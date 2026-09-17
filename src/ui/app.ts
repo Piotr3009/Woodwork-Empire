@@ -280,7 +280,7 @@ function freshUi(): Ui {
     toast: '',
     filters: { board: '', catalogue: '' },
     focusNext: null,
-    stockSheets: '6',
+    stockSheets: '',
     arrearsAmount: '500',
     loanAmount: '10000',
     boardTab: 'enquiries',
@@ -1380,7 +1380,8 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
       dispatch({ type: 'SET_WEBSITE_LEVEL', level: Number(id) });
       return;
     case 'restock':
-      dispatch({ type: 'RESTOCK' });
+      // What the player typed into the field, which the button carries (CLAUDE.md T17 2.20).
+      dispatch({ type: 'RESTOCK', sheets: Number(element.dataset.sheets ?? '0') });
       return;
     case 'orderForJob':
       dispatch({ type: 'ORDER_FOR_JOB', jobId: id });

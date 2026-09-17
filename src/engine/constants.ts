@@ -508,10 +508,10 @@ export const SHEET_VALUE = 200;
  *  between them (PIOTR: 175, in his band of 170 to 180; 200 ad hoc; CLAUDE.md T13 3.3). */
 export const SHEET_PRICE_STOCK = 175;
 export const SHEET_PRICE_AD_HOC = 200;
-/** A stock line whose free count is under this many sheets wears the Low stock badge, and
- *  Restock brings every low line back up to this many [TUNE] (CLAUDE.md T13 3.2). */
+/** A stock line whose free count is under this many sheets wears the Low stock badge [TUNE]
+ *  (CLAUDE.md T13 3.2). What Restock buys is the number the player types now, and what fills the
+ *  rack when he types none, so there is no figure to bring a line back up to (CLAUDE.md T17 2.20). */
 export const LOW_STOCK_SHEETS = 4;
-export const RESTOCK_TO_SHEETS = 12;
 /** The stock number a line carries, in the style of the software the player is meant to
  *  recognise: the prefix per material kind, and three digits off the seed [TUNE wording]
  *  (CLAUDE.md T13 3.2). */

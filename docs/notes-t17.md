@@ -31,3 +31,12 @@ What each phase B group had to add to a frozen file of Turn 13, and why it could
   `ASSIGN_SECOND` with the worker on the chip, or null for Alone. CLAUDE.md T17 2.10 says
   assigning the second man is a click on the work plan row; phase A routed the action in the
   engine and left the click to B2.
+- `src/engine/constants.ts`: one export deleted, `RESTOCK_TO_SHEETS`. CLAUDE.md T17 2.20 says it
+  goes: Restock takes the number the player types and fills the rack when he types none, so there
+  is no figure to bring a low line back up to. `LOW_STOCK_SHEETS`, which shared its comment, is
+  untouched and still wears the Low stock badge.
+- `src/ui/app.ts`, the click routing switch: the `restock` case now carries the number off the
+  button, `dispatch({ type: 'RESTOCK', sheets: Number(element.dataset.sheets ?? '0') })`, the way
+  the `buyStock` case beside it already reads `data-sheets`. Phase A made the action carry the
+  count and CLAUDE.md T17 2.20 asks for the typed number to reach the engine; no other path
+  could carry it.

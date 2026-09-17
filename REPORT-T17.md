@@ -133,3 +133,48 @@ the task queue of section 5 names them.
   gone, and a new day comes home to x1.
   Done: `tests/engine/theDesk.test.ts`, `tests/ui/doThese.test.ts` and the rewritten drawings
   tests.
+- **T17-B2d Restock by number, and Joinery Core charged once (2.20, 2.21).** The Stock page takes
+  a number: the player types how many sheets he wants and Restock buys exactly that, capped at the
+  free places on the rack less whatever is already on the road. An empty field is what fills the
+  rack, which the placeholder shows, and the "Nothing is low" refusal is gone with the target
+  figure: the number is his, not the rack's. `RESTOCK_TO_SHEETS` is deleted. Joinery Core writes
+  down the month it was bought in, so the month end that closes that month carries no line for it
+  and the subscription starts the month after, each extension on its own month.
+  Done: `tests/engine/joineryCoreOnce.test.ts` and the restock tests in
+  `tests/engine/materials.test.ts` and `tests/ui/materials.test.ts`.
+
+### Numbers chosen (B2, the people and the desk)
+
+- **2.9** A month of a man's pay is his weekly wage times `WEEKS_PER_MONTH`, which is 30 over 7,
+  or his monthly wage where he has one: a poor joiner at 480 a week is £2,057 a month and a normal
+  one at 640 is £2,743 [TUNE in `monthlyPay`, src/engine/staff.ts]. It is the one conversion, and
+  the hiring gate of 2.11 refuses on the same number. The owner has no wage, so his row is the
+  draw he pays himself over a month of working days: `ownerDrawPerDay` times
+  `WORKING_DAYS_PER_MONTH` [TUNE in src/ui/team.ts]. His start day is day 1: nobody took him on.
+- **2.9** The hours of the month are printed to a tenth of an hour, and the days off as whole
+  days. A man's month counts every minute he books, at the desk, at the bench and on the night
+  shift; the owner's counts every minute he spends. The meters start again on the first working
+  day of a month, which is the Monday when the 1st falls at a weekend.
+- **2.11** The bank refusal is the last link of the blockReason chain [TUNE]: reputation, the
+  office admin, the bench slot, the floor limit and the missing kit are standing facts about the
+  workshop, and the balance is the one that changes by the minute, so it is the last thing asked.
+- **2.12** The owner takes a job on only past 17:00 [TUNE]: by day a job is assigned to a man or
+  given a second one, and the takeover is the evening's own thing. He stands at it as the second
+  man, so the job keeps its first man and gives itself back to him in the morning; a job of his
+  own goes back on the list when he takes another man's on, exactly as it does when a man is given
+  a job he was holding.
+- **2.13** The day meter's bar is the working day on the clock, `DAY_END_MINUTE` 540, and it grows
+  to `OVERTIME_END_MINUTE` 660 by the overtime minutes he has actually stayed for. The printed
+  figure is read off the same number, so the bar and the figure agree, and the evening's minutes
+  are the tail of the day log painted in `.seg-overtime`.
+- **2.14** No new field: a task he has put minutes into keeps its `doneBy`, and one he never
+  started goes back on the list. The office is still given a task the owner put down while he is
+  not holding it, so nothing that used to be delegated stops being delegated.
+- **2.20** Restock buys standard sheets, so it lands the next working day; the bespoke lead time
+  of three working days is the one the deliveries already have, and the brief's "two working days"
+  is not applied, because the brief's own words say to keep the lead time the deliveries have.
+  An empty or unreadable field is what fills the rack [TUNE].
+- **2.21** The subscription starts the month after the month end that closes the month it was
+  bought in: bought in month 1, the month end of month 1 skips it and the month end of month 2
+  charges it. A v24 save is stamped month 0 by the migration, so nothing that is running now is
+  given a free month.

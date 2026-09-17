@@ -7,7 +7,6 @@ import {
   DELIVERY_WORKING_DAYS_STANDARD,
   LOW_STOCK_SHEETS,
   MATERIAL_FRACTION,
-  RESTOCK_TO_SHEETS,
   SHEET_PRICE_AD_HOC,
   SHEET_PRICE_STOCK,
   SHEET_VALUE,
@@ -144,17 +143,14 @@ export function pendingStockSheets(state: GameState): number {
   return pending;
 }
 
-/** What Restock would buy: every low line brought back up to the restock figure, which tonight is
- *  the one line of sheets, less what is already on the road for stock, and never more than the
- *  rack has room for, because a lorry that cannot be unloaded is the overflow question of Turn 2
- *  and a button should not walk the player into it (CLAUDE.md T13 3.2). Zero when nothing is low. */
+/** What Restock would buy: the number the player typed, or, when he has typed none, what fills the
+ *  rack. Either way it is capped at the free places on the rack less what is already on the road
+ *  for stock, because a lorry that cannot be unloaded is the overflow question of Turn 2 and a
+ *  button should not walk the player into it (PIOTR, 16.09; CLAUDE.md T13 3.2, T17 2.20). */
 export function restockSheets(state: GameState, asked?: number): number {
   const pending = pendingStockSheets(state);
   const room = stockFree(state) - pending;
-  // The number the player typed, capped at the free places in the rack (CLAUDE.md T17 2.20).
-  if (asked !== undefined) return Math.max(0, Math.min(Math.floor(asked), room));
-  if (!stockIsLow(state)) return 0;
-  const wanted = RESTOCK_TO_SHEETS - freeSheets(state) - pending;
+  const wanted = asked === undefined ? room : Math.floor(asked);
   return Math.max(0, Math.min(wanted, room));
 }
 
@@ -164,26 +160,23 @@ export interface RestockCheck {
   /** What the click would buy, and what it would cost at the stock price. */
   sheets: number;
   cost: number;
-  /** The figure every low line is brought back to. */
-  target: number;
 }
 
 /** Whether Restock can be pressed, and why not when it cannot: the one answer the button prints
- *  (CLAUDE.md T13 3.2). */
-export function restockCheck(state: GameState): RestockCheck {
-  const target = RESTOCK_TO_SHEETS;
-  const refused = (reason: string): RestockCheck => ({ ok: false, reason, sheets: 0, cost: 0, target });
+ *  (CLAUDE.md T13 3.2). It is asked of the number the player typed, so the button says what that
+ *  number would really buy (CLAUDE.md T17 2.20). */
+export function restockCheck(state: GameState, asked?: number): RestockCheck {
+  const refused = (reason: string): RestockCheck => ({ ok: false, reason, sheets: 0, cost: 0 });
   if (rackCapacity(state) <= 0) return refused('No shelving yet');
-  if (!stockIsLow(state)) return refused('Nothing is low');
-  const sheets = restockSheets(state);
+  const sheets = restockSheets(state, asked);
   const pending = pendingStockSheets(state);
   if (sheets <= 0 && pending > 0) {
     return refused(`${plural(pending, 'sheet is', 'sheets are')} on the way`);
   }
   if (sheets <= 0) return refused('No room on the rack');
   const cost = stockCostFor(sheets);
-  if (!canAfford(state, cost)) return { ok: false, reason: 'Not enough cash', sheets, cost, target };
-  return { ok: true, reason: '', sheets, cost, target };
+  if (!canAfford(state, cost)) return { ok: false, reason: 'Not enough cash', sheets, cost };
+  return { ok: true, reason: '', sheets, cost };
 }
 
 /** What buying the shortfall of one job ad hoc costs: the ad hoc price, and the bespoke uplift

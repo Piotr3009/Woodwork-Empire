@@ -102,6 +102,7 @@ import {
   receive,
   refund,
   runDayCosts,
+  stampSoftwareMonths,
   writeUpBooks,
 } from './economy';
 import { isPaused, openNextEvent, queueEvent } from './events';
@@ -1381,6 +1382,9 @@ function updateStations(state: GameState): void {
 
 function settle(state: GameState): void {
   refreshLocks(state);
+  // The month Joinery Core was bought in, written down the first time the state settles after the
+  // click: its first month is paid at the click and not again (CLAUDE.md T17 2.21).
+  stampSoftwareMonths(state);
   // What the property cover is written on follows every purchase and every stock change
   // (CLAUDE.md T13 3.15); a run whose machine has gone goes with it (T13 3.19).
   refreshInsuredValue(state);
