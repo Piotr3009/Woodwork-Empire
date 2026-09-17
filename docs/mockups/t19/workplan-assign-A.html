@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Work plan: assigning people (mockup)</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Patrick+Hand&display=swap">
+<style>
+:root{--bg:#2b2e33;--paper:#f3ecdc;--ink:#2a2418;--dim:#6f665a;--line:#c9bfa9;--green:#3f8a45;--red:#c05a4e;--blue:#2f5f9a;--hand:'Patrick Hand',cursive;--ui:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif}
+:root:not([data-theme="light"]){color-scheme:dark}
+body{margin:0;background:#15171a;color:#e8e6e1;font-family:var(--ui);padding:24px}
+h1{font-family:var(--hand);font-weight:400;font-size:32px;margin:0 0 4px}
+p.lead{color:#a8adb6;max-width:78ch;margin:0 0 24px}
+h2{font-family:var(--hand);font-weight:400;font-size:26px;margin:30px 0 8px;color:var(--paper)}
+h2 span{font-family:var(--ui);font-size:14px;color:#a8adb6;margin-left:10px}
+.plan{background:var(--bg);border-radius:8px;padding:14px;max-width:1100px}
+.row{display:grid;grid-template-columns:1fr 1.15fr;gap:12px;background:var(--paper);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:12px 14px;margin-bottom:12px}
+.title{font-weight:600;font-size:15px}
+.title small{color:var(--dim);font-weight:400;margin-left:8px}
+.stages{margin:6px 0 10px;display:flex;gap:6px;flex-wrap:wrap}
+.stage{font-size:11px;padding:2px 7px;border-radius:3px;background:var(--green);color:#fff}
+.stage.now{background:#fff;color:var(--dim);border:1px dashed var(--dim)}
+.people{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:8px 0}
+.people .lbl{color:var(--dim);font-size:13px}
+.chip{display:inline-flex;align-items:center;gap:6px;background:#e3d9c2;border:1px solid var(--line);border-radius:14px;padding:3px 8px 3px 10px;font-size:14px}
+.chip .x{display:inline-flex;width:18px;height:18px;border-radius:50%;background:#fff;border:1px solid var(--line);align-items:center;justify-content:center;font-size:12px;color:var(--dim)}
+.btn{font-family:var(--hand);font-size:18px;line-height:1.1;padding:4px 12px;border-radius:4px;border:1px solid #5b5446;background:linear-gradient(#f9f4e8,#e4dcc7);box-shadow:0 3px 0 #0a1a10;color:#12301f;display:inline-block}
+.btn.blue{background:linear-gradient(#4a78b8,#2f5f9a);color:#fff;border-color:#1e3f6a;box-shadow:0 3px 0 #0e2340}
+.btn.quiet{background:#efe8d8;box-shadow:none;color:var(--dim)}
+.gantt{background:#fbf7ee;border:1px solid var(--line);border-radius:4px;position:relative;height:110px}
+.bar{position:absolute;left:38%;top:14px;height:12px;width:22%;background:var(--green);border-radius:2px}
+.bar.rest{left:60%;width:12%;background:#fff;border:1px solid var(--line)}
+.now{position:absolute;left:62%;top:0;bottom:0;border-left:2px solid var(--blue)}
+.dl{position:absolute;left:84%;top:0;bottom:0;border-left:2px solid var(--red)}
+.dl:after{content:"DL";position:absolute;left:4px;top:4px;color:var(--red);font-size:11px}
+.foot{position:absolute;left:10px;bottom:6px;font-size:11px;color:var(--dim)}
+.who{position:absolute;right:10px;bottom:6px;font-size:11px;color:var(--dim)}
+/* the popover */
+.pop{position:absolute;z-index:2;background:#fff;border:1px solid var(--line);border-radius:6px;box-shadow:0 8px 18px rgba(0,0,0,.35);padding:8px;min-width:250px;left:180px;top:70px}
+.pop .h{font-size:12px;color:var(--dim);margin:2px 6px 6px}
+.pp{display:flex;align-items:center;justify-content:space-between;padding:7px 8px;border-radius:4px;font-size:14px}
+.pp:hover{background:#f1ebdd}
+.pp.busy{color:#9a917f}
+.pp.busy .why{font-size:11px;color:#9a917f}
+.pp .tier{font-size:11px;color:var(--dim);margin-left:6px}
+.pp .add{font-family:var(--hand);font-size:16px;color:var(--blue)}
+.wrap{position:relative}
+.note{color:#a8adb6;font-size:14px;max-width:78ch;margin:6px 0 0}
+</style></head><body>
+<h1>Work plan: putting people on a job</h1>
+<p class="lead">Today's row has two things that read as one: "on it: Gary" with You / Gary toggles, and a "Second man: Alone / Gary" line, so it looks as if two men must share one job and the same man can be on two. The mockup replaces both with one thing: the people on the job as chips, and one button, <b>Assign to this job</b>, that opens the list. A man already on another job is in the list but greyed with where he is; you cannot pick him. Taking somebody off is the little cross on his chip.</p>
+
+<h2>A. Chips and the list<span>the proposal</span></h2>
+<div class="plan">
+  <div class="row wrap">
+    <div>
+      <div class="title">TV unit <small>£1,040 · due Wed 1 April</small></div>
+      <div class="stages"><span class="stage">Calls</span><span class="stage">Design</span><span class="stage">Material</span><span class="stage">Delivery</span><span class="stage now">Production: Assembly</span></div>
+      <div class="people"><span class="lbl">On it:</span> <span class="chip">Gary <span class="x">×</span></span> <span class="btn blue">Assign to this job</span></div>
+      <div class="pop">
+        <div class="h">Who goes on TV unit?</div>
+        <div class="pp"><span>You <span class="tier">owner</span></span><span class="add">add</span></div>
+        <div class="pp busy"><span>Gary <span class="tier">ok joiner</span></span><span class="why">already on this job</span></div>
+        <div class="pp busy"><span>Callum <span class="tier">poor joiner</span></span><span class="why">on Garage shelves</span></div>
+        <div class="pp"><span>Ravi <span class="tier">good joiner</span></span><span class="add">add</span></div>
+        <div class="pp busy"><span>Sam <span class="tier">helper</span></span><span class="why">helpers do not build</span></div>
+      </div>
+      <div class="people" style="margin-top:14px"><span class="btn quiet">Drop project</span></div>
+    </div>
+    <div class="gantt"><div class="bar"></div><div class="bar rest"></div><div class="now"></div><div class="dl"></div><div class="foot">569 of 855 min · Assembly, no bench</div><div class="who">Gary</div></div>
+  </div>
+  <div class="row">
+    <div>
+      <div class="title">Garage shelves <small>£450 · due Wed 1 April</small></div>
+      <div class="stages"><span class="stage">Calls</span><span class="stage">Design</span><span class="stage">Material</span><span class="stage">Delivery</span><span class="stage now">Production: Assembly</span></div>
+      <div class="people"><span class="lbl">On it:</span> <span class="chip">You <span class="x">×</span></span> <span class="chip">Callum <span class="x">×</span></span> <span class="btn blue">Assign to this job</span></div>
+      <div class="people" style="margin-top:14px"><span class="btn quiet">Drop project</span></div>
+    </div>
+    <div class="gantt"><div class="bar" style="left:40%;width:8%"></div><div class="bar rest" style="left:48%;width:6%"></div><div class="now" style="left:54%"></div><div class="dl"></div><div class="foot">118 of 244 min · Assembly</div><div class="who">You and Callum</div></div>
+  </div>
+</div>
+<p class="note">Rules the list enforces, so the player never has to know them: one man is on one job at a time; the owner is a man like any other; a helper is never offered for building; up to two men on a job (the bench has two places). A job with nobody on it says so in red on the chip line: "Nobody on it", and the warning strip already shouts about it.</p>
+
+<h2>B. Everybody in the row<span>the alternative, no popover</span></h2>
+<div class="plan">
+  <div class="row">
+    <div>
+      <div class="title">TV unit <small>£1,040 · due Wed 1 April</small></div>
+      <div class="stages"><span class="stage">Calls</span><span class="stage">Design</span><span class="stage">Material</span><span class="stage">Delivery</span><span class="stage now">Production: Assembly</span></div>
+      <div class="people"><span class="lbl">On it:</span> <span class="btn quiet">You</span> <span class="btn blue">Gary ✓</span> <span class="btn quiet" style="opacity:.5">Callum · Garage shelves</span> <span class="btn quiet">Ravi</span></div>
+      <div class="people" style="margin-top:14px"><span class="btn quiet">Drop project</span></div>
+    </div>
+    <div class="gantt"><div class="bar"></div><div class="bar rest"></div><div class="now"></div><div class="dl"></div><div class="foot">569 of 855 min · Assembly, no bench</div><div class="who">Gary</div></div>
+  </div>
+</div>
+<p class="note">Every person as a toggle in the row: one click on, one click off, busy men faded with their job's name. No list to open, but with eight joiners the row gets long.</p>
+</body></html>
