@@ -178,3 +178,40 @@ describe('a v24 save in this build (CLAUDE.md T17 section 4)', () => {
     expect(back.state).toEqual(later);
   });
 });
+
+describe('the category rename of version 14 (CLAUDE.md T13 3.20)', () => {
+  it('renames the running totals with the ledger, so no raw key reaches the Accounts page', () => {
+    // Turn 13 renamed `living` to `ownerDraw` and `ducting` to `pipes` in the ledger and not in
+    // `finance.day/week/month.byCategory`, which is keyed by the same names and is what the
+    // Accounts summary draws its rows from. `categoryLabel` has no word for the old names and
+    // falls back on the key, so a lifted save printed `living` at the player. Found by the Turn 19
+    // review of the migration.
+    const raw = {
+      version: 13,
+      jobs: [],
+      equipment: [],
+      ledger: [
+        { category: 'living', amount: -200 },
+        { category: 'ducting', amount: -75 },
+      ],
+      finance: {
+        day: { income: 0, costs: 275, byCategory: { living: -200, ducting: -75 } },
+        week: { income: 0, costs: 200, byCategory: { living: -200, ownerDraw: -50 } },
+        month: { income: 0, costs: 0, byCategory: { rent: -80 } },
+      },
+      settings: { tips: true },
+    };
+    const lifted = migrateState(raw, 13) as unknown as {
+      ledger: Array<{ category: string }>;
+      finance: Record<string, { byCategory: Record<string, number> }>;
+    } | null;
+    if (lifted === null) throw new Error('the lift refused a version 13 state');
+    expect(lifted.ledger.map((entry) => entry.category)).toEqual(['ownerDraw', 'pipes']);
+    // The old keys are gone, and the day's two costs land on the names the page has words for.
+    expect(lifted.finance.day?.byCategory).toEqual({ ownerDraw: -200, pipes: -75 });
+    // A period that already carried the new name keeps it and the old one is added to it.
+    expect(lifted.finance.week?.byCategory).toEqual({ ownerDraw: -250 });
+    // A period with neither is left exactly as it was.
+    expect(lifted.finance.month?.byCategory).toEqual({ rent: -80 });
+  });
+});

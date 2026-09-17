@@ -111,3 +111,18 @@ their reason in the test:
   working day the shift was on whether or not he had work, is untouched and still passes.
 
 `npm run check` exit 0: 168 files, 1,638 tests.
+
+### T19-A4 A second migration bug, found by reviewing phase A
+
+An adversarial review of the phase A diff turned up one more defect in the migration, again older
+than this turn. `liftToVersion14` renames the ledger's `living` category to `ownerDraw` and
+`ducting` to `pipes`, but `finance.day`, `finance.week` and `finance.month` each carry a
+`byCategory` record keyed by the same names, and it was left alone. `categoryLabel` in the
+Accounts modal has no word for either old name and falls back on the key, so a lifted v19 save
+printed `living` and `ducting` at the player as row labels.
+
+The lift now renames the three periods' totals with the ledger, adding the old name's figure to
+the new name's when a period already carries both. A period with neither is left exactly as it
+was. `tests/cloud/migrate.test.ts` gained a case covering all three.
+
+`npm run check` exit 0: 168 files, 1,639 tests.

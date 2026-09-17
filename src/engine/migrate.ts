@@ -142,6 +142,26 @@ function liftToVersion14(state: Raw): void {
     if (entry.category === 'living') entry.category = 'ownerDraw';
     if (entry.category === 'ducting') entry.category = 'pipes';
   }
+  // The running totals are keyed by the same category names, and renaming them in the ledger and
+  // not here left a lifted save showing `living` and `ducting` as row labels in the Accounts
+  // summary: `categoryLabel` has no word for either and falls back on the key. Found by the Turn
+  // 19 review of the migration; the bug is as old as the rename.
+  for (const period of ['day', 'week', 'month']) {
+    const totals = state.finance;
+    if (!isRecord(totals)) break;
+    const slice = totals[period];
+    if (!isRecord(slice) || !isRecord(slice.byCategory)) continue;
+    const by = slice.byCategory;
+    for (const [from, to] of [['living', 'ownerDraw'], ['ducting', 'pipes']]) {
+      if (from === undefined || to === undefined) continue;
+      if (!(from in by)) continue;
+      const amount = by[from];
+      delete by[from];
+      if (typeof amount !== 'number') continue;
+      const held = by[to];
+      by[to] = (typeof held === 'number' ? held : 0) + amount;
+    }
+  }
   state.version = 14;
 }
 
