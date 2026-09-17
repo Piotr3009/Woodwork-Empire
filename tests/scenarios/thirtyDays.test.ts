@@ -667,8 +667,11 @@ describe('a day with a break, played by the script', () => {
     // It was 473 while the small compressor was a two hour lorry job; the used class the day 1
     // shopping buys is light now, so two hours of the gate are gone (CLAUDE.md T10 3.4), and the
     // board he works from is drawn differently again (T10 3.7), and differently again with one
-    // enquiry a day and the client's number (T13 3.4, 3.24). Measured, not tuned.
-    expect(last?.owner.minutesWorked).toBe(332);
+    // enquiry a day and the client's number (T13 3.4, 3.24). It was 332 while a drawing was read
+    // off the product and its size; from Turn 19 it is read off the value of the job and this
+    // day's small piece is drawn in the half hour the floor sets instead of the hours the
+    // template asked for (CLAUDE.md T19 2.11). Measured, not tuned.
+    expect(last?.owner.minutesWorked).toBe(300);
     expect(last?.owner.minutesWorked).toBeLessThanOrEqual(MINUTES_PER_WORKING_DAY);
     expect(last?.owner.overtimeMinutes).toBe(0);
     const idle = states.filter(

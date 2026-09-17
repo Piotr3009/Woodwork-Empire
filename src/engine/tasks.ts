@@ -23,6 +23,8 @@ import {
   CLIENT_CALL_ANSWER_MINUTES,
   EQUIPMENT_UNLOAD_MINUTES,
   DAILY_ORDERING_MINUTES,
+  DESIGN_MIN_MINUTES,
+  DESIGN_MINUTES_PER_1000,
   MOVE_MINUTES_PER_ITEM,
   EMAIL_ABOVE_BREAKS,
   EMAIL_ABOVE_PRICE,
@@ -59,7 +61,6 @@ import { websiteUpkeepMinutes } from './website';
 import type {
   DayCategory,
   GameState,
-  ProductTemplate,
   Worker,
   SoftwareTier,
   TaskCategory,
@@ -208,13 +209,15 @@ export function softwareActive(state: GameState): boolean {
   return state.software.mode === 'oneOff' && state.software.jobsRemaining > 0;
 }
 
-/** Template minutes scale with the size, and the software tier divides them. */
-export function designMinutes(
-  template: ProductTemplate,
-  sizeMultiplier: number,
-  tier: SoftwareTier,
-): number {
-  return Math.round(template.designMinutes * sizeMultiplier * SOFTWARE_DESIGN_FACTOR[tier]);
+/** How long a drawing takes: off the value of the job and nothing else, with a floor under it,
+ *  and the software tier still dividing it (PIOTR, 17.09: "drawings take far too long";
+ *  CLAUDE.md T19 2.11). A GBP 2,500 job is an hour, GBP 10,000 is four, GBP 20,000 is eight; the
+ *  smallest job there is takes the half hour the floor sets. The per product figure and the size
+ *  multiplier are gone: a job's price already carries its size, and two figures for one thing is
+ *  what made a set of shelves cost a day at the desk. */
+export function designMinutes(basePrice: number, tier: SoftwareTier): number {
+  const raw = Math.max(DESIGN_MIN_MINUTES, (DESIGN_MINUTES_PER_1000 * basePrice) / 1000);
+  return Math.round(raw * SOFTWARE_DESIGN_FACTOR[tier]);
 }
 
 /** The best handling kit in the hall: the key of the one table the unloading minutes are read

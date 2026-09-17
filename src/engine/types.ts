@@ -276,7 +276,6 @@ export interface ProductTemplate {
   name: string;
   basePrice: number;
   material: MaterialKind;
-  designMinutes: number;
   calls: number;
   needsMeasure: boolean;
   requiredEquipment: string[];

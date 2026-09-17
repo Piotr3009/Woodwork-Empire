@@ -209,6 +209,17 @@ function addLedger(
       open.amount = Math.round((open.amount + amount) * 100) / 100;
       open.balance = state.cash;
       open.minute = when.minute;
+      // The line now carries this minute and this bank, so it belongs at the end of the ledger
+      // and not back where the day's first piece put it. Left where it was, it held a later
+      // balance than the entries written after it, the running balance down the ledger stopped
+      // meaning anything, and a month whose last piece was booked after its last other entry
+      // closed on the wrong figure: the month end report did not add up (found by the Turn 19
+      // playthrough, and the bug is as old as the merge). Nothing about the money changes; the
+      // line moves to where its own stamp says it was written.
+      if (index !== state.ledger.length - 1) {
+        state.ledger.splice(index, 1);
+        state.ledger.push(open);
+      }
       return;
     }
   }
@@ -771,9 +782,16 @@ export interface MonthReport {
  *  lines are the cash that moved, so they add up to the bank at the close less the bank at the
  *  open; what never left the bank is counted apart. */
 export function monthReport(state: GameState, month: number): MonthReport {
-  const entries = state.ledger
+  // Two orders, and they are not the same one. `balance` on an entry is the bank after that entry
+  // was written, so it only means anything in the order the entries were written in; a job's own
+  // costs are booked at the minute they happened and land in the ledger after a piece of the day
+  // that happened later on the clock, so the month's entries are not in minute order as written.
+  // The bank at the open and at the close are read off the written order, and the lines, which
+  // the player reads down the page, off the clock. Reading the bank off the sorted list took the
+  // balance of the wrong entry and the report did not add up (found in the Turn 19 playthrough).
+  const inLedgerOrder = state.ledger.filter((entry) => monthOfDay(entry.day) === month);
+  const entries = inLedgerOrder
     .map((entry, index) => ({ entry, index }))
-    .filter(({ entry }) => monthOfDay(entry.day) === month)
     .sort(
       (left, right) =>
         left.entry.day - right.entry.day ||
@@ -803,8 +821,8 @@ export function monthReport(state: GameState, month: number): MonthReport {
     income += line.income;
     costs += line.costs;
   }
-  const first = entries[0];
-  const last = entries[entries.length - 1];
+  const first = inLedgerOrder[0];
+  const last = inLedgerOrder[inLedgerOrder.length - 1];
   const cashOpen = first
     ? first.unpaid
       ? first.balance

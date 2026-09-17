@@ -64,3 +64,50 @@ written in this task and are frozen from here to the end of phase B.
 - **`styles.css`** gained the Turn 19 class names with empty rules, as Turn 13's phase A rule asks.
 
 `npm run check` exit 0: 168 files, 1,638 tests.
+
+### T19-A3 Design time from the value (2.11), and a ledger bug it uncovered
+
+**2.11.** `designMinutes(basePrice, tier)` in `tasks.ts` is now
+`round(max(DESIGN_MIN_MINUTES 30, DESIGN_MINUTES_PER_1000 24 * basePrice / 1000) * softwareFactor)`.
+The per product `designMinutes` is gone off `ProductTemplate` and off all nine product rows, and
+the size multiplier is no longer read for drawing time at all: a job's price already carries its
+size, and two figures for one thing is what made a set of shelves cost a day at the desk. Piotr's
+three figures hold: GBP 2,500 is 60 minutes, GBP 10,000 is 240, GBP 20,000 is 480, and the floor
+is 30. The software still divides (basic 1.0, standard 0.5, pro 0.2), so GBP 2,500 on pro is 12
+minutes.
+
+This was done in phase A rather than by B3, because it crosses `types.ts` and `constants.ts`,
+which are frozen for phase B. B3's list is section 2.9, 2.12, 2.13 and the Settings side of 2.10.
+
+**The ledger bug.** The shorter drawings changed the playthrough's path and the three month
+report stopped adding up: month 2 closed 38 out. It is not a Turn 19 bug; it is as old as the
+standing contracts' merged ledger line (Turn 13 3.16), and the new path simply walked into it.
+
+`addLedger`'s merge branch finds the day's open line for the same category and words, adds the
+piece to it, and re-stamps it with the bank and the minute of *now*. The entry stayed where the
+day's first piece had put it, so it held a later balance than every entry written after it. The
+running balance down the ledger meant nothing from day 8 of the run, and a month whose last piece
+was booked after its last other entry closed on the wrong figure.
+
+Fixed in two places, and no money moves differently:
+
+- `addLedger`: a merged line is moved to the end of the ledger, where its own new stamp says it
+  was written. The day still holds one line per contract, which is the whole point of the merge.
+- `monthReport`: the bank at the open and at the close are read off the ledger's written order
+  (where `balance` means something), and the lines the player reads down the page off the clock.
+  Reading both off the sorted list was the second half of the same mistake.
+
+The playthrough's month end reconciliation passes on all three months.
+
+**Two scenario figures re-measured**, both a direct consequence of 2.11 and both recorded with
+their reason in the test:
+
+- `thirtyDays`: the owner's day 2 is 300 minutes, not 332. The day's small piece is drawn in the
+  half hour the floor sets instead of the hours the template asked for.
+- `turn13 (w)`: the night shift works 2 nights, not more than 3. The desk is no longer the
+  bottleneck, so this script draws its whole book in the first days, thirteen of the fourteen
+  jobs are finished by day 5 and the rack is down to one sheet: there is nothing for the night
+  man to stand at. The claim the test is really making, that the premium is paid for every
+  working day the shift was on whether or not he had work, is untouched and still passes.
+
+`npm run check` exit 0: 168 files, 1,638 tests.

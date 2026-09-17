@@ -423,7 +423,7 @@ export function takeEnquiry(state: GameState, enquiryId: string, byHand: boolean
     deliverOnDay: null,
     calls: [],
     callsMissed: 0,
-    designMinutesRemaining: designMinutes(entry, enquiry.sizeMultiplier, state.software.tier),
+    designMinutesRemaining: designMinutes(enquiry.basePrice, state.software.tier),
     assignees: [],
     stageRuns: [],
     completedDay: null,
