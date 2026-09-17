@@ -11,6 +11,8 @@ import { dayOfWorkingIndex, isWorkingDay, workedMinutesOfDay, workingDayIndex } 
 import { OWNER } from './machines';
 import {
   designOutstanding,
+  jobMen,
+  jobRate,
   jobStage,
   meetingOutstanding,
   minutesRemainingFor,
@@ -39,7 +41,10 @@ export function dayOfPoint(point: number): number {
 
 /** What the hands the workshop has today average, against the owner at his best. He is one of
  *  them, at 1.0: a job nobody is on is drawn at what this workshop does to it, not at what the
- *  owner alone would do to it (CLAUDE.md T9 3.6). */
+ *  owner alone would do to it (CLAUDE.md T9 3.6).
+ *
+ *  Not the workshop rate of Turn 17, which is a figure in pounds an hour and lives in rate.ts:
+ *  this one is a speed the work plan draws a bar at, and it has carried the name since Turn 9. */
 export function workshopRate(state: GameState): number {
   const rates: number[] = [];
   if (ownerIsAvailable(state)) rates.push(1);
@@ -51,15 +56,31 @@ export function workshopRate(state: GameState): number {
   return Math.round((total / rates.length) * 10000) / 10000;
 }
 
-/** The rate this job's bar is drawn at, and what the board calls it. */
+/** What the men on a job are called, in the order they were put on it: "you", "Tom", or the two of
+ *  them named together when a job has a second man (CLAUDE.md T17 2.10). Empty when nobody is on
+ *  it at all. */
+export function menOnJob(state: GameState, job: Job): string[] {
+  return jobMen(job).map((who) => {
+    if (who === OWNER) return 'you';
+    const worker = state.workers.find((entry) => entry.id === who);
+    if (!worker) return who;
+    // A man on the second shift is named with it: the bar moves tonight, not today (T13 3.9).
+    return shiftOf(state, worker) === 'night' ? `${worker.name}, night shift` : worker.name;
+  });
+}
+
+/** Two names joined the way the board says them: "Tom and Ben". */
+export function namesText(names: readonly string[]): string {
+  if (names.length === 0) return 'nobody yet';
+  return names.length === 1 ? names[0] ?? '' : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1] ?? ''}`;
+}
+
+/** The rate this job's bar is drawn at, and what the board calls it. Two men on it is both their
+ *  rates, because both stand at it in the same minute (CLAUDE.md T17 2.10). */
 export function rateFor(state: GameState, job: Job): { rate: number; label: string } {
-  if (job.assignedTo === OWNER) return { rate: 1, label: 'for you' };
-  const worker =
-    job.assignedTo === null
-      ? undefined
-      : state.workers.find((entry) => entry.id === job.assignedTo);
-  if (worker && worker.rate > 0) return { rate: worker.rate, label: `for ${worker.name}` };
-  return { rate: workshopRate(state), label: 'at workshop average' };
+  const rate = jobRate(state, job);
+  if (rate <= 0) return { rate: workshopRate(state), label: 'at workshop average' };
+  return { rate, label: `for ${namesText(menOnJob(state, job))}` };
 }
 
 /** Where the job is standing, in the words the board says it in. No stage colours and no five
@@ -172,10 +193,6 @@ function rowFor(state: GameState, job: Job): PlanRow {
   // The work takes working days, so counting back from the deadline counts back over the axis
   // and never over a weekend (CLAUDE.md T10 3.5).
   const latestStartPoint = notStarted ? Math.round((duePoint - length) * 100) / 100 : null;
-  const worker =
-    job.assignedTo === null || job.assignedTo === OWNER
-      ? null
-      : state.workers.find((entry) => entry.id === job.assignedTo);
   // The bar is as long as the work in it, from the day it was picked up. Started, its right edge
   // is the projected end and never the deadline: now plus what is left at this rate, which is the
   // same thing as the length of the work plus every minute the job's clock did not move. An hour
@@ -191,15 +208,8 @@ function rowFor(state: GameState, job: Job): PlanRow {
     jobId: job.id,
     name: job.name,
     price: job.price,
-    // A man on the second shift is named with it: the bar moves tonight, not today (T13 3.9).
-    who:
-      job.assignedTo === OWNER
-        ? 'you'
-        : worker
-          ? shiftOf(state, worker) === 'night'
-            ? `${worker.name}, night shift`
-            : worker.name
-          : 'nobody yet',
+    // Both men when a job has two, in the order they were put on it (CLAUDE.md T17 2.10).
+    who: namesText(menOnJob(state, job)),
     stage: stageText(state, job),
     notStarted,
     from,

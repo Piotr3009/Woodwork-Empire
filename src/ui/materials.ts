@@ -10,6 +10,8 @@
 
 import { deliveriesInYard, deliveriesOnTheWay, openJobs } from '../engine/index';
 import { restockCheck, stockLines } from '../engine/index';
+// Straight off its own module: the public API does not carry it (REPORT-T13 10).
+import { restockSheets } from '../engine/materials';
 import type { Delivery, GameState, Job, StockLine } from '../engine/index';
 import { placeholderSvg } from '../render/placeholder';
 import { button, emptyLine, escapeHtml, lockedButton, money, plural } from './modal';
@@ -47,15 +49,32 @@ function stockRow(line: StockLine): string {
   );
 }
 
-/** The one button: every low line back to the restock figure, or the reason it cannot be
- *  pressed (CLAUDE.md T13 3.2). */
-function restockControl(state: GameState): string {
-  const check = restockCheck(state);
-  if (!check.ok) return lockedButton('Restock', check.reason);
-  return button(
-    'restock',
-    `Restock: ${plural(check.sheets, 'sheet', 'sheets')} to ${check.target} free, ${money(check.cost)}`,
-  );
+/** The number the player typed, or nothing when the field is empty and he wants what fills the
+ *  rack (PIOTR, 16.09; CLAUDE.md T17 2.20). Anything that is not a number at all is nothing. */
+function askedSheets(typed: string): number | undefined {
+  const asked = Number(typed);
+  if (typed.trim() === '' || !Number.isFinite(asked) || asked <= 0) return undefined;
+  return Math.floor(asked);
+}
+
+/** The field and the one button beside it: so many sheets, capped at the free places on the rack,
+ *  or the reason it cannot be pressed (CLAUDE.md T13 3.2, T17 2.20). The field is empty until he
+ *  types in it, and what it would buy then is what fills the rack, which the placeholder shows. */
+function restockControl(state: GameState, typed: string): string {
+  const check = restockCheck(state, askedSheets(typed));
+  const fills = restockSheets(state);
+  const field =
+    '<input type="text" inputmode="numeric" pattern="[0-9]*" class="num" ' +
+    `data-field="stockSheets" value="${escapeHtml(typed)}" placeholder="${fills}" ` +
+    'aria-label="Sheets to order" /> sheets';
+  const action = check.ok
+    ? button(
+        'restock',
+        `Restock: ${plural(check.sheets, 'sheet', 'sheets')}, ${money(check.cost)}`,
+        `data-sheets="${check.sheets}"`,
+      )
+    : lockedButton('Restock', check.reason);
+  return `${field}<span class="row-action">${action}</span>`;
 }
 
 /** A project and its material line: green with the sheets in hand, red with the shortfall and
@@ -82,11 +101,9 @@ function deliveryRow(delivery: Delivery): string {
   );
 }
 
-/** The Stock tab. The second argument is the laptop view's typed sheet count of Turn 11, kept for
- *  the signature the laptop calls and read by nothing: the page has no free form order any more
- *  (CLAUDE.md T13 3.2). */
+/** The Stock tab. The second argument is what the player has typed into the sheet count, which
+ *  Restock buys (CLAUDE.md T17 2.20). */
 export function renderMaterials(state: GameState, sheets: string): string {
-  void sheets;
   const lines = stockLines(state);
   // The projects whose material is still a question: a piece at the gate has used its sheets.
   const projects = openJobs(state).filter((job) => job.stage !== 'awaitingTransport');
@@ -98,7 +115,7 @@ export function renderMaterials(state: GameState, sheets: string): string {
       : '<p class="warn">No shelving yet. Buy some from the catalogue before anything is ' +
         'delivered.</p>') +
     '<div class="row stock-head"><span class="row-main">Stock</span>' +
-    `<span class="row-action">${restockControl(state)}</span></div>` +
+    `${restockControl(state, sheets)}</div>` +
     `<div class="stock-list">${lines.map(stockRow).join('')}</div>` +
     (state.stock.tempStorageSheets > 0
       ? `<p class="hint">${plural(state.stock.tempStorageSheets, 'sheet is', 'sheets are')} in paid storage.</p>`

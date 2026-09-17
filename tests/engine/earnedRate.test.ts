@@ -56,6 +56,8 @@ function withJoiner(state: GameState): GameState {
     absentDaysRemaining: 0,
     shift: 'day',
     dayLog: [],
+    monthMinutes: 0,
+    monthDaysOff: 0,
     anchorX: 0,
     anchorY: 4,
   });
@@ -138,6 +140,9 @@ describe('the two of them together', () => {
         dayLog: [],
         efficiency: { possible: 0, worked: 0, lost: { noPeople: 0, noMachine: 0, noMaterial: 0, ownerAway: 0 } },
         nightMinutes: 0,
+        paidHours: 0,
+        expressUplift: 0,
+        hallFactor: 1,
       },
     ];
     state.dayStats.workMinutes = 480;

@@ -283,6 +283,8 @@ export function placeEquipment(
     anchorY: options.y ?? 0,
     broken: false,
     serviceHours: 0,
+    hoursThisWeek: 0,
+    hoursThisMonth: 0,
     enduranceHours: enduranceHoursFor(specId, variantId),
     hoursUsed: 0,
     takenBy: null,
@@ -493,6 +495,8 @@ export function sixJoinersOnSheetWork(
       absentDaysRemaining: 0,
       shift: 'day',
       dayLog: [],
+      monthMinutes: 0,
+      monthDaysOff: 0,
       anchorX: 4 + man * 2,
       anchorY: 6,
     });
@@ -564,6 +568,8 @@ export function twoMenOnSheetWork(
     absentDaysRemaining: 0,
     shift: 'day',
     dayLog: [],
+    monthMinutes: 0,
+    monthDaysOff: 0,
     anchorX: 0,
     anchorY: 4,
   });

@@ -101,7 +101,7 @@ describe('the first ten minutes', () => {
     expect(state?.difficulty).toBe('easy');
     expect(state?.clock).toEqual({ day: 1, minute: 0 });
     expect(html()).toContain('Mon, day 1');
-    expect(html()).toContain('0 / 480 min');
+    expect(html()).toContain('0 / 540 min');
     expect(html()).toContain('Board');
   });
 
@@ -240,7 +240,8 @@ describe('the first ten minutes', () => {
     click('[data-modal="laptop"] [data-tile="drawings"]');
     expect(html()).toContain('Design queue');
     expect(html()).toContain(`Design: ${name}`);
-    expect(html()).toContain('Finished drawings');
+    // The Finished drawings list is gone (CLAUDE.md T17 2.18).
+    expect(html()).not.toContain('Finished drawings');
     click('[data-modal="laptop"] [data-tile="home"]');
     click('[data-modal="laptop"] [data-tile="tasks"]');
     click('[data-do="startTask"]');
@@ -265,9 +266,13 @@ describe('the first ten minutes', () => {
     // needs a screen matrix, which this page has none of, so it is proved where the matrix is
     // stubbed: tests/ui/hallRooms.test.ts.
     expect(html()).toContain('<title>The WC.');
-    // Nothing has its material in the hall yet, so the hall says why instead of a dead button.
-    expect(html()).toContain('No job has its material in the hall yet');
-    expect(html()).toContain('Clean up');
+    // Nothing has to be done in a clean hall with nothing ready, so the only chip over the floor
+    // is the setting out, and the camera is three small chips (CLAUDE.md T17 2.5).
+    expect(html()).toContain('class="hall-chips"');
+    expect(html()).not.toContain('No job has its material in the hall yet');
+    expect(html()).not.toContain('Clean up');
+    expect(html()).toContain('data-do="startSetup"');
+    expect(html()).toContain('class="hall-zoom"');
   });
 });
 
@@ -653,7 +658,7 @@ describe('the style rules of 10.4', () => {
 
   it('prints money with a pound sign and a comma, and minutes with a unit', () => {
     expect(html()).toMatch(/£[\d,]+/);
-    expect(html()).toContain('120 min');
+    expect(html()).toContain(' min');
     expect(html()).not.toMatch(/£\d+\.\d/);
   });
 

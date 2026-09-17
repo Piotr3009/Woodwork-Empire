@@ -12,7 +12,9 @@
 // and the rack, and the walker touches one and goes to the other, with the sheet on the way to
 // the rack and empty handed on the way back, for as long as the engine has him unloading. As many
 // trips as the time allows; a farther rack is fewer trips. When the engine moves him on, he
-// finishes the leg he is on and goes to his new station.
+// finishes the leg he is on and goes to his new station. A machine off the lorry is the same
+// loop with the far end somewhere else and no station on it: from the gate to the floor held for
+// the machine and back, empty handed both ways (CLAUDE.md T17 2.4).
 //
 // Nothing here is game state. A rebuilt page finds the walkers still here and puts every figure
 // back where it had actually got to (the same reason the slides of Turn 2 lived in the app).
@@ -44,10 +46,14 @@ export interface Arrival {
   station: string;
 }
 
-/** The two ends of an unloading: where he touches the pallet and where he touches the rack. */
+/** The two ends of an unloading: where he touches the pallet and the far end he goes to and
+ *  comes back from. A load of sheets goes to the rack, which is what the far end is when the
+ *  page names no other; a machine off the lorry goes to the floor held for it and is at no
+ *  station at all when he gets there, so the leg is a plain walk (CLAUDE.md T16 2.2, T17 2.4). */
 export interface Loop {
   gate: Cell;
   rack: Cell;
+  farStation: string;
 }
 
 export interface Walker {
@@ -69,9 +75,9 @@ export interface Walker {
   lastMs: number;
   /** Every goal he arrived at, in order: the test's log. */
   arrivals: Arrival[];
-  /** Trips of the unloading completed: arrivals at the pallet after a visit to the rack. */
+  /** Trips of the unloading completed: arrivals at the pallet after a visit to the far end. */
   loops: number;
-  sawRack: boolean;
+  sawFarEnd: boolean;
 }
 
 export type PathFinder = (from: Cell, to: Cell) => Cell[];
@@ -99,15 +105,16 @@ function cellOf(raw: string): Cell | null {
   return { x, y };
 }
 
-/** The loop the page put on a figure: "px,py;rx,ry", or null. */
+/** The loop the page put on a figure: "px,py;rx,ry" for the sheets, and "px,py;mx,my;station"
+ *  when the far end is somewhere else with a station of its own. */
 function loopOf(node: Element): Loop | null {
   const raw = node.getAttribute('data-loop');
   if (raw === null) return null;
-  const [gateRaw, rackRaw] = raw.split(';');
+  const [gateRaw, rackRaw, stationRaw] = raw.split(';');
   const gate = cellOf(gateRaw ?? '');
   const rack = cellOf(rackRaw ?? '');
   if (gate === null || rack === null) return null;
-  return { gate, rack };
+  return { gate, rack, farStation: stationRaw ?? STATION_RACK };
 }
 
 function translateOf(at: { x: number; y: number }): string {
@@ -139,11 +146,11 @@ function setOff(walker: Walker, goal: Goal): void {
   walker.station = goal.station;
 }
 
-/** The other end of the loop from where he is: the rack after the pallet, the pallet after the
- *  rack, and the rack first when he is anywhere else. */
+/** The other end of the loop from where he is: the far end after the pallet, the pallet after
+ *  the far end, and the far end first when he is anywhere else. */
 function nextEnd(walker: Walker, loop: Loop): Goal {
-  if (walker.station === STATION_RACK) return { cell: loop.gate, station: STATION_GATE };
-  return { cell: loop.rack, station: STATION_RACK };
+  if (walker.station === loop.farStation) return { cell: loop.gate, station: STATION_GATE };
+  return { cell: loop.rack, station: loop.farStation };
 }
 
 /** Reads the figures the page has just been built with and gives every walker its orders: a new
@@ -175,7 +182,7 @@ export function syncWalkers(root: ParentNode, nowMs: number, pathFor: PathFinder
         lastMs: nowMs,
         arrivals: [],
         loops: 0,
-        sawRack: false,
+        sawFarEnd: false,
       };
       walkers.set(key, walker);
       // Born on the loop: off he goes.
@@ -231,10 +238,11 @@ function dress(node: Element, walker: Walker, heading: Facing | null = null): vo
  *  of the loop, or to where the engine wants him after it. */
 function arrive(walker: Walker): void {
   walker.arrivals.push({ cell: { x: walker.at.x, y: walker.at.y }, station: walker.station });
-  if (walker.station === STATION_RACK) walker.sawRack = true;
-  if (walker.station === STATION_GATE && walker.sawRack) {
+  const far = walker.loop?.farStation ?? STATION_RACK;
+  if (walker.station === far) walker.sawFarEnd = true;
+  if (walker.station === STATION_GATE && walker.sawFarEnd) {
     walker.loops += 1;
-    walker.sawRack = false;
+    walker.sawFarEnd = false;
   }
   if (walker.loop !== null) {
     setOff(walker, nextEnd(walker, walker.loop));

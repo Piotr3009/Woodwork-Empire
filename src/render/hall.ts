@@ -8,8 +8,10 @@ import {
   GATE_CROWD_LIMIT,
   GATE_LAYOUT,
   PALLET_LAYOUT,
+  CLASS_BADGE,
   ROOM_DOOR,
   ROOM_LAYOUT,
+  WELFARE_IN_THE_CANTEEN,
   YARD_WIDTH_CELLS,
   roomDoorCell,
 } from '../engine/constants';
@@ -18,7 +20,6 @@ import {
   bagStoreLine,
   brokenMachines,
   dustBand,
-  extractorBroken,
   findSpec,
   gateIsCrowded,
   hasExtraction,
@@ -44,7 +45,7 @@ import {
   sheetCapacityOf,
 } from '../engine/machines';
 import { machineInUse } from '../engine/game';
-import { rackCapacity, stockIsLow } from '../engine/materials';
+import { rackCapacity } from '../engine/materials';
 import {
   STATION_BENCH,
   STATION_GATE,
@@ -60,10 +61,11 @@ import {
   palletCell,
   standingCell,
   stationMachine,
+  stationSecondAt,
   stationWaitingFor,
 } from '../engine/stations';
 import { gateCollarArt, pipeTile, portRing } from './pipes';
-import { ownerIsAvailable, staffOutputFactor } from '../engine/owner';
+import { ownerIsAvailable } from '../engine/owner';
 import { homeCellOf } from '../engine/staff';
 import { plural } from '../engine/text';
 import type { RoomId } from '../engine/constants';
@@ -632,6 +634,7 @@ export function pipeCellArt(
   cell: { x: number; y: number },
   files: readonly string[],
   scale = 1,
+  landsAt = 0,
 ): string {
   const url = pickSprite(files, kind);
   if (url !== null) {
@@ -642,7 +645,7 @@ export function pipeCellArt(
     const centre = centreOf(cell.x, cell.y, 1, 1, DUCT_HEIGHT);
     return spriteImage(url, { x: centre.x - width / 2, y: centre.y - height / 2, width, height });
   }
-  return kind === 'gate.collar' ? gateCollarArt(cell) : pipeTile(kind, cell);
+  return kind === 'gate.collar' ? gateCollarArt(cell) : pipeTile(kind, cell, landsAt);
 }
 
 /** How much smaller than a cell the collar is drawn [TUNE]. */
@@ -683,7 +686,12 @@ export function pipeRunArt(
 ): string {
   const machine = state.equipment.find((item) => item.id === run.equipmentId);
   const running = machine !== undefined && machine.takenBy !== null;
-  const tiles = run.tiles.map((tile) => pipeCellArt(tile.key, tile, files)).join('');
+  // The drop lands on the machine's own top face, where its port is, and not on the floor of the
+  // cell it stands on (PIOTR, 16.09; CLAUDE.md T17 2.7).
+  const lands = machine === undefined ? 0 : footprintIn(machine).height;
+  const tiles = run.tiles
+    .map((tile) => pipeCellArt(tile.key, tile, files, 1, tile.key === 'pipe.drop' ? lands : 0))
+    .join('');
   return (
     `<g class="pipe${short && running ? ' pipe-short' : ''}" data-pipe="${escapeText(run.id)}" ` +
     `data-pipe-for="${escapeText(run.equipmentId)}">${tiles}</g>`
@@ -725,9 +733,12 @@ export function centralRunArt(state: GameState, files: readonly string[]): strin
     // The port is the drop, the wall the tee, and every cell between a straight length: the
     // same key rule the routed runs use (src/engine/pipes.ts).
     const keyed = cells.length === 1 ? [{ x: port.x, y: port.y, key: 'pipe.drop' }] : tileKeysFor(cells, 'tee');
+    const lands = footprintIn(item).height;
     drops.push(
       `<g class="pipe central-drop" data-central-for="${escapeText(item.id)}">` +
-        keyed.map((tile) => pipeCellArt(tile.key, tile, files)).join('') +
+        keyed
+          .map((tile) => pipeCellArt(tile.key, tile, files, 1, tile.key === 'pipe.drop' ? lands : 0))
+          .join('') +
         '</g>',
     );
   }
@@ -779,6 +790,12 @@ export function machineFx(state: GameState, item: Equipment, spec: EquipmentSpec
   if (item.specId === 'edgebander') return { className: '', svg: chipStream(point) };
   return NO_FX;
 }
+
+/** How tall a seat or a locker is drawn on the canteen roof, in metres, and how far its box is
+ *  inset in its cell [TUNE]: small enough to read as a plan of what is in there and not as kit
+ *  standing on the roof (CLAUDE.md T17 2.2). */
+const CANTEEN_KIT_HEIGHT = 0.3;
+const CANTEEN_KIT_INSET = 0.15;
 
 const CATEGORY_FILL: Record<string, string> = {
   storage: 'var(--kit-stock)',
@@ -845,6 +862,16 @@ export function stationCell(
   station: string,
   bench: { x: number; y: number },
 ): Standing {
+  // The second man of a job stands at the first man's own bench, in its second place: two men on
+  // one bench, one in front of it and one behind it (CLAUDE.md T17 2.10).
+  const secondAt = stationSecondAt(station);
+  if (secondAt !== null) {
+    const item = state.equipment.find((entry) => entry.id === secondAt && !isSold(entry));
+    if (item) {
+      const cell = standingCell(state, item, 'second');
+      return { ...cell, facing: facingAt(cell, item) };
+    }
+  }
   // A man waiting for a machine stands at its waiting cell, which is what waiting at one looks
   // like (T7 3.1; T16 2.1).
   const waitingFor = stationWaitingFor(station);
@@ -892,6 +919,7 @@ function stationLabel(station: string): string {
   if (waiting !== null) {
     return `waiting for ${(findSpec(waiting)?.name ?? waiting).toLowerCase()}`;
   }
+  if (stationSecondAt(station) !== null) return 'the bench, second place';
   if (station === STATION_RACK) return 'the rack';
   if (station === STATION_GATE) return 'the gate';
   if (station === STATION_OFFICE) return 'the office';
@@ -899,6 +927,95 @@ function stationLabel(station: string): string {
   if (station === STATION_BENCH) return 'the bench';
   if (station === STATION_NO_BENCH) return 'no bench';
   return 'waiting';
+}
+
+/** How tall the placeholder man stands, in metres: the height the character sheets themselves
+ *  declare for a man (metresPerCell.height in public/sprites/characters.json), so the drawn
+ *  figure and the placeholder are the same man (CLAUDE.md T17 2.1). */
+const CAPSULE_HEIGHT_M = 1.8;
+
+/** The placeholder figure, in fractions of his own height [TUNE]: head, trunk, legs and feet,
+ *  in the proportions of a man on a 2:1 floor. Nothing here is a sprite: it is the one shape a
+ *  role with no character sheet is drawn as, and it goes the day his sheet lands. */
+const CAPSULE_PARTS = {
+  headRadius: 0.1,
+  headCentre: 0.88,
+  shoulders: 0.34,
+  trunkTop: 0.78,
+  trunkBottom: 0.42,
+  legWidth: 0.11,
+  legGap: 0.04,
+  footLength: 0.16,
+  footHeight: 0.05,
+};
+
+/** The man a role with no character sheet is drawn as, until the art side delivers one
+ *  (CLAUDE.md T17 2.1). He was a 12 by 26 rounded rect, a third of the height of a delivered
+ *  sheet and a fifth of its width: beside a joiner he read as a stroke on the floor, which is
+ *  what Piotr saw of his yellow shirted helper. He is sized off the projection instead, at
+ *  TILE_RISE pixels to the metre of a 1.8 m man, and given a head, a trunk, legs and feet so he
+ *  reads as a person. */
+function capsuleBody(fill: string): string {
+  const height = CAPSULE_HEIGHT_M * TILE_RISE;
+  // Scene pixels to a tenth: the shapes are small, and a long tail of decimals is noise in the
+  // page and in the tests that read it.
+  const px = (fraction: number): number => Math.round(fraction * height * 10) / 10;
+  const at = (value: number): number => Math.round(value * 10) / 10;
+  const trunkWidth = px(CAPSULE_PARTS.shoulders);
+  const legWidth = px(CAPSULE_PARTS.legWidth);
+  const legGap = px(CAPSULE_PARTS.legGap);
+  const foot = px(CAPSULE_PARTS.footLength);
+  const leg = (side: number): string =>
+    `<rect x="${at(side > 0 ? legGap / 2 : -(legGap / 2 + legWidth))}" ` +
+    `y="${-px(CAPSULE_PARTS.trunkBottom)}" width="${legWidth}" ` +
+    `height="${at(px(CAPSULE_PARTS.trunkBottom) - px(CAPSULE_PARTS.footHeight))}" ` +
+    `rx="${at(legWidth / 2)}" fill="${fill}" />`;
+  const shoe = (side: number): string =>
+    `<ellipse cx="${at(side * (legGap / 2 + legWidth / 2))}" ` +
+    `cy="${-px(CAPSULE_PARTS.footHeight)}" rx="${at(foot / 2)}" ` +
+    `ry="${px(CAPSULE_PARTS.footHeight)}" fill="${fill}" opacity="0.7" />`;
+  return (
+    leg(-1) +
+    leg(1) +
+    shoe(-1) +
+    shoe(1) +
+    `<rect x="${at(-trunkWidth / 2)}" y="${-px(CAPSULE_PARTS.trunkTop)}" ` +
+    `width="${trunkWidth}" ` +
+    `height="${at(px(CAPSULE_PARTS.trunkTop) - px(CAPSULE_PARTS.trunkBottom))}" ` +
+    `rx="${at(trunkWidth / 3)}" fill="${fill}" />` +
+    `<circle cx="0" cy="${-px(CAPSULE_PARTS.headCentre)}" ` +
+    `r="${px(CAPSULE_PARTS.headRadius)}" fill="${fill}" />`
+  );
+}
+
+/** How the number on the rack is set out [TUNE]: how far up the front face the plate sits, how
+ *  high the plate is in scene pixels, how wide a digit is on it, and the padding each side. The
+ *  type itself is `.rack-count` in the stylesheet, in the hand. */
+const RACK_COUNT = { up: 0.55, height: 26, digit: 15, pad: 9 };
+
+/** The sheets in the rack, over its own front face, big, in the hand, on the class's colour
+ *  (PIOTR, 17.09; CLAUDE.md T17 2.8). The count used to be glued into the object's name, and
+ *  `objectArt` throws the name away whenever a sprite file exists, so in the real game the number
+ *  was invisible: the rack draws it itself now, and it moves with the stock. */
+function rackCount(item: Equipment, sheets: number): string {
+  const stands = footprintIn(item);
+  const at = centreOf(
+    stands.x,
+    stands.y,
+    stands.width,
+    stands.depth,
+    stands.height * RACK_COUNT.up,
+  );
+  const text = String(Math.max(0, Math.round(sheets)));
+  const width = RACK_COUNT.pad * 2 + text.length * RACK_COUNT.digit;
+  const colour = CLASS_BADGE[item.variantId]?.colour ?? 'var(--kit-stock)';
+  return (
+    `<rect class="rack-count-plate" x="${round(at.x - width / 2)}" ` +
+    `y="${round(at.y - RACK_COUNT.height / 2)}" width="${width}" height="${RACK_COUNT.height}" ` +
+    `rx="${round(RACK_COUNT.height / 3)}" fill="${colour}" />` +
+    `<text class="rack-count" x="${round(at.x)}" ` +
+    `y="${round(at.y + RACK_COUNT.height / 3)}">${escapeText(text)}</text>`
+  );
 }
 
 /** A worker is his sheet if the art side has delivered one and a capsule if it has not, with his
@@ -922,8 +1039,7 @@ function figure(
   const rest = art === null ? 'idle' : animationForStation(art.station);
   const drawn =
     art === null ? null : characterArt(art.role, rest, tile.facing, art.options);
-  const body =
-    drawn ?? `<rect x="-6" y="-30" width="12" height="26" rx="6" fill="${fill}" />`;
+  const body = drawn ?? capsuleBody(fill);
   return {
     depth: depthKey(tile.x, tile.y) + 0.2,
     svg:
@@ -1066,8 +1182,6 @@ export interface Scene {
   shell: () => string;
   /** Written into that element on every render. */
   live: string;
-  /** The lines under the view. They belong to the page, not to the scene. */
-  notes: string;
 }
 
 /** The empty element a shell leaves for its live part. */
@@ -1075,7 +1189,7 @@ export const LIVE_SLOT = '<g data-live="1"></g>';
 
 /** The shell and the live part as one string, for a caller that just wants the markup. */
 export function sceneHtml(scene: Scene): string {
-  return scene.shell().replace(LIVE_SLOT, `<g data-live="1">${scene.live}</g>`) + scene.notes;
+  return scene.shell().replace(LIVE_SLOT, `<g data-live="1">${scene.live}</g>`);
 }
 
 export interface HallOptions {
@@ -1195,10 +1309,17 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
   const store = bagStore(state);
   // Everything the player has bought, except the office furniture, which lives in the office
   // view, and the hand edgebander, which lives in a tool cabinet (CLAUDE.md T6 3.5).
+  const welfare: Equipment[] = [];
   for (const item of state.equipment) {
     const spec = findSpec(item.specId);
     if (!spec || spec.category === 'furniture') continue;
     if (!itemStandsInTheHall(item)) continue;
+    // The seats and the lockers are inside the canteen and are drawn on the block, with no
+    // data-kit on them: there is no hall cell to drag them to (CLAUDE.md T17 2.2).
+    if (WELFARE_IN_THE_CANTEEN.includes(item.specId)) {
+      welfare.push(item);
+      continue;
+    }
     // What the picture stands on is the class's own footprint, centred inside the working zone
     // the class reserves (CLAUDE.md T7 3.3).
     const stands = footprintIn(item);
@@ -1251,7 +1372,37 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
           label: name,
         }) +
         (unconnected ? notConnectedLabel(stands) : '') +
+        (sheetCapacityOf(item) > 0 ? rackCount(item, state.stock.sheets) : '') +
         fx.svg +
+        '</g>',
+    });
+  }
+
+  // The welfare kit, drawn where it stands: inside the canteen, on the block's own cells, lifted
+  // to the roof so the player can see what is in there through it. No hall cell, no data-kit and
+  // no drag: it is placed by count and that is all (PIOTR, 17.09; CLAUDE.md T17 2.2). The art
+  // side has no seat and no locker yet, so this is the one placeholder helper's box
+  // (docs/art/REQUESTS-T17.md 2).
+  const canteen = ROOM_LAYOUT.find((room) => room.id === 'canteen');
+  for (const item of welfare) {
+    const spec = findSpec(item.specId);
+    if (spec === null || spec === undefined) continue;
+    const lift = canteen?.height ?? 0;
+    const faces = boxPolygons(
+      item.anchorX + CANTEEN_KIT_INSET,
+      item.anchorY + CANTEEN_KIT_INSET,
+      1 - CANTEEN_KIT_INSET * 2,
+      1 - CANTEEN_KIT_INSET * 2,
+      CANTEEN_KIT_HEIGHT,
+    );
+    drawables.push({
+      depth: depthKey(item.anchorX, item.anchorY) + 0.01,
+      svg:
+        `<g class="canteen-kit" data-canteen-kit="${item.id}" ` +
+        `data-sprite="${item.spriteKey}" ` +
+        `transform="translate(0,${round(-lift * TILE_RISE)})">` +
+        `<title>${escapeText(`${spec.name}, in the canteen. ${spec.effect}`)}</title>` +
+        box(faces, 'var(--kit-welfare)', 'var(--kit-welfare-dark)') +
         '</g>',
     });
   }
@@ -1286,6 +1437,24 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
   const onTheLoop = (station: string): string =>
     unloadingNow && (station === STATION_GATE || station === STATION_RACK) ? loopEnds() : '';
 
+  // A machine off the lorry is the same loop walked empty handed: from the gate to the floor
+  // held for it and back, as many times as the unload minutes allow, and nobody stands moving
+  // his legs (PIOTR, 16.09; CLAUDE.md T17 2.4). The far end carries its own station, so the leg
+  // is a walk and not a carry, and the man rests idle if the loop ever ends on it.
+  const machineUnload = state.tasks.find(
+    (task) => task.kind === 'unload' && !task.done && task.deliveryId === null && task.orderIds.length > 0,
+  );
+  const heldFor = machineUnload
+    ? state.onOrder.find((item) => machineUnload.orderIds.includes(item.id))
+    : undefined;
+  const machineLoopEnds = (): string => {
+    if (machineUnload === undefined || heldFor === undefined) return '';
+    const gate = stationCell(state, STATION_GATE, { x: 2, y: 5 });
+    return `${gate.x},${gate.y};${heldFor.anchorX},${heldFor.anchorY};${STATION_IDLE}`;
+  };
+  const onTheMachineLoop = (taskId: string | null): string =>
+    machineUnload !== undefined && taskId === machineUnload.id ? machineLoopEnds() : '';
+
   // The crew, and the owner, each at the station the engine put him on.
   for (const worker of state.workers) {
     if (worker.startDay > state.clock.day) continue;
@@ -1304,7 +1473,7 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
         // Joiners have a sheet tonight; everybody else falls back to the capsule until his own
         // one is delivered (CLAUDE.md T9 3.13).
         { role: worker.role, station: worker.station, options: characterOptions },
-        onTheLoop(worker.station),
+        onTheMachineLoop(worker.taskId) || onTheLoop(worker.station),
       ),
     );
   }
@@ -1324,7 +1493,7 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
         // The owner is his sheet where the art side has delivered one (character.owner.*, the
         // boss pack of 14.09), and the capsule where it has not, like every worker.
         { role: 'owner', station: state.owner.station, options: characterOptions },
-        onTheLoop(state.owner.station),
+        onTheMachineLoop(state.owner.currentTaskId) || onTheLoop(state.owner.station),
       ),
     );
   }
@@ -1449,69 +1618,6 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
         height: Math.round(bounds.height + pad * 2),
       };
   const viewBox = [size.x, size.y, size.width, size.height].join(' ');
-  const output = `${Math.round(staffOutputFactor(state) * 100)}%`;
-  const ownerLine = !state.owner.present
-    ? `. The owner is not in today, so everyone works at ${output}`
-    : state.owner.wentHome
-      ? `. The owner has gone home, so everyone works at ${output}`
-      : '';
-  const band = dustBand(state.dust);
-  // 9.7: from the dirty band on, the player is warned that somebody can get hurt.
-  const riskLine =
-    band.label === 'dirty' || band.label === 'dangerous' ? ', somebody will get hurt in this' : '';
-  const stateLine = extractorBroken(state)
-    ? `Hall: the extractor is broken, everything runs at a quarter speed${ownerLine}`
-    : `Hall: ${band.label}${riskLine}${ownerLine}`;
-  const machines = state.equipment.filter((item) => findSpec(item.specId)?.category === 'machine');
-  const extractionLine =
-    machines.length > 0 && !hasExtraction(state)
-      ? '<p class="view-note warn">No extraction in the hall, so no machine will run. ' +
-        'Buy an extractor.</p>'
-      : '';
-  // The fans are too small for what is running this minute: nothing stops, the hall just turns
-  // out less and fills with dust (PIOTR, CLAUDE.md T10 3.1).
-  const extraction = extractionCheck(state);
-  const shortLine = extraction.short
-    ? `<p class="view-note warn">${escapeText(extraction.line)} m\u00b3/h. Everything in the hall is ` +
-      '30% slower and the dust rises three times as fast. Nothing stops.</p>'
-    : '';
-  // A compressor with more drawn on it than the pipe will carry: everything on it runs at 0.7
-  // for the minute (PIOTR, CLAUDE.md T10 3.2).
-  const airLines = hallAirCheck(state)
-    .lines.map((line) => `<p class="view-note warn">${escapeText(line)}. Everything on it runs at ` +
-      '70% until something is turned off.</p>')
-    .join('');
-  const brokenLine =
-    brokenMachines(state).length > 0
-      ? '<p class="view-note warn">Broken: ' +
-        escapeText(
-          brokenMachines(state)
-            .map((item) => (findSpec(item.specId)?.name ?? item.specId).toLowerCase())
-            .join(', '),
-        ) +
-        '.</p>'
-      : '';
-  const serviceLine =
-    machinesDueService(state).length > 0
-      ? '<p class="view-note warn">Service due: ' +
-        escapeText(
-          machinesDueService(state)
-            .map((item) => (findSpec(item.specId)?.name ?? item.specId).toLowerCase())
-            .join(', '),
-        ) +
-        '.</p>'
-      : '';
-  const gateLine = gateIsCrowded(state)
-    ? `<p class="view-note warn">Order transport, no room at the gate: ${jobsAtGate(state).length}` +
-      ` finished pieces against a limit of ${GATE_CROWD_LIMIT}. Everything in the hall is 30% ` +
-      'slower.</p>'
-    : '';
-  const lowStock = stockIsLow(state)
-    ? `<p class="view-note warn">The rack is nearly empty: ${state.stock.sheets} of ` +
-      `${rackCapacity(state)} sheets left.</p>`
-    : rackCapacity(state) === 0
-      ? '<p class="view-note warn">No shelving in the hall, so nothing can be unloaded.</p>'
-      : '';
   // The shell stands until the frame, the painting or the grid changes. Nothing else in the hall
   // can make it wrong, so the pictures are loaded once and never again.
   const key = [
@@ -1532,10 +1638,101 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
       `<g class="hall-scene" data-camera="1" transform="${cameraTransform(HALL_CAMERA_FIT)}">` +
       `${parts.join('')}${LIVE_SLOT}</g></svg>`,
     live: live.join(''),
-    notes:
-      `<p class="view-note">${escapeText(stateLine)}</p>` +
-      `${extractionLine}${shortLine}${airLines}${brokenLine}${serviceLine}${gateLine}${lowStock}`,
   };
+}
+
+/** One thing the hall wants doing: the sentence the old strip under the hall used to carry, and
+ *  what it is about, so the page can hang the right button on the chip (PIOTR, 16.09;
+ *  CLAUDE.md T17 2.5). A hall with nothing wrong with it has none of them and shows no chip. */
+export interface HallProblem {
+  kind: 'broken' | 'bags' | 'hall' | 'dirty' | 'service';
+  /** The machine it is about, where it is about one. */
+  equipmentId: string | null;
+  text: string;
+}
+
+function lowerName(specId: string): string {
+  return (findSpec(specId)?.name ?? specId).toLowerCase();
+}
+
+/** Everything the hall wants doing, in the order it costs the workshop: what has stopped, then
+ *  what is slowing it down, then what can wait a day (CLAUDE.md T17 2.5). The one list: the
+ *  chips over the floor are built from it and nothing else reads the hall's state in words. */
+export function hallProblems(state: GameState): HallProblem[] {
+  const list: HallProblem[] = [];
+  // A machine that has stopped, the extractor first in its own words: without it nothing in the
+  // hall runs at more than a quarter speed.
+  for (const item of brokenMachines(state)) {
+    list.push({
+      kind: 'broken',
+      equipmentId: item.id,
+      text:
+        item.specId === 'extractor'
+          ? 'The extractor is broken, so everything runs at a quarter speed'
+          : `The ${lowerName(item.specId)} has stopped`,
+    });
+  }
+  if (bagStore(state).full) {
+    list.push({
+      kind: 'bags',
+      equipmentId: null,
+      text: 'The bags are full, so nothing that makes dust runs',
+    });
+  }
+  const machines = state.equipment.filter((item) => findSpec(item.specId)?.category === 'machine');
+  if (machines.length > 0 && !hasExtraction(state)) {
+    list.push({
+      kind: 'hall',
+      equipmentId: null,
+      text: 'No extraction in the hall, so no machine will run. Buy an extractor',
+    });
+  }
+  // The fans are too small for what is running this minute: nothing stops, the hall just turns
+  // out less and fills with dust (PIOTR, CLAUDE.md T10 3.1).
+  const extraction = extractionCheck(state);
+  if (extraction.short) {
+    list.push({
+      kind: 'hall',
+      equipmentId: null,
+      text: `${extraction.line} m³/h: everything is 30% slower and the dust rises three times as fast`,
+    });
+  }
+  // A compressor with more drawn on it than the pipe will carry: everything on it runs at 0.7
+  // for the minute (PIOTR, CLAUDE.md T10 3.2).
+  for (const line of hallAirCheck(state).lines) {
+    list.push({
+      kind: 'hall',
+      equipmentId: null,
+      text: `${line}. Everything on it runs at 70% until something is turned off`,
+    });
+  }
+  if (gateIsCrowded(state)) {
+    list.push({
+      kind: 'hall',
+      equipmentId: null,
+      text:
+        `Order transport, no room at the gate: ${jobsAtGate(state).length} finished pieces ` +
+        `against a limit of ${GATE_CROWD_LIMIT}. Everything is 30% slower`,
+    });
+  }
+  // 9.7: from the dirty band on, the player is warned that somebody can get hurt.
+  const band = dustBand(state.dust);
+  if (band.label !== 'clean') {
+    const risk =
+      band.label === 'dirty' || band.label === 'dangerous'
+        ? ', somebody will get hurt in this'
+        : '';
+    list.push({ kind: 'dirty', equipmentId: null, text: `The hall is ${band.label}${risk}` });
+  }
+  for (const item of machinesDueService(state)) {
+    if (item.broken) continue;
+    list.push({
+      kind: 'service',
+      equipmentId: item.id,
+      text: `The ${lowerName(item.specId)} is due a service`,
+    });
+  }
+  return list;
 }
 
 /** The hall as one string. The app builds it from the pieces instead, so the painting survives a

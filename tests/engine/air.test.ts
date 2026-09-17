@@ -29,7 +29,7 @@ import {
 } from '../../src/engine/index';
 import { applyRating } from '../../src/engine/reputation';
 import { renderCatalogue } from '../../src/ui/catalogue';
-import { renderHall } from '../../src/render/hall';
+import { hallProblems, renderHall } from '../../src/render/hall';
 import type { Equipment, GameState } from '../../src/engine/index';
 import {
   acceptNow,
@@ -223,7 +223,9 @@ describe('rule 2, the litres', () => {
     }
     expect(hallAirCheck(state).lowAir).toHaveLength(1);
     const page = renderHall(state);
-    expect(page).toContain('Low air on compressor 1');
+    expect(
+      hallProblems(state).some((problem) => problem.text.startsWith('Low air on compressor 1')),
+    ).toBe(true);
     expect(page).toContain('fx-lamp');
   });
 });

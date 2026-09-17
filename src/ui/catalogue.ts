@@ -15,7 +15,10 @@ import type { EquipmentSpec, EquipmentTab, OnOrderItem } from '../engine/types';
 import {
   airBlockFor,
   airDemandOf,
+  bagStore,
+  bagStoreLine,
   bagsFull,
+  canPlace,
   canSell,
   dayOneComplete,
   dayOneKit,
@@ -36,6 +39,7 @@ import {
   hasExtraction,
   isSellableFamily,
   isSold,
+  itemStandsInTheHall,
   rackCapacity,
   salePriceFor,
   serviceDueOn,
@@ -352,6 +356,22 @@ export function connectAction(state: GameState, item: Equipment): string {
     : lockedButton(label, check.reason);
 }
 
+/** The hall's bag store on the extractor's own card: the line and the small bar that goes red
+ *  when it is full (CLAUDE.md T12 3.3). It was a note under the hall, written by a click on the
+ *  fan; the click opens the fan's card now and the store is on it (CLAUDE.md T17 2.6). */
+function bagStoreBlock(state: GameState, item: Equipment): string {
+  if (item.specId !== 'extractor') return '';
+  const store = bagStore(state);
+  if (!store.exists) return '';
+  const percent = store.capacityM3 <= 0 ? 0 : Math.min(100, (store.fillM3 / store.capacityM3) * 100);
+  return (
+    `<p class="tile-figures">${escapeHtml(bagStoreLine(store))} ` +
+    `<span class="bag-gauge${store.full ? ' is-full' : ''}" role="img" ` +
+    `aria-label="${escapeHtml(bagStoreLine(store))}">` +
+    `<span class="bag-gauge-fill" style="width:${percent.toFixed(1)}%"></span></span></p>`
+  );
+}
+
 /** The pipe on the card: how much of it there is, or that there is none (CLAUDE.md T13 3.19). */
 function pipeLine(state: GameState, item: Equipment): string {
   if (!wantsExtraction(item) || hasCentralExtraction(state)) return '';
@@ -368,7 +388,10 @@ function gateLine(state: GameState, item: Equipment): string {
   return `<p class="tile-figures">${signedFigure(`Automatic gate fitted: output +${per}%`, per)}</p>`;
 }
 
-function ownedTile(
+/** One machine's card as the Owned tab draws it. From Turn 17 the machine's own modal, opened by
+ *  a click on it on the hall, is this same card: one drawing and one set of buttons, so Connect to
+ *  extraction cannot be on one and missing from the other (CLAUDE.md T17 2.6). */
+export function ownedTile(
   state: GameState,
   item: Equipment,
   spec: EquipmentSpec,
@@ -394,8 +417,21 @@ function ownedTile(
       ? button('serviceMachine', 'Service', `data-id="${item.id}"`)
       : '';
   const sell = sellAction(state, item, sellConfirm);
+  // Shifting it is setting the hall out, which is the one way anything moves (CLAUDE.md T4 3.5):
+  // the button takes him there and he drags it where he wants it (CLAUDE.md T17 2.6). Only what
+  // can actually be dragged is offered it, and the engine's own check says which: the office
+  // furniture, the welfare kit in the canteen and a tool in a cabinet are not on the floor.
+  const canMove =
+    !isSold(item) &&
+    itemStandsInTheHall(item) &&
+    canPlace(state, item.id, item.anchorX, item.anchorY).ok;
+  const move = canMove ? button('startSetup', 'Move') : '';
+  // The bags are the hall's, and the button that empties them is the one the chip over the floor
+  // presses (CLAUDE.md T12 2.3, T17 2.5).
+  const bags = item.specId === 'extractor' && bagsFull(state) ? button('emptyBags', 'Empty bags') : '';
   const lines = [
     className,
+    spec.effect,
     life,
     service,
     ownedState(state, item),
@@ -416,9 +452,11 @@ function ownedTile(
     '<span class="badge badge-owned">Owned</span></h3>' +
     pictureSlot(spec.spriteKey, item.variantId) +
     lines +
+    bagStoreBlock(state, item) +
     gateLine(state, item) +
     airAssign(state, item) +
-    `<div class="tile-action">${action}${connectAction(state, item)}${gateAction(state, item)}${sell}</div>` +
+    '<div class="tile-action">' +
+    `${action}${bags}${connectAction(state, item)}${gateAction(state, item)}${move}${sell}</div>` +
     '</div>'
   );
 }

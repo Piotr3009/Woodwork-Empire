@@ -9,6 +9,7 @@ import {
   bagsToM3,
   HEAVY_SPECS,
   LIGHT_CLASSES,
+  LOW_AIR_FACTOR,
   EXTRACTOR_BROKEN_OUTPUT_FACTOR,
   BREAK_SKIP_FACTOR,
   GATE_CROWD_FACTOR,
@@ -39,8 +40,20 @@ import {
   SALE_FRACTION_USED,
   USED_VARIANT,
 } from './constants';
+import { weekOfDay, monthOfDay } from './clock';
 import { canAfford } from './economy';
-import { extractionCheck, extractionDemandOf, underExtracted } from './media';
+import {
+  airBlockFor,
+  airCheck,
+  airDemandOf,
+  compressorFor,
+  compressorIsLow,
+  extractionCheck,
+  extractionDemandOf,
+  isConnectedToExtraction,
+  underExtracted,
+} from './media';
+import type { AirCheck } from './media';
 import { cubicMetres, trimmed } from './text';
 import type {
   Equipment,
@@ -414,6 +427,13 @@ export function dustFactor(dust: number): number {
   return dustBand(dust).factor;
 }
 
+/** True when the hall has reached this band of dust or a worse one. The one reading of the table
+ *  for everybody who asks it a question about how dirty the hall is (CLAUDE.md T17 2.3). */
+export function dustAtLeast(dust: number, label: string): boolean {
+  const order = DUST_BANDS.map((band) => band.label);
+  return order.indexOf(dustBand(dust).label) >= order.indexOf(label);
+}
+
 /** True once five joiners are on the books without a helper (CLAUDE.md 9.3). */
 export function helperMissing(state: GameState): boolean {
   const joiners = state.workers.filter((worker) => worker.role === 'joiner').length;
@@ -729,7 +749,13 @@ export function accumulateMachineMinute(
     if (minutes <= 0) continue;
     const spec = findSpec(item.specId);
     if (!spec) continue;
-    if (spec.category === 'machine') item.hoursUsed = round6(item.hoursUsed + minutes / 60);
+    if (spec.category === 'machine') {
+      item.hoursUsed = round6(item.hoursUsed + minutes / 60);
+      // The machine's own week and month, for the Machines column and the month end: the life
+      // clock cannot answer either of them (CLAUDE.md T17 2.24, 2.25).
+      item.hoursThisWeek = round6(item.hoursThisWeek + minutes / 60);
+      item.hoursThisMonth = round6(item.hoursThisMonth + minutes / 60);
+    }
     madeM3 += (dustOutputOf(item.specId) / 60) * minutes;
   }
   if (madeM3 <= 0) return false;
@@ -863,4 +889,121 @@ export function brokenMachines(state: GameState): Equipment[] {
 /** True when the hall is dangerous enough for somebody to get hurt (CLAUDE.md 9.7). */
 export function accidentRisk(state: GameState): boolean {
   return dustBand(state.dust).label === 'dangerous';
+}
+
+// ---------------------------------------------------------------------------
+// What the machines saved (CLAUDE.md T17 2.24, 2.25): the Machines column of the Company board
+// and the machines line of the month end. Informational: nothing here multiplies anything, the
+// hours are the ones somebody actually stood at the machine, and the effect is the class's own
+// factor with the gate on it, exactly as the minute of work reads it.
+// ---------------------------------------------------------------------------
+
+/** The machines' own week and month clocks. The week starts again on the first working day of a
+ *  new week, the way the men's month meters start (staff.ts).
+ *
+ *  The month clock starts again a day later than that: on the SECOND working day of the month.
+ *  The month end of the month that has just gone is raised and answered on the first working day
+ *  of the new one and reads these hours, so the clock has to still hold the month it reports on
+ *  that morning. The run it measures is therefore the morning after one month end to the morning
+ *  of the next: every working day falls in exactly one report, and none in two
+ *  (CLAUDE.md T17 2.24, 2.25). */
+export function startMachineMeters(state: GameState): void {
+  const days = state.days;
+  const last = days[days.length - 1];
+  const before = days[days.length - 2];
+  const freshWeek = last === undefined || weekOfDay(last.day) !== weekOfDay(state.clock.day);
+  const freshMonth =
+    last !== undefined &&
+    before !== undefined &&
+    monthOfDay(last.day) === monthOfDay(state.clock.day) &&
+    monthOfDay(before.day) !== monthOfDay(last.day);
+  if (!freshWeek && !freshMonth) return;
+  for (const item of state.equipment) {
+    if (freshWeek) item.hoursThisWeek = 0;
+    if (freshMonth) item.hoursThisMonth = 0;
+  }
+}
+
+export interface MachineSaving {
+  id: string;
+  /** The class, the way the card names it: "Standard table saw". */
+  name: string;
+  /** What its class does to the stage it does, the gate's 2% in it: 0.05 is +5%. */
+  effect: number;
+  gate: boolean;
+  /** Hours somebody stood at it in the span. */
+  hours: number;
+  /** Hours times the effect, in minutes: what those hours would have taken without it. */
+  minutesSaved: number;
+  /** What is wrong with it this minute, as a factor off 1, and what it is. Zero while nothing is.
+   *  There is no per machine penalty in the engine: the air is per compressor and the extraction
+   *  is one hall wide line, and each is shown on the row that draws it (CLAUDE.md T17 2.24). */
+  minus: number;
+  minusWhy: string;
+}
+
+export interface MachineSavings {
+  rows: MachineSaving[];
+  hours: number;
+  minutesSaved: number;
+  hoursSaved: number;
+}
+
+/** What is wrong with this machine this minute: it cannot run on the air it is given, the
+ *  compressor it draws on is short of litres, or it has no pipe to the extraction and the hall is
+ *  short because of it. */
+function machineMinus(
+  state: GameState,
+  item: Equipment,
+  air: AirCheck,
+): { minus: number; why: string } {
+  const blocked = airBlockFor(state, item);
+  if (blocked !== '') return { minus: -1, why: blocked };
+  const compressor = airDemandOf(item) === null ? null : compressorFor(state, item);
+  if (compressor !== null && compressorIsLow(air, compressor.id)) {
+    return { minus: LOW_AIR_FACTOR - 1, why: 'short of air' };
+  }
+  if (extractionDemandOf(item) > 0 && !isConnectedToExtraction(state, item)) {
+    return { minus: -UNDER_EXTRACTION_OUTPUT_PENALTY, why: 'no pipe to the extraction' };
+  }
+  return { minus: 0, why: '' };
+}
+
+/** One row per machine standing in the hall, with the hours it ran in the span and the minutes
+ *  its class saved over those hours. `week` reads the machine's week clock and `month` its month
+ *  one (CLAUDE.md T17 2.24, 2.25). */
+export function machineSavings(state: GameState, span: 'week' | 'month'): MachineSavings {
+  const air = airCheck(state);
+  const rows: MachineSaving[] = [];
+  let hours = 0;
+  let minutesSaved = 0;
+  for (const item of state.equipment) {
+    if (isSold(item) || !itemStandsInTheHall(item)) continue;
+    const spec = findSpec(item.specId);
+    if (!spec || spec.category !== 'machine') continue;
+    const effect = roundPoints(outputFactorOf(state, item) - 1);
+    const ran = span === 'week' ? item.hoursThisWeek : item.hoursThisMonth;
+    const saved = Math.round(ran * 60 * effect);
+    const wrong = machineMinus(state, item, air);
+    rows.push({
+      id: item.id,
+      // The class, named the way the catalogue tile and the machine card name it.
+      name: variantFor(item)?.name ?? spec.name,
+      effect,
+      gate: hasGate(state, item),
+      hours: Math.round(ran * 10) / 10,
+      minutesSaved: saved,
+      minus: roundPoints(wrong.minus),
+      minusWhy: wrong.why,
+    });
+    hours += ran;
+    minutesSaved += saved;
+  }
+  rows.sort((left, right) => right.minutesSaved - left.minutesSaved || left.name.localeCompare(right.name));
+  return {
+    rows,
+    hours: Math.round(hours * 10) / 10,
+    minutesSaved,
+    hoursSaved: Math.round((minutesSaved / 60) * 10) / 10,
+  };
 }

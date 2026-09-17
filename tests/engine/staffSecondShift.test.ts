@@ -29,7 +29,6 @@ import {
   secondShiftCheck,
   secondShiftRuns,
   shiftOf,
-  staysForOvertime,
 } from '../../src/engine/staff';
 import { absenceFactor, nightShareOf } from '../../src/engine/owner';
 import { hands, jobOf } from '../../src/engine/production';
@@ -68,6 +67,8 @@ function manager(id = 'pm-1'): Worker {
     absentDaysRemaining: 0,
     shift: 'day',
     dayLog: [],
+    monthMinutes: 0,
+    monthDaysOff: 0,
     anchorX: 1,
     anchorY: 1,
   };
@@ -140,7 +141,6 @@ describe('the second shift', () => {
     expect(onTheBooksToday(state, five)).toBe(true);
     expect(isWorkingToday(state, five)).toBe(false);
     expect(isWorkingToday(state, five, 'night')).toBe(true);
-    expect(staysForOvertime(state, five)).toBe(false);
     expect(hands(state).map((hand) => hand.who)).toEqual(['staff-1', 'staff-2', 'staff-3', 'staff-4']);
     expect(hands(state, { shift: 'night' }).map((hand) => hand.who)).toEqual(['staff-5', 'staff-6']);
     expect(nightCrew(state).map((worker) => worker.id)).toEqual(['staff-5', 'staff-6']);

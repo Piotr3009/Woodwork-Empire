@@ -3,7 +3,13 @@
 // A station is a string so the state stays plain JSON: 'bench', 'machine:<specId>', 'rack',
 // 'gate', 'office' or 'idle'.
 
-import { GATE_LAYOUT, PALLET_LAYOUT, SHEETS_PER_TRIP } from './constants';
+import {
+  GATE_LAYOUT,
+  PALLET_LAYOUT,
+  SHEETS_PER_TRIP,
+  WELFARE_IN_THE_CANTEEN,
+  roomDoorCell,
+} from './constants';
 import { itemStandsInTheHall } from './machines';
 import type { Cell } from './pipes';
 import type { Equipment, GameState, TaskInstance } from './types';
@@ -39,6 +45,18 @@ export function waitingStation(specId: string): string {
 /** The machine a man is waiting for, or null when he is not waiting for one. */
 export function stationWaitingFor(station: string): string | null {
   return station.startsWith('waiting:') ? station.slice('waiting:'.length) : null;
+}
+
+/** The second man of a job, at the second place of the very item the first man is standing at:
+ *  two men on one bench, the first in front of it and the second behind it (CLAUDE.md T16 2.1,
+ *  T17 2.10). This one names the item and not the family, because it is that bench and no other. */
+export function secondStation(equipmentId: string): string {
+  return `second:${equipmentId}`;
+}
+
+/** The item a man is standing at as the second of two, or null when he is not. */
+export function stationSecondAt(station: string): string | null {
+  return station.startsWith('second:') ? station.slice('second:'.length) : null;
 }
 
 /** How many trips a load of sheets is between the pallet at the gate and the rack, so many
@@ -263,6 +281,9 @@ export function freeSideOf(state: GameState, item: Equipment): Side {
  *  first free side at the same position along it where it is not, and the table's cell as it
  *  stands when nothing is free at all (the straight line walk still gets him there). */
 export function standingCell(state: GameState, item: Equipment, role: StationRole = 'operator'): Cell {
+  // A seat and a locker are inside the canteen: a man at one of them stands in the doorway and is
+  // not drawn through the wall (PIOTR, 17.09; CLAUDE.md T17 2.2).
+  if (WELFARE_IN_THE_CANTEEN.includes(item.specId)) return roomDoorCell('canteen');
   const row = stationRow(item.specId);
   const box = standsOn(item);
   let offset: StationOffset;

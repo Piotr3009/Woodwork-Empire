@@ -94,6 +94,8 @@ export const MODAL_SKINS: Record<string, ModalSkin> = {
   company: 'board',
   // The settings, off the gear on the top bar, are a sheet of paper (CLAUDE.md T13 3.22).
   settings: 'folder',
+  // One machine's card is a card in a folder, like an event (CLAUDE.md T17 2.6).
+  machineCard: 'folder',
 };
 
 /** The one board of the three that is a picture and not CSS: green felt in an oak frame, with the

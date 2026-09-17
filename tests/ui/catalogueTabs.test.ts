@@ -257,12 +257,13 @@ describe('the Owned tab', () => {
     expect(card).toContain('no service due while it stands idle');
     expect(card).toContain('running');
     // Nothing is offered on a machine with nothing wrong with it but the gate it can take on its
-    // drop (CLAUDE.md T13 3.11) and the one thing that is always offered on a machine the hall
-    // has finished with (CLAUDE.md T8 3.5).
+    // drop (CLAUDE.md T13 3.11), shifting it, which is setting the hall out (CLAUDE.md T17 2.6),
+    // and the one thing that is always offered on a machine the hall has finished with
+    // (CLAUDE.md T8 3.5).
     const controls = Array.from(
       owned.querySelectorAll(`[data-owned="${saw?.id}"] [data-do]`),
     ).map((node) => node.getAttribute('data-do'));
-    expect(controls).toEqual(['buyGate', 'sellMachine']);
+    expect(controls).toEqual(['buyGate', 'startSetup', 'sellMachine']);
     expect(card).toContain('Sell for £630');
   });
 

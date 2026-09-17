@@ -7,11 +7,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   LOW_STOCK_SHEETS,
-  RESTOCK_TO_SHEETS,
   SHEET_PRICE_AD_HOC,
   SHEET_PRICE_STOCK,
 } from '../../src/engine/constants';
-import { stockNumberFor } from '../../src/engine/materials';
+import { rackCapacity, stockFree, stockNumberFor } from '../../src/engine/materials';
 import { renderLaptop } from '../../src/ui/laptop';
 import { renderMaterials } from '../../src/ui/materials';
 import { money } from '../../src/ui/modal';
@@ -72,25 +71,41 @@ describe('the stock page', () => {
     expect(parse(renderMaterials(fine, '')).querySelector('.badge-low')).toBeNull();
   });
 
-  it('has one Restock button at the top that says what it buys and what it costs', () => {
+  it('takes a number and says what that number buys and what it costs', () => {
     const state = fillRack(ready(), 2);
-    const page = parse(renderMaterials(state, ''));
+    const page = parse(renderMaterials(state, '6'));
     const buttons = page.querySelectorAll('[data-do="restock"]');
     expect(buttons).toHaveLength(1);
-    const sheets = RESTOCK_TO_SHEETS - 2;
-    expect(text(buttons[0])).toBe(
-      `Restock: ${sheets} sheets to ${RESTOCK_TO_SHEETS} free, ${money(sheets * SHEET_PRICE_STOCK)}`,
-    );
+    // Six sheets typed, six sheets bought, at the stock price (CLAUDE.md T17 2.20).
+    expect(text(buttons[0])).toBe(`Restock: 6 sheets, ${money(6 * SHEET_PRICE_STOCK)}`);
+    expect(buttons[0]?.getAttribute('data-sheets')).toBe('6');
+    // The field is the one the player types in, and it is empty until he does.
+    const field = page.querySelector('[data-field="stockSheets"]');
+    expect(field?.getAttribute('value')).toBe('6');
+    expect(parse(renderMaterials(state, '')).querySelector('[data-field="stockSheets"]')
+      ?.getAttribute('value')).toBe('');
     // The button comes before the lines: it is the one control at the top.
     const html = page.innerHTML;
     expect(html.indexOf('data-do="restock"')).toBeLessThan(html.indexOf('class="stock-line"'));
   });
 
-  it('greys Restock with the reason when nothing is low and while a load is on the way', () => {
-    const fine = fillRack(ready(), RESTOCK_TO_SHEETS);
-    const page = parse(renderMaterials(fine, ''));
+  it('fills the rack when no number is typed, and says so on the field', () => {
+    const state = fillRack(ready(), 2);
+    const page = parse(renderMaterials(state, ''));
+    const fills = stockFree(state);
+    expect(text(page.querySelector('[data-do="restock"]'))).toBe(
+      `Restock: ${fills} sheets, ${money(fills * SHEET_PRICE_STOCK)}`,
+    );
+    expect(page.querySelector('[data-field="stockSheets"]')?.getAttribute('placeholder')).toBe(
+      String(fills),
+    );
+  });
+
+  it('greys Restock with the reason when the rack is full and while a load is on the way', () => {
+    const full = fillRack(ready(), rackCapacity(ready()));
+    const page = parse(renderMaterials(full, ''));
     expect(page.querySelector('[data-do="restock"]')).toBeNull();
-    expect(page.querySelector('button[disabled]')?.getAttribute('title')).toBe('Nothing is low');
+    expect(page.querySelector('button[disabled]')?.getAttribute('title')).toBe('No room on the rack');
     const low = fillRack(ready(), 1);
     const ordered = act(low, { type: 'RESTOCK' });
     const again = parse(renderMaterials(ordered, '')).querySelector('button[disabled]');
@@ -121,10 +136,11 @@ describe('the stock page', () => {
   });
 
   it('has no per project question, no free form order and none of the software’s detail', () => {
+    // The typed sheet count came back in Turn 17, as the number Restock buys (T17 2.20); the free
+    // form "buy sheets for stock" of Turn 11, which was a second way to buy, did not.
     const state = fillRack(ready(), 10);
     const html = renderMaterials(state, '6');
     for (const gone of [
-      'data-field="stockSheets"',
       'data-do="buyStock"',
       'per project',
       'from stock',
@@ -136,7 +152,7 @@ describe('the stock page', () => {
       expect(html, gone).not.toContain(gone);
     }
     // And it is still the laptop's Stock tab, reached the one way (CLAUDE.md T4 3.1).
-    expect(renderLaptop(state, { page: 'stock', stockSheets: '6', teamTab: 'workshop' })).toContain(
+    expect(renderLaptop(state, { page: 'stock', stockSheets: '6', teamTab: 'workshop', tickedTasks: [] })).toContain(
       'data-stock="sheet"',
     );
   });

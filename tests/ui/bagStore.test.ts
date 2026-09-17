@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
-// The hall's bag store on the floor: click the extractor and the line under the hall says how
-// full the bags are, with a small bar that goes red once they are full; the chore to empty them
-// carries the bags and the minutes in its name (CLAUDE.md T12 3.3).
+// The hall's bag store on the floor: click the extractor and its own card says how full the bags
+// are, with a small bar that goes red once they are full and the button that empties them; the
+// chore carries the bags and the minutes in its name (CLAUDE.md T12 3.3, T17 2.6).
 
 import { beforeAll, describe, expect, it } from 'vitest';
 import { currentState, mount, render } from '../../src/ui/app';
@@ -34,11 +34,9 @@ function kitId(specId: string): string {
   return item.id;
 }
 
-/** Every line under the hall, the hall's own state line included, as one string. */
-function notes(): string {
-  return Array.from(root().querySelectorAll('.view-note'))
-    .map((element) => element.textContent ?? '')
-    .join(' | ');
+/** Everything on the open machine card, as one string. */
+function card(): string {
+  return root().querySelector('.modal-layer [data-modal="machineCard"]')?.textContent ?? '';
 }
 
 function gauge(): { full: boolean; width: string } | null {
@@ -56,43 +54,49 @@ beforeAll(() => {
   render();
 });
 
-describe('the store under the hall', () => {
+describe('the store on the extractor s own card', () => {
   it('reads the line and the bar when the extractor is clicked, and the bar fills with the store', () => {
     click(`[data-kit="${kitId('extractor')}"]`);
-    expect(notes()).toContain('Bags 0 / 1 m³');
+    expect(card()).toContain('Bags 0 / 1 m³');
     expect(gauge()).toEqual({ full: false, width: '0%' });
-    // The note is drawn off the state, so it moves as the saws run.
+    // The card is drawn off the state, so it moves as the saws run.
     game().bagFillM3 = 0.4;
     render();
-    expect(notes()).toContain('Bags 0.4 / 1 m³');
+    expect(card()).toContain('Bags 0.4 / 1 m³');
     expect(gauge()).toEqual({ full: false, width: '40%' });
     fillBags(game());
     render();
-    expect(notes()).toContain('Bags 1 / 1 m³');
+    expect(card()).toContain('Bags 1 / 1 m³');
     expect(gauge()).toEqual({ full: true, width: '100%' });
   });
 
-  it('asks who empties them when the extractor is clicked full, in one event for the hall', () => {
+  it('asks who empties them from the button on the card, in one event for the hall', () => {
+    fillBags(game());
     click(`[data-kit="${kitId('extractor')}"]`);
+    expect(card()).toContain('Empty bags');
+    click('.modal-layer [data-do="emptyBags"]');
     expect(game().activeEvent?.title).toBe('Bags full in the workshop');
     expect(root().innerHTML).toContain('Bags full in the workshop');
     // Left stopped, the chore stays on the owner's list under its full name.
     Object.assign(game(), choose(game(), 'later'));
     render();
     expect(game().activeEvent).toBeNull();
-    const tasks = renderLaptop(game(), { page: 'tasks', stockSheets: '', teamTab: 'workshop' });
+    const tasks = renderLaptop(game(), { page: 'tasks', stockSheets: '', teamTab: 'workshop', tickedTasks: [] });
     expect(tasks).toContain(`Empty the bags (1 bag, ${BAG_CHANGE_MINUTES} min)`);
   });
 
-  it('gives way to any other note, so the store never lingers under the wrong click', () => {
+  it('goes when another machine is clicked: one card, and it is that machine s', () => {
     Object.assign(game(), act(game(), { type: 'ASK_EMPTY_BAGS' }));
     Object.assign(game(), choose(game(), 'later'));
     game().bagFillM3 = 0.2;
     render();
     click(`[data-kit="${kitId('extractor')}"]`);
     expect(gauge()).not.toBeNull();
+    // From Turn 17 a click on a machine opens that machine's own card (CLAUDE.md T17 2.6), and
+    // the saw's card carries no bags.
     click(`[data-kit="${kitId('tableSaw')}"]`);
-    expect(notes()).toContain('of use on the clock');
+    expect(root().querySelector('.modal-layer [data-modal="machineCard"]')).not.toBeNull();
+    expect(card()).toContain('Table saw');
     expect(gauge()).toBeNull();
   });
 });

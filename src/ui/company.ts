@@ -19,6 +19,11 @@ import {
   outputBreakdown,
   weekOfDay,
 } from '../engine/index';
+import { machineSavings } from '../engine/machines';
+import type { MachineSaving, MachineSavings } from '../engine/machines';
+import { lastWeekRate, weekRate } from '../engine/rate';
+import type { WorkshopRate } from '../engine/rate';
+import { plural } from '../engine/text';
 import type {
   DayLogEntry,
   GameState,
@@ -26,7 +31,7 @@ import type {
   OutputLine,
   ReputationEntry,
 } from '../engine/index';
-import { emptyLine, escapeHtml, signClass } from './modal';
+import { emptyLine, escapeHtml, money, signClass } from './modal';
 
 /** Points as the board writes them: a sign on every one of them, and never more than two places. */
 export function points(value: number): string {
@@ -250,6 +255,75 @@ function outputSheet(breakdown: OutputBreakdown): string {
   );
 }
 
+/** What the workshop earns for every hour it pays for, big, at the top of the board: the one
+ *  figure that sees the machines, the men and the hall at once, through the labour they actually
+ *  earn (PIOTR, 17.09; CLAUDE.md T17 2.26). The engine works it out; this prints it. */
+function rateLine(week: WorkshopRate, before: WorkshopRate): string {
+  const beside: string[] = [];
+  if (before.days > 0) beside.push(`last week ${money(before.rate)}`);
+  if (week.days > 0) beside.push(`per man ${money(week.perMan)}`);
+  const big =
+    week.days === 0
+      ? 'Workshop earns nothing an hour yet'
+      : `Workshop earns ${money(week.rate)} an hour`;
+  return (
+    '<div class="rate-figure">' +
+    `<span class="rate-big">${escapeHtml(big)}</span>` +
+    (beside.length === 0 ? '' : `<span class="rate-side">${escapeHtml(beside.join(' · '))}</span>`) +
+    '</div>'
+  );
+}
+
+/** Hours as the board writes them: "12.5 h", and "none" for a machine nobody stood at. */
+function hours(value: number): string {
+  return value <= 0 ? 'none' : `${value} h`;
+}
+
+/** What the class does to its stage, as a percentage: "+5%", with the gate's 2% already in it. */
+function percent(value: number): string {
+  return `${value < 0 ? '−' : '+'}${Math.round(Math.abs(value) * 100)}%`;
+}
+
+/** One machine's row: the class, what it did to its stage and the hours it ran under it, and the
+ *  minutes those hours saved on the right. A machine short of air or with no pipe to the
+ *  extraction says so, and its figure is written in the minus. */
+function machineRow(row: MachineSaving): string {
+  const gate = row.gate ? ', gate in it' : '';
+  const second =
+    row.minusWhy === ''
+      ? `ran ${hours(row.hours)} at ${percent(row.effect)}${gate}`
+      : `ran ${hours(row.hours)} at ${percent(row.effect)}${gate} · ${row.minusWhy}, ${percent(row.minus)}`;
+  const figure = row.minutesSaved === 0 ? '0 min' : `${percent0(row.minutesSaved)} min`;
+  return ledgerRow(row.name, second, figure, row.minus < 0 ? row.minus : row.minutesSaved, `data-machine="${escapeHtml(row.id)}"`);
+}
+
+/** A whole number with its sign, the way the saved minutes are written. */
+function percent0(value: number): string {
+  return `${value < 0 ? '−' : '+'}${Math.abs(Math.round(value))}`;
+}
+
+/** The third sheet: one row per machine standing in the hall and what its class saved the
+ *  workshop this week. Informational: it multiplies nothing (CLAUDE.md T17 2.24). */
+function machinesSheet(savings: MachineSavings): string {
+  // The same figure as the one at the top of the sheet, to the same tenth of an hour: rounding it
+  // to whole hours here said "0 hours" under a total that read 0.3 h.
+  const sentence = `Machines saved us ${plural(savings.hoursSaved, 'hour', 'hours')} this week`;
+  return (
+    '<section class="sheet company-machines" data-sheet="machines">' +
+    pin() +
+    '<h3>Machines</h3>' +
+    totalLine('what they saved this week', hours(savings.hoursSaved), 'machines') +
+    '<div class="ledger-head"><span>What it does to its stage</span><span>saved</span></div>' +
+    '<div class="ledger-list">' +
+    (savings.rows.length === 0
+      ? emptyLine('No machines in the hall.')
+      : savings.rows.map(machineRow).join('')) +
+    `<div class="ledger-sum"><span data-sum="total">${escapeHtml(sentence)}</span></div>` +
+    '</div>' +
+    '</section>'
+  );
+}
+
 export function renderCompany(state: GameState): string {
   const weeks = weeksOf(state);
   const week = thisWeek(state, weeks);
@@ -262,8 +336,14 @@ export function renderCompany(state: GameState): string {
     '<span class="felt-line">' +
     `<span class="felt-week">Week ${week.week} · ${escapeHtml(points(week.total))}</span>` +
     (shares === '' ? '' : ` · <span class="felt-shares">${escapeHtml(shares)}</span>`) +
-    '</span></div>' +
-    `<div class="sheets">${reputationSheet(state, weeks)}${outputSheet(outputBreakdown(state))}</div>` +
+    '</span>' +
+    rateLine(weekRate(state), lastWeekRate(state)) +
+    '</div>' +
+    '<div class="sheets">' +
+    reputationSheet(state, weeks) +
+    outputSheet(outputBreakdown(state)) +
+    machinesSheet(machineSavings(state, 'week')) +
+    '</div>' +
     '</div>'
   );
 }

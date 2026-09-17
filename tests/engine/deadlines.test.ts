@@ -48,14 +48,16 @@ describe('what the client gives', () => {
     }
   });
 
-  it('gives a 15,000 kitchen eighteen to twenty three days, and eleven to fourteen express', () => {
+  it('gives a 15,000 kitchen eighteen to twenty three days, and seventeen to nineteen express', () => {
     const state = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
     const standard = spread(state, 15000, false);
     expect(standard[0], `${standard.join(',')}`).toBeGreaterThanOrEqual(18);
     expect(standard[standard.length - 1], `${standard.join(',')}`).toBeLessThanOrEqual(23);
+    // Turn 17: express is 20% sooner and no longer 40% (PIOTR, 17.09; CLAUDE.md T17 2.23), so the
+    // same kitchen that was eleven to fourteen days is seventeen to nineteen now.
     const express = spread(state, 15000, true);
-    expect(express[0], `${express.join(',')}`).toBeGreaterThanOrEqual(11);
-    expect(express[express.length - 1], `${express.join(',')}`).toBeLessThanOrEqual(14);
+    expect(express[0], `${express.join(',')}`).toBeGreaterThanOrEqual(17);
+    expect(express[express.length - 1], `${express.join(',')}`).toBeLessThanOrEqual(19);
     // A hall with no saw and no edgebander cuts and machines by hand, which is two fifths of the
     // job at half again as long, so the client is told a longer date (CLAUDE.md T7 3.1).
     const bare = spread(newGame(), 15000, false);
@@ -70,9 +72,11 @@ describe('what the client gives', () => {
     const huge = deadlineDaysFor(state, { ownerDays: 400, price: 200000, express: false });
     // Thirty days of the formula, and the slack the client adds on top of it.
     expect(huge).toBeLessThanOrEqual(DEADLINE_DAYS_MAX + Math.round(DEADLINE_DAYS_MAX * 0.15));
-    expect(deadlineDaysFor(state, { ownerDays: 0, price: 100, express: true })).toBe(
-      DEADLINE_DAYS_MIN,
-    );
+    // The smallest express job the board can make: the floor holds, and at 0.8 the arithmetic can
+    // land a day above it where at 0.6 it was always clamped (CLAUDE.md T17 2.23).
+    const tiny = deadlineDaysFor(state, { ownerDays: 0, price: 100, express: true });
+    expect(tiny).toBeGreaterThanOrEqual(DEADLINE_DAYS_MIN);
+    expect(tiny).toBeLessThanOrEqual(DEADLINE_DAYS_MIN + 1);
   });
 
   it('reads the owner days off the machines the hall has now', () => {

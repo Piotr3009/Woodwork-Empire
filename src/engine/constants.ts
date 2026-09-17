@@ -66,12 +66,17 @@ import type {
  *  unloading of several orders, so a task carries a list of them (CLAUDE.md T9 3.1).
  *
  *  Bumped in Turn 11: the owner carries the log of his day and the state carries the last week of
- *  them, which is what the top bar's meter and the company board are drawn from (T11 3.1). */
-export const STATE_VERSION = 14;
+ *  them, which is what the top bar's meter and the company board are drawn from (T11 3.1).
+ *
+ *  Bumped in Turn 17: a job may have a second man on it, the day counts the hours the company
+ *  paid for whether they were worked or not, and the laptop keeps the tasks the player ticked
+ *  to be done one after another. The welfare kit moved off the hall floor and into the canteen
+ *  with the same bump (CLAUDE.md T17 section 4). Every v24 save loads. */
+export const STATE_VERSION = 15;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
-export const APP_VERSION = 'v24';
+export const APP_VERSION = 'v25';
 
 // ---------------------------------------------------------------------------
 // The owner's day, in the seven things it is made of
@@ -156,17 +161,12 @@ export const BREAK_SKIP_FACTOR = 0.97;
 export const OVERTIME_DEBT_PER_DAY = 0.1;
 /** However tired he is, half a day's work still comes out of him [TUNE]. */
 export const LABOUR_FACTOR_FLOOR = 0.5;
-/** Staff overtime, the Turn 1 paper rule made real (CLAUDE.md T8 3.6). Each joiner and helper in
- *  the hall stays with the owner from 17:00, at one and a half times his hourly wage, and his
- *  hourly wage is his week divided by forty [TUNE: the 40]. Two hours is all he will do; past
- *  that he goes home whatever anybody says (PIOTR). Office staff do none of it. */
-export const STAFF_OVERTIME_RATE = 1.5;
-export const STAFF_OVERTIME_MAX_MINUTES = 120;
+/** A man's hourly wage is his week divided by forty [TUNE: the 40]. The staff overtime of Turn 8
+ *  is gone with the rule: the men go home at five, always, and the evening is the owner's alone,
+ *  so nobody stays, nobody is paid time and a half and nobody hands his notice in over it
+ *  (PIOTR, 17.09; CLAUDE.md T17 2.12). The four figures that priced it went with the functions
+ *  that read them. */
 export const WORKER_HOURS_PER_WEEK = 40;
-/** Three evenings in a row and he has had enough: a flag that adds this much to his chance of
- *  handing his notice in at the month end [TUNE] (CLAUDE.md T8 3.6). */
-export const OVERTIME_TIRED_DAYS = 3;
-export const OVERTIME_QUIT_CHANCE = 0.05;
 
 /** Owner away: all staff production drops by this much (PIOTR: 30%). With a production manager
  *  on the books the drop is this much instead (PIOTR: 0.05 to 0.10, the session uses 0.08). The
@@ -184,6 +184,20 @@ export const OWNER_JOB_VALUE_PER_DAY = 800;
 export const OWNER_LABOUR_VALUE_PER_DAY = 320;
 /** CLAUDE.md 8.5 writes this as 0.6667, which is this exact fraction rounded to four places. */
 export const OWNER_LABOUR_PER_MINUTE = OWNER_LABOUR_VALUE_PER_DAY / MINUTES_PER_WORKING_DAY;
+
+/** The hours the company pays for, per man, per working day: eight, whether they were worked or
+ *  not. The bottom of the workshop rate, and the reason a shop that stands still still pays
+ *  (PIOTR, 17.09; CLAUDE.md T17 2.26). The owner is paid for the same eight, and for the
+ *  overtime he actually stayed for on top. */
+export const PAID_HOURS_PER_WORKING_DAY = 8;
+
+/** The owner alone, at his work every minute of his eight hours, earns exactly this an hour:
+ *  the reference the workshop rate is read against. 320 over 8 is 40 (CLAUDE.md T17 2.26). */
+export const OWNER_RATE_PER_HOUR = OWNER_LABOUR_VALUE_PER_DAY / PAID_HOURS_PER_WORKING_DAY;
+
+/** Working days the workshop rate on the Company board is read over, and the week it compares
+ *  itself with [TUNE: five, one working week] (CLAUDE.md T17 2.26). */
+export const RATE_WEEK_DAYS = 5;
 
 // ---------------------------------------------------------------------------
 // 8.1 Fixed costs and the unit
@@ -245,6 +259,11 @@ export const PELLET_INCOME_PER_1000_PRODUCTION_MINUTES = 40;
 /** Working days in a month of 30 calendar days, for the fixed cost figure the arrears interest
  *  threshold is measured against [TUNE]. */
 export const WORKING_DAYS_PER_MONTH = (DAYS_PER_MONTH * WORKING_DAYS_PER_WEEK) / DAYS_PER_WEEK;
+
+/** Weeks in one of the game's months: thirty days over seven, which is 4.2857. What a man on a
+ *  weekly wage costs in a month, so the Our team page and the hiring gate can put every man's
+ *  pay in the same column (CLAUDE.md T17 2.9, 2.11). */
+export const WEEKS_PER_MONTH = DAYS_PER_MONTH / DAYS_PER_WEEK;
 
 /** The hall in cells, which are metres now: x along the rear wall, y along the left wall, the
  *  origin at the rear left corner (docs/art/SPRITES.md 9.1 and 9.3). 200 cells. */
@@ -484,10 +503,10 @@ export const SHEET_VALUE = 200;
  *  between them (PIOTR: 175, in his band of 170 to 180; 200 ad hoc; CLAUDE.md T13 3.3). */
 export const SHEET_PRICE_STOCK = 175;
 export const SHEET_PRICE_AD_HOC = 200;
-/** A stock line whose free count is under this many sheets wears the Low stock badge, and
- *  Restock brings every low line back up to this many [TUNE] (CLAUDE.md T13 3.2). */
+/** A stock line whose free count is under this many sheets wears the Low stock badge [TUNE]
+ *  (CLAUDE.md T13 3.2). What Restock buys is the number the player types now, and what fills the
+ *  rack when he types none, so there is no figure to bring a line back up to (CLAUDE.md T17 2.20). */
 export const LOW_STOCK_SHEETS = 4;
-export const RESTOCK_TO_SHEETS = 12;
 /** The stock number a line carries, in the style of the software the player is meant to
  *  recognise: the prefix per material kind, and three digits off the seed [TUNE wording]
  *  (CLAUDE.md T13 3.2). */
@@ -688,8 +707,9 @@ export const DEADLINE_SMALL_JOB_PRICE = 3000;
 export const DEADLINE_SMALL_SLACK_DAYS = 2;
 export const DEADLINE_SLACK_PERCENT_MIN = 10;
 export const DEADLINE_SLACK_PERCENT_MAX = 15;
-/** An express job wants it in six tenths of the time, and never in under three days (PIOTR). */
-export const DEADLINE_EXPRESS_FACTOR = 0.6;
+/** An express job wants it in eight tenths of the time, and never in under three days: 20% sooner
+ *  and not 40%, which is what an uplift of a fifth is worth (PIOTR, 17.09; CLAUDE.md T17 2.23). */
+export const DEADLINE_EXPRESS_FACTOR = 0.8;
 
 /** Every machine wants a service once a month, and it costs half an hour (PIOTR). From Turn 6 the
  *  month is counted on the machine's own clock and not on the calendar: 80 hours is the month a
@@ -2996,24 +3016,29 @@ export const BENCH_SLOT_LAYOUT: LayoutSlot[] = [
   { x: 18, y: 4 },
 ];
 
-/** Welfare items stand along the front edge, clear of the gate lane and of the three room
- *  doors that open into the hall (CLAUDE.md T7 3.3). */
+/** The two families that stand inside the canteen and not on the hall floor: a man's seat and his
+ *  locker (PIOTR, 17.09; CLAUDE.md T17 2.2). The one list: the placement, the render and the
+ *  migration all ask it. */
+export const WELFARE_IN_THE_CANTEEN: readonly string[] = ['canteenSeat', 'locker'];
+
+/** The welfare kit stands inside the canteen and takes no hall cell: a man eats and keeps his
+ *  coat out of the dust, not on the floor between the benches (PIOTR, 17.09; CLAUDE.md T17 2.2).
+ *  The canteen block is two cells wide and four deep at x 3, y 0, and its door is in the front
+ *  face at x 4. The lockers take the far column and the seats the door column, the first seat
+ *  the cell just inside the door; past the last cell of a column the next one stands on the same
+ *  cell, which is what `slotFrom` does everywhere else [TUNE: the two columns]. */
 export const LOCKER_SLOT_LAYOUT: LayoutSlot[] = [
-  { x: 13, y: 9 },
-  { x: 14, y: 9 },
-  { x: 15, y: 9 },
-  { x: 16, y: 9 },
-  { x: 17, y: 9 },
-  { x: 18, y: 9 },
+  { x: 3, y: 0 },
+  { x: 3, y: 1 },
+  { x: 3, y: 2 },
+  { x: 3, y: 3 },
 ];
 
 export const CANTEEN_SLOT_LAYOUT: LayoutSlot[] = [
-  { x: 7, y: 9 },
-  { x: 8, y: 9 },
-  { x: 9, y: 9 },
-  { x: 10, y: 9 },
-  { x: 11, y: 9 },
-  { x: 12, y: 9 },
+  { x: 4, y: 3 },
+  { x: 4, y: 2 },
+  { x: 4, y: 1 },
+  { x: 4, y: 0 },
 ];
 
 /** Tool cabinets stand in the row between the rear machines and the benches: one for the owner
@@ -3316,6 +3341,10 @@ export const ACCIDENT_CHANCE_PER_DAY = 0.02;
 export const ACCIDENT_DAYS_OFF = 3;
 /** A helper cleans every Friday at no owner cost (PIOTR). */
 export const HELPER_CLEAN_WEEKDAY = 4;
+/** [TUNE] The band of dust at which the helper picks up a brush without being asked, any day of
+ *  the week (PIOTR, 16.09; CLAUDE.md T17 2.3): the moment the hall stops being clean, which is
+ *  the moment the dust starts costing the workshop output. */
+export const HELPER_CLEAN_DUST_BAND = 'messy';
 
 // ---------------------------------------------------------------------------
 // Housekeeping
@@ -3388,13 +3417,69 @@ export interface ContractPieceSpec {
   /** What the client pays a piece, and what the material in it costs. */
   price: number;
   material: number;
+  /** What a piece takes off the rack, in sheets: the material in it over what a sheet is worth,
+   *  so a piece with 30 of material in it is 0.15 of a 200 sheet. A contract's material comes off
+   *  the rack like a job's and is never bought as money on the contract line (T17 2.22). Whole
+   *  sheets are drawn as the pieces add up, the way a job draws them as it goes. */
+  sheets: number;
+  /** The labour value in a piece, in pounds: what the workshop earns by making it, which is what
+   *  the workshop rate counts (CLAUDE.md T17 2.26). */
+  labour: number;
 }
 
-/** The pieces a contract can be for. One tonight [TUNE]: cut sheet packs for a shop, cutting
- *  only, 45 minutes, sold at 38 with 30 of material in it (CLAUDE.md T13 3.16). */
+/** The pieces a contract can be for. `minutes` is owner minutes a piece, `price` what the client
+ *  pays for one, `material` the money in its sheets, `sheets` what it takes off the rack, and
+ *  `labour` the labour value the workshop earns by making it (CLAUDE.md T13 3.16, T17 2.22, 2.26).
+ *
+ *  Three kinds, so the board offers work of different lengths and the player chooses (PIOTR,
+ *  17.09: "a piece may be an hour at 8 profit or three days at 40"; CLAUDE.md T17 2.22). The cut
+ *  sheet pack is Turn 13's own [TUNE]: cutting only, 45 minutes, sold at 38 with 30 of material in
+ *  it, which is 8 of labour and 0.15 of a sheet. The drawer box is the hour at 8 [TUNE: 34 a piece
+ *  with 26 of material], and the wardrobe front the three days at 40 [TUNE: 260 a piece with 220
+ *  of material]. `labour` is the margin the piece carries, which is what the workshop earns by
+ *  making it: repeat work is thin, and the workshop rate says so. */
 export const CONTRACT_PIECES: readonly ContractPieceSpec[] = [
-  { id: 'cutSheetPack', name: 'Cut sheet pack', stages: ['cutting'], minutes: 45, price: 38, material: 30 },
+  {
+    id: 'cutSheetPack',
+    name: 'Cut sheet pack',
+    stages: ['cutting'],
+    minutes: 45,
+    price: 38,
+    material: 30,
+    sheets: 0.15,
+    labour: 8,
+  },
+  {
+    id: 'drawerBox',
+    name: 'Drawer box',
+    stages: ['cutting', 'assembly'],
+    minutes: 60,
+    price: 34,
+    material: 26,
+    sheets: 0.13,
+    labour: 8,
+  },
+  {
+    id: 'wardrobeFront',
+    name: 'Wardrobe front',
+    stages: ['cutting', 'finishing'],
+    minutes: 3 * MINUTES_PER_WORKING_DAY,
+    price: 260,
+    material: 220,
+    sheets: 1.1,
+    labour: 40,
+  },
 ];
+
+/** The owner minutes one piece of the quantity band stands for: the band of Turn 13 is 20 to 40
+ *  cut sheet packs a week, which is the week's work the client is asking for. A longer piece is
+ *  asked for in proportion, so a contract for three day pieces wants one a week and not thirty
+ *  (CLAUDE.md T17 2.22). */
+export const CONTRACT_QUANTITY_MINUTES = 45;
+
+/** A contract may be ended by the player once it has run this long, and it costs nothing but the
+ *  work he will not now do [TUNE: one month, as Piotr said] (CLAUDE.md T17 2.22). */
+export const CONTRACT_FREE_END_DAYS = DAYS_PER_MONTH;
 /** Contracts arrive from this reputation tier up [TUNE: the second tier, reputation 0], one on
  *  the board at a time, and an offer stands for this many days [TUNE]. */
 export const CONTRACT_MIN_TIER = 1;
@@ -3460,6 +3545,8 @@ export const EFFICIENCY_CAUSES: ReadonlyArray<{ id: LostMinuteCause; label: stri
 /** The first use bubbles, one sentence each, keyed by the screen they open on [TUNE wording]
  *  (CLAUDE.md T13 3.22). Dismissed by a click, remembered in the save. */
 export const TIPS: Record<string, string> = {
+  hallCamera:
+    'The wheel zooms the hall and dragging the floor moves it. Fit puts the whole workshop back in the view.',
   unconnected:
     'A red ring is a machine with no pipe to the extraction. Open its card to connect it, or hire a production manager and it is done for you.',
   catalogue:

@@ -1,7 +1,7 @@
 // Where things stand on the hall floor. Pure geometry over the state, so the setup view can ask
 // before it drops and the catalogue can ask before it buys (CLAUDE.md T2 3.10).
 
-import { GATE_LANE, M2_PER_PERSON, ROOM_LAYOUT } from './constants';
+import { GATE_LANE, M2_PER_PERSON, ROOM_LAYOUT, WELFARE_IN_THE_CANTEEN } from './constants';
 import { findSpec, itemStandsInTheHall, standsInTheHall, zoneOf } from './machines';
 import { reservedItems } from './orders';
 import type { Equipment, GameState, OnOrderItem } from './types';
@@ -41,6 +41,10 @@ export function hallItems(state: GameState): Equipment[] {
   return state.equipment.filter((item) => {
     const spec = findSpec(item.specId);
     if (!spec || spec.category === 'furniture') return false;
+    // A seat and a locker stand inside the canteen, so they take no hall cell at all: nothing may
+    // bump into them and they eat none of the floor the crew is limited by
+    // (PIOTR, 17.09; CLAUDE.md T17 2.2).
+    if (WELFARE_IN_THE_CANTEEN.includes(item.specId)) return false;
     if (!itemStandsInTheHall(item)) return false;
     return item.anchorX < state.unit.widthCells;
   });
@@ -90,9 +94,11 @@ export function canPlaceSpec(
     return { ok: false, reason: 'Off the floor' };
   }
   for (const room of ROOM_LAYOUT) {
-    if (overlaps(box, { x: room.x, y: room.y, width: room.width, depth: room.depth })) {
-      return { ok: false, reason: `On the ${room.name.toLowerCase()}` };
-    }
+    if (!overlaps(box, { x: room.x, y: room.y, width: room.width, depth: room.depth })) continue;
+    // The welfare kit lives inside the canteen and nowhere else: a seat and a locker belong out of
+    // the dust, and they take no hall cell at all (PIOTR, 17.09; CLAUDE.md T17 2.2).
+    if (room.id === 'canteen' && WELFARE_IN_THE_CANTEEN.includes(specId)) continue;
+    return { ok: false, reason: `On the ${room.name.toLowerCase()}` };
   }
   if (overlaps(box, gateLane())) {
     return { ok: false, reason: 'Blocking the way to the gate' };
@@ -150,6 +156,11 @@ export function canPlace(
   if (!item) return { ok: false, reason: 'Nothing to move' };
   const spec = findSpec(item.specId);
   if (spec?.category === 'furniture') return { ok: false, reason: 'It lives in the office' };
+  // The welfare kit is placed by count, inside the canteen: there is no hall cell to drag it to
+  // (CLAUDE.md T17 2.2).
+  if (WELFARE_IN_THE_CANTEEN.includes(item.specId)) {
+    return { ok: false, reason: 'It stands in the canteen' };
+  }
   if (item.anchorX >= state.unit.widthCells) return { ok: false, reason: 'It stands in the yard' };
   return canPlaceSpec(state, item.specId, x, y, item.id, item.variantId, rotated ?? item.rotated);
 }

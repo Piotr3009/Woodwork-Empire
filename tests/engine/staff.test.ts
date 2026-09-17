@@ -337,6 +337,8 @@ describe('the office working day', () => {
       absentDaysRemaining: 0,
       shift: 'day',
       dayLog: [],
+      monthMinutes: 0,
+      monthDaysOff: 0,
       anchorX: 1,
       anchorY: 1,
     };

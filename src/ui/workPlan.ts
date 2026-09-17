@@ -4,6 +4,9 @@
 
 import { workPlan } from '../engine/index';
 import type { GameState, Job, PlanRow, WorkPlan } from '../engine/index';
+// Straight off their own module, not round the public API, which Turn 13 froze (REPORT-T13 10).
+import { canTakeOver, ownerTookOver } from '../engine/jobs';
+import { joiners, onTheBooksToday } from '../engine/staff';
 import { renderContractBar } from './contracts';
 import {
   callsLine,
@@ -13,7 +16,7 @@ import {
   jobLifecycleRow,
   materialLine,
 } from './jobCard';
-import { emptyLine, escapeHtml, money } from './modal';
+import { button, emptyLine, escapeHtml, money } from './modal';
 
 /** Where a point of the axis sits across it, as a percentage. One axis for every row, so the blue
  *  line is the same line on all of them. The axis is in working days: Monday comes straight after
@@ -33,6 +36,44 @@ function minutesText(row: PlanRow): string {
   return `${done.toLocaleString('en-GB')} of ${total.toLocaleString('en-GB')} min · ${row.stage}`;
 }
 
+/** The second man on a job: a click on the row and two men stand at it, each booking his own
+ *  minutes into it (PIOTR, 16.09; CLAUDE.md T17 2.10). The first man is not on the chips, and
+ *  Alone takes the second off again. A job nobody is on is assigned, not seconded. */
+function secondManControls(state: GameState, job: Job): string {
+  if (job.assignedTo === null) return '';
+  if (job.stage !== 'ready' && job.stage !== 'inProduction') return '';
+  // The owner on it for the evening is the takeover of 2.12 and not a second man to choose.
+  if (ownerTookOver(job)) return '';
+  const chip = (workerId: string, label: string): string =>
+    `<button class="chip${(job.secondAssignee ?? '') === workerId ? ' is-on' : ''}" ` +
+    `data-do="assignSecond" data-id="${job.id}" data-worker="${workerId}">` +
+    `${escapeHtml(label)}</button>`;
+  const crew = joiners(state)
+    .filter((worker) => onTheBooksToday(state, worker) && worker.id !== job.assignedTo)
+    .map((worker) => chip(worker.id, worker.name))
+    .join('');
+  if (crew === '') return '';
+  return (
+    '<span class="row-figure">Second man</span>' +
+    `<span class="row-action">${chip('', 'Alone')}${crew}</span>`
+  );
+}
+
+/** The evening: the owner takes a man's job on himself, by this click and never on his own. The
+ *  man has it back in the morning where the evening left it (PIOTR, 17.09; CLAUDE.md T17 2.12).
+ *  Nothing at all by day: the crew are in the hall and the job is theirs. */
+function takeOverControl(state: GameState, job: Job): string {
+  if (ownerTookOver(job)) {
+    return '<span class="row-figure">You are on it tonight; he has it back in the morning</span>';
+  }
+  if (!canTakeOver(state, job)) return '';
+  return (
+    '<span class="row-action">' +
+    button('takeOverJob', 'Take it on tonight', `data-id="${job.id}"`) +
+    '</span>'
+  );
+}
+
 /** Who is on it and what it is worth: the left hand column of the board. */
 function headHtml(state: GameState, job: Job, row: PlanRow, dropConfirm: string | null): string {
   const action = jobAction(state, job);
@@ -45,6 +86,8 @@ function headHtml(state: GameState, job: Job, row: PlanRow, dropConfirm: string 
     callsLine(job) +
     materialLine(state, job) +
     jobAssignControls(state, job) +
+    secondManControls(state, job) +
+    takeOverControl(state, job) +
     dropControl(job, dropConfirm) +
     (action === '' ? '' : `<span class="row-action">${action}</span>`) +
     '</div>'

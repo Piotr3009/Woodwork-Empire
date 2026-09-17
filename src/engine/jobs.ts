@@ -30,7 +30,7 @@ import {
 import { canAccept, drawOffer, findEnquiry, removeEnquiry } from './board';
 import { callRinging, scheduleCalls } from './calls';
 import { template } from './catalog';
-import { addWorkingDays, nextWorkingDay, workingDaysBetween } from './clock';
+import { addWorkingDays, isOvertime, nextWorkingDay, workingDaysBetween } from './clock';
 import { chargeUnavoidable, formatMoney, noteLoss, receive } from './economy';
 import { queueEvent } from './events';
 import {
@@ -83,9 +83,17 @@ export function findJob(state: GameState, jobId: string): Job | null {
   return state.jobs.find((job) => job.id === jobId) ?? null;
 }
 
-/** The job the owner is standing at. One source of truth: the job's own assignment. */
+/** The job this man is standing at, whether he is the first man on it or the second: two men can
+ *  be on one job now, and the owner is the second man on the one he takes on for an evening
+ *  (CLAUDE.md T17 2.10, 2.12). The one finder for it. */
+export function jobHeldBy(state: GameState, who: string): Job | null {
+  const job =
+    state.jobs.find((entry) => entry.assignedTo === who || entry.secondAssignee === who) ?? null;
+  return job !== null && job.stage === 'inProduction' ? job : null;
+}
+
 export function ownerJob(state: GameState): Job | null {
-  return state.jobs.find((job) => job.assignedTo === 'owner' && job.stage === 'inProduction') ?? null;
+  return jobHeldBy(state, OWNER);
 }
 
 export function openJobs(state: GameState): Job[] {
@@ -177,18 +185,46 @@ export function workerMinuteCost(weeklyWage: number): number {
   return weeklyWage / WORKER_MINUTE_RATE_DIVISOR;
 }
 
-/** What the rest of a job costs in wages if the man on it finishes it, for the job card only
- *  (CLAUDE.md 8.5). The owner costs nothing: his time is not a wage. */
-export function jobLabourCost(state: GameState, job: Job): { minutes: number; cost: number } {
-  const worker =
-    job.assignedTo === null || job.assignedTo === 'owner'
-      ? null
-      : state.workers.find((entry) => entry.id === job.assignedTo);
-  if (!worker || worker.rate <= 0) {
-    return { minutes: minutesRemainingFor(state, job, 1), cost: 0 };
+/** The men standing at this job: the one it is assigned to and the second one beside him, in that
+ *  order (CLAUDE.md T17 2.10). The one list: the rate, the cost and the names all read it. */
+export function jobMen(job: Job): string[] {
+  const men: string[] = [];
+  if (job.assignedTo !== null) men.push(job.assignedTo);
+  if (job.secondAssignee !== null && job.secondAssignee !== job.assignedTo) {
+    men.push(job.secondAssignee);
   }
-  const minutes = minutesRemainingFor(state, job, worker.rate);
-  return { minutes, cost: minutes * workerMinuteCost(worker.weeklyWage) };
+  return men;
+}
+
+/** What the job goes forward at with the men on it: the owner at his own speed and every joiner at
+ *  his, added up, because the two of them stand at it in the same minute (CLAUDE.md T17 2.10).
+ *  Zero when nobody is on it, which is the board's cue to draw it at the workshop average. */
+export function jobRate(state: GameState, job: Job): number {
+  let rate = 0;
+  for (const who of jobMen(job)) {
+    if (who === OWNER) {
+      rate += 1;
+      continue;
+    }
+    const worker = state.workers.find((entry) => entry.id === who);
+    if (worker && worker.rate > 0) rate += worker.rate;
+  }
+  return Math.round(rate * 10000) / 10000;
+}
+
+/** What the rest of a job costs in wages if the men on it finish it, for the job card only
+ *  (CLAUDE.md 8.5). The owner costs nothing: his time is not a wage. Two men take half the
+ *  minutes and cost both their rates for every one of them (CLAUDE.md T17 2.10). */
+export function jobLabourCost(state: GameState, job: Job): { minutes: number; cost: number } {
+  const rate = jobRate(state, job);
+  if (rate <= 0) return { minutes: minutesRemainingFor(state, job, 1), cost: 0 };
+  const minutes = minutesRemainingFor(state, job, rate);
+  let perMinute = 0;
+  for (const who of jobMen(job)) {
+    const worker = state.workers.find((entry) => entry.id === who);
+    if (worker && worker.rate > 0) perMinute += workerMinuteCost(worker.weeklyWage);
+  }
+  return { minutes, cost: minutes * perMinute };
 }
 
 /** How far through the job the bench is, 0 to 1. */
@@ -340,6 +376,7 @@ export function takeEnquiry(state: GameState, enquiryId: string, byHand: boolean
     callsMissed: 0,
     designMinutesRemaining: designMinutes(entry, enquiry.sizeMultiplier, state.software.tier),
     assignedTo: null,
+    secondAssignee: null,
     stageRuns: [],
     completedDay: null,
     daysLate: 0,
@@ -775,13 +812,93 @@ export function assignJob(state: GameState, jobId: string, workerId: string | nu
   return true;
 }
 
+/** The second man on a job, put on it or taken off it. Both book minutes into it, each at his own
+ *  rate, at the stage's station: one of them at the machine and the other at the waiting cell
+ *  until his turn, and both at the bench, the second in the bench's second place
+ *  (PIOTR, 16.09; CLAUDE.md T17 2.10). */
+export function assignSecond(state: GameState, jobId: string, workerId: string | null): boolean {
+  const job = findJob(state, jobId);
+  if (!job) return false;
+  if (job.stage !== 'ready' && job.stage !== 'inProduction') return false;
+  if (workerId === null) {
+    // He goes back to the list, and off the job he was standing at.
+    const second = job.secondAssignee;
+    if (second !== null) {
+      const man = state.workers.find((entry) => entry.id === second);
+      if (man && man.jobId === job.id) man.jobId = null;
+      releaseMachines(state, second);
+    }
+    job.secondAssignee = null;
+    return true;
+  }
+  // The second man is second to somebody: a job with nobody on it is assigned, not seconded.
+  if (job.assignedTo === null) return false;
+  if (workerId === job.assignedTo) return false;
+  const worker = state.workers.find((entry) => entry.id === workerId) ?? null;
+  if (!worker || worker.role !== 'joiner' || worker.absentDaysRemaining > 0) return false;
+  // Nobody is on two jobs at once: he comes off whatever he was on, first man or second.
+  for (const other of state.jobs) {
+    if (other.id === job.id) continue;
+    if (other.assignedTo === workerId) releaseJob(state, other);
+    if (other.secondAssignee === workerId) other.secondAssignee = null;
+  }
+  worker.jobId = job.id;
+  job.secondAssignee = workerId;
+  if (job.assignedTo !== null) job.stage = 'inProduction';
+  return true;
+}
+
+/** The owner takes a worker's job on for the evening, by a click and never on his own. He stands
+ *  at it as the second man, so the job keeps the man it is assigned to and that man carries on
+ *  with it in the morning: what the owner does tonight comes off the labour that is left
+ *  (PIOTR, 17.09; CLAUDE.md T17 2.12). The evening only: by day a job is assigned to a man, or
+ *  given a second one. */
+export function canTakeOver(state: GameState, job: Job): boolean {
+  if (job.stage !== 'ready' && job.stage !== 'inProduction') return false;
+  if (!ownerIsAvailable(state)) return false;
+  // The evening only, and only somebody else's job: his own he is already on.
+  if (!isOvertime(state.clock.minute)) return false;
+  return job.assignedTo !== null && job.assignedTo !== OWNER && job.secondAssignee !== OWNER;
+}
+
+export function takeOverJob(state: GameState, jobId: string): boolean {
+  const job = findJob(state, jobId);
+  if (!job || !canTakeOver(state, job)) return false;
+  // He cannot be at the desk and at the bench in the same minute.
+  state.owner.currentTaskId = null;
+  // Nor at two benches: a job of his own goes back on the list, as it does when a man is given it.
+  const held = jobHeldBy(state, OWNER);
+  if (held !== null && held.id !== job.id) releaseJob(state, held);
+  job.secondAssignee = OWNER;
+  job.stage = 'inProduction';
+  return true;
+}
+
+/** The evening is over: every job the owner took on for it goes back to the man it belongs to,
+ *  who picks it up in the morning where the evening left it (CLAUDE.md T17 2.12). */
+export function endOwnerTakeOver(state: GameState): void {
+  for (const job of state.jobs) {
+    if (job.secondAssignee === OWNER) job.secondAssignee = null;
+  }
+}
+
+/** True while the owner is standing at a job that is somebody else's: the row says "You are on
+ *  it tonight" rather than offering the takeover again (CLAUDE.md T17 2.12). */
+export function ownerTookOver(job: Job): boolean {
+  return job.secondAssignee === OWNER && job.assignedTo !== null && job.assignedTo !== OWNER;
+}
+
 /** Takes whoever is on the job off it, leaving the work done in place. He walks away from every
  *  machine he was standing at, so the next man can have it (CLAUDE.md T7 3.1). */
 export function releaseJob(state: GameState, job: Job): void {
-  const worker = state.workers.find((entry) => entry.jobId === job.id);
-  if (worker) worker.jobId = null;
+  // Both men come off it: a job can have a second (CLAUDE.md T17 2.10).
+  for (const worker of state.workers) {
+    if (worker.jobId === job.id) worker.jobId = null;
+  }
   if (job.assignedTo !== null) releaseMachines(state, job.assignedTo);
+  if (job.secondAssignee !== null) releaseMachines(state, job.secondAssignee);
   job.assignedTo = null;
+  job.secondAssignee = null;
   closeStageRun(state, job);
   if (job.stage === 'inProduction') job.stage = 'ready';
 }
@@ -810,6 +927,17 @@ export function closeStageRun(state: GameState, job: Job): void {
   open.endMinute = state.clock.minute;
 }
 
+/** What an express job pays over its base price, earned with the labour that earns it: the whole
+ *  uplift over the whole job, so a minute of an express job earns its share of the premium. The
+ *  workshop rate counts it; the job, the deadline, the penalty and the rating are untouched
+ *  (CLAUDE.md T17 2.26 and 6). */
+function expressUpliftOn(job: Job, put: number): number {
+  if (!job.express || job.labourValue <= 0) return 0;
+  const uplift = job.price - job.basePrice;
+  if (uplift <= 0) return 0;
+  return (uplift * put) / job.labourValue;
+}
+
 /** Work one person minute of labour into a job. What actually went in is booked against the day
  *  here, so the earned labour rate counts what was produced and not what was offered: the last
  *  minute of a job is usually a part minute (CLAUDE.md T6 3.8). The stage it went into is written
@@ -821,6 +949,10 @@ export function addLabour(state: GameState, job: Job, labour: number, stage: Sta
   job.labourRemaining -= labour;
   state.dayStats.workMinutes += 1;
   state.dayStats.labourValue = Math.round((state.dayStats.labourValue + put) * 10000) / 10000;
+  const uplift = expressUpliftOn(job, put);
+  if (uplift > 0) {
+    state.dayStats.expressUplift = Math.round((state.dayStats.expressUplift + uplift) * 10000) / 10000;
+  }
   if (!state.dayStats.jobsAdvanced.includes(job.id)) state.dayStats.jobsAdvanced.push(job.id);
   if (job.labourRemaining > WORK_EPSILON) return false;
   job.labourRemaining = 0;
@@ -891,7 +1023,9 @@ export function deliverJob(state: GameState, job: Job): void {
   // Late by the days the workshop was open: a weekend is not a day anybody was late on
   // (PIOTR; CLAUDE.md T10 3.5).
   job.daysLate = Math.max(0, workingDaysBetween(job.dueDay, state.clock.day));
-  job.emailsUnanswered = emailsOutstanding(state, job);
+  // The ones still open at delivery, on top of the ones that died at dusk on the days between
+  // (CLAUDE.md T17 2.15): the count is added to, never overwritten.
+  job.emailsUnanswered += emailsOutstanding(state, job);
   const rate = job.express ? LATE_PENALTY_PER_DAY_EXPRESS : LATE_PENALTY_PER_DAY;
   const balanceDue = Math.round(job.price * (1 - DEPOSIT_FRACTION) * 100) / 100;
   const late = Math.round(job.daysLate * rate * job.price * 100) / 100;

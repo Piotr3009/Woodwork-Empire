@@ -18,7 +18,12 @@ import {
   staffManagementMinutes,
 } from '../engine/index';
 import type { GameState, HiringOption, Worker, WorkerRole } from '../engine/index';
-import { DAY_CATEGORY_LABELS, HOUSE_TIER_NAMES, OWNER_DRAW_TIERS } from '../engine/constants';
+import {
+  DAY_CATEGORY_LABELS,
+  HOUSE_TIER_NAMES,
+  OWNER_DRAW_TIERS,
+  WORKING_DAYS_PER_MONTH,
+} from '../engine/constants';
 import {
   HOLIDAY_OPTIONS_DAYS,
   holidayCheck,
@@ -30,6 +35,9 @@ import {
   shiftOf,
   staffManagementTaker,
 } from '../engine/index';
+// Straight off its own module, not round the public API, which Turn 13 froze (REPORT-T13 10).
+import { monthlyPay } from '../engine/staff';
+import { ownerDayLine } from './topbar';
 import {
   button,
   emptyLine,
@@ -43,10 +51,14 @@ import {
   tripLine,
 } from './modal';
 
-/** The four tabs, in the order Piotr named them, the Technical one joining in Turn 13. */
-export type TeamTab = 'workshop' | 'office' | 'technical' | 'management';
+/** The tabs, in the order Piotr named them, the Technical one joining in Turn 13 and Our team,
+ *  which is the whole roll call and hires nobody, leading them from tonight (CLAUDE.md T17 2.9). */
+export type TeamTab = 'ourTeam' | 'workshop' | 'office' | 'technical' | 'management';
 
 const TABS: Array<[TeamTab, string]> = [
+  // Everybody on the books, the owner first: who they are, what they cost and what they are on
+  // this minute (PIOTR, 16.09; CLAUDE.md T17 2.9).
+  ['ourTeam', 'Our team'],
   ['workshop', 'Workshop'],
   ['office', 'Office'],
   // The estimator's tab: in this game the price arrives with the enquiry and this person only
@@ -72,8 +84,9 @@ const ROLE_WORDS: Record<WorkerRole, string> = {
   productionManager: 'production manager',
 };
 
-/** Which trade a role belongs to. The one table: the tabs and the tiles read it, and a role that
- *  is not on it is not hired from this board at all. */
+/** Which trade a role belongs to. The one table: the hiring tabs and the tiles read it, and a role
+ *  that is not on it is not hired from this board at all. Our team is not on it and must not be:
+ *  it hires nobody and every role would vanish from its trade (CLAUDE.md T17 2.9). */
 const TRADE_OF_ROLE: Record<WorkerRole, TeamTab> = {
   joiner: 'workshop',
   helper: 'workshop',
@@ -181,39 +194,35 @@ function dayMeterLine(worker: Worker): string {
   return `<span class="row-figure crew-day">Today: ${escapeHtml(text)}</span>`;
 }
 
+/** What this man is doing this minute, in the words the board says it in. The one answer: the
+ *  crew row and the Our team row both print it (CLAUDE.md T17 2.9). */
+export function workerDoing(state: GameState, worker: Worker): string {
+  const job = worker.jobId === null ? null : state.jobs.find((entry) => entry.id === worker.jobId);
+  const night = shiftOf(state, worker) === 'night';
+  if (worker.absentDaysRemaining > 0) {
+    return `off for ${plural(worker.absentDaysRemaining, 'more day', 'more days')}`;
+  }
+  if (worker.startDay > state.clock.day) return `starts day ${worker.startDay}`;
+  if (worker.taskId !== null) return 'on a job of work';
+  if (job) return `${night ? 'tonight on' : 'on'} ${job.name}`;
+  return night ? 'on the night shift, nothing to do yet' : 'free';
+}
+
 /** The crew of one trade, as a row each: who he is, what he is doing and what he costs. */
 function crewRows(state: GameState, tab: TeamTab): string {
   const rows = state.workers
     .filter((worker) => tradeOf(worker.role) === tab)
     .map((worker) => {
-      const job =
-        worker.jobId === null ? null : state.jobs.find((entry) => entry.id === worker.jobId);
-      const night = shiftOf(state, worker) === 'night';
-      const doing =
-        worker.absentDaysRemaining > 0
-          ? `off for ${plural(worker.absentDaysRemaining, 'more day', 'more days')}`
-          : worker.startDay > state.clock.day
-            ? `starts day ${worker.startDay}`
-            : worker.taskId !== null
-              ? 'on a job of work'
-              : job
-                ? `${night ? 'tonight on' : 'on'} ${job.name}`
-                : night
-                  ? 'on the night shift, nothing to do yet'
-                  : 'free';
+      const doing = workerDoing(state, worker);
       const wage =
         worker.weeklyWage > 0
           ? `${money(worker.weeklyWage)} a week`
           : `${money(worker.monthlyWage)} a month`;
-      const tired = worker.tiredOfOvertime
-        ? '<span class="row-figure warn">Tired of overtime</span>'
-        : '';
       return (
         `<div class="row" data-crew="${worker.id}" data-shift="${shiftOf(state, worker)}">` +
         `<span class="row-main">${escapeHtml(worker.name)}, ${escapeHtml(ROLE_WORDS[worker.role])}` +
         `${worker.tier === null ? '' : ` (${worker.tier})`}</span>` +
         `<span class="row-figure">${escapeHtml(doing)}</span>` +
-        tired +
         dayMeterLine(worker) +
         `<span class="row-figure">${escapeHtml(wage)}</span>` +
         shiftChips(state, worker) +
@@ -222,6 +231,82 @@ function crewRows(state: GameState, tab: TeamTab): string {
     })
     .join('');
   return rows;
+}
+
+/** The owner has been here since the company's first day: nobody took him on (CLAUDE.md T17 2.9). */
+const OWNER_START_DAY = 1;
+
+/** Hours, to a tenth, the way a month of a man's time reads on the page. */
+function hoursText(minutesWorked: number): string {
+  return `${Math.round(minutesWorked / 6) / 10} h`;
+}
+
+/** When he started and how long ago that is, in the days the player counts everything else in. */
+function startedText(state: GameState, startDay: number): string {
+  const since = state.clock.day - startDay;
+  const ago =
+    since > 0
+      ? `${plural(since, 'day', 'days')} ago`
+      : since === 0
+        ? 'today'
+        : `in ${plural(-since, 'day', 'days')}`;
+  return `started day ${startDay}, ${ago}`;
+}
+
+/** One row of Our team: who he is, when he started, what he costs a month, the hours he has put
+ *  in this month, the days he has had off and what he is on this minute (CLAUDE.md T17 2.9). */
+function teamRow(
+  id: string,
+  name: string,
+  role: string,
+  when: string,
+  pay: number,
+  minutesWorked: number,
+  daysOff: number,
+  doing: string,
+): string {
+  return (
+    `<div class="row" data-team="${id}">` +
+    `<span class="row-main">${escapeHtml(name)}, ${escapeHtml(role)}</span>` +
+    `<span class="row-figure team-when">${escapeHtml(when)}</span>` +
+    `<span class="row-figure">${money(pay)} a month</span>` +
+    `<span class="row-figure">${hoursText(minutesWorked)} this month</span>` +
+    `<span class="row-figure">${plural(daysOff, 'day off', 'days off')}</span>` +
+    `<span class="row-figure">${escapeHtml(doing)}</span>` +
+    '</div>'
+  );
+}
+
+/** Everybody on the books, one row each, the owner first: the roll call Piotr asked for, with no
+ *  hiring on it at all (PIOTR, 16.09; CLAUDE.md T17 2.9). The owner has no wage, so his month is
+ *  the draw he pays himself on every working day of it. */
+function ourTeamRows(state: GameState): string {
+  const owner = state.owner;
+  const rows = [
+    teamRow(
+      'owner',
+      state.playerName,
+      'owner',
+      startedText(state, OWNER_START_DAY),
+      ownerDrawPerDay(state) * WORKING_DAYS_PER_MONTH,
+      owner.monthMinutes,
+      owner.monthDaysOff,
+      ownerDayLine(state),
+    ),
+    ...state.workers.map((worker) =>
+      teamRow(
+        worker.id,
+        worker.name,
+        `${ROLE_WORDS[worker.role]}${worker.tier === null ? '' : `, ${worker.tier}`}`,
+        startedText(state, worker.startDay),
+        monthlyPay(worker),
+        worker.monthMinutes,
+        worker.monthDaysOff,
+        workerDoing(state, worker),
+      ),
+    ),
+  ];
+  return rows.join('');
 }
 
 /** The floor's verdict on the crew, on the two tabs that hire onto it (CLAUDE.md T13 3.10). */
@@ -350,6 +435,15 @@ function joineryCoreLines(state: GameState): string {
 }
 
 function tabBody(state: GameState, tab: TeamTab): string {
+  // The roll call, and nobody is hired from it (CLAUDE.md T17 2.9).
+  if (tab === 'ourTeam') {
+    return (
+      '<h3>Our team</h3>' +
+      '<p class="hint">Everybody on the books, the owner first. The hours and the days off are ' +
+      'this month\u0027s.</p>' +
+      ourTeamRows(state)
+    );
+  }
   const options = hiringOptions(state).filter((option) => tradeOf(option.role) === tab);
   const crew = crewRows(state, tab);
   const heading =

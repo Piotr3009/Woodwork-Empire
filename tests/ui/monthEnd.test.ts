@@ -6,6 +6,11 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { MONTH_LINES, MONTH_LINE_OF, monthReport } from '../../src/engine/economy';
+import { monthEfficiency } from '../../src/engine/efficiency';
+import { machineSavings } from '../../src/engine/machines';
+import { monthRate, weekRate } from '../../src/engine/rate';
+import { daySummaryOf } from '../../src/engine/index';
+import { renderCompany } from '../../src/ui/company';
 import { renderMonthEnd, renderMonthReport } from '../../src/ui/monthEnd';
 import type { GameEvent, GameState } from '../../src/engine/index';
 import { buyStartingKit, eventsOfKind, newGame, runToDay } from '../helpers';
@@ -118,5 +123,85 @@ describe('a played month', () => {
     expect(figures[0]?.textContent).toBe('+£1,200');
     expect(figures[0]?.className).toContain('good');
     expect(page.querySelector('.month-end .warn')?.textContent).toContain('£350');
+  });
+});
+
+describe('the workshop rate and Total efficiency (CLAUDE.md T17 2.25, 2.26)', () => {
+  const played = runToDay(buyStartingKit(newGame({ difficulty: 'veryEasy' })), 62);
+  const state: GameState = played.state;
+
+  it('puts the month’s rate first, and prints the same function’s number as the Company board', () => {
+    const event = monthEndEvent(played.events, 1);
+    const page = parse(renderMonthEnd(state, event));
+    const rate = monthRate(state, 1);
+    expect(rate.days).toBeGreaterThan(15);
+    expect(page.querySelector('.rate-big')?.textContent).toBe(`Workshop earned £${Math.round(rate.rate)} an hour`);
+    // First: the figure stands above the event's own sentence and the money table.
+    expect(page.firstElementChild?.className).toBe('rate-figure');
+  });
+
+  it('prints the same function’s number as the Company board, over the same days', () => {
+    // A workshop whose whole history is one working week: the board's rolling five days and the
+    // month's days are then the same days, so the two figures must read the same pound
+    // (CLAUDE.md T17 2.26, cross check of section 7).
+    const week = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
+    const blank = daySummaryOf(newGame());
+    week.days = [1, 2, 3, 4, 5].map((day) => ({ ...blank, day, labourValue: 250, paidHours: 8 }));
+    week.clock.day = 8;
+    expect(weekRate(week).rate).toBe(monthRate(week, 1).rate);
+    const board = parse(renderCompany(week)).querySelector('.rate-big')?.textContent ?? '';
+    const event: GameEvent = {
+      id: 'ev-1',
+      kind: 'monthEnd',
+      title: 'Month 1',
+      body: 'The month is over.',
+      choices: [{ id: 'ok', label: 'Right' }],
+      data: { month: 1 },
+      day: 8,
+      minute: 0,
+    };
+    const folder = parse(renderMonthEnd(week, event)).querySelector('.rate-big')?.textContent ?? '';
+    expect(board).toBe('Workshop earns £31 an hour');
+    expect(folder).toBe('Workshop earned £31 an hour');
+    expect(board.replace('earns', 'earned')).toBe(folder);
+  });
+
+  it('adds up the month’s machines, people, hall and waiting under the money', () => {
+    const event = monthEndEvent(played.events, 1);
+    const page = parse(renderMonthEnd(state, event));
+    const section = page.querySelector('.month-efficiency');
+    expect(section?.querySelector('h3')?.textContent).toBe('Total efficiency');
+    const rows = Array.from(section?.querySelectorAll('[data-efficiency]') ?? []);
+    expect(rows.map((row) => row.getAttribute('data-efficiency'))).toEqual([
+      'machines',
+      'people',
+      'hall',
+      'waiting',
+      'total',
+    ]);
+    const month = monthEfficiency(state, 1);
+    const machines = machineSavings(state, 'month');
+    expect(rows[0]?.querySelector('.row-figure')?.textContent).toBe(
+      `ran ${machines.hours} h, saved ${machines.hoursSaved} h`,
+    );
+    expect(rows[1]?.querySelector('.row-figure')?.textContent).toBe(
+      `${month.workedHours} h of real work out of ${month.paidHours} h paid for`,
+    );
+    expect(rows[2]?.querySelector('.row-figure')?.textContent).toBe(month.hallFactor.toFixed(2));
+    expect(rows[3]?.querySelector('.row-figure')?.textContent).toBe(
+      `${Math.round(month.waitingMinutes)} minutes lost`,
+    );
+    // The one line the brief asks for, in its own words.
+    expect(rows[4]?.querySelector('.row-main')?.textContent).toBe('Total efficiency');
+    expect(rows[4]?.querySelector('.row-figure')?.textContent).toBe(
+      `${month.percent}% = real work over paid hours`,
+    );
+    // Real work over paid hours, and nothing else: the month's own hours, not the day's seats.
+    expect(month.percent).toBe(Math.round((month.workedHours / month.paidHours) * 100));
+    expect(month.paidHours).toBe(monthRate(state, 1).paidHours);
+    // The section comes after the money, and the money table is untouched.
+    const blocks = Array.from(page.children).map((node) => node.className);
+    expect(blocks.indexOf('month-efficiency')).toBe(blocks.length - 1);
+    expect(page.querySelector('.month-end')).not.toBeNull();
   });
 });

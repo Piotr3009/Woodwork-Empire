@@ -225,6 +225,11 @@ export interface Equipment {
   enduranceHours: number;
   /** Hours of use it has had. Past its endurance it starts giving up. */
   hoursUsed: number;
+  /** The hours it actually ran this week and this month, so the Machines column of the Company
+   *  board and the month end can say what it saved. `hoursUsed` is the machine's whole life and
+   *  cannot answer either (CLAUDE.md T17 2.24, 2.25). Both start again on their own boundary. */
+  hoursThisWeek: number;
+  hoursThisMonth: number;
   /** The one man standing at it: 'owner', a worker id, or null while it is free. A machine serves
    *  one person at a time (CLAUDE.md T7 3.1). */
   takenBy: string | null;
@@ -321,6 +326,10 @@ export interface OwnerState {
   /** Today's day, in the order it happened: one segment per run of minutes on the same thing.
    *  Emptied every morning (CLAUDE.md T11 3.1). */
   dayLog: DayLogEntry[];
+  /** Minutes he has worked since the 1st, and working days he was not in, so the owner's row on
+   *  Our team reads the same two figures as everybody else's (CLAUDE.md T17 2.9). */
+  monthMinutes: number;
+  monthDaysOff: number;
 }
 
 export interface UnitState {
@@ -372,6 +381,10 @@ export interface Worker {
   /** His own day, in the order it happened, for a man who has a day meter of his own: the
    *  production manager's shows the assigning the owner no longer does (CLAUDE.md T13 3.9). */
   dayLog: DayLogEntry[];
+  /** Minutes he has actually worked since the 1st, and working days he was not in: the two
+   *  figures the Our team page reads. Both start again on the 1st (CLAUDE.md T17 2.9). */
+  monthMinutes: number;
+  monthDaysOff: number;
 }
 
 export interface HiringOption {
@@ -493,6 +506,10 @@ export interface Job {
   callsMissed: number;
   designMinutesRemaining: number;
   assignedTo: string | null;
+  /** The second man on the job. Both book minutes into it, each at his own rate: the machine
+   *  stage takes one of them at the machine and the other at the waiting cell, the bench stage
+   *  takes both at the bench (CLAUDE.md T17 2.10). Null while one man has it to himself. */
+  secondAssignee: string | null;
   /** What was worked when, one entry per run at a stage, for the Work Plan (CLAUDE.md T7 3.2). */
   stageRuns: StageRun[];
   completedDay: number | null;
@@ -844,6 +861,11 @@ export interface Contract {
   pieceMinutes: number;
   weeks: ContractWeek[];
   /** Totals for the closing report. */
+  /** Sheets held on the rack for this contract and not yet cut, and the whole sheets it has taken
+   *  off it. A contract's material comes off the rack like a job's and is never bought as money on
+   *  the contract line (PIOTR, 17.09; CLAUDE.md T17 2.22). */
+  sheetsReserved: number;
+  sheetsUsed: number;
   piecesMade: number;
   revenue: number;
   materialCost: number;
@@ -917,6 +939,11 @@ export interface SoftwareState {
    *  more per extension, at most two (CLAUDE.md T13 3.8). */
   joineryCore: boolean;
   joineryCoreExtensions: number;
+  /** The month the subscription starts running: the month after the one it was bought in, because
+   *  the first month is paid at the click. Null while it is not owned (CLAUDE.md T17 2.21). */
+  joineryCoreFromMonth: number | null;
+  /** The same for every extension, one entry each, in the order they were bought. */
+  joineryCoreExtensionMonths: number[];
 }
 
 /** What the end of day summary says, kept per day so the Days tab can open a past one and get
@@ -953,6 +980,15 @@ export interface DaySummary {
   efficiency: EfficiencyStats;
   /** Minutes of production the second shift put in after the day (CLAUDE.md T13 3.9). */
   nightMinutes: number;
+  /** Hours the company paid for that day, worked or not: the bottom of the workshop rate, kept
+   *  on the day so a week of it survives a save (CLAUDE.md T17 2.26). */
+  paidHours: number;
+  /** The express uplift earned with that day's labour: the top of the workshop rate counts it
+   *  beside the labour value (CLAUDE.md T17 2.26). */
+  expressUplift: number;
+  /** What the hall multiplied the day's work by when it closed: dust, the gate, the extraction and
+   *  who was in. The month end reads the average of these (CLAUDE.md T17 2.25). */
+  hallFactor: number;
 }
 
 export interface DayStats {
@@ -973,6 +1009,15 @@ export interface DayStats {
   efficiency: EfficiencyStats;
   /** Minutes of production the second shift put in after the day (CLAUDE.md T13 3.9). */
   nightMinutes: number;
+  /** Hours the company paid for today whether they were worked or not: eight for every man on
+   *  the books and eight for the owner on a working day, plus the overtime the owner actually
+   *  stayed for. The bottom of the workshop rate (CLAUDE.md T17 2.26). */
+  paidHours: number;
+  /** What the express jobs worked on today paid over their base price, earned minute by minute
+   *  with the labour that earns it. The same hours on an express job earn the client's premium,
+   *  so the workshop rate counts it on top of the labour value; nothing else reads it and express
+   *  itself is untouched (CLAUDE.md T17 2.26). */
+  expressUplift: number;
 }
 
 /** One line of the reputation log: the day, what happened, and what it was worth. The company
@@ -1018,6 +1063,10 @@ export interface GameState {
   software: SoftwareState;
   /** The day the laptop was last booted: it is up for the rest of that day (PIOTR, 13.09). */
   laptopBootedOnDay: number | null;
+  /** Tasks the player ticked on the laptop and asked for in one go, in the order he ticked
+   *  them. The owner works them off one after another, and the list empties as he does
+   *  (CLAUDE.md T17 2.16). */
+  taskQueue: string[];
   stock: StockState;
   equipment: Equipment[];
   /** Bought, paid for, and still on its way (CLAUDE.md T8 3.2). */
@@ -1088,13 +1137,17 @@ export type GameAction =
    *  number is (CLAUDE.md T13 3.24). */
   | { type: 'ACCEPT_ENQUIRY'; enquiryId: string; byHand: boolean }
   | { type: 'START_TASK'; taskId: string }
+  /** Several tasks ticked on the laptop and asked for in one go, in the order they were ticked
+   *  (CLAUDE.md T17 2.16). */
+  | { type: 'QUEUE_TASKS'; taskIds: string[] }
   | { type: 'PAUSE_TASK' }
   /** Lifting the lid: the machine has to come up before anything on it can be touched. */
   | { type: 'BOOT_LAPTOP' }
   /** Buys a job's shortfall at the ad hoc price, for that job (CLAUDE.md T13 3.3). */
   | { type: 'ORDER_FOR_JOB'; jobId: string }
-  /** Brings every low stock line back up to the restock figure (CLAUDE.md T13 3.2). */
-  | { type: 'RESTOCK' }
+  /** Orders sheets onto the rack: the number the player typed, capped at the free places in it
+   *  (CLAUDE.md T13 3.2, T17 2.20). */
+  | { type: 'RESTOCK'; sheets?: number }
   /** Gives the client his deposit back and takes the job off the plan (CLAUDE.md T9 3.9). */
   | { type: 'DROP_JOB'; jobId: string }
   | { type: 'SET_SAW_FALLBACK'; jobId: string; on: boolean }
@@ -1107,6 +1160,12 @@ export type GameAction =
   | { type: 'SET_SHOW_WHY'; on: boolean }
   | { type: 'WORK_HERE'; jobId: string | null }
   | { type: 'ASSIGN_JOB'; jobId: string; workerId: string | null }
+  /** The second man on a job, put on it or taken off it by a click on the row
+   *  (CLAUDE.md T17 2.10). */
+  | { type: 'ASSIGN_SECOND'; jobId: string; workerId: string | null }
+  /** The owner takes a worker's job on for the evening. Never automatic: the worker carries on
+   *  with it in the morning (CLAUDE.md T17 2.12). */
+  | { type: 'TAKE_OVER_JOB'; jobId: string }
   /** Puts a machine, or an air dryer, on one of the compressors in the hall (CLAUDE.md T10 3.2). */
   | { type: 'ASSIGN_AIR'; equipmentId: string; compressorId: string | null }
   | { type: 'HIRE'; role: WorkerRole; tier: WorkerTier | null }
@@ -1127,6 +1186,9 @@ export type GameAction =
   | { type: 'DECLINE_CONTRACT'; contractId: string }
   | { type: 'ASSIGN_CONTRACT'; contractId: string; workerId: string; on: boolean }
   | { type: 'RENEW_CONTRACT'; contractId: string; accept: boolean }
+  /** Ends a running contract. Free after the first month, and the work not done is simply not
+   *  earned (PIOTR, 17.09; CLAUDE.md T17 2.22). */
+  | { type: 'END_CONTRACT'; contractId: string }
   // People and shifts:
   | { type: 'SET_SECOND_SHIFT'; on: boolean }
   | { type: 'ASSIGN_SHIFT'; workerId: string; shift: Shift }

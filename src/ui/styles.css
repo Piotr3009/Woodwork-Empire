@@ -2574,13 +2574,14 @@ input.num {
   opacity: 0.85;
 }
 
-/* Two sheets side by side, each pinned once at the top centre, straight: no rule of the board
-   family tilts a .sheet (CLAUDE.md T15 2.1, 2.4) [TUNE: the gap]. */
+/* Three sheets side by side, each pinned once at the top centre, straight: no rule of the board
+   family tilts a .sheet (CLAUDE.md T15 2.1, 2.4; the Machines sheet is T17 2.24)
+   [TUNE: the gap]. */
 .sheets {
   display: grid;
   flex: 1 1 auto;
   gap: 26px;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   margin-top: 16px;
   min-height: 0;
 }
@@ -3293,6 +3294,177 @@ input.num {
   font-size: var(--fs-small);
   gap: 6px;
   justify-content: space-between;
+}
+
+
+/* ---------------------------------------------------------------------------
+   Turn 17: the workshop earns by the hour (CLAUDE.md T17)
+   --------------------------------------------------------------------------- */
+
+/* 2.5 The strip under the hall is gone: what has to be done floats over the floor, bottom left,
+   in the hand, and the camera is three small chips bottom right (PIOTR, 16.09,
+   docs/mockups/t17/hall-strip-C.html, variant C). The hall itself is the whole view, so the
+   chips are positioned against it. */
+.view {
+  position: relative;
+}
+
+.hall-chips {
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+  z-index: 2;
+}
+
+.hall-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
+  border: 1px solid #ffffff22;
+  border-radius: 20px;
+  background: rgba(20, 22, 26, 0.78);
+  color: #f1ebdd;
+  font-family: var(--font-title);
+  font-size: var(--fs-lead);
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  line-height: 1.2;
+}
+
+/* A button on a chip is the chip's own colour, not the grey of the old strip. */
+.hall-chip .btn {
+  padding: 1px 10px;
+  border-color: #ffffff33;
+  border-radius: 14px;
+  background: #ffffff1a;
+  color: #f1ebdd;
+  font-family: var(--font-title);
+  font-size: var(--fs-body);
+}
+
+.hall-chip .btn:hover:not([disabled]) {
+  background: #ffffff2e;
+}
+
+/* The camera, bottom right: three small chips and nothing else. */
+.hall-zoom {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  display: flex;
+  gap: 6px;
+  z-index: 2;
+}
+
+.hall-zoom .btn {
+  min-width: 26px;
+  padding: 1px 8px;
+  border: 1px solid #ffffff22;
+  border-radius: 14px;
+  background: rgba(20, 22, 26, 0.78);
+  color: #f1ebdd;
+  font-family: var(--font-title);
+  font-size: var(--fs-body);
+  text-align: center;
+}
+
+.hall-zoom .btn:hover:not([disabled]) {
+  background: rgba(20, 22, 26, 0.92);
+}
+
+/* 2.8 The rack carries its own number, over its front face, in the hand, on the class's colour. */
+.rack-count-plate {
+  opacity: 0.9;
+}
+
+.rack-count {
+  fill: #f6f1e4;
+  font-family: var(--font-title);
+  font-size: var(--fs-hand);
+  text-anchor: middle;
+}
+
+/* 2.6 One machine's own card, opened from the hall. It is the Owned tab's tile in a folder. */
+.machine-card .tile {
+  margin: 0;
+}
+
+/* 2.2 The welfare kit stands inside the canteen, drawn on the block and never on the floor. */
+.canteen-kit {
+  opacity: 0.95;
+}
+
+/* 2.13 The day meter runs past 17:00 when the owner does, and the evening has its own colour. */
+.seg-overtime {
+  background: var(--accent);
+}
+
+/* 2.16 The tick on a task row, and the one button that sets the ticked ones going. */
+.row-tick {
+  margin-right: 8px;
+  accent-color: var(--accent);
+}
+
+.tasks-do {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 0 0 8px;
+}
+
+/* 2.9 Our team: the row is the list row everywhere else, with one more column for what he is on. */
+.team-when {
+  color: var(--text-dim);
+  font-size: var(--fs-small);
+}
+
+/* 2.26 The workshop rate, the one figure at the top of the Company board and of the month end. */
+.rate-figure {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  justify-content: center;
+  margin: 6px 0 0;
+}
+
+.rate-big {
+  font-family: var(--font-title);
+  font-size: var(--fs-display);
+  font-weight: 400;
+  letter-spacing: 0.01em;
+}
+
+.rate-side {
+  color: var(--text-dim);
+  font-size: var(--fs-small);
+}
+
+/* On the felt the board's own ink is cream, so the figure is lit like the company name and the
+   small figures beside it read like the week line under it. */
+.felt .rate-big {
+  text-shadow: 0 1px 2px #000;
+}
+
+.felt .rate-side {
+  color: inherit;
+  opacity: 0.85;
+}
+
+/* 2.24 The Machines column of the Company board, right of Output: a ledger sheet like the two
+   beside it, with the sentence of the total on the last line. */
+.company-machines .ledger-points {
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* 2.25 Total efficiency, the section after the money in the month end. */
+.month-efficiency {
+  margin-top: 12px;
 }
 
 /* ------------------------------------------------------------------------------------------

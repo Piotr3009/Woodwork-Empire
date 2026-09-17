@@ -1240,6 +1240,10 @@ describe('a month with a helper, where the owner never unloads', () => {
     const helper = state.workers.find((worker) => worker.role === 'helper');
     const chores = state.tasks.filter((task) => HELPER_ONLY_KINDS.includes(task.kind));
     expect(chores.length).toBeGreaterThan(0);
+    // Both of the labourer's own jobs of work came up in the month and both were his: measured,
+    // twelve loads off the lorry and nineteen sweeps of the hall (CLAUDE.md T17 2.3, section 7).
+    expect(chores.filter((task) => task.kind === 'unload').length).toBeGreaterThan(0);
+    expect(chores.filter((task) => task.kind === 'cleaning').length).toBeGreaterThan(0);
     for (const task of chores) {
       expect(task.doneBy, `${task.kind} ${task.label}`).not.toBe('owner');
       if (task.doneBy !== null) expect(task.doneBy, task.kind).toBe(helper?.id);

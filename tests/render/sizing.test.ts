@@ -45,7 +45,7 @@ describe('a job name is printed once', () => {
     const enquiry = placeEnquiry(state, { price: 580, name: 'Garage shelves' });
     state = acceptNow(state, enquiry.id, false);
     firstJob(state).stage = 'ready';
-    const html = renderLaptop(state, { page: 'tasks', stockSheets: '6', teamTab: 'workshop' });
+    const html = renderLaptop(state, { page: 'tasks', stockSheets: '6', teamTab: 'workshop', tickedTasks: [] });
     // Every row carries the name at most once.
     for (const row of html.split('<div class="row"').slice(1)) {
       const hits = row.split('Garage shelves').length - 1;

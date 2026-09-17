@@ -19,8 +19,6 @@ import {
   PELLET_INCOME_PER_1000_PRODUCTION_MINUTES,
   POWER_BASE_DAILY,
   SOFTWARE_SUBSCRIPTION_MONTHLY,
-  STAFF_OVERTIME_RATE,
-  WORKER_HOURS_PER_WEEK,
   WORKING_DAYS_PER_MONTH,
   unitDepositFor,
 } from './constants';
@@ -52,7 +50,6 @@ import type {
   LedgerCategory,
   LedgerEntry,
   PeriodTotals,
-  Worker,
 } from './types';
 
 /** What a period came to: money in less money out. */
@@ -378,13 +375,41 @@ export function monthlyFixedCosts(state: GameState): number {
   );
 }
 
+/** The month a thing bought this month starts being charged monthly: the one after the month end
+ *  that follows it. The first month is paid at the click, so the first month end carries no line
+ *  for it (PIOTR, 16.09; CLAUDE.md T17 2.21). */
+function chargedFrom(boughtInMonth: number): number {
+  return boughtInMonth + 1;
+}
+
+/** Stamps the month Joinery Core and each of its extensions were bought in, the first time the
+ *  state settles after the click. The purchase itself is a line of its own, "first month", so the
+ *  month it was bought in is the month it is already paid for (CLAUDE.md T17 2.21). */
+export function stampSoftwareMonths(state: GameState): void {
+  const software = state.software;
+  const month = monthOfDay(state.clock.day);
+  if (software.joineryCore && software.joineryCoreFromMonth === null) {
+    software.joineryCoreFromMonth = month;
+  }
+  while (software.joineryCoreExtensionMonths.length < software.joineryCoreExtensions) {
+    software.joineryCoreExtensionMonths.push(month);
+  }
+}
+
 /** Joinery Core and its extensions, bought by the year and charged as a twelfth each month
- *  (CLAUDE.md T13 3.8). */
+ *  (CLAUDE.md T13 3.8). Nothing is charged for the month it was bought in, nor at the month end
+ *  that closes it: that month went out of the account at the click (CLAUDE.md T17 2.21). */
 export function joineryCoreMonthly(state: GameState): number {
-  if (!state.software.joineryCore) return 0;
-  const yearly =
-    JOINERY_CORE_PRICE_YEARLY +
-    state.software.joineryCoreExtensions * JOINERY_CORE_EXTENSION_PRICE_YEARLY;
+  const software = state.software;
+  if (!software.joineryCore) return 0;
+  const month = monthOfDay(state.clock.day);
+  const from = software.joineryCoreFromMonth;
+  const core = from !== null && month > chargedFrom(from) ? JOINERY_CORE_PRICE_YEARLY : 0;
+  const extensions = software.joineryCoreExtensionMonths.filter(
+    (bought) => month > chargedFrom(bought),
+  ).length;
+  const yearly = core + extensions * JOINERY_CORE_EXTENSION_PRICE_YEARLY;
+  if (yearly <= 0) return 0;
   return Math.round((yearly / 12) * 100) / 100;
 }
 
@@ -419,25 +444,6 @@ export function weeklyWageBill(state: GameState): number {
   return state.workers
     .filter((worker) => worker.weeklyWage > 0 && worker.startDay <= state.clock.day)
     .reduce((total, worker) => total + worker.weeklyWage, 0);
-}
-
-/** What one man is owed for the evenings since the last wages went out: his hourly wage, which is
- *  his week over forty, and half as much again on top (PIOTR, CLAUDE.md T8 3.6). */
-export function overtimePayFor(worker: Worker): number {
-  if (worker.overtimeMinutesWeek <= 0) return 0;
-  const hourly = worker.weeklyWage / WORKER_HOURS_PER_WEEK;
-  return Math.round(hourly * (worker.overtimeMinutesWeek / 60) * STAFF_OVERTIME_RATE * 100) / 100;
-}
-
-/** The Friday line for the evenings the crew stayed for (CLAUDE.md T8 3.6). */
-export function overtimeWageBill(state: GameState): number {
-  const total = state.workers.reduce((sum, worker) => sum + overtimePayFor(worker), 0);
-  return Math.round(total * 100) / 100;
-}
-
-/** Paid for: the slate is clean for the week that follows. */
-export function clearOvertimeWeek(state: GameState): void {
-  for (const worker of state.workers) worker.overtimeMinutesWeek = 0;
 }
 
 export function monthlySalaryBill(state: GameState): number {
@@ -629,23 +635,16 @@ export function runDayCosts(state: GameState, day: number): void {
     chargeUnavoidable(state, 'ownerDraw', 'Owner\u0027s draw', ownerDrawPerDay(state));
   }
   if (isFriday(day)) {
+    // The weekly wages, and nothing on top of them: the crew go home at five, so there is no
+    // overtime line to pay them any more (PIOTR, 17.09; CLAUDE.md T17 2.12).
     const wages = weeklyWageBill(state);
-    // The evenings the crew stayed for, at one and a half times the hour (CLAUDE.md T8 3.6).
-    const overtime = overtimeWageBill(state);
-    if (overtime > 0) {
-      chargeUnavoidable(state, 'wages', 'Overtime', overtime);
-      clearOvertimeWeek(state);
-    }
     if (wages > 0) {
       chargeUnavoidable(state, 'wages', 'Weekly wages', wages);
       queueEvent(state, {
         kind: 'wagesPaid',
         title: 'Wages',
-        body:
-          overtime > 0
-            ? `Friday. The weekly wages have gone out, with ${formatMoney(overtime)} of overtime.`
-            : 'Friday. The weekly wages have gone out.',
-        data: { amount: Math.round(wages + overtime), overtime: Math.round(overtime) },
+        body: 'Friday. The weekly wages have gone out.',
+        data: { amount: Math.round(wages), overtime: 0 },
       });
     }
   }

@@ -209,7 +209,9 @@ describe('the sixth chip', () => {
     // Sixteen frames of work and two of dinner: the whole day in eighteen real seconds, plus one
     // for every question that cut a frame short, because a frame ends on the minute it is asked.
     expect(frames).toBeLessThanOrEqual(18 + asked.length);
-    expect(currentState()?.speed).toBe(30);
+    // And x30 comes home: a new day starts at x1 whatever last night was run at
+    // (PIOTR, 16.09; CLAUDE.md T17 2.19).
+    expect(currentState()?.speed).toBe(1);
   });
 });
 

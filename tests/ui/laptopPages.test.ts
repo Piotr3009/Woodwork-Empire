@@ -101,7 +101,7 @@ describe('the content is as Turn 13 left it', () => {
       ['security', renderSecurity(state)],
     ];
     for (const [id, body] of pages) {
-      const screen = parse(renderLaptop(state, { page: id as never, stockSheets: '6', teamTab: 'workshop' }));
+      const screen = parse(renderLaptop(state, { page: id as never, stockSheets: '6', teamTab: 'workshop', tickedTasks: [] }));
       const inside = screen.querySelector(`.laptop-screen[data-laptop-page="${id}"]`);
       expect(inside, id).not.toBeNull();
       // The page header first, with the back arrow as its first child (CLAUDE.md T15 2.3).
@@ -115,7 +115,7 @@ describe('the content is as Turn 13 left it', () => {
       expect(rest, id).toBe(parse(body).innerHTML);
     }
     // The tasks page keeps its three headings and nothing of the jobs on the books.
-    const tasks = parse(renderLaptop(state, { page: 'tasks', stockSheets: '6', teamTab: 'workshop' }));
+    const tasks = parse(renderLaptop(state, { page: 'tasks', stockSheets: '6', teamTab: 'workshop', tickedTasks: [] }));
     expect(tasks.querySelector('.laptop-screen[data-laptop-page="tasks"] .screen-back')).not.toBeNull();
     expect(tasks.textContent).toContain('Office tasks today');
     expect(tasks.textContent).toContain('Workshop jobs of work');

@@ -516,6 +516,8 @@ describe('the piece at the gate', () => {
     for (const specId of missingForHire(state, 'joiner')) {
       state = buyNow(state, specId);
     }
+    // A month of his pay in the bank, or nobody is taken on (CLAUDE.md T17 2.11).
+    state.cash = 10000;
     state = clearEvents(hireNow(state, 'joiner', 'poor'));
     const joiner = state.workers[0];
     if (joiner) joiner.startDay = state.clock.day;

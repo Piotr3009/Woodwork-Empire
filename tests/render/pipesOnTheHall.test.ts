@@ -4,7 +4,15 @@
 
 import { describe, expect, it } from 'vitest';
 import { connectExtraction } from '../../src/engine/pipes';
-import { centralRunArt, ductSystemOf, portRings, renderHall } from '../../src/render/hall';
+import {
+  centralRunArt,
+  ductSystemOf,
+  footprintIn,
+  portRings,
+  renderHall,
+} from '../../src/render/hall';
+import { portCell } from '../../src/engine/pipes';
+import { tileToScreen } from '../../src/render/iso';
 import { PIPE_KINDS, pipeTile, portRing } from '../../src/render/pipes';
 import type { GameState } from '../../src/engine/index';
 import { newGame, placeEquipment } from '../helpers';
@@ -33,8 +41,20 @@ describe('one drawing of a pipe (CLAUDE.md T16 2.3)', () => {
     // The drop goes down: from the pipe's height to the floor of the cell.
     expect(Number(bar?.[2])).toBeGreaterThan(Number(bar?.[1]));
     expect(pipeTile('pipe.inlet', { x: 5, y: 5 })).toContain('pipe-collar');
-    expect(pipeTile('pipe.tee', { x: 5, y: 5 }).match(/pipe-bar/g)?.length).toBe(4);
-    expect(pipeTile('pipe.ne', { x: 5, y: 5 }).match(/pipe-bar/g)?.length).toBe(2);
+    // Every length of pipe is three strokes: the bar, the shade along its underside and the
+    // lighter edge along its top (CLAUDE.md T17 2.7). A tee is four arms and the body they meet
+    // in; a bend is one quarter arc with no disc over a joint it has not got.
+    const tee = pipeTile('pipe.tee', { x: 5, y: 5 });
+    expect((tee.match(/<line class="pipe-bar"/g) ?? []).length).toBe(8);
+    expect((tee.match(/<line class="pipe-edge"/g) ?? []).length).toBe(4);
+    expect(tee).toContain('pipe-joint');
+    const elbow = pipeTile('pipe.ne', { x: 5, y: 5 });
+    expect((elbow.match(/<path class="pipe-bar"/g) ?? []).length).toBe(2);
+    expect((elbow.match(/<path class="pipe-edge"/g) ?? []).length).toBe(1);
+    expect(elbow).toContain(' Q ');
+    expect(elbow).not.toContain('pipe-joint');
+    // And a straight run has no joint in the middle of it either.
+    expect(pipeTile('pipe.ew', { x: 5, y: 5 })).not.toContain('pipe-joint');
   });
 
   it('marks the one saw with no pipe: a drop on the other, a red ring and the words on this one, and no Turn 4 ducting', () => {
@@ -74,5 +94,41 @@ describe('one drawing of a pipe (CLAUDE.md T16 2.3)', () => {
     const state = newGame({ difficulty: 'veryEasy' });
     expect(centralRunArt(state, [])).toBe('');
     expect(ductSystemOf(state)).toBeNull();
+  });
+});
+
+describe('pipes that look like pipes (PIOTR, 16.09; CLAUDE.md T17 2.7)', () => {
+  it('lands the drop on the machine and not through it to the floor of the cell', () => {
+    const state = twoSaws();
+    const saw = state.equipment.find((item) => item.id === 'kit-saw-1');
+    if (saw === undefined) throw new Error('no saw');
+    const stands = footprintIn(saw);
+    const port = portCell(saw);
+    const svg = renderHall(state, { files: [] });
+    const drop = /<g class="pipe-tile" data-pipe-tile="pipe.drop">(.*?)<\/g>/.exec(svg)?.[1] ?? '';
+    expect(drop).not.toBe('');
+    // The collar sits on the top face of the footprint, which is the machine's own port, and is
+    // that much higher on the screen than the floor of the same cell.
+    const floor = tileToScreen(port.x + 0.5, port.y + 0.5, 0);
+    const top = tileToScreen(port.x + 0.5, port.y + 0.5, stands.height);
+    const ring = /<ellipse class="pipe-port"[^>]*cy="([-\d.]+)"/.exec(drop);
+    expect(Number(ring?.[1])).toBeCloseTo(top.y, 1);
+    expect(Number(ring?.[1])).toBeLessThan(floor.y);
+    expect(stands.height).toBeGreaterThan(0);
+  });
+
+  it('gives every length a shade under it and the lighter edge over it', () => {
+    const straight = pipeTile('pipe.ns', { x: 5, y: 5 });
+    // Three strokes a length: the bar, the shade and the edge, and the shade is the one with a
+    // colour of its own on it.
+    expect((straight.match(/<line class="pipe-bar"/g) ?? []).length).toBe(4);
+    expect(straight).toContain('style="stroke:rgba(0,0,0,0.35)"');
+    expect((straight.match(/<line class="pipe-edge"/g) ?? []).length).toBe(2);
+  });
+
+  it('draws the inlet as a flange at the unit, rings and all', () => {
+    const inlet = pipeTile('pipe.inlet', { x: 5, y: 5 });
+    expect((inlet.match(/<ellipse class="pipe-collar"/g) ?? []).length).toBe(2);
+    expect(inlet).toContain('pipe-bar');
   });
 });

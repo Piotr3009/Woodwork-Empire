@@ -3,7 +3,6 @@ import {
   BESPOKE_COST_UPLIFT,
   LOW_STOCK_SHEETS,
   MATERIAL_FRACTION,
-  RESTOCK_TO_SHEETS,
   SHEET_PRICE_AD_HOC,
   SHEET_PRICE_STOCK,
   SHEET_VALUE,
@@ -29,6 +28,7 @@ import {
   stockLines,
   stockNumberFor,
 } from '../../src/engine/materials';
+import { addWorkingDays } from '../../src/engine/clock';
 import { canBuy } from '../../src/engine/game';
 import { jobProgress, tick } from '../../src/engine/index';
 import type { GameEvent, GameState } from '../../src/engine/index';
@@ -490,17 +490,17 @@ describe('the reservation rule and Restock (CLAUDE.md T13 3.2, 3.3)', () => {
     expect(firstJob(next).sheetsReserved).toBe(2);
   });
 
-  it('buys every low line back to the restock figure at the stock price, and no more', () => {
+  it('fills the rack at the stock price when no number is typed, and no more', () => {
     const state = fillRack(ready(), LOW_STOCK_SHEETS - 2);
     expect(stockIsLow(state)).toBe(true);
     const sheets = restockSheets(state);
-    expect(sheets).toBe(RESTOCK_TO_SHEETS - (LOW_STOCK_SHEETS - 2));
+    // What fills the rack: the free places on it (CLAUDE.md T17 2.20).
+    expect(sheets).toBe(stockFree(state));
     expect(restockCheck(state)).toEqual({
       ok: true,
       reason: '',
       sheets,
       cost: sheets * SHEET_PRICE_STOCK,
-      target: RESTOCK_TO_SHEETS,
     });
     const before = state.cash;
     const bought = act(state, { type: 'RESTOCK' });
@@ -516,10 +516,25 @@ describe('the reservation rule and Restock (CLAUDE.md T13 3.2, 3.3)', () => {
     expect(again.cash).toBe(bought.cash);
   });
 
-  it('does nothing when nothing is low', () => {
-    const state = fillRack(ready(), RESTOCK_TO_SHEETS);
+  it('buys the number the player typed, capped at the free places on the rack', () => {
+    const state = fillRack(ready(), 2);
+    // Six sheets asked for, six bought (CLAUDE.md T17 2.20).
+    expect(restockSheets(state, 6)).toBe(6);
+    const six = act(state, { type: 'RESTOCK', sheets: 6 });
+    expect(six.deliveries[0]?.sheets).toBe(6);
+    // The material lands the next working day, which is the lead time a standard sheet has.
+    expect(six.deliveries[0]?.arriveDay).toBe(addWorkingDays(state.clock.day, 1));
+    expect(six.deliveries[0]?.bespoke).toBe(false);
+    // More than the rack holds is cut back to what it holds, and never refused outright.
+    const room = stockFree(state);
+    expect(restockSheets(state, room + 50)).toBe(room);
+    expect(restockCheck(state, room + 50).sheets).toBe(room);
+  });
+
+  it('does nothing when the rack is full', () => {
+    const state = fillRack(ready(), rackCapacity(ready()));
     expect(restockSheets(state)).toBe(0);
-    expect(restockCheck(state)).toMatchObject({ ok: false, reason: 'Nothing is low' });
+    expect(restockCheck(state)).toMatchObject({ ok: false, reason: 'No room on the rack' });
     const same = act(state, { type: 'RESTOCK' });
     expect(same.deliveries).toHaveLength(0);
     expect(same.cash).toBe(state.cash);

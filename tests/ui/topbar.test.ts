@@ -79,23 +79,37 @@ describe("the boss's day meter", () => {
     expect(bandsOf(html)).toEqual(SCRIPTED.map(([category]) => category));
   });
 
-  it('paints each band the width of its own minutes out of the 480', () => {
-    const html = renderTopbar(withScriptedDay([['workshop', 240]]), 'hall');
+  it('paints each band the width of its own minutes out of the 540 the day runs', () => {
+    // The bar is the working day on the clock, 08:00 to 17:00 (CLAUDE.md T17 2.13).
+    const html = renderTopbar(withScriptedDay([['workshop', 270]]), 'hall');
     expect(html).toContain('class="seg seg-workshop" data-band="workshop" style="width:50.0000%"');
   });
 
   it('leaves the break and the idle time unpainted', () => {
-    const html = renderTopbar(withScriptedDay([['workshop', 120]]), 'hall');
+    const html = renderTopbar(withScriptedDay([['workshop', 135]]), 'hall');
     expect(bandsOf(html)).toEqual(['workshop']);
     // A quarter of the day painted, and nothing at all for the other three quarters.
     expect(html).toContain('style="width:25.0000%"');
   });
 
-  it('grows past the 480 once overtime runs, rather than clipping the evening', () => {
-    const html = renderTopbar(withScriptedDay([['workshop', 480], ['office', 120]]), 'hall');
-    expect(html).toContain('600 / 480 min');
-    expect(html).toContain('style="width:80.0000%"');
-    expect(html).toContain('style="width:20.0000%"');
+  it('grows from 540 to 660 as the evening runs, and the figure grows with it', () => {
+    // Two hours of overtime worked: the bar ends at 19:00 and says so (CLAUDE.md T17 2.13).
+    const state = withScriptedDay([['workshop', 480], ['office', 120]]);
+    state.owner.overtimeMinutes = 120;
+    const html = renderTopbar(state, 'hall');
+    expect(html).toContain('600 / 660 min');
+    expect(html).toContain('style="width:72.7273%"');
+  });
+
+  it('paints the evening in its own colour, whatever he spent it on', () => {
+    const state = withScriptedDay([['workshop', 480], ['office', 120]]);
+    state.owner.overtimeMinutes = 120;
+    // The last two hours of the log are the evening: the band is the overtime one.
+    expect(bandsOf(renderTopbar(state, 'hall'))).toEqual(['workshop', 'overtime']);
+    // Half an hour of it, and the band he was in when five o'clock came is cut in two.
+    state.owner.overtimeMinutes = 30;
+    expect(bandsOf(renderTopbar(state, 'hall'))).toEqual(['workshop', 'office', 'overtime']);
+    expect(renderTopbar(state, 'hall')).toContain('600 / 570 min');
   });
 
   it('carries no legend under the bar, and holds the minutes on the hover plate', () => {
@@ -116,7 +130,7 @@ describe("the boss's day meter", () => {
     const state = withScriptedDay(SCRIPTED);
     const html = renderTopbar(state, 'hall');
     expect(html).toContain("Piotr's day \u00b7 idle");
-    expect(html).toContain('370 / 480 min');
+    expect(html).toContain('370 / 540 min');
     expect(html).toContain('class="lamp is-idle"');
   });
 
@@ -237,6 +251,9 @@ describe('the plate at the top of the day end summary', () => {
       dayLog: state.owner.dayLog,
       efficiency: { possible: 0, worked: 0, lost: { noPeople: 0, noMachine: 0, noMaterial: 0, ownerAway: 0 } },
       nightMinutes: 0,
+      paidHours: 0,
+      expressUplift: 0,
+      hallFactor: 1,
     });
     expect(html).toContain('Day 3 done');
     expect(html).toContain('370 of 480 min · overtime 0');

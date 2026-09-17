@@ -18,6 +18,7 @@ import {
   jobsAtGate,
   laptopHome,
   openTasks,
+  startTaskCheck,
   staffMinutesLeft,
   workerById,
 } from '../engine/index';
@@ -29,7 +30,16 @@ import { renderMaterials } from './materials';
 import { renderSecurity } from './security';
 import { type TeamTab, renderTeam } from './team';
 import { renderWebsite } from './website';
-import { emptyLine, escapeHtml, minutes, money, plural, taskStartAction } from './modal';
+import {
+  button,
+  emptyLine,
+  escapeHtml,
+  lockedButton,
+  minutes,
+  money,
+  plural,
+  taskStartAction,
+} from './modal';
 
 /** The pages the screen shows: home, the three behind the big tiles, the Team and the three
  *  Admin pages behind their small tiles (CLAUDE.md T14 2.1, T15 2.3). Home is the default, every
@@ -148,7 +158,18 @@ function onItLine(state: GameState, task: TaskInstance): string {
   return `${worker.name} is on it, ${minutes(staffMinutesLeft(worker))} of his day left`;
 }
 
-function taskRow(state: GameState, task: TaskInstance): string {
+/** The tick on a row: the player ticks several and presses Do these, and they are done one after
+ *  another in the order he ticked them (PIOTR, 16.09; CLAUDE.md T17 2.16). Only on a row the owner
+ *  could start himself: a tick on a job of work he cannot take on would tick nothing. */
+function tickBox(state: GameState, task: TaskInstance, ticked: readonly string[]): string {
+  if (task.done || !startTaskCheck(state, task.id).ok) return '';
+  return (
+    `<input type="checkbox" class="row-tick" data-do="tickTask" data-id="${task.id}"` +
+    `${ticked.includes(task.id) ? ' checked' : ''} aria-label="Do this one too" />`
+  );
+}
+
+function taskRow(state: GameState, task: TaskInstance, ticked: readonly string[] = []): string {
   const running = state.owner.currentTaskId === task.id;
   const staffLine = onItLine(state, task);
   const job = task.jobId === null ? null : findJob(state, task.jobId);
@@ -163,8 +184,9 @@ function taskRow(state: GameState, task: TaskInstance): string {
         : 'Take it on';
   const action = taskStartAction(state, task, startLabel);
   return (
-    `<div class="row${task.done ? ' is-done' : ''}${running ? ' is-running' : ''}">` +
-    `<span class="row-main">${escapeHtml(task.label)}${jobLine}</span>` +
+    `<div class="row${task.done ? ' is-done' : ''}${running ? ' is-running' : ''}" ` +
+    `data-task="${task.id}">` +
+    `<span class="row-main">${tickBox(state, task, ticked)}${escapeHtml(task.label)}${jobLine}</span>` +
     `<span class="row-figure">${minutes(task.minutesRemaining)} left of ` +
     `${minutes(task.minutesTotal)}${staffLine === '' ? '' : ` · ${escapeHtml(staffLine)}`}` +
     '</span>' +
@@ -172,8 +194,30 @@ function taskRow(state: GameState, task: TaskInstance): string {
   );
 }
 
+/** The one button over the list: what is ticked, done one after another in the order it was
+ *  ticked (CLAUDE.md T17 2.16). It is greyed until something is ticked, and says how many. */
+function doTheseControl(state: GameState, ticked: readonly string[]): string {
+  const live = ticked.filter((id) => startTaskCheck(state, id).ok);
+  const queued = state.taskQueue.filter((id) => {
+    const task = state.tasks.find((entry) => entry.id === id);
+    return task !== undefined && !task.done;
+  });
+  const queueLine =
+    queued.length > 0
+      ? `<span class="row-figure">${plural(queued.length, 'job of work', 'jobs of work')} queued</span>`
+      : '';
+  return (
+    '<div class="tasks-do">' +
+    (live.length === 0
+      ? lockedButton('Do these', 'Tick the ones you want doing')
+      : button('doTheseTasks', `Do these ${live.length}`)) +
+    queueLine +
+    '</div>'
+  );
+}
+
 /** Today's desk: everything still open, and what was finished today. Yesterday's is gone. */
-function tasksPage(state: GameState): string {
+function tasksPage(state: GameState, ticked: readonly string[]): string {
   const office = state.tasks.filter(
     (task) =>
       task.category !== 'workshop' &&
@@ -183,13 +227,14 @@ function tasksPage(state: GameState): string {
   const workshop = openTasks(state).filter((task) => task.category === 'workshop');
   return (
     '<h3>Office tasks today</h3>' +
+    doTheseControl(state, ticked) +
     (office.length === 0
       ? emptyLine('Nothing on the desk.')
-      : office.map((task) => taskRow(state, task)).join('')) +
+      : office.map((task) => taskRow(state, task, ticked)).join('')) +
     '<h3>Workshop jobs of work</h3>' +
     (workshop.length === 0
       ? emptyLine('Nothing waiting in the hall.')
-      : workshop.map((task) => taskRow(state, task)).join('')) +
+      : workshop.map((task) => taskRow(state, task, ticked)).join('')) +
     `<h3>At the gate, ${plural(jobsAtGate(state).length, 'piece', 'pieces')}</h3>` +
     gateSection(state)
   );
@@ -277,15 +322,18 @@ export interface LaptopView {
   /** What the player has typed into the sheet count on the Stock page. Read by nothing since
    *  Turn 13 (REPORT-T13 section 10); the page has no free form order any more. */
   stockSheets: string;
-  /** Which of the Team's four tabs is on top (CLAUDE.md T10 3.6, T15 2.3). */
+  /** Which of the Team's tabs is on top (CLAUDE.md T10 3.6, T15 2.3, T17 2.9). */
   teamTab: TeamTab;
+  /** The tasks the player has ticked on the Tasks page, in the order he ticked them, waiting for
+   *  Do these (CLAUDE.md T17 2.16). */
+  tickedTasks: readonly string[];
 }
 
 /** A page behind a tile, as Turn 13 left it: the screen skin is all it inherits (T14 2.1). */
 function pageBody(state: GameState, page: Exclude<LaptopPage, 'home'>, view: LaptopView): string {
   switch (page) {
     case 'tasks':
-      return tasksPage(state);
+      return tasksPage(state, view.tickedTasks);
     case 'stock':
       return renderMaterials(state, view.stockSheets);
     case 'drawings':

@@ -5,7 +5,16 @@ import { describe, expect, it } from 'vitest';
 import { renderDrawings } from '../../src/ui/drawings';
 import { renderLaptop } from '../../src/ui/laptop';
 import type { GameState } from '../../src/engine/index';
-import { acceptNow, act, buyStartingKit, clearEvents, doTask, newGame, placeEnquiry } from '../helpers';
+import {
+  acceptNow,
+  act,
+  buyStartingKit,
+  clearEvents,
+  doTask,
+  newGame,
+  placeEnquiry,
+  runClock,
+} from '../helpers';
 
 function parse(html: string): HTMLElement {
   const holder = document.createElement('div');
@@ -24,8 +33,8 @@ function withJob(): GameState {
 describe('the drawings in the laptop', () => {
   it('is the Drawings page of the laptop, and the Tasks page has none of it', () => {
     const state = withJob();
-    const drawings = parse(renderLaptop(state, { page: 'drawings', stockSheets: '6', teamTab: 'workshop' }));
-    const tasks = parse(renderLaptop(state, { page: 'tasks', stockSheets: '6', teamTab: 'workshop' }));
+    const drawings = parse(renderLaptop(state, { page: 'drawings', stockSheets: '6', teamTab: 'workshop', tickedTasks: [] }));
+    const tasks = parse(renderLaptop(state, { page: 'tasks', stockSheets: '6', teamTab: 'workshop', tickedTasks: [] }));
     expect(drawings.innerHTML).toContain('Design queue');
     expect(drawings.innerHTML).toContain('Design: Garage shelves');
     expect(tasks.innerHTML).not.toContain('Design queue');
@@ -42,7 +51,7 @@ describe('the drawings in the laptop', () => {
     const state = withJob();
     expect(parse(renderDrawings(state)).innerHTML).toContain('One off licence');
     expect(
-      parse(renderLaptop(state, { page: 'tasks', stockSheets: '6', teamTab: 'workshop' })).innerHTML,
+      parse(renderLaptop(state, { page: 'tasks', stockSheets: '6', teamTab: 'workshop', tickedTasks: [] })).innerHTML,
     ).not.toContain('One off licence');
   });
 
@@ -84,15 +93,29 @@ describe('the drawings in the laptop', () => {
     state = doTask(state, 'design');
     const design = state.tasks.find((task) => task.kind === 'design');
     expect(design?.done).toBe(true);
-    expect(parse(renderDrawings(state)).innerHTML).toContain('drawn on day 1');
+    // It comes off the queue the minute it is done, and the page has nothing else on it.
+    expect(parse(renderDrawings(state)).innerHTML).toContain('No drawings waiting.');
   });
 
-  it('lists a finished drawing with the day it was drawn', () => {
+  it('keeps no list of what has been drawn: done is done', () => {
+    // The Finished drawings list is gone (PIOTR, 16.09; CLAUDE.md T17 2.18).
     let state = withJob();
     state = doTask(state, 'design');
     const html = parse(renderDrawings(state)).innerHTML;
-    expect(html).toContain('Finished drawings');
-    expect(html).toContain('drawn on day 1');
+    expect(html).not.toContain('Finished drawings');
+    expect(html).not.toContain('drawn on day 1');
     expect(html).toContain('No drawings waiting.');
+  });
+
+  it('leaves a drawing that is not done on the queue, with Continue on it', () => {
+    let state = withJob();
+    const design = state.tasks.find((task) => task.kind === 'design');
+    if (!design) throw new Error('no drawing');
+    state = act(state, { type: 'START_TASK', taskId: design.id });
+    state = runClock(state, 10);
+    state = act(state, { type: 'PAUSE_TASK' });
+    const html = parse(renderDrawings(state)).innerHTML;
+    expect(html).toContain('Design queue');
+    expect(html).toContain('Continue');
   });
 });

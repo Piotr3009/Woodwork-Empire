@@ -178,13 +178,15 @@ describe('the helper has his dinner too', () => {
       absentDaysRemaining: 0,
       shift: 'day',
       dayLog: [],
+      monthMinutes: 0,
+      monthDaysOff: 0,
       anchorX: 0,
       anchorY: 0,
     });
     state = clearEvents(tick(clearEvents(tick(state, BREAK_START_MINUTE)), 1));
     expect(isBreak(state.clock.minute)).toBe(true);
-    // The bags fill as they sit down. The helper needs no minutes, so nothing but the break stops
-    // him.
+    // The bags fill as they sit down. Nobody is sent at them in the middle of his dinner: the
+    // list waits for him (CLAUDE.md T17 2.3).
     const task = createTask(state, {
       kind: 'emptyBags',
       label: 'Empty the bags (1 bag, 15 min)',
@@ -193,8 +195,10 @@ describe('the helper has his dinner too', () => {
     state = clearEvents(tick(state, 5));
     expect(findTask(state, task.id)?.done).toBe(false);
     expect(findTask(state, task.id)?.doneBy).toBeNull();
-    // And he has it cleared the minute they are back at it.
+    // And he picks it up the minute they are back at it, and works the quarter of an hour off.
     state = clearEvents(tick(state, BREAK_MINUTES));
+    expect(findTask(state, task.id)?.doneBy).toBe('help-1');
+    state = clearEvents(tick(state, 20));
     expect(findTask(state, task.id)?.done).toBe(true);
     expect(findTask(state, task.id)?.doneBy).toBe('help-1');
   });

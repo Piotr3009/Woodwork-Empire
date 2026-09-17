@@ -44,6 +44,8 @@ const OPENERS: Array<[string, string]> = [
   ['shopping', '[data-do="openModal"][data-modal="shopping"]'],
   ['company', '[data-office="company"]'],
   ['laptop', '[data-office="laptop"]'],
+  // One machine's own card, from a click on the machine standing in the hall (T17 2.6).
+  ['machineCard', '.hall-view [data-sprite="tableSaw"]'],
 ];
 
 /** The two ids the modal layer opens that are not on the room: the event of the minute and a past
@@ -58,7 +60,7 @@ beforeAll(() => {
   dismissEvents();
   const state = currentState();
   if (state === null) throw new Error('no game');
-  Object.assign(state, buyNow(buyNow(state, 'desk'), 'laptop'));
+  Object.assign(state, buyNow(buyNow(buyNow(state, 'desk'), 'laptop'), 'tableSaw'));
   render();
 });
 
@@ -83,7 +85,7 @@ describe('the three skins', () => {
 
   it('puts that family on the modal the player opens, and exactly one skin class on it', () => {
     for (const [id, opener] of OPENERS) {
-      goTo(id === 'shopping' ? 'hall' : 'office');
+      goTo(id === 'shopping' || id === 'machineCard' ? 'hall' : 'office');
       click(opener);
       dismissEvents();
       const node = root().querySelector('.modal-layer .modal');

@@ -6,9 +6,22 @@
 
 import { beforeEach, describe, expect, it } from 'vitest';
 import { WALK_CELLS_PER_SECOND } from '../../src/engine/constants';
-import { STATION_BENCH, STATION_GATE, STATION_RACK, machineStation } from '../../src/engine/stations';
+import {
+  STATION_BENCH,
+  STATION_GATE,
+  STATION_IDLE,
+  STATION_NO_BENCH,
+  STATION_OFFICE,
+  STATION_PHONE,
+  STATION_RACK,
+  machineStation,
+  secondStation,
+  waitingStation,
+} from '../../src/engine/stations';
+import { createTask } from '../../src/engine/tasks';
+import { ANIMATIONS, animationForStation, legCarries } from '../../src/render/characters';
 import { walkPath } from '../../src/engine/walk';
-import { renderHall } from '../../src/render/hall';
+import { renderHall, stationCell } from '../../src/render/hall';
 import { centreOf } from '../../src/render/iso';
 import { resetWalkers, stepWalkers, syncWalkers, walkerOf } from '../../src/render/walkers';
 import type { GameState } from '../../src/engine/index';
@@ -186,5 +199,100 @@ describe('the walker', () => {
     expect(walker.path).toHaveLength(0);
     stepWalkers(root, now + 5000);
     expect(walker.path).toHaveLength(0);
+  });
+
+  it('walks a machine off the lorry to the floor held for it and back, empty handed', () => {
+    const state = hall();
+    const pathFor = (from: { x: number; y: number }, to: { x: number; y: number }): Array<{ x: number; y: number }> =>
+      walkPath(state, from, to);
+    // A saw on the apron at the gate, with the floor held for it in the middle of the hall.
+    state.onOrder.push({
+      id: 'order-saw',
+      specId: 'tableSaw',
+      variantId: 'budget',
+      pricePaid: 0,
+      orderedDay: state.clock.day,
+      dueDay: state.clock.day,
+      anchorX: 10,
+      anchorY: 6,
+      arrived: true,
+      rotated: false,
+    });
+    const task = createTask(state, {
+      kind: 'unload',
+      label: 'Unload the delivery: 1 machine',
+      minutes: 120,
+      orderIds: ['order-saw'],
+    });
+    const helper = state.workers[0];
+    if (!helper) throw new Error('nobody in the hall');
+    helper.taskId = task.id;
+    helper.station = STATION_GATE;
+    const key = `worker-${helper.id}`;
+    const root = page(state);
+    const loop = root.querySelector(`[data-figure="${key}"]`)?.getAttribute('data-loop') ?? '';
+    // Both ends and the far end's station: the gate's standing cell, the cell held for the
+    // machine, and no station at all when he gets there (CLAUDE.md T17 2.4).
+    const gate = stationCell(state, STATION_GATE, { x: 2, y: 5 });
+    expect(loop).toBe(`${gate.x},${gate.y};10,6;idle`);
+    // Neither leg carries anything: it is a plain walk out and a plain walk back.
+    expect(legCarries(STATION_GATE, STATION_IDLE)).toBe(false);
+    expect(legCarries(STATION_IDLE, STATION_GATE)).toBe(false);
+    syncWalkers(root, 0, pathFor);
+    let now = 0;
+    for (let frame = 0; frame < 900; frame += 1) {
+      now += 100;
+      stepWalkers(root, now);
+      expect(walkerOf(key)?.path.length, `frame ${frame}`).toBeGreaterThan(0);
+    }
+    const walker = walkerOf(key);
+    if (!walker) throw new Error('no walker');
+    expect(walker.loops).toBeGreaterThanOrEqual(1);
+    const stations = walker.arrivals.map((entry) => entry.station);
+    expect(stations).toContain(STATION_IDLE);
+    expect(stations).toContain(STATION_GATE);
+    expect(stations).not.toContain(STATION_RACK);
+    for (let index = 1; index < stations.length; index += 1) {
+      expect(stations[index]).not.toBe(stations[index - 1]);
+    }
+  });
+});
+
+describe('nobody walks on the spot (CLAUDE.md T17 1, section 7)', () => {
+  it('rests every station at something that is not a walk and not a carry', () => {
+    // The one place a resting figure's animation is chosen, over every station the game puts a
+    // man at: the benches, the machines and their waiting cells, the bench's second place, the
+    // rack, the gate, the office, the phone and standing idle. An unload rests at the gate or at
+    // the rack, which are both on the list.
+    const stations = [
+      STATION_BENCH,
+      STATION_RACK,
+      STATION_GATE,
+      STATION_IDLE,
+      STATION_OFFICE,
+      STATION_PHONE,
+      STATION_NO_BENCH,
+      machineStation('tableSaw'),
+      waitingStation('tableSaw'),
+      secondStation('kit-bench-1'),
+    ];
+    for (const station of stations) {
+      const rest = animationForStation(station);
+      expect(rest, station).not.toBe('walk');
+      expect(rest, station).not.toBe('carry');
+      expect(ANIMATIONS, station).toContain(rest);
+    }
+  });
+
+  it('writes no walk and no carry onto a figure standing in the hall', () => {
+    const state = hall();
+    const root = page(state);
+    const figures = Array.from(root.querySelectorAll('[data-figure]'));
+    expect(figures.length).toBeGreaterThan(0);
+    for (const figure of figures) {
+      const rest = figure.getAttribute('data-rest');
+      expect(rest, figure.getAttribute('data-figure') ?? '').not.toBe('walk');
+      expect(rest, figure.getAttribute('data-figure') ?? '').not.toBe('carry');
+    }
   });
 });
