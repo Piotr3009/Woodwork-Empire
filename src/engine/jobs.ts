@@ -1008,7 +1008,9 @@ export function deliverJob(state: GameState, job: Job): void {
   // Late by the days the workshop was open: a weekend is not a day anybody was late on
   // (PIOTR; CLAUDE.md T10 3.5).
   job.daysLate = Math.max(0, workingDaysBetween(job.dueDay, state.clock.day));
-  job.emailsUnanswered = emailsOutstanding(state, job);
+  // The ones still open at delivery, on top of the ones that died at dusk on the days between
+  // (CLAUDE.md T17 2.15): the count is added to, never overwritten.
+  job.emailsUnanswered += emailsOutstanding(state, job);
   const rate = job.express ? LATE_PENALTY_PER_DAY_EXPRESS : LATE_PENALTY_PER_DAY;
   const balanceDue = Math.round(job.price * (1 - DEPOSIT_FRACTION) * 100) / 100;
   const late = Math.round(job.daysLate * rate * job.price * 100) / 100;

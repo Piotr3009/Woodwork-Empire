@@ -412,6 +412,7 @@ function modalBody(id: ModalId, current: GameState): string {
         page: ui.laptopPage,
         stockSheets: ui.stockSheets,
         teamTab: ui.teamTab,
+        tickedTasks: ui.tickedTasks,
       });
     case 'workPlan':
       return renderWorkPlan(current, ui.dropConfirm);

@@ -306,7 +306,7 @@ describe('back on every page', () => {
     // And the page frame is the same on a page rendered on its own.
     const state = fillRack(buyStartingKit(newGame({ difficulty: 'veryEasy' })), 30);
     for (const id of pages) {
-      const inside = parse(renderLaptop(state, { page: id as never, stockSheets: '6', teamTab: 'workshop' }))
+      const inside = parse(renderLaptop(state, { page: id as never, stockSheets: '6', teamTab: 'workshop', tickedTasks: [] }))
         .querySelector('.laptop-screen');
       expect(inside?.firstElementChild?.className, id).toBe('screen-page-head');
       expect(inside?.firstElementChild?.firstElementChild?.className, id).toBe('screen-back');

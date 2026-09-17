@@ -269,8 +269,11 @@ import {
   movePending,
   movingMachines,
   ownerOutTask,
+  dropDuskTasks,
   pauseOwnerTask,
   resumeOwnerTask,
+  resumeStartedTask,
+  startNextQueued,
   skippedTask,
   queueTasks,
   startTask,
@@ -551,6 +554,8 @@ function startDay(state: GameState): void {
   checkLowStock(state);
   runAccidentRoll(state);
   runHelperClean(state);
+  // What he started yesterday is his again, before anybody else is given anything (T17 2.14).
+  resumeStartedTask(state);
   delegateTasks(state);
   queueDeliveryEvents(state, arriving);
   queueKitDeliveryEvents(state, kit);
@@ -905,6 +910,8 @@ function finishDay(state: GameState): void {
     state.activeEvent?.kind === 'dayEnd' || state.eventQueue.some((event) => event.kind === 'dayEnd');
   if (ending) return;
   pauseOwnerTask(state);
+  // Calls and emails die at dusk, done or not (CLAUDE.md T17 2.15).
+  dropDuskTasks(state);
   chargeOvertimeDebt(state);
   // The evening is over: a job he took on for it goes back to its own man (CLAUDE.md T17 2.12).
   endOwnerTakeOver(state);
@@ -949,6 +956,10 @@ function advanceToNextDay(state: GameState): void {
   }
   state.clock.day = day;
   state.clock.minute = 0;
+  // A new day starts at the speed a day starts at, whatever last night was run at (PIOTR, 16.09;
+  // CLAUDE.md T17 2.19). Not in `startDay`, which a new game calls with the clock stopped for the
+  // setting out of the hall.
+  state.speed = 1;
   if (skipped.length > 0) {
     queueEvent(state, {
       kind: 'weekend',
@@ -1034,8 +1045,8 @@ function applyTaskCompletion(state: GameState, task: TaskInstance): void {
       if (!startNextTrip(state)) resumeOwnerTask(state);
       break;
     case 'booting':
-      // The laptop is up for the rest of the day: back to whatever he put down to open it.
-      state.laptopBootedOnDay = state.clock.day;
+      // The laptop is up: back to whatever he put down to open it. The day was written down when
+      // the boot started, so nothing is written here (CLAUDE.md T17 2.17).
       resumeOwnerTask(state);
       break;
     case 'bookkeeping':
@@ -1296,7 +1307,12 @@ function runMinute(state: GameState): void {
   }
   spendOwnerMinute(state, task.category, dayCategoryOf(task.kind));
   const finished = advanceOwnerTask(state, ownerEfficiency(state));
-  if (finished) applyTaskCompletion(state, finished);
+  if (finished) {
+    applyTaskCompletion(state, finished);
+    // The next one he ticked on the laptop, once whatever the completion sent him to is done
+    // (CLAUDE.md T17 2.16).
+    startNextQueued(state);
+  }
 }
 
 /** Everything derived that has to be true before the state is handed back. */
@@ -2705,9 +2721,12 @@ export function bootLaptop(state: GameState): BuyCheck {
   if (!has(state, 'laptop')) return { ok: false, reason: 'Needs a laptop first' };
   // Lifting the lid starts the clock if it was stopped (PIOTR, 13.09).
   if (timeIsPaused(state)) state.speed = 1;
-  // Booted once today: it stays up, and opening it again costs nothing (PIOTR, 13.09).
+  // Booted once today: it stays up, and opening it again costs nothing (PIOTR, 13.09). The day is
+  // written down as the boot is STARTED and not when it finishes, so a boot the day end, a
+  // holiday or a walk to the bench took off him unfinished can neither suppress tomorrow's nor be
+  // paid for a second time days later (PIOTR, 16.09; CLAUDE.md T17 2.17).
   if (state.laptopBootedOnDay === state.clock.day) return OK;
-  if (state.tasks.some((task) => task.kind === 'booting' && !task.done)) return OK;
+  state.laptopBootedOnDay = state.clock.day;
   const task = createTask(state, {
     kind: 'booting',
     label: 'Waiting for the laptop',

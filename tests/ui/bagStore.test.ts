@@ -81,7 +81,7 @@ describe('the store on the extractor s own card', () => {
     Object.assign(game(), choose(game(), 'later'));
     render();
     expect(game().activeEvent).toBeNull();
-    const tasks = renderLaptop(game(), { page: 'tasks', stockSheets: '', teamTab: 'workshop' });
+    const tasks = renderLaptop(game(), { page: 'tasks', stockSheets: '', teamTab: 'workshop', tickedTasks: [] });
     expect(tasks).toContain(`Empty the bags (1 bag, ${BAG_CHANGE_MINUTES} min)`);
   });
 

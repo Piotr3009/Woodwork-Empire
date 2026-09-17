@@ -121,3 +121,15 @@ the task queue of section 5 names them.
   bench, the second in the bench's second place of Turn 16, and he takes no bench of his own.
   Done: `tests/engine/secondMan.test.ts` (the rate doubles, the labour in an hour, the waiting
   cell, both names on the row and the chips that put him on and take him off).
+- **T17-B2c The desk stops nagging (2.14 to 2.19).** A job of work somebody started stays his: the
+  minutes and the man both carry over, so the drawing he was on at five is in his hands at eight
+  and a man of the office is never passed round by rank for what he already started. Calls and
+  emails die at dusk instead, done or not, and the emails that are dropped are counted onto the
+  job as they go, so the client's penalty at delivery is exactly what it was. The Tasks page has a
+  tick on every row the owner could start and one Do these over the list: they are queued in the
+  order they were ticked and each one starts the next as it finishes. The laptop writes the day
+  down as the boot starts, so an interrupted boot can neither suppress tomorrow's nor be paid for
+  twice, and an unfinished one is dropped with the daily chores. The Finished drawings list is
+  gone, and a new day comes home to x1.
+  Done: `tests/engine/theDesk.test.ts`, `tests/ui/doThese.test.ts` and the rewritten drawings
+  tests.

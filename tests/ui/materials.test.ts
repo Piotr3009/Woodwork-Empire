@@ -136,7 +136,7 @@ describe('the stock page', () => {
       expect(html, gone).not.toContain(gone);
     }
     // And it is still the laptop's Stock tab, reached the one way (CLAUDE.md T4 3.1).
-    expect(renderLaptop(state, { page: 'stock', stockSheets: '6', teamTab: 'workshop' })).toContain(
+    expect(renderLaptop(state, { page: 'stock', stockSheets: '6', teamTab: 'workshop', tickedTasks: [] })).toContain(
       'data-stock="sheet"',
     );
   });

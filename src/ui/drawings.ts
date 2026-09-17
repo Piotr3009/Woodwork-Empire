@@ -1,5 +1,7 @@
-// The roll of drawings on the desk: the design queue and what has already been drawn. Design used
-// to sit in the laptop, and one thing belongs in one place (CLAUDE.md T3 3.3).
+// The roll of drawings on the desk: the design queue, and nothing else. Design used to sit in the
+// laptop, and one thing belongs in one place (CLAUDE.md T3 3.3). The list of finished drawings is
+// gone: a drawing that is done is done, and one that is not stays on the queue until it is
+// (PIOTR, 16.09; CLAUDE.md T17 2.18).
 
 import { findJob, jobTasks, openJobs, staffMinutesLeft, workerById } from '../engine/index';
 import type { GameState, TaskInstance } from '../engine/index';
@@ -41,26 +43,6 @@ function designRow(state: GameState, task: TaskInstance): string {
   );
 }
 
-/** Every drawing that is finished, with the day it was finished on. */
-function finishedRows(state: GameState): string {
-  const rows = state.jobs
-    .flatMap((job) =>
-      jobTasks(state, job.id)
-        .filter((task) => task.kind === 'design' && task.done)
-        .map((task) => ({ job, task })),
-    )
-    .sort((left, right) => (right.task.doneDay ?? 0) - (left.task.doneDay ?? 0));
-  if (rows.length === 0) return emptyLine('Nothing drawn yet.');
-  return rows
-    .map(
-      ({ job, task }) =>
-        `<div class="row is-done"><span class="row-main">${escapeHtml(job.name)} ` +
-        `${money(job.price)}</span>` +
-        `<span class="row-figure">drawn on day ${task.doneDay ?? job.acceptedDay}</span></div>`,
-    )
-    .join('');
-}
-
 export function renderDrawings(state: GameState): string {
   const open = openJobs(state)
     .flatMap((job) => jobTasks(state, job.id))
@@ -70,8 +52,6 @@ export function renderDrawings(state: GameState): string {
     '<h3>Design queue</h3>' +
     (open.length === 0
       ? emptyLine('No drawings waiting.')
-      : open.map((task) => designRow(state, task)).join('')) +
-    '<h3>Finished drawings</h3>' +
-    finishedRows(state)
+      : open.map((task) => designRow(state, task)).join(''))
   );
 }

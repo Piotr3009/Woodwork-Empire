@@ -465,9 +465,11 @@ export function jobTasks(state: GameState, jobId: string): TaskInstance[] {
 }
 
 /** Drops yesterday's daily tasks, done or not: the day is gone. Emails belong to a job now, so
- *  they are not on this list: an unanswered email follows the job to the client (T2 3.5). */
+ *  they are not on this list: an unanswered email follows the job to the client (T2 3.5), and it
+ *  dies at dusk with the calls (CLAUDE.md T17 2.15). A boot that was never finished goes too: the
+ *  five minutes were spent yesterday and yesterday's laptop is shut (CLAUDE.md T17 2.17). */
 function dropDailyTasks(state: GameState): void {
-  const daily: TaskKind[] = ['bookkeeping', 'dailyOrdering', 'staffManagement'];
+  const daily: TaskKind[] = ['bookkeeping', 'dailyOrdering', 'staffManagement', 'booting'];
   state.tasks = state.tasks.filter((task) => !daily.includes(task.kind));
 }
 
@@ -560,12 +562,24 @@ export function bestTakerOf(
 
 /** A worker on the books takes the tasks his role covers, and the owner never sees them. Every
  *  man who can take one on books minutes into it, so nothing is cleared here: the minute runner
- *  finishes it and applies what it does (CLAUDE.md T17 2.3). */
+ *  finishes it and applies what it does (CLAUDE.md T17 2.3).
+ *
+ *  What somebody started stays his: a task still marked for a man who is in today is handed back
+ *  to that man and never passed round the workshop by rank (CLAUDE.md T17 2.14). One the owner put
+ *  down is the office's again while he is not holding it. */
 export function assignStaffTasks(state: GameState): void {
   const started = state.workers.filter((worker) => isWorkingToday(state, worker));
   if (started.length === 0) return;
   for (const task of state.tasks) {
-    if (task.done || task.doneBy !== null) continue;
+    if (task.done) continue;
+    if (task.doneBy !== null) {
+      const holder = started.find((worker) => worker.id === task.doneBy);
+      if (holder !== undefined) {
+        if (holder.taskId === null) holder.taskId = task.id;
+        continue;
+      }
+      if (task.doneBy !== 'owner' || state.owner.currentTaskId === task.id) continue;
+    }
     if (task.kind === 'unload' && task.deliveryId !== null && !canUnload(state)) continue;
     const staff = bestTakerOf(state, started, task);
     if (!staff) continue;
@@ -649,15 +663,55 @@ export function startTask(state: GameState, taskId: string, force = false): bool
   return true;
 }
 
+/** He stops working on what he is holding. A task he has put minutes into stays marked as his, so
+ *  he picks it up again in the morning without being assigned it (CLAUDE.md T17 2.14); one he
+ *  never started goes back on the list for whoever is free. Either way the office can still take
+ *  a task of its own off him while he is not holding it: `assignStaffTasks` says so. */
 export function pauseOwnerTask(state: GameState): void {
   const taskId = state.owner.currentTaskId;
   if (taskId) {
     const task = findTask(state, taskId);
-    if (task && !task.done) task.doneBy = null;
+    if (task && !task.done && task.minutesRemaining >= task.minutesTotal) task.doneBy = null;
   }
   state.owner.currentTaskId = null;
   // Putting something down on purpose ends whatever the phone was going to send him back to.
   state.owner.resumeTaskId = null;
+}
+
+/** The morning: what he started yesterday and did not finish is his again, and he carries on with
+ *  it where he left it, without being assigned it (PIOTR, 16.09; CLAUDE.md T17 2.14). */
+export function resumeStartedTask(state: GameState): void {
+  if (!ownerIsAvailable(state)) return;
+  if (state.owner.currentTaskId !== null) return;
+  const held = state.tasks.find(
+    (task) => !task.done && task.doneBy === 'owner' && task.minutesRemaining < task.minutesTotal,
+  );
+  if (held) startTask(state, held.id, true);
+}
+
+/** Calls and emails die at dusk, done or not, and nothing carries over: the client has rung off
+ *  and the inbox is a day older (PIOTR, 16.09; CLAUDE.md T17 2.15). The punishment is already in
+ *  the client's rating for the unanswered call and the unread email, so nothing else is added
+ *  here: the emails that are dropped are counted onto the job first, because the penalty at
+ *  delivery is counted off the emails still open (CLAUDE.md T2 3.5). */
+export function dropDuskTasks(state: GameState): void {
+  const gone = state.tasks.filter(
+    (task) => !task.done && (task.kind === 'clientCall' || task.kind === 'emails'),
+  );
+  if (gone.length === 0) return;
+  const ids = new Set(gone.map((task) => task.id));
+  for (const task of gone) {
+    if (task.kind !== 'emails' || task.jobId === null) continue;
+    const job = state.jobs.find((entry) => entry.id === task.jobId);
+    if (job) job.emailsUnanswered += 1;
+  }
+  state.tasks = state.tasks.filter((task) => !ids.has(task.id));
+  for (const worker of state.workers) {
+    if (worker.taskId !== null && ids.has(worker.taskId)) worker.taskId = null;
+  }
+  const owner = state.owner;
+  if (owner.currentTaskId !== null && ids.has(owner.currentTaskId)) owner.currentTaskId = null;
+  if (owner.resumeTaskId !== null && ids.has(owner.resumeTaskId)) owner.resumeTaskId = null;
 }
 
 /** The phone goes and the owner picks it up. This is the one thing that comes before the checks
@@ -753,9 +807,21 @@ export function queueTasks(state: GameState, taskIds: readonly string[]): boolea
   });
   if (wanted.length === 0) return false;
   state.taskQueue = wanted.filter((id, at) => wanted.indexOf(id) === at);
-  const first = state.taskQueue[0];
-  if (first !== undefined && state.owner.currentTaskId === null) startTask(state, first);
+  startNextQueued(state);
   return true;
+}
+
+/** The next one he ticked. Whatever is done or gone falls off the front of the queue, and the head
+ *  of it is started the moment his hands are free: the queue waits while the phone has him, and
+ *  the call he was interrupted with sends him back to it when it is over (CLAUDE.md T17 2.16). */
+export function startNextQueued(state: GameState): void {
+  state.taskQueue = state.taskQueue.filter((id) => {
+    const task = findTask(state, id);
+    return task !== null && !task.done;
+  });
+  const next = state.taskQueue[0];
+  if (next === undefined || state.owner.currentTaskId !== null) return;
+  startTask(state, next);
 }
 
 export const AD_HOC_TASK_MINUTES = {

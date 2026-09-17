@@ -240,7 +240,8 @@ describe('the first ten minutes', () => {
     click('[data-modal="laptop"] [data-tile="drawings"]');
     expect(html()).toContain('Design queue');
     expect(html()).toContain(`Design: ${name}`);
-    expect(html()).toContain('Finished drawings');
+    // The Finished drawings list is gone (CLAUDE.md T17 2.18).
+    expect(html()).not.toContain('Finished drawings');
     click('[data-modal="laptop"] [data-tile="home"]');
     click('[data-modal="laptop"] [data-tile="tasks"]');
     click('[data-do="startTask"]');
