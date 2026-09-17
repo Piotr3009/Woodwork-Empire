@@ -305,7 +305,9 @@ function percent0(value: number): string {
 /** The third sheet: one row per machine standing in the hall and what its class saved the
  *  workshop this week. Informational: it multiplies nothing (CLAUDE.md T17 2.24). */
 function machinesSheet(savings: MachineSavings): string {
-  const sentence = `Machines saved us ${plural(Math.round(savings.hoursSaved), 'hour', 'hours')} this week`;
+  // The same figure as the one at the top of the sheet, to the same tenth of an hour: rounding it
+  // to whole hours here said "0 hours" under a total that read 0.3 h.
+  const sentence = `Machines saved us ${plural(savings.hoursSaved, 'hour', 'hours')} this week`;
   return (
     '<section class="sheet company-machines" data-sheet="machines">' +
     pin() +

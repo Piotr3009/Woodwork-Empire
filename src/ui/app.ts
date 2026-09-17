@@ -262,6 +262,23 @@ export const MODAL_IS_FULL: Record<ModalId, boolean> = {
   machineCard: false,
 };
 
+/** The middle of the folder's three sizes, for a modal that is not a list but is more than two
+ *  sentences: the day summary and the month end have taken it since Turn 13, and a machine's card
+ *  takes it because a picture, six figures and five buttons do not fit the small folder without
+ *  the buttons falling under the fold, which is the very thing the card was made to end
+ *  (PIOTR, 17.09: "I never found Connect to extraction"; CLAUDE.md T11 3.5, T17 2.6). */
+export const MODAL_IS_WIDE: Record<ModalId, boolean> = {
+  board: false,
+  laptop: false,
+  workPlan: false,
+  accounting: false,
+  catalogue: false,
+  shopping: false,
+  company: false,
+  settings: false,
+  machineCard: true,
+};
+
 let ui: Ui = freshUi();
 let state: GameState | null = null;
 let root: HTMLElement | null = null;
@@ -634,6 +651,7 @@ function modalSpecs(): ModalSpec[] {
       title: MODAL_TITLES[ui.modal],
       body: tipKey === '' ? body : withTip(body, current, tipKey),
       full: MODAL_IS_FULL[ui.modal],
+      wide: MODAL_IS_WIDE[ui.modal],
       position: ui.modalPosition,
     });
   }

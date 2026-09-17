@@ -359,6 +359,64 @@ the task queue of section 5 names them.
   Done: `tests/render/walkers.test.ts` (two new), `tests/engine/hiringGate.test.ts` (one new),
   `tests/scenarios/thirtyDays.test.ts` and `tests/engine/theDesk.test.ts` (tightened).
 
+- **T17-C4 Look and shoot.** Ten pictures in `docs/report-t17`, 1280 wide, taken against the real
+  app in a browser and looked at one by one. Three things were wrong in the first set and are
+  fixed: the machine card's buttons fell under the fold of the small folder, so the card is the
+  middle folder now and Connect, Service, Move and Sell are on the page where Piotr could not find
+  them; the Machines sheet said "saved us 0 hours" under a total that read 0.3 h, and says the same
+  figure in both places now; and the first hall had two identical service chips, which was two
+  saws both past their 80 hours and not a fault.
+  Done: `tests/ui/modalSize.test.ts` has the wide table and the folder rule, the companyBoard test
+  reads the unrounded sentence, and the ten pictures are in the folder.
+
+### The ten pictures, and which were staged
+
+All ten are the real app in headless Chromium at 1280 by 800, driven by clicks: the camera chips,
+the top bar, the office wall, the laptop's own tabs. Six of them stand in front of a hall a click
+cannot reach in a reasonable number of steps, and that hall was reached the way a player reaches
+one, by loading a saved game the game itself wrote through its own Continue button. The saves were
+built by playing the game headless (the day 1 kit with a standard saw, a second saw, an industrial
+fan, a labourer and two joiners with the kit they need, a full rack, four pieces of work and a
+fortnight behind it) and then, where the picture needed it, one thing was set for the camera. Each
+is named below.
+
+1. **01-hall-chips.** The chips over the floor: the bags full with Empty bags on the chip, the hall
+   dirty with Clean up, the table saw due a service with Service it, and Set up hall under them.
+   Staged: the dust, the bag store and the saw's service hours were set on the saved hall.
+2. **02-hall-quiet.** The same hall swept, the bags empty, nothing due and the bench clear: one
+   chip, Set up hall, and no others. Staged: the same three set the other way, and the board and
+   the jobs cleared.
+3. **03-machine-card.** A click on the table saw standing in the hall. Not staged beyond the save.
+4. **04-canteen-seats.** The canteen block with the welfare kit on it, three seats and three
+   lockers, and the labourer standing at its door. Zoom and drag, both by the game's own controls.
+   Not staged beyond the save.
+5. **05-two-men-bench.** Two men at one bench, the second in the bench's own second place. Staged:
+   the second joiner was taken off his own job and put on the first man's by the work plan's own
+   action, and the clock was run until the stage was the bench.
+6. **06-company-board.** The office wall: three sheets, Reputation, Output and Machines, with
+   "Workshop earns £21 an hour, last week £16, per man £5" over them and "Machines saved us 0.2
+   hours this week" on the last line. Not staged beyond the save.
+7. **07-month-end.** The month end folder scrolled to Total efficiency: the machines, the people,
+   the hall, the waiting and "Total efficiency 67% = real work over paid hours". The rate is the
+   first line of the same folder, above the money. Staged: the clock was run to the morning of day
+   31, which is when the game raises it.
+8. **08-our-team.** The laptop's Team page, Our team tab: the owner first, then the labourer and
+   the two joiners, each with the day he started, how long ago, his month's pay, his hours this
+   month, his days off and what he is on. Not staged beyond the save.
+9. **09-day-meter-overtime.** The day meter at 18:11 reading 551 of 611 minutes, the evening's
+   minutes painted in their own colour at the end of the bar, with the hover plate open. Staged:
+   the owner answered the going home question with the evening, which is the click the game asks
+   for, and the clock ran on.
+10. **10-pipes.** The run along the wall with its lighter top edge and its darker underside, the
+    tee, two drops landing on their machines as collars, and the flange at the fan. Not staged
+    beyond the save.
+
+What the pictures showed that is not worth a change tonight: two men standing on the same cell
+print their names over each other (the canteen doorway takes every man at a seat or a locker), and
+a hall with two machines of one family prints the family's name on both rows of the Machines sheet
+and on both service chips. Both are older than this turn and neither is a fault; the first is on
+the art list of `docs/art/REQUESTS-T17.md` with the welfare kit.
+
 ### The Easy playthrough, and why it was re-scripted
 
 The C brief asked me to decide whether B2's and B3's split (the crew and the contract claims moved
@@ -431,6 +489,34 @@ or whether the Easy script should be re-scripted. I re-scripted it. The figures:
   code path for moving, which the house forbids and the brief does not ask for. What was wrong was
   the comment over `keepSetupHonest`, which claimed the machine was under his hand; it now says
   what happens. The button is offered only on what the engine would actually let him drag.
+
+### Numbers chosen (phase C)
+
+- **The Easy playthrough's loan [TUNE].** `LOAN_AMOUNT` 25,000, half what the bank will lend, and
+  `LOAN_BY_DAY` 30, the last day of the fitting out he will borrow for. 25,000 is the smallest
+  round figure that carries the three months of 10.4 with the crew the brief asks for: at 15,000
+  the estimator is affordable in month 2 but the account is at −5,065 by day 60 and the manager is
+  refused; at 20,000 it is at −641 on the same day and still refused. Both figures are in
+  `tests/scenarios/playthrough.test.ts` and nothing in `src` reads them: they are the scripted
+  player's decisions, not the game's.
+- **(y), the month [TUNE].** Very easy, three joiners of the poor class with a saw each and no work
+  taken off the board, so the month is about the one piece and the one contract; a 6,000 piece,
+  which is 2,400 of labour and about five weeks of one poor joiner; and a contract for 20 cut sheet
+  packs a week at 100 a piece over an 8 week term, which is a week's work for the third man and
+  more rack than a week of jobs. The assertion on the halving is a band, 0.45 to 0.7 of the days,
+  and the measured figure is 0.5 exactly: 13 days against 26.
+- **(z), the week [TUNE].** A 40,000 piece, whose 16,000 of labour is fifty owner days, so the week
+  never runs out of work for him; the board and the month end are read over the same five days; and
+  the fall when two of the five stand is asserted as a band, 0.5 to 0.7, with the measured figure
+  0.605 against the brief's three fifths.
+- **The machine card's size.** `MODAL_IS_WIDE` in app.ts, one table beside `MODAL_IS_FULL`, with
+  the machine card the only true in it: the folder's middle size, which the day summary and the
+  month end have taken since Turn 13. Measured on the real page: the card is 406 px of content and
+  the small folder gives it 333, so the five buttons sat 73 px under the fold.
+- **The staged saves.** Built by playing the game headless and written with the game's own
+  `encodeSaveFile`, so every picture stands in front of a state the game itself could have saved.
+  The fortnight behind them is 14 days, long enough for a week of closed days under the rate and
+  for the machines to have hours on their week.
 
 ## Cross check (section 7)
 

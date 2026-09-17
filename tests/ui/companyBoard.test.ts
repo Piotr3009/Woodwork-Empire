@@ -469,7 +469,7 @@ describe('the Machines sheet (CLAUDE.md T17 2.24)', () => {
     // The figure at the top and the sentence at the bottom are the engine's own totals.
     expect(sheet?.querySelector('[data-figure="machines"]')?.textContent).toBe(`${savings.hoursSaved} h`);
     expect(sheet?.querySelector('[data-sum="total"]')?.textContent).toBe(
-      `Machines saved us ${plural(Math.round(savings.hoursSaved), 'hour', 'hours')} this week`,
+      `Machines saved us ${plural(savings.hoursSaved, 'hour', 'hours')} this week`,
     );
   });
 

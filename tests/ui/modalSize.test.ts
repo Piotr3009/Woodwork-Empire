@@ -2,8 +2,9 @@
 // Big modals, not tiny ones: anything that is a list or a board fills the page, and a small modal
 // is for an event with a decision in it (PIOTR, 13.09; CLAUDE.md T9 1, 3.12).
 
+import { readFileSync } from 'node:fs';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { MODAL_IS_FULL, currentState, mount, render } from '../../src/ui/app';
+import { MODAL_IS_FULL, MODAL_IS_WIDE, currentState, mount, render } from '../../src/ui/app';
 import { buyNow } from '../helpers';
 
 function root(): HTMLElement {
@@ -75,6 +76,7 @@ describe('the size of every modal in the game', () => {
       const node = openModalNode();
       expect(node?.getAttribute('data-modal'), id).toBe(id);
       expect(node?.classList.contains('modal-full'), id).toBe(MODAL_IS_FULL[id as never]);
+      expect(node?.classList.contains('modal-wide'), id).toBe(MODAL_IS_WIDE[id as never]);
       click('[data-modal="' + id + '"] [data-do="closeModal"]');
     }
   });
@@ -95,5 +97,23 @@ describe('the size of every modal in the game', () => {
       // One machine's card is a card, not a list (CLAUDE.md T17 2.6).
       machineCard: false,
     });
+  });
+
+  it('gives the machine card the middle folder, so its buttons are not under the fold', () => {
+    // The small folder is 62vh and the card is a picture, six figures and five buttons: measured
+    // on the real page, the buttons fell 73 px below the body (CLAUDE.md T17 2.6).
+    expect(MODAL_IS_WIDE).toEqual({
+      board: false,
+      laptop: false,
+      workPlan: false,
+      accounting: false,
+      catalogue: false,
+      shopping: false,
+      company: false,
+      settings: false,
+      machineCard: true,
+    });
+    const css = readFileSync('src/ui/styles.css', 'utf8');
+    expect(css).toContain('.modal-folder.modal-wide {');
   });
 });
