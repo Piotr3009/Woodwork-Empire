@@ -60,3 +60,12 @@ queue of section 4 names them.
   outer HTML is `closeButton()` to the character and shuts on a click, the Menu's is the same helper
   with the one action that differs, and the stylesheet carries no per skin cross and the source
   spells the class in one file.
+- **T18-05 Chips over tips (2.4).** `hallBottom` puts everything that stands under the hall in one
+  column, bottom left: `.hall-bottom`, with the chips of T17 2.5 first and the first use tip last,
+  both in the flow of that column. The chips are no longer placed on the view themselves, so a long
+  tip pushes them up instead of being covered by them, and the column stops 76 px short of the right
+  edge so a wide tip cannot run under the camera's three chips either. The tip is still `renderTip`
+  through the one `withTip` helper, and the office, which has no hall to stand under, has neither.
+  Done: `tests/ui/chipsOverTips.test.ts`, four tests: the DOM order of the column with a full bag
+  store making a second chip, the same order with a tip forty sentences long, the camera's own
+  corner, and neither of the two on the office.

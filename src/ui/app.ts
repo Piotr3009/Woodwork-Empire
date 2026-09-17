@@ -584,6 +584,14 @@ function hallControls(current: GameState): string {
   return `<div class="hall-chips">${chips.join('')}</div>`;
 }
 
+/** Everything that stands under the hall, in one column, bottom left: the chips of T17 2.5 first
+ *  and the first use tip last, both in the flow of the column, so a long tip pushes the chips up
+ *  instead of being covered by them and nothing ever overlaps whatever the tip's length
+ *  (PIOTR, 17.09; CLAUDE.md T18 2.4). The camera is its own thing, bottom right. */
+function hallBottom(current: GameState): string {
+  return `<div class="hall-bottom">${hallControls(current)}${hallTip(current)}</div>`;
+}
+
 /** The camera, bottom right: three small chips and nothing else. What the wheel and the drag do
  *  is a tip now, said once (CLAUDE.md T17 2.5). */
 function hallZoomControls(): string {
@@ -776,7 +784,7 @@ function pageBody(): string {
   const current = state;
   // The last word the company gets is the bankruptcy event, over the game over screen.
   if (current.gameOver) return renderGameOver(current);
-  const controls = ui.view === 'hall' ? hallControls(current) + hallZoomControls() : '';
+  const controls = ui.view === 'hall' ? hallBottom(current) + hallZoomControls() : '';
   const note = ui.note === '' ? '' : `<p class="view-note">${escapeHtml(ui.note)}</p>`;
   const toast = ui.toast === '' ? '' : `<p class="toast">${escapeHtml(ui.toast)}</p>`;
   const out = ui.view === 'sprites' ? '' : renderOwnerOut(current);
@@ -788,7 +796,7 @@ function pageBody(): string {
     toast +
     out +
     (ui.menuOpen ? renderMenu(current, ui.cloud) : '') +
-    `<main class="view">${SCENE_SLOT}${controls}${note}${hallTip(current)}</main>` +
+    `<main class="view">${SCENE_SLOT}${controls}${note}</main>` +
     renderWhy()
   );
 }

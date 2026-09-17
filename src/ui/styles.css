@@ -3305,15 +3305,40 @@ input.num {
   position: relative;
 }
 
-.hall-chips {
-  position: absolute;
-  left: 16px;
+/* Chips over tips (PIOTR, 17.09; CLAUDE.md T18 2.4). Everything under the hall is one column,
+   bottom left: the chips first and the first use tip last, both in the flow of that column, so
+   the tip is the last thing on the page whatever its length and the chips are pushed up by it
+   rather than sitting over it. The column stops short of the camera's three chips, bottom right
+   [TUNE: 76 px, which is the camera at its widest plus the gutter]. */
+.hall-bottom {
+  align-items: flex-start;
   bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  left: 16px;
+  pointer-events: none;
+  position: absolute;
+  right: 76px;
+  z-index: 2;
+}
+
+.hall-bottom > * {
+  max-width: 100%;
+  pointer-events: auto;
+}
+
+/* The tip in that column is the column's own last row: the 16 px it carries inside a modal body
+   would double the gap here. */
+.hall-bottom .tip-bubble {
+  margin: 0;
+}
+
+.hall-chips {
   display: flex;
   flex-direction: column;
   gap: 6px;
   align-items: flex-start;
-  z-index: 2;
 }
 
 .hall-chip {
