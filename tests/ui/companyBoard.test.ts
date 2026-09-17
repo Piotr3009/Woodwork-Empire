@@ -141,16 +141,21 @@ describe('the cross', () => {
     expect(cross).not.toBeNull();
     expect(cross?.getAttribute('data-do')).toBe('closeModal');
     // The disc: CLOSE_DISC 54 px, a 3 px oak border, the glyph in the title hand at the display
-    // size, half outside the top right corner.
-    const disc = ruleBody('.modal-felt .modal-close');
-    expect(disc).toContain('height: 54px;');
-    expect(disc).toContain('width: 54px;');
+    // size, hanging off the top right corner. Since T18 2.5 it is the one `.modal-close` rule and
+    // not the board's own, because every modal, page and card wears it now; what is left on the
+    // felt is the one figure its oak frame changes, which is how far the disc has to come out to
+    // hang off the frame by the same amount.
+    const disc = ruleBody('.modal-close');
+    expect(disc).toContain('height: var(--close-disc);');
+    expect(disc).toContain('width: var(--close-disc);');
     expect(disc).toContain('border-radius: 50%;');
-    expect(disc).toContain('border: 3px solid var(--oak-2);');
+    expect(disc).toContain('border: 3px solid var(--close-edge);');
     expect(disc).toContain('font-family: var(--font-title);');
     expect(disc).toContain('font-size: var(--fs-display);');
-    expect(disc).toContain('right: -27px;');
-    expect(disc).toContain('top: -27px;');
+    expect(disc).toContain('right: var(--close-out);');
+    expect(disc).toContain('top: var(--close-out);');
+    expect(ruleBody(':root')).toContain('--close-disc: 54px;');
+    expect(ruleBody('.modal-board.modal-felt')).toContain('--close-out: -27px;');
     // The root cause of the dead cross: the head and the body were both absolute with no stacking
     // order and the body came later, so it covered the head. The head is above the body now.
     const head = ruleBody('.modal-felt .modal-head');

@@ -46,3 +46,17 @@ queue of section 4 names them.
   all eight screens, every page of the laptop and the day end and asserts that none of them matches
   `day N` for the current day, or `day` followed by any number at all; twenty-one existing tests
   moved onto the formatter rather than onto a new hard-coded string.
+- **T18-04 One cross to close everything (2.5).** `closeButton(action)` in `src/ui/modal.ts` is the
+  one helper and the one markup; the modal layer calls it for every skin and the Menu calls it with
+  `closeMenu`. The disc itself is the one `.modal-close` rule in the stylesheet, lifted off the
+  Company board: a cream face, a 3 px oak edge, the glyph in the title hand at the display size,
+  54 px, hanging 11 px off the top right corner of whatever it shuts. The folder's small dark cross
+  in the corner, the board's pale one, the screen's grey one and the Menu's own are gone, and the
+  five figures behind the disc are tokens on `:root`, with one override each on the felt board and
+  the Menu because their own frame is padding and an absolute child is placed against the padding
+  box.
+  Done: `tests/ui/oneCross.test.ts`, four tests: the openers table is checked against `MODAL_IS_FULL`
+  so no `ModalId` can escape it, every one of the nine renders exactly one `.modal-close` whose
+  outer HTML is `closeButton()` to the character and shuts on a click, the Menu's is the same helper
+  with the one action that differs, and the stylesheet carries no per skin cross and the source
+  spells the class in one file.

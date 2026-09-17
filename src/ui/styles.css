@@ -11,6 +11,15 @@
   --bad: #c05a4e;
   /* The cream of the paper family, on the dark green cabinet of the top bar (T11 3.1). */
   --cream: #f3ecdc;
+  /* The one cross, off the Company board (CLAUDE.md T18 2.5) [TUNE]: the disc, its cream face,
+     its oak edge, its green glyph, and how far it hangs off the corner of whatever it shuts. A
+     panel that draws its own frame as padding overrides `--close-out` by that padding, because an
+     absolutely placed child is put against the padding box and not the border box. */
+  --close-disc: 54px;
+  --close-out: -11px;
+  --close-face: #f7f1e4;
+  --close-edge: #8a5424;
+  --close-ink: #1f5a3a;
   /* The system stack: the body, and the one font inside the laptop's screen (T14 2.1). */
   --font-ui: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 
@@ -948,18 +957,35 @@ input.num {
   padding: 8px 10px;
 }
 
+/* The one cross (PIOTR, 17.09; CLAUDE.md T18 2.5). It was the Company board's alone since Turn
+   15: a cream disc, CLOSE_DISC 54 px, a 3 px oak border, a shadow, the glyph in the title hand,
+   on the top right corner of the frame and hanging off it. Now every modal, every page and every
+   card wears it, out of the one `closeButton()` helper and this one rule, so nothing in the game
+   is shut by a different control. The three skins' own crosses are gone with the catalogue's
+   little dark one [TUNE: the disc, the glyph and how far it hangs off]. */
 .modal-close {
-  background: none;
-  border: none;
-  color: var(--text-dim);
+  background: var(--close-face);
+  border: 3px solid var(--close-edge);
+  border-radius: 50%;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+  color: var(--close-ink);
   cursor: pointer;
-  font-size: var(--fs-lead);
+  display: grid;
+  font-family: var(--font-title);
+  font-size: var(--fs-display);
+  height: var(--close-disc);
   line-height: 1;
-  padding: 0 4px;
+  padding: 0;
+  place-items: center;
+  position: absolute;
+  right: var(--close-out);
+  top: var(--close-out);
+  width: var(--close-disc);
+  z-index: 3;
 }
 
 .modal-close:hover {
-  color: var(--text);
+  color: var(--accent);
 }
 
 .choices {
@@ -2038,9 +2064,6 @@ input.num {
   letter-spacing: -0.01em;
 }
 
-.modal-folder .modal-close {
-  color: #444;
-}
 
 .modal-folder .modal-body {
   flex: 1;
@@ -2274,9 +2297,6 @@ input.num {
   color: #f6f8f9;
 }
 
-.modal-board .modal-close {
-  color: #cfd6da;
-}
 
 .modal-board .modal-body {
   margin: 0 10px;
@@ -2508,30 +2528,12 @@ input.num {
   width: 1px;
 }
 
-/* The cross: a cream disc, CLOSE_DISC 54 px, a 3 px oak border, a shadow, the glyph in the title
-   hand, on the top right corner of the frame and half outside it. The same data-do as every
-   other close (CLAUDE.md T15 2.1) [TUNE: the disc and the glyph size]. */
-.modal-felt .modal-close {
-  background: var(--cream);
-  border: 3px solid var(--oak-2);
-  border-radius: 50%;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
-  color: var(--sheet-green);
-  display: grid;
-  font-family: var(--font-title);
-  font-size: var(--fs-display);
-  height: 54px;
-  line-height: 1;
-  padding: 0;
-  place-items: center;
-  position: absolute;
-  right: -27px;
-  top: -27px;
-  width: 54px;
-}
-
-.modal-felt .modal-close:hover {
-  color: var(--accent);
+/* The board's oak frame is 16 px of padding, and the cross is placed against the padding box, so
+   its own figure is 16 px larger for the same overhang every other modal has. The disc itself is
+   the one `.modal-close` rule, which this board is where the game took it from (CLAUDE.md T15
+   2.1, T18 2.5). */
+.modal-board.modal-felt {
+  --close-out: -27px;
 }
 
 .modal-felt .modal-body {
@@ -3170,18 +3172,12 @@ input.num {
   font-weight: 700;
 }
 
-/* Phase B5 (REPORT-T13-B5.md, section 3) */
-.menu-close {
-  background: none;
-  border: 0;
-  color: #f5efe2;
-  cursor: pointer;
-  font-size: var(--fs-lead);
-  line-height: 1;
-  padding: 2px 6px;
-  position: absolute;
-  right: 6px;
-  top: 6px;
+/* Phase B5 (REPORT-T13-B5.md, section 3). The Menu's own cross is gone: it calls the one
+   `closeButton()` and wears the one `.modal-close`. Its 8 px of padding is added to the overhang
+   so the disc hangs off its corner by the same 11 px it hangs off a modal's
+   (CLAUDE.md T18 2.5). */
+.menu-pop {
+  --close-out: -19px;
 }
 
 .gear {
@@ -3542,9 +3538,6 @@ input.num {
   padding: 10px 16px 4px;
 }
 
-.modal-screen .modal-close {
-  color: #555;
-}
 
 .modal-screen .modal-body {
   padding: 6px 16px 14px;

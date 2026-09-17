@@ -66,9 +66,20 @@ export function signedFigure(text: string, value: number): string {
   return `<span class="figure${tone === '' ? '' : ` ${tone}`}">${escapeHtml(text)}</span>`;
 }
 
-const CROSS =
-  '<button class="modal-close" data-do="closeModal" title="Close" aria-label="Close">' +
-  '×</button>';
+/** The one close control in the game: the cross the Company board has, a cream disc on the top
+ *  right corner of the frame, half outside it. Every modal, every page and every card is shut by
+ *  this markup and this class, so a screen cannot wear a different cross from the one beside it,
+ *  and the catalogue's little dark cross in the corner is gone with the rest of them
+ *  (PIOTR, 17.09; CLAUDE.md T18 2.5). The action is the one thing that changes: a modal is shut
+ *  with `closeModal` and the Menu with `closeMenu`. */
+export function closeButton(action = 'closeModal'): string {
+  return (
+    `<button class="modal-close" data-do="${action}" title="Close" aria-label="Close">` +
+    '×</button>'
+  );
+}
+
+const CROSS = closeButton();
 
 /** Three families and nothing else (CLAUDE.md T11 1, T14 2.1). `folder` is paper on a kraft
  *  folder (SPRITES.md 11, the GPT asset ui.folder.png): the catalogue, the books, the desk and
