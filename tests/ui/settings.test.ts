@@ -126,6 +126,47 @@ describe('the settings modal', () => {
     const state = currentState();
     expect(state?.settings.tips).toBe(true);
     expect(root().querySelector('[data-modal="settings"] [data-tip="settings"]')).not.toBeNull();
+  });
+
+  // The three cases below were B3's to write and app.ts was frozen under it, so the click had no
+  // route until the integrator added `setSound` and `setVolume` (CLAUDE.md T19 3, the freeze).
+  it('mutes and unmutes from the row, one click each way', () => {
+    click('[data-modal="settings"] [data-do="setSound"][data-muted="1"]');
+    expect(currentState()?.settings.sound.muted).toBe(true);
+    // The lit chip follows the setting, so the player can see which way it is.
+    expect(
+      root().querySelector('[data-modal="settings"] [data-do="setSound"][data-muted="1"]')
+        ?.className,
+    ).toBe('chip is-on');
+    click('[data-modal="settings"] [data-do="setSound"][data-muted="0"]');
+    expect(currentState()?.settings.sound.muted).toBe(false);
+  });
+
+  it('steps the volume down and up, and never past its own ends', () => {
+    const volume = (): number => currentState()?.settings.sound.volume ?? -1;
+    const opened = volume();
+    click('[data-modal="settings"] [data-do="setVolume"][data-volume="0.6"]');
+    expect(volume()).toBeCloseTo(opened - 0.1, 5);
+    click('[data-modal="settings"] [data-do="setVolume"][data-volume="0.7"]');
+    expect(volume()).toBeCloseTo(opened, 5);
+    // All the way down: the last step disables itself rather than leaving a dead click.
+    let guard = 0;
+    while (volume() > 0 && guard < 20) {
+      const step = root().querySelector(
+        '[data-modal="settings"] [data-do="setVolume"]:not([disabled])',
+      );
+      const label = step?.textContent ?? '';
+      if (step === null || label !== 'Quieter') break;
+      step.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      guard += 1;
+    }
+    expect(volume()).toBeCloseTo(0, 5);
+    expect(
+      root().querySelectorAll('[data-modal="settings"] [data-do="setVolume"]:not([disabled])'),
+    ).toHaveLength(1);
+  });
+
+  it('closes on the one cross', () => {
     click('[data-modal="settings"] [data-do="closeModal"]');
     expect(root().querySelector('[data-modal="settings"]')).toBeNull();
   });

@@ -196,6 +196,7 @@ describe('through the page', () => {
     expect(currentState()?.owner.currentTaskId).toBeNull();
   });
 
+
   it('keeps the drawings page working inside the screen: a drawing starts', () => {
     openPage('drawings');
     const state = currentState();
@@ -208,6 +209,28 @@ describe('through the page', () => {
     expect(page()).toBe('drawings');
     click('[data-modal="laptop"] [data-do="pauseTask"]');
     expect(currentState()?.owner.currentTaskId).toBeNull();
+  });
+
+  // B3 wrote the button and the engine's half; app.ts was frozen under it, so the click had no
+  // route until the integrator added `queueTaskNext` (CLAUDE.md T19 3, the freeze). This is the
+  // one case that presses it on the running page (CLAUDE.md T19 2.12).
+  it('adds a second job of work behind the running one with one click, and keeps the first', () => {
+    openPage('tasks');
+    const state = currentState();
+    if (state === null) throw new Error('no game');
+    const open = state.tasks.filter((task) => !task.done);
+    const first = open[0];
+    const second = open[1];
+    if (first === undefined || second === undefined) throw new Error('two jobs of work wanted');
+    click(`[data-modal="laptop"] [data-do="startTask"][data-id="${first.id}"]`);
+    expect(currentState()?.owner.currentTaskId).toBe(first.id);
+    click(`[data-modal="laptop"] [data-do="queueTaskNext"][data-id="${second.id}"]`);
+    // The one he is on is still in his hands: Add as next never put it down.
+    expect(currentState()?.owner.currentTaskId).toBe(first.id);
+    expect(currentState()?.taskQueue).toContain(second.id);
+    // And the row that was pressed says where it stands, with no second button to press.
+    const row = root().querySelector(`[data-modal="laptop"] [data-task="${second.id}"]`);
+    expect(row?.querySelector('[data-do="queueTaskNext"]')).toBeNull();
   });
 });
 

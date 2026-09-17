@@ -212,3 +212,20 @@ one control a laptop task row carries and both its callers are B3's, so writing 
 anywhere else would have made two code paths for one button. Accepted.
 
 `npm run check` exit 0: 169 files, 1,661 tests.
+
+### T19-C1b The clicks B3 could not test, now that the routes are in
+
+B3's three new controls had no `data-do` route while `src/ui/app.ts` was frozen under it, so its
+own tests assert the markup and the engine's half and stop short of the click. With the routes
+applied, four cases are added that press them the way the player does:
+
+- `tests/ui/settings.test.ts`: the mute goes on and off from the row and the lit chip follows the
+  setting; the volume steps down and up by `VOLUME_STEP` and stops at nought with the last step
+  disabled rather than dead; the one cross still closes the modal.
+- `tests/ui/laptopPages.test.ts`: `Add as next` on a second job of work leaves the running one in
+  the owner's hands, puts the second in `taskQueue`, and takes its own button off that row.
+
+The laptop case sits at the end of its block on purpose: these tests drive one mounted game in
+sequence, and a case that leaves a task running changes what the next case can click.
+
+`npm run check` exit 0: 169 files, 1,665 tests.
