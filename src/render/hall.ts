@@ -8,6 +8,7 @@ import {
   GATE_CROWD_LIMIT,
   GATE_LAYOUT,
   PALLET_LAYOUT,
+  CLASS_BADGE,
   ROOM_DOOR,
   ROOM_LAYOUT,
   WELFARE_IN_THE_CANTEEN,
@@ -632,6 +633,7 @@ export function pipeCellArt(
   cell: { x: number; y: number },
   files: readonly string[],
   scale = 1,
+  landsAt = 0,
 ): string {
   const url = pickSprite(files, kind);
   if (url !== null) {
@@ -642,7 +644,7 @@ export function pipeCellArt(
     const centre = centreOf(cell.x, cell.y, 1, 1, DUCT_HEIGHT);
     return spriteImage(url, { x: centre.x - width / 2, y: centre.y - height / 2, width, height });
   }
-  return kind === 'gate.collar' ? gateCollarArt(cell) : pipeTile(kind, cell);
+  return kind === 'gate.collar' ? gateCollarArt(cell) : pipeTile(kind, cell, landsAt);
 }
 
 /** How much smaller than a cell the collar is drawn [TUNE]. */
@@ -683,7 +685,12 @@ export function pipeRunArt(
 ): string {
   const machine = state.equipment.find((item) => item.id === run.equipmentId);
   const running = machine !== undefined && machine.takenBy !== null;
-  const tiles = run.tiles.map((tile) => pipeCellArt(tile.key, tile, files)).join('');
+  // The drop lands on the machine's own top face, where its port is, and not on the floor of the
+  // cell it stands on (PIOTR, 16.09; CLAUDE.md T17 2.7).
+  const lands = machine === undefined ? 0 : footprintIn(machine).height;
+  const tiles = run.tiles
+    .map((tile) => pipeCellArt(tile.key, tile, files, 1, tile.key === 'pipe.drop' ? lands : 0))
+    .join('');
   return (
     `<g class="pipe${short && running ? ' pipe-short' : ''}" data-pipe="${escapeText(run.id)}" ` +
     `data-pipe-for="${escapeText(run.equipmentId)}">${tiles}</g>`
@@ -725,9 +732,12 @@ export function centralRunArt(state: GameState, files: readonly string[]): strin
     // The port is the drop, the wall the tee, and every cell between a straight length: the
     // same key rule the routed runs use (src/engine/pipes.ts).
     const keyed = cells.length === 1 ? [{ x: port.x, y: port.y, key: 'pipe.drop' }] : tileKeysFor(cells, 'tee');
+    const lands = footprintIn(item).height;
     drops.push(
       `<g class="pipe central-drop" data-central-for="${escapeText(item.id)}">` +
-        keyed.map((tile) => pipeCellArt(tile.key, tile, files)).join('') +
+        keyed
+          .map((tile) => pipeCellArt(tile.key, tile, files, 1, tile.key === 'pipe.drop' ? lands : 0))
+          .join('') +
         '</g>',
     );
   }
@@ -963,6 +973,36 @@ function capsuleBody(fill: string): string {
     `rx="${at(trunkWidth / 3)}" fill="${fill}" />` +
     `<circle cx="0" cy="${-px(CAPSULE_PARTS.headCentre)}" ` +
     `r="${px(CAPSULE_PARTS.headRadius)}" fill="${fill}" />`
+  );
+}
+
+/** How the number on the rack is set out [TUNE]: how far up the front face the plate sits, how
+ *  high the plate is in scene pixels, how wide a digit is on it, and the padding each side. The
+ *  type itself is `.rack-count` in the stylesheet, in the hand. */
+const RACK_COUNT = { up: 0.55, height: 26, digit: 15, pad: 9 };
+
+/** The sheets in the rack, over its own front face, big, in the hand, on the class's colour
+ *  (PIOTR, 17.09; CLAUDE.md T17 2.8). The count used to be glued into the object's name, and
+ *  `objectArt` throws the name away whenever a sprite file exists, so in the real game the number
+ *  was invisible: the rack draws it itself now, and it moves with the stock. */
+function rackCount(item: Equipment, sheets: number): string {
+  const stands = footprintIn(item);
+  const at = centreOf(
+    stands.x,
+    stands.y,
+    stands.width,
+    stands.depth,
+    stands.height * RACK_COUNT.up,
+  );
+  const text = String(Math.max(0, Math.round(sheets)));
+  const width = RACK_COUNT.pad * 2 + text.length * RACK_COUNT.digit;
+  const colour = CLASS_BADGE[item.variantId]?.colour ?? 'var(--kit-stock)';
+  return (
+    `<rect class="rack-count-plate" x="${round(at.x - width / 2)}" ` +
+    `y="${round(at.y - RACK_COUNT.height / 2)}" width="${width}" height="${RACK_COUNT.height}" ` +
+    `rx="${round(RACK_COUNT.height / 3)}" fill="${colour}" />` +
+    `<text class="rack-count" x="${round(at.x)}" ` +
+    `y="${round(at.y + RACK_COUNT.height / 3)}">${escapeText(text)}</text>`
   );
 }
 
@@ -1320,6 +1360,7 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
           label: name,
         }) +
         (unconnected ? notConnectedLabel(stands) : '') +
+        (sheetCapacityOf(item) > 0 ? rackCount(item, state.stock.sheets) : '') +
         fx.svg +
         '</g>',
     });

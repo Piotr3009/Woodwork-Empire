@@ -66,3 +66,35 @@ the task queue of section 5 names them.
   Done: `tests/ui/machineCard.test.ts` (the card is that machine's, Connect works from it, Move
   puts him on the floor, the Owned tab draws the same card) and `tests/ui/bagStore.test.ts` moved
   onto the card.
+- **T17-B1e Pipes that look like pipes, and the number on the rack (2.7, 2.8).** Every length of
+  pipe is three strokes of the one shape now: a wider bar, the shade along its underside and the
+  lighter edge along its top. An elbow is a quarter arc with no disc over a joint it has not got, a
+  straight run has no joint in the middle of it, a tee keeps its four arms and the body they meet
+  in, the drop lands on the machine's own top face as a short collar over its port instead of
+  going through it to the floor, and the inlet is a flange of two rings at the unit. The nine kinds
+  and their `data-pipe-tile` keys are untouched, so a delivered file still wins tile for tile. The
+  rack carries its own number over its front face, big, in the hand, on the class's colour, drawn
+  off the stock every render: it used to be glued into the object's name, which the sprite branch
+  throws away, so in the real game it was invisible.
+  Done: the three new pipe tests in `tests/render/pipesOnTheHall.test.ts` and the rack number test
+  in `tests/render/views.test.ts`, with Turn 16's own pipe tests still green.
+
+### Numbers chosen (B1, the hall)
+
+- **2.1** The placeholder man is `CAPSULE_HEIGHT_M` 1.8 m at `TILE_RISE` (24 px to the metre), so
+  43 px tall where the old capsule was 26. His proportions, in fractions of his own height
+  [TUNE in src/render/hall.ts]: head radius 0.1 at 0.88 up, shoulders 0.34 wide, trunk 0.78 down
+  to 0.42, legs 0.11 wide with a 0.04 gap, feet 0.16 long and 0.05 high.
+- **2.3** The helper's day is the clock's and not a meter of his own [TUNE in src/engine/staff.ts,
+  `booksTaskMinutes`]: he is on the floor, takes his dinner with the workshop and stays for the
+  owner's overtime like a joiner, so only the office has the 480 of `hasWorkingDay`.
+  `HELPER_CLEAN_DUST_BAND` is `'messy'` [TUNE in constants.ts]: he picks up a brush the moment the
+  hall stops being clean, which is the moment the dust starts costing output.
+- **2.2** The welfare kit is drawn on the canteen roof at `CANTEEN_KIT_HEIGHT` 0.3 m with a
+  `CANTEEN_KIT_INSET` of 0.15 of a cell [TUNE in src/render/hall.ts]: a plan of what is in there,
+  not kit standing on the roof.
+- **2.7** `PIPE_BAR_WIDEN` 1.5, so the bar is 7 px where it was 5; the shade and the edge are a
+  third of that off the middle; the shade is `rgba(0,0,0,0.35)`; the collar on a port stands
+  `COLLAR_DEPTH` 0.18 m proud of the machine's top face [TUNE in src/render/pipes.ts].
+- **2.8** The number on the rack sits `RACK_COUNT.up` 0.55 of the way up the front face on a plate
+  26 px high, 15 px a digit and 9 px of padding each side [TUNE in src/render/hall.ts].

@@ -1,9 +1,11 @@
+// @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
 import { footprintIn, hallProblems, renderHall, stationCell } from '../../src/render/hall';
 import { renderOffice } from '../../src/render/office';
 import { renderGameOver } from '../../src/ui/dayEnd';
 import { renderLaptop } from '../../src/ui/laptop';
-import { FINISHED_GOODS_LAYOUT } from '../../src/engine/constants';
+import { CLASS_BADGE, FINISHED_GOODS_LAYOUT } from '../../src/engine/constants';
+import { sheetCapacityOf } from '../../src/engine/machines';
 import { centreOf } from '../../src/render/iso';
 import type { GameState } from '../../src/engine/index';
 import { tick } from '../../src/engine/index';
@@ -468,5 +470,34 @@ describe('the office once the art side has painted the board and the book (chat 
     const drawn = renderOffice(state, viewport, []);
     expect(drawn).toContain('How the company is doing');
     expect(drawn).toContain('<span>Equipment</span>');
+  });
+});
+
+describe('the number on the rack (PIOTR, 17.09; CLAUDE.md T17 2.8)', () => {
+  it('is drawn over the rack itself, in the class colour, and moves with the stock', () => {
+    const state = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
+    state.stock.sheets = 12;
+    const item = state.equipment.find((entry) => sheetCapacityOf(entry) > 0);
+    if (item === undefined) throw new Error('no shelving in the hall');
+    const holder = document.createElement('div');
+    holder.innerHTML = `<svg>${renderHall(state)}</svg>`;
+    const rack = holder.querySelector(`[data-kit="${item.id}"]`);
+    expect(rack?.getAttribute('data-rack')).toBe('1');
+    expect(rack?.querySelector('.rack-count')?.textContent).toBe('12');
+    // On the class's own colour, which is what the badge on its card wears.
+    expect(rack?.querySelector('.rack-count-plate')?.getAttribute('fill')).toBe(
+      CLASS_BADGE[item.variantId]?.colour,
+    );
+    // Live: the number is drawn off the state every render, so it follows the rack's contents.
+    state.stock.sheets = 7;
+    holder.innerHTML = `<svg>${renderHall(state)}</svg>`;
+    expect(
+      holder.querySelector(`[data-kit="${item.id}"] .rack-count`)?.textContent,
+    ).toBe('7');
+    // And a cabinet, which is storage but holds no sheets, carries no number at all.
+    const cabinet = state.equipment.find((entry) => entry.specId === 'toolCabinet');
+    expect(
+      holder.querySelector(`[data-kit="${cabinet?.id}"] .rack-count`),
+    ).toBeNull();
   });
 });
