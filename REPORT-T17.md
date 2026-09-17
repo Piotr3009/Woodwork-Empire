@@ -225,3 +225,101 @@ the task queue of section 5 names them.
   and Machines sheet tests in `tests/ui/companyBoard.test.ts`, and the month end tests in
   `tests/ui/monthEnd.test.ts`, one of which reads the board and the folder over the same days and
   gets the same pound.
+- **T17-B3c Standing contracts on stock, and the express deadline (2.22, 2.23).** A contract's
+  material is sheets on the rack now, held for the week in hand the way a job holds what it has to
+  cut, drawn as the pieces are made and never bought as money on the contract line: the
+  `${name}: material` charge is gone, the stock page counts what a contract is holding, and a
+  contract never cuts into what a job has reserved. With nothing on the rack for the next piece the
+  men on it stand at their benches until a delivery lands. The tab shows the result with each man
+  on his own row, price less material less his own time at his own rate, and the offer says how
+  much of the rack a week of it takes. The table carries three lengths of work now, the cut sheet
+  pack, the drawer box (an hour at 8) and the wardrobe front (three days at 40), and the client
+  asks for a week's work of whichever was drawn rather than a flat count. A running contract can be
+  ended after its first month from the block itself, and before that the button says how long is
+  left. 2.23 was already done by phase A and is checked: `DEADLINE_EXPRESS_FACTOR` is 0.8 and
+  nothing else about express is touched.
+  Done: the new blocks in `tests/engine/contracts.test.ts` (the rack, the result, the way out, the
+  three lengths) and in `tests/ui/contracts.test.ts`, with the Turn 13 contract tests and the (v)
+  month rewritten for the wider table.
+
+### Numbers chosen (B3, the money)
+
+- **2.26 the window.** The board reads the rate over the last five closed working days
+  (`RATE_WEEK_DAYS`) and "last week" over the five before them: a rolling working week and not the
+  calendar's [TUNE], so the figure means the same on a Monday morning as on a Friday afternoon. The
+  day in hand is not in it: a day has paid for eight hours before it has had the chance to earn one
+  of them, so a live figure would read low every morning and say nothing. A day from before tonight
+  (paid hours 0, which is what the migration gives a v24 save) is left out of both.
+- **2.26 the hours paid.** Eight hours for every man whose start day has come, worked or not, on
+  holiday or off sick, which is the predicate the wage bills themselves use; eight for the owner on
+  every working day; and the minutes of the evening he actually stayed for on top. A weekend pays
+  nobody, and the clock never stands on one. It is worked out once, at the day's close, and the
+  same function answers for the day in hand, so the record and the live figure cannot disagree.
+- **2.26 the express uplift.** An express job's minute earns its share of the client's premium: the
+  whole uplift (the price less the base price) spread over the job's labour value, booked in
+  `addLabour` beside the labour itself. Only an express job carries one, so an ordinary job's
+  haggle never touches the figure and the owner alone at full work still reads exactly 40. Express
+  itself is untouched, as CLAUDE.md T17 6 says.
+- **2.26 per man.** The heads a day paid for are its paid hours less the owner's evening, over
+  eight; per man is the rate over the average of those heads across the window. So the owner's
+  overtime lengthens the hours paid without inventing a man to spread them over.
+- **2.24 the minus on a machine's row.** There is no per machine penalty in the engine: the air is
+  per compressor per minute and the extraction is one hall wide line. Each is shown on the row that
+  draws it, and nothing is invented: a machine that cannot run on the air it is given shows −100%
+  with the hall's own words for it, one whose compressor is short of litres shows
+  `LOW_AIR_FACTOR − 1` (−30%), and one with no pipe to the extraction shows
+  `−UNDER_EXTRACTION_OUTPUT_PENALTY` (−30%), which is the line the whole hall is carrying because
+  of it. The minus is printed, never multiplied into the saved minutes.
+- **2.24 the machines' own clocks.** `hoursThisWeek` starts again on the first working day of a new
+  week. `hoursThisMonth` starts again on the SECOND working day of a month [TUNE], because the
+  month end is raised and answered on the first and reads those hours: the run it measures is the
+  morning after one month end to the morning of the next, so every working day falls in exactly one
+  report and none in two.
+- **2.25 Total efficiency.** The percentage is the brief's own sum and nothing else: the month's
+  real work (the people minutes booked into the work) over the hours it paid for, which is a harder
+  figure than the day's efficiency and always under it. The month's labour and hours paid come off
+  the rate's own fold, so the section and the figure at the top of the report cannot disagree. The
+  hall line is the average of the day records' `hallFactor`, the waiting lines are the day's four
+  causes added up over the month, and the machines line names the three that saved the most.
+- **2.22 the two new pieces [TUNE].** The drawer box is Piotr's hour at 8: 60 minutes, 34 a piece
+  with 26 of material. The wardrobe front is his three days at 40: 1,440 minutes, 260 a piece with
+  220 of material. A piece's `labour` is the margin it carries, which is what the workshop earns by
+  making it, and its `sheets` is its material over `SHEET_VALUE`, so a 30 piece is 0.15 of a 200
+  sheet. The cut sheet pack's sheets figure moved from 1 to 0.15 for the same reason: at a whole
+  sheet a piece the client would have been paying 38 for 200 of material.
+- **2.22 the quantity.** The band of Turn 13 (20 to 40 a week, in fives) is drawn exactly as it was
+  and then read as a week's work rather than a count: `CONTRACT_QUANTITY_MINUTES` (45) is the piece
+  it was written for, so a 60 minute piece is asked for 15 to 30 a week and a three day piece one a
+  week. Every draw stays on `offerCarrier`, the side stream, so the main seeded stream is untouched
+  and no month of the game moves for anything but the contract itself. The contract itself does
+  move: `pick` takes no number at all from a one entry table (`int` returns early when the band is
+  a single value), so the piece draw that was free with one piece costs a draw with three, and the
+  quantity, the term and the client of a given seed's offer are not the ones Turn 13 measured. The
+  contract tests and the (v) month are rewritten for that.
+- **2.22 the reservation.** A contract holds what the week in hand still wants and no more [TUNE]:
+  a term runs for months and holding the whole of it would lock the rack for the year. It is held
+  every morning after the jobs have had theirs, it may only ever draw its own claim plus the sheets
+  nobody has a claim on, and it gives what it holds back when the term ends.
+- **2.22, the scripted player.** The autopilot takes the first contract on the board whose week of
+  work fits seven tenths of its crew's minutes [TUNE] and declines the rest, because the board
+  offers three lengths now and a contract nobody can keep up with is a point of reputation a week.
+  The 10.4 playthrough keeps sheets under it while a contract runs, restocking twenty at a time
+  when the free stock falls under six [TUNE].
+
+### What B3 could not do as the brief writes it
+
+- **2.22, "so a poor joiner shows a thinner margin than a good one".** The line is on the row and
+  it is his own, but the wage table of Turn 1 does not make the sentence true: a poor joiner at 480
+  a week works at 0.6 and a normal one at 640 works at 0.8, which is exactly the same money for the
+  same work, and a super joiner at 800 works at 0.9, which is a premium for the speed. So a cut
+  sheet pack shows the same result a piece with the poor man and the normal one, and a thinner one
+  with the super. The figure is right; the sentence was written about a wage table the game does
+  not have. Tests: `tests/engine/contracts.test.ts`, "the result with a man on it".
+- **2.22, what the rack rule did to the 10.4 playthrough on Easy.** A contract's material used to
+  be an unavoidable ledger line, which a broke workshop could put into the arrears and go on
+  producing; it is sheets now, and sheets have to be bought. The scripted Easy run is in the
+  overdraft from the end of month 1 and in arrears by month 3, so its contract goes short from week
+  9 and the month 3 efficiency falls away with it. The month 3 efficiency claim and the "every week
+  in full" claim of the brief's 10.4 now stand on the Very easy control, which has the money,
+  beside the crew claims B2 moved there for the same reason. Phase C should look at the Easy script
+  again when it re-runs the months.

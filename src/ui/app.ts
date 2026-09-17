@@ -1354,6 +1354,9 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
     case 'renewContract':
       dispatch({ type: 'RENEW_CONTRACT', contractId: id, accept: element.dataset.accept === '1' });
       return;
+    case 'endContract':
+      dispatch({ type: 'END_CONTRACT', contractId: id });
+      return;
     case 'setSecondShift':
       dispatch({ type: 'SET_SECOND_SHIFT', on: element.dataset.on === '1' });
       return;

@@ -41,12 +41,19 @@ export function canUnload(state: GameState): boolean {
   return rackCapacity(state) > 0;
 }
 
-/** Sheets on the rack held for accepted jobs and not yet cut (CLAUDE.md T13 3.2). */
+/** Sheets on the rack held for accepted jobs and running contracts and not yet cut
+ *  (CLAUDE.md T13 3.2, T17 2.22). A contract holds what the week in hand wants, the way a job
+ *  holds what it still has to cut; the contracts are read here rather than through contracts.ts,
+ *  which asks this file for the free stock. */
 export function reservedSheets(state: GameState): number {
   let reserved = 0;
   for (const job of state.jobs) {
     if (job.stage === 'completed') continue;
     reserved += job.sheetsReserved;
+  }
+  for (const contract of state.contracts) {
+    if (contract.status !== 'active') continue;
+    reserved += contract.sheetsReserved;
   }
   return reserved;
 }

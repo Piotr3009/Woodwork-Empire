@@ -1,16 +1,23 @@
 // A scripted player, so a whole month can be played the same way twice. It makes the decisions a
 // careful owner would make: advance the jobs, get the material in, then stand at the bench.
 
-import { DAY_END_MINUTE, SOLID_WOOD_EQUIPMENT } from '../../src/engine/constants';
+import {
+  DAY_END_MINUTE,
+  MINUTES_PER_WORKING_DAY,
+  SOLID_WOOD_EQUIPMENT,
+  WORKING_DAYS_PER_WEEK,
+} from '../../src/engine/constants';
 import {
   applyAction,
+  contractPiece,
   helperOnDuty,
+  joiners,
   shortfallOf,
   startTaskCheck,
   tick,
   unconnectedMachines,
 } from '../../src/engine/index';
-import type { GameEvent, GameState, TaskInstance } from '../../src/engine/index';
+import type { Contract, GameEvent, GameState, TaskInstance } from '../../src/engine/index';
 
 /** What the script answers when the clock stops for a decision. */
 export function answer(state: GameState, policy?: Policy): string {
@@ -363,14 +370,28 @@ function connectMachines(state: GameState): GameState {
   return next;
 }
 
-/** The first standing contract on the board is taken, and the first joiner put on it; nobody
- *  else is moved (CLAUDE.md T13 3.16). */
+/** A week of this contract against what the crew could put into it in a week, in owner minutes.
+ *  The board offers pieces of three lengths now and asks for a week's work of whichever it drew
+ *  (CLAUDE.md T17 2.22), so the scripted player takes what his crew can actually make and leaves
+ *  the rest, the way the tab's own result line tells a real one to [TUNE: seven tenths of the
+ *  crew's minutes, which is what the dinner, the hall and the owner's absence leave of them]. */
+function crewCanKeepUp(state: GameState, contract: Contract): boolean {
+  const week = contract.quantityPerWeek * contractPiece(contract).minutes;
+  const crew = joiners(state).reduce((total, worker) => total + worker.rate, 0);
+  return week <= crew * MINUTES_PER_WORKING_DAY * WORKING_DAYS_PER_WEEK * 0.7;
+}
+
+/** The first standing contract on the board the crew can keep up with is taken, and the first
+ *  joiner put on it; nobody else is moved (CLAUDE.md T13 3.16, T17 2.22). */
 function takeContract(state: GameState, policy: Policy): GameState {
   if (policy.takeContracts !== true) return state;
   // The first one offered, and no other while it runs: one standing bar on the plan.
   if (state.contracts.some((contract) => contract.status !== 'offered')) return state;
   const offered = state.contracts.find((contract) => contract.status === 'offered');
   if (!offered) return state;
+  if (!crewCanKeepUp(state, offered)) {
+    return applyAction(state, { type: 'DECLINE_CONTRACT', contractId: offered.id });
+  }
   let next = applyAction(state, { type: 'ACCEPT_CONTRACT', contractId: offered.id });
   const joiner = next.workers.find((worker) => worker.role === 'joiner');
   if (joiner) {

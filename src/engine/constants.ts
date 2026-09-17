@@ -3422,8 +3422,10 @@ export interface ContractPieceSpec {
   /** What the client pays a piece, and what the material in it costs. */
   price: number;
   material: number;
-  /** Whole sheets off the rack a piece takes. A contract's material comes off the rack like a
-   *  job's and is never bought as money on the contract line (CLAUDE.md T17 2.22). */
+  /** What a piece takes off the rack, in sheets: the material in it over what a sheet is worth,
+   *  so a piece with 30 of material in it is 0.15 of a 200 sheet. A contract's material comes off
+   *  the rack like a job's and is never bought as money on the contract line (T17 2.22). Whole
+   *  sheets are drawn as the pieces add up, the way a job draws them as it goes. */
   sheets: number;
   /** The labour value in a piece, in pounds: what the workshop earns by making it, which is what
    *  the workshop rate counts (CLAUDE.md T17 2.26). */
@@ -3431,14 +3433,16 @@ export interface ContractPieceSpec {
 }
 
 /** The pieces a contract can be for. `minutes` is owner minutes a piece, `price` what the client
- *  pays for one, `material` the money in its sheets, `sheets` the whole sheets it takes off the
- *  rack, and `labour` the labour value the workshop earns by making it (CLAUDE.md T13 3.16,
- *  T17 2.22, 2.26).
+ *  pays for one, `material` the money in its sheets, `sheets` what it takes off the rack, and
+ *  `labour` the labour value the workshop earns by making it (CLAUDE.md T13 3.16, T17 2.22, 2.26).
  *
- *  Tonight's one [TUNE]: cut sheet packs for a shop, cutting only, 45 minutes, sold at 38 with 30
- *  of material in it, which is one sheet off the rack and 8 of labour, the margin it always
- *  carried. Turn 17 adds the short and the long piece beside it, so the board can offer both
- *  kinds (T17-B3c). */
+ *  Three kinds, so the board offers work of different lengths and the player chooses (PIOTR,
+ *  17.09: "a piece may be an hour at 8 profit or three days at 40"; CLAUDE.md T17 2.22). The cut
+ *  sheet pack is Turn 13's own [TUNE]: cutting only, 45 minutes, sold at 38 with 30 of material in
+ *  it, which is 8 of labour and 0.15 of a sheet. The drawer box is the hour at 8 [TUNE: 34 a piece
+ *  with 26 of material], and the wardrobe front the three days at 40 [TUNE: 260 a piece with 220
+ *  of material]. `labour` is the margin the piece carries, which is what the workshop earns by
+ *  making it: repeat work is thin, and the workshop rate says so. */
 export const CONTRACT_PIECES: readonly ContractPieceSpec[] = [
   {
     id: 'cutSheetPack',
@@ -3447,10 +3451,36 @@ export const CONTRACT_PIECES: readonly ContractPieceSpec[] = [
     minutes: 45,
     price: 38,
     material: 30,
-    sheets: 1,
+    sheets: 0.15,
     labour: 8,
   },
+  {
+    id: 'drawerBox',
+    name: 'Drawer box',
+    stages: ['cutting', 'assembly'],
+    minutes: 60,
+    price: 34,
+    material: 26,
+    sheets: 0.13,
+    labour: 8,
+  },
+  {
+    id: 'wardrobeFront',
+    name: 'Wardrobe front',
+    stages: ['cutting', 'finishing'],
+    minutes: 3 * MINUTES_PER_WORKING_DAY,
+    price: 260,
+    material: 220,
+    sheets: 1.1,
+    labour: 40,
+  },
 ];
+
+/** The owner minutes one piece of the quantity band stands for: the band of Turn 13 is 20 to 40
+ *  cut sheet packs a week, which is the week's work the client is asking for. A longer piece is
+ *  asked for in proportion, so a contract for three day pieces wants one a week and not thirty
+ *  (CLAUDE.md T17 2.22). */
+export const CONTRACT_QUANTITY_MINUTES = 45;
 
 /** A contract may be ended by the player once it has run this long, and it costs nothing but the
  *  work he will not now do [TUNE: one month, as Piotr said] (CLAUDE.md T17 2.22). */

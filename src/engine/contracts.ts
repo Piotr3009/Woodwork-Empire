@@ -22,6 +22,7 @@ import {
   WORKING_DAYS_PER_WEEK,
   CONTRACT_OFFER_CHANCE_PER_DAY,
   CONTRACT_QUANTITY_STEP,
+  CONTRACT_QUANTITY_MINUTES,
   CONTRACT_CLIENTS,
   CONTRACT_FREE_END_DAYS,
 } from './constants';
@@ -31,6 +32,7 @@ import { plural } from './text';
 import { charge, formatMoney } from './economy';
 import { queueEvent } from './events';
 import { findJob, releaseJob, stagedJob, workerMinuteCost } from './jobs';
+import { freeSheets } from './materials';
 import {
   accumulateMachineMinute,
   bagsFull,
@@ -156,6 +158,99 @@ export function weekOfTerm(contract: Contract, day: number): number {
   return weekOfDay(day) - weekOfDay(contract.startDay) + 1;
 }
 
+/** Pieces a week of this piece for a week's work drawn in cut sheet packs: the same minutes of
+ *  work whatever the piece is, and never less than one (CLAUDE.md T17 2.22). */
+export function quantityForPiece(piece: ContractPieceSpec, wanted: number): number {
+  if (piece.minutes <= 0) return wanted;
+  return Math.max(1, Math.round((wanted * CONTRACT_QUANTITY_MINUTES) / piece.minutes));
+}
+
+// ---------------------------------------------------------------------------
+// The material (PIOTR, 17.09; CLAUDE.md T17 2.22): a contract's sheets come off the rack the way
+// a job's do, held while the week runs and drawn as the pieces are made. Nothing is bought on the
+// contract line any more.
+// ---------------------------------------------------------------------------
+
+/** Whole sheets this many pieces of this piece take off the rack, rounded up the way a job's
+ *  are: the bench always holds the sheet it is cutting (CLAUDE.md T2 3.6). */
+export function sheetsForPieces(piece: ContractPieceSpec, pieces: number): number {
+  if (piece.sheets <= 0 || pieces <= 0) return 0;
+  return Math.ceil(pieces * piece.sheets);
+}
+
+/** Sheets the week in hand still wants and the contract has not got a claim on. */
+export function contractShortfall(state: GameState, contract: Contract): number {
+  const left = Math.max(0, weekWanted(contract, state.clock.day) - contract.piecesThisWeek);
+  const wants = sheetsForPieces(contractPiece(contract), left);
+  return Math.max(0, wants - contract.sheetsReserved);
+}
+
+/** Holds what the rack can spare for the week in hand, up to what it wants. Returns what it
+ *  held, like the job side's own `reserveSheetsFor`. */
+export function reserveContractSheets(state: GameState, contract: Contract): number {
+  if (contract.status !== 'active') return 0;
+  const held = Math.min(contractShortfall(state, contract), freeSheets(state));
+  if (held <= 0) return 0;
+  contract.sheetsReserved += held;
+  return held;
+}
+
+/** Sheets the next piece owes the rack, over what has been drawn for the pieces before it. */
+function sheetsOwedByContract(contract: Contract, piece: ContractPieceSpec): number {
+  return sheetsForPieces(piece, contract.piecesMade + 1) - contract.sheetsUsed;
+}
+
+/** What this contract may take off the rack: what it is holding, and the sheets nobody has a
+ *  claim on. It never cuts into what a job is holding (CLAUDE.md T13 3.2). */
+function sheetsOpenTo(state: GameState, contract: Contract): number {
+  return contract.sheetsReserved + freeSheets(state);
+}
+
+/** True while the rack cannot give this contract the sheets its next piece needs: the men on it
+ *  stand at their benches until a delivery lands, the way a job waits for material. */
+export function contractWaitingForMaterial(state: GameState, contract: Contract): boolean {
+  const due = sheetsOwedByContract(contract, contractPiece(contract));
+  return due > 0 && sheetsOpenTo(state, contract) < due;
+}
+
+/** Takes the finished piece's sheets off the rack, out of what was held for it first. False when
+ *  the rack cannot supply them, and then the piece is not booked. */
+function drawContractSheets(state: GameState, contract: Contract, piece: ContractPieceSpec): boolean {
+  const due = sheetsOwedByContract(contract, piece);
+  if (due <= 0) return true;
+  if (sheetsOpenTo(state, contract) < due) return false;
+  state.stock.sheets -= due;
+  contract.sheetsUsed += due;
+  contract.sheetsReserved = Math.max(0, contract.sheetsReserved - due);
+  return true;
+}
+
+/** What one piece comes to with one man on it. */
+export interface ContractResult {
+  /** Minutes this man takes over a piece, at his rate. */
+  minutes: number;
+  labourCost: number;
+  margin: number;
+}
+
+/** What one piece is worth with this man on it: the price less the material in it and less what
+ *  his own time costs, so the result of putting him on it is on his own row before he is put on
+ *  it (PIOTR, 17.09; CLAUDE.md T17 2.22). A slower man takes more minutes over a piece, and what
+ *  those minutes cost is his own weekly wage: the wage table pays the poor man and the normal one
+ *  the same money for the same work and the super one a premium for his speed, so the thinner
+ *  margin is not always the poorer man's. The owner is never on a contract. */
+export function contractResultFor(contract: Contract, worker: Worker): ContractResult {
+  const piece = contractPiece(contract);
+  const rate = worker.rate > 0 ? worker.rate : 1;
+  const minutes = piece.minutes / rate;
+  const labourCost = pence(minutes * workerMinuteCost(worker.weeklyWage));
+  return {
+    minutes: Math.round(minutes),
+    labourCost,
+    margin: pence(contract.pricePerPiece - piece.material - labourCost),
+  };
+}
+
 /** The stream the offers are drawn off: seeded from the game's seed and the day, so the same
  *  game rings the same shop on the same day, and the day's other rolls (the burglary, the
  *  accident, the quits) read the same numbers whether or not a contract is on the board. A draw
@@ -169,12 +264,17 @@ export function offerCarrier(state: GameState): RngCarrier {
 export function drawContract(state: GameState, carrier: RngCarrier = state): Contract {
   const piece = pick(carrier, CONTRACT_PIECES) ?? contractPiece({ pieceId: 'cutSheetPack' } as Contract);
   const client = pick(carrier, CONTRACT_CLIENTS) ?? 'a shop';
-  const quantityPerWeek =
+  // The client asks for a week's work, not a count: the band is drawn in cut sheet packs, the
+  // piece it was written for, and turned into pieces of the one that was drawn, so a contract for
+  // three day pieces wants one a week (CLAUDE.md T17 2.22). The draw itself is unchanged, so the
+  // stream is the same shape it was.
+  const wanted =
     int(
       carrier,
       Math.ceil(CONTRACT_QUANTITY_PER_WEEK_MIN / CONTRACT_QUANTITY_STEP),
       Math.floor(CONTRACT_QUANTITY_PER_WEEK_MAX / CONTRACT_QUANTITY_STEP),
     ) * CONTRACT_QUANTITY_STEP;
+  const quantityPerWeek = quantityForPiece(piece, wanted);
   const months = int(carrier, CONTRACT_TERM_MONTHS_MIN, CONTRACT_TERM_MONTHS_MAX);
   return {
     // Named by the day it was offered, one offer a day at most: the id counter is left alone, so
@@ -332,23 +432,24 @@ export interface ContractMinute {
   bagsFilled: boolean;
 }
 
-/** A piece is done: the revenue and the material go through the ledger, one line a day each, and
- *  the totals for the closing report move (CLAUDE.md T13 3.16). */
-function finishPiece(state: GameState, contract: Contract, piece: ContractPieceSpec): void {
+/** A piece is done: the revenue goes through the ledger, one growing line a day, the sheets in it
+ *  come off the rack and the totals for the closing report move (CLAUDE.md T13 3.16, T17 2.22).
+ *  False when the rack could not cover it, and then nothing is booked at all. */
+function finishPiece(state: GameState, contract: Contract, piece: ContractPieceSpec): boolean {
+  // The material is on the rack and is taken off it, never bought on the contract line: a piece
+  // the rack cannot cover is not made (CLAUDE.md T17 2.22).
+  if (!drawContractSheets(state, contract, piece)) return false;
   contract.pieceMinutes = Math.round((contract.pieceMinutes - piece.minutes) * 10000) / 10000;
   contract.piecesThisWeek += 1;
   contract.piecesMade += 1;
   contract.revenue = pence(contract.revenue + contract.pricePerPiece);
   contract.materialCost = pence(contract.materialCost + piece.material);
   charge(state, 'contract', `${contract.name}: pieces`, contract.pricePerPiece, { merge: true });
-  charge(state, 'contract', `${contract.name}: material`, -piece.material, {
-    unavoidable: true,
-    merge: true,
-  });
   // What the workshop earned by making it, which is what the rate counts: the piece's own labour
   // and not its margin, so the day's labour value means one thing whatever produced it
   // (CLAUDE.md T17 2.26).
   state.dayStats.labourValue = Math.round((state.dayStats.labourValue + piece.labour) * 10000) / 10000;
+  return true;
 }
 
 /** One production minute of every man on a contract: the piece in hand moves on at his rate and
@@ -368,6 +469,17 @@ export function runContractMinute(state: GameState): ContractMinute {
   let hall: number | null = null;
   for (const contract of active) {
     const piece = contractPiece(contract);
+    // Nothing on the rack for the next piece: the men on it stand at their benches, the way a job
+    // waits for its material (CLAUDE.md T17 2.22).
+    if (contractWaitingForMaterial(state, contract)) {
+      for (const worker of contractHands(state, contract)) {
+        // The marker goes back on, as it does on a working minute, so the jobs leave him where
+        // he is instead of handing him work he cannot take.
+        worker.jobId = contractMarker(contract.id);
+        worker.station = STATION_BENCH;
+      }
+      continue;
+    }
     for (const worker of contractHands(state, contract)) {
       // The jobs' own hook writes the marker off every minute it finds no job behind it; it goes
       // back on here, so the man stays on the contract between the minutes.
@@ -407,7 +519,9 @@ export function runContractMinute(state: GameState): ContractMinute {
       state.dayStats.workMinutes += 1;
       result.worked += away;
       if (machineId !== null) used.set(machineId, (used.get(machineId) ?? 0) + 1);
-      while (contract.pieceMinutes >= piece.minutes) finishPiece(state, contract, piece);
+      while (contract.pieceMinutes >= piece.minutes) {
+        if (!finishPiece(state, contract, piece)) break;
+      }
     }
   }
   if (used.size > 0 && accumulateMachineMinute(state, used)) result.bagsFilled = true;
@@ -520,6 +634,8 @@ export function endContract(state: GameState, contract: Contract): void {
   }
   contract.assigned = [];
   contract.status = 'ended';
+  // What it held on the rack goes back to the free stock (CLAUDE.md T17 2.22).
+  contract.sheetsReserved = 0;
   const report = closingReport(state, contract);
   queueEvent(state, {
     kind: 'contractEnded',
@@ -550,6 +666,9 @@ export function runContractDay(state: GameState): void {
       closeWeek(state, contract);
     }
     if (contract.endDay !== null && today > contract.endDay) endContract(state, contract);
+    // What the week wants off the rack is held this morning, after the jobs have had theirs
+    // (CLAUDE.md T17 2.22).
+    if (contract.status === 'active') reserveContractSheets(state, contract);
   }
 }
 
@@ -606,6 +725,8 @@ export function renewContract(state: GameState, contractId: string, accept: bool
     piecesThisWeek: 0,
     pieceMinutes: 0,
     weeks: [],
+    sheetsReserved: 0,
+    sheetsUsed: 0,
     piecesMade: 0,
     revenue: 0,
     materialCost: 0,

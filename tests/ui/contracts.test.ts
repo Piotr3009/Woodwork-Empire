@@ -2,12 +2,14 @@
 // The Contracts tab beside Orders and the standing bar on the Work Plan (CLAUDE.md T13 3.16).
 
 import { describe, expect, it } from 'vitest';
-import { WORKER_RATES } from '../../src/engine/constants';
+import { CONTRACT_FREE_END_DAYS, WORKER_RATES } from '../../src/engine/constants';
 import {
   acceptContract,
   assignContract,
+  contractResultFor,
   drawContract,
   endContract,
+  reserveContractSheets,
 } from '../../src/engine/contracts';
 import { renderContractBar, renderContracts } from '../../src/ui/contracts';
 import { renderWorkPlan } from '../../src/ui/workPlan';
@@ -57,8 +59,13 @@ function hall(): GameState {
   return state;
 }
 
+/** An offer on the board for the cut sheet pack, whatever the stream drew: this file is about
+ *  what the tab prints, and the board offers three lengths of work now (CLAUDE.md T17 2.22). */
 function offered(state: GameState): Contract {
   const contract = drawContract(state);
+  contract.pieceId = 'cutSheetPack';
+  contract.name = 'Cut sheet packs for a shop';
+  contract.pricePerPiece = 38;
   contract.quantityPerWeek = 60;
   state.contracts.push(contract);
   return contract;
@@ -144,6 +151,47 @@ describe('the Contracts tab', () => {
     expect(renew?.getAttribute('data-id')).toBe(contract.id);
     expect(renew?.textContent).toContain('Renew at £39');
     expect(go?.textContent).toBe('Let it go');
+  });
+});
+
+describe('the material and the way out (CLAUDE.md T17 2.22)', () => {
+  it('shows what the contract makes with each man on it, on his own row', () => {
+    const state = hall();
+    const contract = offered(state);
+    acceptContract(state, contract.id);
+    const page = parse(renderContracts(state));
+    const row = page.querySelector(`.contract-active [data-worker="staff-1"]`);
+    const result = contractResultFor(contract, state.workers[0] as Worker);
+    expect(row?.querySelector('small')?.textContent).toBe(
+      `${result.minutes} minutes a piece, £15 of his time: -£7 a piece`,
+    );
+    expect(row?.querySelector('.row-figure')?.className).toContain('bad');
+  });
+
+  it('says the material is off the rack, and how much of it a week takes', () => {
+    const state = hall();
+    const contract = offered(state);
+    const tile = parse(renderContracts(state)).querySelector('.tile');
+    expect(tile?.textContent).toContain('It comes off the rack: about 9 sheets a week');
+    acceptContract(state, contract.id);
+    reserveContractSheets(state, contract);
+    const block = parse(renderContracts(state)).querySelector('.contract-active');
+    expect(block?.textContent).toContain('9 sheets held on the rack');
+  });
+
+  it('locks End it inside the first month with the days to go, and offers it after', () => {
+    const state = hall();
+    const contract = offered(state);
+    acceptContract(state, contract.id);
+    const locked = parse(renderContracts(state)).querySelector('.contract-active .row-action');
+    expect(locked?.textContent).toContain('End it');
+    expect(locked?.querySelector('[data-do="endContract"]')).toBeNull();
+    expect(locked?.querySelector('[title]')?.getAttribute('title')).toContain('The first month stands');
+    state.clock.day += CONTRACT_FREE_END_DAYS;
+    const open = parse(renderContracts(state)).querySelector('.contract-active .row-action');
+    const end = open?.querySelector('[data-do="endContract"]');
+    expect(end?.getAttribute('data-id')).toBe(contract.id);
+    expect(end?.textContent).toBe('End it');
   });
 });
 

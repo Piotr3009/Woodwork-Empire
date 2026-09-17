@@ -18,7 +18,13 @@ import {
   weekWanted,
   joiners,
 } from '../engine/index';
-import type { Contract, GameState } from '../engine/index';
+import {
+  contractResultFor,
+  contractShortfall,
+  endContractCheck,
+  sheetsForPieces,
+} from '../engine/contracts';
+import type { Contract, GameState, Worker } from '../engine/index';
 import {
   button,
   days,
@@ -40,13 +46,27 @@ function figureRow(label: string, value: number, signed = true): string {
   );
 }
 
-/** What a piece is, in the words the offer and the bar both use. */
+/** What a piece is, in the words the offer and the bar both use. The material is off the rack
+ *  now, so the line says how much of the rack a week of it takes (CLAUDE.md T17 2.22). */
 function pieceLine(contract: Contract): string {
   const piece = contractPiece(contract);
   const margin = contract.pricePerPiece - piece.material;
+  const week = sheetsForPieces(piece, contract.quantityPerWeek);
   return (
     `${piece.minutes} minutes of ${piece.stages.join(' and ')} a piece, ` +
-    `${money(piece.material)} of material in it: ${money(margin)} a piece before labour.`
+    `${money(piece.material)} of material in it: ${money(margin)} a piece before labour. ` +
+    `It comes off the rack: about ${plural(week, 'sheet', 'sheets')} a week.`
+  );
+}
+
+/** What the contract makes with this man on it: the price less the material in the piece and less
+ *  what his own time costs at his own rate, so the player sees the result of putting him on it
+ *  before he does (PIOTR, 17.09; CLAUDE.md T17 2.22). */
+function resultLine(contract: Contract, worker: Worker): string {
+  const result = contractResultFor(contract, worker);
+  return (
+    `${result.minutes} minutes a piece, ${money(result.labourCost)} of his time: ` +
+    `${signedMoney(result.margin)} a piece`
   );
 }
 
@@ -87,9 +107,12 @@ function peopleRows(state: GameState, contract: Contract): string {
           ? button('assignContract', 'Put on it', `data-id="${contract.id}" data-worker="${worker.id}" data-on="1"`)
           : lockedButton('Put on it', check.reason);
       const doing = on ? 'on the contract' : worker.jobId === null ? 'free' : 'on a job';
+      const result = contractResultFor(contract, worker);
       return (
-        `<div class="row${on ? ' is-on-contract' : ''}"><span class="row-main">${escapeHtml(worker.name)}</span>` +
-        `<span class="row-figure">${escapeHtml(doing)}</span>` +
+        `<div class="row${on ? ' is-on-contract' : ''}" data-worker="${worker.id}">` +
+        `<span class="row-main">${escapeHtml(worker.name)}` +
+        `<small>${escapeHtml(resultLine(contract, worker))}</small></span>` +
+        `<span class="row-figure${result.margin < 0 ? ' bad' : ' good'}">${escapeHtml(doing)}</span>` +
         `<span class="row-action">${control}</span></div>`
       );
     })
@@ -118,12 +141,23 @@ function historyRows(contract: Contract): string {
 
 function activeBlock(state: GameState, contract: Contract): string {
   const day = state.clock.day;
+  // The first month stands; after it he may walk away for nothing but the work (T17 2.22).
+  const ending = endContractCheck(state, contract.id);
+  const endIt = ending.ok
+    ? button('endContract', 'End it', `data-id="${contract.id}"`)
+    : lockedButton('End it', ending.reason);
+  const held =
+    contract.sheetsReserved > 0 || contractShortfall(state, contract) > 0
+      ? ` · ${plural(contract.sheetsReserved, 'sheet', 'sheets')} held on the rack` +
+        (contractShortfall(state, contract) > 0 ? ', the rack is short' : '')
+      : '';
   return (
     `<div class="contract-active" data-contract="${contract.id}">` +
-    `<h3>${escapeHtml(contract.name)}</h3>` +
+    `<div class="row"><span class="row-main"><h3>${escapeHtml(contract.name)}</h3></span>` +
+    `<span class="row-action">${endIt}</span></div>` +
     `<p class="figures"><strong class="contract-count">${escapeHtml(contractCounterLine(contract, day))}</strong> · ` +
     `week ${weekOfTerm(contract, day)} of ${contract.termWeeks}, ends day ${contract.endDay ?? day} · ` +
-    `${money(contract.pricePerPiece)} a piece</p>` +
+    `${money(contract.pricePerPiece)} a piece${escapeHtml(held)}</p>` +
     `<p class="hint">${escapeHtml(pieceLine(contract))} The saw stays in the general queue: ` +
     'a better one makes more pieces without a click.</p>' +
     '<h4>People</h4>' +

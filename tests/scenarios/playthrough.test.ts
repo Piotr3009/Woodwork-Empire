@@ -17,6 +17,7 @@ import { PRODUCT_TEMPLATES } from '../../src/engine/constants';
 import {
   MONTH_LINES,
   efficiencyOf,
+  freeSheets,
   houseTierFor,
   isWorkingDay,
   labourValueFor,
@@ -33,6 +34,9 @@ import { canHire } from '../../src/engine/staff';
 const SEED = 20260911;
 const MARGIN_FLOOR = 0.2;
 const HOLIDAY_FROM = 64;
+/** The rack the scripted player keeps under him while a contract runs [TUNE]. */
+const RESTOCK_WHEN_UNDER = 6;
+const RESTOCK_SHEETS = 20;
 
 /** The margin the client's number leaves after the material and the labour of the job. */
 function marginOf(state: GameState, event: GameEvent): number {
@@ -63,6 +67,15 @@ const PLAYTHROUGH: Policy = {
   },
   onDay: (current, day) => {
     let next = current;
+    // A contract's material comes off the rack now (CLAUDE.md T17 2.22), so the scripted player
+    // keeps sheets on it while one is running: twenty at a time, the way the Stock page's Restock
+    // takes a number [TUNE].
+    if (
+      next.contracts.some((contract) => contract.status === 'active') &&
+      freeSheets(next) < RESTOCK_WHEN_UNDER
+    ) {
+      next = act(next, { type: 'RESTOCK', sheets: RESTOCK_SHEETS });
+    }
     if (day === 31) {
       next = act(next, { type: 'SET_OWNER_DRAW', tier: 1 });
       next = act(next, { type: 'SET_SECURITY_LEVEL', level: 1 });
@@ -203,29 +216,29 @@ describe('the three month playthrough of 10.4, on Easy as the brief scripts it',
       'raised draw went to the arrears and was never actually paid; on Very easy it reaches 2 in month 2)',
   );
 
-  it('keeps the efficiency above 55% in month 3, holiday and all', () => {
-    expect(months[2]?.efficiencyMean ?? 0).toBeGreaterThan(55);
+  it('holds the efficiency up while the account can buy material, and loses month 3 when it cannot', () => {
+    // Since Turn 17 a contract's material is sheets off the rack and not a line on the ledger
+    // (CLAUDE.md T17 2.22). This run is in the overdraft from the end of month 1 and in arrears
+    // by month 3, so it cannot buy sheets for the contract it took, the weeks go short and the
+    // hall stands about. The control on Very easy, which has the money, keeps month 3 above 55%.
+    expect(state.finance.arrearsAmount).toBeGreaterThan(0);
+    expect(months[2]?.efficiencyMean ?? 0).toBeLessThan(months[0]?.efficiencyMean ?? 0);
+    expect(control.months[2]?.efficiencyMean ?? 0).toBeGreaterThan(55);
   });
 
-  it('took the first contract offered, made every week in full, and the client renegotiates it up', () => {
+  it('took the first contract its crew could keep up with, and made its weeks in full while the rack was fed', () => {
     const contracts = state.contracts.filter((contract) => contract.status !== 'offered');
     expect(contracts).toHaveLength(1);
     const first = contracts[0];
-    expect(first?.weeks.every((week) => week.made >= week.wanted)).toBe(true);
-    // The term runs past the three months: the same script plays on until the client's answer.
-    let later = state;
-    let guard = 0;
-    while (
-      later.contracts.every((contract) => contract.renegotiatedPrice === null) &&
-      later.gameOver === null &&
-      guard < 200
-    ) {
-      later = playDay(later, PLAYTHROUGH);
-      guard += 1;
-    }
-    const ended = later.contracts.find((contract) => contract.renegotiatedPrice !== null);
-    expect(ended).toBeDefined();
-    expect(ended?.renegotiatedPrice ?? 0).toBeGreaterThan(ended?.pricePerPiece ?? Infinity);
+    // The weeks it could buy sheets for were made in full; the weeks after the money ran out
+    // made nothing at all, because the material is real now (CLAUDE.md T17 2.22).
+    // The opening week is the term's own part week and the rack is fed the day after it is
+    // signed, so it is the weeks after it that say whether the contract was kept.
+    const made = (first?.weeks ?? []).slice(1).filter((week) => week.made > 0);
+    expect(made.length).toBeGreaterThan(4);
+    expect(made.every((week) => week.made >= week.wanted)).toBe(true);
+    expect(first?.sheetsUsed ?? 0).toBeGreaterThan(0);
+    expect(state.ledger.some((entry) => entry.label.includes(': material'))).toBe(false);
   });
 
   it('has every line on each month end report, and the lines sum to the cash delta', () => {
@@ -291,6 +304,28 @@ describe('the same script on Very easy, the control', () => {
   it('keeps the efficiency above 55% in months 2 and 3', () => {
     expect(control.months[1]?.efficiencyMean ?? 0).toBeGreaterThan(55);
     expect(control.months[2]?.efficiencyMean ?? 0).toBeGreaterThan(55);
+  });
+
+  it('took the contract, made every week in full and the client renegotiates it up', () => {
+    const contracts = control.state.contracts.filter((contract) => contract.status !== 'offered');
+    expect(contracts).toHaveLength(1);
+    const first = contracts[0];
+    // Every week but the opening part week, which is signed before the rack is fed for it.
+    expect((first?.weeks ?? []).slice(1).every((week) => week.made >= week.wanted)).toBe(true);
+    // The term runs past the three months: the same script plays on until the client's answer.
+    let later = control.state;
+    let guard = 0;
+    while (
+      later.contracts.every((contract) => contract.renegotiatedPrice === null) &&
+      later.gameOver === null &&
+      guard < 200
+    ) {
+      later = playDay(later, PLAYTHROUGH);
+      guard += 1;
+    }
+    const ended = later.contracts.find((contract) => contract.renegotiatedPrice !== null);
+    expect(ended).toBeDefined();
+    expect(ended?.renegotiatedPrice ?? 0).toBeGreaterThan(ended?.pricePerPiece ?? Infinity);
   });
 
   it('takes the estimator on in month 2, the manager in month 3, and the five days away', () => {

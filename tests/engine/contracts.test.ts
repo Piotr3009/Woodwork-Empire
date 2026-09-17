@@ -16,7 +16,12 @@ import {
   DAYS_PER_WEEK,
   WORKER_RATES,
   CONTRACT_QUANTITY_STEP,
+  CONTRACT_QUANTITY_MINUTES,
+  CONTRACT_FREE_END_DAYS,
+  MINUTES_PER_WORKING_DAY,
+  SHEET_VALUE,
 } from '../../src/engine/constants';
+import type { ContractPieceSpec } from '../../src/engine/constants';
 import {
   acceptContract,
   activeContracts,
@@ -25,7 +30,16 @@ import {
   contractCounterLine,
   contractMarker,
   contractMen,
+  contractPiece,
+  contractResultFor,
+  contractShortfall,
   contractStationFor,
+  contractWaitingForMaterial,
+  endContractCheck,
+  endContractNow,
+  offerCarrier,
+  quantityForPiece,
+  reserveContractSheets,
   declineContract,
   drawContract,
   endedContracts,
@@ -35,10 +49,12 @@ import {
   renewContract,
   runContractDay,
   runContractMinute,
+  sheetsForPieces,
   termWeeksFor,
   weekWanted,
 } from '../../src/engine/contracts';
 import { workerMinuteCost } from '../../src/engine/jobs';
+import { freeSheets, reservedSheets } from '../../src/engine/materials';
 import { hallProductivityFactor, variantFor } from '../../src/engine/machines';
 import { staffOutputFactor } from '../../src/engine/owner';
 import type { Contract, GameState, Worker } from '../../src/engine/index';
@@ -141,14 +157,18 @@ describe('the offer', () => {
     if (!contract) return;
     expect(days).toBeLessThan(60);
     expect(contract.status).toBe('offered');
-    expect(contract.pieceId).toBe(CONTRACT_PIECES[0]?.id);
-    expect(contract.name).toContain('Cut sheet packs for ');
-    expect(contract.quantityPerWeek).toBeGreaterThanOrEqual(CONTRACT_QUANTITY_PER_WEEK_MIN);
-    expect(contract.quantityPerWeek).toBeLessThanOrEqual(CONTRACT_QUANTITY_PER_WEEK_MAX);
-    expect(contract.quantityPerWeek % CONTRACT_QUANTITY_STEP).toBe(0);
+    // One of the three pieces the board offers now, of whatever length of work (T17 2.22).
+    const piece = CONTRACT_PIECES.find((entry) => entry.id === contract.pieceId);
+    expect(piece).toBeDefined();
+    expect(contract.name).toContain(`${piece?.name ?? ''}s for `);
+    // The client asks for a week's work: the band in cut sheet packs, converted to this piece.
+    const packs = Math.round((contract.quantityPerWeek * (piece?.minutes ?? 45)) / CONTRACT_QUANTITY_MINUTES);
+    expect(packs).toBeGreaterThanOrEqual(CONTRACT_QUANTITY_PER_WEEK_MIN - CONTRACT_QUANTITY_STEP);
+    expect(packs).toBeLessThanOrEqual(CONTRACT_QUANTITY_PER_WEEK_MAX + CONTRACT_QUANTITY_STEP);
+    expect(contract.quantityPerWeek).toBeGreaterThanOrEqual(1);
     expect(contract.termWeeks).toBeGreaterThanOrEqual(termWeeksFor(CONTRACT_TERM_MONTHS_MIN));
     expect(contract.termWeeks).toBeLessThanOrEqual(termWeeksFor(CONTRACT_TERM_MONTHS_MAX));
-    expect(contract.pricePerPiece).toBe(CONTRACT_PIECES[0]?.price);
+    expect(contract.pricePerPiece).toBe(piece?.price);
     expect(contract.expiresOnDay).toBe(contract.offeredDay + CONTRACT_OFFER_DAYS - 1);
     // One on the board at a time: fifty more days bring no second one.
     for (let day = days + 1; day <= days + 50; day += 1) {
@@ -284,8 +304,7 @@ describe('the piece work', () => {
   it('advances the piece at his rate and the class of the saw he got, and books each piece', () => {
     const state = joinerHall();
     const contract = running(state);
-    const piece = CONTRACT_PIECES[0];
-    if (!piece) throw new Error('a piece is wanted');
+    const piece = contractPiece(contract);
     const saw = state.equipment.find((item) => item.specId === 'tableSaw');
     if (!saw) throw new Error('a saw is wanted');
     const speed = variantFor(saw)?.outputFactor ?? 1;
@@ -300,7 +319,8 @@ describe('the piece work', () => {
     expect(contract.labourMinutes).toBe(200);
     expect(contract.revenue).toBe(pieces * piece.price);
     expect(contract.materialCost).toBe(pieces * piece.material);
-    expect(state.cash).toBeCloseTo(cashBefore + pieces * (piece.price - piece.material), 6);
+    // The cash is the pieces and nothing else: the material was on the rack (T17 2.22).
+    expect(state.cash).toBeCloseTo(cashBefore + pieces * piece.price, 6);
     expect(saw.takenBy).toBe('staff-1');
     expect(saw.hoursUsed).toBeCloseTo(200 / 60, 3);
     expect(state.workers[0]?.station).toBe('machine:tableSaw');
@@ -308,15 +328,21 @@ describe('the piece work', () => {
     expect(state.dayStats.workMinutes).toBe(200);
   });
 
-  it('books one revenue line and one material line a day, not one a piece', () => {
+  it('books one revenue line a day, not one a piece, and buys no material at all', () => {
+    // The material is off the rack now, so the contract line carries the money in and nothing
+    // out (CLAUDE.md T17 2.22).
     const state = joinerHall();
     const contract = running(state);
+    const sheets = state.stock.sheets;
     minutes(state, 300);
-    expect(contract.piecesMade).toBeGreaterThan(2);
+    expect(contract.piecesMade).toBeGreaterThan(1);
     const lines = contractLines(state);
-    expect(lines).toHaveLength(2);
-    expect(lines[0]).toEqual([`${contract.name}: pieces`, contract.piecesMade * 38]);
-    expect(lines[1]).toEqual([`${contract.name}: material`, -contract.piecesMade * 30]);
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toEqual([`${contract.name}: pieces`, contract.piecesMade * contract.pricePerPiece]);
+    expect(contractLines(state).some(([label]) => label.includes('material'))).toBe(false);
+    // And the sheets it used are off the rack, whole ones, as the pieces added up.
+    expect(contract.sheetsUsed).toBe(sheetsForPieces(contractPiece(contract), contract.piecesMade));
+    expect(state.stock.sheets).toBe(sheets - contract.sheetsUsed);
   });
 
   it('makes more pieces in the same minutes on a better saw, without a click', () => {
@@ -447,7 +473,9 @@ describe('the week and the term', () => {
     runContractDay(state);
     expect(contract.status).toBe('ended');
     expect(contract.weeks).toHaveLength(2);
-    expect(contract.renegotiatedPrice).toBe(Math.round(38 * (1 + 2 * CONTRACT_RENEW_FULL_WEEK)));
+    expect(contract.renegotiatedPrice).toBe(
+      Math.round(contract.pricePerPiece * (1 + 2 * CONTRACT_RENEW_FULL_WEEK)),
+    );
     expect(contract.assigned).toEqual([]);
     expect(state.workers[0]?.jobId).toBeNull();
     expect(endedContracts(state)).toHaveLength(1);
@@ -480,5 +508,166 @@ describe('the week and the term', () => {
     runContractDay(state);
     expect(renewContract(state, renewed.id, false).ok).toBe(true);
     expect(state.contracts).toHaveLength(0);
+  });
+});
+
+describe('the material off the rack (CLAUDE.md T17 2.22)', () => {
+  /** A contract for cut sheet packs, whatever the stream drew, so the sheets are the known ones. */
+  function packs(state: GameState, quantity = 60): Contract {
+    const contract = running(state, 1, quantity);
+    contract.pieceId = 'cutSheetPack';
+    contract.pricePerPiece = 38;
+    return contract;
+  }
+
+  it('holds what the week wants on the rack, and the free stock counts it', () => {
+    const state = joinerHall();
+    const contract = packs(state, 20);
+    const free = freeSheets(state);
+    // Twenty packs at 0.15 of a sheet each: three sheets for the week.
+    expect(contractShortfall(state, contract)).toBe(3);
+    expect(reserveContractSheets(state, contract)).toBe(3);
+    expect(contract.sheetsReserved).toBe(3);
+    expect(reservedSheets(state)).toBeGreaterThanOrEqual(3);
+    expect(freeSheets(state)).toBe(free - 3);
+    // Nothing more is held once the week is covered.
+    expect(reserveContractSheets(state, contract)).toBe(0);
+  });
+
+  it('draws whole sheets as the pieces add up, out of what was held first', () => {
+    const state = joinerHall();
+    const contract = packs(state);
+    reserveContractSheets(state, contract);
+    const held = contract.sheetsReserved;
+    const rack = state.stock.sheets;
+    minutes(state, 400);
+    expect(contract.piecesMade).toBeGreaterThan(1);
+    const piece = contractPiece(contract);
+    expect(contract.sheetsUsed).toBe(sheetsForPieces(piece, contract.piecesMade));
+    expect(state.stock.sheets).toBe(rack - contract.sheetsUsed);
+    expect(contract.sheetsReserved).toBe(Math.max(0, held - contract.sheetsUsed));
+  });
+
+  it('stands the men at their benches while the rack cannot cover the next piece', () => {
+    const state = joinerHall();
+    const contract = packs(state);
+    state.stock.sheets = 0;
+    expect(contractWaitingForMaterial(state, contract)).toBe(true);
+    const worked = minutes(state, 60);
+    expect(worked).toBe(0);
+    expect(contract.piecesMade).toBe(0);
+    expect(state.workers[0]?.station).toBe('bench');
+    // A delivery lands and the work goes on.
+    state.stock.sheets = 20;
+    expect(contractWaitingForMaterial(state, contract)).toBe(false);
+    expect(minutes(state, 60)).toBeGreaterThan(0);
+  });
+
+  it('gives the rack its sheets back when the term ends', () => {
+    const state = joinerHall();
+    const contract = packs(state);
+    reserveContractSheets(state, contract);
+    expect(contract.sheetsReserved).toBeGreaterThan(0);
+    contract.endDay = 7;
+    state.clock.day = 8;
+    runContractDay(state);
+    expect(contract.status).toBe('ended');
+    expect(contract.sheetsReserved).toBe(0);
+    expect(reservedSheets(state)).toBe(0);
+  });
+});
+
+describe('the result with a man on it (CLAUDE.md T17 2.22)', () => {
+  it('is the price less the material and less his own time, and it is his own time', () => {
+    const state = joinerHall();
+    const contract = running(state, 1, 60);
+    contract.pieceId = 'cutSheetPack';
+    contract.pricePerPiece = 38;
+    const poor = state.workers[0] as Worker;
+    const normal: Worker = {
+      ...joiner('staff-2', 'Nick'),
+      tier: 'normal',
+      rate: WORKER_RATES.normal,
+      weeklyWage: 640,
+    };
+    const best: Worker = {
+      ...joiner('staff-3', 'Sam'),
+      tier: 'super',
+      rate: WORKER_RATES.super,
+      weeklyWage: 800,
+    };
+    state.workers.push(normal, best);
+    const poorResult = contractResultFor(contract, poor);
+    const normalResult = contractResultFor(contract, normal);
+    const bestResult = contractResultFor(contract, best);
+    // A poor joiner does 45 minutes of the owner's work in 75 of his own, a super one in 50.
+    expect(poorResult.minutes).toBe(Math.round(45 / WORKER_RATES.poor));
+    expect(bestResult.minutes).toBe(Math.round(45 / WORKER_RATES.super));
+    expect(poorResult.labourCost).toBe(Math.round((45 / WORKER_RATES.poor) * workerMinuteCost(480) * 100) / 100);
+    expect(poorResult.margin).toBe(Math.round((38 - 30 - poorResult.labourCost) * 100) / 100);
+    // The wage table of Turn 1 pays 480 for 0.6 and 640 for 0.8, which is the same money for the
+    // same work, and 800 for 0.9, which is a premium for the speed: so the poor man and the
+    // normal one show the same result a piece and the super one a thinner one. The line is his
+    // own, whichever way it falls, which is what the tab has to show before he is put on it.
+    expect(normalResult.margin).toBe(poorResult.margin);
+    expect(bestResult.margin).toBeLessThan(poorResult.margin);
+    // And every one of them is under water on repeat work at this price, which is what the
+    // closing report has always said and what the rate says now.
+    expect(poorResult.margin).toBeLessThan(0);
+  });
+});
+
+describe('ending the contract early (CLAUDE.md T17 2.22)', () => {
+  it('refuses inside the first month and says how long is left, then ends it for nothing', () => {
+    const state = joinerHall();
+    const contract = running(state, 1, 60);
+    const refused = endContractCheck(state, contract.id);
+    expect(refused.ok).toBe(false);
+    expect(refused.reason).toBe(`The first month stands: ${CONTRACT_FREE_END_DAYS} days to go`);
+    expect(endContractNow(state, contract.id).ok).toBe(false);
+    expect(contract.status).toBe('active');
+    // A month on, he walks away: nothing is charged and the men come off it.
+    state.clock.day = 1 + CONTRACT_FREE_END_DAYS;
+    expect(endContractCheck(state, contract.id).ok).toBe(true);
+    const cash = state.cash;
+    expect(endContractNow(state, contract.id).ok).toBe(true);
+    expect(contract.status).toBe('ended');
+    expect(contract.assigned).toEqual([]);
+    expect(state.cash).toBe(cash);
+    expect(state.workers[0]?.jobId).toBeNull();
+  });
+});
+
+describe('the lengths of work the board offers (CLAUDE.md T17 2.22)', () => {
+  it('has a short piece and a long one, each asking for a week of work', () => {
+    const short = CONTRACT_PIECES.find((piece) => piece.id === 'drawerBox');
+    const long = CONTRACT_PIECES.find((piece) => piece.id === 'wardrobeFront');
+    expect(short?.minutes).toBe(60);
+    expect(short === undefined ? 0 : short.price - short.material).toBe(8);
+    expect(long?.minutes).toBe(3 * MINUTES_PER_WORKING_DAY);
+    expect(long === undefined ? 0 : long.price - long.material).toBe(40);
+    // Every piece carries what it takes off the rack and what the workshop earns by making it.
+    for (const piece of CONTRACT_PIECES) {
+      expect(piece.sheets).toBeCloseTo(piece.material / SHEET_VALUE, 2);
+      expect(piece.labour).toBe(piece.price - piece.material);
+    }
+    // The quantity is a week's work whatever the piece: thirty cut sheet packs are one wardrobe
+    // front and twenty two drawer boxes.
+    expect(quantityForPiece(CONTRACT_PIECES[0] as ContractPieceSpec, 30)).toBe(30);
+    expect(quantityForPiece(short as ContractPieceSpec, 30)).toBe(23);
+    expect(quantityForPiece(long as ContractPieceSpec, 30)).toBe(1);
+  });
+
+  it('draws all three over the days, and prices each at its own piece', () => {
+    const drawn = new Set<string>();
+    for (let seed = 1; seed <= 200; seed += 1) {
+      const state = newGame({ seed });
+      state.clock.day = 1 + (seed % 20);
+      const contract = drawContract(state, offerCarrier(state));
+      drawn.add(contract.pieceId);
+      const piece = CONTRACT_PIECES.find((entry) => entry.id === contract.pieceId);
+      expect(contract.pricePerPiece).toBe(piece?.price);
+    }
+    expect(drawn.size).toBe(CONTRACT_PIECES.length);
   });
 });

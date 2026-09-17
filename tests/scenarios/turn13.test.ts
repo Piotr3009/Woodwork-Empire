@@ -184,7 +184,9 @@ describe('(u) a burglary on day 10', () => {
 describe('(v) a four week contract with the joiner taken off it for two of them', () => {
   /** A month with one joiner, and the contract accepted on his first day with a quantity he can
    *  make in a week when he is on it. */
-  const WITH_JOINER: Policy = { ...CAREFUL, hireJoiner: true, maxOpenJobs: 1 };
+  // Sheets on the rack from day 1: a contract's material comes off the rack now, and the careful
+  // month orders only what its jobs need (CLAUDE.md T17 2.22).
+  const WITH_JOINER: Policy = { ...CAREFUL, hireJoiner: true, maxOpenJobs: 1, stockSheets: 40 };
   const seen: GameEvent[] = [];
   let state = playUntilDay(newGame({ seed: SEED, difficulty: 'veryEasy' }), 2, WITH_JOINER, seen);
   const joiner = state.workers.find((worker) => worker.role === 'joiner');
@@ -194,6 +196,9 @@ describe('(v) a four week contract with the joiner taken off it for two of them'
   state.contracts = state.contracts.filter((contract) => contract.status !== 'offered');
   const drawn = drawContract(state);
   drawn.id = 'contract-month-v';
+  // The board offers three lengths of work now (CLAUDE.md T17 2.22); this month is about the man
+  // going on and off the contract, so it is the short piece whatever the stream drew.
+  drawn.pieceId = 'cutSheetPack';
   drawn.quantityPerWeek = 20;
   drawn.termWeeks = 4;
   drawn.pricePerPiece = 100;
