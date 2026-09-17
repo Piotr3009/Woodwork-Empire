@@ -12,7 +12,7 @@ import { COMPANY_BOARD_BOX, OFFICE_TEXTS } from '../../src/render/office';
 import { machineSavings } from '../../src/engine/machines';
 import { plural } from '../../src/engine/text';
 import { weekRate } from '../../src/engine/rate';
-import { daySummaryOf } from '../../src/engine/index';
+import { daySummaryOf, formatCalendarDay } from '../../src/engine/index';
 import { renderCompany, weeksOf } from '../../src/ui/company';
 import { currentState, mount, render } from '../../src/ui/app';
 import type { GameState } from '../../src/engine/index';
@@ -262,10 +262,10 @@ describe('the Reputation sheet', () => {
       'Bookcase: on time',
     ]);
     expect(rows.map((row) => row.querySelector('small')?.textContent)).toEqual([
-      'day 11',
-      'day 9',
-      'day 3',
-      'day 3',
+      formatCalendarDay(11),
+      formatCalendarDay(9),
+      formatCalendarDay(3),
+      formatCalendarDay(3),
     ]);
     expect(rows.map((row) => row.querySelector('.ledger-points')?.textContent)).toEqual([
       '−10',

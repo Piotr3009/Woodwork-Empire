@@ -11,7 +11,7 @@ import { decodeSaveFile, encodeSaveFile, saveFileName } from '../../src/cloud/fi
 import { openSavedRow } from '../../src/cloud/saves';
 import { peekSave, readStore, saveStore } from '../../src/cloud/store';
 import type { SaveStore } from '../../src/cloud/store';
-import { APP_VERSION, STATE_VERSION, tick } from '../../src/engine/index';
+import { APP_VERSION, STATE_VERSION, formatCalendarDay, tick } from '../../src/engine/index';
 import type { GameState } from '../../src/engine/index';
 import {
   AUTOSAVE_MIN_MS,
@@ -205,7 +205,7 @@ describe('a v20 save', () => {
   it('continues from the start screen and loads from the file through the page', async () => {
     saveStore.write(text);
     openPage();
-    expect(root().innerHTML).toContain('Continue · Woodwork Empire, day 2');
+    expect(root().innerHTML).toContain(`Continue · Woodwork Empire, ${formatCalendarDay(2)}`);
     click('[data-do="continueSaved"]');
     expect(game().clock).toEqual({ day: 2, minute: 30 });
     expect(game().jobs).toHaveLength(1);

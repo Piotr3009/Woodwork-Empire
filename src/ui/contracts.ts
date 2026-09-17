@@ -11,12 +11,13 @@ import {
   contractPiece,
   contractsAllowed,
   endedContracts,
+  formatCalendarDay,
   fullWeeksOf,
+  joiners,
   offeredContract,
   shortWeeksOf,
   weekOfTerm,
   weekWanted,
-  joiners,
 } from '../engine/index';
 import {
   contractResultFor,
@@ -156,7 +157,8 @@ function activeBlock(state: GameState, contract: Contract): string {
     `<div class="row"><span class="row-main"><h3>${escapeHtml(contract.name)}</h3></span>` +
     `<span class="row-action">${endIt}</span></div>` +
     `<p class="figures"><strong class="contract-count">${escapeHtml(contractCounterLine(contract, day))}</strong> · ` +
-    `week ${weekOfTerm(contract, day)} of ${contract.termWeeks}, ends day ${contract.endDay ?? day} · ` +
+    `week ${weekOfTerm(contract, day)} of ${contract.termWeeks}, ends ` +
+    `${formatCalendarDay(contract.endDay ?? day)} · ` +
     `${money(contract.pricePerPiece)} a piece${escapeHtml(held)}</p>` +
     `<p class="hint">${escapeHtml(pieceLine(contract))} The saw stays in the general queue: ` +
     'a better one makes more pieces without a click.</p>' +

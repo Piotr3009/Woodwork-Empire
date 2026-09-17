@@ -7,17 +7,18 @@
 import {
   callsScheduled,
   callsTaken,
+  formatCalendarDay,
   has,
-  onTheBooksToday,
   jobLabourCost,
   jobProgress,
   jobsAtGate,
   joiners,
   lifecycleSteps,
+  onTheBooksToday,
   orderForJobCheck,
   orderForJobCost,
-  showsStartProduction,
   shortfallOf,
+  showsStartProduction,
   startProductionCheck,
   transportLabel,
   workerById,
@@ -151,7 +152,7 @@ function cncControls(state: GameState, job: Job): string {
 export function jobAction(state: GameState, job: Job): string {
   if (job.stage === 'awaitingTransport') {
     if (job.deliverOnDay !== null) {
-      return reasonLabel(`Booked out, leaves day ${job.deliverOnDay}`);
+      return reasonLabel(`Booked out, leaves ${formatCalendarDay(job.deliverOnDay)}`);
     }
     // The van run is a task on somebody's list, so the piece is booked out either way.
     const inTheVan = state.tasks.some(
@@ -174,8 +175,9 @@ export function jobRow(state: GameState, job: Job): string {
   return (
     `<div class="row"><span class="row-main">${escapeHtml(job.name)} ${money(job.price)}</span>` +
     jobLifecycleRow(state, job) +
-    `<span class="row-figure">${escapeHtml(STAGE_LABELS[job.stage])} · due day ` +
-    `${job.dueDay}${job.stage === 'inProduction' ? ` · ${done}% made` : ''}` +
+    `<span class="row-figure">${escapeHtml(STAGE_LABELS[job.stage])} · due ` +
+    `${formatCalendarDay(job.dueDay)}` +
+    `${job.stage === 'inProduction' ? ` · ${done}% made` : ''}` +
     `${escapeHtml(waiting)}</span>` +
     `<span class="row-figure">${jobLabourLine(state, job)}</span>` +
     callsLine(job) +
@@ -199,8 +201,9 @@ export function gateSection(state: GameState): string {
           `<div class="row"><span class="row-main">${escapeHtml(job.name)} ` +
           `${money(job.price)}</span>` +
           jobLifecycleRow(state, job) +
-          `<span class="row-figure">finished day ${job.finishedDay ?? '?'} · due day ` +
-          `${job.dueDay}</span>` +
+          `<span class="row-figure">finished ` +
+          `${job.finishedDay === null ? '?' : formatCalendarDay(job.finishedDay)} · due ` +
+          `${formatCalendarDay(job.dueDay)}</span>` +
           `<span class="row-action">${jobAction(state, job)}</span></div>`,
       )
       .join('')

@@ -38,7 +38,7 @@ import {
   staffManagementTaker,
   tasksOfKind,
 } from '../../src/engine/tasks';
-import { tick } from '../../src/engine/index';
+import { formatCalendarDay, tick } from '../../src/engine/index';
 import type { GameState, Worker } from '../../src/engine/index';
 import { act, clearEvents, sixJoinersOnSheetWork } from '../helpers';
 
@@ -115,7 +115,9 @@ describe('the second shift', () => {
     // With a manager who has not started yet, the reason says when.
     const soon = sixJoinersOnSheetWork();
     soon.workers.push({ ...manager(), startDay: 3 });
-    expect(secondShiftCheck(soon).reason).toBe('The production manager starts on day 3');
+    expect(secondShiftCheck(soon).reason).toBe(
+      `The production manager starts on ${formatCalendarDay(3)}`,
+    );
   });
 
   it('is switched on with a manager, and a joiner is put on it one click at a time', () => {

@@ -14,6 +14,7 @@ import { deliveryDaysFor, isHeavy } from '../../src/engine/machines';
 import { unloadMinutes } from '../../src/engine/tasks';
 import { addWorkingDays } from '../../src/engine/clock';
 import { PALLET_PLACEHOLDER, PALLET_SPRITE, renderHall } from '../../src/render/hall';
+import { formatCalendarDay } from '../../src/engine/index';
 import type { GameEvent, GameState } from '../../src/engine/index';
 import { act, buyNow, buyStartingKit, clearEvents, fillRack, newGame, runClock } from '../helpers';
 
@@ -159,7 +160,7 @@ describe('the floor held for a delivery', () => {
     // The outline is drawn on the hall, with what it is and when it is due on it.
     const svg = renderHall(state);
     expect(svg).toContain(`data-order="${held.id}"`);
-    expect(svg).toContain(`Industrial table saw, due day ${held.dueDay}`);
+    expect(svg).toContain(`Industrial table saw, due ${formatCalendarDay(held.dueDay)}`);
     expect(held.dueDay).toBe(addWorkingDays(1, 12));
     // And it is dragged by the same hook a machine is.
     expect(svg).toContain(`data-kit="${held.id}"`);

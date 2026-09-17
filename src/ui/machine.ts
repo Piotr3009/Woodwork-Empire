@@ -13,18 +13,19 @@ import {
   bagsOf,
   compressorAirOf,
   compressors,
+  countOf,
   cubicMetres,
+  deliveryDaysFor,
   dustOutputOf,
+  enduranceHoursFor,
   extractionCapacityOf,
   extractionDemandOf,
+  findSpec,
+  footprintOf,
+  formatCalendarDay,
   mediaFigure,
   metresBy,
   orderEquipmentCheck,
-  countOf,
-  deliveryDaysFor,
-  enduranceHoursFor,
-  findSpec,
-  footprintOf,
   sheetCapacityOf,
   zoneOf,
 } from '../engine/index';
@@ -289,7 +290,7 @@ function classCard(
   ).length;
   const label = ownedCount > 0 ? 'Buy another' : 'Buy';
   const buy = onTheList
-    ? `<span class="tile-waiting">On order, due day ${onTheList.dueDay}</span>`
+    ? `<span class="tile-waiting">On order, due ${formatCalendarDay(onTheList.dueDay)}</span>`
     : check.ok
       ? variant.id === recommended
         ? primaryButton('buyEquipment', label, `data-id="${spec.id}" data-variant="${variant.id}"`)

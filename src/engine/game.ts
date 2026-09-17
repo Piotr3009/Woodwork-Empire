@@ -79,6 +79,7 @@ import {
 } from './orders';
 import {
   daysBetween,
+  formatCalendarDay,
   nextWorkingDay,
   isDayExhausted,
   isFriday,
@@ -853,7 +854,7 @@ export function summaryTotals(state: GameState): PeriodTotals {
 export function summaryTitle(state: GameState): string {
   if (state.summaryCadence === 'weekly') return `End of week ${weekOfDay(state.clock.day)}`;
   if (state.summaryCadence === 'monthly') return `End of month ${monthOfDay(state.clock.day)}`;
-  return `End of day ${state.clock.day}`;
+  return `End of ${formatCalendarDay(state.clock.day)}`;
 }
 
 /** The day as the summary reads it: the evening writes one of these into the state and the modal

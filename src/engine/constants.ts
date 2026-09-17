@@ -149,6 +149,27 @@ export const DAYS_PER_YEAR = DAYS_PER_MONTH * MONTHS_PER_YEAR;
 /** Monday to Friday (PIOTR). */
 export const WORKING_DAYS_PER_WEEK = 5;
 export const WEEKDAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const;
+/** The twelve month names the calendar cycles through. The game's month is thirty days, so a name
+ *  is a label on a block of thirty and never a real April; there is no year on a date, because a
+ *  workshop's year number is nothing the player does anything with (PIOTR, 17.09;
+ *  CLAUDE.md T18 2.2). */
+export const MONTH_NAMES = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+] as const;
+/** The month the company opens in, as an index into `MONTH_NAMES`: 0 is January, so 2 is March
+ *  [TUNE: March, which is the spring the trade picks up in and what day 1 should feel like]. */
+export const START_MONTH = 2;
 
 // ---------------------------------------------------------------------------
 // 7. The owner

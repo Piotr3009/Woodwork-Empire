@@ -10,6 +10,7 @@ import {
   LEDGER_VISIBLE_ENTRIES,
   LAPTOP_BOOT_MINUTES,
 } from '../../src/engine/constants';
+import { formatCalendarDay, monthName } from '../../src/engine/index';
 import { findSpec } from '../../src/engine/machines';
 import { STARTING_CLASS, STARTING_KIT } from '../helpers';
 
@@ -100,7 +101,7 @@ describe('the first ten minutes', () => {
     const state = currentState();
     expect(state?.difficulty).toBe('easy');
     expect(state?.clock).toEqual({ day: 1, minute: 0 });
-    expect(html()).toContain('Mon, day 1');
+    expect(html()).toContain(formatCalendarDay(1));
     expect(html()).toContain('0 / 540 min');
     expect(html()).toContain('Board');
   });
@@ -144,7 +145,7 @@ describe('the first ten minutes', () => {
     // A second click on a machine that is on the road buys nothing: one click is one machine.
     click('[data-do="catalogueTab"][data-id="sheetMachines"]');
     click('[data-do="openFolder"][data-id="tableSaw"]');
-    expect(html()).toContain('On order, due day 2');
+    expect(html()).toContain(`On order, due ${formatCalendarDay(2)}`);
     expect(root().querySelector('[data-do="buyEquipment"][data-id="tableSaw"][data-variant="used"]')).toBeNull();
     expect(before - (currentState()?.cash ?? 0)).toBe(paid);
     click('[data-do="closeFolder"]');
@@ -167,7 +168,7 @@ describe('the first ten minutes', () => {
     // Home first: the house card, clicked away, then the summary (CLAUDE.md T13 3.18).
     expect(html()).toContain('Resting at home now');
     click('[data-do="closeHouseCard"]');
-    expect(html()).toContain('End of day 1');
+    expect(html()).toContain(`End of ${formatCalendarDay(1)}`);
     expect(html()).toContain('Your minutes');
     click('[data-do="resolveEvent"][data-id="next"]');
     expect(currentState()?.clock.day).toBe(2);
@@ -544,12 +545,12 @@ describe('accounting', () => {
   it('plays blind while the books are behind, and shows everything once they are written up', () => {
     click('[data-office="binder"]');
     click('[data-do="accountingTab"][data-id="ledger"]');
-    expect(html()).toContain('Books not up to date since day 1');
+    expect(html()).toContain(`Books not up to date since ${formatCalendarDay(1)}`);
     expect(html()).toContain('? today');
     expect(html()).not.toContain('Unit deposit');
     // Nothing on the Days tab either: the month has not been written up.
     click('[data-do="accountingTab"][data-id="days"]');
-    expect(html()).toContain('Nothing has moved in month 1.');
+    expect(html()).toContain(`Nothing has moved in ${monthName(1)}.`);
     click('[data-do="closeModal"]');
     // The bookkeeping task catches every day up at once.
     const state = currentState();

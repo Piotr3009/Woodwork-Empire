@@ -10,6 +10,7 @@ import { roomById } from '../../src/engine/constants';
 import { renderCatalogue } from '../../src/ui/catalogue';
 import { renderShopping } from '../../src/ui/shopping';
 import { renderTopbar } from '../../src/ui/topbar';
+import { formatCalendarDay } from '../../src/engine/index';
 import type { GameState } from '../../src/engine/index';
 import { act, buyStartingKit, fillRack, newGame } from '../helpers';
 
@@ -56,7 +57,7 @@ describe('the shopping list', () => {
     expect(rows).toHaveLength(4);
     const html = page.innerHTML;
     expect(html).toContain('£45,000 paid');
-    expect(html).toContain('ordered day 1');
+    expect(html).toContain(`ordered ${formatCalendarDay(1)}`);
     expect(html).toContain('arrives tomorrow at 08:00');
     expect(html).toContain('class="order-bar"');
     // The bar runs from the day of the click to the day of the lorry: nothing has moved yet.
@@ -108,7 +109,7 @@ describe('the Owned tab', () => {
     const page = parse(renderCatalogue(state, '', 'owned', null, 'all'));
     const tiles = Array.from(page.querySelectorAll('.tile.is-ordered'));
     expect(tiles).toHaveLength(3);
-    expect(page.innerHTML).toContain('On order, due day');
+    expect(page.innerHTML).toContain('On order, due ');
     expect(page.innerHTML).toContain('class="order-bar"');
     // The kit that is here keeps its own frame beside them.
     expect(page.querySelectorAll('.tile.is-owned').length).toBeGreaterThan(0);

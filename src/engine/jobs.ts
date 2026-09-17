@@ -30,7 +30,13 @@ import {
 import { canAccept, drawOffer, findEnquiry, removeEnquiry } from './board';
 import { callRinging, scheduleCalls } from './calls';
 import { template } from './catalog';
-import { addWorkingDays, isOvertime, nextWorkingDay, workingDaysBetween } from './clock';
+import {
+  addWorkingDays,
+  formatCalendarDay,
+  isOvertime,
+  nextWorkingDay,
+  workingDaysBetween,
+} from './clock';
 import { chargeUnavoidable, formatMoney, noteLoss, receive } from './economy';
 import { queueEvent } from './events';
 import {
@@ -636,7 +642,7 @@ function onOrderBlock(state: GameState, family: string): string {
   const coming = firstOnOrder(state, family);
   if (coming === null) return '';
   const name = (findSpec(family)?.name ?? family).toLowerCase();
-  return `waiting for ${name} (on order, due day ${coming.dueDay})`;
+  return `waiting for ${name} (on order, due ${formatCalendarDay(coming.dueDay)})`;
 }
 
 /** Everything in the hall that can stop a job, in the order the player would notice it. Empty
@@ -699,7 +705,7 @@ function arrivalReason(state: GameState, job: Job): string {
   if (!delivery) return 'material not ordered';
   const wait = delivery.arriveDay - state.clock.day;
   if (wait <= 1) return 'material arrives tomorrow';
-  return `material arrives on day ${delivery.arriveDay}`;
+  return `material arrives on ${formatCalendarDay(delivery.arriveDay)}`;
 }
 
 /** Why the owner cannot go and make this one, or that he can. Exactly one reason, the first

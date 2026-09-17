@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'vitest';
 import { WORKER_RATES } from '../../src/engine/constants';
 import { earnedRate } from '../../src/engine/economy';
-import { tick } from '../../src/engine/index';
+import { formatCalendarDay, tick } from '../../src/engine/index';
 import type { GameState } from '../../src/engine/index';
 import {
   acceptNow,
@@ -118,7 +118,7 @@ describe('the two of them together', () => {
     state.days = [
       {
         day: 1,
-        title: 'End of day 1',
+        title: `End of ${formatCalendarDay(1)}`,
         minutesByCategory: { admin: 0, design: 0, workshop: 0 },
         minutesWorked: 0,
         minutesAvailable: 480,

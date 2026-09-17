@@ -85,7 +85,7 @@ import {
   pointInPolygon,
   tileToScreen,
 } from './iso';
-import { formatTime } from '../engine/clock';
+import { formatCalendarDay, formatTime } from '../engine/clock';
 import { compressorIsLow, extractionCheck, hallAirCheck } from '../engine/media';
 import { type CharacterOptions, animationForStation, characterArt } from './characters';
 import {
@@ -1160,14 +1160,14 @@ export function reservedOutline(item: OnOrderItem): string {
   const name = orderName(item);
   return (
     `<g data-kit="${item.id}" data-order="${item.id}" class="clickable reserved">` +
-    `<title>${escapeText(`${name}, on order, due day ${item.dueDay}`)}</title>` +
+    `<title>${escapeText(`${name}, on order, due ${formatCalendarDay(item.dueDay)}`)}</title>` +
     `<polygon points="${points(footprintPolygon(item.anchorX, item.anchorY, zone.width, zone.depth))}" ` +
     'class="reserved-zone" />' +
     `<polygon points="${points(footprintPolygon(inset.x, inset.y, stands.width, stands.depth))}" ` +
     'class="reserved-floor" />' +
     label(
       centreOf(item.anchorX, item.anchorY, zone.width, zone.depth),
-      `${name}, due day ${item.dueDay}`,
+      `${name}, due ${formatCalendarDay(item.dueDay)}`,
     ) +
     '</g>'
   );

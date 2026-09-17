@@ -2,7 +2,7 @@
 // Every call answers with a line the Menu can show, and a missing table is "save unavailable"
 // rather than an error the player has to understand (CLAUDE.md T2 3.14).
 
-import { STATE_VERSION } from '../engine/index';
+import { STATE_VERSION, formatCalendarDay } from '../engine/index';
 import type { GameState } from '../engine/index';
 import { canOpenVersion } from '../engine/migrate';
 import { decodeSaveFile, encodeSaveFile } from './file';
@@ -72,7 +72,7 @@ export async function saveGame(state: GameState): Promise<SaveResult> {
     { onConflict: 'user_id,slot' },
   );
   if (error) return { ok: false, note: describe(error) };
-  return { ok: true, note: `Saved on day ${state.clock.day}.` };
+  return { ok: true, note: `Saved on ${formatCalendarDay(state.clock.day)}.` };
 }
 
 /** What a row of the saves table opens into. The row holds the same bytes the file save and the

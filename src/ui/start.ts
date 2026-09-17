@@ -1,6 +1,7 @@
 // The start screen: an empty unit seen from outside, and the three decisions (CLAUDE.md 10.1).
 
 import { DIFFICULTIES } from '../engine/constants';
+import { formatCalendarDay } from '../engine/index';
 import type { StoredSave } from '../cloud/store';
 import { escapeHtml, money } from './modal';
 
@@ -69,7 +70,7 @@ function savedBlock(choice: StartChoice): string {
     );
   }
   if (saved.kind !== 'ready') return '';
-  const where = `${saved.companyName}, day ${saved.day}`;
+  const where = `${saved.companyName}, ${formatCalendarDay(saved.day)}`;
   return (
     '<button class="btn btn-primary btn-big" data-do="continueSaved">' +
     `Continue · ${escapeHtml(where)}</button>`

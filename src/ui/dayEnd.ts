@@ -1,15 +1,16 @@
 // The end of day summary, and the game over screen (CLAUDE.md 10.1).
 
 import {
-  DAY_CATEGORY_LABELS,
-  HOUSE_TIER_NAMES,
   cubicMetres,
+  DAY_CATEGORY_LABELS,
   dayPercentages,
   daySummaryOf,
   dustBand,
   earnedRate,
   efficiencyOf,
+  formatCalendarDay,
   formatReputation,
+  HOUSE_TIER_NAMES,
   houseTierFor,
   summaryOfDay,
 } from '../engine/index';
@@ -57,7 +58,7 @@ function dayPlate(summary: DaySummary): string {
           .join(' · ');
   return (
     '<div class="day-plate">' +
-    `<h3>Day ${summary.day} done</h3>` +
+    `<h3>${formatCalendarDay(summary.day)} done</h3>` +
     `<p class="day-shares">${escapeHtml(line)}</p>` +
     `<p class="day-figures">${summary.minutesWorked} of ${summary.minutesAvailable} min · ` +
     `overtime ${summary.overtimeMinutes}</p>` +
@@ -85,7 +86,7 @@ export function renderDaySummary(
   return (
     dayPlate(summary) +
     '<div class="cols">' +
-    `<div class="col"><h3>Your minutes, day ${summary.day}</h3>` +
+    `<div class="col"><h3>Your minutes, ${formatCalendarDay(summary.day)}</h3>` +
     row('Admin', minutes(used.admin)) +
     row('Design', minutes(used.design)) +
     row('Workshop', minutes(used.workshop)) +
@@ -104,7 +105,7 @@ export function renderDaySummary(
     // (CLAUDE.md T13 3.18). The evening knows it; a past day's record does not carry it.
     (options.houseLine === undefined ? '' : row('Home', options.houseLine)) +
     '</div>' +
-    `<div class="col"><h3>The hall, day ${summary.day}</h3>` +
+    `<div class="col"><h3>The hall, ${formatCalendarDay(summary.day)}</h3>` +
     row('Jobs moved on', String(summary.jobsAdvanced)) +
     row('Jobs finished', jobs === '' ? 'none' : jobs) +
     row(

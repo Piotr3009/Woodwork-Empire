@@ -226,7 +226,7 @@ describe('one click is one purchase (PIOTR, 13.09)', () => {
     expect(paid).toBeGreaterThan(0);
     click('[data-do="catalogueTab"][data-id="extraction"]');
     click('[data-do="openFolder"][data-id="extractor"]');
-    expect(html()).toContain('On order, due day');
+    expect(html()).toContain('On order, due ');
     expect(html()).toContain('is-ordered');
     expect(
       root().querySelector('[data-do="buyEquipment"][data-id="extractor"][data-variant="standard"]'),

@@ -5,7 +5,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { SAVE_KEY, localSaveStore, peekSave, readStore, saveStore } from '../../src/cloud/store';
 import { encodeSaveFile } from '../../src/cloud/file';
-import { STATE_VERSION } from '../../src/engine/index';
+import { STATE_VERSION, formatCalendarDay } from '../../src/engine/index';
 import { AUTOSAVE_MIN_MS, advanceMinutes, currentState, mount, render } from '../../src/ui/app';
 import { createTask } from '../../src/engine/tasks';
 import { newGame } from '../helpers';
@@ -183,7 +183,7 @@ describe('the start screen with a game in the store', () => {
     saveStore.write(encodeSaveFile(state));
     openPage();
     expect(has('[data-do="continueSaved"]')).toBe(true);
-    expect(root().innerHTML).toContain('Continue · Joinery Core, day 4');
+    expect(root().innerHTML).toContain(`Continue · Joinery Core, ${formatCalendarDay(4)}`);
     click('[data-do="continueSaved"]');
     expect(currentState()?.clock).toEqual({ day: 4, minute: 123 });
     expect(currentState()?.companyName).toBe('Joinery Core');

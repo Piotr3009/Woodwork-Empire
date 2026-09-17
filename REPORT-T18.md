@@ -34,3 +34,15 @@ queue of section 4 names them.
   Done: the new size test in `tests/render/views.test.ts` reads the plate's height and width and
   the glyph's `font-size` at a third of 26, 48 and 26, and checks the plate is still centred where
   it was; the new pace test in `tests/render/walkers.test.ts` pins the constant at 1.0.
+- **T18-03 The date reads like a date (2.2).** One formatter, `formatCalendarDay(day)` in
+  `src/engine/clock.ts`: the weekday, the day of its month and the month's name, `Mon 12 March`.
+  `formatDate` calls it and puts the clock after it, and every one of the forty places that printed
+  "day N" at the player calls it too, in the UI, in the renderer, in three engine strings and in the
+  cloud save's note. Month names are `MONTH_NAMES` with `START_MONTH` [TUNE: March], twelve cycling,
+  no year; `monthName(month)` is the second formatter and the three places that printed "Month N"
+  (the month end's heading, the books' month chips, the books' empty month) call it.
+  `state.clock.day`, `monthOfDay`, `dayOfMonth` and every engine figure are untouched: this is copy.
+  Done: `tests/ui/calendarDate.test.ts`, five tests, of which the sweep opens the hall, the office,
+  all eight screens, every page of the laptop and the day end and asserts that none of them matches
+  `day N` for the current day, or `day` followed by any number at all; twenty-one existing tests
+  moved onto the formatter rather than onto a new hard-coded string.

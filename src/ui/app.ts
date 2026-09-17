@@ -2,14 +2,15 @@
 // here, in one place (CLAUDE.md 3.5, 10.1).
 
 import {
-  CLEANING_MINUTES,
   applyAction,
+  CLEANING_MINUTES,
   createGame,
+  ductingDue,
+  findSpec,
   finishTimeFor,
+  formatCalendarDay,
   formatTime,
   gameMinutesPerRealSecond,
-  findSpec,
-  ductingDue,
   moveConfirmPending,
   movePending,
   movingMachines,
@@ -659,7 +660,7 @@ function modalSpecs(): ModalSpec[] {
     const past = summaryOfDay(current, ui.daySummary);
     specs.push({
       id: 'daySummary',
-      title: past === null ? `Day ${ui.daySummary}` : past.title,
+      title: past === null ? formatCalendarDay(ui.daySummary) : past.title,
       body:
         past === null
           ? '<p class="empty">That day is off the back of the books now.</p>'
@@ -735,7 +736,7 @@ function moveFinishNote(current: GameState): string {
   const clock = formatTime(at.minute);
   if (at.day === current.clock.day) return `Finished by ${clock}.`;
   if (at.day === current.clock.day + 1) return `Finished tomorrow by ${clock}.`;
-  return `Finished on day ${at.day} by ${clock}.`;
+  return `Finished on ${formatCalendarDay(at.day)} by ${clock}.`;
 }
 
 /** The version in the corner of every screen, the start screen included (PIOTR, 13.09). It takes
@@ -1836,7 +1837,7 @@ function handleSceneClick(element: DataElement): boolean {
       // The outline of something bought and not here yet: it says when the lorry is due.
       const reserved = reservationById(game(), kit);
       if (reserved !== null) {
-        setNote(`On order, due day ${reserved.dueDay} at 08:00.`);
+        setNote(`On order, due ${formatCalendarDay(reserved.dueDay)} at 08:00.`);
         requestRender();
       }
       return true;

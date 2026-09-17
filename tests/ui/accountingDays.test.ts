@@ -5,7 +5,7 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { advanceMinutes, currentState, mount } from '../../src/ui/app';
 import { renderAccounting } from '../../src/ui/accounting';
-import { daysOfMonth, ledgerOfDay, summaryOfDay } from '../../src/engine/index';
+import { daysOfMonth, formatCalendarDay, ledgerOfDay, summaryOfDay } from '../../src/engine/index';
 import type { GameState } from '../../src/engine/index';
 import { buyStartingKit, newGame, runDays } from '../helpers';
 
@@ -128,8 +128,8 @@ describe('a past day put back on the screen', () => {
     const modal = root().querySelector('[data-modal="daySummary"]');
     expect(modal).not.toBeNull();
     expect(modal?.querySelector('h2')?.textContent).toBe(summary?.title);
-    expect(modal?.innerHTML).toContain('Your minutes, day 1');
-    expect(modal?.innerHTML).toContain('The hall, day 1');
+    expect(modal?.innerHTML).toContain(`Your minutes, ${formatCalendarDay(1)}`);
+    expect(modal?.innerHTML).toContain(`The hall, ${formatCalendarDay(1)}`);
     // The books are still open behind it.
     expect(root().querySelector('[data-modal="accounting"]')).not.toBeNull();
     click('[data-modal="daySummary"] [data-do="closeModal"]');

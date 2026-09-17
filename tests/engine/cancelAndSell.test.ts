@@ -124,7 +124,7 @@ describe('selling a machine', () => {
       nextWorkingDay(state.clock.day),
     );
     expect(state.cash).toBe(before);
-    expect(renderCatalogue(state, '', 'owned', null, 'all')).toContain('Sold, collection on day');
+    expect(renderCatalogue(state, '', 'owned', null, 'all')).toContain('Sold, collection on ');
     // The next morning the buyer's van comes, and the cash with it.
     const seen: GameEvent[] = [];
     state = toDay(state, nextWorkingDay(state.clock.day), seen);
