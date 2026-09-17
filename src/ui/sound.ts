@@ -194,9 +194,12 @@ export function soundIsUnlocked(): boolean {
  *  first it costs a comparison. */
 export function unlockSound(): void {
   if (unlocked) return;
-  unlocked = true;
   const made = factory();
+  // The latch goes down only when there is something to play through. Setting it first meant one
+  // click that could not build a context (a browser with audio off, a sandboxed frame) left the
+  // game silent for the rest of the session with no second try; the next click gets one now.
   if (made === null) return;
+  unlocked = true;
   context = made;
   const gain = made.createGain();
   gain.gain.value = muted ? 0 : volume;
@@ -248,12 +251,14 @@ export function resetSound(): void {
  *  of it, looped, is enough at this volume and it costs one buffer. */
 function noiseBuffer(ctx: AudioLike): AudioBufferLike | null {
   const length = Math.max(1, Math.floor(ctx.sampleRate));
-  let buffer: AudioBufferLike;
+  let buffer: AudioBufferLike | null | undefined;
   try {
     buffer = ctx.createBuffer(1, length, ctx.sampleRate);
   } catch {
     return null;
   }
+  // A context that answers with nothing is a context with no buffer, not a crash one frame later.
+  if (buffer === null || buffer === undefined) return null;
   const data = buffer.getChannelData?.(0);
   if (data === undefined) return buffer;
   // A cheap deterministic hiss: no Math.random anywhere in this repository, and a fixed noise
@@ -272,7 +277,17 @@ function standInFor(ctx: AudioLike, spec: SoundSpec, out: GainLike): Running | n
   shaped.connect(out);
   if (spec.standIn === 'noise' || spec.standIn === 'hiss' || spec.standIn === 'rasp') {
     const buffer = noiseBuffer(ctx);
-    if (buffer === null) return null;
+    // Nothing to play through it: let go of the gain rather than leave it hanging off the master.
+    // A loop that cannot start is tried again on the next frame, so a leak here is a leak a
+    // second, for as long as the hall is running.
+    if (buffer === null) {
+      try {
+        shaped.disconnect();
+      } catch {
+        // A fake that does not disconnect is no worse off than before.
+      }
+      return null;
+    }
     const source = ctx.createBufferSource();
     source.buffer = buffer;
     source.loop = true;

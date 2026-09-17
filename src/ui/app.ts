@@ -2330,6 +2330,19 @@ function driveSound(now: number): void {
 }
 
 function frame(now: number): void {
+  // Whatever happens inside, the next frame is asked for. The loop asks for itself at the end of
+  // itself, so anything that threw in here used to stop the game dead: no figure moved, no minute
+  // ran and no page was written again, for the rest of the session (found by the Turn 19 review,
+  // and true since the loop was written).
+  try {
+    runFrame(now);
+  } catch (error) {
+    console.error(error);
+  }
+  requestAnimationFrame(frame);
+}
+
+function runFrame(now: number): void {
   const elapsed = Math.min(1000, now - lastFrame);
   lastFrame = now;
   // The figures walk in real time and not in game minutes, so they are moved on before anything
@@ -2353,7 +2366,6 @@ function frame(now: number): void {
       }
     }
   });
-  requestAnimationFrame(frame);
 }
 
 export function mount(element: HTMLElement): void {

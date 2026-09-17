@@ -437,3 +437,55 @@ describe('resetSound', () => {
     expect(sound.masterGain).toBeNull();
   });
 });
+
+describe('the engine when the browser will not play (CLAUDE.md T19 2.10, found by the review)', () => {
+  it('gives the next click another go when the first could not build a context', () => {
+    // A browser with audio off, or a page in a sandboxed frame, answers with nothing. Latching the
+    // unlock before knowing that left the game silent for the whole session with no second try.
+    resetSound();
+    setAudioContextFactory(() => null);
+    unlockSound();
+    expect(soundIsUnlocked()).toBe(false);
+    const made = fakeContext();
+    let builds = 0;
+    setAudioContextFactory(() => {
+      builds += 1;
+      return made;
+    });
+    unlockSound();
+    expect(soundIsUnlocked()).toBe(true);
+    // And still only one context, however many clicks follow it.
+    unlockSound();
+    unlockSound();
+    expect(builds).toBe(1);
+  });
+
+  it('lets go of the gain when a stand in cannot be built, however many frames ask for it', () => {
+    // A loop that cannot start is asked for again on the next frame, so a gain left hanging off
+    // the master here is a gain a frame for as long as the hall runs.
+    resetSound();
+    const made = fakeContext();
+    made.createBuffer = (): AudioBufferLike => {
+      throw new Error('no buffers here');
+    };
+    setAudioContextFactory(() => made);
+    unlockSound();
+    for (let at = 0; at < 60; at += 1) setLoops(new Set<LoopName>(['tableSaw', 'extractor']));
+    expect(soundStateForTests().loops).toEqual([]);
+    // Every gain the engine built was let go of again, but the master, which stays.
+    const hanging = made.gains.filter((gain) => gain.connected > gain.disconnected);
+    expect(hanging).toHaveLength(1);
+  });
+
+  it('does not throw when the context answers a buffer with nothing', () => {
+    // The frame loop asks for itself at the end of itself, so a throw in here used to stop the
+    // game dead. app.ts re-arms the frame whatever happens now, and this end does not throw.
+    resetSound();
+    const made = fakeContext();
+    made.createBuffer = (): AudioBufferLike => undefined as unknown as AudioBufferLike;
+    setAudioContextFactory(() => made);
+    unlockSound();
+    expect(() => setLoops(new Set<LoopName>(['tableSaw']))).not.toThrow();
+    expect(soundStateForTests().loops).toEqual([]);
+  });
+});

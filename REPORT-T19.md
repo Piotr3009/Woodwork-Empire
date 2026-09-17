@@ -229,3 +229,26 @@ The laptop case sits at the end of its block on purpose: these tests drive one m
 sequence, and a case that leaves a task running changes what the next case can click.
 
 `npm run check` exit 0: 169 files, 1,665 tests.
+
+### T19-C1c Three defects in the sound engine and the frame loop, from the review
+
+An adversarial review of phase A's own diff found three, all real, all now fixed with a test each:
+
+1. **`unlockSound` latched before it knew there was anything to play through.** `unlocked = true`
+   was set above the null check, so one first click that could not build a context (a browser with
+   audio off, a page in a sandboxed frame) left the game silent for the whole session with no
+   second try. The latch goes down on success now, and the next click gets its own go.
+2. **A stand in that could not be built leaked a gain, once a frame, for ever.** `standInFor`
+   connected its gain to the master before asking for the noise buffer and returned null without
+   letting go of it; a loop that cannot start is asked for again on the next frame, so a context
+   whose `createBuffer` throws built 121 master-connected gains in 60 frames and disconnected
+   none. It disconnects on the way out now.
+3. **Anything that threw inside the frame killed the game.** `frame(now)` asks for the next frame
+   at the end of itself, so one exception meant no figure moved, no minute ran and no page was
+   written again for the rest of the session. This is older than Turn 19 and `driveSound` only
+   added a new way to reach it. The body is `runFrame(now)` now, called inside a `try`, and the
+   next frame is asked for whatever happened. A third fix went with it: `noiseBuffer` dereferenced
+   the buffer outside its own `try`, so a context that answers with `undefined` threw a TypeError
+   rather than falling back.
+
+`npm run check` exit 0: 169 files, 1,668 tests.
