@@ -3,9 +3,70 @@
 The workshop earns by the hour. Built in Claude Code, cloud, on branch
 `claude/wonderful-rubin-31i1no`, 17.09.2026.
 
-Base: `36ca109` on that branch, which carries `APP_VERSION` `v24` and `STATE_VERSION` 14, the
-brief's precondition. The report is written as the turn is built: one entry per task, in the order
-the task queue of section 5 names them.
+Base: the branch's own head, which carried `APP_VERSION` `v24` and `STATE_VERSION` 14, the brief's
+precondition. The report is written as the turn is built: one entry per task, in the order the task
+queue of section 5 names them.
+
+`npm run check` on the finished tree, read off its own exit code: **exit 0**, 164 test files,
+1,601 tests and one todo, up from 152 files and 1,495 tests at the end of Turn 16.
+
+---
+
+## 0. Blockers, and where the session did not follow the brief to the letter
+
+**Nothing stopped the build.** Everything in sections 2.1 to 2.26 is built, tested and
+photographed. Four things about how it was built differ from what the brief and the session's own
+instructions describe, and each one is a decision, not an accident.
+
+1. **The branch, and what `main` actually holds.** The brief says to branch
+   `turn-17-the-workshop-earns-by-the-hour` from `main` and that "main carries v24". It does not:
+   `main` in this repository is two commits, the initial commit and a `CLAUDE.md`, and the whole
+   game lives on `claude/wonderful-rubin-31i1no`, which is also the branch this session is
+   required to push to. The turn is built there, on top of the v24 head, and the precondition was
+   checked against that head: `APP_VERSION` was `'v24'` and the CLAUDE.md's first line said
+   Turn 17, so the two things the brief asks to be true were true.
+2. **Phase B ran as three agents one after another, not three at once.** The brief's section 3 and
+   the session's instructions both put the three B groups in parallel. This container has four
+   cores, so the agent runner allows two at a time, and two of the three groups own the same files
+   (B1 and B2 both had to work in `staff.ts` and `tasks.ts`; B2 and B3 both in `game.ts` and
+   `jobs.ts`). Worse, `tests/ui/laptopTeam.test.ts` fails under CPU load and passes on its own, so
+   two agents running the suite against one working tree would have read each other's failures as
+   their own. Running them serially cost wall clock and bought a green `npm run check` on every one
+   of the fourteen commits. The division of the work is exactly the brief's: B1 took 2.1 to 2.8,
+   B2 took 2.9 to 2.21, B3 took 2.22 to 2.26.
+3. **The frozen files were opened, eleven times, each with its reason written down.** The six files
+   of Turn 13 were frozen for phase B. Phase A put in everything it could foresee (every state
+   field, every action, every constant, sixteen class names), which is why the freeze held for most
+   of the turn. It could not hold for all of it: a click in a routing switch cannot be reached from
+   anywhere else, and a constant the brief says to delete has to be deleted. Every one of the
+   eleven is listed in `docs/notes-t17.md` with the section of the brief that forced it, and phase
+   C read all eleven with the three groups in and reworked what was wrong (T17-C1). The
+   alternative the brief offers, leaving a note and carrying on, would have meant commits that do
+   not compile, and the session's own rule is that `npm run check` is green before every commit.
+4. **Two sentences of the brief could not both be true, and one figure of it does not exist.**
+   2.5 says both "a clean hall with nothing to do shows no chip at all" and "Set up hall stays as a
+   chip when the hall is not in setup": a quiet hall therefore shows exactly one chip, which is
+   what the mockup Piotr chose also draws, and picture 02 is that hall. 2.11's "2,500 a month
+   joiner" is between two real classes: a poor joiner is £2,057 a month and a normal one £2,743,
+   and the gate asks each candidate's own pay. Both are worked through in the cross check.
+
+Four more places where the code could not do what a sentence of the brief says, each in the group
+that met it and each with its evidence: 2.22's "a poor joiner shows a thinner margin than a good
+one" is not true of the game's wage table (B3); an express job could not push the rate over 40
+without a new field, because its uplift is pure profit and never reaches the labour booked by the
+minute (B3); 2.20's "two working days for bespoke" and "the lead time the deliveries already have"
+disagree, and the lead time won, at three (B2); and the brief's `startedBy` was not needed, because
+a task already carries the man who is on it (B2).
+
+**What left the game, and why.** Rule 2.12 sends every worker home at five o'clock, so the staff
+overtime of Turn 8 had nothing left to measure: the Friday overtime wage line, `overtimePayFor`,
+`overtimeWageBill`, `clearOvertimeWeek`, `staysForOvertime`, `worksOvertime`,
+`countStaffOvertimeMinute`, `recordStaffOvertime` and `runOvertimeQuits` are gone, and with the
+last of them the `workerQuit` event, because a man can no longer be tired of evenings he does not
+work. Phase C took the four constants behind them out as well. The owner's own overtime, his debt
+and his labour factor are Turn 6's rule and are untouched. This is a feature of Turn 8 leaving the
+game as a consequence of a rule Piotr asked for tonight, and it is the one thing in this report
+worth his eye before the merge.
 
 ---
 
@@ -580,3 +641,45 @@ hall floor, lifted to version 15. After it both stand inside the canteen block, 
 move is not a move any more. Nothing of the welfare kit is on a hall cell.
 
 **7. The look.** The ten pictures of T17-C4, below.
+
+---
+
+## How the turn was run
+
+Phase A was one worker, serial, and committed twice (`T17-A1`, `T17-A2`) before anything else
+started. Four readers went over the code before it, one per group of the brief plus one over the
+state and the tests, and their notes are what the three B agents were handed with the brief; that
+reading is where the cause of 2.3 was actually found (the helper's task was cleared on the spot for
+zero minutes, so nothing was ever seen), and where the trap in 2.15 was caught before it was
+sprung (the email penalty at delivery counts the still open email tasks, so dropping them at dusk
+without first banking the count would have deleted the penalty and the rating hit from the game).
+
+Phase B was three agents, one per group of section 3, run one after another for the reason in
+section 0. Phase C was one agent for the notes, the scenarios, the cross check and the pictures.
+Fourteen commits, `npm run check` green on its own exit code before every one of them.
+
+## Names the brief uses that the code does not
+
+Where the two differ, the code's name won and the report says so. The ones that mattered:
+
+- "a new tab on the Team page" (2.9): the Team is a page of the laptop, `LaptopPage 'team'`, and
+  not a modal; the tab is a `TeamTab`.
+- "started on day N" (2.9): `Worker.startDay`, which is the first day he turns up, not a hired day.
+- "monthly pay" (2.9, 2.11): a joiner and a helper carry `weeklyWage` and a `monthlyWage` of zero;
+  the office roles are the other way round. One helper now reads either as a month.
+- "the job's remaining hours" (2.12): `Job.labourRemaining`, which is a labour value in pounds.
+- "the bench's second place of Turn 16" (2.10): `STATION_TABLE.workbench.second`, reached by
+  `standingCell(state, item, 'second')`, declared in Turn 16 and called by nothing until tonight.
+- "a `startedBy`" (section 4): `TaskInstance.doneBy` already is it.
+- "the laptop's queued task ids" (section 4): `GameState.taskQueue`.
+- "the workshop rate" (2.26): `src/engine/rate.ts`. Turn 9's `workshopRate` in `plan.ts` is a
+  different thing wearing the same word, a speed and not a rate of pay; it is untouched and its
+  comment now points at the new file so the next reader is not caught by it.
+
+## What the state chose, and why (section 4)
+
+The rate keeps `dayStats.paidHours` per day, written at the day's close before the day is recorded,
+so it reaches `DaySummary.paidHours` and `state.days` on its own and a week of it survives a save
+with nothing else to do. The ledger route the brief offers as the alternative cannot see the
+owner's evening at all, because his draw is a flat per working day charge. `STATE_VERSION` is 15
+and every v24 save loads: `tests/cloud/migrate.test.ts` opens one and runs it on.
