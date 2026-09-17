@@ -254,6 +254,7 @@ export {
   findJob,
   hallBlock,
   labourValueFor,
+  marginOfPrice,
   lifecycleSteps,
   meetingOutstanding,
   needsMeeting,

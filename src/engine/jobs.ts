@@ -110,6 +110,19 @@ export function labourValueFor(price: number): number {
   return price * LABOUR_FRACTION;
 }
 
+/** What a price leaves after the material and the labour of the job, as a fraction of the price.
+ *  The one margin figure in the game: the client's answer prints it beside the offer, the scripted
+ *  player of the playthrough decides on it, and anything else that wants to say what a job is
+ *  worth reads this and not its own arithmetic (PIOTR accepted, 17.09; CLAUDE.md T18 2.9).
+ *
+ *  Material and labour come off the base price, because the express uplift and the client's own
+ *  haggle are pure profit and change neither (CLAUDE.md T2 3.4, T13 3.24). */
+export function marginOfPrice(basePrice: number, bespokeMaterial: boolean, price: number): number {
+  if (price <= 0) return 0;
+  const cost = materialCostFor(basePrice, bespokeMaterial) + labourValueFor(basePrice);
+  return (price - cost) / price;
+}
+
 /** A job as the stages read it. Everything that asks what a piece of work will take comes through
  *  here, an enquiry nobody has accepted included (CLAUDE.md T7 3.1). */
 export function stagedJob(
@@ -296,17 +309,22 @@ export function acceptEnquiry(state: GameState, enquiryId: string, byHand: boole
     (event) => event.kind === 'clientOffer' && event.data.enquiryId === enquiry.id,
   );
   if (!already && !queued) {
+    // The margin the number leaves rides on the event, and the dialogue prints it after the offer
+    // in the colour its size earns. The sentence ends on the colon the figure is written after:
+    // the two buttons under it are the question, so it does not ask one twice
+    // (PIOTR accepted, 17.09; CLAUDE.md T18 2.9).
+    const margin = marginOfPrice(enquiry.basePrice, enquiry.bespokeMaterial, enquiry.offer);
     queueEvent(state, {
       kind: 'clientOffer',
       title: `${enquiry.name}: the client answers`,
       body:
         `The budget was ${formatMoney(enquiry.budget)}. The client offers ` +
-        `${formatMoney(enquiry.offer)}. Accept?`,
+        `${formatMoney(enquiry.offer)}:`,
       choices: [
         { id: 'accept', label: `Accept ${formatMoney(enquiry.offer)}` },
         { id: 'decline', label: 'Decline' },
       ],
-      data: { enquiryId: enquiry.id, byHand, offer: enquiry.offer },
+      data: { enquiryId: enquiry.id, byHand, offer: enquiry.offer, margin },
     });
   }
   return { ok: true, reason: '', job: null };

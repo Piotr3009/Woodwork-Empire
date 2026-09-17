@@ -245,6 +245,15 @@ export const SPEND_WARNING_CATEGORIES = [
   'overdraftInterest',
   'software',
 ] as const;
+/** The two lines a margin is read against, on the client's answer and anywhere else the game
+ *  colours one (PIOTR accepted, 17.09; CLAUDE.md T18 2.9) [TUNE]. A fifth of the price left after
+ *  the material and the labour is a job worth having, which is the floor the scripted player of
+ *  Turn 13's 10.4 has taken every job on; a tenth is the line under which the job pays for the
+ *  wood and the hours and almost nothing else. Between them the figure is printed in the body
+ *  colour, because it is neither news nor a warning. */
+export const MARGIN_GOOD = 0.2;
+export const MARGIN_THIN = 0.1;
+
 /** The days the first steps line walks a new player in for. After the third one, or from the day
  *  after this, it is gone for good (PIOTR accepted, 17.09; CLAUDE.md T18 2.7) [TUNE]. */
 export const FIRST_STEPS_LAST_DAY = 3;

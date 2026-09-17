@@ -94,3 +94,14 @@ queue of section 4 names them.
   input, a textarea or a select, and nothing before there is a game to run.
   Done: `tests/ui/keyboard.test.ts`, six tests, including the knob on the top bar lighting for the
   key that was pressed, and Escape still closing a modal without touching the clock.
+- **T18-08 The margin on the client's answer (2.9).** `marginOfPrice(basePrice, bespokeMaterial,
+  price)` in `src/engine/jobs.ts` is the one margin figure in the game: what a price leaves after
+  the material and the labour, both off the base price, so the express uplift and the client's own
+  haggle never flatter it. The answer event carries it in its data and the accept dialogue prints it
+  after the offer, `The client offers £9,400: margin 18%`, in the game's green over `MARGIN_GOOD`
+  (20%), its red under `MARGIN_THIN` (10%) and the body colour between. The scripted player of the
+  10.4 playthrough now decides on the same function, so what the autopilot reads and what a real
+  player reads are the same number.
+  Done: `tests/ui/board.test.ts`, four new tests: the sentence to the character, the three colours
+  with a hair either side of both lines, the same function answering for a job already taken, and no
+  margin at all on an event that carries none.
