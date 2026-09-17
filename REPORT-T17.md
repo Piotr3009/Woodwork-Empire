@@ -35,3 +35,11 @@ the task queue of section 5 names them.
   sheet), the three new helper tests in `tests/engine/helper.test.ts` (a delivery unloaded by him
   minute by minute, a dirty hall swept by him, no `fixing` minutes on the owner's day) and the
   machine loop test in `tests/render/walkers.test.ts`.
+- **T17-B1b The welfare kit lives in the canteen (2.2).** A seat and a locker are off the hall
+  floor for good: `hallItems` leaves them out, so nothing bumps into them, they eat none of the
+  free floor the crew is limited by and `anchorFor` never sends one looking for a free cell; a
+  move to a hall cell is refused with "It stands in the canteen", and the hall draws them on the
+  canteen block with no `data-kit` on them, so setup mode has nothing to pick them up by. A man at
+  one stands in the canteen doorway facing in, and what they are worth is untouched: a seat a man
+  and a locker a man, which is what hiring a joiner still asks for.
+  Done: `tests/render/canteenKit.test.ts`, six tests, with phase A's migration test still green.

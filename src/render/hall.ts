@@ -10,6 +10,7 @@ import {
   PALLET_LAYOUT,
   ROOM_DOOR,
   ROOM_LAYOUT,
+  WELFARE_IN_THE_CANTEEN,
   YARD_WIDTH_CELLS,
   roomDoorCell,
 } from '../engine/constants';
@@ -780,6 +781,12 @@ export function machineFx(state: GameState, item: Equipment, spec: EquipmentSpec
   return NO_FX;
 }
 
+/** How tall a seat or a locker is drawn on the canteen roof, in metres, and how far its box is
+ *  inset in its cell [TUNE]: small enough to read as a plan of what is in there and not as kit
+ *  standing on the roof (CLAUDE.md T17 2.2). */
+const CANTEEN_KIT_HEIGHT = 0.3;
+const CANTEEN_KIT_INSET = 0.15;
+
 const CATEGORY_FILL: Record<string, string> = {
   storage: 'var(--kit-stock)',
   machine: 'var(--kit-machine)',
@@ -1253,10 +1260,17 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
   const store = bagStore(state);
   // Everything the player has bought, except the office furniture, which lives in the office
   // view, and the hand edgebander, which lives in a tool cabinet (CLAUDE.md T6 3.5).
+  const welfare: Equipment[] = [];
   for (const item of state.equipment) {
     const spec = findSpec(item.specId);
     if (!spec || spec.category === 'furniture') continue;
     if (!itemStandsInTheHall(item)) continue;
+    // The seats and the lockers are inside the canteen and are drawn on the block, with no
+    // data-kit on them: there is no hall cell to drag them to (CLAUDE.md T17 2.2).
+    if (WELFARE_IN_THE_CANTEEN.includes(item.specId)) {
+      welfare.push(item);
+      continue;
+    }
     // What the picture stands on is the class's own footprint, centred inside the working zone
     // the class reserves (CLAUDE.md T7 3.3).
     const stands = footprintIn(item);
@@ -1310,6 +1324,35 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
         }) +
         (unconnected ? notConnectedLabel(stands) : '') +
         fx.svg +
+        '</g>',
+    });
+  }
+
+  // The welfare kit, drawn where it stands: inside the canteen, on the block's own cells, lifted
+  // to the roof so the player can see what is in there through it. No hall cell, no data-kit and
+  // no drag: it is placed by count and that is all (PIOTR, 17.09; CLAUDE.md T17 2.2). The art
+  // side has no seat and no locker yet, so this is the one placeholder helper's box
+  // (docs/art/REQUESTS-T17.md 2).
+  const canteen = ROOM_LAYOUT.find((room) => room.id === 'canteen');
+  for (const item of welfare) {
+    const spec = findSpec(item.specId);
+    if (spec === null || spec === undefined) continue;
+    const lift = canteen?.height ?? 0;
+    const faces = boxPolygons(
+      item.anchorX + CANTEEN_KIT_INSET,
+      item.anchorY + CANTEEN_KIT_INSET,
+      1 - CANTEEN_KIT_INSET * 2,
+      1 - CANTEEN_KIT_INSET * 2,
+      CANTEEN_KIT_HEIGHT,
+    );
+    drawables.push({
+      depth: depthKey(item.anchorX, item.anchorY) + 0.01,
+      svg:
+        `<g class="canteen-kit" data-canteen-kit="${item.id}" ` +
+        `data-sprite="${item.spriteKey}" ` +
+        `transform="translate(0,${round(-lift * TILE_RISE)})">` +
+        `<title>${escapeText(`${spec.name}, in the canteen. ${spec.effect}`)}</title>` +
+        box(faces, 'var(--kit-welfare)', 'var(--kit-welfare-dark)') +
         '</g>',
     });
   }

@@ -3,7 +3,13 @@
 // A station is a string so the state stays plain JSON: 'bench', 'machine:<specId>', 'rack',
 // 'gate', 'office' or 'idle'.
 
-import { GATE_LAYOUT, PALLET_LAYOUT, SHEETS_PER_TRIP } from './constants';
+import {
+  GATE_LAYOUT,
+  PALLET_LAYOUT,
+  SHEETS_PER_TRIP,
+  WELFARE_IN_THE_CANTEEN,
+  roomDoorCell,
+} from './constants';
 import { itemStandsInTheHall } from './machines';
 import type { Cell } from './pipes';
 import type { Equipment, GameState, TaskInstance } from './types';
@@ -263,6 +269,9 @@ export function freeSideOf(state: GameState, item: Equipment): Side {
  *  first free side at the same position along it where it is not, and the table's cell as it
  *  stands when nothing is free at all (the straight line walk still gets him there). */
 export function standingCell(state: GameState, item: Equipment, role: StationRole = 'operator'): Cell {
+  // A seat and a locker are inside the canteen: a man at one of them stands in the doorway and is
+  // not drawn through the wall (PIOTR, 17.09; CLAUDE.md T17 2.2).
+  if (WELFARE_IN_THE_CANTEEN.includes(item.specId)) return roomDoorCell('canteen');
   const row = stationRow(item.specId);
   const box = standsOn(item);
   let offset: StationOffset;

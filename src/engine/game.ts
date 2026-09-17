@@ -42,6 +42,7 @@ import {
   TOOL_CABINET,
   STATE_VERSION,
   WEBSITE_START_LEVEL,
+  WELFARE_IN_THE_CANTEEN,
 } from './constants';
 import { arriveEnquiries, refreshBoard, refreshLocks } from './board';
 import {
@@ -2417,6 +2418,9 @@ function anchorFor(state: GameState, specId: string, variantId: string): { x: nu
   if (!spec || spec.category === 'furniture' || STARTING_LAYOUT[specId]?.yard === true) {
     return preferred;
   }
+  // The welfare kit stands inside the canteen by count and never on a hall cell, so it never
+  // looks for a free one (PIOTR, 17.09; CLAUDE.md T17 2.2).
+  if (WELFARE_IN_THE_CANTEEN.includes(specId)) return preferred;
   if (canPlaceSpec(state, specId, preferred.x, preferred.y, null, variantId).ok) return preferred;
   return firstFreeCell(state, specId, variantId) ?? preferred;
 }

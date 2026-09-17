@@ -41,6 +41,10 @@ export function hallItems(state: GameState): Equipment[] {
   return state.equipment.filter((item) => {
     const spec = findSpec(item.specId);
     if (!spec || spec.category === 'furniture') return false;
+    // A seat and a locker stand inside the canteen, so they take no hall cell at all: nothing may
+    // bump into them and they eat none of the floor the crew is limited by
+    // (PIOTR, 17.09; CLAUDE.md T17 2.2).
+    if (WELFARE_IN_THE_CANTEEN.includes(item.specId)) return false;
     if (!itemStandsInTheHall(item)) return false;
     return item.anchorX < state.unit.widthCells;
   });
@@ -152,6 +156,11 @@ export function canPlace(
   if (!item) return { ok: false, reason: 'Nothing to move' };
   const spec = findSpec(item.specId);
   if (spec?.category === 'furniture') return { ok: false, reason: 'It lives in the office' };
+  // The welfare kit is placed by count, inside the canteen: there is no hall cell to drag it to
+  // (CLAUDE.md T17 2.2).
+  if (WELFARE_IN_THE_CANTEEN.includes(item.specId)) {
+    return { ok: false, reason: 'It stands in the canteen' };
+  }
   if (item.anchorX >= state.unit.widthCells) return { ok: false, reason: 'It stands in the yard' };
   return canPlaceSpec(state, item.specId, x, y, item.id, item.variantId, rotated ?? item.rotated);
 }
