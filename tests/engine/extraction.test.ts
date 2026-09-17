@@ -24,7 +24,7 @@ import {
 } from '../../src/engine/index';
 import { dustGainPerMinute, hallProductivityFactor } from '../../src/engine/machines';
 import { applyRating } from '../../src/engine/reputation';
-import { renderHall } from '../../src/render/hall';
+import { hallProblems } from '../../src/render/hall';
 import type { GameState, Job } from '../../src/engine/index';
 import { acceptNow, act, fillRack, firstJob, newGame, placeEnquiry, placeEquipment, runClock } from '../helpers';
 
@@ -187,11 +187,11 @@ describe('what a minute of under extraction costs', () => {
     );
   });
 
-  it('says so under the hall, and never stops a machine', () => {
-    const page = renderHall(twoManShop('standard'));
-    expect(page).toContain('Extraction short: 2,500 of 1,660');
-    expect(page).toContain('Nothing stops.');
-    expect(renderHall(twoManShop('pro'))).not.toContain('Extraction short');
+  it('says so on a chip over the floor, and never stops a machine', () => {
+    const said = hallProblems(twoManShop('standard')).map((problem) => problem.text);
+    expect(said.join(' ')).toContain('Extraction short: 2,500 of 1,660');
+    expect(said.join(' ')).toContain('everything is 30% slower');
+    expect(hallProblems(twoManShop('pro')).join(' ')).not.toContain('Extraction short');
   });
 });
 

@@ -43,3 +43,14 @@ the task queue of section 5 names them.
   one stands in the canteen doorway facing in, and what they are worth is untouched: a seat a man
   and a locker a man, which is what hiring a joiner still asks for.
   Done: `tests/render/canteenKit.test.ts`, six tests, with phase A's migration test still green.
+- **T17-B1c The strip under the hall, variant C (2.5).** The four lines and the grey buttons are
+  gone: `hallProblems` in hall.ts is the one list of what the hall wants doing, and the page draws
+  one dark chip in the hand over the floor for each of them, bottom left, with the button that puts
+  it right on the chip itself (Clean up on the dirty hall, Empty bags on the full store, Service it
+  on the machine that is due one, Fix it on the one that has stopped). The stack's order is what it
+  costs the workshop: moving machines first (nothing runs at all), then Work here, then what has
+  stopped a machine, then what is slowing the hall, then the service, then Set up hall last. The
+  rack warning and "No job has its material in the hall yet" are gone, the wheel sentence is a tip
+  said once, and the camera is three small chips bottom right.
+  Done: `tests/ui/hallChips.test.ts`, with the old strip's assertions moved onto `hallProblems` in
+  the views, machines, extraction and air tests.

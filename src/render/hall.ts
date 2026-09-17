@@ -19,7 +19,6 @@ import {
   bagStoreLine,
   brokenMachines,
   dustBand,
-  extractorBroken,
   findSpec,
   gateIsCrowded,
   hasExtraction,
@@ -45,7 +44,7 @@ import {
   sheetCapacityOf,
 } from '../engine/machines';
 import { machineInUse } from '../engine/game';
-import { rackCapacity, stockIsLow } from '../engine/materials';
+import { rackCapacity } from '../engine/materials';
 import {
   STATION_BENCH,
   STATION_GATE,
@@ -64,7 +63,7 @@ import {
   stationWaitingFor,
 } from '../engine/stations';
 import { gateCollarArt, pipeTile, portRing } from './pipes';
-import { ownerIsAvailable, staffOutputFactor } from '../engine/owner';
+import { ownerIsAvailable } from '../engine/owner';
 import { homeCellOf } from '../engine/staff';
 import { plural } from '../engine/text';
 import type { RoomId } from '../engine/constants';
@@ -1131,8 +1130,6 @@ export interface Scene {
   shell: () => string;
   /** Written into that element on every render. */
   live: string;
-  /** The lines under the view. They belong to the page, not to the scene. */
-  notes: string;
 }
 
 /** The empty element a shell leaves for its live part. */
@@ -1140,7 +1137,7 @@ export const LIVE_SLOT = '<g data-live="1"></g>';
 
 /** The shell and the live part as one string, for a caller that just wants the markup. */
 export function sceneHtml(scene: Scene): string {
-  return scene.shell().replace(LIVE_SLOT, `<g data-live="1">${scene.live}</g>`) + scene.notes;
+  return scene.shell().replace(LIVE_SLOT, `<g data-live="1">${scene.live}</g>`);
 }
 
 export interface HallOptions {
@@ -1568,69 +1565,6 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
         height: Math.round(bounds.height + pad * 2),
       };
   const viewBox = [size.x, size.y, size.width, size.height].join(' ');
-  const output = `${Math.round(staffOutputFactor(state) * 100)}%`;
-  const ownerLine = !state.owner.present
-    ? `. The owner is not in today, so everyone works at ${output}`
-    : state.owner.wentHome
-      ? `. The owner has gone home, so everyone works at ${output}`
-      : '';
-  const band = dustBand(state.dust);
-  // 9.7: from the dirty band on, the player is warned that somebody can get hurt.
-  const riskLine =
-    band.label === 'dirty' || band.label === 'dangerous' ? ', somebody will get hurt in this' : '';
-  const stateLine = extractorBroken(state)
-    ? `Hall: the extractor is broken, everything runs at a quarter speed${ownerLine}`
-    : `Hall: ${band.label}${riskLine}${ownerLine}`;
-  const machines = state.equipment.filter((item) => findSpec(item.specId)?.category === 'machine');
-  const extractionLine =
-    machines.length > 0 && !hasExtraction(state)
-      ? '<p class="view-note warn">No extraction in the hall, so no machine will run. ' +
-        'Buy an extractor.</p>'
-      : '';
-  // The fans are too small for what is running this minute: nothing stops, the hall just turns
-  // out less and fills with dust (PIOTR, CLAUDE.md T10 3.1).
-  const extraction = extractionCheck(state);
-  const shortLine = extraction.short
-    ? `<p class="view-note warn">${escapeText(extraction.line)} m\u00b3/h. Everything in the hall is ` +
-      '30% slower and the dust rises three times as fast. Nothing stops.</p>'
-    : '';
-  // A compressor with more drawn on it than the pipe will carry: everything on it runs at 0.7
-  // for the minute (PIOTR, CLAUDE.md T10 3.2).
-  const airLines = hallAirCheck(state)
-    .lines.map((line) => `<p class="view-note warn">${escapeText(line)}. Everything on it runs at ` +
-      '70% until something is turned off.</p>')
-    .join('');
-  const brokenLine =
-    brokenMachines(state).length > 0
-      ? '<p class="view-note warn">Broken: ' +
-        escapeText(
-          brokenMachines(state)
-            .map((item) => (findSpec(item.specId)?.name ?? item.specId).toLowerCase())
-            .join(', '),
-        ) +
-        '.</p>'
-      : '';
-  const serviceLine =
-    machinesDueService(state).length > 0
-      ? '<p class="view-note warn">Service due: ' +
-        escapeText(
-          machinesDueService(state)
-            .map((item) => (findSpec(item.specId)?.name ?? item.specId).toLowerCase())
-            .join(', '),
-        ) +
-        '.</p>'
-      : '';
-  const gateLine = gateIsCrowded(state)
-    ? `<p class="view-note warn">Order transport, no room at the gate: ${jobsAtGate(state).length}` +
-      ` finished pieces against a limit of ${GATE_CROWD_LIMIT}. Everything in the hall is 30% ` +
-      'slower.</p>'
-    : '';
-  const lowStock = stockIsLow(state)
-    ? `<p class="view-note warn">The rack is nearly empty: ${state.stock.sheets} of ` +
-      `${rackCapacity(state)} sheets left.</p>`
-    : rackCapacity(state) === 0
-      ? '<p class="view-note warn">No shelving in the hall, so nothing can be unloaded.</p>'
-      : '';
   // The shell stands until the frame, the painting or the grid changes. Nothing else in the hall
   // can make it wrong, so the pictures are loaded once and never again.
   const key = [
@@ -1651,10 +1585,101 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
       `<g class="hall-scene" data-camera="1" transform="${cameraTransform(HALL_CAMERA_FIT)}">` +
       `${parts.join('')}${LIVE_SLOT}</g></svg>`,
     live: live.join(''),
-    notes:
-      `<p class="view-note">${escapeText(stateLine)}</p>` +
-      `${extractionLine}${shortLine}${airLines}${brokenLine}${serviceLine}${gateLine}${lowStock}`,
   };
+}
+
+/** One thing the hall wants doing: the sentence the old strip under the hall used to carry, and
+ *  what it is about, so the page can hang the right button on the chip (PIOTR, 16.09;
+ *  CLAUDE.md T17 2.5). A hall with nothing wrong with it has none of them and shows no chip. */
+export interface HallProblem {
+  kind: 'broken' | 'bags' | 'hall' | 'dirty' | 'service';
+  /** The machine it is about, where it is about one. */
+  equipmentId: string | null;
+  text: string;
+}
+
+function lowerName(specId: string): string {
+  return (findSpec(specId)?.name ?? specId).toLowerCase();
+}
+
+/** Everything the hall wants doing, in the order it costs the workshop: what has stopped, then
+ *  what is slowing it down, then what can wait a day (CLAUDE.md T17 2.5). The one list: the
+ *  chips over the floor are built from it and nothing else reads the hall's state in words. */
+export function hallProblems(state: GameState): HallProblem[] {
+  const list: HallProblem[] = [];
+  // A machine that has stopped, the extractor first in its own words: without it nothing in the
+  // hall runs at more than a quarter speed.
+  for (const item of brokenMachines(state)) {
+    list.push({
+      kind: 'broken',
+      equipmentId: item.id,
+      text:
+        item.specId === 'extractor'
+          ? 'The extractor is broken, so everything runs at a quarter speed'
+          : `The ${lowerName(item.specId)} has stopped`,
+    });
+  }
+  if (bagStore(state).full) {
+    list.push({
+      kind: 'bags',
+      equipmentId: null,
+      text: 'The bags are full, so nothing that makes dust runs',
+    });
+  }
+  const machines = state.equipment.filter((item) => findSpec(item.specId)?.category === 'machine');
+  if (machines.length > 0 && !hasExtraction(state)) {
+    list.push({
+      kind: 'hall',
+      equipmentId: null,
+      text: 'No extraction in the hall, so no machine will run. Buy an extractor',
+    });
+  }
+  // The fans are too small for what is running this minute: nothing stops, the hall just turns
+  // out less and fills with dust (PIOTR, CLAUDE.md T10 3.1).
+  const extraction = extractionCheck(state);
+  if (extraction.short) {
+    list.push({
+      kind: 'hall',
+      equipmentId: null,
+      text: `${extraction.line} m³/h: everything is 30% slower and the dust rises three times as fast`,
+    });
+  }
+  // A compressor with more drawn on it than the pipe will carry: everything on it runs at 0.7
+  // for the minute (PIOTR, CLAUDE.md T10 3.2).
+  for (const line of hallAirCheck(state).lines) {
+    list.push({
+      kind: 'hall',
+      equipmentId: null,
+      text: `${line}. Everything on it runs at 70% until something is turned off`,
+    });
+  }
+  if (gateIsCrowded(state)) {
+    list.push({
+      kind: 'hall',
+      equipmentId: null,
+      text:
+        `Order transport, no room at the gate: ${jobsAtGate(state).length} finished pieces ` +
+        `against a limit of ${GATE_CROWD_LIMIT}. Everything is 30% slower`,
+    });
+  }
+  // 9.7: from the dirty band on, the player is warned that somebody can get hurt.
+  const band = dustBand(state.dust);
+  if (band.label !== 'clean') {
+    const risk =
+      band.label === 'dirty' || band.label === 'dangerous'
+        ? ', somebody will get hurt in this'
+        : '';
+    list.push({ kind: 'dirty', equipmentId: null, text: `The hall is ${band.label}${risk}` });
+  }
+  for (const item of machinesDueService(state)) {
+    if (item.broken) continue;
+    list.push({
+      kind: 'service',
+      equipmentId: item.id,
+      text: `The ${lowerName(item.specId)} is due a service`,
+    });
+  }
+  return list;
 }
 
 /** The hall as one string. The app builds it from the pieces instead, so the painting survives a

@@ -411,7 +411,6 @@ export function officeScene(
       OFFICE_LIVE_SLOT +
       '</div></div>',
     live: liveText(state),
-    notes: '',
   };
 }
 

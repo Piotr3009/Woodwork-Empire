@@ -25,6 +25,9 @@ const SCREENS = [
   'settings',
   // The first machine with no pipe to the extraction, under the hall (CLAUDE.md T16 2.3).
   'unconnected',
+  // What the wheel and the drag do: the sentence that used to sit under the hall for ever is a
+  // tip now, said once (PIOTR, 16.09; CLAUDE.md T17 2.5).
+  'hallCamera',
 ];
 
 function parse(html: string): HTMLElement {
@@ -46,7 +49,7 @@ function click(selector: string): void {
 }
 
 describe('the first use bubbles', () => {
-  it('have one sentence each for the twelve screens of the brief, and the unconnected machine', () => {
+  it('have one sentence each for the twelve screens of the brief, the unconnected machine and the camera', () => {
     for (const key of SCREENS) {
       expect(TIPS[key], key).toBeTypeOf('string');
       expect((TIPS[key] ?? '').length, key).toBeGreaterThan(20);

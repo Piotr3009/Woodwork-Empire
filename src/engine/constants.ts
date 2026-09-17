@@ -3520,6 +3520,8 @@ export const EFFICIENCY_CAUSES: ReadonlyArray<{ id: LostMinuteCause; label: stri
 /** The first use bubbles, one sentence each, keyed by the screen they open on [TUNE wording]
  *  (CLAUDE.md T13 3.22). Dismissed by a click, remembered in the save. */
 export const TIPS: Record<string, string> = {
+  hallCamera:
+    'The wheel zooms the hall and dragging the floor moves it. Fit puts the whole workshop back in the view.',
   unconnected:
     'A red ring is a machine with no pipe to the extraction. Open its card to connect it, or hire a production manager and it is done for you.',
   catalogue:

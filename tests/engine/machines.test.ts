@@ -56,7 +56,7 @@ import { canBuy } from '../../src/engine/game';
 import { startProductionCheck } from '../../src/engine/jobs';
 import { STATION_NO_BENCH, tick } from '../../src/engine/index';
 import type { Equipment, GameEvent, GameState } from '../../src/engine/index';
-import { renderHall } from '../../src/render/hall';
+import { hallProblems, renderHall } from '../../src/render/hall';
 import {
   acceptNow,
   act,
@@ -446,7 +446,10 @@ describe('no extraction at all', () => {
     state = tick(state, 60);
     expect(firstJob(state).labourRemaining).toBe(before);
     expect(firstJob(state).blockedBy).toBe('no extraction');
-    expect(renderHall(state)).toContain('No extraction in the hall');
+    // And the hall says so on a chip over the floor (CLAUDE.md T17 2.5).
+    expect(hallProblems(state).some((problem) => problem.text.startsWith('No extraction'))).toBe(
+      true,
+    );
     // Buy one and the bench starts again.
     const fixed = tick(buyNow(state, 'extractor'), 10);
     expect(firstJob(fixed).labourRemaining).toBeLessThan(before);

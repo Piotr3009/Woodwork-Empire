@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { footprintIn, renderHall, stationCell } from '../../src/render/hall';
+import { footprintIn, hallProblems, renderHall, stationCell } from '../../src/render/hall';
 import { renderOffice } from '../../src/render/office';
 import { renderGameOver } from '../../src/ui/dayEnd';
 import { renderLaptop } from '../../src/ui/laptop';
@@ -30,7 +30,6 @@ describe('the hall on day 1', () => {
     expect(svg).toContain('Canteen');
     // The rack is bought from the catalogue now, so on day 1 there is none.
     expect(svg).not.toContain('data-rack="1"');
-    expect(svg).toContain('No shelving in the hall');
     expect(svg).not.toContain('Table saw');
     expect(svg).not.toContain('Extractor');
     expect(svg).not.toContain('data-kit=');
@@ -43,7 +42,6 @@ describe('the hall on day 1', () => {
     const svg = renderHall(state);
     expect(svg).toContain('data-rack="1"');
     expect(svg).toContain('Sheet rack: 12 / 50');
-    expect(renderHall(state)).not.toContain('No shelving in the hall');
   });
 
   it('draws what has been bought, and leaves the office furniture in the office', () => {
@@ -68,13 +66,13 @@ describe('the hall on day 1', () => {
     expect(svg).toContain('</svg>');
   });
 
-  it('says how dirty the hall is, and never with a side panel of numbers', () => {
-    const clean = renderHall(newGame());
-    expect(clean).toContain('Hall: clean');
+  it('says how dirty the hall is on a chip, and never with a side panel of numbers', () => {
+    // A clean hall has nothing to say about itself at all (CLAUDE.md T17 2.5).
+    expect(hallProblems(newGame()).filter((problem) => problem.kind === 'dirty')).toEqual([]);
     const dirty = newGame();
     dirty.dust = 75;
+    expect(hallProblems(dirty)[0]?.text).toContain('The hall is dirty');
     const drawn = renderHall(dirty, { files: [], characters: {} });
-    expect(drawn).toContain('Hall: dirty');
     expect(drawn).not.toContain('75');
   });
 
@@ -95,7 +93,7 @@ describe('the hall on day 1', () => {
     // instead, so the test draws the hall as if no file had landed (art lands without code).
     const svg = renderHall(state, { files: [] });
     expect(svg).toContain('var(--stopped)');
-    expect(svg).toContain('the extractor is broken');
+    expect(hallProblems(state)[0]?.text).toContain('The extractor is broken');
   });
 
   it('marks the extractor when the bags on it are full, and no machine', () => {
@@ -156,7 +154,9 @@ describe('the hall on day 1', () => {
     expect(svg).not.toContain(`data-finished="${FINISHED_GOODS_LAYOUT.width}"`);
     expect(svg).toContain('At the gate: 4');
     expect(svg).toContain('var(--kit-stock)');
-    expect(svg).toContain('Order transport, no room at the gate');
+    expect(
+      hallProblems(state).some((problem) => problem.text.includes('no room at the gate')),
+    ).toBe(true);
   });
 
   it('shows the owner, and the crew with their names', () => {
@@ -197,7 +197,6 @@ describe('the hall on day 1', () => {
     expect(renderHall(state)).toContain('Ben (off)');
     state = act(state, { type: 'SKIP_DAY' });
     expect(renderHall(state)).not.toContain('data-owner="1"');
-    expect(renderHall(state)).toContain('The owner is not in today');
   });
 
   it('draws the one painted hall at the same size whatever the difficulty', () => {
@@ -230,15 +229,17 @@ describe('the game over screen', () => {
   });
 });
 
-describe('the warnings on the hall line', () => {
+describe('the warnings on the hall chips', () => {
   it('warns that somebody will get hurt from the dirty band on, as 9.7 asks', () => {
     const state = newGame();
+    const said = (): string => hallProblems(state).map((problem) => problem.text).join(' ');
     state.dust = 50;
-    expect(renderHall(state)).not.toContain('get hurt');
+    expect(said()).toContain('The hall is messy');
+    expect(said()).not.toContain('get hurt');
     state.dust = 75;
-    expect(renderHall(state)).toContain('Hall: dirty, somebody will get hurt');
+    expect(said()).toContain('The hall is dirty, somebody will get hurt');
     state.dust = 95;
-    expect(renderHall(state)).toContain('Hall: dangerous, somebody will get hurt');
+    expect(said()).toContain('The hall is dangerous, somebody will get hurt');
   });
 });
 

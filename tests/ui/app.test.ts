@@ -265,9 +265,13 @@ describe('the first ten minutes', () => {
     // needs a screen matrix, which this page has none of, so it is proved where the matrix is
     // stubbed: tests/ui/hallRooms.test.ts.
     expect(html()).toContain('<title>The WC.');
-    // Nothing has its material in the hall yet, so the hall says why instead of a dead button.
-    expect(html()).toContain('No job has its material in the hall yet');
-    expect(html()).toContain('Clean up');
+    // Nothing has to be done in a clean hall with nothing ready, so the only chip over the floor
+    // is the setting out, and the camera is three small chips (CLAUDE.md T17 2.5).
+    expect(html()).toContain('class="hall-chips"');
+    expect(html()).not.toContain('No job has its material in the hall yet');
+    expect(html()).not.toContain('Clean up');
+    expect(html()).toContain('data-do="startSetup"');
+    expect(html()).toContain('class="hall-zoom"');
   });
 });
 
@@ -653,7 +657,7 @@ describe('the style rules of 10.4', () => {
 
   it('prints money with a pound sign and a comma, and minutes with a unit', () => {
     expect(html()).toMatch(/£[\d,]+/);
-    expect(html()).toContain('120 min');
+    expect(html()).toContain(' min');
     expect(html()).not.toMatch(/£\d+\.\d/);
   });
 

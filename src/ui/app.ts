@@ -11,9 +11,7 @@ import {
   bagStore,
   bagStoreLine,
   bagsFull,
-  brokenMachines,
   findSpec,
-  machinesDueService,
   ductingDue,
   moveConfirmPending,
   movePending,
@@ -47,6 +45,7 @@ import { WHY, boxOf, canPlace, reservationById, summaryOfDay } from '../engine/i
 import {
   type Frame,
   type HallCamera,
+  type HallProblem,
   HALL_CAMERA_FIT,
   HALL_CAMERA_START,
   hallStartCamera,
@@ -54,6 +53,7 @@ import {
   type Scene,
   cameraTransform,
   clampCamera,
+  hallProblems,
   hallScene,
   roomAtScenePoint,
   sceneToContent,
@@ -83,7 +83,6 @@ import {
   escapeHtml,
   minutes,
   plural,
-  reasonLabel,
   syncModals,
   tabBar,
 } from './modal';
@@ -518,66 +517,69 @@ function setupControls(current: GameState): string {
   );
 }
 
+/** One chip over the floor: what has to be done, in the hand, with the button that does it where
+ *  there is one (PIOTR, 16.09, docs/mockups/t17/hall-strip-C.html; CLAUDE.md T17 2.5). */
+function hallChip(text: string, action = ''): string {
+  const said = text === '' ? '' : `<span>${escapeHtml(text)}</span>`;
+  return `<div class="hall-chip">${said}${action}</div>`;
+}
+
+/** The button that puts a chip's problem right: the same actions the machine's own card calls, so
+ *  there is one way to clean the hall, empty the bags, fix a machine and service one. */
+function chipAction(problem: HallProblem): string {
+  if (problem.kind === 'dirty') {
+    return `<button class="btn" data-do="startCleaning">Clean up · ${minutes(CLEANING_MINUTES)}</button>`;
+  }
+  if (problem.kind === 'bags') {
+    return '<button class="btn" data-do="emptyBags">Empty bags</button>';
+  }
+  if (problem.equipmentId === null) return '';
+  if (problem.kind === 'broken') {
+    return `<button class="btn" data-do="repairMachine" data-id="${problem.equipmentId}">Fix it</button>`;
+  }
+  return `<button class="btn" data-do="serviceMachine" data-id="${problem.equipmentId}">Service it</button>`;
+}
+
+/** What floats over the floor, bottom left: one chip per thing that has to be done and nothing
+ *  else, so a clean hall with nothing waiting shows the setting out chip alone (PIOTR, 16.09;
+ *  CLAUDE.md T17 2.5). The order is what it costs the workshop: nothing runs at all, then the
+ *  owner's own bench, then what the hall wants doing, then the setting out.
+ *  Setup mode keeps the controls it has always had. */
 function hallControls(current: GameState): string {
   if (ui.setup) return setupControls(current);
+  const chips: string[] = [];
   // Somebody is carrying the kit: nothing else happens in the hall until it is down (T4 3.5).
   if (movingMachines(current) !== null) {
-    return (
-      '<div class="view-controls">' +
-      '<span class="reason">Moving machines. Nothing gets made until the kit is back down and ' +
-      'the ducting is on.</span></div>'
+    chips.push(
+      hallChip('Moving machines. Nothing gets made until the kit is back down and the ducting is on.'),
     );
+    return `<div class="hall-chips">${chips.join('')}</div>`;
   }
   const ready = oldestReadyJob(current);
   const working = ownerJob(current) !== null;
-  // The hall says exactly what the job card says, out of the one check (CLAUDE.md T4 3.4).
-  const check = ready === null ? null : startProductionCheck(current, ready);
-  const workHere = working
-    ? reasonLabel('You are at the bench')
-    : check === null
-      ? reasonLabel('No job has its material in the hall yet')
-      : check.ok
-        ? '<button class="btn btn-primary" data-do="workHere">Work here</button>'
-        : reasonLabel(`Cannot work here, ${check.reason}`);
-  const name = (specId: string): string =>
-    (findSpec(specId)?.name ?? specId).toLowerCase();
-  const fix = brokenMachines(current)
-    .map(
-      (item) =>
-        `<button class="btn" data-do="repairMachine" data-id="${item.id}">` +
-        `Fix the ${escapeHtml(name(item.specId))}</button>`,
-    )
-    .join('');
-  const service = machinesDueService(current)
-    .filter((item) => !item.broken)
-    .map(
-      (item) =>
-        `<button class="btn" data-do="serviceMachine" data-id="${item.id}">` +
-        `Service the ${escapeHtml(name(item.specId))}</button>`,
-    )
-    .join('');
-  return (
-    '<div class="view-controls">' +
-    workHere +
-    '<button class="btn" data-do="startCleaning">Clean up · ' +
-    `${minutes(CLEANING_MINUTES)}</button>` +
-    setupButton(current) +
-    fix +
-    service +
-    '</div>'
-  );
+  // The hall says exactly what the job card says, out of the one check (CLAUDE.md T4 3.4). A man
+  // already at his bench, and a board with nothing ready on it, are not things to be done.
+  const check = ready === null || working ? null : startProductionCheck(current, ready);
+  if (check !== null) {
+    chips.push(
+      check.ok
+        ? hallChip('', '<button class="btn btn-primary" data-do="workHere">Work here</button>')
+        : hallChip(`Cannot work here, ${check.reason}`),
+    );
+  }
+  for (const problem of hallProblems(current)) chips.push(hallChip(problem.text, chipAction(problem)));
+  chips.push(hallChip('', setupButton(current)));
+  return `<div class="hall-chips">${chips.join('')}</div>`;
 }
 
-/** The camera under the hall. It is here in setup mode as well: the player sets the hall out at
- *  whatever he can see (CLAUDE.md T6 3.3). */
+/** The camera, bottom right: three small chips and nothing else. What the wheel and the drag do
+ *  is a tip now, said once (CLAUDE.md T17 2.5). */
 function hallZoomControls(): string {
-  const at = `${Math.round(ui.camera.scale * 100)}%`;
   return (
-    '<div class="view-controls">' +
+    '<div class="hall-zoom">' +
     '<button class="btn" data-do="zoomFit">Fit</button>' +
     '<button class="btn" data-do="zoomIn">+</button>' +
     '<button class="btn" data-do="zoomOut">-</button>' +
-    `<span class="reason">Wheel to zoom, drag the floor to move. Now at ${at}.</span>` +
     '</div>'
   );
 }
@@ -603,7 +605,7 @@ function officeViewport(): { width: number; height: number } {
  *  second batch would ride on the first one's minutes (CLAUDE.md T4 3.5). */
 function setupButton(current: GameState): string {
   if (movePending(current) !== null || moveConfirmPending(current)) {
-    return reasonLabel('The kit is half shifted. Finish the move first.');
+    return '<span>The kit is half shifted. Finish the move first.</span>';
   }
   return '<button class="btn" data-do="startSetup">Set up hall</button>';
 }
@@ -704,7 +706,7 @@ const SCENE_SLOT = '<div data-scene-slot="1"></div>';
 function sceneFor(current: GameState): Scene | null {
   if (ui.view === 'sprites') {
     // A page of every key in the game, which is dear to build and never changes: it is all shell.
-    return { key: 'sprites', shell: renderSpriteCheck, live: '', notes: '' };
+    return { key: 'sprites', shell: renderSpriteCheck, live: '' };
   }
   if (ui.view === 'hall') {
     return hallScene(current, { ghost: ghostFor(current), setup: ui.setup });
@@ -730,8 +732,8 @@ const VERSION_CORNER = `<span class="version-corner">${APP_VERSION}</span>`;
 
 /** Everything on the page except the modal layer, which keeps its own DOM between renders, and the
  *  scene, which goes into the slot afterwards. */
-function pageHtml(scene: Scene | null): string {
-  return pageBody(scene) + VERSION_CORNER;
+function pageHtml(): string {
+  return pageBody() + VERSION_CORNER;
 }
 
 /** What the player has not looked at yet: an enquiry that was not on the board when he last
@@ -744,7 +746,7 @@ function topbarNews(current: GameState): TopbarNews {
   };
 }
 
-function pageBody(scene: Scene | null): string {
+function pageBody(): string {
   if (ui.screen === 'start' || state === null) {
     return (
       renderStart({
@@ -761,7 +763,6 @@ function pageBody(scene: Scene | null): string {
   const current = state;
   // The last word the company gets is the bankruptcy event, over the game over screen.
   if (current.gameOver) return renderGameOver(current);
-  const notes = scene?.notes ?? '';
   const controls = ui.view === 'hall' ? hallControls(current) + hallZoomControls() : '';
   const note = ui.storeNote
     ? storeNote(bagStore(current))
@@ -778,7 +779,7 @@ function pageBody(scene: Scene | null): string {
     toast +
     out +
     (ui.menuOpen ? renderMenu(current, ui.cloud) : '') +
-    `<main class="view">${SCENE_SLOT}${notes}${controls}${note}${hallTip(current)}</main>` +
+    `<main class="view">${SCENE_SLOT}${controls}${note}${hallTip(current)}</main>` +
     renderWhy()
   );
 }
@@ -954,7 +955,7 @@ export function render(): void {
   const wanted = ui.screen === 'game' && state !== null && state.gameOver === null
     ? sceneFor(state)
     : null;
-  patchInto(parts.page, pageHtml(wanted));
+  patchInto(parts.page, pageHtml());
   mountScene(parts.page, wanted);
   applyCamera();
   syncModals(parts.layer, modalSpecs());
@@ -1041,6 +1042,11 @@ function shutModal(): void {
  *  in the same place (CLAUDE.md T16 2.3). */
 function hallTip(current: GameState): string {
   if (ui.view !== 'hall') return '';
+  // What the wheel and the drag do, said once and then never again: the sentence that used to sit
+  // under the hall for ever (PIOTR, 16.09; CLAUDE.md T17 2.5). One bubble at a time, so the
+  // camera is explained first and the red rings after it.
+  const camera = withTip('', current, 'hallCamera');
+  if (camera !== '') return camera;
   if (hasCentralExtraction(current) || unconnectedMachines(current).length === 0) return '';
   return withTip('', current, 'unconnected');
 }
@@ -1534,6 +1540,11 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
       return;
     case 'startCleaning':
       dispatch({ type: 'START_CLEANING' });
+      return;
+    // The bags, from the chip over the floor and from the extractor's own card: the one question
+    // the hall has always asked, who empties them (CLAUDE.md T12 2.3, T17 2.5, 2.6).
+    case 'emptyBags':
+      dispatch({ type: 'ASK_EMPTY_BAGS' });
       return;
     case 'repairMachine':
       dispatch({ type: 'REPAIR_MACHINE', equipmentId: id });
