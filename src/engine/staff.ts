@@ -23,7 +23,7 @@ import { addWorkingDays, formatCalendarDay, isOvertime, isWorkingDay, monthOfDay
 import { charge, formatMoney } from './economy';
 import { queueEvent } from './events';
 import { onAccident } from './insurance';
-import { assignJob, findJob, oldestReadyJob, releaseJob } from './jobs';
+import { assignJob, findJob, oldestReadyJob, takeOffJob } from './jobs';
 import { crewLimit } from './layout';
 import {
   accidentRisk,
@@ -454,8 +454,11 @@ export function hurtWorker(
   options: { night?: boolean } = {},
 ): void {
   worker.absentDaysRemaining = ACCIDENT_DAYS_OFF;
+  // He comes off the job and nobody else does: one man cutting his hand does not stop a job four
+  // men are standing at (CLAUDE.md T19 2.5). The job falls back to the list only if he was the
+  // last on it.
   const job = worker.jobId ? findJob(state, worker.jobId) : null;
-  if (job) releaseJob(state, job);
+  if (job) takeOffJob(state, job.id, worker.id);
   const where = options.night === true ? 'on the night shift, with nobody to see it' : 'in all that mess';
   queueEvent(state, {
     kind: 'accident',

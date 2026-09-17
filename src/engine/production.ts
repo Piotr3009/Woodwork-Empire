@@ -29,6 +29,7 @@ import {
   claimMachine,
   countOf,
   findSpec,
+  floorMachines,
   hallProductivityFactor,
   has,
   heldMachine,
@@ -151,28 +152,70 @@ function sharedTool(state: GameState, family: string | null): Equipment | null {
   return cabinetTools(state, family)[0] ?? null;
 }
 
+/** A place at an item beyond the two the station table draws by name. Place 0 is the operator's
+ *  cell and place 1 is the waiting cell at a machine, or the second place at a bench; from place
+ *  2 the men stand on along the same side, one cell further out each time, so twenty on one job
+ *  do not stack on one tile (PIOTR, 17.09; CLAUDE.md T19 2.5). The string names the item and not
+ *  the family, because it is that bench and that saw and no other.
+ *  [NOTES-B2.md] this pair belongs in `src/engine/stations.ts` beside `secondStation`, which is
+ *  frozen for phase B; the renderer resolves the string with `benchCellsAt` / `queueCellsAt`. */
+export function placeStation(equipmentId: string, place: number): string {
+  return `place:${equipmentId}:${place}`;
+}
+
+/** The item and the place a station names, or null when it is not a place station. */
+export function stationPlaceAt(station: string): { id: string; place: number } | null {
+  if (!station.startsWith('place:')) return null;
+  const rest = station.slice('place:'.length);
+  const cut = rest.lastIndexOf(':');
+  if (cut <= 0) return null;
+  const place = Number(rest.slice(cut + 1));
+  if (!Number.isFinite(place) || place < 0) return null;
+  return { id: rest.slice(0, cut), place };
+}
+
+/** Where this man stands among the men on his job, counting only the ones the same thing is true
+ *  of. Nought is the first of them, and the list's own order is the order they were put on. */
+function placeAmong(job: Job, who: string, eligible: (other: string) => boolean): number {
+  let place = 0;
+  for (const other of job.assignees) {
+    if (other === who) return place;
+    if (eligible(other)) place += 1;
+  }
+  return place;
+}
+
 /** Where a man on a job is standing: at the machine of the stage he is at, waiting at one
- *  somebody else has, or at his bench (CLAUDE.md T7 3.1). */
+ *  somebody else has, or at his bench (CLAUDE.md T7 3.1). With more than two men on the job the
+ *  third and the rest take the places beyond the table's two, along the same side of the item
+ *  (CLAUDE.md T19 2.5). */
 export function stationForProduction(state: GameState, who: string, job: Job): string {
   const stage = currentStage(state, job, cncOptions(state, who, job));
   const family = stage?.family ?? null;
-  // The second man of the job stands at the first man's bench, in its second place, whenever the
-  // work is bench work (CLAUDE.md T17 2.10). At a machine he queues for it like anybody else.
+  // Everybody but the first man of the job works at the first man's bench: the second in its
+  // second place and the rest along its front (CLAUDE.md T17 2.10, T19 2.5).
   const lead = leadAssignee(job);
-  const second =
-    lead !== null && lead !== who && isOnJob(job, who)
-      ? heldMachine(state, lead, BENCH)
-      : null;
-  if (family === null || family === BENCH) {
-    return second === null ? STATION_BENCH : secondStation(second.id);
-  }
+  const behind = lead !== null && lead !== who && isOnJob(job, who);
+  const bench = behind ? heldMachine(state, lead, BENCH) : null;
+  const atTheBench = (): string => {
+    if (bench === null) return STATION_BENCH;
+    const place = placeAmong(job, who, (other) => other !== lead);
+    return place === 0 ? secondStation(bench.id) : placeStation(bench.id, place + 1);
+  };
+  if (family === null || family === BENCH) return atTheBench();
   // By hand, or out of a cabinet: either way he does it at his bench.
-  if (!has(state, family) || machineIsShared(state, family)) {
-    return second === null ? STATION_BENCH : secondStation(second.id);
-  }
-  return heldMachine(state, who, family) === null
-    ? waitingStation(family)
-    : machineStation(family);
+  if (!has(state, family) || machineIsShared(state, family)) return atTheBench();
+  if (heldMachine(state, who, family) !== null) return machineStation(family);
+  // He is queueing for it. The first man waiting takes the waiting cell and the next of them the
+  // free cells along the same side, one out at a time (CLAUDE.md T19 2.5).
+  const queue = placeAmong(
+    job,
+    who,
+    (other) => other !== who && heldMachine(state, other, family) === null,
+  );
+  if (queue === 0) return waitingStation(family);
+  const item = floorMachines(state, family)[0] ?? null;
+  return item === null ? waitingStation(family) : placeStation(item.id, queue + 1);
 }
 
 /** Everybody who is standing at a job this minute, whatever else is true of the clock: the owner
@@ -338,7 +381,10 @@ export function workMinute(
     if (stage === null) continue;
     const at = takeMachines(state, hand);
     if (at.waitingFor !== null) {
-      // He stands at the machine until the man on it is done with it (CLAUDE.md T7 3.1).
+      // He stands at the machine until the man on it is done with it (CLAUDE.md T7 3.1). This is
+      // also the cap on the men: one machine is one man's, so a stage at a machine goes at that
+      // one man's speed however many are on the job, and the others put their minutes in only on
+      // the bench work the stage allows, which for a cutting stage is none (CLAUDE.md T19 2.5).
       hand.job.blockedBy = waitingLine(at.waitingFor);
       lose('noMachine');
       continue;

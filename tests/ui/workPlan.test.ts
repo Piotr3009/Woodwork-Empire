@@ -197,7 +197,7 @@ describe('what the board draws', () => {
     // The name, the price and the man on it are to the left of the bar.
     expect(row?.querySelector('.plan-head')?.textContent).toContain('Garage shelves');
     expect(row?.querySelector('.plan-head')?.textContent).toContain('4,000');
-    expect(row?.querySelector('.plan-head [data-do="assignJob"]')).not.toBeNull();
+    expect(row?.querySelector('.plan-head [data-do="openAssign"]')).not.toBeNull();
     // And there are no stage bars and no stage colours left anywhere on it.
     expect(page.querySelectorAll('.gantt-bar')).toHaveLength(0);
     expect(page.innerHTML).not.toContain('stage-cutting');
@@ -217,5 +217,51 @@ describe('what the board draws', () => {
     const page = parse(renderWorkPlan(newGame()));
     expect(page.textContent).toContain('No jobs yet');
     expect(page.querySelectorAll('.plan-row')).toHaveLength(0);
+  });
+});
+
+// Assign to this job (PIOTR, 17.09; CLAUDE.md T19 2.5, the mockup of docs/mockups/t19). The row
+// says who is on it in chips and offers one blue button, and no limit is put on how many go on.
+describe('the row says who is on it', () => {
+  it('says so plainly while nobody is, and offers the one button either way', () => {
+    const state = boardWith({ deadlineDays: 10 });
+    const row = parse(renderWorkPlan(state)).querySelector('.plan-row[data-plan]');
+    expect(row?.querySelector('.assign-none')?.textContent).toBe('Nobody is on it');
+    expect(row?.querySelectorAll('.assign-chip')).toHaveLength(0);
+    expect(row?.querySelector('.assign-open')?.textContent).toBe('Assign to this job');
+    // The Turn 17 controls are gone from the row, both of them.
+    expect(row?.querySelector('[data-do="assignJob"]')).toBeNull();
+    expect(row?.querySelector('[data-do="assignSecond"]')).toBeNull();
+  });
+
+  it('draws the owner as a chip of his own, with the cross that takes him off', () => {
+    const state = act(boardWith({ deadlineDays: 10 }), { type: 'WORK_HERE', jobId: null });
+    const row = parse(renderWorkPlan(state)).querySelector('.plan-row[data-plan]');
+    const chips = Array.from(row?.querySelectorAll('.assign-chip') ?? []);
+    expect(chips).toHaveLength(1);
+    expect(chips[0]?.textContent).toBe('You×');
+    const cross = chips[0]?.querySelector('[data-do="assignOff"]');
+    expect(cross?.getAttribute('data-worker')).toBe('owner');
+    expect(cross?.getAttribute('data-id')).toBe(firstJob(state).id);
+    expect(row?.querySelector('.assign-none')).toBeNull();
+  });
+
+  it('opens the list on one click, with the men already on it greyed', () => {
+    const state = act(boardWith({ deadlineDays: 10 }), { type: 'WORK_HERE', jobId: null });
+    const job = firstJob(state);
+    const open = parse(renderWorkPlan(state, null, job.id));
+    const list = open.querySelector('.assign-list');
+    expect(list).not.toBeNull();
+    expect(list?.textContent).toContain(`Who goes on ${job.name}?`);
+    const owner = list?.querySelector('[data-worker="owner"]');
+    // He is on it already, so his row is greyed and carries no way of adding him twice.
+    expect(owner).toBeNull();
+    const busy = Array.from(list?.querySelectorAll('.assign-row.is-busy') ?? []);
+    expect(busy.some((entry) => (entry.textContent ?? '').includes('already on this job'))).toBe(
+      true,
+    );
+    // One button closes it again, and it is the same single click.
+    expect(open.querySelector('[data-do="closeAssign"]')).not.toBeNull();
+    expect(open.querySelector('[data-do="openAssign"]')).toBeNull();
   });
 });

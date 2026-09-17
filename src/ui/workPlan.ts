@@ -5,8 +5,7 @@
 import { formatCalendarDay, workPlan } from '../engine/index';
 import type { GameState, Job, PlanRow, WorkPlan } from '../engine/index';
 // Straight off their own module, not round the public API, which Turn 13 froze (REPORT-T13 10).
-import { canTakeOver, leadAssignee, ownerTookOver } from '../engine/jobs';
-import { joiners, onTheBooksToday } from '../engine/staff';
+import { canTakeOver, ownerTookOver } from '../engine/jobs';
 import { renderContractBar } from './contracts';
 import {
   callsLine,
@@ -36,30 +35,6 @@ function minutesText(row: PlanRow): string {
   return `${done.toLocaleString('en-GB')} of ${total.toLocaleString('en-GB')} min · ${row.stage}`;
 }
 
-/** The second man on a job: a click on the row and two men stand at it, each booking his own
- *  minutes into it (PIOTR, 16.09; CLAUDE.md T17 2.10). The first man is not on the chips, and
- *  Alone takes the second off again. A job nobody is on is assigned, not seconded. */
-function secondManControls(state: GameState, job: Job): string {
-  const lead = leadAssignee(job);
-  if (lead === null) return '';
-  if (job.stage !== 'ready' && job.stage !== 'inProduction') return '';
-  // The owner on it for the evening is the takeover of 2.12 and not a second man to choose.
-  if (ownerTookOver(job)) return '';
-  const chip = (workerId: string, label: string): string =>
-    `<button class="chip${(job.assignees[1] ?? '') === workerId ? ' is-on' : ''}" ` +
-    `data-do="assignSecond" data-id="${job.id}" data-worker="${workerId}">` +
-    `${escapeHtml(label)}</button>`;
-  const crew = joiners(state)
-    .filter((worker) => onTheBooksToday(state, worker) && worker.id !== lead)
-    .map((worker) => chip(worker.id, worker.name))
-    .join('');
-  if (crew === '') return '';
-  return (
-    '<span class="row-figure">Second man</span>' +
-    `<span class="row-action">${chip('', 'Alone')}${crew}</span>`
-  );
-}
-
 /** The evening: the owner takes a man's job on himself, by this click and never on his own. The
  *  man has it back in the morning where the evening left it (PIOTR, 17.09; CLAUDE.md T17 2.12).
  *  Nothing at all by day: the crew are in the hall and the job is theirs. */
@@ -75,20 +50,26 @@ function takeOverControl(state: GameState, job: Job): string {
   );
 }
 
-/** Who is on it and what it is worth: the left hand column of the board. */
-function headHtml(state: GameState, job: Job, row: PlanRow, dropConfirm: string | null): string {
+/** Who is on it and what it is worth: the left hand column of the board. The men are the chips of
+ *  2.5 now, so the head says the day it is due and nothing about who has it: the chips do that,
+ *  and saying it twice was what made the row unreadable (PIOTR, 17.09; CLAUDE.md T19 2.5). */
+function headHtml(
+  state: GameState,
+  job: Job,
+  row: PlanRow,
+  dropConfirm: string | null,
+  assignOpen: string | null,
+): string {
   const action = jobAction(state, job);
   return (
     '<div class="plan-head">' +
     `<span class="row-main">${escapeHtml(job.name)} ${money(job.price)}</span>` +
     jobLifecycleRow(state, job) +
     `<span class="row-figure">${escapeHtml(row.stage)}</span>` +
-    `<span class="row-figure">on it: ${escapeHtml(row.who)} · due ` +
-    `${formatCalendarDay(row.dueDay)}</span>` +
+    `<span class="row-figure">due ${formatCalendarDay(row.dueDay)}</span>` +
     callsLine(job) +
     materialLine(state, job) +
-    jobAssignControls(state, job) +
-    secondManControls(state, job) +
+    jobAssignControls(state, job, assignOpen === job.id) +
     takeOverControl(state, job) +
     dropControl(job, dropConfirm) +
     (action === '' ? '' : `<span class="row-action">${action}</span>`) +
@@ -164,7 +145,12 @@ function scaleHtml(plan: WorkPlan): string {
   );
 }
 
-export function renderWorkPlan(state: GameState, dropConfirm: string | null = null): string {
+export function renderWorkPlan(
+  state: GameState,
+  dropConfirm: string | null = null,
+  /** The job whose Assign to this job list is open, or null for none (CLAUDE.md T19 2.5). */
+  assignOpen: string | null = null,
+): string {
   const plan = workPlan(state);
   // The standing contracts have a bar of their own, apart from the jobs (CLAUDE.md T13 3.16).
   const contracts = renderContractBar(state);
@@ -175,7 +161,7 @@ export function renderWorkPlan(state: GameState, dropConfirm: string | null = nu
       if (!job) return '';
       return (
         `<div class="plan-row" data-plan="${row.jobId}">` +
-        headHtml(state, job, row, dropConfirm) +
+        headHtml(state, job, row, dropConfirm, assignOpen) +
         '<div class="plan-chart">' +
         nowHtml(plan) +
         barHtml(plan, row) +

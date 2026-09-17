@@ -111,3 +111,50 @@ their reason in the test:
   working day the shift was on whether or not he had work, is untouched and still passes.
 
 `npm run check` exit 0: 168 files, 1,638 tests.
+
+### T19-B2a Assign to this job, no limit (2.5)
+
+- `Job.assignees` is now the only list anybody reads, and the Work Plan row draws it as chips with
+  a cross apiece beside one blue `Assign to this job` button, exactly as variant A of
+  `docs/mockups/t19` draws it. The list behind the button offers you, every joiner and every
+  sprayer, with a man already on this job greyed as "already on this job", a man on another greyed
+  with that job's name, the helper greyed with "helpers do not build", and no limit at all on how
+  many go on one job. The Turn 17 "on it: You | Gary" chips and the "Second man: Alone | Gary"
+  line are gone from the row, and so is the "on it:" text in the head, which said the same thing a
+  third time.
+- **The rule for the men and the machines, in one sentence:** one machine is one man's, so a stage
+  at a machine goes at the speed of the man who holds it however many are on the job, and everyone
+  else stands in the queue and books nothing into that stage; a bench stage gives every man on the
+  job his own full minute at his own rate, so three men on assembly go three times as fast. The
+  tests assert both: three men and one saw cut at one man's speed to four decimal places, and the
+  same three assemble at more than two and a half times one man's.
+
+Also in this task, three places where phase A's straight conversion of the two old fields was too
+wide, all of them the same shape: `releaseJob` empties the whole list now, so calling it to take
+ONE man off took everybody off. `assignJob` (the previous job the new man was on), `takeOverJob`
+(the job the owner steps off), `staff.hurtWorker` (the man who has had an accident) and
+`contracts.assignToContract` (the man put on a standing contract) all use `takeOffJob` instead,
+which frees his machines, clears his `jobId` and drops the job back to `'ready'` only when the
+list actually empties. `releaseJob` is left for what it now means, everybody off: `completeJob`
+and `assignJob(jobId, null)`.
+
+`endOwnerTakeOver` read `assignees[1] === OWNER`, so an owner who had been added third or tenth
+was never taken off at dusk. There is no state to record the takeover with (`types.ts` is frozen),
+so it is derived instead, and deliberately: **the evening gives back every job the owner is on
+that somebody else leads**, wherever he stands in the list, and never a job he leads himself.
+`ownerTookOver` is the same predicate and the row's "You are on it tonight" reads off it.
+
+Three more judgement calls, all recorded here rather than guessed at later. The list prints the
+game's own tier words, "poor / normal / super joiner", and not the mockup's "ok" and "good": Our
+team has said poor, normal and super since Turn 6 and two vocabularies for one thing is what 2.9
+is fixing elsewhere tonight. `assignSecond` is kept as a shim over `addToJob` and `takeOffJob`,
+because `ASSIGN_SECOND` lives in the frozen `types.ts` and `game.ts`; the three of them go
+together in phase C (NOTES-B2.md 2). And the third man and beyond get a station string of their
+own, `place:<equipmentId>:<n>`, place 0 being the operator's cell, 1 the waiting cell or the
+bench's second place and 2 upward the free cells along the same side; the renderer's half of that
+is NOTES-B2.md 5, so until phase C lands it a third man is still drawn on the first man's cell.
+
+The whole of the Assign list is inert in the running game until the four click routes of
+NOTES-B2.md 1 are applied to `src/ui/app.ts`, which is frozen. `tests/ui/app.test.ts` (not B2's
+file) asserted a click on the old `assignJob` chip; it now asserts the new markup instead, and
+goes back to clicking when that note lands.
