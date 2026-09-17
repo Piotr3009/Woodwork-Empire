@@ -500,4 +500,28 @@ describe('the number on the rack (PIOTR, 17.09; CLAUDE.md T17 2.8)', () => {
       holder.querySelector(`[data-kit="${cabinet?.id}"] .rack-count`),
     ).toBeNull();
   });
+
+  // T18 2.3: a third of the height and the stroke Turn 17 drew, in the same place.
+  it('is drawn at a third of the height and the stroke it had, in the same place', () => {
+    const state = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
+    state.stock.sheets = 12;
+    const item = state.equipment.find((entry) => sheetCapacityOf(entry) > 0);
+    if (item === undefined) throw new Error('no shelving in the hall');
+    const holder = document.createElement('div');
+    holder.innerHTML = `<svg>${renderHall(state)}</svg>`;
+    const plate = holder.querySelector(`[data-kit="${item.id}"] .rack-count-plate`);
+    const figure = holder.querySelector(`[data-kit="${item.id}"] .rack-count`);
+    // Turn 17 drew a 26 px plate with 15 px digits and 9 px of padding, and the type was
+    // `--fs-hand`, 26 px. Every one of the four is a third of that now.
+    expect(Number(plate?.getAttribute('height'))).toBeCloseTo(26 / 3, 2);
+    // Two digits: the padding each side plus a digit each, all thirds.
+    expect(Number(plate?.getAttribute('width'))).toBeCloseTo((9 * 2 + 15 * 2) / 3, 2);
+    expect(Number(figure?.getAttribute('font-size'))).toBeCloseTo(26 / 3, 2);
+    // In the same place: the plate is still centred on the figure, 0.55 of the way up the rack.
+    const stands = footprintIn(item);
+    const at = centreOf(stands.x, stands.y, stands.width, stands.depth, stands.height * 0.55);
+    expect(Number(figure?.getAttribute('x'))).toBeCloseTo(at.x, 1);
+    const top = Number(plate?.getAttribute('y'));
+    expect(top + Number(plate?.getAttribute('height')) / 2).toBeCloseTo(at.y, 1);
+  });
 });

@@ -94,7 +94,7 @@ describe('clock time of day', () => {
   });
 
   it('formats the date line', () => {
-    expect(formatDate({ day: 6, minute: 162 })).toBe('Sat, day 6 · 10:42');
+    expect(formatDate({ day: 6, minute: 162 })).toBe('Sat 6 March · 10:42');
   });
 
   it('stops the workshop for the break, and counts it against nobody', () => {
@@ -170,7 +170,7 @@ describe('the summary cadence', () => {
 
   it('names the summary after the span of figures it carries', () => {
     const state = newGame();
-    expect(summaryTitle({ ...state, clock: { day: 5, minute: 0 } })).toBe('End of day 5');
+    expect(summaryTitle({ ...state, clock: { day: 5, minute: 0 } })).toBe('End of Fri 5 March');
     expect(
       summaryTitle({ ...state, summaryCadence: 'weekly', clock: { day: 5, minute: 0 } }),
     ).toBe('End of week 1');

@@ -25,9 +25,8 @@ import {
   freeSheets,
   houseTierFor,
   isWorkingDay,
-  labourValueFor,
   managerOnDuty,
-  materialCostFor,
+  marginOfPrice,
   monthOfDay,
   monthReport,
   onHoliday,
@@ -46,13 +45,14 @@ const RESTOCK_SHEETS = 20;
 const LOAN_AMOUNT = 25000;
 const LOAN_BY_DAY = 30;
 
-/** The margin the client's number leaves after the material and the labour of the job. */
+/** The margin the client's number leaves after the material and the labour of the job. The
+ *  engine's own figure since Turn 18: the accept dialogue prints this one beside the offer, so the
+ *  scripted player decides on exactly what a real one reads (CLAUDE.md T18 2.9). */
 function marginOf(state: GameState, event: GameEvent): number {
   const enquiry = state.enquiries.find((entry) => entry.id === event.data.enquiryId);
   const offer = typeof event.data.offer === 'number' ? event.data.offer : 0;
   if (!enquiry || offer <= 0) return 0;
-  const cost = materialCostFor(enquiry.basePrice, enquiry.bespokeMaterial) + labourValueFor(enquiry.basePrice);
-  return (offer - cost) / offer;
+  return marginOfPrice(enquiry.basePrice, enquiry.bespokeMaterial, offer);
 }
 
 let holidayTaken = false;
@@ -201,8 +201,9 @@ describe('the three month playthrough of 10.4, on Easy as the brief scripts it',
     expect(state.jobs.length).toBeGreaterThan(10);
     for (const job of state.jobs) {
       expect(job.kind).toBe('residential');
-      const cost = materialCostFor(job.basePrice, job.bespokeMaterial) + labourValueFor(job.basePrice);
-      expect((job.price - cost) / job.price, job.name).toBeGreaterThan(MARGIN_FLOOR);
+      expect(marginOfPrice(job.basePrice, job.bespokeMaterial, job.price), job.name).toBeGreaterThan(
+        MARGIN_FLOOR,
+      );
     }
   });
 

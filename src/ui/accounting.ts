@@ -10,15 +10,17 @@ import {
   dailyRent,
   daysOfMonth,
   earnedRate,
+  formatCalendarDay,
+  ledgerOfDay,
+  monthName,
   monthOfDay,
   monthsOfYear,
-  yearTotals,
-  ledgerOfDay,
   netOf,
   nextDueDays,
   summaryOfDay,
   visibleTotals,
   weeklyWageBill,
+  yearTotals,
 } from '../engine/index';
 import type { GameState, LedgerCategory, LedgerEntry, PeriodTotals } from '../engine/index';
 import { monthlyPremiums, nextInstalmentFor } from '../engine/index';
@@ -143,7 +145,7 @@ function arrearsBlock(state: GameState, typed: string): string {
 
 function ledgerRow(entry: LedgerEntry): string {
   return (
-    `<div class="row"><span class="row-main">day ${entry.day} ` +
+    `<div class="row"><span class="row-main">${formatCalendarDay(entry.day)} ` +
     `${escapeHtml(entry.label)}${entry.unpaid ? ' (no cash moved)' : ''}</span>` +
     `<span class="row-figure ${entry.amount < 0 ? 'bad' : 'good'}">${money(entry.amount)}` +
     `</span><span class="row-figure dim">${money(entry.balance)}</span></div>`
@@ -164,7 +166,7 @@ function monthChips(state: GameState, entries: LedgerEntry[], month: number): st
     .map(
       (row) =>
         `<button class="chip${row.month === month ? ' is-on' : ''}" ` +
-        `data-do="accountingMonth" data-id="${row.month}">Month ${row.month}</button>`,
+        `data-do="accountingMonth" data-id="${row.month}">${monthName(row.month)}</button>`,
     )
     .join('');
   return `<div class="tabs">${chips}</div>`;
@@ -178,7 +180,7 @@ function daysTab(
 ): string {
   const chips = monthChips(state, entries, month);
   const rows = daysOfMonth({ ...state, ledger: entries }, month);
-  if (rows.length === 0) return `${chips}<p class="empty">Nothing has moved in month ${month}.</p>`;
+  if (rows.length === 0) return `${chips}<p class="empty">Nothing has moved in ${monthName(month)}.</p>`;
   return chips + dayRows(state, entries, open, rows);
 }
 
@@ -203,7 +205,7 @@ function dayRows(
         `<div class="day-row${isOpen ? ' is-open' : ''}" data-day="${row.day}">` +
         `<div class="row day-head"><button class="day-toggle" data-do="toggleDay" ` +
         `data-id="${row.day}" aria-expanded="${isOpen ? 'true' : 'false'}">` +
-        `<span class="row-main">${isOpen ? '-' : '+'} Day ${row.day}</span>` +
+        `<span class="row-main">${isOpen ? '-' : '+'} ${formatCalendarDay(row.day)}</span>` +
         `<span class="row-figure good">${money(row.income)}</span>` +
         `<span class="row-figure bad">${money(-row.costs)}</span>` +
         `<span class="row-figure ${row.net < 0 ? 'bad' : 'good'}">${money(row.net)}</span>` +
@@ -252,7 +254,7 @@ export function renderAccounting(
   const behind = booksBehind(state);
   const books = visibleTotals(state);
   const banner = behind
-    ? `<p class="warn">Books not up to date since day ${Math.max(1, state.booksUpToDay)}. ` +
+    ? `<p class="warn">Books not up to date since ${formatCalendarDay(Math.max(1, state.booksUpToDay))}. ` +
       'These are the last figures anybody wrote down. Do the bookkeeping to catch up.</p>'
     : '';
   const entries = behind
@@ -277,9 +279,9 @@ export function renderAccounting(
     `<span class="row-figure">${money(dailyRates(state))}</span></div>` +
     `<div class="row"><span class="row-main">Power, every day</span>` +
     `<span class="row-figure">${money(dailyPower(state))}</span></div>` +
-    `<div class="row"><span class="row-main">Wages, day ${due.wages}</span>` +
+    `<div class="row"><span class="row-main">Wages, ${formatCalendarDay(due.wages)}</span>` +
     `<span class="row-figure">${money(weeklyWageBill(state))}</span></div>` +
-    `<div class="row"><span class="row-main">Monthly bills, day ${due.monthly}</span>` +
+    `<div class="row"><span class="row-main">Monthly bills, ${formatCalendarDay(due.monthly)}</span>` +
     `<span class="row-figure">${escapeHtml(monthlyBillsLine(state))}</span></div>` +
     '';
   const ledgerTab = `<h3>Ledger, last ${LEDGER_VISIBLE_ENTRIES}</h3>` + ledger;

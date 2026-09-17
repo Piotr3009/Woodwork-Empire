@@ -14,6 +14,7 @@ import { rackCapacity, stockFree, stockNumberFor } from '../../src/engine/materi
 import { renderLaptop } from '../../src/ui/laptop';
 import { renderMaterials } from '../../src/ui/materials';
 import { money } from '../../src/ui/modal';
+import { formatCalendarDay } from '../../src/engine/index';
 import type { GameState } from '../../src/engine/index';
 import { acceptNow, act, buyStartingKit, fillRack, newGame, placeEnquiry } from '../helpers';
 
@@ -111,7 +112,9 @@ describe('the stock page', () => {
     const again = parse(renderMaterials(ordered, '')).querySelector('button[disabled]');
     expect(again?.getAttribute('title')).toContain('on the way');
     // And the load is on the page, on its way.
-    expect(parse(renderMaterials(ordered, '')).textContent).toContain('arrives day 2');
+    expect(parse(renderMaterials(ordered, '')).textContent).toContain(
+      `arrives ${formatCalendarDay(2)}`,
+    );
   });
 
   it('lists the projects in green when their sheets are held and red with the shortfall', () => {

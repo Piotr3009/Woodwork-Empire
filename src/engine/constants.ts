@@ -76,7 +76,7 @@ export const STATE_VERSION = 15;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
-export const APP_VERSION = 'v25';
+export const APP_VERSION = 'v26';
 
 // ---------------------------------------------------------------------------
 // The owner's day, in the seven things it is made of
@@ -149,6 +149,27 @@ export const DAYS_PER_YEAR = DAYS_PER_MONTH * MONTHS_PER_YEAR;
 /** Monday to Friday (PIOTR). */
 export const WORKING_DAYS_PER_WEEK = 5;
 export const WEEKDAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const;
+/** The twelve month names the calendar cycles through. The game's month is thirty days, so a name
+ *  is a label on a block of thirty and never a real April; there is no year on a date, because a
+ *  workshop's year number is nothing the player does anything with (PIOTR, 17.09;
+ *  CLAUDE.md T18 2.2). */
+export const MONTH_NAMES = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+] as const;
+/** The month the company opens in, as an index into `MONTH_NAMES`: 0 is January, so 2 is March
+ *  [TUNE: March, which is the spring the trade picks up in and what day 1 should feel like]. */
+export const START_MONTH = 2;
 
 // ---------------------------------------------------------------------------
 // 7. The owner
@@ -198,6 +219,44 @@ export const OWNER_RATE_PER_HOUR = OWNER_LABOUR_VALUE_PER_DAY / PAID_HOURS_PER_W
 /** Working days the workshop rate on the Company board is read over, and the week it compares
  *  itself with [TUNE: five, one working week] (CLAUDE.md T17 2.26). */
 export const RATE_WEEK_DAYS = 5;
+/** The warning strip's two money lines (PIOTR accepted, 17.09; CLAUDE.md T18 2.6).
+ *
+ *  `SPEND_WARNING_FROM_CLOSED_DAYS` is the sixth day the game has closed: the brief's own figure.
+ *  A workshop's first week is the fitting out, when everything is spending and nothing has been
+ *  delivered, so the line would be true and useless on every one of those days [TUNE].
+ *
+ *  `SPEND_WARNING_CATEGORIES` is what the line counts as going out: the wages under all three of
+ *  the ledger's names for them, the owner's draw, and the fixed charges of the month. Material,
+ *  equipment, transport and a job's own costs are not in it, because they are bought against work
+ *  and the line is about the money that goes out whether the hall works or not. The loan's capital
+ *  instalment is not in it either: the brief names the interest [TUNE]. */
+export const SPEND_WARNING_FROM_CLOSED_DAYS = RATE_WEEK_DAYS + 1;
+export const SPEND_WARNING_CATEGORIES = [
+  'wages',
+  'wagesNight',
+  'salaries',
+  'ownerDraw',
+  'rent',
+  'rates',
+  'power',
+  'insurance',
+  'security',
+  'loanInterest',
+  'overdraftInterest',
+  'software',
+] as const;
+/** The two lines a margin is read against, on the client's answer and anywhere else the game
+ *  colours one (PIOTR accepted, 17.09; CLAUDE.md T18 2.9) [TUNE]. A fifth of the price left after
+ *  the material and the labour is a job worth having, which is the floor the scripted player of
+ *  Turn 13's 10.4 has taken every job on; a tenth is the line under which the job pays for the
+ *  wood and the hours and almost nothing else. Between them the figure is printed in the body
+ *  colour, because it is neither news nor a warning. */
+export const MARGIN_GOOD = 0.2;
+export const MARGIN_THIN = 0.1;
+
+/** The days the first steps line walks a new player in for. After the third one, or from the day
+ *  after this, it is gone for good (PIOTR accepted, 17.09; CLAUDE.md T18 2.7) [TUNE]. */
+export const FIRST_STEPS_LAST_DAY = 3;
 
 // ---------------------------------------------------------------------------
 // 8.1 Fixed costs and the unit
@@ -3095,8 +3154,10 @@ export const PORT_RING = 8;
  *  side, never outside (PIOTR, 16.09; CLAUDE.md T16 2.1). */
 export const PALLET_LAYOUT = { x: GATE_LAYOUT.x, y: GATE_LAYOUT.y, width: 1, depth: 1, height: 1 };
 /** How fast a man walks the floor, in cells of real time a second [TUNE]: a man does not walk
- *  faster at x10 (docs/art/SPRITES.md 10.4; CLAUDE.md T16 2.2). */
-export const WALK_CELLS_PER_SECOND = 1.6;
+ *  faster at x10 (docs/art/SPRITES.md 10.4; CLAUDE.md T16 2.2). One cell a second at x1, because
+ *  1.6 read as a trot and a joiner crossing his own hall does not trot (PIOTR, 17.09;
+ *  CLAUDE.md T18 2.1). */
+export const WALK_CELLS_PER_SECOND = 1.0;
 
 // ---------------------------------------------------------------------------
 // 9.3 Hiring pool (PIOTR: tiers and gating; wages [TUNE])

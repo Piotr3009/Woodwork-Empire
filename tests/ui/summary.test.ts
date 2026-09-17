@@ -7,7 +7,13 @@ import { houseLineFor, renderDayEnd, renderDaySummary } from '../../src/ui/dayEn
 import { signedMoney } from '../../src/ui/modal';
 import { renderMenu } from '../../src/ui/topbar';
 import { currentState, mount } from '../../src/ui/app';
-import { daySummaryOf, formatMoney, summaryOfDay, tick } from '../../src/engine/index';
+import {
+  daySummaryOf,
+  formatCalendarDay,
+  formatMoney,
+  summaryOfDay,
+  tick,
+} from '../../src/engine/index';
 import type { GameEvent, GameState } from '../../src/engine/index';
 import {
   acceptNow,
@@ -154,8 +160,8 @@ describe('a week at the weekly cadence', () => {
     expect(formatMoney(week.costs)).not.toBe(formatMoney(friday.finance.day.costs));
     // The owner's minutes and the day's work are a day's figures whatever the cadence, and the
     // headings say so rather than letting the week's title speak for them.
-    expect(html).toContain(`Your minutes, day ${friday.clock.day}`);
-    expect(html).toContain(`The hall, day ${friday.clock.day}`);
+    expect(html).toContain(`Your minutes, ${formatCalendarDay(friday.clock.day)}`);
+    expect(html).toContain(`The hall, ${formatCalendarDay(friday.clock.day)}`);
   });
 });
 

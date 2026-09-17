@@ -19,7 +19,7 @@ import {
   WORKER_NAMES,
   WORKER_RATES,
 } from './constants';
-import { addWorkingDays, isOvertime, isWorkingDay, monthOfDay } from './clock';
+import { addWorkingDays, formatCalendarDay, isOvertime, isWorkingDay, monthOfDay } from './clock';
 import { charge, formatMoney } from './economy';
 import { queueEvent } from './events';
 import { onAccident } from './insurance';
@@ -208,7 +208,12 @@ export function secondShiftRuns(state: GameState): boolean {
 export function secondShiftCheck(state: GameState): { ok: boolean; reason: string } {
   if (managerOnDuty(state)) return { ok: true, reason: '' };
   const hired = state.workers.find((worker) => worker.role === 'productionManager');
-  if (hired) return { ok: false, reason: `The production manager starts on day ${hired.startDay}` };
+  if (hired) {
+    return {
+      ok: false,
+      reason: `The production manager starts on ${formatCalendarDay(hired.startDay)}`,
+    };
+  }
   return { ok: false, reason: 'Hire a production manager for a second shift' };
 }
 

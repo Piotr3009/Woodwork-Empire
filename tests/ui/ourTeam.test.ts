@@ -6,7 +6,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { WEEKS_PER_MONTH, WORKING_DAYS_PER_MONTH } from '../../src/engine/constants';
-import { ownerDrawPerDay } from '../../src/engine/index';
+import { formatCalendarDay, ownerDrawPerDay } from '../../src/engine/index';
 import { monthlyPay } from '../../src/engine/staff';
 import { renderTeam } from '../../src/ui/team';
 import { money } from '../../src/ui/modal';
@@ -48,7 +48,7 @@ describe('Our team', () => {
     expect(first?.getAttribute('data-team')).toBe('owner');
     expect(first?.textContent).toContain(state.playerName);
     expect(first?.textContent).toContain('owner');
-    expect(first?.textContent).toContain('started day 1');
+    expect(first?.textContent).toContain(`started ${formatCalendarDay(1)}`);
     expect(first?.textContent).toContain(
       money(ownerDrawPerDay(state) * WORKING_DAYS_PER_MONTH),
     );
@@ -61,13 +61,13 @@ describe('Our team', () => {
     const row = rows(state).find((entry) => entry.getAttribute('data-team') === man.id);
     expect(row?.textContent).toContain(man.name);
     expect(row?.textContent).toContain('joiner, poor');
-    expect(row?.textContent).toContain(`started day ${man.startDay}`);
+    expect(row?.textContent).toContain(`started ${formatCalendarDay(man.startDay)}`);
     // A week is 30 over 7 of a month: 480 a week is 2,057 a month.
     expect(monthlyPay(man)).toBe(Math.round(man.weeklyWage * WEEKS_PER_MONTH * 100) / 100);
     expect(row?.textContent).toContain(money(monthlyPay(man)));
     expect(row?.textContent).toContain('0 days off');
     // He does not start until the next working day, so that is what the row says of him.
-    expect(row?.textContent).toContain(`starts day ${man.startDay}`);
+    expect(row?.textContent).toContain(`starts ${formatCalendarDay(man.startDay)}`);
   });
 
   it('counts the hours of the month as they are worked', () => {

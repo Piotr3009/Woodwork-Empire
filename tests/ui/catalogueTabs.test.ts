@@ -14,6 +14,7 @@ import { catalogueTabFrom, ownedState, renderCatalogue } from '../../src/ui/cata
 import { findSpec } from '../../src/engine/machines';
 import { addWorkingDays } from '../../src/engine/clock';
 import { machineHoursPerDay } from '../../src/engine/production';
+import { formatCalendarDay } from '../../src/engine/index';
 import type { Equipment, GameState } from '../../src/engine/index';
 import {
   acceptNow,
@@ -283,7 +284,7 @@ describe('the Owned tab', () => {
     expect(perDay).toBeGreaterThan(0);
     expect(perDay).toBeLessThan(HOURS_PER_WORKING_DAY / 3);
     const due = addWorkingDays(working.clock.day, Math.ceil(SERVICE_INTERVAL_HOURS / perDay));
-    expect(card?.textContent).toContain(`service on day ${due}`);
+    expect(card?.textContent).toContain(`service on ${formatCalendarDay(due)}`);
     expect(card?.textContent).toContain('80 h of use away');
   });
 

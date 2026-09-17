@@ -8,7 +8,7 @@
 // free form "buy sheets for stock" of Turn 11 is gone with the per project question: Restock here
 // and Order for this job on the job card are the two ways material is bought (T13 3.3).
 
-import { deliveriesInYard, deliveriesOnTheWay, openJobs } from '../engine/index';
+import { deliveriesInYard, deliveriesOnTheWay, formatCalendarDay, openJobs } from '../engine/index';
 import { restockCheck, stockLines } from '../engine/index';
 // Straight off its own module: the public API does not carry it (REPORT-T13 10).
 import { restockSheets } from '../engine/materials';
@@ -94,7 +94,7 @@ function deliveryRow(delivery: Delivery): string {
   const what = `${plural(delivery.sheets, 'sheet', 'sheets')}${delivery.bespoke ? ', bespoke' : ''}`;
   const when = delivery.arrived
     ? 'at the gate, waiting to be unloaded'
-    : `arrives day ${delivery.arriveDay}`;
+    : `arrives ${formatCalendarDay(delivery.arriveDay)}`;
   return (
     `<div class="row"><span class="row-main">${escapeHtml(what)}</span>` +
     `<span class="row-figure">${escapeHtml(when)}</span></div>`

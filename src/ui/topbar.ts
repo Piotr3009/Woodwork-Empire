@@ -26,7 +26,7 @@ import {
 import type { DayCategory, GameState, Speed } from '../engine/index';
 import { openJobs } from '../engine/jobs';
 import { cadenceControl } from './dayEnd';
-import { escapeHtml, minutes, money, signedMoney } from './modal';
+import { closeButton, escapeHtml, minutes, money, signedMoney } from './modal';
 
 /** The five speed knobs. One place builds them, whatever else the top bar has to say. The Pause
  *  knob pulses once when the player asks for something stopped time will not give him
@@ -320,9 +320,9 @@ export function renderMenu(state: GameState, cloud: MenuCloud): string {
   return (
     '<div class="menu-pop">' +
     // The menu shuts on a click outside it and on this cross; it did neither before (PIOTR;
-    // CLAUDE.md T13 3.1).
-    '<button class="menu-close" data-do="closeMenu" title="Close" aria-label="Close">' +
-    '×</button>' +
+    // CLAUDE.md T13 3.1). The cross is the one cross, the same helper every modal calls
+    // (CLAUDE.md T18 2.5).
+    closeButton('closeMenu') +
     '<button class="btn" data-do="endDay">End day</button>' +
     stayHome +
     `<button class="btn" data-do="toggleWhy">${

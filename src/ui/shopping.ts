@@ -4,7 +4,7 @@
 // One panel for the kit and the material alike, reached from the top bar and from the pin board
 // on the office wall in the hall. It is a thing to read, so it opens on a stopped clock.
 
-import { shoppingList } from '../engine/index';
+import { formatCalendarDay, shoppingList } from '../engine/index';
 import type { GameState, OrderLine } from '../engine/index';
 import { emptyLine, escapeHtml, money } from './modal';
 
@@ -14,15 +14,16 @@ export function arrivalLine(line: OrderLine, day: number): string {
   const away = line.dueDay - day;
   if (away <= 0) return 'arrives today at 08:00';
   if (away === 1) return 'arrives tomorrow at 08:00';
-  return `arrives day ${line.dueDay} at 08:00, ${away} days away`;
+  return `arrives ${formatCalendarDay(line.dueDay)} at 08:00, ${away} days away`;
 }
 
 /** The bar from the day of the click to the day of the lorry. */
 export function progressBar(line: OrderLine): string {
   const filled = Math.round(line.progress * 100);
   return (
-    `<span class="order-bar" data-progress="${filled}" title="ordered day ${line.orderedDay}, ` +
-    `due day ${line.dueDay}"><span style="width:${filled}%"></span></span>`
+    `<span class="order-bar" data-progress="${filled}" ` +
+    `title="ordered ${formatCalendarDay(line.orderedDay)}, ` +
+    `due ${formatCalendarDay(line.dueDay)}"><span style="width:${filled}%"></span></span>`
   );
 }
 
@@ -40,7 +41,7 @@ export function cancelButton(line: OrderLine): string {
 /** What the tile or the row says about one thing on its way. */
 function figures(line: OrderLine, day: number): string {
   const paid = line.pricePaid > 0 ? `${money(line.pricePaid)} paid · ` : '';
-  return `${paid}ordered day ${line.orderedDay} · ${arrivalLine(line, day)}`;
+  return `${paid}ordered ${formatCalendarDay(line.orderedDay)} · ${arrivalLine(line, day)}`;
 }
 
 function row(line: OrderLine, day: number): string {

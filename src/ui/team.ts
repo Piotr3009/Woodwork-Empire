@@ -11,6 +11,7 @@
 import {
   crewLine,
   dayMinutesByCategory,
+  formatCalendarDay,
   hiringOptions,
   houseTierFor,
   ownerDrawPaidInWindow,
@@ -202,7 +203,7 @@ export function workerDoing(state: GameState, worker: Worker): string {
   if (worker.absentDaysRemaining > 0) {
     return `off for ${plural(worker.absentDaysRemaining, 'more day', 'more days')}`;
   }
-  if (worker.startDay > state.clock.day) return `starts day ${worker.startDay}`;
+  if (worker.startDay > state.clock.day) return `starts ${formatCalendarDay(worker.startDay)}`;
   if (worker.taskId !== null) return 'on a job of work';
   if (job) return `${night ? 'tonight on' : 'on'} ${job.name}`;
   return night ? 'on the night shift, nothing to do yet' : 'free';
@@ -250,7 +251,7 @@ function startedText(state: GameState, startDay: number): string {
       : since === 0
         ? 'today'
         : `in ${plural(-since, 'day', 'days')}`;
-  return `started day ${startDay}, ${ago}`;
+  return `started ${formatCalendarDay(startDay)}, ${ago}`;
 }
 
 /** One row of Our team: who he is, when he started, what he costs a month, the hours he has put

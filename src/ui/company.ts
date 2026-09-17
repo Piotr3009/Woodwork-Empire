@@ -15,6 +15,7 @@ import { DAY_CATEGORY_LABELS } from '../engine/constants';
 import {
   dayPercentages,
   effectiveReputation,
+  formatCalendarDay,
   formatReputation,
   outputBreakdown,
   weekOfDay,
@@ -166,7 +167,7 @@ function sumLine(plus: string, minus: string, total: string): string {
 function ratingRow(entry: ReputationEntry, index: number): string {
   return ledgerRow(
     entry.reason,
-    `day ${entry.day}`,
+    formatCalendarDay(entry.day),
     points(entry.points),
     entry.points,
     `data-rating="${index}"`,

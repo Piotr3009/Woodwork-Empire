@@ -4,6 +4,7 @@
 
 import { LOAN_MAX, LOAN_MONTHS, LOAN_RATE_YEARLY, OVERDRAFT_RATE_YEARLY } from '../engine/constants';
 import {
+  formatCalendarDay,
   loanCapitalForMonth,
   loanCheck,
   loanInterestForMonth,
@@ -64,7 +65,7 @@ function loanBlock(state: GameState, typed: string): string {
     ? primaryButton('repayLoan', 'Repay it all', 'data-amount="all"')
     : lockedButton('Repay it all', all.reason);
   return (
-    `<p class="hint">${money(loan.principal)} borrowed on day ${loan.startDay} at ` +
+    `<p class="hint">${money(loan.principal)} borrowed on ${formatCalendarDay(loan.startDay)} at ` +
     `${percent(LOAN_RATE_YEARLY)} a year.</p>` +
     line('Balance owed', -loan.balance) +
     line(

@@ -3,7 +3,7 @@
 // `monthReport`; this prints it, every signed figure in the colour its sign gives it, and every
 // line printed whether or not anything moved on it, so the report always has the same shape.
 
-import { monthOfDay, monthReport } from '../engine/index';
+import { monthName, monthOfDay, monthReport } from '../engine/index';
 import { monthEfficiency } from '../engine/efficiency';
 import type { MonthEfficiency } from '../engine/efficiency';
 import { machineSavings } from '../engine/machines';
@@ -58,7 +58,7 @@ export function renderMonthReport(report: MonthReport): string {
       : '';
   return (
     `<div class="month-end" data-month="${report.month}">` +
-    `<h3>Month ${report.month}</h3>` +
+    `<h3>${monthName(report.month)}</h3>` +
     head +
     report.lines.map(lineRow).join('') +
     totalRow('In', report.income) +

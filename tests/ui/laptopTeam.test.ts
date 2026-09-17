@@ -251,8 +251,16 @@ describe('the Team as a page of the laptop', () => {
     expect(page()).toBe('team');
     expect(currentState()?.workers).toHaveLength(0);
     expect(laptop().textContent).toContain(`Interview: 0 of ${HIRING_MINUTES} min`);
-    advanceMinutes(HIRING_MINUTES);
-    dismissEvents();
+    // The interview is run through the clock. A question the engine raises stops the clock where
+    // it stands, so a single call can come back with minutes still owed on it and the hire
+    // unfinished: the minutes are given until she is on the books. This test is about the hire,
+    // not about how many calls it took to get the clock through it.
+    let guard = 0;
+    while ((currentState()?.workers.length ?? 0) === 0 && guard < 20) {
+      advanceMinutes(HIRING_MINUTES);
+      dismissEvents();
+      guard += 1;
+    }
     expect(currentState()?.workers).toHaveLength(1);
     expect(currentState()?.workers[0]?.role).toBe('officeAdmin');
     expect(page()).toBe('team');

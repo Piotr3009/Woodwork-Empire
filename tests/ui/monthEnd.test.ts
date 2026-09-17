@@ -9,7 +9,7 @@ import { MONTH_LINES, MONTH_LINE_OF, monthReport } from '../../src/engine/econom
 import { monthEfficiency } from '../../src/engine/efficiency';
 import { machineSavings } from '../../src/engine/machines';
 import { monthRate, weekRate } from '../../src/engine/rate';
-import { daySummaryOf } from '../../src/engine/index';
+import { daySummaryOf, monthName } from '../../src/engine/index';
 import { renderCompany } from '../../src/ui/company';
 import { renderMonthEnd, renderMonthReport } from '../../src/ui/monthEnd';
 import type { GameEvent, GameState } from '../../src/engine/index';
@@ -153,7 +153,7 @@ describe('the workshop rate and Total efficiency (CLAUDE.md T17 2.25, 2.26)', ()
     const event: GameEvent = {
       id: 'ev-1',
       kind: 'monthEnd',
-      title: 'Month 1',
+      title: monthName(1),
       body: 'The month is over.',
       choices: [{ id: 'ok', label: 'Right' }],
       data: { month: 1 },

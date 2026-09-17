@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { DAYS_PER_MONTH } from '../../src/engine/constants';
 import { daysOfMonth, monthsOfYear, netOf, yearTotals } from '../../src/engine/economy';
 import { renderAccounting } from '../../src/ui/accounting';
+import { formatCalendarDay, monthName } from '../../src/engine/index';
 import type { GameState, LedgerEntry } from '../../src/engine/index';
 import { newGame } from '../helpers';
 
@@ -89,15 +90,15 @@ describe('what the books show', () => {
     ]);
     const page = parse(renderAccounting(state, '0', 'days'));
     const chips = Array.from(page.querySelectorAll('[data-do="accountingMonth"]'));
-    expect(chips.map((chip) => chip.textContent)).toEqual(['Month 1', 'Month 2', 'Month 3']);
+    expect(chips.map((chip) => chip.textContent)).toEqual([monthName(1), monthName(2), monthName(3)]);
     // The clock is in month one, so month one is the one that is open.
     expect(chips[0]?.className).toContain('is-on');
-    expect(page.innerHTML).toContain('Day 2');
-    expect(page.innerHTML).not.toContain(`Day ${DAYS_PER_MONTH + 2}`);
+    expect(page.innerHTML).toContain(formatCalendarDay(2));
+    expect(page.innerHTML).not.toContain(formatCalendarDay(DAYS_PER_MONTH + 2));
     // Ask for month two and the rows are month two's.
     const second = parse(renderAccounting(state, '0', 'days', [], 2));
-    expect(second.innerHTML).toContain(`Day ${DAYS_PER_MONTH + 2}`);
-    expect(second.innerHTML).not.toContain('Day 2<');
+    expect(second.innerHTML).toContain(formatCalendarDay(DAYS_PER_MONTH + 2));
+    expect(second.innerHTML).not.toContain(`${formatCalendarDay(2)}<`);
     expect(
       Array.from(second.querySelectorAll('[data-do="accountingMonth"]'))[1]?.className,
     ).toContain('is-on');
@@ -109,6 +110,6 @@ describe('what the books show', () => {
       [DAYS_PER_MONTH * 2 + 5, -250],
     ]);
     const page = parse(renderAccounting(state, '0', 'days', [], 2));
-    expect(page.textContent).toContain('Nothing has moved in month 2');
+    expect(page.textContent).toContain(`Nothing has moved in ${monthName(2)}`);
   });
 });

@@ -2,7 +2,7 @@
 // under it, a blue line for now and a red tick for the deadline (PIOTR, the mockup of 13.09;
 // CLAUDE.md T9 3.6). The five stage bars of Turn 7 are gone; a stage is a word now.
 
-import { workPlan } from '../engine/index';
+import { formatCalendarDay, workPlan } from '../engine/index';
 import type { GameState, Job, PlanRow, WorkPlan } from '../engine/index';
 // Straight off their own module, not round the public API, which Turn 13 froze (REPORT-T13 10).
 import { canTakeOver, ownerTookOver } from '../engine/jobs';
@@ -82,7 +82,8 @@ function headHtml(state: GameState, job: Job, row: PlanRow, dropConfirm: string 
     `<span class="row-main">${escapeHtml(job.name)} ${money(job.price)}</span>` +
     jobLifecycleRow(state, job) +
     `<span class="row-figure">${escapeHtml(row.stage)}</span>` +
-    `<span class="row-figure">on it: ${escapeHtml(row.who)} · due day ${row.dueDay}</span>` +
+    `<span class="row-figure">on it: ${escapeHtml(row.who)} · due ` +
+    `${formatCalendarDay(row.dueDay)}</span>` +
     callsLine(job) +
     materialLine(state, job) +
     jobAssignControls(state, job) +
@@ -125,13 +126,13 @@ function ticksHtml(plan: WorkPlan, row: PlanRow): string {
   const due =
     `<div class="plan-due" data-due="${row.dueDay}" ` +
     `style="left:${round(across(plan, row.duePoint))}%" ` +
-    `title="Due day ${row.dueDay}"><span>DL</span></div>`;
+    `title="Due ${formatCalendarDay(row.dueDay)}"><span>DL</span></div>`;
   if (row.latestStart === null || row.latestStartPoint === null) return due;
   const at = row.late ? plan.now : row.latestStartPoint;
   const label = row.late ? 'late' : 'Latest start';
   const title = row.late
-    ? `Already late: it wanted starting on day ${row.latestStart}, ${row.rateLabel}`
-    : `Latest start day ${row.latestStart}, ${row.rateLabel}`;
+    ? `Already late: it wanted starting on ${formatCalendarDay(row.latestStart)}, ${row.rateLabel}`
+    : `Latest start ${formatCalendarDay(row.latestStart)}, ${row.rateLabel}`;
   return (
     due +
     `<div class="plan-start${row.late ? ' is-late' : ''}" data-start="${row.latestStart}" ` +
@@ -154,7 +155,8 @@ function scaleHtml(plan: WorkPlan): string {
   );
   return (
     '<div class="plan-row plan-scale-row"><div class="plan-head">' +
-    `<span class="row-figure">Day ${plan.fromDay} to day ${plan.toDay}</span></div>` +
+    `<span class="row-figure">${formatCalendarDay(plan.fromDay)} to ` +
+    `${formatCalendarDay(plan.toDay)}</span></div>` +
     `<div class="plan-chart plan-scale">${days.join('')}${nowHtml(plan)}` +
     `<span class="plan-now-label" style="left:${round(across(plan, plan.now))}%">Now</span>` +
     '</div></div>'

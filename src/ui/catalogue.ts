@@ -45,7 +45,7 @@ import {
   serviceDueOn,
   serviceIsDue,
 } from '../engine/index';
-import { gateCheck, hasGate, variantFor } from '../engine/index';
+import { formatCalendarDay, gateCheck, hasGate, variantFor } from '../engine/index';
 import { serviceDueIn } from '../engine/machines';
 import { orderName, orderProgress } from '../engine/orders';
 import type { Equipment, GameState, OrderLine } from '../engine/index';
@@ -260,7 +260,7 @@ function orderedTile(state: GameState, item: OnOrderItem, spec: EquipmentSpec): 
     arrived: item.arrived,
     canCancel: !item.arrived,
   };
-  const lines = [`On order, due day ${item.dueDay}`, arrivalLine(line, state.clock.day)]
+  const lines = [`On order, due ${formatCalendarDay(item.dueDay)}`, arrivalLine(line, state.clock.day)]
     .map((text) => `<p class="tile-figures">${escapeHtml(text)}</p>`)
     .join('');
   return (
@@ -317,8 +317,8 @@ export function airAssign(state: GameState, item: Equipment): string {
 /** The one control on a machine the hall has finished with: what the buyer pays, and a second
  *  click to mean it (CLAUDE.md T8 3.5). */
 function sellAction(state: GameState, item: Equipment, sellConfirm: string | null): string {
-  if (isSold(item)) {
-    return `<span class="reason">Sold, collection on day ${item.soldOnDay}</span>`;
+  if (item.soldOnDay !== null) {
+    return `<span class="reason">Sold, collection on ${formatCalendarDay(item.soldOnDay)}</span>`;
   }
   if (!isSellableFamily(item.specId)) return '';
   const check = canSell(state, item.id);
@@ -409,7 +409,7 @@ export function ownedTile(
       ? 'service due now'
       : due === null
         ? 'no service due while it stands idle'
-        : `service on day ${due}, ${hours(serviceDueIn(item))} of use away`;
+        : `service on ${formatCalendarDay(due)}, ${hours(serviceDueIn(item))} of use away`;
   const life = machine ? `${hours(item.hoursUsed)} of ${hours(item.enduranceHours)}` : '';
   const action = item.broken
     ? button('repairMachine', 'Repair', `data-id="${item.id}"`)

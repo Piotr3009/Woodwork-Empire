@@ -17,6 +17,7 @@ import { createOnOrder } from '../../src/engine/orders';
 import { lockReasonFor } from '../../src/engine/catalog';
 import { template } from '../../src/engine/catalog';
 import { acceptNow, act, fillRack, firstJob, newGame, placeEnquiry, placeEquipment, runClock } from '../helpers';
+import { formatCalendarDay } from '../../src/engine/index';
 import type { GameState } from '../../src/engine/index';
 
 /** A hall with a bench and an extractor, a sheet job ready for the bench, and a table saw that is
@@ -74,7 +75,7 @@ describe('kit that is bought and still on the road', () => {
     const state = sawOnTheRoad();
     const order = state.onOrder[0];
     if (!order) throw new Error('the saw should be on order');
-    const wanted = `waiting for table saw (on order, due day ${order.dueDay})`;
+    const wanted = `waiting for table saw (on order, due ${formatCalendarDay(order.dueDay)})`;
     expect(hallBlock(state, firstJob(state))).toBe(wanted);
     expect(startProductionCheck(state, firstJob(state))).toEqual({ ok: false, reason: wanted });
   });
@@ -85,7 +86,9 @@ describe('kit that is bought and still on the road', () => {
     if (!order) throw new Error('the saw should be on order');
     const next = runClock(act(state, { type: 'WORK_HERE', jobId: firstJob(state).id }), 10);
     const job = firstJob(next);
-    expect(job.blockedBy).toBe(`waiting for table saw (on order, due day ${order.dueDay})`);
+    expect(job.blockedBy).toBe(
+      `waiting for table saw (on order, due ${formatCalendarDay(order.dueDay)})`,
+    );
     // And nothing was cut while it waited.
     expect(job.labourRemaining).toBe(job.labourValue);
   });

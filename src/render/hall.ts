@@ -85,7 +85,7 @@ import {
   pointInPolygon,
   tileToScreen,
 } from './iso';
-import { formatTime } from '../engine/clock';
+import { formatCalendarDay, formatTime } from '../engine/clock';
 import { compressorIsLow, extractionCheck, hallAirCheck } from '../engine/media';
 import { type CharacterOptions, animationForStation, characterArt } from './characters';
 import {
@@ -988,10 +988,24 @@ function capsuleBody(fill: string): string {
   );
 }
 
+/** A third of what Turn 17 drew. The figure over the rack was the size of a shop sign and sat on
+ *  top of the hall; at a third of its height and its stroke it is a label on a rack, in the same
+ *  place (PIOTR, 17.09; CLAUDE.md T18 2.3) [TUNE: the divisor]. */
+const RACK_COUNT_SHRINK = 3;
+
 /** How the number on the rack is set out [TUNE]: how far up the front face the plate sits, how
- *  high the plate is in scene pixels, how wide a digit is on it, and the padding each side. The
- *  type itself is `.rack-count` in the stylesheet, in the hand. */
-const RACK_COUNT = { up: 0.55, height: 26, digit: 15, pad: 9 };
+ *  high the plate is in scene pixels, how wide a digit is on it, the padding each side, and the
+ *  stroke of the type. Turn 17's own figures over `RACK_COUNT_SHRINK`, so the source says what
+ *  was shrunk and by how much. The type is written onto the text itself and not left to the
+ *  stylesheet, because a third of the hand is this figure and nothing else. */
+const RACK_COUNT = {
+  up: 0.55,
+  height: 26 / RACK_COUNT_SHRINK,
+  digit: 15 / RACK_COUNT_SHRINK,
+  pad: 9 / RACK_COUNT_SHRINK,
+  // 26 px is `--fs-hand`, which is what `.rack-count` wore before tonight.
+  type: 26 / RACK_COUNT_SHRINK,
+};
 
 /** The sheets in the rack, over its own front face, big, in the hand, on the class's colour
  *  (PIOTR, 17.09; CLAUDE.md T17 2.8). The count used to be glued into the object's name, and
@@ -1011,9 +1025,10 @@ function rackCount(item: Equipment, sheets: number): string {
   const colour = CLASS_BADGE[item.variantId]?.colour ?? 'var(--kit-stock)';
   return (
     `<rect class="rack-count-plate" x="${round(at.x - width / 2)}" ` +
-    `y="${round(at.y - RACK_COUNT.height / 2)}" width="${width}" height="${RACK_COUNT.height}" ` +
+    `y="${round(at.y - RACK_COUNT.height / 2)}" width="${round(width)}" ` +
+    `height="${round(RACK_COUNT.height)}" ` +
     `rx="${round(RACK_COUNT.height / 3)}" fill="${colour}" />` +
-    `<text class="rack-count" x="${round(at.x)}" ` +
+    `<text class="rack-count" x="${round(at.x)}" font-size="${round(RACK_COUNT.type)}" ` +
     `y="${round(at.y + RACK_COUNT.height / 3)}">${escapeText(text)}</text>`
   );
 }
@@ -1145,14 +1160,14 @@ export function reservedOutline(item: OnOrderItem): string {
   const name = orderName(item);
   return (
     `<g data-kit="${item.id}" data-order="${item.id}" class="clickable reserved">` +
-    `<title>${escapeText(`${name}, on order, due day ${item.dueDay}`)}</title>` +
+    `<title>${escapeText(`${name}, on order, due ${formatCalendarDay(item.dueDay)}`)}</title>` +
     `<polygon points="${points(footprintPolygon(item.anchorX, item.anchorY, zone.width, zone.depth))}" ` +
     'class="reserved-zone" />' +
     `<polygon points="${points(footprintPolygon(inset.x, inset.y, stands.width, stands.depth))}" ` +
     'class="reserved-floor" />' +
     label(
       centreOf(item.anchorX, item.anchorY, zone.width, zone.depth),
-      `${name}, due day ${item.dueDay}`,
+      `${name}, due ${formatCalendarDay(item.dueDay)}`,
     ) +
     '</g>'
   );

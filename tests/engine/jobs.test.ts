@@ -608,9 +608,8 @@ describe('the client answers with a number (CLAUDE.md T13 3.24)', () => {
     expect(state.activeEvent?.kind).toBe('clientOffer');
     const offer = state.enquiries.find((entry) => entry.id === enquiry.id)?.offer ?? null;
     expect(offer).not.toBeNull();
-    expect(state.activeEvent?.body).toContain(
-      `The client offers ${formatMoney(offer ?? 0)}. Accept?`,
-    );
+    // The sentence ends on the colon the margin is written after (CLAUDE.md T18 2.9).
+    expect(state.activeEvent?.body).toContain(`The client offers ${formatMoney(offer ?? 0)}:`);
     expect(state.activeEvent?.choices.map((choice) => choice.id)).toEqual(['accept', 'decline']);
     const cash = state.cash;
     state = choose(state, 'accept');

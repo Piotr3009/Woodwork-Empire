@@ -5,7 +5,7 @@
 
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { HOUSE_CARD_SECONDS, HOUSE_TIER_NAMES } from '../../src/engine/constants';
-import { houseTierFor } from '../../src/engine/index';
+import { formatCalendarDay, houseTierFor } from '../../src/engine/index';
 import { advanceMinutes, currentState, mount, render } from '../../src/ui/app';
 import { houseLineFor, renderDayEnd } from '../../src/ui/dayEnd';
 import { buyStartingKit, newGame, runClock } from '../helpers';
@@ -75,14 +75,14 @@ describe('going home, through the page', () => {
     expect(modal?.querySelector('[data-tip="house"]')).not.toBeNull();
     expect(modal?.querySelector('[data-do="resolveEvent"]')).toBeNull();
     expect(modal?.querySelector('.modal-close')).toBeNull();
-    expect(modal?.textContent).not.toContain('Day 1 done');
+    expect(modal?.textContent).not.toContain(`${formatCalendarDay(1)} done`);
   });
 
   it('goes to the summary on the click, and the summary carries the house and the efficiency', () => {
     click('[data-do="closeHouseCard"]');
     const modal = eventModal();
     expect(modal?.querySelector('[data-do="closeHouseCard"]')).toBeNull();
-    expect(modal?.textContent).toContain('Day 1 done');
+    expect(modal?.textContent).toContain(`${formatCalendarDay(1)} done`);
     const state = currentState();
     if (state === null) throw new Error('no game');
     const rows = Array.from(modal?.querySelectorAll('.row') ?? []).map((row) => [
@@ -105,7 +105,9 @@ describe('going home, through the page', () => {
     render();
     const modal = eventModal();
     expect(modal?.querySelector('[data-do="closeHouseCard"]')).toBeNull();
-    expect(modal?.textContent).toContain(`Day ${currentState()?.clock.day ?? 0} done`);
+    expect(modal?.textContent).toContain(
+      `${formatCalendarDay(currentState()?.clock.day ?? 0)} done`,
+    );
     click('[data-modal="event"] [data-do="resolveEvent"]');
   });
 

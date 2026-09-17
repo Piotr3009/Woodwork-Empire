@@ -8,32 +8,59 @@
 // avoidable. A commercial enquiry the company cannot take for want of insurance is money not
 // earned, not money lost. The crew at the floor limit is a wall the player will meet at the next
 // hire, and nothing until then.
+//
+// Turn 18 adds the two money lines and the first steps line (CLAUDE.md T18 2.6, 2.7). The money
+// lines read the ledger, the closed days and the workshop rate, and change none of them: the game
+// used to say nothing at all about the money until the month end, and a player could be four weeks
+// into a hole before the game mentioned it.
 
-import { NO_INSURANCE_REASON } from './constants';
-import { bagStore } from './machines';
+import {
+  FIRST_STEPS_LAST_DAY,
+  NO_INSURANCE_REASON,
+  RATE_WEEK_DAYS,
+  SPEND_WARNING_CATEGORIES,
+  SPEND_WARNING_FROM_CLOSED_DAYS,
+} from './constants';
+import { formatMoney } from './economy';
+import { overdraftInterestForDay } from './finance';
+import { bagStore, has } from './machines';
 import { workPlan } from './plan';
+import { ratedDays, weekRate } from './rate';
 import { crewFull, crewLine } from './staff';
-import type { GameState } from './types';
+import type { GameState, LedgerCategory } from './types';
 
 export type WarningKey =
   | 'bagsFull'
   | 'nobodyAssigned'
   | 'deadlineAtRisk'
   | 'noInsurance'
-  | 'crewFull';
+  /** The money speaks before the month end (PIOTR accepted, 17.09; CLAUDE.md T18 2.6). */
+  | 'belowZero'
+  | 'spendingOverEarning'
+  | 'crewFull'
+  /** The first days say what to do (PIOTR accepted, 17.09; CLAUDE.md T18 2.7). */
+  | 'firstSteps';
 
 export interface Warning {
   key: WarningKey;
   text: string;
 }
 
-/** The order of urgency: the strip shows the first key in this list that has a problem behind it. */
+/** The order of urgency: the strip shows the first key in this list that has a problem behind it.
+ *  The two money lines sit above the crew line and under the deadlines: an account under zero is
+ *  costing the company money every day it stands there, and a week that spends more than it earns
+ *  is the month end arriving early, where the crew at the floor limit is a wall the player will
+ *  only meet at his next hire. The first steps line is last of all: it is said only when there is
+ *  nothing at all to warn about (CLAUDE.md T18 2.6, 2.7). */
 export const WARNING_ORDER: readonly WarningKey[] = [
   'bagsFull',
   'nobodyAssigned',
   'deadlineAtRisk',
   'noInsurance',
+  'belowZero',
+  'spendingOverEarning',
   'crewFull',
+  'firstSteps',
 ];
 
 function bagsFullWarning(state: GameState): Warning | null {
@@ -87,12 +114,102 @@ function crewFullWarning(state: GameState): Warning | null {
   return { key: 'crewFull', text: `${crewLine(state)}: no floor for another person` };
 }
 
+/** What a charge a day costs, in the words the strip wants it: the pound, or the pence while it is
+ *  under a pound, because "£0 a day" is not a warning (CLAUDE.md T18 2.6). */
+function perDay(cost: number): string {
+  if (cost < 1) return `\u00a3${cost.toFixed(2)}`;
+  return formatMoney(cost);
+}
+
+/** The account is under zero and the overdraft is charging for it, today and every day it stands
+ *  there. The figure is the one the engine itself accrues with, `overdraftInterestForDay`, so the
+ *  line and the charge cannot disagree; nothing here touches the ledger (CLAUDE.md T18 2.6). */
+function belowZeroWarning(state: GameState): Warning | null {
+  if (state.cash >= 0) return null;
+  const cost = overdraftInterestForDay(state.cash);
+  return {
+    key: 'belowZero',
+    text: `Account below zero: the overdraft costs ${perDay(cost)} a day`,
+  };
+}
+
+const SPEND_SET: ReadonlySet<LedgerCategory> = new Set(
+  SPEND_WARNING_CATEGORIES as readonly LedgerCategory[],
+);
+
+/** What went out on wages, the draw and the fixed charges over a run of days, off the ledger. An
+ *  entry that became arrears is counted: it is spending the company could not pay for, which is
+ *  the very thing the line is about. */
+export function fixedSpendOver(state: GameState, days: ReadonlySet<number>): number {
+  let out = 0;
+  for (const entry of state.ledger) {
+    if (!days.has(entry.day)) continue;
+    if (!SPEND_SET.has(entry.category)) continue;
+    if (entry.amount < 0) out -= entry.amount;
+  }
+  return Math.round(out * 100) / 100;
+}
+
+/** The week's money in one sentence: what the workshop spent on standing still against what its
+ *  labour earned over the same five closed days. The top of the workshop rate is the "in", so the
+ *  Company board's figure and this line are the same arithmetic (CLAUDE.md T17 2.26, T18 2.6). */
+function spendingOverEarningWarning(state: GameState): Warning | null {
+  const closed = ratedDays(state);
+  if (closed.length < SPEND_WARNING_FROM_CLOSED_DAYS) return null;
+  const window = closed.slice(Math.max(0, closed.length - RATE_WEEK_DAYS));
+  const out = fixedSpendOver(state, new Set(window.map((day) => day.day)));
+  const earned = weekRate(state).labour;
+  if (out <= earned) return null;
+  return {
+    key: 'spendingOverEarning',
+    text: `You spend more than you earn: ${formatMoney(out)} out, ${formatMoney(earned)} in this week`,
+  };
+}
+
+/** A hall that has been set up once. There is no flag for it in the state and Turn 18 does not
+ *  bump the state version, so it is read off the floor: a workshop with a bench standing in it has
+ *  had its day 1 kit delivered and put down, which is what setting the hall out is for and what
+ *  the first job cannot start without (CLAUDE.md T18 2.7; see REPORT-T18.md). */
+function hallIsSetUp(state: GameState): boolean {
+  return has(state, 'workbench');
+}
+
+/** A job with production behind it: the three stages a piece can only reach by being started. */
+function productionStarted(state: GameState): boolean {
+  return state.jobs.some(
+    (job) =>
+      job.stage === 'inProduction' ||
+      job.stage === 'awaitingTransport' ||
+      job.stage === 'completed',
+  );
+}
+
+/** The first three days say what to do, one step at a time, in the strip's own last place: it is
+ *  said only when the game has nothing to warn about. After the third step, or from the day after
+ *  `FIRST_STEPS_LAST_DAY`, it is gone for good, and the tips setting turns it off with the tips
+ *  (PIOTR accepted, 17.09; CLAUDE.md T18 2.7). */
+function firstStepsWarning(state: GameState): Warning | null {
+  if (!state.settings.tips) return null;
+  if (state.clock.day > FIRST_STEPS_LAST_DAY) return null;
+  if (!hallIsSetUp(state)) return { key: 'firstSteps', text: 'Set up the hall' };
+  if (state.jobs.length === 0) {
+    return { key: 'firstSteps', text: 'Accept an enquiry on the board' };
+  }
+  if (!productionStarted(state)) {
+    return { key: 'firstSteps', text: 'Press Start production on the work plan' };
+  }
+  return null;
+}
+
 const CHECKS: Record<WarningKey, (state: GameState) => Warning | null> = {
   bagsFull: bagsFullWarning,
   nobodyAssigned: nobodyAssignedWarning,
   deadlineAtRisk: deadlineWarning,
   noInsurance: noInsuranceWarning,
+  belowZero: belowZeroWarning,
+  spendingOverEarning: spendingOverEarningWarning,
   crewFull: crewFullWarning,
+  firstSteps: firstStepsWarning,
 };
 
 /** Every problem the game sees right now, the most urgent first. Empty when nothing is wrong. */

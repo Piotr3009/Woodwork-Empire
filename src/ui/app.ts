@@ -2,14 +2,15 @@
 // here, in one place (CLAUDE.md 3.5, 10.1).
 
 import {
-  CLEANING_MINUTES,
   applyAction,
+  CLEANING_MINUTES,
   createGame,
+  ductingDue,
+  findSpec,
   finishTimeFor,
+  formatCalendarDay,
   formatTime,
   gameMinutesPerRealSecond,
-  findSpec,
-  ductingDue,
   moveConfirmPending,
   movePending,
   movingMachines,
@@ -17,6 +18,7 @@ import {
   ownerJob,
   runMinutes,
   shoppingList,
+  SPEEDS,
   startProductionCheck,
   timeIsPaused,
 } from '../engine/index';
@@ -200,6 +202,9 @@ interface Ui {
   /** True while the next drop stands the item at ninety degrees to the walls (T10 3.8). */
   rotate: boolean;
   speedBeforeSetup: Speed;
+  /** What the clock was doing before the P key stopped it, so the same key starts it again where
+   *  it was (PIOTR, 17.09; CLAUDE.md T18 2.8). */
+  speedBeforePause: Speed;
   drag: Drag | null;
   /** Where the player has the hall pushed to and how far in. UI state, never game state: a save
    *  carries the workshop, not where somebody was looking (CLAUDE.md T6 3.3). */
@@ -320,6 +325,7 @@ function freshUi(): Ui {
     setup: false,
     rotate: false,
     speedBeforeSetup: 0,
+    speedBeforePause: 1,
     drag: null,
     camera: { ...HALL_CAMERA_START },
     cameraStarted: false,
@@ -583,6 +589,14 @@ function hallControls(current: GameState): string {
   return `<div class="hall-chips">${chips.join('')}</div>`;
 }
 
+/** Everything that stands under the hall, in one column, bottom left: the chips of T17 2.5 first
+ *  and the first use tip last, both in the flow of the column, so a long tip pushes the chips up
+ *  instead of being covered by them and nothing ever overlaps whatever the tip's length
+ *  (PIOTR, 17.09; CLAUDE.md T18 2.4). The camera is its own thing, bottom right. */
+function hallBottom(current: GameState): string {
+  return `<div class="hall-bottom">${hallControls(current)}${hallTip(current)}</div>`;
+}
+
 /** The camera, bottom right: three small chips and nothing else. What the wheel and the drag do
  *  is a tip now, said once (CLAUDE.md T17 2.5). */
 function hallZoomControls(): string {
@@ -659,7 +673,7 @@ function modalSpecs(): ModalSpec[] {
     const past = summaryOfDay(current, ui.daySummary);
     specs.push({
       id: 'daySummary',
-      title: past === null ? `Day ${ui.daySummary}` : past.title,
+      title: past === null ? formatCalendarDay(ui.daySummary) : past.title,
       body:
         past === null
           ? '<p class="empty">That day is off the back of the books now.</p>'
@@ -735,7 +749,7 @@ function moveFinishNote(current: GameState): string {
   const clock = formatTime(at.minute);
   if (at.day === current.clock.day) return `Finished by ${clock}.`;
   if (at.day === current.clock.day + 1) return `Finished tomorrow by ${clock}.`;
-  return `Finished on day ${at.day} by ${clock}.`;
+  return `Finished on ${formatCalendarDay(at.day)} by ${clock}.`;
 }
 
 /** The version in the corner of every screen, the start screen included (PIOTR, 13.09). It takes
@@ -775,7 +789,7 @@ function pageBody(): string {
   const current = state;
   // The last word the company gets is the bankruptcy event, over the game over screen.
   if (current.gameOver) return renderGameOver(current);
-  const controls = ui.view === 'hall' ? hallControls(current) + hallZoomControls() : '';
+  const controls = ui.view === 'hall' ? hallBottom(current) + hallZoomControls() : '';
   const note = ui.note === '' ? '' : `<p class="view-note">${escapeHtml(ui.note)}</p>`;
   const toast = ui.toast === '' ? '' : `<p class="toast">${escapeHtml(ui.toast)}</p>`;
   const out = ui.view === 'sprites' ? '' : renderOwnerOut(current);
@@ -787,7 +801,7 @@ function pageBody(): string {
     toast +
     out +
     (ui.menuOpen ? renderMenu(current, ui.cloud) : '') +
-    `<main class="view">${SCENE_SLOT}${controls}${note}${hallTip(current)}</main>` +
+    `<main class="view">${SCENE_SLOT}${controls}${note}</main>` +
     renderWhy()
   );
 }
@@ -1836,7 +1850,7 @@ function handleSceneClick(element: DataElement): boolean {
       // The outline of something bought and not here yet: it says when the lorry is due.
       const reserved = reservationById(game(), kit);
       if (reserved !== null) {
-        setNote(`On order, due day ${reserved.dueDay} at 08:00.`);
+        setNote(`On order, due ${formatCalendarDay(reserved.dueDay)} at 08:00.`);
         requestRender();
       }
       return true;
@@ -1962,6 +1976,31 @@ function onKeyUp(event: KeyboardEvent): void {
   if (event.key === ' ') spaceHeld = false;
 }
 
+/** The five running speeds under the hand, `1` to `5` in the order `SPEEDS` has them: x1, x2, x4,
+ *  x10, x30. `SPEEDS[0]` is Pause, which has its own key (CLAUDE.md T18 2.8). */
+const SPEED_KEYS = ['1', '2', '3', '4', '5'] as const;
+
+/** True while the caret is in a field. A key does nothing at all then: a "1" typed into the stock
+ *  box is a number of sheets and not a speed, and a "p" is a letter (CLAUDE.md T18 2.8). */
+function typingInAField(): boolean {
+  const active = document.activeElement;
+  if (active === null) return false;
+  const tag = active.tagName.toLowerCase();
+  return tag === 'input' || tag === 'textarea' || tag === 'select';
+}
+
+/** P stops the clock and starts it again where it was. The same dispatch the Pause knob makes, so
+ *  there is one way the speed is ever set (CLAUDE.md T18 2.8). */
+function togglePause(): void {
+  const current = game().speed;
+  if (current !== 0) {
+    ui.speedBeforePause = current;
+    dispatch({ type: 'SET_SPEED', speed: 0 });
+    return;
+  }
+  dispatch({ type: 'SET_SPEED', speed: ui.speedBeforePause === 0 ? 1 : ui.speedBeforePause });
+}
+
 function onKeyDown(event: KeyboardEvent): void {
   batched(() => runKeyDown(event));
 }
@@ -1973,6 +2012,20 @@ function runKeyDown(event: KeyboardEvent): void {
   if (ui.setup && (event.key === 'r' || event.key === 'R')) {
     turnGhost();
     return;
+  }
+  // The clock under the hand: P stops it and starts it again, 1 to 5 are the top bar's own five
+  // running knobs. They do exactly what a click on the knob does, and nothing at all while a
+  // field has the caret or before there is a game to run (CLAUDE.md T18 2.8).
+  if (state !== null && !typingInAField()) {
+    if (event.key === 'p' || event.key === 'P') {
+      togglePause();
+      return;
+    }
+    const knob = SPEED_KEYS.indexOf(event.key as (typeof SPEED_KEYS)[number]);
+    if (knob >= 0) {
+      dispatch({ type: 'SET_SPEED', speed: SPEEDS[knob + 1] ?? 1 });
+      return;
+    }
   }
   if (event.key !== 'Escape') return;
   // Escape drops whatever is in hand before it closes anything (CLAUDE.md T2 3.10).

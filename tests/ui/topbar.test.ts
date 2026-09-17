@@ -5,7 +5,13 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { DAY_CATEGORY_LABELS, EFFICIENCY_CAUSES } from '../../src/engine/constants';
-import { applyAction, dayPercentages, netOf, workshopEfficiency } from '../../src/engine/index';
+import {
+  applyAction,
+  dayPercentages,
+  formatCalendarDay,
+  netOf,
+  workshopEfficiency,
+} from '../../src/engine/index';
 import type { DayCategory, GameState } from '../../src/engine/index';
 import { renderTopbar } from '../../src/ui/topbar';
 import { renderDaySummary } from '../../src/ui/dayEnd';
@@ -229,7 +235,7 @@ describe('the plate at the top of the day end summary', () => {
     const state = withScriptedDay(SCRIPTED);
     const html = renderDaySummary({
       day: 3,
-      title: 'End of day 3',
+      title: `End of ${formatCalendarDay(3)}`,
       minutesByCategory: { admin: 0, design: 0, workshop: 0 },
       minutesWorked: 370,
       minutesAvailable: 480,
@@ -255,7 +261,7 @@ describe('the plate at the top of the day end summary', () => {
       expressUplift: 0,
       hallFactor: 1,
     });
-    expect(html).toContain('Day 3 done');
+    expect(html).toContain(`${formatCalendarDay(3)} done`);
     expect(html).toContain('370 of 480 min · overtime 0');
     const shares = dayPercentages(state.owner.dayLog);
     expect(shares.reduce((sum, share) => sum + share.percent, 0)).toBe(100);

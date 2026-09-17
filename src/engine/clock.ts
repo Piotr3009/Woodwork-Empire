@@ -14,8 +14,10 @@ import {
   MAX_CLOCK_MINUTES_PER_DAY,
   MINUTES_PER_WORKING_DAY,
   MONTHS_PER_YEAR,
+  MONTH_NAMES,
   OVERTIME_END_MINUTE,
   REAL_SECONDS_PER_DAY_AT_1X,
+  START_MONTH,
   WEEKDAY_NAMES,
   WORKING_DAYS_PER_WEEK,
 } from './constants';
@@ -121,8 +123,24 @@ export function formatTime(minute: number): string {
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
 }
 
+/** The name of a game month: month 1 is `START_MONTH` and the twelve names cycle after it, with
+ *  no year on the end of it (CLAUDE.md T18 2.2). */
+export function monthName(month: number): string {
+  const index = (((START_MONTH + month - 1) % MONTHS_PER_YEAR) + MONTHS_PER_YEAR) % MONTHS_PER_YEAR;
+  return MONTH_NAMES[index] ?? MONTH_NAMES[START_MONTH];
+}
+
+/** The one date in the game: the weekday, the day of its month and the month's name, `Mon 12
+ *  March`. Every screen that used to print "day N" at the player calls this, so a date reads the
+ *  same wherever it stands and `state.clock.day` stays the engine's own count (PIOTR, 17.09;
+ *  CLAUDE.md T18 2.2). */
+export function formatCalendarDay(day: number): string {
+  const safe = Math.max(1, Math.round(day));
+  return `${weekdayName(safe)} ${dayOfMonth(safe)} ${monthName(monthOfDay(safe))}`;
+}
+
 export function formatDate(clock: Clock): string {
-  return `${weekdayName(clock.day)}, day ${clock.day} · ${formatTime(clock.minute)}`;
+  return `${formatCalendarDay(clock.day)} · ${formatTime(clock.minute)}`;
 }
 
 /** The next day the workshop is open. */
