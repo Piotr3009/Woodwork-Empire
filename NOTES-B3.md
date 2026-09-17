@@ -27,32 +27,24 @@ and set the week's net apart from the two columns of arithmetic beside it.
 
 ## 2. `src/ui/styles.css`: the sound controls (T19-B3c, CLAUDE.md T19 2.10)
 
-Phase A left `.sound-row` and `.sound-volume` empty. Fill them with:
+Phase A left `.sound-row` and `.sound-volume` empty. The two rows are built out of `.row`,
+`.row-main`, `.row-action`, `.chip` and `.row-figure`, all of which already carry rules, so the
+sheet reads correctly with both left empty. What they are for is the volume row's figure, which
+sits between two chips and should not jump about as it counts:
 
 ```css
 /* 2.10 The sound controls in Settings. */
-.sound-row .row-action {
-  gap: 6px;
-}
-
+.sound-row .row-action,
 .sound-volume .row-action {
-  gap: 10px;
-}
-
-.sound-volume input[type='range'] {
-  accent-color: var(--ink);
-  width: 140px;
+  gap: 6px;
 }
 
 .sound-volume .row-figure {
   font-variant-numeric: tabular-nums;
-  min-width: 42px;
-  text-align: right;
+  min-width: 46px;
+  text-align: center;
 }
 ```
-
-`.row-figure` is a new class name in `settings.ts`; if phase C would rather not add one, the span
-can carry `.hint` instead and the last rule goes.
 
 ## 3. `src/ui/app.ts`: the mute's click (T19-B3c, CLAUDE.md T19 2.10)
 
@@ -66,21 +58,21 @@ There is no route for the Settings mute today. In the `data-do` switch, directly
       return;
 ```
 
-## 4. `src/ui/app.ts`: the volume's slider (T19-B3c, CLAUDE.md T19 2.10)
+## 4. `src/ui/app.ts`: the volume's two steps (T19-B3c, CLAUDE.md T19 2.10)
 
-There is no route for the Settings volume today. In `runInput`, beside the other `data-field`
-branches, add:
+There is no route for the Settings volume today. The chip carries the volume it would set, so the
+case is one line. Directly after `case 'setSound':`, add:
 
 ```ts
-    if (field === 'soundVolume') {
-      // The master volume, nought to one; the slider counts in whole percent (CLAUDE.md T19 2.10).
-      dispatch({ type: 'SET_SOUND', volume: Number(target.value) / 100 });
+    case 'setVolume':
+      // Quieter and Louder each carry where they would put the master (CLAUDE.md T19 2.10).
+      dispatch({ type: 'SET_SOUND', volume: Number(element.dataset.volume) });
       return;
-    }
 ```
 
-`driveSound` already pushes `state.settings.sound` into the engine every frame, so nothing else is
-needed for the change to be heard.
+`SET_SOUND` already clamps the volume to nought and one in `game.ts`, and `driveSound` already
+pushes `state.settings.sound` into the engine every frame, so nothing else is needed for the
+change to be heard.
 
 ## 5. `src/ui/app.ts`: the laptop's Add as next (T19-B3b, CLAUDE.md T19 2.12)
 
@@ -128,8 +120,13 @@ edited `modal.ts`, the two changes should merge cleanly, but this is where to lo
   second press of `Add as next` is never a dead click.
 - **2.12, when `Add as next` is offered:** only on the "Busy with X" refusal, never on any other.
   See the report for why.
-- **2.10, the volume slider:** 0 to 100 in steps of 5, so one drag is twenty dispatches and not
-  two hundred.
+- **2.10, the volume's step:** `VOLUME_STEP` 0.1, declared in `src/ui/settings.ts` because
+  `constants.ts` is frozen for phase B. It should move to `constants.ts` beside
+  `SOUND_VOLUME_DEFAULT` in phase C, exported as `SOUND_VOLUME_STEP`.
+- **2.10, no slider:** the volume is a step down, the figure, and a step up, not a range input.
+  Every control in this game is one click, the stylesheet has no rule for a range anywhere, the
+  page is written again every frame, and a stepper can print the volume itself instead of the
+  nearest of a handful of named steps (`SOUND_VOLUME_DEFAULT` 0.7 is not a quarter of anything).
 - **2.10, the one shot gaps:** the hammer and the drill now read `HAMMER_EVERY_SECONDS` 3 and
   `DRILL_EVERY_SECONDS` 4 (phase A's constants, which were dead until now) through a new optional
   `gapMs` on `SoundSpec`; every other one shot keeps `SOUND_ONE_SHOT_GAP_MS` 1,000.

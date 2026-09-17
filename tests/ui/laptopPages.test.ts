@@ -14,7 +14,17 @@ import { renderMaterials } from '../../src/ui/materials';
 import { renderSecurity } from '../../src/ui/security';
 import { renderTeam } from '../../src/ui/team';
 import { renderWebsite } from '../../src/ui/website';
-import { acceptNow, buyStartingKit, fillRack, newGame, placeEnquiry } from '../helpers';
+import type { GameState } from '../../src/engine/index';
+import {
+  acceptNow,
+  act,
+  buyStartingKit,
+  fillRack,
+  newGame,
+  placeEnquiry,
+  runClock,
+  withLicence,
+} from '../helpers';
 
 function root(): HTMLElement {
   const element = document.querySelector('#app');
@@ -198,5 +208,108 @@ describe('through the page', () => {
     expect(page()).toBe('drawings');
     click('[data-modal="laptop"] [data-do="pauseTask"]');
     expect(currentState()?.owner.currentTaskId).toBeNull();
+  });
+});
+
+describe('Add as next (CLAUDE.md T19 2.12)', () => {
+  /** A desk with the licence in, a job on the books and more than one job of work open on it. */
+  function desk(): GameState {
+    let state = fillRack(buyStartingKit(newGame({ difficulty: 'veryEasy' })), 30);
+    state.enquiries = [];
+    state = acceptNow(state, placeEnquiry(state, { price: 900, deadlineDays: 30 }).id);
+    return state;
+  }
+
+  function tasksPage(state: GameState): HTMLElement {
+    return parse(
+      renderLaptop(state, { page: 'tasks', stockSheets: '6', teamTab: 'workshop', tickedTasks: [] }),
+    );
+  }
+
+  function openIds(state: GameState): string[] {
+    return state.tasks.filter((task) => !task.done).map((task) => task.id);
+  }
+
+  it('offers every other job of work behind the one he is on, and never in place of it', () => {
+    const state = desk();
+    const ids = openIds(state);
+    const first = ids[0];
+    const second = ids[1];
+    if (first === undefined || second === undefined) throw new Error('two jobs of work wanted');
+    // Nothing running: every row he could take offers a plain Start, and nothing is queued.
+    const idle = tasksPage(state);
+    expect(idle.querySelectorAll('[data-do="queueTaskNext"]')).toHaveLength(0);
+    expect(idle.querySelectorAll('[data-do="startTask"]').length).toBeGreaterThan(1);
+
+    // One in his hands: that row says what it always said, and the rest say Add as next.
+    const busy = act(state, { type: 'START_TASK', taskId: first });
+    expect(busy.owner.currentTaskId).toBe(first);
+    const page = tasksPage(busy);
+    const running = page.querySelector(`[data-task="${first}"]`);
+    expect(running?.classList.contains('is-running')).toBe(true);
+    expect(running?.querySelector('[data-do="pauseTask"]')?.textContent).toBe('Put that down');
+    expect(page.querySelectorAll('[data-do="startTask"]')).toHaveLength(0);
+    const add = page.querySelector(`[data-task="${second}"] [data-do="queueTaskNext"]`);
+    expect(add?.textContent).toBe('Add as next');
+    expect(add?.getAttribute('data-id')).toBe(second);
+    expect(add?.classList.contains('task-queue-next')).toBe(true);
+    // The way out is never "put that down" on somebody else's row any more.
+    expect(page.querySelectorAll('[data-do="pauseTask"]')).toHaveLength(1);
+  });
+
+  it('queues it behind the running one instead of replacing it, and says so on the row', () => {
+    const state = desk();
+    const ids = openIds(state);
+    const first = ids[0];
+    const second = ids[1];
+    if (first === undefined || second === undefined) throw new Error('two jobs of work wanted');
+    const busy = act(state, { type: 'START_TASK', taskId: first });
+    const queued = act(busy, { type: 'QUEUE_TASK_NEXT', taskId: second });
+    // The whole of Piotr's complaint: what he was doing is still in his hands.
+    expect(queued.owner.currentTaskId).toBe(first);
+    expect(queued.taskQueue).toContain(second);
+    // And the row now says it is waiting, with nothing left to press on it.
+    const row = tasksPage(queued).querySelector(`[data-task="${second}"]`);
+    expect(row?.querySelector('[data-do]')).toBeNull();
+    expect(row?.querySelector('.reason')?.textContent).toBe('Next in the queue');
+    // A second press of the same button would queue it twice; it cannot be pressed twice.
+    const again = act(queued, { type: 'QUEUE_TASK_NEXT', taskId: second });
+    expect(again.taskQueue.filter((id) => id === second)).toHaveLength(1);
+    // The laptop's own count of the queue reads it.
+    expect(tasksPage(queued).textContent).toContain('1 job of work queued');
+  });
+
+  it('starts the queued one the moment his hands are free', () => {
+    const state = desk();
+    const ids = openIds(state);
+    const first = ids[0];
+    const second = ids[1];
+    if (first === undefined || second === undefined) throw new Error('two jobs of work wanted');
+    const queued = act(
+      act(state, { type: 'START_TASK', taskId: first }),
+      { type: 'QUEUE_TASK_NEXT', taskId: second },
+    );
+    // The one he is on finishes; the queue's head goes into his hands where T17's queue has
+    // always picked it up, and nothing about Add as next changes that (CLAUDE.md T17 2.16).
+    const held = queued.tasks.find((task) => task.id === first);
+    if (held === undefined) throw new Error('the job of work he is on has gone');
+    held.minutesRemaining = 1;
+    const freed = runClock(queued, 3);
+    expect(freed.tasks.find((task) => task.id === first)?.done).toBe(true);
+    expect(freed.owner.currentTaskId).toBe(second);
+    // It stays on the queue until it is done, the way T17 wrote it: the queue is what he is
+    // working through, not what he has yet to pick up.
+    expect(freed.taskQueue[0]).toBe(second);
+  });
+
+  it('gives the drawings page the same button, because the drawings page is on the laptop too', () => {
+    const state = withLicence(desk());
+    const design = state.tasks.find((task) => task.kind === 'design' && !task.done);
+    const other = state.tasks.find((task) => !task.done && task.kind !== 'design');
+    if (design === undefined || other === undefined) throw new Error('a drawing and one other wanted');
+    const busy = act(state, { type: 'START_TASK', taskId: other.id });
+    const page = parse(renderDrawings(busy));
+    const add = page.querySelector(`[data-do="queueTaskNext"][data-id="${design.id}"]`);
+    expect(add?.textContent).toBe('Add as next');
   });
 });

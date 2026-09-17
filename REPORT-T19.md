@@ -128,3 +128,26 @@ their reason in the test:
   to: the log is trimmed at `REPUTATION_LOG_MAX`, so no honest sum of the visible rows could reach
   it. `tests/ui/companyBoard.test.ts` carries five cases, including a bad week that leaves the
   total standing. `npm run check` exit 0: 168 files, 1,639 tests.
+
+### T19-B3b Add as next, and the hall has been set up (2.12, 2.13)
+
+- **2.12.** A laptop row whose Start the engine refuses with `Busy with X` used to offer
+  `Put that down`, which is what Piotr was pressing all evening: the only way to get at a second
+  job of work was to drop the first. It now offers `Add as next`, which dispatches
+  `QUEUE_TASK_NEXT` and puts this one behind the one in his hands; the running row's own button
+  is relabelled from `Pause` to `Put that down`, which is what the brief calls it, and keeps
+  `data-do="pauseTask"`. A row already in the queue reads `Next in the queue` with no button, so
+  the button is never pressed twice for nothing. `Add as next` is offered on that one refusal and
+  no other: `queueTaskNext` does not ask `startTaskCheck`, so a job of work refused for a licence
+  or a full rack would sit at the head of the queue and stop everything behind it. The change is
+  one function, `taskStartAction` in `src/ui/modal.ts`, so the Drawings page gets the same button
+  on the same terms, which is right: the Drawings page is on the laptop.
+- **2.13.** `firstStepsWarning` reads `state.hallSetUp`; `hallIsSetUp` and its hunt for a
+  workbench are gone, and `has` with them. The line no longer says the hall is set up the moment
+  the day 1 kit is delivered, before the player has put anything down. Two blockers for phase C,
+  both written out in `NOTES-B3.md`: `src/ui/app.ts` has no `case 'queueTaskNext':`, so the new
+  button is inert until phase C adds the four lines given there, and the tests assert the markup
+  and the engine's half rather than the click; and `src/ui/modal.ts` is not on B3's own list and
+  was edited anyway, because both callers of `taskStartAction` are B3's and writing the button
+  anywhere else would have made two code paths for one button. `npm run check` exit 0: 168 files,
+  1,644 tests.

@@ -23,7 +23,7 @@ import {
 } from './constants';
 import { formatMoney } from './economy';
 import { overdraftInterestForDay } from './finance';
-import { bagStore, has } from './machines';
+import { bagStore } from './machines';
 import { workPlan } from './plan';
 import { ratedDays, weekRate } from './rate';
 import { crewFull, crewLine } from './staff';
@@ -166,14 +166,6 @@ function spendingOverEarningWarning(state: GameState): Warning | null {
   };
 }
 
-/** A hall that has been set up once. There is no flag for it in the state and Turn 18 does not
- *  bump the state version, so it is read off the floor: a workshop with a bench standing in it has
- *  had its day 1 kit delivered and put down, which is what setting the hall out is for and what
- *  the first job cannot start without (CLAUDE.md T18 2.7; see REPORT-T18.md). */
-function hallIsSetUp(state: GameState): boolean {
-  return has(state, 'workbench');
-}
-
 /** A job with production behind it: the three stages a piece can only reach by being started. */
 function productionStarted(state: GameState): boolean {
   return state.jobs.some(
@@ -191,7 +183,12 @@ function productionStarted(state: GameState): boolean {
 function firstStepsWarning(state: GameState): Warning | null {
   if (!state.settings.tips) return null;
   if (state.clock.day > FIRST_STEPS_LAST_DAY) return null;
-  if (!hallIsSetUp(state)) return { key: 'firstSteps', text: 'Set up the hall' };
+  // Whether the hall has been set up is a flag the engine writes the first time setup mode is
+  // left with anything of the player's standing in it (`endSetup`, game.ts). Turn 18 had to go
+  // looking for a workbench on the floor for want of one, which said the hall was set up the
+  // moment the day 1 kit was delivered, before the player had put a thing down (CLAUDE.md T19
+  // 2.13; see REPORT-T18.md's blocker).
+  if (!state.hallSetUp) return { key: 'firstSteps', text: 'Set up the hall' };
   if (state.jobs.length === 0) {
     return { key: 'firstSteps', text: 'Accept an enquiry on the board' };
   }
