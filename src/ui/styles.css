@@ -3377,7 +3377,10 @@ input.num {
   background: rgba(20, 22, 26, 0.92);
 }
 
-/* 2.8 The rack carries its own number, over its front face, in the hand, on the class's colour. */
+/* 2.8 The rack carries its own number, over its front face, in the hand, on the class's colour.
+   T18 2.3: a third of the height and the stroke it had. The stroke is a font-size attribute the
+   renderer writes off `RACK_COUNT.type`, so the plate and the glyph are shrunk by one figure and
+   the render test can read it. */
 .rack-count-plate {
   opacity: 0.9;
 }
@@ -3385,7 +3388,6 @@ input.num {
 .rack-count {
   fill: #f6f1e4;
   font-family: var(--font-title);
-  font-size: var(--fs-hand);
   text-anchor: middle;
 }
 

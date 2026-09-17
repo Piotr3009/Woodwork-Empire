@@ -23,3 +23,14 @@ queue of section 4 names them.
   `STATE_VERSION` stays 15.
   Done: the two version assertions (`tests/ui/version.test.ts`, `tests/ui/saveCheck.test.ts`) read
   `v26`, and the third still finds the string in `constants.ts` and nowhere else in `src`.
+- **T18-02 A man walks slower, and the rack's number is a third of the size (2.1, 2.3).**
+  `WALK_CELLS_PER_SECOND` is 1.0, one cell of the hall a second of real time at every speed in the
+  game; nothing else about the walker is touched, and the walk test still reads the constant rather
+  than a figure of its own, for its pace assertion and now for the cap on its own loop as well. The
+  number over the rack is a third of the height, the stroke, the digit width and the padding Turn 17
+  gave it, in the same place: `RACK_COUNT` is Turn 17's four figures over `RACK_COUNT_SHRINK`, and
+  the stroke is written onto the text as a `font-size` attribute off the same constant, so the
+  stylesheet no longer sets it and the plate and the glyph cannot be shrunk apart.
+  Done: the new size test in `tests/render/views.test.ts` reads the plate's height and width and
+  the glyph's `font-size` at a third of 26, 48 and 26, and checks the plate is still centred where
+  it was; the new pace test in `tests/render/walkers.test.ts` pins the constant at 1.0.

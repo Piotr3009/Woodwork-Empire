@@ -60,6 +60,14 @@ function cellAttr(root: ParentNode, key: string): { x: number; y: number } {
 
 const A_CELL_ON_SCREEN = Math.hypot(24, 12) + 0.01;
 
+describe("a man's pace (PIOTR, 17.09; CLAUDE.md T18 2.1)", () => {
+  it('is one cell of the hall a second of real time, at x1 and at x30 alike', () => {
+    // A man does not walk faster because the clock does: the walker steps in real seconds and
+    // never reads the speed, so this one figure is his pace at every speed in the game.
+    expect(WALK_CELLS_PER_SECOND).toBe(1.0);
+  });
+});
+
 describe('the walker', () => {
   beforeEach(() => resetWalkers());
 
@@ -84,11 +92,15 @@ describe('the walker', () => {
     expect(goal).not.toEqual(startCell);
     const goalPoint = centreOf(goal.x, goal.y, 1, 1);
     const path = walkPath(state, startCell, goal);
-    // Real time, a man's pace: a frame of 100 ms is less than a cell.
+    // Real time, a man's pace: a frame of 100 ms is less than a cell. The cap on the loop reads
+    // the constant too, so slowing him down (T18 2.1) lengthens the walk and never fails the
+    // test: ten frames a cell at one cell a second, with a frame of slack per cell for the
+    // fraction a floating point step leaves behind.
+    const capFrames = Math.ceil((path.length / WALK_CELLS_PER_SECOND) * 11) + 10;
     let before = start;
     let now = 0;
     let frames = 0;
-    while (frames < 400) {
+    while (frames < capFrames) {
       now += 100;
       frames += 1;
       stepWalkers(root, now);
@@ -97,10 +109,14 @@ describe('the walker', () => {
         A_CELL_ON_SCREEN,
       );
       before = after;
-      if (after.x === Math.round(goalPoint.x) && after.y === Math.round(goalPoint.y)) break;
+      // Stop when he has actually arrived and not when the rounded transform first reads as the
+      // goal: a step of a tenth of a cell leaves a fraction of a cell behind it that rounds away
+      // on the screen but is still a step of the walk (T18 2.1).
+      if (walkerOf(key)?.path.length === 0) break;
     }
     expect(transformOf(root, key)).toEqual({ x: Math.round(goalPoint.x), y: Math.round(goalPoint.y) });
-    // At the pace the constant says: as many frames as the path is long at 1.6 cells a second.
+    // At the pace the constant says: as many frames as the path is long at the constant's cells a
+    // second, which is one of them since T18 2.1.
     const cellsWalked = path.length - 1;
     expect(frames).toBeGreaterThanOrEqual(Math.floor((cellsWalked / WALK_CELLS_PER_SECOND) * 10));
     expect(walkerOf(key)?.arrivals.map((entry) => entry.station)).toEqual([machineStation('tableSaw')]);

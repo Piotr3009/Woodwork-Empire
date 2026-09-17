@@ -3095,8 +3095,10 @@ export const PORT_RING = 8;
  *  side, never outside (PIOTR, 16.09; CLAUDE.md T16 2.1). */
 export const PALLET_LAYOUT = { x: GATE_LAYOUT.x, y: GATE_LAYOUT.y, width: 1, depth: 1, height: 1 };
 /** How fast a man walks the floor, in cells of real time a second [TUNE]: a man does not walk
- *  faster at x10 (docs/art/SPRITES.md 10.4; CLAUDE.md T16 2.2). */
-export const WALK_CELLS_PER_SECOND = 1.6;
+ *  faster at x10 (docs/art/SPRITES.md 10.4; CLAUDE.md T16 2.2). One cell a second at x1, because
+ *  1.6 read as a trot and a joiner crossing his own hall does not trot (PIOTR, 17.09;
+ *  CLAUDE.md T18 2.1). */
+export const WALK_CELLS_PER_SECOND = 1.0;
 
 // ---------------------------------------------------------------------------
 // 9.3 Hiring pool (PIOTR: tiers and gating; wages [TUNE])
