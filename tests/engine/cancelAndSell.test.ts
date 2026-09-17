@@ -1,9 +1,11 @@
+// @vitest-environment jsdom
 // Calling an order off before the lorry, and selling a machine the hall has finished with
 // (PIOTR, 13.09; CLAUDE.md T8 3.5).
 
 import { describe, expect, it } from 'vitest';
 import { SALE_FRACTION, SALE_FRACTION_USED } from '../../src/engine/constants';
 import { canSell, salePriceFor } from '../../src/engine/index';
+import { freeBenches, releaseMachinesExcept } from '../../src/engine/machines';
 import { nextWorkingDay } from '../../src/engine/clock';
 import { shoppingList } from '../../src/engine/orders';
 import { renderCatalogue } from '../../src/ui/catalogue';
@@ -164,9 +166,14 @@ describe('selling a machine', () => {
       ),
     };
     expect(canSell(broken, saw.id).reason).toBe('It is broken. Fix it first');
-    // A hand edgebander lives in a tool cabinet, and a bench is a fitting.
+    // A hand edgebander lives in a tool cabinet, and is not sold off the hall.
     expect(canSell(state, bander.id).reason).toBe('It lives in a tool cabinet');
-    expect(canSell(state, bench.id).reason).toBe('Nobody buys second hand fittings');
+    // The bench is sold like any other thing standing on the floor (CLAUDE.md T19 2.8).
+    expect(canSell(state, bench.id).ok).toBe(true);
+    // The office furniture is what "fittings" means now, and it is still refused.
+    const desk = state.equipment.find((item) => item.specId === 'desk');
+    if (!desk) throw new Error('no desk');
+    expect(canSell(state, desk.id).reason).toBe('Nobody buys second hand fittings');
     // The tile says the reason rather than offering a button the engine would refuse.
     const page = renderCatalogue(busy, '', 'owned', null, 'all');
     expect(page).toContain('Cannot sell it: Somebody is standing at it');
@@ -181,5 +188,68 @@ describe('selling a machine', () => {
     // The catalogue says so, and nobody can take it.
     expect(renderCatalogue(state, '', 'owned', null, 'all')).toContain('does no more work');
     expect(state.equipment.find((item) => item.id === saw.id)?.takenBy).toBeNull();
+  });
+});
+
+// The bench can be sold (PIOTR, 17.09; CLAUDE.md T19 2.8): the workshop buys and sells it like
+// any other thing that stands on its floor, at the catalogue's own resale rule, and one somebody
+// is working at cannot go until he has let go of it.
+describe('selling the bench (CLAUDE.md T19 2.8)', () => {
+  function withBench(): { state: GameState; benchId: string } {
+    const state = fillRack(buyStartingKit(newGame({ difficulty: 'veryEasy' })));
+    state.enquiries = [];
+    const bench = state.equipment.find((item) => item.specId === 'workbench');
+    if (!bench) throw new Error('no bench');
+    return { state, benchId: bench.id };
+  }
+
+  it('fetches the catalogue s own resale figure, and no rule of its own', () => {
+    const { state, benchId } = withBench();
+    const bench = state.equipment.find((item) => item.id === benchId);
+    if (!bench) throw new Error('no bench');
+    expect(canSell(state, benchId).ok).toBe(true);
+    const fraction = bench.variantId === 'used' ? SALE_FRACTION_USED : SALE_FRACTION;
+    expect(salePriceFor(bench)).toBe(Math.round(bench.purchasePrice * fraction));
+    // And the Owned tab draws the button that takes the money, on the bench's own tile.
+    const page = renderCatalogue(state, '', 'owned', null, 'all');
+    const holder = document.createElement('div');
+    holder.innerHTML = page;
+    const tile = holder.querySelector(`[data-owned="${benchId}"]`);
+    expect(tile?.querySelector('[data-do="sellMachine"]')).not.toBeNull();
+  });
+
+  it('refuses one somebody is working at, with the reason on the tile', () => {
+    const { state, benchId } = withBench();
+    const busy: GameState = {
+      ...state,
+      equipment: state.equipment.map((item) =>
+        item.id === benchId ? { ...item, takenBy: 'owner' } : item,
+      ),
+    };
+    expect(canSell(busy, benchId).ok).toBe(false);
+    expect(canSell(busy, benchId).reason).toBe('Somebody is standing at it');
+    const holder = document.createElement('div');
+    holder.innerHTML = renderCatalogue(busy, '', 'owned', null, 'all');
+    const tile = holder.querySelector(`[data-owned="${benchId}"]`);
+    expect(tile?.textContent).toContain('Cannot sell it: Somebody is standing at it');
+    expect(tile?.querySelector('[data-do="sellMachine"]')).toBeNull();
+  });
+
+  it('lets it go once the day has ended and nobody is standing at it any more', () => {
+    const { state, benchId } = withBench();
+    // A man holds his bench from the first minute of a job to the last; he lets go of it when he
+    // is not at a job any more, which is what the end of the day does (CLAUDE.md T7 3.1).
+    const bench = state.equipment.find((item) => item.id === benchId);
+    if (!bench) throw new Error('no bench');
+    bench.takenBy = 'owner';
+    expect(canSell(state, benchId).ok).toBe(false);
+    releaseMachinesExcept(state, []);
+    expect(canSell(state, benchId).ok).toBe(true);
+    const sold = act(state, { type: 'SELL_MACHINE', equipmentId: benchId });
+    expect(sold.equipment.find((item) => item.id === benchId)?.soldOnDay).toBe(
+      nextWorkingDay(sold.clock.day),
+    );
+    // Sold is sold: nobody is put on it again while it stands there waiting for the van.
+    expect(freeBenches(sold)).toBe(0);
   });
 });

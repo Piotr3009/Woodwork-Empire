@@ -21,7 +21,7 @@ import {
   WORKER_RATES,
 } from '../../src/engine/constants';
 import { dustAtLeast } from '../../src/engine/machines';
-import { assignWorkerTask, createTask } from '../../src/engine/tasks';
+import { assignWorkerTask, cleanerAtWork, createTask } from '../../src/engine/tasks';
 import { renderHall, stationCell } from '../../src/render/hall';
 import type { GameState, TaskInstance, Worker } from '../../src/engine/index';
 import {
@@ -349,5 +349,47 @@ describe('the labourer does the labourer s work (CLAUDE.md T17 2.3)', () => {
     const byHand = act(state, { type: 'START_CLEANING' });
     const cleaning = byHand.tasks.find((task) => task.kind === 'cleaning' && !task.done);
     expect(cleaning?.doneBy).toBe('owner');
+  });
+
+  it('leaves a hall with a helper on the books clean by the end of the day, unasked', () => {
+    // The whole of CLAUDE.md T19 2.7 in one day: the hall turns dirty, nobody presses anything,
+    // and the labourer has it clean again before the men go home.
+    const state = withHelper();
+    const helper = state.workers.find((worker) => worker.role === 'helper');
+    if (helper === undefined) throw new Error('no helper');
+    state.dust = (DUST_BANDS[1]?.max ?? 70) + 1;
+    expect(dustAtLeast(state.dust, HELPER_CLEAN_DUST_BAND)).toBe(true);
+    const evening = nextDay(state);
+    // Nothing of the player's went into it: he was never asked, and the owner spent no minute.
+    expect(evening.dust).toBeLessThan(DUST_BANDS[0]?.max ?? 40);
+    const done = evening.tasks.find((task) => task.kind === 'cleaning' && task.done);
+    expect(done?.doneBy).toBe(helper.id);
+    expect(evening.owner.dayLog.some((entry) => entry.category === 'fixing')).toBe(false);
+  });
+
+  it('raises one cleaning for one dirtying, and none at all without a helper', () => {
+    // Without a helper nothing changes: the hall says it is dirty and the button is the way out.
+    const alone = quietHall();
+    alone.dust = (DUST_BANDS[1]?.max ?? 70) + 1;
+    const later = runClock(alone, 60);
+    expect(later.tasks.some((task) => task.kind === 'cleaning')).toBe(false);
+    expect(cleanerAtWork(later)).toBeNull();
+    // With one, exactly one is raised however long the hall stands dirty: an open cleaning is the
+    // once-per-dirtying flag, and finishing it puts the dust back to nought.
+    const withHim = withHelper();
+    withHim.dust = (DUST_BANDS[1]?.max ?? 70) + 1;
+    const swept = runClock(withHim, 30);
+    expect(swept.tasks.filter((task) => task.kind === 'cleaning')).toHaveLength(1);
+    const man = swept.workers.find((worker) => worker.role === 'helper');
+    expect(cleanerAtWork(swept)?.id).toBe(man?.id);
+  });
+
+  it('names the man on the chip only while he actually has it in hand', () => {
+    const state = withHelper();
+    expect(cleanerAtWork(state)).toBeNull();
+    // The owner's own override is his: the chip keeps its button and names nobody.
+    const byHand = act(state, { type: 'START_CLEANING' });
+    expect(byHand.tasks.find((task) => task.kind === 'cleaning')?.doneBy).toBe('owner');
+    expect(cleanerAtWork(byHand)).toBeNull();
   });
 });

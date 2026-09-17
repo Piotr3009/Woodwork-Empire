@@ -198,3 +198,39 @@ The day shift still does not run him: `game.ts` carries a hand written second co
 list and the labour arithmetic, and it is frozen. The three lines are NOTES-B2.md 6, and one of
 them (`possibleSeats`) is a silent wrong if it is applied without the others, so they are named
 together. The engine's own path, which the night shift and every engine test drive, is right.
+
+### T19-B2c The labourer cleans, and the bench can be sold (2.7, 2.8)
+
+- **2.7.** The brief's premise is out of date: the engine half of T17 2.3 did land and works.
+  `runHelperClean` raises the cleaning task itself the moment the hall's dust passes
+  `HELPER_CLEAN_DUST_BAND`, which is the band the Clean up chip appears for, and the helper takes
+  it at his next free minute. What was missing is the chip: the hall still read "The hall is
+  dirty, somebody will get hurt in this" with a Clean up button on it while the labourer was
+  already sweeping, so the player was still being asked. `cleanerAtWork(state)` in `tasks.ts` is
+  the one selector that says who is sweeping this minute; the sentence and the dropped button are
+  `render/hall.ts` and `src/ui/app.ts`, neither of them B2's, and both are written out in
+  NOTES-B2.md 7. **"Once per dirtying" needed no new field:** an open cleaning task IS the flag,
+  because `ensureTask` raises one and only one while the dust is up and finishing it puts the dust
+  back to nought, so the band is clean again until the hall dirties afresh. The tests assert the
+  brief's two claims: a hall that turns dirty with a helper on the books is clean again by the end
+  of the day with no action from the player, and without a helper no cleaning task is created at
+  all.
+- **2.8.** `isSellableFamily` admits the bench, which is the whole of it: the rest of the sell path
+  was already family blind, so the Owned tab and the bench's own card draw Sell at the catalogue's
+  own resale rule (`SALE_FRACTION`, or `SALE_FRACTION_USED` for one bought second hand) and
+  `canSell` refuses a bench somebody is standing at with "Somebody is standing at it", because a
+  man holds his bench from the first minute of a job to the last and lets go of it when the day
+  ends. No new constant, and no second code path.
+
+Two judgement calls. The refusal is drawn the way every other family's has been drawn since Turn
+8, as `Cannot sell it: <reason>` in place of the button, rather than as a greyed button: it is one
+code path, it is the wording the player already knows, and a disabled button is the one thing
+`lockedButton` is reserved for. And the hall's own click on a bench still does nothing, because
+the category gate that opens a machine's card lives in the frozen `src/ui/app.ts`; the three line
+change is NOTES-B2.md 8, and until it lands the Sell is reached from the Owned tab.
+
+One cross section flag for phase C. `src/engine/warnings.ts` still reads `has(state, 'workbench')`
+as "the hall has been set up", so a workshop that sells its last bench would flip the first steps
+line of T18 2.7 back on. T19 2.13 (`state.hallSetUp`, B3's) removes that read. If 2.13 lands there
+is nothing to do; if it does not, this is a blocker. `warnings.ts` is not B2's file and was not
+touched.
