@@ -111,3 +111,20 @@ their reason in the test:
   working day the shift was on whether or not he had work, is untouched and still passes.
 
 `npm run check` exit 0: 168 files, 1,638 tests.
+
+### T19-B3a Reputation is a total, and the board says so (2.9)
+
+- The Reputation sheet's headline is the total and nothing else: the label over the figure was
+  `this week` and is now `the total to date` [TUNE], the figure is still `effectiveReputation`, and
+  the heading with the figure reads the same `Reputation 40` the office wall prints off
+  `companyTotals`, asserted against it so the two can never drift. The `Start of the week, carried
+  over` row is gone, the list's head is `What moved it this week`, and the weeks before this one
+  keep their `Week N` labels under it: the brief takes away the weekly reading, not the history
+  Turn 15 built the sheet around.
+- The arithmetic at the bottom is the week's own pluses and minuses, then the week's net in its own
+  span (`−5 this week`, `+0 this week`) beside the total, which holds the whole `Reputation 40`.
+  The net is never in the total's place and the total never carries a week's wording, which was the
+  whole of Piotr's complaint. The rows no longer add up to the figure at the top and are not meant
+  to: the log is trimmed at `REPUTATION_LOG_MAX`, so no honest sum of the visible rows could reach
+  it. `tests/ui/companyBoard.test.ts` carries five cases, including a bad week that leaves the
+  total standing. `npm run check` exit 0: 168 files, 1,639 tests.
