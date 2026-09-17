@@ -151,3 +151,31 @@ their reason in the test:
   was edited anyway, because both callers of `taskStartAction` are B3's and writing the button
   anywhere else would have made two code paths for one button. `npm run check` exit 0: 168 files,
   1,644 tests.
+
+### T19-B3c Sound: the Settings side, the table's cadences and the fake context test (2.10)
+
+- **Settings.** Two rows in the shape of the tips row above them: a mute (`On` / `Off`, one chip
+  lit, `data-do="setSound"`) and a volume (`Quieter`, the figure, `Louder`, `data-do="setVolume"`,
+  each step carrying the volume it would set). No slider: every control in this game is one click,
+  the stylesheet has no rule for a range input anywhere, the page is written again every frame and
+  a thumb held on a thumbnail does not enjoy that, and a stepper can print the volume itself
+  (`70%`) instead of the nearest of a handful of named steps, which `SOUND_VOLUME_DEFAULT` 0.7 is
+  not. `VOLUME_STEP` 0.1 [TUNE] lives in `settings.ts` because `constants.ts` is frozen; the end
+  of the travel is the one allowed disabled button with its reason on it, so neither step is ever
+  a click that does nothing. `src/ui/app.ts` is frozen and has no route for either control: the
+  two cases are written out in `NOTES-B3.md` and the tests assert the markup, not the click.
+- **The engine, read right through, and three things put right.** The hammer and the drill now
+  read `HAMMER_EVERY_SECONDS` 3 and `DRILL_EVERY_SECONDS` 4 through a new optional `gapMs` on
+  `SoundSpec`; both were dead exports and the brief asks for knocks every few seconds, not every
+  second. A finished one shot now lets go of its own nodes through `onended`, so an hour of
+  knocking no longer leaves an hour of finished gains hanging off the master. And a mute now takes
+  the running loops down as well as putting the master to nought: it used to leave them in the
+  engine's list, so the list said the saw was going while nothing could be heard, and a loop that
+  could not start while the mute was on was left out when it came off. `tests/ui/sound.test.ts`
+  (14 cases, a hand rolled `AudioLike` fake through `setAudioContextFactory`) proves the context
+  is never so much as built before `unlockSound`, that the volume reaches the master gain, that
+  mute silences everything and unmuting brings it back, that `setLoops` runs exactly the hall's
+  loops and stops the ones that drop out, that the saw is heard only while somebody is at it, that
+  a one shot offered every frame comes out twice in four seconds, and that with no recordings in
+  `public/sounds/` every sound in the table falls back to its stand in and none of them throws.
+  `npm run check` exit 0.

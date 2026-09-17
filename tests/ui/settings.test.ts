@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
-// The Settings modal, off the gear on the top bar: tips on and off and nothing else tonight
-// (PIOTR; CLAUDE.md T13 3.22). Off, and every first use bubble in the game goes with it.
+// The Settings modal, off the gear on the top bar: the tips, and from Turn 19 the sound as well
+// (PIOTR; CLAUDE.md T13 3.22, T19 2.10). Tips off, and every first use bubble in the game goes
+// with it; sound off, and the hall is silent with the volume left where it was.
 
 import { beforeAll, describe, expect, it } from 'vitest';
-import { TIPS } from '../../src/engine/constants';
+import { SOUND_VOLUME_DEFAULT, TIPS } from '../../src/engine/constants';
 import { currentState, mount } from '../../src/ui/app';
 import { renderSettings } from '../../src/ui/settings';
 import { renderTip } from '../../src/ui/tips';
@@ -35,7 +36,7 @@ beforeAll(() => {
 });
 
 describe('the settings modal', () => {
-  it('carries the one control, with the lit chip following the setting', () => {
+  it('carries the tips, with the lit chip following the setting', () => {
     const state = newGame();
     const on = parse(renderSettings(state));
     expect(on.querySelector('[data-setting="tips"]')).not.toBeNull();
@@ -45,8 +46,56 @@ describe('the settings modal', () => {
     const off = parse(renderSettings(state));
     expect(off.querySelector('[data-do="setTips"][data-on="1"]')?.className).toBe('chip');
     expect(off.querySelector('[data-do="setTips"][data-on="0"]')?.className).toBe('chip is-on');
-    // Tips, and nothing else tonight.
-    expect(off.querySelectorAll('[data-do]')).toHaveLength(2);
+    // The tips and the sound, and nothing else: two chips, two chips and two steps.
+    expect(off.querySelectorAll('[data-do]')).toHaveLength(6);
+  });
+
+  it('carries the sound: a mute in the tips row\'s own shape, and a volume that steps', () => {
+    // Turn 19 puts the sound in Settings and nowhere else (PIOTR; CLAUDE.md T19 2.10).
+    const state = newGame();
+    expect(state.settings.sound).toEqual({ volume: SOUND_VOLUME_DEFAULT, muted: false });
+    const loud = parse(renderSettings(state));
+    expect(loud.querySelector('[data-setting="sound"]')).not.toBeNull();
+    expect(loud.querySelector('[data-do="setSound"][data-muted="0"]')?.className).toBe('chip is-on');
+    expect(loud.querySelector('[data-do="setSound"][data-muted="1"]')?.className).toBe('chip');
+    // The figure is the setting itself, not the nearest of a handful of named steps.
+    expect(loud.querySelector('[data-setting="volume"] [data-figure="volume"]')?.textContent).toBe(
+      `${Math.round(SOUND_VOLUME_DEFAULT * 100)}%`,
+    );
+    const steps = Array.from(loud.querySelectorAll('[data-do="setVolume"]'));
+    expect(steps.map((step) => step.textContent)).toEqual(['Quieter', 'Louder']);
+    expect(steps.map((step) => step.getAttribute('data-volume'))).toEqual(['0.6', '0.8']);
+
+    state.settings.sound = { volume: 0.5, muted: true };
+    const quiet = parse(renderSettings(state));
+    expect(quiet.querySelector('[data-do="setSound"][data-muted="0"]')?.className).toBe('chip');
+    expect(quiet.querySelector('[data-do="setSound"][data-muted="1"]')?.className).toBe('chip is-on');
+    expect(quiet.querySelector('[data-figure="volume"]')?.textContent).toBe('50%');
+    // The volume is not lost when it is muted: it is where the player left it.
+    expect(
+      Array.from(quiet.querySelectorAll('[data-do="setVolume"]')).map((step) =>
+        step.getAttribute('data-volume'),
+      ),
+    ).toEqual(['0.4', '0.6']);
+  });
+
+  it('greys the step that has nowhere to go, rather than offering a click that does nothing', () => {
+    const state = newGame();
+    state.settings.sound = { volume: 0, muted: false };
+    const bottom = parse(renderSettings(state));
+    expect(bottom.querySelectorAll('[data-do="setVolume"]')).toHaveLength(1);
+    expect(bottom.querySelector('[data-do="setVolume"]')?.textContent).toBe('Louder');
+    const off = bottom.querySelector('[data-setting="volume"] button[disabled]');
+    expect(off?.textContent).toBe('Quieter');
+    expect(off?.getAttribute('title')).toBe('It is as quiet as it goes');
+    state.settings.sound = { volume: 1, muted: false };
+    const top = parse(renderSettings(state));
+    expect(top.querySelectorAll('[data-do="setVolume"]')).toHaveLength(1);
+    expect(top.querySelector('[data-do="setVolume"]')?.textContent).toBe('Quieter');
+    expect(top.querySelector('[data-setting="volume"] button[disabled]')?.textContent).toBe(
+      'Louder',
+    );
+    expect(top.querySelector('[data-figure="volume"]')?.textContent).toBe('100%');
   });
 
   it('opens from the gear on the top bar, as a sheet of paper', () => {

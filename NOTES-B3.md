@@ -74,6 +74,13 @@ case is one line. Directly after `case 'setSound':`, add:
 pushes `state.settings.sound` into the engine every frame, so nothing else is needed for the
 change to be heard.
 
+## 4b. `src/ui/styles.css`: `.task-queue-next` (T19-B3b, CLAUDE.md T19 2.12)
+
+Phase A left it empty and the markup now uses it, on the `Add as next` button beside the reason on
+a refused row. It reads correctly with the rule left empty, because the button is a plain `.btn`;
+if phase C wants it set apart from the reason beside it, `.task-queue-next { margin-left: 4px; }`
+is all it needs. Otherwise leave it empty, which by Turn 13's rule means nobody needed it.
+
 ## 5. `src/ui/app.ts`: the laptop's Add as next (T19-B3b, CLAUDE.md T19 2.12)
 
 There is no route for `queueTaskNext` today, although `QUEUE_TASK_NEXT` is already handled in
@@ -127,6 +134,10 @@ edited `modal.ts`, the two changes should merge cleanly, but this is where to lo
   Every control in this game is one click, the stylesheet has no rule for a range anywhere, the
   page is written again every frame, and a stepper can print the volume itself instead of the
   nearest of a handful of named steps (`SOUND_VOLUME_DEFAULT` 0.7 is not a quarter of anything).
+- **2.10, what a mute does:** it takes the running loops down as well as putting the master gain
+  to nought, so the engine's own list never says the saw is going while nothing can be heard. The
+  frame says what the hall sounds like again at the next `setLoops`, which is within a frame of
+  the mute coming off.
 - **2.10, the one shot gaps:** the hammer and the drill now read `HAMMER_EVERY_SECONDS` 3 and
   `DRILL_EVERY_SECONDS` 4 (phase A's constants, which were dead until now) through a new optional
   `gapMs` on `SoundSpec`; every other one shot keeps `SOUND_ONE_SHOT_GAP_MS` 1,000.
