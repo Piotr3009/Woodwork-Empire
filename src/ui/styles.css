@@ -2574,13 +2574,14 @@ input.num {
   opacity: 0.85;
 }
 
-/* Two sheets side by side, each pinned once at the top centre, straight: no rule of the board
-   family tilts a .sheet (CLAUDE.md T15 2.1, 2.4) [TUNE: the gap]. */
+/* Three sheets side by side, each pinned once at the top centre, straight: no rule of the board
+   family tilts a .sheet (CLAUDE.md T15 2.1, 2.4; the Machines sheet is T17 2.24)
+   [TUNE: the gap]. */
 .sheets {
   display: grid;
   flex: 1 1 auto;
   gap: 26px;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   margin-top: 16px;
   min-height: 0;
 }
@@ -3427,7 +3428,8 @@ input.num {
   display: flex;
   align-items: baseline;
   gap: 12px;
-  margin: 0 0 10px;
+  justify-content: center;
+  margin: 6px 0 0;
 }
 
 .rate-big {
@@ -3442,9 +3444,22 @@ input.num {
   font-size: var(--fs-small);
 }
 
-/* 2.24 The Machines column of the Company board, right of Output. */
-.company-machines .row-figure {
+/* On the felt the board's own ink is cream, so the figure is lit like the company name and the
+   small figures beside it read like the week line under it. */
+.felt .rate-big {
+  text-shadow: 0 1px 2px #000;
+}
+
+.felt .rate-side {
+  color: inherit;
+  opacity: 0.85;
+}
+
+/* 2.24 The Machines column of the Company board, right of Output: a ledger sheet like the two
+   beside it, with the sentence of the total on the last line. */
+.company-machines .ledger-points {
   text-align: right;
+  white-space: nowrap;
 }
 
 /* 2.25 Total efficiency, the section after the money in the month end. */

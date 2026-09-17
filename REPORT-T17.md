@@ -210,3 +210,18 @@ the task queue of section 5 names them.
   Done: `tests/engine/rate.test.ts`, which reads the brief's own four: 40 an hour for the owner
   alone at full work for a week, 24 with two of the five days idle, 26 with a poor joiner half
   idle, and 70 with an express job on the bench.
+- **T17-B3b The Machines column, Total efficiency, and the rate where it belongs (2.24, 2.25,
+  2.26).** A third sheet is pinned right of Output: one row per machine standing in the hall, what
+  its class does to the stage it does with the gate's 2% in it, the hours somebody stood at it
+  this week and the minutes those hours saved, with "Machines saved us 6 hours this week" on the
+  last line. A machine that cannot run on its air, whose compressor is short, or that has no pipe
+  to the extraction says so on its row and its figure is written in the minus. The machines carry
+  their own week and month clocks now, filled where the life clock is filled. Above the three
+  sheets the workshop rate stands in the hand font, with last week and per man beside it, and the
+  same function opens the month end, over the month, followed by Total efficiency: the machines,
+  the people, the hall and the waiting of that month, and the one line "Total efficiency N% = real
+  work over paid hours".
+  Done: the Machines column tests in `tests/engine/companyBoard.test.ts`, the three sheet, rate
+  and Machines sheet tests in `tests/ui/companyBoard.test.ts`, and the month end tests in
+  `tests/ui/monthEnd.test.ts`, one of which reads the board and the folder over the same days and
+  gets the same pound.

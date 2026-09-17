@@ -150,6 +150,7 @@ import {
   gateCheck,
   outputFactorOf,
   specOf,
+  startMachineMeters,
   variantOf,
 } from './machines';
 import {
@@ -517,6 +518,9 @@ function startDay(state: GameState): void {
   // The month's meters first, so the day that starts a month is counted into the new one, and
   // then the days off of this morning (CLAUDE.md T17 2.9).
   startMonthMeters(state);
+  // And the machines' own week and month, which the Machines column and the month end read
+  // (CLAUDE.md T17 2.24, 2.25).
+  startMachineMeters(state);
   runOwnerDayStart(state);
   runStaffDayStart(state);
   countMonthDaysOff(state);

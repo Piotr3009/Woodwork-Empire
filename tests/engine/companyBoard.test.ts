@@ -8,17 +8,26 @@ import {
   EXTRACTOR_BROKEN_OUTPUT_FACTOR,
   GATE_CROWD_FACTOR,
   RATING_ON_TIME,
+  UNDER_EXTRACTION_OUTPUT_PENALTY,
 } from '../../src/engine/constants';
-import { hallProductivityFactor, outputBreakdown } from '../../src/engine/machines';
+import { monthOfDay } from '../../src/engine/clock';
+import { hallProductivityFactor, machineSavings, outputBreakdown } from '../../src/engine/machines';
 import { applyRating, changeReputation } from '../../src/engine/reputation';
+import { tick } from '../../src/engine/index';
 import type { GameState } from '../../src/engine/index';
 import {
   acceptNow,
+  act,
   buyStartingKit,
   clearEvents,
+  connectAll,
   fillRack,
+  firstJob,
   newGame,
   placeEnquiry,
+  runDays,
+  runToDay,
+  withExtraction,
 } from '../helpers';
 
 function hall(): GameState {
@@ -143,5 +152,80 @@ describe('the company output breakdown', () => {
     expect(crowded.lines.some((line) => line.label === 'No room at the gate')).toBe(true);
     expect(crowded.total).toBeLessThan(before);
     expect(crowded.total).toBe(Number((before * GATE_CROWD_FACTOR).toFixed(10)));
+  });
+});
+
+describe('the Machines column (CLAUDE.md T17 2.24)', () => {
+  /** The day 1 kit with the standard saw, one big job and the owner standing at it. */
+  function atTheSaw(): GameState {
+    let state = connectAll(
+      withExtraction(fillRack(buyStartingKit(newGame({ difficulty: 'veryEasy' }), { sawVariant: 'standard' }), 80)),
+    );
+    state.enquiries = [];
+    const enquiry = placeEnquiry(state, { price: 40000, deadlineDays: 90 });
+    state = acceptNow(state, enquiry.id, false);
+    firstJob(state).stage = 'ready';
+    return act(state, { type: 'WORK_HERE', jobId: null });
+  }
+
+  it('gives a row to every machine in the hall, with its class, its effect and the hours it ran', () => {
+    const state = tick(atTheSaw(), 60);
+    const savings = machineSavings(state, 'week');
+    const saw = savings.rows.find((row) => row.name === 'Standard table saw');
+    expect(saw).toBeDefined();
+    // An hour at the standard saw: its class is worth 5% and an hour of it saves three minutes.
+    expect(saw?.hours).toBe(1);
+    expect(saw?.effect).toBeCloseTo(0.05, 4);
+    expect(saw?.minutesSaved).toBe(3);
+    expect(saw?.gate).toBe(false);
+    expect(saw?.minus).toBe(0);
+    // Nobody stood at the compressor, so it ran no hours and saved nothing; the edgebander and
+    // the drill live in a cabinet and are not machines standing in the hall.
+    const other = savings.rows.find((row) => row.name === 'Used compressor');
+    expect(other?.hours).toBe(0);
+    expect(other?.minutesSaved).toBe(0);
+    expect(savings.rows.map((row) => row.name)).toEqual(['Standard table saw', 'Used compressor']);
+    // And the total is the rows added up.
+    expect(savings.minutesSaved).toBe(savings.rows.reduce((sum, row) => sum + row.minutesSaved, 0));
+    expect(savings.hoursSaved).toBe(Math.round((savings.minutesSaved / 60) * 10) / 10);
+  });
+
+  it('puts the gate’s 2% in the row it is fitted to', () => {
+    const state = tick(atTheSaw(), 60);
+    const saw = state.equipment.find((item) => item.specId === 'tableSaw');
+    if (!saw) throw new Error('no saw');
+    state.gates.push(saw.id);
+    const row = machineSavings(state, 'week').rows.find((entry) => entry.id === saw.id);
+    expect(row?.gate).toBe(true);
+    expect(row?.effect).toBeCloseTo(1.05 * 1.02 - 1, 4);
+  });
+
+  it('shows the minus of a machine with no pipe to the extraction', () => {
+    const state = tick(atTheSaw(), 60);
+    state.pipes = [];
+    const saw = machineSavings(state, 'week').rows.find((row) => row.name === 'Standard table saw');
+    expect(saw?.minus).toBe(-UNDER_EXTRACTION_OUTPUT_PENALTY);
+    expect(saw?.minusWhy).toBe('no pipe to the extraction');
+  });
+
+  it('starts the week’s hours again on a Monday and the month’s on the second working day', () => {
+    // A day of work, then the days that follow it: the machine's own clocks are the ones the
+    // column and the month end read, and the life clock never moves back.
+    const friday = runToDay(atTheSaw(), 5).state;
+    const worked = runDays(friday, 1);
+    const saw = (state: GameState) => {
+      const item = state.equipment.find((entry) => entry.specId === 'tableSaw');
+      if (!item) throw new Error('no saw');
+      return item;
+    };
+    expect(saw(worked.state).hoursThisWeek).toBe(0);
+    expect(saw(worked.state).hoursUsed).toBeGreaterThan(0);
+    // The month: the first working day of month 2 still carries month 1, so the month end has
+    // the month it reports on; the day after that starts the new one.
+    const openingMonth2 = runToDay(atTheSaw(), 31).state;
+    expect(monthOfDay(openingMonth2.clock.day)).toBe(2);
+    expect(saw(openingMonth2).hoursThisMonth).toBeGreaterThan(0);
+    const secondDay = runToDay(openingMonth2, 32).state;
+    expect(saw(secondDay).hoursThisMonth).toBe(0);
   });
 });

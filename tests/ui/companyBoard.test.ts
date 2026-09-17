@@ -9,6 +9,10 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { changeReputation, companyTotals, effectiveReputation, formatReputation } from '../../src/engine/reputation';
 import { outputBreakdown } from '../../src/engine/machines';
 import { COMPANY_BOARD_BOX, OFFICE_TEXTS } from '../../src/render/office';
+import { machineSavings } from '../../src/engine/machines';
+import { plural } from '../../src/engine/text';
+import { weekRate } from '../../src/engine/rate';
+import { daySummaryOf } from '../../src/engine/index';
 import { renderCompany, weeksOf } from '../../src/ui/company';
 import { currentState, mount, render } from '../../src/ui/app';
 import type { GameState } from '../../src/engine/index';
@@ -164,17 +168,21 @@ describe('the cross', () => {
   });
 });
 
-describe('the two sheets', () => {
-  it('are exactly two, straight, and there is no third block and no paragraph of explanation', () => {
+describe('the three sheets', () => {
+  it('are exactly three, straight, and there is no fourth block and no paragraph of explanation', () => {
+    // Turn 17 pins the Machines sheet right of Output (CLAUDE.md T17 2.24); the two of Turn 15
+    // are unchanged beside it, and the grid has the third track for it.
     const page = parse(renderCompany(traded()));
     const felt = page.querySelector('.felt');
     const sheets = felt?.querySelectorAll('.sheets > *') ?? [];
-    expect(sheets).toHaveLength(2);
-    expect(texts(sheets).map((text) => text.startsWith('Reputation'))).toEqual([true, false]);
+    expect(sheets).toHaveLength(3);
+    expect(texts(sheets).map((text) => text.startsWith('Reputation'))).toEqual([true, false, false]);
     expect(Array.from(sheets).map((sheet) => sheet.getAttribute('data-sheet'))).toEqual([
       'reputation',
       'output',
+      'machines',
     ]);
+    expect(ruleBody('.sheets')).toContain('grid-template-columns: repeat(3, 1fr);');
     expect(felt?.querySelectorAll('.col, .board-column, .board-columns, .hint, p:not(.empty)')).toHaveLength(0);
     expect(page.textContent).not.toContain('never counted twice');
     expect(page.textContent).not.toContain('Reputation started at');
@@ -393,5 +401,86 @@ describe('the Output sheet', () => {
     expect(outputPart).toContain('breakdown.plus');
     expect(outputPart).toContain('breakdown.minus');
     expect(outputPart).toContain('breakdown.total');
+  });
+});
+
+describe('the workshop rate at the top (CLAUDE.md T17 2.26)', () => {
+  /** A company with two closed weeks behind it: five days at 320 a day, and five before them at
+   *  half of that, each day paying for the owner's eight hours. */
+  function weeks(): GameState {
+    const state = traded();
+    const blank = daySummaryOf(newGame());
+    state.days = [1, 2, 3, 4, 5, 8, 9, 10, 11, 12].map((day, index) => ({
+      ...blank,
+      day,
+      labourValue: index < 5 ? 160 : 320,
+      paidHours: 8,
+    }));
+    state.clock.day = 15;
+    return state;
+  }
+
+  it('prints the figure big in the hand font, with last week and per man small beside it', () => {
+    const state = weeks();
+    const page = parse(renderCompany(state));
+    const figure = page.querySelector('.felt .rate-figure');
+    expect(figure).not.toBeNull();
+    const week = weekRate(state);
+    expect(week.rate).toBe(40);
+    expect(page.querySelector('.rate-big')?.textContent).toBe('Workshop earns £40 an hour');
+    const side = page.querySelector('.rate-side')?.textContent ?? '';
+    expect(side).toContain('last week £20');
+    expect(side).toContain('per man £40');
+    // The hand font, and the figure on the felt above the sheets rather than on a sheet.
+    expect(ruleBody('.rate-big')).toContain('font-family: var(--font-title);');
+    expect(page.querySelector('.sheets .rate-figure')).toBeNull();
+  });
+
+  it('says so plainly before a day has closed', () => {
+    const fresh = fillRack(buyStartingKit(newGame({ difficulty: 'veryEasy' })), 0);
+    const page = parse(renderCompany(fresh));
+    expect(page.querySelector('.rate-big')?.textContent).toBe('Workshop earns nothing an hour yet');
+    expect(page.querySelector('.rate-side')).toBeNull();
+  });
+});
+
+describe('the Machines sheet (CLAUDE.md T17 2.24)', () => {
+  function withMachines(): GameState {
+    const state = traded();
+    const saw = state.equipment.find((item) => item.specId === 'tableSaw');
+    if (saw) {
+      saw.hoursThisWeek = 10;
+      saw.variantId = 'standard';
+    }
+    return state;
+  }
+
+  it('gives a row to every machine in the hall with its class, its hours and what it saved', () => {
+    const state = withMachines();
+    const savings = machineSavings(state, 'week');
+    const sheet = parse(renderCompany(state)).querySelector('[data-sheet="machines"]');
+    expect(sheet?.querySelector('h3')?.textContent).toBe('Machines');
+    const rows = Array.from(sheet?.querySelectorAll('.ledger-row[data-machine]') ?? []);
+    expect(rows).toHaveLength(savings.rows.length);
+    const saw = rows.find((row) => row.textContent?.includes('Standard table saw'));
+    expect(saw?.querySelector('small')?.textContent).toBe('ran 10 h at +5%');
+    expect(saw?.querySelector('.ledger-points')?.textContent).toBe('+30 min');
+    expect(saw?.querySelector('.ledger-points')?.className).toBe('ledger-points good');
+    // The figure at the top and the sentence at the bottom are the engine's own totals.
+    expect(sheet?.querySelector('[data-figure="machines"]')?.textContent).toBe(`${savings.hoursSaved} h`);
+    expect(sheet?.querySelector('[data-sum="total"]')?.textContent).toBe(
+      `Machines saved us ${plural(Math.round(savings.hoursSaved), 'hour', 'hours')} this week`,
+    );
+  });
+
+  it('says what is wrong with a machine that is short of its extraction, in the minus', () => {
+    const state = withMachines();
+    state.pipes = [];
+    const sheet = parse(renderCompany(state)).querySelector('[data-sheet="machines"]');
+    const saw = Array.from(sheet?.querySelectorAll('.ledger-row[data-machine]') ?? []).find((row) =>
+      row.textContent?.includes('Standard table saw'),
+    );
+    expect(saw?.querySelector('small')?.textContent).toContain('no pipe to the extraction, −30%');
+    expect(saw?.querySelector('.ledger-points')?.className).toBe('ledger-points bad');
   });
 });

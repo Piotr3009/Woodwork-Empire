@@ -10,7 +10,9 @@
 // could have worked (possible 0) reads 100: nothing was lost, and the number erodes from there as
 // the first seat goes empty.
 
+import { monthOfDay } from './clock';
 import { EFFICIENCY_CAUSES } from './constants';
+import { monthRate } from './rate';
 import type { EfficiencyStats, GameState, LostMinuteCause } from './types';
 
 export interface EfficiencyLine {
@@ -81,4 +83,64 @@ export function topCause(efficiency: Efficiency): EfficiencyLine | null {
     if (top === null || line.minutes > top.minutes) top = line;
   }
   return top;
+}
+
+/** The month's own efficiency, for the Total efficiency section of the month end
+ *  (CLAUDE.md T17 2.25). The day's stats are on every closed day, and nothing added them up
+ *  before tonight: this is the fold, over the days of one month.
+ *
+ *  `percent` is the brief's own sum: the real work of the month over the hours it paid for,
+ *  which is not the day's efficiency (worked over the seats the day could have filled) and is
+ *  always the harsher of the two, because a day pays for eight hours whether it fills them or
+ *  not. The waiting lines are the day's own causes, added up. */
+export interface MonthEfficiency {
+  month: number;
+  days: number;
+  /** Hours of real work: the people minutes actually put into the work, in hours. */
+  workedHours: number;
+  /** Hours the month paid for, worked or not. */
+  paidHours: number;
+  /** Real work over hours paid, as a whole percentage. */
+  percent: number;
+  /** The labour those hours earned, express uplift and all. */
+  labour: number;
+  /** What the hall multiplied the work by, averaged over the days of the month. */
+  hallFactor: number;
+  /** Where the minutes the workshop could have worked went, by cause. */
+  waiting: EfficiencyLine[];
+  waitingMinutes: number;
+}
+
+export function monthEfficiency(state: GameState, month: number): MonthEfficiency {
+  const stats = emptyEfficiency();
+  let workMinutes = 0;
+  let hall = 0;
+  let days = 0;
+  for (const day of state.days) {
+    if (monthOfDay(day.day) !== month) continue;
+    days += 1;
+    workMinutes += day.workMinutes;
+    hall += day.hallFactor;
+    stats.possible += day.efficiency.possible;
+    stats.worked += day.efficiency.worked;
+    for (const cause of EFFICIENCY_CAUSES) {
+      stats.lost[cause.id] += day.efficiency.lost[cause.id];
+    }
+  }
+  const folded = efficiencyOf(stats);
+  const workedHours = Math.round((workMinutes / 60) * 10) / 10;
+  // The labour of the month and the hours it paid for come off the rate's own fold, so the
+  // section and the figure at the top of the report can never disagree (CLAUDE.md T17 2.26).
+  const rate = monthRate(state, month);
+  return {
+    month,
+    days,
+    workedHours,
+    paidHours: rate.paidHours,
+    percent: rate.paidHours <= 0 ? 0 : Math.round((workMinutes / 60 / rate.paidHours) * 100),
+    labour: rate.labour,
+    hallFactor: days === 0 ? 1 : Math.round((hall / days) * 100) / 100,
+    waiting: folded.lines,
+    waitingMinutes: folded.lost,
+  };
 }
