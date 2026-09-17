@@ -351,6 +351,14 @@ the task queue of section 5 names them.
   Done: 12 assertions on the re-scripted playthrough, 10 on (y) and (z), and the two `it.todo`
   lines of Turn 13 that recorded claims which did not hold are real tests now.
 
+- **T17-C3 The cross check.** Every line of section 7 is answered below with the test, the grep or
+  the figure that proves it. Four checks wanted a test that did not exist and now have one: no
+  station rests as a walk or a carry, the gate at 2,499 in the bank, both of the labourer's own
+  jobs of work in the helper month, and a started drawing surviving the same dusk the calls and the
+  emails die at.
+  Done: `tests/render/walkers.test.ts` (two new), `tests/engine/hiringGate.test.ts` (one new),
+  `tests/scenarios/thirtyDays.test.ts` and `tests/engine/theDesk.test.ts` (tightened).
+
 ### The Easy playthrough, and why it was re-scripted
 
 The C brief asked me to decide whether B2's and B3's split (the crew and the contract claims moved
@@ -423,3 +431,66 @@ or whether the Easy script should be re-scripted. I re-scripted it. The figures:
   code path for moving, which the house forbids and the brief does not ask for. What was wrong was
   the comment over `keepSetupHonest`, which claimed the machine was under his hand; it now says
   what happens. The button is offered only on what the engine would actually let him drag.
+
+## Cross check (section 7)
+
+**1. The rate.** The four engine readings are `tests/engine/rate.test.ts`, "the four readings of
+2.26", and they read what the brief writes: *reads 40 an hour for the owner alone at full work for
+a week* (exactly `OWNER_RATE_PER_HOUR`, 320 over 8), *reads 24 an hour when the shop stands two of
+the five days*, *is pulled under 40 by a poor joiner who is idle half the day* (26), and *is pushed
+over 40 by an express job* (70). The board and the month end print the same function's number:
+`tests/ui/monthEnd.test.ts`, "prints the same function's number as the Company board, over the same
+days", builds a workshop whose whole history is one working week, so the board's rolling five days
+and the month's days are the same days, and asserts `weekRate(week).rate === monthRate(week, 1).rate`
+and that both renderers print that pound. The played week of scenario (z) says it again on a week
+that went through the clock: the board reads £37.68 an hour and the month end reads £37.68.
+
+**2. Nobody walks on the spot.** The grep, and what it printed:
+
+    $ grep -rn "data-rest" src/render src/ui
+    src/render/walkers.ts:231:  const rest = (node.getAttribute('data-rest') ?? 'idle') as Animation;
+    src/render/hall.ts:1050:      `data-rest="${rest}" ${extra}>` +
+
+    $ grep -rnE "data-rest=\"(walk|carry)\"|return '(walk|carry)';" src/render
+    (nothing)
+
+There is one place a resting figure's animation is chosen, `animationForStation` in
+`src/render/characters.ts`, and it returns `bench`, `idle` or `phone` and nothing else; `walk` and
+`carry` are set in one place, `dress` in walkers.ts, and only while `walker.path.length > 0`, which
+is a man actually moving. The one other `'walk'` in the renderer is `playableAnimation`'s last
+fallback, which is frame 0 of the walk held still (`frozen: true`) for a role whose sheet has no
+idle at all: a figure standing, not a figure walking on the spot. Pinned now by
+`tests/render/walkers.test.ts`, "nobody walks on the spot": every station the game puts a man at
+rests at something that is not a walk and not a carry, and no figure drawn in a hall carries
+`data-rest="walk"` or `data-rest="carry"`.
+
+**3. The helper.** `tests/scenarios/thirtyDays.test.ts`, "a month with a helper, where the owner
+never unloads": a month played to day 31 on the `WITH_HELPER` script. Measured in it, 12 loads off
+the lorry and 19 sweeps of the hall, and every one of the 31 chores has `doneBy` the helper and
+never the owner. The owner's day meter carries no minutes for them: the `fixing` minutes across
+every day log of the month are exactly the minutes of the repairs and services he did himself, and
+nothing else. The van is never even put in front of him: no `deliveryArrived` question all month,
+where the same month without a helper is asked in the first three days.
+
+**4. The gate.** `tests/engine/hiringGate.test.ts`, "answers the brief's 2,500 a month joiner,
+which is between two real classes". The brief's 2,500 a month joiner does not exist in the game:
+**a poor joiner is 480 a week, which is £2,057.14 a month, and a normal one is 640 a week, which is
+£2,742.86** (a super joiner is 800 a week and £3,428.57). So 2,499 in the bank is the answer to
+both at once: the poor man is affordable and the normal one is refused, with the sentence
+**"Not enough in the bank: needs £2,743"**, on the hire card as well as out of the engine, because
+it is the one blockReason chain. The standing has to be there first: the bank is the last link,
+which is what the third test in that file measures.
+
+**5. Dusk.** `tests/engine/theDesk.test.ts`, "die at dusk, done or not, and carry nothing over": a
+drawing with minutes in it, the clock run to five and the day ended. After it, no `emails` task and
+no `clientCall` task is open at all, and the drawing is still there, not done, with minutes left and
+`doneBy` the owner. The morning after it is in his hands without being assigned again, which is the
+test above it, "is the same man's in the morning, and he carries on with it".
+
+**6. The canteen.** `tests/cloud/migrate.test.ts`, "moves every seat and locker off the hall floor
+and into the canteen": a real v24 save with a canteen seat at 7,9 and a locker at 13,9, both on the
+hall floor, lifted to version 15. After it both stand inside the canteen block, the first seat on
+`CANTEEN_SLOT_LAYOUT[0]`, the cell just inside the door, and a seat that was half way through a
+move is not a move any more. Nothing of the welfare kit is on a hall cell.
+
+**7. The look.** The ten pictures of T17-C4, below.

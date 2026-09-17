@@ -10,11 +10,16 @@ import {
   STATION_BENCH,
   STATION_GATE,
   STATION_IDLE,
+  STATION_NO_BENCH,
+  STATION_OFFICE,
+  STATION_PHONE,
   STATION_RACK,
   machineStation,
+  secondStation,
+  waitingStation,
 } from '../../src/engine/stations';
 import { createTask } from '../../src/engine/tasks';
-import { legCarries } from '../../src/render/characters';
+import { ANIMATIONS, animationForStation, legCarries } from '../../src/render/characters';
 import { walkPath } from '../../src/engine/walk';
 import { renderHall, stationCell } from '../../src/render/hall';
 import { centreOf } from '../../src/render/iso';
@@ -249,6 +254,45 @@ describe('the walker', () => {
     expect(stations).not.toContain(STATION_RACK);
     for (let index = 1; index < stations.length; index += 1) {
       expect(stations[index]).not.toBe(stations[index - 1]);
+    }
+  });
+});
+
+describe('nobody walks on the spot (CLAUDE.md T17 1, section 7)', () => {
+  it('rests every station at something that is not a walk and not a carry', () => {
+    // The one place a resting figure's animation is chosen, over every station the game puts a
+    // man at: the benches, the machines and their waiting cells, the bench's second place, the
+    // rack, the gate, the office, the phone and standing idle. An unload rests at the gate or at
+    // the rack, which are both on the list.
+    const stations = [
+      STATION_BENCH,
+      STATION_RACK,
+      STATION_GATE,
+      STATION_IDLE,
+      STATION_OFFICE,
+      STATION_PHONE,
+      STATION_NO_BENCH,
+      machineStation('tableSaw'),
+      waitingStation('tableSaw'),
+      secondStation('kit-bench-1'),
+    ];
+    for (const station of stations) {
+      const rest = animationForStation(station);
+      expect(rest, station).not.toBe('walk');
+      expect(rest, station).not.toBe('carry');
+      expect(ANIMATIONS, station).toContain(rest);
+    }
+  });
+
+  it('writes no walk and no carry onto a figure standing in the hall', () => {
+    const state = hall();
+    const root = page(state);
+    const figures = Array.from(root.querySelectorAll('[data-figure]'));
+    expect(figures.length).toBeGreaterThan(0);
+    for (const figure of figures) {
+      const rest = figure.getAttribute('data-rest');
+      expect(rest, figure.getAttribute('data-figure') ?? '').not.toBe('walk');
+      expect(rest, figure.getAttribute('data-figure') ?? '').not.toBe('carry');
     }
   });
 });

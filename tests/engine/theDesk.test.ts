@@ -83,13 +83,22 @@ describe('a task somebody started', () => {
 
 describe('calls and emails', () => {
   it('die at dusk, done or not, and carry nothing over', () => {
-    const state = toFive(withJob());
+    // A drawing he has put minutes into, so the same evening says both halves of it: the calls
+    // and the emails go, and what somebody started stays his (CLAUDE.md T17 2.14, 2.15).
+    let started = withJob();
+    const design = createTask(started, { kind: 'design', label: 'Wardrobe drawing', minutes: 600 });
+    started = clearEvents(runClock(act(started, { type: 'START_TASK', taskId: design.id }), 30));
+    const state = toFive(started);
     expect(state.tasks.some((task) => task.kind === 'emails' && !task.done)).toBe(true);
     const tomorrow = clearEvents(act(state, { type: 'END_DAY' }));
     expect(tomorrow.tasks.some((task) => task.kind === 'emails' && !task.done)).toBe(false);
     expect(tomorrow.tasks.some((task) => task.kind === 'clientCall' && !task.done)).toBe(false);
-    // A drawing with minutes left is still there, with the man who started it on it.
-    expect(tomorrow.tasks.some((task) => task.kind === 'design' && !task.done)).toBe(true);
+    // And the drawing with minutes left in it is there in the morning, with its man on it.
+    const drawing = findTask(tomorrow, design.id);
+    expect(drawing?.done).toBe(false);
+    expect(drawing?.minutesRemaining ?? 0).toBeGreaterThan(0);
+    expect(drawing?.minutesRemaining ?? 0).toBeLessThan(drawing?.minutesTotal ?? 0);
+    expect(drawing?.doneBy).toBe('owner');
   });
 
   it('still cost the client his patience: the penalty lands at delivery', () => {
