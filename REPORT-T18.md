@@ -86,3 +86,11 @@ queue of section 4 names them.
   spends does not, the line is never said before the sixth closed day, it counts the draw and the
   fixed charges and not the material or the kit, it reads the board's own five days, the three
   first steps in order, the line's last day, the tips switch, and the whole order asserted twice.
+- **T18-07 The keyboard (2.8).** `P` stops the clock and starts it again at the speed it was doing,
+  which the UI remembers in `speedBeforePause` and which is x1 for a clock that was never running;
+  `1` to `5` are `SPEEDS[1]` to `SPEEDS[5]`, x1, x2, x4, x10 and x30. Both make the same
+  `SET_SPEED` dispatch the top bar's knobs make, so there is one way the speed is ever set. Escape,
+  Space and the setup mode's R are untouched. A key does nothing at all while the caret is in an
+  input, a textarea or a select, and nothing before there is a game to run.
+  Done: `tests/ui/keyboard.test.ts`, six tests, including the knob on the top bar lighting for the
+  key that was pressed, and Escape still closing a modal without touching the clock.

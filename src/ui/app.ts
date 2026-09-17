@@ -18,6 +18,7 @@ import {
   ownerJob,
   runMinutes,
   shoppingList,
+  SPEEDS,
   startProductionCheck,
   timeIsPaused,
 } from '../engine/index';
@@ -201,6 +202,9 @@ interface Ui {
   /** True while the next drop stands the item at ninety degrees to the walls (T10 3.8). */
   rotate: boolean;
   speedBeforeSetup: Speed;
+  /** What the clock was doing before the P key stopped it, so the same key starts it again where
+   *  it was (PIOTR, 17.09; CLAUDE.md T18 2.8). */
+  speedBeforePause: Speed;
   drag: Drag | null;
   /** Where the player has the hall pushed to and how far in. UI state, never game state: a save
    *  carries the workshop, not where somebody was looking (CLAUDE.md T6 3.3). */
@@ -321,6 +325,7 @@ function freshUi(): Ui {
     setup: false,
     rotate: false,
     speedBeforeSetup: 0,
+    speedBeforePause: 1,
     drag: null,
     camera: { ...HALL_CAMERA_START },
     cameraStarted: false,
@@ -1971,6 +1976,31 @@ function onKeyUp(event: KeyboardEvent): void {
   if (event.key === ' ') spaceHeld = false;
 }
 
+/** The five running speeds under the hand, `1` to `5` in the order `SPEEDS` has them: x1, x2, x4,
+ *  x10, x30. `SPEEDS[0]` is Pause, which has its own key (CLAUDE.md T18 2.8). */
+const SPEED_KEYS = ['1', '2', '3', '4', '5'] as const;
+
+/** True while the caret is in a field. A key does nothing at all then: a "1" typed into the stock
+ *  box is a number of sheets and not a speed, and a "p" is a letter (CLAUDE.md T18 2.8). */
+function typingInAField(): boolean {
+  const active = document.activeElement;
+  if (active === null) return false;
+  const tag = active.tagName.toLowerCase();
+  return tag === 'input' || tag === 'textarea' || tag === 'select';
+}
+
+/** P stops the clock and starts it again where it was. The same dispatch the Pause knob makes, so
+ *  there is one way the speed is ever set (CLAUDE.md T18 2.8). */
+function togglePause(): void {
+  const current = game().speed;
+  if (current !== 0) {
+    ui.speedBeforePause = current;
+    dispatch({ type: 'SET_SPEED', speed: 0 });
+    return;
+  }
+  dispatch({ type: 'SET_SPEED', speed: ui.speedBeforePause === 0 ? 1 : ui.speedBeforePause });
+}
+
 function onKeyDown(event: KeyboardEvent): void {
   batched(() => runKeyDown(event));
 }
@@ -1982,6 +2012,20 @@ function runKeyDown(event: KeyboardEvent): void {
   if (ui.setup && (event.key === 'r' || event.key === 'R')) {
     turnGhost();
     return;
+  }
+  // The clock under the hand: P stops it and starts it again, 1 to 5 are the top bar's own five
+  // running knobs. They do exactly what a click on the knob does, and nothing at all while a
+  // field has the caret or before there is a game to run (CLAUDE.md T18 2.8).
+  if (state !== null && !typingInAField()) {
+    if (event.key === 'p' || event.key === 'P') {
+      togglePause();
+      return;
+    }
+    const knob = SPEED_KEYS.indexOf(event.key as (typeof SPEED_KEYS)[number]);
+    if (knob >= 0) {
+      dispatch({ type: 'SET_SPEED', speed: SPEEDS[knob + 1] ?? 1 });
+      return;
+    }
   }
   if (event.key !== 'Escape') return;
   // Escape drops whatever is in hand before it closes anything (CLAUDE.md T2 3.10).
