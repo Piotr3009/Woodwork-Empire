@@ -211,6 +211,7 @@ import {
   staffOutputFactor,
   startHoliday,
 } from './owner';
+import { paidHoursToday } from './rate';
 import { chance, int, makeId } from './rng';
 import { type StagePlan, cncOptions, labourPerMinute } from './stages';
 import {
@@ -430,6 +431,7 @@ export function createGame(options: NewGameOptions): GameState {
       efficiency: emptyEfficiency(),
       nightMinutes: 0,
       paidHours: 0,
+      expressUplift: 0,
     },
     days: [],
     lastExpressDay: null,
@@ -502,6 +504,7 @@ function startDay(state: GameState): void {
     efficiency: emptyEfficiency(),
     nightMinutes: 0,
     paidHours: 0,
+    expressUplift: 0,
   };
   // Nobody stands at a machine overnight: the hall starts the day with every one of them free
   // (CLAUDE.md T7 3.1).
@@ -881,6 +884,7 @@ export function daySummaryOf(state: GameState): DaySummary {
     dayLog: owner.dayLog.map((entry) => ({ ...entry })),
     dustMadeM3: state.dayStats.dustM3,
     paidHours: state.dayStats.paidHours,
+    expressUplift: state.dayStats.expressUplift,
     hallFactor: hallProductivityFactor(state),
     efficiency: JSON.parse(JSON.stringify(state.dayStats.efficiency)) as DaySummary['efficiency'],
     nightMinutes: state.dayStats.nightMinutes,
@@ -929,6 +933,9 @@ function finishDay(state: GameState): void {
   for (const machine of rollNightBreakdowns(state, night.usedMachineIds)) {
     raiseMachineBroken(state, machine);
   }
+  // The hours the day paid for, worked or not, now that the evening is behind it: the bottom of
+  // the workshop rate goes on the day record with the labour it earned (CLAUDE.md T17 2.26).
+  state.dayStats.paidHours = paidHoursToday(state);
   recordDay(state);
   if (!showsDaySummary(state)) {
     advanceToNextDay(state);

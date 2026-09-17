@@ -345,7 +345,10 @@ function finishPiece(state: GameState, contract: Contract, piece: ContractPieceS
     unavoidable: true,
     merge: true,
   });
-  state.dayStats.labourValue += contract.pricePerPiece - piece.material;
+  // What the workshop earned by making it, which is what the rate counts: the piece's own labour
+  // and not its margin, so the day's labour value means one thing whatever produced it
+  // (CLAUDE.md T17 2.26).
+  state.dayStats.labourValue = Math.round((state.dayStats.labourValue + piece.labour) * 10000) / 10000;
 }
 
 /** One production minute of every man on a contract: the piece in hand moves on at his rate and

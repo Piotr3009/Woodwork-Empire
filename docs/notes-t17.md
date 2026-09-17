@@ -40,3 +40,16 @@ What each phase B group had to add to a frozen file of Turn 13, and why it could
   the `buyStock` case beside it already reads `data-sheets`. Phase A made the action carry the
   count and CLAUDE.md T17 2.20 asks for the typed number to reach the engine; no other path
   could carry it.
+
+## B3, the money
+
+- `src/engine/types.ts`: one new field on `DayStats` and the same on `DaySummary`,
+  `expressUplift`. CLAUDE.md T17 2.26 says an express job pushes the workshop rate over 40, and
+  nothing in the engine made that true: an express job's labour value comes off its base price
+  (T2 3.4, T13 3.24) and its uplift is pure profit, so the labour booked by the minute is the same
+  as a standard job's. The uplift had to be earned somewhere the rate could read it a week later,
+  and `dayStats.labourValue` could not carry it: that field is the earned labour rate of Turn 6
+  and has its own tests and three UI readers. The field is written in one place, `addLabour` in
+  jobs.ts, defaulted to 0 in `createGame`, `startDay` and `liftToVersion15`, and read only by
+  `src/engine/rate.ts`. Express itself is untouched: the probability, the uplift band, the
+  deadline factor, the late penalty and the rating are all as they were (CLAUDE.md T17 6).

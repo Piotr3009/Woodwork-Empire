@@ -151,9 +151,13 @@ function liftToVersion14(state: Raw): void {
 function liftToVersion15(state: Raw): void {
   for (const job of records(state.jobs)) job.secondAssignee = null;
   state.taskQueue = [];
-  if (isRecord(state.dayStats)) state.dayStats.paidHours = 0;
+  if (isRecord(state.dayStats)) {
+    state.dayStats.paidHours = 0;
+    state.dayStats.expressUplift = 0;
+  }
   for (const day of records(state.days)) {
     day.paidHours = 0;
+    day.expressUplift = 0;
     day.hallFactor = 1;
   }
   // Nobody has a month behind him on the new fields, and no machine has a week on its own clock.

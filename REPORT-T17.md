@@ -193,3 +193,20 @@ the task queue of section 5 names them.
   the brief's 10.4 is checked on the Very easy control instead, which has the money, and the Easy
   test now asserts what the bank does rather than what the script wanted. Phase C should look at
   it again when it re-runs the sixteen months.
+
+---
+
+## Phase B3: the money
+
+- **T17-B3a The workshop rate, the engine (2.26).** `src/engine/rate.ts` is the one place the
+  turn's figure is worked out: labour earned on jobs and contracts over the hours paid for, gross,
+  with nothing taken off it. The top is the labour value the engine already books minute by minute
+  as the work is done, plus what an express job pays over its base price (earned with the labour
+  that earns it, so a minute of an express job earns its share of the premium), plus a contract
+  piece's own labour, which `finishPiece` now books instead of the piece's margin. The bottom is
+  `paidHoursToday`: eight hours for every man on the books and eight for the owner on every
+  working day, worked or not, and the overtime the owner actually stayed for on top. The evening
+  writes it onto the day before the day is recorded, so a week of hours paid survives a save.
+  Done: `tests/engine/rate.test.ts`, which reads the brief's own four: 40 an hour for the owner
+  alone at full work for a week, 24 with two of the five days idle, 26 with a poor joiner half
+  idle, and 70 with an express job on the bench.

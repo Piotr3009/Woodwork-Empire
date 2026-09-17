@@ -141,6 +141,7 @@ describe('the two of them together', () => {
         efficiency: { possible: 0, worked: 0, lost: { noPeople: 0, noMachine: 0, noMaterial: 0, ownerAway: 0 } },
         nightMinutes: 0,
         paidHours: 0,
+        expressUplift: 0,
         hallFactor: 1,
       },
     ];

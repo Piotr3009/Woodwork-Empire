@@ -927,6 +927,17 @@ export function closeStageRun(state: GameState, job: Job): void {
   open.endMinute = state.clock.minute;
 }
 
+/** What an express job pays over its base price, earned with the labour that earns it: the whole
+ *  uplift over the whole job, so a minute of an express job earns its share of the premium. The
+ *  workshop rate counts it; the job, the deadline, the penalty and the rating are untouched
+ *  (CLAUDE.md T17 2.26 and 6). */
+function expressUpliftOn(job: Job, put: number): number {
+  if (!job.express || job.labourValue <= 0) return 0;
+  const uplift = job.price - job.basePrice;
+  if (uplift <= 0) return 0;
+  return (uplift * put) / job.labourValue;
+}
+
 /** Work one person minute of labour into a job. What actually went in is booked against the day
  *  here, so the earned labour rate counts what was produced and not what was offered: the last
  *  minute of a job is usually a part minute (CLAUDE.md T6 3.8). The stage it went into is written
@@ -938,6 +949,10 @@ export function addLabour(state: GameState, job: Job, labour: number, stage: Sta
   job.labourRemaining -= labour;
   state.dayStats.workMinutes += 1;
   state.dayStats.labourValue = Math.round((state.dayStats.labourValue + put) * 10000) / 10000;
+  const uplift = expressUpliftOn(job, put);
+  if (uplift > 0) {
+    state.dayStats.expressUplift = Math.round((state.dayStats.expressUplift + uplift) * 10000) / 10000;
+  }
   if (!state.dayStats.jobsAdvanced.includes(job.id)) state.dayStats.jobsAdvanced.push(job.id);
   if (job.labourRemaining > WORK_EPSILON) return false;
   job.labourRemaining = 0;

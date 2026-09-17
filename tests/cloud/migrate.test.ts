@@ -141,7 +141,11 @@ describe('a v24 save in this build (CLAUDE.md T17 section 4)', () => {
     expect(STATE_VERSION).toBe(15);
     expect(state.taskQueue).toEqual([]);
     expect(state.dayStats.paidHours).toBe(0);
-    for (const day of state.days) expect(day.paidHours).toBe(0);
+    expect(state.dayStats.expressUplift).toBe(0);
+    for (const day of state.days) {
+      expect(day.paidHours).toBe(0);
+      expect(day.expressUplift).toBe(0);
+    }
     for (const job of state.jobs) expect(job.secondAssignee).toBeNull();
   });
 

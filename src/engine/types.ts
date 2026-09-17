@@ -983,6 +983,9 @@ export interface DaySummary {
   /** Hours the company paid for that day, worked or not: the bottom of the workshop rate, kept
    *  on the day so a week of it survives a save (CLAUDE.md T17 2.26). */
   paidHours: number;
+  /** The express uplift earned with that day's labour: the top of the workshop rate counts it
+   *  beside the labour value (CLAUDE.md T17 2.26). */
+  expressUplift: number;
   /** What the hall multiplied the day's work by when it closed: dust, the gate, the extraction and
    *  who was in. The month end reads the average of these (CLAUDE.md T17 2.25). */
   hallFactor: number;
@@ -1010,6 +1013,11 @@ export interface DayStats {
    *  the books and eight for the owner on a working day, plus the overtime the owner actually
    *  stayed for. The bottom of the workshop rate (CLAUDE.md T17 2.26). */
   paidHours: number;
+  /** What the express jobs worked on today paid over their base price, earned minute by minute
+   *  with the labour that earns it. The same hours on an express job earn the client's premium,
+   *  so the workshop rate counts it on top of the labour value; nothing else reads it and express
+   *  itself is untouched (CLAUDE.md T17 2.26). */
+  expressUplift: number;
 }
 
 /** One line of the reputation log: the day, what happened, and what it was worth. The company
