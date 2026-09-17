@@ -1,10 +1,21 @@
 // The warning strip's list: one engine function, the problems the game sees, the most urgent
-// first, and nothing at all when nothing is wrong (CLAUDE.md T13 3.22).
+// first, and nothing at all when nothing is wrong (CLAUDE.md T13 3.22). Turn 18 adds the two money
+// lines, which read the ledger and the closed days and change neither, and the first steps line,
+// which walks a new player in over the first three days (CLAUDE.md T18 2.6, 2.7).
 
 import { describe, expect, it } from 'vitest';
-import { NO_INSURANCE_REASON, WORKER_RATES } from '../../src/engine/constants';
-import { bagStore, crewFull, crewLimit, workPlan } from '../../src/engine/index';
-import type { GameState, Worker } from '../../src/engine/index';
+import {
+  FIRST_STEPS_LAST_DAY,
+  NO_INSURANCE_REASON,
+  OVERDRAFT_RATE_YEARLY,
+  DAYS_PER_YEAR,
+  PAID_HOURS_PER_WORKING_DAY,
+  RATE_WEEK_DAYS,
+  SPEND_WARNING_FROM_CLOSED_DAYS,
+  WORKER_RATES,
+} from '../../src/engine/constants';
+import { bagStore, crewFull, crewLimit, daySummaryOf, workPlan } from '../../src/engine/index';
+import type { DaySummary, GameState, LedgerCategory, Worker } from '../../src/engine/index';
 import { WARNING_ORDER, warnings } from '../../src/engine/warnings';
 import {
   acceptNow,
@@ -16,10 +27,49 @@ import {
   placeEnquiry,
 } from '../helpers';
 
-/** A hall with the day 1 kit and an empty board: nothing is wrong with it. */
+/** A hall with the day 1 kit and an empty board: nothing is wrong with it. The clock is past the
+ *  first steps line's last day, so the line that walks a new player in is behind this workshop and
+ *  a quiet hall is quiet (CLAUDE.md T18 2.7). */
 function quietHall(): GameState {
   const state = fillRack(buyStartingKit(newGame({ difficulty: 'veryEasy' })));
   state.enquiries = [];
+  state.clock.day = FIRST_STEPS_LAST_DAY + 1;
+  return state;
+}
+
+const BLANK: DaySummary = daySummaryOf(newGame());
+
+/** A closed day with a labour figure and the hours it paid for. */
+function closed(day: number, labour: number): DaySummary {
+  return { ...BLANK, day, labourValue: labour, paidHours: PAID_HOURS_PER_WORKING_DAY };
+}
+
+/** Puts a charge on the ledger of a given day, the way the engine's own `charge` does: money out
+ *  is negative. */
+function spend(state: GameState, day: number, category: LedgerCategory, amount: number): void {
+  state.ledger.push({
+    id: `led-${state.ledger.length}`,
+    day,
+    minute: 0,
+    category,
+    label: category,
+    amount: -amount,
+    balance: state.cash,
+    unpaid: false,
+  });
+}
+
+/** A workshop with `SPEND_WARNING_FROM_CLOSED_DAYS` days behind it, each earning `labour`, and
+ *  `wagesPerDay` of wages on the ledger of each of the five the window reads. */
+function tradedWeek(labour: number, wagesPerDay: number): GameState {
+  const state = quietHall();
+  const days: DaySummary[] = [];
+  for (let day = 1; day <= SPEND_WARNING_FROM_CLOSED_DAYS; day += 1) days.push(closed(day, labour));
+  state.days = days;
+  state.clock.day = SPEND_WARNING_FROM_CLOSED_DAYS + 1;
+  for (const day of days.slice(days.length - RATE_WEEK_DAYS)) {
+    spend(state, day.day, 'wages', wagesPerDay);
+  }
   return state;
 }
 
@@ -140,25 +190,185 @@ describe('the list', () => {
   });
 });
 
+describe('the money speaks before the month end (CLAUDE.md T18 2.6)', () => {
+  it('says what the overdraft costs a day while the account is under zero, and clears when it is not', () => {
+    const state = quietHall();
+    state.cash = -10000;
+    const found = warnings(state);
+    expect(found.map((warning) => warning.key)).toEqual(['belowZero']);
+    // The engine's own figure: the balance at the yearly rate over a year of days.
+    const aDay = (10000 * OVERDRAFT_RATE_YEARLY) / DAYS_PER_YEAR;
+    expect(found[0]?.text).toBe(
+      `Account below zero: the overdraft costs \u00a3${Math.round(aDay).toLocaleString('en-GB')} a day`,
+    );
+    // It follows the balance every day, and goes the moment the account is back.
+    state.cash = -20000;
+    expect(warnings(state)[0]?.text).toContain(
+      `\u00a3${Math.round((20000 * OVERDRAFT_RATE_YEARLY) / DAYS_PER_YEAR).toLocaleString('en-GB')}`,
+    );
+    state.cash = 0;
+    expect(warnings(state)).toEqual([]);
+    state.cash = 1;
+    expect(warnings(state)).toEqual([]);
+  });
+
+  it('counts the pence while the charge is under a pound', () => {
+    const state = quietHall();
+    state.cash = -500;
+    const aDay = (500 * OVERDRAFT_RATE_YEARLY) / DAYS_PER_YEAR;
+    expect(aDay).toBeLessThan(1);
+    expect(warnings(state)[0]?.text).toBe(
+      `Account below zero: the overdraft costs \u00a3${aDay.toFixed(2)} a day`,
+    );
+  });
+
+  it('says a week of wages with no work done for them', () => {
+    const state = tradedWeek(0, 500);
+    const found = warnings(state);
+    expect(found.map((warning) => warning.key)).toEqual(['spendingOverEarning']);
+    expect(found[0]?.text).toBe(
+      'You spend more than you earn: \u00a32,500 out, \u00a30 in this week',
+    );
+  });
+
+  it('says nothing about a week that earns more than it spends', () => {
+    expect(warnings(tradedWeek(1000, 500))).toEqual([]);
+    // And nothing at the line either: it wants more out than in, not as much.
+    expect(warnings(tradedWeek(500, 500))).toEqual([]);
+  });
+
+  it('is never said before the sixth day the game has closed', () => {
+    const state = tradedWeek(0, 500);
+    state.days = state.days.slice(0, SPEND_WARNING_FROM_CLOSED_DAYS - 1);
+    expect(warnings(state)).toEqual([]);
+    expect(state.days).toHaveLength(SPEND_WARNING_FROM_CLOSED_DAYS - 1);
+  });
+
+  it('counts the wages, the draw and the fixed charges, and not the material or the kit', () => {
+    const state = tradedWeek(1000, 0);
+    const window = state.days.slice(state.days.length - RATE_WEEK_DAYS);
+    const first = window[0]?.day ?? 1;
+    // Five thousand of sheets and a saw: bought against work, so they are not the line's business.
+    spend(state, first, 'material', 5000);
+    spend(state, first, 'equipment', 7000);
+    expect(warnings(state)).toEqual([]);
+    // The draw and the fixed charges are.
+    spend(state, first, 'ownerDraw', 3000);
+    spend(state, first, 'rent', 2000);
+    spend(state, first, 'overdraftInterest', 500);
+    expect(warnings(state).map((warning) => warning.key)).toEqual(['spendingOverEarning']);
+    expect(warnings(state)[0]?.text).toContain('\u00a35,500 out');
+    expect(warnings(state)[0]?.text).toContain('\u00a35,000 in');
+  });
+
+  it('reads the same five closed days the Company board reads, and no older one', () => {
+    const state = tradedWeek(1000, 0);
+    const oldest = state.days[0]?.day ?? 1;
+    // The sixth day back is outside the window: a fortune spent on it says nothing today.
+    spend(state, oldest, 'wages', 99999);
+    expect(warnings(state)).toEqual([]);
+  });
+});
+
+describe('the first days say what to do (CLAUDE.md T18 2.7)', () => {
+  /** Day 1: a new company, nothing bought and nothing delivered. */
+  function dayOne(): GameState {
+    return newGame({ difficulty: 'veryEasy' });
+  }
+
+  it('walks a new player through the three steps, in order', () => {
+    const state = dayOne();
+    state.enquiries = [];
+    expect(warnings(state).map((warning) => warning.key)).toEqual(['firstSteps']);
+    expect(warnings(state)[0]?.text).toBe('Set up the hall');
+    // The hall set up: the kit is in and standing on the floor.
+    const fitted = fillRack(buyStartingKit(dayOne()));
+    fitted.enquiries = [];
+    expect(warnings(fitted)[0]?.text).toBe('Accept an enquiry on the board');
+    // A job on the books: the last step is to start it.
+    const enquiry = placeEnquiry(fitted, { price: 4000, deadlineDays: 90 });
+    const taken = acceptNow(fitted, enquiry.id);
+    taken.enquiries = [];
+    expect(warnings(taken)[0]?.text).toBe('Press Start production on the work plan');
+    // Started: the line is gone for good.
+    firstJob(taken).stage = 'inProduction';
+    firstJob(taken).assignedTo = 'owner';
+    expect(warnings(taken)).toEqual([]);
+  });
+
+  it('is gone from the day after the third, whatever the player has done', () => {
+    const state = dayOne();
+    state.enquiries = [];
+    expect(warnings(state)[0]?.key).toBe('firstSteps');
+    state.clock.day = FIRST_STEPS_LAST_DAY;
+    expect(warnings(state)[0]?.key).toBe('firstSteps');
+    state.clock.day = FIRST_STEPS_LAST_DAY + 1;
+    expect(warnings(state)).toEqual([]);
+  });
+
+  it('goes off with the tips, because it is a tip', () => {
+    const state = dayOne();
+    state.enquiries = [];
+    expect(warnings(state)[0]?.key).toBe('firstSteps');
+    state.settings.tips = false;
+    expect(warnings(state)).toEqual([]);
+  });
+
+  it('gives way to anything the game actually has to warn about', () => {
+    const state = fillRack(buyStartingKit(dayOne()));
+    state.enquiries = [];
+    expect(warnings(state)[0]?.key).toBe('firstSteps');
+    fillBags(state);
+    expect(warnings(state)[0]?.key).toBe('bagsFull');
+    // And it is still under it, last of the list.
+    expect(warnings(state)[warnings(state).length - 1]?.key).toBe('firstSteps');
+  });
+});
+
 describe('the order of urgency', () => {
-  it('is bags, then the started job, then the deadline, then the insurance, then the crew', () => {
+  it('is bags, nobody assigned, overdue, no insurance, below zero, spending over earning, crew full, first steps', () => {
     expect(WARNING_ORDER).toEqual([
       'bagsFull',
       'nobodyAssigned',
       'deadlineAtRisk',
       'noInsurance',
+      'belowZero',
+      'spendingOverEarning',
       'crewFull',
+      'firstSteps',
     ]);
   });
 
   it('puts every problem in that order when the hall has them all at once', () => {
-    let state = quietHall();
+    // Seven of the eight at once. The first steps line cannot be one of them: it is only said
+    // while production has never started, and "a started job nobody is on" is production started.
+    let state = tradedWeek(0, 500);
     state = withStartedJobNobodyOn(state);
     state = withDeadlineAtRisk(state);
     state = withUninsuredCommercial(state);
     state = withCrewAtTheLimit(state);
     state = withBagsFull(state);
-    expect(warnings(state).map((warning) => warning.key)).toEqual([...WARNING_ORDER]);
+    // The deposits of those two jobs put the account back over: the overdraft is the last thing
+    // set, so the line is about the balance the strip would actually read.
+    state.cash = -10000;
+    expect(warnings(state).map((warning) => warning.key)).toEqual(
+      WARNING_ORDER.filter((key) => key !== 'firstSteps'),
+    );
+  });
+
+  it('puts the first steps line under everything the game actually has to warn about', () => {
+    const state = fillRack(buyStartingKit(newGame({ difficulty: 'veryEasy' })));
+    state.enquiries = [];
+    state.clock.day = FIRST_STEPS_LAST_DAY;
+    withUninsuredCommercial(state);
+    withBagsFull(state);
+    state.cash = -10000;
+    expect(warnings(state).map((warning) => warning.key)).toEqual([
+      'bagsFull',
+      'noInsurance',
+      'belowZero',
+      'firstSteps',
+    ]);
   });
 
   it('shows the next one down once the most urgent is dealt with', () => {

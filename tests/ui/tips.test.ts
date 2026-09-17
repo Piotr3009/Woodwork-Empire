@@ -4,7 +4,7 @@
 // top bar, one line, the most urgent problem first, nothing when nothing is wrong.
 
 import { beforeAll, describe, expect, it } from 'vitest';
-import { NO_INSURANCE_REASON, TIPS } from '../../src/engine/constants';
+import { FIRST_STEPS_LAST_DAY, NO_INSURANCE_REASON, TIPS } from '../../src/engine/constants';
 import { bagStore } from '../../src/engine/index';
 import { currentState, mount, render } from '../../src/ui/app';
 import { renderTip, renderWarningStrip } from '../../src/ui/tips';
@@ -87,6 +87,9 @@ describe('the warning strip', () => {
   it('is empty when nothing is wrong', () => {
     const state = fillRack(buyStartingKit(newGame({ difficulty: 'veryEasy' })));
     state.enquiries = [];
+    // Past the first three days, so the line that walks a new player in is behind this workshop
+    // and an empty strip is an empty strip (CLAUDE.md T18 2.7).
+    state.clock.day = FIRST_STEPS_LAST_DAY + 1;
     expect(renderWarningStrip(state)).toBe('');
   });
 
@@ -129,6 +132,10 @@ describe('through the page', () => {
   it('prints the strip right under the top bar, and takes it down when the problem goes', () => {
     const state = currentState();
     if (state === null) throw new Error('no game');
+    // The first steps line owns the strip for the first three days (CLAUDE.md T18 2.7), so this
+    // test stands where the strip is otherwise empty: the fourth day.
+    state.clock.day = FIRST_STEPS_LAST_DAY + 1;
+    render();
     expect(root().querySelector('.warning-strip')).toBeNull();
     // Day 1 has no hall to fill bags in, so the problem here is a commercial enquiry the company
     // has no insurance for.

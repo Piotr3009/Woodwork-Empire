@@ -262,12 +262,15 @@ describe('the laptop tiles', () => {
     expect(html()).toContain('Start production');
     expect(html()).toContain('Calls: 0 of');
     click('[data-do="closeModal"]');
-    // And nowhere in the laptop, on any of its three pages.
+    // And nowhere in the laptop, on any of its three pages. The laptop's own screen is what is
+    // read, not the whole page: the warning strip tells a new player to press Start production on
+    // the work plan, which is the point of it (CLAUDE.md T18 2.7).
     click('[data-office="laptop"]');
     for (const tile of ['tasks', 'stock', 'drawings']) {
       click(`[data-modal="laptop"] [data-tile="${tile}"]`);
-      expect(html(), tile).not.toContain('Start production');
-      expect(html(), tile).not.toContain('Calls: 0 of');
+      const screen = root().querySelector('.modal-layer [data-modal="laptop"]')?.innerHTML ?? '';
+      expect(screen, tile).not.toContain('Start production');
+      expect(screen, tile).not.toContain('Calls: 0 of');
       click('[data-modal="laptop"] [data-tile="home"]');
     }
     click('[data-do="closeModal"]');

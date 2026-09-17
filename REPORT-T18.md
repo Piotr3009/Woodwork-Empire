@@ -69,3 +69,20 @@ queue of section 4 names them.
   Done: `tests/ui/chipsOverTips.test.ts`, four tests: the DOM order of the column with a full bag
   store making a second chip, the same order with a tip forty sentences long, the camera's own
   corner, and neither of the two on the office.
+- **T18-06 The money speaks before the month end, and the first days say what to do (2.6, 2.7).**
+  Three new keys in `warnings.ts`, in the order section 7 asks for. `belowZero`: while the account
+  is under zero, `Account below zero: the overdraft costs £X a day`, X off the engine's own
+  `overdraftInterestForDay`, so the line and the charge cannot disagree, to the pound or to the
+  pence while it is under a pound, recomputed every render off the balance.
+  `spendingOverEarning`: over the last five closed days the Company board reads, what went out on
+  wages, the draw and the fixed charges against the labour the same days earned, which is the
+  rate's own numerator; `You spend more than you earn: £X out, £Y in this week`, from the sixth day
+  the game has closed and never before. `firstSteps`: on days 1 to 3 and last in the order, `Set up
+  the hall`, then `Accept an enquiry on the board`, then `Press Start production on the work plan`,
+  gone for good after the third step or from day 4, and off with the tips setting. Nothing touches
+  the ledger, the rate or a figure.
+  Done: `tests/engine/warnings.test.ts`, up from 11 tests to 22: the overdraft line shows and
+  clears and counts the pence, a week of wages with no work shows, a week that earns more than it
+  spends does not, the line is never said before the sixth closed day, it counts the draw and the
+  fixed charges and not the material or the kit, it reads the board's own five days, the three
+  first steps in order, the line's last day, the tips switch, and the whole order asserted twice.

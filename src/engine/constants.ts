@@ -219,6 +219,35 @@ export const OWNER_RATE_PER_HOUR = OWNER_LABOUR_VALUE_PER_DAY / PAID_HOURS_PER_W
 /** Working days the workshop rate on the Company board is read over, and the week it compares
  *  itself with [TUNE: five, one working week] (CLAUDE.md T17 2.26). */
 export const RATE_WEEK_DAYS = 5;
+/** The warning strip's two money lines (PIOTR accepted, 17.09; CLAUDE.md T18 2.6).
+ *
+ *  `SPEND_WARNING_FROM_CLOSED_DAYS` is the sixth day the game has closed: the brief's own figure.
+ *  A workshop's first week is the fitting out, when everything is spending and nothing has been
+ *  delivered, so the line would be true and useless on every one of those days [TUNE].
+ *
+ *  `SPEND_WARNING_CATEGORIES` is what the line counts as going out: the wages under all three of
+ *  the ledger's names for them, the owner's draw, and the fixed charges of the month. Material,
+ *  equipment, transport and a job's own costs are not in it, because they are bought against work
+ *  and the line is about the money that goes out whether the hall works or not. The loan's capital
+ *  instalment is not in it either: the brief names the interest [TUNE]. */
+export const SPEND_WARNING_FROM_CLOSED_DAYS = RATE_WEEK_DAYS + 1;
+export const SPEND_WARNING_CATEGORIES = [
+  'wages',
+  'wagesNight',
+  'salaries',
+  'ownerDraw',
+  'rent',
+  'rates',
+  'power',
+  'insurance',
+  'security',
+  'loanInterest',
+  'overdraftInterest',
+  'software',
+] as const;
+/** The days the first steps line walks a new player in for. After the third one, or from the day
+ *  after this, it is gone for good (PIOTR accepted, 17.09; CLAUDE.md T18 2.7) [TUNE]. */
+export const FIRST_STEPS_LAST_DAY = 3;
 
 // ---------------------------------------------------------------------------
 // 8.1 Fixed costs and the unit
