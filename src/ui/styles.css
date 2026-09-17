@@ -3977,19 +3977,29 @@ input.num {
 }
 
 /* 2.9 The reputation column's headline: the total, with the week's net beside it. */
-.reputation-total {
+.reputation-total .ledger-total-label {
+  max-width: 55%;
 }
 
 .reputation-week {
+  color: var(--sheet-dim);
+  font-style: italic;
 }
 
-/* 2.10 The sound controls in Settings. */
-.sound-row {
+/* 2.10 The sound controls in Settings. The volume's figure sits between two chips and must not
+   jump about as it counts. */
+.sound-row .row-action,
+.sound-volume .row-action {
+  gap: 6px;
 }
 
-.sound-volume {
+.sound-volume .row-figure {
+  font-variant-numeric: tabular-nums;
+  min-width: 46px;
+  text-align: center;
 }
 
-/* 2.12 The laptop's second button while a task is running. */
+/* 2.12 The laptop's second button while a task is running: set apart from the reason beside it. */
 .task-queue-next {
+  margin-left: 4px;
 }

@@ -3679,7 +3679,8 @@ export const TIPS: Record<string, string> = {
   website: 'People buy with their eyes. Levels 1 to 3 change the enquiries; 4 and 5 add a little standing.',
   house: 'What you pay yourself every day is the house you sleep in.',
   team: 'The floor limits the crew: one person per so many square metres of free hall.',
-  settings: 'Tips on or off. Nothing else here tonight.',
+  settings:
+    'Tips on or off, and the workshop\'s own noise: a volume, and a mute for a quiet room.',
 };
 
 // ---------------------------------------------------------------------------

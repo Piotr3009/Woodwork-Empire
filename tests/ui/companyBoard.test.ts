@@ -245,16 +245,23 @@ describe('the Reputation sheet', () => {
     ]);
   });
 
-  it('puts the reputation at the top, equal to the state\'s, over the rule', () => {
+  it('puts the total at the top, equal to the state\'s, over the rule, and never calls it a week', () => {
+    // The figure was labelled "this week" over a cumulative number and read as a weekly count
+    // that resets (PIOTR, 17.09; CLAUDE.md T19 2.9).
     const state = traded();
     const sheet = parse(renderCompany(state)).querySelector('[data-sheet="reputation"]');
     expect(sheet?.querySelector('h3')?.textContent).toBe('Reputation');
     const total = sheet?.querySelector('.ledger-total');
-    expect(total?.querySelector('.ledger-total-label')?.textContent).toBe('this week');
+    expect(total?.classList.contains('reputation-total')).toBe(true);
+    expect(total?.querySelector('.ledger-total-label')?.textContent).not.toContain('week');
     expect(total?.querySelector('[data-figure="reputation"]')?.textContent).toBe(
       formatReputation(effectiveReputation(state)),
     );
     expect(formatReputation(effectiveReputation(state))).toBe(String(state.reputation));
+    // The headline is the board's `Reputation 40`: the heading and the figure, the same string
+    // the office wall prints off the same engine call.
+    const headline = `${sheet?.querySelector('h3')?.textContent} ${total?.querySelector('[data-figure="reputation"]')?.textContent}`;
+    expect(headline).toBe(companyTotals(state).reputation);
     expect(ruleBody('.ledger-total')).toContain('border-bottom: 2px solid var(--sheet-ink);');
     expect(ruleBody('.ledger-total-figure')).toContain('font-size: var(--fs-display);');
   });
@@ -289,48 +296,66 @@ describe('the Reputation sheet', () => {
     ]);
     expect(texts(sheet?.querySelectorAll('.ledger-week') ?? [])).toEqual(['Week 2', 'Week 1']);
     // The head row, and the list that scrolls inside the sheet while the total does not.
-    expect(sheet?.querySelector('.ledger-head')?.textContent).toBe('Who said whatpoints');
+    expect(sheet?.querySelector('.ledger-head')?.textContent).toBe('What moved it this weekpoints');
     expect(ruleBody('.ledger-list')).toContain('overflow-y: auto;');
     expect(ruleBody('.ledger-total')).toContain('flex: none;');
   });
 
-  it('carries last week over as the last row of this week, and balances at the bottom to the figure at the top', () => {
+  it('carries nothing over, and puts the week\'s net beside the total, never in its place', () => {
     const state = traded();
-    const sheet = parse(renderCompany(state)).querySelector('[data-sheet="reputation"]');
-    const carry = sheet?.querySelector('.ledger-row[data-carry]');
-    expect(carry?.querySelector('.ledger-main')?.firstChild?.textContent).toBe('Start of the week');
-    expect(carry?.querySelector('small')?.textContent).toBe('carried over');
-    // Week 2 did minus 5; the reputation is what it is now, so the week started 5 higher.
-    const now = effectiveReputation(state);
-    expect(carry?.querySelector('.ledger-points')?.textContent).toBe(`+${now + 5}`);
-    // The carry over sits after this week's ratings and before the next label.
+    const page = renderCompany(state);
+    const sheet = parse(page).querySelector('[data-sheet="reputation"]');
+    // The start of the week row went with the weekly reading it belonged to (CLAUDE.md T19 2.9).
+    expect(sheet?.querySelector('.ledger-row[data-carry]')).toBeNull();
+    expect(page).not.toContain('carried over');
+    expect(page).not.toContain('Start of the week');
+    // The list is this week's rows and the weeks before it, under their own labels, and nothing
+    // else: the last child of the list is a rating, not a sum.
     const list = Array.from(sheet?.querySelectorAll('.ledger-list > *') ?? []);
-    const index = list.indexOf(carry as Element);
-    expect(list[index + 1]?.textContent).toBe('Week 1');
-    expect(list[index - 1]?.getAttribute('data-rating')).toBe('1');
-    // The balance: the pluses of this week with the carry, the minuses, and the figure.
+    expect(list[list.length - 1]?.getAttribute('data-rating')).toBe('3');
+    // Week 2 did plus 5 and minus 10, so minus 5; the reputation is 40 and stays 40.
+    const now = effectiveReputation(state);
     const sum = sheet?.querySelector('.ledger-sum');
-    expect(sum?.querySelector('[data-sum="plus"]')?.textContent).toBe(`+${now + 5 + 5}`);
+    expect(sum?.querySelector('[data-sum="plus"]')?.textContent).toBe('+5');
     expect(sum?.querySelector('[data-sum="minus"]')?.textContent).toBe('−10');
-    expect(sum?.querySelector('[data-sum="total"]')?.textContent).toBe(`= ${formatReputation(now)}`);
-    expect(now + 5 + 5 - 10).toBe(now);
+    expect(sum?.querySelector('[data-sum="week"]')?.textContent).toBe('−5 this week');
+    expect(sum?.querySelector('[data-sum="week"]')?.classList.contains('reputation-week')).toBe(true);
+    expect(sum?.querySelector('[data-sum="total"]')?.textContent).toBe(companyTotals(state).reputation);
+    expect(sum?.querySelector('[data-sum="total"]')?.textContent).toContain(formatReputation(now));
+    // The two are never the same figure, and the total is never the week's net.
+    expect(sum?.querySelector('[data-sum="total"]')?.textContent).not.toBe(
+      sum?.querySelector('[data-sum="week"]')?.textContent,
+    );
+    expect(sum?.querySelector('[data-sum="total"]')?.textContent).not.toContain('−5');
   });
 
-  it('reads plainly when nothing has moved the reputation yet: the carry over and nothing else', () => {
+  it('reads plainly when nothing has moved the reputation this week: the total, and +0 this week', () => {
     const quiet = fillRack(buyStartingKit(newGame({ difficulty: 'veryEasy' })), 0);
     const sheet = parse(renderCompany(quiet)).querySelector('[data-sheet="reputation"]');
     expect(sheet?.querySelectorAll('.ledger-row[data-rating]')).toHaveLength(0);
-    expect(sheet?.querySelector('.ledger-row[data-carry] .ledger-points')?.textContent).toBe(
-      points(quiet.reputation),
+    expect(sheet?.querySelector('.ledger-row[data-carry]')).toBeNull();
+    expect(sheet?.querySelector('[data-sum="week"]')?.textContent).toBe('+0 this week');
+    expect(sheet?.querySelector('[data-figure="reputation"]')?.textContent).toBe(
+      formatReputation(effectiveReputation(quiet)),
     );
-    expect(sheet?.querySelector('[data-sum="total"]')?.textContent).toBe(`= ${quiet.reputation}`);
+    expect(sheet?.querySelector('[data-sum="total"]')?.textContent).toBe(companyTotals(quiet).reputation);
+  });
+
+  it('keeps the total standing while the week goes backwards: the figure is what the company is worth now', () => {
+    // The point of 2.9: a bad week does not reset the number, and the number is not the week.
+    const state = traded();
+    const before = effectiveReputation(state);
+    changeReputation(state, -3, 'Kitchen: late');
+    const sheet = parse(renderCompany(state)).querySelector('[data-sheet="reputation"]');
+    expect(sheet?.querySelector('[data-figure="reputation"]')?.textContent).toBe(
+      formatReputation(before - 3),
+    );
+    expect(sheet?.querySelector('[data-sum="week"]')?.textContent).toBe('−8 this week');
+    expect(sheet?.querySelector('[data-sum="total"]')?.textContent).toBe(
+      `Reputation ${formatReputation(before - 3)}`,
+    );
   });
 });
-
-/** The sign the sheet writes, for the test's own expectations. */
-function points(value: number): string {
-  return `${value < 0 ? '−' : '+'}${Math.abs(value)}`;
-}
 
 describe('the Output sheet', () => {
   it('prints the engine\'s breakdown: the hall\'s lines with their balance, base first and dim', () => {

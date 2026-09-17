@@ -81,7 +81,11 @@ describe('the drawings in the laptop', () => {
     const html = parse(renderDrawings(state)).innerHTML;
     expect(html).not.toContain('data-do="startTask"');
     expect(html).toContain('Busy with Bookkeeping');
-    expect(html).toContain('data-do="pauseTask"');
+    // The way out used to be putting the bookkeeping down. Since Turn 19 the drawing goes behind
+    // it instead, on the drawings page as on the tasks page (CLAUDE.md T19 2.12).
+    expect(html).not.toContain('data-do="pauseTask"');
+    expect(html).toContain(`data-do="queueTaskNext" data-id="${design.id}"`);
+    expect(html).toContain('Add as next');
   });
 
   it('draws the drawing to the end once the other job of work is put down', () => {

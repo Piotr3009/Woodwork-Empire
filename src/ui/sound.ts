@@ -15,6 +15,8 @@
 // pushed in; everything else is the page's, and a reloaded page starts silent and locked again.
 
 import {
+  DRILL_EVERY_SECONDS,
+  HAMMER_EVERY_SECONDS,
   SOUND_ONE_SHOT_GAP_MS,
   SOUND_VOLUME_DEFAULT,
   STAND_IN_GAIN,
@@ -43,13 +45,33 @@ export interface SoundSpec {
   hz: number;
   /** How long a one shot's stand in lasts, in seconds [TUNE]. Ignored by a loop. */
   seconds: number;
+  /** The shortest gap between two of this one shot, in milliseconds. `SOUND_ONE_SHOT_GAP_MS` when
+   *  the row does not say: the hammer and the drill are knocks and screws, which the brief wants
+   *  every few seconds and not every second (CLAUDE.md T19 2.10). Ignored by a loop. */
+  gapMs?: number;
 }
 
 /** The table: one row per sound, by event and by station (CLAUDE.md T19 2.10). */
 export const SOUNDS: Record<SoundName, SoundSpec> = {
   door: { file: 'sounds/door.ogg', kind: 'oneShot', standIn: 'thud', gain: 0.6, hz: 160, seconds: 0.18 },
-  hammer: { file: 'sounds/hammer.ogg', kind: 'oneShot', standIn: 'click', gain: 0.5, hz: 900, seconds: 0.06 },
-  drill: { file: 'sounds/drill.ogg', kind: 'oneShot', standIn: 'buzz', gain: 0.4, hz: 220, seconds: 0.35 },
+  hammer: {
+    file: 'sounds/hammer.ogg',
+    kind: 'oneShot',
+    standIn: 'click',
+    gain: 0.5,
+    hz: 900,
+    seconds: 0.06,
+    gapMs: HAMMER_EVERY_SECONDS * 1000,
+  },
+  drill: {
+    file: 'sounds/drill.ogg',
+    kind: 'oneShot',
+    standIn: 'buzz',
+    gain: 0.4,
+    hz: 220,
+    seconds: 0.35,
+    gapMs: DRILL_EVERY_SECONDS * 1000,
+  },
   tableSaw: { file: 'sounds/tableSaw.ogg', kind: 'loop', standIn: 'noise', gain: 0.5, hz: 1400, seconds: 0 },
   extractor: { file: 'sounds/extractor.ogg', kind: 'loop', standIn: 'noise', gain: 0.3, hz: 320, seconds: 0 },
   sander: { file: 'sounds/sander.ogg', kind: 'loop', standIn: 'rasp', gain: 0.3, hz: 2200, seconds: 0 },
@@ -89,6 +111,8 @@ export interface ParamLike {
 export interface NodeLike {
   connect(to: unknown): unknown;
   disconnect(): void;
+  /** Web Audio calls this when a source has finished. A fake context need not have it. */
+  onended?: (() => void) | null;
 }
 export interface GainLike extends NodeLike {
   gain: ParamLike;
@@ -187,6 +211,11 @@ export function applySoundSettings(settings: SoundSettings): void {
   volume = Math.min(1, Math.max(0, settings.volume));
   muted = settings.muted;
   if (master !== null) master.gain.value = muted ? 0 : volume;
+  // A mute is not a quieter hall, it is a silent one: what was already running is taken down with
+  // it, so the engine's own list never says the saw is going while nothing can be heard, and a
+  // loop that could not start while it was on cannot be left out when it comes off. The frame
+  // says what the hall sounds like again at the next `setLoops` (CLAUDE.md T19 2.10).
+  if (muted) stopAllSounds();
 }
 
 /** Everything stops and the page goes silent: a scene change, a load, or the end of a test. */
@@ -311,6 +340,18 @@ function wantRecording(name: SoundName): AudioBufferLike | null {
   return null;
 }
 
+/** Everything a sound was made of, let go of. A loop is taken down by `loop(name, false)`; a one
+ *  shot has nobody to take it down, so it takes itself down when it has finished. Without this an
+ *  hour of knocking leaves an hour of finished gains hanging off the master. */
+function release(made: Running): void {
+  try {
+    made.source.disconnect();
+    made.gain.disconnect();
+  } catch {
+    // A graph already in pieces is the state we wanted anyway.
+  }
+}
+
 function start(name: SoundName): Running | null {
   const ctx = context;
   const out = master;
@@ -319,7 +360,13 @@ function start(name: SoundName): Running | null {
   const recording = wantRecording(name);
   const made =
     recording === null ? standInFor(ctx, spec, out) : fromRecording(ctx, recording, spec, out);
-  if (made !== null) played.set(name, (played.get(name) ?? 0) + 1);
+  if (made === null) return null;
+  played.set(name, (played.get(name) ?? 0) + 1);
+  if (spec.kind === 'oneShot') {
+    made.source.onended = (): void => {
+      release(made);
+    };
+  }
   return made;
 }
 
@@ -328,7 +375,7 @@ function start(name: SoundName): Running | null {
 export function play(name: OneShotName, nowMs: number): void {
   if (!soundIsUnlocked() || muted) return;
   const last = lastOneShotMs.get(name) ?? NOTHING_YET;
-  if (nowMs - last < SOUND_ONE_SHOT_GAP_MS) return;
+  if (nowMs - last < (SOUNDS[name].gapMs ?? SOUND_ONE_SHOT_GAP_MS)) return;
   lastOneShotMs.set(name, nowMs);
   start(name);
 }
@@ -350,14 +397,9 @@ export function loop(name: LoopName, on: boolean): void {
   try {
     already.source.stop();
   } catch {
-    // A one shot that has already stopped itself, or a fake that does not stop at all.
+    // A source that has already stopped itself, or a fake that does not stop at all.
   }
-  try {
-    already.source.disconnect();
-    already.gain.disconnect();
-  } catch {
-    // Same: a graph that is already in pieces is the state we wanted anyway.
-  }
+  release(already);
 }
 
 /** Turns on exactly the loops in this set and turns off every other one. The one call the frame

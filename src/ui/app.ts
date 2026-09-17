@@ -1354,6 +1354,14 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
     case 'setTips':
       dispatch({ type: 'SET_TIPS', on: element.dataset.on === '1' });
       return;
+    case 'setSound':
+      // The mute, off the same two chips the tips row uses (CLAUDE.md T19 2.10).
+      dispatch({ type: 'SET_SOUND', muted: element.dataset.muted === '1' });
+      return;
+    case 'setVolume':
+      // Quieter and Louder each carry where they would put the master (CLAUDE.md T19 2.10).
+      dispatch({ type: 'SET_SOUND', volume: Number(element.dataset.volume) });
+      return;
     case 'dismissTip':
       dispatch({ type: 'DISMISS_TIP', key: id });
       return;
@@ -1511,6 +1519,10 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
         dispatch({ type: 'QUEUE_TASKS', taskIds: ui.tickedTasks });
         ui.tickedTasks = [];
       }
+      return;
+    case 'queueTaskNext':
+      // Behind the one he is on, without putting that one down (CLAUDE.md T19 2.12).
+      dispatch({ type: 'QUEUE_TASK_NEXT', taskId: id });
       return;
     case 'pauseTask':
       dispatch({ type: 'PAUSE_TASK' });

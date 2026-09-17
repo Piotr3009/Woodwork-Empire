@@ -262,10 +262,6 @@ export function reasonLabel(reason: string): string {
   return `<span class="reason">${escapeHtml(reason)}</span>`;
 }
 
-/** The one control a task row carries, wherever the row is drawn. The engine is asked whether the
- *  owner could start this task and the answer is shown: a button he can press, or the reason he
- *  cannot, with the way out of it. A Start the engine would refuse is never drawn, which is what
- *  left the drawings unable to be drawn (CLAUDE.md T4 3.2). */
 /** The interview the owner is in, over the modal that started it. Nobody is taken on until the
  *  hour is spent (CLAUDE.md T7 3.10). Buying is no longer a trip: it costs him nothing and he
  *  never leaves the workshop for it (CLAUDE.md T9 3.1), and an interview is not one of the three
@@ -280,12 +276,38 @@ export function tripLine(state: GameState): string {
   );
 }
 
+/** What a row says when the job of work is already waiting its turn: there is nothing left to
+ *  press on it, and a button that did nothing would be a click the player spent for nothing
+ *  (CLAUDE.md T19 2.12; the standing rule that every click does something). */
+const QUEUED_REASON = 'Next in the queue';
+
+/** The button that puts this job of work behind the one he is on instead of in place of it. It
+ *  wears its own class because it is the second button a row can carry (CLAUDE.md T19 2.12). */
+function queueNextButton(taskId: string): string {
+  return (
+    '<button class="btn task-queue-next" data-do="queueTaskNext" ' +
+    `data-id="${taskId}">Add as next</button>`
+  );
+}
+
+/** The one control a task row carries, wherever the row is drawn. The engine is asked whether the
+ *  owner could start this task and the answer is shown: a button he can press, or the reason he
+ *  cannot, with the way out of it. A Start the engine would refuse is never drawn, which is what
+ *  left the drawings unable to be drawn (CLAUDE.md T4 3.2). Turn 19 changed what the way out is:
+ *  it used to be putting down what he was holding, and it is now putting this one behind it
+ *  (PIOTR, 17.09; CLAUDE.md T19 2.12). */
 export function taskStartAction(state: GameState, task: TaskInstance, startLabel: string): string {
   if (task.done) return '<span class="done">Done</span>';
-  if (state.owner.currentTaskId === task.id) return button('pauseTask', 'Pause');
+  // The one he is holding is the one he can put down (CLAUDE.md T19 2.12).
+  if (state.owner.currentTaskId === task.id) return button('pauseTask', 'Put that down');
   const check = startTaskCheck(state, task.id);
   if (check.ok) return button('startTask', startLabel, `data-id="${task.id}"`);
-  // He is holding something else: he can put it down here, without going to find it.
-  const wayOut = check.blockingTaskId === null ? '' : button('pauseTask', 'Put that down');
+  if (state.taskQueue.includes(task.id)) return reasonLabel(QUEUED_REASON);
+  // He is holding something else. It used to be put down to get at this one, which is what Piotr
+  // was doing all evening; now this one goes behind it and he carries on (PIOTR, 17.09;
+  // CLAUDE.md T19 2.12). Only on this refusal: the queue's head is started without being asked
+  // again, so a job of work refused for any other reason would sit at the front of it and stop
+  // everything behind it.
+  const wayOut = check.blockingTaskId === null ? '' : queueNextButton(task.id);
   return reasonLabel(check.reason) + wayOut;
 }

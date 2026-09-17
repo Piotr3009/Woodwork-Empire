@@ -19,6 +19,7 @@ import type { DaySummary, GameState, LedgerCategory, Worker } from '../../src/en
 import { WARNING_ORDER, warnings } from '../../src/engine/warnings';
 import {
   acceptNow,
+  act,
   buyStartingKit,
   fillBags,
   fillRack,
@@ -281,8 +282,9 @@ describe('the first days say what to do (CLAUDE.md T18 2.7)', () => {
     state.enquiries = [];
     expect(warnings(state).map((warning) => warning.key)).toEqual(['firstSteps']);
     expect(warnings(state)[0]?.text).toBe('Set up the hall');
-    // The hall set up: the kit is in and standing on the floor.
-    const fitted = fillRack(buyStartingKit(dayOne()));
+    // The hall set up: the kit is in, put down, and setup mode left behind. The line reads the
+    // flag the engine writes then, not the floor (CLAUDE.md T19 2.13).
+    const fitted = act(fillRack(buyStartingKit(dayOne())), { type: 'END_SETUP', speed: 1 });
     fitted.enquiries = [];
     expect(warnings(fitted)[0]?.text).toBe('Accept an enquiry on the board');
     // A job on the books: the last step is to start it.
@@ -294,6 +296,24 @@ describe('the first days say what to do (CLAUDE.md T18 2.7)', () => {
     firstJob(taken).stage = 'inProduction';
     firstJob(taken).assignees = ['owner'];
     expect(warnings(taken)).toEqual([]);
+  });
+
+  it('reads the flag, not the floor: a hall full of kit still asks to be set up until it is left', () => {
+    // Turn 18 looked for a workbench, which is on the floor the moment the day 1 kit is delivered,
+    // before the player has put a thing down (CLAUDE.md T19 2.13).
+    const delivered = fillRack(buyStartingKit(dayOne()));
+    delivered.enquiries = [];
+    expect(delivered.hallSetUp).toBe(false);
+    expect(delivered.equipment.some((item) => item.specId === 'workbench')).toBe(true);
+    expect(warnings(delivered)[0]?.text).toBe('Set up the hall');
+    const left = act(delivered, { type: 'END_SETUP', speed: 1 });
+    expect(left.hallSetUp).toBe(true);
+    expect(warnings(left)[0]?.text).toBe('Accept an enquiry on the board');
+    // An empty hall left behind is no hall at all: the flag stays down and the line stays up.
+    const empty = act(dayOne(), { type: 'END_SETUP', speed: 1 });
+    empty.enquiries = [];
+    expect(empty.hallSetUp).toBe(false);
+    expect(warnings(empty)[0]?.text).toBe('Set up the hall');
   });
 
   it('is gone from the day after the third, whatever the player has done', () => {
