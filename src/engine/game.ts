@@ -2321,7 +2321,10 @@ export function applyAction(state: GameState, action: GameAction): GameState {
       queueTaskNext(next, action.taskId);
       break;
     case 'SET_SOUND':
-      if (typeof action.volume === 'number') {
+      // A volume that is not a finite number is not a volume. Clamping alone let NaN through
+      // (Math.max(0, NaN) is NaN), and a NaN on the master gain throws in Web Audio, which used to
+      // take the whole frame loop with it (CLAUDE.md T19 2.10; found by the Turn 19 review).
+      if (typeof action.volume === 'number' && Number.isFinite(action.volume)) {
         next.settings.sound.volume = Math.min(1, Math.max(0, action.volume));
       }
       if (typeof action.muted === 'boolean') next.settings.sound.muted = action.muted;

@@ -42,6 +42,7 @@ import type {
 } from '../../src/ui/sound';
 import {
   acceptNow,
+  act,
   buyStartingKit,
   fillRack,
   firstJob,
@@ -475,6 +476,20 @@ describe('the engine when the browser will not play (CLAUDE.md T19 2.10, found b
     // Every gain the engine built was let go of again, but the master, which stays.
     const hanging = made.gains.filter((gain) => gain.connected > gain.disconnected);
     expect(hanging).toHaveLength(1);
+  });
+
+  it('refuses a volume that is not a number, rather than putting NaN on the master', () => {
+    // Math.max(0, NaN) is NaN, so clamping alone let it through, and a NaN gain throws in Web
+    // Audio, which used to take the frame loop with it (CLAUDE.md T19 2.10).
+    const opened = newGame();
+    const bad = act(opened, { type: 'SET_SOUND', volume: Number.NaN });
+    expect(bad.settings.sound.volume).toBe(opened.settings.sound.volume);
+    const worse = act(opened, { type: 'SET_SOUND', volume: Number.POSITIVE_INFINITY });
+    expect(worse.settings.sound.volume).toBe(opened.settings.sound.volume);
+    // A real figure still lands, and is still clamped at both ends.
+    expect(act(opened, { type: 'SET_SOUND', volume: 0.25 }).settings.sound.volume).toBe(0.25);
+    expect(act(opened, { type: 'SET_SOUND', volume: 9 }).settings.sound.volume).toBe(1);
+    expect(act(opened, { type: 'SET_SOUND', volume: -9 }).settings.sound.volume).toBe(0);
   });
 
   it('does not throw when the context answers a buffer with nothing', () => {
