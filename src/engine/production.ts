@@ -11,6 +11,7 @@
 import { HOURS_PER_WORKING_DAY, WET_AIR_FINISH_FACTOR } from './constants';
 import { addWorkingDays, isBreak } from './clock';
 import {
+  BUILDING_ROLES,
   addLabour,
   findJob,
   hallBlock,
@@ -60,6 +61,7 @@ import {
   labourPerMinute,
   stageMinutes,
   stagePlanFor,
+  tradeFactor,
 } from './stages';
 import type { Equipment, GameState, Job, LostMinuteCause, Shift } from './types';
 
@@ -96,7 +98,9 @@ export function hands(
   if (options.staff === false) return list;
   const away = staffOutputFactor(state);
   for (const worker of state.workers) {
-    if (worker.role !== 'joiner' || !isWorkingToday(state, worker, shift)) continue;
+    // A joiner and a sprayer both stand at a job: the helper and the desks do not
+    // (CLAUDE.md T19 2.5, 2.6).
+    if (!BUILDING_ROLES.includes(worker.role) || !isWorkingToday(state, worker, shift)) continue;
     if (worker.taskId !== null || worker.jobId === null) continue;
     const job = findJob(state, worker.jobId);
     if (!job || job.stage !== 'inProduction') continue;
@@ -440,7 +444,10 @@ export function workMinute(
     // A compressor's hours run only while something draws on it (CLAUDE.md T10 3.2 rule 3).
     const compressor = drawingOn(state, machine, atTheBench);
     if (compressor !== null) used.set(compressor.id, (used.get(compressor.id) ?? 0) + 1);
-    const minute = labourPerMinute(hand.rate, speed) * hall;
+    // What his trade is worth at the stage he is standing at: the booth is the sprayer's and a
+    // joiner is slower at it, and the sprayer is a pair of hands anywhere else (CLAUDE.md T19 2.6).
+    const trade = tradeFactor(worker?.role ?? null, stage.family);
+    const minute = labourPerMinute(hand.rate * trade, speed) * hall;
     if (addLabour(state, hand.job, minute, stage.id)) report.finished.push(hand.job);
   }
   // What the owner's absence took off every staff minute this minute is the owner away line of

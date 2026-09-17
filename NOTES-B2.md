@@ -83,8 +83,10 @@ together:
 `../engine/jobs`, and `OWNER` off `../engine/machines`, with the established
 `// T13-C1: export from index.ts` marker (the convention `src/ui/team.ts` already follows for
 `monthlyPay`). Export from `./jobs`: `BUILDING_ROLES`, `canBuild`, `jobMen`, `addToJob`,
-`takeOffJob`. Export from `./staff`: `tradeFactor` (2.6). Export from `./tasks`: `cleanerAtWork`
-(2.7). Then the module-path imports can be tidied back onto the barrel.
+`takeOffJob`. Export from `./stages`: `tradeFactor` (2.6). Export from `./machines`:
+`SPRAY_BOOTH`. Export from `./tasks`: `cleanerAtWork` (2.7). Export from `./production`:
+`placeStation` and `stationPlaceAt`, or from `./stations` once they are moved there (5). Then the
+module-path imports can be tidied back onto the barrel.
 
 ---
 
@@ -252,7 +254,13 @@ on the night shift and looks dead in play.
 - `game.ts` `runProductionMinute` (about line 1678):
   `const minute = labourPerMinute(hand.rate, speed) * hall;` becomes
   `const minute = labourPerMinute(hand.rate * tradeFactor(worker?.role ?? null, stage.family), speed) * hall;`,
-  importing `tradeFactor` from `./staff`. Without it the day ignores 2.6's rates entirely.
+  importing `tradeFactor` from `./stages`. Without it the day ignores 2.6's rates entirely.
+
+One more, smaller: `src/ui/spriteCheck.ts` `CHARACTER_ROLES` does not name the sprayer, so the
+sprite check page asks the art side for no frame keys of his. That file is not B2's. Adding
+`'sprayer'` to the list is the whole change; both tests that read it compute off its length.
+Nothing else is needed for 2.6's "a capsule until his sheet is delivered": `characterArt` returns
+null for a role with no sheet and `figure()` falls to `capsuleBody` on its own.
 
 ---
 

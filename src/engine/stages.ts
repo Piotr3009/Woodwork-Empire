@@ -12,12 +12,23 @@ import {
   CNC_STAGE,
   CNC_STAGE_FACTOR,
   CNC_STAGE_FACTOR_WITH_HEAD,
+  JOINER_SPRAY_RATE,
   OWNER_LABOUR_PER_MINUTE,
   PRODUCTION_STAGES,
+  SPRAYER_BENCH_RATE,
+  SPRAYER_SPRAY_RATE,
   WORK_EPSILON,
 } from './constants';
-import { bestOutputFactor, freeMachines, has, heldMachine } from './machines';
-import type { Finish, GameState, Job, MaterialKind, StageId, StageSpec } from './types';
+import { SPRAY_BOOTH, bestOutputFactor, freeMachines, has, heldMachine } from './machines';
+import type {
+  Finish,
+  GameState,
+  Job,
+  MaterialKind,
+  StageId,
+  StageSpec,
+  WorkerRole,
+} from './types';
 
 /** What a stage needs to know about the job it belongs to. A plan can be drawn for an enquiry
  *  nobody has accepted yet, which is what the board tile and the deadline are worked out from. */
@@ -99,7 +110,7 @@ export function familyForStage(job: StagedJob, stage: StageId): string | null {
     return job.materialKind === 'sheet' ? 'edgebander' : 'solidWoodTools';
   }
   if (stage === 'assembly') return 'workbench';
-  if (stage === 'finishing') return job.finish === 'lacquer' ? 'sprayBooth' : null;
+  if (stage === 'finishing') return job.finish === 'lacquer' ? SPRAY_BOOTH : null;
   return null;
 }
 
@@ -224,4 +235,17 @@ export function currentStage(
  *  minute of somebody's time is turned into work in a job. */
 export function labourPerMinute(rate: number, speed: number): number {
   return OWNER_LABOUR_PER_MINUTE * rate * speed;
+}
+
+/** What this man's minute is worth at the stage he is standing at, against his own rate: the one
+ *  place a trade changes what a stage is worth (PIOTR, 17.09; CLAUDE.md T19 2.6). A sprayer's
+ *  trade is the booth. He is at his full rate there and a pair of hands anywhere else; a joiner,
+ *  and the owner, may still lacquer, slower, so a workshop with no sprayer is slower at the booth
+ *  and never stuck. `role` is null for the owner, who has no role of his own and is a joiner by
+ *  trade. Every other man at every other stage is worth exactly his own rate, so nothing about
+ *  Output or the rate changes outside the booth (CLAUDE.md T19 6). */
+export function tradeFactor(role: WorkerRole | null, family: string | null): number {
+  const spraying = family === SPRAY_BOOTH;
+  if (role === 'sprayer') return spraying ? SPRAYER_SPRAY_RATE : SPRAYER_BENCH_RATE;
+  return spraying ? JOINER_SPRAY_RATE : 1;
 }

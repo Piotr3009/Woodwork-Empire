@@ -129,7 +129,8 @@ const DUTIES: Record<WorkerRole, string> = {
     'Runs the second shift, assigns the crew, connects the machines, and covers the hall while ' +
     'you are away. He makes nothing.',
   sprayer:
-    'The finishing of a lacquered job, at full speed, and a hand at the bench on anything else.',
+    'The finishing of a lacquered job, which is his trade, and a pair of hands at the bench on ' +
+    'anything else. A joiner can spray, slower.',
 };
 
 function wageLine(option: HiringOption): string {

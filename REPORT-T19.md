@@ -158,3 +158,43 @@ The whole of the Assign list is inert in the running game until the four click r
 NOTES-B2.md 1 are applied to `src/ui/app.ts`, which is frozen. `tests/ui/app.test.ts` (not B2's
 file) asserted a click on the old `assignJob` chip; it now asserts the new markup instead, and
 goes back to clicking when that note lands.
+
+### T19-B2b The sprayer (2.6)
+
+- A `sprayer` is hired off the Workshop tab like a joiner, in three tiers, paid by the month at
+  `SPRAYER_MONTHLY_WAGE`, listed in Our team as "sprayer, normal" and counted against the floor's
+  crew limit. The Assign list of 2.5 offers him for every job and prints "sprayer" beside his name
+  so the player sees who is who. He is drawn as a capsule until his sheet is delivered, which
+  wanted no code: a role with no character sheet falls to `capsuleBody` on its own.
+- The one new mechanism is `tradeFactor(role, family)` in `stages.ts`, beside `labourPerMinute`:
+  a sprayer is worth `SPRAYER_SPRAY_RATE` at the booth and `SPRAYER_BENCH_RATE` anywhere else, and
+  a joiner, or the owner, is worth `JOINER_SPRAY_RATE` at the booth and his whole rate everywhere
+  else. It multiplies the man's rate and never the machine's speed, so nothing about Output or the
+  rate changes away from the booth (CLAUDE.md T19 6). The cross check of section 7 is asserted:
+  the same lacquered wardrobe at its finishing stage takes labour faster with a sprayer on it than
+  with a joiner, in the ratio of the two rates to four decimal places, and the joiner alone still
+  finishes it.
+
+A joiner's whole path through the code, checked place by place, and what was decided for each.
+**In:** `WorkerRole`, `HIRING_SPECS` (three tiers, phase A), `TRADE_OF_ROLE` and `ROLE_WORDS`
+(phase A), `FLOOR_ROLES` so the floor counts him, `benchAnchor` so he stands at the booth and not
+at (1, 1), which is inside the office block, `BUILDING_ROLES` so the Assign list offers him and
+`addToJob` takes him, and `production.hands` so his minutes reach a job at all.
+**Out, and why:** `shortfallForHire` still returns nothing for him, so no bench, locker, seat,
+cabinet or tool set is bought before he starts and he can be hired into a hall with no booth,
+where he will simply spray nothing [TUNE: the brief asks for no gate and a booth gate would block
+the (bb) scenario]. `availableJoiners` and `autoAssignJobs` are joiner only, so the hall never
+hands him a job by itself: the player puts him on one. `shiftOf` keeps him on the day, so he is
+never on the night shift, which is right as it stands because `nightPremiumFor` divides a weekly
+wage and his is nought. `contractAssignCheck` stays joiner only: a standing contract is saw work.
+`HELPER_REQUIRED_FROM_JOINERS` counts joiners only, so he does not pull a helper into the hall.
+He takes no `cleaning`, `unload` or `emptyBags`: those are the helper's.
+
+One defect fixed while passing: `jobLabourCost` priced a man's minutes off his weekly wage, which
+is nought for anybody paid by the month, so the job card would have quoted a sprayer's labour at
+nothing. It reads the monthly wage over `WEEKS_PER_MONTH` when the weekly one is nought.
+
+The day shift still does not run him: `game.ts` carries a hand written second copy of the hand
+list and the labour arithmetic, and it is frozen. The three lines are NOTES-B2.md 6, and one of
+them (`possibleSeats`) is a silent wrong if it is applied without the others, so they are named
+together. The engine's own path, which the night shift and every engine test drive, is right.

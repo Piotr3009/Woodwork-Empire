@@ -79,6 +79,23 @@ describe('Our team', () => {
     expect(first?.textContent).toContain(`${hours} h this month`);
   });
 
+  it('lists the sprayer with his trade and the month he is paid by (CLAUDE.md T19 2.6)', () => {
+    const ready = withAJoiner();
+    // A normal sprayer answers from the middle of the ladder, and a month of his pay has to be in
+    // the bank before anybody is taken on (CLAUDE.md T17 2.11).
+    ready.reputation = 40;
+    ready.cash = 200000;
+    const state = hireNow(ready, 'sprayer', 'normal');
+    const man = state.workers[state.workers.length - 1];
+    if (!man || man.role !== 'sprayer') throw new Error('no sprayer on the books');
+    const row = rows(state).find((entry) => entry.getAttribute('data-team') === man.id);
+    expect(row?.textContent).toContain(man.name);
+    expect(row?.textContent).toContain('sprayer, normal');
+    // He is paid by the month, so the row prints the month's figure straight.
+    expect(man.weeklyWage).toBe(0);
+    expect(row?.textContent).toContain(money(monthlyPay(man)));
+  });
+
   it('hires nobody: the roll call has no candidates on it', () => {
     const page = parse(renderTeam(withAJoiner(), 'ourTeam'));
     expect(page.textContent).not.toContain('Taking somebody on');

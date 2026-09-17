@@ -26,6 +26,7 @@ import { onAccident } from './insurance';
 import { assignJob, findJob, oldestReadyJob, takeOffJob } from './jobs';
 import { crewLimit } from './layout';
 import {
+  SPRAY_BOOTH,
   accidentRisk,
   breakMachine,
   findSpec,
@@ -68,8 +69,9 @@ const BEHIND_THE_ADMIN: WorkerRole[] = ['purchasingClerk', 'salesman', 'draftsma
 
 /** The roles that stand on the hall floor and so count against it: the crew the floor limits
  *  (CLAUDE.md T13 3.10). The office is in the office block. The production manager stands on the
- *  floor, because the floor is what he runs. */
-const FLOOR_ROLES: WorkerRole[] = ['joiner', 'helper', 'productionManager'];
+ *  floor, because the floor is what he runs, and so does the sprayer, who is at the booth
+ *  (CLAUDE.md T19 2.6). */
+const FLOOR_ROLES: WorkerRole[] = ['joiner', 'helper', 'productionManager', 'sprayer'];
 
 /** The crew on the floor, the owner among them (CLAUDE.md T13 3.10). */
 export function crewCount(state: GameState): number {
@@ -373,6 +375,14 @@ function nameFor(state: GameState): string {
 function benchAnchor(state: GameState, role: WorkerRole): { x: number; y: number } {
   // The helper's own corner of the hall, and the office door for everybody else (T11 3.4).
   if (role === 'helper') return { ...HELPER_HOME_CELL };
+  // The sprayer's place is the booth, if the hall has one: he is a floor man and (1, 1) is
+  // inside the office block (CLAUDE.md T19 2.6, T11 3.4).
+  if (role === 'sprayer') {
+    const booth = state.equipment.find(
+      (item) => item.specId === SPRAY_BOOTH && itemStandsInTheHall(item),
+    );
+    return booth ? { x: booth.anchorX, y: booth.anchorY } : { x: 0, y: 4 };
+  }
   if (role !== 'joiner') return { x: 1, y: 1 };
   const index = joiners(state).length;
   const bench = state.equipment.filter((item) => item.specId === 'workbench')[index];

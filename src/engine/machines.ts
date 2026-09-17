@@ -374,6 +374,10 @@ export function countOf(state: GameState, specId: string): number {
  *  he is standing at (CLAUDE.md T4 3.4). */
 export const BENCH = 'workbench';
 
+/** The booth family. The finishing of a lacquered job is done at it, and it is the sprayer's own
+ *  trade: he is at his full rate there and a joiner is slower (CLAUDE.md T19 2.6). */
+export const SPRAY_BOOTH = 'sprayBooth';
+
 /** Without a bench there is no way to start production, and two men cannot share one
  *  (CLAUDE.md T4 3.4). A job whose man is already at a bench keeps it. */
 export function hasBenchFor(state: GameState, jobId: string | null): boolean {
