@@ -105,8 +105,8 @@ export function hasWorkingDay(role: WorkerRole): boolean {
  *  office, and the helper with them (PIOTR, 16.09; CLAUDE.md T17 2.3). The helper used to clear
  *  an unload or a cleaning on the spot for nothing, in the same minute it was raised, so nobody
  *  ever saw him do it. He spends the minutes now. His day is the clock's and not a meter of his
- *  own: he is on the floor, he takes his dinner with the workshop and he stays for the owner's
- *  overtime like a joiner, so only the office has the 480 of `hasWorkingDay`. */
+ *  own: he is on the floor and he takes his dinner with the workshop, so only the office has the
+ *  480 of `hasWorkingDay`. He goes home at five with the rest of them (CLAUDE.md T17 2.12). */
 export function booksTaskMinutes(role: WorkerRole): boolean {
   return hasWorkingDay(role) || role === 'helper';
 }

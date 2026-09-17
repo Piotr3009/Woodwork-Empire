@@ -13,7 +13,13 @@
 // flip. No sheet, or no animation, and the game draws the capsule it has always drawn.
 
 import sheets from '../../public/sprites/characters.json';
-import { STATION_BENCH, STATION_GATE, STATION_PHONE, STATION_RACK } from '../engine/stations';
+import {
+  STATION_BENCH,
+  STATION_GATE,
+  STATION_PHONE,
+  STATION_RACK,
+  stationSecondAt,
+} from '../engine/stations';
 import { pickSprite, spriteFiles, SPRITE_SCALE } from './sprites';
 
 /** The four ways a figure can face on a 2:1 isometric floor. */
@@ -249,7 +255,10 @@ export function playCharacters(root: ParentNode, nowMs: number): void {
  *  the leg between two of them, and the walker plays it (CLAUDE.md T9 3.13; T16 2.2). A man is
  *  never seen walking on the spot. */
 export function animationForStation(station: string): Animation {
+  // The second man of a job is at the first man's bench, in its second place: bench work, the
+  // same as the man in front of him (CLAUDE.md T17 2.10).
   if (station === STATION_BENCH || station.startsWith('machine:')) return 'bench';
+  if (stationSecondAt(station) !== null) return 'bench';
   if (station === STATION_RACK) return 'bench';
   if (station === STATION_GATE) return 'idle';
   // The phone is in his hand for as long as the call lasts, and idle the moment it is down

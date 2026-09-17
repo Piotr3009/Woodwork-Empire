@@ -178,3 +178,18 @@ the task queue of section 5 names them.
   bought in: bought in month 1, the month end of month 1 skips it and the month end of month 2
   charges it. A v24 save is stamped month 0 by the migration, so nothing that is running now is
   given a free month.
+- **2.12, what was removed with the rule.** Gone, because nothing can reach them once the men go
+  home at five: `worksOvertime`, `staysForOvertime`, `countStaffOvertimeMinute` and
+  `recordStaffOvertime` in staff.ts; `overtimePayFor`, `overtimeWageBill`, `clearOvertimeWeek` and
+  the Friday "Overtime" line in economy.ts; `runOvertimeQuits` in game.ts, with it the only path
+  that raised a `workerQuit`; and the "Tired of overtime" chip on the crew row. Kept: the four
+  fields on `Worker` (`overtimeMinutes`, `overtimeMinutesWeek`, `overtimeDays`, `tiredOfOvertime`)
+  and `GameState.lastQuitMonth`, because types.ts is frozen and every save carries them; they now
+  stand at zero and nothing reads them. Kept too: the owner's own overtime, his debt and the
+  labour factor it costs him tomorrow, which is Turn 6's rule and not Turn 8's.
+- **2.11, what the gate does to the Turn 13 playthrough.** The scripted three months on Easy are
+  in the overdraft from the end of month 1, so under the gate that player can take nobody on: the
+  estimator, the production manager and the five days away all fall out of that run. The crew of
+  the brief's 10.4 is checked on the Very easy control instead, which has the money, and the Easy
+  test now asserts what the bank does rather than what the script wanted. Phase C should look at
+  it again when it re-runs the sixteen months.

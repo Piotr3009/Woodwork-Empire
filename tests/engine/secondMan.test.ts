@@ -6,7 +6,14 @@
 
 import { describe, expect, it } from 'vitest';
 import { jobMen, jobRate, minutesRemainingFor } from '../../src/engine/jobs';
-import { stationSecondAt, waitingStation } from '../../src/engine/stations';
+import {
+  STATION_BENCH,
+  secondStation,
+  standingCell,
+  stationSecondAt,
+  waitingStation,
+} from '../../src/engine/stations';
+import { animationForStation } from '../../src/render/characters';
 import { renderWorkPlan } from '../../src/ui/workPlan';
 import type { GameState, Job } from '../../src/engine/index';
 import { CREW, act, clearEvents, runClock, sixJoinersOnSheetWork } from '../helpers';
@@ -82,6 +89,19 @@ describe('a second man on a job', () => {
       // Bench work: both of them are at the one bench, the second in its second place.
       expect(stationSecondAt(second.station)).not.toBe(null);
     }
+  });
+
+  it('stands at the bench\u2019s own second place, and works there rather than standing about', () => {
+    const state = twoOnOne();
+    const bench = state.equipment.find((item) => item.specId === 'workbench');
+    if (!bench) throw new Error('no bench');
+    // The second place of Turn 16, which nothing had asked for before tonight, and bench work
+    // there: nobody walks on the spot (CLAUDE.md T16 2.1, T17 2.10).
+    const second = secondStation(bench.id);
+    expect(stationSecondAt(second)).toBe(bench.id);
+    expect(standingCell(state, bench, 'second')).not.toEqual(standingCell(state, bench, 'operator'));
+    expect(animationForStation(second)).toBe('bench');
+    expect(animationForStation(STATION_BENCH)).toBe('bench');
   });
 
   it('is named on the work plan row, and the row offers the second man', () => {
