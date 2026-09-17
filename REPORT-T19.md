@@ -127,6 +127,68 @@ their reason in the test:
   leg changes neither the facing, nor the frame, nor the mirror, nor the place. Two tests outside
   this task's files were re-measured, one line each and both named in the section.
 
+### T19-B1b At the bench, not on it (2.4)
+
+- The brief's premise was measured and is not what the art does: every delivered PNG is exactly
+  the canvas `docs/art/SPRITES.md` section 2 gives its footprint, to the pixel, and the alpha at
+  the foot point of every operator, waiting and second cell of every family is zero. The real
+  cause of Piotr's joiner standing on his bench is a routing one: `STATION_BENCH` had no branch in
+  `stationCell` and fell through onto the cell the engine keeps for the man, which for a joiner is
+  his bench's own anchor cell, a cell the bench stands on. The helper's corner is the fan's anchor
+  cell and was the same bug. One fix for both: whatever item a man's own cell belongs to, the
+  station table says where to stand at it.
+- The second half is the measured one: the cells at the right hand end and the middle of a front
+  edge put the man where the body leans on this 2:1 dimetric, so half to four fifths of him was
+  painted over the machine. Those cells carry `out: 1` now, with the table below; the bench's own
+  operator and second places are deliberately left where they are. `queueCellsAt` and
+  `benchCellsAt` are exported from `stations.ts` for 2.5's queue of men.
+
+#### The sprite table (family, sprite extent, footprint, cell chosen)
+
+Measured by decoding every delivered PNG and sampling its alpha through the exact `spriteBox`
+placement the hall draws with: "floor" is how much of a cell's floor diamond opaque sprite pixels
+cover, "foot" is the alpha at the cell centre, which is where the figure's feet go, and "man over"
+is how much of a 1.8 m joiner standing on that cell is painted over the machine, composited from
+`character.joiner.bench.sheet.png` at the facing the station table gives him.
+
+| family.class | footprint | sprite file | canvas the contract asks for | cell chosen | floor / foot | man over, at the table | man over, a cell out |
+|---|---|---|---|---|---|---|---|
+| tableSaw.used | 2x1x1 | 160x136 | 160x136 | operator, front right, **out 1** | 0% / 0 | 67.8% | 0.0% |
+| tableSaw.budget | 2x1x1 | 160x136 | 160x136 | operator, front right, **out 1** | 0% / 0 | 33.1% | 12.1% |
+| tableSaw.standard | 3x1x1 | 208x160 | 208x160 | operator, front right, **out 1** | 0% / 0 | 62.1% | 16.8% |
+| tableSaw.pro | 3x2x1 | 256x184 | 256x184 | operator, front right, **out 1** | 0% / 0 | 64.2% | 36.2% |
+| tableSaw.industrial | 4x2x1.2 | 304x217 | 304x217 | operator, front right, **out 1** | 0% / 0 | 60.3% | 9.7% |
+| edgebander.standard | 3x1x1.2 | 208x169 | 208x169 | operator, front along 1, **out 1** | 5.0% / 0 | 68.8% | 7.3% |
+| edgebander.pro | 3x1x1.3 | 208x174 | 208x174 | operator, front along 1, **out 1** | 12.3% / 0 | 43.3% | 10.6% |
+| edgebander.industrial | 4x1x1.4 | 256x203 | 256x203 | operator, front along 1, **out 1** | 3.8% / 0 | 65.6% | 15.2% |
+| workbench.standard | 2x1x0.9 | 160x131 | 160x131 | operator, front along 0, out 0 (kept) | 2.8% / 0 | 18.9% | 0.0% |
+| workbench.standard | 2x1x0.9 | 160x131 | 160x131 | second, back right, out 0 (kept) | 30.9% / 0 | 9.4% | 0.0% |
+| workbench.standard | 2x1x0.9 | 160x131 | 160x131 | waiting, front right, **out 1** | 0% / 0 | 59.3% | 11.2% |
+| workbench.industrial | 3x1x0.9 | 208x155 | 208x155 | operator, front along 0, out 0 (kept) | 23.8% / 0 | 15.8% | 0.0% |
+| sheetRack.standard | 2x1x1.8 | 160x174 | 160x174 | free side, middle, **out 1** | 0% / 0 | 52.2% | 2.4% |
+| sheetRack.pro | 3x1x2 | 208x208 | 208x208 | free side, middle, **out 1** | 0.9% / 0 | 67.8% | 24.5% |
+| sheetRack.industrial | 4x1x2.2 | 256x241 | 256x241 | free side, middle, **out 1** | 12.0% / 0 | 83.2% | 26.7% |
+| extractor.standard | 2x1x2 | 160x184 | 160x184 | free side, middle, **out 1** | 0% / 0 | 52.5% | 0.3% |
+| extractor.pro | 3x1x2.5 | 208x232 | 208x232 | free side, middle, **out 1** | 15.8% / 0 | 68.6% | 3.7% |
+| compressor.standard | 2x1x1.5 | 160x160 | 160x160 | operator, front along 0, out 0 (kept) | 2.8% / 0 | 0.0% | 0.0% |
+| compressor.standard | 2x1x1.5 | 160x160 | 160x160 | waiting, front along 1, **out 1** (default row) | 0.9% / 0 | 70.3% | 0.1% |
+| pelletiser.standard | 2x2x2.5 | 208x232 | 208x232 | default row, front along 0 | 0% / 0 | 0.0% | 0.0% |
+| dustSystem / flexiSystem | 3x2x4 | 256x328 | 256x328 | default row, front along 0 | 0% / 0 | 0.0% | 0.0% |
+| thicknesser, spindleMoulder, cnc, sprayBooth, solidWoodTools, drill | 2x1x1 to 4x3x2 | no file | - | see below | n/a | n/a | n/a |
+
+Not one delivered file is bigger than the canvas the contract gives it, and the foot alpha is zero
+everywhere: no man's feet were ever inside a drawn body. Six families have no picture at all and
+are drawn as the placeholder box or the extruded footprint, which never leaves the diamond, so
+their rows can only be chosen by geometry: `cnc.operator` and `sprayBooth.operator` take `out: 1`
+because they are the saw's geometry (the right hand end and the middle of a front edge);
+`thicknesser` keeps its left end, along the machine, which is where the man feeds it;
+`spindleMoulder` keeps the left of its front edge, which is the bench's own geometry and measured
+at 15 to 19%.
+
+A man is 28 px each side of his feet and 71.5 px above them and a cell is 48 by 24, so he overlaps
+something at every cell in the hall. `out: 1` takes the worst cases from 60 to 83% down to 0 to
+27%; it does not take them to zero and nothing here promises that.
+
 ## The movement (CLAUDE.md T19 2.1, PIOTR: "they walk like robots and shake like a leaf")
 
 This section was written, and committed, before a line of `src/render/walkers.ts` or

@@ -38,7 +38,9 @@ export function footprintCells(item: {
   };
 }
 
-function covers(
+/** Whether a box of whole cells holds this cell: the one test for "is the thing standing on it"
+ *  (CLAUDE.md T16 2.2, T19 2.4). */
+export function covers(
   box: { x: number; y: number; width: number; depth: number },
   cell: Cell,
 ): boolean {

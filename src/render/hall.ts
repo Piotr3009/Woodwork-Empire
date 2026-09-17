@@ -58,6 +58,7 @@ import {
   facingAt,
   facingAtPallet,
   facingTowards,
+  itemAtCell,
   palletCell,
   standingCell,
   stationMachine,
@@ -911,6 +912,17 @@ export function stationCell(
   if (station === STATION_IDLE || station === STATION_NO_BENCH) {
     const cell = roomDoorCell('canteen');
     return { ...cell, facing: facingTowards(cell, { x: cell.x - 1, y: cell.y + 1 }) };
+  }
+  // A man at his bench stands AT it and not on it (PIOTR, 17.09; CLAUDE.md T19 2.4). The bench
+  // station names no bench, because every joiner has one, and the cell the engine keeps for him is
+  // his bench's own anchor cell, which is a cell the bench stands on: this fall-through used to put
+  // his feet on the bench top, and the depth order painted him over it. The helper's own cell is
+  // the fan's anchor and was the same bug. Whatever item his cell belongs to, the station table
+  // says where to stand at it; a cell that belongs to nothing is the middle of the floor as before.
+  const under = itemAtCell(state, bench);
+  if (under !== null) {
+    const cell = standingCell(state, under, 'operator');
+    return { ...cell, facing: facingAt(cell, under) };
   }
   return { ...bench, facing: facingTowards(bench, { x: bench.x, y: bench.y - 1 }) };
 }
