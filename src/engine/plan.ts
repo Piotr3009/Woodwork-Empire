@@ -41,7 +41,10 @@ export function dayOfPoint(point: number): number {
 
 /** What the hands the workshop has today average, against the owner at his best. He is one of
  *  them, at 1.0: a job nobody is on is drawn at what this workshop does to it, not at what the
- *  owner alone would do to it (CLAUDE.md T9 3.6). */
+ *  owner alone would do to it (CLAUDE.md T9 3.6).
+ *
+ *  Not the workshop rate of Turn 17, which is a figure in pounds an hour and lives in rate.ts:
+ *  this one is a speed the work plan draws a bar at, and it has carried the name since Turn 9. */
 export function workshopRate(state: GameState): number {
   const rates: number[] = [];
   if (ownerIsAvailable(state)) rates.push(1);

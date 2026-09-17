@@ -323,3 +323,39 @@ the task queue of section 5 names them.
   in full" claim of the brief's 10.4 now stand on the Very easy control, which has the money,
   beside the crew claims B2 moved there for the same reason. Phase C should look at the Easy script
   again when it re-runs the months.
+
+---
+
+## Phase C
+
+- **T17-C1 The notes applied.** `docs/notes-t17.md` is the finished record: every addition the
+  three B groups made to one of the six frozen files of Turn 13, with what phase C decided about
+  it. Nothing had to be merged. No two groups added the same click case, the same constant or the
+  same function under two names; `emptyBags` is one case reached from two places, and the one
+  repeated figure, `CONTRACT_QUANTITY_MINUTES`, repeats a fixed point in the past on purpose.
+  `src/engine/index.ts` still exports what the UI imports after B2's four removals: the build
+  passes and the four names are nowhere in `src` or `tests`.
+  Done: four constants of a rule the game no longer has are out of constants.ts
+  (`STAFF_OVERTIME_RATE`, `STAFF_OVERTIME_MAX_MINUTES`, `OVERTIME_TIRED_DAYS`,
+  `OVERTIME_QUIT_CHANCE`, all unread), the comment over `keepSetupHonest` no longer says the
+  machine is under his hand, and Turn 9's `workshopRate` in plan.ts now points at Turn 17's rate.ts
+  so the two figures that wear the word cannot be confused.
+
+### Phase C decisions
+
+- **The "Set up hall" chip stands on a quiet hall (2.5).** B1's reading is confirmed. 2.5 says two
+  things that look like a contradiction, and they are not: "one chip per thing that has to be done
+  and nothing else" governs the problem chips, and the sentence "a clean hall with nothing to do
+  shows no chip at all" is what that costs on a clean hall. "Set up hall stays as a chip when the
+  hall is not in setup" is the exception written in the same paragraph, and
+  `docs/mockups/t17/hall-strip-C.html`, which Piotr chose, draws Set up hall as a chip beside
+  Clean up, with the README saying the two buttons under the lines are as drawn. So a clean,
+  quiet hall shows one chip, Set up hall, and no problem chips at all. The code and the test say
+  that (`tests/ui/hallChips.test.ts`) and so does this report.
+- **Move on the machine card is honest as it is (2.6).** It takes the player into setup mode with
+  the card put away, where he drags the machine to where he wants it. That is the one way anything
+  has moved in this game since Turn 4: the destination is a cell he has to choose, so a single
+  click cannot do it, and putting the machine "in his hand" for a second click would be a second
+  code path for moving, which the house forbids and the brief does not ask for. What was wrong was
+  the comment over `keepSetupHonest`, which claimed the machine was under his hand; it now says
+  what happens. The button is offered only on what the engine would actually let him drag.

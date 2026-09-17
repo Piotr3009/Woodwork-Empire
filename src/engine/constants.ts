@@ -161,17 +161,12 @@ export const BREAK_SKIP_FACTOR = 0.97;
 export const OVERTIME_DEBT_PER_DAY = 0.1;
 /** However tired he is, half a day's work still comes out of him [TUNE]. */
 export const LABOUR_FACTOR_FLOOR = 0.5;
-/** Staff overtime, the Turn 1 paper rule made real (CLAUDE.md T8 3.6). Each joiner and helper in
- *  the hall stays with the owner from 17:00, at one and a half times his hourly wage, and his
- *  hourly wage is his week divided by forty [TUNE: the 40]. Two hours is all he will do; past
- *  that he goes home whatever anybody says (PIOTR). Office staff do none of it. */
-export const STAFF_OVERTIME_RATE = 1.5;
-export const STAFF_OVERTIME_MAX_MINUTES = 120;
+/** A man's hourly wage is his week divided by forty [TUNE: the 40]. The staff overtime of Turn 8
+ *  is gone with the rule: the men go home at five, always, and the evening is the owner's alone,
+ *  so nobody stays, nobody is paid time and a half and nobody hands his notice in over it
+ *  (PIOTR, 17.09; CLAUDE.md T17 2.12). The four figures that priced it went with the functions
+ *  that read them. */
 export const WORKER_HOURS_PER_WEEK = 40;
-/** Three evenings in a row and he has had enough: a flag that adds this much to his chance of
- *  handing his notice in at the month end [TUNE] (CLAUDE.md T8 3.6). */
-export const OVERTIME_TIRED_DAYS = 3;
-export const OVERTIME_QUIT_CHANCE = 0.05;
 
 /** Owner away: all staff production drops by this much (PIOTR: 30%). With a production manager
  *  on the books the drop is this much instead (PIOTR: 0.05 to 0.10, the session uses 0.08). The

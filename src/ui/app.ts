@@ -938,8 +938,9 @@ function fitCamera(): void {
 }
 
 /** Setting the hall out is the hall's own job: the view is the hall while it is on, and nothing
- *  stands open over it. That is what Move on a machine's card leans on, so one click takes the
- *  player from the card to the floor with the machine under his hand (CLAUDE.md T17 2.6). */
+ *  stands open over it. That is what Move on a machine's card leans on: one click puts the card
+ *  away and the player on the floor with the grid out, where he shifts the machine the one way
+ *  anything in this game is shifted, by dragging it (CLAUDE.md T4 3.5, T17 2.6). */
 function keepSetupHonest(): void {
   if (!ui.setup) return;
   ui.view = 'hall';
