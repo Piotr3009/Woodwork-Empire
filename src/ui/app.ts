@@ -8,9 +8,6 @@ import {
   finishTimeFor,
   formatTime,
   gameMinutesPerRealSecond,
-  bagStore,
-  bagStoreLine,
-  bagsFull,
   findSpec,
   ductingDue,
   moveConfirmPending,
@@ -24,7 +21,6 @@ import {
   timeIsPaused,
 } from '../engine/index';
 import type {
-  BagStore,
   Difficulty,
   GameAction,
   GameState,
@@ -151,8 +147,6 @@ interface Ui {
   eventPosition: ModalPosition | null;
   menuOpen: boolean;
   note: string;
-  /** The note under the hall is the hall's bag store, drawn live with its bar (T12 3.3). */
-  storeNote: boolean;
   /** The one line that says why a click did nothing, and the pulse on the Pause button that goes
    *  with it. Both last one render (CLAUDE.md T7 3.10). */
   toast: string;
@@ -283,7 +277,6 @@ function freshUi(): Ui {
     eventPosition: null,
     menuOpen: false,
     note: '',
-    storeNote: false,
     toast: '',
     filters: { board: '', catalogue: '' },
     focusNext: null,
@@ -764,11 +757,7 @@ function pageBody(): string {
   // The last word the company gets is the bankruptcy event, over the game over screen.
   if (current.gameOver) return renderGameOver(current);
   const controls = ui.view === 'hall' ? hallControls(current) + hallZoomControls() : '';
-  const note = ui.storeNote
-    ? storeNote(bagStore(current))
-    : ui.note === ''
-      ? ''
-      : `<p class="view-note">${escapeHtml(ui.note)}</p>`;
+  const note = ui.note === '' ? '' : `<p class="view-note">${escapeHtml(ui.note)}</p>`;
   const toast = ui.toast === '' ? '' : `<p class="toast">${escapeHtml(ui.toast)}</p>`;
   const out = ui.view === 'sprites' ? '' : renderOwnerOut(current);
   // The warning strip under the top bar: one problem at a time (CLAUDE.md T13 3.22).
@@ -947,9 +936,19 @@ function fitCamera(): void {
   ui.cameraStarted = true;
 }
 
+/** Setting the hall out is the hall's own job: the view is the hall while it is on, and nothing
+ *  stands open over it. That is what Move on a machine's card leans on, so one click takes the
+ *  player from the card to the floor with the machine under his hand (CLAUDE.md T17 2.6). */
+function keepSetupHonest(): void {
+  if (!ui.setup) return;
+  ui.view = 'hall';
+  ui.modal = null;
+}
+
 export function render(): void {
   const parts = halves();
   if (parts === null) return;
+  keepSetupHonest();
   const memory = ui.focusNext === null ? captureFocus() : { key: ui.focusNext, start: null };
   ui.focusNext = null;
   const wanted = ui.screen === 'game' && state !== null && state.gameOver === null
@@ -1051,22 +1050,10 @@ function hallTip(current: GameState): string {
   return withTip('', current, 'unconnected');
 }
 
-/** The one way a note is put under the hall, so the store's live note goes when another comes. */
+/** The one way a note is put under the hall. The hall's bag store is not one of them any more:
+ *  it is on the extractor's own card, where the button that empties them is (CLAUDE.md T17 2.6). */
 function setNote(text: string): void {
   ui.note = text;
-  ui.storeNote = false;
-}
-
-/** The hall's bag store under the hall: the line and a small bar, red once it is full
- *  (CLAUDE.md T12 3.3). Drawn off the state every render, so it fills as the saws run. */
-function storeNote(store: BagStore): string {
-  const percent = store.capacityM3 <= 0 ? 0 : Math.min(100, (store.fillM3 / store.capacityM3) * 100);
-  return (
-    `<p class="view-note">${escapeHtml(bagStoreLine(store))} ` +
-    `<span class="bag-gauge${store.full ? ' is-full' : ''}" role="img" ` +
-    `aria-label="${escapeHtml(bagStoreLine(store))}">` +
-    `<span class="bag-gauge-fill" style="width:${percent.toFixed(1)}%"></span></span></p>`
-  );
 }
 
 function hoursOfUse(hours: number): string {
@@ -1819,25 +1806,17 @@ function handleSceneClick(element: DataElement): boolean {
       }
       return true;
     }
-    if (item.specId === 'extractor' && bagsFull(game())) {
-      // The bags are full: clicking the extractor asks again who empties them (T12 2.3).
-      dispatch({ type: 'ASK_EMPTY_BAGS' });
-      return true;
-    }
     // A click on a machine opens that machine's own card, with the same buttons the Owned tab
-    // calls (PIOTR, 17.09; CLAUDE.md T17 2.6). Anything that is not a machine keeps its note.
-    if (findSpec(item.specId)?.category === 'machine' && item.specId !== 'extractor') {
+    // calls, and the extractor's carries the hall's bag store (PIOTR, 17.09; CLAUDE.md T17 2.6).
+    // Anything that is not a machine keeps its note.
+    const category = findSpec(item.specId)?.category;
+    if (category === 'machine' || category === 'extraction') {
       openMachineCard(item.id);
       requestRender();
       return true;
     }
     if (item.broken) {
       setNote('It has stopped. Nothing runs until it is fixed.');
-    } else if (item.specId === 'extractor') {
-      // The hall's store, live under the hall with its bar (CLAUDE.md T12 3.3). Phase B1 puts the
-      // store on the extractor's own card and this branch goes with it (CLAUDE.md T17 2.6).
-      ui.note = '';
-      ui.storeNote = true;
     } else {
       setNote(`${hoursOfUse(item.hoursUsed)} of use on the clock.`);
     }

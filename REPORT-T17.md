@@ -54,3 +54,15 @@ the task queue of section 5 names them.
   said once, and the camera is three small chips bottom right.
   Done: `tests/ui/hallChips.test.ts`, with the old strip's assertions moved onto `hallProblems` in
   the views, machines, extraction and air tests.
+- **T17-B1d A click on a machine opens its own card (2.6).** The card is the Owned tab's card and
+  one function draws both, so Connect to extraction cannot be on one and missing from the other:
+  its picture and class, what it does, its hours and its life, its service, what it is doing, the
+  metres of pipe or that there is none, the gate line, and the buttons Repair or Service, Empty
+  bags, Connect to extraction, Automatic gate, Move and Sell. The extractor opens its own card too,
+  with the hall's bag store and its bar on it, and the store note under the hall is gone with the
+  old strip. Move is one click: it takes the player into setup mode, where nothing stands open over
+  the hall and he drags the machine himself, and it is offered only on what the engine would let
+  him drag.
+  Done: `tests/ui/machineCard.test.ts` (the card is that machine's, Connect works from it, Move
+  puts him on the floor, the Owned tab draws the same card) and `tests/ui/bagStore.test.ts` moved
+  onto the card.
