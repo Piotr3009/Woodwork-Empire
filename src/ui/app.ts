@@ -1525,6 +1525,11 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
     case 'assignJob':
       dispatch({ type: 'ASSIGN_JOB', jobId: id, workerId: element.dataset.worker ?? 'owner' });
       return;
+    // The evening is the owner's: he takes a man's job on himself and the man has it back in the
+    // morning (CLAUDE.md T17 2.12).
+    case 'takeOverJob':
+      dispatch({ type: 'TAKE_OVER_JOB', jobId: id });
+      return;
     case 'startCleaning':
       dispatch({ type: 'START_CLEANING' });
       return;

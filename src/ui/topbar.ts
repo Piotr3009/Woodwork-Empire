@@ -2,7 +2,13 @@
 // the money on a name plate, the clock and the knobs beside it, the boss's day in the middle and
 // the push buttons on the right (CLAUDE.md T11 3.1). Nothing else lives here.
 
-import { DAY_CATEGORIES, DAY_CATEGORY_LABELS, SPEEDS } from '../engine/constants';
+import {
+  DAY_CATEGORIES,
+  DAY_CATEGORY_LABELS,
+  DAY_END_MINUTE,
+  OVERTIME_END_MINUTE,
+  SPEEDS,
+} from '../engine/constants';
 import {
   booksBehind,
   dayMinutesByCategory,
@@ -13,7 +19,6 @@ import {
   netOf,
   ownerIsAvailable,
   ownerJob,
-  ownerMinutesToday,
   shoppingList,
   skippedTask,
   workshopEfficiency,
@@ -116,8 +121,10 @@ function ownerLamp(state: GameState): string {
   return 'is-idle';
 }
 
-/** What he is doing, in the words the meter says it in. One line, whatever the day is like. */
-function ownerDayLine(state: GameState): string {
+/** What he is doing, in the words the meter says it in. One line, whatever the day is like. The
+ *  Our team page asks it of him too, so the owner's row and his meter say the same thing
+ *  (CLAUDE.md T17 2.9). */
+export function ownerDayLine(state: GameState): string {
   const owner = state.owner;
   if (!owner.present) return 'not in today';
   if (owner.wentHome) return 'gone home';
@@ -142,14 +149,35 @@ function minutesPerBand(state: GameState): Map<DayCategory, number> {
   return found;
 }
 
-/** The day itself: the 480 minutes, and the overtime beyond them once it runs, painted in the
- *  order they happened. Break and idle are left unpainted (CLAUDE.md T11 3.1). */
+/** The day itself, in bands: the last minutes of it are the evening's, in the overtime colour.
+ *  The day log is written in the order the minutes happened, so the overtime is the tail of it,
+ *  and an entry the evening began in the middle of is cut in two (CLAUDE.md T17 2.13). */
+function bands(state: GameState): Array<{ band: string; minutes: number }> {
+  const log = state.owner.dayLog.map((entry) => ({ band: String(entry.category), minutes: entry.minutes }));
+  let evening = Math.min(state.owner.overtimeMinutes, dayMeterTotal(state) - DAY_END_MINUTE);
+  for (let at = log.length - 1; at >= 0 && evening > 0; at -= 1) {
+    const entry = log[at];
+    if (entry === undefined) continue;
+    const taken = Math.min(entry.minutes, evening);
+    evening -= taken;
+    if (taken >= entry.minutes) {
+      entry.band = 'overtime';
+      continue;
+    }
+    entry.minutes -= taken;
+    log.splice(at + 1, 0, { band: 'overtime', minutes: taken });
+  }
+  return log;
+}
+
+/** The day itself: the 540 minutes of it, and the evening beyond them once it runs, painted in
+ *  the order they happened. Break and idle are left unpainted (CLAUDE.md T11 3.1, T17 2.13). */
 function segmentBar(state: GameState, total: number): string {
-  const segments = state.owner.dayLog
+  const segments = bands(state)
     .map((entry) => {
       const width = (entry.minutes / total) * 100;
       return (
-        `<span class="seg seg-${entry.category}" data-band="${entry.category}" ` +
+        `<span class="seg seg-${entry.band}" data-band="${entry.band}" ` +
         `style="width:${width.toFixed(4)}%"></span>`
       );
     })
@@ -173,12 +201,22 @@ function segmentTooltip(state: GameState): string {
   return `<div class="day-tip">${rows}</div>`;
 }
 
+/** How long the bar is: the working day on the clock, 08:00 to 17:00, and the evening on the end
+ *  of it as it is worked, up to 19:00 when the tools go down (PIOTR, 17.09; CLAUDE.md T17 2.13).
+ *  The figure beside the bar is read off the same number, so the two agree. */
+function dayMeterTotal(state: GameState): number {
+  const evening = Math.min(
+    Math.max(0, state.owner.overtimeMinutes),
+    OVERTIME_END_MINUTE - DAY_END_MINUTE,
+  );
+  return DAY_END_MINUTE + evening;
+}
+
 /** The boss's day, which is the middle of the bar and the point of it: a lamp, what he is on, how
  *  much of his day has gone, and the day itself in bands (CLAUDE.md T11 3.1). */
 function dayMeter(state: GameState): string {
-  const available = ownerMinutesToday(state);
-  // Overtime runs past the pool, so the bar grows to hold it rather than clipping the evening.
-  const total = Math.max(available, state.owner.minutesWorked, 1);
+  const available = dayMeterTotal(state);
+  const total = Math.max(available, 1);
   return (
     '<div class="day-meter" data-day-meter="1">' +
     '<div class="day-head">' +

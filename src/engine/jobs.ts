@@ -30,7 +30,7 @@ import {
 import { canAccept, drawOffer, findEnquiry, removeEnquiry } from './board';
 import { callRinging, scheduleCalls } from './calls';
 import { template } from './catalog';
-import { addWorkingDays, nextWorkingDay, workingDaysBetween } from './clock';
+import { addWorkingDays, isOvertime, nextWorkingDay, workingDaysBetween } from './clock';
 import { chargeUnavoidable, formatMoney, noteLoss, receive } from './economy';
 import { queueEvent } from './events';
 import {
@@ -83,9 +83,17 @@ export function findJob(state: GameState, jobId: string): Job | null {
   return state.jobs.find((job) => job.id === jobId) ?? null;
 }
 
-/** The job the owner is standing at. One source of truth: the job's own assignment. */
+/** The job this man is standing at, whether he is the first man on it or the second: two men can
+ *  be on one job now, and the owner is the second man on the one he takes on for an evening
+ *  (CLAUDE.md T17 2.10, 2.12). The one finder for it. */
+export function jobHeldBy(state: GameState, who: string): Job | null {
+  const job =
+    state.jobs.find((entry) => entry.assignedTo === who || entry.secondAssignee === who) ?? null;
+  return job !== null && job.stage === 'inProduction' ? job : null;
+}
+
 export function ownerJob(state: GameState): Job | null {
-  return state.jobs.find((job) => job.assignedTo === 'owner' && job.stage === 'inProduction') ?? null;
+  return jobHeldBy(state, OWNER);
 }
 
 export function openJobs(state: GameState): Job[] {
@@ -802,26 +810,57 @@ export function assignSecond(state: GameState, jobId: string, workerId: string |
   return true;
 }
 
-/** The owner takes a worker's job on for the evening, by a click and never on his own. The job
- *  keeps the man it is assigned to: he carries on with it in the morning (CLAUDE.md T17 2.12).
- *  Phase A routes it; the overtime hours it moves are phase B2's. */
-export function takeOverJob(state: GameState, jobId: string): boolean {
-  const job = findJob(state, jobId);
-  if (!job) return false;
+/** The owner takes a worker's job on for the evening, by a click and never on his own. He stands
+ *  at it as the second man, so the job keeps the man it is assigned to and that man carries on
+ *  with it in the morning: what the owner does tonight comes off the labour that is left
+ *  (PIOTR, 17.09; CLAUDE.md T17 2.12). The evening only: by day a job is assigned to a man, or
+ *  given a second one. */
+export function canTakeOver(state: GameState, job: Job): boolean {
   if (job.stage !== 'ready' && job.stage !== 'inProduction') return false;
   if (!ownerIsAvailable(state)) return false;
+  // The evening only, and only somebody else's job: his own he is already on.
+  if (!isOvertime(state.clock.minute)) return false;
+  return job.assignedTo !== null && job.assignedTo !== OWNER && job.secondAssignee !== OWNER;
+}
+
+export function takeOverJob(state: GameState, jobId: string): boolean {
+  const job = findJob(state, jobId);
+  if (!job || !canTakeOver(state, job)) return false;
+  // He cannot be at the desk and at the bench in the same minute.
   state.owner.currentTaskId = null;
+  // Nor at two benches: a job of his own goes back on the list, as it does when a man is given it.
+  const held = jobHeldBy(state, OWNER);
+  if (held !== null && held.id !== job.id) releaseJob(state, held);
+  job.secondAssignee = OWNER;
   job.stage = 'inProduction';
   return true;
+}
+
+/** The evening is over: every job the owner took on for it goes back to the man it belongs to,
+ *  who picks it up in the morning where the evening left it (CLAUDE.md T17 2.12). */
+export function endOwnerTakeOver(state: GameState): void {
+  for (const job of state.jobs) {
+    if (job.secondAssignee === OWNER) job.secondAssignee = null;
+  }
+}
+
+/** True while the owner is standing at a job that is somebody else's: the row says "You are on
+ *  it tonight" rather than offering the takeover again (CLAUDE.md T17 2.12). */
+export function ownerTookOver(job: Job): boolean {
+  return job.secondAssignee === OWNER && job.assignedTo !== null && job.assignedTo !== OWNER;
 }
 
 /** Takes whoever is on the job off it, leaving the work done in place. He walks away from every
  *  machine he was standing at, so the next man can have it (CLAUDE.md T7 3.1). */
 export function releaseJob(state: GameState, job: Job): void {
-  const worker = state.workers.find((entry) => entry.jobId === job.id);
-  if (worker) worker.jobId = null;
+  // Both men come off it: a job can have a second (CLAUDE.md T17 2.10).
+  for (const worker of state.workers) {
+    if (worker.jobId === job.id) worker.jobId = null;
+  }
   if (job.assignedTo !== null) releaseMachines(state, job.assignedTo);
+  if (job.secondAssignee !== null) releaseMachines(state, job.secondAssignee);
   job.assignedTo = null;
+  job.secondAssignee = null;
   closeStageRun(state, job);
   if (job.stage === 'inProduction') job.stage = 'ready';
 }

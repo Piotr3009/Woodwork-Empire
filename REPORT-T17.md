@@ -98,3 +98,18 @@ the task queue of section 5 names them.
   `COLLAR_DEPTH` 0.18 m proud of the machine's top face [TUNE in src/render/pipes.ts].
 - **2.8** The number on the rack sits `RACK_COUNT.up` 0.55 of the way up the front face on a plate
   26 px high, 15 px a digit and 9 px of padding each side [TUNE in src/render/hall.ts].
+
+## Phase B2: the people and the desk
+
+- **T17-B2a Our team, the hiring gate, the evening and the day meter (2.9, 2.11, 2.12, 2.13).**
+  Our team is a fifth tab on the Team page and the first of them: one row a person, the owner at
+  the top of it, with the day he started and how long ago, what he costs a month, the hours he has
+  worked this month, his days off and what he is on this minute. The month's hours and days off
+  are counted where the minutes and the absences already are, and start again on the first working
+  day of a month. A hire is refused with "Not enough in the bank: needs £2,057" when the account is
+  under a month of the man's pay, last in the one blockReason chain. The men go home at five now,
+  always: the evening is the owner's, and he takes a man's job on by a click on the work plan row,
+  which leaves the job assigned to the man and gives it back to him in the morning. The day meter
+  runs 540 to 660 with the evening, and the evening's minutes are painted in their own colour.
+  Done: `tests/ui/ourTeam.test.ts`, `tests/engine/hiringGate.test.ts`, the rewritten
+  `tests/engine/staffOvertime.test.ts` and the day meter tests in `tests/ui/topbar.test.ts`.

@@ -10,7 +10,7 @@
 
 import { HOURS_PER_WORKING_DAY, WET_AIR_FINISH_FACTOR } from './constants';
 import { addWorkingDays, isBreak } from './clock';
-import { addLabour, findJob, hallBlock, jobProgress, jobStage } from './jobs';
+import { addLabour, findJob, hallBlock, jobHeldBy, jobProgress, jobStage } from './jobs';
 import {
   BENCH,
   OWNER,
@@ -41,7 +41,7 @@ import {
 } from './media';
 import { ownerEfficiency, ownerIsAvailable, spendOwnerMinute, staffOutputFactor } from './owner';
 import { contractMen } from './contracts';
-import { isWorkingToday } from './staff';
+import { bookMonthMinute, isWorkingToday } from './staff';
 import { STATION_BENCH, machineStation, waitingStation } from './stations';
 import {
   type StagePlan,
@@ -64,8 +64,7 @@ export interface Hand {
 
 /** The job this man is on, in production, or null. */
 export function jobOf(state: GameState, who: string): Job | null {
-  const job = state.jobs.find((entry) => entry.assignedTo === who) ?? null;
-  return job !== null && job.stage === 'inProduction' ? job : null;
+  return jobHeldBy(state, who);
 }
 
 /** Everybody who is standing at a job this minute, the owner first. Order matters only for who
@@ -338,6 +337,8 @@ export function workMinute(
     const worker = state.workers.find((entry) => entry.id === hand.who);
     if (worker) {
       worker.productionMinutes += 1;
+      // The night's minutes are minutes of his month too (CLAUDE.md T17 2.9).
+      bookMonthMinute(worker);
     } else {
       spendOwnerMinute(state, 'workshop', 'workshop');
       state.owner.productionMinutes += 1;

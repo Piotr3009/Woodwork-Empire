@@ -175,7 +175,13 @@ describe('the Team as a page of the laptop', () => {
     expect(openModalId()).toBe('laptop');
     expect(page()).toBe('team');
     const tabs = Array.from(laptop().querySelectorAll('.laptop-screen .tabs [data-do="teamTab"]'));
-    expect(tabs.map((tab) => tab.textContent)).toEqual(['Workshop', 'Office', 'Technical', 'Management']);
+    expect(tabs.map((tab) => tab.textContent)).toEqual([
+      'Our team',
+      'Workshop',
+      'Office',
+      'Technical',
+      'Management',
+    ]);
     expect(laptop().textContent).toContain('Taking somebody on');
     // The skin: white segments, the one on in green; the hire cards white panels with Hire green.
     const tabsRule = CSS.slice(CSS.indexOf('.modal-screen .tabs {'));

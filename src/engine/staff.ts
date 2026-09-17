@@ -10,18 +10,17 @@ import {
   MINUTES_PER_WORKING_DAY,
   NIGHT_ERROR_FACTOR,
   NIGHT_RATE,
-  OVERTIME_TIRED_DAYS,
   SECOND_SHIFT_MINUTES,
-  STAFF_OVERTIME_MAX_MINUTES,
   HIRING_SPECS,
   JOINER_PREREQUISITES,
   TOOL_CABINET,
+  WEEKS_PER_MONTH,
   WORKER_HOURS_PER_WEEK,
   WORKER_NAMES,
   WORKER_RATES,
 } from './constants';
-import { addWorkingDays, isOvertime, isWorkingDay } from './clock';
-import { charge } from './economy';
+import { addWorkingDays, isOvertime, isWorkingDay, monthOfDay } from './clock';
+import { charge, formatMoney } from './economy';
 import { queueEvent } from './events';
 import { onAccident } from './insurance';
 import { assignJob, findJob, oldestReadyJob, releaseJob } from './jobs';
@@ -35,7 +34,7 @@ import {
   releaseMachinesExcept,
 } from './machines';
 import { countOwnedOrOnOrder } from './orders';
-import { managerOnDuty, ownerIsAvailable } from './owner';
+import { managerOnDuty } from './owner';
 import { hands, workMinute } from './production';
 import { chance, int, makeId } from './rng';
 import { STATION_IDLE } from './stations';
@@ -115,6 +114,46 @@ export function booksTaskMinutes(role: WorkerRole): boolean {
 /** Minutes of his own day this man has left. */
 export function staffMinutesLeft(worker: Worker): number {
   return Math.max(0, MINUTES_PER_WORKING_DAY - worker.minutesWorked);
+}
+
+/** What a man costs in a month, whichever way he is paid: the office carries a monthly wage and
+ *  the floor a weekly one, and a week is 30 over 7 of a month. The one conversion: the Our team
+ *  row prints it and the hiring gate refuses on it (CLAUDE.md T17 2.9, 2.11). */
+export function monthlyPay(pay: { weeklyWage: number; monthlyWage: number }): number {
+  if (pay.monthlyWage > 0) return Math.round(pay.monthlyWage * 100) / 100;
+  return Math.round(pay.weeklyWage * WEEKS_PER_MONTH * 100) / 100;
+}
+
+/** One minute of this man's month, wherever he worked it: at the desk, at the bench or on the
+ *  night shift. The Our team page reads his hours off it (CLAUDE.md T17 2.9). */
+export function bookMonthMinute(worker: Worker): void {
+  worker.monthMinutes += 1;
+}
+
+/** The month's meters on the owner and on every man, started again on the first working day of a
+ *  new month: the hours worked and the days off are a month's figures (CLAUDE.md T17 2.9). The
+ *  day that closed last says which month the workshop was in yesterday, so a month that turns
+ *  over a weekend turns on the Monday. */
+export function startMonthMeters(state: GameState): void {
+  const last = state.days[state.days.length - 1];
+  if (last !== undefined && monthOfDay(last.day) === monthOfDay(state.clock.day)) return;
+  state.owner.monthMinutes = 0;
+  state.owner.monthDaysOff = 0;
+  for (const worker of state.workers) {
+    worker.monthMinutes = 0;
+    worker.monthDaysOff = 0;
+  }
+}
+
+/** The days off of the month, counted the morning they are taken: the owner sick, away or at
+ *  home, and a man off with an accident (CLAUDE.md T17 2.9). Called once a morning, after the
+ *  absences of the day are known. */
+export function countMonthDaysOff(state: GameState): void {
+  if (!state.owner.present) state.owner.monthDaysOff += 1;
+  for (const worker of state.workers) {
+    if (worker.startDay > state.clock.day) continue;
+    if (worker.absentDaysRemaining > 0) worker.monthDaysOff += 1;
+  }
 }
 
 export function officeStaff(state: GameState): Worker[] {
@@ -198,47 +237,17 @@ export function nightCrew(state: GameState): Worker[] {
 }
 
 // ---------------------------------------------------------------------------
-// Overtime (CLAUDE.md T8 3.6). The hall stays with the owner or it goes home: nobody works an
-// evening he is not there for. Two hours is what a man will do, and three evenings in a row are
-// what he remembers at the month end.
+// The end of the day (PIOTR, 17.09; CLAUDE.md T17 2.12). The men go home at five, always. The
+// evening is the owner's alone: he stays if he wants it, and he takes a job on by a click on the
+// row, never automatically. The two hours of staff overtime of Turn 8 are gone with the rule, and
+// with them the Friday overtime line and the man who had had enough of the evenings.
 // ---------------------------------------------------------------------------
 
-/** The roles that stay: the men on the floor. The office goes home at five whatever happens. */
-export function worksOvertime(role: WorkerRole): boolean {
-  return role === 'joiner' || role === 'helper';
-}
-
-/** True while this man is still standing in the hall past five: on the floor, on the books today,
- *  and under the two hours he will do (PIOTR, CLAUDE.md T8 3.6). A man on the night shift is not
- *  in the hall at five to stay. */
-export function staysForOvertime(state: GameState, worker: Worker): boolean {
-  if (!worksOvertime(worker.role)) return false;
-  if (!isWorkingToday(state, worker)) return false;
-  return worker.overtimeMinutes < STAFF_OVERTIME_MAX_MINUTES;
-}
-
-/** Books one minute past 17:00 against every man who stayed. Nobody stays on a day the owner is
- *  not there to stay with them (CLAUDE.md T8 3.6). */
-export function countStaffOvertimeMinute(state: GameState): void {
-  if (!isOvertime(state.clock.minute) || !ownerIsAvailable(state)) return;
-  for (const worker of state.workers) {
-    if (!staysForOvertime(state, worker)) continue;
-    worker.overtimeMinutes += 1;
-    worker.overtimeMinutesWeek += 1;
-  }
-}
-
-/** Written at the end of every working day: a man who stayed adds an evening to his run, a man
- *  who went home at five ends it, and three in a row is what tires him (CLAUDE.md T8 3.6). */
-export function recordStaffOvertime(state: GameState): void {
-  for (const worker of state.workers) {
-    if (worker.overtimeMinutes > 0) {
-      worker.overtimeDays += 1;
-      if (worker.overtimeDays >= OVERTIME_TIRED_DAYS) worker.tiredOfOvertime = true;
-      continue;
-    }
-    worker.overtimeDays = 0;
-  }
+/** True once the hired men have gone home, which is five o'clock whatever the owner does. The one
+ *  predicate for it: production, the standing contracts and the efficiency seats all ask it
+ *  (PIOTR, 17.09; CLAUDE.md T17 2.12). */
+export function crewHasGoneHome(state: GameState): boolean {
+  return isOvertime(state.clock.minute);
 }
 
 /** The joiners of this shift who are in today and on no job. */
@@ -314,6 +323,12 @@ export function hiringOptions(state: GameState): HiringOption[] {
       blockReason = crewLine(state);
     } else if (missing.length > 0) {
       blockReason = `Buy first: ${missing.join(', ')}`;
+    } else if (state.cash < monthlyPay(spec)) {
+      // Last of the refusals, because it is the only one that changes by the minute: who answers
+      // the advert, what the office wants first, the bench and the kit are all standing facts,
+      // and the bank balance is what an owner looks at once the rest of it is ready. A man is not
+      // taken on without a month of his pay in the account (PIOTR, 17.09; CLAUDE.md T17 2.11).
+      blockReason = `Not enough in the bank: needs ${formatMoney(monthlyPay(spec))}`;
     }
     return {
       role: spec.role,
@@ -416,7 +431,6 @@ export function runStaffDayStart(state: GameState): void {
   for (const worker of state.workers) {
     if (worker.absentDaysRemaining > 0) worker.absentDaysRemaining -= 1;
     worker.minutesWorked = 0;
-    worker.overtimeMinutes = 0;
     worker.ordersToday = 0;
     worker.dayLog = [];
   }

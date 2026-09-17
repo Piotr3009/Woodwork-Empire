@@ -218,6 +218,8 @@ export function spendOwnerMinute(
 ): void {
   const owner = state.owner;
   owner.minutesWorked += 1;
+  // The hours of his month, which the Our team page reads off him (CLAUDE.md T17 2.9).
+  owner.monthMinutes += 1;
   owner.minutesByCategory[category] += 1;
   logDayMinute(owner.dayLog, dayCategory);
 }

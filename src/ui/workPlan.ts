@@ -4,6 +4,8 @@
 
 import { workPlan } from '../engine/index';
 import type { GameState, Job, PlanRow, WorkPlan } from '../engine/index';
+// Straight off their own module, not round the public API, which Turn 13 froze (REPORT-T13 10).
+import { canTakeOver, ownerTookOver } from '../engine/jobs';
 import { renderContractBar } from './contracts';
 import {
   callsLine,
@@ -13,7 +15,7 @@ import {
   jobLifecycleRow,
   materialLine,
 } from './jobCard';
-import { emptyLine, escapeHtml, money } from './modal';
+import { button, emptyLine, escapeHtml, money } from './modal';
 
 /** Where a point of the axis sits across it, as a percentage. One axis for every row, so the blue
  *  line is the same line on all of them. The axis is in working days: Monday comes straight after
@@ -33,6 +35,21 @@ function minutesText(row: PlanRow): string {
   return `${done.toLocaleString('en-GB')} of ${total.toLocaleString('en-GB')} min · ${row.stage}`;
 }
 
+/** The evening: the owner takes a man's job on himself, by this click and never on his own. The
+ *  man has it back in the morning where the evening left it (PIOTR, 17.09; CLAUDE.md T17 2.12).
+ *  Nothing at all by day: the crew are in the hall and the job is theirs. */
+function takeOverControl(state: GameState, job: Job): string {
+  if (ownerTookOver(job)) {
+    return '<span class="row-figure">You are on it tonight; he has it back in the morning</span>';
+  }
+  if (!canTakeOver(state, job)) return '';
+  return (
+    '<span class="row-action">' +
+    button('takeOverJob', 'Take it on tonight', `data-id="${job.id}"`) +
+    '</span>'
+  );
+}
+
 /** Who is on it and what it is worth: the left hand column of the board. */
 function headHtml(state: GameState, job: Job, row: PlanRow, dropConfirm: string | null): string {
   const action = jobAction(state, job);
@@ -45,6 +62,7 @@ function headHtml(state: GameState, job: Job, row: PlanRow, dropConfirm: string 
     callsLine(job) +
     materialLine(state, job) +
     jobAssignControls(state, job) +
+    takeOverControl(state, job) +
     dropControl(job, dropConfirm) +
     (action === '' ? '' : `<span class="row-action">${action}</span>`) +
     '</div>'

@@ -26,7 +26,7 @@ import {
   CONTRACT_FREE_END_DAYS,
 } from './constants';
 import type { ContractPieceSpec } from './constants';
-import { isBreak, isOvertime, isWorkingDay, weekOfDay, weekday } from './clock';
+import { isBreak, isWorkingDay, weekOfDay, weekday } from './clock';
 import { plural } from './text';
 import { charge, formatMoney } from './economy';
 import { queueEvent } from './events';
@@ -41,11 +41,11 @@ import {
   releaseMachines,
   variantFor,
 } from './machines';
-import { ownerIsAvailable, staffOutputFactor } from './owner';
+import { staffOutputFactor } from './owner';
 import { changeReputation, reputationTier } from './reputation';
 import { chance, int, pick } from './rng';
 import type { RngCarrier } from './rng';
-import { isWorkingToday, joiners, staysForOvertime } from './staff';
+import { crewHasGoneHome, isWorkingToday, joiners } from './staff';
 import { STATION_BENCH, machineStation, waitingStation } from './stations';
 import { cncOptions, familyForStage, jobOnCnc, stageSpeed } from './stages';
 import type { Contract, ContractWeek, GameState, StageId, Worker } from './types';
@@ -358,8 +358,8 @@ export function runContractMinute(state: GameState): ContractMinute {
   if (active.length === 0) return result;
   const minute = state.clock.minute;
   if (isBreak(minute)) return result;
-  const overtime = isOvertime(minute);
-  if (overtime && !ownerIsAvailable(state)) return result;
+  // The men on a contract go home at five with everybody else (CLAUDE.md T17 2.12).
+  if (crewHasGoneHome(state)) return result;
   const away = staffOutputFactor(state);
   const used = new Map<string, number>();
   let hall: number | null = null;
@@ -369,7 +369,6 @@ export function runContractMinute(state: GameState): ContractMinute {
       // The jobs' own hook writes the marker off every minute it finds no job behind it; it goes
       // back on here, so the man stays on the contract between the minutes.
       worker.jobId = contractMarker(contract.id);
-      if (overtime && !staysForOvertime(state, worker)) continue;
       const { stage, family } = pieceStage(state, worker.id, piece);
       let speed: number;
       let machineId: string | null = null;

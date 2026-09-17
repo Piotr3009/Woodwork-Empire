@@ -53,12 +53,16 @@ describe('the board itself', () => {
     const tabs = Array.from(page.querySelectorAll('[data-do="teamTab"]'));
     // The estimator's tab joined in Turn 13 (CLAUDE.md T13 3.8).
     expect(tabs.map((tab) => tab.getAttribute('data-id'))).toEqual([
+      // Our team leads them: the roll call, which hires nobody (CLAUDE.md T17 2.9).
+      'ourTeam',
       'workshop',
       'office',
       'technical',
       'management',
     ]);
-    expect(tabs[0]?.className).toContain('is-on');
+    expect(tabs.find((tab) => tab.getAttribute('data-id') === 'workshop')?.className).toContain(
+      'is-on',
+    );
   });
 
   it('puts every role of the hiring pool on one of the four, and none on two', () => {

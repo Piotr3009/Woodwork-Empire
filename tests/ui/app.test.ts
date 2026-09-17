@@ -101,7 +101,7 @@ describe('the first ten minutes', () => {
     expect(state?.difficulty).toBe('easy');
     expect(state?.clock).toEqual({ day: 1, minute: 0 });
     expect(html()).toContain('Mon, day 1');
-    expect(html()).toContain('0 / 480 min');
+    expect(html()).toContain('0 / 540 min');
     expect(html()).toContain('Board');
   });
 

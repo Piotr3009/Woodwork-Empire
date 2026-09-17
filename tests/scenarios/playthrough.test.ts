@@ -1,9 +1,14 @@
 // The three month playthrough of CLAUDE.md T13 10.4, headless, through the one scripted player:
 // Easy, a joiner in week 1, a standard saw and a twin bag extractor connected, every residential
 // enquiry with a margin over twenty per cent after the client's answer, the first contract
-// offered, an estimator in month 2, a manager in month 3, five days away in month 3, the draw
-// raised to 400 in month 2, level 1 security and both covers in month 2. The three month end
-// reports are written to the scratchpad for REPORT-T13.md.
+// offered, an estimator asked for in month 2, a manager in month 3, five days away in month 3,
+// the draw raised to 400 in month 2, level 1 security and both covers in month 2. The three month
+// end reports are written to the scratchpad for REPORT-T13.md.
+//
+// Since Turn 17 a hire wants a month of the man's pay in the account (CLAUDE.md T17 2.11), and
+// this script is in the overdraft from the end of month 1 on Easy: the estimator and the manager
+// are held back by the bank there, and the control run on Very easy, which has the money, is
+// where the crew of 10.4 is checked.
 
 import { describe, expect, it } from 'vitest';
 import { type Policy, playDay } from './autopilot';
@@ -22,6 +27,8 @@ import {
   onHoliday,
 } from '../../src/engine/index';
 import type { GameEvent, GameState } from '../../src/engine/index';
+// Straight off its own module: the public API does not carry it (REPORT-T13 10).
+import { canHire } from '../../src/engine/staff';
 
 const SEED = 20260911;
 const MARGIN_FLOOR = 0.2;
@@ -57,11 +64,21 @@ const PLAYTHROUGH: Policy = {
   onDay: (current, day) => {
     let next = current;
     if (day === 31) {
-      next = act(next, { type: 'HIRE', role: 'estimator', tier: 'normal' });
       next = act(next, { type: 'SET_OWNER_DRAW', tier: 1 });
       next = act(next, { type: 'SET_SECURITY_LEVEL', level: 1 });
       next = act(next, { type: 'SET_INSURANCE', cover: 'property', on: true });
       next = act(next, { type: 'SET_INSURANCE', cover: 'liability', on: true });
+    }
+    // From day 31 the owner takes an estimator on. A hire wants a month of his pay in the bank
+    // now (CLAUDE.md T17 2.11), and the interview is an hour of the owner's day, so the script
+    // asks again on the days that follow until he is on the books.
+    if (
+      day >= 31 &&
+      isWorkingDay(day) &&
+      !next.workers.some((worker) => worker.role === 'estimator') &&
+      !next.tasks.some((task) => task.kind === 'hiring' && !task.done)
+    ) {
+      next = act(next, { type: 'HIRE', role: 'estimator', tier: 'normal' });
     }
     // From day 61 the owner takes a production manager on. The interview is an hour of his day and
     // the day he is free to sit it is not always the 61st, so the script asks again until one is on
@@ -138,16 +155,22 @@ describe('the three month playthrough of 10.4, on Easy as the brief scripts it',
     expect(state.clock.day).toBeGreaterThanOrEqual(91);
     const joiner = state.workers.find((worker) => worker.role === 'joiner');
     expect(joiner?.startDay).toBeLessThanOrEqual(5);
-    expect(state.workers.some((worker) => worker.role === 'estimator' && worker.startDay <= 35)).toBe(true);
-    expect(state.workers.some((worker) => worker.role === 'productionManager' && worker.startDay >= 61)).toBe(true);
+    // The rest of the crew is held back by the bank, not by the script. This run is in the
+    // overdraft from the first month, and nobody is taken on without a month of his pay in the
+    // account (PIOTR, 16.09; CLAUDE.md T17 2.11). The same script on Very easy, which has the
+    // money, takes the estimator and the manager on below.
+    expect(state.cash).toBeLessThan(0);
+    expect(canHire(state, 'estimator', 'normal').reason).toContain('Not enough in the bank');
+    expect(state.workers.some((worker) => worker.role === 'estimator')).toBe(false);
+    expect(state.workers.some((worker) => worker.role === 'productionManager')).toBe(false);
     expect(state.equipment.some((item) => item.specId === 'tableSaw' && item.variantId === 'standard')).toBe(true);
     expect(state.equipment.some((item) => item.specId === 'extractor' && item.variantId === 'standard')).toBe(true);
     expect(state.pipes.length).toBeGreaterThanOrEqual(1);
     expect(state.security.level).toBe(1);
     expect(state.insurance.property && state.insurance.liability).toBe(true);
     expect(state.ownerDraw.tier).toBe(1);
-    expect(holidayTaken).toBe(true);
-    expect(days.some((day) => onHoliday(day))).toBe(true);
+    // No manager, so no holiday either: the hall is not covered (CLAUDE.md T13 3.9).
+    expect(days.some((day) => onHoliday(day))).toBe(false);
   });
 
   it('took every residential enquiry with a margin over twenty per cent, and no commercial one', () => {
@@ -268,5 +291,19 @@ describe('the same script on Very easy, the control', () => {
   it('keeps the efficiency above 55% in months 2 and 3', () => {
     expect(control.months[1]?.efficiencyMean ?? 0).toBeGreaterThan(55);
     expect(control.months[2]?.efficiencyMean ?? 0).toBeGreaterThan(55);
+  });
+
+  it('takes the estimator on in month 2, the manager in month 3, and the five days away', () => {
+    // The crew of the brief's 10.4, on the run that can afford it (CLAUDE.md T17 2.11).
+    expect(
+      control.state.workers.some((worker) => worker.role === 'estimator' && worker.startDay <= 35),
+    ).toBe(true);
+    expect(
+      control.state.workers.some(
+        (worker) => worker.role === 'productionManager' && worker.startDay >= 61,
+      ),
+    ).toBe(true);
+    expect(holidayTaken).toBe(true);
+    expect(control.days.some((day) => onHoliday(day))).toBe(true);
   });
 });
