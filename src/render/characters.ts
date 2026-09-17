@@ -13,6 +13,7 @@
 // flip. No sheet, or no animation, and the game draws the capsule it has always drawn.
 
 import sheets from '../../public/sprites/characters.json';
+import { WALK_CELLS_PER_SECOND, WALK_STRIDE_METRES } from '../engine/constants';
 import {
   STATION_BENCH,
   STATION_GATE,
@@ -116,11 +117,36 @@ export function rowFor(sheet: CharacterSheet, facing: Facing): { row: number; fl
   return null;
 }
 
-/** The frame this animation is on at this moment of real time. Real time, and never game minutes:
- *  a man does not walk faster because the clock is at 10x (CLAUDE.md T9 3.13). */
+/** The frame this animation is on at this moment of real time, at the sheet's own fps. Real time,
+ *  and never game minutes: a man does not walk faster because the clock is at 10x
+ *  (CLAUDE.md T9 3.13). A figure on the page plays at the fps written on it, which for the
+ *  locomotion sheets is `walkFps` and not the sheet's own (CLAUDE.md T19 2.1). */
 export function frameAt(sheet: CharacterSheet, nowMs: number): number {
   if (sheet.frames <= 1 || sheet.fps <= 0) return 0;
   return Math.floor((nowMs / 1000) * sheet.fps) % sheet.frames;
+}
+
+/** The animations that carry a man across the floor. They are the only ones whose frame rate is
+ *  the floor's and not the sheet's (CLAUDE.md T19 2.1). */
+const LOCOMOTION: readonly Animation[] = ['walk', 'carry'];
+
+/** How many frames a second a locomotion sheet plays at, so the feet plant where the floor moves
+ *  (PIOTR, 17.09: "they walk like robots"; CLAUDE.md T19 2.1). One full cycle of the sheet is one
+ *  stride of `WALK_STRIDE_METRES`, so the cycle has to last exactly as long as the man takes to
+ *  cover that much floor: `frames * cells a second / metres a stride`. The sheets were delivered
+ *  at 3.4286 fps with no stride at all beside them (docs/art/SPRITES.md 10.5), which at one cell a
+ *  second dragged the feet 1.67 times past where they planted. The manifest is not touched: what
+ *  is written on the figure is the renderer's, which is what SPRITES.md 10.4 leaves to it. */
+export function walkFps(sheet: CharacterSheet, cellsPerSecond = WALK_CELLS_PER_SECOND): number {
+  if (sheet.frames <= 1 || WALK_STRIDE_METRES <= 0) return 0;
+  return (sheet.frames * cellsPerSecond) / WALK_STRIDE_METRES;
+}
+
+/** The fps to write on a figure: the floor's pace for a walk and a carry, the sheet's own for
+ *  everything else, and nothing at all for a sheet with nothing to play. */
+function fpsFor(sheet: CharacterSheet, animation: Animation, frozen: boolean): number {
+  if (frozen) return 0;
+  return LOCOMOTION.includes(animation) ? walkFps(sheet) : sheet.fps;
 }
 
 /** The view box of one cell of the sheet, in file pixels. */
@@ -155,7 +181,7 @@ export function characterArt(
   const inner =
     `<svg class="figure-art" data-character="${role}" data-anim="${playable.animation}" ` +
     `data-facing="${facing}" data-frame="0" data-frames="${sheet.frames}" ` +
-    `data-fps="${playable.frozen ? 0 : sheet.fps}" data-row="${placed.row}" ` +
+    `data-fps="${fpsFor(sheet, playable.animation, playable.frozen)}" data-row="${placed.row}" ` +
     `x="${round(x)}" y="${round(y)}" width="${round(width)}" height="${round(height)}" ` +
     `viewBox="${cellBox(sheet, placed.row, 0)}" preserveAspectRatio="xMidYMid meet">` +
     `<image href="${url}" x="0" y="0" /></svg>`;
@@ -208,12 +234,17 @@ export function setCharacterAnimation(
   const placed = rowFor(found.sheet, facing);
   if (placed === null) return;
   const { sheet, url } = found;
+  // The cycle carries on where it was instead of snapping back to frame 0: a walk that becomes a
+  // carry is the same man still walking, and a page written again in the middle of a leg must not
+  // be seen to restart him (CLAUDE.md T19 2.1). A sheet with fewer frames wraps into its own.
+  const was = Number(art.getAttribute('data-frame') ?? '0');
+  const frame = Number.isFinite(was) && sheet.frames > 0 ? Math.abs(Math.trunc(was)) % sheet.frames : 0;
   art.setAttribute('data-anim', playable.animation);
   art.setAttribute('data-frames', String(sheet.frames));
-  art.setAttribute('data-fps', String(playable.frozen ? 0 : sheet.fps));
+  art.setAttribute('data-fps', String(fpsFor(sheet, playable.animation, playable.frozen)));
   art.setAttribute('data-row', String(placed.row));
-  art.setAttribute('data-frame', '0');
-  art.setAttribute('viewBox', cellBox(sheet, placed.row, 0));
+  art.setAttribute('data-frame', String(frame));
+  art.setAttribute('viewBox', cellBox(sheet, placed.row, frame));
   art.setAttribute('x', String(round(-sheet.anchorX / SPRITE_SCALE)));
   art.setAttribute('y', String(round(-sheet.anchorY / SPRITE_SCALE)));
   art.setAttribute('width', String(round(sheet.cellWidth / SPRITE_SCALE)));

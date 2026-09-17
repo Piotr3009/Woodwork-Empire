@@ -12,6 +12,7 @@ import {
   faceCharacter,
   facingFromScreen,
   frameAt,
+  walkFps,
   playCharacters,
   playableAnimation,
   rowFor,
@@ -151,13 +152,17 @@ describe('the frames', () => {
     const node = holder.querySelector('[data-character]');
     if (node === null) throw new Error('no art');
     expect(node.getAttribute('data-frame')).toBe('0');
-    // A second of real time, and the game clock never came into it.
-    playCharacters(holder, 375);
+    // A walk is played at the pace of the floor and not at the sheet's own fps, so the cycle to
+    // count frames against is the floor's one (CLAUDE.md T19 2.1). Everything else about the
+    // frames is unchanged: they are real time, and the game clock never comes into them.
+    expect(Number(node.getAttribute('data-fps'))).toBeCloseTo(walkFps(WALK), 6);
+    const cycleMs = 1000 / walkFps(WALK);
+    playCharacters(holder, cycleMs * 3 + 1);
     expect(node.getAttribute('data-frame')).toBe('3');
     expect(node.getAttribute('viewBox')).toBe(
       `${3 * WALK.cellWidth} 0 ${WALK.cellWidth} ${WALK.cellHeight}`,
     );
-    playCharacters(holder, 875);
+    playCharacters(holder, cycleMs * 7 + 1);
     expect(node.getAttribute('data-frame')).toBe('7');
     // And a sheet with nothing to play stands on frame 0 however long it is left.
     node.setAttribute('data-fps', '0');

@@ -112,6 +112,21 @@ their reason in the test:
 
 `npm run check` exit 0: 168 files, 1,638 tests.
 
+### T19-B1a The movement (2.1)
+
+- Diagnosed first and in its own commit, then fixed: the whole of it is the section **The
+  movement** below, with the before log, what was measured, what was changed and the after log.
+  The four causes were the whole pixel transform (144 frames of 240 with no movement in x at all),
+  the walk sheet playing 1.67 times faster across the floor than its own stride, the facing read
+  off every cell instead of off the leg, and the render that runs inside the same frame as the
+  walker and put a walking man back to his station's face and to frame 0 up to thirty times a
+  second.
+- After the fix: no frame of a second's walking stands still, the step is the same 0.4 px by
+  0.2 px every frame, a twelve cell staircase is walked with one facing and an L turns him once at
+  its corner, the walk plays at 5.7143 fps instead of 3.4286, and a page written in the middle of a
+  leg changes neither the facing, nor the frame, nor the mirror, nor the place. Two tests outside
+  this task's files were re-measured, one line each and both named in the section.
+
 ## The movement (CLAUDE.md T19 2.1, PIOTR: "they walk like robots and shake like a leaf")
 
 This section was written, and committed, before a line of `src/render/walkers.ts` or
@@ -220,6 +235,75 @@ AFTER A RENDER: anim=walk face=ne frame=0 fps=3.4286 flip=scale(1,1)
 A render happens once for every whole game minute, so once a real second at x1, four times at x4
 and up to thirty times a second at x30. At every one of them the painted figure is mirror-flipped
 back to his station's facing and his walk cycle is restarted at frame 0. **That is the leaf.**
+
+### What was changed
+
+1. **`translateOf` writes two decimals** and lets the browser interpolate; `transform` now reads
+   `translate(95.60,155.80)`. The sprite inside the group is untouched and stays anchored on the
+   sheet's own anchor, which was already written to two decimals. `hall.ts`'s freshly built markup
+   keeps its `Math.round`: a station cell is a whole cell, `centreOf` of a whole cell is a whole
+   pixel, so the rounding there is a no-op that two render tests pin as an exact string.
+   `setOffFrom` stops rounding what the walker remembers; only the cell handed to the path finder
+   is rounded, because the network is a grid of whole cells.
+2. **`walkFps(sheet, cellsPerSecond)`** in `characters.ts` derives the locomotion frame rate,
+   `frames * WALK_CELLS_PER_SECOND / WALK_STRIDE_METRES` = `8 * 1.0 / 1.4` = **5.7143 fps**, and
+   the two places that write `data-fps` (`characterArt` and `setCharacterAnimation`) use it for
+   `walk` and `carry` and the sheet's own fps for everything else. One rule in one place;
+   `playCharacters` reads `data-fps` off the figure and did not have to change. Nothing is written
+   back into the manifest, which section 6 freezes: the fps a figure plays at is the renderer's,
+   which is what `SPRITES.md` 10.4 leaves to it. `WALK_CELLS_PER_SECOND` is untouched at 1.0.
+3. **The facing is chosen once per leg**, in `setOff`, and kept on the walker as one facing per
+   cell of the path. `legHeadings(from, path)` gives the whole leg the facing of its overall
+   screen direction and gives any run of more than `WALK_CORNER_CELLS` (2) cells in one world
+   direction its own, so the L the path finder returns on open floor turns him exactly once, at
+   its corner, and a staircase reads as one direction from end to end. `stepWalkers` looks the
+   facing up by the cell it is walking to instead of recomputing it.
+4. **A page written mid leg no longer undoes the walk.** `syncWalkers` passes `walker.facings[0]`
+   to `dress`, so the walking facing and its mirror are put back after every render, and it then
+   calls `playCharacters` on that one figure with the same clock the frame uses, so the walk cycle
+   is put back to the frame real time is on instead of being left at the 0 the fresh markup
+   carries. `setCharacterAnimation` also keeps the frame it finds (wrapped into the new sheet's
+   count) rather than writing 0, so a walk that becomes a carry is the same man still walking.
+
+### The after log
+
+The same leg, the same fake clock, after the fix. `at` is the walker's fractional cell, `t` is the
+transform as it is written, `d` is the change from the frame before:
+
+```
+f1  at=(7.9833,4.0000) t=(95.60,155.80) d=(-0.40,-0.20) face=ne
+f2  at=(7.9667,4.0000) t=(95.20,155.60) d=(-0.40,-0.20) face=ne
+f3  at=(7.9500,4.0000) t=(94.80,155.40) d=(-0.40,-0.20) face=ne
+f4  at=(7.9333,4.0000) t=(94.40,155.20) d=(-0.40,-0.20) face=ne
+f5  at=(7.9167,4.0000) t=(94.00,155.00) d=(-0.40,-0.20) face=ne
+f6  at=(7.9000,4.0000) t=(93.60,154.80) d=(-0.40,-0.20) face=ne
+...
+f40 at=(7.3333,4.0000) t=(80.00,148.00) d=(-0.40,-0.20) face=ne
+f80 at=(7.0000,3.6667) t=(80.00,140.00) d=( 0.40,-0.20) face=ne
+f240 at=(6.0000,2.0000) t=(96.00,108.00) d=(-0.40,-0.20) face=ne
+```
+
+**Zero dx frames: 0 of 240. Zero dy frames: 0 of 240.** Every frame of the second moves, by the
+same 0.4 px of x and 0.2 px of y, which is exactly one cell a second at 60 frames a second. The
+facing changed **0 times** over the whole leg, where it changed twice before: the leg runs up and
+to the right on the screen and he faces up and to the right for the whole of it, instead of
+turning for the one cell at its start and turning back.
+
+The twelve cell staircase: **one facing for the whole leg, 0 changes**, and the mirror flip never
+moves either, where before it alternated on every cell. The L of four cells and four cells: **one
+turn, at its corner**. A walking figure now carries `data-fps` 5.7143 and not 3.4286.
+
+And the render mid leg, measured the same way as the before log:
+
+```
+MID WALK:       anim=walk face=ne frame=2 fps=5.714285714285714
+AFTER A RENDER: anim=walk face=ne frame=2 fps=5.714285714285714
+```
+
+The permanent assertions are in `tests/render/walkers.test.ts` under "The movement (CLAUDE.md
+T19 2.1)": no zero step and a near constant step over a second of walking, one facing over a
+staircase, one turn over an L, the derived fps, and a page written mid leg that changes neither
+the facing, nor the frame, nor the mirror, nor the place.
 
 ### What was found and not changed
 
