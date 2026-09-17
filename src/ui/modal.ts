@@ -141,15 +141,17 @@ function fillModal(node: Element, spec: ModalSpec): void {
     node.style.left = spec.position ? `${spec.position.left}px` : '';
     node.style.top = spec.position ? `${spec.position.top}px` : '';
   }
-  const head = node.querySelector('.modal-head');
   const heading = node.querySelector('.modal-head h2');
   if (heading !== null && heading.textContent !== spec.title) heading.textContent = spec.title;
-  if (head !== null) {
-    const cross = head.querySelector('.modal-close');
-    const closable = spec.closable !== false;
-    if (closable && cross === null) head.insertAdjacentHTML('beforeend', CROSS);
-    if (!closable && cross !== null) cross.remove();
-  }
+  // The cross is the modal's own child and not the head's, so every skin hangs it off the same
+  // box: a head that is placed (the felt board's, the laptop's, the Work Plan's) would otherwise
+  // put the same figure in three different places, which is what T18 2.5 is about. It is written
+  // last, so it is over the body whatever the skin does with its stacking (CLAUDE.md T15 2.1,
+  // T18 2.5).
+  const cross = node.querySelector(':scope > .modal-close');
+  const closable = spec.closable !== false;
+  if (closable && cross === null) node.insertAdjacentHTML('beforeend', CROSS);
+  if (!closable && cross !== null) cross.remove();
   const body = node.querySelector('.modal-body');
   if (body !== null) {
     const scrolled = body.scrollTop;

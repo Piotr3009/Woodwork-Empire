@@ -137,7 +137,9 @@ describe('the board on the wall', () => {
 describe('the cross', () => {
   it('is the one close of every modal, a big disc on the corner of the frame, and a real click shuts the board', () => {
     click('[data-office="company"]');
-    const cross = root().querySelector('[data-modal="company"] .modal-head .modal-close');
+    // The cross is the modal's own last child, not the head's: every skin hangs it off the same
+    // box, which is what makes it the same cross everywhere (CLAUDE.md T18 2.5).
+    const cross = root().querySelector('[data-modal="company"] > .modal-close');
     expect(cross).not.toBeNull();
     expect(cross?.getAttribute('data-do')).toBe('closeModal');
     // The disc: CLOSE_DISC 54 px, a 3 px oak border, the glyph in the title hand at the display
@@ -155,18 +157,19 @@ describe('the cross', () => {
     expect(disc).toContain('right: var(--close-out);');
     expect(disc).toContain('top: var(--close-out);');
     expect(ruleBody(':root')).toContain('--close-disc: 54px;');
-    expect(ruleBody('.modal-board.modal-felt')).toContain('--close-out: -27px;');
+    expect(ruleBody(':root')).toContain('--close-out: -11px;');
     // The root cause of the dead cross: the head and the body were both absolute with no stacking
-    // order and the body came later, so it covered the head. The head is above the body now.
+    // order and the body came later, so it covered the head. The head is above the body now, and
+    // since T18 2.5 the cross is above both of them: it is the modal's last child and carries its
+    // own stacking order, so no skin can bury it again.
     const head = ruleBody('.modal-felt .modal-head');
     expect(head).toContain('position: absolute;');
     expect(head).toContain('z-index: 2;');
     const body = ruleBody('.modal-felt .modal-body');
     expect(body).not.toContain('position: absolute;');
     expect(body).not.toContain('inset: 0;');
-    if (cross !== null) {
-      expect(getComputedStyle(cross.parentElement as Element).zIndex).toBe('2');
-    }
+    expect(disc).toContain('z-index: 3;');
+    expect(cross?.nextElementSibling).toBeNull();
     // A real click on the cross, bubbling up as the browser sends it: the board shuts.
     cross?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
     expect(root().querySelector('[data-modal="company"]')).toBeNull();

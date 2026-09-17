@@ -105,3 +105,13 @@ queue of section 4 names them.
   Done: `tests/ui/board.test.ts`, four new tests: the sentence to the character, the three colours
   with a hair either side of both lines, the same function answering for a job already taken, and no
   margin at all on an event that carries none.
+- **T18-09 Look and shoot.** Six pictures in `docs/report-t18`, taken against the real app in
+  headless Chromium at 1280 by 800 and looked at one by one. **One thing was wrong in the first set
+  and is fixed:** the cross of 2.5 was the same disc and the same colours everywhere but not in the
+  same place. Measured on the running page it hung 27 px off the Company board, 11 px off the
+  folder modals, 10 px off the Work Plan and 8 px *inside* the laptop's frame, because three of the
+  skins place their own head and the cross was the head's child. The cross is the modal's own last
+  child now, so every skin hangs it off the same box: measured again, 54 by 54 on all of them, the
+  same three colours and the same 11 px of overhang, to the pixel a skin's 1 px border takes off it.
+  Done: the measurement above, `--close-out` declared once and asserted once
+  (`tests/ui/oneCross.test.ts`), and the cross asserted as the modal's last child.

@@ -12,9 +12,11 @@
   /* The cream of the paper family, on the dark green cabinet of the top bar (T11 3.1). */
   --cream: #f3ecdc;
   /* The one cross, off the Company board (CLAUDE.md T18 2.5) [TUNE]: the disc, its cream face,
-     its oak edge, its green glyph, and how far it hangs off the corner of whatever it shuts. A
-     panel that draws its own frame as padding overrides `--close-out` by that padding, because an
-     absolutely placed child is put against the padding box and not the border box. */
+     its oak edge, its green glyph, and how far it hangs off the corner of whatever it shuts. The
+     cross is a child of the modal itself and not of its head, because three of the skins place
+     their head and would otherwise hang the same figure in three different places; against the
+     modal it measures 11 px of overhang on every one of them, to the pixel a skin's own border
+     takes off it. */
   --close-disc: 54px;
   --close-out: -11px;
   --close-face: #f7f1e4;
@@ -2528,14 +2530,6 @@ input.num {
   width: 1px;
 }
 
-/* The board's oak frame is 16 px of padding, and the cross is placed against the padding box, so
-   its own figure is 16 px larger for the same overhang every other modal has. The disc itself is
-   the one `.modal-close` rule, which this board is where the game took it from (CLAUDE.md T15
-   2.1, T18 2.5). */
-.modal-board.modal-felt {
-  --close-out: -27px;
-}
-
 .modal-felt .modal-body {
   background: radial-gradient(ellipse at 40% 30%, var(--felt-green), var(--felt-green-2));
   border-radius: 3px;
@@ -3173,12 +3167,8 @@ input.num {
 }
 
 /* Phase B5 (REPORT-T13-B5.md, section 3). The Menu's own cross is gone: it calls the one
-   `closeButton()` and wears the one `.modal-close`. Its 8 px of padding is added to the overhang
-   so the disc hangs off its corner by the same 11 px it hangs off a modal's
-   (CLAUDE.md T18 2.5). */
-.menu-pop {
-  --close-out: -19px;
-}
+   `closeButton()` and wears the one `.modal-close`, which hangs off its corner by the same 11 px
+   it hangs off a modal's (CLAUDE.md T18 2.5). */
 
 .gear {
   font-size: var(--fs-lead);

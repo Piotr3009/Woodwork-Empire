@@ -85,6 +85,9 @@ describe('the one cross (CLAUDE.md T18 2.5)', () => {
       const crosses = Array.from(modal?.querySelectorAll('.modal-close') ?? []);
       expect(crosses.length, id).toBe(1);
       expect(crosses[0]?.outerHTML, id).toBe(wanted);
+      // The modal's own last child, not the head's: three of the skins place their head, and a
+      // cross hung off a placed head lands somewhere different on each of them.
+      expect(modal?.lastElementChild, id).toBe(crosses[0]);
       click(`[data-modal="${id}"] .modal-close`);
       expect(root().querySelector(`.modal-layer [data-modal="${id}"]`), id).toBeNull();
     }
@@ -114,5 +117,10 @@ describe('the one cross (CLAUDE.md T18 2.5)', () => {
     const inSource = ['src/ui/modal.ts', 'src/ui/topbar.ts', 'src/ui/app.ts', 'src/ui/catalogue.ts']
       .filter((path) => readFileSync(path, 'utf8').includes('class="modal-close"'));
     expect(inSource).toEqual(['src/ui/modal.ts']);
+    // One place sets how far it hangs off, so no skin can hang it somewhere of its own. Measured
+    // against the running page at 1280 by 800, every modal reads the same 54 px disc and the same
+    // 11 px of overhang, to the pixel a skin's own border takes off it (REPORT-T18.md).
+    expect(CSS.match(/--close-out:/g)).toHaveLength(1);
+    expect(CSS.match(/--close-disc:/g)).toHaveLength(1);
   });
 });
