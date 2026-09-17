@@ -341,6 +341,70 @@ the task queue of section 5 names them.
   machine is under his hand, and Turn 9's `workshopRate` in plan.ts now points at Turn 17's rate.ts
   so the two figures that wear the word cannot be confused.
 
+- **T17-C2 The scenarios.** The sixteen scenario months of Turns 2 to 13 are played again under
+  the new rules and stand: `thirtyDays.test.ts`, `turn13.test.ts` ((t) to (x)) and the 10.4
+  playthrough, 128 scenario assertions, all green with the hiring gate, restock by number and the
+  men going home at five. The 10.4 run on Easy is re-scripted rather than split: the player goes to
+  the bank the day the fitting out puts him under, and with the loan drawn every claim of 10.4 is
+  back on Easy where the brief put it. Two new months are added in `tests/scenarios/turn17.test.ts`:
+  (y) two men on one job and a contract on the rack, and (z) a week that proves the rate.
+  Done: 12 assertions on the re-scripted playthrough, 10 on (y) and (z), and the two `it.todo`
+  lines of Turn 13 that recorded claims which did not hold are real tests now.
+
+### The Easy playthrough, and why it was re-scripted
+
+The C brief asked me to decide whether B2's and B3's split (the crew and the contract claims moved
+onto the Very easy control, Easy left asserting that the bank holds him back) was the right answer,
+or whether the Easy script should be re-scripted. I re-scripted it. The figures:
+
+- **Where the money goes.** Measured on the Easy run as B2 and B3 left it: the account is at 4,597
+  on day 1 and at −464 on day 4, because the script buys 15,400 of kit on day 1 out of 20,000 of
+  capital and another 8,200 of kit and stock by day 5. Nothing Turn 17 changed touches those days:
+  the run has been in the overdraft from day 4 since Turn 13. It then sat there for three months at
+  25% a year, went into arrears in month 2 and ended day 91 at −9,998 with 12,445 of arrears, no
+  estimator, no manager, no holiday, and a contract starving for sheets from week 9.
+- **The lever.** The C brief names three: spend less, take the loan earlier, take fewer jobs at
+  once. The evidence says the loan. The month reports show the workshop's own trade is not the
+  problem: the contract nets +3,876, +4,902 and +4,446 over the three months, and the jobs are all
+  taken at over 20% margin. What it cannot do is carry 8,600 a month of owner's draw (the draw
+  raised to tier 1, which is 400 a day, by 10.4's own script) on the capital it has. Spending less
+  would be rewriting what 10.4 measures; the bank is the thing the script never used.
+- **The re-script.** One rule in `onDay`: while he is still standing the workshop up (day 30 or
+  under), the day the account goes under he takes a loan of 25,000 [TUNE: half what the bank
+  lends], once. It fires on day 4 on Easy. Very easy never goes under in month 1, so the control
+  is untouched and still never borrows.
+- **What it bought.** Easy now closes month 1 at +19,186 and month 2 at +4,359; the estimator is on
+  the books on day 32 and the manager on day 64; the five days away are taken; the contract's
+  thirteen weeks are made in full out of the rack (27 to 32 against 20 wanted); month 3 efficiency
+  is 74.4% against the 55% the claim wants; the house reaches tier 2 in month 2 and keeps it; and
+  the run ends at −8,711 with 6,000 of arrears. That is less overdrawn and with half the arrears of
+  the run that sat in the overdraft, so the loan is not a trick to get past the gate: it is the
+  cheaper money, and the player who takes it is better off on every figure.
+- **What the overdraft still costs him.** Two charges in three months, 32p on day 31 for the hours
+  between going under on day 4 and the bank answering, and 82.43 on day 91 for the end of month 3.
+  The month end of month 2 carries none at all.
+- **What the gate still proves.** `tests/engine/hiringGate.test.ts` is where the refusal is
+  measured, and the cross check below reads it at 2,499 in the bank. The playthrough's job is to
+  show that a careful player can still build the crew of 10.4 on Easy, and it does.
+
+### The two new months
+
+- **(y) two men on one job and a contract on stock.** Very easy, three poor joiners with a saw
+  each, one 6,000 piece ready on the first man's bench, a standing contract for 20 cut sheet packs
+  a week on the third man's, and nothing else taken off the board. The same month is played twice
+  and only one thing differs: the second joiner on the piece. Measured: 26 days to finish it with
+  the one man, 13 with the two of them, which is half to the day, the machine stage included. The
+  contract holds sheets on the rack while it runs (3 held at the end of the month), draws them as
+  the pieces are made (17 sheets, 112 pieces), keeps every full week in full, and puts no material
+  line on the ledger at all: every contract entry is income.
+- **(z) a week that proves the rate.** The owner alone in a fitted hall, one big piece on his
+  bench, a working week played through the clock a minute at a time. The board reads
+  **£37.68 an hour** and the month end reads the same pounds out of the same function. The same
+  week with the last two days standing, the wages paid for all five, reads **£22.80 an hour**:
+  three fifths of it (0.605), which is Piotr's own arithmetic of 40 falling to 24. The played week
+  is under 40 because he books 304 of the 320 a full owner day is, losing the rest to the walk to
+  the bench and the hall's factor; the exact 40 and 24 are pinned in `tests/engine/rate.test.ts`.
+
 ### Phase C decisions
 
 - **The "Set up hall" chip stands on a quiet hall (2.5).** B1's reading is confirmed. 2.5 says two
