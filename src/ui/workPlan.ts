@@ -5,7 +5,7 @@
 import { formatCalendarDay, workPlan } from '../engine/index';
 import type { GameState, Job, PlanRow, WorkPlan } from '../engine/index';
 // Straight off their own module, not round the public API, which Turn 13 froze (REPORT-T13 10).
-import { canTakeOver, ownerTookOver } from '../engine/jobs';
+import { canTakeOver, leadAssignee, ownerTookOver } from '../engine/jobs';
 import { joiners, onTheBooksToday } from '../engine/staff';
 import { renderContractBar } from './contracts';
 import {
@@ -40,16 +40,17 @@ function minutesText(row: PlanRow): string {
  *  minutes into it (PIOTR, 16.09; CLAUDE.md T17 2.10). The first man is not on the chips, and
  *  Alone takes the second off again. A job nobody is on is assigned, not seconded. */
 function secondManControls(state: GameState, job: Job): string {
-  if (job.assignedTo === null) return '';
+  const lead = leadAssignee(job);
+  if (lead === null) return '';
   if (job.stage !== 'ready' && job.stage !== 'inProduction') return '';
   // The owner on it for the evening is the takeover of 2.12 and not a second man to choose.
   if (ownerTookOver(job)) return '';
   const chip = (workerId: string, label: string): string =>
-    `<button class="chip${(job.secondAssignee ?? '') === workerId ? ' is-on' : ''}" ` +
+    `<button class="chip${(job.assignees[1] ?? '') === workerId ? ' is-on' : ''}" ` +
     `data-do="assignSecond" data-id="${job.id}" data-worker="${workerId}">` +
     `${escapeHtml(label)}</button>`;
   const crew = joiners(state)
-    .filter((worker) => onTheBooksToday(state, worker) && worker.id !== job.assignedTo)
+    .filter((worker) => onTheBooksToday(state, worker) && worker.id !== lead)
     .map((worker) => chip(worker.id, worker.name))
     .join('');
   if (crew === '') return '';

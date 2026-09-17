@@ -24,7 +24,7 @@ function atFive(): GameState {
 }
 
 function mansJob(state: GameState): Job {
-  const job = state.jobs.find((entry) => entry.assignedTo === 'staff-1');
+  const job = state.jobs.find((entry) => entry.assignees[0] === 'staff-1');
   if (!job) throw new Error('the joiner has no job');
   return job;
 }
@@ -48,16 +48,16 @@ describe('five in the afternoon', () => {
     const before = job.labourRemaining;
     const taken = act(state, { type: 'TAKE_OVER_JOB', jobId: job.id });
     // It is still the man's job: the owner is the second man on it for the evening.
-    expect(mansJob(taken).assignedTo).toBe('staff-1');
-    expect(mansJob(taken).secondAssignee).toBe('owner');
+    expect(mansJob(taken).assignees[0]).toBe('staff-1');
+    expect(mansJob(taken).assignees[1]).toBe('owner');
     const worked = clearEvents(runClock(taken, 60));
     expect(mansJob(worked).labourRemaining).toBeLessThan(before);
     // The morning: the evening is over, the owner is off it and the man carries on with it.
     const tomorrow = clearEvents(act(worked, { type: 'END_DAY' }));
     expect(tomorrow.clock.day).toBeGreaterThan(state.clock.day);
     const morning = mansJob(tomorrow);
-    expect(morning.secondAssignee).toBe(null);
-    expect(morning.assignedTo).toBe('staff-1');
+    expect(morning.assignees[1] ?? null).toBe(null);
+    expect(morning.assignees[0]).toBe('staff-1');
     expect(tomorrow.workers.find((worker) => worker.id === 'staff-1')?.jobId).toBe(morning.id);
   });
 
@@ -65,7 +65,7 @@ describe('five in the afternoon', () => {
     const state = twoMenOnSheetWork();
     const job = mansJob(state);
     const tried = act(state, { type: 'TAKE_OVER_JOB', jobId: job.id });
-    expect(mansJob(tried).secondAssignee).toBe(null);
+    expect(mansJob(tried).assignees[1] ?? null).toBe(null);
   });
 });
 

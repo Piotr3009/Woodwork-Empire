@@ -138,7 +138,7 @@ describe('a v24 save in this build (CLAUDE.md T17 section 4)', () => {
     expect(opened.state).not.toBeNull();
     const state = opened.state as GameState;
     expect(state.version).toBe(STATE_VERSION);
-    expect(STATE_VERSION).toBe(15);
+    expect(STATE_VERSION).toBe(16);
     expect(state.taskQueue).toEqual([]);
     expect(state.dayStats.paidHours).toBe(0);
     expect(state.dayStats.expressUplift).toBe(0);
@@ -146,7 +146,7 @@ describe('a v24 save in this build (CLAUDE.md T17 section 4)', () => {
       expect(day.paidHours).toBe(0);
       expect(day.expressUplift).toBe(0);
     }
-    for (const job of state.jobs) expect(job.secondAssignee).toBeNull();
+    for (const job of state.jobs) expect(job.assignees[1] ?? null).toBeNull();
   });
 
   it('moves every seat and locker off the hall floor and into the canteen', () => {

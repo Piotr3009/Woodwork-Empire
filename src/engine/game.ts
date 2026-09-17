@@ -42,6 +42,7 @@ import {
   STATE_VERSION,
   WEBSITE_START_LEVEL,
   WELFARE_IN_THE_CANTEEN,
+  SOUND_VOLUME_DEFAULT,
 } from './constants';
 import { arriveEnquiries, refreshBoard, refreshLocks } from './board';
 import {
@@ -158,6 +159,7 @@ import {
   acceptEnquiry,
   addLabour,
   assignJob,
+  addToJob,
   assignSecond,
   chargeSiteMeasure,
   checkOverdueJobs,
@@ -180,6 +182,7 @@ import {
   runBookedTransport,
   dropJob,
   setSawFallback,
+  takeOffJob,
   takeOverJob,
   transportLabel,
 } from './jobs';
@@ -279,6 +282,7 @@ import {
   resumeStartedTask,
   startNextQueued,
   skippedTask,
+  queueTaskNext,
   queueTasks,
   startTask,
   taskWorkRate,
@@ -415,7 +419,8 @@ export function createGame(options: NewGameOptions): GameState {
     ownerDraw: { tier: 0 },
     pipes: [],
     gates: [],
-    settings: { tips: true },
+    settings: { tips: true, sound: { volume: SOUND_VOLUME_DEFAULT, muted: false } },
+    hallSetUp: false,
     tips: { seen: [] },
     shift: { second: false },
     monthEndShownFor: 0,
@@ -1185,6 +1190,10 @@ function hoursText(minutes: number): string {
  *  two hours and a ducting bill (PIOTR, 13.09; CLAUDE.md T8 3.4). */
 function endSetup(state: GameState, speed: Speed): void {
   state.speed = speed;
+  // The hall has been set up once the player has left setup mode with anything of his standing in
+  // it. The flag is what the first steps line reads; nothing goes looking for a workbench any more
+  // (CLAUDE.md T19 2.13).
+  if (!state.hallSetUp && state.equipment.some((item) => !isSold(item))) state.hallSetUp = true;
   if (state.movedItems.length === 0) return;
   if (movePending(state) !== null) return;
   // The question is already in front of him: asking it twice would book the move twice.
@@ -2297,6 +2306,25 @@ export function applyAction(state: GameState, action: GameAction): GameState {
       break;
     case 'SET_TIPS':
       next.settings.tips = action.on;
+      break;
+    case 'ADD_TO_JOB':
+      // One more man on the job, however many are on it already (CLAUDE.md T19 2.5).
+      addToJob(next, action.jobId, action.workerId);
+      break;
+    case 'REMOVE_FROM_JOB':
+      // The cross on his chip: he comes off and everybody else stays on (CLAUDE.md T19 2.5).
+      takeOffJob(next, action.jobId, action.workerId);
+      break;
+    case 'QUEUE_TASK_NEXT':
+      // Add as next: behind the one running, and the running one is not put down
+      // (CLAUDE.md T19 2.12).
+      queueTaskNext(next, action.taskId);
+      break;
+    case 'SET_SOUND':
+      if (typeof action.volume === 'number') {
+        next.settings.sound.volume = Math.min(1, Math.max(0, action.volume));
+      }
+      if (typeof action.muted === 'boolean') next.settings.sound.muted = action.muted;
       break;
     case 'DISMISS_TIP':
       if (!next.tips.seen.includes(action.key)) next.tips.seen.push(action.key);

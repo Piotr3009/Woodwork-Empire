@@ -26,7 +26,7 @@ function parse(html: string): HTMLElement {
 
 /** The first joiner's job, which is the one the second man joins. */
 function jobOfFirst(state: GameState): Job {
-  const job = state.jobs.find((entry) => entry.assignedTo === 'staff-1');
+  const job = state.jobs.find((entry) => entry.assignees[0] === 'staff-1');
   if (!job) throw new Error('the first joiner has no job');
   return job;
 }
@@ -41,7 +41,7 @@ function twoOnOne(saws = CREW): GameState {
 }
 
 function jobIdOf(state: GameState, workerId: string): string {
-  const job = state.jobs.find((entry) => entry.assignedTo === workerId);
+  const job = state.jobs.find((entry) => entry.assignees[0] === workerId);
   if (!job) throw new Error(`no job for ${workerId}`);
   return job.id;
 }
@@ -50,11 +50,11 @@ describe('a second man on a job', () => {
   it('stands at it beside the first, and holds no other job', () => {
     const state = twoOnOne();
     const job = jobOfFirst(state);
-    expect(job.secondAssignee).toBe('staff-2');
+    expect(job.assignees[1]).toBe('staff-2');
     expect(jobMen(job)).toEqual(['staff-1', 'staff-2']);
     expect(state.workers.find((worker) => worker.id === 'staff-2')?.jobId).toBe(job.id);
     // The job he was on is nobody's now, and he is on no other.
-    expect(state.jobs.filter((entry) => entry.assignedTo === 'staff-2')).toHaveLength(0);
+    expect(state.jobs.filter((entry) => entry.assignees[0] === 'staff-2')).toHaveLength(0);
   });
 
   it('halves the days, because both of them work at their own rate', () => {
@@ -121,7 +121,7 @@ describe('a second man on a job', () => {
     const state = twoOnOne();
     const job = jobOfFirst(state);
     const alone = act(state, { type: 'ASSIGN_SECOND', jobId: job.id, workerId: null });
-    expect(jobOfFirst(alone).secondAssignee).toBe(null);
+    expect(jobOfFirst(alone).assignees[1] ?? null).toBe(null);
     // He is off that job. The hall gives a free joiner the oldest job waiting, as it always did.
     expect(alone.workers.find((worker) => worker.id === 'staff-2')?.jobId).not.toBe(job.id);
   });

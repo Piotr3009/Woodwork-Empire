@@ -13,6 +13,7 @@ import {
   jobProgress,
   jobsAtGate,
   joiners,
+  leadAssignee,
   lifecycleSteps,
   onTheBooksToday,
   orderForJobCheck,
@@ -69,7 +70,8 @@ export function callsLine(job: Job): string {
 /** The informational labour cost of a job in progress comes from the engine (CLAUDE.md 8.5). */
 export function jobLabourLine(state: GameState, job: Job): string {
   const { minutes: left, cost } = jobLabourCost(state, job);
-  const worker = job.assignedTo === null ? null : workerById(state, job.assignedTo);
+  const lead = leadAssignee(job);
+  const worker = lead === null ? null : workerById(state, lead);
   if (!worker) return `${minutes(left)} of your own time left`;
   return `${minutes(left)} of ${escapeHtml(worker.name)}, about ${money(cost)} of wages`;
 }
@@ -78,7 +80,7 @@ export function jobLabourLine(state: GameState, job: Job): string {
 export function jobAssignControls(state: GameState, job: Job): string {
   if (job.stage !== 'ready' && job.stage !== 'inProduction') return '';
   const chip = (workerId: string, label: string): string =>
-    `<button class="chip${job.assignedTo === workerId ? ' is-on' : ''}" data-do="assignJob" ` +
+    `<button class="chip${leadAssignee(job) === workerId ? ' is-on' : ''}" data-do="assignJob" ` +
     `data-id="${job.id}" data-worker="${workerId}">${escapeHtml(label)}</button>`;
   const crew = joiners(state)
     // A night man can be given a job by day: the chips offer everybody on the books today.

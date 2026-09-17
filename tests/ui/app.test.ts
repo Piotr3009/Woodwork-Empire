@@ -446,7 +446,7 @@ describe('assigning work by hand', () => {
     click('[data-office="workPlan"]');
     expect(html()).toContain('data-do="assignJob"');
     click('[data-do="assignJob"][data-worker="owner"]');
-    expect(currentState()?.jobs[0]?.assignedTo).toBe('owner');
+    expect(currentState()?.jobs[0]?.assignees[0]).toBe('owner');
     click('[data-do="closeModal"]');
   });
 });
@@ -457,7 +457,7 @@ describe('start production', () => {
     expect(state).not.toBeNull();
     if (state && state.jobs[0]) {
       state.jobs[0].stage = 'ready';
-      state.jobs[0].assignedTo = null;
+      state.jobs[0].assignees = [];
       state.stock.sheets = 20;
     }
     click('[data-office="workPlan"]');
@@ -466,7 +466,7 @@ describe('start production', () => {
     // The work plan is shut; the top bar's Projects chip still carries the modal's name.
     expect(root().querySelector('.modal-layer [data-modal="workPlan"]')).toBeNull();
     expect(html()).toContain('hall-view');
-    expect(currentState()?.jobs[0]?.assignedTo).toBe('owner');
+    expect(currentState()?.jobs[0]?.assignees[0]).toBe('owner');
     expect(currentState()?.jobs[0]?.stage).toBe('inProduction');
     click('[data-do="setView"][data-view="office"]');
   });

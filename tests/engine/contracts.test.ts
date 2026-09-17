@@ -257,12 +257,12 @@ describe('people, not machines', () => {
     const job = state.jobs[0];
     if (!job) throw new Error('a job is wanted');
     job.stage = 'ready';
-    job.assignedTo = 'staff-1';
+    job.assignees = ['staff-1'];
     job.stage = 'inProduction';
     const ben = state.workers[0];
     if (ben) ben.jobId = job.id;
     const contract = running(state);
-    expect(job.assignedTo).toBeNull();
+    expect(job.assignees[0] ?? null).toBeNull();
     expect(job.stage).toBe('ready');
     expect(ben?.jobId).toBe(contractMarker(contract.id));
   });
@@ -279,7 +279,7 @@ describe('people, not machines', () => {
     const later = runClock(state, 5);
     const ben = later.workers.find((worker) => worker.id === 'staff-1');
     expect(ben?.jobId).toBe(contractMarker(contract.id));
-    expect(later.jobs[0]?.assignedTo).toBeNull();
+    expect(later.jobs[0]?.assignees[0] ?? null).toBeNull();
     const running5 = activeContracts(later)[0];
     expect(running5?.assigned).toEqual(['staff-1']);
     expect(running5?.labourMinutes).toBeGreaterThan(0);

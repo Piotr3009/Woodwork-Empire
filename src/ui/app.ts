@@ -86,6 +86,8 @@ import {
 } from './modal';
 import { playCharacters } from '../render/characters';
 import { resetWalkers, stepWalkers, syncWalkers } from '../render/walkers';
+import { applySoundSettings, play as soundPlay, setLoops, stopAllSounds, unlockSound } from './sound';
+import { hallLoops, hallOneShots } from '../render/hall';
 import { walkPath } from '../engine/walk';
 import { unconnectedMachines } from '../engine/pipes';
 import { hasCentralExtraction } from '../engine/machines';
@@ -1886,6 +1888,11 @@ function onClick(event: MouseEvent): void {
 function runClick(event: MouseEvent): void {
   const target = event.target;
   if (!(target instanceof Element)) return;
+  // The player has clicked something, so the browser will let a sound engine start. Nothing plays
+  // before this, ever: that is the rule the browsers themselves enforce and the one the brief
+  // sets (CLAUDE.md T19 2.10). After the first click it costs a comparison.
+  unlockSound();
+  if (state !== null) applySoundSettings(state.settings.sound);
   if (ui.panned) {
     // The pointer travelled: that was the player moving the hall, not pressing what it started on.
     ui.panned = false;
@@ -2290,6 +2297,26 @@ export function advanceMinutes(wholeMinutes: number): number {
   return result.minutesRun;
 }
 
+/** The hall's own sound, once a frame and in real time like the figures (CLAUDE.md T19 2.10).
+ *  The loops are set to exactly what the hall is running; the one shots are offered every frame
+ *  and the engine thins them to one a second each, so x10 and x30 do not rattle. Nothing plays
+ *  before the first click, because nothing is unlocked before it. */
+function driveSound(now: number): void {
+  if (state === null || ui.screen !== 'game') {
+    stopAllSounds();
+    return;
+  }
+  applySoundSettings(state.settings.sound);
+  // A stopped clock is a stopped workshop: nothing is being cut while the player reads a modal.
+  const running = state.speed > 0 && state.activeEvent === null && state.gameOver === null;
+  if (!running) {
+    stopAllSounds();
+    return;
+  }
+  setLoops(hallLoops(state));
+  for (const name of hallOneShots(state)) soundPlay(name, now);
+}
+
 function frame(now: number): void {
   const elapsed = Math.min(1000, now - lastFrame);
   lastFrame = now;
@@ -2299,6 +2326,7 @@ function frame(now: number): void {
   if (root !== null) {
     stepWalkers(root, now);
     playCharacters(root, now);
+    driveSound(now);
   }
   // One frame, one writing of the page, whatever the clock did inside it: ten game minutes at
   // 10x used to be ten pages (CLAUDE.md T9 3.8, 3.11).

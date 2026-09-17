@@ -1005,7 +1005,7 @@ describe('a month that sells the used saw on day 5 after buying a standard one',
   /** Takes the owner off whatever he is at, so the saw under him is free to sell. */
   function offTheBench(state: GameState): GameState {
     let next = act(state, { type: 'PAUSE_TASK' });
-    for (const job of next.jobs.filter((entry) => entry.assignedTo === 'owner')) {
+    for (const job of next.jobs.filter((entry) => entry.assignees[0] === 'owner')) {
       next = act(next, { type: 'ASSIGN_JOB', jobId: job.id, workerId: null });
     }
     return next;
@@ -1387,7 +1387,7 @@ describe('a month with a thicknesser on a single bag and a helper', () => {
     expect(helperOnDuty(state)).toBe(true);
     const tables = state.jobs.filter((job) => job.templateId === 'oakDiningTable');
     expect(tables.length).toBeGreaterThan(0);
-    expect(tables.some((job) => job.assignedTo === 'owner' || job.stage === 'completed')).toBe(true);
+    expect(tables.some((job) => job.assignees[0] === 'owner' || job.stage === 'completed')).toBe(true);
   });
 
   it('never stood a man at the thicknesser, so its two bags a day never reached the store', () => {

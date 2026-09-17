@@ -100,6 +100,10 @@ import {
   spriteUrl,
 } from './sprites';
 import { placeholder } from './placeholder';
+import { cncOptions } from '../engine/stages';
+import { jobStage } from '../engine/jobs';
+import type { StageId } from '../engine/types';
+import type { LoopName as HallLoopName, OneShotName as HallOneShotName } from '../ui/sound';
 
 // ---------------------------------------------------------------------------
 // SVG primitives. office.ts uses these too: one place builds the strings.
@@ -1760,4 +1764,79 @@ function lineAttrs(x1: number, y1: number, x2: number, y2: number): string {
   const from = centreOf(x1, y1, 0, 0);
   const to = centreOf(x2, y2, 0, 0);
   return `x1="${Math.round(from.x)}" y1="${Math.round(from.y)}" x2="${Math.round(to.x)}" y2="${Math.round(to.y)}"`;
+}
+
+// ---------------------------------------------------------------------------
+// What the hall sounds like this moment (CLAUDE.md T19 2.10)
+// ---------------------------------------------------------------------------
+//
+// The engine of the sound is in src/ui/sound.ts; what is here is the hall's own reading of itself,
+// so the sound follows what the player can see and never a second copy of the state. The names are
+// the sound table's names; the types come across as types only, so nothing in render depends on
+// anything in ui at run time.
+//
+// A naming note for the report: the brief's "fitting" is not a stage in this code. The stages are
+// cutting, machining, cnc, assembly, finishing and delivery (src/engine/types.ts, StageId), and
+// the fitting of a carcass happens inside assembly. The hammer and the drill are therefore both
+// hooked to assembly, at their own cadences, and the code's names are used.
+
+/** Every machine of this family somebody is standing at this minute. */
+function familyInUse(state: GameState, specId: string): boolean {
+  return state.equipment.some(
+    (item) =>
+      item.specId === specId &&
+      !isSold(item) &&
+      itemStandsInTheHall(item) &&
+      machineInUse(state, item),
+  );
+}
+
+/** The stage every job in production is at this minute, as a list of stage ids with the job's
+ *  finish beside each, which is what the bench sounds are chosen from. */
+function benchStagesNow(state: GameState): Array<{ stage: StageId; finish: string }> {
+  const found: Array<{ stage: StageId; finish: string }> = [];
+  for (const job of state.jobs) {
+    if (job.stage !== 'inProduction') continue;
+    const who = job.assignees[0] ?? null;
+    if (who === null) continue;
+    const plan = jobStage(state, job, cncOptions(state, who, job));
+    if (plan === null) continue;
+    found.push({ stage: plan.id, finish: job.finish });
+  }
+  return found;
+}
+
+/** The loops the hall is running this moment: the saw while somebody is at it, the extraction
+ *  while it pulls, the sander while a bench is finishing something that is not lacquered, and the
+ *  booth while somebody sprays (CLAUDE.md T19 2.10). */
+export function hallLoops(state: GameState): Set<HallLoopName> {
+  const on = new Set<HallLoopName>();
+  if (familyInUse(state, 'tableSaw')) on.add('tableSaw');
+  // The extraction pulls while any machine on it is running, which is what makes its fan breathe
+  // on the hall already (machineFx above reads the same thing).
+  if (hasExtraction(state) && state.equipment.some(
+    (item) => !isSold(item) && itemStandsInTheHall(item) && wantsExtraction(item) && machineInUse(state, item),
+  )) {
+    on.add('extractor');
+  }
+  for (const at of benchStagesNow(state)) {
+    if (at.stage !== 'finishing') continue;
+    if (at.finish === 'lacquer') on.add('sprayBooth');
+    else on.add('sander');
+  }
+  return on;
+}
+
+/** The one shot sounds the hall wants this moment: knocks and screws off the benches that are
+ *  assembling. The engine thins them to at most one a second per sound, so this may say "yes"
+ *  every frame and the hall still does not rattle (CLAUDE.md T19 2.10). */
+export function hallOneShots(state: GameState): Set<HallOneShotName> {
+  const on = new Set<HallOneShotName>();
+  for (const at of benchStagesNow(state)) {
+    if (at.stage === 'assembly') {
+      on.add('hammer');
+      on.add('drill');
+    }
+  }
+  return on;
 }

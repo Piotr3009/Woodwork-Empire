@@ -96,10 +96,10 @@ function contractOf(state: GameState): Contract | undefined {
 describe('(y) two men on one job, on Very easy', () => {
   it('stands the second man at it with no job of his own, and the control leaves it one man’s', () => {
     const job = watched(MIDMONTH);
-    expect(job.secondAssignee).toBe(OPENING.men[1]);
+    expect(job.assignees[1]).toBe(OPENING.men[1]);
     expect(job.stage).toBe('inProduction');
-    expect(MIDMONTH.jobs.filter((entry) => entry.assignedTo === OPENING.men[1])).toHaveLength(0);
-    expect(watched(ALONE).secondAssignee).toBe(null);
+    expect(MIDMONTH.jobs.filter((entry) => entry.assignees[0] === OPENING.men[1])).toHaveLength(0);
+    expect(watched(ALONE).assignees[1] ?? null).toBe(null);
   });
 
   it('finishes the piece in about half the days, the machine stage apart', () => {

@@ -139,7 +139,7 @@ function sprayedMinutes(dryer: boolean): number {
   let next = acceptNow(state, enquiry.id, false);
   const job = firstJob(next);
   job.stage = 'inProduction';
-  job.assignedTo = 'owner';
+  job.assignees = ['owner'];
   // Into the Finishing, which for a lacquered job is done at the booth (CLAUDE.md T11 3.7).
   job.labourRemaining = job.labourValue * 0.1;
   const before = firstJob(next).labourRemaining;
@@ -177,7 +177,7 @@ function assembledMinutes(compressorClass: string | null): number {
   }
   for (const job of next.jobs) {
     job.stage = 'inProduction';
-    job.assignedTo = 'owner';
+    job.assignees = ['owner'];
     // Into the assembly, which is the stage a man does with a nailer in his hand.
     job.labourRemaining = job.labourValue * 0.5;
   }
@@ -210,7 +210,7 @@ describe('air for every bench', () => {
     const next = acceptNow(state, enquiry.id, false);
     const job = firstJob(next);
     job.stage = 'inProduction';
-    job.assignedTo = 'owner';
+    job.assignees = ['owner'];
     job.labourRemaining = job.labourValue * 0.5;
     expect(hallAirCheck(next).lines).toContain(NO_AIR_LINE);
   });

@@ -10,7 +10,16 @@
 
 import { HOURS_PER_WORKING_DAY, WET_AIR_FINISH_FACTOR } from './constants';
 import { addWorkingDays, isBreak } from './clock';
-import { addLabour, findJob, hallBlock, jobHeldBy, jobProgress, jobStage } from './jobs';
+import {
+  addLabour,
+  findJob,
+  hallBlock,
+  isOnJob,
+  jobHeldBy,
+  jobProgress,
+  jobStage,
+  leadAssignee,
+} from './jobs';
 import {
   BENCH,
   OWNER,
@@ -100,7 +109,8 @@ export function hands(
 export function familiesWanted(state: GameState, job: Job, who = OWNER): string[] {
   // The second man works at the first man's bench, in its second place: he does not take a bench
   // of his own, and one that is free is left for somebody else (CLAUDE.md T17 2.10).
-  const wanted: string[] = job.secondAssignee === who && job.assignedTo !== null ? [] : [BENCH];
+  const lead = leadAssignee(job);
+  const wanted: string[] = lead !== null && lead !== who && isOnJob(job, who) ? [] : [BENCH];
   const stage = currentStage(state, job, cncOptions(state, who, job));
   const family = stage?.family ?? null;
   if (family === null || family === BENCH) return wanted;
@@ -148,9 +158,10 @@ export function stationForProduction(state: GameState, who: string, job: Job): s
   const family = stage?.family ?? null;
   // The second man of the job stands at the first man's bench, in its second place, whenever the
   // work is bench work (CLAUDE.md T17 2.10). At a machine he queues for it like anybody else.
+  const lead = leadAssignee(job);
   const second =
-    job.secondAssignee === who && job.assignedTo !== null && job.assignedTo !== who
-      ? heldMachine(state, job.assignedTo, BENCH)
+    lead !== null && lead !== who && isOnJob(job, who)
+      ? heldMachine(state, lead, BENCH)
       : null;
   if (family === null || family === BENCH) {
     return second === null ? STATION_BENCH : secondStation(second.id);

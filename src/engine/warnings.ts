@@ -73,7 +73,7 @@ function bagsFullWarning(state: GameState): Warning | null {
 
 function nobodyAssignedWarning(state: GameState): Warning | null {
   const started = state.jobs.find(
-    (job) => job.stage === 'inProduction' && job.assignedTo === null,
+    (job) => job.stage === 'inProduction' && job.assignees.length === 0,
   );
   if (started === undefined) return null;
   return { key: 'nobodyAssigned', text: `${started.name} is started and nobody is on it` };

@@ -3937,3 +3937,59 @@ input.num {
   box-shadow: none;
   color: var(--screen-ink);
 }
+/* ---------------------------------------------------------------------------
+   Turn 19. Phase A puts the class names in with nothing in them, so the three
+   phase B groups can write their markup against names that already exist and
+   the one stylesheet is never two agents' at once (CLAUDE.md T13 2.1, T19 3).
+   Phase B fills these; a rule left empty at the end of the turn is a class
+   nobody needed.
+   --------------------------------------------------------------------------- */
+
+/* 2.5 The people on a job: chips with a cross, one blue button, and the list it opens. */
+.assign-line {
+}
+
+.assign-chip {
+}
+
+.assign-chip .assign-off {
+}
+
+.assign-open {
+}
+
+.assign-list {
+}
+
+.assign-row {
+}
+
+.assign-row.is-busy {
+}
+
+.assign-row .assign-tier {
+}
+
+.assign-row .assign-why {
+}
+
+.assign-none {
+}
+
+/* 2.9 The reputation column's headline: the total, with the week's net beside it. */
+.reputation-total {
+}
+
+.reputation-week {
+}
+
+/* 2.10 The sound controls in Settings. */
+.sound-row {
+}
+
+.sound-volume {
+}
+
+/* 2.12 The laptop's second button while a task is running. */
+.task-queue-next {
+}

@@ -83,6 +83,7 @@ const ROLE_WORDS: Record<WorkerRole, string> = {
   draftsman: 'draftsman',
   estimator: 'estimator',
   productionManager: 'production manager',
+  sprayer: 'sprayer',
 };
 
 /** Which trade a role belongs to. The one table: the hiring tabs and the tiles read it, and a role
@@ -97,6 +98,7 @@ const TRADE_OF_ROLE: Record<WorkerRole, TeamTab> = {
   draftsman: 'office',
   estimator: 'technical',
   productionManager: 'management',
+  sprayer: 'workshop',
 };
 
 export function tradeOf(role: WorkerRole): TeamTab {
@@ -124,6 +126,8 @@ const DUTIES: Record<WorkerRole, string> = {
   productionManager:
     'Runs the second shift, assigns the crew, connects the machines, and covers the hall while ' +
     'you are away. He makes nothing.',
+  sprayer:
+    'The finishing of a lacquered job, at full speed, and a hand at the bench on anything else.',
 };
 
 function wageLine(option: HiringOption): string {

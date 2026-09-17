@@ -9,6 +9,7 @@
 import {
   CANTEEN_SLOT_LAYOUT,
   LOCKER_SLOT_LAYOUT,
+  SOUND_VOLUME_DEFAULT,
   STATE_VERSION,
   WEBSITE_START_LEVEL,
 } from './constants';
@@ -218,11 +219,42 @@ function liftToVersion15(state: Raw): void {
   state.version = 15;
 }
 
+/** Version 15 to 16: a job carries everybody on it as one list, the settings carry the sound, and
+ *  the state remembers that the hall has been set up (CLAUDE.md T19 section 4). Every v26 save
+ *  loads: the two old fields become the list, in the order the two men stood in; the sound starts
+ *  at the default volume, unmuted; and a hall with anything of the player's standing in it has
+ *  been set up, because it could not have got there any other way. */
+function liftToVersion16(state: Raw): void {
+  for (const job of records(state.jobs)) {
+    const assignees: string[] = [];
+    if (typeof job.assignedTo === 'string') assignees.push(job.assignedTo);
+    if (typeof job.secondAssignee === 'string' && !assignees.includes(job.secondAssignee)) {
+      assignees.push(job.secondAssignee);
+    }
+    job.assignees = assignees;
+    delete job.assignedTo;
+    delete job.secondAssignee;
+  }
+  if (isRecord(state.settings)) {
+    state.settings.sound = { volume: SOUND_VOLUME_DEFAULT, muted: false };
+  } else {
+    state.settings = { tips: true, sound: { volume: SOUND_VOLUME_DEFAULT, muted: false } };
+  }
+  // Anything of the player's standing in the hall means he has been through setup at least once.
+  // A machine still on the lorry has no anchor on the floor, so it is not counted
+  // (CLAUDE.md T19 2.13).
+  state.hallSetUp = records(state.equipment).some(
+    (item) => item.soldOnDay === null || item.soldOnDay === undefined,
+  );
+  state.version = 16;
+}
+
 /** One lift per bump, keyed by the version it lifts from. */
 const LIFTS: Record<number, (state: Raw) => void> = {
   12: liftToVersion13,
   13: liftToVersion14,
   14: liftToVersion15,
+  15: liftToVersion16,
 };
 
 /** The state a save holds, lifted bump by bump into this build's shape, or null when the save is

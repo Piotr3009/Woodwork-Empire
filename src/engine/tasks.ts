@@ -811,6 +811,19 @@ export function queueTasks(state: GameState, taskIds: readonly string[]): boolea
   return true;
 }
 
+/** One more task behind the one he is on, instead of putting that one down: the laptop's
+ *  "Add as next" (PIOTR, 17.09; CLAUDE.md T19 2.12). With nothing running it simply starts. A task
+ *  already in the queue is not queued twice; one already running is left alone. */
+export function queueTaskNext(state: GameState, taskId: string): boolean {
+  const task = findTask(state, taskId);
+  if (task === null || task.done) return false;
+  if (state.owner.currentTaskId === taskId) return false;
+  if (state.taskQueue.includes(taskId)) return false;
+  state.taskQueue.push(taskId);
+  startNextQueued(state);
+  return true;
+}
+
 /** The next one he ticked. Whatever is done or gone falls off the front of the queue, and the head
  *  of it is started the moment his hands are free: the queue waits while the phone has him, and
  *  the call he was interrupted with sends him back to it when it is over (CLAUDE.md T17 2.16). */

@@ -474,7 +474,7 @@ export function playDay(
     next = takeContract(next, policy);
     next = orderShortfalls(next);
     if (next.owner.present && !next.owner.wentHome && next.owner.currentTaskId === null) {
-      const onBench = next.jobs.some((job) => job.assignedTo === 'owner');
+      const onBench = next.jobs.some((job) => job.assignees[0] === 'owner');
       if (next.dust > policy.cleanAbove) {
         next = applyAction(next, { type: 'START_CLEANING' });
       } else {

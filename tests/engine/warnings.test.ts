@@ -114,7 +114,7 @@ function withStartedJobNobodyOn(state: GameState): GameState {
   const next = acceptNow(state, enquiry.id);
   const job = firstJob(next);
   job.stage = 'inProduction';
-  job.assignedTo = null;
+  job.assignees = [];
   return next;
 }
 
@@ -292,7 +292,7 @@ describe('the first days say what to do (CLAUDE.md T18 2.7)', () => {
     expect(warnings(taken)[0]?.text).toBe('Press Start production on the work plan');
     // Started: the line is gone for good.
     firstJob(taken).stage = 'inProduction';
-    firstJob(taken).assignedTo = 'owner';
+    firstJob(taken).assignees = ['owner'];
     expect(warnings(taken)).toEqual([]);
   });
 
@@ -379,7 +379,7 @@ describe('the order of urgency', () => {
     expect(warnings(state)[0]?.key).toBe('bagsFull');
     state.bagFillM3 = 0;
     expect(warnings(state)[0]?.key).toBe('nobodyAssigned');
-    firstJob(state).assignedTo = 'owner';
+    firstJob(state).assignees = ['owner'];
     expect(warnings(state)[0]?.key).toBe('noInsurance');
   });
 });

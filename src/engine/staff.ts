@@ -425,7 +425,7 @@ export function hire(state: GameState, role: WorkerRole, tier: WorkerTier | null
 export function autoAssignJobs(state: GameState, shift: Shift = 'day'): void {
   for (const worker of availableJoiners(state, shift)) {
     const job = oldestReadyJob(state);
-    if (!job || job.assignedTo !== null) return;
+    if (!job || job.assignees.length > 0) return;
     assignJob(state, job.id, worker.id);
   }
 }

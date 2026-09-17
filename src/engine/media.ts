@@ -405,8 +405,9 @@ export function benchDrawsAir(stage: { id: string; family: string | null }): 'be
 export function airHands(state: GameState): AirHands {
   const hands: AirHands = { bench: 0, sanding: 0 };
   for (const job of state.jobs) {
-    if (job.stage !== 'inProduction' || job.assignedTo === null) continue;
-    const stage = currentStage(state, job, cncOptions(state, job.assignedTo, job));
+    const lead = job.assignees[0] ?? null;
+    if (job.stage !== 'inProduction' || lead === null) continue;
+    const stage = currentStage(state, job, cncOptions(state, lead, job));
     if (stage === null) continue;
     const draw = benchDrawsAir(stage);
     if (draw === 'bench') hands.bench += 1;

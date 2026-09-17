@@ -84,7 +84,11 @@ export type WorkerRole =
   | 'estimator'
   /** The first management role: the second shift, the assigning, and the owner's absence covered
    *  (CLAUDE.md T13 3.9). */
-  | 'productionManager';
+  | 'productionManager'
+  /** The finishing man. A lacquered job's finishing is his at his full rate; a joiner may still
+   *  do it, slower, so a workshop without one is slower there and never stuck
+   *  (PIOTR, 17.09; CLAUDE.md T19 2.6). */
+  | 'sprayer';
 
 /** Which shift a man on the floor works. The second one runs after the day shift, at the night
  *  rate, only while a production manager is on the books (CLAUDE.md T13 3.9). */
@@ -505,11 +509,13 @@ export interface Job {
   /** Calls nobody picked up. The first is free, every one after it costs. */
   callsMissed: number;
   designMinutesRemaining: number;
-  assignedTo: string | null;
-  /** The second man on the job. Both book minutes into it, each at his own rate: the machine
-   *  stage takes one of them at the machine and the other at the waiting cell, the bench stage
-   *  takes both at the bench (CLAUDE.md T17 2.10). Null while one man has it to himself. */
-  secondAssignee: string | null;
+  /** Everybody on this job, the owner as `'owner'`, in the order they were put on it. There is
+   *  no limit: if the player wants twenty men on one job he may have twenty, the time shortens,
+   *  and it is his decision (PIOTR, 17.09; CLAUDE.md T19 2.5). The first of the list is the one a
+   *  machine stage puts at the machine; the rest take the waiting cell and the free cells along
+   *  the same side. All of them book minutes into the job at their own rates. Empty while nobody
+   *  is on it. Replaces `assignedTo` and `secondAssignee` of Turns 1 to 18. */
+  assignees: string[];
   /** What was worked when, one entry per run at a stage, for the Work Plan (CLAUDE.md T7 3.2). */
   stageRuns: StageRun[];
   completedDay: number | null;
@@ -907,6 +913,15 @@ export interface PipeRun {
 /** What the player can switch (CLAUDE.md T13 3.22). Tips and nothing else tonight. */
 export interface SettingsState {
   tips: boolean;
+  /** The master volume and the mute, saved with the game (CLAUDE.md T19 2.10). */
+  sound: SoundSettings;
+}
+
+/** What the player has set the sound to. Volume is 0 to 1; muted silences everything whatever the
+ *  volume says (CLAUDE.md T19 2.10). */
+export interface SoundSettings {
+  volume: number;
+  muted: boolean;
 }
 
 /** The first use bubbles already dismissed (CLAUDE.md T13 3.22). */
@@ -1088,6 +1103,9 @@ export interface GameState {
   /** The ids of the machines with an automatic blast gate on their drop (CLAUDE.md T13 3.11). */
   gates: string[];
   settings: SettingsState;
+  /** True the first time setup mode was left with anything standing in the hall. The first steps
+   *  line reads this and never goes looking for a workbench (CLAUDE.md T19 2.13). */
+  hallSetUp: boolean;
   tips: TipsState;
   shift: ShiftState;
   /** The month whose report has been put in front of the player, so it is shown once
@@ -1204,4 +1222,15 @@ export type GameAction =
   | { type: 'SET_SECURITY_LEVEL'; level: number }
   // Chrome and guidance:
   | { type: 'SET_TIPS'; on: boolean }
+  /** Puts one more man on a job, from the Assign to this job list. There is no limit on how many
+   *  (PIOTR, 17.09; CLAUDE.md T19 2.5). */
+  | { type: 'ADD_TO_JOB'; jobId: string; workerId: string }
+  /** Takes one man off a job and leaves the rest on it: the cross on his chip
+   *  (CLAUDE.md T19 2.5). */
+  | { type: 'REMOVE_FROM_JOB'; jobId: string; workerId: string }
+  /** Puts one task behind the one running, instead of putting that one down
+   *  (CLAUDE.md T19 2.12). */
+  | { type: 'QUEUE_TASK_NEXT'; taskId: string }
+  /** The master volume and the mute, off the Settings modal (CLAUDE.md T19 2.10). */
+  | { type: 'SET_SOUND'; volume?: number; muted?: boolean }
   | { type: 'DISMISS_TIP'; key: string };

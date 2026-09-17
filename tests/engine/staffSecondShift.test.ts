@@ -231,7 +231,7 @@ describe('the second shift', () => {
     hurtWorker(state, five, { night: true });
     expect(five.absentDaysRemaining).toBe(ACCIDENT_DAYS_OFF);
     expect(five.jobId).toBeNull();
-    expect(job?.assignedTo).toBeNull();
+    expect(job?.assignees[0] ?? null).toBeNull();
     const event = state.eventQueue.find((entry) => entry.kind === 'accident') ?? state.activeEvent;
     expect(event?.kind).toBe('accident');
     expect(event?.data.night).toBe(true);

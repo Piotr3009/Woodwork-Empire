@@ -178,7 +178,7 @@ describe('rule 2, the litres', () => {
       }
       for (const job of next.jobs) {
         job.stage = 'inProduction';
-        job.assignedTo = 'owner';
+        job.assignees = ['owner'];
         // Into the assembly, which is the stage a man does with a nailer in his hand.
         job.labourRemaining = job.labourValue * 0.5;
       }
@@ -218,7 +218,7 @@ describe('rule 2, the litres', () => {
     }
     for (const job of state.jobs) {
       job.stage = 'inProduction';
-      job.assignedTo = 'owner';
+      job.assignees = ['owner'];
       job.labourRemaining = job.labourValue * 0.5;
     }
     expect(hallAirCheck(state).lowAir).toHaveLength(1);

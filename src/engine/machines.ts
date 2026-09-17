@@ -378,7 +378,7 @@ export const BENCH = 'workbench';
  *  (CLAUDE.md T4 3.4). A job whose man is already at a bench keeps it. */
 export function hasBenchFor(state: GameState, jobId: string | null): boolean {
   const job = jobId === null ? null : state.jobs.find((entry) => entry.id === jobId) ?? null;
-  const who = job?.assignedTo ?? null;
+  const who = job?.assignees[0] ?? null;
   if (who !== null && heldMachine(state, who, BENCH) !== null) return true;
   return freeMachines(state, BENCH).length > 0;
 }
