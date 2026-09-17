@@ -48,7 +48,13 @@ import { canUnload } from './materials';
 import { managerOnDuty, ownerIsAvailable } from './owner';
 import { makeId } from './rng';
 import { plural } from './text';
-import { hasWorkingDay, helperOnDuty, isWorkingToday, joiners, staffMinutesLeft } from './staff';
+import {
+  hasWorkingDay,
+  helperOnDuty,
+  isWorkingToday,
+  joiners,
+  staffMinutesLeft,
+} from './staff';
 import { websiteUpkeepMinutes } from './website';
 import type {
   DayCategory,
@@ -503,15 +509,17 @@ export function taskWorkRate(worker: Worker, task: TaskInstance): number {
   return 1;
 }
 
-/** Can this man take this task on today? Office roles work it off minute by minute out of their
- *  own 480, a helper still clears his workshop jobs on the spot (CLAUDE.md T2 3.8). */
+/** Can this man take this task on today? Everybody who books minutes works it off minute by
+ *  minute, the office out of its own 480 and the helper off the clock (CLAUDE.md T2 3.8, T17
+ *  2.3). */
 function canTakeOn(state: GameState, worker: Worker, task: TaskInstance): boolean {
   if (!TASK_DEFINITIONS[task.kind].autoRoles.includes(worker.role)) return false;
   // The client will not sit down with a salesman until the company is known (CLAUDE.md T7 3.11).
   if (task.kind === 'clientMeeting' && state.reputation < MEETING_SALESMAN_REPUTATION) return false;
-  if (!hasWorkingDay(worker.role)) return true;
+  // One job of work at a time, whoever he is, and only the office has a meter of its own to run
+  // out of (CLAUDE.md T17 2.3).
   if (worker.taskId !== null) return false;
-  if (staffMinutesLeft(worker) <= 0) return false;
+  if (hasWorkingDay(worker.role) && staffMinutesLeft(worker) <= 0) return false;
   if (task.kind === 'materialTakeOff' && worker.role === 'estimator') {
     // So many a day, and none before the drawing it reads (CLAUDE.md T13 3.8).
     if (worker.ordersToday >= estimatorCapacity(state)) return false;
@@ -550,28 +558,21 @@ export function bestTakerOf(
   return best;
 }
 
-/** A worker on the books takes the tasks his role covers, and the owner never sees them.
- *  Returns what was cleared on the spot, so the caller can apply what each finished task does. */
-export function assignStaffTasks(state: GameState): TaskInstance[] {
-  const cleared: TaskInstance[] = [];
+/** A worker on the books takes the tasks his role covers, and the owner never sees them. Every
+ *  man who can take one on books minutes into it, so nothing is cleared here: the minute runner
+ *  finishes it and applies what it does (CLAUDE.md T17 2.3). */
+export function assignStaffTasks(state: GameState): void {
   const started = state.workers.filter((worker) => isWorkingToday(state, worker));
-  if (started.length === 0) return cleared;
+  if (started.length === 0) return;
   for (const task of state.tasks) {
     if (task.done || task.doneBy !== null) continue;
     if (task.kind === 'unload' && task.deliveryId !== null && !canUnload(state)) continue;
     const staff = bestTakerOf(state, started, task);
     if (!staff) continue;
-    if (hasWorkingDay(staff.role)) {
-      // He picks it up and works it off as the clock runs, like the owner does.
-      staff.taskId = task.id;
-      task.doneBy = staff.id;
-      continue;
-    }
-    advanceTask(task, task.minutesRemaining, state.clock.day);
+    // He picks it up and works it off as the clock runs, like the owner does.
+    staff.taskId = task.id;
     task.doneBy = staff.id;
-    cleared.push(task);
   }
-  return cleared;
 }
 
 // ---------------------------------------------------------------------------

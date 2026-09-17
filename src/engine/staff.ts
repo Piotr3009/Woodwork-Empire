@@ -102,6 +102,16 @@ export function hasWorkingDay(role: WorkerRole): boolean {
   return OFFICE_ROLES.includes(role);
 }
 
+/** True for a man who works a job of work off minute by minute, the way the owner does: the
+ *  office, and the helper with them (PIOTR, 16.09; CLAUDE.md T17 2.3). The helper used to clear
+ *  an unload or a cleaning on the spot for nothing, in the same minute it was raised, so nobody
+ *  ever saw him do it. He spends the minutes now. His day is the clock's and not a meter of his
+ *  own: he is on the floor, he takes his dinner with the workshop and he stays for the owner's
+ *  overtime like a joiner, so only the office has the 480 of `hasWorkingDay`. */
+export function booksTaskMinutes(role: WorkerRole): boolean {
+  return hasWorkingDay(role) || role === 'helper';
+}
+
 /** Minutes of his own day this man has left. */
 export function staffMinutesLeft(worker: Worker): number {
   return Math.max(0, MINUTES_PER_WORKING_DAY - worker.minutesWorked);

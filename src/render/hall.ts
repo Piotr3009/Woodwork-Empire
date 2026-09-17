@@ -901,6 +901,65 @@ function stationLabel(station: string): string {
   return 'waiting';
 }
 
+/** How tall the placeholder man stands, in metres: the height the character sheets themselves
+ *  declare for a man (metresPerCell.height in public/sprites/characters.json), so the drawn
+ *  figure and the placeholder are the same man (CLAUDE.md T17 2.1). */
+const CAPSULE_HEIGHT_M = 1.8;
+
+/** The placeholder figure, in fractions of his own height [TUNE]: head, trunk, legs and feet,
+ *  in the proportions of a man on a 2:1 floor. Nothing here is a sprite: it is the one shape a
+ *  role with no character sheet is drawn as, and it goes the day his sheet lands. */
+const CAPSULE_PARTS = {
+  headRadius: 0.1,
+  headCentre: 0.88,
+  shoulders: 0.34,
+  trunkTop: 0.78,
+  trunkBottom: 0.42,
+  legWidth: 0.11,
+  legGap: 0.04,
+  footLength: 0.16,
+  footHeight: 0.05,
+};
+
+/** The man a role with no character sheet is drawn as, until the art side delivers one
+ *  (CLAUDE.md T17 2.1). He was a 12 by 26 rounded rect, a third of the height of a delivered
+ *  sheet and a fifth of its width: beside a joiner he read as a stroke on the floor, which is
+ *  what Piotr saw of his yellow shirted helper. He is sized off the projection instead, at
+ *  TILE_RISE pixels to the metre of a 1.8 m man, and given a head, a trunk, legs and feet so he
+ *  reads as a person. */
+function capsuleBody(fill: string): string {
+  const height = CAPSULE_HEIGHT_M * TILE_RISE;
+  // Scene pixels to a tenth: the shapes are small, and a long tail of decimals is noise in the
+  // page and in the tests that read it.
+  const px = (fraction: number): number => Math.round(fraction * height * 10) / 10;
+  const at = (value: number): number => Math.round(value * 10) / 10;
+  const trunkWidth = px(CAPSULE_PARTS.shoulders);
+  const legWidth = px(CAPSULE_PARTS.legWidth);
+  const legGap = px(CAPSULE_PARTS.legGap);
+  const foot = px(CAPSULE_PARTS.footLength);
+  const leg = (side: number): string =>
+    `<rect x="${at(side > 0 ? legGap / 2 : -(legGap / 2 + legWidth))}" ` +
+    `y="${-px(CAPSULE_PARTS.trunkBottom)}" width="${legWidth}" ` +
+    `height="${at(px(CAPSULE_PARTS.trunkBottom) - px(CAPSULE_PARTS.footHeight))}" ` +
+    `rx="${at(legWidth / 2)}" fill="${fill}" />`;
+  const shoe = (side: number): string =>
+    `<ellipse cx="${at(side * (legGap / 2 + legWidth / 2))}" ` +
+    `cy="${-px(CAPSULE_PARTS.footHeight)}" rx="${at(foot / 2)}" ` +
+    `ry="${px(CAPSULE_PARTS.footHeight)}" fill="${fill}" opacity="0.7" />`;
+  return (
+    leg(-1) +
+    leg(1) +
+    shoe(-1) +
+    shoe(1) +
+    `<rect x="${at(-trunkWidth / 2)}" y="${-px(CAPSULE_PARTS.trunkTop)}" ` +
+    `width="${trunkWidth}" ` +
+    `height="${at(px(CAPSULE_PARTS.trunkTop) - px(CAPSULE_PARTS.trunkBottom))}" ` +
+    `rx="${at(trunkWidth / 3)}" fill="${fill}" />` +
+    `<circle cx="0" cy="${-px(CAPSULE_PARTS.headCentre)}" ` +
+    `r="${px(CAPSULE_PARTS.headRadius)}" fill="${fill}" />`
+  );
+}
+
 /** A worker is his sheet if the art side has delivered one and a capsule if it has not, with his
  *  name under him either way. The owner is the green one. The group carries its standing cell,
  *  its station and the way he faces there, and the walker in the renderer carries him to that
@@ -922,8 +981,7 @@ function figure(
   const rest = art === null ? 'idle' : animationForStation(art.station);
   const drawn =
     art === null ? null : characterArt(art.role, rest, tile.facing, art.options);
-  const body =
-    drawn ?? `<rect x="-6" y="-30" width="12" height="26" rx="6" fill="${fill}" />`;
+  const body = drawn ?? capsuleBody(fill);
   return {
     depth: depthKey(tile.x, tile.y) + 0.2,
     svg:
@@ -1286,6 +1344,24 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
   const onTheLoop = (station: string): string =>
     unloadingNow && (station === STATION_GATE || station === STATION_RACK) ? loopEnds() : '';
 
+  // A machine off the lorry is the same loop walked empty handed: from the gate to the floor
+  // held for it and back, as many times as the unload minutes allow, and nobody stands moving
+  // his legs (PIOTR, 16.09; CLAUDE.md T17 2.4). The far end carries its own station, so the leg
+  // is a walk and not a carry, and the man rests idle if the loop ever ends on it.
+  const machineUnload = state.tasks.find(
+    (task) => task.kind === 'unload' && !task.done && task.deliveryId === null && task.orderIds.length > 0,
+  );
+  const heldFor = machineUnload
+    ? state.onOrder.find((item) => machineUnload.orderIds.includes(item.id))
+    : undefined;
+  const machineLoopEnds = (): string => {
+    if (machineUnload === undefined || heldFor === undefined) return '';
+    const gate = stationCell(state, STATION_GATE, { x: 2, y: 5 });
+    return `${gate.x},${gate.y};${heldFor.anchorX},${heldFor.anchorY};${STATION_IDLE}`;
+  };
+  const onTheMachineLoop = (taskId: string | null): string =>
+    machineUnload !== undefined && taskId === machineUnload.id ? machineLoopEnds() : '';
+
   // The crew, and the owner, each at the station the engine put him on.
   for (const worker of state.workers) {
     if (worker.startDay > state.clock.day) continue;
@@ -1304,7 +1380,7 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
         // Joiners have a sheet tonight; everybody else falls back to the capsule until his own
         // one is delivered (CLAUDE.md T9 3.13).
         { role: worker.role, station: worker.station, options: characterOptions },
-        onTheLoop(worker.station),
+        onTheMachineLoop(worker.taskId) || onTheLoop(worker.station),
       ),
     );
   }
@@ -1324,7 +1400,7 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
         // The owner is his sheet where the art side has delivered one (character.owner.*, the
         // boss pack of 14.09), and the capsule where it has not, like every worker.
         { role: 'owner', station: state.owner.station, options: characterOptions },
-        onTheLoop(state.owner.station),
+        onTheMachineLoop(state.owner.currentTaskId) || onTheLoop(state.owner.station),
       ),
     );
   }

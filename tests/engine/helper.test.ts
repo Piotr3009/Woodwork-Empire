@@ -5,17 +5,22 @@ import { describe, expect, it } from 'vitest';
 import {
   HELPER_ONLY_KINDS,
   WAITING_FOR_HELPER,
+  dayMinutesByCategory,
   helperOnDuty,
   homeCellOf,
   isHelperTask,
   startTaskCheck,
 } from '../../src/engine/index';
 import {
+  CLEANING_MINUTES,
+  DUST_BANDS,
+  HELPER_CLEAN_DUST_BAND,
   HELPER_HOME_CELL,
   LAPTOP_BOOT_MINUTES,
   ROOM_LAYOUT,
   WORKER_RATES,
 } from '../../src/engine/constants';
+import { dustAtLeast } from '../../src/engine/machines';
 import { assignWorkerTask, createTask } from '../../src/engine/tasks';
 import { renderHall, stationCell } from '../../src/render/hall';
 import type { GameState, TaskInstance, Worker } from '../../src/engine/index';
@@ -266,5 +271,83 @@ describe('the helper you can see', () => {
     const helper = state.workers.find((worker) => worker.role === 'helper');
     if (helper === undefined) throw new Error('no helper');
     expect(onTheFloor(state, homeCellOf(state, helper))).toBe(true);
+  });
+});
+
+describe('the labourer does the labourer s work (CLAUDE.md T17 2.3)', () => {
+  it('unloads a delivery himself, minute by minute, and the owner is never asked', () => {
+    const state = withHelper();
+    const helper = state.workers.find((worker) => worker.role === 'helper');
+    if (helper === undefined) throw new Error('no helper');
+    state.deliveries.push({
+      id: 'delivery-1',
+      jobId: null,
+      sheets: 10,
+      orderedDay: state.clock.day,
+      pricePaid: 0,
+      arriveDay: state.clock.day,
+      arrived: true,
+      unloaded: false,
+      bespoke: false,
+      overflowSheets: 0,
+    });
+    const unload = createTask(state, {
+      kind: 'unload',
+      label: 'Unload 10 sheets',
+      minutes: 45,
+      deliveryId: 'delivery-1',
+    });
+    // It goes to him at once and is spent minute by minute: it is not cleared on the spot.
+    const started = runClock(state, 2);
+    const taken = started.tasks.find((entry) => entry.id === unload.id);
+    expect(taken?.doneBy).toBe(helper.id);
+    expect(taken?.done).toBe(false);
+    expect(taken?.minutesRemaining).toBeLessThan(45);
+    expect(started.workers.find((entry) => entry.id === helper.id)?.taskId).toBe(unload.id);
+    // He is at the gate with it, not standing in his corner.
+    expect(started.workers.find((entry) => entry.id === helper.id)?.station).not.toBe('idle');
+    // And when the time is in, it is done, by him, with nothing on the owner's day meter.
+    const finished = runClock(started, 60);
+    const over = finished.tasks.find((entry) => entry.id === unload.id);
+    expect(over?.done).toBe(true);
+    expect(over?.doneBy).toBe(helper.id);
+    expect(finished.owner.currentTaskId).toBeNull();
+    const ownerFixing = dayMinutesByCategory(finished.owner.dayLog).find(
+      (part) => part.category === 'fixing',
+    );
+    expect(ownerFixing).toBeUndefined();
+    // His own day meter carries the minutes instead.
+    const his = finished.workers.find((entry) => entry.id === helper.id);
+    expect(his?.minutesWorked).toBeGreaterThan(40);
+    expect(
+      dayMinutesByCategory(his?.dayLog ?? []).find((part) => part.category === 'fixing')?.minutes,
+    ).toBeGreaterThan(40);
+  });
+
+  it('sweeps a dirty hall without being asked, on any day of the week', () => {
+    const state = withHelper();
+    const helper = state.workers.find((worker) => worker.role === 'helper');
+    if (helper === undefined) throw new Error('no helper');
+    expect(dustAtLeast(state.dust, HELPER_CLEAN_DUST_BAND)).toBe(false);
+    expect(state.tasks.some((task) => task.kind === 'cleaning' && !task.done)).toBe(false);
+    // The hall goes past clean in the middle of the week.
+    state.dust = DUST_BANDS[0] ? DUST_BANDS[0].max + 1 : 41;
+    const swept = runClock(state, 2);
+    const cleaning = swept.tasks.find((task) => task.kind === 'cleaning' && !task.done);
+    expect(cleaning?.doneBy).toBe(helper.id);
+    expect(cleaning?.minutesRemaining).toBeLessThan(CLEANING_MINUTES);
+    expect(swept.owner.currentTaskId).toBeNull();
+    const ownerFixing = dayMinutesByCategory(swept.owner.dayLog).find(
+      (part) => part.category === 'fixing',
+    );
+    expect(ownerFixing).toBeUndefined();
+  });
+
+  it('leaves a clean hall alone, and the Clean up button is still the player s own override', () => {
+    const state = withHelper();
+    expect(runClock(state, 30).tasks.some((task) => task.kind === 'cleaning')).toBe(false);
+    const byHand = act(state, { type: 'START_CLEANING' });
+    const cleaning = byHand.tasks.find((task) => task.kind === 'cleaning' && !task.done);
+    expect(cleaning?.doneBy).toBe('owner');
   });
 });

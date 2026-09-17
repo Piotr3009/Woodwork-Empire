@@ -3346,6 +3346,10 @@ export const ACCIDENT_CHANCE_PER_DAY = 0.02;
 export const ACCIDENT_DAYS_OFF = 3;
 /** A helper cleans every Friday at no owner cost (PIOTR). */
 export const HELPER_CLEAN_WEEKDAY = 4;
+/** [TUNE] The band of dust at which the helper picks up a brush without being asked, any day of
+ *  the week (PIOTR, 16.09; CLAUDE.md T17 2.3): the moment the hall stops being clean, which is
+ *  the moment the dust starts costing the workshop output. */
+export const HELPER_CLEAN_DUST_BAND = 'messy';
 
 // ---------------------------------------------------------------------------
 // Housekeeping

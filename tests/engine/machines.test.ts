@@ -69,6 +69,7 @@ import {
   newGame,
   placeEnquiry,
   placeEquipment,
+  runClock,
   runToDay,
 } from '../helpers';
 
@@ -276,7 +277,7 @@ describe('dust', () => {
     expect(state.owner.minutesByCategory.workshop).toBeGreaterThanOrEqual(CLEANING_MINUTES);
   });
 
-  it('is cleared by the helper every Friday at no cost to the owner', () => {
+  it('is swept by the helper the moment the hall stops being clean, at no cost to the owner', () => {
     const state = atTheBench();
     state.workers.push({
       id: 'staff-h',
@@ -306,9 +307,19 @@ describe('dust', () => {
       anchorY: 4,
     });
     state.dust = 60;
-    const friday = runToDay(state, 5).state;
-    expect(friday.dust).toBe(0);
-    expect(friday.owner.minutesByCategory.workshop).toBe(0);
+    // Past clean, so the brush comes out that morning without anybody asking, and the two hours
+    // are his (PIOTR, 16.09; CLAUDE.md T17 2.3).
+    const swept = runClock(state, CLEANING_MINUTES + 30);
+    expect(swept.dust).toBeLessThan(DUST_BANDS[0]?.max ?? 40);
+    expect(swept.tasks.find((task) => task.kind === 'cleaning')?.doneBy).toBe('staff-h');
+    // Not a minute of the owner's day went on it: his are at the bench where they were.
+    expect(swept.owner.dayLog.some((entry) => entry.category === 'fixing')).toBe(false);
+    // And the standing Friday clean is on the list on the Friday, his as well.
+    const friday = runToDay(swept, 5).state;
+    expect(
+      friday.tasks.some((task) => task.kind === 'cleaning' && task.label === 'Weekly clean'),
+    ).toBe(true);
+    expect(friday.owner.dayLog.some((entry) => entry.category === 'fixing')).toBe(false);
   });
 
   it('marks the hall dangerous above 90', () => {

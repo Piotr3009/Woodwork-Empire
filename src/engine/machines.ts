@@ -414,6 +414,13 @@ export function dustFactor(dust: number): number {
   return dustBand(dust).factor;
 }
 
+/** True when the hall has reached this band of dust or a worse one. The one reading of the table
+ *  for everybody who asks it a question about how dirty the hall is (CLAUDE.md T17 2.3). */
+export function dustAtLeast(dust: number, label: string): boolean {
+  const order = DUST_BANDS.map((band) => band.label);
+  return order.indexOf(dustBand(dust).label) >= order.indexOf(label);
+}
+
 /** True once five joiners are on the books without a helper (CLAUDE.md 9.3). */
 export function helperMissing(state: GameState): boolean {
   const joiners = state.workers.filter((worker) => worker.role === 'joiner').length;
