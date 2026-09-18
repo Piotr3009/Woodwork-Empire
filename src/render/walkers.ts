@@ -19,7 +19,7 @@
 // Nothing here is game state. A rebuilt page finds the walkers still here and puts every figure
 // back where it had actually got to (the same reason the slides of Turn 2 lived in the app).
 
-import { WALK_CELLS_PER_SECOND } from '../engine/constants';
+import { WALK_CELLS_PER_SECOND, WALK_CORNER_CELLS } from '../engine/constants';
 import { STATION_GATE, STATION_RACK } from '../engine/stations';
 import {
   type Animation,
@@ -146,12 +146,6 @@ function setOffFrom(walker: Walker): Cell {
   if (next !== undefined) return next;
   return { x: walker.at.x, y: walker.at.y };
 }
-
-/** How long a run of cells in one world direction has to be before it is a corner he turns at,
- *  rather than a wobble inside the leg [TUNE]: the brief's own "the path turns ninety degrees for
- *  more than two cells" (CLAUDE.md T19 2.1). It belongs in constants.ts and is here because that
- *  file is frozen for phase B; NOTES-B1.md says so. */
-const WALK_CORNER_CELLS = 2;
 
 /** The way a step reads on the screen, as the sign of its world direction. */
 function screenFacing(from: { x: number; y: number }, to: { x: number; y: number }): Facing {

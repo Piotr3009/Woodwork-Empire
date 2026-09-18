@@ -13,13 +13,9 @@
 // So the volume is a step down, the figure, and a step up, and the figure is the setting itself
 // rather than the nearest of a handful of named steps: nothing on the row is a rounded lie.
 
+import { SOUND_VOLUME_STEP } from '../engine/constants';
 import type { GameState } from '../engine/index';
 import { lockedButton } from './modal';
-
-/** What one press of Quieter or Louder moves the master volume by [TUNE]: nought to full in ten
- *  presses, fine enough to find a level and coarse enough to reach both ends. It belongs in
- *  `constants.ts`, which is frozen for phase B; see NOTES-B3.md. */
-const VOLUME_STEP = 0.1;
 
 /** The volume as the row prints it: whole percent of the master, off the setting itself. */
 function volumeFigure(volume: number): string {
@@ -63,14 +59,14 @@ export function renderSettings(state: GameState): string {
     '<span class="row-action">' +
     volumeStep(
       'Quieter',
-      stepped(sound.volume - VOLUME_STEP),
+      stepped(sound.volume - SOUND_VOLUME_STEP),
       'It is as quiet as it goes',
       sound.volume <= 0,
     ) +
     `<span class="row-figure" data-figure="volume">${volumeFigure(sound.volume)}</span>` +
     volumeStep(
       'Louder',
-      stepped(sound.volume + VOLUME_STEP),
+      stepped(sound.volume + SOUND_VOLUME_STEP),
       'It is as loud as it goes',
       sound.volume >= 1,
     ) +

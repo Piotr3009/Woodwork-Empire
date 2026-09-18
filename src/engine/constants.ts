@@ -3187,6 +3187,11 @@ export const WALK_CELLS_PER_SECOND = 1.0;
  *  (PIOTR, 17.09: "they walk like robots"; CLAUDE.md T19 2.1). The sheet's own fps is kept for
  *  every animation that is not locomotion. */
 export const WALK_STRIDE_METRES = 1.4;
+/** How long a run of cells in one world direction has to be before it is a corner a man turns at,
+ *  rather than a wobble inside the leg he is walking [TUNE]. The brief's own words are "the path
+ *  turns ninety degrees for more than two cells", so the figure is Piotr's and only its name is
+ *  chosen here (CLAUDE.md T19 2.1). */
+export const WALK_CORNER_CELLS = 2;
 
 // ---------------------------------------------------------------------------
 // 9.3 Hiring pool (PIOTR: tiers and gating; wages [TUNE])
@@ -3808,6 +3813,10 @@ export const DESIGN_MINUTES_PER_1000 = 24;
 
 /** The volume a fresh game and a lifted save start on, and unmuted [TUNE] (CLAUDE.md T19 2.10). */
 export const SOUND_VOLUME_DEFAULT = 0.7;
+/** What one press of Quieter or Louder moves the master volume by [TUNE]: nought to full in ten
+ *  presses, fine enough to find a level and coarse enough to reach both ends
+ *  (CLAUDE.md T19 2.10). */
+export const SOUND_VOLUME_STEP = 0.1;
 /** How loud the synthesised stand ins play, against a real recording's 1.0 [TUNE]. They are there
  *  so every hook can be heard before Piotr's recordings land, not to be listened to
  *  (CLAUDE.md T19 2.10, section 9). */
