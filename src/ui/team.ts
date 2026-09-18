@@ -38,7 +38,7 @@ import {
   staffManagementTaker,
 } from '../engine/index';
 // Straight off its own module, not round the public API, which Turn 13 froze (REPORT-T13 10).
-import { monthlyWageOf } from '../engine/staff';
+import { ROLE_WORDS, monthlyWageOf } from '../engine/staff';
 import { ownerDayLine } from './topbar';
 import {
   button,
@@ -76,18 +76,11 @@ export function teamTabFrom(value: string): TeamTab {
 
 /** What a role is called on a crew row: plain English, never the engine key (CLAUDE.md 3). The
  *  one table: Our team, the hiring tiles and the job's Assign list all read it, so a sprayer is
- *  called a sprayer wherever he is drawn (CLAUDE.md T19 2.5, 2.6). */
-export const ROLE_WORDS: Record<WorkerRole, string> = {
-  joiner: 'joiner',
-  helper: 'helper',
-  officeAdmin: 'office admin',
-  purchasingClerk: 'purchasing clerk',
-  salesman: 'salesman',
-  draftsman: 'draftsman',
-  estimator: 'estimator',
-  productionManager: 'production manager',
-  sprayer: 'sprayer',
-};
+ *  called a sprayer wherever he is drawn (CLAUDE.md T19 2.5, 2.6). It moved into
+ *  `src/engine/staff.ts` tonight, because the hire card's refusal is written there and names the
+ *  trade ("extremely experienced joiners come from reputation 60"; CLAUDE.md T20 2.5). This is
+ *  the same table, handed on, so every screen that already read it here still does.  */
+export { ROLE_WORDS };
 
 /** Which trade a role belongs to. The one table: the hiring tabs and the tiles read it, and a role
  *  that is not on it is not hired from this board at all. Our team is not on it and must not be:
@@ -134,10 +127,16 @@ const DUTIES: Record<WorkerRole, string> = {
     'anything else. A joiner can spray, slower.',
 };
 
-/** What he costs. One unit of pay in the game and it is the week (PIOTR, 18.09;
- *  CLAUDE.md T20 2.6). */
+/** What he costs: the week he is paid by, and the month it comes to beside it. One unit of pay in
+ *  the game and it is the week (PIOTR, 18.09: "one unit"; CLAUDE.md T20 2.6); the month is there
+ *  because a month of wages is what the bank balance is read against. The one text: the hire
+ *  card, the crew row and Our team all print this. */
+export function wageText(weeklyWage: number): string {
+  return `${money(weeklyWage)} a week (about ${money(monthlyWageOf({ weeklyWage }))} a month)`;
+}
+
 function wageLine(option: HiringOption): string {
-  return `${money(option.weeklyWage)} a week`;
+  return wageText(option.weeklyWage);
 }
 
 /** One candidate, as a tile: what he is, what he costs, what he is worth and what stands in the
@@ -223,7 +222,7 @@ function crewRows(state: GameState, tab: TeamTab): string {
     .filter((worker) => tradeOf(worker.role) === tab)
     .map((worker) => {
       const doing = workerDoing(state, worker);
-      const wage = `${money(worker.weeklyWage)} a week`;
+      const wage = wageText(worker.weeklyWage);
       return (
         `<div class="row" data-crew="${worker.id}" data-shift="${shiftOf(state, worker)}">` +
         `<span class="row-main">${escapeHtml(worker.name)}, ${escapeHtml(ROLE_WORDS[worker.role])}` +
@@ -259,14 +258,16 @@ function startedText(state: GameState, startDay: number): string {
   return `started ${formatCalendarDay(startDay)}, ${ago}`;
 }
 
-/** One row of Our team: who he is, when he started, what he costs a month, the hours he has put
- *  in this month, the days he has had off and what he is on this minute (CLAUDE.md T17 2.9). */
+/** One row of Our team: who he is, when he started, what he costs, the hours he has put in this
+ *  month, the days he has had off and what he is on this minute (CLAUDE.md T17 2.9). The pay is
+ *  handed in as the words the row prints, because a man is paid by the week and the owner draws
+ *  his by the day (CLAUDE.md T20 2.6). */
 function teamRow(
   id: string,
   name: string,
   role: string,
   when: string,
-  pay: number,
+  pay: string,
   minutesWorked: number,
   daysOff: number,
   doing: string,
@@ -275,7 +276,7 @@ function teamRow(
     `<div class="row" data-team="${id}">` +
     `<span class="row-main">${escapeHtml(name)}, ${escapeHtml(role)}</span>` +
     `<span class="row-figure team-when">${escapeHtml(when)}</span>` +
-    `<span class="row-figure">${money(pay)} a month</span>` +
+    `<span class="row-figure">${escapeHtml(pay)}</span>` +
     `<span class="row-figure">${hoursText(minutesWorked)} this month</span>` +
     `<span class="row-figure">${plural(daysOff, 'day off', 'days off')}</span>` +
     `<span class="row-figure">${escapeHtml(doing)}</span>` +
@@ -294,7 +295,7 @@ function ourTeamRows(state: GameState): string {
       state.playerName,
       'owner',
       startedText(state, OWNER_START_DAY),
-      ownerDrawPerDay(state) * WORKING_DAYS_PER_MONTH,
+      `${money(ownerDrawPerDay(state) * WORKING_DAYS_PER_MONTH)} a month`,
       owner.monthMinutes,
       owner.monthDaysOff,
       ownerDayLine(state),
@@ -305,7 +306,7 @@ function ourTeamRows(state: GameState): string {
         worker.name,
         `${ROLE_WORDS[worker.role]}${worker.tier === null ? '' : `, ${TIER_WORDS[worker.tier]}`}`,
         startedText(state, worker.startDay),
-        monthlyWageOf(worker),
+        wageText(worker.weeklyWage),
         worker.monthMinutes,
         worker.monthDaysOff,
         workerDoing(state, worker),

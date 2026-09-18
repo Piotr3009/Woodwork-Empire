@@ -74,9 +74,11 @@ function withCrew(state: GameState, count: number, tier: Worker['tier']): GameSt
 describe('the hiring pool', () => {
   it('opens up as the reputation rises', () => {
     const state = newGame();
+    // The card says what is missing in the game's own words now: "extremely experienced joiners
+    // come from reputation 60" (PIOTR; CLAUDE.md T20 2.5).
     const byLabel = (reputation: number): string[] =>
       hiringOptions({ ...state, reputation })
-        .filter((option) => option.blockReason.startsWith('Nobody'))
+        .filter((option) => option.blockReason.includes('come from reputation'))
         .map((option) => option.label);
     expect(byLabel(-50)).toContain('Office admin');
     expect(byLabel(-50)).not.toContain('Joiner, no experience');

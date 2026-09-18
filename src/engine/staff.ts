@@ -13,6 +13,7 @@ import {
   SECOND_SHIFT_MINUTES,
   HIRING_SPECS,
   JOINER_PREREQUISITES,
+  TIER_WORDS,
   TOOL_CABINET,
   WEEKS_PER_MONTH,
   WORKER_HOURS_PER_WEEK,
@@ -50,6 +51,48 @@ import type {
   WorkerRole,
   WorkerTier,
 } from './types';
+
+/** What a trade is called, one man of it and several. The one table: the crew rows, Our team, the
+ *  job's Assign list and the hire card's refusal all read it, so a sprayer is called a sprayer
+ *  wherever he is named (CLAUDE.md T19 2.5, 2.6). It sits here and not in the UI because the
+ *  refusal the hire card prints is written in this module: "extremely experienced joiners come
+ *  from reputation 60" (PIOTR; CLAUDE.md T20 2.5). `src/ui/team.ts` hands `ROLE_WORDS` on. */
+export const ROLE_WORDS: Record<WorkerRole, string> = {
+  joiner: 'joiner',
+  helper: 'helper',
+  officeAdmin: 'office admin',
+  purchasingClerk: 'purchasing clerk',
+  salesman: 'salesman',
+  draftsman: 'draftsman',
+  estimator: 'estimator',
+  productionManager: 'production manager',
+  sprayer: 'sprayer',
+};
+
+/** The same trades, several of them: the plural is written out because a salesman is not a
+ *  "salesmans" (CLAUDE.md 3: plain English, never the engine key). */
+export const ROLE_WORDS_MANY: Record<WorkerRole, string> = {
+  joiner: 'joiners',
+  helper: 'helpers',
+  officeAdmin: 'office admins',
+  purchasingClerk: 'purchasing clerks',
+  salesman: 'salesmen',
+  draftsman: 'draftsmen',
+  estimator: 'estimators',
+  productionManager: 'production managers',
+  sprayer: 'sprayers',
+};
+
+/** The trades that make something: the men whose minutes come out of the hall as work, and the
+ *  owner with them. An estimator has a rate at his desk and a draftsman has one at his, and
+ *  neither of them is a production rate, so neither is on the Company board's list of the men who
+ *  act where they are (PIOTR; CLAUDE.md T20 2.3). */
+export const PRODUCING_ROLES: ReadonlyArray<WorkerRole> = ['joiner', 'sprayer'];
+
+/** True for a man who produces. The one rule, asked by the board (CLAUDE.md T20 2.3). */
+export function produces(role: WorkerRole): boolean {
+  return PRODUCING_ROLES.includes(role);
+}
 
 /** The roles that have a working day of their own, the way the owner does (CLAUDE.md T2 3.8).
  *  A helper still clears his workshop jobs at no cost, as in Turn 1. */
@@ -312,6 +355,20 @@ export function missingLabelsForHire(state: GameState, role: WorkerRole): string
   });
 }
 
+/** What the card says when the workshop is not known enough for this man: who applies depends on
+ *  the standing the workshop has earned, and the card says what is missing, in the game's own
+ *  words (PIOTR: "extremely experienced joiners come from reputation 60"; CLAUDE.md T20 2.5). A
+ *  role with no classes to it says the same thing about the trade itself. */
+export function standingWanted(
+  role: WorkerRole,
+  tier: WorkerTier | null,
+  minReputation: number,
+): string {
+  const who =
+    tier === null ? ROLE_WORDS_MANY[role] : `${TIER_WORDS[tier]} ${ROLE_WORDS_MANY[role]}`;
+  return `${who} come from reputation ${minReputation}`;
+}
+
 /** Everything the hiring modal needs, one row per role and tier. */
 export function hiringOptions(state: GameState): HiringOption[] {
   return HIRING_SPECS.map((spec) => {
@@ -322,7 +379,7 @@ export function hiringOptions(state: GameState): HiringOption[] {
     // the one function the tier tables go through, and who answers an advert is a tier table
     // (CLAUDE.md T13 3.7, T20 2.5).
     if (effectiveReputation(state) < spec.minReputation) {
-      blockReason = `Nobody of this standing answers yet, reputation ${spec.minReputation}`;
+      blockReason = standingWanted(spec.role, spec.tier, spec.minReputation);
     } else if (BEHIND_THE_ADMIN.includes(spec.role) && !hasOfficeAdmin(state)) {
       // Nobody in the office before the one who runs it (PIOTR, CLAUDE.md T10 3.6).
       blockReason = 'Hire an office admin first';
