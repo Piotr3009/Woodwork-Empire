@@ -34,11 +34,15 @@ import {
   MATERIAL_ORDER_MINUTES_LOW,
   MATERIAL_ORDER_PRICE_HIGH,
   MATERIAL_ORDER_PRICE_LOW,
+  MATERIAL_TAKE_OFF_MINUTES,
+  JOINERY_CORE_TAKE_OFF_FACTOR,
+  JOINERY_CORE_EXTENSION_TAKE_OFF_FACTOR,
   SERVICE_MINUTES,
   SITE_MEASURE_MINUTES,
   SOFTWARE_DESIGN_FACTOR,
   STAFF_MANAGEMENT_MINUTES_PER_JOINER,
   UNLOAD_BASE_MINUTES,
+  WEEK_JOBS_KEPT,
   WORK_EPSILON,
 } from './constants';
 import { DAY_END_MINUTE } from './constants';
@@ -49,7 +53,6 @@ import { managerOnDuty, ownerIsAvailable } from './owner';
 import { makeId } from './rng';
 import { plural } from './text';
 import {
-  WEEK_JOBS_KEPT,
   crewHasGoneHome,
   effortSoFar,
   hasWorkingDay,
@@ -59,10 +62,8 @@ import {
   staffMinutesLeft,
   weekMetersOf,
 } from './staff';
-import type { WeekCategory, WeekMeters } from './staff';
 import { websiteUpkeepMinutes } from './website';
 import type {
-  Contract,
   DayCategory,
   GameState,
   OwnerState,
@@ -72,6 +73,8 @@ import type {
   TaskInstance,
   TaskKind,
   TaskOrder,
+  WeekCategory,
+  WeekMeters,
   WorkerRole,
   WorkerTier,
 } from './types';
@@ -137,7 +140,9 @@ const TASK_DEFINITIONS: Record<TaskKind, TaskDefinition> = {
     autoRoles: ['helper'],
   },
   deliver: { category: 'workshop', eligibleRoles: ['joiner', 'helper'], autoRoles: [] },
-  service: { category: 'workshop', eligibleRoles: ['joiner'], autoRoles: [] },
+  // A service is called in and paid for, never worked off: nobody is eligible for one, so the
+  // Tasks page draws no Start against it (PIOTR, 18.09; CLAUDE.md T20 2.9.2).
+  service: { category: 'workshop', eligibleRoles: [], autoRoles: [] },
   repair: { category: 'workshop', eligibleRoles: ['joiner'], autoRoles: [] },
   moveMachines: { category: 'workshop', eligibleRoles: ['joiner', 'helper'], autoRoles: [] },
   // The owner does his own interviewing and his own waiting for the laptop: there is nobody to
@@ -207,20 +212,27 @@ export function isHelperTask(state: GameState, task: TaskInstance): boolean {
   return HELPER_ONLY_KINDS.includes(task.kind) && helperOnDuty(state);
 }
 
-/** The man who is sweeping the hall this minute, or null. The one selector: the chip under the
- *  hall says his name and draws no button while he has it, because the labourer cleans without
- *  being asked and the player is not put the question (PIOTR, 17.09; CLAUDE.md T19 2.7). Null for
- *  the owner sweeping it himself off Clean up, which is his own override and keeps its button.
+/** The man who has the one open job of work of this kind in his hands this minute, or null. Both
+ *  halves have to be true: the task names him and he names it. A task the owner took on himself
+ *  answers null, because that is his own override and it keeps its button. The one selector: the
+ *  chips under the hall say his name and draw no button while he has it, because the labourer
+ *  sweeps and empties the bags without being asked and the player is not put the question
+ *  (PIOTR, 17.09 and 18.09; CLAUDE.md T19 2.7, T20 2.8).
  *
  *  There is no flag for "once per dirtying" and none is wanted: an open cleaning task IS the
  *  flag, because the hall raises one and only one while the dust is up, and finishing it puts the
  *  dust back to nought so the band is clean again until the hall dirties afresh. */
-export function cleanerAtWork(state: GameState): Worker | null {
-  const task = state.tasks.find((entry) => entry.kind === 'cleaning' && !entry.done);
+export function manOnOpenTask(state: GameState, kind: TaskKind): Worker | null {
+  const task = state.tasks.find((entry) => entry.kind === kind && !entry.done);
   if (!task || task.doneBy === null) return null;
   const worker = state.workers.find((entry) => entry.id === task.doneBy);
   if (!worker || worker.taskId !== task.id) return null;
   return worker;
+}
+
+/** The man who is sweeping the hall this minute, or null: `manOnOpenTask` asked about the broom. */
+export function cleanerAtWork(state: GameState): Worker | null {
+  return manOnOpenTask(state, 'cleaning');
 }
 
 /** What the hall says while the van or the bag is waiting for the man whose job it is. */
@@ -294,17 +306,6 @@ export function unloadMinutes(state: GameState): number {
 export function equipmentUnloadMinutes(state: GameState): number {
   return Math.round(EQUIPMENT_UNLOAD_MINUTES * unloadFactor(state));
 }
-
-/** A material take off is half an hour of the desk it is done at, whatever the job is worth
- *  [PIOTR, 18.09: "when I did it, it took 30 minutes"] (CLAUDE.md T20 2.3). The curve by price is
- *  gone with the five a day: the man's own speed is what makes one take off longer than another,
- *  so a man with no experience spends 37 minutes over it and an extremely experienced one 21. */
-export const MATERIAL_TAKE_OFF_MINUTES = 30;
-/** What Joinery Core does to those minutes: it halves them [TUNE, from PIOTR's "16 a day bare and
- *  32 with the software"]. */
-export const JOINERY_CORE_TAKE_OFF_FACTOR = 0.5;
-/** And what each of its extensions does on top of that: a further quarter off [TUNE]. */
-export const JOINERY_CORE_EXTENSION_TAKE_OFF_FACTOR = 0.75;
 
 /** The minutes one take off is worth with this software on the laptop. */
 function takeOffMinutesWith(core: boolean, extensions: number): number {
@@ -446,11 +447,7 @@ export interface TaskDraft {
 
 export function createTask(state: GameState, draft: TaskDraft): TaskInstance {
   const definition = TASK_DEFINITIONS[draft.kind];
-  // The minutes of a material take off are this module's, whatever the caller asks for: half an
-  // hour of the desk, less what the software takes off it, and never the old curve by the job's
-  // price (PIOTR; CLAUDE.md T20 2.3). The one caller that makes one is `src/engine/jobs.ts`,
-  // which phase C points straight at `takeOffMinutes` (NOTES-B2.md).
-  const minutes = draft.kind === 'materialTakeOff' ? takeOffMinutes(state) : draft.minutes;
+  const minutes = draft.minutes;
   const task: TaskInstance = {
     id: makeId(state, 'task'),
     kind: draft.kind,
@@ -750,20 +747,14 @@ function bookOne(
   return meters;
 }
 
-/** What the contract had made last time the sampler looked. It sits on the contract itself, so it
- *  is cloned and saved with it and two games can never read each other's count; it belongs beside
- *  `piecesMade` in the frozen types.ts, and NOTES-B2.md says so. */
-interface HasSeenPieces {
-  piecesSeenByTheWeek?: number;
-}
-
 /** The pieces a standing contract turned out since the last sample, shared among the men who are
- *  on it: a piece two men made is half of each man's week (CLAUDE.md T20 2.7). */
+ *  on it: a piece two men made is half of each man's week (CLAUDE.md T20 2.7). What it had counted
+ *  last time is `piecesSeenByTheWeek`, on the contract itself, so it is cloned and saved with it
+ *  and two games can never read each other's count. */
 function bookContractPieces(state: GameState, week: number): void {
   for (const contract of state.contracts) {
-    const carrier = contract as Contract & HasSeenPieces;
-    const seen = carrier.piecesSeenByTheWeek;
-    carrier.piecesSeenByTheWeek = contract.piecesMade;
+    const seen = contract.piecesSeenByTheWeek;
+    contract.piecesSeenByTheWeek = contract.piecesMade;
     if (seen === undefined || contract.piecesMade <= seen) continue;
     const hands = state.workers.filter((worker) => contract.assigned.includes(worker.id));
     if (hands.length === 0) continue;
@@ -804,9 +795,6 @@ export function bookWeekMinutes(state: GameState): void {
  *  to that man and never passed round the workshop by rank (CLAUDE.md T17 2.14). One the owner put
  *  down is the office's again while he is not holding it. */
 export function assignStaffTasks(state: GameState): void {
-  // The week's meters first, because they are a reading of the minute that has just gone and not
-  // of who picks what up next (CLAUDE.md T20 2.7).
-  bookWeekMinutes(state);
   const started = state.workers.filter((worker) => isWorkingToday(state, worker));
   if (started.length === 0) return;
   for (const task of state.tasks) {

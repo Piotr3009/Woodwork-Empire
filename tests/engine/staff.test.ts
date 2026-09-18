@@ -24,7 +24,8 @@ import {
 } from '../../src/engine/staff';
 import { crewLimit } from '../../src/engine/layout';
 import { waitingStation } from '../../src/engine/stations';
-import { MATERIAL_TAKE_OFF_MINUTES, createTask, estimatorCapacity } from '../../src/engine/tasks';
+import { MATERIAL_TAKE_OFF_MINUTES } from '../../src/engine/constants';
+import { createTask, estimatorCapacity } from '../../src/engine/tasks';
 import { minutesRemainingFor, ownerJob } from '../../src/engine/jobs';
 import { weeklyWageBill } from '../../src/engine/economy';
 import { tick } from '../../src/engine/index';

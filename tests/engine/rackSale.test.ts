@@ -48,6 +48,14 @@ describe('the rack is a thing the workshop can sell (CLAUDE.md T20 2.10)', () =>
     const rack = theRack(state);
     expect(sheetsStrandedBySale(state, rack)).toBe(24);
     expect(storageSaleBlock(state, rack)).toBe('Empty it first, 24 sheets on it');
+    // And the engine's own guard says it in the same words, so the Owned tab and `canSell` cannot
+    // part company (NOTES-B3.md note 8).
+    expect(canSell(state, rack.id)).toEqual({
+      ok: false,
+      reason: 'Empty it first, 24 sheets on it',
+    });
+    expect(sellMachine(state, rack.id).ok).toBe(false);
+    expect(rack.soldOnDay).toBeNull();
     // One sheet is one sheet, and the sentence counts.
     state.stock.sheets = 1;
     expect(storageSaleBlock(state, rack)).toBe('Empty it first, 1 sheet on it');
@@ -79,6 +87,7 @@ describe('the rack is a thing the workshop can sell (CLAUDE.md T20 2.10)', () =>
     state.owner.station = STATION_RACK;
     expect(somebodyAtTheRack(state)).toBe(true);
     expect(storageSaleBlock(state, rack)).toBe('Somebody is standing at it');
+    expect(canSell(state, rack.id)).toEqual({ ok: false, reason: 'Somebody is standing at it' });
     state.owner.station = 'idle';
     expect(storageSaleBlock(state, rack)).toBe('');
   });

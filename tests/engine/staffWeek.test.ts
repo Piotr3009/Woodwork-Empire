@@ -13,7 +13,11 @@ import {
   weekNowOf,
   weekWorkedMinutes,
 } from '../../src/engine/staff';
-import { DAY_END_MINUTE } from '../../src/engine/constants';
+import {
+  BREAK_MINUTES,
+  BREAK_START_MINUTE,
+  DAY_END_MINUTE,
+} from '../../src/engine/constants';
 import { acceptContract, assignContract, drawContract } from '../../src/engine/contracts';
 import { assignJob } from '../../src/engine/jobs';
 import type { GameState, Worker } from '../../src/engine/index';
@@ -115,6 +119,29 @@ describe('a man s week', () => {
     expect(weekWorkedMinutes(meters)).toBe(0);
     expect(meters.paidMinutes).toBeGreaterThan(0);
     expect(weekEfficiency(after.rate, meters)).toBe(0);
+  });
+
+  it('leaves the dinner hour out of his week: the canteen is neither worked nor paid for', () => {
+    // The sampler rode in on the top of `assignStaffTasks` while `game.ts` was frozen, which is
+    // inside the guard that keeps the dinner hour off the delegation. It has a line of its own in
+    // `settle` now and it kept the guard, so the hour in the canteen is still nobody's minute
+    // (CLAUDE.md T6 3.4, T20 2.7).
+    const start = readyHall();
+    const man = start.workers[0];
+    if (!man) throw new Error('nobody on the books');
+    assignJob(start, firstJob(start).id, man.id);
+    // Up to noon, then the hour of the break itself.
+    const noon = clearEvents(runClock(start, BREAK_START_MINUTE + 1));
+    const before = metersOf(noon, noon.workers[0] as Worker);
+    if (!before) throw new Error('no week on him');
+    const paid = before.paidMinutes;
+    const worked = weekWorkedMinutes(before);
+    const after = clearEvents(runClock(noon, BREAK_MINUTES - 2));
+    expect(after.clock.minute).toBeLessThan(BREAK_START_MINUTE + BREAK_MINUTES);
+    const meters = metersOf(after, after.workers[0] as Worker);
+    if (!meters) throw new Error('no week on him');
+    expect(meters.paidMinutes).toBe(paid);
+    expect(weekWorkedMinutes(meters)).toBe(worked);
   });
 
   it('leaves the evening to the owner: nobody else is paid for it or counted through it', () => {

@@ -133,6 +133,11 @@ export const BREAK_MINUTES = 60;
 /** 13:00: the board is written again when the workshop comes back off its dinner, which is the
  *  second of the day's two refreshes (PIOTR, 13.09; CLAUDE.md T10 3.7). */
 export const BOARD_MIDDAY_MINUTE = BREAK_START_MINUTE + BREAK_MINUTES;
+/** How often the clock under a day track is marked, in minutes of the working day [TUNE]: every
+ *  two hours from 8:00, which is what the drawing has. The last two hour mark is left off when the
+ *  end of the day is nearer to it than half of that, so 16:00 and 17:00 never sit on top of each
+ *  other (docs/mockups/t20/contracts-tab.html; CLAUDE.md T20 2.1.1). */
+export const DAY_TRACK_TICK_MINUTES = 120;
 /** 17:00 on the clock: the 480 minutes of work and the hour of dinner between them (PIOTR). */
 export const DAY_END_MINUTE = MINUTES_PER_WORKING_DAY + BREAK_MINUTES;
 /** 19:00, and the tools go down whoever wants what (PIOTR: overtime until 19:00 at the latest). */
@@ -614,13 +619,17 @@ export const LATE_ACCOUNTS_CHARGE = 100;
  *  projects, the admin's when there is one (PIOTR; CLAUDE.md T13 3.3). */
 export const DAILY_ORDERING_MINUTES = 30;
 export const CONSUMABLES_LABEL = 'Consumables and materials';
-/** The material take off: reading the drawing and counting the sheets for one accepted job. The
- *  owner does it until an estimator is taken on; an estimator does this many a day (PIOTR: 5),
- *  ten with Joinery Core on the laptop (PIOTR: 10), and five more per extension, at most two
- *  [TUNE the extension figures] (CLAUDE.md T13 3.8). */
-export const ESTIMATOR_JOBS_PER_DAY = 5;
-export const ESTIMATOR_JOBS_WITH_JOINERY_CORE = 10;
-export const JOINERY_CORE_EXTENSION_JOBS = 5;
+/** A material take off is half an hour of the desk it is done at, whatever the job is worth
+ *  [PIOTR, 18.09: "when I did it, it took 30 minutes"] (CLAUDE.md T20 2.3). The curve by price and
+ *  the five a day are both gone: the man's own speed is what makes one take off longer than
+ *  another, so a man with no experience spends 37 minutes over it and an extremely experienced one
+ *  21, and he does as many a day as his minutes allow. */
+export const MATERIAL_TAKE_OFF_MINUTES = 30;
+/** What Joinery Core does to those minutes: it halves them [TUNE, from PIOTR's "16 a day bare and
+ *  32 with the software"]. */
+export const JOINERY_CORE_TAKE_OFF_FACTOR = 0.5;
+/** And what each of its extensions does on top of that: a further quarter off [TUNE]. */
+export const JOINERY_CORE_EXTENSION_TAKE_OFF_FACTOR = 0.75;
 export const JOINERY_CORE_MAX_EXTENSIONS = 2;
 /** Joinery Core and its extensions are bought by the year [TUNE], charged as a twelfth each
  *  month like every other subscription (CLAUDE.md T13 3.8). */
@@ -798,8 +807,22 @@ export const DEADLINE_EXPRESS_FACTOR = 0.8;
  *  [TUNE: 80] (CLAUDE.md T6 3.6). */
 export const SERVICE_INTERVAL_HOURS = 80;
 export const SERVICE_MINUTES = 30;
-/** [TUNE] the service bill, and what an overdue machine risks every working day. */
-export const SERVICE_COST_FRACTION = 0.02;
+/** [PIOTR, 18.09] A service is a tenth of what the machine cost (CLAUDE.md T20 2.9.2). It was 2%
+ *  from Turn 6 to Turn 19. */
+export const SERVICE_COST_FRACTION = 0.1;
+/** [PIOTR, 18.09] What a service adds to the machine's life: half of its ORIGINAL life the first
+ *  time, and half of the last extension each time after that, so the extensions are 50%, 25%,
+ *  12.5% of the original and they never add up past the original again (CLAUDE.md T20 2.9.1). */
+export const SERVICE_LIFE_EXTENSION = 0.5;
+/** [TUNE] A week of a machine's own clock, which is the same reading `SERVICE_INTERVAL_HOURS` is
+ *  written in: 80 hours is the month a one man shop puts on a saw (CLAUDE.md T6 3.6), so a week of
+ *  it is that over `WEEKS_PER_MONTH`. No new figure: the two it is made of are Piotr's own
+ *  (CLAUDE.md T20 2.9.4). */
+export const PAST_LIFE_WEEK_HOURS = SERVICE_INTERVAL_HOURS / WEEKS_PER_MONTH;
+/** [PIOTR, 18.09: "red when under a tenth is left"] The share of a machine's life left at which
+ *  the bar on the Machines page turns from good to bad (CLAUDE.md T20 2.9). */
+export const LIFE_LOW_FRACTION = 0.1;
+/** [TUNE] What an overdue machine risks every working day. */
 export const OVERDUE_BREAKDOWN_CHANCE = 0.02;
 
 /** Design speed by software tier (PIOTR: 5 to 80% faster). */
@@ -3183,6 +3206,11 @@ export const WALK_STRIDE_METRES = 1.4;
  *  turns ninety degrees for more than two cells", so the figure is Piotr's and only its name is
  *  chosen here (CLAUDE.md T19 2.1). */
 export const WALK_CORNER_CELLS = 2;
+/** How far in front of his own cell a figure is painted, in cells of the depth key [TUNE]. Not a
+ *  new figure: it is the 0.2 `src/render/hall.ts` has painted a man in front of his own tile with
+ *  since Turn 16, given a name so the scene and the re-sort of a walking man read one figure
+ *  (CLAUDE.md T20 2.11). */
+export const FIGURE_DEPTH_OFFSET = 0.2;
 
 // ---------------------------------------------------------------------------
 // 9.3 Hiring pool (PIOTR: tiers and gating; wages [TUNE])
@@ -3287,6 +3315,22 @@ function tieredSpecs(
     duties: duties(tier),
   }));
 }
+
+/** The trades that make something: the men whose minutes come out of the hall as work. An
+ *  estimator has a rate at his desk and a draftsman has one at his, and neither of them is a
+ *  production rate, so neither is on the Company board's list of the men who act where they are
+ *  (PIOTR; CLAUDE.md T20 2.3). A table and not behaviour, so it lives here and both
+ *  `src/engine/staff.ts` and `src/engine/machines.ts` read it. */
+export const PRODUCING_ROLES: ReadonlyArray<WorkerRole> = ['joiner', 'sprayer'];
+
+/** The notice a man let go works out, in days [TUNE, Piotr's decision is open: he said a week's
+ *  wage]. Seven days from the click, so exactly one Friday falls inside them and the week he works
+ *  is the week he is paid for (CLAUDE.md T20 2.4). */
+export const LET_GO_NOTICE_DAYS = 7;
+
+/** How many job names a man's week line carries [TUNE]: enough to read, not a paragraph
+ *  (CLAUDE.md T20 2.7). */
+export const WEEK_JOBS_KEPT = 4;
 
 export const HIRING_SPECS: HiringSpec[] = [
   ...tieredSpecs(
@@ -3473,6 +3517,10 @@ export const DUST_BANDS: Array<{ max: number; factor: number; label: string }> =
   { max: 90, factor: 0.85, label: 'dirty' },
   { max: DUST_MAX, factor: 0.7, label: 'dangerous' },
 ];
+/** [TUNE] How much dust one pile of sawdust on the floor is worth. It is not a new figure: it is
+ *  the ten `sawdust()` in `src/render/hall.ts` has divided by since Turn 2, given a name so that
+ *  the dirt the player sees and the dirt the engine answers are one reading (CLAUDE.md T20 2.8). */
+export const DUST_PER_SAWDUST_PILE = 10;
 /** [TUNE] accident chance per day in the dangerous band, and days the joiner is off. */
 export const ACCIDENT_CHANCE_PER_DAY = 0.02;
 export const ACCIDENT_DAYS_OFF = 3;
@@ -3575,7 +3623,25 @@ export interface ContractPieceSpec {
  *  piece lands near 25 pounds of margin an hour, between a joiner's wage of about 14 and a job's
  *  40; with a CNC on the cutting stage and an edgebander or a booth on the rest the same pieces
  *  reach 40 to 60. The wardrobe front is four hours of work now and no longer three days, which
- *  is what a wardrobe front actually is. `sheets` a piece is unchanged. */
+ *  is what a wardrobe front actually is.
+ *
+ *  `sheets` a piece is unchanged for the two small pieces. The wardrobe front's is not, and that
+ *  DEVIATES FROM THE LETTER of 2.2, which says "sheets per piece stays what it is". Why it was
+ *  moved, and what the other answer is, in plain words:
+ *
+ *  The table's own rule is material = sheets x SHEET_VALUE. The cut sheet pack keeps it (0.15 x
+ *  200 = 30) and so does the drawer box (0.13 x 200 = 26). The wardrobe front was 1.1 sheets
+ *  beside 220 of material in v28, and 2.2 dropped the material to 60 without moving the sheets,
+ *  so the piece was costed at 60 on the card and in the closing report and drew about 220 off the
+ *  rack. The Contracts tab exists to tell the player whether a contract pays BEFORE he takes it
+ *  (T20 2.1), and on that one piece it would have reported the opposite sign: +£100 a piece where
+ *  the piece really loses about £90. Everything else 2.2 states (material 60, the margin of 100 a
+ *  piece, the band of 22 to 30 an hour) needs the table to agree with itself, so the sheets moved
+ *  to 60 / SHEET_VALUE and not the other three figures.
+ *
+ *  [TUNE, PIOTR'S TO RULE ON] The other answer is his: keep 1.1 sheets and move the material and
+ *  the price together, about 220 of material and about 320 a piece, which holds the same margin an
+ *  hour and makes the wardrobe front a dearer contract than the table says tonight. */
 export const CONTRACT_PIECES: readonly ContractPieceSpec[] = [
   {
     id: 'cutSheetPack',
@@ -3603,8 +3669,10 @@ export const CONTRACT_PIECES: readonly ContractPieceSpec[] = [
     stages: ['cutting', 'finishing'],
     minutes: 240,
     price: 160,
+    // [TUNE] 60 over SHEET_VALUE 200, so the piece draws off the rack exactly what it is costed
+    // at. It was 1.1 in v28, beside a material of 220. See the note above the table.
     material: 60,
-    sheets: 1.1,
+    sheets: 0.3,
     labour: 100,
   },
 ];
@@ -3630,6 +3698,10 @@ export const CONTRACT_QUANTITY_PER_WEEK_MAX = 40;
 /** A short week is a point of reputation [TUNE]; at the end of the term every full week raises the
  *  offered price by this much and every short week lowers it by this much [TUNE]. */
 export const CONTRACT_SHORT_WEEK_REPUTATION = 1;
+/** Short weeks a client puts up with inside one term. The first costs its point of reputation as
+ *  it always did; on the second the client ends the contract himself and there is no third
+ *  [TUNE: two, and Piotr's decision on it is still open] (CLAUDE.md T20 2.1.6). */
+export const CONTRACT_SHORT_WEEKS_ALLOWED = 2;
 export const CONTRACT_RENEW_FULL_WEEK = 0.01;
 export const CONTRACT_RENEW_SHORT_WEEK = 0.02;
 
@@ -3809,15 +3881,11 @@ export const ANSWER_SKEW_NEUTRAL_TIER = 1;
 export const HOLIDAY_OPTIONS_DAYS: readonly number[] = [1, 3, 5, HOLIDAY_MAX_DAYS];
 
 // ---------------------------------------------------------------------------
-// Turn 19: the doors, the sprayer, the drawings, the sound
+// Turn 19: the sprayer, the drawings, the sound
 // ---------------------------------------------------------------------------
-
-/** How long a door takes to swing from shut to open, in milliseconds of real time [TUNE]. A man
- *  whose leg ends at a door cell opens it as he arrives: closed, half, open (CLAUDE.md T19 2.3). */
-export const DOOR_SWING_MS = 400;
-/** How long a door stands open after the last man leaves its cell, in milliseconds of real time
- *  [TUNE]. A door with somebody standing in it never closes (CLAUDE.md T19 2.3). */
-export const DOOR_CLOSE_MS = 600;
+// The swing's two figures (DOOR_SWING_MS, DOOR_CLOSE_MS) went with the swing itself, and
+// STAND_IN_GAIN with the synthesised stand ins: a door is drawn closed and the hall is silent
+// until Piotr's recordings land, so nothing reads any of the three (CLAUDE.md T20 2.12, 2.13).
 
 /** The shortest a drawing can take, in minutes [TUNE] (CLAUDE.md T19 2.11). */
 export const DESIGN_MIN_MINUTES = 30;
@@ -3832,10 +3900,6 @@ export const SOUND_VOLUME_DEFAULT = 0.7;
  *  presses, fine enough to find a level and coarse enough to reach both ends
  *  (CLAUDE.md T19 2.10). */
 export const SOUND_VOLUME_STEP = 0.1;
-/** How loud the synthesised stand ins play, against a real recording's 1.0 [TUNE]. They are there
- *  so every hook can be heard before Piotr's recordings land, not to be listened to
- *  (CLAUDE.md T19 2.10, section 9). */
-export const STAND_IN_GAIN = 0.15;
 /** The shortest gap between two one shot sounds, in milliseconds of real time. At x10 and x30 the
  *  hall would rattle otherwise: the loops play at their own pitch and the one shots are thinned to
  *  at most one a second (CLAUDE.md T19 2.10). */

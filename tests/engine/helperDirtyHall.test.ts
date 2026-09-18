@@ -1,17 +1,15 @@
 // "Dave stands and does not sweep; I see the dirt" (PIOTR, 18.09; CLAUDE.md T20 2.8).
 //
-// THIS IS A CHARACTERISATION TEST. Every expectation in it is what the game does TODAY, on the
-// base of Turn 20, and not what it ought to do: it is here to pin the complaint down so the fix
-// has something to flip. The cause it pins is (c) of the brief's four, the dust band: the floor
-// shows its first pile of sawdust at 5 points of dust and the helper is not asked for a broom
-// until the dust is past 40, so a hall the player can see the dirt in is a hall the labourer has
-// nothing to do about.
+// This file was written as a CHARACTERISATION test, pinning what the game did on the base of
+// Turn 20 so the fix had something to flip. The cause it pinned is (c) of the brief's four, the
+// dust band: the floor shows its first pile of sawdust at 5 points of dust and the helper was not
+// asked for a broom until the dust was past 40, so a hall the player could see the dirt in was a
+// hall the labourer had nothing to do about.
 //
-// The one line that fixes it is in `runHelperClean`, which lives in the frozen
-// `src/engine/game.ts`, so B3 could not write it: it is note 1 of NOTES-B3.md, for phase C. The
-// day that note is applied, the three expectations marked FLIP below become their opposite (the
-// hall is clean by the end of the day and the helper is the man who cleaned it), and this comment
-// goes with them.
+// The one line that fixes it is in `runHelperClean`, in `src/engine/game.ts`, which was frozen
+// for phase B: `hallLooksDirty(state.dust)` in place of the messy band. It was applied in T20-C1,
+// and the expectations that were marked FLIP are flipped here with it: the helper picks up a
+// broom at 10:00 and the hall is clean by the time the men go home.
 
 import { describe, expect, it } from 'vitest';
 import { HELPER_CLEAN_DUST_BAND } from '../../src/engine/constants';
@@ -103,17 +101,18 @@ describe('why the helper stands beside the dirt (CLAUDE.md T20 2.8)', () => {
     expect(dustAtLeast(state.dust, HELPER_CLEAN_DUST_BAND)).toBe(true);
   });
 
-  it('leaves a hall that dirties at 10:00 dirty when the men go home', () => {
+  it('leaves a hall that dirties at 10:00 clean by the time the men go home', () => {
     const { atTen, evening } = theDay();
-    // 10:00: three piles on the floor, and the game does not think the hall wants sweeping.
+    // 10:00: three piles on the floor, which is dirt the player can see, and still inside the
+    // clean band, which is what the helper used to be asked about.
     expect(atTen.dust).toBe(DIRTIED_TO);
     expect(pilesDrawn(atTen)).toBe(3);
     expect(hallLooksDirty(atTen.dust)).toBe(true);
     expect(dustAtLeast(atTen.dust, HELPER_CLEAN_DUST_BAND)).toBe(false);
-    // FLIP: after note 1 the helper picks up a broom here and the hall is clean by the evening.
-    expect(evening.tasks.some((task) => task.kind === 'cleaning')).toBe(false);
-    expect(pilesDrawn(evening)).toBeGreaterThan(0);
-    expect(evening.dust).toBeGreaterThanOrEqual(DIRTIED_TO);
+    // He picks up a broom on the dirt and the hall is clean by the evening.
+    expect(evening.tasks.some((task) => task.kind === 'cleaning' && task.done)).toBe(true);
+    expect(pilesDrawn(evening)).toBe(0);
+    expect(evening.dust).toBe(0);
   });
 
   it('is not the lorry, not his day and not the owner s queue that stops him', () => {
@@ -124,8 +123,9 @@ describe('why the helper stands beside the dirt (CLAUDE.md T20 2.8)', () => {
     expect(unload?.doneBy).toBe(theHelper(atTen).id);
     expect(unload?.done).toBe(true);
     expect(atTen.deliveries[0]?.unloaded).toBe(true);
-    // FLIP: he is holding a broom here after note 1, instead of holding nothing at all.
-    expect(theHelper(atTen).taskId).toBeNull();
+    // He is holding a broom here, instead of holding nothing at all. The cleaning is raised in
+    // `settle`, so it is read one minute of the clock on from the dirt.
+    expect(theHelper(runClock(atTen, 2)).taskId).not.toBeNull();
     // (b) He is on duty, all day.
     expect(helperOnDuty(atTen)).toBe(true);
     expect(helperOnDuty(evening)).toBe(true);

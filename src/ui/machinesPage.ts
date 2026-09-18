@@ -10,29 +10,21 @@
 // prints it.
 
 import {
+  LIFE_LOW_FRACTION,
   findSpec,
   isSold,
   itemStandsInTheHall,
-  pastEndurance,
-  serviceCostFor,
-  serviceIsDue,
-} from '../engine/index';
-// The four the service rule of T20 2.9 adds. `src/engine/index.ts` is frozen tonight, so they are
-// read from the module that owns them, the way `catalogue.ts` reads `serviceDueIn`; NOTES-B3.md
-// note 6 asks phase C to put them on the index beside the rest of the machine selectors.
-import {
   lifeAfterServices,
   machineIsOut,
   originalLifeOf,
+  pastEndurance,
   serviceCallCheck,
-} from '../engine/machines';
+  serviceCostFor,
+  serviceIsDue,
+} from '../engine/index';
 import type { Equipment, EquipmentSpec, GameState } from '../engine/index';
 import { button, emptyLine, escapeHtml, money, reasonLabel } from './modal';
 import { lifeFigures, pictureSlot } from './machine';
-
-/** [PIOTR, 18.09: "red when under a tenth is left"] The share of a machine's life left at which
- *  the bar turns from the good colour to the bad one (CLAUDE.md T20 2.9). */
-export const LIFE_LOW_FRACTION = 0.1;
 
 /** What stands on the floor and has a life to run out: the machines and the extraction kit. The
  *  office furniture, the rack and a tool in a cabinet are not plant and are not on this page. */

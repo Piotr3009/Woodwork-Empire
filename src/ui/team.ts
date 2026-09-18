@@ -19,7 +19,7 @@ import {
   staffManagementMinutes,
   weekOfDay,
 } from '../engine/index';
-import type { GameState, HiringOption, Worker, WorkerRole } from '../engine/index';
+import type { GameState, HiringOption, WeekMeters, Worker, WorkerRole } from '../engine/index';
 import {
   DAY_CATEGORY_LABELS,
   HOUSE_TIER_NAMES,
@@ -49,7 +49,7 @@ import {
   weekNowOf,
   weekWorkedMinutes,
 } from '../engine/staff';
-import type { WeekMeters } from '../engine/staff';
+import type { WeekHolder } from '../engine/staff';
 import { ownerDayLine } from './topbar';
 import {
   button,
@@ -337,7 +337,7 @@ function weekText(label: string, rate: number, meters: WeekMeters | null): strin
 
 /** The second line of a man's row on Our team: this week and last, one under the other inside his
  *  own row (CLAUDE.md T20 2.7). */
-function weekLine(state: GameState, id: string, rate: number, holder: object): string {
+function weekLine(state: GameState, id: string, rate: number, holder: WeekHolder): string {
   const week = weekOfDay(state.clock.day);
   return (
     `<span data-team-week="${id}">` +

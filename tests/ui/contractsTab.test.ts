@@ -297,12 +297,74 @@ describe('the one click that takes the contract (CLAUDE.md T20 2.1.1)', () => {
     render();
   });
 
-  it('accepts the offer and puts the man on it, in one click, and the list has the cross', () => {
-    // Into the office and up to the Work Plan, then the Contracts tab.
+  it('works the card out for the man the player picks, through the real DOM', () => {
+    // The route sets `ui.contractMan` and the modal body has to be given it: without that fifth
+    // argument the chips move and the card keeps the first man's figures (NOTES-B1.md 1.1).
     const toOffice = root().querySelector('[data-do="setView"][data-view="office"]');
     if (toOffice !== null) toOffice.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     click('[data-office="workPlan"]');
     click('[data-do="workPlanTab"][data-id="contracts"]');
+    const state = game();
+    const contract = state.contracts[0] as Contract;
+    const ben = contractResultFor(state, contract, state.workers[0] as Worker);
+    const ravi = contractResultFor(state, contract, state.workers[1] as Worker);
+    // The two men are not the same man: the card has something to change.
+    expect(ravi.minutes).not.toBe(ben.minutes);
+    expect(ravi.margin).not.toBe(ben.margin);
+    const first = root().querySelector('[data-do="takeContract"]');
+    expect(first?.getAttribute('data-worker')).toBe('staff-1');
+    expect(first?.textContent).toBe('Take it, Ben on it');
+    expect(root().querySelector('.contract-offer')?.textContent).toContain(`Ben's labour a piece`);
+    click('[data-do="pickContractMan"][data-worker="staff-2"]');
+    const second = root().querySelector('[data-do="takeContract"]');
+    expect(second?.getAttribute('data-worker')).toBe('staff-2');
+    expect(second?.textContent).toBe('Take it, Ravi on it');
+    // And the figures moved with him, not only his name.
+    const card = root().querySelector('.contract-offer');
+    expect(card?.textContent).toContain(`Ravi's labour a piece`);
+    const figures = Array.from(card?.querySelectorAll('.row-figure') ?? []).map(
+      (figure) => figure.textContent,
+    );
+    expect(figures).toContain(signedMoney(ravi.margin));
+    expect(figures).not.toContain(signedMoney(ben.margin));
+    expect(figures).toContain(signedMoney(ravi.weekResult));
+    const day = card?.querySelector('.contract-day');
+    expect(day?.querySelectorAll('.contract-day-block:not(.is-lunch):not(.is-free)')).toHaveLength(
+      ravi.piecesPerDay,
+    );
+    // Back to Ben, so the click that takes the contract below starts where the card does.
+    click('[data-do="pickContractMan"][data-worker="staff-1"]');
+    expect(root().querySelector('[data-do="takeContract"]')?.getAttribute('data-worker')).toBe(
+      'staff-1',
+    );
+  });
+
+  it('will not take the contract for a man the engine refuses, and says why', () => {
+    // The owner is costed on the card and cannot stand at a contract (NOTES-B1.md 6.1), so the tab
+    // draws him the plain `acceptContract` button and never this one. The route is shut all the
+    // same, so that a button written in a later turn cannot take the offer and leave it with
+    // nobody on it (NOTES-B1.md 1.2). Nothing on screen dispatches this, so the test makes the
+    // click itself.
+    click('[data-do="pickContractMan"][data-worker="owner"]');
+    expect(root().querySelector('[data-do="takeContract"]')).toBeNull();
+    expect(root().querySelector('[data-do="acceptContract"]')?.textContent).toBe('Take it');
+    const contract = game().contracts[0] as Contract;
+    expect(contract.status).toBe('offered');
+    const button = document.createElement('button');
+    button.dataset.do = 'takeContract';
+    button.dataset.id = contract.id;
+    button.dataset.worker = 'owner';
+    root().appendChild(button);
+    button.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(game().contracts[0]?.status).toBe('offered');
+    expect(game().contracts[0]?.assigned).toEqual([]);
+    expect(root().querySelector('.toast')?.textContent).toBe(
+      'A contract is work for a joiner: you cannot be put on one',
+    );
+    click('[data-do="pickContractMan"][data-worker="staff-1"]');
+  });
+
+  it('accepts the offer and puts the man on it, in one click, and the list has the cross', () => {
     expect(root().querySelector('.contract-offer')).not.toBeNull();
     const before = game().contracts[0];
     expect(before?.status).toBe('offered');

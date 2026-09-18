@@ -4,7 +4,8 @@
 // production rate, so he is not on the Output sheet at all (PIOTR; CLAUDE.md T20 2.3).
 
 import { describe, expect, it } from 'vitest';
-import { PRODUCING_ROLES, produces } from '../../src/engine/staff';
+import { PRODUCING_ROLES } from '../../src/engine/constants';
+import { produces } from '../../src/engine/staff';
 import { renderCompany } from '../../src/ui/company';
 import type { GameState } from '../../src/engine/index';
 import { buyStartingKit, hireNow, newGame, placeEquipment } from '../helpers';
@@ -63,5 +64,24 @@ describe('who acts where they are', () => {
     const rows = elsewhereRows(state).join(' ');
     expect(rows).toContain(joiner.name);
     expect(rows).not.toContain(estimator.name);
+  });
+
+  it('reads the role and never the name, so two men called Dave keep their own lines', () => {
+    // The pool of names holds twenty and the crew limit can pass twenty, so a second Dave is
+    // reachable. A filter that matched a line by the name it is written under would take the
+    // joiner Dave's line off the sheet with the estimator Dave's, so the rule is at the source,
+    // in `outputBreakdown`, and it reads the role (NOTES-B2.md 2.3, 8.8).
+    let state = hireNow(known(), 'joiner', 'senior');
+    state = hireNow(state, 'estimator', 'experienced');
+    const joiner = state.workers.find((worker) => worker.role === 'joiner');
+    const estimator = state.workers.find((worker) => worker.role === 'estimator');
+    if (!joiner || !estimator) throw new Error('nobody on the books');
+    joiner.name = 'Dave';
+    estimator.name = 'Dave';
+    const rows = elsewhereRows(state);
+    const daves = rows.filter((row) => row.startsWith('Dave,'));
+    expect(daves).toHaveLength(1);
+    expect(daves[0]).toContain('joiner');
+    expect(daves[0]).not.toContain('estimator');
   });
 });

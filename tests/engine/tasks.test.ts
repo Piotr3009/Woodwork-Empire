@@ -8,6 +8,7 @@ import {
   JOINERY_CORE_EXTENSION_PRICE_YEARLY,
   JOINERY_CORE_MAX_EXTENSIONS,
   JOINERY_CORE_PRICE_YEARLY,
+  MATERIAL_TAKE_OFF_MINUTES,
   DESIGN_MIN_MINUTES,
   SOFTWARE_DESIGN_FACTOR,
   TAKE_OFF_BUTTON_LABEL,
@@ -17,7 +18,6 @@ import {
   createTask,
   designMinutes,
   emailsForPrice,
-  MATERIAL_TAKE_OFF_MINUTES,
   estimatorCapacity,
   takeOffMinutes,
   findTask,
@@ -381,6 +381,23 @@ describe('the material take off', () => {
     state.software.joineryCoreExtensions = 3;
     expect(estimatorCapacity(state)).toBe(56);
     expect(JOINERY_CORE_MAX_EXTENSIONS).toBe(2);
+  });
+
+  it('is the same half hour whatever the job is worth, and the caller asks for it', () => {
+    // The curve by price went with the five a day: `src/engine/jobs.ts` asks `takeOffMinutes` for
+    // the figure now, instead of `createTask` overriding whatever it was handed (NOTES-B2.md 2.1).
+    const takeOff = (price: number): number => {
+      const state = newGame();
+      state.enquiries = [];
+      const enquiry = placeEnquiry(state, { name: 'A job', price });
+      const taken = acceptNow(state, enquiry.id, false);
+      return tasksOfKind(taken, 'materialTakeOff')[0]?.minutesTotal ?? 0;
+    };
+    expect(takeOff(400)).toBe(MATERIAL_TAKE_OFF_MINUTES);
+    expect(takeOff(100000)).toBe(MATERIAL_TAKE_OFF_MINUTES);
+    // The old curve is still exported for the material order it was written for, and it does not
+    // agree with the take off any more, which is the point.
+    expect(materialOrderMinutes(100000)).not.toBe(MATERIAL_TAKE_OFF_MINUTES);
   });
 
   it('gives a man with no experience 37 minutes over one and the top man 21', () => {

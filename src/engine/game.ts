@@ -17,7 +17,6 @@ import {
   DAY_END_MINUTE,
   DIFFICULTIES,
   GATE_LANE,
-  HELPER_CLEAN_DUST_BAND,
   HELPER_CLEAN_WEEKDAY,
   LOCKER_SLOT_LAYOUT,
   GATE_PRICE,
@@ -123,10 +122,10 @@ import {
   extractorBreakdownChance,
   extractorBroken,
   OWNER,
-  dustAtLeast,
   ductedMoves,
   ductingDue,
   findSpec,
+  hallLooksDirty,
   itemIsHeavy,
   isSellableFamily,
   isSold,
@@ -147,6 +146,7 @@ import {
   standsInTheHall,
   zoneOf,
   serviceCostFor,
+  serviceCallCheck,
   serviceMachine,
   serviceableMachines,
   gateCheck,
@@ -229,7 +229,7 @@ import {
   underExtracted,
 } from './media';
 import { cubicMetres, metresBy, plural } from './text';
-import { STATION_IDLE, STATION_NO_BENCH, stationForTask } from './stations';
+import { STATION_IDLE, STATION_NO_BENCH, stationForTask, storageSaleBlock } from './stations';
 import {
   type Hand,
   jobOf,
@@ -252,6 +252,7 @@ import {
   isWorkingToday,
   joiners,
   hurtWorker,
+  letGo,
   rollNightBreakdowns,
   runNightShift,
   runStaffDayStart,
@@ -264,6 +265,7 @@ import {
   advanceTask,
   assignStaffTasks,
   assignWorkerTask,
+  bookWeekMinutes,
   createDailyTasks,
   createTask,
   dayCategoryOf,
@@ -742,6 +744,26 @@ function runExtractorBreakdown(state: GameState): void {
   raiseMachineBroken(state, extractor);
 }
 
+/** The service called in: paid at the call, the machine out for the working day, and the reminder
+ *  off the list (PIOTR, 18.09; CLAUDE.md T20 2.9). 2.9.2 says it is "paid when called" and 2.9.3
+ *  says the machine is "out for one working day from the call", which leaves no room for Turn 8's
+ *  half hour at the spanner: the press pays and takes the machine out in the same minute. The one
+ *  path, for the event's choice and for the Machines page's button. */
+function callServiceIn(state: GameState, equipmentId: string): void {
+  const machine = state.equipment.find((item) => item.id === equipmentId);
+  if (!machine || !serviceCallCheck(state, machine.id).ok) return;
+  const name = findSpec(machine.specId)?.name ?? machine.specId;
+  pay(state, 'repair', `${name} service`, serviceCostFor(machine));
+  serviceMachine(state, machine.id);
+  for (const task of state.tasks) {
+    if (task.kind !== 'service' || task.equipmentId !== machine.id || task.done) continue;
+    task.done = true;
+    task.doneDay = state.clock.day;
+    if (state.owner.currentTaskId === task.id) state.owner.currentTaskId = null;
+    for (const worker of state.workers) if (worker.taskId === task.id) worker.taskId = null;
+  }
+}
+
 /** A machine wants a service once a month, and one that never gets it gives up (CLAUDE.md T2 3.9). */
 function runServiceDue(state: GameState): void {
   for (const machine of machinesDueService(state)) {
@@ -759,7 +781,11 @@ function runServiceDue(state: GameState): void {
         `It has ${SERVICE_INTERVAL_HOURS} hours on it since the last one. The parts and the oil come to ` +
         `${formatMoney(serviceCostFor(machine))}. Left alone it will give up in the middle of a ` +
         'job.',
-      choices: adHocChoices(state, task.minutesTotal, 'Do it yourself'),
+      // A service is called in and paid for; nobody stands at it with a spanner (CLAUDE.md T20 2.9).
+      choices: [
+        { id: 'service', label: `Call it in, ${formatMoney(serviceCostFor(machine))}` },
+        { id: 'later', label: 'Leave it' },
+      ],
       data: { equipmentId: machine.id, taskId: task.id },
     });
   }
@@ -796,7 +822,11 @@ function runHelperClean(state: GameState): void {
     ensureTask(state, 'cleaning', 'Weekly clean', null);
     return;
   }
-  if (!dustAtLeast(state.dust, HELPER_CLEAN_DUST_BAND)) return;
+  // The dirt he answers is the dirt the player sees: one pile of sawdust on the floor, which the
+  // renderer draws from five points of dust, and not the messy band, which starts past forty. The
+  // player saw dirt and the labourer stood beside it (PIOTR, 18.09; CLAUDE.md T20 2.8; the
+  // diagnosis is in REPORT-T20.md).
+  if (!hallLooksDirty(state.dust)) return;
   ensureTask(state, 'cleaning', 'Sweep the hall', null);
 }
 
@@ -1078,17 +1108,6 @@ function applyTaskCompletion(state: GameState, task: TaskInstance): void {
         const name = findSpec(machine.specId)?.name ?? machine.specId;
         pay(state, 'repair', `${name} repair`, repairCostFor(machine));
         repairMachine(state, machine.id);
-      }
-      break;
-    }
-    case 'service': {
-      const machine = task.equipmentId
-        ? state.equipment.find((item) => item.id === task.equipmentId)
-        : null;
-      if (machine) {
-        const name = findSpec(machine.specId)?.name ?? machine.specId;
-        pay(state, 'repair', `${name} service`, serviceCostFor(machine));
-        serviceMachine(state, machine.id);
       }
       break;
     }
@@ -1421,8 +1440,15 @@ function settle(state: GameState): void {
   // A hall that has gone past clean is the helper's to sweep, the minute it does (T17 2.3).
   runHelperClean(state);
   // The helper takes his break like everybody else, and the list is there for him when he is
-  // back: nobody is sent at a bag change in the middle of his dinner.
-  if (!isBreak(state.clock.minute)) delegateTasks(state);
+  // back: nobody is sent at a bag change in the middle of his dinner. The week's meters take the
+  // dinner hour off with him: they are a sample of the minute that has just gone, and the hour in
+  // the canteen is neither worked nor paid for (CLAUDE.md T20 2.7). The sampler rode in on the top
+  // of `assignStaffTasks` while game.ts was frozen for phase B, which is inside this same guard;
+  // it has a line of its own now and the guard with it, so not a minute of it moved.
+  if (!isBreak(state.clock.minute)) {
+    bookWeekMinutes(state);
+    delegateTasks(state);
+  }
   autoAssignJobs(state);
   updateStations(state);
   openNextEvent(state);
@@ -2005,8 +2031,12 @@ function resolveEvent(state: GameState, choiceId: string): void {
       }
       break;
     }
-    case 'bagsFull':
     case 'serviceDue':
+      // Called in, not worked off: the money goes now and the machine is away for the day
+      // (CLAUDE.md T20 2.9).
+      if (choiceId === 'service') callServiceIn(state, String(event.data.equipmentId));
+      break;
+    case 'bagsFull':
     case 'machineBroken': {
       const taskId = event.data.taskId;
       const task = typeof taskId === 'string' ? findTask(state, taskId) : null;
@@ -2163,15 +2193,9 @@ export function applyAction(state: GameState, action: GameAction): GameState {
       }
       break;
     }
-    case 'SERVICE_MACHINE': {
-      const machine = next.equipment.find((item) => item.id === action.equipmentId);
-      if (machine) {
-        const name = findSpec(machine.specId)?.name ?? machine.specId;
-        const task = ensureTask(next, 'service', `Service the ${name.toLowerCase()}`, machine.id);
-        startTask(next, task.id);
-      }
+    case 'SERVICE_MACHINE':
+      callServiceIn(next, action.equipmentId);
       break;
-    }
     case 'BOOT_LAPTOP':
       bootLaptop(next);
       break;
@@ -2255,6 +2279,9 @@ export function applyAction(state: GameState, action: GameAction): GameState {
     case 'SET_SECOND_SHIFT':
       // No manager, no second shift (CLAUDE.md T13 3.9).
       if (managerOnDuty(next) || !action.on) next.shift.second = action.on;
+      break;
+    case 'LET_GO':
+      letGo(next, action.workerId);
       break;
     case 'ASSIGN_SHIFT': {
       const worker = next.workers.find((entry) => entry.id === action.workerId);
@@ -2745,6 +2772,10 @@ export function canSell(state: GameState, equipmentId: string): BuyCheck {
   if (!itemStandsInTheHall(item)) return { ok: false, reason: 'It lives in a tool cabinet' };
   if (item.broken) return { ok: false, reason: 'It is broken. Fix it first' };
   if (item.takenBy !== null) return { ok: false, reason: 'Somebody is standing at it' };
+  // A rack goes when it is empty and nobody is at it (PIOTR, 18.09; CLAUDE.md T20 2.10). The one
+  // sentence: the Owned tab prints this very string.
+  const storage = storageSaleBlock(state, item);
+  if (storage !== '') return { ok: false, reason: storage };
   return OK;
 }
 

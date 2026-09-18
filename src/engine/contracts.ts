@@ -13,6 +13,7 @@ import {
   CONTRACT_QUANTITY_PER_WEEK_MIN,
   CONTRACT_RENEW_FULL_WEEK,
   CONTRACT_RENEW_SHORT_WEEK,
+  CONTRACT_SHORT_WEEKS_ALLOWED,
   CONTRACT_SHORT_WEEK_REPUTATION,
   CONTRACT_TERM_MONTHS_MAX,
   CONTRACT_TERM_MONTHS_MIN,
@@ -59,11 +60,9 @@ import type { Contract, ContractWeek, GameState, Job, StageId, Worker } from './
  *  a job, not at one, and not a job the plan could find (CLAUDE.md T13 3.16). */
 export const CONTRACT_MARKER = 'contract:';
 
-/** Short weeks a client puts up with inside one term. The first costs its point of reputation as
- *  it always did; on the second the client ends the contract himself and there is no third
- *  [TUNE: two, and Piotr's decision on it is still open] (CLAUDE.md T20 2.1.6). It lives here
- *  until phase C takes it home to constants.ts. */
-export const CONTRACT_SHORT_WEEKS_ALLOWED = 2;
+/** Re-exported from constants.ts, where it lives with the rest of the contract figures: the
+ *  engine and the tests both read it off this module (CLAUDE.md T20 2.1.6). */
+export { CONTRACT_SHORT_WEEKS_ALLOWED };
 
 export interface ContractCheck {
   ok: boolean;

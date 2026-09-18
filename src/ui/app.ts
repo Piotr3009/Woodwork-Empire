@@ -63,6 +63,8 @@ import { centreOf, screenToTile } from '../render/iso';
 import { fitOfficeStack, officeScene } from '../render/office';
 import { type AccountingTab, accountingTabFrom, renderAccounting } from './accounting';
 import { renderContracts } from './contracts';
+// Straight off its own module, not round the public API, which Turn 13 froze (REPORT-T13 10).
+import { contractManCheck } from '../engine/contracts';
 import { renderHouseCard } from './house';
 import { renderMonthEnd } from './monthEnd';
 import { renderSettings } from './settings';
@@ -453,7 +455,7 @@ function modalBody(id: ModalId, current: GameState): string {
         tickedTasks: ui.tickedTasks,
       });
     case 'workPlan':
-      return renderWorkPlan(current, ui.workPlanTab, ui.dropConfirm, ui.assignOpen);
+      return renderWorkPlan(current, ui.workPlanTab, ui.dropConfirm, ui.assignOpen, ui.contractMan);
     case 'machineCard':
       return renderMachineCard(current, ui.machineCard, ui.sellConfirm);
     case 'accounting': {
@@ -1422,17 +1424,22 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
     case 'renewContract':
       dispatch({ type: 'RENEW_CONTRACT', contractId: id, accept: element.dataset.accept === '1' });
       return;
-    case 'takeContract':
+    case 'takeContract': {
       // The one click of the Contracts tab: the offer is accepted and the man the card has
-      // selected is put on it, in that order (PIOTR; CLAUDE.md T20 2.1.1).
+      // selected is put on it, in that order (PIOTR; CLAUDE.md T20 2.1.1). The man is asked about
+      // first: a click that cannot put him on it would otherwise take the contract and leave it
+      // with nobody on it, which is not what the button says.
+      const onIt = element.dataset.worker ?? '';
+      const check = contractManCheck(game(), onIt);
+      if (!check.ok) {
+        ui.toast = check.reason;
+        requestRender();
+        return;
+      }
       dispatch({ type: 'ACCEPT_CONTRACT', contractId: id });
-      dispatch({
-        type: 'ASSIGN_CONTRACT',
-        contractId: id,
-        workerId: element.dataset.worker ?? '',
-        on: true,
-      });
+      dispatch({ type: 'ASSIGN_CONTRACT', contractId: id, workerId: onIt, on: true });
       return;
+    }
     case 'pickContractMan':
       // Which man the offer card is worked out for. He is not on anything: the card is showing
       // the player what it would be like with him on it (CLAUDE.md T20 2.1.1). It breaks and does
@@ -1440,10 +1447,10 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
       // new man: the player picks through the men with the clock stopped.
       ui.contractMan = element.dataset.worker ?? null;
       break;
-    // Phase B fills this one. Nothing renders a control for it yet, so no click can reach it; the
-    // route is here so the button has one to wire to when it is written: `letGo` is the week's
-    // notice of CLAUDE.md T20 2.4. The service already has its own route, further down.
     case 'letGo':
+      // The week's notice: he works it out, he is paid for it, and the morning after his last day
+      // his jobs and his contracts are short of a man (PIOTR, 18.09; CLAUDE.md T20 2.4).
+      dispatch({ type: 'LET_GO', workerId: id });
       return;
     case 'endContract':
       dispatch({ type: 'END_CONTRACT', contractId: id });

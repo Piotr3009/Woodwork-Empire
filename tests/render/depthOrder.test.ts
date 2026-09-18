@@ -6,11 +6,11 @@
 // feet are on, checked every frame and changed only where it has crossed a neighbour.
 
 import { beforeEach, describe, expect, it } from 'vitest';
+import { FIGURE_DEPTH_OFFSET } from '../../src/engine/constants';
 import { STATION_BENCH } from '../../src/engine/stations';
 import { depthKey } from '../../src/render/iso';
 import { renderHall } from '../../src/render/hall';
 import {
-  FIGURE_DEPTH_OFFSET,
   figureDepth,
   resetWalkers,
   resortFigures,

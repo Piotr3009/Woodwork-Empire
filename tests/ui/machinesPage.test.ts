@@ -4,10 +4,14 @@
 // it, and Service with its price on the row.
 
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { LAPTOP_BOOT_MINUTES, SERVICE_INTERVAL_HOURS } from '../../src/engine/constants';
+import {
+  LAPTOP_BOOT_MINUTES,
+  LIFE_LOW_FRACTION,
+  SERVICE_INTERVAL_HOURS,
+} from '../../src/engine/constants';
 import { serviceCostFor, serviceMachine } from '../../src/engine/machines';
 import { formatMoney } from '../../src/engine/index';
-import { LIFE_LOW_FRACTION, machinesInTheHall, renderMachinesPage } from '../../src/ui/machinesPage';
+import { machinesInTheHall, renderMachinesPage } from '../../src/ui/machinesPage';
 import { advanceMinutes, currentState, mount, render } from '../../src/ui/app';
 import type { Equipment, GameState } from '../../src/engine/index';
 import { buyStartingKit, newGame } from '../helpers';

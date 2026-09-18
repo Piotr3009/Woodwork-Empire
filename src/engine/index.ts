@@ -388,6 +388,7 @@ export {
   openTasks,
   canQueueTask,
   cleanerAtWork,
+  manOnOpenTask,
   softwareActive,
   staffManagementMinutes,
   startTaskCheck,
@@ -476,6 +477,16 @@ export {
   repairCostFor,
   serviceCostFor,
   SPRAY_BOOTH,
+  // The service rule and the dirt the helper answers, Turn 20 (CLAUDE.md T20 2.8, 2.9).
+  hallLooksDirty,
+  hoursPastLife,
+  lifeAfterServices,
+  machineIsOut,
+  machinesInService,
+  originalLifeOf,
+  sawdustPiles,
+  serviceCallCheck,
+  weeksPastLife,
 } from './machines';
 
 // Who is standing at which machine (CLAUDE.md T7 3.1)
@@ -710,7 +721,11 @@ export {
   CONTRACT_CLIENTS,
   CONTRACT_OFFER_CHANCE_PER_DAY,
   CONTRACT_QUANTITY_STEP,
+  DUST_PER_SAWDUST_PILE,
   HOLIDAY_OPTIONS_DAYS,
+  LIFE_LOW_FRACTION,
+  PAST_LIFE_WEEK_HOURS,
+  SERVICE_LIFE_EXTENSION,
   STOCK_LINE_KINDS,
   STOCK_LINE_NAME,
   TAKE_OFF_BUTTON_LABEL,

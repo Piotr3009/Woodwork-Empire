@@ -1116,6 +1116,13 @@ input.num {
   overflow: hidden;
 }
 
+/* The picture on a row rather than on a card: the same slot at a row's height (CLAUDE.md T20 2.9). */
+.tile-picture.is-small {
+  height: 48px;
+  margin: 0;
+  width: 64px;
+}
+
 .tile-picture img {
   display: block;
   max-height: 100%;
@@ -2969,6 +2976,76 @@ input.num {
   background: var(--good);
 }
 
+/* A life that is nearly run out, on the Machines page's bar (CLAUDE.md T20 2.9). */
+.contract-fill.is-low {
+  background: var(--bad);
+}
+
+/* The Machines page's middle column: the bar with its figures under it (CLAUDE.md T20 2.9). */
+.machine-life {
+  display: flex;
+  flex: 1 1 140px;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* The man's day on a contract, 8:00 to 17:00, one block a piece, the lunch block where he puts
+   his tools down and what is left of the day going to the job he is also on (PIOTR, the mockup
+   of docs/mockups/t20/contracts-tab.html; CLAUDE.md T20 2.1.1, 2.1.2). The week's bar above is
+   .contract-track; this is one day of it. */
+.contract-day {
+  margin: 6px 0 10px;
+}
+
+.contract-day-track {
+  background: var(--card, var(--panel-2));
+  border: 1px solid var(--card-line, var(--border));
+  border-radius: 3px;
+  height: 26px;
+  overflow: hidden;
+  position: relative;
+}
+
+.contract-day-block {
+  align-items: center;
+  background: var(--good);
+  border-right: 1px solid var(--card, var(--panel-2));
+  bottom: 2px;
+  color: var(--cream);
+  display: flex;
+  font-size: var(--fs-tiny);
+  justify-content: center;
+  overflow: hidden;
+  position: absolute;
+  top: 2px;
+  white-space: nowrap;
+}
+
+.contract-day-block.is-lunch {
+  background: var(--border);
+  color: var(--text-dim);
+}
+
+.contract-day-block.is-free {
+  background: var(--panel-2);
+  color: var(--text-dim);
+}
+
+/* The minutes that go to the job he is also on: the house accent, as the drawing has them. The
+   ink is the one .btn-primary already puts on that amber. */
+.contract-day-block.is-job {
+  background: var(--accent);
+  color: #1c1f24;
+}
+
+.contract-day-ticks {
+  color: var(--text-dim);
+  display: flex;
+  font-size: var(--fs-tiny);
+  justify-content: space-between;
+  margin-top: 2px;
+}
+
 .contract-active,
 .contract-ended {
   margin-bottom: 14px;
@@ -3774,6 +3851,12 @@ input.num {
 
 /* The pages behind the tiles inherit the screen and nothing else: flat white cards and rows on
    the cool background, the buttons and chips of the software, no cream anywhere. */
+/* The bar of a life on a laptop page: the track is the screen's own line and not the dark
+   palette's border (CLAUDE.md T20 2.9). */
+.modal-screen .contract-track {
+  background: var(--screen-line);
+}
+
 .modal-screen .row {
   border-bottom: 1px solid var(--screen-line);
 }
@@ -4038,6 +4121,14 @@ input.num {
 
 .assign-row .assign-tier {
   color: var(--card-ink-2, var(--text-dim));
+  font-size: var(--fs-tiny);
+}
+
+/* The same thing under a man's name in the offer card's picker, which is a chip and not a row, so
+   the tier goes on its own line under him (CLAUDE.md T20 2.1.1). */
+.contract-men .assign-tier {
+  color: var(--card-ink-2, var(--text-dim));
+  display: block;
   font-size: var(--fs-tiny);
 }
 

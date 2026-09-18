@@ -81,7 +81,7 @@ import {
   emailMinutes,
   emailsForPrice,
   jobTasks,
-  materialOrderMinutes,
+  takeOffMinutes,
 } from './tasks';
 import type {
   Finish,
@@ -496,11 +496,13 @@ export function createJobTasks(state: GameState, job: Job): void {
     jobId: job.id,
   });
   // The material take off: reading the drawing and counting the sheets. The owner's until an
-  // estimator is taken on, and never before the drawing (CLAUDE.md T13 3.8).
+  // estimator is taken on, and never before the drawing (CLAUDE.md T13 3.8). Half an hour of the
+  // desk it is done at, less what the software takes off it, whatever the job is worth: the curve
+  // by price went with the five a day (PIOTR, 18.09; CLAUDE.md T20 2.3).
   createTask(state, {
     kind: 'materialTakeOff',
     label: `Material take off: ${job.name}`,
-    minutes: Math.round(materialOrderMinutes(job.price)),
+    minutes: takeOffMinutes(state),
     jobId: job.id,
   });
   if (job.needsMeasure) {
@@ -712,7 +714,11 @@ export function hallBlock(state: GameState, job: Job): string {
   if (stopped === null) return '';
   // The hall's bags are full: one block for every machine that makes dust (CLAUDE.md T12 2.3).
   if (stopped.why === 'bags') return 'bags full';
-  return `${(findSpec(stopped.item.specId)?.name ?? 'a machine').toLowerCase()} is broken`;
+  const machine = (findSpec(stopped.item.specId)?.name ?? 'a machine').toLowerCase();
+  // A machine away being serviced stops the stage the way a broken one does, and the card says
+  // which of the two it is (CLAUDE.md T20 2.9.3).
+  if (stopped.why === 'service') return `${machine} is in for a service`;
+  return `${machine} is broken`;
 }
 
 /** The stages a job can still be sent to the bench from. Once somebody is on it there is nothing

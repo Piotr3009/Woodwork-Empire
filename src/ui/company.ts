@@ -26,7 +26,6 @@ import {
 import { machineSavings } from '../engine/machines';
 import type { MachineSaving, MachineSavings } from '../engine/machines';
 // Straight off its own module, as the Turn 13 freeze on the public API asks (REPORT-T13 10).
-import { produces } from '../engine/staff';
 import { lastWeekRate, weekRate } from '../engine/rate';
 import type { WorkshopRate } from '../engine/rate';
 import { plural } from '../engine/text';
@@ -235,17 +234,6 @@ function reputationSheet(state: GameState, weeks: readonly Week[]): string {
   );
 }
 
-/** True for a line that belongs to a man who does not produce. The sheet under the second rule is
- *  the men and the machines that act where they are, and a rate at a desk is not a production
- *  rate: an estimator, an admin, a draftsman, a clerk and a salesman are off it, and the joiners,
- *  the sprayers and the owner are on it (PIOTR; CLAUDE.md T20 2.3). The rule is `produces` in
- *  `src/engine/staff.ts` and the man is found by the name his line is written under. */
-function isAtADesk(state: GameState, line: OutputLine): boolean {
-  return state.workers.some(
-    (worker) => !produces(worker.role) && line.label.startsWith(`${worker.name},`),
-  );
-}
-
 /** A line of the breakdown as a row: the hall's own carry no second line tonight, because no tip
  *  or warning of the game has matching wording for them (CLAUDE.md T15 2.1); the rest say where
  *  they act. */
@@ -263,11 +251,11 @@ function outputRow(line: OutputLine, index: number): string {
  *  make it with their balance, and under a second rule the men and the machines, which act where
  *  they are and are not in the number above. The engine's breakdown is printed and nothing is
  *  computed from it (CLAUDE.md T15 0, 2.1). */
-function outputSheet(state: GameState, breakdown: OutputBreakdown): string {
+function outputSheet(breakdown: OutputBreakdown): string {
   const hall = breakdown.lines.filter((line) => line.hall);
-  const elsewhere = breakdown.lines.filter(
-    (line) => !line.hall && !isAtADesk(state, line),
-  );
+  // The men who do not produce are off this sheet at the source, in `outputBreakdown`, where the
+  // rule reads the role and never the name (CLAUDE.md T20 2.3.3).
+  const elsewhere = breakdown.lines.filter((line) => !line.hall);
   const base = ledgerRow('Base', '', breakdown.base.toFixed(2), 0, 'data-line="base"');
   return (
     '<section class="sheet" data-sheet="output">' +
@@ -376,7 +364,7 @@ export function renderCompany(state: GameState): string {
     '</div>' +
     '<div class="sheets">' +
     reputationSheet(state, weeks) +
-    outputSheet(state, outputBreakdown(state)) +
+    outputSheet(outputBreakdown(state)) +
     machinesSheet(machineSavings(state, 'week')) +
     '</div>' +
     '</div>'

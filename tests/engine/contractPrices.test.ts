@@ -9,7 +9,12 @@
 // off it, which is why the band is above a joiner's 14 and below a job's 40.
 
 import { describe, expect, it } from 'vitest';
-import { CONTRACT_PIECES, MINUTES_PER_WORKING_DAY, WORKER_RATES } from '../../src/engine/constants';
+import {
+  CONTRACT_PIECES,
+  MINUTES_PER_WORKING_DAY,
+  SHEET_VALUE,
+  WORKER_RATES,
+} from '../../src/engine/constants';
 import { contractPiece, contractResultFor, drawContract } from '../../src/engine/contracts';
 import type { Contract, GameState, Worker } from '../../src/engine/index';
 import { buyStartingKit, newGame } from '../helpers';
@@ -49,6 +54,25 @@ describe('the prices that pay (CLAUDE.md T20 2.2)', () => {
     expect(round(marginAnHour(contractPiece({ pieceId: 'cutSheetPack' } as Contract)))).toBe(26.67);
     expect(round(marginAnHour(contractPiece({ pieceId: 'drawerBox' } as Contract)))).toBe(26);
     expect(round(marginAnHour(contractPiece({ pieceId: 'wardrobeFront' } as Contract)))).toBe(25);
+  });
+
+  it('costs every piece at the sheets it actually draws off the rack', () => {
+    // The table's own rule: material = sheets x SHEET_VALUE. The wardrobe front broke it, because
+    // 2.2 dropped its material to 60 and said the sheet count stays, so the card and the closing
+    // report costed it at 60 while the rack lost about 220 of stock a piece, and the Contracts
+    // tab, whose whole job is to say whether a contract pays before it is taken, reported the
+    // opposite sign on it. The sheets moved to 0.3 for it: the ONE deviation from the letter of
+    // 2.2 in this turn, and Piotr's to rule on (the note above CONTRACT_PIECES).
+    for (const piece of CONTRACT_PIECES) {
+      expect(Math.abs(piece.sheets * SHEET_VALUE - piece.material)).toBeLessThanOrEqual(1);
+    }
+    console.log(
+      `WHAT A PIECE DRAWS OFF THE RACK\n${CONTRACT_PIECES.map(
+        (piece) =>
+          `${piece.name}: ${piece.sheets} of a sheet, £${round(piece.sheets * SHEET_VALUE)} of ` +
+          `stock, costed at £${piece.material}`,
+      ).join('\n')}`,
+    );
   });
 
   it('makes the wardrobe front four hours of work and not three days', () => {

@@ -17,7 +17,7 @@ import {
 } from './constants';
 import { addWorkingDays } from './clock';
 import { canAfford, noteLoss, pay } from './economy';
-import { sheetCapacityOf } from './machines';
+import { isSold, itemStandsInTheHall, sheetCapacityOf } from './machines';
 import { makeId } from './rng';
 import { createTask, unloadMinutes } from './tasks';
 import { plural } from './text';
@@ -32,7 +32,12 @@ export function sheetsForCost(cost: number): number {
  *  the two of them hold (PIOTR, CLAUDE.md T7 3.6). */
 export function rackCapacity(state: GameState): number {
   let capacity = 0;
-  for (const item of state.equipment) capacity += sheetCapacityOf(item);
+  // A rack that is sold stands in the hall until the van comes, and it is no room: nothing is
+  // unloaded onto a rack that leaves in the morning (CLAUDE.md T20 2.10).
+  for (const item of state.equipment) {
+    if (isSold(item) || !itemStandsInTheHall(item)) continue;
+    capacity += sheetCapacityOf(item);
+  }
   return capacity;
 }
 

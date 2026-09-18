@@ -13,7 +13,6 @@ import {
   OVERDUE_BREAKDOWN_CHANCE,
   SERVICE_COST_FRACTION,
   SERVICE_INTERVAL_HOURS,
-  SERVICE_MINUTES,
   EXTRACTOR_REPAIR_COST,
   REPAIR_MINUTES,
   NO_HELPER_DUST_MULTIPLIER,
@@ -316,9 +315,11 @@ describe('dust', () => {
     expect(swept.owner.dayLog.some((entry) => entry.category === 'fixing')).toBe(false);
     // And the standing Friday clean is on the list on the Friday, his as well.
     const friday = runToDay(swept, 5).state;
-    expect(
-      friday.tasks.some((task) => task.kind === 'cleaning' && task.label === 'Weekly clean'),
-    ).toBe(true);
+    // The sweeping is raised the moment there is dirt on the floor now (CLAUDE.md T20 2.8), so by
+    // Friday morning one of his is usually open already, `ensureTask` finds it and keeps its own
+    // label, `Sweep the hall`. The Friday clean still happens and is still his, which is what this
+    // test is about; the label is not.
+    expect(friday.tasks.some((task) => task.kind === 'cleaning' && !task.done)).toBe(true);
     expect(friday.owner.dayLog.some((entry) => entry.category === 'fixing')).toBe(false);
   });
 
@@ -600,23 +601,26 @@ describe('the service, counted on the machine\u0027s own clock', () => {
     expect(serviceDueOn(quiet, saw as Equipment)).toBeNull();
   });
 
-  it('raises the service and is done in half an hour, and the clock starts again', () => {
+  it('raises the service, and calling it in pays for it and starts the clock again', () => {
+    // Turn 8's half hour at the spanner is gone: a service is called in and paid for at the call,
+    // and the machine is away for the working day (PIOTR, 18.09; CLAUDE.md T20 2.9.2, 2.9.3).
     let state = withHours(atTheBench(), 'tableSaw', SERVICE_INTERVAL_HOURS);
+    const saw = state.equipment.find((item) => item.specId === 'tableSaw');
+    // `runToDay` answers whatever the day throws up with its first choice, which is Call it in.
     const run = runToDay(state, state.clock.day + 1);
     const due = eventsOfKind(run.events, 'serviceDue');
     expect(due.length).toBeGreaterThanOrEqual(1);
     expect(due[0]?.title).toContain('Service due');
+    expect(due[0]?.choices[0]?.id).toBe('service');
     state = run.state;
-    const task = state.tasks.find((entry) => entry.kind === 'service' && !entry.done);
-    expect(task?.minutesTotal).toBe(SERVICE_MINUTES);
-    const saw = state.equipment.find((item) => item.specId === 'tableSaw');
-    const cash = state.cash;
-    state = act(state, { type: 'SERVICE_MACHINE', equipmentId: saw?.id ?? '' });
-    state = tick(state, SERVICE_MINUTES);
+    // Nothing is left on the list for anybody to stand at.
+    expect(state.tasks.some((entry) => entry.kind === 'service' && !entry.done)).toBe(false);
     const serviced = state.equipment.find((item) => item.specId === 'tableSaw');
     expect(serviced?.serviceHours).toBe(serviced?.hoursUsed);
     expect(serviceIsDue(serviced as Equipment)).toBe(false);
-    expect(cash - state.cash).toBeCloseTo(serviceCostFor(saw as Equipment), 6);
+    // The bill went out at the call, on its own line, and it is a tenth of what the saw cost.
+    const bill = state.ledger.find((entry) => entry.label.endsWith('service'));
+    expect(bill?.amount).toBeCloseTo(-serviceCostFor(saw as Equipment), 6);
   });
 
   it('gives an overdue machine a 2% chance a day of giving up, and it is out until repaired', () => {

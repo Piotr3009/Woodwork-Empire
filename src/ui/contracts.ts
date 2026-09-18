@@ -9,6 +9,7 @@ import {
   CONTRACT_OFFER_DAYS,
   DAYS_PER_WEEK,
   DAY_END_MINUTE,
+  DAY_TRACK_TICK_MINUTES,
   MINUTES_PER_WORKING_DAY,
   TIER_WORDS,
 } from '../engine/constants';
@@ -342,12 +343,9 @@ function across(minute: number): number {
   return Math.round((minute / DAY_END_MINUTE) * 10000) / 100;
 }
 
-/** The clock under a day track, every two hours of it from 8:00 [TUNE: two hours, which is what
- *  the drawing of docs/mockups/t20 has], and the end of the day on the right. The last two hour
- *  mark is left off when the end is nearer to it than that, so the two labels never sit on top of
- *  each other. Phase C: this belongs in `constants.ts` beside the working day's own minutes. */
-export const DAY_TRACK_TICK_MINUTES = 120;
-
+/** The clock under a day track, every `DAY_TRACK_TICK_MINUTES` of it from 8:00, and the end of the
+ *  day on the right. The last two hour mark is left off when the end is nearer to it than half of
+ *  that, so the two labels never sit on top of each other. */
 function dayTicks(): number[] {
   const ticks: number[] = [];
   for (

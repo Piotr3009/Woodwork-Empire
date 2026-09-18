@@ -19,7 +19,11 @@
 // Nothing here is game state. A rebuilt page finds the walkers still here and puts every figure
 // back where it had actually got to (the same reason the slides of Turn 2 lived in the app).
 
-import { WALK_CELLS_PER_SECOND, WALK_CORNER_CELLS } from '../engine/constants';
+import {
+  FIGURE_DEPTH_OFFSET,
+  WALK_CELLS_PER_SECOND,
+  WALK_CORNER_CELLS,
+} from '../engine/constants';
 import { STATION_GATE, STATION_RACK, isDoorwayCell } from '../engine/stations';
 import {
   type Animation,
@@ -93,11 +97,6 @@ let pathFinder: PathFinder = (from, to) => [from, to];
 export function resetWalkers(): void {
   walkers.clear();
 }
-
-/** How far in front of his own cell a figure is painted, so a man standing at a machine is in
- *  front of the machine on that cell and not inside it (CLAUDE.md T16 2.1). The hall writes it on
- *  the figure when it builds the scene and the re-sort below reads it back. */
-export const FIGURE_DEPTH_OFFSET = 0.2;
 
 /** The depth key a figure has this frame: the cell his feet are actually on, and not the station
  *  he is walking to (PIOTR; CLAUDE.md T20 2.11). For the whole of a walk the hall used to paint

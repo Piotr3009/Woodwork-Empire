@@ -677,14 +677,14 @@ describe('the lengths of work the board offers (CLAUDE.md T17 2.22)', () => {
     for (const piece of CONTRACT_PIECES) {
       expect(piece.labour).toBe(piece.price - piece.material);
     }
-    // What a piece takes off the rack is unchanged by the new prices, and for the two small ones
-    // it is still the money in its sheets. The wardrobe front is the one that parts company: it
-    // draws 1.1 sheets and is costed at 60, because Piotr set the price table and said the sheet
-    // count stays (CLAUDE.md T20 2.2).
-    for (const piece of CONTRACT_PIECES.filter((entry) => entry.id !== 'wardrobeFront')) {
+    // What a piece takes off the rack is what it is costed at, every piece of the three: the two
+    // readings of one piece of material can never part company again. The wardrobe front's sheets
+    // moved from 1.1 to 0.3 for it, which is the one deviation from the letter of 2.2 in this turn
+    // and is Piotr's to rule on (CLAUDE.md T20 2.2; the note above CONTRACT_PIECES).
+    for (const piece of CONTRACT_PIECES) {
       expect(piece.sheets).toBeCloseTo(piece.material / SHEET_VALUE, 2);
     }
-    expect(long?.sheets).toBe(1.1);
+    expect(long?.sheets).toBe(0.3);
     // The quantity is a week's work whatever the piece: thirty cut sheet packs are one wardrobe
     // front and twenty two drawer boxes.
     expect(quantityForPiece(CONTRACT_PIECES[0] as ContractPieceSpec, 30)).toBe(30);

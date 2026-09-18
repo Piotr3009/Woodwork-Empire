@@ -78,14 +78,13 @@ import { gateCollarArt, pipeTile, portRing } from './pipes';
 import { ownerIsAvailable } from '../engine/owner';
 import { homeCellOf } from '../engine/staff';
 import { plural } from '../engine/text';
+import { FIGURE_DEPTH_OFFSET } from '../engine/constants';
 import type { RoomId } from '../engine/constants';
 import type {
   Equipment,
   EquipmentSpec,
   GameState,
   OnOrderItem,
-  TaskInstance,
-  Worker,
 } from '../engine/types';
 import {
   type BoxFaces,
@@ -119,10 +118,9 @@ import {
 import { placeholder } from './placeholder';
 import { cncOptions } from '../engine/stages';
 import { jobStage } from '../engine/jobs';
-import { cleanerAtWork } from '../engine/tasks';
+import { cleanerAtWork, manOnOpenTask } from '../engine/tasks';
 import type { StageId } from '../engine/types';
 import { figureIsThroughADoor, takeDoorGoings } from './doors';
-import { FIGURE_DEPTH_OFFSET } from './walkers';
 
 /** What the hall can be heard doing (CLAUDE.md T19 2.10, T20 2.13). The render layer owns the
  *  list, because the render layer is what reports the events; `src/ui/sound.ts` plays what is on
@@ -1834,20 +1832,6 @@ export interface HallProblem {
 
 function lowerName(specId: string): string {
   return (findSpec(specId)?.name ?? specId).toLowerCase();
-}
-
-/** The man who has the one open job of work of this kind in his hands this minute, or null. It is
- *  `cleanerAtWork` of `src/engine/tasks.ts` with the kind asked for instead of fixed at the
- *  cleaning: both halves have to be true, the task names him and he names it, and a task the owner
- *  took on himself is nobody, because that is his own override and it keeps its button
- *  (CLAUDE.md T19 2.7, T20 2.8). NOTES-B3.md note 3 asks phase C to fold the two into one
- *  selector in `tasks.ts`, which is not B3's file this phase. */
-function manOnOpenTask(state: GameState, kind: TaskInstance['kind']): Worker | null {
-  const task = state.tasks.find((entry) => entry.kind === kind && !entry.done);
-  if (!task || task.doneBy === null) return null;
-  const worker = state.workers.find((entry) => entry.id === task.doneBy);
-  if (!worker || worker.taskId !== task.id) return null;
-  return worker;
 }
 
 /** Everything the hall wants doing, in the order it costs the workshop: what has stopped, then

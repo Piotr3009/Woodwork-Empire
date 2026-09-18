@@ -3,19 +3,18 @@
 // costs a tenth of what the machine cost; the machine is out for the working day; and a machine
 // past its life goes on working and gives up oftener every week.
 //
-// The cost is read off `SERVICE_COST_FRACTION` and never off the figure 0.10, because that
-// constant lives in the frozen `src/engine/constants.ts` and NOTES-B3.md note 4 carries the new
-// value for phase C: these assertions are true either side of it.
+// The cost is read off `SERVICE_COST_FRACTION` and never off the figure 0.10, so the constant is
+// the one place the tenth is written down.
 
 import { describe, expect, it } from 'vitest';
 import {
   OVERDUE_BREAKDOWN_CHANCE,
+  PAST_LIFE_WEEK_HOURS,
   SERVICE_COST_FRACTION,
   SERVICE_INTERVAL_HOURS,
 } from '../../src/engine/constants';
 import { nextWorkingDay } from '../../src/engine/clock';
 import {
-  PAST_LIFE_WEEK_HOURS,
   enduranceHoursFor,
   familyStopped,
   freeMachines,
@@ -213,10 +212,8 @@ describe('what the day costs when the machine goes out (CLAUDE.md T20 2.9.3)', (
     // And the work did not happen: the stage the saw makes is stopped, so the day's output falls.
     expect(jobProgress(firstJob(worked))).toBeGreaterThan(0);
     expect(jobProgress(firstJob(stopped))).toBe(0);
-    // FLIP, NOTES-B3.md note 6: `src/engine/jobs.ts` is nobody's file this phase, so the job card
-    // still calls a machine that is away being serviced broken. When phase C applies note 6 this
-    // line reads 'table saw is in for a service'.
-    expect(hallBlock(stopped, firstJob(stopped))).toBe('table saw is broken');
+    // And the card says which of the two it is: away being serviced, not broken (T20 2.9.3).
+    expect(hallBlock(stopped, firstJob(stopped))).toBe('table saw is in for a service');
   });
 });
 

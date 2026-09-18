@@ -32,15 +32,18 @@ import {
   EXTRACTOR_BROKEN_DUST_MULTIPLIER,
   HELPER_REQUIRED_FROM_JOINERS,
   NO_DUCTING_SPECS,
+  DUST_PER_SAWDUST_PILE,
   NO_HELPER_DUST_MULTIPLIER,
   NO_HELPER_PRODUCTIVITY_FACTOR,
   PROPERTY_INSURANCE_RATE_YEARLY,
+  PAST_LIFE_WEEK_HOURS,
+  PRODUCING_ROLES,
   SALE_FRACTION,
+  SERVICE_LIFE_EXTENSION,
   UNDER_EXTRACTION_DUST_MULTIPLIER,
   UNDER_EXTRACTION_OUTPUT_PENALTY,
   SALE_FRACTION_USED,
   USED_VARIANT,
-  WEEKS_PER_MONTH,
 } from './constants';
 import { weekOfDay, monthOfDay, nextWorkingDay } from './clock';
 import { canAfford } from './economy';
@@ -472,12 +475,6 @@ export function dustAtLeast(dust: number, label: string): boolean {
   return order.indexOf(dustBand(dust).label) >= order.indexOf(label);
 }
 
-/** [TUNE] How much dust one pile of sawdust on the floor is worth. It is not a new figure: it is
- *  the ten `sawdust()` in `src/render/hall.ts` has divided by since Turn 2, given a name so that
- *  the dirt the player sees and the dirt the engine answers are one reading. Phase C moves it
- *  into constants.ts with the rest of the dust figures (CLAUDE.md T20 2.8). */
-export const DUST_PER_SAWDUST_PILE = 10;
-
 /** How many piles of sawdust the hall is painting at this much dust. The renderer draws exactly
  *  this many (CLAUDE.md T20 2.8). */
 export function sawdustPiles(dust: number): number {
@@ -595,12 +592,16 @@ export function outputBreakdown(state: GameState): OutputBreakdown {
       where: 'your own minutes',
     });
   }
-  // Everybody on the books who works at a rate of his own. The guard used to stop at a rate of
-  // 1 as well, from the days when no tier reached the owner; tonight the experienced man is his
-  // equal and the two above him beat him, so that half of it took every man worth having off the
-  // list. The experienced man reads 0.00, which is the truth about him (CLAUDE.md T20 2.5).
+  // Everybody on the books who PRODUCES, and only them: this sheet is the men and the machines
+  // that act where they are, and a rate at a desk is not a production rate, so an estimator, an
+  // admin, a draftsman, a clerk and a salesman are off it whatever their rate is (PIOTR;
+  // CLAUDE.md T20 2.3.3). The rule is the role and never the name, so two men called Dave cannot
+  // take each other's line off the sheet. The guard used to read the rate: it stopped at 1 as
+  // well, from the days when no tier reached the owner, and tonight the experienced man is his
+  // equal and the two above him beat him. The experienced man reads 0.00, which is the truth
+  // about him (CLAUDE.md T20 2.5).
   for (const worker of state.workers) {
-    if (worker.rate <= 0) continue;
+    if (!PRODUCING_ROLES.includes(worker.role)) continue;
     lines.push({
       label: `${worker.name}, ${worker.tier === null ? 'a' : TIER_WORDS[worker.tier]} ${worker.role}`,
       points: roundPoints(worker.rate - 1),
@@ -737,17 +738,11 @@ export function machinesDueService(state: GameState): Equipment[] {
 }
 
 /** A tenth of what the machine cost [PIOTR, 18.09; CLAUDE.md T20 2.9.2]. The fraction itself is
- *  `SERVICE_COST_FRACTION` in constants.ts, which is one of the six frozen files tonight: it still
- *  reads 0.02 and NOTES-B3.md note 4 carries the new value. Everything here and every test reads
- *  the constant, so both are true of the same code. */
+ *  `SERVICE_COST_FRACTION`, which is a tenth of what the machine cost [PIOTR, 18.09]. Everything
+ *  here and every test reads the constant and never the figure. */
 export function serviceCostFor(item: Equipment): number {
   return Math.round(item.purchasePrice * SERVICE_COST_FRACTION * 100) / 100;
 }
-
-/** [PIOTR, 18.09] What a service adds to the machine's life: half of its ORIGINAL life the first
- *  time, and half of the last extension each time after that, so the extensions are 50%, 25%,
- *  12.5% of the original and they never add up past the original again (CLAUDE.md T20 2.9.1). */
-export const SERVICE_LIFE_EXTENSION = 0.5;
 
 /** The life the machine left the shop with, before any service was called on it. */
 export function originalLifeOf(item: Equipment): number {
@@ -801,12 +796,6 @@ export function hoursPastLife(item: Equipment): number {
   if (item.enduranceHours <= 0) return 0;
   return Math.max(0, round6(item.hoursUsed - item.enduranceHours));
 }
-
-/** [TUNE] A week of a machine's own clock, which is the same reading `SERVICE_INTERVAL_HOURS`
- *  is written in: 80 hours is the month a one man shop puts on a saw (CLAUDE.md T6 3.6), so a
- *  week of it is that over `WEEKS_PER_MONTH`. No new figure: the two it is made of are Piotr's
- *  own. */
-export const PAST_LIFE_WEEK_HOURS = SERVICE_INTERVAL_HOURS / WEEKS_PER_MONTH;
 
 /** How many weeks of its own clock the machine has run past the end of its life. */
 export function weeksPastLife(item: Equipment): number {

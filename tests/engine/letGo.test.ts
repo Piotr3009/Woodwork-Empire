@@ -4,7 +4,8 @@
 // man short. It costs no reputation.
 
 import { describe, expect, it } from 'vitest';
-import { LET_GO_NOTICE_DAYS, crewCount, letGo, letGoCheck, runStaffDayStart } from '../../src/engine/staff';
+import { LET_GO_NOTICE_DAYS } from '../../src/engine/constants';
+import { crewCount, letGo, letGoCheck, runStaffDayStart } from '../../src/engine/staff';
 import { canHire, crewLine, hiringOptions } from '../../src/engine/staff';
 import { weeklyWageBill } from '../../src/engine/economy';
 import { acceptContract, assignContract, drawContract } from '../../src/engine/contracts';
