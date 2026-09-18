@@ -45,6 +45,13 @@ describe('who acts where they are', () => {
     }
   });
 
+  it('says 0 h of a machine nobody stood at, and never "none" (CLAUDE.md T20 2.14)', () => {
+    const page = parse(renderCompany(known()));
+    const machines = page.querySelector('[data-sheet="machines"]');
+    expect(machines?.textContent).toContain('0 h');
+    expect(machines?.textContent).not.toContain('none');
+  });
+
   it('keeps the estimator off the Output sheet and leaves the joiner on it', () => {
     let state = hireNow(known(), 'joiner', 'senior');
     state = hireNow(state, 'estimator', 'experienced');

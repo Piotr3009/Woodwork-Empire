@@ -43,20 +43,24 @@ import {
 } from './constants';
 import { DAY_END_MINUTE } from './constants';
 import { isBreak, nextWorkingDay, weekOfDay } from './clock';
-import { has } from './machines';
+import { OWNER, has } from './machines';
 import { canUnload } from './materials';
 import { managerOnDuty, ownerIsAvailable } from './owner';
 import { makeId } from './rng';
 import { plural } from './text';
 import {
+  WEEK_JOBS_KEPT,
   hasWorkingDay,
   helperOnDuty,
   isWorkingToday,
   joiners,
   staffMinutesLeft,
+  weekMetersOf,
 } from './staff';
+import type { WeekCategory, WeekMeters } from './staff';
 import { websiteUpkeepMinutes } from './website';
 import type {
+  Contract,
   DayCategory,
   GameState,
   Worker,
@@ -643,6 +647,117 @@ export function bestTakerOf(
   return best;
 }
 
+// ---------------------------------------------------------------------------
+// The week's meters (CLAUDE.md T20 2.7). One sample a minute of what every man on the books was
+// doing, into the meters `src/engine/staff.ts` keeps on him. It hangs off `assignStaffTasks`
+// because that is the one hook the day already runs over the whole crew every minute; the sample
+// is guarded by the day and the minute it was taken on, so a minute the state settles more than
+// once is never counted twice. NOTES-B2.md asks phase C for a line of its own in `settle`.
+// ---------------------------------------------------------------------------
+
+/** Which of the six bands of a man's week a job of work falls in. The desk is the office and the
+ *  drawing board; the van and the rack are the unloading; the broom and the spanner are the
+ *  cleaning; the tape measure is the site (CLAUDE.md T20 2.7). */
+export const WEEK_CATEGORY_OF_TASK: Record<TaskKind, WeekCategory> = {
+  emails: 'desk',
+  bookkeeping: 'desk',
+  dailyOrdering: 'desk',
+  staffManagement: 'desk',
+  clientCall: 'desk',
+  clientMeeting: 'desk',
+  design: 'desk',
+  materialTakeOff: 'desk',
+  websiteUpkeep: 'desk',
+  hiring: 'desk',
+  booting: 'desk',
+  siteMeasure: 'site',
+  unload: 'unloading',
+  fetchStorage: 'unloading',
+  deliver: 'unloading',
+  emptyBags: 'cleaning',
+  cleaning: 'cleaning',
+  service: 'cleaning',
+  repair: 'cleaning',
+  moveMachines: 'cleaning',
+};
+
+/** What this man was at this minute, or null while he was standing about. */
+function bandOf(state: GameState, taskId: string | null, jobId: string | null): WeekCategory | null {
+  if (taskId !== null) {
+    const task = findTask(state, taskId);
+    return task ? WEEK_CATEGORY_OF_TASK[task.kind] : null;
+  }
+  if (jobId === null) return null;
+  // A man on a contract carries its marker in `jobId`, which is no job of the board's: if the
+  // jobs do not know it, he is on the standing work (CLAUDE.md T13 3.16).
+  return state.jobs.some((job) => job.id === jobId) ? 'jobs' : 'contracts';
+}
+
+/** The name of the job he stood at this minute, for the list on his row. */
+function jobNameOf(state: GameState, jobId: string | null): string | null {
+  if (jobId === null) return null;
+  return state.jobs.find((job) => job.id === jobId)?.name ?? null;
+}
+
+/** Books one minute onto one man's week. True when the minute was his to book. */
+function bookOne(
+  state: GameState,
+  holder: object,
+  week: number,
+  band: WeekCategory | null,
+  jobName: string | null,
+): WeekMeters | null {
+  const meters = weekMetersOf(holder, week);
+  if (meters.day === state.clock.day && meters.minute === state.clock.minute) return null;
+  meters.day = state.clock.day;
+  meters.minute = state.clock.minute;
+  meters.paidMinutes += 1;
+  if (band !== null) meters.minutes[band] += 1;
+  if (jobName !== null && !meters.jobs.includes(jobName) && meters.jobs.length < WEEK_JOBS_KEPT) {
+    meters.jobs.push(jobName);
+  }
+  return meters;
+}
+
+/** What the contract had made last time the sampler looked. It sits on the contract itself, so it
+ *  is cloned and saved with it and two games can never read each other's count; it belongs beside
+ *  `piecesMade` in the frozen types.ts, and NOTES-B2.md says so. */
+interface HasSeenPieces {
+  piecesSeenByTheWeek?: number;
+}
+
+/** The pieces a standing contract turned out since the last sample, shared among the men who are
+ *  on it: a piece two men made is half of each man's week (CLAUDE.md T20 2.7). */
+function bookContractPieces(state: GameState, week: number): void {
+  for (const contract of state.contracts) {
+    const carrier = contract as Contract & HasSeenPieces;
+    const seen = carrier.piecesSeenByTheWeek;
+    carrier.piecesSeenByTheWeek = contract.piecesMade;
+    if (seen === undefined || contract.piecesMade <= seen) continue;
+    const hands = state.workers.filter((worker) => contract.assigned.includes(worker.id));
+    if (hands.length === 0) continue;
+    const share = (contract.piecesMade - seen) / hands.length;
+    for (const worker of hands) weekMetersOf(worker, week).pieces += share;
+  }
+}
+
+/** One sample of the minute just worked, over the owner and everybody on the books. */
+export function bookWeekMinutes(state: GameState): void {
+  const week = weekOfDay(state.clock.day);
+  const owner = state.owner;
+  if (ownerIsAvailable(state)) {
+    const job = state.jobs.find((entry) => entry.assignees.includes(OWNER)) ?? null;
+    const band = bandOf(state, owner.currentTaskId, job?.id ?? null);
+    bookOne(state, owner, week, band, job?.name ?? null);
+  }
+  for (const worker of state.workers) {
+    if (!isWorkingToday(state, worker) && !isWorkingToday(state, worker, 'night')) continue;
+    const band = bandOf(state, worker.taskId, worker.jobId);
+    bookOne(state, worker, week, band, jobNameOf(state, worker.jobId));
+  }
+  bookContractPieces(state, week);
+}
+
 /** A worker on the books takes the tasks his role covers, and the owner never sees them. Every
  *  man who can take one on books minutes into it, so nothing is cleared here: the minute runner
  *  finishes it and applies what it does (CLAUDE.md T17 2.3).
@@ -651,6 +766,9 @@ export function bestTakerOf(
  *  to that man and never passed round the workshop by rank (CLAUDE.md T17 2.14). One the owner put
  *  down is the office's again while he is not holding it. */
 export function assignStaffTasks(state: GameState): void {
+  // The week's meters first, because they are a reading of the minute that has just gone and not
+  // of who picks what up next (CLAUDE.md T20 2.7).
+  bookWeekMinutes(state);
   const started = state.workers.filter((worker) => isWorkingToday(state, worker));
   if (started.length === 0) return;
   for (const task of state.tasks) {

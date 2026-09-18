@@ -17,6 +17,7 @@ import {
   ownerDrawPaidInWindow,
   ownerDrawPerDay,
   staffManagementMinutes,
+  weekOfDay,
 } from '../engine/index';
 import type { GameState, HiringOption, Worker, WorkerRole } from '../engine/index';
 import {
@@ -38,7 +39,17 @@ import {
   staffManagementTaker,
 } from '../engine/index';
 // Straight off its own module, not round the public API, which Turn 13 froze (REPORT-T13 10).
-import { ROLE_WORDS, letGoCheck, monthlyWageOf } from '../engine/staff';
+import {
+  ROLE_WORDS,
+  WEEK_CATEGORIES,
+  letGoCheck,
+  monthlyWageOf,
+  weekBeforeOf,
+  weekEfficiency,
+  weekNowOf,
+  weekWorkedMinutes,
+} from '../engine/staff';
+import type { WeekMeters } from '../engine/staff';
 import { ownerDayLine } from './topbar';
 import {
   button,
@@ -298,6 +309,40 @@ function letGoControl(state: GameState, worker: Worker): string {
   return button('letGo', 'Let go', `data-id="${worker.id}"`);
 }
 
+/** A man's week, in one line under his row: the hours he worked, where they went, the pieces a
+ *  standing contract took off him, the jobs he stood at and the one efficiency figure of the week
+ *  (PIOTR; CLAUDE.md T20 2.7). The engine samples the minutes; this prints them, and the bands
+ *  add up to the hours because they are the same minutes.
+ *
+ *  The figure is his rate times the minutes he spent making something, over the minutes the
+ *  company paid for while he was on the books. */
+function weekText(label: string, rate: number, meters: WeekMeters | null): string {
+  if (meters === null || meters.paidMinutes === 0) return `${label}: nothing yet`;
+  const worked = weekWorkedMinutes(meters);
+  const split = WEEK_CATEGORIES.filter((band) => meters.minutes[band] > 0)
+    .map((band) => `${band} ${hoursText(meters.minutes[band])}`)
+    .join(' \u00b7 ');
+  const parts = [`${hoursText(worked)} worked`];
+  if (split !== '') parts.push(split);
+  if (meters.pieces > 0) {
+    parts.push(`${plural(Math.round(meters.pieces), 'piece', 'pieces')} on contracts`);
+  }
+  if (meters.jobs.length > 0) parts.push(`on ${meters.jobs.join(', ')}`);
+  parts.push(`efficiency ${Math.round(weekEfficiency(rate, meters) * 100)}%`);
+  return `${label}: ${parts.join(', ')}`;
+}
+
+/** The second line of a man's row on Our team: this week and last (CLAUDE.md T20 2.7). */
+function weekRow(state: GameState, id: string, rate: number, holder: object): string {
+  const week = weekOfDay(state.clock.day);
+  return (
+    `<div class="row" data-team-week="${id}">` +
+    `<span class="hint">${escapeHtml(weekText('This week', rate, weekNowOf(holder, week)))}</span>` +
+    `<span class="hint">${escapeHtml(weekText('Last week', rate, weekBeforeOf(holder, week)))}</span>` +
+    '</div>'
+  );
+}
+
 /** Everybody on the books, one row each, the owner first: the roll call Piotr asked for, with no
  *  hiring on it at all (PIOTR, 16.09; CLAUDE.md T17 2.9). The owner has no wage, so his month is
  *  the draw he pays himself on every working day of it. */
@@ -313,19 +358,22 @@ function ourTeamRows(state: GameState): string {
       owner.monthMinutes,
       owner.monthDaysOff,
       ownerDayLine(state),
-    ),
-    ...state.workers.map((worker) =>
-      teamRow(
-        worker.id,
-        worker.name,
-        `${ROLE_WORDS[worker.role]}${worker.tier === null ? '' : `, ${TIER_WORDS[worker.tier]}`}`,
-        startedText(state, worker.startDay),
-        wageText(worker.weeklyWage),
-        worker.monthMinutes,
-        worker.monthDaysOff,
-        workerDoing(state, worker),
-        letGoControl(state, worker),
-      ),
+    ) +
+      // The owner works at his own speed, which is the 1.00 every tier is measured against.
+      weekRow(state, 'owner', 1, owner),
+    ...state.workers.map(
+      (worker) =>
+        teamRow(
+          worker.id,
+          worker.name,
+          `${ROLE_WORDS[worker.role]}${worker.tier === null ? '' : `, ${TIER_WORDS[worker.tier]}`}`,
+          startedText(state, worker.startDay),
+          wageText(worker.weeklyWage),
+          worker.monthMinutes,
+          worker.monthDaysOff,
+          workerDoing(state, worker),
+          letGoControl(state, worker),
+        ) + weekRow(state, worker.id, worker.rate > 0 ? worker.rate : 1, worker),
     ),
   ];
   return rows.join('');
@@ -465,7 +513,7 @@ function tabBody(state: GameState, tab: TeamTab): string {
     return (
       '<h3>Our team</h3>' +
       '<p class="hint">Everybody on the books, the owner first. The hours and the days off are ' +
-      'this month\u0027s.</p>' +
+      'this month\u0027s; the line under each man is his week, and the week before it.</p>' +
       ourTeamRows(state)
     );
   }

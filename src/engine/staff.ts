@@ -502,6 +502,108 @@ export function autoAssignJobs(state: GameState, shift: Shift = 'day'): void {
 }
 
 // ---------------------------------------------------------------------------
+// The week, man by man (PIOTR; CLAUDE.md T20 2.7). Our team says what this week was and what last
+// week was: the hours, where they went, the pieces a contract took off him, the jobs he stood at
+// and the one efficiency figure of the week. The meters are filled a minute at a time by the
+// sampler in `src/engine/tasks.ts`, which is the one hook the day already runs over the crew
+// every minute, and they roll over on the first minute of a new week.
+// ---------------------------------------------------------------------------
+
+/** Where a man's minutes went, in the six the brief names (CLAUDE.md T20 2.7). */
+export type WeekCategory = 'jobs' | 'contracts' | 'unloading' | 'cleaning' | 'desk' | 'site';
+
+/** The order the row prints them in. */
+export const WEEK_CATEGORIES: ReadonlyArray<WeekCategory> = [
+  'jobs',
+  'contracts',
+  'unloading',
+  'cleaning',
+  'desk',
+  'site',
+];
+
+/** One man's week. `day` and `minute` are the last minute counted into it, so a minute the clock
+ *  settles twice is never booked twice. */
+export interface WeekMeters {
+  week: number;
+  minutes: Record<WeekCategory, number>;
+  /** Minutes the clock ran while he was on the books, worked or not: what he is paid for. */
+  paidMinutes: number;
+  /** Pieces of a standing contract finished while he was on it. A piece made by two men is half
+   *  his, because two men made it. */
+  pieces: number;
+  /** The jobs he put a minute into, by name, in the order he first stood at them. */
+  jobs: string[];
+  day: number;
+  minute: number;
+}
+
+/** How many job names a week's line carries [TUNE]: enough to read, not a paragraph. */
+export const WEEK_JOBS_KEPT = 4;
+
+/** Where the two weeks hang. They belong on `Worker` and on `OwnerState` in `src/engine/types.ts`,
+ *  which is frozen tonight, so this module is the one place that knows the shape and NOTES-B2.md
+ *  hands phase C the two lines to add. The state is saved as JSON, so the fields survive a save
+ *  and a load exactly as any other field does. */
+interface HasWeek {
+  weekNow?: WeekMeters;
+  weekBefore?: WeekMeters | null;
+}
+
+function freshMeters(week: number): WeekMeters {
+  return {
+    week,
+    minutes: { jobs: 0, contracts: 0, unloading: 0, cleaning: 0, desk: 0, site: 0 },
+    paidMinutes: 0,
+    pieces: 0,
+    jobs: [],
+    day: 0,
+    minute: -1,
+  };
+}
+
+/** The meters of the week in hand, made and rolled over if the week has turned. The write side:
+ *  only the sampler calls it. */
+export function weekMetersOf(holder: object, week: number): WeekMeters {
+  const carrier = holder as HasWeek;
+  const held = carrier.weekNow;
+  if (held !== undefined && held.week === week) return held;
+  if (held !== undefined) carrier.weekBefore = held;
+  carrier.weekNow = freshMeters(week);
+  return carrier.weekNow;
+}
+
+/** This week's meters, or null while nothing has been counted into them. Read only: the page asks
+ *  this and never the one above, because a render writes nothing. */
+export function weekNowOf(holder: object, week: number): WeekMeters | null {
+  const held = (holder as HasWeek).weekNow;
+  return held !== undefined && held.week === week ? held : null;
+}
+
+/** Last week's meters, or null. The week before this one is either the pair that has been rolled
+ *  aside or the one still in hand from a week nobody has played into yet. */
+export function weekBeforeOf(holder: object, week: number): WeekMeters | null {
+  const carrier = holder as HasWeek;
+  if (carrier.weekNow !== undefined && carrier.weekNow.week === week - 1) return carrier.weekNow;
+  const before = carrier.weekBefore;
+  return before !== undefined && before !== null && before.week === week - 1 ? before : null;
+}
+
+/** The minutes of the week, all six bands of them: the hours the row prints. */
+export function weekWorkedMinutes(meters: WeekMeters): number {
+  return WEEK_CATEGORIES.reduce((total, band) => total + meters.minutes[band], 0);
+}
+
+/** What he earned the company for the minutes it paid for: his rate times the minutes he spent
+ *  making something, over the minutes on the clock while he was on the books. One figure a week
+ *  (CLAUDE.md T20 2.7). Nought while nothing has been paid for yet. */
+export function weekEfficiency(rate: number, meters: WeekMeters): number {
+  if (meters.paidMinutes <= 0) return 0;
+  const making = meters.minutes.jobs + meters.minutes.contracts;
+  return (rate * making) / meters.paidMinutes;
+}
+
+// ---------------------------------------------------------------------------
 // Letting a man go (PIOTR, 18.09: "how do I fire people?"; CLAUDE.md T20 2.4). He works a week's
 // notice out, he is paid for it, and the morning after his last day his jobs and his contracts
 // are short of a man and the plan says so. It costs no reputation: a workshop that cannot carry

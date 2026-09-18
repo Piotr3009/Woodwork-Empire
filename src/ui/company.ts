@@ -308,9 +308,10 @@ function rateLine(week: WorkshopRate, before: WorkshopRate): string {
   );
 }
 
-/** Hours as the board writes them: "12.5 h", and "none" for a machine nobody stood at. */
+/** Hours as the board writes them: "12.5 h", and "0 h" for a machine nobody stood at. A column of
+ *  hours reads as hours all the way down (PIOTR, 18.09; CLAUDE.md T20 2.14). */
 function hours(value: number): string {
-  return value <= 0 ? 'none' : `${value} h`;
+  return value <= 0 ? '0 h' : `${value} h`;
 }
 
 /** What the class does to its stage, as a percentage: "+5%", with the gate's 2% already in it. */
