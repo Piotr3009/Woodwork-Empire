@@ -265,8 +265,6 @@
   }
 }
 
-/* A figure slides between its stations instead of jumping (CLAUDE.md T2 3.3). How long is left of
-   the slide is app.ts's to say: the view is rebuilt part way through it. */
 .view-note {
   margin: 4px 0 0;
   color: var(--text-dim);
@@ -4059,4 +4057,31 @@ input.num {
 /* 2.12 The laptop's second button while a task is running: set apart from the reason beside it. */
 .task-queue-next {
   margin-left: 4px;
+}
+
+/* 2.3 The doors open. All three leaves are in the markup and exactly one of them is shown, so a
+   swing is one attribute on the door and never a piece of the page built again (T9 3.8). */
+.door-opening {
+  fill: #14110d;
+  opacity: 0.85;
+}
+
+.door-leaf {
+  display: none;
+  fill: #6b4f33;
+  stroke: #2a2118;
+  stroke-width: 1;
+}
+
+[data-door-state='closed'] .door-leaf[data-state='closed'],
+[data-door-state='half'] .door-leaf[data-state='half'],
+[data-door-state='open'] .door-leaf[data-state='open'] {
+  display: block;
+}
+
+/* 2.2 The owner is at his desk when the player follows him in. The live slot is the last child of
+   the stack, so without pointer-events none the figure eats every click in the office. */
+.office-figure {
+  position: absolute;
+  pointer-events: none;
 }

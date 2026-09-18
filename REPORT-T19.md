@@ -695,3 +695,30 @@ the facing, nor the frame, nor the mirror, nor the place.
   stations instead of jumping", left over from Turn 2. There is no such rule and there must not be
   one: a CSS transition on the transform would fight the per frame write and lag the man behind
   his own feet. The comment is in a frozen file; it is in `NOTES-B1.md` for the integrator.
+
+### T19-C1f B1's frozen file notes applied: the doors swing
+
+`turn-19-b1` merged, and the four changes B1 wrote into `NOTES-B1.md` are applied:
+
+- `src/ui/styles.css`: the door's three leaves and its dark opening, with exactly one leaf shown
+  per state, so a swing is one attribute on the door and never a piece of the page built again.
+  Without them every door drew all three leaves at once. `.office-figure` gets
+  `pointer-events: none`, which is not decoration: the live slot is the last child of the office
+  stack, so without it the owner at his desk ate every click in the room.
+- `src/ui/styles.css`: the stale Turn 2 comment promising that "a figure slides between its
+  stations" is deleted. There is no such rule and there must not be one: a CSS transition on the
+  transform would fight the walker's per frame write and lag a man behind his own feet.
+- `src/ui/app.ts`: `syncDoors` after the figures in `render`, `stepDoors` beside `stepWalkers` in
+  the frame, and `resetDoors` beside every `resetWalkers`. Until this landed the doors were drawn
+  in whatever state the hall computed for the frame the page was built in, and never swung.
+
+B1's fifth note, the hammer's and the drill's own cadences, was already done: B3 had put `gapMs`
+on the `SOUNDS` row while B1 was writing the note.
+
+**One cross group failure, and it was the test that was wrong.** B3's sound test asserted that a
+lacquered job at its finishing stage sounds the booth. B1's reading of the hall is stricter and
+right: the booth hisses while somebody is standing at a booth, not while a lacquered job happens
+to be at that stage, because a workshop with no booth cannot spray and must not be heard to. The
+test now builds the booth and puts a man at it, and asserts the silence at each step on the way.
+
+`npm run check` exit 0: 172 files, 1,728 tests.

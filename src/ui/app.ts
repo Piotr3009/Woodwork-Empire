@@ -86,6 +86,7 @@ import {
 } from './modal';
 import { playCharacters } from '../render/characters';
 import { resetWalkers, stepWalkers, syncWalkers } from '../render/walkers';
+import { resetDoors, stepDoors, syncDoors } from '../render/doors';
 import { applySoundSettings, play as soundPlay, setLoops, stopAllSounds, unlockSound } from './sound';
 import { hallLoops, hallOneShots } from '../render/hall';
 import { walkPath } from '../engine/walk';
@@ -1006,6 +1007,9 @@ export function render(): void {
   // The stylesheet is the authority on how much room the office has (docs/art/SPRITES.md 8.1).
   fitOfficeStack(parts.page);
   syncFigures(nowMs());
+  // And the doors, which the fresh markup has just written back to the state the hall computed
+  // for this frame: the swing is the renderer's, like the walk (CLAUDE.md T19 2.3).
+  syncDoors(parts.page, nowMs());
   restoreFocus(memory);
 }
 
@@ -1168,6 +1172,7 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
       ui.screen = 'game';
       accumulator = 0;
       resetWalkers();
+      resetDoors();
       startedStore();
       noteOrders();
       break;
@@ -1186,6 +1191,7 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
       ui.startOverAsked = false;
       accumulator = 0;
       resetWalkers();
+      resetDoors();
       startedStore();
       noteOrders();
       autosaveLocal();
@@ -1660,6 +1666,7 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
           state = result.state;
           ui.screen = 'game';
           resetWalkers();
+          resetDoors();
           startedStore();
           writeStore();
           ui.saved = peekSave();
@@ -1675,6 +1682,7 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
           ui.screen = 'game';
           accumulator = 0;
           resetWalkers();
+          resetDoors();
         }
         return result.note;
       });
@@ -1811,6 +1819,7 @@ export function onFileChosen(file: File): Promise<void> {
       ui.screen = 'game';
       ui.menuOpen = false;
       resetWalkers();
+      resetDoors();
       // A file loaded is the game from now on, so the browser's store holds it too (T11 3.2).
       startedStore();
       writeStore();
@@ -2363,6 +2372,9 @@ function runFrame(now: number): void {
   // the floor, then on to the frame of their animation.
   if (root !== null) {
     stepWalkers(root, now);
+    // The doors swing on the renderer's own clock, beside the figures and for the same reason:
+    // the page is written again under them and the swing is not game state (CLAUDE.md T19 2.3).
+    stepDoors(root, now);
     playCharacters(root, now);
     driveSound(now);
   }
