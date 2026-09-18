@@ -73,7 +73,10 @@ describe('the fallback of a missing frame', () => {
       expect(playableAnimation('joiner', animation), animation).toEqual({ animation, frozen: false });
     }
     expect(playableAnimation('owner', 'home')).toEqual({ animation: 'idle', frozen: false });
-    expect(playableAnimation('owner', 'sweep')).toEqual({ animation: 'idle', frozen: false });
+    // The broom is the helper's sheet. A man with no broom sheet is working with his hands, so he
+    // falls to the bench and not to standing about (CLAUDE.md T20 2.8).
+    expect(playableAnimation('owner', 'sweep')).toEqual({ animation: 'bench', frozen: false });
+    expect(playableAnimation('joiner', 'sweep')).toEqual({ animation: 'bench', frozen: false });
     expect(playableAnimation('helper', 'sweep')).toEqual({ animation: 'sweep', frozen: false });
   });
 

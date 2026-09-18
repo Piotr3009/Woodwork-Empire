@@ -46,7 +46,8 @@ import {
   serviceIsDue,
 } from '../engine/index';
 import { formatCalendarDay, gateCheck, hasGate, variantFor } from '../engine/index';
-import { serviceDueIn } from '../engine/machines';
+import { serviceCallCheck, serviceDueIn } from '../engine/machines';
+import { storageSaleBlock } from '../engine/stations';
 import { orderName, orderProgress } from '../engine/orders';
 import type { Equipment, GameState, OrderLine } from '../engine/index';
 import { classBadge, classFrame, isMachineFamily, pictureSlot, renderMachine } from './machine';
@@ -323,6 +324,11 @@ function sellAction(state: GameState, item: Equipment, sellConfirm: string | nul
   if (!isSellableFamily(item.specId)) return '';
   const check = canSell(state, item.id);
   if (!check.ok) return `<span class="reason">Cannot sell it: ${escapeHtml(check.reason)}</span>`;
+  // A rack goes when it is empty and nobody is at it (PIOTR, 18.09; CLAUDE.md T20 2.10). The
+  // engine's own refusal is note 8 of NOTES-B3.md, because `canSell` is in the frozen game.ts;
+  // both read this one sentence, so the button and the engine cannot say different things.
+  const storage = storageSaleBlock(state, item);
+  if (storage !== '') return `<span class="reason">Cannot sell it: ${escapeHtml(storage)}</span>`;
   if (sellConfirm === item.id) {
     return button('sellMachine', 'Confirm sale', `data-id="${item.id}" data-confirm="1"`);
   }
@@ -411,9 +417,11 @@ export function ownedTile(
         ? 'no service due while it stands idle'
         : `service on ${formatCalendarDay(due)}, ${hours(serviceDueIn(item))} of use away`;
   const life = machine ? `${hours(item.hoursUsed)} of ${hours(item.enduranceHours)}` : '';
+  // A service is called in and paid for, and the machine goes out for the working day, so the
+  // card offers it only while the engine would take the call (CLAUDE.md T4 3.2, T20 2.9).
   const action = item.broken
     ? button('repairMachine', 'Repair', `data-id="${item.id}"`)
-    : machine && serviceIsDue(item)
+    : machine && serviceIsDue(item) && serviceCallCheck(state, item.id).ok
       ? button('serviceMachine', 'Service', `data-id="${item.id}"`)
       : '';
   const sell = sellAction(state, item, sellConfirm);

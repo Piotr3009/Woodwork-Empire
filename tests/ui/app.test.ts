@@ -4,7 +4,7 @@
 // (CLAUDE.md T9 3.1).
 
 import { beforeAll, describe, expect, it } from 'vitest';
-import { advanceMinutes, currentState, mount } from '../../src/ui/app';
+import { advanceMinutes, currentState, mount, render } from '../../src/ui/app';
 import {
   BREAK_MINUTES,
   LEDGER_VISIBLE_ENTRIES,
@@ -256,11 +256,19 @@ describe('the first ten minutes', () => {
     expect(html()).toContain('class="chip knob is-on" data-do="setSpeed" data-speed="4"');
   });
 
-  it('10. shows the hall with the kit, the owner and the rooms', () => {
+  it('10. shows the hall with the kit and the rooms, and the owner through the office door', () => {
     click('[data-do="closeModal"]');
     click('[data-do="setView"][data-view="hall"]');
     expect(html()).toContain('hall-view');
     expect(html()).toContain('Table saw');
+    // He is at his desk with the books at this minute, which from T20 2.12 is through the office
+    // door and off the hall: the office view is where he is drawn. Put him on the floor and the
+    // hall has him back.
+    expect(currentState()?.owner.station).toBe('office');
+    expect(html()).not.toContain('data-owner="1"');
+    const state = currentState();
+    if (state) state.owner.station = 'bench';
+    render();
     expect(html()).toContain('data-owner="1"');
     expect(html()).toContain('data-room="wc"');
     // The block carries its own tooltip. Walking into a room is driven off the footprints and

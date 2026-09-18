@@ -10,7 +10,8 @@ import {
   WELFARE_IN_THE_CANTEEN,
   roomDoorCell,
 } from './constants';
-import { isSold, itemStandsInTheHall } from './machines';
+import { isSold, itemStandsInTheHall, sheetCapacityOf, sheetsStrandedBySale } from './machines';
+import { plural } from './text';
 import type { Cell } from './pipes';
 import type { Equipment, GameState, TaskInstance } from './types';
 import { covers, footprintCells, isFree } from './walk';
@@ -23,6 +24,10 @@ export const STATION_OFFICE = 'office';
  *  sheet the figure plays (PIOTR, 15.09; CLAUDE.md T11 3.11). */
 export const STATION_PHONE = 'phone';
 export const STATION_IDLE = 'idle';
+/** Sweeping the floor. It is its own station and not the bench, because a man with a broom is not
+ *  a man at a bench: the renderer plays the sweep sheet at it (CLAUDE.md T20 2.8). Where he stands
+ *  is unchanged, his own home cell, which is what the bench station fell through to. */
+export const STATION_CLEANING = 'cleaning';
 /** Standing at the canteen door because there is no bench to work at (CLAUDE.md T4 3.4). */
 export const STATION_NO_BENCH = 'noBench';
 
@@ -104,6 +109,41 @@ export function unloadStation(task: TaskInstance, sheets: number): string {
   return unloadLegAt(task, sheets) % 2 === 0 ? STATION_GATE : STATION_RACK;
 }
 
+/** True while this cell is a doorway a man goes through and out of the hall's drawing (PIOTR,
+ *  18.09; CLAUDE.md T20 2.12). The renderer asks it of the cell a figure's feet are on, so a
+ *  doorway is never stood in: he walks to it, goes through, and the room behind it draws him.
+ *
+ *  The office is the one room the game has behind a door: the office view draws the man at his
+ *  desk (CLAUDE.md T19 2.2). The canteen's door cell is not one of these, and deliberately: it is
+ *  where a man with nothing to do, or with no bench to work at, stands about (CLAUDE.md T4 3.4,
+ *  T11 3.4), which is the hall and not the room behind it, and the player is meant to see him
+ *  standing there. Nothing behind the canteen door is drawn, so a man sent through it would be
+ *  nowhere at all. */
+export function isDoorwayCell(cell: { x: number; y: number }): boolean {
+  const door = roomDoorCell('office');
+  return door.x === Math.round(cell.x) && door.y === Math.round(cell.y);
+}
+
+/** True while anybody is standing at the rack this minute, the owner or a man on his feet: a
+ *  rack is not sold out from under the man loading it (PIOTR, 18.09; CLAUDE.md T20 2.10). The
+ *  rack is the one item in the hall nobody ever "takes" the way a machine is taken, so the claim
+ *  `canSell` reads on a machine answers nothing about it and this is the question instead. */
+export function somebodyAtTheRack(state: GameState): boolean {
+  if (state.owner.station === STATION_RACK) return true;
+  return state.workers.some((worker) => worker.station === STATION_RACK);
+}
+
+/** Why a rack cannot be sold yet, or an empty string. The one sentence: the button on the Owned
+ *  tab prints it and the engine's own refusal reads it (CLAUDE.md T20 2.10). Anything that holds
+ *  no sheets, a tool cabinet or a machine, is nothing to do with it. */
+export function storageSaleBlock(state: GameState, item: Equipment): string {
+  if (sheetCapacityOf(item) <= 0) return '';
+  const stranded = sheetsStrandedBySale(state, item);
+  if (stranded > 0) return `Empty it first, ${plural(stranded, 'sheet', 'sheets')} on it`;
+  if (somebodyAtTheRack(state)) return 'Somebody is standing at it';
+  return '';
+}
+
 /** Where a job of work puts the figure doing it. */
 export function stationForTask(state: GameState, task: TaskInstance): string {
   switch (task.kind) {
@@ -135,7 +175,7 @@ export function stationForTask(state: GameState, task: TaskInstance): string {
       return machineStation(machine.specId);
     }
     case 'cleaning':
-      return STATION_BENCH;
+      return STATION_CLEANING;
     case 'clientCall':
       return STATION_PHONE;
     default:

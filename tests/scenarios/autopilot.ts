@@ -43,6 +43,7 @@ export function answer(state: GameState, policy?: Policy): string {
   if (event.kind === 'clientOffer' && policy?.acceptOffer !== undefined) {
     return policy.acceptOffer(state, event) ? 'accept' : 'decline';
   }
+  if (event.kind === 'serviceDue' && ids.includes('later')) return 'later';
   for (const preferred of ['accept', 'answer', 'unload', 'owner', 'storage', 'next', 'ok']) {
     if (ids.includes(preferred)) return preferred;
   }
@@ -58,7 +59,6 @@ const TASK_ORDER: TaskInstance['kind'][] = [
   'unload',
   'emptyBags',
   'repair',
-  'service',
   'fetchStorage',
   'clientCall',
   'emails',
@@ -69,10 +69,19 @@ const TASK_ORDER: TaskInstance['kind'][] = [
   'design',
   'materialTakeOff',
   'cleaning',
+  // A service takes the machine out for the rest of the working day now (CLAUDE.md T20 2.9.3), so
+  // the careful owner calls it in when the day's work is done and not in the middle of a cut.
+  'service',
 ];
+
+/** [TUNE] The last hour of the working day, which is when the scripted owner calls a service in:
+ *  from T20 2.9 a service takes the machine out until the next working day, so a careful owner
+ *  does not stop his only saw in the middle of a cut. */
+const SERVICE_FROM_MINUTE = DAY_END_MINUTE - 60;
 
 function nextTask(state: GameState): TaskInstance | null {
   for (const kind of TASK_ORDER) {
+    if (kind === 'service' && state.clock.minute < SERVICE_FROM_MINUTE) continue;
     // He does not reach for what the engine would refuse him: with a helper in the hall the
     // unloading, the bags and the cleaning are the helper's, and the script walks past them
     // (CLAUDE.md T11 3.4).

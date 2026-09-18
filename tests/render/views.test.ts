@@ -439,18 +439,22 @@ describe('the figures that move', () => {
     expect(transforms(saw)).not.toEqual(transforms(atBench));
   });
 
-  it('puts a figure at the gate, the rack, the office and the canteen door', () => {
+  it('puts a figure at the gate, the rack, the bench and the canteen door, and none in a doorway', () => {
     const state = buyStartingKit(newGame());
-    const places = ['gate', 'rack', 'office', 'idle'];
+    const places = ['gate', 'rack', 'bench', 'idle'];
     const seen = new Set<string>();
     for (const station of places) {
       state.owner.station = station;
       const match = renderHall(state).match(/data-figure="owner" transform="([^"]+)"/);
-      expect(match?.[1]).toBeDefined();
+      expect(match?.[1], station).toBeDefined();
       seen.add(match?.[1] ?? '');
     }
     // Four different stations, four different places to stand.
     expect(seen.size).toBe(places.length);
+    // The office is not one of them any more: a man at his desk has gone through the door and is
+    // drawn in the office view instead (CLAUDE.md T20 2.12).
+    state.owner.station = 'office';
+    expect(renderHall(state)).not.toContain('data-figure="owner"');
   });
 });
 

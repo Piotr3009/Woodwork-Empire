@@ -20,7 +20,7 @@
 // back where it had actually got to (the same reason the slides of Turn 2 lived in the app).
 
 import { WALK_CELLS_PER_SECOND, WALK_CORNER_CELLS } from '../engine/constants';
-import { STATION_GATE, STATION_RACK } from '../engine/stations';
+import { STATION_GATE, STATION_RACK, isDoorwayCell } from '../engine/stations';
 import {
   type Animation,
   type Facing,
@@ -30,7 +30,7 @@ import {
   playCharacters,
   setCharacterAnimation,
 } from './characters';
-import { centreOf } from './iso';
+import { centreOf, depthKey } from './iso';
 
 export interface Cell {
   x: number;
@@ -94,9 +94,81 @@ export function resetWalkers(): void {
   walkers.clear();
 }
 
+/** How far in front of his own cell a figure is painted, so a man standing at a machine is in
+ *  front of the machine on that cell and not inside it (CLAUDE.md T16 2.1). The hall writes it on
+ *  the figure when it builds the scene and the re-sort below reads it back. */
+export const FIGURE_DEPTH_OFFSET = 0.2;
+
+/** The depth key a figure has this frame: the cell his feet are actually on, and not the station
+ *  he is walking to (PIOTR; CLAUDE.md T20 2.11). For the whole of a walk the hall used to paint
+ *  him in the order of where he was going, so a man crossing the floor passed behind a machine he
+ *  was in front of and snapped into place on arrival. */
+export function figureDepth(walker: Walker): number {
+  return depthKey(walker.at.x, walker.at.y) + FIGURE_DEPTH_OFFSET;
+}
+
+/** The depth the scene wrote on a drawable, or null for one that carries none. */
+function depthOf(node: Element): number | null {
+  const raw = node.getAttribute('data-depth');
+  if (raw === null) return null;
+  const value = Number(raw);
+  return Number.isFinite(value) ? value : null;
+}
+
+/** Puts every figure back in the painter's order for the cell his feet are on this frame. The
+ *  cheap re-sort Turn 19's report proposed and did not do (REPORT-T19, "What was not done
+ *  tonight"): a figure is swapped with the sibling before or after it only when its own depth key
+ *  has crossed that sibling's, so a frame in which nothing crosses moves nothing at all and the
+ *  scene is never sorted again. A sibling with no depth on it is a boundary and is not crossed.
+ *
+ *  Returns how many figures were moved, which is what the stability test counts. */
+export function resortFigures(root: ParentNode): number {
+  let moved = 0;
+  for (const node of Array.from(root.querySelectorAll('[data-figure]'))) {
+    const key = node.getAttribute('data-figure');
+    const walker = key === null ? undefined : walkers.get(key);
+    if (walker === undefined) continue;
+    const depth = figureDepth(walker);
+    node.setAttribute('data-depth', String(Math.round(depth * 1000) / 1000));
+    const parent = node.parentNode;
+    if (parent === null) continue;
+    let shifted = false;
+    // Up the list while the drawable before him is painted after him.
+    for (let guard = 0; guard < 64; guard += 1) {
+      const before = node.previousElementSibling;
+      const value = before === null ? null : depthOf(before);
+      if (before === null || value === null || value <= depth) break;
+      parent.insertBefore(node, before);
+      shifted = true;
+    }
+    // And down it while the drawable after him is painted before him.
+    for (let guard = 0; guard < 64; guard += 1) {
+      const after = node.nextElementSibling;
+      const value = after === null ? null : depthOf(after);
+      if (after === null || value === null || value >= depth) break;
+      parent.insertBefore(after, node);
+      shifted = true;
+    }
+    if (shifted) moved += 1;
+  }
+  return moved;
+}
+
 /** The walker of a figure, for the tests and nobody else. */
 export function walkerOf(key: string): Walker | undefined {
   return walkers.get(key);
+}
+
+/** Every figure the walker is driving, for the doors and for the tests. */
+export function walkerKeys(): string[] {
+  return Array.from(walkers.keys());
+}
+
+/** True while this man has gone through a door: his walk is over and his feet are on a doorway
+ *  cell. The hall leaves him out of the drawing from that moment and the door counts him through
+ *  (PIOTR, 18.09; CLAUDE.md T20 2.12). */
+export function walkerIsThroughADoor(walker: Walker): boolean {
+  return walker.path.length === 0 && isDoorwayCell(walker.at);
 }
 
 function goalKey(cell: Cell, station: string): string {
@@ -286,8 +358,18 @@ export function syncWalkers(root: ParentNode, nowMs: number, pathFor: PathFinder
     playCharacters(node, nowMs);
   }
   for (const key of Array.from(walkers.keys())) {
-    if (!seen.has(key)) walkers.delete(key);
+    const walker = walkers.get(key);
+    // A man the page has stopped drawing because he has gone through a door is still there, on
+    // the other side of it: his walker waits on the doorway cell so that he walks out of the door
+    // when the engine sends him somewhere, instead of appearing at the far end of the hall
+    // (CLAUDE.md T20 2.12). Every other figure the page has dropped is gone.
+    if (!seen.has(key) && (walker === undefined || !walkerIsThroughADoor(walker))) {
+      walkers.delete(key);
+    }
   }
+  // The page has just been written in the order the state put everybody in; the men are where the
+  // walker has actually got them, so the painter's order is put back with them (T20 2.11).
+  resortFigures(root);
 }
 
 /** The animation and the facing a figure shows now: the leg's while it walks, the station's
@@ -330,8 +412,10 @@ function arrive(walker: Walker): void {
 
 /** Moves every walker on by the real time since the last frame, at a man's pace, never more than
  *  one cell in one frame, and writes the transform, the animation and the facing on the figure
- *  that is already on the page. */
-export function stepWalkers(root: ParentNode, nowMs: number): void {
+ *  that is already on the page. It answers how many figures the frame's re-sort moved, which is
+ *  what the depth order's own test measures: the re-sort is inside the frame, so counting it
+ *  afterwards counts nothing (CLAUDE.md T20 2.11). Every caller but a test ignores it. */
+export function stepWalkers(root: ParentNode, nowMs: number): number {
   for (const node of Array.from(root.querySelectorAll('[data-figure]'))) {
     const key = node.getAttribute('data-figure');
     if (key === null) continue;
@@ -368,4 +452,7 @@ export function stepWalkers(root: ParentNode, nowMs: number): void {
     node.setAttribute('transform', translateOf(walker.at));
     dress(node, walker, heading);
   }
+  // He is painted where his feet are: the order is checked against his neighbours every frame and
+  // changed only where it has crossed one (PIOTR; CLAUDE.md T20 2.11).
+  return resortFigures(root);
 }
