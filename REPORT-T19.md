@@ -223,6 +223,25 @@ something at every cell in the hall. `out: 1` takes the worst cases from 60 to 8
   Until those lines land the doors are drawn in the state the hall computes for the frame, open
   with a man in the doorway and closed without one, and they do not swing.
 
+### T19-B1d The hall's own sound (2.10, the hooks)
+
+- Phase A's first versions were checked against the real state and three were wrong. The spray
+  booth was hooked to "a lacquered job is at its finishing stage", which is heard in a workshop
+  that owns no booth and therefore cannot spray at all: it is now `takenBy` on a booth, the same
+  predicate as the saw. The extraction was hooked to a machine that wants a pipe being in use,
+  which says nothing about the fan: it is now the extraction item's own `machineInUse`, which is
+  exactly what makes its fan breathe on the hall, so what is heard and what is seen cannot
+  disagree, and a broken or sold unit is silent. And the bench sounds read `assignees[0]`, which
+  can be a man who is off sick: they now take the first man on the job who is actually at work.
+  The saw was right and is unchanged: `takenBy` on an unbroken saw standing in the hall.
+- The brief's "fitting" is not a stage in this code. `StageId` is cutting, machining, cnc,
+  assembly, finishing and delivery, and the fitting of a carcass, its hinges and its runners,
+  happens inside assembly, so the drill is hooked to assembly beside the hammer and the code's own
+  names are used. Two figures phase A put in `constants.ts` are still dead: `HAMMER_EVERY_SECONDS`
+  and `DRILL_EVERY_SECONDS`. Both one shots fire at the shared `SOUND_ONE_SHOT_GAP_MS` of one
+  second instead of the brief's "every few seconds"; the thinning is the engine's and the engine is
+  B3's file, so it is written up in `NOTES-B1.md` for whoever lands 2.10's engine side.
+
 ## The movement (CLAUDE.md T19 2.1, PIOTR: "they walk like robots and shake like a leaf")
 
 This section was written, and committed, before a line of `src/render/walkers.ts` or

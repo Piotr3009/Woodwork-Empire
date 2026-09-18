@@ -38,6 +38,7 @@ import {
 import { jobsAtGate } from '../engine/jobs';
 import { orderName, reservedItems, shoppingList } from '../engine/orders';
 import {
+  OWNER,
   isSold,
   itemFootprint,
   itemStandsInTheHall,
@@ -1912,13 +1913,24 @@ function familyInUse(state: GameState, specId: string): boolean {
   );
 }
 
+/** Whether this man is in the hall to be heard: the owner while he is at work, and a worker who
+ *  has started and is not away. A job can carry a man who is off sick, and a sick man makes no
+ *  noise (CLAUDE.md T19 2.10). */
+function manIsAtWork(state: GameState, who: string): boolean {
+  if (who === OWNER) return ownerIsAvailable(state);
+  const worker = state.workers.find((entry) => entry.id === who);
+  if (worker === undefined) return false;
+  return worker.startDay <= state.clock.day && worker.absentDaysRemaining <= 0;
+}
+
 /** The stage every job in production is at this minute, as a list of stage ids with the job's
- *  finish beside each, which is what the bench sounds are chosen from. */
+ *  finish beside each, which is what the bench sounds are chosen from. A job with nobody on it,
+ *  and a job whose men are all off, is silent. */
 function benchStagesNow(state: GameState): Array<{ stage: StageId; finish: string }> {
   const found: Array<{ stage: StageId; finish: string }> = [];
   for (const job of state.jobs) {
     if (job.stage !== 'inProduction') continue;
-    const who = job.assignees[0] ?? null;
+    const who = job.assignees.find((man) => manIsAtWork(state, man)) ?? null;
     if (who === null) continue;
     const plan = jobStage(state, job, cncOptions(state, who, job));
     if (plan === null) continue;
@@ -1932,25 +1944,40 @@ function benchStagesNow(state: GameState): Array<{ stage: StageId; finish: strin
  *  booth while somebody sprays (CLAUDE.md T19 2.10). */
 export function hallLoops(state: GameState): Set<HallLoopName> {
   const on = new Set<HallLoopName>();
+  // Somebody is at the saw when the saw is taken: `takenBy` is how the hall already knows to spin
+  // its blade and throw chips off it (machineFx above reads the same thing).
   if (familyInUse(state, 'tableSaw')) on.add('tableSaw');
-  // The extraction pulls while any machine on it is running, which is what makes its fan breathe
-  // on the hall already (machineFx above reads the same thing).
-  if (hasExtraction(state) && state.equipment.some(
-    (item) => !isSold(item) && itemStandsInTheHall(item) && wantsExtraction(item) && machineInUse(state, item),
-  )) {
-    on.add('extractor');
-  }
+  // The extraction pulls while a machine on it is running, which is what makes its own fan breathe
+  // on the hall: the same predicate, on the extraction item itself, so what is heard and what is
+  // seen can never disagree. A broken or sold unit, and one still on the lorry, is silent.
+  const pulling = state.equipment.some(
+    (item) =>
+      !isSold(item) &&
+      itemStandsInTheHall(item) &&
+      findSpec(item.specId)?.category === 'extraction' &&
+      machineInUse(state, item),
+  );
+  if (pulling) on.add('extractor');
+  // The booth hisses while somebody is standing at one, and not merely while a lacquered job is at
+  // its finishing stage: a workshop with no booth cannot spray, and it must not be heard to.
+  if (familyInUse(state, 'sprayBooth')) on.add('sprayBooth');
+  // The sander is hands and paper at a bench, which no machine is taken for: it is the stage that
+  // says so. Lacquer is the booth's above and never the sander's.
   for (const at of benchStagesNow(state)) {
-    if (at.stage !== 'finishing') continue;
-    if (at.finish === 'lacquer') on.add('sprayBooth');
-    else on.add('sander');
+    if (at.stage === 'finishing' && at.finish !== 'lacquer') on.add('sander');
   }
   return on;
 }
 
 /** The one shot sounds the hall wants this moment: knocks and screws off the benches that are
  *  assembling. The engine thins them to at most one a second per sound, so this may say "yes"
- *  every frame and the hall still does not rattle (CLAUDE.md T19 2.10). */
+ *  every frame and the hall still does not rattle (CLAUDE.md T19 2.10).
+ *
+ *  A naming note the report carries too: the brief hangs the drill on "fitting", and there is no
+ *  fitting stage in this code. `StageId` is cutting, machining, cnc, assembly, finishing and
+ *  delivery, and the fitting of a carcass, the hinges and the runners, happens inside assembly.
+ *  The hammer and the drill are therefore both hooked to assembly, which is the stage a man is at
+ *  a bench with a carcass in front of him. */
 export function hallOneShots(state: GameState): Set<HallOneShotName> {
   const on = new Set<HallOneShotName>();
   for (const at of benchStagesNow(state)) {
