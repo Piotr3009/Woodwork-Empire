@@ -29,6 +29,7 @@ import {
   closingReport,
   contractCounterLine,
   contractMarker,
+  jobBesideContract,
   contractMen,
   contractPiece,
   contractResultFor,
@@ -250,7 +251,9 @@ describe('people, not machines', () => {
     expect(state.equipment.every((item) => item.takenBy !== 'staff-1')).toBe(true);
   });
 
-  it('takes him off his job when he goes on the contract, and the job goes back to ready', () => {
+  it('leaves him on the job he is on: the contract takes the first of his day, not the whole of him', () => {
+    // Turn 19 took him off the job when he went on a contract. From tonight he is on both, and
+    // the contract has the morning (PIOTR; CLAUDE.md T20 2.1.4).
     let state = joinerHall();
     const enquiry = placeEnquiry(state, { price: 4000, deadlineDays: 30 });
     state = acceptNow(state, enquiry.id);
@@ -262,9 +265,14 @@ describe('people, not machines', () => {
     const ben = state.workers[0];
     if (ben) ben.jobId = job.id;
     const contract = running(state);
-    expect(job.assignees[0] ?? null).toBeNull();
-    expect(job.stage).toBe('ready');
+    expect(job.assignees).toEqual(['staff-1']);
+    expect(job.stage).toBe('inProduction');
     expect(ben?.jobId).toBe(contractMarker(contract.id));
+    expect(jobBesideContract(state, 'staff-1')?.id).toBe(job.id);
+    // And off the contract again he is the job's, where he came from.
+    expect(assignContract(state, contract.id, 'staff-1', false).ok).toBe(true);
+    expect(ben?.jobId).toBe(job.id);
+    expect(job.assignees).toEqual(['staff-1']);
   });
 
   it('is left alone by the jobs: the marker survives a minute of the clock and he is not handed a ready job', () => {
@@ -285,7 +293,9 @@ describe('people, not machines', () => {
     expect(running5?.labourMinutes).toBeGreaterThan(0);
   });
 
-  it('drops a man the player put on a job through the Work Plan', () => {
+  it('keeps a man the player puts on a job as well: assigned once, he stays on it', () => {
+    // The v28 rule dropped him from the contract the moment a job had him. Assigned once, a man
+    // stays on it until he is taken off or leaves (PIOTR; CLAUDE.md T20 2.1.2).
     let state = joinerHall();
     const enquiry = placeEnquiry(state, { price: 4000, deadlineDays: 30 });
     state = acceptNow(state, enquiry.id);
@@ -295,8 +305,8 @@ describe('people, not machines', () => {
     if (!job || !ben) throw new Error('a job and a man are wanted');
     ben.jobId = job.id;
     runContractMinute(state);
-    expect(contract.assigned).toEqual([]);
-    expect(ben.jobId).toBe(job.id);
+    expect(contract.assigned).toEqual(['staff-1']);
+    expect(ben.jobId).toBe(contractMarker(contract.id));
   });
 });
 

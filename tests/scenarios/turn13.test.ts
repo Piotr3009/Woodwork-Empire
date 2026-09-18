@@ -227,13 +227,17 @@ describe('(v) a four week contract with the joiner taken off it for two of them'
   const ended = playUntilDay(state, endDay + 3, offOn, seen);
   const contract = ended.contracts.find((entry) => entry.id === drawn.id);
 
-  it('has the term over with five calendar weeks on the history, two of them short', () => {
+  it('has the client ending it on the second short week, with three weeks on the history', () => {
+    // Turn 13 ran this term to its end and counted five calendar weeks. From tonight the client
+    // puts up with one short week and ends the contract himself on the second, so the month stops
+    // at the Monday that closes the third week (PIOTR; CLAUDE.md T20 2.1.6).
     expect(contract?.status).toBe('ended');
-    expect(contract?.weeks).toHaveLength(5);
+    expect(contract?.endedBy).toBe('client');
+    expect(contract?.weeks).toHaveLength(3);
     const short = contract?.weeks.filter((week) => week.made < week.wanted) ?? [];
     const full = contract?.weeks.filter((week) => week.made >= week.wanted) ?? [];
     expect(short).toHaveLength(2);
-    expect(full).toHaveLength(3);
+    expect(full).toHaveLength(1);
     // The weeks he was off it made nothing at all.
     expect(short.every((week) => week.made === 0)).toBe(true);
   });
@@ -245,14 +249,15 @@ describe('(v) a four week contract with the joiner taken off it for two of them'
     void reputationAtStart;
   });
 
-  it('renegotiates from the history: three per cent up for the full weeks, four down for the short', () => {
-    const factor = 1 + 3 * CONTRACT_RENEW_FULL_WEEK - 2 * CONTRACT_RENEW_SHORT_WEEK;
+  it('renegotiates from the history: a per cent up for the full week, four down for the short', () => {
+    const factor = 1 + CONTRACT_RENEW_FULL_WEEK - 2 * CONTRACT_RENEW_SHORT_WEEK;
     expect(contract?.renegotiatedPrice).toBe(Math.round(priceAtStart * factor));
-    expect(contract?.renegotiatedPrice).toBe(99);
+    expect(contract?.renegotiatedPrice).toBe(97);
     const report = seen.find((event) => event.kind === 'contractEnded');
     expect(report).toBeDefined();
     expect(report?.data.pieces).toBe(contract?.piecesMade);
-    expect(report?.body).toContain('3 full weeks and 2 short');
+    expect(report?.body).toContain('1 full weeks and 2 short');
+    expect(report?.body).toContain('the client has ended it after 2 short weeks');
   });
 
   it('renews at the new price for another term, or lets it go', () => {

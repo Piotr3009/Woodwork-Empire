@@ -31,7 +31,7 @@ import { isBreak, isWorkingDay, weekOfDay, weekday } from './clock';
 import { plural } from './text';
 import { charge, formatMoney } from './economy';
 import { queueEvent } from './events';
-import { findJob, stagedJob, takeOffJob, workerMinuteCost } from './jobs';
+import { isOnJob, stagedJob, workerMinuteCost } from './jobs';
 import { freeSheets } from './materials';
 import {
   accumulateMachineMinute,
@@ -50,11 +50,17 @@ import type { RngCarrier } from './rng';
 import { crewHasGoneHome, isWorkingToday, joiners } from './staff';
 import { STATION_BENCH, machineStation, waitingStation } from './stations';
 import { cncOptions, familyForStage, jobOnCnc, stageSpeed } from './stages';
-import type { Contract, ContractWeek, GameState, StageId, Worker } from './types';
+import type { Contract, ContractWeek, GameState, Job, StageId, Worker } from './types';
 
 /** What a man on a contract carries in `jobId`, so the jobs leave him alone: not available for
  *  a job, not at one, and not a job the plan could find (CLAUDE.md T13 3.16). */
 export const CONTRACT_MARKER = 'contract:';
+
+/** Short weeks a client puts up with inside one term. The first costs its point of reputation as
+ *  it always did; on the second the client ends the contract himself and there is no third
+ *  [TUNE: two, and Piotr's decision on it is still open] (CLAUDE.md T20 2.1.6). It lives here
+ *  until phase C takes it home to constants.ts. */
+export const CONTRACT_SHORT_WEEKS_ALLOWED = 2;
 
 export interface ContractCheck {
   ok: boolean;
@@ -135,6 +141,17 @@ function workingDaysOfWeekInTerm(contract: Contract, day: number): number {
   const sunday = monday + DAYS_PER_WEEK - 1;
   const from = Math.max(monday, contract.startDay ?? monday);
   const to = Math.min(sunday, contract.endDay ?? sunday);
+  let count = 0;
+  for (let at = from; at <= to; at += 1) if (isWorkingDay(at)) count += 1;
+  return count;
+}
+
+/** Working days of this calendar week that fall inside the term and have been worked by the end
+ *  of `day`, today included: what the week's line is read against (CLAUDE.md T20 2.1.4). */
+function workingDaysOfWeekSoFar(contract: Contract, day: number): number {
+  const monday = day - weekday(day);
+  const from = Math.max(monday, contract.startDay ?? monday);
+  const to = Math.min(day, contract.endDay ?? day);
   let count = 0;
   for (let at = from; at <= to; at += 1) if (isWorkingDay(at)) count += 1;
   return count;
@@ -352,12 +369,17 @@ export function contractAssignCheck(contract: Contract, worker: Worker | null): 
 
 function takeOff(state: GameState, contract: Contract, worker: Worker): void {
   contract.assigned = contract.assigned.filter((id) => id !== worker.id);
-  if (worker.jobId === contractMarker(contract.id)) worker.jobId = null;
+  // Off the contract and back to the job he was also standing on, when he was on one
+  // (CLAUDE.md T20 2.1.4).
+  if (worker.jobId === contractMarker(contract.id)) {
+    worker.jobId = jobBesideContract(state, worker.id)?.id ?? null;
+  }
   releaseMachines(state, worker.id);
 }
 
-/** Puts a joiner on the contract or takes him off it. Going on takes him off whatever job he was
- *  at, which goes back to ready, and marks him so the jobs leave him alone (CLAUDE.md T13 3.16). */
+/** Puts a joiner on the contract or takes him off it. He keeps the job he is standing on: the
+ *  contract has the first of his day and the job what is left of it, and the marker is what the
+ *  jobs read while the contract wants him (CLAUDE.md T13 3.16, T20 2.1.4). */
 export function assignContract(
   state: GameState,
   contractId: string,
@@ -376,9 +398,8 @@ export function assignContract(
   if (contract.assigned.includes(worker.id)) return OK;
   const elsewhere = contractOfWorker(state, worker.id);
   if (elsewhere) takeOff(state, elsewhere, worker);
-  // He comes off his job on his own: the men beside him carry on with it (CLAUDE.md T19 2.5).
-  const job = worker.jobId === null ? null : findJob(state, worker.jobId);
-  if (job) takeOffJob(state, job.id, worker.id);
+  // The job he is on stays his: the contract books his pieces from 8:00 and the job gets what is
+  // left of the day (PIOTR; CLAUDE.md T20 2.1.4). Turn 19's rule that he comes off it is gone.
   releaseMachines(state, worker.id);
   worker.jobId = contractMarker(contract.id);
   contract.assigned.push(worker.id);
@@ -386,10 +407,10 @@ export function assignContract(
 }
 
 /** The men on this contract who can put a minute in now: on the books and in today, on the day
- *  shift, not on a job of work, and not taken by a job since (a man the player put on a job
- *  through the Work Plan has left the contract, and is dropped from it here). */
+ *  shift and not on an errand. Assigned once, a man stays on it until he is taken off or leaves
+ *  (PIOTR; CLAUDE.md T20 2.1.2), so a job of work no longer drops him from it: the day's order is
+ *  `contractWantsToday` and nothing else. */
 export function contractHands(state: GameState, contract: Contract): Worker[] {
-  const marker = contractMarker(contract.id);
   const hands: Worker[] = [];
   for (const id of [...contract.assigned]) {
     const worker = state.workers.find((entry) => entry.id === id);
@@ -397,14 +418,40 @@ export function contractHands(state: GameState, contract: Contract): Worker[] {
       contract.assigned = contract.assigned.filter((entry) => entry !== id);
       continue;
     }
-    if (worker.jobId !== null && worker.jobId !== marker) {
-      contract.assigned = contract.assigned.filter((entry) => entry !== id);
-      continue;
-    }
     if (!isWorkingToday(state, worker) || worker.taskId !== null || worker.shift !== 'day') continue;
     hands.push(worker);
   }
   return hands;
+}
+
+/** The job of work this man is standing on beside his contract, or null when he has nothing else
+ *  to go to. Only a job in production: a job that is not started is nowhere for him to go
+ *  (CLAUDE.md T20 2.1.4). */
+export function jobBesideContract(state: GameState, workerId: string): Job | null {
+  return state.jobs.find((job) => job.stage === 'inProduction' && isOnJob(job, workerId)) ?? null;
+}
+
+/** The pieces the client wants by the end of today: the week's quantity spread over the working
+ *  days of the week, which is the line the man on it works to (PIOTR; CLAUDE.md T20 2.1.4). A
+ *  contract behind the line asks for the catch up on the next day it is read, because the line is
+ *  the same line read forward. */
+export function piecesDueBy(contract: Contract, day: number): number {
+  const wanted = weekWanted(contract, day);
+  const days = workingDaysOfWeekInTerm(contract, day);
+  if (days <= 0) return wanted;
+  return Math.min(wanted, Math.ceil((wanted * workingDaysOfWeekSoFar(contract, day)) / days));
+}
+
+/** Does the contract want this man this minute? He books his pieces from 8:00 until the day's
+ *  share of the week is made, and only then goes to the job he is also on (PIOTR;
+ *  CLAUDE.md T20 2.1.4). With no job to go to he stays on the contract, because the client pays
+ *  for every piece he makes. This is the one place the day's order is decided: the job's hands,
+ *  the contract's minute and the Contracts tab all read it. */
+export function contractWantsToday(state: GameState, workerId: string): boolean {
+  const contract = contractOfWorker(state, workerId);
+  if (contract === null) return false;
+  if (contract.piecesThisWeek < piecesDueBy(contract, state.clock.day)) return true;
+  return jobBesideContract(state, workerId) === null;
 }
 
 /** The stage the piece is at and the family it is done on: the CNC when the man can have one,
@@ -472,10 +519,23 @@ export function runContractMinute(state: GameState): ContractMinute {
   let hall: number | null = null;
   for (const contract of active) {
     const piece = contractPiece(contract);
+    // The contract fills the day first (PIOTR; CLAUDE.md T20 2.1.4): the men it still wants today
+    // are its own this minute, and a man whose share of the week is made goes back to the job he
+    // is also on, from the next minute, which is when the jobs read him again.
+    const wanted: Worker[] = [];
+    for (const worker of contractHands(state, contract)) {
+      if (contractWantsToday(state, worker.id)) {
+        wanted.push(worker);
+        continue;
+      }
+      const job = jobBesideContract(state, worker.id);
+      if (job) worker.jobId = job.id;
+    }
+    if (wanted.length === 0) continue;
     // Nothing on the rack for the next piece: the men on it stand at their benches, the way a job
     // waits for its material (CLAUDE.md T17 2.22).
     if (contractWaitingForMaterial(state, contract)) {
-      for (const worker of contractHands(state, contract)) {
+      for (const worker of wanted) {
         // The marker goes back on, as it does on a working minute, so the jobs leave him where
         // he is instead of handing him work he cannot take.
         worker.jobId = contractMarker(contract.id);
@@ -483,7 +543,7 @@ export function runContractMinute(state: GameState): ContractMinute {
       }
       continue;
     }
-    for (const worker of contractHands(state, contract)) {
+    for (const worker of wanted) {
       // The jobs' own hook writes the marker off every minute it finds no job behind it; it goes
       // back on here, so the man stays on the contract between the minutes.
       worker.jobId = contractMarker(contract.id);
@@ -609,12 +669,22 @@ export function closingReport(state: GameState, contract: Contract): ClosingRepo
   };
 }
 
+/** How the contract came to an end, in the words the report and the event both use
+ *  (CLAUDE.md T20 2.1.6). */
+export function endedLine(contract: Contract): string {
+  if (contract.endedBy === 'client') {
+    return `the client has ended it after ${plural(shortWeeksOf(contract), 'short week', 'short weeks')}`;
+  }
+  if (contract.endedBy === 'player') return 'you ended it';
+  return 'the term is over';
+}
+
 function closingBody(state: GameState, contract: Contract): string {
   const report = closingReport(state, contract);
   const full = fullWeeksOf(contract);
   const short = shortWeeksOf(contract);
   return (
-    `${contract.name}: the term is over. ${report.pieces} pieces made, ` +
+    `${contract.name}: ${endedLine(contract)}. ${report.pieces} pieces made, ` +
     `${formatMoney(report.revenue)} of revenue, ${formatMoney(report.material)} of material, ` +
     `${report.labourHours} hours of labour at cost ${formatMoney(report.labourCost)}, ` +
     `net margin ${formatMoney(report.margin)}. ${full} full weeks and ${short} short. ` +
@@ -624,9 +694,16 @@ function closingBody(state: GameState, contract: Contract): string {
 }
 
 /** The end of the term: the last week is closed, the client's new price is worked out from the
- *  history, the men come off it, and the closing report goes up (CLAUDE.md T13 3.16). */
-export function endContract(state: GameState, contract: Contract): void {
+ *  history, the men come off it, and the closing report goes up (CLAUDE.md T13 3.16). Who ended
+ *  it is written on the contract, for the report and for the Ended section of the tab
+ *  (CLAUDE.md T20 2.1.6). */
+export function endContract(
+  state: GameState,
+  contract: Contract,
+  endedBy: Contract['endedBy'] = 'term',
+): void {
   if (contract.status !== 'active') return;
+  contract.endedBy = endedBy;
   // The week in hand is closed when the term has days in it; a week opened on the Monday after
   // the last day holds nothing and is not a week the client counts.
   if (contract.weekStartDay !== null && contract.weekStartDay <= (contract.endDay ?? contract.weekStartDay)) {
@@ -644,7 +721,7 @@ export function endContract(state: GameState, contract: Contract): void {
   const report = closingReport(state, contract);
   queueEvent(state, {
     kind: 'contractEnded',
-    title: `${contract.name}: the term is over`,
+    title: `${contract.name}: ${endedLine(contract)}`,
     body: closingBody(state, contract),
     data: {
       contractId: contract.id,
@@ -659,8 +736,19 @@ export function endContract(state: GameState, contract: Contract): void {
   });
 }
 
+/** The second short week of a term and the client ends the contract himself, with the closing
+ *  report marked his. There is no third (PIOTR; CLAUDE.md T20 2.1.6). The week in hand has just
+ *  been closed, so there is none to close again. */
+function endedByClient(state: GameState, contract: Contract): void {
+  contract.endDay = state.clock.day;
+  contract.weekStartDay = null;
+  endContract(state, contract, 'client');
+}
+
 /** The day's open: an offer past its day comes off the board, the week that has gone is closed
- *  on the Monday, and a term whose last day has passed ends (CLAUDE.md T13 3.16). */
+ *  on the Monday, a client who has had two short weeks ends it, a term whose last day has passed
+ *  ends, and the men the contract wants today take their marker before the first minute
+ *  (CLAUDE.md T13 3.16, T20 2.1.4, 2.1.6). */
 export function runContractDay(state: GameState): void {
   const today = state.clock.day;
   state.contracts = state.contracts.filter(
@@ -669,11 +757,20 @@ export function runContractDay(state: GameState): void {
   for (const contract of activeContracts(state)) {
     if (contract.weekStartDay !== null && weekOfDay(today) !== weekOfDay(contract.weekStartDay)) {
       closeWeek(state, contract);
+      if (shortWeeksOf(contract) >= CONTRACT_SHORT_WEEKS_ALLOWED) endedByClient(state, contract);
     }
-    if (contract.endDay !== null && today > contract.endDay) endContract(state, contract);
+    if (contract.status === 'active' && contract.endDay !== null && today > contract.endDay) {
+      endContract(state, contract);
+    }
+    if (contract.status !== 'active') continue;
     // What the week wants off the rack is held this morning, after the jobs have had theirs
     // (CLAUDE.md T17 2.22).
-    if (contract.status === 'active') reserveContractSheets(state, contract);
+    reserveContractSheets(state, contract);
+    // The contract has the morning: a man it wants today carries its marker from 8:00, so the
+    // jobs do not have him for the first minute of the day (CLAUDE.md T20 2.1.4).
+    for (const worker of contractHands(state, contract)) {
+      if (contractWantsToday(state, worker.id)) worker.jobId = contractMarker(contract.id);
+    }
   }
 }
 
@@ -700,7 +797,7 @@ export function endContractNow(state: GameState, contractId: string): ContractCh
   const contract = state.contracts.find((entry) => entry.id === contractId);
   if (!contract) return { ok: false, reason: 'That contract has gone' };
   contract.endDay = state.clock.day;
-  endContract(state, contract);
+  endContract(state, contract, 'player');
   return OK;
 }
 

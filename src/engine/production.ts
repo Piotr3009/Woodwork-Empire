@@ -51,7 +51,7 @@ import {
   underExtracted,
 } from './media';
 import { ownerEfficiency, ownerIsAvailable, spendOwnerMinute, staffOutputFactor } from './owner';
-import { contractMen } from './contracts';
+import { contractMen, contractWantsToday } from './contracts';
 import { bookMonthMinute, isWorkingToday } from './staff';
 import {
   STATION_BENCH,
@@ -108,6 +108,9 @@ export function hands(
     // (CLAUDE.md T19 2.5, 2.6).
     if (!BUILDING_ROLES.includes(worker.role) || !isWorkingToday(state, worker, shift)) continue;
     if (worker.taskId !== null || worker.jobId === null) continue;
+    // The contract fills the day first: a man it still wants today is not among the job's hands
+    // this minute, whichever of the two the Work Plan shows him on (PIOTR; CLAUDE.md T20 2.1.4).
+    if (contractWantsToday(state, worker.id)) continue;
     const job = findJob(state, worker.jobId);
     if (!job || job.stage !== 'inProduction') continue;
     list.push({ who: worker.id, job, rate: worker.rate * away });
