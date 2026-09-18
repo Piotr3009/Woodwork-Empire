@@ -37,3 +37,52 @@ why popover missed by the `data-popover` pass, the hiring gate reading a differe
 figure from the board, and the lift with no test behind it.
 `npm run check` green on its own exit code. Each finding, confirmed or rejected, is in
 `PHASE-A-NOTES.md` under "Phase A review".
+
+## Phase B3, the hall
+
+### 2.8 The helper: why he stands beside the dirt
+
+**The cause is (c) of the four the brief lists: the dust band.** The floor the player looks at and
+the figure the engine tests are two different things, and they are eight times apart.
+
+`sawdust()` in `src/render/hall.ts` (line 907) paints one pile of sawdust on the floor for every
+ten points of dust: `const piles = Math.round(state.dust / 10)`. At 5 points of dust there is one
+pile beside the saw, at 30 there are three, at 41 there are four. `runHelperClean` in
+`src/engine/game.ts` (line 799) asks a different question:
+`if (!dustAtLeast(state.dust, HELPER_CLEAN_DUST_BAND)) return;`, and
+`HELPER_CLEAN_DUST_BAND` is `'messy'` (`src/engine/constants.ts` line 3484), which
+`DUST_BANDS` starts past 40. So between 5 points of dust and 40 there is dirt on the floor, the
+player can see it, and no cleaning task is ever made for the helper to take. He stands.
+
+How long that lasts: `addDust(state, 1)` is called once per clock minute of production
+(`src/engine/game.ts` line 1698 and `src/engine/production.ts` line 449), not once per man, and
+`DUST_PER_PRODUCTION_MINUTE` is 0.02, so a whole working day of production adds 9.6 points however
+many men are on the floor. The first pile is on the floor half way through the first day; the
+helper is not asked for a broom until the fifth. With `HELPER_CLEAN_WEEKDAY` sweeping on Friday
+anyway, the working week Piotr plays is four days of dirt he can see and a labourer with nothing
+to do about it, which is the complaint word for word.
+
+**How it was proved.** `tests/engine/helperDirtyHall.test.ts` builds the brief's scenario: a
+helper on the books and in today, a lorry in the yard from 08:00, the hall dirtied at 10:00 to 30
+points. It counts the piles off the drawing itself (the `var(--sawdust)` ellipses in the hall's
+SVG, not the number they are computed from): three at 10:00, three when the men go home, no
+cleaning task raised all day.
+
+**The other three causes are all false, and the same test shows it in the same day.** (a) The
+delivery does not swallow him: the unloading is his, he takes it at 08:00 without the owner being
+asked, and it is finished and the pallet gone before 10:00. (b) `helperOnDuty` is true at 10:00
+and true in the evening. (d) The cleaning is not made for the owner's queue: when the hall is
+dirtied past the band instead, the task is made for nobody (`doneBy` null), `assignStaffTasks`
+hands it to the helper because `cleaning` carries `helper` in its `autoRoles`, and the owner's
+`currentTaskId` stays null.
+
+**A second half of the same complaint, found on the way.** While he does sweep, he is not seen to
+sweep: `stationForTask` returns `STATION_BENCH` for a cleaning task (`src/engine/stations.ts`),
+`animationForStation('bench')` is `'bench'`, so for the two hours of `CLEANING_MINUTES` the
+helper is drawn at a bench doing bench work. That is what 2.8.2 puts right, with the cleaning
+station and the sweep sheet.
+
+**The fix** is one line in `runHelperClean`: the helper answers the dirt the player can see
+instead of a band of his own. `src/engine/game.ts` is one of the six frozen files, so B3 did not
+write it: it is note 1 of `NOTES-B3.md` for phase C, with its exact old and new text, and the
+characterisation test above keeps asserting today's behaviour until that note lands.
