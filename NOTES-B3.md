@@ -289,6 +289,22 @@ rule refuses; what is missing is the engine's own guard behind the button.
 
 and the same for the man at the rack.
 
+### Note 9 (housekeeping, not a fix). `src/ui/app.ts` and the door driver
+
+`src/render/doors.ts` no longer swings anything: a door is drawn closed and the file's job is the
+door's bookkeeping, who is through one and how many men have gone in or out. Its three exports
+`resetDoors`, `syncDoors` and `stepDoors` are unchanged in name and in shape, so the frozen
+`src/ui/app.ts` needed no note: it calls them where it always did and they now keep the count the
+hall reports through `hallOneShots`. Nothing is wanted from phase C here; this note is so that a
+reader of `app.ts` knows the calls changed meaning.
+
+Two constants in `constants.ts` are left with no reader by 2.12 and 2.13: `DOOR_SWING_MS`,
+`DOOR_CLOSE_MS` (the swing) and `STAND_IN_GAIN` (the synthesised sound). They are Piotr's figures
+for things the game no longer does. Phase C may delete them with the rest of the turn's tidying;
+B3 left them, because `constants.ts` is frozen and an unread constant harms nothing.
+
+---
+
 ---
 
 ## 2. Numbers chosen
@@ -300,6 +316,7 @@ and the same for the man at the rack.
 | `PAST_LIFE_WEEK_HOURS` | `SERVICE_INTERVAL_HOURS / WEEKS_PER_MONTH`, 18.46 h | `src/engine/machines.ts` | [TUNE]. A week of a machine's own clock, for the doubling of 2.9.4. No new figure: 80 hours is the month a one man shop puts on a saw (T6 3.6) and `WEEKS_PER_MONTH` is the game's own week. |
 | the doubling past the life | 2 | `overdueBreakdownChance`, `src/engine/machines.ts` | [TUNE, named in the brief]. The chance doubles for every whole week past the end and is capped at a certainty. The first week past the end is the Turn 8 chance unchanged. |
 | `LIFE_LOW_FRACTION` | 0.1 | `src/ui/machinesPage.ts` | [PIOTR, 18.09: "red when under a tenth is left"]. The share of the life left at which the bar turns from good to bad. |
+| `FIGURE_DEPTH_OFFSET` | 0.2 | `src/render/walkers.ts` | [TUNE]. Not a new number: it is the 0.2 `hall.ts` has painted a figure in front of his own cell with since Turn 16, given a name so the scene and the re-sort read one figure (2.11). |
 | the machine is out until | `nextWorkingDay(day of the call)` | `serviceMachine`, `src/engine/machines.ts` | [PIOTR, the rule; TUNE, the reading]. "Out for one working day from the call" is read as: out from the call, back the next working day, the first service included (2.9.3 leaves that one open). |
 
 ## 3. CSS needed
@@ -347,22 +364,6 @@ them; what it does not do until they land is look small, green and red.
 | "hours of life" (2.9) | `Equipment.enduranceHours`, and `enduranceHoursFor(specId, variantId)` for the life it left the shop with | `enduranceHours` is the life it has now, extensions and all, and `originalLifeOf(item)` is the life it was born with. The bar's total is `enduranceHours`, so it grows with each service, which is what 2.9.1 asks for. |
 | "2,140 of 3,600 h" (2.9) | the Owned tab prints `0 h of 750 h` through its own `hours()` | The page prints the brief's own shape, `lifeFigures` in `src/ui/machine.ts`: the thousands separator of `formatMoney` and the unit once. The Owned tab was left as it is, because its line is asserted by `tests/ui/catalogueTabs.test.ts` and 2.9 is about the new page. |
 
-### Note 9 (housekeeping, not a fix). `src/ui/app.ts` and the door driver
-
-`src/render/doors.ts` no longer swings anything: a door is drawn closed and the file's job is the
-door's bookkeeping, who is through one and how many men have gone in or out. Its three exports
-`resetDoors`, `syncDoors` and `stepDoors` are unchanged in name and in shape, so the frozen
-`src/ui/app.ts` needed no note: it calls them where it always did and they now keep the count the
-hall reports through `hallOneShots`. Nothing is wanted from phase C here; this note is so that a
-reader of `app.ts` knows the calls changed meaning.
-
-Two constants in `constants.ts` are left with no reader by 2.12 and 2.13: `DOOR_SWING_MS`,
-`DOOR_CLOSE_MS` (the swing) and `STAND_IN_GAIN` (the synthesised sound). They are Piotr's figures
-for things the game no longer does. Phase C may delete them with the rest of the turn's tidying;
-B3 left them, because `constants.ts` is frozen and an unread constant harms nothing.
-
----
-
 ## 5. Tests changed
 
 - `tests/render/frameFallbacks.test.ts`: `playableAnimation('owner', 'sweep')` was
@@ -405,3 +406,5 @@ B3 left them, because `constants.ts` is frozen and an unread constant harms noth
   `game.ts`. It is note 8, and the Owned tab already refuses it in the same words, so nothing in
   the game offers the sale.
 - 2.14, the Machines column's `0 h`, which is B2's: `src/ui/company.ts` is theirs this phase.
+- Nothing of 2.11 was left undone, and it wanted no note: the re-sort is the walker's own and the
+  depth every drawable carries is written where the scene is built.

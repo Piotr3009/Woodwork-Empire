@@ -201,3 +201,20 @@ layer plays, so `src/render` no longer imports `src/ui/sound.ts`: the names of t
 belong to the render layer, which is what reports the events, and the ui layer reads them from
 there. `grep -rn "from '../ui/sound'" src/render` returns nothing, and a test in
 `tests/render/doors.test.ts` is that grep.
+
+### 2.11 A figure is painted where his feet are
+
+REPORT-T19 wrote this one up and did not do it: the hall sorted a figure by the depth key of the
+cell he was walking TO, so for the whole of a walk he was painted in the order of where he was
+going, passed behind a machine he was in front of, and snapped into place on arrival. It is done
+now, and it is the cheap re-sort that report proposed rather than a sort of the scene.
+
+Every drawable the hall builds carries the depth it was sorted at, written on its own first tag as
+`data-depth`. A figure's own key is `depthKey` of the cell his feet are on this frame plus the one
+`FIGURE_DEPTH_OFFSET` the hall has always painted him in front of his cell with. After the walkers
+have moved, and again after every render, each figure is compared with the sibling before it and
+the sibling after it and swapped only where its key has crossed one: a frame in which nothing
+crosses moves nothing, and a drawable with no depth on it is a boundary that is not crossed. The
+walk from behind a machine to in front of it therefore changes the painter's order exactly once,
+as his feet cross it, and sixty ticks of a hall in which nothing crosses move nothing at all. Both
+are asserted, with the fake clock, in `tests/render/depthOrder.test.ts`.

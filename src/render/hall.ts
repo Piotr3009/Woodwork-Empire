@@ -121,6 +121,7 @@ import { jobStage } from '../engine/jobs';
 import { cleanerAtWork } from '../engine/tasks';
 import type { StageId } from '../engine/types';
 import { figureIsThroughADoor, takeDoorGoings } from './doors';
+import { FIGURE_DEPTH_OFFSET } from './walkers';
 
 /** What the hall can be heard doing (CLAUDE.md T19 2.10, T20 2.13). The render layer owns the
  *  list, because the render layer is what reports the events; `src/ui/sound.ts` plays what is on
@@ -276,6 +277,14 @@ export function objectArt(art: {
 interface Drawable {
   depth: number;
   svg: string;
+}
+
+/** Writes the depth a drawable was sorted at on to its own element, so the live layer says what
+ *  the painter's order is and the walker's re-sort can read a neighbour (CLAUDE.md T20 2.11). A
+ *  drawable is one element with everything else inside it, and it is its first tag that is
+ *  written on. */
+function withDepth(svg: string, depth: number): string {
+  return svg.replace(/^<([a-zA-Z]+)/, `<$1 data-depth="${Math.round(depth * 1000) / 1000}"`);
 }
 
 // ---------------------------------------------------------------------------
@@ -1193,7 +1202,7 @@ function figure(
     art === null ? null : characterArt(art.role, rest, tile.facing, art.options);
   const body = drawn ?? capsuleBody(fill);
   return {
-    depth: depthKey(tile.x, tile.y) + 0.2,
+    depth: depthKey(tile.x, tile.y) + FIGURE_DEPTH_OFFSET,
     svg:
       `<g class="figure" data-figure="${key}" ` +
       `transform="translate(${Math.round(feet.x)},${Math.round(feet.y)})" ` +
@@ -1741,7 +1750,9 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
     );
   }
 
-  live.push(drawables.map((drawable) => drawable.svg).join(''));
+  // Every drawable carries the depth it was sorted at, so the renderer can put a figure back in
+  // the order of the cell his feet are on without sorting the scene again (CLAUDE.md T20 2.11).
+  live.push(drawables.map((drawable) => withDepth(drawable.svg, drawable.depth)).join(''));
 
   // The pipes the game routed and the gate collars on their drops: a layer above the equipment
   // (CLAUDE.md T13 3.11, 3.19).
