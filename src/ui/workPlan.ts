@@ -6,7 +6,7 @@ import { formatCalendarDay, workPlan } from '../engine/index';
 import type { GameState, Job, PlanRow, WorkPlan } from '../engine/index';
 // Straight off their own module, not round the public API, which Turn 13 froze (REPORT-T13 10).
 import { canTakeOver, ownerTookOver } from '../engine/jobs';
-import { renderContractBar } from './contracts';
+import { renderContractsTab } from './contracts';
 import {
   callsLine,
   dropControl,
@@ -163,14 +163,17 @@ export function renderWorkPlan(
   /** Which of the two tabs is on top (CLAUDE.md T20 2.1). */
   tab: WorkPlanTab = 'jobs',
   dropConfirm: string | null = null,
-  /** The job whose Assign to this job list is open, or null for none (CLAUDE.md T19 2.5). */
+  /** The job or contract whose Assign list is open, or null for none (CLAUDE.md T19 2.5). */
   assignOpen: string | null = null,
+  /** The man an offer card is worked out for, or null for the card's own first choice
+   *  (CLAUDE.md T20 2.1.1). */
+  contractMan: string | null = null,
 ): string {
   const tabs = tabBar('workPlanTab', WORK_PLAN_TABS, tab);
-  // The Contracts tab is the drawing of docs/mockups/t20/contracts-tab.html, and it is filled in
-  // this turn's next step. Until then the contracts are where v28 left them, on the Jobs tab
-  // under the plan (CLAUDE.md T20 2.1, phase B1).
-  if (tab === 'contracts') return tabs + emptyLine('The contracts are still on the Jobs tab.');
+  // The Contracts tab is the drawing of docs/mockups/t20/contracts-tab.html; the Jobs tab is what
+  // the modal always was, less the contract bar, which has moved into Running
+  // (CLAUDE.md T20 2.1, 2.1.5).
+  if (tab === 'contracts') return tabs + renderContractsTab(state, assignOpen, contractMan);
   return tabs + jobsTab(state, dropConfirm, assignOpen);
 }
 
@@ -180,10 +183,9 @@ function jobsTab(
   assignOpen: string | null,
 ): string {
   const plan = workPlan(state);
-  // The standing contracts have a bar of their own, apart from the jobs, under them so the
-  // modal's lead never covers it (CLAUDE.md T13 3.16; PIOTR, 18.09).
-  const contracts = renderContractBar(state, assignOpen);
-  if (plan.rows.length === 0) return emptyLine('No jobs yet. Open the board.') + contracts;
+  // The contract bar of v28 has left this tab: its chips and its button are in Running, on the
+  // Contracts tab (PIOTR; CLAUDE.md T20 2.1.5).
+  if (plan.rows.length === 0) return emptyLine('No jobs yet. Open the board.');
   const rows = plan.rows
     .map((row) => {
       const job = state.jobs.find((entry) => entry.id === row.jobId);
@@ -209,7 +211,6 @@ function jobsTab(
     'turns red. A job nobody has started yet carries the yellow tick on the last day it can be ' +
     'started and still be on time. The axis is working days: Monday follows Friday and no ' +
     'deadline falls at a weekend.</p>' +
-    `<div class="plan">${scaleHtml(plan)}${rows}</div>` +
-    contracts
+    `<div class="plan">${scaleHtml(plan)}${rows}</div>`
   );
 }

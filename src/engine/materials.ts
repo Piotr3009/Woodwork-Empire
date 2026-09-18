@@ -49,7 +49,9 @@ export function reservedSheets(state: GameState): number {
   let reserved = 0;
   for (const job of state.jobs) {
     if (job.stage === 'completed') continue;
-    reserved += job.sheetsReserved;
+    // What a job holds on its own pallet is the job's, but it is not on the rack, and the rack's
+    // free count is the rack's (CLAUDE.md T20 2.16).
+    reserved += Math.max(0, job.sheetsReserved - jobSheetsOnPallet(state, job.id));
   }
   for (const contract of state.contracts) {
     if (contract.status !== 'active') continue;
@@ -64,9 +66,40 @@ export function freeSheets(state: GameState): number {
 }
 
 /** Sheets this job still needs and has not got: red on the card until Restock or an order for
- *  this job clears it (CLAUDE.md T13 3.3, 3.6). */
+ *  this job clears it (CLAUDE.md T13 3.3, 3.6). What it holds on its own pallet counts: a job's
+ *  own delivery is the job's whether it fitted on the rack or not, so one order is one order
+ *  (PIOTR: "materials for a 50k job want ordering several times"; CLAUDE.md T20 2.16). */
 export function shortfallOf(job: Job): number {
   return Math.max(0, job.sheets - job.sheetsUsed - job.sheetsReserved);
+}
+
+/** Sheets of this job's own deliveries that are its own and not on the rack: they would not fit
+ *  when the lorry landed and they stand on their pallet until the rack has room. They are counted
+ *  in the job's reservation, so its card is not short, and they are never left outside
+ *  (CLAUDE.md T20 2.16). */
+export function jobSheetsOnPallet(state: GameState, jobId: string): number {
+  let sheets = 0;
+  for (const delivery of state.deliveries) {
+    if (delivery.jobId !== jobId || !delivery.unloaded) continue;
+    sheets += delivery.overflowSheets;
+  }
+  return sheets;
+}
+
+/** Every pallet held for a job comes onto the rack the moment the cutting has made room for it.
+ *  Hands back how many sheets went on (CLAUDE.md T20 2.16). */
+export function landPalletSheets(state: GameState): number {
+  let landed = 0;
+  for (const delivery of state.deliveries) {
+    if (delivery.jobId === null || !delivery.unloaded || delivery.overflowSheets <= 0) continue;
+    const room = stockFree(state);
+    if (room <= 0) break;
+    const onto = Math.min(room, delivery.overflowSheets);
+    state.stock.sheets += onto;
+    delivery.overflowSheets -= onto;
+    landed += onto;
+  }
+  return landed;
 }
 
 /** Holds what the rack can spare for this job, up to what it needs. Bespoke material never comes
@@ -217,6 +250,9 @@ export function rackCanSupply(state: GameState, job: Job, progress: number): boo
 export function drawSheetsFor(state: GameState, job: Job, progress: number): boolean {
   const due = sheetsOwedBy(job, progress);
   if (due <= 0) return true;
+  // What a job's own lorry could not fit on the rack goes on it as soon as the cutting has made
+  // the room (CLAUDE.md T20 2.16).
+  landPalletSheets(state);
   if (!rackCanSupply(state, job, progress)) return false;
   state.stock.sheets -= due;
   job.sheetsUsed += due;
@@ -340,9 +376,16 @@ export function unloadIntoStock(state: GameState, delivery: Delivery): number {
   delivery.overflowSheets = overflow;
   const job = delivery.jobId === null ? null : state.jobs.find((entry) => entry.id === delivery.jobId);
   if (job) {
-    // The job's own sheets come off its own lorry: reserved for it, bespoke or not.
-    const held = Math.min(fitted, job.sheets - job.sheetsUsed - job.sheetsReserved);
+    // A job's own delivery is the job's whether it fits or not: what the rack took is held for it
+    // and what would not go on it stands on its own pallet, held for it just the same, so a
+    // bespoke load bigger than the rack does not leave the job short and its card does not ask
+    // for a second order (PIOTR; CLAUDE.md T20 2.16).
+    const held = Math.min(delivery.sheets, job.sheets - job.sheetsUsed - job.sheetsReserved);
     if (held > 0) job.sheetsReserved += held;
+    reserveShortfalls(state);
+    // Nothing of it is at risk and nothing is to be decided: the pallet waits for room on the
+    // rack and is never written off.
+    return 0;
   }
   reserveShortfalls(state);
   return overflow;
@@ -361,6 +404,9 @@ export function writeOffSheetsLeftOutside(state: GameState): number {
   let lost = 0;
   for (const delivery of state.deliveries) {
     if (delivery.overflowSheets <= 0) continue;
+    // A job's own pallet is not left outside: it is the job's, and it waits for room on the rack
+    // (CLAUDE.md T20 2.16).
+    if (delivery.jobId !== null) continue;
     lost += delivery.overflowSheets;
     delivery.overflowSheets = 0;
   }

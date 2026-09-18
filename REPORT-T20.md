@@ -37,3 +37,60 @@ why popover missed by the `data-popover` pass, the hiring gate reading a differe
 figure from the board, and the lift with no test behind it.
 `npm run check` green on its own exit code. Each finding, confirmed or rejected, is in
 `PHASE-A-NOTES.md` under "Phase A review".
+
+## Phase B, B1: the money
+
+**T20-B1a The prices that pay (2.2).** `CONTRACT_PIECES` came from phase A at Piotr's figures and
+this task proved them: by hand a cut sheet pack makes £26.67 an hour of margin, a drawer box £26
+and a wardrobe front £25, each inside the band of 22 to 30, and the wardrobe front is four hours
+of work and no longer three days. `tests/engine/contractPrices.test.ts` prints the three figures
+for this report and asserts the band, and it prints what one piece comes to for each of the four
+tiers, by hand and with a used saw.
+`npm run check` green on its own exit code.
+
+**T20-B1b The contract fills the day first, and the client who ends it (2.1.4, 2.1.6).** A man
+assigned to a contract keeps the job he is standing on: the contract books his pieces from 8:00
+until the day's share of the week is made and the job has what is left of the day, which is one
+predicate, `contractWantsToday`, read by the job's hands, by the contract's minute and by the tab.
+A second short week in a term now ends the contract, the client's own ending, with the closing
+report marked `ended by the client`.
+`npm run check` green on its own exit code.
+
+**T20-B1c The Contracts tab (2.1.1 to 2.1.3, 2.1.5).** The Work Plan's second folder: every offer
+as a card costed for the man who would do it, with his day drawn 8:00 to 17:00 a block a piece,
+the next best man's day beside it, the one machine that would shorten the piece most with its
+figures computed, and `Take it, <name> on it` in one click; Running with the week live, the amber
+minutes that go to his job and `End the contract`; Ended greyed. The v28 contract bar left the
+Jobs tab, it was not copied.
+`npm run check` green on its own exit code.
+
+**T20-B1d A job's own delivery is the job's, rack or no rack (2.16).** What would not fit on the
+rack stays on the job's pallet instead of being lost, `shortfallOf` counts it and the pallet lands
+as the saw makes room, so a £50,000 bespoke job is one order, one unload and nothing short after
+it. A stock lorry's overflow is still the yard question of Turn 2.
+`npm run check` green on its own exit code.
+
+**T20-B1 reviewed.** An adversarial reading of the B1 diff gave six findings. Three stood and were
+put right: a contract short of sheets used to freeze the man off his job as well and stand him at
+his bench all day, the Orders page still called a contract the client had walked away from "the
+term is over", and two clock positions were typed into the day track. One stood and is a line in a
+frozen file, note 1.1 of `NOTES-B1.md`. Two are put in front of Piotr below.
+`npm run check` green on its own exit code. Each finding, confirmed or refused, is in
+`NOTES-B1.md` under "REVIEW".
+
+### Two things Piotr has to answer
+
+1. **The wardrobe front is costed at £60 of material and draws about £220 of sheets.** 2.2 sets it
+   at `material: 60` and says `sheets` per piece stays what it is, which for this piece is 1.1
+   sheets, and a sheet is £200. The card therefore prints a margin of +£100 a piece on a piece
+   that empties the rack three and a half times faster than that. The other two pieces agree with
+   themselves (30 against 0.15 of a sheet, 26 against 0.13). One number settles it: the wardrobe
+   front's `sheets` at 0.3. It is not moved tonight because it is Piotr's own figure and the
+   brief says the sheets stay. Note 1.5 of `NOTES-B1.md` has the exact change and the test.
+2. **A contract piece is worked at its first stage only.** The engine, the card and the machine
+   tip all read `piece.stages[0]`, so the wardrobe front is a cutting job: a CNC or a saw shortens
+   it and a spray booth buys nothing on it, against the sentence of 2.2. The engine and the card
+   agree with each other, so nothing lies to the player about the figures he is shown; what is
+   missing is the second half of 2.2's promise. Putting it right means a piece that moves from
+   stage to stage inside the minute loop, with the station and the hall following it, which is a
+   turn's work of its own.
