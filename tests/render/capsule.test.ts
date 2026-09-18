@@ -68,12 +68,25 @@ function groupOf(svg: string, selector: string): Element {
 }
 
 describe('the helper on the floor', () => {
-  it('is drawn as a body and not as a stroke', () => {
+  it('is drawn from his own sheets, which came in with the v28 patch', () => {
     const state = hallWithA('helper');
     const helper = state.workers.find((worker) => worker.role === 'helper');
     if (helper === undefined) throw new Error('no helper on the books');
     const group = groupOf(renderHall(state), `[data-worker="${helper.id}"]`);
-    // No sheet for him tonight, so this is the placeholder and not the art.
+    // He had no sheet when this was written. His walk, idle, carry and sweep were delivered with
+    // the v28 patch (REPORT-T19, "Patch v28"), so he is the art now and not the placeholder.
+    expect(group.querySelector('[data-character]')).not.toBeNull();
+  });
+
+  it('stands a man of full height for a role the art side has not drawn', () => {
+    const state = hallWithA('helper');
+    const helper = state.workers.find((worker) => worker.role === 'helper');
+    if (helper === undefined) throw new Error('no helper on the books');
+    // The sprayer has no sheets yet (docs/art/REQUESTS-T20.md 2), so he is the placeholder, and
+    // the placeholder is what this measures.
+    const id = 'staff-sprayer';
+    state.workers.push({ ...helper, id, name: 'sprayer', role: 'sprayer' as WorkerRole });
+    const group = groupOf(renderHall(state), `[data-worker="${id}"]`);
     expect(group.querySelector('[data-character]')).toBeNull();
     const body = bodyOf(group);
     // As tall as the 1.8 m man the sheets declare, give or take the rounding, where the old
@@ -89,7 +102,7 @@ describe('the helper on the floor', () => {
 });
 
 describe('every role the art side has not drawn yet', () => {
-  it('stands the same man, and only the joiner and the owner have sheets', () => {
+  it('stands the same man, and only the owner, the joiner and the helper have sheets', () => {
     const state = hallWithA('helper');
     const helper = state.workers.find((worker) => worker.role === 'helper');
     if (helper === undefined) throw new Error('no helper on the books');
@@ -97,15 +110,13 @@ describe('every role the art side has not drawn yet', () => {
     // desk, and this is about how a man is drawn and not about who may be taken on.
     const drawn: string[] = [];
     for (const role of CHARACTER_ROLES) {
-      if (role === 'owner' || role === 'joiner') {
+      // Three men are drawn now: the owner and the joiner from the start, and the helper since
+      // the v28 patch (REPORT-T19, "Patch v28").
+      if (role === 'owner' || role === 'joiner' || role === 'helper') {
         expect(characterArt(role, 'idle', 'sw'), role).not.toBeNull();
         continue;
       }
       expect(characterArt(role, 'idle', 'sw'), role).toBeNull();
-      if (role === 'helper') {
-        drawn.push(helper.id);
-        continue;
-      }
       const id = `staff-${role}`;
       state.workers.push({ ...helper, id, name: role, role: role as WorkerRole });
       drawn.push(id);
@@ -118,6 +129,6 @@ describe('every role the art side has not drawn yet', () => {
       expect(-body.top, id).toBeGreaterThan(MAN * 0.9);
       expect(body.width, id).toBeGreaterThan(TILE_RISE / 3);
     }
-    expect(drawn).toHaveLength(CHARACTER_ROLES.length - 2);
+    expect(drawn).toHaveLength(CHARACTER_ROLES.length - 3);
   });
 });
