@@ -223,11 +223,14 @@ export function salePriceFor(item: Equipment): number {
   return Math.round(item.purchasePrice * fraction);
 }
 
-/** The families the Owned tab offers a sale on: what the game calls a machine, standing on the
- *  hall floor (CLAUDE.md T8 3.5). A bench, a rack and a locker are fittings, not plant. */
+/** The families the Owned tab offers a sale on: what the game calls a machine or the extraction
+ *  kit, standing on the hall floor, and the bench, which a workshop buys and sells like any other
+ *  thing that stands on its floor (PIOTR, 17.09; CLAUDE.md T8 3.5, T19 2.8). A rack, a locker and
+ *  the office furniture are fittings, not plant. A bench somebody is working at is refused by the
+ *  next line of `canSell`, which is the claim on it and needs nothing of its own. */
 export function isSellableFamily(specId: string): boolean {
   const category = findSpec(specId)?.category;
-  return category === 'machine' || category === 'extraction';
+  return category === 'machine' || category === 'extraction' || category === 'bench';
 }
 
 /** Tools of this family that live in a cabinet: two men can have one out at once. */
@@ -373,6 +376,10 @@ export function countOf(state: GameState, specId: string): number {
  *  finished, whatever stage he is at, which is the Turn 4 rule that nobody is turned off a bench
  *  he is standing at (CLAUDE.md T4 3.4). */
 export const BENCH = 'workbench';
+
+/** The booth family. The finishing of a lacquered job is done at it, and it is the sprayer's own
+ *  trade: he is at his full rate there and a joiner is slower (CLAUDE.md T19 2.6). */
+export const SPRAY_BOOTH = 'sprayBooth';
 
 /** Without a bench there is no way to start production, and two men cannot share one
  *  (CLAUDE.md T4 3.4). A job whose man is already at a bench keeps it. */

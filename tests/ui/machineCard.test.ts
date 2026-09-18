@@ -6,6 +6,7 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { currentState, mount, render } from '../../src/ui/app';
 import { renderCatalogue } from '../../src/ui/catalogue';
+import { renderMachineCard } from '../../src/ui/machineCard';
 import { pipeRunFor } from '../../src/engine/pipes';
 import type { GameState } from '../../src/engine/index';
 import { buyStartingKit, newGame } from '../helpers';
@@ -91,6 +92,21 @@ describe('a click on a machine on the hall', () => {
     expect(root().querySelector('[data-do="endSetup"]')).not.toBeNull();
     click('[data-do="endSetup"]');
     render();
+  });
+
+  it('draws the bench its own card with a Sell on it (CLAUDE.md T19 2.8)', () => {
+    const benchId = kitId('workbench');
+    const card = renderMachineCard(game(), benchId, null);
+    expect(card).toContain('data-do="sellMachine"');
+    // And one somebody is standing at says why it cannot go, rather than offering the button.
+    const busy = game();
+    const bench = busy.equipment.find((item) => item.id === benchId);
+    if (bench === undefined) throw new Error('no bench');
+    bench.takenBy = 'owner';
+    const held = renderMachineCard(busy, benchId, null);
+    expect(held).not.toContain('data-do="sellMachine"');
+    expect(held).toContain('Cannot sell it: Somebody is standing at it');
+    bench.takenBy = null;
   });
 
   it('leaves the Owned tab drawing the same card', () => {

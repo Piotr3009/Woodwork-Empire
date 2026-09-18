@@ -183,6 +183,22 @@ export function isHelperTask(state: GameState, task: TaskInstance): boolean {
   return HELPER_ONLY_KINDS.includes(task.kind) && helperOnDuty(state);
 }
 
+/** The man who is sweeping the hall this minute, or null. The one selector: the chip under the
+ *  hall says his name and draws no button while he has it, because the labourer cleans without
+ *  being asked and the player is not put the question (PIOTR, 17.09; CLAUDE.md T19 2.7). Null for
+ *  the owner sweeping it himself off Clean up, which is his own override and keeps its button.
+ *
+ *  There is no flag for "once per dirtying" and none is wanted: an open cleaning task IS the
+ *  flag, because the hall raises one and only one while the dust is up, and finishing it puts the
+ *  dust back to nought so the band is clean again until the hall dirties afresh. */
+export function cleanerAtWork(state: GameState): Worker | null {
+  const task = state.tasks.find((entry) => entry.kind === 'cleaning' && !entry.done);
+  if (!task || task.doneBy === null) return null;
+  const worker = state.workers.find((entry) => entry.id === task.doneBy);
+  if (!worker || worker.taskId !== task.id) return null;
+  return worker;
+}
+
 /** What the hall says while the van or the bag is waiting for the man whose job it is. */
 export const WAITING_FOR_HELPER = 'Waiting for the helper';
 

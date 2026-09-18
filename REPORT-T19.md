@@ -252,3 +252,125 @@ An adversarial review of phase A's own diff found three, all real, all now fixed
    rather than falling back.
 
 `npm run check` exit 0: 169 files, 1,668 tests.
+### T19-B2a Assign to this job, no limit (2.5)
+
+- `Job.assignees` is now the only list anybody reads, and the Work Plan row draws it as chips with
+  a cross apiece beside one blue `Assign to this job` button, exactly as variant A of
+  `docs/mockups/t19` draws it. The list behind the button offers you, every joiner and every
+  sprayer, with a man already on this job greyed as "already on this job", a man on another greyed
+  with that job's name, the helper greyed with "helpers do not build", and no limit at all on how
+  many go on one job. The Turn 17 "on it: You | Gary" chips and the "Second man: Alone | Gary"
+  line are gone from the row, and so is the "on it:" text in the head, which said the same thing a
+  third time.
+- **The rule for the men and the machines, in one sentence:** one machine is one man's, so a stage
+  at a machine goes at the speed of the man who holds it however many are on the job, and everyone
+  else stands in the queue and books nothing into that stage; a bench stage gives every man on the
+  job his own full minute at his own rate, so three men on assembly go three times as fast. The
+  tests assert both: three men and one saw cut at one man's speed to four decimal places, and the
+  same three assemble at more than two and a half times one man's.
+
+Also in this task, three places where phase A's straight conversion of the two old fields was too
+wide, all of them the same shape: `releaseJob` empties the whole list now, so calling it to take
+ONE man off took everybody off. `assignJob` (the previous job the new man was on), `takeOverJob`
+(the job the owner steps off), `staff.hurtWorker` (the man who has had an accident) and
+`contracts.assignToContract` (the man put on a standing contract) all use `takeOffJob` instead,
+which frees his machines, clears his `jobId` and drops the job back to `'ready'` only when the
+list actually empties. `releaseJob` is left for what it now means, everybody off: `completeJob`
+and `assignJob(jobId, null)`.
+
+`endOwnerTakeOver` read `assignees[1] === OWNER`, so an owner who had been added third or tenth
+was never taken off at dusk. There is no state to record the takeover with (`types.ts` is frozen),
+so it is derived instead, and deliberately: **the evening gives back every job the owner is on
+that somebody else leads**, wherever he stands in the list, and never a job he leads himself.
+`ownerTookOver` is the same predicate and the row's "You are on it tonight" reads off it.
+
+Three more judgement calls, all recorded here rather than guessed at later. The list prints the
+game's own tier words, "poor / normal / super joiner", and not the mockup's "ok" and "good": Our
+team has said poor, normal and super since Turn 6 and two vocabularies for one thing is what 2.9
+is fixing elsewhere tonight. `assignSecond` is kept as a shim over `addToJob` and `takeOffJob`,
+because `ASSIGN_SECOND` lives in the frozen `types.ts` and `game.ts`; the three of them go
+together in phase C (NOTES-B2.md 2). And the third man and beyond get a station string of their
+own, `place:<equipmentId>:<n>`, place 0 being the operator's cell, 1 the waiting cell or the
+bench's second place and 2 upward the free cells along the same side; the renderer's half of that
+is NOTES-B2.md 5, so until phase C lands it a third man is still drawn on the first man's cell.
+
+The whole of the Assign list is inert in the running game until the four click routes of
+NOTES-B2.md 1 are applied to `src/ui/app.ts`, which is frozen. `tests/ui/app.test.ts` (not B2's
+file) asserted a click on the old `assignJob` chip; it now asserts the new markup instead, and
+goes back to clicking when that note lands.
+
+### T19-B2b The sprayer (2.6)
+
+- A `sprayer` is hired off the Workshop tab like a joiner, in three tiers, paid by the month at
+  `SPRAYER_MONTHLY_WAGE`, listed in Our team as "sprayer, normal" and counted against the floor's
+  crew limit. The Assign list of 2.5 offers him for every job and prints "sprayer" beside his name
+  so the player sees who is who. He is drawn as a capsule until his sheet is delivered, which
+  wanted no code: a role with no character sheet falls to `capsuleBody` on its own.
+- The one new mechanism is `tradeFactor(role, family)` in `stages.ts`, beside `labourPerMinute`:
+  a sprayer is worth `SPRAYER_SPRAY_RATE` at the booth and `SPRAYER_BENCH_RATE` anywhere else, and
+  a joiner, or the owner, is worth `JOINER_SPRAY_RATE` at the booth and his whole rate everywhere
+  else. It multiplies the man's rate and never the machine's speed, so nothing about Output or the
+  rate changes away from the booth (CLAUDE.md T19 6). The cross check of section 7 is asserted:
+  the same lacquered wardrobe at its finishing stage takes labour faster with a sprayer on it than
+  with a joiner, in the ratio of the two rates to four decimal places, and the joiner alone still
+  finishes it.
+
+A joiner's whole path through the code, checked place by place, and what was decided for each.
+**In:** `WorkerRole`, `HIRING_SPECS` (three tiers, phase A), `TRADE_OF_ROLE` and `ROLE_WORDS`
+(phase A), `FLOOR_ROLES` so the floor counts him, `benchAnchor` so he stands at the booth and not
+at (1, 1), which is inside the office block, `BUILDING_ROLES` so the Assign list offers him and
+`addToJob` takes him, and `production.hands` so his minutes reach a job at all.
+**Out, and why:** `shortfallForHire` still returns nothing for him, so no bench, locker, seat,
+cabinet or tool set is bought before he starts and he can be hired into a hall with no booth,
+where he will simply spray nothing [TUNE: the brief asks for no gate and a booth gate would block
+the (bb) scenario]. `availableJoiners` and `autoAssignJobs` are joiner only, so the hall never
+hands him a job by itself: the player puts him on one. `shiftOf` keeps him on the day, so he is
+never on the night shift, which is right as it stands because `nightPremiumFor` divides a weekly
+wage and his is nought. `contractAssignCheck` stays joiner only: a standing contract is saw work.
+`HELPER_REQUIRED_FROM_JOINERS` counts joiners only, so he does not pull a helper into the hall.
+He takes no `cleaning`, `unload` or `emptyBags`: those are the helper's.
+
+One defect fixed while passing: `jobLabourCost` priced a man's minutes off his weekly wage, which
+is nought for anybody paid by the month, so the job card would have quoted a sprayer's labour at
+nothing. It reads the monthly wage over `WEEKS_PER_MONTH` when the weekly one is nought.
+
+The day shift still does not run him: `game.ts` carries a hand written second copy of the hand
+list and the labour arithmetic, and it is frozen. The three lines are NOTES-B2.md 6, and one of
+them (`possibleSeats`) is a silent wrong if it is applied without the others, so they are named
+together. The engine's own path, which the night shift and every engine test drive, is right.
+
+### T19-B2c The labourer cleans, and the bench can be sold (2.7, 2.8)
+
+- **2.7.** The brief's premise is out of date: the engine half of T17 2.3 did land and works.
+  `runHelperClean` raises the cleaning task itself the moment the hall's dust passes
+  `HELPER_CLEAN_DUST_BAND`, which is the band the Clean up chip appears for, and the helper takes
+  it at his next free minute. What was missing is the chip: the hall still read "The hall is
+  dirty, somebody will get hurt in this" with a Clean up button on it while the labourer was
+  already sweeping, so the player was still being asked. `cleanerAtWork(state)` in `tasks.ts` is
+  the one selector that says who is sweeping this minute; the sentence and the dropped button are
+  `render/hall.ts` and `src/ui/app.ts`, neither of them B2's, and both are written out in
+  NOTES-B2.md 7. **"Once per dirtying" needed no new field:** an open cleaning task IS the flag,
+  because `ensureTask` raises one and only one while the dust is up and finishing it puts the dust
+  back to nought, so the band is clean again until the hall dirties afresh. The tests assert the
+  brief's two claims: a hall that turns dirty with a helper on the books is clean again by the end
+  of the day with no action from the player, and without a helper no cleaning task is created at
+  all.
+- **2.8.** `isSellableFamily` admits the bench, which is the whole of it: the rest of the sell path
+  was already family blind, so the Owned tab and the bench's own card draw Sell at the catalogue's
+  own resale rule (`SALE_FRACTION`, or `SALE_FRACTION_USED` for one bought second hand) and
+  `canSell` refuses a bench somebody is standing at with "Somebody is standing at it", because a
+  man holds his bench from the first minute of a job to the last and lets go of it when the day
+  ends. No new constant, and no second code path.
+
+Two judgement calls. The refusal is drawn the way every other family's has been drawn since Turn
+8, as `Cannot sell it: <reason>` in place of the button, rather than as a greyed button: it is one
+code path, it is the wording the player already knows, and a disabled button is the one thing
+`lockedButton` is reserved for. And the hall's own click on a bench still does nothing, because
+the category gate that opens a machine's card lives in the frozen `src/ui/app.ts`; the three line
+change is NOTES-B2.md 8, and until it lands the Sell is reached from the Owned tab.
+
+One cross section flag for phase C. `src/engine/warnings.ts` still reads `has(state, 'workbench')`
+as "the hall has been set up", so a workshop that sells its last bench would flip the first steps
+line of T18 2.7 back on. T19 2.13 (`state.hallSetUp`, B3's) removes that read. If 2.13 lands there
+is nothing to do; if it does not, this is a blocker. `warnings.ts` is not B2's file and was not
+touched.

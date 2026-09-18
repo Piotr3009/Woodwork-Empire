@@ -31,7 +31,7 @@ import { isBreak, isWorkingDay, weekOfDay, weekday } from './clock';
 import { plural } from './text';
 import { charge, formatMoney } from './economy';
 import { queueEvent } from './events';
-import { findJob, releaseJob, stagedJob, workerMinuteCost } from './jobs';
+import { findJob, stagedJob, takeOffJob, workerMinuteCost } from './jobs';
 import { freeSheets } from './materials';
 import {
   accumulateMachineMinute,
@@ -374,8 +374,9 @@ export function assignContract(
   if (contract.assigned.includes(worker.id)) return OK;
   const elsewhere = contractOfWorker(state, worker.id);
   if (elsewhere) takeOff(state, elsewhere, worker);
+  // He comes off his job on his own: the men beside him carry on with it (CLAUDE.md T19 2.5).
   const job = worker.jobId === null ? null : findJob(state, worker.jobId);
-  if (job) releaseJob(state, job);
+  if (job) takeOffJob(state, job.id, worker.id);
   releaseMachines(state, worker.id);
   worker.jobId = contractMarker(contract.id);
   contract.assigned.push(worker.id);
