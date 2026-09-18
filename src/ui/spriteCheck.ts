@@ -299,6 +299,7 @@ export const CHARACTER_ROLES: readonly string[] = [
   'draftsman',
   'estimator',
   'productionManager',
+  'sprayer',
 ];
 
 /** One character sheet as a strip, with the anchor marked and the frames playing. The acceptance

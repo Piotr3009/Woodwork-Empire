@@ -869,25 +869,6 @@ export function assignJob(state: GameState, jobId: string, workerId: string | nu
   return true;
 }
 
-/** The second man of Turn 17, kept only as the one old action's way in. There is no second man
- *  any more: there is a list of men and no limit on it, so this puts one more on the job or takes
- *  the man behind the lead off it, and does both through `addToJob` and `takeOffJob` so there is
- *  one code path and not two (PIOTR, 16.09, 17.09; CLAUDE.md T17 2.10, T19 2.5). The action, the
- *  case in game.ts and this function go together when the frozen files are opened (NOTES-B2.md). */
-export function assignSecond(state: GameState, jobId: string, workerId: string | null): boolean {
-  const job = findJob(state, jobId);
-  if (!job) return false;
-  if (job.stage !== 'ready' && job.stage !== 'inProduction') return false;
-  if (workerId === null) {
-    const second = job.assignees[1] ?? null;
-    if (second !== null) takeOffJob(state, job.id, second);
-    return true;
-  }
-  // A second man is second to somebody: a job with nobody on it is assigned, not seconded.
-  if (leadAssignee(job) === null) return false;
-  return addToJob(state, job.id, workerId);
-}
-
 /** The roles that may be put on a job at all. A helper never builds: he carries, cleans and
  *  empties bags, and the Assign list says so rather than offering him (PIOTR, 17.09;
  *  CLAUDE.md T19 2.5, 2.6). */

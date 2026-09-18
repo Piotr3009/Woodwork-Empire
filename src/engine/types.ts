@@ -1177,9 +1177,6 @@ export type GameAction =
   | { type: 'SET_SHOW_WHY'; on: boolean }
   | { type: 'WORK_HERE'; jobId: string | null }
   | { type: 'ASSIGN_JOB'; jobId: string; workerId: string | null }
-  /** The second man on a job, put on it or taken off it by a click on the row
-   *  (CLAUDE.md T17 2.10). */
-  | { type: 'ASSIGN_SECOND'; jobId: string; workerId: string | null }
   /** The owner takes a worker's job on for the evening. Never automatic: the worker carries on
    *  with it in the morning (CLAUDE.md T17 2.12). */
   | { type: 'TAKE_OVER_JOB'; jobId: string }

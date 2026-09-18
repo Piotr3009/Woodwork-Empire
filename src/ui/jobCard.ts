@@ -5,13 +5,16 @@
 // everywhere in the game (CLAUDE.md T3 3.1, T4 3.1).
 
 import {
+  BUILDING_ROLES,
   callsScheduled,
   callsTaken,
+  canBuild,
   formatCalendarDay,
   has,
   helpers,
   isOnJob,
   jobLabourCost,
+  jobMen,
   jobProgress,
   jobsAtGate,
   leadAssignee,
@@ -25,9 +28,7 @@ import {
   transportLabel,
   workerById,
 } from '../engine/index';
-// Straight off their own modules, not round the public API, which Turn 13 froze (REPORT-T13 10).
-// T13-C1: export BUILDING_ROLES, canBuild and jobMen from index.ts (NOTES-B2.md).
-import { BUILDING_ROLES, canBuild, jobMen } from '../engine/jobs';
+// Straight off its own module, not round the public API, which Turn 13 froze (REPORT-T13 10).
 import { OWNER } from '../engine/machines';
 import { ROLE_WORDS } from './team';
 import { DROP_PROJECT_REPUTATION } from '../engine/constants';

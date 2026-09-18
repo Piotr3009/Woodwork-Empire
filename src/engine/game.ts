@@ -160,7 +160,6 @@ import {
   addLabour,
   assignJob,
   addToJob,
-  assignSecond,
   chargeSiteMeasure,
   checkOverdueJobs,
   endOwnerTakeOver,
@@ -182,6 +181,7 @@ import {
   runBookedTransport,
   dropJob,
   setSawFallback,
+  BUILDING_ROLES,
   takeOffJob,
   takeOverJob,
   transportLabel,
@@ -218,7 +218,7 @@ import {
 } from './owner';
 import { paidHoursToday } from './rate';
 import { chance, int, makeId } from './rng';
-import { type StagePlan, cncOptions, labourPerMinute } from './stages';
+import { type StagePlan, cncOptions, labourPerMinute, tradeFactor } from './stages';
 import {
   airFactorFor,
   benchDrawsAir,
@@ -1531,7 +1531,7 @@ function handsAtWork(state: GameState, ownerOnTask: boolean, moving: boolean): H
       continue;
     }
     if (moving) continue;
-    if (worker.role !== 'joiner' || worker.jobId === null) continue;
+    if (!BUILDING_ROLES.includes(worker.role) || worker.jobId === null) continue;
     const job = findJob(state, worker.jobId);
     if (!job || job.stage !== 'inProduction') {
       worker.jobId = null;
@@ -1566,7 +1566,7 @@ function possibleSeats(state: GameState): { owner: boolean; joiners: number } {
   if (crewHasGoneHome(state)) return { owner, joiners: 0 };
   let count = 0;
   for (const worker of state.workers) {
-    if (worker.role !== 'joiner' || !isWorkingToday(state, worker)) continue;
+    if (!BUILDING_ROLES.includes(worker.role) || !isWorkingToday(state, worker)) continue;
     count += 1;
   }
   return { owner, joiners: count };
@@ -1675,7 +1675,10 @@ function runProductionMinute(state: GameState, ownerOnTask: boolean): void {
     // A compressor's hours run only while something draws on it (CLAUDE.md T10 3.2 rule 3).
     const compressor = drawingOn(state, machine, atTheBench);
     if (compressor !== null) used.set(compressor.id, (used.get(compressor.id) ?? 0) + 1);
-    const minute = labourPerMinute(hand.rate, speed) * hall;
+    // What the man's own trade is worth at this stage: a sprayer's full minute at the booth, a
+    // joiner's slower one there, and neither anywhere else (CLAUDE.md T19 2.6).
+    const trade = tradeFactor(worker?.role ?? null, stage.family);
+    const minute = labourPerMinute(hand.rate * trade, speed) * hall;
     if (addLabour(state, hand.job, minute, stage.id)) raiseJobAtGate(state, hand.job);
   }
   // What the owner's absence took off every staff minute this minute is the owner away line of
@@ -2117,10 +2120,6 @@ export function applyAction(state: GameState, action: GameAction): GameState {
     }
     case 'ASSIGN_JOB':
       assignJob(next, action.jobId, action.workerId);
-      break;
-    case 'ASSIGN_SECOND':
-      // The second man on the job, on it or off it (CLAUDE.md T17 2.10).
-      assignSecond(next, action.jobId, action.workerId);
       break;
     case 'TAKE_OVER_JOB':
       // The evening is the owner's to give: he takes a worker's job on and the worker has it back

@@ -74,9 +74,11 @@ const OPENED_ON = OPENING.state.clock.day;
 /** The month with the piece left to the one man it was given to. */
 const ALONE = playUntilDay(OPENING.state, 41, QUIET_MONTH, []);
 
-/** The same month with the second joiner put on it beside him, and nothing else changed. */
+/** The same month with the second joiner put on it beside him, and nothing else changed. Turn 19
+ *  took the second man's own action away: a job carries a list of everybody on it and the second
+ *  man is simply the second name on it, so this is one Assign to this job (CLAUDE.md T19 2.5). */
 const WITH_SECOND = act(OPENING.state, {
-  type: 'ASSIGN_SECOND',
+  type: 'ADD_TO_JOB',
   jobId: OPENING.jobId,
   workerId: OPENING.men[1] ?? '',
 });

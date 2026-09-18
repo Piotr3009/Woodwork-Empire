@@ -188,6 +188,9 @@ interface Ui {
   /** The job whose Drop project has been pressed once. The same rule: it is meant on the second
    *  click, inside the card (CLAUDE.md T9 3.9). */
   dropConfirm: string | null;
+  /** The job whose Assign to this job list is open, or null. One list is open at a time, and a
+   *  click on the button that opened it shuts it again (CLAUDE.md T19 2.5). */
+  assignOpen: string | null;
   /** Which tab of the books is on top, and the past day whose summary is open over them
    *  (CLAUDE.md T6 3.9). */
   accountingTab: AccountingTab;
@@ -319,6 +322,7 @@ function freshUi(): Ui {
     machineCard: null,
     tickedTasks: [],
     dropConfirm: null,
+    assignOpen: null,
     accountingTab: 'days',
     accountingMonth: null,
     openDays: [],
@@ -440,7 +444,7 @@ function modalBody(id: ModalId, current: GameState): string {
         tickedTasks: ui.tickedTasks,
       });
     case 'workPlan':
-      return renderWorkPlan(current, ui.dropConfirm);
+      return renderWorkPlan(current, ui.dropConfirm, ui.assignOpen);
     case 'machineCard':
       return renderMachineCard(current, ui.machineCard, ui.sellConfirm);
     case 'accounting': {
@@ -1577,12 +1581,21 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
     case 'assignJob':
       dispatch({ type: 'ASSIGN_JOB', jobId: id, workerId: element.dataset.worker ?? 'owner' });
       return;
-    // The second man on a job: both stand at it, each at his own rate (CLAUDE.md T17 2.10).
-    case 'assignSecond': {
-      const second = element.dataset.worker ?? '';
-      dispatch({ type: 'ASSIGN_SECOND', jobId: id, workerId: second === '' ? null : second });
+    // The men on a job, and no limit on how many of them (PIOTR, 17.09; CLAUDE.md T19 2.5). Every
+    // one of these is a single click: the button that opened the list shuts it again.
+    case 'openAssign':
+      ui.assignOpen = ui.assignOpen === id ? null : id;
+      break;
+    case 'closeAssign':
+      ui.assignOpen = null;
+      break;
+    case 'assignAdd':
+      ui.assignOpen = null;
+      dispatch({ type: 'ADD_TO_JOB', jobId: id, workerId: element.dataset.worker ?? 'owner' });
       return;
-    }
+    case 'assignOff':
+      dispatch({ type: 'REMOVE_FROM_JOB', jobId: id, workerId: element.dataset.worker ?? '' });
+      return;
     // The evening is the owner's: he takes a man's job on himself and the man has it back in the
     // morning (CLAUDE.md T17 2.12).
     case 'takeOverJob':
