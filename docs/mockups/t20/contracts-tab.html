@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Contracts tab: the man's day (mockup)</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Patrick+Hand&display=swap">
+<style>
+:root{--bg:#2b2e33;--paper:#f3ecdc;--ink:#2a2418;--dim:#6f665a;--line:#c9bfa9;--green:#3f8a45;--red:#c05a4e;--blue:#2f5f9a;--amber:#c98a3b;--hand:'Patrick Hand',cursive;--ui:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif}
+:root:not([data-theme="light"]){color-scheme:dark}
+body{margin:0;background:#15171a;color:#e8e6e1;font-family:var(--ui);padding:24px}
+h1{font-family:var(--hand);font-weight:400;font-size:32px;margin:0 0 4px}
+p.lead{color:#a8adb6;max-width:80ch;margin:0 0 20px}
+h2{font-family:var(--hand);font-weight:400;font-size:26px;margin:28px 0 8px;color:var(--paper)}
+.tabs{display:flex;gap:6px;margin-bottom:10px}
+.tab{font-family:var(--hand);font-size:20px;padding:4px 14px;border-radius:4px 4px 0 0;background:#3a3d44;color:#c9c4b8}
+.tab.on{background:var(--paper);color:var(--ink)}
+.sheet{background:var(--paper);color:var(--ink);border:1px solid var(--line);border-radius:0 6px 6px 6px;padding:14px;max-width:1120px}
+.card{border:1px solid var(--line);border-radius:6px;padding:12px 14px;margin-bottom:12px;background:#faf6ec}
+.card h3{font-family:var(--hand);font-weight:400;font-size:22px;margin:0 0 4px;display:flex;justify-content:space-between;align-items:baseline}
+.card h3 small{font-family:var(--ui);font-size:13px;color:var(--dim)}
+.grid{display:grid;grid-template-columns:1.1fr 1fr;gap:16px}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;font-size:14px;margin:6px 0}
+.kv b{font-variant-numeric:tabular-nums;text-align:right}
+.good{color:var(--green);font-weight:600}.bad{color:var(--red);font-weight:600}
+.btn{font-family:var(--hand);font-size:18px;line-height:1.1;padding:4px 12px;border-radius:4px;border:1px solid #5b5446;background:linear-gradient(#f9f4e8,#e4dcc7);box-shadow:0 3px 0 #0a1a10;color:#12301f;display:inline-block;margin-right:6px}
+.btn.blue{background:linear-gradient(#4a78b8,#2f5f9a);color:#fff;border-color:#1e3f6a;box-shadow:0 3px 0 #0e2340}
+.btn.quiet{background:#efe8d8;box-shadow:none;color:var(--dim)}
+.chip{display:inline-flex;align-items:center;gap:6px;background:#e3d9c2;border:1px solid var(--line);border-radius:14px;padding:3px 8px 3px 10px;font-size:14px;margin-right:6px}
+.chip .x{display:inline-flex;width:18px;height:18px;border-radius:50%;background:#fff;border:1px solid var(--line);align-items:center;justify-content:center;font-size:12px;color:var(--dim)}
+/* the day */
+.day{margin-top:8px}
+.day .lbl{font-size:12px;color:var(--dim);display:flex;justify-content:space-between;margin-bottom:2px}
+.track{position:relative;height:34px;background:#fff;border:1px solid var(--line);border-radius:4px;overflow:hidden}
+.blk{position:absolute;top:4px;bottom:4px;background:var(--green);border-right:2px solid #fff;display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px}
+.blk.left{background:#e6e0d0;color:var(--dim);border-right:0}
+.blk.lunch{background:#d8cfb8;color:var(--dim);border-right:0}
+.ticks{display:flex;justify-content:space-between;font-size:11px;color:var(--dim);margin-top:2px}
+.pick{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0}
+.pick .who{border:1px solid var(--line);border-radius:6px;padding:6px 10px;background:#fff;font-size:14px;min-width:150px}
+.pick .who.on{border-color:var(--blue);box-shadow:0 0 0 2px #2f5f9a33}
+.pick .who small{display:block;color:var(--dim);font-size:12px}
+.tip{background:#fff7dd;border:1px solid #e3c98a;border-radius:6px;padding:8px 12px;font-size:13px;margin-top:8px}
+.note{color:#a8adb6;font-size:14px;max-width:80ch;margin:8px 0 0}
+</style></head><body>
+<h1>Contracts: a tab of its own, and the man's day</h1>
+<p class="lead">Two things Piotr asked for: know whether a contract pays <b>before</b> taking it, and see the work as a man's day, the way Airline Tycoon shows a plane's week as blocks, only ours is one day, 8:00 to 17:00. Every figure below is live from the engine: change the man and the day, the count and the result change with him. Numbers are the proposed new prices (25 £/h by hand, more with machines), not the ones on main today.</p>
+
+<div class="tabs"><span class="tab">Jobs</span><span class="tab on">Contracts</span></div>
+<div class="sheet">
+
+<h2 style="margin-top:0;color:var(--ink)">On offer <small style="font-family:var(--ui);font-size:13px;color:var(--dim)">answer within 5 days</small></h2>
+<div class="card">
+  <h3>Cut sheet packs for Hollis and Daughters <small>40 a week · 26 weeks · £50 a piece · 45 min a piece by hand</small></h3>
+  <div class="grid">
+    <div>
+      <div class="pick">
+        <span style="font-size:13px;color:var(--dim)">Who would do it?</span>
+        <span class="who on">Callum <small>experienced joiner · 45 min a piece</small></span>
+        <span class="who">Ravi <small>super experienced · 37 min a piece</small></span>
+        <span class="who">You <small>owner · 45 min a piece</small></span>
+      </div>
+      <div class="kv">
+        <span>Price a piece</span><b>£50</b>
+        <span>Material a piece (from stock)</span><b>−£30</b>
+        <span>Callum's labour a piece (45 min at £14/h)</span><b>−£11</b>
+        <span>Margin a piece</span><b class="good">£9</b>
+        <span>Pieces Callum makes in a day</span><b>10 of the 8 needed</b>
+        <span>Days a week on it</span><b>4</b>
+        <span>Week: 40 pieces × £9 − his 4 days' wages already counted</span><b class="good">+£360 a week</b>
+        <span>Over the term</span><b class="good">+£9,360</b>
+      </div>
+      <div class="tip">With a CNC the piece takes 20 min: Callum makes 24 a day, the contract needs 2 days of his week, and the margin a piece rises to £22. <b>+£880 a week.</b></div>
+    </div>
+    <div>
+      <div class="day">
+        <div class="lbl"><span>Callum's day on this contract</span><span>10 pieces · 30 min left at the end</span></div>
+        <div class="track">
+          <span class="blk" style="left:0%;width:8.3%">1</span><span class="blk" style="left:8.3%;width:8.3%">2</span><span class="blk" style="left:16.6%;width:8.3%">3</span><span class="blk" style="left:24.9%;width:8.3%">4</span><span class="blk" style="left:33.2%;width:8.3%">5</span>
+          <span class="blk lunch" style="left:41.5%;width:5.5%">lunch</span>
+          <span class="blk" style="left:47%;width:8.3%">6</span><span class="blk" style="left:55.3%;width:8.3%">7</span><span class="blk" style="left:63.6%;width:8.3%">8</span><span class="blk" style="left:71.9%;width:8.3%">9</span><span class="blk" style="left:80.2%;width:8.3%">10</span>
+          <span class="blk left" style="left:88.5%;width:11.5%">free</span>
+        </div>
+        <div class="ticks"><span>8:00</span><span>10:00</span><span>12:00</span><span>14:00</span><span>17:00</span></div>
+      </div>
+      <div class="day">
+        <div class="lbl"><span>Ravi's day, for comparison</span><span>13 pieces · 4 min left</span></div>
+        <div class="track">
+          <span class="blk" style="left:0%;width:6.8%">1</span><span class="blk" style="left:6.8%;width:6.8%">2</span><span class="blk" style="left:13.6%;width:6.8%">3</span><span class="blk" style="left:20.4%;width:6.8%">4</span><span class="blk" style="left:27.2%;width:6.8%">5</span><span class="blk" style="left:34%;width:6.8%">6</span>
+          <span class="blk lunch" style="left:40.8%;width:5.5%">lunch</span>
+          <span class="blk" style="left:46.3%;width:6.8%">7</span><span class="blk" style="left:53.1%;width:6.8%">8</span><span class="blk" style="left:59.9%;width:6.8%">9</span><span class="blk" style="left:66.7%;width:6.8%">10</span><span class="blk" style="left:73.5%;width:6.8%">11</span><span class="blk" style="left:80.3%;width:6.8%">12</span><span class="blk" style="left:87.1%;width:6.8%">13</span>
+          <span class="blk left" style="left:93.9%;width:6.1%"></span>
+        </div>
+        <div class="ticks"><span>8:00</span><span>10:00</span><span>12:00</span><span>14:00</span><span>17:00</span></div>
+      </div>
+      <div style="margin-top:12px"><span class="btn blue">Take it, Callum on it</span><span class="btn quiet">Decline</span></div>
+    </div>
+  </div>
+</div>
+
+<h2 style="color:var(--ink)">Running</h2>
+<div class="card">
+  <h3>Drawer boxes for Ashby Kitchens <small>week 3 of 17 · 60 a week · £52 a piece</small></h3>
+  <div class="grid">
+    <div>
+      <div style="margin:4px 0 8px"><span class="chip">Ravi <span class="x">×</span></span><span class="btn blue" style="font-size:16px">Assign to this contract</span></div>
+      <div class="kv">
+        <span>This week</span><b class="good">41 of 60, on course</b>
+        <span>Margin a piece with Ravi</span><b class="good">£17</b>
+        <span>This week so far</span><b class="good">+£697</b>
+        <span>Term so far</span><b class="good">+£2,140</b>
+        <span>Delivered in full</span><b>2 of 2 weeks</b>
+      </div>
+      <div style="margin-top:8px"><span class="btn quiet">End the contract (free after week 4)</span></div>
+    </div>
+    <div>
+      <div class="day">
+        <div class="lbl"><span>Ravi's day</span><span>12 boxes, then 40 min on Small kitchen</span></div>
+        <div class="track">
+          <span class="blk" style="left:0%;width:7.4%">1</span><span class="blk" style="left:7.4%;width:7.4%">2</span><span class="blk" style="left:14.8%;width:7.4%">3</span><span class="blk" style="left:22.2%;width:7.4%">4</span><span class="blk" style="left:29.6%;width:7.4%">5</span>
+          <span class="blk lunch" style="left:37%;width:5.5%">lunch</span>
+          <span class="blk" style="left:42.5%;width:7.4%">6</span><span class="blk" style="left:49.9%;width:7.4%">7</span><span class="blk" style="left:57.3%;width:7.4%">8</span><span class="blk" style="left:64.7%;width:7.4%">9</span><span class="blk" style="left:72.1%;width:7.4%">10</span><span class="blk" style="left:79.5%;width:7.4%">11</span><span class="blk" style="left:86.9%;width:7.4%">12</span>
+          <span class="blk" style="left:94.3%;width:5.7%;background:var(--amber)">job</span>
+        </div>
+        <div class="ticks"><span>8:00</span><span>10:00</span><span>12:00</span><span>14:00</span><span>17:00</span></div>
+      </div>
+      <div class="tip">The contract fills his day first; what is left of it goes to the job he is also on. Assigned once, he stays on it until you take him off.</div>
+    </div>
+  </div>
+</div>
+
+<h2 style="color:var(--ink)">Ended</h2>
+<div class="card" style="opacity:.8">
+  <h3>Cut sheet packs for Hollis and Daughters <small>ended week 17 · 3 short weeks</small></h3>
+  <div class="kv"><span>Pieces</span><b>612</b><span>Revenue</span><b>£30,600</b><span>Material</span><b>−£18,360</b><span>Labour</span><b>−£6,800</b><span>Net</span><b class="good">+£5,440</b><span>Reputation</span><b class="bad">−3</b></div>
+</div>
+</div>
+
+<p class="note">What the tab enforces without saying so: the piece's minutes come from the man's rate and the machines in the hall; material is always from stock (a short rack shows the week in red on the offer); the result is after his wages; a contract fills the day first and the job gets the rest; one click ends it after the free month.</p>
+</body></html>

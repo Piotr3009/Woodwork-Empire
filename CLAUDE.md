@@ -1,233 +1,331 @@
-# Turn 19: the men move like men
+# Turn 20: contracts that pay, people you can run
 
 Woodwork Empire. Autonomous session brief for Claude Code (Opus 5, effort ultracode, cloud, agent
-teams expected). Owner: Piotr. Programmer: Claude. Spec author: Claude (chat), 17.09.2026, from
-Piotr playing v26 and the day's talk (Petros: software/woodwork-empire, STAN V27-1 to V27-4 and
-T19).
+teams expected). Owner: Piotr. Programmer: Claude. Spec author: Claude (chat), 18.09.2026, from
+Piotr playing v27 and v28 and two days of talk (Petros: software/woodwork-empire, STAN T20, the
+rules of 18.09 and the v28 patch).
 
-Read this whole file (first line must say "Turn 19"; if the root CLAUDE.md does not, stop and
-report), then REPORT-T18.md and REPORT-T17.md in full, then docs/mockups/t19/README.md and open
-workplan-assign-A.html in a browser, then docs/art/SPRITES.md sections 9 and 10, then the archived
-briefs in docs/. Where files disagree, this one wins. All standing rules apply (no em or en dashes
-anywhere, scope 1:1, one code path, constants never in the UI, [TUNE] for every figure you choose
-and [PIOTR] for his, kill background processes, PR without merge, end the session, no PR watching,
-npm run check gated on its own exit code, every click single, one APP_VERSION bump).
+Read this whole file (first line must say "Turn 20"; if the root CLAUDE.md does not, stop and
+report), then REPORT-T19.md in full (its last two sections are the v28 patch and the helper's
+sheets), then docs/mockups/t20/README.md and open contracts-tab.html in a browser, then
+docs/art/SPRITES.md sections 9 and 10, then the archived briefs in docs/. Where files disagree,
+this one wins. All standing rules apply (no em or en dashes anywhere, scope 1:1, one code path,
+constants never in the UI, [TUNE] for every figure you choose and [PIOTR] for his, kill
+background processes, PR without merge, end the session, no PR watching, npm run check gated on
+its own exit code, every click single, one APP_VERSION bump).
 
-Precondition. main carries Turn 18 merged (PR #18): APP_VERSION 'v26', STATE_VERSION 15. If
-APP_VERSION is not 'v26', stop and report.
+Precondition. main carries v28 (the chat patch of 18.09): APP_VERSION 'v28', STATE_VERSION 16,
+`src/ui/jobCard.ts` has `assignMove`, and `public/sprites/character.helper.walk.sheet.png`
+exists. If APP_VERSION is not 'v28', stop and report.
 
-## 0. What this turn is for (Piotr, 17.09)
+## 0. What this turn is for (Piotr, 17.09 and 18.09)
 
-Piotr watched v26 and said the men "walk like robots and shake like a leaf"; that his own figure
-vanishes when he goes into the office; that the joiner stands on the bench, not at it; that the
-work plan's way of putting people on a job is unreadable; that the labourer still does not clean;
-that a workshop is silent and should not be; and that the doors should open. And four things
-from the day: reputation is a total and should read as one, drawings take far too long, the
-laptop should queue tasks, and there is no sprayer.
+Two days of playing v27 and v28 gave Piotr one conclusion about the money and one about the
+people. The money: **every standing contract is a loss by definition** (a piece pays 8 to 11
+pounds an hour against a joiner's 14, before anything else), so the Contracts tab he drew with
+Claude shows the result before he takes one, for the man he would put on it, and the prices are
+set so that a contract pays a little by hand and well with machines. The people: he cannot let a
+man go, the tiers are called "poor", the estimator does five a day when the owner does sixteen,
+pay is by the week for some and by the month for others, and the helper stands beside the dirt.
 
-The name of the turn is the first of these. One agent's whole job tonight is to find out why the
-figures move badly and make them move well; nothing else that agent does matters if that is not
-done.
+Three rules were set on 18.09 and they bind this brief: **nothing visual or moving is built
+without a mockup** (the one in docs/mockups/t20 is the only one this turn has, so nothing else
+here changes the look beyond what a section states line by line); **no sound plays without a
+recorded file Piotr has heard** (there are none yet, so the synthesised stand ins of Turn 19 go
+and the hall is silent until the files land); and **every modal, popover and list has the cross,
+Escape and click outside**, checked by a test.
 
 ## 1. Rules restated (short)
 
-Everything from Turns 1 to 18. Tonight in addition:
+Everything from Turns 1 to 19 and the v28 patch. Tonight in addition:
 
-- APP_VERSION = 'v27'. STATE_VERSION bumps to 16 in phase A, once, for section 4's fields; every
-  v26 save loads.
-- **Sound is in** [PIOTR]. The standing "no sound" line of every brief since Turn 4 is withdrawn
-  for this and later turns. The rule that replaces it: one sound engine (`src/ui/sound.ts`, Web
-  Audio), one table of sounds by event and by station, a volume and a mute in Settings, and
-  nothing that plays before the player's first click (browsers refuse it). Real recordings are
-  Piotr's to make in his own workshop (section 9); the engine ships with quiet synthesised stand
-  ins so every hook can be heard tonight.
-- Nobody stands on a thing. A standing cell is a cell the figure's feet can be seen on the floor
-  of; if a sprite's drawn body covers the table's cell, the cell moves, the sprite does not.
-- Art is not this session's beyond vectors: doors, the sprayer's capsule, the stand in sounds.
-  Requests in docs/art/REQUESTS-T19.md.
+- APP_VERSION = 'v29'. STATE_VERSION bumps to 17 in phase A, once, for section 4's fields; every
+  v28 save loads.
+- The work of a job with several men on it stays a plain division: n men take 1/n of the time,
+  the machine stage takes one man at the machine [PIOTR, 18.09: "leave it, we change nothing"].
+  No crowding factor, no limit.
+- Output, Efficiency and the workshop rate are untouched. Section 2.3 only takes a man off a
+  list he should not be on.
+- Nothing new is drawn. Where a section needs a picture it does not have (the sprayer, the helper
+  at a bench), the fallback rule of Turn 19 stands and the request goes to
+  docs/art/REQUESTS-T20.md.
+- **One game, one look** [PIOTR, 18.09: "the whole look is not coherent"]. Before any agent
+  builds or changes a screen it reads what the game already has and uses it, never a new
+  version of it: the three modal skins and every helper in `src/ui/modal.ts` (`closeButton`,
+  `button`, `primaryButton`, `lockedButton`, `money`, `minutes`), the tokens and classes of
+  `src/ui/styles.css` (no new colour, font, radius or shadow; a new class only when no existing
+  one does the job, and then named and placed beside its family), the chips of the top bar, the
+  tabs of the laptop, the cards of the Company board, the rows of the Work Plan and Our team.
+  Phase A writes `docs/ui-style.md` from the code as it is (the skins, the tokens, the buttons,
+  the chips, the cross, the fonts, the two figure sizes, with the CSS class of each), every
+  phase B agent reads it before its first UI commit, and phase C puts every new or changed
+  screen's picture beside the closest existing screen in the report and says what differs; any
+  difference that is not in this brief is a bug to fix before the PR.
 
 ## 2. Changes to the design (the contract)
 
-### The figures
+### The money
 
-**2.1 The movement, diagnosed and fixed [PIOTR: "like robots, shaking like a leaf"].** This is a
-diagnosis first and a fix second, by one agent, written up in the report as its own section
-("The movement") before any code is changed. What to look at, in this order, and measure:
+**2.1 The Contracts tab [PIOTR; docs/mockups/t20/contracts-tab.html].** The Work Plan modal gets
+two tabs, `Jobs` and `Contracts`, the folder's tabs as the laptop draws them; Jobs is what the
+modal is today minus the contract bar (2.1.5). Contracts is the drawing, section by section:
 
-1. **The transform is rounded every frame.** `translateOf` in walkers.ts writes
-   `Math.round(feet.x), Math.round(feet.y)`: a figure moving 1.0 cell a second at 60 fps moves
-   0.4 px a frame and the rounding makes it step 0 px, 0 px, 1 px, 0 px, 1 px. That is the
-   shake. Measure it (log the transform for one second of walking) and, if it is the cause,
-   write sub pixel positions (two decimals) and let the browser interpolate; the figure's own
-   sprite stays pixel aligned inside the group by the sheet's anchor.
-2. **The frame clock and the walk are not tied.** `characters.ts` picks the frame from
-   `nowMs * fps`, the walk advances by cells a second: a stride in the sheet does not match a
-   cell on the floor, so the feet slide. Measure the walk sheet's stride (how far the figure
-   should travel per full cycle at the sheet's fps, from SPRITES.md 10) and tie
-   `WALK_CELLS_PER_SECOND` to it, or the fps to the speed, so the feet plant where the floor
-   moves. If the sheet gives no stride, choose one [TUNE] and say so.
-3. **A turn at every cell.** `facingFromScreen` is re-read on every cell of the path, and a
-   diagonal on the grid is a staircase of one cell steps, so the figure flips facing every cell.
-   Fix: the facing is chosen per leg from the leg's overall screen direction (from the cell he
-   set off from to the cell he is going to), not per cell; a genuine corner (the path turns
-   ninety degrees for more than two cells) turns him.
-4. **Frame changes on the wrong frame.** If `playCharacters` and `stepWalkers` run in the same
-   frame but write the transform and the frame at different points, the figure can be seen half
-   updated. Check the order and the DOM writes.
-5. **Anything else the log shows.** The report says what was measured, what was found, what
-   was changed and what the new log looks like.
+1. **On offer.** Every contract on the board (`offeredContract`, and the Orders page keeps its
+   copy) as a card: name, quantity a week, term in weeks, price a piece, minutes a piece by hand.
+   A row of **who would do it**: the owner and every joiner on the books, each with his tier and
+   his minutes a piece at his rate with the machines the hall has (`contractPiece` minutes over
+   his rate, the stage's machine speed applied); one is selected (the first joiner, or the owner
+   with none) and every figure on the card is computed for him: price a piece, material a piece
+   (from stock, at the stock price), his labour a piece (his minutes at his wage a minute, the
+   `workerMinuteCost` of the job card), margin a piece; pieces he makes in a day (his working
+   minutes over his minutes a piece, whole, the lunch break out) against pieces needed a day;
+   days of his week the contract takes; **the week's result: pieces × margin, less his wages for
+   the days it takes** (the same wages the job card counts; the owner's days cost his draw); the
+   term's result (weeks × week). His day as the drawing: a track 8:00 to 17:00, one block per
+   piece, the lunch block, the free time at the end labelled "N min left at the end". A second
+   track for the next best man "for comparison" when there are two or more. The tip under the
+   figures names the one machine that would shorten the piece most among those the hall lacks
+   (`the CNC: 20 min a piece, 24 a day, +£880 a week` computed, not typed). Buttons: `Take it,
+   <name> on it` (accepts and assigns in one click) and `Decline`.
+2. **Running.** Every active contract: the chips and the `Assign to this contract` button of v28
+   (the same list, the same cross), the week live (`41 of 60, on course` in green, `short` in
+   red when the week's pace will not reach the quantity), margin a piece with the men on it, the
+   week so far, the term so far, weeks delivered in full, and the man's day track: his pieces
+   first, then, in amber, the minutes that go to the job he is also on, labelled with its name.
+   `End the contract` with its reason (`free after week 4` from `CONTRACT_FREE_END_DAYS`).
+   **Assigned once, a man stays on it until he is taken off or leaves** (the engine already does
+   this: `contract.assigned` persists; the tab must never ask again).
+3. **Ended.** The closing report as `closingReport` gives it, greyed.
+4. **The contract fills the day first** [PIOTR]: a man on a contract books his pieces from 8:00
+   until the day's quantity is met (the week's quantity spread over the days left in the week),
+   and only then goes to the job he is also on. The engine's minute loop orders his work that
+   way; the tab's track and the hall agree.
+5. **The contract bar of v28 leaves the Jobs tab.** Its chips and button moved into Running.
+6. **The short week** [TUNE, Piotr's decision still open]: the first short week costs 1 point of
+   reputation as today; a second short week in the same term and the client ends the contract
+   himself with a closing report marked `ended by the client`. No third.
 
-Done: a test with a fake clock that asserts, over one second of walking, that the transform's x
-and y each change by a near constant amount every frame (no zero steps between nonzero ones),
-that the facing does not change on a straight diagonal leg, and a screen recording is not asked
-for: the log in the report stands in for it.
+Done: the engine tests (the week's result for a poor, a normal and a super joiner on the cut
+sheet pack differ as their rates do; the day fills contract first and job second; the client
+ends on the second short week), the tab's render tests (a card per offer with the selected man's
+figures, the track's block count equals pieces a day, Running shows the amber job minutes) and
+the app test (Take it assigns; the list has the cross).
 
-**2.2 The owner in the office [PIOTR].** When the owner's station is the office or the phone, the
-hall draws him standing in the office doorway, the door open (2.3), facing in; he is never absent
-from the hall. The office view draws him at his desk (the office picture's desk region), so a
-player who follows him through the door finds him. Done: the render tests for both views.
+**2.2 Prices that pay [PIOTR: "a contract is worse than a job, better than the wage, and rewards
+machines"].** `CONTRACT_PIECES` becomes:
 
-**2.3 Doors open [PIOTR].** The office door and the canteen door are drawn in three states by a
-vector on the door control: closed, half, open (a door leaf swung on its hinge in the hall's
-dimetric, the dark opening behind it). A figure whose leg ends at a door cell opens it as he
-arrives (closed to half to open over `DOOR_SWING_MS` 400 [TUNE]), stands in it while his station
-is the room, and the door closes after `DOOR_CLOSE_MS` 600 [TUNE] when he leaves the cell; a
-door with somebody standing in it stays open. Each swing plays the door sound (2.10). Done: a
-render test of the three states and the app test that the door opens when the owner goes to the
-office and closes when he comes out.
+| Piece | Stages | Minutes by hand | Material | Price | Margin a piece by hand | An hour, normal joiner |
+|---|---|---|---|---|---|---|
+| Cut sheet pack | cutting | 45 | 30 | 50 | 20 | 27 |
+| Drawer box | cutting, assembly | 60 | 26 | 52 | 26 | 26 |
+| Wardrobe front | cutting, finishing (lacquer) | 240 | 60 | 160 | 100 | 25 |
 
-**2.4 At the bench, not on it [PIOTR].** The joiner at a bench is drawn with his feet on the
-bench's front cell; on the hall his body covers the table's top because the bench sprite is drawn
-larger than its footprint and the standing cell is inside the drawn body. Measure the bench
-sprite's drawn extent against its footprint (SPRITES.md 9) and put the operator's cell on the
-first cell whose floor is visible in front of the drawn body (one cell further out if it must,
-`out: 1` in the station table row), the same for the second man at the back, and check every
-other family's operator cell against its sprite the same way: a table of family, sprite extent,
-footprint, cell chosen, in the report. Done: the station table test updated to the new rows and
-a screenshot of a joiner at a bench with his feet on the floor.
+By hand, every piece lands near 25 pounds an hour of margin (between the joiner's wage of about
+14 and a job's 40); with a CNC on the cutting stage and an edgebander or a spray booth on the
+rest, the same pieces reach 40 to 60. The wardrobe front is four hours of work, not three days.
+`sheets` per piece stays what it is. Done: a test that prints the three margins an hour by hand
+and asserts each is between 22 and 30 [TUNE].
+
+**2.3 The estimator [PIOTR].** Three things:
+
+1. **He does as many as his minutes allow, not five.** `ESTIMATOR_JOBS_PER_DAY` goes. A material
+   take off is `MATERIAL_TAKE_OFF_MINUTES` 30 [PIOTR: "when I did it, it took 30 minutes"] of his
+   day at his rate (a no experience estimator takes 37, an excellent one 21), and Joinery Core
+   halves the minutes (`JOINERY_CORE_TAKE_OFF_FACTOR` 0.5 [TUNE]) with each extension taking a
+   further quarter off [TUNE], so a normal estimator does 16 a day bare and 32 with the software.
+   The owner without an estimator does the same 30 minutes each, as today.
+2. **He goes on site measures** when there is no owner free for it: `siteMeasure` gains
+   `estimator` (and `salesman`) in `eligibleRoles` and the estimator in `autoRoles`, with the
+   day's travel minutes charged to him instead of the owner.
+3. **He is not in the Output list.** The Company board's "act where they are" rows list only men
+   who produce (joiners, sprayers, the owner); an estimator, an admin, a draftsman, a clerk or a
+   salesman is not a production rate and does not appear there.
+
+Done: the tests (16 and 32 a day for a normal estimator; a no experience one fewer; the site
+measure lands on him when the owner is at the bench; the board's rows).
 
 ### The people
 
-**2.5 Assign to this job, no limit [PIOTR; docs/mockups/t19].** The work plan row's "on it:
-Gary · You | Gary" and "Second man: Alone | Gary" go. In their place, as drawn: the people on the
-job as chips (each with a cross that takes him off) and one blue button `Assign to this job`
-that opens a list: You, every joiner and every sprayer (2.9), with the ones already on another job
-greyed and unclickable, with the job's name after theirs ("Callum · on Garage shelves"), the ones
-already on this job greyed with "already on this job", and the helper greyed with "helpers do not
-build". No limit on how many go on a job. Engine: `job.assignedTo` and `job.secondAssignee` become
-`job.assignees: string[]` (the owner as 'owner'), every place that read the two reads the list;
-a stage at a machine takes the first man free at the machine's operator cell and the rest at the
-waiting cell (and, when the waiting cell is taken, the next free cell along the same side, one
-out); a bench stage takes the first at the operator's cell, the second at the second place, and
-the rest at the next free cells along the front; all of them book minutes into the job at their
-own rates, so twenty men do make it go faster, and the machine stage goes no faster than one man
-at the machine plus what the others do on the bench work that stage allows. Migration: the two
-old fields become the list. Done: the engine tests (three men, one saw: the cutting stage is one
-man's speed, the assembly stage is three men's), the work plan test, the migration test.
+**2.4 Let go [PIOTR: "how do I fire people?"].** Our team gets `Let go` on every worker's row
+(never on the owner). One click: the man works out **one week's notice** [TUNE, Piotr's decision
+open: a week's wage] and leaves at the end of it; he is paid for the week; the row reads `leaves
+on <date>`; his jobs and contracts drop him the morning he goes and the plan shows them with
+nobody on it. Letting go costs no reputation. The hiring gate (T17 2.11) and the crew limit
+(T17 3.10) count him until he has gone. Done: the tests.
 
-**2.6 The sprayer [PIOTR].** A new role `sprayer`: hired like a joiner with three tiers, pay
-`[TUNE 2,300 / 2,700 / 3,100 a month]`, a capsule until his sheet is delivered, listed in Our
-team and the crew limit. The finishing stage of a lacquered job (`sprayBooth`) is his at rate
-1.0; a joiner may still do it at `JOINER_SPRAY_RATE` 0.7 [TUNE], so a workshop without a sprayer
-is slower there, not stuck. The assign list (2.5) offers sprayers for every job (they can help on
-a bench) and marks them "sprayer" so the player sees who is who. Done: the tests.
+**2.5 Four tiers, and no "poor" [PIOTR].** `WorkerTier` becomes `'novice' | 'experienced' |
+'senior' | 'master'`, and the words the game prints are **no experience, experienced, super
+experienced, extremely experienced** (one `TIER_WORDS` table, used everywhere a tier is printed:
+hire cards, Our team, the assign lists, the Company board, the reports). Rates 0.8 / 1.0 / 1.2 /
+1.4 for every role that has a rate [PIOTR: 0.8 and the top at 120% over him, which is 1.2 of the
+owner's 1.0; 1.4 is the extremely experienced man's step above that, TUNE]. Pay a week per tier
+for a joiner: 450 / 600 / 800 / 1,000 [PIOTR: 1,000 for the top; the rest TUNE]; the other roles'
+tiers scale the same way from their experienced pay. **Who applies depends on reputation**
+[PIOTR]: the hire card offers only tiers the workshop's reputation earns: no experience always,
+experienced from 15, super experienced from 35, extremely experienced from 60 [TUNE except the
+60]; the card says what is missing (`extremely experienced joiners come from reputation 60`).
+Migration: poor to novice, normal to experienced, super to senior; nobody is a master on a v28
+save. Every test that read `poor`, `normal` or `super` reads the new ids. Done: the tests.
 
-**2.7 The labourer cleans without being asked [PIOTR, the half of T17 2.3 that was not done].**
-A `cleaning` task exists today only after the player presses Clean up; the helper takes it the
-moment it exists, but nothing creates it. Tonight: when the hall's dust band reaches dirty (the
-band Clean up appears for) and a helper is on duty, the engine creates the cleaning task itself,
-once per dirtying, and the helper does it at his next free minute; the chip under the hall reads
-`The hall is dirty, Dave is cleaning it` with no button. Without a helper nothing changes. Done:
-an engine test (a hall that turns dirty with a helper on the books is clean again by the end of
-the day with no action from the player; without a helper the task is not created).
+**2.6 Pay by the week, everybody [PIOTR: "one unit"; Claude: the week].** Every role is paid by
+the week, on Friday, as joiners are today: the sprayer, the estimator, the admin, the clerk, the
+draftsman, the salesman, the production manager. `monthlyWage` goes; `weeklyWage` is the one
+field; `WEEKS_PER_MONTH` converts wherever a month is asked for (the month end's salary line, the
+hiring gate of T17 2.11 which stays "a month's pay in the bank" computed as 4.33 weeks, the
+Company board's per man rate, the insurance's per employee premium). The hire card and Our team
+print `£600 a week (about £2,600 a month)`. Migration: every worker's `weeklyWage` from his
+`monthlyWage / WEEKS_PER_MONTH` where the weekly is zero. Done: the tests (a sprayer's wage
+appears in Friday's payroll; the month end's salary line equals the four or five Fridays).
 
-**2.8 The bench can be sold [PIOTR].** The workbench's card gets Sell like every machine, at the
-catalogue's resale rule; a bench somebody is working at cannot be sold until the day ends (the
-button greyed with the reason). Done: its test.
+**2.7 Our team, the week [PIOTR].** Every row of Our team gets a second line for this week and
+last: hours worked, the split (jobs, contracts, unloading, cleaning, desk, site), pieces made on
+contracts, jobs he was on, and his efficiency (his rate × his production minutes over his paid
+minutes, one figure a week, `dayStats` already carries the minutes by category). The owner's row
+too. Done: a test that the split adds up to his hours and the figure follows the minutes.
 
-### The desk
+### The hall
 
-**2.9 Reputation is a total, and the board says so [PIOTR].** The reputation column of the
-Company board reads "this week 40" with a "Start of the week, carried over" row, so it looks like
-a weekly count that resets. It is not: the figure is the reputation now, cumulative. The column's
-headline becomes `Reputation 40` (the total, `effectiveReputation`), the list under it is headed
-`What moved it this week` with the week's rows and no carried over row, and the arithmetic under
-the list shows the week's net (`+0 this week`) beside the total, never as the total. Done: the
-company test.
+**2.8 The helper, again [PIOTR: "Dave stands and does not sweep; I see the dirt"].** The engine
+creates his cleaning task the moment the hall leaves clean (`runHelperClean`, T17) and he takes it
+when it exists, and still Piotr sees him idle beside a dirty hall. This is a diagnosis first:
+write into the report why (the likely causes, in order: the task is created but a delivery or
+the bags take him first and the cleaning waits behind a task that never ends; `helperOnDuty` is
+false because his day has not started or he is "off"; the dust band Piotr calls dirt is below
+`HELPER_CLEAN_DUST_BAND`; the task is created for the owner's queue and not his), reproduce it in
+a scenario (a helper on the books, a hall that dirties at 10:00 with a delivery in the yard) and
+fix the cause, then two more things:
 
-**2.10 Sound [PIOTR].** `src/ui/sound.ts`: one engine on Web Audio, unlocked by the first click,
-with `play(event)` for one shot sounds and `loop(station, on)` for the machines, a master volume
-and a mute in Settings (saved). The table `SOUNDS` maps: `door` (2.3), `tableSaw` (loop while
-somebody is at the saw), `extractor` (loop while the extraction pulls), `hammer` (short knocks at
-a bench during assembly, every few seconds [TUNE]), `drill` (at a bench during fitting), `sander`
-(at a bench during finishing without lacquer), `sprayBooth` (loop while somebody sprays). Each
-entry names a file under `public/sounds/<name>.ogg`; when the file is there it plays, when it is
-not the engine plays a synthesised stand in (a filtered noise for the saw and the extractor, a
-click for the hammer, a buzz for the drill, a rasp for the sander, a soft thud for the door)
-quietly, at `STAND_IN_GAIN` 0.15 [TUNE]. At x10 and x30 the loops play at their own pitch and
-the one shots are thinned to at most one a second, so the game does not rattle. Done: a test
-with a fake audio context that the right loops are on for a hall with a saw running and a bench
-assembling, that nothing plays before the unlock, and that mute silences everything.
+1. **The bags are his too**: `bagChange` gains him as an autoRole, so a full store is emptied by
+   him without the chip asking the owner (the chip reads `Dave is emptying the bags`).
+2. **He sweeps with a broom**: a new `sweep` animation in `ANIMATIONS`, played at the cleaning
+   station (`animationForStation('cleaning')` returns `sweep`), with the fallback rule for a role
+   without a sweep sheet (the joiner and the owner fall to `bench`). The helper's sweep sheet is
+   delivered (v28).
 
-**2.11 Design time from the value [PIOTR].** Drawings take
-`max(DESIGN_MIN_MINUTES 30, DESIGN_MINUTES_PER_1000 24 * basePrice / 1000)` minutes, times the
-software factor as today (basic 1.0, standard 0.5, pro 0.2, confirmed). A £2,500 job is 60
-minutes, £10,000 is four hours, £20,000 is eight. The per product `designMinutes` and the size
-multiplier go. Done: the tests at the three figures and the minimum.
+Done: the scenario, green; the animation test.
 
-**2.12 Add as next [PIOTR].** On the laptop, while a task is running, the other tasks' buttons
-read `Add as next` and queue the task behind the running one (the queue of T17 2.16), instead of
-`Put that down` and replacing it. The running task keeps a `Put that down`. Done: the laptop test.
+**2.9 Machines: the inventory and the service [PIOTR].** A new laptop page **Machines** (under
+the Equipment group): one row per machine or extractor standing in the hall: its picture (the
+sprite's own cell, small), name and class, and a green bar of life: hours used against hours of
+life, the number `2,140 of 3,600 h` under it, red when under a tenth is left; `Service` with its
+price on the row; a `broken` or `in service` label when it is. The service rule replaces Turn 8's
+30 minutes at 2%:
 
-**2.13 The hall has been set up, a flag [T18's blocker].** `state.hallSetUp` (boolean), set the
-first time setup mode is left with anything placed; the first steps line of T18 2.7 reads it
-instead of looking for a workbench. Migration: true when any equipment stands in the hall.
+1. A service **extends the machine's life by half of its original life the first time**, and
+   each next service by half of the previous extension (50%, 25%, 12.5% ... of the original
+   life), `serviceCount` on the item; the bar's total grows with it.
+2. It costs **a tenth of the machine's value** (`SERVICE_COST_FRACTION` 0.10) [PIOTR], paid when
+   called.
+3. The machine is **out for one working day** from the call [PIOTR]: `inServiceUntilDay`; nothing
+   runs on it, its stage falls back the way a broken machine's does, and the chip under the hall
+   says so. The first service is out for the day too [TUNE, Piotr's decision open].
+4. At the end of its life a machine does not vanish: it keeps running with the breakdown chance
+   of Turn 8 rising every week past the end [TUNE: doubling], and the row says `past its life`.
+   The player sells it or lets it break [TUNE, Piotr's decision open: not scrap].
+
+Done: the engine tests (three services extend by 50, 25 and 12.5 percent; the cost is a tenth;
+the day off; the past life chance) and the page's test.
+
+**2.10 The rack can be sold [PIOTR].** `isSellableFamily` accepts `storage`; the rack cannot be
+sold while it holds sheets (the reason on the button: `Empty it first, 24 sheets on it`) or while
+somebody is at it. Done: its test.
+
+**2.11 A figure is painted where his feet are [REPORT-T19: not done].** The depth key of a
+figure is computed from the walker's current cell every frame, not from the station he is
+walking to, so a man walking past a saw is drawn in front of it when his feet are in front of it
+and behind it when they are behind; the re-sort is the cheap one Turn 19's report proposed
+(swap the figure's node among its siblings when its depth key crosses a neighbour's). Done: a
+test with the fake clock that a figure walking from behind a machine to in front of it changes
+its order once, and the sixty tick stability test.
+
+**2.12 Doors as Airline Tycoon does them [PIOTR, 18.09].** The swing of Turn 19 goes. A door is
+drawn **closed, always** (the closed frame of the three; the other two are deleted). When a
+figure's leg ends at a door cell he **goes through**: the figure leaves the hall's drawing at the
+door (not standing in it, not in the corner) and, when his station is the office, the office
+view draws him at his desk (T19 2.2's office half stays); when he comes out he appears at the
+door cell and walks on. The door plays its sound when a file exists (2.13) and is silent when
+not. The owner in the office is therefore not on the hall at all; the hall's figure count test
+of Turn 19 changes accordingly. Done: the render tests (closed door, no figure at the door while
+in the office, the owner at the desk in the office view) and the app test of going in and out.
+
+**2.13 Silence until the files [PIOTR, 18.09].** The synthesised stand ins of `src/ui/sound.ts`
+are deleted: `play` and `loop` do nothing when the named file is not in `public/sounds/`; the
+Settings controls stay; the tests of Turn 19 that expected a stand in expect silence. The door's
+sound is fired through `hallOneShots` (the render layer reports the event, the ui layer plays it),
+so `src/render` no longer imports `src/ui/sound.ts` (REPORT-T19's own note). Done: the tests.
+
+**2.14 The Machines column says `0 h`, not `none` [PIOTR].** One word in `company.ts`.
+
+**2.15 Every popover has the cross [PIOTR, 18.09].** A test walks every renderer that produces a
+`.modal`, `.assign-list`, `.menu-pop` or any element with `data-popover` and asserts exactly one
+`.modal-close` inside it; Escape shuts the topmost open one (the order: assign list, day summary,
+modal, menu); a click outside shuts the assign list and the menu. `data-popover` is the attribute
+every future popover must carry, and the test is the rule.
+
+**2.16 Bespoke material ordered twice [PIOTR: "materials for a £50k job want ordering several
+times at £7k"].** In `unloadIntoStock` a job's own delivery gives the job only what fitted on the
+rack (`held = min(fitted, ...)`), so a bespoke load bigger than the rack's free space leaves the
+job short and the card asks for another order. Fix: a job's own delivery is the job's whether it
+fits or not: the overflow of a job delivery is reserved for that job in temporary storage (the
+`moveOverflowToStorage` path, one charge) or held on the pallet until the rack has room, and
+`shortfallOf(job)` counts it; `Order for this job` is greyed while a delivery for the job is on
+the way or in the yard (the check exists; make sure the button reads it). Scenario: a £50,000
+bespoke job with a rack of 50 free places, one order, one unload, no shortfall after. Done: that
+scenario and the unit test.
 
 ## 3. How to run this session (agents)
 
-- **Phase A (one agent, serial):** section 4's fields, STATE_VERSION 16, the migration; the new
-  role in `WorkerRole` and its constants; `assignees` in the types with every compile error fixed
-  by reading the list; the sound engine's file and the Settings fields stubbed; `hallSetUp`. The
-  six frozen files of Turn 13 are frozen for phase B after this; a B agent that needs one writes
-  a note for phase C.
-- **Phase B (three agents):** B1 the figures: 2.1 (the diagnosis first, written before the fix),
-  2.2, 2.3, 2.4, 2.10 (the engine's hooks on the hall). B2 the people: 2.5, 2.6, 2.7, 2.8. B3 the
-  desk: 2.9, 2.11, 2.12, 2.13 and the Settings side of 2.10.
-- **Phase C (one agent, serial):** the notes, the scenarios (the sixteen months with assignees and
-  the sprayer; plus (aa) a month with three men on one job; (bb) a lacquered kitchen with and
-  without a sprayer), the cross check of section 7, the pictures, the report, the PR.
+- **Phase A (one agent, serial):** section 4's fields, STATE_VERSION 17, the migrations (tiers,
+  weekly wages, service count, contract fields); the new tier ids through the types with every
+  compile error fixed by the rename; `CONTRACT_PIECES` (2.2); `ANIMATIONS` gains `sweep`; the
+  Work Plan tab routing and the Machines page routing stubbed; `data-popover` on the existing
+  popovers. The six frozen files of Turn 13 are frozen for phase B after this; a B agent that
+  needs one writes a note for phase C.
+- **Phase B (three agents):** B1 the money: 2.1, 2.16 (contracts.ts, its ui, plan.ts, production
+  for the contract-first day, materials.ts). B2 the people: 2.3, 2.4, 2.5, 2.6, 2.7 (staff.ts,
+  tasks.ts, team.ts, hire cards, economy.ts payroll, company.ts rows). B3 the hall: 2.8, 2.9,
+  2.10, 2.11, 2.12, 2.13, 2.14 (game.ts helper paths only through notes, machines.ts, a new
+  src/ui/machinesPage.ts, walkers.ts, doors.ts, sound.ts, hall.ts, office.ts).
+- **Phase C (one agent, serial):** the notes, 2.15's test, the scenarios (the sixteen months with
+  weekly pay, four tiers and the new prices; plus (cc) a contract month with a normal joiner that
+  ends in profit; (dd) the helper's dirty hall day; (ee) the bespoke job; (ff) three services on
+  one saw), the cross check of section 7, the pictures, the report, the PR.
 
 ## 4. State
 
-STATE_VERSION 16. `job.assignees: string[]` replacing `assignedTo` and `secondAssignee`;
-`settings.sound: { volume: number; muted: boolean }`; `hallSetUp: boolean`; the sprayer as a
-worker role (no new field). Every v26 save loads: assignees from the two old fields, sound at
-0.7 unmuted [TUNE], hallSetUp from the equipment.
+STATE_VERSION 17. `WorkerTier` ids renamed (migration maps the three old ids); `weeklyWage` for
+every worker and `monthlyWage` gone; `worker.leavesOnDay: number | null`; `equipment.serviceCount`
+and `equipment.inServiceUntilDay`; `contract.endedBy: 'term' | 'player' | 'client'`; the day's
+contract-first minutes need no field. Every v28 save loads.
 
 ## 5. Task queue, in order
 
-Branch turn-19-the-men-move-like-men from main. One commit per task, npm run check green on its
-own exit code before each, two report lines per task in REPORT-T19.md.
+Branch turn-20-contracts-that-pay from main. One commit per task, npm run check green on its own
+exit code before each, two report lines per task in REPORT-T20.md.
 
-T19-A1 Housekeeping and v27: docs/turn-18-brief.md byte for byte from the Turn 18 merge commit's
-CLAUDE.md, the README's lines, APP_VERSION 'v27', docs/art/REQUESTS-T19.md (section 9).
-T19-A2 Phase A as section 3 says.
-T19-B1a 2.1 (diagnosis in the report first, then the fix). T19-B1b 2.4. T19-B1c 2.3 and 2.2.
-T19-B1d 2.10's hooks on the hall.
-T19-B2a 2.5. T19-B2b 2.6. T19-B2c 2.7 and 2.8.
-T19-B3a 2.9 and 2.11. T19-B3b 2.12 and 2.13. T19-B3c 2.10's engine, table, Settings and tests.
-T19-C1 notes. T19-C2 scenarios. T19-C3 cross check. T19-C4 look and shoot: ten pictures into
-docs/report-t19/ (a joiner at a bench with his feet on the floor, the owner in the open office
-door, the owner at his desk in the office view, the three door states, the assign list open,
-three men on one job in the plan, the sprayer in Our team, the Company board's Reputation
-headline, Settings with the sound controls, the laptop with Add as next). T19-C5 report and PR
-titled `Turn 19: the men move like men`, do not merge, end the session.
+T20-A1 Housekeeping and v29: docs/turn-19-brief.md byte for byte from the Turn 19 merge commit's
+CLAUDE.md, the README's lines, APP_VERSION 'v29', docs/art/REQUESTS-T20.md (section 9),
+docs/ui-style.md written from the code (section 1).
+T20-A2 Phase A as section 3 says.
+T20-B1a 2.2 (prices, the margin test). T20-B1b 2.1.4 (contract first day) and 2.1.6. T20-B1c the
+Contracts tab, 2.1.1 to 2.1.3 and 2.1.5. T20-B1d 2.16.
+T20-B2a 2.5 and 2.6. T20-B2b 2.3. T20-B2c 2.4. T20-B2d 2.7.
+T20-B3a 2.8 (the diagnosis in the report first). T20-B3b 2.9. T20-B3c 2.10 and 2.14. T20-B3d 2.12
+and 2.13. T20-B3e 2.11.
+T20-C1 notes. T20-C2 2.15. T20-C3 scenarios. T20-C4 cross check. T20-C5 look and shoot: twelve
+pictures into docs/report-t20/ (the Contracts tab's three sections, the Take it card with a man
+selected, the Jobs tab without the bar, Our team with Let go and the week line, a hire card with
+the tiers and a locked master, the Machines page with a bar and Service, a closed office door
+with the owner in the office view at his desk, the helper sweeping, the chip "Dave is emptying
+the bags", the Company board with 0 h). T20-C6 report and PR titled `Turn 20: contracts that
+pay, people you can run`, do not merge, end the session.
 
 ## 6. Do not (tonight)
 
-- No limit on assignees. Piotr said none.
-- No change to Output, Efficiency, the rate or the economy beyond 2.11.
-- No sound before the first click; no sound files invented (stand ins are synthesised).
+- No crowding factor, no limit on men per job.
+- No change to Output, Efficiency, the rate, the design time, express.
+- No synthesised sound of any kind; no sound file invented.
+- No door animation; no new mockup built from words.
 - No touching docs/art/SPRITES.md, CLAUDE.md, the archived briefs, the mockup files, the sprite
   files, the character sheets or the font file.
 - No storage access outside src/cloud/store.ts; no PixiJS, mobile, Steam, Electron.
@@ -235,38 +333,38 @@ titled `Turn 19: the men move like men`, do not merge, end the session.
 
 ## 7. The cross check (before the PR)
 
-- The movement section of the report exists, was written before the fix, and its after log shows
-  no zero steps between nonzero ones and no facing change on a straight leg.
-- `grep -rn "assignedTo\|secondAssignee" src`: nothing outside the migration.
-- The sprayer: a lacquered job with a sprayer finishes its finishing stage faster than the same
-  job with a joiner, asserted.
-- The helper: a scenario day with a dirty hall and a helper ends clean with no player action.
-- The owner is in the hall's doorway while in the office, and at the desk in the office view.
-- Sound: nothing plays before the unlock; mute silences; the saw loop is on only while somebody
-  is at the saw.
-- The ten pictures.
+- The three margins an hour by hand are between 22 and 30, printed in the report.
+- A contract month with a normal joiner ends in profit after his wages, asserted.
+- `grep -rn "poor\|'normal'\|'super'" src`: nothing but the migration and the tier words table.
+- `grep -rn "monthlyWage" src`: nothing but the migration.
+- The helper's day scenario: a dirty hall at 10:00 with a delivery in the yard is clean by the
+  end of the day, the bags emptied, the owner never asked, and the report's diagnosis names the
+  cause that was found.
+- The bespoke scenario: one order, one unload, no shortfall.
+- `grep -rn "from '../ui/sound'" src/render`: nothing.
+- The popover test passes and lists every popover it found.
+- The twelve pictures, each beside its closest existing screen, with the differences listed and
+  none of them outside this brief.
+- `git diff main --stat -- src/ui/styles.css` shows no new colour token, font or shadow value;
+  every new class sits beside its family.
 
 ## 8. Parked
 
-- Real sound recordings (section 9): Piotr.
-- The sprayer's character sheet: GPT, from the owner's model, a white shirt [TUNE].
-- The helper's character sheet: Piotr with GPT (yellow shirt), as before.
-- Everything parked by Turns 13 to 18.
+- The walk itself (new sheets or frame blending): needs the animated mockup first.
+- Sound files: Piotr's recordings; the door first.
+- The sprayer's and the helper's bench sheets.
+- The website retainer, the second click on Sell, greying the catalogue.
+- Everything parked by Turns 13 to 19.
 
-## 9. Recordings requested (docs/art/REQUESTS-T19.md, for Piotr, in his own workshop)
+## 9. Art and sound requested (docs/art/REQUESTS-T20.md)
 
-Mono, 44.1 kHz, `.ogg` (or `.m4a`), in `public/sounds/`, named exactly:
-
-- `door.ogg`: an internal door opened and closed, two seconds, the open first.
-- `tableSaw.ogg`: the saw cutting a sheet, ten seconds of steady cut, loopable (no start, no
-  stop; the engine loops it).
-- `extractor.ogg`: the extraction running, ten seconds, loopable.
-- `hammer.ogg`: three knocks of a hammer on a carcass, one second.
-- `drill.ogg`: a cordless drill driving one screw, one second.
-- `sander.ogg`: hand sanding a panel, five seconds, loopable.
-- `sprayBooth.ogg`: the spray gun on a panel, five seconds, loopable.
-
-Record with the phone a metre from the tool, in the empty hall, nothing else running. The engine
-picks each file the moment it is there; until then it plays a quiet stand in.
+- Sound files, `public/sounds/`, mono, 44.1 kHz, `.ogg`: `door.ogg` (an internal door, open then
+  close, two seconds), `tableSaw.ogg` (ten seconds of steady cut, loopable), `extractor.ogg` (ten
+  seconds, loopable), `hammer.ogg` (three knocks), `drill.ogg` (one screw), `sander.ogg` (five
+  seconds, loopable), `sprayBooth.ogg` (five seconds, loopable). Piotr records them in his own
+  workshop; each is played to him on a sample page before the game uses it.
+- `character.helper.bench` (the helper at a bench, the joiner's bench contract) and the sprayer's
+  four sheets (the owner's model, a white shirt), on the character sheet contract of SPRITES.md
+  10.
 
 End of brief.
