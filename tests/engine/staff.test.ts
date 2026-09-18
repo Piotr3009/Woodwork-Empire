@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   BOOKKEEPING_MINUTES,
-  ESTIMATOR_JOBS_PER_DAY,
   DAY_END_MINUTE,
   HIRING_SPECS,
   JOINER_PREREQUISITES,
@@ -25,7 +24,7 @@ import {
 } from '../../src/engine/staff';
 import { crewLimit } from '../../src/engine/layout';
 import { waitingStation } from '../../src/engine/stations';
-import { createTask } from '../../src/engine/tasks';
+import { MATERIAL_TAKE_OFF_MINUTES, createTask, estimatorCapacity } from '../../src/engine/tasks';
 import { minutesRemainingFor, ownerJob } from '../../src/engine/jobs';
 import { weeklyWageBill } from '../../src/engine/economy';
 import { tick } from '../../src/engine/index';
@@ -74,9 +73,11 @@ function withCrew(state: GameState, count: number, tier: Worker['tier']): GameSt
 describe('the hiring pool', () => {
   it('opens up as the reputation rises', () => {
     const state = newGame();
+    // The card says what is missing in the game's own words now: "extremely experienced joiners
+    // come from reputation 60" (PIOTR; CLAUDE.md T20 2.5).
     const byLabel = (reputation: number): string[] =>
       hiringOptions({ ...state, reputation })
-        .filter((option) => option.blockReason.startsWith('Nobody'))
+        .filter((option) => option.blockReason.includes('come from reputation'))
         .map((option) => option.label);
     expect(byLabel(-50)).toContain('Office admin');
     expect(byLabel(-50)).not.toContain('Joiner, no experience');
@@ -405,8 +406,9 @@ describe('the office working day', () => {
     expect(state.tasks.find((task) => task.kind === 'bookkeeping')?.doneBy).toBe('owner');
   });
 
-  it('stops the estimator at five take offs a day', () => {
-    // Five a day without Joinery Core (PIOTR; CLAUDE.md T13 3.8).
+  it('lets the estimator do as many take offs as his minutes allow, not five', () => {
+    // The count of jobs a day is gone: a take off is half an hour of his desk, so an experienced
+    // man gets sixteen of them out of his 480 minutes (PIOTR, 18.09; CLAUDE.md T20 2.3).
     let state = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
     state.enquiries = [];
     state.workers.push(officeWorker('e1', 'estimator'));
@@ -422,7 +424,7 @@ describe('the office working day', () => {
       createTask(state, {
         kind: 'materialTakeOff',
         label: `Material take off: ${job.name}`,
-        minutes: 30,
+        minutes: MATERIAL_TAKE_OFF_MINUTES,
         jobId: job.id,
       });
     }
@@ -431,9 +433,9 @@ describe('the office working day', () => {
     // His day is the 480 minutes of work, and the clock takes the dinner hour on top of them.
     const day = clearEvents(runClock(morning, DAY_END_MINUTE));
     const done = day.tasks.filter((task) => task.kind === 'materialTakeOff' && task.done).length;
-    expect(done).toBe(ESTIMATOR_JOBS_PER_DAY);
-    expect(day.workers[0]?.ordersToday).toBe(ESTIMATOR_JOBS_PER_DAY);
-    // Five lists are not a day's work: the cap is the capacity, not his minutes.
-    expect(staffMinutesLeft(day.workers[0] as Worker)).toBeGreaterThan(0);
+    expect(done).toBe(estimatorCapacity(day));
+    expect(done).toBe(16);
+    // And the cap is his minutes now: the day is spent, not a counter run out.
+    expect(staffMinutesLeft(day.workers[0] as Worker)).toBeLessThan(MATERIAL_TAKE_OFF_MINUTES);
   });
 });

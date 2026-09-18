@@ -94,3 +94,73 @@ frozen file, note 1.1 of `NOTES-B1.md`. Two are put in front of Piotr below.
    missing is the second half of 2.2's promise. Putting it right means a piece that moves from
    stage to stage inside the minute loop, with the station and the hall following it, which is a
    turn's work of its own.
+---
+
+
+## Phase B2, the people (2.3, 2.4, 2.5, 2.6, 2.7, 2.14)
+
+**T20-B2a Four tiers in the words the game prints, and everybody paid by the week (2.5, 2.6).**
+Every tier the player reads comes off the one `TIER_WORDS` table, and the hire card now says what
+is missing in the game's own voice: `extremely experienced joiners come from reputation 60`, off
+`TIER_MIN_REPUTATION` and the trade's own plural, through the existing `reasonLabel`. `ROLE_WORDS`
+moved into `src/engine/staff.ts`, where that refusal is written, and `src/ui/team.ts` hands it on.
+The week is the one unit of pay: the hire card, the crew row and Our team all print
+`GBP600 a week (about GBP2,571 a month)` through one `wageText`, with `monthlyWageOf` the one
+conversion wherever a month is asked for.
+`npm run check` green on its own exit code. New tests: a sprayer, an estimator and the office in
+Friday's wages, the month end's salary line equal to the four or five Fridays of that month, and
+the cards offering and withholding by reputation with the reason on them.
+
+**T20-B2b The estimator works by his minutes, goes on site, and is off the Output list (2.3).**
+A material take off is thirty minutes of the desk it is done at [PIOTR], whatever the job is
+worth, at the man's own rate: 37 minutes for a man with no experience, 21 for the top man. The
+five a day is gone and his 480 minutes are the whole of the cap, which makes an experienced
+estimator sixteen a day bare and thirty two with Joinery Core, and each extension takes a further
+quarter off the minutes [TUNE], so 42 and 56. The site measure gained the estimator and the
+salesman on its eligible list and the estimator on its auto list, so he goes when no owner is free
+for it and the day's travel minutes come off his own day. The Company board's "act where they are"
+rows are the men who produce, off the new `produces` rule.
+`npm run check` green on its own exit code. New tests: the day's count at every class, the minutes
+one take off costs each of them, the measure landing on the estimator with the owner at the bench,
+and the board's rows holding the joiner and not the estimator.
+
+**T20-B2c Let go: a week's notice, paid, and the plan shows the hole (2.4).** Our team carries
+`Let go` on every worker's row and never on the owner's. One click gives him seven days of notice
+[TUNE]: he stays on the books, on his job and on his contract, and Friday pays him. The morning
+after his last day the day start walks him out, off the job, off the contract, with whatever he
+was holding back on the list, and the plan draws his work with nobody on it. No reputation moves,
+and the crew limit and the hiring gate count him until he has gone.
+`npm run check` green on its own exit code. The click itself wants three lines in the frozen files
+(the action, the reducer case and the route); they are written out in `NOTES-B2.md` for phase C,
+and the row is already drawn with the `data-do="letGo"` phase A left open.
+
+**T20-B2d Our team says what the week was, and a machine nobody stood at says 0 h (2.7, 2.14).**
+Every row of Our team gained a second line for this week and last: the hours worked, the split
+over the six bands (jobs, contracts, unloading, cleaning, desk, site), the pieces a standing
+contract took off him, the jobs he stood at and the one efficiency figure of the week, which is
+his rate times the minutes he spent making something over the minutes the company paid for. The
+owner's row has it too. The minutes are sampled once a minute from the hook the day already runs
+over the crew, guarded by the day and the minute so nothing is counted twice, and the bands add up
+to the hours because they are the same minutes. The Machines column says `0 h` where it said
+`none`.
+`npm run check` green on its own exit code. New tests: the bench minutes into the jobs band with
+the job named, a man on a contract into the contracts band, the week rolling over instead of
+adding, the row printing the hours, the split, the job and the figure, and the machine nobody
+stood at reading `0 h`.
+
+**T20-B2 review: the findings that stood.** A reviewer read the four commits and reported eight
+things. Three stood and are fixed: the week's meters booked a minute for every man the clock ran
+over, worked or not, so an evening of the owner's overtime put two hours into every man's week and
+a joiner at an empty rack read a full day at the bench, and the sampler now credits a band only
+when the man's own counters rose and leaves the crew out of the evening altogether; 2.7's own test
+asserted the formula against itself and now pins the jobs band to the engine's count of the
+minutes he made something in; and the week was drawn as a second `.row` under a man instead of the
+second line inside his own row that the rest of the game uses. Two more are fixed as far as my
+files reach: the Technical tab worked Joinery Core out for an experienced man whoever was at the
+desk, and now names the estimator on the books and prints his day. Three are rejected, with the
+reasons in `NOTES-B2.md` section 8: the dead `Let go` click is three lines in three frozen files
+and hiding the button would break 2.4; the eligible list test carries the roles the brief names
+and is a content check; and the take off's minutes want `src/engine/jobs.ts`, which is not mine,
+in the same commit as the override they replace.
+`npm run check` green on its own exit code. Two new engine tests and one new UI test, all three
+red on the old code.
