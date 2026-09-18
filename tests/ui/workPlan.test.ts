@@ -125,7 +125,7 @@ describe('a job nobody has started', () => {
     for (const specId of ['workbench', 'locker', 'canteenSeat', 'toolCabinet', 'handToolSet']) {
       kitted = buyNow(kitted, specId, specId === 'workbench' ? 'budget' : undefined);
     }
-    const state = hireNow(kitted, 'joiner', 'poor');
+    const state = hireNow(kitted, 'joiner', 'novice');
     const joiner = state.workers[state.workers.length - 1];
     if (joiner === undefined) throw new Error('nobody was taken on');
     const before = workPlan(state).rows[0];
@@ -136,7 +136,7 @@ describe('a job nobody has started', () => {
     });
     const after = workPlan(assigned).rows[0];
     expect(after?.rateLabel).toBe(`for ${joiner.name}`);
-    expect(joiner.rate).toBe(WORKER_RATES.poor);
+    expect(joiner.rate).toBe(WORKER_RATES.novice);
     // He is slower, so the job takes longer and has to be started sooner.
     expect(after?.minutesTotal ?? 0).toBeGreaterThan(before?.minutesTotal ?? 0);
     expect(after?.latestStart ?? 0).toBeLessThan(before?.latestStart ?? 0);
@@ -249,7 +249,7 @@ describe('the row says who is on it', () => {
   it('opens the list on one click, with the men already on it greyed', () => {
     const state = act(boardWith({ deadlineDays: 10 }), { type: 'WORK_HERE', jobId: null });
     const job = firstJob(state);
-    const open = parse(renderWorkPlan(state, null, job.id));
+    const open = parse(renderWorkPlan(state, 'jobs', null, job.id));
     const list = open.querySelector('.assign-list');
     expect(list).not.toBeNull();
     expect(list?.textContent).toContain(`Who goes on ${job.name}?`);

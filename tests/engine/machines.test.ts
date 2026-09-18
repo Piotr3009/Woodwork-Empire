@@ -236,10 +236,10 @@ describe('dust', () => {
         id: `staff-${index}`,
         name: `J${index}`,
         role: 'joiner',
-        tier: 'poor',
+        tier: 'novice',
         rate: 0.6,
         weeklyWage: 480,
-        monthlyWage: 0,
+        leavesOnDay: null,
         startDay: 1,
         jobId: null,
         taskId: null,
@@ -286,7 +286,7 @@ describe('dust', () => {
       tier: null,
       rate: 0,
       weeklyWage: 420,
-      monthlyWage: 0,
+      leavesOnDay: null,
       startDay: 1,
       jobId: null,
       taskId: null,
@@ -340,10 +340,10 @@ describe('dust', () => {
         id: 'staff-1',
         name: 'Ben',
         role: 'joiner',
-        tier: 'normal',
+        tier: 'experienced',
         rate: 0.8,
         weeklyWage: 640,
-        monthlyWage: 0,
+        leavesOnDay: null,
         startDay: 1,
         jobId: null,
         taskId: null,
@@ -499,7 +499,7 @@ describe('no bench in the hall', () => {
     for (const specId of ['locker', 'canteenSeat', 'toolCabinet', 'handToolSet']) {
       state = buyNow(state, specId);
     }
-    state = hireNow(state, 'joiner', 'poor');
+    state = hireNow(state, 'joiner', 'novice');
     const joiner = state.workers[0];
     if (!joiner) throw new Error('nobody was hired');
     joiner.startDay = state.clock.day;
@@ -538,7 +538,7 @@ describe('no bench in the hall', () => {
     for (const specId of ['locker', 'canteenSeat', 'toolCabinet', 'handToolSet']) {
       state = buyNow(state, specId);
     }
-    state = hireNow(state, 'joiner', 'poor');
+    state = hireNow(state, 'joiner', 'novice');
     const joiner = state.workers[0];
     if (!joiner) throw new Error('nobody was hired');
     joiner.startDay = state.clock.day;

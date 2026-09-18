@@ -6,7 +6,7 @@ import {
   DAY_END_MINUTE,
   ESTIMATOR_JOBS_PER_DAY,
   ESTIMATOR_JOBS_WITH_JOINERY_CORE,
-  ESTIMATOR_RATES,
+  WORKER_RATES,
   JOINERY_CORE_EXTENSION_JOBS,
   JOINERY_CORE_EXTENSION_PRICE_YEARLY,
   JOINERY_CORE_MAX_EXTENSIONS,
@@ -50,15 +50,15 @@ import {
   withLicence,
 } from '../helpers';
 
-function staff(id: string, role: Worker['role'], monthlyWage: number): Worker {
+function staff(id: string, role: Worker['role'], weeklyWage: number): Worker {
   return {
     id,
     name: id,
     role,
     tier: null,
     rate: 0,
-    weeklyWage: 0,
-    monthlyWage,
+    weeklyWage,
+    leavesOnDay: null,
     startDay: 1,
     jobId: null,
     taskId: null,
@@ -122,8 +122,8 @@ describe('minute curves', () => {
   it('charges 10 minutes a joiner a day for management', () => {
     const state = newGame();
     expect(staffManagementMinutes(state)).toBe(0);
-    state.workers.push({ ...staff('j1', 'joiner', 0), tier: 'poor', rate: 0.6, weeklyWage: 480 });
-    state.workers.push({ ...staff('j2', 'joiner', 0), tier: 'poor', rate: 0.6, weeklyWage: 480 });
+    state.workers.push({ ...staff('j1', 'joiner', 0), tier: 'novice', rate: 0.6, weeklyWage: 480 });
+    state.workers.push({ ...staff('j2', 'joiner', 0), tier: 'novice', rate: 0.6, weeklyWage: 480 });
     expect(staffManagementMinutes(state)).toBe(20);
   });
 });
@@ -196,7 +196,7 @@ describe('the daily list', () => {
 
   it('hands the office admin his own tasks, which he works off out of his own day', () => {
     const state = newGame();
-    state.workers.push(staff('a1', 'officeAdmin', 1900));
+    state.workers.push(staff('a1', 'officeAdmin', 445));
     const day2 = runToDay(state, 2).state;
     const taken = day2.tasks.find((task) => task.kind === 'bookkeeping');
     expect(taken?.doneBy).toBe('a1');
@@ -405,7 +405,11 @@ describe('the material take off', () => {
 
   it('is the estimator’s from the day he is in, at the speed of his tier, and waits for the drawing too', () => {
     let state = withTakeOff();
-    state = hireNow(state, 'estimator', 'super');
+    // A super experienced man answers from reputation 35 now (CLAUDE.md T20 2.5), and the bank
+    // wants a month of his pay before anybody is taken on (CLAUDE.md T17 2.11).
+    state.reputation = 40;
+    state.cash = 100000;
+    state = hireNow(state, 'estimator', 'senior');
     const estimator = state.workers.find((worker) => worker.role === 'estimator');
     expect(estimator).toBeDefined();
     for (const worker of state.workers) worker.startDay = state.clock.day;
@@ -418,8 +422,8 @@ describe('the material take off', () => {
     const before = takeOffOf(state)?.minutesRemaining ?? 0;
     const later = clearEvents(runClock(state, 10));
     const after = takeOffOf(later)?.minutesRemaining ?? 0;
-    // A super estimator works it off at 1.2 of a minute a minute (ESTIMATOR_RATES).
-    expect(before - after).toBeCloseTo(10 * ESTIMATOR_RATES.super, 6);
+    // A super experienced estimator works it off at 1.2 of a minute a minute (WORKER_RATES).
+    expect(before - after).toBeCloseTo(10 * WORKER_RATES.senior, 6);
     expect(later.owner.minutesWorked).toBe(state.owner.minutesWorked);
   });
 
@@ -469,7 +473,7 @@ describe('the material take off', () => {
     // And it is the admin's when there is one: she picks it up after the books, which come first
     // on her list, and the owner never sees it.
     const office = newGame();
-    office.workers.push(staff('a1', 'officeAdmin', 1900));
+    office.workers.push(staff('a1', 'officeAdmin', 445));
     const day2 = clearEvents(runToDay(office, 2).state);
     const later = clearEvents(tick(day2, BOOKKEEPING_MINUTES + 1));
     expect(tasksOfKind(later, 'dailyOrdering')[0]?.doneBy).toBe('a1');

@@ -30,7 +30,7 @@ function withCrew(state: GameState, count: number): GameState {
       for (const specId of missingForHire(next, 'joiner')) next = buyNow(next, specId);
       guard += 1;
     }
-    next = hireNow(next, 'joiner', 'poor');
+    next = hireNow(next, 'joiner', 'novice');
   }
   return next;
 }
@@ -51,9 +51,9 @@ describe('the floor limit on the team page', () => {
     const state = withCrew(buyStartingKit(known()), 4);
     const page = parse(renderTeam(state, 'workshop'));
     expect(page.querySelector('.crew-limit')?.textContent).toBe('Crew 5 / 5, floor limited');
-    const poor = page.querySelector('[data-candidate="joiner.poor"]');
-    expect(poor?.querySelectorAll('[data-do="hire"]')).toHaveLength(0);
-    expect(poor?.textContent).toContain('Crew 5 / 5, floor limited');
+    const novice = page.querySelector('[data-candidate="joiner.novice"]');
+    expect(novice?.querySelectorAll('[data-do="hire"]')).toHaveLength(0);
+    expect(novice?.textContent).toContain('Crew 5 / 5, floor limited');
     const helper = page.querySelector('[data-candidate="helper."]');
     expect(helper?.querySelectorAll('[data-do="hire"]')).toHaveLength(0);
     // The desks are not on the floor: the admin can still be taken on.

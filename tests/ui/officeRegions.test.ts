@@ -197,6 +197,8 @@ describe('the laptop tiles', () => {
       'security',
       'joineryCore',
       'settings',
+      // The Equipment group, added in Turn 20 (CLAUDE.md T20 2.9).
+      'machines',
     ]);
     // The tab bar is gone: the tiles are the navigation, and there is no second one (T14 2.1).
     expect(root().querySelector('[data-modal="laptop"] .tabs')).toBeNull();

@@ -7,7 +7,7 @@ import {
   DRAFTSMAN_RATE,
   ESTIMATOR_JOBS_PER_DAY,
   ESTIMATOR_JOBS_WITH_JOINERY_CORE,
-  ESTIMATOR_RATES,
+  WORKER_RATES,
   JOINERY_CORE_EXTENSION_JOBS,
   JOINERY_CORE_EXTENSION_PRICE_YEARLY,
   JOINERY_CORE_MAX_EXTENSIONS,
@@ -525,7 +525,7 @@ export function taskWorkRate(worker: Worker, task: TaskInstance): number {
   if (worker.role === 'draftsman' && task.kind === 'design') return DRAFTSMAN_RATE;
   // An estimator's tier is his speed at the take off (CLAUDE.md T13 3.8).
   if (worker.role === 'estimator' && task.kind === 'materialTakeOff') {
-    return ESTIMATOR_RATES[worker.tier ?? 'normal'];
+    return WORKER_RATES[worker.tier ?? 'experienced'];
   }
   return 1;
 }

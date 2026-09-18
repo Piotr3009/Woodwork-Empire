@@ -2,7 +2,11 @@
 // The Contracts tab beside Orders and the standing bar on the Work Plan (CLAUDE.md T13 3.16).
 
 import { describe, expect, it } from 'vitest';
-import { CONTRACT_FREE_END_DAYS, WORKER_RATES } from '../../src/engine/constants';
+import {
+  CONTRACT_FREE_END_DAYS,
+  CONTRACT_PIECES,
+  WORKER_RATES,
+} from '../../src/engine/constants';
 import {
   acceptContract,
   assignContract,
@@ -12,6 +16,7 @@ import {
   reserveContractSheets,
 } from '../../src/engine/contracts';
 import { renderContractBar, renderContracts } from '../../src/ui/contracts';
+import { money, signedMoney } from '../../src/ui/modal';
 import { renderWorkPlan } from '../../src/ui/workPlan';
 import type { Contract, GameState, Worker } from '../../src/engine/index';
 import { buyStartingKit, fillRack, newGame, withAir, withExtraction } from '../helpers';
@@ -27,10 +32,10 @@ function joiner(id: string, name: string): Worker {
     id,
     name,
     role: 'joiner',
-    tier: 'poor',
-    rate: WORKER_RATES.poor,
+    tier: 'novice',
+    rate: WORKER_RATES.novice,
     weeklyWage: 480,
-    monthlyWage: 0,
+    leavesOnDay: null,
     startDay: 1,
     jobId: null,
     taskId: null,
@@ -65,7 +70,8 @@ function offered(state: GameState): Contract {
   const contract = drawContract(state);
   contract.pieceId = 'cutSheetPack';
   contract.name = 'Cut sheet packs for a shop';
-  contract.pricePerPiece = 38;
+  // The piece's own price, off the table Piotr set (CLAUDE.md T20 2.2).
+  contract.pricePerPiece = CONTRACT_PIECES.find((piece) => piece.id === 'cutSheetPack')?.price ?? 0;
   contract.quantityPerWeek = 60;
   state.contracts.push(contract);
   return contract;
@@ -86,7 +92,8 @@ describe('the Contracts tab', () => {
     const page = parse(renderContracts(state));
     const tile = page.querySelector(`.tile[data-contract="${contract.id}"]`);
     expect(tile?.querySelector('.tile-name')?.textContent).toBe(contract.name);
-    expect(tile?.querySelector('.tile-price')?.textContent).toBe('£38 a piece');
+    // The cut sheet pack is 50 a piece from tonight (CLAUDE.md T20 2.2).
+    expect(tile?.querySelector('.tile-price')?.textContent).toBe('£50 a piece');
     expect(tile?.textContent).toContain('60 a week for');
     expect(tile?.textContent).toContain('£30 of material');
     expect(tile?.querySelector('[data-do="acceptContract"]')?.getAttribute('data-id')).toBe(contract.id);
@@ -149,7 +156,8 @@ describe('the Contracts tab', () => {
     const renew = block?.querySelector('[data-do="renewContract"][data-accept="1"]');
     const go = block?.querySelector('[data-do="renewContract"][data-accept="0"]');
     expect(renew?.getAttribute('data-id')).toBe(contract.id);
-    expect(renew?.textContent).toContain('Renew at £39');
+    // Two full weeks put a percent on the 50 (CLAUDE.md T17 2.22, T20 2.2).
+    expect(renew?.textContent).toContain('Renew at £51');
     expect(go?.textContent).toBe('Let it go');
   });
 });
@@ -162,10 +170,14 @@ describe('the material and the way out (CLAUDE.md T17 2.22)', () => {
     const page = parse(renderContracts(state));
     const row = page.querySelector(`.contract-active [data-worker="staff-1"]`);
     const result = contractResultFor(contract, state.workers[0] as Worker);
+    // The prices of T20 2.2 make a cut sheet pack pay by hand, so the line is his own figures and
+    // not a loss typed into the test (CLAUDE.md T20 2.2).
     expect(row?.querySelector('small')?.textContent).toBe(
-      `${result.minutes} minutes a piece, £15 of his time: -£7 a piece`,
+      `${result.minutes} minutes a piece, ${money(result.labourCost)} of his time: ` +
+        `${signedMoney(result.margin)} a piece`,
     );
-    expect(row?.querySelector('.row-figure')?.className).toContain('bad');
+    expect(result.margin).toBeGreaterThan(0);
+    expect(row?.querySelector('.row-figure')?.className).toContain('good');
   });
 
   it('says the material is off the rack, and how much of it a week takes', () => {
@@ -230,7 +242,7 @@ describe('the contract bar on the plan, assigned like a job (PIOTR, 18.09)', () 
     expect(bar?.nextElementSibling).toBeNull();
     expect(bar?.querySelector('[data-do="openAssign"]')?.textContent).toBe('Assign to this contract');
     expect(bar?.textContent).toContain('Nobody is on it');
-    const open = parse(renderWorkPlan(state, null, contract.id));
+    const open = parse(renderWorkPlan(state, 'jobs', null, contract.id));
     const list = open.querySelector(`.contract-bar[data-contract="${contract.id}"] .assign-list`);
     expect(list).not.toBeNull();
     expect(list?.querySelector('.modal-close[data-do="closeAssign"]')).not.toBeNull();

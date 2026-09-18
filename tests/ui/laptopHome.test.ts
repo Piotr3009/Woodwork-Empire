@@ -195,6 +195,11 @@ describe('home first', () => {
     const node = laptop();
     expect(node.querySelector('.screen-rule')).not.toBeNull();
     expect(node.querySelector('.screen-group')?.textContent).toBe('Office');
+    // The Equipment group came under it in Turn 20, with the Machines page on it
+    // (CLAUDE.md T20 2.9).
+    expect(
+      Array.from(node.querySelectorAll('.screen-group')).map((head) => head.textContent),
+    ).toEqual(['Office', 'Equipment']);
     const small = Array.from(node.querySelectorAll('.screen-small-tiles .screen-small-tile'));
     // An icon above every label, from mockup C (CLAUDE.md T15 2.3).
     for (const tile of small) expect(tile.querySelector('svg.screen-icon'), tile.textContent ?? '').not.toBeNull();
@@ -205,6 +210,7 @@ describe('home first', () => {
       'Security',
       'Joinery Core',
       'Settings',
+      'Machines',
     ]);
     expect(OFFICE_GROUP.map((tile) => tile.id)).toEqual([
       'team',

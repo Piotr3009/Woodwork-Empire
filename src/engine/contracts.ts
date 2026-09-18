@@ -236,9 +236,10 @@ export interface ContractResult {
 /** What one piece is worth with this man on it: the price less the material in it and less what
  *  his own time costs, so the result of putting him on it is on his own row before he is put on
  *  it (PIOTR, 17.09; CLAUDE.md T17 2.22). A slower man takes more minutes over a piece, and what
- *  those minutes cost is his own weekly wage: the wage table pays the poor man and the normal one
- *  the same money for the same work and the super one a premium for his speed, so the thinner
- *  margin is not always the poorer man's. The owner is never on a contract. */
+ *  those minutes cost is his own weekly wage. The wage ladder is steeper than the speed ladder,
+ *  450, 600, 800 and 1,000 a week against 0.8, 1.0, 1.2 and 1.4 of the owner, so a piece costs
+ *  more in a better man's time and the thinner margin is the better man's (CLAUDE.md T20 2.5).
+ *  The owner is never on a contract. */
 export function contractResultFor(contract: Contract, worker: Worker): ContractResult {
   const piece = contractPiece(contract);
   const rate = worker.rate > 0 ? worker.rate : 1;
@@ -302,6 +303,7 @@ export function drawContract(state: GameState, carrier: RngCarrier = state): Con
     materialCost: 0,
     labourMinutes: 0,
     renegotiatedPrice: null,
+    endedBy: 'term',
   };
 }
 
@@ -579,16 +581,18 @@ export interface ClosingReport {
   margin: number;
 }
 
-/** The hourly cost the labour is written up at: the joiners on the books, or the normal joiner's
- *  wage when there are none. */
+/** The hourly cost the labour is written up at: the joiners on the books, or the experienced
+ *  joiner's wage when there are none. */
 function labourMinuteCost(state: GameState): number {
   const crew = joiners(state);
   if (crew.length > 0) {
     const weekly = crew.reduce((total, worker) => total + worker.weeklyWage, 0) / crew.length;
     return workerMinuteCost(weekly);
   }
-  const normal = HIRING_SPECS.find((spec) => spec.role === 'joiner' && spec.tier === 'normal');
-  return workerMinuteCost(normal?.weeklyWage ?? 0);
+  const middling = HIRING_SPECS.find(
+    (spec) => spec.role === 'joiner' && spec.tier === 'experienced',
+  );
+  return workerMinuteCost(middling?.weeklyWage ?? 0);
 }
 
 /** The closing report: pieces made, revenue, material, labour hours at cost, the net margin. */
@@ -733,6 +737,7 @@ export function renewContract(state: GameState, contractId: string, accept: bool
     materialCost: 0,
     labourMinutes: 0,
     renegotiatedPrice: null,
+    endedBy: 'term',
   };
   state.contracts.push(renewed);
   acceptContract(state, renewed.id);

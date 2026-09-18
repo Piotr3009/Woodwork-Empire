@@ -2,7 +2,7 @@
 // the offer with Accept and Decline, the active contract with its piece counter, its history and
 // its people with the assign controls, and the renew question at the end of the term.
 
-import { CONTRACT_OFFER_DAYS } from '../engine/constants';
+import { CONTRACT_OFFER_DAYS, TIER_WORDS } from '../engine/constants';
 import {
   activeContracts,
   closingReport,
@@ -269,7 +269,9 @@ function contractAssignList(state: GameState, contract: Contract): string {
     .map((worker) => {
       const head =
         `<span>${escapeHtml(worker.name)} ` +
-        `<span class="assign-tier">${escapeHtml(worker.tier === null ? worker.role : `${worker.tier} ${worker.role}`)}</span></span>`;
+        `<span class="assign-tier">${escapeHtml(
+          worker.tier === null ? worker.role : `${TIER_WORDS[worker.tier]} ${worker.role}`,
+        )}</span></span>`;
       if (contract.assigned.includes(worker.id)) {
         return `<div class="assign-row is-busy">${head}<span class="assign-why">already on this contract</span></div>`;
       }
@@ -285,7 +287,7 @@ function contractAssignList(state: GameState, contract: Contract): string {
     })
     .join('');
   return (
-    '<div class="assign-list">' + closeButton('closeAssign') +
+    '<div class="assign-list" data-popover="assign-contract">' + closeButton('closeAssign') +
     `<span class="row-figure">Who goes on ${escapeHtml(contract.name)}?</span>${rows}</div>`
   );
 }

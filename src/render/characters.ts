@@ -29,10 +29,19 @@ export type Facing = 'sw' | 'se' | 'nw' | 'ne';
 
 /** What a figure can be doing: every state the character system can be in has a frame key
  *  (CLAUDE.md T9 3.13, T13 3.23). `home` is the figure going home at the end of the day; no
- *  sheet is wanted for it, so it falls back to idle like any missing frame. */
-export type Animation = 'walk' | 'bench' | 'carry' | 'idle' | 'phone' | 'home';
+ *  sheet is wanted for it, so it falls back to idle like any missing frame.
+ *  `sweep` is the helper with a broom, whose sheet came in with v28 (CLAUDE.md T20 2.8). */
+export type Animation = 'walk' | 'bench' | 'carry' | 'idle' | 'phone' | 'home' | 'sweep';
 
-export const ANIMATIONS: readonly Animation[] = ['walk', 'bench', 'carry', 'idle', 'phone', 'home'];
+export const ANIMATIONS: readonly Animation[] = [
+  'walk',
+  'bench',
+  'carry',
+  'idle',
+  'phone',
+  'home',
+  'sweep',
+];
 
 /** Where a missing direction is mirrored from (CLAUDE.md T9 3.13). */
 const MIRROR: Record<Facing, Facing> = { se: 'sw', sw: 'se', nw: 'ne', ne: 'nw' };

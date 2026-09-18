@@ -106,7 +106,10 @@ const PLAYTHROUGH: Policy = {
       !next.workers.some((worker) => worker.role === 'estimator') &&
       !next.tasks.some((task) => task.kind === 'hiring' && !task.done)
     ) {
-      next = act(next, { type: 'HIRE', role: 'estimator', tier: 'normal' });
+      // The tier answers to the workshop's standing from tonight, and an experienced man wants
+      // 15 of it (CLAUDE.md T20 2.5). Three months in, the one who answers is the man with no
+      // experience, and he is the one the script takes on.
+      next = act(next, { type: 'HIRE', role: 'estimator', tier: 'novice' });
     }
     // From day 61 the owner takes a production manager on. The interview is an hour of his day and
     // the day he is free to sit it is not always the 61st, so the script asks again until one is on

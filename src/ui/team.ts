@@ -23,6 +23,7 @@ import {
   DAY_CATEGORY_LABELS,
   HOUSE_TIER_NAMES,
   OWNER_DRAW_TIERS,
+  TIER_WORDS,
   WORKING_DAYS_PER_MONTH,
 } from '../engine/constants';
 import {
@@ -37,7 +38,7 @@ import {
   staffManagementTaker,
 } from '../engine/index';
 // Straight off its own module, not round the public API, which Turn 13 froze (REPORT-T13 10).
-import { monthlyPay } from '../engine/staff';
+import { monthlyWageOf } from '../engine/staff';
 import { ownerDayLine } from './topbar';
 import {
   button,
@@ -133,10 +134,10 @@ const DUTIES: Record<WorkerRole, string> = {
     'anything else. A joiner can spray, slower.',
 };
 
+/** What he costs. One unit of pay in the game and it is the week (PIOTR, 18.09;
+ *  CLAUDE.md T20 2.6). */
 function wageLine(option: HiringOption): string {
-  return option.weeklyWage > 0
-    ? `${money(option.weeklyWage)} a week`
-    : `${money(option.monthlyWage)} a month`;
+  return `${money(option.weeklyWage)} a week`;
 }
 
 /** One candidate, as a tile: what he is, what he costs, what he is worth and what stands in the
@@ -222,14 +223,11 @@ function crewRows(state: GameState, tab: TeamTab): string {
     .filter((worker) => tradeOf(worker.role) === tab)
     .map((worker) => {
       const doing = workerDoing(state, worker);
-      const wage =
-        worker.weeklyWage > 0
-          ? `${money(worker.weeklyWage)} a week`
-          : `${money(worker.monthlyWage)} a month`;
+      const wage = `${money(worker.weeklyWage)} a week`;
       return (
         `<div class="row" data-crew="${worker.id}" data-shift="${shiftOf(state, worker)}">` +
         `<span class="row-main">${escapeHtml(worker.name)}, ${escapeHtml(ROLE_WORDS[worker.role])}` +
-        `${worker.tier === null ? '' : ` (${worker.tier})`}</span>` +
+        `${worker.tier === null ? '' : ` (${TIER_WORDS[worker.tier]})`}</span>` +
         `<span class="row-figure">${escapeHtml(doing)}</span>` +
         dayMeterLine(worker) +
         `<span class="row-figure">${escapeHtml(wage)}</span>` +
@@ -305,9 +303,9 @@ function ourTeamRows(state: GameState): string {
       teamRow(
         worker.id,
         worker.name,
-        `${ROLE_WORDS[worker.role]}${worker.tier === null ? '' : `, ${worker.tier}`}`,
+        `${ROLE_WORDS[worker.role]}${worker.tier === null ? '' : `, ${TIER_WORDS[worker.tier]}`}`,
         startedText(state, worker.startDay),
-        monthlyPay(worker),
+        monthlyWageOf(worker),
         worker.monthMinutes,
         worker.monthDaysOff,
         workerDoing(state, worker),

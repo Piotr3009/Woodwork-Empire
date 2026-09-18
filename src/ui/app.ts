@@ -74,7 +74,7 @@ import { renderEvent, renderEventFooter } from './eventModal';
 import { type LaptopPage, laptopPageFrom, renderLaptop } from './laptop';
 import { type TeamTab, teamTabFrom } from './team';
 import { renderSpriteCheck } from './spriteCheck';
-import { renderWorkPlan } from './workPlan';
+import { type WorkPlanTab, renderWorkPlan, workPlanTabFrom } from './workPlan';
 import {
   type ModalPosition,
   type ModalSpec,
@@ -164,6 +164,12 @@ interface Ui {
   loanAmount: string;
   /** Which tab of the Orders page is on top (CLAUDE.md T13 3.16). */
   boardTab: BoardTab;
+  /** Which of the Work Plan's two tabs is on top: the jobs, or the standing contracts
+   *  (CLAUDE.md T20 2.1). */
+  workPlanTab: WorkPlanTab;
+  /** The man an offer card on the Contracts tab is worked out for, or null for the card's own
+   *  first choice. He is nobody's assignee until Take it is pressed (CLAUDE.md T20 2.1.1). */
+  contractMan: string | null;
   /** The house card is up at the end of the day, since this real time (CLAUDE.md T13 3.18). */
   houseCardSince: number | null;
   houseCardDone: boolean;
@@ -312,6 +318,8 @@ function freshUi(): Ui {
     arrearsAmount: '500',
     loanAmount: '10000',
     boardTab: 'enquiries',
+    workPlanTab: 'jobs',
+    contractMan: null,
     houseCardSince: null,
     houseCardDone: false,
     laptopPage: 'home',
@@ -445,7 +453,7 @@ function modalBody(id: ModalId, current: GameState): string {
         tickedTasks: ui.tickedTasks,
       });
     case 'workPlan':
-      return renderWorkPlan(current, ui.dropConfirm, ui.assignOpen);
+      return renderWorkPlan(current, ui.workPlanTab, ui.dropConfirm, ui.assignOpen);
     case 'machineCard':
       return renderMachineCard(current, ui.machineCard, ui.sellConfirm);
     case 'accounting': {
@@ -1357,6 +1365,11 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
       ui.boardTab = id === 'contracts' ? 'contracts' : 'enquiries';
       ui.scrollModalTop = true;
       break;
+    case 'workPlanTab':
+      // The folder's two tabs: the jobs, and the standing contracts (CLAUDE.md T20 2.1).
+      ui.workPlanTab = workPlanTabFrom(id);
+      ui.scrollModalTop = true;
+      break;
     case 'openSettings':
       openModal('settings');
       break;
@@ -1408,6 +1421,27 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
       return;
     case 'renewContract':
       dispatch({ type: 'RENEW_CONTRACT', contractId: id, accept: element.dataset.accept === '1' });
+      return;
+    case 'takeContract':
+      // The one click of the Contracts tab: the offer is accepted and the man the card has
+      // selected is put on it, in that order (PIOTR; CLAUDE.md T20 2.1.1).
+      dispatch({ type: 'ACCEPT_CONTRACT', contractId: id });
+      dispatch({
+        type: 'ASSIGN_CONTRACT',
+        contractId: id,
+        workerId: element.dataset.worker ?? '',
+        on: true,
+      });
+      return;
+    case 'pickContractMan':
+      // Which man the offer card is worked out for. He is not on anything: the card is showing
+      // the player what it would be like with him on it (CLAUDE.md T20 2.1.1).
+      ui.contractMan = element.dataset.worker ?? null;
+      return;
+    // Phase B fills this one. Nothing renders a control for it yet, so no click can reach it; the
+    // route is here so the button has one to wire to when it is written: `letGo` is the week's
+    // notice of CLAUDE.md T20 2.4. The service already has its own route, further down.
+    case 'letGo':
       return;
     case 'endContract':
       dispatch({ type: 'END_CONTRACT', contractId: id });

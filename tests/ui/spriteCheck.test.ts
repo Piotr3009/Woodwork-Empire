@@ -146,7 +146,16 @@ describe('the sprite check page', () => {
 
   it('lists every role of the game with every frame key, the two of Turn 13 among them', () => {
     // Every state the character system can be in has a key, home included (CLAUDE.md T13 3.23).
-    expect([...ANIMATIONS]).toEqual(['walk', 'bench', 'carry', 'idle', 'phone', 'home']);
+    // Sweep joined them in Turn 20, for the helper with a broom (CLAUDE.md T20 2.8).
+    expect([...ANIMATIONS]).toEqual([
+      'walk',
+      'bench',
+      'carry',
+      'idle',
+      'phone',
+      'home',
+      'sweep',
+    ]);
     expect(CHARACTER_ROLES).toContain('estimator');
     expect(CHARACTER_ROLES).toContain('productionManager');
     const page = parse(renderSpriteCheck());

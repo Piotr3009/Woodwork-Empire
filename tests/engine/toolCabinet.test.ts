@@ -88,13 +88,13 @@ describe('hiring wants a free cabinet', () => {
     for (const specId of ['locker', 'canteenSeat', 'handToolSet']) {
       state = buyNow(state, specId);
     }
-    expect(canHire(state, 'joiner', 'poor').ok).toBe(false);
-    expect(canHire(state, 'joiner', 'poor').reason).toContain('Tool cabinet');
+    expect(canHire(state, 'joiner', 'novice').ok).toBe(false);
+    expect(canHire(state, 'joiner', 'novice').reason).toContain('Tool cabinet');
     state = buyNow(state, TOOL_CABINET);
     expect(countOf(state, TOOL_CABINET)).toBe(2);
     expect(missingForHire(state, 'joiner')).toEqual([]);
-    expect(canHire(state, 'joiner', 'poor').ok).toBe(true);
-    state = hireNow(state, 'joiner', 'poor');
+    expect(canHire(state, 'joiner', 'novice').ok).toBe(true);
+    state = hireNow(state, 'joiner', 'novice');
     expect(state.workers).toHaveLength(1);
     // And the next man wants a third.
     expect(missingForHire(state, 'joiner')).toContain(TOOL_CABINET);

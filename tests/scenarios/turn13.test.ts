@@ -318,7 +318,10 @@ describe('(w) a month with a production manager, a night joiner and five days aw
     // then idles. Measured, not tuned. What the test is really about, that the premium is paid
     // for every working day the shift was on whether or not he had work, is asserted below and
     // is unchanged.
-    expect(nights.length).toBeGreaterThanOrEqual(2);
+    // Re-measured again in Turn 20: the tier ladder moved up (a man with no experience is 0.8 of
+    // the owner where he was 0.6, CLAUDE.md T20 2.5), so the day crew clear the book a day sooner
+    // still and the night man has one night of work in him. Measured, not tuned.
+    expect(nights.length).toBeGreaterThanOrEqual(1);
     for (const day of nights) expect(day.nightMinutes).toBeLessThanOrEqual(SECOND_SHIFT_MINUTES);
     // The premium is for the shift, not for the minutes the rack let him work (nothing is free):
     // one line for every working day the shift was on, from the day it was switched on.
@@ -347,12 +350,14 @@ describe('(w) a month with a production manager, a night joiner and five days aw
     }
   });
 
-  it('is still trading at the end of it, having paid the manager for the month', () => {
+  it('is still trading at the end of it, having paid the manager every Friday', () => {
     expect(state.gameOver).toBeNull();
     expect(state.clock.day).toBe(31);
     expect(state.cash).toBeGreaterThan(state.finance.overdraftLimit);
-    const salaries = state.ledger.filter((entry) => entry.category === 'salaries');
-    expect(salaries.length).toBeGreaterThan(0);
+    // He is paid by the week now, with everybody else, and the office salary line of the 1st is
+    // gone with the monthly wage (PIOTR, 18.09; CLAUDE.md T20 2.6).
+    expect(state.ledger.filter((entry) => entry.category === 'salaries')).toHaveLength(0);
+    expect(state.ledger.filter((entry) => entry.category === 'wages').length).toBeGreaterThan(0);
   });
 });
 

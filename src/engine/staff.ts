@@ -118,11 +118,11 @@ export function staffMinutesLeft(worker: Worker): number {
   return Math.max(0, MINUTES_PER_WORKING_DAY - worker.minutesWorked);
 }
 
-/** What a man costs in a month, whichever way he is paid: the office carries a monthly wage and
- *  the floor a weekly one, and a week is 30 over 7 of a month. The one conversion: the Our team
- *  row prints it and the hiring gate refuses on it (CLAUDE.md T17 2.9, 2.11). */
-export function monthlyPay(pay: { weeklyWage: number; monthlyWage: number }): number {
-  if (pay.monthlyWage > 0) return Math.round(pay.monthlyWage * 100) / 100;
+/** What a man costs in a month. Everybody is paid by the week from tonight, so a month of him is
+ *  his week times the weeks in one, and there is no second wage field to ask about (PIOTR, 18.09;
+ *  CLAUDE.md T20 2.6). The one conversion, wherever a month is asked for: the Our team row prints
+ *  it, the hiring gate refuses on it, and the Company board reads it (CLAUDE.md T17 2.9, 2.11). */
+export function monthlyWageOf(pay: { weeklyWage: number }): number {
   return Math.round(pay.weeklyWage * WEEKS_PER_MONTH * 100) / 100;
 }
 
@@ -330,12 +330,12 @@ export function hiringOptions(state: GameState): HiringOption[] {
       blockReason = crewLine(state);
     } else if (missing.length > 0) {
       blockReason = `Buy first: ${missing.join(', ')}`;
-    } else if (state.cash < monthlyPay(spec)) {
+    } else if (state.cash < monthlyWageOf(spec)) {
       // Last of the refusals, because it is the only one that changes by the minute: who answers
       // the advert, what the office wants first, the bench and the kit are all standing facts,
       // and the bank balance is what an owner looks at once the rest of it is ready. A man is not
       // taken on without a month of his pay in the account (PIOTR, 17.09; CLAUDE.md T17 2.11).
-      blockReason = `Not enough in the bank: needs ${formatMoney(monthlyPay(spec))}`;
+      blockReason = `Not enough in the bank: needs ${formatMoney(monthlyWageOf(spec))}`;
     }
     return {
       role: spec.role,
@@ -343,7 +343,6 @@ export function hiringOptions(state: GameState): HiringOption[] {
       label: spec.label,
       rate: spec.tier ? WORKER_RATES[spec.tier] : 0,
       weeklyWage: spec.weeklyWage,
-      monthlyWage: spec.monthlyWage,
       minReputation: spec.minReputation,
       available: blockReason === '',
       blockReason,
@@ -404,8 +403,8 @@ export function hire(state: GameState, role: WorkerRole, tier: WorkerTier | null
     tier,
     rate: tier ? WORKER_RATES[tier] : 0,
     weeklyWage: spec.weeklyWage,
-    monthlyWage: spec.monthlyWage,
     startDay: addWorkingDays(state.clock.day, HIRE_START_DELAY_DAYS),
+    leavesOnDay: null,
     jobId: null,
     taskId: null,
     minutesWorked: 0,

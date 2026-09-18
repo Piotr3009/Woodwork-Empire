@@ -50,7 +50,7 @@ function hallWithAJoiner(): GameState {
   for (const specId of ['workbench', 'locker', 'canteenSeat', 'toolCabinet', 'handToolSet']) {
     state = buyNow(state, specId, specId === 'workbench' ? 'budget' : undefined);
   }
-  const hired = hireNow(state, 'joiner', 'poor');
+  const hired = hireNow(state, 'joiner', 'novice');
   // He starts the next working day; the hall draws the men who are in today (CLAUDE.md T2 3.8).
   for (const worker of hired.workers) worker.startDay = hired.clock.day;
   return hired;

@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 import {
   CONTRACT_OFFER_DAYS,
   CONTRACT_PIECES,
+  JOINER_WEEKLY_WAGE,
   CONTRACT_QUANTITY_PER_WEEK_MAX,
   CONTRACT_QUANTITY_PER_WEEK_MIN,
   CONTRACT_RENEW_FULL_WEEK,
@@ -18,7 +19,6 @@ import {
   CONTRACT_QUANTITY_STEP,
   CONTRACT_QUANTITY_MINUTES,
   CONTRACT_FREE_END_DAYS,
-  MINUTES_PER_WORKING_DAY,
   SHEET_VALUE,
 } from '../../src/engine/constants';
 import type { ContractPieceSpec } from '../../src/engine/constants';
@@ -89,10 +89,10 @@ function joiner(id: string, name: string): Worker {
     id,
     name,
     role: 'joiner',
-    tier: 'poor',
-    rate: WORKER_RATES.poor,
-    weeklyWage: 480,
-    monthlyWage: 0,
+    tier: 'novice',
+    rate: WORKER_RATES.novice,
+    weeklyWage: JOINER_WEEKLY_WAGE.novice,
+    leavesOnDay: null,
     startDay: 1,
     jobId: null,
     taskId: null,
@@ -308,7 +308,7 @@ describe('the piece work', () => {
     const saw = state.equipment.find((item) => item.specId === 'tableSaw');
     if (!saw) throw new Error('a saw is wanted');
     const speed = variantFor(saw)?.outputFactor ?? 1;
-    const worth = WORKER_RATES.poor * staffOutputFactor(state) * speed * hallProductivityFactor(state);
+    const worth = WORKER_RATES.novice * staffOutputFactor(state) * speed * hallProductivityFactor(state);
     const cashBefore = state.cash;
     const worked = minutes(state, 200);
     expect(worked).toBe(200);
@@ -450,7 +450,8 @@ describe('the week and the term', () => {
     contract.materialCost = 3000;
     contract.labourMinutes = 6000;
     const report = closingReport(state, contract);
-    const labourCost = Math.round(6000 * workerMinuteCost(480) * 100) / 100;
+    const labourCost =
+      Math.round(6000 * workerMinuteCost(JOINER_WEEKLY_WAGE.novice) * 100) / 100;
     expect(report).toEqual({
       pieces: 100,
       revenue: 3800,
@@ -581,39 +582,46 @@ describe('the result with a man on it (CLAUDE.md T17 2.22)', () => {
   it('is the price less the material and less his own time, and it is his own time', () => {
     const state = joinerHall();
     const contract = running(state, 1, 60);
-    contract.pieceId = 'cutSheetPack';
-    contract.pricePerPiece = 38;
-    const poor = state.workers[0] as Worker;
-    const normal: Worker = {
+    const piece = CONTRACT_PIECES.find((entry) => entry.id === 'cutSheetPack');
+    if (piece === undefined) throw new Error('no cut sheet pack');
+    contract.pieceId = piece.id;
+    contract.pricePerPiece = piece.price;
+    const green = state.workers[0] as Worker;
+    const middling: Worker = {
       ...joiner('staff-2', 'Nick'),
-      tier: 'normal',
-      rate: WORKER_RATES.normal,
-      weeklyWage: 640,
+      tier: 'experienced',
+      rate: WORKER_RATES.experienced,
+      weeklyWage: JOINER_WEEKLY_WAGE.experienced,
     };
     const best: Worker = {
       ...joiner('staff-3', 'Sam'),
-      tier: 'super',
-      rate: WORKER_RATES.super,
-      weeklyWage: 800,
+      tier: 'senior',
+      rate: WORKER_RATES.senior,
+      weeklyWage: JOINER_WEEKLY_WAGE.senior,
     };
-    state.workers.push(normal, best);
-    const poorResult = contractResultFor(contract, poor);
-    const normalResult = contractResultFor(contract, normal);
+    state.workers.push(middling, best);
+    const greenResult = contractResultFor(contract, green);
+    const middlingResult = contractResultFor(contract, middling);
     const bestResult = contractResultFor(contract, best);
-    // A poor joiner does 45 minutes of the owner's work in 75 of his own, a super one in 50.
-    expect(poorResult.minutes).toBe(Math.round(45 / WORKER_RATES.poor));
-    expect(bestResult.minutes).toBe(Math.round(45 / WORKER_RATES.super));
-    expect(poorResult.labourCost).toBe(Math.round((45 / WORKER_RATES.poor) * workerMinuteCost(480) * 100) / 100);
-    expect(poorResult.margin).toBe(Math.round((38 - 30 - poorResult.labourCost) * 100) / 100);
-    // The wage table of Turn 1 pays 480 for 0.6 and 640 for 0.8, which is the same money for the
-    // same work, and 800 for 0.9, which is a premium for the speed: so the poor man and the
-    // normal one show the same result a piece and the super one a thinner one. The line is his
-    // own, whichever way it falls, which is what the tab has to show before he is put on it.
-    expect(normalResult.margin).toBe(poorResult.margin);
-    expect(bestResult.margin).toBeLessThan(poorResult.margin);
-    // And every one of them is under water on repeat work at this price, which is what the
-    // closing report has always said and what the rate says now.
-    expect(poorResult.margin).toBeLessThan(0);
+    // A joiner with no experience does 45 minutes of the owner's work in 56 of his own, a super
+    // experienced one in 38 (CLAUDE.md T20 2.5).
+    expect(greenResult.minutes).toBe(Math.round(45 / WORKER_RATES.novice));
+    expect(bestResult.minutes).toBe(Math.round(45 / WORKER_RATES.senior));
+    expect(greenResult.labourCost).toBe(
+      Math.round((45 / WORKER_RATES.novice) * workerMinuteCost(green.weeklyWage) * 100) / 100,
+    );
+    expect(greenResult.margin).toBe(
+      Math.round((piece.price - piece.material - greenResult.labourCost) * 100) / 100,
+    );
+    // The wage ladder is steeper than the speed ladder: 450, 600 and 800 a week against 0.8, 1.0
+    // and 1.2 of the owner. So the same piece costs more in a better man's time, and the line
+    // thins as the tier rises. The line is his own, which is what the tab has to show before he
+    // is put on it (CLAUDE.md T20 2.1, 2.5).
+    expect(middlingResult.margin).toBeLessThan(greenResult.margin);
+    expect(bestResult.margin).toBeLessThan(middlingResult.margin);
+    // And every one of them is above water by hand at the prices of T20 2.2, which is the whole
+    // point of the new table: a contract pays a little by hand and well with machines.
+    expect(bestResult.margin).toBeGreaterThan(0);
   });
 });
 
@@ -643,19 +651,29 @@ describe('the lengths of work the board offers (CLAUDE.md T17 2.22)', () => {
     const short = CONTRACT_PIECES.find((piece) => piece.id === 'drawerBox');
     const long = CONTRACT_PIECES.find((piece) => piece.id === 'wardrobeFront');
     expect(short?.minutes).toBe(60);
-    expect(short === undefined ? 0 : short.price - short.material).toBe(8);
-    expect(long?.minutes).toBe(3 * MINUTES_PER_WORKING_DAY);
-    expect(long === undefined ? 0 : long.price - long.material).toBe(40);
-    // Every piece carries what it takes off the rack and what the workshop earns by making it.
+    expect(short === undefined ? 0 : short.price - short.material).toBe(26);
+    // The wardrobe front is four hours of work now and no longer three days (CLAUDE.md T20 2.2).
+    expect(long?.minutes).toBe(240);
+    expect(long === undefined ? 0 : long.price - long.material).toBe(100);
+    // Every piece carries what the workshop earns by making it.
     for (const piece of CONTRACT_PIECES) {
-      expect(piece.sheets).toBeCloseTo(piece.material / SHEET_VALUE, 2);
       expect(piece.labour).toBe(piece.price - piece.material);
     }
+    // What a piece takes off the rack is unchanged by the new prices, and for the two small ones
+    // it is still the money in its sheets. The wardrobe front is the one that parts company: it
+    // draws 1.1 sheets and is costed at 60, because Piotr set the price table and said the sheet
+    // count stays (CLAUDE.md T20 2.2).
+    for (const piece of CONTRACT_PIECES.filter((entry) => entry.id !== 'wardrobeFront')) {
+      expect(piece.sheets).toBeCloseTo(piece.material / SHEET_VALUE, 2);
+    }
+    expect(long?.sheets).toBe(1.1);
     // The quantity is a week's work whatever the piece: thirty cut sheet packs are one wardrobe
     // front and twenty two drawer boxes.
     expect(quantityForPiece(CONTRACT_PIECES[0] as ContractPieceSpec, 30)).toBe(30);
     expect(quantityForPiece(short as ContractPieceSpec, 30)).toBe(23);
-    expect(quantityForPiece(long as ContractPieceSpec, 30)).toBe(1);
+    // Six wardrobe fronts are a week now, where three days a front made it one
+    // (CLAUDE.md T20 2.2).
+    expect(quantityForPiece(long as ContractPieceSpec, 30)).toBe(6);
   });
 
   it('draws all three over the days, and prices each at its own piece', () => {

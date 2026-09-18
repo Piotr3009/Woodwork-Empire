@@ -12,8 +12,10 @@ import {
   SOUND_VOLUME_DEFAULT,
   STATE_VERSION,
   WEBSITE_START_LEVEL,
+  WEEKS_PER_MONTH,
+  WORKER_RATES,
 } from './constants';
-import type { GameState } from './types';
+import type { GameState, WorkerTier } from './types';
 
 /** The oldest save this build opens: Turn 11's v18, which is state version 12. */
 export const OLDEST_SAVE_VERSION = 12;
@@ -269,12 +271,53 @@ function liftToVersion16(state: Raw): void {
   state.version = 16;
 }
 
+/** What a v28 tier is called from tonight. Nobody is a master on a lifted save: the fourth tier
+ *  is new and nobody was ever hired into it (CLAUDE.md T20 2.5). */
+const TIER_LIFT: Record<string, string> = {
+  poor: 'novice',
+  normal: 'experienced',
+  super: 'senior',
+};
+
+/** Version 16 to 17: the tiers are named again, everybody is paid by the week, a man can be let
+ *  go, a machine counts its services, and a contract records who ended it (CLAUDE.md T20 section
+ *  4). Every v28 save loads: his tier is renamed and his speed comes up to what that tier is
+ *  worth tonight, because the rate is the tier's and not the man's and a lifted crew would
+ *  otherwise be slower than the same men hired this morning; his own wage is left alone, because
+ *  what he is paid is what he was taken on for, and it comes off his monthly one where he had no
+ *  weekly; nobody is under notice; no machine has been serviced under the new rule or is away
+ *  being serviced; and every contract that has already ended, ended on its term, because there
+ *  was no other way to end one before tonight. */
+function liftToVersion17(state: Raw): void {
+  for (const worker of records(state.workers)) {
+    if (typeof worker.tier === 'string') {
+      const lifted = TIER_LIFT[worker.tier];
+      if (lifted !== undefined) {
+        worker.tier = lifted;
+        worker.rate = WORKER_RATES[lifted as WorkerTier];
+      }
+    }
+    const weekly = typeof worker.weeklyWage === 'number' ? worker.weeklyWage : 0;
+    const monthly = typeof worker.monthlyWage === 'number' ? worker.monthlyWage : 0;
+    worker.weeklyWage = weekly > 0 ? weekly : Math.round(monthly / WEEKS_PER_MONTH);
+    delete worker.monthlyWage;
+    worker.leavesOnDay = null;
+  }
+  for (const item of records(state.equipment)) {
+    item.serviceCount = 0;
+    item.inServiceUntilDay = null;
+  }
+  for (const contract of records(state.contracts)) contract.endedBy = 'term';
+  state.version = 17;
+}
+
 /** One lift per bump, keyed by the version it lifts from. */
 const LIFTS: Record<number, (state: Raw) => void> = {
   12: liftToVersion13,
   13: liftToVersion14,
   14: liftToVersion15,
   15: liftToVersion16,
+  16: liftToVersion17,
 };
 
 /** The state a save holds, lifted bump by bump into this build's shape, or null when the save is

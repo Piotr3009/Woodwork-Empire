@@ -95,10 +95,10 @@ describe('Drop project', () => {
 
   it('is meant on the second click, inside the card', () => {
     const { state, job } = withJob(1600);
-    const card = renderWorkPlan(state, null);
+    const card = renderWorkPlan(state, 'jobs', null);
     expect(card).toContain('data-do="dropJob"');
     expect(card).not.toContain('data-confirm="1"');
-    const armed = renderWorkPlan(state, job.id);
+    const armed = renderWorkPlan(state, 'jobs', job.id);
     expect(armed).toContain('Confirm drop');
     expect(armed).toContain('data-confirm="1"');
     expect(armed).toContain('800');

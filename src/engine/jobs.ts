@@ -25,7 +25,6 @@ import {
   MINUTES_PER_WORKING_DAY,
   SITE_MEASURE_MINUTES,
   SITE_MEASURE_TAXI_COST,
-  WEEKS_PER_MONTH,
   WORKER_MINUTE_RATE_DIVISOR,
 } from './constants';
 import { canAccept, drawOffer, findEnquiry, removeEnquiry } from './board';
@@ -268,11 +267,9 @@ export function jobLabourCost(state: GameState, job: Job): { minutes: number; co
   for (const who of jobMen(job)) {
     const worker = state.workers.find((entry) => entry.id === who);
     if (!worker || worker.rate <= 0) continue;
-    // A sprayer is paid by the month, not by the week, so his minutes would cost the card nothing
-    // if only the weekly wage were read (CLAUDE.md T19 2.6).
-    const weekly =
-      worker.weeklyWage > 0 ? worker.weeklyWage : worker.monthlyWage / WEEKS_PER_MONTH;
-    perMinute += workerMinuteCost(weekly);
+    // Everybody is paid by the week from tonight, the sprayer with the rest of them, so there is
+    // one wage to read and no monthly one behind it (CLAUDE.md T20 2.6).
+    perMinute += workerMinuteCost(worker.weeklyWage);
   }
   return { minutes, cost: minutes * perMinute };
 }

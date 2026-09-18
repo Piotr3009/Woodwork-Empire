@@ -77,14 +77,19 @@ describe('the hiring pool', () => {
         .filter((option) => option.blockReason.startsWith('Nobody'))
         .map((option) => option.label);
     expect(byLabel(-50)).toContain('Office admin');
-    expect(byLabel(-50)).not.toContain('Joiner, poor');
+    expect(byLabel(-50)).not.toContain('Joiner, no experience');
     expect(byLabel(-50)).not.toContain('Helper');
-    expect(byLabel(0)).toContain('Joiner, normal');
+    // The tier comes with the standing the workshop has earned: a man with no experience always
+    // answers, an experienced one from 15, a super experienced one from 35 and an extremely
+    // experienced one from 60 (CLAUDE.md T20 2.5).
+    expect(byLabel(0)).toContain('Joiner, experienced');
     expect(byLabel(5)).not.toContain('Office admin');
-    expect(byLabel(10)).not.toContain('Joiner, normal');
-    expect(byLabel(10)).toContain('Joiner, super');
+    expect(byLabel(15)).not.toContain('Joiner, experienced');
+    expect(byLabel(15)).toContain('Joiner, super experienced');
     expect(byLabel(15)).not.toContain('Salesman');
-    expect(byLabel(40)).toHaveLength(0);
+    expect(byLabel(35)).not.toContain('Joiner, super experienced');
+    expect(byLabel(35)).toContain('Joiner, extremely experienced');
+    expect(byLabel(60)).toHaveLength(0);
   });
 
   it('names what has to be bought before a joiner can start, and how many of each', () => {
@@ -93,7 +98,7 @@ describe('the hiring pool', () => {
     // Two cabinets on the first hire, one for the new man and one for the owner, so the bill on
     // the card is two of them and buying to it leaves nothing still blocking (CLAUDE.md T6 3.5).
     expect(shortfallForHire(state, 'joiner')).toContainEqual({ specId: TOOL_CABINET, count: 2 });
-    const option = hiringOptions(state).find((entry) => entry.tier === 'poor');
+    const option = hiringOptions(state).find((entry) => entry.tier === 'novice');
     expect(option?.available).toBe(false);
     // The bill is the cheapest way into each family, which for the bench is the used one at 120
     // (CLAUDE.md T7 3.6).
@@ -106,48 +111,48 @@ describe('the hiring pool', () => {
 
   it('blocks the hire while the kit is missing and lets it through once it is there', () => {
     let state = buyStartingKit(newGame());
-    expect(canHire(state, 'joiner', 'poor').ok).toBe(false);
-    state = hireNow(state, 'joiner', 'poor');
+    expect(canHire(state, 'joiner', 'novice').ok).toBe(false);
+    state = hireNow(state, 'joiner', 'novice');
     expect(state.workers).toHaveLength(0);
     state = withJoinerKit(state);
-    expect(canHire(state, 'joiner', 'poor').ok).toBe(true);
-    state = hireNow(state, 'joiner', 'poor');
+    expect(canHire(state, 'joiner', 'novice').ok).toBe(true);
+    state = hireNow(state, 'joiner', 'novice');
     expect(state.workers).toHaveLength(1);
-    expect(state.workers[0]?.rate).toBe(WORKER_RATES.poor);
-    expect(state.workers[0]?.weeklyWage).toBe(480);
+    expect(state.workers[0]?.rate).toBe(WORKER_RATES.novice);
+    expect(state.workers[0]?.weeklyWage).toBe(450);
   });
 
   it('needs a second set of everything for a second joiner', () => {
-    let state = withCrew(buyStartingKit(newGame()), 1, 'poor');
-    expect(canHire(state, 'joiner', 'poor').ok).toBe(false);
+    let state = withCrew(buyStartingKit(newGame()), 1, 'novice');
+    expect(canHire(state, 'joiner', 'novice').ok).toBe(false);
     expect(missingForHire(state, 'joiner')).toEqual(JOINER_PREREQUISITES);
     state = withJoinerKit(state);
-    expect(canHire(state, 'joiner', 'poor').ok).toBe(true);
+    expect(canHire(state, 'joiner', 'novice').ok).toBe(true);
   });
 
   it('stops at the floor limit of the hall, before the bench slots of the unit', () => {
     // One person per so many square metres of free floor, the owner among them, so a 200 m2
     // hall with a normal set of kit holds the owner and four (PIOTR; CLAUDE.md T13 3.10).
-    const state = withCrew(buyStartingKit(newGame({ difficulty: 'veryEasy' })), 6, 'poor');
+    const state = withCrew(buyStartingKit(newGame({ difficulty: 'veryEasy' })), 6, 'novice');
     expect(joiners(state)).toHaveLength(4);
     // Every man's bench and cabinets take floor of their own, so the limit came down with the
     // hiring: the crew is now over it and the next hire is refused with the reason.
     expect(crewLimit(state)).toBeLessThanOrEqual(joiners(state).length + 1);
-    const option = hiringOptions(state).find((entry) => entry.tier === 'poor');
+    const option = hiringOptions(state).find((entry) => entry.tier === 'novice');
     expect(option?.blockReason).toContain('floor limited');
   });
 
   it('starts the new man the next working day and pays him weekly', () => {
-    const state = withCrew(buyStartingKit(newGame()), 1, 'poor');
+    const state = withCrew(buyStartingKit(newGame()), 1, 'novice');
     expect(state.workers[0]?.startDay).toBe(2);
     expect(availableJoiners(state)).toHaveLength(0);
     const day2 = runToDay(state, 2).state;
     expect(availableJoiners(day2)).toHaveLength(1);
-    expect(weeklyWageBill(day2)).toBe(480);
+    expect(weeklyWageBill(day2)).toBe(450);
   });
 
   it('gives everyone a different name', () => {
-    const state = withCrew(buyStartingKit(newGame({ difficulty: 'veryEasy' })), 4, 'poor');
+    const state = withCrew(buyStartingKit(newGame({ difficulty: 'veryEasy' })), 4, 'novice');
     const names = state.workers.map((worker) => worker.name);
     expect(new Set(names).size).toBe(names.length);
   });
@@ -164,7 +169,8 @@ describe('the hiring pool', () => {
     state = hireNow(state, 'salesman', null);
     expect(state.workers[0]?.role).toBe('officeAdmin');
     expect(state.workers[1]?.role).toBe('salesman');
-    expect(state.workers[1]?.monthlyWage).toBe(2200);
+    // The salesman's 2,200 a month is 515 a week from tonight (CLAUDE.md T20 2.6).
+    expect(state.workers[1]?.weeklyWage).toBe(515);
   });
 });
 
@@ -189,20 +195,21 @@ function jobReadyWith(price: number, tier: Worker['tier']): GameState {
 }
 
 describe('joiners at the bench', () => {
-  it('takes a poor joiner 13.3 days to make a 6400 wardrobe', () => {
-    const state = jobReadyWith(6400, 'poor');
+  it('takes a joiner with no experience 10 days to make a 6400 wardrobe', () => {
+    const state = jobReadyWith(6400, 'novice');
     const job = firstJob(state);
     expect(job.labourValue).toBe(6400 * LABOUR_FRACTION);
-    const minutes = minutesRemainingFor(state, job, WORKER_RATES.poor);
-    expect(minutes).toBeCloseTo(6400, 6);
-    expect(minutes / 480).toBeCloseTo(13.333, 3);
-    // The same wardrobe is 8 days for the owner and 10 for a normal joiner (CLAUDE.md 8.5).
+    const minutes = minutesRemainingFor(state, job, WORKER_RATES.novice);
+    expect(minutes).toBeCloseTo(4800, 6);
+    expect(minutes / 480).toBeCloseTo(10, 3);
+    // The same wardrobe is 8 days for the owner, and the experienced joiner matches him now
+    // (CLAUDE.md 8.5, T20 2.5).
     expect(minutesRemainingFor(state, job, 1) / 480).toBeCloseTo(8, 6);
-    expect(minutesRemainingFor(state, job, WORKER_RATES.normal) / 480).toBeCloseTo(10, 6);
+    expect(minutesRemainingFor(state, job, WORKER_RATES.experienced) / 480).toBeCloseTo(8, 6);
   });
 
   it('picks up the oldest ready job on its own', () => {
-    const state = runToDay(jobReadyWith(1600, 'poor'), 2).state;
+    const state = runToDay(jobReadyWith(1600, 'novice'), 2).state;
     expect(state.workers[0]?.jobId).toBe(firstJob(state).id);
     expect(firstJob(state).stage).toBe('inProduction');
     const later = tick(state, 100);
@@ -210,7 +217,7 @@ describe('joiners at the bench', () => {
   });
 
   it('lets the player take the job off a joiner and put the owner on it', () => {
-    let state = runToDay(jobReadyWith(1600, 'poor'), 2).state;
+    let state = runToDay(jobReadyWith(1600, 'novice'), 2).state;
     const jobId = firstJob(state).id;
     state = act(state, { type: 'ASSIGN_JOB', jobId, workerId: 'owner' });
     expect(firstJob(state).assignees[0]).toBe('owner');
@@ -219,18 +226,18 @@ describe('joiners at the bench', () => {
   });
 
   it('produces at the tier rate', () => {
-    const state = runToDay(jobReadyWith(1600, 'poor'), 2).state;
+    const state = runToDay(jobReadyWith(1600, 'novice'), 2).state;
     const before = firstJob(state).labourRemaining;
     const after = firstJob(tick(state, 60)).labourRemaining;
-    expect(before - after).toBeCloseTo(60 * OWNER_LABOUR_PER_MINUTE * WORKER_RATES.poor, 6);
+    expect(before - after).toBeCloseTo(60 * OWNER_LABOUR_PER_MINUTE * WORKER_RATES.novice, 6);
   });
 
   it('drops the output of everyone the owner is not there to run', () => {
-    let state = runToDay(jobReadyWith(1600, 'poor'), 2).state;
+    let state = runToDay(jobReadyWith(1600, 'novice'), 2).state;
     state = act(state, { type: 'SKIP_DAY' });
     const before = firstJob(state).labourRemaining;
     const after = firstJob(tick(state, 60)).labourRemaining;
-    expect(before - after).toBeCloseTo(60 * OWNER_LABOUR_PER_MINUTE * WORKER_RATES.poor * 0.7, 6);
+    expect(before - after).toBeCloseTo(60 * OWNER_LABOUR_PER_MINUTE * WORKER_RATES.novice * 0.7, 6);
   });
 });
 
@@ -240,8 +247,9 @@ describe('the queue at the saw', () => {
     let state = withExtraction(
       buyStartingKit(newGame({ difficulty: 'veryEasy' }), { sawVariant: 'budget' }),
     );
-    state.reputation = 10;
-    state = withCrew(state, 4, 'normal');
+    // An experienced man answers from 15 now (CLAUDE.md T20 2.5).
+    state.reputation = 15;
+    state = withCrew(state, 4, 'experienced');
     for (let index = 0; index < 4; index += 1) {
       const enquiry = placeEnquiry(state, {
         templateId: 'wardrobe',
@@ -264,7 +272,7 @@ describe('the queue at the saw', () => {
     const done = before.map((value, index) => value - (worked.jobs[index]?.labourRemaining ?? 0));
     // One saw, one man on it: the ratio is not a multiplier on anybody's speed now, it is three
     // men standing and waiting (CLAUDE.md T7 3.1).
-    const full = 60 * OWNER_LABOUR_PER_MINUTE * WORKER_RATES.normal;
+    const full = 60 * OWNER_LABOUR_PER_MINUTE * WORKER_RATES.experienced;
     expect(done.filter((value) => Math.abs(value - full) < 1e-6)).toHaveLength(1);
     expect(done.filter((value) => value === 0)).toHaveLength(3);
     expect(
@@ -287,7 +295,7 @@ describe('the queue at the saw', () => {
 
 describe('one path for putting a man on a job', () => {
   it('automatic assignment goes through the same door as the manual one', () => {
-    const state = runToDay(jobReadyWith(1600, 'poor'), 2).state;
+    const state = runToDay(jobReadyWith(1600, 'novice'), 2).state;
     const worker = state.workers[0];
     const job = firstJob(state);
     expect(worker?.jobId).toBe(job.id);
@@ -300,7 +308,7 @@ describe('one path for putting a man on a job', () => {
   });
 
   it('knows who is on the books today', () => {
-    const state = withCrew(buyStartingKit(newGame()), 1, 'poor');
+    const state = withCrew(buyStartingKit(newGame()), 1, 'novice');
     const worker = state.workers[0];
     expect(worker).toBeDefined();
     if (!worker) return;
@@ -322,7 +330,7 @@ describe('the office working day', () => {
       tier: null,
       rate: 0,
       weeklyWage: 0,
-      monthlyWage: 1900,
+      leavesOnDay: null,
       startDay: 1,
       jobId: null,
       taskId: null,

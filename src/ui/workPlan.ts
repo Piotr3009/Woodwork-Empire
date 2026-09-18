@@ -15,7 +15,7 @@ import {
   jobLifecycleRow,
   materialLine,
 } from './jobCard';
-import { button, emptyLine, escapeHtml, money } from './modal';
+import { button, emptyLine, escapeHtml, money, tabBar } from './modal';
 
 /** Where a point of the axis sits across it, as a percentage. One axis for every row, so the blue
  *  line is the same line on all of them. The axis is in working days: Monday comes straight after
@@ -145,11 +145,39 @@ function scaleHtml(plan: WorkPlan): string {
   );
 }
 
+/** The two tabs of the folder the Work Plan is read in: the jobs, and the standing contracts
+ *  (PIOTR, the mockup of docs/mockups/t20; CLAUDE.md T20 2.1). */
+export type WorkPlanTab = 'jobs' | 'contracts';
+
+const WORK_PLAN_TABS: Array<[string, string]> = [
+  ['jobs', 'Jobs'],
+  ['contracts', 'Contracts'],
+];
+
+export function workPlanTabFrom(value: string): WorkPlanTab {
+  return value === 'contracts' ? 'contracts' : 'jobs';
+}
+
 export function renderWorkPlan(
   state: GameState,
+  /** Which of the two tabs is on top (CLAUDE.md T20 2.1). */
+  tab: WorkPlanTab = 'jobs',
   dropConfirm: string | null = null,
   /** The job whose Assign to this job list is open, or null for none (CLAUDE.md T19 2.5). */
   assignOpen: string | null = null,
+): string {
+  const tabs = tabBar('workPlanTab', WORK_PLAN_TABS, tab);
+  // The Contracts tab is the drawing of docs/mockups/t20/contracts-tab.html, and it is filled in
+  // this turn's next step. Until then the contracts are where v28 left them, on the Jobs tab
+  // under the plan (CLAUDE.md T20 2.1, phase B1).
+  if (tab === 'contracts') return tabs + emptyLine('The contracts are still on the Jobs tab.');
+  return tabs + jobsTab(state, dropConfirm, assignOpen);
+}
+
+function jobsTab(
+  state: GameState,
+  dropConfirm: string | null,
+  assignOpen: string | null,
 ): string {
   const plan = workPlan(state);
   // The standing contracts have a bar of their own, apart from the jobs, under them so the

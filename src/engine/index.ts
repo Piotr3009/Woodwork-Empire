@@ -220,7 +220,6 @@ export {
   dailyRates,
   dailyRent,
   monthlyFixedCosts,
-  monthlySalaryBill,
   netOf,
   nextDueDays,
   visibleTotals,

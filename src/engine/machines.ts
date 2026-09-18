@@ -20,6 +20,7 @@ import {
   OVERDUE_BREAKDOWN_CHANCE,
   SERVICE_COST_FRACTION,
   SERVICE_INTERVAL_HOURS,
+  TIER_WORDS,
   DUST_HIGH_THRESHOLD,
   DUST_MAX,
   DUST_PER_PRODUCTION_MINUTE,
@@ -545,7 +546,7 @@ export function outputBreakdown(state: GameState): OutputBreakdown {
   for (const worker of state.workers) {
     if (worker.rate <= 0 || worker.rate >= 1) continue;
     lines.push({
-      label: `${worker.name}, ${worker.tier ?? 'a'} ${worker.role}`,
+      label: `${worker.name}, ${worker.tier === null ? 'a' : TIER_WORDS[worker.tier]} ${worker.role}`,
       points: roundPoints(worker.rate - 1),
       hall: false,
       where: 'his own minutes',

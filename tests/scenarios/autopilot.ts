@@ -98,7 +98,7 @@ export interface Policy {
   /** Take this many poor joiners on instead of one, each with his own kit (CLAUDE.md T7 3.1). */
   joiners?: number;
   /** The tier of the joiners taken on; the poor one unless the month says otherwise. */
-  joinerTier?: 'poor' | 'normal' | 'super';
+  joinerTier?: 'novice' | 'experienced' | 'senior';
   /** How the management software is paid for: outright unless the month says the subscription. */
   licence?: 'oneOff' | 'subscription';
   /** Saws to stand in the hall beyond the one in the day 1 kit. A machine serves one man at a
@@ -355,7 +355,7 @@ function takeOnJoiner(state: GameState, policy: Policy): GameState {
     for (const specId of JOINER_KIT) {
       next = applyAction(next, { type: 'BUY_EQUIPMENT', specId, variantId: DAY_ONE_CLASS[specId] });
     }
-    next = applyAction(next, { type: 'HIRE', role: 'joiner', tier: policy.joinerTier ?? 'poor' });
+    next = applyAction(next, { type: 'HIRE', role: 'joiner', tier: policy.joinerTier ?? 'novice' });
   }
   return next;
 }

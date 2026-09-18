@@ -2483,6 +2483,8 @@ function standItem(
     anchorY: at.y,
     broken: false,
     serviceHours: 0,
+    serviceCount: 0,
+    inServiceUntilDay: null,
     hoursThisWeek: 0,
     hoursThisMonth: 0,
     enduranceHours: enduranceHoursFor(specId, variant.id),

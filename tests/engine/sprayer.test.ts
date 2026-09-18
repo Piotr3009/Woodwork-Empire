@@ -8,15 +8,16 @@ import {
   HIRING_SPECS,
   JOINER_SPRAY_RATE,
   SPRAYER_BENCH_RATE,
-  SPRAYER_MONTHLY_WAGE,
-  SPRAYER_REPUTATION,
+  SPRAYER_WEEKLY_WAGE,
+  TIER_MIN_REPUTATION,
   SPRAYER_SPRAY_RATE,
+  WEEKS_PER_MONTH,
   WORKER_RATES,
 } from '../../src/engine/constants';
 import { BENCH, SPRAY_BOOTH } from '../../src/engine/machines';
 import { addToJob, jobLabourCost, stagedJob } from '../../src/engine/jobs';
 import { hands, workMinute } from '../../src/engine/production';
-import { crewCount, crewFull, monthlyPay } from '../../src/engine/staff';
+import { crewCount, crewFull, monthlyWageOf } from '../../src/engine/staff';
 import { familyForStage, tradeFactor } from '../../src/engine/stages';
 import { ROLE_WORDS } from '../../src/ui/team';
 import type { GameState, Job, WorkerTier } from '../../src/engine/index';
@@ -60,7 +61,7 @@ function boothHall(): GameState {
 
 /** The same hall with one man of this trade on the books today, put on the job, with the job
  *  stood at its finishing stage, which for a lacquered piece is the booth. */
-function atTheBooth(role: 'joiner' | 'sprayer', tier: WorkerTier = 'normal'): GameState {
+function atTheBooth(role: 'joiner' | 'sprayer', tier: WorkerTier = 'experienced'): GameState {
   const state = hireNow(boothHall(), role, tier);
   const man = state.workers[state.workers.length - 1];
   const job = state.jobs[0];
@@ -81,27 +82,29 @@ function labourIn(state: GameState, minutes: number): number {
 }
 
 describe('the sprayer (CLAUDE.md T19 2.6)', () => {
-  it('is hired like a joiner, in three tiers, and paid by the month', () => {
+  it('is hired like a joiner, in four tiers, and paid by the week', () => {
     const rows = HIRING_SPECS.filter((spec) => spec.role === 'sprayer');
-    expect(rows.map((spec) => spec.tier)).toEqual(['poor', 'normal', 'super']);
+    // Four tiers from tonight, and the week is the one unit of pay (CLAUDE.md T20 2.5, 2.6).
+    expect(rows.map((spec) => spec.tier)).toEqual(['novice', 'experienced', 'senior', 'master']);
     for (const spec of rows) {
       const tier = spec.tier as WorkerTier;
-      expect(spec.monthlyWage, spec.label).toBe(SPRAYER_MONTHLY_WAGE[tier]);
-      expect(spec.weeklyWage, spec.label).toBe(0);
-      expect(spec.minReputation, spec.label).toBe(SPRAYER_REPUTATION[tier]);
+      expect(spec.weeklyWage, spec.label).toBe(SPRAYER_WEEKLY_WAGE[tier]);
+      expect(spec.minReputation, spec.label).toBe(TIER_MIN_REPUTATION[tier]);
     }
-    const state = hireNow(boothHall(), 'sprayer', 'normal');
+    const state = hireNow(boothHall(), 'sprayer', 'experienced');
     const man = state.workers[state.workers.length - 1];
     expect(man?.role).toBe('sprayer');
-    expect(man?.rate).toBe(WORKER_RATES.normal);
-    expect(monthlyPay(man ?? { weeklyWage: 0, monthlyWage: 0 })).toBe(SPRAYER_MONTHLY_WAGE.normal);
+    expect(man?.rate).toBe(WORKER_RATES.experienced);
+    expect(monthlyWageOf(man ?? { weeklyWage: 0 })).toBe(
+      Math.round(SPRAYER_WEEKLY_WAGE.experienced * WEEKS_PER_MONTH * 100) / 100,
+    );
     // He is called a sprayer wherever he is drawn, and the Assign list reads the same table.
     expect(ROLE_WORDS.sprayer).toBe('sprayer');
   });
 
   it('stands on the hall floor and counts against the crew limit', () => {
     const before = boothHall();
-    const after = hireNow(before, 'sprayer', 'normal');
+    const after = hireNow(before, 'sprayer', 'experienced');
     expect(crewCount(after)).toBe(crewCount(before) + 1);
     // And the floor refuses him when it is full: he is on it like a joiner and a helper.
     const man = after.workers[after.workers.length - 1];

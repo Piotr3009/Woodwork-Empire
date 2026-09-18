@@ -65,7 +65,7 @@ describe('the Work Plan rows', () => {
 
   it('render with no transform on the board, while a shopping card still tilts', () => {
     const state = withJobs();
-    const plan = onTheBoard(renderWorkPlan(state, null));
+    const plan = onTheBoard(renderWorkPlan(state, 'jobs', null));
     const rows = Array.from(plan.querySelectorAll('.plan-row[data-plan]'));
     expect(rows.length).toBe(4);
     for (const [index, row] of rows.entries()) {

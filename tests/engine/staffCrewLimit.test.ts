@@ -4,7 +4,7 @@
 // everything through two shifts."
 
 import { describe, expect, it } from 'vitest';
-import { M2_PER_PERSON, PRODUCTION_MANAGER_MONTHLY_WAGE } from '../../src/engine/constants';
+import { M2_PER_PERSON, PRODUCTION_MANAGER_WEEKLY_WAGE } from '../../src/engine/constants';
 import { crewLimit, freeFloorM2 } from '../../src/engine/layout';
 import {
   canHire,
@@ -48,8 +48,8 @@ function manager(id = 'pm-1'): Worker {
     role: 'productionManager',
     tier: null,
     rate: 0,
-    weeklyWage: 0,
-    monthlyWage: PRODUCTION_MANAGER_MONTHLY_WAGE,
+    weeklyWage: PRODUCTION_MANAGER_WEEKLY_WAGE,
+    leavesOnDay: null,
     startDay: 1,
     jobId: null,
     taskId: null,
@@ -84,19 +84,19 @@ describe('the floor limit', () => {
     expect(state.unit.areaM2).toBe(200);
     expect(crewCount(state)).toBe(1);
     expect(crewLimit(state)).toBeGreaterThanOrEqual(5);
-    state = withCrew(state, 4, 'poor');
+    state = withCrew(state, 4, 'novice');
     expect(joiners(state)).toHaveLength(4);
     expect(crewCount(state)).toBe(5);
     // Every man's bench and cabinets took floor of their own: five is what is left.
     expect(crewLimit(state)).toBe(5);
     expect(crewLine(state)).toBe('Crew 5 / 5, floor limited');
     expect(crewFull(state, 'joiner')).toBe(true);
-    expect(canHire(state, 'joiner', 'poor')).toEqual({ ok: false, reason: 'Crew 5 / 5, floor limited' });
+    expect(canHire(state, 'joiner', 'novice')).toEqual({ ok: false, reason: 'Crew 5 / 5, floor limited' });
     // A helper stands on the floor too; the office does not.
     expect(canHire(state, 'helper', null).reason).toBe('Crew 5 / 5, floor limited');
     expect(crewFull(state, 'officeAdmin')).toBe(false);
     expect(canHire(state, 'officeAdmin', null).ok).toBe(true);
-    expect(canHire(state, 'estimator', 'normal').ok).toBe(true);
+    expect(canHire(state, 'estimator', 'experienced').ok).toBe(true);
   });
 
   it('counts the owner, the men on the floor and the manager, and never the desks', () => {
@@ -104,7 +104,7 @@ describe('the floor limit', () => {
     expect(crewCount(state)).toBe(1);
     state.workers.push(manager());
     expect(crewCount(state)).toBe(2);
-    state.workers.push({ ...manager('e1'), role: 'estimator', tier: 'normal' });
+    state.workers.push({ ...manager('e1'), role: 'estimator', tier: 'experienced' });
     expect(crewCount(state)).toBe(2);
     state.workers.push({ ...manager('a1'), role: 'officeAdmin' });
     expect(crewCount(state)).toBe(2);

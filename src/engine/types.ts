@@ -98,7 +98,10 @@ export type Shift = 'day' | 'night';
  *  and a crew, and both covers of insurance held (CLAUDE.md T13 3.15). */
 export type EnquiryKind = 'residential' | 'commercial';
 
-export type WorkerTier = 'poor' | 'normal' | 'super';
+/** What a man can be at his trade, worst to best. The words the game prints for these are in
+ *  TIER_WORDS and never here: nobody in Piotr's workshop is called poor (PIOTR, 18.09;
+ *  CLAUDE.md T20 2.5). A v28 save's poor, normal and super are lifted to the first three. */
+export type WorkerTier = 'novice' | 'experienced' | 'senior' | 'master';
 
 export type EquipmentCategory =
   | 'furniture'
@@ -225,6 +228,12 @@ export interface Equipment {
   /** Hours on the machine's own clock at the last service: the service is due by its hours, not
    *  by the calendar (CLAUDE.md T6 3.6). */
   serviceHours: number;
+  /** Services it has had. The first adds half of its original life, and each one after that half
+   *  of what the last one added (CLAUDE.md T20 2.9). */
+  serviceCount: number;
+  /** The working day it is back in the hall, while it is away being serviced, and null while it
+   *  is standing here. Nothing runs on a machine that is out (CLAUDE.md T20 2.9). */
+  inServiceUntilDay: number | null;
   /** Hours of use it has in it, family base times the variant factor. */
   enduranceHours: number;
   /** Hours of use it has had. Past its endurance it starts giving up. */
@@ -353,9 +362,14 @@ export interface Worker {
   tier: WorkerTier | null;
   /** Fraction of the owner's speed. 0 for non-production roles. */
   rate: number;
+  /** The one wage field: everybody is paid by the week, on Friday (PIOTR, 18.09: "one unit";
+   *  CLAUDE.md T20 2.6). What a month of him costs is `monthlyWageOf`. */
   weeklyWage: number;
-  monthlyWage: number;
   startDay: number;
+  /** The last working day he is on the books, once he has been let go: he works a week's notice
+   *  out, is paid for it, and his jobs and his contracts drop him the morning after. Null for
+   *  everybody who is staying (CLAUDE.md T20 2.4). */
+  leavesOnDay: number | null;
   jobId: string | null;
   taskId: string | null;
   /** Minutes of his own day spent so far. Office roles have 480 of them (CLAUDE.md T2 3.8). */
@@ -396,7 +410,6 @@ export interface HiringOption {
   label: string;
   rate: number;
   weeklyWage: number;
-  monthlyWage: number;
   minReputation: number;
   available: boolean;
   blockReason: string;
@@ -878,6 +891,9 @@ export interface Contract {
   /** The price the client offers at the end of the term, from the delivery history. Null until
    *  the term ends. */
   renegotiatedPrice: number | null;
+  /** Who ended it: the term running out, the player pressing End the contract, or the client
+   *  walking away on a second short week (CLAUDE.md T20 2.1.6). */
+  endedBy: 'term' | 'player' | 'client';
 }
 
 /** One tile of pipe over the floor. It occupies no cell and blocks nothing under it

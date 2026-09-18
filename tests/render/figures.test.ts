@@ -125,7 +125,7 @@ describe('at the bench, not on it (PIOTR, 17.09; CLAUDE.md T19 2.4)', () => {
     for (const specId of ['workbench', 'locker', 'canteenSeat', 'toolCabinet', 'handToolSet']) {
       state = buyNow(state, specId, specId === 'workbench' ? 'budget' : undefined);
     }
-    const hired = hireNow(state, 'joiner', 'poor');
+    const hired = hireNow(state, 'joiner', 'novice');
     for (const worker of hired.workers) worker.startDay = hired.clock.day;
     return hired;
   }

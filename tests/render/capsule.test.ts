@@ -18,7 +18,7 @@ const MAN = 1.8 * TILE_RISE;
 function hallWithA(role: WorkerRole): GameState {
   const state = fillRack(buyStartingKit(newGame({ difficulty: 'veryEasy' })), 60);
   state.enquiries = [];
-  const hired = hireNow(state, role, role === 'joiner' ? 'poor' : null);
+  const hired = hireNow(state, role, role === 'joiner' ? 'novice' : null);
   for (const worker of hired.workers) worker.startDay = hired.clock.day;
   return hired;
 }

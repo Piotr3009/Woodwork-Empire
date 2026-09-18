@@ -7,7 +7,7 @@
 import { describe, expect, it } from 'vitest';
 import { WEEKS_PER_MONTH, WORKING_DAYS_PER_MONTH } from '../../src/engine/constants';
 import { formatCalendarDay, ownerDrawPerDay } from '../../src/engine/index';
-import { monthlyPay } from '../../src/engine/staff';
+import { monthlyWageOf } from '../../src/engine/staff';
 import { renderTeam } from '../../src/ui/team';
 import { money } from '../../src/ui/modal';
 import type { GameState } from '../../src/engine/index';
@@ -38,7 +38,7 @@ function withAJoiner(): GameState {
   placeEquipment(state, 'canteenSeat', { x: 8, y: 9 });
   placeEquipment(state, 'handToolSet', { x: 12, y: 9 });
   placeEquipment(state, 'toolCabinet', { x: 10, y: 9 });
-  return hireNow(state, 'joiner', 'poor');
+  return hireNow(state, 'joiner', 'novice');
 }
 
 describe('Our team', () => {
@@ -60,11 +60,12 @@ describe('Our team', () => {
     if (!man) throw new Error('no joiner');
     const row = rows(state).find((entry) => entry.getAttribute('data-team') === man.id);
     expect(row?.textContent).toContain(man.name);
-    expect(row?.textContent).toContain('joiner, poor');
+    // The words of a tier come off TIER_WORDS now, and nobody is poor (CLAUDE.md T20 2.5).
+    expect(row?.textContent).toContain('joiner, no experience');
     expect(row?.textContent).toContain(`started ${formatCalendarDay(man.startDay)}`);
-    // A week is 30 over 7 of a month: 480 a week is 2,057 a month.
-    expect(monthlyPay(man)).toBe(Math.round(man.weeklyWage * WEEKS_PER_MONTH * 100) / 100);
-    expect(row?.textContent).toContain(money(monthlyPay(man)));
+    // A week is 30 over 7 of a month: 450 a week is 1,929 a month.
+    expect(monthlyWageOf(man)).toBe(Math.round(man.weeklyWage * WEEKS_PER_MONTH * 100) / 100);
+    expect(row?.textContent).toContain(money(monthlyWageOf(man)));
     expect(row?.textContent).toContain('0 days off');
     // He does not start until the next working day, so that is what the row says of him.
     expect(row?.textContent).toContain(`starts ${formatCalendarDay(man.startDay)}`);
@@ -79,21 +80,22 @@ describe('Our team', () => {
     expect(first?.textContent).toContain(`${hours} h this month`);
   });
 
-  it('lists the sprayer with his trade and the month he is paid by (CLAUDE.md T19 2.6)', () => {
+  it('lists the sprayer with his trade and the week he is paid by (CLAUDE.md T20 2.6)', () => {
     const ready = withAJoiner();
-    // A normal sprayer answers from the middle of the ladder, and a month of his pay has to be in
-    // the bank before anybody is taken on (CLAUDE.md T17 2.11).
+    // An experienced sprayer answers from the middle of the ladder, and a month of his pay has to
+    // be in the bank before anybody is taken on (CLAUDE.md T17 2.11).
     ready.reputation = 40;
     ready.cash = 200000;
-    const state = hireNow(ready, 'sprayer', 'normal');
+    const state = hireNow(ready, 'sprayer', 'experienced');
     const man = state.workers[state.workers.length - 1];
     if (!man || man.role !== 'sprayer') throw new Error('no sprayer on the books');
     const row = rows(state).find((entry) => entry.getAttribute('data-team') === man.id);
     expect(row?.textContent).toContain(man.name);
-    expect(row?.textContent).toContain('sprayer, normal');
-    // He is paid by the month, so the row prints the month's figure straight.
-    expect(man.weeklyWage).toBe(0);
-    expect(row?.textContent).toContain(money(monthlyPay(man)));
+    expect(row?.textContent).toContain('sprayer, experienced');
+    // He is paid by the week like everybody else from tonight (CLAUDE.md T20 2.6), and the row
+    // prints what a month of him costs.
+    expect(man.weeklyWage).toBeGreaterThan(0);
+    expect(row?.textContent).toContain(money(monthlyWageOf(man)));
   });
 
   it('hires nobody: the roll call has no candidates on it', () => {

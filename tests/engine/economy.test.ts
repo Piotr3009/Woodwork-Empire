@@ -30,7 +30,6 @@ import {
   dailyRates,
   dailyRent,
   monthlyFixedCosts,
-  monthlySalaryBill,
   nextDueDays,
   pay,
   payArrears,
@@ -68,10 +67,10 @@ function joiner(id: string, weeklyWage: number): Worker {
     id,
     name: id,
     role: 'joiner',
-    tier: 'poor',
+    tier: 'novice',
     rate: 0.6,
     weeklyWage,
-    monthlyWage: 0,
+    leavesOnDay: null,
     startDay: 1,
     jobId: null,
     taskId: null,
@@ -158,14 +157,15 @@ describe('weekly and monthly cadences', () => {
     expect(ledgerFor(monday.state, 'wages')).toBe(-900);
   });
 
-  it('pays office salaries on the 1st of the month', () => {
+  it('pays the office on Friday with the floor, and nothing at the month end', () => {
+    // One unit of pay in the game and it is the week: the office salary line of the 1st is gone
+    // (PIOTR, 18.09; CLAUDE.md T20 2.6).
     const state = newGame();
-    state.workers.push({ ...joiner('a1', 0), role: 'officeAdmin', monthlyWage: 1900, rate: 0 });
-    expect(monthlySalaryBill(state)).toBe(1900);
-    const before = runToDay(state, 30).state;
-    expect(ledgerFor(before, 'salaries')).toBe(0);
+    state.workers.push({ ...joiner('a1', 0), role: 'officeAdmin', weeklyWage: 445, rate: 0 });
+    expect(weeklyWageBill(state)).toBe(445);
     const after = runToDay(state, 31).state;
-    expect(ledgerFor(after, 'salaries')).toBe(-1900);
+    expect(ledgerFor(after, 'salaries')).toBe(0);
+    expect(ledgerFor(after, 'wages')).toBeLessThan(0);
   });
 
   it('bills the software subscription monthly and the one off never again', () => {

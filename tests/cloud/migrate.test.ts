@@ -138,7 +138,7 @@ describe('a v24 save in this build (CLAUDE.md T17 section 4)', () => {
     expect(opened.state).not.toBeNull();
     const state = opened.state as GameState;
     expect(state.version).toBe(STATE_VERSION);
-    expect(STATE_VERSION).toBe(16);
+    expect(STATE_VERSION).toBe(17);
     expect(state.taskQueue).toEqual([]);
     expect(state.dayStats.paidHours).toBe(0);
     expect(state.dayStats.expressUplift).toBe(0);
