@@ -244,6 +244,51 @@ function callServiceIn(state: GameState, equipmentId: string): void {
 With it, `TASK_DEFINITIONS.service` should lose its `eligibleRoles`, because a service task nobody
 can work off must not offer a Start on the Tasks page.
 
+### Note 8. `src/engine/game.ts`, `canSell`: a rack goes when it is empty and nobody is at it
+
+2.10 lets `isSellableFamily` take the storage, which is `machines.ts` and is done. The two
+refusals that come with it, the sheets on the rack and the man standing at it, belong in
+`canSell`, which is in the frozen `game.ts`. Until this note lands the Owned tab reads the same
+sentence itself (`sellAction` in `src/ui/catalogue.ts`), so the player is never offered a sale the
+rule refuses; what is missing is the engine's own guard behind the button.
+
+**The file.** `src/engine/game.ts`, `canSell`, the last two lines of it.
+
+**Old text:**
+
+```ts
+  if (item.takenBy !== null) return { ok: false, reason: 'Somebody is standing at it' };
+  return OK;
+```
+
+**New text:**
+
+```ts
+  if (item.takenBy !== null) return { ok: false, reason: 'Somebody is standing at it' };
+  // A rack goes when it is empty and nobody is at it (PIOTR, 18.09; CLAUDE.md T20 2.10). The one
+  // sentence: the Owned tab prints this very string.
+  const storage = storageSaleBlock(state, item);
+  if (storage !== '') return { ok: false, reason: storage };
+  return OK;
+```
+
+**And the import:** `storageSaleBlock` joins the existing
+`import { STATION_IDLE, STATION_NO_BENCH, stationForTask } from './stations';` at the top of
+`game.ts`. With it in, `src/ui/catalogue.ts` can drop its own call and its comment and let
+`canSell` answer, which is the tidier end state.
+
+**The test that proves it.** `tests/engine/rackSale.test.ts`: add to
+`it('will not go while it holds sheets, and says how many are on it')`
+
+```ts
+    expect(canSell(state, rack.id)).toEqual({
+      ok: false,
+      reason: 'Empty it first, 24 sheets on it',
+    });
+```
+
+and the same for the man at the rack.
+
 ---
 
 ## 2. Numbers chosen
@@ -327,3 +372,7 @@ them; what it does not do until they land is look small, green and red.
 - The word a job card gives for a machine that is away being serviced, because `src/engine/jobs.ts`
   is nobody's file this phase. It is note 6. Until it lands the card says the machine is broken,
   which stops the stage in exactly the right way and calls it by the wrong name.
+- The engine's own guard on selling a rack with sheets on it, because `canSell` is in the frozen
+  `game.ts`. It is note 8, and the Owned tab already refuses it in the same words, so nothing in
+  the game offers the sale.
+- 2.14, the Machines column's `0 h`, which is B2's: `src/ui/company.ts` is theirs this phase.

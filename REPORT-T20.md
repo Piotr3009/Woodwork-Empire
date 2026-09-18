@@ -156,3 +156,14 @@ three month playthrough loses the day its saw is serviced in the middle of month
 run never earns the standing of 10 that a production manager wants, although it delivers the same
 29 jobs: the manager and the five days away both fall over. Every assertion of the playthrough
 stands as it was written.
+
+### 2.10 The rack can be sold
+
+`isSellableFamily` takes the storage now, so the rack and the tool cabinet stand beside the
+machines, the extraction and the bench; the office furniture is still a fitting. Two refusals come
+with it and they are one sentence each, read by the button and, once note 8 lands, by the engine
+behind it: `Empty it first, 24 sheets on it` while the hall's stock would have nowhere to go
+without this rack, and `Somebody is standing at it` while anybody's station is the rack, which is
+the question to ask of a rack because nobody ever claims one the way a man claims a machine. The
+sale itself is the sale the game already has: one Sell, the second click to mean it, the buyer's
+van in the morning.

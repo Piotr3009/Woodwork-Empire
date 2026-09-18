@@ -226,13 +226,36 @@ export function salePriceFor(item: Equipment): number {
 }
 
 /** The families the Owned tab offers a sale on: what the game calls a machine or the extraction
- *  kit, standing on the hall floor, and the bench, which a workshop buys and sells like any other
- *  thing that stands on its floor (PIOTR, 17.09; CLAUDE.md T8 3.5, T19 2.8). A rack, a locker and
- *  the office furniture are fittings, not plant. A bench somebody is working at is refused by the
- *  next line of `canSell`, which is the claim on it and needs nothing of its own. */
+ *  kit, standing on the hall floor, the bench, and from Turn 20 the storage as well, the rack and
+ *  the tool cabinet, which a workshop buys and sells like any other thing that stands on its floor
+ *  (PIOTR, 17.09 and 18.09; CLAUDE.md T8 3.5, T19 2.8, T20 2.10). The office furniture is a
+ *  fitting and not plant. A bench somebody is working at is refused by the claim on it in
+ *  `canSell`; a rack with sheets on it, or with somebody at it, is refused by
+ *  `storageSaleBlock` in `stations.ts`. */
 export function isSellableFamily(specId: string): boolean {
   const category = findSpec(specId)?.category;
-  return category === 'machine' || category === 'extraction' || category === 'bench';
+  return (
+    category === 'machine' ||
+    category === 'extraction' ||
+    category === 'bench' ||
+    category === 'storage'
+  );
+}
+
+/** The sheets that would have nowhere to go if this rack went: the hall's stock less what the
+ *  rest of the racks could hold (CLAUDE.md T20 2.10). With one rack in the hall, which is the
+ *  workshop Piotr plays, that is every sheet on it.
+ *
+ *  It is `rackCapacity` of `materials.ts` less this one rack, written here because `materials.ts`
+ *  reads this module and not the other way about; it is the same sum over the same
+ *  `sheetCapacityOf`. NOTES-B3.md asks phase C to bring the two together. */
+export function sheetsStrandedBySale(state: GameState, item: Equipment): number {
+  let room = 0;
+  for (const other of state.equipment) {
+    if (other.id === item.id) continue;
+    room += sheetCapacityOf(other);
+  }
+  return Math.max(0, state.stock.sheets - room);
 }
 
 /** Tools of this family that live in a cabinet: two men can have one out at once. */

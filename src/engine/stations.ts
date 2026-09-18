@@ -10,7 +10,8 @@ import {
   WELFARE_IN_THE_CANTEEN,
   roomDoorCell,
 } from './constants';
-import { isSold, itemStandsInTheHall } from './machines';
+import { isSold, itemStandsInTheHall, sheetCapacityOf, sheetsStrandedBySale } from './machines';
+import { plural } from './text';
 import type { Cell } from './pipes';
 import type { Equipment, GameState, TaskInstance } from './types';
 import { covers, footprintCells, isFree } from './walk';
@@ -106,6 +107,26 @@ export function unloadLegAt(task: { minutesTotal: number; minutesRemaining: numb
  *  walks the path the character system already uses, back and forth (CLAUDE.md T13 3.21). */
 export function unloadStation(task: TaskInstance, sheets: number): string {
   return unloadLegAt(task, sheets) % 2 === 0 ? STATION_GATE : STATION_RACK;
+}
+
+/** True while anybody is standing at the rack this minute, the owner or a man on his feet: a
+ *  rack is not sold out from under the man loading it (PIOTR, 18.09; CLAUDE.md T20 2.10). The
+ *  rack is the one item in the hall nobody ever "takes" the way a machine is taken, so the claim
+ *  `canSell` reads on a machine answers nothing about it and this is the question instead. */
+export function somebodyAtTheRack(state: GameState): boolean {
+  if (state.owner.station === STATION_RACK) return true;
+  return state.workers.some((worker) => worker.station === STATION_RACK);
+}
+
+/** Why a rack cannot be sold yet, or an empty string. The one sentence: the button on the Owned
+ *  tab prints it and the engine's own refusal reads it (CLAUDE.md T20 2.10). Anything that holds
+ *  no sheets, a tool cabinet or a machine, is nothing to do with it. */
+export function storageSaleBlock(state: GameState, item: Equipment): string {
+  if (sheetCapacityOf(item) <= 0) return '';
+  const stranded = sheetsStrandedBySale(state, item);
+  if (stranded > 0) return `Empty it first, ${plural(stranded, 'sheet', 'sheets')} on it`;
+  if (somebodyAtTheRack(state)) return 'Somebody is standing at it';
+  return '';
 }
 
 /** Where a job of work puts the figure doing it. */
