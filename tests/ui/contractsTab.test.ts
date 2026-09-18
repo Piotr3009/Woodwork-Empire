@@ -291,6 +291,9 @@ describe('the one click that takes the contract (CLAUDE.md T20 2.1.1)', () => {
     const state = hall();
     offered(state);
     Object.assign(game(), state);
+    // The clock is stopped for this one: the Work Plan is read on a stopped clock anyway
+    // (CLAUDE.md T7 3.10), and a frame loop running behind a test is a day going by under it.
+    game().speed = 0;
     render();
   });
 
