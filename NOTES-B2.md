@@ -78,7 +78,9 @@ and to `OwnerState`:
 ```
 
 with `WeekMeters` moved from `src/engine/staff.ts` into types.ts beside `DayLog`, and then delete
-the `HasWeek` interface and the two casts in `weekMetersOf`, `weekNowOf` and `weekBeforeOf`.
+the `HasWeek` interface and the three casts in `weekMetersOf`, `weekNowOf` and `weekBeforeOf`
+(the third is `productionMinutes`, which a fresh week seeds its baseline off; both `Worker` and
+`OwnerState` already declare it, so the cast goes with the interface).
 Nothing else changes: every caller already goes through those three. Test: the existing
 `tests/engine/staffWeek.test.ts` and `tests/ui/teamWeek.test.ts` stay green.
 
@@ -165,8 +167,14 @@ machines.ts is B3's tonight and staff.ts cannot be imported from it without a cy
 - new: `if (!PRODUCING_ROLES.includes(worker.role)) continue;` with `PRODUCING_ROLES` moved into
   constants.ts (it is a table, not behaviour) and read by both modules
 
-and then delete `isAtADesk` and its call in `src/ui/company.ts`. **One or the other, never both.**
-Test: `tests/ui/staffOnTheBoard.test.ts` stays green either way.
+and then delete `isAtADesk` and its call in `src/ui/company.ts`. **One or the other, never both,
+and the source is the one to apply.** The board's filter matches a line by the name it is written
+under, and `nameFor` in `src/engine/staff.ts` only keeps names unique while `WORKER_NAMES` has a
+free one; the pool holds 20 and the crew limit can pass 20 in a large unit, so a second Dave is
+reachable, and then an estimator Dave would take a joiner Dave's line off the sheet with him. The
+filter at the source reads the role and never the name, and the ambiguity goes with it.
+Test: `tests/ui/staffOnTheBoard.test.ts` stays green either way; add a hall with two men of one
+name, one at a desk and one at a bench, and assert the bench man keeps his line.
 
 ### 2.4 `src/ui/contracts.ts`: the engine key on the assign list (2.5, one word)
 
@@ -209,8 +217,10 @@ constants.ts and never copied.
 is drawn with classes that already exist:
 
 - the Let go control: `.row-action` with `button()` (`.btn`) or `reasonLabel()` (`.reason`).
-- the week line: a `.row` of two `.hint` spans, hooked by `data-team-week="<id>"` and by no class
-  of its own, so no rule is wanted.
+- the week line: two `<small>` elements inside the man's own `.row-main`, wrapped in a span hooked
+  by `data-team-week="<id>"` and carrying no class of its own. `small` is already
+  `display: block; font-size: var(--fs-tiny); color: var(--text-dim)` in styles.css and
+  `src/ui/contracts.ts` writes its second lines the same way, so no rule is wanted.
 - the hire card's refusal: the tile's own `.lock` paragraph and `reasonLabel`, as before.
 
 ## 5. Names: the brief's word against the code's
@@ -273,10 +283,118 @@ New test files: `tests/engine/payrollWeek.test.ts`, `tests/engine/estimatorSiteM
    with the evenings in Turn 17, and nothing else raises it. A kind of its own (`workerLetGo`)
    would read better if phase C wants to add one.
 4. **The night shift is not in a man's week.** `runNightShift` runs its own minute loop and never
-   calls `settle`, so the sampler never sees those minutes. Nothing in 2.7 asks for the night, and
-   a line inside `runNightShift` (B3's and the frozen game.ts's) would be wanted for it.
+   calls `settle`, so the sampler never sees those minutes. The sampler therefore leaves a night
+   man alone altogether rather than sampling him through the day he was asleep for: his week reads
+   nothing, which is true, instead of a day that was somebody else's. Nothing in 2.7 asks for the
+   night, and a line inside `runNightShift` (B3's and the frozen game.ts's) would be wanted for it.
 5. **The take off's minutes are forced in `createTask`** instead of at the one caller in jobs.ts,
    which is not mine (2.1 above).
 6. **A man under notice is still given new work.** 2.4 does not say he should not be, so nothing
    stops the Work Plan putting him on a job he will not be there to finish; the morning he goes the
    job simply has nobody on it, which is what the brief asks for.
+
+---
+
+## 8. Review: the eight findings, one by one
+
+An adversarial reviewer read the four commits. Three findings stood and are fixed, two are fixed
+as far as my files reach, three are rejected. Nothing below weakened or skipped a test.
+
+### 8.1 Confirmed and fixed: the week's meters booked minutes nobody worked
+(`src/engine/tasks.ts`, `bookWeekMinutes`)
+
+True, in all three of the ways the finding names, and proved before the fix went in: a joiner at an
+empty rack read 1 band minute for 1 minute of standing about, and an hour of the owner's evening
+put 60 minutes into every man's week with the hall dark. The sampler read `worker.jobId` and
+`worker.taskId`, which a man keeps whether or not the minute went anywhere.
+
+The minute is sampled now only when it was somebody's to work:
+
+- `bookWeekMinutes` skips the whole crew while `crewHasGoneHome(state)` is true, so the evening
+  after five is the owner's alone on the meters as it is in the hall (CLAUDE.md T17 2.12), and it
+  samples the day shift only. A night man is left out rather than counted through a day he was
+  asleep for (7.4 above).
+- `bookOne` credits a band only when the man's own counters rose since the last sample:
+  `productionMinutes` for a bench or contract minute and `minutesWorked` for a task minute, read
+  through the new `effortSoFar` in `src/engine/staff.ts`. The paid minute is booked either way,
+  which is the point of the efficiency figure: a man at an empty rack is paid for the hour and his
+  week says he made nothing in it.
+- `WeekMeters` gains `seenBench` and `seenTask` for those two baselines. The bench counter never
+  goes back, so a fresh week seeds it off the man; the task counter starts again every morning, so
+  the first sample of a day takes a baseline and credits nothing. Both are exact in the game,
+  where a man's week opens at the day start before he has touched anything.
+
+Tests: `tests/engine/staffWeek.test.ts` gains "pays him for the hour he spends at an empty rack and
+counts none of it as worked" and "leaves the evening to the owner". Both fail on the old sampler.
+
+### 8.2 Confirmed and fixed: 2.7's Done test asserted the formula against itself
+(`tests/engine/staffWeek.test.ts`)
+
+True. `summed === weekWorkedMinutes(meters)` was the same reduce twice and the efficiency line
+re-typed the function's body, so the over-counting above passed green. The first test now pins the
+meters to the engine's own count: an hour at the bench raises the jobs band by exactly the sixty
+minutes `worker.productionMinutes` rose by, the other five bands never open, and the hours are the
+bands. The efficiency assertion is written against `productionMinutes`, not against the formula.
+
+### 8.3 Confirmed and fixed: the week was a second row, not a second line
+(`src/ui/team.ts`)
+
+True, and against "one game, one look": `.row` carries a border and `space-between`, so a man was
+drawn with a rule between him and his own week and the two sentences were pushed to the two ends.
+The game already has the second line, a `<small>` inside `.row-main` (`src/ui/contracts.ts`), and
+that is what the week uses now: `teamRow` takes the week as its last argument and puts it inside
+the man's own main span, with `data-team-week` on a wrapping span so the tests still find it. No
+new class and no new rule.
+
+### 8.4 Confirmed and fixed: the Technical tab printed a stranger's day
+(`src/engine/tasks.ts`, `src/ui/team.ts`)
+
+True. `estimatorCapacity` scales with the man's class, but the offer filled every figure with the
+experienced man, so a workshop with a no experience estimator at the desk was sold Joinery Core
+against 16 and 32 when his own day is 12 and 25. `joineryCoreOffer` works the figures out for the
+estimator on the books (`deskEstimator`), falls back to the experienced man when the desk is empty,
+and carries his name and his tier; the line reads `Take offs for Ed, no experience: 12 a day, 25
+with Joinery Core`, or `Take offs for an experienced man` with nobody there. `minutesEach` is his
+half hour at his own rate, so the two halves of the sentence agree. Test: a new `it` in
+`tests/ui/team.test.ts`.
+
+### 8.5 Confirmed as a fact, rejected as a change: Let go is drawn and the click is phase C's
+(`src/ui/team.ts`)
+
+The fact is true and this file said so before the review (7.1, and REPORT-T20.md with it): the
+action, the reducer case and the route are three lines in `src/engine/types.ts`,
+`src/engine/game.ts` and `src/ui/app.ts`, which are three of the six frozen files, and they are
+written out for phase C in 1.1 to 1.3. The remedy the finding proposes, not drawing the button
+until then, is rejected: 2.4 says Our team gets `Let go` on every worker's row, T20-C5 asks for
+the picture of it, and a brief's control that the branch hides is a worse lie than one that waits
+three lines. The engine behind it and its two tests are done. Phase C applies the three lines and
+adds the click test named in 1.3.
+
+### 8.6 Rejected: the eligible list test reads the table it is checking
+(`tests/engine/estimatorSiteMeasure.test.ts`)
+
+Half true, and not a defect. The assertions carry the literal roles 2.3.2 names, so the test fails
+if `salesman` or `estimator` is taken off the table: that is a content check, not the tautology of
+8.2, which compared a function with a copy of itself and could not fail. That `eligibleRoles` is
+read by nothing but `rolesForTask` is true and is the brief's own doing: 2.3.2 asks for the
+salesman on the list and asks for no screen that sends him. Giving `assignWorkerTask` an
+eligibility gate would change who may be put on every other kind of task as well, which this brief
+does not ask for and which section 6 of it would call a second rule about the same thing.
+
+### 8.7 Rejected here, already noted: `createTask` sets the take off's own minutes
+(`src/engine/tasks.ts`)
+
+The override is deliberate and commented, and 2.1 above hands phase C both halves of the change:
+point `src/engine/jobs.ts` at `takeOffMinutes` and delete the override in the same commit.
+`src/engine/jobs.ts` is not mine tonight, and deleting the override on its own would put the old
+price curve back into the one take off the game creates, which is exactly what 2.3 removes. One
+half of a two file change is not the smallest correct change; it is a bug.
+
+### 8.8 Confirmed, and it is a note: the Output sheet matches a line by the man's name
+(`src/ui/company.ts`, `src/engine/machines.ts`)
+
+True and reachable: `nameFor` gives a second Dave out once the twenty names are used and the crew
+limit can pass twenty, and then `isAtADesk` takes the joiner Dave's line off the sheet with the
+estimator Dave's. The line carries no id, and `src/engine/machines.ts` is B3's tonight, so 2.3
+above is now written as the fix to apply and not as an alternative: filter at the source on the
+role, delete `isAtADesk` and its call, and the name never comes into it.

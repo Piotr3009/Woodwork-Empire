@@ -1,7 +1,8 @@
 // The week, man by man (PIOTR; CLAUDE.md T20 2.7). A sample a minute of what everybody was at,
 // into the six bands Our team prints: jobs, contracts, unloading, cleaning, desk and site. The
-// bands add up to the hours he worked, because they are the same minutes, and the efficiency
-// figure is his rate times the minutes he spent making something over the minutes he was paid for.
+// bands are the minutes he actually put in, which is why they are pinned here to the engine's own
+// count of them and never to the formula that reads them: a man standing at an empty rack is paid
+// for the hour and works none of it, and the evening after five belongs to the owner alone.
 
 import { describe, expect, it } from 'vitest';
 import { weekOfDay } from '../../src/engine/clock';
@@ -12,12 +13,14 @@ import {
   weekNowOf,
   weekWorkedMinutes,
 } from '../../src/engine/staff';
+import { DAY_END_MINUTE } from '../../src/engine/constants';
 import { acceptContract, assignContract, drawContract } from '../../src/engine/contracts';
 import { assignJob } from '../../src/engine/jobs';
 import type { GameState, Worker } from '../../src/engine/index';
 import {
   acceptNow,
   buyStartingKit,
+  choose,
   clearEvents,
   fillRack,
   firstJob,
@@ -28,9 +31,11 @@ import {
   runClock,
 } from '../helpers';
 
-/** A hall with a full rack, one experienced joiner on the books and a job ready for the bench. */
-function readyHall(): GameState {
-  let state = fillRack(buyStartingKit(newGame({ difficulty: 'veryEasy' })), 60);
+/** A hall with a rack, one experienced joiner on the books and a job ready for the bench. An
+ *  empty rack is the same hall with nothing on it: the man is there and there is nothing to make.
+ */
+function readyHall(sheets = 60): GameState {
+  let state = fillRack(buyStartingKit(newGame({ difficulty: 'veryEasy' })), sheets);
   state.enquiries = [];
   placeEquipment(state, 'locker', { x: 6, y: 9 });
   placeEquipment(state, 'canteenSeat', { x: 8, y: 9 });
@@ -52,28 +57,84 @@ function metersOf(state: GameState, worker: Worker) {
   return weekNowOf(worker, weekOfDay(state.clock.day));
 }
 
+/** Runs the clock and answers whatever the hall asks on the way, a minute at a time, because a
+ *  hall with nothing on the rack stops the run to say so. */
+function runOn(state: GameState, minutes: number): GameState {
+  let next = state;
+  for (let i = 0; i < minutes; i += 1) next = clearEvents(runClock(next, 1));
+  return next;
+}
+
 describe('a man s week', () => {
-  it('counts his minutes at the bench into the jobs band, and names the job', () => {
+  it('counts the minutes he stood at the bench and not one more, and names the job', () => {
     const start = readyHall();
     const man = start.workers[0];
     if (!man) throw new Error('nobody on the books');
     assignJob(start, firstJob(start).id, man.id);
-    const state = clearEvents(runClock(start, 60));
+    // A minute to open his week, and then the hour this is about.
+    const opened = clearEvents(runClock(start, 1));
+    const first = opened.workers[0];
+    const opening = metersOf(opened, first as Worker);
+    if (!first || !opening) throw new Error('no week on him');
+    const state = clearEvents(runClock(opened, 60));
     const after = state.workers[0];
     if (!after) throw new Error('nobody on the books');
     const meters = metersOf(state, after);
     if (!meters) throw new Error('no week on him');
-    expect(meters.minutes.jobs).toBeGreaterThan(0);
-    expect(meters.jobs).toContain(firstJob(state).name);
-    // The split is the hours: every band of it and nothing else.
-    const summed = WEEK_CATEGORIES.reduce((total, band) => total + meters.minutes[band], 0);
-    expect(summed).toBe(weekWorkedMinutes(meters));
-    expect(weekWorkedMinutes(meters)).toBeLessThanOrEqual(meters.paidMinutes);
-    // And the figure follows the minutes: his rate times what he made over what he was paid for.
+    // The engine's own count of what he made in the hour, and nothing else, is what the jobs
+    // band took: sixty minutes at the bench, sixty minutes in the band.
+    expect(after.productionMinutes - first.productionMinutes).toBe(60);
+    expect(meters.minutes.jobs - opening.minutes.jobs).toBe(60);
+    // He was at a bench and nowhere else: the other five bands never opened.
+    for (const band of WEEK_CATEGORIES) {
+      if (band !== 'jobs') expect(meters.minutes[band]).toBe(0);
+    }
+    expect(meters.jobs).toEqual([firstJob(state).name]);
+    // The hours are the bands, and the company paid for at least them.
+    expect(weekWorkedMinutes(meters)).toBe(meters.minutes.jobs);
+    expect(meters.paidMinutes).toBeGreaterThanOrEqual(weekWorkedMinutes(meters));
+    // The figure is the minutes he made something in against the minutes he was paid for.
     expect(weekEfficiency(after.rate, meters)).toBeCloseTo(
-      (after.rate * (meters.minutes.jobs + meters.minutes.contracts)) / meters.paidMinutes,
+      (after.rate * meters.minutes.jobs) / meters.paidMinutes,
       6,
     );
+  });
+
+  it('pays him for the hour he spends at an empty rack and counts none of it as worked', () => {
+    const start = readyHall(0);
+    const man = start.workers[0];
+    if (!man) throw new Error('nobody on the books');
+    assignJob(start, firstJob(start).id, man.id);
+    const state = runOn(start, 60);
+    const after = state.workers[0];
+    if (!after) throw new Error('nobody on the books');
+    const meters = metersOf(state, after);
+    if (!meters) throw new Error('no week on him');
+    // Nothing was made, so nothing is in the bands, and the wages ran all the same.
+    expect(after.productionMinutes).toBe(0);
+    expect(weekWorkedMinutes(meters)).toBe(0);
+    expect(meters.paidMinutes).toBeGreaterThan(0);
+    expect(weekEfficiency(after.rate, meters)).toBe(0);
+  });
+
+  it('leaves the evening to the owner: nobody else is paid for it or counted through it', () => {
+    const start = readyHall();
+    const man = start.workers[0];
+    if (!man) throw new Error('nobody on the books');
+    assignJob(start, firstJob(start).id, man.id);
+    // Five o'clock, and the owner stays on while the men go home (CLAUDE.md T17 2.12).
+    const evening = runClock(start, DAY_END_MINUTE + 1);
+    expect(evening.activeEvent?.kind).toBe('goingHome');
+    const before = metersOf(evening, evening.workers[0] as Worker);
+    if (!before) throw new Error('no week on him');
+    const paid = before.paidMinutes;
+    const worked = weekWorkedMinutes(before);
+    const later = runOn(choose(evening, 'overtime'), 60);
+    expect(later.clock.minute).toBeGreaterThan(DAY_END_MINUTE);
+    const meters = metersOf(later, later.workers[0] as Worker);
+    if (!meters) throw new Error('no week on him');
+    expect(meters.paidMinutes).toBe(paid);
+    expect(weekWorkedMinutes(meters)).toBe(worked);
   });
 
   it('counts a man on a standing contract into the contracts band', () => {

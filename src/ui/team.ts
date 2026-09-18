@@ -274,7 +274,9 @@ function startedText(state: GameState, startDay: number): string {
 /** One row of Our team: who he is, when he started, what he costs, the hours he has put in this
  *  month, the days he has had off and what he is on this minute (CLAUDE.md T17 2.9). The pay is
  *  handed in as the words the row prints, because a man is paid by the week and the owner draws
- *  his by the day (CLAUDE.md T20 2.6). */
+ *  his by the day (CLAUDE.md T20 2.6). His week goes under his name as the second line of the
+ *  same row, which is what the game's rows already do with a `<small>` inside the main span
+ *  (`src/ui/contracts.ts`), and never as a row of its own (CLAUDE.md T20 1, 2.7). */
 function teamRow(
   id: string,
   name: string,
@@ -285,10 +287,11 @@ function teamRow(
   daysOff: number,
   doing: string,
   action = '',
+  week = '',
 ): string {
   return (
     `<div class="row" data-team="${id}">` +
-    `<span class="row-main">${escapeHtml(name)}, ${escapeHtml(role)}</span>` +
+    `<span class="row-main">${escapeHtml(name)}, ${escapeHtml(role)}${week}</span>` +
     `<span class="row-figure team-when">${escapeHtml(when)}</span>` +
     `<span class="row-figure">${escapeHtml(pay)}</span>` +
     `<span class="row-figure">${hoursText(minutesWorked)} this month</span>` +
@@ -332,14 +335,15 @@ function weekText(label: string, rate: number, meters: WeekMeters | null): strin
   return `${label}: ${parts.join(', ')}`;
 }
 
-/** The second line of a man's row on Our team: this week and last (CLAUDE.md T20 2.7). */
-function weekRow(state: GameState, id: string, rate: number, holder: object): string {
+/** The second line of a man's row on Our team: this week and last, one under the other inside his
+ *  own row (CLAUDE.md T20 2.7). */
+function weekLine(state: GameState, id: string, rate: number, holder: object): string {
   const week = weekOfDay(state.clock.day);
   return (
-    `<div class="row" data-team-week="${id}">` +
-    `<span class="hint">${escapeHtml(weekText('This week', rate, weekNowOf(holder, week)))}</span>` +
-    `<span class="hint">${escapeHtml(weekText('Last week', rate, weekBeforeOf(holder, week)))}</span>` +
-    '</div>'
+    `<span data-team-week="${id}">` +
+    `<small>${escapeHtml(weekText('This week', rate, weekNowOf(holder, week)))}</small>` +
+    `<small>${escapeHtml(weekText('Last week', rate, weekBeforeOf(holder, week)))}</small>` +
+    '</span>'
   );
 }
 
@@ -358,9 +362,10 @@ function ourTeamRows(state: GameState): string {
       owner.monthMinutes,
       owner.monthDaysOff,
       ownerDayLine(state),
-    ) +
+      '',
       // The owner works at his own speed, which is the 1.00 every tier is measured against.
-      weekRow(state, 'owner', 1, owner),
+      weekLine(state, 'owner', 1, owner),
+    ),
     ...state.workers.map(
       (worker) =>
         teamRow(
@@ -373,7 +378,8 @@ function ourTeamRows(state: GameState): string {
           worker.monthDaysOff,
           workerDoing(state, worker),
           letGoControl(state, worker),
-        ) + weekRow(state, worker.id, worker.rate > 0 ? worker.rate : 1, worker),
+          weekLine(state, worker.id, worker.rate > 0 ? worker.rate : 1, worker),
+        ),
     ),
   ];
   return rows.join('');
@@ -481,8 +487,14 @@ function ownerCard(state: GameState): string {
  *  man whose day they lengthen (CLAUDE.md T13 3.8). */
 function joineryCoreLines(state: GameState): string {
   const offer = joineryCoreOffer(state);
-  // A take off is half an hour of his desk at his own rate, so what the software buys is a
-  // shorter half hour and a longer pile (CLAUDE.md T20 2.3).
+  // Whose day the figures are. A take off is half an hour of his desk at his own rate, so the
+  // man at the desk is the man they are worked out for, and with nobody there they are the
+  // experienced man's and the line says as much (CLAUDE.md T20 2.3).
+  const whose =
+    offer.estimator === null
+      ? 'for an experienced man'
+      : `for ${offer.estimator}, ${TIER_WORDS[offer.tier]}`;
+  // What the software buys him is a shorter half hour and a longer pile.
   const held = offer.held
     ? `On the laptop${offer.extensions > 0 ? `, with ${plural(offer.extensions, 'extension', 'extensions')}` : ''}: ` +
       `${minutes(offer.minutesEach)} each, ${offer.capacity} take offs a day.`
@@ -497,7 +509,7 @@ function joineryCoreLines(state: GameState): string {
     : reasonLabel(offer.extension.reason);
   return (
     '<h3>Joinery Core</h3>' +
-    `<p class="hint joinery-core">Take offs: ${escapeHtml(held)}</p>` +
+    `<p class="hint joinery-core">Take offs ${escapeHtml(whose)}: ${escapeHtml(held)}</p>` +
     '<div class="row"><span class="row-main">Joinery Core</span>' +
     `<span class="row-figure">${money(offer.yearlyPrice)} a year, charged monthly</span>` +
     `<span class="row-action">${core}</span></div>` +

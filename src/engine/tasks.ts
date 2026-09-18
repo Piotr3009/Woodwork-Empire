@@ -50,6 +50,8 @@ import { makeId } from './rng';
 import { plural } from './text';
 import {
   WEEK_JOBS_KEPT,
+  crewHasGoneHome,
+  effortSoFar,
   hasWorkingDay,
   helperOnDuty,
   isWorkingToday,
@@ -63,6 +65,7 @@ import type {
   Contract,
   DayCategory,
   GameState,
+  OwnerState,
   Worker,
   SoftwareTier,
   TaskCategory,
@@ -336,6 +339,13 @@ export function estimatorCapacity(state: GameState, tier: WorkerTier = 'experien
   return capacityFor(takeOffMinutes(state), tier);
 }
 
+/** The man the software is bought for: the estimator on the books, if there is one. The figures on
+ *  the Technical tab are his day, not a stranger's, because a take off is half an hour of the desk
+ *  it is done at and his class is what makes it 37 minutes or 21 (CLAUDE.md T20 2.3). */
+function deskEstimator(state: GameState): Worker | null {
+  return state.workers.find((worker) => worker.role === 'estimator') ?? null;
+}
+
 /** What the Technical tab says about Joinery Core: whether it is on the laptop, what it and its
  *  extensions do to the estimator's day, what each costs a year, and whether the two buttons can
  *  be pressed (CLAUDE.md T13 3.8). The refusals are the ones the action applies. */
@@ -343,14 +353,18 @@ export interface JoineryCoreOffer {
   held: boolean;
   extensions: number;
   maxExtensions: number;
-  /** Take offs a day as things stand, for an experienced man at the desk. */
+  /** Take offs a day as things stand, for the man whose day this is. */
   capacity: number;
-  /** The minutes one of them takes with what is on the laptop now. */
+  /** The minutes one of them costs him, at his own rate. */
   minutesEach: number;
   baseCapacity: number;
   coreCapacity: number;
   /** A day's take offs with the core and one extension, and with both (CLAUDE.md T20 2.3). */
   extensionCapacities: number[];
+  /** Whose day every figure above is: the estimator on the books, or nobody, and then they are
+   *  the experienced man's and the page says so (CLAUDE.md T20 2.3). */
+  estimator: string | null;
+  tier: WorkerTier;
   yearlyPrice: number;
   extensionYearlyPrice: number;
   core: { ok: boolean; reason: string };
@@ -366,17 +380,23 @@ export function joineryCoreOffer(state: GameState): JoineryCoreOffer {
   let extension = { ok: true, reason: '' };
   if (!held) extension = { ok: false, reason: 'Joinery Core first' };
   else if (extensions >= JOINERY_CORE_MAX_EXTENSIONS) extension = { ok: false, reason: 'Both extensions bought' };
+  // The man at the desk, or the experienced man the trade is measured against when the desk is
+  // empty: the player is never shown a day that is nobody's (CLAUDE.md T20 2.3).
+  const man = deskEstimator(state);
+  const tier = man?.tier ?? 'experienced';
   return {
     held,
     extensions,
     maxExtensions: JOINERY_CORE_MAX_EXTENSIONS,
-    capacity: estimatorCapacity(state),
-    minutesEach: takeOffMinutes(state),
-    baseCapacity: capacityFor(takeOffMinutesWith(false, 0), 'experienced'),
-    coreCapacity: capacityFor(takeOffMinutesWith(true, 0), 'experienced'),
+    capacity: estimatorCapacity(state, tier),
+    minutesEach: Math.round(takeOffMinutes(state) / WORKER_RATES[tier]),
+    baseCapacity: capacityFor(takeOffMinutesWith(false, 0), tier),
+    coreCapacity: capacityFor(takeOffMinutesWith(true, 0), tier),
     extensionCapacities: EXTENSION_STEPS.map((step) =>
-      capacityFor(takeOffMinutesWith(true, step), 'experienced'),
+      capacityFor(takeOffMinutesWith(true, step), tier),
     ),
+    estimator: man === null ? null : man.name,
+    tier,
     yearlyPrice: JOINERY_CORE_PRICE_YEARLY,
     extensionYearlyPrice: JOINERY_CORE_EXTENSION_PRICE_YEARLY,
     core,
@@ -699,19 +719,30 @@ function jobNameOf(state: GameState, jobId: string | null): string | null {
   return state.jobs.find((job) => job.id === jobId)?.name ?? null;
 }
 
-/** Books one minute onto one man's week. True when the minute was his to book. */
+/** Books one minute onto one man's week: the minute he was paid for, and the band it went into if
+ *  he actually worked it. The clock paid for it and his own counters say whether he put anything
+ *  into it: a joiner standing at an empty rack keeps his job and raises neither, so his week reads
+ *  the hours he was there and the nothing he did with them (CLAUDE.md T20 2.7). */
 function bookOne(
   state: GameState,
-  holder: object,
+  holder: Worker | OwnerState,
   week: number,
   band: WeekCategory | null,
   jobName: string | null,
 ): WeekMeters | null {
   const meters = weekMetersOf(holder, week);
   if (meters.day === state.clock.day && meters.minute === state.clock.minute) return null;
+  const effort = effortSoFar(holder);
+  // His task counter goes back to nought every morning, so the day's first sample takes a
+  // baseline off it and credits nothing; the bench counter never goes back.
+  const sameDay = meters.day === state.clock.day;
+  const worked = effort.bench > meters.seenBench || (sameDay && effort.task > meters.seenTask);
+  meters.seenBench = effort.bench;
+  meters.seenTask = effort.task;
   meters.day = state.clock.day;
   meters.minute = state.clock.minute;
   meters.paidMinutes += 1;
+  if (!worked) return meters;
   if (band !== null) meters.minutes[band] += 1;
   if (jobName !== null && !meters.jobs.includes(jobName) && meters.jobs.length < WEEK_JOBS_KEPT) {
     meters.jobs.push(jobName);
@@ -750,10 +781,17 @@ export function bookWeekMinutes(state: GameState): void {
     const band = bandOf(state, owner.currentTaskId, job?.id ?? null);
     bookOne(state, owner, week, band, job?.name ?? null);
   }
-  for (const worker of state.workers) {
-    if (!isWorkingToday(state, worker) && !isWorkingToday(state, worker, 'night')) continue;
-    const band = bandOf(state, worker.taskId, worker.jobId);
-    bookOne(state, worker, week, band, jobNameOf(state, worker.jobId));
+  // Five o'clock and the men have gone home. The clock runs on for the owner and for nobody else,
+  // so nobody else is paid for the evening or counted through it (CLAUDE.md T17 2.12).
+  if (!crewHasGoneHome(state)) {
+    for (const worker of state.workers) {
+      // The day shift, and only the day shift: the night runs its own minute loop and never
+      // settles, so a man on it is left out of the meters rather than sampled through a day he
+      // was asleep for (NOTES-B2.md).
+      if (!isWorkingToday(state, worker)) continue;
+      const band = bandOf(state, worker.taskId, worker.jobId);
+      bookOne(state, worker, week, band, jobNameOf(state, worker.jobId));
+    }
   }
   bookContractPieces(state, week);
 }

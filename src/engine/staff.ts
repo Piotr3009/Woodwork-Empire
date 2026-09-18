@@ -47,6 +47,7 @@ import type {
   GameState,
   HiringOption,
   Job,
+  OwnerState,
   Shift,
   Worker,
   WorkerRole,
@@ -536,6 +537,21 @@ export interface WeekMeters {
   jobs: string[];
   day: number;
   minute: number;
+  /** His bench and contract minutes when the sampler last looked. It is a running total that never
+   *  goes back, so it is seeded the minute the meters are made and a rise in it is a minute he
+   *  actually stood and made something. */
+  seenBench: number;
+  /** His task minutes when the sampler last looked. That counter starts again every morning, so
+   *  the first sample of a day takes a baseline off it and credits nothing. */
+  seenTask: number;
+}
+
+/** What his own counters say he has put in: the bench and contract minutes the production runner
+ *  raises and the task minutes the task runner raises. The one reading of whether the minute just
+ *  gone was worked at all: a man at an empty rack, or one standing at a saw another man is on,
+ *  keeps his job and his task and raises neither (CLAUDE.md T20 2.7). */
+export function effortSoFar(holder: Worker | OwnerState): { bench: number; task: number } {
+  return { bench: holder.productionMinutes, task: holder.minutesWorked };
 }
 
 /** How many job names a week's line carries [TUNE]: enough to read, not a paragraph. */
@@ -548,9 +564,12 @@ export const WEEK_JOBS_KEPT = 4;
 interface HasWeek {
   weekNow?: WeekMeters;
   weekBefore?: WeekMeters | null;
+  /** The bench counter, so a fresh week seeds itself off the man it hangs on. Both `Worker` and
+   *  `OwnerState` carry it; a holder that does not is seeded at nought. */
+  productionMinutes?: number;
 }
 
-function freshMeters(week: number): WeekMeters {
+function freshMeters(week: number, bench: number): WeekMeters {
   return {
     week,
     minutes: { jobs: 0, contracts: 0, unloading: 0, cleaning: 0, desk: 0, site: 0 },
@@ -559,17 +578,20 @@ function freshMeters(week: number): WeekMeters {
     jobs: [],
     day: 0,
     minute: -1,
+    seenBench: bench,
+    seenTask: 0,
   };
 }
 
 /** The meters of the week in hand, made and rolled over if the week has turned. The write side:
- *  only the sampler calls it. */
+ *  only the sampler calls it. A new week starts from where his bench counter stands, so the first
+ *  minute of it is not credited with every minute he has ever worked. */
 export function weekMetersOf(holder: object, week: number): WeekMeters {
   const carrier = holder as HasWeek;
   const held = carrier.weekNow;
   if (held !== undefined && held.week === week) return held;
   if (held !== undefined) carrier.weekBefore = held;
-  carrier.weekNow = freshMeters(week);
+  carrier.weekNow = freshMeters(week, carrier.productionMinutes ?? 0);
   return carrier.weekNow;
 }
 

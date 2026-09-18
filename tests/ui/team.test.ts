@@ -258,6 +258,20 @@ describe('the Technical tab (CLAUDE.md T13 3.8)', () => {
     expect(bought.textContent).toContain('15 min each');
   });
 
+  it('works the day out for the estimator on the books, and names him', () => {
+    // With nobody at the desk the figures are the experienced man's and the line says so.
+    const empty = parse(renderTeam(buyStartingKit(known()), 'technical'));
+    expect(empty.textContent).toContain('Take offs for an experienced man: 16 a day');
+    // With a man of no experience at it they are his: half an hour at 0.8 is 37 minutes, and 12
+    // of them fill his day (CLAUDE.md T20 2.3).
+    const state = hireNow(buyStartingKit(known()), 'estimator', 'novice');
+    const man = state.workers[0];
+    if (!man) throw new Error('nobody at the desk');
+    const page = parse(renderTeam(state, 'technical'));
+    expect(page.textContent).toContain(`Take offs for ${man.name}, no experience: 12 a day`);
+    expect(page.textContent).toContain('25 with Joinery Core');
+  });
+
   it('says so when there is no laptop to put it on', () => {
     const page = parse(renderTeam(known(), 'technical'));
     expect(page.querySelectorAll('[data-do="buyJoineryCore"]')).toHaveLength(0);

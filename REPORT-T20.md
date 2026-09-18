@@ -90,3 +90,20 @@ to the hours because they are the same minutes. The Machines column says `0 h` w
 the job named, a man on a contract into the contracts band, the week rolling over instead of
 adding, the row printing the hours, the split, the job and the figure, and the machine nobody
 stood at reading `0 h`.
+
+**T20-B2 review: the findings that stood.** A reviewer read the four commits and reported eight
+things. Three stood and are fixed: the week's meters booked a minute for every man the clock ran
+over, worked or not, so an evening of the owner's overtime put two hours into every man's week and
+a joiner at an empty rack read a full day at the bench, and the sampler now credits a band only
+when the man's own counters rose and leaves the crew out of the evening altogether; 2.7's own test
+asserted the formula against itself and now pins the jobs band to the engine's count of the
+minutes he made something in; and the week was drawn as a second `.row` under a man instead of the
+second line inside his own row that the rest of the game uses. Two more are fixed as far as my
+files reach: the Technical tab worked Joinery Core out for an experienced man whoever was at the
+desk, and now names the estimator on the books and prints his day. Three are rejected, with the
+reasons in `NOTES-B2.md` section 8: the dead `Let go` click is three lines in three frozen files
+and hiding the button would break 2.4; the eligible list test carries the roles the brief names
+and is a content check; and the take off's minutes want `src/engine/jobs.ts`, which is not mine,
+in the same commit as the override they replace.
+`npm run check` green on its own exit code. Two new engine tests and one new UI test, all three
+red on the old code.
