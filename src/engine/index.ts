@@ -485,10 +485,8 @@ export {
   hands,
   jobOf,
   machineHoursPerDay,
-  placeStation,
   serviceDueOn,
   stationForProduction,
-  stationPlaceAt,
   takeMachines,
 } from './production';
 export type { Hand, StationCheck } from './production';
@@ -554,8 +552,10 @@ export {
   STATION_PHONE,
   STATION_RACK,
   machineStation,
+  placeStation,
   stationForTask,
   stationMachine,
+  stationPlaceAt,
   stationWaitingFor,
   waitingStation,
 } from './stations';

@@ -59,6 +59,27 @@ export function stationSecondAt(station: string): string | null {
   return station.startsWith('second:') ? station.slice('second:'.length) : null;
 }
 
+/** A place at an item beyond the two the station table draws by name. Place 0 is the operator's
+ *  cell and place 1 is the waiting cell at a machine, or the second place at a bench; from place
+ *  2 the men stand on along the same side, one cell further out each time, so twenty on one job
+ *  do not stack on one tile (PIOTR, 17.09; CLAUDE.md T19 2.5). The string names the item and not
+ *  the family, because it is that bench and that saw and no other. The renderer resolves the
+ *  string through `benchCellsAt` and `queueCellsAt` below. */
+export function placeStation(equipmentId: string, place: number): string {
+  return `place:${equipmentId}:${place}`;
+}
+
+/** The item and the place a station names, or null when it is not a place station. */
+export function stationPlaceAt(station: string): { id: string; place: number } | null {
+  if (!station.startsWith('place:')) return null;
+  const rest = station.slice('place:'.length);
+  const cut = rest.lastIndexOf(':');
+  if (cut <= 0) return null;
+  const place = Number(rest.slice(cut + 1));
+  if (!Number.isFinite(place) || place < 0) return null;
+  return { id: rest.slice(0, cut), place };
+}
+
 /** How many trips a load of sheets is between the pallet at the gate and the rack, so many
  *  sheets a trip, and never fewer than one (CLAUDE.md T13 3.21). */
 export function unloadTrips(sheets: number): number {

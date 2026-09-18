@@ -53,7 +53,13 @@ import {
 import { ownerEfficiency, ownerIsAvailable, spendOwnerMinute, staffOutputFactor } from './owner';
 import { contractMen } from './contracts';
 import { bookMonthMinute, isWorkingToday } from './staff';
-import { STATION_BENCH, machineStation, secondStation, waitingStation } from './stations';
+import {
+  STATION_BENCH,
+  machineStation,
+  placeStation,
+  secondStation,
+  waitingStation,
+} from './stations';
 import {
   type StagePlan,
   cncOptions,
@@ -154,28 +160,6 @@ export function takeMachines(state: GameState, hand: Hand): StationCheck {
 function sharedTool(state: GameState, family: string | null): Equipment | null {
   if (family === null || !machineIsShared(state, family)) return null;
   return cabinetTools(state, family)[0] ?? null;
-}
-
-/** A place at an item beyond the two the station table draws by name. Place 0 is the operator's
- *  cell and place 1 is the waiting cell at a machine, or the second place at a bench; from place
- *  2 the men stand on along the same side, one cell further out each time, so twenty on one job
- *  do not stack on one tile (PIOTR, 17.09; CLAUDE.md T19 2.5). The string names the item and not
- *  the family, because it is that bench and that saw and no other.
- *  [NOTES-B2.md] this pair belongs in `src/engine/stations.ts` beside `secondStation`, which is
- *  frozen for phase B; the renderer resolves the string with `benchCellsAt` / `queueCellsAt`. */
-export function placeStation(equipmentId: string, place: number): string {
-  return `place:${equipmentId}:${place}`;
-}
-
-/** The item and the place a station names, or null when it is not a place station. */
-export function stationPlaceAt(station: string): { id: string; place: number } | null {
-  if (!station.startsWith('place:')) return null;
-  const rest = station.slice('place:'.length);
-  const cut = rest.lastIndexOf(':');
-  if (cut <= 0) return null;
-  const place = Number(rest.slice(cut + 1));
-  if (!Number.isFinite(place) || place < 0) return null;
-  return { id: rest.slice(0, cut), place };
 }
 
 /** Where this man stands among the men on his job, counting only the ones the same thing is true

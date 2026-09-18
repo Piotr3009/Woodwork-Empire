@@ -551,6 +551,8 @@ function hallChip(text: string, action = ''): string {
 /** The button that puts a chip's problem right: the same actions the machine's own card calls, so
  *  there is one way to clean the hall, empty the bags, fix a machine and service one. */
 function chipAction(problem: HallProblem): string {
+  // Somebody is already on it: the chip tells him so and asks him nothing (CLAUDE.md T19 2.7).
+  if (problem.inHand === true) return '';
   if (problem.kind === 'dirty') {
     return `<button class="btn" data-do="startCleaning">Clean up · ${minutes(CLEANING_MINUTES)}</button>`;
   }
@@ -1895,7 +1897,8 @@ function handleSceneClick(element: DataElement): boolean {
     // calls, and the extractor's carries the hall's bag store (PIOTR, 17.09; CLAUDE.md T17 2.6).
     // Anything that is not a machine keeps its note.
     const category = findSpec(item.specId)?.category;
-    if (category === 'machine' || category === 'extraction') {
+    // The bench has a card of its own now, because it can be sold like a machine (T19 2.8).
+    if (category === 'machine' || category === 'extraction' || category === 'bench') {
       openMachineCard(item.id);
       requestRender();
       return true;

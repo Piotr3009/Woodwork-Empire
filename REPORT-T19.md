@@ -722,3 +722,24 @@ to be at that stage, because a workshop with no booth cannot spray and must not 
 test now builds the booth and puts a man at it, and asserts the silence at each step on the way.
 
 `npm run check` exit 0: 172 files, 1,728 tests.
+
+### T19-C1g B2's last three notes: the third man's cell, the cleaning chip, the bench click
+
+- **The third man stood on the first man's cell.** B2's engine gives every man past the second a
+  station of his own, `place:<equipmentId>:<n>`, and B1's `queueCellsAt` and `benchCellsAt` say
+  where those places are, but the two halves were written in different worktrees and nothing
+  joined them: `stationCell` had no branch for the prefix, so a third man fell through to the
+  bench fallback and was drawn on top of the first. `stationCell` resolves it now, `stationLabel`
+  names it, and `animationForStation` puts him on bench work like the two in front of him. The
+  pair `placeStation` / `stationPlaceAt` moved from `production.ts`, where B2 had to write them
+  because `stations.ts` was B1's, to `stations.ts` beside `secondStation` where they belong.
+  `tests/engine/assignees.test.ts` now asserts what the engine could not: three men, three cells,
+  none of them shared.
+- **The cleaning chip** reads `The hall is dirty, Dave is cleaning it` with no button once the
+  helper has it in hand, and goes back to the question when nobody has. `HallProblem.inHand` is
+  what `chipAction` reads. Tested both ways.
+- **The bench's card** was reachable from the Owned tab and not from the hall: `handleSceneClick`
+  gated on `machine` and `extraction` and the bench is category `bench`. It opens from the hall
+  now, with its Sell on it. Tested.
+
+`npm run check` exit 0: 172 files, 1,730 tests.

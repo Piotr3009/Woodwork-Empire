@@ -15,7 +15,9 @@ import {
   minutesRemainingFor,
   takeOffJob,
 } from '../../src/engine/jobs';
-import { hands, stationForProduction, stationPlaceAt, workMinute } from '../../src/engine/production';
+import { hands, stationForProduction, workMinute } from '../../src/engine/production';
+import { placeStation, stationPlaceAt } from '../../src/engine/stations';
+import { stationCell } from '../../src/render/hall';
 import {
   STATION_BENCH,
   secondStation,
@@ -176,6 +178,14 @@ describe('the men on a job (CLAUDE.md T19 2.5)', () => {
     expect(standingCell(state, bench, 'second')).not.toEqual(standingCell(state, bench, 'operator'));
     expect(animationForStation(secondStation(bench.id))).toBe('bench');
     expect(animationForStation(STATION_BENCH)).toBe('bench');
+    // And the third man works at the bench like the two in front of him (CLAUDE.md T19 2.5).
+    expect(animationForStation(placeStation(bench.id, 2))).toBe('bench');
+    // The renderer gives him a cell of his own: three men, three cells, none of them shared. This
+    // is the half the engine cannot check on its own, and it was the last thing left of the "one
+    // sprite on top of another" that 2.5 set out to fix (T19-C1g).
+    const cells = stations.map((station) => stationCell(state, station, { x: 0, y: 0 }));
+    const seen = new Set(cells.map((cell) => `${cell.x},${cell.y}`));
+    expect(seen.size).toBe(3);
   });
 
   it('draws them as chips on the work plan row, each with a cross of its own', () => {

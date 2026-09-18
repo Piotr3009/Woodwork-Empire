@@ -19,6 +19,7 @@ import {
   STATION_GATE,
   STATION_PHONE,
   STATION_RACK,
+  stationPlaceAt,
   stationSecondAt,
 } from '../engine/stations';
 import { pickSprite, spriteFiles, SPRITE_SCALE } from './sprites';
@@ -287,9 +288,11 @@ export function playCharacters(root: ParentNode, nowMs: number): void {
  *  never seen walking on the spot. */
 export function animationForStation(station: string): Animation {
   // The second man of a job is at the first man's bench, in its second place: bench work, the
-  // same as the man in front of him (CLAUDE.md T17 2.10).
+  // same as the man in front of him (CLAUDE.md T17 2.10). So is everybody past him, at his own
+  // place along the same side (CLAUDE.md T19 2.5).
   if (station === STATION_BENCH || station.startsWith('machine:')) return 'bench';
   if (stationSecondAt(station) !== null) return 'bench';
+  if (stationPlaceAt(station) !== null) return 'bench';
   if (station === STATION_RACK) return 'bench';
   if (station === STATION_GATE) return 'idle';
   // The phone is in his hand for as long as the call lasts, and idle the moment it is down

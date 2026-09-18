@@ -39,6 +39,7 @@ import { jobsAtGate } from '../engine/jobs';
 import { orderName, reservedItems, shoppingList } from '../engine/orders';
 import {
   OWNER,
+  BENCH,
   isSold,
   itemFootprint,
   itemStandsInTheHall,
@@ -61,8 +62,11 @@ import {
   facingTowards,
   itemAtCell,
   palletCell,
+  benchCellsAt,
+  queueCellsAt,
   standingCell,
   stationMachine,
+  stationPlaceAt,
   stationSecondAt,
   stationWaitingFor,
 } from '../engine/stations';
@@ -104,6 +108,7 @@ import {
 import { placeholder } from './placeholder';
 import { cncOptions } from '../engine/stages';
 import { jobStage } from '../engine/jobs';
+import { cleanerAtWork } from '../engine/tasks';
 import type { StageId } from '../engine/types';
 import type { LoopName as HallLoopName, OneShotName as HallOneShotName } from '../ui/sound';
 
@@ -933,6 +938,21 @@ export function stationCell(
   station: string,
   bench: { x: number; y: number },
 ): Standing {
+  // The third man and beyond, at a place of his own along the same side of the same item: the
+  // engine counts the places and the renderer knows where they are, so twenty men on one job do
+  // not stand on one tile (PIOTR, 17.09; CLAUDE.md T19 2.5).
+  const placeAt = stationPlaceAt(station);
+  if (placeAt !== null) {
+    const item = state.equipment.find((entry) => entry.id === placeAt.id && !isSold(entry));
+    if (item) {
+      const cells =
+        item.specId === BENCH
+          ? benchCellsAt(state, item, placeAt.place + 1)
+          : queueCellsAt(state, item, placeAt.place + 1);
+      const cell = cells[placeAt.place] ?? standingCell(state, item, 'operator');
+      return { ...cell, facing: facingAt(cell, item) };
+    }
+  }
   // The second man of a job stands at the first man's own bench, in its second place: two men on
   // one bench, one in front of it and one behind it (CLAUDE.md T17 2.10).
   const secondAt = stationSecondAt(station);
@@ -1036,6 +1056,7 @@ function stationLabel(station: string): string {
     return `waiting for ${(findSpec(waiting)?.name ?? waiting).toLowerCase()}`;
   }
   if (stationSecondAt(station) !== null) return 'the bench, second place';
+  if (stationPlaceAt(station) !== null) return 'alongside, on the next place';
   if (station === STATION_RACK) return 'the rack';
   if (station === STATION_GATE) return 'the gate';
   if (station === STATION_OFFICE) return 'the office';
@@ -1790,6 +1811,8 @@ export interface HallProblem {
   /** The machine it is about, where it is about one. */
   equipmentId: string | null;
   text: string;
+  /** Somebody is already on it, so the chip is a statement and not a question (CLAUDE.md T19 2.7). */
+  inHand?: boolean;
 }
 
 function lowerName(specId: string): string {
@@ -1859,11 +1882,23 @@ export function hallProblems(state: GameState): HallProblem[] {
   // 9.7: from the dirty band on, the player is warned that somebody can get hurt.
   const band = dustBand(state.dust);
   if (band.label !== 'clean') {
-    const risk =
-      band.label === 'dirty' || band.label === 'dangerous'
-        ? ', somebody will get hurt in this'
-        : '';
-    list.push({ kind: 'dirty', equipmentId: null, text: `The hall is ${band.label}${risk}` });
+    // With a helper on the books the hall makes the job of work itself and he takes it, so the
+    // chip says who is on it and asks the player nothing (PIOTR, 17.09; CLAUDE.md T19 2.7).
+    const cleaner = cleanerAtWork(state);
+    if (cleaner !== null) {
+      list.push({
+        kind: 'dirty',
+        equipmentId: null,
+        text: `The hall is ${band.label}, ${cleaner.name} is cleaning it`,
+        inHand: true,
+      });
+    } else {
+      const risk =
+        band.label === 'dirty' || band.label === 'dangerous'
+          ? ', somebody will get hurt in this'
+          : '';
+      list.push({ kind: 'dirty', equipmentId: null, text: `The hall is ${band.label}${risk}` });
+    }
   }
   for (const item of machinesDueService(state)) {
     if (item.broken) continue;

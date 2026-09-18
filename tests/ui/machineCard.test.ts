@@ -109,6 +109,17 @@ describe('a click on a machine on the hall', () => {
     bench.takenBy = null;
   });
 
+  it('opens the bench’s card from the hall, the same click as a machine (CLAUDE.md T19 2.8)', () => {
+    // B2 made the bench sellable and the Owned tab drew its Sell at once; the hall's own click
+    // still fell through the category gate, so the card was reachable one way and not the other.
+    click(`[data-kit="${kitId('workbench')}"]`);
+    const open = card();
+    expect(open).not.toBeNull();
+    expect(open?.textContent ?? '').toContain('Workbench');
+    expect(open?.querySelector('[data-do="sellMachine"]')).not.toBeNull();
+    click('.modal-layer [data-do="closeModal"]');
+  });
+
   it('leaves the Owned tab drawing the same card', () => {
     const owned = renderCatalogue(game(), '', 'owned', null, 'all', null);
     expect(owned).toContain('Table saw');
