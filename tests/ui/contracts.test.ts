@@ -15,7 +15,7 @@ import {
   endContract,
   reserveContractSheets,
 } from '../../src/engine/contracts';
-import { renderContractBar, renderContracts } from '../../src/ui/contracts';
+import { renderContracts } from '../../src/ui/contracts';
 import { money, signedMoney } from '../../src/ui/modal';
 import { renderWorkPlan } from '../../src/ui/workPlan';
 import type { Contract, GameState, Worker } from '../../src/engine/index';
@@ -169,7 +169,7 @@ describe('the material and the way out (CLAUDE.md T17 2.22)', () => {
     acceptContract(state, contract.id);
     const page = parse(renderContracts(state));
     const row = page.querySelector(`.contract-active [data-worker="staff-1"]`);
-    const result = contractResultFor(contract, state.workers[0] as Worker);
+    const result = contractResultFor(state, contract, state.workers[0] as Worker);
     // The prices of T20 2.2 make a cut sheet pack pay by hand, so the line is his own figures and
     // not a loss typed into the test (CLAUDE.md T20 2.2).
     expect(row?.querySelector('small')?.textContent).toBe(
@@ -207,51 +207,42 @@ describe('the material and the way out (CLAUDE.md T17 2.22)', () => {
   });
 });
 
-describe('the standing bar on the work plan', () => {
-  it('is a bar apart from the jobs, with the piece counter and the people on it', () => {
+describe('the contract bar has left the Jobs tab (CLAUDE.md T20 2.1.5)', () => {
+  it('draws no contract on the Jobs tab and puts its chips and its button into Running', () => {
     const state = hall();
-    expect(renderContractBar(state)).toBe('');
     const contract = offered(state);
     acceptContract(state, contract.id);
     assignContract(state, contract.id, 'staff-1', true);
     contract.piecesThisWeek = 15;
-    const bar = parse(renderContractBar(state)).querySelector('.contract-bar');
-    expect(bar?.getAttribute('data-contract')).toBe(contract.id);
-    expect(bar?.querySelector('.contract-count')?.textContent).toBe('15 / 60 this week');
+    // The Jobs tab is the plan and nothing else now.
+    const jobs = parse(renderWorkPlan(state, 'jobs'));
+    expect(jobs.querySelector('.contract-bar')).toBeNull();
+    expect(jobs.querySelector('.plan-row[data-plan]')).toBeNull();
+    // Running carries the same chips and the same button it carried on the plan in v28.
+    const running = parse(renderWorkPlan(state, 'contracts'));
+    const bar = running.querySelector(`.contract-bar[data-contract="${contract.id}"]`);
+    expect(bar).not.toBeNull();
     expect(bar?.querySelector('.contract-fill')?.getAttribute('style')).toBe('width:25%');
-    expect(bar?.textContent).toContain('Ben');
-    expect(bar?.textContent).toContain('week 1 of');
-    const plan = parse(renderWorkPlan(state));
-    expect(plan.querySelector('.contract-bar')).not.toBeNull();
-    expect(plan.querySelector('.plan-row[data-plan]')).toBeNull();
+    expect(bar?.querySelector('.assign-chip')?.textContent).toBe('Ben×');
+    expect(bar?.querySelector('[data-do="assignContract"][data-on="0"]')?.getAttribute('data-worker')).toBe(
+      'staff-1',
+    );
+    expect(bar?.querySelector('[data-do="openAssign"]')?.textContent).toBe('Assign to this contract');
   });
-});
 
-describe('the contract bar on the plan, assigned like a job (PIOTR, 18.09)', () => {
-  it('sits under the jobs, shows the men as chips and opens a list with the cross every popover has', () => {
+  it('opens the same list, with the cross every popover has', () => {
     const state = hall();
     const contract = offered(state);
     acceptContract(state, contract.id);
-    const plan = parse(renderWorkPlan(state));
-    const bar = plan.querySelector(`.contract-bar[data-contract="${contract.id}"]`);
-    expect(bar).not.toBeNull();
-    // Under the rows (or the empty line), never covered by the modal's lead: nothing of the plan
-    // comes after the bar.
-    const before = bar?.previousElementSibling;
-    expect(before).not.toBeNull();
-    expect(bar?.nextElementSibling).toBeNull();
-    expect(bar?.querySelector('[data-do="openAssign"]')?.textContent).toBe('Assign to this contract');
-    expect(bar?.textContent).toContain('Nobody is on it');
-    const open = parse(renderWorkPlan(state, 'jobs', null, contract.id));
+    const shut = parse(renderWorkPlan(state, 'contracts'));
+    expect(shut.querySelector('.assign-list')).toBeNull();
+    expect(shut.querySelector('.contract-bar')?.textContent).toContain('Nobody is on it');
+    const open = parse(renderWorkPlan(state, 'contracts', null, contract.id));
     const list = open.querySelector(`.contract-bar[data-contract="${contract.id}"] .assign-list`);
     expect(list).not.toBeNull();
+    expect(list?.getAttribute('data-popover')).toBe('assign-contract');
     expect(list?.querySelector('.modal-close[data-do="closeAssign"]')).not.toBeNull();
     const add = list?.querySelector('[data-do="assignContract"][data-on="1"]');
     expect(add?.getAttribute('data-worker')).toBe('staff-1');
-    // On it: a chip with a cross that takes him off.
-    contract.assigned.push('staff-1');
-    const chips = parse(renderWorkPlan(state)).querySelector(`.contract-bar[data-contract="${contract.id}"]`);
-    expect(chips?.querySelector('.assign-chip')?.textContent).toBe('Ben×');
-    expect(chips?.querySelector('[data-do="assignContract"][data-on="0"]')?.getAttribute('data-worker')).toBe('staff-1');
   });
 });

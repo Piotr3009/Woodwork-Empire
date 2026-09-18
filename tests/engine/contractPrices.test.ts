@@ -10,8 +10,9 @@
 
 import { describe, expect, it } from 'vitest';
 import { CONTRACT_PIECES, MINUTES_PER_WORKING_DAY, WORKER_RATES } from '../../src/engine/constants';
-import { contractPiece, contractResultFor } from '../../src/engine/contracts';
-import type { Contract, Worker } from '../../src/engine/index';
+import { contractPiece, contractResultFor, drawContract } from '../../src/engine/contracts';
+import type { Contract, GameState, Worker } from '../../src/engine/index';
+import { buyStartingKit, newGame } from '../helpers';
 
 /** The band of CLAUDE.md T20 2.2 [TUNE: 22 to 30, the brief's own]. */
 const MARGIN_AN_HOUR_MIN = 22;
@@ -57,21 +58,41 @@ describe('the prices that pay (CLAUDE.md T20 2.2)', () => {
     expect(front.minutes).toBeLessThan(3 * MINUTES_PER_WORKING_DAY);
   });
 
-  it('pays a joiner more an hour than his wage, whatever his tier', () => {
+  it('leaves every tier a margin with a saw in the hall, and the top man nothing without one', () => {
     // The man's own result: the price less the material and less what his minutes cost, which is
-    // the margin the offer card puts on his row (CLAUDE.md T20 2.1.1).
-    const contract = { pieceId: 'cutSheetPack', pricePerPiece: 50 } as Contract;
-    const tiers: Array<[Worker['tier'], number]> = [
+    // the margin the offer card puts on his row (CLAUDE.md T20 2.1.1). The wage ladder is steeper
+    // than the speed ladder, so the line thins as the tier rises, and in an empty hall, where
+    // every piece is made by hand at two thirds speed, the extremely experienced man ends at
+    // nothing. One used saw is enough to put all four above water, which is the table doing what
+    // Piotr asked of it: a contract pays a little by hand and well with machines (T20 2.2).
+    const tiers: Array<[Exclude<Worker['tier'], null>, number]> = [
       ['novice', 450],
       ['experienced', 600],
       ['senior', 800],
       ['master', 1000],
     ];
+    const packs = (state: GameState): Contract => {
+      const contract = drawContract(state);
+      contract.pieceId = 'cutSheetPack';
+      contract.pricePerPiece = 50;
+      contract.quantityPerWeek = 40;
+      return contract;
+    };
+    const byHand = newGame();
+    const hall = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
+    const lines: string[] = [];
     for (const [tier, weekly] of tiers) {
-      if (tier === null) continue;
-      const worker = { rate: WORKER_RATES[tier], weeklyWage: weekly } as Worker;
-      const result = contractResultFor(contract, worker);
-      expect(result.margin).toBeGreaterThan(0);
+      const worker = { id: `staff-${tier}`, rate: WORKER_RATES[tier], weeklyWage: weekly } as Worker;
+      const bare = contractResultFor(byHand, packs(byHand), worker);
+      const sawn = contractResultFor(hall, packs(hall), worker);
+      expect(bare.margin).toBeGreaterThanOrEqual(0);
+      expect(sawn.margin).toBeGreaterThan(0);
+      expect(sawn.weekResult).toBeGreaterThan(0);
+      lines.push(
+        `${tier}: by hand ${bare.minutes} min a piece, margin £${bare.margin}; ` +
+          `with the used saw ${sawn.minutes} min, margin £${sawn.margin}`,
+      );
     }
+    console.log(`A CUT SHEET PACK BY TIER\n${lines.join('\n')}`);
   });
 });

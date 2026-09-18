@@ -32,6 +32,7 @@ import {
   jobBesideContract,
   contractMen,
   contractPiece,
+  contractPieceSpeed,
   contractResultFor,
   contractShortfall,
   contractStationFor,
@@ -610,16 +611,23 @@ describe('the result with a man on it (CLAUDE.md T17 2.22)', () => {
       weeklyWage: JOINER_WEEKLY_WAGE.senior,
     };
     state.workers.push(middling, best);
-    const greenResult = contractResultFor(contract, green);
-    const middlingResult = contractResultFor(contract, middling);
-    const bestResult = contractResultFor(contract, best);
-    // A joiner with no experience does 45 minutes of the owner's work in 56 of his own, a super
-    // experienced one in 38 (CLAUDE.md T20 2.5).
-    expect(greenResult.minutes).toBe(Math.round(45 / WORKER_RATES.novice));
-    expect(bestResult.minutes).toBe(Math.round(45 / WORKER_RATES.senior));
+    const greenResult = contractResultFor(state, contract, green);
+    const middlingResult = contractResultFor(state, contract, middling);
+    const bestResult = contractResultFor(state, contract, best);
+    // His minutes are at his rate and on the machines the hall has: the used saw of the day 1 kit
+    // is 0.95 of the owner's own speed (CLAUDE.md T20 2.1.1). A joiner with no experience does 45
+    // minutes of the owner's work in 59 of his own on it, a super experienced one in 39.
+    const saw = contractPieceSpeed(state, green.id, piece);
+    expect(saw).toBe(0.95);
+    expect(greenResult.minutes).toBe(Math.round(45 / (WORKER_RATES.novice * saw)));
+    expect(bestResult.minutes).toBe(Math.round(45 / (WORKER_RATES.senior * saw)));
     expect(greenResult.labourCost).toBe(
-      Math.round((45 / WORKER_RATES.novice) * workerMinuteCost(green.weeklyWage) * 100) / 100,
+      Math.round(greenResult.minutes * workerMinuteCost(green.weeklyWage) * 100) / 100,
     );
+    // And with no saw at all it is the by hand reading, which is half again as long.
+    const empty = newGame();
+    empty.contracts.push(contract);
+    expect(contractPieceSpeed(empty, green.id, piece)).toBeCloseTo(1 / 1.5, 4);
     expect(greenResult.margin).toBe(
       Math.round((piece.price - piece.material - greenResult.labourCost) * 100) / 100,
     );
