@@ -114,6 +114,42 @@ a B agent may not write to `constants.ts`. Move it to `constants.ts` beside
 tests read it by name from wherever it lives (`tests/engine/contractDay.test.ts` imports it from
 `src/engine/contracts`, so re-export it there or move the import in that test with it).
 
+### 1.5 `src/engine/constants.ts`: the wardrobe front's sheets, which only Piotr can settle
+
+Put here as well as in section 6.2, because this is where phase C looks. **Do not apply it
+without Piotr's word**: 2.2 says in as many words that `sheets` per piece stays what it is, so
+this moves one of his own figures.
+
+The piece is costed at `material: 60` on the card and in the closing report, and draws
+`sheets: 1.1` off the rack, which is about 220 at `SHEET_VALUE`. The two readings of one piece of
+material disagree by about three and a half times, and only for this piece: the cut sheet pack is
+30 against 0.15 sheets and the drawer box 26 against 0.13, both at 200 a sheet.
+
+File: `src/engine/constants.ts`, in `CONTRACT_PIECES`, the `wardrobeFront` entry.
+
+Exact old text (one occurrence):
+
+```ts
+    material: 60,
+    sheets: 1.1,
+```
+
+Exact new text:
+
+```ts
+    material: 60,
+    sheets: 0.3,
+```
+
+The test that proves it: in `tests/engine/contractPrices.test.ts`, for every piece of
+`CONTRACT_PIECES`, `piece.sheets * SHEET_VALUE` is within a pound of `piece.material`, so the two
+readings of one piece can never part company again. The margin an hour band of 22 to 30 is
+untouched by it, because the card was always costed at 60.
+
+Piotr's other answer is to leave the sheets at 1.1 and raise the material and the price together,
+and then the margin an hour leaves the band the same test asserts. That is why nothing is moved
+tonight.
+
 ### 1.4 Nothing else in the six is wanted
 
 `types.ts`, `index.ts`, `game.ts` and `styles.css` need no change from me. In particular
@@ -129,6 +165,7 @@ carries no signature, so it compiles as it stands.
 | Figure | Value | Where | Tag and why |
 |---|---|---|---|
 | `CONTRACT_SHORT_WEEKS_ALLOWED` | 2 | `src/engine/contracts.ts` | [TUNE] The brief's own rule (2.1.6): the first short week costs a point of reputation, the second ends the contract, no third. Piotr's decision on it is still open, so it is one named number and not a rule written twice. |
+| `DAY_TRACK_TICK_MINUTES` | 120 | `src/ui/contracts.ts` | [TUNE] The clock under a day track is read every two hours from 8:00, which is what the drawing has; the last mark is left off when the end of the day is nearer than half of it, so 17:00 and 16:00 never sit on top of each other. Phase C: beside the working day's minutes in `constants.ts`. |
 | `OWNER_RATE` | 1 | `src/engine/contracts.ts` | Not a tunable: the ladder of the tiers is measured against the owner, so he is 1 by definition (T20 2.5). It is named rather than typed into the arithmetic. |
 
 Everything else on the Contracts tab reads a constant that already exists:
@@ -446,3 +483,74 @@ my first commit and was stripped out of all four again with
 The four commits carry none of it now; check the other two branches before the merge, and if
 anybody wants it shut for good, the line in `.gitignore` wants to be `node_modules` without the
 slash.
+
+---
+
+## 10. REVIEW: the adversarial reading of the B1 diff
+
+Six findings. Three stood and are put right in the commit `B1 reviewed: the findings that stood`;
+one stood and is a line in a frozen file, so it stays note 1.1; one stood and cannot be put right
+without moving one of Piotr's own figures, so it is now note 1.5 as well as section 6.2; one is a
+true reading of the code whose fix is a turn's work of its own, so it is refused and said plainly
+in the report instead.
+
+**1. The wardrobe front's margin forgets three quarters of its material (blocker). CONFIRMED,
+not fixed here.** The reading is right and section 6.2 had it: the card and the closing report
+cost the piece at `material` 60 and the rack is drawn by `sheets` 1.1, about 220 at
+`SHEET_VALUE`. The fix the reviewer asks for is one line of `src/engine/constants.ts`, which is
+frozen for phase B, and 2.2 of the brief says in as many words that `sheets` per piece stays what
+it is, so it is also one of Piotr's own figures. It is now note 1.5, exact old and new text and
+the test with it, marked as wanting Piotr's word, and it is a line of the report. Nothing in my
+own files can mend it: costing the card off `sheets` would put the wardrobe front's margin an
+hour outside the band 2.2 asks for, and would be a second arithmetic beside the table.
+
+**2. A contract short of sheets freezes the man off his job as well. CONFIRMED and FIXED.** The
+failure was exactly as described: `contractWantsToday` stayed true all day while
+`contractWaitingForMaterial`, so `hands()` in `production.ts` skipped the man and
+`runContractMinute` stood him at his bench, and the job under him stood still with him.
+`contractWantsToday` now answers the material question first: with the rack unable to cover the
+next piece, the contract wants only the man who has nowhere else to go. The waiting branch of
+`runContractMinute` is left alone, because a man with a job is no longer in `wanted` when it is
+reached, and its comment says so. Two tests in `tests/engine/contractDay.test.ts`: the hour the
+job gets while the rack is empty (red before the fix, on the line the reviewer named), and the
+man with no job who still stands at his bench.
+
+**3. The man picker chips change nothing in the running app. CONFIRMED, cannot be fixed here.**
+`src/ui/app.ts` is one of the six frozen files and the change is note 1.1, which carries the
+exact old and new text. The app level test the reviewer asks for is in note 1.1 as well: it
+cannot be committed tonight because it would be red until the line is applied, and a B agent
+commits nothing red. Phase C applies the line and the test together.
+
+**4. The Orders page says "the term is over" when the client walked away. CONFIRMED and FIXED.**
+`endedBlock` now prints `endedLine(contract)` the way `endedCard` does, so the engine's one word
+for it reaches both screens. Test in `tests/ui/contracts.test.ts`: a contract with
+`endedBy: 'client'` and two short weeks heads its Orders block "the client has ended it after 2
+short weeks".
+
+**5. Two clock positions typed into the day track's ticks. CONFIRMED and FIXED.** The array is
+gone. `dayTicks()` reads every two hours from 8:00 off one named figure,
+`DAY_TRACK_TICK_MINUTES` (section 2), and puts `DAY_END_MINUTE` on the end, leaving the last two
+hour mark off when the end of the day is nearer to it than half of that. The labels are the
+drawing's own, 08:00, 10:00, 12:00, 14:00 and 17:00, which the tick test in
+`tests/ui/contractsTab.test.ts` already asserts, and they now follow the working day instead of
+sitting under it.
+
+**6. Only the piece's first stage ever has a machine. CONFIRMED as a reading, fix REFUSED.** The
+reviewer is right about the code: `pieceStage` takes `piece.stages[0]`, so the wardrobe front is
+worked, costed and tipped at its cutting stage, and a spray booth buys nothing on a contract. It
+is the contract model of T13 and T17 and not tonight's work: weighting a piece's minutes across
+its stages means the minute loop has to know how far through the piece it is, which machine he
+stands at changes inside a piece, and the hall's drawing and the station follow it. That is a
+turn of its own, and 2.1 and 2.2 do not state it line by line, so scope 1:1 says no. It is said
+plainly in the report instead, in the words the reviewer's second option asks for, and the
+engine and the card go on agreeing with each other.
+
+### What this review changed
+
+- `src/engine/contracts.ts`: `contractWantsToday` answers the material question first.
+- `src/ui/contracts.ts`: `endedBlock` prints `endedLine`; `dayTicks()` and
+  `DAY_TRACK_TICK_MINUTES` replace the typed clock positions.
+- `tests/engine/contractDay.test.ts`: two tests for the empty rack.
+- `tests/ui/contracts.test.ts`: one test for the closing line on the Orders page.
+- `NOTES-B1.md`: note 1.5, the new figure in section 2, this section.
+- `REPORT-T20.md`: the four B1 tasks in two lines each, and the two things Piotr has to answer.

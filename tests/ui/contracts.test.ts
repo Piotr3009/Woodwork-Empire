@@ -160,6 +160,30 @@ describe('the Contracts tab', () => {
     expect(renew?.textContent).toContain('Renew at £51');
     expect(go?.textContent).toBe('Let it go');
   });
+
+  it('says how it ended, in the words the engine has for it (CLAUDE.md T20 2.1.6)', () => {
+    const state = hall();
+    const contract = offered(state);
+    acceptContract(state, contract.id);
+    contract.weeks = [
+      { week: 1, wanted: 60, made: 40 },
+      { week: 2, wanted: 60, made: 40 },
+    ];
+    contract.endDay = 7;
+    state.clock.day = 8;
+    contract.piecesThisWeek = 60;
+    endContract(state, contract);
+    // The client walked away after two short weeks: the page the closing event sends the player
+    // to says so, and does not call it the end of the term.
+    contract.endedBy = 'client';
+    const block = parse(renderContracts(state)).querySelector(
+      `.contract-ended[data-contract="${contract.id}"]`,
+    );
+    expect(block?.querySelector('h3')?.textContent).toBe(
+      `${contract.name}: the client has ended it after 2 short weeks`,
+    );
+    expect(block?.querySelector('h3')?.textContent).not.toContain('the term is over');
+  });
 });
 
 describe('the material and the way out (CLAUDE.md T17 2.22)', () => {

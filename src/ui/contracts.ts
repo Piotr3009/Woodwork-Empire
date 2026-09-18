@@ -199,7 +199,7 @@ function endedBlock(state: GameState, contract: Contract): string {
   const offered = contract.renegotiatedPrice ?? contract.pricePerPiece;
   return (
     `<div class="contract-ended" data-contract="${contract.id}">` +
-    `<h3>${escapeHtml(contract.name)}: the term is over</h3>` +
+    `<h3>${escapeHtml(contract.name)}: ${escapeHtml(endedLine(contract))}</h3>` +
     figureRow('Pieces made', report.pieces, false) +
     figureRow('Revenue', report.revenue) +
     figureRow('Material', -report.material) +
@@ -342,6 +342,25 @@ function across(minute: number): number {
   return Math.round((minute / DAY_END_MINUTE) * 10000) / 100;
 }
 
+/** The clock under a day track, every two hours of it from 8:00 [TUNE: two hours, which is what
+ *  the drawing of docs/mockups/t20 has], and the end of the day on the right. The last two hour
+ *  mark is left off when the end is nearer to it than that, so the two labels never sit on top of
+ *  each other. Phase C: this belongs in `constants.ts` beside the working day's own minutes. */
+export const DAY_TRACK_TICK_MINUTES = 120;
+
+function dayTicks(): number[] {
+  const ticks: number[] = [];
+  for (
+    let at = 0;
+    at < DAY_END_MINUTE - DAY_TRACK_TICK_MINUTES / 2;
+    at += DAY_TRACK_TICK_MINUTES
+  ) {
+    ticks.push(at);
+  }
+  ticks.push(DAY_END_MINUTE);
+  return ticks;
+}
+
 /** The track itself, with the head above it and the clock under it. */
 function dayTrack(head: string, figure: string, blocks: DayBlock[]): string {
   const drawn = blocks
@@ -355,7 +374,7 @@ function dayTrack(head: string, figure: string, blocks: DayBlock[]): string {
       );
     })
     .join('');
-  const ticks = [0, 120, BREAK_START_MINUTE, 360, DAY_END_MINUTE]
+  const ticks = dayTicks()
     .map((minute) => `<span>${formatTime(minute)}</span>`)
     .join('');
   return (

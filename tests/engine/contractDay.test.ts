@@ -14,6 +14,7 @@ import {
   activeContracts,
   assignContract,
   contractMarker,
+  contractWaitingForMaterial,
   contractWantsToday,
   drawContract,
   endContractNow,
@@ -184,6 +185,43 @@ describe('the day is the contract first and the job second (CLAUDE.md T20 2.1.4)
     next.clock.day = 2;
     runContractDay(next);
     expect(ben.jobId).toBe(contractMarker(contract.id));
+  });
+
+  it('gives him to the job under him while the rack cannot cover the next piece', () => {
+    let state = joinerHall();
+    // The line is well ahead of him all day, so nothing but the empty rack can let the job have
+    // him.
+    running(state, 60);
+    state = jobUnderHim(state).state;
+    const job = theJob(state);
+    const contract = theContract(state);
+    // Every sheet on the rack is the job's own: the contract can hold none and cannot make a
+    // piece.
+    contract.sheetsReserved = 0;
+    job.sheetsReserved = job.sheets - job.sheetsUsed;
+    state.stock.sheets = job.sheetsReserved;
+    expect(contractWaitingForMaterial(state, contract)).toBe(true);
+    expect(contract.piecesThisWeek).toBeLessThan(piecesDueBy(contract, state.clock.day));
+    expect(contractWantsToday(state, 'staff-1')).toBe(false);
+    state = runClock(state, 60);
+    // The contract made nothing, because it could not; the job had his hour, and he is still on
+    // both.
+    expect(theContract(state).piecesMade).toBe(0);
+    expect(theJob(state).productionMinutes).toBeGreaterThan(0);
+    expect(theContract(state).assigned).toEqual(['staff-1']);
+    // A delivery lands and the contract has him back the next minute.
+    state.stock.sheets += 20;
+    expect(contractWaitingForMaterial(state, theContract(state))).toBe(false);
+    expect(contractWantsToday(state, 'staff-1')).toBe(true);
+  });
+
+  it('stands a man with no job to go to at his bench while the rack is empty', () => {
+    const state = joinerHall();
+    const contract = running(state, 60);
+    state.stock.sheets = 0;
+    expect(contractWaitingForMaterial(state, contract)).toBe(true);
+    // Nowhere else to go: the contract keeps him, as it always did.
+    expect(contractWantsToday(state, 'staff-1')).toBe(true);
   });
 });
 

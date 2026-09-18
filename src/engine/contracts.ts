@@ -630,6 +630,12 @@ export function piecesDueBy(contract: Contract, day: number): number {
 export function contractWantsToday(state: GameState, workerId: string): boolean {
   const contract = contractOfWorker(state, workerId);
   if (contract === null) return false;
+  // Nothing on the rack for its next piece: the contract cannot use the minute, so a man with a
+  // job of work under him goes to it instead of standing at his bench until a delivery lands.
+  // Only a man with nowhere else to go waits it out (CLAUDE.md T17 2.22, T20 2.1.4).
+  if (contractWaitingForMaterial(state, contract)) {
+    return jobBesideContract(state, workerId) === null;
+  }
   if (contract.piecesThisWeek < piecesDueBy(contract, state.clock.day)) return true;
   return jobBesideContract(state, workerId) === null;
 }
@@ -713,11 +719,13 @@ export function runContractMinute(state: GameState): ContractMinute {
     }
     if (wanted.length === 0) continue;
     // Nothing on the rack for the next piece: the men on it stand at their benches, the way a job
-    // waits for its material (CLAUDE.md T17 2.22).
+    // waits for its material (CLAUDE.md T17 2.22). A man with a job of work under him is not among
+    // them: `contractWantsToday` has already sent him to it, so only a man with nowhere else to go
+    // stands here (CLAUDE.md T20 2.1.4).
     if (contractWaitingForMaterial(state, contract)) {
       for (const worker of wanted) {
-        // The marker goes back on, as it does on a working minute, so the jobs leave him where
-        // he is instead of handing him work he cannot take.
+        // The marker goes back on, as it does on a working minute, so the contract keeps him
+        // between the minutes.
         worker.jobId = contractMarker(contract.id);
         worker.station = STATION_BENCH;
       }
