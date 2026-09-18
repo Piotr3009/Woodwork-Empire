@@ -6,6 +6,7 @@ import { STATION_PHONE, stationForTask } from '../../src/engine/stations';
 import { ANIMATIONS, animationForStation } from '../../src/render/characters';
 import { shoppingList } from '../../src/engine/orders';
 import { renderHall } from '../../src/render/hall';
+import { officeFigure as renderOfficeFigure } from '../../src/render/office';
 import { renderShopping } from '../../src/ui/shopping';
 import { createTask } from '../../src/engine/tasks';
 import { orderForJob } from '../../src/engine/materials';
@@ -62,13 +63,15 @@ describe('the owner on the phone', () => {
     const answering = act(state, { type: 'START_TASK', taskId: call.id });
     expect(answering.owner.currentTaskId).toBe(call.id);
     expect(answering.owner.station).toBe(STATION_PHONE);
-    const svg = renderHall(answering);
-    expect(svg).toContain('data-character="owner"');
-    expect(svg).toContain('character.owner.phone.sheet.png');
-    expect(svg).toContain('the phone');
-    // And with the phone down he is back to standing about.
+    // The phone is on the desk, so from T20 2.12 he has gone through the office door: he is not
+    // on the hall at all and the office view is where the phone sheet is played.
+    expect(renderHall(answering)).not.toContain('data-figure="owner"');
+    const office = renderOfficeFigure(answering, ['character.owner.phone.sheet.png']);
+    expect(office).toContain('data-character="owner"');
+    expect(office).toContain('character.owner.phone.sheet.png');
+    // And with the phone down he is back on the floor, off the sheet.
     const done = act(answering, { type: 'PAUSE_TASK' });
-    expect(renderHall(done)).not.toContain('character.owner.phone.sheet.png');
+    expect(renderOfficeFigure(done, ['character.owner.phone.sheet.png'])).toBe('');
   });
 });
 

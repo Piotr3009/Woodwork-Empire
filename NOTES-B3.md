@@ -347,11 +347,40 @@ them; what it does not do until they land is look small, green and red.
 | "hours of life" (2.9) | `Equipment.enduranceHours`, and `enduranceHoursFor(specId, variantId)` for the life it left the shop with | `enduranceHours` is the life it has now, extensions and all, and `originalLifeOf(item)` is the life it was born with. The bar's total is `enduranceHours`, so it grows with each service, which is what 2.9.1 asks for. |
 | "2,140 of 3,600 h" (2.9) | the Owned tab prints `0 h of 750 h` through its own `hours()` | The page prints the brief's own shape, `lifeFigures` in `src/ui/machine.ts`: the thousands separator of `formatMoney` and the unit once. The Owned tab was left as it is, because its line is asserted by `tests/ui/catalogueTabs.test.ts` and 2.9 is about the new page. |
 
+### Note 9 (housekeeping, not a fix). `src/ui/app.ts` and the door driver
+
+`src/render/doors.ts` no longer swings anything: a door is drawn closed and the file's job is the
+door's bookkeeping, who is through one and how many men have gone in or out. Its three exports
+`resetDoors`, `syncDoors` and `stepDoors` are unchanged in name and in shape, so the frozen
+`src/ui/app.ts` needed no note: it calls them where it always did and they now keep the count the
+hall reports through `hallOneShots`. Nothing is wanted from phase C here; this note is so that a
+reader of `app.ts` knows the calls changed meaning.
+
+Two constants in `constants.ts` are left with no reader by 2.12 and 2.13: `DOOR_SWING_MS`,
+`DOOR_CLOSE_MS` (the swing) and `STAND_IN_GAIN` (the synthesised sound). They are Piotr's figures
+for things the game no longer does. Phase C may delete them with the rest of the turn's tidying;
+B3 left them, because `constants.ts` is frozen and an unread constant harms nothing.
+
+---
+
 ## 5. Tests changed
 
 - `tests/render/frameFallbacks.test.ts`: `playableAnimation('owner', 'sweep')` was
   `{ animation: 'idle' }` and is `{ animation: 'bench' }`, with the joiner asserted beside him.
   The brief changes it: 2.8.2 says a role with no sweep sheet falls to `bench`.
+- `tests/render/hallRoom.test.ts`, `tests/render/views.test.ts`, `tests/ui/app.test.ts`,
+  `tests/engine/phoneAndCancel.test.ts`: the brief changes them. 2.12 takes the owner off the hall
+  while he is behind the office door, so Turn 19's `is never absent from the hall: he stands in the
+  doorway` is now `is off the hall altogether while he is in the office`; the figure count test
+  reads the bench in place of the office; the app's tenth minute asserts he is not on the hall
+  while the books are on his desk; and the phone sheet is read off the office view, which is where
+  he is playing it. The three door states of Turn 19 are one closed leaf.
+- `tests/render/doors.test.ts` was the swing's own test and is rewritten around 2.12 and 2.13: the
+  closed leaf, the walk to the door, the walker kept at the doorway so he walks out of it, the
+  knock counted once in and once out, and a grep of `src/render` for `from '../ui/sound'`.
+- `tests/ui/sound.test.ts`: the stand ins are gone (2.13), so the tests that heard one now assert
+  silence, and the tests about what the hall plays are run against a fake that can decode, which
+  is the day Piotr's recordings land. `withRecordings` in that file is the whole of the change.
 - `tests/scenarios/autopilot.ts`, the scripted player, **re-scripted and not re-measured**, the
   way REPORT-T17 re-scripted him for the hiring gate. Under 2.9.3 a service takes the machine out
   until the next working day, so the careful owner does not stop his only saw in the middle of a

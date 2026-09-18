@@ -167,3 +167,37 @@ without this rack, and `Somebody is standing at it` while anybody's station is t
 the question to ask of a rack because nobody ever claims one the way a man claims a machine. The
 sale itself is the sale the game already has: one Sell, the second click to mean it, the buyer's
 van in the morning.
+
+### 2.12 The door is a door you go through, and 2.13 the hall is silent until the files
+
+**The door.** A door is drawn closed, always: one leaf lying flat in the face of the room, hung on
+the left jamb, and the two open frames of Turn 19 are deleted with the sixty degree half angle
+that made them. The swing driver in `src/render/doors.ts` is gone with them; the file's three
+hooks, which the frozen `app.ts` calls, keep their names and their beat and do the door's new job,
+which is bookkeeping: who is through a door this frame, and how many men have gone in or come out
+since the ui layer last asked.
+
+**A man goes through it.** When a figure's leg ends on the office's doorway cell he leaves the
+hall's drawing: he is not standing in the doorway and he is not in a corner, he is in the room, and
+the office view draws him at his desk, which is Turn 19's office half kept as it was. The walk to
+the door is still seen, because the two halves are both asked: the engine has to have him behind
+the door and his walker has to have got him there. His walker waits on the doorway cell while the
+page is not drawing him, so a man who comes out comes out of the door and walks on from it instead
+of appearing at the far end of the hall. Turn 19's `is never absent from the hall` is therefore
+the opposite of what it was, and it says so.
+
+**Only the office.** The canteen's door cell is deliberately not one a man goes through. It is
+where a man with nothing to do, and a joiner with no bench to work at, stands about (T4 3.4,
+T11 3.4), which is the hall and not the room behind it; nothing behind that door is drawn, so a
+man sent through it would be nowhere at all, and the player would lose sight of his own crew at
+dinner. The office is the one room this game draws behind a door.
+
+**The silence.** The synthesised stand ins are deleted: `play` and `loop` make nothing at all
+while the named file is not in `public/sounds/`, and there are no files, so the hall is silent.
+The Settings controls stay exactly as they are, every hook stays where it is, and the day Piotr's
+recordings land they are heard with no code change: the loader asks for a file once, on the first
+play, and remembers what it found. The door's knock is fired through `hallOneShots`, which the ui
+layer plays, so `src/render` no longer imports `src/ui/sound.ts`: the names of the sounds now
+belong to the render layer, which is what reports the events, and the ui layer reads them from
+there. `grep -rn "from '../ui/sound'" src/render` returns nothing, and a test in
+`tests/render/doors.test.ts` is that grep.

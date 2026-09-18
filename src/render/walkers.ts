@@ -20,7 +20,7 @@
 // back where it had actually got to (the same reason the slides of Turn 2 lived in the app).
 
 import { WALK_CELLS_PER_SECOND, WALK_CORNER_CELLS } from '../engine/constants';
-import { STATION_GATE, STATION_RACK } from '../engine/stations';
+import { STATION_GATE, STATION_RACK, isDoorwayCell } from '../engine/stations';
 import {
   type Animation,
   type Facing,
@@ -97,6 +97,18 @@ export function resetWalkers(): void {
 /** The walker of a figure, for the tests and nobody else. */
 export function walkerOf(key: string): Walker | undefined {
   return walkers.get(key);
+}
+
+/** Every figure the walker is driving, for the doors and for the tests. */
+export function walkerKeys(): string[] {
+  return Array.from(walkers.keys());
+}
+
+/** True while this man has gone through a door: his walk is over and his feet are on a doorway
+ *  cell. The hall leaves him out of the drawing from that moment and the door counts him through
+ *  (PIOTR, 18.09; CLAUDE.md T20 2.12). */
+export function walkerIsThroughADoor(walker: Walker): boolean {
+  return walker.path.length === 0 && isDoorwayCell(walker.at);
 }
 
 function goalKey(cell: Cell, station: string): string {
@@ -286,7 +298,14 @@ export function syncWalkers(root: ParentNode, nowMs: number, pathFor: PathFinder
     playCharacters(node, nowMs);
   }
   for (const key of Array.from(walkers.keys())) {
-    if (!seen.has(key)) walkers.delete(key);
+    const walker = walkers.get(key);
+    // A man the page has stopped drawing because he has gone through a door is still there, on
+    // the other side of it: his walker waits on the doorway cell so that he walks out of the door
+    // when the engine sends him somewhere, instead of appearing at the far end of the hall
+    // (CLAUDE.md T20 2.12). Every other figure the page has dropped is gone.
+    if (!seen.has(key) && (walker === undefined || !walkerIsThroughADoor(walker))) {
+      walkers.delete(key);
+    }
   }
 }
 

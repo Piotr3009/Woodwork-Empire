@@ -1,105 +1,91 @@
-// The doors swing (PIOTR, 17.09: "the doors should open"; CLAUDE.md T19 2.3).
+// The doors, as Airline Tycoon does them (PIOTR, 18.09; CLAUDE.md T20 2.12).
 //
-// The same shape as the walker in walkers.ts, and for the same reason. The hall says what each
-// door wants, closed or open, off the state it has just been built from: a door with a man
-// standing in it wants to be open, and any other wants to be closed. This file says when: on every
-// frame it moves each door on by the real time since the last one, closed to half to open over
-// `DOOR_SWING_MS` and back again after `DOOR_CLOSE_MS` of nobody in it, and writes the phase on
-// the door that is already on the page. Nothing here is game state: a rebuilt page finds the doors
-// still here and puts each one back to the phase it had got to, which it has to, because the patch
-// writes every attribute back from fresh markup on every render.
+// The swing of Turn 19 is gone, and the two open frames with it: a door is drawn closed, always.
+// What a door does now is take a man through it. When a figure's leg ends on a doorway cell he is
+// off the hall's drawing until he comes out again, so nobody is ever seen standing in a doorway;
+// the hall asks this file which of its figures have gone through before it draws them.
 //
-// Each swing is one knock of the door sound (2.10). The sound engine is a singleton that does
-// nothing at all until the player's first click has unlocked it, so a door that swings before then
-// is silent by itself and this file needs no guard of its own.
+// This file is the door's own bookkeeping and nothing else: who is through one this frame, and how
+// many men have gone in or come out since the ui layer last asked. The knock itself belongs to the
+// ui layer: `hallOneShots` reports the going and `src/ui/app.ts` plays it, so `src/render` no
+// longer reaches into `src/ui/sound.ts` (CLAUDE.md T20 2.13, REPORT-T19's own note).
+//
+// Nothing here is game state. The three hooks the app calls, `resetDoors`, `syncDoors` and
+// `stepDoors`, are where they always were: the first when a view is built from nothing, the second
+// after the page has been written again, the third on the frame beat.
 
-import { DOOR_CLOSE_MS, DOOR_SWING_MS } from '../engine/constants';
-import { play } from '../ui/sound';
-import { DOOR_PHASES, type DoorPhase } from './hall';
+import { isDoorwayCell } from '../engine/stations';
+import { walkerIsThroughADoor, walkerKeys, walkerOf } from './walkers';
 
-interface Door {
-  phase: DoorPhase;
-  /** What the hall last said it wants: true while somebody is standing in it. */
-  want: boolean;
-  /** The moment the phase was last written, in real milliseconds. */
-  since: number;
-  /** The moment the want last went false, or null while it is true. */
-  leftAt: number | null;
+export interface Cell {
+  x: number;
+  y: number;
 }
 
-const doors = new Map<string, Door>();
+/** Who is behind a door this frame, by figure key. */
+const through = new Set<string>();
+
+/** Men who have gone in or come out since the ui layer last asked. */
+let goings = 0;
 
 /** Forgets every door: the view is being built from nothing. */
 export function resetDoors(): void {
-  doors.clear();
+  through.clear();
+  goings = 0;
 }
 
-/** The phase of a door, for the tests and nobody else. */
-export function doorOf(key: string): DoorPhase | undefined {
-  return doors.get(key)?.phase;
+/** True while this figure has gone through a door: the engine has him behind one, and his legs
+ *  have got him there. Both halves matter. The cell is what the engine says this minute, so the
+ *  moment it sends him somewhere else he is drawn again and walks out of the door; the walker is
+ *  what says his leg is over, so the walk to the door is seen and only the doorway itself is never
+ *  stood in. A figure the walker has never heard of is where the page says he is, which is what a
+ *  page built from nothing, and every render test, reads. */
+export function figureIsThroughADoor(key: string, cell: Cell): boolean {
+  if (!isDoorwayCell(cell)) return false;
+  const walker = walkerOf(key);
+  if (walker === undefined) return true;
+  return walkerIsThroughADoor(walker);
 }
 
-/** How long one step of the swing takes: closed to half and half to open are half the swing each,
- *  so a door is open `DOOR_SWING_MS` after a man reaches it (CLAUDE.md T19 2.3). */
-const STEP_MS = DOOR_SWING_MS / 2;
-
-function keyOf(node: Element): string | null {
-  return node.getAttribute('data-door-room');
+/** Who is through a door this moment, for the tests and for the count. */
+export function figuresThroughDoors(): string[] {
+  return Array.from(through).sort();
 }
 
-function nextPhase(phase: DoorPhase, towards: DoorPhase): DoorPhase {
-  const at = DOOR_PHASES.indexOf(phase);
-  const to = DOOR_PHASES.indexOf(towards);
-  if (at === to) return phase;
-  return DOOR_PHASES[at + (to > at ? 1 : -1)] as DoorPhase;
+/** One pass over the walkers: who is through a door, and one knock for every man who has just
+ *  gone in or come out. */
+function readDoors(): void {
+  const now = new Set<string>();
+  for (const key of walkerKeys()) {
+    const walker = walkerOf(key);
+    if (walker === undefined) continue;
+    if (walkerIsThroughADoor(walker)) now.add(key);
+  }
+  for (const key of now) if (!through.has(key)) goings += 1;
+  for (const key of through) if (!now.has(key)) goings += 1;
+  through.clear();
+  for (const key of now) through.add(key);
 }
 
-/** Reads the doors the page has just been built with and puts each one back to the phase it had
- *  got to. A door the page has not shown before starts at what the hall says it is, so a view
- *  built from nothing opens on a door that is already open rather than swinging it in front of the
- *  player. */
+/** After the page has been written again. */
 export function syncDoors(root: ParentNode, nowMs: number): void {
-  const seen = new Set<string>();
-  for (const node of Array.from(root.querySelectorAll('[data-door-room]'))) {
-    const key = keyOf(node);
-    if (key === null) continue;
-    seen.add(key);
-    const want = node.getAttribute('data-door-want') === 'open';
-    let door = doors.get(key);
-    if (door === undefined) {
-      door = { phase: want ? 'open' : 'closed', want, since: nowMs, leftAt: null };
-      doors.set(key, door);
-    } else if (want !== door.want) {
-      door.want = want;
-      door.since = nowMs;
-      door.leftAt = want ? null : nowMs;
-    }
-    // The patch has just written the hall's own state over the phase: put the real one back.
-    node.setAttribute('data-door-state', door.phase);
-  }
-  for (const key of Array.from(doors.keys())) {
-    if (!seen.has(key)) doors.delete(key);
-  }
+  void root;
+  void nowMs;
+  readDoors();
 }
 
-/** Moves every door on by the real time since the last frame: one step of the swing every half of
- *  `DOOR_SWING_MS`, and a door nobody is standing in waits `DOOR_CLOSE_MS` before it starts back,
- *  so it is open `DOOR_SWING_MS` after a man reaches it and shut a step after `DOOR_CLOSE_MS`.
- *  A door somebody is standing in never leaves open. */
+/** On the frame beat, after the walkers have moved. */
 export function stepDoors(root: ParentNode, nowMs: number): void {
-  for (const node of Array.from(root.querySelectorAll('[data-door-room]'))) {
-    const key = keyOf(node);
-    if (key === null) continue;
-    const door = doors.get(key);
-    if (door === undefined) continue;
-    const towards: DoorPhase = door.want ? 'open' : 'closed';
-    if (door.phase === towards) continue;
-    if (!door.want && door.leftAt !== null && nowMs - door.leftAt < DOOR_CLOSE_MS) continue;
-    if (nowMs - door.since < STEP_MS) continue;
-    door.phase = nextPhase(door.phase, towards);
-    door.since = nowMs;
-    node.setAttribute('data-door-state', door.phase);
-    // One knock a step, which the engine thins to one a second however many doors are moving.
-    play('door', nowMs);
-  }
+  void root;
+  void nowMs;
+  readDoors();
+}
+
+/** How many men have gone through a door since this was last asked; the asking clears the count.
+ *  The hall reports it as a one shot and the ui layer plays the door's sound when Piotr's
+ *  recording is there to play (CLAUDE.md T20 2.13). */
+export function takeDoorGoings(): number {
+  const count = goings;
+  goings = 0;
+  return count;
 }

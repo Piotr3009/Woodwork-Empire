@@ -109,6 +109,21 @@ export function unloadStation(task: TaskInstance, sheets: number): string {
   return unloadLegAt(task, sheets) % 2 === 0 ? STATION_GATE : STATION_RACK;
 }
 
+/** True while this cell is a doorway a man goes through and out of the hall's drawing (PIOTR,
+ *  18.09; CLAUDE.md T20 2.12). The renderer asks it of the cell a figure's feet are on, so a
+ *  doorway is never stood in: he walks to it, goes through, and the room behind it draws him.
+ *
+ *  The office is the one room the game has behind a door: the office view draws the man at his
+ *  desk (CLAUDE.md T19 2.2). The canteen's door cell is not one of these, and deliberately: it is
+ *  where a man with nothing to do, or with no bench to work at, stands about (CLAUDE.md T4 3.4,
+ *  T11 3.4), which is the hall and not the room behind it, and the player is meant to see him
+ *  standing there. Nothing behind the canteen door is drawn, so a man sent through it would be
+ *  nowhere at all. */
+export function isDoorwayCell(cell: { x: number; y: number }): boolean {
+  const door = roomDoorCell('office');
+  return door.x === Math.round(cell.x) && door.y === Math.round(cell.y);
+}
+
 /** True while anybody is standing at the rack this minute, the owner or a man on his feet: a
  *  rack is not sold out from under the man loading it (PIOTR, 18.09; CLAUDE.md T20 2.10). The
  *  rack is the one item in the hall nobody ever "takes" the way a machine is taken, so the claim

@@ -1,11 +1,15 @@
-// The sound of the workshop (PIOTR, 17.09; CLAUDE.md T19 2.10). One engine, one table, one volume
-// and one mute, and nothing at all before the player's first click.
+// The sound of the workshop (PIOTR, 17.09 and 18.09; CLAUDE.md T19 2.10, T20 2.13). One engine,
+// one table, one volume and one mute, and nothing at all before the player's first click.
 //
 // The whole of it is driven through a fake audio context handed in with `setAudioContextFactory`,
 // which is what that seam is for: no browser, no stubbed global, and the fake counts what was
 // built so "nothing plays before the unlock" can be proved by the context never being made at all.
-// The fake deliberately has no `decodeAudioData`, so the loader never asks for a recording and
-// every sound in here is the synthesised stand in, which is what ships tonight.
+//
+// From Turn 20 there are no synthesised stand ins: a sound whose file is not in `public/sounds/`
+// is silence, which is what the game ships with tonight. A fake with no `decodeAudioData` is that
+// workshop; `withRecordings` gives the fake a decoder and a fetch that answers, which is Piotr's
+// workshop the day his own recordings land, and every test about what the hall plays is run
+// against that one.
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
@@ -13,7 +17,6 @@ import {
   HAMMER_EVERY_SECONDS,
   SOUND_ONE_SHOT_GAP_MS,
   SOUND_VOLUME_DEFAULT,
-  STAND_IN_GAIN,
 } from '../../src/engine/constants';
 import { labourDone, stagePlanFor } from '../../src/engine/index';
 import type { GameState, StageId } from '../../src/engine/index';
@@ -35,7 +38,6 @@ import {
 } from '../../src/ui/sound';
 import type {
   AudioBufferLike,
-  FilterLike,
   GainLike,
   LoopName,
   ParamLike,
@@ -91,9 +93,9 @@ interface FakeContext {
   gains: TrackedGain[];
   createGain(): TrackedGain;
   createBufferSource(): TrackedSource;
-  createOscillator(): TrackedSource;
-  createBiquadFilter(): FilterLike;
-  createBuffer(channels: number, length: number, rate: number): AudioBufferLike;
+  /** Undefined until `withRecordings` gives it one: a context that cannot decode is a workshop
+   *  with no files in it. */
+  decodeAudioData?: (data: ArrayBuffer) => Promise<AudioBufferLike>;
 }
 
 function trackedParam(): TrackedParam {
@@ -162,20 +164,30 @@ function fakeContext(): FakeContext {
       return node;
     },
     createBufferSource: source,
-    createOscillator: source,
-    createBiquadFilter(): FilterLike {
-      return {
-        type: 'lowpass',
-        frequency: trackedParam(),
-        Q: trackedParam(),
-        connect: () => undefined,
-        disconnect: () => undefined,
-      };
-    },
-    createBuffer(_channels: number, length: number): AudioBufferLike {
-      return { length, getChannelData: () => new Float32Array(length) };
-    },
   };
+}
+
+/** Piotr's recordings, landed: the context can decode and the fetch answers with bytes. The
+ *  loader asks for a file once, on the first play of that sound, and that first play is silent
+ *  whatever happens, so every sound is asked for here, long before the clock the tests use, and
+ *  the microtasks are let run before anything is expected of it (CLAUDE.md T20 2.13). Nothing is
+ *  made by it: the engine is left with no loops running and nothing counted as played. */
+async function withRecordings(): Promise<void> {
+  const decoded: AudioBufferLike = { length: 4 };
+  context.decodeAudioData = async (): Promise<AudioBufferLike> => decoded;
+  (globalThis as { fetch?: unknown }).fetch = async (): Promise<unknown> => ({
+    ok: true,
+    arrayBuffer: async (): Promise<ArrayBuffer> => new ArrayBuffer(8),
+  });
+  let at = -1_000_000;
+  for (const name of ONE_SHOT_NAMES) {
+    play(name, at);
+    at += 10_000;
+  }
+  for (const name of LOOP_NAMES) loop(name, true);
+  for (let turn = 0; turn < 8; turn += 1) await Promise.resolve();
+  expect(soundStateForTests().loops).toEqual([]);
+  expect(soundStateForTests().played).toEqual({});
 }
 
 let context: FakeContext = fakeContext();
@@ -190,9 +202,12 @@ beforeEach(() => {
   });
 });
 
+const realFetch = (globalThis as { fetch?: unknown }).fetch;
+
 afterEach(() => {
   resetSound();
   setAudioContextFactory(null);
+  (globalThis as { fetch?: unknown }).fetch = realFetch;
 });
 
 // ---------------------------------------------------------------------------
@@ -274,8 +289,9 @@ describe('the volume and the mute', () => {
     expect(soundStateForTests().masterGain).toBe(0);
   });
 
-  it('silences everything when it is muted, and brings it back when it is not', () => {
+  it('silences everything when it is muted, and brings it back when it is not', async () => {
     unlockSound();
+    await withRecordings();
     setLoops(new Set<LoopName>(['tableSaw']));
     play('door', 0);
     expect(soundStateForTests().loops).toEqual(['tableSaw']);
@@ -299,8 +315,9 @@ describe('the volume and the mute', () => {
 });
 
 describe('the loops follow the hall', () => {
-  it('runs exactly the named loops and stops the ones that drop out', () => {
+  it('runs exactly the named loops and stops the ones that drop out', async () => {
     unlockSound();
+    await withRecordings();
     setLoops(new Set<LoopName>(['tableSaw']));
     expect(soundStateForTests().loops).toEqual(['tableSaw']);
     const saw = context.sources[0];
@@ -319,7 +336,7 @@ describe('the loops follow the hall', () => {
     expect(soundStateForTests().loops).toEqual([]);
   });
 
-  it('is on at the saw only while somebody is at the saw', () => {
+  it('is on at the saw only while somebody is at the saw', async () => {
     const idle = quietHall();
     expect(Array.from(hallLoops(idle))).toEqual([]);
     expect(Array.from(hallOneShots(idle))).toEqual([]);
@@ -327,6 +344,7 @@ describe('the loops follow the hall', () => {
     expect(hallLoops(cutting).has('tableSaw')).toBe(true);
 
     unlockSound();
+    await withRecordings();
     setLoops(hallLoops(cutting));
     expect(soundStateForTests().loops).toContain('tableSaw');
     setLoops(hallLoops(idle));
@@ -343,12 +361,13 @@ describe('the loops follow the hall', () => {
     expect(hallLoops(quietHall()).has('extractor')).toBe(false);
   });
 
-  it('knocks and screws at a bench that is assembling, and nothing else', () => {
+  it('knocks and screws at a bench that is assembling, and nothing else', async () => {
     const assembling = jobAt('assembly');
     expect(Array.from(hallOneShots(assembling)).sort()).toEqual(['drill', 'hammer']);
     expect(hallLoops(assembling).has('sander')).toBe(false);
 
     unlockSound();
+    await withRecordings();
     for (const name of hallOneShots(assembling)) play(name, 0);
     const played = soundStateForTests().played;
     expect(played['hammer']).toBe(1);
@@ -373,8 +392,9 @@ describe('the loops follow the hall', () => {
 });
 
 describe('the one shots are thinned', () => {
-  it('lets a door through once a second and no more', () => {
+  it('lets a door through once a second and no more', async () => {
     unlockSound();
+    await withRecordings();
     play('door', 0);
     play('door', 1);
     play('door', SOUND_ONE_SHOT_GAP_MS - 1);
@@ -383,11 +403,12 @@ describe('the one shots are thinned', () => {
     expect(soundStateForTests().played['door']).toBe(2);
   });
 
-  it('gives the hammer and the drill their own few seconds', () => {
+  it('gives the hammer and the drill their own few seconds', async () => {
     // The brief asks for knocks every few seconds, not every second (CLAUDE.md T19 2.10).
     expect(SOUNDS.hammer.gapMs).toBe(HAMMER_EVERY_SECONDS * 1000);
     expect(SOUNDS.drill.gapMs).toBe(DRILL_EVERY_SECONDS * 1000);
     unlockSound();
+    await withRecordings();
     // Offered every frame for four seconds, as the hall offers it.
     for (let at = 0; at <= 4000; at += 16) play('hammer', at);
     expect(soundStateForTests().played['hammer']).toBe(2);
@@ -402,8 +423,10 @@ describe('the one shots are thinned', () => {
   });
 });
 
-describe('with no recordings in public/sounds', () => {
-  it('plays the quiet stand in for every sound in the table, and throws for none of them', () => {
+describe('with no recordings in public/sounds (PIOTR, 18.09; CLAUDE.md T20 2.13)', () => {
+  it('is silent: every sound in the table plays nothing at all, and throws for none of them', () => {
+    // No file, no sound. The synthesised stand ins of Turn 19 are deleted, so a workshop with an
+    // empty public/sounds makes no noise whatever the hall is doing.
     unlockSound();
     let at = 0;
     for (const name of ONE_SHOT_NAMES) {
@@ -411,18 +434,41 @@ describe('with no recordings in public/sounds', () => {
       at += 10_000;
     }
     for (const name of LOOP_NAMES) expect(() => loop(name, true)).not.toThrow();
-    expect(soundStateForTests().loops).toEqual([...LOOP_NAMES].sort());
-    const played = soundStateForTests().played;
-    for (const name of [...ONE_SHOT_NAMES, ...LOOP_NAMES]) expect(played[name]).toBe(1);
-    // Quietly: every stand in is made at STAND_IN_GAIN times its own row's gain, under the master.
-    const shaped = context.gains.slice(1).map((gain) => gain.gain.value);
-    expect(shaped).toHaveLength(ONE_SHOT_NAMES.length + LOOP_NAMES.length);
-    for (const value of shaped) expect(value).toBeLessThanOrEqual(STAND_IN_GAIN);
-    expect(shaped).toContain(STAND_IN_GAIN * SOUNDS.door.gain);
+    expect(soundStateForTests().loops).toEqual([]);
+    expect(soundStateForTests().played).toEqual({});
+    // Nothing was built to make it with either: the master is the only thing on the graph.
+    expect(context.sources).toHaveLength(0);
+    expect(context.gains).toHaveLength(1);
   });
 
-  it('lets a finished one shot go, so an hour of knocking leaves nothing hanging on the master', () => {
+  it('asks for each file once and remembers there was none, however many frames ask', () => {
     unlockSound();
+    for (let frame = 0; frame < 60; frame += 1) {
+      setLoops(new Set<LoopName>(['tableSaw', 'extractor']));
+      play('door', frame * 2000);
+    }
+    expect(soundStateForTests().loops).toEqual([]);
+    expect(context.sources).toHaveLength(0);
+    // And no gain is left hanging off the master by a sound that was never made.
+    expect(context.gains).toHaveLength(1);
+  });
+
+  it('plays it the day the recording is there, with no code change', async () => {
+    unlockSound();
+    await withRecordings();
+    play('door', 0);
+    expect(soundStateForTests().played['door']).toBe(1);
+    setLoops(new Set<LoopName>(['tableSaw']));
+    expect(soundStateForTests().loops).toEqual(['tableSaw']);
+    // The one shot is the recording itself and it is not looped.
+    const knock = context.sources[0];
+    expect(knock?.buffer).not.toBeNull();
+    expect(knock?.loop).toBe(false);
+  });
+
+  it('lets a finished one shot go, so an hour of knocking leaves nothing hanging on the master', async () => {
+    unlockSound();
+    await withRecordings();
     play('hammer', 0);
     const knock = context.sources[0];
     expect(knock?.onended).toBeTypeOf('function');
@@ -432,8 +478,9 @@ describe('with no recordings in public/sounds', () => {
 });
 
 describe('resetSound', () => {
-  it('leaves it silent and locked again', () => {
+  it('leaves it silent and locked again', async () => {
     unlockSound();
+    await withRecordings();
     setLoops(new Set<LoopName>(['tableSaw']));
     play('door', 0);
     applySoundSettings({ volume: 0.2, muted: true });
@@ -470,23 +517,6 @@ describe('the engine when the browser will not play (CLAUDE.md T19 2.10, found b
     expect(builds).toBe(1);
   });
 
-  it('lets go of the gain when a stand in cannot be built, however many frames ask for it', () => {
-    // A loop that cannot start is asked for again on the next frame, so a gain left hanging off
-    // the master here is a gain a frame for as long as the hall runs.
-    resetSound();
-    const made = fakeContext();
-    made.createBuffer = (): AudioBufferLike => {
-      throw new Error('no buffers here');
-    };
-    setAudioContextFactory(() => made);
-    unlockSound();
-    for (let at = 0; at < 60; at += 1) setLoops(new Set<LoopName>(['tableSaw', 'extractor']));
-    expect(soundStateForTests().loops).toEqual([]);
-    // Every gain the engine built was let go of again, but the master, which stays.
-    const hanging = made.gains.filter((gain) => gain.connected > gain.disconnected);
-    expect(hanging).toHaveLength(1);
-  });
-
   it('refuses a volume that is not a number, rather than putting NaN on the master', () => {
     // Math.max(0, NaN) is NaN, so clamping alone let it through, and a NaN gain throws in Web
     // Audio, which used to take the frame loop with it (CLAUDE.md T19 2.10).
@@ -501,15 +531,4 @@ describe('the engine when the browser will not play (CLAUDE.md T19 2.10, found b
     expect(act(opened, { type: 'SET_SOUND', volume: -9 }).settings.sound.volume).toBe(0);
   });
 
-  it('does not throw when the context answers a buffer with nothing', () => {
-    // The frame loop asks for itself at the end of itself, so a throw in here used to stop the
-    // game dead. app.ts re-arms the frame whatever happens now, and this end does not throw.
-    resetSound();
-    const made = fakeContext();
-    made.createBuffer = (): AudioBufferLike => undefined as unknown as AudioBufferLike;
-    setAudioContextFactory(() => made);
-    unlockSound();
-    expect(() => setLoops(new Set<LoopName>(['tableSaw']))).not.toThrow();
-    expect(soundStateForTests().loops).toEqual([]);
-  });
 });
