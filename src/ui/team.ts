@@ -38,7 +38,7 @@ import {
   staffManagementTaker,
 } from '../engine/index';
 // Straight off its own module, not round the public API, which Turn 13 froze (REPORT-T13 10).
-import { ROLE_WORDS, monthlyWageOf } from '../engine/staff';
+import { ROLE_WORDS, letGoCheck, monthlyWageOf } from '../engine/staff';
 import { ownerDayLine } from './topbar';
 import {
   button,
@@ -273,6 +273,7 @@ function teamRow(
   minutesWorked: number,
   daysOff: number,
   doing: string,
+  action = '',
 ): string {
   return (
     `<div class="row" data-team="${id}">` +
@@ -282,8 +283,19 @@ function teamRow(
     `<span class="row-figure">${hoursText(minutesWorked)} this month</span>` +
     `<span class="row-figure">${plural(daysOff, 'day off', 'days off')}</span>` +
     `<span class="row-figure">${escapeHtml(doing)}</span>` +
+    (action === '' ? '' : `<span class="row-action">${action}</span>`) +
     '</div>'
   );
+}
+
+/** The one control a man's row carries: Let go, or the date he goes on once he has been given his
+ *  notice. One click is one click: he works a week out, he is paid for it, and the morning after
+ *  his last day his jobs and his contracts are a man short (PIOTR, 18.09: "how do I fire
+ *  people?"; CLAUDE.md T20 2.4). The owner's row never has it: nobody lets him go. */
+function letGoControl(state: GameState, worker: Worker): string {
+  const check = letGoCheck(state, worker.id);
+  if (!check.ok) return reasonLabel(check.reason);
+  return button('letGo', 'Let go', `data-id="${worker.id}"`);
 }
 
 /** Everybody on the books, one row each, the owner first: the roll call Piotr asked for, with no
@@ -312,6 +324,7 @@ function ourTeamRows(state: GameState): string {
         worker.monthMinutes,
         worker.monthDaysOff,
         workerDoing(state, worker),
+        letGoControl(state, worker),
       ),
     ),
   ];

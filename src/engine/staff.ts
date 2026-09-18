@@ -33,6 +33,7 @@ import {
   findSpec,
   itemStandsInTheHall,
   overdueBreakdownChance,
+  releaseMachines,
   releaseMachinesExcept,
 } from './machines';
 import { countOwnedOrOnOrder } from './orders';
@@ -500,9 +501,84 @@ export function autoAssignJobs(state: GameState, shift: Shift = 'day'): void {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Letting a man go (PIOTR, 18.09: "how do I fire people?"; CLAUDE.md T20 2.4). He works a week's
+// notice out, he is paid for it, and the morning after his last day his jobs and his contracts
+// are short of a man and the plan says so. It costs no reputation: a workshop that cannot carry
+// somebody lets him go, and the trade thinks nothing of it.
+// ---------------------------------------------------------------------------
+
+/** The notice he works out, in days [TUNE, Piotr's decision is open: he said a week's wage]. Seven
+ *  days from the click, so exactly one Friday falls inside them and the week he works is the week
+ *  he is paid for. */
+export const LET_GO_NOTICE_DAYS = 7;
+
+/** Why this man cannot be let go, or that he can. The one refusal: the row asks it before it
+ *  draws the control, so a button the engine would refuse is never drawn (CLAUDE.md T4 3.2). */
+export function letGoCheck(state: GameState, workerId: string): { ok: boolean; reason: string } {
+  const worker = workerById(state, workerId);
+  if (!worker) return { ok: false, reason: 'No such person' };
+  if (worker.leavesOnDay !== null) {
+    return { ok: false, reason: `leaves on ${formatCalendarDay(worker.leavesOnDay)}` };
+  }
+  return { ok: true, reason: '' };
+}
+
+/** Gives him his notice. He stays on the books, on his job and on his contract, and is paid, to
+ *  the end of the last day of it; `runStaffDayStart` is what walks him out of the gate the
+ *  morning after (CLAUDE.md T20 2.4). */
+export function letGo(state: GameState, workerId: string): boolean {
+  if (!letGoCheck(state, workerId).ok) return false;
+  const worker = workerById(state, workerId);
+  if (!worker) return false;
+  worker.leavesOnDay = state.clock.day + LET_GO_NOTICE_DAYS;
+  return true;
+}
+
+/** The morning the notice is up: he is off the books, off his job and off his contract, and what
+ *  he was holding goes back on the list for somebody else. The plan draws his jobs with nobody on
+ *  them, which is the hole the player has to fill (CLAUDE.md T20 2.4). */
+function walkOutTheGone(state: GameState): Worker[] {
+  const gone = state.workers.filter(
+    (worker) => worker.leavesOnDay !== null && worker.leavesOnDay < state.clock.day,
+  );
+  for (const worker of gone) {
+    const job = worker.jobId === null ? null : findJob(state, worker.jobId);
+    if (job) takeOffJob(state, job.id, worker.id);
+    // The contracts are told here and not through `assignContract`, because contracts.ts reads
+    // this module and the two cannot read each other (NOTES-B2.md says so for phase C).
+    for (const contract of state.contracts) {
+      contract.assigned = contract.assigned.filter((id) => id !== worker.id);
+    }
+    if (worker.taskId !== null) {
+      const task = state.tasks.find((entry) => entry.id === worker.taskId);
+      if (task) task.doneBy = null;
+      worker.taskId = null;
+    }
+    releaseMachines(state, worker.id);
+    // `workerQuit` is the one kind the game has for a man going off the books. It was written for
+    // the overtime quit of Turn 8, which went with the evenings in Turn 17, and nothing has raised
+    // it since; a man let go leaves by the same gate (GameEventKind is in the frozen types.ts,
+    // and NOTES-B2.md says so for phase C).
+    queueEvent(state, {
+      kind: 'workerQuit',
+      title: 'He has gone',
+      body: `${worker.name} has worked his notice out and left. Anything he was on is nobody\u0027s now.`,
+      data: { workerId: worker.id, name: worker.name },
+    });
+  }
+  if (gone.length > 0) {
+    const ids = new Set(gone.map((worker) => worker.id));
+    state.workers = state.workers.filter((worker) => !ids.has(worker.id));
+  }
+  return gone;
+}
+
 /** Counts down an injured joiner's days off and hands everybody a fresh day. What a man did not
- *  finish yesterday he is still holding this morning (CLAUDE.md T2 3.8). */
+ *  finish yesterday he is still holding this morning (CLAUDE.md T2 3.8). The men whose notice ran
+ *  out yesterday are walked out first: they are not handed a day (CLAUDE.md T20 2.4). */
 export function runStaffDayStart(state: GameState): void {
+  walkOutTheGone(state);
   for (const worker of state.workers) {
     if (worker.absentDaysRemaining > 0) worker.absentDaysRemaining -= 1;
     worker.minutesWorked = 0;
