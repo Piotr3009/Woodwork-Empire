@@ -4,13 +4,22 @@
 
 import { describe, expect, it } from 'vitest';
 import { footprintIn, renderHall, stationCell } from '../../src/render/hall';
-import { STATION_BENCH, machineStation, waitingStation } from '../../src/engine/stations';
+import {
+  STATION_BENCH,
+  itemAtCell,
+  machineStation,
+  standingCell,
+  waitingStation,
+} from '../../src/engine/stations';
+import { footprintCells, isFree } from '../../src/engine/walk';
 import { tick } from '../../src/engine/index';
 import type { GameState } from '../../src/engine/index';
 import {
   acceptNow,
   act,
+  buyNow,
   buyStartingKit,
+  hireNow,
   fillRack,
   firstJob,
   newGame,
@@ -42,11 +51,11 @@ describe('the figure of a man at work', () => {
     // He is at the front edge of the saw itself, on its right cell, not at the corner of its
     // working zone: a used saw is 2 by 1 of machine centred on 3 by 3 of floor, and the operator
     // of a saw stands at the right end of its front, back to the camera (CLAUDE.md T7 3.3; T16
-    // 2.1).
+    // 2.1), one cell out from the table since T19 2.4, where the floor is his and not the saw's.
     const stands = footprintIn(saw);
     expect({ x: atSaw.x, y: atSaw.y }).toEqual({
       x: Math.floor(stands.x) + 1,
-      y: Math.floor(stands.y + stands.depth),
+      y: Math.floor(stands.y + stands.depth) + 1,
     });
     expect(atSaw.y).toBeGreaterThan(saw.anchorY);
     expect(['ne', 'nw']).toContain(atSaw.facing);
@@ -69,7 +78,14 @@ describe('the figure of a man at work', () => {
     const working = stationCell(state, machineStation('tableSaw'), { x: 0, y: 0 });
     const waiting = stationCell(state, waitingStation('tableSaw'), { x: 0, y: 0 });
     expect({ x: waiting.x, y: waiting.y }).not.toEqual({ x: working.x, y: working.y });
-    expect(waiting.y).toBe(working.y);
+    // Both in front of the saw and neither on it: the man working it is a cell out from the table
+    // and the man waiting is at the other end of the same front edge (CLAUDE.md T19 2.4).
+    const saw = state.equipment.find((item) => item.specId === 'tableSaw');
+    if (!saw) throw new Error('no saw');
+    const stands = footprintIn(saw);
+    expect(waiting.y).toBeGreaterThanOrEqual(Math.floor(stands.y + stands.depth));
+    expect(working.y).toBe(waiting.y + 1);
+    expect(working.x).not.toBe(waiting.x);
   });
 
   it('has no cycle of minutes left in it at all', () => {
@@ -96,5 +112,61 @@ describe('the figure of a man at work', () => {
     // Nothing but his bench, so the cell he is given is the bench cell he was handed.
     const cell = stationCell(finishing, STATION_BENCH, { x: 7, y: 7 });
     expect({ x: cell.x, y: cell.y }).toEqual({ x: 7, y: 7 });
+  });
+});
+
+describe('at the bench, not on it (PIOTR, 17.09; CLAUDE.md T19 2.4)', () => {
+  /** The day 1 kit with a joiner hired and on the floor, which gives him a bench of his own. */
+  function withAJoiner(): GameState {
+    let state = fillRack(
+      buyStartingKit(newGame({ difficulty: 'veryEasy' }), { sawVariant: 'budget' }),
+      40,
+    );
+    for (const specId of ['workbench', 'locker', 'canteenSeat', 'toolCabinet', 'handToolSet']) {
+      state = buyNow(state, specId, specId === 'workbench' ? 'budget' : undefined);
+    }
+    const hired = hireNow(state, 'joiner', 'poor');
+    for (const worker of hired.workers) worker.startDay = hired.clock.day;
+    return hired;
+  }
+
+  it('stands the joiner at his bench and never on it', () => {
+    const state = withAJoiner();
+    const joiner = state.workers[0];
+    if (!joiner) throw new Error('nobody was hired');
+    joiner.station = STATION_BENCH;
+    // The cell the engine keeps for him is his bench's own anchor cell: that is what used to be
+    // drawn under his feet.
+    const his = { x: joiner.anchorX, y: joiner.anchorY };
+    const bench = itemAtCell(state, his);
+    if (bench === null) throw new Error('his cell is not a bench');
+    expect(bench.specId).toBe('workbench');
+    const cell = stationCell(state, STATION_BENCH, his);
+    expect({ x: cell.x, y: cell.y }).toEqual(standingCell(state, bench, 'operator'));
+    expect(itemAtCell(state, cell)).toBeNull();
+    expect(isFree(state, cell)).toBe(true);
+    const at = footprintCells(bench);
+    expect(cell.y).toBe(at.y + at.depth);
+    // And the hall really draws him there, feet on that cell.
+    const svg = renderHall(state);
+    expect(svg).toContain(`data-worker="${joiner.id}"`);
+    const figure = svg.slice(svg.indexOf(`data-worker="${joiner.id}"`) - 400);
+    expect(figure).toContain(`data-cell="${cell.x},${cell.y}"`);
+  });
+
+  it('stands the helper at the fan and never on it', () => {
+    // His own corner of the hall is the fan's anchor cell, which is a cell the fan stands on: the
+    // same bug and the same one fix.
+    let state = withAJoiner();
+    state = buyNow(state, 'extractor', 'standard');
+    const hired = hireNow(state, 'helper', null);
+    for (const worker of hired.workers) worker.startDay = hired.clock.day;
+    const helper = hired.workers.find((worker) => worker.role === 'helper');
+    if (!helper) throw new Error('no helper');
+    helper.station = STATION_BENCH;
+    const fan = hired.equipment.find((item) => item.specId === 'extractor');
+    if (!fan) throw new Error('no fan');
+    const cell = stationCell(hired, STATION_BENCH, { x: fan.anchorX, y: fan.anchorY });
+    expect(itemAtCell(hired, cell)).toBeNull();
   });
 });

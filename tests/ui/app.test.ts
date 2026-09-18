@@ -484,8 +484,9 @@ describe('the walking figures', () => {
     advanceMinutes(1);
     const after = root().querySelector('[data-figure="owner"]')?.getAttribute('transform');
     // The new node starts at the old place: the walker moves him on the frames that follow
-    // (CLAUDE.md T16 2.2).
-    expect(after).toBe(before);
+    // (CLAUDE.md T16 2.2). The markup writes a station cell in whole pixels and the walker writes
+    // where he really is in two decimals, so the same point is written two ways (T19 2.1).
+    expect(after?.replace(/\.00/g, '')).toBe(before);
     click('[data-do="setView"][data-view="office"]');
   });
 });

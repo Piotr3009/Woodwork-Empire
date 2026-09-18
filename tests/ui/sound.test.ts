@@ -48,6 +48,7 @@ import {
   firstJob,
   newGame,
   placeEnquiry,
+  placeEquipment,
 } from '../helpers';
 
 // ---------------------------------------------------------------------------
@@ -354,12 +355,20 @@ describe('the loops follow the hall', () => {
     expect(played['drill']).toBe(1);
   });
 
-  it('sands a bench that is finishing, and sprays one that is lacquering', () => {
+  it('sands a bench that is finishing, and sprays only when somebody is at a booth', () => {
     expect(hallLoops(jobAt('finishing')).has('sander')).toBe(true);
     expect(hallLoops(jobAt('finishing')).has('sprayBooth')).toBe(false);
+    // A lacquered job is not a sander: lacquer goes to the booth and hands and paper do not.
     const lacquered = jobAt('finishing', 'lacquer');
-    expect(hallLoops(lacquered).has('sprayBooth')).toBe(true);
     expect(hallLoops(lacquered).has('sander')).toBe(false);
+    // And it is not a booth either, until there is a booth with somebody standing at it. A
+    // workshop with no booth cannot spray and must not be heard to (CLAUDE.md T19 2.10; the hall's
+    // own reading of itself, T19-B1d).
+    expect(hallLoops(lacquered).has('sprayBooth')).toBe(false);
+    const booth = placeEquipment(lacquered, 'sprayBooth', { x: 14, y: 7 });
+    expect(hallLoops(lacquered).has('sprayBooth')).toBe(false);
+    booth.takenBy = 'owner';
+    expect(hallLoops(lacquered).has('sprayBooth')).toBe(true);
   });
 });
 
