@@ -46,7 +46,7 @@ import {
   serviceIsDue,
 } from '../engine/index';
 import { formatCalendarDay, gateCheck, hasGate, variantFor } from '../engine/index';
-import { serviceDueIn } from '../engine/machines';
+import { serviceCallCheck, serviceDueIn } from '../engine/machines';
 import { orderName, orderProgress } from '../engine/orders';
 import type { Equipment, GameState, OrderLine } from '../engine/index';
 import { classBadge, classFrame, isMachineFamily, pictureSlot, renderMachine } from './machine';
@@ -411,9 +411,11 @@ export function ownedTile(
         ? 'no service due while it stands idle'
         : `service on ${formatCalendarDay(due)}, ${hours(serviceDueIn(item))} of use away`;
   const life = machine ? `${hours(item.hoursUsed)} of ${hours(item.enduranceHours)}` : '';
+  // A service is called in and paid for, and the machine goes out for the working day, so the
+  // card offers it only while the engine would take the call (CLAUDE.md T4 3.2, T20 2.9).
   const action = item.broken
     ? button('repairMachine', 'Repair', `data-id="${item.id}"`)
-    : machine && serviceIsDue(item)
+    : machine && serviceIsDue(item) && serviceCallCheck(state, item.id).ok
       ? button('serviceMachine', 'Service', `data-id="${item.id}"`)
       : '';
   const sell = sellAction(state, item, sellConfirm);

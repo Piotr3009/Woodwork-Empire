@@ -24,7 +24,9 @@ import {
   gateIsCrowded,
   hasExtraction,
   hasGate,
+  machineIsOut,
   machinesDueService,
+  machinesInService,
   sawdustPiles,
   serviceIsDue,
 } from '../engine/machines';
@@ -1943,8 +1945,18 @@ export function hallProblems(state: GameState): HallProblem[] {
       list.push({ kind: 'dirty', equipmentId: null, text: `The hall is ${band.label}${risk}` });
     }
   }
+  // A machine away being serviced is a statement and not a question: it is paid for and it comes
+  // back the next working day (PIOTR, 18.09; CLAUDE.md T20 2.9.3).
+  for (const item of machinesInService(state)) {
+    list.push({
+      kind: 'service',
+      equipmentId: item.id,
+      text: `The ${lowerName(item.specId)} is in for a service, nothing runs on it today`,
+      inHand: true,
+    });
+  }
   for (const item of machinesDueService(state)) {
-    if (item.broken) continue;
+    if (item.broken || machineIsOut(item, state.clock.day)) continue;
     list.push({
       kind: 'service',
       equipmentId: item.id,

@@ -40,8 +40,9 @@ import {
   UNDER_EXTRACTION_OUTPUT_PENALTY,
   SALE_FRACTION_USED,
   USED_VARIANT,
+  WEEKS_PER_MONTH,
 } from './constants';
-import { weekOfDay, monthOfDay } from './clock';
+import { weekOfDay, monthOfDay, nextWorkingDay } from './clock';
 import { canAfford } from './economy';
 import {
   airBlockFor,
@@ -241,7 +242,10 @@ export function cabinetTools(state: GameState, specId: string): Equipment[] {
 
 /** Machines of this family nobody is standing at. */
 export function freeMachines(state: GameState, specId: string): Equipment[] {
-  return floorMachines(state, specId).filter((item) => item.takenBy === null && !item.broken);
+  // A machine away being serviced is no more use than a broken one (CLAUDE.md T20 2.9.3).
+  return floorMachines(state, specId).filter(
+    (item) => item.takenBy === null && !item.broken && !machineIsOut(item, state.clock.day),
+  );
 }
 
 /** The machine of this family this man is standing at, or null. */
@@ -706,9 +710,84 @@ export function machinesDueService(state: GameState): Equipment[] {
   return serviceableMachines(state).filter((item) => serviceIsDue(item));
 }
 
-/** 2% of what the machine cost [TUNE]. */
+/** A tenth of what the machine cost [PIOTR, 18.09; CLAUDE.md T20 2.9.2]. The fraction itself is
+ *  `SERVICE_COST_FRACTION` in constants.ts, which is one of the six frozen files tonight: it still
+ *  reads 0.02 and NOTES-B3.md note 4 carries the new value. Everything here and every test reads
+ *  the constant, so both are true of the same code. */
 export function serviceCostFor(item: Equipment): number {
   return Math.round(item.purchasePrice * SERVICE_COST_FRACTION * 100) / 100;
+}
+
+/** [PIOTR, 18.09] What a service adds to the machine's life: half of its ORIGINAL life the first
+ *  time, and half of the last extension each time after that, so the extensions are 50%, 25%,
+ *  12.5% of the original and they never add up past the original again (CLAUDE.md T20 2.9.1). */
+export const SERVICE_LIFE_EXTENSION = 0.5;
+
+/** The life the machine left the shop with, before any service was called on it. */
+export function originalLifeOf(item: Equipment): number {
+  return enduranceHoursFor(item.specId, item.variantId);
+}
+
+/** The hours of life a machine has after so many services: the original, and 50, then 25, then
+ *  12.5 percent of the original again. Worked out from the original and the count every time,
+ *  never added to what is there, so a lifted save and a machine serviced ten times both come out
+ *  at the same figure (CLAUDE.md T20 2.9.1). */
+export function lifeAfterServices(original: number, services: number): number {
+  const extension = 1 - Math.pow(SERVICE_LIFE_EXTENSION, Math.max(0, services));
+  return Math.round(original * (1 + extension));
+}
+
+/** True while the machine is away being serviced: nothing runs on it and its stage falls back the
+ *  way a broken machine's does [PIOTR, 18.09: out for one working day from the call]
+ *  (CLAUDE.md T20 2.9.3). */
+export function machineIsOut(item: Equipment, day: number): boolean {
+  return item.inServiceUntilDay !== null && day < item.inServiceUntilDay;
+}
+
+/** Everything standing in the hall that is away being serviced today. */
+export function machinesInService(state: GameState): Equipment[] {
+  return state.equipment.filter(
+    (item) => itemStandsInTheHall(item) && !isSold(item) && machineIsOut(item, state.clock.day),
+  );
+}
+
+/** Why a service cannot be called on this machine, or that it can. The one refusal: the button on
+ *  the Machines page and the engine's own call read it, so a button the engine would refuse is
+ *  never drawn (CLAUDE.md T4 3.2, T20 2.9). */
+export function serviceCallCheck(
+  state: GameState,
+  equipmentId: string,
+): { ok: boolean; reason: string } {
+  const item = state.equipment.find((entry) => entry.id === equipmentId);
+  if (!item) return { ok: false, reason: 'No such machine' };
+  if (isSold(item)) return { ok: false, reason: 'Sold' };
+  if (findSpec(item.specId)?.category !== 'machine') {
+    return { ok: false, reason: 'It is repaired, never serviced' };
+  }
+  if (machineIsOut(item, state.clock.day)) return { ok: false, reason: 'In service' };
+  if (item.broken) return { ok: false, reason: 'It is broken. Fix it first' };
+  if (!canAfford(state, serviceCostFor(item))) return { ok: false, reason: 'Not enough cash' };
+  return { ok: true, reason: '' };
+}
+
+/** Hours the machine has run past the life it has, extensions and all. */
+export function hoursPastLife(item: Equipment): number {
+  if (item.enduranceHours <= 0) return 0;
+  return Math.max(0, round6(item.hoursUsed - item.enduranceHours));
+}
+
+/** [TUNE] A week of a machine's own clock, which is the same reading `SERVICE_INTERVAL_HOURS`
+ *  is written in: 80 hours is the month a one man shop puts on a saw (CLAUDE.md T6 3.6), so a
+ *  week of it is that over `WEEKS_PER_MONTH`. No new figure: the two it is made of are Piotr's
+ *  own. */
+export const PAST_LIFE_WEEK_HOURS = SERVICE_INTERVAL_HOURS / WEEKS_PER_MONTH;
+
+/** How many weeks of its own clock the machine has run past the end of its life. */
+export function weeksPastLife(item: Equipment): number {
+  if (PAST_LIFE_WEEK_HOURS <= 0) return 0;
+  // Rounded to six places before the floor: two whole weeks of a figure that is 80 over 4.33 is
+  // 1.9999999 in binary, and a week of a machine's life is not lost to that.
+  return Math.floor(round6(hoursPastLife(item) / PAST_LIFE_WEEK_HOURS));
 }
 
 /** The extractor keeps its Turn 1 parts bill, every other machine is 5% of its price [TUNE]. */
@@ -718,13 +797,20 @@ export function repairCostFor(item: Equipment): number {
 }
 
 /** A machine that is past its service hours can give up on any working day, and so can one that
- *  is past its endurance. The two stack (CLAUDE.md T3 3.5) [TUNE]. */
+ *  is past its endurance. The two stack (CLAUDE.md T3 3.5) [TUNE].
+ *
+ *  A machine at the end of its life does not vanish: it goes on working and gives up oftener, the
+ *  chance doubling for every week of its own clock it runs past the end [PIOTR, 18.09, the rule;
+ *  TUNE, the doubling] (CLAUDE.md T20 2.9.4). The first week past it is the Turn 8 chance it has
+ *  always been, so nothing about a machine that has just worn out has changed. */
 export function overdueBreakdownChance(item: Equipment): number {
   if (item.broken) return 0;
   let chance = 0;
   if (serviceIsDue(item)) chance += OVERDUE_BREAKDOWN_CHANCE;
-  if (pastEndurance(item)) chance += OVERDUE_BREAKDOWN_CHANCE;
-  return chance;
+  if (pastEndurance(item)) {
+    chance += OVERDUE_BREAKDOWN_CHANCE * Math.pow(2, weeksPastLife(item));
+  }
+  return Math.min(1, chance);
 }
 
 /** What is stopping a stage that is done on this family: a machine that has given up, when there
@@ -734,12 +820,17 @@ export function overdueBreakdownChance(item: Equipment): number {
 export function familyStopped(
   state: GameState,
   specId: string,
-): { item: Equipment; why: 'broken' | 'bags' } | null {
+): { item: Equipment; why: 'broken' | 'bags' | 'service' } | null {
   const machines = owned(state, specId);
   if (machines.length === 0) return null;
-  if (!machines.some((item) => !item.broken)) {
+  const out = (item: Equipment): boolean => item.broken || machineIsOut(item, state.clock.day);
+  // One away being serviced stops the stage the way a broken one does, and says which it is
+  // (PIOTR, 18.09; CLAUDE.md T20 2.9.3).
+  if (!machines.some((item) => !out(item))) {
     const broken = machines.find((item) => item.broken);
-    return broken ? { item: broken, why: 'broken' } : null;
+    if (broken) return { item: broken, why: 'broken' };
+    const serviced = machines.find((item) => machineIsOut(item, state.clock.day));
+    return serviced ? { item: serviced, why: 'service' } : null;
   }
   // The hall's bags are full: nothing that puts dust into them runs, whatever its class and
   // however many of the family stand in the hall, until they are emptied (CLAUDE.md T12 2.3).
@@ -907,12 +998,18 @@ export function repairMachine(state: GameState, equipmentId: string): Equipment 
   return item;
 }
 
-/** The service is done: the clock on the next one starts again. A service is not a repair, so a
- *  machine that has already given up stays broken until somebody repairs it. */
+/** The service is called in: the clock on the next one starts again, the machine's life is
+ *  extended by half of what the last extension was, and it stands there doing nothing until the
+ *  next working day [PIOTR, 18.09; the first service is out for the day too, TUNE: his decision
+ *  is open] (CLAUDE.md T20 2.9). A service is not a repair, so a machine that has already given
+ *  up stays broken until somebody repairs it; `serviceCallCheck` is what refuses the call. */
 export function serviceMachine(state: GameState, equipmentId: string): Equipment | null {
   const item = state.equipment.find((entry) => entry.id === equipmentId);
   if (!item) return null;
   item.serviceHours = item.hoursUsed;
+  item.serviceCount += 1;
+  item.enduranceHours = lifeAfterServices(originalLifeOf(item), item.serviceCount);
+  item.inServiceUntilDay = nextWorkingDay(state.clock.day);
   return item;
 }
 

@@ -114,3 +114,45 @@ moved a cell: the new station falls through `stationCell` exactly where the benc
 role with no broom sheet falls to `bench` and not to idle, through one table `INSTEAD_OF` in
 `src/render/characters.ts` beside the Turn 19 fallbacks, so the owner and a joiner sweeping are men
 working with their hands rather than men standing about.
+
+### 2.9 Machines: the inventory, the bar of life and the service that buys it
+
+**The page.** A row a machine, under Equipment on the laptop: the sprite's own cell small on the
+left, the name and the class, then the bar of its life with `2,140 of 3,600 h` under it, then
+Service with its price on it. The row is the game's own row and the bar is the game's own bar, the
+one a contract's week is drawn with, because a life against a total and a week against its
+quantity are the same picture (docs/ui-style.md 11, 13). The row says `broken`, `in service`,
+`past its life` or `service due` where the class is, and where the button would be it says why
+there is none. Four CSS rules are wanted for it, all of them modifiers on families that exist and
+all of them on tokens that exist; they are in NOTES-B3.md for phase C, and the page reads
+correctly without them.
+
+**The service rule.** A service extends the machine's life by half of its **original** life the
+first time, a quarter the second, an eighth the third, counted off `serviceCount` and worked out
+from the original every time, so a machine serviced ten times and a lifted save come out at the
+same figure and the bar's total grows with each one. It costs `SERVICE_COST_FRACTION` of what the
+machine cost; that constant is in the frozen `constants.ts` and still reads 0.02, so the tenth is
+note 4 for phase C and every line of code and every test reads the constant instead of the figure.
+The machine is out from the call until the next working day, the first service included: nothing
+runs on it (`freeMachines` passes it over), its stage stops the way a broken machine's does
+(`familyStopped` answers `service` beside `broken` and `bags`), and the chip under the hall says
+`The table saw is in for a service, nothing runs on it today` with no button on it. Past the end
+of its life the machine does not vanish and is not scrapped: it goes on working and gives up
+twice as often for every week of its own clock it runs past the end, capped at a certainty, and
+the row says `past its life`.
+
+**What was left, and why.** 2.9 says the rule "replaces Turn 8's 30 minutes at 2%", and its four
+numbered points say what a service gives, costs and takes and what happens past the end. None of
+the four takes the half hour of somebody's time away, so it was left: the service is still the
+task the morning raises and somebody works off, and all four points are true of it. The machine
+goes out when the service is done rather than when the button is pressed, which is half an hour
+apart. If Piotr means the half hour to go, it is three places in the frozen `game.ts` and it is
+written out in full as note 7 of NOTES-B3.md, as a decision and not as a fix.
+
+**The scripted player was re-scripted, and nothing was re-measured.** A service now costs the
+machine a working day, so the careful owner of `tests/scenarios/autopilot.ts` leaves the service
+event until the last hour of the day instead of taking the spanner at once. Without that, the
+three month playthrough loses the day its saw is serviced in the middle of month 2 and the seeded
+run never earns the standing of 10 that a production manager wants, although it delivers the same
+29 jobs: the manager and the five days away both fall over. Every assertion of the playthrough
+stands as it was written.
