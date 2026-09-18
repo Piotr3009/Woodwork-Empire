@@ -20,9 +20,15 @@ import {
   roomSilhouette,
   wallMatrix,
 } from '../../src/render/hall';
+import { DOOR_PHASES, doorIsUsed, doorLeaf, doorOpening, points } from '../../src/render/hall';
 import { TILE_RISE, centreOf, pointInPolygon, tileToScreen } from '../../src/render/iso';
-import { roomById } from '../../src/engine/constants';
-import { STATION_BENCH } from '../../src/engine/stations';
+import { roomById, roomDoorCell } from '../../src/engine/constants';
+import {
+  STATION_BENCH,
+  STATION_IDLE,
+  STATION_OFFICE,
+  STATION_PHONE,
+} from '../../src/engine/stations';
 import { ROOM_LAYOUT } from '../../src/engine/constants';
 import { buyStartingKit, newGame } from '../helpers';
 
@@ -299,5 +305,107 @@ describe('where the owner stands', () => {
     expect(svg).toContain(
       `data-figure="owner" transform="translate(${Math.round(feet.x)},${Math.round(feet.y)})"`,
     );
+  });
+});
+
+describe('the doors open (PIOTR, 17.09; CLAUDE.md T19 2.3)', () => {
+  const OFFICE = ROOM_LAYOUT.find((room) => room.id === 'office');
+  const CANTEEN = ROOM_LAYOUT.find((room) => room.id === 'canteen');
+
+  it('draws every door in three states, a leaf on its hinge over a dark opening', () => {
+    if (!OFFICE || !CANTEEN) throw new Error('no rooms');
+    const svg = hall();
+    for (const room of [OFFICE, CANTEEN]) {
+      expect(svg).toContain(`data-door-room="${room.id}"`);
+      // The dark hole in the face, which is the opening the leaf swings out of.
+      expect(svg).toContain(`<polygon points="${points(doorOpening(room))}" class="door-opening" />`);
+      for (const phase of DOOR_PHASES) {
+        expect(svg, `${room.id} ${phase}`).toContain(
+          `<polygon class="door-leaf" data-state="${phase}" points="${points(doorLeaf(room, phase))}" />`,
+        );
+      }
+    }
+    // Three leaves per door and no more, and the stylesheet shows the one the state names.
+    expect(svg.match(/class="door-leaf"/g) ?? []).toHaveLength(DOOR_PHASES.length * 2);
+  });
+
+  it('hangs the leaf on the left jamb and swings it out into the hall', () => {
+    if (!OFFICE) throw new Error('no office');
+    const door = roomDoorBox(OFFICE);
+    const face = OFFICE.y + OFFICE.depth;
+    const hinge = { x: OFFICE.x + door.from, y: face };
+    // Closed lies in the face, open is square out of it, and both are hung on the same jamb
+    // (docs/art/SPRITES.md 9.3: the room doors open into the hall).
+    expect(doorLeaf(OFFICE, 'closed')[0]).toEqual(tileToScreen(hinge.x, hinge.y, 0));
+    expect(doorLeaf(OFFICE, 'open')[0]).toEqual(tileToScreen(hinge.x, hinge.y, 0));
+    expect(doorLeaf(OFFICE, 'closed')[1]).toEqual(tileToScreen(hinge.x + door.across, face, 0));
+    expect(doorLeaf(OFFICE, 'open')[1]).toEqual(tileToScreen(hinge.x, face + door.across, 0));
+    // And every leaf is the full height of the opening.
+    for (const phase of DOOR_PHASES) {
+      const leaf = doorLeaf(OFFICE, phase);
+      expect(leaf).toHaveLength(4);
+      expect(leaf[3]?.y).toBeLessThan(leaf[0]?.y ?? 0);
+    }
+    // Every leaf is also wide enough to be seen. A leaf at world forty five degrees projects to
+    // exactly no width in this dimetric (screen x is (x - y) * 24), so the middle of the swing
+    // read as a sliver until the half angle was moved off it (T19-C4, found in the picture).
+    const full = Math.abs(
+      (doorLeaf(OFFICE, 'closed')[1]?.x ?? 0) - (doorLeaf(OFFICE, 'closed')[0]?.x ?? 0),
+    );
+    for (const phase of DOOR_PHASES) {
+      const leaf = doorLeaf(OFFICE, phase);
+      const wide = Math.abs((leaf[1]?.x ?? 0) - (leaf[0]?.x ?? 0));
+      expect(wide / full, phase).toBeGreaterThan(0.25);
+    }
+  });
+
+  it('wants the door open while somebody is standing in it, and shut when nobody is', () => {
+    const state = buyStartingKit(newGame());
+    state.owner.station = STATION_BENCH;
+    expect(doorIsUsed(state, 'office')).toBe(false);
+    expect(renderHall(state, { files: DELIVERED })).toContain(
+      'data-door-room="office" data-door-want="closed"',
+    );
+    state.owner.station = STATION_OFFICE;
+    expect(doorIsUsed(state, 'office')).toBe(true);
+    expect(renderHall(state, { files: DELIVERED })).toContain(
+      'data-door-room="office" data-door-want="open"',
+    );
+    // The phone is the same desk and the same doorway.
+    state.owner.station = STATION_PHONE;
+    expect(doorIsUsed(state, 'office')).toBe(true);
+    // A man with nowhere to be stands in the canteen door, and it opens for him too.
+    state.owner.station = STATION_IDLE;
+    expect(doorIsUsed(state, 'canteen')).toBe(true);
+    expect(doorIsUsed(state, 'office')).toBe(false);
+  });
+
+  it('keeps the office door a control and leaves the canteen click to the block', () => {
+    const svg = hall();
+    // The office door is what it has always been: a way into the office view.
+    expect(svg).toContain('data-door="office"');
+    expect(svg).toContain('<title>To the office</title>');
+    expect(svg).toContain('class="clickable office-door"');
+    // The canteen door is a door and not a control: the hook that scene clicks are read by is
+    // deliberately not on it, so the block behind it still answers with the canteen's own note.
+    expect(svg).not.toContain('data-door="canteen"');
+    expect(svg).toContain('class="canteen-door"');
+  });
+});
+
+describe('the owner in the office doorway (PIOTR, 17.09; CLAUDE.md T19 2.2)', () => {
+  it('is never absent from the hall: he stands in the doorway, facing in', () => {
+    const state = buyStartingKit(newGame());
+    for (const station of [STATION_OFFICE, STATION_PHONE]) {
+      state.owner.station = station;
+      const svg = renderHall(state, { files: DELIVERED });
+      const door = roomDoorCell('office');
+      expect(svg, station).toContain('data-figure="owner"');
+      expect(svg, station).toContain(`data-cell="${door.x},${door.y}"`);
+      // Facing in is facing away from the hall, up the screen.
+      expect(svg, station).toContain('data-facing-rest="ne"');
+      // And the door he is standing in is open behind him.
+      expect(svg, station).toContain('data-door-room="office" data-door-want="open"');
+    }
   });
 });

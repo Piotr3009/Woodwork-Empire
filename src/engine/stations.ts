@@ -10,10 +10,10 @@ import {
   WELFARE_IN_THE_CANTEEN,
   roomDoorCell,
 } from './constants';
-import { itemStandsInTheHall } from './machines';
+import { isSold, itemStandsInTheHall } from './machines';
 import type { Cell } from './pipes';
 import type { Equipment, GameState, TaskInstance } from './types';
-import { footprintCells, isFree } from './walk';
+import { covers, footprintCells, isFree } from './walk';
 
 export const STATION_BENCH = 'bench';
 export const STATION_RACK = 'rack';
@@ -57,6 +57,27 @@ export function secondStation(equipmentId: string): string {
 /** The item a man is standing at as the second of two, or null when he is not. */
 export function stationSecondAt(station: string): string | null {
   return station.startsWith('second:') ? station.slice('second:'.length) : null;
+}
+
+/** A place at an item beyond the two the station table draws by name. Place 0 is the operator's
+ *  cell and place 1 is the waiting cell at a machine, or the second place at a bench; from place
+ *  2 the men stand on along the same side, one cell further out each time, so twenty on one job
+ *  do not stack on one tile (PIOTR, 17.09; CLAUDE.md T19 2.5). The string names the item and not
+ *  the family, because it is that bench and that saw and no other. The renderer resolves the
+ *  string through `benchCellsAt` and `queueCellsAt` below. */
+export function placeStation(equipmentId: string, place: number): string {
+  return `place:${equipmentId}:${place}`;
+}
+
+/** The item and the place a station names, or null when it is not a place station. */
+export function stationPlaceAt(station: string): { id: string; place: number } | null {
+  if (!station.startsWith('place:')) return null;
+  const rest = station.slice('place:'.length);
+  const cut = rest.lastIndexOf(':');
+  if (cut <= 0) return null;
+  const place = Number(rest.slice(cut + 1));
+  if (!Number.isFinite(place) || place < 0) return null;
+  return { id: rest.slice(0, cut), place };
 }
 
 /** How many trips a load of sheets is between the pallet at the gate and the rack, so many
@@ -132,6 +153,19 @@ export function stationForTask(state: GameState, task: TaskInstance): string {
 // along the side. A rack, and the extractor by its bags, take the side with the most free cells
 // in the two rows beyond it instead, which is the hall side when it stands against a wall
 // (PIOTR, red pen, 16.09: "when it stands against a wall you come at it from the other side").
+//
+// `out` moves a cell a further cell away from the body (CLAUDE.md T19 2.4, PIOTR: "he stands on
+// the bench, not at it"). Every delivered sprite was measured against its own footprint for this
+// turn and not one of them is drawn bigger than the canvas the contract gives it, and the alpha
+// at the foot point of every operator, waiting and second cell is zero: nobody's feet are inside
+// a drawn body. What the measurement did show is the other half of the same complaint, that the
+// cells at the RIGHT and the MIDDLE of a front edge put the man exactly where the body leans on
+// this 2:1 dimetric, so half to four fifths of him is painted over the machine and he reads as
+// standing on it. Those cells are the ones that carry `out: 1`, each with its figure in the
+// report's table; the cells at the left of a front edge (the bench's own operator cell, 18.9% of
+// him over his bench) and the back cells (9.4%) are left where they are, because a man leaning
+// over his own bench is what a joiner looks like and a metre further out reads as a man who has
+// stepped away from it.
 // ---------------------------------------------------------------------------
 
 export type Side = 'front' | 'back' | 'left' | 'right';
@@ -156,7 +190,9 @@ export interface StationRow {
 /** The station table, one row per family (CLAUDE.md T16 2.1). */
 export const STATION_TABLE: Record<string, StationRow> = {
   tableSaw: {
-    operator: { side: 'front', along: 'right' },
+    // One cell out from the front: at the table itself 62.1% of the man was painted over the saw
+    // (60.3% industrial, 64.2% pro), and a cell further out is 16.8% (CLAUDE.md T19 2.4).
+    operator: { side: 'front', along: 'right', out: 1 },
     waiting: { side: 'front', along: 0 },
     second: null,
   },
@@ -173,33 +209,42 @@ export const STATION_TABLE: Record<string, StationRow> = {
   edgebander: {
     // The second cell from the infeed end, which is the left, read off the footprint's width so
     // the row needs no change when the footprint grows to 4 by 1 (CLAUDE.md T16 2.1, 6).
-    operator: { side: 'front', along: 1 },
+    // And one cell out from it: 68.8% of the man over the bander at the machine, 7.3% a cell out.
+    operator: { side: 'front', along: 1, out: 1 },
     waiting: { side: 'front', along: 0 },
     second: null,
   },
   cnc: {
-    operator: { side: 'front', along: 'right' },
+    // No picture has been delivered for a CNC, so this row is by the saw's geometry and not by a
+    // measurement: the right hand end of a front edge is where the body leans.
+    operator: { side: 'front', along: 'right', out: 1 },
     waiting: { side: 'front', along: 'middle' },
     second: { side: 'back', along: 'middle' },
   },
   sprayBooth: {
-    operator: { side: 'front', along: 'middle' },
+    // The same, and it is the cell 2.6 puts the sprayer on.
+    operator: { side: 'front', along: 'middle', out: 1 },
     waiting: { side: 'front', along: 0 },
     second: null,
   },
   workbench: {
+    // The bench's own two places stay where they are: 18.9% of the man over his bench in front of
+    // it and 9.4% behind it, which is a joiner leaning over his work. The waiting cell at the
+    // right hand end was 59.3% and is 11.2% a cell out.
     operator: { side: 'front', along: 0 },
-    waiting: { side: 'front', along: 'right' },
+    waiting: { side: 'front', along: 'right', out: 1 },
     second: { side: 'back', along: 'right' },
   },
   sheetRack: { operator: 'freeSide', waiting: null, second: null },
   extractor: { operator: 'freeSide', waiting: null, second: null },
 };
 
-/** Anything not in the table: the front side, the left cell, as every item was placed before. */
+/** Anything not in the table: the front side, the left cell, as every item was placed before. The
+ *  waiting cell is a cell out, because the second cell along a small item's front edge is the one
+ *  the body leans over (a compressor hid 50 to 70% of the man, and 3.7% a cell out). */
 const DEFAULT_ROW: StationRow = {
   operator: { side: 'front', along: 0 },
-  waiting: { side: 'front', along: 1 },
+  waiting: { side: 'front', along: 1, out: 1 },
   second: null,
 };
 
@@ -289,9 +334,11 @@ export function standingCell(state: GameState, item: Equipment, role: StationRol
   let offset: StationOffset;
   if (row.operator === 'freeSide') {
     const side = freeSideOf(state, item);
-    // Half way along the free side, the way a man stands at a rack to reach it.
-    offset = { side, along: 'middle' };
-    if (role === 'waiting') offset = { side, along: 'middle', out: 1 };
+    // Half way along the free side and a cell out from it, the way a man stands at a rack to
+    // reach it: hard against a standard rack 52.2% of him was painted over it and a cell out is
+    // 2.4%, and a rack is the tallest thing in the hall (CLAUDE.md T19 2.4).
+    offset = { side, along: 'middle', out: 1 };
+    if (role === 'waiting') offset = { side, along: 'middle', out: 2 };
   } else {
     const wanted = role === 'operator' ? row.operator : role === 'waiting' ? row.waiting : row.second;
     offset = wanted ?? row.operator;
@@ -304,6 +351,84 @@ export function standingCell(state: GameState, item: Equipment, role: StationRol
     if (isFree(state, candidate)) return candidate;
   }
   return preferred;
+}
+
+/** The item whose own footprint holds this cell, or null: what a man is standing on, if anything.
+ *  The engine keeps a cell for every joiner, and for a joiner that cell is his bench's own anchor
+ *  cell, which is a cell the bench stands on. Asking this question turns "his place" into "the
+ *  item his place belongs to", and the caller then asks the station table where to put him
+ *  (PIOTR, 17.09: "he stands on the bench, not at it"; CLAUDE.md T19 2.4). */
+export function itemAtCell(state: GameState, cell: Cell): Equipment | null {
+  return (
+    state.equipment.find(
+      (item) =>
+        !isSold(item) && itemStandsInTheHall(item) && covers(footprintCells(item), cell),
+    ) ?? null
+  );
+}
+
+function sameCell(left: Cell, right: Cell): boolean {
+  return left.x === right.x && left.y === right.y;
+}
+
+/** The side a queue of men lines up along at this item: the table's own side, or the free side of
+ *  a rack or a fan. */
+function queueSide(state: GameState, item: Equipment): Side {
+  const row = stationRow(item.specId);
+  return row.operator === 'freeSide' ? freeSideOf(state, item) : row.operator.side;
+}
+
+/** Fills a list of standing cells up to `count` from the cells along one side of an item, a row at
+ *  a time outwards, taking only cells that are free and not already in the list. The list is never
+ *  shorter than `count`: when the hall has nothing else left the last cell is repeated, because a
+ *  man has to be drawn somewhere and two men in one place is better than a man with none. */
+function fillAlong(
+  state: GameState,
+  item: Equipment,
+  side: Side,
+  cells: Cell[],
+  count: number,
+): Cell[] {
+  const box = standsOn(item);
+  const extent = side === 'front' || side === 'back' ? box.width : box.depth;
+  for (let out = 0; cells.length < count && out < extent + count + 2; out += 1) {
+    for (let along = 0; along < extent && cells.length < count; along += 1) {
+      const cell = cellAt(box, { side, along, out });
+      if (!isFree(state, cell)) continue;
+      if (cells.some((taken) => sameCell(taken, cell))) continue;
+      cells.push(cell);
+    }
+  }
+  const last = cells[cells.length - 1];
+  while (cells.length < count && last !== undefined) cells.push({ ...last });
+  return cells;
+}
+
+/** Cells for a queue of men at an item: the first is the operator's cell, then the waiting cell,
+ *  then the next free cells along the same side, one out at a time. Never fewer than `count`
+ *  cells; a cell is repeated only when the hall leaves nothing else (CLAUDE.md T19 2.5). */
+export function queueCellsAt(state: GameState, item: Equipment, count: number): Cell[] {
+  if (count <= 0) return [];
+  const cells: Cell[] = [standingCell(state, item, 'operator')];
+  if (cells.length < count) {
+    const waiting = standingCell(state, item, 'waiting');
+    if (!cells.some((taken) => sameCell(taken, waiting))) cells.push(waiting);
+  }
+  return fillAlong(state, item, queueSide(state, item), cells, count);
+}
+
+/** The same for a bench: the operator's cell, the second place, then the next free cells along
+ *  the front (CLAUDE.md T19 2.5). */
+export function benchCellsAt(state: GameState, item: Equipment, count: number): Cell[] {
+  if (count <= 0) return [];
+  const cells: Cell[] = [standingCell(state, item, 'operator')];
+  if (cells.length < count) {
+    const second = standingCell(state, item, 'second');
+    if (!cells.some((taken) => sameCell(taken, second))) cells.push(second);
+  }
+  // The rest are along the front, which is the side the bench is worked from and the side the
+  // player sees: the second place is behind it and is the only man drawn at the back.
+  return fillAlong(state, item, 'front', cells, count);
 }
 
 /** Where the man unloading the pallet stands: in front of it on the hall side, the cell east of

@@ -25,6 +25,7 @@ import {
   MINUTES_PER_WORKING_DAY,
   SITE_MEASURE_MINUTES,
   SITE_MEASURE_TAXI_COST,
+  WEEKS_PER_MONTH,
   WORKER_MINUTE_RATE_DIVISOR,
 } from './constants';
 import { canAccept, drawOffer, findEnquiry, removeEnquiry } from './board';
@@ -83,7 +84,16 @@ import {
   jobTasks,
   materialOrderMinutes,
 } from './tasks';
-import type { Finish, GameState, Job, JobStage, JsonValue, MaterialKind, StageId } from './types';
+import type {
+  Finish,
+  GameState,
+  Job,
+  JobStage,
+  JsonValue,
+  MaterialKind,
+  StageId,
+  WorkerRole,
+} from './types';
 
 export function findJob(state: GameState, jobId: string): Job | null {
   return state.jobs.find((job) => job.id === jobId) ?? null;
@@ -93,8 +103,7 @@ export function findJob(state: GameState, jobId: string): Job | null {
  *  be on one job now, and the owner is the second man on the one he takes on for an evening
  *  (CLAUDE.md T17 2.10, 2.12). The one finder for it. */
 export function jobHeldBy(state: GameState, who: string): Job | null {
-  const job =
-    state.jobs.find((entry) => entry.assignedTo === who || entry.secondAssignee === who) ?? null;
+  const job = state.jobs.find((entry) => entry.assignees.includes(who)) ?? null;
   return job !== null && job.stage === 'inProduction' ? job : null;
 }
 
@@ -204,15 +213,32 @@ export function workerMinuteCost(weeklyWage: number): number {
   return weeklyWage / WORKER_MINUTE_RATE_DIVISOR;
 }
 
-/** The men standing at this job: the one it is assigned to and the second one beside him, in that
- *  order (CLAUDE.md T17 2.10). The one list: the rate, the cost and the names all read it. */
+/** The men standing at this job, in the order they were put on it. There is no limit on how many
+ *  (PIOTR, 17.09; CLAUDE.md T19 2.5). The one list: the rate, the cost, the stations and the
+ *  names all read it. */
 export function jobMen(job: Job): string[] {
-  const men: string[] = [];
-  if (job.assignedTo !== null) men.push(job.assignedTo);
-  if (job.secondAssignee !== null && job.secondAssignee !== job.assignedTo) {
-    men.push(job.secondAssignee);
-  }
-  return men;
+  return job.assignees.slice();
+}
+
+/** The first man on the job: the one a machine stage puts at the machine itself, the rest taking
+ *  the waiting cell and the free cells along the same side (CLAUDE.md T19 2.5). Null while nobody
+ *  is on it. This is what `assignedTo` used to be. */
+export function leadAssignee(job: Job): string | null {
+  return job.assignees[0] ?? null;
+}
+
+/** True while this man is one of the people on this job, wherever he stands in the list. */
+export function isOnJob(job: Job, who: string): boolean {
+  return job.assignees.includes(who);
+}
+
+/** Takes one man off a job, leaving everybody else on it (the cross on his chip,
+ *  CLAUDE.md T19 2.5). True when he was on it. */
+export function removeAssignee(job: Job, who: string): boolean {
+  const at = job.assignees.indexOf(who);
+  if (at < 0) return false;
+  job.assignees.splice(at, 1);
+  return true;
 }
 
 /** What the job goes forward at with the men on it: the owner at his own speed and every joiner at
@@ -241,7 +267,12 @@ export function jobLabourCost(state: GameState, job: Job): { minutes: number; co
   let perMinute = 0;
   for (const who of jobMen(job)) {
     const worker = state.workers.find((entry) => entry.id === who);
-    if (worker && worker.rate > 0) perMinute += workerMinuteCost(worker.weeklyWage);
+    if (!worker || worker.rate <= 0) continue;
+    // A sprayer is paid by the month, not by the week, so his minutes would cost the card nothing
+    // if only the weekly wage were read (CLAUDE.md T19 2.6).
+    const weekly =
+      worker.weeklyWage > 0 ? worker.weeklyWage : worker.monthlyWage / WEEKS_PER_MONTH;
+    perMinute += workerMinuteCost(weekly);
   }
   return { minutes, cost: minutes * perMinute };
 }
@@ -398,9 +429,8 @@ export function takeEnquiry(state: GameState, enquiryId: string, byHand: boolean
     deliverOnDay: null,
     calls: [],
     callsMissed: 0,
-    designMinutesRemaining: designMinutes(entry, enquiry.sizeMultiplier, state.software.tier),
-    assignedTo: null,
-    secondAssignee: null,
+    designMinutesRemaining: designMinutes(enquiry.basePrice, state.software.tier),
+    assignees: [],
     stageRuns: [],
     completedDay: null,
     daysLate: 0,
@@ -672,7 +702,7 @@ export function hallBlock(state: GameState, job: Job): string {
   if (job.byHand) return '';
   // Only the machine of the stage he is at can stop him: a broken edgebander does not stop a
   // job that is still being cut (CLAUDE.md T7 3.1).
-  const stage = jobStage(state, job, cncOptions(state, job.assignedTo ?? OWNER, job));
+  const stage = jobStage(state, job, cncOptions(state, leadAssignee(job) ?? OWNER, job));
   const family = stage?.family ?? null;
   if (family === null) return '';
   const coming = onOrderBlock(state, family);
@@ -701,7 +731,7 @@ const STARTABLE_STAGES: JobStage[] = [
 
 /** True while the job card carries a Start production button, pressable or not. */
 export function showsStartProduction(job: Job): boolean {
-  return STARTABLE_STAGES.includes(job.stage) && job.assignedTo === null;
+  return STARTABLE_STAGES.includes(job.stage) && job.assignees.length === 0;
 }
 
 export interface StartCheck {
@@ -800,12 +830,16 @@ export function lifecycleSteps(state: GameState, job: Job): LifecycleStep[] {
 /** The oldest job with its material in the hall and nobody on it. */
 export function oldestReadyJob(state: GameState): Job | null {
   return (
-    state.jobs.find((job) => job.stage === 'ready' && job.assignedTo === null) ??
+    state.jobs.find((job) => job.stage === 'ready' && job.assignees.length === 0) ??
     state.jobs.find((job) => job.stage === 'ready') ??
     null
   );
 }
 
+/** This job is this one man's: he goes on it and anybody else on it comes off. Start production
+ *  and the hall's own automatic assignment go through here, so the job a man is handed is his
+ *  alone; the player's Assign to this job adds men to what is already there and goes through
+ *  `addToJob` instead (CLAUDE.md 9.4, T19 2.5). A null worker is the whole job let go. */
 export function assignJob(state: GameState, jobId: string, workerId: string | null): boolean {
   const job = findJob(state, jobId);
   if (!job) return false;
@@ -814,61 +848,80 @@ export function assignJob(state: GameState, jobId: string, workerId: string | nu
     releaseJob(state, job);
     return true;
   }
+  if (!canBuild(state, workerId)) return false;
   const worker =
-    workerId === 'owner' ? null : state.workers.find((entry) => entry.id === workerId) ?? null;
-  if (workerId === 'owner') {
-    if (!ownerIsAvailable(state)) return false;
-  } else if (!worker || worker.role !== 'joiner' || worker.absentDaysRemaining > 0) {
-    return false;
-  }
-  // Whoever was on this job comes off it, and the new man comes off whatever he was on.
+    workerId === OWNER ? null : state.workers.find((entry) => entry.id === workerId) ?? null;
+  // Whoever was on this job comes off it, and the new man comes off whatever he was on. He is
+  // taken off that other job on his own: with no limit on the men, releasing the whole of it
+  // would send everybody else home too (CLAUDE.md T19 2.5).
   releaseJob(state, job);
-  const previous = state.jobs.find((entry) => entry.id !== job.id && entry.assignedTo === workerId);
-  if (previous) releaseJob(state, previous);
+  for (const other of state.jobs) {
+    if (other.id !== job.id && isOnJob(other, workerId)) takeOffJob(state, other.id, workerId);
+  }
   if (worker) {
     worker.jobId = job.id;
   } else {
     // The owner cannot draw and cut at the same time.
     state.owner.currentTaskId = null;
   }
-  job.assignedTo = workerId;
+  job.assignees = [workerId];
   job.stage = 'inProduction';
   return true;
 }
 
-/** The second man on a job, put on it or taken off it. Both book minutes into it, each at his own
- *  rate, at the stage's station: one of them at the machine and the other at the waiting cell
- *  until his turn, and both at the bench, the second in the bench's second place
- *  (PIOTR, 16.09; CLAUDE.md T17 2.10). */
-export function assignSecond(state: GameState, jobId: string, workerId: string | null): boolean {
+/** The roles that may be put on a job at all. A helper never builds: he carries, cleans and
+ *  empties bags, and the Assign list says so rather than offering him (PIOTR, 17.09;
+ *  CLAUDE.md T19 2.5, 2.6). */
+export const BUILDING_ROLES: readonly WorkerRole[] = ['joiner', 'sprayer'];
+
+/** True while this man could be put on a job at all: a joiner or a sprayer, on the books and not
+ *  off sick. The owner is always able, if he is about. */
+export function canBuild(state: GameState, workerId: string): boolean {
+  if (workerId === OWNER) return ownerIsAvailable(state);
+  const worker = state.workers.find((entry) => entry.id === workerId);
+  if (!worker) return false;
+  return BUILDING_ROLES.includes(worker.role) && worker.absentDaysRemaining <= 0;
+}
+
+/** Puts one more man on a job. There is no limit on how many go on one: if the player wants
+ *  twenty, he gets twenty, the time shortens, and it is his decision (PIOTR, 17.09;
+ *  CLAUDE.md T19 2.5). Nobody is on two jobs at once, so he comes off whatever he was on. */
+export function addToJob(state: GameState, jobId: string, workerId: string): boolean {
   const job = findJob(state, jobId);
   if (!job) return false;
   if (job.stage !== 'ready' && job.stage !== 'inProduction') return false;
-  if (workerId === null) {
-    // He goes back to the list, and off the job he was standing at.
-    const second = job.secondAssignee;
-    if (second !== null) {
-      const man = state.workers.find((entry) => entry.id === second);
-      if (man && man.jobId === job.id) man.jobId = null;
-      releaseMachines(state, second);
-    }
-    job.secondAssignee = null;
-    return true;
-  }
-  // The second man is second to somebody: a job with nobody on it is assigned, not seconded.
-  if (job.assignedTo === null) return false;
-  if (workerId === job.assignedTo) return false;
-  const worker = state.workers.find((entry) => entry.id === workerId) ?? null;
-  if (!worker || worker.role !== 'joiner' || worker.absentDaysRemaining > 0) return false;
-  // Nobody is on two jobs at once: he comes off whatever he was on, first man or second.
+  if (isOnJob(job, workerId)) return false;
+  if (!canBuild(state, workerId)) return false;
+  // He comes off whatever else he was on, first man or not.
   for (const other of state.jobs) {
     if (other.id === job.id) continue;
-    if (other.assignedTo === workerId) releaseJob(state, other);
-    if (other.secondAssignee === workerId) other.secondAssignee = null;
+    if (isOnJob(other, workerId)) takeOffJob(state, other.id, workerId);
   }
-  worker.jobId = job.id;
-  job.secondAssignee = workerId;
-  if (job.assignedTo !== null) job.stage = 'inProduction';
+  if (workerId === OWNER) {
+    // The owner cannot draw and cut in the same minute.
+    state.owner.currentTaskId = null;
+  } else {
+    const worker = state.workers.find((entry) => entry.id === workerId);
+    if (worker) worker.jobId = job.id;
+  }
+  job.assignees.push(workerId);
+  job.stage = 'inProduction';
+  return true;
+}
+
+/** Takes one man off a job and leaves everybody else on it: the cross on his chip
+ *  (CLAUDE.md T19 2.5). The last man off puts the job back on the list. */
+export function takeOffJob(state: GameState, jobId: string, workerId: string): boolean {
+  const job = findJob(state, jobId);
+  if (!job) return false;
+  if (!removeAssignee(job, workerId)) return false;
+  releaseMachines(state, workerId);
+  const worker = state.workers.find((entry) => entry.id === workerId);
+  if (worker && worker.jobId === job.id) worker.jobId = null;
+  if (job.assignees.length === 0) {
+    closeStageRun(state, job);
+    if (job.stage === 'inProduction') job.stage = 'ready';
+  }
   return true;
 }
 
@@ -882,7 +935,8 @@ export function canTakeOver(state: GameState, job: Job): boolean {
   if (!ownerIsAvailable(state)) return false;
   // The evening only, and only somebody else's job: his own he is already on.
   if (!isOvertime(state.clock.minute)) return false;
-  return job.assignedTo !== null && job.assignedTo !== OWNER && job.secondAssignee !== OWNER;
+  const lead = leadAssignee(job);
+  return lead !== null && lead !== OWNER && !isOnJob(job, OWNER);
 }
 
 export function takeOverJob(state: GameState, jobId: string): boolean {
@@ -890,10 +944,11 @@ export function takeOverJob(state: GameState, jobId: string): boolean {
   if (!job || !canTakeOver(state, job)) return false;
   // He cannot be at the desk and at the bench in the same minute.
   state.owner.currentTaskId = null;
-  // Nor at two benches: a job of his own goes back on the list, as it does when a man is given it.
+  // Nor at two benches: he steps off the one he was at, and the men beside him stay on it
+  // (CLAUDE.md T19 2.5).
   const held = jobHeldBy(state, OWNER);
-  if (held !== null && held.id !== job.id) releaseJob(state, held);
-  job.secondAssignee = OWNER;
+  if (held !== null && held.id !== job.id) takeOffJob(state, held.id, OWNER);
+  job.assignees.splice(1, 0, OWNER);
   job.stage = 'inProduction';
   return true;
 }
@@ -902,27 +957,29 @@ export function takeOverJob(state: GameState, jobId: string): boolean {
  *  who picks it up in the morning where the evening left it (CLAUDE.md T17 2.12). */
 export function endOwnerTakeOver(state: GameState): void {
   for (const job of state.jobs) {
-    if (job.secondAssignee === OWNER) job.secondAssignee = null;
+    if (ownerTookOver(job)) removeAssignee(job, OWNER);
   }
 }
 
 /** True while the owner is standing at a job that is somebody else's: the row says "You are on
- *  it tonight" rather than offering the takeover again (CLAUDE.md T17 2.12). */
+ *  it tonight" rather than offering the takeover again (CLAUDE.md T17 2.12). Read off the list
+ *  and not off a place in it: with no limit on the men he can be third or tenth on the job, and
+ *  the evening must still give it back to the man whose job it is (CLAUDE.md T19 2.5). A job he
+ *  leads is his own and dusk never takes him off it. */
 export function ownerTookOver(job: Job): boolean {
-  return job.secondAssignee === OWNER && job.assignedTo !== null && job.assignedTo !== OWNER;
+  const lead = leadAssignee(job);
+  return isOnJob(job, OWNER) && lead !== null && lead !== OWNER;
 }
 
 /** Takes whoever is on the job off it, leaving the work done in place. He walks away from every
  *  machine he was standing at, so the next man can have it (CLAUDE.md T7 3.1). */
 export function releaseJob(state: GameState, job: Job): void {
-  // Both men come off it: a job can have a second (CLAUDE.md T17 2.10).
+  // Everybody comes off it, however many are on it (CLAUDE.md T19 2.5).
   for (const worker of state.workers) {
     if (worker.jobId === job.id) worker.jobId = null;
   }
-  if (job.assignedTo !== null) releaseMachines(state, job.assignedTo);
-  if (job.secondAssignee !== null) releaseMachines(state, job.secondAssignee);
-  job.assignedTo = null;
-  job.secondAssignee = null;
+  for (const who of job.assignees) releaseMachines(state, who);
+  job.assignees = [];
   closeStageRun(state, job);
   if (job.stage === 'inProduction') job.stage = 'ready';
 }
@@ -990,7 +1047,6 @@ export function addLabour(state: GameState, job: Job, labour: number, stage: Sta
 export function completeJob(state: GameState, job: Job): void {
   closeStageRun(state, job);
   releaseJob(state, job);
-  job.assignedTo = null;
   job.stage = 'awaitingTransport';
   job.finishedDay = state.clock.day;
   state.dayStats.jobsCompleted.push(job.id);

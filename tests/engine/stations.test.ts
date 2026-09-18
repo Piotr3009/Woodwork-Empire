@@ -5,7 +5,11 @@ import {
   STATION_IDLE,
   STATION_OFFICE,
   STATION_RACK,
+  benchCellsAt,
+  itemAtCell,
   machineStation,
+  queueCellsAt,
+  standingCell,
   stationForTask,
   stationMachine,
   stationWaitingFor,
@@ -14,6 +18,8 @@ import {
   unloadTrips,
   waitingStation,
 } from '../../src/engine/stations';
+import { footprintCells, isFree } from '../../src/engine/walk';
+import { placeEquipment } from '../helpers';
 import { SHEETS_PER_TRIP } from '../../src/engine/constants';
 import { stationForProduction } from '../../src/engine/production';
 import { OWNER } from '../../src/engine/machines';
@@ -177,5 +183,60 @@ describe('where the owner stands', () => {
   it('puts a day off figure nowhere at all', () => {
     const state = clearEvents(act(buyStartingKit(newGame()), { type: 'SKIP_DAY' }));
     expect(state.owner.station).toBe(STATION_IDLE);
+  });
+});
+
+describe('a queue of men at one thing (CLAUDE.md T19 2.5)', () => {
+  /** A hall with nothing in it but the one thing being asked about. */
+  function only(specId: string, variantId = 'standard'): { state: GameState; item: ReturnType<typeof placeEquipment> } {
+    const state = newGame({ difficulty: 'veryEasy' });
+    state.equipment = [];
+    state.pipes = [];
+    return { state, item: placeEquipment(state, specId, { variantId, x: 8, y: 4 }) };
+  }
+
+  it('gives a machine the operator, then the waiting cell, then free cells along the same side', () => {
+    const { state, item } = only('tableSaw');
+    const cells = queueCellsAt(state, item, 6);
+    expect(cells).toHaveLength(6);
+    expect(cells[0]).toEqual(standingCell(state, item, 'operator'));
+    expect(cells[1]).toEqual(standingCell(state, item, 'waiting'));
+    // No two men in one place while the floor has room, and nobody standing on the saw.
+    expect(new Set(cells.map((cell) => `${cell.x},${cell.y}`)).size).toBe(6);
+    for (const cell of cells) {
+      expect(isFree(state, cell)).toBe(true);
+      expect(itemAtCell(state, cell)).toBeNull();
+    }
+    // As many as are asked for and not one more, and nothing at all for nobody.
+    expect(queueCellsAt(state, item, 0)).toEqual([]);
+    expect(queueCellsAt(state, item, 2)).toEqual(cells.slice(0, 2));
+  });
+
+  it('gives a bench the operator, the second place behind it, then the front', () => {
+    const { state, item } = only('workbench');
+    const box = footprintCells(item);
+    const cells = benchCellsAt(state, item, 5);
+    expect(cells).toHaveLength(5);
+    expect(cells[0]).toEqual(standingCell(state, item, 'operator'));
+    expect(cells[1]).toEqual(standingCell(state, item, 'second'));
+    expect(cells[1]?.y).toBe(box.y - 1);
+    for (const cell of cells.slice(2)) expect(cell.y).toBeGreaterThanOrEqual(box.y + box.depth);
+    expect(new Set(cells.map((cell) => `${cell.x},${cell.y}`)).size).toBe(5);
+  });
+
+  it('never hands back fewer cells than men, even in a corner with no room', () => {
+    // A bench in the far corner of the unit: the front runs off the floor after a cell or two and
+    // the list still has a place for every man (CLAUDE.md T19 2.5).
+    const state = newGame({ difficulty: 'veryEasy' });
+    state.equipment = [];
+    state.pipes = [];
+    const item = placeEquipment(state, 'workbench', {
+      variantId: 'standard',
+      x: state.unit.widthCells - 2,
+      y: state.unit.depthCells - 1,
+    });
+    const cells = benchCellsAt(state, item, 8);
+    expect(cells).toHaveLength(8);
+    for (const cell of cells) expect(Number.isFinite(cell.x) && Number.isFinite(cell.y)).toBe(true);
   });
 });

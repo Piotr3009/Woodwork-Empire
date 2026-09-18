@@ -438,15 +438,17 @@ describe('the modals', () => {
 });
 
 describe('assigning work by hand', () => {
-  it('offers the owner on the job card, which is the override of CLAUDE.md 9.4', () => {
-    // Push the job to the bench so the card shows its assign controls.
+  it('offers Assign to this job on the row, which is the override of CLAUDE.md 9.4', () => {
+    // Push the job to the bench so the row shows its assign controls (CLAUDE.md T19 2.5). The
+    // Turn 17 chip row is gone: the men are chips with a cross apiece and the list is behind one
+    // blue button, whose clicks arrive with the app's own route in phase C (NOTES-B2.md).
     const state = currentState();
     expect(state?.jobs[0]).toBeDefined();
     if (state && state.jobs[0]) state.jobs[0].stage = 'ready';
     click('[data-office="workPlan"]');
-    expect(html()).toContain('data-do="assignJob"');
-    click('[data-do="assignJob"][data-worker="owner"]');
-    expect(currentState()?.jobs[0]?.assignedTo).toBe('owner');
+    expect(html()).toContain('data-do="openAssign"');
+    expect(html()).not.toContain('data-do="assignJob"');
+    expect(html()).toContain('Nobody is on it');
     click('[data-do="closeModal"]');
   });
 });
@@ -457,7 +459,7 @@ describe('start production', () => {
     expect(state).not.toBeNull();
     if (state && state.jobs[0]) {
       state.jobs[0].stage = 'ready';
-      state.jobs[0].assignedTo = null;
+      state.jobs[0].assignees = [];
       state.stock.sheets = 20;
     }
     click('[data-office="workPlan"]');
@@ -466,7 +468,7 @@ describe('start production', () => {
     // The work plan is shut; the top bar's Projects chip still carries the modal's name.
     expect(root().querySelector('.modal-layer [data-modal="workPlan"]')).toBeNull();
     expect(html()).toContain('hall-view');
-    expect(currentState()?.jobs[0]?.assignedTo).toBe('owner');
+    expect(currentState()?.jobs[0]?.assignees[0]).toBe('owner');
     expect(currentState()?.jobs[0]?.stage).toBe('inProduction');
     click('[data-do="setView"][data-view="office"]');
   });
@@ -482,8 +484,9 @@ describe('the walking figures', () => {
     advanceMinutes(1);
     const after = root().querySelector('[data-figure="owner"]')?.getAttribute('transform');
     // The new node starts at the old place: the walker moves him on the frames that follow
-    // (CLAUDE.md T16 2.2).
-    expect(after).toBe(before);
+    // (CLAUDE.md T16 2.2). The markup writes a station cell in whole pixels and the walker writes
+    // where he really is in two decimals, so the same point is written two ways (T19 2.1).
+    expect(after?.replace(/\.00/g, '')).toBe(before);
     click('[data-do="setView"][data-view="office"]');
   });
 });

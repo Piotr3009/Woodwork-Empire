@@ -100,7 +100,7 @@ describe('one person per machine', () => {
     const joiner = state.workers[0];
     if (!joiner) throw new Error('no joiner');
     expect(joiner.station).toBe(waitingStation('tableSaw'));
-    const waiting = state.jobs.find((job) => job.assignedTo === joiner.id);
+    const waiting = state.jobs.find((job) => job.assignees[0] === joiner.id);
     expect(waiting?.blockedBy).toBe('waiting for table saw');
     // He stood there for the hour and put nothing into his job.
     expect(waiting?.labourRemaining).toBe(waiting?.labourValue);
@@ -112,7 +112,7 @@ describe('one person per machine', () => {
     expect(saws.map((item) => item.takenBy).filter((who) => who !== null)).toHaveLength(2);
     for (const saw of saws) expect(saw.hoursUsed).toBeCloseTo(1, 4);
     const joiner = worked.workers[0];
-    const working = worked.jobs.find((job) => job.assignedTo === joiner?.id);
+    const working = worked.jobs.find((job) => job.assignees[0] === joiner?.id);
     expect(working?.blockedBy).toBe('');
     expect(working?.labourRemaining).toBeLessThan(working?.labourValue ?? 0);
   });
@@ -131,7 +131,7 @@ describe('what the Owned tab projects', () => {
   it('counts only the share of the day the work at it takes, over the saws there are', () => {
     const state = tick(twoMenOnSheetWork({ saws: 1 }), 60);
     const saw = machine(state, 'tableSaw');
-    const job = state.jobs.find((entry) => entry.assignedTo === OWNER);
+    const job = state.jobs.find((entry) => entry.assignees[0] === OWNER);
     if (!job) throw new Error('no job under the owner');
     const share = familyShareOfJob(state, job, 'tableSaw');
     // A saw has a man for the cutting quarter and no longer, which is why two of them serve six

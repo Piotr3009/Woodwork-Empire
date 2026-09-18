@@ -5,7 +5,12 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { decodeSaveFile } from '../../src/cloud/file';
-import { OWNER_DRAW_TIERS, STATE_VERSION, WEBSITE_START_LEVEL } from '../../src/engine/constants';
+import {
+  OWNER_DRAW_TIERS,
+  SOUND_VOLUME_DEFAULT,
+  STATE_VERSION,
+  WEBSITE_START_LEVEL,
+} from '../../src/engine/constants';
 import { applyAction, ownerDrawPerDay } from '../../src/engine/index';
 import type { GameAction, GameState } from '../../src/engine/index';
 import { newGame } from '../helpers';
@@ -108,7 +113,10 @@ describe('a v19 save opens with the section 4 defaults', () => {
     expect(ownerDrawPerDay(state)).toBe(200);
     expect(state.pipes).toEqual([]);
     expect(state.gates).toEqual([]);
-    expect(state.settings).toEqual({ tips: true });
+    expect(state.settings).toEqual({
+      tips: true,
+      sound: { volume: SOUND_VOLUME_DEFAULT, muted: false },
+    });
     expect(state.tips).toEqual({ seen: [] });
     expect(state.shift).toEqual({ second: false });
     expect(state.software.joineryCore).toBe(false);

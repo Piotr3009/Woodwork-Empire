@@ -10,11 +10,18 @@ import {
   OFFICE_CANVAS,
   OFFICE_LAYERS,
   OFFICE_NAME_SIZE_MIN,
+  OFFICE_OWNER_BOX,
   OFFICE_REGIONS,
   OFFICE_TEXTS,
+  officeRegionsOf,
   officeScale,
   renderOffice,
 } from '../../src/render/office';
+import {
+  STATION_BENCH,
+  STATION_OFFICE,
+  STATION_PHONE,
+} from '../../src/engine/stations';
 import { fitName } from '../../src/render/hall';
 import { formatTime } from '../../src/engine/clock';
 import { tick } from '../../src/engine/index';
@@ -312,5 +319,69 @@ describe('the live text', () => {
     expect(holder.querySelector('[data-office-text="company"]')?.textContent).toBe(
       'Joinery Core & Sons',
     );
+  });
+});
+
+describe('the owner at his desk (PIOTR, 17.09; CLAUDE.md T19 2.2)', () => {
+  const SHEETS = ['character.owner.idle.sheet.png', 'character.owner.phone.sheet.png'];
+
+  it('draws him in the room while his station is the office or the phone', () => {
+    for (const station of [STATION_OFFICE, STATION_PHONE]) {
+      const state = furnished();
+      state.owner.station = station;
+      const holder = room({ width: 1280, height: 800 }, SHEETS, state);
+      const figure = holder.querySelector('[data-office-figure="owner"]');
+      expect(figure, station).not.toBeNull();
+      // In the live part, where the clock is, so sitting down never rebuilds the room.
+      expect(figure?.closest('.office-live'), station).not.toBeNull();
+      expect(figure?.getAttribute('style')).toContain(`left:${OFFICE_OWNER_BOX.x}px`);
+      expect(figure?.getAttribute('style')).toContain(`top:${OFFICE_OWNER_BOX.y}px`);
+      expect(figure?.getAttribute('style')).toContain(`width:${OFFICE_OWNER_BOX.width}px`);
+      expect(figure?.getAttribute('style')).toContain(`height:${OFFICE_OWNER_BOX.height}px`);
+      // It is his own sheet and not a region: it opens nothing and answers no click.
+      expect(figure?.querySelector('image')?.getAttribute('href')).toContain('character.owner');
+      expect(figure?.classList.contains('office-region')).toBe(false);
+      expect(figure?.closest('.office-region')).toBeNull();
+      expect(figure?.getAttribute('data-do')).toBeNull();
+    }
+  });
+
+  it('draws nobody when he is not in the office, and takes no region away when he is', () => {
+    const out = furnished();
+    out.owner.station = STATION_BENCH;
+    expect(
+      room({ width: 1280, height: 800 }, SHEETS, out).querySelector('[data-office-figure]'),
+    ).toBeNull();
+    // Gone home: the office is empty whatever his station says.
+    const home = furnished();
+    home.owner.station = STATION_OFFICE;
+    home.owner.wentHome = true;
+    expect(
+      room({ width: 1280, height: 800 }, SHEETS, home).querySelector('[data-office-figure]'),
+    ).toBeNull();
+    const there = furnished();
+    there.owner.station = STATION_OFFICE;
+    const holder = room({ width: 1280, height: 800 }, SHEETS, there);
+    expect(holder.querySelectorAll('.office-region')).toHaveLength(
+      officeRegionsOf(there).length,
+    );
+  });
+
+  it('stands him clear of everything the player clicks', () => {
+    // The box is measured off the picture, so this is the assertion that keeps it honest: he is
+    // in the strip of wall between the Work Plan board and the door opening, and on nothing else.
+    const box = OFFICE_OWNER_BOX;
+    for (const region of OFFICE_REGIONS) {
+      const clear =
+        box.x + box.width <= region.x ||
+        region.x + region.width <= box.x ||
+        box.y + box.height <= region.y ||
+        region.y + region.height <= box.y;
+      expect(clear, region.id).toBe(true);
+    }
+    expect(box.x + box.width).toBeLessThanOrEqual(OFFICE_CANVAS.width);
+    expect(box.y + box.height).toBeLessThanOrEqual(OFFICE_CANVAS.height);
+    // And he keeps the sheet cell's own shape, so nothing is stretched.
+    expect(box.width / box.height).toBeCloseTo(112 / 151, 2);
   });
 });

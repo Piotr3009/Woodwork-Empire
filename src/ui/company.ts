@@ -4,15 +4,18 @@
 //
 // Two cream sheets pinned to the felt, straight, a ledger each (PIOTR, 16.09: "one clear column
 // on the left and one on the right, every plus and minus in one column and the result at the top
-// over a line, like Excel"; CLAUDE.md T15 2.1). Left, Reputation: the figure at the top, every
-// rating newest first with its points, the carry over from last week, and the balance at the
-// bottom. Right, Output: the figure at the top, the hall's own lines and their balance, then under
+// over a line, like Excel"; CLAUDE.md T15 2.1). Left, Reputation: the total at the top, every
+// rating newest first with its points under a head that says they are this week's, and the week's
+// own net beside the total at the bottom, never in its place (PIOTR, 17.09: "reputation is a total
+// and should read as one"; CLAUDE.md T19 2.9). Right, Output: the figure at the top, the hall's
+// own lines and their balance, then under
 // a second rule the men and the machines, which act where they are and are not in the number.
 // Nothing here is computed but the fold of the log into weeks: every figure is a rating's points
 // or a field of the engine's breakdown.
 
 import { DAY_CATEGORY_LABELS } from '../engine/constants';
 import {
+  companyTotals,
   dayPercentages,
   effectiveReputation,
   formatCalendarDay,
@@ -174,43 +177,58 @@ function ratingRow(entry: ReputationEntry, index: number): string {
   );
 }
 
-/** The left sheet: the reputation now, every rating newest first, a thin label between the
- *  weeks, the carry over from last week as the last row of this one, and the balance of this
- *  week at the bottom (CLAUDE.md T15 2.1). */
+/** The figure at the top of the Reputation sheet: the standing now, all of it, under a label that
+ *  cannot be read as a week. It said "this week" over a cumulative number, which is exactly what
+ *  Piotr read it as (PIOTR, 17.09: "reputation is a total and should read as one"; CLAUDE.md T19
+ *  2.9). The heading over it and this figure are the same `Reputation 40` the office wall prints,
+ *  off the same `effectiveReputation`, so the two can never disagree. */
+function reputationTotal(now: number): string {
+  return (
+    '<div class="ledger-total reputation-total">' +
+    '<span class="ledger-total-label">the total to date</span>' +
+    '<span class="ledger-total-figure" data-figure="reputation">' +
+    `${escapeHtml(formatReputation(now))}</span></div>`
+  );
+}
+
+/** The balance of the Reputation sheet: the week's own pluses and minuses, the week's own net,
+ *  and the total beside it, named. The net is never put where the total goes and the total is
+ *  never given a week's wording, which is the whole of 2.9 (CLAUDE.md T19 2.9). */
+function reputationSum(state: GameState, week: Week): string {
+  return (
+    `<div class="ledger-sum"><span data-sum="plus">${escapeHtml(points(week.plus))}</span>` +
+    `<span data-sum="minus">${escapeHtml(points(week.minus))}</span>` +
+    '<span class="reputation-week" data-sum="week">' +
+    `${escapeHtml(`${points(week.total)} this week`)}</span>` +
+    `<span data-sum="total">${escapeHtml(companyTotals(state).reputation)}</span></div>`
+  );
+}
+
+/** The left sheet: the reputation now, cumulative, over every rating newest first with a thin
+ *  label between the weeks, and the week's own net beside the total at the bottom (CLAUDE.md T15
+ *  2.1, T19 2.9). The start of the week row is gone with the weekly reading it belonged to: the
+ *  rows under the head are what moved the figure this week, not a sum that has to come out at it.
+ *  Nothing on the sheet reconciles the visible rows to the total any more and nothing should: the
+ *  log is trimmed at REPUTATION_LOG_MAX, so on a long game the oldest weeks have fallen off it and
+ *  no such sum could be drawn honestly. The total is simply the total. */
 function reputationSheet(state: GameState, weeks: readonly Week[]): string {
   const now = effectiveReputation(state);
   const week = thisWeek(state, weeks);
-  // What the week started from: the reputation now less what this week's rows did to it, so the
-  // rows add up to the figure at the top. The website's standing, while it is held, is in it.
-  const carried = twoPlaces(now - week.total);
-  const carryRow = ledgerRow(
-    'Start of the week',
-    'carried over',
-    points(carried),
-    carried,
-    'data-carry="1"',
-  );
   let index = 0;
   const groups = (weeks.some((entry) => entry.week === week.week) ? weeks : [week, ...weeks])
     .map((entry) => {
       const rows = entry.entries.map((rating) => ratingRow(rating, index++)).join('');
-      return (
-        `<div class="ledger-week" data-week="${entry.week}">Week ${entry.week}</div>` +
-        rows +
-        (entry.week === week.week ? carryRow : '')
-      );
+      return `<div class="ledger-week" data-week="${entry.week}">Week ${entry.week}</div>${rows}`;
     })
     .join('');
-  const plus = twoPlaces(week.plus + Math.max(carried, 0));
-  const minus = twoPlaces(week.minus + Math.min(carried, 0));
   return (
     '<section class="sheet" data-sheet="reputation">' +
     pin() +
     '<h3>Reputation</h3>' +
-    totalLine('this week', formatReputation(now), 'reputation') +
-    '<div class="ledger-head"><span>Who said what</span><span>points</span></div>' +
+    reputationTotal(now) +
+    '<div class="ledger-head"><span>What moved it this week</span><span>points</span></div>' +
     `<div class="ledger-list">${groups}</div>` +
-    sumLine(points(plus), points(minus), formatReputation(now)) +
+    reputationSum(state, week) +
     '</section>'
   );
 }

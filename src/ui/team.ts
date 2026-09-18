@@ -73,8 +73,10 @@ export function teamTabFrom(value: string): TeamTab {
   return found ? found[0] : 'workshop';
 }
 
-/** What a role is called on a crew row: plain English, never the engine key (CLAUDE.md 3). */
-const ROLE_WORDS: Record<WorkerRole, string> = {
+/** What a role is called on a crew row: plain English, never the engine key (CLAUDE.md 3). The
+ *  one table: Our team, the hiring tiles and the job's Assign list all read it, so a sprayer is
+ *  called a sprayer wherever he is drawn (CLAUDE.md T19 2.5, 2.6). */
+export const ROLE_WORDS: Record<WorkerRole, string> = {
   joiner: 'joiner',
   helper: 'helper',
   officeAdmin: 'office admin',
@@ -83,6 +85,7 @@ const ROLE_WORDS: Record<WorkerRole, string> = {
   draftsman: 'draftsman',
   estimator: 'estimator',
   productionManager: 'production manager',
+  sprayer: 'sprayer',
 };
 
 /** Which trade a role belongs to. The one table: the hiring tabs and the tiles read it, and a role
@@ -97,6 +100,7 @@ const TRADE_OF_ROLE: Record<WorkerRole, TeamTab> = {
   draftsman: 'office',
   estimator: 'technical',
   productionManager: 'management',
+  sprayer: 'workshop',
 };
 
 export function tradeOf(role: WorkerRole): TeamTab {
@@ -124,6 +128,9 @@ const DUTIES: Record<WorkerRole, string> = {
   productionManager:
     'Runs the second shift, assigns the crew, connects the machines, and covers the hall while ' +
     'you are away. He makes nothing.',
+  sprayer:
+    'The finishing of a lacquered job, which is his trade, and a pair of hands at the bench on ' +
+    'anything else. A joiner can spray, slower.',
 };
 
 function wageLine(option: HiringOption): string {

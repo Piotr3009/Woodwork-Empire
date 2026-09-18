@@ -410,11 +410,12 @@ describe('the figures that move', () => {
     const saw = state.equipment.find((item) => item.specId === 'tableSaw');
     expect(saw).toBeDefined();
     // At the front edge of the saw itself, inside the working zone the class reserves, on the
-    // cell the station table gives the saw's operator (CLAUDE.md T7 3.3; T16 2.1).
+    // cell the station table gives the saw's operator (CLAUDE.md T7 3.3; T16 2.1), a cell out
+    // from the table since T19 2.4 so the saw is not drawn over him.
     if (!saw) throw new Error('no saw in the hall');
     const stands = footprintIn(saw);
     const cell = stationCell(state, state.owner.station, { x: 0, y: 0 });
-    expect(cell.y).toBe(Math.floor(stands.y + stands.depth));
+    expect(cell.y).toBe(Math.floor(stands.y + stands.depth) + 1);
     const feet = centreOf(cell.x, cell.y, 1, 1);
     const svg = renderHall(state);
     expect(svg).toContain('data-figure="owner"');

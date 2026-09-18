@@ -37,7 +37,7 @@ describe('GameState', () => {
     // put the owner's own day on the state, and the last week of them (CLAUDE.md T11 3.1). Turn 12
     // moved the bags onto the extractor, and a Turn 11 save is lifted rather than refused
     // (CLAUDE.md T12 2.3).
-    expect(STATE_VERSION).toBe(15);
+    expect(STATE_VERSION).toBe(16);
     expect(sample.version).toBe(STATE_VERSION);
   });
 

@@ -213,7 +213,7 @@ describe('joiners at the bench', () => {
     let state = runToDay(jobReadyWith(1600, 'poor'), 2).state;
     const jobId = firstJob(state).id;
     state = act(state, { type: 'ASSIGN_JOB', jobId, workerId: 'owner' });
-    expect(firstJob(state).assignedTo).toBe('owner');
+    expect(firstJob(state).assignees[0]).toBe('owner');
     expect(ownerJob(state)?.id).toBe(jobId);
     expect(state.workers[0]?.jobId).toBeNull();
   });
@@ -291,12 +291,12 @@ describe('one path for putting a man on a job', () => {
     const worker = state.workers[0];
     const job = firstJob(state);
     expect(worker?.jobId).toBe(job.id);
-    expect(job.assignedTo).toBe(worker?.id);
+    expect(job.assignees[0]).toBe(worker?.id);
     expect(job.stage).toBe('inProduction');
     // And putting the owner on it takes the joiner off, whichever way it was assigned.
     const taken = act(state, { type: 'ASSIGN_JOB', jobId: job.id, workerId: 'owner' });
     expect(taken.workers[0]?.jobId).toBeNull();
-    expect(firstJob(taken).assignedTo).toBe('owner');
+    expect(firstJob(taken).assignees[0]).toBe('owner');
   });
 
   it('knows who is on the books today', () => {

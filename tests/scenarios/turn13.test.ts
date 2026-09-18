@@ -309,7 +309,16 @@ describe('(w) a month with a production manager, a night joiner and five days aw
 
   it('works the nights and pays the premium for every shift the man turned up for', () => {
     const nights = state.days.filter((day) => day.nightMinutes > 0);
-    expect(nights.length).toBeGreaterThan(3);
+    // Re-measured in Turn 19. It was more than three nights while a drawing took the owner most
+    // of a day: the desk was the bottleneck and the night man always had a backlog to pick up.
+    // With the drawing read off the value of the job (CLAUDE.md T19 2.11) this script draws its
+    // whole book in the first days, the two day joiners and the owner finish thirteen of the
+    // fourteen jobs by day 5, and the rack is down to one sheet, so from day 5 on there is
+    // nothing for the night man to stand at: he works nights 3 and 4 (480 and 118 minutes) and
+    // then idles. Measured, not tuned. What the test is really about, that the premium is paid
+    // for every working day the shift was on whether or not he had work, is asserted below and
+    // is unchanged.
+    expect(nights.length).toBeGreaterThanOrEqual(2);
     for (const day of nights) expect(day.nightMinutes).toBeLessThanOrEqual(SECOND_SHIFT_MINUTES);
     // The premium is for the shift, not for the minutes the rack let him work (nothing is free):
     // one line for every working day the shift was on, from the day it was switched on.

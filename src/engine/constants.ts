@@ -71,12 +71,16 @@ import type {
  *  Bumped in Turn 17: a job may have a second man on it, the day counts the hours the company
  *  paid for whether they were worked or not, and the laptop keeps the tasks the player ticked
  *  to be done one after another. The welfare kit moved off the hall floor and into the canteen
- *  with the same bump (CLAUDE.md T17 section 4). Every v24 save loads. */
-export const STATE_VERSION = 15;
+ *  with the same bump (CLAUDE.md T17 section 4). Every v24 save loads.
+ *
+ *  Bumped in Turn 19: a job carries the list of everybody on it and not one man and a second, the
+ *  settings carry the sound, and the state remembers that the hall has been set up
+ *  (CLAUDE.md T19 section 4). Every v26 save loads. */
+export const STATE_VERSION = 16;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
-export const APP_VERSION = 'v26';
+export const APP_VERSION = 'v27';
 
 // ---------------------------------------------------------------------------
 // The owner's day, in the seven things it is made of
@@ -632,6 +636,32 @@ export const ESTIMATOR_MONTHLY_WAGE: Record<WorkerTier, number> = {
 };
 export const ESTIMATOR_RATES: Record<WorkerTier, number> = { poor: 0.8, normal: 1, super: 1.2 };
 export const ESTIMATOR_REPUTATION = 0;
+/** What a sprayer costs a month, three tiers like the joiners [TUNE] (CLAUDE.md T19 2.6). He is
+ *  paid monthly like the office roles, because he is hired on a trade rate and not on the
+ *  workshop's weekly one. */
+export const SPRAYER_MONTHLY_WAGE: Record<WorkerTier, number> = {
+  poor: 2300,
+  normal: 2700,
+  super: 3100,
+};
+/** The reputation a sprayer wants before he will come, by tier [TUNE]: the same ladder the joiners
+ *  climb, because he is a floor man like them (CLAUDE.md T19 2.6). */
+export const SPRAYER_REPUTATION: Record<WorkerTier, number> = {
+  poor: -50,
+  normal: 10,
+  super: 40,
+};
+/** What a joiner gets through in a minute of a lacquered job's finishing, against a sprayer's 1.0
+ *  [TUNE]. A workshop without a sprayer is slower at the booth, never stuck
+ *  (CLAUDE.md T19 2.6). */
+export const JOINER_SPRAY_RATE = 0.7;
+/** What a sprayer gets through in a minute of the finishing he is there for: his own trade, at
+ *  the full rate (CLAUDE.md T19 2.6). */
+export const SPRAYER_SPRAY_RATE = 1.0;
+/** What a sprayer gets through in a minute of anything that is not spraying [TUNE]. He can stand
+ *  at a bench and help, and he is not a joiner (CLAUDE.md T19 2.6). */
+export const SPRAYER_BENCH_RATE = 0.6;
+
 /** The production manager: one tier, a pure cost, and the first management role in the game
  *  [TUNE wage and standing] (CLAUDE.md T13 3.9). */
 export const PRODUCTION_MANAGER_MONTHLY_WAGE = 3400;
@@ -868,7 +898,6 @@ export const PRODUCT_TEMPLATES: ProductTemplate[] = [
     name: 'Garage shelves',
     basePrice: 400,
     material: 'sheet',
-    designMinutes: 30,
     calls: 2,
     needsMeasure: false,
     requiredEquipment: ['tableSaw', 'drill'],
@@ -882,7 +911,6 @@ export const PRODUCT_TEMPLATES: ProductTemplate[] = [
     name: 'Bookcase',
     basePrice: 900,
     material: 'sheet',
-    designMinutes: 60,
     calls: 2,
     needsMeasure: false,
     requiredEquipment: ['tableSaw', 'drill', 'edgebander'],
@@ -896,7 +924,6 @@ export const PRODUCT_TEMPLATES: ProductTemplate[] = [
     name: 'TV unit',
     basePrice: 1200,
     material: 'sheet',
-    designMinutes: 120,
     calls: 3,
     needsMeasure: false,
     requiredEquipment: ['tableSaw', 'drill', 'edgebander'],
@@ -910,7 +937,6 @@ export const PRODUCT_TEMPLATES: ProductTemplate[] = [
     name: 'Wardrobe',
     basePrice: 1600,
     material: 'sheet',
-    designMinutes: 480,
     calls: 3,
     needsMeasure: false,
     requiredEquipment: ['tableSaw', 'drill', 'edgebander'],
@@ -924,7 +950,6 @@ export const PRODUCT_TEMPLATES: ProductTemplate[] = [
     name: 'Small kitchen (6 units)',
     basePrice: 3500,
     material: 'sheet',
-    designMinutes: 720,
     calls: 4,
     needsMeasure: true,
     requiredEquipment: ['tableSaw', 'drill', 'edgebander'],
@@ -943,7 +968,6 @@ export const PRODUCT_TEMPLATES: ProductTemplate[] = [
     // multiplier takes it up from there [PIOTR: 3,500 to 6,000].
     basePrice: 4375,
     material: 'sheet',
-    designMinutes: 300,
     // The calls come off the price curve of 8.10, like every other template.
     calls: 4,
     needsMeasure: true,
@@ -959,7 +983,6 @@ export const PRODUCT_TEMPLATES: ProductTemplate[] = [
     // The same rule at the top of the ladder [PIOTR: 12,000 to 20,000].
     basePrice: 15000,
     material: 'sheet',
-    designMinutes: 900,
     calls: 4,
     needsMeasure: true,
     // A sprayed kitchen has its fronts moulded on the spindle moulder as well (T13 3.13).
@@ -977,7 +1000,6 @@ export const PRODUCT_TEMPLATES: ProductTemplate[] = [
     name: 'Handleless kitchen',
     basePrice: 9000,
     material: 'sheet',
-    designMinutes: 800,
     calls: 4,
     needsMeasure: true,
     requiredEquipment: ['tableSaw', 'drill', 'edgebander', 'spindleMoulder'],
@@ -991,7 +1013,6 @@ export const PRODUCT_TEMPLATES: ProductTemplate[] = [
     name: 'Oak dining table',
     basePrice: 12000,
     material: 'solidWood',
-    designMinutes: 480,
     calls: 4,
     needsMeasure: false,
     requiredEquipment: ['thicknesser', 'solidWoodTools'],
@@ -3158,6 +3179,19 @@ export const PALLET_LAYOUT = { x: GATE_LAYOUT.x, y: GATE_LAYOUT.y, width: 1, dep
  *  1.6 read as a trot and a joiner crossing his own hall does not trot (PIOTR, 17.09;
  *  CLAUDE.md T18 2.1). */
 export const WALK_CELLS_PER_SECOND = 1.0;
+/** How far a man travels in one full cycle of the walk sheet, in metres [TUNE]. The sheets give a
+ *  frame count and an fps and no stride at all (docs/art/SPRITES.md 10.5), so one is chosen here:
+ *  1.4 m is a 1.8 m man's stride over two steps at an unhurried pace. The renderer plays the walk
+ *  and the carry at `frames * WALK_CELLS_PER_SECOND / WALK_STRIDE_METRES` frames a second instead
+ *  of the sheet's own fps, so the feet plant where the floor moves and the man stops skating
+ *  (PIOTR, 17.09: "they walk like robots"; CLAUDE.md T19 2.1). The sheet's own fps is kept for
+ *  every animation that is not locomotion. */
+export const WALK_STRIDE_METRES = 1.4;
+/** How long a run of cells in one world direction has to be before it is a corner a man turns at,
+ *  rather than a wobble inside the leg he is walking [TUNE]. The brief's own words are "the path
+ *  turns ninety degrees for more than two cells", so the figure is Piotr's and only its name is
+ *  chosen here (CLAUDE.md T19 2.1). */
+export const WALK_CORNER_CELLS = 2;
 
 // ---------------------------------------------------------------------------
 // 9.3 Hiring pool (PIOTR: tiers and gating; wages [TUNE])
@@ -3274,6 +3308,34 @@ export const HIRING_SPECS: HiringSpec[] = [
     monthlyWage: ESTIMATOR_MONTHLY_WAGE.super,
     minReputation: ESTIMATOR_REPUTATION,
     duties: 'Material take offs, faster than you.',
+  },
+  // The finishing man, three tiers like the joiners (PIOTR, 17.09; CLAUDE.md T19 2.6).
+  {
+    role: 'sprayer',
+    tier: 'poor',
+    label: 'Sprayer, poor',
+    weeklyWage: 0,
+    monthlyWage: SPRAYER_MONTHLY_WAGE.poor,
+    minReputation: SPRAYER_REPUTATION.poor,
+    duties: 'Spray finishing at full speed, bench work at 0.60.',
+  },
+  {
+    role: 'sprayer',
+    tier: 'normal',
+    label: 'Sprayer, normal',
+    weeklyWage: 0,
+    monthlyWage: SPRAYER_MONTHLY_WAGE.normal,
+    minReputation: SPRAYER_REPUTATION.normal,
+    duties: 'Spray finishing at full speed, bench work at 0.60.',
+  },
+  {
+    role: 'sprayer',
+    tier: 'super',
+    label: 'Sprayer, super',
+    weeklyWage: 0,
+    monthlyWage: SPRAYER_MONTHLY_WAGE.super,
+    minReputation: SPRAYER_REPUTATION.super,
+    duties: 'Spray finishing at full speed, bench work at 0.60.',
   },
   {
     role: 'productionManager',
@@ -3622,7 +3684,8 @@ export const TIPS: Record<string, string> = {
   website: 'People buy with their eyes. Levels 1 to 3 change the enquiries; 4 and 5 add a little standing.',
   house: 'What you pay yourself every day is the house you sleep in.',
   team: 'The floor limits the crew: one person per so many square metres of free hall.',
-  settings: 'Tips on or off. Nothing else here tonight.',
+  settings:
+    'Tips on or off, and the workshop\'s own noise: a volume, and a mute for a quiet room.',
 };
 
 // ---------------------------------------------------------------------------
@@ -3729,3 +3792,40 @@ export const ANSWER_SKEW_NEUTRAL_TIER = 1;
 /** The holidays the owner's card offers, in working days, the longest of them the cap the action
  *  applies [TUNE] (CLAUDE.md T13 3.9). */
 export const HOLIDAY_OPTIONS_DAYS: readonly number[] = [1, 3, 5, HOLIDAY_MAX_DAYS];
+
+// ---------------------------------------------------------------------------
+// Turn 19: the doors, the sprayer, the drawings, the sound
+// ---------------------------------------------------------------------------
+
+/** How long a door takes to swing from shut to open, in milliseconds of real time [TUNE]. A man
+ *  whose leg ends at a door cell opens it as he arrives: closed, half, open (CLAUDE.md T19 2.3). */
+export const DOOR_SWING_MS = 400;
+/** How long a door stands open after the last man leaves its cell, in milliseconds of real time
+ *  [TUNE]. A door with somebody standing in it never closes (CLAUDE.md T19 2.3). */
+export const DOOR_CLOSE_MS = 600;
+
+/** The shortest a drawing can take, in minutes [TUNE] (CLAUDE.md T19 2.11). */
+export const DESIGN_MIN_MINUTES = 30;
+/** Minutes of drawing per 1,000 of the job's base price [TUNE]: 2,500 is an hour, 10,000 is four
+ *  hours, 20,000 is eight. The software factor still divides it, and the per product figure and
+ *  the size multiplier are gone (PIOTR, 17.09; CLAUDE.md T19 2.11). */
+export const DESIGN_MINUTES_PER_1000 = 24;
+
+/** The volume a fresh game and a lifted save start on, and unmuted [TUNE] (CLAUDE.md T19 2.10). */
+export const SOUND_VOLUME_DEFAULT = 0.7;
+/** What one press of Quieter or Louder moves the master volume by [TUNE]: nought to full in ten
+ *  presses, fine enough to find a level and coarse enough to reach both ends
+ *  (CLAUDE.md T19 2.10). */
+export const SOUND_VOLUME_STEP = 0.1;
+/** How loud the synthesised stand ins play, against a real recording's 1.0 [TUNE]. They are there
+ *  so every hook can be heard before Piotr's recordings land, not to be listened to
+ *  (CLAUDE.md T19 2.10, section 9). */
+export const STAND_IN_GAIN = 0.15;
+/** The shortest gap between two one shot sounds, in milliseconds of real time. At x10 and x30 the
+ *  hall would rattle otherwise: the loops play at their own pitch and the one shots are thinned to
+ *  at most one a second (CLAUDE.md T19 2.10). */
+export const SOUND_ONE_SHOT_GAP_MS = 1000;
+/** How often a hammer is heard from a bench in assembly, in seconds of real time [TUNE]. */
+export const HAMMER_EVERY_SECONDS = 3;
+/** How often a drill is heard from a bench in fitting, in seconds of real time [TUNE]. */
+export const DRILL_EVERY_SECONDS = 4;

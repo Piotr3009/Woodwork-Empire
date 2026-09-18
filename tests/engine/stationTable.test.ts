@@ -6,12 +6,14 @@ import { describe, expect, it } from 'vitest';
 import { GATE_LAYOUT, ROOM_LAYOUT } from '../../src/engine/constants';
 import {
   STATION_TABLE,
+  benchCellsAt,
   cellAt,
   facingAt,
   facingAtPallet,
   facingTowards,
   freeSideOf,
   palletCell,
+  queueCellsAt,
   standingCell,
   standsOn,
 } from '../../src/engine/stations';
@@ -45,10 +47,81 @@ describe('the station table', () => {
     ]) {
       expect(STATION_TABLE[family], family).toBeDefined();
     }
-    expect(STATION_TABLE.tableSaw?.operator).toEqual({ side: 'front', along: 'right' });
+    expect(STATION_TABLE.tableSaw?.operator).toEqual({ side: 'front', along: 'right', out: 1 });
     expect(STATION_TABLE.thicknesser?.waiting).toEqual({ side: 'left', along: 0, out: 1 });
     expect(STATION_TABLE.cnc?.second).toEqual({ side: 'back', along: 'middle' });
     expect(STATION_TABLE.workbench?.second).toEqual({ side: 'back', along: 'right' });
+  });
+
+  it('keeps the man a cell out of the cells his own body would be painted over', () => {
+    // The rows moved by T19 2.4, each with the figure it was measured at: how much of the man was
+    // painted over the machine at the table's cell, and how much a cell further out. The bench's
+    // own two places are deliberately not among them.
+    expect(STATION_TABLE.tableSaw?.operator).toEqual({ side: 'front', along: 'right', out: 1 });
+    expect(STATION_TABLE.edgebander?.operator).toEqual({ side: 'front', along: 1, out: 1 });
+    expect(STATION_TABLE.cnc?.operator).toEqual({ side: 'front', along: 'right', out: 1 });
+    expect(STATION_TABLE.sprayBooth?.operator).toEqual({ side: 'front', along: 'middle', out: 1 });
+    expect(STATION_TABLE.workbench?.waiting).toEqual({ side: 'front', along: 'right', out: 1 });
+    expect(STATION_TABLE.workbench?.operator).toEqual({ side: 'front', along: 0 });
+    expect(STATION_TABLE.workbench?.second).toEqual({ side: 'back', along: 'right' });
+    expect(STATION_TABLE.spindleMoulder?.operator).toEqual({ side: 'front', along: 0 });
+  });
+
+  it('never stands a man on the thing he is using, whatever the family', () => {
+    // Nobody stands on a thing (CLAUDE.md T19 1): every cell the table gives, for every family and
+    // every role it defines, is a free cell of the floor and none of it is the item's own.
+    const families: Array<[string, string]> = [
+      ['tableSaw', 'standard'],
+      ['thicknesser', 'standard'],
+      ['spindleMoulder', 'standard'],
+      ['edgebander', 'standard'],
+      ['cnc', 'standard'],
+      ['sprayBooth', 'standard'],
+      ['workbench', 'standard'],
+      ['sheetRack', 'standard'],
+      ['extractor', 'standard'],
+      ['compressor', 'standard'],
+    ];
+    for (const [specId, variantId] of families) {
+      const state = emptyHall();
+      const item = placeEquipment(state, specId, { variantId, x: 8, y: 4 });
+      const at = box(item);
+      for (const role of ['operator', 'waiting', 'second'] as const) {
+        const cell = standingCell(state, item, role);
+        expect(isFree(state, cell), `${specId} ${role}`).toBe(true);
+        const onIt =
+          cell.x >= at.x && cell.x < at.x + at.width && cell.y >= at.y && cell.y < at.y + at.depth;
+        expect(onIt, `${specId} ${role}`).toBe(false);
+      }
+    }
+  });
+
+  it('lines a queue of men up along one side, the operator first and the rest behind him', () => {
+    // What 2.5 hands a job with more men on it than an item has places (CLAUDE.md T19 2.5).
+    const state = emptyHall();
+    const saw = placeEquipment(state, 'tableSaw', { variantId: 'standard', x: 8, y: 4 });
+    const queue = queueCellsAt(state, saw, 5);
+    expect(queue).toHaveLength(5);
+    expect(queue[0]).toEqual(standingCell(state, saw, 'operator'));
+    expect(queue[1]).toEqual(standingCell(state, saw, 'waiting'));
+    for (const cell of queue) expect(isFree(state, cell)).toBe(true);
+    expect(new Set(queue.map((cell) => `${cell.x},${cell.y}`)).size).toBe(5);
+    expect(queueCellsAt(state, saw, 0)).toEqual([]);
+    expect(queueCellsAt(state, saw, 1)).toEqual([standingCell(state, saw, 'operator')]);
+
+    // The bench on open floor, where there is room for a queue at all.
+    const floor = emptyHall();
+    const bench = placeEquipment(floor, 'workbench', { variantId: 'standard', x: 8, y: 4 });
+    const men = benchCellsAt(floor, bench, 4);
+    expect(men).toHaveLength(4);
+    expect(men[0]).toEqual(standingCell(floor, bench, 'operator'));
+    expect(men[1]).toEqual(standingCell(floor, bench, 'second'));
+    const wb = box(bench);
+    // The second place is the one behind it; the rest are along the front where the player sees
+    // them.
+    expect(men[1]?.y).toBe(wb.y - 1);
+    for (const cell of men.slice(2)) expect(cell.y).toBeGreaterThanOrEqual(wb.y + wb.depth);
+    expect(new Set(men.map((cell) => `${cell.x},${cell.y}`)).size).toBe(4);
   });
 
   it('puts the saw man at the right end of the front, back to us, and the waiting man at the left', () => {
@@ -58,7 +131,8 @@ describe('the station table', () => {
     // A standard saw is 3 by 1 of machine (CLAUDE.md T7 3.3).
     expect(at.width).toBe(3);
     const operator = standingCell(state, saw, 'operator');
-    expect(operator).toEqual({ x: at.x + at.width - 1, y: at.y + at.depth });
+    // A cell out from the table, where the floor is his and not the saw's (CLAUDE.md T19 2.4).
+    expect(operator).toEqual({ x: at.x + at.width - 1, y: at.y + at.depth + 1 });
     expect(standingCell(state, saw, 'waiting')).toEqual({ x: at.x, y: at.y + at.depth });
     // Facing the saw from its front is facing away from the camera.
     expect(['ne', 'nw']).toContain(facingAt(operator, saw));
@@ -79,11 +153,11 @@ describe('the station table', () => {
     const state = emptyHall();
     const edgebander = placeEquipment(state, 'edgebander', { variantId: 'standard', x: 8, y: 4 });
     const eb = box(edgebander);
-    expect(standingCell(state, edgebander, 'operator')).toEqual({ x: eb.x + 1, y: eb.y + eb.depth });
+    expect(standingCell(state, edgebander, 'operator')).toEqual({ x: eb.x + 1, y: eb.y + eb.depth + 1 });
     expect(standingCell(state, edgebander, 'waiting')).toEqual({ x: eb.x, y: eb.y + eb.depth });
     const cnc = placeEquipment(state, 'cnc', { variantId: 'standard', x: 12, y: 5 });
     const at = box(cnc);
-    expect(standingCell(state, cnc, 'operator')).toEqual({ x: at.x + at.width - 1, y: at.y + at.depth });
+    expect(standingCell(state, cnc, 'operator')).toEqual({ x: at.x + at.width - 1, y: at.y + at.depth + 1 });
     expect(standingCell(state, cnc, 'waiting')).toEqual({ x: at.x + Math.floor(at.width / 2), y: at.y + at.depth });
     expect(standingCell(state, cnc, 'second')).toEqual({ x: at.x + Math.floor(at.width / 2), y: at.y - 1 });
     const bench = placeEquipment(state, 'workbench', { variantId: 'standard', x: 15, y: 8 });
@@ -97,7 +171,7 @@ describe('the station table', () => {
     const state = emptyHall();
     const saw = placeEquipment(state, 'tableSaw', { variantId: 'standard', x: 8, y: 4 });
     const at = box(saw);
-    const front = { x: at.x + at.width - 1, y: at.y + at.depth };
+    const front = cellAt(at, { side: 'front', along: 'right', out: 1 });
     // Another machine standing on the front cell: the table's cell is not free. A second saw is
     // anchored so that its own footprint covers that cell.
     let covered = false;
@@ -113,8 +187,10 @@ describe('the station table', () => {
       }
     }
     expect(isFree(state, front)).toBe(false);
-    expect(standingCell(state, saw, 'operator')).toEqual({ x: at.x + at.width - 1, y: at.y - 1 });
-    expect(cellAt(at, { side: 'back', along: 'right' })).toEqual({ x: at.x + at.width - 1, y: at.y - 1 });
+    // The same position along the next free side, with the cell out kept: a row that stands a man
+    // a cell clear of the front stands him a cell clear of the back too (CLAUDE.md T19 2.4).
+    expect(standingCell(state, saw, 'operator')).toEqual(cellAt(at, { side: 'back', along: 'right', out: 1 }));
+    expect(cellAt(at, { side: 'back', along: 'right', out: 1 })).toEqual({ x: at.x + at.width - 1, y: at.y - 2 });
   });
 });
 
@@ -132,7 +208,8 @@ describe('the free side of a rack', () => {
     const at = standsOn(rack);
     expect(freeSideOf(state, rack)).toBe('front');
     const cell = standingCell(state, rack);
-    expect(cell.y).toBe(at.y + at.depth);
+    // A cell out from the rack: hard against it the rack was painted over half the man (T19 2.4).
+    expect(cell.y).toBe(at.y + at.depth + 1);
     expect(['ne', 'nw']).toContain(facingAt(cell, rack));
   });
 
@@ -144,7 +221,7 @@ describe('the free side of a rack', () => {
     expect(at.y + at.depth).toBe(state.unit.depthCells);
     expect(freeSideOf(state, rack)).toBe('back');
     const cell = standingCell(state, rack);
-    expect(cell.y).toBe(at.y - 1);
+    expect(cell.y).toBe(at.y - 2);
     expect(['se', 'sw']).toContain(facingAt(cell, rack));
   });
 

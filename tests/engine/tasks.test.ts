@@ -11,10 +11,10 @@ import {
   JOINERY_CORE_EXTENSION_PRICE_YEARLY,
   JOINERY_CORE_MAX_EXTENSIONS,
   JOINERY_CORE_PRICE_YEARLY,
+  DESIGN_MIN_MINUTES,
   SOFTWARE_DESIGN_FACTOR,
   TAKE_OFF_BUTTON_LABEL,
 } from '../../src/engine/constants';
-import { PRODUCT_TEMPLATES } from '../../src/engine/constants';
 import {
   createDailyTasks,
   createTask,
@@ -32,7 +32,7 @@ import {
   unloadMinutes,
 } from '../../src/engine/tasks';
 import { tick } from '../../src/engine/index';
-import type { GameState, ProductTemplate, Worker } from '../../src/engine/index';
+import type { GameState, Worker } from '../../src/engine/index';
 import {
   acceptNow,
   act,
@@ -49,12 +49,6 @@ import {
   sixJoinersOnSheetWork,
   withLicence,
 } from '../helpers';
-
-function template(id: string): ProductTemplate {
-  const found = PRODUCT_TEMPLATES.find((entry) => entry.id === id);
-  if (!found) throw new Error(`no template ${id}`);
-  return found;
-}
 
 function staff(id: string, role: Worker['role'], monthlyWage: number): Worker {
   return {
@@ -95,13 +89,21 @@ describe('minute curves', () => {
     expect(materialOrderMinutes(250000)).toBe(200);
   });
 
-  it('scales design minutes with the size and the software tier', () => {
-    const wardrobe = template('wardrobe');
-    expect(designMinutes(wardrobe, 1, 'basic')).toBe(480);
-    expect(designMinutes(wardrobe, 1.5, 'basic')).toBe(720);
-    expect(designMinutes(wardrobe, 1, 'standard')).toBe(480 * SOFTWARE_DESIGN_FACTOR.standard);
-    expect(designMinutes(wardrobe, 1, 'pro')).toBe(96);
-    expect(designMinutes(template('garageShelves'), 1, 'basic')).toBe(30);
+  it('reads the drawing time off the value of the job, with a floor and the software tier', () => {
+    // PIOTR's three figures (CLAUDE.md T19 2.11): GBP 2,500 is an hour, GBP 10,000 four hours,
+    // GBP 20,000 eight. Nothing about the product and nothing about its size comes into it.
+    expect(designMinutes(2500, 'basic')).toBe(60);
+    expect(designMinutes(10000, 'basic')).toBe(240);
+    expect(designMinutes(20000, 'basic')).toBe(480);
+    // The floor: the smallest job there is still takes half an hour to draw.
+    expect(designMinutes(100, 'basic')).toBe(DESIGN_MIN_MINUTES);
+    expect(designMinutes(0, 'basic')).toBe(DESIGN_MIN_MINUTES);
+    // Exactly at the floor's own price, the two agree.
+    expect(designMinutes(1250, 'basic')).toBe(DESIGN_MIN_MINUTES);
+    // The software still divides what the value asks for, as it always did.
+    expect(designMinutes(10000, 'standard')).toBe(240 * SOFTWARE_DESIGN_FACTOR.standard);
+    expect(designMinutes(10000, 'pro')).toBe(48);
+    expect(designMinutes(2500, 'pro')).toBe(12);
   });
 
   it('cuts unloading with a forklift', () => {
@@ -174,8 +176,7 @@ describe('the daily list', () => {
       calls: [],
       callsMissed: 0,
       designMinutesRemaining: 30,
-      assignedTo: null,
-      secondAssignee: null,
+      assignees: [],
       stageRuns: [],
       completedDay: null,
       daysLate: 0,

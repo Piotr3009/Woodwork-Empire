@@ -42,6 +42,7 @@ import {
   STATE_VERSION,
   WEBSITE_START_LEVEL,
   WELFARE_IN_THE_CANTEEN,
+  SOUND_VOLUME_DEFAULT,
 } from './constants';
 import { arriveEnquiries, refreshBoard, refreshLocks } from './board';
 import {
@@ -158,7 +159,7 @@ import {
   acceptEnquiry,
   addLabour,
   assignJob,
-  assignSecond,
+  addToJob,
   chargeSiteMeasure,
   checkOverdueJobs,
   endOwnerTakeOver,
@@ -180,6 +181,8 @@ import {
   runBookedTransport,
   dropJob,
   setSawFallback,
+  BUILDING_ROLES,
+  takeOffJob,
   takeOverJob,
   transportLabel,
 } from './jobs';
@@ -215,7 +218,7 @@ import {
 } from './owner';
 import { paidHoursToday } from './rate';
 import { chance, int, makeId } from './rng';
-import { type StagePlan, cncOptions, labourPerMinute } from './stages';
+import { type StagePlan, cncOptions, labourPerMinute, tradeFactor } from './stages';
 import {
   airFactorFor,
   benchDrawsAir,
@@ -279,6 +282,7 @@ import {
   resumeStartedTask,
   startNextQueued,
   skippedTask,
+  queueTaskNext,
   queueTasks,
   startTask,
   taskWorkRate,
@@ -415,7 +419,8 @@ export function createGame(options: NewGameOptions): GameState {
     ownerDraw: { tier: 0 },
     pipes: [],
     gates: [],
-    settings: { tips: true },
+    settings: { tips: true, sound: { volume: SOUND_VOLUME_DEFAULT, muted: false } },
+    hallSetUp: false,
     tips: { seen: [] },
     shift: { second: false },
     monthEndShownFor: 0,
@@ -1185,6 +1190,10 @@ function hoursText(minutes: number): string {
  *  two hours and a ducting bill (PIOTR, 13.09; CLAUDE.md T8 3.4). */
 function endSetup(state: GameState, speed: Speed): void {
   state.speed = speed;
+  // The hall has been set up once the player has left setup mode with anything of his standing in
+  // it. The flag is what the first steps line reads; nothing goes looking for a workbench any more
+  // (CLAUDE.md T19 2.13).
+  if (!state.hallSetUp && state.equipment.some((item) => !isSold(item))) state.hallSetUp = true;
   if (state.movedItems.length === 0) return;
   if (movePending(state) !== null) return;
   // The question is already in front of him: asking it twice would book the move twice.
@@ -1522,7 +1531,7 @@ function handsAtWork(state: GameState, ownerOnTask: boolean, moving: boolean): H
       continue;
     }
     if (moving) continue;
-    if (worker.role !== 'joiner' || worker.jobId === null) continue;
+    if (!BUILDING_ROLES.includes(worker.role) || worker.jobId === null) continue;
     const job = findJob(state, worker.jobId);
     if (!job || job.stage !== 'inProduction') {
       worker.jobId = null;
@@ -1557,7 +1566,7 @@ function possibleSeats(state: GameState): { owner: boolean; joiners: number } {
   if (crewHasGoneHome(state)) return { owner, joiners: 0 };
   let count = 0;
   for (const worker of state.workers) {
-    if (worker.role !== 'joiner' || !isWorkingToday(state, worker)) continue;
+    if (!BUILDING_ROLES.includes(worker.role) || !isWorkingToday(state, worker)) continue;
     count += 1;
   }
   return { owner, joiners: count };
@@ -1666,7 +1675,10 @@ function runProductionMinute(state: GameState, ownerOnTask: boolean): void {
     // A compressor's hours run only while something draws on it (CLAUDE.md T10 3.2 rule 3).
     const compressor = drawingOn(state, machine, atTheBench);
     if (compressor !== null) used.set(compressor.id, (used.get(compressor.id) ?? 0) + 1);
-    const minute = labourPerMinute(hand.rate, speed) * hall;
+    // What the man's own trade is worth at this stage: a sprayer's full minute at the booth, a
+    // joiner's slower one there, and neither anywhere else (CLAUDE.md T19 2.6).
+    const trade = tradeFactor(worker?.role ?? null, stage.family);
+    const minute = labourPerMinute(hand.rate * trade, speed) * hall;
     if (addLabour(state, hand.job, minute, stage.id)) raiseJobAtGate(state, hand.job);
   }
   // What the owner's absence took off every staff minute this minute is the owner away line of
@@ -2109,10 +2121,6 @@ export function applyAction(state: GameState, action: GameAction): GameState {
     case 'ASSIGN_JOB':
       assignJob(next, action.jobId, action.workerId);
       break;
-    case 'ASSIGN_SECOND':
-      // The second man on the job, on it or off it (CLAUDE.md T17 2.10).
-      assignSecond(next, action.jobId, action.workerId);
-      break;
     case 'TAKE_OVER_JOB':
       // The evening is the owner's to give: he takes a worker's job on and the worker has it back
       // in the morning (CLAUDE.md T17 2.12).
@@ -2297,6 +2305,28 @@ export function applyAction(state: GameState, action: GameAction): GameState {
       break;
     case 'SET_TIPS':
       next.settings.tips = action.on;
+      break;
+    case 'ADD_TO_JOB':
+      // One more man on the job, however many are on it already (CLAUDE.md T19 2.5).
+      addToJob(next, action.jobId, action.workerId);
+      break;
+    case 'REMOVE_FROM_JOB':
+      // The cross on his chip: he comes off and everybody else stays on (CLAUDE.md T19 2.5).
+      takeOffJob(next, action.jobId, action.workerId);
+      break;
+    case 'QUEUE_TASK_NEXT':
+      // Add as next: behind the one running, and the running one is not put down
+      // (CLAUDE.md T19 2.12).
+      queueTaskNext(next, action.taskId);
+      break;
+    case 'SET_SOUND':
+      // A volume that is not a finite number is not a volume. Clamping alone let NaN through
+      // (Math.max(0, NaN) is NaN), and a NaN on the master gain throws in Web Audio, which used to
+      // take the whole frame loop with it (CLAUDE.md T19 2.10; found by the Turn 19 review).
+      if (typeof action.volume === 'number' && Number.isFinite(action.volume)) {
+        next.settings.sound.volume = Math.min(1, Math.max(0, action.volume));
+      }
+      if (typeof action.muted === 'boolean') next.settings.sound.muted = action.muted;
       break;
     case 'DISMISS_TIP':
       if (!next.tips.seen.includes(action.key)) next.tips.seen.push(action.key);

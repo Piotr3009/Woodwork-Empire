@@ -19,7 +19,7 @@
 // Nothing here is game state. A rebuilt page finds the walkers still here and puts every figure
 // back where it had actually got to (the same reason the slides of Turn 2 lived in the app).
 
-import { WALK_CELLS_PER_SECOND } from '../engine/constants';
+import { WALK_CELLS_PER_SECOND, WALK_CORNER_CELLS } from '../engine/constants';
 import { STATION_GATE, STATION_RACK } from '../engine/stations';
 import {
   type Animation,
@@ -27,6 +27,7 @@ import {
   faceCharacter,
   facingFromScreen,
   legCarries,
+  playCharacters,
   setCharacterAnimation,
 } from './characters';
 import { centreOf } from './iso';
@@ -62,6 +63,9 @@ export interface Walker {
   at: { x: number; y: number };
   /** The cells still to walk through to the goal he is on, the next one first. */
   path: Cell[];
+  /** The way he faces walking to each of those cells, one for one with `path`: chosen once when
+   *  the leg is set off on and never re-read per cell (CLAUDE.md T19 2.1). */
+  facings: Facing[];
   /** The station he is walking to, or standing at. */
   station: string;
   /** The station he set off from, for the leg's animation. */
@@ -117,9 +121,16 @@ function loopOf(node: Element): Loop | null {
   return { gate, rack, farStation: stationRaw ?? STATION_RACK };
 }
 
+/** Where the figure's group sits this frame, written to two decimals and not to whole pixels
+ *  (PIOTR, 17.09: "they shake like a leaf"; CLAUDE.md T19 2.1). At one cell a second and 60 frames
+ *  a second a man covers 0.4 px of screen x and 0.2 px of screen y in a frame, so rounding to
+ *  whole pixels made him stand still on two frames out of every five and jump a pixel on the
+ *  others. Two decimals is enough for the smallest real step and the browser interpolates the
+ *  rest; the sprite inside the group stays anchored on the sheet's own anchor, so nothing is
+ *  drawn off its pixel. */
 function translateOf(at: { x: number; y: number }): string {
   const feet = centreOf(at.x, at.y, 1, 1);
-  return `translate(${Math.round(feet.x)},${Math.round(feet.y)})`;
+  return `translate(${feet.x.toFixed(2)},${feet.y.toFixed(2)})`;
 }
 
 function sameCell(a: Cell, b: { x: number; y: number }): boolean {
@@ -127,21 +138,77 @@ function sameCell(a: Cell, b: { x: number; y: number }): boolean {
 }
 
 /** The cell to set off from: the next cell of the path he is on, so a man mid stride finishes it
- *  and turns, or the cell he stands on. */
+ *  and turns, or the cell he stands on. Where he stands is not rounded here: the path finder is
+ *  handed a whole cell in `setOff`, and rounding what the walker remembers would teleport a man
+ *  stopped mid cell by up to half a cell (CLAUDE.md T19 2.1). */
 function setOffFrom(walker: Walker): Cell {
   const next = walker.path[0];
   if (next !== undefined) return next;
-  return { x: Math.round(walker.at.x), y: Math.round(walker.at.y) };
+  return { x: walker.at.x, y: walker.at.y };
+}
+
+/** The way a step reads on the screen, as the sign of its world direction. */
+function screenFacing(from: { x: number; y: number }, to: { x: number; y: number }): Facing {
+  const a = centreOf(from.x, from.y, 1, 1);
+  const b = centreOf(to.x, to.y, 1, 1);
+  return facingFromScreen(b.x - a.x, b.y - a.y);
+}
+
+/** The facing to walk each cell of a leg with: one per cell of `path`, chosen once (CLAUDE.md
+ *  T19 2.1).
+ *
+ *  A man does not turn his shoulders for every cell of a staircase. The leg's own direction, from
+ *  the cell he sets off from to the cell he is going to, is what he faces for the whole of it; a
+ *  run of more than `WALK_CORNER_CELLS` cells in one world direction is a genuine corner and is
+ *  faced its own way, so the L the path finder gives on open floor turns him exactly once and a
+ *  staircase reads as one direction from end to end. */
+export function legHeadings(from: Cell, path: readonly Cell[]): Facing[] {
+  if (path.length === 0) return [];
+  const last = path[path.length - 1] as Cell;
+  const leg =
+    last.x === from.x && last.y === from.y
+      ? screenFacing(from, path[0] as Cell)
+      : screenFacing(from, last);
+  // The runs of the path: consecutive cells going the same way in the world.
+  const facings: Facing[] = new Array(path.length).fill(leg) as Facing[];
+  let runStart = 0;
+  let runX = 0;
+  let runY = 0;
+  let at: { x: number; y: number } = from;
+  const closeRun = (end: number): void => {
+    // A short run is a wobble inside the leg and is walked the leg's way; a long one is a corner
+    // and is walked its own, from its first cell to its last.
+    if (end - runStart <= WALK_CORNER_CELLS) return;
+    const facing = screenFacing(path[runStart] as Cell, path[end - 1] as Cell);
+    for (let index = runStart; index < end; index += 1) facings[index] = facing;
+  };
+  for (let index = 0; index < path.length; index += 1) {
+    const cell = path[index] as Cell;
+    const stepX = Math.sign(cell.x - at.x);
+    const stepY = Math.sign(cell.y - at.y);
+    if (index > 0 && (stepX !== runX || stepY !== runY)) {
+      closeRun(index);
+      runStart = index;
+    }
+    runX = stepX;
+    runY = stepY;
+    at = cell;
+  }
+  closeRun(path.length);
+  return facings;
 }
 
 /** Starts a walker on the way to a goal along the network. */
 function setOff(walker: Walker, goal: Goal): void {
   const from = setOffFrom(walker);
-  const cells = pathFinder(from, goal.cell);
+  // The network is a grid of whole cells: it is asked about the cell he is in, and the fraction
+  // of a cell he has walked into it stays on the walker.
+  const cells = pathFinder({ x: Math.round(from.x), y: Math.round(from.y) }, goal.cell);
   // The path starts on the cell he is on: nothing to walk for that one.
   const first = cells[0];
   if (first !== undefined && cells.length > 1 && sameCell(first, walker.at)) cells.shift();
   walker.path = cells;
+  walker.facings = legHeadings(from, cells);
   walker.fromStation = walker.station;
   walker.station = goal.station;
 }
@@ -174,6 +241,7 @@ export function syncWalkers(root: ParentNode, nowMs: number, pathFor: PathFinder
         key,
         at: { x: cell.x, y: cell.y },
         path: [],
+        facings: [],
         station,
         fromStation: station,
         loop,
@@ -208,9 +276,14 @@ export function syncWalkers(root: ParentNode, nowMs: number, pathFor: PathFinder
       walker.after = null;
       setOff(walker, { cell, station });
     }
-    // The page was built with him at his station: put him back where he had actually got to.
+    // The page was built with him at his station: put him back where he had actually got to, and
+    // face him and play him the way he already was. The fresh markup carries his station's facing,
+    // his station's animation and frame 0, so a page written in the middle of a leg used to be
+    // painted with a mirrored man restarting his walk, once a second at x1 and thirty times a
+    // second at x30 (PIOTR, 17.09: "shake like a leaf"; CLAUDE.md T19 2.1).
     node.setAttribute('transform', translateOf(walker.at));
-    dress(node, walker);
+    dress(node, walker, walker.facings[0] ?? null);
+    playCharacters(node, nowMs);
   }
   for (const key of Array.from(walkers.keys())) {
     if (!seen.has(key)) walkers.delete(key);
@@ -271,17 +344,17 @@ export function stepWalkers(root: ParentNode, nowMs: number): void {
     let heading: Facing | null = null;
     while (left > 0 && walker.path.length > 0) {
       const next = walker.path[0] as Cell;
+      // The facing was chosen for the whole leg when he set off on it, and is only looked up
+      // here: reading it back off every cell was what flipped him on every step of a staircase
+      // (CLAUDE.md T19 2.1).
+      heading = walker.facings[0] ?? heading;
       const dx = next.x - walker.at.x;
       const dy = next.y - walker.at.y;
       const distance = Math.hypot(dx, dy);
-      if (distance > 0) {
-        const from = centreOf(walker.at.x, walker.at.y, 1, 1);
-        const to = centreOf(next.x, next.y, 1, 1);
-        heading = facingFromScreen(to.x - from.x, to.y - from.y);
-      }
       if (distance <= left) {
         walker.at = { x: next.x, y: next.y };
         walker.path.shift();
+        walker.facings.shift();
         left -= distance;
         if (walker.path.length === 0) arrive(walker);
       } else {

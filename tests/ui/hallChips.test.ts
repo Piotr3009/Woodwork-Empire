@@ -8,7 +8,8 @@ import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { CLEANING_MINUTES, SERVICE_INTERVAL_HOURS } from '../../src/engine/constants';
 import { currentState, mount, render } from '../../src/ui/app';
 import type { GameState } from '../../src/engine/index';
-import { buyStartingKit, fillBags, newGame } from '../helpers';
+import { createTask } from '../../src/engine/tasks';
+import { buyStartingKit, fillBags, hireNow, newGame } from '../helpers';
 
 function root(): HTMLElement {
   const element = document.querySelector('#app');
@@ -72,6 +73,40 @@ describe('the chips over the floor', () => {
     expect(dirty).toBeDefined();
     expect(dirty).toContain(`Clean up · ${CLEANING_MINUTES} min`);
     expect(root().querySelector('.hall-chip [data-do="startCleaning"]')).not.toBeNull();
+  });
+
+  it('says who is cleaning, with no button, once the helper has it in hand', () => {
+    // The hall makes the job of work itself and the helper takes it, so the chip is a statement
+    // and not a question (PIOTR, 17.09; CLAUDE.md T19 2.7).
+    const state = game();
+    state.dust = 75;
+    const helper = hireNow(state, 'helper', null).workers.find((man) => man.role === 'helper');
+    if (helper === undefined) throw new Error('no helper was taken on');
+    const dave = { ...helper, id: 'helper-1', name: 'Dave', startDay: state.clock.day };
+    state.workers.push(dave);
+    const task = createTask(state, {
+      kind: 'cleaning',
+      label: 'Clean up',
+      minutes: CLEANING_MINUTES,
+    });
+    // He has it in his hands, which is both halves of it: the task names him and he names it.
+    task.doneBy = dave.id;
+    dave.taskId = task.id;
+    render();
+    const dirty = chips().find((text) => text.includes('The hall is dirty'));
+    expect(dirty).toBeDefined();
+    expect(dirty).toContain('Dave is cleaning it');
+    expect(dirty).not.toContain('somebody will get hurt');
+    // No button at all: there is nothing for the player to press.
+    expect(root().querySelector('.hall-chip [data-do="startCleaning"]')).toBeNull();
+    // And back to the question when nobody has it.
+    task.doneBy = null;
+    dave.taskId = null;
+    render();
+    expect(root().querySelector('.hall-chip [data-do="startCleaning"]')).not.toBeNull();
+    task.done = true;
+    state.dust = 0;
+    render();
   });
 
   it('puts Empty bags on the full store’s chip', () => {

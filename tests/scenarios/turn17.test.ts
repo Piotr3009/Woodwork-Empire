@@ -74,9 +74,11 @@ const OPENED_ON = OPENING.state.clock.day;
 /** The month with the piece left to the one man it was given to. */
 const ALONE = playUntilDay(OPENING.state, 41, QUIET_MONTH, []);
 
-/** The same month with the second joiner put on it beside him, and nothing else changed. */
+/** The same month with the second joiner put on it beside him, and nothing else changed. Turn 19
+ *  took the second man's own action away: a job carries a list of everybody on it and the second
+ *  man is simply the second name on it, so this is one Assign to this job (CLAUDE.md T19 2.5). */
 const WITH_SECOND = act(OPENING.state, {
-  type: 'ASSIGN_SECOND',
+  type: 'ADD_TO_JOB',
   jobId: OPENING.jobId,
   workerId: OPENING.men[1] ?? '',
 });
@@ -96,10 +98,10 @@ function contractOf(state: GameState): Contract | undefined {
 describe('(y) two men on one job, on Very easy', () => {
   it('stands the second man at it with no job of his own, and the control leaves it one man’s', () => {
     const job = watched(MIDMONTH);
-    expect(job.secondAssignee).toBe(OPENING.men[1]);
+    expect(job.assignees[1]).toBe(OPENING.men[1]);
     expect(job.stage).toBe('inProduction');
-    expect(MIDMONTH.jobs.filter((entry) => entry.assignedTo === OPENING.men[1])).toHaveLength(0);
-    expect(watched(ALONE).secondAssignee).toBe(null);
+    expect(MIDMONTH.jobs.filter((entry) => entry.assignees[0] === OPENING.men[1])).toHaveLength(0);
+    expect(watched(ALONE).assignees[1] ?? null).toBe(null);
   });
 
   it('finishes the piece in about half the days, the machine stage apart', () => {

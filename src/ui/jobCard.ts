@@ -5,14 +5,19 @@
 // everywhere in the game (CLAUDE.md T3 3.1, T4 3.1).
 
 import {
+  BUILDING_ROLES,
   callsScheduled,
   callsTaken,
+  canBuild,
   formatCalendarDay,
   has,
+  helpers,
+  isOnJob,
   jobLabourCost,
+  jobMen,
   jobProgress,
   jobsAtGate,
-  joiners,
+  leadAssignee,
   lifecycleSteps,
   onTheBooksToday,
   orderForJobCheck,
@@ -23,6 +28,9 @@ import {
   transportLabel,
   workerById,
 } from '../engine/index';
+// Straight off its own module, not round the public API, which Turn 13 froze (REPORT-T13 10).
+import { OWNER } from '../engine/machines';
+import { ROLE_WORDS } from './team';
 import { DROP_PROJECT_REPUTATION } from '../engine/constants';
 import type { GameState, Job } from '../engine/index';
 import {
@@ -69,23 +77,105 @@ export function callsLine(job: Job): string {
 /** The informational labour cost of a job in progress comes from the engine (CLAUDE.md 8.5). */
 export function jobLabourLine(state: GameState, job: Job): string {
   const { minutes: left, cost } = jobLabourCost(state, job);
-  const worker = job.assignedTo === null ? null : workerById(state, job.assignedTo);
+  const lead = leadAssignee(job);
+  const worker = lead === null ? null : workerById(state, lead);
   if (!worker) return `${minutes(left)} of your own time left`;
   return `${minutes(left)} of ${escapeHtml(worker.name)}, about ${money(cost)} of wages`;
 }
 
-/** Automatic assignment can always be overridden from the job card (CLAUDE.md 9.4). */
-export function jobAssignControls(state: GameState, job: Job): string {
+/** What this man is called on the job's chips and in its list. The owner is You. */
+function assigneeName(state: GameState, who: string): string {
+  if (who === OWNER) return 'You';
+  return workerById(state, who)?.name ?? who;
+}
+
+/** The trade under a name in the list: "normal joiner", "poor sprayer", "owner". The tier is his
+ *  standing and the role is his trade, so a sprayer is plainly not a joiner (CLAUDE.md T19 2.6).
+ *  The mockup's own words for the tiers were "ok" and "good"; the game has said poor, normal and
+ *  super since Turn 6 and Our team still does, so one vocabulary is kept and not two. */
+function assigneeTrade(state: GameState, who: string): string {
+  if (who === OWNER) return 'owner';
+  const worker = workerById(state, who);
+  if (!worker) return '';
+  const trade = ROLE_WORDS[worker.role];
+  return worker.tier === null ? trade : `${worker.tier} ${trade}`;
+}
+
+/** One row of the Assign list: his name, his trade, and either the one click that puts him on or
+ *  the reason he cannot be put on, greyed (PIOTR, 17.09; the mockup of docs/mockups/t19). */
+function assignRow(state: GameState, job: Job, who: string, why: string): string {
+  const head =
+    `<span>${escapeHtml(assigneeName(state, who))} ` +
+    `<span class="assign-tier">${escapeHtml(assigneeTrade(state, who))}</span></span>`;
+  if (why !== '') {
+    return `<div class="assign-row is-busy">${head}` +
+      `<span class="assign-why">${escapeHtml(why)}</span></div>`;
+  }
+  return (
+    '<div class="assign-row">' + head +
+    `<button class="chip" data-do="assignAdd" data-id="${job.id}" data-worker="${who}">add</button>` +
+    '</div>'
+  );
+}
+
+/** Who the list offers, in the order it draws them: the owner, then the men who build, then the
+ *  helpers, who are on it only to be told they do not build (CLAUDE.md T19 2.5). */
+function assignCandidates(state: GameState): string[] {
+  const crew = state.workers.filter(
+    (worker) => onTheBooksToday(state, worker) && BUILDING_ROLES.includes(worker.role),
+  );
+  const labourers = helpers(state).filter((worker) => onTheBooksToday(state, worker));
+  return [OWNER, ...crew.map((worker) => worker.id), ...labourers.map((worker) => worker.id)];
+}
+
+/** The people on the job, as chips with a cross apiece, and the one blue button that opens the
+ *  list of everybody who could join them. There is no limit on how many go on a job: if the
+ *  player wants twenty, he gets twenty and the time shortens (PIOTR, 17.09; CLAUDE.md T19 2.5).
+ *  The Turn 17 row of "You | Gary" chips and its Second man line are gone: a chip now says who is
+ *  on it and nothing else does. */
+export function jobAssignControls(state: GameState, job: Job, open = false): string {
   if (job.stage !== 'ready' && job.stage !== 'inProduction') return '';
-  const chip = (workerId: string, label: string): string =>
-    `<button class="chip${job.assignedTo === workerId ? ' is-on' : ''}" data-do="assignJob" ` +
-    `data-id="${job.id}" data-worker="${workerId}">${escapeHtml(label)}</button>`;
-  const crew = joiners(state)
-    // A night man can be given a job by day: the chips offer everybody on the books today.
-    .filter((worker) => onTheBooksToday(state, worker))
-    .map((worker) => chip(worker.id, worker.name))
+  const chips = jobMen(job)
+    .map(
+      (who) =>
+        `<span class="assign-chip">${escapeHtml(assigneeName(state, who))}` +
+        `<button class="assign-off" data-do="assignOff" data-id="${job.id}" data-worker="${who}" ` +
+        `title="${escapeHtml(`Take ${assigneeName(state, who)} off this job`)}">×</button>` +
+        '</span>',
+    )
     .join('');
-  return `<span class="row-action">${chip('owner', 'You')}${crew}</span>`;
+  const nobody = chips === '' ? '<span class="assign-none">Nobody is on it</span>' : '';
+  const opener = open
+    ? `<button class="btn btn-primary assign-open" data-do="closeAssign" data-id="${job.id}">` +
+      'Assign to this job</button>'
+    : `<button class="btn btn-primary assign-open" data-do="openAssign" data-id="${job.id}">` +
+      'Assign to this job</button>';
+  return (
+    `<span class="row-action assign-line">${nobody}${chips}${opener}</span>` +
+    (open ? assignList(state, job) : '')
+  );
+}
+
+/** The list the blue button opens: everybody who could stand at this job, with the ones who
+ *  cannot greyed and told why (PIOTR, 17.09; CLAUDE.md T19 2.5, 2.6). */
+function assignList(state: GameState, job: Job): string {
+  const rows = assignCandidates(state)
+    .map((who) => {
+      if (isOnJob(job, who)) return assignRow(state, job, who, 'already on this job');
+      const worker = who === OWNER ? null : workerById(state, who);
+      if (worker && !BUILDING_ROLES.includes(worker.role)) {
+        return assignRow(state, job, who, 'helpers do not build');
+      }
+      const other = state.jobs.find((entry) => entry.id !== job.id && isOnJob(entry, who));
+      if (other) return assignRow(state, job, who, `on ${other.name}`);
+      if (!canBuild(state, who)) return assignRow(state, job, who, 'not in the hall today');
+      return assignRow(state, job, who, '');
+    })
+    .join('');
+  return (
+    '<div class="assign-list">' +
+    `<span class="row-figure">Who goes on ${escapeHtml(job.name)}?</span>${rows}</div>`
+  );
 }
 
 /** The job's material line: green when its sheets are held from stock, red with the count when

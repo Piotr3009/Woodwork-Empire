@@ -79,11 +79,16 @@ describe('the board itself', () => {
     const names = Array.from(workshop.querySelectorAll('[data-candidate]')).map((tile) =>
       tile.getAttribute('data-candidate'),
     );
+    // The sprayer stands on the workshop tab beside the joiners and the helper: he is a floor
+    // man and he is hired with three tiers like them (CLAUDE.md T19 2.6).
     expect(names).toEqual([
       'joiner.poor',
       'joiner.normal',
       'joiner.super',
       'helper.',
+      'sprayer.poor',
+      'sprayer.normal',
+      'sprayer.super',
     ]);
     const office = parse(renderTeam(known(), 'office'));
     expect(

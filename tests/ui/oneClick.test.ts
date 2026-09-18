@@ -56,7 +56,7 @@ function offTheBench(): void {
   const job = state.jobs[0];
   if (job === undefined) throw new Error('no job');
   job.stage = 'ready';
-  job.assignedTo = null;
+  job.assignees = [];
   job.labourRemaining = job.labourValue;
   state.owner.currentTaskId = null;
   render();
@@ -87,7 +87,7 @@ function landAll(minutesPerFrame: number): number {
     advanceMinutes(minutesPerFrame);
     // The very node he pressed, a frame later.
     press(button);
-    if (game().jobs[0]?.assignedTo === 'owner') landed += 1;
+    if (game().jobs[0]?.assignees[0] === 'owner') landed += 1;
   }
   return landed;
 }

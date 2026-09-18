@@ -265,8 +265,6 @@
   }
 }
 
-/* A figure slides between its stations instead of jumping (CLAUDE.md T2 3.3). How long is left of
-   the slide is app.ts's to say: the view is rebuilt part way through it. */
 .view-note {
   margin: 4px 0 0;
   color: var(--text-dim);
@@ -1698,6 +1696,8 @@ input.num {
 }
 
 .plan-head {
+  /* The Assign to this job list sits over the row, not in the flow of it (T19 2.5). */
+  position: relative;
   align-items: center;
   display: flex;
   flex: 0 0 42%;
@@ -3936,4 +3936,162 @@ input.num {
   border-radius: 12px;
   box-shadow: none;
   color: var(--screen-ink);
+}
+/* ---------------------------------------------------------------------------
+   Turn 19. Phase A puts the class names in with nothing in them, so the three
+   phase B groups can write their markup against names that already exist and
+   the one stylesheet is never two agents' at once (CLAUDE.md T13 2.1, T19 3).
+   Phase B fills these; a rule left empty at the end of the turn is a class
+   nobody needed.
+   --------------------------------------------------------------------------- */
+
+/* 2.5 The people on a job: chips with a cross, one blue button, and the list it opens.
+   The colours read off the skin the row is drawn in: the Work Plan wears the board skin, whose
+   cards are paper, and the dark panel palette is the fallback for anywhere else. Drawn in the
+   panel's own colours they were dark pills on a cream card, which is not what the mockup shows
+   (found in the picture for T19-C4). */
+.assign-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.assign-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 6px 3px 10px;
+  border: 1px solid var(--card-line, var(--border));
+  border-radius: 14px;
+  background: var(--card-2, var(--panel-2));
+  color: var(--card-ink, inherit);
+  font-size: var(--fs-small);
+  /* The name and its cross sit side by side and neither shrinks onto the other. */
+  white-space: nowrap;
+}
+
+.assign-chip .assign-off {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 1px solid var(--card-line, var(--border));
+  border-radius: 50%;
+  background: var(--card, #fff);
+  color: var(--card-ink-2, var(--text-dim));
+  font-size: var(--fs-tiny);
+  line-height: 16px;
+  cursor: pointer;
+}
+
+.assign-chip .assign-off:hover {
+  background: var(--bad);
+  border-color: var(--bad);
+  color: #fff;
+}
+
+.assign-open {
+  white-space: nowrap;
+}
+
+.assign-list {
+  position: absolute;
+  z-index: 2;
+  left: 12px;
+  right: 12px;
+  margin-top: 6px;
+  padding: 8px;
+  border: 1px solid var(--card-line, var(--border));
+  border-radius: 8px;
+  background: var(--card, var(--panel-2));
+  color: var(--card-ink, inherit);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 35%);
+}
+
+.assign-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 4px 6px;
+  border-radius: 6px;
+}
+
+.assign-row:not(.is-busy):hover {
+  background: var(--card-2, var(--panel));
+}
+
+.assign-row.is-busy {
+  color: var(--card-ink-2, var(--text-dim));
+}
+
+.assign-row .assign-tier {
+  color: var(--card-ink-2, var(--text-dim));
+  font-size: var(--fs-tiny);
+}
+
+.assign-row .assign-why {
+  color: var(--card-ink-2, var(--text-dim));
+  font-size: var(--fs-tiny);
+  white-space: nowrap;
+}
+
+.assign-none {
+  color: var(--bad);
+}
+
+/* 2.9 The reputation column's headline: the total, with the week's net beside it. */
+.reputation-total .ledger-total-label {
+  max-width: 55%;
+}
+
+.reputation-week {
+  color: var(--sheet-dim);
+  font-style: italic;
+}
+
+/* 2.10 The sound controls in Settings. The volume's figure sits between two chips and must not
+   jump about as it counts. */
+.sound-row .row-action,
+.sound-volume .row-action {
+  gap: 6px;
+}
+
+.sound-volume .row-figure {
+  font-variant-numeric: tabular-nums;
+  min-width: 46px;
+  text-align: center;
+}
+
+/* 2.12 The laptop's second button while a task is running: set apart from the reason beside it. */
+.task-queue-next {
+  margin-left: 4px;
+}
+
+/* 2.3 The doors open. All three leaves are in the markup and exactly one of them is shown, so a
+   swing is one attribute on the door and never a piece of the page built again (T9 3.8). */
+.door-opening {
+  fill: #14110d;
+  opacity: 0.85;
+}
+
+.door-leaf {
+  display: none;
+  fill: #6b4f33;
+  stroke: #2a2118;
+  stroke-width: 1;
+}
+
+[data-door-state='closed'] .door-leaf[data-state='closed'],
+[data-door-state='half'] .door-leaf[data-state='half'],
+[data-door-state='open'] .door-leaf[data-state='open'] {
+  display: block;
+}
+
+/* 2.2 The owner is at his desk when the player follows him in. The live slot is the last child of
+   the stack, so without pointer-events none the figure eats every click in the office. */
+.office-figure {
+  position: absolute;
+  pointer-events: none;
 }

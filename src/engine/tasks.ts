@@ -23,6 +23,8 @@ import {
   CLIENT_CALL_ANSWER_MINUTES,
   EQUIPMENT_UNLOAD_MINUTES,
   DAILY_ORDERING_MINUTES,
+  DESIGN_MIN_MINUTES,
+  DESIGN_MINUTES_PER_1000,
   MOVE_MINUTES_PER_ITEM,
   EMAIL_ABOVE_BREAKS,
   EMAIL_ABOVE_PRICE,
@@ -59,7 +61,6 @@ import { websiteUpkeepMinutes } from './website';
 import type {
   DayCategory,
   GameState,
-  ProductTemplate,
   Worker,
   SoftwareTier,
   TaskCategory,
@@ -182,6 +183,22 @@ export function isHelperTask(state: GameState, task: TaskInstance): boolean {
   return HELPER_ONLY_KINDS.includes(task.kind) && helperOnDuty(state);
 }
 
+/** The man who is sweeping the hall this minute, or null. The one selector: the chip under the
+ *  hall says his name and draws no button while he has it, because the labourer cleans without
+ *  being asked and the player is not put the question (PIOTR, 17.09; CLAUDE.md T19 2.7). Null for
+ *  the owner sweeping it himself off Clean up, which is his own override and keeps its button.
+ *
+ *  There is no flag for "once per dirtying" and none is wanted: an open cleaning task IS the
+ *  flag, because the hall raises one and only one while the dust is up, and finishing it puts the
+ *  dust back to nought so the band is clean again until the hall dirties afresh. */
+export function cleanerAtWork(state: GameState): Worker | null {
+  const task = state.tasks.find((entry) => entry.kind === 'cleaning' && !entry.done);
+  if (!task || task.doneBy === null) return null;
+  const worker = state.workers.find((entry) => entry.id === task.doneBy);
+  if (!worker || worker.taskId !== task.id) return null;
+  return worker;
+}
+
 /** What the hall says while the van or the bag is waiting for the man whose job it is. */
 export const WAITING_FOR_HELPER = 'Waiting for the helper';
 
@@ -208,13 +225,15 @@ export function softwareActive(state: GameState): boolean {
   return state.software.mode === 'oneOff' && state.software.jobsRemaining > 0;
 }
 
-/** Template minutes scale with the size, and the software tier divides them. */
-export function designMinutes(
-  template: ProductTemplate,
-  sizeMultiplier: number,
-  tier: SoftwareTier,
-): number {
-  return Math.round(template.designMinutes * sizeMultiplier * SOFTWARE_DESIGN_FACTOR[tier]);
+/** How long a drawing takes: off the value of the job and nothing else, with a floor under it,
+ *  and the software tier still dividing it (PIOTR, 17.09: "drawings take far too long";
+ *  CLAUDE.md T19 2.11). A GBP 2,500 job is an hour, GBP 10,000 is four, GBP 20,000 is eight; the
+ *  smallest job there is takes the half hour the floor sets. The per product figure and the size
+ *  multiplier are gone: a job's price already carries its size, and two figures for one thing is
+ *  what made a set of shelves cost a day at the desk. */
+export function designMinutes(basePrice: number, tier: SoftwareTier): number {
+  const raw = Math.max(DESIGN_MIN_MINUTES, (DESIGN_MINUTES_PER_1000 * basePrice) / 1000);
+  return Math.round(raw * SOFTWARE_DESIGN_FACTOR[tier]);
 }
 
 /** The best handling kit in the hall: the key of the one table the unloading minutes are read
@@ -616,6 +635,7 @@ export function startTaskCheck(
   state: GameState,
   taskId: string,
   force = false,
+  ignoreBusy = false,
 ): TaskStartCheck {
   const task = findTask(state, taskId);
   if (!task) return refused('That job of work has gone');
@@ -625,7 +645,7 @@ export function startTaskCheck(
   if (!force && isHelperTask(state, task)) return refused(WAITING_FOR_HELPER);
   // One thing at a time: the current task has to be finished or paused first (CLAUDE.md 10.1).
   const current = state.owner.currentTaskId;
-  if (current !== null && current !== task.id) {
+  if (!ignoreBusy && current !== null && current !== task.id) {
     const held = findTask(state, current);
     return refused(`Busy with ${held ? held.label : 'something else'}`, current);
   }
@@ -807,6 +827,31 @@ export function queueTasks(state: GameState, taskIds: readonly string[]): boolea
   });
   if (wanted.length === 0) return false;
   state.taskQueue = wanted.filter((id, at) => wanted.indexOf(id) === at);
+  startNextQueued(state);
+  return true;
+}
+
+/** True while this job of work would start if only his hands were free: every refusal but the
+ *  busy one. What "Add as next" is allowed to offer, and what the queue is allowed to take
+ *  (CLAUDE.md T19 2.12). */
+export function canQueueTask(state: GameState, taskId: string): boolean {
+  return startTaskCheck(state, taskId, false, true).ok;
+}
+
+/** One more task behind the one he is on, instead of putting that one down: the laptop's
+ *  "Add as next" (PIOTR, 17.09; CLAUDE.md T19 2.12). With nothing running it simply starts. A task
+ *  already in the queue is not queued twice; one already running is left alone. */
+export function queueTaskNext(state: GameState, taskId: string): boolean {
+  const task = findTask(state, taskId);
+  if (task === null || task.done) return false;
+  if (state.owner.currentTaskId === taskId) return false;
+  if (state.taskQueue.includes(taskId)) return false;
+  // Only a job of work whose one refusal is that his hands are full. The queue's head is started
+  // without being asked again, so anything refused for a second reason would sit at the front of
+  // it and stop everything behind it for the rest of the day (found by the Turn 19 review; the
+  // busy refusal is tested above the licence, the unloading and the take off, so it hides them).
+  if (!canQueueTask(state, taskId)) return false;
+  state.taskQueue.push(taskId);
   startNextQueued(state);
   return true;
 }

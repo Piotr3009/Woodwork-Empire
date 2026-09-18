@@ -38,6 +38,8 @@ import {
 import { jobsAtGate } from '../engine/jobs';
 import { orderName, reservedItems, shoppingList } from '../engine/orders';
 import {
+  OWNER,
+  BENCH,
   isSold,
   itemFootprint,
   itemStandsInTheHall,
@@ -58,9 +60,13 @@ import {
   facingAt,
   facingAtPallet,
   facingTowards,
+  itemAtCell,
   palletCell,
+  benchCellsAt,
+  queueCellsAt,
   standingCell,
   stationMachine,
+  stationPlaceAt,
   stationSecondAt,
   stationWaitingFor,
 } from '../engine/stations';
@@ -100,6 +106,11 @@ import {
   spriteUrl,
 } from './sprites';
 import { placeholder } from './placeholder';
+import { cncOptions } from '../engine/stages';
+import { jobStage } from '../engine/jobs';
+import { cleanerAtWork } from '../engine/tasks';
+import type { StageId } from '../engine/types';
+import type { LoopName as HallLoopName, OneShotName as HallOneShotName } from '../ui/sound';
 
 // ---------------------------------------------------------------------------
 // SVG primitives. office.ts uses these too: one place builds the strings.
@@ -278,20 +289,92 @@ export function officeDoor(room: {
   width: number;
   depth: number;
 }): string {
+  return roomDoor(room, 'office', false);
+}
+
+/** The three states a door is drawn in (CLAUDE.md T19 2.3). Every one of them is in the markup and
+ *  the stylesheet shows one, so the swing costs the render nothing and is one attribute. */
+export type DoorPhase = 'closed' | 'half' | 'open';
+export const DOOR_PHASES: readonly DoorPhase[] = ['closed', 'half', 'open'];
+
+/** The dark hole in the face, behind the leaf: the door opening itself. */
+export function doorOpening(room: { x: number; y: number; width: number; depth: number }): Polygon {
   const door = roomDoorBox(room);
   const face = room.y + room.depth;
   const from = room.x + door.from;
   const to = from + door.across;
-  const shape: Polygon = [
+  return [
     tileToScreen(from, face, door.bottom),
     tileToScreen(to, face, door.bottom),
     tileToScreen(to, face, door.top),
     tileToScreen(from, face, door.top),
   ];
+}
+
+/** The leaf, swung on its hinge in the hall's own dimetric (CLAUDE.md T19 2.3). The hinge is the
+ *  left jamb and the leaf swings out into the hall, which is the way the room doors open
+ *  (docs/art/SPRITES.md 9.3), so it never sweeps through the man standing in the doorway, who is
+ *  at the middle of the opening. Closed is flat in the face and open is square out of it.
+ *
+ *  Half is NOT the forty five degrees between them, and the reason is the projection. A leaf at
+ *  world forty five degrees runs equally in +x and +y, and this dimetric puts screen x at
+ *  `(x - y) * 24`, so that one angle projects to exactly no width at all: the door vanished to a
+ *  sliver and the middle of the swing read as nothing. Found by looking at the picture of the
+ *  three states for T19-C4, which is what that task is for. `DOOR_HALF_ANGLE` is 60 degrees
+ *  [TUNE]: past the degenerate angle, so the leaf has width again and reads as a door caught on
+ *  its way open. */
+const DOOR_HALF_ANGLE = (Math.PI / 180) * 60;
+export function doorLeaf(
+  room: { x: number; y: number; width: number; depth: number },
+  phase: DoorPhase,
+): Polygon {
+  const door = roomDoorBox(room);
+  const face = room.y + room.depth;
+  const hinge = { x: room.x + door.from, y: face };
+  const angle = phase === 'closed' ? 0 : phase === 'half' ? DOOR_HALF_ANGLE : Math.PI / 2;
+  const free = {
+    x: hinge.x + door.across * Math.cos(angle),
+    y: hinge.y + door.across * Math.sin(angle),
+  };
+  return [
+    tileToScreen(hinge.x, hinge.y, door.bottom),
+    tileToScreen(free.x, free.y, door.bottom),
+    tileToScreen(free.x, free.y, door.top),
+    tileToScreen(hinge.x, hinge.y, door.top),
+  ];
+}
+
+/** A room's door: the dark opening, the three leaves, and, for the office, the control that walks
+ *  into it. `open` is what the hall reads off the state this minute, which the driver in
+ *  src/render/doors.ts then swings to over DOOR_SWING_MS; a page with no driver on it still draws
+ *  the door the way the hall is (CLAUDE.md T19 2.3).
+ *
+ *  Only the office carries `data-door`, because only the office door is a control: the canteen
+ *  door is a door and the block behind it is still the way to the canteen's own note, and giving
+ *  it the control's hook would have taken that click away from it. */
+export function roomDoor(
+  room: { x: number; y: number; width: number; depth: number },
+  id: string,
+  open: boolean,
+): string {
+  const state = open ? 'open' : 'closed';
+  const leaves = DOOR_PHASES.map(
+    (phase) => `<polygon class="door-leaf" data-state="${phase}" points="${points(doorLeaf(room, phase))}" />`,
+  ).join('');
+  const opening = points(doorOpening(room));
+  if (id !== 'office') {
+    return (
+      `<g data-door-room="${id}" data-door-want="${state}" data-door-state="${state}" ` +
+      `class="${id}-door">` +
+      `<polygon points="${opening}" class="door-opening" />${leaves}</g>`
+    );
+  }
   return (
-    '<g data-door="office" class="clickable office-door">' +
+    `<g data-door="office" data-door-room="office" data-door-want="${state}" ` +
+    `data-door-state="${state}" class="clickable office-door">` +
     '<title>To the office</title>' +
-    `<polygon points="${points(shape)}" class="door-hit" />` +
+    `<polygon points="${opening}" class="door-opening" />${leaves}` +
+    `<polygon points="${opening}" class="door-hit" />` +
     '</g>'
   );
 }
@@ -862,6 +945,21 @@ export function stationCell(
   station: string,
   bench: { x: number; y: number },
 ): Standing {
+  // The third man and beyond, at a place of his own along the same side of the same item: the
+  // engine counts the places and the renderer knows where they are, so twenty men on one job do
+  // not stand on one tile (PIOTR, 17.09; CLAUDE.md T19 2.5).
+  const placeAt = stationPlaceAt(station);
+  if (placeAt !== null) {
+    const item = state.equipment.find((entry) => entry.id === placeAt.id && !isSold(entry));
+    if (item) {
+      const cells =
+        item.specId === BENCH
+          ? benchCellsAt(state, item, placeAt.place + 1)
+          : queueCellsAt(state, item, placeAt.place + 1);
+      const cell = cells[placeAt.place] ?? standingCell(state, item, 'operator');
+      return { ...cell, facing: facingAt(cell, item) };
+    }
+  }
   // The second man of a job stands at the first man's own bench, in its second place: two men on
   // one bench, one in front of it and one behind it (CLAUDE.md T17 2.10).
   const secondAt = stationSecondAt(station);
@@ -908,7 +1006,52 @@ export function stationCell(
     const cell = roomDoorCell('canteen');
     return { ...cell, facing: facingTowards(cell, { x: cell.x - 1, y: cell.y + 1 }) };
   }
+  // A man at his bench stands AT it and not on it (PIOTR, 17.09; CLAUDE.md T19 2.4). The bench
+  // station names no bench, because every joiner has one, and the cell the engine keeps for him is
+  // his bench's own anchor cell, which is a cell the bench stands on: this fall-through used to put
+  // his feet on the bench top, and the depth order painted him over it. The helper's own cell is
+  // the fan's anchor and was the same bug. Whatever item his cell belongs to, the station table
+  // says where to stand at it; a cell that belongs to nothing is the middle of the floor as before.
+  const under = itemAtCell(state, bench);
+  if (under !== null) {
+    const cell = standingCell(state, under, 'operator');
+    return { ...cell, facing: facingAt(cell, under) };
+  }
   return { ...bench, facing: facingTowards(bench, { x: bench.x, y: bench.y - 1 }) };
+}
+
+/** The cell the owner falls back to when his station is nothing in particular: his bench's own
+ *  standing cell, or the middle of the floor while the workshop has no bench (CLAUDE.md T16 2.1). */
+export function ownerBenchCell(state: GameState): { x: number; y: number } {
+  const bench = state.equipment.find(
+    (item) => item.specId === 'workbench' && !isSold(item) && itemStandsInTheHall(item),
+  );
+  return bench ? standingCell(state, bench, 'operator') : { x: 2, y: 5 };
+}
+
+/** Every cell a man is standing on this minute, the owner and the crew who are in today. A door
+ *  reads it to know whether somebody is in it (CLAUDE.md T19 2.3); it is the same question the
+ *  figure loop asks, through the same `stationCell`, so the two can never disagree. */
+export function standingCellsNow(state: GameState): Array<{ x: number; y: number }> {
+  const cells: Array<{ x: number; y: number }> = [];
+  for (const worker of state.workers) {
+    if (worker.startDay > state.clock.day) continue;
+    const cell = stationCell(state, worker.station, homeCellOf(state, worker));
+    cells.push({ x: cell.x, y: cell.y });
+  }
+  if (ownerIsAvailable(state)) {
+    const cell = stationCell(state, state.owner.station, ownerBenchCell(state));
+    cells.push({ x: cell.x, y: cell.y });
+  }
+  return cells;
+}
+
+/** Whether this room's door has somebody standing in it, which is what opens it and what keeps it
+ *  open (CLAUDE.md T19 2.3). The owner in the office is in its doorway, and a man at the canteen
+ *  for his tea, or idle, or with no bench to work at, is in the canteen's. */
+export function doorIsUsed(state: GameState, room: RoomId): boolean {
+  const door = roomDoorCell(room);
+  return standingCellsNow(state).some((cell) => cell.x === door.x && cell.y === door.y);
 }
 
 /** The line under a figure's name: where he is standing, in words. */
@@ -920,6 +1063,7 @@ function stationLabel(station: string): string {
     return `waiting for ${(findSpec(waiting)?.name ?? waiting).toLowerCase()}`;
   }
   if (stationSecondAt(station) !== null) return 'the bench, second place';
+  if (stationPlaceAt(station) !== null) return 'alongside, on the next place';
   if (station === STATION_RACK) return 'the rack';
   if (station === STATION_GATE) return 'the gate';
   if (station === STATION_OFFICE) return 'the office';
@@ -1280,6 +1424,11 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
 
   const drawables: Drawable[] = [];
 
+  // Which doors have somebody standing in them this minute, read once for the whole scene.
+  const doorsOpen = new Set<RoomId>(
+    (['office', 'canteen'] as RoomId[]).filter((room) => doorIsUsed(state, room)),
+  );
+
   // The three room blocks. Each is a layer of the painting, or a placeholder box while that layer
   // is missing; either way its footprint is what the player clicks on.
   for (const room of ROOM_LAYOUT) {
@@ -1312,11 +1461,19 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
           : contactShadow(room.x, room.y, room.width, room.depth) +
             box(faces, 'var(--room)', 'var(--room-dark)') +
             label(centreOf(room.x, room.y, room.width, room.depth, room.height), room.name)) +
-        '</g>' +
-        // The office door is a control of its own: knock on it and the team is behind it. The
-        // rest of the block is still the way into the office view (PIOTR, CLAUDE.md T10 3.6).
-        (room.id === 'office' ? officeDoor(room) : ''),
+        '</g>',
     });
+    // The door is a drawable of its own, keyed off the cell a man stands in it on, so an open leaf
+    // swinging out into the hall is painted in front of the wall and behind the man in the doorway
+    // (CLAUDE.md T19 2.3). The office one is also the control it has always been: knock on it and
+    // the team is behind it (PIOTR, CLAUDE.md T10 3.6).
+    if (room.id === 'office' || room.id === 'canteen') {
+      const door = roomDoorCell(room.id);
+      drawables.push({
+        depth: depthKey(door.x, door.y) - 0.05,
+        svg: roomDoor(room, room.id, doorsOpen.has(room.id)),
+      });
+    }
   }
 
   // The hall's bag store, read once: the full state is worn by the extractor the bags are on,
@@ -1493,11 +1650,8 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
     );
   }
   if (ownerIsAvailable(state)) {
-    const bench = state.equipment.find(
-      (item) => item.specId === 'workbench' && !isSold(item) && itemStandsInTheHall(item),
-    );
     // At his bench's own standing cell from the station table, or the middle of the floor.
-    const ownerBench = bench ? standingCell(state, bench, 'operator') : { x: 2, y: 5 };
+    const ownerBench = ownerBenchCell(state);
     drawables.push(
       figure(
         'owner',
@@ -1664,6 +1818,8 @@ export interface HallProblem {
   /** The machine it is about, where it is about one. */
   equipmentId: string | null;
   text: string;
+  /** Somebody is already on it, so the chip is a statement and not a question (CLAUDE.md T19 2.7). */
+  inHand?: boolean;
 }
 
 function lowerName(specId: string): string {
@@ -1733,11 +1889,23 @@ export function hallProblems(state: GameState): HallProblem[] {
   // 9.7: from the dirty band on, the player is warned that somebody can get hurt.
   const band = dustBand(state.dust);
   if (band.label !== 'clean') {
-    const risk =
-      band.label === 'dirty' || band.label === 'dangerous'
-        ? ', somebody will get hurt in this'
-        : '';
-    list.push({ kind: 'dirty', equipmentId: null, text: `The hall is ${band.label}${risk}` });
+    // With a helper on the books the hall makes the job of work itself and he takes it, so the
+    // chip says who is on it and asks the player nothing (PIOTR, 17.09; CLAUDE.md T19 2.7).
+    const cleaner = cleanerAtWork(state);
+    if (cleaner !== null) {
+      list.push({
+        kind: 'dirty',
+        equipmentId: null,
+        text: `The hall is ${band.label}, ${cleaner.name} is cleaning it`,
+        inHand: true,
+      });
+    } else {
+      const risk =
+        band.label === 'dirty' || band.label === 'dangerous'
+          ? ', somebody will get hurt in this'
+          : '';
+      list.push({ kind: 'dirty', equipmentId: null, text: `The hall is ${band.label}${risk}` });
+    }
   }
   for (const item of machinesDueService(state)) {
     if (item.broken) continue;
@@ -1760,4 +1928,105 @@ function lineAttrs(x1: number, y1: number, x2: number, y2: number): string {
   const from = centreOf(x1, y1, 0, 0);
   const to = centreOf(x2, y2, 0, 0);
   return `x1="${Math.round(from.x)}" y1="${Math.round(from.y)}" x2="${Math.round(to.x)}" y2="${Math.round(to.y)}"`;
+}
+
+// ---------------------------------------------------------------------------
+// What the hall sounds like this moment (CLAUDE.md T19 2.10)
+// ---------------------------------------------------------------------------
+//
+// The engine of the sound is in src/ui/sound.ts; what is here is the hall's own reading of itself,
+// so the sound follows what the player can see and never a second copy of the state. The names are
+// the sound table's names; the types come across as types only, so nothing in render depends on
+// anything in ui at run time.
+//
+// A naming note for the report: the brief's "fitting" is not a stage in this code. The stages are
+// cutting, machining, cnc, assembly, finishing and delivery (src/engine/types.ts, StageId), and
+// the fitting of a carcass happens inside assembly. The hammer and the drill are therefore both
+// hooked to assembly, at their own cadences, and the code's names are used.
+
+/** Every machine of this family somebody is standing at this minute. */
+function familyInUse(state: GameState, specId: string): boolean {
+  return state.equipment.some(
+    (item) =>
+      item.specId === specId &&
+      !isSold(item) &&
+      itemStandsInTheHall(item) &&
+      machineInUse(state, item),
+  );
+}
+
+/** Whether this man is in the hall to be heard: the owner while he is at work, and a worker who
+ *  has started and is not away. A job can carry a man who is off sick, and a sick man makes no
+ *  noise (CLAUDE.md T19 2.10). */
+function manIsAtWork(state: GameState, who: string): boolean {
+  if (who === OWNER) return ownerIsAvailable(state);
+  const worker = state.workers.find((entry) => entry.id === who);
+  if (worker === undefined) return false;
+  return worker.startDay <= state.clock.day && worker.absentDaysRemaining <= 0;
+}
+
+/** The stage every job in production is at this minute, as a list of stage ids with the job's
+ *  finish beside each, which is what the bench sounds are chosen from. A job with nobody on it,
+ *  and a job whose men are all off, is silent. */
+function benchStagesNow(state: GameState): Array<{ stage: StageId; finish: string }> {
+  const found: Array<{ stage: StageId; finish: string }> = [];
+  for (const job of state.jobs) {
+    if (job.stage !== 'inProduction') continue;
+    const who = job.assignees.find((man) => manIsAtWork(state, man)) ?? null;
+    if (who === null) continue;
+    const plan = jobStage(state, job, cncOptions(state, who, job));
+    if (plan === null) continue;
+    found.push({ stage: plan.id, finish: job.finish });
+  }
+  return found;
+}
+
+/** The loops the hall is running this moment: the saw while somebody is at it, the extraction
+ *  while it pulls, the sander while a bench is finishing something that is not lacquered, and the
+ *  booth while somebody sprays (CLAUDE.md T19 2.10). */
+export function hallLoops(state: GameState): Set<HallLoopName> {
+  const on = new Set<HallLoopName>();
+  // Somebody is at the saw when the saw is taken: `takenBy` is how the hall already knows to spin
+  // its blade and throw chips off it (machineFx above reads the same thing).
+  if (familyInUse(state, 'tableSaw')) on.add('tableSaw');
+  // The extraction pulls while a machine on it is running, which is what makes its own fan breathe
+  // on the hall: the same predicate, on the extraction item itself, so what is heard and what is
+  // seen can never disagree. A broken or sold unit, and one still on the lorry, is silent.
+  const pulling = state.equipment.some(
+    (item) =>
+      !isSold(item) &&
+      itemStandsInTheHall(item) &&
+      findSpec(item.specId)?.category === 'extraction' &&
+      machineInUse(state, item),
+  );
+  if (pulling) on.add('extractor');
+  // The booth hisses while somebody is standing at one, and not merely while a lacquered job is at
+  // its finishing stage: a workshop with no booth cannot spray, and it must not be heard to.
+  if (familyInUse(state, 'sprayBooth')) on.add('sprayBooth');
+  // The sander is hands and paper at a bench, which no machine is taken for: it is the stage that
+  // says so. Lacquer is the booth's above and never the sander's.
+  for (const at of benchStagesNow(state)) {
+    if (at.stage === 'finishing' && at.finish !== 'lacquer') on.add('sander');
+  }
+  return on;
+}
+
+/** The one shot sounds the hall wants this moment: knocks and screws off the benches that are
+ *  assembling. The engine thins them to at most one a second per sound, so this may say "yes"
+ *  every frame and the hall still does not rattle (CLAUDE.md T19 2.10).
+ *
+ *  A naming note the report carries too: the brief hangs the drill on "fitting", and there is no
+ *  fitting stage in this code. `StageId` is cutting, machining, cnc, assembly, finishing and
+ *  delivery, and the fitting of a carcass, the hinges and the runners, happens inside assembly.
+ *  The hammer and the drill are therefore both hooked to assembly, which is the stage a man is at
+ *  a bench with a carcass in front of him. */
+export function hallOneShots(state: GameState): Set<HallOneShotName> {
+  const on = new Set<HallOneShotName>();
+  for (const at of benchStagesNow(state)) {
+    if (at.stage === 'assembly') {
+      on.add('hammer');
+      on.add('drill');
+    }
+  }
+  return on;
 }

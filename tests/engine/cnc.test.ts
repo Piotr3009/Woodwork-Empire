@@ -128,11 +128,11 @@ describe('one man per CNC', () => {
     const worked = tick(state, 60);
     const joiner = worked.workers[0];
     expect(joiner?.station).toBe(waitingStation('cnc'));
-    const waiting = worked.jobs.find((job) => job.assignedTo === joiner?.id);
+    const waiting = worked.jobs.find((job) => job.assignees[0] === joiner?.id);
     expect(waiting?.blockedBy).toBe('waiting for cnc');
     expect(waiting?.labourRemaining).toBe(waiting?.labourValue);
     // And the man who has it is at it.
-    const owner = worked.jobs.find((job) => job.assignedTo === OWNER);
+    const owner = worked.jobs.find((job) => job.assignees[0] === OWNER);
     expect(owner?.labourRemaining).toBeLessThan(owner?.labourValue ?? 0);
   });
 

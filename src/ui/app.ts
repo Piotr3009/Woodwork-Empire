@@ -86,6 +86,9 @@ import {
 } from './modal';
 import { playCharacters } from '../render/characters';
 import { resetWalkers, stepWalkers, syncWalkers } from '../render/walkers';
+import { resetDoors, stepDoors, syncDoors } from '../render/doors';
+import { applySoundSettings, play as soundPlay, setLoops, stopAllSounds, unlockSound } from './sound';
+import { hallLoops, hallOneShots } from '../render/hall';
 import { walkPath } from '../engine/walk';
 import { unconnectedMachines } from '../engine/pipes';
 import { hasCentralExtraction } from '../engine/machines';
@@ -186,6 +189,9 @@ interface Ui {
   /** The job whose Drop project has been pressed once. The same rule: it is meant on the second
    *  click, inside the card (CLAUDE.md T9 3.9). */
   dropConfirm: string | null;
+  /** The job whose Assign to this job list is open, or null. One list is open at a time, and a
+   *  click on the button that opened it shuts it again (CLAUDE.md T19 2.5). */
+  assignOpen: string | null;
   /** Which tab of the books is on top, and the past day whose summary is open over them
    *  (CLAUDE.md T6 3.9). */
   accountingTab: AccountingTab;
@@ -317,6 +323,7 @@ function freshUi(): Ui {
     machineCard: null,
     tickedTasks: [],
     dropConfirm: null,
+    assignOpen: null,
     accountingTab: 'days',
     accountingMonth: null,
     openDays: [],
@@ -438,7 +445,7 @@ function modalBody(id: ModalId, current: GameState): string {
         tickedTasks: ui.tickedTasks,
       });
     case 'workPlan':
-      return renderWorkPlan(current, ui.dropConfirm);
+      return renderWorkPlan(current, ui.dropConfirm, ui.assignOpen);
     case 'machineCard':
       return renderMachineCard(current, ui.machineCard, ui.sellConfirm);
     case 'accounting': {
@@ -544,6 +551,8 @@ function hallChip(text: string, action = ''): string {
 /** The button that puts a chip's problem right: the same actions the machine's own card calls, so
  *  there is one way to clean the hall, empty the bags, fix a machine and service one. */
 function chipAction(problem: HallProblem): string {
+  // Somebody is already on it: the chip tells him so and asks him nothing (CLAUDE.md T19 2.7).
+  if (problem.inHand === true) return '';
   if (problem.kind === 'dirty') {
     return `<button class="btn" data-do="startCleaning">Clean up · ${minutes(CLEANING_MINUTES)}</button>`;
   }
@@ -1000,6 +1009,9 @@ export function render(): void {
   // The stylesheet is the authority on how much room the office has (docs/art/SPRITES.md 8.1).
   fitOfficeStack(parts.page);
   syncFigures(nowMs());
+  // And the doors, which the fresh markup has just written back to the state the hall computed
+  // for this frame: the swing is the renderer's, like the walk (CLAUDE.md T19 2.3).
+  syncDoors(parts.page, nowMs());
   restoreFocus(memory);
 }
 
@@ -1162,6 +1174,7 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
       ui.screen = 'game';
       accumulator = 0;
       resetWalkers();
+      resetDoors();
       startedStore();
       noteOrders();
       break;
@@ -1180,6 +1193,7 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
       ui.startOverAsked = false;
       accumulator = 0;
       resetWalkers();
+      resetDoors();
       startedStore();
       noteOrders();
       autosaveLocal();
@@ -1352,6 +1366,14 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
     case 'setTips':
       dispatch({ type: 'SET_TIPS', on: element.dataset.on === '1' });
       return;
+    case 'setSound':
+      // The mute, off the same two chips the tips row uses (CLAUDE.md T19 2.10).
+      dispatch({ type: 'SET_SOUND', muted: element.dataset.muted === '1' });
+      return;
+    case 'setVolume':
+      // Quieter and Louder each carry where they would put the master (CLAUDE.md T19 2.10).
+      dispatch({ type: 'SET_SOUND', volume: Number(element.dataset.volume) });
+      return;
     case 'dismissTip':
       dispatch({ type: 'DISMISS_TIP', key: id });
       return;
@@ -1510,6 +1532,10 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
         ui.tickedTasks = [];
       }
       return;
+    case 'queueTaskNext':
+      // Behind the one he is on, without putting that one down (CLAUDE.md T19 2.12).
+      dispatch({ type: 'QUEUE_TASK_NEXT', taskId: id });
+      return;
     case 'pauseTask':
       dispatch({ type: 'PAUSE_TASK' });
       return;
@@ -1563,12 +1589,21 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
     case 'assignJob':
       dispatch({ type: 'ASSIGN_JOB', jobId: id, workerId: element.dataset.worker ?? 'owner' });
       return;
-    // The second man on a job: both stand at it, each at his own rate (CLAUDE.md T17 2.10).
-    case 'assignSecond': {
-      const second = element.dataset.worker ?? '';
-      dispatch({ type: 'ASSIGN_SECOND', jobId: id, workerId: second === '' ? null : second });
+    // The men on a job, and no limit on how many of them (PIOTR, 17.09; CLAUDE.md T19 2.5). Every
+    // one of these is a single click: the button that opened the list shuts it again.
+    case 'openAssign':
+      ui.assignOpen = ui.assignOpen === id ? null : id;
+      break;
+    case 'closeAssign':
+      ui.assignOpen = null;
+      break;
+    case 'assignAdd':
+      ui.assignOpen = null;
+      dispatch({ type: 'ADD_TO_JOB', jobId: id, workerId: element.dataset.worker ?? 'owner' });
       return;
-    }
+    case 'assignOff':
+      dispatch({ type: 'REMOVE_FROM_JOB', jobId: id, workerId: element.dataset.worker ?? '' });
+      return;
     // The evening is the owner's: he takes a man's job on himself and the man has it back in the
     // morning (CLAUDE.md T17 2.12).
     case 'takeOverJob':
@@ -1633,6 +1668,7 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
           state = result.state;
           ui.screen = 'game';
           resetWalkers();
+          resetDoors();
           startedStore();
           writeStore();
           ui.saved = peekSave();
@@ -1648,6 +1684,7 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
           ui.screen = 'game';
           accumulator = 0;
           resetWalkers();
+          resetDoors();
         }
         return result.note;
       });
@@ -1784,6 +1821,7 @@ export function onFileChosen(file: File): Promise<void> {
       ui.screen = 'game';
       ui.menuOpen = false;
       resetWalkers();
+      resetDoors();
       // A file loaded is the game from now on, so the browser's store holds it too (T11 3.2).
       startedStore();
       writeStore();
@@ -1859,7 +1897,8 @@ function handleSceneClick(element: DataElement): boolean {
     // calls, and the extractor's carries the hall's bag store (PIOTR, 17.09; CLAUDE.md T17 2.6).
     // Anything that is not a machine keeps its note.
     const category = findSpec(item.specId)?.category;
-    if (category === 'machine' || category === 'extraction') {
+    // The bench has a card of its own now, because it can be sold like a machine (T19 2.8).
+    if (category === 'machine' || category === 'extraction' || category === 'bench') {
       openMachineCard(item.id);
       requestRender();
       return true;
@@ -1886,6 +1925,11 @@ function onClick(event: MouseEvent): void {
 function runClick(event: MouseEvent): void {
   const target = event.target;
   if (!(target instanceof Element)) return;
+  // The player has clicked something, so the browser will let a sound engine start. Nothing plays
+  // before this, ever: that is the rule the browsers themselves enforce and the one the brief
+  // sets (CLAUDE.md T19 2.10). After the first click it costs a comparison.
+  unlockSound();
+  if (state !== null) applySoundSettings(state.settings.sound);
   if (ui.panned) {
     // The pointer travelled: that was the player moving the hall, not pressing what it started on.
     ui.panned = false;
@@ -2290,7 +2334,40 @@ export function advanceMinutes(wholeMinutes: number): number {
   return result.minutesRun;
 }
 
+/** The hall's own sound, once a frame and in real time like the figures (CLAUDE.md T19 2.10).
+ *  The loops are set to exactly what the hall is running; the one shots are offered every frame
+ *  and the engine thins them to one a second each, so x10 and x30 do not rattle. Nothing plays
+ *  before the first click, because nothing is unlocked before it. */
+function driveSound(now: number): void {
+  if (state === null || ui.screen !== 'game') {
+    stopAllSounds();
+    return;
+  }
+  applySoundSettings(state.settings.sound);
+  // A stopped clock is a stopped workshop: nothing is being cut while the player reads a modal.
+  const running = state.speed > 0 && state.activeEvent === null && state.gameOver === null;
+  if (!running) {
+    stopAllSounds();
+    return;
+  }
+  setLoops(hallLoops(state));
+  for (const name of hallOneShots(state)) soundPlay(name, now);
+}
+
 function frame(now: number): void {
+  // Whatever happens inside, the next frame is asked for. The loop asks for itself at the end of
+  // itself, so anything that threw in here used to stop the game dead: no figure moved, no minute
+  // ran and no page was written again, for the rest of the session (found by the Turn 19 review,
+  // and true since the loop was written).
+  try {
+    runFrame(now);
+  } catch (error) {
+    console.error(error);
+  }
+  requestAnimationFrame(frame);
+}
+
+function runFrame(now: number): void {
   const elapsed = Math.min(1000, now - lastFrame);
   lastFrame = now;
   // The figures walk in real time and not in game minutes, so they are moved on before anything
@@ -2298,7 +2375,11 @@ function frame(now: number): void {
   // the floor, then on to the frame of their animation.
   if (root !== null) {
     stepWalkers(root, now);
+    // The doors swing on the renderer's own clock, beside the figures and for the same reason:
+    // the page is written again under them and the swing is not game state (CLAUDE.md T19 2.3).
+    stepDoors(root, now);
     playCharacters(root, now);
+    driveSound(now);
   }
   // One frame, one writing of the page, whatever the clock did inside it: ten game minutes at
   // 10x used to be ten pages (CLAUDE.md T9 3.8, 3.11).
@@ -2313,7 +2394,6 @@ function frame(now: number): void {
       }
     }
   });
-  requestAnimationFrame(frame);
 }
 
 export function mount(element: HTMLElement): void {
