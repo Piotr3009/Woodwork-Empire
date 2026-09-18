@@ -1026,7 +1026,9 @@ input.num {
 
 .why-pop p {
   font-size: var(--fs-body);
-  margin: 0 0 8px;
+  /* The bubble's own "Right" button is gone and the cross is the way out, so the text has nothing
+     under it to stand off (CLAUDE.md T20 2.15). */
+  margin: 0;
 }
 
 .check-row {
@@ -4092,9 +4094,12 @@ input.num {
   box-shadow: 0 8px 24px rgb(0 0 0 / 35%);
 }
 
-/* The cross on the Assign list: the same disc as every modal, hung off the list's top right
-   corner (PIOTR, 18.09). The list is absolute already, so the disc anchors to it. */
-.assign-list .modal-close {
+/* The cross on a popover that is not a modal: the same disc as every modal, hung off the top
+   right corner of the list or the bubble (PIOTR, 18.09; CLAUDE.md T20 2.15). Both are positioned
+   already, so the disc anchors to them, and one rule serves the two of them so a popover cannot
+   wear a cross of its own. */
+.assign-list .modal-close,
+.why-pop .modal-close {
   position: absolute;
   right: -14px;
   top: -14px;

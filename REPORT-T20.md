@@ -347,3 +347,54 @@ crosses moves nothing, and a drawable with no depth on it is a boundary that is 
 walk from behind a machine to in front of it therefore changes the painter's order exactly once,
 as his feet cross it, and sixty ticks of a hall in which nothing crosses move nothing at all. Both
 are asserted, with the fake clock, in `tests/render/depthOrder.test.ts`.
+
+## Phase C
+
+**T20-C2 Every popover has the cross, and the test is the rule (2.15).** The rule is now a file,
+`tests/ui/popovers.test.ts`, and it finds the popovers in the source instead of being told them:
+it reads every `data-popover` in `src/ui` and `src/render`, checks that list both ways against the
+one table in the test, proves that the only writer of a modal shell is `src/ui/modal.ts`, and
+walks the stylesheet for anything that floats over the page with a `z-index`, which must either
+wear the cross or carry its reason for not being a popover. Then it opens every one of them and
+counts the crosses inside it, ignoring the crosses of a popover nested in another (an Assign list
+sits inside the modal it hangs off, and its cross is the list's, not the modal's).
+`npm run check` green on its own exit code.
+
+**What it caught, and what was put right.** Two things. The why bubble, the real life note behind
+an "i" link, carried `data-popover` from phase A but no cross at all: it was shut by a "Right"
+button of its own, which is exactly the second way out of a popover that T18 2.5 took out of the
+rest of the game. It now wears `closeButton('closeWhy')`, the same disc as the Assign list, off
+the one CSS rule, and the "Right" button is gone. And Escape did not shut the Menu at all, and
+took the day summary before the Assign list, where 2.15 asks for the Assign list first. Escape now
+reads one table, `ESCAPE_ORDER` in `src/ui/app.ts`, which the test reads too, so the order is
+written down once: assign list, why, day summary, modal, menu. The why bubble sits between the
+first two because it is painted over everything and is never opened from inside an Assign list.
+The click outside was already there for the list, the Menu and the bubble, and is now tested for
+all three, as is the cross on each.
+
+**The popovers the test found**, which is the list it prints on every run:
+
+| Popover | Written in | Its cross |
+|---|---|---|
+| the modal shell, worn by all 11 modals | `src/ui/modal.ts` | `closeModal` |
+| `assign-job`, who goes on this job | `src/ui/jobCard.ts` | `closeAssign` |
+| `assign-contract`, who goes on this contract | `src/ui/contracts.ts` | `closeAssign` |
+| `menu`, off the top bar | `src/ui/topbar.ts` | `closeMenu` |
+| `why`, the real life note | `src/ui/app.ts` | `closeWhy` |
+
+Two things wear no cross on purpose, and the test says so in its own words. A decision modal
+(`closable: false`) has none, because a decision is answered and not closed, which is older than
+this rule. The first use bubble has none, because it is the last child of a modal's body and
+floats over nothing: a cross in it would be a second cross inside its modal. The test also prints
+the layers that float over the page and are not popovers, each with its reason: the modal layer,
+the cross itself, the hover note on the day meter, the version in the corner, the felt board's
+head, the hall's strip and its zoom, and the Efficiency plate. **The Efficiency plate is the one
+judgement call for Piotr**: it is the body of a native `<details>` on the top bar, opened and shut
+by the same summary, and section 6 of the brief says nothing about Efficiency changes tonight, so
+it was left as it is rather than given a cross.
+
+**The test is the rule for what comes next.** A popover written in a later turn fails here and not
+in front of Piotr: a new `data-popover` with no line in the table fails the census, a popover with
+no cross fails the walk, and a new floating layer in the stylesheet fails until it is either given
+the cross or written down with its reason. All three were checked by breaking them on purpose and
+watching the test go red.

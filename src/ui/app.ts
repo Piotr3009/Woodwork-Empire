@@ -80,6 +80,7 @@ import { type WorkPlanTab, renderWorkPlan, workPlanTabFrom } from './workPlan';
 import {
   type ModalPosition,
   type ModalSpec,
+  closeButton,
   escapeHtml,
   minutes,
   plural,
@@ -664,8 +665,11 @@ function renderWhy(): string {
   const left = Math.max(8, Math.min(open.left, Math.max(8, width - 340)));
   return (
     `<div class="why-pop" data-popover="why" style="left:${left}px;top:${open.top + 16}px">` +
-    `<p>${escapeHtml(text)}</p>` +
-    '<button class="btn" data-do="closeWhy">Right</button></div>'
+    // The one cross, the same helper every modal and every list calls: the bubble used to be shut
+    // by a "Right" button of its own, which was a second way out of a popover
+    // (PIOTR, 18.09; CLAUDE.md T20 2.15, T18 2.5).
+    closeButton('closeWhy') +
+    `<p>${escapeHtml(text)}</p></div>`
   );
 }
 
@@ -2112,6 +2116,49 @@ function togglePause(): void {
   dispatch({ type: 'SET_SPEED', speed: ui.speedBeforePause === 0 ? 1 : ui.speedBeforePause });
 }
 
+/** What Escape shuts, topmost first: the one open layer nearest the player and nothing under it
+ *  (PIOTR, 18.09; CLAUDE.md T20 2.15). One table, so the key, the test and the report read the
+ *  same order. The Assign list hangs off the modal under it and goes first; the why bubble is
+ *  opened from a modal's body or an event's, never from inside an Assign list, so the two are
+ *  never up together; the day summary sits over the modal that opened it; and the Menu is last,
+ *  because it is the one popover that is not on the modal layer at all. */
+export const ESCAPE_ORDER: ReadonlyArray<{
+  /** What the report and the test call it. */
+  name: string;
+  isOpen: () => boolean;
+  shut: () => void;
+}> = [
+  {
+    name: 'assign list',
+    isOpen: () => ui.assignOpen !== null,
+    shut: () => {
+      ui.assignOpen = null;
+    },
+  },
+  {
+    name: 'why',
+    isOpen: () => ui.why !== null,
+    shut: () => {
+      ui.why = null;
+    },
+  },
+  {
+    name: 'day summary',
+    isOpen: () => ui.daySummary !== null,
+    shut: () => {
+      ui.daySummary = null;
+    },
+  },
+  { name: 'modal', isOpen: () => ui.modal !== null, shut: shutModal },
+  {
+    name: 'menu',
+    isOpen: () => ui.menuOpen,
+    shut: () => {
+      ui.menuOpen = false;
+    },
+  },
+];
+
 function onKeyDown(event: KeyboardEvent): void {
   batched(() => runKeyDown(event));
 }
@@ -2145,27 +2192,12 @@ function runKeyDown(event: KeyboardEvent): void {
     requestRender();
     return;
   }
-  if (ui.daySummary !== null) {
-    ui.daySummary = null;
+  // And then the topmost open popover, and only that one, off the one table below.
+  for (const layer of ESCAPE_ORDER) {
+    if (!layer.isOpen()) continue;
+    layer.shut();
     requestRender();
     return;
-  }
-  // An open Assign list shuts on Escape before the modal under it does (PIOTR, 18.09).
-  if (ui.assignOpen !== null) {
-    ui.assignOpen = null;
-    requestRender();
-    return;
-  }
-  // The why popover sits on top of whatever asked the question, so it goes first too
-  // (PIOTR, 18.09: every popover closes by its cross, Escape and a click outside).
-  if (ui.why !== null) {
-    ui.why = null;
-    requestRender();
-    return;
-  }
-  if (ui.modal !== null) {
-    shutModal();
-    requestRender();
   }
 }
 
