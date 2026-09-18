@@ -4,10 +4,7 @@ import {
   CONSUMABLES_LABEL,
   DAILY_ORDERING_MINUTES,
   DAY_END_MINUTE,
-  ESTIMATOR_JOBS_PER_DAY,
-  ESTIMATOR_JOBS_WITH_JOINERY_CORE,
   WORKER_RATES,
-  JOINERY_CORE_EXTENSION_JOBS,
   JOINERY_CORE_EXTENSION_PRICE_YEARLY,
   JOINERY_CORE_MAX_EXTENSIONS,
   JOINERY_CORE_PRICE_YEARLY,
@@ -20,7 +17,9 @@ import {
   createTask,
   designMinutes,
   emailsForPrice,
+  MATERIAL_TAKE_OFF_MINUTES,
   estimatorCapacity,
+  takeOffMinutes,
   findTask,
   jobTasks,
   joineryCoreOffer,
@@ -366,20 +365,31 @@ describe('the material take off', () => {
     return jobTasks(state, firstJob(state).id).find((task) => task.kind === 'materialTakeOff');
   }
 
-  it('is five a day, ten with Joinery Core, five more per extension and never more than two', () => {
+  it('is as many a day as his minutes allow: 16 bare, 32 with Joinery Core (CLAUDE.md T20 2.3)', () => {
     const state = newGame();
-    expect(estimatorCapacity(state)).toBe(ESTIMATOR_JOBS_PER_DAY);
-    expect(ESTIMATOR_JOBS_PER_DAY).toBe(5);
+    expect(MATERIAL_TAKE_OFF_MINUTES).toBe(30);
+    expect(takeOffMinutes(state)).toBe(MATERIAL_TAKE_OFF_MINUTES);
+    expect(estimatorCapacity(state)).toBe(16);
     state.software.joineryCore = true;
-    expect(estimatorCapacity(state)).toBe(ESTIMATOR_JOBS_WITH_JOINERY_CORE);
-    expect(ESTIMATOR_JOBS_WITH_JOINERY_CORE).toBe(10);
+    expect(takeOffMinutes(state)).toBe(15);
+    expect(estimatorCapacity(state)).toBe(32);
     state.software.joineryCoreExtensions = 1;
-    expect(estimatorCapacity(state)).toBe(10 + JOINERY_CORE_EXTENSION_JOBS);
+    expect(estimatorCapacity(state)).toBe(42);
     state.software.joineryCoreExtensions = 2;
-    expect(estimatorCapacity(state)).toBe(10 + 2 * JOINERY_CORE_EXTENSION_JOBS);
+    expect(estimatorCapacity(state)).toBe(56);
     // At most two: a third counts for nothing, whatever the state says.
     state.software.joineryCoreExtensions = 3;
-    expect(estimatorCapacity(state)).toBe(10 + JOINERY_CORE_MAX_EXTENSIONS * JOINERY_CORE_EXTENSION_JOBS);
+    expect(estimatorCapacity(state)).toBe(56);
+    expect(JOINERY_CORE_MAX_EXTENSIONS).toBe(2);
+  });
+
+  it('gives a man with no experience 37 minutes over one and the top man 21', () => {
+    const state = newGame();
+    // His tier is his speed at the desk, off the one WORKER_RATES table (CLAUDE.md T20 2.5).
+    expect(MATERIAL_TAKE_OFF_MINUTES / WORKER_RATES.novice).toBeCloseTo(37.5, 6);
+    expect(MATERIAL_TAKE_OFF_MINUTES / WORKER_RATES.master).toBeCloseTo(21.43, 2);
+    expect(estimatorCapacity(state, 'novice')).toBe(12);
+    expect(estimatorCapacity(state, 'master')).toBe(22);
   });
 
   it('is the owner’s with nobody hired, and only once the drawing is done', () => {
@@ -436,7 +446,10 @@ describe('the material take off', () => {
     expect(offer.held).toBe(false);
     expect(offer.core.ok).toBe(true);
     expect(offer.extension).toEqual({ ok: false, reason: 'Joinery Core first' });
-    expect(offer.capacity).toBe(ESTIMATOR_JOBS_PER_DAY);
+    expect(offer.capacity).toBe(16);
+    expect(offer.baseCapacity).toBe(16);
+    expect(offer.coreCapacity).toBe(32);
+    expect(offer.extensionCapacities).toEqual([42, 56]);
     expect(offer.yearlyPrice).toBe(JOINERY_CORE_PRICE_YEARLY);
     expect(offer.extensionYearlyPrice).toBe(JOINERY_CORE_EXTENSION_PRICE_YEARLY);
     // The click switches it on and pays the first twelfth of the year (CLAUDE.md T13 3.8).
@@ -445,13 +458,11 @@ describe('the material take off', () => {
     expect(state.software.joineryCore).toBe(true);
     expect(cash - state.cash).toBeCloseTo(JOINERY_CORE_PRICE_YEARLY / 12, 2);
     expect(joineryCoreOffer(state).core).toEqual({ ok: false, reason: 'On the laptop' });
-    expect(joineryCoreOffer(state).capacity).toBe(ESTIMATOR_JOBS_WITH_JOINERY_CORE);
+    expect(joineryCoreOffer(state).capacity).toBe(32);
     state = act(state, { type: 'BUY_JOINERY_CORE_EXTENSION' });
     state = act(state, { type: 'BUY_JOINERY_CORE_EXTENSION' });
     expect(joineryCoreOffer(state).extension).toEqual({ ok: false, reason: 'Both extensions bought' });
-    expect(joineryCoreOffer(state).capacity).toBe(
-      ESTIMATOR_JOBS_WITH_JOINERY_CORE + 2 * JOINERY_CORE_EXTENSION_JOBS,
-    );
+    expect(joineryCoreOffer(state).capacity).toBe(56);
     // A third click buys nothing.
     const two = state.cash;
     state = act(state, { type: 'BUY_JOINERY_CORE_EXTENSION' });

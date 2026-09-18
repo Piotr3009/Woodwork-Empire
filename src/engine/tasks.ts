@@ -5,10 +5,8 @@ import {
   ADMIN_COVER_RATE,
   CONSUMABLES_LABEL,
   DRAFTSMAN_RATE,
-  ESTIMATOR_JOBS_PER_DAY,
-  ESTIMATOR_JOBS_WITH_JOINERY_CORE,
+  MINUTES_PER_WORKING_DAY,
   WORKER_RATES,
-  JOINERY_CORE_EXTENSION_JOBS,
   JOINERY_CORE_EXTENSION_PRICE_YEARLY,
   JOINERY_CORE_MAX_EXTENSIONS,
   JOINERY_CORE_PRICE_YEARLY,
@@ -68,6 +66,7 @@ import type {
   TaskKind,
   TaskOrder,
   WorkerRole,
+  WorkerTier,
 } from './types';
 
 /** Which bar segment a task fills, who may be asked to do it, and who takes it off the owner
@@ -112,7 +111,14 @@ const TASK_DEFINITIONS: Record<TaskKind, TaskDefinition> = {
   // The take off is the owner's until an estimator is taken on, and then his, so many a day
   // (CLAUDE.md T13 3.8).
   materialTakeOff: { category: 'admin', eligibleRoles: ['estimator'], autoRoles: ['estimator'] },
-  siteMeasure: { category: 'admin', eligibleRoles: [], autoRoles: [] },
+  // The site measure is a day out with a tape. It was the owner's alone; from tonight the
+  // estimator goes when there is no owner free for it, with the day's travel minutes coming off
+  // his own 480 and not the owner's, and a salesman can be sent (PIOTR; CLAUDE.md T20 2.3).
+  siteMeasure: {
+    category: 'admin',
+    eligibleRoles: ['estimator', 'salesman'],
+    autoRoles: ['estimator'],
+  },
   // The website's weekly minutes: the owner's, or the admin's (CLAUDE.md T13 3.7).
   websiteUpkeep: { category: 'admin', eligibleRoles: ['officeAdmin'], autoRoles: ['officeAdmin'] },
   unload: { category: 'workshop', eligibleRoles: ['joiner', 'helper'], autoRoles: ['helper'] },
@@ -132,6 +138,17 @@ const TASK_DEFINITIONS: Record<TaskKind, TaskDefinition> = {
   hiring: { category: 'admin', eligibleRoles: [], autoRoles: [] },
   booting: { category: 'admin', eligibleRoles: [], autoRoles: [] },
 };
+
+/** Who may be sent at this job of work, and who takes it off the owner without being asked. The
+ *  one reading of the table from outside this module, so nothing keeps a second list of who does
+ *  what (CLAUDE.md T20 2.3 moved the site measure onto the estimator). */
+export function rolesForTask(kind: TaskKind): {
+  eligible: ReadonlyArray<WorkerRole>;
+  auto: ReadonlyArray<WorkerRole>;
+} {
+  const definition = TASK_DEFINITIONS[kind];
+  return { eligible: definition.eligibleRoles, auto: definition.autoRoles };
+}
 
 /** Every kind of task the runner knows about, off the runner's own table. The one list: a test
  *  that asks "every kind of task in the game" asks this and not the table it is checking. */
@@ -271,13 +288,48 @@ export function equipmentUnloadMinutes(state: GameState): number {
   return Math.round(EQUIPMENT_UNLOAD_MINUTES * unloadFactor(state));
 }
 
-/** Take offs an estimator does in a day: five, ten with Joinery Core, and five more per extension,
- *  at most two of them (PIOTR; CLAUDE.md T13 3.8). The jump from five to ten is the one that is
- *  meant to be felt. */
-export function estimatorCapacity(state: GameState): number {
-  if (!state.software.joineryCore) return ESTIMATOR_JOBS_PER_DAY;
-  const extensions = Math.min(JOINERY_CORE_MAX_EXTENSIONS, state.software.joineryCoreExtensions);
-  return ESTIMATOR_JOBS_WITH_JOINERY_CORE + extensions * JOINERY_CORE_EXTENSION_JOBS;
+/** A material take off is half an hour of the desk it is done at, whatever the job is worth
+ *  [PIOTR, 18.09: "when I did it, it took 30 minutes"] (CLAUDE.md T20 2.3). The curve by price is
+ *  gone with the five a day: the man's own speed is what makes one take off longer than another,
+ *  so a man with no experience spends 37 minutes over it and an extremely experienced one 21. */
+export const MATERIAL_TAKE_OFF_MINUTES = 30;
+/** What Joinery Core does to those minutes: it halves them [TUNE, from PIOTR's "16 a day bare and
+ *  32 with the software"]. */
+export const JOINERY_CORE_TAKE_OFF_FACTOR = 0.5;
+/** And what each of its extensions does on top of that: a further quarter off [TUNE]. */
+export const JOINERY_CORE_EXTENSION_TAKE_OFF_FACTOR = 0.75;
+
+/** The minutes one take off is worth with this software on the laptop. */
+function takeOffMinutesWith(core: boolean, extensions: number): number {
+  if (!core) return MATERIAL_TAKE_OFF_MINUTES;
+  const held = Math.max(0, Math.min(JOINERY_CORE_MAX_EXTENSIONS, extensions));
+  return (
+    MATERIAL_TAKE_OFF_MINUTES *
+    JOINERY_CORE_TAKE_OFF_FACTOR *
+    JOINERY_CORE_EXTENSION_TAKE_OFF_FACTOR ** held
+  );
+}
+
+/** One entry per extension the laptop can hold, for the line that prices them. */
+const EXTENSION_STEPS: number[] = [];
+for (let step = 1; step <= JOINERY_CORE_MAX_EXTENSIONS; step += 1) EXTENSION_STEPS.push(step);
+
+/** The minutes a take off carries in this workshop: the one figure the task is created with. */
+export function takeOffMinutes(state: GameState): number {
+  return takeOffMinutesWith(state.software.joineryCore, state.software.joineryCoreExtensions);
+}
+
+/** How many of them a man of this class gets through in a day: his working minutes over the
+ *  minutes one costs him at his own rate, whole ones only. Not a number of jobs any more: he does
+ *  as many as his minutes allow (PIOTR, 18.09: "the estimator does five a day when the owner does
+ *  sixteen"; CLAUDE.md T20 2.3). An experienced man does 16 a day bare and 32 with Joinery Core. */
+function capacityFor(minutesEach: number, tier: WorkerTier): number {
+  if (minutesEach <= 0) return 0;
+  return Math.floor((MINUTES_PER_WORKING_DAY * WORKER_RATES[tier]) / minutesEach);
+}
+
+export function estimatorCapacity(state: GameState, tier: WorkerTier = 'experienced'): number {
+  return capacityFor(takeOffMinutes(state), tier);
 }
 
 /** What the Technical tab says about Joinery Core: whether it is on the laptop, what it and its
@@ -287,11 +339,14 @@ export interface JoineryCoreOffer {
   held: boolean;
   extensions: number;
   maxExtensions: number;
-  /** Take offs a day as things stand. */
+  /** Take offs a day as things stand, for an experienced man at the desk. */
   capacity: number;
+  /** The minutes one of them takes with what is on the laptop now. */
+  minutesEach: number;
   baseCapacity: number;
   coreCapacity: number;
-  extensionJobs: number;
+  /** A day's take offs with the core and one extension, and with both (CLAUDE.md T20 2.3). */
+  extensionCapacities: number[];
   yearlyPrice: number;
   extensionYearlyPrice: number;
   core: { ok: boolean; reason: string };
@@ -312,9 +367,12 @@ export function joineryCoreOffer(state: GameState): JoineryCoreOffer {
     extensions,
     maxExtensions: JOINERY_CORE_MAX_EXTENSIONS,
     capacity: estimatorCapacity(state),
-    baseCapacity: ESTIMATOR_JOBS_PER_DAY,
-    coreCapacity: ESTIMATOR_JOBS_WITH_JOINERY_CORE,
-    extensionJobs: JOINERY_CORE_EXTENSION_JOBS,
+    minutesEach: takeOffMinutes(state),
+    baseCapacity: capacityFor(takeOffMinutesWith(false, 0), 'experienced'),
+    coreCapacity: capacityFor(takeOffMinutesWith(true, 0), 'experienced'),
+    extensionCapacities: EXTENSION_STEPS.map((step) =>
+      capacityFor(takeOffMinutesWith(true, step), 'experienced'),
+    ),
     yearlyPrice: JOINERY_CORE_PRICE_YEARLY,
     extensionYearlyPrice: JOINERY_CORE_EXTENSION_PRICE_YEARLY,
     core,
@@ -364,13 +422,18 @@ export interface TaskDraft {
 
 export function createTask(state: GameState, draft: TaskDraft): TaskInstance {
   const definition = TASK_DEFINITIONS[draft.kind];
+  // The minutes of a material take off are this module's, whatever the caller asks for: half an
+  // hour of the desk, less what the software takes off it, and never the old curve by the job's
+  // price (PIOTR; CLAUDE.md T20 2.3). The one caller that makes one is `src/engine/jobs.ts`,
+  // which phase C points straight at `takeOffMinutes` (NOTES-B2.md).
+  const minutes = draft.kind === 'materialTakeOff' ? takeOffMinutes(state) : draft.minutes;
   const task: TaskInstance = {
     id: makeId(state, 'task'),
     kind: draft.kind,
     category: definition.category,
     label: draft.label,
-    minutesTotal: draft.minutes,
-    minutesRemaining: draft.minutes,
+    minutesTotal: minutes,
+    minutesRemaining: minutes,
     jobId: draft.jobId ?? null,
     equipmentId: draft.equipmentId ?? null,
     deliveryId: draft.deliveryId ?? null,
@@ -542,8 +605,9 @@ function canTakeOn(state: GameState, worker: Worker, task: TaskInstance): boolea
   if (worker.taskId !== null) return false;
   if (hasWorkingDay(worker.role) && staffMinutesLeft(worker) <= 0) return false;
   if (task.kind === 'materialTakeOff' && worker.role === 'estimator') {
-    // So many a day, and none before the drawing it reads (CLAUDE.md T13 3.8).
-    if (worker.ordersToday >= estimatorCapacity(state)) return false;
+    // As many as his minutes allow, and none before the drawing it reads. The count of jobs a day
+    // is gone: his 480 minutes above are the whole of the cap now, so a quicker man and a laptop
+    // with Joinery Core on it both show in the pile he gets through (PIOTR; CLAUDE.md T20 2.3).
     return !designOutstandingFor(state, task.jobId);
   }
   return true;

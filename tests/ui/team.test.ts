@@ -243,7 +243,10 @@ describe('the Technical tab (CLAUDE.md T13 3.8)', () => {
     const state = buyStartingKit(known());
     const page = parse(renderTeam(state, 'technical'));
     expect(page.querySelectorAll('[data-do="buyJoineryCore"]')).toHaveLength(1);
-    expect(page.textContent).toContain('5 a day, 10 with Joinery Core');
+    // As many a day as his minutes allow: 16 at half an hour each, 32 with the software
+    // (CLAUDE.md T20 2.3).
+    expect(page.textContent).toContain('16 a day, 32 with Joinery Core');
+    expect(page.textContent).toContain('42 and 56 with its extensions');
     expect(page.textContent).toContain(`${money(JOINERY_CORE_PRICE_YEARLY)} a year`);
     // The extension waits for the core: a reason, not a button.
     expect(page.querySelectorAll('[data-do="buyJoineryCoreExtension"]')).toHaveLength(0);
@@ -251,7 +254,8 @@ describe('the Technical tab (CLAUDE.md T13 3.8)', () => {
     const bought = parse(renderTeam(act(state, { type: 'BUY_JOINERY_CORE' }), 'technical'));
     expect(bought.querySelectorAll('[data-do="buyJoineryCore"]')).toHaveLength(0);
     expect(bought.querySelectorAll('[data-do="buyJoineryCoreExtension"]')).toHaveLength(1);
-    expect(bought.textContent).toContain('10 take offs a day');
+    expect(bought.textContent).toContain('32 take offs a day');
+    expect(bought.textContent).toContain('15 min each');
   });
 
   it('says so when there is no laptop to put it on', () => {

@@ -118,7 +118,9 @@ const DUTIES: Record<WorkerRole, string> = {
   purchasingClerk: 'The daily consumables and materials chore, ahead of the office admin.',
   salesman: 'Client calls, and the meeting a big job starts with.',
   draftsman: 'The drawings, at 0.8 of your own speed, in the order the laptop has them.',
-  estimator: 'Reads the drawing and counts the sheets: the material take off, so many a day.',
+  estimator:
+    'Reads the drawing and counts the sheets: the material take off, as many a day as his ' +
+    'minutes allow, and the site measure when you are not free for it.',
   productionManager:
     'Runs the second shift, assigns the crew, connects the machines, and covers the hall while ' +
     'you are away. He makes nothing.',
@@ -418,11 +420,14 @@ function ownerCard(state: GameState): string {
  *  man whose day they lengthen (CLAUDE.md T13 3.8). */
 function joineryCoreLines(state: GameState): string {
   const offer = joineryCoreOffer(state);
+  // A take off is half an hour of his desk at his own rate, so what the software buys is a
+  // shorter half hour and a longer pile (CLAUDE.md T20 2.3).
   const held = offer.held
     ? `On the laptop${offer.extensions > 0 ? `, with ${plural(offer.extensions, 'extension', 'extensions')}` : ''}: ` +
-      `${offer.capacity} take offs a day.`
+      `${minutes(offer.minutesEach)} each, ${offer.capacity} take offs a day.`
     : `${offer.baseCapacity} a day, ${offer.coreCapacity} with Joinery Core, ` +
-      `${offer.extensionJobs} more per extension (${offer.maxExtensions} at most).`;
+      `${offer.extensionCapacities.join(' and ')} with its extensions ` +
+      `(${offer.maxExtensions} at most).`;
   const core = offer.core.ok
     ? button('buyJoineryCore', 'Buy Joinery Core')
     : reasonLabel(offer.core.reason);
