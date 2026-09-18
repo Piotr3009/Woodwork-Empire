@@ -635,6 +635,7 @@ export function startTaskCheck(
   state: GameState,
   taskId: string,
   force = false,
+  ignoreBusy = false,
 ): TaskStartCheck {
   const task = findTask(state, taskId);
   if (!task) return refused('That job of work has gone');
@@ -644,7 +645,7 @@ export function startTaskCheck(
   if (!force && isHelperTask(state, task)) return refused(WAITING_FOR_HELPER);
   // One thing at a time: the current task has to be finished or paused first (CLAUDE.md 10.1).
   const current = state.owner.currentTaskId;
-  if (current !== null && current !== task.id) {
+  if (!ignoreBusy && current !== null && current !== task.id) {
     const held = findTask(state, current);
     return refused(`Busy with ${held ? held.label : 'something else'}`, current);
   }
@@ -830,6 +831,13 @@ export function queueTasks(state: GameState, taskIds: readonly string[]): boolea
   return true;
 }
 
+/** True while this job of work would start if only his hands were free: every refusal but the
+ *  busy one. What "Add as next" is allowed to offer, and what the queue is allowed to take
+ *  (CLAUDE.md T19 2.12). */
+export function canQueueTask(state: GameState, taskId: string): boolean {
+  return startTaskCheck(state, taskId, false, true).ok;
+}
+
 /** One more task behind the one he is on, instead of putting that one down: the laptop's
  *  "Add as next" (PIOTR, 17.09; CLAUDE.md T19 2.12). With nothing running it simply starts. A task
  *  already in the queue is not queued twice; one already running is left alone. */
@@ -838,6 +846,11 @@ export function queueTaskNext(state: GameState, taskId: string): boolean {
   if (task === null || task.done) return false;
   if (state.owner.currentTaskId === taskId) return false;
   if (state.taskQueue.includes(taskId)) return false;
+  // Only a job of work whose one refusal is that his hands are full. The queue's head is started
+  // without being asked again, so anything refused for a second reason would sit at the front of
+  // it and stop everything behind it for the rest of the day (found by the Turn 19 review; the
+  // busy refusal is tested above the licence, the unloading and the take off, so it hides them).
+  if (!canQueueTask(state, taskId)) return false;
   state.taskQueue.push(taskId);
   startNextQueued(state);
   return true;

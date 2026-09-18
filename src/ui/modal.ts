@@ -4,7 +4,14 @@
 // One escape and one money format for the whole game: the renderers and the engine own them,
 // because both layers sit below the modals.
 
-import { WHY, formatMoney, interviewTask, plural, startTaskCheck } from '../engine/index';
+import {
+  WHY,
+  canQueueTask,
+  formatMoney,
+  interviewTask,
+  plural,
+  startTaskCheck,
+} from '../engine/index';
 import type { GameState, TaskInstance } from '../engine/index';
 import { escapeText } from '../render/hall';
 import { patchInto } from './patch';
@@ -308,6 +315,10 @@ export function taskStartAction(state: GameState, task: TaskInstance, startLabel
   // CLAUDE.md T19 2.12). Only on this refusal: the queue's head is started without being asked
   // again, so a job of work refused for any other reason would sit at the front of it and stop
   // everything behind it.
-  const wayOut = check.blockingTaskId === null ? '' : queueNextButton(task.id);
+  // And only when his hands are the one thing in the way: the busy refusal is tested above the
+  // licence, the unloading and the take off, so a job of work with a second reason against it
+  // shows "Busy with X" and nothing else (found by the Turn 19 review).
+  const canQueue = check.blockingTaskId !== null && canQueueTask(state, task.id);
+  const wayOut = canQueue ? queueNextButton(task.id) : '';
   return reasonLabel(check.reason) + wayOut;
 }

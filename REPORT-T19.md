@@ -743,3 +743,19 @@ test now builds the booth and puts a man at it, and asserts the silence at each 
   now, with its Sell on it. Tested.
 
 `npm run check` exit 0: 172 files, 1,730 tests.
+
+### T19-C1h Add as next can no longer stall the laptop
+
+The last of the four findings the adversarial review of phase A confirmed. `startTaskCheck` tests
+"Busy with X" **above** the licence, the unloading and the take off, so a job of work that could
+not start even with free hands still reads only "Busy with X". B3's button was already gated on
+that refusal, which was the right instinct and not enough: the hidden second reason came with it,
+`startNextQueued` calls `startTask`, `startTask` refuses, and the head of the queue sits there
+with everything behind it for the rest of the day.
+
+`startTaskCheck` takes an `ignoreBusy` flag now and `canQueueTask(state, taskId)` asks it the
+question that matters: would this start if only his hands were free? The button is gated on it,
+and so is `queueTaskNext` itself, so no other way in can park a dead task at the head either. The
+pre-existing tick-several queue of T17 2.16 could reach the same state; it cannot now.
+
+`npm run check` exit 0: 172 files, 1,731 tests.

@@ -387,6 +387,7 @@ export {
   skippedTask,
   movingMachines,
   openTasks,
+  canQueueTask,
   cleanerAtWork,
   softwareActive,
   staffManagementMinutes,

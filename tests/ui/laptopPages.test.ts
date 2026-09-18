@@ -5,9 +5,15 @@
 
 import { beforeAll, describe, expect, it } from 'vitest';
 import { LAPTOP_BOOT_MINUTES, LOW_STOCK_SHEETS } from '../../src/engine/constants';
-import { pendingStockSheets, restockCheck, shortfallOf } from '../../src/engine/index';
+import {
+  canQueueTask,
+  pendingStockSheets,
+  restockCheck,
+  shortfallOf,
+} from '../../src/engine/index';
 import { advanceMinutes, currentState, mount, render } from '../../src/ui/app';
 import { renderDrawings } from '../../src/ui/drawings';
+import { taskStartAction } from '../../src/ui/modal';
 import { renderInsurance } from '../../src/ui/insurance';
 import { renderLaptop } from '../../src/ui/laptop';
 import { renderMaterials } from '../../src/ui/materials';
@@ -323,6 +329,39 @@ describe('Add as next (CLAUDE.md T19 2.12)', () => {
     // It stays on the queue until it is done, the way T17 wrote it: the queue is what he is
     // working through, not what he has yet to pick up.
     expect(freed.taskQueue[0]).toBe(second);
+  });
+
+  it('never offers Add as next for a job of work that has a second reason against it', () => {
+    // The busy refusal is tested above the licence, the unloading and the take off, so a task
+    // that could not start even with free hands still reads "Busy with X". Queued, it would sit
+    // at the head and stop everything behind it for the rest of the day (found by the Turn 19
+    // review of phase A; CLAUDE.md T19 2.12).
+    const state = desk();
+    const design = state.tasks.find((task) => task.kind === 'design' && !task.done);
+    if (design === undefined) throw new Error('no drawing on the desk');
+    const other = state.tasks.find((task) => task.id !== design.id && !task.done);
+    if (other === undefined) throw new Error('nothing else to hold');
+    // The licence is what a drawing wants, and there is none.
+    state.software.mode = 'none';
+    expect(canQueueTask(state, design.id)).toBe(false);
+    const busy = act(state, { type: 'START_TASK', taskId: other.id });
+    // The one control every task row carries, wherever it is drawn: it says "Busy with X" and
+    // offers nothing, where a task with only the busy refusal gets the button.
+    const held = taskStartAction(busy, design, 'Start');
+    expect(held).toContain('Busy with');
+    expect(held).not.toContain('queueTaskNext');
+    const startable = busy.tasks.find(
+      (task) => !task.done && task.id !== other.id && canQueueTask(busy, task.id),
+    );
+    if (startable === undefined) throw new Error('nothing queueable to compare against');
+    expect(taskStartAction(busy, startable, 'Start')).toContain('queueTaskNext');
+    // And the engine refuses it too, so no other way in can park it there either.
+    expect(act(busy, { type: 'QUEUE_TASK_NEXT', taskId: design.id }).taskQueue).not.toContain(
+      design.id,
+    );
+    // With the licence back it is offered, which is the case the button is for.
+    const licensed = act(busy, { type: 'BUY_SOFTWARE', mode: 'oneOff' });
+    expect(canQueueTask(licensed, design.id)).toBe(true);
   });
 
   it('gives the drawings page the same button, because the drawings page is on the laptop too', () => {
