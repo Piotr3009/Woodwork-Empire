@@ -759,3 +759,41 @@ and so is `queueTaskNext` itself, so no other way in can park a dead task at the
 pre-existing tick-several queue of T17 2.16 could reach the same state; it cannot now.
 
 `npm run check` exit 0: 172 files, 1,731 tests.
+
+### T19-C2 The scenarios
+
+**The sixteen months of Turns 2 to 13 stand**, re-run under the new rules with no change beyond
+the two figures T19-A3 re-measured with their reason: `thirtyDays.test.ts`, `turn13.test.ts`,
+`turn17.test.ts` and the 10.4 playthrough are all green.
+
+`turn17.test.ts`'s (y) now puts its second man on with `ADD_TO_JOB` instead of `ASSIGN_SECOND`.
+`addToJob` pushes where `assignSecond` spliced, which for a two man job is the same second name,
+so every claim (y) makes stands untouched. That was the last caller of the second man's own
+action anywhere, so the action, its case, its shim and its type went with it.
+
+**Three new months in `tests/scenarios/turn19.test.ts`:**
+
+- **(aa) three men on one job.** One opening state, three runs off it: one man, two, three. All
+  three finish the GBP 9,000 piece, so what is measured is the day it was finished on, and every
+  man put on it brings that day forward. The piece is the same piece: same value, same price, and
+  the same production minutes to within a hundred, because what three men buy is the calendar and
+  not the work. The ceiling is asserted too: three men never beat one man by more than three to
+  one, and the machine stages mean they do not come close.
+- **(bb) a lacquered kitchen, by a joiner and by a sprayer.** One hall with a booth, a moulder and
+  dry air (the dryer is deliberate: month (r) of `thirtyDays` measures wet air and this one
+  measures the man), and one kitchen set to the top of its finishing stage so the only stage
+  either man works is the one the trade is about. Over three working days the joiner gets through
+  510.72 of the 900 the stage carries and the sprayer 729.60. That is **1.4286 to one, and
+  `SPRAYER_SPRAY_RATE / JOINER_SPRAY_RATE` is 1.4285714**: the month and the constant are one
+  number and neither can drift from the other unnoticed. The joiner moves it, so a workshop
+  without a sprayer is slower at the booth and never stuck, which is the whole of 2.6.
+  A note on why the run starts at the finishing stage: a sprayer is slower than a joiner at a
+  bench, so a run from the beginning measures the cutting and the assembly as well and says the
+  joiner was faster overall. That is true and it is not what 2.6 is about.
+- **The cleaning day of 2.7**, which is one of section 7's own cross checks. A hall run to the
+  dirty band with a helper on the books and the script's own `cleanAbove` set out of the dust's
+  reach, so the scripted player can never press Clean up. The hall ends clean, the cleaning task
+  was made by the engine, and it was done by the helper. The control, the same day with no helper,
+  makes no cleaning task at all and ends as dirty as it started.
+
+`npm run check` exit 0: 173 files, 1,740 tests.
