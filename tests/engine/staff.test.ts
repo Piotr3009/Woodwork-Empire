@@ -3,10 +3,12 @@ import {
   BOOKKEEPING_MINUTES,
   ESTIMATOR_JOBS_PER_DAY,
   DAY_END_MINUTE,
+  HIRING_SPECS,
   JOINER_PREREQUISITES,
   LABOUR_FRACTION,
   MINUTES_PER_WORKING_DAY,
   OWNER_LABOUR_PER_MINUTE,
+  REPUTATION_MIN,
   TOOL_CABINET,
   WORKER_RATES,
 } from '../../src/engine/constants';
@@ -120,6 +122,16 @@ describe('the hiring pool', () => {
     expect(state.workers).toHaveLength(1);
     expect(state.workers[0]?.rate).toBe(WORKER_RATES.novice);
     expect(state.workers[0]?.weeklyWage).toBe(450);
+  });
+
+  it('pays a joiner 450, 600, 800 and 1,000 a week, tier by tier', () => {
+    // Piotr named the 1,000 for the extremely experienced man (CLAUDE.md T20 2.5); the three under
+    // him are the [TUNE] ladder. Written out as the four figures and not off the table that makes
+    // them, so a change to the ladder has to be meant.
+    const rows = HIRING_SPECS.filter((spec) => spec.role === 'joiner');
+    expect(rows.map((spec) => spec.tier)).toEqual(['novice', 'experienced', 'senior', 'master']);
+    expect(rows.map((spec) => spec.weeklyWage)).toEqual([450, 600, 800, 1000]);
+    expect(rows.map((spec) => spec.minReputation)).toEqual([REPUTATION_MIN, 15, 35, 60]);
   });
 
   it('needs a second set of everything for a second joiner', () => {

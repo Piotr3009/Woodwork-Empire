@@ -543,8 +543,12 @@ export function outputBreakdown(state: GameState): OutputBreakdown {
       where: 'your own minutes',
     });
   }
+  // Everybody on the books who works at a rate of his own. The guard used to stop at a rate of
+  // 1 as well, from the days when no tier reached the owner; tonight the experienced man is his
+  // equal and the two above him beat him, so that half of it took every man worth having off the
+  // list. The experienced man reads 0.00, which is the truth about him (CLAUDE.md T20 2.5).
   for (const worker of state.workers) {
-    if (worker.rate <= 0 || worker.rate >= 1) continue;
+    if (worker.rate <= 0) continue;
     lines.push({
       label: `${worker.name}, ${worker.tier === null ? 'a' : TIER_WORDS[worker.tier]} ${worker.role}`,
       points: roundPoints(worker.rate - 1),

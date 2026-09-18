@@ -661,7 +661,7 @@ function renderWhy(): string {
   const width = typeof window === 'undefined' ? 1280 : window.innerWidth;
   const left = Math.max(8, Math.min(open.left, Math.max(8, width - 340)));
   return (
-    `<div class="why-pop" style="left:${left}px;top:${open.top + 16}px">` +
+    `<div class="why-pop" data-popover="why" style="left:${left}px;top:${open.top + 16}px">` +
     `<p>${escapeHtml(text)}</p>` +
     '<button class="btn" data-do="closeWhy">Right</button></div>'
   );
@@ -1435,9 +1435,11 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
       return;
     case 'pickContractMan':
       // Which man the offer card is worked out for. He is not on anything: the card is showing
-      // the player what it would be like with him on it (CLAUDE.md T20 2.1.1).
+      // the player what it would be like with him on it (CLAUDE.md T20 2.1.1). It breaks and does
+      // not return, because nothing is dispatched here and the card has to be drawn again for the
+      // new man: the player picks through the men with the clock stopped.
       ui.contractMan = element.dataset.worker ?? null;
-      return;
+      break;
     // Phase B fills this one. Nothing renders a control for it yet, so no click can reach it; the
     // route is here so the button has one to wire to when it is written: `letGo` is the week's
     // notice of CLAUDE.md T20 2.4. The service already has its own route, further down.
@@ -1996,6 +1998,11 @@ function runClick(event: MouseEvent): void {
     ui.assignOpen = null;
     requestRender();
   }
+  // And the same for the why popover, which the "i" link opens (PIOTR, 18.09).
+  if (ui.why !== null && target.closest('.why-pop') === null && doer?.dataset.do !== 'showWhy') {
+    ui.why = null;
+    requestRender();
+  }
   if (doer) {
     if (doer instanceof HTMLButtonElement && doer.disabled) return;
     handleAction(doer, point);
@@ -2139,6 +2146,13 @@ function runKeyDown(event: KeyboardEvent): void {
   // An open Assign list shuts on Escape before the modal under it does (PIOTR, 18.09).
   if (ui.assignOpen !== null) {
     ui.assignOpen = null;
+    requestRender();
+    return;
+  }
+  // The why popover sits on top of whatever asked the question, so it goes first too
+  // (PIOTR, 18.09: every popover closes by its cross, Escape and a click outside).
+  if (ui.why !== null) {
+    ui.why = null;
     requestRender();
     return;
   }

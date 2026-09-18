@@ -36,6 +36,7 @@ import {
 } from './machines';
 import { countOwnedOrOnOrder } from './orders';
 import { managerOnDuty } from './owner';
+import { effectiveReputation } from './reputation';
 import { hands, workMinute } from './production';
 import { chance, int, makeId } from './rng';
 import { STATION_IDLE } from './stations';
@@ -317,7 +318,10 @@ export function hiringOptions(state: GameState): HiringOption[] {
     const missing = missingLabelsForHire(state, spec.role);
     const benchSlotsUsed = spec.role === 'joiner' ? joiners(state).length + 1 : 0;
     let blockReason = '';
-    if (state.reputation < spec.minReputation) {
+    // The figure the player reads on the board, website bonus and all: `effectiveReputation` is
+    // the one function the tier tables go through, and who answers an advert is a tier table
+    // (CLAUDE.md T13 3.7, T20 2.5).
+    if (effectiveReputation(state) < spec.minReputation) {
       blockReason = `Nobody of this standing answers yet, reputation ${spec.minReputation}`;
     } else if (BEHIND_THE_ADMIN.includes(spec.role) && !hasOfficeAdmin(state)) {
       // Nobody in the office before the one who runs it (PIOTR, CLAUDE.md T10 3.6).

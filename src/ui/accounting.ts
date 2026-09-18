@@ -219,9 +219,10 @@ function dayRows(
 }
 
 /** What the 1st takes, in words: the standing items, and the loan and the covers when they are
- *  on the books (CLAUDE.md T13 3.14, 3.15). */
+ *  on the books (CLAUDE.md T13 3.14, 3.15). No salary line: everybody is paid by the week now and
+ *  the Friday row above this one carries the whole payroll (CLAUDE.md T20 2.6). */
 function monthlyBillsLine(state: GameState): string {
-  const items = ['salaries', 'software', 'waste'];
+  const items = ['software', 'waste'];
   const loan = state.finance.loan;
   if (loan !== null) items.push(`loan instalment ${money(nextInstalmentFor(loan))}`);
   const premiums = monthlyPremiums(state);

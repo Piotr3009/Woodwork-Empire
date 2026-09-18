@@ -3256,7 +3256,6 @@ export function tierWeeklyWages(experiencedWeekly: number): Record<WorkerTier, n
 }
 
 export const JOINER_WEEKLY_WAGE = tierWeeklyWages(JOINER_WEEKLY_WAGE_EXPERIENCED);
-export const ESTIMATOR_WEEKLY_WAGE = tierWeeklyWages(ESTIMATOR_WEEKLY_WAGE_EXPERIENCED);
 export const SPRAYER_WEEKLY_WAGE = tierWeeklyWages(SPRAYER_WEEKLY_WAGE_EXPERIENCED);
 
 export interface HiringSpec {

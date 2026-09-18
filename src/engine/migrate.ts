@@ -286,8 +286,16 @@ const TIER_LIFT: Record<string, string> = {
  *  otherwise be slower than the same men hired this morning; his own wage is left alone, because
  *  what he is paid is what he was taken on for, and it comes off his monthly one where he had no
  *  weekly; nobody is under notice; no machine has been serviced under the new rule or is away
- *  being serviced; and every contract that has already ended, ended on its term, because there
- *  was no other way to end one before tonight. */
+ *  being serviced; and every contract is recorded as ended on its term, because a lifted save
+ *  cannot tell a term that ran out from an end the player called himself, and both were on the
+ *  books before tonight.
+ *
+ *  Two things the lift does not put right, both of them the price of the bump and neither of them
+ *  a bug for phase C to find. The month the upgrade lands in pays the office twice: the men who
+ *  were on a monthly wage had their whole month taken on the 1st under the old rule, and their
+ *  weeks go out again on the Fridays that are left under the new one. Nothing is given back, as
+ *  nothing was given back for Joinery Core in the lift before this one (CLAUDE.md T17 2.21).
+ *  Every month after it is right. */
 function liftToVersion17(state: Raw): void {
   for (const worker of records(state.workers)) {
     if (typeof worker.tier === 'string') {
@@ -306,6 +314,18 @@ function liftToVersion17(state: Raw): void {
   for (const item of records(state.equipment)) {
     item.serviceCount = 0;
     item.inServiceUntilDay = null;
+  }
+  // An interview the owner was sitting in when the save was taken holds the tier he is
+  // interviewing for, and the man is taken on when the hour is spent. That tier is renamed with
+  // the rest: an order left reading an old id matches no spec at all, and the hour would be spent
+  // for nobody (CLAUDE.md T20 2.5).
+  for (const task of records(state.tasks)) {
+    for (const order of records(task.orders)) {
+      if (typeof order.tier === 'string') {
+        const lifted = TIER_LIFT[order.tier];
+        if (lifted !== undefined) order.tier = lifted;
+      }
+    }
   }
   for (const contract of records(state.contracts)) contract.endedBy = 'term';
   state.version = 17;
