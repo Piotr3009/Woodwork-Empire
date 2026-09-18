@@ -3945,7 +3945,11 @@ input.num {
    nobody needed.
    --------------------------------------------------------------------------- */
 
-/* 2.5 The people on a job: chips with a cross, one blue button, and the list it opens. */
+/* 2.5 The people on a job: chips with a cross, one blue button, and the list it opens.
+   The colours read off the skin the row is drawn in: the Work Plan wears the board skin, whose
+   cards are paper, and the dark panel palette is the fallback for anywhere else. Drawn in the
+   panel's own colours they were dark pills on a cream card, which is not what the mockup shows
+   (found in the picture for T19-C4). */
 .assign-line {
   display: flex;
   flex-wrap: wrap;
@@ -3958,27 +3962,32 @@ input.num {
   align-items: center;
   gap: 6px;
   padding: 3px 6px 3px 10px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--card-line, var(--border));
   border-radius: 14px;
-  background: var(--panel-2);
+  background: var(--card-2, var(--panel-2));
+  color: var(--card-ink, inherit);
   font-size: var(--fs-small);
+  /* The name and its cross sit side by side and neither shrinks onto the other. */
+  white-space: nowrap;
 }
 
 .assign-chip .assign-off {
+  flex: 0 0 auto;
   width: 18px;
   height: 18px;
   padding: 0;
-  border: 0;
+  border: 1px solid var(--card-line, var(--border));
   border-radius: 50%;
-  background: var(--panel);
-  color: var(--text-dim);
-  font-size: var(--fs-small);
-  line-height: 18px;
+  background: var(--card, #fff);
+  color: var(--card-ink-2, var(--text-dim));
+  font-size: var(--fs-tiny);
+  line-height: 16px;
   cursor: pointer;
 }
 
 .assign-chip .assign-off:hover {
   background: var(--bad);
+  border-color: var(--bad);
   color: #fff;
 }
 
@@ -3993,9 +4002,10 @@ input.num {
   right: 12px;
   margin-top: 6px;
   padding: 8px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--card-line, var(--border));
   border-radius: 8px;
-  background: var(--panel-2);
+  background: var(--card, var(--panel-2));
+  color: var(--card-ink, inherit);
   box-shadow: 0 8px 24px rgb(0 0 0 / 35%);
 }
 
@@ -4009,20 +4019,20 @@ input.num {
 }
 
 .assign-row:not(.is-busy):hover {
-  background: var(--panel);
+  background: var(--card-2, var(--panel));
 }
 
 .assign-row.is-busy {
-  color: var(--text-dim);
+  color: var(--card-ink-2, var(--text-dim));
 }
 
 .assign-row .assign-tier {
-  color: var(--text-dim);
+  color: var(--card-ink-2, var(--text-dim));
   font-size: var(--fs-tiny);
 }
 
 .assign-row .assign-why {
-  color: var(--text-dim);
+  color: var(--card-ink-2, var(--text-dim));
   font-size: var(--fs-tiny);
   white-space: nowrap;
 }

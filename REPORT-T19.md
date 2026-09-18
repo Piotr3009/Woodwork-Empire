@@ -797,3 +797,59 @@ action anywhere, so the action, its case, its shim and its type went with it.
   makes no cleaning task at all and ends as dirty as it started.
 
 `npm run check` exit 0: 173 files, 1,740 tests.
+
+### T19-C4 Look and shoot
+
+Ten pictures in `docs/report-t19/`, every one the real app in headless Chromium at 1280 by 800 at
+one device pixel, driven by clicks, standing in front of saves the game's own `encodeSaveFile`
+wrote and its own Continue button opened. Each was looked at, one by one, and **two things the
+pictures showed were wrong are fixed**:
+
+1. **The half open door was a sliver.** The leaf swings on its hinge at 0, 45 and 90 degrees in
+   world space, and this dimetric puts screen x at `(x - y) * 24`, so a leaf at exactly 45 degrees
+   runs equally in +x and +y and projects to **no width at all**. The middle of every swing read
+   as nothing. `DOOR_HALF_ANGLE` is 60 degrees [TUNE] now, past the degenerate angle, and the
+   three states read as a door, a door caught on its way, and a door open. The test asserts every
+   leaf is at least a quarter of the closed leaf's width, so it cannot creep back.
+2. **The assign chips were dark pills on a cream card.** B2 wrote them in the dark panel palette,
+   which is right everywhere except the one place they are drawn: the Work Plan wears the board
+   skin, whose cards are paper. They read off `--card`, `--card-2`, `--card-line`, `--card-ink`
+   with the panel palette as the fallback now, and the cross no longer sits over the last letter
+   of a name (`white-space: nowrap`, and the cross does not shrink).
+
+The ten:
+
+1. `01-joiner-at-the-bench.png` (2.4, and 2.5 and 2.2 with it). The whole hall: three joiners at
+   one bench, one in front of it, one behind it and one along its side, every one of them with his
+   feet on the floor beside the bench and not one standing on its top. Piotr is in the open office
+   doorway in the same frame.
+2. `02-owner-in-the-open-door.png` (2.2, 2.3). The owner standing in the office doorway, the leaf
+   swung out and the dark opening behind him.
+3. `03-owner-at-his-desk.png` (2.2). The office view, with the owner in the room. See the note
+   below on where he stands.
+4. `04-door-three-states.png` (2.3). The real door drawn by the real stylesheet in its three
+   states, side by side, framed from the door's own `getBBox`.
+5. `05-assign-list-open.png` (2.5). "Who goes on TV unit?" with You and `add`, and Liam, Callum
+   and Ravi greyed with "on Garage shelves".
+6. `06-three-men-on-one-job.png` (2.5). Garage shelves with three chips and a cross apiece, one
+   `Assign to this job`, and the bar reading "for Liam, Callum and Ravi". The TV unit above it
+   says "Nobody is on it" in red. No "Second man" line anywhere.
+7. `07-sprayer-in-our-team.png` (2.6). Our team, with "Ravi, sprayer (normal), on TV unit,
+   GBP 2,700 a month" beside the two joiners.
+8. `08-reputation-total.png` (2.9). `Reputation 45`, "the total to date", "WHAT MOVED IT THIS
+   WEEK" with the week's rows and no carried over row, and the arithmetic reading
+   `+10  -10  +0 this week   Reputation 45`.
+9. `09-settings-sound.png` (2.10). Tips, Sound on and off, and Volume with Quieter, 70% and
+   Louder.
+10. `10-laptop-add-as-next.png` (2.12). Bookkeeping running with `Put that down`, every other row
+    offering `Add as next`, **and the Material take off row offering nothing**, because the
+    drawing comes first: the picture shows T19-C1h's fix doing its job.
+
+**One thing the pictures showed that is not fixed, and is Piotr's to say.** In
+`03-owner-at-his-desk.png` the owner stands against the back wall of the office rather than at the
+desk. The office picture is shot from the desk, so there is no floor behind it to stand a man on;
+B1's `OFFICE_OWNER_BOX` [TUNE] puts him on the visible floor to the left of the door. The brief's
+claim, that a player who follows him through the door finds him, holds. If Piotr wants him nearer
+the desk, that box is the one number to move.
+
+`npm run check` exit 0: 173 files, 1,740 tests.

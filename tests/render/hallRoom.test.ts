@@ -346,6 +346,17 @@ describe('the doors open (PIOTR, 17.09; CLAUDE.md T19 2.3)', () => {
       expect(leaf).toHaveLength(4);
       expect(leaf[3]?.y).toBeLessThan(leaf[0]?.y ?? 0);
     }
+    // Every leaf is also wide enough to be seen. A leaf at world forty five degrees projects to
+    // exactly no width in this dimetric (screen x is (x - y) * 24), so the middle of the swing
+    // read as a sliver until the half angle was moved off it (T19-C4, found in the picture).
+    const full = Math.abs(
+      (doorLeaf(OFFICE, 'closed')[1]?.x ?? 0) - (doorLeaf(OFFICE, 'closed')[0]?.x ?? 0),
+    );
+    for (const phase of DOOR_PHASES) {
+      const leaf = doorLeaf(OFFICE, phase);
+      const wide = Math.abs((leaf[1]?.x ?? 0) - (leaf[0]?.x ?? 0));
+      expect(wide / full, phase).toBeGreaterThan(0.25);
+    }
   });
 
   it('wants the door open while somebody is standing in it, and shut when nobody is', () => {

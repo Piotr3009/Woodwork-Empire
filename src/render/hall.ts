@@ -314,9 +314,16 @@ export function doorOpening(room: { x: number; y: number; width: number; depth: 
 /** The leaf, swung on its hinge in the hall's own dimetric (CLAUDE.md T19 2.3). The hinge is the
  *  left jamb and the leaf swings out into the hall, which is the way the room doors open
  *  (docs/art/SPRITES.md 9.3), so it never sweeps through the man standing in the doorway, who is
- *  at the middle of the opening. Closed is flat in the face, open is square out of it, half is
- *  the forty five degrees between: three quarters of a right angle is not a swing, it is a door
- *  caught on the way. */
+ *  at the middle of the opening. Closed is flat in the face and open is square out of it.
+ *
+ *  Half is NOT the forty five degrees between them, and the reason is the projection. A leaf at
+ *  world forty five degrees runs equally in +x and +y, and this dimetric puts screen x at
+ *  `(x - y) * 24`, so that one angle projects to exactly no width at all: the door vanished to a
+ *  sliver and the middle of the swing read as nothing. Found by looking at the picture of the
+ *  three states for T19-C4, which is what that task is for. `DOOR_HALF_ANGLE` is 60 degrees
+ *  [TUNE]: past the degenerate angle, so the leaf has width again and reads as a door caught on
+ *  its way open. */
+const DOOR_HALF_ANGLE = (Math.PI / 180) * 60;
 export function doorLeaf(
   room: { x: number; y: number; width: number; depth: number },
   phase: DoorPhase,
@@ -324,7 +331,7 @@ export function doorLeaf(
   const door = roomDoorBox(room);
   const face = room.y + room.depth;
   const hinge = { x: room.x + door.from, y: face };
-  const angle = phase === 'closed' ? 0 : phase === 'half' ? Math.PI / 4 : Math.PI / 2;
+  const angle = phase === 'closed' ? 0 : phase === 'half' ? DOOR_HALF_ANGLE : Math.PI / 2;
   const free = {
     x: hinge.x + door.across * Math.cos(angle),
     y: hinge.y + door.across * Math.sin(angle),
