@@ -469,7 +469,7 @@ describe('a month short handed, with a joiner and one small rack', () => {
     expect(state.cash).toBeGreaterThan(state.finance.overdraftLimit);
   });
 
-  it('took a poor joiner on and bought the shelving', () => {
+  it('took a joiner with no experience on and bought the shelving', () => {
     expect(state.workers).toHaveLength(1);
     expect(state.workers[0]?.role).toBe('joiner');
     expect(state.workers[0]?.tier).toBe('novice');

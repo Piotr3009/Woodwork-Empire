@@ -29,6 +29,7 @@ import {
   serviceMachine,
 } from '../../src/engine/machines';
 import { hallBlock } from '../../src/engine/jobs';
+import { SERVICE_IS_CALLED_IN, startTaskCheck } from '../../src/engine/tasks';
 import { jobProgress, tick } from '../../src/engine/index';
 import type { Equipment, GameState } from '../../src/engine/index';
 import {
@@ -214,6 +215,56 @@ describe('what the day costs when the machine goes out (CLAUDE.md T20 2.9.3)', (
     expect(jobProgress(firstJob(stopped))).toBe(0);
     // And the card says which of the two it is: away being serviced, not broken (T20 2.9.3).
     expect(hallBlock(stopped, firstJob(stopped))).toBe('table saw is in for a service');
+  });
+});
+
+describe('a service is called in, never worked off (CLAUDE.md T20 2.9)', () => {
+  it('leaves the reminder on the list and refuses the hands that reach for it', () => {
+    // Turn 8's half hour at the spanner went with 2.9, and `applyTaskCompletion` has no service
+    // case any more: a service task the owner could still start would be thirty minutes of his
+    // day for nothing, and a Start button on a row that does nothing. The reminder stays, and it
+    // says where the one path is.
+    const state = hall();
+    const saw = theSaw(state);
+    saw.hoursUsed = SERVICE_INTERVAL_HOURS + 1;
+    // The day's open raises it and the player answers Leave it, the way the scripted owner does:
+    // the reminder is then on the Workshop list with nobody on it, which is the state this is
+    // about.
+    let raised = act(state, { type: 'END_DAY' });
+    let guard = 0;
+    while (guard < 3000 && !raised.tasks.some((entry) => entry.kind === 'service' && !entry.done)) {
+      guard += 1;
+      const open = raised.activeEvent;
+      if (open === null) {
+        raised = tick(raised, 1);
+        continue;
+      }
+      const later = open.choices.find((choice) => choice.id === 'later');
+      raised = act(raised, {
+        type: 'RESOLVE_EVENT',
+        choiceId: later?.id ?? open.choices[0]?.id ?? 'ok',
+      });
+    }
+    const task = raised.tasks.find((entry) => entry.kind === 'service' && !entry.done);
+    expect(task).toBeDefined();
+    expect(task?.equipmentId).toBe(saw.id);
+    if (task === undefined) throw new Error('no service reminder');
+    expect(startTaskCheck(raised, task.id)).toEqual({
+      ok: false,
+      reason: SERVICE_IS_CALLED_IN,
+      blockingTaskId: null,
+    });
+    // Not even the explicit override starts it: there is nothing to stand at. And the click the
+    // player would make on the row leaves him where he was.
+    expect(startTaskCheck(raised, task.id, true).ok).toBe(false);
+    const pressed = act(raised, { type: 'START_TASK', taskId: task.id });
+    expect(pressed.owner.currentTaskId).toBeNull();
+    expect(pressed.tasks.some((entry) => entry.kind === 'service' && !entry.done)).toBe(true);
+    // And the one path does close it: the call pays, takes the machine out and takes the
+    // reminder off the list in the same minute.
+    const called = act(raised, { type: 'SERVICE_MACHINE', equipmentId: saw.id });
+    expect(called.tasks.some((entry) => entry.kind === 'service' && !entry.done)).toBe(false);
+    expect(machineIsOut(theSaw(called), called.clock.day)).toBe(true);
   });
 });
 

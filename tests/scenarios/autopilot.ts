@@ -17,7 +17,7 @@ import {
   tick,
   unconnectedMachines,
 } from '../../src/engine/index';
-import type { Contract, GameEvent, GameState, TaskInstance } from '../../src/engine/index';
+import type { Contract, GameEvent, GameState, TaskInstance, WorkerTier } from '../../src/engine/index';
 
 /** What the script answers when the clock stops for a decision. */
 export function answer(state: GameState, policy?: Policy): string {
@@ -69,19 +69,14 @@ const TASK_ORDER: TaskInstance['kind'][] = [
   'design',
   'materialTakeOff',
   'cleaning',
-  // A service takes the machine out for the rest of the working day now (CLAUDE.md T20 2.9.3), so
-  // the careful owner calls it in when the day's work is done and not in the middle of a cut.
-  'service',
+  // No service here. From CLAUDE.md T20 2.9 a service is called in and paid for at the call and
+  // nobody stands at the machine with a spanner, so the reminder on the list is a reminder and
+  // not a job of work: `startTaskCheck` refuses it and points at the Machines page. The scripted
+  // owner walks past it the way he walks past the helper's jobs of work.
 ];
-
-/** [TUNE] The last hour of the working day, which is when the scripted owner calls a service in:
- *  from T20 2.9 a service takes the machine out until the next working day, so a careful owner
- *  does not stop his only saw in the middle of a cut. */
-const SERVICE_FROM_MINUTE = DAY_END_MINUTE - 60;
 
 function nextTask(state: GameState): TaskInstance | null {
   for (const kind of TASK_ORDER) {
-    if (kind === 'service' && state.clock.minute < SERVICE_FROM_MINUTE) continue;
     // He does not reach for what the engine would refuse him: with a helper in the hall the
     // unloading, the bags and the cleaning are the helper's, and the script walks past them
     // (CLAUDE.md T11 3.4).
@@ -102,12 +97,14 @@ export interface Policy {
   cleanAbove: number;
   /** Templates the script will take, dearest first. Nothing else is touched. */
   wanted: string[];
-  /** Take one poor joiner on, with the kit he needs, on day 1. */
+  /** Take one joiner with no experience on, with the kit he needs, on day 1. */
   hireJoiner: boolean;
-  /** Take this many poor joiners on instead of one, each with his own kit (CLAUDE.md T7 3.1). */
+  /** Take this many of them on instead of one, each with his own kit (CLAUDE.md T7 3.1). */
   joiners?: number;
-  /** The tier of the joiners taken on; the poor one unless the month says otherwise. */
-  joinerTier?: 'novice' | 'experienced' | 'senior';
+  /** The tier of the joiners taken on. All four of them, in the words of TIER_WORDS: no
+   *  experience, experienced, super experienced, extremely experienced (CLAUDE.md T20 2.5). The
+   *  man with no experience unless the month says otherwise. */
+  joinerTier?: WorkerTier;
   /** How the management software is paid for: outright unless the month says the subscription. */
   licence?: 'oneOff' | 'subscription';
   /** Saws to stand in the hall beyond the one in the day 1 kit. A machine serves one man at a

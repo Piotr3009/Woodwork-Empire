@@ -27,6 +27,7 @@ import {
   MONTH_LINES,
   burgle,
   claimBurglary,
+  contractPiece,
   drawContract,
   dustOutputOf,
   extractionCheck,
@@ -201,7 +202,11 @@ describe('(v) a four week contract with the joiner taken off it for two of them'
   drawn.pieceId = 'cutSheetPack';
   drawn.quantityPerWeek = 20;
   drawn.termWeeks = 4;
-  drawn.pricePerPiece = 100;
+  // The piece's own price off the table, and never a figure this month made up. It read 100 here,
+  // written in Turn 13 when a cut sheet pack was 38, so the month was trading at a price the board
+  // has never offered. From tonight it is the 50 of CLAUDE.md T20 2.2, and the months run on the
+  // prices the game really has.
+  drawn.pricePerPiece = contractPiece(drawn).price;
   state.contracts.push(drawn);
   state = act(state, { type: 'ACCEPT_CONTRACT', contractId: drawn.id });
   state = act(state, { type: 'ASSIGN_CONTRACT', contractId: drawn.id, workerId: joiner.id, on: true });
@@ -252,7 +257,10 @@ describe('(v) a four week contract with the joiner taken off it for two of them'
   it('renegotiates from the history: a per cent up for the full week, four down for the short', () => {
     const factor = 1 + CONTRACT_RENEW_FULL_WEEK - 2 * CONTRACT_RENEW_SHORT_WEEK;
     expect(contract?.renegotiatedPrice).toBe(Math.round(priceAtStart * factor));
-    expect(contract?.renegotiatedPrice).toBe(97);
+    // 49, where it read 97 until tonight: the month runs at the piece's own 50 now instead of the
+    // 100 it used to make up, and 0.97 of 50 rounds to 49. The new prices of CLAUDE.md T20 2.2
+    // moved it and nothing else did: the weeks, the short weeks and the factor are what they were.
+    expect(contract?.renegotiatedPrice).toBe(49);
     const report = seen.find((event) => event.kind === 'contractEnded');
     expect(report).toBeDefined();
     expect(report?.data.pieces).toBe(contract?.piecesMade);

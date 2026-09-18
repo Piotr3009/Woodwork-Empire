@@ -238,6 +238,10 @@ export function cleanerAtWork(state: GameState): Worker | null {
 /** What the hall says while the van or the bag is waiting for the man whose job it is. */
 export const WAITING_FOR_HELPER = 'Waiting for the helper';
 
+/** What the service row says instead of a Start: nobody stands at a service, it is called in and
+ *  paid for from the Machines page (PIOTR, 18.09; CLAUDE.md T20 2.9). */
+export const SERVICE_IS_CALLED_IN = 'Call it in on the Machines page';
+
 /** Float guard, not a game number: work this small is finished work. It lives in constants.ts
  *  with every other figure and is handed on from here, where it has always been imported from. */
 export { WORK_EPSILON };
@@ -848,6 +852,12 @@ export function startTaskCheck(
   const task = findTask(state, taskId);
   if (!task) return refused('That job of work has gone');
   if (task.done) return refused('Done');
+  // A service is called in and paid for, never worked off: Turn 8's half hour at the spanner went
+  // with the rule of CLAUDE.md T20 2.9, and `applyTaskCompletion` has no service case any more.
+  // The reminder stays on the list so the player sees the machine is due, and it points him at
+  // the one path that services it: the Machines page, or the choice on the event
+  // (`callServiceIn`), both of which close this task.
+  if (task.kind === 'service') return refused(SERVICE_IS_CALLED_IN);
   if (!ownerIsAvailable(state)) return refused('The owner is not in today');
   // The unloading, the bags and the cleaning are the helper's while he is here.
   if (!force && isHelperTask(state, task)) return refused(WAITING_FOR_HELPER);
