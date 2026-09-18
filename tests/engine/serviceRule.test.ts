@@ -29,8 +29,19 @@ import {
   serviceIsDue,
   serviceMachine,
 } from '../../src/engine/machines';
+import { hallBlock } from '../../src/engine/jobs';
+import { jobProgress, tick } from '../../src/engine/index';
 import type { Equipment, GameState } from '../../src/engine/index';
-import { buyStartingKit, fillRack, newGame } from '../helpers';
+import {
+  acceptNow,
+  act,
+  buyStartingKit,
+  clearEvents,
+  fillRack,
+  firstJob,
+  newGame,
+  placeEnquiry,
+} from '../helpers';
 
 function hall(): GameState {
   const state = fillRack(buyStartingKit(newGame({ difficulty: 'veryEasy' })), 20);
@@ -175,6 +186,37 @@ describe('the machine is out for the working day (CLAUDE.md T20 2.9.3)', () => {
       ok: false,
       reason: 'It is repaired, never serviced',
     });
+  });
+});
+
+/** A job on the bench with the material on the rack, at the cutting stage: the saw is what makes
+ *  it, so the saw going out is felt in the day's work. */
+function cutting(): GameState {
+  let state = fillRack(buyStartingKit(newGame({ difficulty: 'veryEasy' })), 40);
+  state.enquiries = [];
+  const enquiry = placeEnquiry(state, { price: 10000, deadlineDays: 90 });
+  state = acceptNow(state, enquiry.id, false);
+  firstJob(state).stage = 'ready';
+  return act(state, { type: 'WORK_HERE', jobId: null });
+}
+
+describe('what the day costs when the machine goes out (CLAUDE.md T20 2.9.3)', () => {
+  it('stops the stage from the call to the end of the day, and the day s work with it', () => {
+    // Four hours of the morning, once with the saw on the floor and once with it away.
+    const worked = clearEvents(tick(cutting(), 240));
+    const away = cutting();
+    serviceMachine(away, theSaw(away).id);
+    const stopped = clearEvents(tick(away, 240));
+    // It is still out at the end of those hours: the day is the unit, not the half hour.
+    expect(machineIsOut(theSaw(stopped), stopped.clock.day)).toBe(true);
+    expect(familyStopped(stopped, 'tableSaw')?.why).toBe('service');
+    // And the work did not happen: the stage the saw makes is stopped, so the day's output falls.
+    expect(jobProgress(firstJob(worked))).toBeGreaterThan(0);
+    expect(jobProgress(firstJob(stopped))).toBe(0);
+    // FLIP, NOTES-B3.md note 6: `src/engine/jobs.ts` is nobody's file this phase, so the job card
+    // still calls a machine that is away being serviced broken. When phase C applies note 6 this
+    // line reads 'table saw is in for a service'.
+    expect(hallBlock(stopped, firstJob(stopped))).toBe('table saw is broken');
   });
 });
 

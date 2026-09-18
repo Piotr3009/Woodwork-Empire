@@ -22,11 +22,13 @@ import type { GameState } from '../../src/engine/index';
 import { buyStartingKit, newGame } from '../helpers';
 
 /** The fake clock: real milliseconds, a second a tick, which is a cell a tick at the walker's
- *  own pace. */
+ *  own pace. It answers how many figures the frame's own re-sort moved, which is the figure this
+ *  file measures: the re-sort is inside the frame, so a second `resortFigures` after it has
+ *  nothing left to do and would answer 0 however much the first one had thrashed. */
 let clockMs = 0;
-function tick(root: ParentNode): void {
+function tick(root: ParentNode): number {
   clockMs += 1000;
-  stepWalkers(root, clockMs);
+  return stepWalkers(root, clockMs);
 }
 
 function page(state: GameState): HTMLElement {
@@ -119,19 +121,22 @@ describe('a man walking past a machine', () => {
     let was = start.owner < start.saw;
     let moves = 0;
     for (let frame = 0; frame < 20 && walker.path.length > 0; frame += 1) {
-      tick(root);
+      moves += tick(root) > 0 ? 1 : 0;
       const now = order(root);
       const isBefore = now.owner < now.saw;
       if (isBefore !== was) changes += 1;
       was = isBefore;
-      moves += resortFigures(root) > 0 ? 1 : 0;
     }
     expect(changes).toBe(1);
     // And he ends in front of it: painted after it.
     const end = order(root);
     expect(end.owner).toBeGreaterThan(end.saw);
-    // Nothing was moved again once he was past it: the re-sort is a swap and not a sort.
-    expect(moves).toBe(0);
+    // The whole walk moved him in the order on one frame and no other: the re-sort is a swap
+    // where his feet have crossed a neighbour, and not a sort of the scene every frame.
+    expect(moves).toBe(1);
+    // And nothing is moved again once he is standing still.
+    expect(tick(root)).toBe(0);
+    expect(tick(root)).toBe(0);
   });
 });
 
@@ -146,10 +151,7 @@ describe('a hall in which nothing crosses', () => {
     resortFigures(root);
     const start = order(root);
     let moved = 0;
-    for (let frame = 0; frame < 60; frame += 1) {
-      tick(root);
-      moved += resortFigures(root);
-    }
+    for (let frame = 0; frame < 60; frame += 1) moved += tick(root);
     expect(moved).toBe(0);
     expect(order(root)).toEqual(start);
   });

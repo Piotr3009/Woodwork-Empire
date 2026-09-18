@@ -19,7 +19,7 @@ import {
 } from '../../src/render/doors';
 import { resetWalkers, syncWalkers, stepWalkers, walkerOf } from '../../src/render/walkers';
 import type { GameState } from '../../src/engine/index';
-import { buyStartingKit, newGame } from '../helpers';
+import { buyStartingKit, hireNow, newGame } from '../helpers';
 
 function page(state: GameState): HTMLElement {
   const holder = document.createElement('div');
@@ -120,6 +120,30 @@ describe('a man goes through it (CLAUDE.md T20 2.12)', () => {
     syncWalkers(back, 62_000, straight);
     expect(walkerOf('owner')?.at).toEqual({ x: door.x, y: door.y });
     expect(walkerOf('owner')?.path.length).toBeGreaterThan(0);
+  });
+});
+
+describe('the office is the owner s room, and a desk man stands at its door', () => {
+  it('draws the estimator at the doorway, because the office view has nobody but the owner in it', () => {
+    const start = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
+    start.cash = 50_000;
+    const hired = hireNow(start, 'estimator', 'novice');
+    hired.enquiries = [];
+    const estimator = hired.workers.find((worker) => worker.role === 'estimator');
+    if (estimator === undefined) throw new Error('nobody was hired');
+    estimator.startDay = hired.clock.day;
+    // A take off, the books, a drawing or the phone are all desk work: the engine puts him on the
+    // office station and his cell is the doorway.
+    estimator.station = STATION_OFFICE;
+    hired.owner.station = STATION_BENCH;
+    const root = page(hired);
+    syncWalkers(root, 0, straight);
+    walkOn(root, 0);
+    const drawn = renderHall(hired);
+    expect(drawn).toContain(`data-worker="${estimator.id}"`);
+    expect(figureIsThroughADoor(`worker-${estimator.id}`, roomDoorCell('office'))).toBe(false);
+    // And he is nobody's knock: the door counts the owner alone.
+    expect(figuresThroughDoors()).toEqual([]);
   });
 });
 

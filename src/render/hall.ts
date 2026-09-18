@@ -53,6 +53,7 @@ import { machineInUse } from '../engine/game';
 import { rackCapacity } from '../engine/materials';
 import {
   STATION_BENCH,
+  STATION_CLEANING,
   STATION_GATE,
   STATION_IDLE,
   STATION_NO_BENCH,
@@ -1071,6 +1072,9 @@ function stationLabel(station: string): string {
   if (station === STATION_OFFICE) return 'the office';
   if (station === STATION_PHONE) return 'the phone';
   if (station === STATION_BENCH) return 'the bench';
+  // The cleaning is a station of its own since 2.8.2, and a man with a broom in his hands is not
+  // waiting for anything (CLAUDE.md T20 2.8).
+  if (station === STATION_CLEANING) return 'sweeping the floor';
   if (station === STATION_NO_BENCH) return 'no bench';
   return 'waiting';
 }
@@ -1634,7 +1638,9 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
     const where = stationLabel(worker.station);
     const cell = stationCell(state, worker.station, bench);
     // He has gone through a door and is in the room behind it: off the hall's drawing until he
-    // comes out again (PIOTR, 18.09; CLAUDE.md T20 2.12).
+    // comes out again (PIOTR, 18.09; CLAUDE.md T20 2.12). `figureGoesThroughDoors` says who that
+    // is: the owner, because the office view draws him and nobody else yet, so a man at a desk is
+    // still drawn standing in the doorway rather than nowhere at all.
     if (figureIsThroughADoor(`worker-${worker.id}`, cell)) continue;
     drawables.push(
       figure(

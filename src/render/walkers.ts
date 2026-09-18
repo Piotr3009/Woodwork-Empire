@@ -412,8 +412,10 @@ function arrive(walker: Walker): void {
 
 /** Moves every walker on by the real time since the last frame, at a man's pace, never more than
  *  one cell in one frame, and writes the transform, the animation and the facing on the figure
- *  that is already on the page. */
-export function stepWalkers(root: ParentNode, nowMs: number): void {
+ *  that is already on the page. It answers how many figures the frame's re-sort moved, which is
+ *  what the depth order's own test measures: the re-sort is inside the frame, so counting it
+ *  afterwards counts nothing (CLAUDE.md T20 2.11). Every caller but a test ignores it. */
+export function stepWalkers(root: ParentNode, nowMs: number): number {
   for (const node of Array.from(root.querySelectorAll('[data-figure]'))) {
     const key = node.getAttribute('data-figure');
     if (key === null) continue;
@@ -452,5 +454,5 @@ export function stepWalkers(root: ParentNode, nowMs: number): void {
   }
   // He is painted where his feet are: the order is checked against his neighbours every frame and
   // changed only where it has crossed one (PIOTR; CLAUDE.md T20 2.11).
-  resortFigures(root);
+  return resortFigures(root);
 }

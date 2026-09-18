@@ -34,6 +34,18 @@ export function resetDoors(): void {
   goings = 0;
 }
 
+/** Which figures go through a door, and which stand at it (CLAUDE.md T20 2.12). The office is the
+ *  one room the game draws behind a door, and its view draws the owner alone (T19 2.2: one box,
+ *  measured for him, `OFFICE_OWNER_BOX`). So the owner is the one man who leaves the hall's drawing
+ *  at the doorway. An estimator on a take off, an admin on the books, a draftsman on a drawing or a
+ *  salesman on the phone is a desk job too (`stationForTask`), and he stands in the doorway as he
+ *  did in Turn 19: a man who is on neither picture is a man the player has lost. The crew's own
+ *  places in the office are a drawing nobody has made, and nothing visual is built without a
+ *  mockup (PIOTR, 18.09). The day that mockup lands, this predicate is the one line that widens. */
+export function figureGoesThroughDoors(key: string): boolean {
+  return key === 'owner';
+}
+
 /** True while this figure has gone through a door: the engine has him behind one, and his legs
  *  have got him there. Both halves matter. The cell is what the engine says this minute, so the
  *  moment it sends him somewhere else he is drawn again and walks out of the door; the walker is
@@ -41,6 +53,7 @@ export function resetDoors(): void {
  *  stood in. A figure the walker has never heard of is where the page says he is, which is what a
  *  page built from nothing, and every render test, reads. */
 export function figureIsThroughADoor(key: string, cell: Cell): boolean {
+  if (!figureGoesThroughDoors(key)) return false;
   if (!isDoorwayCell(cell)) return false;
   const walker = walkerOf(key);
   if (walker === undefined) return true;
@@ -57,6 +70,7 @@ export function figuresThroughDoors(): string[] {
 function readDoors(): void {
   const now = new Set<string>();
   for (const key of walkerKeys()) {
+    if (!figureGoesThroughDoors(key)) continue;
     const walker = walkerOf(key);
     if (walker === undefined) continue;
     if (walkerIsThroughADoor(walker)) now.add(key);

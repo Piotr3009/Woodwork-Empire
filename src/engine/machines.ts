@@ -252,7 +252,10 @@ export function isSellableFamily(specId: string): boolean {
 export function sheetsStrandedBySale(state: GameState, item: Equipment): number {
   let room = 0;
   for (const other of state.equipment) {
-    if (other.id === item.id) continue;
+    // A rack that is already sold is no room at all: it stands in the hall until the buyer's van
+    // comes in the morning, and counting it would let the last two racks be sold one after the
+    // other on the same day with the sheets still on them (CLAUDE.md T20 2.10).
+    if (other.id === item.id || isSold(other) || !itemStandsInTheHall(other)) continue;
     room += sheetCapacityOf(other);
   }
   return Math.max(0, state.stock.sheets - room);

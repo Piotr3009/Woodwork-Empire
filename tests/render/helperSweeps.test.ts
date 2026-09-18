@@ -63,6 +63,10 @@ describe('the helper sweeps with a broom (CLAUDE.md T20 2.8)', () => {
     expect(svg).toContain(`data-station="${STATION_CLEANING}"`);
     expect(svg).toContain('data-rest="sweep"');
     expect(svg).toContain('character.helper.sweep.sheet.png');
+    // And the line under his name says what he is doing. The cleaning is a station of its own
+    // since 2.8.2, and a station the hall has no word for reads "waiting", which a man with a
+    // broom in his hands is not.
+    expect(svg).toContain(`${helper.name}, sweeping the floor`);
     // At his bench he is at his bench, as he always was.
     helper.station = STATION_BENCH;
     expect(renderHall(state, { files: ['character.helper.sweep.sheet.png'] })).not.toContain(

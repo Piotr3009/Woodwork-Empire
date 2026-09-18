@@ -8,7 +8,7 @@ import { STATION_RACK, somebodyAtTheRack, storageSaleBlock } from '../../src/eng
 import { ownedTile } from '../../src/ui/catalogue';
 import { findSpec } from '../../src/engine/index';
 import type { Equipment, GameState } from '../../src/engine/index';
-import { buyStartingKit, fillRack, newGame } from '../helpers';
+import { buyNow, buyStartingKit, fillRack, newGame } from '../helpers';
 
 function hall(sheets = 0): GameState {
   const state = fillRack(buyStartingKit(newGame({ difficulty: 'veryEasy' })), sheets);
@@ -51,6 +51,25 @@ describe('the rack is a thing the workshop can sell (CLAUDE.md T20 2.10)', () =>
     // One sheet is one sheet, and the sentence counts.
     state.stock.sheets = 1;
     expect(storageSaleBlock(state, rack)).toBe('Empty it first, 1 sheet on it');
+  });
+
+  it('counts no room on a rack that is already sold, so the last two cannot both go in a day', () => {
+    const state = hall(24);
+    state.cash = 50_000;
+    const withTwo = buyNow(state, 'sheetRack', 'budget');
+    const racks = withTwo.equipment.filter((item) => item.specId === 'sheetRack');
+    expect(racks).toHaveLength(2);
+    const first = racks[0];
+    const second = racks[1];
+    if (first === undefined || second === undefined) throw new Error('two racks were wanted');
+    // Two racks and twenty four sheets: either one can go, because the other one holds them.
+    expect(storageSaleBlock(withTwo, first)).toBe('');
+    expect(storageSaleBlock(withTwo, second)).toBe('');
+    expect(sellMachine(withTwo, first.id).ok).toBe(true);
+    // A sold rack stands in the hall until the buyer's van comes in the morning, and it is no room
+    // at all: the sheets are the second rack's now, and it stays until they are gone.
+    expect(sheetsStrandedBySale(withTwo, second)).toBe(24);
+    expect(storageSaleBlock(withTwo, second)).toBe('Empty it first, 24 sheets on it');
   });
 
   it('will not go while somebody is standing at it', () => {

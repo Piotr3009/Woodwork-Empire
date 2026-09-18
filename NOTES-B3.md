@@ -200,17 +200,22 @@ this phase, so it still prints the broken sentence for it. The line, at the end 
 `tests/engine/jobs.test.ts`, that `hallBlock` of a job at the cutting stage then reads
 `table saw is in for a service`.
 
-### Note 7 (a decision for Piotr, not a fix). The half hour with a spanner
+### Note 7 (REQUIRED, raised from an open question by the review). `src/engine/game.ts`: the service is called in
 
-2.9 says the new rule "replaces Turn 8's 30 minutes at 2%", and its four numbered points say what
-a service now gives (the life), costs (a tenth), takes (a working day of the machine) and what
-happens past the end of the life. **None of the four says the half hour of somebody's time goes**,
-so B3 left it: the service is still the task `runServiceDue` raises and somebody works off, and
-the four points are all true of it. The machine goes out for the working day from the moment the
-service is done rather than the moment the button is pressed, which is half an hour apart.
+**Why it is required and not a question.** 2.9.2 says the service "costs a tenth of the machine's
+value, **paid when called**" and 2.9.3 says "the machine is **out for one working day from the
+call**", and 2.9's own preamble says the rule "replaces Turn 8's 30 minutes at 2%". B3 first read
+the four numbered points as silent about the half hour and left the Turn 8 task in place; that
+reading does not survive the two words "the call". As the code stands, the Machines page's
+`Service, £180` button raises a task and starts it, and `pay` and `serviceMachine` only run in
+`applyTaskCompletion`, so the press costs nothing at the minute it is pressed, the machine goes on
+cutting, and with nobody free the service never happens at all while the row goes on naming its
+price. The button must pay and put the machine out in the same minute.
 
-If Piotr means the half hour to go as well, the change is three places in `src/engine/game.ts`,
-and it is a decision and not a fix, so it is written here rather than applied:
+**Why B3 did not do it.** `src/engine/game.ts` is one of the six frozen files, and every one of
+the three places is in it.
+
+**The change, three places in `src/engine/game.ts`:**
 
 1. a new helper beside `runServiceDue`:
 
@@ -241,8 +246,23 @@ function callServiceIn(state: GameState, equipmentId: string): void {
    taken out of the `bagsFull`/`machineBroken` group in `resolveEvent` and given its own
    `if (choiceId === 'service') callServiceIn(state, String(event.data.equipmentId));`.
 
-With it, `TASK_DEFINITIONS.service` should lose its `eligibleRoles`, because a service task nobody
-can work off must not offer a Start on the Tasks page.
+With it, `TASK_DEFINITIONS.service` should lose its `eligibleRoles` (`src/engine/tasks.ts`),
+because a service task nobody can work off must not offer a Start on the Tasks page.
+
+**The test that proves it.** An app test, `tests/ui/machineService.test.ts` (B3's own name space,
+so phase C may write it there): open the Machines page on a hall with a saw, read the cash and
+click the row's `Service` button once; in the same minute `state.cash` has fallen by
+`serviceCostFor(saw)`, `saw.inServiceUntilDay` is `nextWorkingDay(state.clock.day)`,
+`saw.serviceCount` is 1, and `state.tasks` has no open `service` task for it. And in
+`tests/engine/serviceRule.test.ts`, the day the call costs is already measured
+(`what the day costs when the machine goes out`); it will read the same after this note, because
+it calls `serviceMachine` itself.
+
+**What moves when it lands.** `tests/scenarios/autopilot.ts` answers the `serviceDue` event with
+`later` and keeps the scripted owner off a `service` task until the last hour of the day (section 5
+below); with this note the event's choices become `service` and `later`, so the `later` line stands
+as it is and the `nextTask` guard has nothing left to guard, because there is no service task to
+take. Phase C should run the three month playthrough after applying it.
 
 ### Note 8. `src/engine/game.ts`, `canSell`: a rack goes when it is empty and nobody is at it
 
@@ -302,6 +322,69 @@ Two constants in `constants.ts` are left with no reader by 2.12 and 2.13: `DOOR_
 `DOOR_CLOSE_MS` (the swing) and `STAND_IN_GAIN` (the synthesised sound). They are Piotr's figures
 for things the game no longer does. Phase C may delete them with the rest of the turn's tidying;
 B3 left them, because `constants.ts` is frozen and an unread constant harms nothing.
+
+### Note 10 (raised by the review). `src/ui/company.ts`: the Machines column says `0 h`
+
+2.14 is one word, it is on the turn's cross check list, and the two halves of the brief put it in
+two places: the task queue gives it to B3 (`T20-B3c 2.10 and 2.14`) and section 3 gives
+`company.ts rows` to B2. `src/ui/company.ts` is not in B3's file list, so B3 did not touch it; this
+note is here so that the word is nobody's assumption. Phase C: if B2's diff does not carry it,
+apply it.
+
+**The file.** `src/ui/company.ts`, the helper `hours`, just above `percent`.
+
+**Old text:**
+
+```ts
+/** Hours as the board writes them: "12.5 h", and "none" for a machine nobody stood at. */
+function hours(value: number): string {
+  return value <= 0 ? 'none' : `${value} h`;
+}
+```
+
+**New text:**
+
+```ts
+/** Hours as the board writes them: "12.5 h", and "0 h" for a machine nobody stood at, because a
+ *  column of hours reads in hours (PIOTR, 18.09; CLAUDE.md T20 2.14). */
+function hours(value: number): string {
+  return `${value <= 0 ? 0 : value} h`;
+}
+```
+
+**The test that proves it.** `tests/ui/company.test.ts`: the Machines column of a board whose
+machines have stood idle reads `0 h` and the word `none` is nowhere in it.
+
+### Note 11 (raised by the review). `src/engine/materials.ts`, `rackCapacity`: a rack that leaves tomorrow is not room
+
+`sheetsStrandedBySale` in `machines.ts` now passes over a rack that is sold and waiting for the
+buyer's van, so the last two racks cannot both be sold on the same day with the sheets still on
+them. `rackCapacity` in `materials.ts` sums `sheetCapacityOf` over every entry of
+`state.equipment` with no such filter, so a delivery can still be unloaded onto a rack that leaves
+in the morning. `materials.ts` is B1's file this phase, so B3 left it.
+
+**Old text:**
+
+```ts
+  for (const item of state.equipment) capacity += sheetCapacityOf(item);
+```
+
+**New text:**
+
+```ts
+  // A rack that is sold stands in the hall until the van comes, and it is no room: nothing is
+  // unloaded onto a rack that leaves in the morning (CLAUDE.md T20 2.10).
+  for (const item of state.equipment) {
+    if (isSold(item) || !itemStandsInTheHall(item)) continue;
+    capacity += sheetCapacityOf(item);
+  }
+```
+
+with `isSold` joining the `from './machines'` import beside `sheetCapacityOf` and
+`itemStandsInTheHall`.
+
+**The test that proves it.** `tests/engine/materials.test.ts`: with the hall's only rack sold and
+not yet collected, `rackCapacity` is 0 and `canUnload` is false.
 
 ---
 
@@ -382,6 +465,11 @@ them; what it does not do until they land is look small, green and red.
 - `tests/ui/sound.test.ts`: the stand ins are gone (2.13), so the tests that heard one now assert
   silence, and the tests about what the hall plays are run against a fake that can decode, which
   is the day Piotr's recordings land. `withRecordings` in that file is the whole of the change.
+- `tests/render/depthOrder.test.ts`, `tests/render/doors.test.ts`,
+  `tests/render/helperSweeps.test.ts`, `tests/engine/rackSale.test.ts` and
+  `tests/engine/serviceRule.test.ts` each gained a case in the review pass (section 7): the
+  measurement of the re-sort, the estimator at the office door, the sweeping man's own label, the
+  rack that is already sold, and the day a service costs. Nothing was weakened and nothing removed.
 - `tests/scenarios/autopilot.ts`, the scripted player, **re-scripted and not re-measured**, the
   way REPORT-T17 re-scripted him for the hiring gate. Under 2.9.3 a service takes the machine out
   until the next working day, so the careful owner does not stop his only saw in the middle of a
@@ -405,6 +493,85 @@ them; what it does not do until they land is look small, green and red.
 - The engine's own guard on selling a rack with sheets on it, because `canSell` is in the frozen
   `game.ts`. It is note 8, and the Owned tab already refuses it in the same words, so nothing in
   the game offers the sale.
-- 2.14, the Machines column's `0 h`, which is B2's: `src/ui/company.ts` is theirs this phase.
+- The service paid and the machine out at the press of the button, because all three places are in
+  the frozen `game.ts`. It is note 7, which the review raised from an open question to a required
+  change.
+- The unload's own reading of a sold rack, because `materials.ts` is B1's file this phase. It is
+  note 11.
+- 2.14, the Machines column's `0 h`: `src/ui/company.ts` is not in B3's file list and section 3
+  gives the company rows to B2, while the task queue gives 2.14 to B3. It is written out as note 10
+  so that the one word is nobody's assumption, and phase C applies it if B2's diff has not.
 - Nothing of 2.11 was left undone, and it wanted no note: the re-sort is the walker's own and the
   depth every drawable carries is written where the scene is built.
+
+---
+
+## 7. Review: the findings that stood
+
+An adversarial reviewer read B3's diff and reported eight findings. Each was checked against the
+code before anything was written. Five were confirmed and fixed in B3's own files, two were
+confirmed as facts whose fix is in a file B3 may not edit and are now notes, and one was already a
+note before the review.
+
+**1. `src/render/hall.ts`, every desk worker vanishes (blocker). Confirmed and fixed.** It was
+true and it was B3's: `stationForTask` sends a material take off, the books, an order, a drawing, a
+site measure and a client call to the office or the phone for a worker as well as for the owner,
+`stationCell` gives all of them the office doorway, and the skip at the worker loop took him off
+the hall, while `officeFigure` starts `if (!ownerIsAvailable(state)) return '';` and draws nobody
+but the owner. So an estimator on a take off was on neither picture. The fix is one predicate in
+`src/render/doors.ts`, `figureGoesThroughDoors(key)`, which `figureIsThroughADoor` and `readDoors`
+both ask: the owner goes through a door, because the office view draws the owner alone (one box,
+`OFFICE_OWNER_BOX`, measured for him in T19 2.2), and everybody else stands at the doorway as he
+did in Turn 19. The crew's places in the office are a drawing nobody has made, and nothing visual
+is built without a mockup (PIOTR, 18.09), so widening the office view was not the fix; the day that
+mockup lands, the predicate is the one line that changes. The test is in
+`tests/render/doors.test.ts`, `draws the estimator at the doorway ...`: it fails on the code as the
+reviewer read it (`expected ... to contain 'data-worker="staff-38"'`) and passes on the fix.
+
+**2. `src/ui/machinesPage.ts`, the Service button neither pays nor takes the machine out.
+Confirmed; it is note 7, now required.** The reviewer read 2.9.2 and 2.9.3 correctly: "paid when
+called" and "out for one working day from the call" leave no room for the Turn 8 half hour, and
+2.9's preamble says the rule replaces it. B3's first reading was too kind to the old path. Every
+one of the three places is in the frozen `src/engine/game.ts`, so nothing could be applied here:
+note 7 above is rewritten from "a decision for Piotr" into a required change, with the exact text
+and with the app test phase C must add (`tests/ui/machineService.test.ts`).
+
+**3. `tests/render/depthOrder.test.ts`, the sixty tick stability test measured nothing. Confirmed
+and fixed.** `stepWalkers` ends with `resortFigures(root)`, so the test's own second call always
+answered 0 whatever the first had done. `stepWalkers` now returns the count from its own re-sort
+(`: number` in place of `: void`; every caller but a test ignores it, and `src/ui/app.ts` needed no
+change), the fake clock's `tick` answers it, and the two tests accumulate that: the walk past the
+saw moves him in the order on exactly one frame, two further frames standing still move nothing,
+and the sixty quiet ticks move nothing, measured and not assumed.
+
+**4. `src/engine/machines.ts`, `sheetsStrandedBySale` counted racks that are already sold.
+Confirmed and fixed.** A sold rack stands in `state.equipment` until `collectSoldMachines` takes it
+in the morning, so two racks could both be sold on the same day with the sheets still on them. The
+sum now passes over `isSold(other)` and `!itemStandsInTheHall(other)`. The new case is in
+`tests/engine/rackSale.test.ts`. The same hole in `rackCapacity` (`src/engine/materials.ts`, B1's
+file) is note 11.
+
+**5. `src/render/hall.ts`, a man sweeping was labelled "waiting". Confirmed and fixed.** 2.8.2 made
+the cleaning its own station and `stationLabel` had no case for it, so the helper with a broom read
+`Dave, waiting` for the two hours of `CLEANING_MINUTES`. It now reads `Dave, sweeping the floor`,
+beside the bench's own line, and `tests/render/helperSweeps.test.ts` asserts the title.
+
+**6. `src/ui/company.ts`, 2.14 not done. Confirmed as a conflict in the brief, written as note 10,
+not edited.** The task queue gives 2.14 to B3 and section 3 gives the company rows to B2;
+`src/ui/company.ts` is not in B3's file list and the phase rule is "anything else: a note, not an
+edit". Note 10 carries the exact old and new text and the test, so the word is nobody's assumption.
+
+**7. `tests/scenarios/autopilot.ts`, the re-script hides what 2.9.3 costs. Confirmed, and answered
+in B3's own file.** `tests/scenarios` is not B3's, and the scripted player's deferral is honest
+(a careful owner does not stop his only saw mid-cut). What was missing was a test that the day off
+costs a day, and it is now in `tests/engine/serviceRule.test.ts`,
+`stops the stage from the call to the end of the day, and the day s work with it`: four hours of a
+cutting job with the saw on the floor moves the job on, the same four hours with the saw away moves
+it not at all (`jobProgress` is exactly 0), `familyStopped` reads `service` at the end of them, and
+the machine is still out. It would fail the day the day-out were dropped.
+
+**8. `src/engine/jobs.ts`, a card says "broken" for a machine in for a service. Confirmed; it was
+already note 6.** `src/engine/jobs.ts` is nobody's file this phase, so the sentence could not be
+fixed here. What the review adds is the assertion the note asked for, written as a FLIP line in
+`tests/engine/serviceRule.test.ts`: it asserts today's wrong word, `table saw is broken`, with the
+note's number on it, so phase C can see the note land.
