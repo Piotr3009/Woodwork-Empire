@@ -214,3 +214,32 @@ describe('the standing bar on the work plan', () => {
     expect(plan.querySelector('.plan-row[data-plan]')).toBeNull();
   });
 });
+
+describe('the contract bar on the plan, assigned like a job (PIOTR, 18.09)', () => {
+  it('sits under the jobs, shows the men as chips and opens a list with the cross every popover has', () => {
+    const state = hall();
+    const contract = offered(state);
+    acceptContract(state, contract.id);
+    const plan = parse(renderWorkPlan(state));
+    const bar = plan.querySelector(`.contract-bar[data-contract="${contract.id}"]`);
+    expect(bar).not.toBeNull();
+    // Under the rows (or the empty line), never covered by the modal's lead: nothing of the plan
+    // comes after the bar.
+    const before = bar?.previousElementSibling;
+    expect(before).not.toBeNull();
+    expect(bar?.nextElementSibling).toBeNull();
+    expect(bar?.querySelector('[data-do="openAssign"]')?.textContent).toBe('Assign to this contract');
+    expect(bar?.textContent).toContain('Nobody is on it');
+    const open = parse(renderWorkPlan(state, null, contract.id));
+    const list = open.querySelector(`.contract-bar[data-contract="${contract.id}"] .assign-list`);
+    expect(list).not.toBeNull();
+    expect(list?.querySelector('.modal-close[data-do="closeAssign"]')).not.toBeNull();
+    const add = list?.querySelector('[data-do="assignContract"][data-on="1"]');
+    expect(add?.getAttribute('data-worker')).toBe('staff-1');
+    // On it: a chip with a cross that takes him off.
+    contract.assigned.push('staff-1');
+    const chips = parse(renderWorkPlan(state)).querySelector(`.contract-bar[data-contract="${contract.id}"]`);
+    expect(chips?.querySelector('.assign-chip')?.textContent).toBe('Ben×');
+    expect(chips?.querySelector('[data-do="assignContract"][data-on="0"]')?.getAttribute('data-worker')).toBe('staff-1');
+  });
+});

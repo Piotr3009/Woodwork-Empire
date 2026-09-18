@@ -4009,6 +4009,16 @@ input.num {
   box-shadow: 0 8px 24px rgb(0 0 0 / 35%);
 }
 
+/* The cross on the Assign list: the same disc as every modal, hung off the list's top right
+   corner (PIOTR, 18.09). The list is absolute already, so the disc anchors to it. */
+.assign-list .modal-close {
+  position: absolute;
+  right: -14px;
+  top: -14px;
+  transform: scale(0.72);
+  transform-origin: top right;
+}
+
 .assign-row {
   display: flex;
   align-items: center;

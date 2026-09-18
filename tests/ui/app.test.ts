@@ -451,6 +451,29 @@ describe('assigning work by hand', () => {
     expect(html()).toContain('Nobody is on it');
     click('[data-do="closeModal"]');
   });
+
+  it('shuts the Assign list by its cross, by Escape and by a click outside it (PIOTR, 18.09)', () => {
+    const state = currentState();
+    if (state && state.jobs[0]) state.jobs[0].stage = 'ready';
+    click('[data-office="workPlan"]');
+    click('[data-do="openAssign"]');
+    expect(root().querySelector('.assign-list')).not.toBeNull();
+    // The cross: the same control every modal has.
+    expect(root().querySelector('.assign-list .modal-close[data-do="closeAssign"]')).not.toBeNull();
+    click('.assign-list .modal-close');
+    expect(root().querySelector('.assign-list')).toBeNull();
+    // Escape shuts the list and leaves the plan open under it.
+    click('[data-do="openAssign"]');
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(root().querySelector('.assign-list')).toBeNull();
+    expect(root().querySelector('.modal-layer [data-modal="workPlan"]')).not.toBeNull();
+    // A click anywhere outside it shuts it too.
+    click('[data-do="openAssign"]');
+    expect(root().querySelector('.assign-list')).not.toBeNull();
+    click('.plan-chart');
+    expect(root().querySelector('.assign-list')).toBeNull();
+    click('[data-do="closeModal"]');
+  });
 });
 
 describe('start production', () => {

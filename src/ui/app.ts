@@ -1601,6 +1601,15 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
       ui.assignOpen = null;
       dispatch({ type: 'ADD_TO_JOB', jobId: id, workerId: element.dataset.worker ?? 'owner' });
       return;
+    // A man on another job comes here in one click: off that job, on to this one (PIOTR, 18.09).
+    case 'assignMove': {
+      ui.assignOpen = null;
+      const who = element.dataset.worker ?? 'owner';
+      const from = element.dataset.from ?? '';
+      if (from !== '') dispatch({ type: 'REMOVE_FROM_JOB', jobId: from, workerId: who });
+      dispatch({ type: 'ADD_TO_JOB', jobId: id, workerId: who });
+      return;
+    }
     case 'assignOff':
       dispatch({ type: 'REMOVE_FROM_JOB', jobId: id, workerId: element.dataset.worker ?? '' });
       return;
@@ -1943,6 +1952,16 @@ function runClick(event: MouseEvent): void {
     ui.menuOpen = false;
     requestRender();
   }
+  // A click anywhere but inside the Assign list, or on the button that opens one, shuts it
+  // (PIOTR, 18.09: every popover closes by its cross, Escape and a click outside).
+  if (
+    ui.assignOpen !== null &&
+    target.closest('.assign-list') === null &&
+    doer?.dataset.do !== 'openAssign'
+  ) {
+    ui.assignOpen = null;
+    requestRender();
+  }
   if (doer) {
     if (doer instanceof HTMLButtonElement && doer.disabled) return;
     handleAction(doer, point);
@@ -2080,6 +2099,12 @@ function runKeyDown(event: KeyboardEvent): void {
   }
   if (ui.daySummary !== null) {
     ui.daySummary = null;
+    requestRender();
+    return;
+  }
+  // An open Assign list shuts on Escape before the modal under it does (PIOTR, 18.09).
+  if (ui.assignOpen !== null) {
+    ui.assignOpen = null;
     requestRender();
     return;
   }

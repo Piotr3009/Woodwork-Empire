@@ -1101,3 +1101,26 @@ faults they showed fixed.
   record are listed in `docs/art/REQUESTS-T19.md`.
 - **The sprayer has no character sheet**, so he is drawn by the capsule, which is what 2.6 asks
   for. His sheets are requested in `docs/art/REQUESTS-T19.md` 2.
+
+---
+
+## Patch v28 (Claude, in the chat, 18.09): the Assign list can be shut, and moves men
+
+Piotr could not close the Assign to this job list (no cross, Escape and a click outside did
+nothing) and could not move a man off another job without unpinning him first. `APP_VERSION`
+`v28`, no state change:
+
+1. The list has the cross every modal has (`closeButton('closeAssign')`, scaled down, hung off its
+   top right), Escape shuts it before the modal under it, and a click anywhere outside it shuts it
+   (the opener toggles as before).
+2. A man on another job is no longer greyed: his row says `leaves <job>` and a `Move here` button
+   takes him off that job and puts him on this one in one click (`assignMove`: REMOVE_FROM_JOB
+   then ADD_TO_JOB). Greyed stays for: already on this job, helpers, not in the hall today.
+3. The contract bar on the Work Plan is assigned like a job: the men on it as chips with a cross
+   (`assignContract` with `on=0`), an `Assign to this contract` button opening the same kind of
+   list (joiners only; the engine's `contractAssignCheck` says why for the rest), sharing
+   `ui.assignOpen`. The bar moved under the jobs so the modal's lead never covers it.
+
+Tests: `app.test.ts` (cross, Escape, click outside), `assignees.test.ts` (Move here off another
+job), `contracts.test.ts` (the bar's chips, button, list and place). The rule this comes from:
+every new modal, popover or list has the cross, Escape and click outside (PIOTR, 18.09).

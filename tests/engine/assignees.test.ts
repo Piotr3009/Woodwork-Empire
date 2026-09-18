@@ -217,7 +217,7 @@ describe('the men on a job (CLAUDE.md T19 2.5)', () => {
     expect(open.querySelector(`[data-plan="${job.id}"] .assign-list`)).not.toBeNull();
   });
 
-  it('greys the men it cannot take, and says why of each of them', () => {
+  it('greys the men it cannot take, says why, and moves a man off another job in one click', () => {
     const state = menOnOne(2);
     const job = jobOfFirst(state);
     const other = state.jobs.find((entry) => leadAssignee(entry) === 'staff-3');
@@ -231,8 +231,16 @@ describe('the men on a job (CLAUDE.md T19 2.5)', () => {
     );
     expect(onIt.some((text) => text.includes('Joiner 1') && text.includes('already on this job')))
       .toBe(true);
-    // A man on another job carries that job's name.
-    expect(onIt.some((text) => text.includes('Joiner 3') && text.includes(other.name))).toBe(true);
+    // A man on another job is not greyed: his row says where he is and moves him here in one
+    // click, off that job and on to this one (PIOTR, 18.09).
+    const third = rowFor('staff-3');
+    expect(third?.className).not.toContain('is-busy');
+    expect(third?.textContent).toContain(`leaves ${other.name}`);
+    const move = third?.querySelector('[data-do="assignMove"]');
+    expect(move?.getAttribute('data-from')).toBe(other.id);
+    expect(move?.getAttribute('data-id')).toBe(job.id);
+    // The cross every popover has (PIOTR, 18.09).
+    expect(list?.querySelector('.modal-close[data-do="closeAssign"]')).not.toBeNull();
     // The owner is free, so his row is the one that can be clicked, once.
     const owner = rowFor('owner');
     expect(owner?.className).not.toContain('is-busy');

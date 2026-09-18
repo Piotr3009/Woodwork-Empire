@@ -15,6 +15,7 @@ import {
   fullWeeksOf,
   joiners,
   offeredContract,
+  onTheBooksToday,
   shortWeeksOf,
   weekOfTerm,
   weekWanted,
@@ -28,6 +29,7 @@ import {
 import type { Contract, GameState, Worker } from '../engine/index';
 import {
   button,
+  closeButton,
   days,
   emptyLine,
   escapeHtml,
@@ -214,7 +216,7 @@ export function renderContracts(state: GameState): string {
 
 /** The standing bar on the Work Plan, separate from the jobs, with its piece counter
  *  (CLAUDE.md T13 3.16). Nothing while no contract is running. */
-export function renderContractBar(state: GameState): string {
+export function renderContractBar(state: GameState, assignOpen: string | null = null): string {
   const active = activeContracts(state);
   if (active.length === 0) return '';
   const day = state.clock.day;
@@ -222,20 +224,68 @@ export function renderContractBar(state: GameState): string {
     .map((contract) => {
       const wanted = weekWanted(contract, day);
       const share = wanted <= 0 ? 100 : Math.min(100, Math.round((contract.piecesThisWeek / wanted) * 100));
-      const names = contract.assigned
-        .map((id) => state.workers.find((worker) => worker.id === id)?.name ?? '')
-        .filter((name) => name !== '');
-      const people = names.length === 0 ? 'nobody on it' : names.join(', ');
+      // The men on it as chips with a cross apiece, and the one button that opens the list, the
+      // same as a job's (PIOTR, 18.09: a contract is assigned from the plan like anything else).
+      const chips = contract.assigned
+        .map((id) => {
+          const worker = state.workers.find((entry) => entry.id === id);
+          if (!worker) return '';
+          return (
+            `<span class="assign-chip">${escapeHtml(worker.name)}` +
+            `<button class="assign-off" data-do="assignContract" data-id="${contract.id}" ` +
+            `data-worker="${id}" data-on="0" title="${escapeHtml(`Take ${worker.name} off this contract`)}">×</button>` +
+            '</span>'
+          );
+        })
+        .join('');
+      const nobody = chips === '' ? '<span class="assign-none">Nobody is on it</span>' : '';
+      const open = assignOpen === contract.id;
+      const opener =
+        `<button class="btn btn-primary assign-open" data-do="${open ? 'closeAssign' : 'openAssign'}" ` +
+        `data-id="${contract.id}">Assign to this contract</button>`;
       return (
         `<div class="contract-bar" data-contract="${contract.id}">` +
         `<div class="row"><span class="row-main">${escapeHtml(contract.name)}</span>` +
         `<span class="contract-count">${escapeHtml(contractCounterLine(contract, day))}</span></div>` +
         `<div class="contract-track"><span class="contract-fill${share < 100 ? '' : ' is-full'}" ` +
         `style="width:${share}%"></span></div>` +
-        `<p class="hint">${escapeHtml(people)} · week ${weekOfTerm(contract, day)} of ${contract.termWeeks} · ` +
+        `<p class="hint">week ${weekOfTerm(contract, day)} of ${contract.termWeeks} · ` +
         `${money(contract.pricePerPiece)} a piece</p>` +
+        `<span class="row-action assign-line">${nobody}${chips}${opener}</span>` +
+        (open ? contractAssignList(state, contract) : '') +
         '</div>'
       );
     })
     .join('');
+}
+
+/** The list the contract's blue button opens: every joiner on the books, with the one click that
+ *  puts him on, and everybody else told why not (only a joiner goes on a contract; a man already
+ *  on it; a man not in today). A joiner on a job is offered too: the contract takes him alongside
+ *  the job, as the engine allows, and the plan shows him on both. */
+function contractAssignList(state: GameState, contract: Contract): string {
+  const rows = state.workers
+    .filter((worker) => onTheBooksToday(state, worker))
+    .map((worker) => {
+      const head =
+        `<span>${escapeHtml(worker.name)} ` +
+        `<span class="assign-tier">${escapeHtml(worker.tier === null ? worker.role : `${worker.tier} ${worker.role}`)}</span></span>`;
+      if (contract.assigned.includes(worker.id)) {
+        return `<div class="assign-row is-busy">${head}<span class="assign-why">already on this contract</span></div>`;
+      }
+      const check = contractAssignCheck(contract, worker);
+      if (!check.ok) {
+        return `<div class="assign-row is-busy">${head}<span class="assign-why">${escapeHtml(check.reason)}</span></div>`;
+      }
+      return (
+        `<div class="assign-row">${head}` +
+        `<button class="chip" data-do="assignContract" data-id="${contract.id}" data-worker="${worker.id}" data-on="1">add</button>` +
+        '</div>'
+      );
+    })
+    .join('');
+  return (
+    '<div class="assign-list">' + closeButton('closeAssign') +
+    `<span class="row-figure">Who goes on ${escapeHtml(contract.name)}?</span>${rows}</div>`
+  );
 }

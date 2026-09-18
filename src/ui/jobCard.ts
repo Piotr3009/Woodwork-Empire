@@ -35,6 +35,7 @@ import { DROP_PROJECT_REPUTATION } from '../engine/constants';
 import type { GameState, Job } from '../engine/index';
 import {
   button,
+  closeButton,
   emptyLine,
   escapeHtml,
   lockedButton,
@@ -101,12 +102,29 @@ function assigneeTrade(state: GameState, who: string): string {
   return worker.tier === null ? trade : `${worker.tier} ${trade}`;
 }
 
-/** One row of the Assign list: his name, his trade, and either the one click that puts him on or
- *  the reason he cannot be put on, greyed (PIOTR, 17.09; the mockup of docs/mockups/t19). */
-function assignRow(state: GameState, job: Job, who: string, why: string): string {
+/** One row of the Assign list: his name, his trade, and either the one click that puts him on, the
+ *  one click that moves him here off another job, or the reason he cannot be put on, greyed
+ *  (PIOTR, 17.09 and 18.09; the mockup of docs/mockups/t19). A man on another job is not a wall:
+ *  five men for a quarter of an hour and then on to the next job is two clicks a head, not an
+ *  unpinning first. */
+function assignRow(
+  state: GameState,
+  job: Job,
+  who: string,
+  why: string,
+  moveFrom: Job | null = null,
+): string {
   const head =
     `<span>${escapeHtml(assigneeName(state, who))} ` +
     `<span class="assign-tier">${escapeHtml(assigneeTrade(state, who))}</span></span>`;
+  if (moveFrom !== null) {
+    return (
+      '<div class="assign-row">' + head +
+      `<span class="assign-why">leaves ${escapeHtml(moveFrom.name)}</span>` +
+      `<button class="chip" data-do="assignMove" data-id="${job.id}" data-from="${moveFrom.id}" ` +
+      `data-worker="${who}">Move here</button></div>`
+    );
+  }
   if (why !== '') {
     return `<div class="assign-row is-busy">${head}` +
       `<span class="assign-why">${escapeHtml(why)}</span></div>`;
@@ -166,14 +184,15 @@ function assignList(state: GameState, job: Job): string {
       if (worker && !BUILDING_ROLES.includes(worker.role)) {
         return assignRow(state, job, who, 'helpers do not build');
       }
-      const other = state.jobs.find((entry) => entry.id !== job.id && isOnJob(entry, who));
-      if (other) return assignRow(state, job, who, `on ${other.name}`);
       if (!canBuild(state, who)) return assignRow(state, job, who, 'not in the hall today');
+      const other = state.jobs.find((entry) => entry.id !== job.id && isOnJob(entry, who));
+      if (other) return assignRow(state, job, who, '', other);
       return assignRow(state, job, who, '');
     })
     .join('');
+  // The cross every modal, popover and list has (PIOTR, 18.09): the same one as the Company board.
   return (
-    '<div class="assign-list">' +
+    '<div class="assign-list">' + closeButton('closeAssign') +
     `<span class="row-figure">Who goes on ${escapeHtml(job.name)}?</span>${rows}</div>`
   );
 }

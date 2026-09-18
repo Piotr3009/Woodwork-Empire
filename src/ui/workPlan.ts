@@ -152,9 +152,10 @@ export function renderWorkPlan(
   assignOpen: string | null = null,
 ): string {
   const plan = workPlan(state);
-  // The standing contracts have a bar of their own, apart from the jobs (CLAUDE.md T13 3.16).
-  const contracts = renderContractBar(state);
-  if (plan.rows.length === 0) return contracts + emptyLine('No jobs yet. Open the board.');
+  // The standing contracts have a bar of their own, apart from the jobs, under them so the
+  // modal's lead never covers it (CLAUDE.md T13 3.16; PIOTR, 18.09).
+  const contracts = renderContractBar(state, assignOpen);
+  if (plan.rows.length === 0) return emptyLine('No jobs yet. Open the board.') + contracts;
   const rows = plan.rows
     .map((row) => {
       const job = state.jobs.find((entry) => entry.id === row.jobId);
@@ -180,7 +181,7 @@ export function renderWorkPlan(
     'turns red. A job nobody has started yet carries the yellow tick on the last day it can be ' +
     'started and still be on time. The axis is working days: Monday follows Friday and no ' +
     'deadline falls at a weekend.</p>' +
-    contracts +
-    `<div class="plan">${scaleHtml(plan)}${rows}</div>`
+    `<div class="plan">${scaleHtml(plan)}${rows}</div>` +
+    contracts
   );
 }
