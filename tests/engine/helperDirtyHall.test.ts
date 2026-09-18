@@ -15,7 +15,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { HELPER_CLEAN_DUST_BAND } from '../../src/engine/constants';
-import { dustAtLeast, dustBand } from '../../src/engine/machines';
+import { dustAtLeast, dustBand, hallLooksDirty, sawdustPiles } from '../../src/engine/machines';
 import { helperOnDuty } from '../../src/engine/staff';
 import { renderHall } from '../../src/render/hall';
 import type { GameState, Worker } from '../../src/engine/index';
@@ -92,6 +92,9 @@ describe('why the helper stands beside the dirt (CLAUDE.md T20 2.8)', () => {
     const state = hallWithHelper();
     state.dust = 5;
     expect(pilesDrawn(state)).toBe(1);
+    // The drawing and the count are one figure, which is what note 1 hands the helper.
+    expect(sawdustPiles(state.dust)).toBe(1);
+    expect(hallLooksDirty(state.dust)).toBe(true);
     expect(dustBand(state.dust).label).toBe('clean');
     expect(dustAtLeast(state.dust, HELPER_CLEAN_DUST_BAND)).toBe(false);
     // And at the band he does answer, the floor has been dirty to the eye for a long time.
@@ -105,6 +108,7 @@ describe('why the helper stands beside the dirt (CLAUDE.md T20 2.8)', () => {
     // 10:00: three piles on the floor, and the game does not think the hall wants sweeping.
     expect(atTen.dust).toBe(DIRTIED_TO);
     expect(pilesDrawn(atTen)).toBe(3);
+    expect(hallLooksDirty(atTen.dust)).toBe(true);
     expect(dustAtLeast(atTen.dust, HELPER_CLEAN_DUST_BAND)).toBe(false);
     // FLIP: after note 1 the helper picks up a broom here and the hall is clean by the evening.
     expect(evening.tasks.some((task) => task.kind === 'cleaning')).toBe(false);

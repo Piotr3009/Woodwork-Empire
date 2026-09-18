@@ -86,3 +86,31 @@ station and the sweep sheet.
 instead of a band of his own. `src/engine/game.ts` is one of the six frozen files, so B3 did not
 write it: it is note 1 of `NOTES-B3.md` for phase C, with its exact old and new text, and the
 characterisation test above keeps asserting today's behaviour until that note lands.
+
+### 2.8 The fix, the bags and the broom
+
+**The fix is a note, and the characterisation test still asserts today's behaviour.** The cause is
+one line of `runHelperClean` in `src/engine/game.ts`, which is one of the six frozen files, so B3
+wrote it out as note 1 of `NOTES-B3.md` with its exact old and new text, its two import lines and
+the tests it moves. What B3 could build is the half the note stands on:
+`hallLooksDirty(dust)` and `sawdustPiles(dust)` in `src/engine/machines.ts`, off one named
+`DUST_PER_SAWDUST_PILE` [TUNE] of 10, and `sawdust()` in `src/render/hall.ts` now draws its piles
+from that same count, so the dirt the player sees and the dirt the helper is asked about are one
+figure and cannot drift apart again. The note was applied to a scratch copy and the whole suite
+run against it: exit 0, and two test files move, both written out in the note.
+
+**The bags.** 2.8.1 asks for `bagChange` to gain the helper as an autoRole. There is no
+`bagChange`: the kind is `emptyBags` and it has carried `autoRoles: ['helper']` since Turn 12,
+and `raiseBagsFull` already delegates to him instead of putting the question to the owner. The
+half that was missing is the chip, and it is built: with the store full and the helper holding
+the job of work, the chip under the hall reads `Dave is emptying the bags` and carries no button,
+the way the cleaning chip has said who is sweeping since Turn 19. It is driven by its own input,
+the open task and the man holding it, and not by the role table.
+
+**The broom.** Cleaning is a station of its own now, `STATION_CLEANING`, instead of falling in with
+the bench: `stationForTask` sends a cleaning task to it, `animationForStation('cleaning')` returns
+`sweep`, and the helper plays the broom sheet the v28 patch delivered. Where he stands has not
+moved a cell: the new station falls through `stationCell` exactly where the bench station did. A
+role with no broom sheet falls to `bench` and not to idle, through one table `INSTEAD_OF` in
+`src/render/characters.ts` beside the Turn 19 fallbacks, so the owner and a joiner sweeping are men
+working with their hands rather than men standing about.

@@ -25,6 +25,7 @@ import {
   hasExtraction,
   hasGate,
   machinesDueService,
+  sawdustPiles,
   serviceIsDue,
 } from '../engine/machines';
 import {
@@ -75,7 +76,14 @@ import { ownerIsAvailable } from '../engine/owner';
 import { homeCellOf } from '../engine/staff';
 import { plural } from '../engine/text';
 import type { RoomId } from '../engine/constants';
-import type { Equipment, EquipmentSpec, GameState, OnOrderItem } from '../engine/types';
+import type {
+  Equipment,
+  EquipmentSpec,
+  GameState,
+  OnOrderItem,
+  TaskInstance,
+  Worker,
+} from '../engine/types';
 import {
   type BoxFaces,
   type Point,
@@ -905,7 +913,9 @@ const CATEGORY_SHADE: Record<string, string> = {
 /** Grey sawdust piles near the machines, one per ten points of dust, in a fixed pattern so the
  *  view never jitters (CLAUDE.md 10.3). */
 function sawdust(state: GameState): Drawable[] {
-  const piles = Math.round(state.dust / 10);
+  // One figure for the piles that are drawn and for the dirt the helper answers, so he picks up a
+  // broom for the dirt the player is looking at (CLAUDE.md T20 2.8).
+  const piles = sawdustPiles(state.dust);
   const drawables: Drawable[] = [];
   const machines = state.equipment.filter((item) => {
     const spec = findSpec(item.specId);
@@ -1826,6 +1836,20 @@ function lowerName(specId: string): string {
   return (findSpec(specId)?.name ?? specId).toLowerCase();
 }
 
+/** The man who has the one open job of work of this kind in his hands this minute, or null. It is
+ *  `cleanerAtWork` of `src/engine/tasks.ts` with the kind asked for instead of fixed at the
+ *  cleaning: both halves have to be true, the task names him and he names it, and a task the owner
+ *  took on himself is nobody, because that is his own override and it keeps its button
+ *  (CLAUDE.md T19 2.7, T20 2.8). NOTES-B3.md note 3 asks phase C to fold the two into one
+ *  selector in `tasks.ts`, which is not B3's file this phase. */
+function manOnOpenTask(state: GameState, kind: TaskInstance['kind']): Worker | null {
+  const task = state.tasks.find((entry) => entry.kind === kind && !entry.done);
+  if (!task || task.doneBy === null) return null;
+  const worker = state.workers.find((entry) => entry.id === task.doneBy);
+  if (!worker || worker.taskId !== task.id) return null;
+  return worker;
+}
+
 /** Everything the hall wants doing, in the order it costs the workshop: what has stopped, then
  *  what is slowing it down, then what can wait a day (CLAUDE.md T17 2.5). The one list: the
  *  chips over the floor are built from it and nothing else reads the hall's state in words. */
@@ -1844,11 +1868,23 @@ export function hallProblems(state: GameState): HallProblem[] {
     });
   }
   if (bagStore(state).full) {
-    list.push({
-      kind: 'bags',
-      equipmentId: null,
-      text: 'The bags are full, so nothing that makes dust runs',
-    });
+    // The bags are the helper's, like the unloading and the sweeping, so once he has them in hand
+    // the chip says so and asks the player nothing (PIOTR, 18.09; CLAUDE.md T20 2.8).
+    const man = manOnOpenTask(state, 'emptyBags');
+    list.push(
+      man === null
+        ? {
+            kind: 'bags',
+            equipmentId: null,
+            text: 'The bags are full, so nothing that makes dust runs',
+          }
+        : {
+            kind: 'bags',
+            equipmentId: null,
+            text: `${man.name} is emptying the bags`,
+            inHand: true,
+          },
+    );
   }
   const machines = state.equipment.filter((item) => findSpec(item.specId)?.category === 'machine');
   if (machines.length > 0 && !hasExtraction(state)) {

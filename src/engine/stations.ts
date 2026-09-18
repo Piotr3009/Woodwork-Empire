@@ -23,6 +23,10 @@ export const STATION_OFFICE = 'office';
  *  sheet the figure plays (PIOTR, 15.09; CLAUDE.md T11 3.11). */
 export const STATION_PHONE = 'phone';
 export const STATION_IDLE = 'idle';
+/** Sweeping the floor. It is its own station and not the bench, because a man with a broom is not
+ *  a man at a bench: the renderer plays the sweep sheet at it (CLAUDE.md T20 2.8). Where he stands
+ *  is unchanged, his own home cell, which is what the bench station fell through to. */
+export const STATION_CLEANING = 'cleaning';
 /** Standing at the canteen door because there is no bench to work at (CLAUDE.md T4 3.4). */
 export const STATION_NO_BENCH = 'noBench';
 
@@ -135,7 +139,7 @@ export function stationForTask(state: GameState, task: TaskInstance): string {
       return machineStation(machine.specId);
     }
     case 'cleaning':
-      return STATION_BENCH;
+      return STATION_CLEANING;
     case 'clientCall':
       return STATION_PHONE;
     default:

@@ -442,6 +442,28 @@ export function dustAtLeast(dust: number, label: string): boolean {
   return order.indexOf(dustBand(dust).label) >= order.indexOf(label);
 }
 
+/** [TUNE] How much dust one pile of sawdust on the floor is worth. It is not a new figure: it is
+ *  the ten `sawdust()` in `src/render/hall.ts` has divided by since Turn 2, given a name so that
+ *  the dirt the player sees and the dirt the engine answers are one reading. Phase C moves it
+ *  into constants.ts with the rest of the dust figures (CLAUDE.md T20 2.8). */
+export const DUST_PER_SAWDUST_PILE = 10;
+
+/** How many piles of sawdust the hall is painting at this much dust. The renderer draws exactly
+ *  this many (CLAUDE.md T20 2.8). */
+export function sawdustPiles(dust: number): number {
+  return Math.round(dust / DUST_PER_SAWDUST_PILE);
+}
+
+/** True while there is dirt on the floor to look at, which is from the first pile on. This is the
+ *  question the helper is asked, and it is asked of the drawing and not of a band of its own: the
+ *  bands say what the dust does to the work and to the men (CLAUDE.md 9.7) and they start past 40,
+ *  eight times the dust the first pile is drawn at. Between the two the player saw dirt and the
+ *  labourer stood beside it, which is PIOTR's complaint of 18.09 word for word (CLAUDE.md T20 2.8;
+ *  the diagnosis is in REPORT-T20.md). */
+export function hallLooksDirty(dust: number): boolean {
+  return sawdustPiles(dust) > 0;
+}
+
 /** True once five joiners are on the books without a helper (CLAUDE.md 9.3). */
 export function helperMissing(state: GameState): boolean {
   const joiners = state.workers.filter((worker) => worker.role === 'joiner').length;
