@@ -1,5 +1,9 @@
 [
   "catalogueFloor.png",
+  "character.helper.carry.sheet.png",
+  "character.helper.idle.sheet.png",
+  "character.helper.sweep.sheet.png",
+  "character.helper.walk.sheet.png",
   "character.joiner.bench.sheet.png",
   "character.joiner.carry.sheet.png",
   "character.joiner.idle.sheet.png",

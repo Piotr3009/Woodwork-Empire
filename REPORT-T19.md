@@ -1124,3 +1124,15 @@ nothing) and could not move a man off another job without unpinning him first. `
 Tests: `app.test.ts` (cross, Escape, click outside), `assignees.test.ts` (Move here off another
 job), `contracts.test.ts` (the bar's chips, button, list and place). The rule this comes from:
 every new modal, popover or list has the cross, Escape and click outside (PIOTR, 18.09).
+
+Also in v28: **the helper's character sheets** from Piotr's GPT pack (18.09), built into the game's
+sheet format by the same rule as the joiner's (scale 0.1957, padding 8, four rows sw, se, nw, ne,
+the anchor at the projected ground origin): `character.helper.walk` (8 frames, 3.43 fps),
+`character.helper.idle` (2, 1 fps), `character.helper.carry` (8, 3.43 fps, the wider 800 by 736
+canvas like the joiner's carry) and `character.helper.sweep` (8, 5 fps, a broom in hand). The
+manifest is regenerated. `sweep` is delivered but not yet played: the game has no `sweep`
+animation, so the cleaning station plays `bench` until Turn 20 adds it. No bench sheet is in the
+pack, so at a bench the helper falls back as the fallback rule says. The helper's frames are laid
+out from the pack's own anchors, so his cell (110 by 146, anchor 55 by 115) is not the joiner's
+(112 by 151, anchor 56 by 143); the renderer places by the anchor, so both stand on the floor,
+but the helper may draw up to a tenth taller than the joiner and that is to be judged on the hall.

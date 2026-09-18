@@ -1,0 +1,41 @@
+{
+  "cellWidth": 110,
+  "cellHeight": 146,
+  "anchorX": 55,
+  "anchorY": 115,
+  "frames": 8,
+  "fps": 3.4286,
+  "rows": {
+    "sw": 0,
+    "se": 1,
+    "nw": 2,
+    "ne": 3
+  },
+  "spriteKey": "character.helper",
+  "animation": "walk",
+  "loop": true,
+  "directions": [
+    "sw",
+    "se",
+    "nw",
+    "ne"
+  ],
+  "padding": 8,
+  "metresPerCell": {
+    "width": 1,
+    "depth": 1,
+    "height": 1.8
+  },
+  "scaleFromSource": 0.1957,
+  "source": {
+    "file": "Woodwork-Empire-helper-animation-pack.zip",
+    "canvas": {
+      "width": 480,
+      "height": 660
+    },
+    "anchorPixels": {
+      "x": 240,
+      "y": 545
+    }
+  }
+}

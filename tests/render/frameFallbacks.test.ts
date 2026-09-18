@@ -89,7 +89,10 @@ describe('the fallback of a missing frame', () => {
   });
 
   it('draws nothing for a role with no sheet at all, and the caller stands the capsule', () => {
-    for (const role of ROLES.filter((entry) => entry !== 'owner' && entry !== 'joiner')) {
+    // The owner, the joiner and, since v28, the helper have their sheets (the helper's from
+    // Piotr's GPT pack, 18.09); every other role is the capsule until his own lands.
+    const drawn = ['owner', 'joiner', 'helper'];
+    for (const role of ROLES.filter((entry) => !drawn.includes(entry))) {
       for (const animation of ANIMATIONS) {
         expect(playableAnimation(role, animation), `${role} ${animation}`).toBeNull();
         expect(characterArt(role, animation, 'sw'), `${role} ${animation}`).toBeNull();
@@ -144,3 +147,14 @@ describe('the four directions', () => {
 
 /** Every animation key a role can be asked for, so the table in the report is the code's list. */
 export const FRAME_KEYS: readonly Animation[] = ANIMATIONS;
+
+describe('the helper has his own sheets (v28, from the GPT pack of 18.09)', () => {
+  it('draws the helper from his walk, idle and carry sheets, and falls back to idle for the rest', () => {
+    for (const animation of ['walk', 'idle', 'carry'] as const) {
+      expect(playableAnimation('helper', animation)?.frozen, animation).toBe(false);
+      expect(characterArt('helper', animation, 'ne'), animation).toContain('character.helper');
+    }
+    // No bench sheet in the pack: the standing animation falls back and still draws him.
+    expect(characterArt('helper', 'bench', 'sw')).toContain('character.helper');
+  });
+});

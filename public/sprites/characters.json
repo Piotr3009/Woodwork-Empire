@@ -1,4 +1,168 @@
 {
+  "character.helper.carry": {
+    "cellWidth": 174,
+    "cellHeight": 161,
+    "anchorX": 86,
+    "anchorY": 118,
+    "frames": 8,
+    "fps": 3.4286,
+    "rows": {
+      "sw": 0,
+      "se": 1,
+      "nw": 2,
+      "ne": 3
+    },
+    "spriteKey": "character.helper",
+    "animation": "carry",
+    "loop": true,
+    "directions": [
+      "sw",
+      "se",
+      "nw",
+      "ne"
+    ],
+    "padding": 8,
+    "metresPerCell": {
+      "width": 1,
+      "depth": 1,
+      "height": 1.8
+    },
+    "scaleFromSource": 0.1957,
+    "source": {
+      "file": "Woodwork-Empire-helper-animation-pack.zip",
+      "canvas": {
+        "width": 800,
+        "height": 736
+      },
+      "anchorPixels": {
+        "x": 400,
+        "y": 560
+      }
+    }
+  },
+  "character.helper.idle": {
+    "cellWidth": 110,
+    "cellHeight": 146,
+    "anchorX": 55,
+    "anchorY": 115,
+    "frames": 2,
+    "fps": 1,
+    "rows": {
+      "sw": 0,
+      "se": 1,
+      "nw": 2,
+      "ne": 3
+    },
+    "spriteKey": "character.helper",
+    "animation": "idle",
+    "loop": true,
+    "directions": [
+      "sw",
+      "se",
+      "nw",
+      "ne"
+    ],
+    "padding": 8,
+    "metresPerCell": {
+      "width": 1,
+      "depth": 1,
+      "height": 1.8
+    },
+    "scaleFromSource": 0.1957,
+    "source": {
+      "file": "Woodwork-Empire-helper-animation-pack.zip",
+      "canvas": {
+        "width": 480,
+        "height": 660
+      },
+      "anchorPixels": {
+        "x": 240,
+        "y": 545
+      }
+    }
+  },
+  "character.helper.sweep": {
+    "cellWidth": 110,
+    "cellHeight": 146,
+    "anchorX": 55,
+    "anchorY": 115,
+    "frames": 8,
+    "fps": 5,
+    "rows": {
+      "sw": 0,
+      "se": 1,
+      "nw": 2,
+      "ne": 3
+    },
+    "spriteKey": "character.helper",
+    "animation": "sweep",
+    "loop": true,
+    "directions": [
+      "sw",
+      "se",
+      "nw",
+      "ne"
+    ],
+    "padding": 8,
+    "metresPerCell": {
+      "width": 1,
+      "depth": 1,
+      "height": 1.8
+    },
+    "scaleFromSource": 0.1957,
+    "source": {
+      "file": "Woodwork-Empire-helper-animation-pack.zip",
+      "canvas": {
+        "width": 480,
+        "height": 660
+      },
+      "anchorPixels": {
+        "x": 240,
+        "y": 545
+      }
+    }
+  },
+  "character.helper.walk": {
+    "cellWidth": 110,
+    "cellHeight": 146,
+    "anchorX": 55,
+    "anchorY": 115,
+    "frames": 8,
+    "fps": 3.4286,
+    "rows": {
+      "sw": 0,
+      "se": 1,
+      "nw": 2,
+      "ne": 3
+    },
+    "spriteKey": "character.helper",
+    "animation": "walk",
+    "loop": true,
+    "directions": [
+      "sw",
+      "se",
+      "nw",
+      "ne"
+    ],
+    "padding": 8,
+    "metresPerCell": {
+      "width": 1,
+      "depth": 1,
+      "height": 1.8
+    },
+    "scaleFromSource": 0.1957,
+    "source": {
+      "file": "Woodwork-Empire-helper-animation-pack.zip",
+      "canvas": {
+        "width": 480,
+        "height": 660
+      },
+      "anchorPixels": {
+        "x": 240,
+        "y": 545
+      }
+    }
+  },
   "character.joiner.bench": {
     "cellWidth": 112,
     "cellHeight": 151,
