@@ -340,9 +340,16 @@ export function unloadIntoStock(state: GameState, delivery: Delivery): number {
   delivery.overflowSheets = overflow;
   const job = delivery.jobId === null ? null : state.jobs.find((entry) => entry.id === delivery.jobId);
   if (job) {
-    // The job's own sheets come off its own lorry: reserved for it, bespoke or not.
-    const held = Math.min(fitted, job.sheets - job.sheetsUsed - job.sheetsReserved);
+    // The job's own sheets come off its own lorry: reserved for it, bespoke or not, and ALL of
+    // them, whether the rack had room or not. What does not fit goes straight to temporary
+    // storage for the job (one charge, the fetch chore in the morning) and is never left in
+    // the yard, because a load bought for a job that the job then does not count is the job
+    // asking to be bought again (PIOTR, 18.09: a £50,000 job ordered three times over).
+    const held = Math.min(delivery.sheets, job.sheets - job.sheetsUsed - job.sheetsReserved);
     if (held > 0) job.sheetsReserved += held;
+    if (overflow > 0) moveOverflowToStorage(state, delivery);
+    reserveShortfalls(state);
+    return 0;
   }
   reserveShortfalls(state);
   return overflow;
@@ -371,8 +378,10 @@ export function writeOffSheetsLeftOutside(state: GameState): number {
   return lost;
 }
 
-/** The hour somebody loses in the morning bringing the stored sheets back. */
+/** The hour somebody loses in the morning bringing the stored sheets back. What comes back is
+ *  held by the jobs that were short, in the order they were accepted. */
 export function fetchFromStorage(state: GameState): void {
   state.stock.sheets += state.stock.tempStorageSheets;
   state.stock.tempStorageSheets = 0;
+  reserveShortfalls(state);
 }
