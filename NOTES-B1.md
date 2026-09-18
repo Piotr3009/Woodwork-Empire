@@ -3,6 +3,11 @@
 Everything here is a change B1 needs in a file that Turn 13 froze for phase B. None of it has
 been made; each entry names the file, the place and the exact code.
 
+**Apply entries 2, 3 and 4 before the pictures of T19-C4 are taken.** Without the two stylesheet
+rules a door draws all three of its leaves at once and the owner in the office is laid out in the
+flow instead of on his own spot, and without the `app.ts` lines the doors do not swing. Every test
+passes either way, which is exactly why these three are easy to miss.
+
 ## Numbers chosen (B1)
 
 Every figure B1 picked itself. The constants phase A already put in `constants.ts` are used
@@ -41,11 +46,15 @@ wherever one exists, so this list is short.
 
 ### 2.2 The owner in the office
 
-- `OFFICE_OWNER_BOX` [TUNE] in `src/render/office.ts`: where the owner is drawn on the office
-  canvas. Measured off `officeDesk.png` and the region table, in the clear wall strip left of the
-  door, so he is behind the desk's far edge and clear of every region button. The office picture
-  has no desk region to read this off (`OFFICE_REGIONS` is workPlan, orders, door, clock, laptop,
-  catalogue, binder, company), so it is a new box and not a number out of `SPRITES.md` 8.
+- `OFFICE_OWNER_BOX` = `{ x: 392, y: 378, width: 165, height: 222 }` [TUNE] in
+  `src/render/office.ts`: where the owner is drawn on the office canvas, in canvas pixels.
+  Measured off `officeDesk.png`, the background and the region table: the strip of wall between
+  the Work Plan board, which ends at x 385, and the laptop on the desk, which begins at x 558,
+  with his feet at y 600 where the floor meets the wall. He is across the room from the camera, so
+  he is drawn small, and the box keeps the sheet cell's own 112 by 151. The office picture has no
+  desk region to read this off (`OFFICE_REGIONS` is workPlan, orders, door, clock, laptop,
+  catalogue, binder, company), so it is a new box and not a number out of `SPRITES.md` 8. A test
+  holds it clear of every region the player clicks.
 
 ## For the integrator: changes wanted in frozen files
 
@@ -114,19 +123,21 @@ Until this is applied the doors are drawn in the state the hall computes for the
 was built in (closed, or open when somebody stands in the doorway) and they do not swing. Every
 render test passes either way; the swing test drives `syncDoors`/`stepDoors` directly.
 
-### 5. `src/ui/app.ts`, the canteen door's click (2.3)
+### 5. `src/ui/sound.ts`, the cadence of the hammer and the drill (2.10)
 
+Not a frozen file, but B3's, so B1 has left it alone. `HAMMER_EVERY_SECONDS` (3) and
+`DRILL_EVERY_SECONDS` (4) are in `constants.ts` and are read nowhere: both one shots fire at the
+shared `SOUND_ONE_SHOT_GAP_MS` of one second, where 2.10 asks for "short knocks at a bench during
+assembly, every few seconds". The smallest change is an optional `gapMs` on `SoundSpec`, set to
+`HAMMER_EVERY_SECONDS * 1000` and `DRILL_EVERY_SECONDS * 1000` in the `SOUNDS` table, read in
+`play` as `spec.gapMs ?? SOUND_ONE_SHOT_GAP_MS`. Both gaps are longer than a second, so the x10 and
+x30 cap of "at most one a second" still holds.
+
+### A note on what was NOT needed
+
+An earlier draft of this file asked for a canteen branch in `app.ts`'s `handleSceneClick`, because
 `runClick` matches `closest('[data-van],[data-kit],[data-door]')` before it tests the room
-footprints, and `handleSceneClick` returns false for a door it does not know. The canteen now has
-a `[data-door="canteen"]` group, so without this branch a click on the canteen door does nothing
-at all where it used to write the canteen's note. Beside the `element.dataset.door === 'office'`
-branch (around line 1837):
-
-```ts
-if (element.dataset.door === 'canteen') {
-  setNote(roomById('canteen')?.tooltip ?? '');
-  return true;
-}
-```
-
-Use whatever the canteen block's own click does today, so there is one code path and not two.
+footprints and would have swallowed the canteen's own click. That is why the canteen door carries
+`data-door-room` and not `data-door`: only the office door is a control, the canteen door is a
+door, and the block behind it answers the click exactly as it did before. No change to `app.ts`'s
+click path is wanted.

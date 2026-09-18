@@ -283,20 +283,85 @@ export function officeDoor(room: {
   width: number;
   depth: number;
 }): string {
+  return roomDoor(room, 'office', false);
+}
+
+/** The three states a door is drawn in (CLAUDE.md T19 2.3). Every one of them is in the markup and
+ *  the stylesheet shows one, so the swing costs the render nothing and is one attribute. */
+export type DoorPhase = 'closed' | 'half' | 'open';
+export const DOOR_PHASES: readonly DoorPhase[] = ['closed', 'half', 'open'];
+
+/** The dark hole in the face, behind the leaf: the door opening itself. */
+export function doorOpening(room: { x: number; y: number; width: number; depth: number }): Polygon {
   const door = roomDoorBox(room);
   const face = room.y + room.depth;
   const from = room.x + door.from;
   const to = from + door.across;
-  const shape: Polygon = [
+  return [
     tileToScreen(from, face, door.bottom),
     tileToScreen(to, face, door.bottom),
     tileToScreen(to, face, door.top),
     tileToScreen(from, face, door.top),
   ];
+}
+
+/** The leaf, swung on its hinge in the hall's own dimetric (CLAUDE.md T19 2.3). The hinge is the
+ *  left jamb and the leaf swings out into the hall, which is the way the room doors open
+ *  (docs/art/SPRITES.md 9.3), so it never sweeps through the man standing in the doorway, who is
+ *  at the middle of the opening. Closed is flat in the face, open is square out of it, half is
+ *  the forty five degrees between: three quarters of a right angle is not a swing, it is a door
+ *  caught on the way. */
+export function doorLeaf(
+  room: { x: number; y: number; width: number; depth: number },
+  phase: DoorPhase,
+): Polygon {
+  const door = roomDoorBox(room);
+  const face = room.y + room.depth;
+  const hinge = { x: room.x + door.from, y: face };
+  const angle = phase === 'closed' ? 0 : phase === 'half' ? Math.PI / 4 : Math.PI / 2;
+  const free = {
+    x: hinge.x + door.across * Math.cos(angle),
+    y: hinge.y + door.across * Math.sin(angle),
+  };
+  return [
+    tileToScreen(hinge.x, hinge.y, door.bottom),
+    tileToScreen(free.x, free.y, door.bottom),
+    tileToScreen(free.x, free.y, door.top),
+    tileToScreen(hinge.x, hinge.y, door.top),
+  ];
+}
+
+/** A room's door: the dark opening, the three leaves, and, for the office, the control that walks
+ *  into it. `open` is what the hall reads off the state this minute, which the driver in
+ *  src/render/doors.ts then swings to over DOOR_SWING_MS; a page with no driver on it still draws
+ *  the door the way the hall is (CLAUDE.md T19 2.3).
+ *
+ *  Only the office carries `data-door`, because only the office door is a control: the canteen
+ *  door is a door and the block behind it is still the way to the canteen's own note, and giving
+ *  it the control's hook would have taken that click away from it. */
+export function roomDoor(
+  room: { x: number; y: number; width: number; depth: number },
+  id: string,
+  open: boolean,
+): string {
+  const state = open ? 'open' : 'closed';
+  const leaves = DOOR_PHASES.map(
+    (phase) => `<polygon class="door-leaf" data-state="${phase}" points="${points(doorLeaf(room, phase))}" />`,
+  ).join('');
+  const opening = points(doorOpening(room));
+  if (id !== 'office') {
+    return (
+      `<g data-door-room="${id}" data-door-want="${state}" data-door-state="${state}" ` +
+      `class="${id}-door">` +
+      `<polygon points="${opening}" class="door-opening" />${leaves}</g>`
+    );
+  }
   return (
-    '<g data-door="office" class="clickable office-door">' +
+    `<g data-door="office" data-door-room="office" data-door-want="${state}" ` +
+    `data-door-state="${state}" class="clickable office-door">` +
     '<title>To the office</title>' +
-    `<polygon points="${points(shape)}" class="door-hit" />` +
+    `<polygon points="${opening}" class="door-opening" />${leaves}` +
+    `<polygon points="${opening}" class="door-hit" />` +
     '</g>'
   );
 }
@@ -927,6 +992,40 @@ export function stationCell(
   return { ...bench, facing: facingTowards(bench, { x: bench.x, y: bench.y - 1 }) };
 }
 
+/** The cell the owner falls back to when his station is nothing in particular: his bench's own
+ *  standing cell, or the middle of the floor while the workshop has no bench (CLAUDE.md T16 2.1). */
+export function ownerBenchCell(state: GameState): { x: number; y: number } {
+  const bench = state.equipment.find(
+    (item) => item.specId === 'workbench' && !isSold(item) && itemStandsInTheHall(item),
+  );
+  return bench ? standingCell(state, bench, 'operator') : { x: 2, y: 5 };
+}
+
+/** Every cell a man is standing on this minute, the owner and the crew who are in today. A door
+ *  reads it to know whether somebody is in it (CLAUDE.md T19 2.3); it is the same question the
+ *  figure loop asks, through the same `stationCell`, so the two can never disagree. */
+export function standingCellsNow(state: GameState): Array<{ x: number; y: number }> {
+  const cells: Array<{ x: number; y: number }> = [];
+  for (const worker of state.workers) {
+    if (worker.startDay > state.clock.day) continue;
+    const cell = stationCell(state, worker.station, homeCellOf(state, worker));
+    cells.push({ x: cell.x, y: cell.y });
+  }
+  if (ownerIsAvailable(state)) {
+    const cell = stationCell(state, state.owner.station, ownerBenchCell(state));
+    cells.push({ x: cell.x, y: cell.y });
+  }
+  return cells;
+}
+
+/** Whether this room's door has somebody standing in it, which is what opens it and what keeps it
+ *  open (CLAUDE.md T19 2.3). The owner in the office is in its doorway, and a man at the canteen
+ *  for his tea, or idle, or with no bench to work at, is in the canteen's. */
+export function doorIsUsed(state: GameState, room: RoomId): boolean {
+  const door = roomDoorCell(room);
+  return standingCellsNow(state).some((cell) => cell.x === door.x && cell.y === door.y);
+}
+
 /** The line under a figure's name: where he is standing, in words. */
 function stationLabel(station: string): string {
   const specId = stationMachine(station);
@@ -1296,6 +1395,11 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
 
   const drawables: Drawable[] = [];
 
+  // Which doors have somebody standing in them this minute, read once for the whole scene.
+  const doorsOpen = new Set<RoomId>(
+    (['office', 'canteen'] as RoomId[]).filter((room) => doorIsUsed(state, room)),
+  );
+
   // The three room blocks. Each is a layer of the painting, or a placeholder box while that layer
   // is missing; either way its footprint is what the player clicks on.
   for (const room of ROOM_LAYOUT) {
@@ -1328,11 +1432,19 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
           : contactShadow(room.x, room.y, room.width, room.depth) +
             box(faces, 'var(--room)', 'var(--room-dark)') +
             label(centreOf(room.x, room.y, room.width, room.depth, room.height), room.name)) +
-        '</g>' +
-        // The office door is a control of its own: knock on it and the team is behind it. The
-        // rest of the block is still the way into the office view (PIOTR, CLAUDE.md T10 3.6).
-        (room.id === 'office' ? officeDoor(room) : ''),
+        '</g>',
     });
+    // The door is a drawable of its own, keyed off the cell a man stands in it on, so an open leaf
+    // swinging out into the hall is painted in front of the wall and behind the man in the doorway
+    // (CLAUDE.md T19 2.3). The office one is also the control it has always been: knock on it and
+    // the team is behind it (PIOTR, CLAUDE.md T10 3.6).
+    if (room.id === 'office' || room.id === 'canteen') {
+      const door = roomDoorCell(room.id);
+      drawables.push({
+        depth: depthKey(door.x, door.y) - 0.05,
+        svg: roomDoor(room, room.id, doorsOpen.has(room.id)),
+      });
+    }
   }
 
   // The hall's bag store, read once: the full state is worn by the extractor the bags are on,
@@ -1509,11 +1621,8 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
     );
   }
   if (ownerIsAvailable(state)) {
-    const bench = state.equipment.find(
-      (item) => item.specId === 'workbench' && !isSold(item) && itemStandsInTheHall(item),
-    );
     // At his bench's own standing cell from the station table, or the middle of the floor.
-    const ownerBench = bench ? standingCell(state, bench, 'operator') : { x: 2, y: 5 };
+    const ownerBench = ownerBenchCell(state);
     drawables.push(
       figure(
         'owner',

@@ -7,10 +7,13 @@
 
 import { formatTime } from '../engine/clock';
 import { has } from '../engine/machines';
+import { ownerIsAvailable } from '../engine/owner';
 import { companyTotals } from '../engine/reputation';
+import { STATION_OFFICE, STATION_PHONE } from '../engine/stations';
 import type { GameState } from '../engine/types';
+import { animationForStation, characterArt, characterSheet } from './characters';
 import { type Scene, escapeText, fitName } from './hall';
-import { pickSprite, spriteFiles } from './sprites';
+import { SPRITE_SCALE, pickSprite, spriteFiles } from './sprites';
 
 /** The empty element the office shell leaves for its live text. The hall's slot is an SVG group
  *  and the office is HTML, so the two are not the same element, only the same idea. */
@@ -318,8 +321,48 @@ function litHtml(layer: OfficeLitLayer, files: readonly string[]): string {
   );
 }
 
+/** Where the owner stands in the office, in canvas pixels [TUNE] (CLAUDE.md T19 2.2). The office
+ *  picture has no desk region to read this off: `OFFICE_REGIONS` is the boards, the door, the
+ *  clock, the laptop, the catalogue and the binder, and the desk is a layer. So the box is
+ *  measured off `officeDesk.png` and the background instead: the clear strip of wall between the
+ *  Work Plan board, which ends at x 385, and the laptop on the desk, which begins at x 558, with
+ *  his feet at y 600 where the floor meets the wall behind the desk. The room is drawn from the
+ *  owner's own chair, so he cannot be at the desk without standing in front of his own eyes:
+ *  standing him at the wall behind it is the readable compromise, and it is the one place on the
+ *  canvas where he covers nothing the player clicks, which a test holds him to. He is across the
+ *  room from the camera, so he is drawn small; the box keeps the sheet cell's own 112 by 151 so
+ *  nothing is stretched. */
+export const OFFICE_OWNER_BOX = { x: 392, y: 378, width: 165, height: 222 };
+
+/** The owner, drawn in the room the player followed him into (PIOTR, 17.09: "he vanishes when he
+ *  goes into the office"; CLAUDE.md T19 2.2). He is here while his station is the office or the
+ *  phone, and nowhere else; the hall draws him in the doorway at the same minute, so a player who
+ *  walks through the door finds the same man. Nothing at all while the art side has delivered no
+ *  sheet for him, which is what the office tests render with: a capsule on a photoreal room would
+ *  read as a bug and not as a man. */
+export function officeFigure(state: GameState, files: readonly string[]): string {
+  if (!ownerIsAvailable(state)) return '';
+  const station = state.owner.station;
+  if (station !== STATION_OFFICE && station !== STATION_PHONE) return '';
+  const animation = animationForStation(station);
+  const found = characterSheet('owner', animation, { files }) ?? characterSheet('owner', 'idle', { files });
+  if (found === null) return '';
+  // The art is drawn about the figure's feet, so the box is the sheet's own cell in scene units
+  // with the anchor at the origin: the box does the scaling and no second factor is wanted.
+  const { sheet } = found;
+  const art = characterArt('owner', animation, 'se', { files });
+  if (art === null) return '';
+  const left = -sheet.anchorX / SPRITE_SCALE;
+  const top = -sheet.anchorY / SPRITE_SCALE;
+  return (
+    `<svg class="office-figure" data-office-figure="owner" style="${boxStyle(OFFICE_OWNER_BOX)}" ` +
+    `viewBox="${round(left)} ${round(top)} ${round(sheet.cellWidth / SPRITE_SCALE)} ` +
+    `${round(sheet.cellHeight / SPRITE_SCALE)}" aria-hidden="true">${art}</svg>`
+  );
+}
+
 /** The clock and the company name, drawn by the game over the blank areas of the artwork. */
-function liveText(state: GameState): string {
+function liveText(state: GameState, files: readonly string[]): string {
   const clock = OFFICE_TEXTS.clock;
   const company = OFFICE_TEXTS.company;
   // Shrink to fit before cutting, the same helper the hall letters its wall with. The board is
@@ -341,7 +384,10 @@ function liveText(state: GameState): string {
     `<span class="office-board-totals" data-office-text="companyTotals" ` +
     `style="${boxStyle(board)};font-size:${board.fontSize}px">` +
     `<span data-total="reputation">${escapeText(totals.reputation)}</span>` +
-    `<span data-total="output">${escapeText(totals.output)}</span></span>`
+    `<span data-total="output">${escapeText(totals.output)}</span></span>` +
+    // The man at the desk follows the state like the clock does, so he is in the live part and
+    // never in the shell: sitting down must not rebuild the room (CLAUDE.md T19 2.2).
+    officeFigure(state, files)
   );
 }
 
@@ -410,7 +456,7 @@ export function officeScene(
       regions.map((region) => regionHtml(region, onTheFloor, files)).join('') +
       OFFICE_LIVE_SLOT +
       '</div></div>',
-    live: liveText(state),
+    live: liveText(state, files),
   };
 }
 

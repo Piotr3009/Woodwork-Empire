@@ -5,6 +5,7 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { STATION_BENCH } from '../../src/engine/stations';
 import { renderOffice } from '../../src/render/office';
 import { newGame } from '../helpers';
 
@@ -54,10 +55,18 @@ describe('the desk items are gone, not hidden', () => {
     }
   });
 
-  it('draws no SVG in the office at all', () => {
-    const html = renderOffice(newGame(), { width: 1280, height: 800 });
+  it('draws no SVG in the office but the owner himself', () => {
+    // The seven desk objects were drawn in SVG, and the proxy this test used for "they are gone"
+    // was that the office draws none at all. Since T19 2.2 the room has one figure in it, the
+    // owner at his desk, and a figure is an SVG in this game like every other: the proxy is
+    // narrowed to that one figure, so a desk object still cannot come back unseen.
+    const empty = newGame();
+    empty.owner.station = STATION_BENCH;
+    const html = renderOffice(empty, { width: 1280, height: 800 });
     expect(html).not.toContain('<svg');
     expect(html).not.toContain('viewBox');
-    expect(readFileSync('src/render/office.ts', 'utf8')).not.toContain('<svg');
+    const source = readFileSync('src/render/office.ts', 'utf8');
+    expect(source.match(/<svg/g) ?? []).toHaveLength(1);
+    expect(source).toContain('data-office-figure="owner"');
   });
 });

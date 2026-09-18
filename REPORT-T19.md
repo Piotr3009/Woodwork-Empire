@@ -189,6 +189,40 @@ A man is 28 px each side of his feet and 71.5 px above them and a cell is 48 by 
 something at every cell in the hall. `out: 1` takes the worst cases from 60 to 83% down to 0 to
 27%; it does not take them to zero and nothing here promises that.
 
+### T19-B1c The doors open, and the owner is in both rooms (2.3 and 2.2)
+
+- **2.3.** `roomDoor` draws the office door and the canteen door as a dark opening in the face with
+  a leaf hung on the left jamb, in three states: flat in the face, forty five degrees out, and
+  square out into the hall, which is the way the room doors open (`SPRITES.md` 9.3). All three
+  leaves are in the markup and the stylesheet shows the one `data-door-state` names, so the swing
+  costs a render nothing. The driver is `src/render/doors.ts`, the walker's own shape and for the
+  walker's own reason: the hall says what each door wants off the state, the driver says when, and
+  it puts its phase back after every render because the patch writes every attribute back. A man
+  arriving opens it over `DOOR_SWING_MS`, a door with somebody in it never leaves open, and one he
+  has left waits `DOOR_CLOSE_MS` and then swings back. Each step plays `door` from the sound
+  engine: `doors.ts` calls `play` from `src/ui/sound.ts` directly, which is a new dependency of
+  `render` on `ui` at run time and the one this turn takes, because the swing is the renderer's own
+  clock and no engine state carries it; the engine is silent until the first click unlocks it, so
+  nothing plays before then. The door is its own drawable, keyed off the cell a man stands in it
+  on, so an open leaf is painted in front of the wall and behind him. Only the office door carries
+  `data-door`, because only the office door is a control: the canteen block still answers a click
+  with its own note, which giving it the control's hook would have taken away.
+- **2.2.** In the hall nothing had to change: the owner at the office or the phone already stands
+  on `roomDoorCell('office')` facing in, and nothing anywhere drops a figure for being at a desk.
+  What was missing was the office view, which drew no people at all. `officeFigure` puts him on the
+  canvas in the live part, so sitting down never rebuilds the room, at `OFFICE_OWNER_BOX` [TUNE],
+  measured off the picture: the strip of wall between the Work Plan board and the laptop on the
+  desk, his feet at the floor line behind the desk's far edge. The room is drawn from the owner's
+  own chair, so he cannot be at the desk without standing in front of his own eyes; at the wall
+  behind it is the readable compromise, and a test holds the box clear of every region the player
+  clicks. The tests are the three door states and their geometry, the swing on a fake clock, the
+  hall with him in the open doorway, and the office with him at his desk. 2.3's "Done" also asks
+  for an app test that the door opens when the owner goes to the office and closes when he comes
+  out: the swing is driven from `app.ts`, which is frozen for phase B, so `NOTES-B1.md` carries
+  the four lines that wire it and the swing is tested here against the real hall markup instead.
+  Until those lines land the doors are drawn in the state the hall computes for the frame, open
+  with a man in the doorway and closed without one, and they do not swing.
+
 ## The movement (CLAUDE.md T19 2.1, PIOTR: "they walk like robots and shake like a leaf")
 
 This section was written, and committed, before a line of `src/render/walkers.ts` or
