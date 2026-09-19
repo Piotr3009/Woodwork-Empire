@@ -5,6 +5,7 @@
 
 import { describe, expect, it } from 'vitest';
 import {
+  BANKRUPTCY_DAYS_BELOW_LIMIT,
   FIRST_STEPS_LAST_DAY,
   NO_INSURANCE_REASON,
   OVERDRAFT_RATE_YEARLY,
@@ -202,9 +203,11 @@ describe('the money speaks before the month end (CLAUDE.md T18 2.6)', () => {
     expect(found[0]?.text).toBe(
       `Account below zero: the overdraft costs \u00a3${Math.round(aDay).toLocaleString('en-GB')} a day`,
     );
-    // It follows the balance every day, and goes the moment the account is back.
+    // It follows the balance every day, and goes the moment the account is back. At -20,000 the
+    // bank's own line is over the top of it, so the overdraft line is asked for by name.
     state.cash = -20000;
-    expect(warnings(state)[0]?.text).toContain(
+    const deeper = warnings(state).find((warning) => warning.key === 'belowZero');
+    expect(deeper?.text).toContain(
       `\u00a3${Math.round((20000 * OVERDRAFT_RATE_YEARLY) / DAYS_PER_YEAR).toLocaleString('en-GB')}`,
     );
     state.cash = 0;
@@ -345,56 +348,44 @@ describe('the first days say what to do (CLAUDE.md T18 2.7)', () => {
   });
 });
 
-describe('the line that says the bank is about to close you', () => {
-  /** A company standing where Piotr's was on 15 May: in the overdraft with arrears beside it. */
-  function inDebt(cash: number, arrears: number): GameState {
+describe('the line that counts the days below the bank s limit (CLAUDE.md T22 2.2)', () => {
+  /** A company under the overdraft limit, as deep and as long as the test wants it. */
+  function inDebt(cash: number, days = 0): GameState {
     const state = quietHall();
     state.cash = cash;
-    state.finance.arrearsAmount = arrears;
-    state.finance.firstArrearsDay = 1;
-    state.finance.arrearsMonths = 1;
+    state.finance.daysBelowOverdraft = days;
     return state;
   }
 
-  it('says the four things the drawing says, in its words', () => {
-    const found = warnings(inDebt(-7259, 25740));
+  it('says where the account stands, what the limit is and which day of the thirty it is', () => {
+    const found = warnings(inDebt(-18200, 12));
     expect(found[0]?.key).toBe('pastTheLimit');
     expect(found[0]?.text).toBe(
-      'Account below zero and \u00a325,740 in arrears: together -\u00a332,999, past the ' +
-        '-\u00a315,000 the bank allows. Pay the arrears or the bank closes you.',
+      'Account -\u00a318,200 is below the bank\u0027s -\u00a310,000 limit: day 12 of 30.',
     );
+    expect(BANKRUPTCY_DAYS_BELOW_LIMIT).toBe(30);
   });
 
-  it('says nothing while the net position is still inside what the bank allows', () => {
-    // 5,000 owed on a 9,000 overdraft is -14,000 against the -15,000 the bank allows.
-    const found = warnings(inDebt(-9000, 5000)).map((warning) => warning.key);
+  it('calls the day a bill first takes the account under the limit the first of them', () => {
+    // The count is taken once a calendar day, at the day's open, so an afternoon that goes under
+    // the limit has not been counted yet and the line would read "day 0 of 30" [TUNE].
+    expect(warnings(inDebt(-10100, 0))[0]?.text).toContain('day 1 of 30');
+  });
+
+  it('says nothing at all while the account is inside the limit, however far under zero', () => {
+    const found = warnings(inDebt(-9999)).map((warning) => warning.key);
     expect(found).not.toContain('pastTheLimit');
     // The overdraft line is still said, because the account is still under zero.
     expect(found).toContain('belowZero');
+    // And a day exactly on the limit is a day at the limit, not under it: the same reading the
+    // engine's own count takes.
+    expect(warnings(inDebt(-10000)).map((warning) => warning.key)).not.toContain('pastTheLimit');
   });
 
-  it('says nothing about a company that owes nothing, however deep in the overdraft it is', () => {
-    const state = quietHall();
-    state.cash = -9999;
-    expect(warnings(state).map((warning) => warning.key)).not.toContain('pastTheLimit');
-  });
-
-  it('drops the account clause for a company that owes but has been paid since', () => {
-    // A big bill missed and a big client paid: the arrears stand, the account does not.
-    const found = warnings(inDebt(2000, 20000));
-    expect(found[0]?.key).toBe('pastTheLimit');
-    expect(found[0]?.text).toBe(
-      '\u00a320,000 in arrears: together -\u00a318,000, past the -\u00a315,000 the bank allows. ' +
-        'Pay the arrears or the bank closes you.',
-    );
-  });
-
-  it('is gone the day the arrears are cleared', () => {
-    const state = inDebt(-7259, 25740);
+  it('is gone the day the account comes back up to the limit', () => {
+    const state = inDebt(-18200, 12);
     expect(warnings(state)[0]?.key).toBe('pastTheLimit');
-    state.finance.arrearsAmount = 0;
-    state.finance.arrearsMonths = 0;
-    state.finance.firstArrearsDay = null;
+    state.cash = 2000;
     expect(warnings(state).map((warning) => warning.key)).not.toContain('pastTheLimit');
   });
 });
@@ -426,13 +417,9 @@ describe('the order of urgency', () => {
     state = withCrewAtTheLimit(state);
     state = withBagsFull(state);
     // The deposits of those two jobs put the account back over: the overdraft is the last thing
-    // set, so the line is about the balance the strip would actually read.
-    state.cash = -10000;
-    // And 6,000 it never paid, which puts the net position at -16,000 against the -15,000 the bank
-    // allows: the Turn 21 line (CLAUDE.md T21 2.1).
-    state.finance.arrearsAmount = 6000;
-    state.finance.firstArrearsDay = 1;
-    state.finance.arrearsMonths = 1;
+    // set, so the line is about the balance the strip would actually read. -16,000 against the
+    // -15,000 the bank allows is the Turn 21 line (CLAUDE.md T21 2.1).
+    state.cash = -16000;
     expect(warnings(state).map((warning) => warning.key)).toEqual(
       WARNING_ORDER.filter((key) => key !== 'firstSteps'),
     );

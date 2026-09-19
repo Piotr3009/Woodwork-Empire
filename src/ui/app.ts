@@ -165,7 +165,6 @@ interface Ui {
   /** Field to put the caret back in after the next render. */
   focusNext: string | null;
   stockSheets: string;
-  arrearsAmount: string;
   /** What the player has typed into the loan field (CLAUDE.md T13 3.14). */
   loanAmount: string;
   /** Which tab of the Orders page is on top (CLAUDE.md T13 3.16). */
@@ -321,7 +320,6 @@ function freshUi(): Ui {
     filters: { board: '', catalogue: '' },
     focusNext: null,
     stockSheets: '',
-    arrearsAmount: '500',
     loanAmount: '10000',
     boardTab: 'enquiries',
     workPlanTab: 'jobs',
@@ -465,7 +463,6 @@ function modalBody(id: ModalId, current: GameState): string {
     case 'accounting': {
       const books = renderAccounting(
         current,
-        ui.arrearsAmount,
         ui.accountingTab,
         ui.openDays,
         ui.accountingMonth,
@@ -1327,15 +1324,6 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
     case 'openModal':
       openModal((element.dataset.modal ?? 'board') as ModalId);
       break;
-    // The red plate on the top bar: what the company owes, and behind it the books open at the
-    // Summary, where the arrears block and the button that pays them are. There is no way to open a
-    // modal on a chosen tab, so the tab is set first and the modal after it, the way
-    // `openLaptopPage` sets its page (PIOTR, 18.09; CLAUDE.md T21 2.1).
-    case 'openArrears':
-      ui.accountingTab = 'summary';
-      ui.scrollModalTop = true;
-      openModal('accounting');
-      break;
     case 'officeRegion': {
       const region = element.dataset.office ?? '';
       if (region === 'door') {
@@ -1656,11 +1644,6 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
       walkTo('hall');
       dispatch({ type: 'WORK_HERE', jobId: id });
       return;
-    case 'payArrears': {
-      const typed = element.dataset.amount ?? 'all';
-      dispatch({ type: 'PAY_ARREARS', amount: typed === 'all' ? null : Number(typed) });
-      return;
-    }
     case 'sawFallback':
       dispatch({ type: 'SET_SAW_FALLBACK', jobId: id, on: element.dataset.on === '1' });
       return;
@@ -2130,10 +2113,6 @@ function runInput(event: Event): void {
   if (field === 'companyName') ui.companyName = target.value;
   if (field === 'stockSheets') {
     ui.stockSheets = target.value;
-    requestRender();
-  }
-  if (field === 'arrearsAmount') {
-    ui.arrearsAmount = target.value;
     requestRender();
   }
   if (field === 'loanAmount') {

@@ -1,13 +1,12 @@
-// Cash, the cost cadences, debt, arrears, the bailiff and bankruptcy.
+// Cash, the cost cadences, the overdraft and bankruptcy.
 // Every movement of money in the game goes through `pay` or `receive`, so the ledger is complete.
+//
+// From Turn 22 there is one track for money and not two: a cost the player did not choose is paid
+// in full whatever the balance, and the account goes under the overdraft limit for it. The bank
+// closes a company for being too deep or too long under, and nothing else closes one
+// (PIOTR, 19.09; CLAUDE.md T22 2.1, 2.2).
 
 import {
-  ARREARS_INTEREST_THRESHOLD_MONTHS,
-  ARREARS_MONTHLY_INTEREST,
-  ARREARS_MONTHS_BAILIFF,
-  ARREARS_MONTHS_FINAL_WARNING,
-  ARREARS_MONTHS_WARNING,
-  BAILIFF_SEIZURE_FRACTION,
   BANKRUPTCY_DAYS_BELOW_LIMIT,
   BANKRUPTCY_LIMIT_FACTOR,
   DAYS_PER_MONTH,
@@ -40,7 +39,7 @@ import { queueEvent } from './events';
 import { runFinanceMonth } from './finance';
 import { runInsuranceMonth } from './insurance';
 import { runSecurityMonth } from './security';
-import { has, hasCentralExtraction, machinePowerPerDay, seizableMachines } from './machines';
+import { has, hasCentralExtraction, machinePowerPerDay } from './machines';
 import { ownerDrawPerDay } from './owner';
 import { makeId } from './rng';
 import { plural } from './text';
@@ -258,7 +257,8 @@ function record(state: GameState, category: LedgerCategory, amount: number): voi
  *  in, a negative one is money out, dated `when`, which is the clock unless the caller says
  *  otherwise, as the night shift's wages booked at the end of the day do (CLAUDE.md T13 2.3,
  *  10.2). Money out that the player chose obeys the overdraft floor and is refused past it; a cost
- *  marked unavoidable becomes arrears past it, like the rent. True when the money moved. */
+ *  marked unavoidable is paid past it, like the rent, and the account goes under the limit for it
+ *  (PIOTR, 19.09; CLAUDE.md T22 2.1). True when the money moved. */
 export function charge(
   state: GameState,
   category: LedgerCategory,
@@ -282,23 +282,22 @@ export function charge(
     return true;
   }
   const out = -amount;
-  if (canAfford(state, out)) {
-    state.cash -= out;
-    record(state, category, -out);
-    addLedger(state, category, label, -out, false, when, merge);
-    return true;
-  }
-  if (options.unavoidable !== true) return false;
-  chargeUnavoidable(state, category, label, out);
+  // The floor is the player's own spending and nothing else: a cost he did not choose is paid
+  // whatever the balance, and the account goes under the limit for it (PIOTR, 19.09;
+  // CLAUDE.md T22 2.1).
+  if (options.unavoidable !== true && !canAfford(state, out)) return false;
+  state.cash -= out;
+  record(state, category, -out);
+  addLedger(state, category, label, -out, false, when, merge);
   return true;
 }
 
-/** Money out that the player chose: purchases. Call `canAfford` first. */
+/** Money out that the player chose: purchases. Call `canAfford` first, because this does not: the
+ *  one place a pound leaves the account is `charge`, and it is asked here for a cost whose floor
+ *  the caller has already read. */
 export function pay(state: GameState, category: LedgerCategory, label: string, amount: number): void {
   if (amount <= 0) return;
-  state.cash -= amount;
-  record(state, category, -amount);
-  addLedger(state, category, label, -amount, false);
+  charge(state, category, label, -amount, { unavoidable: true });
 }
 
 export function receive(
@@ -313,10 +312,8 @@ export function receive(
   addLedger(state, category, label, amount, false);
 }
 
-/** Money handed back for something that never came. A bill the company could not pay went to the
- *  arrears and never left the bank, so what comes back goes against the arrears first and only
- *  what is left of it reaches the cash (CLAUDE.md T11 3.12). One path: the arrears are paid down
- *  by the one function that pays them down. */
+/** Money handed back for something that never came. Every bill left the bank when it arrived, so
+ *  what comes back is cash again and nothing else (PIOTR, 19.09; CLAUDE.md T22 2.1). */
 export function refund(
   state: GameState,
   category: LedgerCategory,
@@ -325,7 +322,6 @@ export function refund(
 ): void {
   if (amount <= 0) return;
   receive(state, category, label, amount);
-  payArrears(state, amount);
 }
 
 /** The overdraft is the floor for anything the player buys. */
@@ -333,8 +329,12 @@ export function canAfford(state: GameState, amount: number): boolean {
   return state.cash - amount >= state.finance.overdraftLimit;
 }
 
-/** A cost that arrives whether the player likes it or not: rent, wages, or material already
- *  ordered. It obeys the overdraft floor and becomes arrears when there is no room left. */
+/** A cost that arrives whether the player likes it or not: rent, wages, the power, a repair, or
+ *  material already ordered. It is paid in full every time, the overdraft limit included, and the
+ *  account goes under the limit for it: the bill cannot go anywhere else, because there is nowhere
+ *  else for it to go. The overdraft limit is still the floor for everything the player buys, which
+ *  is `canAfford` and `pay` (PIOTR, 19.09: "a cost he does not choose goes through the limit";
+ *  CLAUDE.md T22 2.1). */
 export function chargeUnavoidable(
   state: GameState,
   category: LedgerCategory,
@@ -342,24 +342,7 @@ export function chargeUnavoidable(
   amount: number,
 ): void {
   if (amount <= 0) return;
-  if (canAfford(state, amount)) {
-    pay(state, category, label, amount);
-    return;
-  }
-  state.finance.arrearsAmount += amount;
-  addLedger(state, category, `${label} (unpaid)`, -amount, true);
-  if (state.finance.firstArrearsDay === null) {
-    state.finance.firstArrearsDay = state.clock.day;
-    state.finance.arrearsMonths = ARREARS_MONTHS_WARNING;
-    queueEvent(state, {
-      kind: 'arrearsWarning',
-      title: 'Arrears warning',
-      body:
-        'A bill went unpaid. The landlord and the council both write. One month of arrears is on ' +
-        'the books.',
-      data: { arrears: Math.round(state.finance.arrearsAmount) },
-    });
-  }
+  pay(state, category, label, amount);
 }
 
 export function dailyRent(state: GameState): number {
@@ -376,8 +359,7 @@ export function dailyPower(state: GameState): number {
   return POWER_BASE_DAILY + machinePowerPerDay(state);
 }
 
-/** One month of the costs that arrive whether or not a single job is made. The arrears interest
- *  threshold is measured against this [TUNE]. */
+/** One month of the costs that arrive whether or not a single job is made. */
 export function monthlyFixedCosts(state: GameState): number {
   return (
     state.unit.rentMonthly +
@@ -425,33 +407,6 @@ export function joineryCoreMonthly(state: GameState): number {
   return Math.round((yearly / 12) * 100) / 100;
 }
 
-/** Arrears carry interest only while they are large (CLAUDE.md T2 3.4). */
-export function arrearsCarryInterest(state: GameState): boolean {
-  return (
-    state.finance.arrearsAmount >
-    monthlyFixedCosts(state) * ARREARS_INTEREST_THRESHOLD_MONTHS
-  );
-}
-
-/** The player pays what he owes, all of it or a typed amount. Nothing goes past the overdraft
- *  floor, and clearing the debt resets the ladder (CLAUDE.md T2 3.4). */
-export function payArrears(state: GameState, amount: number | null): number {
-  const finance = state.finance;
-  if (finance.arrearsAmount <= 0) return 0;
-  const wanted = amount === null ? finance.arrearsAmount : Math.min(finance.arrearsAmount, amount);
-  const room = state.cash - finance.overdraftLimit;
-  const paid = Math.round(Math.min(wanted, Math.max(0, room)) * 100) / 100;
-  if (paid <= 0) return 0;
-  pay(state, 'arrears', 'Arrears paid off', paid);
-  finance.arrearsAmount = Math.round((finance.arrearsAmount - paid) * 100) / 100;
-  if (finance.arrearsAmount <= 0) {
-    finance.arrearsAmount = 0;
-    finance.arrearsMonths = 0;
-    finance.firstArrearsDay = null;
-  }
-  return paid;
-}
-
 /** What the crew costs for the month that is closing: everybody on the books, each at his one
  *  monthly wage (PIOTR, 19.09: "I wanted everyone monthly"; CLAUDE.md T21 2.10). */
 export function monthlyWageBill(state: GameState): number {
@@ -484,10 +439,6 @@ function runMonthlyItems(state: GameState): void {
   const before = state.cash;
   const entriesBefore = state.ledger.length;
   runLateAccounts(state);
-  if (arrearsCarryInterest(state)) {
-    const interest = state.finance.arrearsAmount * ARREARS_MONTHLY_INTEREST;
-    chargeUnavoidable(state, 'interest', 'Interest on the arrears', interest);
-  }
   // The office salary line is gone: everybody is paid by the week now, on the Fridays of the
   // month, so charging a month of the office here would be paying them twice (PIOTR, 18.09;
   // CLAUDE.md T20 2.6).
@@ -521,28 +472,6 @@ function runMonthlyItems(state: GameState): void {
   }
 }
 
-/** Months of arrears, counted from the day the first bill went unpaid (CLAUDE.md 8.3). Runs every
- *  day, because a month of arrears can come due on any day. */
-function runArrearsEscalation(state: GameState, day: number): void {
-  const finance = state.finance;
-  if (finance.arrearsAmount <= 0 || finance.firstArrearsDay === null) return;
-  const months = 1 + Math.floor((day - finance.firstArrearsDay) / DAYS_PER_MONTH);
-  if (months <= finance.arrearsMonths) return;
-  finance.arrearsMonths = months;
-  if (finance.arrearsMonths === ARREARS_MONTHS_FINAL_WARNING) {
-    queueEvent(state, {
-      kind: 'arrearsFinalWarning',
-      title: 'Final warning',
-      body: 'Two months of arrears. The next letter comes with a bailiff.',
-      data: { arrears: Math.round(finance.arrearsAmount) },
-    });
-    return;
-  }
-  if (finance.arrearsMonths >= ARREARS_MONTHS_BAILIFF) {
-    runBailiff(state);
-  }
-}
-
 /** A loss with no cash movement: sheets left in the yard overnight. */
 export function noteLoss(
   state: GameState,
@@ -554,48 +483,6 @@ export function noteLoss(
   addLedger(state, category, label, -amount, true);
 }
 
-/** Three months of arrears: the cheapest machine goes, credited at half its purchase price.
- *  Everything slows down, but the company carries on (PIOTR, Turn 2). */
-export function runBailiff(state: GameState): void {
-  const target = seizableMachines(state)[0];
-  if (!target) {
-    declareBankruptcy(state, 'Three months of arrears and nothing left to seize.');
-    return;
-  }
-  const credit = target.purchasePrice * BAILIFF_SEIZURE_FRACTION;
-  state.equipment = state.equipment.filter((item) => item.id !== target.id);
-  // Nobody can service or repair a machine that is on the back of a lorry.
-  const orphaned = new Set(
-    state.tasks.filter((task) => task.equipmentId === target.id && !task.done).map((task) => task.id),
-  );
-  state.tasks = state.tasks.filter((task) => !orphaned.has(task.id));
-  if (state.owner.currentTaskId !== null && orphaned.has(state.owner.currentTaskId)) {
-    state.owner.currentTaskId = null;
-  }
-  for (const worker of state.workers) {
-    if (worker.taskId !== null && orphaned.has(worker.taskId)) worker.taskId = null;
-  }
-  state.finance.arrearsAmount -= credit;
-  addLedger(state, 'seizure', `Seized ${target.specId}, credited against arrears`, credit, true);
-  if (state.finance.arrearsAmount <= 0) {
-    state.finance.arrearsAmount = 0;
-    state.finance.arrearsMonths = 0;
-    state.finance.firstArrearsDay = null;
-  } else {
-    // The debt is still there, so the ladder starts again from one month of arrears.
-    state.finance.arrearsMonths = ARREARS_MONTHS_WARNING;
-    state.finance.firstArrearsDay = state.clock.day;
-  }
-  queueEvent(state, {
-    kind: 'bailiff',
-    title: 'Bailiff',
-    body:
-      `The bailiff took the ${target.specId} and credited ${formatMoney(credit)}, ` +
-      'half of what it cost, against the arrears.',
-    data: { specId: target.specId, credit: Math.round(credit) },
-  });
-}
-
 export function declareBankruptcy(state: GameState, reason: string): void {
   if (state.gameOver) return;
   state.gameOver = { reason, day: state.clock.day };
@@ -604,41 +491,33 @@ export function declareBankruptcy(state: GameState, reason: string): void {
     title: 'Bankrupt',
     body: `${reason} That is the end of the company.`,
     choices: [{ id: 'ok', label: 'That is that' }],
-    // The four figures the card prints are the ones the engine was looking at when it closed the
+    // The figures the card prints are the ones the engine was looking at when it closed the
     // company, and they ride on the event so the card cannot work out a different sum a minute
     // later (CLAUDE.md T21 2.2; docs/mockups/t21/debt.html part 3).
     data: {
       day: state.clock.day,
       month: monthOfDay(state.clock.day),
       cash: Math.round(state.cash),
-      arrears: Math.round(state.finance.arrearsAmount),
-      net: Math.round(netPosition(state)),
       allowed: Math.round(bankruptcyFloor(state)),
+      // The other rule's own reading, so the card can say how long the company stood under the
+      // limit whichever of the two closed it (CLAUDE.md T22 2.2).
+      daysBelow: state.finance.daysBelowOverdraft,
+      daysAllowed: BANKRUPTCY_DAYS_BELOW_LIMIT,
     },
   });
 }
 
 /** How far under the company may go before the bank closes it: one and a half times the overdraft
- *  limit, whatever the difficulty set that to, and read against the **net** position and not the
- *  cash alone (PIOTR, 18.09; CLAUDE.md T21 2.2). */
+ *  limit, whatever the difficulty set that to (PIOTR, 18.09; CLAUDE.md T21 2.2, T22 2.2). */
 export function bankruptcyFloor(state: GameState): number {
   return state.finance.overdraftLimit * BANKRUPTCY_LIMIT_FACTOR;
 }
 
-/** What the company is really worth to the bank: what is in the account less what it owes and has
- *  not paid. Piotr dropped a 50,000 job with 7,000 in the bank, the deposit he owed went to
- *  arrears, and the top bar carried on saying -7,259 as though the debt were somebody else's: this
- *  is the sum that says otherwise. The arrears are stored as a positive amount owed, so the sum
- *  subtracts them (PIOTR, 18.09; CLAUDE.md T21 2.1, 2.2). */
-export function netPosition(state: GameState): number {
-  return state.cash - state.finance.arrearsAmount;
-}
-
-/** The bank closes a company that cannot pay its debts, two ways (PIOTR, 18.09; CLAUDE.md T21 2.2).
+/** The bank closes a company for being too deep or too long under, and nothing else closes one
+ *  (PIOTR, 19.09; CLAUDE.md T22 2.2). It reads the cash alone, because from Turn 22 the cash is
+ *  the whole of the company's position: every bill is paid out of the account, the limit included.
  *
- *  1. The net position has passed what the bank allows: cash less arrears against one and a half
- *     times the overdraft limit. The cash alone is not the test any more, because a company that
- *     owes 25,740 it cannot pay is not solvent on a 7,000 overdraft.
+ *  1. The cash has passed what the bank allows: one and a half times the overdraft limit.
  *  2. Or thirty calendar days in a row have closed with the cash below the overdraft limit itself,
  *     whatever the amount it is below by. The day the count reaches thirty is the day it ends.
  *
@@ -646,7 +525,7 @@ export function netPosition(state: GameState): number {
  *  money is settled, which is `runDayCosts`. */
 export function checkBankruptcy(state: GameState): void {
   if (state.gameOver) return;
-  if (netPosition(state) <= bankruptcyFloor(state)) {
+  if (state.cash <= bankruptcyFloor(state)) {
     declareBankruptcy(state, 'You cannot pay what you owe and the bank has pulled the overdraft.');
     return;
   }
@@ -680,7 +559,6 @@ export function runDayCosts(state: GameState, day: number): void {
     runMonthlyItems(state);
     state.productionMinutesMonth = 0;
   }
-  runArrearsEscalation(state, day);
   if (day === 1) {
     const deposit = unitDepositFor(state.unit.rentMonthly);
     state.unit.depositHeld = deposit;
@@ -804,8 +682,6 @@ export const MONTH_LINE_OF: Record<LedgerCategory, MonthLineId> = {
   website: 'software',
   accounts: 'other',
   pellets: 'other',
-  arrears: 'other',
-  seizure: 'other',
   other: 'other',
 };
 
@@ -826,14 +702,15 @@ export interface MonthReport {
   /** The bank at the first line of the month and at the last. */
   cashOpen: number;
   cashClose: number;
-  /** Bills that went to the arrears instead of out of the bank: no cash moved, so they are not
-   *  in the lines, and the report says so beside the net. */
-  unpaid: number;
 }
 
-/** The month's report, read off the ledger the state still carries (CLAUDE.md T13 3.20). The
- *  lines are the cash that moved, so they add up to the bank at the close less the bank at the
- *  open; what never left the bank is counted apart. */
+/** The month's report, read off the ledger the state still carries (CLAUDE.md T13 3.20). The lines
+ *  are the cash that moved, so they add up to the bank at the close less the bank at the open. From
+ *  Turn 22 every bill is cash that moved, because a cost the player did not choose is paid out of
+ *  the account whatever the balance: the figure the report used to carry beside the net for the
+ *  bills that went unpaid is gone with them (CLAUDE.md T22 2.1, 2.4). What is left with no cash
+ *  behind it is a loss noted on the books, like sheets ruined in the yard (`noteLoss`), and a note
+ *  is not a line of the month's money. */
 export function monthReport(state: GameState, month: number): MonthReport {
   // Two orders, and they are not the same one. `balance` on an entry is the bank after that entry
   // was written, so it only means anything in the order the entries were written in; a job's own
@@ -854,12 +731,10 @@ export function monthReport(state: GameState, month: number): MonthReport {
     .map(({ entry }) => entry);
   const lines: MonthLine[] = MONTH_LINES.map((line) => ({ ...line, income: 0, costs: 0, net: 0 }));
   const byId = new Map(lines.map((line) => [line.id, line]));
-  let unpaid = 0;
   for (const entry of entries) {
-    if (entry.unpaid) {
-      unpaid += Math.abs(entry.amount);
-      continue;
-    }
+    // A line with no cash behind it is not the month's money: `noteLoss` and nothing else writes
+    // one now (CLAUDE.md T22 2.4).
+    if (entry.unpaid) continue;
     const line = byId.get(MONTH_LINE_OF[entry.category]);
     if (!line) continue;
     if (entry.amount >= 0) line.income += entry.amount;
@@ -890,6 +765,5 @@ export function monthReport(state: GameState, month: number): MonthReport {
     net: Math.round((income - costs) * 100) / 100,
     cashOpen: Math.round(cashOpen * 100) / 100,
     cashClose: Math.round(cashClose * 100) / 100,
-    unpaid: Math.round(unpaid * 100) / 100,
   };
 }

@@ -109,10 +109,10 @@ describe('the binder', () => {
     const state = newGame();
     takeLoan(state, 12000);
     state.insurance.liability = true;
-    const finance = parse(renderAccounting(state, '', 'finance', [], null, '1000'));
+    const finance = parse(renderAccounting(state, 'finance', [], null, '1000'));
     expect(finance.querySelector('.finance-loan')).not.toBeNull();
     expect(finance.querySelector('[data-do="accountingTab"][data-id="finance"]')?.className).toContain('is-on');
-    const summary = parse(renderAccounting(state, '', 'summary'));
+    const summary = parse(renderAccounting(state, 'summary'));
     const coming = rowFigure(summary, 'Monthly bills');
     expect(coming?.textContent).toContain('loan instalment £350');
     expect(coming?.textContent).toContain('insurance £50');

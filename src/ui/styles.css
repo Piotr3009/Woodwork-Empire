@@ -534,8 +534,8 @@ input.num {
   border: 1px solid #5b5446;
   border-radius: 4px;
   display: flex;
-  /* The bar is a row of plates and the money is not the one that gives way: without this the
-     owes plate beside it squeezed the cash into a column and broke "-£7,259" over two lines
+  /* The bar is a row of plates and the money is not the one that gives way: without this a plate
+     beside it squeezed the cash into a column and broke "-£7,259" over two lines
      (T21-C4, picture 1). */
   flex: none;
   flex-direction: column;
@@ -558,57 +558,6 @@ input.num {
 
 .topbar .net.good {
   color: #1d6b39;
-}
-
-/* T21 2.1 What the company owes, beside what it has: a red plate between the cash and the clock,
-   only while there are arrears, pulsing so it is not read as part of the furniture
-   (docs/mockups/t21/debt.html part 1). Built like the name plate above it, in the palette's own
-   --bad, and it takes no colour, font, radius or shadow value the file did not already have. */
-.owes-plate {
-  align-items: flex-start;
-  background: linear-gradient(#8f3a31, #6f2b24);
-  border: 1px solid #5b5446;
-  border-radius: 4px;
-  color: var(--cream);
-  cursor: pointer;
-  display: flex;
-  /* A plate of the bar and not a column of it: the drawing has both its lines on one line each,
-     and a plate that gives way wraps to 110 px and bursts out of the 70 px bar, top and bottom
-     (T21-C4, picture 1). */
-  flex: none;
-  flex-direction: column;
-  font: inherit;
-  justify-content: center;
-  line-height: 1.1;
-  padding: 4px 12px;
-  text-align: left;
-  white-space: nowrap;
-  animation: owes-pulse 1.2s ease-in-out infinite;
-}
-
-.owes-plate:hover {
-  border-color: var(--text-dim);
-}
-
-.owes-figure {
-  font-family: var(--font-title);
-  font-size: var(--fs-hand);
-  font-weight: 400;
-}
-
-.owes-line {
-  font-size: var(--fs-small);
-}
-
-@keyframes owes-pulse {
-  0%,
-  100% {
-    box-shadow: none;
-  }
-
-  50% {
-    box-shadow: 0 0 0 4px rgb(192 90 78 / 35%);
-  }
 }
 
 .topbar .net.bad {
@@ -676,10 +625,9 @@ input.num {
   box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.6);
   display: flex;
   /* 340 px is the width it wants and it never takes more, but from Turn 21 it may be given less:
-     the owes plate of 2.1 is 212 px of bar that was not there before, and a hard minimum here put
-     the Office and Menu buttons off the right edge of a 1280 page while a company was in arrears.
-     A meter that is a bar and two short lines can be read narrower; a button that is off the page
-     cannot be pressed at all (CLAUDE.md T21 2.1, 2.8). */
+     a hard minimum here put the Office and Menu buttons off the right edge of a 1280 page on a
+     crowded bar. A meter that is a bar and two short lines can be read narrower; a button that is
+     off the page cannot be pressed at all (CLAUDE.md T21 2.8). */
   flex: 0 1 340px;
   flex-direction: column;
   gap: 5px;

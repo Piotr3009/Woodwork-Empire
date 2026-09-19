@@ -50,7 +50,7 @@ describe('the Days tab', () => {
   it('gives every day of the month its own row, newest first', () => {
     const rows = daysOfMonth(state);
     expect(rows.length).toBeGreaterThanOrEqual(3);
-    const page = parse(renderAccounting(state, '', 'days'));
+    const page = parse(renderAccounting(state, 'days'));
     const shown = Array.from(page.querySelectorAll('.day-row')).map((row) =>
       Number(row.getAttribute('data-day')),
     );
@@ -69,12 +69,12 @@ describe('the Days tab', () => {
   });
 
   it('opens a row on its own ledger lines, and only the rows the player opened', () => {
-    const shut = parse(renderAccounting(state, '', 'days', []));
+    const shut = parse(renderAccounting(state, 'days', []));
     const closed = shut.querySelector('.day-row[data-day="1"]');
     expect(closed).not.toBeNull();
     expect(closed?.innerHTML).not.toContain('Unit deposit');
     expect(closed?.querySelectorAll('.row')).toHaveLength(1);
-    const page = parse(renderAccounting(state, '', 'days', [1]));
+    const page = parse(renderAccounting(state, 'days', [1]));
     const first = page.querySelector('.day-row[data-day="1"]');
     // The head row plus one line per ledger entry of that day.
     const lines = Array.from(first?.querySelectorAll('.row') ?? []);
@@ -87,24 +87,24 @@ describe('the Days tab', () => {
   it('says which rows are open in the markup it writes', () => {
     // Which rows are open is state and not a browser detail (CLAUDE.md T3 3.4). That it survives
     // the body being written again every game minute is driven through the page below.
-    expect(renderAccounting(state, '', 'days', [1])).toContain('aria-expanded="true"');
-    expect(renderAccounting(state, '', 'days', [])).toContain('aria-expanded="false"');
+    expect(renderAccounting(state, 'days', [1])).toContain('aria-expanded="true"');
+    expect(renderAccounting(state, 'days', [])).toContain('aria-expanded="false"');
   });
 
   it('offers the day its summary, and only for a day the state still carries', () => {
-    const page = parse(renderAccounting(state, '', 'days'));
+    const page = parse(renderAccounting(state, 'days'));
     expect(summaryOfDay(state, 1)).not.toBeNull();
     expect(page.querySelector('[data-do="openDaySummary"][data-id="1"]')).not.toBeNull();
     const forgotten = { ...state, days: [] };
-    const bare = parse(renderAccounting(forgotten, '', 'days'));
+    const bare = parse(renderAccounting(forgotten, 'days'));
     expect(bare.querySelector('[data-do="openDaySummary"]')).toBeNull();
   });
 
   it('shows the earned labour rate on the Summary tab and nowhere else', () => {
-    expect(parse(renderAccounting(state, '', 'summary')).innerHTML).toContain(
+    expect(parse(renderAccounting(state, 'summary')).innerHTML).toContain(
       'Earned labour rate',
     );
-    expect(parse(renderAccounting(state, '', 'days')).innerHTML).not.toContain(
+    expect(parse(renderAccounting(state, 'days')).innerHTML).not.toContain(
       'Earned labour rate',
     );
   });
@@ -122,6 +122,30 @@ describe('what is coming, on the Summary tab', () => {
     return next;
   }
 
+  it('carries no arrears row, on a company whose account is under the limit', () => {
+    // 2.4: the Summary drops the block it carried for the arrears, and nothing else on it moves.
+    // The company this test builds is the one that used to carry it: a bill it could not pay inside
+    // the overdraft, which is now simply out of the account (CLAUDE.md T22 2.1, 2.4).
+    const state = withAdmin();
+    state.cash = state.finance.overdraftLimit - 2000;
+    const page = parse(renderAccounting(state, 'summary'));
+    expect(page.textContent).not.toContain('Arrears');
+    expect(page.textContent).not.toContain('arrears');
+    expect(page.textContent).not.toContain('bailiff');
+    expect(page.querySelector('[data-do="payArrears"]')).toBeNull();
+    expect(page.querySelector('[data-field="arrearsAmount"]')).toBeNull();
+    // And nothing else moved: the four totals blocks, the earned rate line and every row of what is
+    // coming are where they were, and the head still says what is in the bank against the limit.
+    expect(page.querySelectorAll('.col')).toHaveLength(4);
+    expect(page.textContent).toContain('Earned labour rate');
+    expect(page.textContent).toContain('What is coming');
+    for (const row of ['Rent, every day', 'Business rates, every day', 'Power, every day']) {
+      expect(page.textContent, row).toContain(row);
+    }
+    expect(page.textContent).toContain(money(state.cash));
+    expect(page.textContent).toContain(money(state.finance.overdraftLimit));
+  });
+
   it('dates the wages by the last working day of the month and names no week', () => {
     // One pay day a month for everybody, so the row the player reads is the month's bill against
     // the month's own pay day, and the Friday the row used to be dated by is gone from the
@@ -129,7 +153,7 @@ describe('what is coming, on the Summary tab', () => {
     const state = withAdmin();
     const due = nextDueDays(state).wages;
     expect(isLastWorkingDayOfMonth(due)).toBe(true);
-    const page = parse(renderAccounting(state, '', 'summary'));
+    const page = parse(renderAccounting(state, 'summary'));
     const row = Array.from(page.querySelectorAll('.row')).find((entry) =>
       (entry.querySelector('.row-main')?.textContent ?? '').startsWith('Wages,'),
     );

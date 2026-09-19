@@ -723,9 +723,6 @@ export type GameEventKind =
   | 'weekend'
   | 'wagesPaid'
   | 'monthlyBills'
-  | 'arrearsWarning'
-  | 'arrearsFinalWarning'
-  | 'bailiff'
   | 'bankruptcy'
   | 'ownerSick'
   | 'jobOverdue'
@@ -790,8 +787,6 @@ export type LedgerCategory =
   | 'transport'
   | 'accounts'
   | 'pellets'
-  | 'arrears'
-  | 'seizure'
   /** The Turn 13 lines: every one of them its own line on the month end (CLAUDE.md T13 3.20). */
   | 'insurance'
   | 'security'
@@ -803,11 +798,10 @@ export type LedgerCategory =
   | 'pipes'
   | 'claim'
   | 'burglary'
-  /** Money that belongs on the books and on no line of its own. It exists because Turn 22 took the
-   *  arrears out of the game: a v18 save's unpaid balance is carried into the account by the v19
-   *  lift and the line that says so is booked here, and every `arrears` line an old ledger already
-   *  holds is rewritten to this, so not a pound of a played company's history is lost with the word
-   *  (CLAUDE.md T22 2.1, section 4). */
+  /** Money that belongs on the books and on no line of its own. It exists for the v19 lift of
+   *  Turn 22: a v18 save's unpaid balance is carried into the account and the line that says so is
+   *  booked here, and the two categories that word took with it are rewritten to this, so not a
+   *  pound of a played company's history is lost with it (CLAUDE.md T22 2.1, section 4). */
   | 'other';
 
 export interface LedgerEntry {
@@ -819,7 +813,8 @@ export interface LedgerEntry {
   /** Positive is money in, negative is money out. */
   amount: number;
   balance: number;
-  /** True when no cash moved: a cost that became arrears, or a credit applied against them. */
+  /** True when no cash moved: a loss noted on the books, like sheets ruined in the yard
+   *  overnight (`noteLoss`). */
   unpaid: boolean;
 }
 
@@ -857,9 +852,6 @@ export interface FinanceState {
   /** Overdraft interest accrued day by day below zero and not yet charged: it goes out on the
    *  1st, interest only (CLAUDE.md T13 3.14). */
   overdraftInterestAccrued: number;
-  arrearsAmount: number;
-  arrearsMonths: number;
-  firstArrearsDay: number | null;
   day: PeriodTotals;
   week: PeriodTotals;
   month: PeriodTotals;
@@ -1290,7 +1282,6 @@ export type GameAction =
   | { type: 'DROP_JOB'; jobId: string }
   | { type: 'SET_SAW_FALLBACK'; jobId: string; on: boolean }
   | { type: 'BUY_STOCK'; sheets: number }
-  | { type: 'PAY_ARREARS'; amount: number | null }
   | { type: 'ORDER_TRANSPORT'; jobId: string }
   | { type: 'MOVE_ITEM'; itemId: string; x: number; y: number; orientation?: Orientation }
   | { type: 'END_SETUP'; speed: Speed }
