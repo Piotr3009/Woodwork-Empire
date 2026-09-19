@@ -275,21 +275,38 @@ describe('arrears, bailiff and bankruptcy', () => {
 
   it('counts months of arrears from the day the first bill went unpaid', () => {
     const kitted = buyNow(newGame({ difficulty: 'hard' }), 'tableSaw');
-    // With the 5000 overdraft of Hard and 2400 of rent the first miss is on day 3, so month two
-    // lands on day 33.
+    // With the 5000 overdraft of Hard and 2400 of rent the first miss is on day 3.
     const first = runToDay(kitted, 4);
     expect(first.state.finance.firstArrearsDay).toBe(3);
     expect(first.state.finance.arrearsMonths).toBe(1);
+    // From Turn 21 a company whose debt keeps growing is closed by the bank long before the ladder
+    // gets to its second rung: the net position passes one and a half times the overdraft inside a
+    // fortnight (PIOTR, 18.09; CLAUDE.md T21 2.2). So the month the ladder counts is shown on the
+    // company this ladder was written for: one that missed a bill and was then paid by a client,
+    // which leaves the debt standing still while the calendar runs.
+    const paid = { ...first.state, finance: { ...first.state.finance } };
+    paid.cash = 30000;
     // Day 32 is the last look inside month one.
-    expect(runToDay(kitted, 32).state.finance.arrearsMonths).toBe(1);
-    const run = runToDay(kitted, 33);
+    expect(runToDay(paid, 32).state.finance.arrearsMonths).toBe(1);
+    const run = runToDay(paid, 33);
+    expect(run.state.gameOver).toBeNull();
     expect(eventsOfKind(run.events, 'arrearsFinalWarning')).toHaveLength(1);
     expect(run.state.finance.arrearsMonths).toBe(2);
   });
 
   it('sends the bailiff for the cheapest machine at three months, within 90 days', () => {
-    const kitted = buyNow(newGame({ difficulty: 'hard' }), 'tableSaw');
+    const missed = runToDay(buyNow(newGame({ difficulty: 'hard' }), 'tableSaw'), 4).state;
+    // The bill it missed was a big one and then a client paid, so the company trades on with the
+    // debt still on its books: that is the only way a company reaches three months of arrears now
+    // the bank closes one whose net position has passed its limit (CLAUDE.md T21 2.2). The seizure
+    // has to leave some of the debt standing, or the ladder is done with instead of starting again.
+    const kitted = {
+      ...missed,
+      finance: { ...missed.finance, arrearsAmount: 5000 },
+      cash: 60000,
+    };
     const run = runToDay(kitted, 90);
+    expect(run.state.gameOver).toBeNull();
     const bailiff = eventsOfKind(run.events, 'bailiff');
     expect(bailiff).toHaveLength(1);
     expect(bailiff[0]?.data.specId).toBe('tableSaw');
@@ -344,17 +361,27 @@ describe('arrears, bailiff and bankruptcy', () => {
   });
 
   it('goes bankrupt at three months with nothing left to seize, and says so', () => {
-    const run = runToDay(newGame({ difficulty: 'hard' }), 100);
+    // An empty hall on Hard: the first miss is on day 11 with the 5000 overdraft and the 200 m2
+    // rent, so three months are up on day 71. A client paid on day 12 and the debt stayed, which is
+    // what keeps the bank's own line (CLAUDE.md T21 2.2) off the company long enough for the
+    // arrears ladder to run its three rungs.
+    const missed = runToDay(newGame({ difficulty: 'hard' }), 12).state;
+    expect(missed.finance.firstArrearsDay).toBe(11);
+    const carriedOn = {
+      ...missed,
+      finance: { ...missed.finance, arrearsAmount: 5000 },
+      cash: 60000,
+    };
+    const run = runToDay(carriedOn, 100);
     expect(run.state.gameOver).not.toBeNull();
     expect(run.state.gameOver?.reason).toContain('arrears');
-    // First miss on day 11 with the 5000 overdraft and the 200 m2 rent, so three months are up
-    // on day 71.
     expect(run.state.gameOver?.day).toBe(71);
     expect(eventsOfKind(run.events, 'bankruptcy')).toHaveLength(1);
   });
 
   it('stops the clock once the game is over', () => {
     const run = runToDay(newGame({ difficulty: 'hard' }), 100);
+    expect(run.state.gameOver).not.toBeNull();
     const frozen = tick(run.state, 100);
     expect(frozen.clock).toEqual(run.state.clock);
   });

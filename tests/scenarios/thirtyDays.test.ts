@@ -358,13 +358,24 @@ describe('30 days on Easy, working the board', () => {
 });
 
 describe('30 days on Hard, doing nothing', () => {
-  it('is flat on the 5000 overdraft with the arrears already running', () => {
-    // The Turn 2 overdraft limit of 5000 brings the first missed bill forward to day 23.
+  it('is closed by the bank on day 22, on the arrears it could not pay', () => {
+    // Turn 21 changed what this scenario shows, and it is the change Piotr asked for. The Turn 2
+    // overdraft limit of 5000 fills by day 11 and the bills go unpaid from then; on day 22 the
+    // arrears have reached 2,780 and the net position, -7,778, has passed the -7,500 the bank
+    // allows. Doing nothing used to drift to the end of the month and past it, with the top bar
+    // saying nothing at all: "you cannot pay your debts, you are bankrupt, and the game should end"
+    // (PIOTR, 18.09; CLAUDE.md T21 2.2).
     const state = playUntilDay(newGame({ seed: SEED, difficulty: 'hard' }), 31, IDLE);
-    expect(state.clock.day).toBe(31);
+    expect(state.clock.day).toBe(22);
     expect(state.cash).toBeLessThan(-4900);
     expect(state.finance.arrearsAmount).toBeGreaterThan(0);
-    expect(state.gameOver).toBeNull();
+    expect(state.gameOver).not.toBeNull();
+    expect(state.gameOver?.day).toBe(22);
+    expect(state.gameOver?.reason).toContain('cannot pay');
+    // The line it passed, read the one way the engine reads it.
+    expect(state.cash - state.finance.arrearsAmount).toBeLessThanOrEqual(
+      state.finance.overdraftLimit * 1.5,
+    );
   });
 
   it('gets its arrears warning once the overdraft is full', () => {
