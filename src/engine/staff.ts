@@ -60,8 +60,9 @@ import type {
 /** What a trade is called, one man of it and several. The one table: the crew rows, Our team, the
  *  job's Assign list and the hire card's refusal all read it, so a sprayer is called a sprayer
  *  wherever he is named (CLAUDE.md T19 2.5, 2.6). It sits here and not in the UI because the
- *  refusal the hire card prints is written in this module: "extremely experienced joiners come
- *  from reputation 60" (PIOTR; CLAUDE.md T20 2.5). `src/ui/team.ts` hands `ROLE_WORDS` on. */
+ *  refusal the hire card prints is written in this module: "excellent joiners come from
+ *  reputation 60" (PIOTR; CLAUDE.md T20 2.5, T21 2.9, the words his own of 19.09).
+ *  `src/ui/team.ts` hands `ROLE_WORDS` on. */
 export const ROLE_WORDS: Record<WorkerRole, string> = {
   joiner: 'joiner',
   helper: 'helper',
@@ -357,7 +358,7 @@ export function missingLabelsForHire(state: GameState, role: WorkerRole): string
 
 /** What the card says when the workshop is not known enough for this man: who applies depends on
  *  the standing the workshop has earned, and the card says what is missing, in the game's own
- *  words (PIOTR: "extremely experienced joiners come from reputation 60"; CLAUDE.md T20 2.5). A
+ *  words (PIOTR: "excellent joiners come from reputation 60"; CLAUDE.md T20 2.5, T21 2.9). A
  *  role with no classes to it says the same thing about the trade itself. */
 export function standingWanted(
   role: WorkerRole,

@@ -11,6 +11,7 @@ import { OLDEST_SAVE_VERSION, canOpenVersion, migrateState } from '../../src/eng
 import { STATE_VERSION, bagStore, tick } from '../../src/engine/index';
 import { CANTEEN_SLOT_LAYOUT, roomById } from '../../src/engine/constants';
 import type { GameState } from '../../src/engine/index';
+import { twoMenOnSheetWork } from '../helpers';
 
 /** A game saved by v18 on the morning of day 2, with a full bag on the saw, the question about
  *  it open and the bag change on the list: everything the bump took away, in the shape it had.
@@ -350,5 +351,113 @@ describe('a v28 save in this build (CLAUDE.md T20 section 4, T21 section 4)', ()
 
   it('records every contract as ended on its term, which is all a lifted save can tell', () => {
     expect(lifted.contracts[0]?.endedBy).toBe('term');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Turn 21: version 17 to 18 (CLAUDE.md T21 section 4)
+// ---------------------------------------------------------------------------
+
+/** A v29 save, in the shape the Turn 20 build wrote: the four tiers already carry the ids they carry
+ *  tonight, every man is paid by the week, and the rates are Turn 20's own 0.8 / 1.0 / 1.2 / 1.4,
+ *  which were Claude's reading of Piotr and one step too high all the way up. Cut down to what the
+ *  lift of tonight touches, so each question is asked on its own (CLAUDE.md T21 2.9, 2.10). */
+function v29Save(): Record<string, unknown> {
+  return {
+    version: 17,
+    jobs: [],
+    workers: [
+      { id: 'w1', name: 'Bob', role: 'joiner', tier: 'novice', rate: 0.8, weeklyWage: 450 },
+      { id: 'w2', name: 'Joe', role: 'joiner', tier: 'experienced', rate: 1.0, weeklyWage: 600 },
+      { id: 'w3', name: 'Sam', role: 'joiner', tier: 'senior', rate: 1.2, weeklyWage: 800 },
+      { id: 'w4', name: 'Kit', role: 'joiner', tier: 'master', rate: 1.4, weeklyWage: 1000 },
+      { id: 'w5', name: 'Ann', role: 'officeAdmin', tier: null, rate: 0, weeklyWage: 445 },
+    ],
+    equipment: [],
+    finance: { overdraftLimit: -10000, arrearsAmount: 0 },
+    owner: { minutesWorked: 203, dayLog: [] },
+    unit: { widthCells: 20, depthCells: 10 },
+    contracts: [],
+    tasks: [],
+  };
+}
+
+describe('a v29 save in this build (CLAUDE.md T21 section 4)', () => {
+  const lifted = migrateState(v29Save(), 17) as unknown as LiftedSave | null;
+  if (lifted === null) throw new Error('the lift refused a version 17 state');
+
+  it('pays every man by the month at the conversion the Turn 20 build printed', () => {
+    expect(lifted.version).toBe(18);
+    // Turn 20's four weekly wages for a joiner were 450, 600, 800 and 1,000, and the build printed
+    // the month beside each of them at thirty days over seven. A lifted man costs what the game
+    // told the player he cost, and his own wage is never re-read off the hiring specs: what he is
+    // paid is what he was taken on for (CLAUDE.md T21 2.10).
+    expect(lifted.workers.map((worker) => worker.monthlyWage)).toEqual([
+      1929,
+      2571,
+      3429,
+      4286,
+      1907,
+    ]);
+    for (const worker of lifted.workers) {
+      expect(Object.keys(worker), String(worker.name)).not.toContain('weeklyWage');
+    }
+  });
+
+  it('brings the very experienced man out at 1.0 and not at Turn 20\u0027s 1.2', () => {
+    // The rate is the tier's and not the man's, so it is recomputed on load: Turn 21 moved every
+    // tier down a step to Piotr's own four figures, and a crew lifted with Turn 20's rates would be
+    // faster than the same men hired this morning (PIOTR, 19.09; CLAUDE.md T21 2.9).
+    expect(lifted.workers.map((worker) => worker.rate)).toEqual([0.6, 0.8, 1, 1.2, 0]);
+    const senior = lifted.workers.find((worker) => worker.tier === 'senior');
+    expect(senior?.rate).toBe(1);
+    expect(lifted.workers.some((worker) => worker.rate === 1.4)).toBe(false);
+    // The tier ids themselves do not change in this bump, so nobody is renamed.
+    expect(lifted.workers.map((worker) => worker.tier)).toEqual([
+      'novice',
+      'experienced',
+      'senior',
+      'master',
+      null,
+    ]);
+  });
+
+  it('starts the days below the limit and the owner\u0027s idle minutes at nought', () => {
+    expect(lifted.finance.daysBelowOverdraft).toBe(0);
+    expect(lifted.owner.idleMinutes).toBe(0);
+    expect(lifted.owner.idleByReason).toEqual({
+      noMachine: 0,
+      noMaterial: 0,
+      nothingAssigned: 0,
+      officeEmpty: 0,
+    });
+  });
+
+  it('opens a whole v29 game, runs it on and round trips through the one encoder', () => {
+    // Not a cut down fixture this time but a real hall with men in it, put back into the shape the
+    // Turn 20 build saved it in and opened again: every v29 save loads (CLAUDE.md T21 section 4).
+    const played = twoMenOnSheetWork();
+    const raw = JSON.parse(JSON.stringify(played)) as Record<string, unknown>;
+    raw.version = 17;
+    const back: Record<string, number> = { novice: 0.8, experienced: 1.0, senior: 1.2, master: 1.4 };
+    for (const worker of raw.workers as Array<Record<string, unknown>>) {
+      const monthly = worker.monthlyWage as number;
+      delete worker.monthlyWage;
+      worker.weeklyWage = Math.round((monthly * 7) / 30);
+      if (typeof worker.tier === 'string') worker.rate = back[worker.tier] ?? worker.rate;
+    }
+    delete (raw.finance as Record<string, unknown>).daysBelowOverdraft;
+    delete (raw.owner as Record<string, unknown>).idleMinutes;
+    delete (raw.owner as Record<string, unknown>).idleByReason;
+    const opened = migrateState(raw, 17);
+    if (opened === null) throw new Error('the lift refused a whole v29 game');
+    expect(opened.version).toBe(STATE_VERSION);
+    const joiner = opened.workers.find((worker) => worker.role === 'joiner');
+    expect(joiner?.monthlyWage).toBeGreaterThan(0);
+    expect(joiner?.rate).toBe(0.6);
+    const later = tick(opened, 60);
+    expect(later.clock.minute).toBeGreaterThan(opened.clock.minute);
+    const round = decodeSaveFile(encodeSaveFile(later));
+    expect(round.state).toEqual(later);
   });
 });

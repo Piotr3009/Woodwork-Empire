@@ -8,6 +8,9 @@ import {
   MINUTES_PER_WORKING_DAY,
   OWNER_LABOUR_PER_MINUTE,
   REPUTATION_MIN,
+  TIERS,
+  TIER_MIN_REPUTATION,
+  TIER_WORDS,
   TOOL_CABINET,
   WORKER_RATES,
 } from '../../src/engine/constants';
@@ -135,6 +138,25 @@ describe('the hiring pool', () => {
     expect(rows.map((spec) => spec.tier)).toEqual(['novice', 'experienced', 'senior', 'master']);
     expect(rows.map((spec) => spec.monthlyWage)).toEqual([1950, 2600, 3500, 4330]);
     expect(rows.map((spec) => spec.minReputation)).toEqual([REPUTATION_MIN, 15, 35, 60]);
+  });
+
+  it('runs the four tiers on Piotr\u2019s own words, rates and standings', () => {
+    // His four, of 19.09, and not the ladder Turn 20 wrote for him: no experience, experienced,
+    // very experienced, excellent at 0.6, 0.8, 1.0 and 1.2 of the owner, with the excellent man
+    // answering from reputation 60 (PIOTR, 19.09; CLAUDE.md T21 2.9). Written out as the figures
+    // and the words themselves, so Turn 20's 0.8 / 1.0 / 1.2 / 1.4 cannot come back by accident.
+    expect(TIERS).toEqual(['novice', 'experienced', 'senior', 'master']);
+    expect(TIERS.map((tier) => TIER_WORDS[tier])).toEqual([
+      'no experience',
+      'experienced',
+      'very experienced',
+      'excellent',
+    ]);
+    expect(TIERS.map((tier) => WORKER_RATES[tier])).toEqual([0.6, 0.8, 1.0, 1.2]);
+    expect(TIER_MIN_REPUTATION.master).toBe(60);
+    // The very experienced man is the one who matches the owner, and nobody is above 1.2.
+    expect(WORKER_RATES.senior).toBe(1);
+    expect(Math.max(...TIERS.map((tier) => WORKER_RATES[tier]))).toBe(1.2);
   });
 
   it('needs a second set of everything for a second joiner', () => {

@@ -88,7 +88,7 @@ export function teamTabFrom(value: string): TeamTab {
  *  one table: Our team, the hiring tiles and the job's Assign list all read it, so a sprayer is
  *  called a sprayer wherever he is drawn (CLAUDE.md T19 2.5, 2.6). It moved into
  *  `src/engine/staff.ts` tonight, because the hire card's refusal is written there and names the
- *  trade ("extremely experienced joiners come from reputation 60"; CLAUDE.md T20 2.5). This is
+ *  trade ("excellent joiners come from reputation 60"; CLAUDE.md T20 2.5, T21 2.9). This is
  *  the same table, handed on, so every screen that already read it here still does.  */
 export { ROLE_WORDS };
 

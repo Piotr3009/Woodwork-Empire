@@ -86,6 +86,29 @@ describe('taking somebody on', () => {
     );
   });
 
+  it('stands at 2,600 for an experienced joiner, which is Piotr\u2019s own figure', () => {
+    // The one wage field is the month's and the gate reads it directly, with nothing converted out
+    // of a week on the way (PIOTR, 19.09: "I wanted everyone monthly"; CLAUDE.md T21 2.10, T17
+    // 2.11). So the figure in the refusal is the figure on the hire card and the figure in the
+    // bank: 2,600 takes him on and 2,599 does not.
+    expect(payOf('experienced')).toBe(2600);
+    const exact = readyToHire(2600);
+    exact.reputation = 60;
+    expect(canHire(exact, 'joiner', 'experienced')).toEqual({ ok: true, reason: '' });
+    const short = readyToHire(2599);
+    short.reputation = 60;
+    expect(canHire(short, 'joiner', 'experienced')).toEqual({
+      ok: false,
+      reason: 'Not enough in the bank: needs \u00a32,600',
+    });
+    // And the card prints that sentence and no week beside it.
+    const tile = parse(renderTeam(short, 'workshop')).querySelector(
+      '[data-candidate="joiner.experienced"]',
+    );
+    expect(tile?.textContent).toContain('Not enough in the bank: needs \u00a32,600');
+    expect(tile?.textContent).not.toContain('a week');
+  });
+
   it('is the last of the refusals: the kit is named before the bank is', () => {
     const state = fillRack(buyStartingKit(newGame({ difficulty: 'veryEasy' })));
     state.cash = 0;
