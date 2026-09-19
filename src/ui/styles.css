@@ -534,6 +534,10 @@ input.num {
   border: 1px solid #5b5446;
   border-radius: 4px;
   display: flex;
+  /* The bar is a row of plates and the money is not the one that gives way: without this the
+     owes plate beside it squeezed the cash into a column and broke "-£7,259" over two lines
+     (T21-C4, picture 1). */
+  flex: none;
   flex-direction: column;
   justify-content: center;
   line-height: 1.1;
@@ -568,12 +572,17 @@ input.num {
   color: var(--cream);
   cursor: pointer;
   display: flex;
+  /* A plate of the bar and not a column of it: the drawing has both its lines on one line each,
+     and a plate that gives way wraps to 110 px and bursts out of the 70 px bar, top and bottom
+     (T21-C4, picture 1). */
+  flex: none;
   flex-direction: column;
   font: inherit;
   justify-content: center;
   line-height: 1.1;
   padding: 4px 12px;
   text-align: left;
+  white-space: nowrap;
   animation: owes-pulse 1.2s ease-in-out infinite;
 }
 
@@ -2228,6 +2237,17 @@ input.num {
 .modal-folder .button.primary {
   background: var(--green);
   box-shadow: 0 2px 0 var(--green-dark);
+  color: var(--paper);
+}
+
+/* T21 2.3 The one red button in the game, on the folder's paper: the second click of a drop. The
+   skin's own paper and green ink above beat .btn-danger on weight alone, so the drawing's red
+   button came out cream like every other one and the card had no second click to fear
+   (T21-C4, picture 2; docs/mockups/t21/debt.html part 2). The board skin keeps its own danger red
+   the same way, a few rules down. */
+.modal-folder button.btn-danger:not(.chip) {
+  background: var(--bad);
+  border-color: var(--bad);
   color: var(--paper);
 }
 

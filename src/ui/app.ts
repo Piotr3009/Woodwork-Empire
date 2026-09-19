@@ -758,7 +758,11 @@ function modalSpecs(): ModalSpec[] {
             : renderEvent(current, event),
       footer: houseCard ? '' : renderEventFooter(event),
       closable: !houseCard && event.choices.length === 1,
-      wide: event.kind === 'dayEnd' || event.kind === 'monthEnd',
+      // The bank's card joins the day end and the month end on the middle folder size: a head, a
+      // date line, four figures and the epitaph do not fit the small one, and the last line of it
+      // ("built 0 of them") was cut in half by the fold (T21-C4, picture 4; CLAUDE.md T21 2.2).
+      wide:
+        event.kind === 'dayEnd' || event.kind === 'monthEnd' || event.kind === 'bankruptcy',
       position: ui.eventPosition,
     });
   }
