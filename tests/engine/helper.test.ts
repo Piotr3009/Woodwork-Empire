@@ -193,14 +193,18 @@ describe('a joiner with a helper in the hall', () => {
   it('is never sent at a bag change, at an unload or at the cleaning', () => {
     const state = withHelper();
     const joiner = addJoiner(state);
+    const helper = state.workers.find((worker) => worker.role === 'helper');
+    if (helper === undefined) throw new Error('no helper');
     for (const kind of HELPER_ONLY_KINDS) {
       const task = taskOfKind(state, kind);
       expect(assignWorkerTask(state, joiner.id, task.id), kind).toBe(false);
-      expect(task.doneBy, kind).toBeNull();
+      // Never the joiner's, whoever else has it. The helper on duty takes his own work the minute
+      // it exists now and not at the next pass over the crew, so the first of these three is
+      // already his before the joiner is offered it (CLAUDE.md T21 2.5.3).
+      expect([null, helper.id], kind).toContain(task.doneBy);
+      expect(task.doneBy, kind).not.toBe(joiner.id);
     }
     // The helper himself may always be sent at his own work.
-    const helper = state.workers.find((worker) => worker.role === 'helper');
-    if (helper === undefined) throw new Error('no helper');
     const bags = taskOfKind(state, 'emptyBags');
     expect(assignWorkerTask(state, helper.id, bags.id)).toBe(true);
   });

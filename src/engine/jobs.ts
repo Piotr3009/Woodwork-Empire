@@ -84,6 +84,7 @@ import {
   designMinutes,
   emailMinutes,
   emailsForPrice,
+  firstOnDutyOf,
   jobTasks,
   takeOffMinutes,
 } from './tasks';
@@ -577,6 +578,40 @@ export function refreshJob(state: GameState, job: Job): void {
   }
   const coming = state.deliveries.some((delivery) => delivery.jobId === job.id && !delivery.unloaded);
   job.stage = coming ? 'materialOrdered' : 'materialPending';
+  // The drawings are done and the job is short of sheets: the office orders them itself
+  // (CLAUDE.md T21 2.5.2).
+  if (job.stage === 'materialPending') autoOrderMaterial(state, job);
+}
+
+/** Who places a job's material order when nobody asks him to, in the order he is asked: the
+ *  purchasing clerk, whose job it is; the estimator, who read the drawing and counted the sheets;
+ *  and the office admin, who covers for a specialist the company has not taken on, which is the
+ *  order every other job of office work is handed out in (CLAUDE.md T7 3.12, T21 2.5.2). */
+export const MATERIAL_ORDER_ROLES: ReadonlyArray<WorkerRole> = [
+  'purchasingClerk',
+  'estimator',
+  'officeAdmin',
+];
+
+/** The material is ordered the moment the drawings are done, by whoever in the office is there to
+ *  order it, and not when the owner next has time to open the job's card (PIOTR, 19.09: "they wait
+ *  until I have time; stupid"; CLAUDE.md T21 2.5.2).
+ *
+ *  It is the same order the player's own button places, at the same ad hoc price, through the same
+ *  `orderForJob`: the only difference is the name in the ledger line. `orderForJob` asks the
+ *  engine's own `canAfford`, which is the overdraft floor to the penny, so the office never takes
+ *  the company past the limit the bank allows; it simply has nothing to order with until the money
+ *  is there, and orders the minute it is. With none of the three on the books nothing happens here
+ *  and the job's card asks the owner exactly as it always did. */
+export function autoOrderMaterial(state: GameState, job: Job): boolean {
+  if (takeOffOutstanding(state, job)) return false;
+  if (shortfallOf(job) <= 0) return false;
+  if (!orderForJobCheck(state, job).ok) return false;
+  const clerk = firstOnDutyOf(state, MATERIAL_ORDER_ROLES);
+  if (clerk === null) return false;
+  if (orderForJob(state, job, clerk.name) === null) return false;
+  job.stage = 'materialOrdered';
+  return true;
 }
 
 /** The site measure costs a taxi while there is no van (CLAUDE.md 8.10). */

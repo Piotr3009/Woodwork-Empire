@@ -121,13 +121,17 @@ const TASK_DEFINITIONS: Record<TaskKind, TaskDefinition> = {
   // The take off is the owner's until an estimator is taken on, and then his, so many a day
   // (CLAUDE.md T13 3.8).
   materialTakeOff: { category: 'admin', eligibleRoles: ['estimator'], autoRoles: ['estimator'] },
-  // The site measure is a day out with a tape. It was the owner's alone; from tonight the
-  // estimator goes when there is no owner free for it, with the day's travel minutes coming off
-  // his own 480 and not the owner's, and a salesman can be sent (PIOTR; CLAUDE.md T20 2.3).
+  // The site measure is a day out with a tape. It was the owner's alone; Turn 20 let the estimator
+  // go, with the day's travel minutes coming off his own 480 and not the owner's (PIOTR;
+  // CLAUDE.md T20 2.3). From tonight nobody waits for the owner to have time for it: the estimator
+  // goes the minute the measure exists, the salesman goes when there is no estimator on the books,
+  // and the owner only when there is neither of them (PIOTR, 19.09: "they wait until I have time;
+  // stupid"; CLAUDE.md T21 2.5.1). The order of this list is that order, because `bestTakerOf`
+  // reads it as a ranking.
   siteMeasure: {
     category: 'admin',
     eligibleRoles: ['estimator', 'salesman'],
-    autoRoles: ['estimator'],
+    autoRoles: ['estimator', 'salesman'],
   },
   // The website's weekly minutes: the owner's, or the admin's (CLAUDE.md T13 3.7).
   websiteUpkeep: { category: 'admin', eligibleRoles: ['officeAdmin'], autoRoles: ['officeAdmin'] },
@@ -470,6 +474,12 @@ export function createTask(state: GameState, draft: TaskDraft): TaskInstance {
     orders: draft.orders ? draft.orders.slice() : [],
   };
   state.tasks.push(task);
+  // Whoever it belongs to has it now and not at the next pass over the crew: a call that comes in
+  // at 11:00 is the admin's at 11:00, and the site measure of a job accepted this minute is the
+  // estimator's this minute (PIOTR, 19.09: "they wait until I have time; stupid";
+  // CLAUDE.md T21 2.5.1, 2.5.3). The dinner hour is left out for the same reason the day's own pass
+  // leaves it out: nobody is sent at a job of work in the middle of his break (CLAUDE.md T6 3.4).
+  if (!assigning && !isBreak(state.clock.minute)) assignStaffTasks(state);
   return task;
 }
 
@@ -647,6 +657,24 @@ export function designOutstandingFor(state: GameState, jobId: string | null): bo
   );
 }
 
+/** The first man in today of these roles, in the order they are named: who does a job of office
+ *  work without the owner being asked for it. The one reading of a role ranking outside
+ *  `bestTakerOf`, which ranks a task's own `autoRoles`; this is for the work that is not a task at
+ *  all, which tonight means the material order a job's finished drawings call for
+ *  (CLAUDE.md T21 2.5.2). */
+export function firstOnDutyOf(
+  state: GameState,
+  roles: readonly WorkerRole[],
+): Worker | null {
+  for (const role of roles) {
+    const found = state.workers.find(
+      (worker) => worker.role === role && isWorkingToday(state, worker),
+    );
+    if (found !== undefined) return found;
+  }
+  return null;
+}
+
 /** Who takes a task the company has more than one kind of man for: the one whose job it is, and
  *  the man covering for him only when he is not there (CLAUDE.md T7 3.12). */
 export function bestTakerOf(
@@ -799,9 +827,24 @@ export function bookWeekMinutes(state: GameState): void {
  *  What somebody started stays his: a task still marked for a man who is in today is handed back
  *  to that man and never passed round the workshop by rank (CLAUDE.md T17 2.14). One the owner put
  *  down is the office's again while he is not holding it. */
+/** True while the pass is running. `createTask` runs the pass so nothing waits for 8:00, and the
+ *  pass must not be able to run itself again from inside itself: it hands work out and creates
+ *  none, so this is a guard against a future change and not against today's code
+ *  (CLAUDE.md T21 2.5.3). */
+let assigning = false;
+
 export function assignStaffTasks(state: GameState): void {
   const started = state.workers.filter((worker) => isWorkingToday(state, worker));
   if (started.length === 0) return;
+  assigning = true;
+  try {
+    handOutTasks(state, started);
+  } finally {
+    assigning = false;
+  }
+}
+
+function handOutTasks(state: GameState, started: readonly Worker[]): void {
   for (const task of state.tasks) {
     if (task.done) continue;
     if (task.doneBy !== null) {

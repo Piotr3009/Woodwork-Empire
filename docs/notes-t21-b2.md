@@ -181,3 +181,68 @@ this commit only asserted them. The figures chosen in the other three tasks are 
   `WORKER_HOURS_PER_MONTH`, for the eight hours of the shift, at the quarter the night rate adds,
   which is 22.75 for a joiner with no experience, and `tests/engine/staffSecondShift.test.ts` already
   asserts that figure and not the old one. No test was weakened or skipped in this commit.
+
+## T21-B2b: 2.5, the office works without you
+
+- Built: all three, in the unfrozen modules and with no frozen file touched.
+  1. **The site measure.** `TASK_DEFINITIONS.siteMeasure.autoRoles` is `['estimator', 'salesman']`
+     where it was `['estimator']`, and `bestTakerOf` already reads that list as a ranking, so the
+     estimator goes first, the salesman second, and the owner only when there is neither on the
+     books. The owner is never handed a task behind his back in this game (he starts what he does),
+     so "the owner only when neither" is the absence of a taker and not a third rung.
+  2. **The material.** `autoOrderMaterial(state, job)` in `src/engine/jobs.ts`, called from the one
+     place a job becomes short with its paperwork behind it, the tail of `refreshJob`. It asks
+     `firstOnDutyOf(state, MATERIAL_ORDER_ROLES)` for the purchasing clerk, then the estimator, then
+     the office admin, and places the player's own order through the player's own `orderForJob`, at
+     the ad hoc price, with `canAfford`'s overdraft floor deciding whether there is anything to order
+     with. `orderForJob` takes a third argument, `orderedBy`, and writes
+     `Material for <job>, ordered by <name>`.
+  3. **The minute a task arrives.** `createTask` ends by running `assignStaffTasks(state)`, outside
+     the dinner hour and behind an `assigning` guard.
+  Tests: `tests/engine/officeWithoutYou.test.ts` (7, each of the two here with the person on the
+  books and without, plus the overdraft floor and the dinner hour) and three new ones in
+  `tests/engine/estimatorSiteMeasure.test.ts`.
+- Left: nothing of 2.5. Two tests were rewritten to the new truth and neither was weakened.
+  `tests/engine/estimatorSiteMeasure.test.ts` asserted `auto` was `['estimator']` alone and now
+  asserts the pair in Piotr's order; `tests/engine/helper.test.ts` asserted a freshly created
+  helper task had nobody on it, and now asserts what it was always about, that the task is never the
+  joiner's, and that whoever holds it is the helper.
+
+### What was already true, and what actually changed (2.5.3)
+
+The brief says "`runAutoAssign` is called when a task is created, not only at 8:00". Read out of the
+code as it stands, the pass is `assignStaffTasks` and it was **already** called every clock minute:
+`settle` runs it through `delegateTasks` on every minute that is not the break, and `act` ends in
+`settle` too, so a call that rang at 11:00 was taken at 11:00 and a task created by a player action
+was taken in the same action. Nothing in the game waited for 08:00. What changed is the ordering
+inside a minute: a task is now handed out **as it is created**, before the rest of whatever created
+it has run, so no code path can create a task and leave it lying for the remainder of that minute.
+This matters most where a task is created after `delegateTasks` has already run in the same settle,
+which is every task `startDay` creates after its own `delegateTasks` line and every task an event's
+completion creates. Reported here because the brief's sentence describes a bug that was not there.
+
+### The ledger line, and why the name is in the label
+
+`LedgerEntry` has `day`, `category`, `label` and `amount` and no field for a person, and adding one
+is a frozen-file change (`types.ts`) that nothing else in the game would read. So the name goes in
+the label, which is the string the Accounting page prints: `Material for Small kitchen, ordered by
+Percy`. An order the owner places himself keeps the old label exactly, so the player can tell the two
+apart by reading the line.
+
+### What the auto order does not do, on purpose
+
+It books nobody's minutes. Ordering the material for a job costs no minutes today either: the
+player's `Order for this job` is one click and no task, and `materialOrderMinutes` is a curve the
+Tasks page never creates a task from. Giving the clerk minutes for it would be a new rule about his
+day, and the brief does not ask for one. The daily consumables chore (`dailyOrdering`) is untouched.
+
+### The balance consequence Piotr should see
+
+A workshop with anybody at all in the office now spends on material the minute a drawing is finished,
+without being asked. On a company that is short of cash this is money leaving earlier than it used
+to, and with phase B1's net position rule a company can now walk itself closer to the bank's limit
+through its own office. Two things hold it: `canAfford` is the overdraft floor to the penny, so the
+office cannot cross the limit; and the order was going to be placed anyway, because a job cannot be
+made without its sheets. The whole test tree, the playthroughs included, came out green with no
+scenario changing its ending, so the effect is timing and not outcome. It is worth one line to him
+all the same: **the office will spend his overdraft down to the last pound without asking.**
