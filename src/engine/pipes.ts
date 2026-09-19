@@ -11,7 +11,7 @@
 // the drop and the last the inlet or the tee. When a run goes (a move, a sale, a burglary), a
 // branch that joined it takes over its tail, so no pipe is ever left hanging in the air.
 
-import { PIPE_PRICE_PER_METRE } from './constants';
+import { DUCT_SYSTEMS, PIPE_PRICE_PER_METRE } from './constants';
 import { canAfford, charge } from './economy';
 import { cellIsFloor } from './layout';
 import { extractionCapacityOf, extractionDemandOf } from './media';
@@ -54,6 +54,18 @@ export function pipeTargets(state: GameState): Equipment[] {
 /** True for a machine that wants a pipe at all: one with an extraction demand above zero. */
 export function wantsExtraction(item: { specId: string; variantId: string }): boolean {
   return extractionDemandOf(item) > 0;
+}
+
+/** True for a picture a connection point has to be measured on: a machine that pulls on the
+ *  extraction, so a drop comes down onto it, or a fan a run goes into, so an inlet turns into its
+ *  mouth (CLAUDE.md T22 2.8). A central system is neither: it draws a run along the rear wall and a
+ *  drop to every machine, and there is no inlet of its own anywhere on it (CLAUDE.md T16 2.3).
+ *
+ *  It is the Sprite check page's question: a file that wants a line and has not got one is printed
+ *  in red as `no port data`, so a missing measurement is visible rather than quietly guessed at. */
+export function needsPortData(item: { specId: string; variantId: string }): boolean {
+  if (extractionDemandOf(item) > 0) return true;
+  return extractionCapacityOf(item) > 0 && !DUCT_SYSTEMS.includes(item.specId);
 }
 
 /** Where a machine's own footprint stands: its class's footprint, centred inside the working zone
@@ -101,11 +113,11 @@ export function portCell(item: {
   const first = { x: Math.floor(origin.x), y: Math.floor(origin.y) };
   const spec = findSpec(item.specId);
   if (spec === undefined || spec === null) return first;
-  const cell = portCellIn(
-    deliveredFiles(),
-    { spriteKey: spec.spriteKey, variantId: item.variantId, orientation: item.orientation ?? 0 },
-    origin.width,
-  );
+  const cell = portCellIn(deliveredFiles(), {
+    spriteKey: spec.spriteKey,
+    variantId: item.variantId,
+    orientation: item.orientation ?? 0,
+  });
   if (cell === null) return first;
   return { x: first.x + cell.x, y: first.y + cell.y };
 }

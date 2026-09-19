@@ -27,6 +27,9 @@ import {
 } from '../render/sprites';
 import { placeholderSvg } from '../render/placeholder';
 import { footprintOf, standsInTheHall, zoneOf } from '../engine/machines';
+import { needsPortData } from '../engine/pipes';
+import { type Port, PORTS, portFor, spriteFileName } from '../engine/ports';
+import type { Orientation } from '../engine/types';
 import { metresBy } from '../engine/text';
 import {
   type Animation,
@@ -40,6 +43,9 @@ import { escapeHtml } from './modal';
 export interface SpriteTarget {
   /** The file name without .png: the family key, or the family key and the class. */
   name: string;
+  /** The catalogue id of the family, which is what the engine's questions are keyed by. The
+   *  pallet at the gate is not in the catalogue and carries its own key here. */
+  specId: string;
   spriteKey: string;
   tier: string | null;
   width: number;
@@ -74,6 +80,7 @@ export function spriteTargets(): SpriteTarget[] {
         const zone = zoneOf(spec.id, variant.id);
         add({
           name: `${spec.spriteKey}.${variant.id}`,
+          specId: spec.id,
           spriteKey: spec.spriteKey,
           tier: variant.id,
           width: stands.width,
@@ -89,6 +96,7 @@ export function spriteTargets(): SpriteTarget[] {
     if (!standsInTheHall(spec.id)) continue;
     add({
       name: spec.spriteKey,
+      specId: spec.id,
       spriteKey: spec.spriteKey,
       tier: null,
       width: spec.width,
@@ -103,6 +111,7 @@ export function spriteTargets(): SpriteTarget[] {
   // stands; the lorry it replaced is gone from the hall (CLAUDE.md T13 3.21).
   add({
     name: PALLET_SPRITE,
+    specId: PALLET_SPRITE,
     spriteKey: PALLET_SPRITE,
     tier: null,
     width: PALLET_LAYOUT.width,
@@ -201,7 +210,54 @@ function zoneLine(target: SpriteTarget): string {
   return `works in ${metresBy({ width: target.zoneWidth, depth: target.zoneDepth })}`;
 }
 
-function cell(target: SpriteTarget): string {
+/** The measured connection point of this picture, or the red warning that nothing has been
+ *  measured on a file that wants a line: a machine a drop comes down onto, or a fan a run goes
+ *  into (PIOTR, 19.09; CLAUDE.md T22 2.8). A file nothing is ever piped to says nothing at all. */
+function portLine(target: SpriteTarget, ports: Record<string, Port>): string {
+  const item = { specId: target.specId, variantId: target.tier ?? '' };
+  if (!needsPortData(item)) return '';
+  const file = spriteFileName(target.spriteKey, target.tier);
+  const port = portFor(file, ports);
+  if (port === null) {
+    return '<p class="sprite-figures warn" data-port="none">no port data</p>';
+  }
+  const where = port.faces === undefined ? 'drop' : `inlet, mouth ${port.faces}`;
+  const hidden = port.hidden === true ? ', hidden behind the body' : '';
+  return (
+    `<p class="sprite-figures" data-port="${escapeHtml(file)}">${where} at px ${port.px}, ` +
+    `py ${port.py} · cell ${port.cell.x},${port.cell.y}${hidden}</p>`
+  );
+}
+
+/** Which of the four orientations the art side has drawn a file for, per family and class
+ *  (CLAUDE.md T22 2.11). Orientation 1 is always reachable, because a quarter turn with no file of
+ *  its own is the base picture mirrored, which the hall has done since Turn 10; what this line says
+ *  is which of them has a picture of its very own. */
+function turnsLine(target: SpriteTarget): string {
+  const files = spriteFiles();
+  const drawn = ORIENTATIONS.filter((orientation) =>
+    files.includes(spriteFileName(target.spriteKey, target.tier, orientation)),
+  );
+  const words = ORIENTATIONS.map((orientation) =>
+    drawn.includes(orientation) ? SUFFIX_WORDS[orientation] : '',
+  ).filter((word) => word !== '');
+  return (
+    `<p class="sprite-figures" data-turns="${drawn.join(',')}">` +
+    `${drawn.length} of 4 orientations drawn: ${words.length === 0 ? 'none' : words.join(', ')}` +
+    `${drawn.length < 4 ? ', the rest mirrored or the base picture' : ''}</p>`
+  );
+}
+
+/** The four orientations, and what the file of each is called after the class (T22 2.11). */
+const ORIENTATIONS: readonly Orientation[] = [0, 1, 2, 3];
+const SUFFIX_WORDS: Record<Orientation, string> = {
+  0: 'the base file',
+  1: '.r',
+  2: '.rr',
+  3: '.rrr',
+};
+
+function cell(target: SpriteTarget, ports: Record<string, Port>): string {
   const canvas = spriteCanvas(target.width, target.depth, target.height);
   const file = spriteFileSize(target.width, target.depth, target.height);
   const url = spriteUrl(target.spriteKey, target.tier);
@@ -213,6 +269,8 @@ function cell(target: SpriteTarget): string {
     `${zoneLine(target)} · ${escapeHtml(target.where)}</p>` +
     `<p class="sprite-figures">canvas ${canvas.width} by ${canvas.height} · ` +
     `file ${file.width} by ${file.height}</p>` +
+    turnsLine(target) +
+    portLine(target, ports) +
     `<p class="sprite-figures">${url === null ? 'no file yet' : escapeHtml(url)}</p>` +
     '</div>'
   );
@@ -361,7 +419,10 @@ function characterSection(): string {
   );
 }
 
-export function renderSpriteCheck(): string {
+/** The whole page. The port table is injectable so the test can ask what the page says about a
+ *  file whose line has been taken out of it, which is the one thing a real table can never show
+ *  (CLAUDE.md T22 2.8). */
+export function renderSpriteCheck(ports: Record<string, Port> = PORTS): string {
   const targets = spriteTargets();
   const delivered = targets.filter(
     (target) => spriteUrl(target.spriteKey, target.tier) !== null,
@@ -370,8 +431,10 @@ export function renderSpriteCheck(): string {
     '<div class="sprite-page">' +
     `<p class="hint">Sprite check: ${targets.length} keys, ${delivered} with a file. ` +
     'Every cell shows the footprint the game expects, the placeholder box, and the picture ' +
-    'beside it. A picture that floats or sinks has the wrong anchor.</p>' +
-    `<div class="sprite-grid">${targets.map((target) => cell(target)).join('')}</div>` +
+    'beside it, which of the four orientations has a file of its own, and the connection point ' +
+    'measured on it. A picture that floats or sinks has the wrong anchor; a red ' +
+    '\u201cno port data\u201d is a file a pipe is drawn to with nothing measured on it.</p>' +
+    `<div class="sprite-grid">${targets.map((target) => cell(target, ports)).join('')}</div>` +
     layerSection(
       'The painted hall',
       'One canvas at 2x, three layers, all of them laid down at the origin: the background with ' +

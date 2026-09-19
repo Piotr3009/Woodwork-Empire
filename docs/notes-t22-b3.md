@@ -81,6 +81,68 @@ the bend the brief asks for.
 
 ---
 
+## T22-B3b, 2.8: every connection point is a number
+
+- The drawing reads the table: `portPointOf` in `src/render/hall.ts` turns a line's `px, py` into a
+  screen point through `spriteBox` and `SPRITE_SCALE`, which is the very arithmetic that places the
+  picture, so the pipe lands on the same pixel of the picture at any zoom. A machine's drop comes
+  down from the run at that pixel's own screen x: `hidden` (the five saws) stops it at `py` and
+  draws nothing else, and a visible port (the spindle moulders, the three floor edgebanders) stops
+  half a metre above it and a hose in `HOSE_COLOUR` finishes the job. An extractor's inlet is
+  Piotr's variant C: the vertical stands 0.25 m in front of the mouth, comes down to the mouth's
+  height, and an elbow turns into the mouth and ends on the measured pixel.
+- `connectCheck` refuses a run into a fan whose mouth faces a wall, in the brief's own words, and
+  `needsPortData` in `src/engine/pipes.ts` is what the Sprite check page asks: a machine with an
+  extraction demand or a fan a run goes into wants a line, and a file that wants one and has not got
+  one is printed in red as `no port data`.
+
+### The defect the coordinator found, fixed: the mirrored cell is the axis swap
+
+`mirroredPort` and `portCellIn` mirrored a cell with `footprintWidth - 1 - cell.x`, which is the
+reflection of a *row* and not of this projection. A mirror about the vertical screen axis on a 2 to 1
+dimetric exchanges the two world axes, which is why the same sentence of 2.8 says `faces` swaps
+`+x` and `+y`: the rule is `{ x: cell.y, y: cell.x }`. Both of the coordinator's worked examples come
+out right under it and neither does under the old one:
+
+| line | cell | old mirror | new mirror | what it means |
+| --- | --- | --- | --- | --- |
+| `tableSaw.standard` (3 by 1, turned 1 by 3) | 1,0 | -1,0 | 0,1 | a metre off the machine, against the middle cell of the turned footprint |
+| `extractor.standard` (2 by 1, turned 1 by 2), `faces +y` | 0,1 | 0,1 | 1,0 | under the unit, against one cell along the axis the mouth now opens down |
+
+`footprintWidth` is no part of the rule, so it is gone from `mirroredPort`, from `portCellIn` and
+from `portOf`'s `size`, and `portCell` in `src/engine/pipes.ts` no longer hands it in.
+`tests/engine/ports.test.ts` asserts the rule on both worked examples, and asserts of **every one of
+the eighteen lines, at orientations 0 and 1**, that a machine's cell lands inside its own footprint
+and an extractor's outside it. Nothing is clamped: the assertion is the guard.
+
+### `portCell` and the measured pixel can be half a metre apart, and nothing is wrong
+
+Worth Piotr's eye rather than a change. `portCell` is `Math.floor(footprint origin) + the line's
+cell`, and a footprint is centred inside the zone it reserves (Turn 7 3.3), so a 3 by 1 saw in a
+4 by 3 zone has its origin at x 4.5 and not 4.5 rounded anywhere. The standard saw at anchor 4,2
+therefore routes to cell 5,3 while its measured pixel at px 137 lands at screen x 76.5, which is
+4.5 px past the right edge of that cell and inside the next one along. Nothing in the drawing minds:
+the drop hangs from the run at the pixel's own screen x and `runAbove` finds the run's y there, so
+the pipe meets the run exactly and comes down exactly on the port. The only thing that is half a
+metre out is which grid cell the *route* claims, and the run passes over both. Changing it means
+changing `portCell`, which moves the length of every run on a centred footprint and the pipe bill
+with it, so it was not changed tonight.
+
+### Figures this agent chose in 2.8
+
+- `needsPortData` excludes the two central systems [TUNE, Claude]: `dustSystem` and `flexiSystem`
+  have an extraction capacity, so the plain rule would ask the art side for a measurement on them,
+  and there is nothing to measure. A central system draws a run along the rear wall and a drop to
+  each machine, and no inlet of its own anywhere (CLAUDE.md T16 2.3).
+- The words on the Sprite check page: `no port data` is the brief's, in red through the one `.warn`
+  class. A line that is there reads `drop at px 137, py 62 · cell 1,0, hidden behind the body`
+  or `inlet, mouth +y at px 28, py 67 · cell 0,1` [TUNE: Claude's wording, the numbers are the
+  table's].
+- `INLET_STANDOFF` 0.25 m and the hose's 0.5 m and `PIPE_STROKE * 0.7` are the brief's own figures
+  [PIOTR, and the brief].
+
+---
+
 ## Notes for the lead: changes wanted in files or regions that are not B3's
 
 ### 1. `src/engine/index.ts` (the barrel), applied by B3 because nothing compiles without it
