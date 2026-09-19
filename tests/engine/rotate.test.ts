@@ -162,18 +162,27 @@ describe('what turning does to the picture', () => {
     expect(art).not.toContain('scale(-1, 1)');
   });
 
-  it('takes the one second orientation the art side has delivered, and mirrors the rest', () => {
+  it('takes the second orientations the art side has delivered, and mirrors the rest', () => {
     // The art side's `.r` files were parked (CLAUDE.md T10 6.2): the hall mirrored until one
     // landed, and the day one did the loader was to take it with no code change at all. Piotr
-    // delivered `toolCabinet.standard.r.png` between Turn 20 and Turn 21, and that is what this
-    // reads: the cabinet turned is drawn from its own file and not mirrored, and every other
-    // class the game draws still mirrors.
+    // delivered `toolCabinet.standard.r.png` between Turn 20 and Turn 21 and the other four
+    // cabinet classes' turned files between Turn 21 and Turn 22, and that is what this reads: a
+    // cabinet turned is drawn from its own file and not mirrored, whatever its class, and every
+    // other class the game draws still mirrors.
     const turned = spriteFiles().filter((name) => name.endsWith('.r.png'));
-    expect(turned).toEqual(['toolCabinet.standard.r.png']);
-    expect(mirrorNeeded(spriteFiles(), 'toolCabinet', 'standard', true)).toBe(false);
-    expect(pickSprite(spriteFiles(), 'toolCabinet', 'standard', true)).toBe(
-      '/sprites/toolCabinet.standard.r.png',
-    );
+    expect(turned).toEqual([
+      'toolCabinet.budget.r.png',
+      'toolCabinet.industrial.r.png',
+      'toolCabinet.pro.r.png',
+      'toolCabinet.standard.r.png',
+      'toolCabinet.used.r.png',
+    ]);
+    for (const cabinet of ['used', 'budget', 'standard', 'pro', 'industrial']) {
+      expect(mirrorNeeded(spriteFiles(), 'toolCabinet', cabinet, true), cabinet).toBe(false);
+      expect(pickSprite(spriteFiles(), 'toolCabinet', cabinet, true), cabinet).toBe(
+        `/sprites/toolCabinet.${cabinet}.r.png`,
+      );
+    }
     // The saw has no second orientation, so it is mirrored as it always was.
     expect(mirrorNeeded(spriteFiles(), 'tableSaw', 'standard', true)).toBe(true);
     expect(mirrorNeeded([], 'tableSaw', 'standard', true)).toBe(true);
