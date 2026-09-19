@@ -69,6 +69,19 @@ describe('a click on a machine on the hall', () => {
     expect(card()?.textContent ?? '').not.toContain('Table saw');
   });
 
+  it('puts the thing s own name and class in the head, and not the word Machine', () => {
+    // 2.13 asks for the name and the class in the title. "Machine" over a tool cabinet says
+    // nothing, and the card is opened by clicking that very cabinet (CLAUDE.md T22 2.13).
+    click(`[data-kit="${kitId('tableSaw')}"]`);
+    const head = card()?.closest('.modal')?.querySelector('.modal-head h2')?.textContent ?? '';
+    expect(head).toBe('Table saw: Used table saw');
+    expect(head).not.toContain('Machine');
+    click(`[data-kit="${kitId('extractor')}"]`);
+    expect(card()?.closest('.modal')?.querySelector('.modal-head h2')?.textContent).toBe(
+      'Extractor: Used extractor',
+    );
+  });
+
   it('connects it to the extraction from the card, which is what was never found', () => {
     const saw = kitId('tableSaw');
     // The day 1 kit comes connected: the pipe is pulled off it so the button is the one that

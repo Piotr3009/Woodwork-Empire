@@ -268,6 +268,24 @@ interface Ui {
   startOverAsked: boolean;
 }
 
+/** The head of a modal. Every one of them has a name of its own except the card of a thing on the
+ *  hall, whose head is the thing's own name and class, because "Machine" over a tool cabinet says
+ *  nothing and the card is opened by clicking that very cabinet (CLAUDE.md T22 2.13). */
+function modalTitleOf(id: ModalId, current: GameState): string {
+  if (id !== 'machineCard') return MODAL_TITLES[id];
+  const item = ui.machineCard === null
+    ? undefined
+    : current.equipment.find((entry) => entry.id === ui.machineCard);
+  if (item === undefined) return MODAL_TITLES[id];
+  const spec = findSpec(item.specId);
+  if (spec === undefined || spec === null) return MODAL_TITLES[id];
+  const variant = spec.variants.find((entry) => entry.id === item.variantId);
+  // One class deep families say their own name once and not twice over.
+  return variant === undefined || spec.variants.length <= 1
+    ? spec.name
+    : `${spec.name}: ${variant.name}`;
+}
+
 const MODAL_TITLES: Record<ModalId, string> = {
   board: 'Order board',
   laptop: 'Laptop',
@@ -750,7 +768,7 @@ function modalSpecs(): ModalSpec[] {
     const body = modalBody(ui.modal, current);
     specs.push({
       id: ui.modal,
-      title: MODAL_TITLES[ui.modal],
+      title: modalTitleOf(ui.modal, current),
       body: tipKey === '' ? body : withTip(body, current, tipKey),
       full: MODAL_IS_FULL[ui.modal],
       wide: MODAL_IS_WIDE[ui.modal],
