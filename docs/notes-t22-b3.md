@@ -188,6 +188,35 @@ cabinet both ways round instead of naming one, so it measures Rotate and not the
 
 ---
 
+## T22-B3e, 2.11: Rotate cycles only through the orientations that have a picture
+
+- `orientationsFor` and `nextOrientation` in `src/engine/ports.ts` are the cycle, pure and asked of
+  a list of files so a test can ask them of a list that is not the one on disk; `spriteOrientations`
+  and `nextSpriteOrientation` in `src/render/sprites.ts` ask them of the manifest. `turnGhost` and
+  the pick up's armed turn both go through `turnedFrom` in `src/ui/app.ts`, which is the one place
+  the ring is walked, so Rotate, R and 2.13's Turn row cannot disagree.
+- The rest of 2.11 was phase A's: `orientation` on every item and reservation, the footprint swap,
+  `pictureFor`, and the v19 migration. What this task added beside the cycle is the Sprite check
+  page's orientation line (written in T22-B3b, tested there), the cycle's tests in
+  `tests/engine/rotate.test.ts`, and a whole v31 game opened in `tests/cloud/migrate.test.ts` with a
+  turned cabinet coming up at orientation 1, standing 1 by 2, still the standard class.
+
+### The rule for which orientations exist, which is Claude's and not the brief's
+
+0 and 1 always; 2 and 3 only where the art side has drawn the file [TUNE]. The reason is that a
+quarter turn with no file of its own is the base picture mirrored about its anchor, which the hall
+has done since Turn 10 and which reads correctly, while a half turn has no mirror that would be
+right: the base picture stood at 2 would show the front of the machine where its back belongs. So
+an item with no turned files has two orientations, one with an `.rr` has three, and one with both
+has four. A family with no picture at all still has 0 and 1, because what the player is really
+turning there is the footprint of a box.
+
+An orientation that is not on the ring at all, which is what a save would carry if a `.rr` file were
+ever deleted, comes back to the first one that is rather than leaving the item standing at a picture
+that is not there.
+
+---
+
 ## Notes for the lead: changes wanted in files or regions that are not B3's
 
 ### 1. `src/engine/index.ts` (the barrel), applied by B3 because nothing compiles without it

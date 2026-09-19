@@ -149,6 +149,62 @@ function swapsFaces(orientation: Orientation): boolean {
   return orientation === 1 || orientation === 3;
 }
 
+/** The four orientations, in the order Rotate walks them. */
+const ALL_ORIENTATIONS: readonly Orientation[] = [0, 1, 2, 3];
+
+/** True when the art side has drawn a file for this orientation of this picture: the orientation's
+ *  own class file or its family file, which are the two names `pictureFor` tries before it falls
+ *  back to the base picture. */
+function hasOwnPicture(
+  files: readonly string[],
+  spriteKey: string,
+  variantId: string | null | undefined,
+  orientation: Orientation,
+): boolean {
+  return (
+    files.includes(spriteFileName(spriteKey, variantId, orientation)) ||
+    files.includes(spriteFileName(spriteKey, null, orientation))
+  );
+}
+
+/** The orientations a thing may be stood at: the ones Rotate can reach (PIOTR, 19.09: "I need two
+ *  more turns, we have four walls"; CLAUDE.md T22 2.11).
+ *
+ *  **0 and 1 always.** A quarter turn with no file of its own is the base picture mirrored about
+ *  its anchor, which the hall has done since Turn 10, and a family with no picture at all is a box
+ *  whose footprint swaps all the same. **2 and 3 only where the file is there**, because a half
+ *  turn has no mirror that would be right: the base picture stood at 2 would be the front of the
+ *  machine where its back should be. That is Claude's rule rather than the brief's arithmetic
+ *  [TUNE], and it is there so that no wrong picture ever stands on the hall.
+ *
+ *  The five tool cabinets are the first items in the game with all four (PIOTR's art, 19.09); the
+ *  extractors join them the day `docs/art/REQUESTS-T22.md` 2 lands, with no code change. */
+export function orientationsFor(
+  files: readonly string[],
+  spriteKey: string,
+  variantId?: string | null,
+): Orientation[] {
+  return ALL_ORIENTATIONS.filter(
+    (orientation) =>
+      orientation === 0 || orientation === 1 || hasOwnPicture(files, spriteKey, variantId, orientation),
+  );
+}
+
+/** The next orientation after this one, round the ones that have a picture: `0, 1, 0` for a thing
+ *  with two, `0, 1, 2, 3, 0` for one with four (CLAUDE.md T22 2.11). An orientation that is not on
+ *  the list at all, which is what a save made before its `.rr` file was deleted would carry, comes
+ *  back to the first one on it. */
+export function nextOrientation(
+  files: readonly string[],
+  spriteKey: string,
+  variantId: string | null | undefined,
+  orientation: Orientation,
+): Orientation {
+  const ring = orientationsFor(files, spriteKey, variantId);
+  const at = ring.indexOf(orientation);
+  return ring[(at + 1) % ring.length] ?? 0;
+}
+
 /** The line for this file, or null when nothing has been measured on it. */
 export function portFor(file: string | null, ports: Record<string, Port> = PORTS): Port | null {
   if (file === null) return null;

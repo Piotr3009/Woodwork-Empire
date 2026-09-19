@@ -11,6 +11,9 @@ import { OLDEST_SAVE_VERSION, canOpenVersion, migrateState } from '../../src/eng
 import { STATE_VERSION, bagStore, tick } from '../../src/engine/index';
 import { CABINET_SLOT_LAYOUT, CANTEEN_SLOT_LAYOUT, roomById } from '../../src/engine/constants';
 import type { GameState } from '../../src/engine/index';
+import { itemFootprint } from '../../src/engine/machines';
+import { orientationsFor } from '../../src/engine/ports';
+import { spriteFiles } from '../../src/render/sprites';
 import { twoMenOnSheetWork } from '../helpers';
 
 /** A game saved by v18 on the morning of day 2, with a full bag on the saw, the question about
@@ -518,5 +521,38 @@ describe('a v29 save in this build (CLAUDE.md T21 section 4)', () => {
     expect(later.clock.minute).toBeGreaterThan(opened.clock.minute);
     const round = decodeSaveFile(encodeSaveFile(later));
     expect(round.state).toEqual(later);
+  });
+
+  it('opens a whole v31 game, and a turned cabinet comes up at orientation 1', () => {
+    // Every v30 and v31 save loads (CLAUDE.md T22 section 4). A v31 save is state version 18, so
+    // only tonight's lift runs on it: the boolean becomes the number, and a cabinet the player had
+    // standing across its cells stays across them rather than being squared up, because the row
+    // was laid out again by the Turn 21 lift and not by this one (CLAUDE.md T22 2.11).
+    const played = twoMenOnSheetWork();
+    const raw = JSON.parse(JSON.stringify(played)) as Record<string, unknown>;
+    raw.version = 18;
+    const equipment = raw.equipment as Array<Record<string, unknown>>;
+    for (const item of equipment) {
+      item.rotated = item.specId === 'toolCabinet';
+      delete item.orientation;
+    }
+    const opened = migrateState(raw, 18);
+    if (opened === null) throw new Error('the lift refused a whole v31 game');
+    expect(opened.version).toBe(STATE_VERSION);
+    for (const item of opened.equipment) {
+      expect(item.orientation, item.specId).toBe(item.specId === 'toolCabinet' ? 1 : 0);
+      expect(Object.keys(item), item.specId).not.toContain('rotated');
+    }
+    const cabinet = opened.equipment.find((item) => item.specId === 'toolCabinet');
+    if (cabinet === undefined) throw new Error('the day one kit has a cabinet in it');
+    // Turned, and the standard class, which is the class every cabinet in a save was bought as
+    // (CLAUDE.md T22 2.12).
+    expect(cabinet.variantId).toBe('standard');
+    expect(itemFootprint(cabinet)).toEqual({ width: 1, depth: 2, height: 1 });
+    // And Rotate walks all four from there, because the art side has drawn all four
+    // (CLAUDE.md T22 2.11).
+    expect(orientationsFor(spriteFiles(), 'toolCabinet', cabinet.variantId)).toEqual([0, 1, 2, 3]);
+    const later = tick(opened, 60);
+    expect(later.clock.minute).toBeGreaterThan(opened.clock.minute);
   });
 });

@@ -97,6 +97,7 @@ import { hallLoops, hallOneShots } from '../render/hall';
 import { walkPath } from '../engine/walk';
 import { unconnectedMachines } from '../engine/pipes';
 import { hasCentralExtraction } from '../engine/machines';
+import { nextSpriteOrientation } from '../render/sprites';
 import { patchInto } from './patch';
 import { renderOwnerOut } from './ownerOut';
 import { renderCompany } from './company';
@@ -548,8 +549,21 @@ function turnGhost(): void {
     requestRender();
     return;
   }
-  ui.rotate = ui.rotate === 0 ? 1 : 0;
+  ui.rotate = turnedFrom(ui.drag.itemId, ui.rotate);
   requestRender();
+}
+
+/** The orientation after this one for the thing named: round the orientations that have a picture,
+ *  which is `0, 1, 0` for almost everything and `0, 1, 2, 3, 0` for the five tool cabinets
+ *  (CLAUDE.md T22 2.11). The one place the cycle is asked for, so Rotate, R and the Turn row of a
+ *  card all walk the same ring. */
+function turnedFrom(itemId: string, orientation: Orientation): Orientation {
+  const current = state;
+  if (current === null) return orientation;
+  const kit = kitOf(current, itemId);
+  const spec = kit === null ? null : findSpec(kit.specId);
+  if (kit === null || spec === null || spec === undefined) return orientation;
+  return nextSpriteOrientation(spec.spriteKey, kit.variantId, orientation);
 }
 
 function setupControls(current: GameState): string {
@@ -2444,7 +2458,7 @@ function onSetupPointerDown(event: MouseEvent): boolean {
   // turns it from there (CLAUDE.md T10 3.8, T22 2.10). The arming is spent on the pick up, so the
   // next thing he lifts comes up square unless he arms it again.
   const stood: Orientation = 'orientation' in item ? item.orientation : 0;
-  ui.rotate = ui.armTurn ? (stood === 0 ? 1 : 0) : stood;
+  ui.rotate = ui.armTurn ? turnedFrom(itemId, stood) : stood;
   ui.armTurn = false;
   ui.drag = { itemId, x: item.anchorX, y: item.anchorY };
   const move = (moveEvent: MouseEvent): void => {
