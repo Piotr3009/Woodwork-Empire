@@ -675,10 +675,16 @@ input.num {
   border-radius: 5px;
   box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.6);
   display: flex;
+  /* 340 px is the width it wants and it never takes more, but from Turn 21 it may be given less:
+     the owes plate of 2.1 is 212 px of bar that was not there before, and a hard minimum here put
+     the Office and Menu buttons off the right edge of a 1280 page while a company was in arrears.
+     A meter that is a bar and two short lines can be read narrower; a button that is off the page
+     cannot be pressed at all (CLAUDE.md T21 2.1, 2.8). */
+  flex: 0 1 340px;
   flex-direction: column;
   gap: 5px;
   justify-content: center;
-  min-width: 340px;
+  min-width: 0;
   padding: 6px 10px;
   position: relative;
 }
