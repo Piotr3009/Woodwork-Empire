@@ -70,7 +70,7 @@ describe('who acts where they are', () => {
     // The pool of names holds twenty and the crew limit can pass twenty, so a second Dave is
     // reachable. A filter that matched a line by the name it is written under would take the
     // joiner Dave's line off the sheet with the estimator Dave's, so the rule is at the source,
-    // in `outputBreakdown`, and it reads the role (NOTES-B2.md 2.3, 8.8).
+    // in `outputBreakdown`, and it reads the role (CLAUDE.md T20 2.3.3; REPORT-T20.md).
     let state = hireNow(known(), 'joiner', 'senior');
     state = hireNow(state, 'estimator', 'experienced');
     const joiner = state.workers.find((worker) => worker.role === 'joiner');

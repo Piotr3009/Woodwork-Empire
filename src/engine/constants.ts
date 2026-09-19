@@ -3526,9 +3526,10 @@ export const ACCIDENT_CHANCE_PER_DAY = 0.02;
 export const ACCIDENT_DAYS_OFF = 3;
 /** A helper cleans every Friday at no owner cost (PIOTR). */
 export const HELPER_CLEAN_WEEKDAY = 4;
-/** [TUNE] The band of dust at which the helper picks up a brush without being asked, any day of
- *  the week (PIOTR, 16.09; CLAUDE.md T17 2.3): the moment the hall stops being clean, which is
- *  the moment the dust starts costing the workshop output. */
+/** [TUNE] The band of dust the Turn 17 rule waited for before the helper picked up a brush
+ *  (PIOTR, 16.09; CLAUDE.md T17 2.3). Turn 20 2.8 found that this was four days behind the dirt
+ *  the player can see and put `hallLooksDirty` in its place, so nothing in the game reads this any
+ *  more: it is kept as the old band the tests of 2.8 measure the new rule against. */
 export const HELPER_CLEAN_DUST_BAND = 'messy';
 
 // ---------------------------------------------------------------------------

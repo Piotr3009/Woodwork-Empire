@@ -49,7 +49,7 @@ describe('the rack is a thing the workshop can sell (CLAUDE.md T20 2.10)', () =>
     expect(sheetsStrandedBySale(state, rack)).toBe(24);
     expect(storageSaleBlock(state, rack)).toBe('Empty it first, 24 sheets on it');
     // And the engine's own guard says it in the same words, so the Owned tab and `canSell` cannot
-    // part company (NOTES-B3.md note 8).
+    // part company (CLAUDE.md T20 2.10, landed in T20-C1).
     expect(canSell(state, rack.id)).toEqual({
       ok: false,
       reason: 'Empty it first, 24 sheets on it',

@@ -80,7 +80,8 @@ describe('the bags are the helper s (CLAUDE.md T20 2.8)', () => {
 
   it('empties them without the owner being asked, because the store is already his', () => {
     // 2.8.1 asks for the helper on `bagChange`'s autoRoles. The kind is called `emptyBags` now
-    // (NOTES-B3.md, names) and it has carried `helper` in its autoRoles since Turn 12: this is
+    // (REPORT-T20.md, the names section) and it has carried `helper` in its autoRoles since Turn 12:
+    // this is
     // the assertion that says so, in the engine and not in the table.
     let state = fillBags(buyStartingKit(newGame({ difficulty: 'veryEasy' })));
     state.enquiries = [];

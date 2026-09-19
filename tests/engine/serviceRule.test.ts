@@ -121,7 +121,7 @@ describe('a service costs a tenth of the machine (CLAUDE.md T20 2.9.2)', () => {
     expect(serviceCostFor(saw)).toBe(
       Math.round(saw.purchasePrice * SERVICE_COST_FRACTION * 100) / 100,
     );
-    // Note 4 of NOTES-B3.md moves the fraction to a tenth; this is what that will read.
+    // The fraction is the tenth of CLAUDE.md T20 2.9.2, landed in T20-C1; this reads it.
     expect(serviceCostFor({ ...saw, purchasePrice: 1800 })).toBe(1800 * SERVICE_COST_FRACTION);
   });
 

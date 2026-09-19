@@ -624,7 +624,7 @@ function walkOutTheGone(state: GameState): Worker[] {
     const job = worker.jobId === null ? null : findJob(state, worker.jobId);
     if (job) takeOffJob(state, job.id, worker.id);
     // The contracts are told here and not through `assignContract`, because contracts.ts reads
-    // this module and the two cannot read each other (NOTES-B2.md says so for phase C).
+    // this module and the two cannot read each other (REPORT-T20.md, what was not done).
     for (const contract of state.contracts) {
       contract.assigned = contract.assigned.filter((id) => id !== worker.id);
     }
@@ -637,7 +637,7 @@ function walkOutTheGone(state: GameState): Worker[] {
     // `workerQuit` is the one kind the game has for a man going off the books. It was written for
     // the overtime quit of Turn 8, which went with the evenings in Turn 17, and nothing has raised
     // it since; a man let go leaves by the same gate (GameEventKind is in the frozen types.ts,
-    // and NOTES-B2.md says so for phase C).
+    // and REPORT-T20.md says so under what was not done).
     queueEvent(state, {
       kind: 'workerQuit',
       title: 'He has gone',

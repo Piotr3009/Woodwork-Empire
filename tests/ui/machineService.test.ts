@@ -2,8 +2,8 @@
 // The Service button of the Machines page, pressed once (PIOTR, 18.09; CLAUDE.md T20 2.9.2,
 // 2.9.3). The rule replaces Turn 8's half hour at the spanner: the service is "paid when called"
 // and the machine is "out for one working day from the call", so the press pays and takes the
-// machine out in the same minute and there is no task for anybody to stand at. NOTES-B3.md note 7
-// asked for this test, because all three places are in `src/engine/game.ts`.
+// machine out in the same minute and there is no task for anybody to stand at. B3's review asked
+// for this test, because all three places are in `src/engine/game.ts` (REPORT-T20.md, T20-C1).
 
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { LAPTOP_BOOT_MINUTES } from '../../src/engine/constants';

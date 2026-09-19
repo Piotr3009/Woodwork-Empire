@@ -299,7 +299,8 @@ describe('the one click that takes the contract (CLAUDE.md T20 2.1.1)', () => {
 
   it('works the card out for the man the player picks, through the real DOM', () => {
     // The route sets `ui.contractMan` and the modal body has to be given it: without that fifth
-    // argument the chips move and the card keeps the first man's figures (NOTES-B1.md 1.1).
+    // argument the chips move and the card keeps the first man's figures (REPORT-T20.md, B1's notes
+    // applied in T20-C1).
     const toOffice = root().querySelector('[data-do="setView"][data-view="office"]');
     if (toOffice !== null) toOffice.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     click('[data-office="workPlan"]');
@@ -340,10 +341,11 @@ describe('the one click that takes the contract (CLAUDE.md T20 2.1.1)', () => {
   });
 
   it('will not take the contract for a man the engine refuses, and says why', () => {
-    // The owner is costed on the card and cannot stand at a contract (NOTES-B1.md 6.1), so the tab
+    // The owner is costed on the card and cannot stand at a contract (REPORT-T20.md 0.6), so the tab
     // draws him the plain `acceptContract` button and never this one. The route is shut all the
     // same, so that a button written in a later turn cannot take the offer and leave it with
-    // nobody on it (NOTES-B1.md 1.2). Nothing on screen dispatches this, so the test makes the
+    // nobody on it (REPORT-T20.md, B1's notes applied in T20-C1). Nothing on screen dispatches this,
+    // so the test makes the
     // click itself.
     click('[data-do="pickContractMan"][data-worker="owner"]');
     expect(root().querySelector('[data-do="takeContract"]')).toBeNull();

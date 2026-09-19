@@ -1,5 +1,6 @@
 // The sprayer (PIOTR, 17.09; CLAUDE.md T19 2.6). A new trade on the floor, hired like a joiner in
-// three tiers and paid by the month. The finishing of a lacquered job is his, at his own full
+// the four tiers of T20 2.5 and paid by the week like everybody else (T20 2.6). The finishing of
+// a lacquered job is his, at his own full
 // rate; a joiner may still do it, slower, so a workshop without one is slower at the booth and
 // never stuck. Anywhere else he is a pair of hands.
 
@@ -160,16 +161,16 @@ describe('the sprayer (CLAUDE.md T19 2.6)', () => {
     const state = atTheBooth('sprayer');
     const man = state.workers.find((worker) => worker.role === 'sprayer');
     expect(hands(state).map((hand) => hand.who)).toContain(man?.id);
-    // The day's own copy of this loop lives in the frozen game.ts; until the note of NOTES-B2.md
-    // section 6 is applied he works on the night path only. The engine's one is right here.
+    // The day's own copy of this loop lives in game.ts, which was frozen for phase B; the line
+    // landed in T20-C1. The engine's one is right here.
     expect(labourIn(state, 5)).toBeGreaterThan(0);
   });
 
-  it('costs the job card real money, although he is paid by the month', () => {
+  it('costs the job card real money, at his own weekly wage', () => {
     const state = atTheBooth('sprayer');
     const job = state.jobs[0] as Job;
-    // `jobLabourCost` reads the weekly wage, which is nought for a man on a monthly one: without
-    // the conversion his minutes would be quoted at nothing (CLAUDE.md T19 2.6).
+    // `jobLabourCost` reads the weekly wage, which is the one wage field every man has since
+    // CLAUDE.md T20 2.6, so his minutes are quoted at his own rate and never at nothing.
     const { cost } = jobLabourCost(state, job);
     expect(cost).toBeGreaterThan(0);
   });

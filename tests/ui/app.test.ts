@@ -449,7 +449,7 @@ describe('assigning work by hand', () => {
   it('offers Assign to this job on the row, which is the override of CLAUDE.md 9.4', () => {
     // Push the job to the bench so the row shows its assign controls (CLAUDE.md T19 2.5). The
     // Turn 17 chip row is gone: the men are chips with a cross apiece and the list is behind one
-    // blue button, whose clicks arrive with the app's own route in phase C (NOTES-B2.md).
+    // blue button, whose clicks arrive with the app's own route (T20-C1).
     const state = currentState();
     expect(state?.jobs[0]).toBeDefined();
     if (state && state.jobs[0]) state.jobs[0].stage = 'ready';

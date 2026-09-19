@@ -251,7 +251,8 @@ export function isSellableFamily(specId: string): boolean {
  *
  *  It is `rackCapacity` of `materials.ts` less this one rack, written here because `materials.ts`
  *  reads this module and not the other way about; it is the same sum over the same
- *  `sheetCapacityOf`. NOTES-B3.md asks phase C to bring the two together. */
+ *  `sheetCapacityOf`. Bringing the two sums into one is still open (REPORT-T20.md, what was not
+ *  done). */
 export function sheetsStrandedBySale(state: GameState, item: Equipment): number {
   let room = 0;
   for (const other of state.equipment) {

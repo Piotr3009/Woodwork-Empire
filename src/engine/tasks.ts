@@ -673,7 +673,8 @@ export function bestTakerOf(
 // doing, into the meters `src/engine/staff.ts` keeps on him. It hangs off `assignStaffTasks`
 // because that is the one hook the day already runs over the whole crew every minute; the sample
 // is guarded by the day and the minute it was taken on, so a minute the state settles more than
-// once is never counted twice. NOTES-B2.md asks phase C for a line of its own in `settle`.
+// once is never counted twice. A line of its own in `settle` was not taken: one hook over the
+// crew is one code path, and two would be two (REPORT-T20.md, what was not done).
 // ---------------------------------------------------------------------------
 
 /** Which of the six bands of a man's week a job of work falls in. The desk is the office and the
@@ -782,7 +783,7 @@ export function bookWeekMinutes(state: GameState): void {
     for (const worker of state.workers) {
       // The day shift, and only the day shift: the night runs its own minute loop and never
       // settles, so a man on it is left out of the meters rather than sampled through a day he
-      // was asleep for (NOTES-B2.md).
+      // was asleep for (REPORT-T20.md, what was not done).
       if (!isWorkingToday(state, worker)) continue;
       const band = bandOf(state, worker.taskId, worker.jobId);
       bookOne(state, worker, week, band, jobNameOf(state, worker.jobId));

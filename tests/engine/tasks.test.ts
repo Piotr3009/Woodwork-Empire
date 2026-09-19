@@ -385,7 +385,7 @@ describe('the material take off', () => {
 
   it('is the same half hour whatever the job is worth, and the caller asks for it', () => {
     // The curve by price went with the five a day: `src/engine/jobs.ts` asks `takeOffMinutes` for
-    // the figure now, instead of `createTask` overriding whatever it was handed (NOTES-B2.md 2.1).
+    // the figure now, instead of `createTask` overriding whatever it was handed (T20-C1).
     const takeOff = (price: number): number => {
       const state = newGame();
       state.enquiries = [];
