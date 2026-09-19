@@ -145,6 +145,11 @@ describe('the men on a job (CLAUDE.md T19 2.5)', () => {
   it('sends the men past the first to the waiting cell and then along the same side', () => {
     const state = menOnOne(3, 1);
     const job = jobOfFirst(state);
+    // The one job in the hall, because from Turn 21 a man who would stand in a queue is moved to
+    // another job that has work for him, and then there is no queue to look at. This test is about
+    // where the men of a queue stand, so the hall is given nothing else to do (CLAUDE.md T19 2.5,
+    // T21 2.7). The scheduler itself is asserted in tests/engine/nobodyWaits.test.ts.
+    state.jobs = [job];
     job.labourRemaining = job.labourValue * 0.95;
     workMinute(
       state,

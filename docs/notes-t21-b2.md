@@ -92,6 +92,175 @@ becoming `*  was Claude's reading and not his. One table for every role that has
 Reason for all four: the cross check of section 7 is a grep, and a grep cannot tell a history line
 from a live one. (a) and (b) are wrong whatever the grep says.
 
+### 2. `src/engine/game.ts`: the day's production minute goes through `placeHand` (T21-B2c, 2.7)
+
+**This is the most important note in this file. Until it is applied, 2.7 is not live for the
+player:** the day loop keeps its own copy of the production minute, and the scheduler, the moves and
+the article in "waiting for the table saw" are only on the path `workMinute` serves, which is the
+night shift and the tests. The night shift already has all of it.
+
+Five edits, all in `runProductionMinute` and the helpers above it.
+
+**(a) The loop over the hands.** Exact old text:
+
+```ts
+  for (const hand of working) {
+    if (!canWorkOn(state, hand.job)) {
+      releaseMachines(state, hand.who);
+      lose(hand.job.blockedBy === 'waiting for material' ? 'noMaterial' : 'noMachine');
+      continue;
+    }
+    const stage = jobStage(state, hand.job, cncOptions(state, hand.who, hand.job));
+    if (stage === null) continue;
+    const at = takeMachines(state, hand);
+    if (at.waitingFor !== null) {
+      // He stands at the machine until the man on it is done with it (CLAUDE.md T7 3.1).
+      hand.job.blockedBy = waitingLine(at.waitingFor);
+      lose('noMachine');
+      continue;
+    }
+    atWork.push({ hand, stage, machine: at.machine });
+  }
+```
+
+Exact new text:
+
+```ts
+  for (const hand of working) {
+    // One reading of a man's minute, the scheduler of CLAUDE.md T21 2.7 inside it: he is moved off a
+    // queue he is standing in if there is anything else for him to do, and only then does he stand.
+    // The night shift runs the same function through `workMinute` (CLAUDE.md T21 2.7).
+    const place = placeHand(state, hand);
+    if (place.noMaterial) raiseNoMaterial(state);
+    if (place.lost !== null) lose(place.lost);
+    if (place.work === null) continue;
+    atWork.push({ hand, stage: place.work.stage, machine: place.work.machine });
+  }
+```
+
+**(b) The three helpers that are now somebody else's.** Delete `materialReady`, `canWorkOn` and
+`waitingLine` from game.ts: `placeHand` does all three, in `src/engine/production.ts` and
+`src/engine/jobs.ts`, and leaving these behind is the second copy this turn is closing. Exact old
+text to delete (lines 1498 to 1519 and 1580 to 1583 as the file stands at commit T21-B2c):
+
+```ts
+/** The rack has to hand over what the next slice of work needs, or the job stands still and the
+ *  joiners stand around (CLAUDE.md T2 3.6). */
+function materialReady(state: GameState, job: Job): boolean {
+  const ok = drawSheetsFor(state, job, jobProgress(job));
+  if (!ok) {
+    job.blockedBy = 'waiting for material';
+    raiseNoMaterial(state);
+  }
+  return ok;
+}
+
+/** True when the job can be worked on this minute. Writes down why it cannot, either way. */
+function canWorkOn(state: GameState, job: Job): boolean {
+  const block = hallBlock(state, job);
+  job.blockedBy = block;
+  if (block !== '') return false;
+  return materialReady(state, job);
+}
+```
+
+and
+
+```ts
+/** What the hall says a man is waiting for, in the words the job card and the Work Plan use. */
+function waitingLine(specId: string): string {
+  return `waiting for ${(findSpec(specId)?.name ?? specId).toLowerCase()}`;
+}
+```
+
+`raiseNoMaterial` stays exactly as it is: the loop above calls it now.
+
+**(c) The import of `placeHand`.** Exact old text:
+
+```ts
+import {
+  type Hand,
+  jobOf,
+  releaseIdleMachines,
+  stationForProduction,
+  takeMachines,
+} from './production';
+```
+
+Exact new text:
+
+```ts
+import {
+  type Hand,
+  jobOf,
+  placeHand,
+  releaseIdleMachines,
+  stationForProduction,
+} from './production';
+```
+
+**(d) Four imports that nothing in game.ts reads any more.** Each is used exactly once today, in the
+text deleted above, so each one left behind is a lint error. Remove the line `  hallBlock,` and the
+line `  jobStage,` and the line `  jobProgress,` from the `from './jobs'` block; remove the line
+`  drawSheetsFor,` from the `from './materials'` block; remove the line `  releaseMachines,` from the
+`from './machines'` block; and in `import { type StagePlan, cncOptions, labourPerMinute, tradeFactor }
+from './stages';` remove `cncOptions`, leaving
+`import { type StagePlan, labourPerMinute, tradeFactor } from './stages';`. `findSpec` stays: five
+other places in the file read it.
+
+**(e) Three test assertions that carry the old wording.** They pass today because they drive the day
+loop, which writes `waiting for table saw` from the copy being deleted. When (a) to (d) land they
+each want the article putting in:
+
+- `tests/engine/machineHours.test.ts:104`, `expect(waiting?.blockedBy).toBe('waiting for table saw')`
+- `tests/engine/staff.test.ts:321`, `job.blockedBy === 'waiting for table saw'`
+- `tests/render/figures.test.ts:76`, `expect(svg).toContain('waiting for table saw')`
+
+`tests/engine/onOrderKit.test.ts` already carries the article: its sentence comes from
+`src/engine/jobs.ts`, which is not frozen and was changed in this commit.
+
+One more consequence of (a) to (d), and it is a good one: the day loop will then move men the way the
+night shift does, so the efficiency figures of a hall with a queue on a job will rise. Two tests read
+a figure that could move and both are about a hall of one man a job, which the scheduler never
+touches: `tests/engine/efficiency.test.ts` ("books a man waiting for the one saw as no machine free")
+and `tests/ui/topbar.test.ts` (the 50% beside the clock). They were run against the new scheduler
+through `workMinute` and neither moved.
+
+### 3. `src/engine/constants.ts`: the drawing's short word for a machine (T21-B2c, 2.6, 2.7)
+
+The drawing says `waiting for the saw / the CNC / the booth`
+(docs/mockups/t21/bubbles.html). What is built says `waiting for the table saw`, because the machine's
+own name is the only name the game has and a second table of words is what the rules forbid. To reach
+the drawing exactly, that second table has to exist, and it is the smallest one that could:
+
+```ts
+/** What a man calls a machine when he is standing about waiting for it: the trade's own short word,
+ *  not the catalogue's name [PIOTR's drawing, 19.09: "waiting for the saw"]. Only the families a man
+ *  ever queues for are on it, and a family that is not on it is called by its catalogue name
+ *  (CLAUDE.md T21 2.6, 2.7). */
+export const MACHINE_SHORT_WORDS: Record<string, string> = {
+  tableSaw: 'saw',
+  panelSaw: 'saw',
+  cnc: 'CNC',
+  sprayBooth: 'booth',
+  edgebander: 'edgebander',
+  planerThicknesser: 'planer',
+};
+```
+
+and then in `src/engine/jobs.ts`, `waitingLine` reads it:
+
+```ts
+export function waitingLine(specId: string): string {
+  const name = MACHINE_SHORT_WORDS[specId] ?? (findSpec(specId)?.name ?? specId).toLowerCase();
+  return `waiting for the ${name}`;
+}
+```
+
+This is not applied and not asserted anywhere, because the ids above want checking against the
+catalogue before they are trusted, and because it is Piotr's call whether the hall should say "the
+saw" while the Machines page says "Table saw". The article is applied and is what the tests assert.
+
 ## Names: the brief against the code
 
 Confirmed again from the code, and used in these four commits:
@@ -246,3 +415,79 @@ office cannot cross the limit; and the order was going to be placed anyway, beca
 made without its sheets. The whole test tree, the playthroughs included, came out green with no
 scenario changing its ending, so the effect is timing and not outcome. It is worth one line to him
 all the same: **the office will spend his overdraft down to the last pound without asking.**
+
+## T21-B2c: 2.7, nobody waits while there is work
+
+- Built: the scheduler, in `src/engine/production.ts`, as one function the day loop can call.
+  `placeHand(state, hand)` is the whole of one man's minute: the hall, the rack, the machine of his
+  stage, and between each of them the question of whether there is other work. `otherWorkFor` finds it
+  and `moveToOtherWork` moves him through the game's own `addToJob`, so his chip on the Work Plan, the
+  cell he stands on and the job his minute goes into are one fact. `jobHasWorkFor(state, job, who)` in
+  `src/engine/jobs.ts` is the question asked of a job the man is not on: in production, the hall not
+  stopping it, the rack able to cover its next slice, and its stage wanting no machine or a free one,
+  with nothing claimed and nothing written down. The contract clause is one line in
+  `contractWantsToday`, which is the one place the day's order is decided. The words: `waitingLine`
+  moved into `src/engine/jobs.ts`, gained the drawing's article and is now read by `onOrderBlock` too,
+  so the phrase exists once instead of twice; `waitingWordsFor` says what one man says, which is
+  `waiting for the table saw` for the first man of a queue and `no cut parts yet` for the men behind
+  him at a cutting stage. Tests: `tests/engine/nobodyWaits.test.ts` (8) and one in
+  `tests/engine/contractDay.test.ts`.
+- Left: the day loop. `src/engine/game.ts` is frozen for this agent and carries a second copy of the
+  production minute, so **2.7 is live only on the path `workMinute` serves until note 2 above is
+  applied**. Two tests were rewritten and neither was weakened:
+  `tests/engine/assignees.test.ts` ("sends the men past the first to the waiting cell") now puts its
+  three men in a hall with one job in it, because with other work about there is no queue left to
+  look at, and `tests/engine/onOrderKit.test.ts` carries the article.
+
+### What of 2.7 could not be built, and why
+
+Two of the section's three clauses cannot be expressed by this model, and neither is faked.
+
+1. **"Another stage of the same job that needs no machine or a free one."** A job's position is one
+   number, `job.labourRemaining`, and its stage is derived from that by `stageAt` / `currentStage`.
+   Every man on a job works the same stage, and the stages are consumed in order. There is no second
+   stage of a job to be at. `tests/engine/nobodyWaits.test.ts` asserts the plan of a job is ordered
+   and end to end, which is that fact written down.
+2. **"The same on another job he is assigned to."** A man is an assignee of exactly one job, always:
+   `assignJob` sets `job.assignees = [workerId]` and `addToJob` takes him off every other job first,
+   and its comment is the rule, "Nobody is on two jobs at once". So "another job he is assigned to" is
+   the empty set for every man in the game. What is built instead is the move: the scheduler puts him
+   on the other job, through the same one path, and the Work Plan shows his chip there. Piotr should
+   know that this is the reading, because the other reading, a man assigned to several jobs at once,
+   is a change to a rule of Turn 19 and wants his word.
+
+**"The scheduler treats that stage as not available to him"** (assembly before cutting) is already
+true by construction: a job at a cutting stage has no assembly stage to offer, so `jobHasWorkFor` says
+no to it while its saw is taken and the scheduler sends nobody. It is asserted as an invariant and not
+added as a second gate that could one day disagree with the first.
+
+### The three men the scheduler never moves, and why
+
+- **The owner.** What he does next is his own decision and the game has always kept it so
+  (CLAUDE.md T4 3.2). Nothing is handed to him behind his back.
+- **The last man on a job.** `takeOffJob` puts a job with nobody left on it back on the ready list, and
+  nothing would bring him back to it when the saw freed, so a hall of one man a job would collapse all
+  its work onto whichever job happened to be workable. The man who holds the machine stays and the
+  queue behind him moves, which is the scene the section is about.
+- **A man the contract still wants today.** He is not among the job's hands at all.
+
+### Numbers chosen (T21-B2c)
+
+- **The order the scheduler looks in is the hall's own book order** [TUNE]: `state.jobs` is in the
+  order the jobs were taken, so the oldest job that can use the minute gets him. Any other order
+  would be a new rule about which job matters most.
+- **The men behind the first in a queue say `no cut parts yet` only at a cutting stage** [TUNE, from
+  the drawing's two men]. At any other stage every man of the queue says he is waiting for the
+  machine, because "no cut parts" would be false of a job whose parts are cut and are in the booth.
+
+### What this measures, for Piotr
+
+- In the section's own scene, four men, one saw, two jobs, one at cutting and one at assembly: the
+  hall works **four minutes where it worked three**, and the man who would have stood at the saw is at
+  the other job's bench.
+- In the six man, one saw hall with six jobs, one a man, it changes **nothing at all**: measured over
+  an hour, 300 minutes worked and 60 lost to the saw, before the scheduler and after it. Every one of
+  those men is the last man on his job, so moving him would take his job off the bench. **This is the
+  limit of 2.7 as built and Piotr should hear it plainly: the scheduler empties a queue on a job, and
+  it does not move a man who is working a job by himself.** Emptying that one too wants either a man
+  on more than one job, or a scheduler that brings him back, and both are new rules.

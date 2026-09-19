@@ -44,12 +44,16 @@ import {
 import { chargeUnavoidable, formatMoney, noteLoss, receive } from './economy';
 import { queueEvent } from './events';
 import {
+  BENCH,
   OWNER,
   familyStopped,
   findSpec,
+  freeMachines,
   has,
   hasBenchFor,
   hasExtraction,
+  heldMachine,
+  machineIsShared,
   releaseMachines,
 } from './machines';
 import {
@@ -295,6 +299,27 @@ export function jobStage(
   options: StageOptions = {},
 ): StagePlan | null {
   return currentStage(state, job, options);
+}
+
+/** True when this job could take a minute from this man right now: it is in production, the hall is
+ *  not stopping it, the rack can hand over what its next slice of work needs, and the stage it is at
+ *  wants no machine or one the hall has free (CLAUDE.md T21 2.7).
+ *
+ *  It is the question `canWorkOn` and `takeMachines` answer between them for the man who is already
+ *  on the job, asked without the answering: `canWorkOn` draws the sheets off the rack and
+ *  `takeMachines` claims the machine, and neither may happen for a job the man may not end up at.
+ *  Nothing here is claimed and nothing is written down, so the scheduler can ask it of every job in
+ *  the hall before it moves anybody. */
+export function jobHasWorkFor(state: GameState, job: Job, who: string): boolean {
+  if (job.stage !== 'inProduction') return false;
+  if (hallBlock(state, job) !== '') return false;
+  if (!rackCanSupply(state, job, jobProgress(job))) return false;
+  const stage = currentStage(state, job, cncOptions(state, who, job));
+  const family = stage?.family ?? null;
+  if (family === null || family === BENCH) return true;
+  // By hand, or a tool out of a cabinet: there is no queue for either (CLAUDE.md T7 3.1, 3.6).
+  if (!has(state, family) || machineIsShared(state, family)) return true;
+  return heldMachine(state, who, family) !== null || freeMachines(state, family).length > 0;
 }
 
 /** The player's say over whether this job waits for the CNC or goes on the saw when the CNC is
@@ -740,12 +765,22 @@ export function dropJob(state: GameState, jobId: string): boolean {
  *  it stands and waits for the lorry rather than falling back to a pair of hands, and says which
  *  day the lorry is (CLAUDE.md T10 1, 3.10). The board's lock is the one question on-order kit
  *  may answer, and it asked it days ago, when the job was taken. */
+/** "waiting for the table saw": the one phrase the game says about a job or a man standing at a
+ *  machine he cannot have. The article is the drawing's (docs/mockups/t21/bubbles.html says
+ *  "waiting for the saw") and the name is the machine's own, lowercased, so there is no second table
+ *  of machine words [TUNE: the drawing's short word for a family, "the saw" for a table saw, would be
+ *  such a table, and it is written out for the lead in docs/notes-t21-b2.md]. It lives here because
+ *  the two things that say it, the hall's own block and the queue at a machine, are read from here
+ *  and from `src/engine/production.ts` (CLAUDE.md T21 2.7). */
+export function waitingLine(specId: string): string {
+  return `waiting for the ${(findSpec(specId)?.name ?? specId).toLowerCase()}`;
+}
+
 function onOrderBlock(state: GameState, family: string): string {
   if (has(state, family)) return '';
   const coming = firstOnOrder(state, family);
   if (coming === null) return '';
-  const name = (findSpec(family)?.name ?? family).toLowerCase();
-  return `waiting for ${name} (on order, due ${formatCalendarDay(coming.dueDay)})`;
+  return `${waitingLine(family)} (on order, due ${formatCalendarDay(coming.dueDay)})`;
 }
 
 /** Everything in the hall that can stop a job, in the order the player would notice it. Empty

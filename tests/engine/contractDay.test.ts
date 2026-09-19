@@ -140,6 +140,26 @@ describe('the day is the contract first and the job second (CLAUDE.md T20 2.1.4)
     expect(contractWantsToday(state, 'staff-1')).toBe(true);
   });
 
+  it('takes him back when the job he would go to cannot use the minute (T21 2.7)', () => {
+    // The third thing the scheduler looks at before a man stands: his contract's pieces. His day's
+    // share is made and he has a job to go to, so the job has him; the minute the job cannot use him,
+    // because the saw its stage wants is taken, the contract has him again, because the client pays
+    // for every piece he makes (PIOTR; CLAUDE.md T21 2.7).
+    let state = joinerHall();
+    const contract = running(state, 5);
+    contract.piecesThisWeek = 5;
+    state = jobUnderHim(state).state;
+    expect(contractWantsToday(state, 'staff-1')).toBe(false);
+    const saw = state.equipment.find((item) => item.specId === 'tableSaw');
+    if (!saw) throw new Error('a saw is wanted');
+    saw.takenBy = 'owner';
+    expect(contractWantsToday(state, 'staff-1')).toBe(true);
+    // And the minute the saw is free again the job has him back: the question is asked fresh off the
+    // hall every minute and never off a flag written down last minute.
+    saw.takenBy = null;
+    expect(contractWantsToday(state, 'staff-1')).toBe(false);
+  });
+
   it('books his pieces from the morning and gives the job what is left of the day', () => {
     let state = joinerHall();
     // One piece is the whole of Monday's share of the week, so the changeover lands inside a day

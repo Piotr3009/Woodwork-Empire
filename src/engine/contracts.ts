@@ -33,7 +33,7 @@ import { isBreak, isWorkingDay, weekOfDay, weekday, workedMinutesOfDay } from '.
 import { plural } from './text';
 import { charge, formatMoney } from './economy';
 import { queueEvent } from './events';
-import { isOnJob, stagedJob, workerMinuteCost } from './jobs';
+import { isOnJob, jobHasWorkFor, stagedJob, workerMinuteCost } from './jobs';
 import { freeSheets } from './materials';
 import {
   OWNER,
@@ -636,7 +636,15 @@ export function contractWantsToday(state: GameState, workerId: string): boolean 
     return jobBesideContract(state, workerId) === null;
   }
   if (contract.piecesThisWeek < piecesDueBy(contract, state.clock.day)) return true;
-  return jobBesideContract(state, workerId) === null;
+  const job = jobBesideContract(state, workerId);
+  if (job === null) return true;
+  // His day's share is made and he has a job to go to, but the job cannot use the minute: its saw is
+  // taken, its rack is empty or the hall has stopped it. He makes pieces rather than stand at it,
+  // because the client pays for every piece he makes, and the contract is the third thing the
+  // scheduler looks at before a man waits (PIOTR; CLAUDE.md T21 2.7). Asked fresh every minute off
+  // the hall itself and never off a flag written down last minute, so the minute his job can have him
+  // again it has him.
+  return !jobHasWorkFor(state, job, workerId);
 }
 
 /** The stage the piece is at and the family it is done on: the CNC when the man can have one,
