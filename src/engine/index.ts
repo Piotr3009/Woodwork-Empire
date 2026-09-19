@@ -66,11 +66,10 @@ export {
   CONSUMABLES_LABEL,
   EFFICIENCY_CAUSES,
   HOUSE_CARD_SECONDS,
-  // Turn 21 (CLAUDE.md T21 2.6, 2.8): the words the bubbles say and the reasons the owner stood.
+  // Turn 22 (CLAUDE.md T22 2.5) and Turn 21 (T21 2.8): the words of the mark over a man's head and
+  // the reasons the owner stood.
   BUBBLES,
   BUBBLE_HEAD_GAP,
-  BUBBLE_WORK_MAX_SPEED,
-  BUBBLE_WORK_SECONDS,
   OWNER_IDLE_REASONS,
   HOUSE_TIER_NAMES,
   LOAN_MAX,

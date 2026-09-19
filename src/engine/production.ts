@@ -13,11 +13,9 @@ import { addWorkingDays, isBreak, workedMinutesOfDay } from './clock';
 import {
   BUILDING_ROLES,
   addLabour,
-  addToJob,
   findJob,
   hallBlock,
   isOnJob,
-  jobHasWorkFor,
   jobHeldBy,
   jobProgress,
   jobStage,
@@ -340,43 +338,9 @@ export function canWorkOn(state: GameState, job: Job): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// The scheduler: nobody stands and waits while there is work he could do (PIOTR;
-// CLAUDE.md T21 2.7).
+// One man, one job: nobody is moved between jobs [PIOTR, 19.09: "he is assigned to it, so he works
+// on it; the production manager will do the moving, later"] (CLAUDE.md T22 2.6).
 // ---------------------------------------------------------------------------
-
-/** The job this man goes to instead of standing at a machine another man has: a job in production,
- *  oldest first, that can take a minute from him right now [TUNE: the hall works its book in the
- *  order it took it]. Null when there is nothing of the sort, and then he stands (T21 2.7).
- *
- *  Three men are never moved. The owner, because he is never given work behind his back: what he
- *  does next is his own decision and the game has always kept it so (CLAUDE.md T4 3.2). The last man
- *  on a job, because a job with nobody on it goes back to the ready list and would be abandoned the
- *  first minute its saw was busy: the man who holds the machine stays and the queue behind him moves,
- *  which is the scene the section is about. And a man the contract still wants today, who is not
- *  among the job's hands at all. */
-export function otherWorkFor(state: GameState, hand: Hand): Job | null {
-  if (hand.who === OWNER) return null;
-  if (hand.job.assignees.length <= 1) return null;
-  for (const job of state.jobs) {
-    if (job.id === hand.job.id) continue;
-    if (isOnJob(job, hand.who)) continue;
-    if (!jobHasWorkFor(state, job, hand.who)) continue;
-    return job;
-  }
-  return null;
-}
-
-/** Moves him, through the game's own one path for putting a man on a job, so his chip on the Work
- *  Plan, the cell he stands on in the hall and the job his minute goes into are all the same fact.
- *  He is the job's second man, working at the first man's bench, so he takes no bench of his own
- *  (CLAUDE.md T17 2.10, T19 2.5, T21 2.7). False when there was nothing to move him to. */
-export function moveToOtherWork(state: GameState, hand: Hand): boolean {
-  const other = otherWorkFor(state, hand);
-  if (other === null) return false;
-  if (!addToJob(state, other.id, hand.who)) return false;
-  hand.job = other;
-  return true;
-}
 
 /** What this man did with the minute: the stage and the machine he got, or why he stood. The whole
  *  of one man's minute before the hall's factors are applied to it, in one place, because the day
@@ -388,54 +352,37 @@ export interface HandPlace {
   lost: LostMinuteCause | null;
   /** The rack had nothing for the job he was on: the caller tells the player, once a day. */
   noMaterial: boolean;
-  /** The scheduler moved him to another job rather than let him stand. */
-  moved: boolean;
 }
 
-/** Gets this man to work, moving him off a queue he is standing in if there is anything else for him
- *  to do (PIOTR; CLAUDE.md T21 2.7). The one reading of a man's minute: the hall, then the rack, then
- *  the machine of his stage, and between each of them the question the section is about, which is
- *  whether there is other work.
+/** Gets this man to work on the job he is on, and stands him at its machine when another man has
+ *  it. The one reading of a man's minute: the hall, then the rack, then the machine of his stage.
  *
- *  A man is moved at most once in a minute: the job he is moved to was asked whether it could take
- *  the minute before he went, so the second look never finds him waiting again for the same reason.
- *  **The brief's first clause, "another stage of the same job that needs no machine", is not built
- *  and cannot be:** a job stands at exactly one stage, which is derived from the one labour number,
- *  and its stages are consumed in order, so there is no second stage of it to go to. The written up
- *  reading of that is in docs/notes-t21-b2.md. */
+ *  He is never moved to another job. Turn 21 moved him, and Piotr reversed it on 19.09: a man is
+ *  assigned to a job, so he works on that job, and the hall's own lever for moving men will be the
+ *  production manager, whose design is parked for Turn 23 (CLAUDE.md T22 2.6, 8). The minute he
+ *  stands is booked to `noMachine` and counted by the day meter's idle segment, which is the point
+ *  of it: the queue at the machine is there for the player to see and to shorten by buying a second
+ *  one. */
 export function placeHand(state: GameState, hand: Hand): HandPlace {
-  let moved = false;
-  for (let look = 0; look < 2; look += 1) {
-    const first = look === 0;
-    if (!canWorkOn(state, hand.job)) {
-      // The hall or the rack has stopped this job. There is work for him elsewhere or there is not,
-      // and the question is the same question as for a taken machine.
-      if (first && moveToOtherWork(state, hand)) {
-        moved = true;
-        continue;
-      }
-      releaseMachines(state, hand.who);
-      const noMaterial = hand.job.blockedBy === WAITING_FOR_MATERIAL;
-      return { work: null, lost: noMaterial ? 'noMaterial' : 'noMachine', noMaterial, moved };
-    }
-    const stage = jobStage(state, hand.job, cncOptions(state, hand.who, hand.job));
-    if (stage === null) return { work: null, lost: null, noMaterial: false, moved };
-    const at = takeMachines(state, hand);
-    if (at.waitingFor === null) {
-      return { work: { stage, machine: at.machine }, lost: null, noMaterial: false, moved };
-    }
-    if (first && moveToOtherWork(state, hand)) {
-      moved = true;
-      continue;
-    }
-    // He stands at the machine until the man on it is done with it (CLAUDE.md T7 3.1). This is also
-    // the cap on the men: one machine is one man's, so a stage at a machine goes at that one man's
-    // speed however many are on the job, and the others put their minutes in only on the bench work
-    // the stage allows, which for a cutting stage is none (CLAUDE.md T19 2.5).
-    hand.job.blockedBy = waitingLine(at.waitingFor);
-    return { work: null, lost: 'noMachine', noMaterial: false, moved };
+  if (!canWorkOn(state, hand.job)) {
+    // The hall or the rack has stopped this job, and the man stays on it: the chips and the warning
+    // strip say what is wrong and the mark over his head says it over him (CLAUDE.md T22 2.5).
+    releaseMachines(state, hand.who);
+    const noMaterial = hand.job.blockedBy === WAITING_FOR_MATERIAL;
+    return { work: null, lost: noMaterial ? 'noMaterial' : 'noMachine', noMaterial };
   }
-  return { work: null, lost: 'noMachine', noMaterial: false, moved };
+  const stage = jobStage(state, hand.job, cncOptions(state, hand.who, hand.job));
+  if (stage === null) return { work: null, lost: null, noMaterial: false };
+  const at = takeMachines(state, hand);
+  if (at.waitingFor === null) {
+    return { work: { stage, machine: at.machine }, lost: null, noMaterial: false };
+  }
+  // He stands at the machine until the man on it is done with it (CLAUDE.md T7 3.1). This is also
+  // the cap on the men: one machine is one man's, so a stage at a machine goes at that one man's
+  // speed however many are on the job, and the others put their minutes in only on the bench work
+  // the stage allows, which for a cutting stage is none (CLAUDE.md T19 2.5).
+  hand.job.blockedBy = waitingLine(at.waitingFor);
+  return { work: null, lost: 'noMachine', noMaterial: false };
 }
 
 // ---------------------------------------------------------------------------
@@ -539,8 +486,8 @@ export function workMinute(
   // to be taken before the hall can be asked what its media add up to.
   const atWork: AtWork[] = [];
   for (const hand of working) {
-    // One reading of a man's minute, the scheduler of CLAUDE.md T21 2.7 inside it: he is moved off a
-    // queue he is standing in if there is anything else for him to do, and only then does he stand.
+    // One reading of a man's minute (CLAUDE.md T22 2.6): the job he is on, and the machine of its
+    // stage, or the wait at it. Nobody is moved to another job.
     const place = placeHand(state, hand);
     if (place.noMaterial) report.noMaterial = true;
     if (place.lost !== null) lose(place.lost);

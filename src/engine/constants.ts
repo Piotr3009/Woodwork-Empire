@@ -5,7 +5,6 @@
 
 import type {
   BubbleKey,
-  BubbleTone,
   DayCategory,
   Difficulty,
   EquipmentSpec,
@@ -3847,44 +3846,27 @@ export const OWNER_IDLE_REASONS: ReadonlyArray<{ id: OwnerIdleReason; label: str
 ];
 
 // ---------------------------------------------------------------------------
-// T21 2.6 What the men say: the bubble over a figure's head
+// T22 2.5 What is wrong with a man: the words of the mark over his head
 // ---------------------------------------------------------------------------
 
-/** The words in every bubble the hall draws, and the colour each wears
- *  (docs/mockups/t21/bubbles.html is the drawing and its table is this contract; CLAUDE.md T21
- *  2.6). One table, so a word Piotr wants changed is a line here and not a repaint. A `{slot}` is
- *  filled by the renderer off the state and never by a second table of words.
+/** The words the mark over a man's head says when the player points at it
+ *  (docs/mockups/t22/bubbles-v2.png, the red column and the hover; CLAUDE.md T22 2.5). One table,
+ *  so a word Piotr wants changed is a line here and not a repaint. A `{slot}` is filled off the
+ *  state by `src/engine/bubbles.ts` and never by a second table of words.
  *
- *  The tone is the colour: `wait` is the red border, something the player can fix; `chore` is the
- *  green, a helper doing what he is there for; `work` is plain paper, the first seconds of a new
- *  stage and then gone; `away` is the dashed grey of a man who is off the hall, drawn at the door
- *  he went through. At x10 and x30 only `wait`, `chore` and `away` are drawn, so the hall does not
- *  flicker. */
-export const BUBBLES: Record<BubbleKey, { text: string; tone: BubbleTone }> = {
-  waitingForMachine: { text: 'waiting for the {machine}', tone: 'wait' },
-  noCutParts: { text: 'no cut parts yet', tone: 'wait' },
-  noMaterial: { text: 'no sheets for {job}', tone: 'wait' },
-  nothingToDo: { text: 'nothing to do', tone: 'wait' },
-  sweeping: { text: 'sweeping', tone: 'chore' },
-  emptyingBags: { text: 'emptying the bags', tone: 'chore' },
-  unloading: { text: 'unloading', tone: 'chore' },
-  working: { text: '{stage} {job}', tone: 'work' },
-  pieces: { text: '{made} of {wanted} {piece}', tone: 'work' },
-  offToMeasure: { text: 'off to measure, back at {time}', tone: 'away' },
-  inTheOffice: { text: 'in the office', tone: 'away' },
-  atLunch: { text: 'at lunch', tone: 'away' },
+ *  Four lines and no colour: a mark is drawn only when something is wrong, so every one of them is
+ *  the red one [PIOTR, 19.09: "when all is fine, no bubble; only when it is bad"]. The green chore
+ *  lines, the paper lines of a stage just begun and the dashed grey lines of a man off the hall are
+ *  gone with the classes that drew them. */
+export const BUBBLES: Record<BubbleKey, string> = {
+  waitingForMachine: 'waiting for the {machine}',
+  noCutParts: 'no cut parts yet',
+  noMaterial: 'no sheets for {job}',
+  nothingToDo: 'nothing to do',
 };
 
-/** How long a bubble about the stage a man has just started stays up, in real seconds
- *  [PIOTR's drawing says three] (CLAUDE.md T21 2.6). */
-export const BUBBLE_WORK_SECONDS = 3;
-
-/** Above this speed only the red, the green and the grey bubbles are drawn: the paper ones would
- *  flicker on and off faster than they could be read (CLAUDE.md T21 2.6). */
-export const BUBBLE_WORK_MAX_SPEED = 4;
-
-/** How far over a figure's head the bubble's point sits, in screen pixels [PIOTR's drawing says
- *  six] (CLAUDE.md T21 2.6). */
+/** How far over a figure's head the point of the mark's tail sits, in screen pixels [PIOTR's
+ *  drawing says six] (docs/mockups/t22/bubbles-v2.png; CLAUDE.md T22 2.5). */
 export const BUBBLE_HEAD_GAP = 6;
 
 /** What a man calls a machine when he is standing about waiting for it: the trade's own short word,

@@ -91,7 +91,6 @@ import {
 import { playCharacters } from '../render/characters';
 import { resetWalkers, stepWalkers, syncWalkers } from '../render/walkers';
 import { resetDoors, stepDoors, syncDoors } from '../render/doors';
-import { resetBubbles } from '../render/bubbles';
 import { applySoundSettings, play as soundPlay, setLoops, stopAllSounds, unlockSound } from './sound';
 import { hallLoops, hallOneShots } from '../render/hall';
 import { walkPath } from '../engine/walk';
@@ -1221,7 +1220,6 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
       accumulator = 0;
       resetWalkers();
       resetDoors();
-      resetBubbles();
       startedStore();
       noteOrders();
       break;
@@ -1241,7 +1239,6 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
       accumulator = 0;
       resetWalkers();
       resetDoors();
-      resetBubbles();
       startedStore();
       noteOrders();
       autosaveLocal();
@@ -1764,7 +1761,6 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
           ui.screen = 'game';
           resetWalkers();
           resetDoors();
-          resetBubbles();
           startedStore();
           writeStore();
           ui.saved = peekSave();
@@ -1781,7 +1777,6 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
           accumulator = 0;
           resetWalkers();
           resetDoors();
-          resetBubbles();
         }
         return result.note;
       });
@@ -1919,7 +1914,6 @@ export function onFileChosen(file: File): Promise<void> {
       ui.menuOpen = false;
       resetWalkers();
       resetDoors();
-      resetBubbles();
       // A file loaded is the game from now on, so the browser's store holds it too (T11 3.2).
       startedStore();
       writeStore();

@@ -4315,14 +4315,61 @@ input.num {
   border-color: var(--text);
 }
 
-/* 2.6 What the men say. Paper, the title hand, one line, a tail under the box pointing at the head
-   it belongs to, and a border that says what kind of thing is being said: red is the player's to
-   fix, green is a helper about his work, plain paper is a stage just begun, dashed grey is a man off
-   the hall (docs/mockups/t21/bubbles.html). Drawn in the hall's live SVG layer, so the box is a
-   foreignObject's child and moves with the figure the walker moves. */
+/* 2.5 What is wrong with a man. A 14 px disc with an exclamation in it over his head, drawn only
+   while something is wrong, and the words on the hover (docs/mockups/t22/bubbles-v2.png, the red
+   column and the hover column). Drawn in the hall's live SVG layer, so the disc is a child of the
+   figure group and the walker carries both of them. Every value here is a token that was already
+   on :root or a colour the paper bubble of Turn 21 already wore. */
+.mark-disc {
+  fill: var(--cream);
+  stroke: var(--bad);
+  stroke-width: 2;
+}
+
+/* The tail is the paper bubble's own: an ink triangle with a lighter one over it, so the two read
+   as one tail pointing at the head. The disc is painted after them and covers their base. */
+.mark-tail {
+  fill: var(--bad);
+}
+
+.mark-tail-in {
+  fill: var(--cream);
+}
+
+.mark-glyph {
+  fill: var(--bad);
+  font-family: var(--font-title);
+  font-size: var(--fs-tiny);
+  pointer-events: none;
+}
+
+/* The disc takes the mouse, because the player has to be able to point at it, and it sits inside
+   the figure group, so a click on it is a click on the man under it and a drag of the hall is
+   still a drag of the hall (CLAUDE.md T22 2.5). */
+.mark {
+  pointer-events: auto;
+}
+
+/* The words: in the DOM beside the disc and brought up by the pointer alone, on the figure group,
+   so pointing at the disc and pointing at the man are the one hover. No JavaScript, so it works at
+   x1 and at x30 and survives every rewrite of the page (PIOTR, 19.09: "the words only when I
+   hover"). */
+.mark-line {
+  visibility: hidden;
+}
+
+.figure:hover .mark-line {
+  visibility: visible;
+}
+
+/* The paper of that one line: the title hand, one line, a tail under the box pointing at the disc
+   it belongs to, and the red border of something the player can fix. Red is the only colour left:
+   a mark is drawn only when something is wrong, so the green of a chore, the plain paper of a stage
+   just begun and the dashed grey of a man off the hall are gone with the bubbles that wore them
+   (CLAUDE.md T22 2.5). */
 .bubble {
   background: var(--cream);
-  border: 2px solid #2a2418;
+  border: 2px solid var(--bad);
   border-radius: 12px;
   color: #2a2418;
   font-family: var(--font-title);
@@ -4340,7 +4387,7 @@ input.num {
 .bubble::before {
   border: 6px solid transparent;
   border-bottom: 0;
-  border-top-color: #2a2418;
+  border-top-color: var(--bad);
   bottom: -9px;
   content: '';
   left: 50%;
@@ -4359,30 +4406,8 @@ input.num {
   position: absolute;
 }
 
-.bubble-wait {
-  border-color: var(--bad);
-}
-
-.bubble-wait::before {
-  border-top-color: var(--bad);
-}
-
-.bubble-chore {
-  border-color: var(--good);
-}
-
-.bubble-chore::before {
-  border-top-color: var(--good);
-}
-
-/* A man who is off the hall: the thought, not the word, so it is dashed and dim. */
-.bubble-away {
-  border-style: dashed;
-  color: var(--text-dim);
-}
-
-/* The box the paper hangs in: layout and nothing else, so the paper is centred over the head it
-   points at and the tail's own nine pixels fall under it. No paint here (CLAUDE.md T21 2.6). */
+/* The box the paper hangs in: layout and nothing else, so the paper is centred over the disc it
+   points at and the tail's own nine pixels fall under it. No paint here (CLAUDE.md T22 2.5). */
 .bubble-holder {
   align-items: flex-start;
   display: flex;
