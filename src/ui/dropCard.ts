@@ -11,8 +11,8 @@
 // The card is a folder card like a machine's: the game's own paper, the one cross, the one button
 // helpers. Nothing here is a second version of anything in src/ui/modal.ts.
 
-import { BANKRUPTCY_LIMIT_FACTOR } from '../engine/constants';
-import { dropReputationCost, formatMoney } from '../engine/index';
+import { bankruptcyFloor, netPosition } from '../engine/economy';
+import { canAfford, dropReputationCost } from '../engine/index';
 import type { GameState, Job } from '../engine/index';
 import { button, dangerButton, escapeHtml, money, signedFigure } from './modal';
 
@@ -33,49 +33,76 @@ export function materialWrittenOff(state: GameState, job: Job): number {
 }
 
 /** Whether the deposit can be paid back at all: out of the cash, or out of what the overdraft has
- *  left in it. When it cannot, the deposit becomes arrears, and the arrears are what close a
- *  company (CLAUDE.md T21 2.2, 2.3). */
+ *  left in it. The one reading the engine does of any cost, `canAfford`, which is what `dropJob`
+ *  asks through `chargeUnavoidable`; when the answer is no the whole deposit becomes arrears, and
+ *  the arrears are what close a company (CLAUDE.md T21 2.2, 2.3). */
 export function depositCanBePaid(state: GameState, job: Job): boolean {
-  return state.cash - job.depositPaid >= state.finance.overdraftLimit;
+  return canAfford(state, job.depositPaid);
 }
 
 /** Where the company would stand the moment the deposit went to arrears, and what the bank allows:
- *  the two figures the red box is written from (CLAUDE.md T21 2.2). */
+ *  the two figures the red box is written from. A cost that cannot be paid goes to arrears whole,
+ *  the way `chargeUnavoidable` puts it there, so the position is read off the state with that debt
+ *  on it, through the same two functions the bank itself reads (CLAUDE.md T21 2.2). */
 export function netAfterDrop(state: GameState, job: Job): { net: number; allowed: number } {
-  const arrears = state.finance.arrearsAmount + job.depositPaid;
-  return {
-    net: state.cash - arrears,
-    allowed: state.finance.overdraftLimit * BANKRUPTCY_LIMIT_FACTOR,
+  const after: GameState = {
+    ...state,
+    finance: {
+      ...state.finance,
+      arrearsAmount: state.finance.arrearsAmount + job.depositPaid,
+    },
   };
+  return { net: netPosition(after), allowed: bankruptcyFloor(after) };
+}
+
+/** One line of the card: what it is on the left, what it costs on the right, in the row vocabulary
+ *  every list in the game is written in (docs/ui-style.md 11). */
+function row(label: string, figure: string): string {
+  return (
+    `<div class="row"><span class="row-main">${escapeHtml(label)}</span>` +
+    `<span class="row-figure">${figure}</span></div>`
+  );
 }
 
 /** The body of the card: the deposit, the material, the reputation, where the overdraft stands, and
  *  the red box when the deposit cannot be paid back (CLAUDE.md T21 2.3). A small job shows the same
- *  card with green figures and no box, so the player learns the card and not just the danger. */
+ *  card with green figures and no box, so the player learns the card and not just the danger: the
+ *  three costs are money out whatever the job, and the figure that changes colour with the company
+ *  is the account, green while it is in the black and red once it is not [TUNE on the reading: the
+ *  drawing gives the card no other figure that can carry a sign]. */
 export function renderDropCard(state: GameState, job: Job): string {
   const material = materialWrittenOff(state, job);
   const reputation = dropReputationCost(job);
   const rows =
-    '<div class="row"><span class="row-main">Deposit to return to the client</span>' +
-    `${signedFigure(`-${money(job.depositPaid)}`, -job.depositPaid)}</div>` +
-    '<div class="row"><span class="row-main">Material bought for it, written off</span>' +
-    `${signedFigure(material === 0 ? money(0) : `-${money(material)}`, -material)}</div>` +
-    '<div class="row"><span class="row-main">Reputation</span>' +
-    `${signedFigure(`-${reputation}`, -reputation)}</div>`;
-  return `<div class="drop-card">${rows}${overdraftLine(state)}${dangerBox(state, job)}</div>`;
+    row(
+      'Deposit to return to the client',
+      signedFigure(`-${money(job.depositPaid)}`, -job.depositPaid),
+    ) +
+    row(
+      'Material bought for it, written off',
+      signedFigure(material === 0 ? money(0) : `-${money(material)}`, -material),
+    ) +
+    // The points, not pounds, through the same function the drop itself is charged by.
+    row('Reputation', signedFigure(`-${reputation}`, -reputation)) +
+    overdraftLine(state);
+  return `<div class="drop-card">${rows}${dangerBox(state, job)}</div>`;
 }
 
-/** Where the account stands against the overdraft, in the words the drawing uses. */
+/** Where the account stands against the overdraft, in the words the drawing uses: the balance
+ *  carries its sign's colour, and the limit beside it is a fact and carries none. */
 function overdraftLine(state: GameState): string {
-  return (
-    `<p class="hint">You have ${escapeHtml(formatMoney(state.cash))} of ` +
-    `${escapeHtml(formatMoney(state.finance.overdraftLimit))} overdraft</p>`
+  return row(
+    'You have',
+    `${signedFigure(money(state.cash), state.cash)} of ` +
+      `${escapeHtml(money(state.finance.overdraftLimit))} overdraft`,
   );
 }
 
-/** The red box, and only when the deposit cannot be paid back. It says `today` when the drop would
- *  close the company at the day's close and nothing at all about days when it would not: a sentence
- *  the game cannot be sure of is not written (CLAUDE.md T21 2.3). */
+/** The red box, and only when the deposit cannot be paid back. It says `today` when the drop
+ *  itself would close the company at the day's own look at the money, which is the net position
+ *  against what the bank allows (`checkBankruptcy`, rule one), and nothing at all about days when it
+ *  would not: "puts you N days from the bank closing you" is not something the game can be sure of,
+ *  so it is not written (CLAUDE.md T21 2.2, 2.3). */
 function dangerBox(state: GameState, job: Job): string {
   if (depositCanBePaid(state, job)) return '';
   const { net, allowed } = netAfterDrop(state, job);
@@ -85,7 +112,7 @@ function dangerBox(state: GameState, job: Job): string {
     '<p class="warn drop-danger">' +
     escapeHtml(
       'You cannot pay the deposit back. It goes to arrears: ' +
-        `${formatMoney(net)} against the bank's ${formatMoney(allowed)} limit.${ending}`,
+        `${money(net)} against the bank's ${money(allowed)} limit.${ending}`,
     ) +
     '</p>'
   );

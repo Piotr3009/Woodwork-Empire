@@ -101,6 +101,30 @@ block:
 Reason: the card is built and tested, and until this lands it renders with the folder's paper colours
 and an unhidden file input. Nothing outside these three edits is wanted in styles.css for B1b.
 
+### 3. `src/ui/styles.css`: the ink of the drop card's red box (T21-B1d, optional)
+
+Phase A gave `.drop-danger` the drawing's dark red ink, `#5a2320`, but the box carries both classes
+(`class="warn drop-danger"`) and the folder skin's own `.modal-folder .warn { color: #b3261e; }` is
+two classes to its one, so the skin wins whatever the order in the file. The box is right in every
+other way. To give it the drawing's ink:
+
+Exact old text:
+
+```css
+.drop-danger {
+```
+
+Exact new text:
+
+```css
+.modal-folder .drop-danger,
+.drop-danger {
+```
+
+Reason: the drawing's box (docs/mockups/t21/debt.html part 2) is #5a2320 on #fbe7e3, and phase A
+already put both values in the file; this is only which selector wins. Nothing else changes, and it
+is worth skipping if the lead would rather touch styles.css once.
+
 
 ### 2. `src/ui/app.ts`: the click on the owes plate (T21-B1c, CLAUDE.md 2.1)
 
@@ -282,3 +306,33 @@ skipped, but two of them are findings and not bookkeeping:
   `tests/ui/topbar.test.ts`, with its body written out in the note for the lead to paste in the same
   commit as the case. `src/ui/tips.ts` was not touched: the strip reads whatever `warnings` returns
   and needed nothing.
+
+## T21-B1d: 2.3, drop project with its price on the card
+
+- Built: the card finished against the drawing. `materialWrittenOff` was checked line by line against
+  `dropJob` and is right (a job whose material was ordered in loses `job.materialCost`, a job that
+  drew from the rack writes off nothing), and it is asserted both ways. `depositCanBePaid` now asks
+  the engine's own `canAfford`, and `netAfterDrop` reads `netPosition` and `bankruptcyFloor` off a
+  copy of the state with the deposit on the arrears, the way `chargeUnavoidable` puts an unpayable
+  cost there whole: three sums the card used to keep its own copies of, gone. The rows are the
+  drawing's four in the game's row vocabulary (`.row`, `.row-main`, `.row-figure`), the reputation is
+  `dropReputationCost` signed, and the overdraft line is the drawing's own
+  `You have -£7,259 of -£10,000 overdraft` with the balance carrying its sign's colour. The
+  red box is drawn only when the deposit cannot be paid and says `today` only when the drop itself
+  would take the net position past what the bank allows. Tests: thirteen in
+  `tests/ui/dropCard.test.ts`, including the two clicks in the mounted game, and one more in
+  `tests/ui/popovers.test.ts` that opens the card and shuts it with Escape and with a click outside.
+- Left: nothing of 2.3. Phase A's `dangerButton` in `src/ui/modal.ts` already puts the class in the
+  markup and the extra attributes after it, so the double class attribute the brief warned about is
+  not there; the test asserts one `class=` on each of the two buttons. `renderDropCardFooter` keeps
+  phase A's `<p class="choices">`.
+
+### The reading of "green figures" (CLAUDE.md 2.3)
+
+The brief says a small job shows the same card with green figures. Three of the card's four figures
+are costs, and the game's one colour helper paints a negative figure red everywhere
+(`signedFigure`, docs/ui-style.md 3), so they cannot be green without a second colour path. The one
+figure on the drawing that can carry a sign either way is the account on the `You have` line, and
+that is what is green on a healthy company and red on Piotr's. Tagged [TUNE] in the source. If Piotr
+meant the three costs in green on a small job, that is a new rule about colour and wants his word,
+because it would undo "the sign decides the colour everywhere".
