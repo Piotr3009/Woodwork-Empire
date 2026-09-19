@@ -1319,6 +1319,15 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
     case 'openModal':
       openModal((element.dataset.modal ?? 'board') as ModalId);
       break;
+    // The red plate on the top bar: what the company owes, and behind it the books open at the
+    // Summary, where the arrears block and the button that pays them are. There is no way to open a
+    // modal on a chosen tab, so the tab is set first and the modal after it, the way
+    // `openLaptopPage` sets its page (PIOTR, 18.09; CLAUDE.md T21 2.1).
+    case 'openArrears':
+      ui.accountingTab = 'summary';
+      ui.scrollModalTop = true;
+      openModal('accounting');
+      break;
     case 'officeRegion': {
       const region = element.dataset.office ?? '';
       if (region === 'door') {

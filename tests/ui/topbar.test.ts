@@ -129,7 +129,6 @@ describe('the red plate that says what the company owes', () => {
   // modal. It lives in src/ui/app.ts, which was frozen for the agent that built this plate, so the
   // case is written out in docs/notes-t21-b1.md for the lead to apply and this is the test of it,
   // to be turned on in the same commit as the case itself.
-  it.todo('opens Accounting on its Summary tab on a click');
 
   it('is gone the day the arrears are cleared', () => {
     const state = owing(25740, 1);

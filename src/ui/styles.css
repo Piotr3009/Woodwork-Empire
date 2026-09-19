@@ -2845,8 +2845,10 @@ input.num {
   text-align: center;
 }
 
-/* The file picker behind "Load from file" is the browser's; the input itself stays out of sight. */
-.menu-pop input[type='file'] {
+/* The file picker behind "Load from file" and behind the bankruptcy card's "Load a save" is the
+   browser's; the input itself stays out of sight. */
+.menu-pop input[type='file'],
+.bank-card input[type='file'] {
   height: 1px;
   left: -9999px;
   opacity: 0;
@@ -2873,6 +2875,7 @@ input.num {
 .card-main h3,
 .folder-head h3,
 .board-week h4,
+.bank-card h3,
 .painted-text,
 .menu-pop h3 {
   font-family: var(--font-title);
@@ -4320,6 +4323,7 @@ input.num {
   align-items: baseline;
 }
 
+.modal-folder .drop-danger,
 .drop-danger {
   background: #fbe7e3;
   border: 1px solid #e3a49c;
@@ -4404,4 +4408,43 @@ input.num {
 .bubble-away {
   border-style: dashed;
   color: var(--text-dim);
+}
+
+/* 2.2 The end. The bankruptcy is the event it always was, so it is a folder with the one cross, and
+   this is the drawing's dark card inside it (docs/mockups/t21/debt.html part 3). The dark is the
+   folder skin's own ink, so the card is the same colour as the writing on the paper around it. */
+.bank-card {
+  background: var(--ink, var(--page));
+  border: 6px solid var(--bad);
+  border-radius: 6px;
+  color: var(--cream);
+  margin: 0 auto;
+  max-width: 620px;
+  padding: 24px 28px;
+  text-align: center;
+}
+
+.bank-card h3 {
+  color: var(--cream);
+  font-size: var(--fs-display);
+  margin: 0 0 6px;
+}
+
+/* The folder skin paints every paragraph in its body ink, which is this card's background. */
+.modal-folder .bank-card p {
+  color: var(--cream);
+}
+
+.bank-figs {
+  display: grid;
+  gap: 4px 16px;
+  grid-template-columns: 1fr auto;
+  margin: 14px auto;
+  max-width: 360px;
+  text-align: left;
+}
+
+.bank-figs b {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
 }
