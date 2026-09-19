@@ -22,6 +22,12 @@ already in. Landed since Turn 20 closed:
 
 ## 2. The tool cabinet, at the size the spec now says
 
+**Delivered 19.09.2026 (tool cabinets v2, PIOTR's art): `toolCabinet.standard.png` and
+`toolCabinet.standard.r.png` at 160 by 136, the turned file a true second orientation and not a
+mirror. Registered as v31. The pack also holds used, budget, pro and industrial cabinets on their
+own canvases; the game has no cabinet class ladder, so those eight files are kept out of the repo
+until it does. The request below is closed.**
+
 The one thing this turn asks the art side for that is not a character sheet, and it comes out of
 2.13. The picture Piotr delivered on 19.09 is plainly a **two metre** cabinet: drawers, two doors
 and a bench top over them. The spec said one metre square, which is why it looked wrong in the hall,
