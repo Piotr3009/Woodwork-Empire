@@ -272,8 +272,18 @@ export function createDelivery(
 }
 
 /** The order for this job: the shortfall bought at the ad hoc price, on a lorry for this job
- *  (CLAUDE.md T13 3.3). The cash leaves at the click, so it is refused past the overdraft. */
-export function orderForJob(state: GameState, job: Job): Delivery | null {
+ *  (CLAUDE.md T13 3.3). The cash leaves at the click, so it is refused past the overdraft.
+ *
+ *  `orderedBy` is the name of the man who placed it without being asked: the purchasing clerk, or
+ *  the estimator, or the office admin, the minute the drawings are done (CLAUDE.md T21 2.5.2). A
+ *  `LedgerEntry` has no field for who did a thing, so the name goes in the label, which is what the
+ *  player reads on the Accounting page; an order the owner placed himself names nobody, as it always
+ *  did. */
+export function orderForJob(
+  state: GameState,
+  job: Job,
+  orderedBy: string | null = null,
+): Delivery | null {
   const sheets = shortfallOf(job);
   if (sheets <= 0) return null;
   if (state.deliveries.some((delivery) => delivery.jobId === job.id && !delivery.unloaded)) {
@@ -281,7 +291,9 @@ export function orderForJob(state: GameState, job: Job): Delivery | null {
   }
   const cost = orderForJobCost(job);
   if (!canAfford(state, cost)) return null;
-  pay(state, 'material', `Material for ${job.name}`, cost);
+  const label =
+    orderedBy === null ? `Material for ${job.name}` : `Material for ${job.name}, ordered by ${orderedBy}`;
+  pay(state, 'material', label, cost);
   return createDelivery(state, job.id, sheets, job.bespokeMaterial, cost);
 }
 

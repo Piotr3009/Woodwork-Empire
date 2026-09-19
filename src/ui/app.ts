@@ -90,6 +90,7 @@ import {
 import { playCharacters } from '../render/characters';
 import { resetWalkers, stepWalkers, syncWalkers } from '../render/walkers';
 import { resetDoors, stepDoors, syncDoors } from '../render/doors';
+import { resetBubbles } from '../render/bubbles';
 import { applySoundSettings, play as soundPlay, setLoops, stopAllSounds, unlockSound } from './sound';
 import { hallLoops, hallOneShots } from '../render/hall';
 import { walkPath } from '../engine/walk';
@@ -100,6 +101,7 @@ import { renderOwnerOut } from './ownerOut';
 import { renderCompany } from './company';
 import { renderShopping } from './shopping';
 import { renderStart } from './start';
+import { dropCardTitle, renderDropCard, renderDropCardFooter } from './dropCard';
 import { renderMachineCard } from './machineCard';
 import { decodeSaveFile, encodeSaveFile, saveFileName } from '../cloud/file';
 import {
@@ -456,7 +458,7 @@ function modalBody(id: ModalId, current: GameState): string {
         tickedTasks: ui.tickedTasks,
       });
     case 'workPlan':
-      return renderWorkPlan(current, ui.workPlanTab, ui.dropConfirm, ui.assignOpen, ui.contractMan);
+      return renderWorkPlan(current, ui.workPlanTab, ui.assignOpen, ui.contractMan);
     case 'machineCard':
       return renderMachineCard(current, ui.machineCard, ui.sellConfirm);
     case 'accounting': {
@@ -713,6 +715,27 @@ function modalSpecs(): ModalSpec[] {
       position: null,
     });
   }
+  // Dropping a project is the one action in the game that takes two clicks, because for a big job
+  // it ends the company: the first click opens this card, which says what the drop costs before
+  // anything is done, and the red button on it is the second (PIOTR, 18.09; CLAUDE.md T21 2.3). It
+  // is pushed after the Work Plan it was opened from, so it sits over it, and it carries the cross,
+  // Escape and a click outside like every other card.
+  if (ui.dropConfirm !== null) {
+    const job = current.jobs.find((entry) => entry.id === ui.dropConfirm) ?? null;
+    if (job === null) {
+      ui.dropConfirm = null;
+    } else {
+      specs.push({
+        id: 'dropJob',
+        title: dropCardTitle(job),
+        body: renderDropCard(current, job),
+        footer: renderDropCardFooter(job),
+        closable: true,
+        wide: true,
+        position: null,
+      });
+    }
+  }
   const event = current.activeEvent;
   if (event) {
     // Going home: the house card first, for a few seconds or until a click, then the summary
@@ -735,7 +758,11 @@ function modalSpecs(): ModalSpec[] {
             : renderEvent(current, event),
       footer: houseCard ? '' : renderEventFooter(event),
       closable: !houseCard && event.choices.length === 1,
-      wide: event.kind === 'dayEnd' || event.kind === 'monthEnd',
+      // The bank's card joins the day end and the month end on the middle folder size: a head, a
+      // date line, four figures and the epitaph do not fit the small one, and the last line of it
+      // ("built 0 of them") was cut in half by the fold (T21-C4, picture 4; CLAUDE.md T21 2.2).
+      wide:
+        event.kind === 'dayEnd' || event.kind === 'monthEnd' || event.kind === 'bankruptcy',
       position: ui.eventPosition,
     });
   }
@@ -1196,6 +1223,7 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
       accumulator = 0;
       resetWalkers();
       resetDoors();
+      resetBubbles();
       startedStore();
       noteOrders();
       break;
@@ -1215,6 +1243,7 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
       accumulator = 0;
       resetWalkers();
       resetDoors();
+      resetBubbles();
       startedStore();
       noteOrders();
       autosaveLocal();
@@ -1296,6 +1325,15 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
       break;
     case 'openModal':
       openModal((element.dataset.modal ?? 'board') as ModalId);
+      break;
+    // The red plate on the top bar: what the company owes, and behind it the books open at the
+    // Summary, where the arrears block and the button that pays them are. There is no way to open a
+    // modal on a chosen tab, so the tab is set first and the modal after it, the way
+    // `openLaptopPage` sets its page (PIOTR, 18.09; CLAUDE.md T21 2.1).
+    case 'openArrears':
+      ui.accountingTab = 'summary';
+      ui.scrollModalTop = true;
+      openModal('accounting');
       break;
     case 'officeRegion': {
       const region = element.dataset.office ?? '';
@@ -1541,6 +1579,12 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
         ui.daySummary = null;
         break;
       }
+      // The cross on the drop card is "Keep the job": the card goes and the job stays
+      // (CLAUDE.md T21 2.3).
+      if (which === 'dropJob') {
+        ui.dropConfirm = null;
+        break;
+      }
       shutModal();
       break;
     }
@@ -1620,7 +1664,8 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
       dispatch({ type: 'SET_SAW_FALLBACK', jobId: id, on: element.dataset.on === '1' });
       return;
     case 'dropJob':
-      // The first click says what it costs, the second means it (CLAUDE.md T9 3.9).
+      // The first click opens the card that says what it costs; the red button on the card is the
+      // second and the only one that drops anything (CLAUDE.md T9 3.9, T21 2.3).
       if (element.dataset.confirm !== '1') {
         ui.dropConfirm = id;
         break;
@@ -1628,6 +1673,9 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
       ui.dropConfirm = null;
       dispatch({ type: 'DROP_JOB', jobId: id });
       return;
+    case 'keepJob':
+      ui.dropConfirm = null;
+      break;
     case 'hire':
       dispatch({
         type: 'HIRE',
@@ -1732,6 +1780,7 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
           ui.screen = 'game';
           resetWalkers();
           resetDoors();
+          resetBubbles();
           startedStore();
           writeStore();
           ui.saved = peekSave();
@@ -1748,6 +1797,7 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
           accumulator = 0;
           resetWalkers();
           resetDoors();
+          resetBubbles();
         }
         return result.note;
       });
@@ -1885,6 +1935,7 @@ export function onFileChosen(file: File): Promise<void> {
       ui.menuOpen = false;
       resetWalkers();
       resetDoors();
+      resetBubbles();
       // A file loaded is the game from now on, so the browser's store holds it too (T11 3.2).
       startedStore();
       writeStore();
@@ -2021,6 +2072,16 @@ function runClick(event: MouseEvent): void {
     ui.why = null;
     requestRender();
   }
+  // A click anywhere but inside the drop card, or on the control that opens one, keeps the job:
+  // the card is the warning and not the deed (PIOTR, 18.09; CLAUDE.md T21 2.3).
+  if (
+    ui.dropConfirm !== null &&
+    target.closest('[data-modal="dropJob"]') === null &&
+    doer?.dataset.do !== 'dropJob'
+  ) {
+    ui.dropConfirm = null;
+    requestRender();
+  }
   if (doer) {
     if (doer instanceof HTMLButtonElement && doer.disabled) return;
     handleAction(doer, point);
@@ -2154,6 +2215,13 @@ export const ESCAPE_ORDER: ReadonlyArray<{
     isOpen: () => ui.daySummary !== null,
     shut: () => {
       ui.daySummary = null;
+    },
+  },
+  {
+    name: 'drop card',
+    isOpen: () => ui.dropConfirm !== null,
+    shut: () => {
+      ui.dropConfirm = null;
     },
   },
   { name: 'modal', isOpen: () => ui.modal !== null, shut: shutModal },

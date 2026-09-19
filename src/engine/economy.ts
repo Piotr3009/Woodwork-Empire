@@ -8,7 +8,8 @@ import {
   ARREARS_MONTHS_FINAL_WARNING,
   ARREARS_MONTHS_WARNING,
   BAILIFF_SEIZURE_FRACTION,
-  BANKRUPTCY_OVERDRAFT_MULTIPLIER,
+  BANKRUPTCY_DAYS_BELOW_LIMIT,
+  BANKRUPTCY_LIMIT_FACTOR,
   DAYS_PER_MONTH,
   DUST_WASTE_MONTHLY,
   LATE_ACCOUNTS_CHARGE,
@@ -24,7 +25,7 @@ import {
 } from './constants';
 import {
   isFirstOfMonth,
-  isFriday,
+  isLastWorkingDayOfMonth,
   isWorkingDay,
   monthOfDay,
   previousWorkingDay,
@@ -451,10 +452,12 @@ export function payArrears(state: GameState, amount: number | null): number {
   return paid;
 }
 
-export function weeklyWageBill(state: GameState): number {
+/** What the crew costs for the month that is closing: everybody on the books, each at his one
+ *  monthly wage (PIOTR, 19.09: "I wanted everyone monthly"; CLAUDE.md T21 2.10). */
+export function monthlyWageBill(state: GameState): number {
   return state.workers
-    .filter((worker) => worker.weeklyWage > 0 && worker.startDay <= state.clock.day)
-    .reduce((total, worker) => total + worker.weeklyWage, 0);
+    .filter((worker) => worker.monthlyWage > 0 && worker.startDay <= state.clock.day)
+    .reduce((total, worker) => total + worker.monthlyWage, 0);
 }
 
 /** The accountant charges for the mess on the 1st, and the longer it runs the dearer it gets
@@ -601,20 +604,70 @@ export function declareBankruptcy(state: GameState, reason: string): void {
     title: 'Bankrupt',
     body: `${reason} That is the end of the company.`,
     choices: [{ id: 'ok', label: 'That is that' }],
-    data: { day: state.clock.day },
+    // The four figures the card prints are the ones the engine was looking at when it closed the
+    // company, and they ride on the event so the card cannot work out a different sum a minute
+    // later (CLAUDE.md T21 2.2; docs/mockups/t21/debt.html part 3).
+    data: {
+      day: state.clock.day,
+      month: monthOfDay(state.clock.day),
+      cash: Math.round(state.cash),
+      arrears: Math.round(state.finance.arrearsAmount),
+      net: Math.round(netPosition(state)),
+      allowed: Math.round(bankruptcyFloor(state)),
+    },
   });
 }
 
-/** Twice the overdraft limit, whatever the difficulty set it to [TUNE]. */
+/** How far under the company may go before the bank closes it: one and a half times the overdraft
+ *  limit, whatever the difficulty set that to, and read against the **net** position and not the
+ *  cash alone (PIOTR, 18.09; CLAUDE.md T21 2.2). */
 export function bankruptcyFloor(state: GameState): number {
-  return state.finance.overdraftLimit * BANKRUPTCY_OVERDRAFT_MULTIPLIER;
+  return state.finance.overdraftLimit * BANKRUPTCY_LIMIT_FACTOR;
 }
 
+/** What the company is really worth to the bank: what is in the account less what it owes and has
+ *  not paid. Piotr dropped a 50,000 job with 7,000 in the bank, the deposit he owed went to
+ *  arrears, and the top bar carried on saying -7,259 as though the debt were somebody else's: this
+ *  is the sum that says otherwise. The arrears are stored as a positive amount owed, so the sum
+ *  subtracts them (PIOTR, 18.09; CLAUDE.md T21 2.1, 2.2). */
+export function netPosition(state: GameState): number {
+  return state.cash - state.finance.arrearsAmount;
+}
+
+/** The bank closes a company that cannot pay its debts, two ways (PIOTR, 18.09; CLAUDE.md T21 2.2).
+ *
+ *  1. The net position has passed what the bank allows: cash less arrears against one and a half
+ *     times the overdraft limit. The cash alone is not the test any more, because a company that
+ *     owes 25,740 it cannot pay is not solvent on a 7,000 overdraft.
+ *  2. Or thirty calendar days in a row have closed with the cash below the overdraft limit itself,
+ *     whatever the amount it is below by. The day the count reaches thirty is the day it ends.
+ *
+ *  Both are read once a calendar day, where Turn 13 read the one it had: at the point the day's
+ *  money is settled, which is `runDayCosts`. */
 export function checkBankruptcy(state: GameState): void {
   if (state.gameOver) return;
-  if (state.cash <= bankruptcyFloor(state)) {
-    declareBankruptcy(state, 'The bank pulled the overdraft.');
+  if (netPosition(state) <= bankruptcyFloor(state)) {
+    declareBankruptcy(state, 'You cannot pay what you owe and the bank has pulled the overdraft.');
+    return;
   }
+  if (state.finance.daysBelowOverdraft >= BANKRUPTCY_DAYS_BELOW_LIMIT) {
+    declareBankruptcy(
+      state,
+      `${plural(BANKRUPTCY_DAYS_BELOW_LIMIT, 'day', 'days')} in a row past the overdraft limit, ` +
+        'and the bank has pulled it.',
+    );
+  }
+}
+
+/** The run of days past the limit, counted at the close of the day's money and nowhere else: a day
+ *  that ends below the overdraft limit adds one, a day that ends at or above it puts the count back
+ *  to nought (PIOTR, 18.09: "thirty days below the limit"; CLAUDE.md T21 2.2). */
+function countDayBelowOverdraft(state: GameState): void {
+  if (state.cash < state.finance.overdraftLimit) {
+    state.finance.daysBelowOverdraft += 1;
+    return;
+  }
+  state.finance.daysBelowOverdraft = 0;
 }
 
 /** Everything the given calendar day owes. Runs for weekend days too (CLAUDE.md 8.1). */
@@ -640,20 +693,24 @@ export function runDayCosts(state: GameState, day: number): void {
     // What he pays himself, every working day, at the tier he chose (CLAUDE.md T13 3.18).
     chargeUnavoidable(state, 'ownerDraw', 'Owner\u0027s draw', ownerDrawPerDay(state));
   }
-  if (isFriday(day)) {
-    // The weekly wages, and nothing on top of them: the crew go home at five, so there is no
-    // overtime line to pay them any more (PIOTR, 17.09; CLAUDE.md T17 2.12).
-    const wages = weeklyWageBill(state);
+  if (isLastWorkingDayOfMonth(day)) {
+    // The monthly wages, everybody on one cadence, on the last working day of the month, and
+    // nothing on top of them: the crew go home at five, so there is no overtime line to pay them
+    // any more (PIOTR, 19.09: "I wanted everyone monthly"; CLAUDE.md T21 2.10, T17 2.12).
+    const wages = monthlyWageBill(state);
     if (wages > 0) {
-      chargeUnavoidable(state, 'wages', 'Weekly wages', wages);
+      chargeUnavoidable(state, 'wages', 'Monthly wages', wages);
       queueEvent(state, {
         kind: 'wagesPaid',
         title: 'Wages',
-        body: 'Friday. The weekly wages have gone out.',
+        body: 'The last working day of the month. The monthly wages have gone out.',
         data: { amount: Math.round(wages), overtime: 0 },
       });
     }
   }
+  // The day's money is settled, so this is where the run of days past the limit is counted and
+  // where the bank looks at the company (CLAUDE.md T21 2.2).
+  countDayBelowOverdraft(state);
   checkBankruptcy(state);
 }
 
@@ -662,7 +719,7 @@ export function runDayCosts(state: GameState, day: number): void {
 export function nextDueDays(state: GameState): { wages: number; monthly: number } {
   // Today's bills have already run, so both searches start tomorrow.
   let wages = state.clock.day + 1;
-  while (!isFriday(wages)) wages += 1;
+  while (!isLastWorkingDayOfMonth(wages)) wages += 1;
   let monthly = state.clock.day + 1;
   while (!isFirstOfMonth(monthly)) monthly += 1;
   return { wages, monthly };

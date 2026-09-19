@@ -216,7 +216,13 @@ describe('the overdraft', () => {
     // overdraft interest with them (CLAUDE.md T13 3.14).
     const state = newGame();
     state.cash = -2000;
+    // Three months of fixed costs with nothing coming in is 15,000, which passes the one and a half
+    // times the overdraft the bank now allows, so the company would be closed before the third 1st
+    // (CLAUDE.md T21 2.2). The cadence of the charge is what this asserts, so the bank gives it the
+    // room to reach the third one.
+    state.finance.overdraftLimit = -40000;
     const next = runToDay(state, 92).state;
+    expect(next.gameOver).toBeNull();
     const charged = linesOf(next, 'overdraftInterest').map((entry) => entry.day);
     expect(charged).toEqual([31, 61, 91]);
   });

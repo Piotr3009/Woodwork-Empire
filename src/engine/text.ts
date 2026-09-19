@@ -6,6 +6,15 @@ export function plural(count: number, one: string, many: string): string {
   return `${count} ${count === 1 ? one : many}`;
 }
 
+/** More than one of a thing the game names itself: "drawer boxes", "cut sheet packs", "wardrobe
+ *  fronts". Not a dictionary and not meant to be [TUNE]: a name that ends in a hiss takes "es" and
+ *  everything else takes "s", which is right for every name in the game and is checked in
+ *  `tests/engine/bubbles.test.ts`. It exists because the bubble over a man's head counts the pieces
+ *  he is making and the pieces table holds one name each (CLAUDE.md T21 2.6). */
+export function pluralOf(name: string): string {
+  return /(s|x|z|ch|sh)$/i.test(name) ? `${name}es` : `${name}s`;
+}
+
 /** A figure to at most this many decimal places, the trailing zeros trimmed: 0.25, 0.06, 0.015,
  *  and 10 rather than 10.0 (CLAUDE.md T12 3.1). */
 export function trimmed(value: number, places: number): string {

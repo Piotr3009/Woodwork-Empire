@@ -7,15 +7,23 @@
 // against the types, because the whole point is that the file does not match them yet.
 
 import {
+  CABINET_SLOT_LAYOUT,
   CANTEEN_SLOT_LAYOUT,
+  EQUIPMENT_SPECS,
   LOCKER_SLOT_LAYOUT,
   SOUND_VOLUME_DEFAULT,
   STATE_VERSION,
+  UNIT_WIDTH_CELLS,
   WEBSITE_START_LEVEL,
-  WEEKS_PER_MONTH,
   WORKER_RATES,
 } from './constants';
 import type { GameState, WorkerTier } from './types';
+
+/** The weeks in a month that the Turn 20 build converted a monthly wage with, thirty days over
+ *  seven. Turn 21 deleted `WEEKS_PER_MONTH` from the constants because nothing in the game converts
+ *  a week into a month any more, and the lift out of v16 still has to do the arithmetic that build
+ *  did, so the figure is written here and only here (CLAUDE.md T21 2.10, section 7). */
+const WEEKS_PER_MONTH_V17 = 30 / 7;
 
 /** The oldest save this build opens: Turn 11's v18, which is state version 12. */
 export const OLDEST_SAVE_VERSION = 12;
@@ -307,7 +315,7 @@ function liftToVersion17(state: Raw): void {
     }
     const weekly = typeof worker.weeklyWage === 'number' ? worker.weeklyWage : 0;
     const monthly = typeof worker.monthlyWage === 'number' ? worker.monthlyWage : 0;
-    worker.weeklyWage = weekly > 0 ? weekly : Math.round(monthly / WEEKS_PER_MONTH);
+    worker.weeklyWage = weekly > 0 ? weekly : Math.round(monthly / WEEKS_PER_MONTH_V17);
     delete worker.monthlyWage;
     worker.leavesOnDay = null;
   }
@@ -331,6 +339,89 @@ function liftToVersion17(state: Raw): void {
   state.version = 17;
 }
 
+/** Version 17 to 18: everybody is paid by the month again and the week is gone, the four tiers
+ *  carry Piotr's own rates, the state counts the days the cash has been under the overdraft limit,
+ *  the owner's day counts the minutes he stood as well as the ones he worked, and a tool cabinet is
+ *  two metres wide (CLAUDE.md T21 section 4). Every v29 save loads.
+ *
+ *  What the lift does, and why each one is the honest answer:
+ *
+ *  - **The wage.** `weeklyWage` becomes `monthlyWage` at `weeklyWage * 30 / 7`, which is the
+ *    conversion the Turn 20 build itself printed beside every wage it showed, so a lifted man costs
+ *    what the game told the player he cost. A man's own wage is not re-read off `HIRING_SPECS`:
+ *    what he is paid is what he was taken on for, which is the rule the lift before this one set
+ *    (CLAUDE.md T20 section 4).
+ *  - **The rate.** It is recomputed from the tier, because the rate is the tier's and not the
+ *    man's: Turn 21 moved every tier down a step (0.8 becomes 0.6 and so on), and a crew lifted
+ *    with Turn 20's rates would be faster than the same men hired this morning (CLAUDE.md T21 2.9).
+ *    The tier ids do not change, so nobody is renamed.
+ *  - **The days below the limit.** Nought, not a count worked back out of the ledger: a save cannot
+ *    say whether yesterday ended under the limit, and starting the count today is the reading that
+ *    cannot close a company for something it was never warned about (CLAUDE.md T21 2.2).
+ *  - **The owner's idle minutes.** Nought for the day the save was taken in. The minutes he stood
+ *    before the save were never written down, and inventing them would put a grey segment on the
+ *    bar that no reason can be given for (CLAUDE.md T21 2.8).
+ *  - **The tool cabinet.** Every cabinet standing in the hall is two cells wide now where it was
+ *    one, so a row of them laid out one cell apart overlaps itself. Each is put back on the cabinet
+ *    row's own slots, which are two cells apart from tonight, in the order the save holds them.
+ *    A cabinet past the row's seventh place, or one that will not fit a hall narrower than the row
+ *    was drawn for, goes to the yard, which is the game's own word for a thing that has nowhere to
+ *    stand: `hallItems` counts an item at or past `unit.widthCells` as out of the hall, the player
+ *    drags it back in in setup mode, and nothing else in the game has to learn a new word for it.
+ *    This is the Turn 17 welfare kit lift's own shape (CLAUDE.md T21 2.13, T17 section 4).
+ *
+ *  One thing the lift does not put right, and it is the price of the bump rather than a bug. The
+ *  month the upgrade lands in pays the crew twice over: the Fridays before the save went out under
+ *  Turn 20's weekly rule, and the last working day of this month takes a whole month's wages under
+ *  the new one. Nothing is given back, as nothing was given back for the mirror of this in the lift
+ *  before it (CLAUDE.md T20 section 4, T17 2.21). Every month after it is right. */
+function liftToVersion18(state: Raw): void {
+  for (const worker of records(state.workers)) {
+    const weekly = typeof worker.weeklyWage === 'number' ? worker.weeklyWage : 0;
+    const monthly = typeof worker.monthlyWage === 'number' ? worker.monthlyWage : 0;
+    worker.monthlyWage = monthly > 0 ? monthly : Math.round(weekly * WEEKS_PER_MONTH_V17);
+    delete worker.weeklyWage;
+    if (typeof worker.tier === 'string' && worker.tier in WORKER_RATES) {
+      worker.rate = WORKER_RATES[worker.tier as WorkerTier];
+    }
+  }
+  if (isRecord(state.finance)) state.finance.daysBelowOverdraft = 0;
+  if (isRecord(state.owner)) {
+    state.owner.idleMinutes = 0;
+    state.owner.idleByReason = { noMachine: 0, noMaterial: 0, nothingAssigned: 0, officeEmpty: 0 };
+  }
+  liftCabinets(state);
+  state.version = 18;
+}
+
+/** Every tool cabinet in the hall put back on the widened cabinet row (CLAUDE.md T21 2.13). Written
+ *  against the plain JSON of a save, so the hall's own `canPlaceSpec` is not asked: the cells this
+ *  walks are the cells the constants name, and the width it needs is the catalogue's own. */
+function liftCabinets(state: Raw): void {
+  const cells = EQUIPMENT_SPECS.find((spec) => spec.id === 'toolCabinet')?.width ?? 2;
+  const unit = isRecord(state.unit) ? state.unit : null;
+  const width = typeof unit?.widthCells === 'number' ? unit.widthCells : UNIT_WIDTH_CELLS;
+  let placed = 0;
+  for (const item of records(state.equipment)) {
+    if (item.specId !== 'toolCabinet') continue;
+    if (item.soldOnDay !== null && item.soldOnDay !== undefined) continue;
+    const slot = CABINET_SLOT_LAYOUT[placed];
+    placed += 1;
+    if (slot !== undefined && slot.x + cells <= width) {
+      item.anchorX = slot.x;
+      item.anchorY = slot.y;
+      // Unturned, whichever way the save had it: a cabinet turned is one cell wide and two deep, and
+      // the row it goes back on is one cell deep with the workbenches under it.
+      item.rotated = false;
+      continue;
+    }
+    // Nowhere on the row for it: out to the yard, where the player picks it up in setup mode.
+    item.anchorX = width;
+    item.anchorY = 0;
+    item.rotated = false;
+  }
+}
+
 /** One lift per bump, keyed by the version it lifts from. */
 const LIFTS: Record<number, (state: Raw) => void> = {
   12: liftToVersion13,
@@ -338,6 +429,7 @@ const LIFTS: Record<number, (state: Raw) => void> = {
   14: liftToVersion15,
   15: liftToVersion16,
   16: liftToVersion17,
+  17: liftToVersion18,
 };
 
 /** The state a save holds, lifted bump by bump into this build's shape, or null when the save is

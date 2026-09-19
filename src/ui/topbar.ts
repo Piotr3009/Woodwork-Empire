@@ -3,10 +3,12 @@
 // the push buttons on the right (CLAUDE.md T11 3.1). Nothing else lives here.
 
 import {
+  ARREARS_MONTHS_BAILIFF,
   DAY_CATEGORIES,
   DAY_CATEGORY_LABELS,
   DAY_END_MINUTE,
   OVERTIME_END_MINUTE,
+  OWNER_IDLE_REASONS,
   SPEEDS,
 } from '../engine/constants';
 import {
@@ -26,7 +28,7 @@ import {
 import type { DayCategory, GameState, Speed } from '../engine/index';
 import { openJobs } from '../engine/jobs';
 import { cadenceControl } from './dayEnd';
-import { closeButton, escapeHtml, minutes, money, signedMoney } from './modal';
+import { closeButton, escapeHtml, minutes, money, plural, signedMoney } from './modal';
 
 /** The five speed knobs. One place builds them, whatever else the top bar has to say. The Pause
  *  knob pulses once when the player asks for something stopped time will not give him
@@ -82,6 +84,33 @@ function namePlate(state: GameState): string {
     `<span class="net ${netClass}" title="${blind ? 'The books are behind' : 'Today'}">` +
     `${escapeHtml(netText)}</span>` +
     '</div>'
+  );
+}
+
+/** What the company owes, beside what it has (PIOTR, 18.09; CLAUDE.md T21 2.1;
+ *  docs/mockups/t21/debt.html part 1). Piotr dropped a 50,000 job, the deposit he could not pay
+ *  became 25,740 of arrears, and the only number on the screen was the -7,259 in the account: the
+ *  debt was invisible and the game played on. So while there are arrears a red plate stands between
+ *  the cash and the clock, pulsing, with what is owed on the first line and how long it has been
+ *  owed on the second. A click opens the books at the Summary, where the arrears and the button that
+ *  pays them are. It is gone the day the arrears are cleared. */
+function owesPlate(state: GameState): string {
+  const owed = state.finance.arrearsAmount;
+  if (owed <= 0) return '';
+  const months = state.finance.arrearsMonths;
+  const toBailiff = Math.max(0, ARREARS_MONTHS_BAILIFF - months);
+  // The drawn line is "bailiff in 2". At nought months left the bailiff is the next thing that
+  // happens, and "bailiff in 0" is not English, so that one case says so in a word [TUNE].
+  const bailiff = toBailiff === 0 ? 'bailiff due' : `bailiff in ${toBailiff}`;
+  return (
+    // One action, `openArrears`, which sets the Summary tab and opens the books
+    // (its case is in `src/ui/app.ts`, beside the other openers).
+    '<button class="owes-plate" data-do="openArrears" ' +
+    'title="What the company owes. Opens the books at the Summary.">' +
+    `<span class="owes-figure">owes ${escapeHtml(money(owed))}</span>` +
+    `<span class="owes-line">arrears, ${escapeHtml(plural(months, 'month', 'months'))} · ` +
+    `${escapeHtml(bailiff)}</span>` +
+    '</button>'
   );
 }
 
@@ -171,9 +200,19 @@ function bands(state: GameState): Array<{ band: string; minutes: number }> {
 }
 
 /** The day itself: the 540 minutes of it, and the evening beyond them once it runs, painted in
- *  the order they happened. Break and idle are left unpainted (CLAUDE.md T11 3.1, T17 2.13). */
+ *  the order they happened, and then one grey run for the minutes he stood. The break is still
+ *  unpainted (CLAUDE.md T11 3.1, T17 2.13, T21 2.8).
+ *
+ *  The grey goes between the worked colours and the empty rest, which is where the section puts it
+ *  and the only place it can go: the day log is the day in the order the minutes happened and the
+ *  minutes he stood are not in it, so there is nowhere in the run of bands to put them. A band of
+ *  their own in the log would be a new `DayCategory`, which is a frozen file and a bigger change than
+ *  the drawing asks for (docs/notes-t21-b2.md). */
 function segmentBar(state: GameState, total: number): string {
-  const segments = bands(state)
+  const runs = bands(state);
+  const idle = Math.max(0, state.owner.idleMinutes);
+  if (idle > 0) runs.push({ band: 'idle', minutes: idle });
+  const segments = runs
     .map((entry) => {
       const width = (entry.minutes / total) * 100;
       return (
@@ -185,11 +224,13 @@ function segmentBar(state: GameState, total: number): string {
   return `<div class="day-bar">${segments}</div>`;
 }
 
-/** The legend, on a small cream plate, with what each band has come to so far. It is behind the
- *  pointer, so the bar itself carries no legend under it (CLAUDE.md T11 3.1). */
+/** The legend, on a small cream plate, with what each band has come to so far, and under it the
+ *  four reasons he stood with their minutes. It is behind the pointer, so the bar itself carries no
+ *  legend under it, and it is one plate and not two: the grey run is a run of the same bar and the
+ *  plate behind the pointer is the same plate (CLAUDE.md T11 3.1, T21 2.8). */
 function segmentTooltip(state: GameState): string {
   const found = minutesPerBand(state);
-  const rows = DAY_CATEGORIES.map((category) => {
+  const worked = DAY_CATEGORIES.map((category) => {
     const minutes = found.get(category) ?? 0;
     return (
       `<span class="tip-row" data-band="${category}">` +
@@ -198,7 +239,16 @@ function segmentTooltip(state: GameState): string {
       `<span class="tip-min">${minutes} min</span></span>`
     );
   }).join('');
-  return `<div class="day-tip">${rows}</div>`;
+  const stood = OWNER_IDLE_REASONS.map((reason) => {
+    const minutes = state.owner.idleByReason[reason.id] ?? 0;
+    return (
+      `<span class="tip-row" data-idle="${reason.id}">` +
+      '<span class="tip-key seg-idle"></span>' +
+      `<span class="tip-name">${escapeHtml(reason.label)}</span>` +
+      `<span class="tip-min">${minutes} min</span></span>`
+    );
+  }).join('');
+  return `<div class="day-tip">${worked}${stood}</div>`;
 }
 
 /** How long the bar is: the working day on the clock, 08:00 to 17:00, and the evening on the end
@@ -224,7 +274,8 @@ function dayMeter(state: GameState): string {
     `<span class="day-line">${escapeHtml(state.playerName)}'s day · ` +
     `${escapeHtml(ownerDayLine(state))}</span>` +
     outputChip(state) +
-    `<span class="day-count">${state.owner.minutesWorked} / ${available} min</span>` +
+    `<span class="day-count">${state.owner.minutesWorked} worked \u00b7 ` +
+    `${state.owner.idleMinutes} idle \u00b7 ${available}</span>` +
     '</div>' +
     segmentBar(state, total) +
     segmentTooltip(state) +
@@ -260,6 +311,8 @@ export function renderTopbar(
   return (
     '<div class="topbar">' +
     namePlate(state) +
+    // Between the cash and the speed knobs, and only while the company owes something (T21 2.1).
+    owesPlate(state) +
     '<div class="clock-block">' +
     `<span class="date">${escapeHtml(formatDate(state.clock))}</span>` +
     `<span class="speeds">${speedButtons(state, pulse)}</span>` +

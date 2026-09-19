@@ -534,6 +534,10 @@ input.num {
   border: 1px solid #5b5446;
   border-radius: 4px;
   display: flex;
+  /* The bar is a row of plates and the money is not the one that gives way: without this the
+     owes plate beside it squeezed the cash into a column and broke "-£7,259" over two lines
+     (T21-C4, picture 1). */
+  flex: none;
   flex-direction: column;
   justify-content: center;
   line-height: 1.1;
@@ -554,6 +558,57 @@ input.num {
 
 .topbar .net.good {
   color: #1d6b39;
+}
+
+/* T21 2.1 What the company owes, beside what it has: a red plate between the cash and the clock,
+   only while there are arrears, pulsing so it is not read as part of the furniture
+   (docs/mockups/t21/debt.html part 1). Built like the name plate above it, in the palette's own
+   --bad, and it takes no colour, font, radius or shadow value the file did not already have. */
+.owes-plate {
+  align-items: flex-start;
+  background: linear-gradient(#8f3a31, #6f2b24);
+  border: 1px solid #5b5446;
+  border-radius: 4px;
+  color: var(--cream);
+  cursor: pointer;
+  display: flex;
+  /* A plate of the bar and not a column of it: the drawing has both its lines on one line each,
+     and a plate that gives way wraps to 110 px and bursts out of the 70 px bar, top and bottom
+     (T21-C4, picture 1). */
+  flex: none;
+  flex-direction: column;
+  font: inherit;
+  justify-content: center;
+  line-height: 1.1;
+  padding: 4px 12px;
+  text-align: left;
+  white-space: nowrap;
+  animation: owes-pulse 1.2s ease-in-out infinite;
+}
+
+.owes-plate:hover {
+  border-color: var(--text-dim);
+}
+
+.owes-figure {
+  font-family: var(--font-title);
+  font-size: var(--fs-hand);
+  font-weight: 400;
+}
+
+.owes-line {
+  font-size: var(--fs-small);
+}
+
+@keyframes owes-pulse {
+  0%,
+  100% {
+    box-shadow: none;
+  }
+
+  50% {
+    box-shadow: 0 0 0 4px rgb(192 90 78 / 35%);
+  }
 }
 
 .topbar .net.bad {
@@ -620,10 +675,16 @@ input.num {
   border-radius: 5px;
   box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.6);
   display: flex;
+  /* 340 px is the width it wants and it never takes more, but from Turn 21 it may be given less:
+     the owes plate of 2.1 is 212 px of bar that was not there before, and a hard minimum here put
+     the Office and Menu buttons off the right edge of a 1280 page while a company was in arrears.
+     A meter that is a bar and two short lines can be read narrower; a button that is off the page
+     cannot be pressed at all (CLAUDE.md T21 2.1, 2.8). */
+  flex: 0 1 340px;
   flex-direction: column;
   gap: 5px;
   justify-content: center;
-  min-width: 340px;
+  min-width: 0;
   padding: 6px 10px;
   position: relative;
 }
@@ -2185,6 +2246,17 @@ input.num {
   color: var(--paper);
 }
 
+/* T21 2.3 The one red button in the game, on the folder's paper: the second click of a drop. The
+   skin's own paper and green ink above beat .btn-danger on weight alone, so the drawing's red
+   button came out cream like every other one and the card had no second click to fear
+   (T21-C4, picture 2; docs/mockups/t21/debt.html part 2). The board skin keeps its own danger red
+   the same way, a few rules down. */
+.modal-folder button.btn-danger:not(.chip) {
+  background: var(--bad);
+  border-color: var(--bad);
+  color: var(--paper);
+}
+
 .modal-folder button:not(.chip):not(.modal-close):hover:not([disabled]),
 .modal-folder .button:hover {
   background: var(--accent);
@@ -2799,8 +2871,10 @@ input.num {
   text-align: center;
 }
 
-/* The file picker behind "Load from file" is the browser's; the input itself stays out of sight. */
-.menu-pop input[type='file'] {
+/* The file picker behind "Load from file" and behind the bankruptcy card's "Load a save" is the
+   browser's; the input itself stays out of sight. */
+.menu-pop input[type='file'],
+.bank-card input[type='file'] {
   height: 1px;
   left: -9999px;
   opacity: 0;
@@ -2827,6 +2901,7 @@ input.num {
 .card-main h3,
 .folder-head h3,
 .board-week h4,
+.bank-card h3,
 .painted-text,
 .menu-pop h3 {
   font-family: var(--font-title);
@@ -3538,6 +3613,12 @@ input.num {
 /* 2.13 The day meter runs past 17:00 when the owner does, and the evening has its own colour. */
 .seg-overtime {
   background: var(--accent);
+}
+
+/* T21 2.8 The minutes he stood: grey, between the worked colours and the empty rest of the bar, so
+   a day that reads 203 of 540 says where the other 337 went. */
+.seg-idle {
+  background: #6f7681;
 }
 
 /* 2.16 The tick on a task row, and the one button that sets the ticked ones going. */
@@ -4255,4 +4336,150 @@ input.num {
 .office-figure {
   position: absolute;
   pointer-events: none;
+}
+
+/* --------------------------------------------------------------------------
+   Turn 21: debt you can see, and the men who say why they stand
+   -------------------------------------------------------------------------- */
+
+/* 2.3 The drop card. A card in the folder skin, so the paper, the ink and the buttons are the
+   folder's own (docs/mockups/t21/debt.html part 2): this adds the spacing of its rows, the red box
+   and the one button in the game that is red because the click behind it cannot be taken back. */
+.drop-card .row {
+  align-items: baseline;
+}
+
+.modal-folder .drop-danger,
+.drop-danger {
+  background: #fbe7e3;
+  border: 1px solid #e3a49c;
+  border-radius: 6px;
+  color: #5a2320;
+  margin: 10px 0 0;
+  padding: 10px 12px;
+}
+
+.btn-danger {
+  background: var(--bad);
+  border-color: var(--bad);
+  color: var(--cream);
+  font-weight: 600;
+}
+
+.btn-danger:hover {
+  border-color: var(--text);
+}
+
+/* 2.6 What the men say. Paper, the title hand, one line, a tail under the box pointing at the head
+   it belongs to, and a border that says what kind of thing is being said: red is the player's to
+   fix, green is a helper about his work, plain paper is a stage just begun, dashed grey is a man off
+   the hall (docs/mockups/t21/bubbles.html). Drawn in the hall's live SVG layer, so the box is a
+   foreignObject's child and moves with the figure the walker moves. */
+.bubble {
+  background: var(--cream);
+  border: 2px solid #2a2418;
+  border-radius: 12px;
+  color: #2a2418;
+  font-family: var(--font-title);
+  font-size: var(--fs-hand-small);
+  line-height: 1.15;
+  padding: 3px 9px;
+  position: relative;
+  white-space: nowrap;
+}
+
+/* The tail is two triangles, the ink one under the paper one. The ink is ::before and the paper
+   ::after, so the paper covers it by the paint order alone: a z-index here would make the bubble one
+   more layer floating over the page, which is a thing the popover census has to have a reason for
+   (CLAUDE.md T20 2.15). */
+.bubble::before {
+  border: 6px solid transparent;
+  border-bottom: 0;
+  border-top-color: #2a2418;
+  bottom: -9px;
+  content: '';
+  left: 50%;
+  margin-left: -6px;
+  position: absolute;
+}
+
+.bubble::after {
+  border: 4px solid transparent;
+  border-bottom: 0;
+  border-top-color: var(--cream);
+  bottom: -6px;
+  content: '';
+  left: 50%;
+  margin-left: -4px;
+  position: absolute;
+}
+
+.bubble-wait {
+  border-color: var(--bad);
+}
+
+.bubble-wait::before {
+  border-top-color: var(--bad);
+}
+
+.bubble-chore {
+  border-color: var(--good);
+}
+
+.bubble-chore::before {
+  border-top-color: var(--good);
+}
+
+/* A man who is off the hall: the thought, not the word, so it is dashed and dim. */
+.bubble-away {
+  border-style: dashed;
+  color: var(--text-dim);
+}
+
+/* The box the paper hangs in: layout and nothing else, so the paper is centred over the head it
+   points at and the tail's own nine pixels fall under it. No paint here (CLAUDE.md T21 2.6). */
+.bubble-holder {
+  align-items: flex-start;
+  display: flex;
+  height: 100%;
+  justify-content: center;
+}
+
+/* 2.2 The end. The bankruptcy is the event it always was, so it is a folder with the one cross, and
+   this is the drawing's dark card inside it (docs/mockups/t21/debt.html part 3). The dark is the
+   folder skin's own ink, so the card is the same colour as the writing on the paper around it. */
+.bank-card {
+  background: var(--ink, var(--page));
+  border: 6px solid var(--bad);
+  border-radius: 6px;
+  color: var(--cream);
+  margin: 0 auto;
+  max-width: 620px;
+  padding: 24px 28px;
+  text-align: center;
+}
+
+.bank-card h3 {
+  color: var(--cream);
+  font-size: var(--fs-display);
+  margin: 0 0 6px;
+}
+
+/* The folder skin paints every paragraph in its body ink, which is this card's background. */
+.modal-folder .bank-card p {
+  color: var(--cream);
+}
+
+.bank-figs {
+  display: grid;
+  gap: 4px 16px;
+  grid-template-columns: 1fr auto;
+  margin: 14px auto;
+  max-width: 360px;
+  text-align: left;
+}
+
+.bank-figs b {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
 }

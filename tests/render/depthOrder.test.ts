@@ -55,6 +55,12 @@ function hallWithASaw(): GameState {
   if (saw === undefined) throw new Error('no saw');
   saw.anchorX = 8;
   saw.anchorY = 4;
+  // The saw is put on cells the day one kit does not choose for it, so the hall it is measured in
+  // holds the saw and nothing else on that column. The tool cabinet of the kit stands at (8, 3)
+  // from Turn 21, two cells wide, which is inside the saw's own working zone and on the column this
+  // test walks the owner down: it is a third drawable between the two this test is about, so it
+  // goes (CLAUDE.md T21 2.13).
+  state.equipment = state.equipment.filter((item) => item.specId !== 'toolCabinet');
   state.owner.station = STATION_BENCH;
   return state;
 }

@@ -6,7 +6,16 @@
 
 import { beforeEach, describe, expect, it } from 'vitest';
 import { roomDoorCell } from '../../src/engine/constants';
-import { STATION_BENCH, STATION_OFFICE, isDoorwayCell } from '../../src/engine/stations';
+import {
+  STATION_BENCH,
+  STATION_IDLE,
+  STATION_LUNCH,
+  STATION_NO_BENCH,
+  STATION_OFFICE,
+  STATION_PHONE,
+  isBehindTheDoor,
+  isDoorwayCell,
+} from '../../src/engine/stations';
 import { renderHall } from '../../src/render/hall';
 import { hallOneShots } from '../../src/render/hall';
 import {
@@ -75,12 +84,25 @@ describe('a door is drawn closed, always (CLAUDE.md T20 2.12)', () => {
 });
 
 describe('a man goes through it (CLAUDE.md T20 2.12)', () => {
-  it('knows the office doorway from every other cell', () => {
-    const door = roomDoorCell('office');
-    expect(isDoorwayCell(door)).toBe(true);
-    expect(isDoorwayCell({ x: door.x, y: door.y + 1 })).toBe(false);
-    // The canteen's is not one: a man with nothing to do stands about there, in the hall.
-    expect(isDoorwayCell(roomDoorCell('canteen'))).toBe(false);
+  it('knows both doorways from every other cell, and the station tells the two men apart', () => {
+    const office = roomDoorCell('office');
+    const canteen = roomDoorCell('canteen');
+    expect(isDoorwayCell(office)).toBe(true);
+    expect(isDoorwayCell({ x: office.x, y: office.y + 1 })).toBe(false);
+    // Turn 21: the canteen's is a doorway too, because the hall goes through it for its dinner
+    // (PIOTR, 19.09; CLAUDE.md T21 2.12). Turn 20 asserted the opposite here, and its reason was that
+    // a man with nothing to do stands about on that very cell: that reason is answered by the station
+    // and not by the cell, which is what `isBehindTheDoor` asks.
+    expect(isDoorwayCell(canteen)).toBe(true);
+    expect(isBehindTheDoor(STATION_LUNCH, canteen)).toBe(true);
+    expect(isBehindTheDoor(STATION_IDLE, canteen)).toBe(false);
+    expect(isBehindTheDoor(STATION_NO_BENCH, canteen)).toBe(false);
+    // And a station is only behind its own door: a man at his desk is not in the canteen.
+    expect(isBehindTheDoor(STATION_OFFICE, office)).toBe(true);
+    expect(isBehindTheDoor(STATION_PHONE, office)).toBe(true);
+    expect(isBehindTheDoor(STATION_OFFICE, canteen)).toBe(false);
+    expect(isBehindTheDoor(STATION_LUNCH, office)).toBe(false);
+    expect(isBehindTheDoor(STATION_BENCH, office)).toBe(false);
   });
 
   it('leaves him on the hall while he is still walking to the door, and takes him off at it', () => {
@@ -93,12 +115,12 @@ describe('a man goes through it (CLAUDE.md T20 2.12)', () => {
     const walking = page(state);
     syncWalkers(walking, 100, straight);
     expect(walkerOf('owner')).toBeDefined();
-    expect(figureIsThroughADoor('owner', door)).toBe(false);
+    expect(figureIsThroughADoor('owner', door, STATION_OFFICE)).toBe(false);
     expect(renderHall(state)).toContain('data-figure="owner"');
     // He arrives: from that moment he is through the door and off the drawing.
     walkOn(walking, 100);
     expect(walkerOf('owner')?.path).toHaveLength(0);
-    expect(figureIsThroughADoor('owner', door)).toBe(true);
+    expect(figureIsThroughADoor('owner', door, STATION_OFFICE)).toBe(true);
     expect(renderHall(state)).not.toContain('data-figure="owner"');
   });
 
@@ -123,8 +145,12 @@ describe('a man goes through it (CLAUDE.md T20 2.12)', () => {
   });
 });
 
-describe('the office is the owner s room, and a desk man stands at its door', () => {
-  it('draws the estimator at the doorway, because the office view has nobody but the owner in it', () => {
+describe('every man goes through the office door, not the owner alone (CLAUDE.md T21 2.11)', () => {
+  it('takes the estimator off the hall at his take off, and gives him back when it is done', () => {
+    // Turn 20 drew him standing in the doorway and this test asserted that, because the office view
+    // draws the owner alone and a man on neither picture was a man the player had lost. Turn 21 sends
+    // him through, and what tells the player where he is, is the bubble at the door (PIOTR, 19.09;
+    // CLAUDE.md T21 2.6, 2.11).
     const start = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
     start.cash = 50_000;
     const hired = hireNow(start, 'estimator', 'novice');
@@ -140,10 +166,18 @@ describe('the office is the owner s room, and a desk man stands at its door', ()
     syncWalkers(root, 0, straight);
     walkOn(root, 0);
     const drawn = renderHall(hired);
-    expect(drawn).toContain(`data-worker="${estimator.id}"`);
-    expect(figureIsThroughADoor(`worker-${estimator.id}`, roomDoorCell('office'))).toBe(false);
-    // And he is nobody's knock: the door counts the owner alone.
-    expect(figuresThroughDoors()).toEqual([]);
+    expect(drawn).not.toContain(`data-worker="${estimator.id}"`);
+    expect(figureIsThroughADoor(`worker-${estimator.id}`, roomDoorCell('office'), STATION_OFFICE)).toBe(
+      true,
+    );
+    // His words are at the door instead, in the dashed grey of a man who is off the hall.
+    expect(drawn).toContain('data-away-door="office"');
+    expect(drawn).toContain('data-bubble="inTheOffice"');
+    // And the office view is still the owner's alone: one box, measured for him (CLAUDE.md T19 2.2).
+    expect(drawn).not.toContain('data-office-figure');
+    // The take off is over and he is on the floor again.
+    estimator.station = STATION_BENCH;
+    expect(renderHall(hired)).toContain(`data-worker="${estimator.id}"`);
   });
 });
 

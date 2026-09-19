@@ -24,7 +24,7 @@ import {
   efficiencyOf,
   freeSheets,
   houseTierFor,
-  isFriday,
+  isLastWorkingDayOfMonth,
   isWorkingDay,
   managerOnDuty,
   marginOfPrice,
@@ -211,25 +211,28 @@ describe('the three month playthrough of 10.4, on Easy as the brief scripts it',
     }
   });
 
-  it('went to the bank in week 1 rather than live in the overdraft, and stayed out of it for two months', () => {
+  it('went to the bank in week 2 rather than live in the overdraft, and stayed out of it for two months', () => {
     // 20,000 of capital, a 7,000 saw, a 1,400 fan, the joiner's kit and the deposit come to
-    // 23,000 in month 1 against 4,500 of revenue, so the account goes under on day 4. He borrows
-    // that day, once, and the first two months close in the black instead of in the overdraft
-    // (CLAUDE.md T13 3.14). What the overdraft charges for the hours before the bank answered,
-    // and for the end of month 3, is small change beside the 25% a year it charged all three
-    // months before the script was rewritten.
+    // 23,000 in month 1 against 4,500 of revenue, so the account runs down to 16 by the Friday of
+    // week 1 and goes under on day 8. He borrows that day, once, and the first two months close in
+    // the black instead of in the overdraft (CLAUDE.md T13 3.14). Turn 20's Friday payroll took
+    // him under on day 4; from tonight the wages wait for the month's last working day, so nothing
+    // leaves the account for the crew in week 1 and the dip comes with week 2's buying instead
+    // (CLAUDE.md T21 2.10). What the overdraft charges for the days before the bank answered, and
+    // for the end of month 3, is small change beside the 25% a year it charged all three months
+    // before the script was rewritten.
     const loan = state.finance.loan;
     expect(loan?.principal).toBe(LOAN_AMOUNT);
-    expect(loan?.startDay ?? 99).toBeLessThanOrEqual(7);
+    expect(loan?.startDay ?? 99).toBeLessThanOrEqual(8);
     expect(months[0]?.cashClose ?? 0).toBeGreaterThan(0);
     expect(months[1]?.cashClose ?? 0).toBeGreaterThan(0);
-    // Two charges in three months: 32p on day 31, for the hours between going under on day 4 and
-    // the bank answering, and 82 on day 91 for the end of month 3, when the crew of 10.4 is all on
-    // the books. The month end of month 2 carries none at all.
+    // Two charges in three months: 7.53 on day 31, for the days between going under and the bank
+    // answering, and 7.45 on day 91 for the end of month 3, when the crew of 10.4 is all on the
+    // books. The month end of month 2 carries none at all.
     const overdraft = state.ledger.filter((entry) => entry.category === 'overdraftInterest');
     expect(overdraft).toHaveLength(2);
     expect(overdraft[0]?.day).toBe(31);
-    expect(Math.abs(overdraft[0]?.amount ?? 0)).toBeLessThan(1);
+    expect(Math.abs(overdraft[0]?.amount ?? 0)).toBeLessThan(10);
     expect(overdraft.some((entry) => entry.day === 61)).toBe(false);
   });
 
@@ -272,28 +275,34 @@ describe('the three month playthrough of 10.4, on Easy as the brief scripts it',
     expect(ended?.renegotiatedPrice ?? 0).toBeGreaterThan(ended?.pricePerPiece ?? Infinity);
   });
 
-  it('pays every trade by the week, on a Friday, and never by the month', () => {
+  it('pays every trade by the month, on its last working day, and never by the week', () => {
     // The crew of 10.4 is three trades: a joiner in week 1, an estimator in month 2 and a
-    // production manager in month 3. From tonight every one of them is on the one unit, the week
-    // (PIOTR, 18.09: "one unit"; CLAUDE.md T20 2.6), so the three months are a played proof that
-    // weekly pay covers the office as well as the bench.
+    // production manager in month 3. Every one of them is on the one unit, and it is the month
+    // (PIOTR, 19.09: "I wanted everyone monthly"; CLAUDE.md T21 2.10), so the three months are a
+    // played proof that monthly pay covers the office as well as the bench.
     const roles = new Set(state.workers.map((worker) => worker.role));
     expect(roles.has('joiner')).toBe(true);
     expect(roles.has('estimator')).toBe(true);
     expect(roles.has('productionManager')).toBe(true);
-    for (const worker of state.workers) expect(worker.weeklyWage, worker.role).toBeGreaterThan(0);
+    for (const worker of state.workers) expect(worker.monthlyWage, worker.role).toBeGreaterThan(0);
     // The office salary line of the 1st of the month is gone with `monthlyWage`.
     expect(state.ledger.filter((entry) => entry.category === 'salaries')).toEqual([]);
+    // One wage line a month and no more: days 30, 60 and 89, which are the last working days of
+    // the three months. Day 90 is a Saturday, so month 3 pays on the Friday before it.
     const wages = state.ledger.filter((entry) => entry.category === 'wages');
-    expect(wages.length).toBeGreaterThan(10);
-    for (const entry of wages) expect(isFriday(entry.day), `day ${entry.day}`).toBe(true);
-    // The last Friday of the three months pays the whole crew, each at his own weekly wage and
+    expect(wages).toHaveLength(3);
+    expect(wages.map((entry) => entry.day)).toEqual([30, 60, 89]);
+    for (const entry of wages) {
+      expect(isLastWorkingDayOfMonth(entry.day), `day ${entry.day}`).toBe(true);
+      expect(entry.label, `day ${entry.day}`).toBe('Monthly wages');
+    }
+    // The last pay day of the three months pays the whole crew, each at his own monthly wage and
     // nothing on top of it: the estimator and the manager are in the same line as the joiner.
     const last = wages[wages.length - 1];
     const crew = state.workers.filter((worker) => worker.startDay <= (last?.day ?? 0));
     expect(crew.length).toBe(3);
     expect(Math.abs(last?.amount ?? 0)).toBeCloseTo(
-      crew.reduce((total, worker) => total + worker.weeklyWage, 0),
+      crew.reduce((total, worker) => total + worker.monthlyWage, 0),
       2,
     );
   });
@@ -374,3 +383,4 @@ describe('the same script on Very easy, the control', () => {
     expect(holidayTaken).toBe(true);
   });
 });
+

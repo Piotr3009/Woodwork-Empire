@@ -9,17 +9,21 @@
 // phase C folds it onto this function (the note in REPORT-T13-B2.md).
 
 import { HOURS_PER_WORKING_DAY, WET_AIR_FINISH_FACTOR } from './constants';
-import { addWorkingDays, isBreak } from './clock';
+import { addWorkingDays, isBreak, workedMinutesOfDay } from './clock';
 import {
   BUILDING_ROLES,
   addLabour,
+  addToJob,
   findJob,
   hallBlock,
   isOnJob,
+  jobHasWorkFor,
   jobHeldBy,
   jobProgress,
   jobStage,
   leadAssignee,
+  oldestReadyJob,
+  waitingLine,
 } from './jobs';
 import {
   BENCH,
@@ -41,7 +45,8 @@ import {
   specOf,
   variantOf,
 } from './machines';
-import { drawSheetsFor } from './materials';
+import { drawSheetsFor, rackCanSupply } from './materials';
+import { openTasks } from './tasks';
 import {
   airFactorFor,
   benchDrawsAir,
@@ -50,7 +55,13 @@ import {
   sprayingOnWetAir,
   underExtracted,
 } from './media';
-import { ownerEfficiency, ownerIsAvailable, spendOwnerMinute, staffOutputFactor } from './owner';
+import {
+  ownerEfficiency,
+  ownerIsAvailable,
+  spendOwnerIdleMinute,
+  spendOwnerMinute,
+  staffOutputFactor,
+} from './owner';
 import { contractMen, contractWantsToday } from './contracts';
 import { bookMonthMinute, isWorkingToday } from './staff';
 import {
@@ -69,7 +80,7 @@ import {
   stagePlanFor,
   tradeFactor,
 } from './stages';
-import type { Equipment, GameState, Job, LostMinuteCause, Shift } from './types';
+import type { Equipment, GameState, Job, LostMinuteCause, OwnerIdleReason, Shift } from './types';
 
 /** One man who could put a minute into a job right now. */
 export interface Hand {
@@ -286,9 +297,31 @@ interface AtWork {
   machine: Equipment | null;
 }
 
-/** What the hall says a man is waiting for, in the words the job card and the Work Plan use. */
-function waitingLine(specId: string): string {
-  return `waiting for ${(findSpec(specId)?.name ?? specId).toLowerCase()}`;
+/** What the men behind the first one in a queue for a cutting machine say. They are not waiting for
+ *  the saw, which only one man can stand at: they are waiting for the parts it has not cut yet, and
+ *  that is what the drawing has the second man in the queue saying (docs/mockups/t21/bubbles.html,
+ *  Callum at the saw and Ravi behind him; CLAUDE.md T21 2.6, 2.7). */
+export const NO_CUT_PARTS = 'no cut parts yet';
+
+/** What this one man says while he stands, which is not always what his job says. The first man in
+ *  the queue for a machine is waiting for the machine; the men behind him at a cutting stage have no
+ *  cut parts yet, because the parts they would be assembling are still on the saw
+ *  [TUNE: the reading of who says which, from the drawing's two men]. Null when he is not standing at
+ *  all. The queue is read the way `stationForProduction` reads it, through the same `placeAmong`, so
+ *  the words and the cell he stands on cannot disagree (CLAUDE.md T21 2.6, 2.7). */
+export function waitingWordsFor(state: GameState, who: string, job: Job): string | null {
+  const stage = currentStage(state, job, cncOptions(state, who, job));
+  const family = stage?.family ?? null;
+  if (family === null || family === BENCH) return null;
+  if (!has(state, family) || machineIsShared(state, family)) return null;
+  if (heldMachine(state, who, family) !== null) return null;
+  const queue = placeAmong(
+    job,
+    who,
+    (other) => other !== who && heldMachine(state, other, family) === null,
+  );
+  const cutting = stage !== null && (stage.id === 'cutting' || stage.id === 'cnc');
+  return queue > 0 && cutting ? NO_CUT_PARTS : waitingLine(family);
 }
 
 /** The words the job carries while the rack has nothing for it (CLAUDE.md T2 3.6). */
@@ -304,6 +337,154 @@ export function canWorkOn(state: GameState, job: Job): boolean {
   if (drawSheetsFor(state, job, jobProgress(job))) return true;
   job.blockedBy = WAITING_FOR_MATERIAL;
   return false;
+}
+
+// ---------------------------------------------------------------------------
+// The scheduler: nobody stands and waits while there is work he could do (PIOTR;
+// CLAUDE.md T21 2.7).
+// ---------------------------------------------------------------------------
+
+/** The job this man goes to instead of standing at a machine another man has: a job in production,
+ *  oldest first, that can take a minute from him right now [TUNE: the hall works its book in the
+ *  order it took it]. Null when there is nothing of the sort, and then he stands (T21 2.7).
+ *
+ *  Three men are never moved. The owner, because he is never given work behind his back: what he
+ *  does next is his own decision and the game has always kept it so (CLAUDE.md T4 3.2). The last man
+ *  on a job, because a job with nobody on it goes back to the ready list and would be abandoned the
+ *  first minute its saw was busy: the man who holds the machine stays and the queue behind him moves,
+ *  which is the scene the section is about. And a man the contract still wants today, who is not
+ *  among the job's hands at all. */
+export function otherWorkFor(state: GameState, hand: Hand): Job | null {
+  if (hand.who === OWNER) return null;
+  if (hand.job.assignees.length <= 1) return null;
+  for (const job of state.jobs) {
+    if (job.id === hand.job.id) continue;
+    if (isOnJob(job, hand.who)) continue;
+    if (!jobHasWorkFor(state, job, hand.who)) continue;
+    return job;
+  }
+  return null;
+}
+
+/** Moves him, through the game's own one path for putting a man on a job, so his chip on the Work
+ *  Plan, the cell he stands on in the hall and the job his minute goes into are all the same fact.
+ *  He is the job's second man, working at the first man's bench, so he takes no bench of his own
+ *  (CLAUDE.md T17 2.10, T19 2.5, T21 2.7). False when there was nothing to move him to. */
+export function moveToOtherWork(state: GameState, hand: Hand): boolean {
+  const other = otherWorkFor(state, hand);
+  if (other === null) return false;
+  if (!addToJob(state, other.id, hand.who)) return false;
+  hand.job = other;
+  return true;
+}
+
+/** What this man did with the minute: the stage and the machine he got, or why he stood. The whole
+ *  of one man's minute before the hall's factors are applied to it, in one place, because the day
+ *  and the night both have to ask exactly the same question (CLAUDE.md T21 2.7). */
+export interface HandPlace {
+  /** The stage he is at and the machine he got, or null when he stood. */
+  work: { stage: StagePlan; machine: Equipment | null } | null;
+  /** What the minute is booked as lost to, or null when he worked it. */
+  lost: LostMinuteCause | null;
+  /** The rack had nothing for the job he was on: the caller tells the player, once a day. */
+  noMaterial: boolean;
+  /** The scheduler moved him to another job rather than let him stand. */
+  moved: boolean;
+}
+
+/** Gets this man to work, moving him off a queue he is standing in if there is anything else for him
+ *  to do (PIOTR; CLAUDE.md T21 2.7). The one reading of a man's minute: the hall, then the rack, then
+ *  the machine of his stage, and between each of them the question the section is about, which is
+ *  whether there is other work.
+ *
+ *  A man is moved at most once in a minute: the job he is moved to was asked whether it could take
+ *  the minute before he went, so the second look never finds him waiting again for the same reason.
+ *  **The brief's first clause, "another stage of the same job that needs no machine", is not built
+ *  and cannot be:** a job stands at exactly one stage, which is derived from the one labour number,
+ *  and its stages are consumed in order, so there is no second stage of it to go to. The written up
+ *  reading of that is in docs/notes-t21-b2.md. */
+export function placeHand(state: GameState, hand: Hand): HandPlace {
+  let moved = false;
+  for (let look = 0; look < 2; look += 1) {
+    const first = look === 0;
+    if (!canWorkOn(state, hand.job)) {
+      // The hall or the rack has stopped this job. There is work for him elsewhere or there is not,
+      // and the question is the same question as for a taken machine.
+      if (first && moveToOtherWork(state, hand)) {
+        moved = true;
+        continue;
+      }
+      releaseMachines(state, hand.who);
+      const noMaterial = hand.job.blockedBy === WAITING_FOR_MATERIAL;
+      return { work: null, lost: noMaterial ? 'noMaterial' : 'noMachine', noMaterial, moved };
+    }
+    const stage = jobStage(state, hand.job, cncOptions(state, hand.who, hand.job));
+    if (stage === null) return { work: null, lost: null, noMaterial: false, moved };
+    const at = takeMachines(state, hand);
+    if (at.waitingFor === null) {
+      return { work: { stage, machine: at.machine }, lost: null, noMaterial: false, moved };
+    }
+    if (first && moveToOtherWork(state, hand)) {
+      moved = true;
+      continue;
+    }
+    // He stands at the machine until the man on it is done with it (CLAUDE.md T7 3.1). This is also
+    // the cap on the men: one machine is one man's, so a stage at a machine goes at that one man's
+    // speed however many are on the job, and the others put their minutes in only on the bench work
+    // the stage allows, which for a cutting stage is none (CLAUDE.md T19 2.5).
+    hand.job.blockedBy = waitingLine(at.waitingFor);
+    return { work: null, lost: 'noMachine', noMaterial: false, moved };
+  }
+  return { work: null, lost: 'noMachine', noMaterial: false, moved };
+}
+
+// ---------------------------------------------------------------------------
+// The owner's own minute: the ones he worked, and the ones he stood and why (PIOTR, 19.09: "my time
+// runs two to three times slower than the clock"; CLAUDE.md T21 2.8).
+// ---------------------------------------------------------------------------
+
+/** Why the owner stood through the minute just gone, or null when there was nothing of his day to
+ *  stand through: he is not in the workshop, the hall is at dinner, or he is holding a job of work,
+ *  and a minute he holds something is a minute `spendOwnerMinute` has already booked as worked
+ *  (CLAUDE.md T21 2.8). The four reasons are `OWNER_IDLE_REASONS`, in the order the hover lists them.
+ *
+ *  Two of the four are the two the workshop's own efficiency breakdown counts, and they are read the
+ *  same way here: the rack first, and then the hall and the machine of the stage, which is everything
+ *  else (CLAUDE.md T13 3.5). The other two are his alone: nothing in the hall is his, or there is
+ *  nothing in the hall at all. */
+export function ownerIdleReason(state: GameState): OwnerIdleReason | null {
+  const owner = state.owner;
+  if (!ownerIsAvailable(state)) return null;
+  if (isBreak(state.clock.minute) && !owner.breakSkipped) return null;
+  if (owner.currentTaskId !== null) return null;
+  const job = jobOf(state, OWNER);
+  if (job !== null) {
+    return rackCanSupply(state, job, jobProgress(job)) ? 'noMachine' : 'noMaterial';
+  }
+  // Nothing of his own at all. Either the hall's list has a job of work nobody has taken, or a job
+  // is standing ready for a bench, and either way there is work about that he has not been put on;
+  // or there is none of that and he is in the office with his hands in his pockets
+  // [TUNE: which of the two the split falls on].
+  const waiting =
+    openTasks(state).some((task) => task.doneBy === null) || oldestReadyJob(state) !== null;
+  return waiting ? 'nothingAssigned' : 'officeEmpty';
+}
+
+/** Books the minute just gone onto the owner's day as one he stood through, with its reason. Called
+ *  once a minute from the one hook that already samples what everybody was at
+ *  (`bookWeekMinutes` in src/engine/tasks.ts), and never for a minute it has already booked.
+ *
+ *  A minute is either worked or stood and never both, and the cap says so: the minutes of the day
+ *  that have run, the dinner hour taken out of them unless he worked through it, are all there are
+ *  to divide between the two. Nothing is booked past that, whatever the hooks do
+ *  (CLAUDE.md T21 2.8). */
+export function bookOwnerIdleMinute(state: GameState): void {
+  const owner = state.owner;
+  const ran = workedMinutesOfDay(state.clock.minute, owner.breakSkipped);
+  if (owner.minutesWorked + owner.idleMinutes >= ran) return;
+  const reason = ownerIdleReason(state);
+  if (reason === null) return;
+  spendOwnerIdleMinute(state, reason);
 }
 
 /** What one minute of the hall came to, for the efficiency tally and for the events game.ts
@@ -358,29 +539,13 @@ export function workMinute(
   // to be taken before the hall can be asked what its media add up to.
   const atWork: AtWork[] = [];
   for (const hand of working) {
-    if (!canWorkOn(state, hand.job)) {
-      releaseMachines(state, hand.who);
-      if (hand.job.blockedBy === WAITING_FOR_MATERIAL) {
-        report.noMaterial = true;
-        lose('noMaterial');
-      } else {
-        lose('noMachine');
-      }
-      continue;
-    }
-    const stage = jobStage(state, hand.job, cncOptions(state, hand.who, hand.job));
-    if (stage === null) continue;
-    const at = takeMachines(state, hand);
-    if (at.waitingFor !== null) {
-      // He stands at the machine until the man on it is done with it (CLAUDE.md T7 3.1). This is
-      // also the cap on the men: one machine is one man's, so a stage at a machine goes at that
-      // one man's speed however many are on the job, and the others put their minutes in only on
-      // the bench work the stage allows, which for a cutting stage is none (CLAUDE.md T19 2.5).
-      hand.job.blockedBy = waitingLine(at.waitingFor);
-      lose('noMachine');
-      continue;
-    }
-    atWork.push({ hand, stage, machine: at.machine });
+    // One reading of a man's minute, the scheduler of CLAUDE.md T21 2.7 inside it: he is moved off a
+    // queue he is standing in if there is anything else for him to do, and only then does he stand.
+    const place = placeHand(state, hand);
+    if (place.noMaterial) report.noMaterial = true;
+    if (place.lost !== null) lose(place.lost);
+    if (place.work === null) continue;
+    atWork.push({ hand, stage: place.work.stage, machine: place.work.machine });
   }
   if (atWork.length === 0) return report;
   // The hall as it is with those machines running: the dust band, the missing helper, the crowded

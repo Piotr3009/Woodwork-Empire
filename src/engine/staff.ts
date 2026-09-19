@@ -17,8 +17,7 @@ import {
   PRODUCING_ROLES,
   TIER_WORDS,
   TOOL_CABINET,
-  WEEKS_PER_MONTH,
-  WORKER_HOURS_PER_WEEK,
+  WORKER_HOURS_PER_MONTH,
   WORKER_NAMES,
   WORKER_RATES,
 } from './constants';
@@ -61,8 +60,9 @@ import type {
 /** What a trade is called, one man of it and several. The one table: the crew rows, Our team, the
  *  job's Assign list and the hire card's refusal all read it, so a sprayer is called a sprayer
  *  wherever he is named (CLAUDE.md T19 2.5, 2.6). It sits here and not in the UI because the
- *  refusal the hire card prints is written in this module: "extremely experienced joiners come
- *  from reputation 60" (PIOTR; CLAUDE.md T20 2.5). `src/ui/team.ts` hands `ROLE_WORDS` on. */
+ *  refusal the hire card prints is written in this module: "excellent joiners come from
+ *  reputation 60" (PIOTR; CLAUDE.md T20 2.5, T21 2.9, the words his own of 19.09).
+ *  `src/ui/team.ts` hands `ROLE_WORDS` on. */
 export const ROLE_WORDS: Record<WorkerRole, string> = {
   joiner: 'joiner',
   helper: 'helper',
@@ -162,12 +162,13 @@ export function staffMinutesLeft(worker: Worker): number {
   return Math.max(0, MINUTES_PER_WORKING_DAY - worker.minutesWorked);
 }
 
-/** What a man costs in a month. Everybody is paid by the week from tonight, so a month of him is
- *  his week times the weeks in one, and there is no second wage field to ask about (PIOTR, 18.09;
- *  CLAUDE.md T20 2.6). The one conversion, wherever a month is asked for: the Our team row prints
- *  it, the hiring gate refuses on it, and the Company board reads it (CLAUDE.md T17 2.9, 2.11). */
-export function monthlyWageOf(pay: { weeklyWage: number }): number {
-  return Math.round(pay.weeklyWage * WEEKS_PER_MONTH * 100) / 100;
+/** What a man costs in a month, which from Turn 21 is simply what he is paid: everybody is on a
+ *  monthly wage and nothing converts a week into one, so this is the field and no arithmetic
+ *  (PIOTR, 19.09: "I wanted everyone monthly"; CLAUDE.md T21 2.10). Kept as the one reader the
+ *  Our team row, the hiring gate and the Company board all go through, so the day a second pay
+ *  cadence arrives there is one line to change (CLAUDE.md T17 2.9, 2.11). */
+export function monthlyWageOf(pay: { monthlyWage: number }): number {
+  return pay.monthlyWage;
 }
 
 /** One minute of this man's month, wherever he worked it: at the desk, at the bench or on the
@@ -357,7 +358,7 @@ export function missingLabelsForHire(state: GameState, role: WorkerRole): string
 
 /** What the card says when the workshop is not known enough for this man: who applies depends on
  *  the standing the workshop has earned, and the card says what is missing, in the game's own
- *  words (PIOTR: "extremely experienced joiners come from reputation 60"; CLAUDE.md T20 2.5). A
+ *  words (PIOTR: "excellent joiners come from reputation 60"; CLAUDE.md T20 2.5, T21 2.9). A
  *  role with no classes to it says the same thing about the trade itself. */
 export function standingWanted(
   role: WorkerRole,
@@ -391,19 +392,19 @@ export function hiringOptions(state: GameState): HiringOption[] {
       blockReason = crewLine(state);
     } else if (missing.length > 0) {
       blockReason = `Buy first: ${missing.join(', ')}`;
-    } else if (state.cash < monthlyWageOf(spec)) {
+    } else if (state.cash < spec.monthlyWage) {
       // Last of the refusals, because it is the only one that changes by the minute: who answers
       // the advert, what the office wants first, the bench and the kit are all standing facts,
       // and the bank balance is what an owner looks at once the rest of it is ready. A man is not
       // taken on without a month of his pay in the account (PIOTR, 17.09; CLAUDE.md T17 2.11).
-      blockReason = `Not enough in the bank: needs ${formatMoney(monthlyWageOf(spec))}`;
+      blockReason = `Not enough in the bank: needs ${formatMoney(spec.monthlyWage)}`;
     }
     return {
       role: spec.role,
       tier: spec.tier,
       label: spec.label,
       rate: spec.tier ? WORKER_RATES[spec.tier] : 0,
-      weeklyWage: spec.weeklyWage,
+      monthlyWage: spec.monthlyWage,
       minReputation: spec.minReputation,
       available: blockReason === '',
       blockReason,
@@ -463,7 +464,7 @@ export function hire(state: GameState, role: WorkerRole, tier: WorkerTier | null
     role,
     tier,
     rate: tier ? WORKER_RATES[tier] : 0,
-    weeklyWage: spec.weeklyWage,
+    monthlyWage: spec.monthlyWage,
     startDay: addWorkingDays(state.clock.day, HIRE_START_DELAY_DAYS),
     leavesOnDay: null,
     jobId: null,
@@ -726,13 +727,13 @@ export function rollNightBreakdowns(state: GameState, usedMachineIds: readonly s
 // luxury, because it cannot make the deadline" (PIOTR).
 // ---------------------------------------------------------------------------
 
-/** What the night costs on top of a man's week: his hourly wage, which is his week over forty,
- *  for the hours of the shift, at the night rate less the one his weekly wage already pays. The
- *  weekly wage goes out on Friday as it always did and covers his hours whichever shift they are
- *  on; the night's premium is the quarter on top, booked the night it is worked
- *  (PIOTR: 1.25 of salary for those hours; CLAUDE.md T13 3.9). */
+/** What the night costs on top of a man's month: his hourly wage, which is his month over the hours
+ *  a month of him is, for the hours of the shift, at the night rate less the one his wage already
+ *  pays. The monthly wage goes out on the last working day of the month and covers his hours
+ *  whichever shift they are on; the night's premium is the quarter on top, booked the night it is
+ *  worked (PIOTR: 1.25 of salary for those hours; CLAUDE.md T13 3.9, T21 2.10). */
 export function nightPremiumFor(worker: Worker): number {
-  const hourly = worker.weeklyWage / WORKER_HOURS_PER_WEEK;
+  const hourly = worker.monthlyWage / WORKER_HOURS_PER_MONTH;
   const premium = hourly * (SECOND_SHIFT_MINUTES / 60) * (NIGHT_RATE - 1);
   return Math.round(premium * 100) / 100;
 }

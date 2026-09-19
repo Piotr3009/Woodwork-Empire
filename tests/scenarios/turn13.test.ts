@@ -92,7 +92,15 @@ describe('(t) a month with a loan, on Easy', () => {
 
 describe('(t) a month in the overdraft, on Hard doing nothing', () => {
   const day20 = playUntilDay(newGame({ seed: SEED, difficulty: 'hard' }), 20, IDLE);
-  const day32 = playUntilDay(day20, 32, IDLE);
+  // From Turn 21 a Hard company that does nothing does not live to see the 1st: the bills go unpaid
+  // from day 11 and on day 22, the first working day after the weekend of days 20 and 21, the net
+  // position passes one and a half times its 5,000 overdraft and the bank closes it (PIOTR, 18.09;
+  // CLAUDE.md T21 2.2, and the whole scenario of it is in thirtyDays.test.ts). The interest cadence
+  // this block is about is a fact about the 1st and not about Hard, so it is shown on the same idle
+  // month with the room at the bank it takes to reach the 1st at all.
+  const withRoom = newGame({ seed: SEED, difficulty: 'hard' });
+  withRoom.finance.overdraftLimit = -20000;
+  const day32 = playUntilDay(withRoom, 32, IDLE);
 
   it('is under zero inside the month and the interest accrues day by day', () => {
     expect(day20.cash).toBeLessThan(0);
@@ -100,7 +108,14 @@ describe('(t) a month in the overdraft, on Hard doing nothing', () => {
     expect(day20.ledger.some((entry) => entry.category === 'overdraftInterest')).toBe(false);
   });
 
+  it('is closed by the bank before the 1st on the overdraft Hard really gives it', () => {
+    expect(day20.gameOver?.day).toBe(22);
+    expect(day20.gameOver?.reason).toContain('cannot pay');
+    expect(playUntilDay(day20, 32, IDLE).clock.day).toBe(22);
+  });
+
   it('is charged once on the 1st, interest only, and the balance stays under zero', () => {
+    expect(day32.gameOver).toBeNull();
     const charged = day32.ledger.filter((entry) => entry.category === 'overdraftInterest');
     expect(charged).toHaveLength(1);
     expect(charged[0]?.day).toBe(31);
@@ -334,6 +349,11 @@ describe('(w) a month with a production manager, a night joiner and five days aw
     // Re-measured again in Turn 20: the tier ladder moved up (a man with no experience is 0.8 of
     // the owner where he was 0.6, CLAUDE.md T20 2.5), so the day crew clear the book a day sooner
     // still and the night man has one night of work in him. Measured, not tuned.
+    // Turn 21 put that ladder back where it was: a man with no experience is 0.6 of the owner
+    // again, which is Piotr's own figure and not Claude's reading of it (PIOTR, 19.09;
+    // CLAUDE.md T21 2.9). The day crew are therefore a shade slower than the line above says, the
+    // night man has at least as much work in him as he did, and the assertion below, which asks
+    // only that the shift ran at all, is the one that was ever tested.
     expect(nights.length).toBeGreaterThanOrEqual(1);
     for (const day of nights) expect(day.nightMinutes).toBeLessThanOrEqual(SECOND_SHIFT_MINUTES);
     // The premium is for the shift, not for the minutes the rack let him work (nothing is free):

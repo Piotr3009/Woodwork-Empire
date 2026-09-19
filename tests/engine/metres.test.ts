@@ -88,7 +88,9 @@ describe('footprints in metres', () => {
     // What Turn 6 added, and the four families Piotr measured himself in metres tonight: the
     // cheapest class of each is what the catalogue line carries (CLAUDE.md T7 3.3, 3.6).
     const metres: Record<string, [number, number, number]> = {
-      toolCabinet: [1, 1, 1],
+      // Turn 21: two metres wide, because the picture the art side painted is a two metre cabinet
+      // and the spec follows the picture (PIOTR's art, 19.09; CLAUDE.md T21 2.13).
+      toolCabinet: [2, 1, 1],
       tableSaw: [2, 1, 1],
       workbench: [2, 1, 0.9],
       sheetRack: [2, 1, 1.5],
@@ -183,13 +185,16 @@ describe('the 200 square metre hall', () => {
     expect(lane).toBe(8);
     expect(state.unit.widthCells * state.unit.depthCells - rooms - lane).toBe(174);
     // And the same number counted cell by cell through the placement rule itself. The probe is a
-    // tool cabinet and no longer a canteen seat: from Turn 17 the seat and the locker are the two
-    // families that may stand inside the canteen, so they would count its eight cells as well
-    // (CLAUDE.md T17 2.2).
+    // compressor: it has to be a family that is one cell by one cell, so that the count is the
+    // floor's and not the probe's. It was a canteen seat until Turn 17, which made the seat and the
+    // locker the two families that may stand inside the canteen, so they count its eight cells as
+    // well (CLAUDE.md T17 2.2); it was a tool cabinet until Turn 21, which made the cabinet two
+    // metres wide, so it can no longer stand on the last column or the cell beside a room
+    // (CLAUDE.md T21 2.13).
     let free = 0;
     for (let y = 0; y < state.unit.depthCells; y += 1) {
       for (let x = 0; x < state.unit.widthCells; x += 1) {
-        if (canPlaceSpec(state, 'toolCabinet', x, y, null).ok) free += 1;
+        if (canPlaceSpec(state, 'compressor', x, y, null).ok) free += 1;
       }
     }
     expect(free).toBe(174);

@@ -70,7 +70,7 @@ function withRole(state: GameState, role: WorkerRole): void {
     role,
     tier: null,
     rate: 0,
-    weeklyWage: 465,
+    monthlyWage: 1900,
     leavesOnDay: null,
     startDay: 1,
     jobId: null,

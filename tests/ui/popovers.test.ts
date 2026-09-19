@@ -216,8 +216,8 @@ describe('the one cross in every popover (CLAUDE.md T20 2.15)', () => {
     const contract = state.contracts.find((entry) => entry.status === 'active');
     if (contract === undefined) throw new Error('a running contract is wanted');
     const drawn: Array<[string, string]> = [
-      ['assign-job', renderWorkPlan(state, 'jobs', null, job.id)],
-      ['assign-contract', renderWorkPlan(state, 'contracts', null, contract.id)],
+      ['assign-job', renderWorkPlan(state, 'jobs', job.id)],
+      ['assign-contract', renderWorkPlan(state, 'contracts', contract.id)],
       ['menu', renderMenu(state, { available: false, signedIn: null })],
     ];
     for (const [name, html] of drawn) {
@@ -345,6 +345,9 @@ describe('the game itself (CLAUDE.md T20 2.15)', () => {
       'assign list',
       'why',
       'day summary',
+      // The drop card shuts before the Work Plan it was opened over, because Escape means "not that"
+      // and the thing the player means is the question in front of him (CLAUDE.md T21 2.3).
+      'drop card',
       'modal',
       'menu',
     ]);
@@ -387,6 +390,28 @@ describe('the game itself (CLAUDE.md T20 2.15)', () => {
     expect(modalShown('accounting')).toBe(true);
     press('Escape');
     expect(modalShown('accounting')).toBe(false);
+  });
+
+  it('finds the drop card and shuts it before the Work Plan it was opened over', () => {
+    // The one action in the game that takes two clicks, so the card is a modal like any other: the
+    // one cross, Escape before the board under it, and a click outside (CLAUDE.md T21 2.3).
+    openWorkPlan();
+    const before = currentState()?.jobs.length ?? 0;
+    expect(before).toBeGreaterThan(0);
+    click('[data-do="dropJob"]');
+    expect(modalShown('dropJob')).toBe(true);
+    const card = root().querySelector('.modal-layer [data-modal="dropJob"]');
+    if (card !== null) expect(ownCrosses(card)).toHaveLength(1);
+    press('Escape');
+    expect(modalShown('dropJob')).toBe(false);
+    expect(modalShown('workPlan')).toBe(true);
+    // Escape is not a drop: the question is what closed, and the job is still on the books.
+    expect(currentState()?.jobs.length).toBe(before);
+    click('[data-do="dropJob"]');
+    clickOutside();
+    expect(modalShown('dropJob')).toBe(false);
+    expect(currentState()?.jobs.length).toBe(before);
+    press('Escape');
   });
 
   it('shuts the Menu last, after everything on the modal layer', () => {

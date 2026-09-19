@@ -34,7 +34,7 @@ function joiner(id: string, name: string): Worker {
     role: 'joiner',
     tier: 'novice',
     rate: WORKER_RATES.novice,
-    weeklyWage: 480,
+    monthlyWage: 1950,
     leavesOnDay: null,
     startDay: 1,
     jobId: null,
@@ -261,7 +261,7 @@ describe('the contract bar has left the Jobs tab (CLAUDE.md T20 2.1.5)', () => {
     const shut = parse(renderWorkPlan(state, 'contracts'));
     expect(shut.querySelector('.assign-list')).toBeNull();
     expect(shut.querySelector('.contract-bar')?.textContent).toContain('Nobody is on it');
-    const open = parse(renderWorkPlan(state, 'contracts', null, contract.id));
+    const open = parse(renderWorkPlan(state, 'contracts', contract.id));
     const list = open.querySelector(`.contract-bar[data-contract="${contract.id}"] .assign-list`);
     expect(list).not.toBeNull();
     expect(list?.getAttribute('data-popover')).toBe('assign-contract');

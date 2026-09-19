@@ -5,9 +5,18 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { advanceMinutes, currentState, mount } from '../../src/ui/app';
 import { renderAccounting } from '../../src/ui/accounting';
-import { daysOfMonth, formatCalendarDay, ledgerOfDay, summaryOfDay } from '../../src/engine/index';
+import {
+  daysOfMonth,
+  formatCalendarDay,
+  isLastWorkingDayOfMonth,
+  ledgerOfDay,
+  monthlyWageBill,
+  nextDueDays,
+  summaryOfDay,
+} from '../../src/engine/index';
+import { money } from '../../src/ui/modal';
 import type { GameState } from '../../src/engine/index';
-import { buyStartingKit, newGame, runDays } from '../helpers';
+import { buyStartingKit, hireNow, newGame, runDays } from '../helpers';
 
 function root(): HTMLElement {
   const element = document.querySelector('#app');
@@ -98,6 +107,36 @@ describe('the Days tab', () => {
     expect(parse(renderAccounting(state, '', 'days')).innerHTML).not.toContain(
       'Earned labour rate',
     );
+  });
+});
+
+describe('what is coming, on the Summary tab', () => {
+  /** Three days on the books and an office admin on them too, so the wages row has a figure. */
+  function withAdmin(): GameState {
+    const state = threeDays();
+    state.reputation = 20;
+    state.cash = 50000;
+    const next = hireNow(state, 'officeAdmin', null);
+    for (const worker of next.workers) worker.startDay = 1;
+    next.booksUpToDay = next.clock.day;
+    return next;
+  }
+
+  it('dates the wages by the last working day of the month and names no week', () => {
+    // One pay day a month for everybody, so the row the player reads is the month's bill against
+    // the month's own pay day, and the Friday the row used to be dated by is gone from the
+    // calendar with the weekly wage it paid (PIOTR, 19.09; CLAUDE.md T21 2.10).
+    const state = withAdmin();
+    const due = nextDueDays(state).wages;
+    expect(isLastWorkingDayOfMonth(due)).toBe(true);
+    const page = parse(renderAccounting(state, '', 'summary'));
+    const row = Array.from(page.querySelectorAll('.row')).find((entry) =>
+      (entry.querySelector('.row-main')?.textContent ?? '').startsWith('Wages,'),
+    );
+    expect(row?.querySelector('.row-main')?.textContent).toBe(`Wages, ${formatCalendarDay(due)}`);
+    expect(monthlyWageBill(state)).toBe(1900);
+    expect(row?.querySelector('.row-figure')?.textContent).toBe(money(monthlyWageBill(state)));
+    expect(page.textContent).not.toContain('a week');
   });
 });
 

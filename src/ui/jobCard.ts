@@ -31,7 +31,7 @@ import {
 // Straight off its own module, not round the public API, which Turn 13 froze (REPORT-T13 10).
 import { OWNER } from '../engine/machines';
 import { ROLE_WORDS } from './team';
-import { DROP_PROJECT_REPUTATION, TIER_WORDS } from '../engine/constants';
+import { TIER_WORDS } from '../engine/constants';
 import type { GameState, Job } from '../engine/index';
 import {
   button,
@@ -218,25 +218,15 @@ export function materialLine(state: GameState, job: Job): string {
   return figure + `<span class="row-action">${control}</span>`;
 }
 
-/** Dropping the project: the deposit goes back, the job goes off the plan and the company is ten
- *  points of reputation worse off, so it is meant on the second click and inside the card itself
- *  (PIOTR, 13.09; CLAUDE.md T9 3.9). */
-export function dropControl(job: Job, confirm: string | null): string {
+/** Dropping the project: one button, which opens the card that says what the drop costs. The card
+ *  is the second click and the only thing that drops anything, so this row carries no figures of its
+ *  own any more: it said the deposit and a flat ten points, and both were wrong for a big job
+ *  (PIOTR, 13.09 and 18.09; CLAUDE.md T9 3.9, T21 2.3, 2.4). */
+export function dropControl(job: Job): string {
   if (job.stage === 'completed' || job.stage === 'awaitingTransport') return '';
-  if (confirm !== job.id) {
-    return (
-      '<span class="row-action">' +
-      button('dropJob', 'Drop project', `data-id="${job.id}"`) +
-      '</span>'
-    );
-  }
   return (
-    '<span class="row-action drop-confirm">' +
-    `<span class="reason">${escapeHtml(
-      `${money(job.depositPaid)} back to the client, ${DROP_PROJECT_REPUTATION} off the ` +
-        'reputation.',
-    )}</span>` +
-    button('dropJob', 'Confirm drop', `data-id="${job.id}" data-confirm="1"`) +
+    '<span class="row-action">' +
+    button('dropJob', 'Drop project', `data-id="${job.id}"`) +
     '</span>'
   );
 }

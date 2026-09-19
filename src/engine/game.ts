@@ -138,7 +138,6 @@ import {
   machinesDueService,
   overdueBreakdownChance,
   repairCostFor,
-  releaseMachines,
   releaseMachinesExcept,
   repairMachine,
   requiresFor,
@@ -165,9 +164,6 @@ import {
   endOwnerTakeOver,
   deliverJob,
   findJob,
-  hallBlock,
-  jobProgress,
-  jobStage,
   oldestReadyJob,
   onDeliveryArrived,
   orderTransport,
@@ -191,7 +187,6 @@ import {
   buyStock,
   canUnload,
   deliveriesArrivingOn,
-  drawSheetsFor,
   fetchFromStorage,
   findDelivery,
   moveOverflowToStorage,
@@ -204,6 +199,7 @@ import {
 import {
   chargeOvertimeDebt,
   countOvertimeMinute,
+  emptyOwnerIdle,
   logDayMinute,
   managerOnDuty,
   nextDayLabourFactor,
@@ -218,7 +214,7 @@ import {
 } from './owner';
 import { paidHoursToday } from './rate';
 import { chance, int, makeId } from './rng';
-import { type StagePlan, cncOptions, labourPerMinute, tradeFactor } from './stages';
+import { type StagePlan, labourPerMinute, tradeFactor } from './stages';
 import {
   airFactorFor,
   benchDrawsAir,
@@ -233,9 +229,9 @@ import { STATION_IDLE, STATION_NO_BENCH, stationForTask, storageSaleBlock } from
 import {
   type Hand,
   jobOf,
+  placeHand,
   releaseIdleMachines,
   stationForProduction,
-  takeMachines,
 } from './production';
 import {
   autoAssignJobs,
@@ -362,6 +358,8 @@ export function createGame(options: NewGameOptions): GameState {
       minutesByCategory: { admin: 0, design: 0, workshop: 0 },
       dayLog: [],
       minutesWorked: 0,
+      idleMinutes: 0,
+      idleByReason: emptyOwnerIdle(),
       overtimeMinutes: 0,
       labourFactor: 1,
       overtimeDebt: 0,
@@ -401,6 +399,7 @@ export function createGame(options: NewGameOptions): GameState {
     deliveries: [],
     finance: {
       overdraftLimit: spec.overdraftLimit,
+      daysBelowOverdraft: 0,
       loan: null,
       overdraftInterestAccrued: 0,
       arrearsAmount: 0,
@@ -497,6 +496,10 @@ function startDay(state: GameState): void {
   // A new day is a blank bar: what he did yesterday is on yesterday's log (CLAUDE.md T11 3.1).
   owner.dayLog = [];
   owner.minutesWorked = 0;
+  // And a blank grey segment with it: the minutes he stood are today's minutes and no other day's
+  // (CLAUDE.md T21 2.8).
+  owner.idleMinutes = 0;
+  owner.idleByReason = emptyOwnerIdle();
   owner.wentHome = false;
   owner.currentTaskId = null;
   owner.resumeTaskId = null;
@@ -1487,24 +1490,6 @@ function runWorkerTaskMinute(state: GameState, workerId: string, taskId: string)
   return true;
 }
 
-/** The rack has to hand over what the next slice of work needs, or the job stands still and the
- *  joiners stand around (CLAUDE.md T2 3.6). */
-function materialReady(state: GameState, job: Job): boolean {
-  const ok = drawSheetsFor(state, job, jobProgress(job));
-  if (!ok) {
-    job.blockedBy = 'waiting for material';
-    raiseNoMaterial(state);
-  }
-  return ok;
-}
-
-/** True when the job can be worked on this minute. Writes down why it cannot, either way. */
-function canWorkOn(state: GameState, job: Job): boolean {
-  const block = hallBlock(state, job);
-  job.blockedBy = block;
-  if (block !== '') return false;
-  return materialReady(state, job);
-}
 
 function raiseNoMaterial(state: GameState): void {
   if (state.dayStats.noMaterialWarned) return;
@@ -1568,10 +1553,6 @@ function handsAtWork(state: GameState, ownerOnTask: boolean, moving: boolean): H
   return list;
 }
 
-/** What the hall says a man is waiting for, in the words the job card and the Work Plan use. */
-function waitingLine(specId: string): string {
-  return `waiting for ${(findSpec(specId)?.name ?? specId).toLowerCase()}`;
-}
 
 /** One man putting one minute into one job, with the machine he got for it. Gathered before the
  *  hall is measured, because the extraction and the air sums are the sums of the machines running
@@ -1637,21 +1618,14 @@ function runProductionMinute(state: GameState, ownerOnTask: boolean): void {
     lost[cause] = (lost[cause] ?? 0) + minutes;
   };
   for (const hand of working) {
-    if (!canWorkOn(state, hand.job)) {
-      releaseMachines(state, hand.who);
-      lose(hand.job.blockedBy === 'waiting for material' ? 'noMaterial' : 'noMachine');
-      continue;
-    }
-    const stage = jobStage(state, hand.job, cncOptions(state, hand.who, hand.job));
-    if (stage === null) continue;
-    const at = takeMachines(state, hand);
-    if (at.waitingFor !== null) {
-      // He stands at the machine until the man on it is done with it (CLAUDE.md T7 3.1).
-      hand.job.blockedBy = waitingLine(at.waitingFor);
-      lose('noMachine');
-      continue;
-    }
-    atWork.push({ hand, stage, machine: at.machine });
+    // One reading of a man's minute, the scheduler of CLAUDE.md T21 2.7 inside it: he is moved off a
+    // queue he is standing in if there is anything else for him to do, and only then does he stand.
+    // The night shift runs the same function through `workMinute` (CLAUDE.md T21 2.7).
+    const place = placeHand(state, hand);
+    if (place.noMaterial) raiseNoMaterial(state);
+    if (place.lost !== null) lose(place.lost);
+    if (place.work === null) continue;
+    atWork.push({ hand, stage: place.work.stage, machine: place.work.machine });
   }
   // The men on a standing contract put their minute in beside the jobs (CLAUDE.md T13 3.16).
   const contract = runContractMinute(state);

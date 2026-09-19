@@ -65,6 +65,25 @@ export function stageLabel(id: StageId): string {
   return PRODUCTION_STAGES.find((stage) => stage.id === id)?.label ?? id;
 }
 
+/** What a man says he is doing at this stage, in the trade's own word: "cutting Small kitchen",
+ *  "assembling", "spraying" (PIOTR's drawing, 19.09, docs/mockups/t21/bubbles.html;
+ *  CLAUDE.md T21 2.6). The bubble over his head is the only thing that reads it; the stage's own
+ *  label ("Cutting", "Assembly") is what every list and every bar prints and that is untouched.
+ *
+ *  [TUNE: the words themselves.] `stageLabel` above is the stage as a thing and this is the stage
+ *  as an act, which in English is not the same word: nobody stands at a bench "assembly". The
+ *  finishing stage is the one that needs the job as well as the stage, because the drawing's
+ *  "spraying" is true of a lacquered job and of no other: everything else is sanded and waxed or
+ *  oiled by hand, which is the same division the hall's own sound already makes
+ *  (`hallLoops`, lacquer to the booth and the rest to the sander). */
+export function stageDoing(id: StageId, lacquer: boolean): string {
+  if (id === 'cutting' || id === CNC_STAGE.id) return 'cutting';
+  if (id === 'machining') return 'machining';
+  if (id === 'assembly') return 'assembling';
+  if (id === 'finishing') return lacquer ? 'spraying' : 'sanding';
+  return stageLabel(id).toLowerCase();
+}
+
 /** How this job is to be made this minute. The CNC is the one thing that changes the shape of a
  *  job's stages, so it is the one option there is (CLAUDE.md T7 3.4). */
 export interface StageOptions {

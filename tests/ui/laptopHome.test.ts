@@ -331,8 +331,14 @@ describe('no handwriting inside the screen', () => {
       if (head !== null) expect(fontFamilyOf(head), page).toBe(system);
     }
     expect(headings).toBeGreaterThan(6);
-    // And the stylesheet gives the screen no cream, no folder picture and no title font.
-    const screen = CSS.slice(CSS.indexOf('.modal-screen {'));
+    // And the stylesheet gives the screen no cream, no folder picture and no title font. The slice is
+    // the screen's own run of rules, which ends at the next section divider: it used to run to the end
+    // of the file, and Turn 21 put the hall's speech bubbles after it, which wear the title hand
+    // because they are paper in the hall and not anything inside the bezel (CLAUDE.md T21 2.6).
+    const from = CSS.indexOf('.modal-screen {');
+    const lastScreenRule = CSS.lastIndexOf('.modal-screen ');
+    const divider = CSS.indexOf('/* ---', lastScreenRule);
+    const screen = CSS.slice(from, divider > from ? divider : CSS.length);
     expect(screen).not.toContain('--font-title');
     expect(screen).not.toContain('ui.folder.png');
     expect(screen).not.toContain('#f5efe2');

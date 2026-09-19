@@ -1,9 +1,16 @@
-// The doors, as Airline Tycoon does them (PIOTR, 18.09; CLAUDE.md T20 2.12).
+// The doors, as Airline Tycoon does them (PIOTR, 18.09; CLAUDE.md T20 2.12, T21 2.11, 2.12).
 //
 // The swing of Turn 19 is gone, and the two open frames with it: a door is drawn closed, always.
-// What a door does now is take a man through it. When a figure's leg ends on a doorway cell he is
-// off the hall's drawing until he comes out again, so nobody is ever seen standing in a doorway;
-// the hall asks this file which of its figures have gone through before it draws them.
+// What a door does now is take a man through it. When a figure's leg ends in the doorway of the room
+// his station is in he is off the hall's drawing until he comes out again, so nobody is ever seen
+// standing in a doorway; the hall asks this file which of its figures have gone through before it
+// draws them.
+//
+// From Turn 21 that is everybody and not the owner alone: an estimator at a take off, an admin at
+// the emails, a clerk at his orders and a draftsman at his drawings all go through the office door,
+// and at the dinner hour the whole hall goes through the canteen's (CLAUDE.md T21 2.11, 2.12). What
+// decides is the station and not the man, which is `roomBehindStation` in `src/engine/stations.ts`:
+// the question was never really who he is but where he has gone.
 //
 // This file is the door's own bookkeeping and nothing else: who is through one this frame, and how
 // many men have gone in or come out since the ui layer last asked. The knock itself belongs to the
@@ -14,7 +21,7 @@
 // `stepDoors`, are where they always were: the first when a view is built from nothing, the second
 // after the page has been written again, the third on the frame beat.
 
-import { isDoorwayCell } from '../engine/stations';
+import { isBehindTheDoor } from '../engine/stations';
 import { walkerIsThroughADoor, walkerKeys, walkerOf } from './walkers';
 
 export interface Cell {
@@ -34,27 +41,19 @@ export function resetDoors(): void {
   goings = 0;
 }
 
-/** Which figures go through a door, and which stand at it (CLAUDE.md T20 2.12). The office is the
- *  one room the game draws behind a door, and its view draws the owner alone (T19 2.2: one box,
- *  measured for him, `OFFICE_OWNER_BOX`). So the owner is the one man who leaves the hall's drawing
- *  at the doorway. An estimator on a take off, an admin on the books, a draftsman on a drawing or a
- *  salesman on the phone is a desk job too (`stationForTask`), and he stands in the doorway as he
- *  did in Turn 19: a man who is on neither picture is a man the player has lost. The crew's own
- *  places in the office are a drawing nobody has made, and nothing visual is built without a
- *  mockup (PIOTR, 18.09). The day that mockup lands, this predicate is the one line that widens. */
-export function figureGoesThroughDoors(key: string): boolean {
-  return key === 'owner';
-}
-
 /** True while this figure has gone through a door: the engine has him behind one, and his legs
- *  have got him there. Both halves matter. The cell is what the engine says this minute, so the
- *  moment it sends him somewhere else he is drawn again and walks out of the door; the walker is
- *  what says his leg is over, so the walk to the door is seen and only the doorway itself is never
- *  stood in. A figure the walker has never heard of is where the page says he is, which is what a
- *  page built from nothing, and every render test, reads. */
-export function figureIsThroughADoor(key: string, cell: Cell): boolean {
-  if (!figureGoesThroughDoors(key)) return false;
-  if (!isDoorwayCell(cell)) return false;
+ *  have got him there. Both halves matter. The station and the cell are what the engine says this
+ *  minute, so the moment it sends him somewhere else he is drawn again and walks out of the door; the
+ *  walker is what says his leg is over, so the walk to the door is seen and only the doorway itself is
+ *  never stood in. A figure the walker has never heard of is where the page says he is, which is what
+ *  a page built from nothing, and every render test, reads.
+ *
+ *  Turn 20's `figureGoesThroughDoors(key)`, which was `key === 'owner'`, is gone: every key goes
+ *  through a door now, and which door is the station's question (CLAUDE.md T21 2.11). The office view
+ *  still draws the owner alone at his desk (T19 2.2, `OFFICE_OWNER_BOX`), and what tells the player
+ *  where the rest of them are is the bubble at the door (CLAUDE.md T21 2.6). */
+export function figureIsThroughADoor(key: string, cell: Cell, station: string): boolean {
+  if (!isBehindTheDoor(station, cell)) return false;
   const walker = walkerOf(key);
   if (walker === undefined) return true;
   return walkerIsThroughADoor(walker);
@@ -70,7 +69,6 @@ export function figuresThroughDoors(): string[] {
 function readDoors(): void {
   const now = new Set<string>();
   for (const key of walkerKeys()) {
-    if (!figureGoesThroughDoors(key)) continue;
     const walker = walkerOf(key);
     if (walker === undefined) continue;
     if (walkerIsThroughADoor(walker)) now.add(key);

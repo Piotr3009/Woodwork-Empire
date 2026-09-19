@@ -73,7 +73,7 @@ describe('the figure of a man at work', () => {
     if (!joiner) throw new Error('no joiner');
     expect(joiner.station).toBe(waitingStation('tableSaw'));
     const svg = renderHall(state);
-    expect(svg).toContain('waiting for table saw');
+    expect(svg).toContain('waiting for the saw');
     // He waits beside the man who has it rather than on top of him.
     const working = stationCell(state, machineStation('tableSaw'), { x: 0, y: 0 });
     const waiting = stationCell(state, waitingStation('tableSaw'), { x: 0, y: 0 });

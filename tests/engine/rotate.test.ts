@@ -49,13 +49,16 @@ describe('what turning does to the floor', () => {
 describe('where a turned machine will go', () => {
   it('wants a free 1 by 3 of hall where the saw wanted a 3 by 1', () => {
     const state = emptyHall();
-    // A wall of cabinets with a gap three deep and one wide in it: nothing but a turned saw fits.
+    // A wall with a gap three deep and one wide in it: nothing but a turned saw fits. The wall is
+    // built of compressors and no longer of tool cabinets, because a cabinet is two cells wide from
+    // Turn 21 and a wall of them leaves gaps of its own that a square saw would fit
+    // (CLAUDE.md T21 2.13).
     for (let y = 0; y < 10; y += 1) {
       for (let x = 0; x < 20; x += 1) {
         const inGap = x >= 8 && x < 11 && y >= 2 && y < 6;
         if (inGap) continue;
-        if (!canPlaceSpec(state, 'toolCabinet', x, y, null).ok) continue;
-        placeEquipment(state, 'toolCabinet', { x, y, id: `cab-${x}-${y}` });
+        if (!canPlaceSpec(state, 'compressor', x, y, null).ok) continue;
+        placeEquipment(state, 'compressor', { x, y, id: `cab-${x}-${y}` });
       }
     }
     // Square to the walls the saw wants 4 by 3 and there is no 4 anywhere.
@@ -159,10 +162,20 @@ describe('what turning does to the picture', () => {
     expect(art).not.toContain('scale(-1, 1)');
   });
 
-  it('has no second orientation delivered yet, for any class the game draws', () => {
-    // The art side's `.r` files are parked (CLAUDE.md T10 6.2): the hall mirrors until they land,
-    // and the day one does the loader takes it with no code change at all.
+  it('takes the one second orientation the art side has delivered, and mirrors the rest', () => {
+    // The art side's `.r` files were parked (CLAUDE.md T10 6.2): the hall mirrored until one
+    // landed, and the day one did the loader was to take it with no code change at all. Piotr
+    // delivered `toolCabinet.standard.r.png` between Turn 20 and Turn 21, and that is what this
+    // reads: the cabinet turned is drawn from its own file and not mirrored, and every other
+    // class the game draws still mirrors.
+    const turned = spriteFiles().filter((name) => name.endsWith('.r.png'));
+    expect(turned).toEqual(['toolCabinet.standard.r.png']);
+    expect(mirrorNeeded(spriteFiles(), 'toolCabinet', 'standard', true)).toBe(false);
+    expect(pickSprite(spriteFiles(), 'toolCabinet', 'standard', true)).toBe(
+      '/sprites/toolCabinet.standard.r.png',
+    );
+    // The saw has no second orientation, so it is mirrored as it always was.
+    expect(mirrorNeeded(spriteFiles(), 'tableSaw', 'standard', true)).toBe(true);
     expect(mirrorNeeded([], 'tableSaw', 'standard', true)).toBe(true);
-    expect(spriteFiles().some((name) => name.endsWith('.r.png'))).toBe(false);
   });
 });

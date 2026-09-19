@@ -148,7 +148,7 @@ describe('the day puts its two questions and the top bar shows what they cost', 
     // And the hour he worked through is an hour more on the bar.
     state.owner.breakSkipped = true;
     expect(renderTopbar(state, 'hall')).toContain(
-      `0 / ${MINUTES_PER_WORKING_DAY + BREAK_MINUTES} min`,
+      `0 worked \u00b7 0 idle \u00b7 ${MINUTES_PER_WORKING_DAY + BREAK_MINUTES}`,
     );
   });
 });
@@ -162,7 +162,7 @@ describe('the helper has his dinner too', () => {
       role: 'helper',
       tier: null,
       rate: 0,
-      weeklyWage: 420,
+      monthlyWage: 1800,
       leavesOnDay: null,
       startDay: 1,
       jobId: null,

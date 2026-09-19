@@ -17,6 +17,11 @@ import {
   DEADLINE_SMALL_SLACK_DAYS,
   DEPOSIT_FRACTION,
   DROP_PROJECT_REPUTATION,
+  MACHINE_SHORT_WORDS,
+  DROP_REPUTATION_COMMERCIAL_FACTOR,
+  DROP_REPUTATION_FREE_PRICE,
+  DROP_REPUTATION_MAX,
+  DROP_REPUTATION_PER_1000,
   EMAIL_PAYMENT_PENALTY,
   EMAIL_PAYMENT_PENALTY_MAX,
   LABOUR_FRACTION,
@@ -40,12 +45,16 @@ import {
 import { chargeUnavoidable, formatMoney, noteLoss, receive } from './economy';
 import { queueEvent } from './events';
 import {
+  BENCH,
   OWNER,
   familyStopped,
   findSpec,
+  freeMachines,
   has,
   hasBenchFor,
   hasExtraction,
+  heldMachine,
+  machineIsShared,
   releaseMachines,
 } from './machines';
 import {
@@ -80,10 +89,12 @@ import {
   designMinutes,
   emailMinutes,
   emailsForPrice,
+  firstOnDutyOf,
   jobTasks,
   takeOffMinutes,
 } from './tasks';
 import type {
+  EnquiryKind,
   Finish,
   GameState,
   Job,
@@ -207,9 +218,10 @@ export function deadlineDaysFor(
   return deadlineDaysFrom(drawDeadline(state), job);
 }
 
-/** What a worker of this rate is worth per minute, for the job card only [TUNE]. */
-export function workerMinuteCost(weeklyWage: number): number {
-  return weeklyWage / WORKER_MINUTE_RATE_DIVISOR;
+/** What a worker of this rate is worth per minute, for the job card only [TUNE]. His monthly wage
+ *  over the working minutes of a month (CLAUDE.md T21 2.10). */
+export function workerMinuteCost(monthlyWage: number): number {
+  return monthlyWage / WORKER_MINUTE_RATE_DIVISOR;
 }
 
 /** The men standing at this job, in the order they were put on it. There is no limit on how many
@@ -267,9 +279,9 @@ export function jobLabourCost(state: GameState, job: Job): { minutes: number; co
   for (const who of jobMen(job)) {
     const worker = state.workers.find((entry) => entry.id === who);
     if (!worker || worker.rate <= 0) continue;
-    // Everybody is paid by the week from tonight, the sprayer with the rest of them, so there is
-    // one wage to read and no monthly one behind it (CLAUDE.md T20 2.6).
-    perMinute += workerMinuteCost(worker.weeklyWage);
+    // Everybody is paid by the month, the sprayer with the rest of them, so there is one wage to
+    // read and no weekly one behind it (CLAUDE.md T21 2.10).
+    perMinute += workerMinuteCost(worker.monthlyWage);
   }
   return { minutes, cost: minutes * perMinute };
 }
@@ -288,6 +300,27 @@ export function jobStage(
   options: StageOptions = {},
 ): StagePlan | null {
   return currentStage(state, job, options);
+}
+
+/** True when this job could take a minute from this man right now: it is in production, the hall is
+ *  not stopping it, the rack can hand over what its next slice of work needs, and the stage it is at
+ *  wants no machine or one the hall has free (CLAUDE.md T21 2.7).
+ *
+ *  It is the question `canWorkOn` and `takeMachines` answer between them for the man who is already
+ *  on the job, asked without the answering: `canWorkOn` draws the sheets off the rack and
+ *  `takeMachines` claims the machine, and neither may happen for a job the man may not end up at.
+ *  Nothing here is claimed and nothing is written down, so the scheduler can ask it of every job in
+ *  the hall before it moves anybody. */
+export function jobHasWorkFor(state: GameState, job: Job, who: string): boolean {
+  if (job.stage !== 'inProduction') return false;
+  if (hallBlock(state, job) !== '') return false;
+  if (!rackCanSupply(state, job, jobProgress(job))) return false;
+  const stage = currentStage(state, job, cncOptions(state, who, job));
+  const family = stage?.family ?? null;
+  if (family === null || family === BENCH) return true;
+  // By hand, or a tool out of a cabinet: there is no queue for either (CLAUDE.md T7 3.1, 3.6).
+  if (!has(state, family) || machineIsShared(state, family)) return true;
+  return heldMachine(state, who, family) !== null || freeMachines(state, family).length > 0;
 }
 
 /** The player's say over whether this job waits for the CNC or goes on the saw when the CNC is
@@ -571,6 +604,40 @@ export function refreshJob(state: GameState, job: Job): void {
   }
   const coming = state.deliveries.some((delivery) => delivery.jobId === job.id && !delivery.unloaded);
   job.stage = coming ? 'materialOrdered' : 'materialPending';
+  // The drawings are done and the job is short of sheets: the office orders them itself
+  // (CLAUDE.md T21 2.5.2).
+  if (job.stage === 'materialPending') autoOrderMaterial(state, job);
+}
+
+/** Who places a job's material order when nobody asks him to, in the order he is asked: the
+ *  purchasing clerk, whose job it is; the estimator, who read the drawing and counted the sheets;
+ *  and the office admin, who covers for a specialist the company has not taken on, which is the
+ *  order every other job of office work is handed out in (CLAUDE.md T7 3.12, T21 2.5.2). */
+export const MATERIAL_ORDER_ROLES: ReadonlyArray<WorkerRole> = [
+  'purchasingClerk',
+  'estimator',
+  'officeAdmin',
+];
+
+/** The material is ordered the moment the drawings are done, by whoever in the office is there to
+ *  order it, and not when the owner next has time to open the job's card (PIOTR, 19.09: "they wait
+ *  until I have time; stupid"; CLAUDE.md T21 2.5.2).
+ *
+ *  It is the same order the player's own button places, at the same ad hoc price, through the same
+ *  `orderForJob`: the only difference is the name in the ledger line. `orderForJob` asks the
+ *  engine's own `canAfford`, which is the overdraft floor to the penny, so the office never takes
+ *  the company past the limit the bank allows; it simply has nothing to order with until the money
+ *  is there, and orders the minute it is. With none of the three on the books nothing happens here
+ *  and the job's card asks the owner exactly as it always did. */
+export function autoOrderMaterial(state: GameState, job: Job): boolean {
+  if (takeOffOutstanding(state, job)) return false;
+  if (shortfallOf(job) <= 0) return false;
+  if (!orderForJobCheck(state, job).ok) return false;
+  const clerk = firstOnDutyOf(state, MATERIAL_ORDER_ROLES);
+  if (clerk === null) return false;
+  if (orderForJob(state, job, clerk.name) === null) return false;
+  job.stage = 'materialOrdered';
+  return true;
 }
 
 /** The site measure costs a taxi while there is no van (CLAUDE.md 8.10). */
@@ -631,10 +698,25 @@ export function refreshMaterial(state: GameState): void {
   }
 }
 
+/** What dropping this job costs the company in reputation: ten points, and a point for every
+ *  thousand pounds of its price above five thousand, capped at fifty; a commercial client's job
+ *  costs half again on top of that, still capped at the fifty (PIOTR, 19.09: "up to 50 max";
+ *  CLAUDE.md T21 2.4).
+ *
+ *  A 3,000 job costs 10, a 10,000 one 15, a 20,000 one 25, and 50,000 or anything above it costs
+ *  the whole 50. The one function: the drop itself and the card that warns about it before the
+ *  click both read this, so the figure the player is shown is the figure he is charged. */
+export function dropReputationCost(job: { price: number; kind: EnquiryKind }): number {
+  const over = Math.max(0, job.price - DROP_REPUTATION_FREE_PRICE);
+  const scaled = DROP_PROJECT_REPUTATION + (over / 1000) * DROP_REPUTATION_PER_1000;
+  const trade = job.kind === 'commercial' ? scaled * DROP_REPUTATION_COMMERCIAL_FACTOR : scaled;
+  return Math.min(DROP_REPUTATION_MAX, Math.round(trade));
+}
+
 /** Drops the project. The client has his deposit back, the job is off the plan, the material it
  *  drew from the rack goes back on it and the material that was ordered in for it is written off,
- *  and the company loses ten points of reputation at once (PIOTR, 13.09: "drastically";
- *  CLAUDE.md T9 3.9). */
+ *  and the company loses what `dropReputationCost` says at once (PIOTR, 13.09: "drastically";
+ *  CLAUDE.md T9 3.9, T21 2.4). */
 export function dropJob(state: GameState, jobId: string): boolean {
   const job = findJob(state, jobId);
   if (!job) return false;
@@ -672,7 +754,7 @@ export function dropJob(state: GameState, jobId: string): boolean {
     if (worker.jobId === job.id) worker.jobId = null;
   }
   state.jobs = state.jobs.filter((entry) => entry.id !== job.id);
-  changeReputation(state, -DROP_PROJECT_REPUTATION, `Dropped: ${job.name}`);
+  changeReputation(state, -dropReputationCost(job), `Dropped: ${job.name}`);
   return true;
 }
 
@@ -684,12 +766,23 @@ export function dropJob(state: GameState, jobId: string): boolean {
  *  it stands and waits for the lorry rather than falling back to a pair of hands, and says which
  *  day the lorry is (CLAUDE.md T10 1, 3.10). The board's lock is the one question on-order kit
  *  may answer, and it asked it days ago, when the job was taken. */
+/** "waiting for the table saw": the one phrase the game says about a job or a man standing at a
+ *  machine he cannot have. The article is the drawing's (docs/mockups/t21/bubbles.html says
+ *  "waiting for the saw") and the name is the machine's own, lowercased, so there is no second table
+ *  of machine words [TUNE: the drawing's short word for a family, "the saw" for a table saw, would be
+ *  such a table, and it is written out for the lead in docs/notes-t21-b2.md]. It lives here because
+ *  the two things that say it, the hall's own block and the queue at a machine, are read from here
+ *  and from `src/engine/production.ts` (CLAUDE.md T21 2.7). */
+export function waitingLine(specId: string): string {
+  const name = MACHINE_SHORT_WORDS[specId] ?? (findSpec(specId)?.name ?? specId).toLowerCase();
+  return `waiting for the ${name}`;
+}
+
 function onOrderBlock(state: GameState, family: string): string {
   if (has(state, family)) return '';
   const coming = firstOnOrder(state, family);
   if (coming === null) return '';
-  const name = (findSpec(family)?.name ?? family).toLowerCase();
-  return `waiting for ${name} (on order, due ${formatCalendarDay(coming.dueDay)})`;
+  return `${waitingLine(family)} (on order, due ${formatCalendarDay(coming.dueDay)})`;
 }
 
 /** Everything in the hall that can stop a job, in the order the player would notice it. Empty

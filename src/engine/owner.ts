@@ -28,7 +28,7 @@ import {
 } from './clock';
 import { queueEvent } from './events';
 import { int } from './rng';
-import type { DayCategory, DayLogEntry, GameState, Job } from './types';
+import type { DayCategory, DayLogEntry, GameState, Job, OwnerIdleReason } from './types';
 
 /** Round to four places, which is where every factor in the engine stops. */
 function round4(value: number): number {
@@ -207,6 +207,22 @@ export function logDayMinute(log: DayLogEntry[], category: DayCategory): void {
     return;
   }
   log.push({ category, minutes: 1 });
+}
+
+/** An owner's idle minute store with nothing in it. The morning empties it and the state factory
+ *  starts from it (CLAUDE.md T21 2.8). */
+export function emptyOwnerIdle(): Record<OwnerIdleReason, number> {
+  return { noMachine: 0, noMaterial: 0, nothingAssigned: 0, officeEmpty: 0 };
+}
+
+/** Books one clock minute the owner stood still, and why. The day meter's grey segment is the sum
+ *  of these and its hover is the four reasons one by one. A minute is either worked or stood, never
+ *  both: `spendOwnerMinute` is the other half of this pair (PIOTR, 19.09: "my time runs two to
+ *  three times slower than the clock"; CLAUDE.md T21 2.8). */
+export function spendOwnerIdleMinute(state: GameState, reason: OwnerIdleReason): void {
+  const owner = state.owner;
+  owner.idleMinutes += 1;
+  owner.idleByReason[reason] += 1;
 }
 
 /** Books one worked clock minute against the pool, and onto the day the top bar draws. The three

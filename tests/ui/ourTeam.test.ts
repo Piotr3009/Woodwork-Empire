@@ -5,7 +5,7 @@
 // and what he is doing this minute.
 
 import { describe, expect, it } from 'vitest';
-import { WEEKS_PER_MONTH, WORKING_DAYS_PER_MONTH } from '../../src/engine/constants';
+import { WORKING_DAYS_PER_MONTH } from '../../src/engine/constants';
 import { formatCalendarDay, ownerDrawPerDay } from '../../src/engine/index';
 import { monthlyWageOf } from '../../src/engine/staff';
 import { renderTeam } from '../../src/ui/team';
@@ -63,8 +63,10 @@ describe('Our team', () => {
     // The words of a tier come off TIER_WORDS now, and nobody is poor (CLAUDE.md T20 2.5).
     expect(row?.textContent).toContain('joiner, no experience');
     expect(row?.textContent).toContain(`started ${formatCalendarDay(man.startDay)}`);
-    // A week is 30 over 7 of a month: 450 a week is 1,929 a month.
-    expect(monthlyWageOf(man)).toBe(Math.round(man.weeklyWage * WEEKS_PER_MONTH * 100) / 100);
+    // What a month of him costs is what he is paid: a joiner with no experience is on 1,950 and
+    // there is no week behind it any more (CLAUDE.md T21 2.10).
+    expect(monthlyWageOf(man)).toBe(man.monthlyWage);
+    expect(man.monthlyWage).toBe(1950);
     expect(row?.textContent).toContain(money(monthlyWageOf(man)));
     expect(row?.textContent).toContain('0 days off');
     // He does not start until the next working day, so that is what the row says of him.
@@ -80,7 +82,7 @@ describe('Our team', () => {
     expect(first?.textContent).toContain(`${hours} h this month`);
   });
 
-  it('lists the sprayer with his trade and the week he is paid by (CLAUDE.md T20 2.6)', () => {
+  it('lists the sprayer with his trade and the month he is paid by (CLAUDE.md T21 2.10)', () => {
     const ready = withAJoiner();
     // An experienced sprayer answers from the middle of the ladder, and a month of his pay has to
     // be in the bank before anybody is taken on (CLAUDE.md T17 2.11).
@@ -92,9 +94,9 @@ describe('Our team', () => {
     const row = rows(state).find((entry) => entry.getAttribute('data-team') === man.id);
     expect(row?.textContent).toContain(man.name);
     expect(row?.textContent).toContain('sprayer, experienced');
-    // He is paid by the week like everybody else from tonight (CLAUDE.md T20 2.6), and the row
-    // prints what a month of him costs.
-    expect(man.weeklyWage).toBeGreaterThan(0);
+    // He is paid by the month like everybody else (CLAUDE.md T21 2.10), and the row prints that
+    // one figure.
+    expect(man.monthlyWage).toBeGreaterThan(0);
     expect(row?.textContent).toContain(money(monthlyWageOf(man)));
   });
 

@@ -244,7 +244,7 @@ describe('a day off with nobody in the hall', () => {
       role: 'joiner',
       tier: 'novice',
       rate: 0.6,
-      weeklyWage: 480,
+      monthlyWage: 1950,
       leavesOnDay: null,
       startDay: 1,
       jobId: null,

@@ -11,10 +11,10 @@ import {
   DUST_MAX,
   NIGHT_ERROR_FACTOR,
   NIGHT_RATE,
-  PRODUCTION_MANAGER_WEEKLY_WAGE,
+  PRODUCTION_MANAGER_MONTHLY_WAGE,
   SECOND_SHIFT_MINUTES,
   STAFF_MANAGEMENT_MINUTES_PER_JOINER,
-  WORKER_HOURS_PER_WEEK,
+  WORKER_HOURS_PER_MONTH,
   WORKER_RATES,
 } from '../../src/engine/constants';
 import {
@@ -51,7 +51,7 @@ function manager(id = 'pm-1'): Worker {
     role: 'productionManager',
     tier: null,
     rate: 0,
-    weeklyWage: PRODUCTION_MANAGER_WEEKLY_WAGE,
+    monthlyWage: PRODUCTION_MANAGER_MONTHLY_WAGE,
     leavesOnDay: null,
     startDay: 1,
     jobId: null,
@@ -184,16 +184,17 @@ describe('the second shift', () => {
     expect(state.dayStats.nightMinutes).toBe(
       jobs.reduce((sum, job) => sum + (job?.nightMinutes ?? 0), 0),
     );
-    // A poor joiner's week is 480 over forty hours: 12 an hour, eight hours, the quarter on top.
+    // A joiner with no experience is on 1,950 a month, and a month of him is 171.43 hours: 11.375
+    // an hour, eight hours of night, the quarter on top, which is 22.75 (CLAUDE.md T21 2.10).
     expect(nightPremiumFor(workerOf(state, 'staff-5'))).toBe(
-      (480 / WORKER_HOURS_PER_WEEK) * (SECOND_SHIFT_MINUTES / 60) * (NIGHT_RATE - 1),
+      (1950 / WORKER_HOURS_PER_MONTH) * (SECOND_SHIFT_MINUTES / 60) * (NIGHT_RATE - 1),
     );
-    expect(nightPremiumFor(workerOf(state, 'staff-5'))).toBe(24);
-    expect(report.premium).toBe(48);
-    expect(cash - state.cash).toBe(48);
+    expect(nightPremiumFor(workerOf(state, 'staff-5'))).toBe(22.75);
+    expect(report.premium).toBe(45.5);
+    expect(cash - state.cash).toBe(45.5);
     const line = state.ledger[state.ledger.length - 1];
     expect(line?.category).toBe('wagesNight');
-    expect(line?.amount).toBe(-48);
+    expect(line?.amount).toBe(-45.5);
     // Nobody stands at a machine overnight.
     expect(state.equipment.every((item) => item.takenBy === null)).toBe(true);
   });

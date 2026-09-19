@@ -4,7 +4,7 @@
 // meter with the assigning on it.
 
 import { describe, expect, it } from 'vitest';
-import { HOLIDAY_OPTIONS_DAYS, PRODUCTION_MANAGER_WEEKLY_WAGE } from '../../src/engine/constants';
+import { HOLIDAY_OPTIONS_DAYS, PRODUCTION_MANAGER_MONTHLY_WAGE } from '../../src/engine/constants';
 import { renderTeam } from '../../src/ui/team';
 import type { GameState, Worker } from '../../src/engine/index';
 import { act, newGame, sixJoinersOnSheetWork } from '../helpers';
@@ -30,7 +30,7 @@ function manager(id = 'pm-1'): Worker {
     role: 'productionManager',
     tier: null,
     rate: 0,
-    weeklyWage: PRODUCTION_MANAGER_WEEKLY_WAGE,
+    monthlyWage: PRODUCTION_MANAGER_MONTHLY_WAGE,
     leavesOnDay: null,
     startDay: 1,
     jobId: null,

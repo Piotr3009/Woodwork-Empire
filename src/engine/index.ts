@@ -66,6 +66,12 @@ export {
   CONSUMABLES_LABEL,
   EFFICIENCY_CAUSES,
   HOUSE_CARD_SECONDS,
+  // Turn 21 (CLAUDE.md T21 2.6, 2.8): the words the bubbles say and the reasons the owner stood.
+  BUBBLES,
+  BUBBLE_HEAD_GAP,
+  BUBBLE_WORK_MAX_SPEED,
+  BUBBLE_WORK_SECONDS,
+  OWNER_IDLE_REASONS,
   HOUSE_TIER_NAMES,
   LOAN_MAX,
   LOW_STOCK_SHEETS,
@@ -187,6 +193,7 @@ export {
   absenceFactor,
   dayMinutesByCategory,
   dayPercentages,
+  emptyOwnerIdle,
   houseTierFor,
   labourFactorFor,
   logDayMinute,
@@ -197,6 +204,7 @@ export {
   ownerIsAvailable,
   ownerMinutesLeft,
   ownerMinutesToday,
+  spendOwnerIdleMinute,
   staffOutputFactor,
   startHoliday,
 } from './owner';
@@ -223,7 +231,7 @@ export {
   netOf,
   nextDueDays,
   visibleTotals,
-  weeklyWageBill,
+  monthlyWageBill,
 } from './economy';
 export type { DayMoney, MonthMoney } from './economy';
 
@@ -285,7 +293,7 @@ export {
   takeOffOutstanding,
   transportLabel,
 } from './jobs';
-export { dropJob } from './jobs';
+export { dropJob, dropReputationCost } from './jobs';
 export { changeReputation, companyTotals } from './reputation';
 export type { LifecycleStep, StartCheck, StepState } from './jobs';
 export type { BagStore, OutputBreakdown, OutputLine } from './machines';

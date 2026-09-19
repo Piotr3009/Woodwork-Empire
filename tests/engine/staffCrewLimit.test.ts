@@ -4,7 +4,7 @@
 // everything through two shifts."
 
 import { describe, expect, it } from 'vitest';
-import { M2_PER_PERSON, PRODUCTION_MANAGER_WEEKLY_WAGE } from '../../src/engine/constants';
+import { M2_PER_PERSON, PRODUCTION_MANAGER_MONTHLY_WAGE } from '../../src/engine/constants';
 import { crewLimit, freeFloorM2 } from '../../src/engine/layout';
 import {
   canHire,
@@ -48,7 +48,7 @@ function manager(id = 'pm-1'): Worker {
     role: 'productionManager',
     tier: null,
     rate: 0,
-    weeklyWage: PRODUCTION_MANAGER_WEEKLY_WAGE,
+    monthlyWage: PRODUCTION_MANAGER_MONTHLY_WAGE,
     leavesOnDay: null,
     startDay: 1,
     jobId: null,

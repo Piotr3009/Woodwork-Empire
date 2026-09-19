@@ -1,8 +1,11 @@
 // @vitest-environment jsdom
-// Four classes of man, and the words the game prints for them: no experience, experienced, super
-// experienced, extremely experienced, off the one TIER_WORDS table (PIOTR; CLAUDE.md T20 2.5).
-// Who applies depends on the standing the workshop has earned, and the card says what is missing
-// in the game's own voice. The pay beside them is the week, with the month it comes to.
+// Four classes of man, and the words the game prints for them: no experience, experienced, very
+// experienced, excellent, off the one TIER_WORDS table (PIOTR, 19.09; CLAUDE.md T21 2.9). Turn 20
+// printed "super experienced" and "extremely experienced", which were Claude's words and not
+// Piotr's, so this turn forbids them in src along with the 1.4 of the old top rate
+// (CLAUDE.md T21 2.9, 7). Who applies depends on the standing the workshop has earned, and the
+// card says what is missing in the game's own voice. The pay beside them is the month, and only
+// the month (CLAUDE.md T21 2.10).
 
 import { describe, expect, it } from 'vitest';
 import { TIER_MIN_REPUTATION, TIER_WORDS } from '../../src/engine/constants';
@@ -56,10 +59,10 @@ describe('the four classes on the hire cards', () => {
   it('withholds the classes the workshop has not earned, and says what is missing', () => {
     const low = kitted(0);
     expect(tile(low, 'joiner.master')?.textContent).toContain(
-      `extremely experienced joiners come from reputation ${TIER_MIN_REPUTATION.master}`,
+      `excellent joiners come from reputation ${TIER_MIN_REPUTATION.master}`,
     );
     expect(tile(low, 'joiner.senior')?.textContent).toContain(
-      'super experienced joiners come from reputation 35',
+      'very experienced joiners come from reputation 35',
     );
     // The man with no experience always answers: nothing about the standing on his card.
     expect(tile(low, 'joiner.novice')?.textContent).not.toContain('come from reputation 15');
@@ -77,23 +80,26 @@ describe('the four classes on the hire cards', () => {
     expect(tile(known, 'joiner.master')?.querySelector('[data-do="hire"]')).not.toBeNull();
   });
 
-  it('prints the week he is paid by and the month it comes to, on the card and on the crew row', () => {
+  it('prints the month he is paid by, and no week beside it, on the card and on the crew row', () => {
     const state = hireNow(kitted(60), 'joiner', 'senior');
     const man = state.workers[0];
     if (!man) throw new Error('nobody on the books');
-    const week = `${money(man.weeklyWage)} a week (about ${money(monthlyWageOf(man))} a month)`;
+    // One unit of pay and it is the month, so the one line is the month's figure: a very
+    // experienced joiner is on 3,500 (CLAUDE.md T21 2.9, 2.10).
+    const month = `${money(man.monthlyWage)} a month`;
+    expect(man.monthlyWage).toBe(3500);
+    expect(monthlyWageOf(man)).toBe(man.monthlyWage);
     const page = parse(renderTeam(state, 'workshop'));
-    expect(page.querySelector(`[data-crew="${man.id}"]`)?.textContent).toContain(week);
+    expect(page.querySelector(`[data-crew="${man.id}"]`)?.textContent).toContain(month);
     expect(page.querySelector(`[data-crew="${man.id}"]`)?.textContent).toContain(
       TIER_WORDS.senior,
     );
-    expect(tile(state, 'joiner.senior')?.textContent).toContain(
-      `${money(man.weeklyWage)} a week`,
-    );
-    // And Our team says the same two figures and the same words.
+    expect(page.querySelector(`[data-crew="${man.id}"]`)?.textContent).not.toContain('a week');
+    expect(tile(state, 'joiner.senior')?.textContent).toContain(month);
+    // And Our team says the same figure and the same words.
     const roll = parse(renderTeam(state, 'ourTeam'));
     const row = roll.querySelector(`[data-team="${man.id}"]`);
-    expect(row?.textContent).toContain(week);
+    expect(row?.textContent).toContain(month);
     expect(row?.textContent).toContain(`joiner, ${TIER_WORDS.senior}`);
   });
 });

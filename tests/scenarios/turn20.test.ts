@@ -95,7 +95,7 @@ function contractMonth(): ContractMonth {
   const seen: GameEvent[] = [];
   let state = playUntilDay(newGame({ seed: SEED, difficulty: 'veryEasy' }), 8, CONTRACT_MONTH, seen);
   // The term opens on a Monday, so its four weeks are four whole weeks: a term that opened mid
-  // week would take a part week's quantity and pay a whole Friday against it, and the profit this
+  // week would take a part week's quantity against a whole month of wages, and the profit this
   // month is about would be measuring the calendar instead of the contract.
   while (weekday(state.clock.day) !== 0) state = playDay(state, CONTRACT_MONTH, seen);
   const man = joiners(state)[0];
@@ -132,10 +132,12 @@ function theContract(state: GameState): Contract {
   return contract;
 }
 
-/** What the workshop really paid him while the term ran: the Friday wage lines of the ledger
- *  between the first day of the term and the last, and no other cost of the workshop. He is the
- *  only man on the books, so the wage bill is his wage and nobody else's. */
-function wagesOverTheTerm(state: GameState): { total: number; fridays: number[] } {
+/** What the workshop really paid him while the term ran: the wage lines of the ledger between the
+ *  first day of the term and the last, and no other cost of the workshop. Everybody is paid by the
+ *  month from Turn 21, so a four week term holds one of them, on the month's last working day
+ *  (CLAUDE.md T21 2.10). He is the only man on the books, so the wage bill is his wage and nobody
+ *  else's. */
+function wagesOverTheTerm(state: GameState): { total: number; payDays: number[] } {
   const contract = theContract(state);
   const from = contract.startDay ?? 0;
   const to = contract.endDay ?? 0;
@@ -144,7 +146,7 @@ function wagesOverTheTerm(state: GameState): { total: number; fridays: number[] 
   );
   return {
     total: pounds(lines.reduce((sum, entry) => sum + Math.abs(entry.amount), 0)),
-    fridays: lines.map((entry) => entry.day),
+    payDays: lines.map((entry) => entry.day),
   };
 }
 
@@ -156,34 +158,46 @@ describe('(cc) a contract month with an experienced joiner, on Very easy', () =>
     expect(contract.pricePerPiece).toBe(50);
     expect(contract.assigned).toEqual([CC.man.id]);
     // The card's own reading of him, which is what the player saw before he pressed Take it
-    // (CLAUDE.md T20 2.1.1): 47 minutes a piece behind the day 1 used saw at his 1.0 of the owner,
-    // ten pieces a day against the eight the week asks for, so the week is never short.
+    // (CLAUDE.md T20 2.1.1): 59 minutes a piece behind the day 1 used saw at his 0.8 of the owner,
+    // which is what an experienced man is worth on Piotr's own ladder (CLAUDE.md T21 2.9). Eight
+    // pieces a day against the eight the week asks for, so a whole week is exactly his week and
+    // there is nothing in hand for the part weeks at either end of the term. Turn 20 read him at
+    // 1.0 of the owner and 47 minutes a piece, and it is that step down the ladder, and not the
+    // pay, that turns this month from comfortable into tight.
     const result = contractResultFor(CC.opened, contract, CC.man);
-    expect(result.minutes).toBe(47);
+    expect(result.minutes).toBe(59);
     expect(result.piecesPerDay).toBe(Math.floor(MINUTES_PER_WORKING_DAY / result.minutes));
-    expect(result.piecesPerDay).toBe(10);
+    expect(result.piecesPerDay).toBe(8);
     expect(result.piecesNeededPerDay).toBe(PACKS_A_WEEK / WORKING_DAYS_PER_WEEK);
-    expect(result.piecesPerDay).toBeGreaterThan(result.piecesNeededPerDay);
+    expect(result.piecesPerDay).toBe(result.piecesNeededPerDay);
   });
 
-  it('delivers every week of the term in full, so the client never ends it and the standing holds', () => {
+  it('delivers three of the four weeks in full and runs the term out, one point down for the fourth', () => {
     const contract = theContract(CC.ended);
     expect(contract.status).toBe('ended');
     // The term ran out; the client did not walk away and neither did the player (T20 2.1.6).
     expect(contract.endedBy).toBe('term');
     expect(contract.weeks).toHaveLength(TERM_WEEKS);
-    expect(contract.weeks.every((week) => week.made >= week.wanted)).toBe(true);
-    // More than the client asked for, and every one of them paid for: the day fills with the
+    // Three weeks of forty and one of thirty eight. At eight pieces a day against eight wanted he
+    // has nothing in hand, so the week the part days fall in comes up short: the client takes the
+    // two off next week's order and docks a point of standing for it, and he keeps the contract
+    // (CLAUDE.md T20 2.1.3). Turn 20 read the same month with nothing short, because it had him a
+    // step faster up the ladder (CLAUDE.md T21 2.9). Measured on this build.
+    expect(contract.weeks.filter((week) => week.made >= week.wanted)).toHaveLength(TERM_WEEKS - 1);
+    expect(contract.weeks.filter((week) => week.made < week.wanted)).toEqual([
+      { week: 4, wanted: 40, made: 38 },
+    ]);
+    // 158 against the 160 the term wanted, which is his eight a day for the twenty working days of
+    // the term, less the two the part days at each end of it leave behind. The day fills with the
     // contract first and a man with no job of work to go back to stays on it, because the client
-    // buys every piece he makes (CLAUDE.md T20 2.1.4). 198 against the 160 the term wanted, which
-    // is his ten a day for the twenty working days of the term, less the two the part days at
-    // each end of it leave behind. Measured on this build.
-    expect(contract.piecesMade).toBeGreaterThanOrEqual(PACKS_A_WEEK * TERM_WEEKS);
-    expect(contract.piecesMade).toBe(198);
-    // Not one short week, so not one point of the workshop's standing went on it.
-    expect(CC.ended.reputationLog.filter((entry) => entry.reason.startsWith(contract.name))).toEqual(
-      [],
-    );
+    // buys every piece he makes (CLAUDE.md T20 2.1.4).
+    expect(contract.piecesMade).toBe(158);
+    expect(contract.piecesMade).toBe(PACKS_A_WEEK * TERM_WEEKS - 2);
+    // One short week, one point of the workshop's standing, and the reason says the figures.
+    const log = CC.ended.reputationLog.filter((entry) => entry.reason.startsWith(contract.name));
+    expect(log).toHaveLength(1);
+    expect(log[0]?.points).toBe(-1);
+    expect(log[0]?.reason).toContain('38 of 40 this week');
   });
 
   it('ends in profit after his wages, and the figure is the one the report quotes', () => {
@@ -192,16 +206,18 @@ describe('(cc) a contract month with an experienced joiner, on Very easy', () =>
     const revenue = pounds(contract.revenue);
     const material = pounds(contract.materialCost);
     const profit = pounds(revenue - material - wages.total);
-    // Four whole weeks, so four Fridays and four wage lines, each one his own weekly wage.
-    expect(wages.fridays).toHaveLength(TERM_WEEKS);
-    expect(wages.total).toBe(pounds(CC.man.weeklyWage * TERM_WEEKS));
-    // 198 packs at 50 is 9,900 taken; 198 packs of 0.15 of a sheet at 200 a sheet is 5,940 of
-    // stock off the rack; his four Fridays are 2,400. The line of the cross check of
-    // CLAUDE.md T20 7: a contract month with an experienced joiner ends in profit AFTER his wages.
-    expect(revenue).toBe(9900);
-    expect(material).toBe(5940);
-    expect(wages.total).toBe(2400);
-    expect(profit).toBe(1560);
+    // Four whole weeks hold one pay day, because everybody is paid by the month now and the month
+    // pays on its last working day (CLAUDE.md T21 2.10). One line, and it is his month whole.
+    expect(wages.payDays).toHaveLength(1);
+    expect(wages.total).toBe(pounds(CC.man.monthlyWage));
+    // 158 packs at 50 is 7,900 taken; 158 packs of 0.15 of a sheet at 200 a sheet is 4,740 of
+    // stock off the rack; the one pay day inside the term is his 2,600. The line of the cross check
+    // of CLAUDE.md T20 7, which tonight's figures keep: a contract month with an experienced joiner
+    // ends in profit AFTER his wages.
+    expect(revenue).toBe(7900);
+    expect(material).toBe(4740);
+    expect(wages.total).toBe(2600);
+    expect(profit).toBe(560);
     expect(profit).toBeGreaterThan(0);
     // The closing report the player is handed says the same thing in its own arithmetic: it costs
     // the minutes he actually stood at the contract and not the days he was paid for, so it reads
@@ -212,7 +228,7 @@ describe('(cc) a contract month with an experienced joiner, on Very easy', () =>
       '(cc) A CONTRACT MONTH WITH AN EXPERIENCED JOINER\n' +
         `piece: ${contractPiece(contract).name} at ${formatMoney(contract.pricePerPiece)}, ` +
         `${PACKS_A_WEEK} a week over ${TERM_WEEKS} weeks\n` +
-        `the man: ${CC.man.name}, experienced, ${formatMoney(CC.man.weeklyWage)} a week\n` +
+        `the man: ${CC.man.name}, experienced, ${formatMoney(CC.man.monthlyWage)} a month\n` +
         `pieces made ${contract.piecesMade}, revenue ${formatMoney(revenue)}, ` +
         `material ${formatMoney(material)}, his wages ${formatMoney(wages.total)}\n` +
         `PROFIT AFTER HIS WAGES ${formatMoney(profit)}\n` +

@@ -13,6 +13,10 @@
 // lines read the ledger, the closed days and the workshop rate, and change none of them: the game
 // used to say nothing at all about the money until the month end, and a player could be four weeks
 // into a hole before the game mentioned it.
+//
+// Turn 21 adds the line above them all but the bags: the company owes what it cannot pay and the two
+// together have passed what the bank allows, which is the last thing said before the bank closes it
+// (PIOTR, 18.09; CLAUDE.md T21 2.1).
 
 import {
   FIRST_STEPS_LAST_DAY,
@@ -21,7 +25,7 @@ import {
   SPEND_WARNING_CATEGORIES,
   SPEND_WARNING_FROM_CLOSED_DAYS,
 } from './constants';
-import { formatMoney } from './economy';
+import { bankruptcyFloor, formatMoney, netPosition } from './economy';
 import { overdraftInterestForDay } from './finance';
 import { bagStore } from './machines';
 import { workPlan } from './plan';
@@ -31,6 +35,9 @@ import type { GameState, LedgerCategory } from './types';
 
 export type WarningKey =
   | 'bagsFull'
+  /** The company owes more than the bank will carry, and the next look closes it
+   *  (PIOTR, 18.09; CLAUDE.md T21 2.1). */
+  | 'pastTheLimit'
   | 'nobodyAssigned'
   | 'deadlineAtRisk'
   | 'noInsurance'
@@ -54,6 +61,9 @@ export interface Warning {
  *  nothing at all to warn about (CLAUDE.md T18 2.6, 2.7). */
 export const WARNING_ORDER: readonly WarningKey[] = [
   'bagsFull',
+  // Second of all, above everything but the bags: the bags stop every machine in the hall this
+  // minute, and this stops the company for good at the next look (CLAUDE.md T21 2.1).
+  'pastTheLimit',
   'nobodyAssigned',
   'deadlineAtRisk',
   'noInsurance',
@@ -68,6 +78,35 @@ function bagsFullWarning(state: GameState): Warning | null {
   return {
     key: 'bagsFull',
     text: 'The bags are full: nothing that makes dust runs until they are emptied',
+  };
+}
+
+/** The company owes what it cannot pay, and the sum of the two has passed what the bank allows: the
+ *  strip says the whole position in one sentence, because Piotr's top bar said only the -7,259 in
+ *  the account while 25,740 of arrears stood beside it and the game played on
+ *  (PIOTR, 18.09; CLAUDE.md T21 2.1; docs/mockups/t21/debt.html part 1).
+ *
+ *  It fires on the position the bank reads, `netPosition` against `bankruptcyFloor`, and on nothing
+ *  softer [TUNE]: the sentence the drawing gives it says the company is already past the line, and a
+ *  line that said that while it was not true would be the old top bar's lie the other way about. The
+ *  day's look at the money is what closes the company (`checkBankruptcy`), so this is the warning
+ *  that stands between the arrears arriving and the bank pulling the overdraft. The two figures are
+ *  the engine's own, so the strip and the close cannot disagree. */
+function pastTheLimitWarning(state: GameState): Warning | null {
+  const net = netPosition(state);
+  const allowed = bankruptcyFloor(state);
+  if (state.finance.arrearsAmount <= 0) return null;
+  if (net > allowed) return null;
+  const owed = `${formatMoney(state.finance.arrearsAmount)} in arrears`;
+  // The drawn sentence opens on the account, which is where a company in arrears almost always is.
+  // A company that has been paid since it missed the bill is not below zero, and the line says what
+  // is true of it instead of the drawing's words [TUNE].
+  const opening = state.cash < 0 ? `Account below zero and ${owed}` : owed;
+  return {
+    key: 'pastTheLimit',
+    text:
+      `${opening}: together ${formatMoney(net)}, past the ${formatMoney(allowed)} the bank ` +
+      'allows. Pay the arrears or the bank closes you.',
   };
 }
 
@@ -200,6 +239,7 @@ function firstStepsWarning(state: GameState): Warning | null {
 
 const CHECKS: Record<WarningKey, (state: GameState) => Warning | null> = {
   bagsFull: bagsFullWarning,
+  pastTheLimit: pastTheLimitWarning,
   nobodyAssigned: nobodyAssignedWarning,
   deadlineAtRisk: deadlineWarning,
   noInsurance: noInsuranceWarning,

@@ -81,7 +81,7 @@ function joiner(index: number): Worker {
     role: 'joiner',
     tier: 'novice',
     rate: WORKER_RATES.novice,
-    weeklyWage: 480,
+    monthlyWage: 1950,
     leavesOnDay: null,
     startDay: 1,
     jobId: null,
@@ -345,10 +345,67 @@ describe('the first days say what to do (CLAUDE.md T18 2.7)', () => {
   });
 });
 
+describe('the line that says the bank is about to close you', () => {
+  /** A company standing where Piotr's was on 15 May: in the overdraft with arrears beside it. */
+  function inDebt(cash: number, arrears: number): GameState {
+    const state = quietHall();
+    state.cash = cash;
+    state.finance.arrearsAmount = arrears;
+    state.finance.firstArrearsDay = 1;
+    state.finance.arrearsMonths = 1;
+    return state;
+  }
+
+  it('says the four things the drawing says, in its words', () => {
+    const found = warnings(inDebt(-7259, 25740));
+    expect(found[0]?.key).toBe('pastTheLimit');
+    expect(found[0]?.text).toBe(
+      'Account below zero and \u00a325,740 in arrears: together -\u00a332,999, past the ' +
+        '-\u00a315,000 the bank allows. Pay the arrears or the bank closes you.',
+    );
+  });
+
+  it('says nothing while the net position is still inside what the bank allows', () => {
+    // 5,000 owed on a 9,000 overdraft is -14,000 against the -15,000 the bank allows.
+    const found = warnings(inDebt(-9000, 5000)).map((warning) => warning.key);
+    expect(found).not.toContain('pastTheLimit');
+    // The overdraft line is still said, because the account is still under zero.
+    expect(found).toContain('belowZero');
+  });
+
+  it('says nothing about a company that owes nothing, however deep in the overdraft it is', () => {
+    const state = quietHall();
+    state.cash = -9999;
+    expect(warnings(state).map((warning) => warning.key)).not.toContain('pastTheLimit');
+  });
+
+  it('drops the account clause for a company that owes but has been paid since', () => {
+    // A big bill missed and a big client paid: the arrears stand, the account does not.
+    const found = warnings(inDebt(2000, 20000));
+    expect(found[0]?.key).toBe('pastTheLimit');
+    expect(found[0]?.text).toBe(
+      '\u00a320,000 in arrears: together -\u00a318,000, past the -\u00a315,000 the bank allows. ' +
+        'Pay the arrears or the bank closes you.',
+    );
+  });
+
+  it('is gone the day the arrears are cleared', () => {
+    const state = inDebt(-7259, 25740);
+    expect(warnings(state)[0]?.key).toBe('pastTheLimit');
+    state.finance.arrearsAmount = 0;
+    state.finance.arrearsMonths = 0;
+    state.finance.firstArrearsDay = null;
+    expect(warnings(state).map((warning) => warning.key)).not.toContain('pastTheLimit');
+  });
+});
+
 describe('the order of urgency', () => {
-  it('is bags, nobody assigned, overdue, no insurance, below zero, spending over earning, crew full, first steps', () => {
+  it('is bags, past the limit, nobody assigned, overdue, no insurance, below zero, spending over earning, crew full, first steps', () => {
     expect(WARNING_ORDER).toEqual([
       'bagsFull',
+      // Turn 21: above everything but the bags. The bags stop every machine in the hall this
+      // minute; this stops the company for good at the next look at the money (CLAUDE.md T21 2.1).
+      'pastTheLimit',
       'nobodyAssigned',
       'deadlineAtRisk',
       'noInsurance',
@@ -360,7 +417,7 @@ describe('the order of urgency', () => {
   });
 
   it('puts every problem in that order when the hall has them all at once', () => {
-    // Seven of the eight at once. The first steps line cannot be one of them: it is only said
+    // Eight of the nine at once. The first steps line cannot be one of them: it is only said
     // while production has never started, and "a started job nobody is on" is production started.
     let state = tradedWeek(0, 500);
     state = withStartedJobNobodyOn(state);
@@ -371,6 +428,11 @@ describe('the order of urgency', () => {
     // The deposits of those two jobs put the account back over: the overdraft is the last thing
     // set, so the line is about the balance the strip would actually read.
     state.cash = -10000;
+    // And 6,000 it never paid, which puts the net position at -16,000 against the -15,000 the bank
+    // allows: the Turn 21 line (CLAUDE.md T21 2.1).
+    state.finance.arrearsAmount = 6000;
+    state.finance.firstArrearsDay = 1;
+    state.finance.arrearsMonths = 1;
     expect(warnings(state).map((warning) => warning.key)).toEqual(
       WARNING_ORDER.filter((key) => key !== 'firstSteps'),
     );

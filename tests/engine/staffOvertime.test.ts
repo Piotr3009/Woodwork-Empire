@@ -1,13 +1,16 @@
 // The end of the day (PIOTR, 17.09; CLAUDE.md T17 2.12). The men go home at five, always, and the
 // evening is the owner's alone: what moves after five is what he takes on himself, by a click on
 // the row, and the man has his job back in the morning where the evening left it. The two hours of
-// staff overtime of Turn 8 are gone, and the Friday line that paid for them with them.
+// staff overtime of Turn 8 are gone, and the wage line that paid for them with them. The pay day
+// they are looked for on is the last working day of the month, which is the one there is
+// (CLAUDE.md T21 2.10).
 
 import { describe, expect, it } from 'vitest';
 import { DAY_END_MINUTE } from '../../src/engine/constants';
+import { isLastWorkingDayOfMonth } from '../../src/engine/clock';
 import { crewHasGoneHome } from '../../src/engine/staff';
 import type { GameState, Job } from '../../src/engine/index';
-import { act, clearEvents, runClock, twoMenOnSheetWork } from '../helpers';
+import { act, clearEvents, runClock, runToDay, twoMenOnSheetWork } from '../helpers';
 
 /** The hall at five o'clock, the owner staying on, one poor joiner on a job of his own and the
  *  owner on nothing: the evening Piotr described. */
@@ -73,15 +76,16 @@ describe('the wages', () => {
   it('carry no overtime line any more: nobody is paid for an evening', () => {
     let state = atFive();
     state = clearEvents(runClock(state, 60));
-    // On to Friday, which is day 5.
-    let guard = 0;
-    while (state.clock.day < 5 && guard < 60) {
-      state = clearEvents(act(state, { type: 'END_DAY' }));
-      state = clearEvents(runClock(state, 60));
-      guard += 1;
-    }
-    expect(state.clock.day).toBe(5);
+    // On to the pay day, which is the last working day of the month and the one there is. A day's
+    // costs run on its own morning, so the wage line is in the ledger the minute the clock turns
+    // to it (CLAUDE.md T21 2.10).
+    let payDay = state.clock.day + 1;
+    while (!isLastWorkingDayOfMonth(payDay)) payDay += 1;
+    state = runToDay(state, payDay).state;
+    expect(state.clock.day).toBe(payDay);
     expect(state.ledger.some((entry) => entry.label === 'Overtime')).toBe(false);
-    expect(state.ledger.some((entry) => entry.label === 'Weekly wages')).toBe(true);
+    expect(state.ledger.some((entry) => entry.label === 'Monthly wages')).toBe(true);
+    // And never the week's line, which went with Turn 20's cadence.
+    expect(state.ledger.some((entry) => entry.label === 'Weekly wages')).toBe(false);
   });
 });

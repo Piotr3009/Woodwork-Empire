@@ -2,6 +2,9 @@
 // and it hands back an SVG string (CLAUDE.md 10.3).
 
 import {
+  BUBBLES,
+  BUBBLE_HEAD_GAP,
+  BUBBLE_WORK_MAX_SPEED,
   DUCT_HEIGHT,
   DUCT_SYSTEMS,
   FINISHED_GOODS_LAYOUT,
@@ -38,7 +41,7 @@ import {
   tileKeysFor,
   wantsExtraction,
 } from '../engine/pipes';
-import { jobsAtGate } from '../engine/jobs';
+import { jobsAtGate, waitingLine } from '../engine/jobs';
 import { orderName, reservedItems, shoppingList } from '../engine/orders';
 import {
   OWNER,
@@ -56,12 +59,15 @@ import {
   STATION_CLEANING,
   STATION_GATE,
   STATION_IDLE,
+  STATION_LUNCH,
   STATION_NO_BENCH,
   STATION_OFFICE,
   STATION_PHONE,
   STATION_RACK,
   type Facing as StationFacing,
   facingAt,
+  roomBehindStation,
+  stationNow,
   facingAtPallet,
   facingTowards,
   itemAtCell,
@@ -81,6 +87,8 @@ import { plural } from '../engine/text';
 import { FIGURE_DEPTH_OFFSET } from '../engine/constants';
 import type { RoomId } from '../engine/constants';
 import type {
+  Bubble,
+  BubbleTone,
   Equipment,
   EquipmentSpec,
   GameState,
@@ -103,7 +111,12 @@ import {
 } from './iso';
 import { formatCalendarDay, formatTime } from '../engine/clock';
 import { compressorIsLow, extractionCheck, hallAirCheck } from '../engine/media';
-import { type CharacterOptions, animationForStation, characterArt } from './characters';
+import {
+  type CharacterOptions,
+  animationForStation,
+  characterArt,
+  characterTop,
+} from './characters';
 import {
   SPRITE_SCALE,
   contactShadow,
@@ -121,6 +134,8 @@ import { jobStage } from '../engine/jobs';
 import { cleanerAtWork, manOnOpenTask } from '../engine/tasks';
 import type { StageId } from '../engine/types';
 import { figureIsThroughADoor, takeDoorGoings } from './doors';
+import { bubbleIsFresh, bubbleNowMs } from './bubbles';
+import { bubblesFor } from '../engine/bubbles';
 
 /** What the hall can be heard doing (CLAUDE.md T19 2.10, T20 2.13). The render layer owns the
  *  list, because the render layer is what reports the events; `src/ui/sound.ts` plays what is on
@@ -1003,7 +1018,11 @@ export function stationCell(
     const cell = roomDoorCell('office');
     return { ...cell, facing: facingTowards(cell, { x: cell.x, y: cell.y - 1 }) };
   }
-  if (station === STATION_IDLE || station === STATION_NO_BENCH) {
+  // The canteen door: a man with nothing to do, a joiner with no bench to work at, and from Turn 21
+  // every man of the hall at the dinner hour, who walks to this cell and goes through it
+  // (CLAUDE.md T4 3.4, T11 3.4, T21 2.12). The walk is the walk the hall already had; what the lunch
+  // station adds is that he does not stop in the doorway.
+  if (station === STATION_IDLE || station === STATION_NO_BENCH || station === STATION_LUNCH) {
     const cell = roomDoorCell('canteen');
     return { ...cell, facing: facingTowards(cell, { x: cell.x - 1, y: cell.y + 1 }) };
   }
@@ -1060,9 +1079,10 @@ function stationLabel(station: string): string {
   const specId = stationMachine(station);
   if (specId !== null) return (findSpec(specId)?.name ?? specId).toLowerCase();
   const waiting = stationWaitingFor(station);
-  if (waiting !== null) {
-    return `waiting for ${(findSpec(waiting)?.name ?? waiting).toLowerCase()}`;
-  }
+  // The one phrase for a machine a man cannot have. The hall built its own copy of it until Turn 21
+  // put the article in: two copies meant the Work Plan said "waiting for the table saw" and the man
+  // under his own name said "waiting for table saw" (CLAUDE.md T21 2.7).
+  if (waiting !== null) return waitingLine(waiting);
   if (stationSecondAt(station) !== null) return 'the bench, second place';
   if (stationPlaceAt(station) !== null) return 'alongside, on the next place';
   if (station === STATION_RACK) return 'the rack';
@@ -1074,6 +1094,9 @@ function stationLabel(station: string): string {
   // waiting for anything (CLAUDE.md T20 2.8).
   if (station === STATION_CLEANING) return 'sweeping the floor';
   if (station === STATION_NO_BENCH) return 'no bench';
+  // In the canteen for the dinner hour: the words are the bubble's own, so the line under his name
+  // and the paper over his head say the same thing once (CLAUDE.md T21 2.6, 2.12).
+  if (station === STATION_LUNCH) return BUBBLES.atLunch.text;
   return 'waiting';
 }
 
@@ -1181,6 +1204,59 @@ function rackCount(item: Equipment, sheets: number): string {
   );
 }
 
+// ---------------------------------------------------------------------------
+// What the men say (PIOTR, 19.09; docs/mockups/t21/bubbles.html; CLAUDE.md T21 2.6). The words are
+// `src/engine/bubbles.ts`, the three seconds are `src/render/bubbles.ts`, and the paper is here.
+// ---------------------------------------------------------------------------
+
+/** The class the stylesheet dresses each tone in. A `work` bubble is the plain paper and takes no
+ *  second class. */
+const TONE_CLASS: Record<BubbleTone, string> = {
+  wait: 'bubble-wait',
+  chore: 'bubble-chore',
+  work: '',
+  away: 'bubble-away',
+};
+
+/** The box the paper is hung in, in scene pixels [TUNE]. `line` is the paper's own height at
+ *  `--fs-hand-small` with the padding and the border the stylesheet gives it (23 + 3 + 3 + 2 + 2),
+ *  and `tail` is how far the ink triangle of `.bubble::before` hangs below the box it points from.
+ *  `char` and `pad` are a generous guess at how wide the words come out in the title hand: the paper
+ *  sizes itself to its own text inside the box, so a guess that is too wide costs nothing, and one
+ *  that is too narrow cannot clip it either, because the box is drawn with `overflow="visible"`. */
+const BUBBLE_BOX = { line: 34, tail: 9, char: 12, pad: 26 };
+
+/** How far over his feet the top of a man drawn as the placeholder capsule is: the crown of the
+ *  head, which is `capsuleBody`'s own two figures and not a third copy of them. A figure drawn from
+ *  a delivered sheet is taller and carries its own answer (`characterTop`). */
+export const CAPSULE_HEAD_TOP = -(
+  Math.round((CAPSULE_PARTS.headCentre + CAPSULE_PARTS.headRadius) * CAPSULE_HEIGHT_M * TILE_RISE * 10) / 10
+);
+
+/** The bubble as it hangs over one figure: the point of its tail `BUBBLE_HEAD_GAP` pixels over the
+ *  top of him, in the figure group's own local space, so the walker's transform carries it and the
+ *  depth sort keeps it with him (CLAUDE.md T21 2.6). It is an HTML box in a `foreignObject`, which is
+ *  how it wears the classes the stylesheet already has for it; it carries no `data-character`,
+ *  because `dress` and `playCharacters` reach for that attribute and a bubble is not a man; and it
+ *  catches no mouse, so the figure under it keeps the one line the player reads off him, which is
+ *  the group's own `<title>` (CLAUDE.md T11 3.12). */
+export function bubbleArt(bubble: Bubble, headTop: number): string {
+  const height = BUBBLE_BOX.line + BUBBLE_BOX.tail;
+  const width = bubble.text.length * BUBBLE_BOX.char + BUBBLE_BOX.pad;
+  const tone = TONE_CLASS[bubble.tone];
+  return (
+    `<foreignObject class="bubble-box" data-bubble="${escapeText(bubble.key)}" ` +
+    `data-bubble-for="${escapeText(bubble.who)}" data-tone="${bubble.tone}" ` +
+    `x="${Math.round(-width / 2)}" y="${Math.round(headTop - BUBBLE_HEAD_GAP - height)}" ` +
+    `width="${width}" height="${height}" overflow="visible" pointer-events="none">` +
+    // The holder is laid out and not painted: it centres the paper over the head and leaves the
+    // tail's own nine pixels under it. Nothing of the look is here; that is the stylesheet's.
+    '<div xmlns="http://www.w3.org/1999/xhtml" class="bubble-holder">' +
+    `<div class="bubble${tone === '' ? '' : ` ${tone}`}">${escapeText(bubble.text)}</div>` +
+    '</div></foreignObject>'
+  );
+}
+
 /** A worker is his sheet if the art side has delivered one and a capsule if it has not, with his
  *  name under him either way. The owner is the green one. The group carries its standing cell,
  *  its station and the way he faces there, and the walker in the renderer carries him to that
@@ -1194,6 +1270,7 @@ function figure(
   extra: string,
   art: { role: string; station: string; options: CharacterOptions } | null = null,
   loop = '',
+  bubble: Bubble | null = null,
 ): Drawable {
   const feet = centreOf(tile.x, tile.y, 1, 1);
   const fill = isOwner ? 'var(--owner)' : 'var(--worker)';
@@ -1203,6 +1280,10 @@ function figure(
   const drawn =
     art === null ? null : characterArt(art.role, rest, tile.facing, art.options);
   const body = drawn ?? capsuleBody(fill);
+  // Over the top of whichever man was drawn: the sheet's own cell for a delivered figure and the
+  // capsule's crown for the placeholder (CLAUDE.md T21 2.6).
+  const headTop =
+    (art === null ? null : characterTop(art.role, rest, art.options)) ?? CAPSULE_HEAD_TOP;
   return {
     depth: depthKey(tile.x, tile.y) + FIGURE_DEPTH_OFFSET,
     svg:
@@ -1214,7 +1295,9 @@ function figure(
       `<title>${escapeText(name)}</title>` +
       body +
       '<text x="0" y="14" text-anchor="middle" ' +
-      `class="iso-label figure-label">${escapeText(name.split(',')[0] ?? name)}</text></g>`,
+      `class="iso-label figure-label">${escapeText(name.split(',')[0] ?? name)}</text>` +
+      (bubble === null ? '' : bubbleArt(bubble, headTop)) +
+      '</g>',
   };
 }
 
@@ -1366,6 +1449,10 @@ export interface HallOptions {
   /** The character sheets, for the same reason: a figure is his sheet where there is one and the
    *  capsule where there is not (CLAUDE.md T9 3.13). */
   characters?: CharacterOptions['sheets'];
+  /** Real milliseconds, for the three seconds a paper bubble stays up (CLAUDE.md T21 2.6). A
+   *  parameter so a test can hold the clock still; the game leaves it out and the render layer reads
+   *  the real one, which is why no caller had to change. */
+  nowMs?: number;
 }
 
 export function hallScene(state: GameState, options: HallOptions = {}): Scene {
@@ -1626,6 +1713,31 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
   const onTheMachineLoop = (taskId: string | null): string =>
     machineUnload !== undefined && taskId === machineUnload.id ? machineLoopEnds() : '';
 
+  // What each man has to say this minute (PIOTR, 19.09; CLAUDE.md T21 2.6). The words are the
+  // engine's, the three seconds of a paper bubble are real seconds, and the clock is the render
+  // layer's own, the way the house card and the sprite frames read theirs.
+  const nowMs = options.nowMs ?? bubbleNowMs();
+  const said = new Map<string, Bubble>();
+  for (const one of bubblesFor(state)) said.set(one.who, one);
+  // Every bubble is recorded as it is read, so the three seconds start when the words change and
+  // not when they are first drawn; the paper ones are the only ones that come down, and above x4
+  // they are not drawn at all, where they would flicker faster than they could be read.
+  const bubbleOf = (who: string): Bubble | null => {
+    const one = said.get(who) ?? null;
+    if (one === null) return null;
+    const fresh = bubbleIsFresh(one, nowMs);
+    if (one.tone !== 'work') return one;
+    if (state.speed > BUBBLE_WORK_MAX_SPEED) return null;
+    return fresh ? one : null;
+  };
+  // A man who is off the hall says it at the door he went through and not at his station, because
+  // his station is inside a room nothing draws him in (CLAUDE.md T21 2.6, 2.11, 2.12).
+  const behindDoors: Array<{ room: RoomId; bubble: Bubble }> = [];
+  const atTheDoor = (one: Bubble | null, station: string): void => {
+    const room = one === null || one.tone !== 'away' ? null : roomBehindStation(station);
+    if (room !== null) behindDoors.push({ room, bubble: one as Bubble });
+  };
+
   // The crew, and the owner, each at the station the engine put him on.
   for (const worker of state.workers) {
     if (worker.startDay > state.clock.day) continue;
@@ -1633,13 +1745,20 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
     // Where he stands when the hall has nothing else for him. The helper's own corner is the fan
     // or the gate lane, never the inside of the office block (CLAUDE.md T11 3.4).
     const bench = homeCellOf(state, worker);
-    const where = stationLabel(worker.station);
-    const cell = stationCell(state, worker.station, bench);
+    // The dinner hour is the canteen, and the station says so: `stationNow` is the one place the
+    // hour is read (CLAUDE.md T21 2.12).
+    const station = stationNow(state, worker.id);
+    const where = stationLabel(station);
+    const cell = stationCell(state, station, bench);
+    const bubble = bubbleOf(worker.id);
     // He has gone through a door and is in the room behind it: off the hall's drawing until he
-    // comes out again (PIOTR, 18.09; CLAUDE.md T20 2.12). `figureGoesThroughDoors` says who that
-    // is: the owner, because the office view draws him and nobody else yet, so a man at a desk is
-    // still drawn standing in the doorway rather than nowhere at all.
-    if (figureIsThroughADoor(`worker-${worker.id}`, cell)) continue;
+    // comes out again (PIOTR, 18.09; CLAUDE.md T20 2.12). From Turn 21 that is every man and not the
+    // owner alone: a desk job is behind the office door and the dinner hour is behind the canteen's
+    // (CLAUDE.md T21 2.11, 2.12). His bubble stays at the door.
+    if (figureIsThroughADoor(`worker-${worker.id}`, cell, station)) {
+      atTheDoor(bubble, station);
+      continue;
+    }
     drawables.push(
       figure(
         `worker-${worker.id}`,
@@ -1649,28 +1768,61 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
         `data-worker="${worker.id}"`,
         // Joiners have a sheet tonight; everybody else falls back to the capsule until his own
         // one is delivered (CLAUDE.md T9 3.13).
-        { role: worker.role, station: worker.station, options: characterOptions },
-        onTheMachineLoop(worker.taskId) || onTheLoop(worker.station),
+        { role: worker.role, station, options: characterOptions },
+        onTheMachineLoop(worker.taskId) || onTheLoop(station),
+        bubble,
       ),
     );
   }
-  const ownerCell = stationCell(state, state.owner.station, ownerBenchCell(state));
+  const ownerStation = stationNow(state, OWNER);
+  const ownerCell = stationCell(state, ownerStation, ownerBenchCell(state));
+  const ownerBubble = ownerIsAvailable(state) ? bubbleOf(OWNER) : null;
   // The owner in the office is not on the hall at all: he went through the door, and the office
   // view draws him at his desk (PIOTR, 18.09; CLAUDE.md T20 2.12, T19 2.2).
-  if (ownerIsAvailable(state) && !figureIsThroughADoor('owner', ownerCell)) {
-    drawables.push(
-      figure(
-        'owner',
-        ownerCell,
-        `${state.playerName}, ${stationLabel(state.owner.station)}`,
-        true,
-        'data-owner="1"',
-        // The owner is his sheet where the art side has delivered one (character.owner.*, the
-        // boss pack of 14.09), and the capsule where it has not, like every worker.
-        { role: 'owner', station: state.owner.station, options: characterOptions },
-        onTheMachineLoop(state.owner.currentTaskId) || onTheLoop(state.owner.station),
-      ),
-    );
+  if (ownerIsAvailable(state)) {
+    if (figureIsThroughADoor('owner', ownerCell, ownerStation)) {
+      atTheDoor(ownerBubble, ownerStation);
+    } else {
+      drawables.push(
+        figure(
+          'owner',
+          ownerCell,
+          `${state.playerName}, ${stationLabel(ownerStation)}`,
+          true,
+          'data-owner="1"',
+          // The owner is his sheet where the art side has delivered one (character.owner.*, the
+          // boss pack of 14.09), and the capsule where it has not, like every worker.
+          { role: 'owner', station: ownerStation, options: characterOptions },
+          onTheMachineLoop(state.owner.currentTaskId) || onTheLoop(ownerStation),
+          ownerBubble,
+        ),
+      );
+    }
+  }
+
+  // The bubbles of the men who are behind a door, at the door they went through: one a thing being
+  // said, so three men in the office all saying "in the office" are one bubble and two different
+  // things said stack up the wall a box at a time [TUNE: the dedupe and the stack]. The words
+  // themselves say nothing about how many men are behind the door, which is the drawing's own table
+  // (docs/mockups/t21/bubbles.html; CLAUDE.md T21 2.6).
+  const saidAtADoor = new Set<string>();
+  const stacked = new Map<RoomId, number>();
+  for (const at of behindDoors) {
+    const once = `${at.room}|${at.bubble.text}`;
+    if (saidAtADoor.has(once)) continue;
+    saidAtADoor.add(once);
+    const lift = stacked.get(at.room) ?? 0;
+    stacked.set(at.room, lift + 1);
+    const door = roomDoorCell(at.room);
+    const feet = centreOf(door.x, door.y, 1, 1);
+    drawables.push({
+      depth: depthKey(door.x, door.y) + FIGURE_DEPTH_OFFSET,
+      svg:
+        `<g class="figure-away" data-away-door="${at.room}" ` +
+        `transform="translate(${Math.round(feet.x)},${Math.round(feet.y)})">` +
+        bubbleArt(at.bubble, CAPSULE_HEAD_TOP - lift * (BUBBLE_BOX.line + BUBBLE_BOX.tail)) +
+        '</g>',
+    });
   }
 
   // A pallet of sheets at the gate while a delivery is waiting to be unloaded: the material

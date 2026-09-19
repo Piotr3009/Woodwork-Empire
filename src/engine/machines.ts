@@ -31,6 +31,7 @@ import {
   EXTRACTOR_BREAKDOWN_CHANCE_HIGH_DUST,
   EXTRACTOR_BROKEN_DUST_MULTIPLIER,
   HELPER_REQUIRED_FROM_JOINERS,
+  MACHINE_SHORT_WORDS,
   NO_DUCTING_SPECS,
   DUST_PER_SAWDUST_PILE,
   NO_HELPER_DUST_MULTIPLIER,
@@ -76,6 +77,19 @@ export function specOf(specId: string): EquipmentSpec {
 
 export function findSpec(specId: string): EquipmentSpec | null {
   return EQUIPMENT_SPECS.find((entry) => entry.id === specId) ?? null;
+}
+
+/** What a man calls this family of machine when he is standing about waiting for it: the trade's
+ *  own short word where `MACHINE_SHORT_WORDS` has one, and the catalogue's name lowercased where it
+ *  has not (PIOTR's drawing, 19.09, "waiting for the saw"; CLAUDE.md T21 2.6, 2.7).
+ *
+ *  The phrase it goes into is `waitingLine` in `src/engine/jobs.ts`, which builds the same word the
+ *  same way; the bubble over a man's head fills its own `{machine}` slot from here, and
+ *  `tests/render/bubbles.test.ts` holds the two equal. A note for the lead in
+ *  docs/notes-t21-b3.md asks for `waitingLine` to read this one function, which this agent may not
+ *  edit `jobs.ts` to do. */
+export function machineShortWord(specId: string): string {
+  return MACHINE_SHORT_WORDS[specId] ?? (findSpec(specId)?.name ?? specId).toLowerCase();
 }
 
 /** What a class of a family stands on, in metres: the picture's own footprint. A class that says

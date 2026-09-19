@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest';
 import { LET_GO_NOTICE_DAYS } from '../../src/engine/constants';
 import { crewCount, letGo, letGoCheck, runStaffDayStart } from '../../src/engine/staff';
 import { canHire, crewLine, hiringOptions } from '../../src/engine/staff';
-import { weeklyWageBill } from '../../src/engine/economy';
+import { monthlyWageBill } from '../../src/engine/economy';
 import { acceptContract, assignContract, drawContract } from '../../src/engine/contracts';
 import { assignJob } from '../../src/engine/jobs';
 import { formatCalendarDay } from '../../src/engine/clock';
@@ -69,8 +69,8 @@ describe('let go', () => {
 
   it('keeps him on the books, paid, and counted, until the notice is up', () => {
     const { state, man } = withAJoiner();
-    const bill = weeklyWageBill(state);
-    expect(bill).toBe(man.weeklyWage);
+    const bill = monthlyWageBill(state);
+    expect(bill).toBe(man.monthlyWage);
     letGo(state, man.id);
     const crew = crewCount(state);
     // Every day of the notice: still on the books, still paid, still counted against the floor
@@ -78,13 +78,13 @@ describe('let go', () => {
     for (let day = state.clock.day; day <= (man.leavesOnDay ?? 0); day += 1) {
       morningOf(state, day);
       expect(state.workers).toHaveLength(1);
-      expect(weeklyWageBill(state)).toBe(bill);
+      expect(monthlyWageBill(state)).toBe(bill);
       expect(crewCount(state)).toBe(crew);
     }
     // The morning after his last day he is gone, and the floor has room again.
     morningOf(state, (man.leavesOnDay ?? 0) + 1);
     expect(state.workers).toHaveLength(0);
-    expect(weeklyWageBill(state)).toBe(0);
+    expect(monthlyWageBill(state)).toBe(0);
     expect(crewCount(state)).toBe(crew - 1);
   });
 

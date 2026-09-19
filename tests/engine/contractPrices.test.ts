@@ -82,18 +82,22 @@ describe('the prices that pay (CLAUDE.md T20 2.2)', () => {
     expect(front.minutes).toBeLessThan(3 * MINUTES_PER_WORKING_DAY);
   });
 
-  it('leaves every tier a margin with a saw in the hall, and the top man nothing without one', () => {
+  it('leaves every tier under water by hand at these prices, and all four of them above it with one used saw', () => {
     // The man's own result: the price less the material and less what his minutes cost, which is
-    // the margin the offer card puts on his row (CLAUDE.md T20 2.1.1). The wage ladder is steeper
-    // than the speed ladder, so the line thins as the tier rises, and in an empty hall, where
-    // every piece is made by hand at two thirds speed, the extremely experienced man ends at
-    // nothing. One used saw is enough to put all four above water, which is the table doing what
-    // Piotr asked of it: a contract pays a little by hand and well with machines (T20 2.2).
+    // the margin the offer card puts on his row (CLAUDE.md T20 2.1.1). Piotr's four tier figures
+    // of tonight are a step slower than Turn 20's for nearly the same money (CLAUDE.md T21 2.9,
+    // 2.10), and that turns the by hand reading over: in an empty hall, where every piece is made
+    // at two thirds speed, a cut sheet pack at the T20 2.2 price of 50 against 30 of material
+    // costs more in a man's minutes than it pays, at every one of the four tiers. Turn 20's own
+    // measurement of this left the three lower tiers a thin line and the top man nothing.
+    // One used saw still puts all four well above water, so half of what T20 2.2 asked of the
+    // table holds and half of it does not: a contract pays well with machines and does not pay by
+    // hand [TUNE: the piece prices are Piotr's and this turn does not touch them, T21 6].
     const tiers: Array<[Exclude<Worker['tier'], null>, number]> = [
-      ['novice', 450],
-      ['experienced', 600],
-      ['senior', 800],
-      ['master', 1000],
+      ['novice', 1950],
+      ['experienced', 2600],
+      ['senior', 3500],
+      ['master', 4330],
     ];
     const packs = (state: GameState): Contract => {
       const contract = drawContract(state);
@@ -105,11 +109,11 @@ describe('the prices that pay (CLAUDE.md T20 2.2)', () => {
     const byHand = newGame();
     const hall = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
     const lines: string[] = [];
-    for (const [tier, weekly] of tiers) {
-      const worker = { id: `staff-${tier}`, rate: WORKER_RATES[tier], weeklyWage: weekly } as Worker;
+    for (const [tier, monthly] of tiers) {
+      const worker = { id: `staff-${tier}`, rate: WORKER_RATES[tier], monthlyWage: monthly } as Worker;
       const bare = contractResultFor(byHand, packs(byHand), worker);
       const sawn = contractResultFor(hall, packs(hall), worker);
-      expect(bare.margin).toBeGreaterThanOrEqual(0);
+      expect(bare.margin).toBeLessThan(0);
       expect(sawn.margin).toBeGreaterThan(0);
       expect(sawn.weekResult).toBeGreaterThan(0);
       lines.push(

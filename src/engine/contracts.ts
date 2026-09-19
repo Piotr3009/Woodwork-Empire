@@ -33,7 +33,7 @@ import { isBreak, isWorkingDay, weekOfDay, weekday, workedMinutesOfDay } from '.
 import { plural } from './text';
 import { charge, formatMoney } from './economy';
 import { queueEvent } from './events';
-import { isOnJob, stagedJob, workerMinuteCost } from './jobs';
+import { isOnJob, jobHasWorkFor, stagedJob, workerMinuteCost } from './jobs';
 import { freeSheets } from './materials';
 import {
   OWNER,
@@ -272,11 +272,11 @@ export interface ContractResult {
  *  definition (CLAUDE.md T20 2.5). */
 const OWNER_RATE = 1;
 
-/** What a minute of this man costs on a contract: a worker's weekly wage through the job card's
+/** What a minute of this man costs on a contract: a worker's monthly wage through the job card's
  *  own divisor, and the owner's daily draw over the minutes of his day, because the owner's days
- *  cost his draw (CLAUDE.md T20 2.1.1). */
+ *  cost his draw (CLAUDE.md T20 2.1.1, T21 2.10). */
 export function contractMinuteCost(state: GameState, worker: Worker | null): number {
-  if (worker) return workerMinuteCost(worker.weeklyWage);
+  if (worker) return workerMinuteCost(worker.monthlyWage);
   return ownerDrawPerDay(state) / MINUTES_PER_WORKING_DAY;
 }
 
@@ -346,10 +346,11 @@ function resultAtSpeed(
  *  his own time costs at his own rate and on the machines the hall has, so the result of putting
  *  him on it is on his own row before he is put on it (PIOTR, 17.09; CLAUDE.md T17 2.22,
  *  T20 2.1.1). A slower man takes more minutes over a piece, and what those minutes cost is his
- *  own weekly wage. The wage ladder is steeper than the speed ladder, 450, 600, 800 and 1,000 a
- *  week against 0.8, 1.0, 1.2 and 1.4 of the owner, so a piece costs more in a better man's time
- *  and the thinner margin is the better man's (CLAUDE.md T20 2.5). `null` is the owner, whose
- *  days cost his draw: he is costed here, and the check says whether he may be put on it. */
+ *  own monthly wage. The wage ladder is steeper than the speed ladder, 1,950, 2,600, 3,500 and
+ *  4,330 a month against 0.6, 0.8, 1.0 and 1.2 of the owner, so a piece costs more in a better
+ *  man's time and the thinner margin is the better man's (CLAUDE.md T21 2.9, 2.10). `null` is the
+ *  owner, whose days cost his draw: he is costed here, and the check says whether he may be put on
+ *  it. */
 export function contractResultFor(
   state: GameState,
   contract: Contract,
@@ -636,7 +637,15 @@ export function contractWantsToday(state: GameState, workerId: string): boolean 
     return jobBesideContract(state, workerId) === null;
   }
   if (contract.piecesThisWeek < piecesDueBy(contract, state.clock.day)) return true;
-  return jobBesideContract(state, workerId) === null;
+  const job = jobBesideContract(state, workerId);
+  if (job === null) return true;
+  // His day's share is made and he has a job to go to, but the job cannot use the minute: its saw is
+  // taken, its rack is empty or the hall has stopped it. He makes pieces rather than stand at it,
+  // because the client pays for every piece he makes, and the contract is the third thing the
+  // scheduler looks at before a man waits (PIOTR; CLAUDE.md T21 2.7). Asked fresh every minute off
+  // the hall itself and never off a flag written down last minute, so the minute his job can have him
+  // again it has him.
+  return !jobHasWorkFor(state, job, workerId);
 }
 
 /** The stage the piece is at and the family it is done on: the CNC when the man can have one,
@@ -833,13 +842,13 @@ export interface ClosingReport {
 function labourMinuteCost(state: GameState): number {
   const crew = joiners(state);
   if (crew.length > 0) {
-    const weekly = crew.reduce((total, worker) => total + worker.weeklyWage, 0) / crew.length;
-    return workerMinuteCost(weekly);
+    const monthly = crew.reduce((total, worker) => total + worker.monthlyWage, 0) / crew.length;
+    return workerMinuteCost(monthly);
   }
   const middling = HIRING_SPECS.find(
     (spec) => spec.role === 'joiner' && spec.tier === 'experienced',
   );
-  return workerMinuteCost(middling?.weeklyWage ?? 0);
+  return workerMinuteCost(middling?.monthlyWage ?? 0);
 }
 
 /** The closing report: pieces made, revenue, material, labour hours at cost, the net margin. */
