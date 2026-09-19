@@ -5,10 +5,8 @@ import {
   ADMIN_COVER_RATE,
   CONSUMABLES_LABEL,
   DRAFTSMAN_RATE,
-  ESTIMATOR_JOBS_PER_DAY,
-  ESTIMATOR_JOBS_WITH_JOINERY_CORE,
-  ESTIMATOR_RATES,
-  JOINERY_CORE_EXTENSION_JOBS,
+  MINUTES_PER_WORKING_DAY,
+  WORKER_RATES,
   JOINERY_CORE_EXTENSION_PRICE_YEARLY,
   JOINERY_CORE_MAX_EXTENSIONS,
   JOINERY_CORE_PRICE_YEARLY,
@@ -36,38 +34,49 @@ import {
   MATERIAL_ORDER_MINUTES_LOW,
   MATERIAL_ORDER_PRICE_HIGH,
   MATERIAL_ORDER_PRICE_LOW,
+  MATERIAL_TAKE_OFF_MINUTES,
+  JOINERY_CORE_TAKE_OFF_FACTOR,
+  JOINERY_CORE_EXTENSION_TAKE_OFF_FACTOR,
   SERVICE_MINUTES,
   SITE_MEASURE_MINUTES,
   SOFTWARE_DESIGN_FACTOR,
   STAFF_MANAGEMENT_MINUTES_PER_JOINER,
   UNLOAD_BASE_MINUTES,
+  WEEK_JOBS_KEPT,
   WORK_EPSILON,
 } from './constants';
 import { DAY_END_MINUTE } from './constants';
 import { isBreak, nextWorkingDay, weekOfDay } from './clock';
-import { has } from './machines';
+import { OWNER, has } from './machines';
 import { canUnload } from './materials';
 import { managerOnDuty, ownerIsAvailable } from './owner';
 import { makeId } from './rng';
 import { plural } from './text';
 import {
+  crewHasGoneHome,
+  effortSoFar,
   hasWorkingDay,
   helperOnDuty,
   isWorkingToday,
   joiners,
   staffMinutesLeft,
+  weekMetersOf,
 } from './staff';
 import { websiteUpkeepMinutes } from './website';
 import type {
   DayCategory,
   GameState,
+  OwnerState,
   Worker,
   SoftwareTier,
   TaskCategory,
   TaskInstance,
   TaskKind,
   TaskOrder,
+  WeekCategory,
+  WeekMeters,
   WorkerRole,
+  WorkerTier,
 } from './types';
 
 /** Which bar segment a task fills, who may be asked to do it, and who takes it off the owner
@@ -112,7 +121,14 @@ const TASK_DEFINITIONS: Record<TaskKind, TaskDefinition> = {
   // The take off is the owner's until an estimator is taken on, and then his, so many a day
   // (CLAUDE.md T13 3.8).
   materialTakeOff: { category: 'admin', eligibleRoles: ['estimator'], autoRoles: ['estimator'] },
-  siteMeasure: { category: 'admin', eligibleRoles: [], autoRoles: [] },
+  // The site measure is a day out with a tape. It was the owner's alone; from tonight the
+  // estimator goes when there is no owner free for it, with the day's travel minutes coming off
+  // his own 480 and not the owner's, and a salesman can be sent (PIOTR; CLAUDE.md T20 2.3).
+  siteMeasure: {
+    category: 'admin',
+    eligibleRoles: ['estimator', 'salesman'],
+    autoRoles: ['estimator'],
+  },
   // The website's weekly minutes: the owner's, or the admin's (CLAUDE.md T13 3.7).
   websiteUpkeep: { category: 'admin', eligibleRoles: ['officeAdmin'], autoRoles: ['officeAdmin'] },
   unload: { category: 'workshop', eligibleRoles: ['joiner', 'helper'], autoRoles: ['helper'] },
@@ -124,7 +140,9 @@ const TASK_DEFINITIONS: Record<TaskKind, TaskDefinition> = {
     autoRoles: ['helper'],
   },
   deliver: { category: 'workshop', eligibleRoles: ['joiner', 'helper'], autoRoles: [] },
-  service: { category: 'workshop', eligibleRoles: ['joiner'], autoRoles: [] },
+  // A service is called in and paid for, never worked off: nobody is eligible for one, so the
+  // Tasks page draws no Start against it (PIOTR, 18.09; CLAUDE.md T20 2.9.2).
+  service: { category: 'workshop', eligibleRoles: [], autoRoles: [] },
   repair: { category: 'workshop', eligibleRoles: ['joiner'], autoRoles: [] },
   moveMachines: { category: 'workshop', eligibleRoles: ['joiner', 'helper'], autoRoles: [] },
   // The owner does his own interviewing and his own waiting for the laptop: there is nobody to
@@ -132,6 +150,17 @@ const TASK_DEFINITIONS: Record<TaskKind, TaskDefinition> = {
   hiring: { category: 'admin', eligibleRoles: [], autoRoles: [] },
   booting: { category: 'admin', eligibleRoles: [], autoRoles: [] },
 };
+
+/** Who may be sent at this job of work, and who takes it off the owner without being asked. The
+ *  one reading of the table from outside this module, so nothing keeps a second list of who does
+ *  what (CLAUDE.md T20 2.3 moved the site measure onto the estimator). */
+export function rolesForTask(kind: TaskKind): {
+  eligible: ReadonlyArray<WorkerRole>;
+  auto: ReadonlyArray<WorkerRole>;
+} {
+  const definition = TASK_DEFINITIONS[kind];
+  return { eligible: definition.eligibleRoles, auto: definition.autoRoles };
+}
 
 /** Every kind of task the runner knows about, off the runner's own table. The one list: a test
  *  that asks "every kind of task in the game" asks this and not the table it is checking. */
@@ -183,24 +212,35 @@ export function isHelperTask(state: GameState, task: TaskInstance): boolean {
   return HELPER_ONLY_KINDS.includes(task.kind) && helperOnDuty(state);
 }
 
-/** The man who is sweeping the hall this minute, or null. The one selector: the chip under the
- *  hall says his name and draws no button while he has it, because the labourer cleans without
- *  being asked and the player is not put the question (PIOTR, 17.09; CLAUDE.md T19 2.7). Null for
- *  the owner sweeping it himself off Clean up, which is his own override and keeps its button.
+/** The man who has the one open job of work of this kind in his hands this minute, or null. Both
+ *  halves have to be true: the task names him and he names it. A task the owner took on himself
+ *  answers null, because that is his own override and it keeps its button. The one selector: the
+ *  chips under the hall say his name and draw no button while he has it, because the labourer
+ *  sweeps and empties the bags without being asked and the player is not put the question
+ *  (PIOTR, 17.09 and 18.09; CLAUDE.md T19 2.7, T20 2.8).
  *
  *  There is no flag for "once per dirtying" and none is wanted: an open cleaning task IS the
  *  flag, because the hall raises one and only one while the dust is up, and finishing it puts the
  *  dust back to nought so the band is clean again until the hall dirties afresh. */
-export function cleanerAtWork(state: GameState): Worker | null {
-  const task = state.tasks.find((entry) => entry.kind === 'cleaning' && !entry.done);
+export function manOnOpenTask(state: GameState, kind: TaskKind): Worker | null {
+  const task = state.tasks.find((entry) => entry.kind === kind && !entry.done);
   if (!task || task.doneBy === null) return null;
   const worker = state.workers.find((entry) => entry.id === task.doneBy);
   if (!worker || worker.taskId !== task.id) return null;
   return worker;
 }
 
+/** The man who is sweeping the hall this minute, or null: `manOnOpenTask` asked about the broom. */
+export function cleanerAtWork(state: GameState): Worker | null {
+  return manOnOpenTask(state, 'cleaning');
+}
+
 /** What the hall says while the van or the bag is waiting for the man whose job it is. */
 export const WAITING_FOR_HELPER = 'Waiting for the helper';
+
+/** What the service row says instead of a Start: nobody stands at a service, it is called in and
+ *  paid for from the Machines page (PIOTR, 18.09; CLAUDE.md T20 2.9). */
+export const SERVICE_IS_CALLED_IN = 'Call it in on the Machines page';
 
 /** Float guard, not a game number: work this small is finished work. It lives in constants.ts
  *  with every other figure and is handed on from here, where it has always been imported from. */
@@ -271,13 +311,44 @@ export function equipmentUnloadMinutes(state: GameState): number {
   return Math.round(EQUIPMENT_UNLOAD_MINUTES * unloadFactor(state));
 }
 
-/** Take offs an estimator does in a day: five, ten with Joinery Core, and five more per extension,
- *  at most two of them (PIOTR; CLAUDE.md T13 3.8). The jump from five to ten is the one that is
- *  meant to be felt. */
-export function estimatorCapacity(state: GameState): number {
-  if (!state.software.joineryCore) return ESTIMATOR_JOBS_PER_DAY;
-  const extensions = Math.min(JOINERY_CORE_MAX_EXTENSIONS, state.software.joineryCoreExtensions);
-  return ESTIMATOR_JOBS_WITH_JOINERY_CORE + extensions * JOINERY_CORE_EXTENSION_JOBS;
+/** The minutes one take off is worth with this software on the laptop. */
+function takeOffMinutesWith(core: boolean, extensions: number): number {
+  if (!core) return MATERIAL_TAKE_OFF_MINUTES;
+  const held = Math.max(0, Math.min(JOINERY_CORE_MAX_EXTENSIONS, extensions));
+  return (
+    MATERIAL_TAKE_OFF_MINUTES *
+    JOINERY_CORE_TAKE_OFF_FACTOR *
+    JOINERY_CORE_EXTENSION_TAKE_OFF_FACTOR ** held
+  );
+}
+
+/** One entry per extension the laptop can hold, for the line that prices them. */
+const EXTENSION_STEPS: number[] = [];
+for (let step = 1; step <= JOINERY_CORE_MAX_EXTENSIONS; step += 1) EXTENSION_STEPS.push(step);
+
+/** The minutes a take off carries in this workshop: the one figure the task is created with. */
+export function takeOffMinutes(state: GameState): number {
+  return takeOffMinutesWith(state.software.joineryCore, state.software.joineryCoreExtensions);
+}
+
+/** How many of them a man of this class gets through in a day: his working minutes over the
+ *  minutes one costs him at his own rate, whole ones only. Not a number of jobs any more: he does
+ *  as many as his minutes allow (PIOTR, 18.09: "the estimator does five a day when the owner does
+ *  sixteen"; CLAUDE.md T20 2.3). An experienced man does 16 a day bare and 32 with Joinery Core. */
+function capacityFor(minutesEach: number, tier: WorkerTier): number {
+  if (minutesEach <= 0) return 0;
+  return Math.floor((MINUTES_PER_WORKING_DAY * WORKER_RATES[tier]) / minutesEach);
+}
+
+export function estimatorCapacity(state: GameState, tier: WorkerTier = 'experienced'): number {
+  return capacityFor(takeOffMinutes(state), tier);
+}
+
+/** The man the software is bought for: the estimator on the books, if there is one. The figures on
+ *  the Technical tab are his day, not a stranger's, because a take off is half an hour of the desk
+ *  it is done at and his class is what makes it 37 minutes or 21 (CLAUDE.md T20 2.3). */
+function deskEstimator(state: GameState): Worker | null {
+  return state.workers.find((worker) => worker.role === 'estimator') ?? null;
 }
 
 /** What the Technical tab says about Joinery Core: whether it is on the laptop, what it and its
@@ -287,11 +358,18 @@ export interface JoineryCoreOffer {
   held: boolean;
   extensions: number;
   maxExtensions: number;
-  /** Take offs a day as things stand. */
+  /** Take offs a day as things stand, for the man whose day this is. */
   capacity: number;
+  /** The minutes one of them costs him, at his own rate. */
+  minutesEach: number;
   baseCapacity: number;
   coreCapacity: number;
-  extensionJobs: number;
+  /** A day's take offs with the core and one extension, and with both (CLAUDE.md T20 2.3). */
+  extensionCapacities: number[];
+  /** Whose day every figure above is: the estimator on the books, or nobody, and then they are
+   *  the experienced man's and the page says so (CLAUDE.md T20 2.3). */
+  estimator: string | null;
+  tier: WorkerTier;
   yearlyPrice: number;
   extensionYearlyPrice: number;
   core: { ok: boolean; reason: string };
@@ -307,14 +385,23 @@ export function joineryCoreOffer(state: GameState): JoineryCoreOffer {
   let extension = { ok: true, reason: '' };
   if (!held) extension = { ok: false, reason: 'Joinery Core first' };
   else if (extensions >= JOINERY_CORE_MAX_EXTENSIONS) extension = { ok: false, reason: 'Both extensions bought' };
+  // The man at the desk, or the experienced man the trade is measured against when the desk is
+  // empty: the player is never shown a day that is nobody's (CLAUDE.md T20 2.3).
+  const man = deskEstimator(state);
+  const tier = man?.tier ?? 'experienced';
   return {
     held,
     extensions,
     maxExtensions: JOINERY_CORE_MAX_EXTENSIONS,
-    capacity: estimatorCapacity(state),
-    baseCapacity: ESTIMATOR_JOBS_PER_DAY,
-    coreCapacity: ESTIMATOR_JOBS_WITH_JOINERY_CORE,
-    extensionJobs: JOINERY_CORE_EXTENSION_JOBS,
+    capacity: estimatorCapacity(state, tier),
+    minutesEach: Math.round(takeOffMinutes(state) / WORKER_RATES[tier]),
+    baseCapacity: capacityFor(takeOffMinutesWith(false, 0), tier),
+    coreCapacity: capacityFor(takeOffMinutesWith(true, 0), tier),
+    extensionCapacities: EXTENSION_STEPS.map((step) =>
+      capacityFor(takeOffMinutesWith(true, step), tier),
+    ),
+    estimator: man === null ? null : man.name,
+    tier,
     yearlyPrice: JOINERY_CORE_PRICE_YEARLY,
     extensionYearlyPrice: JOINERY_CORE_EXTENSION_PRICE_YEARLY,
     core,
@@ -364,13 +451,14 @@ export interface TaskDraft {
 
 export function createTask(state: GameState, draft: TaskDraft): TaskInstance {
   const definition = TASK_DEFINITIONS[draft.kind];
+  const minutes = draft.minutes;
   const task: TaskInstance = {
     id: makeId(state, 'task'),
     kind: draft.kind,
     category: definition.category,
     label: draft.label,
-    minutesTotal: draft.minutes,
-    minutesRemaining: draft.minutes,
+    minutesTotal: minutes,
+    minutesRemaining: minutes,
     jobId: draft.jobId ?? null,
     equipmentId: draft.equipmentId ?? null,
     deliveryId: draft.deliveryId ?? null,
@@ -525,7 +613,7 @@ export function taskWorkRate(worker: Worker, task: TaskInstance): number {
   if (worker.role === 'draftsman' && task.kind === 'design') return DRAFTSMAN_RATE;
   // An estimator's tier is his speed at the take off (CLAUDE.md T13 3.8).
   if (worker.role === 'estimator' && task.kind === 'materialTakeOff') {
-    return ESTIMATOR_RATES[worker.tier ?? 'normal'];
+    return WORKER_RATES[worker.tier ?? 'experienced'];
   }
   return 1;
 }
@@ -542,8 +630,9 @@ function canTakeOn(state: GameState, worker: Worker, task: TaskInstance): boolea
   if (worker.taskId !== null) return false;
   if (hasWorkingDay(worker.role) && staffMinutesLeft(worker) <= 0) return false;
   if (task.kind === 'materialTakeOff' && worker.role === 'estimator') {
-    // So many a day, and none before the drawing it reads (CLAUDE.md T13 3.8).
-    if (worker.ordersToday >= estimatorCapacity(state)) return false;
+    // As many as his minutes allow, and none before the drawing it reads. The count of jobs a day
+    // is gone: his 480 minutes above are the whole of the cap now, so a quicker man and a laptop
+    // with Joinery Core on it both show in the pile he gets through (PIOTR; CLAUDE.md T20 2.3).
     return !designOutstandingFor(state, task.jobId);
   }
   return true;
@@ -577,6 +666,130 @@ export function bestTakerOf(
     }
   }
   return best;
+}
+
+// ---------------------------------------------------------------------------
+// The week's meters (CLAUDE.md T20 2.7). One sample a minute of what every man on the books was
+// doing, into the meters `src/engine/staff.ts` keeps on him. It hangs off `assignStaffTasks`
+// because that is the one hook the day already runs over the whole crew every minute; the sample
+// is guarded by the day and the minute it was taken on, so a minute the state settles more than
+// once is never counted twice. A line of its own in `settle` was not taken: one hook over the
+// crew is one code path, and two would be two (REPORT-T20.md, what was not done).
+// ---------------------------------------------------------------------------
+
+/** Which of the six bands of a man's week a job of work falls in. The desk is the office and the
+ *  drawing board; the van and the rack are the unloading; the broom and the spanner are the
+ *  cleaning; the tape measure is the site (CLAUDE.md T20 2.7). */
+export const WEEK_CATEGORY_OF_TASK: Record<TaskKind, WeekCategory> = {
+  emails: 'desk',
+  bookkeeping: 'desk',
+  dailyOrdering: 'desk',
+  staffManagement: 'desk',
+  clientCall: 'desk',
+  clientMeeting: 'desk',
+  design: 'desk',
+  materialTakeOff: 'desk',
+  websiteUpkeep: 'desk',
+  hiring: 'desk',
+  booting: 'desk',
+  siteMeasure: 'site',
+  unload: 'unloading',
+  fetchStorage: 'unloading',
+  deliver: 'unloading',
+  emptyBags: 'cleaning',
+  cleaning: 'cleaning',
+  service: 'cleaning',
+  repair: 'cleaning',
+  moveMachines: 'cleaning',
+};
+
+/** What this man was at this minute, or null while he was standing about. */
+function bandOf(state: GameState, taskId: string | null, jobId: string | null): WeekCategory | null {
+  if (taskId !== null) {
+    const task = findTask(state, taskId);
+    return task ? WEEK_CATEGORY_OF_TASK[task.kind] : null;
+  }
+  if (jobId === null) return null;
+  // A man on a contract carries its marker in `jobId`, which is no job of the board's: if the
+  // jobs do not know it, he is on the standing work (CLAUDE.md T13 3.16).
+  return state.jobs.some((job) => job.id === jobId) ? 'jobs' : 'contracts';
+}
+
+/** The name of the job he stood at this minute, for the list on his row. */
+function jobNameOf(state: GameState, jobId: string | null): string | null {
+  if (jobId === null) return null;
+  return state.jobs.find((job) => job.id === jobId)?.name ?? null;
+}
+
+/** Books one minute onto one man's week: the minute he was paid for, and the band it went into if
+ *  he actually worked it. The clock paid for it and his own counters say whether he put anything
+ *  into it: a joiner standing at an empty rack keeps his job and raises neither, so his week reads
+ *  the hours he was there and the nothing he did with them (CLAUDE.md T20 2.7). */
+function bookOne(
+  state: GameState,
+  holder: Worker | OwnerState,
+  week: number,
+  band: WeekCategory | null,
+  jobName: string | null,
+): WeekMeters | null {
+  const meters = weekMetersOf(holder, week);
+  if (meters.day === state.clock.day && meters.minute === state.clock.minute) return null;
+  const effort = effortSoFar(holder);
+  // His task counter goes back to nought every morning, so the day's first sample takes a
+  // baseline off it and credits nothing; the bench counter never goes back.
+  const sameDay = meters.day === state.clock.day;
+  const worked = effort.bench > meters.seenBench || (sameDay && effort.task > meters.seenTask);
+  meters.seenBench = effort.bench;
+  meters.seenTask = effort.task;
+  meters.day = state.clock.day;
+  meters.minute = state.clock.minute;
+  meters.paidMinutes += 1;
+  if (!worked) return meters;
+  if (band !== null) meters.minutes[band] += 1;
+  if (jobName !== null && !meters.jobs.includes(jobName) && meters.jobs.length < WEEK_JOBS_KEPT) {
+    meters.jobs.push(jobName);
+  }
+  return meters;
+}
+
+/** The pieces a standing contract turned out since the last sample, shared among the men who are
+ *  on it: a piece two men made is half of each man's week (CLAUDE.md T20 2.7). What it had counted
+ *  last time is `piecesSeenByTheWeek`, on the contract itself, so it is cloned and saved with it
+ *  and two games can never read each other's count. */
+function bookContractPieces(state: GameState, week: number): void {
+  for (const contract of state.contracts) {
+    const seen = contract.piecesSeenByTheWeek;
+    contract.piecesSeenByTheWeek = contract.piecesMade;
+    if (seen === undefined || contract.piecesMade <= seen) continue;
+    const hands = state.workers.filter((worker) => contract.assigned.includes(worker.id));
+    if (hands.length === 0) continue;
+    const share = (contract.piecesMade - seen) / hands.length;
+    for (const worker of hands) weekMetersOf(worker, week).pieces += share;
+  }
+}
+
+/** One sample of the minute just worked, over the owner and everybody on the books. */
+export function bookWeekMinutes(state: GameState): void {
+  const week = weekOfDay(state.clock.day);
+  const owner = state.owner;
+  if (ownerIsAvailable(state)) {
+    const job = state.jobs.find((entry) => entry.assignees.includes(OWNER)) ?? null;
+    const band = bandOf(state, owner.currentTaskId, job?.id ?? null);
+    bookOne(state, owner, week, band, job?.name ?? null);
+  }
+  // Five o'clock and the men have gone home. The clock runs on for the owner and for nobody else,
+  // so nobody else is paid for the evening or counted through it (CLAUDE.md T17 2.12).
+  if (!crewHasGoneHome(state)) {
+    for (const worker of state.workers) {
+      // The day shift, and only the day shift: the night runs its own minute loop and never
+      // settles, so a man on it is left out of the meters rather than sampled through a day he
+      // was asleep for (REPORT-T20.md, what was not done).
+      if (!isWorkingToday(state, worker)) continue;
+      const band = bandOf(state, worker.taskId, worker.jobId);
+      bookOne(state, worker, week, band, jobNameOf(state, worker.jobId));
+    }
+  }
+  bookContractPieces(state, week);
 }
 
 /** A worker on the books takes the tasks his role covers, and the owner never sees them. Every
@@ -640,6 +853,12 @@ export function startTaskCheck(
   const task = findTask(state, taskId);
   if (!task) return refused('That job of work has gone');
   if (task.done) return refused('Done');
+  // A service is called in and paid for, never worked off: Turn 8's half hour at the spanner went
+  // with the rule of CLAUDE.md T20 2.9, and `applyTaskCompletion` has no service case any more.
+  // The reminder stays on the list so the player sees the machine is due, and it points him at
+  // the one path that services it: the Machines page, or the choice on the event
+  // (`callServiceIn`), both of which close this task.
+  if (task.kind === 'service') return refused(SERVICE_IS_CALLED_IN);
   if (!ownerIsAvailable(state)) return refused('The owner is not in today');
   // The unloading, the bags and the cleaning are the helper's while he is here.
   if (!force && isHelperTask(state, task)) return refused(WAITING_FOR_HELPER);

@@ -11,7 +11,7 @@ import {
   DUST_MAX,
   NIGHT_ERROR_FACTOR,
   NIGHT_RATE,
-  PRODUCTION_MANAGER_MONTHLY_WAGE,
+  PRODUCTION_MANAGER_WEEKLY_WAGE,
   SECOND_SHIFT_MINUTES,
   STAFF_MANAGEMENT_MINUTES_PER_JOINER,
   WORKER_HOURS_PER_WEEK,
@@ -51,8 +51,8 @@ function manager(id = 'pm-1'): Worker {
     role: 'productionManager',
     tier: null,
     rate: 0,
-    weeklyWage: 0,
-    monthlyWage: PRODUCTION_MANAGER_MONTHLY_WAGE,
+    weeklyWage: PRODUCTION_MANAGER_WEEKLY_WAGE,
+    leavesOnDay: null,
     startDay: 1,
     jobId: null,
     taskId: null,
@@ -203,8 +203,8 @@ describe('the second shift', () => {
     state.owner.wentHome = true;
     const rates = hands(state, { shift: 'night' }).map((hand) => hand.rate);
     expect(rates).toEqual([
-      WORKER_RATES.poor * absenceFactor(true),
-      WORKER_RATES.poor * absenceFactor(true),
+      WORKER_RATES.novice * absenceFactor(true),
+      WORKER_RATES.novice * absenceFactor(true),
     ]);
     expect(absenceFactor(true)).toBe(0.92);
   });

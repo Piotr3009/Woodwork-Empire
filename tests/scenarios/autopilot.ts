@@ -17,7 +17,7 @@ import {
   tick,
   unconnectedMachines,
 } from '../../src/engine/index';
-import type { Contract, GameEvent, GameState, TaskInstance } from '../../src/engine/index';
+import type { Contract, GameEvent, GameState, TaskInstance, WorkerTier } from '../../src/engine/index';
 
 /** What the script answers when the clock stops for a decision. */
 export function answer(state: GameState, policy?: Policy): string {
@@ -43,6 +43,7 @@ export function answer(state: GameState, policy?: Policy): string {
   if (event.kind === 'clientOffer' && policy?.acceptOffer !== undefined) {
     return policy.acceptOffer(state, event) ? 'accept' : 'decline';
   }
+  if (event.kind === 'serviceDue' && ids.includes('later')) return 'later';
   for (const preferred of ['accept', 'answer', 'unload', 'owner', 'storage', 'next', 'ok']) {
     if (ids.includes(preferred)) return preferred;
   }
@@ -58,7 +59,6 @@ const TASK_ORDER: TaskInstance['kind'][] = [
   'unload',
   'emptyBags',
   'repair',
-  'service',
   'fetchStorage',
   'clientCall',
   'emails',
@@ -69,6 +69,10 @@ const TASK_ORDER: TaskInstance['kind'][] = [
   'design',
   'materialTakeOff',
   'cleaning',
+  // No service here. From CLAUDE.md T20 2.9 a service is called in and paid for at the call and
+  // nobody stands at the machine with a spanner, so the reminder on the list is a reminder and
+  // not a job of work: `startTaskCheck` refuses it and points at the Machines page. The scripted
+  // owner walks past it the way he walks past the helper's jobs of work.
 ];
 
 function nextTask(state: GameState): TaskInstance | null {
@@ -93,12 +97,14 @@ export interface Policy {
   cleanAbove: number;
   /** Templates the script will take, dearest first. Nothing else is touched. */
   wanted: string[];
-  /** Take one poor joiner on, with the kit he needs, on day 1. */
+  /** Take one joiner with no experience on, with the kit he needs, on day 1. */
   hireJoiner: boolean;
-  /** Take this many poor joiners on instead of one, each with his own kit (CLAUDE.md T7 3.1). */
+  /** Take this many of them on instead of one, each with his own kit (CLAUDE.md T7 3.1). */
   joiners?: number;
-  /** The tier of the joiners taken on; the poor one unless the month says otherwise. */
-  joinerTier?: 'poor' | 'normal' | 'super';
+  /** The tier of the joiners taken on. All four of them, in the words of TIER_WORDS: no
+   *  experience, experienced, super experienced, extremely experienced (CLAUDE.md T20 2.5). The
+   *  man with no experience unless the month says otherwise. */
+  joinerTier?: WorkerTier;
   /** How the management software is paid for: outright unless the month says the subscription. */
   licence?: 'oneOff' | 'subscription';
   /** Saws to stand in the hall beyond the one in the day 1 kit. A machine serves one man at a
@@ -355,7 +361,7 @@ function takeOnJoiner(state: GameState, policy: Policy): GameState {
     for (const specId of JOINER_KIT) {
       next = applyAction(next, { type: 'BUY_EQUIPMENT', specId, variantId: DAY_ONE_CLASS[specId] });
     }
-    next = applyAction(next, { type: 'HIRE', role: 'joiner', tier: policy.joinerTier ?? 'poor' });
+    next = applyAction(next, { type: 'HIRE', role: 'joiner', tier: policy.joinerTier ?? 'novice' });
   }
   return next;
 }

@@ -6,7 +6,7 @@ import { formatCalendarDay, workPlan } from '../engine/index';
 import type { GameState, Job, PlanRow, WorkPlan } from '../engine/index';
 // Straight off their own module, not round the public API, which Turn 13 froze (REPORT-T13 10).
 import { canTakeOver, ownerTookOver } from '../engine/jobs';
-import { renderContractBar } from './contracts';
+import { renderContractsTab } from './contracts';
 import {
   callsLine,
   dropControl,
@@ -15,7 +15,7 @@ import {
   jobLifecycleRow,
   materialLine,
 } from './jobCard';
-import { button, emptyLine, escapeHtml, money } from './modal';
+import { button, emptyLine, escapeHtml, money, tabBar } from './modal';
 
 /** Where a point of the axis sits across it, as a percentage. One axis for every row, so the blue
  *  line is the same line on all of them. The axis is in working days: Monday comes straight after
@@ -145,17 +145,47 @@ function scaleHtml(plan: WorkPlan): string {
   );
 }
 
+/** The two tabs of the folder the Work Plan is read in: the jobs, and the standing contracts
+ *  (PIOTR, the mockup of docs/mockups/t20; CLAUDE.md T20 2.1). */
+export type WorkPlanTab = 'jobs' | 'contracts';
+
+const WORK_PLAN_TABS: Array<[string, string]> = [
+  ['jobs', 'Jobs'],
+  ['contracts', 'Contracts'],
+];
+
+export function workPlanTabFrom(value: string): WorkPlanTab {
+  return value === 'contracts' ? 'contracts' : 'jobs';
+}
+
 export function renderWorkPlan(
   state: GameState,
+  /** Which of the two tabs is on top (CLAUDE.md T20 2.1). */
+  tab: WorkPlanTab = 'jobs',
   dropConfirm: string | null = null,
-  /** The job whose Assign to this job list is open, or null for none (CLAUDE.md T19 2.5). */
+  /** The job or contract whose Assign list is open, or null for none (CLAUDE.md T19 2.5). */
   assignOpen: string | null = null,
+  /** The man an offer card is worked out for, or null for the card's own first choice
+   *  (CLAUDE.md T20 2.1.1). */
+  contractMan: string | null = null,
+): string {
+  const tabs = tabBar('workPlanTab', WORK_PLAN_TABS, tab);
+  // The Contracts tab is the drawing of docs/mockups/t20/contracts-tab.html; the Jobs tab is what
+  // the modal always was, less the contract bar, which has moved into Running
+  // (CLAUDE.md T20 2.1, 2.1.5).
+  if (tab === 'contracts') return tabs + renderContractsTab(state, assignOpen, contractMan);
+  return tabs + jobsTab(state, dropConfirm, assignOpen);
+}
+
+function jobsTab(
+  state: GameState,
+  dropConfirm: string | null,
+  assignOpen: string | null,
 ): string {
   const plan = workPlan(state);
-  // The standing contracts have a bar of their own, apart from the jobs, under them so the
-  // modal's lead never covers it (CLAUDE.md T13 3.16; PIOTR, 18.09).
-  const contracts = renderContractBar(state, assignOpen);
-  if (plan.rows.length === 0) return emptyLine('No jobs yet. Open the board.') + contracts;
+  // The contract bar of v28 has left this tab: its chips and its button are in Running, on the
+  // Contracts tab (PIOTR; CLAUDE.md T20 2.1.5).
+  if (plan.rows.length === 0) return emptyLine('No jobs yet. Open the board.');
   const rows = plan.rows
     .map((row) => {
       const job = state.jobs.find((entry) => entry.id === row.jobId);
@@ -181,7 +211,6 @@ export function renderWorkPlan(
     'turns red. A job nobody has started yet carries the yellow tick on the last day it can be ' +
     'started and still be on time. The axis is working days: Monday follows Friday and no ' +
     'deadline falls at a weekend.</p>' +
-    `<div class="plan">${scaleHtml(plan)}${rows}</div>` +
-    contracts
+    `<div class="plan">${scaleHtml(plan)}${rows}</div>`
   );
 }

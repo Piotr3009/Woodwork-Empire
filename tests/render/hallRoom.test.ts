@@ -20,7 +20,7 @@ import {
   roomSilhouette,
   wallMatrix,
 } from '../../src/render/hall';
-import { DOOR_PHASES, doorIsUsed, doorLeaf, doorOpening, points } from '../../src/render/hall';
+import { doorIsUsed, doorLeaf, doorOpening, points } from '../../src/render/hall';
 import { TILE_RISE, centreOf, pointInPolygon, tileToScreen } from '../../src/render/iso';
 import { roomById, roomDoorCell } from '../../src/engine/constants';
 import {
@@ -308,76 +308,63 @@ describe('where the owner stands', () => {
   });
 });
 
-describe('the doors open (PIOTR, 17.09; CLAUDE.md T19 2.3)', () => {
+describe('the doors are closed, and a man goes through them (PIOTR, 18.09; CLAUDE.md T20 2.12)', () => {
   const OFFICE = ROOM_LAYOUT.find((room) => room.id === 'office');
   const CANTEEN = ROOM_LAYOUT.find((room) => room.id === 'canteen');
 
-  it('draws every door in three states, a leaf on its hinge over a dark opening', () => {
+  it('draws every door with one closed leaf over a dark opening, and no other state', () => {
     if (!OFFICE || !CANTEEN) throw new Error('no rooms');
     const svg = hall();
     for (const room of [OFFICE, CANTEEN]) {
       expect(svg).toContain(`data-door-room="${room.id}"`);
-      // The dark hole in the face, which is the opening the leaf swings out of.
+      // The dark hole in the face, with the shut leaf lying in it.
       expect(svg).toContain(`<polygon points="${points(doorOpening(room))}" class="door-opening" />`);
-      for (const phase of DOOR_PHASES) {
-        expect(svg, `${room.id} ${phase}`).toContain(
-          `<polygon class="door-leaf" data-state="${phase}" points="${points(doorLeaf(room, phase))}" />`,
-        );
-      }
+      expect(svg, room.id).toContain(
+        `<polygon class="door-leaf" data-state="closed" points="${points(doorLeaf(room))}" />`,
+      );
     }
-    // Three leaves per door and no more, and the stylesheet shows the one the state names.
-    expect(svg.match(/class="door-leaf"/g) ?? []).toHaveLength(DOOR_PHASES.length * 2);
+    // One leaf per door and no more: the swing of Turn 19 is gone and its two open frames with it.
+    expect(svg.match(/class="door-leaf"/g) ?? []).toHaveLength(2);
+    expect(svg).not.toContain('data-door-want');
+    expect(svg).not.toContain('data-state="half"');
+    expect(svg).not.toContain('data-state="open"');
   });
 
-  it('hangs the leaf on the left jamb and swings it out into the hall', () => {
+  it('hangs the closed leaf on the left jamb, flat in the face, the height of the opening', () => {
     if (!OFFICE) throw new Error('no office');
     const door = roomDoorBox(OFFICE);
     const face = OFFICE.y + OFFICE.depth;
     const hinge = { x: OFFICE.x + door.from, y: face };
-    // Closed lies in the face, open is square out of it, and both are hung on the same jamb
-    // (docs/art/SPRITES.md 9.3: the room doors open into the hall).
-    expect(doorLeaf(OFFICE, 'closed')[0]).toEqual(tileToScreen(hinge.x, hinge.y, 0));
-    expect(doorLeaf(OFFICE, 'open')[0]).toEqual(tileToScreen(hinge.x, hinge.y, 0));
-    expect(doorLeaf(OFFICE, 'closed')[1]).toEqual(tileToScreen(hinge.x + door.across, face, 0));
-    expect(doorLeaf(OFFICE, 'open')[1]).toEqual(tileToScreen(hinge.x, face + door.across, 0));
-    // And every leaf is the full height of the opening.
-    for (const phase of DOOR_PHASES) {
-      const leaf = doorLeaf(OFFICE, phase);
-      expect(leaf).toHaveLength(4);
-      expect(leaf[3]?.y).toBeLessThan(leaf[0]?.y ?? 0);
-    }
-    // Every leaf is also wide enough to be seen. A leaf at world forty five degrees projects to
-    // exactly no width in this dimetric (screen x is (x - y) * 24), so the middle of the swing
-    // read as a sliver until the half angle was moved off it (T19-C4, found in the picture).
-    const full = Math.abs(
-      (doorLeaf(OFFICE, 'closed')[1]?.x ?? 0) - (doorLeaf(OFFICE, 'closed')[0]?.x ?? 0),
+    const leaf = doorLeaf(OFFICE);
+    expect(leaf[0]).toEqual(tileToScreen(hinge.x, hinge.y, 0));
+    expect(leaf[1]).toEqual(tileToScreen(hinge.x + door.across, face, 0));
+    expect(leaf).toHaveLength(4);
+    expect(leaf[3]?.y).toBeLessThan(leaf[0]?.y ?? 0);
+    // It is the width of the opening it lies in, which is what closed means.
+    const opening = doorOpening(OFFICE);
+    expect(Math.abs((leaf[1]?.x ?? 0) - (leaf[0]?.x ?? 0))).toBeCloseTo(
+      Math.abs((opening[1]?.x ?? 0) - (opening[0]?.x ?? 0)),
+      6,
     );
-    for (const phase of DOOR_PHASES) {
-      const leaf = doorLeaf(OFFICE, phase);
-      const wide = Math.abs((leaf[1]?.x ?? 0) - (leaf[0]?.x ?? 0));
-      expect(wide / full, phase).toBeGreaterThan(0.25);
-    }
   });
 
-  it('wants the door open while somebody is standing in it, and shut when nobody is', () => {
+  it('takes the owner off the hall while he is through the office door, and not otherwise', () => {
     const state = buyStartingKit(newGame());
     state.owner.station = STATION_BENCH;
     expect(doorIsUsed(state, 'office')).toBe(false);
-    expect(renderHall(state, { files: DELIVERED })).toContain(
-      'data-door-room="office" data-door-want="closed"',
-    );
-    state.owner.station = STATION_OFFICE;
-    expect(doorIsUsed(state, 'office')).toBe(true);
-    expect(renderHall(state, { files: DELIVERED })).toContain(
-      'data-door-room="office" data-door-want="open"',
-    );
-    // The phone is the same desk and the same doorway.
-    state.owner.station = STATION_PHONE;
-    expect(doorIsUsed(state, 'office')).toBe(true);
-    // A man with nowhere to be stands in the canteen door, and it opens for him too.
+    expect(renderHall(state, { files: DELIVERED })).toContain('data-figure="owner"');
+    // Through the door: the office view draws him at his desk and the hall has nobody in the
+    // doorway (CLAUDE.md T20 2.12, T19 2.2).
+    for (const station of [STATION_OFFICE, STATION_PHONE]) {
+      state.owner.station = station;
+      expect(doorIsUsed(state, 'office'), station).toBe(true);
+      expect(renderHall(state, { files: DELIVERED }), station).not.toContain('data-figure="owner"');
+    }
+    // A man with nowhere to be stands about at the canteen door, in the hall, where the player
+    // can see him: the canteen is not a room the game draws, so nobody goes through that one.
     state.owner.station = STATION_IDLE;
     expect(doorIsUsed(state, 'canteen')).toBe(true);
-    expect(doorIsUsed(state, 'office')).toBe(false);
+    expect(renderHall(state, { files: DELIVERED })).toContain('data-figure="owner"');
   });
 
   it('keeps the office door a control and leaves the canteen click to the block', () => {
@@ -393,19 +380,21 @@ describe('the doors open (PIOTR, 17.09; CLAUDE.md T19 2.3)', () => {
   });
 });
 
-describe('the owner in the office doorway (PIOTR, 17.09; CLAUDE.md T19 2.2)', () => {
-  it('is never absent from the hall: he stands in the doorway, facing in', () => {
+describe('the owner through the office door (PIOTR, 18.09; CLAUDE.md T20 2.12)', () => {
+  it('is off the hall altogether while he is in the office, and the door is shut behind him', () => {
+    // Turn 19 stood him in the doorway, which is the thing Piotr asked to be rid of: a door is a
+    // door you go through. The office view draws him at his desk (T19 2.2 stays).
     const state = buyStartingKit(newGame());
     for (const station of [STATION_OFFICE, STATION_PHONE]) {
       state.owner.station = station;
       const svg = renderHall(state, { files: DELIVERED });
       const door = roomDoorCell('office');
-      expect(svg, station).toContain('data-figure="owner"');
-      expect(svg, station).toContain(`data-cell="${door.x},${door.y}"`);
-      // Facing in is facing away from the hall, up the screen.
-      expect(svg, station).toContain('data-facing-rest="ne"');
-      // And the door he is standing in is open behind him.
-      expect(svg, station).toContain('data-door-room="office" data-door-want="open"');
+      expect(svg, station).not.toContain('data-figure="owner"');
+      expect(svg, station).not.toContain(`data-cell="${door.x},${door.y}"`);
+      expect(svg, station).toContain('data-door-room="office" data-door-state="closed"');
     }
+    // And he is back on the floor the moment his work is on the floor.
+    state.owner.station = STATION_BENCH;
+    expect(renderHall(state, { files: DELIVERED })).toContain('data-figure="owner"');
   });
 });

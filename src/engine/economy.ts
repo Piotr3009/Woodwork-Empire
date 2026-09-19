@@ -457,12 +457,6 @@ export function weeklyWageBill(state: GameState): number {
     .reduce((total, worker) => total + worker.weeklyWage, 0);
 }
 
-export function monthlySalaryBill(state: GameState): number {
-  return state.workers
-    .filter((worker) => worker.monthlyWage > 0 && worker.startDay <= state.clock.day)
-    .reduce((total, worker) => total + worker.monthlyWage, 0);
-}
-
 /** The accountant charges for the mess on the 1st, and the longer it runs the dearer it gets
  *  (CLAUDE.md T2 3.5). */
 function runLateAccounts(state: GameState): void {
@@ -491,8 +485,9 @@ function runMonthlyItems(state: GameState): void {
     const interest = state.finance.arrearsAmount * ARREARS_MONTHLY_INTEREST;
     chargeUnavoidable(state, 'interest', 'Interest on the arrears', interest);
   }
-  const salaries = monthlySalaryBill(state);
-  if (salaries > 0) chargeUnavoidable(state, 'salaries', 'Office salaries', salaries);
+  // The office salary line is gone: everybody is paid by the week now, on the Fridays of the
+  // month, so charging a month of the office here would be paying them twice (PIOTR, 18.09;
+  // CLAUDE.md T20 2.6).
   if (state.software.mode === 'subscription') {
     chargeUnavoidable(state, 'software', 'Software subscription', SOFTWARE_SUBSCRIPTION_MONTHLY);
   }

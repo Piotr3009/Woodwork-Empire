@@ -94,18 +94,18 @@ describe('the four readings of 2.26', () => {
     expect(weekRate(state).paidHours).toBe(40);
   });
 
-  it('is pulled under 40 by a poor joiner who is idle half the day', () => {
-    // The owner at his work all day is 320; a poor joiner at 0.6 of him is 192 a day, and half
-    // of that is 96. Two men are sixteen hours paid for.
-    const poor = OWNER_LABOUR_VALUE_PER_DAY * WORKER_RATES.poor;
+  it('is pulled under 40 by a joiner with no experience who is idle half the day', () => {
+    // The owner at his work all day is 320; a joiner with no experience at 0.8 of him is 256 a
+    // day, and half of that is 128. Two men are sixteen hours paid for (CLAUDE.md T20 2.5).
+    const green = OWNER_LABOUR_VALUE_PER_DAY * WORKER_RATES.novice;
     const days = new Array<number>(RATE_WEEK_DAYS)
       .fill(0)
-      .map((_, index) => closed(index + 1, OWNER_LABOUR_VALUE_PER_DAY + poor / 2, PAID_HOURS_PER_WORKING_DAY * 2));
+      .map((_, index) => closed(index + 1, OWNER_LABOUR_VALUE_PER_DAY + green / 2, PAID_HOURS_PER_WORKING_DAY * 2));
     const rate = weekRate(withDays(days));
-    expect(rate.rate).toBe(26);
+    expect(rate.rate).toBe(28);
     expect(rate.rate).toBeLessThan(OWNER_RATE_PER_HOUR);
     expect(rate.people).toBe(2);
-    expect(rate.perMan).toBe(13);
+    expect(rate.perMan).toBe(14);
   });
 
   it('is pushed over 40 by an express job', () => {

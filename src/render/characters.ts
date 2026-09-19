@@ -16,6 +16,7 @@ import sheets from '../../public/sprites/characters.json';
 import { WALK_CELLS_PER_SECOND, WALK_STRIDE_METRES } from '../engine/constants';
 import {
   STATION_BENCH,
+  STATION_CLEANING,
   STATION_GATE,
   STATION_PHONE,
   STATION_RACK,
@@ -29,10 +30,25 @@ export type Facing = 'sw' | 'se' | 'nw' | 'ne';
 
 /** What a figure can be doing: every state the character system can be in has a frame key
  *  (CLAUDE.md T9 3.13, T13 3.23). `home` is the figure going home at the end of the day; no
- *  sheet is wanted for it, so it falls back to idle like any missing frame. */
-export type Animation = 'walk' | 'bench' | 'carry' | 'idle' | 'phone' | 'home';
+ *  sheet is wanted for it, so it falls back to idle like any missing frame.
+ *  `sweep` is the helper with a broom, whose sheet came in with v28 (CLAUDE.md T20 2.8). */
+export type Animation = 'walk' | 'bench' | 'carry' | 'idle' | 'phone' | 'home' | 'sweep';
 
-export const ANIMATIONS: readonly Animation[] = ['walk', 'bench', 'carry', 'idle', 'phone', 'home'];
+export const ANIMATIONS: readonly Animation[] = [
+  'walk',
+  'bench',
+  'carry',
+  'idle',
+  'phone',
+  'home',
+  'sweep',
+];
+
+/** What a role with no sheet of its own for an animation plays instead of it, before the idle
+ *  fallback of Turn 19 is reached. A man with no broom sheet sweeping is a man working with his
+ *  hands, so he plays the bench and not the standing about of idle: the helper has the broom, the
+ *  joiner and the owner fall to the bench (CLAUDE.md T20 2.8). */
+const INSTEAD_OF: Partial<Record<Animation, Animation>> = { sweep: 'bench' };
 
 /** Where a missing direction is mirrored from (CLAUDE.md T9 3.13). */
 const MIRROR: Record<Facing, Facing> = { se: 'sw', sw: 'se', nw: 'ne', ne: 'nw' };
@@ -83,14 +99,19 @@ export function characterSheet(
   return { key, url, sheet };
 }
 
-/** What the figure plays, with the fallbacks of 3.13: the animation asked for, then idle, then
- *  the first frame of walk, then nothing at all and the capsule stands. */
+/** What the figure plays, with the fallbacks of 3.13: the animation asked for, then the one that
+ *  stands in for it, then idle, then the first frame of walk, then nothing at all and the capsule
+ *  stands. */
 export function playableAnimation(
   role: string,
   wanted: Animation,
   options: CharacterOptions = {},
 ): { animation: Animation; frozen: boolean } | null {
   if (characterSheet(role, wanted, options) !== null) return { animation: wanted, frozen: false };
+  const instead = INSTEAD_OF[wanted];
+  if (instead !== undefined && characterSheet(role, instead, options) !== null) {
+    return { animation: instead, frozen: false };
+  }
   if (characterSheet(role, 'idle', options) !== null) {
     return { animation: 'idle', frozen: false };
   }
@@ -295,6 +316,8 @@ export function animationForStation(station: string): Animation {
   if (stationPlaceAt(station) !== null) return 'bench';
   if (station === STATION_RACK) return 'bench';
   if (station === STATION_GATE) return 'idle';
+  // The broom, for as long as the sweeping lasts (PIOTR, 18.09; CLAUDE.md T20 2.8).
+  if (station === STATION_CLEANING) return 'sweep';
   // The phone is in his hand for as long as the call lasts, and idle the moment it is down
   // (PIOTR, 15.09; CLAUDE.md T11 3.11).
   if (station === STATION_PHONE) return 'phone';

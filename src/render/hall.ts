@@ -24,7 +24,10 @@ import {
   gateIsCrowded,
   hasExtraction,
   hasGate,
+  machineIsOut,
   machinesDueService,
+  machinesInService,
+  sawdustPiles,
   serviceIsDue,
 } from '../engine/machines';
 import {
@@ -50,6 +53,7 @@ import { machineInUse } from '../engine/game';
 import { rackCapacity } from '../engine/materials';
 import {
   STATION_BENCH,
+  STATION_CLEANING,
   STATION_GATE,
   STATION_IDLE,
   STATION_NO_BENCH,
@@ -74,8 +78,14 @@ import { gateCollarArt, pipeTile, portRing } from './pipes';
 import { ownerIsAvailable } from '../engine/owner';
 import { homeCellOf } from '../engine/staff';
 import { plural } from '../engine/text';
+import { FIGURE_DEPTH_OFFSET } from '../engine/constants';
 import type { RoomId } from '../engine/constants';
-import type { Equipment, EquipmentSpec, GameState, OnOrderItem } from '../engine/types';
+import type {
+  Equipment,
+  EquipmentSpec,
+  GameState,
+  OnOrderItem,
+} from '../engine/types';
 import {
   type BoxFaces,
   type Point,
@@ -108,9 +118,15 @@ import {
 import { placeholder } from './placeholder';
 import { cncOptions } from '../engine/stages';
 import { jobStage } from '../engine/jobs';
-import { cleanerAtWork } from '../engine/tasks';
+import { cleanerAtWork, manOnOpenTask } from '../engine/tasks';
 import type { StageId } from '../engine/types';
-import type { LoopName as HallLoopName, OneShotName as HallOneShotName } from '../ui/sound';
+import { figureIsThroughADoor, takeDoorGoings } from './doors';
+
+/** What the hall can be heard doing (CLAUDE.md T19 2.10, T20 2.13). The render layer owns the
+ *  list, because the render layer is what reports the events; `src/ui/sound.ts` plays what is on
+ *  it and reads the names from here, so nothing in `src/render` imports the ui layer. */
+export type HallLoopName = 'tableSaw' | 'extractor' | 'sander' | 'sprayBooth';
+export type HallOneShotName = 'door' | 'hammer' | 'drill';
 
 // ---------------------------------------------------------------------------
 // SVG primitives. office.ts uses these too: one place builds the strings.
@@ -262,6 +278,14 @@ interface Drawable {
   svg: string;
 }
 
+/** Writes the depth a drawable was sorted at on to its own element, so the live layer says what
+ *  the painter's order is and the walker's re-sort can read a neighbour (CLAUDE.md T20 2.11). A
+ *  drawable is one element with everything else inside it, and it is its first tag that is
+ *  written on. */
+function withDepth(svg: string, depth: number): string {
+  return svg.replace(/^<([a-zA-Z]+)/, `<$1 data-depth="${Math.round(depth * 1000) / 1000}"`);
+}
+
 // ---------------------------------------------------------------------------
 // The central system (PIOTR, CLAUDE.md T10 3.4; T16 2.3). The plant itself stands outside on the
 // apron by the shutter, like the van; what the player sees in the hall is one run along the rear
@@ -289,13 +313,9 @@ export function officeDoor(room: {
   width: number;
   depth: number;
 }): string {
-  return roomDoor(room, 'office', false);
+  return roomDoor(room, 'office');
 }
 
-/** The three states a door is drawn in (CLAUDE.md T19 2.3). Every one of them is in the markup and
- *  the stylesheet shows one, so the swing costs the render nothing and is one attribute. */
-export type DoorPhase = 'closed' | 'half' | 'open';
-export const DOOR_PHASES: readonly DoorPhase[] = ['closed', 'half', 'open'];
 
 /** The dark hole in the face, behind the leaf: the door opening itself. */
 export function doorOpening(room: { x: number; y: number; width: number; depth: number }): Polygon {
@@ -311,31 +331,16 @@ export function doorOpening(room: { x: number; y: number; width: number; depth: 
   ];
 }
 
-/** The leaf, swung on its hinge in the hall's own dimetric (CLAUDE.md T19 2.3). The hinge is the
- *  left jamb and the leaf swings out into the hall, which is the way the room doors open
- *  (docs/art/SPRITES.md 9.3), so it never sweeps through the man standing in the doorway, who is
- *  at the middle of the opening. Closed is flat in the face and open is square out of it.
- *
- *  Half is NOT the forty five degrees between them, and the reason is the projection. A leaf at
- *  world forty five degrees runs equally in +x and +y, and this dimetric puts screen x at
- *  `(x - y) * 24`, so that one angle projects to exactly no width at all: the door vanished to a
- *  sliver and the middle of the swing read as nothing. Found by looking at the picture of the
- *  three states for T19-C4, which is what that task is for. `DOOR_HALF_ANGLE` is 60 degrees
- *  [TUNE]: past the degenerate angle, so the leaf has width again and reads as a door caught on
- *  its way open. */
-const DOOR_HALF_ANGLE = (Math.PI / 180) * 60;
-export function doorLeaf(
-  room: { x: number; y: number; width: number; depth: number },
-  phase: DoorPhase,
-): Polygon {
+/** The leaf, closed, flat in the face of the room, hung on the left jamb (docs/art/SPRITES.md
+ *  9.3). A door is drawn closed and always closed: the swing of Turn 19 is gone, and the two open
+ *  frames and the angle that made them with it (PIOTR, 18.09; CLAUDE.md T20 2.12). A man does not
+ *  stand in a doorway any more, he goes through it, which is what `figureIsThroughADoor` says of
+ *  him and why nothing has to be swung out of his way. */
+export function doorLeaf(room: { x: number; y: number; width: number; depth: number }): Polygon {
   const door = roomDoorBox(room);
   const face = room.y + room.depth;
   const hinge = { x: room.x + door.from, y: face };
-  const angle = phase === 'closed' ? 0 : phase === 'half' ? DOOR_HALF_ANGLE : Math.PI / 2;
-  const free = {
-    x: hinge.x + door.across * Math.cos(angle),
-    y: hinge.y + door.across * Math.sin(angle),
-  };
+  const free = { x: hinge.x + door.across, y: face };
   return [
     tileToScreen(hinge.x, hinge.y, door.bottom),
     tileToScreen(free.x, free.y, door.bottom),
@@ -344,10 +349,9 @@ export function doorLeaf(
   ];
 }
 
-/** A room's door: the dark opening, the three leaves, and, for the office, the control that walks
- *  into it. `open` is what the hall reads off the state this minute, which the driver in
- *  src/render/doors.ts then swings to over DOOR_SWING_MS; a page with no driver on it still draws
- *  the door the way the hall is (CLAUDE.md T19 2.3).
+/** A room's door: the dark opening, the one closed leaf, and, for the office, the control that
+ *  walks into it. There is no open state and no swing: a door is drawn closed and a man goes
+ *  through it (PIOTR, 18.09; CLAUDE.md T20 2.12).
  *
  *  Only the office carries `data-door`, because only the office door is a control: the canteen
  *  door is a door and the block behind it is still the way to the canteen's own note, and giving
@@ -355,25 +359,20 @@ export function doorLeaf(
 export function roomDoor(
   room: { x: number; y: number; width: number; depth: number },
   id: string,
-  open: boolean,
 ): string {
-  const state = open ? 'open' : 'closed';
-  const leaves = DOOR_PHASES.map(
-    (phase) => `<polygon class="door-leaf" data-state="${phase}" points="${points(doorLeaf(room, phase))}" />`,
-  ).join('');
+  const leaf = `<polygon class="door-leaf" data-state="closed" points="${points(doorLeaf(room))}" />`;
   const opening = points(doorOpening(room));
   if (id !== 'office') {
     return (
-      `<g data-door-room="${id}" data-door-want="${state}" data-door-state="${state}" ` +
-      `class="${id}-door">` +
-      `<polygon points="${opening}" class="door-opening" />${leaves}</g>`
+      `<g data-door-room="${id}" data-door-state="closed" class="${id}-door">` +
+      `<polygon points="${opening}" class="door-opening" />${leaf}</g>`
     );
   }
   return (
-    `<g data-door="office" data-door-room="office" data-door-want="${state}" ` +
-    `data-door-state="${state}" class="clickable office-door">` +
+    `<g data-door="office" data-door-room="office" data-door-state="closed" ` +
+    'class="clickable office-door">' +
     '<title>To the office</title>' +
-    `<polygon points="${opening}" class="door-opening" />${leaves}` +
+    `<polygon points="${opening}" class="door-opening" />${leaf}` +
     `<polygon points="${opening}" class="door-hit" />` +
     '</g>'
   );
@@ -905,7 +904,9 @@ const CATEGORY_SHADE: Record<string, string> = {
 /** Grey sawdust piles near the machines, one per ten points of dust, in a fixed pattern so the
  *  view never jitters (CLAUDE.md 10.3). */
 function sawdust(state: GameState): Drawable[] {
-  const piles = Math.round(state.dust / 10);
+  // One figure for the piles that are drawn and for the dirt the helper answers, so he picks up a
+  // broom for the dirt the player is looking at (CLAUDE.md T20 2.8).
+  const piles = sawdustPiles(state.dust);
   const drawables: Drawable[] = [];
   const machines = state.equipment.filter((item) => {
     const spec = findSpec(item.specId);
@@ -1069,6 +1070,9 @@ function stationLabel(station: string): string {
   if (station === STATION_OFFICE) return 'the office';
   if (station === STATION_PHONE) return 'the phone';
   if (station === STATION_BENCH) return 'the bench';
+  // The cleaning is a station of its own since 2.8.2, and a man with a broom in his hands is not
+  // waiting for anything (CLAUDE.md T20 2.8).
+  if (station === STATION_CLEANING) return 'sweeping the floor';
   if (station === STATION_NO_BENCH) return 'no bench';
   return 'waiting';
 }
@@ -1200,7 +1204,7 @@ function figure(
     art === null ? null : characterArt(art.role, rest, tile.facing, art.options);
   const body = drawn ?? capsuleBody(fill);
   return {
-    depth: depthKey(tile.x, tile.y) + 0.2,
+    depth: depthKey(tile.x, tile.y) + FIGURE_DEPTH_OFFSET,
     svg:
       `<g class="figure" data-figure="${key}" ` +
       `transform="translate(${Math.round(feet.x)},${Math.round(feet.y)})" ` +
@@ -1425,10 +1429,6 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
   const drawables: Drawable[] = [];
 
   // Which doors have somebody standing in them this minute, read once for the whole scene.
-  const doorsOpen = new Set<RoomId>(
-    (['office', 'canteen'] as RoomId[]).filter((room) => doorIsUsed(state, room)),
-  );
-
   // The three room blocks. Each is a layer of the painting, or a placeholder box while that layer
   // is missing; either way its footprint is what the player clicks on.
   for (const room of ROOM_LAYOUT) {
@@ -1463,15 +1463,14 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
             label(centreOf(room.x, room.y, room.width, room.depth, room.height), room.name)) +
         '</g>',
     });
-    // The door is a drawable of its own, keyed off the cell a man stands in it on, so an open leaf
-    // swinging out into the hall is painted in front of the wall and behind the man in the doorway
-    // (CLAUDE.md T19 2.3). The office one is also the control it has always been: knock on it and
-    // the team is behind it (PIOTR, CLAUDE.md T10 3.6).
+    // The door is a drawable of its own, keyed off the cell it stands in, so it is painted with
+    // the wall it is in and in front of what is behind it. The office one is also the control it
+    // has always been: knock on it and the team is behind it (PIOTR, CLAUDE.md T10 3.6).
     if (room.id === 'office' || room.id === 'canteen') {
       const door = roomDoorCell(room.id);
       drawables.push({
         depth: depthKey(door.x, door.y) - 0.05,
-        svg: roomDoor(room, room.id, doorsOpen.has(room.id)),
+        svg: roomDoor(room, room.id),
       });
     }
   }
@@ -1635,10 +1634,16 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
     // or the gate lane, never the inside of the office block (CLAUDE.md T11 3.4).
     const bench = homeCellOf(state, worker);
     const where = stationLabel(worker.station);
+    const cell = stationCell(state, worker.station, bench);
+    // He has gone through a door and is in the room behind it: off the hall's drawing until he
+    // comes out again (PIOTR, 18.09; CLAUDE.md T20 2.12). `figureGoesThroughDoors` says who that
+    // is: the owner, because the office view draws him and nobody else yet, so a man at a desk is
+    // still drawn standing in the doorway rather than nowhere at all.
+    if (figureIsThroughADoor(`worker-${worker.id}`, cell)) continue;
     drawables.push(
       figure(
         `worker-${worker.id}`,
-        stationCell(state, worker.station, bench),
+        cell,
         away ? `${worker.name} (off)` : `${worker.name}, ${where}`,
         false,
         `data-worker="${worker.id}"`,
@@ -1649,13 +1654,14 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
       ),
     );
   }
-  if (ownerIsAvailable(state)) {
-    // At his bench's own standing cell from the station table, or the middle of the floor.
-    const ownerBench = ownerBenchCell(state);
+  const ownerCell = stationCell(state, state.owner.station, ownerBenchCell(state));
+  // The owner in the office is not on the hall at all: he went through the door, and the office
+  // view draws him at his desk (PIOTR, 18.09; CLAUDE.md T20 2.12, T19 2.2).
+  if (ownerIsAvailable(state) && !figureIsThroughADoor('owner', ownerCell)) {
     drawables.push(
       figure(
         'owner',
-        stationCell(state, state.owner.station, ownerBench),
+        ownerCell,
         `${state.playerName}, ${stationLabel(state.owner.station)}`,
         true,
         'data-owner="1"',
@@ -1748,7 +1754,9 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
     );
   }
 
-  live.push(drawables.map((drawable) => drawable.svg).join(''));
+  // Every drawable carries the depth it was sorted at, so the renderer can put a figure back in
+  // the order of the cell his feet are on without sorting the scene again (CLAUDE.md T20 2.11).
+  live.push(drawables.map((drawable) => withDepth(drawable.svg, drawable.depth)).join(''));
 
   // The pipes the game routed and the gate collars on their drops: a layer above the equipment
   // (CLAUDE.md T13 3.11, 3.19).
@@ -1844,11 +1852,23 @@ export function hallProblems(state: GameState): HallProblem[] {
     });
   }
   if (bagStore(state).full) {
-    list.push({
-      kind: 'bags',
-      equipmentId: null,
-      text: 'The bags are full, so nothing that makes dust runs',
-    });
+    // The bags are the helper's, like the unloading and the sweeping, so once he has them in hand
+    // the chip says so and asks the player nothing (PIOTR, 18.09; CLAUDE.md T20 2.8).
+    const man = manOnOpenTask(state, 'emptyBags');
+    list.push(
+      man === null
+        ? {
+            kind: 'bags',
+            equipmentId: null,
+            text: 'The bags are full, so nothing that makes dust runs',
+          }
+        : {
+            kind: 'bags',
+            equipmentId: null,
+            text: `${man.name} is emptying the bags`,
+            inHand: true,
+          },
+    );
   }
   const machines = state.equipment.filter((item) => findSpec(item.specId)?.category === 'machine');
   if (machines.length > 0 && !hasExtraction(state)) {
@@ -1907,8 +1927,18 @@ export function hallProblems(state: GameState): HallProblem[] {
       list.push({ kind: 'dirty', equipmentId: null, text: `The hall is ${band.label}${risk}` });
     }
   }
+  // A machine away being serviced is a statement and not a question: it is paid for and it comes
+  // back the next working day (PIOTR, 18.09; CLAUDE.md T20 2.9.3).
+  for (const item of machinesInService(state)) {
+    list.push({
+      kind: 'service',
+      equipmentId: item.id,
+      text: `The ${lowerName(item.specId)} is in for a service, nothing runs on it today`,
+      inHand: true,
+    });
+  }
   for (const item of machinesDueService(state)) {
-    if (item.broken) continue;
+    if (item.broken || machineIsOut(item, state.clock.day)) continue;
     list.push({
       kind: 'service',
       equipmentId: item.id,
@@ -2028,5 +2058,9 @@ export function hallOneShots(state: GameState): Set<HallOneShotName> {
       on.add('drill');
     }
   }
+  // A man going through a door, in or out. The render layer reports it and the ui layer plays it,
+  // which is why `src/render` no longer reaches into `src/ui/sound.ts` (CLAUDE.md T20 2.13). The
+  // asking clears the count, so one passage is one knock however many frames it spans.
+  if (takeDoorGoings() > 0) on.add('door');
   return on;
 }

@@ -11,7 +11,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { HIRING_MINUTES, HOLIDAY_OPTIONS_DAYS, LAPTOP_BOOT_MINUTES, OWNER_DRAW_TIERS } from '../../src/engine/constants';
 import { laptopHome } from '../../src/engine/index';
 import { MODAL_IS_FULL, advanceMinutes, currentState, mount, render } from '../../src/ui/app';
-import { OFFICE_GROUP, laptopPageFrom, renderLaptop } from '../../src/ui/laptop';
+import { EQUIPMENT_GROUP, OFFICE_GROUP, laptopPageFrom, renderLaptop } from '../../src/ui/laptop';
 import { MODAL_SKINS } from '../../src/ui/modal';
 import { acceptNow, buyStartingKit, fillRack, newGame, placeEnquiry } from '../helpers';
 
@@ -151,10 +151,11 @@ describe('the counts on the big tiles', () => {
 });
 
 describe('the Office tiles', () => {
-  it('carry the six line icons of the mockup, in the game\'s green, above the label', () => {
+  it('carry the line icons of the mockup, in the game\'s green, above the label', () => {
     openLaptop();
     const tiles = Array.from(laptop().querySelectorAll('.screen-small-tile'));
-    expect(tiles).toHaveLength(6);
+    // The six of the mockup, and the Machines tile of the Equipment group (CLAUDE.md T20 2.9).
+    expect(tiles).toHaveLength(OFFICE_GROUP.length + EQUIPMENT_GROUP.length);
     for (const tile of tiles) {
       const icon = tile.querySelector('svg.screen-icon');
       expect(icon, tile.textContent ?? '').not.toBeNull();
@@ -165,6 +166,7 @@ describe('the Office tiles', () => {
     expect(rule.slice(0, rule.indexOf('}'))).toContain('color: var(--screen-green);');
     expect(rule.slice(0, rule.indexOf('}'))).toContain('height: 30px;');
     expect(OFFICE_GROUP.map((tile) => tile.id)).toEqual(['team', 'website', 'insurance', 'security', 'joineryCore', 'settings']);
+    expect(EQUIPMENT_GROUP.map((tile) => tile.id)).toEqual(['machines']);
   });
 });
 

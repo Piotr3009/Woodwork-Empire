@@ -13,6 +13,9 @@ import {
   SECOND_SHIFT_MINUTES,
   HIRING_SPECS,
   JOINER_PREREQUISITES,
+  LET_GO_NOTICE_DAYS,
+  PRODUCING_ROLES,
+  TIER_WORDS,
   TOOL_CABINET,
   WEEKS_PER_MONTH,
   WORKER_HOURS_PER_WEEK,
@@ -32,10 +35,12 @@ import {
   findSpec,
   itemStandsInTheHall,
   overdueBreakdownChance,
+  releaseMachines,
   releaseMachinesExcept,
 } from './machines';
 import { countOwnedOrOnOrder } from './orders';
 import { managerOnDuty } from './owner';
+import { effectiveReputation } from './reputation';
 import { hands, workMinute } from './production';
 import { chance, int, makeId } from './rng';
 import { STATION_IDLE } from './stations';
@@ -44,11 +49,50 @@ import type {
   GameState,
   HiringOption,
   Job,
+  OwnerState,
   Shift,
+  WeekCategory,
+  WeekMeters,
   Worker,
   WorkerRole,
   WorkerTier,
 } from './types';
+
+/** What a trade is called, one man of it and several. The one table: the crew rows, Our team, the
+ *  job's Assign list and the hire card's refusal all read it, so a sprayer is called a sprayer
+ *  wherever he is named (CLAUDE.md T19 2.5, 2.6). It sits here and not in the UI because the
+ *  refusal the hire card prints is written in this module: "extremely experienced joiners come
+ *  from reputation 60" (PIOTR; CLAUDE.md T20 2.5). `src/ui/team.ts` hands `ROLE_WORDS` on. */
+export const ROLE_WORDS: Record<WorkerRole, string> = {
+  joiner: 'joiner',
+  helper: 'helper',
+  officeAdmin: 'office admin',
+  purchasingClerk: 'purchasing clerk',
+  salesman: 'salesman',
+  draftsman: 'draftsman',
+  estimator: 'estimator',
+  productionManager: 'production manager',
+  sprayer: 'sprayer',
+};
+
+/** The same trades, several of them: the plural is written out because a salesman is not a
+ *  "salesmans" (CLAUDE.md 3: plain English, never the engine key). */
+export const ROLE_WORDS_MANY: Record<WorkerRole, string> = {
+  joiner: 'joiners',
+  helper: 'helpers',
+  officeAdmin: 'office admins',
+  purchasingClerk: 'purchasing clerks',
+  salesman: 'salesmen',
+  draftsman: 'draftsmen',
+  estimator: 'estimators',
+  productionManager: 'production managers',
+  sprayer: 'sprayers',
+};
+
+/** True for a man who produces. The one rule, asked by the board (CLAUDE.md T20 2.3). */
+export function produces(role: WorkerRole): boolean {
+  return PRODUCING_ROLES.includes(role);
+}
 
 /** The roles that have a working day of their own, the way the owner does (CLAUDE.md T2 3.8).
  *  A helper still clears his workshop jobs at no cost, as in Turn 1. */
@@ -118,11 +162,11 @@ export function staffMinutesLeft(worker: Worker): number {
   return Math.max(0, MINUTES_PER_WORKING_DAY - worker.minutesWorked);
 }
 
-/** What a man costs in a month, whichever way he is paid: the office carries a monthly wage and
- *  the floor a weekly one, and a week is 30 over 7 of a month. The one conversion: the Our team
- *  row prints it and the hiring gate refuses on it (CLAUDE.md T17 2.9, 2.11). */
-export function monthlyPay(pay: { weeklyWage: number; monthlyWage: number }): number {
-  if (pay.monthlyWage > 0) return Math.round(pay.monthlyWage * 100) / 100;
+/** What a man costs in a month. Everybody is paid by the week from tonight, so a month of him is
+ *  his week times the weeks in one, and there is no second wage field to ask about (PIOTR, 18.09;
+ *  CLAUDE.md T20 2.6). The one conversion, wherever a month is asked for: the Our team row prints
+ *  it, the hiring gate refuses on it, and the Company board reads it (CLAUDE.md T17 2.9, 2.11). */
+export function monthlyWageOf(pay: { weeklyWage: number }): number {
   return Math.round(pay.weeklyWage * WEEKS_PER_MONTH * 100) / 100;
 }
 
@@ -311,14 +355,31 @@ export function missingLabelsForHire(state: GameState, role: WorkerRole): string
   });
 }
 
+/** What the card says when the workshop is not known enough for this man: who applies depends on
+ *  the standing the workshop has earned, and the card says what is missing, in the game's own
+ *  words (PIOTR: "extremely experienced joiners come from reputation 60"; CLAUDE.md T20 2.5). A
+ *  role with no classes to it says the same thing about the trade itself. */
+export function standingWanted(
+  role: WorkerRole,
+  tier: WorkerTier | null,
+  minReputation: number,
+): string {
+  const who =
+    tier === null ? ROLE_WORDS_MANY[role] : `${TIER_WORDS[tier]} ${ROLE_WORDS_MANY[role]}`;
+  return `${who} come from reputation ${minReputation}`;
+}
+
 /** Everything the hiring modal needs, one row per role and tier. */
 export function hiringOptions(state: GameState): HiringOption[] {
   return HIRING_SPECS.map((spec) => {
     const missing = missingLabelsForHire(state, spec.role);
     const benchSlotsUsed = spec.role === 'joiner' ? joiners(state).length + 1 : 0;
     let blockReason = '';
-    if (state.reputation < spec.minReputation) {
-      blockReason = `Nobody of this standing answers yet, reputation ${spec.minReputation}`;
+    // The figure the player reads on the board, website bonus and all: `effectiveReputation` is
+    // the one function the tier tables go through, and who answers an advert is a tier table
+    // (CLAUDE.md T13 3.7, T20 2.5).
+    if (effectiveReputation(state) < spec.minReputation) {
+      blockReason = standingWanted(spec.role, spec.tier, spec.minReputation);
     } else if (BEHIND_THE_ADMIN.includes(spec.role) && !hasOfficeAdmin(state)) {
       // Nobody in the office before the one who runs it (PIOTR, CLAUDE.md T10 3.6).
       blockReason = 'Hire an office admin first';
@@ -330,12 +391,12 @@ export function hiringOptions(state: GameState): HiringOption[] {
       blockReason = crewLine(state);
     } else if (missing.length > 0) {
       blockReason = `Buy first: ${missing.join(', ')}`;
-    } else if (state.cash < monthlyPay(spec)) {
+    } else if (state.cash < monthlyWageOf(spec)) {
       // Last of the refusals, because it is the only one that changes by the minute: who answers
       // the advert, what the office wants first, the bench and the kit are all standing facts,
       // and the bank balance is what an owner looks at once the rest of it is ready. A man is not
       // taken on without a month of his pay in the account (PIOTR, 17.09; CLAUDE.md T17 2.11).
-      blockReason = `Not enough in the bank: needs ${formatMoney(monthlyPay(spec))}`;
+      blockReason = `Not enough in the bank: needs ${formatMoney(monthlyWageOf(spec))}`;
     }
     return {
       role: spec.role,
@@ -343,7 +404,6 @@ export function hiringOptions(state: GameState): HiringOption[] {
       label: spec.label,
       rate: spec.tier ? WORKER_RATES[spec.tier] : 0,
       weeklyWage: spec.weeklyWage,
-      monthlyWage: spec.monthlyWage,
       minReputation: spec.minReputation,
       available: blockReason === '',
       blockReason,
@@ -404,8 +464,8 @@ export function hire(state: GameState, role: WorkerRole, tier: WorkerTier | null
     tier,
     rate: tier ? WORKER_RATES[tier] : 0,
     weeklyWage: spec.weeklyWage,
-    monthlyWage: spec.monthlyWage,
     startDay: addWorkingDays(state.clock.day, HIRE_START_DELAY_DAYS),
+    leavesOnDay: null,
     jobId: null,
     taskId: null,
     minutesWorked: 0,
@@ -440,9 +500,163 @@ export function autoAssignJobs(state: GameState, shift: Shift = 'day'): void {
   }
 }
 
+// ---------------------------------------------------------------------------
+// The week, man by man (PIOTR; CLAUDE.md T20 2.7). Our team says what this week was and what last
+// week was: the hours, where they went, the pieces a contract took off him, the jobs he stood at
+// and the one efficiency figure of the week. The meters are filled a minute at a time by the
+// sampler in `src/engine/tasks.ts`, which is the one hook the day already runs over the crew
+// every minute, and they roll over on the first minute of a new week.
+// ---------------------------------------------------------------------------
+
+/** The order the row prints them in. */
+export const WEEK_CATEGORIES: ReadonlyArray<WeekCategory> = [
+  'jobs',
+  'contracts',
+  'unloading',
+  'cleaning',
+  'desk',
+  'site',
+];
+
+/** What his own counters say he has put in: the bench and contract minutes the production runner
+ *  raises and the task minutes the task runner raises. The one reading of whether the minute just
+ *  gone was worked at all: a man at an empty rack, or one standing at a saw another man is on,
+ *  keeps his job and his task and raises neither (CLAUDE.md T20 2.7). */
+export function effortSoFar(holder: Worker | OwnerState): { bench: number; task: number } {
+  return { bench: holder.productionMinutes, task: holder.minutesWorked };
+}
+
+/** Who carries a week: a man on the books or the owner. Both declare the two fields and the bench
+ *  counter a fresh week seeds itself off, so there is no cast (CLAUDE.md T20 2.7). */
+export type WeekHolder = Worker | OwnerState;
+
+function freshMeters(week: number, bench: number): WeekMeters {
+  return {
+    week,
+    minutes: { jobs: 0, contracts: 0, unloading: 0, cleaning: 0, desk: 0, site: 0 },
+    paidMinutes: 0,
+    pieces: 0,
+    jobs: [],
+    day: 0,
+    minute: -1,
+    seenBench: bench,
+    seenTask: 0,
+  };
+}
+
+/** The meters of the week in hand, made and rolled over if the week has turned. The write side:
+ *  only the sampler calls it. A new week starts from where his bench counter stands, so the first
+ *  minute of it is not credited with every minute he has ever worked. */
+export function weekMetersOf(holder: WeekHolder, week: number): WeekMeters {
+  const held = holder.weekNow;
+  if (held !== undefined && held.week === week) return held;
+  if (held !== undefined) holder.weekBefore = held;
+  holder.weekNow = freshMeters(week, holder.productionMinutes);
+  return holder.weekNow;
+}
+
+/** This week's meters, or null while nothing has been counted into them. Read only: the page asks
+ *  this and never the one above, because a render writes nothing. */
+export function weekNowOf(holder: WeekHolder, week: number): WeekMeters | null {
+  const held = holder.weekNow;
+  return held !== undefined && held.week === week ? held : null;
+}
+
+/** Last week's meters, or null. The week before this one is either the pair that has been rolled
+ *  aside or the one still in hand from a week nobody has played into yet. */
+export function weekBeforeOf(holder: WeekHolder, week: number): WeekMeters | null {
+  if (holder.weekNow !== undefined && holder.weekNow.week === week - 1) return holder.weekNow;
+  const before = holder.weekBefore;
+  return before !== undefined && before !== null && before.week === week - 1 ? before : null;
+}
+
+/** The minutes of the week, all six bands of them: the hours the row prints. */
+export function weekWorkedMinutes(meters: WeekMeters): number {
+  return WEEK_CATEGORIES.reduce((total, band) => total + meters.minutes[band], 0);
+}
+
+/** What he earned the company for the minutes it paid for: his rate times the minutes he spent
+ *  making something, over the minutes on the clock while he was on the books. One figure a week
+ *  (CLAUDE.md T20 2.7). Nought while nothing has been paid for yet. */
+export function weekEfficiency(rate: number, meters: WeekMeters): number {
+  if (meters.paidMinutes <= 0) return 0;
+  const making = meters.minutes.jobs + meters.minutes.contracts;
+  return (rate * making) / meters.paidMinutes;
+}
+
+// ---------------------------------------------------------------------------
+// Letting a man go (PIOTR, 18.09: "how do I fire people?"; CLAUDE.md T20 2.4). He works a week's
+// notice out, he is paid for it, and the morning after his last day his jobs and his contracts
+// are short of a man and the plan says so. It costs no reputation: a workshop that cannot carry
+// somebody lets him go, and the trade thinks nothing of it.
+// ---------------------------------------------------------------------------
+
+/** Why this man cannot be let go, or that he can. The one refusal: the row asks it before it
+ *  draws the control, so a button the engine would refuse is never drawn (CLAUDE.md T4 3.2). */
+export function letGoCheck(state: GameState, workerId: string): { ok: boolean; reason: string } {
+  const worker = workerById(state, workerId);
+  if (!worker) return { ok: false, reason: 'No such person' };
+  if (worker.leavesOnDay !== null) {
+    return { ok: false, reason: `leaves on ${formatCalendarDay(worker.leavesOnDay)}` };
+  }
+  return { ok: true, reason: '' };
+}
+
+/** Gives him his notice. He stays on the books, on his job and on his contract, and is paid, to
+ *  the end of the last day of it; `runStaffDayStart` is what walks him out of the gate the
+ *  morning after (CLAUDE.md T20 2.4). */
+export function letGo(state: GameState, workerId: string): boolean {
+  if (!letGoCheck(state, workerId).ok) return false;
+  const worker = workerById(state, workerId);
+  if (!worker) return false;
+  worker.leavesOnDay = state.clock.day + LET_GO_NOTICE_DAYS;
+  return true;
+}
+
+/** The morning the notice is up: he is off the books, off his job and off his contract, and what
+ *  he was holding goes back on the list for somebody else. The plan draws his jobs with nobody on
+ *  them, which is the hole the player has to fill (CLAUDE.md T20 2.4). */
+function walkOutTheGone(state: GameState): Worker[] {
+  const gone = state.workers.filter(
+    (worker) => worker.leavesOnDay !== null && worker.leavesOnDay < state.clock.day,
+  );
+  for (const worker of gone) {
+    const job = worker.jobId === null ? null : findJob(state, worker.jobId);
+    if (job) takeOffJob(state, job.id, worker.id);
+    // The contracts are told here and not through `assignContract`, because contracts.ts reads
+    // this module and the two cannot read each other (REPORT-T20.md, what was not done).
+    for (const contract of state.contracts) {
+      contract.assigned = contract.assigned.filter((id) => id !== worker.id);
+    }
+    if (worker.taskId !== null) {
+      const task = state.tasks.find((entry) => entry.id === worker.taskId);
+      if (task) task.doneBy = null;
+      worker.taskId = null;
+    }
+    releaseMachines(state, worker.id);
+    // `workerQuit` is the one kind the game has for a man going off the books. It was written for
+    // the overtime quit of Turn 8, which went with the evenings in Turn 17, and nothing has raised
+    // it since; a man let go leaves by the same gate (GameEventKind is in the frozen types.ts,
+    // and REPORT-T20.md says so under what was not done).
+    queueEvent(state, {
+      kind: 'workerQuit',
+      title: 'He has gone',
+      body: `${worker.name} has worked his notice out and left. Anything he was on is nobody\u0027s now.`,
+      data: { workerId: worker.id, name: worker.name },
+    });
+  }
+  if (gone.length > 0) {
+    const ids = new Set(gone.map((worker) => worker.id));
+    state.workers = state.workers.filter((worker) => !ids.has(worker.id));
+  }
+  return gone;
+}
+
 /** Counts down an injured joiner's days off and hands everybody a fresh day. What a man did not
- *  finish yesterday he is still holding this morning (CLAUDE.md T2 3.8). */
+ *  finish yesterday he is still holding this morning (CLAUDE.md T2 3.8). The men whose notice ran
+ *  out yesterday are walked out first: they are not handed a day (CLAUDE.md T20 2.4). */
 export function runStaffDayStart(state: GameState): void {
+  walkOutTheGone(state);
   for (const worker of state.workers) {
     if (worker.absentDaysRemaining > 0) worker.absentDaysRemaining -= 1;
     worker.minutesWorked = 0;

@@ -3,7 +3,8 @@
 // Home is three big tiles, Tasks, Stock and Drawings in that order, each with a live line the
 // engine counts and a red count in its corner while there is something to do, and under a rule
 // the Office group of small tiles with their icons: Team, Website, Insurance, Security, Joinery
-// Core, Settings. A tile opens its page full screen inside the laptop with a back arrow to home
+// Core, Settings, and under that the Equipment group with Machines on it (CLAUDE.md T20 2.9).
+// A tile opens its page full screen inside the laptop with a back arrow to home
 // in the same place on every page; the tiles are the whole of the navigation, and there is no
 // tab bar (CLAUDE.md T15 2.3).
 //
@@ -26,6 +27,7 @@ import type { GameState, LaptopHome, TaskInstance } from '../engine/index';
 import { renderDrawings } from './drawings';
 import { renderInsurance } from './insurance';
 import { gateSection } from './jobCard';
+import { renderMachinesPage } from './machinesPage';
 import { renderMaterials } from './materials';
 import { renderSecurity } from './security';
 import { type TeamTab, renderTeam } from './team';
@@ -52,7 +54,10 @@ export type LaptopPage =
   | 'team'
   | 'website'
   | 'insurance'
-  | 'security';
+  | 'security'
+  /** The kit standing in the hall, with the life of every machine and its service
+   *  (CLAUDE.md T20 2.9). */
+  | 'machines';
 
 const PAGES: readonly LaptopPage[] = [
   'home',
@@ -63,6 +68,7 @@ const PAGES: readonly LaptopPage[] = [
   'website',
   'insurance',
   'security',
+  'machines',
 ];
 
 export function laptopPageFrom(value: string): LaptopPage {
@@ -79,6 +85,15 @@ export const HOME_TILES: ReadonlyArray<{ page: HomePage; label: string; count: k
   { page: 'stock', label: 'Stock', count: 'lowLines' },
   { page: 'drawings', label: 'Drawings', count: 'drawingsWaiting' },
 ];
+
+/** The Equipment group, under the Office one: the kit the company owns, with the life of every
+ *  machine and its service on it (CLAUDE.md T20 2.9). */
+export const EQUIPMENT_GROUP: ReadonlyArray<{
+  id: string;
+  label: string;
+  action: string;
+  extra: string;
+}> = [{ id: 'machines', label: 'Machines', action: 'laptopPage', extra: 'data-id="machines"' }];
 
 /** The Office group, in the order the brief names it: the Team and the three Admin pages open
  *  inside the laptop; Joinery Core is the software line on the Team's Technical tab (REPORT-T13
@@ -107,6 +122,7 @@ const PAGE_TITLES: Record<Exclude<LaptopPage, 'home'>, string> = {
   website: 'Website',
   insurance: 'Insurance',
   security: 'Security',
+  machines: 'Machines',
 };
 
 function icon(paths: string): string {
@@ -143,6 +159,10 @@ const OFFICE_ICONS: Record<string, string> = {
       '<circle cx="12" cy="15.5" r="1.5" />',
   ),
   joineryCore: icon('<rect x="3" y="5" width="18" height="12" rx="2" /><path d="M7 20h10M12 17v3M6 9h12M6 13h7" />'),
+  machines: icon(
+    '<rect x="3" y="11" width="18" height="8" rx="1" /><path d="M7 11V7h6v4M9 4h8M17 4v3" />' +
+      '<path d="M6 19v2M18 19v2" />',
+  ),
   settings: icon(
     '<circle cx="12" cy="12" r="3" />' +
       '<path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1" />',
@@ -285,13 +305,18 @@ function homeScreen(state: GameState): string {
       `<span class="screen-tile-small" data-line="${tile.page}">${lines[tile.page]}</span>` +
       '</button>',
   ).join('');
-  const office = OFFICE_GROUP.map(
-    (tile) =>
-      `<button class="screen-small-tile" data-do="${tile.action}"` +
-      `${tile.extra === '' ? '' : ` ${tile.extra}`} data-tile="${tile.id}">` +
-      (OFFICE_ICONS[tile.id] ?? '') +
-      `<span class="screen-small-label">${escapeHtml(tile.label)}</span></button>`,
-  ).join('');
+  const smallTiles = (group: typeof OFFICE_GROUP): string =>
+    group
+      .map(
+        (tile) =>
+          `<button class="screen-small-tile" data-do="${tile.action}"` +
+          `${tile.extra === '' ? '' : ` ${tile.extra}`} data-tile="${tile.id}">` +
+          (OFFICE_ICONS[tile.id] ?? '') +
+          `<span class="screen-small-label">${escapeHtml(tile.label)}</span></button>`,
+      )
+      .join('');
+  const office = smallTiles(OFFICE_GROUP);
+  const equipment = smallTiles(EQUIPMENT_GROUP);
   return (
     '<p class="screen-status">' +
     `<span class="screen-company">${escapeHtml(state.companyName)}</span>, ` +
@@ -299,7 +324,9 @@ function homeScreen(state: GameState): string {
     `<div class="screen-tiles">${tiles}</div>` +
     '<hr class="screen-rule" />' +
     '<h3 class="screen-group">Office</h3>' +
-    `<div class="screen-small-tiles">${office}</div>`
+    `<div class="screen-small-tiles">${office}</div>` +
+    '<h3 class="screen-group">Equipment</h3>' +
+    `<div class="screen-small-tiles">${equipment}</div>`
   );
 }
 
@@ -346,6 +373,8 @@ function pageBody(state: GameState, page: Exclude<LaptopPage, 'home'>, view: Lap
       return renderInsurance(state);
     case 'security':
       return renderSecurity(state);
+    case 'machines':
+      return renderMachinesPage(state);
   }
 }
 

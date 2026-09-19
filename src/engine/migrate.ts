@@ -12,8 +12,10 @@ import {
   SOUND_VOLUME_DEFAULT,
   STATE_VERSION,
   WEBSITE_START_LEVEL,
+  WEEKS_PER_MONTH,
+  WORKER_RATES,
 } from './constants';
-import type { GameState } from './types';
+import type { GameState, WorkerTier } from './types';
 
 /** The oldest save this build opens: Turn 11's v18, which is state version 12. */
 export const OLDEST_SAVE_VERSION = 12;
@@ -269,12 +271,73 @@ function liftToVersion16(state: Raw): void {
   state.version = 16;
 }
 
+/** What a v28 tier is called from tonight. Nobody is a master on a lifted save: the fourth tier
+ *  is new and nobody was ever hired into it (CLAUDE.md T20 2.5). */
+const TIER_LIFT: Record<string, string> = {
+  poor: 'novice',
+  normal: 'experienced',
+  super: 'senior',
+};
+
+/** Version 16 to 17: the tiers are named again, everybody is paid by the week, a man can be let
+ *  go, a machine counts its services, and a contract records who ended it (CLAUDE.md T20 section
+ *  4). Every v28 save loads: his tier is renamed and his speed comes up to what that tier is
+ *  worth tonight, because the rate is the tier's and not the man's and a lifted crew would
+ *  otherwise be slower than the same men hired this morning; his own wage is left alone, because
+ *  what he is paid is what he was taken on for, and it comes off his monthly one where he had no
+ *  weekly; nobody is under notice; no machine has been serviced under the new rule or is away
+ *  being serviced; and every contract is recorded as ended on its term, because a lifted save
+ *  cannot tell a term that ran out from an end the player called himself, and both were on the
+ *  books before tonight.
+ *
+ *  Two things the lift does not put right, both of them the price of the bump and neither of them
+ *  a bug for phase C to find. The month the upgrade lands in pays the office twice: the men who
+ *  were on a monthly wage had their whole month taken on the 1st under the old rule, and their
+ *  weeks go out again on the Fridays that are left under the new one. Nothing is given back, as
+ *  nothing was given back for Joinery Core in the lift before this one (CLAUDE.md T17 2.21).
+ *  Every month after it is right. */
+function liftToVersion17(state: Raw): void {
+  for (const worker of records(state.workers)) {
+    if (typeof worker.tier === 'string') {
+      const lifted = TIER_LIFT[worker.tier];
+      if (lifted !== undefined) {
+        worker.tier = lifted;
+        worker.rate = WORKER_RATES[lifted as WorkerTier];
+      }
+    }
+    const weekly = typeof worker.weeklyWage === 'number' ? worker.weeklyWage : 0;
+    const monthly = typeof worker.monthlyWage === 'number' ? worker.monthlyWage : 0;
+    worker.weeklyWage = weekly > 0 ? weekly : Math.round(monthly / WEEKS_PER_MONTH);
+    delete worker.monthlyWage;
+    worker.leavesOnDay = null;
+  }
+  for (const item of records(state.equipment)) {
+    item.serviceCount = 0;
+    item.inServiceUntilDay = null;
+  }
+  // An interview the owner was sitting in when the save was taken holds the tier he is
+  // interviewing for, and the man is taken on when the hour is spent. That tier is renamed with
+  // the rest: an order left reading an old id matches no spec at all, and the hour would be spent
+  // for nobody (CLAUDE.md T20 2.5).
+  for (const task of records(state.tasks)) {
+    for (const order of records(task.orders)) {
+      if (typeof order.tier === 'string') {
+        const lifted = TIER_LIFT[order.tier];
+        if (lifted !== undefined) order.tier = lifted;
+      }
+    }
+  }
+  for (const contract of records(state.contracts)) contract.endedBy = 'term';
+  state.version = 17;
+}
+
 /** One lift per bump, keyed by the version it lifts from. */
 const LIFTS: Record<number, (state: Raw) => void> = {
   12: liftToVersion13,
   13: liftToVersion14,
   14: liftToVersion15,
   15: liftToVersion16,
+  16: liftToVersion17,
 };
 
 /** The state a save holds, lifted bump by bump into this build's shape, or null when the save is

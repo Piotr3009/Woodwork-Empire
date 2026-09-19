@@ -1026,7 +1026,9 @@ input.num {
 
 .why-pop p {
   font-size: var(--fs-body);
-  margin: 0 0 8px;
+  /* The bubble's own "Right" button is gone and the cross is the way out, so the text has nothing
+     under it to stand off (CLAUDE.md T20 2.15). */
+  margin: 0;
 }
 
 .check-row {
@@ -1114,6 +1116,13 @@ input.num {
   justify-content: center;
   margin: 4px 0;
   overflow: hidden;
+}
+
+/* The picture on a row rather than on a card: the same slot at a row's height (CLAUDE.md T20 2.9). */
+.tile-picture.is-small {
+  height: 48px;
+  margin: 0;
+  width: 64px;
 }
 
 .tile-picture img {
@@ -2326,6 +2335,15 @@ input.num {
   font-weight: 700;
 }
 
+/* A chip standing on one of those paper cards is paper too: the board's magnet strip is for the
+   tabs on the steel. The chip that is on keeps the blue the game marks a chosen chip with, which
+   is why this sits above that rule and not below it (CLAUDE.md T20 1, 2.1.1). */
+.modal-board .card .chip {
+  background: var(--card);
+  border: 1px solid var(--card-line);
+  color: var(--card-ink);
+}
+
 .modal-board .chip.is-on {
   background: linear-gradient(#4a8fd0, var(--magnet-blue));
   border-color: #1f4d7d;
@@ -2339,9 +2357,14 @@ input.num {
 }
 
 /* Every piece of content is a cream card held by a blue magnet at the top, tilted a degree or so
-   and casting its own shadow. */
+   and casting its own shadow. A row pinned to the board is one of them; a row INSIDE a card is a
+   line of that card and not a second card, which is why the row named here is the board's own
+   child and not any row anywhere. The Contracts tab's running and ended blocks are cards like the
+   offer's (PIOTR, the mockup of docs/mockups/t20; CLAUDE.md T20 1, 2.1). */
 .modal-board .card,
-.modal-board .row,
+.modal-board > .modal-body > .row,
+.modal-board .contract-bar,
+.modal-board .contract-ended,
 .modal-board .plan-row:not(.plan-scale-row),
 .modal-board .tile {
   background: var(--card-2);
@@ -2355,7 +2378,9 @@ input.num {
 }
 
 .modal-board .card::before,
-.modal-board .row::before,
+.modal-board > .modal-body > .row::before,
+.modal-board .contract-bar::before,
+.modal-board .contract-ended::before,
 .modal-board .plan-row:not(.plan-scale-row)::before,
 .modal-board .tile::before {
   background: radial-gradient(circle at 35% 30%, #6fa8e0, var(--magnet-blue));
@@ -2370,27 +2395,35 @@ input.num {
   width: 12px;
 }
 
-/* Minus one degree to one and a half, so a board of cards is never a filing cabinet. The Work
-   Plan's rows are not on these three: a board the player reads numbers off is straight
-   (PIOTR, 16.09: "the job cards must not be crooked"; CLAUDE.md T15 2.4). The Shopping board
-   keeps its tilt [TUNE: Piotr named the Work Plan only; Shopping is a shop window, not a
-   ledger]. */
-.modal-board .card:nth-of-type(3n + 1),
-.modal-board .row:nth-of-type(3n + 1),
-.modal-board .tile:nth-of-type(3n + 1) {
+/* Minus one degree to one and a half, so a board of cards is never a filing cabinet. NOTHING on
+   the Work Plan is on these three: a board the player reads numbers off is straight, which until
+   tonight held because its rows were plan rows and it had no cards, and which its Contracts tab is
+   held to by name (PIOTR, 16.09: "the job cards must not be crooked"; CLAUDE.md T15 2.4, T20 1).
+   The Shopping board keeps its tilt [TUNE: Piotr named the Work Plan only; Shopping is a shop
+   window, not a ledger]. */
+.modal-board:not([data-modal='workPlan']) .card:nth-of-type(3n + 1),
+.modal-board:not([data-modal='workPlan']) .row:nth-of-type(3n + 1),
+.modal-board:not([data-modal='workPlan']) .tile:nth-of-type(3n + 1) {
   transform: rotate(-1deg);
 }
 
-.modal-board .card:nth-of-type(3n + 2),
-.modal-board .row:nth-of-type(3n + 2),
-.modal-board .tile:nth-of-type(3n + 2) {
+.modal-board:not([data-modal='workPlan']) .card:nth-of-type(3n + 2),
+.modal-board:not([data-modal='workPlan']) .row:nth-of-type(3n + 2),
+.modal-board:not([data-modal='workPlan']) .tile:nth-of-type(3n + 2) {
   transform: rotate(0.75deg);
 }
 
-.modal-board .card:nth-of-type(3n),
-.modal-board .row:nth-of-type(3n),
-.modal-board .tile:nth-of-type(3n) {
+.modal-board:not([data-modal='workPlan']) .card:nth-of-type(3n),
+.modal-board:not([data-modal='workPlan']) .row:nth-of-type(3n),
+.modal-board:not([data-modal='workPlan']) .tile:nth-of-type(3n) {
   transform: rotate(1.5deg);
+}
+
+/* A line inside one of those cards is ruled in the card's own colour, the way a row on the laptop
+   is ruled in the screen's: the dark palette's border is a dark line on cream
+   (CLAUDE.md T20 1). */
+.modal-board .row {
+  border-bottom-color: var(--card-line);
 }
 
 /* The scale row of the Work Plan is the ruler over the cards, not a card of its own. */
@@ -2402,6 +2435,7 @@ input.num {
 }
 
 .modal-board .row-main,
+.modal-board .row-main h3,
 .modal-board .card-main h3,
 .modal-board .card-main strong,
 .modal-board .tile-name {
@@ -2412,8 +2446,27 @@ input.num {
 .modal-board .figures,
 .modal-board .hint,
 .modal-board .tile-figures,
+.modal-board .contract-ended .row-main,
+.modal-board .contract-ended .row-main h3,
 .modal-board p {
   color: var(--card-ink-2);
+}
+
+/* A figure the game has marked good or bad keeps its green and its red here too: the skin's ink
+   above is for the figures that are neither, and it was winning on order alone. The same green the
+   Company board's own paper sheets print their points in (CLAUDE.md T20 2.1.2). */
+.modal-board .row-figure.good {
+  color: var(--good);
+}
+
+.modal-board .row-figure.bad {
+  color: var(--bad);
+}
+
+/* The week's bar on a paper card: the part still to make is the card's own line colour, the way
+   the laptop's is the screen's (CLAUDE.md T20 2.1.2). */
+.modal-board .contract-track {
+  background: var(--card-line);
 }
 
 .modal-board .modal-body > .hint,
@@ -2969,6 +3022,76 @@ input.num {
   background: var(--good);
 }
 
+/* A life that is nearly run out, on the Machines page's bar (CLAUDE.md T20 2.9). */
+.contract-fill.is-low {
+  background: var(--bad);
+}
+
+/* The Machines page's middle column: the bar with its figures under it (CLAUDE.md T20 2.9). */
+.machine-life {
+  display: flex;
+  flex: 1 1 140px;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* The man's day on a contract, 8:00 to 17:00, one block a piece, the lunch block where he puts
+   his tools down and what is left of the day going to the job he is also on (PIOTR, the mockup
+   of docs/mockups/t20/contracts-tab.html; CLAUDE.md T20 2.1.1, 2.1.2). The week's bar above is
+   .contract-track; this is one day of it. */
+.contract-day {
+  margin: 6px 0 10px;
+}
+
+.contract-day-track {
+  background: var(--card, var(--panel-2));
+  border: 1px solid var(--card-line, var(--border));
+  border-radius: 3px;
+  height: 26px;
+  overflow: hidden;
+  position: relative;
+}
+
+.contract-day-block {
+  align-items: center;
+  background: var(--good);
+  border-right: 1px solid var(--card, var(--panel-2));
+  bottom: 2px;
+  color: var(--cream);
+  display: flex;
+  font-size: var(--fs-tiny);
+  justify-content: center;
+  overflow: hidden;
+  position: absolute;
+  top: 2px;
+  white-space: nowrap;
+}
+
+.contract-day-block.is-lunch {
+  background: var(--card-line, var(--border));
+  color: var(--card-ink-2, var(--text-dim));
+}
+
+.contract-day-block.is-free {
+  background: var(--card-2, var(--panel-2));
+  color: var(--card-ink-2, var(--text-dim));
+}
+
+/* The minutes that go to the job he is also on: the house accent, as the drawing has them. The
+   ink is the one .btn-primary already puts on that amber. */
+.contract-day-block.is-job {
+  background: var(--accent);
+  color: #1c1f24;
+}
+
+.contract-day-ticks {
+  color: var(--text-dim);
+  display: flex;
+  font-size: var(--fs-tiny);
+  justify-content: space-between;
+  margin-top: 2px;
+}
+
 .contract-active,
 .contract-ended {
   margin-bottom: 14px;
@@ -3436,6 +3559,17 @@ input.num {
   font-size: var(--fs-small);
 }
 
+/* A man's week is the line under his row on Our team: the row wraps and the week takes the whole
+   width of it, so it is read across and his name is not squeezed into a column
+   (PIOTR; CLAUDE.md T20 2.7). */
+.team-row {
+  flex-wrap: wrap;
+}
+
+.team-week {
+  flex: 1 0 100%;
+}
+
 /* 2.26 The workshop rate, the one figure at the top of the Company board and of the month end. */
 .rate-figure {
   display: flex;
@@ -3782,6 +3916,12 @@ input.num {
   background: #fff;
 }
 
+/* The bar of a life on a laptop page: the track is the screen's own line and not the dark
+   palette's border (CLAUDE.md T20 2.9). */
+.modal-screen .contract-track {
+  background: var(--screen-line);
+}
+
 .modal-screen .row.is-done,
 .modal-screen .done,
 .modal-screen .hint,
@@ -4009,9 +4149,12 @@ input.num {
   box-shadow: 0 8px 24px rgb(0 0 0 / 35%);
 }
 
-/* The cross on the Assign list: the same disc as every modal, hung off the list's top right
-   corner (PIOTR, 18.09). The list is absolute already, so the disc anchors to it. */
-.assign-list .modal-close {
+/* The cross on a popover that is not a modal: the same disc as every modal, hung off the top
+   right corner of the list or the bubble (PIOTR, 18.09; CLAUDE.md T20 2.15). Both are positioned
+   already, so the disc anchors to them, and one rule serves the two of them so a popover cannot
+   wear a cross of its own. */
+.assign-list .modal-close,
+.why-pop .modal-close {
   position: absolute;
   right: -14px;
   top: -14px;
@@ -4038,6 +4181,14 @@ input.num {
 
 .assign-row .assign-tier {
   color: var(--card-ink-2, var(--text-dim));
+  font-size: var(--fs-tiny);
+}
+
+/* The same thing under a man's name in the offer card's picker, which is a chip and not a row, so
+   the tier goes on its own line under him (CLAUDE.md T20 2.1.1). */
+.contract-men .assign-tier {
+  color: var(--card-ink-2, var(--text-dim));
+  display: block;
   font-size: var(--fs-tiny);
 }
 

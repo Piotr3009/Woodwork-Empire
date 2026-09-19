@@ -61,13 +61,23 @@ describe('the fallback of a missing frame', () => {
   it('plays the animation asked for wherever the art side has delivered it', () => {
     // The home frame is a Turn 13 key nobody has painted yet (CLAUDE.md T13 3.23): it falls back
     // to idle for every role until the art side delivers it, and is listed in the art request.
-    for (const animation of ANIMATIONS.filter((entry) => entry !== 'home')) {
+    // Sweep is the same kind of key for everybody but the helper, whose broom sheet came in with
+    // the v28 patch (CLAUDE.md T20 2.8).
+    const undrawn = ['home', 'sweep'];
+    for (const animation of ANIMATIONS.filter((entry) => !undrawn.includes(entry))) {
       expect(playableAnimation('owner', animation), animation).toEqual({ animation, frozen: false });
     }
-    for (const animation of ANIMATIONS.filter((entry) => entry !== 'phone' && entry !== 'home')) {
+    for (const animation of ANIMATIONS.filter(
+      (entry) => entry !== 'phone' && !undrawn.includes(entry),
+    )) {
       expect(playableAnimation('joiner', animation), animation).toEqual({ animation, frozen: false });
     }
     expect(playableAnimation('owner', 'home')).toEqual({ animation: 'idle', frozen: false });
+    // The broom is the helper's sheet. A man with no broom sheet is working with his hands, so he
+    // falls to the bench and not to standing about (CLAUDE.md T20 2.8).
+    expect(playableAnimation('owner', 'sweep')).toEqual({ animation: 'bench', frozen: false });
+    expect(playableAnimation('joiner', 'sweep')).toEqual({ animation: 'bench', frozen: false });
+    expect(playableAnimation('helper', 'sweep')).toEqual({ animation: 'sweep', frozen: false });
   });
 
   it('falls back to idle, playing, for an animation the role has no sheet for', () => {

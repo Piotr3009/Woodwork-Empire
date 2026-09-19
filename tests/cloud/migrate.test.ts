@@ -138,7 +138,7 @@ describe('a v24 save in this build (CLAUDE.md T17 section 4)', () => {
     expect(opened.state).not.toBeNull();
     const state = opened.state as GameState;
     expect(state.version).toBe(STATE_VERSION);
-    expect(STATE_VERSION).toBe(16);
+    expect(STATE_VERSION).toBe(17);
     expect(state.taskQueue).toEqual([]);
     expect(state.dayStats.paidHours).toBe(0);
     expect(state.dayStats.expressUplift).toBe(0);
@@ -213,5 +213,91 @@ describe('the category rename of version 14 (CLAUDE.md T13 3.20)', () => {
     expect(lifted.finance.week?.byCategory).toEqual({ ownerDraw: -250 });
     // A period with neither is left exactly as it was.
     expect(lifted.finance.month?.byCategory).toEqual({ rent: -80 });
+  });
+});
+// ---------------------------------------------------------------------------
+// Turn 20: version 16 to 17 (CLAUDE.md T20 section 4)
+// ---------------------------------------------------------------------------
+
+/** A v28 save, cut down to what the lift of tonight touches: a joiner at each of the three tiers
+ *  there were, a sprayer and an office admin on a monthly wage, a machine with hours on it, a
+ *  contract still running, and the owner half way through an interview for a joiner. The three
+ *  fixture files under tests/fixtures carry no crew at all, so this is written out here, in the
+ *  plain JSON a save is and not against the types, which is how every lift is tested. */
+function v28Save(): Record<string, unknown> {
+  return {
+    version: 16,
+    jobs: [],
+    workers: [
+      { id: 'w1', name: 'Bob', role: 'joiner', tier: 'poor', rate: 0.6, weeklyWage: 480, monthlyWage: 0 },
+      { id: 'w2', name: 'Joe', role: 'joiner', tier: 'normal', rate: 0.8, weeklyWage: 640, monthlyWage: 0 },
+      { id: 'w3', name: 'Sam', role: 'sprayer', tier: 'super', rate: 0.9, weeklyWage: 0, monthlyWage: 2700 },
+      { id: 'w4', name: 'Ann', role: 'officeAdmin', tier: null, rate: 0, weeklyWage: 0, monthlyWage: 1900 },
+    ],
+    equipment: [{ id: 'kit-saw', specId: 'tableSaw', hoursUsed: 120 }],
+    contracts: [{ id: 'c1', status: 'active', assigned: ['w1'] }],
+    tasks: [
+      { id: 't1', kind: 'hiring', done: false, orders: [{ kind: 'hire', role: 'joiner', tier: 'normal' }] },
+      { id: 't2', kind: 'cleaning', done: false, orders: [] },
+    ],
+  };
+}
+
+type LiftedSave = {
+  version: number;
+  workers: Array<Record<string, unknown>>;
+  equipment: Array<Record<string, unknown>>;
+  contracts: Array<Record<string, unknown>>;
+  tasks: Array<{ orders: Array<Record<string, unknown>> }>;
+};
+
+describe('a v28 save in this build (CLAUDE.md T20 section 4)', () => {
+  const lifted = migrateState(v28Save(), 16) as unknown as LiftedSave | null;
+  if (lifted === null) throw new Error('the lift refused a version 16 state');
+
+  it('renames every tier and brings the man up to what that tier is worth tonight', () => {
+    expect(lifted.version).toBe(17);
+    expect(lifted.workers.map((worker) => worker.tier)).toEqual([
+      'novice',
+      'experienced',
+      'senior',
+      null,
+    ]);
+    expect(lifted.workers.map((worker) => worker.rate)).toEqual([0.8, 1, 1.2, 0]);
+    // Nobody is a master on a lifted save: the fourth tier is new.
+    expect(lifted.workers.some((worker) => worker.tier === 'master')).toBe(false);
+  });
+
+  it('pays everybody by the week, off his monthly wage where he had none, and drops the field', () => {
+    // The two joiners keep what they were taken on for; the sprayer's 2,700 a month and the
+    // admin's 1,900 come off WEEKS_PER_MONTH, which is 4.2857 (CLAUDE.md T20 2.6).
+    expect(lifted.workers.map((worker) => worker.weeklyWage)).toEqual([480, 640, 630, 443]);
+    for (const worker of lifted.workers) {
+      expect(Object.keys(worker), String(worker.name)).not.toContain('monthlyWage');
+      expect(worker.leavesOnDay, String(worker.name)).toBeNull();
+    }
+  });
+
+  it('renames the tier inside an interview the owner is sitting in, so the hour is not spent for nobody', () => {
+    // The order is what the interview books when its hour is up, and it carries the tier. Left
+    // reading `normal` it would match no hiring spec at all and nobody would be taken on
+    // (CLAUDE.md T20 2.5).
+    expect(lifted.tasks[0]?.orders[0]?.tier).toBe('experienced');
+    expect(lifted.tasks[1]?.orders).toEqual([]);
+    const tiers = lifted.tasks.flatMap((task) => task.orders.map((order) => order.tier));
+    expect(tiers).not.toContain('poor');
+    expect(tiers).not.toContain('normal');
+    expect(tiers).not.toContain('super');
+  });
+
+  it('has serviced no machine under the new rule, and sent none away', () => {
+    expect(lifted.equipment[0]?.serviceCount).toBe(0);
+    expect(lifted.equipment[0]?.inServiceUntilDay).toBeNull();
+    // The hours it has done are its own and are left alone.
+    expect(lifted.equipment[0]?.hoursUsed).toBe(120);
+  });
+
+  it('records every contract as ended on its term, which is all a lifted save can tell', () => {
+    expect(lifted.contracts[0]?.endedBy).toBe('term');
   });
 });

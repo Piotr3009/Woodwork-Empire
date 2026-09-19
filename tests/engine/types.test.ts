@@ -37,7 +37,7 @@ describe('GameState', () => {
     // put the owner's own day on the state, and the last week of them (CLAUDE.md T11 3.1). Turn 12
     // moved the bags onto the extractor, and a Turn 11 save is lifted rather than refused
     // (CLAUDE.md T12 2.3).
-    expect(STATE_VERSION).toBe(16);
+    expect(STATE_VERSION).toBe(17);
     expect(sample.version).toBe(STATE_VERSION);
   });
 
@@ -84,8 +84,10 @@ describe('constants', () => {
     const labour = 6400 * LABOUR_FRACTION;
     expect(labour).toBe(2560);
     expect(labour / OWNER_LABOUR_PER_MINUTE / 480).toBeCloseTo(8, 6);
-    expect(labour / (OWNER_LABOUR_PER_MINUTE * WORKER_RATES.normal) / 480).toBeCloseTo(10, 6);
-    expect(labour / (OWNER_LABOUR_PER_MINUTE * WORKER_RATES.poor) / 480).toBeCloseTo(13.333, 3);
+    // The ladder moved in Turn 20: the experienced man matches the owner and the man with no
+    // experience is where the normal one used to be (CLAUDE.md T20 2.5).
+    expect(labour / (OWNER_LABOUR_PER_MINUTE * WORKER_RATES.experienced) / 480).toBeCloseTo(8, 6);
+    expect(labour / (OWNER_LABOUR_PER_MINUTE * WORKER_RATES.novice) / 480).toBeCloseTo(10, 6);
   });
 
   it('has unique ids in every catalogue', () => {

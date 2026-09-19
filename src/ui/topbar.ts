@@ -318,7 +318,7 @@ export function renderMenu(state: GameState, cloud: MenuCloud): string {
     ? '<button class="btn" data-do="skipDay">Stay home today</button>'
     : '<button class="btn" disabled title="Already a day off">Stay home today</button>';
   return (
-    '<div class="menu-pop">' +
+    '<div class="menu-pop" data-popover="menu">' +
     // The menu shuts on a click outside it and on this cross; it did neither before (PIOTR;
     // CLAUDE.md T13 3.1). The cross is the one cross, the same helper every modal calls
     // (CLAUDE.md T18 2.5).

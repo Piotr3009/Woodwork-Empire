@@ -11,6 +11,7 @@ import {
 } from '../../src/engine/constants';
 import { decodeSaveFile, encodeSaveFile } from '../../src/cloud/file';
 import {
+  canUnload,
   deliveryDay,
   freeSheets,
   materialCostFor,
@@ -29,7 +30,7 @@ import {
   stockNumberFor,
 } from '../../src/engine/materials';
 import { addWorkingDays } from '../../src/engine/clock';
-import { canBuy } from '../../src/engine/game';
+import { canBuy, sellMachine } from '../../src/engine/game';
 import { orderForJobCheck } from '../../src/engine/jobs';
 import { jobProgress, tick } from '../../src/engine/index';
 import type { GameEvent, GameState } from '../../src/engine/index';
@@ -349,6 +350,12 @@ describe('the rack the sheets live on', () => {
     expect(rackCapacity(two)).toBe(30 + 75);
     const big = buyNow(bare, 'sheetRack', 'industrial');
     expect(rackCapacity(big)).toBe(160);
+    // A rack that is sold stands in the hall until the van comes and it is no room: nothing is
+    // unloaded onto a rack that leaves in the morning (CLAUDE.md T20 2.10, landed in T20-C1).
+    const sold = sellMachine(used, used.equipment.find((item) => item.specId === 'sheetRack')?.id ?? '');
+    expect(sold.ok).toBe(true);
+    expect(rackCapacity(used)).toBe(0);
+    expect(canUnload(used)).toBe(false);
   });
 
   it('leaves a delivery at the gate while there is nowhere to put it', () => {

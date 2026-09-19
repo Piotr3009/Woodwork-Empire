@@ -46,7 +46,7 @@ import {
   serviceIsDue,
 } from '../engine/index';
 import { formatCalendarDay, gateCheck, hasGate, variantFor } from '../engine/index';
-import { serviceDueIn } from '../engine/machines';
+import { serviceCallCheck, serviceDueIn } from '../engine/machines';
 import { orderName, orderProgress } from '../engine/orders';
 import type { Equipment, GameState, OrderLine } from '../engine/index';
 import { classBadge, classFrame, isMachineFamily, pictureSlot, renderMachine } from './machine';
@@ -321,6 +321,8 @@ function sellAction(state: GameState, item: Equipment, sellConfirm: string | nul
     return `<span class="reason">Sold, collection on ${formatCalendarDay(item.soldOnDay)}</span>`;
   }
   if (!isSellableFamily(item.specId)) return '';
+  // A rack goes when it is empty and nobody is at it (PIOTR, 18.09; CLAUDE.md T20 2.10), and it is
+  // `canSell` that says so: one refusal, the engine's, printed here word for word.
   const check = canSell(state, item.id);
   if (!check.ok) return `<span class="reason">Cannot sell it: ${escapeHtml(check.reason)}</span>`;
   if (sellConfirm === item.id) {
@@ -411,9 +413,11 @@ export function ownedTile(
         ? 'no service due while it stands idle'
         : `service on ${formatCalendarDay(due)}, ${hours(serviceDueIn(item))} of use away`;
   const life = machine ? `${hours(item.hoursUsed)} of ${hours(item.enduranceHours)}` : '';
+  // A service is called in and paid for, and the machine goes out for the working day, so the
+  // card offers it only while the engine would take the call (CLAUDE.md T4 3.2, T20 2.9).
   const action = item.broken
     ? button('repairMachine', 'Repair', `data-id="${item.id}"`)
-    : machine && serviceIsDue(item)
+    : machine && serviceIsDue(item) && serviceCallCheck(state, item.id).ok
       ? button('serviceMachine', 'Service', `data-id="${item.id}"`)
       : '';
   const sell = sellAction(state, item, sellConfirm);

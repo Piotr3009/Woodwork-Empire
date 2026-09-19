@@ -17,7 +17,7 @@ import {
 } from './constants';
 import { addWorkingDays } from './clock';
 import { canAfford, noteLoss, pay } from './economy';
-import { sheetCapacityOf } from './machines';
+import { isSold, itemStandsInTheHall, sheetCapacityOf } from './machines';
 import { makeId } from './rng';
 import { createTask, unloadMinutes } from './tasks';
 import { plural } from './text';
@@ -32,7 +32,12 @@ export function sheetsForCost(cost: number): number {
  *  the two of them hold (PIOTR, CLAUDE.md T7 3.6). */
 export function rackCapacity(state: GameState): number {
   let capacity = 0;
-  for (const item of state.equipment) capacity += sheetCapacityOf(item);
+  // A rack that is sold stands in the hall until the van comes, and it is no room: nothing is
+  // unloaded onto a rack that leaves in the morning (CLAUDE.md T20 2.10).
+  for (const item of state.equipment) {
+    if (isSold(item) || !itemStandsInTheHall(item)) continue;
+    capacity += sheetCapacityOf(item);
+  }
   return capacity;
 }
 
@@ -64,7 +69,9 @@ export function freeSheets(state: GameState): number {
 }
 
 /** Sheets this job still needs and has not got: red on the card until Restock or an order for
- *  this job clears it (CLAUDE.md T13 3.3, 3.6). */
+ *  this job clears it (CLAUDE.md T13 3.3, 3.6). What it holds on its own pallet counts: a job's
+ *  own delivery is the job's whether it fitted on the rack or not, so one order is one order
+ *  (PIOTR: "materials for a 50k job want ordering several times"; CLAUDE.md T20 2.16). */
 export function shortfallOf(job: Job): number {
   return Math.max(0, job.sheets - job.sheetsUsed - job.sheetsReserved);
 }
@@ -340,11 +347,16 @@ export function unloadIntoStock(state: GameState, delivery: Delivery): number {
   delivery.overflowSheets = overflow;
   const job = delivery.jobId === null ? null : state.jobs.find((entry) => entry.id === delivery.jobId);
   if (job) {
-    // The job's own sheets come off its own lorry: reserved for it, bespoke or not, and ALL of
-    // them, whether the rack had room or not. What does not fit goes straight to temporary
-    // storage for the job (one charge, the fetch chore in the morning) and is never left in
-    // the yard, because a load bought for a job that the job then does not count is the job
-    // asking to be bought again (PIOTR, 18.09: a £50,000 job ordered three times over).
+    // A job's own delivery is the job's whether it fits or not, so a bespoke load bigger than the
+    // rack does not leave the job short and its card does not ask for a second order
+    // (PIOTR, 18.09: a 50,000 job ordered three times over; CLAUDE.md T20 2.16). What the rack
+    // took is held for it and what would not go on it goes straight to temporary storage for it,
+    // one charge and the fetch chore in the morning, which is the path 2.16 names.
+    //
+    // This is Piotr's own fix of the same line, made on main while this turn ran (commit a0a7d37).
+    // T20-B1d had built the other half of 2.16's sentence instead, the pallet that waits in the
+    // yard for room on the rack, at no charge. His stands because 2.16 names this path first and
+    // by its function, and because it is his. The pallet is in REPORT-T20.md if he wants it back.
     const held = Math.min(delivery.sheets, job.sheets - job.sheetsUsed - job.sheetsReserved);
     if (held > 0) job.sheetsReserved += held;
     if (overflow > 0) moveOverflowToStorage(state, delivery);
@@ -368,6 +380,8 @@ export function writeOffSheetsLeftOutside(state: GameState): number {
   let lost = 0;
   for (const delivery of state.deliveries) {
     if (delivery.overflowSheets <= 0) continue;
+    // A job's own load never reaches here: `unloadIntoStock` puts what would not fit on the rack
+    // into storage for the job the moment the lorry is unloaded (CLAUDE.md T20 2.16).
     lost += delivery.overflowSheets;
     delivery.overflowSheets = 0;
   }

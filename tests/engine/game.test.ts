@@ -242,10 +242,10 @@ describe('a day off with nobody in the hall', () => {
       id: 'staff-1',
       name: 'Ben',
       role: 'joiner',
-      tier: 'poor',
+      tier: 'novice',
       rate: 0.6,
       weeklyWage: 480,
-      monthlyWage: 0,
+      leavesOnDay: null,
       startDay: 1,
       jobId: null,
       taskId: null,
@@ -350,7 +350,7 @@ describe('who can be sent at a job of work', () => {
     for (const specId of missingForHire(state, 'joiner')) {
       state = buyNow(state, specId);
     }
-    state = clearEvents(hireNow(state, 'joiner', 'poor'));
+    state = clearEvents(hireNow(state, 'joiner', 'novice'));
     expect(state.workers).toHaveLength(1);
     // The hall's bags are full, and the question is who empties them (CLAUDE.md T12 2.3).
     fillBags(state);

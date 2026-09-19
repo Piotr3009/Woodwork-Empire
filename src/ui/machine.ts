@@ -172,16 +172,28 @@ function deliveryLine(spec: EquipmentSpec, variant: EquipmentVariant): string {
 
 /** Where the picture of this class goes: the file the art side delivered for this very class,
  *  through the loader, and a box while there is none (CLAUDE.md T3 3.6, T7 3.7). */
-export function pictureSlot(spriteKey: string, tier: string): string {
+export function pictureSlot(spriteKey: string, tier: string, small = false): string {
   const url = spriteUrl(spriteKey, tier);
   const inside =
     url === null
       ? '<span class="tile-picture-box"></span>'
       : `<img src="${url}" alt="${escapeHtml(spriteKey)}" loading="lazy" />`;
+  // The same slot at a row's height, for a list of what stands in the hall rather than a card of
+  // one class of it (CLAUDE.md T20 2.9): one picture in the game, one class beside it.
   return (
-    `<div class="tile-picture" data-sprite="${escapeHtml(spriteKey)}" ` +
+    `<div class="tile-picture${small ? ' is-small' : ''}" data-sprite="${escapeHtml(spriteKey)}" ` +
     `data-tier="${escapeHtml(tier)}">${inside}</div>`
   );
+}
+
+/** A machine's own clock as the Machines page prints it: "2,140 of 3,600 h", the thousands
+ *  separator of `formatMoney` and the unit once (PIOTR; CLAUDE.md T20 2.9). */
+export function hoursFigure(value: number): string {
+  return (Math.round(value * 10) / 10).toLocaleString('en-GB');
+}
+
+export function lifeFigures(item: { hoursUsed: number; enduranceHours: number }): string {
+  return `${hoursFigure(item.hoursUsed)} of ${hoursFigure(item.enduranceHours)} h`;
 }
 
 /** What the class takes of the hall floor, in the words Piotr asked for: both figures with

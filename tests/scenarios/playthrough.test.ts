@@ -24,6 +24,7 @@ import {
   efficiencyOf,
   freeSheets,
   houseTierFor,
+  isFriday,
   isWorkingDay,
   managerOnDuty,
   marginOfPrice,
@@ -106,7 +107,10 @@ const PLAYTHROUGH: Policy = {
       !next.workers.some((worker) => worker.role === 'estimator') &&
       !next.tasks.some((task) => task.kind === 'hiring' && !task.done)
     ) {
-      next = act(next, { type: 'HIRE', role: 'estimator', tier: 'normal' });
+      // The tier answers to the workshop's standing from tonight, and an experienced man wants
+      // 15 of it (CLAUDE.md T20 2.5). Three months in, the one who answers is the man with no
+      // experience, and he is the one the script takes on.
+      next = act(next, { type: 'HIRE', role: 'estimator', tier: 'novice' });
     }
     // From day 61 the owner takes a production manager on. The interview is an hour of his day and
     // the day he is free to sit it is not always the 61st, so the script asks again until one is on
@@ -266,6 +270,32 @@ describe('the three month playthrough of 10.4, on Easy as the brief scripts it',
     const ended = later.contracts.find((contract) => contract.renegotiatedPrice !== null);
     expect(ended).toBeDefined();
     expect(ended?.renegotiatedPrice ?? 0).toBeGreaterThan(ended?.pricePerPiece ?? Infinity);
+  });
+
+  it('pays every trade by the week, on a Friday, and never by the month', () => {
+    // The crew of 10.4 is three trades: a joiner in week 1, an estimator in month 2 and a
+    // production manager in month 3. From tonight every one of them is on the one unit, the week
+    // (PIOTR, 18.09: "one unit"; CLAUDE.md T20 2.6), so the three months are a played proof that
+    // weekly pay covers the office as well as the bench.
+    const roles = new Set(state.workers.map((worker) => worker.role));
+    expect(roles.has('joiner')).toBe(true);
+    expect(roles.has('estimator')).toBe(true);
+    expect(roles.has('productionManager')).toBe(true);
+    for (const worker of state.workers) expect(worker.weeklyWage, worker.role).toBeGreaterThan(0);
+    // The office salary line of the 1st of the month is gone with `monthlyWage`.
+    expect(state.ledger.filter((entry) => entry.category === 'salaries')).toEqual([]);
+    const wages = state.ledger.filter((entry) => entry.category === 'wages');
+    expect(wages.length).toBeGreaterThan(10);
+    for (const entry of wages) expect(isFriday(entry.day), `day ${entry.day}`).toBe(true);
+    // The last Friday of the three months pays the whole crew, each at his own weekly wage and
+    // nothing on top of it: the estimator and the manager are in the same line as the joiner.
+    const last = wages[wages.length - 1];
+    const crew = state.workers.filter((worker) => worker.startDay <= (last?.day ?? 0));
+    expect(crew.length).toBe(3);
+    expect(Math.abs(last?.amount ?? 0)).toBeCloseTo(
+      crew.reduce((total, worker) => total + worker.weeklyWage, 0),
+      2,
+    );
   });
 
   it('has every line on each month end report, and the lines sum to the cash delta', () => {

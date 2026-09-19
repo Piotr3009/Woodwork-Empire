@@ -67,6 +67,33 @@ export interface DayLog {
   segments: DayLogEntry[];
 }
 
+/** Where a man's minutes went, in the six bands the brief names (CLAUDE.md T20 2.7). */
+export type WeekCategory = 'jobs' | 'contracts' | 'unloading' | 'cleaning' | 'desk' | 'site';
+
+/** One man's week, the second line of his Our team row. `day` and `minute` are the last minute
+ *  counted into it, so a minute the clock settles twice is never booked twice
+ *  (CLAUDE.md T20 2.7). */
+export interface WeekMeters {
+  week: number;
+  minutes: Record<WeekCategory, number>;
+  /** Minutes the clock ran while he was on the books, worked or not: what he is paid for. */
+  paidMinutes: number;
+  /** Pieces of a standing contract finished while he was on it. A piece made by two men is half
+   *  his, because two men made it. */
+  pieces: number;
+  /** The jobs he put a minute into, by name, in the order he first stood at them. */
+  jobs: string[];
+  day: number;
+  minute: number;
+  /** His bench and contract minutes when the sampler last looked. It is a running total that never
+   *  goes back, so it is seeded the minute the meters are made and a rise in it is a minute he
+   *  actually stood and made something. */
+  seenBench: number;
+  /** His task minutes when the sampler last looked. That counter starts again every morning, so
+   *  the first sample of a day takes a baseline off it and credits nothing. */
+  seenTask: number;
+}
+
 /** How often the player wants the end of day summary in front of him. A preference, not an
  *  engine number: the day ends the same way whatever it says (CLAUDE.md T4 3.6). */
 export type SummaryCadence = 'daily' | 'weekly' | 'monthly';
@@ -98,7 +125,10 @@ export type Shift = 'day' | 'night';
  *  and a crew, and both covers of insurance held (CLAUDE.md T13 3.15). */
 export type EnquiryKind = 'residential' | 'commercial';
 
-export type WorkerTier = 'poor' | 'normal' | 'super';
+/** What a man can be at his trade, worst to best. The words the game prints for these are in
+ *  TIER_WORDS and never here: nobody in Piotr's workshop is called poor (PIOTR, 18.09;
+ *  CLAUDE.md T20 2.5). A v28 save's poor, normal and super are lifted to the first three. */
+export type WorkerTier = 'novice' | 'experienced' | 'senior' | 'master';
 
 export type EquipmentCategory =
   | 'furniture'
@@ -225,6 +255,12 @@ export interface Equipment {
   /** Hours on the machine's own clock at the last service: the service is due by its hours, not
    *  by the calendar (CLAUDE.md T6 3.6). */
   serviceHours: number;
+  /** Services it has had. The first adds half of its original life, and each one after that half
+   *  of what the last one added (CLAUDE.md T20 2.9). */
+  serviceCount: number;
+  /** The working day it is back in the hall, while it is away being serviced, and null while it
+   *  is standing here. Nothing runs on a machine that is out (CLAUDE.md T20 2.9). */
+  inServiceUntilDay: number | null;
   /** Hours of use it has in it, family base times the variant factor. */
   enduranceHours: number;
   /** Hours of use it has had. Past its endurance it starts giving up. */
@@ -298,6 +334,12 @@ export interface OwnerState {
   present: boolean;
   minutesByCategory: Record<TaskCategory, number>;
   minutesWorked: number;
+  /** His week and the week before it: the hours, the six bands they went into, the pieces of a
+   *  standing contract and the jobs he stood at, for the second line of his Our team row
+   *  (CLAUDE.md T20 2.7). */
+  weekNow?: WeekMeters;
+  weekBefore?: WeekMeters | null;
+
   /** Overtime minutes worked today. Any at all costs him tomorrow. */
   overtimeMinutes: number;
   /** What today's work is multiplied by: 1 less the overtime debt, and 3% off again if he worked
@@ -351,11 +393,22 @@ export interface Worker {
   name: string;
   role: WorkerRole;
   tier: WorkerTier | null;
+  /** His week and the week before it: the hours, the six bands they went into, the pieces of a
+   *  standing contract and the jobs he stood at, for the second line of his Our team row
+   *  (CLAUDE.md T20 2.7). */
+  weekNow?: WeekMeters;
+  weekBefore?: WeekMeters | null;
+
   /** Fraction of the owner's speed. 0 for non-production roles. */
   rate: number;
+  /** The one wage field: everybody is paid by the week, on Friday (PIOTR, 18.09: "one unit";
+   *  CLAUDE.md T20 2.6). What a month of him costs is `monthlyWageOf`. */
   weeklyWage: number;
-  monthlyWage: number;
   startDay: number;
+  /** The last working day he is on the books, once he has been let go: he works a week's notice
+   *  out, is paid for it, and his jobs and his contracts drop him the morning after. Null for
+   *  everybody who is staying (CLAUDE.md T20 2.4). */
+  leavesOnDay: number | null;
   jobId: string | null;
   taskId: string | null;
   /** Minutes of his own day spent so far. Office roles have 480 of them (CLAUDE.md T2 3.8). */
@@ -396,7 +449,6 @@ export interface HiringOption {
   label: string;
   rate: number;
   weeklyWage: number;
-  monthlyWage: number;
   minReputation: number;
   available: boolean;
   blockReason: string;
@@ -872,12 +924,18 @@ export interface Contract {
   sheetsReserved: number;
   sheetsUsed: number;
   piecesMade: number;
+  /** What the week's meters had counted off this contract when they last looked
+   *  (CLAUDE.md T20 2.7). */
+  piecesSeenByTheWeek?: number;
   revenue: number;
   materialCost: number;
   labourMinutes: number;
   /** The price the client offers at the end of the term, from the delivery history. Null until
    *  the term ends. */
   renegotiatedPrice: number | null;
+  /** Who ended it: the term running out, the player pressing End the contract, or the client
+   *  walking away on a second short week (CLAUDE.md T20 2.1.6). */
+  endedBy: 'term' | 'player' | 'client';
 }
 
 /** One tile of pipe over the floor. It occupies no cell and blocks nothing under it
@@ -1206,6 +1264,9 @@ export type GameAction =
   // People and shifts:
   | { type: 'SET_SECOND_SHIFT'; on: boolean }
   | { type: 'ASSIGN_SHIFT'; workerId: string; shift: Shift }
+  /** Gives this man a week's notice. He works it out, he is paid for it, and the morning after
+   *  his last day he is off the books (PIOTR, 18.09; CLAUDE.md T20 2.4). */
+  | { type: 'LET_GO'; workerId: string }
   | { type: 'TAKE_HOLIDAY'; days: number }
   | { type: 'SET_OWNER_DRAW'; tier: number }
   | { type: 'BUY_JOINERY_CORE' }

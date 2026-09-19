@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 import {
   CONTRACT_OFFER_DAYS,
   CONTRACT_PIECES,
+  JOINER_WEEKLY_WAGE,
   CONTRACT_QUANTITY_PER_WEEK_MAX,
   CONTRACT_QUANTITY_PER_WEEK_MIN,
   CONTRACT_RENEW_FULL_WEEK,
@@ -18,7 +19,6 @@ import {
   CONTRACT_QUANTITY_STEP,
   CONTRACT_QUANTITY_MINUTES,
   CONTRACT_FREE_END_DAYS,
-  MINUTES_PER_WORKING_DAY,
   SHEET_VALUE,
 } from '../../src/engine/constants';
 import type { ContractPieceSpec } from '../../src/engine/constants';
@@ -29,8 +29,10 @@ import {
   closingReport,
   contractCounterLine,
   contractMarker,
+  jobBesideContract,
   contractMen,
   contractPiece,
+  contractPieceSpeed,
   contractResultFor,
   contractShortfall,
   contractStationFor,
@@ -89,10 +91,10 @@ function joiner(id: string, name: string): Worker {
     id,
     name,
     role: 'joiner',
-    tier: 'poor',
-    rate: WORKER_RATES.poor,
-    weeklyWage: 480,
-    monthlyWage: 0,
+    tier: 'novice',
+    rate: WORKER_RATES.novice,
+    weeklyWage: JOINER_WEEKLY_WAGE.novice,
+    leavesOnDay: null,
     startDay: 1,
     jobId: null,
     taskId: null,
@@ -250,7 +252,9 @@ describe('people, not machines', () => {
     expect(state.equipment.every((item) => item.takenBy !== 'staff-1')).toBe(true);
   });
 
-  it('takes him off his job when he goes on the contract, and the job goes back to ready', () => {
+  it('leaves him on the job he is on: the contract takes the first of his day, not the whole of him', () => {
+    // Turn 19 took him off the job when he went on a contract. From tonight he is on both, and
+    // the contract has the morning (PIOTR; CLAUDE.md T20 2.1.4).
     let state = joinerHall();
     const enquiry = placeEnquiry(state, { price: 4000, deadlineDays: 30 });
     state = acceptNow(state, enquiry.id);
@@ -262,9 +266,14 @@ describe('people, not machines', () => {
     const ben = state.workers[0];
     if (ben) ben.jobId = job.id;
     const contract = running(state);
-    expect(job.assignees[0] ?? null).toBeNull();
-    expect(job.stage).toBe('ready');
+    expect(job.assignees).toEqual(['staff-1']);
+    expect(job.stage).toBe('inProduction');
     expect(ben?.jobId).toBe(contractMarker(contract.id));
+    expect(jobBesideContract(state, 'staff-1')?.id).toBe(job.id);
+    // And off the contract again he is the job's, where he came from.
+    expect(assignContract(state, contract.id, 'staff-1', false).ok).toBe(true);
+    expect(ben?.jobId).toBe(job.id);
+    expect(job.assignees).toEqual(['staff-1']);
   });
 
   it('is left alone by the jobs: the marker survives a minute of the clock and he is not handed a ready job', () => {
@@ -285,7 +294,9 @@ describe('people, not machines', () => {
     expect(running5?.labourMinutes).toBeGreaterThan(0);
   });
 
-  it('drops a man the player put on a job through the Work Plan', () => {
+  it('keeps a man the player puts on a job as well: assigned once, he stays on it', () => {
+    // The v28 rule dropped him from the contract the moment a job had him. Assigned once, a man
+    // stays on it until he is taken off or leaves (PIOTR; CLAUDE.md T20 2.1.2).
     let state = joinerHall();
     const enquiry = placeEnquiry(state, { price: 4000, deadlineDays: 30 });
     state = acceptNow(state, enquiry.id);
@@ -295,8 +306,8 @@ describe('people, not machines', () => {
     if (!job || !ben) throw new Error('a job and a man are wanted');
     ben.jobId = job.id;
     runContractMinute(state);
-    expect(contract.assigned).toEqual([]);
-    expect(ben.jobId).toBe(job.id);
+    expect(contract.assigned).toEqual(['staff-1']);
+    expect(ben.jobId).toBe(contractMarker(contract.id));
   });
 });
 
@@ -308,7 +319,7 @@ describe('the piece work', () => {
     const saw = state.equipment.find((item) => item.specId === 'tableSaw');
     if (!saw) throw new Error('a saw is wanted');
     const speed = variantFor(saw)?.outputFactor ?? 1;
-    const worth = WORKER_RATES.poor * staffOutputFactor(state) * speed * hallProductivityFactor(state);
+    const worth = WORKER_RATES.novice * staffOutputFactor(state) * speed * hallProductivityFactor(state);
     const cashBefore = state.cash;
     const worked = minutes(state, 200);
     expect(worked).toBe(200);
@@ -450,7 +461,8 @@ describe('the week and the term', () => {
     contract.materialCost = 3000;
     contract.labourMinutes = 6000;
     const report = closingReport(state, contract);
-    const labourCost = Math.round(6000 * workerMinuteCost(480) * 100) / 100;
+    const labourCost =
+      Math.round(6000 * workerMinuteCost(JOINER_WEEKLY_WAGE.novice) * 100) / 100;
     expect(report).toEqual({
       pieces: 100,
       revenue: 3800,
@@ -581,39 +593,53 @@ describe('the result with a man on it (CLAUDE.md T17 2.22)', () => {
   it('is the price less the material and less his own time, and it is his own time', () => {
     const state = joinerHall();
     const contract = running(state, 1, 60);
-    contract.pieceId = 'cutSheetPack';
-    contract.pricePerPiece = 38;
-    const poor = state.workers[0] as Worker;
-    const normal: Worker = {
+    const piece = CONTRACT_PIECES.find((entry) => entry.id === 'cutSheetPack');
+    if (piece === undefined) throw new Error('no cut sheet pack');
+    contract.pieceId = piece.id;
+    contract.pricePerPiece = piece.price;
+    const green = state.workers[0] as Worker;
+    const middling: Worker = {
       ...joiner('staff-2', 'Nick'),
-      tier: 'normal',
-      rate: WORKER_RATES.normal,
-      weeklyWage: 640,
+      tier: 'experienced',
+      rate: WORKER_RATES.experienced,
+      weeklyWage: JOINER_WEEKLY_WAGE.experienced,
     };
     const best: Worker = {
       ...joiner('staff-3', 'Sam'),
-      tier: 'super',
-      rate: WORKER_RATES.super,
-      weeklyWage: 800,
+      tier: 'senior',
+      rate: WORKER_RATES.senior,
+      weeklyWage: JOINER_WEEKLY_WAGE.senior,
     };
-    state.workers.push(normal, best);
-    const poorResult = contractResultFor(contract, poor);
-    const normalResult = contractResultFor(contract, normal);
-    const bestResult = contractResultFor(contract, best);
-    // A poor joiner does 45 minutes of the owner's work in 75 of his own, a super one in 50.
-    expect(poorResult.minutes).toBe(Math.round(45 / WORKER_RATES.poor));
-    expect(bestResult.minutes).toBe(Math.round(45 / WORKER_RATES.super));
-    expect(poorResult.labourCost).toBe(Math.round((45 / WORKER_RATES.poor) * workerMinuteCost(480) * 100) / 100);
-    expect(poorResult.margin).toBe(Math.round((38 - 30 - poorResult.labourCost) * 100) / 100);
-    // The wage table of Turn 1 pays 480 for 0.6 and 640 for 0.8, which is the same money for the
-    // same work, and 800 for 0.9, which is a premium for the speed: so the poor man and the
-    // normal one show the same result a piece and the super one a thinner one. The line is his
-    // own, whichever way it falls, which is what the tab has to show before he is put on it.
-    expect(normalResult.margin).toBe(poorResult.margin);
-    expect(bestResult.margin).toBeLessThan(poorResult.margin);
-    // And every one of them is under water on repeat work at this price, which is what the
-    // closing report has always said and what the rate says now.
-    expect(poorResult.margin).toBeLessThan(0);
+    state.workers.push(middling, best);
+    const greenResult = contractResultFor(state, contract, green);
+    const middlingResult = contractResultFor(state, contract, middling);
+    const bestResult = contractResultFor(state, contract, best);
+    // His minutes are at his rate and on the machines the hall has: the used saw of the day 1 kit
+    // is 0.95 of the owner's own speed (CLAUDE.md T20 2.1.1). A joiner with no experience does 45
+    // minutes of the owner's work in 59 of his own on it, a super experienced one in 39.
+    const saw = contractPieceSpeed(state, green.id, piece);
+    expect(saw).toBe(0.95);
+    expect(greenResult.minutes).toBe(Math.round(45 / (WORKER_RATES.novice * saw)));
+    expect(bestResult.minutes).toBe(Math.round(45 / (WORKER_RATES.senior * saw)));
+    expect(greenResult.labourCost).toBe(
+      Math.round(greenResult.minutes * workerMinuteCost(green.weeklyWage) * 100) / 100,
+    );
+    // And with no saw at all it is the by hand reading, which is half again as long.
+    const empty = newGame();
+    empty.contracts.push(contract);
+    expect(contractPieceSpeed(empty, green.id, piece)).toBeCloseTo(1 / 1.5, 4);
+    expect(greenResult.margin).toBe(
+      Math.round((piece.price - piece.material - greenResult.labourCost) * 100) / 100,
+    );
+    // The wage ladder is steeper than the speed ladder: 450, 600 and 800 a week against 0.8, 1.0
+    // and 1.2 of the owner. So the same piece costs more in a better man's time, and the line
+    // thins as the tier rises. The line is his own, which is what the tab has to show before he
+    // is put on it (CLAUDE.md T20 2.1, 2.5).
+    expect(middlingResult.margin).toBeLessThan(greenResult.margin);
+    expect(bestResult.margin).toBeLessThan(middlingResult.margin);
+    // And every one of them is above water by hand at the prices of T20 2.2, which is the whole
+    // point of the new table: a contract pays a little by hand and well with machines.
+    expect(bestResult.margin).toBeGreaterThan(0);
   });
 });
 
@@ -643,19 +669,29 @@ describe('the lengths of work the board offers (CLAUDE.md T17 2.22)', () => {
     const short = CONTRACT_PIECES.find((piece) => piece.id === 'drawerBox');
     const long = CONTRACT_PIECES.find((piece) => piece.id === 'wardrobeFront');
     expect(short?.minutes).toBe(60);
-    expect(short === undefined ? 0 : short.price - short.material).toBe(8);
-    expect(long?.minutes).toBe(3 * MINUTES_PER_WORKING_DAY);
-    expect(long === undefined ? 0 : long.price - long.material).toBe(40);
-    // Every piece carries what it takes off the rack and what the workshop earns by making it.
+    expect(short === undefined ? 0 : short.price - short.material).toBe(26);
+    // The wardrobe front is four hours of work now and no longer three days (CLAUDE.md T20 2.2).
+    expect(long?.minutes).toBe(240);
+    expect(long === undefined ? 0 : long.price - long.material).toBe(100);
+    // Every piece carries what the workshop earns by making it.
     for (const piece of CONTRACT_PIECES) {
-      expect(piece.sheets).toBeCloseTo(piece.material / SHEET_VALUE, 2);
       expect(piece.labour).toBe(piece.price - piece.material);
     }
+    // What a piece takes off the rack is what it is costed at, every piece of the three: the two
+    // readings of one piece of material can never part company again. The wardrobe front's sheets
+    // moved from 1.1 to 0.3 for it, which is the one deviation from the letter of 2.2 in this turn
+    // and is Piotr's to rule on (CLAUDE.md T20 2.2; the note above CONTRACT_PIECES).
+    for (const piece of CONTRACT_PIECES) {
+      expect(piece.sheets).toBeCloseTo(piece.material / SHEET_VALUE, 2);
+    }
+    expect(long?.sheets).toBe(0.3);
     // The quantity is a week's work whatever the piece: thirty cut sheet packs are one wardrobe
     // front and twenty two drawer boxes.
     expect(quantityForPiece(CONTRACT_PIECES[0] as ContractPieceSpec, 30)).toBe(30);
     expect(quantityForPiece(short as ContractPieceSpec, 30)).toBe(23);
-    expect(quantityForPiece(long as ContractPieceSpec, 30)).toBe(1);
+    // Six wardrobe fronts are a week now, where three days a front made it one
+    // (CLAUDE.md T20 2.2).
+    expect(quantityForPiece(long as ContractPieceSpec, 30)).toBe(6);
   });
 
   it('draws all three over the days, and prices each at its own piece', () => {

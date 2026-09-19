@@ -1,16 +1,25 @@
 // @vitest-environment jsdom
-// The doors swing (PIOTR, 17.09; CLAUDE.md T19 2.3): a fake clock steps real time, the office
-// door goes closed, half, open over DOOR_SWING_MS as the owner arrives, stays open while he is
-// standing in it, and comes back after DOOR_CLOSE_MS when he leaves. A page written again in the
-// middle of a swing does not reset it.
+// The doors, as Airline Tycoon does them (PIOTR, 18.09; CLAUDE.md T20 2.12): a door is drawn
+// closed, always, and a man whose leg ends on a door cell goes through it and off the hall's
+// drawing. The swing of Turn 19 is gone, and with it the sound this file used to play: a man going
+// through is one knock the hall reports and the ui layer plays (CLAUDE.md T20 2.13).
 
 import { beforeEach, describe, expect, it } from 'vitest';
-import { DOOR_CLOSE_MS, DOOR_SWING_MS } from '../../src/engine/constants';
-import { STATION_BENCH, STATION_OFFICE } from '../../src/engine/stations';
+import { roomDoorCell } from '../../src/engine/constants';
+import { STATION_BENCH, STATION_OFFICE, isDoorwayCell } from '../../src/engine/stations';
 import { renderHall } from '../../src/render/hall';
-import { doorOf, resetDoors, stepDoors, syncDoors } from '../../src/render/doors';
+import { hallOneShots } from '../../src/render/hall';
+import {
+  figureIsThroughADoor,
+  figuresThroughDoors,
+  resetDoors,
+  stepDoors,
+  syncDoors,
+  takeDoorGoings,
+} from '../../src/render/doors';
+import { resetWalkers, syncWalkers, stepWalkers, walkerOf } from '../../src/render/walkers';
 import type { GameState } from '../../src/engine/index';
-import { buyStartingKit, newGame } from '../helpers';
+import { buyStartingKit, hireNow, newGame } from '../helpers';
 
 function page(state: GameState): HTMLElement {
   const holder = document.createElement('div');
@@ -18,100 +27,194 @@ function page(state: GameState): HTMLElement {
   return holder;
 }
 
-function stateOf(root: ParentNode, room: string): string {
-  return root.querySelector(`[data-door-room="${room}"]`)?.getAttribute('data-door-state') ?? '';
+/** The path finder the page hands the walker: a straight line, which is all a test wants. */
+const straight = (from: { x: number; y: number }, to: { x: number; y: number }): Array<{ x: number; y: number }> => [
+  from,
+  to,
+];
+
+beforeEach(() => {
+  resetDoors();
+  resetWalkers();
+});
+
+/** Walks whoever is on his feet to the end of his path: the walker covers a cell a frame at most,
+ *  so a leg is as many frames as it is cells. */
+function walkOn(root: ParentNode, from: number): number {
+  let at = from;
+  for (let guard = 0; guard < 200 && (walkerOf('owner')?.path.length ?? 0) > 0; guard += 1) {
+    at += 1000;
+    stepWalkers(root, at);
+  }
+  return at;
 }
 
-describe('the door of a room', () => {
-  beforeEach(() => resetDoors());
+/** Plays the way in: he is at his bench, the engine sends him to the office, and the walker puts
+ *  him through the door. The page that still had him on it is handed back. */
+function walkHimIn(state: GameState): HTMLElement {
+  state.owner.station = STATION_BENCH;
+  syncWalkers(page(state), 0, straight);
+  state.owner.station = STATION_OFFICE;
+  const walking = page(state);
+  syncWalkers(walking, 100, straight);
+  walkOn(walking, 100);
+  return walking;
+}
 
-  it('opens over the swing as the man arrives and stays open while he is in it', () => {
+describe('a door is drawn closed, always (CLAUDE.md T20 2.12)', () => {
+  it('has one leaf, no want and no swing, whoever is in the office', () => {
     const state = buyStartingKit(newGame());
-    state.owner.station = STATION_BENCH;
-    let root = page(state);
-    syncDoors(root, 0);
-    expect(stateOf(root, 'office')).toBe('closed');
-    expect(stateOf(root, 'canteen')).toBe('closed');
-    // He walks to the office: the hall says the door wants to be open and the driver swings it.
-    state.owner.station = STATION_OFFICE;
-    root = page(state);
-    syncDoors(root, 1000);
-    expect(stateOf(root, 'office')).toBe('closed');
-    stepDoors(root, 1000 + DOOR_SWING_MS / 2);
-    expect(stateOf(root, 'office')).toBe('half');
-    expect(doorOf('office')).toBe('half');
-    stepDoors(root, 1000 + DOOR_SWING_MS);
-    expect(stateOf(root, 'office')).toBe('open');
-    // And it stays open for as long as he is standing in it, however long the game runs.
-    stepDoors(root, 1000 + DOOR_SWING_MS + 60000);
-    expect(stateOf(root, 'office')).toBe('open');
-    // The canteen door never moved: only the door with somebody in it opens.
-    expect(stateOf(root, 'canteen')).toBe('closed');
+    for (const station of [STATION_BENCH, STATION_OFFICE]) {
+      state.owner.station = station;
+      const svg = renderHall(state);
+      expect(svg, station).toContain('data-door-room="office" data-door-state="closed"');
+      expect(svg, station).not.toContain('data-door-want');
+      expect((svg.match(/class="door-leaf"/g) ?? []).length, station).toBe(2);
+    }
+  });
+});
+
+describe('a man goes through it (CLAUDE.md T20 2.12)', () => {
+  it('knows the office doorway from every other cell', () => {
+    const door = roomDoorCell('office');
+    expect(isDoorwayCell(door)).toBe(true);
+    expect(isDoorwayCell({ x: door.x, y: door.y + 1 })).toBe(false);
+    // The canteen's is not one: a man with nothing to do stands about there, in the hall.
+    expect(isDoorwayCell(roomDoorCell('canteen'))).toBe(false);
   });
 
-  it('waits DOOR_CLOSE_MS after he leaves and then swings back', () => {
+  it('leaves him on the hall while he is still walking to the door, and takes him off at it', () => {
     const state = buyStartingKit(newGame());
-    state.owner.station = STATION_OFFICE;
-    let root = page(state);
-    syncDoors(root, 0);
-    // Born open: a view built from nothing does not swing the door in front of the player.
-    expect(stateOf(root, 'office')).toBe('open');
     state.owner.station = STATION_BENCH;
-    root = page(state);
-    const left = 5000;
-    syncDoors(root, left);
-    stepDoors(root, left + DOOR_CLOSE_MS - 1);
-    expect(stateOf(root, 'office')).toBe('open');
-    stepDoors(root, left + DOOR_CLOSE_MS);
-    expect(stateOf(root, 'office')).toBe('half');
-    stepDoors(root, left + DOOR_CLOSE_MS + DOOR_SWING_MS / 2);
-    expect(stateOf(root, 'office')).toBe('closed');
+    syncWalkers(page(state), 0, straight);
+    const door = roomDoorCell('office');
+    // The engine sends him to the office: he is still drawn, because his legs are still on him.
+    state.owner.station = STATION_OFFICE;
+    const walking = page(state);
+    syncWalkers(walking, 100, straight);
+    expect(walkerOf('owner')).toBeDefined();
+    expect(figureIsThroughADoor('owner', door)).toBe(false);
+    expect(renderHall(state)).toContain('data-figure="owner"');
+    // He arrives: from that moment he is through the door and off the drawing.
+    walkOn(walking, 100);
+    expect(walkerOf('owner')?.path).toHaveLength(0);
+    expect(figureIsThroughADoor('owner', door)).toBe(true);
+    expect(renderHall(state)).not.toContain('data-figure="owner"');
   });
 
-  it('goes back out when he comes back mid close', () => {
+  it('keeps his walker at the door so that he walks out of it when he comes back', () => {
     const state = buyStartingKit(newGame());
-    state.owner.station = STATION_OFFICE;
-    let root = page(state);
-    syncDoors(root, 0);
+    const door = roomDoorCell('office');
+    const inside = walkHimIn(state);
+    expect(walkerOf('owner')?.at).toEqual({ x: door.x, y: door.y });
+    expect(inside.querySelector('[data-figure="owner"]')).not.toBeNull();
+    // The page stops drawing him the moment he is through, and the walker waits on the doorway
+    // cell rather than being forgotten: a man who comes out comes out of the door.
+    const gone = page(state);
+    expect(gone.querySelector('[data-figure="owner"]')).toBeNull();
+    syncWalkers(gone, 61_000, straight);
+    expect(walkerOf('owner')?.at).toEqual({ x: door.x, y: door.y });
+    // And when the hall draws him again he sets off from the door, on his feet.
     state.owner.station = STATION_BENCH;
-    root = page(state);
-    syncDoors(root, 1000);
-    stepDoors(root, 1000 + DOOR_CLOSE_MS);
-    expect(stateOf(root, 'office')).toBe('half');
-    state.owner.station = STATION_OFFICE;
-    root = page(state);
-    syncDoors(root, 2000);
-    expect(stateOf(root, 'office')).toBe('half');
-    stepDoors(root, 2000 + DOOR_SWING_MS / 2);
-    expect(stateOf(root, 'office')).toBe('open');
+    const back = page(state);
+    syncWalkers(back, 62_000, straight);
+    expect(walkerOf('owner')?.at).toEqual({ x: door.x, y: door.y });
+    expect(walkerOf('owner')?.path.length).toBeGreaterThan(0);
   });
+});
 
-  it('is not reset by a page written in the middle of a swing', () => {
-    // The patch writes every attribute back from the hall's fresh markup, so the driver has to put
-    // its own phase back after every render, exactly as the walker puts the transform back.
+describe('the office is the owner s room, and a desk man stands at its door', () => {
+  it('draws the estimator at the doorway, because the office view has nobody but the owner in it', () => {
+    const start = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
+    start.cash = 50_000;
+    const hired = hireNow(start, 'estimator', 'novice');
+    hired.enquiries = [];
+    const estimator = hired.workers.find((worker) => worker.role === 'estimator');
+    if (estimator === undefined) throw new Error('nobody was hired');
+    estimator.startDay = hired.clock.day;
+    // A take off, the books, a drawing or the phone are all desk work: the engine puts him on the
+    // office station and his cell is the doorway.
+    estimator.station = STATION_OFFICE;
+    hired.owner.station = STATION_BENCH;
+    const root = page(hired);
+    syncWalkers(root, 0, straight);
+    walkOn(root, 0);
+    const drawn = renderHall(hired);
+    expect(drawn).toContain(`data-worker="${estimator.id}"`);
+    expect(figureIsThroughADoor(`worker-${estimator.id}`, roomDoorCell('office'))).toBe(false);
+    // And he is nobody's knock: the door counts the owner alone.
+    expect(figuresThroughDoors()).toEqual([]);
+  });
+});
+
+describe('the knock is the ui layer s to play (CLAUDE.md T20 2.13)', () => {
+  it('counts a man in and a man out, once each, and the asking clears it', () => {
     const state = buyStartingKit(newGame());
-    state.owner.station = STATION_OFFICE;
-    let root = page(state);
-    syncDoors(root, 0);
     state.owner.station = STATION_BENCH;
-    root = page(state);
-    syncDoors(root, 1000);
-    stepDoors(root, 1000 + DOOR_CLOSE_MS);
-    expect(stateOf(root, 'office')).toBe('half');
-    // A whole game minute runs and the page is written again at the same moment.
-    const fresh = page(state);
-    syncDoors(fresh, 1000 + DOOR_CLOSE_MS);
-    expect(stateOf(fresh, 'office')).toBe('half');
-    expect(doorOf('office')).toBe('half');
-  });
-
-  it('forgets every door when the view is built from nothing', () => {
-    const state = buyStartingKit(newGame());
-    state.owner.station = STATION_OFFICE;
     const root = page(state);
-    syncDoors(root, 0);
-    expect(doorOf('office')).toBe('open');
+    syncWalkers(root, 0, straight);
+    stepDoors(root, 0);
+    expect(takeDoorGoings()).toBe(0);
+    // In.
+    const going = walkHimIn(state);
+    syncDoors(going, 60_000);
+    expect(figuresThroughDoors()).toEqual(['owner']);
+    expect(takeDoorGoings()).toBe(1);
+    // And no second knock for standing there.
+    stepDoors(going, 61_000);
+    expect(takeDoorGoings()).toBe(0);
+    // Out.
+    state.owner.station = STATION_BENCH;
+    const out = page(state);
+    syncWalkers(out, 62_000, straight);
+    stepDoors(out, 62_000);
+    expect(figuresThroughDoors()).toEqual([]);
+    expect(takeDoorGoings()).toBe(1);
+  });
+
+  it('is reported through hallOneShots, which is what the ui layer reads', () => {
+    const state = buyStartingKit(newGame());
+    state.owner.station = STATION_BENCH;
+    const root = page(state);
+    syncWalkers(root, 0, straight);
+    stepDoors(root, 0);
+    expect(Array.from(hallOneShots(state))).toEqual([]);
+    const going = walkHimIn(state);
+    stepDoors(going, 60_000);
+    expect(Array.from(hallOneShots(state))).toEqual(['door']);
+    // One passage, one knock, however many frames ask.
+    expect(Array.from(hallOneShots(state))).toEqual([]);
+  });
+
+  it('forgets everything when the view is built from nothing', () => {
+    const state = buyStartingKit(newGame());
+    const root = walkHimIn(state);
+    syncDoors(root, 60_000);
+    expect(figuresThroughDoors()).toEqual(['owner']);
     resetDoors();
-    expect(doorOf('office')).toBeUndefined();
+    expect(figuresThroughDoors()).toEqual([]);
+    expect(takeDoorGoings()).toBe(0);
+  });
+});
+
+describe('the render layer does not reach into the ui layer (CLAUDE.md T20 2.13)', () => {
+  it('imports nothing from src/ui/sound anywhere under src/render', async () => {
+    const { readFileSync, readdirSync, statSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    const files: string[] = [];
+    const walk = (directory: string): void => {
+      for (const name of readdirSync(directory)) {
+        const path = join(directory, name);
+        if (statSync(path).isDirectory()) walk(path);
+        else if (name.endsWith('.ts')) files.push(path);
+      }
+    };
+    walk('src/render');
+    expect(files.length).toBeGreaterThan(5);
+    for (const path of files) {
+      const source = readFileSync(path, 'utf8');
+      expect(source, path).not.toContain("from '../ui/sound'");
+      expect(source, path).not.toContain('from "../ui/sound"');
+    }
   });
 });

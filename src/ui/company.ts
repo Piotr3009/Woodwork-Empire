@@ -25,6 +25,7 @@ import {
 } from '../engine/index';
 import { machineSavings } from '../engine/machines';
 import type { MachineSaving, MachineSavings } from '../engine/machines';
+// Straight off its own module, as the Turn 13 freeze on the public API asks (REPORT-T13 10).
 import { lastWeekRate, weekRate } from '../engine/rate';
 import type { WorkshopRate } from '../engine/rate';
 import { plural } from '../engine/text';
@@ -252,6 +253,8 @@ function outputRow(line: OutputLine, index: number): string {
  *  computed from it (CLAUDE.md T15 0, 2.1). */
 function outputSheet(breakdown: OutputBreakdown): string {
   const hall = breakdown.lines.filter((line) => line.hall);
+  // The men who do not produce are off this sheet at the source, in `outputBreakdown`, where the
+  // rule reads the role and never the name (CLAUDE.md T20 2.3.3).
   const elsewhere = breakdown.lines.filter((line) => !line.hall);
   const base = ledgerRow('Base', '', breakdown.base.toFixed(2), 0, 'data-line="base"');
   return (
@@ -293,9 +296,12 @@ function rateLine(week: WorkshopRate, before: WorkshopRate): string {
   );
 }
 
-/** Hours as the board writes them: "12.5 h", and "none" for a machine nobody stood at. */
+/** Hours as the board writes them: "12.5 h", and "0 h" for a machine nobody stood at. A column of
+ *  hours reads as hours all the way down (PIOTR, 18.09; CLAUDE.md T20 2.14). Hours the machines
+ *  COST the workshop are said as they are: rounding them to "0 h" put a nought at the top of a
+ *  sheet whose own sum line read "-0.1 hours" (T20-C5, seen in the picture). */
 function hours(value: number): string {
-  return value <= 0 ? 'none' : `${value} h`;
+  return value === 0 ? '0 h' : `${value} h`;
 }
 
 /** What the class does to its stage, as a percentage: "+5%", with the gate's 2% already in it. */

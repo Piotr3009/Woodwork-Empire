@@ -1,15 +1,15 @@
-// The sound of the workshop (PIOTR, 17.09; CLAUDE.md T19 2.10). One engine, one table, one volume
-// and one mute, and nothing at all before the player's first click.
+// The sound of the workshop (PIOTR, 17.09 and 18.09; CLAUDE.md T19 2.10, T20 2.13). One engine,
+// one table, one volume and one mute, and nothing at all before the player's first click.
 //
-// The standing "no sound" line of every brief since Turn 4 is withdrawn. What replaces it is this
-// file: a single Web Audio graph built the first time the player clicks anything (browsers refuse
-// to start one before a gesture), a master gain the Settings modal writes to, and a table that
-// says, per sound, which file it wants and what to make instead while the file is not there.
+// **No sound plays without a recorded file Piotr has heard** (PIOTR, 18.09). The synthesised stand
+// ins of Turn 19 are deleted: `play` and `loop` do nothing at all while the named file is not in
+// `public/sounds/`, and the hall is silent until Piotr's own recordings land
+// (docs/art/REQUESTS-T20.md). Every hook stays where it is and the Settings controls stay as they
+// are, so the day a file is there it is heard with no code change: the loader asks for the file
+// once, on the first play, and remembers what it found.
 //
-// Real recordings are Piotr's to make in his own workshop (docs/art/REQUESTS-T19.md). Until a file
-// lands in `public/sounds/` the engine plays a quiet synthesised stand in for it, so every hook in
-// the game can be heard tonight. The moment a file is there it is used instead, with no code
-// change: the loader asks for the file once, on the first play, and remembers what it found.
+// The names of the sounds are the render layer's, off `src/render/hall.ts`, because the render
+// layer is what reports the events; this file plays what it is told (CLAUDE.md T20 2.13).
 //
 // Nothing here is game state. The volume and the mute live on `state.settings.sound` and are
 // pushed in; everything else is the page's, and a reloaded page starts silent and locked again.
@@ -19,32 +19,23 @@ import {
   HAMMER_EVERY_SECONDS,
   SOUND_ONE_SHOT_GAP_MS,
   SOUND_VOLUME_DEFAULT,
-  STAND_IN_GAIN,
 } from '../engine/constants';
+import type { HallLoopName, HallOneShotName } from '../render/hall';
 import type { SoundSettings } from '../engine/index';
 
 /** The sounds that play once: a door, a knock, a screw. */
-export type OneShotName = 'door' | 'hammer' | 'drill';
+export type OneShotName = HallOneShotName;
 /** The sounds that run for as long as the thing making them runs. */
-export type LoopName = 'tableSaw' | 'extractor' | 'sander' | 'sprayBooth';
+export type LoopName = HallLoopName;
 export type SoundName = OneShotName | LoopName;
 
-/** What the engine makes when the recording is not there: noise through a filter for the machines,
- *  a short shaped tone for the hand tools, a soft thud for a door. */
-export type StandIn = 'noise' | 'hiss' | 'rasp' | 'click' | 'buzz' | 'thud';
-
 export interface SoundSpec {
-  /** The file under `public/sounds/`, exactly as docs/art/REQUESTS-T19.md names it. */
+  /** The file under `public/sounds/`, exactly as docs/art/REQUESTS-T20.md names it. Until it is
+   *  there this sound is silence: nothing is synthesised in its place (PIOTR, 18.09). */
   file: string;
   kind: 'oneShot' | 'loop';
-  /** What is made while the file is not there. */
-  standIn: StandIn;
   /** How loud this one is against the master [TUNE per sound]. */
   gain: number;
-  /** The middle of the band the stand in is shaped around, in Hz [TUNE]. */
-  hz: number;
-  /** How long a one shot's stand in lasts, in seconds [TUNE]. Ignored by a loop. */
-  seconds: number;
   /** The shortest gap between two of this one shot, in milliseconds. `SOUND_ONE_SHOT_GAP_MS` when
    *  the row does not say: the hammer and the drill are knocks and screws, which the brief wants
    *  every few seconds and not every second (CLAUDE.md T19 2.10). Ignored by a loop. */
@@ -53,29 +44,23 @@ export interface SoundSpec {
 
 /** The table: one row per sound, by event and by station (CLAUDE.md T19 2.10). */
 export const SOUNDS: Record<SoundName, SoundSpec> = {
-  door: { file: 'sounds/door.ogg', kind: 'oneShot', standIn: 'thud', gain: 0.6, hz: 160, seconds: 0.18 },
+  door: { file: 'sounds/door.ogg', kind: 'oneShot', gain: 0.6 },
   hammer: {
     file: 'sounds/hammer.ogg',
     kind: 'oneShot',
-    standIn: 'click',
     gain: 0.5,
-    hz: 900,
-    seconds: 0.06,
     gapMs: HAMMER_EVERY_SECONDS * 1000,
   },
   drill: {
     file: 'sounds/drill.ogg',
     kind: 'oneShot',
-    standIn: 'buzz',
     gain: 0.4,
-    hz: 220,
-    seconds: 0.35,
     gapMs: DRILL_EVERY_SECONDS * 1000,
   },
-  tableSaw: { file: 'sounds/tableSaw.ogg', kind: 'loop', standIn: 'noise', gain: 0.5, hz: 1400, seconds: 0 },
-  extractor: { file: 'sounds/extractor.ogg', kind: 'loop', standIn: 'noise', gain: 0.3, hz: 320, seconds: 0 },
-  sander: { file: 'sounds/sander.ogg', kind: 'loop', standIn: 'rasp', gain: 0.3, hz: 2200, seconds: 0 },
-  sprayBooth: { file: 'sounds/sprayBooth.ogg', kind: 'loop', standIn: 'hiss', gain: 0.35, hz: 4000, seconds: 0 },
+  tableSaw: { file: 'sounds/tableSaw.ogg', kind: 'loop', gain: 0.5 },
+  extractor: { file: 'sounds/extractor.ogg', kind: 'loop', gain: 0.3 },
+  sander: { file: 'sounds/sander.ogg', kind: 'loop', gain: 0.3 },
+  sprayBooth: { file: 'sounds/sprayBooth.ogg', kind: 'loop', gain: 0.35 },
 };
 
 export const LOOP_NAMES: readonly LoopName[] = ['tableSaw', 'extractor', 'sander', 'sprayBooth'];
@@ -94,9 +79,6 @@ export interface AudioLike {
   sampleRate: number;
   createGain(): GainLike;
   createBufferSource(): BufferSourceLike;
-  createOscillator(): OscillatorLike;
-  createBiquadFilter(): FilterLike;
-  createBuffer(channels: number, length: number, rate: number): AudioBufferLike;
   resume?: () => Promise<void> | void;
   close?: () => Promise<void> | void;
   decodeAudioData?: (data: ArrayBuffer) => Promise<AudioBufferLike>;
@@ -128,22 +110,10 @@ export interface BufferSourceLike extends NodeLike {
   start(when?: number): void;
   stop(when?: number): void;
 }
-export interface OscillatorLike extends NodeLike {
-  type: string;
-  frequency: ParamLike;
-  start(when?: number): void;
-  stop(when?: number): void;
-}
-export interface FilterLike extends NodeLike {
-  type: string;
-  frequency: ParamLike;
-  Q?: ParamLike;
-}
-
 type ContextFactory = () => AudioLike | null;
 
 interface Running {
-  source: BufferSourceLike | OscillatorLike;
+  source: BufferSourceLike;
   gain: GainLike;
 }
 
@@ -247,72 +217,6 @@ export function resetSound(): void {
   played.clear();
 }
 
-/** Noise, shaped: what a saw and a fan are made of while the recordings are not there. One second
- *  of it, looped, is enough at this volume and it costs one buffer. */
-function noiseBuffer(ctx: AudioLike): AudioBufferLike | null {
-  const length = Math.max(1, Math.floor(ctx.sampleRate));
-  let buffer: AudioBufferLike | null | undefined;
-  try {
-    buffer = ctx.createBuffer(1, length, ctx.sampleRate);
-  } catch {
-    return null;
-  }
-  // A context that answers with nothing is a context with no buffer, not a crash one frame later.
-  if (buffer === null || buffer === undefined) return null;
-  const data = buffer.getChannelData?.(0);
-  if (data === undefined) return buffer;
-  // A cheap deterministic hiss: no Math.random anywhere in this repository, and a fixed noise
-  // sounds no different from a random one (CLAUDE.md, the engine's rule, kept here too).
-  let seed = 22026;
-  for (let at = 0; at < data.length; at += 1) {
-    seed = (seed * 1103515245 + 12345) & 0x7fffffff;
-    data[at] = (seed / 0x3fffffff) - 1;
-  }
-  return buffer;
-}
-
-function standInFor(ctx: AudioLike, spec: SoundSpec, out: GainLike): Running | null {
-  const shaped = ctx.createGain();
-  shaped.gain.value = STAND_IN_GAIN * spec.gain;
-  shaped.connect(out);
-  if (spec.standIn === 'noise' || spec.standIn === 'hiss' || spec.standIn === 'rasp') {
-    const buffer = noiseBuffer(ctx);
-    // Nothing to play through it: let go of the gain rather than leave it hanging off the master.
-    // A loop that cannot start is tried again on the next frame, so a leak here is a leak a
-    // second, for as long as the hall is running.
-    if (buffer === null) {
-      try {
-        shaped.disconnect();
-      } catch {
-        // A fake that does not disconnect is no worse off than before.
-      }
-      return null;
-    }
-    const source = ctx.createBufferSource();
-    source.buffer = buffer;
-    source.loop = true;
-    const filter = ctx.createBiquadFilter();
-    filter.type = spec.standIn === 'noise' ? 'lowpass' : 'bandpass';
-    filter.frequency.value = spec.hz;
-    if (filter.Q !== undefined) filter.Q.value = spec.standIn === 'rasp' ? 0.7 : 1;
-    source.connect(filter);
-    filter.connect(shaped);
-    source.start();
-    return { source, gain: shaped };
-  }
-  // A thud, a click and a buzz are one shaped tone each, and they stop themselves.
-  const osc = ctx.createOscillator();
-  osc.type = spec.standIn === 'buzz' ? 'sawtooth' : spec.standIn === 'click' ? 'square' : 'sine';
-  osc.frequency.value = spec.hz;
-  osc.connect(shaped);
-  const now = ctx.currentTime;
-  shaped.gain.setValueAtTime?.(STAND_IN_GAIN * spec.gain, now);
-  shaped.gain.linearRampToValueAtTime?.(0, now + spec.seconds);
-  osc.start();
-  osc.stop(now + spec.seconds);
-  return { source: osc, gain: shaped };
-}
-
 function fromRecording(
   ctx: AudioLike,
   buffer: AudioBufferLike,
@@ -331,8 +235,8 @@ function fromRecording(
 }
 
 /** Asks for the recording once. A file that is not there, or a browser that will not decode it,
- *  is remembered as "there is none" and the stand in is used from then on. Nothing waits for it:
- *  the first play is the stand in and the recording takes over at the next one. */
+ *  is remembered as "there is none" and this sound is silence from then on. Nothing waits for it:
+ *  the first play is silent and the recording is heard from the next one (CLAUDE.md T20 2.13). */
 function wantRecording(name: SoundName): AudioBufferLike | null {
   const known = recordings.get(name);
   if (known !== undefined) return known;
@@ -372,9 +276,11 @@ function start(name: SoundName): Running | null {
   const out = master;
   if (ctx === null || out === null) return null;
   const spec = SOUNDS[name];
+  // No file, no sound. Nothing is synthesised in its place and nothing is heard: the hall is
+  // silent until Piotr's own recordings land (PIOTR, 18.09; CLAUDE.md T20 2.13).
   const recording = wantRecording(name);
-  const made =
-    recording === null ? standInFor(ctx, spec, out) : fromRecording(ctx, recording, spec, out);
+  if (recording === null) return null;
+  const made = fromRecording(ctx, recording, spec, out);
   if (made === null) return null;
   played.set(name, (played.get(name) ?? 0) + 1);
   if (spec.kind === 'oneShot') {

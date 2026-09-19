@@ -4,13 +4,11 @@ import {
   CONSUMABLES_LABEL,
   DAILY_ORDERING_MINUTES,
   DAY_END_MINUTE,
-  ESTIMATOR_JOBS_PER_DAY,
-  ESTIMATOR_JOBS_WITH_JOINERY_CORE,
-  ESTIMATOR_RATES,
-  JOINERY_CORE_EXTENSION_JOBS,
+  WORKER_RATES,
   JOINERY_CORE_EXTENSION_PRICE_YEARLY,
   JOINERY_CORE_MAX_EXTENSIONS,
   JOINERY_CORE_PRICE_YEARLY,
+  MATERIAL_TAKE_OFF_MINUTES,
   DESIGN_MIN_MINUTES,
   SOFTWARE_DESIGN_FACTOR,
   TAKE_OFF_BUTTON_LABEL,
@@ -21,6 +19,7 @@ import {
   designMinutes,
   emailsForPrice,
   estimatorCapacity,
+  takeOffMinutes,
   findTask,
   jobTasks,
   joineryCoreOffer,
@@ -50,15 +49,15 @@ import {
   withLicence,
 } from '../helpers';
 
-function staff(id: string, role: Worker['role'], monthlyWage: number): Worker {
+function staff(id: string, role: Worker['role'], weeklyWage: number): Worker {
   return {
     id,
     name: id,
     role,
     tier: null,
     rate: 0,
-    weeklyWage: 0,
-    monthlyWage,
+    weeklyWage,
+    leavesOnDay: null,
     startDay: 1,
     jobId: null,
     taskId: null,
@@ -122,8 +121,8 @@ describe('minute curves', () => {
   it('charges 10 minutes a joiner a day for management', () => {
     const state = newGame();
     expect(staffManagementMinutes(state)).toBe(0);
-    state.workers.push({ ...staff('j1', 'joiner', 0), tier: 'poor', rate: 0.6, weeklyWage: 480 });
-    state.workers.push({ ...staff('j2', 'joiner', 0), tier: 'poor', rate: 0.6, weeklyWage: 480 });
+    state.workers.push({ ...staff('j1', 'joiner', 0), tier: 'novice', rate: 0.6, weeklyWage: 480 });
+    state.workers.push({ ...staff('j2', 'joiner', 0), tier: 'novice', rate: 0.6, weeklyWage: 480 });
     expect(staffManagementMinutes(state)).toBe(20);
   });
 });
@@ -196,7 +195,7 @@ describe('the daily list', () => {
 
   it('hands the office admin his own tasks, which he works off out of his own day', () => {
     const state = newGame();
-    state.workers.push(staff('a1', 'officeAdmin', 1900));
+    state.workers.push(staff('a1', 'officeAdmin', 445));
     const day2 = runToDay(state, 2).state;
     const taken = day2.tasks.find((task) => task.kind === 'bookkeeping');
     expect(taken?.doneBy).toBe('a1');
@@ -366,20 +365,48 @@ describe('the material take off', () => {
     return jobTasks(state, firstJob(state).id).find((task) => task.kind === 'materialTakeOff');
   }
 
-  it('is five a day, ten with Joinery Core, five more per extension and never more than two', () => {
+  it('is as many a day as his minutes allow: 16 bare, 32 with Joinery Core (CLAUDE.md T20 2.3)', () => {
     const state = newGame();
-    expect(estimatorCapacity(state)).toBe(ESTIMATOR_JOBS_PER_DAY);
-    expect(ESTIMATOR_JOBS_PER_DAY).toBe(5);
+    expect(MATERIAL_TAKE_OFF_MINUTES).toBe(30);
+    expect(takeOffMinutes(state)).toBe(MATERIAL_TAKE_OFF_MINUTES);
+    expect(estimatorCapacity(state)).toBe(16);
     state.software.joineryCore = true;
-    expect(estimatorCapacity(state)).toBe(ESTIMATOR_JOBS_WITH_JOINERY_CORE);
-    expect(ESTIMATOR_JOBS_WITH_JOINERY_CORE).toBe(10);
+    expect(takeOffMinutes(state)).toBe(15);
+    expect(estimatorCapacity(state)).toBe(32);
     state.software.joineryCoreExtensions = 1;
-    expect(estimatorCapacity(state)).toBe(10 + JOINERY_CORE_EXTENSION_JOBS);
+    expect(estimatorCapacity(state)).toBe(42);
     state.software.joineryCoreExtensions = 2;
-    expect(estimatorCapacity(state)).toBe(10 + 2 * JOINERY_CORE_EXTENSION_JOBS);
+    expect(estimatorCapacity(state)).toBe(56);
     // At most two: a third counts for nothing, whatever the state says.
     state.software.joineryCoreExtensions = 3;
-    expect(estimatorCapacity(state)).toBe(10 + JOINERY_CORE_MAX_EXTENSIONS * JOINERY_CORE_EXTENSION_JOBS);
+    expect(estimatorCapacity(state)).toBe(56);
+    expect(JOINERY_CORE_MAX_EXTENSIONS).toBe(2);
+  });
+
+  it('is the same half hour whatever the job is worth, and the caller asks for it', () => {
+    // The curve by price went with the five a day: `src/engine/jobs.ts` asks `takeOffMinutes` for
+    // the figure now, instead of `createTask` overriding whatever it was handed (T20-C1).
+    const takeOff = (price: number): number => {
+      const state = newGame();
+      state.enquiries = [];
+      const enquiry = placeEnquiry(state, { name: 'A job', price });
+      const taken = acceptNow(state, enquiry.id, false);
+      return tasksOfKind(taken, 'materialTakeOff')[0]?.minutesTotal ?? 0;
+    };
+    expect(takeOff(400)).toBe(MATERIAL_TAKE_OFF_MINUTES);
+    expect(takeOff(100000)).toBe(MATERIAL_TAKE_OFF_MINUTES);
+    // The old curve is still exported for the material order it was written for, and it does not
+    // agree with the take off any more, which is the point.
+    expect(materialOrderMinutes(100000)).not.toBe(MATERIAL_TAKE_OFF_MINUTES);
+  });
+
+  it('gives a man with no experience 37 minutes over one and the top man 21', () => {
+    const state = newGame();
+    // His tier is his speed at the desk, off the one WORKER_RATES table (CLAUDE.md T20 2.5).
+    expect(MATERIAL_TAKE_OFF_MINUTES / WORKER_RATES.novice).toBeCloseTo(37.5, 6);
+    expect(MATERIAL_TAKE_OFF_MINUTES / WORKER_RATES.master).toBeCloseTo(21.43, 2);
+    expect(estimatorCapacity(state, 'novice')).toBe(12);
+    expect(estimatorCapacity(state, 'master')).toBe(22);
   });
 
   it('is the owner’s with nobody hired, and only once the drawing is done', () => {
@@ -405,7 +432,11 @@ describe('the material take off', () => {
 
   it('is the estimator’s from the day he is in, at the speed of his tier, and waits for the drawing too', () => {
     let state = withTakeOff();
-    state = hireNow(state, 'estimator', 'super');
+    // A super experienced man answers from reputation 35 now (CLAUDE.md T20 2.5), and the bank
+    // wants a month of his pay before anybody is taken on (CLAUDE.md T17 2.11).
+    state.reputation = 40;
+    state.cash = 100000;
+    state = hireNow(state, 'estimator', 'senior');
     const estimator = state.workers.find((worker) => worker.role === 'estimator');
     expect(estimator).toBeDefined();
     for (const worker of state.workers) worker.startDay = state.clock.day;
@@ -418,8 +449,8 @@ describe('the material take off', () => {
     const before = takeOffOf(state)?.minutesRemaining ?? 0;
     const later = clearEvents(runClock(state, 10));
     const after = takeOffOf(later)?.minutesRemaining ?? 0;
-    // A super estimator works it off at 1.2 of a minute a minute (ESTIMATOR_RATES).
-    expect(before - after).toBeCloseTo(10 * ESTIMATOR_RATES.super, 6);
+    // A super experienced estimator works it off at 1.2 of a minute a minute (WORKER_RATES).
+    expect(before - after).toBeCloseTo(10 * WORKER_RATES.senior, 6);
     expect(later.owner.minutesWorked).toBe(state.owner.minutesWorked);
   });
 
@@ -432,7 +463,10 @@ describe('the material take off', () => {
     expect(offer.held).toBe(false);
     expect(offer.core.ok).toBe(true);
     expect(offer.extension).toEqual({ ok: false, reason: 'Joinery Core first' });
-    expect(offer.capacity).toBe(ESTIMATOR_JOBS_PER_DAY);
+    expect(offer.capacity).toBe(16);
+    expect(offer.baseCapacity).toBe(16);
+    expect(offer.coreCapacity).toBe(32);
+    expect(offer.extensionCapacities).toEqual([42, 56]);
     expect(offer.yearlyPrice).toBe(JOINERY_CORE_PRICE_YEARLY);
     expect(offer.extensionYearlyPrice).toBe(JOINERY_CORE_EXTENSION_PRICE_YEARLY);
     // The click switches it on and pays the first twelfth of the year (CLAUDE.md T13 3.8).
@@ -441,13 +475,11 @@ describe('the material take off', () => {
     expect(state.software.joineryCore).toBe(true);
     expect(cash - state.cash).toBeCloseTo(JOINERY_CORE_PRICE_YEARLY / 12, 2);
     expect(joineryCoreOffer(state).core).toEqual({ ok: false, reason: 'On the laptop' });
-    expect(joineryCoreOffer(state).capacity).toBe(ESTIMATOR_JOBS_WITH_JOINERY_CORE);
+    expect(joineryCoreOffer(state).capacity).toBe(32);
     state = act(state, { type: 'BUY_JOINERY_CORE_EXTENSION' });
     state = act(state, { type: 'BUY_JOINERY_CORE_EXTENSION' });
     expect(joineryCoreOffer(state).extension).toEqual({ ok: false, reason: 'Both extensions bought' });
-    expect(joineryCoreOffer(state).capacity).toBe(
-      ESTIMATOR_JOBS_WITH_JOINERY_CORE + 2 * JOINERY_CORE_EXTENSION_JOBS,
-    );
+    expect(joineryCoreOffer(state).capacity).toBe(56);
     // A third click buys nothing.
     const two = state.cash;
     state = act(state, { type: 'BUY_JOINERY_CORE_EXTENSION' });
@@ -469,7 +501,7 @@ describe('the material take off', () => {
     // And it is the admin's when there is one: she picks it up after the books, which come first
     // on her list, and the owner never sees it.
     const office = newGame();
-    office.workers.push(staff('a1', 'officeAdmin', 1900));
+    office.workers.push(staff('a1', 'officeAdmin', 445));
     const day2 = clearEvents(runToDay(office, 2).state);
     const later = clearEvents(tick(day2, BOOKKEEPING_MINUTES + 1));
     expect(tasksOfKind(later, 'dailyOrdering')[0]?.doneBy).toBe('a1');

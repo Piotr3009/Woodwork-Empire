@@ -75,12 +75,17 @@ import type {
  *
  *  Bumped in Turn 19: a job carries the list of everybody on it and not one man and a second, the
  *  settings carry the sound, and the state remembers that the hall has been set up
- *  (CLAUDE.md T19 section 4). Every v26 save loads. */
-export const STATE_VERSION = 16;
+ *  (CLAUDE.md T19 section 4). Every v26 save loads.
+ *
+ *  Bumped in Turn 20: the four tiers are named again and nobody is "poor"; every man is paid by
+ *  the week and the monthly wage is gone; a man can be let go and works his notice out; a machine
+ *  counts its services and is out of the hall for the day of one; and a contract records who
+ *  ended it (CLAUDE.md T20 section 4). Every v28 save loads. */
+export const STATE_VERSION = 17;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
-export const APP_VERSION = 'v28';
+export const APP_VERSION = 'v29';
 
 // ---------------------------------------------------------------------------
 // The owner's day, in the seven things it is made of
@@ -128,6 +133,11 @@ export const BREAK_MINUTES = 60;
 /** 13:00: the board is written again when the workshop comes back off its dinner, which is the
  *  second of the day's two refreshes (PIOTR, 13.09; CLAUDE.md T10 3.7). */
 export const BOARD_MIDDAY_MINUTE = BREAK_START_MINUTE + BREAK_MINUTES;
+/** How often the clock under a day track is marked, in minutes of the working day [TUNE]: every
+ *  two hours from 8:00, which is what the drawing has. The last two hour mark is left off when the
+ *  end of the day is nearer to it than half of that, so 16:00 and 17:00 never sit on top of each
+ *  other (docs/mockups/t20/contracts-tab.html; CLAUDE.md T20 2.1.1). */
+export const DAY_TRACK_TICK_MINUTES = 120;
 /** 17:00 on the clock: the 480 minutes of work and the hour of dinner between them (PIOTR). */
 export const DAY_END_MINUTE = MINUTES_PER_WORKING_DAY + BREAK_MINUTES;
 /** 19:00, and the tools go down whoever wants what (PIOTR: overtime until 19:00 at the latest). */
@@ -494,12 +504,6 @@ export const SAW_FALLBACK_DEFAULT = true;
 /** The piece leaving. It carries no labour: it is the Turn 2 transport, not work at a bench
  *  (CLAUDE.md T7 3.1). The Work Plan drew a bar for it until Turn 9 took the bars away. */
 export const DELIVERY_STAGE: StageSpec = { id: 'delivery', label: 'Delivery', share: 0 };
-/** Worker speed as a fraction of the owner. Nobody matches the owner (PIOTR). */
-export const WORKER_RATES: Record<WorkerTier, number> = {
-  poor: 0.6,
-  normal: 0.8,
-  super: 0.9,
-};
 /** [TUNE] informational per job cost of a worker minute: weekly wage divided by this. */
 export const WORKER_MINUTE_RATE_DIVISOR = 2400;
 
@@ -615,42 +619,34 @@ export const LATE_ACCOUNTS_CHARGE = 100;
  *  projects, the admin's when there is one (PIOTR; CLAUDE.md T13 3.3). */
 export const DAILY_ORDERING_MINUTES = 30;
 export const CONSUMABLES_LABEL = 'Consumables and materials';
-/** The material take off: reading the drawing and counting the sheets for one accepted job. The
- *  owner does it until an estimator is taken on; an estimator does this many a day (PIOTR: 5),
- *  ten with Joinery Core on the laptop (PIOTR: 10), and five more per extension, at most two
- *  [TUNE the extension figures] (CLAUDE.md T13 3.8). */
-export const ESTIMATOR_JOBS_PER_DAY = 5;
-export const ESTIMATOR_JOBS_WITH_JOINERY_CORE = 10;
-export const JOINERY_CORE_EXTENSION_JOBS = 5;
+/** A material take off is half an hour of the desk it is done at, whatever the job is worth
+ *  [PIOTR, 18.09: "when I did it, it took 30 minutes"] (CLAUDE.md T20 2.3). The curve by price and
+ *  the five a day are both gone: the man's own speed is what makes one take off longer than
+ *  another, so a man with no experience spends 37 minutes over it and an extremely experienced one
+ *  21, and he does as many a day as his minutes allow. */
+export const MATERIAL_TAKE_OFF_MINUTES = 30;
+/** What Joinery Core does to those minutes: it halves them [TUNE, from PIOTR's "16 a day bare and
+ *  32 with the software"]. */
+export const JOINERY_CORE_TAKE_OFF_FACTOR = 0.5;
+/** And what each of its extensions does on top of that: a further quarter off [TUNE]. */
+export const JOINERY_CORE_EXTENSION_TAKE_OFF_FACTOR = 0.75;
 export const JOINERY_CORE_MAX_EXTENSIONS = 2;
 /** Joinery Core and its extensions are bought by the year [TUNE], charged as a twelfth each
  *  month like every other subscription (CLAUDE.md T13 3.8). */
 export const JOINERY_CORE_PRICE_YEARLY = 1200;
 export const JOINERY_CORE_EXTENSION_PRICE_YEARLY = 600;
-/** What an estimator costs a month, three tiers like the joiners [TUNE], what each tier is worth
- *  against the owner at the take off [TUNE], and the standing he answers from [TUNE]. */
-export const ESTIMATOR_MONTHLY_WAGE: Record<WorkerTier, number> = {
-  poor: 2400,
-  normal: 2600,
-  super: 2900,
-};
-export const ESTIMATOR_RATES: Record<WorkerTier, number> = { poor: 0.8, normal: 1, super: 1.2 };
-export const ESTIMATOR_REPUTATION = 0;
-/** What a sprayer costs a month, three tiers like the joiners [TUNE] (CLAUDE.md T19 2.6). He is
- *  paid monthly like the office roles, because he is hired on a trade rate and not on the
- *  workshop's weekly one. */
-export const SPRAYER_MONTHLY_WAGE: Record<WorkerTier, number> = {
-  poor: 2300,
-  normal: 2700,
-  super: 3100,
-};
-/** The reputation a sprayer wants before he will come, by tier [TUNE]: the same ladder the joiners
- *  climb, because he is a floor man like them (CLAUDE.md T19 2.6). */
-export const SPRAYER_REPUTATION: Record<WorkerTier, number> = {
-  poor: -50,
-  normal: 10,
-  super: 40,
-};
+/** What an experienced estimator costs a week [TUNE: his 2,600 a month over WEEKS_PER_MONTH is
+ *  606.67, taken to the nearest ten]. The four tiers come off it by the one ladder in 9.3, and
+ *  what each tier is worth against the owner at the take off is WORKER_RATES: an estimator is a
+ *  man with a rate like any other, so he has no rate table of his own any more
+ *  (CLAUDE.md T20 2.5). The standing each tier answers from is TIER_MIN_REPUTATION. */
+export const ESTIMATOR_WEEKLY_WAGE_EXPERIENCED = 610;
+/** What an experienced sprayer costs a week [TUNE: his 2,700 a month over WEEKS_PER_MONTH is
+ *  630, which is already round]. He is paid by the week like everybody else from tonight: there
+ *  is one unit of pay in the game and it is the week (PIOTR, 18.09; CLAUDE.md T20 2.6). His four
+ *  tiers come off this by the one ladder in 9.3, and the standing each answers from is
+ *  TIER_MIN_REPUTATION, the same gate every tiered role passes (CLAUDE.md T20 2.5). */
+export const SPRAYER_WEEKLY_WAGE_EXPERIENCED = 630;
 /** What a joiner gets through in a minute of a lacquered job's finishing, against a sprayer's 1.0
  *  [TUNE]. A workshop without a sprayer is slower at the booth, never stuck
  *  (CLAUDE.md T19 2.6). */
@@ -663,8 +659,10 @@ export const SPRAYER_SPRAY_RATE = 1.0;
 export const SPRAYER_BENCH_RATE = 0.6;
 
 /** The production manager: one tier, a pure cost, and the first management role in the game
- *  [TUNE wage and standing] (CLAUDE.md T13 3.9). */
-export const PRODUCTION_MANAGER_MONTHLY_WAGE = 3400;
+ *  [TUNE wage and standing] (CLAUDE.md T13 3.9). Paid by the week like everybody else from
+ *  tonight [TUNE: his 3,400 a month over WEEKS_PER_MONTH is 793.33, to the nearest five]
+ *  (CLAUDE.md T20 2.6). */
+export const PRODUCTION_MANAGER_WEEKLY_WAGE = 795;
 export const PRODUCTION_MANAGER_REPUTATION = 10;
 /** The second shift: this many minutes after the day shift [TUNE], at this much of salary for
  *  those hours [TUNE], the owner absent from the hall: quality a tier down for work done at
@@ -695,7 +693,9 @@ export const ADMIN_COVER_RATE = 0.5;
  *  minutes of a drawing already carry the software's own factor, so his rate is the 0.8 and
  *  nothing else: the licence is counted once, where it is written down (CLAUDE.md T10 3.6). */
 export const DRAFTSMAN_RATE = 0.8;
-export const DRAFTSMAN_MONTHLY_WAGE = 2400;
+/** Paid by the week like everybody else from tonight [TUNE: his 2,400 a month over
+ *  WEEKS_PER_MONTH is 560, which is already round] (CLAUDE.md T20 2.6). */
+export const DRAFTSMAN_WEEKLY_WAGE = 560;
 export const DRAFTSMAN_REPUTATION = 15;
 
 /** A call is 15 minutes of whoever takes it, whatever the job is worth (PIOTR, T4 3.3). */
@@ -807,8 +807,22 @@ export const DEADLINE_EXPRESS_FACTOR = 0.8;
  *  [TUNE: 80] (CLAUDE.md T6 3.6). */
 export const SERVICE_INTERVAL_HOURS = 80;
 export const SERVICE_MINUTES = 30;
-/** [TUNE] the service bill, and what an overdue machine risks every working day. */
-export const SERVICE_COST_FRACTION = 0.02;
+/** [PIOTR, 18.09] A service is a tenth of what the machine cost (CLAUDE.md T20 2.9.2). It was 2%
+ *  from Turn 6 to Turn 19. */
+export const SERVICE_COST_FRACTION = 0.1;
+/** [PIOTR, 18.09] What a service adds to the machine's life: half of its ORIGINAL life the first
+ *  time, and half of the last extension each time after that, so the extensions are 50%, 25%,
+ *  12.5% of the original and they never add up past the original again (CLAUDE.md T20 2.9.1). */
+export const SERVICE_LIFE_EXTENSION = 0.5;
+/** [TUNE] A week of a machine's own clock, which is the same reading `SERVICE_INTERVAL_HOURS` is
+ *  written in: 80 hours is the month a one man shop puts on a saw (CLAUDE.md T6 3.6), so a week of
+ *  it is that over `WEEKS_PER_MONTH`. No new figure: the two it is made of are Piotr's own
+ *  (CLAUDE.md T20 2.9.4). */
+export const PAST_LIFE_WEEK_HOURS = SERVICE_INTERVAL_HOURS / WEEKS_PER_MONTH;
+/** [PIOTR, 18.09: "red when under a tenth is left"] The share of a machine's life left at which
+ *  the bar on the Machines page turns from good to bad (CLAUDE.md T20 2.9). */
+export const LIFE_LOW_FRACTION = 0.1;
+/** [TUNE] What an overdue machine risks every working day. */
 export const OVERDUE_BREAKDOWN_CHANCE = 0.02;
 
 /** Design speed by software tier (PIOTR: 5 to 80% faster). */
@@ -3192,64 +3206,153 @@ export const WALK_STRIDE_METRES = 1.4;
  *  turns ninety degrees for more than two cells", so the figure is Piotr's and only its name is
  *  chosen here (CLAUDE.md T19 2.1). */
 export const WALK_CORNER_CELLS = 2;
+/** How far in front of his own cell a figure is painted, in cells of the depth key [TUNE]. Not a
+ *  new figure: it is the 0.2 `src/render/hall.ts` has painted a man in front of his own tile with
+ *  since Turn 16, given a name so the scene and the re-sort of a walking man read one figure
+ *  (CLAUDE.md T20 2.11). */
+export const FIGURE_DEPTH_OFFSET = 0.2;
 
 // ---------------------------------------------------------------------------
 // 9.3 Hiring pool (PIOTR: tiers and gating; wages [TUNE])
 // ---------------------------------------------------------------------------
 
+/** The four tiers, in the order a man climbs them. Nobody is "poor" any more: Piotr would not
+ *  have the word in his workshop, and a man with no experience is not a poor man (PIOTR, 18.09;
+ *  CLAUDE.md T20 2.5). */
+export const TIERS: readonly WorkerTier[] = ['novice', 'experienced', 'senior', 'master'];
+
+/** The one table of the words the game prints for a tier. Every hire card, every row of Our team,
+ *  every assign list, the Company board and every report reads this and never the id, so the
+ *  player sees one vocabulary and the code keeps its own (PIOTR, 18.09; CLAUDE.md T20 2.5). */
+export const TIER_WORDS: Record<WorkerTier, string> = {
+  novice: 'no experience',
+  experienced: 'experienced',
+  senior: 'super experienced',
+  master: 'extremely experienced',
+};
+
+/** Worker speed as a fraction of the owner, tier by tier. The experienced man matches the owner,
+ *  and the two above him beat him: a workshop is meant to grow past the man who started it
+ *  [PIOTR: 0.8 at the bottom, and the top at 120% of the owner's 1.0; the master's 1.4 is the
+ *  step above that, TUNE]. One table for every role that has a rate, so an estimator's tier is
+ *  worth at his desk exactly what a joiner's is at his bench (CLAUDE.md T20 2.5). */
+export const WORKER_RATES: Record<WorkerTier, number> = {
+  novice: 0.8,
+  experienced: 1.0,
+  senior: 1.2,
+  master: 1.4,
+};
+
+/** Who answers the advert. The workshop's reputation earns the tier: a man with no experience
+ *  always comes, and the extremely experienced one does not look at a workshop under 60
+ *  [PIOTR: the 60; the two between are TUNE] (CLAUDE.md T20 2.5). The hire card reads this to say
+ *  what is missing, and it is the one gate every tiered role passes. */
+export const TIER_MIN_REPUTATION: Record<WorkerTier, number> = {
+  novice: REPUTATION_MIN,
+  experienced: 15,
+  senior: 35,
+  master: 60,
+};
+
+/** A joiner's pay a week, tier by tier: 450, 600, 800, 1,000 [PIOTR: 1,000 for the extremely
+ *  experienced man; the rest TUNE]. Every other tiered role's pay is that ladder against its own
+ *  experienced man's wage, which is the rule the brief sets: three quarters of him at the bottom,
+ *  four thirds at the third step and five thirds at the top (CLAUDE.md T20 2.5). */
+export const JOINER_WEEKLY_WAGE_EXPERIENCED = 600;
+export const TIER_WAGE_FACTOR: Record<WorkerTier, number> = {
+  novice: 450 / 600,
+  experienced: 1,
+  senior: 800 / 600,
+  master: 1000 / 600,
+};
+
+/** What this tier of a role costs a week, from what its experienced man costs, rounded to the
+ *  nearest five pounds [TUNE the rounding]. The one conversion, so no role grows a wage ladder of
+ *  its own (CLAUDE.md T20 2.5). */
+export function tierWeeklyWage(experiencedWeekly: number, tier: WorkerTier): number {
+  return Math.round((experiencedWeekly * TIER_WAGE_FACTOR[tier]) / 5) * 5;
+}
+
+/** The four wages of a role, from its experienced man's. */
+export function tierWeeklyWages(experiencedWeekly: number): Record<WorkerTier, number> {
+  return {
+    novice: tierWeeklyWage(experiencedWeekly, 'novice'),
+    experienced: tierWeeklyWage(experiencedWeekly, 'experienced'),
+    senior: tierWeeklyWage(experiencedWeekly, 'senior'),
+    master: tierWeeklyWage(experiencedWeekly, 'master'),
+  };
+}
+
+export const JOINER_WEEKLY_WAGE = tierWeeklyWages(JOINER_WEEKLY_WAGE_EXPERIENCED);
+export const SPRAYER_WEEKLY_WAGE = tierWeeklyWages(SPRAYER_WEEKLY_WAGE_EXPERIENCED);
+
 export interface HiringSpec {
   role: WorkerRole;
   tier: WorkerTier | null;
   label: string;
+  /** The one wage field in the game. Everybody is paid by the week, on Friday (PIOTR, 18.09:
+   *  "one unit"; CLAUDE.md T20 2.6). */
   weeklyWage: number;
-  monthlyWage: number;
   minReputation: number;
   duties: string;
 }
 
+/** The four rows of a tiered role, off the one wage ladder and the one reputation gate. The
+ *  duties line says what the tier is worth at the work, which is WORKER_RATES and not a figure
+ *  typed twice. */
+function tieredSpecs(
+  role: WorkerRole,
+  roleLabel: string,
+  experiencedWeekly: number,
+  duties: (tier: WorkerTier) => string,
+): HiringSpec[] {
+  return TIERS.map((tier) => ({
+    role,
+    tier,
+    label: `${roleLabel}, ${TIER_WORDS[tier]}`,
+    weeklyWage: tierWeeklyWage(experiencedWeekly, tier),
+    minReputation: TIER_MIN_REPUTATION[tier],
+    duties: duties(tier),
+  }));
+}
+
+/** The trades that make something: the men whose minutes come out of the hall as work. An
+ *  estimator has a rate at his desk and a draftsman has one at his, and neither of them is a
+ *  production rate, so neither is on the Company board's list of the men who act where they are
+ *  (PIOTR; CLAUDE.md T20 2.3). A table and not behaviour, so it lives here and both
+ *  `src/engine/staff.ts` and `src/engine/machines.ts` read it. */
+export const PRODUCING_ROLES: ReadonlyArray<WorkerRole> = ['joiner', 'sprayer'];
+
+/** The notice a man let go works out, in days [TUNE, Piotr's decision is open: he said a week's
+ *  wage]. Seven days from the click, so exactly one Friday falls inside them and the week he works
+ *  is the week he is paid for (CLAUDE.md T20 2.4). */
+export const LET_GO_NOTICE_DAYS = 7;
+
+/** How many job names a man's week line carries [TUNE]: enough to read, not a paragraph
+ *  (CLAUDE.md T20 2.7). */
+export const WEEK_JOBS_KEPT = 4;
+
 export const HIRING_SPECS: HiringSpec[] = [
-  {
-    role: 'joiner',
-    tier: 'poor',
-    label: 'Joiner, poor',
-    weeklyWage: 480,
-    monthlyWage: 0,
-    minReputation: -50,
-    duties: 'Production at 0.60 of the owner speed.',
-  },
-  {
-    role: 'joiner',
-    tier: 'normal',
-    label: 'Joiner, normal',
-    weeklyWage: 640,
-    monthlyWage: 0,
-    minReputation: 10,
-    duties: 'Production at 0.80 of the owner speed.',
-  },
-  {
-    role: 'joiner',
-    tier: 'super',
-    label: 'Joiner, super',
-    weeklyWage: 800,
-    monthlyWage: 0,
-    minReputation: 40,
-    duties: 'Production at 0.90 of the owner speed.',
-  },
+  ...tieredSpecs(
+    'joiner',
+    'Joiner',
+    JOINER_WEEKLY_WAGE_EXPERIENCED,
+    (tier) => `Production at ${WORKER_RATES[tier].toFixed(2)} of the owner speed.`,
+  ),
   {
     role: 'helper',
     tier: null,
     label: 'Helper',
     weeklyWage: 420,
-    monthlyWage: 0,
-    minReputation: -50,
+    minReputation: REPUTATION_MIN,
     duties: 'Bag changes, cleaning, unloading.',
   },
   {
     role: 'officeAdmin',
     tier: null,
     label: 'Office admin',
-    weeklyWage: 0,
-    monthlyWage: 1900,
+    // [TUNE: his 1,900 a month over WEEKS_PER_MONTH is 443.33, to the nearest five].
+    weeklyWage: 445,
     minReputation: 5,
     duties: 'Emails, bookkeeping, daily ordering.',
   },
@@ -3257,8 +3360,8 @@ export const HIRING_SPECS: HiringSpec[] = [
     role: 'purchasingClerk',
     tier: null,
     label: 'Purchasing clerk',
-    weeklyWage: 0,
-    monthlyWage: 1700,
+    // [TUNE: his 1,700 a month over WEEKS_PER_MONTH is 396.67, to the nearest five].
+    weeklyWage: 395,
     minReputation: 10,
     duties: 'Per job material orders, about 16 a day.',
   },
@@ -3266,8 +3369,7 @@ export const HIRING_SPECS: HiringSpec[] = [
     role: 'draftsman',
     tier: null,
     label: 'Draftsman',
-    weeklyWage: 0,
-    monthlyWage: DRAFTSMAN_MONTHLY_WAGE,
+    weeklyWage: DRAFTSMAN_WEEKLY_WAGE,
     minReputation: DRAFTSMAN_REPUTATION,
     duties: 'Drawings, at 0.8 of your own speed.',
   },
@@ -3275,74 +3377,30 @@ export const HIRING_SPECS: HiringSpec[] = [
     role: 'salesman',
     tier: null,
     label: 'Salesman',
-    weeklyWage: 0,
-    monthlyWage: 2200,
+    // [TUNE: his 2,200 a month over WEEKS_PER_MONTH is 513.33, to the nearest five].
+    weeklyWage: 515,
     minReputation: 15,
     duties: 'Client calls.',
   },
-  // The estimator, three tiers like the joiners, and the production manager, one tier
-  // (CLAUDE.md T13 3.8, 3.9).
-  {
-    role: 'estimator',
-    tier: 'poor',
-    label: 'Estimator, poor',
-    weeklyWage: 0,
-    monthlyWage: ESTIMATOR_MONTHLY_WAGE.poor,
-    minReputation: ESTIMATOR_REPUTATION,
-    duties: 'Material take offs, at 0.8 of your own speed.',
-  },
-  {
-    role: 'estimator',
-    tier: 'normal',
-    label: 'Estimator, normal',
-    weeklyWage: 0,
-    monthlyWage: ESTIMATOR_MONTHLY_WAGE.normal,
-    minReputation: ESTIMATOR_REPUTATION,
-    duties: 'Material take offs, at your own speed.',
-  },
-  {
-    role: 'estimator',
-    tier: 'super',
-    label: 'Estimator, super',
-    weeklyWage: 0,
-    monthlyWage: ESTIMATOR_MONTHLY_WAGE.super,
-    minReputation: ESTIMATOR_REPUTATION,
-    duties: 'Material take offs, faster than you.',
-  },
-  // The finishing man, three tiers like the joiners (PIOTR, 17.09; CLAUDE.md T19 2.6).
-  {
-    role: 'sprayer',
-    tier: 'poor',
-    label: 'Sprayer, poor',
-    weeklyWage: 0,
-    monthlyWage: SPRAYER_MONTHLY_WAGE.poor,
-    minReputation: SPRAYER_REPUTATION.poor,
-    duties: 'Spray finishing at full speed, bench work at 0.60.',
-  },
-  {
-    role: 'sprayer',
-    tier: 'normal',
-    label: 'Sprayer, normal',
-    weeklyWage: 0,
-    monthlyWage: SPRAYER_MONTHLY_WAGE.normal,
-    minReputation: SPRAYER_REPUTATION.normal,
-    duties: 'Spray finishing at full speed, bench work at 0.60.',
-  },
-  {
-    role: 'sprayer',
-    tier: 'super',
-    label: 'Sprayer, super',
-    weeklyWage: 0,
-    monthlyWage: SPRAYER_MONTHLY_WAGE.super,
-    minReputation: SPRAYER_REPUTATION.super,
-    duties: 'Spray finishing at full speed, bench work at 0.60.',
-  },
+  // The estimator and the finishing man, four tiers each like the joiner (CLAUDE.md T13 3.8,
+  // T19 2.6, T20 2.5).
+  ...tieredSpecs(
+    'estimator',
+    'Estimator',
+    ESTIMATOR_WEEKLY_WAGE_EXPERIENCED,
+    (tier) => `Material take offs, at ${WORKER_RATES[tier].toFixed(2)} of your own speed.`,
+  ),
+  ...tieredSpecs(
+    'sprayer',
+    'Sprayer',
+    SPRAYER_WEEKLY_WAGE_EXPERIENCED,
+    () => 'Spray finishing at full speed, bench work at 0.60.',
+  ),
   {
     role: 'productionManager',
     tier: null,
     label: 'Production manager',
-    weeklyWage: 0,
-    monthlyWage: PRODUCTION_MANAGER_MONTHLY_WAGE,
+    weeklyWage: PRODUCTION_MANAGER_WEEKLY_WAGE,
     minReputation: PRODUCTION_MANAGER_REPUTATION,
     duties: 'The second shift, the assigning, the extraction connections, and the hall while you are away.',
   },
@@ -3459,14 +3517,19 @@ export const DUST_BANDS: Array<{ max: number; factor: number; label: string }> =
   { max: 90, factor: 0.85, label: 'dirty' },
   { max: DUST_MAX, factor: 0.7, label: 'dangerous' },
 ];
+/** [TUNE] How much dust one pile of sawdust on the floor is worth. It is not a new figure: it is
+ *  the ten `sawdust()` in `src/render/hall.ts` has divided by since Turn 2, given a name so that
+ *  the dirt the player sees and the dirt the engine answers are one reading (CLAUDE.md T20 2.8). */
+export const DUST_PER_SAWDUST_PILE = 10;
 /** [TUNE] accident chance per day in the dangerous band, and days the joiner is off. */
 export const ACCIDENT_CHANCE_PER_DAY = 0.02;
 export const ACCIDENT_DAYS_OFF = 3;
 /** A helper cleans every Friday at no owner cost (PIOTR). */
 export const HELPER_CLEAN_WEEKDAY = 4;
-/** [TUNE] The band of dust at which the helper picks up a brush without being asked, any day of
- *  the week (PIOTR, 16.09; CLAUDE.md T17 2.3): the moment the hall stops being clean, which is
- *  the moment the dust starts costing the workshop output. */
+/** [TUNE] The band of dust the Turn 17 rule waited for before the helper picked up a brush
+ *  (PIOTR, 16.09; CLAUDE.md T17 2.3). Turn 20 2.8 found that this was four days behind the dirt
+ *  the player can see and put `hallLooksDirty` in its place, so nothing in the game reads this any
+ *  more: it is kept as the old band the tests of 2.8 measure the new rule against. */
 export const HELPER_CLEAN_DUST_BAND = 'messy';
 
 // ---------------------------------------------------------------------------
@@ -3552,45 +3615,66 @@ export interface ContractPieceSpec {
 
 /** The pieces a contract can be for. `minutes` is owner minutes a piece, `price` what the client
  *  pays for one, `material` the money in its sheets, `sheets` what it takes off the rack, and
- *  `labour` the labour value the workshop earns by making it (CLAUDE.md T13 3.16, T17 2.22, 2.26).
+ *  `labour` the margin the piece carries, which is price less material (CLAUDE.md T13 3.16,
+ *  T17 2.22, T20 2.2).
  *
- *  Three kinds, so the board offers work of different lengths and the player chooses (PIOTR,
- *  17.09: "a piece may be an hour at 8 profit or three days at 40"; CLAUDE.md T17 2.22). The cut
- *  sheet pack is Turn 13's own [TUNE]: cutting only, 45 minutes, sold at 38 with 30 of material in
- *  it, which is 8 of labour and 0.15 of a sheet. The drawer box is the hour at 8 [TUNE: 34 a piece
- *  with 26 of material], and the wardrobe front the three days at 40 [TUNE: 260 a piece with 220
- *  of material]. `labour` is the margin the piece carries, which is what the workshop earns by
- *  making it: repeat work is thin, and the workshop rate says so. */
+ *  The prices are Piotr's, and they are set so that a contract is worse than a job, better than
+ *  paying a man to stand still, and worth a great deal more with machines under it [PIOTR, 18.09:
+ *  "a contract is worse than a job, better than the wage, and rewards machines"]. By hand every
+ *  piece lands near 25 pounds of margin an hour, between a joiner's wage of about 14 and a job's
+ *  40; with a CNC on the cutting stage and an edgebander or a booth on the rest the same pieces
+ *  reach 40 to 60. The wardrobe front is four hours of work now and no longer three days, which
+ *  is what a wardrobe front actually is.
+ *
+ *  `sheets` a piece is unchanged for the two small pieces. The wardrobe front's is not, and that
+ *  DEVIATES FROM THE LETTER of 2.2, which says "sheets per piece stays what it is". Why it was
+ *  moved, and what the other answer is, in plain words:
+ *
+ *  The table's own rule is material = sheets x SHEET_VALUE. The cut sheet pack keeps it (0.15 x
+ *  200 = 30) and so does the drawer box (0.13 x 200 = 26). The wardrobe front was 1.1 sheets
+ *  beside 220 of material in v28, and 2.2 dropped the material to 60 without moving the sheets,
+ *  so the piece was costed at 60 on the card and in the closing report and drew about 220 off the
+ *  rack. The Contracts tab exists to tell the player whether a contract pays BEFORE he takes it
+ *  (T20 2.1), and on that one piece it would have reported the opposite sign: +£100 a piece where
+ *  the piece really loses about £90. Everything else 2.2 states (material 60, the margin of 100 a
+ *  piece, the band of 22 to 30 an hour) needs the table to agree with itself, so the sheets moved
+ *  to 60 / SHEET_VALUE and not the other three figures.
+ *
+ *  [TUNE, PIOTR'S TO RULE ON] The other answer is his: keep 1.1 sheets and move the material and
+ *  the price together, about 220 of material and about 320 a piece, which holds the same margin an
+ *  hour and makes the wardrobe front a dearer contract than the table says tonight. */
 export const CONTRACT_PIECES: readonly ContractPieceSpec[] = [
   {
     id: 'cutSheetPack',
     name: 'Cut sheet pack',
     stages: ['cutting'],
     minutes: 45,
-    price: 38,
+    price: 50,
     material: 30,
     sheets: 0.15,
-    labour: 8,
+    labour: 20,
   },
   {
     id: 'drawerBox',
     name: 'Drawer box',
     stages: ['cutting', 'assembly'],
     minutes: 60,
-    price: 34,
+    price: 52,
     material: 26,
     sheets: 0.13,
-    labour: 8,
+    labour: 26,
   },
   {
     id: 'wardrobeFront',
     name: 'Wardrobe front',
     stages: ['cutting', 'finishing'],
-    minutes: 3 * MINUTES_PER_WORKING_DAY,
-    price: 260,
-    material: 220,
-    sheets: 1.1,
-    labour: 40,
+    minutes: 240,
+    price: 160,
+    // [TUNE] 60 over SHEET_VALUE 200, so the piece draws off the rack exactly what it is costed
+    // at. It was 1.1 in v28, beside a material of 220. See the note above the table.
+    material: 60,
+    sheets: 0.3,
+    labour: 100,
   },
 ];
 
@@ -3615,6 +3699,10 @@ export const CONTRACT_QUANTITY_PER_WEEK_MAX = 40;
 /** A short week is a point of reputation [TUNE]; at the end of the term every full week raises the
  *  offered price by this much and every short week lowers it by this much [TUNE]. */
 export const CONTRACT_SHORT_WEEK_REPUTATION = 1;
+/** Short weeks a client puts up with inside one term. The first costs its point of reputation as
+ *  it always did; on the second the client ends the contract himself and there is no third
+ *  [TUNE: two, and Piotr's decision on it is still open] (CLAUDE.md T20 2.1.6). */
+export const CONTRACT_SHORT_WEEKS_ALLOWED = 2;
 export const CONTRACT_RENEW_FULL_WEEK = 0.01;
 export const CONTRACT_RENEW_SHORT_WEEK = 0.02;
 
@@ -3794,15 +3882,11 @@ export const ANSWER_SKEW_NEUTRAL_TIER = 1;
 export const HOLIDAY_OPTIONS_DAYS: readonly number[] = [1, 3, 5, HOLIDAY_MAX_DAYS];
 
 // ---------------------------------------------------------------------------
-// Turn 19: the doors, the sprayer, the drawings, the sound
+// Turn 19: the sprayer, the drawings, the sound
 // ---------------------------------------------------------------------------
-
-/** How long a door takes to swing from shut to open, in milliseconds of real time [TUNE]. A man
- *  whose leg ends at a door cell opens it as he arrives: closed, half, open (CLAUDE.md T19 2.3). */
-export const DOOR_SWING_MS = 400;
-/** How long a door stands open after the last man leaves its cell, in milliseconds of real time
- *  [TUNE]. A door with somebody standing in it never closes (CLAUDE.md T19 2.3). */
-export const DOOR_CLOSE_MS = 600;
+// The swing's two figures (DOOR_SWING_MS, DOOR_CLOSE_MS) went with the swing itself, and
+// STAND_IN_GAIN with the synthesised stand ins: a door is drawn closed and the hall is silent
+// until Piotr's recordings land, so nothing reads any of the three (CLAUDE.md T20 2.12, 2.13).
 
 /** The shortest a drawing can take, in minutes [TUNE] (CLAUDE.md T19 2.11). */
 export const DESIGN_MIN_MINUTES = 30;
@@ -3817,10 +3901,6 @@ export const SOUND_VOLUME_DEFAULT = 0.7;
  *  presses, fine enough to find a level and coarse enough to reach both ends
  *  (CLAUDE.md T19 2.10). */
 export const SOUND_VOLUME_STEP = 0.1;
-/** How loud the synthesised stand ins play, against a real recording's 1.0 [TUNE]. They are there
- *  so every hook can be heard before Piotr's recordings land, not to be listened to
- *  (CLAUDE.md T19 2.10, section 9). */
-export const STAND_IN_GAIN = 0.15;
 /** The shortest gap between two one shot sounds, in milliseconds of real time. At x10 and x30 the
  *  hall would rattle otherwise: the loops play at their own pitch and the one shots are thinned to
  *  at most one a second (CLAUDE.md T19 2.10). */

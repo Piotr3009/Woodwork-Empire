@@ -13,12 +13,14 @@ import {
   CONTRACT_QUANTITY_PER_WEEK_MIN,
   CONTRACT_RENEW_FULL_WEEK,
   CONTRACT_RENEW_SHORT_WEEK,
+  CONTRACT_SHORT_WEEKS_ALLOWED,
   CONTRACT_SHORT_WEEK_REPUTATION,
   CONTRACT_TERM_MONTHS_MAX,
   CONTRACT_TERM_MONTHS_MIN,
   DAYS_PER_MONTH,
   DAYS_PER_WEEK,
   HIRING_SPECS,
+  MINUTES_PER_WORKING_DAY,
   WORKING_DAYS_PER_WEEK,
   CONTRACT_OFFER_CHANCE_PER_DAY,
   CONTRACT_QUANTITY_STEP,
@@ -27,34 +29,40 @@ import {
   CONTRACT_FREE_END_DAYS,
 } from './constants';
 import type { ContractPieceSpec } from './constants';
-import { isBreak, isWorkingDay, weekOfDay, weekday } from './clock';
+import { isBreak, isWorkingDay, weekOfDay, weekday, workedMinutesOfDay } from './clock';
 import { plural } from './text';
 import { charge, formatMoney } from './economy';
 import { queueEvent } from './events';
-import { findJob, stagedJob, takeOffJob, workerMinuteCost } from './jobs';
+import { isOnJob, stagedJob, workerMinuteCost } from './jobs';
 import { freeSheets } from './materials';
 import {
+  OWNER,
   accumulateMachineMinute,
   bagsFull,
   claimMachine,
+  findSpec,
   hallProductivityFactor,
   has,
   machineIsShared,
   releaseMachines,
   variantFor,
 } from './machines';
-import { staffOutputFactor } from './owner';
+import { ownerDrawPerDay, staffOutputFactor } from './owner';
 import { changeReputation, reputationTier } from './reputation';
 import { chance, int, pick } from './rng';
 import type { RngCarrier } from './rng';
 import { crewHasGoneHome, isWorkingToday, joiners } from './staff';
 import { STATION_BENCH, machineStation, waitingStation } from './stations';
 import { cncOptions, familyForStage, jobOnCnc, stageSpeed } from './stages';
-import type { Contract, ContractWeek, GameState, StageId, Worker } from './types';
+import type { Contract, ContractWeek, GameState, Job, StageId, Worker } from './types';
 
 /** What a man on a contract carries in `jobId`, so the jobs leave him alone: not available for
  *  a job, not at one, and not a job the plan could find (CLAUDE.md T13 3.16). */
 export const CONTRACT_MARKER = 'contract:';
+
+/** Re-exported from constants.ts, where it lives with the rest of the contract figures: the
+ *  engine and the tests both read it off this module (CLAUDE.md T20 2.1.6). */
+export { CONTRACT_SHORT_WEEKS_ALLOWED };
 
 export interface ContractCheck {
   ok: boolean;
@@ -135,6 +143,17 @@ function workingDaysOfWeekInTerm(contract: Contract, day: number): number {
   const sunday = monday + DAYS_PER_WEEK - 1;
   const from = Math.max(monday, contract.startDay ?? monday);
   const to = Math.min(sunday, contract.endDay ?? sunday);
+  let count = 0;
+  for (let at = from; at <= to; at += 1) if (isWorkingDay(at)) count += 1;
+  return count;
+}
+
+/** Working days of this calendar week that fall inside the term and have been worked by the end
+ *  of `day`, today included: what the week's line is read against (CLAUDE.md T20 2.1.4). */
+function workingDaysOfWeekSoFar(contract: Contract, day: number): number {
+  const monday = day - weekday(day);
+  const from = Math.max(monday, contract.startDay ?? monday);
+  const to = Math.min(day, contract.endDay ?? day);
   let count = 0;
   for (let at = from; at <= to; at += 1) if (isWorkingDay(at)) count += 1;
   return count;
@@ -225,30 +244,196 @@ function drawContractSheets(state: GameState, contract: Contract, piece: Contrac
   return true;
 }
 
-/** What one piece comes to with one man on it. */
+/** What one piece, one day and one week come to with one man on it: every figure the offer card
+ *  of CLAUDE.md T20 2.1.1 puts in front of the player before he takes the contract. */
 export interface ContractResult {
-  /** Minutes this man takes over a piece, at his rate. */
+  /** Minutes this man takes over a piece, at his rate and on the machines the hall has. */
   minutes: number;
   labourCost: number;
+  /** The material in one piece, off the piece's own table. */
+  material: number;
   margin: number;
+  /** Pieces he makes in a working day, whole, the lunch break out. */
+  piecesPerDay: number;
+  /** Pieces a day the client's week asks for. */
+  piecesNeededPerDay: number;
+  /** Days of his week the contract takes, never more than the week itself. */
+  daysPerWeek: number;
+  /** Minutes left at the end of a day of his pieces. */
+  freeMinutes: number;
+  /** Pieces the week comes to with him on it: what the client wants, or what he can make. */
+  piecesPerWeek: number;
+  /** The week's result: his pieces times his margin, his own wages already taken off in it. */
+  weekResult: number;
+  termResult: number;
+}
+
+/** The owner's own rate. The ladder of the tiers is measured against him, so he is 1 by
+ *  definition (CLAUDE.md T20 2.5). */
+const OWNER_RATE = 1;
+
+/** What a minute of this man costs on a contract: a worker's weekly wage through the job card's
+ *  own divisor, and the owner's daily draw over the minutes of his day, because the owner's days
+ *  cost his draw (CLAUDE.md T20 2.1.1). */
+export function contractMinuteCost(state: GameState, worker: Worker | null): number {
+  if (worker) return workerMinuteCost(worker.weeklyWage);
+  return ownerDrawPerDay(state) / MINUTES_PER_WORKING_DAY;
+}
+
+/** What the hall does to this piece for this man: the machine of the piece's own stage, the CNC
+ *  when he can have one, or the by hand reading when the hall has neither. It is the same reading
+ *  the minute loop works at, so the card's minutes are the minutes he really takes
+ *  (CLAUDE.md T20 2.1.1). */
+export function contractPieceSpeed(state: GameState, who: string, piece: ContractPieceSpec): number {
+  const { stage } = pieceStage(state, who, piece);
+  return stageSpeed(state, stagedJob(0, 'sheet', false), stage).speed;
+}
+
+/** The men who would do it, in the order the card draws them: the owner, then every joiner on the
+ *  books (CLAUDE.md T20 2.1.1). */
+export function contractCandidates(state: GameState): string[] {
+  return [OWNER, ...joiners(state).map((worker) => worker.id)];
+}
+
+/** The man the card is worked out for: the one the player picked, or the first joiner, or the
+ *  owner when there is no joiner (CLAUDE.md T20 2.1.1). */
+export function contractManOf(state: GameState, picked: string | null): string {
+  const men = contractCandidates(state);
+  if (picked !== null && men.includes(picked)) return picked;
+  return men.find((who) => who !== OWNER) ?? OWNER;
+}
+
+/** The man behind an id, or null for the owner, who is not on the books. */
+export function contractWorkerOf(state: GameState, who: string): Worker | null {
+  return state.workers.find((entry) => entry.id === who) ?? null;
+}
+
+/** The whole of the result at a speed the caller names, so the card and the machine tip are one
+ *  arithmetic read twice (CLAUDE.md T20 2.1.1). */
+function resultAtSpeed(
+  state: GameState,
+  contract: Contract,
+  worker: Worker | null,
+  speed: number,
+): ContractResult {
+  const piece = contractPiece(contract);
+  const rate = worker === null ? OWNER_RATE : worker.rate > 0 ? worker.rate : 1;
+  // His minutes over a piece, which is what the day is counted in: never less than one.
+  const minutes = Math.max(1, Math.round(piece.minutes / (rate * (speed > 0 ? speed : 1))));
+  const labourCost = pence(minutes * contractMinuteCost(state, worker));
+  const margin = pence(contract.pricePerPiece - piece.material - labourCost);
+  const piecesPerDay = Math.floor(MINUTES_PER_WORKING_DAY / minutes);
+  const piecesPerWeek = Math.min(contract.quantityPerWeek, piecesPerDay * WORKING_DAYS_PER_WEEK);
+  return {
+    minutes,
+    labourCost,
+    material: piece.material,
+    margin,
+    piecesPerDay,
+    piecesNeededPerDay: Math.ceil(contract.quantityPerWeek / WORKING_DAYS_PER_WEEK),
+    daysPerWeek:
+      piecesPerDay > 0
+        ? Math.min(WORKING_DAYS_PER_WEEK, Math.ceil(contract.quantityPerWeek / piecesPerDay))
+        : WORKING_DAYS_PER_WEEK,
+    freeMinutes: Math.max(0, MINUTES_PER_WORKING_DAY - piecesPerDay * minutes),
+    piecesPerWeek,
+    weekResult: pence(piecesPerWeek * margin),
+    termResult: pence(piecesPerWeek * margin * contract.termWeeks),
+  };
 }
 
 /** What one piece is worth with this man on it: the price less the material in it and less what
- *  his own time costs, so the result of putting him on it is on his own row before he is put on
- *  it (PIOTR, 17.09; CLAUDE.md T17 2.22). A slower man takes more minutes over a piece, and what
- *  those minutes cost is his own weekly wage: the wage table pays the poor man and the normal one
- *  the same money for the same work and the super one a premium for his speed, so the thinner
- *  margin is not always the poorer man's. The owner is never on a contract. */
-export function contractResultFor(contract: Contract, worker: Worker): ContractResult {
+ *  his own time costs at his own rate and on the machines the hall has, so the result of putting
+ *  him on it is on his own row before he is put on it (PIOTR, 17.09; CLAUDE.md T17 2.22,
+ *  T20 2.1.1). A slower man takes more minutes over a piece, and what those minutes cost is his
+ *  own weekly wage. The wage ladder is steeper than the speed ladder, 450, 600, 800 and 1,000 a
+ *  week against 0.8, 1.0, 1.2 and 1.4 of the owner, so a piece costs more in a better man's time
+ *  and the thinner margin is the better man's (CLAUDE.md T20 2.5). `null` is the owner, whose
+ *  days cost his draw: he is costed here, and the check says whether he may be put on it. */
+export function contractResultFor(
+  state: GameState,
+  contract: Contract,
+  worker: Worker | null,
+): ContractResult {
   const piece = contractPiece(contract);
-  const rate = worker.rate > 0 ? worker.rate : 1;
-  const minutes = piece.minutes / rate;
-  const labourCost = pence(minutes * workerMinuteCost(worker.weeklyWage));
-  return {
-    minutes: Math.round(minutes),
-    labourCost,
-    margin: pence(contract.pricePerPiece - piece.material - labourCost),
-  };
+  const who = worker === null ? OWNER : worker.id;
+  return resultAtSpeed(state, contract, worker, contractPieceSpeed(state, who, piece));
+}
+
+/** The one machine that would shorten the piece most among those the hall has not got: what the
+ *  piece would take, what the day would come to and what the week would gain by it. Null when
+ *  there is nothing to buy that would help (PIOTR, the mockup of docs/mockups/t20;
+ *  CLAUDE.md T20 2.1.1). */
+export interface ContractMachineTip {
+  specId: string;
+  name: string;
+  minutes: number;
+  piecesPerDay: number;
+  weekGain: number;
+}
+
+export function contractMachineTip(
+  state: GameState,
+  contract: Contract,
+  who: string,
+): ContractMachineTip | null {
+  const piece = contractPiece(contract);
+  const worker = contractWorkerOf(state, who);
+  const now = contractResultFor(state, contract, worker);
+  const { stage, family } = pieceStage(state, who, piece);
+  const staged = stagedJob(0, 'sheet', false);
+  // The machines that would do this piece's own stage: the family it is done on, and the CNC,
+  // which takes the cutting off the saw altogether (CLAUDE.md T7 3.4).
+  const candidates: string[] = [];
+  if (family !== null && family !== 'cnc' && !has(state, family)) candidates.push(family);
+  if (stage === 'cutting' && !has(state, 'cnc')) candidates.push('cnc');
+  let best: ContractMachineTip | null = null;
+  for (const specId of candidates) {
+    const spec = findSpec(specId);
+    if (!spec) continue;
+    // The class the catalogue offers first is the one he would buy.
+    const speed =
+      specId === 'cnc'
+        ? stageSpeed(state, staged, 'cnc').speed
+        : (spec.variants[0]?.outputFactor ?? 1);
+    const withIt = resultAtSpeed(state, contract, worker, speed);
+    const weekGain = pence(withIt.weekResult - now.weekResult);
+    if (weekGain <= 0) continue;
+    if (best === null || weekGain > best.weekGain) {
+      best = { specId, name: spec.name, minutes: withIt.minutes, piecesPerDay: withIt.piecesPerDay, weekGain };
+    }
+  }
+  return best;
+}
+
+/** How the week in hand is going: what is made, what is wanted, and whether what is left of the
+ *  week at the pace of the men on it will reach the quantity (CLAUDE.md T20 2.1.2). What is left
+ *  of today is counted in minutes, so the reading changes as the day goes by. */
+export interface ContractPace {
+  made: number;
+  wanted: number;
+  onCourse: boolean;
+}
+
+export function weekPace(state: GameState, contract: Contract): ContractPace {
+  const day = state.clock.day;
+  const wanted = weekWanted(contract, day);
+  const made = contract.piecesThisWeek;
+  if (made >= wanted) return { made, wanted, onCourse: true };
+  const leftToday = Math.max(
+    0,
+    MINUTES_PER_WORKING_DAY - workedMinutesOfDay(state.clock.minute, state.owner.breakSkipped),
+  );
+  const daysLeft = Math.max(
+    0,
+    workingDaysOfWeekInTerm(contract, day) - workingDaysOfWeekSoFar(contract, day),
+  );
+  let coming = 0;
+  for (const worker of contractHands(state, contract)) {
+    const result = contractResultFor(state, contract, worker);
+    coming += Math.floor(leftToday / result.minutes) + result.piecesPerDay * daysLeft;
+  }
+  return { made, wanted, onCourse: made + coming >= wanted };
 }
 
 /** The stream the offers are drawn off: seeded from the game's seed and the day, so the same
@@ -302,6 +487,7 @@ export function drawContract(state: GameState, carrier: RngCarrier = state): Con
     materialCost: 0,
     labourMinutes: 0,
     renegotiatedPrice: null,
+    endedBy: 'term',
   };
 }
 
@@ -339,23 +525,40 @@ export function declineContract(state: GameState, contractId: string): ContractC
   return OK;
 }
 
-/** Why this man cannot go on or come off the contract, or that he can. Only people are assigned,
- *  and only the joiners: the owner has his own jobs and the office its desks. */
-export function contractAssignCheck(contract: Contract, worker: Worker | null): ContractCheck {
-  if (contract.status !== 'active') return { ok: false, reason: 'Not an active contract' };
+/** Why this man cannot be put on a contract at all, or that he can. Only people are put on one
+ *  and only the joiners: the office has its desks, and the owner has his own jobs and is not on
+ *  the books at all, so he is told so on his own row. He is still costed on the offer card, which
+ *  is what the card is for (PIOTR; CLAUDE.md T20 2.1.1). */
+export function contractManCheck(state: GameState, who: string): ContractCheck {
+  if (who === OWNER) {
+    return { ok: false, reason: 'A contract is work for a joiner: you cannot be put on one' };
+  }
+  const worker = state.workers.find((entry) => entry.id === who) ?? null;
   if (!worker) return { ok: false, reason: 'No such person' };
   if (worker.role !== 'joiner') return { ok: false, reason: 'Only a joiner can be put on a contract' };
   return OK;
 }
 
+/** Why this man cannot go on or come off this contract, or that he can: the contract has to be
+ *  running, and then it is the one rule about the man. */
+export function contractAssignCheck(state: GameState, contract: Contract, who: string): ContractCheck {
+  if (contract.status !== 'active') return { ok: false, reason: 'Not an active contract' };
+  return contractManCheck(state, who);
+}
+
 function takeOff(state: GameState, contract: Contract, worker: Worker): void {
   contract.assigned = contract.assigned.filter((id) => id !== worker.id);
-  if (worker.jobId === contractMarker(contract.id)) worker.jobId = null;
+  // Off the contract and back to the job he was also standing on, when he was on one
+  // (CLAUDE.md T20 2.1.4).
+  if (worker.jobId === contractMarker(contract.id)) {
+    worker.jobId = jobBesideContract(state, worker.id)?.id ?? null;
+  }
   releaseMachines(state, worker.id);
 }
 
-/** Puts a joiner on the contract or takes him off it. Going on takes him off whatever job he was
- *  at, which goes back to ready, and marks him so the jobs leave him alone (CLAUDE.md T13 3.16). */
+/** Puts a joiner on the contract or takes him off it. He keeps the job he is standing on: the
+ *  contract has the first of his day and the job what is left of it, and the marker is what the
+ *  jobs read while the contract wants him (CLAUDE.md T13 3.16, T20 2.1.4). */
 export function assignContract(
   state: GameState,
   contractId: string,
@@ -365,7 +568,7 @@ export function assignContract(
   const contract = findContract(state, contractId);
   if (!contract) return { ok: false, reason: 'No such contract' };
   const worker = state.workers.find((entry) => entry.id === workerId) ?? null;
-  const check = contractAssignCheck(contract, worker);
+  const check = contractAssignCheck(state, contract, workerId);
   if (!check.ok || !worker) return check;
   if (!on) {
     takeOff(state, contract, worker);
@@ -374,9 +577,8 @@ export function assignContract(
   if (contract.assigned.includes(worker.id)) return OK;
   const elsewhere = contractOfWorker(state, worker.id);
   if (elsewhere) takeOff(state, elsewhere, worker);
-  // He comes off his job on his own: the men beside him carry on with it (CLAUDE.md T19 2.5).
-  const job = worker.jobId === null ? null : findJob(state, worker.jobId);
-  if (job) takeOffJob(state, job.id, worker.id);
+  // The job he is on stays his: the contract books his pieces from 8:00 and the job gets what is
+  // left of the day (PIOTR; CLAUDE.md T20 2.1.4). Turn 19's rule that he comes off it is gone.
   releaseMachines(state, worker.id);
   worker.jobId = contractMarker(contract.id);
   contract.assigned.push(worker.id);
@@ -384,10 +586,10 @@ export function assignContract(
 }
 
 /** The men on this contract who can put a minute in now: on the books and in today, on the day
- *  shift, not on a job of work, and not taken by a job since (a man the player put on a job
- *  through the Work Plan has left the contract, and is dropped from it here). */
+ *  shift and not on an errand. Assigned once, a man stays on it until he is taken off or leaves
+ *  (PIOTR; CLAUDE.md T20 2.1.2), so a job of work no longer drops him from it: the day's order is
+ *  `contractWantsToday` and nothing else. */
 export function contractHands(state: GameState, contract: Contract): Worker[] {
-  const marker = contractMarker(contract.id);
   const hands: Worker[] = [];
   for (const id of [...contract.assigned]) {
     const worker = state.workers.find((entry) => entry.id === id);
@@ -395,14 +597,46 @@ export function contractHands(state: GameState, contract: Contract): Worker[] {
       contract.assigned = contract.assigned.filter((entry) => entry !== id);
       continue;
     }
-    if (worker.jobId !== null && worker.jobId !== marker) {
-      contract.assigned = contract.assigned.filter((entry) => entry !== id);
-      continue;
-    }
     if (!isWorkingToday(state, worker) || worker.taskId !== null || worker.shift !== 'day') continue;
     hands.push(worker);
   }
   return hands;
+}
+
+/** The job of work this man is standing on beside his contract, or null when he has nothing else
+ *  to go to. Only a job in production: a job that is not started is nowhere for him to go
+ *  (CLAUDE.md T20 2.1.4). */
+export function jobBesideContract(state: GameState, workerId: string): Job | null {
+  return state.jobs.find((job) => job.stage === 'inProduction' && isOnJob(job, workerId)) ?? null;
+}
+
+/** The pieces the client wants by the end of today: the week's quantity spread over the working
+ *  days of the week, which is the line the man on it works to (PIOTR; CLAUDE.md T20 2.1.4). A
+ *  contract behind the line asks for the catch up on the next day it is read, because the line is
+ *  the same line read forward. */
+export function piecesDueBy(contract: Contract, day: number): number {
+  const wanted = weekWanted(contract, day);
+  const days = workingDaysOfWeekInTerm(contract, day);
+  if (days <= 0) return wanted;
+  return Math.min(wanted, Math.ceil((wanted * workingDaysOfWeekSoFar(contract, day)) / days));
+}
+
+/** Does the contract want this man this minute? He books his pieces from 8:00 until the day's
+ *  share of the week is made, and only then goes to the job he is also on (PIOTR;
+ *  CLAUDE.md T20 2.1.4). With no job to go to he stays on the contract, because the client pays
+ *  for every piece he makes. This is the one place the day's order is decided: the job's hands,
+ *  the contract's minute and the Contracts tab all read it. */
+export function contractWantsToday(state: GameState, workerId: string): boolean {
+  const contract = contractOfWorker(state, workerId);
+  if (contract === null) return false;
+  // Nothing on the rack for its next piece: the contract cannot use the minute, so a man with a
+  // job of work under him goes to it instead of standing at his bench until a delivery lands.
+  // Only a man with nowhere else to go waits it out (CLAUDE.md T17 2.22, T20 2.1.4).
+  if (contractWaitingForMaterial(state, contract)) {
+    return jobBesideContract(state, workerId) === null;
+  }
+  if (contract.piecesThisWeek < piecesDueBy(contract, state.clock.day)) return true;
+  return jobBesideContract(state, workerId) === null;
 }
 
 /** The stage the piece is at and the family it is done on: the CNC when the man can have one,
@@ -470,18 +704,33 @@ export function runContractMinute(state: GameState): ContractMinute {
   let hall: number | null = null;
   for (const contract of active) {
     const piece = contractPiece(contract);
+    // The contract fills the day first (PIOTR; CLAUDE.md T20 2.1.4): the men it still wants today
+    // are its own this minute, and a man whose share of the week is made goes back to the job he
+    // is also on, from the next minute, which is when the jobs read him again.
+    const wanted: Worker[] = [];
+    for (const worker of contractHands(state, contract)) {
+      if (contractWantsToday(state, worker.id)) {
+        wanted.push(worker);
+        continue;
+      }
+      const job = jobBesideContract(state, worker.id);
+      if (job) worker.jobId = job.id;
+    }
+    if (wanted.length === 0) continue;
     // Nothing on the rack for the next piece: the men on it stand at their benches, the way a job
-    // waits for its material (CLAUDE.md T17 2.22).
+    // waits for its material (CLAUDE.md T17 2.22). A man with a job of work under him is not among
+    // them: `contractWantsToday` has already sent him to it, so only a man with nowhere else to go
+    // stands here (CLAUDE.md T20 2.1.4).
     if (contractWaitingForMaterial(state, contract)) {
-      for (const worker of contractHands(state, contract)) {
-        // The marker goes back on, as it does on a working minute, so the jobs leave him where
-        // he is instead of handing him work he cannot take.
+      for (const worker of wanted) {
+        // The marker goes back on, as it does on a working minute, so the contract keeps him
+        // between the minutes.
         worker.jobId = contractMarker(contract.id);
         worker.station = STATION_BENCH;
       }
       continue;
     }
-    for (const worker of contractHands(state, contract)) {
+    for (const worker of wanted) {
       // The jobs' own hook writes the marker off every minute it finds no job behind it; it goes
       // back on here, so the man stays on the contract between the minutes.
       worker.jobId = contractMarker(contract.id);
@@ -579,16 +828,18 @@ export interface ClosingReport {
   margin: number;
 }
 
-/** The hourly cost the labour is written up at: the joiners on the books, or the normal joiner's
- *  wage when there are none. */
+/** The hourly cost the labour is written up at: the joiners on the books, or the experienced
+ *  joiner's wage when there are none. */
 function labourMinuteCost(state: GameState): number {
   const crew = joiners(state);
   if (crew.length > 0) {
     const weekly = crew.reduce((total, worker) => total + worker.weeklyWage, 0) / crew.length;
     return workerMinuteCost(weekly);
   }
-  const normal = HIRING_SPECS.find((spec) => spec.role === 'joiner' && spec.tier === 'normal');
-  return workerMinuteCost(normal?.weeklyWage ?? 0);
+  const middling = HIRING_SPECS.find(
+    (spec) => spec.role === 'joiner' && spec.tier === 'experienced',
+  );
+  return workerMinuteCost(middling?.weeklyWage ?? 0);
 }
 
 /** The closing report: pieces made, revenue, material, labour hours at cost, the net margin. */
@@ -605,12 +856,22 @@ export function closingReport(state: GameState, contract: Contract): ClosingRepo
   };
 }
 
+/** How the contract came to an end, in the words the report and the event both use
+ *  (CLAUDE.md T20 2.1.6). */
+export function endedLine(contract: Contract): string {
+  if (contract.endedBy === 'client') {
+    return `the client has ended it after ${plural(shortWeeksOf(contract), 'short week', 'short weeks')}`;
+  }
+  if (contract.endedBy === 'player') return 'you ended it';
+  return 'the term is over';
+}
+
 function closingBody(state: GameState, contract: Contract): string {
   const report = closingReport(state, contract);
   const full = fullWeeksOf(contract);
   const short = shortWeeksOf(contract);
   return (
-    `${contract.name}: the term is over. ${report.pieces} pieces made, ` +
+    `${contract.name}: ${endedLine(contract)}. ${report.pieces} pieces made, ` +
     `${formatMoney(report.revenue)} of revenue, ${formatMoney(report.material)} of material, ` +
     `${report.labourHours} hours of labour at cost ${formatMoney(report.labourCost)}, ` +
     `net margin ${formatMoney(report.margin)}. ${full} full weeks and ${short} short. ` +
@@ -620,9 +881,16 @@ function closingBody(state: GameState, contract: Contract): string {
 }
 
 /** The end of the term: the last week is closed, the client's new price is worked out from the
- *  history, the men come off it, and the closing report goes up (CLAUDE.md T13 3.16). */
-export function endContract(state: GameState, contract: Contract): void {
+ *  history, the men come off it, and the closing report goes up (CLAUDE.md T13 3.16). Who ended
+ *  it is written on the contract, for the report and for the Ended section of the tab
+ *  (CLAUDE.md T20 2.1.6). */
+export function endContract(
+  state: GameState,
+  contract: Contract,
+  endedBy: Contract['endedBy'] = 'term',
+): void {
   if (contract.status !== 'active') return;
+  contract.endedBy = endedBy;
   // The week in hand is closed when the term has days in it; a week opened on the Monday after
   // the last day holds nothing and is not a week the client counts.
   if (contract.weekStartDay !== null && contract.weekStartDay <= (contract.endDay ?? contract.weekStartDay)) {
@@ -640,7 +908,7 @@ export function endContract(state: GameState, contract: Contract): void {
   const report = closingReport(state, contract);
   queueEvent(state, {
     kind: 'contractEnded',
-    title: `${contract.name}: the term is over`,
+    title: `${contract.name}: ${endedLine(contract)}`,
     body: closingBody(state, contract),
     data: {
       contractId: contract.id,
@@ -655,8 +923,19 @@ export function endContract(state: GameState, contract: Contract): void {
   });
 }
 
+/** The second short week of a term and the client ends the contract himself, with the closing
+ *  report marked his. There is no third (PIOTR; CLAUDE.md T20 2.1.6). The week in hand has just
+ *  been closed, so there is none to close again. */
+function endedByClient(state: GameState, contract: Contract): void {
+  contract.endDay = state.clock.day;
+  contract.weekStartDay = null;
+  endContract(state, contract, 'client');
+}
+
 /** The day's open: an offer past its day comes off the board, the week that has gone is closed
- *  on the Monday, and a term whose last day has passed ends (CLAUDE.md T13 3.16). */
+ *  on the Monday, a client who has had two short weeks ends it, a term whose last day has passed
+ *  ends, and the men the contract wants today take their marker before the first minute
+ *  (CLAUDE.md T13 3.16, T20 2.1.4, 2.1.6). */
 export function runContractDay(state: GameState): void {
   const today = state.clock.day;
   state.contracts = state.contracts.filter(
@@ -665,11 +944,20 @@ export function runContractDay(state: GameState): void {
   for (const contract of activeContracts(state)) {
     if (contract.weekStartDay !== null && weekOfDay(today) !== weekOfDay(contract.weekStartDay)) {
       closeWeek(state, contract);
+      if (shortWeeksOf(contract) >= CONTRACT_SHORT_WEEKS_ALLOWED) endedByClient(state, contract);
     }
-    if (contract.endDay !== null && today > contract.endDay) endContract(state, contract);
+    if (contract.status === 'active' && contract.endDay !== null && today > contract.endDay) {
+      endContract(state, contract);
+    }
+    if (contract.status !== 'active') continue;
     // What the week wants off the rack is held this morning, after the jobs have had theirs
     // (CLAUDE.md T17 2.22).
-    if (contract.status === 'active') reserveContractSheets(state, contract);
+    reserveContractSheets(state, contract);
+    // The contract has the morning: a man it wants today carries its marker from 8:00, so the
+    // jobs do not have him for the first minute of the day (CLAUDE.md T20 2.1.4).
+    for (const worker of contractHands(state, contract)) {
+      if (contractWantsToday(state, worker.id)) worker.jobId = contractMarker(contract.id);
+    }
   }
 }
 
@@ -696,7 +984,7 @@ export function endContractNow(state: GameState, contractId: string): ContractCh
   const contract = state.contracts.find((entry) => entry.id === contractId);
   if (!contract) return { ok: false, reason: 'That contract has gone' };
   contract.endDay = state.clock.day;
-  endContract(state, contract);
+  endContract(state, contract, 'player');
   return OK;
 }
 
@@ -733,6 +1021,7 @@ export function renewContract(state: GameState, contractId: string, accept: bool
     materialCost: 0,
     labourMinutes: 0,
     renegotiatedPrice: null,
+    endedBy: 'term',
   };
   state.contracts.push(renewed);
   acceptContract(state, renewed.id);

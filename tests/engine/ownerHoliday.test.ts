@@ -9,7 +9,7 @@ import {
   NIGHT_QUALITY_TIER_DROP,
   OWNER_AWAY_PENALTY,
   OWNER_AWAY_PENALTY_WITH_PM,
-  PRODUCTION_MANAGER_MONTHLY_WAGE,
+  PRODUCTION_MANAGER_WEEKLY_WAGE,
   HOLIDAY_OPTIONS_DAYS,
 } from '../../src/engine/constants';
 import {
@@ -35,8 +35,8 @@ function manager(): Worker {
     role: 'productionManager',
     tier: null,
     rate: 0,
-    weeklyWage: 0,
-    monthlyWage: PRODUCTION_MANAGER_MONTHLY_WAGE,
+    weeklyWage: PRODUCTION_MANAGER_WEEKLY_WAGE,
+    leavesOnDay: null,
     startDay: 1,
     jobId: null,
     taskId: null,

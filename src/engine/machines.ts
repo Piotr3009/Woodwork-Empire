@@ -20,6 +20,7 @@ import {
   OVERDUE_BREAKDOWN_CHANCE,
   SERVICE_COST_FRACTION,
   SERVICE_INTERVAL_HOURS,
+  TIER_WORDS,
   DUST_HIGH_THRESHOLD,
   DUST_MAX,
   DUST_PER_PRODUCTION_MINUTE,
@@ -31,16 +32,20 @@ import {
   EXTRACTOR_BROKEN_DUST_MULTIPLIER,
   HELPER_REQUIRED_FROM_JOINERS,
   NO_DUCTING_SPECS,
+  DUST_PER_SAWDUST_PILE,
   NO_HELPER_DUST_MULTIPLIER,
   NO_HELPER_PRODUCTIVITY_FACTOR,
   PROPERTY_INSURANCE_RATE_YEARLY,
+  PAST_LIFE_WEEK_HOURS,
+  PRODUCING_ROLES,
   SALE_FRACTION,
+  SERVICE_LIFE_EXTENSION,
   UNDER_EXTRACTION_DUST_MULTIPLIER,
   UNDER_EXTRACTION_OUTPUT_PENALTY,
   SALE_FRACTION_USED,
   USED_VARIANT,
 } from './constants';
-import { weekOfDay, monthOfDay } from './clock';
+import { weekOfDay, monthOfDay, nextWorkingDay } from './clock';
 import { canAfford } from './economy';
 import {
   airBlockFor,
@@ -224,13 +229,40 @@ export function salePriceFor(item: Equipment): number {
 }
 
 /** The families the Owned tab offers a sale on: what the game calls a machine or the extraction
- *  kit, standing on the hall floor, and the bench, which a workshop buys and sells like any other
- *  thing that stands on its floor (PIOTR, 17.09; CLAUDE.md T8 3.5, T19 2.8). A rack, a locker and
- *  the office furniture are fittings, not plant. A bench somebody is working at is refused by the
- *  next line of `canSell`, which is the claim on it and needs nothing of its own. */
+ *  kit, standing on the hall floor, the bench, and from Turn 20 the storage as well, the rack and
+ *  the tool cabinet, which a workshop buys and sells like any other thing that stands on its floor
+ *  (PIOTR, 17.09 and 18.09; CLAUDE.md T8 3.5, T19 2.8, T20 2.10). The office furniture is a
+ *  fitting and not plant. A bench somebody is working at is refused by the claim on it in
+ *  `canSell`; a rack with sheets on it, or with somebody at it, is refused by
+ *  `storageSaleBlock` in `stations.ts`. */
 export function isSellableFamily(specId: string): boolean {
   const category = findSpec(specId)?.category;
-  return category === 'machine' || category === 'extraction' || category === 'bench';
+  return (
+    category === 'machine' ||
+    category === 'extraction' ||
+    category === 'bench' ||
+    category === 'storage'
+  );
+}
+
+/** The sheets that would have nowhere to go if this rack went: the hall's stock less what the
+ *  rest of the racks could hold (CLAUDE.md T20 2.10). With one rack in the hall, which is the
+ *  workshop Piotr plays, that is every sheet on it.
+ *
+ *  It is `rackCapacity` of `materials.ts` less this one rack, written here because `materials.ts`
+ *  reads this module and not the other way about; it is the same sum over the same
+ *  `sheetCapacityOf`. Bringing the two sums into one is still open (REPORT-T20.md, what was not
+ *  done). */
+export function sheetsStrandedBySale(state: GameState, item: Equipment): number {
+  let room = 0;
+  for (const other of state.equipment) {
+    // A rack that is already sold is no room at all: it stands in the hall until the buyer's van
+    // comes in the morning, and counting it would let the last two racks be sold one after the
+    // other on the same day with the sheets still on them (CLAUDE.md T20 2.10).
+    if (other.id === item.id || isSold(other) || !itemStandsInTheHall(other)) continue;
+    room += sheetCapacityOf(other);
+  }
+  return Math.max(0, state.stock.sheets - room);
 }
 
 /** Tools of this family that live in a cabinet: two men can have one out at once. */
@@ -240,7 +272,10 @@ export function cabinetTools(state: GameState, specId: string): Equipment[] {
 
 /** Machines of this family nobody is standing at. */
 export function freeMachines(state: GameState, specId: string): Equipment[] {
-  return floorMachines(state, specId).filter((item) => item.takenBy === null && !item.broken);
+  // A machine away being serviced is no more use than a broken one (CLAUDE.md T20 2.9.3).
+  return floorMachines(state, specId).filter(
+    (item) => item.takenBy === null && !item.broken && !machineIsOut(item, state.clock.day),
+  );
 }
 
 /** The machine of this family this man is standing at, or null. */
@@ -441,6 +476,22 @@ export function dustAtLeast(dust: number, label: string): boolean {
   return order.indexOf(dustBand(dust).label) >= order.indexOf(label);
 }
 
+/** How many piles of sawdust the hall is painting at this much dust. The renderer draws exactly
+ *  this many (CLAUDE.md T20 2.8). */
+export function sawdustPiles(dust: number): number {
+  return Math.round(dust / DUST_PER_SAWDUST_PILE);
+}
+
+/** True while there is dirt on the floor to look at, which is from the first pile on. This is the
+ *  question the helper is asked, and it is asked of the drawing and not of a band of its own: the
+ *  bands say what the dust does to the work and to the men (CLAUDE.md 9.7) and they start past 40,
+ *  eight times the dust the first pile is drawn at. Between the two the player saw dirt and the
+ *  labourer stood beside it, which is PIOTR's complaint of 18.09 word for word (CLAUDE.md T20 2.8;
+ *  the diagnosis is in REPORT-T20.md). */
+export function hallLooksDirty(dust: number): boolean {
+  return sawdustPiles(dust) > 0;
+}
+
 /** True once five joiners are on the books without a helper (CLAUDE.md 9.3). */
 export function helperMissing(state: GameState): boolean {
   const joiners = state.workers.filter((worker) => worker.role === 'joiner').length;
@@ -542,10 +593,18 @@ export function outputBreakdown(state: GameState): OutputBreakdown {
       where: 'your own minutes',
     });
   }
+  // Everybody on the books who PRODUCES, and only them: this sheet is the men and the machines
+  // that act where they are, and a rate at a desk is not a production rate, so an estimator, an
+  // admin, a draftsman, a clerk and a salesman are off it whatever their rate is (PIOTR;
+  // CLAUDE.md T20 2.3.3). The rule is the role and never the name, so two men called Dave cannot
+  // take each other's line off the sheet. The guard used to read the rate: it stopped at 1 as
+  // well, from the days when no tier reached the owner, and tonight the experienced man is his
+  // equal and the two above him beat him. The experienced man reads 0.00, which is the truth
+  // about him (CLAUDE.md T20 2.5).
   for (const worker of state.workers) {
-    if (worker.rate <= 0 || worker.rate >= 1) continue;
+    if (!PRODUCING_ROLES.includes(worker.role)) continue;
     lines.push({
-      label: `${worker.name}, ${worker.tier ?? 'a'} ${worker.role}`,
+      label: `${worker.name}, ${worker.tier === null ? 'a' : TIER_WORDS[worker.tier]} ${worker.role}`,
       points: roundPoints(worker.rate - 1),
       hall: false,
       where: 'his own minutes',
@@ -679,9 +738,72 @@ export function machinesDueService(state: GameState): Equipment[] {
   return serviceableMachines(state).filter((item) => serviceIsDue(item));
 }
 
-/** 2% of what the machine cost [TUNE]. */
+/** A tenth of what the machine cost [PIOTR, 18.09; CLAUDE.md T20 2.9.2]. The fraction itself is
+ *  `SERVICE_COST_FRACTION`, which is a tenth of what the machine cost [PIOTR, 18.09]. Everything
+ *  here and every test reads the constant and never the figure. */
 export function serviceCostFor(item: Equipment): number {
   return Math.round(item.purchasePrice * SERVICE_COST_FRACTION * 100) / 100;
+}
+
+/** The life the machine left the shop with, before any service was called on it. */
+export function originalLifeOf(item: Equipment): number {
+  return enduranceHoursFor(item.specId, item.variantId);
+}
+
+/** The hours of life a machine has after so many services: the original, and 50, then 25, then
+ *  12.5 percent of the original again. Worked out from the original and the count every time,
+ *  never added to what is there, so a lifted save and a machine serviced ten times both come out
+ *  at the same figure (CLAUDE.md T20 2.9.1). */
+export function lifeAfterServices(original: number, services: number): number {
+  const extension = 1 - Math.pow(SERVICE_LIFE_EXTENSION, Math.max(0, services));
+  return Math.round(original * (1 + extension));
+}
+
+/** True while the machine is away being serviced: nothing runs on it and its stage falls back the
+ *  way a broken machine's does [PIOTR, 18.09: out for one working day from the call]
+ *  (CLAUDE.md T20 2.9.3). */
+export function machineIsOut(item: Equipment, day: number): boolean {
+  return item.inServiceUntilDay !== null && day < item.inServiceUntilDay;
+}
+
+/** Everything standing in the hall that is away being serviced today. */
+export function machinesInService(state: GameState): Equipment[] {
+  return state.equipment.filter(
+    (item) => itemStandsInTheHall(item) && !isSold(item) && machineIsOut(item, state.clock.day),
+  );
+}
+
+/** Why a service cannot be called on this machine, or that it can. The one refusal: the button on
+ *  the Machines page and the engine's own call read it, so a button the engine would refuse is
+ *  never drawn (CLAUDE.md T4 3.2, T20 2.9). */
+export function serviceCallCheck(
+  state: GameState,
+  equipmentId: string,
+): { ok: boolean; reason: string } {
+  const item = state.equipment.find((entry) => entry.id === equipmentId);
+  if (!item) return { ok: false, reason: 'No such machine' };
+  if (isSold(item)) return { ok: false, reason: 'Sold' };
+  if (findSpec(item.specId)?.category !== 'machine') {
+    return { ok: false, reason: 'It is repaired, never serviced' };
+  }
+  if (machineIsOut(item, state.clock.day)) return { ok: false, reason: 'In service' };
+  if (item.broken) return { ok: false, reason: 'It is broken. Fix it first' };
+  if (!canAfford(state, serviceCostFor(item))) return { ok: false, reason: 'Not enough cash' };
+  return { ok: true, reason: '' };
+}
+
+/** Hours the machine has run past the life it has, extensions and all. */
+export function hoursPastLife(item: Equipment): number {
+  if (item.enduranceHours <= 0) return 0;
+  return Math.max(0, round6(item.hoursUsed - item.enduranceHours));
+}
+
+/** How many weeks of its own clock the machine has run past the end of its life. */
+export function weeksPastLife(item: Equipment): number {
+  if (PAST_LIFE_WEEK_HOURS <= 0) return 0;
+  // Rounded to six places before the floor: two whole weeks of a figure that is 80 over 4.33 is
+  // 1.9999999 in binary, and a week of a machine's life is not lost to that.
+  return Math.floor(round6(hoursPastLife(item) / PAST_LIFE_WEEK_HOURS));
 }
 
 /** The extractor keeps its Turn 1 parts bill, every other machine is 5% of its price [TUNE]. */
@@ -691,13 +813,20 @@ export function repairCostFor(item: Equipment): number {
 }
 
 /** A machine that is past its service hours can give up on any working day, and so can one that
- *  is past its endurance. The two stack (CLAUDE.md T3 3.5) [TUNE]. */
+ *  is past its endurance. The two stack (CLAUDE.md T3 3.5) [TUNE].
+ *
+ *  A machine at the end of its life does not vanish: it goes on working and gives up oftener, the
+ *  chance doubling for every week of its own clock it runs past the end [PIOTR, 18.09, the rule;
+ *  TUNE, the doubling] (CLAUDE.md T20 2.9.4). The first week past it is the Turn 8 chance it has
+ *  always been, so nothing about a machine that has just worn out has changed. */
 export function overdueBreakdownChance(item: Equipment): number {
   if (item.broken) return 0;
   let chance = 0;
   if (serviceIsDue(item)) chance += OVERDUE_BREAKDOWN_CHANCE;
-  if (pastEndurance(item)) chance += OVERDUE_BREAKDOWN_CHANCE;
-  return chance;
+  if (pastEndurance(item)) {
+    chance += OVERDUE_BREAKDOWN_CHANCE * Math.pow(2, weeksPastLife(item));
+  }
+  return Math.min(1, chance);
 }
 
 /** What is stopping a stage that is done on this family: a machine that has given up, when there
@@ -707,12 +836,17 @@ export function overdueBreakdownChance(item: Equipment): number {
 export function familyStopped(
   state: GameState,
   specId: string,
-): { item: Equipment; why: 'broken' | 'bags' } | null {
+): { item: Equipment; why: 'broken' | 'bags' | 'service' } | null {
   const machines = owned(state, specId);
   if (machines.length === 0) return null;
-  if (!machines.some((item) => !item.broken)) {
+  const out = (item: Equipment): boolean => item.broken || machineIsOut(item, state.clock.day);
+  // One away being serviced stops the stage the way a broken one does, and says which it is
+  // (PIOTR, 18.09; CLAUDE.md T20 2.9.3).
+  if (!machines.some((item) => !out(item))) {
     const broken = machines.find((item) => item.broken);
-    return broken ? { item: broken, why: 'broken' } : null;
+    if (broken) return { item: broken, why: 'broken' };
+    const serviced = machines.find((item) => machineIsOut(item, state.clock.day));
+    return serviced ? { item: serviced, why: 'service' } : null;
   }
   // The hall's bags are full: nothing that puts dust into them runs, whatever its class and
   // however many of the family stand in the hall, until they are emptied (CLAUDE.md T12 2.3).
@@ -880,12 +1014,18 @@ export function repairMachine(state: GameState, equipmentId: string): Equipment 
   return item;
 }
 
-/** The service is done: the clock on the next one starts again. A service is not a repair, so a
- *  machine that has already given up stays broken until somebody repairs it. */
+/** The service is called in: the clock on the next one starts again, the machine's life is
+ *  extended by half of what the last extension was, and it stands there doing nothing until the
+ *  next working day [PIOTR, 18.09; the first service is out for the day too, TUNE: his decision
+ *  is open] (CLAUDE.md T20 2.9). A service is not a repair, so a machine that has already given
+ *  up stays broken until somebody repairs it; `serviceCallCheck` is what refuses the call. */
 export function serviceMachine(state: GameState, equipmentId: string): Equipment | null {
   const item = state.equipment.find((entry) => entry.id === equipmentId);
   if (!item) return null;
   item.serviceHours = item.hoursUsed;
+  item.serviceCount += 1;
+  item.enduranceHours = lifeAfterServices(originalLifeOf(item), item.serviceCount);
+  item.inServiceUntilDay = nextWorkingDay(state.clock.day);
   return item;
 }
 

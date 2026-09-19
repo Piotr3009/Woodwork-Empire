@@ -31,7 +31,7 @@ import {
 // Straight off its own module, not round the public API, which Turn 13 froze (REPORT-T13 10).
 import { OWNER } from '../engine/machines';
 import { ROLE_WORDS } from './team';
-import { DROP_PROJECT_REPUTATION } from '../engine/constants';
+import { DROP_PROJECT_REPUTATION, TIER_WORDS } from '../engine/constants';
 import type { GameState, Job } from '../engine/index';
 import {
   button,
@@ -90,16 +90,17 @@ function assigneeName(state: GameState, who: string): string {
   return workerById(state, who)?.name ?? who;
 }
 
-/** The trade under a name in the list: "normal joiner", "poor sprayer", "owner". The tier is his
+/** The trade under a name in the list: "experienced joiner", "no experience sprayer", "owner".
+ *  The words of a tier are TIER_WORDS and nowhere else (CLAUDE.md T20 2.5). The tier is his
  *  standing and the role is his trade, so a sprayer is plainly not a joiner (CLAUDE.md T19 2.6).
- *  The mockup's own words for the tiers were "ok" and "good"; the game has said poor, normal and
+ *  The mockup's own words for the tiers were "ok" and "good"; the game says no experience,
  *  super since Turn 6 and Our team still does, so one vocabulary is kept and not two. */
 function assigneeTrade(state: GameState, who: string): string {
   if (who === OWNER) return 'owner';
   const worker = workerById(state, who);
   if (!worker) return '';
   const trade = ROLE_WORDS[worker.role];
-  return worker.tier === null ? trade : `${worker.tier} ${trade}`;
+  return worker.tier === null ? trade : `${TIER_WORDS[worker.tier]} ${trade}`;
 }
 
 /** One row of the Assign list: his name, his trade, and either the one click that puts him on, the
@@ -192,7 +193,7 @@ function assignList(state: GameState, job: Job): string {
     .join('');
   // The cross every modal, popover and list has (PIOTR, 18.09): the same one as the Company board.
   return (
-    '<div class="assign-list">' + closeButton('closeAssign') +
+    '<div class="assign-list" data-popover="assign-job">' + closeButton('closeAssign') +
     `<span class="row-figure">Who goes on ${escapeHtml(job.name)}?</span>${rows}</div>`
   );
 }

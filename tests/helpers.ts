@@ -283,6 +283,8 @@ export function placeEquipment(
     anchorY: options.y ?? 0,
     broken: false,
     serviceHours: 0,
+    serviceCount: 0,
+    inServiceUntilDay: null,
     hoursThisWeek: 0,
     hoursThisMonth: 0,
     enduranceHours: enduranceHoursFor(specId, variantId),
@@ -430,7 +432,7 @@ export function withLicence(state: GameState): GameState {
   return softwareNow(buyNow(buyNow(state, 'desk'), 'laptop'), 'oneOff');
 }
 
-/** A crew of six poor joiners, each at his own bench and his own job of sheet work, behind the
+/** A crew of six joiners with no experience, each at his own bench and his own job of sheet work, behind the
  *  number of saws the caller asks for. Piotr's claim of CLAUDE.md T7 3.1 in one hall: a machine
  *  serves one man at a time, so six men behind one saw stand at it. The office is not in the way
  *  here, because the queue at the saw is what the month is about: the jobs are drawn and ready
@@ -477,10 +479,10 @@ export function sixJoinersOnSheetWork(
       id: `staff-${man + 1}`,
       name: `Joiner ${man + 1}`,
       role: 'joiner',
-      tier: 'poor',
-      rate: WORKER_RATES.poor,
+      tier: 'novice',
+      rate: WORKER_RATES.novice,
       weeklyWage: 480,
-      monthlyWage: 0,
+      leavesOnDay: null,
       startDay: 1,
       jobId: null,
       taskId: null,
@@ -512,7 +514,7 @@ export function sixJoinersOnSheetWork(
 /** The crew Piotr's saw question is asked about (CLAUDE.md T7 3.1). */
 export const CREW = 6;
 
-/** Two men producing in the same minutes: the owner at one bench and a poor joiner at another,
+/** Two men producing in the same minutes: the owner at one bench and a joiner with no experience at another,
  *  each on a job of sheet work. The one place a two man minute is set up, so the tests that ask
  *  what two men do to the books and to the machines both drive the same hall. */
 export function twoMenOnSheetWork(
@@ -550,10 +552,10 @@ export function twoMenOnSheetWork(
     id: 'staff-1',
     name: 'Ben',
     role: 'joiner',
-    tier: 'poor',
-    rate: WORKER_RATES.poor,
+    tier: 'novice',
+    rate: WORKER_RATES.novice,
     weeklyWage: 480,
-    monthlyWage: 0,
+    leavesOnDay: null,
     startDay: 1,
     jobId: null,
     taskId: null,

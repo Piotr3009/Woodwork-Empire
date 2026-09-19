@@ -63,6 +63,8 @@ import { centreOf, screenToTile } from '../render/iso';
 import { fitOfficeStack, officeScene } from '../render/office';
 import { type AccountingTab, accountingTabFrom, renderAccounting } from './accounting';
 import { renderContracts } from './contracts';
+// Straight off its own module, not round the public API, which Turn 13 froze (REPORT-T13 10).
+import { contractManCheck } from '../engine/contracts';
 import { renderHouseCard } from './house';
 import { renderMonthEnd } from './monthEnd';
 import { renderSettings } from './settings';
@@ -74,10 +76,11 @@ import { renderEvent, renderEventFooter } from './eventModal';
 import { type LaptopPage, laptopPageFrom, renderLaptop } from './laptop';
 import { type TeamTab, teamTabFrom } from './team';
 import { renderSpriteCheck } from './spriteCheck';
-import { renderWorkPlan } from './workPlan';
+import { type WorkPlanTab, renderWorkPlan, workPlanTabFrom } from './workPlan';
 import {
   type ModalPosition,
   type ModalSpec,
+  closeButton,
   escapeHtml,
   minutes,
   plural,
@@ -164,6 +167,12 @@ interface Ui {
   loanAmount: string;
   /** Which tab of the Orders page is on top (CLAUDE.md T13 3.16). */
   boardTab: BoardTab;
+  /** Which of the Work Plan's two tabs is on top: the jobs, or the standing contracts
+   *  (CLAUDE.md T20 2.1). */
+  workPlanTab: WorkPlanTab;
+  /** The man an offer card on the Contracts tab is worked out for, or null for the card's own
+   *  first choice. He is nobody's assignee until Take it is pressed (CLAUDE.md T20 2.1.1). */
+  contractMan: string | null;
   /** The house card is up at the end of the day, since this real time (CLAUDE.md T13 3.18). */
   houseCardSince: number | null;
   houseCardDone: boolean;
@@ -312,6 +321,8 @@ function freshUi(): Ui {
     arrearsAmount: '500',
     loanAmount: '10000',
     boardTab: 'enquiries',
+    workPlanTab: 'jobs',
+    contractMan: null,
     houseCardSince: null,
     houseCardDone: false,
     laptopPage: 'home',
@@ -445,7 +456,7 @@ function modalBody(id: ModalId, current: GameState): string {
         tickedTasks: ui.tickedTasks,
       });
     case 'workPlan':
-      return renderWorkPlan(current, ui.dropConfirm, ui.assignOpen);
+      return renderWorkPlan(current, ui.workPlanTab, ui.dropConfirm, ui.assignOpen, ui.contractMan);
     case 'machineCard':
       return renderMachineCard(current, ui.machineCard, ui.sellConfirm);
     case 'accounting': {
@@ -653,9 +664,12 @@ function renderWhy(): string {
   const width = typeof window === 'undefined' ? 1280 : window.innerWidth;
   const left = Math.max(8, Math.min(open.left, Math.max(8, width - 340)));
   return (
-    `<div class="why-pop" style="left:${left}px;top:${open.top + 16}px">` +
-    `<p>${escapeHtml(text)}</p>` +
-    '<button class="btn" data-do="closeWhy">Right</button></div>'
+    `<div class="why-pop" data-popover="why" style="left:${left}px;top:${open.top + 16}px">` +
+    // The one cross, the same helper every modal and every list calls: the bubble used to be shut
+    // by a "Right" button of its own, which was a second way out of a popover
+    // (PIOTR, 18.09; CLAUDE.md T20 2.15, T18 2.5).
+    closeButton('closeWhy') +
+    `<p>${escapeHtml(text)}</p></div>`
   );
 }
 
@@ -666,8 +680,15 @@ function modalSpecs(): ModalSpec[] {
   const specs: ModalSpec[] = [];
   if (ui.modal !== null) {
     // The first use bubble of the screen, over its body, until it is dismissed (T13 3.22).
+    // The Work Plan's own note is about its job rows ("One row a job"), so it belongs to the Jobs
+    // tab and not to the Contracts tab beside it, which is how the order board's note already
+    // follows its tabs. Seen under the Contracts tab in the T20-C5 pictures.
     const tipKey =
-      ui.modal === 'laptop' ? laptopTipKey(ui.laptopPage) : TIP_KEY_OF_MODAL[ui.modal] ?? '';
+      ui.modal === 'laptop'
+        ? laptopTipKey(ui.laptopPage)
+        : ui.modal === 'workPlan' && ui.workPlanTab !== 'jobs'
+          ? ''
+          : TIP_KEY_OF_MODAL[ui.modal] ?? '';
     const body = modalBody(ui.modal, current);
     specs.push({
       id: ui.modal,
@@ -1357,6 +1378,11 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
       ui.boardTab = id === 'contracts' ? 'contracts' : 'enquiries';
       ui.scrollModalTop = true;
       break;
+    case 'workPlanTab':
+      // The folder's two tabs: the jobs, and the standing contracts (CLAUDE.md T20 2.1).
+      ui.workPlanTab = workPlanTabFrom(id);
+      ui.scrollModalTop = true;
+      break;
     case 'openSettings':
       openModal('settings');
       break;
@@ -1408,6 +1434,34 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
       return;
     case 'renewContract':
       dispatch({ type: 'RENEW_CONTRACT', contractId: id, accept: element.dataset.accept === '1' });
+      return;
+    case 'takeContract': {
+      // The one click of the Contracts tab: the offer is accepted and the man the card has
+      // selected is put on it, in that order (PIOTR; CLAUDE.md T20 2.1.1). The man is asked about
+      // first: a click that cannot put him on it would otherwise take the contract and leave it
+      // with nobody on it, which is not what the button says.
+      const onIt = element.dataset.worker ?? '';
+      const check = contractManCheck(game(), onIt);
+      if (!check.ok) {
+        ui.toast = check.reason;
+        requestRender();
+        return;
+      }
+      dispatch({ type: 'ACCEPT_CONTRACT', contractId: id });
+      dispatch({ type: 'ASSIGN_CONTRACT', contractId: id, workerId: onIt, on: true });
+      return;
+    }
+    case 'pickContractMan':
+      // Which man the offer card is worked out for. He is not on anything: the card is showing
+      // the player what it would be like with him on it (CLAUDE.md T20 2.1.1). It breaks and does
+      // not return, because nothing is dispatched here and the card has to be drawn again for the
+      // new man: the player picks through the men with the clock stopped.
+      ui.contractMan = element.dataset.worker ?? null;
+      break;
+    case 'letGo':
+      // The week's notice: he works it out, he is paid for it, and the morning after his last day
+      // his jobs and his contracts are short of a man (PIOTR, 18.09; CLAUDE.md T20 2.4).
+      dispatch({ type: 'LET_GO', workerId: id });
       return;
     case 'endContract':
       dispatch({ type: 'END_CONTRACT', contractId: id });
@@ -1962,6 +2016,11 @@ function runClick(event: MouseEvent): void {
     ui.assignOpen = null;
     requestRender();
   }
+  // And the same for the why popover, which the "i" link opens (PIOTR, 18.09).
+  if (ui.why !== null && target.closest('.why-pop') === null && doer?.dataset.do !== 'showWhy') {
+    ui.why = null;
+    requestRender();
+  }
   if (doer) {
     if (doer instanceof HTMLButtonElement && doer.disabled) return;
     handleAction(doer, point);
@@ -2064,6 +2123,49 @@ function togglePause(): void {
   dispatch({ type: 'SET_SPEED', speed: ui.speedBeforePause === 0 ? 1 : ui.speedBeforePause });
 }
 
+/** What Escape shuts, topmost first: the one open layer nearest the player and nothing under it
+ *  (PIOTR, 18.09; CLAUDE.md T20 2.15). One table, so the key, the test and the report read the
+ *  same order. The Assign list hangs off the modal under it and goes first; the why bubble is
+ *  opened from a modal's body or an event's, never from inside an Assign list, so the two are
+ *  never up together; the day summary sits over the modal that opened it; and the Menu is last,
+ *  because it is the one popover that is not on the modal layer at all. */
+export const ESCAPE_ORDER: ReadonlyArray<{
+  /** What the report and the test call it. */
+  name: string;
+  isOpen: () => boolean;
+  shut: () => void;
+}> = [
+  {
+    name: 'assign list',
+    isOpen: () => ui.assignOpen !== null,
+    shut: () => {
+      ui.assignOpen = null;
+    },
+  },
+  {
+    name: 'why',
+    isOpen: () => ui.why !== null,
+    shut: () => {
+      ui.why = null;
+    },
+  },
+  {
+    name: 'day summary',
+    isOpen: () => ui.daySummary !== null,
+    shut: () => {
+      ui.daySummary = null;
+    },
+  },
+  { name: 'modal', isOpen: () => ui.modal !== null, shut: shutModal },
+  {
+    name: 'menu',
+    isOpen: () => ui.menuOpen,
+    shut: () => {
+      ui.menuOpen = false;
+    },
+  },
+];
+
 function onKeyDown(event: KeyboardEvent): void {
   batched(() => runKeyDown(event));
 }
@@ -2097,20 +2199,12 @@ function runKeyDown(event: KeyboardEvent): void {
     requestRender();
     return;
   }
-  if (ui.daySummary !== null) {
-    ui.daySummary = null;
+  // And then the topmost open popover, and only that one, off the one table below.
+  for (const layer of ESCAPE_ORDER) {
+    if (!layer.isOpen()) continue;
+    layer.shut();
     requestRender();
     return;
-  }
-  // An open Assign list shuts on Escape before the modal under it does (PIOTR, 18.09).
-  if (ui.assignOpen !== null) {
-    ui.assignOpen = null;
-    requestRender();
-    return;
-  }
-  if (ui.modal !== null) {
-    shutModal();
-    requestRender();
   }
 }
 

@@ -39,7 +39,7 @@ function hall(): GameState {
   for (const specId of ['workbench', 'locker', 'canteenSeat', 'toolCabinet', 'handToolSet']) {
     state = buyNow(state, specId, specId === 'workbench' ? 'budget' : undefined);
   }
-  const hired = hireNow(state, 'joiner', 'poor');
+  const hired = hireNow(state, 'joiner', 'novice');
   for (const worker of hired.workers) worker.startDay = hired.clock.day;
   if (hired.workers.length === 0) throw new Error('nobody was hired');
   return hired;
