@@ -149,6 +149,62 @@ function swapsFaces(orientation: Orientation): boolean {
   return orientation === 1 || orientation === 3;
 }
 
+/** The four orientations, in the order Rotate walks them. */
+const ALL_ORIENTATIONS: readonly Orientation[] = [0, 1, 2, 3];
+
+/** True when the art side has drawn a file for this orientation of this picture: the orientation's
+ *  own class file or its family file, which are the two names `pictureFor` tries before it falls
+ *  back to the base picture. */
+function hasOwnPicture(
+  files: readonly string[],
+  spriteKey: string,
+  variantId: string | null | undefined,
+  orientation: Orientation,
+): boolean {
+  return (
+    files.includes(spriteFileName(spriteKey, variantId, orientation)) ||
+    files.includes(spriteFileName(spriteKey, null, orientation))
+  );
+}
+
+/** The orientations a thing may be stood at: the ones Rotate can reach (PIOTR, 19.09: "I need two
+ *  more turns, we have four walls"; CLAUDE.md T22 2.11).
+ *
+ *  **0 and 1 always.** A quarter turn with no file of its own is the base picture mirrored about
+ *  its anchor, which the hall has done since Turn 10, and a family with no picture at all is a box
+ *  whose footprint swaps all the same. **2 and 3 only where the file is there**, because a half
+ *  turn has no mirror that would be right: the base picture stood at 2 would be the front of the
+ *  machine where its back should be. That is Claude's rule rather than the brief's arithmetic
+ *  [TUNE], and it is there so that no wrong picture ever stands on the hall.
+ *
+ *  The five tool cabinets are the first items in the game with all four (PIOTR's art, 19.09); the
+ *  extractors join them the day `docs/art/REQUESTS-T22.md` 2 lands, with no code change. */
+export function orientationsFor(
+  files: readonly string[],
+  spriteKey: string,
+  variantId?: string | null,
+): Orientation[] {
+  return ALL_ORIENTATIONS.filter(
+    (orientation) =>
+      orientation === 0 || orientation === 1 || hasOwnPicture(files, spriteKey, variantId, orientation),
+  );
+}
+
+/** The next orientation after this one, round the ones that have a picture: `0, 1, 0` for a thing
+ *  with two, `0, 1, 2, 3, 0` for one with four (CLAUDE.md T22 2.11). An orientation that is not on
+ *  the list at all, which is what a save made before its `.rr` file was deleted would carry, comes
+ *  back to the first one on it. */
+export function nextOrientation(
+  files: readonly string[],
+  spriteKey: string,
+  variantId: string | null | undefined,
+  orientation: Orientation,
+): Orientation {
+  const ring = orientationsFor(files, spriteKey, variantId);
+  const at = ring.indexOf(orientation);
+  return ring[(at + 1) % ring.length] ?? 0;
+}
+
 /** The line for this file, or null when nothing has been measured on it. */
 export function portFor(file: string | null, ports: Record<string, Port> = PORTS): Port | null {
   if (file === null) return null;
@@ -156,14 +212,28 @@ export function portFor(file: string | null, ports: Record<string, Port> = PORTS
 }
 
 /** A port read off a picture the hall is mirroring, turned round with it: `px` counts from the
- *  other edge of the file, a `+x` mouth becomes a `+y` one, and the cell is mirrored across the
- *  footprint, whose width in the mirrored orientation is `footprintWidth` (CLAUDE.md T22 2.8). */
-export function mirroredPort(port: Port, fileWidth: number, footprintWidth: number): Port {
+ *  other edge of the file, a `+x` mouth becomes a `+y` one, and the cell has its two offsets
+ *  exchanged (CLAUDE.md T22 2.8).
+ *
+ *  **The cell is the axis swap and not `width - 1 - x`.** A mirror about the vertical screen axis
+ *  on the hall's 2 to 1 dimetric exchanges the roles of the two world axes, which is the very
+ *  reason the same sentence of 2.8 says `faces` swaps `+x` and `+y`: a cell that lay one along x
+ *  lies one along y afterwards. Both worked examples come out right only this way. The standard
+ *  saw's table cell `1,0` on a 3 by 1 footprint becomes `0,1`, the middle cell of the turned 1 by 3
+ *  footprint, where `width - 1 - x` gave `-1,0`, a metre outside the machine. The standard
+ *  extractor's cell `0,1` with a `+y` mouth becomes `1,0` with a `+x` mouth, one cell along the
+ *  axis the mouth now opens down, where `width - 1 - x` left it at `0,1`, under the unit itself.
+ *
+ *  Nothing is clamped either way. A machine's cell is inside its own footprint because the drop
+ *  comes down onto its body; an extractor's is outside it, because the vertical stands in front of
+ *  the mouth and not in it. `tests/engine/ports.test.ts` asserts both of those, per file, at every
+ *  orientation. */
+export function mirroredPort(port: Port, fileWidth: number): Port {
   return {
     ...port,
     px: fileWidth - port.px,
     faces: port.faces === undefined ? undefined : port.faces === '+x' ? '+y' : '+x',
-    cell: { x: footprintWidth - 1 - port.cell.x, y: port.cell.y },
+    cell: { x: port.cell.y, y: port.cell.x },
   };
 }
 
@@ -171,21 +241,20 @@ export function mirroredPort(port: Port, fileWidth: number, footprintWidth: numb
  *  mirroring the picture, or null when nothing has been measured for the picture it is drawn with.
  *
  *  `fileWidth` is the width of the 2x file in pixels, which is the renderer's arithmetic
- *  (`spriteFileSize`) and not the table's, so the caller hands it in; `footprintWidth` is the
- *  item's own footprint in the orientation being asked about. Both are read on the mirrored path
- *  only. The engine's routing wants the cell alone and asks `portCellIn` instead, which needs no
- *  file size at all. */
+ *  (`spriteFileSize`) and not the table's, so the caller hands it in; it is read on the mirrored
+ *  path only. The engine's routing wants the cell alone and asks `portCellIn` instead, which needs
+ *  no file size at all. */
 export function portOf(
   files: readonly string[],
   item: { spriteKey: string; variantId?: string | null; orientation?: Orientation },
-  size: { fileWidth: number; footprintWidth: number },
+  size: { fileWidth: number },
   ports: Record<string, Port> = PORTS,
 ): Port | null {
   const orientation = item.orientation ?? 0;
   const picture = pictureFor(files, item.spriteKey, item.variantId, orientation);
   const port = portFor(picture.file, ports);
   if (port === null) return null;
-  return picture.mirrored ? mirroredPort(port, size.fileWidth, size.footprintWidth) : port;
+  return picture.mirrored ? mirroredPort(port, size.fileWidth) : port;
 }
 
 /** The cell of the route this item's port belongs to, as an offset from the corner of its own
@@ -196,7 +265,6 @@ export function portOf(
 export function portCellIn(
   files: readonly string[],
   item: { spriteKey: string; variantId?: string | null; orientation?: Orientation },
-  footprintWidth: number,
   ports: Record<string, Port> = PORTS,
 ): { x: number; y: number } | null {
   const orientation = item.orientation ?? 0;
@@ -204,7 +272,7 @@ export function portCellIn(
   const port = portFor(picture.file, ports);
   if (port === null) return null;
   if (!picture.mirrored) return { x: port.cell.x, y: port.cell.y };
-  return { x: footprintWidth - 1 - port.cell.x, y: port.cell.y };
+  return { x: port.cell.y, y: port.cell.x };
 }
 
 /** Every file name the table has a line for, sorted: what the Sprite check page and the tests

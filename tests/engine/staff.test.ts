@@ -109,7 +109,10 @@ describe('the hiring pool', () => {
     expect(option?.available).toBe(false);
     // The bill is the cheapest way into each family, which for the bench is the used one at 120
     // (CLAUDE.md T7 3.6).
-    expect(option?.missingCost).toBe(120 + 80 + 40 + 400 + 350 * 2);
+    // The cabinet's cheapest class is the used one at ninety pounds from Turn 22, and two of them
+    // is what a hall with none is short: one slot for the owner's set and one for the new man's
+    // (CLAUDE.md T22 2.12).
+    expect(option?.missingCost).toBe(120 + 80 + 40 + 400 + 90 * 2);
     // Named, never the catalogue id: nothing of the engine's own reaches the card (CLAUDE.md 3).
     expect(option?.missing).toContain('Tool cabinet x 2');
     expect(option?.missing.join(' ')).not.toContain(TOOL_CABINET);

@@ -5,7 +5,7 @@
 // 96 by 48 in the file, 8 px of transparent padding on every side, and the anchor at the bottom
 // corner of the footprint diamond.
 
-import { deliveredFiles, pictureFor } from '../engine/ports';
+import { deliveredFiles, nextOrientation, orientationsFor, pictureFor } from '../engine/ports';
 import type { Orientation } from '../engine/types';
 import { TILE_HEIGHT, TILE_RISE, TILE_WIDTH, tileToScreen } from './iso';
 
@@ -63,6 +63,22 @@ export function pickSprite(
 ): string | null {
   const picture = pictureFor(files, spriteKey, tier, orientation);
   return picture.file === null ? null : `${SPRITE_DIR}/${picture.file}`;
+}
+
+/** The orientations this picture can be stood at, and the next one round. The rule itself is
+ *  `orientationsFor` and `nextOrientation` in `src/engine/ports.ts`, kept pure so a test can ask it
+ *  of a list of files that is not the one on disk; these two ask it of the manifest, which is what
+ *  the setup view and the card of a thing on the hall want (CLAUDE.md T22 2.11). */
+export function spriteOrientations(spriteKey: string, tier?: string | null): Orientation[] {
+  return orientationsFor(DELIVERED, spriteKey, tier);
+}
+
+export function nextSpriteOrientation(
+  spriteKey: string,
+  tier: string | null | undefined,
+  orientation: Orientation,
+): Orientation {
+  return nextOrientation(DELIVERED, spriteKey, tier, orientation);
 }
 
 /** True when the hall has to mirror the picture because no file was delivered for this

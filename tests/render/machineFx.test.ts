@@ -15,6 +15,7 @@ import {
   firstJob,
   newGame,
   placeEnquiry,
+  placeEquipment,
 } from '../helpers';
 
 function machineOf(state: GameState, specId: string): Equipment {
@@ -94,6 +95,37 @@ describe('the other machines', () => {
     // of its own answers for the base picture it falls back to, and that one is measured. This is
     // why 2.11 lets Rotate reach only the orientations that have a file.
     expect(hasMeasuredPort({ ...unit, orientation: 2 })).toBe(true);
+    // And it really does breathe, standing in the hall with the saw running beside it: the rule
+    // of 2.9 took the swell off the things a pipe is fixed to and off nothing else.
+    const withPelletiser = state;
+    const pelletiser = placeEquipment(withPelletiser, 'pelletiser', { x: 14, y: 7 });
+    expect(hasMeasuredPort(pelletiser)).toBe(false);
+    expect(machineInUse(withPelletiser, pelletiser)).toBe(true);
+    const svg = renderHall(withPelletiser);
+    expect(svg).toContain('fx-breathe');
+    // The swell is on the pelletiser's own group and on no other: the extractor beside it has a
+    // measured port and stands still (CLAUDE.md T22 2.9).
+    const breathing = Array.from(
+      svg.matchAll(/data-kit="([^"]+)"[^>]*class="[^"]*fx-breathe/g),
+    ).map((match) => match[1]);
+    expect(breathing).toEqual([pelletiser.id]);
+  });
+
+  it('keeps every machine a pipe is drawn to still while it runs (CLAUDE.md T22 2.9)', () => {
+    // The saw, the spindle moulder and the edgebander all have measured ports, and none of them
+    // has ever breathed: the swell was the extractor's alone. This is the assertion that says the
+    // gate is the table and not the category, so a family that gains a port line gains the rule
+    // with it [PIOTR, 19.09: "the extractor pulsing will tear the pipe"].
+    const state = working();
+    for (const item of state.equipment) {
+      if (!hasMeasuredPort(item)) continue;
+      expect(renderHall(state), item.specId).not.toContain(
+        `data-kit="${item.id}" data-sprite="${item.spriteKey}" data-tier="${item.variantId}" class="clickable fx-breathe`,
+      );
+    }
+    expect(hasMeasuredPort(machineOf(state, 'tableSaw'))).toBe(true);
+    expect(hasMeasuredPort(machineOf(state, 'extractor'))).toBe(true);
+    expect(renderHall(state)).not.toContain('fx-breathe');
   });
 
   it('puts a red lamp on a broken extractor, and it still does not breathe', () => {

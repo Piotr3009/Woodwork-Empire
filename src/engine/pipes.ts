@@ -11,8 +11,9 @@
 // the drop and the last the inlet or the tee. When a run goes (a move, a sale, a burglary), a
 // branch that joined it takes over its tail, so no pipe is ever left hanging in the air.
 
-import { PIPE_PRICE_PER_METRE } from './constants';
+import { DUCT_SYSTEMS, PIPE_PRICE_PER_METRE } from './constants';
 import { canAfford, charge } from './economy';
+import { cellIsFloor } from './layout';
 import { extractionCapacityOf, extractionDemandOf } from './media';
 import {
   findSpec,
@@ -25,12 +26,17 @@ import {
 } from './machines';
 import { deliveredFiles, portCellIn } from './ports';
 import { makeId } from './rng';
-import type { Equipment, GameState, Orientation, PipeRun, PipeTile, PipeTileKey } from './types';
+import type { Equipment, GameState, Orientation, PipeRun, PipeTile } from './types';
 
 export interface PipeCheck {
   ok: boolean;
   reason: string;
 }
+
+/** What Connect says when the mouth of the nearest unit faces a wall: there is no cell in front of
+ *  it for the inlet's vertical to come down in, and the player is told which two things put it
+ *  right (CLAUDE.md T22 2.8). */
+export const INLET_BLOCKED = 'No room in front of the extractor\u0027s inlet: turn it or move it';
 
 export interface Cell {
   x: number;
@@ -48,6 +54,18 @@ export function pipeTargets(state: GameState): Equipment[] {
 /** True for a machine that wants a pipe at all: one with an extraction demand above zero. */
 export function wantsExtraction(item: { specId: string; variantId: string }): boolean {
   return extractionDemandOf(item) > 0;
+}
+
+/** True for a picture a connection point has to be measured on: a machine that pulls on the
+ *  extraction, so a drop comes down onto it, or a fan a run goes into, so an inlet turns into its
+ *  mouth (CLAUDE.md T22 2.8). A central system is neither: it draws a run along the rear wall and a
+ *  drop to every machine, and there is no inlet of its own anywhere on it (CLAUDE.md T16 2.3).
+ *
+ *  It is the Sprite check page's question: a file that wants a line and has not got one is printed
+ *  in red as `no port data`, so a missing measurement is visible rather than quietly guessed at. */
+export function needsPortData(item: { specId: string; variantId: string }): boolean {
+  if (extractionDemandOf(item) > 0) return true;
+  return extractionCapacityOf(item) > 0 && !DUCT_SYSTEMS.includes(item.specId);
 }
 
 /** Where a machine's own footprint stands: its class's footprint, centred inside the working zone
@@ -95,11 +113,11 @@ export function portCell(item: {
   const first = { x: Math.floor(origin.x), y: Math.floor(origin.y) };
   const spec = findSpec(item.specId);
   if (spec === undefined || spec === null) return first;
-  const cell = portCellIn(
-    deliveredFiles(),
-    { spriteKey: spec.spriteKey, variantId: item.variantId, orientation: item.orientation ?? 0 },
-    origin.width,
-  );
+  const cell = portCellIn(deliveredFiles(), {
+    spriteKey: spec.spriteKey,
+    variantId: item.variantId,
+    orientation: item.orientation ?? 0,
+  });
   if (cell === null) return first;
   return { x: first.x + cell.x, y: first.y + cell.y };
 }
@@ -160,37 +178,22 @@ export function pathBetween(from: Cell, to: Cell): Cell[] {
   return cells;
 }
 
-/** Which way a neighbour lies from a cell: north is world minus y, east is world plus x
- *  (docs/art/SPRITES.md 1). */
-function armTo(cell: Cell, neighbour: Cell): 'n' | 's' | 'e' | 'w' {
-  if (neighbour.y < cell.y) return 'n';
-  if (neighbour.y > cell.y) return 's';
-  return neighbour.x > cell.x ? 'e' : 'w';
-}
-
-/** The tile a cell of a run is drawn with, from the arms it has (CLAUDE.md T13 3.19): the first
- *  cell is the drop to the machine, the last the inlet into the unit or the tee onto another run,
- *  and every cell between is straight or an elbow named by its two arms, the north or south arm
- *  first. */
+/** The cells of a run and its two ends (CLAUDE.md T13 3.19, T22 2.7): the first cell is the drop
+ *  onto the machine, the last the inlet into the unit or the tee onto another run, and every cell
+ *  between is a plain cell of the run.
+ *
+ *  It named an elbow or a straight for each of those middle cells until tonight, because each was
+ *  drawn as a picture of its own. A run is one path now and the path works its own corners out from
+ *  the cells, so the direction of the pipe over a cell is no longer anybody's business: what is
+ *  kept is the cells in order and which end is which, which is what the routing, the tee and
+ *  `removeRun` all read. */
 export function tileKeysFor(cells: readonly Cell[], end: 'inlet' | 'tee'): PipeTile[] {
   return cells.map((cell, index): PipeTile => {
     if (index === 0) return { x: cell.x, y: cell.y, key: 'pipe.drop' };
     if (index === cells.length - 1) {
       return { x: cell.x, y: cell.y, key: end === 'tee' ? 'pipe.tee' : 'pipe.inlet' };
     }
-    const before = cells[index - 1];
-    const after = cells[index + 1];
-    if (before === undefined || after === undefined) {
-      return { x: cell.x, y: cell.y, key: 'pipe.ns' };
-    }
-    const arms = [armTo(cell, before), armTo(cell, after)];
-    const vertical = arms.find((arm) => arm === 'n' || arm === 's');
-    const horizontal = arms.find((arm) => arm === 'e' || arm === 'w');
-    let key: PipeTileKey;
-    if (vertical === undefined) key = 'pipe.ew';
-    else if (horizontal === undefined) key = 'pipe.ns';
-    else key = `pipe.${vertical}${horizontal}` as PipeTileKey;
-    return { x: cell.x, y: cell.y, key };
+    return { x: cell.x, y: cell.y, key: 'pipe.run' };
   });
 }
 
@@ -282,6 +285,12 @@ export function connectCheck(state: GameState, equipmentId: string): PipeCheck &
   if (pipeRunFor(state, item.id) !== null) return { ok: false, reason: 'Connected already', cost: 0 };
   const target = nearestTarget(state, item);
   if (target === null) return { ok: false, reason: 'No extractor in the hall', cost: 0 };
+  // The inlet's vertical stands in the cell in front of the unit's mouth, and there has to be a
+  // cell there: a fan pushed against a wall with its mouth to it has nowhere for the pipe to come
+  // down (PIOTR's variant C; CLAUDE.md T22 2.8).
+  if (!cellIsFloor(state, portCell(target))) {
+    return { ok: false, reason: INLET_BLOCKED, cost: 0 };
+  }
   const cost = pipeCostFor(state, routePipe(state, item, target));
   if (!canAfford(state, cost)) return { ok: false, reason: 'Not enough cash', cost };
   return { ok: true, reason: '', cost };

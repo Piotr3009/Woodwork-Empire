@@ -3,7 +3,7 @@
 // metre, a layer above the floor that occupies no cell. The player never draws a pipe.
 
 import { describe, expect, it } from 'vitest';
-import { PIPE_PRICE_PER_METRE, PIPE_TILE_KEYS } from '../../src/engine/constants';
+import { PIPE_PRICE_PER_METRE } from '../../src/engine/constants';
 import { canPlaceSpec, freeFloorM2 } from '../../src/engine/layout';
 import {
   connectCheck,
@@ -84,9 +84,11 @@ describe('the path between two cells', () => {
   });
 });
 
-describe('the tiles of a run', () => {
-  it('are the drop, the straights and the elbows named by their arms, then the inlet or the tee', () => {
-    // East along the row, then south down the column: the corner has a west arm and a south arm.
+describe('the cells of a run and its two ends (CLAUDE.md T22 2.7)', () => {
+  it('is the drop, the cells between, and the inlet or the tee, with no direction on any of them', () => {
+    // East along the row, then south down the column. Which way the pipe lies over a cell was a
+    // tile key until tonight, because each was a picture of its own; a run is one path now and the
+    // path works its corners out from the cells, so the key says only which end is which.
     const cells = [
       { x: 2, y: 2 },
       { x: 3, y: 2 },
@@ -98,14 +100,16 @@ describe('the tiles of a run', () => {
     ];
     expect(tileKeysFor(cells, 'inlet').map((tile) => tile.key)).toEqual([
       'pipe.drop',
-      'pipe.ew',
-      'pipe.ew',
-      'pipe.sw',
-      'pipe.ns',
-      'pipe.ns',
+      'pipe.run',
+      'pipe.run',
+      'pipe.run',
+      'pipe.run',
+      'pipe.run',
       'pipe.inlet',
     ]);
-    // North up the column, then east: a south arm and an east arm.
+    // The cells themselves are kept in order, which is what the drawing and the routing read.
+    expect(tileKeysFor(cells, 'inlet').map((tile) => ({ x: tile.x, y: tile.y }))).toEqual(cells);
+    // A run that tees onto another says so on its last cell, whichever way it came.
     const up = [
       { x: 5, y: 5 },
       { x: 5, y: 4 },
@@ -115,16 +119,18 @@ describe('the tiles of a run', () => {
     ];
     expect(tileKeysFor(up, 'tee').map((tile) => tile.key)).toEqual([
       'pipe.drop',
-      'pipe.ns',
-      'pipe.se',
-      'pipe.ew',
+      'pipe.run',
+      'pipe.run',
+      'pipe.run',
       'pipe.tee',
     ]);
-    // West then north: an east arm and a north arm; east then north: west and north.
-    expect(tileKeysFor([{ x: 4, y: 4 }, { x: 3, y: 4 }, { x: 3, y: 3 }, { x: 3, y: 2 }], 'inlet')[1]?.key).toBe('pipe.ne');
-    expect(tileKeysFor([{ x: 2, y: 4 }, { x: 3, y: 4 }, { x: 3, y: 3 }, { x: 3, y: 2 }], 'inlet')[1]?.key).toBe('pipe.nw');
-    // Every key a run can carry is one of the eight the art side is asked for.
-    for (const tile of tileKeysFor(cells, 'tee')) expect(PIPE_TILE_KEYS).toContain(tile.key);
+    // The seven drawn tiles of Turn 13 are gone: nothing names an elbow or a straight any more.
+    const keys = new Set(tileKeysFor(cells, 'tee').map((tile) => tile.key));
+    for (const gone of ['pipe.ns', 'pipe.ew', 'pipe.ne', 'pipe.nw', 'pipe.se', 'pipe.sw']) {
+      expect(keys.has(gone as never), gone).toBe(false);
+    }
+    // A run of one cell is its own drop and nothing else.
+    expect(tileKeysFor([{ x: 3, y: 3 }], 'inlet').map((tile) => tile.key)).toEqual(['pipe.drop']);
   });
 });
 
@@ -143,10 +149,10 @@ describe('routing a machine to the extraction', () => {
     expect(run.tiles).toHaveLength(inlet.x - port.x + 1);
     expect(keys(run)[0]).toBe('pipe.drop');
     expect(keys(run)[keys(run).length - 1]).toBe('pipe.inlet');
-    expect(keys(run).slice(1, -1).every((key) => key === 'pipe.ew')).toBe(true);
+    expect(keys(run).slice(1, -1).every((key) => key === 'pipe.run')).toBe(true);
   });
 
-  it('turns once when they do not, and the elbow reads by its arms', () => {
+  it('turns once when they do not, and no cell of it names the turn', () => {
     const { state, fan } = hall();
     const inlet = portCell(fan);
     // The port three rows below the inlet and ten cells to its left: along the row, then up.
@@ -157,11 +163,12 @@ describe('routing a machine to the extraction', () => {
     // Nine cells along the row and three up it: the long leg first, one elbow.
     expect(run.metres).toBe(inlet.x - port.x + (port.y - inlet.y));
     expect(run.metres).toBe(12);
-    const elbows = run.tiles.filter((tile) => /pipe\.[ns][ew]/.test(tile.key));
-    expect(elbows).toHaveLength(1);
-    expect(elbows[0]).toEqual({ x: inlet.x, y: port.y, key: 'pipe.nw' });
-    expect(run.tiles.filter((tile) => tile.key === 'pipe.ew')).toHaveLength(8);
-    expect(run.tiles.filter((tile) => tile.key === 'pipe.ns')).toHaveLength(2);
+    // The corner is in the cells and nowhere else: the drawing finds it there
+    // (CLAUDE.md T22 2.7). The turn is at the inlet's column on the port's row.
+    expect(run.tiles.some((tile) => tile.x === inlet.x && tile.y === port.y)).toBe(true);
+    expect(run.tiles.filter((tile) => tile.y === port.y)).toHaveLength(10);
+    expect(run.tiles.filter((tile) => tile.x === inlet.x)).toHaveLength(4);
+    expect(keys(run).slice(1, -1).every((key) => key === 'pipe.run')).toBe(true);
   });
 
   it('joins an existing run with a tee where that is shorter, to the same unit', () => {
@@ -177,7 +184,7 @@ describe('routing a machine to the extraction', () => {
     const branch = pipeRunFor(state, second.id);
     expect(branch?.metres).toBe(3);
     expect(branch?.extractorId).toBe('kit-fan');
-    expect(keys(branch)).toEqual(['pipe.drop', 'pipe.ns', 'pipe.ns', 'pipe.tee']);
+    expect(keys(branch)).toEqual(['pipe.drop', 'pipe.run', 'pipe.run', 'pipe.tee']);
     const tee = last(branch);
     expect(tee).toEqual({ x: port.x, y: inlet.y, key: 'pipe.tee' });
     // The tee sits on a cell of the first run.
@@ -190,7 +197,10 @@ describe('routing a machine to the extraction', () => {
   it('never tees onto a run to another unit, and goes to the unit itself on a tie', () => {
     const { state, fan } = hall();
     const inlet = portCell(fan);
-    const far = placeEquipment(state, 'extractor', { variantId: 'standard', x: 1, y: 9, id: 'kit-fan-far' });
+    // Clear of the gate lane and one row in from the front kerb: the standard fan's mouth opens
+    // down and to the left, so the cell in front of its inlet is the row below it, and that cell
+    // has to be floor and not the way in from the shutter (CLAUDE.md T22 2.8).
+    const far = placeEquipment(state, 'extractor', { variantId: 'standard', x: 3, y: 8, id: 'kit-fan-far' });
     state.pipes = [];
     const first = saw(state, 'kit-saw-a', 2, 7);
     expect(nearestTarget(state, first)?.id).toBe(far.id);
@@ -285,9 +295,11 @@ describe('routing a machine to the extraction', () => {
     expect(isConnected(state, second)).toBe(true);
     expect(last(branch)).toEqual({ x: inlet.x, y: inlet.y, key: 'pipe.inlet' });
     expect(branch?.metres).toBe(3 + (inlet.x - port.x));
-    // Up the column, round the corner, along the row: the old tee is an elbow now.
-    expect(keys(branch).slice(0, 4)).toEqual(['pipe.drop', 'pipe.ns', 'pipe.ns', 'pipe.se']);
-    expect(keys(branch).slice(4, -1).every((key) => key === 'pipe.ew')).toBe(true);
+    // Up the column, round the corner, along the row: the cells say so and no key does.
+    expect(keys(branch)[0]).toBe('pipe.drop');
+    expect(keys(branch).slice(1, -1).every((key) => key === 'pipe.run')).toBe(true);
+    expect(branch?.tiles.slice(0, 3).every((tile) => tile.x === port.x)).toBe(true);
+    expect(branch?.tiles.slice(3).every((tile) => tile.y === inlet.y)).toBe(true);
     // Nothing was refunded and nothing charged for the hand over.
     expect(state.ledger.filter((line) => line.category === 'pipes')).toHaveLength(2);
   });

@@ -9,7 +9,7 @@ import { standsInTheHall } from '../../src/engine/machines';
 import { spriteUrl } from '../../src/render/sprites';
 import { CHARACTER_ROLES, PIPE_LAYER_KEYS, renderSpriteCheck, spriteTargets } from '../../src/ui/spriteCheck';
 import { ANIMATIONS } from '../../src/render/characters';
-import { PIPE_TILE_KEYS } from '../../src/engine/constants';
+import { PORTS, type Port } from '../../src/engine/ports';
 
 function parse(html: string): HTMLElement {
   const holder = document.createElement('div');
@@ -131,7 +131,7 @@ describe('the sprite check page', () => {
     // Turn 16 did not meet each other, so Turn 22 deleted them and draws a run as one path
     // instead: the page shows the vector drawing, which is the only drawing there is now
     // (PIOTR's screenshot, 19.09; CLAUDE.md T22 2.7). Only `gate.collar` is still a file.
-    expect([...PIPE_LAYER_KEYS]).toEqual([...PIPE_TILE_KEYS, 'gate.collar']);
+    expect([...PIPE_LAYER_KEYS]).toEqual(['gate.collar']);
     const page = parse(renderSpriteCheck());
     expect(page.innerHTML).toContain('The pipe layer');
     const cells = Array.from(page.querySelectorAll('[data-pipe-key]'));
@@ -148,6 +148,72 @@ describe('the sprite check page', () => {
       expect(cell.innerHTML, key).not.toContain('/sprites/pipe.');
       expect(cell.innerHTML, key).toContain(`data-pipe-tile="${key}"`);
     }
+  });
+
+  it('prints the measured connection point of every file a pipe is drawn to (CLAUDE.md T22 2.8)', () => {
+    const page = parse(renderSpriteCheck());
+    // The saw's line: the rear base outlet, hidden behind the body [PIOTR's pick B].
+    const saw = page.querySelector('[data-sprite-target="tableSaw.standard"] [data-port]');
+    expect(saw?.getAttribute('data-port')).toBe('tableSaw.standard.png');
+    expect(saw?.textContent).toContain('drop at px 137, py 62');
+    expect(saw?.textContent).toContain('hidden behind the body');
+    expect(saw?.className).not.toContain('warn');
+    // The fan's line: the mouth, and which way it opens.
+    const fan = page.querySelector('[data-sprite-target="extractor.standard"] [data-port]');
+    expect(fan?.textContent).toContain('inlet, mouth +y at px 28, py 67');
+    // The two hand edgebanders want no extraction at all, so the page asks nothing of them, and
+    // neither does a desk or a locker (CLAUDE.md T22 2.8).
+    for (const name of ['edgebander.used', 'edgebander.budget', 'locker', 'sheetRack.pro']) {
+      expect(
+        page.querySelector(`[data-sprite-target="${name}"] [data-port]`),
+        name,
+      ).toBeNull();
+    }
+  });
+
+  it('prints no port data in red for a file a pipe is drawn to with nothing measured on it', () => {
+    // The one thing a real table can never show, so the page takes the table as an argument and
+    // the test hands it one with the standard saw's line taken out (CLAUDE.md T22 2.8).
+    const table: Record<string, Port> = { ...PORTS };
+    delete table['tableSaw.standard.png'];
+    const page = parse(renderSpriteCheck(table));
+    const saw = page.querySelector('[data-sprite-target="tableSaw.standard"] [data-port]');
+    expect(saw?.getAttribute('data-port')).toBe('none');
+    expect(saw?.textContent).toBe('no port data');
+    // In red, by the one class the game paints a warning with.
+    expect(saw?.className.split(' ')).toContain('warn');
+    // The rest of the page is as it was: the pro saw still has its line.
+    expect(
+      page.querySelector('[data-sprite-target="tableSaw.pro"] [data-port]')?.textContent,
+    ).toContain('px 139, py 80');
+    expect(renderSpriteCheck()).toContain('px 137, py 62');
+  });
+
+  it('says which of the four orientations has a file of its own (CLAUDE.md T22 2.11)', () => {
+    const page = parse(renderSpriteCheck());
+    // The tool cabinet is the first family in the game the art side has drawn all four of
+    // (PIOTR's art, 19.09), and from Turn 22 it is a class ladder, so the page has a cell for each
+    // of the five (CLAUDE.md T22 2.11, 2.12).
+    for (const classId of ['used', 'budget', 'standard', 'pro', 'industrial']) {
+      const cell = page.querySelector(`[data-sprite-target="toolCabinet.${classId}"] [data-turns]`);
+      expect(cell?.getAttribute('data-turns'), classId).toBe('0,1,2,3');
+      expect(cell?.textContent, classId).toContain('4 of 4 orientations drawn');
+      expect(cell?.textContent, classId).toContain('.rrr');
+      expect(cell?.textContent, classId).not.toContain('the rest mirrored');
+    }
+    // Everything else has its base picture and mirrors the quarter turn, as the game has since
+    // Turn 10: the saw and the fan say so, and the fan's three turned files are the one thing
+    // Turn 22 asks the art side for (docs/art/REQUESTS-T22.md 2).
+    for (const name of ['tableSaw.standard', 'extractor.pro']) {
+      const cell = page.querySelector(`[data-sprite-target="${name}"] [data-turns]`);
+      expect(cell?.getAttribute('data-turns'), name).toBe('0');
+      expect(cell?.textContent, name).toContain('1 of 4 orientations drawn: the base file');
+      expect(cell?.textContent, name).toContain('the rest mirrored or the base picture');
+    }
+    // A key with no file at all says none, and still says it.
+    const truck = page.querySelector('[data-sprite-target="palletTruck"] [data-turns]');
+    expect(truck?.getAttribute('data-turns')).toBe('');
+    expect(truck?.textContent).toContain('0 of 4 orientations drawn: none');
   });
 
   it('lists every role of the game with every frame key, the two of Turn 13 among them', () => {

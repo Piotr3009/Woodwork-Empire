@@ -940,17 +940,20 @@ describe('a month of a full crew behind two saws on the day 1 fan alone', () => 
     seen,
   );
 
-  it('is two joiners and not six, because the floor has no room for more', () => {
+  it('is three joiners and not six, because the floor has no room for more', () => {
     // The script asks for six and the hall says no: two saws, their zones and every man's bench
-    // and cabinets leave floor for the owner and two (PIOTR; CLAUDE.md T13 3.10).
+    // and cabinets leave floor for the owner and three (PIOTR; CLAUDE.md T13 3.10).
     //
-    // It was three until Turn 21, and the one cell that changed it is the tool cabinet's: a cabinet
-    // is two metres wide now, so each of the four in this hall takes one cell more of the floor the
-    // crew limit is measured against, and this hall was sitting on the boundary. The limit is
+    // It was three until Turn 21, two through Turn 21, and three again tonight, and the one cell
+    // that moves it each time is the tool cabinet's. Turn 21 made a cabinet two metres wide, so
+    // each of the four in this hall took a cell more of the floor the crew limit is measured
+    // against and the hall lost a man; Turn 22 makes the cabinet a family of five and the cheapest
+    // class, which is the one the script buys, is a metre square again, so the cell comes back and
+    // the man with it (CLAUDE.md T22 2.12). The limit is
     // `Math.floor(freeFloorM2 / M2_PER_PERSON)` with `M2_PER_PERSON` 24, so four cells is the whole
-    // difference between a sixth man and a fifth. Nothing else about the crew rule moved
-    // (CLAUDE.md T21 2.13; the arithmetic is in section 0 of REPORT-T21.md for Piotr to rule on).
-    expect(state.workers.filter((worker) => worker.role === 'joiner')).toHaveLength(2);
+    // difference between a fifth man and a fourth. Nothing about the crew rule itself has moved in
+    // either turn.
+    expect(state.workers.filter((worker) => worker.role === 'joiner')).toHaveLength(3);
     expect(missingForHire(state, 'joiner')).toEqual([]);
     const blocked = state.workers.length;
     expect(blocked).toBeLessThan(6);

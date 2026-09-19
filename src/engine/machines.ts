@@ -44,6 +44,8 @@ import {
   UNDER_EXTRACTION_DUST_MULTIPLIER,
   UNDER_EXTRACTION_OUTPUT_PENALTY,
   SALE_FRACTION_USED,
+  TOOL_CABINET,
+  TOOL_CABINET_SLOTS,
   USED_VARIANT,
 } from './constants';
 import { weekOfDay, monthOfDay, nextWorkingDay } from './clock';
@@ -206,6 +208,22 @@ export function sheetCapacityOf(item: { specId: string; variantId: string }): nu
   const spec = findSpec(item.specId);
   if (!spec) return 0;
   return variantOf(spec, item.variantId).sheetCapacity ?? spec.sheetCapacity;
+}
+
+/** How many men's hand tool sets this class of tool cabinet holds: one, one, two, four or eight up
+ *  the ladder [PIOTR, 19.09]. Zero for everything that is not a cabinet, so the sum over a hall is
+ *  the sum over its cabinets (CLAUDE.md T22 2.12). */
+export function toolSlotsOf(item: { specId: string; variantId: string }): number {
+  if (item.specId !== TOOL_CABINET) return 0;
+  return TOOL_CABINET_SLOTS[item.variantId] ?? 0;
+}
+
+/** What the catalogue's card of a class of cabinet says it is for, in the words the rack's card
+ *  uses for its sheets: `Holds 4 men's tools` (CLAUDE.md T22 2.12). Empty for everything else. */
+export function toolSlotsLine(specId: string, variantId: string): string {
+  const slots = toolSlotsOf({ specId, variantId });
+  if (slots <= 0) return '';
+  return `Holds ${slots} ${slots === 1 ? 'man\u0027s' : 'men\u0027s'} tools`;
 }
 
 /** What must be owned before a class can be bought. A class may say its own, which is how a floor

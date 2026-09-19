@@ -1,7 +1,13 @@
 // Where things stand on the hall floor. Pure geometry over the state, so the setup view can ask
 // before it drops and the catalogue can ask before it buys (CLAUDE.md T2 3.10).
 
-import { GATE_LANE, M2_PER_PERSON, ROOM_LAYOUT, WELFARE_IN_THE_CANTEEN } from './constants';
+import {
+  GATE_LANE,
+  M2_PER_PERSON,
+  ROOM_LAYOUT,
+  WELFARE_IN_THE_CANTEEN,
+  YARD_WIDTH_CELLS,
+} from './constants';
 import { findSpec, itemStandsInTheHall, standsInTheHall, zoneOf } from './machines';
 import { reservedItems } from './orders';
 import type { Equipment, GameState, OnOrderItem, Orientation } from './types';
@@ -70,6 +76,23 @@ function boxOfItem(
   y: number,
 ): Box {
   return boxOf(item.specId, x, y, item.variantId, item.orientation);
+}
+
+/** Is this cell a cell of the floor at all: inside the hall or on the apron beside it, off every
+ *  room and off the way to the gate? It asks nothing about what is standing there, because the
+ *  pipe layer is above the hall and nothing collides with it: the one thing the inlet of an
+ *  extractor needs is a cell in front of its mouth to come down in (CLAUDE.md T22 2.8). */
+export function cellIsFloor(state: GameState, cell: { x: number; y: number }): boolean {
+  const box = { x: cell.x, y: cell.y, width: 1, depth: 1 };
+  if (cell.x < 0 || cell.y < 0) return false;
+  // The apron beyond the front kerb counts: the two central systems stand on it, and a fan may be
+  // pushed out there as well (CLAUDE.md T10 3.4).
+  if (cell.x >= state.unit.widthCells + YARD_WIDTH_CELLS) return false;
+  if (cell.y >= state.unit.depthCells) return false;
+  if (overlaps(box, gateLane())) return false;
+  return !ROOM_LAYOUT.some((room) =>
+    overlaps(box, { x: room.x, y: room.y, width: room.width, depth: room.depth }),
+  );
 }
 
 /** Can a thing of this kind stand here? `ignoreItemId` is the item being moved, which never

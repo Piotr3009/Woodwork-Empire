@@ -7,6 +7,8 @@ import { describe, expect, it } from 'vitest';
 import { footprintOf, itemFootprint, itemZone, zoneOf } from '../../src/engine/machines';
 import { boxOf, canPlaceSpec, canPlace, moveItem } from '../../src/engine/layout';
 import { mirrorNeeded, pickSprite, spriteFiles } from '../../src/render/sprites';
+import { nextOrientation, orientationsFor } from '../../src/engine/ports';
+import type { Orientation } from '../../src/engine/types';
 import { objectArt } from '../../src/render/hall';
 import { act, newGame, placeEquipment } from '../helpers';
 import type { GameState } from '../../src/engine/index';
@@ -96,6 +98,70 @@ describe('where a turned machine will go', () => {
     expect(order.orientation).toBe(0);
     expect(moveItem(ordered, order.id, 6, 1, 1).ok).toBe(true);
     expect(ordered.onOrder[0]?.orientation).toBe(1);
+  });
+});
+
+describe('the orientations Rotate can reach (CLAUDE.md T22 2.11)', () => {
+  it('is 0, 1, 0 for a thing with two pictures and 0, 1, 2, 3, 0 for one with four', () => {
+    const files = spriteFiles();
+    // The saw has its base picture and nothing else, so the quarter turn is the base mirrored and
+    // there is nowhere else to go: a half turn would show the front of the machine where its back
+    // belongs, so Rotate never offers it (CLAUDE.md T22 2.11).
+    expect(orientationsFor(files, 'tableSaw', 'standard')).toEqual([0, 1]);
+    const walk = (spriteKey: string, tier: string, from: Orientation, steps: number): Orientation[] => {
+      const out: Orientation[] = [];
+      let at = from;
+      for (let step = 0; step < steps; step += 1) {
+        at = nextOrientation(files, spriteKey, tier, at);
+        out.push(at);
+      }
+      return out;
+    };
+    expect(walk('tableSaw', 'standard', 0, 3)).toEqual([1, 0, 1]);
+    // The tool cabinet is the first family in the game the art side has drawn all four of
+    // (PIOTR's art, 19.09): the standard cabinet walks the whole ring and comes back.
+    expect(orientationsFor(files, 'toolCabinet', 'standard')).toEqual([0, 1, 2, 3]);
+    expect(walk('toolCabinet', 'standard', 0, 5)).toEqual([1, 2, 3, 0, 1]);
+  });
+
+  it('gives every class of cabinet all four, and swaps the footprint at each', () => {
+    const files = spriteFiles();
+    for (const tier of ['used', 'budget', 'standard', 'pro', 'industrial']) {
+      expect(orientationsFor(files, 'toolCabinet', tier), tier).toEqual([0, 1, 2, 3]);
+      for (const orientation of [0, 1, 2, 3] as Orientation[]) {
+        expect(
+          pickSprite(files, 'toolCabinet', tier, orientation),
+          `${tier} at ${orientation}`,
+        ).toBe(`/sprites/toolCabinet.${tier}${['', '.r', '.rr', '.rrr'][orientation]}.png`);
+        expect(mirrorNeeded(files, 'toolCabinet', tier, orientation)).toBe(false);
+      }
+    }
+    // The standard cabinet is 2 by 1: across at 1 and 3, along at 0 and 2 (CLAUDE.md T22 2.11).
+    expect(footprintOf('toolCabinet', 'standard', 0)).toEqual({ width: 2, depth: 1, height: 1 });
+    expect(footprintOf('toolCabinet', 'standard', 1)).toEqual({ width: 1, depth: 2, height: 1 });
+    expect(footprintOf('toolCabinet', 'standard', 2)).toEqual({ width: 2, depth: 1, height: 1 });
+    expect(footprintOf('toolCabinet', 'standard', 3)).toEqual({ width: 1, depth: 2, height: 1 });
+  });
+
+  it('gives a family with no picture at all its two turns as well', () => {
+    // Orientation 1 is always reachable, whatever the art side has delivered: with no file there
+    // is a box on the floor and the box's footprint swaps, which is the thing the player is
+    // really turning (CLAUDE.md T10 3.8).
+    expect(orientationsFor([], 'somethingNobodyHasPainted', 'standard')).toEqual([0, 1]);
+    expect(nextOrientation([], 'somethingNobodyHasPainted', 'standard', 1)).toBe(0);
+    // An orientation that is not on the ring comes back to the first one that is: a save carrying
+    // a 2 for a family whose `.rr` file has gone is not left standing at a picture that is not
+    // there.
+    expect(nextOrientation([], 'somethingNobodyHasPainted', 'standard', 2)).toBe(0);
+  });
+
+  it('takes a half turn the day its file lands, and not before', () => {
+    const half = ['thing.standard.png', 'thing.standard.rr.png'];
+    expect(orientationsFor(half, 'thing', 'standard')).toEqual([0, 1, 2]);
+    expect(nextOrientation(half, 'thing', 'standard', 2)).toBe(0);
+    // The family file answers for a class that has none of its own, which is the loader's own
+    // rule (docs/art/SPRITES.md 3).
+    expect(orientationsFor(['thing.png', 'thing.rrr.png'], 'thing', 'standard')).toEqual([0, 1, 3]);
   });
 });
 

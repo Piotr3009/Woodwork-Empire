@@ -96,6 +96,7 @@ import { hallLoops, hallOneShots } from '../render/hall';
 import { walkPath } from '../engine/walk';
 import { unconnectedMachines } from '../engine/pipes';
 import { hasCentralExtraction } from '../engine/machines';
+import { nextSpriteOrientation } from '../render/sprites';
 import { patchInto } from './patch';
 import { renderOwnerOut } from './ownerOut';
 import { renderCompany } from './company';
@@ -215,8 +216,16 @@ interface Ui {
   scrollModalTop: boolean;
   /** Setting the hall out: the clock is stopped and the kit can be dragged about. */
   setup: boolean;
-  /** True while the next drop stands the item at ninety degrees to the walls (T10 3.8). */
+  /** The orientation the thing in hand is standing at, which the ghost is drawn with and which the
+   *  drop writes onto the item (T10 3.8). It is read off the item when it is picked up and turned
+   *  from there, so it means nothing with nothing in hand. */
   rotate: Orientation;
+  /** True while a quarter turn is armed for the next thing picked up. Rotate, or R with nothing in
+   *  hand, toggles it, and the button lights while it is set; the pick up applies it once and
+   *  clears it. It was `ui.rotate` itself until tonight, which the pick up then overwrote with the
+   *  item's own orientation, so the button did nothing at all [PIOTR, 19.09: "it does nothing"]
+   *  (CLAUDE.md T22 2.10). */
+  armTurn: boolean;
   speedBeforeSetup: Speed;
   /** What the clock was doing before the P key stopped it, so the same key starts it again where
    *  it was (PIOTR, 17.09; CLAUDE.md T18 2.8). */
@@ -342,6 +351,7 @@ function freshUi(): Ui {
     scrollModalTop: false,
     setup: false,
     rotate: 0,
+    armTurn: false,
     speedBeforeSetup: 0,
     speedBeforePause: 1,
     drag: null,
@@ -522,12 +532,34 @@ function ghostFor(current: GameState): Ghost | null {
   };
 }
 
-/** Turns what is in hand, or arms the turn for the next thing picked up. The one write for it:
- *  the R key and the Rotate button both come through here (CLAUDE.md T10 3.8). */
+/** Turns what is in hand, or arms the turn for the next thing picked up. The one write for it: the
+ *  R key and the Rotate button both come through here (CLAUDE.md T10 3.8, T22 2.10).
+ *
+ *  With nothing in hand it is a toggle on `ui.armTurn`, so two presses cancel and the button says
+ *  which it is; the pick up in `onSetupPointerDown` reads the item's own orientation and applies the
+ *  armed turn to it once. With something in hand it turns what is in hand, as it always did. */
 function turnGhost(): void {
   if (!ui.setup) return;
-  ui.rotate = ui.rotate === 0 ? 1 : 0;
+  if (ui.drag === null) {
+    ui.armTurn = !ui.armTurn;
+    requestRender();
+    return;
+  }
+  ui.rotate = turnedFrom(ui.drag.itemId, ui.rotate);
   requestRender();
+}
+
+/** The orientation after this one for the thing named: round the orientations that have a picture,
+ *  which is `0, 1, 0` for almost everything and `0, 1, 2, 3, 0` for the five tool cabinets
+ *  (CLAUDE.md T22 2.11). The one place the cycle is asked for, so Rotate, R and the Turn row of a
+ *  card all walk the same ring. */
+function turnedFrom(itemId: string, orientation: Orientation): Orientation {
+  const current = state;
+  if (current === null) return orientation;
+  const kit = kitOf(current, itemId);
+  const spec = kit === null ? null : findSpec(kit.specId);
+  if (kit === null || spec === null || spec === undefined) return orientation;
+  return nextSpriteOrientation(spec.spriteKey, kit.variantId, orientation);
 }
 
 function setupControls(current: GameState): string {
@@ -541,7 +573,7 @@ function setupControls(current: GameState): string {
   return (
     '<div class="view-controls">' +
     '<button class="btn btn-primary" data-do="endSetup">Done</button>' +
-    `<button class="btn${ui.rotate === 0 ? '' : ' is-on'}" data-do="rotateGhost">Rotate</button>` +
+    `<button class="btn${ui.armTurn ? ' is-on' : ''}" data-do="rotateGhost">Rotate</button>` +
     bill +
     '<span class="reason">Drag the machines, the benches and the shelving where you want them. ' +
     'The rooms and the gate stay where they are. Every item moved is an hour of somebody\'s ' +
@@ -2395,8 +2427,12 @@ function onSetupPointerDown(event: MouseEvent): boolean {
   const offsetX = item.anchorX - at.x;
   const offsetY = item.anchorY - at.y;
   let moved = false;
-  // He picks it up the way it is standing, and R turns it from there (CLAUDE.md T10 3.8).
-  ui.rotate = 'orientation' in item ? item.orientation : 0;
+  // He picks it up the way it is standing, with the armed quarter turn applied to it once, and R
+  // turns it from there (CLAUDE.md T10 3.8, T22 2.10). The arming is spent on the pick up, so the
+  // next thing he lifts comes up square unless he arms it again.
+  const stood: Orientation = 'orientation' in item ? item.orientation : 0;
+  ui.rotate = ui.armTurn ? turnedFrom(itemId, stood) : stood;
+  ui.armTurn = false;
   ui.drag = { itemId, x: item.anchorX, y: item.anchorY };
   const move = (moveEvent: MouseEvent): void => {
     if (ui.drag === null) return;
@@ -2417,7 +2453,7 @@ function onSetupPointerDown(event: MouseEvent): boolean {
     // A click that never moved is not a move: it leaves the hall exactly as it was. Turning it
     // where it stands is a move, though: the machine has been picked up and put down again
     // (CLAUDE.md T10 3.8).
-    const turned = ui.rotate !== ('orientation' in item ? item.orientation : 0);
+    const turned = ui.rotate !== stood;
     if (drag === null || (!moved && !turned)) {
       requestRender();
       return;
