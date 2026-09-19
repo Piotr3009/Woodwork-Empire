@@ -8,7 +8,7 @@ import {
   ARREARS_MONTHS_FINAL_WARNING,
   ARREARS_MONTHS_WARNING,
   BAILIFF_SEIZURE_FRACTION,
-  BANKRUPTCY_OVERDRAFT_MULTIPLIER,
+  BANKRUPTCY_LIMIT_FACTOR,
   DAYS_PER_MONTH,
   DUST_WASTE_MONTHLY,
   LATE_ACCOUNTS_CHARGE,
@@ -24,7 +24,7 @@ import {
 } from './constants';
 import {
   isFirstOfMonth,
-  isFriday,
+  isLastWorkingDayOfMonth,
   isWorkingDay,
   monthOfDay,
   previousWorkingDay,
@@ -451,10 +451,12 @@ export function payArrears(state: GameState, amount: number | null): number {
   return paid;
 }
 
-export function weeklyWageBill(state: GameState): number {
+/** What the crew costs for the month that is closing: everybody on the books, each at his one
+ *  monthly wage (PIOTR, 19.09: "I wanted everyone monthly"; CLAUDE.md T21 2.10). */
+export function monthlyWageBill(state: GameState): number {
   return state.workers
-    .filter((worker) => worker.weeklyWage > 0 && worker.startDay <= state.clock.day)
-    .reduce((total, worker) => total + worker.weeklyWage, 0);
+    .filter((worker) => worker.monthlyWage > 0 && worker.startDay <= state.clock.day)
+    .reduce((total, worker) => total + worker.monthlyWage, 0);
 }
 
 /** The accountant charges for the mess on the 1st, and the longer it runs the dearer it gets
@@ -605,9 +607,11 @@ export function declareBankruptcy(state: GameState, reason: string): void {
   });
 }
 
-/** Twice the overdraft limit, whatever the difficulty set it to [TUNE]. */
+/** How far under the company may go before the bank closes it: one and a half times the overdraft
+ *  limit, whatever the difficulty set that to, and read against the **net** position and not the
+ *  cash alone (PIOTR, 18.09; CLAUDE.md T21 2.2). */
 export function bankruptcyFloor(state: GameState): number {
-  return state.finance.overdraftLimit * BANKRUPTCY_OVERDRAFT_MULTIPLIER;
+  return state.finance.overdraftLimit * BANKRUPTCY_LIMIT_FACTOR;
 }
 
 export function checkBankruptcy(state: GameState): void {
@@ -640,16 +644,17 @@ export function runDayCosts(state: GameState, day: number): void {
     // What he pays himself, every working day, at the tier he chose (CLAUDE.md T13 3.18).
     chargeUnavoidable(state, 'ownerDraw', 'Owner\u0027s draw', ownerDrawPerDay(state));
   }
-  if (isFriday(day)) {
-    // The weekly wages, and nothing on top of them: the crew go home at five, so there is no
-    // overtime line to pay them any more (PIOTR, 17.09; CLAUDE.md T17 2.12).
-    const wages = weeklyWageBill(state);
+  if (isLastWorkingDayOfMonth(day)) {
+    // The monthly wages, everybody on one cadence, on the last working day of the month, and
+    // nothing on top of them: the crew go home at five, so there is no overtime line to pay them
+    // any more (PIOTR, 19.09: "I wanted everyone monthly"; CLAUDE.md T21 2.10, T17 2.12).
+    const wages = monthlyWageBill(state);
     if (wages > 0) {
-      chargeUnavoidable(state, 'wages', 'Weekly wages', wages);
+      chargeUnavoidable(state, 'wages', 'Monthly wages', wages);
       queueEvent(state, {
         kind: 'wagesPaid',
         title: 'Wages',
-        body: 'Friday. The weekly wages have gone out.',
+        body: 'The last working day of the month. The monthly wages have gone out.',
         data: { amount: Math.round(wages), overtime: 0 },
       });
     }
@@ -662,7 +667,7 @@ export function runDayCosts(state: GameState, day: number): void {
 export function nextDueDays(state: GameState): { wages: number; monthly: number } {
   // Today's bills have already run, so both searches start tomorrow.
   let wages = state.clock.day + 1;
-  while (!isFriday(wages)) wages += 1;
+  while (!isLastWorkingDayOfMonth(wages)) wages += 1;
   let monthly = state.clock.day + 1;
   while (!isFirstOfMonth(monthly)) monthly += 1;
   return { wages, monthly };

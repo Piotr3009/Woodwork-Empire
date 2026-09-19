@@ -216,8 +216,8 @@ describe('the one cross in every popover (CLAUDE.md T20 2.15)', () => {
     const contract = state.contracts.find((entry) => entry.status === 'active');
     if (contract === undefined) throw new Error('a running contract is wanted');
     const drawn: Array<[string, string]> = [
-      ['assign-job', renderWorkPlan(state, 'jobs', null, job.id)],
-      ['assign-contract', renderWorkPlan(state, 'contracts', null, contract.id)],
+      ['assign-job', renderWorkPlan(state, 'jobs', job.id)],
+      ['assign-contract', renderWorkPlan(state, 'contracts', contract.id)],
       ['menu', renderMenu(state, { available: false, signedIn: null })],
     ];
     for (const [name, html] of drawn) {
@@ -345,6 +345,9 @@ describe('the game itself (CLAUDE.md T20 2.15)', () => {
       'assign list',
       'why',
       'day summary',
+      // The drop card shuts before the Work Plan it was opened over, because Escape means "not that"
+      // and the thing the player means is the question in front of him (CLAUDE.md T21 2.3).
+      'drop card',
       'modal',
       'menu',
     ]);

@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { JOINER_PREREQUISITES, TOOL_CABINET } from '../../src/engine/constants';
-import { findSpec } from '../../src/engine/machines';
+import { findSpec, zoneOf } from '../../src/engine/machines';
 import { canBuy } from '../../src/engine/game';
 import { canPlace, canPlaceSpec, hallItems } from '../../src/engine/layout';
 import { standsInTheHall } from '../../src/engine/machines';
@@ -17,15 +17,21 @@ function countOf(state: ReturnType<typeof newGame>, specId: string): number {
 }
 
 describe('the tool cabinet in the catalogue', () => {
-  it('is a metre square, 350, and one is wanted per worker', () => {
+  it('stands two metres wide, 350, and one is wanted per worker', () => {
     const spec = findSpec(TOOL_CABINET);
     expect(spec).not.toBeNull();
     expect(spec?.price).toBe(350);
+    // Two metres from Turn 21, because that is what the art side painted: drawers, doors and a
+    // bench top, which is a two metre unit and not a metre square one. The picture is the fact and
+    // the spec followed it (PIOTR's art, 19.09; CLAUDE.md T21 2.13).
     expect({ width: spec?.width, depth: spec?.depth, height: spec?.height }).toEqual({
-      width: 1,
+      width: 2,
       depth: 1,
       height: 1,
     });
+    // Its working zone is its own footprint and not the brief's 3 by 2: see the comment beside the
+    // spec in `src/engine/constants.ts` for the arithmetic that rules that out.
+    expect(zoneOf(TOOL_CABINET)).toEqual({ width: 2, depth: 1 });
     expect(spec?.perWorker).toBe(true);
     expect(spec?.stackable).toBe(true);
   });

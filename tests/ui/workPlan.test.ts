@@ -249,7 +249,7 @@ describe('the row says who is on it', () => {
   it('opens the list on one click, with the men already on it greyed', () => {
     const state = act(boardWith({ deadlineDays: 10 }), { type: 'WORK_HERE', jobId: null });
     const job = firstJob(state);
-    const open = parse(renderWorkPlan(state, 'jobs', null, job.id));
+    const open = parse(renderWorkPlan(state, 'jobs', job.id));
     const list = open.querySelector('.assign-list');
     expect(list).not.toBeNull();
     expect(list?.textContent).toContain(`Who goes on ${job.name}?`);

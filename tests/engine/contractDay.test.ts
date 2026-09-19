@@ -7,7 +7,7 @@
 // he stays on the contract, because the client pays for every piece he makes.
 
 import { describe, expect, it } from 'vitest';
-import { CONTRACT_FREE_END_DAYS, JOINER_WEEKLY_WAGE, WORKER_RATES } from '../../src/engine/constants';
+import { CONTRACT_FREE_END_DAYS, JOINER_MONTHLY_WAGE, WORKER_RATES } from '../../src/engine/constants';
 import {
   CONTRACT_SHORT_WEEKS_ALLOWED,
   acceptContract,
@@ -44,7 +44,7 @@ function joiner(id: string, name: string): Worker {
     role: 'joiner',
     tier: 'experienced',
     rate: WORKER_RATES.experienced,
-    weeklyWage: JOINER_WEEKLY_WAGE.experienced,
+    monthlyWage: JOINER_MONTHLY_WAGE.experienced,
     leavesOnDay: null,
     startDay: 1,
     jobId: null,

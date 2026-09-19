@@ -48,9 +48,10 @@ const OPENERS: Array<[string, string]> = [
   ['machineCard', '.hall-view [data-sprite="tableSaw"]'],
 ];
 
-/** The two ids the modal layer opens that are not on the room: the event of the minute and a past
- *  day's summary. Both are paper. */
-const LAYER_ONLY = ['event', 'daySummary'];
+/** The ids the modal layer opens that are not on the room: the event of the minute, a past day's
+ *  summary, and from Turn 21 the drop card, which is pushed over the Work Plan it was opened from
+ *  (CLAUDE.md T21 2.3). All three are paper. */
+const LAYER_ONLY = ['event', 'daySummary', 'dropJob'];
 
 beforeAll(() => {
   document.body.innerHTML = '<div id="app"></div>';

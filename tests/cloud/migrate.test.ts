@@ -138,7 +138,7 @@ describe('a v24 save in this build (CLAUDE.md T17 section 4)', () => {
     expect(opened.state).not.toBeNull();
     const state = opened.state as GameState;
     expect(state.version).toBe(STATE_VERSION);
-    expect(STATE_VERSION).toBe(17);
+    expect(STATE_VERSION).toBe(18);
     expect(state.taskQueue).toEqual([]);
     expect(state.dayStats.paidHours).toBe(0);
     expect(state.dayStats.expressUplift).toBe(0);
@@ -234,7 +234,19 @@ function v28Save(): Record<string, unknown> {
       { id: 'w3', name: 'Sam', role: 'sprayer', tier: 'super', rate: 0.9, weeklyWage: 0, monthlyWage: 2700 },
       { id: 'w4', name: 'Ann', role: 'officeAdmin', tier: null, rate: 0, weeklyWage: 0, monthlyWage: 1900 },
     ],
-    equipment: [{ id: 'kit-saw', specId: 'tableSaw', hoursUsed: 120 }],
+    equipment: [
+      { id: 'kit-saw', specId: 'tableSaw', hoursUsed: 120 },
+      // Three tool cabinets laid out the way the old one cell row laid them out, shoulder to
+      // shoulder. Two cells wide from Turn 21, they would stand on one another, so the lift puts
+      // them back on the row the constants name now (CLAUDE.md T21 2.13).
+      { id: 'kit-cab-1', specId: 'toolCabinet', anchorX: 5, anchorY: 3, rotated: false },
+      { id: 'kit-cab-2', specId: 'toolCabinet', anchorX: 6, anchorY: 3, rotated: true },
+      { id: 'kit-cab-3', specId: 'toolCabinet', anchorX: 7, anchorY: 3, rotated: false },
+    ],
+    // The two the Turn 21 bump adds fields to, so the lift is really asked the question.
+    finance: { overdraftLimit: -10000, arrearsAmount: 0 },
+    owner: { minutesWorked: 120, dayLog: [] },
+    unit: { widthCells: 20, depthCells: 10 },
     contracts: [{ id: 'c1', status: 'active', assigned: ['w1'] }],
     tasks: [
       { id: 't1', kind: 'hiring', done: false, orders: [{ kind: 'hire', role: 'joiner', tier: 'normal' }] },
@@ -249,33 +261,72 @@ type LiftedSave = {
   equipment: Array<Record<string, unknown>>;
   contracts: Array<Record<string, unknown>>;
   tasks: Array<{ orders: Array<Record<string, unknown>> }>;
+  finance: { daysBelowOverdraft: number };
+  owner: { idleMinutes: number; idleByReason: Record<string, number> };
 };
 
-describe('a v28 save in this build (CLAUDE.md T20 section 4)', () => {
+describe('a v28 save in this build (CLAUDE.md T20 section 4, T21 section 4)', () => {
+  // A version 16 state lifted in this build runs the whole ladder, 16 to 17 to 18, so what comes out
+  // is what Turn 21 runs on and not what Turn 20 did. Both bumps are asserted here, in the order
+  // they happen.
   const lifted = migrateState(v28Save(), 16) as unknown as LiftedSave | null;
   if (lifted === null) throw new Error('the lift refused a version 16 state');
 
   it('renames every tier and brings the man up to what that tier is worth tonight', () => {
-    expect(lifted.version).toBe(17);
+    expect(lifted.version).toBe(18);
     expect(lifted.workers.map((worker) => worker.tier)).toEqual([
       'novice',
       'experienced',
       'senior',
       null,
     ]);
-    expect(lifted.workers.map((worker) => worker.rate)).toEqual([0.8, 1, 1.2, 0]);
+    // The rates are Turn 21's, not Turn 20's: the rate is the tier's and not the man's, so a lifted
+    // crew is worth what the same men hired this morning are worth (CLAUDE.md T21 2.9).
+    expect(lifted.workers.map((worker) => worker.rate)).toEqual([0.6, 0.8, 1, 0]);
     // Nobody is a master on a lifted save: the fourth tier is new.
     expect(lifted.workers.some((worker) => worker.tier === 'master')).toBe(false);
   });
 
-  it('pays everybody by the week, off his monthly wage where he had none, and drops the field', () => {
-    // The two joiners keep what they were taken on for; the sprayer's 2,700 a month and the
-    // admin's 1,900 come off WEEKS_PER_MONTH, which is 4.2857 (CLAUDE.md T20 2.6).
-    expect(lifted.workers.map((worker) => worker.weeklyWage)).toEqual([480, 640, 630, 443]);
+  it('pays everybody by the month at the end of the ladder, and the week is gone', () => {
+    // Turn 20 took the monthly wage away and paid the week; Turn 21 gives the month back. A save
+    // that goes through both comes out on the month, and a figure that went down one conversion and
+    // up the other comes back within a pound of itself: the sprayer's 2,700 is exactly 2,700 again
+    // and the admin's 1,900 is 1,899, because 1,900 over 4.2857 was rounded to a whole 443 on the
+    // way down (CLAUDE.md T20 2.6, T21 2.10).
+    expect(lifted.workers.map((worker) => worker.monthlyWage)).toEqual([2057, 2743, 2700, 1899]);
     for (const worker of lifted.workers) {
-      expect(Object.keys(worker), String(worker.name)).not.toContain('monthlyWage');
+      expect(Object.keys(worker), String(worker.name)).not.toContain('weeklyWage');
       expect(worker.leavesOnDay, String(worker.name)).toBeNull();
     }
+  });
+
+  it('lays every tool cabinet out again, two cells apart and square to the walls', () => {
+    // Three cabinets one cell apart on the old row would overlap the moment each became two cells
+    // wide, so the lift puts them on the first three places of the row the constants name now, and
+    // unturns the one the save had turned: a cabinet turned is one cell wide and two deep, and the
+    // row it goes back on has the workbenches under it (CLAUDE.md T21 2.13).
+    const cabinets = lifted.equipment.filter((item) => item.specId === 'toolCabinet');
+    expect(cabinets.map((item) => [item.anchorX, item.anchorY])).toEqual([
+      [8, 3],
+      [10, 3],
+      [12, 3],
+    ]);
+    for (const cabinet of cabinets) expect(cabinet.rotated).toBe(false);
+  });
+
+  it('starts the days below the limit and the owner\u0027s idle minutes at nought', () => {
+    // Neither can be worked back out of a save: it cannot say whether yesterday ended under the
+    // overdraft limit, and the minutes the owner stood were never written down. Starting them today
+    // is the reading that cannot close a company for something it was never warned about
+    // (CLAUDE.md T21 2.2, 2.8).
+    expect(lifted.finance.daysBelowOverdraft).toBe(0);
+    expect(lifted.owner.idleMinutes).toBe(0);
+    expect(lifted.owner.idleByReason).toEqual({
+      noMachine: 0,
+      noMaterial: 0,
+      nothingAssigned: 0,
+      officeEmpty: 0,
+    });
   });
 
   it('renames the tier inside an interview the owner is sitting in, so the hour is not spent for nobody', () => {

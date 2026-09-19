@@ -8,7 +8,7 @@ import {
   BREAK_MINUTES,
   CONTRACT_PIECES,
   DAY_END_MINUTE,
-  JOINER_WEEKLY_WAGE,
+  JOINER_MONTHLY_WAGE,
   MINUTES_PER_WORKING_DAY,
   WORKER_RATES,
 } from '../../src/engine/constants';
@@ -47,7 +47,7 @@ function joiner(id: string, name: string, tier: 'novice' | 'experienced' | 'seni
     role: 'joiner',
     tier,
     rate: WORKER_RATES[tier],
-    weeklyWage: JOINER_WEEKLY_WAGE[tier],
+    monthlyWage: JOINER_MONTHLY_WAGE[tier],
     leavesOnDay: null,
     startDay: 1,
     jobId: null,
@@ -94,7 +94,7 @@ function offered(state: GameState, quantityPerWeek = 40): Contract {
 }
 
 function tab(state: GameState, assignOpen: string | null = null, man: string | null = null): HTMLElement {
-  return parse(renderWorkPlan(state, 'contracts', null, assignOpen, man));
+  return parse(renderWorkPlan(state, 'contracts', assignOpen, man));
 }
 
 describe('On offer, costed for the man who would do it (CLAUDE.md T20 2.1.1)', () => {

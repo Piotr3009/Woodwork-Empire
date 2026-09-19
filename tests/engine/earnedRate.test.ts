@@ -40,7 +40,7 @@ function withJoiner(state: GameState): GameState {
     role: 'joiner',
     tier: 'novice',
     rate: WORKER_RATES.novice,
-    weeklyWage: 480,
+    monthlyWage: 1950,
     leavesOnDay: null,
     startDay: 1,
     jobId: null,
@@ -82,13 +82,15 @@ describe('the owner on his own', () => {
 });
 
 describe('a joiner with no experience', () => {
-  it('earns 33.60 an hour on the standard saw, which is 0.8 of the owner', () => {
+  it('earns 25.20 an hour on the standard saw, which is 0.6 of the owner', () => {
     let state = withJoiner(atTheBench('standard'));
     // The job goes to the joiner, so the owner is in the workshop but not at a bench.
     state = act(state, { type: 'ASSIGN_JOB', jobId: firstJob(state).id, workerId: 'staff-1' });
     const worked = tick(state, 60);
     expect(worked.dayStats.workMinutes).toBe(60);
-    expect(earnedRate(worked, 'day')).toBe(33.6);
+    // His tier is 0.6 of the owner from tonight, so the hour he earns is 0.6 of the owner's 42
+    // (CLAUDE.md T21 2.9).
+    expect(earnedRate(worked, 'day')).toBe(25.2);
   });
 });
 
@@ -100,7 +102,7 @@ describe('the two of them together', () => {
     expect(worked.owner.productionMinutes).toBe(60);
     expect(worked.workers[0]?.productionMinutes).toBe(60);
     expect(worked.dayStats.workMinutes).toBe(120);
-    expect(earnedRate(worked, 'day')).toBe((42 + 33.6) / 2);
+    expect(earnedRate(worked, 'day')).toBe((42 + 25.2) / 2);
   });
 
   it('weights by the hours each of them worked, four of the owner against eight of the joiner', () => {

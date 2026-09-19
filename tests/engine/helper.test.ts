@@ -146,7 +146,7 @@ function addJoiner(state: GameState): Worker {
     role: 'joiner',
     tier: 'novice',
     rate: WORKER_RATES.novice,
-    weeklyWage: 480,
+    monthlyWage: 1950,
     leavesOnDay: null,
     startDay: state.clock.day,
     jobId: null,

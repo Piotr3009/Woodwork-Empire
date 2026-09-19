@@ -95,7 +95,7 @@ describe('setting the hall out', () => {
       role: 'joiner',
       tier: 'novice',
       rate: 0.6,
-      weeklyWage: 480,
+      monthlyWage: 1950,
       leavesOnDay: null,
       startDay: 1,
       jobId: null,

@@ -49,14 +49,14 @@ import {
   withLicence,
 } from '../helpers';
 
-function staff(id: string, role: Worker['role'], weeklyWage: number): Worker {
+function staff(id: string, role: Worker['role'], monthlyWage: number): Worker {
   return {
     id,
     name: id,
     role,
     tier: null,
     rate: 0,
-    weeklyWage,
+    monthlyWage,
     leavesOnDay: null,
     startDay: 1,
     jobId: null,
@@ -121,8 +121,8 @@ describe('minute curves', () => {
   it('charges 10 minutes a joiner a day for management', () => {
     const state = newGame();
     expect(staffManagementMinutes(state)).toBe(0);
-    state.workers.push({ ...staff('j1', 'joiner', 0), tier: 'novice', rate: 0.6, weeklyWage: 480 });
-    state.workers.push({ ...staff('j2', 'joiner', 0), tier: 'novice', rate: 0.6, weeklyWage: 480 });
+    state.workers.push({ ...staff('j1', 'joiner', 0), tier: 'novice', rate: 0.6, monthlyWage: 1950 });
+    state.workers.push({ ...staff('j2', 'joiner', 0), tier: 'novice', rate: 0.6, monthlyWage: 1950 });
     expect(staffManagementMinutes(state)).toBe(20);
   });
 });
@@ -365,21 +365,23 @@ describe('the material take off', () => {
     return jobTasks(state, firstJob(state).id).find((task) => task.kind === 'materialTakeOff');
   }
 
-  it('is as many a day as his minutes allow: 16 bare, 32 with Joinery Core (CLAUDE.md T20 2.3)', () => {
+  it('is as many a day as his minutes allow: 12 bare, 25 with Joinery Core (CLAUDE.md T20 2.3)', () => {
     const state = newGame();
     expect(MATERIAL_TAKE_OFF_MINUTES).toBe(30);
     expect(takeOffMinutes(state)).toBe(MATERIAL_TAKE_OFF_MINUTES);
-    expect(estimatorCapacity(state)).toBe(16);
+    // The figures are the experienced man's, and he is 0.8 of the owner on Piotr's ladder from
+    // tonight, so every one of them came down a step with him (CLAUDE.md T21 2.9).
+    expect(estimatorCapacity(state)).toBe(12);
     state.software.joineryCore = true;
     expect(takeOffMinutes(state)).toBe(15);
-    expect(estimatorCapacity(state)).toBe(32);
+    expect(estimatorCapacity(state)).toBe(25);
     state.software.joineryCoreExtensions = 1;
-    expect(estimatorCapacity(state)).toBe(42);
+    expect(estimatorCapacity(state)).toBe(34);
     state.software.joineryCoreExtensions = 2;
-    expect(estimatorCapacity(state)).toBe(56);
+    expect(estimatorCapacity(state)).toBe(45);
     // At most two: a third counts for nothing, whatever the state says.
     state.software.joineryCoreExtensions = 3;
-    expect(estimatorCapacity(state)).toBe(56);
+    expect(estimatorCapacity(state)).toBe(45);
     expect(JOINERY_CORE_MAX_EXTENSIONS).toBe(2);
   });
 
@@ -400,13 +402,15 @@ describe('the material take off', () => {
     expect(materialOrderMinutes(100000)).not.toBe(MATERIAL_TAKE_OFF_MINUTES);
   });
 
-  it('gives a man with no experience 37 minutes over one and the top man 21', () => {
+  it('gives a man with no experience 50 minutes over one and the top man 25', () => {
     const state = newGame();
-    // His tier is his speed at the desk, off the one WORKER_RATES table (CLAUDE.md T20 2.5).
-    expect(MATERIAL_TAKE_OFF_MINUTES / WORKER_RATES.novice).toBeCloseTo(37.5, 6);
-    expect(MATERIAL_TAKE_OFF_MINUTES / WORKER_RATES.master).toBeCloseTo(21.43, 2);
-    expect(estimatorCapacity(state, 'novice')).toBe(12);
-    expect(estimatorCapacity(state, 'master')).toBe(22);
+    // His tier is his speed at the desk, off the one WORKER_RATES table, which is Piotr's own
+    // 0.6, 0.8, 1.0 and 1.2 from tonight (CLAUDE.md T21 2.9). The half hour of a take off is 50
+    // minutes to a man with no experience and 25 to an excellent one.
+    expect(MATERIAL_TAKE_OFF_MINUTES / WORKER_RATES.novice).toBeCloseTo(50, 6);
+    expect(MATERIAL_TAKE_OFF_MINUTES / WORKER_RATES.master).toBeCloseTo(25, 6);
+    expect(estimatorCapacity(state, 'novice')).toBe(9);
+    expect(estimatorCapacity(state, 'master')).toBe(19);
   });
 
   it('is the owner’s with nobody hired, and only once the drawing is done', () => {
@@ -432,7 +436,7 @@ describe('the material take off', () => {
 
   it('is the estimator’s from the day he is in, at the speed of his tier, and waits for the drawing too', () => {
     let state = withTakeOff();
-    // A super experienced man answers from reputation 35 now (CLAUDE.md T20 2.5), and the bank
+    // A very experienced man answers from reputation 35 (CLAUDE.md T21 2.9), and the bank
     // wants a month of his pay before anybody is taken on (CLAUDE.md T17 2.11).
     state.reputation = 40;
     state.cash = 100000;
@@ -449,7 +453,8 @@ describe('the material take off', () => {
     const before = takeOffOf(state)?.minutesRemaining ?? 0;
     const later = clearEvents(runClock(state, 10));
     const after = takeOffOf(later)?.minutesRemaining ?? 0;
-    // A super experienced estimator works it off at 1.2 of a minute a minute (WORKER_RATES).
+    // A very experienced estimator works it off at a minute a minute, which is the owner's own
+    // speed and what his tier is worth from tonight (CLAUDE.md T21 2.9).
     expect(before - after).toBeCloseTo(10 * WORKER_RATES.senior, 6);
     expect(later.owner.minutesWorked).toBe(state.owner.minutesWorked);
   });
@@ -463,10 +468,10 @@ describe('the material take off', () => {
     expect(offer.held).toBe(false);
     expect(offer.core.ok).toBe(true);
     expect(offer.extension).toEqual({ ok: false, reason: 'Joinery Core first' });
-    expect(offer.capacity).toBe(16);
-    expect(offer.baseCapacity).toBe(16);
-    expect(offer.coreCapacity).toBe(32);
-    expect(offer.extensionCapacities).toEqual([42, 56]);
+    expect(offer.capacity).toBe(12);
+    expect(offer.baseCapacity).toBe(12);
+    expect(offer.coreCapacity).toBe(25);
+    expect(offer.extensionCapacities).toEqual([34, 45]);
     expect(offer.yearlyPrice).toBe(JOINERY_CORE_PRICE_YEARLY);
     expect(offer.extensionYearlyPrice).toBe(JOINERY_CORE_EXTENSION_PRICE_YEARLY);
     // The click switches it on and pays the first twelfth of the year (CLAUDE.md T13 3.8).
@@ -475,11 +480,11 @@ describe('the material take off', () => {
     expect(state.software.joineryCore).toBe(true);
     expect(cash - state.cash).toBeCloseTo(JOINERY_CORE_PRICE_YEARLY / 12, 2);
     expect(joineryCoreOffer(state).core).toEqual({ ok: false, reason: 'On the laptop' });
-    expect(joineryCoreOffer(state).capacity).toBe(32);
+    expect(joineryCoreOffer(state).capacity).toBe(25);
     state = act(state, { type: 'BUY_JOINERY_CORE_EXTENSION' });
     state = act(state, { type: 'BUY_JOINERY_CORE_EXTENSION' });
     expect(joineryCoreOffer(state).extension).toEqual({ ok: false, reason: 'Both extensions bought' });
-    expect(joineryCoreOffer(state).capacity).toBe(56);
+    expect(joineryCoreOffer(state).capacity).toBe(45);
     // A third click buys nothing.
     const two = state.cash;
     state = act(state, { type: 'BUY_JOINERY_CORE_EXTENSION' });

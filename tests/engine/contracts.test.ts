@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 import {
   CONTRACT_OFFER_DAYS,
   CONTRACT_PIECES,
-  JOINER_WEEKLY_WAGE,
+  JOINER_MONTHLY_WAGE,
   CONTRACT_QUANTITY_PER_WEEK_MAX,
   CONTRACT_QUANTITY_PER_WEEK_MIN,
   CONTRACT_RENEW_FULL_WEEK,
@@ -93,7 +93,7 @@ function joiner(id: string, name: string): Worker {
     role: 'joiner',
     tier: 'novice',
     rate: WORKER_RATES.novice,
-    weeklyWage: JOINER_WEEKLY_WAGE.novice,
+    monthlyWage: JOINER_MONTHLY_WAGE.novice,
     leavesOnDay: null,
     startDay: 1,
     jobId: null,
@@ -462,7 +462,7 @@ describe('the week and the term', () => {
     contract.labourMinutes = 6000;
     const report = closingReport(state, contract);
     const labourCost =
-      Math.round(6000 * workerMinuteCost(JOINER_WEEKLY_WAGE.novice) * 100) / 100;
+      Math.round(6000 * workerMinuteCost(JOINER_MONTHLY_WAGE.novice) * 100) / 100;
     expect(report).toEqual({
       pieces: 100,
       revenue: 3800,
@@ -602,13 +602,13 @@ describe('the result with a man on it (CLAUDE.md T17 2.22)', () => {
       ...joiner('staff-2', 'Nick'),
       tier: 'experienced',
       rate: WORKER_RATES.experienced,
-      weeklyWage: JOINER_WEEKLY_WAGE.experienced,
+      monthlyWage: JOINER_MONTHLY_WAGE.experienced,
     };
     const best: Worker = {
       ...joiner('staff-3', 'Sam'),
       tier: 'senior',
       rate: WORKER_RATES.senior,
-      weeklyWage: JOINER_WEEKLY_WAGE.senior,
+      monthlyWage: JOINER_MONTHLY_WAGE.senior,
     };
     state.workers.push(middling, best);
     const greenResult = contractResultFor(state, contract, green);
@@ -616,13 +616,14 @@ describe('the result with a man on it (CLAUDE.md T17 2.22)', () => {
     const bestResult = contractResultFor(state, contract, best);
     // His minutes are at his rate and on the machines the hall has: the used saw of the day 1 kit
     // is 0.95 of the owner's own speed (CLAUDE.md T20 2.1.1). A joiner with no experience does 45
-    // minutes of the owner's work in 59 of his own on it, a super experienced one in 39.
+    // minutes of the owner's work in 79 of his own on it, a very experienced one in 47
+    // (CLAUDE.md T21 2.9).
     const saw = contractPieceSpeed(state, green.id, piece);
     expect(saw).toBe(0.95);
     expect(greenResult.minutes).toBe(Math.round(45 / (WORKER_RATES.novice * saw)));
     expect(bestResult.minutes).toBe(Math.round(45 / (WORKER_RATES.senior * saw)));
     expect(greenResult.labourCost).toBe(
-      Math.round(greenResult.minutes * workerMinuteCost(green.weeklyWage) * 100) / 100,
+      Math.round(greenResult.minutes * workerMinuteCost(green.monthlyWage) * 100) / 100,
     );
     // And with no saw at all it is the by hand reading, which is half again as long.
     const empty = newGame();
@@ -631,14 +632,21 @@ describe('the result with a man on it (CLAUDE.md T17 2.22)', () => {
     expect(greenResult.margin).toBe(
       Math.round((piece.price - piece.material - greenResult.labourCost) * 100) / 100,
     );
-    // The wage ladder is steeper than the speed ladder: 450, 600 and 800 a week against 0.8, 1.0
-    // and 1.2 of the owner. So the same piece costs more in a better man's time, and the line
-    // thins as the tier rises. The line is his own, which is what the tab has to show before he
-    // is put on it (CLAUDE.md T20 2.1, 2.5).
-    expect(middlingResult.margin).toBeLessThan(greenResult.margin);
+    // Piotr's four figures put the bottom two rungs of the wage ladder exactly on the speed
+    // ladder: 1,950 over 0.6 and 2,600 over 0.8 are both 3,250 a point of speed, so the same piece
+    // costs an experienced man what it costs a man with no experience, to the pence the rounded
+    // minutes leave behind (CLAUDE.md T21 2.9, 2.10). Turn 20's ladder had the wages steeper all
+    // the way up and this assertion read `toBeLessThan`; on tonight's figures the line only starts
+    // to thin above the experienced man, where 3,500 over 1.0 is 3,500 a point of speed. The line
+    // is his own either way, which is what the tab has to show before he is put on it
+    // (CLAUDE.md T20 2.1).
+    expect(Math.abs(middlingResult.margin - greenResult.margin)).toBeLessThan(0.1);
     expect(bestResult.margin).toBeLessThan(middlingResult.margin);
-    // And every one of them is above water by hand at the prices of T20 2.2, which is the whole
-    // point of the new table: a contract pays a little by hand and well with machines.
+    // And every one of them is above water behind the day 1 used saw at the prices of T20 2.2,
+    // which is half of what the new table was for: a contract pays well with machines. The other
+    // half of it, that it pays a little by hand, no longer holds at Piotr's tier figures, and
+    // `tests/engine/contractPrices.test.ts` is where that is measured tier by tier
+    // (CLAUDE.md T21 2.9).
     expect(bestResult.margin).toBeGreaterThan(0);
   });
 });

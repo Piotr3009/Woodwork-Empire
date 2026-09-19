@@ -57,7 +57,6 @@ function headHtml(
   state: GameState,
   job: Job,
   row: PlanRow,
-  dropConfirm: string | null,
   assignOpen: string | null,
 ): string {
   const action = jobAction(state, job);
@@ -71,7 +70,7 @@ function headHtml(
     materialLine(state, job) +
     jobAssignControls(state, job, assignOpen === job.id) +
     takeOverControl(state, job) +
-    dropControl(job, dropConfirm) +
+    dropControl(job) +
     (action === '' ? '' : `<span class="row-action">${action}</span>`) +
     '</div>'
   );
@@ -162,7 +161,6 @@ export function renderWorkPlan(
   state: GameState,
   /** Which of the two tabs is on top (CLAUDE.md T20 2.1). */
   tab: WorkPlanTab = 'jobs',
-  dropConfirm: string | null = null,
   /** The job or contract whose Assign list is open, or null for none (CLAUDE.md T19 2.5). */
   assignOpen: string | null = null,
   /** The man an offer card is worked out for, or null for the card's own first choice
@@ -174,14 +172,10 @@ export function renderWorkPlan(
   // the modal always was, less the contract bar, which has moved into Running
   // (CLAUDE.md T20 2.1, 2.1.5).
   if (tab === 'contracts') return tabs + renderContractsTab(state, assignOpen, contractMan);
-  return tabs + jobsTab(state, dropConfirm, assignOpen);
+  return tabs + jobsTab(state, assignOpen);
 }
 
-function jobsTab(
-  state: GameState,
-  dropConfirm: string | null,
-  assignOpen: string | null,
-): string {
+function jobsTab(state: GameState, assignOpen: string | null): string {
   const plan = workPlan(state);
   // The contract bar of v28 has left this tab: its chips and its button are in Running, on the
   // Contracts tab (PIOTR; CLAUDE.md T20 2.1.5).
@@ -192,7 +186,7 @@ function jobsTab(
       if (!job) return '';
       return (
         `<div class="plan-row" data-plan="${row.jobId}">` +
-        headHtml(state, job, row, dropConfirm, assignOpen) +
+        headHtml(state, job, row, assignOpen) +
         '<div class="plan-chart">' +
         nowHtml(plan) +
         barHtml(plan, row) +

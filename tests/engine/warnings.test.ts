@@ -81,7 +81,7 @@ function joiner(index: number): Worker {
     role: 'joiner',
     tier: 'novice',
     rate: WORKER_RATES.novice,
-    weeklyWage: 480,
+    monthlyWage: 1950,
     leavesOnDay: null,
     startDay: 1,
     jobId: null,

@@ -5,7 +5,7 @@
 
 import { describe, expect, it } from 'vitest';
 import {
-  DRAFTSMAN_WEEKLY_WAGE,
+  DRAFTSMAN_MONTHLY_WAGE,
   DRAFTSMAN_RATE,
   DRAFTSMAN_REPUTATION,
   HIRING_SPECS,
@@ -124,9 +124,9 @@ describe('the board itself', () => {
   it('carries the rate, the wage and the reputation on every tile, and one Hire', () => {
     const page = parse(renderTeam(known(), 'workshop'));
     const novice = page.querySelector('[data-candidate="joiner.novice"]');
-    expect(novice?.textContent).toContain('a week');
-    // The four tiers run 0.8, 1.0, 1.2 and 1.4 of the owner from tonight (CLAUDE.md T20 2.5).
-    expect(novice?.textContent).toContain('80% of your speed');
+    expect(novice?.textContent).toContain('a month');
+    // The four tiers run Piotr's own 0.6, 0.8, 1.0 and 1.2 of the owner (CLAUDE.md T21 2.9).
+    expect(novice?.textContent).toContain('60% of your speed');
     expect(novice?.textContent).toContain('Available from reputation');
     // A joiner wants his bench, his locker, his seat, his cabinet and his tools first, so his
     // tile says what to buy instead of offering a Hire (CLAUDE.md 9.3).
@@ -188,11 +188,11 @@ describe('the office admin is the one who must be there', () => {
 });
 
 describe('the draftsman', () => {
-  it('is an office role at Piotr’s wage, by the week, and his standing', () => {
+  it('is an office role at Piotr’s wage, by the month, and his standing', () => {
     const spec = HIRING_SPECS.find((entry) => entry.role === 'draftsman');
-    expect(spec?.weeklyWage).toBe(DRAFTSMAN_WEEKLY_WAGE);
-    // Piotr's 2,400 a month, paid by the week like everybody else (CLAUDE.md T20 2.6).
-    expect(DRAFTSMAN_WEEKLY_WAGE).toBe(560);
+    expect(spec?.monthlyWage).toBe(DRAFTSMAN_MONTHLY_WAGE);
+    // Piotr's 2,400 a month, whole, paid like everybody else's (CLAUDE.md T21 2.10).
+    expect(DRAFTSMAN_MONTHLY_WAGE).toBe(2400);
     expect(spec?.minReputation).toBe(DRAFTSMAN_REPUTATION);
     expect(DRAFTSMAN_REPUTATION).toBe(15);
     expect(hasWorkingDay('draftsman')).toBe(true);
@@ -243,10 +243,11 @@ describe('the Technical tab (CLAUDE.md T13 3.8)', () => {
     const state = buyStartingKit(known());
     const page = parse(renderTeam(state, 'technical'));
     expect(page.querySelectorAll('[data-do="buyJoineryCore"]')).toHaveLength(1);
-    // As many a day as his minutes allow: 16 at half an hour each, 32 with the software
-    // (CLAUDE.md T20 2.3).
-    expect(page.textContent).toContain('16 a day, 32 with Joinery Core');
-    expect(page.textContent).toContain('42 and 56 with its extensions');
+    // As many a day as his minutes allow, and the day is the experienced man's, who is 0.8 of the
+    // owner on Piotr's ladder from tonight: 12 at 37.5 minutes each, 25 with the software
+    // (CLAUDE.md T20 2.3, T21 2.9).
+    expect(page.textContent).toContain('12 a day, 25 with Joinery Core');
+    expect(page.textContent).toContain('34 and 45 with its extensions');
     expect(page.textContent).toContain(`${money(JOINERY_CORE_PRICE_YEARLY)} a year`);
     // The extension waits for the core: a reason, not a button.
     expect(page.querySelectorAll('[data-do="buyJoineryCoreExtension"]')).toHaveLength(0);
@@ -254,22 +255,24 @@ describe('the Technical tab (CLAUDE.md T13 3.8)', () => {
     const bought = parse(renderTeam(act(state, { type: 'BUY_JOINERY_CORE' }), 'technical'));
     expect(bought.querySelectorAll('[data-do="buyJoineryCore"]')).toHaveLength(0);
     expect(bought.querySelectorAll('[data-do="buyJoineryCoreExtension"]')).toHaveLength(1);
-    expect(bought.textContent).toContain('32 take offs a day');
-    expect(bought.textContent).toContain('15 min each');
+    expect(bought.textContent).toContain('25 take offs a day');
+    // The minutes are his own and not the owner's: the software's quarter of an hour is 19 minutes
+    // to an experienced man at 0.8 of him (CLAUDE.md T21 2.9).
+    expect(bought.textContent).toContain('19 min each');
   });
 
   it('works the day out for the estimator on the books, and names him', () => {
     // With nobody at the desk the figures are the experienced man's and the line says so.
     const empty = parse(renderTeam(buyStartingKit(known()), 'technical'));
-    expect(empty.textContent).toContain('Take offs for an experienced man: 16 a day');
-    // With a man of no experience at it they are his: half an hour at 0.8 is 37 minutes, and 12
-    // of them fill his day (CLAUDE.md T20 2.3).
+    expect(empty.textContent).toContain('Take offs for an experienced man: 12 a day');
+    // With a man of no experience at it they are his: half an hour at 0.6 is 50 minutes, and 9
+    // of them fill his day (CLAUDE.md T20 2.3, T21 2.9).
     const state = hireNow(buyStartingKit(known()), 'estimator', 'novice');
     const man = state.workers[0];
     if (!man) throw new Error('nobody at the desk');
     const page = parse(renderTeam(state, 'technical'));
-    expect(page.textContent).toContain(`Take offs for ${man.name}, no experience: 12 a day`);
-    expect(page.textContent).toContain('25 with Joinery Core');
+    expect(page.textContent).toContain(`Take offs for ${man.name}, no experience: 9 a day`);
+    expect(page.textContent).toContain('19 with Joinery Core');
   });
 
   it('says so when there is no laptop to put it on', () => {

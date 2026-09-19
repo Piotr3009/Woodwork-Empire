@@ -36,12 +36,12 @@ import {
   receive,
   runBailiff,
   visibleTotals,
-  weeklyWageBill,
+  monthlyWageBill,
 } from '../../src/engine/economy';
 import { applyAction, findVariant, tick } from '../../src/engine/index';
 import type { GameState, Worker } from '../../src/engine/index';
 import { createTask } from '../../src/engine/tasks';
-import { monthOfDay } from '../../src/engine/clock';
+import { isLastWorkingDayOfMonth, monthOfDay } from '../../src/engine/clock';
 import { buyStartingKit } from '../helpers';
 import {
   act,
@@ -62,14 +62,14 @@ function ledgerFor(state: GameState, category: string): number {
     .reduce((total, entry) => total + entry.amount, 0);
 }
 
-function joiner(id: string, weeklyWage: number): Worker {
+function joiner(id: string, monthlyWage: number): Worker {
   return {
     id,
     name: id,
     role: 'joiner',
     tier: 'novice',
     rate: 0.6,
-    weeklyWage,
+    monthlyWage,
     leavesOnDay: null,
     startDay: 1,
     jobId: null,
@@ -142,27 +142,42 @@ describe('daily costs', () => {
   });
 });
 
-describe('weekly and monthly cadences', () => {
-  it('pays joiner wages on Friday only', () => {
+/** The one pay day of the game's first month: its last working day, which the clock is asked for
+ *  and the test never guesses at (CLAUDE.md T21 2.10). */
+function lastWorkingDayOfMonthOne(): number {
+  let day = DAYS_PER_MONTH;
+  while (day > 1 && !isLastWorkingDayOfMonth(day)) day -= 1;
+  return day;
+}
+
+const LAST_WORKING_DAY_OF_MONTH_ONE = lastWorkingDayOfMonthOne();
+
+describe('the pay day and the month end: what the calendar charges for', () => {
+  it('pays the wages on the last working day of the month and on no other day', () => {
+    // Everybody is paid by the month, so Friday buys nothing and the one pay day of the month is
+    // its last working one, which in the game's thirty day month is day 30 (PIOTR, 19.09: "I
+    // wanted everyone monthly"; CLAUDE.md T21 2.10).
     const state = newGame();
-    state.workers.push(joiner('w1', 480), joiner('w2', 420));
-    expect(weeklyWageBill(state)).toBe(900);
-    const thursday = runToDay(state, 4);
-    expect(ledgerFor(thursday.state, 'wages')).toBe(0);
+    state.workers.push(joiner('w1', 1950), joiner('w2', 1800));
+    expect(monthlyWageBill(state)).toBe(3750);
     const friday = runToDay(state, 5);
-    expect(ledgerFor(friday.state, 'wages')).toBe(-900);
-    expect(eventsOfKind(friday.events, 'wagesPaid')).toHaveLength(1);
-    // One Friday, one payment: the following Monday adds nothing.
-    const monday = runToDay(state, 8);
-    expect(ledgerFor(monday.state, 'wages')).toBe(-900);
+    expect(ledgerFor(friday.state, 'wages')).toBe(0);
+    // A day's costs run on its own morning, so the pay day's line is there the minute the clock
+    // turns to it.
+    const payDay = runToDay(state, LAST_WORKING_DAY_OF_MONTH_ONE);
+    expect(ledgerFor(payDay.state, 'wages')).toBe(-3750);
+    expect(eventsOfKind(payDay.events, 'wagesPaid')).toHaveLength(1);
+    // One month, one payment: the days after it add nothing.
+    const next = runToDay(state, LAST_WORKING_DAY_OF_MONTH_ONE + 3);
+    expect(ledgerFor(next.state, 'wages')).toBe(-3750);
   });
 
-  it('pays the office on Friday with the floor, and nothing at the month end', () => {
-    // One unit of pay in the game and it is the week: the office salary line of the 1st is gone
-    // (PIOTR, 18.09; CLAUDE.md T20 2.6).
+  it('pays the office in the one wage line with the floor, and nothing at the month end', () => {
+    // One unit of pay in the game and it is the month: the office salary line of the 1st is gone
+    // (PIOTR, 19.09; CLAUDE.md T21 2.10).
     const state = newGame();
-    state.workers.push({ ...joiner('a1', 0), role: 'officeAdmin', weeklyWage: 445, rate: 0 });
-    expect(weeklyWageBill(state)).toBe(445);
+    state.workers.push({ ...joiner('a1', 0), role: 'officeAdmin', monthlyWage: 1900, rate: 0 });
+    expect(monthlyWageBill(state)).toBe(1900);
     const after = runToDay(state, 31).state;
     expect(ledgerFor(after, 'salaries')).toBe(0);
     expect(ledgerFor(after, 'wages')).toBeLessThan(0);
@@ -208,8 +223,11 @@ describe('weekly and monthly cadences', () => {
   });
 
   it('names the next wage day and the next monthly bill day', () => {
+    // The next wage day is the month's last working one, which is day 30 of the first month, and
+    // no longer the Friday of the week (CLAUDE.md T21 2.10).
     const state = newGame();
-    expect(nextDueDays(state)).toEqual({ wages: 5, monthly: 31 });
+    expect(nextDueDays(state)).toEqual({ wages: LAST_WORKING_DAY_OF_MONTH_ONE, monthly: 31 });
+    expect(LAST_WORKING_DAY_OF_MONTH_ONE).toBe(30);
   });
 });
 
@@ -394,10 +412,16 @@ describe('the Turn 2 balance', () => {
     expect(newGame({ difficulty: 'veryEasy' }).finance.overdraftLimit).toBe(-10000);
   });
 
-  it('declares bankruptcy at twice the limit, whatever the difficulty set it to', () => {
+  it('puts the bank\u0027s line at one and a half times the limit, whatever the difficulty set it to', () => {
+    // Turn 13 read the line at twice the overdraft and against the cash alone. Piotr dropped a
+    // 50,000 job with 7,000 in the bank, the deposit he owed went to arrears, and the game played
+    // on: "you cannot pay your debts, you are bankrupt, and the game should end". So the factor is
+    // 1.5 and the position it is read against is the net one, cash less what is owed
+    // (PIOTR, 18.09; CLAUDE.md T21 2.2). Hard is the brief's "normal": -5,000 of overdraft, so
+    // -7,500; very easy and easy have -10,000, so -15,000.
     const hard = newGame({ difficulty: 'hard' });
-    expect(bankruptcyFloor(hard)).toBe(-10000);
-    expect(bankruptcyFloor(newGame())).toBe(-20000);
+    expect(bankruptcyFloor(hard)).toBe(-7500);
+    expect(bankruptcyFloor(newGame())).toBe(-15000);
   });
 
   it('pays arrears off from cash, all of them or a typed amount', () => {

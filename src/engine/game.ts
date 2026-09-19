@@ -204,6 +204,7 @@ import {
 import {
   chargeOvertimeDebt,
   countOvertimeMinute,
+  emptyOwnerIdle,
   logDayMinute,
   managerOnDuty,
   nextDayLabourFactor,
@@ -362,6 +363,8 @@ export function createGame(options: NewGameOptions): GameState {
       minutesByCategory: { admin: 0, design: 0, workshop: 0 },
       dayLog: [],
       minutesWorked: 0,
+      idleMinutes: 0,
+      idleByReason: emptyOwnerIdle(),
       overtimeMinutes: 0,
       labourFactor: 1,
       overtimeDebt: 0,
@@ -401,6 +404,7 @@ export function createGame(options: NewGameOptions): GameState {
     deliveries: [],
     finance: {
       overdraftLimit: spec.overdraftLimit,
+      daysBelowOverdraft: 0,
       loan: null,
       overdraftInterestAccrued: 0,
       arrearsAmount: 0,
@@ -497,6 +501,10 @@ function startDay(state: GameState): void {
   // A new day is a blank bar: what he did yesterday is on yesterday's log (CLAUDE.md T11 3.1).
   owner.dayLog = [];
   owner.minutesWorked = 0;
+  // And a blank grey segment with it: the minutes he stood are today's minutes and no other day's
+  // (CLAUDE.md T21 2.8).
+  owner.idleMinutes = 0;
+  owner.idleByReason = emptyOwnerIdle();
   owner.wentHome = false;
   owner.currentTaskId = null;
   owner.resumeTaskId = null;

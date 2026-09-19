@@ -19,7 +19,7 @@ import {
   nextDueDays,
   summaryOfDay,
   visibleTotals,
-  weeklyWageBill,
+  monthlyWageBill,
   yearTotals,
 } from '../engine/index';
 import type { GameState, LedgerCategory, LedgerEntry, PeriodTotals } from '../engine/index';
@@ -281,7 +281,7 @@ export function renderAccounting(
     `<div class="row"><span class="row-main">Power, every day</span>` +
     `<span class="row-figure">${money(dailyPower(state))}</span></div>` +
     `<div class="row"><span class="row-main">Wages, ${formatCalendarDay(due.wages)}</span>` +
-    `<span class="row-figure">${money(weeklyWageBill(state))}</span></div>` +
+    `<span class="row-figure">${money(monthlyWageBill(state))}</span></div>` +
     `<div class="row"><span class="row-main">Monthly bills, ${formatCalendarDay(due.monthly)}</span>` +
     `<span class="row-figure">${escapeHtml(monthlyBillsLine(state))}</span></div>` +
     '';

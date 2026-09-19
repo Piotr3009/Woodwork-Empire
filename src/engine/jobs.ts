@@ -17,6 +17,10 @@ import {
   DEADLINE_SMALL_SLACK_DAYS,
   DEPOSIT_FRACTION,
   DROP_PROJECT_REPUTATION,
+  DROP_REPUTATION_COMMERCIAL_FACTOR,
+  DROP_REPUTATION_FREE_PRICE,
+  DROP_REPUTATION_MAX,
+  DROP_REPUTATION_PER_1000,
   EMAIL_PAYMENT_PENALTY,
   EMAIL_PAYMENT_PENALTY_MAX,
   LABOUR_FRACTION,
@@ -84,6 +88,7 @@ import {
   takeOffMinutes,
 } from './tasks';
 import type {
+  EnquiryKind,
   Finish,
   GameState,
   Job,
@@ -207,9 +212,10 @@ export function deadlineDaysFor(
   return deadlineDaysFrom(drawDeadline(state), job);
 }
 
-/** What a worker of this rate is worth per minute, for the job card only [TUNE]. */
-export function workerMinuteCost(weeklyWage: number): number {
-  return weeklyWage / WORKER_MINUTE_RATE_DIVISOR;
+/** What a worker of this rate is worth per minute, for the job card only [TUNE]. His monthly wage
+ *  over the working minutes of a month (CLAUDE.md T21 2.10). */
+export function workerMinuteCost(monthlyWage: number): number {
+  return monthlyWage / WORKER_MINUTE_RATE_DIVISOR;
 }
 
 /** The men standing at this job, in the order they were put on it. There is no limit on how many
@@ -267,9 +273,9 @@ export function jobLabourCost(state: GameState, job: Job): { minutes: number; co
   for (const who of jobMen(job)) {
     const worker = state.workers.find((entry) => entry.id === who);
     if (!worker || worker.rate <= 0) continue;
-    // Everybody is paid by the week from tonight, the sprayer with the rest of them, so there is
-    // one wage to read and no monthly one behind it (CLAUDE.md T20 2.6).
-    perMinute += workerMinuteCost(worker.weeklyWage);
+    // Everybody is paid by the month, the sprayer with the rest of them, so there is one wage to
+    // read and no weekly one behind it (CLAUDE.md T21 2.10).
+    perMinute += workerMinuteCost(worker.monthlyWage);
   }
   return { minutes, cost: minutes * perMinute };
 }
@@ -631,10 +637,25 @@ export function refreshMaterial(state: GameState): void {
   }
 }
 
+/** What dropping this job costs the company in reputation: ten points, and a point for every
+ *  thousand pounds of its price above five thousand, capped at fifty; a commercial client's job
+ *  costs half again on top of that, still capped at the fifty (PIOTR, 19.09: "up to 50 max";
+ *  CLAUDE.md T21 2.4).
+ *
+ *  A 3,000 job costs 10, a 10,000 one 15, a 20,000 one 25, and 50,000 or anything above it costs
+ *  the whole 50. The one function: the drop itself and the card that warns about it before the
+ *  click both read this, so the figure the player is shown is the figure he is charged. */
+export function dropReputationCost(job: { price: number; kind: EnquiryKind }): number {
+  const over = Math.max(0, job.price - DROP_REPUTATION_FREE_PRICE);
+  const scaled = DROP_PROJECT_REPUTATION + (over / 1000) * DROP_REPUTATION_PER_1000;
+  const trade = job.kind === 'commercial' ? scaled * DROP_REPUTATION_COMMERCIAL_FACTOR : scaled;
+  return Math.min(DROP_REPUTATION_MAX, Math.round(trade));
+}
+
 /** Drops the project. The client has his deposit back, the job is off the plan, the material it
  *  drew from the rack goes back on it and the material that was ordered in for it is written off,
- *  and the company loses ten points of reputation at once (PIOTR, 13.09: "drastically";
- *  CLAUDE.md T9 3.9). */
+ *  and the company loses what `dropReputationCost` says at once (PIOTR, 13.09: "drastically";
+ *  CLAUDE.md T9 3.9, T21 2.4). */
 export function dropJob(state: GameState, jobId: string): boolean {
   const job = findJob(state, jobId);
   if (!job) return false;
@@ -672,7 +693,7 @@ export function dropJob(state: GameState, jobId: string): boolean {
     if (worker.jobId === job.id) worker.jobId = null;
   }
   state.jobs = state.jobs.filter((entry) => entry.id !== job.id);
-  changeReputation(state, -DROP_PROJECT_REPUTATION, `Dropped: ${job.name}`);
+  changeReputation(state, -dropReputationCost(job), `Dropped: ${job.name}`);
   return true;
 }
 

@@ -24,7 +24,7 @@ function estimatorOn(state: GameState): Worker {
     role: 'estimator',
     tier: 'experienced',
     rate: 1,
-    weeklyWage: 610,
+    monthlyWage: 2600,
     startDay: 1,
     leavesOnDay: null,
     jobId: null,

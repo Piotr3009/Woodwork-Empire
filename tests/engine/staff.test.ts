@@ -27,7 +27,7 @@ import { waitingStation } from '../../src/engine/stations';
 import { MATERIAL_TAKE_OFF_MINUTES } from '../../src/engine/constants';
 import { createTask, estimatorCapacity } from '../../src/engine/tasks';
 import { minutesRemainingFor, ownerJob } from '../../src/engine/jobs';
-import { weeklyWageBill } from '../../src/engine/economy';
+import { monthlyWageBill } from '../../src/engine/economy';
 import { tick } from '../../src/engine/index';
 import type { GameState, Worker } from '../../src/engine/index';
 import {
@@ -74,8 +74,8 @@ function withCrew(state: GameState, count: number, tier: Worker['tier']): GameSt
 describe('the hiring pool', () => {
   it('opens up as the reputation rises', () => {
     const state = newGame();
-    // The card says what is missing in the game's own words now: "extremely experienced joiners
-    // come from reputation 60" (PIOTR; CLAUDE.md T20 2.5).
+    // The card says what is missing in the game's own words now: "excellent joiners come from
+    // reputation 60" (PIOTR, 19.09; CLAUDE.md T21 2.9).
     const byLabel = (reputation: number): string[] =>
       hiringOptions({ ...state, reputation })
         .filter((option) => option.blockReason.includes('come from reputation'))
@@ -84,15 +84,15 @@ describe('the hiring pool', () => {
     expect(byLabel(-50)).not.toContain('Joiner, no experience');
     expect(byLabel(-50)).not.toContain('Helper');
     // The tier comes with the standing the workshop has earned: a man with no experience always
-    // answers, an experienced one from 15, a super experienced one from 35 and an extremely
-    // experienced one from 60 (CLAUDE.md T20 2.5).
+    // answers, an experienced one from 15, a very experienced one from 35 and an excellent one
+    // from 60 (CLAUDE.md T21 2.9).
     expect(byLabel(0)).toContain('Joiner, experienced');
     expect(byLabel(5)).not.toContain('Office admin');
     expect(byLabel(15)).not.toContain('Joiner, experienced');
-    expect(byLabel(15)).toContain('Joiner, super experienced');
+    expect(byLabel(15)).toContain('Joiner, very experienced');
     expect(byLabel(15)).not.toContain('Salesman');
-    expect(byLabel(35)).not.toContain('Joiner, super experienced');
-    expect(byLabel(35)).toContain('Joiner, extremely experienced');
+    expect(byLabel(35)).not.toContain('Joiner, very experienced');
+    expect(byLabel(35)).toContain('Joiner, excellent');
     expect(byLabel(60)).toHaveLength(0);
   });
 
@@ -123,16 +123,17 @@ describe('the hiring pool', () => {
     state = hireNow(state, 'joiner', 'novice');
     expect(state.workers).toHaveLength(1);
     expect(state.workers[0]?.rate).toBe(WORKER_RATES.novice);
-    expect(state.workers[0]?.weeklyWage).toBe(450);
+    expect(state.workers[0]?.monthlyWage).toBe(1950);
   });
 
-  it('pays a joiner 450, 600, 800 and 1,000 a week, tier by tier', () => {
-    // Piotr named the 1,000 for the extremely experienced man (CLAUDE.md T20 2.5); the three under
-    // him are the [TUNE] ladder. Written out as the four figures and not off the table that makes
-    // them, so a change to the ladder has to be meant.
+  it('pays a joiner 1,950, 2,600, 3,500 and 4,330 a month, tier by tier', () => {
+    // Piotr's own four figures: the excellent man at about 1,000 a week, which is 4,330 a month,
+    // and the experienced one at 2,600, with the other two scaled off him [TUNE]
+    // (PIOTR, 19.09; CLAUDE.md T21 2.9, 2.10). Written out as the four figures and not off the
+    // table that makes them, so a change to the ladder has to be meant.
     const rows = HIRING_SPECS.filter((spec) => spec.role === 'joiner');
     expect(rows.map((spec) => spec.tier)).toEqual(['novice', 'experienced', 'senior', 'master']);
-    expect(rows.map((spec) => spec.weeklyWage)).toEqual([450, 600, 800, 1000]);
+    expect(rows.map((spec) => spec.monthlyWage)).toEqual([1950, 2600, 3500, 4330]);
     expect(rows.map((spec) => spec.minReputation)).toEqual([REPUTATION_MIN, 15, 35, 60]);
   });
 
@@ -156,13 +157,13 @@ describe('the hiring pool', () => {
     expect(option?.blockReason).toContain('floor limited');
   });
 
-  it('starts the new man the next working day and pays him weekly', () => {
+  it('starts the new man the next working day and pays him monthly', () => {
     const state = withCrew(buyStartingKit(newGame()), 1, 'novice');
     expect(state.workers[0]?.startDay).toBe(2);
     expect(availableJoiners(state)).toHaveLength(0);
     const day2 = runToDay(state, 2).state;
     expect(availableJoiners(day2)).toHaveLength(1);
-    expect(weeklyWageBill(day2)).toBe(450);
+    expect(monthlyWageBill(day2)).toBe(1950);
   });
 
   it('gives everyone a different name', () => {
@@ -183,8 +184,9 @@ describe('the hiring pool', () => {
     state = hireNow(state, 'salesman', null);
     expect(state.workers[0]?.role).toBe('officeAdmin');
     expect(state.workers[1]?.role).toBe('salesman');
-    // The salesman's 2,200 a month is 515 a week from tonight (CLAUDE.md T20 2.6).
-    expect(state.workers[1]?.weeklyWage).toBe(515);
+    // The salesman's 2,200 is his month, whole: the week Turn 20 cut it into is gone
+    // (CLAUDE.md T21 2.10).
+    expect(state.workers[1]?.monthlyWage).toBe(2200);
   });
 });
 
@@ -209,17 +211,19 @@ function jobReadyWith(price: number, tier: Worker['tier']): GameState {
 }
 
 describe('joiners at the bench', () => {
-  it('takes a joiner with no experience 10 days to make a 6400 wardrobe', () => {
+  it('takes a joiner with no experience 13 days to make a 6400 wardrobe', () => {
     const state = jobReadyWith(6400, 'novice');
     const job = firstJob(state);
     expect(job.labourValue).toBe(6400 * LABOUR_FRACTION);
     const minutes = minutesRemainingFor(state, job, WORKER_RATES.novice);
-    expect(minutes).toBeCloseTo(4800, 6);
-    expect(minutes / 480).toBeCloseTo(10, 3);
-    // The same wardrobe is 8 days for the owner, and the experienced joiner matches him now
-    // (CLAUDE.md 8.5, T20 2.5).
+    expect(minutes).toBeCloseTo(6400, 6);
+    expect(minutes / 480).toBeCloseTo(13.3333, 3);
+    // The same wardrobe is 8 days for the owner, and the very experienced joiner is the one who
+    // matches him on Piotr's own ladder: the experienced man takes ten days over it
+    // (CLAUDE.md 8.5, T21 2.9).
     expect(minutesRemainingFor(state, job, 1) / 480).toBeCloseTo(8, 6);
-    expect(minutesRemainingFor(state, job, WORKER_RATES.experienced) / 480).toBeCloseTo(8, 6);
+    expect(minutesRemainingFor(state, job, WORKER_RATES.senior) / 480).toBeCloseTo(8, 6);
+    expect(minutesRemainingFor(state, job, WORKER_RATES.experienced) / 480).toBeCloseTo(10, 6);
   });
 
   it('picks up the oldest ready job on its own', () => {
@@ -343,7 +347,7 @@ describe('the office working day', () => {
       role,
       tier: null,
       rate: 0,
-      weeklyWage: 0,
+      monthlyWage: 0,
       leavesOnDay: null,
       startDay: 1,
       jobId: null,
@@ -435,7 +439,9 @@ describe('the office working day', () => {
     const day = clearEvents(runClock(morning, DAY_END_MINUTE));
     const done = day.tasks.filter((task) => task.kind === 'materialTakeOff' && task.done).length;
     expect(done).toBe(estimatorCapacity(day));
-    expect(done).toBe(16);
+    // Twelve, not the sixteen of Turn 20: an experienced man is 0.8 of the owner on Piotr's
+    // ladder, so a half hour take off is 37.5 minutes of his day (CLAUDE.md T21 2.9).
+    expect(done).toBe(12);
     // And the cap is his minutes now: the day is spent, not a counter run out.
     expect(staffMinutesLeft(day.workers[0] as Worker)).toBeLessThan(MATERIAL_TAKE_OFF_MINUTES);
   });

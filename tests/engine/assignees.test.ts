@@ -209,9 +209,9 @@ describe('the men on a job (CLAUDE.md T19 2.5)', () => {
   it('opens the list on the one job the player asked for, and on no other', () => {
     const state = menOnOne(2);
     const job = jobOfFirst(state);
-    const shut = parse(renderWorkPlan(state, 'jobs', null, null));
+    const shut = parse(renderWorkPlan(state, 'jobs', null));
     expect(shut.querySelector('.assign-list')).toBeNull();
-    const open = parse(renderWorkPlan(state, 'jobs', null, job.id));
+    const open = parse(renderWorkPlan(state, 'jobs', job.id));
     const lists = Array.from(open.querySelectorAll('.assign-list'));
     expect(lists).toHaveLength(1);
     expect(open.querySelector(`[data-plan="${job.id}"] .assign-list`)).not.toBeNull();
@@ -222,7 +222,7 @@ describe('the men on a job (CLAUDE.md T19 2.5)', () => {
     const job = jobOfFirst(state);
     const other = state.jobs.find((entry) => leadAssignee(entry) === 'staff-3');
     if (!other) throw new Error('the third joiner has no job of his own');
-    const list = parse(renderWorkPlan(state, 'jobs', null, job.id)).querySelector('.assign-list');
+    const list = parse(renderWorkPlan(state, 'jobs', job.id)).querySelector('.assign-list');
     const rowFor = (who: string): Element | null =>
       list?.querySelector(`[data-worker="${who}"]`)?.closest('.assign-row') ?? null;
     // The men already on this job: greyed, with no way to add them twice.

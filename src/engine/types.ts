@@ -375,6 +375,11 @@ export interface OwnerState {
    *  Our team reads the same two figures as everybody else's (CLAUDE.md T17 2.9). */
   monthMinutes: number;
   monthDaysOff: number;
+  /** Minutes of today he stood still, and why. The day meter counted only the minutes he worked
+   *  and so it stalled while he stood, which read as a clock running two to three times slow
+   *  (PIOTR, 19.09; CLAUDE.md T21 2.8). Emptied every morning with the day log. */
+  idleMinutes: number;
+  idleByReason: Record<OwnerIdleReason, number>;
 }
 
 export interface UnitState {
@@ -401,9 +406,10 @@ export interface Worker {
 
   /** Fraction of the owner's speed. 0 for non-production roles. */
   rate: number;
-  /** The one wage field: everybody is paid by the week, on Friday (PIOTR, 18.09: "one unit";
-   *  CLAUDE.md T20 2.6). What a month of him costs is `monthlyWageOf`. */
-  weeklyWage: number;
+  /** The one wage field: everybody is paid by the month, on the last working day of it
+   *  (PIOTR, 19.09: "I wanted everyone monthly"; CLAUDE.md T21 2.10). Turn 20's week is reversed
+   *  and the week appears nowhere. */
+  monthlyWage: number;
   startDay: number;
   /** The last working day he is on the books, once he has been let go: he works a week's notice
    *  out, is paid for it, and his jobs and his contracts drop him the morning after. Null for
@@ -448,7 +454,7 @@ export interface HiringOption {
   tier: WorkerTier | null;
   label: string;
   rate: number;
-  weeklyWage: number;
+  monthlyWage: number;
   minReputation: number;
   available: boolean;
   blockReason: string;
@@ -828,6 +834,10 @@ export interface LoanState {
 
 export interface FinanceState {
   overdraftLimit: number;
+  /** Calendar days in a row the cash has ended below the overdraft limit. Thirty of them closes the
+   *  company whatever the amount, and one day above the limit puts it back to nought
+   *  (PIOTR, 18.09: "thirty days below the limit"; CLAUDE.md T21 2.2). */
+  daysBelowOverdraft: number;
   loan: LoanState | null;
   /** Overdraft interest accrued day by day below zero and not yet charged: it goes out on the
    *  1st, interest only (CLAUDE.md T13 3.14). */
@@ -993,6 +1003,44 @@ export interface ShiftState {
 
 /** Why a production minute the workshop could have worked was not worked (CLAUDE.md T13 3.5). */
 export type LostMinuteCause = 'noPeople' | 'noMachine' | 'noMaterial' | 'ownerAway';
+
+/** Why the owner himself stood still for a minute of his own day. Not the same list as
+ *  `LostMinuteCause`: that one counts every seat in the hall, and two of its four cannot be true
+ *  of the man whose absence they measure. The words are `OWNER_IDLE_REASONS`
+ *  (CLAUDE.md T21 2.8). */
+export type OwnerIdleReason = 'noMachine' | 'noMaterial' | 'nothingAssigned' | 'officeEmpty';
+
+/** The state a bubble over a figure's head is drawn for, one key a line of the table in
+ *  `docs/mockups/t21/bubbles.html` (CLAUDE.md T21 2.6). */
+export type BubbleKey =
+  | 'waitingForMachine'
+  | 'noCutParts'
+  | 'noMaterial'
+  | 'nothingToDo'
+  | 'sweeping'
+  | 'emptyingBags'
+  | 'unloading'
+  | 'working'
+  | 'pieces'
+  | 'offToMeasure'
+  | 'inTheOffice'
+  | 'atLunch';
+
+/** What colour a bubble wears, which is what kind of thing it is saying: `wait` is the red border
+ *  of something the player can fix, `chore` the green of a helper about his work, `work` the plain
+ *  paper of a stage just begun, `away` the dashed grey of a man off the hall
+ *  (CLAUDE.md T21 2.6). */
+export type BubbleTone = 'wait' | 'chore' | 'work' | 'away';
+
+/** One bubble, ready to draw: the words with every slot filled, the colour, and the figure it
+ *  belongs to (CLAUDE.md T21 2.6). */
+export interface Bubble {
+  /** 'owner', or a worker id. */
+  who: string;
+  key: BubbleKey;
+  tone: BubbleTone;
+  text: string;
+}
 
 /** The day's production minutes: what could have been worked with every hired person at a
  *  station, what was, and where the rest went (CLAUDE.md T13 3.5). */

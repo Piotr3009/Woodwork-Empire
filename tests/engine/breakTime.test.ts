@@ -162,7 +162,7 @@ describe('the helper has his dinner too', () => {
       role: 'helper',
       tier: null,
       rate: 0,
-      weeklyWage: 420,
+      monthlyWage: 1800,
       leavesOnDay: null,
       startDay: 1,
       jobId: null,

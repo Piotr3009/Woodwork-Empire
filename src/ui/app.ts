@@ -100,6 +100,7 @@ import { renderOwnerOut } from './ownerOut';
 import { renderCompany } from './company';
 import { renderShopping } from './shopping';
 import { renderStart } from './start';
+import { dropCardTitle, renderDropCard, renderDropCardFooter } from './dropCard';
 import { renderMachineCard } from './machineCard';
 import { decodeSaveFile, encodeSaveFile, saveFileName } from '../cloud/file';
 import {
@@ -456,7 +457,7 @@ function modalBody(id: ModalId, current: GameState): string {
         tickedTasks: ui.tickedTasks,
       });
     case 'workPlan':
-      return renderWorkPlan(current, ui.workPlanTab, ui.dropConfirm, ui.assignOpen, ui.contractMan);
+      return renderWorkPlan(current, ui.workPlanTab, ui.assignOpen, ui.contractMan);
     case 'machineCard':
       return renderMachineCard(current, ui.machineCard, ui.sellConfirm);
     case 'accounting': {
@@ -712,6 +713,27 @@ function modalSpecs(): ModalSpec[] {
       wide: true,
       position: null,
     });
+  }
+  // Dropping a project is the one action in the game that takes two clicks, because for a big job
+  // it ends the company: the first click opens this card, which says what the drop costs before
+  // anything is done, and the red button on it is the second (PIOTR, 18.09; CLAUDE.md T21 2.3). It
+  // is pushed after the Work Plan it was opened from, so it sits over it, and it carries the cross,
+  // Escape and a click outside like every other card.
+  if (ui.dropConfirm !== null) {
+    const job = current.jobs.find((entry) => entry.id === ui.dropConfirm) ?? null;
+    if (job === null) {
+      ui.dropConfirm = null;
+    } else {
+      specs.push({
+        id: 'dropJob',
+        title: dropCardTitle(job),
+        body: renderDropCard(current, job),
+        footer: renderDropCardFooter(job),
+        closable: true,
+        wide: true,
+        position: null,
+      });
+    }
   }
   const event = current.activeEvent;
   if (event) {
@@ -1541,6 +1563,12 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
         ui.daySummary = null;
         break;
       }
+      // The cross on the drop card is "Keep the job": the card goes and the job stays
+      // (CLAUDE.md T21 2.3).
+      if (which === 'dropJob') {
+        ui.dropConfirm = null;
+        break;
+      }
       shutModal();
       break;
     }
@@ -1620,7 +1648,8 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
       dispatch({ type: 'SET_SAW_FALLBACK', jobId: id, on: element.dataset.on === '1' });
       return;
     case 'dropJob':
-      // The first click says what it costs, the second means it (CLAUDE.md T9 3.9).
+      // The first click opens the card that says what it costs; the red button on the card is the
+      // second and the only one that drops anything (CLAUDE.md T9 3.9, T21 2.3).
       if (element.dataset.confirm !== '1') {
         ui.dropConfirm = id;
         break;
@@ -1628,6 +1657,9 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
       ui.dropConfirm = null;
       dispatch({ type: 'DROP_JOB', jobId: id });
       return;
+    case 'keepJob':
+      ui.dropConfirm = null;
+      break;
     case 'hire':
       dispatch({
         type: 'HIRE',
@@ -2021,6 +2053,16 @@ function runClick(event: MouseEvent): void {
     ui.why = null;
     requestRender();
   }
+  // A click anywhere but inside the drop card, or on the control that opens one, keeps the job:
+  // the card is the warning and not the deed (PIOTR, 18.09; CLAUDE.md T21 2.3).
+  if (
+    ui.dropConfirm !== null &&
+    target.closest('[data-modal="dropJob"]') === null &&
+    doer?.dataset.do !== 'dropJob'
+  ) {
+    ui.dropConfirm = null;
+    requestRender();
+  }
   if (doer) {
     if (doer instanceof HTMLButtonElement && doer.disabled) return;
     handleAction(doer, point);
@@ -2154,6 +2196,13 @@ export const ESCAPE_ORDER: ReadonlyArray<{
     isOpen: () => ui.daySummary !== null,
     shut: () => {
       ui.daySummary = null;
+    },
+  },
+  {
+    name: 'drop card',
+    isOpen: () => ui.dropConfirm !== null,
+    shut: () => {
+      ui.dropConfirm = null;
     },
   },
   { name: 'modal', isOpen: () => ui.modal !== null, shut: shutModal },

@@ -272,11 +272,11 @@ export interface ContractResult {
  *  definition (CLAUDE.md T20 2.5). */
 const OWNER_RATE = 1;
 
-/** What a minute of this man costs on a contract: a worker's weekly wage through the job card's
+/** What a minute of this man costs on a contract: a worker's monthly wage through the job card's
  *  own divisor, and the owner's daily draw over the minutes of his day, because the owner's days
- *  cost his draw (CLAUDE.md T20 2.1.1). */
+ *  cost his draw (CLAUDE.md T20 2.1.1, T21 2.10). */
 export function contractMinuteCost(state: GameState, worker: Worker | null): number {
-  if (worker) return workerMinuteCost(worker.weeklyWage);
+  if (worker) return workerMinuteCost(worker.monthlyWage);
   return ownerDrawPerDay(state) / MINUTES_PER_WORKING_DAY;
 }
 
@@ -833,13 +833,13 @@ export interface ClosingReport {
 function labourMinuteCost(state: GameState): number {
   const crew = joiners(state);
   if (crew.length > 0) {
-    const weekly = crew.reduce((total, worker) => total + worker.weeklyWage, 0) / crew.length;
-    return workerMinuteCost(weekly);
+    const monthly = crew.reduce((total, worker) => total + worker.monthlyWage, 0) / crew.length;
+    return workerMinuteCost(monthly);
   }
   const middling = HIRING_SPECS.find(
     (spec) => spec.role === 'joiner' && spec.tier === 'experienced',
   );
-  return workerMinuteCost(middling?.weeklyWage ?? 0);
+  return workerMinuteCost(middling?.monthlyWage ?? 0);
 }
 
 /** The closing report: pieces made, revenue, material, labour hours at cost, the net margin. */

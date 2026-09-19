@@ -4,6 +4,8 @@
 // Nothing in this file is exposed to the player as a setting (CLAUDE.md rule 3.4).
 
 import type {
+  BubbleKey,
+  BubbleTone,
   DayCategory,
   Difficulty,
   EquipmentSpec,
@@ -12,6 +14,7 @@ import type {
   Finish,
   LostMinuteCause,
   MaterialKind,
+  OwnerIdleReason,
   ProductTemplate,
   SoftwareTier,
   StageId,
@@ -80,8 +83,15 @@ import type {
  *  Bumped in Turn 20: the four tiers are named again and nobody is "poor"; every man is paid by
  *  the week and the monthly wage is gone; a man can be let go and works his notice out; a machine
  *  counts its services and is out of the hall for the day of one; and a contract records who
- *  ended it (CLAUDE.md T20 section 4). Every v28 save loads. */
-export const STATE_VERSION = 17;
+ *  ended it (CLAUDE.md T20 section 4). Every v28 save loads.
+ *
+ *  Bumped in Turn 21: the monthly wage is back and the week is gone, because Piotr wanted everyone
+ *  monthly and Turn 20 read him wrong; the four tiers carry his own rates; the state counts the
+ *  calendar days in a row the cash has been under the overdraft limit, thirty of which close the
+ *  company; the owner's day counts the minutes he stood as well as the ones he worked, and why; and
+ *  a tool cabinet is two metres wide, so a saved hall's cabinets are laid out again
+ *  (CLAUDE.md T21 section 4). Every v29 save loads. */
+export const STATE_VERSION = 18;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
@@ -333,10 +343,15 @@ export const PELLET_INCOME_PER_1000_PRODUCTION_MINUTES = 40;
  *  threshold is measured against [TUNE]. */
 export const WORKING_DAYS_PER_MONTH = (DAYS_PER_MONTH * WORKING_DAYS_PER_WEEK) / DAYS_PER_WEEK;
 
-/** Weeks in one of the game's months: thirty days over seven, which is 4.2857. What a man on a
- *  weekly wage costs in a month, so the Our team page and the hiring gate can put every man's
- *  pay in the same column (CLAUDE.md T17 2.9, 2.11). */
-export const WEEKS_PER_MONTH = DAYS_PER_MONTH / DAYS_PER_WEEK;
+/** Hours a man is paid for in one of the game's months: his forty hour week over thirty days of a
+ *  seven day week, which is 171.43. The one figure that turns a monthly wage into an hourly one,
+ *  which the night premium wants, and the reason nothing has to count weeks in a month any more:
+ *  from Turn 21 the wage itself is the month's (CLAUDE.md T13 3.9, T21 2.10). */
+export const WORKER_HOURS_PER_MONTH = (WORKER_HOURS_PER_WEEK * DAYS_PER_MONTH) / DAYS_PER_WEEK;
+
+/** Working minutes behind that month, 10,285.71: what a minute of a man costs is his wage over
+ *  this (CLAUDE.md T21 2.10). */
+export const WORKER_MINUTES_PER_MONTH = WORKER_HOURS_PER_MONTH * (MINUTES_PER_WORKING_DAY / HOURS_PER_WORKING_DAY);
 
 /** The hall in cells, which are metres now: x along the rear wall, y along the left wall, the
  *  origin at the rear left corner (docs/art/SPRITES.md 9.1 and 9.3). 200 cells. */
@@ -422,8 +437,18 @@ export const LOAN_EARLY_REPAYMENT_PENALTY = 0;
 export const ARREARS_MONTHLY_INTEREST = 0.01;
 /** [TUNE] "large arrears" means more than this many months of fixed costs. */
 export const ARREARS_INTEREST_THRESHOLD_MONTHS = 1;
-/** [TUNE] bankruptcy when the overdraft passes this multiple of the limit. */
-export const BANKRUPTCY_OVERDRAFT_MULTIPLIER = 2;
+/** The bank closes a company that cannot pay: not when the cash alone passes a multiple of the
+ *  overdraft, which is what Turn 13 read, but when the **net position** does, cash plus what the
+ *  company owes in arrears, against this multiple of the limit [PIOTR, 18.09: the 1.5]. On very
+ *  easy and easy that is -15,000 and on hard -7,500. Piotr dropped a 50,000 job with 7,000 in the
+ *  bank, the deposit went to arrears, the top bar said -7,259 and the game played on: "you cannot
+ *  pay your debts, you are bankrupt, and the game should end" (CLAUDE.md T21 2.2). */
+export const BANKRUPTCY_LIMIT_FACTOR = 1.5;
+
+/** The other way the bank closes you: this many calendar days in a row with the cash below the
+ *  overdraft limit, whatever the amount [PIOTR, 18.09: "thirty days below the limit"]. A day above
+ *  the limit puts the count back to nought (CLAUDE.md T21 2.2). */
+export const BANKRUPTCY_DAYS_BELOW_LIMIT = 30;
 export const ARREARS_MONTHS_WARNING = 1;
 export const ARREARS_MONTHS_FINAL_WARNING = 2;
 export const ARREARS_MONTHS_BAILIFF = 3;
@@ -504,8 +529,11 @@ export const SAW_FALLBACK_DEFAULT = true;
 /** The piece leaving. It carries no labour: it is the Turn 2 transport, not work at a bench
  *  (CLAUDE.md T7 3.1). The Work Plan drew a bar for it until Turn 9 took the bars away. */
 export const DELIVERY_STAGE: StageSpec = { id: 'delivery', label: 'Delivery', share: 0 };
-/** [TUNE] informational per job cost of a worker minute: weekly wage divided by this. */
-export const WORKER_MINUTE_RATE_DIVISOR = 2400;
+/** [TUNE] informational per job cost of a worker minute: monthly wage divided by this. It was the
+ *  2,400 minutes of a forty hour week until Turn 21 made the wage the month's; the figure it hands
+ *  back barely moves (an experienced joiner's minute was 600 / 2,400 = 25p and is now
+ *  2,600 / 10,285.71 = 25.3p) (CLAUDE.md T21 2.10). */
+export const WORKER_MINUTE_RATE_DIVISOR = WORKER_MINUTES_PER_MONTH;
 
 // ---------------------------------------------------------------------------
 // 8.8 Order board
@@ -635,18 +663,18 @@ export const JOINERY_CORE_MAX_EXTENSIONS = 2;
  *  month like every other subscription (CLAUDE.md T13 3.8). */
 export const JOINERY_CORE_PRICE_YEARLY = 1200;
 export const JOINERY_CORE_EXTENSION_PRICE_YEARLY = 600;
-/** What an experienced estimator costs a week [TUNE: his 2,600 a month over WEEKS_PER_MONTH is
- *  606.67, taken to the nearest ten]. The four tiers come off it by the one ladder in 9.3, and
+/** What an experienced estimator costs a month [PIOTR's own 2,600, which Turn 20 divided into a
+ *  week and Turn 21 hands back whole]. The four tiers come off it by the one ladder in 9.3, and
  *  what each tier is worth against the owner at the take off is WORKER_RATES: an estimator is a
  *  man with a rate like any other, so he has no rate table of his own any more
- *  (CLAUDE.md T20 2.5). The standing each tier answers from is TIER_MIN_REPUTATION. */
-export const ESTIMATOR_WEEKLY_WAGE_EXPERIENCED = 610;
-/** What an experienced sprayer costs a week [TUNE: his 2,700 a month over WEEKS_PER_MONTH is
- *  630, which is already round]. He is paid by the week like everybody else from tonight: there
- *  is one unit of pay in the game and it is the week (PIOTR, 18.09; CLAUDE.md T20 2.6). His four
- *  tiers come off this by the one ladder in 9.3, and the standing each answers from is
- *  TIER_MIN_REPUTATION, the same gate every tiered role passes (CLAUDE.md T20 2.5). */
-export const SPRAYER_WEEKLY_WAGE_EXPERIENCED = 630;
+ *  (CLAUDE.md T21 2.10). The standing each tier answers from is TIER_MIN_REPUTATION. */
+export const ESTIMATOR_MONTHLY_WAGE_EXPERIENCED = 2600;
+/** What an experienced sprayer costs a month [his own 2,700, back whole]. He is paid by the month
+ *  like everybody else: there is one unit of pay in the game and it is the month (PIOTR, 19.09:
+ *  "I wanted everyone monthly"; CLAUDE.md T21 2.10). His four tiers come off this by the one
+ *  ladder in 9.3, and the standing each answers from is TIER_MIN_REPUTATION, the same gate every
+ *  tiered role passes (CLAUDE.md T21 2.9). */
+export const SPRAYER_MONTHLY_WAGE_EXPERIENCED = 2700;
 /** What a joiner gets through in a minute of a lacquered job's finishing, against a sprayer's 1.0
  *  [TUNE]. A workshop without a sprayer is slower at the booth, never stuck
  *  (CLAUDE.md T19 2.6). */
@@ -659,10 +687,9 @@ export const SPRAYER_SPRAY_RATE = 1.0;
 export const SPRAYER_BENCH_RATE = 0.6;
 
 /** The production manager: one tier, a pure cost, and the first management role in the game
- *  [TUNE wage and standing] (CLAUDE.md T13 3.9). Paid by the week like everybody else from
- *  tonight [TUNE: his 3,400 a month over WEEKS_PER_MONTH is 793.33, to the nearest five]
- *  (CLAUDE.md T20 2.6). */
-export const PRODUCTION_MANAGER_WEEKLY_WAGE = 795;
+ *  [TUNE wage and standing] (CLAUDE.md T13 3.9). Paid by the month like everybody else, at his own
+ *  3,400 (CLAUDE.md T21 2.10). */
+export const PRODUCTION_MANAGER_MONTHLY_WAGE = 3400;
 export const PRODUCTION_MANAGER_REPUTATION = 10;
 /** The second shift: this many minutes after the day shift [TUNE], at this much of salary for
  *  those hours [TUNE], the owner absent from the hall: quality a tier down for work done at
@@ -693,9 +720,8 @@ export const ADMIN_COVER_RATE = 0.5;
  *  minutes of a drawing already carry the software's own factor, so his rate is the 0.8 and
  *  nothing else: the licence is counted once, where it is written down (CLAUDE.md T10 3.6). */
 export const DRAFTSMAN_RATE = 0.8;
-/** Paid by the week like everybody else from tonight [TUNE: his 2,400 a month over
- *  WEEKS_PER_MONTH is 560, which is already round] (CLAUDE.md T20 2.6). */
-export const DRAFTSMAN_WEEKLY_WAGE = 560;
+/** Paid by the month like everybody else, at his own 2,400 (CLAUDE.md T21 2.10). */
+export const DRAFTSMAN_MONTHLY_WAGE = 2400;
 export const DRAFTSMAN_REPUTATION = 15;
 
 /** A call is 15 minutes of whoever takes it, whatever the job is worth (PIOTR, T4 3.3). */
@@ -734,8 +760,19 @@ export const MOVE_MINUTES_PER_ITEM = 60;
 // nothing at all (PIOTR, 13.09; CLAUDE.md T9 3.1). The trip of Turn 7, and the three figures it
 // was measured in, are gone.
 /** What dropping a project costs the company, at once (PIOTR, 13.09: "drastically";
- *  CLAUDE.md T9 3.9). */
+ *  CLAUDE.md T9 3.9). From Turn 21 it is the floor of a scale and not the whole cost: a 3,000 job
+ *  costs the ten, and a 50,000 one costs everything the scale allows, because the two are not the
+ *  same broken promise (CLAUDE.md T21 2.4). */
 export const DROP_PROJECT_REPUTATION = 10;
+/** The price a drop is free of extra cost up to: the ten points and no more [PIOTR, 19.09]. */
+export const DROP_REPUTATION_FREE_PRICE = 5000;
+/** A point for every thousand pounds of the price above that [PIOTR, 19.09]. */
+export const DROP_REPUTATION_PER_1000 = 1;
+/** And never more than this, however big the job [PIOTR, 19.09: "up to 50 max"]. */
+export const DROP_REPUTATION_MAX = 50;
+/** A commercial client tells a trade: his job's drop costs this much more, still capped at the
+ *  fifty [PIOTR, 19.09]. */
+export const DROP_REPUTATION_COMMERCIAL_FACTOR = 1.5;
 /** How many lines of the reputation log are kept. The company board reads it week by week, and a
  *  year of trading is a few hundred lines [TUNE]. */
 export const REPUTATION_LOG_MAX = 2000;
@@ -816,9 +853,9 @@ export const SERVICE_COST_FRACTION = 0.1;
 export const SERVICE_LIFE_EXTENSION = 0.5;
 /** [TUNE] A week of a machine's own clock, which is the same reading `SERVICE_INTERVAL_HOURS` is
  *  written in: 80 hours is the month a one man shop puts on a saw (CLAUDE.md T6 3.6), so a week of
- *  it is that over `WEEKS_PER_MONTH`. No new figure: the two it is made of are Piotr's own
+ *  it is that over the weeks in a month. No new figure: the two it is made of are Piotr's own
  *  (CLAUDE.md T20 2.9.4). */
-export const PAST_LIFE_WEEK_HOURS = SERVICE_INTERVAL_HOURS / WEEKS_PER_MONTH;
+export const PAST_LIFE_WEEK_HOURS = (SERVICE_INTERVAL_HOURS * DAYS_PER_WEEK) / DAYS_PER_MONTH;
 /** [PIOTR, 18.09: "red when under a tenth is left"] The share of a machine's life left at which
  *  the bar on the Machines page turns from good to bad (CLAUDE.md T20 2.9). */
 export const LIFE_LOW_FRACTION = 0.1;
@@ -2664,7 +2701,21 @@ const SPEC_DRAFTS: SpecDraft[] = [
     name: 'Tool cabinet',
     price: 350,
     category: 'storage',
-    width: 1,
+    // Two metres wide, because that is what the art side painted and the picture is the fact
+    // [PIOTR's art, 19.09; CLAUDE.md T21 2.13]. The spec said 1 by 1 and the sprite did not fit it.
+    //
+    // The brief asks for a `zone 3 by 2` with it and tags that figure [TUNE]. It is not built, and
+    // the zone is left equal to the footprint (`withVariants` fills it from the width and the
+    // depth) for two reasons, both of them arithmetic and neither of them a preference.
+    // First, the zone is what nothing else may stand on: a 3 by 2 zone at the cabinet row's y 3
+    // reaches down into y 4, which is the workbench row (BENCH_SLOT_LAYOUT), so the day one hall
+    // could not be laid out at all, and it reaches 3 cells across, so no two cabinets could stand
+    // side by side in a row that holds seven of them. Second, the zone is what the crew's floor
+    // limit is measured against (`freeFloorM2`), so six cabinets at 6 cells instead of 2 would
+    // quietly take 24 m2 off the free floor and cost the player a man he has today.
+    // If Piotr wants the metre of standing room in front of a cabinet drawn, it is this pair of
+    // lines plus a new cabinet row, and the crew limit moves with it.
+    width: 2,
     depth: 1,
     height: 1,
     spriteKey: 'toolCabinet',
@@ -3136,15 +3187,22 @@ export const CANTEEN_SLOT_LAYOUT: LayoutSlot[] = [
 ];
 
 /** Tool cabinets stand in the row between the rear machines and the benches: one for the owner
- *  and one for every worker (CLAUDE.md T6 3.5). */
+ *  and one for every worker (CLAUDE.md T6 3.5).
+ *
+ *  Two cells apart from Turn 21, because a cabinet is two metres wide from Turn 21: the old row put
+ *  them one cell apart and every cabinet after the first would have stood on the one before it. The
+ *  row also starts at 8 now and not at 5. The day one saw stands at (5, 0) on a 3 by 3 zone and the
+ *  man who works it stands one cell out from its front, at (6, 3); a two cell cabinet on the old
+ *  first slot covered cells 5 and 6 of that row, took his cell, and put him three cells from his own
+ *  saw. Six slots, 8 to 19 of a hall 20 cells wide; a seventh cabinet falls back to the first free
+ *  cell as any other purchase does (`anchorFor`) (CLAUDE.md T21 2.13). */
 export const CABINET_SLOT_LAYOUT: LayoutSlot[] = [
-  { x: 5, y: 3 },
-  { x: 6, y: 3 },
-  { x: 7, y: 3 },
+  { x: 8, y: 3 },
   { x: 10, y: 3 },
-  { x: 11, y: 3 },
   { x: 12, y: 3 },
-  { x: 13, y: 3 },
+  { x: 14, y: 3 },
+  { x: 16, y: 3 },
+  { x: 18, y: 3 },
 ];
 
 /** Where a waiting delivery lorry stands: inside the shutter, on the lane. */
@@ -3223,24 +3281,30 @@ export const TIERS: readonly WorkerTier[] = ['novice', 'experienced', 'senior', 
 
 /** The one table of the words the game prints for a tier. Every hire card, every row of Our team,
  *  every assign list, the Company board and every report reads this and never the id, so the
- *  player sees one vocabulary and the code keeps its own (PIOTR, 18.09; CLAUDE.md T20 2.5). */
+ *  player sees one vocabulary and the code keeps its own (PIOTR, 18.09; CLAUDE.md T20 2.5).
+ *
+ *  Turn 21 puts the top two right: Piotr asked for **no experience, experienced, very experienced,
+ *  excellent**, and Turn 20 printed "super experienced" and "extremely experienced" instead, which
+ *  are Claude's words and not his (PIOTR, 19.09; CLAUDE.md T21 2.9). */
 export const TIER_WORDS: Record<WorkerTier, string> = {
   novice: 'no experience',
   experienced: 'experienced',
-  senior: 'super experienced',
-  master: 'extremely experienced',
+  senior: 'very experienced',
+  master: 'excellent',
 };
 
-/** Worker speed as a fraction of the owner, tier by tier. The experienced man matches the owner,
- *  and the two above him beat him: a workshop is meant to grow past the man who started it
- *  [PIOTR: 0.8 at the bottom, and the top at 120% of the owner's 1.0; the master's 1.4 is the
- *  step above that, TUNE]. One table for every role that has a rate, so an estimator's tier is
- *  worth at his desk exactly what a joiner's is at his bench (CLAUDE.md T20 2.5). */
+/** Worker speed as a fraction of the owner, tier by tier. The **very experienced** man matches the
+ *  owner and the **excellent** one beats him: a workshop is meant to grow past the man who started
+ *  it. These are Piotr's own four figures and not a ladder derived from them
+ *  [PIOTR, 19.09: 0.6, 0.8, 1.0, 1.2]. Turn 20 ran 0.8 / 1.0 / 1.2 / 1.4, which was Claude's
+ *  reading and one step too high all the way up. One table for every role that has a rate, so an
+ *  estimator's tier is worth at his desk exactly what a joiner's is at his bench
+ *  (CLAUDE.md T21 2.9). */
 export const WORKER_RATES: Record<WorkerTier, number> = {
-  novice: 0.8,
-  experienced: 1.0,
-  senior: 1.2,
-  master: 1.4,
+  novice: 0.6,
+  experienced: 0.8,
+  senior: 1.0,
+  master: 1.2,
 };
 
 /** Who answers the advert. The workshop's reputation earns the tier: a man with no experience
@@ -3254,45 +3318,44 @@ export const TIER_MIN_REPUTATION: Record<WorkerTier, number> = {
   master: 60,
 };
 
-/** A joiner's pay a week, tier by tier: 450, 600, 800, 1,000 [PIOTR: 1,000 for the extremely
- *  experienced man; the rest TUNE]. Every other tiered role's pay is that ladder against its own
- *  experienced man's wage, which is the rule the brief sets: three quarters of him at the bottom,
- *  four thirds at the third step and five thirds at the top (CLAUDE.md T20 2.5). */
-export const JOINER_WEEKLY_WAGE_EXPERIENCED = 600;
+/** A joiner's pay a month, tier by tier: 1,950, 2,600, 3,500, 4,330 [PIOTR, 19.09: the excellent
+ *  man at about 1,000 a week, which is 4,330 a month, and the rest scaled off the experienced
+ *  2,600; TUNE the three below the top]. Every other tiered role's pay is that ladder against its
+ *  own experienced man's wage, so no role grows a ladder of its own (CLAUDE.md T21 2.9, 2.10). */
+export const JOINER_MONTHLY_WAGE_EXPERIENCED = 2600;
 export const TIER_WAGE_FACTOR: Record<WorkerTier, number> = {
-  novice: 450 / 600,
+  novice: 1950 / 2600,
   experienced: 1,
-  senior: 800 / 600,
-  master: 1000 / 600,
+  senior: 3500 / 2600,
+  master: 4330 / 2600,
 };
 
-/** What this tier of a role costs a week, from what its experienced man costs, rounded to the
- *  nearest five pounds [TUNE the rounding]. The one conversion, so no role grows a wage ladder of
- *  its own (CLAUDE.md T20 2.5). */
-export function tierWeeklyWage(experiencedWeekly: number, tier: WorkerTier): number {
-  return Math.round((experiencedWeekly * TIER_WAGE_FACTOR[tier]) / 5) * 5;
+/** What this tier of a role costs a month, from what its experienced man costs, rounded to the
+ *  nearest five pounds [TUNE the rounding]. The one conversion (CLAUDE.md T21 2.9, 2.10). */
+export function tierMonthlyWage(experiencedMonthly: number, tier: WorkerTier): number {
+  return Math.round((experiencedMonthly * TIER_WAGE_FACTOR[tier]) / 5) * 5;
 }
 
 /** The four wages of a role, from its experienced man's. */
-export function tierWeeklyWages(experiencedWeekly: number): Record<WorkerTier, number> {
+export function tierMonthlyWages(experiencedMonthly: number): Record<WorkerTier, number> {
   return {
-    novice: tierWeeklyWage(experiencedWeekly, 'novice'),
-    experienced: tierWeeklyWage(experiencedWeekly, 'experienced'),
-    senior: tierWeeklyWage(experiencedWeekly, 'senior'),
-    master: tierWeeklyWage(experiencedWeekly, 'master'),
+    novice: tierMonthlyWage(experiencedMonthly, 'novice'),
+    experienced: tierMonthlyWage(experiencedMonthly, 'experienced'),
+    senior: tierMonthlyWage(experiencedMonthly, 'senior'),
+    master: tierMonthlyWage(experiencedMonthly, 'master'),
   };
 }
 
-export const JOINER_WEEKLY_WAGE = tierWeeklyWages(JOINER_WEEKLY_WAGE_EXPERIENCED);
-export const SPRAYER_WEEKLY_WAGE = tierWeeklyWages(SPRAYER_WEEKLY_WAGE_EXPERIENCED);
+export const JOINER_MONTHLY_WAGE = tierMonthlyWages(JOINER_MONTHLY_WAGE_EXPERIENCED);
+export const SPRAYER_MONTHLY_WAGE = tierMonthlyWages(SPRAYER_MONTHLY_WAGE_EXPERIENCED);
 
 export interface HiringSpec {
   role: WorkerRole;
   tier: WorkerTier | null;
   label: string;
-  /** The one wage field in the game. Everybody is paid by the week, on Friday (PIOTR, 18.09:
-   *  "one unit"; CLAUDE.md T20 2.6). */
-  weeklyWage: number;
+  /** The one wage field in the game. Everybody is paid by the month, on the last working day of it
+   *  (PIOTR, 19.09: "I wanted everyone monthly"; CLAUDE.md T21 2.10). */
+  monthlyWage: number;
   minReputation: number;
   duties: string;
 }
@@ -3303,14 +3366,14 @@ export interface HiringSpec {
 function tieredSpecs(
   role: WorkerRole,
   roleLabel: string,
-  experiencedWeekly: number,
+  experiencedMonthly: number,
   duties: (tier: WorkerTier) => string,
 ): HiringSpec[] {
   return TIERS.map((tier) => ({
     role,
     tier,
     label: `${roleLabel}, ${TIER_WORDS[tier]}`,
-    weeklyWage: tierWeeklyWage(experiencedWeekly, tier),
+    monthlyWage: tierMonthlyWage(experiencedMonthly, tier),
     minReputation: TIER_MIN_REPUTATION[tier],
     duties: duties(tier),
   }));
@@ -3336,14 +3399,16 @@ export const HIRING_SPECS: HiringSpec[] = [
   ...tieredSpecs(
     'joiner',
     'Joiner',
-    JOINER_WEEKLY_WAGE_EXPERIENCED,
+    JOINER_MONTHLY_WAGE_EXPERIENCED,
     (tier) => `Production at ${WORKER_RATES[tier].toFixed(2)} of the owner speed.`,
   ),
   {
     role: 'helper',
     tier: null,
     label: 'Helper',
-    weeklyWage: 420,
+    // [TUNE: 420 a week was his Turn 20 figure and he never had a monthly one; 1,800 is that week
+    // over the month and a round figure, which is what the hire card now prints.]
+    monthlyWage: 1800,
     minReputation: REPUTATION_MIN,
     duties: 'Bag changes, cleaning, unloading.',
   },
@@ -3351,8 +3416,7 @@ export const HIRING_SPECS: HiringSpec[] = [
     role: 'officeAdmin',
     tier: null,
     label: 'Office admin',
-    // [TUNE: his 1,900 a month over WEEKS_PER_MONTH is 443.33, to the nearest five].
-    weeklyWage: 445,
+    monthlyWage: 1900,
     minReputation: 5,
     duties: 'Emails, bookkeeping, daily ordering.',
   },
@@ -3360,8 +3424,7 @@ export const HIRING_SPECS: HiringSpec[] = [
     role: 'purchasingClerk',
     tier: null,
     label: 'Purchasing clerk',
-    // [TUNE: his 1,700 a month over WEEKS_PER_MONTH is 396.67, to the nearest five].
-    weeklyWage: 395,
+    monthlyWage: 1700,
     minReputation: 10,
     duties: 'Per job material orders, about 16 a day.',
   },
@@ -3369,7 +3432,7 @@ export const HIRING_SPECS: HiringSpec[] = [
     role: 'draftsman',
     tier: null,
     label: 'Draftsman',
-    weeklyWage: DRAFTSMAN_WEEKLY_WAGE,
+    monthlyWage: DRAFTSMAN_MONTHLY_WAGE,
     minReputation: DRAFTSMAN_REPUTATION,
     duties: 'Drawings, at 0.8 of your own speed.',
   },
@@ -3377,8 +3440,7 @@ export const HIRING_SPECS: HiringSpec[] = [
     role: 'salesman',
     tier: null,
     label: 'Salesman',
-    // [TUNE: his 2,200 a month over WEEKS_PER_MONTH is 513.33, to the nearest five].
-    weeklyWage: 515,
+    monthlyWage: 2200,
     minReputation: 15,
     duties: 'Client calls.',
   },
@@ -3387,20 +3449,20 @@ export const HIRING_SPECS: HiringSpec[] = [
   ...tieredSpecs(
     'estimator',
     'Estimator',
-    ESTIMATOR_WEEKLY_WAGE_EXPERIENCED,
+    ESTIMATOR_MONTHLY_WAGE_EXPERIENCED,
     (tier) => `Material take offs, at ${WORKER_RATES[tier].toFixed(2)} of your own speed.`,
   ),
   ...tieredSpecs(
     'sprayer',
     'Sprayer',
-    SPRAYER_WEEKLY_WAGE_EXPERIENCED,
+    SPRAYER_MONTHLY_WAGE_EXPERIENCED,
     () => 'Spray finishing at full speed, bench work at 0.60.',
   ),
   {
     role: 'productionManager',
     tier: null,
     label: 'Production manager',
-    weeklyWage: PRODUCTION_MANAGER_WEEKLY_WAGE,
+    monthlyWage: PRODUCTION_MANAGER_MONTHLY_WAGE,
     minReputation: PRODUCTION_MANAGER_REPUTATION,
     duties: 'The second shift, the assigning, the extraction connections, and the hall while you are away.',
   },
@@ -3752,6 +3814,64 @@ export const EFFICIENCY_CAUSES: ReadonlyArray<{ id: LostMinuteCause; label: stri
   { id: 'noMaterial', label: 'No material' },
   { id: 'ownerAway', label: 'Owner away' },
 ];
+
+/** The four reasons the owner stood still, in the order the day meter's grey segment lists them,
+ *  each with the minutes it took off him. Piotr read his own meter and said "my time runs two to
+ *  three times slower than the clock": it was not the clock, it was the meter counting only the
+ *  minutes he worked and saying nothing about the ones he stood (PIOTR, 19.09; CLAUDE.md T21 2.8).
+ *
+ *  These are the owner's own minutes and not the workshop's lost ones. `EFFICIENCY_CAUSES` above
+ *  counts every seat in the hall; two of its four (`noPeople`, `ownerAway`) cannot be true of the
+ *  man himself, and two of these four (`nothingAssigned`, `officeEmpty`) are not in it at all.
+ *  The two lists meet on the machine and the material, which is why the words here are the words
+ *  there. */
+export const OWNER_IDLE_REASONS: ReadonlyArray<{ id: OwnerIdleReason; label: string }> = [
+  { id: 'noMachine', label: 'Waiting for a machine' },
+  { id: 'noMaterial', label: 'No material' },
+  { id: 'nothingAssigned', label: 'Nothing assigned' },
+  { id: 'officeEmpty', label: 'In the office with nothing to do' },
+];
+
+// ---------------------------------------------------------------------------
+// T21 2.6 What the men say: the bubble over a figure's head
+// ---------------------------------------------------------------------------
+
+/** The words in every bubble the hall draws, and the colour each wears
+ *  (docs/mockups/t21/bubbles.html is the drawing and its table is this contract; CLAUDE.md T21
+ *  2.6). One table, so a word Piotr wants changed is a line here and not a repaint. A `{slot}` is
+ *  filled by the renderer off the state and never by a second table of words.
+ *
+ *  The tone is the colour: `wait` is the red border, something the player can fix; `chore` is the
+ *  green, a helper doing what he is there for; `work` is plain paper, the first seconds of a new
+ *  stage and then gone; `away` is the dashed grey of a man who is off the hall, drawn at the door
+ *  he went through. At x10 and x30 only `wait`, `chore` and `away` are drawn, so the hall does not
+ *  flicker. */
+export const BUBBLES: Record<BubbleKey, { text: string; tone: BubbleTone }> = {
+  waitingForMachine: { text: 'waiting for the {machine}', tone: 'wait' },
+  noCutParts: { text: 'no cut parts yet', tone: 'wait' },
+  noMaterial: { text: 'no sheets for {job}', tone: 'wait' },
+  nothingToDo: { text: 'nothing to do', tone: 'wait' },
+  sweeping: { text: 'sweeping', tone: 'chore' },
+  emptyingBags: { text: 'emptying the bags', tone: 'chore' },
+  unloading: { text: 'unloading', tone: 'chore' },
+  working: { text: '{stage} {job}', tone: 'work' },
+  pieces: { text: '{made} of {wanted} {piece}', tone: 'work' },
+  offToMeasure: { text: 'off to measure, back at {time}', tone: 'away' },
+  inTheOffice: { text: 'in the office', tone: 'away' },
+  atLunch: { text: 'at lunch', tone: 'away' },
+};
+
+/** How long a bubble about the stage a man has just started stays up, in real seconds
+ *  [PIOTR's drawing says three] (CLAUDE.md T21 2.6). */
+export const BUBBLE_WORK_SECONDS = 3;
+
+/** Above this speed only the red, the green and the grey bubbles are drawn: the paper ones would
+ *  flicker on and off faster than they could be read (CLAUDE.md T21 2.6). */
+export const BUBBLE_WORK_MAX_SPEED = 4;
+
+/** How far over a figure's head the bubble's point sits, in screen pixels [PIOTR's drawing says
+ *  six] (CLAUDE.md T21 2.6). */
+export const BUBBLE_HEAD_GAP = 6;
 
 /** The first use bubbles, one sentence each, keyed by the screen they open on [TUNE wording]
  *  (CLAUDE.md T13 3.22). Dismissed by a click, remembered in the save. */

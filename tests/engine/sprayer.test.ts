@@ -1,5 +1,5 @@
 // The sprayer (PIOTR, 17.09; CLAUDE.md T19 2.6). A new trade on the floor, hired like a joiner in
-// the four tiers of T20 2.5 and paid by the week like everybody else (T20 2.6). The finishing of
+// the four tiers of T21 2.9 and paid by the month like everybody else (T21 2.10). The finishing of
 // a lacquered job is his, at his own full
 // rate; a joiner may still do it, slower, so a workshop without one is slower at the booth and
 // never stuck. Anywhere else he is a pair of hands.
@@ -9,10 +9,9 @@ import {
   HIRING_SPECS,
   JOINER_SPRAY_RATE,
   SPRAYER_BENCH_RATE,
-  SPRAYER_WEEKLY_WAGE,
+  SPRAYER_MONTHLY_WAGE,
   TIER_MIN_REPUTATION,
   SPRAYER_SPRAY_RATE,
-  WEEKS_PER_MONTH,
   WORKER_RATES,
 } from '../../src/engine/constants';
 import { BENCH, SPRAY_BOOTH } from '../../src/engine/machines';
@@ -83,22 +82,23 @@ function labourIn(state: GameState, minutes: number): number {
 }
 
 describe('the sprayer (CLAUDE.md T19 2.6)', () => {
-  it('is hired like a joiner, in four tiers, and paid by the week', () => {
+  it('is hired like a joiner, in four tiers, and paid by the month', () => {
     const rows = HIRING_SPECS.filter((spec) => spec.role === 'sprayer');
-    // Four tiers from tonight, and the week is the one unit of pay (CLAUDE.md T20 2.5, 2.6).
+    // Four tiers, and the month is the one unit of pay (CLAUDE.md T21 2.9, 2.10).
     expect(rows.map((spec) => spec.tier)).toEqual(['novice', 'experienced', 'senior', 'master']);
     for (const spec of rows) {
       const tier = spec.tier as WorkerTier;
-      expect(spec.weeklyWage, spec.label).toBe(SPRAYER_WEEKLY_WAGE[tier]);
+      expect(spec.monthlyWage, spec.label).toBe(SPRAYER_MONTHLY_WAGE[tier]);
       expect(spec.minReputation, spec.label).toBe(TIER_MIN_REPUTATION[tier]);
     }
     const state = hireNow(boothHall(), 'sprayer', 'experienced');
     const man = state.workers[state.workers.length - 1];
     expect(man?.role).toBe('sprayer');
     expect(man?.rate).toBe(WORKER_RATES.experienced);
-    expect(monthlyWageOf(man ?? { weeklyWage: 0 })).toBe(
-      Math.round(SPRAYER_WEEKLY_WAGE.experienced * WEEKS_PER_MONTH * 100) / 100,
-    );
+    // A month of him is his wage and no arithmetic: 2,700 for the experienced man
+    // (CLAUDE.md T21 2.10).
+    expect(monthlyWageOf(man ?? { monthlyWage: 0 })).toBe(SPRAYER_MONTHLY_WAGE.experienced);
+    expect(SPRAYER_MONTHLY_WAGE.experienced).toBe(2700);
     // He is called a sprayer wherever he is drawn, and the Assign list reads the same table.
     expect(ROLE_WORDS.sprayer).toBe('sprayer');
   });
@@ -166,11 +166,11 @@ describe('the sprayer (CLAUDE.md T19 2.6)', () => {
     expect(labourIn(state, 5)).toBeGreaterThan(0);
   });
 
-  it('costs the job card real money, at his own weekly wage', () => {
+  it('costs the job card real money, at his own monthly wage', () => {
     const state = atTheBooth('sprayer');
     const job = state.jobs[0] as Job;
-    // `jobLabourCost` reads the weekly wage, which is the one wage field every man has since
-    // CLAUDE.md T20 2.6, so his minutes are quoted at his own rate and never at nothing.
+    // `jobLabourCost` reads the monthly wage, which is the one wage field every man has since
+    // CLAUDE.md T21 2.10, so his minutes are quoted at his own rate and never at nothing.
     const { cost } = jobLabourCost(state, job);
     expect(cost).toBeGreaterThan(0);
   });

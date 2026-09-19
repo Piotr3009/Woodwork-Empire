@@ -102,8 +102,8 @@ export interface Policy {
   /** Take this many of them on instead of one, each with his own kit (CLAUDE.md T7 3.1). */
   joiners?: number;
   /** The tier of the joiners taken on. All four of them, in the words of TIER_WORDS: no
-   *  experience, experienced, super experienced, extremely experienced (CLAUDE.md T20 2.5). The
-   *  man with no experience unless the month says otherwise. */
+   *  experience, experienced, very experienced, excellent (CLAUDE.md T21 2.9). The man with no
+   *  experience unless the month says otherwise. */
   joinerTier?: WorkerTier;
   /** How the management software is paid for: outright unless the month says the subscription. */
   licence?: 'oneOff' | 'subscription';

@@ -49,13 +49,16 @@ describe('what turning does to the floor', () => {
 describe('where a turned machine will go', () => {
   it('wants a free 1 by 3 of hall where the saw wanted a 3 by 1', () => {
     const state = emptyHall();
-    // A wall of cabinets with a gap three deep and one wide in it: nothing but a turned saw fits.
+    // A wall with a gap three deep and one wide in it: nothing but a turned saw fits. The wall is
+    // built of compressors and no longer of tool cabinets, because a cabinet is two cells wide from
+    // Turn 21 and a wall of them leaves gaps of its own that a square saw would fit
+    // (CLAUDE.md T21 2.13).
     for (let y = 0; y < 10; y += 1) {
       for (let x = 0; x < 20; x += 1) {
         const inGap = x >= 8 && x < 11 && y >= 2 && y < 6;
         if (inGap) continue;
-        if (!canPlaceSpec(state, 'toolCabinet', x, y, null).ok) continue;
-        placeEquipment(state, 'toolCabinet', { x, y, id: `cab-${x}-${y}` });
+        if (!canPlaceSpec(state, 'compressor', x, y, null).ok) continue;
+        placeEquipment(state, 'compressor', { x, y, id: `cab-${x}-${y}` });
       }
     }
     // Square to the walls the saw wants 4 by 3 and there is no 4 anywhere.

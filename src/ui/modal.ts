@@ -114,6 +114,9 @@ export const MODAL_SKINS: Record<string, ModalSkin> = {
   settings: 'folder',
   // One machine's card is a card in a folder, like an event (CLAUDE.md T17 2.6).
   machineCard: 'folder',
+  // The drop card is a card in a folder too: the question, the figures and the two buttons
+  // (CLAUDE.md T21 2.3).
+  dropJob: 'folder',
 };
 
 /** The one board of the three that is a picture and not CSS: green felt in an oak frame, with the
@@ -246,6 +249,16 @@ export function button(action: string, text: string, extra = ''): string {
 export function primaryButton(action: string, text: string, extra = ''): string {
   return (
     `<button class="btn btn-primary" data-do="${action}"${extra ? ` ${extra}` : ''}>` +
+    `${escapeHtml(text)}</button>`
+  );
+}
+
+/** The one red button in the game: the second click of a drop, which cannot be taken back. The house
+ *  amber is what every other action wears, and this is not another action (PIOTR, 18.09;
+ *  CLAUDE.md T21 2.3). */
+export function dangerButton(action: string, text: string, extra = ''): string {
+  return (
+    `<button class="btn btn-danger" data-do="${action}"${extra ? ` ${extra}` : ''}>` +
     `${escapeHtml(text)}</button>`
   );
 }

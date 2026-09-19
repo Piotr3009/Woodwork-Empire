@@ -556,6 +556,52 @@ input.num {
   color: #1d6b39;
 }
 
+/* T21 2.1 What the company owes, beside what it has: a red plate between the cash and the clock,
+   only while there are arrears, pulsing so it is not read as part of the furniture
+   (docs/mockups/t21/debt.html part 1). Built like the name plate above it, in the palette's own
+   --bad, and it takes no colour, font, radius or shadow value the file did not already have. */
+.owes-plate {
+  align-items: flex-start;
+  background: linear-gradient(#8f3a31, #6f2b24);
+  border: 1px solid #5b5446;
+  border-radius: 4px;
+  color: var(--cream);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  font: inherit;
+  justify-content: center;
+  line-height: 1.1;
+  padding: 4px 12px;
+  text-align: left;
+  animation: owes-pulse 1.2s ease-in-out infinite;
+}
+
+.owes-plate:hover {
+  border-color: var(--text-dim);
+}
+
+.owes-figure {
+  font-family: var(--font-title);
+  font-size: var(--fs-hand);
+  font-weight: 400;
+}
+
+.owes-line {
+  font-size: var(--fs-small);
+}
+
+@keyframes owes-pulse {
+  0%,
+  100% {
+    box-shadow: none;
+  }
+
+  50% {
+    box-shadow: 0 0 0 4px rgb(192 90 78 / 35%);
+  }
+}
+
 .topbar .net.bad {
   color: #b3261e;
 }
@@ -3540,6 +3586,12 @@ input.num {
   background: var(--accent);
 }
 
+/* T21 2.8 The minutes he stood: grey, between the worked colours and the empty rest of the bar, so
+   a day that reads 203 of 540 says where the other 337 went. */
+.seg-idle {
+  background: #6f7681;
+}
+
 /* 2.16 The tick on a task row, and the one button that sets the ticked ones going. */
 .row-tick {
   margin-right: 8px;
@@ -4255,4 +4307,101 @@ input.num {
 .office-figure {
   position: absolute;
   pointer-events: none;
+}
+
+/* --------------------------------------------------------------------------
+   Turn 21: debt you can see, and the men who say why they stand
+   -------------------------------------------------------------------------- */
+
+/* 2.3 The drop card. A card in the folder skin, so the paper, the ink and the buttons are the
+   folder's own (docs/mockups/t21/debt.html part 2): this adds the spacing of its rows, the red box
+   and the one button in the game that is red because the click behind it cannot be taken back. */
+.drop-card .row {
+  align-items: baseline;
+}
+
+.drop-danger {
+  background: #fbe7e3;
+  border: 1px solid #e3a49c;
+  border-radius: 6px;
+  color: #5a2320;
+  margin: 10px 0 0;
+  padding: 10px 12px;
+}
+
+.btn-danger {
+  background: var(--bad);
+  border-color: var(--bad);
+  color: var(--cream);
+  font-weight: 600;
+}
+
+.btn-danger:hover {
+  border-color: var(--text);
+}
+
+/* 2.6 What the men say. Paper, the title hand, one line, a tail under the box pointing at the head
+   it belongs to, and a border that says what kind of thing is being said: red is the player's to
+   fix, green is a helper about his work, plain paper is a stage just begun, dashed grey is a man off
+   the hall (docs/mockups/t21/bubbles.html). Drawn in the hall's live SVG layer, so the box is a
+   foreignObject's child and moves with the figure the walker moves. */
+.bubble {
+  background: var(--cream);
+  border: 2px solid #2a2418;
+  border-radius: 12px;
+  color: #2a2418;
+  font-family: var(--font-title);
+  font-size: var(--fs-hand-small);
+  line-height: 1.15;
+  padding: 3px 9px;
+  position: relative;
+  white-space: nowrap;
+}
+
+/* The tail is two triangles, the ink one under the paper one. The ink is ::before and the paper
+   ::after, so the paper covers it by the paint order alone: a z-index here would make the bubble one
+   more layer floating over the page, which is a thing the popover census has to have a reason for
+   (CLAUDE.md T20 2.15). */
+.bubble::before {
+  border: 6px solid transparent;
+  border-bottom: 0;
+  border-top-color: #2a2418;
+  bottom: -9px;
+  content: '';
+  left: 50%;
+  margin-left: -6px;
+  position: absolute;
+}
+
+.bubble::after {
+  border: 4px solid transparent;
+  border-bottom: 0;
+  border-top-color: var(--cream);
+  bottom: -6px;
+  content: '';
+  left: 50%;
+  margin-left: -4px;
+  position: absolute;
+}
+
+.bubble-wait {
+  border-color: var(--bad);
+}
+
+.bubble-wait::before {
+  border-top-color: var(--bad);
+}
+
+.bubble-chore {
+  border-color: var(--good);
+}
+
+.bubble-chore::before {
+  border-top-color: var(--good);
+}
+
+/* A man who is off the hall: the thought, not the word, so it is dashed and dim. */
+.bubble-away {
+  border-style: dashed;
+  color: var(--text-dim);
 }
