@@ -9,7 +9,7 @@ import { peekSave } from '../../src/cloud/store';
 import type { SaveStore } from '../../src/cloud/store';
 import { OLDEST_SAVE_VERSION, canOpenVersion, migrateState } from '../../src/engine/migrate';
 import { STATE_VERSION, bagStore, tick } from '../../src/engine/index';
-import { CANTEEN_SLOT_LAYOUT, roomById } from '../../src/engine/constants';
+import { CABINET_SLOT_LAYOUT, CANTEEN_SLOT_LAYOUT, roomById } from '../../src/engine/constants';
 import type { GameState } from '../../src/engine/index';
 import { twoMenOnSheetWork } from '../helpers';
 
@@ -256,10 +256,17 @@ function v28Save(): Record<string, unknown> {
   };
 }
 
+/** 0, 1, 2 ... one past the last place the cabinet row holds. */
+function oneMoreThanTheRowHolds(): number[] {
+  const indexes: number[] = [];
+  for (let at = 0; at <= CABINET_SLOT_LAYOUT.length; at += 1) indexes.push(at);
+  return indexes;
+}
+
 type LiftedSave = {
   version: number;
   workers: Array<Record<string, unknown>>;
-  equipment: Array<Record<string, unknown>>;
+  equipment: Array<Record<string, unknown> & { specId?: string; soldOnDay?: number | null }>;
   contracts: Array<Record<string, unknown>>;
   tasks: Array<{ orders: Array<Record<string, unknown>> }>;
   finance: { daysBelowOverdraft: number };
@@ -431,6 +438,49 @@ describe('a v29 save in this build (CLAUDE.md T21 section 4)', () => {
       nothingAssigned: 0,
       officeEmpty: 0,
     });
+  });
+
+  it('puts the cabinets the row has no room for out in the yard (CLAUDE.md T21 2.13)', () => {
+    // A hall that had more cabinets than the widened row holds: they were one cell things and seven
+    // of them fitted where six two cell ones do. The first six go back on the row and the seventh is
+    // put in the yard, where the player picks it up in setup mode, which is how Turn 17 handled the
+    // welfare kit that no longer fitted.
+    const save = v28Save() as unknown as Record<string, unknown>;
+    save.equipment = [
+      { id: 'kit-saw', specId: 'tableSaw', hoursUsed: 120 },
+      ...oneMoreThanTheRowHolds().map((index) => ({
+        id: `kit-cab-${index + 1}`,
+        specId: 'toolCabinet',
+        anchorX: 5 + index,
+        anchorY: 3,
+        rotated: false,
+      })),
+      // And one that was sold: it is nowhere in the hall and the row is not to hold a place for it.
+      { id: 'kit-cab-sold', specId: 'toolCabinet', anchorX: 12, anchorY: 3, soldOnDay: 4 },
+    ];
+    const out = migrateState(save, 16) as unknown as LiftedSave | null;
+    if (out === null) throw new Error('the lift refused the hall with too many cabinets');
+    const cabinets = out.equipment.filter((item) => item.specId === 'toolCabinet');
+    expect(cabinets).toHaveLength(CABINET_SLOT_LAYOUT.length + 2);
+    const standing = cabinets.filter((item) => item.soldOnDay === undefined);
+    expect(standing.slice(0, CABINET_SLOT_LAYOUT.length).map((item) => [item.anchorX, item.anchorY]))
+      .toEqual(CABINET_SLOT_LAYOUT.map((slot) => [slot.x, slot.y]));
+    // The one over: out in the yard, which is the first cell past the hall's own width.
+    const spare = standing[CABINET_SLOT_LAYOUT.length];
+    expect([spare?.anchorX, spare?.anchorY]).toEqual([20, 0]);
+    // Nothing on the row stands on anything else on it.
+    const boxes = standing
+      .slice(0, CABINET_SLOT_LAYOUT.length)
+      .map((item) => Number(item.anchorX));
+    for (let one = 0; one < boxes.length; one += 1) {
+      for (let two = one + 1; two < boxes.length; two += 1) {
+        expect(Math.abs((boxes[one] ?? 0) - (boxes[two] ?? 0)), `${one} against ${two}`)
+          .toBeGreaterThanOrEqual(2);
+      }
+    }
+    // The sold one is left exactly where it was: it is not in the hall to be laid out.
+    const sold = cabinets.find((item) => item.id === 'kit-cab-sold');
+    expect([sold?.anchorX, sold?.anchorY]).toEqual([12, 3]);
   });
 
   it('opens a whole v29 game, runs it on and round trips through the one encoder', () => {

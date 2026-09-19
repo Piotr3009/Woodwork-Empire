@@ -214,4 +214,20 @@ describe('the file on disk and the footprint in the engine', () => {
       expect(spriteFiles(), name).toContain(name);
     }
   });
+
+  it('measures the turned picture too, which the loop above leaves out', () => {
+    // The loop counts one file a class and says so: the cabinet's second orientation, the first `.r`
+    // file in the game (PIOTR's art, 19.09), was not measured at all. A rotated 2 by 1 is a 1 by 2 and
+    // `(width + depth)` is the same either way, so a turned picture wants the very same canvas, and
+    // this one is behind by the very same amount as its unturned pair (CLAUDE.md T21 2.13).
+    const turned = 'toolCabinet.standard.r.png';
+    expect(spriteFiles()).toContain(turned);
+    const stands = footprintOf('toolCabinet', 'standard', true);
+    expect(stands).toEqual({ width: 1, depth: 2, height: 1 });
+    const owed = spriteFileSize(stands.width, stands.depth, stands.height);
+    expect([owed.width, Math.floor(owed.height)]).toEqual([160, 136]);
+    expect(pngSize(turned)).toEqual({ width: 112, height: 112 });
+    // And there is no other turned file in the game to be behind: this is the only one.
+    expect(spriteFiles().filter((name) => name.endsWith('.r.png'))).toEqual([turned]);
+  });
 });

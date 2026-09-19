@@ -235,3 +235,67 @@ canteen the walk the hall already had.
 - **A man who is off sick or not working today is not sent to lunch either**, because he is not on
   the hall's own list for the day. He is still drawn at the canteen door all day, marked "(off)",
   which is what Turn 11 did with him and is not this turn's to change.
+
+## T21-B3c: 2.13, the tool cabinet stands two metres wide
+
+- Built: the checks the brief asks for, as tests rather than as paragraphs, and the migration case
+  phase A left. `tests/engine/toolCabinet.test.ts`, which is Turn 6's file and keeps its eight tests,
+  gains six: the footprint of a standing cabinet and of a turned one (1 by 2, which is what a rotated
+  2 by 1 is anywhere); that `canPlaceSpec` places and refuses it as any other
+  2 by 1 with no rule of its own (a cabinet one cell along is refused with "On the tool cabinet", two
+  cells along is the next slot and free, and the last slot ends exactly at the hall's own width);
+  that the whole row lays out with nothing overlapping, nothing on the bench row under it, nothing on
+  a room and nothing off the floor; and that the station table has no row for a cabinet, so it takes
+  `DEFAULT_ROW` and the man stands beside it and never on either of its two cells. The
+  `zone 3 by 2` arithmetic is its own describe, with the numbers in it. `tests/cloud/migrate.test.ts`
+  gains the case the brief names: a v29 hall with one cabinet more than the row holds comes out with
+  the first six on the row two cells apart and the seventh in the yard at (20, 0), with a sold one
+  left exactly where it was because it is not in the hall to be laid out.
+- Left: nothing of 2.13, and nothing was weakened. `tests/render/spriteClasses.test.ts` gained one
+  test rather than losing one: its loop measures one file a class and said so, which left the
+  cabinet's turned picture unmeasured, so that file is now measured too, mismatch and all.
+
+### Phase A's `zone 3 by 2` arithmetic, checked: it holds
+
+The brief tags the 3 by 2 zone [TUNE] and asks for the arithmetic to be checked rather than trusted.
+It is checked, in `tests/engine/toolCabinet.test.ts`, and **phase A's reading is confirmed on all
+three counts. This is a line Piotr has to rule on.**
+
+1. **It stands on the workbenches.** The cabinet row is at y 3 (`CABINET_SLOT_LAYOUT`) and the bench
+   row is at y 4 (`BENCH_SLOT_LAYOUT`). A zone two cells deep at y 3 covers y 3 and y 4, so the first
+   cabinet's zone is on the first bench, and the day one hall cannot be laid out at all.
+2. **No two cabinets can stand side by side.** The slots are two cells apart, because the cabinet is
+   two cells wide; a zone three cells wide overlaps its neighbour's. A row of three cell zones from
+   x 8 holds **four** of them in a hall twenty cells wide, and a six man crew wants seven.
+3. **It costs the player a man.** The zone is what the free floor is measured against
+   (`freeFloorM2`), and the crew limit is that floor over `M2_PER_PERSON`, 24. A cabinet takes 2 m2
+   today and would take 6, so four more each; six cabinets is 24 m2, which is exactly one man.
+   Measured on the day one hall: adding a second cabinet takes 2 m2 off the free floor today.
+
+If Piotr wants the metre of standing room in front of a cabinet drawn after all, it is two lines in
+the spec plus a cabinet row that is three cells apart and clear of the benches, and the crew limit
+moves with it, which is a balance change and not a footprint change.
+
+### What the 2.13 checks measured
+
+- **The spec and the row**: `width 2, depth 1, height 1`, zone equal to the footprint; six slots at
+  x 8, 10, 12, 14, 16, 18, all at y 3, the last ending at x 20, which is the hall's own width. A
+  seventh cabinet falls back to the first free cell the way any purchase does (`anchorFor`).
+- **Placement**: no change was needed. `canPlaceSpec` works on the zone, and the zone is the
+  footprint, so a 2 by 1 is placed and refused as any other 2 by 1. Asserted.
+- **The station table**: no change was needed. There is no `toolCabinet` row in `STATION_TABLE`, so
+  it takes `DEFAULT_ROW`, whose offsets count off `footprintCells(item)`; the man stands off one of
+  the four sides and never on either cell of the cabinet. Asserted for all three roles.
+- **The picture**: **the delivered art does not match the new footprint.** Measured off the PNG
+  headers, `toolCabinet.standard.png` is **112 by 112** and `toolCabinet.standard.r.png` is **112 by
+  112**; the contract (`spriteFileSize`, docs/art/SPRITES.md 2) wants **160 by 136** for a 2 by 1 by
+  1, which is what `spindleMoulder.standard.png` is already drawn at. 112 by 112 is the canvas of a
+  1 by 1 by 1. Until the two are redrawn the hall draws a square one cell picture in the two cell box:
+  `spriteImage` fits it `xMidYMax meet`, so it is scaled to the box's height and centred across its
+  width, and it does not sit over its own two cells the way a two cell picture would. Neither the
+  sprite files nor `docs/art/SPRITES.md` was touched (CLAUDE.md T21 section 6); the request is already
+  written up in `docs/art/REQUESTS-T21.md` 2, phase A asserts the unturned file by name in
+  `tests/render/spriteClasses.test.ts` and this task adds the turned one beside it, so the day the
+  redrawn pictures land those assertions fail and the entries are deleted.
+- **The migration**: a v29 hall whose cabinets stood one cell apart comes out on the new row, a save
+  with more of them than the row holds puts the extras in the yard, and a sold one is left alone.
