@@ -179,7 +179,9 @@ function boothHall(): GameState {
   // carry the locker, the seat or the hand tools; the tool cabinet is counted one higher than the
   // rest, because the owner keeps his own tools in one (CLAUDE.md T6 3.5). The sprayer wants none
   // of it, so buying the lot here is what keeps the two runs the same hall.
-  for (const specId of ['locker', 'canteenSeat', 'handToolSet', 'toolCabinet']) {
+  // The cabinet before the set: a man's tools have to have a slot to live in, and the owner's own
+  // set is already in the one slot the day one used cabinet holds (CLAUDE.md T22 2.12).
+  for (const specId of ['locker', 'canteenSeat', 'toolCabinet', 'handToolSet']) {
     kitted = buyNow(kitted, specId);
   }
   const state = withDryAir(withAir(withExtraction(kitted)));

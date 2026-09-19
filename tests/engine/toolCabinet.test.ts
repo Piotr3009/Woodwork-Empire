@@ -140,8 +140,22 @@ describe('what cannot be bought without one', () => {
     expect(canBuy(state, 'handToolSet').reason).toBe('Needs Tool cabinet first');
     state = buyNow(state, TOOL_CABINET);
     expect(countOf(state, TOOL_CABINET)).toBe(1);
+    // A hand edgebander wants a cabinet and nothing more: it is one tool in a drawer.
     expect(canBuy(state, 'edgebander').ok).toBe(true);
-    expect(canBuy(state, 'handToolSet').ok).toBe(true);
+    // A man's hand tool set wants a free slot, and the one slot of the cheapest cabinet is the
+    // owner's own (CLAUDE.md T22 2.12). So one cabinet is not enough for a man's tools, which is
+    // the rule the hiring gate has counted since Turn 6, now counted in slots.
+    expect(freeToolSlots(state)).toBe(0);
+    expect(canBuy(state, 'handToolSet').ok).toBe(false);
+    expect(canBuy(state, 'handToolSet').reason).toBe('No free slot in a tool cabinet');
+    // A second slot, whichever way it is bought: another used cabinet, or one standard cabinet
+    // instead of the used one, which holds two on its own.
+    const twoUsed = buyNow(state, TOOL_CABINET, 'used');
+    expect(freeToolSlots(twoUsed)).toBe(1);
+    expect(canBuy(twoUsed, 'handToolSet').ok).toBe(true);
+    const standard = buyNow(newGame(), TOOL_CABINET, 'standard');
+    expect(freeToolSlots(standard)).toBe(1);
+    expect(canBuy(standard, 'handToolSet').ok).toBe(true);
   });
 
   it('leaves the buy undone, not half done, while the cabinet is missing', () => {
@@ -195,10 +209,16 @@ describe('hiring wants a free cabinet', () => {
     // With the owner's set in the one cabinet there is no slot for a man's, so the hire is short
     // one, and one used cabinet at ninety pounds is the cheapest way to give him one.
     expect(missingForHire(state, 'joiner')).toContain(TOOL_CABINET);
-    for (const specId of ['locker', 'canteenSeat', 'handToolSet']) state = buyNow(state, specId);
+    for (const specId of ['locker', 'canteenSeat']) state = buyNow(state, specId);
+    // His set cannot even be bought yet: there is nowhere to keep it, which is the other half of
+    // 2.12's free slot rule and is `canBuy`'s own refusal.
+    expect(canBuy(state, 'handToolSet').reason).toBe('No free slot in a tool cabinet');
     expect(canHire(state, 'joiner', 'novice').ok).toBe(false);
     expect(canHire(state, 'joiner', 'novice').reason).toContain('Tool cabinet');
     state = buyNow(state, TOOL_CABINET, 'used');
+    // The second cabinet gives the slot, and the set goes into it.
+    expect(freeToolSlots(state)).toBe(1);
+    state = buyNow(state, 'handToolSet');
     // Two cabinets of one slot each and one set bought: the owner's set and the man's fill them
     // both, the hire goes through, and there is nothing spare for the next man.
     expect(toolSlots(state)).toBe(2);
@@ -228,13 +248,16 @@ describe('hiring wants a free cabinet', () => {
     // The day 1 kit buys one, which is the owner's: the joiner has none.
     expect(countOf(state, TOOL_CABINET)).toBe(1);
     expect(missingForHire(state, 'joiner')).toContain(TOOL_CABINET);
-    for (const specId of ['locker', 'canteenSeat', 'handToolSet']) {
+    for (const specId of ['locker', 'canteenSeat']) {
       state = buyNow(state, specId);
     }
     expect(canHire(state, 'joiner', 'novice').ok).toBe(false);
     expect(canHire(state, 'joiner', 'novice').reason).toContain('Tool cabinet');
+    // The cabinet before the set, because the set wants the slot the cabinet brings
+    // (CLAUDE.md T22 2.12).
     state = buyNow(state, TOOL_CABINET);
     expect(countOf(state, TOOL_CABINET)).toBe(2);
+    state = buyNow(state, 'handToolSet');
     expect(missingForHire(state, 'joiner')).toEqual([]);
     expect(canHire(state, 'joiner', 'novice').ok).toBe(true);
     state = hireNow(state, 'joiner', 'novice');

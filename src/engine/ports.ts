@@ -211,9 +211,8 @@ export function portFor(file: string | null, ports: Record<string, Port> = PORTS
   return ports[file] ?? null;
 }
 
-/** A port read off a picture the hall is mirroring, turned round with it: `px` counts from the
- *  other edge of the file, a `+x` mouth becomes a `+y` one, and the cell has its two offsets
- *  exchanged (CLAUDE.md T22 2.8).
+/** The cell of a port read off a picture the hall is mirroring, turned round with it: its two
+ *  offsets exchanged (CLAUDE.md T22 2.8).
  *
  *  **The cell is the axis swap and not `width - 1 - x`.** A mirror about the vertical screen axis
  *  on the hall's 2 to 1 dimetric exchanges the roles of the two world axes, which is the very
@@ -227,34 +226,19 @@ export function portFor(file: string | null, ports: Record<string, Port> = PORTS
  *  Nothing is clamped either way. A machine's cell is inside its own footprint because the drop
  *  comes down onto its body; an extractor's is outside it, because the vertical stands in front of
  *  the mouth and not in it. `tests/engine/ports.test.ts` asserts both of those, per file, at every
- *  orientation. */
-export function mirroredPort(port: Port, fileWidth: number): Port {
-  return {
-    ...port,
-    px: fileWidth - port.px,
-    faces: port.faces === undefined ? undefined : port.faces === '+x' ? '+y' : '+x',
-    cell: { x: port.cell.y, y: port.cell.x },
-  };
-}
-
-/** The port of a thing standing in the hall, with the mirror already applied where the hall is
- *  mirroring the picture, or null when nothing has been measured for the picture it is drawn with.
+ *  orientation.
  *
- *  `fileWidth` is the width of the 2x file in pixels, which is the renderer's arithmetic
- *  (`spriteFileSize`) and not the table's, so the caller hands it in; it is read on the mirrored
- *  path only. The engine's routing wants the cell alone and asks `portCellIn` instead, which needs
- *  no file size at all. */
-export function portOf(
-  files: readonly string[],
-  item: { spriteKey: string; variantId?: string | null; orientation?: Orientation },
-  size: { fileWidth: number },
-  ports: Record<string, Port> = PORTS,
-): Port | null {
-  const orientation = item.orientation ?? 0;
-  const picture = pictureFor(files, item.spriteKey, item.variantId, orientation);
-  const port = portFor(picture.file, ports);
-  if (port === null) return null;
-  return picture.mirrored ? mirroredPort(port, size.fileWidth) : port;
+ *  The pixel and the mouth are mirrored where the mirror really happens, in `portPointOf` in
+ *  `src/render/hall.ts`, and not here: the hall reflects a picture about its **anchor**
+ *  (`objectArt`'s `translate(anchor.x * 2, 0) scale(-1, 1)`), so the reflection of a file pixel is
+ *  `2 * (8 + width * 48) - px` and not 2.8's `fileWidth - px`, which reflects the file about its
+ *  own middle. The two agree only where the footprint is square. On the standard saw turned, the
+ *  one machine this really happens to, they are 96 file pixels apart, which is two metres of hall:
+ *  the arithmetic is in docs/notes-t22-b3.md and in REPORT-T22.md section 0. One rule each, then:
+ *  the cell here, where the engine routes by it, and the pixel there, where the hall's own
+ *  transform defines it. */
+export function mirroredCell(cell: { x: number; y: number }): { x: number; y: number } {
+  return { x: cell.y, y: cell.x };
 }
 
 /** The cell of the route this item's port belongs to, as an offset from the corner of its own

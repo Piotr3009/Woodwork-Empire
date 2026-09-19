@@ -245,7 +245,7 @@ export interface EquipmentSpec {
 /** Which way a thing on the floor is turned: quarter turns clockwise from the picture as the art
  *  side drew it, so 0 is the base file, 1 the `.r`, 2 the `.rr` and 3 the `.rrr`. Piotr asked for
  *  the other two turns on 19.09 ("I need two more turns, we have four walls") and it replaced the
- *  `rotated` boolean of Turn 10 everywhere (CLAUDE.md T22 2.11). */
+ *  boolean Turn 10 turned a machine with, everywhere (CLAUDE.md T22 2.11). */
 export type Orientation = 0 | 1 | 2 | 3;
 
 /** A purchased item standing in the hall. */

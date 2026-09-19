@@ -92,9 +92,9 @@ import type {
  *  (CLAUDE.md T21 section 4).
  *
  *  Version 19 is Turn 22: the unpaid balance a v18 save carried beside its cash is gone from the
- *  game, so it is subtracted from the cash and one ledger line says so; `rotated` on every placed item and every
- *  reservation becomes `orientation`, the boolean's true reading as a quarter turn; and a tool
- *  cabinet with no class is the standard one, because the cabinet is a family of five now
+ *  game, so it is subtracted from the cash and one ledger line says so; the turn a placed item and a
+ *  reservation carried as a boolean becomes an `orientation`, its true reading as a quarter turn;
+ *  and a tool cabinet with no class is the standard one, because the cabinet is a family of five now
  *  (CLAUDE.md T22 section 4). Every v30 and v31 save loads. */
 export const STATE_VERSION = 19;
 
@@ -3598,12 +3598,17 @@ export const HIRING_SPECS: HiringSpec[] = [
 
 /** Every joiner needs all of these before he can be hired (PIOTR). The tool cabinet is counted
  *  one higher than the rest, because the owner keeps his own tools in one too (T6 3.5). */
+/** What a joiner wants in the hall before he starts, in an order the prerequisites allow: the
+ *  cabinet stands before the set it holds, because from tonight a man's hand tool set wants a free
+ *  slot in one and `canBuy` refuses it without (CLAUDE.md T22 2.12). Anything that buys the
+ *  shortfall walks this list in order, the scripted player included, so an order the game itself
+ *  cannot buy would be a shortfall nobody could fill. */
 export const JOINER_PREREQUISITES = [
   'workbench',
   'locker',
   'canteenSeat',
-  HAND_TOOL_SET,
   TOOL_CABINET_ID,
+  HAND_TOOL_SET,
 ];
 /** The cabinet a man's tools are kept in. One is no longer one man's: a class holds one, two, four
  *  or eight sets, and it is the free slots the gate counts (CLAUDE.md T22 2.12). */

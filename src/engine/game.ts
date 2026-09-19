@@ -38,6 +38,7 @@ import {
   STARTING_LAYOUT,
   TEMP_STORAGE_COST,
   TOOL_CABINET,
+  HAND_TOOL_SET,
   STATE_VERSION,
   WEBSITE_START_LEVEL,
   WELFARE_IN_THE_CANTEEN,
@@ -240,6 +241,7 @@ import {
   canHire,
   countMonthDaysOff,
   crewHasGoneHome,
+  freeToolSlots,
   hasWorkingDay,
   helperOnDuty,
   helpers,
@@ -2402,6 +2404,12 @@ export function canBuy(
       const name = findSpec(required)?.name ?? required;
       return { ok: false, reason: `Needs ${name} first` };
     }
+  }
+  // A man's hand tool set has to have somewhere to live: the cabinets of the hall hold one, two,
+  // four or eight sets by their class, and the sets already bought and the owner's own fill them
+  // from the bottom (PIOTR, 19.09; CLAUDE.md T22 2.12).
+  if (specId === HAND_TOOL_SET && freeToolSlots(state) <= 0) {
+    return { ok: false, reason: 'No free slot in a tool cabinet' };
   }
   const oneOf = requiresOneOfFor(spec, variant);
   if (oneOf.length > 0 && !oneOf.some((id) => has(state, id))) {

@@ -1173,7 +1173,7 @@ function stationLabel(station: string): string {
   const waiting = stationWaitingFor(station);
   // The one phrase for a machine a man cannot have. The hall built its own copy of it until Turn 21
   // put the article in: two copies meant the Work Plan said "waiting for the table saw" and the man
-  // under his own name said "waiting for table saw" (CLAUDE.md T21 2.7).
+  // under his own name said "waiting for table saw" (CLAUDE.md T21 2.6).
   if (waiting !== null) return waitingLine(waiting);
   if (stationSecondAt(station) !== null) return 'the bench, second place';
   if (stationPlaceAt(station) !== null) return 'alongside, on the next place';

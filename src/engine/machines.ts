@@ -491,14 +491,6 @@ export function poweredMachines(state: GameState): Equipment[] {
   });
 }
 
-/** What the bailiff can take: machines, cheapest first (CLAUDE.md T2 3.4). The extraction kit is
- *  left where it is, because taking it would stop the hall dead instead of slowing it. */
-export function seizableMachines(state: GameState): Equipment[] {
-  return state.equipment
-    .filter((item) => findSpec(item.specId)?.category === 'machine')
-    .slice()
-    .sort((left, right) => left.purchasePrice - right.purchasePrice);
-}
 
 /** Which dust band the hall is in (CLAUDE.md 9.7). */
 export function dustBand(dust: number): { max: number; factor: number; label: string } {

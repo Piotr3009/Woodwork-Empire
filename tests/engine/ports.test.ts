@@ -17,11 +17,10 @@ import {
   type Port,
   deliveredFiles,
   measuredFiles,
-  mirroredPort,
+  mirroredCell,
   pictureFor,
   portCellIn,
   portFor,
-  portOf,
   spriteFileName,
 } from '../../src/engine/ports';
 import { footprintOf } from '../../src/engine/machines';
@@ -144,19 +143,17 @@ describe('the cell a port routes to (CLAUDE.md T22 2.8)', () => {
     expect(saw.cell).toEqual({ x: 1, y: 0 });
     // A 3 by 1 saw turned is 1 by 3: the table cell one along x becomes one along y, which is the
     // middle cell of the turned footprint. `width - 1 - x` gave -1, a metre off the machine.
-    expect(mirroredPort(saw, 208).cell).toEqual({ x: 0, y: 1 });
+    expect(mirroredCell(saw.cell)).toEqual({ x: 0, y: 1 });
     expect(footprintOf('tableSaw', 'standard', 1)).toEqual({ width: 1, depth: 3, height: 1 });
     const fan = portFor('extractor.standard.png');
     if (fan === null) throw new Error('no fan line');
     expect(fan.cell).toEqual({ x: 0, y: 1 });
     expect(fan.faces).toBe('+y');
-    const turned = mirroredPort(fan, 160);
     // The cell in front of the mouth moves with the mouth: down and to the left becomes down and
-    // to the right, and the cell goes from one along y to one along x.
-    expect(turned.cell).toEqual({ x: 1, y: 0 });
-    expect(turned.faces).toBe('+x');
-    expect(turned.px).toBe(160 - fan.px);
-    expect(turned.py).toBe(fan.py);
+    // to the right, and the cell goes from one along y to one along x. The mouth itself is swapped
+    // where the mirror happens, in `portPointOf`, which is asserted in
+    // tests/render/pipesOnTheHall.test.ts.
+    expect(mirroredCell(fan.cell)).toEqual({ x: 1, y: 0 });
   });
 
   it('reads the picture the hall really draws, so a turned file brings its own numbers', () => {
@@ -166,12 +163,13 @@ describe('the cell a port routes to (CLAUDE.md T22 2.8)', () => {
       file: 'tableSaw.standard.png',
       mirrored: true,
     });
-    const port = portOf(
-      deliveredFiles(),
-      { spriteKey: 'tableSaw', variantId: 'standard', orientation: 1 },
-      { fileWidth: 208 },
-    );
-    expect(port?.cell).toEqual({ x: 0, y: 1 });
+    expect(
+      portCellIn(deliveredFiles(), {
+        spriteKey: 'tableSaw',
+        variantId: 'standard',
+        orientation: 1,
+      }),
+    ).toEqual({ x: 0, y: 1 });
     // The tool cabinet has all four files and no orientation of it is mirrored, so the day an
     // `extractor.<class>.r.png` lands it brings its own line and no code changes at all.
     for (const orientation of [0, 1, 2, 3] as Orientation[]) {
