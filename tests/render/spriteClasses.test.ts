@@ -181,12 +181,12 @@ describe('the file on disk and the footprint in the engine', () => {
         checked += 1;
       }
     }
-    // Thirty three files: the twenty of the four families Turn 7 gave classes to, the ten of the
-    // extraction and air families of Turn 10, and the three the art side named after the one
-    // synthetic standard class of a family that has no ladder, which are the two central systems
-    // and the pelletiser. Those three were measured against what was delivered in Turn 10: the
-    // systems are 3 by 2 by 4 and the pelletiser 2 by 2 by 2.5 (CLAUDE.md T10 3.4).
-    expect(checked).toBe(33);
+    // Thirty three files from Turn 7 to Turn 19 (the four families with classes, the extraction
+    // and air families of Turn 10, and the three synthetic standard classes measured in Turn 10),
+    // plus the six of 19.09: the five spindle moulders and the tool cabinet's one standard
+    // picture (the cabinet has no class ladder; its rotated `.r` file is picked by orientation
+    // and is not counted here).
+    expect(checked).toBe(39);
     for (const name of ['dustSystem.standard.png', 'flexiSystem.standard.png', 'pelletiser.standard.png']) {
       expect(spriteFiles(), name).toContain(name);
     }

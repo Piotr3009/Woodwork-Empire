@@ -114,15 +114,13 @@ describe('the sprite check page', () => {
     expect(new Set(keys).size).toBe(keys.length);
   });
 
-  it('draws the spindle moulder classes as placeholders in the hall dimetric until they are painted', () => {
+  it('draws the spindle moulder classes from their files (delivered 19.09), and the pallet truck as a placeholder', () => {
     const page = parse(renderSpriteCheck());
     for (const classId of ['used', 'budget', 'standard', 'pro', 'industrial']) {
       const cell = page.querySelector(`[data-sprite-target="spindleMoulder.${classId}"]`);
       expect(cell, classId).not.toBeNull();
-      const drawn = cell?.querySelector('.sprite-shot.is-placeholder [data-placeholder]');
-      expect(drawn?.getAttribute('data-placeholder'), classId).toBe(`spindleMoulder.${classId}`);
-      // The 2:1 diamond, never straight on (docs/art/REQUESTS-T13.md).
-      expect(drawn?.querySelectorAll('polygon').length, classId).toBeGreaterThanOrEqual(3);
+      expect(cell?.querySelector('.sprite-shot.is-placeholder'), classId).toBeNull();
+      expect(cell?.innerHTML, classId).toContain(`/sprites/spindleMoulder.${classId}.png`);
     }
     const truck = page.querySelector('[data-sprite-target="palletTruck"] [data-placeholder]');
     expect(truck?.getAttribute('data-placeholder')).toBe('palletTruck');
@@ -137,8 +135,8 @@ describe('the sprite check page', () => {
     expect(cells.map((cell) => cell.getAttribute('data-pipe-key'))).toEqual([...PIPE_LAYER_KEYS]);
     for (const cell of cells) {
       const key = cell.getAttribute('data-pipe-key') ?? '';
-      // Drawn by the pipe helper, as the hall draws it, until the file lands (CLAUDE.md T16 2.3).
-      expect(cell.querySelector(`[data-pipe-tile="${key}"]`), key).not.toBeNull();
+      // The files landed on 19.09 (the duct kit): drawn from the file, as the hall draws them.
+      expect(cell.innerHTML, key).toContain(`/sprites/${key}.png`);
       expect(cell.querySelector('[data-placeholder]'), key).toBeNull();
       expect(cell.textContent, key).toContain(`${key}.png`);
     }
@@ -194,9 +192,9 @@ describe('the sprite check page', () => {
     // Piotr delivered a batch with this brief, so the page is no longer all placeholders.
     expect(delivered.length).toBeGreaterThan(0);
     // A Turn 13 picture the art side owes is drawn as its placeholder rather than as "no file":
-    // the spindle moulder's five classes and the pallet truck (CLAUDE.md T13 3.13, 3.21).
+    // the pallet truck (the spindle moulder's five classes landed on 19.09).
     const placeholders = Array.from(page.querySelectorAll('.sprite-grid .sprite-shot.is-placeholder'));
-    expect(placeholders).toHaveLength(6);
+    expect(placeholders).toHaveLength(1);
     expect(page.querySelectorAll('.sprite-grid .sprite-shot.is-missing')).toHaveLength(
       targets.length - delivered.length - placeholders.length,
     );
