@@ -349,6 +349,11 @@ describe('(w) a month with a production manager, a night joiner and five days aw
     // Re-measured again in Turn 20: the tier ladder moved up (a man with no experience is 0.8 of
     // the owner where he was 0.6, CLAUDE.md T20 2.5), so the day crew clear the book a day sooner
     // still and the night man has one night of work in him. Measured, not tuned.
+    // Turn 21 put that ladder back where it was: a man with no experience is 0.6 of the owner
+    // again, which is Piotr's own figure and not Claude's reading of it (PIOTR, 19.09;
+    // CLAUDE.md T21 2.9). The day crew are therefore a shade slower than the line above says, the
+    // night man has at least as much work in him as he did, and the assertion below, which asks
+    // only that the shift ran at all, is the one that was ever tested.
     expect(nights.length).toBeGreaterThanOrEqual(1);
     for (const day of nights) expect(day.nightMinutes).toBeLessThanOrEqual(SECOND_SHIFT_MINUTES);
     // The premium is for the shift, not for the minutes the rack let him work (nothing is free):

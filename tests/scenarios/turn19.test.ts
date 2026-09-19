@@ -274,8 +274,11 @@ describe('(bb) a lacquered kitchen, by a joiner and by a sprayer', () => {
     expect(joinerDid).toBeGreaterThan(0);
     expect(sprayerDid).toBeGreaterThan(joinerDid);
     // And by exactly the figure the constant names. Re-measured in Turn 20 over two working days,
-    // because the tier ladder moved and both men are 1.0 of the owner now where they were 0.8
-    // (CLAUDE.md T20 2.5), so three days would see the sprayer finish the stage and the reading
+    // because the tier ladder moved and both men were 1.0 of the owner then where they had been 0.8
+    // (CLAUDE.md T20 2.5); Turn 21 puts them back to 0.8 (CLAUDE.md T21 2.9), so the two figures
+    // below are four fifths of what they read, and the assertion is a ratio between two men on the
+    // same ladder, which is why it holds whatever rung they are on. Three days would see the
+    // sprayer finish the stage and the reading
     // hit a ceiling instead of a rate: the joiner gets through 425.60 of the 900 the stage
     // carries and the sprayer 608.00, which is 1.4286 to one, and 1 / JOINER_SPRAY_RATE is
     // 1.4285714. The month and the constant are one number, so neither can drift from the other

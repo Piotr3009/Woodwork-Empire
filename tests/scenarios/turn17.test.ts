@@ -117,8 +117,11 @@ describe('(y) two men on one job, on Very easy', () => {
     // Measured in Turn 17: 26 days with the one man, 13 with the two of them. Two men are twice
     // one of them, and the machine stage, where one has the saw and the other waits at its cell,
     // is what keeps the saving from being exact (CLAUDE.md T17 2.10).
-    // Re-measured in Turn 20, because a man with no experience is 0.8 of the owner now where he
-    // was 0.6 (CLAUDE.md T20 2.5): 19 days alone and 8 together, which is 0.42. The finished day
+    // Re-measured in Turn 20, because a man with no experience was 0.8 of the owner then where he
+    // had been 0.6 (CLAUDE.md T20 2.5): 19 days alone and 8 together, which is 0.42. Turn 21 puts
+    // him back to 0.6, Piotr's own figure (CLAUDE.md T21 2.9), so both counts are longer than those
+    // two again; the assertions below are a floor and a comparison, which is what makes them hold
+    // through three turns of the ladder moving. The finished day
     // is a whole day, so a piece that is done an hour into the morning counts that day in full,
     // and the ratio sits a little under the half it is made of. The arithmetic itself is asserted
     // minute by minute in tests/engine/assignees.test.ts.
