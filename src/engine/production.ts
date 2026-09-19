@@ -9,7 +9,7 @@
 // phase C folds it onto this function (the note in REPORT-T13-B2.md).
 
 import { HOURS_PER_WORKING_DAY, WET_AIR_FINISH_FACTOR } from './constants';
-import { addWorkingDays, isBreak } from './clock';
+import { addWorkingDays, isBreak, workedMinutesOfDay } from './clock';
 import {
   BUILDING_ROLES,
   addLabour,
@@ -22,6 +22,7 @@ import {
   jobProgress,
   jobStage,
   leadAssignee,
+  oldestReadyJob,
   waitingLine,
 } from './jobs';
 import {
@@ -44,7 +45,8 @@ import {
   specOf,
   variantOf,
 } from './machines';
-import { drawSheetsFor } from './materials';
+import { drawSheetsFor, rackCanSupply } from './materials';
+import { openTasks } from './tasks';
 import {
   airFactorFor,
   benchDrawsAir,
@@ -53,7 +55,13 @@ import {
   sprayingOnWetAir,
   underExtracted,
 } from './media';
-import { ownerEfficiency, ownerIsAvailable, spendOwnerMinute, staffOutputFactor } from './owner';
+import {
+  ownerEfficiency,
+  ownerIsAvailable,
+  spendOwnerIdleMinute,
+  spendOwnerMinute,
+  staffOutputFactor,
+} from './owner';
 import { contractMen, contractWantsToday } from './contracts';
 import { bookMonthMinute, isWorkingToday } from './staff';
 import {
@@ -72,7 +80,7 @@ import {
   stagePlanFor,
   tradeFactor,
 } from './stages';
-import type { Equipment, GameState, Job, LostMinuteCause, Shift } from './types';
+import type { Equipment, GameState, Job, LostMinuteCause, OwnerIdleReason, Shift } from './types';
 
 /** One man who could put a minute into a job right now. */
 export interface Hand {
@@ -428,6 +436,55 @@ export function placeHand(state: GameState, hand: Hand): HandPlace {
     return { work: null, lost: 'noMachine', noMaterial: false, moved };
   }
   return { work: null, lost: 'noMachine', noMaterial: false, moved };
+}
+
+// ---------------------------------------------------------------------------
+// The owner's own minute: the ones he worked, and the ones he stood and why (PIOTR, 19.09: "my time
+// runs two to three times slower than the clock"; CLAUDE.md T21 2.8).
+// ---------------------------------------------------------------------------
+
+/** Why the owner stood through the minute just gone, or null when there was nothing of his day to
+ *  stand through: he is not in the workshop, the hall is at dinner, or he is holding a job of work,
+ *  and a minute he holds something is a minute `spendOwnerMinute` has already booked as worked
+ *  (CLAUDE.md T21 2.8). The four reasons are `OWNER_IDLE_REASONS`, in the order the hover lists them.
+ *
+ *  Two of the four are the two the workshop's own efficiency breakdown counts, and they are read the
+ *  same way here: the rack first, and then the hall and the machine of the stage, which is everything
+ *  else (CLAUDE.md T13 3.5). The other two are his alone: nothing in the hall is his, or there is
+ *  nothing in the hall at all. */
+export function ownerIdleReason(state: GameState): OwnerIdleReason | null {
+  const owner = state.owner;
+  if (!ownerIsAvailable(state)) return null;
+  if (isBreak(state.clock.minute) && !owner.breakSkipped) return null;
+  if (owner.currentTaskId !== null) return null;
+  const job = jobOf(state, OWNER);
+  if (job !== null) {
+    return rackCanSupply(state, job, jobProgress(job)) ? 'noMachine' : 'noMaterial';
+  }
+  // Nothing of his own at all. Either the hall's list has a job of work nobody has taken, or a job
+  // is standing ready for a bench, and either way there is work about that he has not been put on;
+  // or there is none of that and he is in the office with his hands in his pockets
+  // [TUNE: which of the two the split falls on].
+  const waiting =
+    openTasks(state).some((task) => task.doneBy === null) || oldestReadyJob(state) !== null;
+  return waiting ? 'nothingAssigned' : 'officeEmpty';
+}
+
+/** Books the minute just gone onto the owner's day as one he stood through, with its reason. Called
+ *  once a minute from the one hook that already samples what everybody was at
+ *  (`bookWeekMinutes` in src/engine/tasks.ts), and never for a minute it has already booked.
+ *
+ *  A minute is either worked or stood and never both, and the cap says so: the minutes of the day
+ *  that have run, the dinner hour taken out of them unless he worked through it, are all there are
+ *  to divide between the two. Nothing is booked past that, whatever the hooks do
+ *  (CLAUDE.md T21 2.8). */
+export function bookOwnerIdleMinute(state: GameState): void {
+  const owner = state.owner;
+  const ran = workedMinutesOfDay(state.clock.minute, owner.breakSkipped);
+  if (owner.minutesWorked + owner.idleMinutes >= ran) return;
+  const reason = ownerIdleReason(state);
+  if (reason === null) return;
+  spendOwnerIdleMinute(state, reason);
 }
 
 /** What one minute of the hall came to, for the efficiency tally and for the events game.ts

@@ -318,6 +318,12 @@ Every hit, and why it is not a tier rate:
 - The three hits in `src/engine/staff.ts` and `src/ui/team.ts` that this commit found were live
   prose about what the hire card says, and they are fixed in the source: the refusal really reads
   `excellent joiners come from reputation 60` now, so the comments quoting it were out of date.
+- One more hit came up on the last run of the grep, after the greps above were written down:
+  `src/engine/contracts.ts:350`, the comment over `contractResultFor`, still said "his own weekly
+  wage" and named Turn 20's four wages against Turn 20's four rates. It is fixed in the T21-B2d
+  commit, with Piotr's own figures: 1,950, 2,600, 3,500 and 4,330 a month against 0.6, 0.8, 1.0 and
+  1.2 of the owner. The claim it makes is still true, because the wage ladder is still the steeper of
+  the two (0.75, 1, 1.35, 1.67 against 0.75, 1, 1.25, 1.5).
 
 ## Numbers chosen
 
@@ -491,3 +497,60 @@ added as a second gate that could one day disagree with the first.
   limit of 2.7 as built and Piotr should hear it plainly: the scheduler empties a queue on a job, and
   it does not move a man who is working a job by himself.** Emptying that one too wants either a man
   on more than one job, or a scheduler that brings him back, and both are new rules.
+
+## T21-B2d: 2.8, the day meter shows the idle
+
+- Built: the booking and the drawing, with no frozen file needed for either.
+  **The booking.** `ownerIdleReason(state)` in `src/engine/production.ts` hands back one of the four
+  `OWNER_IDLE_REASONS` or null, and `bookOwnerIdleMinute(state)` books it. Rather than hunt for every
+  place a minute of his can pass unworked, it is hung off the one hook that already knows whether the
+  minute just gone was worked at all: `bookOne` inside `bookWeekMinutes` (`src/engine/tasks.ts`), which
+  samples the owner every clock minute for his week's meters and computes `worked` off his own
+  counters. `bookOne` now hands that flag back with the meters, and `bookWeekMinutes` books the idle
+  minute when it is false. That means **every** unworked minute is caught, in the day loop as it
+  stands, with no game.ts edit: the hook is called from `settle` on every minute that is not the
+  dinner hour. The reasons: the rack and the machine are read the way the efficiency tally reads a
+  lost minute, and the other two are the hall's list.
+  **The drawing.** `segmentBar` puts one grey run after the worked bands, `dayMeter`'s figure reads
+  `370 worked · 0 idle · 540` in place of `370 / 540 min`, and `segmentTooltip` adds the four reasons
+  with their minutes, in `OWNER_IDLE_REASONS` order, in the same `.day-tip` and `.tip-row` markup, so
+  there is one plate and not two. Phase A's `.seg-idle` is the grey and no CSS was wanted.
+  Tests: `tests/engine/ownerIdle.test.ts` (9) and four new ones in `tests/ui/topbar.test.ts`.
+- Left: nothing of 2.8. Four tests were rewritten to the new truth and none was weakened: three
+  asserted the old two figure label (`tests/ui/topbar.test.ts` twice, `tests/ui/app.test.ts`,
+  `tests/engine/breakTime.test.ts`) and one had a title that Turn 21 makes wrong
+  ("leaves the break and the idle time unpainted", now "and the minutes nobody spent").
+
+### The invariant, which is the whole of the arithmetic
+
+A minute is either worked or stood and never both, and what the two come to can never be more than
+the minutes of the day that have run, the dinner hour taken out of them unless he worked through it.
+`bookOwnerIdleMinute` refuses to book past that cap, whatever calls it and however often, which is
+what makes the figure safe in a game whose state settles many times a minute. It is asserted minute by
+minute across a whole day, the break included, in `tests/engine/ownerIdle.test.ts`.
+
+### Where the grey goes, and the band that was not added
+
+The day log is the day in the order the minutes happened, and the minutes he stood are not in it: they
+are counted in `owner.idleByReason` and nowhere else. So the grey is one run after the worked bands and
+before the empty rest, which is exactly what the section describes ("between the worked green and the
+empty rest"). The other reading, a `DayCategory` of its own in the log, would put the grey in the right
+place in the order but it is a frozen file change (`types.ts` and `constants.ts` both) and it would
+make the idle minutes part of `dayPercentages`, which the day end plate and the Company board print as
+shares of the minutes worked. That would be a bigger change than the section asks for and it is not
+made.
+
+### Numbers and readings chosen (T21-B2d)
+
+- **The split between `nothingAssigned` and `officeEmpty`** [TUNE]: there is an open job of work on the
+  hall's list that nobody has taken, or a job standing ready for a bench, so there is work about and he
+  is not on it, which is "Nothing assigned"; otherwise there is nothing at all and he is "In the office
+  with nothing to do". Measured on a fresh Easy hall, a morning of doing nothing reads 100 minutes of
+  Nothing assigned, because the morning's own list is sitting there untaken.
+- **A minute he holds a task is never idle**, even if the task makes no progress: `spendOwnerMinute`
+  has already booked it as worked, and a minute cannot be both.
+- **The dinner hour books nothing**, which is the same rule the week's meters keep: an hour in the
+  canteen is neither worked nor paid for.
+- **All three figures are always printed**, so the label reads `370 worked · 0 idle · 540` on a day he
+  stood through none of [TUNE]. The three are one sentence, and a sentence that loses a word on a good
+  day reads as a different sentence.

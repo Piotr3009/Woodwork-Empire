@@ -4,7 +4,11 @@
 
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { DAY_CATEGORY_LABELS, EFFICIENCY_CAUSES } from '../../src/engine/constants';
+import {
+  DAY_CATEGORY_LABELS,
+  EFFICIENCY_CAUSES,
+  OWNER_IDLE_REASONS,
+} from '../../src/engine/constants';
 import {
   applyAction,
   dayPercentages,
@@ -152,7 +156,9 @@ describe("the boss's day meter", () => {
     expect(html).toContain('class="seg seg-workshop" data-band="workshop" style="width:50.0000%"');
   });
 
-  it('leaves the break and the idle time unpainted', () => {
+  it('leaves the break and the minutes nobody spent unpainted', () => {
+    // The minutes he stood are painted grey from Turn 21 and are asserted below; these are the
+    // minutes of the day that have not run yet, which are nothing at all (CLAUDE.md T21 2.8).
     const html = renderTopbar(withScriptedDay([['workshop', 135]]), 'hall');
     expect(bandsOf(html)).toEqual(['workshop']);
     // A quarter of the day painted, and nothing at all for the other three quarters.
@@ -164,7 +170,7 @@ describe("the boss's day meter", () => {
     const state = withScriptedDay([['workshop', 480], ['office', 120]]);
     state.owner.overtimeMinutes = 120;
     const html = renderTopbar(state, 'hall');
-    expect(html).toContain('600 / 660 min');
+    expect(html).toContain('600 worked \u00b7 0 idle \u00b7 660');
     expect(html).toContain('style="width:72.7273%"');
   });
 
@@ -176,7 +182,7 @@ describe("the boss's day meter", () => {
     // Half an hour of it, and the band he was in when five o'clock came is cut in two.
     state.owner.overtimeMinutes = 30;
     expect(bandsOf(renderTopbar(state, 'hall'))).toEqual(['workshop', 'office', 'overtime']);
-    expect(renderTopbar(state, 'hall')).toContain('600 / 570 min');
+    expect(renderTopbar(state, 'hall')).toContain('600 worked \u00b7 0 idle \u00b7 570');
   });
 
   it('carries no legend under the bar, and holds the minutes on the hover plate', () => {
@@ -197,8 +203,62 @@ describe("the boss's day meter", () => {
     const state = withScriptedDay(SCRIPTED);
     const html = renderTopbar(state, 'hall');
     expect(html).toContain("Piotr's day \u00b7 idle");
-    expect(html).toContain('370 / 540 min');
+    // Three figures where there were two: the minutes he worked, the minutes he stood, and the day
+    // (PIOTR, 19.09: "my time runs two to three times slower than the clock"; CLAUDE.md T21 2.8).
+    expect(html).toContain('370 worked \u00b7 0 idle \u00b7 540');
     expect(html).toContain('class="lamp is-idle"');
+  });
+
+  it('paints the minutes he stood grey, between the worked bands and the empty rest', () => {
+    const state = withScriptedDay([['workshop', 120]]);
+    state.owner.idleMinutes = 90;
+    state.owner.idleByReason = {
+      noMachine: 40,
+      noMaterial: 20,
+      nothingAssigned: 20,
+      officeEmpty: 10,
+    };
+    const html = renderTopbar(state, 'hall');
+    // The grey is the last run of the bar and the rest of it is unpainted: 120 worked, 90 stood, and
+    // 330 of the 540 not spent at all (CLAUDE.md T21 2.8).
+    expect(bandsOf(html)).toEqual(['workshop', 'idle']);
+    expect(html).toContain('class="seg seg-idle" data-band="idle" style="width:16.6667%"');
+    expect(html).toContain('120 worked \u00b7 90 idle \u00b7 540');
+  });
+
+  it('has no grey at all on a day he stood through none of', () => {
+    const html = renderTopbar(withScriptedDay([['workshop', 120]]), 'hall');
+    expect(bandsOf(html)).toEqual(['workshop']);
+    expect(html).not.toContain('seg-idle" data-band');
+  });
+
+  it('lists the four reasons he stood on the same plate as the bands, with their minutes', () => {
+    const state = withScriptedDay([['workshop', 120]]);
+    state.owner.idleMinutes = 91;
+    state.owner.idleByReason = {
+      noMachine: 41,
+      noMaterial: 20,
+      nothingAssigned: 20,
+      officeEmpty: 10,
+    };
+    const html = renderTopbar(state, 'hall');
+    // One plate and not two: the rows are the same `.tip-row` the bands use, in the order the
+    // constants name the reasons in (CLAUDE.md T21 2.8).
+    const plate = html.slice(html.indexOf('<div class="day-tip">'));
+    const order = Array.from(plate.matchAll(/data-idle="([a-zA-Z]+)"/g)).map((hit) => hit[1]);
+    expect(order).toEqual(OWNER_IDLE_REASONS.map((reason) => reason.id));
+    for (const reason of OWNER_IDLE_REASONS) {
+      expect(plate, reason.id).toContain(reason.label);
+    }
+    expect(plate).toContain('<span class="tip-key seg-idle"></span>');
+    expect(plate).toContain('41 min');
+    expect(plate).toContain('10 min');
+    // And the four add up to the figure beside the bar, which is the one the grey is drawn from.
+    const summed = OWNER_IDLE_REASONS.reduce(
+      (sum, reason) => sum + state.owner.idleByReason[reason.id],
+      0,
+    );
+    expect(summed).toBe(state.owner.idleMinutes);
   });
 
   it('turns the lamp orange while he is on something and grey while he is out', () => {

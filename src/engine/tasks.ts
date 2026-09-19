@@ -50,6 +50,7 @@ import { isBreak, nextWorkingDay, weekOfDay } from './clock';
 import { OWNER, has } from './machines';
 import { canUnload } from './materials';
 import { managerOnDuty, ownerIsAvailable } from './owner';
+import { bookOwnerIdleMinute } from './production';
 import { makeId } from './rng';
 import { plural } from './text';
 import {
@@ -759,7 +760,7 @@ function bookOne(
   week: number,
   band: WeekCategory | null,
   jobName: string | null,
-): WeekMeters | null {
+): { meters: WeekMeters; worked: boolean } | null {
   const meters = weekMetersOf(holder, week);
   if (meters.day === state.clock.day && meters.minute === state.clock.minute) return null;
   const effort = effortSoFar(holder);
@@ -772,12 +773,12 @@ function bookOne(
   meters.day = state.clock.day;
   meters.minute = state.clock.minute;
   meters.paidMinutes += 1;
-  if (!worked) return meters;
+  if (!worked) return { meters, worked };
   if (band !== null) meters.minutes[band] += 1;
   if (jobName !== null && !meters.jobs.includes(jobName) && meters.jobs.length < WEEK_JOBS_KEPT) {
     meters.jobs.push(jobName);
   }
-  return meters;
+  return { meters, worked };
 }
 
 /** The pieces a standing contract turned out since the last sample, shared among the men who are
@@ -803,7 +804,12 @@ export function bookWeekMinutes(state: GameState): void {
   if (ownerIsAvailable(state)) {
     const job = state.jobs.find((entry) => entry.assignees.includes(OWNER)) ?? null;
     const band = bandOf(state, owner.currentTaskId, job?.id ?? null);
-    bookOne(state, owner, week, band, job?.name ?? null);
+    const sample = bookOne(state, owner, week, band, job?.name ?? null);
+    // The minutes he stood are the other half of his day, and this is the hook that already knows
+    // whether the minute just gone was worked at all (PIOTR, 19.09: "my time runs two to three times
+    // slower than the clock"; CLAUDE.md T21 2.8). The reasons themselves are read in
+    // `src/engine/production.ts`, which is the module that knows who is standing and why.
+    if (sample !== null && !sample.worked) bookOwnerIdleMinute(state);
   }
   // Five o'clock and the men have gone home. The clock runs on for the owner and for nobody else,
   // so nobody else is paid for the evening or counted through it (CLAUDE.md T17 2.12).

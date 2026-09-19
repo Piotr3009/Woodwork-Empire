@@ -346,10 +346,11 @@ function resultAtSpeed(
  *  his own time costs at his own rate and on the machines the hall has, so the result of putting
  *  him on it is on his own row before he is put on it (PIOTR, 17.09; CLAUDE.md T17 2.22,
  *  T20 2.1.1). A slower man takes more minutes over a piece, and what those minutes cost is his
- *  own weekly wage. The wage ladder is steeper than the speed ladder, 450, 600, 800 and 1,000 a
- *  week against 0.8, 1.0, 1.2 and 1.4 of the owner, so a piece costs more in a better man's time
- *  and the thinner margin is the better man's (CLAUDE.md T20 2.5). `null` is the owner, whose
- *  days cost his draw: he is costed here, and the check says whether he may be put on it. */
+ *  own monthly wage. The wage ladder is steeper than the speed ladder, 1,950, 2,600, 3,500 and
+ *  4,330 a month against 0.6, 0.8, 1.0 and 1.2 of the owner, so a piece costs more in a better
+ *  man's time and the thinner margin is the better man's (CLAUDE.md T21 2.9, 2.10). `null` is the
+ *  owner, whose days cost his draw: he is costed here, and the check says whether he may be put on
+ *  it. */
 export function contractResultFor(
   state: GameState,
   contract: Contract,
