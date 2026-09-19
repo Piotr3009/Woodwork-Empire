@@ -38,7 +38,7 @@ import {
   tileKeysFor,
   wantsExtraction,
 } from '../engine/pipes';
-import { jobsAtGate } from '../engine/jobs';
+import { jobsAtGate, waitingLine } from '../engine/jobs';
 import { orderName, reservedItems, shoppingList } from '../engine/orders';
 import {
   OWNER,
@@ -1060,9 +1060,10 @@ function stationLabel(station: string): string {
   const specId = stationMachine(station);
   if (specId !== null) return (findSpec(specId)?.name ?? specId).toLowerCase();
   const waiting = stationWaitingFor(station);
-  if (waiting !== null) {
-    return `waiting for ${(findSpec(waiting)?.name ?? waiting).toLowerCase()}`;
-  }
+  // The one phrase for a machine a man cannot have. The hall built its own copy of it until Turn 21
+  // put the article in: two copies meant the Work Plan said "waiting for the table saw" and the man
+  // under his own name said "waiting for table saw" (CLAUDE.md T21 2.7).
+  if (waiting !== null) return waitingLine(waiting);
   if (stationSecondAt(station) !== null) return 'the bench, second place';
   if (stationPlaceAt(station) !== null) return 'alongside, on the next place';
   if (station === STATION_RACK) return 'the rack';

@@ -17,6 +17,7 @@ import {
   DEADLINE_SMALL_SLACK_DAYS,
   DEPOSIT_FRACTION,
   DROP_PROJECT_REPUTATION,
+  MACHINE_SHORT_WORDS,
   DROP_REPUTATION_COMMERCIAL_FACTOR,
   DROP_REPUTATION_FREE_PRICE,
   DROP_REPUTATION_MAX,
@@ -773,7 +774,8 @@ export function dropJob(state: GameState, jobId: string): boolean {
  *  the two things that say it, the hall's own block and the queue at a machine, are read from here
  *  and from `src/engine/production.ts` (CLAUDE.md T21 2.7). */
 export function waitingLine(specId: string): string {
-  return `waiting for the ${(findSpec(specId)?.name ?? specId).toLowerCase()}`;
+  const name = MACHINE_SHORT_WORDS[specId] ?? (findSpec(specId)?.name ?? specId).toLowerCase();
+  return `waiting for the ${name}`;
 }
 
 function onOrderBlock(state: GameState, family: string): string {

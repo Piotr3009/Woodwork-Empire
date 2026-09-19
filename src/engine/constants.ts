@@ -650,8 +650,8 @@ export const CONSUMABLES_LABEL = 'Consumables and materials';
 /** A material take off is half an hour of the desk it is done at, whatever the job is worth
  *  [PIOTR, 18.09: "when I did it, it took 30 minutes"] (CLAUDE.md T20 2.3). The curve by price and
  *  the five a day are both gone: the man's own speed is what makes one take off longer than
- *  another, so a man with no experience spends 37 minutes over it and an extremely experienced one
- *  21, and he does as many a day as his minutes allow. */
+ *  another, so a man with no experience spends 50 minutes over it and an excellent one 25, and he
+ *  does as many a day as his minutes allow. */
 export const MATERIAL_TAKE_OFF_MINUTES = 30;
 /** What Joinery Core does to those minutes: it halves them [TUNE, from PIOTR's "16 a day bare and
  *  32 with the software"]. */
@@ -3284,8 +3284,8 @@ export const TIERS: readonly WorkerTier[] = ['novice', 'experienced', 'senior', 
  *  player sees one vocabulary and the code keeps its own (PIOTR, 18.09; CLAUDE.md T20 2.5).
  *
  *  Turn 21 puts the top two right: Piotr asked for **no experience, experienced, very experienced,
- *  excellent**, and Turn 20 printed "super experienced" and "extremely experienced" instead, which
- *  are Claude's words and not his (PIOTR, 19.09; CLAUDE.md T21 2.9). */
+ *  excellent**, and Turn 20 printed two words of its own for the top two instead, which were
+ *  Claude's and not his (PIOTR, 19.09; CLAUDE.md T21 2.9). */
 export const TIER_WORDS: Record<WorkerTier, string> = {
   novice: 'no experience',
   experienced: 'experienced',
@@ -3296,8 +3296,8 @@ export const TIER_WORDS: Record<WorkerTier, string> = {
 /** Worker speed as a fraction of the owner, tier by tier. The **very experienced** man matches the
  *  owner and the **excellent** one beats him: a workshop is meant to grow past the man who started
  *  it. These are Piotr's own four figures and not a ladder derived from them
- *  [PIOTR, 19.09: 0.6, 0.8, 1.0, 1.2]. Turn 20 ran 0.8 / 1.0 / 1.2 / 1.4, which was Claude's
- *  reading and one step too high all the way up. One table for every role that has a rate, so an
+ *  [PIOTR, 19.09: 0.6, 0.8, 1.0, 1.2]. Turn 20 ran a ladder one step higher all the way up, which
+ *  was Claude's reading and not his. One table for every role that has a rate, so an
  *  estimator's tier is worth at his desk exactly what a joiner's is at his bench
  *  (CLAUDE.md T21 2.9). */
 export const WORKER_RATES: Record<WorkerTier, number> = {
@@ -3308,7 +3308,7 @@ export const WORKER_RATES: Record<WorkerTier, number> = {
 };
 
 /** Who answers the advert. The workshop's reputation earns the tier: a man with no experience
- *  always comes, and the extremely experienced one does not look at a workshop under 60
+ *  always comes, and the excellent one does not look at a workshop under 60
  *  [PIOTR: the 60; the two between are TUNE] (CLAUDE.md T20 2.5). The hire card reads this to say
  *  what is missing, and it is the one gate every tiered role passes. */
 export const TIER_MIN_REPUTATION: Record<WorkerTier, number> = {
@@ -3872,6 +3872,24 @@ export const BUBBLE_WORK_MAX_SPEED = 4;
 /** How far over a figure's head the bubble's point sits, in screen pixels [PIOTR's drawing says
  *  six] (CLAUDE.md T21 2.6). */
 export const BUBBLE_HEAD_GAP = 6;
+
+/** What a man calls a machine when he is standing about waiting for it: the trade's own short word,
+ *  not the catalogue's name [PIOTR's drawing, 19.09: "waiting for the saw", "the CNC", "the booth"].
+ *  The bubble over his head and the line on the Work Plan both read it through `waitingLine`, so the
+ *  two say the same thing (CLAUDE.md T21 2.6, 2.7).
+ *
+ *  Only the families a man can really queue for are on it, which is what `familyForStage` returns:
+ *  the saw, the CNC, the moulder, the edgebander, the booth and the bench. The edgebander is left
+ *  off because the catalogue already calls it an edgebander and a second entry saying the same word
+ *  is a second thing to keep in step. A family that is not on this table is called by its catalogue
+ *  name, lowercased, which is what the game did before tonight. */
+export const MACHINE_SHORT_WORDS: Record<string, string> = {
+  tableSaw: 'saw',
+  cnc: 'CNC',
+  sprayBooth: 'booth',
+  spindleMoulder: 'moulder',
+  workbench: 'bench',
+};
 
 /** The first use bubbles, one sentence each, keyed by the screen they open on [TUNE wording]
  *  (CLAUDE.md T13 3.22). Dismissed by a click, remembered in the save. */

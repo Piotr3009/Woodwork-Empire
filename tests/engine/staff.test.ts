@@ -318,7 +318,7 @@ describe('the queue at the saw', () => {
     expect(
       worked.workers.filter((worker) => worker.station === waitingStation('tableSaw')),
     ).toHaveLength(3);
-    expect(worked.jobs.filter((job) => job.blockedBy === 'waiting for table saw')).toHaveLength(3);
+    expect(worked.jobs.filter((job) => job.blockedBy === 'waiting for the saw')).toHaveLength(3);
   });
 
   it('puts a second man to work the moment a second saw is bought', () => {

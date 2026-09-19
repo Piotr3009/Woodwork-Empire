@@ -98,10 +98,16 @@ describe('four men, one saw, two jobs', () => {
     expect(cutting.assignees).toEqual(['staff-1', 'staff-3']);
     expect(bench.assignees).toEqual(['staff-2', 'staff-4']);
     // And the job says what it is waiting for, in the words the Work Plan and the job card print.
-    expect(cutting.blockedBy).toBe('waiting for the table saw');
-    expect(waitingLine('tableSaw')).toBe('waiting for the table saw');
-    expect(stageText(state, cutting)).toBe('Cutting, waiting for the table saw');
-    expect(jobRow(state, cutting)).toContain('waiting for the table saw');
+    expect(cutting.blockedBy).toBe('waiting for the saw');
+    // The trade's own short word and not the catalogue's "Table saw", which is what the drawing
+    // over a man's head says and what the Work Plan says under it (CLAUDE.md T21 2.6, 2.7).
+    expect(waitingLine('tableSaw')).toBe('waiting for the saw');
+    expect(waitingLine('cnc')).toBe('waiting for the CNC');
+    expect(waitingLine('sprayBooth')).toBe('waiting for the booth');
+    // A family with no short word of its own keeps the catalogue's, lowercased.
+    expect(waitingLine('thicknesser')).toBe('waiting for the thicknesser');
+    expect(stageText(state, cutting)).toBe('Cutting, waiting for the saw');
+    expect(jobRow(state, cutting)).toContain('waiting for the saw');
   });
 
   it('never moves the last man on a job, and never the owner', () => {
@@ -187,7 +193,7 @@ describe('the cutting stage and the men behind it', () => {
     // The first man of the queue is waiting for the machine; the man behind him is waiting for the
     // parts it has not cut yet, which is what the drawing has the second man in the queue saying
     // (docs/mockups/t21/bubbles.html; CLAUDE.md T21 2.6).
-    expect(waitingWordsFor(state, 'staff-2', cutting)).toBe('waiting for the table saw');
+    expect(waitingWordsFor(state, 'staff-2', cutting)).toBe('waiting for the saw');
     expect(waitingWordsFor(state, 'staff-3', cutting)).toBe(NO_CUT_PARTS);
     expect(NO_CUT_PARTS).toBe('no cut parts yet');
   });

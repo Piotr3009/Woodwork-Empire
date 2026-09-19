@@ -129,7 +129,9 @@ describe('one man per CNC', () => {
     const joiner = worked.workers[0];
     expect(joiner?.station).toBe(waitingStation('cnc'));
     const waiting = worked.jobs.find((job) => job.assignees[0] === joiner?.id);
-    expect(waiting?.blockedBy).toBe('waiting for cnc');
+    // "the CNC" and not "cnc": the trade's own short word, which is also what the drawing over his
+    // head says (CLAUDE.md T21 2.6, 2.7).
+    expect(waiting?.blockedBy).toBe('waiting for the CNC');
     expect(waiting?.labourRemaining).toBe(waiting?.labourValue);
     // And the man who has it is at it.
     const owner = worked.jobs.find((job) => job.assignees[0] === OWNER);

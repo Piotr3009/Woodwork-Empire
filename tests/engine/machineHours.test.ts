@@ -101,7 +101,7 @@ describe('one person per machine', () => {
     if (!joiner) throw new Error('no joiner');
     expect(joiner.station).toBe(waitingStation('tableSaw'));
     const waiting = state.jobs.find((job) => job.assignees[0] === joiner.id);
-    expect(waiting?.blockedBy).toBe('waiting for table saw');
+    expect(waiting?.blockedBy).toBe('waiting for the saw');
     // He stood there for the hour and put nothing into his job.
     expect(waiting?.labourRemaining).toBe(waiting?.labourValue);
   });

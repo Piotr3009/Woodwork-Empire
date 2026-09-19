@@ -77,7 +77,7 @@ describe('kit that is bought and still on the road', () => {
     if (!order) throw new Error('the saw should be on order');
     // The article is the drawing's, and the phrase is the one the game says about any machine a job
     // cannot have (CLAUDE.md T21 2.7).
-    const wanted = `waiting for the table saw (on order, due ${formatCalendarDay(order.dueDay)})`;
+    const wanted = `waiting for the saw (on order, due ${formatCalendarDay(order.dueDay)})`;
     expect(hallBlock(state, firstJob(state))).toBe(wanted);
     expect(startProductionCheck(state, firstJob(state))).toEqual({ ok: false, reason: wanted });
   });
@@ -89,7 +89,7 @@ describe('kit that is bought and still on the road', () => {
     const next = runClock(act(state, { type: 'WORK_HERE', jobId: firstJob(state).id }), 10);
     const job = firstJob(next);
     expect(job.blockedBy).toBe(
-      `waiting for the table saw (on order, due ${formatCalendarDay(order.dueDay)})`,
+      `waiting for the saw (on order, due ${formatCalendarDay(order.dueDay)})`,
     );
     // And nothing was cut while it waited.
     expect(job.labourRemaining).toBe(job.labourValue);
