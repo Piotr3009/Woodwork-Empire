@@ -5,6 +5,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { DROP_PROJECT_REPUTATION } from '../../src/engine/constants';
+import { dropReputationCost } from '../../src/engine/index';
 import { renderWorkPlan } from '../../src/ui/workPlan';
 import type { GameState, Job } from '../../src/engine/index';
 import {
@@ -29,7 +30,7 @@ function withJob(price: number, options: { sheets?: number } = {}): { state: Gam
 }
 
 describe('Drop project', () => {
-  it('refunds the deposit on a 1,600 job, removes it and takes 10 reputation', () => {
+  it('refunds the deposit on a 1,600 job, removes it and takes the floor of ten', () => {
     const { state, job } = withJob(1600);
     expect(job.depositPaid).toBe(800);
     const cash = state.cash;
@@ -37,14 +38,19 @@ describe('Drop project', () => {
     const dropped = act(state, { type: 'DROP_JOB', jobId: job.id });
     expect(cash - dropped.cash).toBe(800);
     expect(dropped.jobs).toHaveLength(0);
-    expect(dropped.reputation).toBe(reputation - DROP_PROJECT_REPUTATION);
+    // From Turn 21 the ten is the floor of a scale and not a flat charge, so a job under the five
+    // thousand the scale starts at costs exactly what Turn 9 charged, and the figure is read
+    // through the one function the drop card reads (CLAUDE.md T21 2.4; the scale itself is
+    // tests/engine/dropReputation.test.ts).
+    expect(dropReputationCost(job)).toBe(DROP_PROJECT_REPUTATION);
+    expect(dropped.reputation).toBe(reputation - dropReputationCost(job));
     expect(DROP_PROJECT_REPUTATION).toBe(10);
     // The books say what happened, and so does the company board.
     const line = dropped.ledger.find((entry) => entry.label.startsWith('Deposit returned'));
     expect(line?.amount).toBe(-800);
     const logged = dropped.reputationLog[dropped.reputationLog.length - 1];
     expect(logged?.reason).toContain('Dropped');
-    expect(logged?.points).toBe(-DROP_PROJECT_REPUTATION);
+    expect(logged?.points).toBe(-dropReputationCost(job));
     expect(logged?.day).toBe(dropped.clock.day);
   });
 

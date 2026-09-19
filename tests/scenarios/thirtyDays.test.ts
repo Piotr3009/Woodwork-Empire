@@ -62,6 +62,7 @@ import {
   addWorkingDays,
   bagStore,
   dayPercentages,
+  dropReputationCost,
   helperOnDuty,
   homeCellOf,
   extractionCheck,
@@ -1128,11 +1129,16 @@ describe('a month that drops a job on day 15', () => {
     expect(workPlan(dropped).rows.some((row) => row.jobId === job?.id)).toBe(false);
   });
 
-  it('takes ten points of reputation at once, with a line on the company board', () => {
-    expect(dropped.reputation).toBe(reputationBefore - DROP_PROJECT_REPUTATION);
+  it('takes the price\u0027s worth of reputation at once, with a line on the company board', () => {
+    // Turn 21: what a drop costs follows the price of the job, ten points and a point for every
+    // thousand over five thousand, so the figure this scenario asserts is the scale's and not a
+    // flat ten (PIOTR, 19.09; CLAUDE.md T21 2.4). The floor is still the ten Turn 9 charged.
+    const cost = job === undefined ? 0 : dropReputationCost(job);
+    expect(cost).toBeGreaterThanOrEqual(DROP_PROJECT_REPUTATION);
+    expect(dropped.reputation).toBe(reputationBefore - cost);
     const logged = dropped.reputationLog[dropped.reputationLog.length - 1];
     expect(logged?.reason).toBe(`Dropped: ${job?.name}`);
-    expect(logged?.points).toBe(-DROP_PROJECT_REPUTATION);
+    expect(logged?.points).toBe(-cost);
     expect(logged?.day).toBe(day8.clock.day);
     // And the board reads it back under the week it happened in.
     const week = weeksOf(dropped)[0];
