@@ -213,6 +213,22 @@ export function characterArt(
   return `<g class="figure-flip" transform="scale(${placed.flip ? -1 : 1},1)">${inner}</g>`;
 }
 
+/** How far over a figure's feet the top of his own cell is, in scene pixels, for the animation he
+ *  would be drawn with: the anchor is where his feet are inside the cell, so everything above it is
+ *  the man. Null while there is no sheet for this role and the caller draws the capsule, which has
+ *  its own height. The bubble over his head is hung off this (CLAUDE.md T21 2.6). */
+export function characterTop(
+  role: string,
+  wanted: Animation,
+  options: CharacterOptions = {},
+): number | null {
+  const playable = playableAnimation(role, wanted, options);
+  if (playable === null) return null;
+  const found = characterSheet(role, playable.animation, options);
+  if (found === null) return null;
+  return -round(found.sheet.anchorY / SPRITE_SCALE);
+}
+
 /** Turns a figure that is already on the page to face this way: the row it draws and the flip its
  *  group carries, and nothing else. */
 export function faceCharacter(

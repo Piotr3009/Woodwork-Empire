@@ -8,9 +8,11 @@ import {
   PALLET_LAYOUT,
   SHEETS_PER_TRIP,
   WELFARE_IN_THE_CANTEEN,
+  type RoomId,
   roomDoorCell,
 } from './constants';
-import { isSold, itemStandsInTheHall, sheetCapacityOf, sheetsStrandedBySale } from './machines';
+import { isBreak } from './clock';
+import { OWNER, isSold, itemStandsInTheHall, sheetCapacityOf, sheetsStrandedBySale } from './machines';
 import { plural } from './text';
 import type { Cell } from './pipes';
 import type { Equipment, GameState, TaskInstance } from './types';
@@ -30,6 +32,12 @@ export const STATION_IDLE = 'idle';
 export const STATION_CLEANING = 'cleaning';
 /** Standing at the canteen door because there is no bench to work at (CLAUDE.md T4 3.4). */
 export const STATION_NO_BENCH = 'noBench';
+/** In the canteen for the dinner hour, and off the hall while it lasts (PIOTR, 19.09;
+ *  CLAUDE.md T21 2.12). It is its own station and not the idle one the day loop writes for the
+ *  hour, because those two men are not the same man: one is behind the canteen door eating and the
+ *  other is standing about in front of it where the player is meant to see him and the red bubble
+ *  over his head (CLAUDE.md T4 3.4, T21 2.6). `stationNow` below is where the hour is read. */
+export const STATION_LUNCH = 'lunch';
 
 export function machineStation(specId: string): string {
   return `machine:${specId}`;
@@ -122,6 +130,35 @@ export function unloadStation(task: TaskInstance, sheets: number): string {
 export function isDoorwayCell(cell: { x: number; y: number }): boolean {
   const door = roomDoorCell('office');
   return door.x === Math.round(cell.x) && door.y === Math.round(cell.y);
+}
+
+/** The room a man at this station is inside, behind its door, or null while he is out on the hall
+ *  (CLAUDE.md T21 2.6, 2.11, 2.12). Desk work is in the office, the phone with it, and the dinner
+ *  hour is in the canteen. Everything else, the idle station and the benchless one included, is the
+ *  hall, however close to a door it stands: the bubble over a man who has gone somewhere is drawn at
+ *  the door he went through, and this says which door that is. */
+export function roomBehindStation(station: string): RoomId | null {
+  if (station === STATION_OFFICE || station === STATION_PHONE) return 'office';
+  if (station === STATION_LUNCH) return 'canteen';
+  return null;
+}
+
+/** The station this man is at for the drawing, and for the bubble over his head: the one the day
+ *  loop wrote, or the canteen while the dinner hour lasts (PIOTR, 19.09; CLAUDE.md T21 2.12).
+ *
+ *  At the break the day loop puts the whole workshop on `STATION_IDLE` (`updateStations`), which is
+ *  the same string it writes for a man it has no work for, so the hour has to be read somewhere to
+ *  tell an eating man from a standing one. It is read here, in the one module that says where a
+ *  figure is, and not in the renderer: the engine decides and the renderer draws (CLAUDE.md T2 3.3).
+ *  A man who works through the break does not go: for the owner that is `breakSkipped`, and nobody
+ *  else in the game may skip it. */
+export function stationNow(state: GameState, who: string): string {
+  const man = who === OWNER ? state.owner : state.workers.find((worker) => worker.id === who);
+  const station = man?.station ?? STATION_IDLE;
+  if (!isBreak(state.clock.minute)) return station;
+  if (who === OWNER && state.owner.breakSkipped) return station;
+  if (station !== STATION_IDLE && station !== STATION_NO_BENCH) return station;
+  return STATION_LUNCH;
 }
 
 /** True while anybody is standing at the rack this minute, the owner or a man on his feet: a
