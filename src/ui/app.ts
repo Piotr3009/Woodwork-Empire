@@ -680,8 +680,15 @@ function modalSpecs(): ModalSpec[] {
   const specs: ModalSpec[] = [];
   if (ui.modal !== null) {
     // The first use bubble of the screen, over its body, until it is dismissed (T13 3.22).
+    // The Work Plan's own note is about its job rows ("One row a job"), so it belongs to the Jobs
+    // tab and not to the Contracts tab beside it, which is how the order board's note already
+    // follows its tabs. Seen under the Contracts tab in the T20-C5 pictures.
     const tipKey =
-      ui.modal === 'laptop' ? laptopTipKey(ui.laptopPage) : TIP_KEY_OF_MODAL[ui.modal] ?? '';
+      ui.modal === 'laptop'
+        ? laptopTipKey(ui.laptopPage)
+        : ui.modal === 'workPlan' && ui.workPlanTab !== 'jobs'
+          ? ''
+          : TIP_KEY_OF_MODAL[ui.modal] ?? '';
     const body = modalBody(ui.modal, current);
     specs.push({
       id: ui.modal,

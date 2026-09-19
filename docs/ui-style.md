@@ -45,9 +45,13 @@ scrolling inside the paper. Its own tokens, defined on the skin and not on `:roo
 `box-shadow: inset 0 0 0 5px #24282c, 0 10px 30px rgba(0, 0, 0, 0.5)`, `color: #eceff1`. Its
 tokens: `--card: #f5efe2`, `--card-2: #fbf8f1`, `--card-line: #cdbf9f`, `--card-ink: #1d2a22`,
 `--card-ink-2: #4d5a52`, `--magnet-red: #c0392b`, `--magnet-blue: #2f6fb0`,
-`--steel-line: #24282c`. A card, a row and a plan row on this skin are paper on steel: that is
-what `--card` is for, and it is why `.assign-chip` and `.assign-list` read
-`var(--card-2, var(--panel-2))` and fall back to the dark panel anywhere else.
+`--steel-line: #24282c`. A card, a plan row and a row PINNED TO THE BOARD (one that is the modal
+body's own child) are paper on steel: that is what `--card` is for, and it is why `.assign-chip`
+and `.assign-list` read `var(--card-2, var(--panel-2))` and fall back to the dark panel anywhere
+else. A row inside one of those cards is a line of that card and not a second card: no paper of
+its own, no magnet, ruled in `--card-line` (CLAUDE.md T20 1, T20-C5). The magnet also tilts what
+it holds by a degree or so, on every board but the Work Plan, which is read for numbers and is
+straight (PIOTR, 16.09), and `tests/ui/workPlanStraight.test.ts` is that rule.
 
 **felt** (`.modal-board.modal-felt`, styles.css 2486): green felt in an oak frame, over the board
 skin. Tokens: `--oak: #b9793a`, `--oak-2: #8a5424`, `--felt-green: #1f4a36`, `--felt-green-2: #173a2a`,

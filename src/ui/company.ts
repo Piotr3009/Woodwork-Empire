@@ -297,9 +297,11 @@ function rateLine(week: WorkshopRate, before: WorkshopRate): string {
 }
 
 /** Hours as the board writes them: "12.5 h", and "0 h" for a machine nobody stood at. A column of
- *  hours reads as hours all the way down (PIOTR, 18.09; CLAUDE.md T20 2.14). */
+ *  hours reads as hours all the way down (PIOTR, 18.09; CLAUDE.md T20 2.14). Hours the machines
+ *  COST the workshop are said as they are: rounding them to "0 h" put a nought at the top of a
+ *  sheet whose own sum line read "-0.1 hours" (T20-C5, seen in the picture). */
 function hours(value: number): string {
-  return value <= 0 ? '0 h' : `${value} h`;
+  return value === 0 ? '0 h' : `${value} h`;
 }
 
 /** What the class does to its stage, as a percentage: "+5%", with the gate's 2% already in it. */

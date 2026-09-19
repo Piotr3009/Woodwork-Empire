@@ -180,13 +180,15 @@ function candidateTile(state: GameState, option: HiringOption): string {
   const action = option.available
     ? button('hire', 'Hire', `data-role="${option.role}" data-tier="${option.tier ?? ''}"`)
     : reasonLabel(option.blockReason);
+  // What stands in the way is said ONCE, where the Hire button would have been, which is the
+  // game's own way of refusing a control. It used to be said twice on every card a standing had
+  // not earned, in red above and in grey below, which the hire card picture showed (T20-C5).
   return (
     `<div class="tile${option.available ? '' : ' is-locked'}${owned === '' ? '' : ' is-owned'}" ` +
     `data-candidate="${option.role}.${option.tier ?? ''}">` +
     `<h3 class="tile-name">${escapeHtml(option.label)} ${owned}</h3>` +
     `<p class="tile-text">${escapeHtml(DUTIES[option.role])}</p>` +
     figures +
-    (option.available ? '' : `<p class="lock">${escapeHtml(option.blockReason)}</p>`) +
     missing +
     `<div class="tile-action">${action}</div>` +
     '</div>'
@@ -274,9 +276,11 @@ function startedText(state: GameState, startDay: number): string {
 /** One row of Our team: who he is, when he started, what he costs, the hours he has put in this
  *  month, the days he has had off and what he is on this minute (CLAUDE.md T17 2.9). The pay is
  *  handed in as the words the row prints, because a man is paid by the week and the owner draws
- *  his by the day (CLAUDE.md T20 2.6). His week goes under his name as the second line of the
- *  same row, which is what the game's rows already do with a `<small>` inside the main span
- *  (`src/ui/contracts.ts`), and never as a row of its own (CLAUDE.md T20 1, 2.7). */
+ *  his by the day (CLAUDE.md T20 2.6). His week is the second line OF THE SAME ROW and never a row
+ *  of its own: it is the last thing in the row and the row wraps, so it runs the whole width under
+ *  everything the row says about him, in the game's own `<small>` (CLAUDE.md T20 1, 2.7). Put
+ *  inside his name instead, as it was until the pictures were looked at, it squeezed his name into
+ *  a column four lines deep (T20-C5). */
 function teamRow(
   id: string,
   name: string,
@@ -290,14 +294,15 @@ function teamRow(
   week = '',
 ): string {
   return (
-    `<div class="row" data-team="${id}">` +
-    `<span class="row-main">${escapeHtml(name)}, ${escapeHtml(role)}${week}</span>` +
+    `<div class="row team-row" data-team="${id}">` +
+    `<span class="row-main">${escapeHtml(name)}, ${escapeHtml(role)}</span>` +
     `<span class="row-figure team-when">${escapeHtml(when)}</span>` +
     `<span class="row-figure">${escapeHtml(pay)}</span>` +
     `<span class="row-figure">${hoursText(minutesWorked)} this month</span>` +
     `<span class="row-figure">${plural(daysOff, 'day off', 'days off')}</span>` +
     `<span class="row-figure">${escapeHtml(doing)}</span>` +
     (action === '' ? '' : `<span class="row-action">${action}</span>`) +
+    week +
     '</div>'
   );
 }
@@ -340,7 +345,7 @@ function weekText(label: string, rate: number, meters: WeekMeters | null): strin
 function weekLine(state: GameState, id: string, rate: number, holder: WeekHolder): string {
   const week = weekOfDay(state.clock.day);
   return (
-    `<span data-team-week="${id}">` +
+    `<span class="team-week" data-team-week="${id}">` +
     `<small>${escapeHtml(weekText('This week', rate, weekNowOf(holder, week)))}</small>` +
     `<small>${escapeHtml(weekText('Last week', rate, weekBeforeOf(holder, week)))}</small>` +
     '</span>'

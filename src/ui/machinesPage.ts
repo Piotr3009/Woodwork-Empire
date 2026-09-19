@@ -48,12 +48,21 @@ export function lifeIsLow(item: Equipment): boolean {
   return 1 - lifeUsedShare(item) < LIFE_LOW_FRACTION;
 }
 
-/** What the row says about the state the machine is in, or nothing while it is simply running. */
+/** Is this one of the machines a service is called on at all? The extraction is repaired and
+ *  never serviced, which is what `serviceableMachines` in the engine means by a machine, and this
+ *  page reads the same category it does. */
+function isServiced(item: Equipment): boolean {
+  return findSpec(item.specId)?.category === 'machine';
+}
+
+/** What the row says about the state the machine is in, or nothing while it is simply running.
+ *  A service is never due on a thing that is never serviced: the extractor's row said "service
+ *  due" beside "It is repaired, never serviced" until the picture was looked at (T20-C5). */
 export function stateLabel(state: GameState, item: Equipment): string {
   if (item.broken) return 'broken';
   if (machineIsOut(item, state.clock.day)) return 'in service';
   if (pastEndurance(item)) return 'past its life';
-  if (serviceIsDue(item)) return 'service due';
+  if (serviceIsDue(item) && isServiced(item)) return 'service due';
   return '';
 }
 

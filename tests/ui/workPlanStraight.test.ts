@@ -1,13 +1,18 @@
 // @vitest-environment jsdom
-// The Work Plan is an interactive board the player reads numbers off, so its job rows are straight
+// The Work Plan is an interactive board the player reads numbers off, so NOTHING on it is crooked
 // (PIOTR, 16.09: "the job cards must not be crooked. Straight, nice boxes"; CLAUDE.md T15 2.4).
-// The tilt of the board family stays on the cards, rows and tiles of the Shopping board.
+// Until Turn 20 that held by accident of class names: the modal had only plan rows on it, and the
+// tilt is on the board family's cards, rows and tiles. Its Contracts tab brought all three onto
+// this board, so the rule now names the modal (CLAUDE.md T20 1, 2.1). The tilt itself stays, on
+// the Shopping board.
 
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { renderShopping } from '../../src/ui/shopping';
 import { renderWorkPlan } from '../../src/ui/workPlan';
 import { acceptNow, act, buyStartingKit, fillRack, newGame, placeEnquiry } from '../helpers';
+import { drawContract } from '../../src/engine/index';
+import { contractPiece } from '../../src/engine/contracts';
 
 const CSS = readFileSync('src/ui/styles.css', 'utf8');
 
@@ -20,14 +25,28 @@ function rules(): Array<[string, string]> {
   ]);
 }
 
-/** A board on the page, inside the steel frame every board wears, with the stylesheet on it. */
-function onTheBoard(body: string): HTMLElement {
+/** A board on the page, inside the steel frame every board wears, with the stylesheet on it. The
+ *  modal is named, because the tilt is the Shopping board's and not the Work Plan's, and a board
+ *  mounted under the wrong name would prove nothing. */
+function onTheBoard(body: string, modal: 'workPlan' | 'shopping' = 'workPlan'): HTMLElement {
   document.body.innerHTML =
-    `<style>${CSS}</style><div class="modal modal-full modal-board" data-modal="workPlan">` +
+    `<style>${CSS}</style><div class="modal modal-full modal-board" data-modal="${modal}">` +
     `<div class="modal-body">${body}</div></div>`;
   const node = document.querySelector('.modal-body');
   if (!(node instanceof HTMLElement)) throw new Error('no board');
   return node;
+}
+
+/** The Work Plan's other tab, with one contract of each kind on it, so what the board does to a
+ *  card and to the rows inside it can be read off the real thing (CLAUDE.md T20 2.1). */
+function withAContract() {
+  const state = withJobs();
+  state.contracts = [];
+  const offer = drawContract(state);
+  offer.pieceId = 'cutSheetPack';
+  offer.pricePerPiece = contractPiece(offer).price;
+  state.contracts.push(offer);
+  return state;
 }
 
 function withJobs() {
@@ -52,14 +71,16 @@ describe('the Work Plan rows', () => {
       ([selectors, body]) => selectors.includes('.plan-row') && /rotate\(/.test(body),
     );
     expect(tilted).toEqual([]);
-    // The three tilt rules are still there for the rest of the board family.
+    // The three tilt rules are still there for the rest of the board family, and every one of
+    // them holds the Work Plan out by name.
     const tilts = rules().filter(([, body]) => /transform: rotate\(/.test(body));
-    const onCards = tilts.filter(([selectors]) => selectors.includes('.modal-board .card'));
+    const onCards = tilts.filter(([selectors]) => selectors.includes('.card:nth-of-type'));
     expect(onCards).toHaveLength(3);
     for (const [selectors] of onCards) {
-      expect(selectors).toContain('.modal-board .row');
-      expect(selectors).toContain('.modal-board .tile');
+      expect(selectors).toContain('.row:nth-of-type');
+      expect(selectors).toContain('.tile:nth-of-type');
       expect(selectors).not.toContain('.plan-row');
+      expect(selectors).toContain(":not([data-modal='workPlan'])");
     }
   });
 
@@ -72,12 +93,31 @@ describe('the Work Plan rows', () => {
       const transform = getComputedStyle(row).transform;
       expect(transform, `row ${index}`).toMatch(/^(none|)$/);
     }
-    // The same stylesheet, the same frame, a card of the Shopping board: the tilt is still there.
+    // The same stylesheet, the same steel frame, a card of the Shopping board: the tilt is still
+    // there.
     const ordered = act(state, { type: 'BUY_EQUIPMENT', specId: 'tableSaw', variantId: 'used' });
-    const shopping = onTheBoard(renderShopping(ordered));
+    const shopping = onTheBoard(renderShopping(ordered), 'shopping');
     const card = shopping.querySelector('.card, .row, .tile');
     expect(card).not.toBeNull();
     if (card !== null) expect(getComputedStyle(card).transform).toMatch(/rotate\(/);
+  });
+
+  it('keep the Contracts tab straight too, and its figure lines inside the card', () => {
+    const board = onTheBoard(renderWorkPlan(withAContract(), 'contracts'));
+    const card = board.querySelector('.contract-offer');
+    expect(card).not.toBeNull();
+    if (card === null) return;
+    // The card is pinned to the board, straight, like a job row.
+    expect(getComputedStyle(card).transform).toMatch(/^(none|)$/);
+    const rows = Array.from(card.querySelectorAll('.row'));
+    expect(rows.length).toBeGreaterThan(4);
+    for (const [index, row] of rows.entries()) {
+      // A figure line inside the card is a line of it: no tilt, no shadow, no paper of its own,
+      // and the numbers stay level with the words they belong to (T20-C5).
+      const style = getComputedStyle(row);
+      expect(style.transform, `row ${index}`).toMatch(/^(none|)$/);
+      expect(style.boxShadow, `row ${index}`).toMatch(/^(none|)$/);
+    }
   });
 
   it('keep the paper, the magnet and the chart of the board family', () => {

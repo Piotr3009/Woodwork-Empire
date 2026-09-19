@@ -629,3 +629,141 @@ question that is Piotr's in front of him.
   `docs/report-t18/06-answer-margin.png`, a picture whose bytes happen to carry the codepoint.
 - `APP_VERSION = 'v29'` and `STATE_VERSION = 17`, one bump each.
 - `npm run check` green on its own exit code before the commit.
+
+---
+
+## Look and shoot (T20-C5)
+
+**Twelve pictures in `docs/report-t20/`, and twelve things they showed.** Every one is the real
+app in headless Chromium at 1280 by 800 at one device pixel, driven by real clicks, standing in
+front of saves the game's own `encodeSaveFile` wrote and its own Continue button opened, with the
+clock stopped by the game's own pause. The saves are played, not written: six halls stood up by
+the scripted player of `tests/scenarios/autopilot.ts`, the same one the T20-C3 months run on, with
+only the one situation each picture is about arranged by hand, the way those scenarios arrange
+theirs. Two things in them could not be played and are said here so no figure in a picture is
+taken for something it is not: the hours on the machines and the hours since their last service
+(a machine's life is thousands of hours, and a fortnight of play leaves the bar a sliver), and the
+three contracts, which the engine drew and which were then set to one piece of the table of 2.2
+each, so the tab's three sections hold a wardrobe front, a drawer box and a cut sheet pack. The
+staging is in the scratchpad and nothing of it is committed.
+
+### What the pictures showed was wrong, and what was done about it
+
+**1. The Contracts tab was a board of crooked notes, and the figures did not line up with their
+words.** This is the one that mattered. On the board skin every `.row` is a cream card pinned by a
+blue magnet and tilted up to a degree and a half; the tab's figure lines are rows INSIDE a card, so
+each label sat on a tilted note of its own, its figure landed about thirty pixels lower at the far
+end of it, and the column read as if every number belonged to the next line down. `£50` sat under
+`Material a piece`, `-£30` under `Gary's labour`, and so on the whole way down both cards. Nothing
+was wrong in the arithmetic; the picture was unreadable. The rule now says what it always meant: a
+row that is the board's own child is a card on the board, and a row inside a card is a line of that
+card. The Running and Ended blocks joined the offer's card as cards of the board, so each of the
+three sections is one pinned sheet of paper, which is what the drawing has.
+
+**2. And nothing on the Work Plan is crooked.** Piotr said it on 16.09 about this board, and it
+held until tonight by accident of class names: the modal carried only plan rows, and the tilt lives
+on the board family's cards, rows and tiles. The Contracts tab brought all three onto it. The three
+tilt rules now hold the Work Plan out by name, `:not([data-modal='workPlan'])`, which is the
+comment they already carried; the Shopping board keeps its tilt, because a shop window is not a
+ledger. `tests/ui/workPlanStraight.test.ts` was brought up to the new rule and given a third case:
+the Contracts tab's card is straight and the figure lines inside it carry no tilt and no shadow of
+their own.
+
+**3. The green and the red were gone.** `2.1.2` asks for `on course` in green and `short` in red.
+The skin's own ink rule, `.modal-board .row-figure`, has the same weight as `.row-figure.good` and
+is written later in the file, so every marked figure on the board was drawn in the card's plain
+ink. It is the first thing the tab is for and it was invisible. Two rules under the skin's ink put
+the green and the red back, in `--good` and `--bad`, which is what the Company board's own paper
+sheets print their points in. The week now reads `24 of 40, short` in red and the margins in green.
+
+**4. The week's bar had a dark bar behind it.** `.contract-track` is the dark palette's border,
+which on a cream card is a dark slab. On the board it reads the card's own line colour now, the way
+the laptop's reads the screen's.
+
+**5. A man's dinner and his free time were dark panel blocks on paper.** The two blocks of the day
+track that are not work now read the card palette with the dark panel as the fallback, the same
+pattern the track they sit in already used.
+
+**6. A contract's name was grey on cream.** An `h3` inside a row's main span took the dark
+palette's heading colour and beat the skin. It is the card's ink now. The ended card's name and
+labels take the card's dim ink with it, so a term that is over reads as past, which is what
+`2.1.3`'s "greyed" asks for.
+
+**7. The picker's chips were steel magnets on a paper card.** The same class of fault Turn 19 found
+with the assign chips. A chip standing on one of the board's paper cards is paper now; the chip
+that is on keeps the blue the game marks a chosen chip with everywhere else.
+
+**8. Our team's week line squeezed a man's name into a column four lines deep.** The week was put
+inside the name span, which is a flex item sharing the row with five figures. It is the last thing
+in the row now and the row wraps, so the week runs the whole width under everything the row says
+about him, which is what the page's own hint promises: "the line under each man is his week".
+
+**9. A hire card said the same thing twice.** Every card a standing had not earned printed the
+reason in red in the middle and again in grey where the Hire button would have been. It is said
+once now, where the button would have been, which is the game's own way of refusing a control.
+
+**10. The Machines page told the extractor that a service was due on it**, on the same row as "It
+is repaired, never serviced". A service is never due on a thing that is never serviced: the label
+is for the machines a service is called on.
+
+**11. The Company board said "0 h" over a sum line reading "-0.1 hours".** `2.14` put "0 h" where
+"none" used to be, and took every figure at or below nought with it, so a week the machines COST
+the workshop time read as a nought at the top of a sheet that said so plainly at the bottom. Hours
+the machines cost are said as they are; "0 h" stays for a machine nobody stood at, which is what
+2.14 is about.
+
+**12. The Work Plan's first use note followed the modal and not the tab.** "One row a job. A red
+figure on a job is material it does not have yet." sat under the Contracts tab, where there are no
+job rows. It belongs to the Jobs tab now, the way the order board's note already follows its tabs.
+
+### The twelve, what each shows, and what it was put beside
+
+| # | File | What it shows | Put beside | What differed |
+|---|---|---|---|---|
+| 1 | `01-contracts-on-offer.png` | On offer: the cut sheet pack at £50, the three men in the picker with Gary chosen, price, material, his labour, the margin, 10 of the 8 needed a day, the week at +£330, the term at +£8,580, the CNC tip, and both day tracks | the Jobs tab of the same modal | findings 1, 2, 3, 5, 6, 7 |
+| 2 | `02-contracts-running.png` | Running: the drawer boxes, week 1 of 17, the week's bar, Ravi's chip and Assign to this contract, `24 of 40, short` in red, the margins in green, his day with eight pieces and the job in the accent after them | the same, and the v28 contract bar it replaces | findings 1, 2, 3, 4 |
+| 3 | `03-contracts-ended.png` | Ended: the wardrobe fronts, the term over, one full week and one short, 15 pieces, £2,400 taken, £900 of stock, 67.8 hours of labour at cost, +£313 net | the closing report event of v28 | findings 1, 2, 6 |
+| 4 | `04-take-it-with-the-man-picked.png` | The offer card after one click on Ravi: every figure, both tracks and the button follow him. 39 min a piece, 12 of the 8 needed, the week at +£280 against Gary's +£330, and `Take it, Ravi on it` | the drawing in `docs/mockups/t20` | the drawing is two columns, the card is one (see below) |
+| 5 | `05-jobs-tab-without-the-contract-bar.png` | The Jobs tab: three job rows, the axis, the blue line, no contract bar anywhere, and the modal's own first use note | the v28 Work Plan | the bar is gone, as 2.1.5 asks; nothing else moved |
+| 6 | `06-our-team-let-go-and-the-week.png` | Our team: the owner and four men, each with his week and the week before it under him, `Let go` on three of them and `leaves on Wed 24 March` on the estimator the button was pressed on | the v28 Our team rows | finding 8 |
+| 7 | `07-hire-card-tiers-and-the-locked-master.png` | The four joiner classes at 450, 600, 800 and 1,000 a week and 80, 100, 120 and 140 per cent of the owner, two of them badged On the books, and the extremely experienced one with no Hire button and `extremely experienced joiners come from reputation 60` where it would be, beside a Helper and a Sprayer that do have one | the v28 hire cards, which had three classes | finding 9 |
+| 8 | `08-machines-page-life-and-service.png` | The Machines page: five rows, each with the sprite's own cell, the class, the bar of life and Service with its price. The saw reads 663.8 of 1,125 h, which is its 750 plus the half a first service bought it; the edgebander is in the red at 4,464 of 4,800 and is the one row that says service due | the laptop's Stock and Drawings pages | finding 10 |
+| 9 | `09-office-door-closed-and-the-owner-in-the-room.png` | The hall's office door drawn closed with nobody standing in it, over the room behind it with the owner in it. Two frames of the same minute, 08:56 | the same door in Turn 19's `02-owner-in-the-open-door.png` | the swing is gone and the doorway is empty, as 2.12 asks; see the note below on where he stands |
+| 10 | `10-the-helper-sweeping.png` | Jack with a broom in his hands at the cleaning station, the dust at his feet, and the chip `The hall is dirty, Jack is cleaning it` | the helper idle beside the dirt, which is what Piotr saw in v28 | nothing: the sheet in his hands is `character.helper.sweep` |
+| 11 | `11-the-helper-is-emptying-the-bags.png` | Jack at the extractor with the chip `Jack is emptying the bags`, and no button on it | the v28 chip, which asked the owner | nothing: 2.8's `bagChange` autoRole does what it says |
+| 12 | `12-company-board-0h.png` | The Company board: the Machines column, and the Output sheet's "act where they are" rows, which list the two joiners and the machines and no estimator | the v28 board | finding 11, and 2.3.3 doing its job |
+
+The halves of picture 9 were shot apart, because the hall and the room behind its door are two
+views of the game and no screen holds both; they are put in one file unaltered, on the game's own
+page colour, and nothing is drawn on them.
+
+### What the pictures showed and was left alone, with the reason
+
+- **The owner in the office stands against the wall beside the door, not at his desk.** Turn 19's
+  report raised this and left it with Piotr, and 2.12 keeps T19 2.2's office half as it is. The
+  room is drawn from the desk, so there is no floor behind it to stand a man on; `OFFICE_OWNER_BOX`
+  is the one number to move if he should be nearer. Unchanged tonight.
+- **`End the contract` is a locked button while the free month runs**, with its reason in its
+  title. That is `lockedButton`, the one disabled button `src/ui/modal.ts` allows, and it is what
+  the game does everywhere else; it is not a dead control drawn by mistake.
+- **The thicknesser has no sprite**, so its row draws the Turn 19 placeholder. No new art tonight
+  (section 6), and machine sheets are not in the section 9 requests.
+- **Two labels in the hall sit on top of each other** where two tool cabinets stand together, and
+  the drill's label crosses the hand tool set's. Older than tonight, and no hall label work is in
+  this brief.
+- **The strip says "The bags are full" while the chip says "Jack is emptying the bags".** Both are
+  true, and the strip asks the owner for nothing, which is what 2.8 is about.
+- **A hire card blocked by kit still says the list twice**, in different words: the red line
+  carries the price of the kit and the grey reason carries none. Older than tonight.
+- **The drawing is two columns and the card is one.** `docs/mockups/t20/contracts-tab.html` puts
+  the figures left and the day tracks right. The game's card and row family is a single column, and
+  a second grid family would be a new look, which section 1 forbids and no line of 2.1 asks for.
+  Every figure and both tracks of the drawing are on the card, in its order.
+- **`24 of 40, short` while his day track shows eight pieces.** The pace counts what is left of
+  today and the days left in the week, so a morning lost queueing at the one saw is one piece short
+  of the forty, and it says so in red. It is the engine's own reading and 2.1.2's own words.
+
+### The check
+
+`npm run check` green on its own exit code before the commit: 196 test files, 1,887 tests, 1 todo.
+No server and no browser is left running.
