@@ -40,7 +40,6 @@ import {
 import { nextWorkingDay } from '../../src/engine/clock';
 import { contractPiece, contractResultFor } from '../../src/engine/contracts';
 import { hallBlock, orderForJobCheck } from '../../src/engine/jobs';
-import { jobSheetsOnPallet } from '../../src/engine/materials';
 import { hallProblems } from '../../src/render/hall';
 import type { Contract, Equipment, GameEvent, GameState, Job, Worker } from '../../src/engine/index';
 
@@ -431,11 +430,11 @@ const BESPOKE_MONTH: Policy = {
   stockSheets: 0,
 };
 
-/** What the rack and the job's own pallet held the minute the lorry was empty. */
+/** What the rack held, and what went into storage for the job, the minute the lorry was empty. */
 interface Landed {
   day: number;
   rack: number;
-  pallet: number;
+  stored: number;
   shortfall: number;
   reserved: number;
   used: number;
@@ -482,7 +481,7 @@ function bespokeRun(): BespokeRun {
     landed = {
       day: current.clock.day,
       rack: current.stock.sheets,
-      pallet: jobSheetsOnPallet(current, jobId),
+      stored: current.stock.tempStorageSheets,
       shortfall: shortfallOf(watched),
       reserved: watched.sheetsReserved,
       used: watched.sheetsUsed,
@@ -526,15 +525,15 @@ describe('(ee) a fifty thousand pound bespoke job and a fifty place rack', () =>
     expect(EE.unloads).toBe(1);
   });
 
-  it('is whole after that one unload: nothing short, nothing written off, the rest on its pallet', () => {
+  it('is whole after that one unload: nothing short, nothing written off, the rest in storage', () => {
     const places = rackCapacity(EE.state);
     // The reading the minute the lorry was empty: nothing short, and every sheet of it the job's.
     expect(EE.landed.shortfall).toBe(0);
     expect(EE.landed.rack).toBe(places);
-    expect(EE.landed.pallet).toBe(EE.job.sheets - places);
+    expect(EE.landed.stored).toBe(EE.job.sheets - places);
     expect(EE.landed.reserved + EE.landed.used).toBe(EE.job.sheets);
-    // And it stays whole while the saw cuts into it: the pallet comes onto the rack as the
-    // cutting makes room, so what it has cut plus what it still holds is the whole load.
+    // And it stays whole while the saw cuts into it: what would not fit went into storage for the
+    // job and comes back on the morning fetch, so what it has cut plus what it holds is the load.
     expect(shortfallOf(EE.job)).toBe(0);
     expect(EE.job.sheetsReserved + EE.job.sheetsUsed).toBe(EE.job.sheets);
     expect(orderForJobCheck(EE.state, EE.job)).toEqual({ ok: false, reason: 'Nothing short' });
@@ -544,8 +543,8 @@ describe('(ee) a fifty thousand pound bespoke job and a fifty place rack', () =>
       '(ee) THE FIFTY THOUSAND POUND BESPOKE JOB\n' +
         `sheets the job wants ${EE.job.sheets}, places on the rack ${places}\n` +
         `orders ${EE.orders}, unloads ${EE.unloads}, unloaded on day ${EE.landed.day}\n` +
-        `the minute the lorry was empty: ${EE.landed.rack} on the rack, ${EE.landed.pallet} on its ` +
-        `pallet, shortfall ${EE.landed.shortfall}, written off in the yard 0`,
+        `the minute the lorry was empty: ${EE.landed.rack} on the rack, ${EE.landed.stored} in ` +
+        `storage for it, shortfall ${EE.landed.shortfall}, written off in the yard 0`,
     );
   });
 });

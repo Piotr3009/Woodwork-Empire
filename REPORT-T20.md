@@ -21,8 +21,8 @@ Piotr is in here and nowhere else.
 
 **Nothing stopped the build.** Everything in sections 2.1 to 2.16 is built, tested and
 photographed, nothing on the "do not" list of section 6 was done, and every v28 save loads: a v28
-save is written out in `tests/cloud/migrate.test.ts` and lifted, with five tests on it. Ten things
-want Piotr's eye, and the first is one of his own figures that had to move.
+save is written out in `tests/cloud/migrate.test.ts` and lifted, with five tests on it. Eleven
+things want Piotr's eye, and the first is one of his own figures that had to move.
 
 1. **The wardrobe front draws 0.3 of a sheet now and not 1.1, and that deviates from the letter of
    2.2. It is the one thing in this turn Piotr most needs to rule on.** The piece table's own rule
@@ -56,15 +56,36 @@ want Piotr's eye, and the first is one of his own figures that had to move.
 3. **The branch, and the base every diff is read against.** Section 5 says "Branch
    turn-20-contracts-that-pay from main". The session's own standing instruction names
    `claude/woodwork-empire-t20-3a7zg6` and forbids any other, so that is the branch this turn is
-   on, as Turns 18 and 19 say of their own. `main` in this repository, local and origin alike, is a
-   stale two commit branch of unrelated history with no source on it at all (`276f494 Create
-   CLAUDE.md`, `d7b8084 Initial commit`), so it is not the base either: the base of this turn is
-   `d35e9b5` ("t20"), which carried `APP_VERSION` `'v28'`, `STATE_VERSION` 16, `assignMove` in
-   `src/ui/jobCard.ts`, the helper's walk sheet and the Turn 20 brief. Both preconditions of the
-   brief were checked against it before a line was written. Every "diff main" of section 7 was run
-   against `d35e9b5`, and the cross check says so where it answers them.
+   on, as Turns 18 and 19 say of their own. The base of this turn is `d35e9b5` ("t20"), which
+   carried `APP_VERSION` `'v28'`, `STATE_VERSION` 16, `assignMove` in `src/ui/jobCard.ts`, the
+   helper's walk sheet and the Turn 20 brief. Both preconditions of the brief were checked against
+   it before a line was written, and every "diff main" of section 7 was run against it.
+   **One correction to what the earlier part of this session believed about `main`.** The container
+   was cloned with a stale `origin/main` (`276f494 Create CLAUDE.md`, `d7b8084 Initial commit`), so
+   the first reading of this repository was that `main` was two commits of unrelated history. It is
+   not. A fresh `git fetch origin main` puts `main` at `a0a7d37`, two commits **ahead of**
+   `d35e9b5` and a proper trunk. `main` was merged into this branch at the end of the turn, and
+   what that merge turned up is item 4 below. Where this report says the base of a diff is
+   `d35e9b5` rather than `main`, that is still right and for a better reason: `d35e9b5` is the v28
+   tree the brief's precondition names, and `main` has moved since.
 
-4. **2.14 was built by B2, although the task queue gives it to B3.** The one word ("0 h" where the
+4. **Piotr fixed 2.16 himself on `main` while this turn ran, and his fix is the one that shipped.**
+   `a0a7d37` ("123") changes the same line of `unloadIntoStock` that 2.16 is about, and `256e039`
+   fixes `tests/render/capsule.test.ts`, which phase A had also fixed. 2.16's sentence offers two
+   answers and the two of us took one each: **his** sends what will not fit on the rack straight to
+   temporary storage for the job, one charge and the morning fetch chore, which is the path 2.16
+   names first and by its function (`moveOverflowToStorage`); **T20-B1d's** kept it on its own
+   pallet in the yard at no charge, took it out of the rack's `reserved` count, drained it onto the
+   rack as the cutting made room, and guarded it against the overnight write off. Both pass the
+   scenario 2.16 asks for. **His stands**, because 2.16 names that path first and because it is
+   his: the pallet and its three helpers are deleted rather than left beside it, so there is one
+   code path and not two, and `tests/engine/bespokeOrder.test.ts` and scenario (ee) were rewritten
+   to assert his mechanism. What the pallet bought that storage does not is written here so he can
+   weigh it: no 150 storage charge and no morning chore for a load the player had no say in, and a
+   rack that cannot end the fetch holding more sheets than it has places. Going back to it is a
+   revert of one commit.
+
+5. **2.14 was built by B2, although the task queue gives it to B3.** The one word ("0 h" where the
    Machines column said "none") lives in `src/ui/company.ts`: section 3 of the brief gives the
    company rows to B2 and the task queue lists 2.14 under B3's T20-B3c. B2 did it, so that one file
    had one owner for the night, and B3 wrote it out as a note with the exact old and new text
@@ -72,7 +93,7 @@ want Piotr's eye, and the first is one of his own figures that had to move.
    pictures then caught in it, a week the machines cost the workshop time reading as a nought, is
    finding 11 of the look and shoot.
 
-5. **Phase B ran in three worktrees, and the six frozen files stayed phase A's and phase C's.** The
+6. **Phase B ran in three worktrees, and the six frozen files stayed phase A's and phase C's.** The
    three groups worked on three branches in three git worktrees off this one, and an integrator
    merged them in three merge commits (`4d18f34`, `589d463`, `419bc39`), each branch checked file
    by file before its merge. Not one phase B commit touches `src/engine/types.ts`,
@@ -82,7 +103,7 @@ want Piotr's eye, and the first is one of his own figures that had to move.
    That is why several paragraphs of this report read as phase B left them and then say what landed
    afterwards.
 
-6. **The owner is costed on an offer and cannot be put on one.** 2.1.1 asks for "the owner and
+7. **The owner is costed on an offer and cannot be put on one.** 2.1.1 asks for "the owner and
    every joiner on the books" in the picker, and he is there: pick him and every figure on the card
    is worked out for him, his minutes at rate 1, his labour at his draw (`ownerDrawPerDay` over the
    working day, which makes him the dearest man in the hall on a contract), his day drawn as
@@ -94,16 +115,16 @@ want Piotr's eye, and the first is one of his own figures that had to move.
    `worker.station` and `worker.jobId`), which is a long way outside what 2.1 states line by line.
    **For Piotr: should he be able to stand at a contract himself?**
 
-7. **The overflow of a job's own delivery is held on its pallet, and nothing is charged for it.**
-   2.16 offers either home, "the `moveOverflowToStorage` path, one charge" or "held on the pallet
-   until the rack has room". B1 took the pallet: the 65 sheets a £50,000 job's lorry cannot fit on
-   a 50 place rack stand on the job's own pallet, `reservedSheets` takes them off the job's
-   reservation so the rack's free count stays the rack's, `landPalletSheets` puts them on the rack
-   as the saw makes room without a click and without a task, and `writeOffSheetsLeftOutside` passes
-   the pallet over. A stock lorry's overflow is still the yard question of Turn 2, storage, charge
-   and all.
+8. **The overflow of a job's own delivery goes into storage for the job, at one charge.** 2.16
+   offers either home, "the `moveOverflowToStorage` path, one charge" or "held on the pallet until
+   the rack has room". T20-B1d built the pallet; Piotr built the storage path on `main` the same
+   night, and the storage path is what shipped, for the reasons in item 4 above. So: the 65 sheets a
+   £50,000 job's lorry cannot fit on a 50 place rack go into temporary storage held for that job,
+   charged `TEMP_STORAGE_COST` once and not once a sheet, nothing is left in the yard to be written
+   off overnight, and the morning `fetchStorage` chore brings them in with the job's claim still on
+   them. A stock lorry's overflow is still the yard question of Turn 2, storage, charge and all.
 
-8. **"the week's result: pieces x margin, less his wages for the days it takes" is the pieces times
+9. **"the week's result: pieces x margin, less his wages for the days it takes" is the pieces times
    the margin, and his wages are not taken off twice.** The margin a piece already has his labour
    in it, two lines earlier in the same paragraph of 2.1.1 (`margin = price less material less what
    his minutes cost`), so taking the days' wages off the product would count the same wages a
@@ -113,14 +134,14 @@ want Piotr's eye, and the first is one of his own figures that had to move.
    wages are taken off in full is the month: scenario (cc) counts the four Fridays one by one off
    the payroll, not off the card.
 
-9. **The Efficiency plate on the top bar wears no cross, and that is a judgement call.** 2.15 says
+10. **The Efficiency plate on the top bar wears no cross, and that is a judgement call.** 2.15 says
    every modal, popover and list has the cross, Escape and a click outside. The plate is the body
    of a native `<details>`, opened and shut by the same summary it hangs from, and section 6 of
    this brief forbids any change to Efficiency, so it was left as it is and written into the
    popover test's own list of things that float over the page and are not popovers, each with its
    reason. If Piotr wants it a popover it is a cross and a line in `ESCAPE_ORDER`.
 
-10. **Only the owner goes through a door; the rest of the crew stand at the doorway.** 2.12 says a
+11. **Only the owner goes through a door; the rest of the crew stand at the doorway.** 2.12 says a
     figure whose leg ends at a door cell goes through it. The office view draws one man, the owner,
     in one box measured for him in T19 2.2, so an estimator sent through the door would be on
     neither picture: B3's review caught exactly that, an estimator at a take off vanishing off the
@@ -977,11 +998,11 @@ because they are Piotr's to rule on; the rest are the session's own reasons.
 **T20-C4.** Every line of section 7, with the command that answered it and what came back. Nothing
 here is a summary of a test: it is the test's own output, run on the branch as it stands.
 
-**The base of the diff is `d35e9b5`, not `main`.** Local `main` and `origin/main` are the same
-stale two commit branch (`276f494 Create CLAUDE.md`, `d7b8084 Initial commit`): no source on it at
-all. The v28 the brief means, the precondition this turn opened on, is `d35e9b5`, which carries
-`STATE_VERSION = 16` and `APP_VERSION = 'v28'`. Every diff of this cross check is against it, and
-section 7's last line was read that way.
+**The base of the diff is `d35e9b5`, not `main`.** `d35e9b5` ("t20") is the v28 tree the brief's
+precondition names: `STATE_VERSION = 16`, `APP_VERSION = 'v28'`. `main` has moved on since it
+(`a0a7d37`, two commits ahead, merged into this branch at the end of the turn: see item 4 of
+section 0), so the fixed v28 tree is the honest base for reading what this turn changed. Every diff
+of this cross check is against it, and section 7's last line was read that way.
 
 ### 1. The three margins an hour by hand, between 22 and 30
 

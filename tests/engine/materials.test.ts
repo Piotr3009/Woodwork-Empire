@@ -31,6 +31,7 @@ import {
 } from '../../src/engine/materials';
 import { addWorkingDays } from '../../src/engine/clock';
 import { canBuy, sellMachine } from '../../src/engine/game';
+import { orderForJobCheck } from '../../src/engine/jobs';
 import { jobProgress, tick } from '../../src/engine/index';
 import type { GameEvent, GameState } from '../../src/engine/index';
 import {
@@ -579,5 +580,46 @@ describe('the reservation rule and Restock (CLAUDE.md T13 3.2, 3.3)', () => {
     expect(stockLines(state)[0]?.number).toBe(number);
     // A different seed, a different number: it is generated, not typed in.
     expect(stockNumberFor(newGame({ seed: 7 }), 'sheet')).not.toBe(number);
+  });
+});
+
+describe('a job whose load is bigger than the rack (PIOTR, 18.09: a £50,000 job ordered three times over)', () => {
+  it('keeps the whole load for the job, stores what does not fit, and never asks to order again', () => {
+    // A bespoke job that needs eighty sheets against a fifty sheet rack.
+    let state = doTask(upToMaterial(ready('veryEasy'), { bespokeMaterial: true }), 'materialTakeOff');
+    const job = firstJob(state);
+    job.sheets = 80;
+    expect(shortfallOf(job)).toBe(80);
+    state = act(state, { type: 'ORDER_FOR_JOB', jobId: job.id });
+    expect(state.deliveries[0]?.sheets).toBe(80);
+    const cashAfterOrder = state.cash;
+    // While it is on the way the card cannot ask for another lorry.
+    expect(orderForJobCheck(state, firstJob(state)).ok).toBe(false);
+    const arrival = state.deliveries[0]?.arriveDay ?? 0;
+    let day = clearEvents(runToDay(state, arrival).state);
+    day = doTask(day, 'unload');
+    const after = firstJob(day);
+    // Fifty on the rack, thirty in storage, all eighty the job's: no shortfall, no question.
+    expect(day.stock.sheets).toBe(50);
+    expect(day.stock.tempStorageSheets).toBe(30);
+    expect(after.sheetsReserved).toBe(80);
+    expect(shortfallOf(after)).toBe(0);
+    expect(day.activeEvent?.kind).not.toBe('stockOverflow');
+    expect(day.deliveries[0]?.overflowSheets).toBe(0);
+    // One storage charge, and no second lorry bought for the job since the order.
+    expect(cashAfterOrder).toBeGreaterThan(day.cash);
+    const storage = day.ledger.filter((entry) => entry.category === 'storage');
+    expect(storage).toHaveLength(1);
+    expect(storage[0]?.amount).toBeCloseTo(-TEMP_STORAGE_COST, 6);
+    expect(day.deliveries.filter((entry) => entry.jobId === after.id)).toHaveLength(1);
+    expect(orderForJobCheck(day, after).ok).toBe(false);
+    expect(orderForJobCost(after)).toBe(0);
+    // The morning fetch brings the thirty back to the rack and the job keeps them.
+    const morning = clearEvents(runToDay(day, arrival + 1).state);
+    expect(morning.tasks.some((task) => task.kind === 'fetchStorage' && !task.done)).toBe(true);
+    const fetched = doTask(morning, 'fetchStorage');
+    expect(fetched.stock.tempStorageSheets).toBe(0);
+    expect(fetched.stock.sheets).toBe(80);
+    expect(shortfallOf(firstJob(fetched))).toBe(0);
   });
 });

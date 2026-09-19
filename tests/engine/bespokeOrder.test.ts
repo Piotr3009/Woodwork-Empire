@@ -4,23 +4,22 @@
 // The bug: `unloadIntoStock` gave a job only what fitted on the rack, so a bespoke load bigger
 // than the free places left the job short the moment it was unloaded and its card asked for
 // another order, at the ad hoc price, for material that was standing in the yard. From tonight
-// the whole lorry is the job's: what the rack took is held for it, what would not go on stands on
-// its own pallet and is held for it just the same, and the pallet goes on the rack as the cutting
-// makes room. Nothing of a job's own load is ever written off in the yard.
+// the whole lorry is the job's: what the rack took is held for it and what would not go on it goes
+// into temporary storage for it, one charge, and comes back on the morning fetch. Nothing of a
+// job's own load is ever left in the yard to be written off.
 
 import { describe, expect, it } from 'vitest';
 import {
   BESPOKE_COST_UPLIFT,
   MATERIAL_FRACTION,
   SHEET_VALUE,
+  TEMP_STORAGE_COST,
 } from '../../src/engine/constants';
 import {
   arriveDeliveries,
   deliveriesInYard,
-  drawSheetsFor,
+  fetchFromStorage,
   freeSheets,
-  jobSheetsOnPallet,
-  landPalletSheets,
   rackCapacity,
   reservedSheets,
   shortfallOf,
@@ -47,7 +46,7 @@ function bespokeJob(state: GameState): { state: GameState; job: Job } {
 }
 
 describe('the fifty thousand pound job and the fifty place rack (CLAUDE.md T20 2.16)', () => {
-  it('is whole after one order and one unload, with the rest of it held on its pallet', () => {
+  it('is whole after one order and one unload, with the rest of it held in storage for it', () => {
     const { state, job } = bespokeJob(hall());
     const places = rackCapacity(state);
     expect(places).toBe(50);
@@ -73,13 +72,20 @@ describe('the fifty thousand pound job and the fifty place rack (CLAUDE.md T20 2
     expect(unloadIntoStock(state, delivery)).toBe(0);
     delivery.unloaded = true;
 
-    // No shortfall after: the rack holds fifty of them and the pallet holds the rest.
+    // No shortfall after: the rack holds fifty of them and storage holds the rest, and every one
+    // of them is the job's.
     expect(shortfallOf(job)).toBe(0);
     expect(state.stock.sheets).toBe(places);
-    expect(jobSheetsOnPallet(state, job.id)).toBe(job.sheets - places);
+    expect(state.stock.tempStorageSheets).toBe(job.sheets - places);
     expect(job.sheetsReserved).toBe(job.sheets);
-    // The rack's own count stays the rack's: what is on the pallet is not on it.
-    expect(reservedSheets(state)).toBe(places);
+    // Nothing of the job's load is left in the yard to be lost overnight, and it was charged
+    // storage once and not once a sheet.
+    expect(state.deliveries[0]?.overflowSheets).toBe(0);
+    const storage = state.ledger.filter((entry) => entry.category === 'storage');
+    expect(storage).toHaveLength(1);
+    expect(storage[0]?.amount).toBeCloseTo(-TEMP_STORAGE_COST, 6);
+    // The whole load is claimed, so the rack has nothing to spare for anybody else.
+    expect(reservedSheets(state)).toBe(job.sheets);
     expect(freeSheets(state)).toBe(0);
     // And the card has nothing to order.
     expect(orderForJobCheck(state, job)).toEqual({ ok: false, reason: 'Nothing short' });
@@ -88,7 +94,7 @@ describe('the fifty thousand pound job and the fifty place rack (CLAUDE.md T20 2
     expect(card).not.toContain('Order for this job');
   });
 
-  it('keeps the pallet overnight and puts it on the rack as the cutting makes room', () => {
+  it('loses none of it overnight and keeps it all through the morning fetch', () => {
     const { state, job } = bespokeJob(hall());
     orderShortfall(state, job.id);
     state.clock.day = state.deliveries[0]?.arriveDay ?? state.clock.day;
@@ -97,28 +103,20 @@ describe('the fifty thousand pound job and the fifty place rack (CLAUDE.md T20 2
     if (!delivery) throw new Error('a lorry is wanted');
     unloadIntoStock(state, delivery);
     delivery.unloaded = true;
-    const pallet = jobSheetsOnPallet(state, job.id);
-    expect(pallet).toBeGreaterThan(0);
+    const stored = state.stock.tempStorageSheets;
+    expect(stored).toBe(job.sheets - rackCapacity(state));
 
-    // The night comes and nothing of the job's own load is written off.
+    // The night comes and nothing of the job's own load is in the yard to be written off.
     expect(writeOffSheetsLeftOutside(state)).toBe(0);
-    expect(jobSheetsOnPallet(state, job.id)).toBe(pallet);
+    expect(state.stock.tempStorageSheets).toBe(stored);
 
-    // The rack is full, so nothing lands until the job has cut into it.
-    const places = rackCapacity(state);
-    expect(landPalletSheets(state)).toBe(0);
-    job.stage = 'inProduction';
-    expect(drawSheetsFor(state, job, 0.1)).toBe(true);
-    expect(state.stock.sheets).toBeLessThan(places);
-    const firstCut = job.sheetsUsed;
-    // And the pallet comes in behind the saw, which the next slice of work does by itself: the
-    // rack is filled again from the pallet and the slice is cut off it.
-    expect(drawSheetsFor(state, job, 0.2)).toBe(true);
-    expect(state.stock.sheets).toBe(places - (job.sheetsUsed - firstCut));
-    expect(jobSheetsOnPallet(state, job.id)).toBeLessThan(pallet);
-    // What it has cut plus what it still holds is the whole load, wherever it is standing.
-    expect(job.sheetsUsed + job.sheetsReserved).toBe(job.sheets);
+    // The morning fetch brings them in and they are still the job's: one order bought the lot.
+    fetchFromStorage(state);
+    expect(state.stock.tempStorageSheets).toBe(0);
+    expect(state.stock.sheets).toBe(job.sheets);
+    expect(job.sheetsReserved).toBe(job.sheets);
     expect(shortfallOf(job)).toBe(0);
+    expect(freeSheets(state)).toBe(0);
   });
 
   it('leaves a stock lorry overflow where it was, nobody\u0027s and gone by morning', () => {
