@@ -93,6 +93,7 @@ import type {
   EquipmentSpec,
   GameState,
   OnOrderItem,
+  Orientation,
 } from '../engine/types';
 import {
   type BoxFaces,
@@ -134,6 +135,7 @@ import { jobStage } from '../engine/jobs';
 import { cleanerAtWork, manOnOpenTask } from '../engine/tasks';
 import type { StageId } from '../engine/types';
 import { figureIsThroughADoor, takeDoorGoings } from './doors';
+import { pictureFor, portFor } from '../engine/ports';
 import { bubbleIsFresh, bubbleNowMs } from './bubbles';
 import { bubblesFor } from '../engine/bubbles';
 
@@ -244,25 +246,26 @@ export function objectArt(art: {
   fill: string;
   shade: string;
   label: string;
-  /** Stood at ninety degrees to the walls: the second orientation the art side delivered, or the
-   *  picture mirrored about its anchor (CLAUDE.md T10 3.8). */
-  rotated?: boolean;
+  /** Which way it is turned: the file the art side delivered for that orientation, or, at a
+   *  quarter turn with no such file, the base picture mirrored about its anchor
+   *  (CLAUDE.md T10 3.8, T22 2.11). */
+  orientation?: Orientation;
   /** What the art side has delivered; the manifest when not given, so a test can draw the hall
    *  as if a file had not landed yet (the placeholders are for exactly that). */
   files?: readonly string[];
 }): string {
   const shadow = contactShadow(art.x, art.y, art.width, art.depth);
-  const rotated = art.rotated === true;
+  const orientation = art.orientation ?? 0;
   const files = art.files ?? spriteFiles();
   const url = art.files === undefined
-    ? spriteUrl(art.spriteKey, art.tier, rotated)
-    : pickSprite(art.files, art.spriteKey, art.tier, rotated);
+    ? spriteUrl(art.spriteKey, art.tier, orientation)
+    : pickSprite(art.files, art.spriteKey, art.tier, orientation);
   if (url !== null) {
     const at = spriteBox(art.x, art.y, art.width, art.depth, art.height);
     // Mirrored about the anchor, which is the corner the picture is placed by, so the object
     // stays on its own tile while it faces the other way (CLAUDE.md T10 3.8).
     const anchor = tileToScreen(art.x + art.width, art.y + art.depth);
-    const mirror = mirrorNeeded(files, art.spriteKey, art.tier, rotated)
+    const mirror = mirrorNeeded(files, art.spriteKey, art.tier, orientation)
       ? ` transform="translate(${round(anchor.x * 2)},0) scale(-1, 1)"`
       : '';
     return shadow + spriteImage(url, at, mirror.trim());
@@ -703,6 +706,14 @@ export interface MachineFx {
 
 const NO_FX: MachineFx = { className: '', svg: '' };
 
+/** True for a thing with a measured connection point: a picture `PORTS` has a line for, at the
+ *  orientation it is standing in (CLAUDE.md T22 2.8). It is the one test for "a pipe is fixed to a
+ *  named pixel of this picture", and 2.9 reads it to keep such a thing still while it runs. */
+export function hasMeasuredPort(item: Equipment): boolean {
+  const picture = pictureFor(spriteFiles(), item.spriteKey, item.variantId, item.orientation);
+  return portFor(picture.file) !== null;
+}
+
 /** Where a machine's picture actually stands: its class's footprint, centred inside the working
  *  zone it reserves (CLAUDE.md T7 3.3). The anchor cell is the zone's corner, so everything that
  *  draws an object comes through here. */
@@ -875,6 +886,12 @@ export function machineFx(state: GameState, item: Equipment, spec: EquipmentSpec
   }
   if (spec.category === 'extraction') {
     if (item.broken) return { className: '', svg: lamp(point, 'red') };
+    // A machine with a pipe on it stands still while it runs [PIOTR, 19.09: "the extractor
+    // pulsing will tear the pipe"]. The test is a measured port: anything `PORTS` has a line for
+    // is a thing a pipe is drawn onto a named pixel of, and a body that breathes under a pipe
+    // fixed to that pixel is the pipe tearing. A unit with no line breathes as it always did
+    // (CLAUDE.md T22 2.9).
+    if (hasMeasuredPort(item)) return NO_FX;
     return machineInUse(state, item) ? { className: ' fx-breathe', svg: '' } : NO_FX;
   }
   if (!machineInUse(state, item)) return NO_FX;
@@ -1412,8 +1429,8 @@ export interface Ghost {
   depth: number;
   ok: boolean;
   reason: string;
-  /** True while the next drop will stand it at ninety degrees to the walls (T10 3.8). */
-  rotated?: boolean;
+  /** Which way the next drop will stand it (T10 3.8; CLAUDE.md T22 2.11). */
+  orientation?: Orientation;
 }
 
 /** A view that is expensive to build. The shell carries the pictures, which are megabytes: a
@@ -1619,7 +1636,7 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
           files,
           spriteKey: item.spriteKey,
           tier: item.variantId,
-          rotated: item.rotated,
+          orientation: item.orientation,
           x: stands.x,
           y: stands.y,
           width: stands.width,
@@ -1925,7 +1942,11 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
         `y="${Math.round(centreOf(ghost.x, ghost.y, ghost.width, ghost.depth).y)}" ` +
         `text-anchor="middle" class="iso-label ghost-label" fill="${colour}">` +
         `${escapeText(
-          ghost.ok ? (ghost.rotated === true ? 'Drop it here, turned' : 'Drop it here') : ghost.reason,
+          ghost.ok
+            ? ghost.orientation !== undefined && ghost.orientation !== 0
+              ? 'Drop it here, turned'
+              : 'Drop it here'
+            : ghost.reason,
         )}</text></g>`,
     );
   }

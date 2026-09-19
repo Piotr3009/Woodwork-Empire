@@ -139,7 +139,7 @@ describe('a v24 save in this build (CLAUDE.md T17 section 4)', () => {
     expect(opened.state).not.toBeNull();
     const state = opened.state as GameState;
     expect(state.version).toBe(STATE_VERSION);
-    expect(STATE_VERSION).toBe(18);
+    expect(STATE_VERSION).toBe(19);
     expect(state.taskQueue).toEqual([]);
     expect(state.dayStats.paidHours).toBe(0);
     expect(state.dayStats.expressUplift).toBe(0);
@@ -281,7 +281,7 @@ describe('a v28 save in this build (CLAUDE.md T20 section 4, T21 section 4)', ()
   if (lifted === null) throw new Error('the lift refused a version 16 state');
 
   it('renames every tier and brings the man up to what that tier is worth tonight', () => {
-    expect(lifted.version).toBe(18);
+    expect(lifted.version).toBe(19);
     expect(lifted.workers.map((worker) => worker.tier)).toEqual([
       'novice',
       'experienced',
@@ -319,7 +319,16 @@ describe('a v28 save in this build (CLAUDE.md T20 section 4, T21 section 4)', ()
       [10, 3],
       [12, 3],
     ]);
-    for (const cabinet of cabinets) expect(cabinet.rotated).toBe(false);
+    // Square to the walls, and the boolean is a number from tonight: the v19 lift turns the turn
+    // into an orientation and the cabinets the v18 lift unturned come out at 0
+    // (CLAUDE.md T22 2.11).
+    for (const cabinet of cabinets) {
+      expect(cabinet.rotated).toBeUndefined();
+      expect(cabinet.orientation).toBe(0);
+      // And every cabinet in a save is the standard class, because that is the one the family had
+      // when it was bought (CLAUDE.md T22 2.12).
+      expect(cabinet.variantId).toBe('standard');
+    }
   });
 
   it('starts the days below the limit and the owner\u0027s idle minutes at nought', () => {
@@ -394,7 +403,7 @@ describe('a v29 save in this build (CLAUDE.md T21 section 4)', () => {
   if (lifted === null) throw new Error('the lift refused a version 17 state');
 
   it('pays every man by the month at the conversion the Turn 20 build printed', () => {
-    expect(lifted.version).toBe(18);
+    expect(lifted.version).toBe(19);
     // Turn 20's four weekly wages for a joiner were 450, 600, 800 and 1,000, and the build printed
     // the month beside each of them at thirty days over seven. A lifted man costs what the game
     // told the player he cost, and his own wage is never re-read off the hiring specs: what he is

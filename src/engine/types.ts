@@ -242,6 +242,12 @@ export interface EquipmentSpec {
   enduranceHours: number;
 }
 
+/** Which way a thing on the floor is turned: quarter turns clockwise from the picture as the art
+ *  side drew it, so 0 is the base file, 1 the `.r`, 2 the `.rr` and 3 the `.rrr`. Piotr asked for
+ *  the other two turns on 19.09 ("I need two more turns, we have four walls") and it replaced the
+ *  `rotated` boolean of Turn 10 everywhere (CLAUDE.md T22 2.11). */
+export type Orientation = 0 | 1 | 2 | 3;
+
 /** A purchased item standing in the hall. */
 export interface Equipment {
   id: string;
@@ -281,10 +287,12 @@ export interface Equipment {
    *  dryer, which is fitted to one compressor. Null means the first compressor in the hall, which
    *  is what "default: all" means (CLAUDE.md T10 3.2, 3.3). */
   compressorId: string | null;
-  /** Stood at ninety degrees to the walls: the footprint and the working zone swap their width
-   *  and their depth, and the picture is mirrored unless the art side has delivered a second
-   *  orientation for it (PIOTR, CLAUDE.md T10 3.8). */
-  rotated: boolean;
+  /** Which way it is turned: quarter turns clockwise from the picture as drawn (CLAUDE.md T22
+   *  2.11). At 1 and 3 the footprint and the working zone swap their width and their depth. The
+   *  picture is the `.r`, `.rr` or `.rrr` file where the art side has drawn one, and at 1 without
+   *  one it is the base file mirrored, which is what the game did when this was a boolean
+   *  (PIOTR, 19.09: "I need two more turns, we have four walls"; CLAUDE.md T10 3.8). */
+  orientation: Orientation;
 }
 
 /** Something bought and paid for that is not here yet: the cash left at the click, the item is
@@ -303,8 +311,9 @@ export interface OnOrderItem {
   anchorY: number;
   /** True from 08:00 of the due day until somebody has it off the lorry. */
   arrived: boolean;
-  /** The outline is dragged and turned like the machine it holds the floor for (T10 3.8). */
-  rotated: boolean;
+  /** The outline is dragged and turned like the machine it holds the floor for, through the same
+   *  four orientations (T10 3.8; CLAUDE.md T22 2.11). */
+  orientation: Orientation;
 }
 
 export interface ProductTemplate {
@@ -613,7 +622,7 @@ export interface MovedItem {
   fromY: number;
   /** Which way it was standing before the player picked it up. Turning a heavy machine where it
    *  stands is a move like any other; turning a bench costs nothing (CLAUDE.md T11 3.9). */
-  fromRotated: boolean;
+  fromOrientation: Orientation;
 }
 
 export interface Delivery {
@@ -793,7 +802,13 @@ export type LedgerCategory =
   | 'website'
   | 'pipes'
   | 'claim'
-  | 'burglary';
+  | 'burglary'
+  /** Money that belongs on the books and on no line of its own. It exists because Turn 22 took the
+   *  arrears out of the game: a v18 save's unpaid balance is carried into the account by the v19
+   *  lift and the line that says so is booked here, and every `arrears` line an old ledger already
+   *  holds is rewritten to this, so not a pound of a played company's history is lost with the word
+   *  (CLAUDE.md T22 2.1, section 4). */
+  | 'other';
 
 export interface LedgerEntry {
   id: string;
@@ -1277,7 +1292,7 @@ export type GameAction =
   | { type: 'BUY_STOCK'; sheets: number }
   | { type: 'PAY_ARREARS'; amount: number | null }
   | { type: 'ORDER_TRANSPORT'; jobId: string }
-  | { type: 'MOVE_ITEM'; itemId: string; x: number; y: number; rotated?: boolean }
+  | { type: 'MOVE_ITEM'; itemId: string; x: number; y: number; orientation?: Orientation }
   | { type: 'END_SETUP'; speed: Speed }
   | { type: 'SET_SUMMARY_CADENCE'; cadence: SummaryCadence }
   | { type: 'SET_SHOW_WHY'; on: boolean }

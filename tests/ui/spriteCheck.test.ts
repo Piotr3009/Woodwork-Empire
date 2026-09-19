@@ -126,8 +126,11 @@ describe('the sprite check page', () => {
     expect(truck?.getAttribute('data-placeholder')).toBe('palletTruck');
   });
 
-  it('lists the eight pipe tiles and the gate collar once each, drawn as the hall draws them', () => {
-    // The pipe layer the art side owes (CLAUDE.md T13 3.11, 3.19; docs/art/REQUESTS-T13.md 1, 2).
+  it('lists the pipe layer once each, drawn as the hall draws it, and from no file at all', () => {
+    // The pipe layer (CLAUDE.md T13 3.11, 3.19). The nine `pipe.*.png` tiles Piotr delivered for
+    // Turn 16 did not meet each other, so Turn 22 deleted them and draws a run as one path
+    // instead: the page shows the vector drawing, which is the only drawing there is now
+    // (PIOTR's screenshot, 19.09; CLAUDE.md T22 2.7). Only `gate.collar` is still a file.
     expect([...PIPE_LAYER_KEYS]).toEqual([...PIPE_TILE_KEYS, 'gate.collar']);
     const page = parse(renderSpriteCheck());
     expect(page.innerHTML).toContain('The pipe layer');
@@ -135,10 +138,15 @@ describe('the sprite check page', () => {
     expect(cells.map((cell) => cell.getAttribute('data-pipe-key'))).toEqual([...PIPE_LAYER_KEYS]);
     for (const cell of cells) {
       const key = cell.getAttribute('data-pipe-key') ?? '';
-      // The files landed on 19.09 (the duct kit): drawn from the file, as the hall draws them.
-      expect(cell.innerHTML, key).toContain(`/sprites/${key}.png`);
       expect(cell.querySelector('[data-placeholder]'), key).toBeNull();
       expect(cell.textContent, key).toContain(`${key}.png`);
+      if (key === 'gate.collar') {
+        expect(cell.innerHTML, key).toContain(`/sprites/${key}.png`);
+        continue;
+      }
+      // Drawn by `src/render/pipes.ts`, off no file: the group the hall itself puts on the floor.
+      expect(cell.innerHTML, key).not.toContain('/sprites/pipe.');
+      expect(cell.innerHTML, key).toContain(`data-pipe-tile="${key}"`);
     }
   });
 

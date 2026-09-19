@@ -4,7 +4,7 @@
 import { GATE_LANE, M2_PER_PERSON, ROOM_LAYOUT, WELFARE_IN_THE_CANTEEN } from './constants';
 import { findSpec, itemStandsInTheHall, standsInTheHall, zoneOf } from './machines';
 import { reservedItems } from './orders';
-import type { Equipment, GameState, OnOrderItem } from './types';
+import type { Equipment, GameState, OnOrderItem, Orientation } from './types';
 
 export interface PlaceCheck {
   ok: boolean;
@@ -57,15 +57,19 @@ export function boxOf(
   x: number,
   y: number,
   variantId?: string,
-  rotated = false,
+  orientation: Orientation = 0,
 ): Box {
-  const zone = zoneOf(specId, variantId, rotated);
+  const zone = zoneOf(specId, variantId, orientation);
   return { x, y, width: zone.width, depth: zone.depth };
 }
 
 /** The floor something already in the hall takes up, turned the way it stands (T10 3.8). */
-function boxOfItem(item: { specId: string; variantId: string; rotated: boolean }, x: number, y: number): Box {
-  return boxOf(item.specId, x, y, item.variantId, item.rotated);
+function boxOfItem(
+  item: { specId: string; variantId: string; orientation: Orientation },
+  x: number,
+  y: number,
+): Box {
+  return boxOf(item.specId, x, y, item.variantId, item.orientation);
 }
 
 /** Can a thing of this kind stand here? `ignoreItemId` is the item being moved, which never
@@ -77,14 +81,14 @@ export function canPlaceSpec(
   y: number,
   ignoreItemId: string | null,
   variantId?: string,
-  rotated = false,
+  orientation: Orientation = 0,
 ): PlaceCheck {
   const spec = findSpec(specId);
   if (!spec) return { ok: false, reason: 'Not in the catalogue' };
   if (!standsInTheHall(specId, variantId)) {
     return { ok: false, reason: 'It lives in a tool cabinet' };
   }
-  const box = boxOf(specId, x, y, variantId, rotated);
+  const box = boxOf(specId, x, y, variantId, orientation);
   if (
     x < 0 ||
     y < 0 ||
@@ -138,7 +142,7 @@ export function canPlace(
   itemId: string,
   x: number,
   y: number,
-  rotated?: boolean,
+  orientation?: Orientation,
 ): PlaceCheck {
   const reserved = reservationById(state, itemId);
   if (reserved !== null) {
@@ -149,7 +153,7 @@ export function canPlace(
       y,
       reserved.id,
       reserved.variantId,
-      rotated ?? reserved.rotated,
+      orientation ?? reserved.orientation,
     );
   }
   const item = state.equipment.find((entry) => entry.id === itemId);
@@ -162,7 +166,15 @@ export function canPlace(
     return { ok: false, reason: 'It stands in the canteen' };
   }
   if (item.anchorX >= state.unit.widthCells) return { ok: false, reason: 'It stands in the yard' };
-  return canPlaceSpec(state, item.specId, x, y, item.id, item.variantId, rotated ?? item.rotated);
+  return canPlaceSpec(
+    state,
+    item.specId,
+    x,
+    y,
+    item.id,
+    item.variantId,
+    orientation ?? item.orientation,
+  );
 }
 
 /** Moves it, or says why not. The man at a bench goes with his bench. */
@@ -171,16 +183,16 @@ export function moveItem(
   itemId: string,
   x: number,
   y: number,
-  rotated?: boolean,
+  orientation?: Orientation,
 ): PlaceCheck {
-  const check = canPlace(state, itemId, x, y, rotated);
+  const check = canPlace(state, itemId, x, y, orientation);
   if (!check.ok) return check;
   const reserved = reservationById(state, itemId);
   if (reserved !== null) {
     // Nothing is carried and nothing is unplugged: the floor held for it is held somewhere else.
     reserved.anchorX = x;
     reserved.anchorY = y;
-    if (rotated !== undefined) reserved.rotated = rotated;
+    if (orientation !== undefined) reserved.orientation = orientation;
     return OK;
   }
   const item = state.equipment.find((entry) => entry.id === itemId);
@@ -189,7 +201,7 @@ export function moveItem(
   const fromY = item.anchorY;
   item.anchorX = x;
   item.anchorY = y;
-  if (rotated !== undefined) item.rotated = rotated;
+  if (orientation !== undefined) item.orientation = orientation;
   for (const worker of state.workers) {
     if (worker.anchorX === fromX && worker.anchorY === fromY) {
       worker.anchorX = x;

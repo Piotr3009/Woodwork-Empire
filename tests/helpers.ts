@@ -6,7 +6,7 @@ import { WORKER_RATES } from '../src/engine/constants';
 import { buyEquipment, buySoftware } from '../src/engine/game';
 import { hire } from '../src/engine/staff';
 import { takeEnquiry } from '../src/engine/jobs';
-import type { WorkerRole, WorkerTier } from '../src/engine/types';
+import type { Orientation, WorkerRole, WorkerTier } from '../src/engine/types';
 import {
   applyAction,
   bagStore,
@@ -268,7 +268,13 @@ export function buyStartingKit(
 export function placeEquipment(
   state: GameState,
   specId: string,
-  options: { variantId?: string; x?: number; y?: number; id?: string; rotated?: boolean } = {},
+  options: {
+    variantId?: string;
+    x?: number;
+    y?: number;
+    id?: string;
+    orientation?: Orientation;
+  } = {},
 ): Equipment {
   const spec = findSpec(specId);
   if (!spec) throw new Error(`unknown equipment: ${specId}`);
@@ -293,7 +299,7 @@ export function placeEquipment(
     purchasePrice: variant ? variant.price : spec.price,
     soldOnDay: null,
     compressorId: null,
-    rotated: options.rotated ?? false,
+    orientation: options.orientation ?? 0,
   };
   state.equipment.push(item);
   // Connected without charge: a test that stands a machine in the hall for nothing wants it on

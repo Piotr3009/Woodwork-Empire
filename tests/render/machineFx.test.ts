@@ -2,7 +2,7 @@
 // (CLAUDE.md T3 3.7).
 
 import { describe, expect, it } from 'vitest';
-import { renderHall } from '../../src/render/hall';
+import { hasMeasuredPort, renderHall } from '../../src/render/hall';
 import { machineInUse, tick } from '../../src/engine/index';
 import type { Equipment, GameState } from '../../src/engine/index';
 import {
@@ -68,9 +68,14 @@ describe('the blade only spins while something is being cut', () => {
 });
 
 describe('the other machines', () => {
-  it('breathes the extractor, and shows nothing for a machine off the floor', () => {
+  it('does not breathe an extractor with a pipe on it, and shows nothing for a machine off the floor', () => {
     const svg = renderHall(working());
-    expect(svg).toContain('fx-breathe');
+    // The extractor breathed as it ran from Turn 3 until tonight. It does not any more
+    // [PIOTR, 19.09: "the extractor pulsing will tear the pipe"]: every extractor class has a
+    // measured connection point, the pipe is drawn onto that pixel, and a body that swells under
+    // a pipe fixed to it is the pipe tearing (CLAUDE.md T22 2.9).
+    expect(hasMeasuredPort(machineOf(working(), 'extractor'))).toBe(true);
+    expect(svg).not.toContain('fx-breathe');
     expect(svg).not.toContain('fx-red');
     // The edgebander is in a tool cabinet: it is never drawn, so its lamp is never drawn
     // either (CLAUDE.md T6 3.5).
@@ -78,7 +83,20 @@ describe('the other machines', () => {
     expect(svg).not.toContain('data-kit="kit-edgebander');
   });
 
-  it('puts a red lamp on a broken extractor and stops it breathing', () => {
+  it('breathes a unit with no measured port, which is what the rule of 2.9 leaves alone', () => {
+    // The gate is the port table and not the family: a unit the art side has measured nothing on
+    // has no pipe drawn to a pixel of it, so nothing tears and it breathes as it did
+    // (CLAUDE.md T22 2.9). The pelletiser is such a unit: extraction by category, no port line.
+    const state = working();
+    const unit = machineOf(state, 'extractor');
+    expect(hasMeasuredPort({ ...unit, spriteKey: 'pelletiser', variantId: 'standard' })).toBe(false);
+    // The question is asked of the picture the hall really draws, so an orientation with no file
+    // of its own answers for the base picture it falls back to, and that one is measured. This is
+    // why 2.11 lets Rotate reach only the orientations that have a file.
+    expect(hasMeasuredPort({ ...unit, orientation: 2 })).toBe(true);
+  });
+
+  it('puts a red lamp on a broken extractor, and it still does not breathe', () => {
     const state = working();
     const broken = { ...state, equipment: state.equipment.map((item) => ({ ...item })) };
     machineOf(broken, 'extractor').broken = true;

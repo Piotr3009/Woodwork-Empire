@@ -296,6 +296,7 @@ import type {
   GameState,
   LostMinuteCause,
   OnOrderItem,
+  Orientation,
   PeriodTotals,
   Speed,
   TaskInstance,
@@ -1154,18 +1155,22 @@ function applyTaskCompletion(state: GameState, task: TaskInstance): void {
 function recordMove(
   state: GameState,
   item: Equipment,
-  stood: { x: number; y: number; rotated: boolean },
+  stood: { x: number; y: number; orientation: Orientation },
 ): void {
   const index = state.movedItems.findIndex((moved) => moved.itemId === item.id);
   if (index < 0) {
-    if (item.anchorX === stood.x && item.anchorY === stood.y && item.rotated === stood.rotated) {
+    if (
+      item.anchorX === stood.x &&
+      item.anchorY === stood.y &&
+      item.orientation === stood.orientation
+    ) {
       return;
     }
     state.movedItems.push({
       itemId: item.id,
       fromX: stood.x,
       fromY: stood.y,
-      fromRotated: stood.rotated,
+      fromOrientation: stood.orientation,
     });
     return;
   }
@@ -1174,7 +1179,7 @@ function recordMove(
     start &&
     item.anchorX === start.fromX &&
     item.anchorY === start.fromY &&
-    item.rotated === start.fromRotated
+    item.orientation === start.fromOrientation
   ) {
     state.movedItems.splice(index, 1);
   }
@@ -1277,7 +1282,7 @@ function putThemBack(state: GameState): void {
     item.anchorY = moved.fromY;
     // Exactly where it stood means the way it stood as well, now that a turn is a move
     // (CLAUDE.md T11 3.9).
-    item.rotated = moved.fromRotated;
+    item.orientation = moved.fromOrientation;
   }
   state.movedItems = [];
 }
@@ -2202,9 +2207,9 @@ export function applyAction(state: GameState, action: GameAction): GameState {
     case 'MOVE_ITEM': {
       const item = next.equipment.find((entry) => entry.id === action.itemId);
       const stood = item
-        ? { x: item.anchorX, y: item.anchorY, rotated: item.rotated }
+        ? { x: item.anchorX, y: item.anchorY, orientation: item.orientation }
         : null;
-      moveItem(next, action.itemId, action.x, action.y, action.rotated);
+      moveItem(next, action.itemId, action.x, action.y, action.orientation);
       if (item && stood) recordMove(next, item, stood);
       break;
     }
@@ -2496,8 +2501,8 @@ function standItem(
     // Everything draws on the first compressor in the hall until the player says otherwise
     // (CLAUDE.md T10 3.2).
     compressorId: null,
-    // Square to the walls until the player turns it (CLAUDE.md T10 3.8).
-    rotated: false,
+    // Square to the walls until the player turns it (CLAUDE.md T10 3.8, T22 2.11).
+    orientation: 0,
   });
   // With a production manager a newly placed machine is connected to the nearest extractor
   // with spare air automatically (CLAUDE.md T13 3.9, 3.19); without one the player clicks it.

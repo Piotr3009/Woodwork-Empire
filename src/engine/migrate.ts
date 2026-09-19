@@ -422,6 +422,77 @@ function liftCabinets(state: Raw): void {
   }
 }
 
+/** Version 18 to 19: the arrears are gone from the game, a turn is a number and not a boolean, and
+ *  the tool cabinet is a family of five (CLAUDE.md T22 section 4).
+ *
+ *  **The arrears into the account.** Turn 21 let a bill the company could not pay become a debt
+ *  beside the bank balance; Turn 22 pays every such cost in full through the overdraft limit
+ *  instead, so there is no second pot of money any more (PIOTR, 19.09; CLAUDE.md T22 2.1). A save
+ *  carrying an unpaid balance has it taken out of the cash, which is where it would have come from
+ *  had it been paid on the day, and one ledger line says so, so the player can see what happened
+ *  to his money rather than finding it missing. The three arrears fields go with it.
+ *
+ *  **The turn.** `rotated: true` is orientation 1 and `rotated: false` is 0, on every placed item,
+ *  every reservation and every item on the moved list (CLAUDE.md T22 2.11).
+ *
+ *  **The cabinet's class.** Every cabinet in a save was bought when the family had one class, and
+ *  that class is the standard one, whatever `variantId` the save happens to carry
+ *  (CLAUDE.md T22 2.12). */
+function liftToVersion19(state: Raw): void {
+  carryArrearsIntoTheAccount(state);
+  for (const item of records(state.equipment)) {
+    item.orientation = item.rotated === true ? 1 : 0;
+    delete item.rotated;
+    if (item.specId === 'toolCabinet') item.variantId = 'standard';
+  }
+  for (const item of records(state.onOrder)) {
+    item.orientation = item.rotated === true ? 1 : 0;
+    delete item.rotated;
+    if (item.specId === 'toolCabinet') item.variantId = 'standard';
+  }
+  for (const moved of records(state.movedItems)) {
+    moved.fromOrientation = moved.fromRotated === true ? 1 : 0;
+    delete moved.fromRotated;
+  }
+  state.version = 19;
+}
+
+/** The unpaid balance of a v18 save taken out of its cash, with one ledger line for it. Written
+ *  against the plain JSON of a save, so the engine's own `charge` is not asked: the point is to
+ *  leave the file in the shape this build runs on, and this build has no arrears to charge to. */
+function carryArrearsIntoTheAccount(state: Raw): void {
+  const finance = isRecord(state.finance) ? state.finance : null;
+  const owed = typeof finance?.arrearsAmount === 'number' ? finance.arrearsAmount : 0;
+  if (finance !== null) {
+    finance.arrearsAmount = 0;
+    finance.arrearsMonths = 0;
+    finance.firstArrearsDay = null;
+  }
+  // Every line an old ledger already holds under the arrears category is rewritten, so a played
+  // company's history keeps its pounds on the books after the word has gone from the game.
+  for (const entry of records(state.ledger)) {
+    if (entry.category === 'arrears') entry.category = 'other';
+  }
+  if (owed <= 0) return;
+  const cash = typeof state.cash === 'number' ? state.cash : 0;
+  state.cash = Math.round((cash - owed) * 100) / 100;
+  const clock = isRecord(state.clock) ? state.clock : null;
+  const day = typeof clock?.day === 'number' ? clock.day : 1;
+  const minute = typeof clock?.minute === 'number' ? clock.minute : 0;
+  const ledger = Array.isArray(state.ledger) ? state.ledger : [];
+  ledger.push({
+    id: `lift-v19-arrears-${day}`,
+    day,
+    minute,
+    category: 'other',
+    label: 'Arrears carried into the account (v32)',
+    amount: -Math.round(owed * 100) / 100,
+    balance: state.cash,
+    unpaid: false,
+  });
+  state.ledger = ledger;
+}
+
 /** One lift per bump, keyed by the version it lifts from. */
 const LIFTS: Record<number, (state: Raw) => void> = {
   12: liftToVersion13,
@@ -430,6 +501,7 @@ const LIFTS: Record<number, (state: Raw) => void> = {
   15: liftToVersion16,
   16: liftToVersion17,
   17: liftToVersion18,
+  18: liftToVersion19,
 };
 
 /** The state a save holds, lifted bump by bump into this build's shape, or null when the save is

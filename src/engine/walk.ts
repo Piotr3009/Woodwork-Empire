@@ -14,7 +14,7 @@ import { PALLET_LAYOUT, ROOM_LAYOUT } from './constants';
 import { isSold, itemStandsInTheHall } from './machines';
 import { footprintOrigin } from './pipes';
 import type { Cell } from './pipes';
-import type { GameState } from './types';
+import type { GameState, Orientation } from './types';
 
 export type { Cell };
 
@@ -25,7 +25,7 @@ export type { Cell };
 export function footprintCells(item: {
   specId: string;
   variantId: string;
-  rotated?: boolean;
+  orientation?: Orientation;
   anchorX: number;
   anchorY: number;
 }): { x: number; y: number; width: number; depth: number } {

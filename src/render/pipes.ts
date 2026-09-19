@@ -6,7 +6,15 @@
 // it is the drawing until the art side paints the eight tiles, and then the sprite file check
 // picks those instead, the way every sprite is picked (CLAUDE.md T16 6).
 
-import { DUCT_HEIGHT, PIPE_DIAMETER, PORT_RING } from '../engine/constants';
+import {
+  DUCT_HEIGHT,
+  PIPE_BODY,
+  PIPE_DIAMETER,
+  PIPE_LIGHT,
+  PIPE_RIM,
+  PIPE_SHADE,
+  PORT_RING,
+} from '../engine/constants';
 import { TILE_RISE, tileToScreen } from './iso';
 
 export type PipeKind =
@@ -42,9 +50,9 @@ const PIPE_STROKE = Math.max(4, Math.round(PIPE_DIAMETER * TILE_RISE * PIPE_BAR_
 /** The lighter edge along the top of the bar and the shade along the bottom of it, both a
  *  thinner line off the middle [TUNE]. */
 const EDGE_LIFT = Math.max(1, Math.round(PIPE_STROKE / 3));
-/** How dark the underside of the bar is painted [TUNE]: a shade over the bar's own colour, so a
- *  run that has gone red is still red under it. */
-const UNDERSIDE = 'rgba(0,0,0,0.35)';
+/** How dark the underside of the bar is painted: the shade grey of the constants
+ *  (CLAUDE.md T22 2.7). */
+const UNDERSIDE = PIPE_SHADE;
 /** How deep the collar on a machine's port is, in metres of the hall [TUNE]. */
 const COLLAR_DEPTH = 0.18;
 
@@ -84,13 +92,13 @@ function anchors(cell: { x: number; y: number }): {
  *  way. */
 function threeStrokes(shape: (by: number, className: string, extra: string) => string): string {
   return (
-    shape(0, 'pipe-bar', `stroke-width="${PIPE_STROKE}"`) +
+    shape(0, 'pipe-bar', `stroke="${PIPE_BODY}" stroke-width="${PIPE_STROKE}"`) +
     shape(
       EDGE_LIFT,
       'pipe-bar',
-      `stroke-width="${round(PIPE_STROKE / 3)}" style="stroke:${UNDERSIDE}"`,
+      `stroke="${UNDERSIDE}" stroke-width="${round(PIPE_STROKE / 3)}"`,
     ) +
-    shape(-EDGE_LIFT, 'pipe-edge', '')
+    shape(-EDGE_LIFT, 'pipe-edge', `stroke="${PIPE_LIGHT}"`)
   );
 }
 
@@ -125,7 +133,7 @@ function arm(from: Point, to: Point): string {
 function flatRing(at: Point, radius: number, className: string): string {
   return (
     `<ellipse class="${className}" cx="${round(at.x)}" cy="${round(at.y)}" ` +
-    `rx="${round(radius)}" ry="${round(radius / 2)}" ` +
+    `rx="${round(radius)}" ry="${round(radius / 2)}" stroke="${PIPE_RIM}" ` +
     `stroke-width="${Math.max(2, Math.round(PIPE_STROKE / 3))}" />`
   );
 }
@@ -168,7 +176,8 @@ export function pipeTile(kind: string, cell: { x: number; y: number }, landsAt =
       straight(at.centre, top) +
       // The collar itself: a short sleeve standing on the port, with the ring of it on the face.
       `<line class="pipe-bar" x1="${round(top.x)}" y1="${round(top.y)}" ` +
-      `x2="${round(port.x)}" y2="${round(port.y)}" stroke-width="${round(PIPE_STROKE * 1.4)}" />` +
+      `x2="${round(port.x)}" y2="${round(port.y)}" stroke="${PIPE_BODY}" ` +
+      `stroke-width="${round(PIPE_STROKE * 1.4)}" />` +
       flatRing(port, PIPE_STROKE, 'pipe-port');
   } else if (kind === 'pipe.inlet') {
     // The flange where the run meets the unit: a stub of pipe and the plate it is bolted to.
@@ -188,7 +197,7 @@ export function pipeTile(kind: string, cell: { x: number; y: number }, landsAt =
     if (arms.length > 2) {
       inner +=
         `<ellipse class="pipe-joint" cx="${round(at.centre.x)}" cy="${round(at.centre.y)}" ` +
-        `rx="${round(PIPE_STROKE / 2)}" ry="${round(PIPE_STROKE / 3)}" />`;
+        `fill="${PIPE_RIM}" rx="${round(PIPE_STROKE / 2)}" ry="${round(PIPE_STROKE / 3)}" />`;
     }
   }
   return `<g class="pipe-tile" data-pipe-tile="${kind}">${inner}</g>`;

@@ -806,6 +806,7 @@ export const MONTH_LINE_OF: Record<LedgerCategory, MonthLineId> = {
   pellets: 'other',
   arrears: 'other',
   seizure: 'other',
+  other: 'other',
 };
 
 export interface MonthLine {

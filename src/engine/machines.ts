@@ -67,6 +67,7 @@ import type {
   EquipmentVariant,
   GameState,
   MaterialKind,
+  Orientation,
 } from './types';
 
 export function specOf(specId: string): EquipmentSpec {
@@ -92,21 +93,30 @@ export function machineShortWord(specId: string): string {
   return MACHINE_SHORT_WORDS[specId] ?? (findSpec(specId)?.name ?? specId).toLowerCase();
 }
 
+/** True for the two orientations that lie across the picture as drawn: a quarter turn and three
+ *  quarter turns swap the width and the depth, half a turn swaps nothing (CLAUDE.md T22 2.11). The
+ *  one place the question is asked, so the footprint, the zone and the sprite canvas cannot
+ *  disagree about it. */
+export function swapsSides(orientation: Orientation): boolean {
+  return orientation === 1 || orientation === 3;
+}
+
 /** What a class of a family stands on, in metres: the picture's own footprint. A class that says
  *  nothing takes the family's (CLAUDE.md T7 3.3). */
 export function footprintOf(
   specId: string,
   variantId?: string,
-  rotated = false,
+  orientation: Orientation = 0,
 ): { width: number; depth: number; height: number } {
   const spec = findSpec(specId);
   if (!spec) return { width: 1, depth: 1, height: 1 };
   const variant = variantOf(spec, variantId ?? spec.variants[0]?.id ?? '');
   const width = variant.width ?? spec.width;
   const depth = variant.depth ?? spec.depth;
+  const across = swapsSides(orientation);
   return {
-    width: rotated ? depth : width,
-    depth: rotated ? width : depth,
+    width: across ? depth : width,
+    depth: across ? width : depth,
     height: variant.height ?? spec.height,
   };
 }
@@ -115,9 +125,9 @@ export function footprintOf(
 export function itemFootprint(item: {
   specId: string;
   variantId: string;
-  rotated?: boolean;
+  orientation?: Orientation;
 }): { width: number; depth: number; height: number } {
-  return footprintOf(item.specId, item.variantId, item.rotated === true);
+  return footprintOf(item.specId, item.variantId, item.orientation ?? 0);
 }
 
 /** The floor a class reserves, in metres: the working room around it, which contains the
@@ -125,23 +135,24 @@ export function itemFootprint(item: {
 export function zoneOf(
   specId: string,
   variantId?: string,
-  rotated = false,
+  orientation: Orientation = 0,
 ): { width: number; depth: number } {
   const spec = findSpec(specId);
   if (!spec) return { width: 1, depth: 1 };
   const variant = variantOf(spec, variantId ?? spec.variants[0]?.id ?? '');
   const width = variant.zoneWidth ?? spec.zoneWidth;
   const depth = variant.zoneDepth ?? spec.zoneDepth;
-  return { width: rotated ? depth : width, depth: rotated ? width : depth };
+  const across = swapsSides(orientation);
+  return { width: across ? depth : width, depth: across ? width : depth };
 }
 
 /** The same question of something already standing in the hall. */
 export function itemZone(item: {
   specId: string;
   variantId: string;
-  rotated?: boolean;
+  orientation?: Orientation;
 }): { width: number; depth: number } {
-  return zoneOf(item.specId, item.variantId, item.rotated === true);
+  return zoneOf(item.specId, item.variantId, item.orientation ?? 0);
 }
 
 /** Working days between the click and the lorry for this class (CLAUDE.md T8 3.2). Zero means it

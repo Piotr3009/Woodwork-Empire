@@ -32,7 +32,11 @@ function hall(): { state: GameState; fan: Equipment } {
   return { state, fan };
 }
 
-/** A standard saw stands 3 by 1 in a 4 by 3 zone: its port is one cell down from its anchor. */
+/** A standard saw stands 3 by 1 in a 4 by 3 zone, and its port is the cell `PORTS` measured on
+ *  `tableSaw.standard.png`: one cell in from the corner of its own footprint, which is one cell
+ *  right of the zone's corner (CLAUDE.md T22 2.8). Every test below asks `portCell` where the run
+ *  starts rather than working it out from the anchor, because the table is the answer now and a
+ *  measurement Piotr retunes must not move a test's arithmetic. */
 function saw(state: GameState, id: string, x: number, y: number): Equipment {
   // The helper connects everything it finds unconnected: the runs are what they were before.
   const pipes = state.pipes.slice();
@@ -129,12 +133,14 @@ describe('routing a machine to the extraction', () => {
     const { state, fan } = hall();
     const inlet = portCell(fan);
     const item = saw(state, 'kit-saw-a', 4, inlet.y - 1);
-    expect(portCell(item)).toEqual({ x: 4, y: inlet.y });
+    // The saw's own drop, and the fan's own inlet, on one row: the run is straight.
+    const port = portCell(item);
+    expect(port).toEqual({ x: 5, y: inlet.y });
     const run = routePipe(state, item, fan);
     expect(run.equipmentId).toBe('kit-saw-a');
     expect(run.extractorId).toBe('kit-fan');
-    expect(run.metres).toBe(inlet.x - 4);
-    expect(run.tiles).toHaveLength(inlet.x - 4 + 1);
+    expect(run.metres).toBe(inlet.x - port.x);
+    expect(run.tiles).toHaveLength(inlet.x - port.x + 1);
     expect(keys(run)[0]).toBe('pipe.drop');
     expect(keys(run)[keys(run).length - 1]).toBe('pipe.inlet');
     expect(keys(run).slice(1, -1).every((key) => key === 'pipe.ew')).toBe(true);
@@ -145,12 +151,16 @@ describe('routing a machine to the extraction', () => {
     const inlet = portCell(fan);
     // The port three rows below the inlet and ten cells to its left: along the row, then up.
     const item = saw(state, 'kit-saw-b', inlet.x - 10, inlet.y + 2);
+    const port = portCell(item);
+    expect(port).toEqual({ x: inlet.x - 9, y: inlet.y + 3 });
     const run = routePipe(state, item, fan);
-    expect(run.metres).toBe(13);
+    // Nine cells along the row and three up it: the long leg first, one elbow.
+    expect(run.metres).toBe(inlet.x - port.x + (port.y - inlet.y));
+    expect(run.metres).toBe(12);
     const elbows = run.tiles.filter((tile) => /pipe\.[ns][ew]/.test(tile.key));
     expect(elbows).toHaveLength(1);
-    expect(elbows[0]).toEqual({ x: inlet.x, y: inlet.y + 3, key: 'pipe.nw' });
-    expect(run.tiles.filter((tile) => tile.key === 'pipe.ew')).toHaveLength(9);
+    expect(elbows[0]).toEqual({ x: inlet.x, y: port.y, key: 'pipe.nw' });
+    expect(run.tiles.filter((tile) => tile.key === 'pipe.ew')).toHaveLength(8);
     expect(run.tiles.filter((tile) => tile.key === 'pipe.ns')).toHaveLength(2);
   });
 
@@ -160,7 +170,8 @@ describe('routing a machine to the extraction', () => {
     const first = saw(state, 'kit-saw-a', 4, inlet.y - 1);
     expect(connectExtraction(state, first.id).ok).toBe(true);
     const second = saw(state, 'kit-saw-b', 8, inlet.y + 2);
-    // Straight to the unit is thirteen metres; up to the run over its head is three.
+    const port = portCell(second);
+    // Straight to the unit is nine metres; up to the run over its head is three.
     expect(connectCheck(state, second.id).cost).toBe(3 * PIPE_PRICE_PER_METRE);
     expect(connectExtraction(state, second.id).ok).toBe(true);
     const branch = pipeRunFor(state, second.id);
@@ -168,9 +179,11 @@ describe('routing a machine to the extraction', () => {
     expect(branch?.extractorId).toBe('kit-fan');
     expect(keys(branch)).toEqual(['pipe.drop', 'pipe.ns', 'pipe.ns', 'pipe.tee']);
     const tee = last(branch);
-    expect(tee).toEqual({ x: 8, y: inlet.y, key: 'pipe.tee' });
+    expect(tee).toEqual({ x: port.x, y: inlet.y, key: 'pipe.tee' });
     // The tee sits on a cell of the first run.
-    expect(pipeRunFor(state, first.id)?.tiles.some((tile) => tile.x === 8 && tile.y === inlet.y)).toBe(true);
+    expect(
+      pipeRunFor(state, first.id)?.tiles.some((tile) => tile.x === port.x && tile.y === inlet.y),
+    ).toBe(true);
     expect(isConnected(state, second)).toBe(true);
   });
 
@@ -194,7 +207,7 @@ describe('routing a machine to the extraction', () => {
     const { state, fan } = hall();
     const inlet = portCell(fan);
     const item = saw(state, 'kit-saw-a', 4, inlet.y - 1);
-    const metres = inlet.x - 4;
+    const metres = inlet.x - portCell(item).x;
     const before = state.cash;
     expect(connectCheck(state, item.id)).toEqual({ ok: true, reason: '', cost: metres * PIPE_PRICE_PER_METRE });
     expect(pipeCostFor(state, routePipe(state, item, fan))).toBe(metres * PIPE_PRICE_PER_METRE);
@@ -248,10 +261,11 @@ describe('routing a machine to the extraction', () => {
     expect(isConnected(state, item)).toBe(false);
     // Moved nearer the fan: the new run is shorter and is charged at its own length.
     item.anchorX = 12;
+    const nearer = inlet.x - portCell(item).x;
     expect(connectExtraction(state, item.id).ok).toBe(true);
     const again = pipeRunFor(state, item.id);
-    expect(again?.metres).toBe(inlet.x - 12);
-    expect(state.cash).toBe(start - paid - (inlet.x - 12) * PIPE_PRICE_PER_METRE);
+    expect(again?.metres).toBe(nearer);
+    expect(state.cash).toBe(start - paid - nearer * PIPE_PRICE_PER_METRE);
   });
 
   it('hands a trunk that goes to the branch on it, so no pipe is left hanging', () => {
@@ -260,6 +274,7 @@ describe('routing a machine to the extraction', () => {
     const first = saw(state, 'kit-saw-a', 4, inlet.y - 1);
     expect(connectExtraction(state, first.id).ok).toBe(true);
     const second = saw(state, 'kit-saw-b', 8, inlet.y + 2);
+    const port = portCell(second);
     expect(connectExtraction(state, second.id).ok).toBe(true);
     expect(last(pipeRunFor(state, second.id))?.key).toBe('pipe.tee');
     // The first saw is moved: its run goes, and the branch takes over the tail to the inlet.
@@ -269,7 +284,7 @@ describe('routing a machine to the extraction', () => {
     expect(branch).not.toBeNull();
     expect(isConnected(state, second)).toBe(true);
     expect(last(branch)).toEqual({ x: inlet.x, y: inlet.y, key: 'pipe.inlet' });
-    expect(branch?.metres).toBe(3 + (inlet.x - 8));
+    expect(branch?.metres).toBe(3 + (inlet.x - port.x));
     // Up the column, round the corner, along the row: the old tee is an elbow now.
     expect(keys(branch).slice(0, 4)).toEqual(['pipe.drop', 'pipe.ns', 'pipe.ns', 'pipe.se']);
     expect(keys(branch).slice(4, -1).every((key) => key === 'pipe.ew')).toBe(true);

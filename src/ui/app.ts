@@ -26,6 +26,7 @@ import type {
   Difficulty,
   GameAction,
   GameState,
+  Orientation,
   Speed,
   SummaryCadence,
   WorkerRole,
@@ -217,7 +218,7 @@ interface Ui {
   /** Setting the hall out: the clock is stopped and the kit can be dragged about. */
   setup: boolean;
   /** True while the next drop stands the item at ninety degrees to the walls (T10 3.8). */
-  rotate: boolean;
+  rotate: Orientation;
   speedBeforeSetup: Speed;
   /** What the clock was doing before the P key stopped it, so the same key starts it again where
    *  it was (PIOTR, 17.09; CLAUDE.md T18 2.8). */
@@ -343,7 +344,7 @@ function freshUi(): Ui {
     daySummary: null,
     scrollModalTop: false,
     setup: false,
-    rotate: false,
+    rotate: 0,
     speedBeforeSetup: 0,
     speedBeforePause: 1,
     drag: null,
@@ -521,7 +522,7 @@ function ghostFor(current: GameState): Ghost | null {
     depth: box.depth,
     ok: check.ok,
     reason: check.reason,
-    rotated: ui.rotate,
+    orientation: ui.rotate,
   };
 }
 
@@ -529,7 +530,7 @@ function ghostFor(current: GameState): Ghost | null {
  *  the R key and the Rotate button both come through here (CLAUDE.md T10 3.8). */
 function turnGhost(): void {
   if (!ui.setup) return;
-  ui.rotate = !ui.rotate;
+  ui.rotate = ui.rotate === 0 ? 1 : 0;
   requestRender();
 }
 
@@ -544,7 +545,7 @@ function setupControls(current: GameState): string {
   return (
     '<div class="view-controls">' +
     '<button class="btn btn-primary" data-do="endSetup">Done</button>' +
-    `<button class="btn${ui.rotate ? ' is-on' : ''}" data-do="rotateGhost">Rotate</button>` +
+    `<button class="btn${ui.rotate === 0 ? '' : ' is-on'}" data-do="rotateGhost">Rotate</button>` +
     bill +
     '<span class="reason">Drag the machines, the benches and the shelving where you want them. ' +
     'The rooms and the gate stay where they are. Every item moved is an hour of somebody\'s ' +
@@ -2422,7 +2423,7 @@ function onSetupPointerDown(event: MouseEvent): boolean {
   const offsetY = item.anchorY - at.y;
   let moved = false;
   // He picks it up the way it is standing, and R turns it from there (CLAUDE.md T10 3.8).
-  ui.rotate = 'rotated' in item ? item.rotated === true : false;
+  ui.rotate = 'orientation' in item ? item.orientation : 0;
   ui.drag = { itemId, x: item.anchorX, y: item.anchorY };
   const move = (moveEvent: MouseEvent): void => {
     if (ui.drag === null) return;
@@ -2443,7 +2444,7 @@ function onSetupPointerDown(event: MouseEvent): boolean {
     // A click that never moved is not a move: it leaves the hall exactly as it was. Turning it
     // where it stands is a move, though: the machine has been picked up and put down again
     // (CLAUDE.md T10 3.8).
-    const turned = ui.rotate !== ('rotated' in item ? item.rotated === true : false);
+    const turned = ui.rotate !== ('orientation' in item ? item.orientation : 0);
     if (drag === null || (!moved && !turned)) {
       requestRender();
       return;
@@ -2453,7 +2454,7 @@ function onSetupPointerDown(event: MouseEvent): boolean {
       itemId: drag.itemId,
       x: drag.x,
       y: drag.y,
-      rotated: ui.rotate,
+      orientation: ui.rotate,
     });
   };
   window.addEventListener('mousemove', move);

@@ -14,6 +14,7 @@ import {
 import { portCell } from '../../src/engine/pipes';
 import { tileToScreen } from '../../src/render/iso';
 import { PIPE_KINDS, pipeTile, portRing } from '../../src/render/pipes';
+import { PIPE_BODY, PIPE_LIGHT, PIPE_SHADE } from '../../src/engine/constants';
 import type { GameState } from '../../src/engine/index';
 import { newGame, placeEquipment } from '../helpers';
 
@@ -68,8 +69,13 @@ describe('one drawing of a pipe (CLAUDE.md T16 2.3)', () => {
     expect(svg).not.toContain('duct-drop');
     expect(svg).not.toContain('data-placeholder="pipe.');
     expect(svg).not.toContain('placeholder-art"><g class="placeholder" data-placeholder="pipe');
-    // The ring sits on the port cell of the bare saw, on the floor.
-    expect(portRings(state)).toBe(portRing({ x: 10, y: 3 }, 'kit-saw-2'));
+    // The ring sits on the port cell of the bare saw, on the floor: the cell `PORTS` measured on
+    // `tableSaw.standard.png`, which is one cell in from the corner of its own footprint and so
+    // one cell right of where the old guess put it (CLAUDE.md T22 2.8).
+    const bare = state.equipment.find((item) => item.id === 'kit-saw-2');
+    if (!bare) throw new Error('no bare saw');
+    expect(portCell(bare)).toEqual({ x: 11, y: 3 });
+    expect(portRings(state)).toBe(portRing({ x: 11, y: 3 }, 'kit-saw-2'));
   });
 
   it('draws two drops and no ring with a central system, through the same helper', () => {
@@ -117,12 +123,16 @@ describe('pipes that look like pipes (PIOTR, 16.09; CLAUDE.md T17 2.7)', () => {
     expect(stands.height).toBeGreaterThan(0);
   });
 
-  it('gives every length a shade under it and the lighter edge over it', () => {
+  it('gives every length a shade under it and the lighter edge over it, in the four greys', () => {
     const straight = pipeTile('pipe.ns', { x: 5, y: 5 });
-    // Three strokes a length: the bar, the shade and the edge, and the shade is the one with a
-    // colour of its own on it.
+    // Three strokes a length: the bar, the shade and the edge, each in its own grey off the
+    // constants. The purple of Turn 16 and its half transparent black are gone with the nine
+    // tiles (PIOTR's screenshot, 19.09; CLAUDE.md T22 2.7).
     expect((straight.match(/<line class="pipe-bar"/g) ?? []).length).toBe(4);
-    expect(straight).toContain('style="stroke:rgba(0,0,0,0.35)"');
+    expect(straight).toContain(`stroke="${PIPE_BODY}"`);
+    expect(straight).toContain(`stroke="${PIPE_SHADE}"`);
+    expect(straight).toContain(`stroke="${PIPE_LIGHT}"`);
+    expect(straight).not.toContain('rgba(0,0,0,0.35)');
     expect((straight.match(/<line class="pipe-edge"/g) ?? []).length).toBe(2);
   });
 

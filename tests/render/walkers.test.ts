@@ -237,7 +237,7 @@ describe('the walker', () => {
       anchorX: 10,
       anchorY: 6,
       arrived: true,
-      rotated: false,
+      orientation: 0,
     });
     const task = createTask(state, {
       kind: 'unload',

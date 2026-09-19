@@ -23,8 +23,9 @@ import {
   itemZone,
   ductingIsFree,
 } from './machines';
+import { deliveredFiles, portCellIn } from './ports';
 import { makeId } from './rng';
-import type { Equipment, GameState, PipeRun, PipeTile, PipeTileKey } from './types';
+import type { Equipment, GameState, Orientation, PipeRun, PipeTile, PipeTileKey } from './types';
 
 export interface PipeCheck {
   ok: boolean;
@@ -57,7 +58,7 @@ export function wantsExtraction(item: { specId: string; variantId: string }): bo
 export function footprintOrigin(item: {
   specId: string;
   variantId: string;
-  rotated?: boolean;
+  orientation?: Orientation;
   anchorX: number;
   anchorY: number;
 }): { x: number; y: number; width: number; depth: number; height: number } {
@@ -73,18 +74,34 @@ export function footprintOrigin(item: {
   };
 }
 
-/** The cell the drop lands on: the first cell of the machine's own footprint, where its port is
- *  (CLAUDE.md T13 3.19). The gate collar sits on the same cell (T13 3.11). The same question of
- *  a unit gives the cell its inlet is on. */
+/** The cell the drop lands on, or an extractor's inlet stands in front of: the cell `PORTS` names
+ *  for the picture this item is really drawn with, as an offset from the corner of its own
+ *  footprint (PIOTR, 19.09; CLAUDE.md T22 2.8). A file with no line keeps the rule the game had
+ *  before tonight, which is the footprint's first cell (CLAUDE.md T13 3.19). The gate collar sits
+ *  on the same cell (T13 3.11).
+ *
+ *  This and the drawing in `src/render/pipes.ts` read the one table, so the routing of Turn 13
+ *  starts and ends exactly where the pipe is painted. For a machine the cell is inside its own
+ *  footprint; for an extractor with a `faces` it is the cell in front of the mouth, which is not,
+ *  and `connectCheck` refuses the run when that cell is not floor. */
 export function portCell(item: {
   specId: string;
   variantId: string;
-  rotated?: boolean;
+  orientation?: Orientation;
   anchorX: number;
   anchorY: number;
 }): Cell {
   const origin = footprintOrigin(item);
-  return { x: Math.floor(origin.x), y: Math.floor(origin.y) };
+  const first = { x: Math.floor(origin.x), y: Math.floor(origin.y) };
+  const spec = findSpec(item.specId);
+  if (spec === undefined || spec === null) return first;
+  const cell = portCellIn(
+    deliveredFiles(),
+    { spriteKey: spec.spriteKey, variantId: item.variantId, orientation: item.orientation ?? 0 },
+    origin.width,
+  );
+  if (cell === null) return first;
+  return { x: first.x + cell.x, y: first.y + cell.y };
 }
 
 export function pipeRunFor(state: GameState, equipmentId: string): PipeRun | null {

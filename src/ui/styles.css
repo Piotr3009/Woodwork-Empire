@@ -3308,28 +3308,25 @@ input.num {
 .pipe-layer {
   pointer-events: none;
 }
-/* The pipes, one vector drawing for every tile (CLAUDE.md T16 2.3): a round duct in the duct
-   grey with a lighter top edge, the ring on the port a drop lands on, the collar at the inlet. */
+/* The pipes, drawn by src/render/pipes.ts (CLAUDE.md T16 2.3, T22 2.7): galvanised, with a dark
+   rim, a lit edge and a shade along the underside. Every grey is a constant written onto the
+   element, because one path is stroked five times and a stylesheet cannot tell the fourth stroke
+   from the second; what is left here is the shape of the line and the red a starved run wears,
+   which is a rule and so beats the attribute. */
 .pipe-bar {
-  stroke: var(--kit-machine-dark, #5d5178);
   stroke-linecap: round;
-  opacity: 0.92;
 }
 .pipe-edge {
-  stroke: #a99cc4;
   stroke-width: 1.5;
   stroke-linecap: round;
-  opacity: 0.8;
+  opacity: 0.85;
 }
 .pipe-joint {
-  fill: var(--kit-machine-dark, #5d5178);
   stroke: none;
 }
 .pipe-port,
 .pipe-collar {
   fill: none;
-  stroke: var(--kit-machine-dark, #5d5178);
-  opacity: 0.9;
 }
 .pipe-short .pipe-bar {
   stroke: var(--bad);

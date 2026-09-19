@@ -163,12 +163,12 @@ describe('hiring wants a free cabinet', () => {
 });
 
 describe('two metres wide, placed and stood at as any other 2 by 1 (CLAUDE.md T21 2.13)', () => {
-  it('is 1 by 2 turned, which is what a rotated 2 by 1 is anywhere', () => {
+  it('is 1 by 2 at a quarter turn, which is what a turned 2 by 1 is anywhere', () => {
     const cabinet = cabinetsOf(hall())[0];
     if (cabinet === undefined) throw new Error('the day one kit has a cabinet in it');
     expect(itemFootprint(cabinet)).toEqual({ width: 2, depth: 1, height: 1 });
     expect(itemZone(cabinet)).toEqual({ width: 2, depth: 1 });
-    expect(itemFootprint({ ...cabinet, rotated: true })).toEqual({ width: 1, depth: 2, height: 1 });
+    expect(itemFootprint({ ...cabinet, orientation: 1 })).toEqual({ width: 1, depth: 2, height: 1 });
   });
 
   it('is placed and refused as any other 2 by 1, with no rule of its own', () => {

@@ -19,25 +19,25 @@ describe('what turning does to the floor', () => {
   it('swaps the width and the depth of the footprint and of the zone', () => {
     // A standard saw is 3 by 1 of machine on a 4 by 3 zone (CLAUDE.md T7 3.6).
     expect(footprintOf('tableSaw', 'standard')).toEqual({ width: 3, depth: 1, height: 1 });
-    expect(footprintOf('tableSaw', 'standard', true)).toEqual({ width: 1, depth: 3, height: 1 });
+    expect(footprintOf('tableSaw', 'standard', 1)).toEqual({ width: 1, depth: 3, height: 1 });
     expect(zoneOf('tableSaw', 'standard')).toEqual({ width: 4, depth: 3 });
-    expect(zoneOf('tableSaw', 'standard', true)).toEqual({ width: 3, depth: 4 });
+    expect(zoneOf('tableSaw', 'standard', 1)).toEqual({ width: 3, depth: 4 });
     // The height is the height whichever way it faces.
-    expect(footprintOf('extractor', 'pro', true)).toEqual({ width: 1, depth: 3, height: 2.5 });
+    expect(footprintOf('extractor', 'pro', 1)).toEqual({ width: 1, depth: 3, height: 2.5 });
     // A square thing is the same thing turned.
-    expect(footprintOf('compressor', 'used', true)).toEqual(footprintOf('compressor', 'used'));
+    expect(footprintOf('compressor', 'used', 1)).toEqual(footprintOf('compressor', 'used'));
   });
 
   it('reads the turn off the item that is standing in the hall', () => {
     const state = emptyHall();
     const saw = placeEquipment(state, 'tableSaw', { variantId: 'standard', x: 6, y: 1 });
-    expect(saw.rotated).toBe(false);
+    expect(saw.orientation).toBe(0);
     expect(itemFootprint(saw)).toEqual({ width: 3, depth: 1, height: 1 });
     expect(itemZone(saw)).toEqual({ width: 4, depth: 3 });
-    saw.rotated = true;
+    saw.orientation = 1;
     expect(itemFootprint(saw)).toEqual({ width: 1, depth: 3, height: 1 });
     expect(itemZone(saw)).toEqual({ width: 3, depth: 4 });
-    expect(boxOf('tableSaw', 6, 1, 'standard', true)).toEqual({
+    expect(boxOf('tableSaw', 6, 1, 'standard', 1)).toEqual({
       x: 6,
       y: 1,
       width: 3,
@@ -62,17 +62,17 @@ describe('where a turned machine will go', () => {
       }
     }
     // Square to the walls the saw wants 4 by 3 and there is no 4 anywhere.
-    expect(canPlaceSpec(state, 'tableSaw', 8, 2, null, 'standard', false).ok).toBe(false);
+    expect(canPlaceSpec(state, 'tableSaw', 8, 2, null, 'standard', 0).ok).toBe(false);
     // Turned it wants 3 by 4, and the gap is exactly that.
-    expect(canPlaceSpec(state, 'tableSaw', 8, 2, null, 'standard', true).ok).toBe(true);
+    expect(canPlaceSpec(state, 'tableSaw', 8, 2, null, 'standard', 1).ok).toBe(true);
   });
 
   it('is refused off the floor when the turned zone runs over the edge', () => {
     const state = emptyHall();
     // A pro extractor is 3 by 1 on a 3 by 1 zone: square to the walls it fits against the front
     // edge, and turned it is 1 by 3 and hangs off it.
-    expect(canPlaceSpec(state, 'extractor', 15, 9, null, 'pro', false).ok).toBe(true);
-    const turned = canPlaceSpec(state, 'extractor', 15, 9, null, 'pro', true);
+    expect(canPlaceSpec(state, 'extractor', 15, 9, null, 'pro', 0).ok).toBe(true);
+    const turned = canPlaceSpec(state, 'extractor', 15, 9, null, 'pro', 1);
     expect(turned.ok).toBe(false);
     expect(turned.reason).toBe('Off the floor');
   });
@@ -80,9 +80,9 @@ describe('where a turned machine will go', () => {
   it('writes the turn down on the machine when it is dropped', () => {
     const state = emptyHall();
     const saw = placeEquipment(state, 'tableSaw', { variantId: 'standard', x: 6, y: 1 });
-    expect(canPlace(state, saw.id, 6, 1, true).ok).toBe(true);
-    expect(moveItem(state, saw.id, 6, 1, true).ok).toBe(true);
-    expect(saw.rotated).toBe(true);
+    expect(canPlace(state, saw.id, 6, 1, 1).ok).toBe(true);
+    expect(moveItem(state, saw.id, 6, 1, 1).ok).toBe(true);
+    expect(saw.orientation).toBe(1);
     // And what it stands on is the turned zone from then on, without being asked again.
     expect(canPlace(state, saw.id, 6, 1).ok).toBe(true);
     expect(itemZone(saw)).toEqual({ width: 3, depth: 4 });
@@ -93,9 +93,9 @@ describe('where a turned machine will go', () => {
     const ordered = act(state, { type: 'BUY_EQUIPMENT', specId: 'tableSaw', variantId: 'standard' });
     const order = ordered.onOrder[0];
     if (!order) throw new Error('nothing on order');
-    expect(order.rotated).toBe(false);
-    expect(moveItem(ordered, order.id, 6, 1, true).ok).toBe(true);
-    expect(ordered.onOrder[0]?.rotated).toBe(true);
+    expect(order.orientation).toBe(0);
+    expect(moveItem(ordered, order.id, 6, 1, 1).ok).toBe(true);
+    expect(ordered.onOrder[0]?.orientation).toBe(1);
   });
 });
 
@@ -103,14 +103,14 @@ describe('what turning does to the picture', () => {
   const files = ['tableSaw.standard.png', 'extractor.pro.png', 'extractor.pro.r.png'];
 
   it('mirrors the picture about its anchor while there is no second orientation', () => {
-    expect(mirrorNeeded(files, 'tableSaw', 'standard', true)).toBe(true);
-    expect(mirrorNeeded(files, 'tableSaw', 'standard', false)).toBe(false);
-    expect(pickSprite(files, 'tableSaw', 'standard', true)).toBe('/sprites/tableSaw.standard.png');
+    expect(mirrorNeeded(files, 'tableSaw', 'standard', 1)).toBe(true);
+    expect(mirrorNeeded(files, 'tableSaw', 'standard', 0)).toBe(false);
+    expect(pickSprite(files, 'tableSaw', 'standard', 1)).toBe('/sprites/tableSaw.standard.png');
     const art = objectArt({
       files,
       spriteKey: 'tableSaw',
       tier: 'standard',
-      rotated: true,
+      orientation: 1,
       x: 4,
       y: 2,
       width: 1,
@@ -125,13 +125,13 @@ describe('what turning does to the picture', () => {
   });
 
   it('uses the second orientation unmirrored where the art side has drawn one', () => {
-    expect(mirrorNeeded(files, 'extractor', 'pro', true)).toBe(false);
-    expect(pickSprite(files, 'extractor', 'pro', true)).toBe('/sprites/extractor.pro.r.png');
+    expect(mirrorNeeded(files, 'extractor', 'pro', 1)).toBe(false);
+    expect(pickSprite(files, 'extractor', 'pro', 1)).toBe('/sprites/extractor.pro.r.png');
     const art = objectArt({
       files,
       spriteKey: 'extractor',
       tier: 'pro',
-      rotated: true,
+      orientation: 1,
       x: 4,
       y: 2,
       width: 1,
@@ -178,13 +178,17 @@ describe('what turning does to the picture', () => {
       'toolCabinet.used.r.png',
     ]);
     for (const cabinet of ['used', 'budget', 'standard', 'pro', 'industrial']) {
-      expect(mirrorNeeded(spriteFiles(), 'toolCabinet', cabinet, true), cabinet).toBe(false);
-      expect(pickSprite(spriteFiles(), 'toolCabinet', cabinet, true), cabinet).toBe(
+      expect(mirrorNeeded(spriteFiles(), 'toolCabinet', cabinet, 1), cabinet).toBe(false);
+      expect(pickSprite(spriteFiles(), 'toolCabinet', cabinet, 1), cabinet).toBe(
         `/sprites/toolCabinet.${cabinet}.r.png`,
       );
     }
     // The saw has no second orientation, so it is mirrored as it always was.
-    expect(mirrorNeeded(spriteFiles(), 'tableSaw', 'standard', true)).toBe(true);
-    expect(mirrorNeeded([], 'tableSaw', 'standard', true)).toBe(true);
+    expect(mirrorNeeded(spriteFiles(), 'tableSaw', 'standard', 1)).toBe(true);
+    // With no picture at all there is nothing to mirror, and the hall draws the box instead. The
+    // boolean version of this said "mirror" for a family that had no file either, which was an
+    // answer nobody read: `objectArt` asks the question only once it has a URL in its hand
+    // (CLAUDE.md T22 2.11).
+    expect(mirrorNeeded([], 'tableSaw', 'standard', 1)).toBe(false);
   });
 });

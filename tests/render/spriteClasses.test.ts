@@ -200,7 +200,7 @@ describe('the file on disk and the footprint in the engine', () => {
     // cabinets v2), which closed the request of docs/art/REQUESTS-T21.md section 2.
     const turned = 'toolCabinet.standard.r.png';
     expect(spriteFiles()).toContain(turned);
-    const stands = footprintOf('toolCabinet', 'standard', true);
+    const stands = footprintOf('toolCabinet', 'standard', 1);
     expect(stands).toEqual({ width: 1, depth: 2, height: 1 });
     const owed = spriteFileSize(stands.width, stands.depth, stands.height);
     expect([owed.width, Math.floor(owed.height)]).toEqual([160, 136]);

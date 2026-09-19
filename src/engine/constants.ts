@@ -90,8 +90,14 @@ import type {
  *  calendar days in a row the cash has been under the overdraft limit, thirty of which close the
  *  company; the owner's day counts the minutes he stood as well as the ones he worked, and why; and
  *  a tool cabinet is two metres wide, so a saved hall's cabinets are laid out again
- *  (CLAUDE.md T21 section 4). Every v29 save loads. */
-export const STATE_VERSION = 18;
+ *  (CLAUDE.md T21 section 4).
+ *
+ *  Version 19 is Turn 22: the arrears are gone from the game, so a save's unpaid balance is
+ *  subtracted from its cash and one ledger line says so; `rotated` on every placed item and every
+ *  reservation becomes `orientation`, the boolean's true reading as a quarter turn; and a tool
+ *  cabinet with no class is the standard one, because the cabinet is a family of five now
+ *  (CLAUDE.md T22 section 4). Every v30 and v31 save loads. */
+export const STATE_VERSION = 19;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
@@ -3230,8 +3236,10 @@ export const YARD_WIDTH_CELLS = 3;
 
 /** The height every pipe hangs at, in metres: the runs the game routes and the run a central
  *  system draws along the rear wall are both up here, over the machines (CLAUDE.md T13 3.19,
- *  T16 2.3). The Turn 4 ducting sprite and its bar are gone: one vector helper draws every pipe. */
-export const DUCT_HEIGHT = 3;
+ *  T16 2.3). The Turn 4 ducting sprite and its bar are gone: one vector helper draws every pipe.
+ *  Raised from 3 to 3.2 on 19.09 [PIOTR: "a bit higher"]; the wall is 3.5, so the run is clear of
+ *  the machines and still under the roof (CLAUDE.md T22 2.7). */
+export const DUCT_HEIGHT = 3.2;
 /** The families that are a central system: with one in the hall every machine is connected and
  *  the drawing says so with a drop to each (CLAUDE.md T16 2.3). */
 export const DUCT_SYSTEMS = ['dustSystem', 'flexiSystem'];
@@ -3241,6 +3249,24 @@ export const PIPE_DIAMETER = 0.2;
 /** The red ring on the port of a machine with no pipe to the extraction, in pixels [TUNE], pulsing
  *  once a second (CLAUDE.md T16 2.3). */
 export const PORT_RING = 8;
+
+/** The four greys a pipe is painted in, darkest to lightest: the dark rim around the bar, the body
+ *  of it, the shade along its underside and the lit edge along its top
+ *  [TUNE: galvanised, read off docs/mockups/t22/pipes-A-one-path.png]. The purple of Turn 16 is
+ *  gone with the nine tiles it was drawn on (PIOTR's screenshot, 19.09; CLAUDE.md T22 2.7).
+ *
+ *  They live here and not in the stylesheet because `src/render/pipes.ts` writes one SVG path per
+ *  run and strokes it five times, and a stroke's colour has to be on the element: the stylesheet
+ *  cannot tell the fourth stroke of a path from the second. `.pipe-short` still overrides them in
+ *  CSS, because a CSS rule beats a presentation attribute. */
+export const PIPE_RIM = '#4b5158';
+export const PIPE_BODY = '#8f979e';
+export const PIPE_SHADE = '#5e666e';
+export const PIPE_LIGHT = '#d7dde1';
+/** The flexible hose from a visible port up to the run: the floor's own colour a touch darker
+ *  [PIOTR, 19.09: "like the floor, a touch darker"; TUNE off the `--concrete` token]
+ *  (CLAUDE.md T22 2.8). */
+export const HOSE_COLOUR = '#787b80';
 
 /** The pallet of sheets at the gate stands where the lorry stood: inside the shutter, on the lane,
  *  one metre each way (CLAUDE.md T13 3.21). The man unloading it stands in front of it on the hall
