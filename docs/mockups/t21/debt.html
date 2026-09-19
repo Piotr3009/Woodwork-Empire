@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Debt on the top bar, the drop warning, the bankruptcy (mockup)</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Patrick+Hand&display=swap">
+<style>
+:root{--bg:#1d2024;--paper:#f3ecdc;--ink:#2a2418;--dim:#6f665a;--line:#c9bfa9;--green:#3f8a45;--red:#c05a4e;--red-dark:#8f3a31;--blue:#2f5f9a;--hand:'Patrick Hand',cursive;--ui:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif}
+:root:not([data-theme="light"]){color-scheme:dark}
+body{margin:0;background:#15171a;color:#e8e6e1;font-family:var(--ui);padding:24px}
+h1{font-family:var(--hand);font-weight:400;font-size:32px;margin:0 0 4px}
+p.lead{color:#a8adb6;max-width:80ch;margin:0 0 20px}
+h2{font-family:var(--hand);font-weight:400;font-size:26px;margin:28px 0 8px;color:var(--paper)}
+.note{color:#a8adb6;font-size:14px;max-width:80ch;margin:8px 0 0}
+/* top bar */
+.bar{background:var(--bg);border:1px solid #454b55;border-radius:6px;padding:8px 10px;display:flex;align-items:center;gap:10px;max-width:1180px}
+.cash{background:var(--paper);color:var(--ink);border-radius:4px;padding:4px 12px;font-family:var(--hand);font-size:26px;line-height:1;min-width:130px;box-shadow:0 3px 0 #0a1a10}
+.cash small{display:block;font-family:var(--ui);font-size:11px;color:var(--dim);margin-top:2px}
+.cash.red{color:var(--red-dark)}
+.owes{background:var(--red-dark);color:#fff;border-radius:4px;padding:4px 12px;font-family:var(--hand);font-size:22px;line-height:1;box-shadow:0 3px 0 #3a1510;animation:pulse 1.2s ease-in-out infinite}
+.owes small{display:block;font-family:var(--ui);font-size:11px;color:#f6d3ce;margin-top:2px}
+@keyframes pulse{0%,100%{box-shadow:0 3px 0 #3a1510}50%{box-shadow:0 3px 0 #3a1510,0 0 0 4px rgba(192,90,78,.35)}}
+.chip{background:linear-gradient(#f3ecdc,#ddd5c1);border:1px solid #5b5446;border-radius:4px;box-shadow:0 3px 0 #0a1a10;color:#12301f;font-family:var(--hand);font-size:18px;padding:2px 10px}
+.spacer{flex:1}
+.strip{background:#5a2320;color:#fff;padding:8px 14px;font-size:15px;max-width:1160px;border-radius:0 0 6px 6px;border:1px solid #7a3a34;border-top:0}
+/* the drop question, folder skin */
+.modal{background:var(--paper);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:18px 22px;max-width:560px;position:relative;box-shadow:0 12px 30px rgba(0,0,0,.5)}
+.modal h3{font-family:var(--hand);font-weight:400;font-size:26px;margin:0 0 8px}
+.kv{display:grid;grid-template-columns:1fr auto;gap:4px 16px;font-size:15px;margin:10px 0}
+.kv b{text-align:right;font-variant-numeric:tabular-nums}
+.bad{color:var(--red);font-weight:600}
+.warn{background:#fbe7e3;border:1px solid #e3a49c;border-radius:6px;padding:10px 12px;font-size:14px;margin:10px 0;color:#5a2320}
+.btn{font-family:var(--hand);font-size:18px;line-height:1.1;padding:4px 14px;border-radius:4px;border:1px solid #5b5446;background:linear-gradient(#f9f4e8,#e4dcc7);box-shadow:0 3px 0 #0a1a10;color:#12301f;display:inline-block;margin-right:8px}
+.btn.red{background:linear-gradient(#d9756a,#c05a4e);color:#fff;border-color:#7a3a34;box-shadow:0 3px 0 #3a1510}
+.cross{position:absolute;right:-16px;top:-16px;width:40px;height:40px;border-radius:50%;background:#f6f0e2;border:3px solid #2a2418;display:grid;place-items:center;font-family:var(--hand);font-size:26px;color:#2a2418}
+/* bankruptcy */
+.bank{background:#2a2418;color:var(--paper);border:6px solid #c05a4e;border-radius:6px;padding:24px 28px;max-width:620px;text-align:center}
+.bank h3{font-family:var(--hand);font-weight:400;font-size:40px;margin:0 0 6px;color:#f6d3ce}
+.bank p{margin:6px 0;font-size:15px;color:#e8e6e1}
+.bank .figs{display:grid;grid-template-columns:1fr auto;gap:4px 16px;max-width:360px;margin:14px auto;text-align:left;font-size:15px}
+.bank .figs b{text-align:right}
+</style></head><body>
+<h1>Debt you can see</h1>
+<p class="lead">Three places, in the game's own skins: the top bar (where the arrears are invisible today), the Drop project question (a click that today is blind and, for a big job, ends the game), and the bankruptcy card (which today never fires on arrears). Figures are Piotr's from 15 May.</p>
+
+<h2>1. The top bar: cash, and beside it what you owe</h2>
+<div class="bar">
+  <div class="cash red">-£7,259<small>-£41,215 today</small></div>
+  <div class="owes">owes £25,740<small>arrears, 1 month · bailiff in 2</small></div>
+  <span class="chip">Pause</span><span class="chip">1x</span><span class="chip">2x</span>
+  <div class="spacer"></div>
+  <span class="chip">Projects: 2</span><span class="chip">Orders: 0</span><span class="chip">Board: 4</span>
+</div>
+<div class="strip">! Account below zero and £25,740 in arrears: together -£32,999, past the -£15,000 the bank allows. Pay the arrears or the bank closes you.</div>
+<p class="note">The red tile sits between cash and the speed chips, only while arrears exist; it pulses. Its small line counts the months to the bailiff. The warning strip under the bar says the net position against the bank's limit (1.5 times the overdraft) in one sentence. Clicking the tile opens Accounting on the arrears.</p>
+
+<h2>2. Drop project: what it costs, before the click</h2>
+<div class="modal">
+  <div class="cross">×</div>
+  <h3>Drop Oak dining table, commercial?</h3>
+  <div class="kv">
+    <span>Deposit to return to the client</span><b class="bad">-£25,740</b>
+    <span>Material bought for it, written off</span><b class="bad">-£12,824</b>
+    <span>Reputation</span><b class="bad">-30</b>
+    <span>You have</span><b>-£7,259 of -£10,000 overdraft</b>
+  </div>
+  <div class="warn">You cannot pay the deposit back. It goes to arrears: <b>-£33,000 against the bank's -£15,000 limit</b>. Dropping this job closes the company today.</div>
+  <span class="btn red">Drop it anyway</span><span class="btn">Keep the job</span>
+</div>
+<p class="note">The only two-click action in the game, by design: the second click is the red one. A small job shows the same card with green figures and no warning box, so the player learns the card, not just the danger. Reputation scales with the price: -10 up to £5,000, then -1 per £2,000 to -30.</p>
+
+<h2>3. The end</h2>
+<div class="bank">
+  <h3>The bank has closed you</h3>
+  <p>Friday 15 May, month 3. You could not pay your debts.</p>
+  <div class="figs"><span>In the bank</span><b>-£7,259</b><span>Arrears</span><b>-£25,740</b><span>Together</span><b>-£32,999</b><span>The bank allowed</span><b>-£15,000</b></div>
+  <p>You kept the workshop 63 working days, took £61,400 in orders and built 9 of them.</p>
+  <span class="btn">Start again</span><span class="btn">Load a save</span>
+</div>
+<p class="note">Fires the day cash plus arrears passes 1.5 times the overdraft limit, or on the 30th day below the limit whatever the amount. Same dark card as the existing bankruptcy event, with the figures that explain it.</p>
+</body></html>
