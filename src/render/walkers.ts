@@ -24,7 +24,7 @@ import {
   WALK_CELLS_PER_SECOND,
   WALK_CORNER_CELLS,
 } from '../engine/constants';
-import { STATION_GATE, STATION_RACK, isDoorwayCell } from '../engine/stations';
+import { STATION_GATE, STATION_RACK, isBehindTheDoor } from '../engine/stations';
 import {
   type Animation,
   type Facing,
@@ -163,11 +163,13 @@ export function walkerKeys(): string[] {
   return Array.from(walkers.keys());
 }
 
-/** True while this man has gone through a door: his walk is over and his feet are on a doorway
- *  cell. The hall leaves him out of the drawing from that moment and the door counts him through
- *  (PIOTR, 18.09; CLAUDE.md T20 2.12). */
+/** True while this man has gone through a door: his walk is over, his feet are in a doorway, and the
+ *  station he walked to is inside that very room. The hall leaves him out of the drawing from that
+ *  moment and the door counts him through (PIOTR, 18.09 and 19.09; CLAUDE.md T20 2.12, T21 2.11,
+ *  2.12). The station is his own goal off the page, which is why a man standing about at the canteen
+ *  door is still drawn and a man eating behind it is not. */
 export function walkerIsThroughADoor(walker: Walker): boolean {
-  return walker.path.length === 0 && isDoorwayCell(walker.at);
+  return walker.path.length === 0 && isBehindTheDoor(walker.station, walker.at);
 }
 
 function goalKey(cell: Cell, station: string): string {

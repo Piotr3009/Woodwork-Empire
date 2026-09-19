@@ -1018,7 +1018,11 @@ export function stationCell(
     const cell = roomDoorCell('office');
     return { ...cell, facing: facingTowards(cell, { x: cell.x, y: cell.y - 1 }) };
   }
-  if (station === STATION_IDLE || station === STATION_NO_BENCH) {
+  // The canteen door: a man with nothing to do, a joiner with no bench to work at, and from Turn 21
+  // every man of the hall at the dinner hour, who walks to this cell and goes through it
+  // (CLAUDE.md T4 3.4, T11 3.4, T21 2.12). The walk is the walk the hall already had; what the lunch
+  // station adds is that he does not stop in the doorway.
+  if (station === STATION_IDLE || station === STATION_NO_BENCH || station === STATION_LUNCH) {
     const cell = roomDoorCell('canteen');
     return { ...cell, facing: facingTowards(cell, { x: cell.x - 1, y: cell.y + 1 }) };
   }
@@ -1749,8 +1753,10 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
     const cell = stationCell(state, station, bench);
     const bubble = bubbleOf(worker.id);
     // He has gone through a door and is in the room behind it: off the hall's drawing until he
-    // comes out again (PIOTR, 18.09; CLAUDE.md T20 2.12). His bubble stays at the door.
-    if (figureIsThroughADoor(`worker-${worker.id}`, cell)) {
+    // comes out again (PIOTR, 18.09; CLAUDE.md T20 2.12). From Turn 21 that is every man and not the
+    // owner alone: a desk job is behind the office door and the dinner hour is behind the canteen's
+    // (CLAUDE.md T21 2.11, 2.12). His bubble stays at the door.
+    if (figureIsThroughADoor(`worker-${worker.id}`, cell, station)) {
       atTheDoor(bubble, station);
       continue;
     }
@@ -1775,7 +1781,7 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
   // The owner in the office is not on the hall at all: he went through the door, and the office
   // view draws him at his desk (PIOTR, 18.09; CLAUDE.md T20 2.12, T19 2.2).
   if (ownerIsAvailable(state)) {
-    if (figureIsThroughADoor('owner', ownerCell)) {
+    if (figureIsThroughADoor('owner', ownerCell, ownerStation)) {
       atTheDoor(ownerBubble, ownerStation);
     } else {
       drawables.push(

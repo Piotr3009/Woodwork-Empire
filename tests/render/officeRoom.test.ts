@@ -25,7 +25,8 @@ import {
 import { fitName } from '../../src/render/hall';
 import { formatTime } from '../../src/engine/clock';
 import { tick } from '../../src/engine/index';
-import type { GameState } from '../../src/engine/index';
+import { WORKER_RATES } from '../../src/engine/constants';
+import type { GameState, Worker } from '../../src/engine/index';
 import { buyNow, newGame } from '../helpers';
 
 /** A game with the desk, the chair and the laptop bought: the room as it is once the office has
@@ -36,6 +37,38 @@ function furnished(): GameState {
     state = buyNow(state, specId);
   }
   return state;
+}
+
+/** A man of the office staff, at his desk. Only his role, his id and his station are read by the
+ *  office view, so the rest is what `hire` would have written for a man with no experience. */
+function deskMan(role: string, id: string): Worker {
+  return {
+    id,
+    name: `Desk ${id}`,
+    role: role as Worker['role'],
+    tier: 'novice',
+    rate: WORKER_RATES.novice,
+    monthlyWage: 1950,
+    leavesOnDay: null,
+    startDay: 1,
+    jobId: null,
+    taskId: null,
+    minutesWorked: 0,
+    ordersToday: 0,
+    overtimeMinutes: 0,
+    overtimeMinutesWeek: 0,
+    overtimeDays: 0,
+    tiredOfOvertime: false,
+    station: STATION_OFFICE,
+    productionMinutes: 0,
+    absentDaysRemaining: 0,
+    shift: 'day',
+    dayLog: [],
+    monthMinutes: 0,
+    monthDaysOff: 0,
+    anchorX: 4,
+    anchorY: 6,
+  };
 }
 
 function room(
@@ -365,6 +398,27 @@ describe('the owner at his desk (PIOTR, 17.09; CLAUDE.md T19 2.2)', () => {
     expect(holder.querySelectorAll('.office-region')).toHaveLength(
       officeRegionsOf(there).length,
     );
+  });
+
+  it('draws him and nobody else, whoever else of the crew is at a desk (CLAUDE.md T21 2.11)', () => {
+    // Turn 21 sends the office staff through the office door, so an estimator at a take off, an admin
+    // at the emails, a clerk at his orders and a draftsman at his drawings are all off the hall. The
+    // office view is not where they turn up: it is one box, measured for the owner (CLAUDE.md T19 2.2),
+    // and the crew's own places in it are a drawing nobody has made (PIOTR, 18.09: nothing visual
+    // without a mockup). What says where they are is the bubble at the door (CLAUDE.md T21 2.6).
+    const state = furnished();
+    state.owner.station = STATION_OFFICE;
+    state.workers.push(...['estimator', 'officeAdmin', 'draftsman'].map((role, index) => ({
+      ...deskMan(role, `staff-${index + 1}`),
+    })));
+    const holder = room({ width: 1280, height: 800 }, SHEETS, state);
+    expect(holder.querySelectorAll('[data-office-figure]')).toHaveLength(1);
+    expect(holder.querySelector('[data-office-figure="owner"]')).not.toBeNull();
+    // And with the owner out of the office the room is empty, however many of them are at a desk.
+    state.owner.station = STATION_BENCH;
+    expect(
+      room({ width: 1280, height: 800 }, SHEETS, state).querySelectorAll('[data-office-figure]'),
+    ).toHaveLength(0);
   });
 
   it('stands him clear of everything the player clicks', () => {

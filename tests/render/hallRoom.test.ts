@@ -360,8 +360,10 @@ describe('the doors are closed, and a man goes through them (PIOTR, 18.09; CLAUD
       expect(doorIsUsed(state, 'office'), station).toBe(true);
       expect(renderHall(state, { files: DELIVERED }), station).not.toContain('data-figure="owner"');
     }
-    // A man with nowhere to be stands about at the canteen door, in the hall, where the player
-    // can see him: the canteen is not a room the game draws, so nobody goes through that one.
+    // A man with nowhere to be stands about at the canteen door, in the hall, where the player can
+    // see him and the red bubble over his head. The canteen door is a doorway from Turn 21 and the
+    // hall goes through it for its dinner, but the idle station is not behind it: the station is what
+    // puts a man in a room and not the cell he is on (CLAUDE.md T21 2.6, 2.12).
     state.owner.station = STATION_IDLE;
     expect(doorIsUsed(state, 'canteen')).toBe(true);
     expect(renderHall(state, { files: DELIVERED })).toContain('data-figure="owner"');

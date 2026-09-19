@@ -117,19 +117,34 @@ export function unloadStation(task: TaskInstance, sheets: number): string {
   return unloadLegAt(task, sheets) % 2 === 0 ? STATION_GATE : STATION_RACK;
 }
 
-/** True while this cell is a doorway a man goes through and out of the hall's drawing (PIOTR,
- *  18.09; CLAUDE.md T20 2.12). The renderer asks it of the cell a figure's feet are on, so a
- *  doorway is never stood in: he walks to it, goes through, and the room behind it draws him.
+/** The two rooms a man walks into and is off the hall's drawing while he is in: the office he does
+ *  his desk work in and the canteen he takes his dinner in (PIOTR, 18.09 and 19.09; CLAUDE.md T20
+ *  2.12, T21 2.11, 2.12). The WC is not one of them, because nothing in this game ever sends a man
+ *  to it.
  *
- *  The office is the one room the game has behind a door: the office view draws the man at his
- *  desk (CLAUDE.md T19 2.2). The canteen's door cell is not one of these, and deliberately: it is
+ *  Turn 20 had the office alone, and its comment gave the reason: the canteen's door cell is also
  *  where a man with nothing to do, or with no bench to work at, stands about (CLAUDE.md T4 3.4,
- *  T11 3.4), which is the hall and not the room behind it, and the player is meant to see him
- *  standing there. Nothing behind the canteen door is drawn, so a man sent through it would be
- *  nowhere at all. */
+ *  T11 3.4), nothing behind that door is drawn, and a man sent through it would have been nowhere at
+ *  all, with the player losing sight of his crew. Turn 21 answers that rather than ignoring it: the
+ *  bubble at the door is what keeps the player informed (CLAUDE.md T21 2.6, the dashed grey tone),
+ *  and the standing man is told apart from the eating one by his station and not by his cell, which
+ *  is `isBehindTheDoor` below. */
+const DOORWAY_ROOMS: readonly RoomId[] = ['office', 'canteen'];
+
+function isTheCell(cell: { x: number; y: number }, at: { x: number; y: number }): boolean {
+  return at.x === Math.round(cell.x) && at.y === Math.round(cell.y);
+}
+
+/** The room whose doorway this cell is, or null for every other cell of the hall. */
+export function roomAtDoorway(cell: { x: number; y: number }): RoomId | null {
+  return DOORWAY_ROOMS.find((room) => isTheCell(cell, roomDoorCell(room))) ?? null;
+}
+
+/** True while this cell is a doorway at all (PIOTR, 18.09; CLAUDE.md T20 2.12, T21 2.12). The cell
+ *  alone does not put a man through it, because one of the two doorways is where the hall parks a man
+ *  it has nothing for; the station is the other half of the question. */
 export function isDoorwayCell(cell: { x: number; y: number }): boolean {
-  const door = roomDoorCell('office');
-  return door.x === Math.round(cell.x) && door.y === Math.round(cell.y);
+  return roomAtDoorway(cell) !== null;
 }
 
 /** The room a man at this station is inside, behind its door, or null while he is out on the hall
@@ -141,6 +156,18 @@ export function roomBehindStation(station: string): RoomId | null {
   if (station === STATION_OFFICE || station === STATION_PHONE) return 'office';
   if (station === STATION_LUNCH) return 'canteen';
   return null;
+}
+
+/** True while a man at this station, standing on this cell, has gone through a door and is off the
+ *  hall's drawing: the station says which room he went into and the cell says his feet are in that
+ *  room's doorway (PIOTR, 18.09 and 19.09; CLAUDE.md T20 2.12, T21 2.11, 2.12).
+ *
+ *  Both halves matter, and the canteen is why: an idle man and a man at his dinner stand on the very
+ *  same cell, and only one of them is in the room. The walk is seen either way, because the cell is
+ *  only reached at the end of it. */
+export function isBehindTheDoor(station: string, cell: { x: number; y: number }): boolean {
+  const room = roomBehindStation(station);
+  return room !== null && roomAtDoorway(cell) === room;
 }
 
 /** The station this man is at for the drawing, and for the bubble over his head: the one the day

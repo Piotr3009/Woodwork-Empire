@@ -190,3 +190,48 @@ is what takes him through the door.
 - **The bubble reads `job.blockedBy` for the rack and not the shortfall.** The drawing's table says
   "the job's shortfall is above zero"; what the engine writes down, every minute a man is on the job,
   is `waiting for material`, which is the same fact a minute fresher and is what the Work Plan reads.
+
+## T21-B3b: 2.11 and 2.12, the crew go through the doors, and lunch in the canteen
+
+- Built: both, and the two rules they overrule are in "What was overruled" above.
+  **2.11**: `figureGoesThroughDoors(key)` is gone and `roomBehindStation(station)` is what decides,
+  so an estimator at a take off, an admin at the emails, a clerk at his orders and a draftsman at his
+  drawings (all of them `stationForTask`'s office station) go through the office door and are off the
+  hall until they come out; their grey bubble sits at the door. `figureIsThroughADoor(key, cell,
+  station)` and `walkerIsThroughADoor(walker)` both read the station now, so the walker of a man
+  behind a door is still kept at the doorway and he walks out of it rather than appearing at his
+  bench. `officeFigure` in `src/render/office.ts` was read and left exactly as it is: the office view
+  is one box measured for the owner (CLAUDE.md T19 2.2), and it is now asserted to draw him and
+  nobody else however many of the crew are at a desk.
+  **2.12**: `isDoorwayCell` answers for the canteen as well, `STATION_LUNCH` is what the dinner hour
+  puts a man on (`stationNow`, landed in B3a for the bubble), and `stationCell` sends that station to
+  the canteen door cell, which is the cell an idle man already walks to, so the walk is the walk the
+  hall already had and no new one was invented. At the break every man on the floor and the owner
+  walk there, go through, and come out when it ends; the owner's `breakSkipped` keeps him on the
+  floor by himself.
+- Left: nothing of 2.11 or 2.12. Three tests were rewritten to the new truth and none was weakened:
+  `tests/render/doors.test.ts` asserted that the canteen's door cell was not a doorway and that the
+  estimator was drawn standing in it, and now asserts what Turn 21 does and the pair that tells the
+  eating man from the idle one; the comment in `tests/render/hallRoom.test.ts` that said "the canteen
+  is not a room the game draws, so nobody goes through that one" says what is true now, with its
+  assertion (an idle owner is still drawn) unchanged, because that is still the rule for an idle man.
+  New: the office view test in `tests/render/officeRoom.test.ts` and `tests/ui/lunchBreak.test.ts`
+  (2), an app test that runs the clock into the dinner hour and finds nobody on the floor and
+  everybody back after it.
+
+### One bug this task found in B3a, and where it was
+
+`stationCell` in `src/render/hall.ts` had no case for `STATION_LUNCH`, so a man at his dinner was
+drawn at his own bench with `at lunch` over his head: the words were right and the cell was wrong.
+It is one line, beside the idle and the benchless stations, and it is what makes the walk to the
+canteen the walk the hall already had.
+
+### Numbers and readings chosen (T21-B3b)
+
+- **Nothing new is a number here.** The one reading is which stations are behind which door
+  (`roomBehindStation`): the office station and the phone are in the office, the lunch station is in
+  the canteen, and everything else is the hall. The WC is behind no station at all, because nothing
+  in the game ever sends a man to it.
+- **A man who is off sick or not working today is not sent to lunch either**, because he is not on
+  the hall's own list for the day. He is still drawn at the canteen door all day, marked "(off)",
+  which is what Turn 11 did with him and is not this turn's to change.
