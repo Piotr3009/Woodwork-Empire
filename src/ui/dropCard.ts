@@ -92,16 +92,21 @@ function overdraftLine(state: GameState): string {
   );
 }
 
-/** The red box, and only when the deposit cannot be paid back. It says `today` when the drop
- *  itself would close the company at the day's own look at the money, which is the net position
- *  against what the bank allows (`checkBankruptcy`, rule one), and nothing at all about days when it
- *  would not: "puts you N days from the bank closing you" is not something the game can be sure of,
- *  so it is not written (CLAUDE.md T21 2.2, 2.3). */
+/** The red box, and only when the deposit cannot be paid back out of the overdraft. Its last
+ *  sentence is one of two, and never a guess: the drop closes the company at the next morning's
+ *  look when the account it leaves has passed what the bank allows (`checkBankruptcy`, rule one),
+ *  and otherwise the box says the other rule instead, which is the one thing that is true of every
+ *  account below the limit. "Puts you N days from the bank closing you" is not something the game
+ *  can be sure of, so it is not written (CLAUDE.md T22 2.2, 2.3). */
 function dangerBox(state: GameState, job: Job): string {
   if (depositCanBePaid(state, job)) return '';
   const { account, allowed } = accountAfterDrop(state, job);
   const closes = account <= allowed;
-  const ending = closes ? ' Dropping this job closes the company today.' : '';
+  // The look that would close him is the next morning's, because the bank looks once a calendar
+  // day at the point the day's money is settled and that day's look has already been (T22 2.2).
+  const ending = closes
+    ? " Dropping this job closes the company at tomorrow's check."
+    : ' The bank counts every day below its limit.';
   return (
     '<p class="warn drop-danger">' +
     escapeHtml(

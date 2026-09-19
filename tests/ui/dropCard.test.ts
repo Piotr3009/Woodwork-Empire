@@ -140,7 +140,7 @@ describe('the card', () => {
 });
 
 describe('the red box', () => {
-  it('says what the deposit does and that the drop closes the company today', () => {
+  it('says what the deposit does and that the drop closes the company at the next check', () => {
     // Piotr's own evening: a 50,000 job on the books and 7,000 in the bank.
     const { state, job } = withJob(50000);
     state.cash = 7000;
@@ -152,21 +152,28 @@ describe('the red box', () => {
     expect(box?.textContent).toBe(
       'You cannot pay the deposit back from the overdraft. The account goes to ' +
         `-£${Math.abs(account).toLocaleString('en-GB')} against the bank's ` +
-        "-£15,000. Dropping this job closes the company today.",
+        "-£15,000. Dropping this job closes the company at tomorrow's check.",
     );
   });
 
-  it('stops after the limit when the drop would not close the company', () => {
+  it('says the other rule instead when the drop would not close the company', () => {
     // A deposit the overdraft will not cover, but not one that takes the company past what the
     // bank allows: 3,000 out of an account at the bottom of its 10,000 overdraft is -13,000
-    // against -15,000. The game does not say how many days that leaves, because it cannot know.
+    // against -15,000. The game does not say how many days that leaves, because it cannot know,
+    // so it says the thing that is true of every account below the limit (CLAUDE.md T22 2.3).
     const { state, job } = withJob(6000);
     state.cash = -9999;
     expect(depositCanBePaid(state, job)).toBe(false);
+    const { account, allowed } = accountAfterDrop(state, job);
+    expect(account).toBe(-9999 - job.depositPaid);
+    expect(account).toBeGreaterThan(allowed);
     const text = parse(renderDropCard(state, job)).querySelector('.drop-danger')?.textContent ?? '';
-    expect(text).toContain('You cannot pay the deposit back from the overdraft');
-    expect(text).toContain("against the bank's -£15,000.");
-    expect(text).not.toContain('today');
+    expect(text).toBe(
+      'You cannot pay the deposit back from the overdraft. The account goes to ' +
+        `-£${Math.abs(account).toLocaleString('en-GB')} against the bank's ` +
+        '-£15,000. The bank counts every day below its limit.',
+    );
+    expect(text).not.toContain('tomorrow');
     expect(text).not.toContain('days from');
   });
 

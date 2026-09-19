@@ -523,7 +523,7 @@ describe('(hh) a fifty thousand pound job dropped with seven thousand in the ban
     );
     expect(dangerBoxOf(renderDropCard(HH.morning, HH.job))).toBe(
       'You cannot pay the deposit back from the overdraft. The account goes to -£18,000 ' +
-        "against the bank's -£15,000. Dropping this job closes the company today.",
+        "against the bank's -£15,000. Dropping this job closes the company at tomorrow's check.",
     );
   });
 

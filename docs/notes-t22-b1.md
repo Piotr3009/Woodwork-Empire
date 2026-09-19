@@ -181,6 +181,15 @@ wages paid out of an account already under the limit on the way (asserted off th
 balance). Its own three tests are in `tests/engine/bankruptcy.test.ts`, beside the reset and the 1.5x
 rule, which stand as they were.
 
-**T22-B1c, 2.3.** (filled in at the commit)
+**T22-B1c, 2.3.** The drop card's red box, shown as before only when the deposit cannot be paid out
+of the cash and the overdraft, now reads the account and not a debt: `You cannot pay the deposit back
+from the overdraft. The account goes to -£18,000 against the bank's -£15,000.` The figures are
+`cash - depositPaid` and `BANKRUPTCY_LIMIT_FACTOR * overdraftLimit`, through the renamed
+`accountAfterDrop` (Turn 21's `netAfterDrop`, which read a state with the deposit on the arrears).
+The last sentence is one of two and never a guess: `Dropping this job closes the company at
+tomorrow's check.` when rule one would fire on the account the drop leaves, and otherwise
+`The bank counts every day below its limit.`, which is the one thing true of every account below the
+limit. Both texts are asserted whole in `tests/ui/dropCard.test.ts`, and the played (hh) scenario
+asserts the first of them word for word.
 
 **T22-B1d, 2.4.** (filled in at the commit)
