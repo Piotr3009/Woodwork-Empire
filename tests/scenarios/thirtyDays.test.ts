@@ -1,4 +1,14 @@
 // The scripted playthroughs of CLAUDE.md T1-13.
+//
+// Sixteen months are played in this file, and beside them the day one list, the replay and one day
+// with a dinner hour in it. From Turn 22 there is one track for money: a cost the player did not
+// choose is paid whatever the balance and the account goes under the overdraft limit for it, so
+// there is nothing carried beside the cash any more (CLAUDE.md T22 2.1). Of the sixteen, exactly
+// one goes under the limit, and it is the empty hall on Hard: it first closes a day under on day
+// 11 and the bank shuts it on day 22 for the amount, with its count of days under the limit at 12
+// of the 30 the other rule allows. Every other month here trades its thirty days with the account
+// above the limit, the short handed one dipping furthest into the overdraft at -466 on day 31, and
+// not one line of any of their ledgers goes unpaid. Measured on this build (T22-C2).
 
 import { describe, expect, it } from 'vitest';
 import {
@@ -161,6 +171,17 @@ describe('30 days on Easy, working the board', () => {
     expect(state.clock.day).toBe(31);
     expect(state.cash).toBeGreaterThan(0);
     expect(state.ledger.some((entry) => entry.unpaid)).toBe(false);
+    // One track for money, read off the ledger's own running balance: every pound the month moved
+    // moved out of the account, and no line of it was written with the account anywhere near the
+    // bank's limit. The lowest balance of the month is its last line, 2,789 on day 31, so the
+    // count of days below the limit never started (CLAUDE.md T22 2.1, 2.2).
+    for (const entry of state.ledger) {
+      expect(entry.balance, `${entry.day} ${entry.label}`).toBeGreaterThan(
+        state.finance.overdraftLimit,
+      );
+    }
+    expect(Math.round(Math.min(...state.ledger.map((entry) => entry.balance)))).toBe(2789);
+    expect(state.finance.daysBelowOverdraft).toBe(0);
   });
 
   it('ends above the reputation it started on, on seven jobs out of the door', () => {
@@ -375,19 +396,31 @@ describe('30 days on Hard, doing nothing', () => {
     expect(state.gameOver?.day).toBe(CLOSED_ON_HARD);
     expect(state.gameOver?.reason).toContain('cannot pay');
     // The line it passed, read the one way the engine reads it, and not a penny left unpaid
-    // anywhere else.
+    // anywhere else. The account is -7,778 against the -7,500 the bank allows on Hard, and the
+    // other rule's count stood at 12 of its 30 when the amount got there first: that is the whole
+    // of the answer to item 23 of REPORT-T21.md, where the count could not leave nought at all
+    // (CLAUDE.md T22 2.1, 2.2).
     expect(state.cash).toBeLessThanOrEqual(state.finance.overdraftLimit * 1.5);
+    expect(Math.round(state.cash)).toBe(-7778);
+    expect(state.finance.daysBelowOverdraft).toBe(12);
     expect(state.ledger.some((entry) => entry.unpaid)).toBe(false);
   });
 
   it('goes under the limit before it passes the line, and the strip says so', () => {
     // The two rules in order: the account goes under the 5,000 limit first and keeps going, and
-    // the bank closes it when it has passed 1.5 times the limit (CLAUDE.md T22 2.1, 2.2). Day 15
-    // is a week before the close and four days after the overdraft filled.
+    // the bank closes it when it has passed 1.5 times the limit (CLAUDE.md T22 2.1, 2.2). Day 11
+    // is the first morning the account closes under the limit, at -5,289 with the count on 1, and
+    // day 15 is four days later and a week before the close, at -6,085 with the count on 5: the
+    // standing costs take 299 a day out of an account that has nothing left to take it from.
+    const first = runToDay(newGame({ seed: SEED, difficulty: 'hard' }), 11);
+    expect(Math.round(first.state.cash)).toBe(-5289);
+    expect(first.state.cash).toBeLessThan(first.state.finance.overdraftLimit);
+    expect(first.state.finance.daysBelowOverdraft).toBe(1);
     const run = runToDay(newGame({ seed: SEED, difficulty: 'hard' }), 15);
     expect(run.state.gameOver).toBeNull();
     expect(run.state.cash).toBeLessThan(run.state.finance.overdraftLimit);
-    expect(run.state.finance.daysBelowOverdraft).toBeGreaterThan(0);
+    expect(Math.round(run.state.cash)).toBe(-6085);
+    expect(run.state.finance.daysBelowOverdraft).toBe(5);
   });
 });
 
@@ -476,6 +509,13 @@ describe('a month short handed, with a joiner and one small rack', () => {
     // job was bought for it at the ad hoc price, and whole sheets at 200 cost more than the 0.40
     // of the price they used to (CLAUDE.md T13 3.3). Measured, not tuned.
     expect(state.cash).toBeGreaterThan(state.finance.overdraftLimit);
+    // This is the month that goes furthest into the overdraft of the fifteen that stay inside it,
+    // and it still never reaches the limit: the lowest running balance of the month is -466, on
+    // day 31, the count of days below the limit never starts, and nothing is left unpaid, because
+    // from Turn 22 there is nowhere for a bill to go but the account (CLAUDE.md T22 2.1).
+    expect(Math.round(Math.min(...state.ledger.map((entry) => entry.balance)))).toBe(-466);
+    expect(state.finance.daysBelowOverdraft).toBe(0);
+    expect(state.ledger.some((entry) => entry.unpaid)).toBe(false);
   });
 
   it('took a joiner with no experience on and bought the shelving', () => {

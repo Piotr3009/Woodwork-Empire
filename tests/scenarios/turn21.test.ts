@@ -1,6 +1,9 @@
-// The Turn 21 scenarios of CLAUDE.md T21 3, T21-C2: (gg) four men, one saw and two jobs, (hh) a
-// drop of a fifty thousand pound job that closes the company, and (ii) a month in arrears that ends
-// on the thirtieth day below the overdraft limit.
+// The Turn 21 scenarios of CLAUDE.md T21 3, T21-C2, as Turn 22 leaves them: (gg) four men, one saw
+// and two jobs, with nobody moved between them (CLAUDE.md T22 2.6), (hh) a drop of a fifty thousand
+// pound job that closes the company, and (ii) a company under the overdraft limit that the amount
+// closes before the run of days can reach thirty. The arrears (ii) was written around are gone from
+// the game tonight (T22 2.1), and the two played halls that answer for the new money are (jj) and
+// (kk) of tests/scenarios/turn22.test.ts.
 //
 // The shape is the one Turns 13, 17, 19 and 20 used: a month, or a day, played through the scripted
 // player of autopilot.ts, off a hall that is stood up by playing the opening days and never by
@@ -618,8 +621,8 @@ describe('(hh) a fifty thousand pound job dropped with seven thousand in the ban
 });
 
 // ---------------------------------------------------------------------------
-// (ii) A month in arrears, and the thirtieth day below the overdraft limit
-//      (PIOTR, 18.09: "thirty days below the limit"; CLAUDE.md T21 2.2, 3)
+// (ii) A month under the overdraft limit, and the thirtieth day below it
+//      (PIOTR, 18.09: "thirty days below the limit"; CLAUDE.md T21 2.2, 3, T22 2.1, 2.2)
 // ---------------------------------------------------------------------------
 
 /** A hall with the day 1 kit in it, nothing off the board and nobody on the books: the month is
