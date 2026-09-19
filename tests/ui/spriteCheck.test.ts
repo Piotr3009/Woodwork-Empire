@@ -191,9 +191,16 @@ describe('the sprite check page', () => {
 
   it('says which of the four orientations has a file of its own (CLAUDE.md T22 2.11)', () => {
     const page = parse(renderSpriteCheck());
-    // The tool cabinet's four orientations are the first in the game, and they are asserted in
-    // `tests/engine/toolCabinet.test.ts` once its class ladder lands: the family key
-    // `toolCabinet.png` was never delivered, so until then the page has no cell to show them in.
+    // The tool cabinet is the first family in the game the art side has drawn all four of
+    // (PIOTR's art, 19.09), and from Turn 22 it is a class ladder, so the page has a cell for each
+    // of the five (CLAUDE.md T22 2.11, 2.12).
+    for (const classId of ['used', 'budget', 'standard', 'pro', 'industrial']) {
+      const cell = page.querySelector(`[data-sprite-target="toolCabinet.${classId}"] [data-turns]`);
+      expect(cell?.getAttribute('data-turns'), classId).toBe('0,1,2,3');
+      expect(cell?.textContent, classId).toContain('4 of 4 orientations drawn');
+      expect(cell?.textContent, classId).toContain('.rrr');
+      expect(cell?.textContent, classId).not.toContain('the rest mirrored');
+    }
     // Everything else has its base picture and mirrors the quarter turn, as the game has since
     // Turn 10: the saw and the fan say so, and the fan's three turned files are the one thing
     // Turn 22 asks the art side for (docs/art/REQUESTS-T22.md 2).

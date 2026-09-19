@@ -217,6 +217,66 @@ that is not there.
 
 ---
 
+## T22-B3f, 2.12: the tool cabinet has a class ladder
+
+- `TOOL_CABINET_VARIANTS` and `TOOL_CABINET_SLOTS` are the five classes and what each holds: used 1,
+  budget 1, standard 2, pro 4, industrial 8 [PIOTR], at 90, 175, 350, 700 and 1,400 [TUNE, doubling
+  from the standard's 350 as Piotr asked]. The footprints and the heights are the delivered
+  pictures' and were measured off the PNG headers before they were written down: 112 by 112,
+  112 by 112, 160 by 136, 160 by 175 and 208 by 208. Every class states its own working zone, which
+  is its own footprint. `perWorker` is gone from the cabinet.
+- The free slots are one engine question read by everything: `toolSlots`, `toolSlotsInUse`,
+  `freeToolSlots` and `slotsInUseIn` in `src/engine/staff.ts`, over `toolSlotsOf` in
+  `src/engine/machines.ts`. `shortfallForHire` counts slots instead of cabinets, so a hall short of
+  room is short a slot and one used cabinet at ninety pounds is the cheapest way to fill it, while
+  one industrial cabinet fills eight at once.
+
+### The cross check's "one free slot" is nought free, and why
+
+Section 7 reads: "Two used cabinets and one hand tool set: one free slot". Section 2.12 reads: "the
+sum of the capacities of the cabinets standing on the hall minus the hand tool sets bought; **the
+owner's own set takes a slot too**". The two cannot both hold: two used cabinets hold two sets, one
+set is bought and the owner's is in there as well, so 2 - 1 - 1 = **0**.
+
+The code follows 2.12, which is the contract, and the arithmetic is then the same as the game has
+had since Turn 6: the day one hall with one cabinet has no slot for a man, the second cabinet gives
+him one, and the man after that wants a third. `tests/engine/toolCabinet.test.ts` asserts that whole
+sequence and says in a comment that section 7's figure reads as nought under 2.12. If Piotr wants
+his own tools to cost nothing, the change is one line (`toolSlotsInUse` drops its `+ 1`) and the
+hiring gate's `toolSlotsNeeded` has to drop its `+ 1` with it, or the first hire would be allowed
+with nowhere to put his tools.
+
+### Figures this agent chose in 2.12
+
+- The class names: `Used tool cabinet`, `Tool cabinet`, `Double tool cabinet`, `Tool wall`,
+  `Tool store` [TUNE], and the three lines of description on each [TUNE]. The prices and the slots
+  are Piotr's.
+- `powerPerDay: 1` on all five [TUNE]: the sheet rack's figure, which is what every class of storage
+  carries. Nothing reads it, because only a machine and the extraction draw power
+  (`poweredMachines`), but every class in the game states a figure above nought and
+  `tests/engine/variants.test.ts` is that rule.
+- The fill order behind `slotsInUseIn` [TUNE]: the sets fill the cabinets in the order they were
+  bought, the owner's first. It is the only rule that needs no new field, and it is what lets the
+  card of one cabinet say `2 in use` without the game writing down whose tools are where.
+
+### Two measured consequences, both of them arithmetic
+
+- **The two saw hall gets its third joiner back.** The day one kit buys the cheapest class, which is
+  a metre square again, where Turn 21's single class was two metres. The crew limit is
+  `Math.floor(freeFloorM2 / M2_PER_PERSON)` with `M2_PER_PERSON` 24, and the four cabinets of
+  scenario (b) in `tests/scenarios/thirtyDays.test.ts` were sitting exactly on the boundary: it held
+  the owner and three until Turn 21, two through Turn 21, and three again tonight. This is item 3 of
+  REPORT-T21.md section 0 undone by the ladder rather than by any change to the crew rule.
+- **The bill on the hiring card is 820 and not 1,340.** `missingCost` is the cheapest way into each
+  family, and the cheapest cabinet is 90: 120 + 80 + 40 + 400 + 90 x 2.
+- **`toolCabinet.pro.png` is 175 px tall where the contract's 174.4 floors to 174.** The art side
+  rounded the fraction up; `sheetRack.standard`, the other class whose height is 1.8 m, was rounded
+  down to 174. `tests/render/spriteClasses.test.ts` now allows the whole pixel either side of a
+  fractional owed height and says which two files those are. Nothing stands off its tile: the hall
+  sizes a picture by the owed box and not by the file.
+
+---
+
 ## Notes for the lead: changes wanted in files or regions that are not B3's
 
 ### 1. `src/engine/index.ts` (the barrel), applied by B3 because nothing compiles without it
@@ -274,3 +334,59 @@ export function mirroredPort(port: Port, anchorPx: number, footprintWidth: numbe
 ```
 with the callers handing in `SPRITE_PADDING + footprintWidth * TILE_WIDTH` at 2x. B3 has not made
 this change, because the coordinator's message names the `px` rule as staying.
+
+### 3. `src/ui/machine.ts`, applied by B3 because 2.12 asks for it and nobody else owns the file
+
+2.12: "The catalogue's `Tool cabinets` folder lists the five with `Holds 4 men's tools` in the effect
+line". That line is written by `effectLines` in `src/ui/machine.ts`, which is not on B3's file list
+and is not on B1's or B2's either. The change is one line and one name on an import, and the words
+themselves come from `toolSlotsLine` in `src/engine/machines.ts`, which is B3's, so the lead can
+check or revert it in a moment.
+
+old
+```
+    line(holdsLine(spec, variant)),
+    gateLine(spec, variant),
+```
+new
+```
+    line(holdsLine(spec, variant)),
+    // What a class of tool cabinet is for: how many men's hand tools it holds, in the words the
+    // rack's card uses for its sheets (PIOTR, 19.09; CLAUDE.md T22 2.12).
+    line(toolSlotsLine(spec.id, variant.id)),
+    gateLine(spec, variant),
+```
+and `toolSlotsLine` added to the `from '../engine/index'` import list beside `sheetCapacityOf`.
+
+### 4. `src/engine/game.ts`: the hand tool set's own gate on a free slot, NOT applied
+
+2.12 asks for two gates on the free slots: the hiring gate, which is B3's `shortfallForHire` and is
+built, and "the hand tool set's `requires`", which is `canBuy` in `src/engine/game.ts`. That file is
+B1's tonight, so this one is a note. `freeToolSlots` is exported from `src/engine/staff.ts` and from
+the barrel, and `HAND_TOOL_SET` from `src/engine/constants.ts`, so the change is the block below and
+an import.
+
+In `canBuy`, straight after the `requires` loop and before `const oneOf = requiresOneOfFor(...)`:
+
+old
+```
+  const oneOf = requiresOneOfFor(spec, variant);
+```
+new
+```
+  // A man's hand tool set has to have somewhere to live: the cabinets of the hall hold one, two,
+  // four or eight sets by their class, and the sets already bought and the owner's own fill them
+  // from the bottom (PIOTR, 19.09; CLAUDE.md T22 2.12).
+  if (specId === HAND_TOOL_SET && freeToolSlots(state) <= 0) {
+    return { ok: false, reason: 'No free slot in a tool cabinet' };
+  }
+  const oneOf = requiresOneOfFor(spec, variant);
+```
+with `HAND_TOOL_SET` added to the `from './constants'` import list and `freeToolSlots` to the
+`from './staff'` one.
+
+It is safe where it stands: `orderEquipmentCheck` lands everything on the road first
+(`afterTheTrips`), so a cabinet ordered this morning counts towards the slot the set wants, and
+`landOrder` does not call `canBuy` at all, so nothing already paid for can be refused off the lorry.
+Without it, the only thing missing is that a player may buy a set with nowhere to keep it; the hiring
+gate still counts the slots, so no man can start without one.

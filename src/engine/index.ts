@@ -411,6 +411,7 @@ export {
   crewCount,
   crewFull,
   crewLine,
+  freeToolSlots,
   hasWorkingDay,
   helperOnDuty,
   homeCellOf,
@@ -419,7 +420,9 @@ export {
   isWorkingToday,
   joiners,
   officeStaff,
+  slotsInUseIn,
   staffMinutesLeft,
+  toolSlots,
   workerById,
 } from './staff';
 
@@ -447,6 +450,8 @@ export {
   isSellableFamily,
   isSold,
   salePriceFor,
+  toolSlotsLine,
+  toolSlotsOf,
   machineIsShared,
   sheetCapacityOf,
   zoneOf,

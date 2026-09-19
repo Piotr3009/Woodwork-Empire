@@ -1170,6 +1170,10 @@ export const CLASS_BADGE: Record<string, { label: string; colour: string }> = {
  *  have more. */
 export const CLASS_LADDER_FAMILIES: readonly string[] = [
   'tableSaw',
+  // The tool cabinet is a family of five from Turn 22, so its cards wear the class badge and the
+  // class frame like every other ladder (CLAUDE.md T22 2.12: "the class ladder words are the
+  // machines'").
+  'toolCabinet',
   'edgebander',
   'thicknesser',
   'solidWoodTools',
@@ -1281,6 +1285,11 @@ export const TABLE_SAW_VARIANTS: EquipmentVariant[] = [
 /** The tool cabinet a hand tool is kept in. The exported name for it is in 9.3 with the hiring
  *  rules; the classes above are declared before that, so the id is named here once. */
 const TOOL_CABINET_ID = 'toolCabinet';
+
+/** The set of hand tools one man works with. It is bought like anything else, it lives in a slot of
+ *  a tool cabinet, and the owner has one of his own that was never bought (CLAUDE.md T6 3.5,
+ *  T22 2.12). */
+export const HAND_TOOL_SET = 'handToolSet';
 
 /** The endurance ladder every family with five classes uses: a worn out one has a quarter of the
  *  hours in it and an industrial one twice them (CLAUDE.md T7 3.6, as the saw's). */
@@ -1470,6 +1479,120 @@ export const SHEET_RACK_VARIANTS: EquipmentVariant[] = [
     description:
       'Four metres of bolted steel rated for a full pack of board. A hundred and sixty sheets ' +
       'means buying by the pack, which is where the material price actually falls.',
+  },
+];
+
+/** How many men's hand tool sets each class of tool cabinet holds
+ *  [PIOTR, 19.09: "weak 1, middle 1, then doubling: 2, 4, 8"]. This number is what a class of
+ *  cabinet is *for*: the hiring gate and the hand tool set count the free slots of the hall, which
+ *  is the sum of these less the sets already bought (CLAUDE.md T22 2.12). */
+export const TOOL_CABINET_SLOTS: Record<string, number> = {
+  used: 1,
+  budget: 1,
+  standard: 2,
+  pro: 4,
+  industrial: 8,
+};
+
+/** The five classes of tool cabinet (PIOTR, 19.09; CLAUDE.md T22 2.12).
+ *
+ *  The footprints and the heights are the pictures': the art side drew the five on 19.09, each in
+ *  four true quarter turns, and the picture is the fact (the pack's README;
+ *  docs/art/REQUESTS-T22.md 1). Used and budget are a metre square at 112 by 112, the standard two
+ *  metres at 160 by 136, the pro two metres and 1.8 high at 160 by 175, the industrial three metres
+ *  and 2 high at 208 by 208. Every class states its own working zone, which is its own footprint:
+ *  the family's is the standard's two metres and a 1 by 1 cabinet must not reserve it (the
+ *  arithmetic against a wider zone is in the comment beside the spec).
+ *
+ *  The prices double up the ladder from the standard's 350, which is the one price the family had
+ *  before tonight [TUNE; PIOTR: "doubling"]. The power a day is the sheet rack's 1, which is what
+ *  every class of storage in the catalogue carries: nothing reads it, because only a machine and
+ *  the extraction draw power (`poweredMachines`), and every class in the game states a figure
+ *  above nought (`tests/engine/variants.test.ts`). */
+export const TOOL_CABINET_VARIANTS: EquipmentVariant[] = [
+  {
+    id: 'used',
+    name: 'Used tool cabinet',
+    price: 90,
+    width: 1,
+    depth: 1,
+    height: 1,
+    zoneWidth: 1,
+    zoneDepth: 1,
+    outputFactor: 1,
+    enduranceFactor: ENDURANCE_BY_CLASS.used ?? 1,
+    powerPerDay: 1,
+    description:
+      'A second hand steel cabinet with two doors and a drawer that sticks. It holds one man\u0027s ' +
+      'hand tools and a hand bander on top of them, and it cost ninety pounds because somebody ' +
+      'wanted it out of their way.',
+  },
+  {
+    id: 'budget',
+    name: 'Tool cabinet',
+    price: 175,
+    width: 1,
+    depth: 1,
+    height: 1,
+    zoneWidth: 1,
+    zoneDepth: 1,
+    outputFactor: 1,
+    enduranceFactor: ENDURANCE_BY_CLASS.budget ?? 1,
+    powerPerDay: 1,
+    description:
+      'A new metre cabinet, bought off the shelf. One man\u0027s tools, a shelf that stays where it ' +
+      'is put, and a lock that works: the cheapest thing in the catalogue that lets you take ' +
+      'somebody on.',
+  },
+  {
+    id: 'standard',
+    name: 'Double tool cabinet',
+    price: 350,
+    width: 2,
+    depth: 1,
+    height: 1,
+    zoneWidth: 2,
+    zoneDepth: 1,
+    outputFactor: 1,
+    enduranceFactor: ENDURANCE_BY_CLASS.standard ?? 1,
+    powerPerDay: 1,
+    description:
+      'Two metres of drawers and doors with a bench top over them, which is what most workshops ' +
+      'stand along the back wall. Two men keep their sets in one of these and nobody argues about ' +
+      'whose chisel it is.',
+  },
+  {
+    id: 'pro',
+    name: 'Tool wall',
+    price: 700,
+    width: 2,
+    depth: 1,
+    height: 1.8,
+    zoneWidth: 2,
+    zoneDepth: 1,
+    outputFactor: 1,
+    enduranceFactor: ENDURANCE_BY_CLASS.pro ?? 1,
+    powerPerDay: 1,
+    description:
+      'A full height tool wall: drawers below, doors above, and four men\u0027s sets in it with room ' +
+      'for the hand banders. It takes no more floor than the double one and holds twice as much.',
+  },
+  {
+    id: 'industrial',
+    name: 'Tool store',
+    price: 1400,
+    width: 3,
+    depth: 1,
+    height: 2,
+    zoneWidth: 3,
+    zoneDepth: 1,
+    outputFactor: 1,
+    enduranceFactor: ENDURANCE_BY_CLASS.industrial ?? 1,
+    powerPerDay: 1,
+    description:
+      'Three metres of shop fitted storage, floor to over head height, with eight men\u0027s sets in ' +
+      'it and a place for everything. A crew of eight wants one of these and not eight cabinets ' +
+      'along the wall.',
   },
 ];
 
@@ -2413,6 +2536,9 @@ const VARIANTS_BY_FAMILY: Record<string, EquipmentVariant[]> = {
   sprayBooth: SPRAY_BOOTH_VARIANTS,
   drill: DRILL_VARIANTS,
   spindleMoulder: SPINDLE_MOULDER_VARIANTS,
+  // The cabinet is a family of five from Turn 22, and what a class is for is how many men's hand
+  // tools it holds (PIOTR, 19.09; CLAUDE.md T22 2.12).
+  toolCabinet: TOOL_CABINET_VARIANTS,
 };
 
 const BASE_SPEC = {
@@ -2695,29 +2821,33 @@ const SPEC_DRAFTS: SpecDraft[] = [
     name: 'Tool cabinet',
     price: 350,
     category: 'storage',
-    // Two metres wide, because that is what the art side painted and the picture is the fact
-    // [PIOTR's art, 19.09; CLAUDE.md T21 2.13]. The spec said 1 by 1 and the sprite did not fit it.
+    // The family's own footprint is the standard class's two metres; every class states its own,
+    // because the art side drew five of them on 19.09 and the picture is the fact
+    // [PIOTR's art; CLAUDE.md T21 2.13, T22 2.12]. `TOOL_CABINET_VARIANTS` has the five.
     //
-    // The brief asks for a `zone 3 by 2` with it and tags that figure [TUNE]. It is not built, and
-    // the zone is left equal to the footprint (`withVariants` fills it from the width and the
-    // depth) for two reasons, both of them arithmetic and neither of them a preference.
-    // First, the zone is what nothing else may stand on: a 3 by 2 zone at the cabinet row's y 3
-    // reaches down into y 4, which is the workbench row (BENCH_SLOT_LAYOUT), so the day one hall
-    // could not be laid out at all, and it reaches 3 cells across, so no two cabinets could stand
-    // side by side in a row that holds seven of them. Second, the zone is what the crew's floor
-    // limit is measured against (`freeFloorM2`), so six cabinets at 6 cells instead of 2 would
-    // quietly take 24 m2 off the free floor and cost the player a man he has today.
-    // If Piotr wants the metre of standing room in front of a cabinet drawn, it is this pair of
-    // lines plus a new cabinet row, and the crew limit moves with it.
+    // The zone of every class is its own footprint, and Turn 21's brief asked for a `zone 3 by 2`
+    // and tagged that figure [TUNE]. It is still not built, for two reasons, both of them
+    // arithmetic and neither of them a preference. First, the zone is what nothing else may stand
+    // on: a 3 by 2 zone at the cabinet row's y 3 reaches down into y 4, which is the workbench row
+    // (BENCH_SLOT_LAYOUT), so the day one hall could not be laid out at all, and it reaches 3 cells
+    // across, so no two cabinets could stand side by side in a row that holds seven of them.
+    // Second, the zone is what the crew's floor limit is measured against (`freeFloorM2`), so six
+    // cabinets at 6 cells instead of 2 would quietly take 24 m2 off the free floor and cost the
+    // player a man he has today.
+    // If Piotr wants the metre of standing room in front of a cabinet drawn, it is a zone line on
+    // each of the five classes plus a new cabinet row, and the crew limit moves with it.
+    //
+    // `perWorker` is gone from tonight: what a workshop needs is not one cabinet a man but a free
+    // slot a man, and a class holds one, two, four or eight of them (PIOTR, 19.09;
+    // CLAUDE.md T22 2.12). `freeToolSlots` in `src/engine/staff.ts` is the count everything reads.
     width: 2,
     depth: 1,
     height: 1,
     spriteKey: 'toolCabinet',
-    perWorker: true,
     stackable: true,
     effect:
-      'Holds one man\u0027s hand tools and the hand edgebander. One for every worker and one ' +
-      'for you.',
+      'Holds the hand tool sets of one man to eight by its class, and the hand edgebander with ' +
+      'them. Every worker needs a slot in one and so do you.',
   },
   {
     ...BASE_SPEC,
@@ -3485,10 +3615,11 @@ export const JOINER_PREREQUISITES = [
   'workbench',
   'locker',
   'canteenSeat',
-  'handToolSet',
-  'toolCabinet',
+  HAND_TOOL_SET,
+  TOOL_CABINET_ID,
 ];
-/** The item every worker and the owner each need one of. */
+/** The cabinet a man's tools are kept in. One is no longer one man's: a class holds one, two, four
+ *  or eight sets, and it is the free slots the gate counts (CLAUDE.md T22 2.12). */
 export const TOOL_CABINET = TOOL_CABINET_ID;
 /** [TUNE] a new hire starts the next working day. */
 export const HIRE_START_DELAY_DAYS = 1;

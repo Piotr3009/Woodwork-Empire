@@ -12,6 +12,7 @@ import {
   NIGHT_RATE,
   SECOND_SHIFT_MINUTES,
   HIRING_SPECS,
+  HAND_TOOL_SET,
   JOINER_PREREQUISITES,
   LET_GO_NOTICE_DAYS,
   PRODUCING_ROLES,
@@ -32,10 +33,12 @@ import {
   accidentRisk,
   breakMachine,
   findSpec,
+  isSold,
   itemStandsInTheHall,
   overdueBreakdownChance,
   releaseMachines,
   releaseMachinesExcept,
+  toolSlotsOf,
 } from './machines';
 import { countOwnedOrOnOrder } from './orders';
 import { managerOnDuty } from './owner';
@@ -309,9 +312,61 @@ export function availableJoiners(state: GameState, shift: Shift = 'day'): Worker
   );
 }
 
-/** How many tool cabinets the workshop owes: one for every joiner and one for the owner, and one
- *  more when somebody is about to be taken on (CLAUDE.md T6 3.5). */
-export function cabinetsNeeded(state: GameState, hiring = 0): number {
+/** How many men's hand tool sets the cabinets standing in the hall will hold: the sum of their
+ *  classes' capacities, one for a used one and eight for the industrial one
+ *  [PIOTR, 19.09; CLAUDE.md T22 2.12]. A cabinet that is sold is no room at all: it stands in the
+ *  hall until the buyer's van comes. */
+export function toolSlots(state: GameState): number {
+  return state.equipment
+    .filter((item) => !isSold(item))
+    .reduce((total, item) => total + toolSlotsOf(item), 0);
+}
+
+/** The same sum with everything on the lorry counted as well, which is what the hiring gate asks:
+ *  a cabinet bought this morning is in by 08:00 tomorrow and the man starts then (T8 3.2). */
+export function toolSlotsOwnedOrOnOrder(state: GameState): number {
+  return (
+    toolSlots(state) +
+    state.onOrder.reduce((total, item) => total + toolSlotsOf(item), 0)
+  );
+}
+
+/** Slots with somebody's tools in them: every hand tool set bought, and the owner's own set, which
+ *  takes a slot like anybody's [PIOTR: "one for every worker and one for you"]. The owner's set is
+ *  not an item in the hall and never was: his tools are his, and the cabinet they live in is the
+ *  `+ 1` the hiring gate has counted since Turn 6 (CLAUDE.md T6 3.5, T22 2.12). */
+export function toolSlotsInUse(state: GameState): number {
+  const sets = state.equipment.filter(
+    (item) => item.specId === HAND_TOOL_SET && !isSold(item),
+  ).length;
+  return sets + 1;
+}
+
+/** Slots nobody's tools are in: what the hand tool set and the hiring gate count
+ *  (CLAUDE.md T22 2.12). Never below nought. */
+export function freeToolSlots(state: GameState): number {
+  return Math.max(0, toolSlots(state) - toolSlotsInUse(state));
+}
+
+/** How many of this cabinet's own slots are in use. The game does not write down whose tools are
+ *  in which cabinet, so they fill in the order the cabinets were bought [TUNE: Claude's rule, and
+ *  the only one that needs no new field]: the first cabinet takes the owner's set and then the
+ *  crew's, and what is left over goes into the next one. It is what the card of a cabinet on the
+ *  hall prints beside its capacity (CLAUDE.md T22 2.13). */
+export function slotsInUseIn(state: GameState, item: Equipment): number {
+  let left = toolSlotsInUse(state);
+  for (const cabinet of state.equipment.filter((entry) => toolSlotsOf(entry) > 0 && !isSold(entry))) {
+    const held = Math.min(left, toolSlotsOf(cabinet));
+    if (cabinet.id === item.id) return held;
+    left -= held;
+  }
+  return 0;
+}
+
+/** How many slots the workshop owes: one for every joiner and one for the owner, and one more when
+ *  somebody is about to be taken on (CLAUDE.md T6 3.5). It counted cabinets until Turn 22, when a
+ *  cabinet became one, two, four or eight of them (CLAUDE.md T22 2.12). */
+export function toolSlotsNeeded(state: GameState, hiring = 0): number {
   return joiners(state).length + hiring + 1;
 }
 
@@ -326,10 +381,17 @@ export function shortfallForHire(
   const needed = joiners(state).length + 1;
   const short: Array<{ specId: string; count: number }> = [];
   for (const specId of JOINER_PREREQUISITES) {
-    const wanted = specId === TOOL_CABINET ? cabinetsNeeded(state, 1) : needed;
     // A bench that is bought and on the lorry is a bench: the man starts the next working day and
-    // it lands at 08:00 that morning (CLAUDE.md T8 3.2).
-    const count = wanted - countOwnedOrOnOrder(state, specId);
+    // it lands at 08:00 that morning (CLAUDE.md T8 3.2). The cabinet is counted in slots and not in
+    // cabinets from Turn 22: the shortfall is the slots the hall is short, which is the number of
+    // used cabinets at a pound ninety that would put it right, and any dearer class covers more of
+    // it at once (CLAUDE.md T22 2.12).
+    const wanted = specId === TOOL_CABINET ? toolSlotsNeeded(state, 1) : needed;
+    const has =
+      specId === TOOL_CABINET
+        ? toolSlotsOwnedOrOnOrder(state)
+        : countOwnedOrOnOrder(state, specId);
+    const count = wanted - has;
     if (count > 0) short.push({ specId, count });
   }
   return short;

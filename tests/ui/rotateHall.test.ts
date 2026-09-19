@@ -92,8 +92,14 @@ function keyDown(key: string): void {
   window.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }));
 }
 
+/** The standard tool cabinet, which is two metres wide and so plainly a different shape turned.
+ *  The day one kit buys the cheapest class of the ladder, which is a metre square and looks the
+ *  same either way round, so this test stands a standard one in its place
+ *  (CLAUDE.md T22 2.12). */
 function cabinet(): Equipment {
-  return required(game().equipment.find((item) => item.specId === 'toolCabinet'));
+  const standing = required(game().equipment.find((item) => item.specId === 'toolCabinet'));
+  standing.variantId = 'standard';
+  return standing;
 }
 
 function orientationOf(id: string): number {
