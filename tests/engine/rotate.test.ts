@@ -159,10 +159,20 @@ describe('what turning does to the picture', () => {
     expect(art).not.toContain('scale(-1, 1)');
   });
 
-  it('has no second orientation delivered yet, for any class the game draws', () => {
-    // The art side's `.r` files are parked (CLAUDE.md T10 6.2): the hall mirrors until they land,
-    // and the day one does the loader takes it with no code change at all.
+  it('takes the one second orientation the art side has delivered, and mirrors the rest', () => {
+    // The art side's `.r` files were parked (CLAUDE.md T10 6.2): the hall mirrored until one
+    // landed, and the day one did the loader was to take it with no code change at all. Piotr
+    // delivered `toolCabinet.standard.r.png` between Turn 20 and Turn 21, and that is what this
+    // reads: the cabinet turned is drawn from its own file and not mirrored, and every other
+    // class the game draws still mirrors.
+    const turned = spriteFiles().filter((name) => name.endsWith('.r.png'));
+    expect(turned).toEqual(['toolCabinet.standard.r.png']);
+    expect(mirrorNeeded(spriteFiles(), 'toolCabinet', 'standard', true)).toBe(false);
+    expect(pickSprite(spriteFiles(), 'toolCabinet', 'standard', true)).toBe(
+      '/sprites/toolCabinet.standard.r.png',
+    );
+    // The saw has no second orientation, so it is mirrored as it always was.
+    expect(mirrorNeeded(spriteFiles(), 'tableSaw', 'standard', true)).toBe(true);
     expect(mirrorNeeded([], 'tableSaw', 'standard', true)).toBe(true);
-    expect(spriteFiles().some((name) => name.endsWith('.r.png'))).toBe(false);
   });
 });
