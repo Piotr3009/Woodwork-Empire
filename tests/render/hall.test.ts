@@ -3,11 +3,17 @@
 // 3.13; T16 2.3).
 
 import { describe, expect, it } from 'vitest';
-import { gateCollars, objectArt, pipeCellArt, pipeRuns, renderHall } from '../../src/render/hall';
+import {
+  gateCollarCellArt,
+  gateCollars,
+  objectArt,
+  pipeRuns,
+  renderHall,
+} from '../../src/render/hall';
 import { PLACEHOLDER_SPRITES, placeholderKindFor } from '../../src/render/sprites';
 import { connectExtraction, pipeRunFor, portCell } from '../../src/engine/pipes';
 import { centreOf } from '../../src/render/iso';
-import { DUCT_HEIGHT, PIPE_TILE_KEYS } from '../../src/engine/constants';
+import { DUCT_HEIGHT } from '../../src/engine/constants';
 import type { GameState } from '../../src/engine/index';
 import { newGame, placeEquipment } from '../helpers';
 
@@ -21,33 +27,41 @@ function pipedHall(fanClass: string): GameState {
   return state;
 }
 
-describe('the pipe layer (CLAUDE.md T13 3.19)', () => {
-  it('maps every tile key to the vector helper, up in the air, and to the file once it lands', () => {
-    for (const key of PIPE_TILE_KEYS) {
-      const drawn = pipeCellArt(key, { x: 3, y: 4 }, []);
-      expect(drawn, key).toContain(`data-pipe-tile="${key}"`);
-      // A drawing of a pipe, never a placeholder box (CLAUDE.md T16 2.3).
-      expect(drawn, key).not.toContain('placeholder');
-      expect(drawn, key).toMatch(/pipe-bar|pipe-collar/);
-      expect(pipeCellArt(key, { x: 3, y: 4 }, [`${key}.png`]), key).toContain(`/sprites/${key}.png`);
-    }
-    // Lifted to the height of the ducting: the bar of a straight tile sits above the cell it is
-    // over, at the pipe's height.
-    const straight = pipeCellArt('pipe.ew', { x: 3, y: 4 }, []);
-    const y1 = /pipe-bar[^>]*y1="([-\d.]+)"/.exec(straight);
-    expect(Number(y1?.[1])).toBeLessThan(centreOf(3, 4, 1, 1).y - DUCT_HEIGHT * 24 + 1);
+describe('the pipe layer (CLAUDE.md T13 3.19, T22 2.7)', () => {
+  it('draws the one key that is still a picture from the file, and from the drawing until it lands', () => {
+    // The nine pipe tiles and the per cell lookup that placed them are gone: a run is one path and
+    // the gate's collar is the whole of what the layer asks the art side for (CLAUDE.md T22 2.7).
+    const drawn = gateCollarCellArt({ x: 3, y: 4 }, []);
+    expect(drawn).toContain('data-pipe-tile="gate.collar"');
+    expect(drawn).not.toContain('placeholder');
+    expect(drawn).toContain('pipe-collar');
+    expect(gateCollarCellArt({ x: 3, y: 4 }, ['gate.collar.png'])).toContain(
+      '/sprites/gate.collar.png',
+    );
+    // Lifted to the height of the ducting: the ring sits above the cell it is over, at the pipe's
+    // height and not on the floor.
+    const cy = /cy="([-\d.]+)"/.exec(drawn);
+    expect(Number(cy?.[1])).toBeLessThan(centreOf(3, 4, 1, 1).y - DUCT_HEIGHT * 24 + 1);
   });
 
-  it('draws every run tile by tile, above the equipment, keyed by the machine it serves', () => {
+  it('draws a run as one path, above the equipment, keyed by the machine it serves', () => {
     const state = pipedHall('pro');
     const run = pipeRunFor(state, 'kit-saw');
     if (!run) throw new Error('no run');
     const svg = renderHall(state, { files: [] });
     expect(svg).toContain(`data-pipe="${run.id}"`);
     expect(svg).toContain('data-pipe-for="kit-saw"');
-    expect((svg.match(/data-pipe-tile="/g) ?? []).length).toBe(run.tiles.length);
-    expect(svg).toContain('data-pipe-tile="pipe.drop"');
-    expect(svg).toContain('data-pipe-tile="pipe.inlet"');
+    // One run and one drop, whatever the run measures: nothing counts cells any more.
+    expect((svg.match(/data-pipe-part="run"/g) ?? []).length).toBe(5);
+    expect((svg.match(/data-pipe-part="drop"/g) ?? []).length).toBe(5);
+    expect(svg).not.toContain('data-pipe-tile="pipe.');
+    // With the pictures the art side has really delivered the inlet is drawn as well: it is the
+    // measured pixel of the fan's own file, and with no file there is nothing measured to draw it
+    // on (CLAUDE.md T22 2.8).
+    const painted = renderHall(state);
+    expect((painted.match(/data-pipe-part="inlet"/g) ?? []).length).toBe(5);
+    expect((painted.match(/data-pipe-part="elbow"/g) ?? []).length).toBe(5);
+    expect(svg).not.toContain('data-pipe-part="inlet"');
     // The layer comes after the machines in the live part, so it is over them.
     expect(svg.indexOf('class="pipe-layer"')).toBeGreaterThan(svg.indexOf('data-kit="kit-saw"'));
     // And a machine with no pipe says so under its name, in words the hall never writes for a

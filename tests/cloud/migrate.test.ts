@@ -11,6 +11,9 @@ import { OLDEST_SAVE_VERSION, canOpenVersion, migrateState } from '../../src/eng
 import { STATE_VERSION, bagStore, tick } from '../../src/engine/index';
 import { CABINET_SLOT_LAYOUT, CANTEEN_SLOT_LAYOUT, roomById } from '../../src/engine/constants';
 import type { GameState } from '../../src/engine/index';
+import { itemFootprint } from '../../src/engine/machines';
+import { orientationsFor } from '../../src/engine/ports';
+import { spriteFiles } from '../../src/render/sprites';
 import { twoMenOnSheetWork } from '../helpers';
 
 /** A game saved by v18 on the morning of day 2, with a full bag on the saw, the question about
@@ -139,7 +142,7 @@ describe('a v24 save in this build (CLAUDE.md T17 section 4)', () => {
     expect(opened.state).not.toBeNull();
     const state = opened.state as GameState;
     expect(state.version).toBe(STATE_VERSION);
-    expect(STATE_VERSION).toBe(18);
+    expect(STATE_VERSION).toBe(19);
     expect(state.taskQueue).toEqual([]);
     expect(state.dayStats.paidHours).toBe(0);
     expect(state.dayStats.expressUplift).toBe(0);
@@ -281,7 +284,7 @@ describe('a v28 save in this build (CLAUDE.md T20 section 4, T21 section 4)', ()
   if (lifted === null) throw new Error('the lift refused a version 16 state');
 
   it('renames every tier and brings the man up to what that tier is worth tonight', () => {
-    expect(lifted.version).toBe(18);
+    expect(lifted.version).toBe(19);
     expect(lifted.workers.map((worker) => worker.tier)).toEqual([
       'novice',
       'experienced',
@@ -319,7 +322,16 @@ describe('a v28 save in this build (CLAUDE.md T20 section 4, T21 section 4)', ()
       [10, 3],
       [12, 3],
     ]);
-    for (const cabinet of cabinets) expect(cabinet.rotated).toBe(false);
+    // Square to the walls, and the boolean is a number from tonight: the v19 lift turns the turn
+    // into an orientation and the cabinets the v18 lift unturned come out at 0
+    // (CLAUDE.md T22 2.11).
+    for (const cabinet of cabinets) {
+      expect(cabinet.rotated).toBeUndefined();
+      expect(cabinet.orientation).toBe(0);
+      // And every cabinet in a save is the standard class, because that is the one the family had
+      // when it was bought (CLAUDE.md T22 2.12).
+      expect(cabinet.variantId).toBe('standard');
+    }
   });
 
   it('starts the days below the limit and the owner\u0027s idle minutes at nought', () => {
@@ -394,7 +406,7 @@ describe('a v29 save in this build (CLAUDE.md T21 section 4)', () => {
   if (lifted === null) throw new Error('the lift refused a version 17 state');
 
   it('pays every man by the month at the conversion the Turn 20 build printed', () => {
-    expect(lifted.version).toBe(18);
+    expect(lifted.version).toBe(19);
     // Turn 20's four weekly wages for a joiner were 450, 600, 800 and 1,000, and the build printed
     // the month beside each of them at thirty days over seven. A lifted man costs what the game
     // told the player he cost, and his own wage is never re-read off the hiring specs: what he is
@@ -509,5 +521,160 @@ describe('a v29 save in this build (CLAUDE.md T21 section 4)', () => {
     expect(later.clock.minute).toBeGreaterThan(opened.clock.minute);
     const round = decodeSaveFile(encodeSaveFile(later));
     expect(round.state).toEqual(later);
+  });
+
+  it('opens a whole v31 game, and a turned cabinet comes up at orientation 1', () => {
+    // Every v30 and v31 save loads (CLAUDE.md T22 section 4). A v31 save is state version 18, so
+    // only tonight's lift runs on it: the boolean becomes the number, and a cabinet the player had
+    // standing across its cells stays across them rather than being squared up, because the row
+    // was laid out again by the Turn 21 lift and not by this one (CLAUDE.md T22 2.11).
+    const played = twoMenOnSheetWork();
+    const raw = JSON.parse(JSON.stringify(played)) as Record<string, unknown>;
+    raw.version = 18;
+    const equipment = raw.equipment as Array<Record<string, unknown>>;
+    for (const item of equipment) {
+      item.rotated = item.specId === 'toolCabinet';
+      delete item.orientation;
+    }
+    const opened = migrateState(raw, 18);
+    if (opened === null) throw new Error('the lift refused a whole v31 game');
+    expect(opened.version).toBe(STATE_VERSION);
+    for (const item of opened.equipment) {
+      expect(item.orientation, item.specId).toBe(item.specId === 'toolCabinet' ? 1 : 0);
+      expect(Object.keys(item), item.specId).not.toContain('rotated');
+    }
+    const cabinet = opened.equipment.find((item) => item.specId === 'toolCabinet');
+    if (cabinet === undefined) throw new Error('the day one kit has a cabinet in it');
+    // Turned, and the standard class, which is the class every cabinet in a save was bought as
+    // (CLAUDE.md T22 2.12).
+    expect(cabinet.variantId).toBe('standard');
+    expect(itemFootprint(cabinet)).toEqual({ width: 1, depth: 2, height: 1 });
+    // And Rotate walks all four from there, because the art side has drawn all four
+    // (CLAUDE.md T22 2.11).
+    expect(orientationsFor(spriteFiles(), 'toolCabinet', cabinet.variantId)).toEqual([0, 1, 2, 3]);
+    const later = tick(opened, 60);
+    expect(later.clock.minute).toBeGreaterThan(opened.clock.minute);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Turn 22: version 18 to 19, the arrears into the account (CLAUDE.md T22 2.1, section 4)
+// ---------------------------------------------------------------------------
+
+/** A v31 save of a company that missed its bills: the unpaid balance stands beside the bank the way
+ *  Turn 21 kept it, with a month of it counted and two ledger lines already written under the two
+ *  categories the word took with it. Cut down to what this one lift touches. */
+function v31SaveInArrears(): Record<string, unknown> {
+  return {
+    version: 18,
+    cash: -4998,
+    clock: { day: 22, minute: 480 },
+    jobs: [],
+    workers: [],
+    equipment: [],
+    finance: {
+      overdraftLimit: -5000,
+      daysBelowOverdraft: 0,
+      arrearsAmount: 2780,
+      arrearsMonths: 1,
+      firstArrearsDay: 11,
+    },
+    ledger: [
+      {
+        id: 'l1',
+        day: 11,
+        minute: 480,
+        category: 'rent',
+        label: 'Rent (unpaid)',
+        amount: -80,
+        balance: -4998,
+        unpaid: true,
+      },
+      {
+        id: 'l2',
+        day: 12,
+        minute: 480,
+        category: 'arrears',
+        label: 'Arrears paid off',
+        amount: -100,
+        balance: -4998,
+        unpaid: false,
+      },
+      {
+        id: 'l3',
+        day: 13,
+        minute: 480,
+        category: 'seizure',
+        label: 'Seized tableSaw, credited against arrears',
+        amount: 900,
+        balance: -4998,
+        unpaid: true,
+      },
+    ],
+    owner: { minutesWorked: 0, dayLog: [] },
+    unit: { widthCells: 20, depthCells: 10 },
+    contracts: [],
+    tasks: [],
+  };
+}
+
+describe('a v31 save with an unpaid balance on it (CLAUDE.md T22 2.1)', () => {
+  const lifted = migrateState(v31SaveInArrears(), 18);
+  if (lifted === null) throw new Error('the lift refused a version 18 state');
+  const finance = lifted.finance as unknown as Record<string, unknown>;
+
+  it('takes what was owed out of the cash, where it would have come from on the day', () => {
+    // There is one track for money from tonight: a cost the player did not choose is paid out of
+    // the account whatever the balance, so a save that was carrying 2,780 it never paid has it
+    // taken out of the account now (PIOTR, 19.09; CLAUDE.md T22 2.1, section 4).
+    expect(lifted.version).toBe(19);
+    expect(lifted.cash).toBe(-4998 - 2780);
+  });
+
+  it('writes the one line that says what happened to the money', () => {
+    const line = lifted.ledger.find((entry) => entry.label === 'Arrears carried into the account (v32)');
+    expect(line).not.toBeUndefined();
+    expect(line?.amount).toBe(-2780);
+    expect(line?.category).toBe('other');
+    expect(line?.unpaid).toBe(false);
+    expect(line?.balance).toBe(lifted.cash);
+    expect(line?.day).toBe(22);
+  });
+
+  it('takes the three fields off the save, because the type no longer has them', () => {
+    expect(Object.keys(finance)).not.toContain('arrearsAmount');
+    expect(Object.keys(finance)).not.toContain('arrearsMonths');
+    expect(Object.keys(finance)).not.toContain('firstArrearsDay');
+    // What the bank does keep is the run of days under the limit, which 2.2 reads.
+    expect(finance.daysBelowOverdraft).toBe(0);
+  });
+
+  it('keeps every pound of a played company s history on the books', () => {
+    // The two categories the word took with it are rewritten, so the lines are still there and
+    // still carry their own labels and figures: nothing is lost with the word.
+    const categories = lifted.ledger.map((entry) => entry.category as string);
+    expect(categories).not.toContain('arrears');
+    expect(categories).not.toContain('seizure');
+    expect(lifted.ledger.find((entry) => entry.id === 'l2')?.category).toBe('other');
+    expect(lifted.ledger.find((entry) => entry.id === 'l2')?.amount).toBe(-100);
+    expect(lifted.ledger.find((entry) => entry.id === 'l3')?.category).toBe('other');
+    expect(lifted.ledger.find((entry) => entry.id === 'l3')?.amount).toBe(900);
+    // The line that went unpaid on the day keeps its flag: it is a record of a day that has been
+    // and gone, and the lift does not rewrite history it cannot re-play.
+    expect(lifted.ledger.find((entry) => entry.id === 'l1')?.unpaid).toBe(true);
+  });
+
+  it('leaves a save that owed nothing exactly where it was', () => {
+    const clear = v31SaveInArrears();
+    const money = clear.finance as Record<string, unknown>;
+    money.arrearsAmount = 0;
+    money.arrearsMonths = 0;
+    money.firstArrearsDay = null;
+    const opened = migrateState(clear, 18);
+    if (opened === null) throw new Error('the lift refused a clear v31 state');
+    expect(opened.cash).toBe(-4998);
+    expect(opened.ledger.some((entry) => entry.label.includes('carried into the account'))).toBe(
+      false,
+    );
   });
 });

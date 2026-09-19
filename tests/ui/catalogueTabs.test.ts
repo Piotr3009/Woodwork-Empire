@@ -259,12 +259,18 @@ describe('the Owned tab', () => {
     expect(card).toContain('running');
     // Nothing is offered on a machine with nothing wrong with it but the gate it can take on its
     // drop (CLAUDE.md T13 3.11), shifting it, which is setting the hall out (CLAUDE.md T17 2.6),
-    // and the one thing that is always offered on a machine the hall has finished with
-    // (CLAUDE.md T8 3.5).
+    // standing it at ninety degrees where it is, and the one thing that is always offered on a
+    // machine the hall has finished with (CLAUDE.md T8 3.5, T22 2.13).
     const controls = Array.from(
       owned.querySelectorAll(`[data-owned="${saw?.id}"] [data-do]`),
     ).map((node) => node.getAttribute('data-do'));
-    expect(controls).toEqual(['buyGate', 'startSetup', 'sellMachine']);
+    expect(controls).toEqual(['buyGate', 'startSetup', 'turnItem', 'sellMachine']);
+    // Turn and Sell are the two rows at the bottom of the card, in that order, drawn by the one
+    // function the tool cabinet's card calls as well (CLAUDE.md T22 2.13).
+    const rows = Array.from(
+      owned.querySelectorAll(`[data-owned="${saw?.id}"] [data-card-row]`),
+    ).map((node) => node.getAttribute('data-card-row'));
+    expect(rows).toEqual(['turn', 'sell']);
     expect(card).toContain('Sell for £630');
   });
 

@@ -2,9 +2,7 @@
 // and it hands back an SVG string (CLAUDE.md 10.3).
 
 import {
-  BUBBLES,
   BUBBLE_HEAD_GAP,
-  BUBBLE_WORK_MAX_SPEED,
   DUCT_HEIGHT,
   DUCT_SYSTEMS,
   FINISHED_GOODS_LAYOUT,
@@ -33,14 +31,7 @@ import {
   sawdustPiles,
   serviceIsDue,
 } from '../engine/machines';
-import {
-  footprintOrigin,
-  isConnected,
-  pipeRunFor,
-  portCell,
-  tileKeysFor,
-  wantsExtraction,
-} from '../engine/pipes';
+import { footprintOrigin, isConnected, portCell, wantsExtraction } from '../engine/pipes';
 import { jobsAtGate, waitingLine } from '../engine/jobs';
 import { orderName, reservedItems, shoppingList } from '../engine/orders';
 import {
@@ -66,7 +57,6 @@ import {
   STATION_RACK,
   type Facing as StationFacing,
   facingAt,
-  roomBehindStation,
   stationNow,
   facingAtPallet,
   facingTowards,
@@ -80,7 +70,17 @@ import {
   stationSecondAt,
   stationWaitingFor,
 } from '../engine/stations';
-import { gateCollarArt, pipeTile, portRing } from './pipes';
+import {
+  ELBOW_RISE,
+  HOSE_DROP,
+  INLET_STANDOFF,
+  elbowArt,
+  gateCollarArt,
+  hoseArt,
+  runAbove,
+  runArt,
+  verticalArt,
+} from './pipes';
 import { ownerIsAvailable } from '../engine/owner';
 import { homeCellOf } from '../engine/staff';
 import { plural } from '../engine/text';
@@ -88,16 +88,18 @@ import { FIGURE_DEPTH_OFFSET } from '../engine/constants';
 import type { RoomId } from '../engine/constants';
 import type {
   Bubble,
-  BubbleTone,
   Equipment,
   EquipmentSpec,
   GameState,
   OnOrderItem,
+  Orientation,
+  PipeTile,
 } from '../engine/types';
 import {
   type BoxFaces,
   type Point,
   type Polygon,
+  TILE_HEIGHT,
   TILE_RISE,
   TILE_WIDTH,
   blockSilhouette,
@@ -134,7 +136,7 @@ import { jobStage } from '../engine/jobs';
 import { cleanerAtWork, manOnOpenTask } from '../engine/tasks';
 import type { StageId } from '../engine/types';
 import { figureIsThroughADoor, takeDoorGoings } from './doors';
-import { bubbleIsFresh, bubbleNowMs } from './bubbles';
+import { type Port, pictureFor, portFor } from '../engine/ports';
 import { bubblesFor } from '../engine/bubbles';
 
 /** What the hall can be heard doing (CLAUDE.md T19 2.10, T20 2.13). The render layer owns the
@@ -244,25 +246,26 @@ export function objectArt(art: {
   fill: string;
   shade: string;
   label: string;
-  /** Stood at ninety degrees to the walls: the second orientation the art side delivered, or the
-   *  picture mirrored about its anchor (CLAUDE.md T10 3.8). */
-  rotated?: boolean;
+  /** Which way it is turned: the file the art side delivered for that orientation, or, at a
+   *  quarter turn with no such file, the base picture mirrored about its anchor
+   *  (CLAUDE.md T10 3.8, T22 2.11). */
+  orientation?: Orientation;
   /** What the art side has delivered; the manifest when not given, so a test can draw the hall
    *  as if a file had not landed yet (the placeholders are for exactly that). */
   files?: readonly string[];
 }): string {
   const shadow = contactShadow(art.x, art.y, art.width, art.depth);
-  const rotated = art.rotated === true;
+  const orientation = art.orientation ?? 0;
   const files = art.files ?? spriteFiles();
   const url = art.files === undefined
-    ? spriteUrl(art.spriteKey, art.tier, rotated)
-    : pickSprite(art.files, art.spriteKey, art.tier, rotated);
+    ? spriteUrl(art.spriteKey, art.tier, orientation)
+    : pickSprite(art.files, art.spriteKey, art.tier, orientation);
   if (url !== null) {
     const at = spriteBox(art.x, art.y, art.width, art.depth, art.height);
     // Mirrored about the anchor, which is the corner the picture is placed by, so the object
     // stays on its own tile while it faces the other way (CLAUDE.md T10 3.8).
     const anchor = tileToScreen(art.x + art.width, art.y + art.depth);
-    const mirror = mirrorNeeded(files, art.spriteKey, art.tier, rotated)
+    const mirror = mirrorNeeded(files, art.spriteKey, art.tier, orientation)
       ? ` transform="translate(${round(anchor.x * 2)},0) scale(-1, 1)"`
       : '';
     return shadow + spriteImage(url, at, mirror.trim());
@@ -703,6 +706,14 @@ export interface MachineFx {
 
 const NO_FX: MachineFx = { className: '', svg: '' };
 
+/** True for a thing with a measured connection point: a picture `PORTS` has a line for, at the
+ *  orientation it is standing in (CLAUDE.md T22 2.8). It is the one test for "a pipe is fixed to a
+ *  named pixel of this picture", and 2.9 reads it to keep such a thing still while it runs. */
+export function hasMeasuredPort(item: Equipment): boolean {
+  const picture = pictureFor(spriteFiles(), item.spriteKey, item.variantId, item.orientation);
+  return portFor(picture.file) !== null;
+}
+
 /** Where a machine's picture actually stands: its class's footprint, centred inside the working
  *  zone it reserves (CLAUDE.md T7 3.3). The anchor cell is the zone's corner, so everything that
  *  draws an object comes through here. */
@@ -718,41 +729,42 @@ export function footprintIn(item: Equipment): {
 }
 
 // ---------------------------------------------------------------------------
-// The pipe layer (CLAUDE.md T13 3.11, 3.19): the runs the game routed and the gate collars on
-// their drops, drawn above the equipment at the height of the ducting. It occupies no cell and
-// blocks nothing under it.
+// The pipe layer (CLAUDE.md T13 3.11, 3.19, T22 2.7 and 2.8): one continuous path for every run,
+// the vertical of every drop and every inlet on the pixel `PORTS` measured for it, and the gate
+// collars on the drops. It is drawn above the equipment at the height of the ducting; it occupies
+// no cell and blocks nothing under it.
+//
+// The nine `pipe.*.png` tiles are gone and with them the per cell sprite lookup that placed them:
+// a run is drawn, never tiled (PIOTR's screenshot, 19.09). What is left of the old lookup is the
+// gate's collar, which is a real delivered file.
 // ---------------------------------------------------------------------------
-
-/** One cell of the pipe layer: the delivered picture where the art side has painted the key,
- *  placed by the cell's anchor at the ducting's height, and the vector helper's own drawing of
- *  that kind where it has not (CLAUDE.md T16 2.3). Nothing green, nothing placeholder. */
-export function pipeCellArt(
-  kind: string,
-  cell: { x: number; y: number },
-  files: readonly string[],
-  scale = 1,
-  landsAt = 0,
-): string {
-  const url = pickSprite(files, kind);
-  if (url !== null) {
-    const width = TILE_WIDTH * scale;
-    // A tile is three thirds tall: the diamond is the middle third, so a cell wide picture is a
-    // cell and a half high and its diamond is exactly a cell (docs/art/SPRITES.md 1).
-    const height = width * 1.5;
-    const centre = centreOf(cell.x, cell.y, 1, 1, DUCT_HEIGHT);
-    return spriteImage(url, { x: centre.x - width / 2, y: centre.y - height / 2, width, height });
-  }
-  return kind === 'gate.collar' ? gateCollarArt(cell) : pipeTile(kind, cell, landsAt);
-}
 
 /** How much smaller than a cell the collar is drawn [TUNE]. */
 const GATE_COLLAR_SCALE = 0.5;
+
+/** The gate's collar on a cell: the delivered picture where the art side has painted it, placed by
+ *  the cell's anchor at the ducting's height, and the vector ring where it has not. The one key of
+ *  the pipe layer that is still a file (docs/art/REQUESTS-T13.md 2). */
+export function gateCollarCellArt(
+  cell: { x: number; y: number },
+  files: readonly string[],
+  scale = 1,
+): string {
+  const url = pickSprite(files, 'gate.collar');
+  if (url === null) return gateCollarArt(cell);
+  const width = TILE_WIDTH * scale;
+  // A tile is three thirds tall: the diamond is the middle third, so a cell wide picture is a cell
+  // and a half high and its diamond is exactly a cell (docs/art/SPRITES.md 1).
+  const height = width * 1.5;
+  const centre = centreOf(cell.x, cell.y, 1, 1, DUCT_HEIGHT);
+  return spriteImage(url, { x: centre.x - width / 2, y: centre.y - height / 2, width, height });
+}
 
 /** The automatic gate on a machine's drop: a short collar on the drop cell (CLAUDE.md T13 3.11). */
 export function gateCollar(item: Equipment, files: readonly string[]): string {
   return (
     `<g class="gate-collar" data-gate="${item.id}">` +
-    pipeCellArt('gate.collar', portCell(item), files, GATE_COLLAR_SCALE) +
+    gateCollarCellArt(portCell(item), files, GATE_COLLAR_SCALE) +
     '</g>'
   );
 }
@@ -771,31 +783,119 @@ export function gateCollars(state: GameState, files: readonly string[]): string 
     .join('');
 }
 
-/** One run of pipe, tile by tile in the order it was routed, as a group the page can find by
- *  the machine it serves. A connected machine that the air rule says is not pulled hard enough
- *  wears a thin red outline on its run (CLAUDE.md T13 3.19): the hall is short this minute and
- *  this machine is one of the ones running in it. */
+/** A measured connection point placed on the screen: the pixel `PORTS` names for the picture this
+ *  thing is really drawn with, put where the picture puts it (CLAUDE.md T22 2.8).
+ *
+ *  The arithmetic is the renderer's own and not a second copy of it: `spriteBox` places the
+ *  picture, `SPRITE_SCALE` halves the 2x file, and a mirrored picture is reflected about its
+ *  anchor exactly as `objectArt` reflects it. A vertical in the world is a vertical on the screen,
+ *  so the screen x of this point is all the drop needs to hang itself from the run.
+ *
+ *  `faces` is swapped on the mirrored path, because a mirror about the vertical screen axis
+ *  exchanges the two world axes: a mouth that opened down right opens down left. The pixel is
+ *  taken from the renderer's transform rather than from `mirroredPort`, whose `fileWidth - px` is
+ *  the reflection of the file about its own middle and so agrees with the hall only where the
+ *  footprint is square (docs/notes-t22-b3.md, 2.8). */
+export function portPointOf(
+  item: Equipment,
+  files: readonly string[],
+): { at: Point; port: Port } | null {
+  const picture = pictureFor(files, item.spriteKey, item.variantId, item.orientation);
+  const port = portFor(picture.file);
+  if (port === null) return null;
+  const stands = footprintIn(item);
+  const box = spriteBox(stands.x, stands.y, stands.width, stands.depth, stands.height);
+  const at = { x: box.x + port.px / SPRITE_SCALE, y: box.y + port.py / SPRITE_SCALE };
+  if (!picture.mirrored) return { at, port };
+  const anchor = tileToScreen(stands.x + stands.width, stands.y + stands.depth);
+  return {
+    at: { x: anchor.x * 2 - at.x, y: at.y },
+    port: {
+      ...port,
+      faces: port.faces === undefined ? undefined : port.faces === '+x' ? '+y' : '+x',
+    },
+  };
+}
+
+/** Where a drop lands when the picture has no measured line: the centre of the port cell at the
+ *  machine's own height, which is the rule the game had before tonight, and no hose with it
+ *  (CLAUDE.md T13 3.19, T22 2.8). */
+function unmeasuredPort(item: Equipment): Point {
+  const stands = footprintIn(item);
+  const cell = portCell(item);
+  return tileToScreen(cell.x + 0.5, cell.y + 0.5, stands.height);
+}
+
+/** A machine's drop: the vertical down from the run at the port's own screen x, and either nothing
+ *  else (a hidden port: the body of the picture covers what would be below, PIOTR's pick B for the
+ *  saw) or a flexible hose from its foot into a visible port (CLAUDE.md T22 2.8). */
+export function dropArt(
+  item: Equipment,
+  cells: ReadonlyArray<{ x: number; y: number }>,
+  files: readonly string[],
+): string {
+  const measured = portPointOf(item, files);
+  const at = measured === null ? unmeasuredPort(item) : measured.at;
+  const top = runAbove(cells, at.x);
+  const hidden = measured === null || measured.port.hidden === true;
+  if (hidden) return verticalArt(top, at, 'drop');
+  const foot = { x: at.x, y: at.y - HOSE_DROP * TILE_RISE };
+  return verticalArt(top, foot, 'drop') + hoseArt(foot, at);
+}
+
+/** An extractor's inlet, Piotr's variant C: the vertical stands a quarter metre in front of the
+ *  mouth, comes down from the run to the mouth's own height, and an elbow turns it into the mouth
+ *  and ends on the measured pixel (docs/mockups/t22/extractor-inlet-C.png; CLAUDE.md T22 2.8). A
+ *  unit with no measured line has no inlet drawn: the run ends over its port cell, which is the
+ *  rule the game had before tonight. */
+export function inletArt(
+  item: Equipment,
+  cells: ReadonlyArray<{ x: number; y: number }>,
+  files: readonly string[],
+): string {
+  const measured = portPointOf(item, files);
+  if (measured === null || measured.port.faces === undefined) return '';
+  const mouth = measured.at;
+  // A quarter metre along the way the mouth opens: down and to the right for `+x`, down and to the
+  // left for `+y`, which is what a metre of either world axis looks like on a 2 to 1 dimetric.
+  const along = measured.port.faces === '+x' ? INLET_STANDOFF : -INLET_STANDOFF;
+  const corner = {
+    x: mouth.x + along * (TILE_WIDTH / 2),
+    y: mouth.y + INLET_STANDOFF * (TILE_HEIGHT / 2),
+  };
+  const elbow = { x: corner.x, y: corner.y - ELBOW_RISE * TILE_RISE };
+  return verticalArt(runAbove(cells, corner.x), elbow, 'inlet') + elbowArt(elbow, corner, mouth);
+}
+
+/** One run of pipe: the one path over the floor, the drop onto the machine it serves and the inlet
+ *  into the unit it goes to, all of them in one group the page can find by the machine
+ *  (CLAUDE.md T22 2.7). A connected machine that the air rule says is not pulled hard enough wears
+ *  a thin red outline on its run (CLAUDE.md T13 3.19): the hall is short this minute and this
+ *  machine is one of the ones running in it. */
 export function pipeRunArt(
   state: GameState,
-  run: { id: string; equipmentId: string; tiles: ReadonlyArray<{ x: number; y: number; key: string }> },
+  run: { id: string; equipmentId: string; extractorId: string; tiles: ReadonlyArray<PipeTile> },
   files: readonly string[],
   short: boolean,
 ): string {
   const machine = state.equipment.find((item) => item.id === run.equipmentId);
   const running = machine !== undefined && machine.takenBy !== null;
-  // The drop lands on the machine's own top face, where its port is, and not on the floor of the
-  // cell it stands on (PIOTR, 16.09; CLAUDE.md T17 2.7).
-  const lands = machine === undefined ? 0 : footprintIn(machine).height;
-  const tiles = run.tiles
-    .map((tile) => pipeCellArt(tile.key, tile, files, 1, tile.key === 'pipe.drop' ? lands : 0))
-    .join('');
+  const cells = run.tiles.map((tile) => ({ x: tile.x, y: tile.y }));
+  const endsAtTheUnit = run.tiles[run.tiles.length - 1]?.key !== 'pipe.tee';
+  const unit = state.equipment.find((item) => item.id === run.extractorId);
+  const inlet = endsAtTheUnit && unit !== undefined ? inletArt(unit, cells, files) : '';
   return (
     `<g class="pipe${short && running ? ' pipe-short' : ''}" data-pipe="${escapeText(run.id)}" ` +
-    `data-pipe-for="${escapeText(run.equipmentId)}">${tiles}</g>`
+    `data-pipe-for="${escapeText(run.equipmentId)}">` +
+    runArt(cells) +
+    (machine === undefined ? '' : dropArt(machine, cells, files)) +
+    inlet +
+    '</g>'
   );
 }
 
-/** Every run over the floor, in the order they were routed. */
+/** Every run over the floor, in the order they were routed, so a branch is drawn over the run it
+ *  tees onto (CLAUDE.md T22 2.7). */
 export function pipeRuns(state: GameState, files: readonly string[]): string {
   const short = extractionCheck(state).short;
   return state.pipes.map((run) => pipeRunArt(state, run, files, short)).join('');
@@ -812,52 +912,38 @@ function machinesWantingExtraction(state: GameState): Equipment[] {
   );
 }
 
-/** What a central system draws: one run along the rear wall at the pipes' height, the width of
- *  the hall, and a run up from every machine's port to it ending in a tee, so every machine is
- *  seen to be connected (CLAUDE.md T16 2.3). Drawn by the same helper as every routed run. */
+/** What a central system draws: one path along the rear wall at the pipes' height, the width of
+ *  the hall, and a branch up from every machine's port to it, so every machine is seen to be
+ *  connected (CLAUDE.md T16 2.3). The same path and the same drop as a routed run. */
 export function centralRunArt(state: GameState, files: readonly string[]): string {
   const system = ductSystemOf(state);
   if (system === null) return '';
-  const tiles: string[] = [];
-  for (let x = 0; x < state.unit.widthCells; x += 1) {
-    tiles.push(pipeCellArt('pipe.ew', { x, y: 0 }, files));
-  }
+  const wall: Array<{ x: number; y: number }> = [];
+  for (let x = 0; x < state.unit.widthCells; x += 1) wall.push({ x, y: 0 });
   const drops: string[] = [];
   for (const item of machinesWantingExtraction(state)) {
     const port = portCell(item);
     const cells: Array<{ x: number; y: number }> = [];
     for (let y = port.y; y >= 0; y -= 1) cells.push({ x: port.x, y });
-    // The port is the drop, the wall the tee, and every cell between a straight length: the
-    // same key rule the routed runs use (src/engine/pipes.ts).
-    const keyed = cells.length === 1 ? [{ x: port.x, y: port.y, key: 'pipe.drop' }] : tileKeysFor(cells, 'tee');
-    const lands = footprintIn(item).height;
     drops.push(
       `<g class="pipe central-drop" data-central-for="${escapeText(item.id)}">` +
-        keyed
-          .map((tile) => pipeCellArt(tile.key, tile, files, 1, tile.key === 'pipe.drop' ? lands : 0))
-          .join('') +
+        runArt(cells) +
+        dropArt(item, cells, files) +
         '</g>',
     );
   }
-  return `<g class="pipe central-run" data-ducts="${system}">${tiles.join('')}</g>${drops.join('')}`;
+  return (
+    `<g class="pipe central-run" data-ducts="${system}">${runArt(wall)}</g>${drops.join('')}`
+  );
 }
 
-/** The red ring on the port of every machine that wants a pipe and has none, and no central
- *  system to make one unnecessary (CLAUDE.md T16 2.3). */
-export function portRings(state: GameState): string {
-  if (ductSystemOf(state) !== null) return '';
-  return machinesWantingExtraction(state)
-    .filter((item) => pipeRunFor(state, item.id) === null)
-    .map((item) => portRing(portCell(item), item.id))
-    .join('');
-}
-
-/** The whole layer: the central system's run where there is one, the runs the game routed, the
- *  collars over their drops, and the red ring on every port without a pipe. */
+/** The whole layer: the central system's run where there is one, the runs the game routed and the
+ *  collars over their drops. The pulsing red ring of Turn 16 is gone with the tiles [PIOTR, 19.09]:
+ *  a machine with no pipe says so under its name and wears no disc (CLAUDE.md T22 2.8). */
 export function pipeLayer(state: GameState, files: readonly string[]): string {
   return (
     `<g class="pipe-layer">${centralRunArt(state, files)}${pipeRuns(state, files)}` +
-    `${gateCollars(state, files)}${portRings(state)}</g>`
+    `${gateCollars(state, files)}</g>`
   );
 }
 
@@ -875,6 +961,12 @@ export function machineFx(state: GameState, item: Equipment, spec: EquipmentSpec
   }
   if (spec.category === 'extraction') {
     if (item.broken) return { className: '', svg: lamp(point, 'red') };
+    // A machine with a pipe on it stands still while it runs [PIOTR, 19.09: "the extractor
+    // pulsing will tear the pipe"]. The test is a measured port: anything `PORTS` has a line for
+    // is a thing a pipe is drawn onto a named pixel of, and a body that breathes under a pipe
+    // fixed to that pixel is the pipe tearing. A unit with no line breathes as it always did
+    // (CLAUDE.md T22 2.9).
+    if (hasMeasuredPort(item)) return NO_FX;
     return machineInUse(state, item) ? { className: ' fx-breathe', svg: '' } : NO_FX;
   }
   if (!machineInUse(state, item)) return NO_FX;
@@ -1081,7 +1173,7 @@ function stationLabel(station: string): string {
   const waiting = stationWaitingFor(station);
   // The one phrase for a machine a man cannot have. The hall built its own copy of it until Turn 21
   // put the article in: two copies meant the Work Plan said "waiting for the table saw" and the man
-  // under his own name said "waiting for table saw" (CLAUDE.md T21 2.7).
+  // under his own name said "waiting for table saw" (CLAUDE.md T21 2.6).
   if (waiting !== null) return waitingLine(waiting);
   if (stationSecondAt(station) !== null) return 'the bench, second place';
   if (stationPlaceAt(station) !== null) return 'alongside, on the next place';
@@ -1094,9 +1186,10 @@ function stationLabel(station: string): string {
   // waiting for anything (CLAUDE.md T20 2.8).
   if (station === STATION_CLEANING) return 'sweeping the floor';
   if (station === STATION_NO_BENCH) return 'no bench';
-  // In the canteen for the dinner hour: the words are the bubble's own, so the line under his name
-  // and the paper over his head say the same thing once (CLAUDE.md T21 2.6, 2.12).
-  if (station === STATION_LUNCH) return BUBBLES.atLunch.text;
+  // In the canteen for the dinner hour (CLAUDE.md T21 2.12). The words were the bubble table's
+  // until Turn 22 took the dinner hour off it: a man at his lunch has nothing wrong with him, so he
+  // has no mark, and the hour is said on the line under his name alone (CLAUDE.md T22 2.5).
+  if (station === STATION_LUNCH) return 'at lunch';
   return 'waiting';
 }
 
@@ -1205,26 +1298,30 @@ function rackCount(item: Equipment, sheets: number): string {
 }
 
 // ---------------------------------------------------------------------------
-// What the men say (PIOTR, 19.09; docs/mockups/t21/bubbles.html; CLAUDE.md T21 2.6). The words are
-// `src/engine/bubbles.ts`, the three seconds are `src/render/bubbles.ts`, and the paper is here.
+// What is wrong with a man (PIOTR, 19.09; docs/mockups/t22/bubbles-v2.png, the red column and the
+// column where the pointer is on him; CLAUDE.md T22 2.5). The words are `src/engine/bubbles.ts`;
+// the disc, its tail and the paper line that the stylesheet brings up under the pointer are here.
+// Nothing expires: a mark is up while the thing it is about is true, and down the minute it is
+// not.
 // ---------------------------------------------------------------------------
 
-/** The class the stylesheet dresses each tone in. A `work` bubble is the plain paper and takes no
- *  second class. */
-const TONE_CLASS: Record<BubbleTone, string> = {
-  wait: 'bubble-wait',
-  chore: 'bubble-chore',
-  work: '',
-  away: 'bubble-away',
-};
-
-/** The box the paper is hung in, in scene pixels [TUNE]. `line` is the paper's own height at
- *  `--fs-hand-small` with the padding and the border the stylesheet gives it (23 + 3 + 3 + 2 + 2),
- *  and `tail` is how far the ink triangle of `.bubble::before` hangs below the box it points from.
- *  `char` and `pad` are a generous guess at how wide the words come out in the title hand: the paper
- *  sizes itself to its own text inside the box, so a guess that is too wide costs nothing, and one
- *  that is too narrow cannot clip it either, because the box is drawn with `overflow="visible"`. */
+/** The box the paper of the one line is hung in, in scene pixels [TUNE, Turn 21's own figures].
+ *  `line` is the paper's own height at `--fs-hand-small` with the padding and the border the
+ *  stylesheet gives it (23 + 3 + 3 + 2 + 2), and `tail` is how far the ink triangle of
+ *  `.bubble::before` hangs below the box it points from. `char` and `pad` are a generous guess at
+ *  how wide the words come out in the title hand: the paper sizes itself to its own text inside the
+ *  box, so a guess that is too wide costs nothing, and one that is too narrow cannot clip it
+ *  either, because the box is drawn with `overflow="visible"`. */
 const BUBBLE_BOX = { line: 34, tail: 9, char: 12, pad: 26 };
+
+/** The mark itself, in scene pixels. `size` is the diameter of the disc [PIOTR's drawing says
+ *  fourteen]; `tail` and `tailHalf` are the ink triangle under it that points at the head, drawn
+ *  the paper bubble's own way, with a lighter triangle `border` pixels inside the ink one, which is
+ *  the 2 px border the paper itself wears [TUNE: read off docs/mockups/t22/bubbles-v2.png at 3x];
+ *  `glyphDrop` is how far below the centre of the disc the baseline of the exclamation sits at
+ *  `--fs-tiny` in the title hand [TUNE]; `step` is how far apart two marks over one cell stand, so
+ *  two men at one machine are never one mark on top of another [TUNE]. */
+const MARK = { size: 14, tail: 5, tailHalf: 4, border: 2, glyphDrop: 4, step: 7 };
 
 /** How far over his feet the top of a man drawn as the placeholder capsule is: the crown of the
  *  head, which is `capsuleBody`'s own two figures and not a third copy of them. A figure drawn from
@@ -1233,27 +1330,55 @@ export const CAPSULE_HEAD_TOP = -(
   Math.round((CAPSULE_PARTS.headCentre + CAPSULE_PARTS.headRadius) * CAPSULE_HEIGHT_M * TILE_RISE * 10) / 10
 );
 
-/** The bubble as it hangs over one figure: the point of its tail `BUBBLE_HEAD_GAP` pixels over the
- *  top of him, in the figure group's own local space, so the walker's transform carries it and the
- *  depth sort keeps it with him (CLAUDE.md T21 2.6). It is an HTML box in a `foreignObject`, which is
- *  how it wears the classes the stylesheet already has for it; it carries no `data-character`,
- *  because `dress` and `playCharacters` reach for that attribute and a bubble is not a man; and it
- *  catches no mouse, so the figure under it keeps the one line the player reads off him, which is
- *  the group's own `<title>` (CLAUDE.md T11 3.12). */
-export function bubbleArt(bubble: Bubble, headTop: number): string {
+/** A triangle pointing down at the head: the base across the centre of the disc, which the disc
+ *  itself covers, and the point `drop` below it. The paper bubble's tail is built of these two
+ *  (`.bubble::before` and `.bubble::after`) and the mark's is the same tail. */
+function markTail(centre: number, half: number, drop: number): string {
+  return `M${round(-half)} ${round(centre)} L${round(half)} ${round(centre)} L0 ${round(centre + drop)} Z`;
+}
+
+/** The mark as it hangs over one figure: a 14 px disc with an exclamation in it, the point of its
+ *  tail `BUBBLE_HEAD_GAP` pixels over the top of him, in the figure group's own local space, so the
+ *  walker's transform carries it and the depth sort keeps it with him (docs/mockups/t22/bubbles-v2.png;
+ *  CLAUDE.md T22 2.5). `shift` steps a mark aside where another man on the same cell already has
+ *  one.
+ *
+ *  The words are in the DOM beside the disc, in a `foreignObject` so that they wear the paper the
+ *  stylesheet already has, and the stylesheet brings them up while the pointer is anywhere on the
+ *  figure group: no JavaScript at all, so they come up at x1 and at x30 alike and survive every
+ *  rewrite of the page. The disc takes the mouse, because the player has to be able to point at
+ *  it; the paper
+ *  takes none, so it cannot eat a click meant for the hall under it. The group carries no
+ *  `data-character`, because `dress` and `playCharacters` reach for that attribute and a mark is
+ *  not a man. */
+export function markArt(bubble: Bubble, headTop: number, shift = 0): string {
+  const radius = MARK.size / 2;
+  const point = Math.round(headTop - BUBBLE_HEAD_GAP);
+  const centre = point - MARK.tail - radius;
   const height = BUBBLE_BOX.line + BUBBLE_BOX.tail;
   const width = bubble.text.length * BUBBLE_BOX.char + BUBBLE_BOX.pad;
-  const tone = TONE_CLASS[bubble.tone];
   return (
-    `<foreignObject class="bubble-box" data-bubble="${escapeText(bubble.key)}" ` +
-    `data-bubble-for="${escapeText(bubble.who)}" data-tone="${bubble.tone}" ` +
-    `x="${Math.round(-width / 2)}" y="${Math.round(headTop - BUBBLE_HEAD_GAP - height)}" ` +
-    `width="${width}" height="${height}" overflow="visible" pointer-events="none">` +
-    // The holder is laid out and not painted: it centres the paper over the head and leaves the
+    `<g class="mark" data-bubble="${escapeText(bubble.key)}" ` +
+    `data-bubble-for="${escapeText(bubble.who)}"` +
+    `${shift === 0 ? '' : ` transform="translate(${shift},0)"`}>` +
+    `<path class="mark-tail" d="${markTail(centre, MARK.tailHalf, MARK.tail + radius)}" />` +
+    `<path class="mark-tail-in" d="${markTail(
+      centre,
+      MARK.tailHalf - MARK.border,
+      MARK.tail + radius - MARK.border,
+    )}" />` +
+    `<circle class="mark-disc" cx="0" cy="${round(centre)}" r="${radius}" />` +
+    `<text class="mark-glyph" x="0" y="${round(centre + MARK.glyphDrop)}" ` +
+    'text-anchor="middle">!</text>' +
+    `<foreignObject class="mark-line" x="${Math.round(-width / 2)}" ` +
+    `y="${Math.round(centre - radius - height)}" width="${width}" height="${height}" ` +
+    'overflow="visible" pointer-events="none">' +
+    // The holder is laid out and not painted: it centres the paper over the disc and leaves the
     // tail's own nine pixels under it. Nothing of the look is here; that is the stylesheet's.
     '<div xmlns="http://www.w3.org/1999/xhtml" class="bubble-holder">' +
-    `<div class="bubble${tone === '' ? '' : ` ${tone}`}">${escapeText(bubble.text)}</div>` +
-    '</div></foreignObject>'
+    `<div class="bubble">${escapeText(bubble.text)}</div>` +
+    '</div></foreignObject>' +
+    '</g>'
   );
 }
 
@@ -1271,6 +1396,7 @@ function figure(
   art: { role: string; station: string; options: CharacterOptions } | null = null,
   loop = '',
   bubble: Bubble | null = null,
+  markShift = 0,
 ): Drawable {
   const feet = centreOf(tile.x, tile.y, 1, 1);
   const fill = isOwner ? 'var(--owner)' : 'var(--worker)';
@@ -1281,7 +1407,7 @@ function figure(
     art === null ? null : characterArt(art.role, rest, tile.facing, art.options);
   const body = drawn ?? capsuleBody(fill);
   // Over the top of whichever man was drawn: the sheet's own cell for a delivered figure and the
-  // capsule's crown for the placeholder (CLAUDE.md T21 2.6).
+  // capsule's crown for the placeholder (CLAUDE.md T22 2.5).
   const headTop =
     (art === null ? null : characterTop(art.role, rest, art.options)) ?? CAPSULE_HEAD_TOP;
   return {
@@ -1296,7 +1422,7 @@ function figure(
       body +
       '<text x="0" y="14" text-anchor="middle" ' +
       `class="iso-label figure-label">${escapeText(name.split(',')[0] ?? name)}</text>` +
-      (bubble === null ? '' : bubbleArt(bubble, headTop)) +
+      (bubble === null ? '' : markArt(bubble, headTop, markShift)) +
       '</g>',
   };
 }
@@ -1412,8 +1538,8 @@ export interface Ghost {
   depth: number;
   ok: boolean;
   reason: string;
-  /** True while the next drop will stand it at ninety degrees to the walls (T10 3.8). */
-  rotated?: boolean;
+  /** Which way the next drop will stand it (T10 3.8; CLAUDE.md T22 2.11). */
+  orientation?: Orientation;
 }
 
 /** A view that is expensive to build. The shell carries the pictures, which are megabytes: a
@@ -1449,10 +1575,6 @@ export interface HallOptions {
   /** The character sheets, for the same reason: a figure is his sheet where there is one and the
    *  capsule where there is not (CLAUDE.md T9 3.13). */
   characters?: CharacterOptions['sheets'];
-  /** Real milliseconds, for the three seconds a paper bubble stays up (CLAUDE.md T21 2.6). A
-   *  parameter so a test can hold the clock still; the game leaves it out and the render layer reads
-   *  the real one, which is why no caller had to change. */
-  nowMs?: number;
 }
 
 export function hallScene(state: GameState, options: HallOptions = {}): Scene {
@@ -1619,7 +1741,7 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
           files,
           spriteKey: item.spriteKey,
           tier: item.variantId,
-          rotated: item.rotated,
+          orientation: item.orientation,
           x: stands.x,
           y: stands.y,
           width: stands.width,
@@ -1713,29 +1835,22 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
   const onTheMachineLoop = (taskId: string | null): string =>
     machineUnload !== undefined && taskId === machineUnload.id ? machineLoopEnds() : '';
 
-  // What each man has to say this minute (PIOTR, 19.09; CLAUDE.md T21 2.6). The words are the
-  // engine's, the three seconds of a paper bubble are real seconds, and the clock is the render
-  // layer's own, the way the house card and the sprite frames read theirs.
-  const nowMs = options.nowMs ?? bubbleNowMs();
+  // What is wrong with each man this minute (PIOTR, 19.09; CLAUDE.md T22 2.5). The engine says
+  // which men have a mark over them and what the words under the pointer are; every mark is drawn at
+  // every speed, because nothing about it expires and nothing flickers.
   const said = new Map<string, Bubble>();
   for (const one of bubblesFor(state)) said.set(one.who, one);
-  // Every bubble is recorded as it is read, so the three seconds start when the words change and
-  // not when they are first drawn; the paper ones are the only ones that come down, and above x4
-  // they are not drawn at all, where they would flicker faster than they could be read.
-  const bubbleOf = (who: string): Bubble | null => {
-    const one = said.get(who) ?? null;
-    if (one === null) return null;
-    const fresh = bubbleIsFresh(one, nowMs);
-    if (one.tone !== 'work') return one;
-    if (state.speed > BUBBLE_WORK_MAX_SPEED) return null;
-    return fresh ? one : null;
-  };
-  // A man who is off the hall says it at the door he went through and not at his station, because
-  // his station is inside a room nothing draws him in (CLAUDE.md T21 2.6, 2.11, 2.12).
-  const behindDoors: Array<{ room: RoomId; bubble: Bubble }> = [];
-  const atTheDoor = (one: Bubble | null, station: string): void => {
-    const room = one === null || one.tone !== 'away' ? null : roomBehindStation(station);
-    if (room !== null) behindDoors.push({ room, bubble: one as Bubble });
+  const bubbleOf = (who: string): Bubble | null => said.get(who) ?? null;
+  // Two men at one machine stand on the one cell, so their marks would be drawn on top of each
+  // other: the second mark over a cell steps `MARK.step` aside and the third one twice as far
+  // [TUNE] (CLAUDE.md T22 2.5). The first keeps his place over the head, which is where the
+  // drawing has a single mark.
+  const marksOnCell = new Map<string, number>();
+  const markShiftAt = (cell: { x: number; y: number }): number => {
+    const key = `${cell.x},${cell.y}`;
+    const before = marksOnCell.get(key) ?? 0;
+    marksOnCell.set(key, before + 1);
+    return before * MARK.step;
   };
 
   // The crew, and the owner, each at the station the engine put him on.
@@ -1754,11 +1869,9 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
     // He has gone through a door and is in the room behind it: off the hall's drawing until he
     // comes out again (PIOTR, 18.09; CLAUDE.md T20 2.12). From Turn 21 that is every man and not the
     // owner alone: a desk job is behind the office door and the dinner hour is behind the canteen's
-    // (CLAUDE.md T21 2.11, 2.12). His bubble stays at the door.
-    if (figureIsThroughADoor(`worker-${worker.id}`, cell, station)) {
-      atTheDoor(bubble, station);
-      continue;
-    }
+    // (CLAUDE.md T21 2.11, 2.12). Nothing is drawn at the door after him: a man in a room has
+    // nothing wrong with him, so he has no mark at all (CLAUDE.md T22 2.5).
+    if (figureIsThroughADoor(`worker-${worker.id}`, cell, station)) continue;
     drawables.push(
       figure(
         `worker-${worker.id}`,
@@ -1771,6 +1884,7 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
         { role: worker.role, station, options: characterOptions },
         onTheMachineLoop(worker.taskId) || onTheLoop(station),
         bubble,
+        bubble === null ? 0 : markShiftAt(cell),
       ),
     );
   }
@@ -1779,50 +1893,22 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
   const ownerBubble = ownerIsAvailable(state) ? bubbleOf(OWNER) : null;
   // The owner in the office is not on the hall at all: he went through the door, and the office
   // view draws him at his desk (PIOTR, 18.09; CLAUDE.md T20 2.12, T19 2.2).
-  if (ownerIsAvailable(state)) {
-    if (figureIsThroughADoor('owner', ownerCell, ownerStation)) {
-      atTheDoor(ownerBubble, ownerStation);
-    } else {
-      drawables.push(
-        figure(
-          'owner',
-          ownerCell,
-          `${state.playerName}, ${stationLabel(ownerStation)}`,
-          true,
-          'data-owner="1"',
-          // The owner is his sheet where the art side has delivered one (character.owner.*, the
-          // boss pack of 14.09), and the capsule where it has not, like every worker.
-          { role: 'owner', station: ownerStation, options: characterOptions },
-          onTheMachineLoop(state.owner.currentTaskId) || onTheLoop(ownerStation),
-          ownerBubble,
-        ),
-      );
-    }
-  }
-
-  // The bubbles of the men who are behind a door, at the door they went through: one a thing being
-  // said, so three men in the office all saying "in the office" are one bubble and two different
-  // things said stack up the wall a box at a time [TUNE: the dedupe and the stack]. The words
-  // themselves say nothing about how many men are behind the door, which is the drawing's own table
-  // (docs/mockups/t21/bubbles.html; CLAUDE.md T21 2.6).
-  const saidAtADoor = new Set<string>();
-  const stacked = new Map<RoomId, number>();
-  for (const at of behindDoors) {
-    const once = `${at.room}|${at.bubble.text}`;
-    if (saidAtADoor.has(once)) continue;
-    saidAtADoor.add(once);
-    const lift = stacked.get(at.room) ?? 0;
-    stacked.set(at.room, lift + 1);
-    const door = roomDoorCell(at.room);
-    const feet = centreOf(door.x, door.y, 1, 1);
-    drawables.push({
-      depth: depthKey(door.x, door.y) + FIGURE_DEPTH_OFFSET,
-      svg:
-        `<g class="figure-away" data-away-door="${at.room}" ` +
-        `transform="translate(${Math.round(feet.x)},${Math.round(feet.y)})">` +
-        bubbleArt(at.bubble, CAPSULE_HEAD_TOP - lift * (BUBBLE_BOX.line + BUBBLE_BOX.tail)) +
-        '</g>',
-    });
+  if (ownerIsAvailable(state) && !figureIsThroughADoor('owner', ownerCell, ownerStation)) {
+    drawables.push(
+      figure(
+        'owner',
+        ownerCell,
+        `${state.playerName}, ${stationLabel(ownerStation)}`,
+        true,
+        'data-owner="1"',
+        // The owner is his sheet where the art side has delivered one (character.owner.*, the
+        // boss pack of 14.09), and the capsule where it has not, like every worker.
+        { role: 'owner', station: ownerStation, options: characterOptions },
+        onTheMachineLoop(state.owner.currentTaskId) || onTheLoop(ownerStation),
+        ownerBubble,
+        ownerBubble === null ? 0 : markShiftAt(ownerCell),
+      ),
+    );
   }
 
   // A pallet of sheets at the gate while a delivery is waiting to be unloaded: the material
@@ -1925,7 +2011,11 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
         `y="${Math.round(centreOf(ghost.x, ghost.y, ghost.width, ghost.depth).y)}" ` +
         `text-anchor="middle" class="iso-label ghost-label" fill="${colour}">` +
         `${escapeText(
-          ghost.ok ? (ghost.rotated === true ? 'Drop it here, turned' : 'Drop it here') : ghost.reason,
+          ghost.ok
+            ? ghost.orientation !== undefined && ghost.orientation !== 0
+              ? 'Drop it here, turned'
+              : 'Drop it here'
+            : ghost.reason,
         )}</text></g>`,
     );
   }

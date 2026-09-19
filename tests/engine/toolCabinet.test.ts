@@ -18,11 +18,20 @@ import {
   TOOL_CABINET,
   UNIT_WIDTH_CELLS,
 } from '../../src/engine/constants';
-import { findSpec, itemFootprint, itemZone, zoneOf } from '../../src/engine/machines';
+import { findSpec, footprintOf, itemFootprint, itemZone, zoneOf } from '../../src/engine/machines';
 import { canBuy } from '../../src/engine/game';
 import { canPlace, canPlaceSpec, crewLimit, freeFloorM2, hallItems } from '../../src/engine/layout';
 import { standsInTheHall } from '../../src/engine/machines';
-import { cabinetsNeeded, canHire, missingForHire } from '../../src/engine/staff';
+import {
+  canHire,
+  freeToolSlots,
+  missingForHire,
+  slotsInUseIn,
+  toolSlots,
+  toolSlotsNeeded,
+} from '../../src/engine/staff';
+import { toolSlotsLine, toolSlotsOf } from '../../src/engine/machines';
+import { TOOL_CABINET_SLOTS, TOOL_CABINET_VARIANTS } from '../../src/engine/constants';
 import { needsDucting } from '../../src/engine/machines';
 import { renderHall } from '../../src/render/hall';
 import { standingCell, stationRow } from '../../src/engine/stations';
@@ -55,24 +64,70 @@ function overlap(
   );
 }
 
-describe('the tool cabinet in the catalogue', () => {
-  it('stands two metres wide, 350, and one is wanted per worker', () => {
+describe('the tool cabinet is a family of five (CLAUDE.md T22 2.12)', () => {
+  it('holds one, one, two, four and eight men\u0027s tools, at doubling prices', () => {
     const spec = findSpec(TOOL_CABINET);
     expect(spec).not.toBeNull();
-    expect(spec?.price).toBe(350);
-    // Two metres from Turn 21, because that is what the art side painted: drawers, doors and a
-    // bench top, which is a two metre unit and not a metre square one. The picture is the fact and
-    // the spec followed it (PIOTR's art, 19.09; CLAUDE.md T21 2.13).
-    expect({ width: spec?.width, depth: spec?.depth, height: spec?.height }).toEqual({
-      width: 2,
-      depth: 1,
-      height: 1,
-    });
-    // Its working zone is its own footprint and not the brief's 3 by 2: see the comment beside the
-    // spec in `src/engine/constants.ts` for the arithmetic that rules that out.
-    expect(zoneOf(TOOL_CABINET)).toEqual({ width: 2, depth: 1 });
-    expect(spec?.perWorker).toBe(true);
+    expect(spec?.variants.map((variant) => variant.id)).toEqual([
+      'used',
+      'budget',
+      'standard',
+      'pro',
+      'industrial',
+    ]);
+    // What a class is for is how many men's hand tools it holds [PIOTR, 19.09: "weak 1, middle 1,
+    // then doubling: 2, 4, 8"], and the prices double up the ladder from the standard's 350, which
+    // is the one price the family had before tonight.
+    expect(TOOL_CABINET_SLOTS).toEqual({ used: 1, budget: 1, standard: 2, pro: 4, industrial: 8 });
+    expect(TOOL_CABINET_VARIANTS.map((variant) => variant.price)).toEqual([90, 175, 350, 700, 1400]);
+    // The catalogue line carries the cheapest way into the family, as every family's does.
+    expect(spec?.price).toBe(90);
+    // The footprints and the heights are the pictures' (the pack's README of 19.09), and every
+    // class reserves exactly what it stands on.
+    const shapes = ['used', 'budget', 'standard', 'pro', 'industrial'].map((variantId) => ({
+      ...footprintOf(TOOL_CABINET, variantId),
+      ...zoneOf(TOOL_CABINET, variantId),
+    }));
+    expect(shapes).toEqual([
+      { width: 1, depth: 1, height: 1 },
+      { width: 1, depth: 1, height: 1 },
+      { width: 2, depth: 1, height: 1 },
+      { width: 2, depth: 1, height: 1.8 },
+      { width: 3, depth: 1, height: 2 },
+    ]);
+    // `perWorker` is gone from the cabinet: it is the free slots that are counted now, not the
+    // cabinets (CLAUDE.md T22 2.12).
+    expect(spec?.perWorker).toBe(false);
     expect(spec?.stackable).toBe(true);
+    // And the words the card prints, singular for the two that hold one.
+    expect(toolSlotsLine(TOOL_CABINET, 'used')).toBe('Holds 1 man\u0027s tools');
+    expect(toolSlotsLine(TOOL_CABINET, 'pro')).toBe('Holds 4 men\u0027s tools');
+    expect(toolSlotsLine('sheetRack', 'pro')).toBe('');
+  });
+
+  it('sums the slots of the hall, takes the owner\u0027s set off them, and fills in order', () => {
+    const state = newGame({ difficulty: 'veryEasy' });
+    expect(toolSlots(state)).toBe(0);
+    // Two used cabinets hold two sets between them. The owner's own set takes one of them, because
+    // his tools live in a cabinet like anybody's [PIOTR: "one for every worker and one for you"].
+    const first = placeEquipment(state, TOOL_CABINET, { variantId: 'used', x: 8, y: 3, id: 'cab-1' });
+    placeEquipment(state, TOOL_CABINET, { variantId: 'used', x: 10, y: 3, id: 'cab-2' });
+    expect(toolSlots(state)).toBe(2);
+    expect(freeToolSlots(state)).toBe(1);
+    placeEquipment(state, 'handToolSet', { x: 0, y: 0, id: 'set-1' });
+    expect(freeToolSlots(state)).toBe(0);
+    // The sets fill the cabinets in the order they were bought, so the card of each says how many
+    // of its own slots are taken [TUNE: Claude's rule, and the only one that needs no new field].
+    expect(slotsInUseIn(state, first)).toBe(1);
+    const second = state.equipment.find((item) => item.id === 'cab-2');
+    if (second === undefined) throw new Error('two cabinets were placed');
+    expect(slotsInUseIn(state, second)).toBe(1);
+    // An industrial one on its own holds the owner and seven men.
+    const alone = newGame({ difficulty: 'veryEasy' });
+    const store = placeEquipment(alone, TOOL_CABINET, { variantId: 'industrial', x: 8, y: 3 });
+    expect(toolSlotsOf(store)).toBe(8);
+    expect(freeToolSlots(alone)).toBe(7);
+    expect(slotsInUseIn(alone, store)).toBe(1);
   });
 });
 
@@ -85,8 +140,22 @@ describe('what cannot be bought without one', () => {
     expect(canBuy(state, 'handToolSet').reason).toBe('Needs Tool cabinet first');
     state = buyNow(state, TOOL_CABINET);
     expect(countOf(state, TOOL_CABINET)).toBe(1);
+    // A hand edgebander wants a cabinet and nothing more: it is one tool in a drawer.
     expect(canBuy(state, 'edgebander').ok).toBe(true);
-    expect(canBuy(state, 'handToolSet').ok).toBe(true);
+    // A man's hand tool set wants a free slot, and the one slot of the cheapest cabinet is the
+    // owner's own (CLAUDE.md T22 2.12). So one cabinet is not enough for a man's tools, which is
+    // the rule the hiring gate has counted since Turn 6, now counted in slots.
+    expect(freeToolSlots(state)).toBe(0);
+    expect(canBuy(state, 'handToolSet').ok).toBe(false);
+    expect(canBuy(state, 'handToolSet').reason).toBe('No free slot in a tool cabinet');
+    // A second slot, whichever way it is bought: another used cabinet, or one standard cabinet
+    // instead of the used one, which holds two on its own.
+    const twoUsed = buyNow(state, TOOL_CABINET, 'used');
+    expect(freeToolSlots(twoUsed)).toBe(1);
+    expect(canBuy(twoUsed, 'handToolSet').ok).toBe(true);
+    const standard = buyNow(newGame(), TOOL_CABINET, 'standard');
+    expect(freeToolSlots(standard)).toBe(1);
+    expect(canBuy(standard, 'handToolSet').ok).toBe(true);
   });
 
   it('leaves the buy undone, not half done, while the cabinet is missing', () => {
@@ -118,11 +187,60 @@ describe('the hand edgebander holds no cell of the floor', () => {
 });
 
 describe('hiring wants a free cabinet', () => {
-  it('counts one for the owner and one for every joiner, and one more for the hire', () => {
+  it('counts slots and not cabinets: one for the owner and one for every joiner', () => {
     const state = newGame();
-    expect(cabinetsNeeded(state)).toBe(1);
-    expect(cabinetsNeeded(state, 1)).toBe(2);
+    expect(toolSlotsNeeded(state)).toBe(1);
+    expect(toolSlotsNeeded(state, 1)).toBe(2);
     expect(JOINER_PREREQUISITES).toContain(TOOL_CABINET);
+  });
+
+  it('is short a slot and not a cabinet: two of one slot hold the owner and one man', () => {
+    // The brief's own scenario (CLAUDE.md T22 section 7), worked through. Section 7 reads "two used
+    // cabinets and one hand tool set: one free slot"; under 2.12's own sentence, "the owner's own
+    // set takes a slot too", it is **nought** free, and the two cabinets hold exactly the owner and
+    // the one man whose set was bought. The note in docs/notes-t22-b3.md has the arithmetic.
+    let state = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
+    // The day one kit buys the cheapest cabinet in the family, which holds one set: the owner's.
+    const cabinets = cabinetsOf(state);
+    expect(cabinets).toHaveLength(1);
+    expect(toolSlotsOf(cabinets[0] ?? { specId: '', variantId: '' })).toBe(1);
+    expect(toolSlots(state)).toBe(1);
+    expect(freeToolSlots(state)).toBe(0);
+    // With the owner's set in the one cabinet there is no slot for a man's, so the hire is short
+    // one, and one used cabinet at ninety pounds is the cheapest way to give him one.
+    expect(missingForHire(state, 'joiner')).toContain(TOOL_CABINET);
+    for (const specId of ['locker', 'canteenSeat']) state = buyNow(state, specId);
+    // His set cannot even be bought yet: there is nowhere to keep it, which is the other half of
+    // 2.12's free slot rule and is `canBuy`'s own refusal.
+    expect(canBuy(state, 'handToolSet').reason).toBe('No free slot in a tool cabinet');
+    expect(canHire(state, 'joiner', 'novice').ok).toBe(false);
+    expect(canHire(state, 'joiner', 'novice').reason).toContain('Tool cabinet');
+    state = buyNow(state, TOOL_CABINET, 'used');
+    // The second cabinet gives the slot, and the set goes into it.
+    expect(freeToolSlots(state)).toBe(1);
+    state = buyNow(state, 'handToolSet');
+    // Two cabinets of one slot each and one set bought: the owner's set and the man's fill them
+    // both, the hire goes through, and there is nothing spare for the next man.
+    expect(toolSlots(state)).toBe(2);
+    expect(freeToolSlots(state)).toBe(0);
+    expect(missingForHire(state, 'joiner')).toEqual([]);
+    expect(canHire(state, 'joiner', 'novice').ok).toBe(true);
+    const hired = hireNow(state, 'joiner', 'novice');
+    expect(missingForHire(hired, 'joiner')).toContain(TOOL_CABINET);
+    // One cabinet of eight slots does instead of eight of one: the ladder is the lever, and the
+    // class is the only thing that gives a hall room for a crew (CLAUDE.md T22 2.12).
+    const bigger = buyNow(hired, TOOL_CABINET, 'industrial');
+    expect(toolSlots(bigger)).toBe(10);
+    expect(freeToolSlots(bigger)).toBe(8);
+    // The cabinet is off the shortfall for good: the next man wants his own bench, locker, seat
+    // and tool set, and a slot to keep the set in, and the slots are there for seven more of him.
+    expect(missingForHire(bigger, 'joiner')).not.toContain(TOOL_CABINET);
+    expect(missingForHire(bigger, 'joiner')).toEqual([
+      'workbench',
+      'locker',
+      'canteenSeat',
+      'handToolSet',
+    ]);
   });
 
   it('blocks the hire while there is no cabinet free, and lets it through when there is', () => {
@@ -130,13 +248,16 @@ describe('hiring wants a free cabinet', () => {
     // The day 1 kit buys one, which is the owner's: the joiner has none.
     expect(countOf(state, TOOL_CABINET)).toBe(1);
     expect(missingForHire(state, 'joiner')).toContain(TOOL_CABINET);
-    for (const specId of ['locker', 'canteenSeat', 'handToolSet']) {
+    for (const specId of ['locker', 'canteenSeat']) {
       state = buyNow(state, specId);
     }
     expect(canHire(state, 'joiner', 'novice').ok).toBe(false);
     expect(canHire(state, 'joiner', 'novice').reason).toContain('Tool cabinet');
+    // The cabinet before the set, because the set wants the slot the cabinet brings
+    // (CLAUDE.md T22 2.12).
     state = buyNow(state, TOOL_CABINET);
     expect(countOf(state, TOOL_CABINET)).toBe(2);
+    state = buyNow(state, 'handToolSet');
     expect(missingForHire(state, 'joiner')).toEqual([]);
     expect(canHire(state, 'joiner', 'novice').ok).toBe(true);
     state = hireNow(state, 'joiner', 'novice');
@@ -162,13 +283,30 @@ describe('hiring wants a free cabinet', () => {
   });
 });
 
-describe('two metres wide, placed and stood at as any other 2 by 1 (CLAUDE.md T21 2.13)', () => {
-  it('is 1 by 2 turned, which is what a rotated 2 by 1 is anywhere', () => {
-    const cabinet = cabinetsOf(hall())[0];
-    if (cabinet === undefined) throw new Error('the day one kit has a cabinet in it');
+describe('placed and stood at as any other 2 by 1 (CLAUDE.md T21 2.13, T22 2.12)', () => {
+  /** A standard cabinet on the first slot of the row: the two metre class, which is the one Turn 21
+   *  measured and the one every save's cabinet is (CLAUDE.md T22 2.12). The day one kit buys the
+   *  cheapest class instead, which is a metre square, so the tests that are about two metres say
+   *  which class they mean. */
+  function standard(state: GameState): Equipment {
+    const slot = CABINET_SLOT_LAYOUT[0];
+    if (slot === undefined) throw new Error('a slot is wanted');
+    for (const item of cabinetsOf(state)) state.equipment.splice(state.equipment.indexOf(item), 1);
+    return placeEquipment(state, TOOL_CABINET, {
+      variantId: 'standard',
+      x: slot.x,
+      y: slot.y,
+      id: 'kit-cab-standard',
+    });
+  }
+
+  it('is 1 by 2 at a quarter turn, which is what a turned 2 by 1 is anywhere', () => {
+    const cabinet = standard(hall());
     expect(itemFootprint(cabinet)).toEqual({ width: 2, depth: 1, height: 1 });
     expect(itemZone(cabinet)).toEqual({ width: 2, depth: 1 });
-    expect(itemFootprint({ ...cabinet, rotated: true })).toEqual({ width: 1, depth: 2, height: 1 });
+    expect(itemFootprint({ ...cabinet, orientation: 1 })).toEqual({ width: 1, depth: 2, height: 1 });
+    // The cheapest class is a metre square and is the same thing turned (CLAUDE.md T22 2.12).
+    expect(footprintOf(TOOL_CABINET, 'used', 1)).toEqual(footprintOf(TOOL_CABINET, 'used', 0));
   });
 
   it('is placed and refused as any other 2 by 1, with no rule of its own', () => {
@@ -178,21 +316,24 @@ describe('two metres wide, placed and stood at as any other 2 by 1 (CLAUDE.md T2
     const first = CABINET_SLOT_LAYOUT[0];
     const second = CABINET_SLOT_LAYOUT[1];
     if (first === undefined || second === undefined) throw new Error('two slots are wanted');
-    const standing = cabinetsOf(state)[0];
-    if (standing === undefined) throw new Error('the day one kit has a cabinet in it');
+    const standing = standard(state);
     expect([standing.anchorX, standing.anchorY]).toEqual([first.x, first.y]);
     // Its own two cells are taken: one cell along is refused and names what is in the way.
-    const clash = canPlaceSpec(state, TOOL_CABINET, first.x + 1, first.y, null);
+    const clash = canPlaceSpec(state, TOOL_CABINET, first.x + 1, first.y, null, 'standard');
     expect(clash.ok).toBe(false);
     expect(clash.reason).toBe('On the tool cabinet');
+    // A metre square class fits in the gap the two metre one leaves, which is the ladder doing
+    // what a ladder does (CLAUDE.md T22 2.12).
+    expect(canPlaceSpec(state, TOOL_CABINET, first.x + 2, first.y, null, 'used').ok).toBe(true);
     // Two cells along is the next slot of the row and is free.
-    expect(canPlaceSpec(state, TOOL_CABINET, second.x, second.y, null).ok).toBe(true);
+    expect(canPlaceSpec(state, TOOL_CABINET, second.x, second.y, null, 'standard').ok).toBe(true);
     // And the last slot ends inside the hall: 18 and 19 of a hall 20 cells wide.
     const last = CABINET_SLOT_LAYOUT[CABINET_SLOT_LAYOUT.length - 1];
     if (last === undefined) throw new Error('a last slot is wanted');
     expect(last.x + (findSpec(TOOL_CABINET)?.width ?? 0)).toBe(UNIT_WIDTH_CELLS);
-    expect(canPlaceSpec(state, TOOL_CABINET, UNIT_WIDTH_CELLS - 1, last.y, null).reason).toBe(
-      'Off the floor',
+    expect(
+      canPlaceSpec(state, TOOL_CABINET, UNIT_WIDTH_CELLS - 1, last.y, null, 'standard').reason,
+    ).toBe('Off the floor',
     );
   });
 
@@ -240,8 +381,7 @@ describe('two metres wide, placed and stood at as any other 2 by 1 (CLAUDE.md T2
     // the whole cells the footprint covers: a 2 by 1 wants no table change. Asserted, not assumed.
     expect(stationRow(TOOL_CABINET)).toEqual(stationRow('somethingWithNoRowOfItsOwn'));
     const state = hall();
-    const cabinet = cabinetsOf(state)[0];
-    if (cabinet === undefined) throw new Error('the day one kit has a cabinet in it');
+    const cabinet = standard(state);
     const cells = footprintCells(cabinet);
     expect(cells.width).toBe(2);
     // The default row's waiting cell is a cell further out than the operator's, because the second
@@ -295,8 +435,13 @@ describe('the zone 3 by 2 the brief tags [TUNE] (CLAUDE.md T21 2.13)', () => {
     const before = freeFloorM2(state);
     const slot = CABINET_SLOT_LAYOUT[1];
     if (slot === undefined) throw new Error('a slot is wanted');
-    placeEquipment(state, TOOL_CABINET, { x: slot.x, y: slot.y, id: 'kit-cab-2' });
-    // A cabinet takes its own two cells today, and it would take six with the wider zone.
+    placeEquipment(state, TOOL_CABINET, {
+      variantId: 'standard',
+      x: slot.x,
+      y: slot.y,
+      id: 'kit-cab-2',
+    });
+    // A standard cabinet takes its own two cells today, and it would take six with the wider zone.
     expect(before - freeFloorM2(state)).toBe(2);
     const extra = 3 * 2 - 2 * 1;
     expect(extra).toBe(4);

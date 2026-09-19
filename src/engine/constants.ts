@@ -5,7 +5,6 @@
 
 import type {
   BubbleKey,
-  BubbleTone,
   DayCategory,
   Difficulty,
   EquipmentSpec,
@@ -90,12 +89,18 @@ import type {
  *  calendar days in a row the cash has been under the overdraft limit, thirty of which close the
  *  company; the owner's day counts the minutes he stood as well as the ones he worked, and why; and
  *  a tool cabinet is two metres wide, so a saved hall's cabinets are laid out again
- *  (CLAUDE.md T21 section 4). Every v29 save loads. */
-export const STATE_VERSION = 18;
+ *  (CLAUDE.md T21 section 4).
+ *
+ *  Version 19 is Turn 22: the unpaid balance a v18 save carried beside its cash is gone from the
+ *  game, so it is subtracted from the cash and one ledger line says so; the turn a placed item and a
+ *  reservation carried as a boolean becomes an `orientation`, its true reading as a quarter turn;
+ *  and a tool cabinet with no class is the standard one, because the cabinet is a family of five now
+ *  (CLAUDE.md T22 section 4). Every v30 and v31 save loads. */
+export const STATE_VERSION = 19;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
-export const APP_VERSION = 'v31';
+export const APP_VERSION = 'v32';
 
 // ---------------------------------------------------------------------------
 // The owner's day, in the seven things it is made of
@@ -339,8 +344,7 @@ export const PELLET_INCOME_MONTHLY_BASE = 600;
 /** [TUNE] extra pellet income per 1000 minutes of production in the month. */
 export const PELLET_INCOME_PER_1000_PRODUCTION_MINUTES = 40;
 
-/** Working days in a month of 30 calendar days, for the fixed cost figure the arrears interest
- *  threshold is measured against [TUNE]. */
+/** Working days in a month of 30 calendar days, for the month's fixed cost figure [TUNE]. */
 export const WORKING_DAYS_PER_MONTH = (DAYS_PER_MONTH * WORKING_DAYS_PER_WEEK) / DAYS_PER_WEEK;
 
 /** Hours a man is paid for in one of the game's months: his forty hour week over thirty days of a
@@ -419,7 +423,7 @@ export const DIFFICULTIES: DifficultySpec[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// 8.3 Debt, arrears, bailiff, bankruptcy
+// 8.3 Debt, the overdraft, the loan, bankruptcy
 // ---------------------------------------------------------------------------
 
 /** The overdraft costs what it costs: a yearly rate on the negative balance, accrued day by day
@@ -433,27 +437,16 @@ export const LOAN_MAX = 50000;
 export const LOAN_RATE_YEARLY = 0.15;
 export const LOAN_MONTHS = 60;
 export const LOAN_EARLY_REPAYMENT_PENALTY = 0;
-/** 1% per month on the arrears balance while the arrears are large (PIOTR). */
-export const ARREARS_MONTHLY_INTEREST = 0.01;
-/** [TUNE] "large arrears" means more than this many months of fixed costs. */
-export const ARREARS_INTEREST_THRESHOLD_MONTHS = 1;
-/** The bank closes a company that cannot pay: not when the cash alone passes a multiple of the
- *  overdraft, which is what Turn 13 read, but when the **net position** does, cash plus what the
- *  company owes in arrears, against this multiple of the limit [PIOTR, 18.09: the 1.5]. On very
- *  easy and easy that is -15,000 and on hard -7,500. Piotr dropped a 50,000 job with 7,000 in the
- *  bank, the deposit went to arrears, the top bar said -7,259 and the game played on: "you cannot
- *  pay your debts, you are bankrupt, and the game should end" (CLAUDE.md T21 2.2). */
+/** The bank closes a company whose cash has passed this multiple of its overdraft limit
+ *  [PIOTR, 18.09: the 1.5]. On very easy and easy that is -15,000 and on hard -7,500. From Turn 22
+ *  the cash is the whole of the company's position, because every bill is paid out of the account,
+ *  the limit included (CLAUDE.md T21 2.2, T22 2.1, 2.2). */
 export const BANKRUPTCY_LIMIT_FACTOR = 1.5;
 
 /** The other way the bank closes you: this many calendar days in a row with the cash below the
  *  overdraft limit, whatever the amount [PIOTR, 18.09: "thirty days below the limit"]. A day above
  *  the limit puts the count back to nought (CLAUDE.md T21 2.2). */
 export const BANKRUPTCY_DAYS_BELOW_LIMIT = 30;
-export const ARREARS_MONTHS_WARNING = 1;
-export const ARREARS_MONTHS_FINAL_WARNING = 2;
-export const ARREARS_MONTHS_BAILIFF = 3;
-/** The bailiff credits the seized machine at half its purchase price (PIOTR). */
-export const BAILIFF_SEIZURE_FRACTION = 0.5;
 
 /** What a machine standing in the hall fetches second hand: half what it cost (PIOTR), and a
  *  third and a bit for one that was second hand when it was bought [TUNE]
@@ -784,18 +777,6 @@ export const LAPTOP_BOOT_MINUTES = 5;
  *  machine disconnects it and refunds nothing; reconnecting charges the new length. This is the
  *  reconnection the Turn 4 flat ducting charge was, and it replaces it (CLAUDE.md T13 3.19). */
 export const PIPE_PRICE_PER_METRE = 45;
-/** The eight tiles a pipe run is drawn from (CLAUDE.md T13 3.19). */
-export const PIPE_TILE_KEYS = [
-  'pipe.ns',
-  'pipe.ew',
-  'pipe.ne',
-  'pipe.nw',
-  'pipe.se',
-  'pipe.sw',
-  'pipe.tee',
-  'pipe.drop',
-  'pipe.inlet',
-] as const;
 /** An automatic blast gate on a machine's drop: fitted for this much (PIOTR: 800 the kit, 1,000
  *  fitted), worth this much output on that machine (PIOTR), and the hall's extraction demand
  *  counts a gated machine only while it is actually running (CLAUDE.md T13 3.11). */
@@ -1176,6 +1157,10 @@ export const CLASS_BADGE: Record<string, { label: string; colour: string }> = {
  *  have more. */
 export const CLASS_LADDER_FAMILIES: readonly string[] = [
   'tableSaw',
+  // The tool cabinet is a family of five from Turn 22, so its cards wear the class badge and the
+  // class frame like every other ladder (CLAUDE.md T22 2.12: "the class ladder words are the
+  // machines'").
+  'toolCabinet',
   'edgebander',
   'thicknesser',
   'solidWoodTools',
@@ -1287,6 +1272,11 @@ export const TABLE_SAW_VARIANTS: EquipmentVariant[] = [
 /** The tool cabinet a hand tool is kept in. The exported name for it is in 9.3 with the hiring
  *  rules; the classes above are declared before that, so the id is named here once. */
 const TOOL_CABINET_ID = 'toolCabinet';
+
+/** The set of hand tools one man works with. It is bought like anything else, it lives in a slot of
+ *  a tool cabinet, and the owner has one of his own that was never bought (CLAUDE.md T6 3.5,
+ *  T22 2.12). */
+export const HAND_TOOL_SET = 'handToolSet';
 
 /** The endurance ladder every family with five classes uses: a worn out one has a quarter of the
  *  hours in it and an industrial one twice them (CLAUDE.md T7 3.6, as the saw's). */
@@ -1476,6 +1466,120 @@ export const SHEET_RACK_VARIANTS: EquipmentVariant[] = [
     description:
       'Four metres of bolted steel rated for a full pack of board. A hundred and sixty sheets ' +
       'means buying by the pack, which is where the material price actually falls.',
+  },
+];
+
+/** How many men's hand tool sets each class of tool cabinet holds
+ *  [PIOTR, 19.09: "weak 1, middle 1, then doubling: 2, 4, 8"]. This number is what a class of
+ *  cabinet is *for*: the hiring gate and the hand tool set count the free slots of the hall, which
+ *  is the sum of these less the sets already bought (CLAUDE.md T22 2.12). */
+export const TOOL_CABINET_SLOTS: Record<string, number> = {
+  used: 1,
+  budget: 1,
+  standard: 2,
+  pro: 4,
+  industrial: 8,
+};
+
+/** The five classes of tool cabinet (PIOTR, 19.09; CLAUDE.md T22 2.12).
+ *
+ *  The footprints and the heights are the pictures': the art side drew the five on 19.09, each in
+ *  four true quarter turns, and the picture is the fact (the pack's README;
+ *  docs/art/REQUESTS-T22.md 1). Used and budget are a metre square at 112 by 112, the standard two
+ *  metres at 160 by 136, the pro two metres and 1.8 high at 160 by 175, the industrial three metres
+ *  and 2 high at 208 by 208. Every class states its own working zone, which is its own footprint:
+ *  the family's is the standard's two metres and a 1 by 1 cabinet must not reserve it (the
+ *  arithmetic against a wider zone is in the comment beside the spec).
+ *
+ *  The prices double up the ladder from the standard's 350, which is the one price the family had
+ *  before tonight [TUNE; PIOTR: "doubling"]. The power a day is the sheet rack's 1, which is what
+ *  every class of storage in the catalogue carries: nothing reads it, because only a machine and
+ *  the extraction draw power (`poweredMachines`), and every class in the game states a figure
+ *  above nought (`tests/engine/variants.test.ts`). */
+export const TOOL_CABINET_VARIANTS: EquipmentVariant[] = [
+  {
+    id: 'used',
+    name: 'Used tool cabinet',
+    price: 90,
+    width: 1,
+    depth: 1,
+    height: 1,
+    zoneWidth: 1,
+    zoneDepth: 1,
+    outputFactor: 1,
+    enduranceFactor: ENDURANCE_BY_CLASS.used ?? 1,
+    powerPerDay: 1,
+    description:
+      'A second hand steel cabinet with two doors and a drawer that sticks. It holds one man\u0027s ' +
+      'hand tools and a hand bander on top of them, and it cost ninety pounds because somebody ' +
+      'wanted it out of their way.',
+  },
+  {
+    id: 'budget',
+    name: 'Tool cabinet',
+    price: 175,
+    width: 1,
+    depth: 1,
+    height: 1,
+    zoneWidth: 1,
+    zoneDepth: 1,
+    outputFactor: 1,
+    enduranceFactor: ENDURANCE_BY_CLASS.budget ?? 1,
+    powerPerDay: 1,
+    description:
+      'A new metre cabinet, bought off the shelf. One man\u0027s tools, a shelf that stays where it ' +
+      'is put, and a lock that works: the cheapest thing in the catalogue that lets you take ' +
+      'somebody on.',
+  },
+  {
+    id: 'standard',
+    name: 'Double tool cabinet',
+    price: 350,
+    width: 2,
+    depth: 1,
+    height: 1,
+    zoneWidth: 2,
+    zoneDepth: 1,
+    outputFactor: 1,
+    enduranceFactor: ENDURANCE_BY_CLASS.standard ?? 1,
+    powerPerDay: 1,
+    description:
+      'Two metres of drawers and doors with a bench top over them, which is what most workshops ' +
+      'stand along the back wall. Two men keep their sets in one of these and nobody argues about ' +
+      'whose chisel it is.',
+  },
+  {
+    id: 'pro',
+    name: 'Tool wall',
+    price: 700,
+    width: 2,
+    depth: 1,
+    height: 1.8,
+    zoneWidth: 2,
+    zoneDepth: 1,
+    outputFactor: 1,
+    enduranceFactor: ENDURANCE_BY_CLASS.pro ?? 1,
+    powerPerDay: 1,
+    description:
+      'A full height tool wall: drawers below, doors above, and four men\u0027s sets in it with room ' +
+      'for the hand banders. It takes no more floor than the double one and holds twice as much.',
+  },
+  {
+    id: 'industrial',
+    name: 'Tool store',
+    price: 1400,
+    width: 3,
+    depth: 1,
+    height: 2,
+    zoneWidth: 3,
+    zoneDepth: 1,
+    outputFactor: 1,
+    enduranceFactor: ENDURANCE_BY_CLASS.industrial ?? 1,
+    powerPerDay: 1,
+    description:
+      'Three metres of shop fitted storage, floor to over head height, with eight men\u0027s sets in ' +
+      'it and a place for everything. A crew of eight wants one of these and not eight cabinets ' +
+      'along the wall.',
   },
 ];
 
@@ -2419,6 +2523,9 @@ const VARIANTS_BY_FAMILY: Record<string, EquipmentVariant[]> = {
   sprayBooth: SPRAY_BOOTH_VARIANTS,
   drill: DRILL_VARIANTS,
   spindleMoulder: SPINDLE_MOULDER_VARIANTS,
+  // The cabinet is a family of five from Turn 22, and what a class is for is how many men's hand
+  // tools it holds (PIOTR, 19.09; CLAUDE.md T22 2.12).
+  toolCabinet: TOOL_CABINET_VARIANTS,
 };
 
 const BASE_SPEC = {
@@ -2701,29 +2808,33 @@ const SPEC_DRAFTS: SpecDraft[] = [
     name: 'Tool cabinet',
     price: 350,
     category: 'storage',
-    // Two metres wide, because that is what the art side painted and the picture is the fact
-    // [PIOTR's art, 19.09; CLAUDE.md T21 2.13]. The spec said 1 by 1 and the sprite did not fit it.
+    // The family's own footprint is the standard class's two metres; every class states its own,
+    // because the art side drew five of them on 19.09 and the picture is the fact
+    // [PIOTR's art; CLAUDE.md T21 2.13, T22 2.12]. `TOOL_CABINET_VARIANTS` has the five.
     //
-    // The brief asks for a `zone 3 by 2` with it and tags that figure [TUNE]. It is not built, and
-    // the zone is left equal to the footprint (`withVariants` fills it from the width and the
-    // depth) for two reasons, both of them arithmetic and neither of them a preference.
-    // First, the zone is what nothing else may stand on: a 3 by 2 zone at the cabinet row's y 3
-    // reaches down into y 4, which is the workbench row (BENCH_SLOT_LAYOUT), so the day one hall
-    // could not be laid out at all, and it reaches 3 cells across, so no two cabinets could stand
-    // side by side in a row that holds seven of them. Second, the zone is what the crew's floor
-    // limit is measured against (`freeFloorM2`), so six cabinets at 6 cells instead of 2 would
-    // quietly take 24 m2 off the free floor and cost the player a man he has today.
-    // If Piotr wants the metre of standing room in front of a cabinet drawn, it is this pair of
-    // lines plus a new cabinet row, and the crew limit moves with it.
+    // The zone of every class is its own footprint, and Turn 21's brief asked for a `zone 3 by 2`
+    // and tagged that figure [TUNE]. It is still not built, for two reasons, both of them
+    // arithmetic and neither of them a preference. First, the zone is what nothing else may stand
+    // on: a 3 by 2 zone at the cabinet row's y 3 reaches down into y 4, which is the workbench row
+    // (BENCH_SLOT_LAYOUT), so the day one hall could not be laid out at all, and it reaches 3 cells
+    // across, so no two cabinets could stand side by side in a row that holds seven of them.
+    // Second, the zone is what the crew's floor limit is measured against (`freeFloorM2`), so six
+    // cabinets at 6 cells instead of 2 would quietly take 24 m2 off the free floor and cost the
+    // player a man he has today.
+    // If Piotr wants the metre of standing room in front of a cabinet drawn, it is a zone line on
+    // each of the five classes plus a new cabinet row, and the crew limit moves with it.
+    //
+    // `perWorker` is gone from tonight: what a workshop needs is not one cabinet a man but a free
+    // slot a man, and a class holds one, two, four or eight of them (PIOTR, 19.09;
+    // CLAUDE.md T22 2.12). `freeToolSlots` in `src/engine/staff.ts` is the count everything reads.
     width: 2,
     depth: 1,
     height: 1,
     spriteKey: 'toolCabinet',
-    perWorker: true,
     stackable: true,
     effect:
-      'Holds one man\u0027s hand tools and the hand edgebander. One for every worker and one ' +
-      'for you.',
+      'Holds the hand tool sets of one man to eight by its class, and the hand edgebander with ' +
+      'them. Every worker needs a slot in one and so do you.',
   },
   {
     ...BASE_SPEC,
@@ -3230,17 +3341,34 @@ export const YARD_WIDTH_CELLS = 3;
 
 /** The height every pipe hangs at, in metres: the runs the game routes and the run a central
  *  system draws along the rear wall are both up here, over the machines (CLAUDE.md T13 3.19,
- *  T16 2.3). The Turn 4 ducting sprite and its bar are gone: one vector helper draws every pipe. */
-export const DUCT_HEIGHT = 3;
+ *  T16 2.3). The Turn 4 ducting sprite and its bar are gone: one vector helper draws every pipe.
+ *  Raised from 3 to 3.2 on 19.09 [PIOTR: "a bit higher"]; the wall is 3.5, so the run is clear of
+ *  the machines and still under the roof (CLAUDE.md T22 2.7). */
+export const DUCT_HEIGHT = 3.2;
 /** The families that are a central system: with one in the hall every machine is connected and
  *  the drawing says so with a drop to each (CLAUDE.md T16 2.3). */
 export const DUCT_SYSTEMS = ['dustSystem', 'flexiSystem'];
 /** The pipe as the vector helper draws it: a round duct this wide, in metres [TUNE]
  *  (CLAUDE.md T16 2.3). */
 export const PIPE_DIAMETER = 0.2;
-/** The red ring on the port of a machine with no pipe to the extraction, in pixels [TUNE], pulsing
- *  once a second (CLAUDE.md T16 2.3). */
-export const PORT_RING = 8;
+
+/** The four greys a pipe is painted in, darkest to lightest: the dark rim around the bar, the body
+ *  of it, the shade along its underside and the lit edge along its top
+ *  [TUNE: galvanised, read off docs/mockups/t22/pipes-A-one-path.png]. The purple of Turn 16 is
+ *  gone with the nine tiles it was drawn on (PIOTR's screenshot, 19.09; CLAUDE.md T22 2.7).
+ *
+ *  They live here and not in the stylesheet because `src/render/pipes.ts` writes one SVG path per
+ *  run and strokes it five times, and a stroke's colour has to be on the element: the stylesheet
+ *  cannot tell the fourth stroke of a path from the second. `.pipe-short` still overrides them in
+ *  CSS, because a CSS rule beats a presentation attribute. */
+export const PIPE_RIM = '#4b5158';
+export const PIPE_BODY = '#8f979e';
+export const PIPE_SHADE = '#5e666e';
+export const PIPE_LIGHT = '#d7dde1';
+/** The flexible hose from a visible port up to the run: the floor's own colour a touch darker
+ *  [PIOTR, 19.09: "like the floor, a touch darker"; TUNE off the `--concrete` token]
+ *  (CLAUDE.md T22 2.8). */
+export const HOSE_COLOUR = '#787b80';
 
 /** The pallet of sheets at the gate stands where the lorry stood: inside the shutter, on the lane,
  *  one metre each way (CLAUDE.md T13 3.21). The man unloading it stands in front of it on the hall
@@ -3470,14 +3598,20 @@ export const HIRING_SPECS: HiringSpec[] = [
 
 /** Every joiner needs all of these before he can be hired (PIOTR). The tool cabinet is counted
  *  one higher than the rest, because the owner keeps his own tools in one too (T6 3.5). */
+/** What a joiner wants in the hall before he starts, in an order the prerequisites allow: the
+ *  cabinet stands before the set it holds, because from tonight a man's hand tool set wants a free
+ *  slot in one and `canBuy` refuses it without (CLAUDE.md T22 2.12). Anything that buys the
+ *  shortfall walks this list in order, the scripted player included, so an order the game itself
+ *  cannot buy would be a shortfall nobody could fill. */
 export const JOINER_PREREQUISITES = [
   'workbench',
   'locker',
   'canteenSeat',
-  'handToolSet',
-  'toolCabinet',
+  TOOL_CABINET_ID,
+  HAND_TOOL_SET,
 ];
-/** The item every worker and the owner each need one of. */
+/** The cabinet a man's tools are kept in. One is no longer one man's: a class holds one, two, four
+ *  or eight sets, and it is the free slots the gate counts (CLAUDE.md T22 2.12). */
 export const TOOL_CABINET = TOOL_CABINET_ID;
 /** [TUNE] a new hire starts the next working day. */
 export const HIRE_START_DELAY_DAYS = 1;
@@ -3833,44 +3967,27 @@ export const OWNER_IDLE_REASONS: ReadonlyArray<{ id: OwnerIdleReason; label: str
 ];
 
 // ---------------------------------------------------------------------------
-// T21 2.6 What the men say: the bubble over a figure's head
+// T22 2.5 What is wrong with a man: the words of the mark over his head
 // ---------------------------------------------------------------------------
 
-/** The words in every bubble the hall draws, and the colour each wears
- *  (docs/mockups/t21/bubbles.html is the drawing and its table is this contract; CLAUDE.md T21
- *  2.6). One table, so a word Piotr wants changed is a line here and not a repaint. A `{slot}` is
- *  filled by the renderer off the state and never by a second table of words.
+/** The words the mark over a man's head says when the player points at it
+ *  (docs/mockups/t22/bubbles-v2.png, the red column and the hover; CLAUDE.md T22 2.5). One table,
+ *  so a word Piotr wants changed is a line here and not a repaint. A `{slot}` is filled off the
+ *  state by `src/engine/bubbles.ts` and never by a second table of words.
  *
- *  The tone is the colour: `wait` is the red border, something the player can fix; `chore` is the
- *  green, a helper doing what he is there for; `work` is plain paper, the first seconds of a new
- *  stage and then gone; `away` is the dashed grey of a man who is off the hall, drawn at the door
- *  he went through. At x10 and x30 only `wait`, `chore` and `away` are drawn, so the hall does not
- *  flicker. */
-export const BUBBLES: Record<BubbleKey, { text: string; tone: BubbleTone }> = {
-  waitingForMachine: { text: 'waiting for the {machine}', tone: 'wait' },
-  noCutParts: { text: 'no cut parts yet', tone: 'wait' },
-  noMaterial: { text: 'no sheets for {job}', tone: 'wait' },
-  nothingToDo: { text: 'nothing to do', tone: 'wait' },
-  sweeping: { text: 'sweeping', tone: 'chore' },
-  emptyingBags: { text: 'emptying the bags', tone: 'chore' },
-  unloading: { text: 'unloading', tone: 'chore' },
-  working: { text: '{stage} {job}', tone: 'work' },
-  pieces: { text: '{made} of {wanted} {piece}', tone: 'work' },
-  offToMeasure: { text: 'off to measure, back at {time}', tone: 'away' },
-  inTheOffice: { text: 'in the office', tone: 'away' },
-  atLunch: { text: 'at lunch', tone: 'away' },
+ *  Four lines and no colour: a mark is drawn only when something is wrong, so every one of them is
+ *  the red one [PIOTR, 19.09: "when all is fine, no bubble; only when it is bad"]. The green chore
+ *  lines, the paper lines of a stage just begun and the dashed grey lines of a man off the hall are
+ *  gone with the classes that drew them. */
+export const BUBBLES: Record<BubbleKey, string> = {
+  waitingForMachine: 'waiting for the {machine}',
+  noCutParts: 'no cut parts yet',
+  noMaterial: 'no sheets for {job}',
+  nothingToDo: 'nothing to do',
 };
 
-/** How long a bubble about the stage a man has just started stays up, in real seconds
- *  [PIOTR's drawing says three] (CLAUDE.md T21 2.6). */
-export const BUBBLE_WORK_SECONDS = 3;
-
-/** Above this speed only the red, the green and the grey bubbles are drawn: the paper ones would
- *  flicker on and off faster than they could be read (CLAUDE.md T21 2.6). */
-export const BUBBLE_WORK_MAX_SPEED = 4;
-
-/** How far over a figure's head the bubble's point sits, in screen pixels [PIOTR's drawing says
- *  six] (CLAUDE.md T21 2.6). */
+/** How far over a figure's head the point of the mark's tail sits, in screen pixels [PIOTR's
+ *  drawing says six] (docs/mockups/t22/bubbles-v2.png; CLAUDE.md T22 2.5). */
 export const BUBBLE_HEAD_GAP = 6;
 
 /** What a man calls a machine when he is standing about waiting for it: the trade's own short word,
@@ -3897,7 +4014,7 @@ export const TIPS: Record<string, string> = {
   hallCamera:
     'The wheel zooms the hall and dragging the floor moves it. Fit puts the whole workshop back in the view.',
   unconnected:
-    'A red ring is a machine with no pipe to the extraction. Open its card to connect it, or hire a production manager and it is done for you.',
+    'A machine with no pipe to the extraction says so under its name. Open its card to connect it, or hire a production manager and it is done for you.',
   catalogue:
     'Every machine family has five classes: the effects come first, then the costs, then what it is.',
   workPlan: 'One row a job. A red figure on a job is material it does not have yet.',
@@ -3941,14 +4058,6 @@ export const WHY: Record<string, string> = {
     'A deposit on acceptance is normal in joinery and it is what pays for the material. Without ' +
     'it you are lending the client the cost of his own kitchen. Half on order and half on ' +
     'delivery is the usual arrangement.',
-  arrearsInterest:
-    'Once a bill goes unpaid it starts to cost extra. Suppliers and landlords add interest to ' +
-    'what you owe, so a debt you ignore grows on its own. The longer it runs the harder it is ' +
-    'to get out from under it.',
-  bailiff:
-    'After a few months of arrears a creditor can send enforcement agents to take goods to the ' +
-    'value of the debt. They take what they can sell, and they credit you a fraction of what it ' +
-    'cost you. Losing a machine you still owe money on is how a workshop stops being a workshop.',
   lateAccounts:
     'Books that are not written up have to be reconstructed by somebody else, and accountants ' +
     'charge by the hour for that. The longer you leave it the more there is to untangle. It is ' +

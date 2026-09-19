@@ -5,7 +5,8 @@
 // 96 by 48 in the file, 8 px of transparent padding on every side, and the anchor at the bottom
 // corner of the footprint diamond.
 
-import manifest from '../../public/sprites/manifest.json';
+import { deliveredFiles, nextOrientation, orientationsFor, pictureFor } from '../engine/ports';
+import type { Orientation } from '../engine/types';
 import { TILE_HEIGHT, TILE_RISE, TILE_WIDTH, tileToScreen } from './iso';
 
 /** Sprites are delivered at twice the screen size and the loader halves them. */
@@ -15,7 +16,10 @@ export const SPRITE_PADDING = 8;
 /** Where Vite serves the folder from. */
 export const SPRITE_DIR = '/sprites';
 
-const DELIVERED: string[] = manifest;
+/** The file names the art side has delivered. `src/engine/ports.ts` reads the manifest, because
+ *  the routing needs to know which turned pictures exist, and the loader takes the same list from
+ *  there so the two cannot disagree (CLAUDE.md T22 2.8). */
+const DELIVERED: readonly string[] = deliveredFiles();
 
 /** The families whose picture is a Turn 13 placeholder until the art side paints it: the spindle
  *  moulder's five classes and the pallet truck (CLAUDE.md T13 1, 3.13, 3.21; the requests are in
@@ -44,52 +48,57 @@ export interface SpriteBox {
 
 /** The file names the art side has delivered, sorted. */
 export function spriteFiles(): string[] {
-  return DELIVERED.slice().sort((left, right) => left.localeCompare(right));
+  return DELIVERED.slice();
 }
 
-/** The class file first, then the family file, then nothing (docs/art/SPRITES.md 3). Kept pure so
- *  a test can ask the question of a list of files that is not the one on disk. */
+/** The orientation's own file first, then the class file, then the family file, then nothing
+ *  (docs/art/SPRITES.md 3; CLAUDE.md T22 2.11). Kept pure so a test can ask the question of a list
+ *  of files that is not the one on disk. The rule itself is `pictureFor` in
+ *  `src/engine/ports.ts`, because the routing has to ask exactly the same question. */
 export function pickSprite(
   files: readonly string[],
   spriteKey: string,
   tier?: string | null,
-  rotated = false,
+  orientation: Orientation = 0,
 ): string | null {
-  // A second orientation, where the art side has drawn one: `family.class.r.png`. Without it the
-  // hall mirrors the picture instead (CLAUDE.md T10 3.8).
-  if (rotated) {
-    if (typeof tier === 'string' && tier !== '') {
-      const turned = `${spriteKey}.${tier}.r.png`;
-      if (files.includes(turned)) return `${SPRITE_DIR}/${turned}`;
-    }
-    const turnedPlain = `${spriteKey}.r.png`;
-    if (files.includes(turnedPlain)) return `${SPRITE_DIR}/${turnedPlain}`;
-  }
-  if (typeof tier === 'string' && tier !== '') {
-    const tiered = `${spriteKey}.${tier}.png`;
-    if (files.includes(tiered)) return `${SPRITE_DIR}/${tiered}`;
-  }
-  const plain = `${spriteKey}.png`;
-  return files.includes(plain) ? `${SPRITE_DIR}/${plain}` : null;
+  const picture = pictureFor(files, spriteKey, tier, orientation);
+  return picture.file === null ? null : `${SPRITE_DIR}/${picture.file}`;
 }
 
-/** True when the hall has to mirror the picture because no second orientation was delivered for
- *  this class (CLAUDE.md T10 3.8). */
+/** The orientations this picture can be stood at, and the next one round. The rule itself is
+ *  `orientationsFor` and `nextOrientation` in `src/engine/ports.ts`, kept pure so a test can ask it
+ *  of a list of files that is not the one on disk; these two ask it of the manifest, which is what
+ *  the setup view and the card of a thing on the hall want (CLAUDE.md T22 2.11). */
+export function spriteOrientations(spriteKey: string, tier?: string | null): Orientation[] {
+  return orientationsFor(DELIVERED, spriteKey, tier);
+}
+
+export function nextSpriteOrientation(
+  spriteKey: string,
+  tier: string | null | undefined,
+  orientation: Orientation,
+): Orientation {
+  return nextOrientation(DELIVERED, spriteKey, tier, orientation);
+}
+
+/** True when the hall has to mirror the picture because no file was delivered for this
+ *  orientation of this class (CLAUDE.md T10 3.8, T22 2.11). */
 export function mirrorNeeded(
   files: readonly string[],
   spriteKey: string,
   tier: string | null | undefined,
-  rotated: boolean,
+  orientation: Orientation,
 ): boolean {
-  if (!rotated) return false;
-  const turned = typeof tier === 'string' && tier !== '' ? `${spriteKey}.${tier}.r.png` : '';
-  if (turned !== '' && files.includes(turned)) return false;
-  return !files.includes(`${spriteKey}.r.png`);
+  return pictureFor(files, spriteKey, tier, orientation).mirrored;
 }
 
 /** The URL to draw this object with, or null while there is no file for it. */
-export function spriteUrl(spriteKey: string, tier?: string | null, rotated = false): string | null {
-  return pickSprite(DELIVERED, spriteKey, tier, rotated);
+export function spriteUrl(
+  spriteKey: string,
+  tier?: string | null,
+  orientation: Orientation = 0,
+): string | null {
+  return pickSprite(DELIVERED, spriteKey, tier, orientation);
 }
 
 /** The canvas the art side draws on, at 2x, before the padding (docs/art/SPRITES.md 2 and 6). */

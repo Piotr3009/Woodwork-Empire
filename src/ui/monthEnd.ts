@@ -2,6 +2,10 @@
 // dated lines for the month, the net, and the cash at open and close. The engine adds it up in
 // `monthReport`; this prints it, every signed figure in the colour its sign gives it, and every
 // line printed whether or not anything moved on it, so the report always has the same shape.
+//
+// From Turn 22 there is no row under the cash for the bills that went unpaid, because no bill goes
+// unpaid: a cost the player did not choose comes out of the account whatever the balance, so it is
+// on a line of the report like every other pound (CLAUDE.md T22 2.1, 2.4).
 
 import { monthName, monthOfDay, monthReport } from '../engine/index';
 import { monthEfficiency } from '../engine/efficiency';
@@ -51,11 +55,6 @@ export function renderMonthReport(report: MonthReport): string {
     '<div class="row month-head"><span class="row-main"></span>' +
     '<span class="row-figure">In</span><span class="row-figure">Out</span>' +
     '<span class="row-figure">Net</span></div>';
-  const unpaid =
-    report.unpaid > 0
-      ? `<p class="warn">${money(report.unpaid)} of bills went to the arrears instead of out of the ` +
-        'bank, and is not in the lines.</p>'
-      : '';
   return (
     `<div class="month-end" data-month="${report.month}">` +
     `<h3>${monthName(report.month)}</h3>` +
@@ -66,7 +65,6 @@ export function renderMonthReport(report: MonthReport): string {
     totalRow('Net for the month', report.net, 'month-net') +
     cashRow('Cash at the open', report.cashOpen, 'open') +
     cashRow('Cash at the close', report.cashClose, 'close') +
-    unpaid +
     '</div>'
   );
 }

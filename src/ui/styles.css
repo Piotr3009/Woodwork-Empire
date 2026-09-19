@@ -534,8 +534,8 @@ input.num {
   border: 1px solid #5b5446;
   border-radius: 4px;
   display: flex;
-  /* The bar is a row of plates and the money is not the one that gives way: without this the
-     owes plate beside it squeezed the cash into a column and broke "-£7,259" over two lines
+  /* The bar is a row of plates and the money is not the one that gives way: without this a plate
+     beside it squeezed the cash into a column and broke "-£7,259" over two lines
      (T21-C4, picture 1). */
   flex: none;
   flex-direction: column;
@@ -558,57 +558,6 @@ input.num {
 
 .topbar .net.good {
   color: #1d6b39;
-}
-
-/* T21 2.1 What the company owes, beside what it has: a red plate between the cash and the clock,
-   only while there are arrears, pulsing so it is not read as part of the furniture
-   (docs/mockups/t21/debt.html part 1). Built like the name plate above it, in the palette's own
-   --bad, and it takes no colour, font, radius or shadow value the file did not already have. */
-.owes-plate {
-  align-items: flex-start;
-  background: linear-gradient(#8f3a31, #6f2b24);
-  border: 1px solid #5b5446;
-  border-radius: 4px;
-  color: var(--cream);
-  cursor: pointer;
-  display: flex;
-  /* A plate of the bar and not a column of it: the drawing has both its lines on one line each,
-     and a plate that gives way wraps to 110 px and bursts out of the 70 px bar, top and bottom
-     (T21-C4, picture 1). */
-  flex: none;
-  flex-direction: column;
-  font: inherit;
-  justify-content: center;
-  line-height: 1.1;
-  padding: 4px 12px;
-  text-align: left;
-  white-space: nowrap;
-  animation: owes-pulse 1.2s ease-in-out infinite;
-}
-
-.owes-plate:hover {
-  border-color: var(--text-dim);
-}
-
-.owes-figure {
-  font-family: var(--font-title);
-  font-size: var(--fs-hand);
-  font-weight: 400;
-}
-
-.owes-line {
-  font-size: var(--fs-small);
-}
-
-@keyframes owes-pulse {
-  0%,
-  100% {
-    box-shadow: none;
-  }
-
-  50% {
-    box-shadow: 0 0 0 4px rgb(192 90 78 / 35%);
-  }
 }
 
 .topbar .net.bad {
@@ -676,10 +625,9 @@ input.num {
   box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.6);
   display: flex;
   /* 340 px is the width it wants and it never takes more, but from Turn 21 it may be given less:
-     the owes plate of 2.1 is 212 px of bar that was not there before, and a hard minimum here put
-     the Office and Menu buttons off the right edge of a 1280 page while a company was in arrears.
-     A meter that is a bar and two short lines can be read narrower; a button that is off the page
-     cannot be pressed at all (CLAUDE.md T21 2.1, 2.8). */
+     a hard minimum here put the Office and Menu buttons off the right edge of a 1280 page on a
+     crowded bar. A meter that is a bar and two short lines can be read narrower; a button that is
+     off the page cannot be pressed at all (CLAUDE.md T21 2.8). */
   flex: 0 1 340px;
   flex-direction: column;
   gap: 5px;
@@ -3308,57 +3256,38 @@ input.num {
 .pipe-layer {
   pointer-events: none;
 }
-/* The pipes, one vector drawing for every tile (CLAUDE.md T16 2.3): a round duct in the duct
-   grey with a lighter top edge, the ring on the port a drop lands on, the collar at the inlet. */
-.pipe-bar {
-  stroke: var(--kit-machine-dark, #5d5178);
+/* The pipes, drawn by src/render/pipes.ts (CLAUDE.md T16 2.3, T22 2.7): galvanised, with a dark
+   rim, a lit edge and a shade along the underside. Every grey is a constant written onto the
+   element, because one path is stroked five times and a stylesheet cannot tell the fourth stroke
+   from the second; what is left here is the shape of the line and the red a starved run wears,
+   which is a rule and so beats the attribute. */
+.pipe-rim,
+.pipe-bar,
+.pipe-shade,
+.pipe-hose {
   stroke-linecap: round;
-  opacity: 0.92;
 }
 .pipe-edge {
-  stroke: #a99cc4;
   stroke-width: 1.5;
   stroke-linecap: round;
-  opacity: 0.8;
+  opacity: 0.85;
 }
-.pipe-joint {
-  fill: var(--kit-machine-dark, #5d5178);
-  stroke: none;
+/* The specular line: the lit grey again, thinner and at full strength, so it reads as the bright
+   core of the lit edge rather than a sixth colour (CLAUDE.md T22 2.7). */
+.pipe-spec {
+  stroke-linecap: round;
 }
-.pipe-port,
 .pipe-collar {
   fill: none;
-  stroke: var(--kit-machine-dark, #5d5178);
-  opacity: 0.9;
 }
-.pipe-short .pipe-bar {
+.pipe-short .pipe-bar,
+.pipe-short .pipe-rim,
+.pipe-short .pipe-shade {
   stroke: var(--bad);
-}
-.pipe-short image {
-  filter: drop-shadow(0 0 1px var(--bad)) drop-shadow(0 0 1px var(--bad));
 }
 
-/* A machine with no pipe to the extraction: a red ring on its port, pulsing once a second on the
-   stylesheet alone, and the words under its name (CLAUDE.md T16 2.3). */
-@keyframes port-pulse {
-  0% {
-    opacity: 0.35;
-    r: 6px;
-  }
-  50% {
-    opacity: 1;
-  }
-  100% {
-    opacity: 0.35;
-    r: 6px;
-  }
-}
-.port-ring circle {
-  fill: none;
-  stroke: var(--bad);
-  stroke-width: 2.5;
-  animation: port-pulse 1s ease-in-out infinite;
-}
+/* A machine with no pipe to the extraction says so under its name, and wears nothing else: the
+   pulsing red ring of Turn 16 went with the nine tiles [PIOTR, 19.09] (CLAUDE.md T22 2.8). */
 .not-connected {
   fill: var(--bad);
   font-weight: 700;
@@ -4370,14 +4299,61 @@ input.num {
   border-color: var(--text);
 }
 
-/* 2.6 What the men say. Paper, the title hand, one line, a tail under the box pointing at the head
-   it belongs to, and a border that says what kind of thing is being said: red is the player's to
-   fix, green is a helper about his work, plain paper is a stage just begun, dashed grey is a man off
-   the hall (docs/mockups/t21/bubbles.html). Drawn in the hall's live SVG layer, so the box is a
-   foreignObject's child and moves with the figure the walker moves. */
+/* 2.5 What is wrong with a man. A 14 px disc with an exclamation in it over his head, drawn only
+   while something is wrong, and the words on the hover (docs/mockups/t22/bubbles-v2.png, the red
+   column and the hover column). Drawn in the hall's live SVG layer, so the disc is a child of the
+   figure group and the walker carries both of them. Every value here is a token that was already
+   on :root or a colour the paper bubble of Turn 21 already wore. */
+.mark-disc {
+  fill: var(--cream);
+  stroke: var(--bad);
+  stroke-width: 2;
+}
+
+/* The tail is the paper bubble's own: an ink triangle with a lighter one over it, so the two read
+   as one tail pointing at the head. The disc is painted after them and covers their base. */
+.mark-tail {
+  fill: var(--bad);
+}
+
+.mark-tail-in {
+  fill: var(--cream);
+}
+
+.mark-glyph {
+  fill: var(--bad);
+  font-family: var(--font-title);
+  font-size: var(--fs-tiny);
+  pointer-events: none;
+}
+
+/* The disc takes the mouse, because the player has to be able to point at it, and it sits inside
+   the figure group, so a click on it is a click on the man under it and a drag of the hall is
+   still a drag of the hall (CLAUDE.md T22 2.5). */
+.mark {
+  pointer-events: auto;
+}
+
+/* The words: in the DOM beside the disc and brought up by the pointer alone, on the figure group,
+   so pointing at the disc and pointing at the man are the one hover. No JavaScript, so it works at
+   x1 and at x30 and survives every rewrite of the page (PIOTR, 19.09: "the words only when I
+   hover"). */
+.mark-line {
+  visibility: hidden;
+}
+
+.figure:hover .mark-line {
+  visibility: visible;
+}
+
+/* The paper of that one line: the title hand, one line, a tail under the box pointing at the disc
+   it belongs to, and the red border of something the player can fix. Red is the only colour left:
+   a mark is drawn only when something is wrong, so the green of a chore, the plain paper of a stage
+   just begun and the dashed grey of a man off the hall are gone with the bubbles that wore them
+   (CLAUDE.md T22 2.5). */
 .bubble {
   background: var(--cream);
-  border: 2px solid #2a2418;
+  border: 2px solid var(--bad);
   border-radius: 12px;
   color: #2a2418;
   font-family: var(--font-title);
@@ -4395,7 +4371,7 @@ input.num {
 .bubble::before {
   border: 6px solid transparent;
   border-bottom: 0;
-  border-top-color: #2a2418;
+  border-top-color: var(--bad);
   bottom: -9px;
   content: '';
   left: 50%;
@@ -4414,30 +4390,8 @@ input.num {
   position: absolute;
 }
 
-.bubble-wait {
-  border-color: var(--bad);
-}
-
-.bubble-wait::before {
-  border-top-color: var(--bad);
-}
-
-.bubble-chore {
-  border-color: var(--good);
-}
-
-.bubble-chore::before {
-  border-top-color: var(--good);
-}
-
-/* A man who is off the hall: the thought, not the word, so it is dashed and dim. */
-.bubble-away {
-  border-style: dashed;
-  color: var(--text-dim);
-}
-
-/* The box the paper hangs in: layout and nothing else, so the paper is centred over the head it
-   points at and the tail's own nine pixels fall under it. No paint here (CLAUDE.md T21 2.6). */
+/* The box the paper hangs in: layout and nothing else, so the paper is centred over the disc it
+   points at and the tail's own nine pixels fall under it. No paint here (CLAUDE.md T22 2.5). */
 .bubble-holder {
   align-items: flex-start;
   display: flex;

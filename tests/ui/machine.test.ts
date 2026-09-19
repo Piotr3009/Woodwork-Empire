@@ -82,6 +82,54 @@ describe('the catalogue lists folders', () => {
   });
 });
 
+describe('the Tool cabinets folder (CLAUDE.md T22 2.12)', () => {
+  it('lists the five, each with what it holds, and the class ladder words of the machines', () => {
+    const state = newGame({ difficulty: 'veryEasy' });
+    // The folder is under Storage with the racks and the benches, and the money is spent inside it.
+    const storage = parse(renderCatalogue(state, '', 'storage'));
+    expect(storage.querySelector('[data-do="openFolder"][data-id="toolCabinet"]')).not.toBeNull();
+    expect(storage.innerHTML).toContain('from £90');
+    expect(storage.innerHTML).toContain('5 classes');
+    const cards = tiles(state, 'toolCabinet');
+    expect(cards).toHaveLength(5);
+    // What a class is for is how many men's hand tools it holds [PIOTR, 19.09], and it is on the
+    // effect line of every one of the five.
+    expect(cards.map((tile) => effects(tile).find((line) => line.startsWith('Holds')))).toEqual([
+      'Holds 1 man\u0027s tools',
+      'Holds 1 man\u0027s tools',
+      'Holds 2 men\u0027s tools',
+      'Holds 4 men\u0027s tools',
+      'Holds 8 men\u0027s tools',
+    ]);
+    expect(cards.map((tile) => text(tile.querySelector('.tile-price')))).toEqual([
+      '£90',
+      '£175',
+      '£350',
+      '£700',
+      '£1,400',
+    ]);
+    // The class ladder words are the machines': the badge of every class, off the one table
+    // (CLAUDE.md T13 3.12).
+    expect(cards.map((tile) => text(tile.querySelector('.badge')))).toEqual([
+      'Used',
+      'Budget',
+      'Standard',
+      'Pro',
+      'Industrial',
+    ]);
+    expect(isMachineFamily(findSpec('toolCabinet') ?? ({} as never))).toBe(true);
+    // And the floor each one wants, which is the picture's own footprint, and the working room,
+    // which is the same cells: a cabinet reserves exactly what it stands on (CLAUDE.md T22 2.12).
+    expect(cards.map((tile) => costs(tile).find((line) => line.startsWith('Takes')))).toEqual([
+      'Takes 1 m by 1 m, works in 1 m by 1 m',
+      'Takes 1 m by 1 m, works in 1 m by 1 m',
+      'Takes 2 m by 1 m, works in 2 m by 1 m',
+      'Takes 2 m by 1 m, works in 2 m by 1 m',
+      'Takes 3 m by 1 m, works in 3 m by 1 m',
+    ]);
+  });
+});
+
 describe('the tiles inside a folder', () => {
   it('draws five tiles for the saw, the compressor, the extractor and the thicknesser, one for the dryer', () => {
     const state = newGame({ difficulty: 'veryEasy' });

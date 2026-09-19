@@ -44,6 +44,8 @@ import {
   UNDER_EXTRACTION_DUST_MULTIPLIER,
   UNDER_EXTRACTION_OUTPUT_PENALTY,
   SALE_FRACTION_USED,
+  TOOL_CABINET,
+  TOOL_CABINET_SLOTS,
   USED_VARIANT,
 } from './constants';
 import { weekOfDay, monthOfDay, nextWorkingDay } from './clock';
@@ -67,6 +69,7 @@ import type {
   EquipmentVariant,
   GameState,
   MaterialKind,
+  Orientation,
 } from './types';
 
 export function specOf(specId: string): EquipmentSpec {
@@ -92,21 +95,30 @@ export function machineShortWord(specId: string): string {
   return MACHINE_SHORT_WORDS[specId] ?? (findSpec(specId)?.name ?? specId).toLowerCase();
 }
 
+/** True for the two orientations that lie across the picture as drawn: a quarter turn and three
+ *  quarter turns swap the width and the depth, half a turn swaps nothing (CLAUDE.md T22 2.11). The
+ *  one place the question is asked, so the footprint, the zone and the sprite canvas cannot
+ *  disagree about it. */
+export function swapsSides(orientation: Orientation): boolean {
+  return orientation === 1 || orientation === 3;
+}
+
 /** What a class of a family stands on, in metres: the picture's own footprint. A class that says
  *  nothing takes the family's (CLAUDE.md T7 3.3). */
 export function footprintOf(
   specId: string,
   variantId?: string,
-  rotated = false,
+  orientation: Orientation = 0,
 ): { width: number; depth: number; height: number } {
   const spec = findSpec(specId);
   if (!spec) return { width: 1, depth: 1, height: 1 };
   const variant = variantOf(spec, variantId ?? spec.variants[0]?.id ?? '');
   const width = variant.width ?? spec.width;
   const depth = variant.depth ?? spec.depth;
+  const across = swapsSides(orientation);
   return {
-    width: rotated ? depth : width,
-    depth: rotated ? width : depth,
+    width: across ? depth : width,
+    depth: across ? width : depth,
     height: variant.height ?? spec.height,
   };
 }
@@ -115,9 +127,9 @@ export function footprintOf(
 export function itemFootprint(item: {
   specId: string;
   variantId: string;
-  rotated?: boolean;
+  orientation?: Orientation;
 }): { width: number; depth: number; height: number } {
-  return footprintOf(item.specId, item.variantId, item.rotated === true);
+  return footprintOf(item.specId, item.variantId, item.orientation ?? 0);
 }
 
 /** The floor a class reserves, in metres: the working room around it, which contains the
@@ -125,23 +137,24 @@ export function itemFootprint(item: {
 export function zoneOf(
   specId: string,
   variantId?: string,
-  rotated = false,
+  orientation: Orientation = 0,
 ): { width: number; depth: number } {
   const spec = findSpec(specId);
   if (!spec) return { width: 1, depth: 1 };
   const variant = variantOf(spec, variantId ?? spec.variants[0]?.id ?? '');
   const width = variant.zoneWidth ?? spec.zoneWidth;
   const depth = variant.zoneDepth ?? spec.zoneDepth;
-  return { width: rotated ? depth : width, depth: rotated ? width : depth };
+  const across = swapsSides(orientation);
+  return { width: across ? depth : width, depth: across ? width : depth };
 }
 
 /** The same question of something already standing in the hall. */
 export function itemZone(item: {
   specId: string;
   variantId: string;
-  rotated?: boolean;
+  orientation?: Orientation;
 }): { width: number; depth: number } {
-  return zoneOf(item.specId, item.variantId, item.rotated === true);
+  return zoneOf(item.specId, item.variantId, item.orientation ?? 0);
 }
 
 /** Working days between the click and the lorry for this class (CLAUDE.md T8 3.2). Zero means it
@@ -195,6 +208,22 @@ export function sheetCapacityOf(item: { specId: string; variantId: string }): nu
   const spec = findSpec(item.specId);
   if (!spec) return 0;
   return variantOf(spec, item.variantId).sheetCapacity ?? spec.sheetCapacity;
+}
+
+/** How many men's hand tool sets this class of tool cabinet holds: one, one, two, four or eight up
+ *  the ladder [PIOTR, 19.09]. Zero for everything that is not a cabinet, so the sum over a hall is
+ *  the sum over its cabinets (CLAUDE.md T22 2.12). */
+export function toolSlotsOf(item: { specId: string; variantId: string }): number {
+  if (item.specId !== TOOL_CABINET) return 0;
+  return TOOL_CABINET_SLOTS[item.variantId] ?? 0;
+}
+
+/** What the catalogue's card of a class of cabinet says it is for, in the words the rack's card
+ *  uses for its sheets: `Holds 4 men's tools` (CLAUDE.md T22 2.12). Empty for everything else. */
+export function toolSlotsLine(specId: string, variantId: string): string {
+  const slots = toolSlotsOf({ specId, variantId });
+  if (slots <= 0) return '';
+  return `Holds ${slots} ${slots === 1 ? 'man\u0027s' : 'men\u0027s'} tools`;
 }
 
 /** What must be owned before a class can be bought. A class may say its own, which is how a floor
@@ -462,14 +491,6 @@ export function poweredMachines(state: GameState): Equipment[] {
   });
 }
 
-/** What the bailiff can take: machines, cheapest first (CLAUDE.md T2 3.4). The extraction kit is
- *  left where it is, because taking it would stop the hall dead instead of slowing it. */
-export function seizableMachines(state: GameState): Equipment[] {
-  return state.equipment
-    .filter((item) => findSpec(item.specId)?.category === 'machine')
-    .slice()
-    .sort((left, right) => left.purchasePrice - right.purchasePrice);
-}
 
 /** Which dust band the hall is in (CLAUDE.md 9.7). */
 export function dustBand(dust: number): { max: number; factor: number; label: string } {

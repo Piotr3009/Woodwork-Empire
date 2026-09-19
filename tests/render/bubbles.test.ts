@@ -1,15 +1,15 @@
-// The bubble over a man's head, drawn (PIOTR, 19.09; docs/mockups/t21/bubbles.html;
-// CLAUDE.md T21 2.6). The words are `tests/engine/bubbles.test.ts`; what is asserted here is the
-// paper: the four colours of the drawing, where the box hangs, that it is a child of the figure's own
-// group so the walker carries it, that a paper bubble comes down after three real seconds, and that
-// at x10 and x30 no paper bubble is drawn at all.
+// The mark over a man's head, drawn (PIOTR, 19.09; docs/mockups/t22/bubbles-v2.png, the red column
+// and the hover column; CLAUDE.md T22 2.5). The words are `tests/engine/bubbles.test.ts`; what is
+// asserted here is the drawing: a 14 px disc with an exclamation in it over the four men something
+// is wrong with, nothing at all over the men nothing is wrong with, two marks over one cell side by
+// side, the words that come up on the hover, and all of it at x10 and x30 as well as at x1.
 
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { BUBBLE_WORK_SECONDS, roomDoorCell } from '../../src/engine/constants';
 import { bubbleFor } from '../../src/engine/bubbles';
-import { STATION_IDLE, STATION_OFFICE } from '../../src/engine/stations';
-import { CAPSULE_HEAD_TOP, bubbleArt, renderHall } from '../../src/render/hall';
-import { resetBubbles } from '../../src/render/bubbles';
+import { WAITING_FOR_MATERIAL } from '../../src/engine/production';
+import { STATION_OFFICE } from '../../src/engine/stations';
+import { CAPSULE_HEAD_TOP, markArt, renderHall } from '../../src/render/hall';
 import type { GameState } from '../../src/engine/index';
 import {
   act,
@@ -18,6 +18,17 @@ import {
   runClock,
   sixJoinersOnSheetWork,
 } from '../helpers';
+
+const CSS = readFileSync('src/ui/styles.css', 'utf8');
+
+/** The body of one rule of the stylesheet, by its selector: the reading `tests/ui/skinPaint.test.ts`
+ *  takes of the same file, because a hover cannot be dispatched and the rule is the contract. */
+function ruleBody(selector: string): string {
+  const at = CSS.indexOf(`${selector} {`);
+  if (at < 0) throw new Error(`no rule for ${selector}`);
+  const open = CSS.indexOf('{', at);
+  return CSS.slice(open + 1, CSS.indexOf('}', open));
+}
 
 /** The whole group of one figure, out of the hall's markup: the opening tag to its own matching
  *  close, so what is asserted is that man and nothing that stands near him. */
@@ -36,8 +47,8 @@ function groupOf(svg: string, figure: string): string {
   throw new Error(`${figure} has no end`);
 }
 
-/** The drawing's own scene: three men on one job at its cutting stage with one saw, the first of them
- *  standing at it, so one man is cutting, one is waiting for the saw and one has no cut parts yet. */
+/** Three men on one job at its cutting stage with one saw, the first of them standing at it, so one
+ *  man is cutting, one is waiting for the saw and one has no cut parts yet. */
 function queueAtTheSaw(): GameState {
   let state = sixJoinersOnSheetWork({ saws: 1 });
   const first = state.jobs[0];
@@ -50,30 +61,70 @@ function queueAtTheSaw(): GameState {
   const saw = state.equipment.find((item) => item.specId === 'tableSaw');
   if (!saw) throw new Error('one saw is wanted');
   saw.takenBy = 'staff-1';
-  resetBubbles();
   return state;
 }
 
-describe('the four colours of the drawing (CLAUDE.md T21 2.6)', () => {
-  it('draws the red of a man waiting and the paper of a man who has just started', () => {
-    const state = queueAtTheSaw();
-    const svg = renderHall(state, { nowMs: 0 });
-    const waiting = groupOf(svg, 'worker-staff-2');
-    expect(waiting).toContain('data-bubble="waitingForMachine"');
-    expect(waiting).toContain('class="bubble bubble-wait"');
-    expect(waiting).toContain('waiting for the saw');
-    const behind = groupOf(svg, 'worker-staff-3');
-    expect(behind).toContain('data-bubble="noCutParts"');
-    expect(behind).toContain('class="bubble bubble-wait"');
-    // The plain paper takes no second class: the tone says so and the stylesheet dresses the rest.
-    const cutting = groupOf(svg, 'worker-staff-1');
-    expect(cutting).toContain('data-bubble="working"');
-    expect(cutting).toContain('data-tone="work"');
-    expect(cutting).toContain('class="bubble">');
-    expect(cutting).not.toContain('bubble-wait');
+/** Two jobs at their cutting stage with one saw between them, played two minutes so the engine has
+ *  put every man at his own station: the two men who cannot have the saw stand at its one waiting
+ *  cell, which is where two marks would be drawn on top of each other. */
+function twoJobsAtOneSaw(): GameState {
+  let state = sixJoinersOnSheetWork({ saws: 1 });
+  const [first, second] = state.jobs;
+  if (!first || !second) throw new Error('two jobs are wanted');
+  state = act(state, { type: 'ADD_TO_JOB', jobId: first.id, workerId: 'staff-3' });
+  state = act(state, { type: 'ADD_TO_JOB', jobId: second.id, workerId: 'staff-4' });
+  const keep = [first.id, second.id];
+  state.jobs = state.jobs.filter((job) => keep.includes(job.id));
+  for (const worker of state.workers) {
+    if (worker.jobId !== null && !keep.includes(worker.jobId)) worker.jobId = null;
+  }
+  for (const job of state.jobs) job.labourRemaining = job.labourValue * 0.95;
+  return runClock(state, 2);
+}
+
+/** The mark drawn over one man, or '' when the hall drew him none. */
+function markOver(svg: string, figure: string): string {
+  const group = groupOf(svg, figure);
+  const at = group.indexOf('<g class="mark"');
+  return at < 0 ? '' : group.slice(at);
+}
+
+describe('a mark only where something is wrong (CLAUDE.md T22 2.5)', () => {
+  it('draws the disc with its exclamation over each of the four things the player can put right', () => {
+    const waiting = queueAtTheSaw();
+    const svg = renderHall(waiting);
+    // The first man of the queue is waiting for the machine; the man behind him is short of the
+    // parts it has not cut yet.
+    for (const [who, key, words] of [
+      ['worker-staff-2', 'waitingForMachine', 'waiting for the saw'],
+      ['worker-staff-3', 'noCutParts', 'no cut parts yet'],
+    ] as const) {
+      const mark = markOver(svg, who);
+      expect(mark, who).toContain(`data-bubble="${key}"`);
+      expect(mark, who).toContain('class="mark-disc"');
+      expect(mark, who).toContain('>!</text>');
+      expect(mark, who).toContain(`<div class="bubble">${words}</div>`);
+    }
+    // The rack has nothing for the job: every man on it says so, the man at the saw included.
+    const job = waiting.jobs[0];
+    if (!job) throw new Error('a job is wanted');
+    job.blockedBy = WAITING_FOR_MATERIAL;
+    const dry = markOver(renderHall(waiting), 'worker-staff-1');
+    expect(dry).toContain('data-bubble="noMaterial"');
+    expect(dry).toContain(`<div class="bubble">no sheets for ${job.name}</div>`);
+    // And a man on no job at all, who stands about with nothing to do.
+    const idle = markOver(renderHall(twoJobsAtOneSaw()), 'worker-staff-5');
+    expect(idle).toContain('data-bubble="nothingToDo"');
+    expect(idle).toContain('<div class="bubble">nothing to do</div>');
   });
 
-  it('draws the green of a helper about his chore', () => {
+  it('draws nothing at all over a man who is working', () => {
+    const state = queueAtTheSaw();
+    expect(bubbleFor(state, 'staff-1')).toBeNull();
+    expect(markOver(renderHall(state), 'worker-staff-1')).toBe('');
+  });
+
+  it('draws nothing at all over a helper sweeping the floor', () => {
     const state = queueAtTheSaw();
     const worker = state.workers.find((entry) => entry.id === 'staff-4');
     if (!worker) throw new Error('a man is wanted');
@@ -99,127 +150,103 @@ describe('the four colours of the drawing (CLAUDE.md T21 2.6)', () => {
       orders: [],
     });
     worker.taskId = 'task-sweep';
-    const group = groupOf(renderHall(state, { nowMs: 0 }), `worker-${worker.id}`);
-    expect(group).toContain('data-bubble="sweeping"');
-    expect(group).toContain('class="bubble bubble-chore"');
-    expect(group).toContain('sweeping');
+    expect(bubbleFor(state, worker.id)).toBeNull();
+    expect(markOver(renderHall(state), `worker-${worker.id}`)).toBe('');
   });
 
-  it('draws the dashed grey at the door the man went through, and not at his station', () => {
+  it('draws nothing anywhere while the hall is at its dinner', () => {
+    const state = runClock(sixJoinersOnSheetWork({ saws: 1 }), 250);
+    const svg = renderHall(state);
+    // They are behind the canteen door and nothing is drawn after them: no mark at the door, and
+    // no group of words standing on an empty cell either (CLAUDE.md T21 2.12, T22 2.5).
+    expect(svg).not.toContain('class="mark"');
+    expect(svg).not.toContain('data-away-door');
+    for (const worker of state.workers) expect(bubbleFor(state, worker.id), worker.id).toBeNull();
+  });
+
+  it('draws nothing at the office door for a man in the office', () => {
     const state = buyStartingKit(newGame());
     state.owner.station = STATION_OFFICE;
-    const svg = renderHall(state, { nowMs: 0 });
-    // He is off the hall: the office view draws him at his desk (CLAUDE.md T20 2.12).
+    const svg = renderHall(state);
+    expect(bubbleFor(state, 'owner')).toBeNull();
     expect(svg).not.toContain('data-figure="owner"');
-    // And his words are at the office door, in their own group, because there is no figure group of
-    // his to hang them on.
-    expect(svg).toContain('data-away-door="office"');
-    expect(svg).toContain('data-bubble="inTheOffice"');
-    expect(svg).toContain('class="bubble bubble-away"');
-    const door = roomDoorCell('office');
-    const at = svg.slice(svg.indexOf('data-away-door="office"'));
-    expect(at).toContain('transform="translate(');
-    // The same cell the figure would have stood on, which is the door itself.
-    const standing = renderHall({ ...state, owner: { ...state.owner, station: STATION_IDLE } }, { nowMs: 0 });
-    expect(standing).toContain('data-figure="owner"');
-    expect(door.x).toBeGreaterThan(0);
+    expect(svg).not.toContain('class="mark"');
+    expect(svg).not.toContain('data-away-door');
+  });
+});
+
+describe('two marks over one cell (CLAUDE.md T22 2.5)', () => {
+  it('stands them side by side and never one on top of the other', () => {
+    const state = twoJobsAtOneSaw();
+    const svg = renderHall(state);
+    // Two men off two jobs at the one saw's waiting cell: the same cell, so the same point over the
+    // hall, and the second mark steps aside.
+    const first = groupOf(svg, 'worker-staff-2');
+    const second = groupOf(svg, 'worker-staff-3');
+    expect(first).toContain('data-cell="5,2"');
+    expect(second).toContain('data-cell="5,2"');
+    expect(markOver(svg, 'worker-staff-2')).toContain('data-bubble-for="staff-2">');
+    expect(markOver(svg, 'worker-staff-3')).toContain('transform="translate(7,0)"');
+    // And the third mark over one cell steps twice as far: three idle men at the canteen door.
+    expect(markOver(svg, 'worker-staff-5')).toContain('data-bubble-for="staff-5">');
+    expect(markOver(svg, 'worker-staff-6')).toContain('transform="translate(7,0)"');
+    expect(markOver(svg, 'owner')).toContain('transform="translate(14,0)"');
   });
 
-  it('hangs the box over the head of whichever man was drawn, and lets the mouse through it', () => {
-    const state = queueAtTheSaw();
-    const group = groupOf(renderHall(state, { nowMs: 0 }), 'worker-staff-2');
-    expect(group).toContain('pointer-events="none"');
-    expect(group).toContain('overflow="visible"');
-    // The capsule's own crown, six pixels of gap and the box above that: the tail's point is over
-    // his head and the box is over the tail.
-    const y = Number(/data-tone="wait"[^>]*y="(-?\d+)"/.exec(group)?.[1] ?? '0');
-    expect(y).toBeLessThan(CAPSULE_HEAD_TOP);
-    // The hover line of Turn 11 is still the group's own title and is not the bubble's.
+  it('hangs every disc over the head of whichever man was drawn', () => {
+    const svg = renderHall(queueAtTheSaw());
+    const mark = markOver(svg, 'worker-staff-2');
+    // The capsule's own crown, six pixels of gap, the tail and then the disc: the tail's point is
+    // over his head and the disc is over the tail.
+    const centre = Number(/<circle class="mark-disc" cx="0" cy="(-?[\d.]+)"/.exec(mark)?.[1] ?? '0');
+    expect(centre).toBeLessThan(CAPSULE_HEAD_TOP);
+    // The words hang above the disc, which is above the head.
+    const line = Number(/<foreignObject class="mark-line" x="-?\d+" y="(-?\d+)"/.exec(mark)?.[1] ?? '0');
+    expect(line).toBeLessThan(centre);
+  });
+});
+
+describe('the words on the hover (CLAUDE.md T22 2.5)', () => {
+  it('keeps the paper in the DOM beside the disc and lets the stylesheet bring it up', () => {
+    const mark = markOver(renderHall(queueAtTheSaw()), 'worker-staff-2');
+    expect(mark).toContain('class="mark-line"');
+    expect(mark).toContain('<div class="bubble">waiting for the saw</div>');
+    // Hidden until the pointer is on the figure, and the figure group is where the rule hangs, so
+    // pointing at the disc and pointing at the man are the one hover. No JavaScript at all.
+    expect(ruleBody('.mark-line')).toContain('visibility: hidden');
+    expect(ruleBody('.figure:hover .mark-line')).toContain('visibility: visible');
+  });
+
+  it('lets the disc be pointed at and the paper eat nothing', () => {
+    const mark = markOver(renderHall(queueAtTheSaw()), 'worker-staff-2');
+    // The disc takes the mouse; the paper takes none, so it cannot eat a click meant for the hall.
+    expect(ruleBody('.mark')).toContain('pointer-events: auto');
+    expect(mark).toContain('pointer-events="none"');
+    expect(mark).toContain('overflow="visible"');
+    // The hover line of Turn 11 is still the group's own title and is not the mark's.
+    const group = groupOf(renderHall(queueAtTheSaw()), 'worker-staff-2');
     expect(group).toContain('<title>');
-    expect(group).not.toContain('data-character="bubble"');
+    expect(mark).not.toContain('data-character');
+  });
+
+  it('draws the discs and the words at x10 and x30, where the old paper bubbles came down', () => {
+    for (const speed of [1, 4, 10, 30] as const) {
+      const fast = act(queueAtTheSaw(), { type: 'SET_SPEED', speed });
+      const mark = markOver(renderHall(fast), 'worker-staff-2');
+      expect(mark, String(speed)).toContain('class="mark-disc"');
+      expect(mark, String(speed)).toContain('<div class="bubble">waiting for the saw</div>');
+    }
   });
 });
 
-describe('the three seconds of a paper bubble (CLAUDE.md T21 2.6)', () => {
-  it('draws the stage a man has just begun and takes it down three seconds later', () => {
-    const state = queueAtTheSaw();
-    expect(groupOf(renderHall(state, { nowMs: 0 }), 'worker-staff-1')).toContain('data-tone="work"');
-    // A second in: still up, and the same words.
-    expect(groupOf(renderHall(state, { nowMs: 1000 }), 'worker-staff-1')).toContain('data-tone="work"');
-    // Past the three seconds of the drawing: gone.
-    const after = groupOf(renderHall(state, { nowMs: BUBBLE_WORK_SECONDS * 1000 }), 'worker-staff-1');
-    expect(after).not.toContain('data-bubble=');
-    // The man beside him is still waiting, and a red bubble stays up as long as it is true.
-    expect(groupOf(renderHall(state, { nowMs: 60_000 }), 'worker-staff-2')).toContain(
-      'data-bubble="waitingForMachine"',
-    );
-  });
-
-  it('starts the three seconds again when the words change, and not when the page is written', () => {
-    const state = queueAtTheSaw();
-    renderHall(state, { nowMs: 0 });
-    expect(groupOf(renderHall(state, { nowMs: 2_900 }), 'worker-staff-1')).toContain('data-tone="work"');
-    expect(groupOf(renderHall(state, { nowMs: 3_100 }), 'worker-staff-1')).not.toContain('data-bubble=');
-    // The same man, further on: the assembly is a new thing to say and it is said.
-    const job = state.jobs[0];
-    if (!job) throw new Error('a job is wanted');
-    job.labourRemaining = job.labourValue * 0.45;
-    const said = bubbleFor(state, 'staff-1');
-    expect(said?.key).toBe('working');
-    expect(said?.text).toContain('assembling');
-    const fresh = groupOf(renderHall(state, { nowMs: 3_200 }), 'worker-staff-1');
-    expect(fresh).toContain('data-tone="work"');
-    expect(fresh).toContain('assembling');
-    expect(groupOf(renderHall(state, { nowMs: 6_300 }), 'worker-staff-1')).not.toContain('data-bubble=');
-  });
-
-  it('draws no paper bubble above x4, where it would flicker, and keeps the red one', () => {
-    const state = queueAtTheSaw();
-    for (const speed of [10, 30] as const) {
-      const fast = act(state, { type: 'SET_SPEED', speed });
-      resetBubbles();
-      const svg = renderHall(fast, { nowMs: 0 });
-      expect(groupOf(svg, 'worker-staff-1'), String(speed)).not.toContain('data-tone="work"');
-      expect(groupOf(svg, 'worker-staff-2'), String(speed)).toContain('data-tone="wait"');
-    }
-    // And at the speeds the drawing allows it is drawn.
-    for (const speed of [1, 2, 4] as const) {
-      const slow = act(state, { type: 'SET_SPEED', speed });
-      resetBubbles();
-      expect(groupOf(renderHall(slow, { nowMs: 0 }), 'worker-staff-1'), String(speed)).toContain(
-        'data-tone="work"',
-      );
-    }
-  });
-
-  it('forgets every man when the view is built from nothing', () => {
-    const state = queueAtTheSaw();
-    renderHall(state, { nowMs: 0 });
-    expect(groupOf(renderHall(state, { nowMs: 9_000 }), 'worker-staff-1')).not.toContain('data-bubble=');
-    resetBubbles();
-    expect(groupOf(renderHall(state, { nowMs: 9_000 }), 'worker-staff-1')).toContain('data-tone="work"');
-  });
-});
-
-describe('the box itself', () => {
+describe('the mark itself', () => {
   it('escapes what it is handed and carries the man it belongs to', () => {
-    const drawn = bubbleArt(
-      { who: 'worker-staff-1', key: 'noMaterial', tone: 'wait', text: 'no sheets for <Bob & Sons>' },
+    const drawn = markArt(
+      { who: 'worker-staff-1', key: 'noMaterial', text: 'no sheets for <Bob & Sons>' },
       CAPSULE_HEAD_TOP,
     );
     expect(drawn).toContain('data-bubble-for="worker-staff-1"');
     expect(drawn).toContain('&lt;Bob &amp; Sons&gt;');
     expect(drawn).not.toContain('<Bob');
-  });
-
-  it('says at lunch over the whole crew while the dinner hour runs', () => {
-    const state = runClock(sixJoinersOnSheetWork({ saws: 1 }), 250);
-    resetBubbles();
-    const svg = renderHall(state, { nowMs: 0 });
-    // Until 2.12 takes them off the hall they stand at the canteen door and say it there; either way
-    // the words are the drawing's.
-    expect(svg).toContain('data-bubble="atLunch"');
-    expect(svg).toContain('class="bubble bubble-away"');
-    expect(svg).toContain('at lunch');
   });
 });

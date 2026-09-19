@@ -1,6 +1,9 @@
-// The Turn 21 scenarios of CLAUDE.md T21 3, T21-C2: (gg) four men, one saw and two jobs, (hh) a
-// drop of a fifty thousand pound job that closes the company, and (ii) a month in arrears that ends
-// on the thirtieth day below the overdraft limit.
+// The Turn 21 scenarios of CLAUDE.md T21 3, T21-C2, as Turn 22 leaves them: (gg) four men, one saw
+// and two jobs, with nobody moved between them (CLAUDE.md T22 2.6), (hh) a drop of a fifty thousand
+// pound job that closes the company, and (ii) a company under the overdraft limit that the amount
+// closes before the run of days can reach thirty. The arrears (ii) was written around are gone from
+// the game tonight (T22 2.1), and the two played halls that answer for the new money are (jj) and
+// (kk) of tests/scenarios/turn22.test.ts.
 //
 // The shape is the one Turns 13, 17, 19 and 20 used: a month, or a day, played through the scripted
 // player of autopilot.ts, off a hall that is stood up by playing the opening days and never by
@@ -8,7 +11,7 @@
 // a scenario does write one figure onto the state it says which figure it is, whose figure it is and
 // why the played route cannot reach it. Every figure in a comment was measured on this build.
 //
-// The unit tests of the same three rules are tests/engine/nobodyWaits.test.ts,
+// The unit tests of the same three rules are tests/engine/nobodyMoved.test.ts,
 // tests/ui/dropCard.test.ts and tests/engine/bankruptcy.test.ts. Nothing here repeats them: they
 // drive one function with a position written into it, and these three play the hall and read the
 // meters, the cards and the words over the men's heads that the player is actually shown.
@@ -31,14 +34,14 @@ import {
   stageText,
   stationWaitingFor,
 } from '../../src/engine/index';
-import { bankruptcyFloor, netPosition } from '../../src/engine/economy';
+import { bankruptcyFloor } from '../../src/engine/economy';
 import { bubbleFor } from '../../src/engine/bubbles';
 import { canHire } from '../../src/engine/staff';
 import {
   depositCanBePaid,
   dropCardTitle,
   materialWrittenOff,
-  netAfterDrop,
+  accountAfterDrop,
   renderDropCard,
 } from '../../src/ui/dropCard';
 import { renderBankruptcyCard } from '../../src/ui/eventModal';
@@ -62,7 +65,7 @@ function jobOn(state: GameState, jobId: string): Job {
 }
 
 // ---------------------------------------------------------------------------
-// (gg) Four men, one saw, two jobs (PIOTR; CLAUDE.md T21 2.7, 3, 7)
+// (gg) Four men, one saw, two jobs (PIOTR; CLAUDE.md T22 2.6, and T21 2.7 before it)
 // ---------------------------------------------------------------------------
 
 /** The fourth man. Three of the four adverts of day 1 come back with a joiner and the fourth is
@@ -112,7 +115,7 @@ interface FourMen {
   men: Worker[];
   record: DaySummary;
   stood: Stood[];
-  /** What each man said over his head that day, in the words of 2.6, each word once. */
+  /** What the mark over each man's head said that day, each line once (CLAUDE.md T22 2.5). */
   said: Map<string, string[]>;
 }
 
@@ -154,7 +157,7 @@ function fourMenTwoJobs(benchWork: boolean): FourMen {
   state = act(state, { type: 'ADD_TO_JOB', jobId: benchId, workerId: crew[3] ?? '' });
   // `labourRemaining` counts what is left, so a twentieth of the way through its making is the
   // cutting stage and fifty five per cent of the way through is the assembly one, which is the
-  // reading tests/engine/nobodyWaits.test.ts takes of the same two stages.
+  // reading tests/engine/nobodyMoved.test.ts takes of the same two stages.
   jobOn(state, cuttingId).labourRemaining = jobOn(state, cuttingId).labourValue * 0.95;
   jobOn(state, benchId).labourRemaining =
     jobOn(state, benchId).labourValue * (benchWork ? 0.45 : 0.95);
@@ -173,7 +176,7 @@ function fourMenTwoJobs(benchWork: boolean): FourMen {
         const bubble = bubbleFor(current, worker.id);
         if (bubble === null) continue;
         const words = said.get(worker.name) ?? new Set<string>();
-        words.add(`${bubble.tone}: ${bubble.text}`);
+        words.add(bubble.text);
         said.set(worker.name, words);
       }
     },
@@ -224,99 +227,98 @@ describe('(gg) four men, one saw and two jobs, on Very easy', () => {
     expect(GG_QUEUE.opening.cash).toBe(GG.opening.cash);
   });
 
-  it('works every man of the four all day while the second job has bench work', () => {
+  it('works three of the four all day and stands the man who cannot have the saw', () => {
     // The day's own meters, which are the ones the top bar showed him: five seats (the owner and
-    // his four men) over the 480 minutes of the working day is 2,400 possible, and 1,920 of them
-    // were worked, which is four men times every minute of the day. Not one minute was lost to a
-    // machine, in a hall with one saw and two men whose stage wants it. This is the line of the
-    // cross check of CLAUDE.md T21 7: nobody stands while bench work exists.
+    // his four men) over the 480 minutes of the working day is 2,400 possible, and 1,440 of them
+    // were worked, which is three men times every minute of the day. The fourth man is the second
+    // man of the cutting job, and his whole day, 480 minutes of it, is lost to the one saw. Turn 21
+    // moved him to the other job's bench and worked all 1,920; Piotr reversed that on 19.09, and
+    // this is the figure of the hall that does not move men (CLAUDE.md T22 2.6).
     expect(GG.record.efficiency.possible).toBe(2400);
-    expect(GG.record.efficiency.worked).toBe(1920);
-    expect(GG.record.efficiency.lost.noMachine).toBe(0);
+    expect(GG.record.efficiency.worked).toBe(1440);
+    expect(GG.record.efficiency.lost.noMachine).toBe(480);
     expect(GG.record.efficiency.lost.noMaterial).toBe(0);
     // The 480 left over is the owner's own seat. He worked the whole of his day, all 480 minutes of
     // it, but on the jobs of work on his own list and never at a bench, so the seat at the benches
     // is nobody at a station and not a man standing about.
     expect(GG.record.efficiency.lost.noPeople).toBe(480);
     expect(GG.record.minutesWorked).toBe(MINUTES_PER_WORKING_DAY);
-    for (const man of GG.men) {
-      expect(minutesOf(GG.evening, man.name), man.name).toBe(MINUTES_PER_WORKING_DAY);
+    // The man on the saw and the two at the other job's bench put in every minute of the day; the
+    // man behind him at the saw put in none.
+    for (const man of [GG.men[0], GG.men[2], GG.men[3]]) {
+      expect(minutesOf(GG.evening, man?.name ?? ''), man?.name).toBe(MINUTES_PER_WORKING_DAY);
     }
+    expect(minutesOf(GG.evening, GG.men[1]?.name ?? '')).toBe(0);
   });
 
-  it('moves the man who could not have the saw to the other job s bench, and keeps him there', () => {
+  it('leaves every man on the job he was assigned to, all day', () => {
     const cutting = jobOn(GG.evening, GG.cuttingId);
     const bench = jobOn(GG.evening, GG.benchId);
-    // One man keeps the saw and the man behind him is at the other job by the end of the first
-    // minute of the day, through the game's own `addToJob`, so his chip on the Work Plan and the
-    // cell he stands on are the one fact (CLAUDE.md T21 2.7).
-    expect(cutting.assignees).toEqual([GG.men[0]?.id]);
-    expect(bench.assignees).toContain(GG.men[1]?.id);
-    expect(bench.assignees).toHaveLength(3);
-    // 480 minutes into the cutting job, one man's day; 1,440 into the assembly job, three men's.
+    // Nobody was moved: the two men of the cutting job are still its two men at the end of the day,
+    // and the two at the bench are still its own [PIOTR, 19.09] (CLAUDE.md T22 2.6).
+    expect(cutting.assignees).toEqual([GG.men[0]?.id, GG.men[1]?.id]);
+    expect(bench.assignees).toEqual([GG.men[2]?.id, GG.men[3]?.id]);
+    const waiting = GG.evening.workers.find((worker) => worker.id === GG.men[1]?.id);
+    expect(waiting?.jobId).toBe(GG.cuttingId);
+    // 480 minutes into the cutting job, one man's day; 960 into the assembly job, two men's.
     expect(cutting.productionMinutes).toBe(480);
-    expect(bench.productionMinutes).toBe(1440);
-    // And the job that has the saw is never left with nobody on it, which is what the scheduler
-    // refuses to do (CLAUDE.md T21 2.7, and the note in docs/notes-t21-b2.md on the last man).
-    expect(cutting.assignees.length).toBeGreaterThan(0);
+    expect(bench.productionMinutes).toBe(960);
   });
 
-  it('has nobody at a waiting cell all day but the two minutes before the scheduler s first look', () => {
-    // Every minute of the day was watched and the men were read where they stood. Two readings in
-    // the whole day, and both are of the man who holds the saw, in the minute before the hall's
-    // first production minute of a spell: 08:00, when the day opens with both men of the cutting job
-    // stood at the saw the stations were written for, and 13:00, the first minute back from the
-    // dinner hour. The watch reads the station the settle before it wrote, so the minute the
-    // scheduler sorts out is read as it was at the top of it; both minutes were worked in full,
-    // which is what the 480 minutes a man above says.
+  it('has the man who cannot have the saw at its waiting cell every minute of the day', () => {
+    // Every minute of the day was watched and the men were read where they stood: 481 readings, and
+    // 479 of them are the second man of the cutting job, at the saw's own waiting cell from 08:01
+    // to the end of the day, the dinner hour apart. The two left over are the man who holds the saw,
+    // read in the minute before the hall's first production minute of a spell: 08:00, when the day
+    // opens with both men of the cutting job stood at the saw the stations were written for, and
+    // 13:00, the first minute back from the dinner hour.
     const first = GG.men[0];
-    if (first === undefined) throw new Error('the man on the saw is wanted here');
-    expect(GG.stood).toEqual([
+    const second = GG.men[1];
+    if (first === undefined || second === undefined) throw new Error('the two men are wanted here');
+    expect(GG.stood).toHaveLength(481);
+    expect(GG.stood.filter((reading) => reading.who === first.name)).toEqual([
       { at: '08:00', who: first.name, waitingFor: 'tableSaw' },
       { at: '13:00', who: first.name, waitingFor: 'tableSaw' },
     ]);
-    // Neither job says it is waiting for anything by the end of the day, which is what the Work
-    // Plan's bar and the job card print (CLAUDE.md T21 2.7).
-    expect(jobOn(GG.evening, GG.cuttingId).blockedBy).toBe('');
+    expect(GG.stood.filter((reading) => reading.who === second.name)).toHaveLength(479);
+    for (const reading of GG.stood) expect(reading.waitingFor).toBe('tableSaw');
+    // And the cutting job says what it is waiting for at the end of the day, which is what the Work
+    // Plan's bar and the job card print; the job with bench work to do says nothing
+    // (CLAUDE.md T22 2.6).
+    expect(jobOn(GG.evening, GG.cuttingId).blockedBy).toBe('waiting for the saw');
     expect(jobOn(GG.evening, GG.benchId).blockedBy).toBe('');
-    expect(stageText(GG.evening, jobOn(GG.evening, GG.cuttingId))).toBe('Cutting');
+    expect(stageText(GG.evening, jobOn(GG.evening, GG.cuttingId))).toBe('Cutting, waiting for the saw');
     expect(stageText(GG.evening, jobOn(GG.evening, GG.benchId))).toBe('Assembly');
   });
 
-  it('says over their heads what they are doing, and only says the queue in its first minute', () => {
-    // The bubbles of CLAUDE.md T21 2.6, as they were said on the played day: three men at the
-    // assembly of the second job and one cutting the first, in the drawing's own words, and the
-    // dinner hour behind the canteen door for all four (CLAUDE.md T21 2.12).
-    const moved = GG.men[1]?.name ?? '';
-    expect(GG.said.get(GG.men[0]?.name ?? '')).toEqual([
-      'away: at lunch',
-      'wait: waiting for the saw',
-      'work: cutting Small kitchen',
-    ]);
-    expect(GG.said.get(moved)).toEqual([
-      'away: at lunch',
-      'wait: no cut parts yet',
-      'work: assembling Garage shelves',
-    ]);
+  it('marks a man only while something is wrong with him, and never a man at work', () => {
+    // The marks of CLAUDE.md T22 2.5, as they stood on the played day. The two men at the assembly
+    // of the second job worked every minute of it and carry nothing at all, and a man at work never
+    // carries a mark. The man on the saw was marked twice, in the minute before the hall's first
+    // production minute of a spell, at 08:00 and at 13:00, which is the same reading as the waiting
+    // cells above. The man behind him carried a mark all day and it said both of the things that
+    // were true of him in turn: he is waiting for the saw while he is the first of its queue, and he
+    // is short of cut parts while somebody else is. The dinner hour is no mark either, because a man
+    // at his lunch has nothing wrong with him (CLAUDE.md T21 2.12, T22 2.5, 2.6).
+    const waiting = GG.men[1]?.name ?? '';
+    expect(GG.said.get(GG.men[0]?.name ?? '')).toEqual(['waiting for the saw']);
+    expect(GG.said.get(waiting)).toEqual(['no cut parts yet', 'waiting for the saw']);
     for (const man of GG.men.slice(2)) {
-      expect(GG.said.get(man.name), man.name).toEqual([
-        'away: at lunch',
-        'work: assembling Garage shelves',
-      ]);
+      expect(GG.said.get(man.name), man.name).toBeUndefined();
     }
     console.log(
       '(gg) FOUR MEN, ONE SAW, TWO JOBS\n' +
         `the hall on day ${GG.opening.clock.day}: ${GG.men.length} joiners, ` +
         `${GG.opening.equipment.filter((item) => item.specId === 'tableSaw').length} saw, ` +
         `${GG.opening.stock.sheets} sheets on the rack\n` +
-        `Small kitchen at its cutting stage with ${GG.men[0]?.name} and ${moved} on it; ` +
+        `Small kitchen at its cutting stage with ${GG.men[0]?.name} and ${waiting} on it; ` +
         `Garage shelves at its assembly with ${GG.men[2]?.name} and ${GG.men[3]?.name}\n` +
         `the day's meters: ${GG.record.efficiency.worked} minutes worked of ` +
         `${GG.record.efficiency.possible} possible, ` +
         `${GG.record.efficiency.lost.noMachine} lost to a machine\n` +
         `Small kitchen took ${jobOn(GG.evening, GG.cuttingId).productionMinutes} minutes, ` +
         `Garage shelves ${jobOn(GG.evening, GG.benchId).productionMinutes}; ` +
-        `${moved} spent his day at the second job's bench\n` +
+        `${waiting} spent his day at the saw's waiting cell, on the job he was put on\n` +
         `readings of a man at a waiting cell, all day: ${GG.stood.length}`,
     );
   });
@@ -326,9 +328,10 @@ describe('(gg) the same hall with nothing in it but the saw s own work', () => {
   it('stands three of the four men at the saw, and moves nobody', () => {
     // The control: both jobs at their cutting stage, so there is no bench work in the hall to be
     // had. One saw, one man cutting, and the other three stand: 480 minutes worked of the same
-    // 2,400, and 1,440 lost to a machine, which is three men times every minute of the day. That is
-    // the other half of 2.7, and it is what says the scheduler moves a man to work and never to
-    // another queue.
+    // 2,400, and 1,440 lost to a machine, which is three men times every minute of the day. These
+    // are the figures the hall had in Turn 21 as well: with nothing else in the hall to do there was
+    // nowhere to move a man to, so the run beside this one is the whole of the difference 2.6 makes
+    // (CLAUDE.md T22 2.6).
     expect(GG_QUEUE.record.efficiency.possible).toBe(2400);
     expect(GG_QUEUE.record.efficiency.worked).toBe(480);
     expect(GG_QUEUE.record.efficiency.lost.noMachine).toBe(1440);
@@ -353,13 +356,15 @@ describe('(gg) the same hall with nothing in it but the saw s own work', () => {
     expect(bench.blockedBy).toBe('waiting for the saw');
     expect(stageText(GG_QUEUE.evening, cutting)).toBe('Cutting, waiting for the saw');
     expect(stageText(GG_QUEUE.evening, bench)).toBe('Cutting, waiting for the saw');
-    // Over their heads: the men at the saw's waiting cell say they are waiting for it and the man
-    // behind the first of a queue says what is really stopping him, which is the parts nobody has
-    // cut yet (docs/mockups/t21/bubbles.html; CLAUDE.md T21 2.6).
+    // Over their heads: the men at the saw's waiting cell are marked as waiting for it and the man
+    // behind the first of a queue is marked with what is really stopping him, which is the parts
+    // nobody has cut yet (docs/mockups/t22/bubbles-v2.png; CLAUDE.md T22 2.5).
     const words = [...GG_QUEUE.said.values()].flat();
-    expect(words).toContain('wait: waiting for the saw');
-    expect(words).toContain('wait: no cut parts yet');
-    expect(words.filter((line) => line.startsWith('work:'))).toEqual([]);
+    expect(words).toContain('waiting for the saw');
+    expect(words).toContain('no cut parts yet');
+    // And nothing else was said all day: every mark is one of the four things that are wrong, so
+    // there is no line left about the stage a man has just begun.
+    expect([...new Set(words)].sort()).toEqual(['no cut parts yet', 'waiting for the saw']);
     // 962 readings of a man at a waiting cell: two of the three standing men are at the saw's own
     // waiting cell every one of the 480 minutes of the day, and the two left over are the man who
     // holds the saw at the top of his two spells, at 08:00 and 13:00, exactly as in the run beside
@@ -490,7 +495,6 @@ describe('(hh) a fifty thousand pound job dropped with seven thousand in the ban
     ).toHaveLength(1);
     expect(HH.morning.cash).toBe(IN_THE_BANK);
     expect(HH.morning.finance.overdraftLimit).toBe(-10000);
-    expect(HH.morning.finance.arrearsAmount).toBe(0);
     // The morning after the lorry, day 11, with the whole working day still in front of him: the
     // click is made at 08:00 and the company trades the rest of the day either way.
     expect(HH.dropDay).toBe(11);
@@ -513,18 +517,18 @@ describe('(hh) a fifty thousand pound job dropped with seven thousand in the ban
     expect(dropReputationCost(HH.job)).toBe(50);
   });
 
-  it('says in the red box that the drop closes the company today, and it is telling the truth', () => {
-    // The deposit cannot be paid out of 7,000 and a 10,000 overdraft, so the whole 25,000 of it goes
-    // to arrears, and the net position that leaves, -18,000, is past the -15,000 one and a half
-    // times the overdraft the bank allows (CLAUDE.md T21 2.2, 2.3).
+  it('says in the red box that the drop closes the company, and it is telling the truth', () => {
+    // The deposit cannot be paid out of 7,000 and a 10,000 overdraft, and from Turn 22 it is paid
+    // anyway: the account goes to -18,000, which is past the -15,000 one and a half times the
+    // overdraft the bank allows (CLAUDE.md T22 2.1, 2.2, 2.3).
     expect(depositCanBePaid(HH.morning, HH.job)).toBe(false);
-    expect(netAfterDrop(HH.morning, HH.job)).toEqual({ net: -18000, allowed: -15000 });
+    expect(accountAfterDrop(HH.morning, HH.job)).toEqual({ account: -18000, allowed: -15000 });
     expect(bankruptcyFloor(HH.morning)).toBe(
       HH.morning.finance.overdraftLimit * BANKRUPTCY_LIMIT_FACTOR,
     );
     expect(dangerBoxOf(renderDropCard(HH.morning, HH.job))).toBe(
-      'You cannot pay the deposit back. It goes to arrears: -£18,000 against the ' +
-        "bank's -£15,000 limit. Dropping this job closes the company today.",
+      'You cannot pay the deposit back from the overdraft. The account goes to -£18,000 ' +
+        "against the bank's -£15,000. Dropping this job closes the company at tomorrow's check.",
     );
   });
 
@@ -532,18 +536,15 @@ describe('(hh) a fifty thousand pound job dropped with seven thousand in the ban
     // CLAUDE.md T21 7, line one: "A GBP 50,000 drop with GBP 7,000 in the bank closes the company at
     // that day's close, asserted." This is that assertion.
     //
-    // The click itself takes the job off the books, hands the deposit back as arrears because there
-    // is nothing to hand it back out of, writes the material off and charges the 50 points. The game
-    // does not end in the middle of the day: the bank looks once a calendar day, at the point the
-    // day's money is settled (`runDayCosts`), so the look that closes him is the one at the close of
-    // the day he dropped it on, which is the reading of "as today" the brief and
-    // docs/notes-t21-b1.md both take.
+    // The click itself takes the job off the books, hands the deposit back out of the account
+    // because a deposit returned is not a cost the player can decline, writes the material off and
+    // charges the 50 points. The game does not end in the middle of the day: the bank looks once a
+    // calendar day, at the point the day's money is settled (`runDayCosts`), so the look that
+    // closes him is the next morning's.
     expect(HH.clicked.jobs).toHaveLength(0);
-    expect(HH.clicked.cash).toBe(IN_THE_BANK);
-    expect(HH.clicked.finance.arrearsAmount).toBe(25000);
-    expect(HH.clicked.finance.arrearsMonths).toBe(1);
-    expect(netPosition(HH.clicked)).toBe(-18000);
-    expect(netPosition(HH.clicked)).toBeLessThanOrEqual(bankruptcyFloor(HH.clicked));
+    expect(HH.clicked.cash).toBe(IN_THE_BANK - HH.job.depositPaid);
+    expect(HH.clicked.cash).toBe(-18000);
+    expect(HH.clicked.cash).toBeLessThanOrEqual(bankruptcyFloor(HH.clicked));
     // The standing of 60 the company took a job of this size on is 10 by the time the click is over.
     expect(HH.clicked.reputation).toBe(10);
     expect(HH.clicked.reputationLog.at(-1)).toEqual({
@@ -552,9 +553,13 @@ describe('(hh) a fifty thousand pound job dropped with seven thousand in the ban
       points: -50,
     });
     const lines = HH.clicked.ledger.filter((entry) => entry.day === HH.dropDay);
-    expect(lines.map((entry) => entry.label)).toContain(
-      'Deposit returned: Kitchen for the Hedges (unpaid)',
+    const deposit = lines.find(
+      (entry) => entry.label === 'Deposit returned: Kitchen for the Hedges',
     );
+    expect(deposit).not.toBeUndefined();
+    // The money really left the account: the line is not a note on the books any more.
+    expect(deposit?.unpaid).toBe(false);
+    expect(deposit?.amount).toBe(-HH.job.depositPaid);
     expect(lines.map((entry) => entry.label)).toContain(
       'Material written off: Kitchen for the Hedges',
     );
@@ -570,25 +575,28 @@ describe('(hh) a fifty thousand pound job dropped with seven thousand in the ban
     expect(HH.closed.days.some((entry) => entry.day > HH.dropDay)).toBe(false);
   });
 
-  it('hands him the bank s card with the four figures the engine closed him on', () => {
-    // The event is the bankruptcy event the game always had, with the four figures of the drawing
-    // riding on it so the card cannot work a different sum out a minute later (CLAUDE.md T21 2.2;
-    // docs/mockups/t21/debt.html part 3). The cash is 6,693 and not the 7,000 of the morning,
+  it('hands him the bank s card with the figures the engine closed him on', () => {
+    // The event is the bankruptcy event the game always had, with the figures of the drawing riding
+    // on it so the card cannot work a different sum out a minute later (CLAUDE.md T21 2.2, T22 2.2;
+    // docs/mockups/t21/debt.html part 3). The cash is -18,307 and not the -18,000 the click left,
     // because the day the bank looked at had its own rent, rates, power and owner's draw to pay
-    // first: 307 of them, and they were paid, because the cash was still above the overdraft.
+    // first: 307 of them, and from Turn 22 they are paid whatever the balance.
     const event = HH.closed.activeEvent;
     expect(event?.kind).toBe('bankruptcy');
     expect(event?.data).toEqual({
       day: 12,
       month: 1,
-      cash: 6693,
-      arrears: 25000,
-      net: -18307,
+      cash: -18307,
       allowed: -15000,
+      // The other rule's reading, which the card prints as its third figure: the account went under
+      // the limit on the click, so the morning that closed him is the first day of the thirty, and
+      // it was the amount and not the days that did it (CLAUDE.md T22 2.2).
+      daysBelow: 1,
+      daysAllowed: BANKRUPTCY_DAYS_BELOW_LIMIT,
     });
-    expect(Number(event?.data.net)).toBeLessThanOrEqual(Number(event?.data.allowed));
+    expect(Number(event?.data.cash)).toBeLessThanOrEqual(Number(event?.data.allowed));
     expect(HH.card).toContain('The bank has closed you');
-    for (const figure of ['£6,693', '-£25,000', '-£18,307', '-£15,000']) {
+    for (const figure of ['-£18,307', '-£15,000']) {
       expect(HH.card, figure).toContain(figure);
     }
     // The epitaph of the drawing: the working days he kept the workshop, and the orders taken and
@@ -604,9 +612,8 @@ describe('(hh) a fifty thousand pound job dropped with seven thousand in the ban
         `-${dropReputationCost(HH.job)}, in the bank ${formatMoney(HH.morning.cash)} of ` +
         `${formatMoney(HH.morning.finance.overdraftLimit)} overdraft\n` +
         `the red box: ${dangerBoxOf(renderDropCard(HH.morning, HH.job))}\n` +
-        `dropped on day ${HH.dropDay}: arrears ${formatMoney(HH.clicked.finance.arrearsAmount)}, ` +
-        `net ${formatMoney(netPosition(HH.clicked))} against the bank's ` +
-        `${formatMoney(bankruptcyFloor(HH.clicked))}\n` +
+        `dropped on day ${HH.dropDay}: the account ${formatMoney(HH.clicked.cash)} against the ` +
+        `bank's ${formatMoney(bankruptcyFloor(HH.clicked))}\n` +
         `CLOSED at the close of day ${HH.dropDay}, on the bank's look of day ` +
         `${HH.closed.gameOver?.day}: "${HH.closed.gameOver?.reason}"`,
     );
@@ -614,20 +621,17 @@ describe('(hh) a fifty thousand pound job dropped with seven thousand in the ban
 });
 
 // ---------------------------------------------------------------------------
-// (ii) A month in arrears, and the thirtieth day below the overdraft limit
-//      (PIOTR, 18.09: "thirty days below the limit"; CLAUDE.md T21 2.2, 3)
+// (ii) A month under the overdraft limit, and the thirtieth day below it
+//      (PIOTR, 18.09: "thirty days below the limit"; CLAUDE.md T21 2.2, 3, T22 2.1, 2.2)
 // ---------------------------------------------------------------------------
 
 /** A hall with the day 1 kit in it, nothing off the board and nobody on the books: the month is
  *  about the money, so there is no job and no wage in the way of it. */
 const PAST_THE_LIMIT: Policy = { ...CAREFUL, maxOpenJobs: 0, stockSheets: 0 };
 
-/** How far past the limit the account is put: a hundred pounds, which is under what the two costs
- *  in the game that are paid without the overdraft floor come to (a repair bill at the end of a
- *  repair, and the 150 of temporary storage when a lorry brings more sheets than the rack holds).
- *  Those two, and nothing else, are how a played company's cash ever closes a day below the limit:
- *  every other cost in the game either fits inside the overdraft or goes to the arrears, which is
- *  what the first test below measures. */
+/** How far past the limit the account is put: a hundred pounds. From Turn 22 every cost the player
+ *  did not choose goes through the limit, so a company gets under it by simply standing still, and
+ *  the hundred is only where these runs start counting from (CLAUDE.md T22 2.1). */
 const PAST_BY = 100;
 
 /** The hall of the section's second rule, played, with two figures written onto it and named:
@@ -635,12 +639,12 @@ const PAST_BY = 100;
  *  1. the cash, a hundred pounds past the overdraft limit;
  *  2. the run of days below it, when the test wants the thirtieth day.
  *
- *  The second one cannot be played up to, and the test after this one is the measurement of why: a
- *  company below the limit can pay nothing at all, so its bills go to the arrears at 307 a working
- *  day and 107 a weekend one, and the 5,000 of room between the limit and the one and a half times
- *  it the bank allows is used up on the twenty first of those days. So a real company is closed by
- *  its arrears nine days before the thirtieth, and the only honest way to watch the thirtieth day
- *  arrive is to write the count the bank is keeping and play the two days that matter. */
+ *  The second one cannot be played up to by a company that stands still: its bills now come out of
+ *  the account at 307 a working day and 107 a weekend one, so the 5,000 of room between the limit
+ *  and the one and a half times it the bank allows is used up on the twenty first of those days,
+ *  and rule one closes it before the thirtieth day arrives. A company that keeps earning while it
+ *  is under the limit does reach it, which is what tests/engine/bankruptcy.test.ts plays; here the
+ *  count the bank is keeping is written and the two days that matter are played. */
 function pastTheLimit(counter: number): GameState {
   const state = playUntilDay(
     newGame({ seed: SEED, difficulty: 'veryEasy' }),
@@ -654,10 +658,10 @@ function pastTheLimit(counter: number): GameState {
 }
 
 /** A played month of a company that does nothing at all on Hard: the cheapest company the game can
- *  hold, which is the one that would reach the thirtieth day if any could. Every day of it is read
- *  as it closes: what the account had in it against the limit, and what the bank's count of days
- *  stood at. */
-interface ArrearsMonth {
+ *  hold, which is the one that would reach the thirtieth day if any standing still could. Every day
+ *  of it is read as it closes: what the account had in it against the limit, and what the bank's
+ *  count of days stood at. */
+interface IdleMonth {
   readings: string[];
   /** What the account was above the overdraft limit at the close of each day. */
   gaps: number[];
@@ -666,7 +670,7 @@ interface ArrearsMonth {
   closed: GameState;
 }
 
-function arrearsMonth(): ArrearsMonth {
+function idleMonth(): IdleMonth {
   const readings: string[] = [];
   const gaps: number[] = [];
   const counts: number[] = [];
@@ -676,9 +680,9 @@ function arrearsMonth(): ArrearsMonth {
     state = playDay(state, IDLE, []);
     guard += 1;
     readings.push(
-      `day ${state.clock.day}: cash ${Math.round(state.cash)}, arrears ` +
-        `${Math.round(state.finance.arrearsAmount)}, net ${Math.round(netPosition(state))}, ` +
-        `days below the limit ${state.finance.daysBelowOverdraft}`,
+      `day ${state.clock.day}: cash ${Math.round(state.cash)}, the limit ` +
+        `${Math.round(state.finance.overdraftLimit)}, days below it ` +
+        `${state.finance.daysBelowOverdraft}`,
     );
     gaps.push(state.cash - state.finance.overdraftLimit);
     counts.push(state.finance.daysBelowOverdraft);
@@ -686,10 +690,10 @@ function arrearsMonth(): ArrearsMonth {
   return { readings, gaps, counts, closed: state };
 }
 
-const II_MONTH = arrearsMonth();
+const II_MONTH = idleMonth();
 
 /** The same position played to the end: how far the bank's count of days actually gets before the
- *  arrears take the net position past what it allows. */
+ *  standing costs take the account past what the bank allows. */
 function playedToTheEnd(): { closed: GameState; counter: number } {
   let state = pastTheLimit(0);
   let guard = 0;
@@ -730,79 +734,71 @@ function dayAboveTheLimit(): { paid: GameState; next: GameState; after: GameStat
 
 const II_RESET = dayAboveTheLimit();
 
-describe('(ii) a played month in arrears, on Hard, doing nothing', () => {
-  it('never gets the bank s count of days off nought, because the cash stops at the limit', () => {
-    // The month Piotr's rule two is written for, played: the 5,000 overdraft of Hard fills by day
-    // 11, every bill after that goes unpaid, and the arrears climb about 299 a working day. The
-    // account itself never closes a day below the limit, so the count of days past it is nought on
-    // every one of the twenty two days the company lasts. The closure itself is rule one, and the
-    // day 22 of it is also asserted in tests/scenarios/thirtyDays.test.ts; what is asserted here is
-    // the count, which is the thing 2.2 rule 2 reads.
-    // Not one day of the month closes with the account below the overdraft limit: a bill that
-    // cannot be paid inside it is not paid at all and goes to the arrears instead, so the cash stops
-    // dead at the limit and the count of days past it never starts (CLAUDE.md T21 2.2 rule 2,
-    // against `canAfford` and `chargeUnavoidable` in src/engine/economy.ts).
-    expect(II_MONTH.gaps.filter((gap) => gap < 0)).toEqual([]);
-    expect([...new Set(II_MONTH.counts)]).toEqual([0]);
+describe('(ii) a played month under the limit, on Hard, doing nothing', () => {
+  it('gets the bank s count of days off nought, and is closed on the amount before the days', () => {
+    // The month Piotr's rule two is written for, played. Turn 21 stopped every bill at the 5,000
+    // overdraft of Hard and put the rest in a second pot, so the account parked on the limit and
+    // the bank's count of days never started; from Turn 22 the bills come out of the account, so it
+    // goes under the limit and keeps going, and the count climbs a day at a time. It is still rule
+    // one that closes the company, because at 307 a working day the 2,500 of room between the limit
+    // and the -7,500 the bank allows runs out long before the thirtieth day
+    // (CLAUDE.md T22 2.1, 2.2; REPORT-T21.md section 0 item 23).
+    expect(II_MONTH.gaps.filter((gap) => gap < 0).length).toBeGreaterThan(0);
+    expect(Math.max(...II_MONTH.counts)).toBeGreaterThan(0);
     const closed = II_MONTH.closed;
     expect(closed.gameOver?.day).toBe(22);
     expect(closed.gameOver?.reason).toContain('cannot pay');
-    expect(closed.finance.daysBelowOverdraft).toBe(0);
-    expect(closed.finance.arrearsAmount).toBeGreaterThan(0);
-    expect(closed.finance.arrearsMonths).toBeGreaterThanOrEqual(1);
-    expect(Math.round(closed.cash)).toBe(-4998);
-    expect(netPosition(closed)).toBeLessThanOrEqual(bankruptcyFloor(closed));
+    expect(closed.finance.daysBelowOverdraft).toBeGreaterThan(0);
+    expect(closed.finance.daysBelowOverdraft).toBeLessThan(BANKRUPTCY_DAYS_BELOW_LIMIT);
+    expect(closed.cash).toBeLessThanOrEqual(bankruptcyFloor(closed));
+    expect(closed.ledger.some((entry) => entry.unpaid)).toBe(false);
     console.log(
-      '(ii) A PLAYED MONTH IN ARREARS, ON HARD, DOING NOTHING\n' +
+      '(ii) A PLAYED MONTH UNDER THE LIMIT, ON HARD, DOING NOTHING\n' +
         `${II_MONTH.readings.slice(-4).join('\n')}\n` +
         `CLOSED on day ${closed.gameOver?.day}: "${closed.gameOver?.reason}"\n` +
-        'the count of days below the overdraft limit, every day of it: 0',
+        'the count of days below the overdraft limit at the close: ' +
+        `${closed.finance.daysBelowOverdraft} of ${BANKRUPTCY_DAYS_BELOW_LIMIT}`,
     );
   });
 });
 
 describe('(ii) a company below the overdraft limit, played to the end', () => {
-  it('is closed by its arrears nine days short of the thirtieth', () => {
+  it('is closed on the amount before the thirtieth day, while it stands still', () => {
     // The company of `pastTheLimit`, played from the day its account first closes below the limit
-    // until the bank shuts it. The count climbs a day at a time, as it should, and it reaches 21 of
-    // the 30: every one of those days puts its unpaid bills on the arrears, 307 of them on a
-    // working day and 107 on a weekend one, and by the twenty first the arrears, 5,247, have taken
-    // the net position to -15,347 against the -15,000 the bank allows. The bank closes the company
-    // on calendar day 28, which is the weekend day its money passed the line on. So rule one always
-    // gets there first, and the thirtieth day is out of the reach of any company whose bills are
-    // going unpaid. One line for Piotr: the thirty day rule as it stands can only bite a company
-    // that is below the limit and still paying its way, and nothing in the game produces one.
+    // until the bank shuts it. The count climbs a day at a time, as it should, and it gets most of
+    // the way to the thirty: every one of those days takes its standing costs out of the account,
+    // 307 of them on a working day and 107 on a weekend one, and the 5,000 of room between the
+    // limit and the -15,000 the bank allows runs out first. So for a company that stands still it
+    // is rule one that gets there, and the thirtieth day belongs to a company that keeps earning
+    // while it is under the limit, which is what tests/engine/bankruptcy.test.ts plays out
+    // (CLAUDE.md T22 2.2).
     expect(II_END.closed.gameOver).not.toBeNull();
     expect(II_END.closed.gameOver?.reason).toContain('cannot pay');
     expect(II_END.closed.gameOver?.reason).not.toContain('30 days');
-    expect(II_END.counter).toBe(21);
+    expect(II_END.counter).toBeGreaterThan(0);
     expect(II_END.counter).toBeLessThan(BANKRUPTCY_DAYS_BELOW_LIMIT);
-    expect(netPosition(II_END.closed)).toBeLessThanOrEqual(bankruptcyFloor(II_END.closed));
+    expect(II_END.closed.cash).toBeLessThanOrEqual(bankruptcyFloor(II_END.closed));
     console.log(
       '(ii) A COMPANY BELOW THE OVERDRAFT LIMIT, PLAYED TO THE END\n' +
         `cash ${formatMoney(II_END.closed.cash)} against a limit of ` +
-        `${formatMoney(II_END.closed.finance.overdraftLimit)}, arrears ` +
-        `${formatMoney(II_END.closed.finance.arrearsAmount)}, net ` +
-        `${formatMoney(netPosition(II_END.closed))} against the bank's ` +
+        `${formatMoney(II_END.closed.finance.overdraftLimit)} and the bank's ` +
         `${formatMoney(bankruptcyFloor(II_END.closed))}\n` +
         `the count of days below the limit reached ${II_END.counter} of ` +
-        `${BANKRUPTCY_DAYS_BELOW_LIMIT}, and the arrears closed the company on day ` +
+        `${BANKRUPTCY_DAYS_BELOW_LIMIT}, and the amount closed the company on day ` +
         `${II_END.closed.gameOver?.day}`,
     );
   });
 });
 
 describe('(ii) the thirtieth day below the overdraft limit', () => {
-  it('leaves the company trading on the twenty ninth day, with the net position well inside', () => {
+  it('leaves the company trading on the twenty ninth day, with the account well inside', () => {
     expect(II_TWENTY_NINE.finance.daysBelowOverdraft).toBe(BANKRUPTCY_DAYS_BELOW_LIMIT - 1);
     expect(II_TWENTY_NINE.finance.daysBelowOverdraft).toBe(29);
     expect(II_TWENTY_NINE.gameOver).toBeNull();
-    // Nothing but the run of days can close this company: the account is 100 past a 10,000 limit
-    // and two days of unpaid bills is 614 of arrears, so the net position, -10,407 on the twenty
-    // ninth day, is nowhere near the -15,000 the bank allows.
-    expect(Math.round(netPosition(II_TWENTY_NINE))).toBe(-10407);
-    expect(netPosition(II_TWENTY_NINE)).toBeGreaterThan(bankruptcyFloor(II_TWENTY_NINE));
-    expect(Math.round(II_TWENTY_NINE.cash)).toBe(-10100);
+    // Nothing but the run of days can close this company: the account is a few hundred past a
+    // 10,000 limit, which is nowhere near the -15,000 the bank allows.
+    expect(II_TWENTY_NINE.cash).toBeLessThan(II_TWENTY_NINE.finance.overdraftLimit);
+    expect(II_TWENTY_NINE.cash).toBeGreaterThan(bankruptcyFloor(II_TWENTY_NINE));
   });
 
   it('closes it on the thirtieth day, and the reason says the thirty days', () => {
@@ -811,29 +807,28 @@ describe('(ii) the thirtieth day below the overdraft limit', () => {
     expect(II_THIRTY.gameOver?.reason).toBe(
       '30 days in a row past the overdraft limit, and the bank has pulled it.',
     );
-    // The amount is not the test: 614 of arrears on an account 100 past the limit, and the net
-    // position -10,714 with -15,000 allowed. It is the run of days and nothing else
+    // The amount is not the test: the account is a few hundred past a 10,000 limit with -15,000
+    // allowed. It is the run of days and nothing else
     // [PIOTR, 18.09: "thirty days below the limit"].
-    expect(netPosition(II_THIRTY)).toBeGreaterThan(bankruptcyFloor(II_THIRTY));
+    expect(II_THIRTY.cash).toBeGreaterThan(bankruptcyFloor(II_THIRTY));
     const event = II_THIRTY.activeEvent;
     expect(event?.kind).toBe('bankruptcy');
     expect(event?.data).toEqual({
       day: II_THIRTY.gameOver?.day,
       month: 1,
-      cash: -10100,
-      arrears: 614,
-      net: -10714,
+      cash: Math.round(II_THIRTY.cash),
       allowed: -15000,
+      daysBelow: BANKRUPTCY_DAYS_BELOW_LIMIT,
+      daysAllowed: BANKRUPTCY_DAYS_BELOW_LIMIT,
     });
   });
 
   it('would have started the count again on one day back above the limit', () => {
     // The control, and it is one client's job: a 4,000 job's deposit is 2,000, and the account goes
-    // from 100 past the limit to 1,900 inside it. That is all it takes. The day that follows closes
-    // above the limit, so the count goes back to nought, and the company that was closed on the
-    // thirtieth day in the run above is still trading two days later (CLAUDE.md T21 2.2 rule 2: "A
-    // day above the limit resets the count").
-    expect(Math.round(II_RESET.paid.cash)).toBe(-8100);
+    // from a few hundred past the limit to a good way inside it. That is all it takes. The day that
+    // follows closes above the limit, so the count goes back to nought, and the company that was
+    // closed on the thirtieth day in the run above is still trading two days later
+    // (CLAUDE.md T21 2.2 rule 2, T22 2.2: "a day at or above the limit resets the count").
     expect(II_RESET.paid.cash).toBeGreaterThan(II_RESET.paid.finance.overdraftLimit);
     expect(II_RESET.paid.finance.daysBelowOverdraft).toBe(BANKRUPTCY_DAYS_BELOW_LIMIT - 1);
     expect(II_RESET.next.finance.daysBelowOverdraft).toBe(0);
@@ -846,10 +841,9 @@ describe('(ii) the thirtieth day below the overdraft limit', () => {
       '(ii) THE THIRTIETH DAY BELOW THE OVERDRAFT LIMIT\n' +
         `calendar day ${II_TWENTY_NINE.clock.day}, the ` +
         `${II_TWENTY_NINE.finance.daysBelowOverdraft}th in a row below the limit: cash ` +
-        `${formatMoney(II_TWENTY_NINE.cash)}, net ${formatMoney(netPosition(II_TWENTY_NINE))}, ` +
-        'still trading\n' +
-        `calendar day ${II_THIRTY.clock.day}, the ${II_THIRTY.finance.daysBelowOverdraft}th: net ` +
-        `${formatMoney(netPosition(II_THIRTY))} against the bank's ` +
+        `${formatMoney(II_TWENTY_NINE.cash)}, still trading\n` +
+        `calendar day ${II_THIRTY.clock.day}, the ${II_THIRTY.finance.daysBelowOverdraft}th: cash ` +
+        `${formatMoney(II_THIRTY.cash)} against the bank's ` +
         `${formatMoney(bankruptcyFloor(II_THIRTY))}, CLOSED: "${II_THIRTY.gameOver?.reason}"\n` +
         `the control, one client's deposit on calendar day ${II_TWENTY_NINE.clock.day}: cash ` +
         `${formatMoney(II_RESET.paid.cash)}, and the count back to ` +

@@ -37,7 +37,9 @@ function boothHall(): GameState {
   let kitted = fillRack(buyStartingKit(newGame({ difficulty: 'veryEasy' })), 200);
   // A joiner wants his locker, his seat, his tools and a cabinet of his own before he starts
   // (CLAUDE.md 9.3), so both trades can be taken on out of this one hall.
-  for (const specId of ['locker', 'canteenSeat', 'handToolSet', 'toolCabinet']) {
+  // The cabinet before the set: a man's tools have to have a slot to live in, and the owner's own
+  // set is already in the one slot the day one used cabinet holds (CLAUDE.md T22 2.12).
+  for (const specId of ['locker', 'canteenSeat', 'toolCabinet', 'handToolSet']) {
     kitted = buyNow(kitted, specId);
   }
   const state = kitted;

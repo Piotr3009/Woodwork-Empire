@@ -38,6 +38,7 @@ import {
   STARTING_LAYOUT,
   TEMP_STORAGE_COST,
   TOOL_CABINET,
+  HAND_TOOL_SET,
   STATE_VERSION,
   WEBSITE_START_LEVEL,
   WELFARE_IN_THE_CANTEEN,
@@ -99,7 +100,6 @@ import {
   emptyTotals,
   formatMoney,
   pay,
-  payArrears,
   receive,
   refund,
   runDayCosts,
@@ -241,6 +241,7 @@ import {
   canHire,
   countMonthDaysOff,
   crewHasGoneHome,
+  freeToolSlots,
   hasWorkingDay,
   helperOnDuty,
   helpers,
@@ -296,6 +297,7 @@ import type {
   GameState,
   LostMinuteCause,
   OnOrderItem,
+  Orientation,
   PeriodTotals,
   Speed,
   TaskInstance,
@@ -402,9 +404,6 @@ export function createGame(options: NewGameOptions): GameState {
       daysBelowOverdraft: 0,
       loan: null,
       overdraftInterestAccrued: 0,
-      arrearsAmount: 0,
-      arrearsMonths: 0,
-      firstArrearsDay: null,
       day: emptyTotals(),
       week: emptyTotals(),
       month: emptyTotals(),
@@ -1154,18 +1153,22 @@ function applyTaskCompletion(state: GameState, task: TaskInstance): void {
 function recordMove(
   state: GameState,
   item: Equipment,
-  stood: { x: number; y: number; rotated: boolean },
+  stood: { x: number; y: number; orientation: Orientation },
 ): void {
   const index = state.movedItems.findIndex((moved) => moved.itemId === item.id);
   if (index < 0) {
-    if (item.anchorX === stood.x && item.anchorY === stood.y && item.rotated === stood.rotated) {
+    if (
+      item.anchorX === stood.x &&
+      item.anchorY === stood.y &&
+      item.orientation === stood.orientation
+    ) {
       return;
     }
     state.movedItems.push({
       itemId: item.id,
       fromX: stood.x,
       fromY: stood.y,
-      fromRotated: stood.rotated,
+      fromOrientation: stood.orientation,
     });
     return;
   }
@@ -1174,7 +1177,7 @@ function recordMove(
     start &&
     item.anchorX === start.fromX &&
     item.anchorY === start.fromY &&
-    item.rotated === start.fromRotated
+    item.orientation === start.fromOrientation
   ) {
     state.movedItems.splice(index, 1);
   }
@@ -1277,7 +1280,7 @@ function putThemBack(state: GameState): void {
     item.anchorY = moved.fromY;
     // Exactly where it stood means the way it stood as well, now that a turn is a move
     // (CLAUDE.md T11 3.9).
-    item.rotated = moved.fromRotated;
+    item.orientation = moved.fromOrientation;
   }
   state.movedItems = [];
 }
@@ -1618,9 +1621,9 @@ function runProductionMinute(state: GameState, ownerOnTask: boolean): void {
     lost[cause] = (lost[cause] ?? 0) + minutes;
   };
   for (const hand of working) {
-    // One reading of a man's minute, the scheduler of CLAUDE.md T21 2.7 inside it: he is moved off a
-    // queue he is standing in if there is anything else for him to do, and only then does he stand.
-    // The night shift runs the same function through `workMinute` (CLAUDE.md T21 2.7).
+    // One reading of a man's minute (CLAUDE.md T22 2.6): the job he is on, and the machine of its
+    // stage, or the wait at it. Nobody is moved to another job, and the night shift runs the same
+    // function through `workMinute`.
     const place = placeHand(state, hand);
     if (place.noMaterial) raiseNoMaterial(state);
     if (place.lost !== null) lose(place.lost);
@@ -2049,7 +2052,6 @@ export function assignAir(
 const PAUSED_ACTIONS: ReadonlyArray<GameAction['type']> = [
   'BUY_STOCK',
   'ORDER_TRANSPORT',
-  'PAY_ARREARS',
 ];
 
 export function applyAction(state: GameState, action: GameAction): GameState {
@@ -2193,18 +2195,15 @@ export function applyAction(state: GameState, action: GameAction): GameState {
     case 'BUY_STOCK':
       buyStock(next, action.sheets);
       break;
-    case 'PAY_ARREARS':
-      payArrears(next, action.amount);
-      break;
     case 'SET_SHOW_WHY':
       next.showWhy = action.on;
       break;
     case 'MOVE_ITEM': {
       const item = next.equipment.find((entry) => entry.id === action.itemId);
       const stood = item
-        ? { x: item.anchorX, y: item.anchorY, rotated: item.rotated }
+        ? { x: item.anchorX, y: item.anchorY, orientation: item.orientation }
         : null;
-      moveItem(next, action.itemId, action.x, action.y, action.rotated);
+      moveItem(next, action.itemId, action.x, action.y, action.orientation);
       if (item && stood) recordMove(next, item, stood);
       break;
     }
@@ -2406,6 +2405,12 @@ export function canBuy(
       return { ok: false, reason: `Needs ${name} first` };
     }
   }
+  // A man's hand tool set has to have somewhere to live: the cabinets of the hall hold one, two,
+  // four or eight sets by their class, and the sets already bought and the owner's own fill them
+  // from the bottom (PIOTR, 19.09; CLAUDE.md T22 2.12).
+  if (specId === HAND_TOOL_SET && freeToolSlots(state) <= 0) {
+    return { ok: false, reason: 'No free slot in a tool cabinet' };
+  }
   const oneOf = requiresOneOfFor(spec, variant);
   if (oneOf.length > 0 && !oneOf.some((id) => has(state, id))) {
     const names = oneOf.map((id) => findSpec(id)?.name ?? id).join(' or ');
@@ -2496,8 +2501,8 @@ function standItem(
     // Everything draws on the first compressor in the hall until the player says otherwise
     // (CLAUDE.md T10 3.2).
     compressorId: null,
-    // Square to the walls until the player turns it (CLAUDE.md T10 3.8).
-    rotated: false,
+    // Square to the walls until the player turns it (CLAUDE.md T10 3.8, T22 2.11).
+    orientation: 0,
   });
   // With a production manager a newly placed machine is connected to the nearest extractor
   // with spare air automatically (CLAUDE.md T13 3.9, 3.19); without one the player clicks it.

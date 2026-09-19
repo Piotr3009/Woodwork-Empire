@@ -26,6 +26,7 @@ import type {
   Difficulty,
   GameAction,
   GameState,
+  Orientation,
   Speed,
   SummaryCadence,
   WorkerRole,
@@ -58,7 +59,13 @@ import {
   zoomAt,
   zoomTo,
 } from '../render/hall';
-import { APP_VERSION, HOUSE_CARD_SECONDS, type RoomId, roomById } from '../engine/constants';
+import {
+  APP_VERSION,
+  HOUSE_CARD_SECONDS,
+  type RoomId,
+  TOOL_CABINET,
+  roomById,
+} from '../engine/constants';
 import { centreOf, screenToTile } from '../render/iso';
 import { fitOfficeStack, officeScene } from '../render/office';
 import { type AccountingTab, accountingTabFrom, renderAccounting } from './accounting';
@@ -90,12 +97,12 @@ import {
 import { playCharacters } from '../render/characters';
 import { resetWalkers, stepWalkers, syncWalkers } from '../render/walkers';
 import { resetDoors, stepDoors, syncDoors } from '../render/doors';
-import { resetBubbles } from '../render/bubbles';
 import { applySoundSettings, play as soundPlay, setLoops, stopAllSounds, unlockSound } from './sound';
 import { hallLoops, hallOneShots } from '../render/hall';
 import { walkPath } from '../engine/walk';
 import { unconnectedMachines } from '../engine/pipes';
 import { hasCentralExtraction } from '../engine/machines';
+import { nextSpriteOrientation } from '../render/sprites';
 import { patchInto } from './patch';
 import { renderOwnerOut } from './ownerOut';
 import { renderCompany } from './company';
@@ -164,7 +171,6 @@ interface Ui {
   /** Field to put the caret back in after the next render. */
   focusNext: string | null;
   stockSheets: string;
-  arrearsAmount: string;
   /** What the player has typed into the loan field (CLAUDE.md T13 3.14). */
   loanAmount: string;
   /** Which tab of the Orders page is on top (CLAUDE.md T13 3.16). */
@@ -216,8 +222,16 @@ interface Ui {
   scrollModalTop: boolean;
   /** Setting the hall out: the clock is stopped and the kit can be dragged about. */
   setup: boolean;
-  /** True while the next drop stands the item at ninety degrees to the walls (T10 3.8). */
-  rotate: boolean;
+  /** The orientation the thing in hand is standing at, which the ghost is drawn with and which the
+   *  drop writes onto the item (T10 3.8). It is read off the item when it is picked up and turned
+   *  from there, so it means nothing with nothing in hand. */
+  rotate: Orientation;
+  /** True while a quarter turn is armed for the next thing picked up. Rotate, or R with nothing in
+   *  hand, toggles it, and the button lights while it is set; the pick up applies it once and
+   *  clears it. It was `ui.rotate` itself until tonight, which the pick up then overwrote with the
+   *  item's own orientation, so the button did nothing at all [PIOTR, 19.09: "it does nothing"]
+   *  (CLAUDE.md T22 2.10). */
+  armTurn: boolean;
   speedBeforeSetup: Speed;
   /** What the clock was doing before the P key stopped it, so the same key starts it again where
    *  it was (PIOTR, 17.09; CLAUDE.md T18 2.8). */
@@ -252,6 +266,24 @@ interface Ui {
    *  (CLAUDE.md T11 3.2). */
   saved: StoredSave;
   startOverAsked: boolean;
+}
+
+/** The head of a modal. Every one of them has a name of its own except the card of a thing on the
+ *  hall, whose head is the thing's own name and class, because "Machine" over a tool cabinet says
+ *  nothing and the card is opened by clicking that very cabinet (CLAUDE.md T22 2.13). */
+function modalTitleOf(id: ModalId, current: GameState): string {
+  if (id !== 'machineCard') return MODAL_TITLES[id];
+  const item = ui.machineCard === null
+    ? undefined
+    : current.equipment.find((entry) => entry.id === ui.machineCard);
+  if (item === undefined) return MODAL_TITLES[id];
+  const spec = findSpec(item.specId);
+  if (spec === undefined || spec === null) return MODAL_TITLES[id];
+  const variant = spec.variants.find((entry) => entry.id === item.variantId);
+  // One class deep families say their own name once and not twice over.
+  return variant === undefined || spec.variants.length <= 1
+    ? spec.name
+    : `${spec.name}: ${variant.name}`;
 }
 
 const MODAL_TITLES: Record<ModalId, string> = {
@@ -320,7 +352,6 @@ function freshUi(): Ui {
     filters: { board: '', catalogue: '' },
     focusNext: null,
     stockSheets: '',
-    arrearsAmount: '500',
     loanAmount: '10000',
     boardTab: 'enquiries',
     workPlanTab: 'jobs',
@@ -343,7 +374,8 @@ function freshUi(): Ui {
     daySummary: null,
     scrollModalTop: false,
     setup: false,
-    rotate: false,
+    rotate: 0,
+    armTurn: false,
     speedBeforeSetup: 0,
     speedBeforePause: 1,
     drag: null,
@@ -464,7 +496,6 @@ function modalBody(id: ModalId, current: GameState): string {
     case 'accounting': {
       const books = renderAccounting(
         current,
-        ui.arrearsAmount,
         ui.accountingTab,
         ui.openDays,
         ui.accountingMonth,
@@ -521,16 +552,59 @@ function ghostFor(current: GameState): Ghost | null {
     depth: box.depth,
     ok: check.ok,
     reason: check.reason,
-    rotated: ui.rotate,
+    orientation: ui.rotate,
   };
 }
 
-/** Turns what is in hand, or arms the turn for the next thing picked up. The one write for it:
- *  the R key and the Rotate button both come through here (CLAUDE.md T10 3.8). */
+/** Turns what is in hand, or arms the turn for the next thing picked up. The one write for it: the
+ *  R key and the Rotate button both come through here (CLAUDE.md T10 3.8, T22 2.10).
+ *
+ *  With nothing in hand it is a toggle on `ui.armTurn`, so two presses cancel and the button says
+ *  which it is; the pick up in `onSetupPointerDown` reads the item's own orientation and applies the
+ *  armed turn to it once. With something in hand it turns what is in hand, as it always did. */
 function turnGhost(): void {
   if (!ui.setup) return;
-  ui.rotate = !ui.rotate;
+  if (ui.drag === null) {
+    ui.armTurn = !ui.armTurn;
+    requestRender();
+    return;
+  }
+  ui.rotate = turnedFrom(ui.drag.itemId, ui.rotate);
   requestRender();
+}
+
+/** The orientation after this one for the thing named: round the orientations that have a picture,
+ *  which is `0, 1, 0` for almost everything and `0, 1, 2, 3, 0` for the five tool cabinets
+ *  (CLAUDE.md T22 2.11). The one place the cycle is asked for, so Rotate, R and the Turn row of a
+ *  card all walk the same ring. */
+function turnedFrom(itemId: string, orientation: Orientation): Orientation {
+  const current = state;
+  if (current === null) return orientation;
+  const kit = kitOf(current, itemId);
+  const spec = kit === null ? null : findSpec(kit.specId);
+  if (kit === null || spec === null || spec === undefined) return orientation;
+  return nextSpriteOrientation(spec.spriteKey, kit.variantId, orientation);
+}
+
+/** Turn on the card of a thing standing on the hall: it stands at ninety degrees where it is, at
+ *  the next orientation that has a picture, through the one action anything moves by
+ *  (CLAUDE.md T22 2.13). The game books the move itself, exactly as it books a drag: `END_SETUP`
+ *  keeps the heavy kit an hour and a question and leaves a cabinet, a bench or a rack free, which
+ *  is the rule `endSetup` has had since Turn 8 and not a second one written here. */
+function turnWhereItStands(itemId: string): void {
+  const current = game();
+  const item = current.equipment.find((entry) => entry.id === itemId);
+  const spec = item === undefined ? null : findSpec(item.specId);
+  if (item === undefined || spec === null || spec === undefined) return;
+  const next = nextSpriteOrientation(spec.spriteKey, item.variantId, item.orientation);
+  dispatch({
+    type: 'MOVE_ITEM',
+    itemId: item.id,
+    x: item.anchorX,
+    y: item.anchorY,
+    orientation: next,
+  });
+  dispatch({ type: 'END_SETUP', speed: game().speed });
 }
 
 function setupControls(current: GameState): string {
@@ -544,7 +618,7 @@ function setupControls(current: GameState): string {
   return (
     '<div class="view-controls">' +
     '<button class="btn btn-primary" data-do="endSetup">Done</button>' +
-    `<button class="btn${ui.rotate ? ' is-on' : ''}" data-do="rotateGhost">Rotate</button>` +
+    `<button class="btn${ui.armTurn ? ' is-on' : ''}" data-do="rotateGhost">Rotate</button>` +
     bill +
     '<span class="reason">Drag the machines, the benches and the shelving where you want them. ' +
     'The rooms and the gate stay where they are. Every item moved is an hour of somebody\'s ' +
@@ -694,7 +768,7 @@ function modalSpecs(): ModalSpec[] {
     const body = modalBody(ui.modal, current);
     specs.push({
       id: ui.modal,
-      title: MODAL_TITLES[ui.modal],
+      title: modalTitleOf(ui.modal, current),
       body: tipKey === '' ? body : withTip(body, current, tipKey),
       full: MODAL_IS_FULL[ui.modal],
       wide: MODAL_IS_WIDE[ui.modal],
@@ -1223,7 +1297,6 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
       accumulator = 0;
       resetWalkers();
       resetDoors();
-      resetBubbles();
       startedStore();
       noteOrders();
       break;
@@ -1243,7 +1316,6 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
       accumulator = 0;
       resetWalkers();
       resetDoors();
-      resetBubbles();
       startedStore();
       noteOrders();
       autosaveLocal();
@@ -1299,6 +1371,9 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
     case 'rotateGhost':
       turnGhost();
       return;
+    case 'turnItem':
+      turnWhereItStands(id);
+      return;
     case 'endSetup':
       endSetup();
       return;
@@ -1325,15 +1400,6 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
       break;
     case 'openModal':
       openModal((element.dataset.modal ?? 'board') as ModalId);
-      break;
-    // The red plate on the top bar: what the company owes, and behind it the books open at the
-    // Summary, where the arrears block and the button that pays them are. There is no way to open a
-    // modal on a chosen tab, so the tab is set first and the modal after it, the way
-    // `openLaptopPage` sets its page (PIOTR, 18.09; CLAUDE.md T21 2.1).
-    case 'openArrears':
-      ui.accountingTab = 'summary';
-      ui.scrollModalTop = true;
-      openModal('accounting');
       break;
     case 'officeRegion': {
       const region = element.dataset.office ?? '';
@@ -1655,11 +1721,6 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
       walkTo('hall');
       dispatch({ type: 'WORK_HERE', jobId: id });
       return;
-    case 'payArrears': {
-      const typed = element.dataset.amount ?? 'all';
-      dispatch({ type: 'PAY_ARREARS', amount: typed === 'all' ? null : Number(typed) });
-      return;
-    }
     case 'sawFallback':
       dispatch({ type: 'SET_SAW_FALLBACK', jobId: id, on: element.dataset.on === '1' });
       return;
@@ -1780,7 +1841,6 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
           ui.screen = 'game';
           resetWalkers();
           resetDoors();
-          resetBubbles();
           startedStore();
           writeStore();
           ui.saved = peekSave();
@@ -1797,7 +1857,6 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
           accumulator = 0;
           resetWalkers();
           resetDoors();
-          resetBubbles();
         }
         return result.note;
       });
@@ -1935,7 +1994,6 @@ export function onFileChosen(file: File): Promise<void> {
       ui.menuOpen = false;
       resetWalkers();
       resetDoors();
-      resetBubbles();
       // A file loaded is the game from now on, so the browser's store holds it too (T11 3.2).
       startedStore();
       writeStore();
@@ -2011,8 +2069,17 @@ function handleSceneClick(element: DataElement): boolean {
     // calls, and the extractor's carries the hall's bag store (PIOTR, 17.09; CLAUDE.md T17 2.6).
     // Anything that is not a machine keeps its note.
     const category = findSpec(item.specId)?.category;
-    // The bench has a card of its own now, because it can be sold like a machine (T19 2.8).
-    if (category === 'machine' || category === 'extraction' || category === 'bench') {
+    // The bench has a card of its own now, because it can be sold like a machine (T19 2.8), and the
+    // tool cabinet has one from Turn 22: it is a ladder of five classes, its card says how many
+    // men's tools it holds and how many are in use, and it can be turned and sold like anything
+    // else on the floor [PIOTR, 19.09: "click it and a modal shows"] (CLAUDE.md T22 2.13). The rest
+    // of the storage keeps its note: 2.13 names the cabinet and nothing else.
+    if (
+      category === 'machine' ||
+      category === 'extraction' ||
+      category === 'bench' ||
+      item.specId === TOOL_CABINET
+    ) {
       openMachineCard(item.id);
       requestRender();
       return true;
@@ -2129,10 +2196,6 @@ function runInput(event: Event): void {
   if (field === 'companyName') ui.companyName = target.value;
   if (field === 'stockSheets') {
     ui.stockSheets = target.value;
-    requestRender();
-  }
-  if (field === 'arrearsAmount') {
-    ui.arrearsAmount = target.value;
     requestRender();
   }
   if (field === 'loanAmount') {
@@ -2421,8 +2484,12 @@ function onSetupPointerDown(event: MouseEvent): boolean {
   const offsetX = item.anchorX - at.x;
   const offsetY = item.anchorY - at.y;
   let moved = false;
-  // He picks it up the way it is standing, and R turns it from there (CLAUDE.md T10 3.8).
-  ui.rotate = 'rotated' in item ? item.rotated === true : false;
+  // He picks it up the way it is standing, with the armed quarter turn applied to it once, and R
+  // turns it from there (CLAUDE.md T10 3.8, T22 2.10). The arming is spent on the pick up, so the
+  // next thing he lifts comes up square unless he arms it again.
+  const stood: Orientation = 'orientation' in item ? item.orientation : 0;
+  ui.rotate = ui.armTurn ? turnedFrom(itemId, stood) : stood;
+  ui.armTurn = false;
   ui.drag = { itemId, x: item.anchorX, y: item.anchorY };
   const move = (moveEvent: MouseEvent): void => {
     if (ui.drag === null) return;
@@ -2443,7 +2510,7 @@ function onSetupPointerDown(event: MouseEvent): boolean {
     // A click that never moved is not a move: it leaves the hall exactly as it was. Turning it
     // where it stands is a move, though: the machine has been picked up and put down again
     // (CLAUDE.md T10 3.8).
-    const turned = ui.rotate !== ('rotated' in item ? item.rotated === true : false);
+    const turned = ui.rotate !== stood;
     if (drag === null || (!moved && !turned)) {
       requestRender();
       return;
@@ -2453,7 +2520,7 @@ function onSetupPointerDown(event: MouseEvent): boolean {
       itemId: drag.itemId,
       x: drag.x,
       y: drag.y,
-      rotated: ui.rotate,
+      orientation: ui.rotate,
     });
   };
   window.addEventListener('mousemove', move);

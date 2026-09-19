@@ -14,18 +14,19 @@
 // used to say nothing at all about the money until the month end, and a player could be four weeks
 // into a hole before the game mentioned it.
 //
-// Turn 21 adds the line above them all but the bags: the company owes what it cannot pay and the two
-// together have passed what the bank allows, which is the last thing said before the bank closes it
-// (PIOTR, 18.09; CLAUDE.md T21 2.1).
+// Turn 21 adds the line above them all but the bags: the account is under the bank's limit, and the
+// line counts the days it has been there, because the thirtieth of them closes the company
+// (PIOTR, 18.09, 19.09; CLAUDE.md T21 2.1, T22 2.2).
 
 import {
+  BANKRUPTCY_DAYS_BELOW_LIMIT,
   FIRST_STEPS_LAST_DAY,
   NO_INSURANCE_REASON,
   RATE_WEEK_DAYS,
   SPEND_WARNING_CATEGORIES,
   SPEND_WARNING_FROM_CLOSED_DAYS,
 } from './constants';
-import { bankruptcyFloor, formatMoney, netPosition } from './economy';
+import { formatMoney } from './economy';
 import { overdraftInterestForDay } from './finance';
 import { bagStore } from './machines';
 import { workPlan } from './plan';
@@ -35,8 +36,8 @@ import type { GameState, LedgerCategory } from './types';
 
 export type WarningKey =
   | 'bagsFull'
-  /** The company owes more than the bank will carry, and the next look closes it
-   *  (PIOTR, 18.09; CLAUDE.md T21 2.1). */
+  /** The account is under the bank's limit, and the days it has been there are counted
+   *  (PIOTR, 18.09; CLAUDE.md T21 2.1, T22 2.2). */
   | 'pastTheLimit'
   | 'nobodyAssigned'
   | 'deadlineAtRisk'
@@ -81,32 +82,26 @@ function bagsFullWarning(state: GameState): Warning | null {
   };
 }
 
-/** The company owes what it cannot pay, and the sum of the two has passed what the bank allows: the
- *  strip says the whole position in one sentence, because Piotr's top bar said only the -7,259 in
- *  the account while 25,740 of arrears stood beside it and the game played on
- *  (PIOTR, 18.09; CLAUDE.md T21 2.1; docs/mockups/t21/debt.html part 1).
+/** The account is below the bank's limit, and the strip counts the days (PIOTR, 19.09;
+ *  CLAUDE.md T22 2.2; docs/mockups/t21/debt.html part 1). It is said from the first day under the
+ *  limit and not only once the company is past what the bank allows, because from Turn 22 the
+ *  account goes under the limit on its own and the thirtieth day in a row there is the end of the
+ *  company: a player who is never told the count cannot act on it.
  *
- *  It fires on the position the bank reads, `netPosition` against `bankruptcyFloor`, and on nothing
- *  softer [TUNE]: the sentence the drawing gives it says the company is already past the line, and a
- *  line that said that while it was not true would be the old top bar's lie the other way about. The
- *  day's look at the money is what closes the company (`checkBankruptcy`), so this is the warning
- *  that stands between the arrears arriving and the bank pulling the overdraft. The two figures are
- *  the engine's own, so the strip and the close cannot disagree. */
+ *  The day is `daysBelowOverdraft`, which the engine counts once a calendar day at the point the
+ *  day's money is settled, and the thirty is the engine's own figure, so the strip and the close
+ *  cannot disagree. The count is taken at the day's open, so on the afternoon a bill first takes
+ *  the account under the limit it still reads nought: the line calls that the first day, because it
+ *  is the first day the player is living through [TUNE]. */
 function pastTheLimitWarning(state: GameState): Warning | null {
-  const net = netPosition(state);
-  const allowed = bankruptcyFloor(state);
-  if (state.finance.arrearsAmount <= 0) return null;
-  if (net > allowed) return null;
-  const owed = `${formatMoney(state.finance.arrearsAmount)} in arrears`;
-  // The drawn sentence opens on the account, which is where a company in arrears almost always is.
-  // A company that has been paid since it missed the bill is not below zero, and the line says what
-  // is true of it instead of the drawing's words [TUNE].
-  const opening = state.cash < 0 ? `Account below zero and ${owed}` : owed;
+  const limit = state.finance.overdraftLimit;
+  if (state.cash >= limit) return null;
+  const day = Math.max(1, state.finance.daysBelowOverdraft);
   return {
     key: 'pastTheLimit',
     text:
-      `${opening}: together ${formatMoney(net)}, past the ${formatMoney(allowed)} the bank ` +
-      'allows. Pay the arrears or the bank closes you.',
+      `Account ${formatMoney(state.cash)} is below the bank's ${formatMoney(limit)} limit: ` +
+      `day ${day} of ${BANKRUPTCY_DAYS_BELOW_LIMIT}.`,
   };
 }
 
@@ -176,9 +171,7 @@ const SPEND_SET: ReadonlySet<LedgerCategory> = new Set(
   SPEND_WARNING_CATEGORIES as readonly LedgerCategory[],
 );
 
-/** What went out on wages, the draw and the fixed charges over a run of days, off the ledger. An
- *  entry that became arrears is counted: it is spending the company could not pay for, which is
- *  the very thing the line is about. */
+/** What went out on wages, the draw and the fixed charges over a run of days, off the ledger. */
 export function fixedSpendOver(state: GameState, days: ReadonlySet<number>): number {
   let out = 0;
   for (const entry of state.ledger) {

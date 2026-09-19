@@ -165,7 +165,7 @@ export function stagesOf(state: GameState, job: StagedJob, options: StageOptions
 }
 
 /** The plan for a job as the hall stands now. It is read every minute, so buying a machine speeds
- *  up work already on the books and losing one to the bailiff slows it down again. */
+ *  up work already on the books and selling one slows it down again. */
 export function stagePlanFor(
   state: GameState,
   job: StagedJob,

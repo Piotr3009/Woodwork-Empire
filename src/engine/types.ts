@@ -242,6 +242,12 @@ export interface EquipmentSpec {
   enduranceHours: number;
 }
 
+/** Which way a thing on the floor is turned: quarter turns clockwise from the picture as the art
+ *  side drew it, so 0 is the base file, 1 the `.r`, 2 the `.rr` and 3 the `.rrr`. Piotr asked for
+ *  the other two turns on 19.09 ("I need two more turns, we have four walls") and it replaced the
+ *  boolean Turn 10 turned a machine with, everywhere (CLAUDE.md T22 2.11). */
+export type Orientation = 0 | 1 | 2 | 3;
+
 /** A purchased item standing in the hall. */
 export interface Equipment {
   id: string;
@@ -281,10 +287,12 @@ export interface Equipment {
    *  dryer, which is fitted to one compressor. Null means the first compressor in the hall, which
    *  is what "default: all" means (CLAUDE.md T10 3.2, 3.3). */
   compressorId: string | null;
-  /** Stood at ninety degrees to the walls: the footprint and the working zone swap their width
-   *  and their depth, and the picture is mirrored unless the art side has delivered a second
-   *  orientation for it (PIOTR, CLAUDE.md T10 3.8). */
-  rotated: boolean;
+  /** Which way it is turned: quarter turns clockwise from the picture as drawn (CLAUDE.md T22
+   *  2.11). At 1 and 3 the footprint and the working zone swap their width and their depth. The
+   *  picture is the `.r`, `.rr` or `.rrr` file where the art side has drawn one, and at 1 without
+   *  one it is the base file mirrored, which is what the game did when this was a boolean
+   *  (PIOTR, 19.09: "I need two more turns, we have four walls"; CLAUDE.md T10 3.8). */
+  orientation: Orientation;
 }
 
 /** Something bought and paid for that is not here yet: the cash left at the click, the item is
@@ -303,8 +311,9 @@ export interface OnOrderItem {
   anchorY: number;
   /** True from 08:00 of the due day until somebody has it off the lorry. */
   arrived: boolean;
-  /** The outline is dragged and turned like the machine it holds the floor for (T10 3.8). */
-  rotated: boolean;
+  /** The outline is dragged and turned like the machine it holds the floor for, through the same
+   *  four orientations (T10 3.8; CLAUDE.md T22 2.11). */
+  orientation: Orientation;
 }
 
 export interface ProductTemplate {
@@ -613,7 +622,7 @@ export interface MovedItem {
   fromY: number;
   /** Which way it was standing before the player picked it up. Turning a heavy machine where it
    *  stands is a move like any other; turning a bench costs nothing (CLAUDE.md T11 3.9). */
-  fromRotated: boolean;
+  fromOrientation: Orientation;
 }
 
 export interface Delivery {
@@ -714,9 +723,6 @@ export type GameEventKind =
   | 'weekend'
   | 'wagesPaid'
   | 'monthlyBills'
-  | 'arrearsWarning'
-  | 'arrearsFinalWarning'
-  | 'bailiff'
   | 'bankruptcy'
   | 'ownerSick'
   | 'jobOverdue'
@@ -781,8 +787,6 @@ export type LedgerCategory =
   | 'transport'
   | 'accounts'
   | 'pellets'
-  | 'arrears'
-  | 'seizure'
   /** The Turn 13 lines: every one of them its own line on the month end (CLAUDE.md T13 3.20). */
   | 'insurance'
   | 'security'
@@ -793,7 +797,12 @@ export type LedgerCategory =
   | 'website'
   | 'pipes'
   | 'claim'
-  | 'burglary';
+  | 'burglary'
+  /** Money that belongs on the books and on no line of its own. It exists for the v19 lift of
+   *  Turn 22: a v18 save's unpaid balance is carried into the account and the line that says so is
+   *  booked here, and the two categories that word took with it are rewritten to this, so not a
+   *  pound of a played company's history is lost with it (CLAUDE.md T22 2.1, section 4). */
+  | 'other';
 
 export interface LedgerEntry {
   id: string;
@@ -804,7 +813,8 @@ export interface LedgerEntry {
   /** Positive is money in, negative is money out. */
   amount: number;
   balance: number;
-  /** True when no cash moved: a cost that became arrears, or a credit applied against them. */
+  /** True when no cash moved: a loss noted on the books, like sheets ruined in the yard
+   *  overnight (`noteLoss`). */
   unpaid: boolean;
 }
 
@@ -842,9 +852,6 @@ export interface FinanceState {
   /** Overdraft interest accrued day by day below zero and not yet charged: it goes out on the
    *  1st, interest only (CLAUDE.md T13 3.14). */
   overdraftInterestAccrued: number;
-  arrearsAmount: number;
-  arrearsMonths: number;
-  firstArrearsDay: number | null;
   day: PeriodTotals;
   week: PeriodTotals;
   month: PeriodTotals;
@@ -950,16 +957,13 @@ export interface Contract {
 
 /** One tile of pipe over the floor. It occupies no cell and blocks nothing under it
  *  (CLAUDE.md T13 3.19). */
-export type PipeTileKey =
-  | 'pipe.ns'
-  | 'pipe.ew'
-  | 'pipe.ne'
-  | 'pipe.nw'
-  | 'pipe.se'
-  | 'pipe.sw'
-  | 'pipe.tee'
-  | 'pipe.drop'
-  | 'pipe.inlet';
+/** What one cell of a run is. A run is drawn as one continuous path from Turn 22, so a cell no
+ *  longer carries the direction of the pipe over it: the seven drawn tiles of Turn 13 (`ns`, `ew`,
+ *  the four elbows and the tee) are gone with the nine pictures that never met each other
+ *  (PIOTR's screenshot, 19.09; CLAUDE.md T22 2.7). What a run still has to know is its cells and
+ *  the two ends of itself, which is all that is left here: the drop onto the machine, the plain
+ *  cells between, and the inlet into the unit or the tee onto another run. */
+export type PipeTileKey = 'pipe.drop' | 'pipe.run' | 'pipe.inlet' | 'pipe.tee';
 
 export interface PipeTile {
   x: number;
@@ -1010,35 +1014,20 @@ export type LostMinuteCause = 'noPeople' | 'noMachine' | 'noMaterial' | 'ownerAw
  *  (CLAUDE.md T21 2.8). */
 export type OwnerIdleReason = 'noMachine' | 'noMaterial' | 'nothingAssigned' | 'officeEmpty';
 
-/** The state a bubble over a figure's head is drawn for, one key a line of the table in
- *  `docs/mockups/t21/bubbles.html` (CLAUDE.md T21 2.6). */
-export type BubbleKey =
-  | 'waitingForMachine'
-  | 'noCutParts'
-  | 'noMaterial'
-  | 'nothingToDo'
-  | 'sweeping'
-  | 'emptyingBags'
-  | 'unloading'
-  | 'working'
-  | 'pieces'
-  | 'offToMeasure'
-  | 'inTheOffice'
-  | 'atLunch';
+/** The state a mark over a figure's head is drawn for: the four things that are wrong with a man
+ *  and that the player can put right (docs/mockups/t22/bubbles-v2.png, the red column;
+ *  CLAUDE.md T22 2.5). A man who is working, at a chore of his own, at his lunch, in the office or
+ *  out measuring has nothing wrong with him and carries no key at all
+ *  [PIOTR, 19.09: "when all is fine, no bubble; only when it is bad"]. */
+export type BubbleKey = 'waitingForMachine' | 'noCutParts' | 'noMaterial' | 'nothingToDo';
 
-/** What colour a bubble wears, which is what kind of thing it is saying: `wait` is the red border
- *  of something the player can fix, `chore` the green of a helper about his work, `work` the plain
- *  paper of a stage just begun, `away` the dashed grey of a man off the hall
- *  (CLAUDE.md T21 2.6). */
-export type BubbleTone = 'wait' | 'chore' | 'work' | 'away';
-
-/** One bubble, ready to draw: the words with every slot filled, the colour, and the figure it
- *  belongs to (CLAUDE.md T21 2.6). */
+/** One mark over a man's head, ready to draw: the words it says on hover with every slot filled,
+ *  and the figure it belongs to (CLAUDE.md T22 2.5). There is no tone on it: a mark is drawn only
+ *  when something is wrong, so every mark in the game is the red one [PIOTR, 19.09]. */
 export interface Bubble {
   /** 'owner', or a worker id. */
   who: string;
   key: BubbleKey;
-  tone: BubbleTone;
   text: string;
 }
 
@@ -1275,9 +1264,8 @@ export type GameAction =
   | { type: 'DROP_JOB'; jobId: string }
   | { type: 'SET_SAW_FALLBACK'; jobId: string; on: boolean }
   | { type: 'BUY_STOCK'; sheets: number }
-  | { type: 'PAY_ARREARS'; amount: number | null }
   | { type: 'ORDER_TRANSPORT'; jobId: string }
-  | { type: 'MOVE_ITEM'; itemId: string; x: number; y: number; rotated?: boolean }
+  | { type: 'MOVE_ITEM'; itemId: string; x: number; y: number; orientation?: Orientation }
   | { type: 'END_SETUP'; speed: Speed }
   | { type: 'SET_SUMMARY_CADENCE'; cadence: SummaryCadence }
   | { type: 'SET_SHOW_WHY'; on: boolean }

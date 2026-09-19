@@ -1,4 +1,14 @@
 // The scripted playthroughs of CLAUDE.md T1-13.
+//
+// Sixteen months are played in this file, and beside them the day one list, the replay and one day
+// with a dinner hour in it. From Turn 22 there is one track for money: a cost the player did not
+// choose is paid whatever the balance and the account goes under the overdraft limit for it, so
+// there is nothing carried beside the cash any more (CLAUDE.md T22 2.1). Of the sixteen, exactly
+// one goes under the limit, and it is the empty hall on Hard: it first closes a day under on day
+// 11 and the bank shuts it on day 22 for the amount, with its count of days under the limit at 12
+// of the 30 the other rule allows. Every other month here trades its thirty days with the account
+// above the limit, the short handed one dipping furthest into the overdraft at -466 on day 31, and
+// not one line of any of their ledgers goes unpaid. Measured on this build (T22-C2).
 
 import { describe, expect, it } from 'vitest';
 import {
@@ -116,6 +126,11 @@ function machineOf(state: GameState, specId: string): Equipment {
 
 const SEED = 20260911;
 
+/** The day an empty hall on Hard is closed by the bank, measured from the run itself: the account
+ *  carries every bill from Turn 22, so it falls through the 5,000 limit and on to the -7,500 the
+ *  bank allows (CLAUDE.md T22 2.1, 2.2). */
+const CLOSED_ON_HARD = 22;
+
 /** What the month's machines made, off every day record and the day in hand: the one figure the
  *  hall's store is fed from (CLAUDE.md T12 2.3, 3.4). */
 function dustMade(state: GameState): number {
@@ -155,7 +170,18 @@ describe('30 days on Easy, working the board', () => {
     expect(state.gameOver).toBeNull();
     expect(state.clock.day).toBe(31);
     expect(state.cash).toBeGreaterThan(0);
-    expect(state.finance.arrearsAmount).toBe(0);
+    expect(state.ledger.some((entry) => entry.unpaid)).toBe(false);
+    // One track for money, read off the ledger's own running balance: every pound the month moved
+    // moved out of the account, and no line of it was written with the account anywhere near the
+    // bank's limit. The lowest balance of the month is its last line, 2,789 on day 31, so the
+    // count of days below the limit never started (CLAUDE.md T22 2.1, 2.2).
+    for (const entry of state.ledger) {
+      expect(entry.balance, `${entry.day} ${entry.label}`).toBeGreaterThan(
+        state.finance.overdraftLimit,
+      );
+    }
+    expect(Math.round(Math.min(...state.ledger.map((entry) => entry.balance)))).toBe(2789);
+    expect(state.finance.daysBelowOverdraft).toBe(0);
   });
 
   it('ends above the reputation it started on, on seven jobs out of the door', () => {
@@ -358,39 +384,43 @@ describe('30 days on Easy, working the board', () => {
 });
 
 describe('30 days on Hard, doing nothing', () => {
-  it('is closed by the bank on day 22, on the arrears it could not pay', () => {
-    // Turn 21 changed what this scenario shows, and it is the change Piotr asked for. The Turn 2
-    // overdraft limit of 5000 fills by day 11 and the bills go unpaid from then; on day 22 the
-    // arrears have reached 2,780 and the net position, -7,778, has passed the -7,500 the bank
-    // allows. Doing nothing used to drift to the end of the month and past it, with the top bar
-    // saying nothing at all: "you cannot pay your debts, you are bankrupt, and the game should end"
-    // (PIOTR, 18.09; CLAUDE.md T21 2.2).
+  it('is closed by the bank on the day the account passes what it allows', () => {
+    // From Turn 22 the account itself carries every bill the company cannot pay, so it falls
+    // through the 5,000 overdraft limit of Hard and on through the -7,500 the bank allows. Doing
+    // nothing used to drift to the end of the month and past it, with the top bar saying nothing
+    // at all: "you cannot pay your debts, you are bankrupt, and the game should end"
+    // (PIOTR, 18.09, 19.09; CLAUDE.md T21 2.2, T22 2.1, 2.2). The day is measured, not tuned.
     const state = playUntilDay(newGame({ seed: SEED, difficulty: 'hard' }), 31, IDLE);
-    expect(state.clock.day).toBe(22);
-    expect(state.cash).toBeLessThan(-4900);
-    expect(state.finance.arrearsAmount).toBeGreaterThan(0);
     expect(state.gameOver).not.toBeNull();
-    expect(state.gameOver?.day).toBe(22);
+    expect(state.clock.day).toBe(CLOSED_ON_HARD);
+    expect(state.gameOver?.day).toBe(CLOSED_ON_HARD);
     expect(state.gameOver?.reason).toContain('cannot pay');
-    // The line it passed, read the one way the engine reads it.
-    expect(state.cash - state.finance.arrearsAmount).toBeLessThanOrEqual(
-      state.finance.overdraftLimit * 1.5,
-    );
+    // The line it passed, read the one way the engine reads it, and not a penny left unpaid
+    // anywhere else. The account is -7,778 against the -7,500 the bank allows on Hard, and the
+    // other rule's count stood at 12 of its 30 when the amount got there first: that is the whole
+    // of the answer to item 23 of REPORT-T21.md, where the count could not leave nought at all
+    // (CLAUDE.md T22 2.1, 2.2).
+    expect(state.cash).toBeLessThanOrEqual(state.finance.overdraftLimit * 1.5);
+    expect(Math.round(state.cash)).toBe(-7778);
+    expect(state.finance.daysBelowOverdraft).toBe(12);
+    expect(state.ledger.some((entry) => entry.unpaid)).toBe(false);
   });
 
-  it('gets its arrears warning once the overdraft is full', () => {
-    const run = runToDay(newGame({ seed: SEED, difficulty: 'hard' }), 40);
-    expect(run.events.filter((event) => event.kind === 'arrearsWarning')).toHaveLength(1);
-    expect(run.state.finance.arrearsMonths).toBe(1);
-  });
-
-  it('warns inside the month once the owner has bought his tools', () => {
-    const state = playUntilDay(newGame({ seed: SEED, difficulty: 'hard' }), 31, {
-      ...IDLE,
-      buyKit: true,
-    });
-    expect(state.finance.arrearsAmount).toBeGreaterThan(0);
-    expect(state.finance.arrearsMonths).toBeGreaterThanOrEqual(1);
+  it('goes under the limit before it passes the line, and the strip says so', () => {
+    // The two rules in order: the account goes under the 5,000 limit first and keeps going, and
+    // the bank closes it when it has passed 1.5 times the limit (CLAUDE.md T22 2.1, 2.2). Day 11
+    // is the first morning the account closes under the limit, at -5,289 with the count on 1, and
+    // day 15 is four days later and a week before the close, at -6,085 with the count on 5: the
+    // standing costs take 299 a day out of an account that has nothing left to take it from.
+    const first = runToDay(newGame({ seed: SEED, difficulty: 'hard' }), 11);
+    expect(Math.round(first.state.cash)).toBe(-5289);
+    expect(first.state.cash).toBeLessThan(first.state.finance.overdraftLimit);
+    expect(first.state.finance.daysBelowOverdraft).toBe(1);
+    const run = runToDay(newGame({ seed: SEED, difficulty: 'hard' }), 15);
+    expect(run.state.gameOver).toBeNull();
+    expect(run.state.cash).toBeLessThan(run.state.finance.overdraftLimit);
+    expect(Math.round(run.state.cash)).toBe(-6085);
+    expect(run.state.finance.daysBelowOverdraft).toBe(5);
   });
 });
 
@@ -479,6 +509,13 @@ describe('a month short handed, with a joiner and one small rack', () => {
     // job was bought for it at the ad hoc price, and whole sheets at 200 cost more than the 0.40
     // of the price they used to (CLAUDE.md T13 3.3). Measured, not tuned.
     expect(state.cash).toBeGreaterThan(state.finance.overdraftLimit);
+    // This is the month that goes furthest into the overdraft of the fifteen that stay inside it,
+    // and it still never reaches the limit: the lowest running balance of the month is -466, on
+    // day 31, the count of days below the limit never starts, and nothing is left unpaid, because
+    // from Turn 22 there is nowhere for a bill to go but the account (CLAUDE.md T22 2.1).
+    expect(Math.round(Math.min(...state.ledger.map((entry) => entry.balance)))).toBe(-466);
+    expect(state.finance.daysBelowOverdraft).toBe(0);
+    expect(state.ledger.some((entry) => entry.unpaid)).toBe(false);
   });
 
   it('took a joiner with no experience on and bought the shelving', () => {
@@ -943,17 +980,20 @@ describe('a month of a full crew behind two saws on the day 1 fan alone', () => 
     seen,
   );
 
-  it('is two joiners and not six, because the floor has no room for more', () => {
+  it('is three joiners and not six, because the floor has no room for more', () => {
     // The script asks for six and the hall says no: two saws, their zones and every man's bench
-    // and cabinets leave floor for the owner and two (PIOTR; CLAUDE.md T13 3.10).
+    // and cabinets leave floor for the owner and three (PIOTR; CLAUDE.md T13 3.10).
     //
-    // It was three until Turn 21, and the one cell that changed it is the tool cabinet's: a cabinet
-    // is two metres wide now, so each of the four in this hall takes one cell more of the floor the
-    // crew limit is measured against, and this hall was sitting on the boundary. The limit is
+    // It was three until Turn 21, two through Turn 21, and three again tonight, and the one cell
+    // that moves it each time is the tool cabinet's. Turn 21 made a cabinet two metres wide, so
+    // each of the four in this hall took a cell more of the floor the crew limit is measured
+    // against and the hall lost a man; Turn 22 makes the cabinet a family of five and the cheapest
+    // class, which is the one the script buys, is a metre square again, so the cell comes back and
+    // the man with it (CLAUDE.md T22 2.12). The limit is
     // `Math.floor(freeFloorM2 / M2_PER_PERSON)` with `M2_PER_PERSON` 24, so four cells is the whole
-    // difference between a sixth man and a fifth. Nothing else about the crew rule moved
-    // (CLAUDE.md T21 2.13; the arithmetic is in section 0 of REPORT-T21.md for Piotr to rule on).
-    expect(state.workers.filter((worker) => worker.role === 'joiner')).toHaveLength(2);
+    // difference between a fifth man and a fourth. Nothing about the crew rule itself has moved in
+    // either turn.
+    expect(state.workers.filter((worker) => worker.role === 'joiner')).toHaveLength(3);
     expect(missingForHire(state, 'joiner')).toEqual([]);
     const blocked = state.workers.length;
     expect(blocked).toBeLessThan(6);

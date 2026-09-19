@@ -27,6 +27,7 @@ import {
   metresBy,
   orderEquipmentCheck,
   sheetCapacityOf,
+  toolSlotsLine,
   zoneOf,
 } from '../engine/index';
 import {
@@ -265,6 +266,9 @@ function effectLines(state: GameState, spec: EquipmentSpec, variant: EquipmentVa
     line(bagsLine(spec, variant)),
     line(spec.id === COMPRESSOR ? airLine(state, spec, variant) : ''),
     line(holdsLine(spec, variant)),
+    // What a class of tool cabinet is for: how many men's hand tools it holds, in the words the
+    // rack's card uses for its sheets (PIOTR, 19.09; CLAUDE.md T22 2.12).
+    line(toolSlotsLine(spec.id, variant.id)),
     gateLine(spec, variant),
   ];
 }

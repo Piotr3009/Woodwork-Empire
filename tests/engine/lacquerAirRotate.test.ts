@@ -235,7 +235,7 @@ function turnedInPlace(state: GameState, itemId: string): GameState {
     itemId,
     x: item.anchorX,
     y: item.anchorY,
-    rotated: !item.rotated,
+    orientation: item.orientation === 0 ? 1 : 0,
   });
 }
 
@@ -246,7 +246,7 @@ describe('turning a thing where it stands', () => {
     if (!bench) throw new Error('no bench in the hall');
     expect(itemIsHeavy(bench)).toBe(false);
     const turned = turnedInPlace(start, bench.id);
-    expect(turned.equipment.find((item) => item.id === bench.id)?.rotated).toBe(true);
+    expect(turned.equipment.find((item) => item.id === bench.id)?.orientation).toBe(1);
     // It is on the list of things that moved, and the list is emptied of everything light the
     // moment the player presses Done: no question, no minutes, no bill.
     const done = act(turned, { type: 'END_SETUP', speed: 1 });
@@ -276,13 +276,13 @@ describe('turning a thing where it stands', () => {
     const start = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
     const saw = start.equipment.find((item) => item.specId === 'tableSaw');
     if (!saw) throw new Error('no saw in the hall');
-    const stood = { x: saw.anchorX, y: saw.anchorY, rotated: saw.rotated };
+    const stood = { x: saw.anchorX, y: saw.anchorY, orientation: saw.orientation };
     const turned = turnedInPlace(start, saw.id);
     const done = act(turned, { type: 'END_SETUP', speed: 1 });
     const back = act(done, { type: 'RESOLVE_EVENT', choiceId: 'back' });
     const same = back.equipment.find((item) => item.id === saw.id);
     // Exactly where it stood means the way it stood as well (CLAUDE.md T11 3.9).
-    expect({ x: same?.anchorX, y: same?.anchorY, rotated: same?.rotated }).toEqual(stood);
+    expect({ x: same?.anchorX, y: same?.anchorY, orientation: same?.orientation }).toEqual(stood);
     expect(back.movedItems).toEqual([]);
     expect(back.tasks.some((task) => task.kind === 'moveMachines' && !task.done)).toBe(false);
   });
@@ -292,7 +292,7 @@ describe('turning a thing where it stands', () => {
     const saw = start.equipment.find((item) => item.specId === 'tableSaw');
     if (!saw) throw new Error('no saw in the hall');
     const back = turnedInPlace(turnedInPlace(start, saw.id), saw.id);
-    expect(back.equipment.find((item) => item.id === saw.id)?.rotated).toBe(false);
+    expect(back.equipment.find((item) => item.id === saw.id)?.orientation).toBe(0);
     expect(back.movedItems).toEqual([]);
   });
 });
