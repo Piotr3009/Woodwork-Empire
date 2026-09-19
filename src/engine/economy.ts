@@ -499,6 +499,10 @@ export function declareBankruptcy(state: GameState, reason: string): void {
       month: monthOfDay(state.clock.day),
       cash: Math.round(state.cash),
       allowed: Math.round(bankruptcyFloor(state)),
+      // The other rule's own reading, so the card can say how long the company stood under the
+      // limit whichever of the two closed it (CLAUDE.md T22 2.2).
+      daysBelow: state.finance.daysBelowOverdraft,
+      daysAllowed: BANKRUPTCY_DAYS_BELOW_LIMIT,
     },
   });
 }

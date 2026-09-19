@@ -16,9 +16,9 @@ import {
   BANKRUPTCY_DAYS_BELOW_LIMIT,
   BANKRUPTCY_LIMIT_FACTOR,
 } from '../../src/engine/constants';
-import { bankruptcyFloor } from '../../src/engine/economy';
-import type { GameState } from '../../src/engine/index';
-import { eventsOfKind, newGame, runDays } from '../helpers';
+import { bankruptcyFloor, receive } from '../../src/engine/economy';
+import type { GameState, Worker } from '../../src/engine/index';
+import { eventsOfKind, newGame, nextDay, runDays } from '../helpers';
 
 /** A company standing where the test wants it, with the money written straight onto the state: the
  *  rule is about the position, not about how it got there. */
@@ -110,5 +110,109 @@ describe('thirty days past the overdraft limit', () => {
     const run = runDays(state, 1);
     expect(run.state.cash).toBeCloseTo(run.state.finance.overdraftLimit, 6);
     expect(run.state.finance.daysBelowOverdraft).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The thirtieth day, played rather than written (CLAUDE.md T22 2.2; REPORT-T21.md section 0 item 23)
+// ---------------------------------------------------------------------------
+
+/** A joiner on the books at the experienced man's monthly wage, so the run has a wage bill to pay
+ *  while it is under the limit. Written onto the state rather than hired, because a hall with no
+ *  bench and no tool cabinet cannot take anybody on and the hall is not what this is about. */
+function joinerOnTheBooks(monthlyWage: number): Worker {
+  return {
+    id: 'w1',
+    name: 'Joe',
+    role: 'joiner',
+    tier: 'experienced',
+    rate: 0.8,
+    monthlyWage,
+    leavesOnDay: null,
+    startDay: 1,
+    jobId: null,
+    taskId: null,
+    minutesWorked: 0,
+    ordersToday: 0,
+    overtimeMinutes: 0,
+    overtimeMinutesWeek: 0,
+    overtimeDays: 0,
+    tiredOfOvertime: false,
+    station: 'idle',
+    productionMinutes: 0,
+    absentDaysRemaining: 0,
+    shift: 'day',
+    dayLog: [],
+    monthMinutes: 0,
+    monthDaysOff: 0,
+    anchorX: 0,
+    anchorY: 4,
+  };
+}
+
+/** A company trading below the overdraft limit, day after day: its bills come out of the account
+ *  whatever the balance (2.1), and a client pays it what the day cost, so the account stands where
+ *  it is instead of falling to the line the bank draws. That is the company rule two is about, and
+ *  Turn 21 could not produce one: with the arrears in the way the account parked on the limit and
+ *  the count never started (REPORT-T21.md item 23).
+ *
+ *  Played day by day, with the takings the one thing written onto the run, until the count of days
+ *  below the limit reaches `stopAt` or the bank closes the company. */
+function tradingBelowTheLimit(stopAt: number): { state: GameState; paid: number } {
+  let state = standing({ cash: -10100 });
+  state.workers.push(joinerOnTheBooks(2600));
+  let paid = 0;
+  let guard = 0;
+  while (
+    state.gameOver === null &&
+    state.finance.daysBelowOverdraft < stopAt &&
+    guard < stopAt + 20
+  ) {
+    const before = state.cash;
+    state = nextDay(state);
+    guard += 1;
+    if (state.gameOver !== null) break;
+    // What a client paid that day: exactly what the day took out, so the company is trading and
+    // not sinking, and it is still under the limit. Money in through the engine's own path.
+    const out = before - state.cash;
+    if (out > 0) {
+      receive(state, 'jobBalance', 'A client paid', out);
+      paid += out;
+    }
+  }
+  return { state, paid };
+}
+
+describe('a company trading below the limit reaches the thirtieth day', () => {
+  const twentyNine = tradingBelowTheLimit(BANKRUPTCY_DAYS_BELOW_LIMIT - 1);
+
+  it('is still trading on the twenty ninth day, with the account nowhere near the line', () => {
+    expect(twentyNine.state.finance.daysBelowOverdraft).toBe(29);
+    expect(twentyNine.state.gameOver).toBeNull();
+    expect(twentyNine.state.cash).toBeLessThan(twentyNine.state.finance.overdraftLimit);
+    expect(twentyNine.state.cash).toBeGreaterThan(bankruptcyFloor(twentyNine.state));
+  });
+
+  it('paid its wages through the limit on the way, and not a bill went unpaid', () => {
+    // The point of 2.1 inside the point of 2.2: the monthly wages of an experienced joiner, 2,600,
+    // went out of an account that was already below the bank's limit, and the ledger says so.
+    const wages = twentyNine.state.ledger.filter((entry) => entry.category === 'wages');
+    expect(wages).toHaveLength(1);
+    expect(wages[0]?.amount).toBe(-2600);
+    expect(wages[0]?.unpaid).toBe(false);
+    expect(wages[0]?.balance).toBeLessThan(twentyNine.state.finance.overdraftLimit);
+    expect(twentyNine.state.ledger.some((entry) => entry.unpaid)).toBe(false);
+  });
+
+  it('is closed on the thirtieth morning, on the days and not on the amount', () => {
+    const thirty = nextDay(twentyNine.state);
+    expect(thirty.finance.daysBelowOverdraft).toBe(BANKRUPTCY_DAYS_BELOW_LIMIT);
+    expect(thirty.gameOver).not.toBeNull();
+    expect(thirty.gameOver?.reason).toContain('30 days');
+    expect(thirty.gameOver?.day).toBe(thirty.clock.day);
+    // The clock is at the top of the morning it closed on: the look is the day's first act.
+    expect(thirty.clock.minute).toBe(0);
+    // And the amount was never the reason.
+    expect(thirty.cash).toBeGreaterThan(bankruptcyFloor(thirty));
   });
 });

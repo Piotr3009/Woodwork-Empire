@@ -583,6 +583,11 @@ describe('(hh) a fifty thousand pound job dropped with seven thousand in the ban
       month: 1,
       cash: -18307,
       allowed: -15000,
+      // The other rule's reading, which the card prints as its third figure: the account went under
+      // the limit on the click, so the morning that closed him is the first day of the thirty, and
+      // it was the amount and not the days that did it (CLAUDE.md T22 2.2).
+      daysBelow: 1,
+      daysAllowed: BANKRUPTCY_DAYS_BELOW_LIMIT,
     });
     expect(Number(event?.data.cash)).toBeLessThanOrEqual(Number(event?.data.allowed));
     expect(HH.card).toContain('The bank has closed you');
@@ -808,6 +813,8 @@ describe('(ii) the thirtieth day below the overdraft limit', () => {
       month: 1,
       cash: Math.round(II_THIRTY.cash),
       allowed: -15000,
+      daysBelow: BANKRUPTCY_DAYS_BELOW_LIMIT,
+      daysAllowed: BANKRUPTCY_DAYS_BELOW_LIMIT,
     });
   });
 

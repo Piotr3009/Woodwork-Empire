@@ -38,21 +38,24 @@ function marginTail(event: GameEvent): string {
   return ` <span class="figure${tone}" data-margin="${Math.round(margin * 100)}">${escapeHtml(figure)}</span>`;
 }
 
-/** The figures the engine was looking at when it closed the company, as a two column grid. They
- *  ride on the event (`declareBankruptcy`), so the card prints what the bank read and cannot work
- *  out a different sum a minute later (CLAUDE.md T21 2.2, T22 2.2). */
+/** The three figures the engine was looking at when it closed the company, as a two column grid.
+ *  They ride on the event (`declareBankruptcy`), so the card prints what the bank read and cannot
+ *  work out a different sum a minute later. The third is not money: it is the run of days the
+ *  account stood under the limit, against the run the bank allows, which is the other of the two
+ *  rules that close a company (CLAUDE.md T21 2.2, T22 2.2). */
 function bankFigures(event: GameEvent): string {
-  const rows: Array<[string, number]> = [
-    ['In the bank', numberOn(event, 'cash')],
-    ['The bank allowed', numberOn(event, 'allowed')],
+  const rows: Array<[string, string]> = [
+    ['In the bank', money(numberOn(event, 'cash'))],
+    ['The bank allowed', money(numberOn(event, 'allowed'))],
+    [
+      'Days below the limit',
+      `${numberOn(event, 'daysBelow')} of ${numberOn(event, 'daysAllowed')}`,
+    ],
   ];
   return (
     '<div class="bank-figs">' +
     rows
-      .map(
-        ([label, value]) =>
-          `<span>${escapeHtml(label)}</span><b>${escapeHtml(money(value))}</b>`,
-      )
+      .map(([label, value]) => `<span>${escapeHtml(label)}</span><b>${escapeHtml(value)}</b>`)
       .join('') +
     '</div>'
   );

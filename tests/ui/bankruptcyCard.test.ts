@@ -5,6 +5,7 @@
 // time it had, and the two ways out of it.
 
 import { describe, expect, it } from 'vitest';
+import { BANKRUPTCY_DAYS_BELOW_LIMIT } from '../../src/engine/constants';
 import { formatCalendarDay } from '../../src/engine/index';
 import { MODAL_SKINS } from '../../src/ui/modal';
 import { renderEvent, renderEventFooter } from '../../src/ui/eventModal';
@@ -46,15 +47,36 @@ describe('the bankruptcy card', () => {
     expect(when).toContain('cannot pay');
   });
 
-  it('prints the figures the bank read, in the drawing’s order', () => {
+  it('prints the three figures the bank read, in the drawing’s order', () => {
     const { state, event } = closedCompany();
     const figs = parse(renderEvent(state, event)).querySelector('.bank-figs');
     const labels = Array.from(figs?.querySelectorAll('span') ?? [], (node) => node.textContent);
-    expect(labels).toEqual(['In the bank', 'The bank allowed']);
+    expect(labels).toEqual(['In the bank', 'The bank allowed', 'Days below the limit']);
     const values = Array.from(figs?.querySelectorAll('b') ?? [], (node) => node.textContent);
     // The figures are the event's own, which are the ones the engine was looking at.
     expect(values[0]).toBe(`-£${Math.abs(Math.round(state.cash)).toLocaleString('en-GB')}`);
     expect(values[1]).toBe('-£15,000');
+    // The third is not money: it is the run of days, against the run the bank allows, and both
+    // come off the event (CLAUDE.md T22 2.2).
+    expect(values[2]).toBe(`${state.finance.daysBelowOverdraft} of ${BANKRUPTCY_DAYS_BELOW_LIMIT}`);
+    expect(values[2]).toBe('1 of 30');
+  });
+
+  it('says the days on a company the thirty day rule closed, and not the amount', () => {
+    // The other of the two rules: the account a few hundred under a 10,000 limit, well inside the
+    // -15,000 the bank allows, closed on the thirtieth day in a row under it (CLAUDE.md T22 2.2).
+    const start = newGame({ difficulty: 'veryEasy' });
+    start.cash = -10100;
+    start.finance.daysBelowOverdraft = BANKRUPTCY_DAYS_BELOW_LIMIT - 1;
+    const run = runDays(start, 1);
+    const event = eventsOfKind(run.events, 'bankruptcy')[0];
+    if (event === undefined) throw new Error('the bank did not close it');
+    const figs = parse(renderEvent(run.state, event)).querySelector('.bank-figs');
+    const values = Array.from(figs?.querySelectorAll('b') ?? [], (node) => node.textContent);
+    expect(values[2]).toBe('30 of 30');
+    expect(run.state.cash).toBeGreaterThan(-15000);
+    const when = parse(renderEvent(run.state, event)).querySelector('.bank-when')?.textContent ?? '';
+    expect(when).toContain('30 days in a row');
   });
 
   it('says what the company did with the time it had', () => {

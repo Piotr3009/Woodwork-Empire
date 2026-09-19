@@ -14,17 +14,19 @@
 // used to say nothing at all about the money until the month end, and a player could be four weeks
 // into a hole before the game mentioned it.
 //
-// Turn 21 adds the line above them all but the bags: the account has passed what the bank allows,
-// which is the last thing said before the bank closes the company (PIOTR, 18.09; CLAUDE.md T21 2.1).
+// Turn 21 adds the line above them all but the bags: the account is under the bank's limit, and the
+// line counts the days it has been there, because the thirtieth of them closes the company
+// (PIOTR, 18.09, 19.09; CLAUDE.md T21 2.1, T22 2.2).
 
 import {
+  BANKRUPTCY_DAYS_BELOW_LIMIT,
   FIRST_STEPS_LAST_DAY,
   NO_INSURANCE_REASON,
   RATE_WEEK_DAYS,
   SPEND_WARNING_CATEGORIES,
   SPEND_WARNING_FROM_CLOSED_DAYS,
 } from './constants';
-import { bankruptcyFloor, formatMoney } from './economy';
+import { formatMoney } from './economy';
 import { overdraftInterestForDay } from './finance';
 import { bagStore } from './machines';
 import { workPlan } from './plan';
@@ -34,8 +36,8 @@ import type { GameState, LedgerCategory } from './types';
 
 export type WarningKey =
   | 'bagsFull'
-  /** The account is past what the bank will carry, and the next look closes the company
-   *  (PIOTR, 18.09; CLAUDE.md T21 2.1). */
+  /** The account is under the bank's limit, and the days it has been there are counted
+   *  (PIOTR, 18.09; CLAUDE.md T21 2.1, T22 2.2). */
   | 'pastTheLimit'
   | 'nobodyAssigned'
   | 'deadlineAtRisk'
@@ -80,22 +82,26 @@ function bagsFullWarning(state: GameState): Warning | null {
   };
 }
 
-/** The account has passed what the bank allows, which is the last thing the strip says before the
- *  company is closed (PIOTR, 18.09; CLAUDE.md T21 2.1; docs/mockups/t21/debt.html part 1).
+/** The account is below the bank's limit, and the strip counts the days (PIOTR, 19.09;
+ *  CLAUDE.md T22 2.2; docs/mockups/t21/debt.html part 1). It is said from the first day under the
+ *  limit and not only once the company is past what the bank allows, because from Turn 22 the
+ *  account goes under the limit on its own and the thirtieth day in a row there is the end of the
+ *  company: a player who is never told the count cannot act on it.
  *
- *  It fires on the figure the bank reads, the cash against `bankruptcyFloor`, and on nothing softer
- *  [TUNE]: the sentence says the company is already past the line, and a line that said that while
- *  it was not true would be a lie the other way about. The day's look at the money is what closes
- *  the company (`checkBankruptcy`). The two figures are the engine's own, so the strip and the
- *  close cannot disagree. */
+ *  The day is `daysBelowOverdraft`, which the engine counts once a calendar day at the point the
+ *  day's money is settled, and the thirty is the engine's own figure, so the strip and the close
+ *  cannot disagree. The count is taken at the day's open, so on the afternoon a bill first takes
+ *  the account under the limit it still reads nought: the line calls that the first day, because it
+ *  is the first day the player is living through [TUNE]. */
 function pastTheLimitWarning(state: GameState): Warning | null {
-  const allowed = bankruptcyFloor(state);
-  if (state.cash > allowed) return null;
+  const limit = state.finance.overdraftLimit;
+  if (state.cash >= limit) return null;
+  const day = Math.max(1, state.finance.daysBelowOverdraft);
   return {
     key: 'pastTheLimit',
     text:
-      `Account ${formatMoney(state.cash)} has passed the ${formatMoney(allowed)} the bank ` +
-      'allows: the next look closes you.',
+      `Account ${formatMoney(state.cash)} is below the bank's ${formatMoney(limit)} limit: ` +
+      `day ${day} of ${BANKRUPTCY_DAYS_BELOW_LIMIT}.`,
   };
 }
 

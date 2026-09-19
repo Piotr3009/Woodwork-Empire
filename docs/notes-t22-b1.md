@@ -149,6 +149,11 @@ Its real life note is gone with the arrears, so `interest` is simply off `WHY_BY
   were the same pounds counted in two places: what changes is that the account now shows them. The
   count of days below the overdraft limit at the close is no longer nought, which is the answer to
   item 23 of REPORT-T21.md.
+- **[TUNE] the strip's first day.** The count of days below the limit is taken once a calendar day,
+  at the day's open, so on the afternoon a bill first takes the account under the limit
+  `daysBelowOverdraft` still reads nought and the line would say "day 0 of 30", which is not
+  English. The line reads `Math.max(1, days)`: the day the player is living through is the first of
+  the thirty. Nothing about the count itself or about the close was changed for it.
 - **Nothing else was chosen.** Every other figure in these four commits is Piotr's (the 1.5 of
   `BANKRUPTCY_LIMIT_FACTOR`, the 30 days, the 200 and the 10,000 of 2.1's clause, the 7,000 and the
   50,000 of the drop) or is measured off the run and asserted as measured.
@@ -163,7 +168,18 @@ describe block in place of the arrears ladder: the wages paid through the limit,
 limit going under it the same day, a machine still refused at the limit, and a refund landing in
 cash.
 
-**T22-B1b, 2.2.** (filled in at the commit)
+**T22-B1b, 2.2.** The bank's two rules read the cash alone: `cash <= 1.5 * overdraftLimit`, and the
+thirtieth calendar day in a row with `cash < overdraftLimit`, both looked at in the morning where
+Turn 13 looked. The card says three figures, `In the bank`, `The bank allowed` and
+`Days below the limit` (`12 of 30`, off the event, not money), and keeps its skin, its epitaph and
+its two buttons. The strip carries one line while the account is under the limit:
+`Account -£18,200 is below the bank's -£10,000 limit: day 12 of 30.`
+Rule two is reachable by playing now, and there is a played test of it: a company trading below the
+limit, its bills out of the account and a client paying what each day cost, stands there for
+twenty nine days and is closed on the thirtieth morning, with the experienced joiner's 2,600 of
+wages paid out of an account already under the limit on the way (asserted off the ledger line's own
+balance). Its own three tests are in `tests/engine/bankruptcy.test.ts`, beside the reset and the 1.5x
+rule, which stand as they were.
 
 **T22-B1c, 2.3.** (filled in at the commit)
 

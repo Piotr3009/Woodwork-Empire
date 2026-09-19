@@ -5,6 +5,7 @@
 
 import { describe, expect, it } from 'vitest';
 import {
+  BANKRUPTCY_DAYS_BELOW_LIMIT,
   FIRST_STEPS_LAST_DAY,
   NO_INSURANCE_REASON,
   OVERDRAFT_RATE_YEARLY,
@@ -347,32 +348,42 @@ describe('the first days say what to do (CLAUDE.md T18 2.7)', () => {
   });
 });
 
-describe('the line that says the bank is about to close you', () => {
-  /** A company standing in the overdraft, as deep as the test wants it. */
-  function inDebt(cash: number): GameState {
+describe('the line that counts the days below the bank s limit (CLAUDE.md T22 2.2)', () => {
+  /** A company under the overdraft limit, as deep and as long as the test wants it. */
+  function inDebt(cash: number, days = 0): GameState {
     const state = quietHall();
     state.cash = cash;
+    state.finance.daysBelowOverdraft = days;
     return state;
   }
 
-  it('says where the account stands and what the bank allows, in its words', () => {
-    const found = warnings(inDebt(-18200));
+  it('says where the account stands, what the limit is and which day of the thirty it is', () => {
+    const found = warnings(inDebt(-18200, 12));
     expect(found[0]?.key).toBe('pastTheLimit');
     expect(found[0]?.text).toBe(
-      'Account -\u00a318,200 has passed the -\u00a315,000 the bank allows: the next look closes you.',
+      'Account -\u00a318,200 is below the bank\u0027s -\u00a310,000 limit: day 12 of 30.',
     );
+    expect(BANKRUPTCY_DAYS_BELOW_LIMIT).toBe(30);
   });
 
-  it('says nothing while the account is still inside what the bank allows', () => {
-    // -14,000 against the -15,000 the bank allows.
-    const found = warnings(inDebt(-14000)).map((warning) => warning.key);
+  it('calls the day a bill first takes the account under the limit the first of them', () => {
+    // The count is taken once a calendar day, at the day's open, so an afternoon that goes under
+    // the limit has not been counted yet and the line would read "day 0 of 30" [TUNE].
+    expect(warnings(inDebt(-10100, 0))[0]?.text).toContain('day 1 of 30');
+  });
+
+  it('says nothing at all while the account is inside the limit, however far under zero', () => {
+    const found = warnings(inDebt(-9999)).map((warning) => warning.key);
     expect(found).not.toContain('pastTheLimit');
     // The overdraft line is still said, because the account is still under zero.
     expect(found).toContain('belowZero');
+    // And a day exactly on the limit is a day at the limit, not under it: the same reading the
+    // engine's own count takes.
+    expect(warnings(inDebt(-10000)).map((warning) => warning.key)).not.toContain('pastTheLimit');
   });
 
-  it('is gone the day the account comes back inside the line', () => {
-    const state = inDebt(-18200);
+  it('is gone the day the account comes back up to the limit', () => {
+    const state = inDebt(-18200, 12);
     expect(warnings(state)[0]?.key).toBe('pastTheLimit');
     state.cash = 2000;
     expect(warnings(state).map((warning) => warning.key)).not.toContain('pastTheLimit');
