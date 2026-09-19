@@ -205,7 +205,16 @@ describe('the file on disk and the footprint in the engine', () => {
     const owed = spriteFileSize(stands.width, stands.depth, stands.height);
     expect([owed.width, Math.floor(owed.height)]).toEqual([160, 136]);
     expect(pngSize(turned)).toEqual({ width: 160, height: 136 });
-    // And there is no other turned file in the game to be behind: this is the only one.
-    expect(spriteFiles().filter((name) => name.endsWith('.r.png'))).toEqual([turned]);
+    // The other four turned files are the cabinet ladder's (tool cabinets v2, PIOTR's art,
+    // 19.09): used and budget at 112 by 112, pro at 160 by 175, industrial at 208 by 208, each
+    // a true quarter turn. Their classes arrive in Turn 22 (CLAUDE.md T22 2.12); until then the
+    // loop above has no variant to measure them against and they are only counted here.
+    expect(spriteFiles().filter((name) => name.endsWith('.r.png'))).toEqual([
+      'toolCabinet.budget.r.png',
+      'toolCabinet.industrial.r.png',
+      'toolCabinet.pro.r.png',
+      turned,
+      'toolCabinet.used.r.png',
+    ]);
   });
 });
