@@ -122,6 +122,30 @@ describe('what is coming, on the Summary tab', () => {
     return next;
   }
 
+  it('carries no arrears row, on a company whose account is under the limit', () => {
+    // 2.4: the Summary drops the block it carried for the arrears, and nothing else on it moves.
+    // The company this test builds is the one that used to carry it: a bill it could not pay inside
+    // the overdraft, which is now simply out of the account (CLAUDE.md T22 2.1, 2.4).
+    const state = withAdmin();
+    state.cash = state.finance.overdraftLimit - 2000;
+    const page = parse(renderAccounting(state, 'summary'));
+    expect(page.textContent).not.toContain('Arrears');
+    expect(page.textContent).not.toContain('arrears');
+    expect(page.textContent).not.toContain('bailiff');
+    expect(page.querySelector('[data-do="payArrears"]')).toBeNull();
+    expect(page.querySelector('[data-field="arrearsAmount"]')).toBeNull();
+    // And nothing else moved: the four totals blocks, the earned rate line and every row of what is
+    // coming are where they were, and the head still says what is in the bank against the limit.
+    expect(page.querySelectorAll('.col')).toHaveLength(4);
+    expect(page.textContent).toContain('Earned labour rate');
+    expect(page.textContent).toContain('What is coming');
+    for (const row of ['Rent, every day', 'Business rates, every day', 'Power, every day']) {
+      expect(page.textContent, row).toContain(row);
+    }
+    expect(page.textContent).toContain(money(state.cash));
+    expect(page.textContent).toContain(money(state.finance.overdraftLimit));
+  });
+
   it('dates the wages by the last working day of the month and names no week', () => {
     // One pay day a month for everybody, so the row the player reads is the month's bill against
     // the month's own pay day, and the Friday the row used to be dated by is gone from the

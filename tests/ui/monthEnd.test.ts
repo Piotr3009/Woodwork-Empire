@@ -5,7 +5,7 @@
 
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { MONTH_LINES, MONTH_LINE_OF, monthReport } from '../../src/engine/economy';
+import { MONTH_LINES, MONTH_LINE_OF, charge, monthReport } from '../../src/engine/economy';
 import { monthEfficiency } from '../../src/engine/efficiency';
 import { machineSavings } from '../../src/engine/machines';
 import { monthRate, weekRate } from '../../src/engine/rate';
@@ -109,20 +109,48 @@ describe('a played month', () => {
     expect(page.querySelector('.month-end .warn')).toBeNull();
   });
 
-  it('prints a plus in green on a line that took money, and says what went unpaid', () => {
+  it('prints a plus in green on a line that took money', () => {
     const report = monthReport(state, 1);
     const revenue = report.lines.find((line) => line.id === 'revenue');
     if (revenue) {
       revenue.income = 1200;
       revenue.net = 1200 - revenue.costs;
     }
-    report.unpaid = 350;
     const page = parse(renderMonthReport(report));
     const row = page.querySelector('.month-line[data-line="revenue"]');
     const figures = Array.from(row?.querySelectorAll('.row-figure') ?? []);
     expect(figures[0]?.textContent).toBe('+£1,200');
     expect(figures[0]?.className).toContain('good');
-    expect(page.querySelector('.month-end .warn')?.textContent).toContain('£350');
+  });
+
+  it('carries no arrears row, on a month that went under the overdraft limit', () => {
+    // 2.4: the card drops the row it carried for the bills that went to the arrears, and nothing
+    // else on it moves. The month is played on Hard with the account taken to the overdraft floor
+    // first, which is the month that used to carry that row: every bill of it is on a line now and
+    // the report still adds up to the cash it moved (CLAUDE.md T22 2.1, 2.4).
+    const hard = newGame({ difficulty: 'hard' });
+    // Down to the overdraft floor through the ledger, the way every pound moves (T13 10.2), so the
+    // report's own cash at the open is the cash the ledger says it was.
+    charge(hard, 'equipment', 'A machine that took the lot', -(hard.cash - hard.finance.overdraftLimit));
+    const played = runToDay(hard, 20).state;
+    expect(played.cash).toBeLessThan(played.finance.overdraftLimit);
+    const report = monthReport(played, 1);
+    const page = parse(renderMonthReport(report));
+    // No paragraph at all under the two cash rows, and not a word of the arrears anywhere.
+    expect(page.querySelector('.month-end .warn')).toBeNull();
+    expect(page.querySelector('.month-end p')).toBeNull();
+    expect(page.textContent).not.toContain('arrears');
+    expect(page.textContent).not.toContain('unpaid');
+    // And nothing else moved: the head, every line of the table, the three totals and the two cash
+    // rows are where they were.
+    const rows = Array.from(page.querySelectorAll('.month-line'));
+    expect(rows.map((row) => row.getAttribute('data-line'))).toEqual(
+      MONTH_LINES.map((line) => line.id),
+    );
+    expect(page.querySelectorAll('.month-total')).toHaveLength(3);
+    expect(page.querySelector('[data-cash="open"]')).not.toBeNull();
+    expect(page.querySelector('[data-cash="close"]')).not.toBeNull();
+    expect(report.cashClose - report.cashOpen).toBeCloseTo(report.net, 2);
   });
 });
 

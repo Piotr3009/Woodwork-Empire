@@ -446,13 +446,15 @@ describe('the books', () => {
 });
 
 describe('the month report', () => {
-  it('reads a played month off the ledger: the lines sum to the cash delta, unpaid bills apart', () => {
+  it('reads a played month off the ledger: the lines sum to the cash delta', () => {
     const state = runToDay(buyStartingKit(newGame({ difficulty: 'veryEasy' })), 32).state;
     const report = monthReport(state, 1);
     const net = report.lines.reduce((total, line) => total + line.net, 0);
     expect(net).toBeCloseTo(report.net, 6);
     expect(report.cashClose - report.cashOpen).toBeCloseTo(report.net, 2);
-    expect(report.unpaid).toBe(0);
+    // The report carries no figure beside the net for bills that went unpaid, because no bill goes
+    // unpaid (CLAUDE.md T22 2.1, 2.4).
+    expect(report).not.toHaveProperty('unpaid');
     // Every line carries its category's lines and nothing else: the rent line is the rent, the
     // rates and the deposit, to the penny.
     const rent = state.ledger

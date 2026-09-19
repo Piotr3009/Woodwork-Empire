@@ -192,4 +192,29 @@ tomorrow's check.` when rule one would fire on the account the drop leaves, and 
 limit. Both texts are asserted whole in `tests/ui/dropCard.test.ts`, and the played (hh) scenario
 asserts the first of them word for word.
 
-**T22-B1d, 2.4.** (filled in at the commit)
+**T22-B1d, 2.4.** The month end card and Accounting's Summary drop their arrears rows and nothing
+else on either moves. `MonthReport.unpaid` is gone with the paragraph that printed it, because there
+is no bill left that the bank did not pay; the one line of `monthReport` that keeps a line with no
+cash behind it out of the month's figures stays, and `noteLoss` (sheets ruined in the yard) is the
+only writer of one now. The Summary's arrears block went out in 2.1, where the field it read was
+deleted. The two render tests are the ones 2.4 asks for: the month end card of a month played under
+the overdraft limit carries no paragraph at all, no word of the arrears, and its head, its seventeen
+lines, its three totals and its two cash rows are where they were, with the report still adding up
+to the cash the month moved; and the Summary of a company 2,000 under its limit carries no arrears
+text, no `payArrears` control and no typed field, with its four totals blocks, its earned rate line
+and every row of what is coming still on it.
+
+## 6. Two things phase C should know
+
+- **`tests/scenarios/turn21.test.ts` was brought up to the new truth, not rewritten.** Its (hh) is
+  the ancestor of Turn 22's (kk) and its (ii) of (jj), and C2 owns both. What B1 changed: (hh) now
+  pays the deposit out of the account (the click leaves -18,000, the next morning's check closes the
+  company at -18,307) and asserts the new box text; (ii) now asserts that the count of days below
+  the limit does climb, and that for a company standing still it is still the amount that closes it,
+  because at 307 a working day the room between the limit and 1.5 times it runs out around the
+  twenty first day. The played thirtieth day is in `tests/engine/bankruptcy.test.ts`.
+- **The scenario of (jj) needs a company that keeps earning.** A company that stands still cannot
+  reach the thirtieth day on any difficulty: the room below the limit is half the limit again, and
+  the standing costs alone eat it in about twenty days. What reaches it is a company trading at or
+  near break even under the limit, which is what the engine test builds by having a client pay what
+  each day cost.

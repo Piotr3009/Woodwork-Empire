@@ -702,14 +702,15 @@ export interface MonthReport {
   /** The bank at the first line of the month and at the last. */
   cashOpen: number;
   cashClose: number;
-  /** Bills that went to the arrears instead of out of the bank: no cash moved, so they are not
-   *  in the lines, and the report says so beside the net. */
-  unpaid: number;
 }
 
-/** The month's report, read off the ledger the state still carries (CLAUDE.md T13 3.20). The
- *  lines are the cash that moved, so they add up to the bank at the close less the bank at the
- *  open; what never left the bank is counted apart. */
+/** The month's report, read off the ledger the state still carries (CLAUDE.md T13 3.20). The lines
+ *  are the cash that moved, so they add up to the bank at the close less the bank at the open. From
+ *  Turn 22 every bill is cash that moved, because a cost the player did not choose is paid out of
+ *  the account whatever the balance: the figure the report used to carry beside the net for the
+ *  bills that went unpaid is gone with them (CLAUDE.md T22 2.1, 2.4). What is left with no cash
+ *  behind it is a loss noted on the books, like sheets ruined in the yard (`noteLoss`), and a note
+ *  is not a line of the month's money. */
 export function monthReport(state: GameState, month: number): MonthReport {
   // Two orders, and they are not the same one. `balance` on an entry is the bank after that entry
   // was written, so it only means anything in the order the entries were written in; a job's own
@@ -730,12 +731,10 @@ export function monthReport(state: GameState, month: number): MonthReport {
     .map(({ entry }) => entry);
   const lines: MonthLine[] = MONTH_LINES.map((line) => ({ ...line, income: 0, costs: 0, net: 0 }));
   const byId = new Map(lines.map((line) => [line.id, line]));
-  let unpaid = 0;
   for (const entry of entries) {
-    if (entry.unpaid) {
-      unpaid += Math.abs(entry.amount);
-      continue;
-    }
+    // A line with no cash behind it is not the month's money: `noteLoss` and nothing else writes
+    // one now (CLAUDE.md T22 2.4).
+    if (entry.unpaid) continue;
     const line = byId.get(MONTH_LINE_OF[entry.category]);
     if (!line) continue;
     if (entry.amount >= 0) line.income += entry.amount;
@@ -766,6 +765,5 @@ export function monthReport(state: GameState, month: number): MonthReport {
     net: Math.round((income - costs) * 100) / 100,
     cashOpen: Math.round(cashOpen * 100) / 100,
     cashClose: Math.round(cashClose * 100) / 100,
-    unpaid: Math.round(unpaid * 100) / 100,
   };
 }
