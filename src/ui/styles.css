@@ -4410,6 +4410,15 @@ input.num {
   color: var(--text-dim);
 }
 
+/* The box the paper hangs in: layout and nothing else, so the paper is centred over the head it
+   points at and the tail's own nine pixels fall under it. No paint here (CLAUDE.md T21 2.6). */
+.bubble-holder {
+  align-items: flex-start;
+  display: flex;
+  height: 100%;
+  justify-content: center;
+}
+
 /* 2.2 The end. The bankruptcy is the event it always was, so it is a folder with the one cross, and
    this is the drawing's dark card inside it (docs/mockups/t21/debt.html part 3). The dark is the
    folder skin's own ink, so the card is the same colour as the writing on the paper around it. */

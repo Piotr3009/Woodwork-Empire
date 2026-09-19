@@ -1251,8 +1251,7 @@ export function bubbleArt(bubble: Bubble, headTop: number): string {
     `width="${width}" height="${height}" overflow="visible" pointer-events="none">` +
     // The holder is laid out and not painted: it centres the paper over the head and leaves the
     // tail's own nine pixels under it. Nothing of the look is here; that is the stylesheet's.
-    '<div xmlns="http://www.w3.org/1999/xhtml" class="bubble-holder" ' +
-    'style="display:flex;justify-content:center;align-items:flex-start;height:100%">' +
+    '<div xmlns="http://www.w3.org/1999/xhtml" class="bubble-holder">' +
     `<div class="bubble${tone === '' ? '' : ` ${tone}`}">${escapeText(bubble.text)}</div>` +
     '</div></foreignObject>'
   );
