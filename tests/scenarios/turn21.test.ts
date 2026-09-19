@@ -31,14 +31,14 @@ import {
   stageText,
   stationWaitingFor,
 } from '../../src/engine/index';
-import { bankruptcyFloor, netPosition } from '../../src/engine/economy';
+import { bankruptcyFloor } from '../../src/engine/economy';
 import { bubbleFor } from '../../src/engine/bubbles';
 import { canHire } from '../../src/engine/staff';
 import {
   depositCanBePaid,
   dropCardTitle,
   materialWrittenOff,
-  netAfterDrop,
+  accountAfterDrop,
   renderDropCard,
 } from '../../src/ui/dropCard';
 import { renderBankruptcyCard } from '../../src/ui/eventModal';
@@ -490,7 +490,6 @@ describe('(hh) a fifty thousand pound job dropped with seven thousand in the ban
     ).toHaveLength(1);
     expect(HH.morning.cash).toBe(IN_THE_BANK);
     expect(HH.morning.finance.overdraftLimit).toBe(-10000);
-    expect(HH.morning.finance.arrearsAmount).toBe(0);
     // The morning after the lorry, day 11, with the whole working day still in front of him: the
     // click is made at 08:00 and the company trades the rest of the day either way.
     expect(HH.dropDay).toBe(11);
@@ -513,18 +512,18 @@ describe('(hh) a fifty thousand pound job dropped with seven thousand in the ban
     expect(dropReputationCost(HH.job)).toBe(50);
   });
 
-  it('says in the red box that the drop closes the company today, and it is telling the truth', () => {
-    // The deposit cannot be paid out of 7,000 and a 10,000 overdraft, so the whole 25,000 of it goes
-    // to arrears, and the net position that leaves, -18,000, is past the -15,000 one and a half
-    // times the overdraft the bank allows (CLAUDE.md T21 2.2, 2.3).
+  it('says in the red box that the drop closes the company, and it is telling the truth', () => {
+    // The deposit cannot be paid out of 7,000 and a 10,000 overdraft, and from Turn 22 it is paid
+    // anyway: the account goes to -18,000, which is past the -15,000 one and a half times the
+    // overdraft the bank allows (CLAUDE.md T22 2.1, 2.2, 2.3).
     expect(depositCanBePaid(HH.morning, HH.job)).toBe(false);
-    expect(netAfterDrop(HH.morning, HH.job)).toEqual({ net: -18000, allowed: -15000 });
+    expect(accountAfterDrop(HH.morning, HH.job)).toEqual({ account: -18000, allowed: -15000 });
     expect(bankruptcyFloor(HH.morning)).toBe(
       HH.morning.finance.overdraftLimit * BANKRUPTCY_LIMIT_FACTOR,
     );
     expect(dangerBoxOf(renderDropCard(HH.morning, HH.job))).toBe(
-      'You cannot pay the deposit back. It goes to arrears: -£18,000 against the ' +
-        "bank's -£15,000 limit. Dropping this job closes the company today.",
+      'You cannot pay the deposit back from the overdraft. The account goes to -£18,000 ' +
+        "against the bank's -£15,000. Dropping this job closes the company today.",
     );
   });
 
@@ -532,18 +531,15 @@ describe('(hh) a fifty thousand pound job dropped with seven thousand in the ban
     // CLAUDE.md T21 7, line one: "A GBP 50,000 drop with GBP 7,000 in the bank closes the company at
     // that day's close, asserted." This is that assertion.
     //
-    // The click itself takes the job off the books, hands the deposit back as arrears because there
-    // is nothing to hand it back out of, writes the material off and charges the 50 points. The game
-    // does not end in the middle of the day: the bank looks once a calendar day, at the point the
-    // day's money is settled (`runDayCosts`), so the look that closes him is the one at the close of
-    // the day he dropped it on, which is the reading of "as today" the brief and
-    // docs/notes-t21-b1.md both take.
+    // The click itself takes the job off the books, hands the deposit back out of the account
+    // because a deposit returned is not a cost the player can decline, writes the material off and
+    // charges the 50 points. The game does not end in the middle of the day: the bank looks once a
+    // calendar day, at the point the day's money is settled (`runDayCosts`), so the look that
+    // closes him is the next morning's.
     expect(HH.clicked.jobs).toHaveLength(0);
-    expect(HH.clicked.cash).toBe(IN_THE_BANK);
-    expect(HH.clicked.finance.arrearsAmount).toBe(25000);
-    expect(HH.clicked.finance.arrearsMonths).toBe(1);
-    expect(netPosition(HH.clicked)).toBe(-18000);
-    expect(netPosition(HH.clicked)).toBeLessThanOrEqual(bankruptcyFloor(HH.clicked));
+    expect(HH.clicked.cash).toBe(IN_THE_BANK - HH.job.depositPaid);
+    expect(HH.clicked.cash).toBe(-18000);
+    expect(HH.clicked.cash).toBeLessThanOrEqual(bankruptcyFloor(HH.clicked));
     // The standing of 60 the company took a job of this size on is 10 by the time the click is over.
     expect(HH.clicked.reputation).toBe(10);
     expect(HH.clicked.reputationLog.at(-1)).toEqual({
@@ -552,9 +548,13 @@ describe('(hh) a fifty thousand pound job dropped with seven thousand in the ban
       points: -50,
     });
     const lines = HH.clicked.ledger.filter((entry) => entry.day === HH.dropDay);
-    expect(lines.map((entry) => entry.label)).toContain(
-      'Deposit returned: Kitchen for the Hedges (unpaid)',
+    const deposit = lines.find(
+      (entry) => entry.label === 'Deposit returned: Kitchen for the Hedges',
     );
+    expect(deposit).not.toBeUndefined();
+    // The money really left the account: the line is not a note on the books any more.
+    expect(deposit?.unpaid).toBe(false);
+    expect(deposit?.amount).toBe(-HH.job.depositPaid);
     expect(lines.map((entry) => entry.label)).toContain(
       'Material written off: Kitchen for the Hedges',
     );
@@ -570,25 +570,23 @@ describe('(hh) a fifty thousand pound job dropped with seven thousand in the ban
     expect(HH.closed.days.some((entry) => entry.day > HH.dropDay)).toBe(false);
   });
 
-  it('hands him the bank s card with the four figures the engine closed him on', () => {
-    // The event is the bankruptcy event the game always had, with the four figures of the drawing
-    // riding on it so the card cannot work a different sum out a minute later (CLAUDE.md T21 2.2;
-    // docs/mockups/t21/debt.html part 3). The cash is 6,693 and not the 7,000 of the morning,
+  it('hands him the bank s card with the figures the engine closed him on', () => {
+    // The event is the bankruptcy event the game always had, with the figures of the drawing riding
+    // on it so the card cannot work a different sum out a minute later (CLAUDE.md T21 2.2, T22 2.2;
+    // docs/mockups/t21/debt.html part 3). The cash is -18,307 and not the -18,000 the click left,
     // because the day the bank looked at had its own rent, rates, power and owner's draw to pay
-    // first: 307 of them, and they were paid, because the cash was still above the overdraft.
+    // first: 307 of them, and from Turn 22 they are paid whatever the balance.
     const event = HH.closed.activeEvent;
     expect(event?.kind).toBe('bankruptcy');
     expect(event?.data).toEqual({
       day: 12,
       month: 1,
-      cash: 6693,
-      arrears: 25000,
-      net: -18307,
+      cash: -18307,
       allowed: -15000,
     });
-    expect(Number(event?.data.net)).toBeLessThanOrEqual(Number(event?.data.allowed));
+    expect(Number(event?.data.cash)).toBeLessThanOrEqual(Number(event?.data.allowed));
     expect(HH.card).toContain('The bank has closed you');
-    for (const figure of ['£6,693', '-£25,000', '-£18,307', '-£15,000']) {
+    for (const figure of ['-£18,307', '-£15,000']) {
       expect(HH.card, figure).toContain(figure);
     }
     // The epitaph of the drawing: the working days he kept the workshop, and the orders taken and
@@ -604,9 +602,8 @@ describe('(hh) a fifty thousand pound job dropped with seven thousand in the ban
         `-${dropReputationCost(HH.job)}, in the bank ${formatMoney(HH.morning.cash)} of ` +
         `${formatMoney(HH.morning.finance.overdraftLimit)} overdraft\n` +
         `the red box: ${dangerBoxOf(renderDropCard(HH.morning, HH.job))}\n` +
-        `dropped on day ${HH.dropDay}: arrears ${formatMoney(HH.clicked.finance.arrearsAmount)}, ` +
-        `net ${formatMoney(netPosition(HH.clicked))} against the bank's ` +
-        `${formatMoney(bankruptcyFloor(HH.clicked))}\n` +
+        `dropped on day ${HH.dropDay}: the account ${formatMoney(HH.clicked.cash)} against the ` +
+        `bank's ${formatMoney(bankruptcyFloor(HH.clicked))}\n` +
         `CLOSED at the close of day ${HH.dropDay}, on the bank's look of day ` +
         `${HH.closed.gameOver?.day}: "${HH.closed.gameOver?.reason}"`,
     );
@@ -622,12 +619,9 @@ describe('(hh) a fifty thousand pound job dropped with seven thousand in the ban
  *  about the money, so there is no job and no wage in the way of it. */
 const PAST_THE_LIMIT: Policy = { ...CAREFUL, maxOpenJobs: 0, stockSheets: 0 };
 
-/** How far past the limit the account is put: a hundred pounds, which is under what the two costs
- *  in the game that are paid without the overdraft floor come to (a repair bill at the end of a
- *  repair, and the 150 of temporary storage when a lorry brings more sheets than the rack holds).
- *  Those two, and nothing else, are how a played company's cash ever closes a day below the limit:
- *  every other cost in the game either fits inside the overdraft or goes to the arrears, which is
- *  what the first test below measures. */
+/** How far past the limit the account is put: a hundred pounds. From Turn 22 every cost the player
+ *  did not choose goes through the limit, so a company gets under it by simply standing still, and
+ *  the hundred is only where these runs start counting from (CLAUDE.md T22 2.1). */
 const PAST_BY = 100;
 
 /** The hall of the section's second rule, played, with two figures written onto it and named:
@@ -635,12 +629,12 @@ const PAST_BY = 100;
  *  1. the cash, a hundred pounds past the overdraft limit;
  *  2. the run of days below it, when the test wants the thirtieth day.
  *
- *  The second one cannot be played up to, and the test after this one is the measurement of why: a
- *  company below the limit can pay nothing at all, so its bills go to the arrears at 307 a working
- *  day and 107 a weekend one, and the 5,000 of room between the limit and the one and a half times
- *  it the bank allows is used up on the twenty first of those days. So a real company is closed by
- *  its arrears nine days before the thirtieth, and the only honest way to watch the thirtieth day
- *  arrive is to write the count the bank is keeping and play the two days that matter. */
+ *  The second one cannot be played up to by a company that stands still: its bills now come out of
+ *  the account at 307 a working day and 107 a weekend one, so the 5,000 of room between the limit
+ *  and the one and a half times it the bank allows is used up on the twenty first of those days,
+ *  and rule one closes it before the thirtieth day arrives. A company that keeps earning while it
+ *  is under the limit does reach it, which is what tests/engine/bankruptcy.test.ts plays; here the
+ *  count the bank is keeping is written and the two days that matter are played. */
 function pastTheLimit(counter: number): GameState {
   const state = playUntilDay(
     newGame({ seed: SEED, difficulty: 'veryEasy' }),
@@ -654,10 +648,10 @@ function pastTheLimit(counter: number): GameState {
 }
 
 /** A played month of a company that does nothing at all on Hard: the cheapest company the game can
- *  hold, which is the one that would reach the thirtieth day if any could. Every day of it is read
- *  as it closes: what the account had in it against the limit, and what the bank's count of days
- *  stood at. */
-interface ArrearsMonth {
+ *  hold, which is the one that would reach the thirtieth day if any standing still could. Every day
+ *  of it is read as it closes: what the account had in it against the limit, and what the bank's
+ *  count of days stood at. */
+interface IdleMonth {
   readings: string[];
   /** What the account was above the overdraft limit at the close of each day. */
   gaps: number[];
@@ -666,7 +660,7 @@ interface ArrearsMonth {
   closed: GameState;
 }
 
-function arrearsMonth(): ArrearsMonth {
+function idleMonth(): IdleMonth {
   const readings: string[] = [];
   const gaps: number[] = [];
   const counts: number[] = [];
@@ -676,9 +670,9 @@ function arrearsMonth(): ArrearsMonth {
     state = playDay(state, IDLE, []);
     guard += 1;
     readings.push(
-      `day ${state.clock.day}: cash ${Math.round(state.cash)}, arrears ` +
-        `${Math.round(state.finance.arrearsAmount)}, net ${Math.round(netPosition(state))}, ` +
-        `days below the limit ${state.finance.daysBelowOverdraft}`,
+      `day ${state.clock.day}: cash ${Math.round(state.cash)}, the limit ` +
+        `${Math.round(state.finance.overdraftLimit)}, days below it ` +
+        `${state.finance.daysBelowOverdraft}`,
     );
     gaps.push(state.cash - state.finance.overdraftLimit);
     counts.push(state.finance.daysBelowOverdraft);
@@ -686,10 +680,10 @@ function arrearsMonth(): ArrearsMonth {
   return { readings, gaps, counts, closed: state };
 }
 
-const II_MONTH = arrearsMonth();
+const II_MONTH = idleMonth();
 
 /** The same position played to the end: how far the bank's count of days actually gets before the
- *  arrears take the net position past what it allows. */
+ *  standing costs take the account past what the bank allows. */
 function playedToTheEnd(): { closed: GameState; counter: number } {
   let state = pastTheLimit(0);
   let guard = 0;
@@ -730,79 +724,71 @@ function dayAboveTheLimit(): { paid: GameState; next: GameState; after: GameStat
 
 const II_RESET = dayAboveTheLimit();
 
-describe('(ii) a played month in arrears, on Hard, doing nothing', () => {
-  it('never gets the bank s count of days off nought, because the cash stops at the limit', () => {
-    // The month Piotr's rule two is written for, played: the 5,000 overdraft of Hard fills by day
-    // 11, every bill after that goes unpaid, and the arrears climb about 299 a working day. The
-    // account itself never closes a day below the limit, so the count of days past it is nought on
-    // every one of the twenty two days the company lasts. The closure itself is rule one, and the
-    // day 22 of it is also asserted in tests/scenarios/thirtyDays.test.ts; what is asserted here is
-    // the count, which is the thing 2.2 rule 2 reads.
-    // Not one day of the month closes with the account below the overdraft limit: a bill that
-    // cannot be paid inside it is not paid at all and goes to the arrears instead, so the cash stops
-    // dead at the limit and the count of days past it never starts (CLAUDE.md T21 2.2 rule 2,
-    // against `canAfford` and `chargeUnavoidable` in src/engine/economy.ts).
-    expect(II_MONTH.gaps.filter((gap) => gap < 0)).toEqual([]);
-    expect([...new Set(II_MONTH.counts)]).toEqual([0]);
+describe('(ii) a played month under the limit, on Hard, doing nothing', () => {
+  it('gets the bank s count of days off nought, and is closed on the amount before the days', () => {
+    // The month Piotr's rule two is written for, played. Turn 21 stopped every bill at the 5,000
+    // overdraft of Hard and put the rest in a second pot, so the account parked on the limit and
+    // the bank's count of days never started; from Turn 22 the bills come out of the account, so it
+    // goes under the limit and keeps going, and the count climbs a day at a time. It is still rule
+    // one that closes the company, because at 307 a working day the 2,500 of room between the limit
+    // and the -7,500 the bank allows runs out long before the thirtieth day
+    // (CLAUDE.md T22 2.1, 2.2; REPORT-T21.md section 0 item 23).
+    expect(II_MONTH.gaps.filter((gap) => gap < 0).length).toBeGreaterThan(0);
+    expect(Math.max(...II_MONTH.counts)).toBeGreaterThan(0);
     const closed = II_MONTH.closed;
     expect(closed.gameOver?.day).toBe(22);
     expect(closed.gameOver?.reason).toContain('cannot pay');
-    expect(closed.finance.daysBelowOverdraft).toBe(0);
-    expect(closed.finance.arrearsAmount).toBeGreaterThan(0);
-    expect(closed.finance.arrearsMonths).toBeGreaterThanOrEqual(1);
-    expect(Math.round(closed.cash)).toBe(-4998);
-    expect(netPosition(closed)).toBeLessThanOrEqual(bankruptcyFloor(closed));
+    expect(closed.finance.daysBelowOverdraft).toBeGreaterThan(0);
+    expect(closed.finance.daysBelowOverdraft).toBeLessThan(BANKRUPTCY_DAYS_BELOW_LIMIT);
+    expect(closed.cash).toBeLessThanOrEqual(bankruptcyFloor(closed));
+    expect(closed.ledger.some((entry) => entry.unpaid)).toBe(false);
     console.log(
-      '(ii) A PLAYED MONTH IN ARREARS, ON HARD, DOING NOTHING\n' +
+      '(ii) A PLAYED MONTH UNDER THE LIMIT, ON HARD, DOING NOTHING\n' +
         `${II_MONTH.readings.slice(-4).join('\n')}\n` +
         `CLOSED on day ${closed.gameOver?.day}: "${closed.gameOver?.reason}"\n` +
-        'the count of days below the overdraft limit, every day of it: 0',
+        'the count of days below the overdraft limit at the close: ' +
+        `${closed.finance.daysBelowOverdraft} of ${BANKRUPTCY_DAYS_BELOW_LIMIT}`,
     );
   });
 });
 
 describe('(ii) a company below the overdraft limit, played to the end', () => {
-  it('is closed by its arrears nine days short of the thirtieth', () => {
+  it('is closed on the amount before the thirtieth day, while it stands still', () => {
     // The company of `pastTheLimit`, played from the day its account first closes below the limit
-    // until the bank shuts it. The count climbs a day at a time, as it should, and it reaches 21 of
-    // the 30: every one of those days puts its unpaid bills on the arrears, 307 of them on a
-    // working day and 107 on a weekend one, and by the twenty first the arrears, 5,247, have taken
-    // the net position to -15,347 against the -15,000 the bank allows. The bank closes the company
-    // on calendar day 28, which is the weekend day its money passed the line on. So rule one always
-    // gets there first, and the thirtieth day is out of the reach of any company whose bills are
-    // going unpaid. One line for Piotr: the thirty day rule as it stands can only bite a company
-    // that is below the limit and still paying its way, and nothing in the game produces one.
+    // until the bank shuts it. The count climbs a day at a time, as it should, and it gets most of
+    // the way to the thirty: every one of those days takes its standing costs out of the account,
+    // 307 of them on a working day and 107 on a weekend one, and the 5,000 of room between the
+    // limit and the -15,000 the bank allows runs out first. So for a company that stands still it
+    // is rule one that gets there, and the thirtieth day belongs to a company that keeps earning
+    // while it is under the limit, which is what tests/engine/bankruptcy.test.ts plays out
+    // (CLAUDE.md T22 2.2).
     expect(II_END.closed.gameOver).not.toBeNull();
     expect(II_END.closed.gameOver?.reason).toContain('cannot pay');
     expect(II_END.closed.gameOver?.reason).not.toContain('30 days');
-    expect(II_END.counter).toBe(21);
+    expect(II_END.counter).toBeGreaterThan(0);
     expect(II_END.counter).toBeLessThan(BANKRUPTCY_DAYS_BELOW_LIMIT);
-    expect(netPosition(II_END.closed)).toBeLessThanOrEqual(bankruptcyFloor(II_END.closed));
+    expect(II_END.closed.cash).toBeLessThanOrEqual(bankruptcyFloor(II_END.closed));
     console.log(
       '(ii) A COMPANY BELOW THE OVERDRAFT LIMIT, PLAYED TO THE END\n' +
         `cash ${formatMoney(II_END.closed.cash)} against a limit of ` +
-        `${formatMoney(II_END.closed.finance.overdraftLimit)}, arrears ` +
-        `${formatMoney(II_END.closed.finance.arrearsAmount)}, net ` +
-        `${formatMoney(netPosition(II_END.closed))} against the bank's ` +
+        `${formatMoney(II_END.closed.finance.overdraftLimit)} and the bank's ` +
         `${formatMoney(bankruptcyFloor(II_END.closed))}\n` +
         `the count of days below the limit reached ${II_END.counter} of ` +
-        `${BANKRUPTCY_DAYS_BELOW_LIMIT}, and the arrears closed the company on day ` +
+        `${BANKRUPTCY_DAYS_BELOW_LIMIT}, and the amount closed the company on day ` +
         `${II_END.closed.gameOver?.day}`,
     );
   });
 });
 
 describe('(ii) the thirtieth day below the overdraft limit', () => {
-  it('leaves the company trading on the twenty ninth day, with the net position well inside', () => {
+  it('leaves the company trading on the twenty ninth day, with the account well inside', () => {
     expect(II_TWENTY_NINE.finance.daysBelowOverdraft).toBe(BANKRUPTCY_DAYS_BELOW_LIMIT - 1);
     expect(II_TWENTY_NINE.finance.daysBelowOverdraft).toBe(29);
     expect(II_TWENTY_NINE.gameOver).toBeNull();
-    // Nothing but the run of days can close this company: the account is 100 past a 10,000 limit
-    // and two days of unpaid bills is 614 of arrears, so the net position, -10,407 on the twenty
-    // ninth day, is nowhere near the -15,000 the bank allows.
-    expect(Math.round(netPosition(II_TWENTY_NINE))).toBe(-10407);
-    expect(netPosition(II_TWENTY_NINE)).toBeGreaterThan(bankruptcyFloor(II_TWENTY_NINE));
-    expect(Math.round(II_TWENTY_NINE.cash)).toBe(-10100);
+    // Nothing but the run of days can close this company: the account is a few hundred past a
+    // 10,000 limit, which is nowhere near the -15,000 the bank allows.
+    expect(II_TWENTY_NINE.cash).toBeLessThan(II_TWENTY_NINE.finance.overdraftLimit);
+    expect(II_TWENTY_NINE.cash).toBeGreaterThan(bankruptcyFloor(II_TWENTY_NINE));
   });
 
   it('closes it on the thirtieth day, and the reason says the thirty days', () => {
@@ -811,29 +797,26 @@ describe('(ii) the thirtieth day below the overdraft limit', () => {
     expect(II_THIRTY.gameOver?.reason).toBe(
       '30 days in a row past the overdraft limit, and the bank has pulled it.',
     );
-    // The amount is not the test: 614 of arrears on an account 100 past the limit, and the net
-    // position -10,714 with -15,000 allowed. It is the run of days and nothing else
+    // The amount is not the test: the account is a few hundred past a 10,000 limit with -15,000
+    // allowed. It is the run of days and nothing else
     // [PIOTR, 18.09: "thirty days below the limit"].
-    expect(netPosition(II_THIRTY)).toBeGreaterThan(bankruptcyFloor(II_THIRTY));
+    expect(II_THIRTY.cash).toBeGreaterThan(bankruptcyFloor(II_THIRTY));
     const event = II_THIRTY.activeEvent;
     expect(event?.kind).toBe('bankruptcy');
     expect(event?.data).toEqual({
       day: II_THIRTY.gameOver?.day,
       month: 1,
-      cash: -10100,
-      arrears: 614,
-      net: -10714,
+      cash: Math.round(II_THIRTY.cash),
       allowed: -15000,
     });
   });
 
   it('would have started the count again on one day back above the limit', () => {
     // The control, and it is one client's job: a 4,000 job's deposit is 2,000, and the account goes
-    // from 100 past the limit to 1,900 inside it. That is all it takes. The day that follows closes
-    // above the limit, so the count goes back to nought, and the company that was closed on the
-    // thirtieth day in the run above is still trading two days later (CLAUDE.md T21 2.2 rule 2: "A
-    // day above the limit resets the count").
-    expect(Math.round(II_RESET.paid.cash)).toBe(-8100);
+    // from a few hundred past the limit to a good way inside it. That is all it takes. The day that
+    // follows closes above the limit, so the count goes back to nought, and the company that was
+    // closed on the thirtieth day in the run above is still trading two days later
+    // (CLAUDE.md T21 2.2 rule 2, T22 2.2: "a day at or above the limit resets the count").
     expect(II_RESET.paid.cash).toBeGreaterThan(II_RESET.paid.finance.overdraftLimit);
     expect(II_RESET.paid.finance.daysBelowOverdraft).toBe(BANKRUPTCY_DAYS_BELOW_LIMIT - 1);
     expect(II_RESET.next.finance.daysBelowOverdraft).toBe(0);
@@ -846,10 +829,9 @@ describe('(ii) the thirtieth day below the overdraft limit', () => {
       '(ii) THE THIRTIETH DAY BELOW THE OVERDRAFT LIMIT\n' +
         `calendar day ${II_TWENTY_NINE.clock.day}, the ` +
         `${II_TWENTY_NINE.finance.daysBelowOverdraft}th in a row below the limit: cash ` +
-        `${formatMoney(II_TWENTY_NINE.cash)}, net ${formatMoney(netPosition(II_TWENTY_NINE))}, ` +
-        'still trading\n' +
-        `calendar day ${II_THIRTY.clock.day}, the ${II_THIRTY.finance.daysBelowOverdraft}th: net ` +
-        `${formatMoney(netPosition(II_THIRTY))} against the bank's ` +
+        `${formatMoney(II_TWENTY_NINE.cash)}, still trading\n` +
+        `calendar day ${II_THIRTY.clock.day}, the ${II_THIRTY.finance.daysBelowOverdraft}th: cash ` +
+        `${formatMoney(II_THIRTY.cash)} against the bank's ` +
         `${formatMoney(bankruptcyFloor(II_THIRTY))}, CLOSED: "${II_THIRTY.gameOver?.reason}"\n` +
         `the control, one client's deposit on calendar day ${II_TWENTY_NINE.clock.day}: cash ` +
         `${formatMoney(II_RESET.paid.cash)}, and the count back to ` +

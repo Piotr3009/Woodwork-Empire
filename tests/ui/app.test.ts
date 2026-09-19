@@ -602,27 +602,6 @@ describe('accounting', () => {
     click('[data-do="closeModal"]');
   });
 
-  it('offers a way to pay the arrears off, and takes the typed amount', () => {
-    const state = currentState();
-    expect(state).not.toBeNull();
-    if (state) {
-      state.finance.arrearsAmount = 1000;
-      state.finance.arrearsMonths = 1;
-      state.finance.firstArrearsDay = 1;
-    }
-    click('[data-office="binder"]');
-    expect(html()).toContain('Arrears');
-    expect(html()).toContain('1 month');
-    expect(html()).toContain('data-do="payArrears"');
-    type('[data-field="arrearsAmount"]', '250');
-    click('[data-do="payArrears"][data-amount="250"]');
-    expect(currentState()?.finance.arrearsAmount).toBe(750);
-    click('[data-do="payArrears"][data-amount="all"]');
-    expect(currentState()?.finance.arrearsAmount).toBe(0);
-    expect(html()).not.toContain('data-do="payArrears"');
-    click('[data-do="closeModal"]');
-  });
-
   it('names every line in plain English, never the engine key', () => {
     click('[data-office="binder"]');
     click('[data-do="accountingTab"][data-id="summary"]');

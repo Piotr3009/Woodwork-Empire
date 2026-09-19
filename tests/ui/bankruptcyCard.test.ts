@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 // The end (CLAUDE.md T21 2.2; docs/mockups/t21/debt.html part 3). The bankruptcy is the event it
 // always was, in the folder skin with the one cross, and the drawing's dark card is a card inside
-// it: the head, the day and the month, the four figures the bank read, what the company did with the
+// it: the head, the day and the month, the figures the bank read, what the company did with the
 // time it had, and the two ways out of it.
 
 import { describe, expect, it } from 'vitest';
@@ -17,14 +17,11 @@ function parse(html: string): HTMLElement {
   return holder;
 }
 
-/** The company Piotr played on 15 May: -7,259 in the bank and 25,740 of arrears it cannot pay, on
- *  the 10,000 overdraft of Very easy. One day of the clock and the bank closes it. */
+/** A company past the line the bank draws: -16,000 in the account on the 10,000 overdraft of Very
+ *  easy, which allows -15,000. One day of the clock and the bank closes it (CLAUDE.md T22 2.2). */
 function closedCompany(): { state: GameState; event: GameEvent } {
   const start = newGame({ difficulty: 'veryEasy' });
-  start.cash = -7259;
-  start.finance.arrearsAmount = 25740;
-  start.finance.arrearsMonths = 1;
-  start.finance.firstArrearsDay = 1;
+  start.cash = -16000;
   const run = runDays(start, 1);
   const event = eventsOfKind(run.events, 'bankruptcy')[0];
   if (event === undefined) throw new Error('the bank did not close it');
@@ -49,20 +46,15 @@ describe('the bankruptcy card', () => {
     expect(when).toContain('cannot pay');
   });
 
-  it('prints the four figures the bank read, in the drawing’s order', () => {
+  it('prints the figures the bank read, in the drawing’s order', () => {
     const { state, event } = closedCompany();
     const figs = parse(renderEvent(state, event)).querySelector('.bank-figs');
     const labels = Array.from(figs?.querySelectorAll('span') ?? [], (node) => node.textContent);
-    expect(labels).toEqual(['In the bank', 'Arrears', 'Together', 'The bank allowed']);
+    expect(labels).toEqual(['In the bank', 'The bank allowed']);
     const values = Array.from(figs?.querySelectorAll('b') ?? [], (node) => node.textContent);
     // The figures are the event's own, which are the ones the engine was looking at.
-    const owed = Math.round(state.finance.arrearsAmount);
     expect(values[0]).toBe(`-£${Math.abs(Math.round(state.cash)).toLocaleString('en-GB')}`);
-    expect(values[1]).toBe(`-£${owed.toLocaleString('en-GB')}`);
-    expect(values[2]).toBe(
-      `-£${Math.abs(Math.round(state.cash) - owed).toLocaleString('en-GB')}`,
-    );
-    expect(values[3]).toBe('-£15,000');
+    expect(values[1]).toBe('-£15,000');
   });
 
   it('says what the company did with the time it had', () => {

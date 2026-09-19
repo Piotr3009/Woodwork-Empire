@@ -74,7 +74,7 @@ describe('what the books show', () => {
       [1, 400],
       [DAYS_PER_MONTH + 2, 900],
     ]);
-    const page = parse(renderAccounting(state, '0', 'summary'));
+    const page = parse(renderAccounting(state, 'summary'));
     const headings = Array.from(page.querySelectorAll('.col h3')).map((node) => node.textContent);
     expect(headings).toEqual(['Today', 'This week', 'This month', 'This year']);
     // The year carries both months of it.
@@ -88,7 +88,7 @@ describe('what the books show', () => {
       [DAYS_PER_MONTH + 2, 900],
       [DAYS_PER_MONTH * 2 + 5, -250],
     ]);
-    const page = parse(renderAccounting(state, '0', 'days'));
+    const page = parse(renderAccounting(state, 'days'));
     const chips = Array.from(page.querySelectorAll('[data-do="accountingMonth"]'));
     expect(chips.map((chip) => chip.textContent)).toEqual([monthName(1), monthName(2), monthName(3)]);
     // The clock is in month one, so month one is the one that is open.
@@ -96,7 +96,7 @@ describe('what the books show', () => {
     expect(page.innerHTML).toContain(formatCalendarDay(2));
     expect(page.innerHTML).not.toContain(formatCalendarDay(DAYS_PER_MONTH + 2));
     // Ask for month two and the rows are month two's.
-    const second = parse(renderAccounting(state, '0', 'days', [], 2));
+    const second = parse(renderAccounting(state, 'days', [], 2));
     expect(second.innerHTML).toContain(formatCalendarDay(DAYS_PER_MONTH + 2));
     expect(second.innerHTML).not.toContain(`${formatCalendarDay(2)}<`);
     expect(
@@ -109,7 +109,7 @@ describe('what the books show', () => {
       [2, 400],
       [DAYS_PER_MONTH * 2 + 5, -250],
     ]);
-    const page = parse(renderAccounting(state, '0', 'days', [], 2));
+    const page = parse(renderAccounting(state, 'days', [], 2));
     expect(page.textContent).toContain(`Nothing has moved in ${monthName(2)}`);
   });
 });

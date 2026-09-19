@@ -1,7 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  ARREARS_MONTHLY_INTEREST,
-  BAILIFF_SEIZURE_FRACTION,
   LATE_ACCOUNTS_CHARGE,
   LEDGER_MAX_ENTRIES,
   DAYS_PER_MONTH,
@@ -20,7 +18,6 @@ import {
   unitDepositFor,
 } from '../../src/engine/constants';
 import {
-  arrearsCarryInterest,
   bankruptcyFloor,
   booksBehind,
   canAfford,
@@ -29,22 +26,18 @@ import {
   monthReport,
   dailyRates,
   dailyRent,
-  monthlyFixedCosts,
   nextDueDays,
   pay,
-  payArrears,
   receive,
-  runBailiff,
+  refund,
   visibleTotals,
   monthlyWageBill,
 } from '../../src/engine/economy';
 import { applyAction, findVariant, tick } from '../../src/engine/index';
 import type { GameState, Worker } from '../../src/engine/index';
-import { createTask } from '../../src/engine/tasks';
 import { isLastWorkingDayOfMonth, monthOfDay } from '../../src/engine/clock';
 import { buyStartingKit } from '../helpers';
 import {
-  act,
   buyNow,
   clearEvents,
   doTask,
@@ -258,125 +251,71 @@ describe('cash primitives', () => {
   });
 });
 
-describe('arrears, bailiff and bankruptcy', () => {
-  it('turns an unpayable periodic cost into arrears and warns once', () => {
-    const start = newGame({ difficulty: 'hard' });
-    // The 200 m2 hall costs 2400 a month, so Hard runs out of overdraft inside a fortnight: the
-    // first miss is on day 11 and month two is not up until day 41.
-    const run = runToDay(start, 30);
-    expect(run.state.finance.arrearsAmount).toBeGreaterThan(0);
-    expect(run.state.finance.firstArrearsDay).toBe(11);
-    expect(run.state.finance.arrearsMonths).toBe(1);
-    expect(run.state.cash).toBeGreaterThan(run.state.finance.overdraftLimit - 300);
-    expect(eventsOfKind(run.events, 'arrearsWarning')).toHaveLength(1);
-    const unpaid = run.state.ledger.filter((entry) => entry.unpaid);
-    expect(unpaid.length).toBeGreaterThan(0);
+describe('a cost the player did not choose goes through the limit', () => {
+  it('pays the monthly wages in full with 200 in the bank and a 10,000 limit', () => {
+    // PIOTR, 19.09: the costs he does not choose go through the limit and drag the account under
+    // it. Turn 21 stopped every such cost at the floor and put the rest of the bill in a second pot
+    // beside the bank balance; there is no second pot now, so the wages come out of the account
+    // whatever is in it (CLAUDE.md T22 2.1).
+    const start = newGame();
+    // Five men at the experienced joiner's 2,600, because the point is a bill the overdraft cannot
+    // carry: 200 in the bank and a 10,000 limit leave 10,200 of room, and 13,000 of wages is more
+    // than that. Turn 21 would have stopped this bill at the floor [TUNE on the crew: the brief's
+    // own 200 and 10,000 are Piotr's].
+    for (let index = 1; index <= 5; index += 1) start.workers.push(joiner(`w${index}`, 2600));
+    expect(start.finance.overdraftLimit).toBe(-10000);
+    expect(monthlyWageBill(start)).toBe(13000);
+    // The eve of the pay day, with 200 left in the account.
+    const eve = runToDay(start, LAST_WORKING_DAY_OF_MONTH_ONE - 1).state;
+    eve.cash = 200;
+    const payDay = nextDay(eve);
+    const lines = payDay.ledger.filter((entry) => entry.day === LAST_WORKING_DAY_OF_MONTH_ONE);
+    const moved = lines.reduce((total, entry) => total + entry.amount, 0);
+    // Every pound of the day is on the ledger and out of the account: nothing was refused, nothing
+    // was left standing somewhere else, and the account is its true figure.
+    expect(payDay.cash).toBeCloseTo(200 + moved, 6);
+    expect(lines.some((entry) => entry.unpaid)).toBe(false);
+    expect(lines.find((entry) => entry.category === 'wages')?.amount).toBe(-13000);
+    // And the figure is under the limit, which is the whole point of 2.1. It is still short of one
+    // and a half times the limit, so the bank has not closed the company on it: that is 2.2's
+    // business and it takes a deeper hole than this.
+    expect(payDay.cash).toBeLessThan(payDay.finance.overdraftLimit);
+    expect(payDay.cash).toBeGreaterThan(bankruptcyFloor(payDay));
+    expect(payDay.gameOver).toBeNull();
   });
 
-  it('counts months of arrears from the day the first bill went unpaid', () => {
-    const kitted = buyNow(newGame({ difficulty: 'hard' }), 'tableSaw');
-    // With the 5000 overdraft of Hard and 2400 of rent the first miss is on day 3.
-    const first = runToDay(kitted, 4);
-    expect(first.state.finance.firstArrearsDay).toBe(3);
-    expect(first.state.finance.arrearsMonths).toBe(1);
-    // From Turn 21 a company whose debt keeps growing is closed by the bank long before the ladder
-    // gets to its second rung: the net position passes one and a half times the overdraft inside a
-    // fortnight (PIOTR, 18.09; CLAUDE.md T21 2.2). So the month the ladder counts is shown on the
-    // company this ladder was written for: one that missed a bill and was then paid by a client,
-    // which leaves the debt standing still while the calendar runs.
-    const paid = { ...first.state, finance: { ...first.state.finance } };
-    paid.cash = 30000;
-    // Day 32 is the last look inside month one.
-    expect(runToDay(paid, 32).state.finance.arrearsMonths).toBe(1);
-    const run = runToDay(paid, 33);
-    expect(run.state.gameOver).toBeNull();
-    expect(eventsOfKind(run.events, 'arrearsFinalWarning')).toHaveLength(1);
-    expect(run.state.finance.arrearsMonths).toBe(2);
+  it('takes a company sitting on the limit under it the same day', () => {
+    // The cross check of section 7: a company at the limit that buys nothing and pays its standing
+    // costs goes under the limit that day.
+    const state = newGame({ difficulty: 'hard' });
+    const settled = runToDay(state, 3).state;
+    settled.cash = settled.finance.overdraftLimit;
+    const after = nextDay(settled);
+    expect(after.cash).toBeLessThan(after.finance.overdraftLimit);
+    expect(after.ledger.some((entry) => entry.unpaid)).toBe(false);
   });
 
-  it('sends the bailiff for the cheapest machine at three months, within 90 days', () => {
-    const missed = runToDay(buyNow(newGame({ difficulty: 'hard' }), 'tableSaw'), 4).state;
-    // The bill it missed was a big one and then a client paid, so the company trades on with the
-    // debt still on its books: that is the only way a company reaches three months of arrears now
-    // the bank closes one whose net position has passed its limit (CLAUDE.md T21 2.2). The seizure
-    // has to leave some of the debt standing, or the ladder is done with instead of starting again.
-    const kitted = {
-      ...missed,
-      finance: { ...missed.finance, arrearsAmount: 5000 },
-      cash: 60000,
-    };
-    const run = runToDay(kitted, 90);
-    expect(run.state.gameOver).toBeNull();
-    const bailiff = eventsOfKind(run.events, 'bailiff');
-    expect(bailiff).toHaveLength(1);
-    expect(bailiff[0]?.data.specId).toBe('tableSaw');
-    expect(bailiff[0]?.data.credit).toBe(Math.round(1800 * BAILIFF_SEIZURE_FRACTION));
-    expect(run.state.equipment).toHaveLength(0);
-    // The debt outlived the machine, so the ladder starts again from one month.
-    expect(run.state.finance.arrearsMonths).toBe(1);
-    const seizure = run.state.ledger.find((entry) => entry.category === 'seizure');
-    expect(seizure?.amount).toBe(1800 * BAILIFF_SEIZURE_FRACTION);
+  it('still refuses a machine at the overdraft limit', () => {
+    // The floor stands where it always stood for everything the player buys (CLAUDE.md T22 2.1).
+    const state = newGame({ difficulty: 'hard' });
+    state.cash = state.finance.overdraftLimit;
+    expect(canAfford(state, 1)).toBe(false);
+    const refused = buyNow(state, 'tableSaw');
+    expect(refused.equipment).toHaveLength(0);
+    expect(refused.onOrder).toHaveLength(0);
+    expect(refused.cash).toBe(state.finance.overdraftLimit);
   });
 
-  it('takes the cheapest machine first, so the company can carry on', () => {
+  it('puts a refund back in the cash and nowhere else', () => {
+    // A refund is cash again: there is nothing left for it to be set against (CLAUDE.md T22 2.1).
     const state = newGame();
-    // The standard thicknesser, so the used saw at 1800 is the cheapest thing in the hall.
-    const withKit = buyNow(buyNow(state, 'tableSaw'), 'thicknesser', 'standard');
-    const copy = { ...withKit, equipment: withKit.equipment.map((item) => ({ ...item })) };
-    copy.finance = { ...copy.finance, arrearsAmount: 5000, arrearsMonths: 3, firstArrearsDay: 1 };
-    runBailiff(copy);
-    expect(copy.equipment.map((item) => item.specId)).toEqual(['thicknesser']);
-    expect(copy.finance.arrearsAmount).toBe(5000 - 1800 * BAILIFF_SEIZURE_FRACTION);
-  });
-
-  it('takes the seized machine off everybody who was working on it', () => {
-    const withKit = buyNow(newGame(), 'tableSaw');
-    const saw = withKit.equipment[0];
-    const service = createTask(withKit, {
-      kind: 'service',
-      label: 'Service the table saw',
-      minutes: 30,
-      equipmentId: saw?.id ?? null,
-    });
-    withKit.owner.currentTaskId = service.id;
-    service.doneBy = 'owner';
-    withKit.finance.arrearsAmount = 500;
-    withKit.finance.arrearsMonths = 3;
-    withKit.finance.firstArrearsDay = 1;
-    runBailiff(withKit);
-    // There is nothing left to service, so the job of work goes with the machine.
-    expect(withKit.tasks.some((task) => task.id === service.id)).toBe(false);
-    expect(withKit.owner.currentTaskId).toBeNull();
-  });
-
-  it('clears the arrears when the seizure covers them', () => {
-    const withKit = buyNow(newGame(), 'tableSaw');
-    withKit.finance.arrearsAmount = 500;
-    withKit.finance.arrearsMonths = 3;
-    withKit.finance.firstArrearsDay = 1;
-    runBailiff(withKit);
-    expect(withKit.finance.arrearsAmount).toBe(0);
-    expect(withKit.finance.arrearsMonths).toBe(0);
-    expect(withKit.finance.firstArrearsDay).toBeNull();
-  });
-
-  it('goes bankrupt at three months with nothing left to seize, and says so', () => {
-    // An empty hall on Hard: the first miss is on day 11 with the 5000 overdraft and the 200 m2
-    // rent, so three months are up on day 71. A client paid on day 12 and the debt stayed, which is
-    // what keeps the bank's own line (CLAUDE.md T21 2.2) off the company long enough for the
-    // arrears ladder to run its three rungs.
-    const missed = runToDay(newGame({ difficulty: 'hard' }), 12).state;
-    expect(missed.finance.firstArrearsDay).toBe(11);
-    const carriedOn = {
-      ...missed,
-      finance: { ...missed.finance, arrearsAmount: 5000 },
-      cash: 60000,
-    };
-    const run = runToDay(carriedOn, 100);
-    expect(run.state.gameOver).not.toBeNull();
-    expect(run.state.gameOver?.reason).toContain('arrears');
-    expect(run.state.gameOver?.day).toBe(71);
-    expect(eventsOfKind(run.events, 'bankruptcy')).toHaveLength(1);
+    state.cash = state.finance.overdraftLimit - 5000;
+    const before = state.cash;
+    refund(state, 'material', 'Sheets that never came', 900);
+    expect(state.cash).toBe(before + 900);
+    const line = state.ledger[state.ledger.length - 1];
+    expect(line?.amount).toBe(900);
+    expect(line?.unpaid).toBe(false);
   });
 
   it('stops the clock once the game is over', () => {
@@ -388,13 +327,12 @@ describe('arrears, bailiff and bankruptcy', () => {
 });
 
 describe('30 days on very easy', () => {
-  it('survives with cash to spare and no arrears', () => {
+  it('survives with cash to spare and every bill paid', () => {
     const run = runDays(newGame({ difficulty: 'veryEasy' }), 30);
     expect(run.state.clock.day).toBe(31);
     expect(run.state.gameOver).toBeNull();
     expect(run.state.cash).toBeGreaterThan(0);
-    expect(run.state.finance.arrearsAmount).toBe(0);
-    expect(run.state.finance.arrearsMonths).toBe(0);
+    expect(run.state.ledger.some((entry) => entry.unpaid)).toBe(false);
   });
 
   it('does not silently lose money: the ledger explains the cash', () => {
@@ -440,79 +378,15 @@ describe('the Turn 2 balance', () => {
   });
 
   it('puts the bank\u0027s line at one and a half times the limit, whatever the difficulty set it to', () => {
-    // Turn 13 read the line at twice the overdraft and against the cash alone. Piotr dropped a
-    // 50,000 job with 7,000 in the bank, the deposit he owed went to arrears, and the game played
-    // on: "you cannot pay your debts, you are bankrupt, and the game should end". So the factor is
-    // 1.5 and the position it is read against is the net one, cash less what is owed
-    // (PIOTR, 18.09; CLAUDE.md T21 2.2). Hard is the brief's "normal": -5,000 of overdraft, so
-    // -7,500; very easy and easy have -10,000, so -15,000.
+    // Turn 13 read the line at twice the overdraft. Piotr dropped a 50,000 job with 7,000 in the
+    // bank and the game played on: "you cannot pay your debts, you are bankrupt, and the game
+    // should end". So the factor is 1.5 (PIOTR, 18.09; CLAUDE.md T21 2.2). Hard is the brief's
+    // "normal": -5,000 of overdraft, so -7,500; very easy and easy have -10,000, so -15,000.
     const hard = newGame({ difficulty: 'hard' });
     expect(bankruptcyFloor(hard)).toBe(-7500);
     expect(bankruptcyFloor(newGame())).toBe(-15000);
   });
 
-  it('pays arrears off from cash, all of them or a typed amount', () => {
-    const state = newGame();
-    state.finance.arrearsAmount = 1000;
-    state.finance.arrearsMonths = 2;
-    state.finance.firstArrearsDay = 3;
-    const cash = state.cash;
-    expect(payArrears(state, 400)).toBe(400);
-    expect(state.cash).toBeCloseTo(cash - 400, 6);
-    expect(state.finance.arrearsAmount).toBe(600);
-    // Part paid, so the ladder is still running.
-    expect(state.finance.arrearsMonths).toBe(2);
-    expect(payArrears(state, null)).toBe(600);
-    expect(state.finance.arrearsAmount).toBe(0);
-    expect(state.finance.arrearsMonths).toBe(0);
-    expect(state.finance.firstArrearsDay).toBeNull();
-    const paid = state.ledger.filter((entry) => entry.category === 'arrears');
-    expect(paid.map((entry) => entry.amount)).toEqual([-400, -600]);
-  });
-
-  it('never pays arrears past the overdraft floor', () => {
-    const state = newGame();
-    state.cash = state.finance.overdraftLimit + 100;
-    state.finance.arrearsAmount = 5000;
-    state.finance.firstArrearsDay = 1;
-    state.finance.arrearsMonths = 1;
-    expect(payArrears(state, null)).toBe(100);
-    expect(state.finance.arrearsAmount).toBe(4900);
-    expect(state.cash).toBe(state.finance.overdraftLimit);
-    expect(payArrears(state, null)).toBe(0);
-  });
-
-  it('reaches the player through the PAY_ARREARS action', () => {
-    let state = newGame();
-    state.finance.arrearsAmount = 300;
-    state.finance.firstArrearsDay = 1;
-    state.finance.arrearsMonths = 1;
-    state = act(state, { type: 'PAY_ARREARS', amount: 100 });
-    expect(state.finance.arrearsAmount).toBe(200);
-    state = act(state, { type: 'PAY_ARREARS', amount: null });
-    expect(state.finance.arrearsAmount).toBe(0);
-  });
-
-  it('charges 1% a month on the arrears only while they are large', () => {
-    const small = newGame();
-    small.finance.arrearsAmount = 100;
-    expect(arrearsCarryInterest(small)).toBe(false);
-    const large = newGame();
-    large.finance.arrearsAmount = monthlyFixedCosts(large) + 1;
-    expect(arrearsCarryInterest(large)).toBe(true);
-
-    // A whole month with large arrears on the books adds 1% of them on the 1st.
-    const state = newGame();
-    state.finance.arrearsAmount = 20000;
-    state.finance.arrearsMonths = 1;
-    state.finance.firstArrearsDay = 1;
-    const run = runToDay(state, 31);
-    const interest = run.state.ledger.filter(
-      (entry) => entry.category === 'interest' && entry.label === 'Interest on the arrears',
-    );
-    expect(interest).toHaveLength(1);
-    expect(-(interest[0]?.amount ?? 0)).toBeCloseTo(20000 * ARREARS_MONTHLY_INTEREST, 4);
-  });
 });
 
 describe('the books', () => {
@@ -588,15 +462,19 @@ describe('the month report', () => {
     expect(report.lines.find((line) => line.id === 'rentAndRates')?.costs).toBeCloseTo(rent, 2);
   });
 
-  it('keeps a bill that went to the arrears out of the lines and says so apart', () => {
+  it('adds up a month that went under the overdraft limit: every bill is on a line', () => {
+    // Turn 21 kept the bills a company could not pay off the lines and counted them apart. From
+    // Turn 22 they are paid out of the account, so they are on the lines like every other pound and
+    // the month still adds up to the cash it moved (CLAUDE.md T22 2.1, 2.4).
     const state = newGame({ difficulty: 'hard' });
     // Down to the overdraft floor through the ledger, the way every pound moves (T13 10.2).
     charge(state, 'equipment', 'A machine that took the lot', -(state.cash - state.finance.overdraftLimit));
     expect(state.cash).toBe(state.finance.overdraftLimit);
-    const played = runToDay(state, 32).state;
+    const played = runToDay(state, 20).state;
+    expect(played.cash).toBeLessThan(played.finance.overdraftLimit);
     const report = monthReport(played, 1);
-    expect(report.unpaid).toBeGreaterThan(0);
     expect(report.cashClose - report.cashOpen).toBeCloseTo(report.net, 2);
+    expect(played.ledger.some((entry) => entry.unpaid)).toBe(false);
   });
 });
 
@@ -623,17 +501,22 @@ describe('charge with merge', () => {
     expect(state.finance.day.costs - costsBefore).toBe(60);
   });
 
-  it('starts a fresh line on a new day, and never merges into a line that went unpaid', () => {
+  it('starts a fresh line on a new day, and merges a cost paid through the limit', () => {
     const state = newGame();
     charge(state, 'contract', 'Packs: pieces', 38, { merge: true });
     state.clock.day += 1;
     charge(state, 'contract', 'Packs: pieces', 38, { merge: true });
     expect(state.ledger.filter((entry) => entry.category === 'contract')).toHaveLength(2);
+    // A contract's material at the floor: from Turn 22 it is paid out of the account like any
+    // other cost the player did not choose, so it merges into the day's line as it always did and
+    // the account goes under the limit for it (CLAUDE.md T22 2.1).
     state.cash = state.finance.overdraftLimit;
     charge(state, 'contract', 'Packs: material', -30, { merge: true, unavoidable: true });
     charge(state, 'contract', 'Packs: material', -30, { merge: true, unavoidable: true });
-    const unpaid = state.ledger.filter((entry) => entry.category === 'contract' && entry.unpaid);
-    expect(unpaid).toHaveLength(2);
-    expect(state.finance.arrearsAmount).toBe(60);
+    const material = state.ledger.filter((entry) => entry.label === 'Packs: material');
+    expect(material).toHaveLength(1);
+    expect(material[0]?.amount).toBe(-60);
+    expect(material[0]?.unpaid).toBe(false);
+    expect(state.cash).toBe(state.finance.overdraftLimit - 60);
   });
 });

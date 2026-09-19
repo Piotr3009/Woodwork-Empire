@@ -2,14 +2,14 @@ import { describe, expect, it } from 'vitest';
 import { WHY } from '../../src/engine/constants';
 import { whyKeyForEvent } from '../../src/ui/eventModal';
 
-/** Everything CLAUDE.md T2 3.12 asks for a note on. */
+/** Everything CLAUDE.md T2 3.12 asks for a note on. The two notes about a debt beside the bank
+ *  balance went with that debt in Turn 22: there is one track for money now, so there is nothing
+ *  left for them to explain (CLAUDE.md T22 2.1). */
 const WANTED = [
   'unitDeposit',
   'rates',
   'rent',
   'depositReturn',
-  'bailiff',
-  'arrearsInterest',
   'jobDeposit',
   'lateAccounts',
   'extractor',
@@ -38,7 +38,6 @@ describe('the real life notes', () => {
   });
 
   it('hangs a note on the events that carry one', () => {
-    expect(whyKeyForEvent('bailiff')).toBe('bailiff');
     expect(whyKeyForEvent('lateAccounts')).toBe('lateAccounts');
     expect(whyKeyForEvent('serviceDue')).toBe('service');
     expect(whyKeyForEvent('jobAtGate')).toBe('finishedGoods');

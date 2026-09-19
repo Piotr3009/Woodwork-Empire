@@ -11,9 +11,6 @@ import { button, escapeHtml, money, plural, primaryButton, whyLink } from './mod
 
 /** The real life note that belongs with each kind of decision (CLAUDE.md T2 3.12). */
 const WHY_BY_EVENT: Partial<Record<GameEvent['kind'], string>> = {
-  arrearsWarning: 'arrearsInterest',
-  arrearsFinalWarning: 'arrearsInterest',
-  bailiff: 'bailiff',
   lateAccounts: 'lateAccounts',
   lowStock: 'lowStock',
   noMaterial: 'lowStock',
@@ -41,17 +38,12 @@ function marginTail(event: GameEvent): string {
   return ` <span class="figure${tone}" data-margin="${Math.round(margin * 100)}">${escapeHtml(figure)}</span>`;
 }
 
-/** The four figures the engine was looking at when it closed the company, as a two column grid.
- *  They ride on the event (`declareBankruptcy`), so the card prints what the bank read and cannot
- *  work out a different sum a minute later (CLAUDE.md T21 2.2). The arrears are stored as an amount
- *  owed, so they are printed as the minus they are. */
+/** The figures the engine was looking at when it closed the company, as a two column grid. They
+ *  ride on the event (`declareBankruptcy`), so the card prints what the bank read and cannot work
+ *  out a different sum a minute later (CLAUDE.md T21 2.2, T22 2.2). */
 function bankFigures(event: GameEvent): string {
-  const cash = numberOn(event, 'cash');
-  const arrears = numberOn(event, 'arrears');
   const rows: Array<[string, number]> = [
-    ['In the bank', cash],
-    ['Arrears', arrears === 0 ? 0 : -arrears],
-    ['Together', numberOn(event, 'net')],
+    ['In the bank', numberOn(event, 'cash')],
     ['The bank allowed', numberOn(event, 'allowed')],
   ];
   return (
@@ -86,7 +78,7 @@ function bankEpitaph(state: GameState, day: number): string {
 }
 
 /** The end (CLAUDE.md T21 2.2; docs/mockups/t21/debt.html part 3). The head, the day it happened and
- *  the rule that closed the company, the four figures, and what the company did with its time. */
+ *  the rule that closed the company, the figures, and what the company did with its time. */
 export function renderBankruptcyCard(state: GameState, event: GameEvent): string {
   const day = numberOn(event, 'day') || state.clock.day;
   const month = numberOn(event, 'month');

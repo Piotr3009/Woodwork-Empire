@@ -1,11 +1,11 @@
 // The bank closes a company that cannot pay (PIOTR, 18.09; CLAUDE.md T21 2.2).
 //
-// Piotr dropped a 50,000 job with 7,000 in the bank. The deposit he owed went to arrears, the top
-// bar kept saying -7,259, and the game played on. His words: "you cannot pay your debts, you are
-// bankrupt, and the game should end." So the test is not the cash any more: it is the net position,
-// what is in the account less what is owed, against one and a half times the overdraft limit. And
-// beside it a second rule, on time rather than on amount: thirty calendar days in a row past the
-// limit close the company whatever the amount it is past it by.
+// Piotr dropped a 50,000 job with 7,000 in the bank. The deposit he owed came out of an account
+// that could not carry it, the top bar kept saying -7,259, and the game played on. His words: "you
+// cannot pay your debts, you are bankrupt, and the game should end." So the company is closed when
+// the cash has passed one and a half times the overdraft limit. And beside it a second rule, on
+// time rather than on amount: thirty calendar days in a row under the limit close the company
+// whatever the amount it is under by (CLAUDE.md T22 2.2).
 //
 // Both are read once a calendar day, where Turn 13 read the one it had: inside `runDayCosts`, which
 // `startDay` calls. The brief says "at the day's close, as today", and "as today" governs: the
@@ -16,69 +16,49 @@ import {
   BANKRUPTCY_DAYS_BELOW_LIMIT,
   BANKRUPTCY_LIMIT_FACTOR,
 } from '../../src/engine/constants';
-import { bankruptcyFloor, netPosition } from '../../src/engine/economy';
+import { bankruptcyFloor } from '../../src/engine/economy';
 import type { GameState } from '../../src/engine/index';
 import { eventsOfKind, newGame, runDays } from '../helpers';
 
 /** A company standing where the test wants it, with the money written straight onto the state: the
  *  rule is about the position, not about how it got there. */
-function standing(
-  money: { cash: number; arrears?: number; daysBelow?: number },
-): GameState {
+function standing(money: { cash: number; daysBelow?: number }): GameState {
   const state = newGame({ difficulty: 'veryEasy' });
   state.cash = money.cash;
-  state.finance.arrearsAmount = money.arrears ?? 0;
-  state.finance.firstArrearsDay = (money.arrears ?? 0) > 0 ? state.clock.day : null;
-  state.finance.arrearsMonths = (money.arrears ?? 0) > 0 ? 1 : 0;
   state.finance.daysBelowOverdraft = money.daysBelow ?? 0;
   return state;
 }
 
-describe('the net position the bank reads', () => {
-  it('is the cash less what is owed, and the arrears are stored as an amount owed', () => {
-    const state = standing({ cash: -7259, arrears: 25740 });
-    expect(netPosition(state)).toBe(-32999);
+describe('the position the bank reads', () => {
+  it('is the cash, against one and a half times the overdraft limit', () => {
+    const state = standing({ cash: -7259 });
     expect(state.finance.overdraftLimit).toBe(-10000);
     expect(bankruptcyFloor(state)).toBe(-15000);
     expect(BANKRUPTCY_LIMIT_FACTOR).toBe(1.5);
   });
 
-  it('closes the company the same day it has passed what the bank allows', () => {
-    // Piotr's own figures of 15 May: -7,259 in the bank and 25,740 of arrears on a 10,000
-    // overdraft. The old rule looked at the -7,259 alone, said it was inside twice the limit, and
-    // played on.
-    const run = runDays(standing({ cash: -7259, arrears: 25740 }), 1);
+  it('closes the company the same day the cash has passed what the bank allows', () => {
+    const run = runDays(standing({ cash: -15000 }), 1);
     expect(run.state.gameOver).not.toBeNull();
     expect(run.state.gameOver?.reason).toContain('cannot pay');
     expect(run.state.gameOver?.day).toBe(2);
     const closed = eventsOfKind(run.events, 'bankruptcy');
     expect(closed).toHaveLength(1);
     // The card prints what the engine saw when it closed the company, which is the position after
-    // that day's own bills have run, so the four figures ride on the event and are not worked out
-    // again later (CLAUDE.md T21 2.2).
-    const owed = Math.round(run.state.finance.arrearsAmount);
+    // that day's own bills have run, so the figures ride on the event and are not worked out again
+    // later (CLAUDE.md T21 2.2, T22 2.2).
     expect(closed[0]?.data.cash).toBe(Math.round(run.state.cash));
-    expect(closed[0]?.data.arrears).toBe(owed);
-    expect(closed[0]?.data.net).toBe(Math.round(run.state.cash) - owed);
     expect(closed[0]?.data.allowed).toBe(-15000);
     expect(closed[0]?.data.day).toBe(2);
     expect(closed[0]?.data.month).toBe(1);
-    expect(Number(closed[0]?.data.net)).toBeLessThanOrEqual(Number(closed[0]?.data.allowed));
+    expect(Number(closed[0]?.data.cash)).toBeLessThanOrEqual(Number(closed[0]?.data.allowed));
   });
 
-  it('leaves a company alone while the net position is still inside the line', () => {
-    // A pound the right side of it: -14,000 against the -15,000 the bank allows.
-    const run = runDays(standing({ cash: -9000, arrears: 5000 }), 1);
+  it('leaves a company alone while the cash is still inside the line', () => {
+    // A thousand the right side of it: -14,000 against the -15,000 the bank allows.
+    const run = runDays(standing({ cash: -14000 }), 1);
     expect(run.state.gameOver).toBeNull();
     expect(eventsOfKind(run.events, 'bankruptcy')).toHaveLength(0);
-  });
-
-  it('closes it on the arrears that tip the net position over, and not on the cash alone', () => {
-    // The same 9,000 in the overdraft, with 6,000 owed instead of 5,000: the cash has not moved and
-    // the company is closed. That is the whole of the change Piotr asked for.
-    const run = runDays(standing({ cash: -9000, arrears: 6000 }), 1);
-    expect(run.state.gameOver).not.toBeNull();
-    expect(run.state.gameOver?.reason).toContain('cannot pay');
   });
 
   it('closes a company the old twice-the-overdraft rule would have traded on', () => {
@@ -101,8 +81,8 @@ describe('thirty days past the overdraft limit', () => {
     const twentyNine = runDays(state, 1);
     expect(twentyNine.state.finance.daysBelowOverdraft).toBe(29);
     expect(twentyNine.state.gameOver).toBeNull();
-    // The net position is still well inside the line, so nothing but the run of days can close it.
-    expect(netPosition(twentyNine.state)).toBeGreaterThan(bankruptcyFloor(twentyNine.state));
+    // The cash is still well inside the line, so nothing but the run of days can close it.
+    expect(twentyNine.state.cash).toBeGreaterThan(bankruptcyFloor(twentyNine.state));
     const thirty = runDays(twentyNine.state, 1);
     expect(thirty.state.finance.daysBelowOverdraft).toBe(30);
     expect(thirty.state.gameOver).not.toBeNull();
@@ -118,9 +98,17 @@ describe('thirty days past the overdraft limit', () => {
   });
 
   it('counts a day that ends exactly on the limit as a day at the limit, not past it', () => {
+    // The day's own standing costs go out of the account before the count is taken, and from
+    // Turn 22 they go out of it whatever the balance, so a company put on the limit in the morning
+    // is under it by the evening. The day is measured first and the cash set so that the day ends
+    // exactly on the limit (CLAUDE.md T22 2.1, 2.2).
+    const probe = standing({ cash: 0, daysBelow: 5 });
+    const dayCosts = 0 - runDays(probe, 1).state.cash;
+    expect(dayCosts).toBeGreaterThan(0);
     const state = standing({ cash: 0, daysBelow: 5 });
-    state.cash = state.finance.overdraftLimit;
+    state.cash = state.finance.overdraftLimit + dayCosts;
     const run = runDays(state, 1);
+    expect(run.state.cash).toBeCloseTo(run.state.finance.overdraftLimit, 6);
     expect(run.state.finance.daysBelowOverdraft).toBe(0);
   });
 });

@@ -464,14 +464,17 @@ function carryArrearsIntoTheAccount(state: Raw): void {
   const finance = isRecord(state.finance) ? state.finance : null;
   const owed = typeof finance?.arrearsAmount === 'number' ? finance.arrearsAmount : 0;
   if (finance !== null) {
-    finance.arrearsAmount = 0;
-    finance.arrearsMonths = 0;
-    finance.firstArrearsDay = null;
+    // The three fields are off `FinanceState` in this build, so they are taken off the save and
+    // not merely emptied: a lift leaves the file in the shape the build runs on.
+    delete finance.arrearsAmount;
+    delete finance.arrearsMonths;
+    delete finance.firstArrearsDay;
   }
-  // Every line an old ledger already holds under the arrears category is rewritten, so a played
-  // company's history keeps its pounds on the books after the word has gone from the game.
+  // Every line an old ledger already holds under the two categories the word took with it, the
+  // arrears themselves and the bailiff's seizure, is rewritten, so a played company's history
+  // keeps its pounds on the books after the word has gone from the game.
   for (const entry of records(state.ledger)) {
-    if (entry.category === 'arrears') entry.category = 'other';
+    if (entry.category === 'arrears' || entry.category === 'seizure') entry.category = 'other';
   }
   if (owed <= 0) return;
   const cash = typeof state.cash === 'number' ? state.cash : 0;

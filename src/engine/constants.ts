@@ -92,8 +92,8 @@ import type {
  *  a tool cabinet is two metres wide, so a saved hall's cabinets are laid out again
  *  (CLAUDE.md T21 section 4).
  *
- *  Version 19 is Turn 22: the arrears are gone from the game, so a save's unpaid balance is
- *  subtracted from its cash and one ledger line says so; `rotated` on every placed item and every
+ *  Version 19 is Turn 22: the unpaid balance a v18 save carried beside its cash is gone from the
+ *  game, so it is subtracted from the cash and one ledger line says so; `rotated` on every placed item and every
  *  reservation becomes `orientation`, the boolean's true reading as a quarter turn; and a tool
  *  cabinet with no class is the standard one, because the cabinet is a family of five now
  *  (CLAUDE.md T22 section 4). Every v30 and v31 save loads. */
@@ -345,8 +345,7 @@ export const PELLET_INCOME_MONTHLY_BASE = 600;
 /** [TUNE] extra pellet income per 1000 minutes of production in the month. */
 export const PELLET_INCOME_PER_1000_PRODUCTION_MINUTES = 40;
 
-/** Working days in a month of 30 calendar days, for the fixed cost figure the arrears interest
- *  threshold is measured against [TUNE]. */
+/** Working days in a month of 30 calendar days, for the month's fixed cost figure [TUNE]. */
 export const WORKING_DAYS_PER_MONTH = (DAYS_PER_MONTH * WORKING_DAYS_PER_WEEK) / DAYS_PER_WEEK;
 
 /** Hours a man is paid for in one of the game's months: his forty hour week over thirty days of a
@@ -425,7 +424,7 @@ export const DIFFICULTIES: DifficultySpec[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// 8.3 Debt, arrears, bailiff, bankruptcy
+// 8.3 Debt, the overdraft, the loan, bankruptcy
 // ---------------------------------------------------------------------------
 
 /** The overdraft costs what it costs: a yearly rate on the negative balance, accrued day by day
@@ -439,27 +438,16 @@ export const LOAN_MAX = 50000;
 export const LOAN_RATE_YEARLY = 0.15;
 export const LOAN_MONTHS = 60;
 export const LOAN_EARLY_REPAYMENT_PENALTY = 0;
-/** 1% per month on the arrears balance while the arrears are large (PIOTR). */
-export const ARREARS_MONTHLY_INTEREST = 0.01;
-/** [TUNE] "large arrears" means more than this many months of fixed costs. */
-export const ARREARS_INTEREST_THRESHOLD_MONTHS = 1;
-/** The bank closes a company that cannot pay: not when the cash alone passes a multiple of the
- *  overdraft, which is what Turn 13 read, but when the **net position** does, cash plus what the
- *  company owes in arrears, against this multiple of the limit [PIOTR, 18.09: the 1.5]. On very
- *  easy and easy that is -15,000 and on hard -7,500. Piotr dropped a 50,000 job with 7,000 in the
- *  bank, the deposit went to arrears, the top bar said -7,259 and the game played on: "you cannot
- *  pay your debts, you are bankrupt, and the game should end" (CLAUDE.md T21 2.2). */
+/** The bank closes a company whose cash has passed this multiple of its overdraft limit
+ *  [PIOTR, 18.09: the 1.5]. On very easy and easy that is -15,000 and on hard -7,500. From Turn 22
+ *  the cash is the whole of the company's position, because every bill is paid out of the account,
+ *  the limit included (CLAUDE.md T21 2.2, T22 2.1, 2.2). */
 export const BANKRUPTCY_LIMIT_FACTOR = 1.5;
 
 /** The other way the bank closes you: this many calendar days in a row with the cash below the
  *  overdraft limit, whatever the amount [PIOTR, 18.09: "thirty days below the limit"]. A day above
  *  the limit puts the count back to nought (CLAUDE.md T21 2.2). */
 export const BANKRUPTCY_DAYS_BELOW_LIMIT = 30;
-export const ARREARS_MONTHS_WARNING = 1;
-export const ARREARS_MONTHS_FINAL_WARNING = 2;
-export const ARREARS_MONTHS_BAILIFF = 3;
-/** The bailiff credits the seized machine at half its purchase price (PIOTR). */
-export const BAILIFF_SEIZURE_FRACTION = 0.5;
 
 /** What a machine standing in the hall fetches second hand: half what it cost (PIOTR), and a
  *  third and a bit for one that was second hand when it was bought [TUNE]
@@ -3967,14 +3955,6 @@ export const WHY: Record<string, string> = {
     'A deposit on acceptance is normal in joinery and it is what pays for the material. Without ' +
     'it you are lending the client the cost of his own kitchen. Half on order and half on ' +
     'delivery is the usual arrangement.',
-  arrearsInterest:
-    'Once a bill goes unpaid it starts to cost extra. Suppliers and landlords add interest to ' +
-    'what you owe, so a debt you ignore grows on its own. The longer it runs the harder it is ' +
-    'to get out from under it.',
-  bailiff:
-    'After a few months of arrears a creditor can send enforcement agents to take goods to the ' +
-    'value of the debt. They take what they can sell, and they credit you a fraction of what it ' +
-    'cost you. Losing a machine you still owe money on is how a workshop stops being a workshop.',
   lateAccounts:
     'Books that are not written up have to be reconstructed by somebody else, and accountants ' +
     'charge by the hour for that. The longer you leave it the more there is to untangle. It is ' +

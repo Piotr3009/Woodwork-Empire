@@ -99,7 +99,6 @@ import {
   emptyTotals,
   formatMoney,
   pay,
-  payArrears,
   receive,
   refund,
   runDayCosts,
@@ -403,9 +402,6 @@ export function createGame(options: NewGameOptions): GameState {
       daysBelowOverdraft: 0,
       loan: null,
       overdraftInterestAccrued: 0,
-      arrearsAmount: 0,
-      arrearsMonths: 0,
-      firstArrearsDay: null,
       day: emptyTotals(),
       week: emptyTotals(),
       month: emptyTotals(),
@@ -2054,7 +2050,6 @@ export function assignAir(
 const PAUSED_ACTIONS: ReadonlyArray<GameAction['type']> = [
   'BUY_STOCK',
   'ORDER_TRANSPORT',
-  'PAY_ARREARS',
 ];
 
 export function applyAction(state: GameState, action: GameAction): GameState {
@@ -2197,9 +2192,6 @@ export function applyAction(state: GameState, action: GameAction): GameState {
       break;
     case 'BUY_STOCK':
       buyStock(next, action.sheets);
-      break;
-    case 'PAY_ARREARS':
-      payArrears(next, action.amount);
       break;
     case 'SET_SHOW_WHY':
       next.showWhy = action.on;

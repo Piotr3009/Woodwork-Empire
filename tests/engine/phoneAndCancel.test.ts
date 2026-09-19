@@ -165,21 +165,18 @@ describe('calling an order off', () => {
     expect(orderForJobCheck(cancelled, firstJob(cancelled)).ok).toBe(true);
   });
 
-  it('pays the arrears down first when the bill it refunds was never paid', () => {
+  it('puts what it refunds back in the bank, even below the overdraft limit', () => {
     // A material order is booked whether the money is there or not: the supplier has loaded it
-    // (CLAUDE.md 8.3). Called off, what comes back goes against the arrears before the bank.
+    // (CLAUDE.md 8.3), and from Turn 22 it is paid out of the account whatever the balance. So
+    // called off, what comes back is cash, and there is nothing else for it to go against
+    // (CLAUDE.md T22 2.1).
     const state = materialOnTheRoad();
     const delivery = state.deliveries[0];
     if (delivery === undefined) throw new Error('no material on the road');
-    // Run the bank down so the bill goes to the arrears, and book it again.
-    state.cash = state.finance.overdraftLimit;
-    state.finance.arrearsAmount = delivery.pricePaid;
-    state.finance.firstArrearsDay = state.clock.day;
+    // The bank under its limit, the way a company that paid this bill out of it would be.
+    state.cash = state.finance.overdraftLimit - delivery.pricePaid;
     const cancelled = act(state, { type: 'CANCEL_ORDER', orderId: delivery.id });
-    expect(cancelled.finance.arrearsAmount).toBe(0);
-    expect(cancelled.finance.firstArrearsDay).toBeNull();
-    // And not a penny of it landed in a bank that never paid it.
-    expect(cancelled.cash).toBe(state.finance.overdraftLimit);
+    expect(cancelled.cash).toBeCloseTo(state.finance.overdraftLimit, 6);
   });
 
   it('still calls a machine off while it is in transit, and refuses one at the gate', () => {

@@ -116,6 +116,11 @@ function machineOf(state: GameState, specId: string): Equipment {
 
 const SEED = 20260911;
 
+/** The day an empty hall on Hard is closed by the bank, measured from the run itself: the account
+ *  carries every bill from Turn 22, so it falls through the 5,000 limit and on to the -7,500 the
+ *  bank allows (CLAUDE.md T22 2.1, 2.2). */
+const CLOSED_ON_HARD = 22;
+
 /** What the month's machines made, off every day record and the day in hand: the one figure the
  *  hall's store is fed from (CLAUDE.md T12 2.3, 3.4). */
 function dustMade(state: GameState): number {
@@ -155,7 +160,7 @@ describe('30 days on Easy, working the board', () => {
     expect(state.gameOver).toBeNull();
     expect(state.clock.day).toBe(31);
     expect(state.cash).toBeGreaterThan(0);
-    expect(state.finance.arrearsAmount).toBe(0);
+    expect(state.ledger.some((entry) => entry.unpaid)).toBe(false);
   });
 
   it('ends above the reputation it started on, on seven jobs out of the door', () => {
@@ -358,39 +363,31 @@ describe('30 days on Easy, working the board', () => {
 });
 
 describe('30 days on Hard, doing nothing', () => {
-  it('is closed by the bank on day 22, on the arrears it could not pay', () => {
-    // Turn 21 changed what this scenario shows, and it is the change Piotr asked for. The Turn 2
-    // overdraft limit of 5000 fills by day 11 and the bills go unpaid from then; on day 22 the
-    // arrears have reached 2,780 and the net position, -7,778, has passed the -7,500 the bank
-    // allows. Doing nothing used to drift to the end of the month and past it, with the top bar
-    // saying nothing at all: "you cannot pay your debts, you are bankrupt, and the game should end"
-    // (PIOTR, 18.09; CLAUDE.md T21 2.2).
+  it('is closed by the bank on the day the account passes what it allows', () => {
+    // From Turn 22 the account itself carries every bill the company cannot pay, so it falls
+    // through the 5,000 overdraft limit of Hard and on through the -7,500 the bank allows. Doing
+    // nothing used to drift to the end of the month and past it, with the top bar saying nothing
+    // at all: "you cannot pay your debts, you are bankrupt, and the game should end"
+    // (PIOTR, 18.09, 19.09; CLAUDE.md T21 2.2, T22 2.1, 2.2). The day is measured, not tuned.
     const state = playUntilDay(newGame({ seed: SEED, difficulty: 'hard' }), 31, IDLE);
-    expect(state.clock.day).toBe(22);
-    expect(state.cash).toBeLessThan(-4900);
-    expect(state.finance.arrearsAmount).toBeGreaterThan(0);
     expect(state.gameOver).not.toBeNull();
-    expect(state.gameOver?.day).toBe(22);
+    expect(state.clock.day).toBe(CLOSED_ON_HARD);
+    expect(state.gameOver?.day).toBe(CLOSED_ON_HARD);
     expect(state.gameOver?.reason).toContain('cannot pay');
-    // The line it passed, read the one way the engine reads it.
-    expect(state.cash - state.finance.arrearsAmount).toBeLessThanOrEqual(
-      state.finance.overdraftLimit * 1.5,
-    );
+    // The line it passed, read the one way the engine reads it, and not a penny left unpaid
+    // anywhere else.
+    expect(state.cash).toBeLessThanOrEqual(state.finance.overdraftLimit * 1.5);
+    expect(state.ledger.some((entry) => entry.unpaid)).toBe(false);
   });
 
-  it('gets its arrears warning once the overdraft is full', () => {
-    const run = runToDay(newGame({ seed: SEED, difficulty: 'hard' }), 40);
-    expect(run.events.filter((event) => event.kind === 'arrearsWarning')).toHaveLength(1);
-    expect(run.state.finance.arrearsMonths).toBe(1);
-  });
-
-  it('warns inside the month once the owner has bought his tools', () => {
-    const state = playUntilDay(newGame({ seed: SEED, difficulty: 'hard' }), 31, {
-      ...IDLE,
-      buyKit: true,
-    });
-    expect(state.finance.arrearsAmount).toBeGreaterThan(0);
-    expect(state.finance.arrearsMonths).toBeGreaterThanOrEqual(1);
+  it('goes under the limit before it passes the line, and the strip says so', () => {
+    // The two rules in order: the account goes under the 5,000 limit first and keeps going, and
+    // the bank closes it when it has passed 1.5 times the limit (CLAUDE.md T22 2.1, 2.2). Day 15
+    // is a week before the close and four days after the overdraft filled.
+    const run = runToDay(newGame({ seed: SEED, difficulty: 'hard' }), 15);
+    expect(run.state.gameOver).toBeNull();
+    expect(run.state.cash).toBeLessThan(run.state.finance.overdraftLimit);
+    expect(run.state.finance.daysBelowOverdraft).toBeGreaterThan(0);
   });
 });
 

@@ -1,9 +1,10 @@
 // Dropping a project, and what it costs before the click (CLAUDE.md T21 2.3;
 // docs/mockups/t21/debt.html part 2).
 //
-// Piotr dropped a 50,000 job with 7,000 in the bank. The deposit he owed went to arrears, the top
-// bar kept saying -7,259, and the game played on. Nothing on screen had told him what the click
-// would do, and nothing after it told him what it had done. So `Drop project` no longer drops: it
+// Piotr dropped a 50,000 job with 7,000 in the bank. The deposit he owed came out of an account
+// that had nothing in it, the top bar kept saying -7,259, and the game played on. Nothing on screen
+// had told him what the click would do, and nothing after it told him what it had done. So
+// `Drop project` no longer drops: it
 // opens this card, which puts the three figures and the bank's own limit in front of him, and only
 // the red button on the card drops anything. It is the one action in the game that takes two
 // clicks (PIOTR, 18.09).
@@ -11,7 +12,7 @@
 // The card is a folder card like a machine's: the game's own paper, the one cross, the one button
 // helpers. Nothing here is a second version of anything in src/ui/modal.ts.
 
-import { bankruptcyFloor, netPosition } from '../engine/economy';
+import { bankruptcyFloor } from '../engine/economy';
 import { canAfford, dropReputationCost } from '../engine/index';
 import type { GameState, Job } from '../engine/index';
 import { button, dangerButton, escapeHtml, money, signedFigure } from './modal';
@@ -32,27 +33,20 @@ export function materialWrittenOff(state: GameState, job: Job): number {
   return orderedIn ? job.materialCost : 0;
 }
 
-/** Whether the deposit can be paid back at all: out of the cash, or out of what the overdraft has
- *  left in it. The one reading the engine does of any cost, `canAfford`, which is what `dropJob`
- *  asks through `chargeUnavoidable`; when the answer is no the whole deposit becomes arrears, and
- *  the arrears are what close a company (CLAUDE.md T21 2.2, 2.3). */
+/** Whether the deposit can be paid back out of the cash and what the overdraft has left in it. The
+ *  one reading the engine does of any cost, `canAfford`; a drop pays it whatever the answer, because
+ *  the deposit is not a cost the player can decline, and the account goes under the limit for it
+ *  (CLAUDE.md T22 2.1, 2.3). */
 export function depositCanBePaid(state: GameState, job: Job): boolean {
   return canAfford(state, job.depositPaid);
 }
 
-/** Where the company would stand the moment the deposit went to arrears, and what the bank allows:
- *  the two figures the red box is written from. A cost that cannot be paid goes to arrears whole,
- *  the way `chargeUnavoidable` puts it there, so the position is read off the state with that debt
- *  on it, through the same two functions the bank itself reads (CLAUDE.md T21 2.2). */
-export function netAfterDrop(state: GameState, job: Job): { net: number; allowed: number } {
-  const after: GameState = {
-    ...state,
-    finance: {
-      ...state.finance,
-      arrearsAmount: state.finance.arrearsAmount + job.depositPaid,
-    },
-  };
-  return { net: netPosition(after), allowed: bankruptcyFloor(after) };
+/** Where the account would stand the moment the deposit went out of it, and what the bank allows:
+ *  the two figures the red box is written from. The deposit is paid in full whatever the balance,
+ *  so the account after the drop is the cash less the deposit, and what the bank allows is the
+ *  bank's own figure (CLAUDE.md T22 2.1, 2.2). */
+export function accountAfterDrop(state: GameState, job: Job): { account: number; allowed: number } {
+  return { account: state.cash - job.depositPaid, allowed: bankruptcyFloor(state) };
 }
 
 /** One line of the card: what it is on the left, what it costs on the right, in the row vocabulary
@@ -105,14 +99,14 @@ function overdraftLine(state: GameState): string {
  *  so it is not written (CLAUDE.md T21 2.2, 2.3). */
 function dangerBox(state: GameState, job: Job): string {
   if (depositCanBePaid(state, job)) return '';
-  const { net, allowed } = netAfterDrop(state, job);
-  const closes = net <= allowed;
+  const { account, allowed } = accountAfterDrop(state, job);
+  const closes = account <= allowed;
   const ending = closes ? ' Dropping this job closes the company today.' : '';
   return (
     '<p class="warn drop-danger">' +
     escapeHtml(
-      'You cannot pay the deposit back. It goes to arrears: ' +
-        `${money(net)} against the bank's ${money(allowed)} limit.${ending}`,
+      'You cannot pay the deposit back from the overdraft. The account goes to ' +
+        `${money(account)} against the bank's ${money(allowed)}.${ending}`,
     ) +
     '</p>'
   );

@@ -520,3 +520,125 @@ describe('a v29 save in this build (CLAUDE.md T21 section 4)', () => {
     expect(round.state).toEqual(later);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Turn 22: version 18 to 19, the arrears into the account (CLAUDE.md T22 2.1, section 4)
+// ---------------------------------------------------------------------------
+
+/** A v31 save of a company that missed its bills: the unpaid balance stands beside the bank the way
+ *  Turn 21 kept it, with a month of it counted and two ledger lines already written under the two
+ *  categories the word took with it. Cut down to what this one lift touches. */
+function v31SaveInArrears(): Record<string, unknown> {
+  return {
+    version: 18,
+    cash: -4998,
+    clock: { day: 22, minute: 480 },
+    jobs: [],
+    workers: [],
+    equipment: [],
+    finance: {
+      overdraftLimit: -5000,
+      daysBelowOverdraft: 0,
+      arrearsAmount: 2780,
+      arrearsMonths: 1,
+      firstArrearsDay: 11,
+    },
+    ledger: [
+      {
+        id: 'l1',
+        day: 11,
+        minute: 480,
+        category: 'rent',
+        label: 'Rent (unpaid)',
+        amount: -80,
+        balance: -4998,
+        unpaid: true,
+      },
+      {
+        id: 'l2',
+        day: 12,
+        minute: 480,
+        category: 'arrears',
+        label: 'Arrears paid off',
+        amount: -100,
+        balance: -4998,
+        unpaid: false,
+      },
+      {
+        id: 'l3',
+        day: 13,
+        minute: 480,
+        category: 'seizure',
+        label: 'Seized tableSaw, credited against arrears',
+        amount: 900,
+        balance: -4998,
+        unpaid: true,
+      },
+    ],
+    owner: { minutesWorked: 0, dayLog: [] },
+    unit: { widthCells: 20, depthCells: 10 },
+    contracts: [],
+    tasks: [],
+  };
+}
+
+describe('a v31 save with an unpaid balance on it (CLAUDE.md T22 2.1)', () => {
+  const lifted = migrateState(v31SaveInArrears(), 18);
+  if (lifted === null) throw new Error('the lift refused a version 18 state');
+  const finance = lifted.finance as unknown as Record<string, unknown>;
+
+  it('takes what was owed out of the cash, where it would have come from on the day', () => {
+    // There is one track for money from tonight: a cost the player did not choose is paid out of
+    // the account whatever the balance, so a save that was carrying 2,780 it never paid has it
+    // taken out of the account now (PIOTR, 19.09; CLAUDE.md T22 2.1, section 4).
+    expect(lifted.version).toBe(19);
+    expect(lifted.cash).toBe(-4998 - 2780);
+  });
+
+  it('writes the one line that says what happened to the money', () => {
+    const line = lifted.ledger.find((entry) => entry.label === 'Arrears carried into the account (v32)');
+    expect(line).not.toBeUndefined();
+    expect(line?.amount).toBe(-2780);
+    expect(line?.category).toBe('other');
+    expect(line?.unpaid).toBe(false);
+    expect(line?.balance).toBe(lifted.cash);
+    expect(line?.day).toBe(22);
+  });
+
+  it('takes the three fields off the save, because the type no longer has them', () => {
+    expect(Object.keys(finance)).not.toContain('arrearsAmount');
+    expect(Object.keys(finance)).not.toContain('arrearsMonths');
+    expect(Object.keys(finance)).not.toContain('firstArrearsDay');
+    // What the bank does keep is the run of days under the limit, which 2.2 reads.
+    expect(finance.daysBelowOverdraft).toBe(0);
+  });
+
+  it('keeps every pound of a played company s history on the books', () => {
+    // The two categories the word took with it are rewritten, so the lines are still there and
+    // still carry their own labels and figures: nothing is lost with the word.
+    const categories = lifted.ledger.map((entry) => entry.category as string);
+    expect(categories).not.toContain('arrears');
+    expect(categories).not.toContain('seizure');
+    expect(lifted.ledger.find((entry) => entry.id === 'l2')?.category).toBe('other');
+    expect(lifted.ledger.find((entry) => entry.id === 'l2')?.amount).toBe(-100);
+    expect(lifted.ledger.find((entry) => entry.id === 'l3')?.category).toBe('other');
+    expect(lifted.ledger.find((entry) => entry.id === 'l3')?.amount).toBe(900);
+    // The line that went unpaid on the day keeps its flag: it is a record of a day that has been
+    // and gone, and the lift does not rewrite history it cannot re-play.
+    expect(lifted.ledger.find((entry) => entry.id === 'l1')?.unpaid).toBe(true);
+  });
+
+  it('leaves a save that owed nothing exactly where it was', () => {
+    const clear = v31SaveInArrears();
+    const money = clear.finance as Record<string, unknown>;
+    money.arrearsAmount = 0;
+    money.arrearsMonths = 0;
+    money.firstArrearsDay = null;
+    const opened = migrateState(clear, 18);
+    if (opened === null) throw new Error('the lift refused a clear v31 state');
+    expect(opened.cash).toBe(-4998);
+    expect(opened.ledger.some((entry) => entry.label.includes('carried into the account'))).toBe(
+      false,
+    );
+  });
+});
