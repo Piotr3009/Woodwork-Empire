@@ -158,3 +158,117 @@ Piotr's.
   grep is on the word: B2 changed no assertion there, and instead wrote the word out of the comments
   in `src/render/hall.ts` ("while the pointer is on the figure group", "the words under the
   pointer"). The stylesheet says `hover` in its own comment and its own selector, where it belongs.
+
+---
+
+## T22-B2b, 2.6: nobody is moved between jobs
+
+**What was built, in two lines.** Turn 21's transfer is gone: `moveToOtherWork`, `otherWorkFor` and
+the `moved` flag of `HandPlace` are deleted, `placeHand` reads a man's minute once instead of twice
+(the hall, then the rack, then the machine of his stage) and the man stands at the machine's waiting
+cell on the job he was assigned to, with the minute booked to `noMachine` for the day meter's idle
+segment and the red mark over his head. Turn 21's own test of the transfer,
+`tests/engine/nobodyWaits.test.ts`, is deleted and `tests/engine/nobodyMoved.test.ts` is written in
+its place: four men, one saw and two jobs work three minutes of four, nobody's job changes, the
+owner's own idle minute is booked to the machine he cannot have, and the queue's words and the
+stage plan invariant of Turn 21 are kept and asserted with it.
+
+**What it costs the hall, measured.** In the section's own scene, four men, one saw and two jobs
+(one at cutting, one at assembly), the played day works **1,440 minutes of 2,400 where Turn 21
+worked 1,920**, and 480 of them are lost to the one saw: the second man of the cutting job stands at
+its waiting cell for all 479 readings of the day after 08:01. With nothing in the hall but the saw's
+own work, nothing changes at all (480 worked, 1,440 lost, in both turns), because there was never
+anywhere to move a man to. That is the whole of the difference 2.6 makes, and it is the queue Piotr
+asked for.
+
+### Changes outside B2's files (please check on the merge)
+
+**1. `src/engine/game.ts`, the day's production minute (B1's file for 2.2).** A comment, and it is
+now false: there is no scheduler inside `placeHand` any more. The two deleted lines of production.ts
+say the same thing in their own words. Nothing about the code needs to change, so B2 left it.
+
+  old (at `for (const hand of working) {` in the day's production minute):
+  ```
+      // One reading of a man's minute, the scheduler of CLAUDE.md T21 2.7 inside it: he is moved off a
+      // queue he is standing in if there is anything else for him to do, and only then does he stand.
+      // The night shift runs the same function through `workMinute` (CLAUDE.md T21 2.7).
+  ```
+  new:
+  ```
+      // One reading of a man's minute (CLAUDE.md T22 2.6): the job he is on, and the machine of its
+      // stage, or the wait at it. Nobody is moved to another job, and the night shift runs the same
+      // function through `workMinute`.
+  ```
+
+**2. `src/engine/contracts.ts`, `contractWantsToday` (nobody's this turn).** Another comment that
+names the scheduler. The rule itself is untouched and stays as Turn 21 left it: the contract's man
+is the contract's for the day, and the minute his job cannot use him the contract has him again.
+
+  old:
+  ```
+    // His day's share is made and he has a job to go to, but the job cannot use the minute: its saw is
+    // taken, its rack is empty or the hall has stopped it. He makes pieces rather than stand at it,
+    // because the client pays for every piece he makes, and the contract is the third thing the
+    // scheduler looks at before a man waits (PIOTR; CLAUDE.md T21 2.7). Asked fresh every minute off
+  ```
+  new:
+  ```
+    // His day's share is made and he has a job to go to, but the job cannot use the minute: its saw is
+    // taken, its rack is empty or the hall has stopped it. He makes pieces rather than stand at it,
+    // because the client pays for every piece he makes, and his contract is the last thing asked
+    // before he stands (PIOTR; CLAUDE.md T20 2.1, T22 2.6). Asked fresh every minute off
+  ```
+
+**3. `src/engine/jobs.ts`, the doc comment of `jobHasWorkFor` (nobody's this turn).** The function
+stays: `contracts.ts` is its one caller now. Its last sentence names the scheduler that is gone.
+
+  old:
+  ```
+   *  Nothing here is claimed and nothing is written down, so the scheduler can ask it of every job in
+   *  the hall before it moves anybody. */
+  ```
+  new:
+  ```
+   *  Nothing here is claimed and nothing is written down, so it can be asked of a job the man will
+   *  not end up at: the contract asks it of the job beside it before it takes him back
+   *  (CLAUDE.md T20 2.1, T22 2.6). */
+  ```
+  Its first line also still cites `CLAUDE.md T21 2.7`, which is the section that is reversed; the
+  citation could become `T20 2.1`.
+
+### Test files B2 changed for 2.6
+
+- **`tests/engine/nobodyWaits.test.ts` deleted**, and `tests/engine/nobodyMoved.test.ts` written in
+  its place: 8 tests.
+- **`tests/scenarios/turn21.test.ts`, the (gg) scenario, rewritten in place.** The brief gives (gg)
+  to phase C, and B2's instruction was to make the suite green on its own exit code and to say
+  exactly what it changed, so it is changed here and phase C should read this list rather than
+  re-derive it. Every figure below was measured on this build, in the file's own way.
+  - `works every man of the four all day while the second job has bench work` became
+    `works three of the four all day and stands the man who cannot have the saw`: worked 1,920
+    becomes **1,440**, `lost.noMachine` 0 becomes **480**, and the three men who worked every minute
+    are the man on the saw and the two at the other job's bench, while the fourth put in **0**.
+    `possible` 2,400, `lost.noMaterial` 0, `lost.noPeople` 480 and `minutesWorked` 480 are
+    unchanged.
+  - `moves the man who could not have the saw to the other job s bench, and keeps him there` became
+    `leaves every man on the job he was assigned to, all day`: both jobs keep the two men the player
+    put on them, the man who stood is still on the cutting job, and the jobs took **480** and
+    **960** minutes where they took 480 and 1,440.
+  - `has nobody at a waiting cell all day but the two minutes before the scheduler s first look`
+    became `has the man who cannot have the saw at its waiting cell every minute of the day`:
+    **481** readings, of which the man on the saw is **2** (08:00 and 13:00, the top of each spell,
+    as before) and the man behind him is **479**; every reading is `tableSaw`. The cutting job now
+    ends the day saying `waiting for the saw` (`Cutting, waiting for the saw` on the bar) where it
+    used to end it saying nothing, and the job with bench work still says nothing.
+  - The marks test (rewritten in T22-B2a) now reads `['no cut parts yet', 'waiting for the saw']`
+    for the man who waits, because over a whole day he is the first of the queue in some minutes and
+    behind another man in others. The two men at the bench say nothing at all.
+  - Three stale comments were reworded (the scheduler, the file name of the unit test, the header of
+    the (gg) section). `(gg) the same hall with nothing in it but the saw s own work` passes
+    unchanged, figures included: 480 worked, 1,440 lost, 962 readings, three men.
+- **`tests/engine/assignees.test.ts`** and **`tests/engine/contractDay.test.ts`**: one comment each
+  named the transfer or the deleted test file. No assertion changed and both files are green.
+
+### Figures B2 chose for itself in 2.6
+
+None. 2.6 deletes a rule and adds no number.

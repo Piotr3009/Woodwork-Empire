@@ -140,11 +140,11 @@ describe('the day is the contract first and the job second (CLAUDE.md T20 2.1.4)
     expect(contractWantsToday(state, 'staff-1')).toBe(true);
   });
 
-  it('takes him back when the job he would go to cannot use the minute (T21 2.7)', () => {
-    // The third thing the scheduler looks at before a man stands: his contract's pieces. His day's
+  it('takes him back when the job he is on cannot use the minute (T20 2.1)', () => {
+    // The last thing asked before a man on a contract stands: his contract's pieces. His day's
     // share is made and he has a job to go to, so the job has him; the minute the job cannot use him,
     // because the saw its stage wants is taken, the contract has him again, because the client pays
-    // for every piece he makes (PIOTR; CLAUDE.md T21 2.7).
+    // for every piece he makes (PIOTR; CLAUDE.md T20 2.1, T22 2.6).
     let state = joinerHall();
     const contract = running(state, 5);
     contract.piecesThisWeek = 5;
