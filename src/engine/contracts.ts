@@ -641,8 +641,8 @@ export function contractWantsToday(state: GameState, workerId: string): boolean 
   if (job === null) return true;
   // His day's share is made and he has a job to go to, but the job cannot use the minute: its saw is
   // taken, its rack is empty or the hall has stopped it. He makes pieces rather than stand at it,
-  // because the client pays for every piece he makes, and the contract is the third thing the
-  // scheduler looks at before a man waits (PIOTR; CLAUDE.md T21 2.7). Asked fresh every minute off
+  // because the client pays for every piece he makes, and his contract is the last thing asked
+  // before he stands (PIOTR; CLAUDE.md T20 2.1, T22 2.6). Asked fresh every minute off
   // the hall itself and never off a flag written down last minute, so the minute his job can have him
   // again it has him.
   return !jobHasWorkFor(state, job, workerId);

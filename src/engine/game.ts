@@ -1619,9 +1619,9 @@ function runProductionMinute(state: GameState, ownerOnTask: boolean): void {
     lost[cause] = (lost[cause] ?? 0) + minutes;
   };
   for (const hand of working) {
-    // One reading of a man's minute, the scheduler of CLAUDE.md T21 2.7 inside it: he is moved off a
-    // queue he is standing in if there is anything else for him to do, and only then does he stand.
-    // The night shift runs the same function through `workMinute` (CLAUDE.md T21 2.7).
+    // One reading of a man's minute (CLAUDE.md T22 2.6): the job he is on, and the machine of its
+    // stage, or the wait at it. Nobody is moved to another job, and the night shift runs the same
+    // function through `workMinute`.
     const place = placeHand(state, hand);
     if (place.noMaterial) raiseNoMaterial(state);
     if (place.lost !== null) lose(place.lost);

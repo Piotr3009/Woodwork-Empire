@@ -304,13 +304,14 @@ export function jobStage(
 
 /** True when this job could take a minute from this man right now: it is in production, the hall is
  *  not stopping it, the rack can hand over what its next slice of work needs, and the stage it is at
- *  wants no machine or one the hall has free (CLAUDE.md T21 2.7).
+ *  wants no machine or one the hall has free (CLAUDE.md T20 2.1, T22 2.6).
  *
  *  It is the question `canWorkOn` and `takeMachines` answer between them for the man who is already
  *  on the job, asked without the answering: `canWorkOn` draws the sheets off the rack and
  *  `takeMachines` claims the machine, and neither may happen for a job the man may not end up at.
- *  Nothing here is claimed and nothing is written down, so the scheduler can ask it of every job in
- *  the hall before it moves anybody. */
+ *  Nothing here is claimed and nothing is written down, so it can be asked of a job the man will
+ *  not end up at: the contract asks it of the job beside it before it takes him back
+ *  (CLAUDE.md T20 2.1, T22 2.6). */
 export function jobHasWorkFor(state: GameState, job: Job, who: string): boolean {
   if (job.stage !== 'inProduction') return false;
   if (hallBlock(state, job) !== '') return false;
@@ -772,7 +773,7 @@ export function dropJob(state: GameState, jobId: string): boolean {
  *  of machine words [TUNE: the drawing's short word for a family, "the saw" for a table saw, would be
  *  such a table, and it is written out for the lead in docs/notes-t21-b2.md]. It lives here because
  *  the two things that say it, the hall's own block and the queue at a machine, are read from here
- *  and from `src/engine/production.ts` (CLAUDE.md T21 2.7). */
+ *  and from `src/engine/production.ts` (CLAUDE.md T21 2.6). */
 export function waitingLine(specId: string): string {
   const name = MACHINE_SHORT_WORDS[specId] ?? (findSpec(specId)?.name ?? specId).toLowerCase();
   return `waiting for the ${name}`;

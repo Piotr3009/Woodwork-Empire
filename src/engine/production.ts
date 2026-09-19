@@ -344,7 +344,7 @@ export function canWorkOn(state: GameState, job: Job): boolean {
 
 /** What this man did with the minute: the stage and the machine he got, or why he stood. The whole
  *  of one man's minute before the hall's factors are applied to it, in one place, because the day
- *  and the night both have to ask exactly the same question (CLAUDE.md T21 2.7). */
+ *  and the night both have to ask exactly the same question (CLAUDE.md T22 2.6). */
 export interface HandPlace {
   /** The stage he is at and the machine he got, or null when he stood. */
   work: { stage: StagePlan; machine: Equipment | null } | null;
