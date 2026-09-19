@@ -159,6 +159,35 @@ the extractor today and on any family the day it gains a port line.
 
 ---
 
+## T22-B3d, 2.10: Rotate works
+
+- `ui.armTurn` is the armed quarter turn and `ui.rotate` is now only ever the orientation of the
+  thing in hand. Rotate, or R with nothing in hand, toggles `armTurn` and the button lights while it
+  is set; the pick up reads the item's own orientation, applies the armed turn to it once and clears
+  the arming; R with the item in hand turns what is in hand, as it always did.
+- `tests/ui/rotateHall.test.ts` is new and drives the whole thing through the real DOM: arm, pick up,
+  drop gives a turned cabinet; arm twice, pick up, drop gives an unturned one; R with nothing in hand
+  arms it too; R with the mouse held turns what is held; and a click that neither moved nor turned
+  leaves the hall and the moved list exactly as they were.
+
+### One thing the brief's wording cannot have, and why it is not a gap
+
+2.10 says "Rotate or R with the item in hand turns what is in hand, as today". R does. **The button
+cannot**, and could not before tonight either: a press on a button is a mouse up, and a mouse up
+anywhere is the item going down (`onSetupPointerDown` listens on `window`). So with something in hand
+there is no way to reach the button at all, and the press that seems to reach it is really the drop
+followed by an arming for the next pick up. The test asserts exactly that behaviour rather than
+pretending the button turns what is held.
+
+### The test asks the engine where a cabinet may be turned
+
+The row the game lays the cabinets out on (`CABINET_SLOT_LAYOUT`, y 3) is one cell deep with the
+workbench row directly under it, so a cabinet turned to 1 by 2 stands on a bench and `canPlace`
+rightly refuses it (CLAUDE.md T21 2.13). The test therefore asks `canPlace` for a cell that takes the
+cabinet both ways round instead of naming one, so it measures Rotate and not the day one layout.
+
+---
+
 ## Notes for the lead: changes wanted in files or regions that are not B3's
 
 ### 1. `src/engine/index.ts` (the barrel), applied by B3 because nothing compiles without it
