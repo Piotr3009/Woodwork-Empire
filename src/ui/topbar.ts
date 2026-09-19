@@ -3,6 +3,7 @@
 // the push buttons on the right (CLAUDE.md T11 3.1). Nothing else lives here.
 
 import {
+  ARREARS_MONTHS_BAILIFF,
   DAY_CATEGORIES,
   DAY_CATEGORY_LABELS,
   DAY_END_MINUTE,
@@ -26,7 +27,7 @@ import {
 import type { DayCategory, GameState, Speed } from '../engine/index';
 import { openJobs } from '../engine/jobs';
 import { cadenceControl } from './dayEnd';
-import { closeButton, escapeHtml, minutes, money, signedMoney } from './modal';
+import { closeButton, escapeHtml, minutes, money, plural, signedMoney } from './modal';
 
 /** The five speed knobs. One place builds them, whatever else the top bar has to say. The Pause
  *  knob pulses once when the player asks for something stopped time will not give him
@@ -82,6 +83,33 @@ function namePlate(state: GameState): string {
     `<span class="net ${netClass}" title="${blind ? 'The books are behind' : 'Today'}">` +
     `${escapeHtml(netText)}</span>` +
     '</div>'
+  );
+}
+
+/** What the company owes, beside what it has (PIOTR, 18.09; CLAUDE.md T21 2.1;
+ *  docs/mockups/t21/debt.html part 1). Piotr dropped a 50,000 job, the deposit he could not pay
+ *  became 25,740 of arrears, and the only number on the screen was the -7,259 in the account: the
+ *  debt was invisible and the game played on. So while there are arrears a red plate stands between
+ *  the cash and the clock, pulsing, with what is owed on the first line and how long it has been
+ *  owed on the second. A click opens the books at the Summary, where the arrears and the button that
+ *  pays them are. It is gone the day the arrears are cleared. */
+function owesPlate(state: GameState): string {
+  const owed = state.finance.arrearsAmount;
+  if (owed <= 0) return '';
+  const months = state.finance.arrearsMonths;
+  const toBailiff = Math.max(0, ARREARS_MONTHS_BAILIFF - months);
+  // The drawn line is "bailiff in 2". At nought months left the bailiff is the next thing that
+  // happens, and "bailiff in 0" is not English, so that one case says so in a word [TUNE].
+  const bailiff = toBailiff === 0 ? 'bailiff due' : `bailiff in ${toBailiff}`;
+  return (
+    // One action, `openArrears`, which sets the Summary tab and opens the books
+    // (its case is in `src/ui/app.ts`, beside the other openers).
+    '<button class="owes-plate" data-do="openArrears" ' +
+    'title="What the company owes. Opens the books at the Summary.">' +
+    `<span class="owes-figure">owes ${escapeHtml(money(owed))}</span>` +
+    `<span class="owes-line">arrears, ${escapeHtml(plural(months, 'month', 'months'))} · ` +
+    `${escapeHtml(bailiff)}</span>` +
+    '</button>'
   );
 }
 
@@ -260,6 +288,8 @@ export function renderTopbar(
   return (
     '<div class="topbar">' +
     namePlate(state) +
+    // Between the cash and the speed knobs, and only while the company owes something (T21 2.1).
+    owesPlate(state) +
     '<div class="clock-block">' +
     `<span class="date">${escapeHtml(formatDate(state.clock))}</span>` +
     `<span class="speeds">${speedButtons(state, pulse)}</span>` +

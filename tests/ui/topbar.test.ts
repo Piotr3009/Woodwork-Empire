@@ -79,6 +79,68 @@ describe('the cabinet', () => {
   });
 });
 
+describe('the red plate that says what the company owes', () => {
+  /** The hall of the scripted day, with a debt on it: Piotr's own figures of 15 May. */
+  function owing(arrears: number, months: number): GameState {
+    const state = withScriptedDay(SCRIPTED);
+    state.cash = -7259;
+    state.finance.arrearsAmount = arrears;
+    state.finance.arrearsMonths = months;
+    state.finance.firstArrearsDay = 1;
+    return state;
+  }
+
+  it('stands between the cash and the clock, and only while the company owes something', () => {
+    const quiet = renderTopbar(withScriptedDay(SCRIPTED), 'hall');
+    expect(quiet).not.toContain('owes-plate');
+    const html = renderTopbar(owing(25740, 1), 'hall');
+    expect(html).toContain('class="owes-plate"');
+    // In the bar itself, after the name plate and before the clock block (CLAUDE.md T21 2.1).
+    expect(html.indexOf('name-plate')).toBeLessThan(html.indexOf('owes-plate'));
+    expect(html.indexOf('owes-plate')).toBeLessThan(html.indexOf('clock-block'));
+  });
+
+  it('says what is owed on the first line and how long it has been owed on the second', () => {
+    const plate = parse(renderTopbar(owing(25740, 1), 'hall')).querySelector('.owes-plate');
+    expect(plate?.querySelector('.owes-figure')?.textContent).toBe('owes \u00a325,740');
+    expect(plate?.querySelector('.owes-line')?.textContent).toBe(
+      'arrears, 1 month \u00b7 bailiff in 2',
+    );
+  });
+
+  it('counts the months of the arrears and the months left before the bailiff', () => {
+    const two = parse(renderTopbar(owing(25740, 2), 'hall')).querySelector('.owes-line');
+    expect(two?.textContent).toBe('arrears, 2 months \u00b7 bailiff in 1');
+    // At the bailiff's own month there is nothing left to count down: he is the next thing to
+    // happen, so the line says so.
+    const three = parse(renderTopbar(owing(25740, 3), 'hall')).querySelector('.owes-line');
+    expect(three?.textContent).toBe('arrears, 3 months \u00b7 bailiff due');
+  });
+
+  it('is one button carrying the one action that opens the books at the Summary', () => {
+    const plate = parse(renderTopbar(owing(25740, 1), 'hall')).querySelector('.owes-plate');
+    expect(plate?.tagName).toBe('BUTTON');
+    expect((plate as HTMLButtonElement | null)?.dataset.do).toBe('openArrears');
+    // One click and no second control on it: the plate is the whole of it (CLAUDE.md T21 2.1).
+    expect(plate?.querySelectorAll('button')).toHaveLength(0);
+  });
+
+  // The handler for `openArrears` sets ui.accountingTab to 'summary' and opens the accounting
+  // modal. It lives in src/ui/app.ts, which was frozen for the agent that built this plate, so the
+  // case is written out in docs/notes-t21-b1.md for the lead to apply and this is the test of it,
+  // to be turned on in the same commit as the case itself.
+  it.todo('opens Accounting on its Summary tab on a click');
+
+  it('is gone the day the arrears are cleared', () => {
+    const state = owing(25740, 1);
+    expect(renderTopbar(state, 'hall')).toContain('owes-plate');
+    state.finance.arrearsAmount = 0;
+    state.finance.arrearsMonths = 0;
+    state.finance.firstArrearsDay = null;
+    expect(renderTopbar(state, 'hall')).not.toContain('owes-plate');
+  });
+});
+
 describe("the boss's day meter", () => {
   it('draws the seven bands in the order they happened', () => {
     const html = renderTopbar(withScriptedDay(SCRIPTED), 'hall');

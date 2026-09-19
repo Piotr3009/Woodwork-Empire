@@ -101,9 +101,88 @@ block:
 Reason: the card is built and tested, and until this lands it renders with the folder's paper colours
 and an unhidden file input. Nothing outside these three edits is wanted in styles.css for B1b.
 
+
+### 2. `src/ui/app.ts`: the click on the owes plate (T21-B1c, CLAUDE.md 2.1)
+
+The plate on the top bar is a button carrying `data-do="openArrears"`. There is no mechanism for
+opening a modal on a chosen tab, so it wants one case of its own beside the other openers. The
+precedent is `openLaptopPage`.
+
+Exact old text (in `runAction`, the `openModal` case, around line 1319):
+
+```ts
+    case 'openModal':
+      openModal((element.dataset.modal ?? 'board') as ModalId);
+      break;
+```
+
+Exact new text:
+
+```ts
+    case 'openModal':
+      openModal((element.dataset.modal ?? 'board') as ModalId);
+      break;
+    // The red plate on the top bar: what the company owes, and behind it the books open at the
+    // Summary, where the arrears block and the button that pays them are. There is no way to open a
+    // modal on a chosen tab, so the tab is set first and the modal after it, the way
+    // `openLaptopPage` sets its page (PIOTR, 18.09; CLAUDE.md T21 2.1).
+    case 'openArrears':
+      ui.accountingTab = 'summary';
+      ui.scrollModalTop = true;
+      openModal('accounting');
+      break;
+```
+
+Reason: without it the plate is drawn and does nothing. `tests/ui/topbar.test.ts` carries the test of
+it as `it.todo('opens Accounting on its Summary tab on a click')`; this is the body to put in its
+place in the same commit as the case (it follows the pattern of the Orders button test in the same
+file, which mounts the app and presses):
+
+```ts
+  it('opens Accounting on its Summary tab on a click', () => {
+    document.body.innerHTML = '<div id="app"></div>';
+    const root = document.querySelector('#app');
+    if (!(root instanceof HTMLElement)) throw new Error('no root');
+    mount(root);
+    const press = (selector: string): void => {
+      const element = root.querySelector(selector);
+      if (element === null) throw new Error(`nothing to click: ${selector}`);
+      element.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    };
+    press('[data-do="startGame"]');
+    const state = currentState();
+    if (state === null) throw new Error('no game');
+    state.finance.arrearsAmount = 25740;
+    state.finance.arrearsMonths = 1;
+    state.finance.firstArrearsDay = 1;
+    render();
+    press('[data-do="openArrears"]');
+    expect(root.querySelector('[data-modal="accounting"]')).not.toBeNull();
+    const on = root.querySelector('[data-do="accountingTab"].is-on');
+    expect(on?.getAttribute('data-id')).toBe('summary');
+  });
+```
+
 ## Numbers chosen
 
-(One line per figure this agent chose itself, with its [TUNE] reason.)
+Every figure of the money this turn is Piotr's or phase A's; these three are the words and the
+readings this agent chose itself.
+
+- **`bailiff due` in place of `bailiff in 0`** on the owes plate's second line [TUNE]. The drawing
+  shows `bailiff in 2`. At three months of arrears there is nothing left to count down, and
+  "bailiff in 0" is not English, so that one case says the bailiff is the next thing to happen.
+  `src/ui/topbar.ts`, `owesPlate`.
+- **The warning line fires on the net position only**, `netPosition(state) <= bankruptcyFloor(state)`
+  with arrears above nought, and not on the softer reading of "any arrears with the account below
+  zero" [TUNE]. The drawing shows the line on a company already past the limit and its sentence says
+  so in words ("past the -15,000 the bank allows"), so a line that said it while it was not true
+  would be the old top bar's lie the other way about. The window it is seen in is real: the arrears
+  arrive the moment a deposit cannot be paid, and the bank does not look until the next day's money
+  is settled. `src/engine/warnings.ts`, `pastTheLimitWarning`.
+- **The account clause is dropped when the account is not below zero** [TUNE]. The drawn sentence
+  opens "Account below zero and 25,740 in arrears", which is true of almost every company in
+  arrears; one that missed a bill and was then paid by a client is not below zero, and the line says
+  "25,740 in arrears: together ..." instead of saying something false. Same function.
 
 ## Names: the brief against the code
 
@@ -186,3 +265,20 @@ skipped, but two of them are findings and not bookkeeping:
    overdraft to reach the 1st they are about at all, because three months of fixed costs with nothing
    coming in now closes a company. Both say so in a comment, and (t) asserts the day 22 closure
    beside its interest line.
+
+## T21-B1c: 2.1, debt on the top bar
+
+- Built: `owesPlate` in `src/ui/topbar.ts`, between the name plate and the clock block and drawn only
+  while `finance.arrearsAmount > 0`, using phase A's `.owes-plate` / `.owes-figure` / `.owes-line`:
+  `owes £25,740` over `arrears, 1 month · bailiff in 2`, the months from
+  `finance.arrearsMonths` through `plural`, the countdown from `ARREARS_MONTHS_BAILIFF` less that
+  floored at nought. It is one button carrying `data-do="openArrears"`. The strip's line is the new
+  `pastTheLimit` key in `src/engine/warnings.ts`, second in `WARNING_ORDER` above everything but
+  `bagsFull`, reading `netPosition` against `bankruptcyFloor` so the line and the close cannot
+  disagree. Tests: five in `tests/ui/topbar.test.ts` and five in `tests/engine/warnings.test.ts`, and
+  the order test now has nine keys with the hall that has eight of them at once.
+- Left: the click itself. `src/ui/app.ts` is frozen, so the `openArrears` case is note 2 above and
+  the test of it is `it.todo('opens Accounting on its Summary tab on a click')` in
+  `tests/ui/topbar.test.ts`, with its body written out in the note for the lead to paste in the same
+  commit as the case. `src/ui/tips.ts` was not touched: the strip reads whatever `warnings` returns
+  and needed nothing.
