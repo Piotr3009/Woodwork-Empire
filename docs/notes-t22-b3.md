@@ -277,6 +277,45 @@ with nowhere to put his tools.
 
 ---
 
+## T22-B3g, 2.13: the card of a thing on the hall
+
+- A click on a tool cabinet on the hall opens its card in the machine card's skin, which is
+  `ownedTile` drawing it as it draws every machine's: the name and the class badge in the title, the
+  class's own name under it, and `Holds 4 men's tools \u00b7 1 in use` from `cabinetLine`. The rest of
+  the storage keeps the note it wrote before, because 2.13 names the cabinet and nothing else.
+- `turnAndSellRows` in `src/ui/catalogue.ts` is the one function that draws the two rows at the
+  bottom, for the machine's card and the cabinet's alike: Turn, which stands the thing at ninety
+  degrees where it is through `MOVE_ITEM` at the next orientation of 2.11, and Sell, which is the
+  catalogue's own `sellAction` of Turn 8, moved out of the row above rather than doubled. A turn the
+  engine would refuse is a `lockedButton` with the engine's own reason in its title.
+
+### What Turn really charges, and why it is not the brief's hour
+
+2.13 says Turn "costs the hour a move costs". The code's own rule is that **only heavy kit costs
+anything to move**: `endSetup` in `src/engine/game.ts` filters the moved list down to
+`itemIsHeavy` and queues the hour and the question for those alone, and a bench, a rack, a locker, a
+seat or a tool cabinet is simply where the player dropped it, no time and no money (CLAUDE.md T8 3.4,
+T11 3.9, and `tests/engine/lacquerAirRotate.test.ts` is that rule). A tool cabinet is not in
+`HEAVY_SPECS`, so **turning a cabinet from its card costs nothing**, and turning a saw from the
+machine card books the hour and asks the question exactly as dragging it would. The caller's
+instruction was to follow the code where the two disagree, so that is what is built, and the card
+test asserts the nothing rather than an hour.
+
+The path is the game's own and not a second one: the card dispatches `MOVE_ITEM` and then
+`END_SETUP` with the speed the clock is already on, which is what the Done button does, so
+`recordMove` and `endSetup` decide the charge. Nothing new was written in `game.ts`, which is B1's
+file tonight.
+
+### Figures and words this agent chose in 2.13
+
+- The two rows are two `.tile-action` divs, which is the class the card already ends with, each
+  marked `data-card-row="turn"` and `data-card-row="sell"` so a test can find them [TUNE: Claude's
+  markup, no new class and no new value].
+- `Holds 4 men's tools \u00b7 1 in use` is the brief's own line; the `in use` figure is
+  `slotsInUseIn` of 2.12, which fills the cabinets in the order they were bought.
+
+---
+
 ## Notes for the lead: changes wanted in files or regions that are not B3's
 
 ### 1. `src/engine/index.ts` (the barrel), applied by B3 because nothing compiles without it

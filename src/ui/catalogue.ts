@@ -46,7 +46,9 @@ import {
   serviceIsDue,
 } from '../engine/index';
 import { formatCalendarDay, gateCheck, hasGate, variantFor } from '../engine/index';
-import { serviceCallCheck, serviceDueIn } from '../engine/machines';
+import { serviceCallCheck, serviceDueIn, toolSlotsLine } from '../engine/machines';
+import { slotsInUseIn } from '../engine/staff';
+import { nextSpriteOrientation } from '../render/sprites';
 import { orderName, orderProgress } from '../engine/orders';
 import type { Equipment, GameState, OrderLine } from '../engine/index';
 import { classBadge, classFrame, isMachineFamily, pictureSlot, renderMachine } from './machine';
@@ -331,6 +333,48 @@ function sellAction(state: GameState, item: Equipment, sellConfirm: string | nul
   return button('sellMachine', `Sell for ${money(salePriceFor(item))}`, `data-id="${item.id}"`);
 }
 
+/** Turn: the thing stands at ninety degrees where it is, at the next orientation that has a
+ *  picture (CLAUDE.md T22 2.11), and the game books the move the way it books any other. Greyed
+ *  with the engine's own reason where the turned footprint does not fit, because a control the
+ *  engine would refuse is never drawn (docs/ui-style.md 3; CLAUDE.md T22 2.13). */
+function turnAction(state: GameState, item: Equipment): string {
+  if (isSold(item)) {
+    return `<span class="reason">Sold, collection on ${formatCalendarDay(item.soldOnDay ?? 0)}</span>`;
+  }
+  if (!itemStandsInTheHall(item)) return '';
+  const spec = findSpec(item.specId);
+  if (spec === undefined || spec === null) return '';
+  const next = nextSpriteOrientation(spec.spriteKey, item.variantId, item.orientation);
+  const check = canPlace(state, item.id, item.anchorX, item.anchorY, next);
+  return check.ok
+    ? button('turnItem', 'Turn', `data-id="${item.id}"`)
+    : lockedButton('Turn', check.reason);
+}
+
+/** The two rows at the bottom of the card of a thing standing on the hall: Turn and Sell. One
+ *  function draws them for the machine's card and the tool cabinet's alike, so the two cannot
+ *  differ (PIOTR, 19.09; CLAUDE.md T22 2.13). */
+export function turnAndSellRows(
+  state: GameState,
+  item: Equipment,
+  sellConfirm: string | null,
+): string {
+  const turn = turnAction(state, item);
+  const sell = sellAction(state, item, sellConfirm);
+  return (
+    (turn === '' ? '' : `<div class="tile-action" data-card-row="turn">${turn}</div>`) +
+    (sell === '' ? '' : `<div class="tile-action" data-card-row="sell">${sell}</div>`)
+  );
+}
+
+/** What a tool cabinet is for, on its own card: how many men's hand tools its class holds and how
+ *  many of them are in use (PIOTR, 19.09; CLAUDE.md T22 2.13). Empty for everything else. */
+function cabinetLine(state: GameState, item: Equipment): string {
+  const holds = toolSlotsLine(item.specId, item.variantId);
+  if (holds === '') return '';
+  return `${holds} \u00b7 ${slotsInUseIn(state, item)} in use`;
+}
+
 /** The automatic gate on the card of a machine standing in the hall: bought once, for machines
  *  with an extraction demand, greyed as fitted once it is (CLAUDE.md T13 3.11). */
 export function gateAction(state: GameState, item: Equipment): string {
@@ -420,7 +464,6 @@ export function ownedTile(
     : machine && serviceIsDue(item) && serviceCallCheck(state, item.id).ok
       ? button('serviceMachine', 'Service', `data-id="${item.id}"`)
       : '';
-  const sell = sellAction(state, item, sellConfirm);
   // Shifting it is setting the hall out, which is the one way anything moves (CLAUDE.md T4 3.5):
   // the button takes him there and he drags it where he wants it (CLAUDE.md T17 2.6). Only what
   // can actually be dragged is offered it, and the engine's own check says which: the office
@@ -438,6 +481,7 @@ export function ownedTile(
     spec.effect,
     life,
     service,
+    cabinetLine(state, item),
     ownedState(state, item),
     pipeLine(state, item),
     airStateLine(state, item),
@@ -460,7 +504,11 @@ export function ownedTile(
     gateLine(state, item) +
     airAssign(state, item) +
     '<div class="tile-action">' +
-    `${action}${bags}${connectAction(state, item)}${gateAction(state, item)}${move}${sell}</div>` +
+    `${action}${bags}${connectAction(state, item)}${gateAction(state, item)}${move}</div>` +
+    // Turn and Sell are the two rows at the bottom of every card of a thing on the hall, drawn by
+    // the one function (CLAUDE.md T22 2.13). The sale was in the row above until tonight; it has
+    // moved rather than been doubled, because there is one Sell in the game.
+    turnAndSellRows(state, item, sellConfirm) +
     '</div>'
   );
 }

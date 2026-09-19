@@ -59,7 +59,13 @@ import {
   zoomAt,
   zoomTo,
 } from '../render/hall';
-import { APP_VERSION, HOUSE_CARD_SECONDS, type RoomId, roomById } from '../engine/constants';
+import {
+  APP_VERSION,
+  HOUSE_CARD_SECONDS,
+  type RoomId,
+  TOOL_CABINET,
+  roomById,
+} from '../engine/constants';
 import { centreOf, screenToTile } from '../render/iso';
 import { fitOfficeStack, officeScene } from '../render/office';
 import { type AccountingTab, accountingTabFrom, renderAccounting } from './accounting';
@@ -564,6 +570,27 @@ function turnedFrom(itemId: string, orientation: Orientation): Orientation {
   const spec = kit === null ? null : findSpec(kit.specId);
   if (kit === null || spec === null || spec === undefined) return orientation;
   return nextSpriteOrientation(spec.spriteKey, kit.variantId, orientation);
+}
+
+/** Turn on the card of a thing standing on the hall: it stands at ninety degrees where it is, at
+ *  the next orientation that has a picture, through the one action anything moves by
+ *  (CLAUDE.md T22 2.13). The game books the move itself, exactly as it books a drag: `END_SETUP`
+ *  keeps the heavy kit an hour and a question and leaves a cabinet, a bench or a rack free, which
+ *  is the rule `endSetup` has had since Turn 8 and not a second one written here. */
+function turnWhereItStands(itemId: string): void {
+  const current = game();
+  const item = current.equipment.find((entry) => entry.id === itemId);
+  const spec = item === undefined ? null : findSpec(item.specId);
+  if (item === undefined || spec === null || spec === undefined) return;
+  const next = nextSpriteOrientation(spec.spriteKey, item.variantId, item.orientation);
+  dispatch({
+    type: 'MOVE_ITEM',
+    itemId: item.id,
+    x: item.anchorX,
+    y: item.anchorY,
+    orientation: next,
+  });
+  dispatch({ type: 'END_SETUP', speed: game().speed });
 }
 
 function setupControls(current: GameState): string {
@@ -1332,6 +1359,9 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
     case 'rotateGhost':
       turnGhost();
       return;
+    case 'turnItem':
+      turnWhereItStands(id);
+      return;
     case 'endSetup':
       endSetup();
       return;
@@ -2044,8 +2074,17 @@ function handleSceneClick(element: DataElement): boolean {
     // calls, and the extractor's carries the hall's bag store (PIOTR, 17.09; CLAUDE.md T17 2.6).
     // Anything that is not a machine keeps its note.
     const category = findSpec(item.specId)?.category;
-    // The bench has a card of its own now, because it can be sold like a machine (T19 2.8).
-    if (category === 'machine' || category === 'extraction' || category === 'bench') {
+    // The bench has a card of its own now, because it can be sold like a machine (T19 2.8), and the
+    // tool cabinet has one from Turn 22: it is a ladder of five classes, its card says how many
+    // men's tools it holds and how many are in use, and it can be turned and sold like anything
+    // else on the floor [PIOTR, 19.09: "click it and a modal shows"] (CLAUDE.md T22 2.13). The rest
+    // of the storage keeps its note: 2.13 names the cabinet and nothing else.
+    if (
+      category === 'machine' ||
+      category === 'extraction' ||
+      category === 'bench' ||
+      item.specId === TOOL_CABINET
+    ) {
       openMachineCard(item.id);
       requestRender();
       return true;
