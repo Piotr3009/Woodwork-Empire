@@ -89,9 +89,12 @@ describe('the dinner hour empties the floor (CLAUDE.md T21 2.12)', () => {
     }
     playing(dinner);
     expect(onTheFloor()).toEqual([]);
-    // And the words are at the door, so the player is not left wondering where his crew went.
-    expect(root().innerHTML).toContain('data-away-door="canteen"');
-    expect(root().innerHTML).toContain('at lunch');
+    // And nothing is left at the door: a man at his dinner has nothing wrong with him, so he carries
+    // no mark, and the bubble of Turn 21 that stood at the door is gone with the away class. Where
+    // his crew went is the top bar's to say, which says the hour is a break (CLAUDE.md T22 2.5).
+    expect(root().innerHTML).not.toContain('data-away-door');
+    expect(root().innerHTML).not.toContain('class="mark"');
+    expect(root().innerHTML).toContain('Break');
     // One o'clock: out of the canteen and back at their stations.
     const after = runClock(dinner, BREAK_START_MINUTE + BREAK_MINUTES + 10 - dinner.clock.minute);
     expect(after.clock.minute).toBeGreaterThan(BREAK_START_MINUTE + BREAK_MINUTES);

@@ -112,7 +112,7 @@ interface FourMen {
   men: Worker[];
   record: DaySummary;
   stood: Stood[];
-  /** What each man said over his head that day, in the words of 2.6, each word once. */
+  /** What the mark over each man's head said that day, each line once (CLAUDE.md T22 2.5). */
   said: Map<string, string[]>;
 }
 
@@ -173,7 +173,7 @@ function fourMenTwoJobs(benchWork: boolean): FourMen {
         const bubble = bubbleFor(current, worker.id);
         if (bubble === null) continue;
         const words = said.get(worker.name) ?? new Set<string>();
-        words.add(`${bubble.tone}: ${bubble.text}`);
+        words.add(bubble.text);
         said.set(worker.name, words);
       }
     },
@@ -283,26 +283,18 @@ describe('(gg) four men, one saw and two jobs, on Very easy', () => {
     expect(stageText(GG.evening, jobOn(GG.evening, GG.benchId))).toBe('Assembly');
   });
 
-  it('says over their heads what they are doing, and only says the queue in its first minute', () => {
-    // The bubbles of CLAUDE.md T21 2.6, as they were said on the played day: three men at the
-    // assembly of the second job and one cutting the first, in the drawing's own words, and the
-    // dinner hour behind the canteen door for all four (CLAUDE.md T21 2.12).
+  it('marks a man only while something is wrong with him, and never a man at work', () => {
+    // The marks of CLAUDE.md T22 2.5, as they stood on the played day. Three men spent it at the
+    // assembly of the second job and one cutting the first, and a man at work carries nothing at
+    // all: the two men who were marked were marked in the minute before the hall's first production
+    // minute of a spell, at 08:00 and at 13:00, which is the same reading as the waiting cells
+    // above. The dinner hour is no mark either, because a man at his lunch has nothing wrong with
+    // him (CLAUDE.md T21 2.12, T22 2.5).
     const moved = GG.men[1]?.name ?? '';
-    expect(GG.said.get(GG.men[0]?.name ?? '')).toEqual([
-      'away: at lunch',
-      'wait: waiting for the saw',
-      'work: cutting Small kitchen',
-    ]);
-    expect(GG.said.get(moved)).toEqual([
-      'away: at lunch',
-      'wait: no cut parts yet',
-      'work: assembling Garage shelves',
-    ]);
+    expect(GG.said.get(GG.men[0]?.name ?? '')).toEqual(['waiting for the saw']);
+    expect(GG.said.get(moved)).toEqual(['no cut parts yet']);
     for (const man of GG.men.slice(2)) {
-      expect(GG.said.get(man.name), man.name).toEqual([
-        'away: at lunch',
-        'work: assembling Garage shelves',
-      ]);
+      expect(GG.said.get(man.name), man.name).toBeUndefined();
     }
     console.log(
       '(gg) FOUR MEN, ONE SAW, TWO JOBS\n' +
@@ -353,13 +345,15 @@ describe('(gg) the same hall with nothing in it but the saw s own work', () => {
     expect(bench.blockedBy).toBe('waiting for the saw');
     expect(stageText(GG_QUEUE.evening, cutting)).toBe('Cutting, waiting for the saw');
     expect(stageText(GG_QUEUE.evening, bench)).toBe('Cutting, waiting for the saw');
-    // Over their heads: the men at the saw's waiting cell say they are waiting for it and the man
-    // behind the first of a queue says what is really stopping him, which is the parts nobody has
-    // cut yet (docs/mockups/t21/bubbles.html; CLAUDE.md T21 2.6).
+    // Over their heads: the men at the saw's waiting cell are marked as waiting for it and the man
+    // behind the first of a queue is marked with what is really stopping him, which is the parts
+    // nobody has cut yet (docs/mockups/t22/bubbles-v2.png; CLAUDE.md T22 2.5).
     const words = [...GG_QUEUE.said.values()].flat();
-    expect(words).toContain('wait: waiting for the saw');
-    expect(words).toContain('wait: no cut parts yet');
-    expect(words.filter((line) => line.startsWith('work:'))).toEqual([]);
+    expect(words).toContain('waiting for the saw');
+    expect(words).toContain('no cut parts yet');
+    // And nothing else was said all day: every mark is one of the four things that are wrong, so
+    // there is no line left about the stage a man has just begun.
+    expect([...new Set(words)].sort()).toEqual(['no cut parts yet', 'waiting for the saw']);
     // 962 readings of a man at a waiting cell: two of the three standing men are at the saw's own
     // waiting cell every one of the 480 minutes of the day, and the two left over are the man who
     // holds the saw at the top of his two spells, at 08:00 and 13:00, exactly as in the run beside

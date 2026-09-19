@@ -1025,35 +1025,20 @@ export type LostMinuteCause = 'noPeople' | 'noMachine' | 'noMaterial' | 'ownerAw
  *  (CLAUDE.md T21 2.8). */
 export type OwnerIdleReason = 'noMachine' | 'noMaterial' | 'nothingAssigned' | 'officeEmpty';
 
-/** The state a bubble over a figure's head is drawn for, one key a line of the table in
- *  `docs/mockups/t21/bubbles.html` (CLAUDE.md T21 2.6). */
-export type BubbleKey =
-  | 'waitingForMachine'
-  | 'noCutParts'
-  | 'noMaterial'
-  | 'nothingToDo'
-  | 'sweeping'
-  | 'emptyingBags'
-  | 'unloading'
-  | 'working'
-  | 'pieces'
-  | 'offToMeasure'
-  | 'inTheOffice'
-  | 'atLunch';
+/** The state a mark over a figure's head is drawn for: the four things that are wrong with a man
+ *  and that the player can put right (docs/mockups/t22/bubbles-v2.png, the red column;
+ *  CLAUDE.md T22 2.5). A man who is working, at a chore of his own, at his lunch, in the office or
+ *  out measuring has nothing wrong with him and carries no key at all
+ *  [PIOTR, 19.09: "when all is fine, no bubble; only when it is bad"]. */
+export type BubbleKey = 'waitingForMachine' | 'noCutParts' | 'noMaterial' | 'nothingToDo';
 
-/** What colour a bubble wears, which is what kind of thing it is saying: `wait` is the red border
- *  of something the player can fix, `chore` the green of a helper about his work, `work` the plain
- *  paper of a stage just begun, `away` the dashed grey of a man off the hall
- *  (CLAUDE.md T21 2.6). */
-export type BubbleTone = 'wait' | 'chore' | 'work' | 'away';
-
-/** One bubble, ready to draw: the words with every slot filled, the colour, and the figure it
- *  belongs to (CLAUDE.md T21 2.6). */
+/** One mark over a man's head, ready to draw: the words it says on hover with every slot filled,
+ *  and the figure it belongs to (CLAUDE.md T22 2.5). There is no tone on it: a mark is drawn only
+ *  when something is wrong, so every mark in the game is the red one [PIOTR, 19.09]. */
 export interface Bubble {
   /** 'owner', or a worker id. */
   who: string;
   key: BubbleKey;
-  tone: BubbleTone;
   text: string;
 }
 
