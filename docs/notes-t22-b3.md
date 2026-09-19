@@ -143,6 +143,22 @@ with it, so it was not changed tonight.
 
 ---
 
+## T22-B3c, 2.9: a machine with a pipe on it does not breathe
+
+- Already built in phase A: `fx-breathe` is gated on `hasMeasuredPort` in `src/render/hall.ts`, so
+  anything `PORTS` has a line for stands still while it runs. Nothing of the code was changed
+  tonight; what this task did was make the test say what 2.9 says.
+- `tests/render/machineFx.test.ts` now asserts both halves rather than one: a pelletiser standing in
+  the hall while the saw runs beside it **does** breathe, and it is the only group in the hall that
+  does, while the extractor beside it has a measured port and stands still. A second test walks every
+  item of the hall with a measured port and asserts none of them wears the swell.
+
+The gate is the table and not the family, which is the point: the saw, the spindle moulder and the
+edgebander never breathed (the swell was the extractor's alone since Turn 3), so the rule bites on
+the extractor today and on any family the day it gains a port line.
+
+---
+
 ## Notes for the lead: changes wanted in files or regions that are not B3's
 
 ### 1. `src/engine/index.ts` (the barrel), applied by B3 because nothing compiles without it
