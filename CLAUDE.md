@@ -15,9 +15,9 @@ session, no PR watching, npm run check gated on its own exit code, every click s
 APP_VERSION bump).
 
 Precondition. main carries Turn 21 merged and one chat fix: APP_VERSION 'v31', STATE_VERSION 18,
-the tool cabinet at 160 by 136 with a true `.r` file, and the other four cabinet classes' pictures
-(`toolCabinet.used`, `.budget`, `.pro`, `.industrial`, each with its `.r`) in `public/sprites` and
-in the manifest, waiting for 2.12; `src/engine/ports.ts` does not exist yet. If APP_VERSION is
+the tool cabinet's five classes in `public/sprites` and in the manifest, each in four pictures
+(`toolCabinet.<class>.png`, `.r.png`, `.rr.png`, `.rrr.png`: a true quarter turn each, from the
+art side's packs of 19.09), waiting for 2.11 and 2.12; `src/engine/ports.ts` does not exist yet. If APP_VERSION is
 not 'v31', stop and report.
 
 The four rules of 18.09 bind every agent: **one game, one look** (read the repo first, build with
@@ -37,7 +37,8 @@ too deep or too long, and the arrears ladder with its bailiff goes to the bin. O
 money, not two.
 
 The bubbles of Turn 21 are, in his words, a nightmare: three times too big and always on. They
-become a mark the size of a coin with an exclamation in it, and the words come on hover.
+become a mark the size of a coin with an exclamation in it, drawn only when something is wrong,
+and the words come on hover.
 
 The pipes: Piotr's screenshot of 19.09 showed GPT's nine pipe tiles not meeting each other. The
 tiles go. A run is drawn by code as one continuous path, so every joint is exact by construction,
@@ -113,18 +114,21 @@ Summary tab drop their arrears rows; nothing else on them moves. Done: the two r
 
 ### The people
 
-**2.5 The mark over the head [PIOTR; docs/mockups/t22/bubbles-v2.png].** The bubble of Turn 21's
-2.6 becomes a **14 px disc with an exclamation mark** in the title hand, 6 px over the head,
-with the same tail, moved by the walker and depth sorted as today; the border and the mark take
-the colour class of Turn 21 (red for a state the player can fix, green for a helper's chore,
-dashed grey for a man off the hall, drawn at his door). **The paper bubble of a new stage goes**
-[PIOTR: "only when I hover"]: the first three seconds show nothing, and the hover line of Turn 11
-already says the stage. **The words come on hover**: while the pointer is over the disc or the
-figure, the one line paper bubble of Turn 21, in its colour, sits above the disc, from the same
-`BUBBLES` table. Two marks over two men at one machine stand side by side, 7 px apart [TUNE],
-never on top of each other; at x10 and x30 the discs are drawn, the hover line too. Done: the
-render test of the three colours and the side by side, the hover test, and `grep -rn
-"bubble-stage\|three second" src`: nothing.
+**2.5 The mark over the head [PIOTR; docs/mockups/t22/bubbles-v2.png, the red column and the
+hover].** The bubble of Turn 21's 2.6 becomes a **14 px disc with an exclamation mark** in the
+title hand, 6 px over the head, with the same tail, moved by the walker and depth sorted as
+today, and **it is drawn only when something is wrong** [PIOTR, 19.09: "when all is fine, no
+bubble; only when it is bad"]: the red class of Turn 21 alone, a man waiting for a taken
+machine, waiting for cut parts, without sheets for his job, or standing with nothing to do. A
+man working, a helper at his chore, a man at lunch, in the office or out measuring gets **no
+mark at all**: the green and the dashed grey classes go, and so does the paper bubble of a new
+stage. **The words come on hover**: while the pointer is over the disc or the figure, the one
+line paper bubble of Turn 21, red, sits above the disc, from the `BUBBLES` table, which keeps
+only its red lines. Two marks over two men at one machine stand side by side, 7 px apart
+[TUNE], never on top of each other; at x10 and x30 the discs are drawn, the hover line too.
+Done: the render test (a red mark for each of the four states, none for a working man, a helper
+sweeping, a man at lunch or in the office; the side by side), the hover test, and `grep -rn
+"bubble-chore\|bubble-away\|bubble-stage\|three second" src`: nothing.
 
 **2.6 Nobody is moved between jobs [PIOTR].** Turn 21's 2.7 transfer (the move of a man to
 another job when his stage needs a taken machine) goes, with its tests; the man stays with his
@@ -241,11 +245,14 @@ depth at 1 and 3, `footprintOf(spec, variant, orientation)`. The picture for an 
 0 the base file; 1 the `.r` file, or the base mirrored when there is none (today's rule); 2 the
 `.rr` file; 3 the `.rrr` file. **Rotate cycles only through the orientations that have a
 picture**: every item has 0 and 1; an item with `.rr` and `.rrr` has all four [TUNE: Claude's
-rule, so that no wrong picture ever stands on the hall]. `PORTS` is keyed by file, so a `.rr`
+rule, so that no wrong picture ever stands on the hall]. The five tool cabinets are the first
+items with all four, tonight; the anchor of every orientation is the one `spriteAnchorIn` gives
+for that orientation's footprint, which is the corner the pack's `projection.json` names. `PORTS` is keyed by file, so a `.rr`
 file brings its own numbers the day it arrives. The Sprite check page lists, per family and
 class, which orientations have a file. Migration: `rotated true` becomes `orientation 1`, false
 becomes 0. Done: the tests (the cycle on an item with two pictures is 0, 1, 0; with four it is 0,
-1, 2, 3, 0; the footprint at each; a v31 save with a rotated cabinet loads at orientation 1), and
+1, 2, 3, 0, proven on the standard cabinet; the footprint at each; a v31 save with a rotated
+cabinet loads at orientation 1), and
 `grep -rn "rotated" src`: nothing but the migration.
 
 **2.12 The tool cabinet has a class ladder [PIOTR, 19.09; the pictures are in the repo].** The
@@ -315,14 +322,14 @@ T22-A2 Phase A as section 3 says.
 T22-B1a 2.1. T22-B1b 2.2. T22-B1c 2.3. T22-B1d 2.4.
 T22-B2a 2.5. T22-B2b 2.6.
 T22-B3a 2.7. T22-B3b 2.8. T22-B3c 2.9. T22-B3d 2.10. T22-B3e 2.11. T22-B3f 2.12. T22-B3g 2.13.
-T22-C1 notes. T22-C2 scenarios. T22-C3 cross check. T22-C4 look and shoot: twelve pictures into
+T22-C1 notes. T22-C2 scenarios. T22-C3 cross check. T22-C4 look and shoot: thirteen pictures into
 docs/report-t22/ (the warning line at day 12 of 30, the bankruptcy card with three figures, the
-drop card's red box with the new text, three marks of three colours over three men, the hover
-line over a mark, a run with a corner and a tee drawn as paths at 3.2 m, the standard saw with
+drop card's red box with the new text, a red mark over a waiting man beside a working man with no
+mark, the hover line over a mark, a run with a corner and a tee drawn as paths at 3.2 m, the standard saw with
 its hidden drop, the standard extractor with the elbow into its mouth, the used extractor with
 the mouth to the right, the Sprite check page with `no port data` provoked in the test and the
-orientation columns, the five cabinets in a row on the hall, the cabinet's card with its slots
-line and the two rows). T22-C5 report and PR titled `Turn 22: a bank that means it, pipes that
+orientation columns, the five cabinets in a row on the hall, the standard cabinet at all four orientations, the
+cabinet's card with its slots line and the two rows). T22-C5 report and PR titled `Turn 22: a bank that means it, pipes that
 join, a hall you can turn`, do not merge, end the session.
 
 ## 6. Do not (tonight)
@@ -352,7 +359,7 @@ join, a hall you can turn`, do not merge, end the session.
 - Every changed screen beside its nearest existing one in the report, with the differences
   listed and none outside this brief; `git diff main --stat -- src/ui/styles.css` with no new
   token beyond the four greys, the hose and the mark.
-- The twelve pictures.
+- The thirteen pictures.
 
 ## 8. Parked
 
@@ -361,7 +368,7 @@ join, a hall you can turn`, do not merge, end the session.
 - The weekly summary card: later, mockup first [PIOTR].
 - Contracts worked at every stage; the owner at a contract: as in Turn 21.
 - The extractor's `.r`, `.rr` and `.rrr` files, five classes: art (section 9). Until they land,
-  extractors turn between 0 and 1 like everything else.
+  extractors turn between 0 and 1 like everything else; the cabinets already turn four ways.
 - The 3D render test of one machine (one camera, azimuth 45, elevation 30, the model squashed in
   Z by 0.816): Piotr's decision, not this turn.
 - Three Turn 20 leftovers Piotr has not ruled on: the Efficiency chip without a cross, the

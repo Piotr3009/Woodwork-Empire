@@ -4,8 +4,10 @@ Pictures made by Claude in chat on 19.09.2026 and approved by Piotr the same day
 picture says otherwise. Every visual change of the brief builds from these and from nothing else.
 
 - `bubbles-v2.png`: the mark over the head (2.5): a 14 px disc with an exclamation, 6 px over
-  the head at 1x, the colour classes of Turn 21, the one line paper bubble only on hover. Shown at
-  3x. [PIOTR, 19.09: "a tiny bubble with an exclamation mark, the words only when I hover"]
+  the head at 1x, the one line paper bubble only on hover. Shown at 3x. Only the RED column and
+  the hover column apply: Piotr ruled later on 19.09 that a mark is drawn only when something is
+  wrong, so the green and the dashed grey marks in the picture are not built. [PIOTR, 19.09: "a
+  tiny bubble with an exclamation mark, the words only when I hover; when all is fine, no bubble"]
 - `pipes-A-one-path.png`: variant A of the pipe drawing (2.7): one continuous path per run, no
   joints, no shadow under the run, galvanised greys, the drop with the hose. Shown at 2x on the
   game's 48 by 24 grid. `pipes-A-vs-B-vs-C.png` is the comparison Piotr chose from (A wins:
