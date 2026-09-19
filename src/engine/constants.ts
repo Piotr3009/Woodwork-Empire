@@ -790,18 +790,6 @@ export const LAPTOP_BOOT_MINUTES = 5;
  *  machine disconnects it and refunds nothing; reconnecting charges the new length. This is the
  *  reconnection the Turn 4 flat ducting charge was, and it replaces it (CLAUDE.md T13 3.19). */
 export const PIPE_PRICE_PER_METRE = 45;
-/** The eight tiles a pipe run is drawn from (CLAUDE.md T13 3.19). */
-export const PIPE_TILE_KEYS = [
-  'pipe.ns',
-  'pipe.ew',
-  'pipe.ne',
-  'pipe.nw',
-  'pipe.se',
-  'pipe.sw',
-  'pipe.tee',
-  'pipe.drop',
-  'pipe.inlet',
-] as const;
 /** An automatic blast gate on a machine's drop: fitted for this much (PIOTR: 800 the kit, 1,000
  *  fitted), worth this much output on that machine (PIOTR), and the hall's extraction demand
  *  counts a gated machine only while it is actually running (CLAUDE.md T13 3.11). */
@@ -3246,9 +3234,6 @@ export const DUCT_SYSTEMS = ['dustSystem', 'flexiSystem'];
 /** The pipe as the vector helper draws it: a round duct this wide, in metres [TUNE]
  *  (CLAUDE.md T16 2.3). */
 export const PIPE_DIAMETER = 0.2;
-/** The red ring on the port of a machine with no pipe to the extraction, in pixels [TUNE], pulsing
- *  once a second (CLAUDE.md T16 2.3). */
-export const PORT_RING = 8;
 
 /** The four greys a pipe is painted in, darkest to lightest: the dark rim around the bar, the body
  *  of it, the shade along its underside and the lit edge along its top
@@ -3923,7 +3908,7 @@ export const TIPS: Record<string, string> = {
   hallCamera:
     'The wheel zooms the hall and dragging the floor moves it. Fit puts the whole workshop back in the view.',
   unconnected:
-    'A red ring is a machine with no pipe to the extraction. Open its card to connect it, or hire a production manager and it is done for you.',
+    'A machine with no pipe to the extraction says so under its name. Open its card to connect it, or hire a production manager and it is done for you.',
   catalogue:
     'Every machine family has five classes: the effects come first, then the costs, then what it is.',
   workPlan: 'One row a job. A red figure on a job is material it does not have yet.',

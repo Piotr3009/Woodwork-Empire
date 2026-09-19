@@ -9,7 +9,6 @@ import { standsInTheHall } from '../../src/engine/machines';
 import { spriteUrl } from '../../src/render/sprites';
 import { CHARACTER_ROLES, PIPE_LAYER_KEYS, renderSpriteCheck, spriteTargets } from '../../src/ui/spriteCheck';
 import { ANIMATIONS } from '../../src/render/characters';
-import { PIPE_TILE_KEYS } from '../../src/engine/constants';
 
 function parse(html: string): HTMLElement {
   const holder = document.createElement('div');
@@ -131,7 +130,7 @@ describe('the sprite check page', () => {
     // Turn 16 did not meet each other, so Turn 22 deleted them and draws a run as one path
     // instead: the page shows the vector drawing, which is the only drawing there is now
     // (PIOTR's screenshot, 19.09; CLAUDE.md T22 2.7). Only `gate.collar` is still a file.
-    expect([...PIPE_LAYER_KEYS]).toEqual([...PIPE_TILE_KEYS, 'gate.collar']);
+    expect([...PIPE_LAYER_KEYS]).toEqual(['gate.collar']);
     const page = parse(renderSpriteCheck());
     expect(page.innerHTML).toContain('The pipe layer');
     const cells = Array.from(page.querySelectorAll('[data-pipe-key]'));

@@ -33,14 +33,7 @@ import {
   sawdustPiles,
   serviceIsDue,
 } from '../engine/machines';
-import {
-  footprintOrigin,
-  isConnected,
-  pipeRunFor,
-  portCell,
-  tileKeysFor,
-  wantsExtraction,
-} from '../engine/pipes';
+import { footprintOrigin, isConnected, portCell, wantsExtraction } from '../engine/pipes';
 import { jobsAtGate, waitingLine } from '../engine/jobs';
 import { orderName, reservedItems, shoppingList } from '../engine/orders';
 import {
@@ -80,7 +73,17 @@ import {
   stationSecondAt,
   stationWaitingFor,
 } from '../engine/stations';
-import { gateCollarArt, pipeTile, portRing } from './pipes';
+import {
+  ELBOW_RISE,
+  HOSE_DROP,
+  INLET_STANDOFF,
+  elbowArt,
+  gateCollarArt,
+  hoseArt,
+  runAbove,
+  runArt,
+  verticalArt,
+} from './pipes';
 import { ownerIsAvailable } from '../engine/owner';
 import { homeCellOf } from '../engine/staff';
 import { plural } from '../engine/text';
@@ -94,11 +97,13 @@ import type {
   GameState,
   OnOrderItem,
   Orientation,
+  PipeTile,
 } from '../engine/types';
 import {
   type BoxFaces,
   type Point,
   type Polygon,
+  TILE_HEIGHT,
   TILE_RISE,
   TILE_WIDTH,
   blockSilhouette,
@@ -135,7 +140,7 @@ import { jobStage } from '../engine/jobs';
 import { cleanerAtWork, manOnOpenTask } from '../engine/tasks';
 import type { StageId } from '../engine/types';
 import { figureIsThroughADoor, takeDoorGoings } from './doors';
-import { pictureFor, portFor } from '../engine/ports';
+import { type Port, pictureFor, portFor } from '../engine/ports';
 import { bubbleIsFresh, bubbleNowMs } from './bubbles';
 import { bubblesFor } from '../engine/bubbles';
 
@@ -729,41 +734,42 @@ export function footprintIn(item: Equipment): {
 }
 
 // ---------------------------------------------------------------------------
-// The pipe layer (CLAUDE.md T13 3.11, 3.19): the runs the game routed and the gate collars on
-// their drops, drawn above the equipment at the height of the ducting. It occupies no cell and
-// blocks nothing under it.
+// The pipe layer (CLAUDE.md T13 3.11, 3.19, T22 2.7 and 2.8): one continuous path for every run,
+// the vertical of every drop and every inlet on the pixel `PORTS` measured for it, and the gate
+// collars on the drops. It is drawn above the equipment at the height of the ducting; it occupies
+// no cell and blocks nothing under it.
+//
+// The nine `pipe.*.png` tiles are gone and with them the per cell sprite lookup that placed them:
+// a run is drawn, never tiled (PIOTR's screenshot, 19.09). What is left of the old lookup is the
+// gate's collar, which is a real delivered file.
 // ---------------------------------------------------------------------------
-
-/** One cell of the pipe layer: the delivered picture where the art side has painted the key,
- *  placed by the cell's anchor at the ducting's height, and the vector helper's own drawing of
- *  that kind where it has not (CLAUDE.md T16 2.3). Nothing green, nothing placeholder. */
-export function pipeCellArt(
-  kind: string,
-  cell: { x: number; y: number },
-  files: readonly string[],
-  scale = 1,
-  landsAt = 0,
-): string {
-  const url = pickSprite(files, kind);
-  if (url !== null) {
-    const width = TILE_WIDTH * scale;
-    // A tile is three thirds tall: the diamond is the middle third, so a cell wide picture is a
-    // cell and a half high and its diamond is exactly a cell (docs/art/SPRITES.md 1).
-    const height = width * 1.5;
-    const centre = centreOf(cell.x, cell.y, 1, 1, DUCT_HEIGHT);
-    return spriteImage(url, { x: centre.x - width / 2, y: centre.y - height / 2, width, height });
-  }
-  return kind === 'gate.collar' ? gateCollarArt(cell) : pipeTile(kind, cell, landsAt);
-}
 
 /** How much smaller than a cell the collar is drawn [TUNE]. */
 const GATE_COLLAR_SCALE = 0.5;
+
+/** The gate's collar on a cell: the delivered picture where the art side has painted it, placed by
+ *  the cell's anchor at the ducting's height, and the vector ring where it has not. The one key of
+ *  the pipe layer that is still a file (docs/art/REQUESTS-T13.md 2). */
+export function gateCollarCellArt(
+  cell: { x: number; y: number },
+  files: readonly string[],
+  scale = 1,
+): string {
+  const url = pickSprite(files, 'gate.collar');
+  if (url === null) return gateCollarArt(cell);
+  const width = TILE_WIDTH * scale;
+  // A tile is three thirds tall: the diamond is the middle third, so a cell wide picture is a cell
+  // and a half high and its diamond is exactly a cell (docs/art/SPRITES.md 1).
+  const height = width * 1.5;
+  const centre = centreOf(cell.x, cell.y, 1, 1, DUCT_HEIGHT);
+  return spriteImage(url, { x: centre.x - width / 2, y: centre.y - height / 2, width, height });
+}
 
 /** The automatic gate on a machine's drop: a short collar on the drop cell (CLAUDE.md T13 3.11). */
 export function gateCollar(item: Equipment, files: readonly string[]): string {
   return (
     `<g class="gate-collar" data-gate="${item.id}">` +
-    pipeCellArt('gate.collar', portCell(item), files, GATE_COLLAR_SCALE) +
+    gateCollarCellArt(portCell(item), files, GATE_COLLAR_SCALE) +
     '</g>'
   );
 }
@@ -782,31 +788,119 @@ export function gateCollars(state: GameState, files: readonly string[]): string 
     .join('');
 }
 
-/** One run of pipe, tile by tile in the order it was routed, as a group the page can find by
- *  the machine it serves. A connected machine that the air rule says is not pulled hard enough
- *  wears a thin red outline on its run (CLAUDE.md T13 3.19): the hall is short this minute and
- *  this machine is one of the ones running in it. */
+/** A measured connection point placed on the screen: the pixel `PORTS` names for the picture this
+ *  thing is really drawn with, put where the picture puts it (CLAUDE.md T22 2.8).
+ *
+ *  The arithmetic is the renderer's own and not a second copy of it: `spriteBox` places the
+ *  picture, `SPRITE_SCALE` halves the 2x file, and a mirrored picture is reflected about its
+ *  anchor exactly as `objectArt` reflects it. A vertical in the world is a vertical on the screen,
+ *  so the screen x of this point is all the drop needs to hang itself from the run.
+ *
+ *  `faces` is swapped on the mirrored path, because a mirror about the vertical screen axis
+ *  exchanges the two world axes: a mouth that opened down right opens down left. The pixel is
+ *  taken from the renderer's transform rather than from `mirroredPort`, whose `fileWidth - px` is
+ *  the reflection of the file about its own middle and so agrees with the hall only where the
+ *  footprint is square (docs/notes-t22-b3.md, 2.8). */
+export function portPointOf(
+  item: Equipment,
+  files: readonly string[],
+): { at: Point; port: Port } | null {
+  const picture = pictureFor(files, item.spriteKey, item.variantId, item.orientation);
+  const port = portFor(picture.file);
+  if (port === null) return null;
+  const stands = footprintIn(item);
+  const box = spriteBox(stands.x, stands.y, stands.width, stands.depth, stands.height);
+  const at = { x: box.x + port.px / SPRITE_SCALE, y: box.y + port.py / SPRITE_SCALE };
+  if (!picture.mirrored) return { at, port };
+  const anchor = tileToScreen(stands.x + stands.width, stands.y + stands.depth);
+  return {
+    at: { x: anchor.x * 2 - at.x, y: at.y },
+    port: {
+      ...port,
+      faces: port.faces === undefined ? undefined : port.faces === '+x' ? '+y' : '+x',
+    },
+  };
+}
+
+/** Where a drop lands when the picture has no measured line: the centre of the port cell at the
+ *  machine's own height, which is the rule the game had before tonight, and no hose with it
+ *  (CLAUDE.md T13 3.19, T22 2.8). */
+function unmeasuredPort(item: Equipment): Point {
+  const stands = footprintIn(item);
+  const cell = portCell(item);
+  return tileToScreen(cell.x + 0.5, cell.y + 0.5, stands.height);
+}
+
+/** A machine's drop: the vertical down from the run at the port's own screen x, and either nothing
+ *  else (a hidden port: the body of the picture covers what would be below, PIOTR's pick B for the
+ *  saw) or a flexible hose from its foot into a visible port (CLAUDE.md T22 2.8). */
+export function dropArt(
+  item: Equipment,
+  cells: ReadonlyArray<{ x: number; y: number }>,
+  files: readonly string[],
+): string {
+  const measured = portPointOf(item, files);
+  const at = measured === null ? unmeasuredPort(item) : measured.at;
+  const top = runAbove(cells, at.x);
+  const hidden = measured === null || measured.port.hidden === true;
+  if (hidden) return verticalArt(top, at, 'drop');
+  const foot = { x: at.x, y: at.y - HOSE_DROP * TILE_RISE };
+  return verticalArt(top, foot, 'drop') + hoseArt(foot, at);
+}
+
+/** An extractor's inlet, Piotr's variant C: the vertical stands a quarter metre in front of the
+ *  mouth, comes down from the run to the mouth's own height, and an elbow turns it into the mouth
+ *  and ends on the measured pixel (docs/mockups/t22/extractor-inlet-C.png; CLAUDE.md T22 2.8). A
+ *  unit with no measured line has no inlet drawn: the run ends over its port cell, which is the
+ *  rule the game had before tonight. */
+export function inletArt(
+  item: Equipment,
+  cells: ReadonlyArray<{ x: number; y: number }>,
+  files: readonly string[],
+): string {
+  const measured = portPointOf(item, files);
+  if (measured === null || measured.port.faces === undefined) return '';
+  const mouth = measured.at;
+  // A quarter metre along the way the mouth opens: down and to the right for `+x`, down and to the
+  // left for `+y`, which is what a metre of either world axis looks like on a 2 to 1 dimetric.
+  const along = measured.port.faces === '+x' ? INLET_STANDOFF : -INLET_STANDOFF;
+  const corner = {
+    x: mouth.x + along * (TILE_WIDTH / 2),
+    y: mouth.y + INLET_STANDOFF * (TILE_HEIGHT / 2),
+  };
+  const elbow = { x: corner.x, y: corner.y - ELBOW_RISE * TILE_RISE };
+  return verticalArt(runAbove(cells, corner.x), elbow, 'inlet') + elbowArt(elbow, corner, mouth);
+}
+
+/** One run of pipe: the one path over the floor, the drop onto the machine it serves and the inlet
+ *  into the unit it goes to, all of them in one group the page can find by the machine
+ *  (CLAUDE.md T22 2.7). A connected machine that the air rule says is not pulled hard enough wears
+ *  a thin red outline on its run (CLAUDE.md T13 3.19): the hall is short this minute and this
+ *  machine is one of the ones running in it. */
 export function pipeRunArt(
   state: GameState,
-  run: { id: string; equipmentId: string; tiles: ReadonlyArray<{ x: number; y: number; key: string }> },
+  run: { id: string; equipmentId: string; extractorId: string; tiles: ReadonlyArray<PipeTile> },
   files: readonly string[],
   short: boolean,
 ): string {
   const machine = state.equipment.find((item) => item.id === run.equipmentId);
   const running = machine !== undefined && machine.takenBy !== null;
-  // The drop lands on the machine's own top face, where its port is, and not on the floor of the
-  // cell it stands on (PIOTR, 16.09; CLAUDE.md T17 2.7).
-  const lands = machine === undefined ? 0 : footprintIn(machine).height;
-  const tiles = run.tiles
-    .map((tile) => pipeCellArt(tile.key, tile, files, 1, tile.key === 'pipe.drop' ? lands : 0))
-    .join('');
+  const cells = run.tiles.map((tile) => ({ x: tile.x, y: tile.y }));
+  const endsAtTheUnit = run.tiles[run.tiles.length - 1]?.key !== 'pipe.tee';
+  const unit = state.equipment.find((item) => item.id === run.extractorId);
+  const inlet = endsAtTheUnit && unit !== undefined ? inletArt(unit, cells, files) : '';
   return (
     `<g class="pipe${short && running ? ' pipe-short' : ''}" data-pipe="${escapeText(run.id)}" ` +
-    `data-pipe-for="${escapeText(run.equipmentId)}">${tiles}</g>`
+    `data-pipe-for="${escapeText(run.equipmentId)}">` +
+    runArt(cells) +
+    (machine === undefined ? '' : dropArt(machine, cells, files)) +
+    inlet +
+    '</g>'
   );
 }
 
-/** Every run over the floor, in the order they were routed. */
+/** Every run over the floor, in the order they were routed, so a branch is drawn over the run it
+ *  tees onto (CLAUDE.md T22 2.7). */
 export function pipeRuns(state: GameState, files: readonly string[]): string {
   const short = extractionCheck(state).short;
   return state.pipes.map((run) => pipeRunArt(state, run, files, short)).join('');
@@ -823,52 +917,38 @@ function machinesWantingExtraction(state: GameState): Equipment[] {
   );
 }
 
-/** What a central system draws: one run along the rear wall at the pipes' height, the width of
- *  the hall, and a run up from every machine's port to it ending in a tee, so every machine is
- *  seen to be connected (CLAUDE.md T16 2.3). Drawn by the same helper as every routed run. */
+/** What a central system draws: one path along the rear wall at the pipes' height, the width of
+ *  the hall, and a branch up from every machine's port to it, so every machine is seen to be
+ *  connected (CLAUDE.md T16 2.3). The same path and the same drop as a routed run. */
 export function centralRunArt(state: GameState, files: readonly string[]): string {
   const system = ductSystemOf(state);
   if (system === null) return '';
-  const tiles: string[] = [];
-  for (let x = 0; x < state.unit.widthCells; x += 1) {
-    tiles.push(pipeCellArt('pipe.ew', { x, y: 0 }, files));
-  }
+  const wall: Array<{ x: number; y: number }> = [];
+  for (let x = 0; x < state.unit.widthCells; x += 1) wall.push({ x, y: 0 });
   const drops: string[] = [];
   for (const item of machinesWantingExtraction(state)) {
     const port = portCell(item);
     const cells: Array<{ x: number; y: number }> = [];
     for (let y = port.y; y >= 0; y -= 1) cells.push({ x: port.x, y });
-    // The port is the drop, the wall the tee, and every cell between a straight length: the
-    // same key rule the routed runs use (src/engine/pipes.ts).
-    const keyed = cells.length === 1 ? [{ x: port.x, y: port.y, key: 'pipe.drop' }] : tileKeysFor(cells, 'tee');
-    const lands = footprintIn(item).height;
     drops.push(
       `<g class="pipe central-drop" data-central-for="${escapeText(item.id)}">` +
-        keyed
-          .map((tile) => pipeCellArt(tile.key, tile, files, 1, tile.key === 'pipe.drop' ? lands : 0))
-          .join('') +
+        runArt(cells) +
+        dropArt(item, cells, files) +
         '</g>',
     );
   }
-  return `<g class="pipe central-run" data-ducts="${system}">${tiles.join('')}</g>${drops.join('')}`;
+  return (
+    `<g class="pipe central-run" data-ducts="${system}">${runArt(wall)}</g>${drops.join('')}`
+  );
 }
 
-/** The red ring on the port of every machine that wants a pipe and has none, and no central
- *  system to make one unnecessary (CLAUDE.md T16 2.3). */
-export function portRings(state: GameState): string {
-  if (ductSystemOf(state) !== null) return '';
-  return machinesWantingExtraction(state)
-    .filter((item) => pipeRunFor(state, item.id) === null)
-    .map((item) => portRing(portCell(item), item.id))
-    .join('');
-}
-
-/** The whole layer: the central system's run where there is one, the runs the game routed, the
- *  collars over their drops, and the red ring on every port without a pipe. */
+/** The whole layer: the central system's run where there is one, the runs the game routed and the
+ *  collars over their drops. The pulsing red ring of Turn 16 is gone with the tiles [PIOTR, 19.09]:
+ *  a machine with no pipe says so under its name and wears no disc (CLAUDE.md T22 2.8). */
 export function pipeLayer(state: GameState, files: readonly string[]): string {
   return (
     `<g class="pipe-layer">${centralRunArt(state, files)}${pipeRuns(state, files)}` +
-    `${gateCollars(state, files)}${portRings(state)}</g>`
+    `${gateCollars(state, files)}</g>`
   );
 }
 

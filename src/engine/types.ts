@@ -965,16 +965,13 @@ export interface Contract {
 
 /** One tile of pipe over the floor. It occupies no cell and blocks nothing under it
  *  (CLAUDE.md T13 3.19). */
-export type PipeTileKey =
-  | 'pipe.ns'
-  | 'pipe.ew'
-  | 'pipe.ne'
-  | 'pipe.nw'
-  | 'pipe.se'
-  | 'pipe.sw'
-  | 'pipe.tee'
-  | 'pipe.drop'
-  | 'pipe.inlet';
+/** What one cell of a run is. A run is drawn as one continuous path from Turn 22, so a cell no
+ *  longer carries the direction of the pipe over it: the seven drawn tiles of Turn 13 (`ns`, `ew`,
+ *  the four elbows and the tee) are gone with the nine pictures that never met each other
+ *  (PIOTR's screenshot, 19.09; CLAUDE.md T22 2.7). What a run still has to know is its cells and
+ *  the two ends of itself, which is all that is left here: the drop onto the machine, the plain
+ *  cells between, and the inlet into the unit or the tee onto another run. */
+export type PipeTileKey = 'pipe.drop' | 'pipe.run' | 'pipe.inlet' | 'pipe.tee';
 
 export interface PipeTile {
   x: number;

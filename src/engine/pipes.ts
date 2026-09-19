@@ -13,6 +13,7 @@
 
 import { PIPE_PRICE_PER_METRE } from './constants';
 import { canAfford, charge } from './economy';
+import { cellIsFloor } from './layout';
 import { extractionCapacityOf, extractionDemandOf } from './media';
 import {
   findSpec,
@@ -25,12 +26,17 @@ import {
 } from './machines';
 import { deliveredFiles, portCellIn } from './ports';
 import { makeId } from './rng';
-import type { Equipment, GameState, Orientation, PipeRun, PipeTile, PipeTileKey } from './types';
+import type { Equipment, GameState, Orientation, PipeRun, PipeTile } from './types';
 
 export interface PipeCheck {
   ok: boolean;
   reason: string;
 }
+
+/** What Connect says when the mouth of the nearest unit faces a wall: there is no cell in front of
+ *  it for the inlet's vertical to come down in, and the player is told which two things put it
+ *  right (CLAUDE.md T22 2.8). */
+export const INLET_BLOCKED = 'No room in front of the extractor\u0027s inlet: turn it or move it';
 
 export interface Cell {
   x: number;
@@ -160,37 +166,22 @@ export function pathBetween(from: Cell, to: Cell): Cell[] {
   return cells;
 }
 
-/** Which way a neighbour lies from a cell: north is world minus y, east is world plus x
- *  (docs/art/SPRITES.md 1). */
-function armTo(cell: Cell, neighbour: Cell): 'n' | 's' | 'e' | 'w' {
-  if (neighbour.y < cell.y) return 'n';
-  if (neighbour.y > cell.y) return 's';
-  return neighbour.x > cell.x ? 'e' : 'w';
-}
-
-/** The tile a cell of a run is drawn with, from the arms it has (CLAUDE.md T13 3.19): the first
- *  cell is the drop to the machine, the last the inlet into the unit or the tee onto another run,
- *  and every cell between is straight or an elbow named by its two arms, the north or south arm
- *  first. */
+/** The cells of a run and its two ends (CLAUDE.md T13 3.19, T22 2.7): the first cell is the drop
+ *  onto the machine, the last the inlet into the unit or the tee onto another run, and every cell
+ *  between is a plain cell of the run.
+ *
+ *  It named an elbow or a straight for each of those middle cells until tonight, because each was
+ *  drawn as a picture of its own. A run is one path now and the path works its own corners out from
+ *  the cells, so the direction of the pipe over a cell is no longer anybody's business: what is
+ *  kept is the cells in order and which end is which, which is what the routing, the tee and
+ *  `removeRun` all read. */
 export function tileKeysFor(cells: readonly Cell[], end: 'inlet' | 'tee'): PipeTile[] {
   return cells.map((cell, index): PipeTile => {
     if (index === 0) return { x: cell.x, y: cell.y, key: 'pipe.drop' };
     if (index === cells.length - 1) {
       return { x: cell.x, y: cell.y, key: end === 'tee' ? 'pipe.tee' : 'pipe.inlet' };
     }
-    const before = cells[index - 1];
-    const after = cells[index + 1];
-    if (before === undefined || after === undefined) {
-      return { x: cell.x, y: cell.y, key: 'pipe.ns' };
-    }
-    const arms = [armTo(cell, before), armTo(cell, after)];
-    const vertical = arms.find((arm) => arm === 'n' || arm === 's');
-    const horizontal = arms.find((arm) => arm === 'e' || arm === 'w');
-    let key: PipeTileKey;
-    if (vertical === undefined) key = 'pipe.ew';
-    else if (horizontal === undefined) key = 'pipe.ns';
-    else key = `pipe.${vertical}${horizontal}` as PipeTileKey;
-    return { x: cell.x, y: cell.y, key };
+    return { x: cell.x, y: cell.y, key: 'pipe.run' };
   });
 }
 
@@ -282,6 +273,12 @@ export function connectCheck(state: GameState, equipmentId: string): PipeCheck &
   if (pipeRunFor(state, item.id) !== null) return { ok: false, reason: 'Connected already', cost: 0 };
   const target = nearestTarget(state, item);
   if (target === null) return { ok: false, reason: 'No extractor in the hall', cost: 0 };
+  // The inlet's vertical stands in the cell in front of the unit's mouth, and there has to be a
+  // cell there: a fan pushed against a wall with its mouth to it has nowhere for the pipe to come
+  // down (PIOTR's variant C; CLAUDE.md T22 2.8).
+  if (!cellIsFloor(state, portCell(target))) {
+    return { ok: false, reason: INLET_BLOCKED, cost: 0 };
+  }
   const cost = pipeCostFor(state, routePipe(state, item, target));
   if (!canAfford(state, cost)) return { ok: false, reason: 'Not enough cash', cost };
   return { ok: true, reason: '', cost };

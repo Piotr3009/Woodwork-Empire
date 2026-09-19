@@ -3313,7 +3313,10 @@ input.num {
    element, because one path is stroked five times and a stylesheet cannot tell the fourth stroke
    from the second; what is left here is the shape of the line and the red a starved run wears,
    which is a rule and so beats the attribute. */
-.pipe-bar {
+.pipe-rim,
+.pipe-bar,
+.pipe-shade,
+.pipe-hose {
   stroke-linecap: round;
 }
 .pipe-edge {
@@ -3321,41 +3324,22 @@ input.num {
   stroke-linecap: round;
   opacity: 0.85;
 }
-.pipe-joint {
-  stroke: none;
+/* The specular line: the lit grey again, thinner and at full strength, so it reads as the bright
+   core of the lit edge rather than a sixth colour (CLAUDE.md T22 2.7). */
+.pipe-spec {
+  stroke-linecap: round;
 }
-.pipe-port,
 .pipe-collar {
   fill: none;
 }
-.pipe-short .pipe-bar {
+.pipe-short .pipe-bar,
+.pipe-short .pipe-rim,
+.pipe-short .pipe-shade {
   stroke: var(--bad);
-}
-.pipe-short image {
-  filter: drop-shadow(0 0 1px var(--bad)) drop-shadow(0 0 1px var(--bad));
 }
 
-/* A machine with no pipe to the extraction: a red ring on its port, pulsing once a second on the
-   stylesheet alone, and the words under its name (CLAUDE.md T16 2.3). */
-@keyframes port-pulse {
-  0% {
-    opacity: 0.35;
-    r: 6px;
-  }
-  50% {
-    opacity: 1;
-  }
-  100% {
-    opacity: 0.35;
-    r: 6px;
-  }
-}
-.port-ring circle {
-  fill: none;
-  stroke: var(--bad);
-  stroke-width: 2.5;
-  animation: port-pulse 1s ease-in-out infinite;
-}
+/* A machine with no pipe to the extraction says so under its name, and wears nothing else: the
+   pulsing red ring of Turn 16 went with the nine tiles [PIOTR, 19.09] (CLAUDE.md T22 2.8). */
 .not-connected {
   fill: var(--bad);
   font-weight: 700;
