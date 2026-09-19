@@ -3853,18 +3853,18 @@ input.num {
 
 /* The pages behind the tiles inherit the screen and nothing else: flat white cards and rows on
    the cool background, the buttons and chips of the software, no cream anywhere. */
-/* The bar of a life on a laptop page: the track is the screen's own line and not the dark
-   palette's border (CLAUDE.md T20 2.9). */
-.modal-screen .contract-track {
-  background: var(--screen-line);
-}
-
 .modal-screen .row {
   border-bottom: 1px solid var(--screen-line);
 }
 
 .modal-screen .row.is-running {
   background: #fff;
+}
+
+/* The bar of a life on a laptop page: the track is the screen's own line and not the dark
+   palette's border (CLAUDE.md T20 2.9). */
+.modal-screen .contract-track {
+  background: var(--screen-line);
 }
 
 .modal-screen .row.is-done,

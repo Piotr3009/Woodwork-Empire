@@ -85,8 +85,14 @@ frozen file, note 1.1 of `NOTES-B1.md`. Two are put in front of Piotr below.
    sheets, and a sheet is £200. The card therefore prints a margin of +£100 a piece on a piece
    that empties the rack three and a half times faster than that. The other two pieces agree with
    themselves (30 against 0.15 of a sheet, 26 against 0.13). One number settles it: the wardrobe
-   front's `sheets` at 0.3. It is not moved tonight because it is Piotr's own figure and the
-   brief says the sheets stay. Note 1.5 of `NOTES-B1.md` has the exact change and the test.
+   front's `sheets` at 0.3, and **T20-C1 moved it**, tagged [TUNE] with its reason beside the
+   table: everything else in 2.2 (the material of 60, the stated margin of 100 a piece, the band of
+   22 to 30) and the whole purpose of 2.1 need the table to agree with itself, and a tab built to
+   tell the player whether a contract pays would otherwise have reported the opposite sign on one
+   of the three pieces. It **deviates from the letter** of 2.2's "sheets per piece stays what it
+   is", and that is the deviation of this turn Piotr most needs to rule on: the other way of
+   settling it, keeping 1.1 and moving the material and the price together, is his to take.
+   Note 1.5 of `NOTES-B1.md` has the change and the test.
 2. **A contract piece is worked at its first stage only.** The engine, the card and the machine
    tip all read `piece.stages[0]`, so the wardrobe front is a cutting job: a CNC or a saw shortens
    it and a spray booth buys nothing on it, against the sentence of 2.2. The engine and the card
@@ -227,6 +233,12 @@ the tests it moves. What B3 could build is the half the note stands on:
 from that same count, so the dirt the player sees and the dirt the helper is asked about are one
 figure and cannot drift apart again. The note was applied to a scratch copy and the whole suite
 run against it: exit 0, and two test files move, both written out in the note.
+
+**The note landed in T20-C1**, which is why the paragraph above reads as B3 left it and the game
+does not: `runHelperClean` asks `hallLooksDirty(state.dust)` now, and
+`tests/engine/helperDirtyHall.test.ts` is flipped with it, so the broom is in the helper's hands at
+10:01 and the hall is clean when the men go home. Scenario (dd) plays the whole day out, and the
+cross check of section 7 quotes it.
 
 **The bags.** 2.8.1 asks for `bagChange` to gain the helper as an autoRole. There is no
 `bagChange`: the kind is `emptyBags` and it has carried `autoRoles: ['helper']` since Turn 12,
@@ -398,3 +410,222 @@ in front of Piotr: a new `data-popover` with no line in the table fails the cens
 no cross fails the walk, and a new floating layer in the stylesheet fails until it is either given
 the cross or written down with its reason. All three were checked by breaking them on purpose and
 watching the test go red.
+
+---
+
+## Cross check (section 7)
+
+**T20-C4.** Every line of section 7, with the command that answered it and what came back. Nothing
+here is a summary of a test: it is the test's own output, run on the branch as it stands.
+
+**The base of the diff is `d35e9b5`, not `main`.** Local `main` and `origin/main` are the same
+stale two commit branch (`276f494 Create CLAUDE.md`, `d7b8084 Initial commit`): no source on it at
+all. The v28 the brief means, the precondition this turn opened on, is `d35e9b5`, which carries
+`STATE_VERSION = 16` and `APP_VERSION = 'v28'`. Every diff of this cross check is against it, and
+section 7's last line was read that way.
+
+### 1. The three margins an hour by hand, between 22 and 30
+
+`npx vitest run tests/engine/contractPrices.test.ts` (4 passed):
+
+```
+MARGIN AN HOUR BY HAND
+Cut sheet pack: 45 min by hand, £50 a piece, £30 of material, £20 of margin, £26.67 an hour
+Drawer box: 60 min by hand, £52 a piece, £26 of material, £26 of margin, £26 an hour
+Wardrobe front: 240 min by hand, £160 a piece, £60 of material, £100 of margin, £25 an hour
+```
+
+£26.67, £26 and £25: the three of them inside the band, and the test asserts each figure as well as
+the band, so a price that moves has to move the test with it. The same file prints what a piece
+draws off the rack, which is the pair the wardrobe front used to break:
+
+```
+WHAT A PIECE DRAWS OFF THE RACK
+Cut sheet pack: 0.15 of a sheet, £30 of stock, costed at £30
+Drawer box: 0.13 of a sheet, £26 of stock, costed at £26
+Wardrobe front: 0.3 of a sheet, £60 of stock, costed at £60
+```
+
+The wardrobe front's 0.3 is T20-C1's change and **the deviation of this turn that is Piotr's to
+rule on**: it deviates from the letter of 2.2's "sheets per piece stays what it is" so that the
+piece table agrees with itself. The B1 section above has it in full.
+
+### 2. A contract month with an experienced joiner ends in profit after his wages
+
+The brief's line says "a normal joiner"; since 2.5 that tier is called **experienced**, and the
+scenario is named for it. `npx vitest run tests/scenarios/turn20.test.ts` (11 passed), scenario
+(cc):
+
+```
+(cc) A CONTRACT MONTH WITH AN EXPERIENCED JOINER
+piece: Cut sheet pack at £50, 40 a week over 4 weeks
+the man: Liam, experienced, £600 a week
+pieces made 198, revenue £9,900, material £5,940, his wages £2,400
+PROFIT AFTER HIS WAGES £1,560
+the closing report's own margin £1,567 over 159.5 hours at the bench
+```
+
+Asserted, not printed only: `expect(profit).toBe(1560)` and `expect(profit).toBeGreaterThan(0)`,
+with the four Fridays counted one by one (`expect(wages.fridays).toHaveLength(TERM_WEEKS)`, and
+TERM_WEEKS is 4) so the wage side
+is the payroll's own and not a multiplication.
+
+### 3. `grep -rn "poor\|'normal'\|'super'" src`
+
+```
+src/engine/constants.ts:80: *  Bumped in Turn 20: the four tiers are named again and nobody is "poor"; every man is paid by
+src/engine/constants.ts:3219:/** The four tiers, in the order a man climbs them. Nobody is "poor" any more: Piotr would not
+src/engine/constants.ts:3220: *  have the word in his workshop, and a man with no experience is not a poor man (PIOTR, 18.09;
+src/engine/migrate.ts:277:  poor: 'novice',
+src/engine/types.ts:129: *  TIER_WORDS and never here: nobody in Piotr's workshop is called poor (PIOTR, 18.09;
+src/engine/types.ts:130: *  CLAUDE.md T20 2.5). A v28 save's poor, normal and super are lifted to the first three. */
+```
+
+One line of code, `migrate.ts:277`, the old id mapped to the new one. The other five are comments:
+the two at `constants.ts:3219` and `3220` are the tier words table's own, and the three others say
+in prose why the word is gone. Nothing reads an old id. The stricter grep,
+`grep -rn "'poor'\|\"poor\"\|'normal'\|\"normal\"\|'super'\|\"super\"" src`, returns only the two
+comment lines that carry the word in quotation marks, so no old id survives as a literal anywhere
+in the game.
+
+### 4. `grep -rn "monthlyWage" src`
+
+```
+src/ui/team.ts:46:  monthlyWageOf,
+src/ui/team.ts:148:  return `${money(weeklyWage)} a week (about ${money(monthlyWageOf({ weeklyWage }))} a month)`;
+src/engine/staff.ts:169:export function monthlyWageOf(pay: { weeklyWage: number }): number {
+src/engine/staff.ts:394:    } else if (state.cash < monthlyWageOf(spec)) {
+src/engine/staff.ts:399:      blockReason = `Not enough in the bank: needs ${formatMoney(monthlyWageOf(spec))}`;
+src/engine/migrate.ts:309:    const monthly = typeof worker.monthlyWage === 'number' ? worker.monthlyWage : 0;
+src/engine/migrate.ts:311:    delete worker.monthlyWage;
+src/engine/types.ts:405:   *  CLAUDE.md T20 2.6). What a month of him costs is `monthlyWageOf`. */
+```
+
+The **field** is gone: `grep -rn "monthlyWage" src | grep -v "monthlyWageOf"` returns the two
+migration lines and nothing else, and both of them are the migration deleting it. Everything else
+is `monthlyWageOf`, the function 2.6 asks for: the one place a week is turned into a month, for the
+hiring gate and for the line the hire card prints. The substring is the same, the field is not.
+
+### 5. The helper's day: a dirty hall at 10:00 with a delivery in the yard
+
+`npx vitest run tests/scenarios/turn20.test.ts`, scenario (dd):
+
+```
+(dd) THE HELPER S DIRTY HALL DAY
+bags at the brim at 08:55, in his hands at 09:15; dirtied to 75 at 10:00, broom in hand at 10:01
+dust at the end of the day 4.799999999999986, band "clean"
+bags 0.09775 of 1 m3
+Callum did: Unload 60 sheets, Unload the delivery: 2 machines, Weekly clean, Weekly clean, Weekly clean, Weekly clean, Weekly clean, Sweep the hall, Unload 12 sheets, Empty the bags (1 bag, 15 min), Sweep the hall
+chips that asked the owner: 0, minutes of it in the owner's hands: 0
+```
+
+Clean at the end of the day, the bags emptied by him, the owner never asked: no chip with a button
+and no minute of it in his hands. **The diagnosis names the cause that was found**, and it is cause
+(c) of the brief's four, the dust band: the floor paints its first pile of sawdust at 5 points of
+dust (`sawdust()` in `src/render/hall.ts`) and `runHelperClean` used to wait for the messy band,
+which starts past 40, so between the two there was dirt on the floor and no cleaning task for
+anybody to take. The fix is `hallLooksDirty(state.dust)` in `runHelperClean`
+(`src/engine/game.ts`), landed in T20-C1, and `tests/engine/helperDirtyHall.test.ts` (3 passed)
+holds the two figures to one count so they cannot drift apart again.
+
+### 6. The bespoke job: one order, one unload, no shortfall
+
+`npx vitest run tests/scenarios/turn20.test.ts`, scenario (ee):
+
+```
+(ee) THE FIFTY THOUSAND POUND BESPOKE JOB
+sheets the job wants 115, places on the rack 50
+orders 1, unloads 1, unloaded on day 12
+the minute the lorry was empty: 50 on the rack, 65 on its pallet, shortfall 0, written off in the yard 0
+```
+
+One order, one unload, shortfall 0, and the 65 sheets the rack had no room for are on the job's own
+pallet rather than lost in the yard.
+
+### 7. `grep -rn "from '../ui/sound'" src/render`
+
+Nothing, exit status 1. The wider `grep -rn "ui/sound\|from '.*sound'" src/render` returns four
+lines, all of them comments (`src/render/doors.ts:11`, `src/render/hall.ts:126`, `1967` and `2062`)
+saying that the render layer reports the event and the ui layer plays it. No import, no call.
+
+### 8. The popover test, and the list it prints
+
+`npx vitest run tests/ui/popovers.test.ts` (16 passed):
+
+```
+The popovers of the game, 5 of them, each with the one cross:
+  modal            src/ui/modal.ts        closeModal   the one modal shell, worn by all 11 modals
+  assign-job       src/ui/jobCard.ts      closeAssign  who goes on this job, off the Work Plan job card
+  assign-contract  src/ui/contracts.ts    closeAssign  who goes on this contract, off Running on the Contracts tab
+  menu             src/ui/topbar.ts       closeMenu    the Menu, off the top bar
+  why              src/ui/app.ts          closeWhy     the real life note, off an "i" link
+Escape shuts them topmost first: assign list, why, day summary, modal, menu
+Floating over the page but not popovers, with the reason:
+  .modal-layer             the layer the modal shells live on, not a thing in itself
+  .modal-close             the cross itself
+  .day-tip                 a hover note on the day meter: it takes no click and is gone with the pointer
+  .version-corner          the version in the corner, which takes no pointer at all
+  .modal-felt .modal-head  the felt board's own head, part of the modal it is in
+  .efficiency-plate        the body of a native <details> on the top bar: the same summary opens and shuts it, and Turn 20 changes nothing about Efficiency (CLAUDE.md T20 6)
+  .hall-bottom             the hall's own strip, always on the page
+  .hall-zoom               the hall's own zoom controls, always on the page
+```
+
+### 9. The twelve pictures
+
+T20-C5's line, not this one's. Noted here and answered there.
+
+### 10. `src/ui/styles.css` against the real base
+
+`git diff d35e9b5 --stat -- src/ui/styles.css`:
+
+```
+ src/ui/styles.css | 104 +++++++++++++++++++++++++++++++++++++++++++++++++++---
+ 1 file changed, 100 insertions(+), 4 deletions(-)
+```
+
+`git diff d35e9b5 -- src/ui/styles.css` read hunk by hunk, with every value checked against the
+file it went into:
+
+- **No new token.** `:root` is untouched; there is not one line of the diff in it. Every colour in
+  the new rules is a token the game already had: `--good`, `--bad`, `--accent`, `--cream`,
+  `--border`, `--panel-2`, `--text-dim`, `--screen-line`, and the card fallbacks
+  `var(--card, var(--panel-2))`, `var(--card-line, var(--border))`, `var(--card-ink-2,
+  var(--text-dim))`, which is the pattern `.assign-row .assign-why` already uses beside them.
+- **One raw colour, and it is not new.** `.contract-day-block.is-job` puts `color: #1c1f24` on
+  `background: var(--accent)`. That literal is the ink the game has always put on the accent:
+  `grep -n "1c1f24" src/ui/styles.css` gives eight lines, seven of them older than this turn, and
+  one of the seven is `.btn-primary` (line 477), exactly as the new rule's comment says.
+- **No new radius.** The one radius in the diff is `border-radius: 3px` on `.contract-day-track`,
+  and `grep -o "border-radius: [^;]*" src/ui/styles.css | sort | uniq -c` shows 3px is the second
+  most used radius in the file, 15 times now and 14 before tonight.
+- **No new shadow and no new font.** No `box-shadow` line is added anywhere (the one in the cross's
+  hunk is unchanged context), and every size in the diff is `var(--fs-tiny)`, a token.
+- **Every new class beside its family.** `.tile-picture.is-small` sits immediately under
+  `.tile-picture` and only changes its two sizes. `.contract-fill.is-low` sits with
+  `.contract-fill.is-full`. The `.contract-day*` family sits under `.contract-track`, which the
+  comment points at. `.contract-men .assign-tier` sits with `.assign-row .assign-why`. The cross on
+  a popover that is not a modal is one rule for both, `.assign-list .modal-close, .why-pop
+  .modal-close`, and not a second version of it.
+- **The one thing that was wrong, and it is fixed.** `.modal-screen .contract-track` had been
+  wedged between the `.modal-screen` family's own section comment and the family's first rule, so
+  the comment that describes the whole laptop screen read as if it described the bar. The rule is
+  moved down beside `.modal-screen .row` and `.modal-screen .row.is-running`, the two rules it
+  belongs with, and the section comment leads its family again. Nothing else in the stylesheet
+  moved and nothing changed value.
+
+### What this check had to fix
+
+One thing: the `.modal-screen .contract-track` rule, moved (check 10). Two things in this report
+were true when phase B wrote them and are not true now, so they were put right rather than left to
+mislead: the B1 section said the wardrobe front's sheets were not moved, and the B3 section said
+the helper's fix was still a note. T20-C1 did both, and both paragraphs now say so and keep the
+question that is Piotr's in front of him.
+
+### The standing rules, checked with it
+
+- No em dash and no en dash in any text of the tree: `grep -rl` for U+2013 and U+2014 over `src`,
+  `tests`, `docs`, `README.md` and every report and note file finds one file, and it is
+  `docs/report-t18/06-answer-margin.png`, a picture whose bytes happen to carry the codepoint.
+- `APP_VERSION = 'v29'` and `STATE_VERSION = 17`, one bump each.
+- `npm run check` green on its own exit code before the commit.
