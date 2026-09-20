@@ -933,6 +933,34 @@ export function oldestReadyJob(state: GameState): Job | null {
   );
 }
 
+/** The oldest job of work standing open with nobody on it: ready for a bench, or already in
+ *  production and dropped by whoever had it. The board's own order is the order it was taken in,
+ *  so the first of them is the oldest (CLAUDE.md T23 2.3).
+ *
+ *  Not the same question as `oldestReadyJob` above, which falls through to a job somebody else is
+ *  already on so that the owner's idle reason can tell "there is work about" from "there is no
+ *  work at all". This one is the job a man can be PUT on, and nothing else. */
+export function oldestOpenJob(state: GameState): Job | null {
+  return (
+    state.jobs.find(
+      (job) =>
+        (job.stage === 'ready' || job.stage === 'inProduction') && job.assignees.length === 0,
+    ) ?? null
+  );
+}
+
+/** True while there is work of the board's about at all: a job ready for a bench, or one in
+ *  production, whoever is holding it. What the owner's idle reason asks to tell "there is work
+ *  here and none of it is mine" from "there is no work at all" (CLAUDE.md T23 2.3).
+ *
+ *  It has to count a job in production and not only a ready one. From tonight the owner takes the
+ *  oldest open job himself the minute his office empties, so a ready job with nobody on it can
+ *  never be the thing he is standing beside: by the time he is idle, every job about is somebody's
+ *  and every one of those is in production. */
+export function workIsAbout(state: GameState): boolean {
+  return state.jobs.some((job) => job.stage === 'ready' || job.stage === 'inProduction');
+}
+
 /** This job is this one man's: he goes on it and anybody else on it comes off. Start production
  *  and the hall's own automatic assignment go through here, so the job a man is handed is his
  *  alone; the player's Assign to this job adds men to what is already there and goes through

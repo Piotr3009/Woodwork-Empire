@@ -13,6 +13,7 @@ import { addWorkingDays, isBreak, workedMinutesOfDay } from './clock';
 import {
   BUILDING_ROLES,
   addLabour,
+  assignJob,
   findJob,
   hallBlock,
   isOnJob,
@@ -20,8 +21,9 @@ import {
   jobProgress,
   jobStage,
   leadAssignee,
-  oldestReadyJob,
+  oldestOpenJob,
   waitingLine,
+  workIsAbout,
 } from './jobs';
 import {
   BENCH,
@@ -71,7 +73,9 @@ import {
   STATION_BENCH,
   machineStation,
   placeStation,
+  roomBehindStation,
   secondStation,
+  stationNow,
   waitingStation,
 } from './stations';
 import {
@@ -422,13 +426,44 @@ export function ownerIdleReason(state: GameState): OwnerIdleReason | null {
   if (job !== null) {
     return rackCanSupply(state, job, jobProgress(job)) ? 'noMachine' : 'noMaterial';
   }
-  // Nothing of his own at all. Either the hall's list has a job of work nobody has taken, or a job
-  // is standing ready for a bench, and either way there is work about that he has not been put on;
-  // or there is none of that and he is in the office with his hands in his pockets
-  // [TUNE: which of the two the split falls on].
-  const waiting =
-    openTasks(state).some((task) => task.doneBy === null) || oldestReadyJob(state) !== null;
+  // Nothing of his own at all. Either the hall's list has a chore nobody has taken, or there is
+  // work of the board's about that is every bit of it somebody else's; or there is none of that
+  // and he is in the office with his hands in his pockets.
+  //
+  // From Turn 23 the second of those is the only way a job can leave him standing: he takes the
+  // oldest open one himself the minute his office empties, so `nothingAssigned` now means the
+  // crew have all the work and he has none of it (CLAUDE.md T23 2.3).
+  const waiting = openTasks(state).some((task) => task.doneBy === null) || workIsAbout(state);
   return waiting ? 'nothingAssigned' : 'officeEmpty';
+}
+
+/** The owner goes to the bench when his office is empty (PIOTR, 20.09: "he never stands doing
+ *  nothing"; CLAUDE.md T23 2.3). Once a minute: he is in, he is on the hall side of the door, he
+ *  holds no chore and no job, and there is nothing in his office queue he could do now. Then he
+ *  takes the oldest job standing open with nobody on it, as lead, exactly the way a joiner did
+ *  until tonight.
+ *
+ *  A job somebody else is on he does not join by day: that is the evening take over of Turn 17
+ *  and it stays a click of its own (CLAUDE.md T17 2.12). He never takes a standing contract
+ *  [PIOTR, 19.09], which `oldestOpenJob` cannot hand him because a contract is no job of the
+ *  board's. The player can move him off it in the Work Plan like anybody.
+ *
+ *  So his own idle reason `nothingAssigned` now only fires when there is work about that he
+ *  cannot take, which is work somebody else already has; `officeEmpty` is unchanged. */
+export function ownerTakesAJob(state: GameState): void {
+  const owner = state.owner;
+  if (!ownerIsAvailable(state)) return;
+  if (isBreak(state.clock.minute) && !owner.breakSkipped) return;
+  if (owner.currentTaskId !== null) return;
+  // Behind the office door or through the canteen one: he is off the hall and not at a bench.
+  if (roomBehindStation(stationNow(state, OWNER)) !== null) return;
+  if (jobOf(state, OWNER) !== null) return;
+  // Anything of his own still to do comes first: the office queue is the owner's day and the
+  // bench is what he does with what is left of it.
+  if (openTasks(state).some((task) => task.doneBy === null)) return;
+  const job = oldestOpenJob(state);
+  if (job === null) return;
+  assignJob(state, job.id, OWNER);
 }
 
 /** Why this man on the books stood through the minute just gone, or null when there was nothing of
