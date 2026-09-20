@@ -257,6 +257,7 @@ import {
   joiners,
   hurtWorker,
   letGo,
+  managerPaceFor,
   rollNightBreakdowns,
   runNightShift,
   runStaffDayStart,
@@ -1580,7 +1581,13 @@ function handsAtWork(state: GameState, ownerOnTask: boolean, moving: boolean): H
       worker.jobId = null;
       continue;
     }
-    list.push({ who: worker.id, job, rate: worker.rate * staffFactor });
+    // His own rate, what the hall does to it, and what the manager over him adds. The night
+    // shift's own `hands` in production.ts has carried the manager's pace since it was written;
+    // the day's minute is this function, and until tonight it did not, so the efficiency
+    // breakdown printed `Manager: +3%` over a hall that was not getting it. The same
+    // `managerPaceFor` answers both, which is the one path 2.4 asks for
+    // (PIOTR, 20.09; CLAUDE.md T23 2.4).
+    list.push({ who: worker.id, job, rate: worker.rate * staffFactor * managerPaceFor(state, worker) });
   }
   return list;
 }

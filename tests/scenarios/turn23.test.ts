@@ -238,28 +238,33 @@ describe('(mm) the same crew with a novice manager over them', () => {
     }
   });
 
-  it('makes not one minute more than (ll): the grade s pace never reaches the day shift', () => {
-    // **This is the one place in the turn where the game does not do what the brief says, and the
-    // lead is to read it before the report goes out.** 2.4 says the grade's pace "multiplies the
-    // production minutes of the men he carries", and a novice's is 1.03, so these ten days should
-    // come to 4,214.73 against (ll)'s 4,091.97. They come to 4,091.97, to the last decimal place:
-    // the two months are the same hall, played the same days, with the same minutes worked, and
-    // the manager makes no difference to the work at all.
+  it('puts more into the jobs than (ll), because the pace reaches the day shift now', () => {
+    // 2.4 says the grade's pace multiplies the production minutes of the men he carries, and a
+    // novice's is 1.03. When this file was first written it did not: `managerPaceFor` was read by
+    // `hands` in src/engine/production.ts, which is the NIGHT shift's hands, and the day's own
+    // minute is `handsAtWork` in src/engine/game.ts, which pushed `rate: worker.rate * staffFactor`
+    // with no manager in it. So the pace reached the second shift alone while the efficiency sheet
+    // printed `Manager: +3%` over a day crew that was not getting it. The lead put the same factor
+    // on the day's hands, which is the one path 2.4 asks for, and this is the month that measures
+    // it: 4,091.97 without him, 4,096.14 with him [both measured on this build].
     //
-    // The arithmetic is in the engine and it is right: `managerPaceFor` reads the grade's table,
-    // the test above shows it answering 1.03 over each of these three men, and `hands` in
-    // src/engine/production.ts multiplies a man's rate by it. But `hands` is the NIGHT shift's
-    // hands: the second shift reaches it through `workMinute`. The day's own minute is
-    // `runProductionMinute` in src/engine/game.ts, which gathers its men in `handsAtWork` (line
-    // 1583 on this build) and pushes `rate: worker.rate * staffFactor` with no manager in it. So
-    // the pace reaches the night crew and not the day crew, and the efficiency breakdown prints
-    // `Manager: +3%` over a hall that is not getting it.
+    // **Four pounds of work and not the hundred and twenty three that 1.03 of 4,091.97 would be,
+    // and that is not the manager, it is the hall.** Every one of the 14,400 hand minutes of the
+    // month carries his 1.03: the rates of the day's hands add up to exactly three per cent more
+    // than (ll)'s, measured. What the hall gives back is the dust. This hall is three saws and one
+    // used fan with no helper behind it, so it works at a hall factor of about 0.75 and spends
+    // four minutes in five under the extraction's margin; three per cent more work in it is three
+    // per cent more dust, and the faster month spends 129 more minutes of the 14,094 in the worse
+    // band. The gain and the giving back are the same size to within a tenth of a per cent.
     //
-    // The figure asserted here is what this build does, measured and not chosen. When the day's
-    // hands are given the same factor as the night's, this test goes red, and the figure to put in
-    // its place is (ll)'s times the grade's pace.
-    expect(NOVICE.done).toBe(NO_MANAGER.done);
-    expect(NOVICE.done).not.toBeCloseTo(NO_MANAGER.done * PRODUCTION_MANAGER_PACE.novice, 2);
+    // It is not a fixed exchange either, which is the point worth Piotr's eye: the same ten days
+    // on the same hall with a standard fan in place of the used one come to 4,162.46 without the
+    // manager and 4,333.42 with him, which is **4.11 per cent**, because that hall lands on the
+    // good side of the band more often. A hall whose extraction keeps up with it banks the three
+    // per cent and a little of the swing; a hall that is already over its margin hands it straight
+    // back. The flat +3% is on the minute, where 2.4 puts it, and never on the month.
+    expect(NOVICE.done).toBeGreaterThan(NO_MANAGER.done);
+    expect(NOVICE.done).toBeCloseTo(4096.14, 2);
   });
 
   it('never sends the owner to the Work Plan', () => {
