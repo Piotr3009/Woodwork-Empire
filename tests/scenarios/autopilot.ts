@@ -18,6 +18,7 @@ import {
   tick,
   unconnectedMachines,
 } from '../../src/engine/index';
+import { waitsForTheBoss } from '../../src/engine/staff';
 import type { Contract, GameEvent, GameState, TaskInstance, WorkerTier } from '../../src/engine/index';
 
 /** What the script answers when the clock stops for a decision. */
@@ -125,6 +126,10 @@ export interface Policy {
   hireHelper?: boolean;
   /** Anything beyond the day 1 list to buy on day 1: a spray booth, say (CLAUDE.md T11 3.7). */
   extraKit?: string[];
+  /** Things on the day 1 list this month does NOT buy. A hall with no compressor in it is the
+   *  only way to play what happens at a bench with nothing in the hose, and the day 1 list buys
+   *  one (CLAUDE.md T23 2.7, scenario (oo)). */
+  withoutKit?: string[];
   /** The standing the company opens the month on, for work that is out of a new company's reach. */
   reputation?: number;
   /** Days the owner works through his dinner (CLAUDE.md T6 3.4). */
@@ -309,6 +314,7 @@ function classFor(specId: string, policy: Policy): string | undefined {
 function buyKit(state: GameState, policy: Policy): GameState {
   let next = state;
   for (const specId of DAY_ONE_BUY_ORDER) {
+    if (policy.withoutKit?.includes(specId) === true) continue;
     next = applyAction(next, {
       type: 'BUY_EQUIPMENT',
       specId,
@@ -411,6 +417,12 @@ function takeContract(state: GameState, policy: Policy): GameState {
   return next;
 }
 
+/** Every Assign the boss's round has clicked since a scenario last put it back to nought. A
+ *  scenario that has to say "the owner never went to the Work Plan" reads this and nothing else:
+ *  with a manager on duty the round finds nobody standing and never clicks (CLAUDE.md T23 2.4,
+ *  scenario (mm)). */
+export const bossRound = { clicks: 0 };
+
 /** The boss's round of the hall at the start of the day: every man standing about is put on the
  *  oldest job nobody is on, which is what an attentive player does the moment he walks in. From
  *  Turn 23 nobody takes a job by himself without a production manager on duty, so without this
@@ -420,11 +432,17 @@ function takeContract(state: GameState, policy: Policy): GameState {
  *
  *  One man to a job and no more: the engine's own assigning has always handed the oldest free job
  *  to the first free man and then looked for the next free job, and this is that round made by
- *  hand. A man already on a job is never moved: he stays on it to its end. */
+ *  hand. A man already on a job is never moved: he stays on it to its end.
+ *
+ *  Who the round is made for is `waitsForTheBoss`, the engine's own reading of the red mark: the
+ *  man the hall draws standing about and the Work Plan's crew column calls `needs a job`. An
+ *  attentive player clicks for the man he can see waiting and for nobody else, so a man a
+ *  production manager carries is left to his manager, who puts him on a job at the first minute of
+ *  the day without anybody's click (CLAUDE.md T23 2.1, 2.4). */
 function assignFreeMen(state: GameState): GameState {
   let next = state;
   for (const worker of joiners(next)) {
-    if (worker.jobId !== null || worker.taskId !== null) continue;
+    if (!waitsForTheBoss(next, worker)) continue;
     if (!canBuild(next, worker.id)) continue;
     const job = next.jobs.find(
       (entry) =>
@@ -432,6 +450,7 @@ function assignFreeMen(state: GameState): GameState {
     );
     if (!job) break;
     next = applyAction(next, { type: 'ASSIGN_JOB', jobId: job.id, workerId: worker.id });
+    bossRound.clicks += 1;
   }
   return next;
 }

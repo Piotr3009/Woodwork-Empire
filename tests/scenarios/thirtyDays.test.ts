@@ -7,8 +7,18 @@
 // one goes under the limit, and it is the empty hall on Hard: it first closes a day under on day
 // 11 and the bank shuts it on day 22 for the amount, with its count of days under the limit at 12
 // of the 30 the other rule allows. Every other month here trades its thirty days with the account
-// above the limit, the short handed one dipping furthest into the overdraft at -586 on day 31, and
-// not one line of any of their ledgers goes unpaid. Measured on this build (T22-C2).
+// above the limit, the short handed one dipping furthest into the overdraft at -639.50 on the
+// owner's draw of day 32, and not one line of any of their ledgers goes unpaid.
+//
+// From Turn 23 nobody takes a job by himself without a production manager on duty, and none of
+// these months has one: every man in this file is put on his job by the owner's click, which the
+// scripted player makes at the start of each day in `assignFreeMen` in tests/scenarios/autopilot.ts
+// (PIOTR, 20.09; CLAUDE.md T23 2.1). Three of the turn's rules moved money in these months and each
+// one is named where its figure is: the canteen seat is off the books (2.11), a sheet is priced by
+// the size of the order (2.16), and a job that comes ready in the middle of a day is picked up at
+// the next morning's round rather than the same minute (2.1).
+//
+// Measured on this build (T23-C2).
 
 import { describe, expect, it } from 'vitest';
 import {
@@ -361,9 +371,11 @@ describe('30 days on Easy, working the board', () => {
   });
 
   it('kept the nailer in air all month, because day 1 bought a compressor', () => {
-    // A bench is a pneumatic tool from Turn 11: with no compressor in the hall the assembly is
-    // screwed together by hand at 0.67 (PIOTR, 15.09; CLAUDE.md T11 3.8). The day 1 list buys
-    // one, so this month never sees it, and the hall never said the line.
+    // A bench is a pneumatic tool from Turn 11, and from Turn 23 a man at one with nothing in the
+    // hose does not screw the assembly together by hand at 0.67 any more: he stands at his bench
+    // and the job does not move at all [PIOTR, 20.09] (CLAUDE.md T11 3.8, T23 2.7). The day 1 list
+    // buys a compressor, so this month never sees it and the hall never said the line. The month
+    // that has no compressor in it at all is (oo) in tests/scenarios/turn23.test.ts.
     expect(state.equipment.some((item) => item.specId === 'compressor')).toBe(true);
     expect(hallAirCheck(state).lines).not.toContain(NO_AIR_LINE);
     expect(hallAirCheck(state).lowAir).toEqual([]);
@@ -492,10 +504,16 @@ describe('30 days on Very easy behind the best saw money can buy', () => {
   it('still trades at the end of the month after spending that much on day 1', () => {
     expect(state.gameOver).toBeNull();
     expect(state.clock.day).toBe(31);
-    // Two jobs where Turns 7 to 9 finished three. The board is a quarter express now, at a
+    // Four jobs where Turns 7 to 9 finished three. The board is a quarter express now, at a
     // deadline of 0.6 of the standard one, and a one man shop that takes them the way the script
-    // does delivers some of them late (PIOTR: more express jobs; CLAUDE.md T10 3.7). Measured,
-    // not tuned: the month is about the company still trading after a 25,000 saw.
+    // does delivers some of them late (PIOTR: more express jobs; CLAUDE.md T10 3.7).
+    //
+    // The line here said two until tonight and the assertion under it has always been a floor of
+    // two, so the prose behind it drifted as the months moved and nothing went red. Four is what
+    // this build makes, remeasured for Turn 23 and not tuned. The rule of this turn that is in it
+    // is the owner taking the oldest open job himself the minute his office queue is empty, where
+    // the script used to stand him at whatever bench was nearest (CLAUDE.md T23 2.3). The month is
+    // still about the company trading after a 25,000 saw and the floor of two is left where it is.
     expect(state.jobs.filter((job) => job.stage === 'completed').length).toBeGreaterThanOrEqual(2);
   });
 });
@@ -995,7 +1013,7 @@ describe('a month of a full crew behind two saws on the day 1 fan alone', () => 
     // The script asks for six and the hall says no: two saws, their zones and every man's bench
     // and cabinets leave floor for the owner and three (PIOTR; CLAUDE.md T13 3.10).
     //
-    // It was three until Turn 21, two through Turn 21, and three again tonight, and the one cell
+    // It was three until Turn 21, two through Turn 21, and three again from Turn 22, and the one cell
     // that moves it each time is the tool cabinet's. Turn 21 made a cabinet two metres wide, so
     // each of the four in this hall took a cell more of the floor the crew limit is measured
     // against and the hall lost a man; Turn 22 makes the cabinet a family of five and the cheapest
@@ -1333,7 +1351,12 @@ describe('a month with a helper, where the owner never unloads', () => {
     const chores = state.tasks.filter((task) => HELPER_ONLY_KINDS.includes(task.kind));
     expect(chores.length).toBeGreaterThan(0);
     // Both of the labourer's own jobs of work came up in the month and both were his: measured,
-    // twelve loads off the lorry and nineteen sweeps of the hall (CLAUDE.md T17 2.3, section 7).
+    // twelve loads off the lorry and thirty two sweeps of the hall (CLAUDE.md T17 2.3, section 7).
+    // The sweeps were nineteen when Turn 17 wrote this line and the loads have not moved: Turn 20
+    // put `hallLooksDirty` in place of the old band the helper waited for, so he picks a brush up
+    // at the dirt the player can see and sweeps more often for it (CLAUDE.md T20 2.8). Remeasured
+    // for Turn 23, not tuned; the assertions under it count neither, they only say that both kinds
+    // came up and that not one of them was the owner's.
     expect(chores.filter((task) => task.kind === 'unload').length).toBeGreaterThan(0);
     expect(chores.filter((task) => task.kind === 'cleaning').length).toBeGreaterThan(0);
     for (const task of chores) {
