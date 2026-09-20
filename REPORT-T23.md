@@ -6,13 +6,14 @@ Branch `claude/busy-archimedes-fznv89`, off `cd51383`, the tree this turn opened
 
 `npm run check` on the finished tree, read off its own exit code: **exit 0**, **220 test files,
 2,200 tests**, 2,199 of them passed and one the standing todo of Turn 12's blocker, up from 209
-files and 2,053 tests at this turn's first green check. Twenty nine commits, every one of them
-with a green check of its own before it. Six sets of hands: the lead for phases A1, C1, C3 and C5
+files and 2,053 tests at this turn's first green check. Thirty one commits, every one of them with
+a green check of its own before it. Six sets of hands: the lead for phases A1, C1, C3 and C5
 and for the three merges, one agent for phase A2, three for the three phase B groups working at
 the same time in three git worktrees, and two for phase C's scenarios and pictures.
 
-`git diff main --stat`: 160 files changed, 8,662 insertions, 1,355 deletions. `src` alone is
-2,794 insertions against 863 deletions over 36 files; the tests are 4,046 against 485 over 99.
+`git diff main --stat`: 160 files changed, 9,102 insertions, 1,355 deletions, of which this
+report and the three notes files are a good share. `src` alone is 2,794 insertions against 863
+deletions over 36 files; the tests are 4,046 against 485 over 99.
 
 Two lines a task, in the order of section 5, each with the commit it sits in. The three notes
 files stay in `docs/` because they carry the exact old and new text of every change an agent made
