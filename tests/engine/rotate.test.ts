@@ -20,8 +20,8 @@ function emptyHall(): GameState {
 describe('what turning does to the floor', () => {
   it('swaps the width and the depth of the footprint and of the zone', () => {
     // A standard saw is 3 by 1 of machine on a 4 by 3 zone (CLAUDE.md T7 3.6).
-    expect(footprintOf('tableSaw', 'standard')).toEqual({ width: 3, depth: 1, height: 1 });
-    expect(footprintOf('tableSaw', 'standard', 1)).toEqual({ width: 1, depth: 3, height: 1 });
+    expect(footprintOf('tableSaw', 'standard')).toEqual({ width: 3, depth: 1, height: 1.95 });
+    expect(footprintOf('tableSaw', 'standard', 1)).toEqual({ width: 1, depth: 3, height: 1.95 });
     expect(zoneOf('tableSaw', 'standard')).toEqual({ width: 4, depth: 3 });
     expect(zoneOf('tableSaw', 'standard', 1)).toEqual({ width: 3, depth: 4 });
     // The height is the height whichever way it faces.
@@ -34,10 +34,10 @@ describe('what turning does to the floor', () => {
     const state = emptyHall();
     const saw = placeEquipment(state, 'tableSaw', { variantId: 'standard', x: 6, y: 1 });
     expect(saw.orientation).toBe(0);
-    expect(itemFootprint(saw)).toEqual({ width: 3, depth: 1, height: 1 });
+    expect(itemFootprint(saw)).toEqual({ width: 3, depth: 1, height: 1.95 });
     expect(itemZone(saw)).toEqual({ width: 4, depth: 3 });
     saw.orientation = 1;
-    expect(itemFootprint(saw)).toEqual({ width: 1, depth: 3, height: 1 });
+    expect(itemFootprint(saw)).toEqual({ width: 1, depth: 3, height: 1.95 });
     expect(itemZone(saw)).toEqual({ width: 3, depth: 4 });
     expect(boxOf('tableSaw', 6, 1, 'standard', 1)).toEqual({
       x: 6,
@@ -104,9 +104,9 @@ describe('where a turned machine will go', () => {
 describe('the orientations Rotate can reach (CLAUDE.md T22 2.11)', () => {
   it('is 0, 1, 0 for a thing with two pictures and 0, 1, 2, 3, 0 for one with four', () => {
     const files = spriteFiles();
-    // The saw has its base picture and nothing else, so the quarter turn is the base mirrored and
-    // there is nowhere else to go: a half turn would show the front of the machine where its back
-    // belongs, so Rotate never offers it (CLAUDE.md T22 2.11).
+    // The saw has its base picture and a true quarter turn (the art side's table saws v2, 19.09)
+    // and nothing else: a half turn would show the front of the machine where its back belongs,
+    // so Rotate never offers it (CLAUDE.md T22 2.11).
     expect(orientationsFor(files, 'tableSaw', 'standard')).toEqual([0, 1]);
     const walk = (spriteKey: string, tier: string, from: Orientation, steps: number): Orientation[] => {
       const out: Orientation[] = [];
@@ -230,27 +230,31 @@ describe('what turning does to the picture', () => {
 
   it('takes the second orientations the art side has delivered, and mirrors the rest', () => {
     // The art side's `.r` files were parked (CLAUDE.md T10 6.2): the hall mirrored until one
-    // landed, and the day one did the loader was to take it with no code change at all. Piotr
-    // delivered `toolCabinet.standard.r.png` between Turn 20 and Turn 21 and the other four
-    // cabinet classes' turned files between Turn 21 and Turn 22, and that is what this reads: a
-    // cabinet turned is drawn from its own file and not mirrored, whatever its class, and every
-    // other class the game draws still mirrors.
+    // landed, and the day one did the loader was to take it with no code change at all. The
+    // cabinets came first (19.09), then the benches, the saws and the corrected equipment of
+    // 20.09: every class of every floor family the game draws has a true quarter turn now, and
+    // only the character sheets, the rooms and the old better rack have none.
     const turned = spriteFiles().filter((name) => name.endsWith('.r.png'));
-    expect(turned).toEqual([
-      'toolCabinet.budget.r.png',
-      'toolCabinet.industrial.r.png',
-      'toolCabinet.pro.r.png',
-      'toolCabinet.standard.r.png',
-      'toolCabinet.used.r.png',
-    ]);
+    expect(turned).toHaveLength(43);
+    for (const family of ['compressor', 'edgebander', 'extractor', 'sheetRack', 'spindleMoulder', 'tableSaw', 'toolCabinet', 'workbench']) {
+      for (const tier of ['used', 'budget', 'standard', 'pro', 'industrial']) {
+        expect(turned, `${family}.${tier}`).toContain(`${family}.${tier}.r.png`);
+      }
+    }
+    for (const single of ['dustSystem', 'flexiSystem', 'pelletiser']) {
+      expect(turned, single).toContain(`${single}.standard.r.png`);
+    }
     for (const cabinet of ['used', 'budget', 'standard', 'pro', 'industrial']) {
       expect(mirrorNeeded(spriteFiles(), 'toolCabinet', cabinet, 1), cabinet).toBe(false);
       expect(pickSprite(spriteFiles(), 'toolCabinet', cabinet, 1), cabinet).toBe(
         `/sprites/toolCabinet.${cabinet}.r.png`,
       );
     }
-    // The saw has no second orientation, so it is mirrored as it always was.
-    expect(mirrorNeeded(spriteFiles(), 'tableSaw', 'standard', 1)).toBe(true);
+    // A class whose turned file is missing is mirrored as it always was: the saw with its `.r`
+    // file taken out of the list.
+    const withoutTurnedSaw = spriteFiles().filter((name) => name !== 'tableSaw.standard.r.png');
+    expect(mirrorNeeded(withoutTurnedSaw, 'tableSaw', 'standard', 1)).toBe(true);
+    expect(mirrorNeeded(spriteFiles(), 'tableSaw', 'standard', 1)).toBe(false);
     // With no picture at all there is nothing to mirror, and the hall draws the box instead. The
     // boolean version of this said "mirror" for a family that had no file either, which was an
     // answer nobody read: `objectArt` asks the question only once it has a URL in its hand

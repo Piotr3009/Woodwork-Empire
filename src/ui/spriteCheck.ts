@@ -11,7 +11,6 @@ import {
   box,
   escapeText,
   label,
-  gateCollarCellArt,
   polygon,
 } from '../render/hall';
 import { OFFICE_CANVAS, OFFICE_LAYERS, OFFICE_LIT_LAYERS } from '../render/office';
@@ -313,39 +312,6 @@ function layerSection(
   );
 }
 
-/** The keys of the pipe layer that are pictures at all. The nine `pipe.*.png` tiles went with the
- *  seven tile kinds: a run is one path drawn by `src/render/pipes.ts` and no cell of it is a file
- *  any more, so the gate's collar is the whole of this list (PIOTR's screenshot, 19.09;
- *  CLAUDE.md T13 3.11, T22 2.7; docs/art/REQUESTS-T13.md 2). */
-export const PIPE_LAYER_KEYS: readonly string[] = ['gate.collar'];
-
-/** One key of the pipe layer as the hall draws it: the delivered file, or the vector ring, on one
- *  cell at the height of the ducting. The view box is the cell with room above it for the lift. */
-function pipeKeyCell(key: string): string {
-  const drawn = gateCollarCellArt({ x: 0, y: 0 }, spriteFiles());
-  const url = spriteUrl(key);
-  return (
-    `<div class="sprite-cell" data-pipe-key="${escapeHtml(key)}">` +
-    `<svg class="sprite-proof" viewBox="-40 -110 80 140" width="80" height="140" ` +
-    `role="img" aria-label="${escapeText(key)}">${drawn}</svg>` +
-    `<p class="sprite-key">${escapeHtml(`${key}.png`)}</p>` +
-    `<p class="sprite-figures">${url === null ? 'no file yet, the drawing stands' : escapeHtml(url)}</p>` +
-    '</div>'
-  );
-}
-
-function pipeSection(): string {
-  const delivered = PIPE_LAYER_KEYS.filter((key) => spriteUrl(key) !== null).length;
-  return (
-    `<h3>The pipe layer, ${delivered} of ${PIPE_LAYER_KEYS.length} pictures delivered</h3>` +
-    '<p class="hint">A pipe run is one continuous path, drawn by the game at the height of the ' +
-    'ducting: there are no pipe tiles to deliver and the nine that were are deleted. The gate\u2019s ' +
-    'collar is the one picture the layer still asks for, one cell, in the hall\u2019s 2:1 dimetric ' +
-    'and never straight on.</p>' +
-    `<div class="sprite-grid">${PIPE_LAYER_KEYS.map((key) => pipeKeyCell(key)).join('')}</div>`
-  );
-}
-
 /** Every role the game draws a figure for: the owner and every WorkerRole, the two of Turn 13
  *  among them. The joiner and the owner have their sheets; the rest fall back to the capsule
  *  until theirs are delivered (CLAUDE.md T9 3.13, T13 3.23). */
@@ -458,7 +424,6 @@ export function renderSpriteCheck(ports: Record<string, Port> = PORTS): string {
       OFFICE_LIT_LAYERS,
       OFFICE_CANVAS,
     ) +
-    pipeSection() +
     characterSection() +
     '</div>'
   );

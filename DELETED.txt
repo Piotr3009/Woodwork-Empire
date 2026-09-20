@@ -1,1 +1,6 @@
-tests/render/ducts.test.ts
+public/sprites/dustSystem.ducts.png
+public/sprites/flexiSystem.ducts.png
+public/sprites/gate.collar.png
+src/render/pipes.ts
+tests/render/pipesOnTheHall.test.ts
+tests/render/ports.test.ts

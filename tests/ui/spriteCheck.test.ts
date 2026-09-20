@@ -7,7 +7,7 @@ import { HALL_LAYERS, PALLET_SPRITE } from '../../src/render/hall';
 import { OFFICE_LAYERS, OFFICE_LIT_LAYERS } from '../../src/render/office';
 import { standsInTheHall } from '../../src/engine/machines';
 import { spriteUrl } from '../../src/render/sprites';
-import { CHARACTER_ROLES, PIPE_LAYER_KEYS, renderSpriteCheck, spriteTargets } from '../../src/ui/spriteCheck';
+import { CHARACTER_ROLES, renderSpriteCheck, spriteTargets } from '../../src/ui/spriteCheck';
 import { ANIMATIONS } from '../../src/render/characters';
 import { PORTS, type Port } from '../../src/engine/ports';
 
@@ -126,30 +126,6 @@ describe('the sprite check page', () => {
     expect(truck?.getAttribute('data-placeholder')).toBe('palletTruck');
   });
 
-  it('lists the pipe layer once each, drawn as the hall draws it, and from no file at all', () => {
-    // The pipe layer (CLAUDE.md T13 3.11, 3.19). The nine `pipe.*.png` tiles Piotr delivered for
-    // Turn 16 did not meet each other, so Turn 22 deleted them and draws a run as one path
-    // instead: the page shows the vector drawing, which is the only drawing there is now
-    // (PIOTR's screenshot, 19.09; CLAUDE.md T22 2.7). Only `gate.collar` is still a file.
-    expect([...PIPE_LAYER_KEYS]).toEqual(['gate.collar']);
-    const page = parse(renderSpriteCheck());
-    expect(page.innerHTML).toContain('The pipe layer');
-    const cells = Array.from(page.querySelectorAll('[data-pipe-key]'));
-    expect(cells.map((cell) => cell.getAttribute('data-pipe-key'))).toEqual([...PIPE_LAYER_KEYS]);
-    for (const cell of cells) {
-      const key = cell.getAttribute('data-pipe-key') ?? '';
-      expect(cell.querySelector('[data-placeholder]'), key).toBeNull();
-      expect(cell.textContent, key).toContain(`${key}.png`);
-      if (key === 'gate.collar') {
-        expect(cell.innerHTML, key).toContain(`/sprites/${key}.png`);
-        continue;
-      }
-      // Drawn by `src/render/pipes.ts`, off no file: the group the hall itself puts on the floor.
-      expect(cell.innerHTML, key).not.toContain('/sprites/pipe.');
-      expect(cell.innerHTML, key).toContain(`data-pipe-tile="${key}"`);
-    }
-  });
-
   it('prints the measured connection point of every file a pipe is drawn to (CLAUDE.md T22 2.8)', () => {
     const page = parse(renderSpriteCheck());
     // The saw's line: the rear base outlet, hidden behind the body [PIOTR's pick B].
@@ -201,13 +177,13 @@ describe('the sprite check page', () => {
       expect(cell?.textContent, classId).toContain('.rrr');
       expect(cell?.textContent, classId).not.toContain('the rest mirrored');
     }
-    // Everything else has its base picture and mirrors the quarter turn, as the game has since
-    // Turn 10: the saw and the fan say so, and the fan's three turned files are the one thing
-    // Turn 22 asks the art side for (docs/art/REQUESTS-T22.md 2).
-    for (const name of ['tableSaw.standard', 'extractor.pro']) {
+    // Every other floor family has its base picture and a true quarter turn since v33 (the art
+    // side's packs of 19.09 and 20.09) and no back yet: the saw and the fan say so, and the backs
+    // are what the art side still owes.
+    for (const name of ['tableSaw.standard', 'extractor.pro', 'workbench.pro']) {
       const cell = page.querySelector(`[data-sprite-target="${name}"] [data-turns]`);
-      expect(cell?.getAttribute('data-turns'), name).toBe('0');
-      expect(cell?.textContent, name).toContain('1 of 4 orientations drawn: the base file');
+      expect(cell?.getAttribute('data-turns'), name).toBe('0,1');
+      expect(cell?.textContent, name).toContain('2 of 4 orientations drawn');
       expect(cell?.textContent, name).toContain('the rest mirrored or the base picture');
     }
     // A key with no file at all says none, and still says it.
@@ -245,16 +221,17 @@ describe('the sprite check page', () => {
     const saw = page.querySelector('[data-sprite-target="tableSaw.used"]');
     expect(saw?.textContent).toContain('tableSaw.used.png');
     // Metres now, and half the tiles of Turns 1 to 4 (docs/art/SPRITES.md 9.1).
-    expect(saw?.textContent).toContain('2 m by 1 m, 1 m high');
-    // The canvas formula of docs/art/SPRITES.md 2, in metres, plus 8 px of padding a side, which
-    // is the 160 by 136 of CLAUDE.md T7 3.5.
-    expect(saw?.textContent).toContain('canvas 144 by 120');
-    expect(saw?.textContent).toContain('file 160 by 136');
-    // And a class with its own footprint gets its own canvas: the pro saw is 3 m by 2 m, 1 m
-    // high, written the way every footprint is (CLAUDE.md T12 3.1).
+    // The saw's height is the picture's since v33: 1.4 m holds the guard over the 1 m body (the art
+    // side's table saws v2, 19.09).
+    expect(saw?.textContent).toContain('2 m by 1 m, 1.4 m high');
+    // The canvas formula of docs/art/SPRITES.md 2, in metres, plus 8 px of padding a side.
+    expect(saw?.textContent).toContain('canvas 144 by 139.2');
+    expect(saw?.textContent).toContain('file 160 by 155.2');
+    // And a class with its own footprint gets its own canvas: the pro saw is 3 m by 2 m, 2.15 m
+    // high with its overhead arm and screen, written the way every footprint is (CLAUDE.md T12 3.1).
     const pro = page.querySelector('[data-sprite-target="tableSaw.pro"]');
-    expect(pro?.textContent).toContain('3 m by 2 m, 1 m high');
-    expect(pro?.textContent).toContain('file 256 by 184');
+    expect(pro?.textContent).toContain('3 m by 2 m, 2.15 m high');
+    expect(pro?.textContent).toContain('file 256 by 239.2');
   });
 
   it('counts what has been delivered and says so plainly where there is not', () => {

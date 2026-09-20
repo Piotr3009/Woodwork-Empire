@@ -58,11 +58,13 @@ describe('the loader tier is the class id', () => {
 describe('the file the art side owes for a class', () => {
   it('measures what the table of CLAUDE.md T7 3.5 says', () => {
     const rows: Array<[string, string, number, number]> = [
-      ['tableSaw', 'used', 160, 136],
-      ['tableSaw', 'budget', 160, 136],
-      ['tableSaw', 'standard', 208, 160],
-      ['tableSaw', 'pro', 256, 184],
-      ['tableSaw', 'industrial', 304, 217],
+      // The saws' canvases hold their guards, arms and screens since v33: the pictures' heights
+      // (1.4, 1.4, 1.95, 2.15, 2.65 m; the art side's table saws v2, 19.09).
+      ['tableSaw', 'used', 160, 155],
+      ['tableSaw', 'budget', 160, 155],
+      ['tableSaw', 'standard', 208, 205],
+      ['tableSaw', 'pro', 256, 239],
+      ['tableSaw', 'industrial', 304, 287],
       ['workbench', 'used', 160, 131],
       ['workbench', 'budget', 160, 131],
       ['workbench', 'standard', 160, 131],
@@ -131,10 +133,10 @@ describe('the anchor of a class', () => {
     const stands = footprintIn(saw);
     // 3 by 2 in a 6 by 3 zone: one and a half metres of clearance each side, half a metre front
     // and back (CLAUDE.md T7 3.3).
-    expect(stands).toEqual({ x: 7.5, y: 2.5, width: 3, depth: 2, height: 1 });
+    expect(stands).toEqual({ x: 7.5, y: 2.5, width: 3, depth: 2, height: 2.15 });
     anchorOf(stands.x, stands.y, stands.width, stands.depth, stands.height);
     const at = spriteBox(stands.x, stands.y, stands.width, stands.depth, stands.height);
-    const file = spriteFileSize(3, 2, 1);
+    const file = spriteFileSize(3, 2, 2.15);
     expect(at.width).toBe(file.width / SPRITE_SCALE);
     expect(at.height).toBe(file.height / SPRITE_SCALE);
   });
@@ -217,12 +219,11 @@ describe('the file on disk and the footprint in the engine', () => {
     // 19.09): used and budget at 112 by 112, pro at 160 by 175, industrial at 208 by 208, each
     // a true quarter turn. Their classes arrive in Turn 22 (CLAUDE.md T22 2.12); until then the
     // loop above has no variant to measure them against and they are only counted here.
-    expect(spriteFiles().filter((name) => name.endsWith('.r.png'))).toEqual([
-      'toolCabinet.budget.r.png',
-      'toolCabinet.industrial.r.png',
-      'toolCabinet.pro.r.png',
-      turned,
-      'toolCabinet.used.r.png',
-    ]);
+    // Every floor family turned since v33 (the art side's packs of 19.09 and 20.09): the loop above
+    // measures the base file of each class; the turned files are counted here and measured by
+    // tests/engine/rotate.test.ts.
+    const turnedFiles = spriteFiles().filter((name) => name.endsWith('.r.png'));
+    expect(turnedFiles).toContain(turned);
+    expect(turnedFiles).toHaveLength(43);
   });
 });

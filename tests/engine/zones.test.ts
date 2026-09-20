@@ -30,7 +30,7 @@ describe('what a class says about the floor', () => {
       expect(zoneOf('tableSaw', id), id).toEqual({ width, depth });
     }
     // "max 20": the industrial saw is 4 by 2 of machine on 20 m2 of floor.
-    expect(footprintOf('tableSaw', 'industrial')).toEqual({ width: 4, depth: 2, height: 1.2 });
+    expect(footprintOf('tableSaw', 'industrial')).toEqual({ width: 4, depth: 2, height: 2.65 });
     expect(zoneOf('tableSaw', 'industrial').width * zoneOf('tableSaw', 'industrial').depth).toBe(20);
   });
 
@@ -115,7 +115,7 @@ describe('where the picture stands', () => {
     // A pro saw is 3 by 2 of machine on a 6 by 3 zone, so it stands one and a half metres in
     // along the zone and half a metre down it.
     const stands = footprintIn(saw);
-    expect(stands).toEqual({ x: 9.5, y: 4.5, width: 3, depth: 2, height: 1 });
+    expect(stands).toEqual({ x: 9.5, y: 4.5, width: 3, depth: 2, height: 2.15 });
     const zone = zoneOf('tableSaw', 'pro');
     expect(stands.x).toBeGreaterThanOrEqual(saw.anchorX);
     expect(stands.x + stands.width).toBeLessThanOrEqual(saw.anchorX + zone.width);

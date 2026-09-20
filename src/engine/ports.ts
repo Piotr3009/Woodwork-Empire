@@ -1,3 +1,6 @@
+// v33 (PIOTR, 19.09): the pipe drawing is gone from the hall. This table still routes a run by
+// `cell`, and the Sprite check page still prints `px, py` as the measured points, so nothing here
+// is dead; the drawing that read them is the only thing removed.
 // Where the extraction goes onto a machine and into an extractor: one number per picture, never a
 // rule guessed from the footprint (PIOTR, 19.09; CLAUDE.md T22 2.8).
 //
@@ -82,22 +85,52 @@ export const PORTS: Record<string, Port> = {
   'extractor.standard.png': { px: 28, py: 67, faces: '+y', cell: { x: 0, y: 1 } },
   'extractor.pro.png': { px: 16, py: 127, faces: '+y', cell: { x: 0, y: 1 } },
   'extractor.industrial.png': { px: 22, py: 64, faces: '+y', cell: { x: 0, y: 1 } },
+  // The extractors' true quarter turns (the art side's corrected equipment v2, 20.09; v33): the
+  // mouth swaps its side with the turn, so the cell and the direction are the axis swap of the base
+  // line; the pixels are the base pixel reflected about the turned anchor as a stand in [TUNE: to
+  // be read off the turned pictures, Petros T23].
+  'extractor.used.r.png': { px: 23, py: 61, faces: '+y', cell: { x: 0, y: 1 } },
+  'extractor.budget.r.png': { px: 23, py: 64, faces: '+y', cell: { x: 0, y: 1 } },
+  'extractor.standard.r.png': { px: 84, py: 67, faces: '+x', cell: { x: 1, y: 0 } },
+  'extractor.pro.r.png': { px: 96, py: 127, faces: '+x', cell: { x: 1, y: 0 } },
+  'extractor.industrial.r.png': { px: 90, py: 64, faces: '+x', cell: { x: 1, y: 0 } },
   // The saws: the rear base outlet, with the drop vanishing behind the body [PIOTR's pick B].
   'tableSaw.used.png': { px: 100, py: 43, cell: { x: 1, y: 0 }, hidden: true },
   'tableSaw.budget.png': { px: 97, py: 62, cell: { x: 1, y: 0 }, hidden: true },
   'tableSaw.standard.png': { px: 137, py: 62, cell: { x: 1, y: 0 }, hidden: true },
   'tableSaw.pro.png': { px: 139, py: 80, cell: { x: 1, y: 0 }, hidden: true },
   'tableSaw.industrial.png': { px: 155, py: 86, cell: { x: 2, y: 0 }, hidden: true },
+  // The saws' true quarter turns (the art side's table saws v2, 19.09; v33): the rear base outlet
+  // behind the blade, read off the turned pictures by Claude in chat [TUNE until Piotr confirms on
+  // a picture]. The base lines above were read off the pictures these replaced and are due the
+  // same re-reading (Petros, T23).
+  'tableSaw.used.r.png': { px: 86, py: 46, cell: { x: 0, y: 1 }, hidden: true },
+  'tableSaw.budget.r.png': { px: 78, py: 46, cell: { x: 0, y: 1 }, hidden: true },
+  'tableSaw.standard.r.png': { px: 100, py: 77, cell: { x: 0, y: 1 }, hidden: true },
+  'tableSaw.pro.r.png': { px: 124, py: 92, cell: { x: 0, y: 1 }, hidden: true },
+  'tableSaw.industrial.r.png': { px: 150, py: 96, cell: { x: 0, y: 2 }, hidden: true },
   // The spindle moulders: the hood on the guard, which the hose reaches down to [TUNE].
   'spindleMoulder.used.png': { px: 107, py: 28, cell: { x: 1, y: 0 } },
   'spindleMoulder.budget.png': { px: 95, py: 40, cell: { x: 1, y: 0 } },
   'spindleMoulder.standard.png': { px: 92, py: 24, cell: { x: 1, y: 0 } },
   'spindleMoulder.pro.png': { px: 151, py: 67, cell: { x: 1, y: 0 } },
   'spindleMoulder.industrial.png': { px: 106, py: 65, cell: { x: 1, y: 0 } },
+  // Their true quarter turns (v33): rough stand ins, the hood near the middle of the file [TUNE, to
+  // be read off the turned pictures, Petros T23].
+  'spindleMoulder.used.r.png': { px: 80, py: 28, cell: { x: 0, y: 1 } },
+  'spindleMoulder.budget.r.png': { px: 80, py: 40, cell: { x: 0, y: 1 } },
+  'spindleMoulder.standard.r.png': { px: 80, py: 24, cell: { x: 0, y: 1 } },
+  'spindleMoulder.pro.r.png': { px: 100, py: 67, cell: { x: 0, y: 1 } },
+  'spindleMoulder.industrial.r.png': { px: 150, py: 65, cell: { x: 0, y: 1 } },
   // The three floor edgebanders: the top of the machine [TUNE].
   'edgebander.standard.png': { px: 104, py: 70, cell: { x: 1, y: 0 } },
   'edgebander.pro.png': { px: 117, py: 95, cell: { x: 1, y: 0 } },
   'edgebander.industrial.png': { px: 122, py: 97, cell: { x: 2, y: 0 } },
+  // Their true quarter turns (v33): rough stand ins, the top near the middle of the file [TUNE, to
+  // be read off the turned pictures, Petros T23].
+  'edgebander.standard.r.png': { px: 100, py: 70, cell: { x: 0, y: 1 } },
+  'edgebander.pro.r.png': { px: 100, py: 95, cell: { x: 0, y: 1 } },
+  'edgebander.industrial.r.png': { px: 130, py: 97, cell: { x: 0, y: 2 } },
 };
 
 /** The suffix each orientation's file carries: 0 the base picture, then a quarter turn at a time

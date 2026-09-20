@@ -100,7 +100,7 @@ export const STATE_VERSION = 19;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
-export const APP_VERSION = 'v32';
+export const APP_VERSION = 'v33';
 
 // ---------------------------------------------------------------------------
 // The owner's day, in the seven things it is made of
@@ -1181,6 +1181,9 @@ export const MACHINE_ENDURANCE_HOURS_DEFAULT = 5000;
 
 /** The five classes of table saw. Prices and the used saw's three effects are (PIOTR), the rest
  *  of the factors are [TUNE] (CLAUDE.md T3 3.5). */
+/** Heights are the pictures' since v33 (the art side's table saws v2, 19.09): the canvas has to hold
+ *  the guard arms, the hoses and the screens that rise above the 1 m body, and a height draws the
+ *  canvas and nothing else. */
 export const TABLE_SAW_VARIANTS: EquipmentVariant[] = [
   {
     id: 'used',
@@ -1188,7 +1191,7 @@ export const TABLE_SAW_VARIANTS: EquipmentVariant[] = [
     price: 1800,
     width: 2,
     depth: 1,
-    height: 1,
+    height: 1.4,
     zoneWidth: 3,
     zoneDepth: 3,
     outputFactor: 0.95,
@@ -1205,7 +1208,7 @@ export const TABLE_SAW_VARIANTS: EquipmentVariant[] = [
     price: 5000,
     width: 2,
     depth: 1,
-    height: 1,
+    height: 1.4,
     zoneWidth: 3,
     zoneDepth: 3,
     outputFactor: 1,
@@ -1222,7 +1225,7 @@ export const TABLE_SAW_VARIANTS: EquipmentVariant[] = [
     price: 7000,
     width: 3,
     depth: 1,
-    height: 1,
+    height: 1.95,
     zoneWidth: 4,
     zoneDepth: 3,
     outputFactor: 1.05,
@@ -1239,7 +1242,7 @@ export const TABLE_SAW_VARIANTS: EquipmentVariant[] = [
     price: 15000,
     width: 3,
     depth: 2,
-    height: 1,
+    height: 2.15,
     zoneWidth: 6,
     zoneDepth: 3,
     outputFactor: 1.15,
@@ -1256,7 +1259,7 @@ export const TABLE_SAW_VARIANTS: EquipmentVariant[] = [
     price: 25000,
     width: 4,
     depth: 2,
-    height: 1.2,
+    height: 2.65,
     zoneWidth: 5,
     zoneDepth: 4,
     outputFactor: 1.3,
@@ -2423,6 +2426,9 @@ export const DRILL_VARIANTS: EquipmentVariant[] = [
 /** The five classes of spindle moulder, the new family two trades share (CLAUDE.md T13 3.13). Prices
  *  [TUNE: 1,500 to 28,000], footprint 2 by 1 in a 3 by 3 zone [TUNE]; the factors follow the saw's
  *  ladder. */
+/** Heights are the pictures' since v33 (the art side's corrected equipment v2, 20.09): the working
+ *  top is 1 m, the hoods and the power feeds rise to these, and a height draws the canvas and
+ *  nothing else. */
 export const SPINDLE_MOULDER_VARIANTS: EquipmentVariant[] = [
   {
     id: 'used',
@@ -2430,7 +2436,7 @@ export const SPINDLE_MOULDER_VARIANTS: EquipmentVariant[] = [
     price: 1500,
     width: 2,
     depth: 1,
-    height: 1,
+    height: 1.9,
     zoneWidth: 3,
     zoneDepth: 3,
     outputFactor: 0.95,
@@ -2447,7 +2453,7 @@ export const SPINDLE_MOULDER_VARIANTS: EquipmentVariant[] = [
     price: 4000,
     width: 2,
     depth: 1,
-    height: 1,
+    height: 1.85,
     zoneWidth: 3,
     zoneDepth: 3,
     outputFactor: 1,
@@ -2463,7 +2469,7 @@ export const SPINDLE_MOULDER_VARIANTS: EquipmentVariant[] = [
     price: 9000,
     width: 2,
     depth: 1,
-    height: 1,
+    height: 2.25,
     zoneWidth: 3,
     zoneDepth: 3,
     outputFactor: 1.05,
@@ -2480,7 +2486,7 @@ export const SPINDLE_MOULDER_VARIANTS: EquipmentVariant[] = [
     price: 16000,
     width: 3,
     depth: 1,
-    height: 1,
+    height: 2.15,
     zoneWidth: 4,
     zoneDepth: 3,
     outputFactor: 1.15,
@@ -2497,7 +2503,7 @@ export const SPINDLE_MOULDER_VARIANTS: EquipmentVariant[] = [
     price: 28000,
     width: 3,
     depth: 2,
-    height: 1.2,
+    height: 2.85,
     zoneWidth: 5,
     zoneDepth: 3,
     outputFactor: 1.3,
@@ -3339,37 +3345,9 @@ export const DELIVERY_VAN_SPRITE = 'deliveryVan';
  *  extraction systems stand, in cells. */
 export const YARD_WIDTH_CELLS = 3;
 
-/** The height every pipe hangs at, in metres: the runs the game routes and the run a central
- *  system draws along the rear wall are both up here, over the machines (CLAUDE.md T13 3.19,
- *  T16 2.3). The Turn 4 ducting sprite and its bar are gone: one vector helper draws every pipe.
- *  Raised from 3 to 3.2 on 19.09 [PIOTR: "a bit higher"]; the wall is 3.5, so the run is clear of
- *  the machines and still under the roof (CLAUDE.md T22 2.7). */
-export const DUCT_HEIGHT = 3.2;
 /** The families that are a central system: with one in the hall every machine is connected and
  *  the drawing says so with a drop to each (CLAUDE.md T16 2.3). */
 export const DUCT_SYSTEMS = ['dustSystem', 'flexiSystem'];
-/** The pipe as the vector helper draws it: a round duct this wide, in metres [TUNE]
- *  (CLAUDE.md T16 2.3). */
-export const PIPE_DIAMETER = 0.2;
-
-/** The four greys a pipe is painted in, darkest to lightest: the dark rim around the bar, the body
- *  of it, the shade along its underside and the lit edge along its top
- *  [TUNE: galvanised, read off docs/mockups/t22/pipes-A-one-path.png]. The purple of Turn 16 is
- *  gone with the nine tiles it was drawn on (PIOTR's screenshot, 19.09; CLAUDE.md T22 2.7).
- *
- *  They live here and not in the stylesheet because `src/render/pipes.ts` writes one SVG path per
- *  run and strokes it five times, and a stroke's colour has to be on the element: the stylesheet
- *  cannot tell the fourth stroke of a path from the second. `.pipe-short` still overrides them in
- *  CSS, because a CSS rule beats a presentation attribute. */
-export const PIPE_RIM = '#4b5158';
-export const PIPE_BODY = '#8f979e';
-export const PIPE_SHADE = '#5e666e';
-export const PIPE_LIGHT = '#d7dde1';
-/** The flexible hose from a visible port up to the run: the floor's own colour a touch darker
- *  [PIOTR, 19.09: "like the floor, a touch darker"; TUNE off the `--concrete` token]
- *  (CLAUDE.md T22 2.8). */
-export const HOSE_COLOUR = '#787b80';
-
 /** The pallet of sheets at the gate stands where the lorry stood: inside the shutter, on the lane,
  *  one metre each way (CLAUDE.md T13 3.21). The man unloading it stands in front of it on the hall
  *  side, never outside (PIOTR, 16.09; CLAUDE.md T16 2.1). */

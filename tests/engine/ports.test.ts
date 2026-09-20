@@ -89,8 +89,10 @@ describe('the table covers what a pipe is drawn to (CLAUDE.md T22 2.8)', () => {
     }
   });
 
-  it('measures eighteen files and every pixel of them is inside its own file', () => {
-    expect(measuredFiles()).toHaveLength(18);
+  it('measures thirty six files and every pixel of them is inside its own file', () => {
+    // Eighteen base pictures, and since v33 the true quarter turn of every one of them (the art
+    // side's packs of 19.09 and 20.09).
+    expect(measuredFiles()).toHaveLength(36);
     for (const file of measuredFiles()) {
       const port = portFor(file);
       if (port === null) throw new Error(`no line for ${file}`);
@@ -144,32 +146,37 @@ describe('the cell a port routes to (CLAUDE.md T22 2.8)', () => {
     // A 3 by 1 saw turned is 1 by 3: the table cell one along x becomes one along y, which is the
     // middle cell of the turned footprint. `width - 1 - x` gave -1, a metre off the machine.
     expect(mirroredCell(saw.cell)).toEqual({ x: 0, y: 1 });
-    expect(footprintOf('tableSaw', 'standard', 1)).toEqual({ width: 1, depth: 3, height: 1 });
+    expect(footprintOf('tableSaw', 'standard', 1)).toEqual({ width: 1, depth: 3, height: 1.95 });
     const fan = portFor('extractor.standard.png');
     if (fan === null) throw new Error('no fan line');
     expect(fan.cell).toEqual({ x: 0, y: 1 });
     expect(fan.faces).toBe('+y');
     // The cell in front of the mouth moves with the mouth: down and to the left becomes down and
     // to the right, and the cell goes from one along y to one along x. The mouth itself is swapped
-    // where the mirror happens, in `portPointOf`, which is asserted in
-    // tests/render/pipesOnTheHall.test.ts.
+    // where the mirror happened in the drawing of Turn 22, gone in v33.
     expect(mirroredCell(fan.cell)).toEqual({ x: 1, y: 0 });
   });
 
   it('reads the picture the hall really draws, so a turned file brings its own numbers', () => {
-    // The saw has no `.r` file, so a quarter turn is the base picture mirrored and the base line
-    // mirrored with it.
-    expect(pictureFor(deliveredFiles(), 'tableSaw', 'standard', 1)).toEqual({
+    // With the saw's `.r` file taken out of the list a quarter turn is the base picture mirrored
+    // and the base line mirrored with it, which is how every family stood before v33.
+    const withoutTurnedSaw = deliveredFiles().filter((name) => name !== 'tableSaw.standard.r.png');
+    expect(pictureFor(withoutTurnedSaw, 'tableSaw', 'standard', 1)).toEqual({
       file: 'tableSaw.standard.png',
       mirrored: true,
     });
     expect(
-      portCellIn(deliveredFiles(), {
+      portCellIn(withoutTurnedSaw, {
         spriteKey: 'tableSaw',
         variantId: 'standard',
         orientation: 1,
       }),
     ).toEqual({ x: 0, y: 1 });
+    // With the file there (the art side's table saws v2, 19.09) the turn reads its own line.
+    expect(pictureFor(deliveredFiles(), 'tableSaw', 'standard', 1)).toEqual({
+      file: 'tableSaw.standard.r.png',
+      mirrored: false,
+    });
     // The tool cabinet has all four files and no orientation of it is mirrored, so the day an
     // `extractor.<class>.r.png` lands it brings its own line and no code changes at all.
     for (const orientation of [0, 1, 2, 3] as Orientation[]) {

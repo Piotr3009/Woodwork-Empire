@@ -3253,39 +3253,6 @@ input.num {
   border-color: var(--good);
   box-shadow: inset 0 0 0 1px var(--good);
 }
-.pipe-layer {
-  pointer-events: none;
-}
-/* The pipes, drawn by src/render/pipes.ts (CLAUDE.md T16 2.3, T22 2.7): galvanised, with a dark
-   rim, a lit edge and a shade along the underside. Every grey is a constant written onto the
-   element, because one path is stroked five times and a stylesheet cannot tell the fourth stroke
-   from the second; what is left here is the shape of the line and the red a starved run wears,
-   which is a rule and so beats the attribute. */
-.pipe-rim,
-.pipe-bar,
-.pipe-shade,
-.pipe-hose {
-  stroke-linecap: round;
-}
-.pipe-edge {
-  stroke-width: 1.5;
-  stroke-linecap: round;
-  opacity: 0.85;
-}
-/* The specular line: the lit grey again, thinner and at full strength, so it reads as the bright
-   core of the lit edge rather than a sixth colour (CLAUDE.md T22 2.7). */
-.pipe-spec {
-  stroke-linecap: round;
-}
-.pipe-collar {
-  fill: none;
-}
-.pipe-short .pipe-bar,
-.pipe-short .pipe-rim,
-.pipe-short .pipe-shade {
-  stroke: var(--bad);
-}
-
 /* A machine with no pipe to the extraction says so under its name, and wears nothing else: the
    pulsing red ring of Turn 16 went with the nine tiles [PIOTR, 19.09] (CLAUDE.md T22 2.8). */
 .not-connected {

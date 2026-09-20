@@ -30,7 +30,10 @@ describe('an object with a file is a picture, not a box', () => {
     const at = spriteBox(stands.x, stands.y, stands.width, stands.depth, stands.height);
     expect(svg).toContain('<image href="/sprites/tableSaw.pro.png"');
     expect(svg).toContain(`width="${at.width}" height="${at.height}"`);
-    expect(svg).toContain(`x="${at.x}" y="${at.y}"`);
+    // The hall rounds every coordinate it writes to a hundredth of a pixel (its own `round`),
+    // and a 2.15 m saw lands on a fraction where the 1 m saw landed on a whole number.
+    const hundredth = (value: number): number => Math.round(value * 100) / 100;
+    expect(svg).toContain(`x="${hundredth(at.x)}" y="${hundredth(at.y)}"`);
   });
 
   it('falls back to the box when there is no file for that class or family', () => {
