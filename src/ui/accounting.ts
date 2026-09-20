@@ -1,7 +1,7 @@
-// Accounting in three tabs: the month day by day, the totals with the earned labour rate, and the
-// running ledger (CLAUDE.md 10.1, T6 3.9). Nothing arrives as a letter, it is all here.
+// Accounting in four tabs: the month day by day, the totals with the earned labour rate, the
+// months the company has closed, and the bank (CLAUDE.md 10.1, T6 3.9, T23 2.14). Nothing arrives
+// as a letter, it is all here.
 
-import { LEDGER_VISIBLE_ENTRIES } from '../engine/constants';
 import {
   booksBehind,
   dailyPower,
@@ -27,12 +27,15 @@ import { renderFinance } from './finance';
 import { button, escapeHtml, money, tabBar, whyLink } from './modal';
 
 /** The three ways of looking at the books (CLAUDE.md T6 3.9), and the loan and the overdraft
- *  (CLAUDE.md T13 3.14). */
-export type AccountingTab = 'days' | 'summary' | 'ledger' | 'finance';
+ *  (CLAUDE.md T13 3.14). The running ledger had a screen of its own until Turn 23: Piotr read it
+ *  and said it was made for an accountant and not for a player, so the months the company has
+ *  closed stand there instead. The ledger itself stays in the engine as the record it is, and the
+ *  Days tab, the Summary tab and the bank all read it [PIOTR, 20.09] (CLAUDE.md T23 2.14). */
+export type AccountingTab = 'days' | 'summary' | 'reports' | 'finance';
 const TABS: Array<[AccountingTab, string]> = [
   ['days', 'Days'],
   ['summary', 'Summary'],
-  ['ledger', 'Ledger'],
+  ['reports', 'Monthly reports'],
   ['finance', 'Finance'],
 ];
 
@@ -116,6 +119,32 @@ function totalsBlock(state: GameState, title: string, totals: PeriodTotals): str
     lines +
     '</div>'
   );
+}
+
+/** The months the company has closed, newest first, one row each. A click opens that month's card,
+ *  drawn by the one function that draws it at the month end (src/ui/monthEnd.ts). The list is
+ *  empty in a company that has not seen a month end yet, and in a v35 save lifted into this build
+ *  [PIOTR, 20.09] (CLAUDE.md T23 2.14). */
+function reportsTab(state: GameState): string {
+  const months = [...state.monthlyReports].reverse();
+  if (months.length === 0) {
+    return '<h3>Monthly reports</h3><p class="empty">No month has closed yet.</p>';
+  }
+  const rows = months
+    .map((entry) => {
+      const net = entry.report.net;
+      return (
+        `<div class="row" data-report="${entry.month}">` +
+        `<button class="day-toggle" data-do="openMonthlyReport" data-id="${entry.month}">` +
+        `<span class="row-main">${escapeHtml(monthName(entry.month))}</span>` +
+        `<span class="row-figure good">${money(entry.report.income)}</span>` +
+        `<span class="row-figure bad">${money(-entry.report.costs)}</span>` +
+        `<span class="row-figure ${net < 0 ? 'bad' : 'good'}">${money(net)}</span>` +
+        '</button></div>'
+      );
+    })
+    .join('');
+  return `<h3>Monthly reports</h3>${rows}`;
 }
 
 function ledgerRow(entry: LedgerEntry): string {
@@ -234,7 +263,6 @@ export function renderAccounting(
   const entries = behind
     ? state.ledger.filter((entry) => entry.day <= state.booksUpToDay)
     : state.ledger;
-  const ledger = entries.slice(-LEDGER_VISIBLE_ENTRIES).reverse().map(ledgerRow).join('');
   const summaryTab =
     '<div class="cols">' +
     totalsBlock(state, 'Today', books.day) +
@@ -258,12 +286,11 @@ export function renderAccounting(
     `<div class="row"><span class="row-main">Monthly bills, ${formatCalendarDay(due.monthly)}</span>` +
     `<span class="row-figure">${escapeHtml(monthlyBillsLine(state))}</span></div>` +
     '';
-  const ledgerTab = `<h3>Ledger, last ${LEDGER_VISIBLE_ENTRIES}</h3>` + ledger;
   const body =
     tab === 'days'
       ? daysTab(state, entries, openDays, month ?? monthOfDay(state.clock.day))
-      : tab === 'ledger'
-        ? ledgerTab
+      : tab === 'reports'
+        ? reportsTab(state)
         : tab === 'finance'
           ? renderFinance(state, loanTyped)
           : summaryTab;

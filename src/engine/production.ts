@@ -30,6 +30,8 @@ import {
   OWNER,
   accumulateMachineMinute,
   addDust,
+  benchOf,
+  benchPlaceAt,
   cabinetTools,
   claimMachine,
   countOf,
@@ -38,6 +40,7 @@ import {
   hallProductivityFactor,
   has,
   heldMachine,
+  isServiced,
   machineIsShared,
   releaseMachines,
   releaseMachinesExcept,
@@ -51,8 +54,11 @@ import {
   airFactorFor,
   benchDrawsAir,
   drawingOn,
+  extractionKit,
+  extractionRunning,
   hallAirCheck,
   sprayingOnWetAir,
+  standsForAir,
   underExtracted,
 } from './media';
 import {
@@ -195,6 +201,13 @@ export function takeMachines(state: GameState, hand: Hand): StationCheck {
   if (family === null || !has(state, family) || machineIsShared(state, family)) {
     return { machine: sharedTool(state, family), waitingFor: null };
   }
+  // A bench is his own place at one and not a thing he took off anybody, so it is asked for by
+  // name. Only the man who wanted a bench has one: the men behind the lead work at the lead's and
+  // put their minutes in at the stage's own speed, as they have since Turn 19
+  // (CLAUDE.md T19 2.5, T23 2.17).
+  if (family === BENCH) {
+    return { machine: wanted.includes(BENCH) ? benchOf(state, hand.who) : null, waitingFor: null };
+  }
   return { machine: heldMachine(state, hand.who, family), waitingFor: null };
 }
 
@@ -227,9 +240,18 @@ export function stationForProduction(state: GameState, who: string, job: Job): s
   // second place and the rest along its front (CLAUDE.md T17 2.10, T19 2.5).
   const lead = leadAssignee(job);
   const behind = lead !== null && lead !== who && isOnJob(job, who);
-  const bench = behind ? heldMachine(state, lead, BENCH) : null;
+  const bench = behind ? benchOf(state, lead) : null;
   const atTheBench = (): string => {
-    if (bench === null) return STATION_BENCH;
+    if (bench === null) {
+      // His own bench, and his own place at it. A class holds one, two or three men from Turn 23
+      // and the first of them stands at its operator's cell, so the second and the third take the
+      // places beside it and no two figures are drawn on the one cell (T19 2.5, T23 2.17).
+      const mine = benchOf(state, who);
+      if (mine === null) return STATION_BENCH;
+      const place = benchPlaceAt(state, who);
+      if (place === 0) return STATION_BENCH;
+      return place === 1 ? secondStation(mine.id) : placeStation(mine.id, place);
+    }
     const place = placeAmong(job, who, (other) => other !== lead);
     return place === 0 ? secondStation(bench.id) : placeStation(bench.id, place + 1);
   };
@@ -437,7 +459,11 @@ export function ownerIdleReason(state: GameState): OwnerIdleReason | null {
   if (owner.currentTaskId !== null) return null;
   const job = jobOf(state, OWNER);
   if (job !== null) {
-    return rackCanSupply(state, job, jobProgress(job)) ? 'noMachine' : 'noMaterial';
+    if (!rackCanSupply(state, job, jobProgress(job))) return 'noMaterial';
+    // A bench the hall has no air for stands the owner still like anybody else, and his meter
+    // says which of the two it was (PIOTR, 20.09; CLAUDE.md T23 2.7).
+    const stage = currentStage(state, job, cncOptions(state, OWNER, job));
+    return standsForAir(state, stage) ? 'noCompressor' : 'noMachine';
   }
   // Nothing of his own at all. Either the hall's list has a chore nobody has taken, or there is
   // work of the board's about that is every bit of it somebody else's; or there is none of that
@@ -590,10 +616,26 @@ export function workMinute(
   // What the men at the benches draw for their nailers and their sanders, through the one
   // selector the hall and the board read as well (CLAUDE.md T10 3.2).
   const air = hallAirCheck(state);
+  // And what the men at the benches do when there is nothing in the hose: they stand. A bench
+  // wants its 30 l/min at 6 bar and without a compressor, or on one that is short, there is no
+  // bench work at all from tonight [PIOTR, 20.09] (CLAUDE.md T23 2.7). It is asked here and not
+  // in `placeHand`, because the air sum is the sum of the machines running this very minute and
+  // the machines are not taken until every hand has been placed.
+  const running: AtWork[] = [];
+  for (const entry of atWork) {
+    if (standsForAir(state, entry.stage)) {
+      // He keeps his bench and stands at it. The minute is one of the hall's lost ones and the
+      // mark over his head says why (src/engine/bubbles.ts).
+      lose('noMachine');
+      continue;
+    }
+    running.push(entry);
+  }
+  if (running.length === 0) return report;
   // The minutes somebody actually stood at each machine: that, and nothing else, is what wears
   // it out and what fills the hall's bags (CLAUDE.md T7 2, T12 2.3).
   const used = new Map<string, number>();
-  for (const { hand, stage, machine } of atWork) {
+  for (const { hand, stage, machine } of running) {
     const worker = state.workers.find((entry) => entry.id === hand.who);
     if (worker) {
       worker.productionMinutes += 1;
@@ -637,10 +679,19 @@ export function workMinute(
     const minute = labourPerMinute(hand.rate * trade, speed) * hall;
     if (addLabour(state, hand.job, minute, stage.id)) report.finished.push(hand.job);
   }
+  // The extraction books its hours the whole time it is running, whoever is at what: a fan is
+  // pulling for the hall and not for one man, and it is serviced on those hours exactly as a
+  // machine is [PIOTR, 20.09] (CLAUDE.md T23 2.8). `isServiced` says which of the kit in the
+  // duct run wears out on them.
+  if (extractionRunning(state)) {
+    for (const fan of extractionKit(state)) {
+      if (isServiced(fan.specId)) used.set(fan.id, (used.get(fan.id) ?? 0) + 1);
+    }
+  }
   // What the owner's absence took off every staff minute this minute is the owner away line of
   // the efficiency breakdown (CLAUDE.md T13 3.5, 3.9).
   const away = staffOutputFactor(state);
-  for (const { hand } of atWork) {
+  for (const { hand } of running) {
     if (hand.who === OWNER) {
       report.worked += 1;
       continue;

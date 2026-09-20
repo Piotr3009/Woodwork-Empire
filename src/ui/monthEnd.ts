@@ -7,12 +7,10 @@
 // unpaid: a cost the player did not choose comes out of the account whatever the balance, so it is
 // on a line of the report like every other pound (CLAUDE.md T22 2.1, 2.4).
 
-import { monthName, monthOfDay, monthReport } from '../engine/index';
-import { monthEfficiency } from '../engine/efficiency';
+import { monthName, monthOfDay, monthlyReportFor } from '../engine/index';
+import type { MonthlyReport } from '../engine/index';
 import type { MonthEfficiency } from '../engine/efficiency';
-import { machineSavings } from '../engine/machines';
 import type { MachineSavings } from '../engine/machines';
-import { monthRate } from '../engine/rate';
 import type { WorkshopRate } from '../engine/rate';
 import { plural } from '../engine/text';
 import type { GameEvent, GameState, MonthLine, MonthReport } from '../engine/index';
@@ -150,14 +148,27 @@ export function renderMonthEfficiency(month: MonthEfficiency, machines: MachineS
   );
 }
 
+/** One month's card, drawn from the figures the month was written down in. The one function: the
+ *  modal the month end raises and a month opened from Accounting's Monthly reports tab a year
+ *  later are the same drawing of the same data, which is the whole point of storing it
+ *  [PIOTR, 20.09] (CLAUDE.md T23 2.14). The line under the rate is the event's own words at the
+ *  month end and nothing at all when a stored report is opened, because there is no event then. */
+export function renderMonthlyReport(entry: MonthlyReport, body = ''): string {
+  return (
+    renderRateLine(entry.rate) +
+    (body === '' ? '' : `<p class="event-body">${escapeHtml(body)}</p>`) +
+    renderMonthReport(entry.report) +
+    renderMonthEfficiency(entry.efficiency, entry.savings)
+  );
+}
+
 export function renderMonthEnd(state: GameState, event: GameEvent): string {
   const asked =
     typeof event.data.month === 'number' ? event.data.month : monthOfDay(state.clock.day) - 1;
   const month = Math.max(1, asked);
-  return (
-    renderRateLine(monthRate(state, month)) +
-    `<p class="event-body">${escapeHtml(event.body)}</p>` +
-    renderMonthReport(monthReport(state, month)) +
-    renderMonthEfficiency(monthEfficiency(state, month), machineSavings(state, 'month'))
-  );
+  // The month the card is raised for is the month that was just written down, so the card is
+  // drawn from the stored report where there is one and worked out on the spot where there is
+  // not, which is a v35 save lifted into this build (CLAUDE.md T23 2.14, section 4).
+  const stored = state.monthlyReports.find((entry) => entry.month === month) ?? null;
+  return renderMonthlyReport(stored ?? monthlyReportFor(state, month), event.body);
 }

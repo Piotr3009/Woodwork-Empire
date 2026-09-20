@@ -35,6 +35,8 @@ import {
   machinesDueService,
   serviceDueIn,
   serviceIsDue,
+  benchOf,
+  benchPlacesOf,
   hasBenchFor,
   bagsExist,
   dustBand,
@@ -523,23 +525,29 @@ describe('no bench in the hall', () => {
     if (!first || !second) throw new Error('two jobs wanted');
     second.stage = 'ready';
     expect(state.equipment.filter((item) => item.specId === 'workbench')).toHaveLength(1);
-    // The second job gets to the one bench first, with the owner on it.
+    // It was a claim on the bench until Turn 23 and it is a place at one now, so nobody is ever
+    // turned off one: there is nothing to turn him off. The one bench of this hall holds one man,
+    // and the man who has him is the joiner, because the crew fill the benches in the order they
+    // were hired and the owner takes what is left over. The gate bought that bench for the
+    // joiner, so the joiner is not the one standing at the canteen door (CLAUDE.md T7 3.1,
+    // T23 2.17).
+    const bench = state.equipment.find((item) => item.specId === 'workbench');
+    if (!bench) throw new Error('one bench wanted');
+    expect(benchPlacesOf(bench)).toBe(1);
+    expect(benchOf(state, joiner.id)?.id ?? null).toBe(bench.id);
+    expect(benchOf(state, 'owner')).toBeNull();
+    // The owner is put on the second job and has nowhere to work; the joiner takes the first and
+    // has. Neither answer changes with a minute of the clock, which is the whole of the rule.
     state = act(state, { type: 'ASSIGN_JOB', jobId: second.id, workerId: 'owner' });
-    expect(hasBenchFor(state, second.id)).toBe(true);
+    expect(hasBenchFor(state, second.id)).toBe(false);
     state = tick(state, 1);
-    // A minute later the joiner is put on the first job, which sits earlier on the books.
     const waiting = state.jobs[0];
     if (!waiting) throw new Error('no first job');
     waiting.stage = 'ready';
     state = act(state, { type: 'ASSIGN_JOB', jobId: first.id, workerId: joiner.id });
     expect(state.jobs[0]?.id).toBe(first.id);
-    // The owner keeps the bench he is standing at; the joiner is the one with nowhere to work.
-    expect(hasBenchFor(state, second.id)).toBe(true);
-    expect(hasBenchFor(state, first.id)).toBe(false);
-    // And what holds it is the claim on the bench itself, not a minute written on the job
-    // (CLAUDE.md T7 3.1).
-    const bench = state.equipment.find((item) => item.specId === 'workbench');
-    expect(bench?.takenBy).toBe('owner');
+    expect(hasBenchFor(state, first.id)).toBe(true);
+    expect(hasBenchFor(state, second.id)).toBe(false);
   });
 
   it('stands a joiner with nowhere to work at the canteen door', () => {

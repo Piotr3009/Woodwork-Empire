@@ -12,6 +12,7 @@
 import {
   LIFE_LOW_FRACTION,
   findSpec,
+  isServiced,
   isSold,
   itemStandsInTheHall,
   lifeAfterServices,
@@ -48,21 +49,15 @@ export function lifeIsLow(item: Equipment): boolean {
   return 1 - lifeUsedShare(item) < LIFE_LOW_FRACTION;
 }
 
-/** Is this one of the machines a service is called on at all? The extraction is repaired and
- *  never serviced, which is what `serviceableMachines` in the engine means by a machine, and this
- *  page reads the same category it does. */
-function isServiced(item: Equipment): boolean {
-  return findSpec(item.specId)?.category === 'machine';
-}
-
 /** What the row says about the state the machine is in, or nothing while it is simply running.
- *  A service is never due on a thing that is never serviced: the extractor's row said "service
- *  due" beside "It is repaired, never serviced" until the picture was looked at (T20-C5). */
+ *  A service is never due on a thing that is never serviced, and the engine's own `isServiced`
+ *  says which those are: the page asked the category itself until Turn 23 put the fans on the
+ *  list and the two readings would have parted (T20-C5; CLAUDE.md T23 2.8). */
 export function stateLabel(state: GameState, item: Equipment): string {
   if (item.broken) return 'broken';
   if (machineIsOut(item, state.clock.day)) return 'in service';
   if (pastEndurance(item)) return 'past its life';
-  if (serviceIsDue(item) && isServiced(item)) return 'service due';
+  if (serviceIsDue(item) && isServiced(item.specId)) return 'service due';
   return '';
 }
 

@@ -1027,7 +1027,14 @@ export type LostMinuteCause = 'noPeople' | 'noMachine' | 'noMaterial' | 'ownerAw
  *  `LostMinuteCause`: that one counts every seat in the hall, and two of its four cannot be true
  *  of the man whose absence they measure. The words are `OWNER_IDLE_REASONS`
  *  (CLAUDE.md T21 2.8). */
-export type OwnerIdleReason = 'noMachine' | 'noMaterial' | 'nothingAssigned' | 'officeEmpty';
+export type OwnerIdleReason =
+  | 'noMachine'
+  | 'noMaterial'
+  /** He stood at a bench with no compressor behind it, or on one short of litres: from Turn 23
+   *  there is no bench work without air at all (PIOTR, 20.09; CLAUDE.md T23 2.7). */
+  | 'noCompressor'
+  | 'nothingAssigned'
+  | 'officeEmpty';
 
 /** Why a man on the books stood still for a minute of his own day. His own list and not the
  *  owner's: the two office reasons are the owner's alone, because a joiner has no office queue to
@@ -1037,7 +1044,7 @@ export type OwnerIdleReason = 'noMachine' | 'noMaterial' | 'nothingAssigned' | '
  *  2.1, 2.13). The words are `WORKER_IDLE_REASONS`. */
 export type WorkerIdleReason = 'waitingForBoss' | 'noMachine' | 'noMaterial';
 
-/** The state a mark over a figure's head is drawn for: the four things that are wrong with a man
+/** The state a mark over a figure's head is drawn for: the six things that are wrong with a man
  *  and that the player can put right (docs/mockups/t22/bubbles-v2.png, the red column;
  *  CLAUDE.md T22 2.5). A man who is working, at a chore of his own, at his lunch, in the office or
  *  out measuring has nothing wrong with him and carries no key at all
@@ -1046,7 +1053,11 @@ export type BubbleKey =
   | 'waitingForMachine'
   | 'noCutParts'
   | 'noMaterial'
+  /** He is at a bench the hall has no air for (CLAUDE.md T23 2.7). */
+  | 'noCompressor'
   | 'nothingToDo'
+  /** Nobody has put him on anything, and without a production manager nobody but the owner can
+   *  (CLAUDE.md T23 2.1). */
   | 'waitingForBoss';
 
 /** One mark over a man's head, ready to draw: the words it says on hover with every slot filled,

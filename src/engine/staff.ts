@@ -60,6 +60,9 @@ import {
   overdueBreakdownChance,
   releaseMachines,
   releaseMachinesExcept,
+  BENCH,
+  benchAtPlace,
+  benchPlacesOwnedOrOnOrder,
   toolSlotsOf,
 } from './machines';
 import { countOwnedOrOnOrder } from './orders';
@@ -409,11 +412,17 @@ export function shortfallForHire(
     // cabinets from Turn 22: the shortfall is the slots the hall is short, which is the number of
     // used cabinets at a pound ninety that would put it right, and any dearer class covers more of
     // it at once (CLAUDE.md T22 2.12).
+    // The bench is counted in places and not in benches from Turn 23, the way the cabinet is
+    // counted in slots: a class holds one, two or three men, so the shortfall is the places the
+    // hall is short, which is the number of used benches at a hundred and twenty that would put
+    // it right, and any dearer class covers more of it at once (CLAUDE.md T23 2.17).
     const wanted = specId === TOOL_CABINET ? toolSlotsNeeded(state, 1) : needed;
     const has =
       specId === TOOL_CABINET
         ? toolSlotsOwnedOrOnOrder(state)
-        : countOwnedOrOnOrder(state, specId);
+        : specId === BENCH
+          ? benchPlacesOwnedOrOnOrder(state)
+          : countOwnedOrOnOrder(state, specId);
     const count = wanted - has;
     if (count > 0) short.push({ specId, count });
   }
@@ -476,7 +485,16 @@ export function hiringOptions(state: GameState): HiringOption[] {
       // (PIOTR; CLAUDE.md T13 3.10).
       blockReason = crewLine(state);
     } else if (missing.length > 0) {
-      blockReason = `Buy first: ${missing.join(', ')}`;
+      // A bench holds one, two or three men by its class from Turn 23, so a hall that has benches
+      // and no room left at them is short of a place and not of a bench, and says so in those
+      // words. A hall that is short of other things as well is told what to buy, as it always was
+      // [PIOTR, 20.09] (CLAUDE.md T23 2.17). One rule either way: both readings are the same
+      // shortfall, counted in places by `shortfallForHire`.
+      const short = missingForHire(state, spec.role);
+      blockReason =
+        short.length === 1 && short[0] === BENCH
+          ? 'No place at a bench'
+          : `Buy first: ${missing.join(', ')}`;
     } else if (state.cash < spec.monthlyWage) {
       // Last of the refusals, because it is the only one that changes by the minute: who answers
       // the advert, what the office wants first, the bench and the kit are all standing facts,
@@ -534,8 +552,12 @@ function benchAnchor(state: GameState, role: WorkerRole): { x: number; y: number
     return booth ? { x: booth.anchorX, y: booth.anchorY } : { x: 0, y: 4 };
   }
   if (role !== 'joiner') return { x: 1, y: 1 };
-  const index = joiners(state).length;
-  const bench = state.equipment.filter((item) => item.specId === 'workbench')[index];
+  // His home bench is the first with a place free. A class holds one, two or three men, so the
+  // second man at a standard bench stands at the same bench as the first and is drawn there
+  // (PIOTR, 20.09; CLAUDE.md T23 2.17). The crew fill the benches in the order they were hired
+  // and the owner takes what is left, so the place this man gets is the one after the men already
+  // on the books, and it is the answer `benchOf` will give for him every morning after.
+  const bench = benchAtPlace(state, joiners(state).length);
   if (bench) return { x: bench.anchorX, y: bench.anchorY };
   return { x: 0, y: 4 };
 }

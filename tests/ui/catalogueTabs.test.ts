@@ -6,12 +6,14 @@ import { describe, expect, it } from 'vitest';
 import {
   EQUIPMENT_SPECS,
   EQUIPMENT_TABS,
+  GATE_OUTPUT_BONUS,
   GATE_PRICE,
   HOURS_PER_WORKING_DAY,
   SERVICE_INTERVAL_HOURS,
 } from '../../src/engine/constants';
 import { catalogueTabFrom, ownedState, renderCatalogue } from '../../src/ui/catalogue';
 import { findSpec } from '../../src/engine/machines';
+import { extractionDemandOf } from '../../src/engine/media';
 import { addWorkingDays } from '../../src/engine/clock';
 import { machineHoursPerDay } from '../../src/engine/production';
 import { formatCalendarDay } from '../../src/engine/index';
@@ -58,10 +60,48 @@ describe('the automatic gate on the card of a machine in the hall (CLAUDE.md T13
       (node) => node.textContent,
     );
     expect(greyed).toContain('Gate fitted');
-    // What it does is on the card, coloured by its sign (CLAUDE.md T13 1).
+    // What it does is on the card, coloured by its sign, and from Turn 23 it says the second half
+    // of it as well (CLAUDE.md T13 1, T23 2.15).
     expect(fitted?.querySelector('.figure.good')?.textContent).toBe(
-      'Automatic gate fitted: output +2%',
+      'Automatic gate fitted: output +2%, counts only while running',
     );
+  });
+
+  it('says what a gate is for in the specification block, above the button that buys it', () => {
+    // Piotr looked at the card on 20.09 and said the output is the small half of a gate: what
+    // sells one is that a shut drop is that machine's whole demand back in the duct for
+    // everything else, and nothing on any screen said so (CLAUDE.md T23 2.15).
+    const state = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
+    const saw = state.equipment.find((item) => item.specId === 'tableSaw');
+    if (!saw) throw new Error('no saw');
+    const card = shop(state, 'owned').querySelector(`[data-owned="${saw.id}"]`);
+    const wants = extractionDemandOf(saw);
+    const per = Math.round(GATE_OUTPUT_BONUS * 100);
+    const line = Array.from(card?.querySelectorAll('.spec-line') ?? []).find((node) =>
+      (node.textContent ?? '').startsWith('Automatic gate:'),
+    );
+    expect(line?.textContent).toBe(
+      `Automatic gate: +${per}% output, and it counts toward the extraction only while it runs ` +
+        `(frees ${wants.toLocaleString('en-GB')} m³/h while it stands)`,
+    );
+    // In the good token, and above the button, which is in the card's action row under it.
+    expect(line?.className).toContain('good');
+    const html = card?.innerHTML ?? '';
+    expect(html.indexOf('Automatic gate:')).toBeLessThan(html.indexOf('data-do="buyGate"'));
+    // And once the gate is on, the offer is gone and the fitted line is what is left.
+    const fitted = act(state, { type: 'BUY_GATE', equipmentId: saw.id });
+    const after = shop(fitted, 'owned').querySelector(`[data-owned="${saw.id}"]`);
+    expect(after?.textContent).not.toContain('Automatic gate: +');
+    expect(after?.textContent).toContain('Automatic gate fitted: output +2%, counts only while running');
+  });
+
+  it('offers no gate line at all on a thing the extraction does not reach', () => {
+    const state = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
+    const bench = state.equipment.find((item) => item.specId === 'workbench');
+    if (!bench) throw new Error('no bench');
+    expect(extractionDemandOf(bench)).toBe(0);
+    const card = shop(state, 'owned').querySelector(`[data-owned="${bench.id}"]`);
+    expect(card?.textContent).not.toContain('Automatic gate');
   });
 });
 
@@ -295,15 +335,49 @@ describe('the Owned tab', () => {
     expect(card?.textContent).toContain('80 h of use away');
   });
 
-  it('gives the extractor its state and no service, because its hours never move', () => {
+  it('gives the extractor its clock and its service, like the machines it pulls for', () => {
+    // Its card said its state and no clock until tonight, because it was repaired and never
+    // serviced. Piotr put the fan on the same footing as the saw on 20.09: it books its hours
+    // while the extraction runs, so the card carries the same life line and the same Service
+    // button every machine's card carries (CLAUDE.md T23 2.8).
     const state = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
     const extractor = state.equipment.find((item) => item.specId === 'extractor');
-    const card = shop(state, 'owned').querySelector(`[data-owned="${extractor?.id}"]`);
+    if (extractor === undefined) throw new Error('no extractor in the hall');
+    const card = shop(state, 'owned').querySelector(`[data-owned="${extractor.id}"]`);
     expect(card?.textContent).toContain('Extractor');
     expect(card?.textContent).toContain('running');
-    // It is repaired, never serviced, and no hours are ever booked on it.
-    expect(card?.textContent).not.toContain('service');
-    expect(card?.textContent).not.toContain(' h of ');
+    expect(card?.textContent).toContain(' h of ');
+    expect(card?.textContent).toContain('no service due while it stands idle');
+    // And once the hours are on it, the card offers the call the Machines page offers.
+    extractor.hoursUsed = SERVICE_INTERVAL_HOURS;
+    const due = shop(state, 'owned');
+    expect(due.querySelector(`[data-owned="${extractor.id}"]`)?.textContent)
+      .toContain('service due now');
+    expect(due.querySelector(`[data-owned="${extractor.id}"] [data-do="serviceMachine"]`))
+      .not.toBeNull();
+  });
+
+  it('gives the hand tool set its line and nothing to open, because it is in a cabinet', () => {
+    // The set is bought, it takes a slot, and from Turn 23 it is not a thing on the hall: its line
+    // in the Owned tab has no Turn and no Move on it, and a click on it opens nothing, because
+    // there is nothing to open (PIOTR, 20.09; CLAUDE.md T23 2.6).
+    const hall = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
+    // The used cabinet the starting kit buys holds one man's tools and that one is the owner's,
+    // so the hall is given a bigger one before a set is bought into it (CLAUDE.md T22 2.12).
+    const holderItem = hall.equipment.find((item) => item.specId === 'toolCabinet');
+    if (holderItem === undefined) throw new Error('the day one kit has a cabinet in it');
+    holderItem.variantId = 'pro';
+    const state = buyNow(hall, 'handToolSet');
+    const set = state.equipment.find((item) => item.specId === 'handToolSet');
+    const card = shop(state, 'owned').querySelector(`[data-owned="${set?.id}"]`);
+    expect(card).not.toBeNull();
+    expect(card?.textContent).toContain('Hand tool set');
+    expect(card?.querySelector('[data-do="turnItem"]')).toBeNull();
+    expect(card?.querySelector('[data-do="startSetup"]')).toBeNull();
+    // And the cabinet it lives in says what it holds and how much of it is in use, as it did.
+    const cabinet = state.equipment.find((item) => item.specId === 'toolCabinet');
+    const holder = shop(state, 'owned').querySelector(`[data-owned="${cabinet?.id}"]`);
+    expect(holder?.textContent).toContain('Holds 4 men\u0027s tools \u00b7 2 in use');
   });
 
   it('says what has stopped a machine, and offers the same action the hall offers', () => {

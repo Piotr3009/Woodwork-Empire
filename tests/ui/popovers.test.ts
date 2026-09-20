@@ -20,7 +20,7 @@ import type { ModalSpec } from '../../src/ui/modal';
 import { renderMenu } from '../../src/ui/topbar';
 import { renderWorkPlan } from '../../src/ui/workPlan';
 import { acceptContract, assignContract, drawContract } from '../../src/engine/contracts';
-import { summaryOfDay } from '../../src/engine/index';
+import { monthlyReportFor, summaryOfDay } from '../../src/engine/index';
 import type { GameState } from '../../src/engine/index';
 import { firstJob, runDays, twoMenOnSheetWork } from '../helpers';
 
@@ -345,6 +345,9 @@ describe('the game itself (CLAUDE.md T20 2.15)', () => {
       'assign list',
       'why',
       'day summary',
+      // A month's report shuts before the Accounting binder it was opened from, for the same
+      // reason the drop card does (CLAUDE.md T23 2.14).
+      'monthly report',
       // The drop card shuts before the Work Plan it was opened over, because Escape means "not that"
       // and the thing the player means is the question in front of him (CLAUDE.md T21 2.3).
       'drop card',
@@ -388,6 +391,36 @@ describe('the game itself (CLAUDE.md T20 2.15)', () => {
     press('Escape');
     expect(modalShown('daySummary')).toBe(false);
     expect(modalShown('accounting')).toBe(true);
+    press('Escape');
+    expect(modalShown('accounting')).toBe(false);
+  });
+
+  it('shuts a month s report before the books under it, on Escape, the cross and a click outside', () => {
+    const state = currentState();
+    if (state === null) throw new Error('no game');
+    // The workshop of this file is three days old, so a closed month is written into it by hand,
+    // through the one function the month end writes with (CLAUDE.md T23 2.14).
+    if (state.monthlyReports.length === 0) state.monthlyReports.push(monthlyReportFor(state, 1));
+    render();
+    if (!shown('[data-office="binder"]')) click('[data-do="setView"][data-view="office"]');
+    click('[data-office="binder"]');
+    click('[data-do="accountingTab"][data-id="reports"]');
+    click('[data-do="openMonthlyReport"][data-id="1"]');
+    expect(modalShown('monthlyReport')).toBe(true);
+    press('Escape');
+    expect(modalShown('monthlyReport')).toBe(false);
+    expect(modalShown('accounting')).toBe(true);
+    // The one cross, and the third way out every card has: a click outside it.
+    click('[data-do="openMonthlyReport"][data-id="1"]');
+    const card = root().querySelector('.modal-layer [data-modal="monthlyReport"]');
+    expect(card).not.toBeNull();
+    if (card !== null) expect(ownCrosses(card)).toHaveLength(1);
+    click('.modal-layer [data-modal="monthlyReport"] .modal-close');
+    expect(modalShown('monthlyReport')).toBe(false);
+    click('[data-do="openMonthlyReport"][data-id="1"]');
+    expect(modalShown('monthlyReport')).toBe(true);
+    clickOutside();
+    expect(modalShown('monthlyReport')).toBe(false);
     press('Escape');
     expect(modalShown('accounting')).toBe(false);
   });

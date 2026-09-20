@@ -201,9 +201,12 @@ describe('nothing at all over a man nothing is wrong with [PIOTR, 19.09]', () =>
 });
 
 describe('the table itself', () => {
-  it('keeps five lines and no colour, and every one of them is a thing that is wrong', () => {
-    // The fifth is Turn 23's: a man nobody has put on anything (CLAUDE.md T23 2.1).
+  it('keeps six lines and no colour, and every one of them is a thing that is wrong', () => {
+    // Four until tonight. Turn 23 hung the bench on the compressor for the fifth
+    // (CLAUDE.md T23 2.7) and stood a man who nobody has put on anything for the sixth
+    // (CLAUDE.md T23 2.1), both of them things the player can put right.
     expect(Object.keys(BUBBLES).sort()).toEqual([
+      'noCompressor',
       'noCutParts',
       'noMaterial',
       'nothingToDo',

@@ -2,12 +2,13 @@
 // engine says what is owed and what the next 1st takes; this prints it, every signed figure in
 // the colour its sign gives it.
 
-import { LOAN_MAX, LOAN_MONTHS, LOAN_RATE_YEARLY, OVERDRAFT_RATE_YEARLY } from '../engine/constants';
+import { LOAN_MONTHS, LOAN_RATE_YEARLY, OVERDRAFT_RATE_YEARLY } from '../engine/constants';
 import {
   formatCalendarDay,
   loanCapitalForMonth,
   loanCheck,
   loanInterestForMonth,
+  loanLimitLine,
   nextInstalmentFor,
   repayCheck,
 } from '../engine/index';
@@ -42,8 +43,10 @@ function offerBlock(state: GameState, typed: string): string {
   const control = check.ok
     ? primaryButton('takeLoan', 'Take the loan', `data-amount="${wanted}"`)
     : lockedButton('Take the loan', check.reason);
+  // Where the figure comes from, in the bank's own words and the engine's: the same sentence the
+  // button is greyed with, so the card and the refusal cannot part (CLAUDE.md T23 2.12).
   return (
-    `<p class="hint">Up to ${money(LOAN_MAX)} at ${percent(LOAN_RATE_YEARLY)} a year, ` +
+    `<p class="hint">${escapeHtml(loanLimitLine(state))} at ${percent(LOAN_RATE_YEARLY)} a year, ` +
     `${LOAN_MONTHS} monthly instalments on the 1st, the interest on what is still owed with each ` +
     'one. Repaid early at no penalty.</p>' +
     `<div class="row"><span class="row-main">${amountField(typed, 'to borrow')}</span>` +

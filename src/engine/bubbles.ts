@@ -20,6 +20,7 @@ import { BUBBLES } from './constants';
 import { contractOfWorker } from './contracts';
 import { OWNER, machineShortWord } from './machines';
 import { ownerIsAvailable } from './owner';
+import { standsForAir } from './media';
 import {
   NO_CUT_PARTS,
   WAITING_FOR_MATERIAL,
@@ -69,10 +70,14 @@ function onAJob(state: GameState, who: string, job: Job): Bubble | null {
   if (job.blockedBy === WAITING_FOR_MATERIAL) {
     return bubble(who, 'noMaterial', { job: job.name });
   }
+  const stage = currentStage(state, job, cncOptions(state, who, job));
+  // A bench with nothing in the hose stands him still, and it is a thing the player can put
+  // right with a compressor: media.ts decides it and the mark reports it (CLAUDE.md T23 2.7).
+  if (standsForAir(state, stage)) return bubble(who, 'noCompressor');
   const waiting = waitingWordsFor(state, who, job);
   if (waiting === NO_CUT_PARTS) return bubble(who, 'noCutParts');
   if (waiting === null) return null;
-  const family = currentStage(state, job, cncOptions(state, who, job))?.family ?? null;
+  const family = stage?.family ?? null;
   return family === null ? null : bubble(who, 'waitingForMachine', { machine: machineShortWord(family) });
 }
 

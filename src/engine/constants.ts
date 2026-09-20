@@ -11,6 +11,7 @@ import type {
   EquipmentVariant,
   EquipmentTab,
   Finish,
+  LedgerCategory,
   LostMinuteCause,
   MaterialKind,
   OwnerIdleReason,
@@ -438,10 +439,32 @@ export const DIFFICULTIES: DifficultySpec[] = [
  *  while the account is below zero and charged monthly, interest only; the balance stays negative
  *  until the player brings it up (PIOTR: 0.25; CLAUDE.md T13 3.14). */
 export const OVERDRAFT_RATE_YEARLY = 0.25;
-/** The one loan: up to this much [TUNE], at Piotr's yearly rate, over sixty monthly instalments
- *  (PIOTR: 5 years), interest on the outstanding balance charged monthly with the instalment.
- *  Early repayment costs nothing [TUNE] (CLAUDE.md T13 3.14). */
-export const LOAN_MAX = 50000;
+/** The one loan: at Piotr's yearly rate, over sixty monthly instalments (PIOTR: 5 years), interest
+ *  on the outstanding balance charged monthly with the instalment. Early repayment costs nothing
+ *  [TUNE] (CLAUDE.md T13 3.14).
+ *
+ *  How much of it there is stopped being one figure in Turn 23. The bank lends against the books
+ *  it is shown: a quarter of the last twelve calendar months' sales [PIOTR, 20.09], and never
+ *  less than the floor a company with no history gets [TUNE]. There is no upper cap at all
+ *  [PIOTR, 20.09: "no upper limit"], so a workshop that turns over a million may borrow a quarter
+ *  of it. `loanLimit` in src/engine/finance.ts is the one function that works it out, and the
+ *  refusal and the finance card both read it (CLAUDE.md T23 2.12). */
+export const LOAN_SHARE_OF_SALES = 0.25;
+export const LOAN_FLOOR = 10000;
+/** How many calendar months of the ledger the bank looks at, today's month among them [PIOTR: the
+ *  last twelve months]. A sale in the thirteenth month back is off the books it reads. */
+export const LOAN_SALES_MONTHS = 12;
+/** What the bank counts as a sale: money invoiced out of the workshop. The deposits and the
+ *  balances of the jobs, the weekly pieces of a standing contract and the pellets the hall sells
+ *  are the four lines of the ledger a customer's money arrives on; a loan drawn, an insurance
+ *  payout and a deposit the landlord gives back are not turnover and are not on it
+ *  (CLAUDE.md T23 2.12). */
+export const SALES_CATEGORIES: readonly LedgerCategory[] = [
+  'jobDeposit',
+  'jobBalance',
+  'contract',
+  'pellets',
+];
 export const LOAN_RATE_YEARLY = 0.15;
 export const LOAN_MONTHS = 60;
 export const LOAN_EARLY_REPAYMENT_PENALTY = 0;
@@ -595,10 +618,25 @@ export const BESPOKE_PROBABILITY = 0.15;
 /** A sheet is a storage unit worth 200 of material value and stands for everything a job needs:
  *  boards, edging, screws (PIOTR). Job sheet counts come from the material cost. */
 export const SHEET_VALUE = 200;
-/** A sheet bought for stock, and a sheet bought ad hoc for one job: the two prices, and nothing
- *  between them (PIOTR: 175, in his band of 170 to 180; 200 ad hoc; CLAUDE.md T13 3.3). */
-export const SHEET_PRICE_STOCK = 175;
-export const SHEET_PRICE_AD_HOC = 200;
+/** What a sheet costs, by how many are on the order. Turn 13 had two prices and nothing between
+ *  them, 175 for stock and 200 ad hoc, and the player could do nothing about either. Piotr made
+ *  it a ladder on 20.09: a merchant prices a load and not a customer, so a job's take off and a
+ *  restock are the same order at the same counter, and buying a lorry load is what makes a sheet
+ *  cheap [PIOTR, 20.09, the rule; TUNE, every figure in the table] (CLAUDE.md T23 2.16).
+ *
+ *  Read through `sheetPriceFor` in src/engine/materials.ts, which walks it from the top: the
+ *  price of an order is the last band whose `from` it reaches. The bands are in order and the
+ *  first one starts at a single sheet, so every order has a price. */
+export const SHEET_PRICE_LADDER: ReadonlyArray<{ from: number; price: number }> = [
+  { from: 1, price: 200 },
+  { from: 10, price: 190 },
+  { from: 30, price: 180 },
+  { from: 50, price: 170 },
+  { from: 100, price: 160 },
+  { from: 200, price: 150 },
+  { from: 500, price: 135 },
+  { from: 1000, price: 120 },
+];
 /** A stock line whose free count is under this many sheets wears the Low stock badge [TUNE]
  *  (CLAUDE.md T13 3.2). What Restock buys is the number the player types now, and what fills the
  *  rack when he types none, so there is no figure to bring a line back up to (CLAUDE.md T17 2.20). */
@@ -1349,9 +1387,33 @@ const ENDURANCE_BY_CLASS: Record<string, number> = {
   industrial: 2,
 };
 
-/** The five classes of workbench. Prices, output and footprints are Piotr's table; the endurance
- *  and the power are [TUNE] (CLAUDE.md T7 3.6). A bench is not a machine, so its hours never
- *  move: the ladder is there so the family reads like every other one. */
+/** How many men can work at one bench of this class at once [TUNE] (PIOTR, 20.09, the rule;
+ *  CLAUDE.md T23 2.17). A bench is a bench, and a three metre assembly station on a steel frame
+ *  is three men round a wardrobe lying down. The hiring gate counts places and not benches
+ *  through `benchPlaces` in src/engine/machines.ts, and each man at one works his own job at that
+ *  bench's pace. */
+/** The roles that may be put on a job at all, and so the roles that take a place at a bench. A
+ *  helper never builds: he carries, cleans and empties bags, and the Assign list says so rather
+ *  than offering him (PIOTR, 17.09; CLAUDE.md T19 2.5, 2.6). It lives here from Turn 23 because
+ *  machines.ts has to fill the benches with these men and cannot reach jobs.ts, which reads it
+ *  and re-exports it under the name every caller has always used (CLAUDE.md T23 2.17). */
+export const BUILDING_ROLES: readonly WorkerRole[] = ['joiner', 'sprayer'];
+
+export const WORKBENCH_PLACES: Record<string, number> = {
+  used: 1,
+  budget: 1,
+  standard: 2,
+  pro: 2,
+  industrial: 3,
+};
+
+/** The five classes of workbench. Prices, places and footprints are Piotr's table; the endurance
+ *  and the power are [TUNE] (CLAUDE.md T7 3.6, T23 2.17). A bench is not a machine, so its hours
+ *  never move: the ladder is there so the family reads like every other one.
+ *
+ *  `outputFactor` is the pace a man works at one, and Turn 23 re tuned the column to top out at
+ *  +10% where it topped out at +8%: 1.02, 1.05 and 1.08 become 1.03, 1.06 and 1.10 [TUNE, the
+ *  figures; PIOTR, 20.09, the top of the ladder]. */
 export const WORKBENCH_VARIANTS: EquipmentVariant[] = [
   {
     id: 'used',
@@ -1396,7 +1458,7 @@ export const WORKBENCH_VARIANTS: EquipmentVariant[] = [
     height: 0.9,
     zoneWidth: 2,
     zoneDepth: 2,
-    outputFactor: 1.02,
+    outputFactor: 1.03,
     enduranceFactor: ENDURANCE_BY_CLASS.standard ?? 1,
     powerPerDay: 1,
     description:
@@ -1412,7 +1474,7 @@ export const WORKBENCH_VARIANTS: EquipmentVariant[] = [
     height: 0.9,
     zoneWidth: 2,
     zoneDepth: 2,
-    outputFactor: 1.05,
+    outputFactor: 1.06,
     enduranceFactor: ENDURANCE_BY_CLASS.pro ?? 1,
     powerPerDay: 1,
     description:
@@ -1429,7 +1491,7 @@ export const WORKBENCH_VARIANTS: EquipmentVariant[] = [
     height: 0.9,
     zoneWidth: 3,
     zoneDepth: 2,
-    outputFactor: 1.08,
+    outputFactor: 1.10,
     enduranceFactor: ENDURANCE_BY_CLASS.industrial ?? 1,
     powerPerDay: 2,
     description:
@@ -2013,15 +2075,15 @@ export const AIR_SANDING_DEMAND = { bar: 6, litres: 200 };
  *  what the compressor makes, which is the headroom a receiver needs (CLAUDE.md T10 3.2). */
 export const AIR_DIVERSITY = 0.6;
 export const AIR_HEADROOM = 0.85;
+/** What the hall says while there is no air for the benches: no compressor at all, or the one the
+ *  hoses are on short of litres. Turn 11 let a man screw a carcass together by hand at 0.67 and
+ *  said so here; from Turn 23 there is no bench work without air and the bench stands still
+ *  [PIOTR, 20.09] (CLAUDE.md T23 2.7). */
+export const NO_AIR_LINE = 'No air: the benches stand still';
+
 /** What every pneumatic consumer on a compressor that is short of litres runs at, for that minute
- *  (PIOTR, CLAUDE.md T10 3.2). */
-/** What a bench is worth with no compressor in the hall at all: the nailer and the driver are no
- *  use and the assembly is screwed together by hand [TUNE] (PIOTR, 15.09; CLAUDE.md T11 3.8). */
-export const NO_AIR_FACTOR = 0.67;
-
-/** What the hall says while there is no air in the hose at all. */
-export const NO_AIR_LINE = 'No air: screws by hand';
-
+ *  (PIOTR, CLAUDE.md T10 3.2). A man at a bench is not one of them from Turn 23: he does not run
+ *  slow on short air, he stands (CLAUDE.md T23 2.7). */
 export const LOW_AIR_FACTOR = 0.7;
 /** A spray booth on wet air still runs, and the Finishing takes half as long again over it and
  *  the job loses a point of rating for the defects in the finish [TUNE] (CLAUDE.md T10 3.3). */
@@ -3757,8 +3819,9 @@ export const DAY_LOGS_KEPT = 7;
  *  end report and the house tier are sums over dated lines and want the whole month and the
  *  thirty days before it in the state (CLAUDE.md T13 3.18, 3.20). */
 export const LEDGER_MAX_ENTRIES = 2000;
-/** The Ledger tab shows the last 200 lines (PIOTR, CLAUDE.md T6 3.9). */
-export const LEDGER_VISIBLE_ENTRIES = 200;
+// The Ledger tab showed the last 200 of them and `LEDGER_VISIBLE_ENTRIES` said so. The tab is
+// gone from Turn 23 and so is the figure: the ledger is the engine's record now and has no screen
+// of its own to be cut to a length (CLAUDE.md T23 2.14).
 
 // ---------------------------------------------------------------------------
 // T13 3.15 Insurance
@@ -3955,6 +4018,7 @@ export const EFFICIENCY_CAUSES: ReadonlyArray<{ id: LostMinuteCause; label: stri
 export const OWNER_IDLE_REASONS: ReadonlyArray<{ id: OwnerIdleReason; label: string }> = [
   { id: 'noMachine', label: 'Waiting for a machine' },
   { id: 'noMaterial', label: 'No material' },
+  { id: 'noCompressor', label: 'No air at the bench' },
   { id: 'nothingAssigned', label: 'Nothing assigned' },
   { id: 'officeEmpty', label: 'In the office with nothing to do' },
 ];
@@ -3988,6 +4052,7 @@ export const BUBBLES: Record<BubbleKey, string> = {
   waitingForMachine: 'waiting for the {machine}',
   noCutParts: 'no cut parts yet',
   noMaterial: 'no sheets for {job}',
+  noCompressor: 'no compressor',
   nothingToDo: 'nothing to do',
   waitingForBoss: 'waiting for the boss',
 };

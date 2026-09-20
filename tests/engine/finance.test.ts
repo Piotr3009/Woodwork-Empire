@@ -6,15 +6,20 @@ import { describe, expect, it } from 'vitest';
 import {
   DAYS_PER_MONTH,
   DAYS_PER_YEAR,
-  LOAN_MAX,
+  LOAN_FLOOR,
   LOAN_MONTHS,
   LOAN_RATE_YEARLY,
+  LOAN_SALES_MONTHS,
+  LOAN_SHARE_OF_SALES,
   OVERDRAFT_RATE_YEARLY,
 } from '../../src/engine/constants';
 import {
   accrueOverdraftInterest,
   loanCheck,
   loanInstalmentFor,
+  loanLimit,
+  loanLimitLine,
+  salesLastTwelveMonths,
   nextInstalmentFor,
   overdraftInterestForDay,
   repayCheck,
@@ -22,7 +27,7 @@ import {
   runFinanceMonth,
   takeLoan,
 } from '../../src/engine/finance';
-import { daysOfMonth, ledgerOfDay } from '../../src/engine/index';
+import { daysOfMonth, ledgerOfDay, monthOfDay } from '../../src/engine/index';
 import type { GameState, LedgerCategory, LedgerEntry } from '../../src/engine/index';
 import { act, newGame, runToDay } from '../helpers';
 
@@ -38,9 +43,31 @@ function pence(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
+/** A sale on the books, on the day given: the bank lends against what the workshop has invoiced
+ *  from Turn 23, so a test that wants a loan of a size has to earn it first (CLAUDE.md T23 2.12). */
+function sell(state: GameState, amount: number, day = 1): void {
+  state.ledger.push({
+    id: `sale-${String(state.ledger.length)}`,
+    day,
+    minute: 0,
+    category: 'jobBalance',
+    label: 'Balance from a client',
+    amount,
+    balance: state.cash,
+    unpaid: false,
+  });
+}
+
+/** The turnover that carries a loan of this much: four pounds of sales for every pound of it. */
+function earn(state: GameState, wanted: number): number {
+  sell(state, wanted / LOAN_SHARE_OF_SALES);
+  return wanted;
+}
+
 describe('the loan', () => {
   it('lands the cash and starts sixty months', () => {
     const state = newGame();
+    earn(state, 12000);
     const before = state.cash;
     expect(takeLoan(state, 12000).ok).toBe(true);
     expect(state.cash).toBe(before + 12000);
@@ -57,16 +84,80 @@ describe('the loan', () => {
 
   it('refuses a second loan, nothing at all, and more than the bank lends', () => {
     const state = newGame();
-    expect(loanCheck(state, LOAN_MAX + 1)).toEqual({ ok: false, reason: `The bank lends up to ${LOAN_MAX}` });
+    const most = earn(state, 30000);
+    expect(loanLimit(state)).toBe(most);
+    expect(loanCheck(state, most + 1)).toEqual({ ok: false, reason: loanLimitLine(state) });
     expect(loanCheck(state, 0).ok).toBe(false);
     expect(loanCheck(state, -5).ok).toBe(false);
-    expect(takeLoan(state, LOAN_MAX).ok).toBe(true);
+    expect(takeLoan(state, most).ok).toBe(true);
     expect(takeLoan(state, 1000)).toEqual({ ok: false, reason: 'One loan at a time' });
     expect(linesOf(state, 'loan')).toHaveLength(1);
   });
 
+  /** The bank lends against the books it is shown, and never less than what a company with no
+   *  history gets. There is no upper cap at all [PIOTR, 20.09] (CLAUDE.md T23 2.12). */
+  it('lends a quarter of the last twelve months of sales, and never less than the floor', () => {
+    const empty = newGame();
+    // Nothing invoiced: the new company's figure, and the sentence that says so.
+    expect(salesLastTwelveMonths(empty)).toBe(0);
+    expect(loanLimit(empty)).toBe(LOAN_FLOOR);
+    expect(loanLimitLine(empty)).toBe('The bank lends a new company up to \u00a310,000');
+    expect(loanCheck(empty, LOAN_FLOOR).ok).toBe(true);
+    expect(loanCheck(empty, LOAN_FLOOR + 1).ok).toBe(false);
+    // A hundred and twenty thousand of sales in the twelve months, and it is thirty thousand.
+    const trading = newGame();
+    sell(trading, 120000);
+    expect(salesLastTwelveMonths(trading)).toBe(120000);
+    expect(loanLimit(trading)).toBe(30000);
+    expect(loanLimitLine(trading)).toBe(
+      'The bank lends up to \u00a330,000: a quarter of your last twelve months\u0027 sales',
+    );
+    expect(loanCheck(trading, 30000).ok).toBe(true);
+    expect(loanCheck(trading, 30001).ok).toBe(false);
+    // And there is no upper cap: a workshop that turns over a million may borrow a quarter of it.
+    const big = newGame();
+    sell(big, 1000000);
+    expect(loanLimit(big)).toBe(250000);
+    expect(loanCheck(big, 250000).ok).toBe(true);
+  });
+
+  it('forgets a sale the thirteenth month back, and counts one twelve months old', () => {
+    // The twelve calendar months the bank reads are this one and the eleven before it, so a sale
+    // in the month before those is off the books (CLAUDE.md T23 2.12).
+    const state = newGame();
+    state.clock.day = 1 + 12 * DAYS_PER_MONTH;
+    expect(monthOfDay(state.clock.day)).toBe(13);
+    sell(state, 120000, 1);
+    expect(salesLastTwelveMonths(state)).toBe(0);
+    expect(loanLimit(state)).toBe(LOAN_FLOOR);
+    // The same sale one month later is the twelfth month back and is on them.
+    sell(state, 120000, 1 + DAYS_PER_MONTH);
+    expect(monthOfDay(1 + DAYS_PER_MONTH)).toBe(13 - (LOAN_SALES_MONTHS - 1));
+    expect(salesLastTwelveMonths(state)).toBe(120000);
+    expect(loanLimit(state)).toBe(30000);
+  });
+
+  it('counts what a client paid and never what the bank or the insurer did', () => {
+    const state = newGame();
+    sell(state, 40000);
+    const before = salesLastTwelveMonths(state);
+    // A loan drawn, an insurance payout and the landlord's deposit back are not turnover.
+    state.ledger.push({
+      id: 'not-a-sale',
+      day: 1,
+      minute: 0,
+      category: 'claim',
+      label: 'Insurance payout',
+      amount: 100000,
+      balance: 0,
+      unpaid: false,
+    });
+    expect(salesLastTwelveMonths(state)).toBe(before);
+  });
+
   it('sixty instalments repay the principal, with the interest the monthly balances imply', () => {
     const state = newGame();
+    const LOAN_MAX = earn(state, 50000);
     state.cash = 1000000;
     takeLoan(state, LOAN_MAX);
     // The same arithmetic, written out: each 1st takes a sixtieth of the principal and the
@@ -94,6 +185,7 @@ describe('the loan', () => {
 
   it('takes one instalment a month however many times the 1st is run, and none before it', () => {
     const state = newGame();
+    earn(state, 12000);
     state.clock.day = 5;
     takeLoan(state, 12000);
     runFinanceMonth(state);
@@ -108,6 +200,7 @@ describe('the loan', () => {
 
   it('puts the instalment and its interest on the ledger dated the 1st, in plain English', () => {
     let state = newGame();
+    earn(state, 12000);
     state = act(state, { type: 'TAKE_LOAN', amount: 12000 });
     expect(state.finance.loan?.principal).toBe(12000);
     const next = runToDay(state, 31).state;
@@ -143,6 +236,7 @@ describe('the loan', () => {
 
   it('a part repayment keeps the term and lowers every instalment still to come', () => {
     const state = newGame();
+    earn(state, 12000);
     takeLoan(state, 12000);
     expect(repayLoan(state, 6000).ok).toBe(true);
     const loan = state.finance.loan;

@@ -180,7 +180,7 @@ describe('the Machines column (CLAUDE.md T17 2.24)', () => {
     expect(saw?.gate).toBe(false);
     expect(saw?.minus).toBe(0);
     // Nobody stood at the compressor, so it ran no hours and saved nothing; the edgebander and
-    // the drill live in a cabinet and are not machines standing in the hall.
+    // the hand tool set live in a cabinet and are not machines standing in the hall.
     const other = savings.rows.find((row) => row.name === 'Used compressor');
     expect(other?.hours).toBe(0);
     expect(other?.minutesSaved).toBe(0);

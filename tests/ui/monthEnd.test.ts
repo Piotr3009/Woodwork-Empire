@@ -10,8 +10,9 @@ import { monthEfficiency } from '../../src/engine/efficiency';
 import { machineSavings } from '../../src/engine/machines';
 import { monthRate, weekRate } from '../../src/engine/rate';
 import { daySummaryOf, monthName } from '../../src/engine/index';
+import { renderAccounting } from '../../src/ui/accounting';
 import { renderCompany } from '../../src/ui/company';
-import { renderMonthEnd, renderMonthReport } from '../../src/ui/monthEnd';
+import { renderMonthEnd, renderMonthReport, renderMonthlyReport } from '../../src/ui/monthEnd';
 import type { GameEvent, GameState } from '../../src/engine/index';
 import { buyStartingKit, eventsOfKind, newGame, runToDay } from '../helpers';
 
@@ -231,5 +232,78 @@ describe('the workshop rate and Total efficiency (CLAUDE.md T17 2.25, 2.26)', ()
     const blocks = Array.from(page.children).map((node) => node.className);
     expect(blocks.indexOf('month-efficiency')).toBe(blocks.length - 1);
     expect(page.querySelector('.month-end')).not.toBeNull();
+  });
+});
+
+/** Piotr read the running ledger on 20.09 and said it was made for an accountant and not for a
+ *  player. The month end card is kept; every month end writes its figures down, and Accounting's
+ *  Ledger tab is the list of them (CLAUDE.md T23 2.14). */
+describe('the months written down', () => {
+  const played = runToDay(buyStartingKit(newGame({ difficulty: 'veryEasy' })), 62);
+  const state: GameState = played.state;
+
+  it('appends one entry a month, in the figures the card is drawn from', () => {
+    // Two months have closed by day 62, so there are two entries, oldest first.
+    expect(state.monthlyReports.map((entry) => entry.month)).toEqual([1, 2]);
+    const stored = state.monthlyReports[0];
+    if (stored === undefined) throw new Error('no report for month 1');
+    // The same four shapes the card asks the engine for, and the same figures.
+    expect(stored.report).toEqual(monthReport(state, 1));
+    expect(stored.rate.rate).toBeCloseTo(monthRate(state, 1).rate, 6);
+    expect(stored.efficiency.percent).toBe(monthEfficiency(state, 1).percent);
+    expect(stored.savings.rows.length).toBeGreaterThan(0);
+  });
+
+  it('draws a stored month with the one function that draws it at the month end', () => {
+    const stored = state.monthlyReports[0];
+    if (stored === undefined) throw new Error('no report for month 1');
+    const card = parse(renderMonthlyReport(stored));
+    // The same three blocks the month end raises, in the same order, and no event line, because
+    // a month opened out of the books has no event behind it.
+    expect(card.querySelector('.rate-figure')).not.toBeNull();
+    expect(card.querySelector('.month-end')?.getAttribute('data-month')).toBe('1');
+    expect(card.querySelector('.month-efficiency')).not.toBeNull();
+    expect(card.querySelector('.event-body')).toBeNull();
+    // And the card the month end itself raises is the same drawing with the event's line in it.
+    const event = monthEndEvent(played.events, 1);
+    expect(parse(renderMonthEnd(state, event)).querySelector('.event-body')?.textContent).toBe(
+      event.body,
+    );
+  });
+
+  it('starts empty in a new company and in a v35 save lifted into this build', () => {
+    expect(newGame().monthlyReports).toEqual([]);
+  });
+});
+
+describe('Accounting s Monthly reports tab', () => {
+  const played = runToDay(buyStartingKit(newGame({ difficulty: 'veryEasy' })), 62);
+  const state: GameState = played.state;
+
+  it('is where the Ledger tab was, and lists the months newest first', () => {
+    const page = parse(renderAccounting(state, 'reports'));
+    // The tab itself, in the bar, in the words Piotr asked for.
+    const tabs = Array.from(parse(renderAccounting(state, 'days')).querySelectorAll('[data-do="accountingTab"]'));
+    expect(tabs.map((tab) => tab.getAttribute('data-id'))).toEqual([
+      'days',
+      'summary',
+      'reports',
+      'finance',
+    ]);
+    expect(tabs.map((tab) => tab.textContent)).toContain('Monthly reports');
+    // Newest first, one row a month, each opening that month's card on one click.
+    const rows = Array.from(page.querySelectorAll('[data-report]'));
+    expect(rows.map((row) => row.getAttribute('data-report'))).toEqual(['2', '1']);
+    const open = rows[0]?.querySelector('[data-do="openMonthlyReport"]');
+    expect(open?.getAttribute('data-id')).toBe('2');
+    expect(rows[0]?.textContent).toContain(monthName(2));
+    // The running ledger has no screen of its own any more.
+    expect(page.textContent).not.toContain('Ledger, last');
+  });
+
+  it('says so while no month has closed', () => {
+    const page = parse(renderAccounting(newGame(), 'reports'));
+    expect(page.querySelector('.empty')?.textContent).toBe('No month has closed yet.');
+    expect(page.querySelectorAll('[data-report]')).toHaveLength(0);
   });
 });

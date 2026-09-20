@@ -236,7 +236,7 @@ export function logDayMinute(log: DayLogEntry[], category: DayCategory): void {
 /** An owner's idle minute store with nothing in it. The morning empties it and the state factory
  *  starts from it (CLAUDE.md T21 2.8). */
 export function emptyOwnerIdle(): Record<OwnerIdleReason, number> {
-  return { noMachine: 0, noMaterial: 0, nothingAssigned: 0, officeEmpty: 0 };
+  return { noMachine: 0, noMaterial: 0, noCompressor: 0, nothingAssigned: 0, officeEmpty: 0 };
 }
 
 /** Books one clock minute the owner stood still, and why. The day meter's grey segment is the sum

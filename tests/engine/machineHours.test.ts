@@ -59,6 +59,16 @@ describe('the hours a machine gains', () => {
     // He is at the saw, so the edgebander in his cabinet and the compressor gained nothing.
     expect(machine(state, 'edgebander').hoursUsed).toBe(0);
     expect(machine(state, 'compressor').hoursUsed).toBe(0);
+    // The fan is the one thing that does not wait to be stood at: it pulls the whole hour he is
+    // at the saw, and from Turn 23 it books those hours and is serviced on them
+    // (PIOTR, 20.09; CLAUDE.md T23 2.8).
+    expect(machine(state, 'extractor').hoursUsed).toBeCloseTo(1, 4);
+  });
+
+  it('are the minutes the extraction ran, and nought on a fan in a hall standing still', () => {
+    // Nobody at a machine with a demand is nothing in the duct: the fan is off and gains no hours
+    // (CLAUDE.md T10 3.1, T23 2.8).
+    const state = tick(buyStartingKit(newGame({ difficulty: 'veryEasy' })), 60);
     expect(machine(state, 'extractor').hoursUsed).toBe(0);
   });
 
