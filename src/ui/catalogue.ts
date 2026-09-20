@@ -434,11 +434,14 @@ function pipeLine(state: GameState, item: Equipment): string {
     : `${run.metres} m of pipe to the extraction`;
 }
 
-/** What the gate does once it is on: the signed line, through the one helper (CLAUDE.md T13 1). */
+/** What the gate does once it is on: the signed line, through the one helper (CLAUDE.md T13 1).
+ *  It says the second half of what a gate is for as well from Turn 23, because the output is the
+ *  small half of it and the duct is the large one [PIOTR, 20.09] (CLAUDE.md T23 2.15). */
 function gateLine(state: GameState, item: Equipment): string {
   if (!hasGate(state, item)) return '';
   const per = Math.round(GATE_OUTPUT_BONUS * 100);
-  return `<p class="tile-figures">${signedFigure(`Automatic gate fitted: output +${per}%`, per)}</p>`;
+  const words = `Automatic gate fitted: output +${per}%, counts only while running`;
+  return `<p class="tile-figures">${signedFigure(words, per)}</p>`;
 }
 
 /** One line of the specification under the rule of a card: what the thing needs from the hall
@@ -474,6 +477,21 @@ export function specLines(state: GameState, item: Equipment): SpecLine[] {
           `Extractor too small: ${hall.machines} machines need ${mediaFigure(hall.demand)} · ` +
           `output −${dustPenalty}% while short`,
         ok: false,
+      });
+    }
+    // What a gate would buy, on the card of a machine that has not got one, in the good token and
+    // above the button that buys it. The output is the small half of it and the player could read
+    // it on the class card already; what he could not read anywhere is that a gated drop is shut
+    // while nobody is standing at the machine, and a shut drop is that machine's whole demand back
+    // in the duct for everything else [PIOTR, 20.09] (CLAUDE.md T13 3.11, T23 2.15). Both figures
+    // are read: the bonus off its constant and the litres off the machine's own demand.
+    if (!hasGate(state, item)) {
+      const per = Math.round(GATE_OUTPUT_BONUS * 100);
+      out.push({
+        text:
+          `Automatic gate: +${per}% output, and it counts toward the extraction only while it ` +
+          `runs (frees ${mediaFigure(wants)} m³/h while it stands)`,
+        ok: true,
       });
     }
   }
