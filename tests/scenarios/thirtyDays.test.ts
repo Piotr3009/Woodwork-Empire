@@ -7,7 +7,7 @@
 // one goes under the limit, and it is the empty hall on Hard: it first closes a day under on day
 // 11 and the bank shuts it on day 22 for the amount, with its count of days under the limit at 12
 // of the 30 the other rule allows. Every other month here trades its thirty days with the account
-// above the limit, the short handed one dipping furthest into the overdraft at -466 on day 31, and
+// above the limit, the short handed one dipping furthest into the overdraft at -586 on day 31, and
 // not one line of any of their ledgers goes unpaid. Measured on this build (T22-C2).
 
 import { describe, expect, it } from 'vitest';
@@ -512,12 +512,16 @@ describe('a month short handed, with a joiner and one small rack', () => {
     // of the price they used to (CLAUDE.md T13 3.3). Measured, not tuned.
     expect(state.cash).toBeGreaterThan(state.finance.overdraftLimit);
     // This is the month that goes furthest into the overdraft of the fifteen that stay inside it,
-    // and it still never reaches the limit: the lowest running balance of the month is -386, on
+    // and it still never reaches the limit: the lowest running balance of the month is -586, on
     // day 31, the count of days below the limit never starts, and nothing is left unpaid, because
-    // from Turn 22 there is nowhere for a bill to go but the account (CLAUDE.md T22 2.1). It was
-    // -466 until tonight: this script kits out two men, and the two canteen seats it bought for
-    // them are eighty pounds it no longer spends (CLAUDE.md T23 2.11).
-    expect(Math.round(Math.min(...state.ledger.map((entry) => entry.balance)))).toBe(-386);
+    // from Turn 22 there is nowhere for a bill to go but the account (CLAUDE.md T22 2.1).
+    //
+    // It was -466 before tonight and it has moved twice. 2.11 took the two canteen seats this
+    // script kitted its two men out with, which is eighty pounds it no longer spends; 2.16 then
+    // put the sheets on a ladder priced by the size of the order, and this script restocks eight
+    // at a time, which is the top band at 200 a sheet where it used to pay 175 whatever it bought
+    // (CLAUDE.md T23 2.11, 2.16).
+    expect(Math.round(Math.min(...state.ledger.map((entry) => entry.balance)))).toBe(-586);
     expect(state.finance.daysBelowOverdraft).toBe(0);
     expect(state.ledger.some((entry) => entry.unpaid)).toBe(false);
   });

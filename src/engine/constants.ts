@@ -617,10 +617,25 @@ export const BESPOKE_PROBABILITY = 0.15;
 /** A sheet is a storage unit worth 200 of material value and stands for everything a job needs:
  *  boards, edging, screws (PIOTR). Job sheet counts come from the material cost. */
 export const SHEET_VALUE = 200;
-/** A sheet bought for stock, and a sheet bought ad hoc for one job: the two prices, and nothing
- *  between them (PIOTR: 175, in his band of 170 to 180; 200 ad hoc; CLAUDE.md T13 3.3). */
-export const SHEET_PRICE_STOCK = 175;
-export const SHEET_PRICE_AD_HOC = 200;
+/** What a sheet costs, by how many are on the order. Turn 13 had two prices and nothing between
+ *  them, 175 for stock and 200 ad hoc, and the player could do nothing about either. Piotr made
+ *  it a ladder on 20.09: a merchant prices a load and not a customer, so a job's take off and a
+ *  restock are the same order at the same counter, and buying a lorry load is what makes a sheet
+ *  cheap [PIOTR, 20.09, the rule; TUNE, every figure in the table] (CLAUDE.md T23 2.16).
+ *
+ *  Read through `sheetPriceFor` in src/engine/materials.ts, which walks it from the top: the
+ *  price of an order is the last band whose `from` it reaches. The bands are in order and the
+ *  first one starts at a single sheet, so every order has a price. */
+export const SHEET_PRICE_LADDER: ReadonlyArray<{ from: number; price: number }> = [
+  { from: 1, price: 200 },
+  { from: 10, price: 190 },
+  { from: 30, price: 180 },
+  { from: 50, price: 170 },
+  { from: 100, price: 160 },
+  { from: 200, price: 150 },
+  { from: 500, price: 135 },
+  { from: 1000, price: 120 },
+];
 /** A stock line whose free count is under this many sheets wears the Low stock badge [TUNE]
  *  (CLAUDE.md T13 3.2). What Restock buys is the number the player types now, and what fills the
  *  rack when he types none, so there is no figure to bring a line back up to (CLAUDE.md T17 2.20). */

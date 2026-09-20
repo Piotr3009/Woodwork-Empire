@@ -204,9 +204,10 @@ const control = play('veryEasy');
  *  tonight the bank lends against the books it is shown and a company eight days old has shown it
  *  nothing, so it gets the floor: ten thousand [PIOTR, 20.09]. Fifteen thousand less capital is
  *  the whole of the difference, and it is a big one. Month 1 still closes at 7,151 in the black;
- *  month 2 closes at -3,801 where it closed in the black, month 3 at -14,874, the production
+ *  month 2 closes at -5,018 where it closed in the black, month 3 at -15,847, the production
  *  manager of 10.4 is never affordable at all, and the bank pulls the overdraft on the morning of
- *  day 92, the day after the three months are up.
+ *  day 91, the last day of the three months. 2.16's ladder makes it a shade worse again, because
+ *  a small restock pays 200 a sheet where it paid 175.
  *
  *  Nothing here is tuned to make that read better. The run is written down as it plays, because
  *  the rule is Piotr's and what it costs a new company is the thing he asked to see. Whether the
@@ -218,7 +219,7 @@ describe('the three month playthrough of 10.4, on Easy as the brief scripts it',
     // It traded all three months and the bank closed it on the morning of day 92, which is the
     // day after them: what the three months did is still what this block is about.
     expect(state.clock.day).toBeGreaterThanOrEqual(91);
-    expect(state.gameOver?.day).toBe(92);
+    expect(state.gameOver?.day).toBe(91);
     const joiner = state.workers.find((worker) => worker.role === 'joiner');
     expect(joiner?.startDay).toBeLessThanOrEqual(5);
     // The estimator on day 32, as ever. The production manager of 10.4 is not on the books at all
@@ -263,18 +264,18 @@ describe('the three month playthrough of 10.4, on Easy as the brief scripts it',
     // there are none (CLAUDE.md T23 2.12).
     expect(loan?.principal).toBe(LOAN_FLOOR);
     expect(loan?.startDay ?? 99).toBeLessThanOrEqual(8);
-    expect(Math.round(months[0]?.cashClose ?? 0)).toBe(7151);
-    expect(Math.round(months[1]?.cashClose ?? 0)).toBe(-3801);
-    expect(Math.round(months[2]?.cashClose ?? 0)).toBe(-14874);
-    // Three charges in three months now and not two: 6.28 on day 31 and 5.75 on day 61 for the
-    // few days each month that ran under, and 170.65 on day 91, which is month 3 spent in the
+    expect(Math.round(months[0]?.cashClose ?? 0)).toBe(6550);
+    expect(Math.round(months[1]?.cashClose ?? 0)).toBe(-5018);
+    expect(Math.round(months[2]?.cashClose ?? 0)).toBe(-15847);
+    // Three charges in three months now and not two: 8 on day 31 and 21 on day 61 for the few
+    // days each month that ran under, and 196 on day 91, which is month 3 spent in the
     // overdraft from end to end. The first two are small change beside the 25% a year the
     // overdraft charged all three months before the script was rewritten; the third is what
     // living in it costs (CLAUDE.md T23 2.12).
     const overdraft = state.ledger.filter((entry) => entry.category === 'overdraftInterest');
     expect(overdraft.map((entry) => entry.day)).toEqual([31, 61, 91]);
-    expect(Math.abs(overdraft[0]?.amount ?? 0)).toBeLessThan(10);
-    expect(Math.abs(overdraft[1]?.amount ?? 0)).toBeLessThan(10);
+    expect(Math.abs(overdraft[0]?.amount ?? 0)).toBeLessThan(15);
+    expect(Math.abs(overdraft[1]?.amount ?? 0)).toBeLessThan(30);
     expect(Math.abs(overdraft[2]?.amount ?? 0)).toBeGreaterThan(100);
   });
 
@@ -328,17 +329,17 @@ describe('the three month playthrough of 10.4, on Easy as the brief scripts it',
     const running = later.contracts.find((contract) => contract.status !== 'offered');
     expect(running?.weeks.length ?? 0).toBe(13);
     expect(running?.renegotiatedPrice ?? null).toBeNull();
-    expect(later.gameOver?.day).toBe(92);
-    // The term still had four weeks to run when the bank pulled it.
-    expect((running?.endDay ?? 0) - (later.gameOver?.day ?? 0)).toBe(29);
+    expect(later.gameOver?.day).toBe(91);
+    // The term still had a month to run when the bank pulled it.
+    expect((running?.endDay ?? 0) - (later.gameOver?.day ?? 0)).toBe(30);
     // The rule it was closed under is the amount and not the thirty days, and the count of days
-    // below the limit was on 4 of its 30 when the bank looked. The bank reads the account at the
+    // below the limit was on 8 of its 30 when the bank looked. The bank reads the account at the
     // point the day's money is settled, which is the morning, and the card it queues carries the
     // figure it read; by the close of that day a client's money had brought the account back to
-    // -14,874, which is the figure the run ends on (CLAUDE.md T22 2.2).
+    // -15,847, which is the figure the run ends on (CLAUDE.md T22 2.2).
     expect(later.gameOver?.reason).toContain('cannot pay');
-    expect(Math.round(later.cash)).toBe(-14874);
-    expect(later.finance.daysBelowOverdraft).toBe(4);
+    expect(Math.round(later.cash)).toBe(-15847);
+    expect(later.finance.daysBelowOverdraft).toBe(8);
     const closed = later.eventQueue.find((entry) => entry.kind === 'bankruptcy');
     expect(closed).toBeDefined();
     expect(Number(closed?.data.cash ?? 0)).toBeLessThanOrEqual(

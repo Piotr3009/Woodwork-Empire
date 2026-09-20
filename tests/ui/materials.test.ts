@@ -7,16 +7,14 @@
 import { describe, expect, it } from 'vitest';
 import {
   LOW_STOCK_SHEETS,
-  SHEET_PRICE_AD_HOC,
-  SHEET_PRICE_STOCK,
 } from '../../src/engine/constants';
-import { rackCapacity, stockFree, stockNumberFor } from '../../src/engine/materials';
+import { rackCapacity, sheetPriceFor, stockFree, stockNumberFor } from '../../src/engine/materials';
 import { renderLaptop } from '../../src/ui/laptop';
 import { renderMaterials } from '../../src/ui/materials';
 import { money } from '../../src/ui/modal';
 import { formatCalendarDay } from '../../src/engine/index';
 import type { GameState } from '../../src/engine/index';
-import { acceptNow, act, buyStartingKit, fillRack, newGame, placeEnquiry } from '../helpers';
+import { acceptNow, act, buyNow, buyStartingKit, fillRack, newGame, placeEnquiry } from '../helpers';
 
 function parse(html: string): HTMLElement {
   const holder = document.createElement('div');
@@ -77,8 +75,9 @@ describe('the stock page', () => {
     const page = parse(renderMaterials(state, '6'));
     const buttons = page.querySelectorAll('[data-do="restock"]');
     expect(buttons).toHaveLength(1);
-    // Six sheets typed, six sheets bought, at the stock price (CLAUDE.md T17 2.20).
-    expect(text(buttons[0])).toBe(`Restock: 6 sheets, ${money(6 * SHEET_PRICE_STOCK)}`);
+    // Six sheets typed, six sheets bought, at the ladder's price for an order of six
+    // (CLAUDE.md T17 2.20, T23 2.16).
+    expect(text(buttons[0])).toBe(`Restock: 6 sheets, ${money(6 * sheetPriceFor(6))}`);
     expect(buttons[0]?.getAttribute('data-sheets')).toBe('6');
     // The field is the one the player types in, and it is empty until he does.
     const field = page.querySelector('[data-field="stockSheets"]');
@@ -90,12 +89,30 @@ describe('the stock page', () => {
     expect(html.indexOf('data-do="restock"')).toBeLessThan(html.indexOf('class="stock-line"'));
   });
 
+  it('says what the typed number gets a sheet before the click, off the ladder', () => {
+    // A sheet is priced by how many are on the order from Turn 23, so the player has to be able
+    // to read the band before he decides how many to buy [PIOTR, 20.09] (CLAUDE.md T23 2.16).
+    // A rack with room for the whole order on it, so the button buys the number that is typed.
+    const big = buyNow(ready(), 'sheetRack', 'pro');
+    expect(rackCapacity(big)).toBeGreaterThanOrEqual(60);
+    const page = parse(renderMaterials(big, '60'));
+    expect(text(page.querySelector('[data-ladder]'))).toBe('60 sheets at \u00a3170 = \u00a310,200');
+    // The line sits before the button it is about.
+    const html = page.innerHTML;
+    expect(html.indexOf('data-ladder')).toBeLessThan(html.indexOf('data-do="restock"'));
+    // A small order is at the top of the ladder and a lorry load is at the bottom of it.
+    expect(text(parse(renderMaterials(big, '9')).querySelector('[data-ladder]')))
+      .toBe('9 sheets at \u00a3200 = \u00a31,800');
+    expect(text(parse(renderMaterials(big, '10')).querySelector('[data-ladder]')))
+      .toBe('10 sheets at \u00a3190 = \u00a31,900');
+  });
+
   it('fills the rack when no number is typed, and says so on the field', () => {
     const state = fillRack(ready(), 2);
     const page = parse(renderMaterials(state, ''));
     const fills = stockFree(state);
     expect(text(page.querySelector('[data-do="restock"]'))).toBe(
-      `Restock: ${fills} sheets, ${money(fills * SHEET_PRICE_STOCK)}`,
+      `Restock: ${fills} sheets, ${money(fills * sheetPriceFor(fills))}`,
     );
     expect(page.querySelector('[data-field="stockSheets"]')?.getAttribute('placeholder')).toBe(
       String(fills),
@@ -135,7 +152,7 @@ describe('the stock page', () => {
     expect(text(second?.querySelector('.shortfall.bad'))).toBe('3 of 4 sheets short');
     const order = second?.querySelector('[data-do="orderForJob"]');
     expect(order?.getAttribute('data-id')).toBe(state.jobs[1]?.id);
-    expect(text(order)).toContain(money(3 * SHEET_PRICE_AD_HOC));
+    expect(text(order)).toContain(money(3 * sheetPriceFor(3)));
   });
 
   it('has no per project question, no free form order and none of the software’s detail', () => {

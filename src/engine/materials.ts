@@ -7,8 +7,7 @@ import {
   DELIVERY_WORKING_DAYS_STANDARD,
   LOW_STOCK_SHEETS,
   MATERIAL_FRACTION,
-  SHEET_PRICE_AD_HOC,
-  SHEET_PRICE_STOCK,
+  SHEET_PRICE_LADDER,
   SHEET_VALUE,
   STOCK_NUMBER_PREFIX,
   TEMP_STORAGE_COST,
@@ -193,10 +192,13 @@ export function restockCheck(state: GameState, asked?: number): RestockCheck {
   return { ok: true, reason: '', sheets, cost };
 }
 
-/** What buying the shortfall of one job ad hoc costs: the ad hoc price, and the bespoke uplift
- *  where the material is bespoke (CLAUDE.md T13 3.3). */
+/** What buying the shortfall of one job costs: the ladder's price for the number of sheets on
+ *  that order, and the bespoke uplift where the material is bespoke (CLAUDE.md T13 3.3, T23 2.16).
+ *  A take off of six sheets is a small order and pays the top of the ladder for it, which is what
+ *  the old flat ad hoc price of 200 was. */
 export function orderForJobCost(job: Job): number {
-  const base = shortfallOf(job) * SHEET_PRICE_AD_HOC;
+  const sheets = shortfallOf(job);
+  const base = sheets * sheetPriceFor(sheets);
   return Math.round((job.bespokeMaterial ? base * (1 + BESPOKE_COST_UPLIFT) : base) * 100) / 100;
 }
 
@@ -232,15 +234,28 @@ export function drawSheetsFor(state: GameState, job: Job, progress: number): boo
   return true;
 }
 
+/** What one sheet costs on an order of this many, off Piotr's ladder: the price of the last band
+ *  the order reaches. The one function, and a job's take off and a restock both read it, because
+ *  they are the same order at the same merchant's counter [PIOTR, 20.09] (CLAUDE.md T23 2.16). An
+ *  order of nothing at all takes the dearest band, which is what a single sheet costs. */
+export function sheetPriceFor(sheets: number): number {
+  let price = SHEET_PRICE_LADDER[0]?.price ?? 0;
+  for (const band of SHEET_PRICE_LADDER) {
+    if (sheets >= band.from) price = band.price;
+  }
+  return price;
+}
+
 /** 0.40 of the price per job, 15% more when the material is bespoke (CLAUDE.md 8.4, 8.9). */
 export function materialCostFor(price: number, bespoke: boolean): number {
   const base = price * MATERIAL_FRACTION;
   return Math.round((bespoke ? base * (1 + BESPOKE_COST_UPLIFT) : base) * 100) / 100;
 }
 
-/** Sheets bought in advance are cheaper, which is the 0.34 P of CLAUDE.md 8.9. */
+/** What a restock of this many sheets costs, off the same ladder the take off reads: buying a lot
+ *  at once is what makes a sheet cheap, and not what the order is for (CLAUDE.md T23 2.16). */
 export function stockCostFor(sheets: number): number {
-  return Math.round(sheets * SHEET_PRICE_STOCK * 100) / 100;
+  return Math.round(sheets * sheetPriceFor(sheets) * 100) / 100;
 }
 
 export function deliveryDay(state: GameState, bespoke: boolean): number {

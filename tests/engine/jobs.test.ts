@@ -14,7 +14,6 @@ import {
   OWNER_JOB_VALUE_PER_DAY,
   OWNER_LABOUR_PER_MINUTE,
   RATING_ON_TIME,
-  SHEET_PRICE_AD_HOC,
   SITE_MEASURE_TAXI_COST,
 } from '../../src/engine/constants';
 import { formatMoney } from '../../src/engine/economy';
@@ -31,7 +30,13 @@ import {
   ownerJob,
 } from '../../src/engine/jobs';
 import { stagePlanFor } from '../../src/engine/stages';
-import { freeSheets, materialCostFor, sheetsForCost, shortfallOf } from '../../src/engine/materials';
+import {
+  freeSheets,
+  materialCostFor,
+  sheetPriceFor,
+  sheetsForCost,
+  shortfallOf,
+} from '../../src/engine/materials';
 import { startTaskCheck } from '../../src/engine/tasks';
 import { missingForHire } from '../../src/engine/staff';
 import { isWorkingDay, tick } from '../../src/engine/index';
@@ -234,7 +239,9 @@ describe('the order of the lifecycle', () => {
     expect(state.jobs[0]?.stage).toBe('materialPending');
     const before = state.cash;
     state = act(state, { type: 'ORDER_FOR_JOB', jobId: firstJob(state).id });
-    expect(before - state.cash).toBe(SHEET_PRICE_AD_HOC);
+    // One sheet is the top band of the ladder, which is the 200 the flat ad hoc price was
+    // (CLAUDE.md T23 2.16).
+    expect(before - state.cash).toBe(sheetPriceFor(1));
     expect(state.jobs[0]?.stage).toBe('materialOrdered');
     expect(state.deliveries).toHaveLength(1);
     expect(state.deliveries[0]?.arriveDay).toBe(2);
@@ -424,7 +431,7 @@ describe('scenario: garage shelves on Easy', () => {
         ['jobDeposit', 'jobBalance', 'material', 'transport'].includes(entry.category),
       )
       .map((entry) => entry.amount);
-    expect(jobMoves).toEqual([200, -SHEET_PRICE_AD_HOC, -COURIER_COST, 200]);
+    expect(jobMoves).toEqual([200, -sheetPriceFor(1), -COURIER_COST, 200]);
     expect(jobMoves.reduce((total, value) => total + value, 0)).toBe(80);
     // The daily costs quietly took more than the job left behind.
     const laterCosts = day3.ledger
