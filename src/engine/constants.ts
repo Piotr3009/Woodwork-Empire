@@ -1370,9 +1370,33 @@ const ENDURANCE_BY_CLASS: Record<string, number> = {
   industrial: 2,
 };
 
-/** The five classes of workbench. Prices, output and footprints are Piotr's table; the endurance
- *  and the power are [TUNE] (CLAUDE.md T7 3.6). A bench is not a machine, so its hours never
- *  move: the ladder is there so the family reads like every other one. */
+/** How many men can work at one bench of this class at once [TUNE] (PIOTR, 20.09, the rule;
+ *  CLAUDE.md T23 2.17). A bench is a bench, and a three metre assembly station on a steel frame
+ *  is three men round a wardrobe lying down. The hiring gate counts places and not benches
+ *  through `benchPlaces` in src/engine/machines.ts, and each man at one works his own job at that
+ *  bench's pace. */
+/** The roles that may be put on a job at all, and so the roles that take a place at a bench. A
+ *  helper never builds: he carries, cleans and empties bags, and the Assign list says so rather
+ *  than offering him (PIOTR, 17.09; CLAUDE.md T19 2.5, 2.6). It lives here from Turn 23 because
+ *  machines.ts has to fill the benches with these men and cannot reach jobs.ts, which reads it
+ *  and re-exports it under the name every caller has always used (CLAUDE.md T23 2.17). */
+export const BUILDING_ROLES: readonly WorkerRole[] = ['joiner', 'sprayer'];
+
+export const WORKBENCH_PLACES: Record<string, number> = {
+  used: 1,
+  budget: 1,
+  standard: 2,
+  pro: 2,
+  industrial: 3,
+};
+
+/** The five classes of workbench. Prices, places and footprints are Piotr's table; the endurance
+ *  and the power are [TUNE] (CLAUDE.md T7 3.6, T23 2.17). A bench is not a machine, so its hours
+ *  never move: the ladder is there so the family reads like every other one.
+ *
+ *  `outputFactor` is the pace a man works at one, and Turn 23 re tuned the column to top out at
+ *  +10% where it topped out at +8%: 1.02, 1.05 and 1.08 become 1.03, 1.06 and 1.10 [TUNE, the
+ *  figures; PIOTR, 20.09, the top of the ladder]. */
 export const WORKBENCH_VARIANTS: EquipmentVariant[] = [
   {
     id: 'used',
@@ -1417,7 +1441,7 @@ export const WORKBENCH_VARIANTS: EquipmentVariant[] = [
     height: 0.9,
     zoneWidth: 2,
     zoneDepth: 2,
-    outputFactor: 1.02,
+    outputFactor: 1.03,
     enduranceFactor: ENDURANCE_BY_CLASS.standard ?? 1,
     powerPerDay: 1,
     description:
@@ -1433,7 +1457,7 @@ export const WORKBENCH_VARIANTS: EquipmentVariant[] = [
     height: 0.9,
     zoneWidth: 2,
     zoneDepth: 2,
-    outputFactor: 1.05,
+    outputFactor: 1.06,
     enduranceFactor: ENDURANCE_BY_CLASS.pro ?? 1,
     powerPerDay: 1,
     description:
@@ -1450,7 +1474,7 @@ export const WORKBENCH_VARIANTS: EquipmentVariant[] = [
     height: 0.9,
     zoneWidth: 3,
     zoneDepth: 2,
-    outputFactor: 1.08,
+    outputFactor: 1.10,
     enduranceFactor: ENDURANCE_BY_CLASS.industrial ?? 1,
     powerPerDay: 2,
     description:

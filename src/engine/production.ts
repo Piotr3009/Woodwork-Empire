@@ -28,6 +28,8 @@ import {
   OWNER,
   accumulateMachineMinute,
   addDust,
+  benchOf,
+  benchPlaceAt,
   cabinetTools,
   claimMachine,
   countOf,
@@ -168,6 +170,13 @@ export function takeMachines(state: GameState, hand: Hand): StationCheck {
   if (family === null || !has(state, family) || machineIsShared(state, family)) {
     return { machine: sharedTool(state, family), waitingFor: null };
   }
+  // A bench is his own place at one and not a thing he took off anybody, so it is asked for by
+  // name. Only the man who wanted a bench has one: the men behind the lead work at the lead's and
+  // put their minutes in at the stage's own speed, as they have since Turn 19
+  // (CLAUDE.md T19 2.5, T23 2.17).
+  if (family === BENCH) {
+    return { machine: wanted.includes(BENCH) ? benchOf(state, hand.who) : null, waitingFor: null };
+  }
   return { machine: heldMachine(state, hand.who, family), waitingFor: null };
 }
 
@@ -200,9 +209,18 @@ export function stationForProduction(state: GameState, who: string, job: Job): s
   // second place and the rest along its front (CLAUDE.md T17 2.10, T19 2.5).
   const lead = leadAssignee(job);
   const behind = lead !== null && lead !== who && isOnJob(job, who);
-  const bench = behind ? heldMachine(state, lead, BENCH) : null;
+  const bench = behind ? benchOf(state, lead) : null;
   const atTheBench = (): string => {
-    if (bench === null) return STATION_BENCH;
+    if (bench === null) {
+      // His own bench, and his own place at it. A class holds one, two or three men from Turn 23
+      // and the first of them stands at its operator's cell, so the second and the third take the
+      // places beside it and no two figures are drawn on the one cell (T19 2.5, T23 2.17).
+      const mine = benchOf(state, who);
+      if (mine === null) return STATION_BENCH;
+      const place = benchPlaceAt(state, who);
+      if (place === 0) return STATION_BENCH;
+      return place === 1 ? secondStation(mine.id) : placeStation(mine.id, place);
+    }
     const place = placeAmong(job, who, (other) => other !== lead);
     return place === 0 ? secondStation(bench.id) : placeStation(bench.id, place + 1);
   };

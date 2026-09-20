@@ -3,6 +3,7 @@
 // in production, completed, paid and rated (CLAUDE.md 9.5).
 
 import {
+  BUILDING_ROLES,
   COURIER_COST,
   MEETING_PRICE_THRESHOLD,
   SAW_FALLBACK_DEFAULT,
@@ -966,10 +967,10 @@ export function assignJob(state: GameState, jobId: string, workerId: string | nu
   return true;
 }
 
-/** The roles that may be put on a job at all. A helper never builds: he carries, cleans and
- *  empties bags, and the Assign list says so rather than offering him (PIOTR, 17.09;
- *  CLAUDE.md T19 2.5, 2.6). */
-export const BUILDING_ROLES: readonly WorkerRole[] = ['joiner', 'sprayer'];
+/** The roles that may be put on a job at all. The list itself is in constants.ts from Turn 23, so
+ *  that machines.ts can fill the benches with these men without reaching into this module; every
+ *  caller still reads it from here, where it has always been (CLAUDE.md T19 2.5, 2.6, T23 2.17). */
+export { BUILDING_ROLES };
 
 /** True while this man could be put on a job at all: a joiner or a sprayer, on the books and not
  *  off sick. The owner is always able, if he is about. */

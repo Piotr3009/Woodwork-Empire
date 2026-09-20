@@ -15,11 +15,16 @@ import {
   buyStartingKit,
   clearEvents,
   fillBags,
+  fillRack,
   firstJob,
+  hireNow,
   newGame,
   placeEnquiry,
+  placeEquipment,
   runToDay,
 } from '../helpers';
+import { benchOf } from '../../src/engine/machines';
+
 
 describe('the hall on day 1', () => {
   it('draws the three rooms and the floor, and nothing that was not bought', () => {
@@ -528,5 +533,57 @@ describe('the number on the rack (PIOTR, 17.09; CLAUDE.md T17 2.8)', () => {
     expect(Number(figure?.getAttribute('x'))).toBeCloseTo(at.x, 1);
     const top = Number(plate?.getAttribute('y'));
     expect(top + Number(plate?.getAttribute('height')) / 2).toBeCloseTo(at.y, 1);
+  });
+});
+
+/** A bench class says how many men can work at it at once from Turn 23, and two men at one bench
+ *  are two figures on the hall, each at his own place at it (PIOTR, 20.09; CLAUDE.md T23 2.17). */
+describe('two men at one bench', () => {
+  it('draws a figure for each of them, at the one bench, with a cell each', () => {
+    let state = fillRack(buyStartingKit(newGame({ difficulty: 'veryEasy' })), 60);
+    state.enquiries = [];
+    const bench = state.equipment.find((item) => item.specId === 'workbench');
+    if (bench === undefined) throw new Error('the day one kit has a bench in it');
+    // A standard bench holds two, and the rest of a joiner's kit for both of them.
+    bench.variantId = 'standard';
+    for (let index = 0; index < 2; index += 1) {
+      placeEquipment(state, 'locker', { x: 6 + index, y: 9 });
+      placeEquipment(state, 'handToolSet', { x: 12 + index, y: 9 });
+      placeEquipment(state, 'toolCabinet', { x: 10 + index, y: 9 });
+    }
+    state.cash = 1000000;
+    state = hireNow(hireNow(state, 'joiner', 'novice'), 'joiner', 'novice');
+    const [first, second] = state.workers;
+    if (first === undefined || second === undefined) throw new Error('two men wanted');
+    // Both of them call the same bench home, which is what the engine's places say.
+    expect(benchOf(state, first.id)?.id).toBe(bench.id);
+    expect(benchOf(state, second.id)?.id).toBe(bench.id);
+    for (const worker of [first, second]) worker.startDay = state.clock.day;
+    // One job each, both at the assembly, so each of them works his own job at the one bench.
+    for (const name of ['His own job', 'The other job']) {
+      const enquiry = placeEnquiry(state, { price: 4000, deadlineDays: 40, name });
+      state = acceptNow(state, enquiry.id, false);
+    }
+    for (const job of state.jobs) {
+      job.stage = 'ready';
+      job.labourRemaining = job.labourValue * 0.5;
+    }
+    const [jobOne, jobTwo] = state.jobs;
+    if (jobOne === undefined || jobTwo === undefined) throw new Error('two jobs wanted');
+    state = act(state, { type: 'ASSIGN_JOB', jobId: jobOne.id, workerId: first.id });
+    state = act(state, { type: 'ASSIGN_JOB', jobId: jobTwo.id, workerId: second.id });
+    state = tick(state, 1);
+    const svg = renderHall(state);
+    // Two figures on the hall, one for each man, named.
+    expect(svg).toContain(`data-figure="worker-${first.id}"`);
+    expect(svg).toContain(`data-figure="worker-${second.id}"`);
+    // And neither of them is drawn on top of the other: the first man of a bench stands at its
+    // operator's cell and the second at the place beside it (CLAUDE.md T19 2.5, T23 2.17).
+    const cellOf = (id: string): string => {
+      const at = svg.indexOf(`data-figure="worker-${id}"`);
+      const from = svg.indexOf('data-cell="', at);
+      return svg.slice(from + 'data-cell="'.length, svg.indexOf('"', from + 'data-cell="'.length));
+    };
+    expect(cellOf(first.id)).not.toBe(cellOf(second.id));
   });
 });

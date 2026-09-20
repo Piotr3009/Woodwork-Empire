@@ -7,6 +7,7 @@ import {
   DUST_OUTPUT_M3_PER_HOUR,
   EXTRACTOR_BAGS,
   bagsToM3,
+  BUILDING_ROLES,
   HEAVY_SPECS,
   LIGHT_CLASSES,
   LOW_AIR_FACTOR,
@@ -21,6 +22,7 @@ import {
   SERVICE_COST_FRACTION,
   SERVICE_INTERVAL_HOURS,
   TIER_WORDS,
+  WORKBENCH_PLACES,
   DUST_HIGH_THRESHOLD,
   DUST_MAX,
   DUST_PER_PRODUCTION_MINUTE,
@@ -321,7 +323,9 @@ export function freeMachines(state: GameState, specId: string): Equipment[] {
   );
 }
 
-/** The machine of this family this man is standing at, or null. */
+/** The machine of this family this man is standing at, or null. A bench is not one of them from
+ *  Turn 23: it is not taken off anybody, every man has his own place at one, and `benchOf` says
+ *  which (CLAUDE.md T23 2.17). */
 export function heldMachine(state: GameState, who: string, specId: string): Equipment | null {
   return owned(state, specId).find((item) => item.takenBy === who) ?? null;
 }
@@ -335,6 +339,10 @@ export function heldMachines(state: GameState, who: string): Equipment[] {
  *  is already at; otherwise he takes the best of the free ones, which is what a joiner would do
  *  and what the projection on his job card assumes he will get. */
 export function claimMachine(state: GameState, who: string, specId: string): Equipment | null {
+  // A bench is never claimed. A class holds one, two or three men and each of them has his own
+  // place at one, so there is nothing to take and nothing to queue for: he either has a place or
+  // the hall has not got one for him (CLAUDE.md T23 2.17).
+  if (specId === BENCH) return benchOf(state, who);
   const held = heldMachine(state, who, specId);
   if (held) return held;
   const free = freeMachines(state, specId);
@@ -459,18 +467,114 @@ export const BENCH = 'workbench';
  *  trade: he is at his full rate there and a joiner is slower (CLAUDE.md T19 2.6). */
 export const SPRAY_BOOTH = 'sprayBooth';
 
-/** Without a bench there is no way to start production, and two men cannot share one
- *  (CLAUDE.md T4 3.4). A job whose man is already at a bench keeps it. */
+/** How many men can work at this bench at once: its class's place in Piotr's table, and nought
+ *  for anything that is not a bench (CLAUDE.md T23 2.17). */
+export function benchPlacesOf(item: { specId: string; variantId: string }): number {
+  if (item.specId !== BENCH) return 0;
+  return WORKBENCH_PLACES[item.variantId] ?? 1;
+}
+
+/** The benches standing in the hall, in the order they were bought, which is the order the men
+ *  fill them in. A broken one is no bench at all, the way a broken machine is no machine. */
+export function benches(state: GameState): Equipment[] {
+  return floorMachines(state, BENCH).filter((item) => !item.broken);
+}
+
+/** Places at the benches of the hall, the classes added up: what the hiring gate counts, the way
+ *  it counts the slots of the tool cabinets and not the cabinets (CLAUDE.md T22 2.12, T23 2.17). */
+export function benchPlaces(state: GameState): number {
+  return benches(state).reduce((total, item) => total + benchPlacesOf(item), 0);
+}
+
+/** The men who have a place at a bench, in the order they get one: the crew in the order they
+ *  were hired, and the owner after them. The crew come first because the hiring gate counts
+ *  places against the men on the books and buys a place for every one of them, so a man the
+ *  player has paid for a bench for is never the one standing at the canteen door; the owner takes
+ *  what is left, which is the whole bench on the first morning and nothing at all in a hall whose
+ *  benches are all spoken for. Only the trades that stand at a bench are on the list: a helper
+ *  with a broom, an estimator at a desk and the production manager take no place at one
+ *  (CLAUDE.md T4 3.4, T19 2.5, T23 2.17). */
+function benchQueue(state: GameState): string[] {
+  const crew = state.workers
+    .filter((worker) => BUILDING_ROLES.includes(worker.role))
+    .map((worker) => worker.id);
+  return [...crew, OWNER];
+}
+
+/** The bench this man works at, or null while the hall has no place for him. It is the same
+ *  answer every minute of his time on the books: the benches in the order they were bought, each
+ *  holding its class's men, filled by `benchQueue` in order. Nobody is turned off a bench he is
+ *  standing at, because nobody was ever standing at somebody else's (CLAUDE.md T23 2.17). */
+export function benchOf(state: GameState, who: string): Equipment | null {
+  let place = benchQueue(state).indexOf(who);
+  if (place < 0) return null;
+  for (const bench of benches(state)) {
+    const places = benchPlacesOf(bench);
+    if (place < places) return bench;
+    place -= places;
+  }
+  return null;
+}
+
+/** Which of his bench's places is his: nought for the first man at it, one for the second, two
+ *  for the third. The renderer wants it so that two men at one bench are two figures beside each
+ *  other and not one drawn on top of another, which is the rule of Turn 19's 2.5 asked of a bench
+ *  that holds more than one man (CLAUDE.md T19 2.5, T23 2.17). */
+export function benchPlaceAt(state: GameState, who: string): number {
+  let place = benchQueue(state).indexOf(who);
+  if (place < 0) return 0;
+  for (const bench of benches(state)) {
+    const places = benchPlacesOf(bench);
+    if (place < places) return place;
+    place -= places;
+  }
+  return 0;
+}
+
+/** How many places at a bench the hall's own men already have: the owner and every trade that
+ *  stands at one (CLAUDE.md T23 2.17). */
+export function benchMen(state: GameState): number {
+  return benchQueue(state).length;
+}
+
+/** Places at the benches that nobody on the books has: what a hall has spare for the next man. */
+export function freeBenches(state: GameState): number {
+  return Math.max(0, benchPlaces(state) - benchMen(state));
+}
+
+/** The same sum with the benches on the lorry counted as well, which is what the hiring gate
+ *  asks: a bench bought this morning is in by 08:00 tomorrow and the man starts then (T8 3.2). */
+export function benchPlacesOwnedOrOnOrder(state: GameState): number {
+  return (
+    benchPlaces(state) +
+    state.onOrder.reduce((total, item) => total + benchPlacesOf(item), 0)
+  );
+}
+
+/** The bench the man who would take this place gets, counting from the owner. The hiring gate's
+ *  own question, asked before the man is on the books: it is what `benchOf` will answer for him
+ *  the morning he starts (CLAUDE.md T23 2.17). */
+export function benchAtPlace(state: GameState, place: number): Equipment | null {
+  let left = place;
+  for (const bench of benches(state)) {
+    const places = benchPlacesOf(bench);
+    if (left < places) return bench;
+    left -= places;
+  }
+  return null;
+}
+
+/** Without a bench there is no way to start production (CLAUDE.md T4 3.4). Two or three men can
+ *  share one from Turn 23, by its class, so the question is whether the man on the job has a
+ *  place at one, and whether the hall has a place spare for a job nobody is on yet. */
 export function hasBenchFor(state: GameState, jobId: string | null): boolean {
   const job = jobId === null ? null : state.jobs.find((entry) => entry.id === jobId) ?? null;
   const who = job?.assignees[0] ?? null;
-  if (who !== null && heldMachine(state, who, BENCH) !== null) return true;
-  return freeMachines(state, BENCH).length > 0;
-}
-
-/** Benches nobody is standing at. */
-export function freeBenches(state: GameState): number {
-  return freeMachines(state, BENCH).length;
+  if (who !== null) return benchOf(state, who) !== null;
+  // Nobody is on it yet, so the question is the hall's and not a man's: is there a bench in it at
+  // all. Whoever takes the job brings his own place with him, and the man who has not got one is
+  // told so the minute he is put on it, by the line above (CLAUDE.md T23 2.17).
+  return benchPlaces(state) > 0;
 }
 
 /** What the machines in the hall draw in a day. A dearer class pulls more (CLAUDE.md T3 3.5). */
