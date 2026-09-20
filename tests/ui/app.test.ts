@@ -408,13 +408,15 @@ describe('the modals', () => {
     click('[data-do="closeModal"]');
     click('[data-office="catalogue"]');
     // The filter works inside the tab that is open and nowhere else (CLAUDE.md T6 3.6).
-    click('[data-do="catalogueTab"][data-id="handTools"]');
+    // Sheet machines, because the hand tools tab holds one folder since the drill went
+    // (CLAUDE.md T23 2.5) and a filter has to have two things to choose between.
+    click('[data-do="catalogueTab"][data-id="sheetMachines"]');
     expect(html()).not.toContain('data-do="clearFilter"');
-    expect(html()).toContain('Drills');
-    type('[data-filter="catalogue"]', 'hand tool');
+    expect(html()).toContain('Table saws');
+    type('[data-filter="catalogue"]', 'edgeband');
     expect(html()).toContain('data-do="clearFilter"');
-    expect(html()).toContain('Hand tool sets');
-    expect(html()).not.toContain('Drills');
+    expect(html()).toContain('Edgebanders');
+    expect(html()).not.toContain('Table saws');
     // A tab with nothing matching says so, and never borrows a folder from another tab.
     click('[data-do="catalogueTab"][data-id="storage"]');
     expect(html()).toContain('Tool cabinets');

@@ -28,9 +28,11 @@ function manager(id = 'pm-1'): Worker {
     id,
     name: 'Frank',
     role: 'productionManager',
-    tier: null,
+    // The grade a save's manager is given and the grade he was always paid for: the experienced
+    // man costs the 3,400 a manager cost before Turn 23 gave him four (CLAUDE.md T23 2.4).
+    tier: 'experienced',
     rate: 0,
-    monthlyWage: PRODUCTION_MANAGER_MONTHLY_WAGE,
+    monthlyWage: PRODUCTION_MANAGER_MONTHLY_WAGE.experienced,
     leavesOnDay: null,
     startDay: 1,
     jobId: null,
@@ -97,17 +99,15 @@ describe('the second shift on the team page', () => {
     ).toHaveLength(0);
   });
 
-  it('shows the manager’s own day meter with the assigning on Management', () => {
+  it('says nothing about the assigning costing anybody a minute', () => {
+    // Nobody is charged for putting a man on a job from Turn 23, so the line that said whose day
+    // it came off is gone from both tabs (PIOTR, 20.09; CLAUDE.md T23 2.2).
     const state = sixJoinersOnSheetWork();
-    const pm = manager();
-    pm.dayLog = [{ category: 'assign', minutes: 30 }];
-    state.workers.push(pm);
+    state.workers.push(manager());
     const page = parse(renderTeam(state, 'management'));
-    expect(page.querySelector('.crew-day')?.textContent).toContain('Assigning 30 min');
-    expect(page.textContent).toContain('The production manager assigns the crew');
-    // Without him the same minutes are the owner's.
+    expect(page.textContent).not.toContain('of his day');
     const alone = parse(renderTeam(sixJoinersOnSheetWork(), 'workshop'));
-    expect(alone.textContent).toContain('Managing them costs you');
+    expect(alone.textContent).not.toContain('Managing them costs you');
   });
 });
 

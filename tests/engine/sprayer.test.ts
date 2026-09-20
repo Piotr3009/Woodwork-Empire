@@ -39,7 +39,7 @@ function boothHall(): GameState {
   // (CLAUDE.md 9.3), so both trades can be taken on out of this one hall.
   // The cabinet before the set: a man's tools have to have a slot to live in, and the owner's own
   // set is already in the one slot the day one used cabinet holds (CLAUDE.md T22 2.12).
-  for (const specId of ['locker', 'canteenSeat', 'toolCabinet', 'handToolSet']) {
+  for (const specId of ['locker', 'toolCabinet', 'handToolSet']) {
     kitted = buyNow(kitted, specId);
   }
   const state = kitted;

@@ -106,14 +106,13 @@ describe('templates', () => {
 describe('tool gating', () => {
   it('names the missing tools on an empty unit', () => {
     const state = newGame();
-    expect(missingEquipment(state, template('garageShelves'))).toEqual(['tableSaw', 'drill']);
-    expect(lockReasonFor(state, template('garageShelves'))).toBe('Needs table saw, cordless drill');
+    expect(missingEquipment(state, template('garageShelves'))).toEqual(['tableSaw']);
+    expect(lockReasonFor(state, template('garageShelves'))).toBe('Needs table saw');
   });
 
   it('clears the lock once the tools are bought', () => {
     let state = newGame();
     state = buyNow(state, 'tableSaw');
-    state = buyNow(state, 'drill');
     expect(lockReasonFor(state, template('garageShelves'))).toBeNull();
     // The bookcase still needs the edgebander.
     expect(lockReasonFor(state, template('bookcase'))).toBe('Needs edgebander');
@@ -134,7 +133,7 @@ describe('tool gating', () => {
     // (PIOTR; CLAUDE.md T13 3.13). The board greys them without it, through the one kit check.
     const state = newGame();
     state.reputation = 100;
-    for (const specId of ['tableSaw', 'drill', 'edgebander', 'sprayBooth', 'extractor']) {
+    for (const specId of ['tableSaw', 'edgebander', 'sprayBooth', 'extractor']) {
       placeEquipment(state, specId, { variantId: 'standard' });
     }
     for (const id of ['lacqueredKitchen', 'handlelessKitchen']) {

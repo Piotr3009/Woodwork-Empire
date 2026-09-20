@@ -159,9 +159,6 @@ describe('rule 2, the litres', () => {
     function assembled(compressorClass: string, others: number): number {
       const state = fillRack(hallWithAir(compressorClass), 200);
       placeEquipment(state, 'tableSaw', { variantId: 'used', x: 6, y: 1 });
-      // The board locks a job the hall has no drill for, and the locks are refreshed after every
-      // action, so the second enquiry would be refused without one (CLAUDE.md T2 3.4).
-      placeEquipment(state, 'drill', { x: 16, y: 8 });
       state.enquiries = [];
       for (let index = 0; index <= others; index += 1) {
         placeEquipment(state, 'workbench', {
@@ -200,7 +197,6 @@ describe('rule 2, the litres', () => {
     const state = fillRack(hallWithAir('used'), 40);
     placeEquipment(state, 'workbench', { variantId: 'budget', x: 2, y: 8 });
     placeEquipment(state, 'tableSaw', { variantId: 'used', x: 6, y: 1 });
-    placeEquipment(state, 'drill', { x: 16, y: 8 });
     state.enquiries = [];
     // Eight jobs in assembly at once: far more nailers than a used compressor will feed.
     for (let index = 0; index < 8; index += 1) {

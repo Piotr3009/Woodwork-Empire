@@ -140,7 +140,7 @@ describe('accepting an enquiry', () => {
 
   it('refuses to start a drawing with no licence', () => {
     let state = newGame();
-    for (const specId of ['desk', 'laptop', 'tableSaw', 'drill']) {
+    for (const specId of ['desk', 'laptop', 'tableSaw']) {
       state = buyNow(state, specId);
     }
     state.enquiries = [];

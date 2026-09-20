@@ -55,9 +55,11 @@ beforeAll(() => {
 });
 
 describe('the day one list', () => {
-  it('is twelve things, in one constant, and every one of them is real', () => {
-    expect(DAY_ONE_KIT).toHaveLength(12);
-    // The same eleven machines the day 1 shopping buys, and the licence with them.
+  it('is eleven things, in one constant, and every one of them is real', () => {
+    // Twelve until Turn 23 took the cordless drill out of the game (PIOTR, 20.09;
+    // CLAUDE.md T23 2.5).
+    expect(DAY_ONE_KIT).toHaveLength(11);
+    // The same ten machines the day 1 shopping buys, and the licence with them.
     expect([...DAY_ONE_KIT].filter((id) => id !== DAY_ONE_SOFTWARE).sort()).toEqual(
       [...STARTING_KIT].sort(),
     );
@@ -71,7 +73,6 @@ describe('the day one list', () => {
       'laptop',
       DAY_ONE_SOFTWARE,
       'tableSaw',
-      'drill',
       'edgebander',
       'compressor',
       'extractor',
@@ -81,13 +82,13 @@ describe('the day one list', () => {
     ]);
   });
 
-  it('lists all twelve at the top of the catalogue, on every tab', () => {
+  it('lists all eleven at the top of the catalogue, on every tab', () => {
     const state = newGame();
     for (const tab of ['computers', 'sheetMachines', 'storage']) {
       const page = shop(state, tab);
       const card = page.querySelector('[data-checklist="dayOne"]');
       expect(card, tab).not.toBeNull();
-      expect(card?.querySelectorAll('.checklist-item'), tab).toHaveLength(12);
+      expect(card?.querySelectorAll('.checklist-item'), tab).toHaveLength(11);
     }
   });
 

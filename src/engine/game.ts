@@ -13,7 +13,6 @@ import {
   CABINET_SLOT_LAYOUT,
   DAY_LOGS_KEPT,
   DAY_SUMMARIES_MAX,
-  CANTEEN_SLOT_LAYOUT,
   DAY_END_MINUTE,
   DIFFICULTIES,
   GATE_LANE,
@@ -424,6 +423,7 @@ export function createGame(options: NewGameOptions): GameState {
     tips: { seen: [] },
     shift: { second: false },
     monthEndShownFor: 0,
+    monthlyReports: [],
     ledger: [],
     eventQueue: [],
     activeEvent: null,
@@ -2442,7 +2442,6 @@ function defaultAnchor(state: GameState, specId: string): { x: number; y: number
   const index = countOf(state, specId) + onOrderCount(state, specId);
   if (specId === 'workbench') return slotFrom(BENCH_SLOT_LAYOUT, index);
   if (specId === 'locker') return slotFrom(LOCKER_SLOT_LAYOUT, index);
-  if (specId === 'canteenSeat') return slotFrom(CANTEEN_SLOT_LAYOUT, index);
   if (specId === TOOL_CABINET) return slotFrom(CABINET_SLOT_LAYOUT, index);
   const slot = STARTING_LAYOUT[specId];
   // Anything the layout has no opinion about starts in the front half, clear of the gate lane.

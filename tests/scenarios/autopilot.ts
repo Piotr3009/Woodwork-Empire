@@ -276,7 +276,6 @@ export const DAY_ONE_BUY_ORDER = [
   'chair',
   'laptop',
   'tableSaw',
-  'drill',
   'toolCabinet',
   'extractor',
   'compressor',
@@ -342,7 +341,7 @@ function buyLicence(state: GameState, policy: Policy): GameState {
 }
 
 /** What a joiner has to have before he can start (CLAUDE.md 9.3). */
-export const JOINER_KIT = ['workbench', 'locker', 'canteenSeat', 'toolCabinet', 'handToolSet'];
+export const JOINER_KIT = ['workbench', 'locker', 'toolCabinet', 'handToolSet'];
 
 function takeOnJoiner(state: GameState, policy: Policy): GameState {
   const wanted = policy.joiners ?? 1;

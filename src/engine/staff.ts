@@ -1,6 +1,8 @@
-// Hiring and the workforce. A joiner cannot start until he has a bench, a locker, a seat and a set
-// of tools, exactly as in life (CLAUDE.md 9.3). The second shift lives here too: the men on it
-// work after the day, at the night rate, with the owner gone home (CLAUDE.md T13 3.9).
+// Hiring and the workforce. A joiner cannot start until he has a bench, a locker and a set of
+// tools, exactly as in life (CLAUDE.md 9.3). The seat was on that list until Turn 23, when the
+// canteen became a room with a table and two stools of its own and nobody buys a seat any more
+// (PIOTR, 20.09; CLAUDE.md T23 2.11). The second shift lives here too: the men on it work after
+// the day, at the night rate, with the owner gone home (CLAUDE.md T13 3.9).
 
 import {
   ACCIDENT_CHANCE_PER_DAY,

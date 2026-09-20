@@ -7,7 +7,6 @@ import { EQUIPMENT_SPECS, findSpec, standsInTheHall, zoneOf } from '../../src/en
 import {
   BENCH_SLOT_LAYOUT,
   CABINET_SLOT_LAYOUT,
-  CANTEEN_SLOT_LAYOUT,
   GATE_LANE,
   LOCKER_SLOT_LAYOUT,
   PERSONNEL_DOOR,
@@ -73,9 +72,7 @@ describe('footprints in metres', () => {
       desk: [3, 2, 1],
       chair: [1, 1, 1],
       laptop: [1, 1, 1],
-      drill: [1, 1, 1],
       locker: [1, 1, 2],
-      canteenSeat: [1, 1, 1],
       handToolSet: [1, 1, 1],
       van: [4, 2, 2],
       forklift: [2, 2, 2],
@@ -136,7 +133,11 @@ describe('footprints in metres', () => {
       });
     }
     // And the two hand classes of the edgebander reserve no floor at all: they live in a tool
-    // cabinet and come out to the bench (CLAUDE.md T6 3.5, T7 3.6).
+    // cabinet and come out to the bench (CLAUDE.md T6 3.5, T7 3.6). A man's hand tool set reads
+    // the same way from Turn 23: it is kept in his cabinet and is not a thing on the hall
+    // (CLAUDE.md T23 2.6).
+    expect(zoneOf('handToolSet')).toEqual({ width: 0, depth: 0 });
+    expect(standsInTheHall('handToolSet')).toBe(false);
     for (const id of ['used', 'budget']) {
       expect(zoneOf('edgebander', id), id).toEqual({ width: 0, depth: 0 });
       expect(standsInTheHall('edgebander', id), id).toBe(false);
@@ -199,11 +200,11 @@ describe('the 200 square metre hall', () => {
     }
     expect(free).toBe(174);
     // The welfare kit has those eight cells of the canteen on top of the hall's own floor, and
-    // nothing else does.
+    // nothing else does. The locker is the whole of that kit from Turn 23 (CLAUDE.md T23 2.11).
     let welfare = 0;
     for (let y = 0; y < state.unit.depthCells; y += 1) {
       for (let x = 0; x < state.unit.widthCells; x += 1) {
-        if (canPlaceSpec(state, 'canteenSeat', x, y, null).ok) welfare += 1;
+        if (canPlaceSpec(state, 'locker', x, y, null).ok) welfare += 1;
       }
     }
     expect(welfare).toBe(174 + roomById('canteen').width * roomById('canteen').depth);
@@ -237,12 +238,12 @@ describe('the 200 square metre hall', () => {
       const check = canPlaceSpec(state, specId, slot.x, slot.y, null, variant?.id);
       expect(check, specId).toEqual({ ok: true, reason: '' });
     }
-    // The bench, locker, canteen seat and tool cabinet slots of a full hall fit too, and they
-    // fit beside each other: a zone is floor nothing else may stand on (CLAUDE.md T7 3.3).
+    // The bench, locker and tool cabinet slots of a full hall fit too, and they fit beside each
+    // other: a zone is floor nothing else may stand on (CLAUDE.md T7 3.3). The canteen seat was on
+    // this list until Turn 23 took it out of the game (CLAUDE.md T23 2.11).
     const slots: Array<[string, typeof BENCH_SLOT_LAYOUT]> = [
       ['workbench', BENCH_SLOT_LAYOUT],
       ['locker', LOCKER_SLOT_LAYOUT],
-      ['canteenSeat', CANTEEN_SLOT_LAYOUT],
       ['toolCabinet', CABINET_SLOT_LAYOUT],
     ];
     for (const [specId, layout] of slots) {

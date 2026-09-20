@@ -173,14 +173,16 @@ describe('30 days on Easy, working the board', () => {
     expect(state.ledger.some((entry) => entry.unpaid)).toBe(false);
     // One track for money, read off the ledger's own running balance: every pound the month moved
     // moved out of the account, and no line of it was written with the account anywhere near the
-    // bank's limit. The lowest balance of the month is its last line, 2,789 on day 31, so the
-    // count of days below the limit never started (CLAUDE.md T22 2.1, 2.2).
+    // bank's limit. The lowest balance of the month is its last line, 2,829 on day 31, so the
+    // count of days below the limit never started (CLAUDE.md T22 2.1, 2.2). It was 2,789 until
+    // tonight: the canteen seat is out of the game, so the forty pounds the scripted player spent
+    // on one stays in the account (CLAUDE.md T23 2.11).
     for (const entry of state.ledger) {
       expect(entry.balance, `${entry.day} ${entry.label}`).toBeGreaterThan(
         state.finance.overdraftLimit,
       );
     }
-    expect(Math.round(Math.min(...state.ledger.map((entry) => entry.balance)))).toBe(2789);
+    expect(Math.round(Math.min(...state.ledger.map((entry) => entry.balance)))).toBe(2829);
     expect(state.finance.daysBelowOverdraft).toBe(0);
   });
 
@@ -510,10 +512,12 @@ describe('a month short handed, with a joiner and one small rack', () => {
     // of the price they used to (CLAUDE.md T13 3.3). Measured, not tuned.
     expect(state.cash).toBeGreaterThan(state.finance.overdraftLimit);
     // This is the month that goes furthest into the overdraft of the fifteen that stay inside it,
-    // and it still never reaches the limit: the lowest running balance of the month is -466, on
+    // and it still never reaches the limit: the lowest running balance of the month is -386, on
     // day 31, the count of days below the limit never starts, and nothing is left unpaid, because
-    // from Turn 22 there is nowhere for a bill to go but the account (CLAUDE.md T22 2.1).
-    expect(Math.round(Math.min(...state.ledger.map((entry) => entry.balance)))).toBe(-466);
+    // from Turn 22 there is nowhere for a bill to go but the account (CLAUDE.md T22 2.1). It was
+    // -466 until tonight: this script kits out two men, and the two canteen seats it bought for
+    // them are eighty pounds it no longer spends (CLAUDE.md T23 2.11).
+    expect(Math.round(Math.min(...state.ledger.map((entry) => entry.balance)))).toBe(-386);
     expect(state.finance.daysBelowOverdraft).toBe(0);
     expect(state.ledger.some((entry) => entry.unpaid)).toBe(false);
   });

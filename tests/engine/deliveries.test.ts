@@ -58,7 +58,7 @@ describe('the days a class waits', () => {
     expect(deliveryDaysFor('thicknesser', 'standard')).toBe(5);
     // The hand tools, the furniture and the storage come the next working day: nothing comes back
     // in the owner's hands any more (CLAUDE.md T9 3.1).
-    for (const specId of ['desk', 'chair', 'laptop', 'drill', 'toolCabinet', 'locker', 'canteenSeat', 'handToolSet']) {
+    for (const specId of ['desk', 'chair', 'laptop', 'toolCabinet', 'locker', 'handToolSet']) {
       expect(deliveryDaysFor(specId, 'standard'), specId).toBe(1);
     }
     // A hand edgebander comes next day like a hand tool; a floor one is ordered in.

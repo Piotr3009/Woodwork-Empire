@@ -137,9 +137,11 @@ describe('the tabs', () => {
     const saws = shop(state, 'sheetMachines');
     expect(saws.innerHTML).toContain('Table saws');
     expect(saws.innerHTML).toContain('Edgebanders');
-    expect(saws.innerHTML).not.toContain('Drills');
     const hand = shop(state, 'handTools');
-    expect(hand.innerHTML).toContain('Drills');
+    // The drill's own folder stood here until Turn 23 took it out of the game
+    // (CLAUDE.md T23 2.5); the hand tool set is what the tab holds now.
+    expect(hand.innerHTML).toContain('Hand tool sets');
+    expect(hand.innerHTML).not.toContain('Drills');
     expect(hand.innerHTML).not.toContain('Table saws');
     // Sanding and the CNC centre have nothing in them tonight.
     expect(shop(state, 'sanding').innerHTML).toContain('Nothing here yet.');
@@ -159,7 +161,6 @@ describe('the tabs', () => {
       'sheetRack',
       'toolCabinet',
       'locker',
-      'canteenSeat',
     ]);
     expect(folders('timberMachines')).toEqual(['thicknesser', 'solidWoodTools', 'spindleMoulder']);
     // Every line of the catalogue is in exactly one folder of exactly one tab, except the shared

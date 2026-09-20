@@ -36,8 +36,9 @@ describe('GameState', () => {
     // and Turn 9 made a lorry load one unloading of several orders (CLAUDE.md T9 3.1). Turn 11
     // put the owner's own day on the state, and the last week of them (CLAUDE.md T11 3.1). Turn 12
     // moved the bags onto the extractor, and a Turn 11 save is lifted rather than refused
-    // (CLAUDE.md T12 2.3).
-    expect(STATE_VERSION).toBe(19);
+    // (CLAUDE.md T12 2.3). Turn 23 wrote the closed months down on the state
+    // (CLAUDE.md T23 section 4).
+    expect(STATE_VERSION).toBe(20);
     expect(sample.version).toBe(STATE_VERSION);
   });
 

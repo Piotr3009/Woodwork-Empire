@@ -122,7 +122,7 @@ describe('a job nobody has started', () => {
     // A man wants his bench, his locker, his seat, his cabinet and his tools before he starts
     // (CLAUDE.md 9.3).
     let kitted = boardWith({ deadlineDays: 10 });
-    for (const specId of ['workbench', 'locker', 'canteenSeat', 'toolCabinet', 'handToolSet']) {
+    for (const specId of ['workbench', 'locker', 'toolCabinet', 'handToolSet']) {
       kitted = buyNow(kitted, specId, specId === 'workbench' ? 'budget' : undefined);
     }
     const state = hireNow(kitted, 'joiner', 'novice');

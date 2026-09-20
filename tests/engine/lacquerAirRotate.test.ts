@@ -124,7 +124,6 @@ function sprayedMinutes(dryer: boolean): number {
   placeEquipment(state, 'sprayBooth', { x: 7, y: 6 });
   placeEquipment(state, 'workbench', { variantId: 'budget', x: 4, y: 8 });
   placeEquipment(state, 'tableSaw', { variantId: 'used', x: 6, y: 1 });
-  placeEquipment(state, 'drill', { x: 16, y: 8 });
   placeEquipment(state, 'edgebander', { variantId: 'budget', x: 14, y: 8 });
   if (dryer) placeEquipment(state, 'airDryer', { x: 19, y: 2 });
   fillRack(state, 200);
@@ -159,7 +158,6 @@ function assembledMinutes(compressorClass: string | null): number {
     placeEquipment(state, 'compressor', { variantId: compressorClass, x: 18, y: 4 });
   }
   placeEquipment(state, 'tableSaw', { variantId: 'used', x: 6, y: 1 });
-  placeEquipment(state, 'drill', { x: 16, y: 8 });
   fillRack(state, 200);
   state.enquiries = [];
   for (let index = 0; index < 2; index += 1) {

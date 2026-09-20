@@ -30,6 +30,7 @@ import {
   freeSheets,
   houseTierFor,
   isLastWorkingDayOfMonth,
+  hiringOptions,
   isWorkingDay,
   managerOnDuty,
   marginOfPrice,
@@ -120,13 +121,20 @@ const PLAYTHROUGH: Policy = {
     // From day 61 the owner takes a production manager on. The interview is an hour of his day and
     // the day he is free to sit it is not always the 61st, so the script asks again until one is on
     // the books and there is no interview already running (CLAUDE.md T17 5, phase A).
+    //
+    // The manager comes in four grades from Turn 23, each behind its own standing and its own
+    // wage, so the scripted player takes the best grade the workshop has actually earned rather
+    // than naming one and going without when the advert brings nobody (CLAUDE.md T23 2.4).
     if (
       day >= 61 &&
       isWorkingDay(day) &&
       !next.workers.some((worker) => worker.role === 'productionManager') &&
       !next.tasks.some((task) => task.kind === 'hiring' && !task.done)
     ) {
-      next = act(next, { type: 'HIRE', role: 'productionManager', tier: null });
+      const best = hiringOptions(next)
+        .filter((option) => option.role === 'productionManager' && option.available)
+        .pop();
+      if (best) next = act(next, { type: 'HIRE', role: best.role, tier: best.tier });
     }
     if (day >= HOLIDAY_FROM && !holidayTaken && isWorkingDay(day) && managerOnDuty(next)) {
       next = act(next, { type: 'TAKE_HOLIDAY', days: 5 });
@@ -301,18 +309,24 @@ describe('the three month playthrough of 10.4, on Easy as the brief scripts it',
     }
     const running = later.contracts.find((contract) => contract.status === 'active');
     expect(running?.weeks.length ?? 0).toBeGreaterThan(16);
-    expect(later.gameOver?.day).toBe(120);
-    expect((running?.endDay ?? 0) - (later.gameOver?.day ?? 0)).toBe(1);
+    expect(later.gameOver?.day).toBe(121);
+    expect((running?.endDay ?? 0) - (later.gameOver?.day ?? 0)).toBe(0);
     // The rule it was closed under is the amount, and the line that got it there is the month's
-    // wages: 7,300 out of an account already 8,381 into the overdraft, and its own balance says
-    // where it left it. The other rule's count was on 1 of its 30.
+    // wages: 6,300 out of an account already 7,299 into the overdraft, and its own balance says
+    // where it left it. The other rule's count was on 2 of its 30.
+    //
+    // The four figures moved tonight and the reason is one thing: the production manager is a
+    // tiered role from Turn 23 and his standing gate is the one every tiered role passes, so the
+    // workshop that used to take the only manager there was now takes the best grade it has
+    // earned by day 61, which is the novice at 2,400 a month. A thousand a month less in wages is
+    // a company that lasts one day longer and closes 348 shallower (CLAUDE.md T23 2.4).
     expect(later.gameOver?.reason).toContain('cannot pay');
-    expect(Math.round(later.cash)).toBe(-15681);
+    expect(Math.round(later.cash)).toBe(-15333);
     expect(later.cash).toBeLessThanOrEqual(later.finance.overdraftLimit * BANKRUPTCY_LIMIT_FACTOR);
-    expect(later.finance.daysBelowOverdraft).toBe(1);
+    expect(later.finance.daysBelowOverdraft).toBe(2);
     const paid = later.ledger.filter((entry) => entry.category === 'wages');
     const last = paid[paid.length - 1];
-    expect([last?.day, last?.amount, Math.round(last?.balance ?? 0)]).toEqual([120, -7300, -15681]);
+    expect([last?.day, last?.amount, Math.round(last?.balance ?? 0)]).toEqual([120, -6300, -13599]);
     // Four months of one money track: nothing waited anywhere but the account (CLAUDE.md T22 2.1).
     expect(later.ledger.some((entry) => entry.unpaid)).toBe(false);
   });

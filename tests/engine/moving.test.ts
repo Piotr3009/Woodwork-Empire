@@ -75,11 +75,9 @@ describe('which items are ducted', () => {
     expect(needsDucting('cnc')).toBe(true);
     expect(needsDucting('compressor')).toBe(false);
     expect(needsDucting('handToolSet')).toBe(false);
-    expect(needsDucting('drill')).toBe(false);
     expect(needsDucting('workbench')).toBe(false);
     expect(needsDucting('sheetRack')).toBe(false);
     expect(needsDucting('locker')).toBe(false);
-    expect(needsDucting('canteenSeat')).toBe(false);
   });
 });
 

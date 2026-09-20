@@ -46,9 +46,11 @@ function manager(id = 'pm-1'): Worker {
     id,
     name: 'Frank',
     role: 'productionManager',
-    tier: null,
+    // The grade a save's manager is given and the grade he was always paid for: the experienced
+    // man costs the 3,400 a manager cost before Turn 23 gave him four (CLAUDE.md T23 2.4).
+    tier: 'experienced',
     rate: 0,
-    monthlyWage: PRODUCTION_MANAGER_MONTHLY_WAGE,
+    monthlyWage: PRODUCTION_MANAGER_MONTHLY_WAGE.experienced,
     leavesOnDay: null,
     startDay: 1,
     jobId: null,

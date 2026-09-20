@@ -362,7 +362,7 @@ describe('the rack the sheets live on', () => {
     let state = newGame();
     state.enquiries = [];
     // Everything but the shelving, so the job can be taken and ordered.
-    for (const specId of ['desk', 'laptop', 'tableSaw', 'drill', 'edgebander', 'extractor']) {
+    for (const specId of ['desk', 'laptop', 'tableSaw', 'edgebander', 'extractor']) {
       state = buyNow(state, specId);
     }
     state = softwareNow(state, 'oneOff');

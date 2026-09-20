@@ -36,7 +36,7 @@ import { buyNow, buyStartingKit, fillRack, hireNow, newGame } from '../helpers';
  *  seat, which is what hiring him takes (CLAUDE.md T4 3.4). */
 function hall(): GameState {
   let state = fillRack(buyStartingKit(newGame({ difficulty: 'veryEasy' }), { sawVariant: 'budget' }), 40);
-  for (const specId of ['workbench', 'locker', 'canteenSeat', 'toolCabinet', 'handToolSet']) {
+  for (const specId of ['workbench', 'locker', 'toolCabinet', 'handToolSet']) {
     state = buyNow(state, specId, specId === 'workbench' ? 'budget' : undefined);
   }
   const hired = hireNow(state, 'joiner', 'novice');

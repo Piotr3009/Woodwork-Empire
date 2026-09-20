@@ -1,5 +1,12 @@
 // All shapes of the simulation. Everything here is plain JSON: no classes, no functions,
 // no Map, no Set. `JSON.parse(JSON.stringify(state))` must return an identical state.
+//
+// One shape is not written here: a month's report is the four sums the month end card is drawn
+// from, and each of those already has a name in the module that works it out. The state carries
+// them, so the type is composed where they compose, in `economy.ts`, and reached from here by a
+// type only import that no build ever has to resolve at run time (CLAUDE.md T23 2.14).
+
+import type { MonthlyReport } from './economy';
 
 export type Difficulty = 'veryEasy' | 'easy' | 'hard';
 
@@ -49,10 +56,7 @@ export type DayCategory =
   | 'meetings'
   | 'siteMeasure'
   | 'office'
-  | 'fixing'
-  /** Assigning the crew to their work: the owner's until a production manager takes it off him,
-   *  and then the manager's own (CLAUDE.md T13 3.9). */
-  | 'assign';
+  | 'fixing';
 
 /** One run of minutes on one thing. Consecutive minutes on the same thing are one segment, so a
  *  morning of drawing is one entry and not two hundred (CLAUDE.md T11 3.1). */
@@ -647,7 +651,6 @@ export type TaskKind =
   | 'clientMeeting'
   | 'bookkeeping'
   | 'dailyOrdering'
-  | 'staffManagement'
   | 'clientCall'
   | 'design'
   /** Reading the drawing and counting the sheets for one accepted job: the owner's until an
@@ -1205,6 +1208,11 @@ export interface GameState {
   /** The month whose report has been put in front of the player, so it is shown once
    *  (CLAUDE.md T13 3.20). */
   monthEndShownFor: number;
+  /** Every month the company has closed, in the figures its month end card was drawn from, oldest
+   *  first. Accounting's Monthly reports tab is this list read back, so a month a player has not
+   *  looked at is not lost with the ledger it was added up from (PIOTR, 20.09;
+   *  CLAUDE.md T23 2.14). */
+  monthlyReports: MonthlyReport[];
   ledger: LedgerEntry[];
   eventQueue: GameEvent[];
   activeEvent: GameEvent | null;

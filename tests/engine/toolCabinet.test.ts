@@ -209,7 +209,7 @@ describe('hiring wants a free cabinet', () => {
     // With the owner's set in the one cabinet there is no slot for a man's, so the hire is short
     // one, and one used cabinet at ninety pounds is the cheapest way to give him one.
     expect(missingForHire(state, 'joiner')).toContain(TOOL_CABINET);
-    for (const specId of ['locker', 'canteenSeat']) state = buyNow(state, specId);
+    for (const specId of ['locker']) state = buyNow(state, specId);
     // His set cannot even be bought yet: there is nowhere to keep it, which is the other half of
     // 2.12's free slot rule and is `canBuy`'s own refusal.
     expect(canBuy(state, 'handToolSet').reason).toBe('No free slot in a tool cabinet');
@@ -232,15 +232,11 @@ describe('hiring wants a free cabinet', () => {
     const bigger = buyNow(hired, TOOL_CABINET, 'industrial');
     expect(toolSlots(bigger)).toBe(10);
     expect(freeToolSlots(bigger)).toBe(8);
-    // The cabinet is off the shortfall for good: the next man wants his own bench, locker, seat
-    // and tool set, and a slot to keep the set in, and the slots are there for seven more of him.
+    // The cabinet is off the shortfall for good: the next man wants his own bench, locker and
+    // tool set, and a slot to keep the set in, and the slots are there for seven more of him. The
+    // seat came off that list in Turn 23 (CLAUDE.md T23 2.11).
     expect(missingForHire(bigger, 'joiner')).not.toContain(TOOL_CABINET);
-    expect(missingForHire(bigger, 'joiner')).toEqual([
-      'workbench',
-      'locker',
-      'canteenSeat',
-      'handToolSet',
-    ]);
+    expect(missingForHire(bigger, 'joiner')).toEqual(['workbench', 'locker', 'handToolSet']);
   });
 
   it('blocks the hire while there is no cabinet free, and lets it through when there is', () => {
@@ -248,7 +244,7 @@ describe('hiring wants a free cabinet', () => {
     // The day 1 kit buys one, which is the owner's: the joiner has none.
     expect(countOf(state, TOOL_CABINET)).toBe(1);
     expect(missingForHire(state, 'joiner')).toContain(TOOL_CABINET);
-    for (const specId of ['locker', 'canteenSeat']) {
+    for (const specId of ['locker']) {
       state = buyNow(state, specId);
     }
     expect(canHire(state, 'joiner', 'novice').ok).toBe(false);

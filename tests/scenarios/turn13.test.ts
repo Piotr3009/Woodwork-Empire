@@ -308,7 +308,7 @@ describe('(w) a month with a production manager, a night joiner and five days aw
     reputation: 20,
     onDay: (current, day) => {
       let next = current;
-      if (day === 1) next = act(next, { type: 'HIRE', role: 'productionManager', tier: null });
+      if (day === 1) next = act(next, { type: 'HIRE', role: 'productionManager', tier: 'experienced' });
       if (day === 3) {
         next = act(next, { type: 'SET_SECOND_SHIFT', on: true });
         const second = next.workers.filter((worker) => worker.role === 'joiner')[1];

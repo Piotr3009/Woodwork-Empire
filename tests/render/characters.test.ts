@@ -47,7 +47,7 @@ function parse(html: string): HTMLElement {
 /** A hall with a joiner on the books, so there is a figure with a role to draw. */
 function hallWithAJoiner(): GameState {
   let state = fillRack(buyStartingKit(newGame({ difficulty: 'veryEasy' })));
-  for (const specId of ['workbench', 'locker', 'canteenSeat', 'toolCabinet', 'handToolSet']) {
+  for (const specId of ['workbench', 'locker', 'toolCabinet', 'handToolSet']) {
     state = buyNow(state, specId, specId === 'workbench' ? 'budget' : undefined);
   }
   const hired = hireNow(state, 'joiner', 'novice');

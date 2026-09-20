@@ -396,7 +396,6 @@ export {
   cleanerAtWork,
   manOnOpenTask,
   softwareActive,
-  staffManagementMinutes,
   startTaskCheck,
   taskWorkRate,
   tasksOfKind,
@@ -684,7 +683,6 @@ export {
 } from './owner';
 export {
   joineryCoreOffer,
-  staffManagementTaker,
 } from './tasks';
 export type { JoineryCoreOffer } from './tasks';
 export {

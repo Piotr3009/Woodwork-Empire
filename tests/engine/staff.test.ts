@@ -4,6 +4,9 @@ import {
   DAY_END_MINUTE,
   HIRING_SPECS,
   JOINER_PREREQUISITES,
+  PRODUCTION_MANAGER_CARRIES,
+  PRODUCTION_MANAGER_MONTHLY_WAGE,
+  PRODUCTION_MANAGER_PACE,
   LABOUR_FRACTION,
   MINUTES_PER_WORKING_DAY,
   OWNER_LABOUR_PER_MINUTE,
@@ -13,6 +16,7 @@ import {
   TIER_WORDS,
   TOOL_CABINET,
   WORKER_RATES,
+  productionManagerDuties,
 } from '../../src/engine/constants';
 import {
   availableJoiners,
@@ -32,7 +36,7 @@ import { createTask, estimatorCapacity } from '../../src/engine/tasks';
 import { minutesRemainingFor, ownerJob } from '../../src/engine/jobs';
 import { monthlyWageBill } from '../../src/engine/economy';
 import { tick } from '../../src/engine/index';
-import type { GameState, Worker } from '../../src/engine/index';
+import type { GameState, Worker, WorkerTier } from '../../src/engine/index';
 import {
   acceptNow,
   act,
@@ -112,7 +116,9 @@ describe('the hiring pool', () => {
     // The cabinet's cheapest class is the used one at ninety pounds from Turn 22, and two of them
     // is what a hall with none is short: one slot for the owner's set and one for the new man's
     // (CLAUDE.md T22 2.12).
-    expect(option?.missingCost).toBe(120 + 80 + 40 + 400 + 90 * 2);
+    // The bench, the locker, the tool set and two cabinets: the canteen seat came off the list
+    // when Turn 23 took the seat out of the game (CLAUDE.md T23 2.11).
+    expect(option?.missingCost).toBe(120 + 80 + 400 + 90 * 2);
     // Named, never the catalogue id: nothing of the engine's own reaches the card (CLAUDE.md 3).
     expect(option?.missing).toContain('Tool cabinet x 2');
     expect(option?.missing.join(' ')).not.toContain(TOOL_CABINET);
@@ -234,6 +240,57 @@ function jobReadyWith(price: number, tier: Worker['tier']): GameState {
   firstJob(state).stage = 'ready';
   return state;
 }
+
+describe('the production manager s four grades (CLAUDE.md T23 2.4)', () => {
+  const cards = HIRING_SPECS.filter((spec) => spec.role === 'productionManager');
+
+  it('is four hire cards, one a grade, on the one wage table Piotr gave him', () => {
+    // He was one man at one wage until tonight. From Turn 23 he is a tiered role like the joiner,
+    // and his four wages are Piotr's own and not the ladder every other role comes off: the
+    // ladder against 3,400 would put the man with no experience at 2,550 (PIOTR, 20.09).
+    expect(cards.map((card) => card.tier)).toEqual([...TIERS]);
+    expect(cards.map((card) => card.monthlyWage)).toEqual([2400, 3400, 4200, 5200]);
+    for (const card of cards) {
+      expect(card.monthlyWage, card.label).toBe(
+        PRODUCTION_MANAGER_MONTHLY_WAGE[card.tier as WorkerTier],
+      );
+      // The one standing gate every tiered role passes.
+      expect(card.minReputation, card.label).toBe(TIER_MIN_REPUTATION[card.tier as WorkerTier]);
+      expect(card.label, card.label).toBe(
+        `Production manager, ${TIER_WORDS[card.tier as WorkerTier]}`,
+      );
+    }
+  });
+
+  it('says the three figures of the grade in words on the card', () => {
+    expect(cards.map((card) => card.duties)).toEqual([
+      'Assigns up to 8 men, oldest open job first, +3% pace',
+      'Assigns up to 12 men, soonest deadline first, +5% pace',
+      'Assigns up to 18 men, soonest deadline, machines spread, +8% pace',
+      'Assigns up to 25 men, soonest deadline, machines spread, re planned hourly, +10% pace',
+    ]);
+    // And the sentence is built from the tables and nowhere typed twice.
+    for (const tier of TIERS) {
+      expect(productionManagerDuties(tier), tier).toContain(
+        `up to ${PRODUCTION_MANAGER_CARRIES[tier]} men`,
+      );
+      expect(productionManagerDuties(tier), tier).toContain(
+        `+${Math.round((PRODUCTION_MANAGER_PACE[tier] - 1) * 100)}% pace`,
+      );
+    }
+  });
+
+  it('carries more men the better he is, and works them faster', () => {
+    const carries = TIERS.map((tier) => PRODUCTION_MANAGER_CARRIES[tier]);
+    const pace = TIERS.map((tier) => PRODUCTION_MANAGER_PACE[tier]);
+    expect(carries).toEqual([8, 12, 18, 25]);
+    expect(pace).toEqual([1.03, 1.05, 1.08, 1.1]);
+    for (let at = 1; at < TIERS.length; at += 1) {
+      expect(carries[at] ?? 0).toBeGreaterThan(carries[at - 1] ?? 0);
+      expect(pace[at] ?? 0).toBeGreaterThan(pace[at - 1] ?? 0);
+    }
+  });
+});
 
 describe('joiners at the bench', () => {
   it('takes a joiner with no experience 13 days to make a 6400 wardrobe', () => {

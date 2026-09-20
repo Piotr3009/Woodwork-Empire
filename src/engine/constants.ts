@@ -95,8 +95,17 @@ import type {
  *  game, so it is subtracted from the cash and one ledger line says so; the turn a placed item and a
  *  reservation carried as a boolean becomes an `orientation`, its true reading as a quarter turn;
  *  and a tool cabinet with no class is the standard one, because the cabinet is a family of five now
- *  (CLAUDE.md T22 section 4). Every v30 and v31 save loads. */
-export const STATE_VERSION = 19;
+ *  (CLAUDE.md T22 section 4). Every v30 and v31 save loads.
+ *
+ *  Version 20 is Turn 23: every month end writes its own figures down, so the state carries the
+ *  months it has closed and Accounting reads them back instead of the ledger; the production
+ *  manager is a tiered role like the joiner, so a saved manager is given the grade he was paid
+ *  for; the cordless drill and the canteen seat are gone from the game, so a save's own are taken
+ *  off its books with a line each; a man's hand tool set lives in a cabinet and not on the floor,
+ *  so it loses the cell it stood on; and nobody is charged minutes for assigning any more, so the
+ *  daily staff management chore goes off the list (CLAUDE.md T23 section 4). Every v33, v34 and
+ *  v35 save loads. */
+export const STATE_VERSION = 20;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
@@ -117,7 +126,6 @@ export const DAY_CATEGORIES: readonly DayCategory[] = [
   'siteMeasure',
   'office',
   'fixing',
-  'assign',
 ];
 
 /** What each one is called on the tooltip, on the day end plate and on the company board. */
@@ -129,7 +137,6 @@ export const DAY_CATEGORY_LABELS: Record<DayCategory, string> = {
   siteMeasure: 'Site measure',
   office: 'Office',
   fixing: 'Fixing and bags',
-  assign: 'Assigning',
 };
 
 // ---------------------------------------------------------------------------
@@ -679,11 +686,49 @@ export const SPRAYER_SPRAY_RATE = 1.0;
  *  at a bench and help, and he is not a joiner (CLAUDE.md T19 2.6). */
 export const SPRAYER_BENCH_RATE = 0.6;
 
-/** The production manager: one tier, a pure cost, and the first management role in the game
- *  [TUNE wage and standing] (CLAUDE.md T13 3.9). Paid by the month like everybody else, at his own
- *  3,400 (CLAUDE.md T21 2.10). */
-export const PRODUCTION_MANAGER_MONTHLY_WAGE = 3400;
-export const PRODUCTION_MANAGER_REPUTATION = 10;
+/** The production manager, in four grades from tonight, because without one on duty nobody takes
+ *  a job by himself and the player has to see what a better man is for (PIOTR, 20.09;
+ *  CLAUDE.md T23 2.4). His grade says three things, and here are the three tables.
+ *
+ *  How many men he can carry: the men on the books, the owner not counted, in the order they were
+ *  hired. A man past his number is a man without a manager, who waits for the boss's click
+ *  [TUNE the four figures]. */
+export const PRODUCTION_MANAGER_CARRIES: Record<WorkerTier, number> = {
+  novice: 8,
+  experienced: 12,
+  senior: 18,
+  master: 25,
+};
+
+/** What he does to the pace of the men he carries: their production minutes are multiplied by it,
+ *  the way a tier's rate is, and it shows on the efficiency breakdown as one line [TUNE]. */
+export const PRODUCTION_MANAGER_PACE: Record<WorkerTier, number> = {
+  novice: 1.03,
+  experienced: 1.05,
+  senior: 1.08,
+  master: 1.1,
+};
+
+/** What each grade costs a month [TUNE]. Piotr's own four figures and not the one wage ladder
+ *  every other tiered role comes off: the ladder against 3,400 would put the novice at 2,550. The
+ *  experienced man keeps the 3,400 a manager is paid today, which is why a saved manager is made
+ *  experienced when a v19 save is lifted (CLAUDE.md T23 2.4, section 4). */
+export const PRODUCTION_MANAGER_MONTHLY_WAGE: Record<WorkerTier, number> = {
+  novice: 2400,
+  experienced: 3400,
+  senior: 4200,
+  master: 5200,
+};
+
+/** How each grade picks the next man's job, in the words the hire card says it in [PIOTR, 20.09:
+ *  the four rules are his]. The middle clause of the duties line, and the order `autoAssignJobs`
+ *  works in. */
+export const PRODUCTION_MANAGER_ORDER_WORDS: Record<WorkerTier, string> = {
+  novice: 'oldest open job first',
+  experienced: 'soonest deadline first',
+  senior: 'soonest deadline, machines spread',
+  master: 'soonest deadline, machines spread, re planned hourly',
+};
 /** The second shift: this many minutes after the day shift [TUNE], at this much of salary for
  *  those hours [TUNE], the owner absent from the hall: quality a tier down for work done at
  *  night [TUNE] and the error chance doubled [TUNE] (CLAUDE.md T13 3.9). */
@@ -695,8 +740,6 @@ export const NIGHT_ERROR_FACTOR = 2;
  *  that a 200 m2 hall with a normal set of machines and racks lands at the owner plus four, five
  *  at most (PIOTR; CLAUDE.md T13 3.10). */
 export const M2_PER_PERSON = 24;
-/** 10 minutes per joiner per day (PIOTR). */
-export const STAFF_MANAGEMENT_MINUTES_PER_JOINER = 10;
 /** A job worth more than this starts with a meeting at the client's before anything is drawn
  *  (PIOTR). Four hours of somebody's day; the salesman goes instead of the owner once the company
  *  is known well enough for the client to accept him [TUNE threshold] (CLAUDE.md T7 3.11). */
@@ -932,7 +975,7 @@ export const PRODUCT_TEMPLATES: ProductTemplate[] = [
     material: 'sheet',
     calls: 2,
     needsMeasure: false,
-    requiredEquipment: ['tableSaw', 'drill'],
+    requiredEquipment: ['tableSaw'],
     allowedFinishes: FINISHES_SHEET,
     minReputation: -50,
     weightsByTier: [50, 20, 8],
@@ -945,7 +988,7 @@ export const PRODUCT_TEMPLATES: ProductTemplate[] = [
     material: 'sheet',
     calls: 2,
     needsMeasure: false,
-    requiredEquipment: ['tableSaw', 'drill', 'edgebander'],
+    requiredEquipment: ['tableSaw', 'edgebander'],
     allowedFinishes: FINISHES_SHEET,
     minReputation: -50,
     weightsByTier: [30, 25, 12],
@@ -958,7 +1001,7 @@ export const PRODUCT_TEMPLATES: ProductTemplate[] = [
     material: 'sheet',
     calls: 3,
     needsMeasure: false,
-    requiredEquipment: ['tableSaw', 'drill', 'edgebander'],
+    requiredEquipment: ['tableSaw', 'edgebander'],
     allowedFinishes: FINISHES_SHEET,
     minReputation: 5,
     weightsByTier: [12, 25, 18],
@@ -971,7 +1014,7 @@ export const PRODUCT_TEMPLATES: ProductTemplate[] = [
     material: 'sheet',
     calls: 3,
     needsMeasure: false,
-    requiredEquipment: ['tableSaw', 'drill', 'edgebander'],
+    requiredEquipment: ['tableSaw', 'edgebander'],
     allowedFinishes: FINISHES_SHEET,
     minReputation: 10,
     weightsByTier: [0, 20, 22],
@@ -984,7 +1027,7 @@ export const PRODUCT_TEMPLATES: ProductTemplate[] = [
     material: 'sheet',
     calls: 4,
     needsMeasure: true,
-    requiredEquipment: ['tableSaw', 'drill', 'edgebander'],
+    requiredEquipment: ['tableSaw', 'edgebander'],
     allowedFinishes: FINISHES_SHEET,
     minReputation: 20,
     weightsByTier: [0, 8, 25],
@@ -1003,7 +1046,7 @@ export const PRODUCT_TEMPLATES: ProductTemplate[] = [
     // The calls come off the price curve of 8.10, like every other template.
     calls: 4,
     needsMeasure: true,
-    requiredEquipment: ['tableSaw', 'drill', 'edgebander', 'sprayBooth'],
+    requiredEquipment: ['tableSaw', 'edgebander', 'sprayBooth'],
     allowedFinishes: FINISHES_LACQUER,
     minReputation: 10,
     weightsByTier: [0, 10, 18],
@@ -1018,7 +1061,7 @@ export const PRODUCT_TEMPLATES: ProductTemplate[] = [
     calls: 4,
     needsMeasure: true,
     // A sprayed kitchen has its fronts moulded on the spindle moulder as well (T13 3.13).
-    requiredEquipment: ['tableSaw', 'drill', 'edgebander', 'sprayBooth', 'spindleMoulder'],
+    requiredEquipment: ['tableSaw', 'edgebander', 'sprayBooth', 'spindleMoulder'],
     allowedFinishes: FINISHES_LACQUER,
     // The same standing the small kitchen wants: the booth is the real gate on this one.
     minReputation: 20,
@@ -1034,7 +1077,7 @@ export const PRODUCT_TEMPLATES: ProductTemplate[] = [
     material: 'sheet',
     calls: 4,
     needsMeasure: true,
-    requiredEquipment: ['tableSaw', 'drill', 'edgebander', 'spindleMoulder'],
+    requiredEquipment: ['tableSaw', 'edgebander', 'spindleMoulder'],
     allowedFinishes: FINISHES_SHEET,
     minReputation: 20,
     weightsByTier: [0, 0, 14],
@@ -1077,7 +1120,6 @@ export const DELIVERY_DAYS_BY_CLASS: Record<string, Record<string, number>> = {
   sprayBooth: { used: 5, budget: 10, standard: 20, pro: 25, industrial: 30 },
   thicknesser: { used: 1, budget: 5, standard: 5, pro: 7, industrial: 12 },
   solidWoodTools: { used: 1, budget: 5, standard: 5, pro: 7, industrial: 12 },
-  drill: { used: 1, budget: 1, standard: 1, pro: 1, industrial: 1 },
 };
 
 /** What a lorry load of heavy kit costs somebody at the gate, before the handling kit shortens
@@ -1167,7 +1209,6 @@ export const CLASS_LADDER_FAMILIES: readonly string[] = [
   'cnc',
   'sprayBooth',
   'spindleMoulder',
-  'drill',
   'extractor',
   'compressor',
   'workbench',
@@ -2338,91 +2379,6 @@ export const SPRAY_BOOTH_VARIANTS: EquipmentVariant[] = [
   },
 ];
 
-/** The five classes of cordless drill (CLAUDE.md T13 3.12). Prices [TUNE]. It is a hand tool in a
- *  cabinet, so it holds no floor and wants no extraction; the endurance is in the batteries. */
-export const DRILL_VARIANTS: EquipmentVariant[] = [
-  {
-    id: 'used',
-    name: 'Used cordless drill',
-    price: 40,
-    width: 1,
-    depth: 1,
-    height: 1,
-    zoneWidth: 1,
-    zoneDepth: 1,
-    outputFactor: 0.95,
-    enduranceFactor: 0.25,
-    powerPerDay: 1,
-    description:
-      'A drill with one tired battery and a chuck that slips. It drives a screw if you lean ' +
-      'on it.',
-  },
-  {
-    id: 'budget',
-    name: 'Budget cordless drill',
-    price: 120,
-    width: 1,
-    depth: 1,
-    height: 1,
-    zoneWidth: 1,
-    zoneDepth: 1,
-    outputFactor: 1,
-    enduranceFactor: 1,
-    powerPerDay: 1,
-    description:
-      'A new drill with two batteries and a charger: the basic assembly tool every joiner ' +
-      'starts with.',
-  },
-  {
-    id: 'standard',
-    name: 'Standard cordless drill',
-    price: 220,
-    width: 1,
-    depth: 1,
-    height: 1,
-    zoneWidth: 1,
-    zoneDepth: 1,
-    outputFactor: 1.05,
-    enduranceFactor: 1.2,
-    powerPerDay: 1,
-    description:
-      'A trade drill with a brushless motor and a clutch that stops before it strips a hole. ' +
-      'Screws go in a little faster and the batteries last the day.',
-  },
-  {
-    id: 'pro',
-    name: 'Professional cordless drill',
-    price: 400,
-    width: 1,
-    depth: 1,
-    height: 1,
-    zoneWidth: 1,
-    zoneDepth: 1,
-    outputFactor: 1.15,
-    enduranceFactor: 1.5,
-    powerPerDay: 1,
-    description:
-      'A drill and an impact driver as a pair, with big batteries and a fast charger. ' +
-      'Assembly moves along when the driver never waits for the drill.',
-  },
-  {
-    id: 'industrial',
-    name: 'Industrial cordless drill',
-    price: 700,
-    width: 1,
-    depth: 1,
-    height: 1,
-    zoneWidth: 1,
-    zoneDepth: 1,
-    outputFactor: 1.3,
-    enduranceFactor: 2,
-    powerPerDay: 1,
-    description:
-      'The top of the range in a case with four batteries, a hammer function nobody in a ' +
-      'joinery needs and a warranty the rep signs on the spot. It never stops for a charge.',
-  },
-];
-
 /** The five classes of spindle moulder, the new family two trades share (CLAUDE.md T13 3.13). Prices
  *  [TUNE: 1,500 to 28,000], footprint 2 by 1 in a 3 by 3 zone [TUNE]; the factors follow the saw's
  *  ladder. */
@@ -2527,7 +2483,6 @@ const VARIANTS_BY_FAMILY: Record<string, EquipmentVariant[]> = {
   solidWoodTools: SOLID_WOOD_TOOLS_VARIANTS,
   cnc: CNC_VARIANTS,
   sprayBooth: SPRAY_BOOTH_VARIANTS,
-  drill: DRILL_VARIANTS,
   spindleMoulder: SPINDLE_MOULDER_VARIANTS,
   // The cabinet is a family of five from Turn 22, and what a class is for is how many men's hand
   // tools it holds (PIOTR, 19.09; CLAUDE.md T22 2.12).
@@ -2657,20 +2612,6 @@ const SPEC_DRAFTS: SpecDraft[] = [
     usedOn: 'sheet',
     stackable: true,
     effect: 'Cuts sheets and timber. One man at a time.',
-  },
-  {
-    ...BASE_SPEC,
-    id: 'drill',
-    folder: 'Drills',
-    tab: 'handTools',
-    name: 'Cordless drill',
-    price: 120,
-    category: 'tools',
-    width: 1,
-    depth: 1,
-    height: 1,
-    spriteKey: 'drill',
-    effect: 'Basic assembly tool.',
   },
   {
     ...BASE_SPEC,
@@ -2860,22 +2801,6 @@ const SPEC_DRAFTS: SpecDraft[] = [
   },
   {
     ...BASE_SPEC,
-    id: 'canteenSeat',
-    folder: 'Canteen seats',
-    tab: 'storage',
-    name: 'Canteen seat',
-    price: 40,
-    category: 'welfare',
-    width: 1,
-    depth: 1,
-    height: 1,
-    spriteKey: 'canteenSeat',
-    perWorker: true,
-    stackable: true,
-    effect: 'One per worker.',
-  },
-  {
-    ...BASE_SPEC,
     id: 'handToolSet',
     folder: 'Hand tool sets',
     tab: 'handTools',
@@ -2885,6 +2810,12 @@ const SPEC_DRAFTS: SpecDraft[] = [
     width: 1,
     depth: 1,
     height: 1,
+    // A set lives in the cabinet it is bought for and is not a thing on the hall from Turn 23: it
+    // holds no cell, it is on no slot of the floor and nothing is drawn for it, the same reading
+    // the hand classes of the edgebander have had since Turn 6 (PIOTR, 20.09;
+    // CLAUDE.md T23 2.6, T6 3.5).
+    zoneWidth: 0,
+    zoneDepth: 0,
     spriteKey: 'handToolSet',
     perWorker: true,
     stackable: true,
@@ -3229,6 +3160,57 @@ export function roomDoorCell(id: RoomId): { x: number; y: number } {
   return { x: room.x + Math.floor(room.width / 2), y: room.y + room.depth };
 }
 
+// ---------------------------------------------------------------------------
+// The canteen room (CLAUDE.md T23 2.9)
+// ---------------------------------------------------------------------------
+
+/** A rectangle on a room's canvas, in the canvas's own pixels, as the art side measures one. */
+export interface RoomRect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/** Where the canteen's four regions are on its layers [PIOTR: every figure is the art side's own
+ *  measurement of the five layers it delivered, copied from docs/mockups/t23/canteen-regions.json
+ *  and typed nowhere else]. The canvas is the office's, `OFFICE_CANVAS`, 1672 by 941: one room
+ *  view, one canvas, and the canteen is built on the office's machinery (CLAUDE.md T23 2.9).
+ *
+ *  The door goes back to the hall, the lockers open the team page, and the kitchen and the table
+ *  do nothing yet. */
+export const CANTEEN_REGIONS: Record<'door' | 'lockers' | 'kitchen' | 'table', RoomRect> = {
+  door: { x: 1390, y: 0, w: 282, h: 941 },
+  lockers: { x: 27, y: 170, w: 710, h: 500 },
+  kitchen: { x: 657, y: 123, w: 225, h: 433 },
+  table: { x: 12, y: 690, w: 310, h: 242 },
+};
+
+/** The eight door plates of the two locker banks, in reading order: the first four are the near
+ *  bank, the last four the far one, and the game writes the name of whoever's locker it is on each
+ *  [PIOTR: measured off canteenLockers.png]. Eight plates, eight lockers, eight men
+ *  (CLAUDE.md T23 2.9, 2.10). */
+export const CANTEEN_PLATES: readonly RoomRect[] = [
+  { x: 97, y: 250, w: 147, h: 33 },
+  { x: 296, y: 255, w: 125, h: 30 },
+  { x: 117, y: 466, w: 95, h: 24 },
+  { x: 311, y: 450, w: 95, h: 24 },
+  { x: 476, y: 260, w: 106, h: 27 },
+  { x: 618, y: 263, w: 95, h: 24 },
+  { x: 482, y: 437, w: 95, h: 24 },
+  { x: 618, y: 432, w: 95, h: 24 },
+];
+
+/** The counter over the banks, where the room says how many of the eight are in use [PIOTR]. */
+export const CANTEEN_COUNTER: RoomRect = { x: 95, y: 35, w: 450, h: 65 };
+
+/** The plate's hand: 18 px, centred, and a name longer than eight characters is cut to fit the
+ *  plate, because the plate is the size the picture painted it [PIOTR]. */
+export const CANTEEN_PLATE_TEXT = { fontSize: 18, maxCharacters: 8, align: 'center' } as const;
+
+/** The counter's hand: 24 px [PIOTR]. */
+export const CANTEEN_COUNTER_TEXT = { fontSize: 24 } as const;
+
 /** The roller shutter, in the left wall: 3 m of wall from y 6, 3 m high (docs/art/SPRITES.md 9.3).
  *  It is a far wall from where the camera stands, so a vehicle is only ever seen once it is
  *  inside, which is what the gate lane below is kept clear for. */
@@ -3262,8 +3244,6 @@ export const STARTING_LAYOUT: Record<string, LayoutSlot> = {
   edgebander: { x: 13, y: 6 },
   forklift: { x: 18, y: 6 },
   forkliftBetter: { x: 18, y: 7 },
-  drill: { x: 19, y: 6 },
-  handToolSet: { x: 19, y: 7 },
   van: { x: 0, y: 7, yard: true },
 };
 
@@ -3278,29 +3258,23 @@ export const BENCH_SLOT_LAYOUT: LayoutSlot[] = [
   { x: 18, y: 4 },
 ];
 
-/** The two families that stand inside the canteen and not on the hall floor: a man's seat and his
- *  locker (PIOTR, 17.09; CLAUDE.md T17 2.2). The one list: the placement, the render and the
- *  migration all ask it. */
-export const WELFARE_IN_THE_CANTEEN: readonly string[] = ['canteenSeat', 'locker'];
+/** The one family that stands inside the canteen and not on the hall floor: a man's locker
+ *  (PIOTR, 17.09; CLAUDE.md T17 2.2). The seat was the other until tonight, when the canteen
+ *  became a room with a table and two stools of its own and nobody buys a seat any more
+ *  (PIOTR, 20.09: "too much micromanagement"; CLAUDE.md T23 2.11). The one list: the placement,
+ *  the render and the migration all ask it. */
+export const WELFARE_IN_THE_CANTEEN: readonly string[] = ['locker'];
 
-/** The welfare kit stands inside the canteen and takes no hall cell: a man eats and keeps his
- *  coat out of the dust, not on the floor between the benches (PIOTR, 17.09; CLAUDE.md T17 2.2).
- *  The canteen block is two cells wide and four deep at x 3, y 0, and its door is in the front
- *  face at x 4. The lockers take the far column and the seats the door column, the first seat
- *  the cell just inside the door; past the last cell of a column the next one stands on the same
- *  cell, which is what `slotFrom` does everywhere else [TUNE: the two columns]. */
+/** The welfare kit stands inside the canteen and takes no hall cell: a man keeps his coat out of
+ *  the dust, not on the floor between the benches (PIOTR, 17.09; CLAUDE.md T17 2.2). The canteen
+ *  block is two cells wide and four deep at x 3, y 0, and its door is in the front face at x 4.
+ *  The lockers take the far column; past the last cell of it the next one stands on the same cell,
+ *  which is what `slotFrom` does everywhere else [TUNE: the column]. */
 export const LOCKER_SLOT_LAYOUT: LayoutSlot[] = [
   { x: 3, y: 0 },
   { x: 3, y: 1 },
   { x: 3, y: 2 },
   { x: 3, y: 3 },
-];
-
-export const CANTEEN_SLOT_LAYOUT: LayoutSlot[] = [
-  { x: 4, y: 3 },
-  { x: 4, y: 2 },
-  { x: 4, y: 1 },
-  { x: 4, y: 0 },
 ];
 
 /** Tool cabinets stand in the row between the rear machines and the benches: one for the owner
@@ -3468,21 +3442,38 @@ export interface HiringSpec {
 
 /** The four rows of a tiered role, off the one wage ladder and the one reputation gate. The
  *  duties line says what the tier is worth at the work, which is WORKER_RATES and not a figure
- *  typed twice. */
+ *  typed twice.
+ *
+ *  A role whose four wages are Piotr's own rather than the ladder's hands its own table in
+ *  `wages`, and the ladder is not asked. The production manager is the one such role tonight: his
+ *  2,400, 3,400, 4,200 and 5,200 are figures he gave, and 3,400 down the ladder would make the
+ *  novice 2,550 (PIOTR, 20.09; CLAUDE.md T23 2.4). There is still one builder and one gate. */
 function tieredSpecs(
   role: WorkerRole,
   roleLabel: string,
   experiencedMonthly: number,
   duties: (tier: WorkerTier) => string,
+  wages?: Record<WorkerTier, number>,
 ): HiringSpec[] {
   return TIERS.map((tier) => ({
     role,
     tier,
     label: `${roleLabel}, ${TIER_WORDS[tier]}`,
-    monthlyWage: tierMonthlyWage(experiencedMonthly, tier),
+    monthlyWage: wages ? wages[tier] : tierMonthlyWage(experiencedMonthly, tier),
     minReputation: TIER_MIN_REPUTATION[tier],
     duties: duties(tier),
   }));
+}
+
+/** What a manager of this grade does, in the three figures his grade is: how many men he carries,
+ *  how he picks their work, and what he does to their pace (CLAUDE.md T23 2.4). Written here
+ *  beside the tables and not in the UI, so the card and the hire card say the same sentence. */
+export function productionManagerDuties(tier: WorkerTier): string {
+  const pace = Math.round((PRODUCTION_MANAGER_PACE[tier] - 1) * 100);
+  return (
+    `Assigns up to ${PRODUCTION_MANAGER_CARRIES[tier]} men, ` +
+    `${PRODUCTION_MANAGER_ORDER_WORDS[tier]}, +${pace}% pace`
+  );
 }
 
 /** The trades that make something: the men whose minutes come out of the hall as work. An
@@ -3564,14 +3555,15 @@ export const HIRING_SPECS: HiringSpec[] = [
     SPRAYER_MONTHLY_WAGE_EXPERIENCED,
     () => 'Spray finishing at full speed, bench work at 0.60.',
   ),
-  {
-    role: 'productionManager',
-    tier: null,
-    label: 'Production manager',
-    monthlyWage: PRODUCTION_MANAGER_MONTHLY_WAGE,
-    minReputation: PRODUCTION_MANAGER_REPUTATION,
-    duties: 'The second shift, the assigning, the extraction connections, and the hall while you are away.',
-  },
+  // The manager is a tiered role from Turn 23, four grades and four cards like the joiner, on his
+  // own wage table (PIOTR, 20.09; CLAUDE.md T23 2.4).
+  ...tieredSpecs(
+    'productionManager',
+    'Production manager',
+    PRODUCTION_MANAGER_MONTHLY_WAGE.experienced,
+    productionManagerDuties,
+    PRODUCTION_MANAGER_MONTHLY_WAGE,
+  ),
 ];
 
 /** Every joiner needs all of these before he can be hired (PIOTR). The tool cabinet is counted
@@ -3584,7 +3576,6 @@ export const HIRING_SPECS: HiringSpec[] = [
 export const JOINER_PREREQUISITES = [
   'workbench',
   'locker',
-  'canteenSeat',
   TOOL_CABINET_ID,
   HAND_TOOL_SET,
 ];
@@ -3655,7 +3646,6 @@ export const DUST_OUTPUT_M3_PER_HOUR: Record<string, number> = {
   cncHead: 0.06, // the same head, the same chips
   solidWoodTools: 0, // the helper sweeps up after hand tools
   sprayBooth: 0, // its own extraction, off this table
-  drill: 0, // a drill makes nothing a bag notices
   spindleMoulder: 0.12, // a bag a day, the figure the Turn 12 comment kept for it (PIOTR)
   // A compressor moves air and makes no chips. Not on Piotr's list: a zero so that every family
   // of the machine category is on this table and the test can hold it to that [TUNE].
@@ -3724,7 +3714,6 @@ export const DAY_ONE_KIT: readonly string[] = [
   'laptop',
   DAY_ONE_SOFTWARE,
   'tableSaw',
-  'drill',
   'edgebander',
   'compressor',
   'extractor',

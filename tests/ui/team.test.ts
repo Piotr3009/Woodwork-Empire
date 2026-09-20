@@ -107,7 +107,13 @@ describe('the board itself', () => {
       Array.from(management.querySelectorAll('[data-candidate]')).map((tile) =>
         tile.getAttribute('data-candidate'),
       ),
-    ).toEqual(['productionManager.']);
+    // Four grades from Turn 23, a card each, like the joiner (PIOTR, 20.09; CLAUDE.md T23 2.4).
+    ).toEqual([
+      'productionManager.novice',
+      'productionManager.experienced',
+      'productionManager.senior',
+      'productionManager.master',
+    ]);
     const technical = parse(renderTeam(known(), 'technical'));
     expect(
       Array.from(technical.querySelectorAll('[data-candidate]')).map((tile) =>

@@ -497,7 +497,7 @@ describe('no bench in the hall', () => {
   it('never turns a man off a bench he is already standing at', () => {
     let state = fillRack(buyStartingKit(newGame({ difficulty: 'veryEasy' })));
     state.enquiries = [];
-    for (const specId of ['locker', 'canteenSeat', 'toolCabinet', 'handToolSet']) {
+    for (const specId of ['locker', 'toolCabinet', 'handToolSet']) {
       state = buyNow(state, specId);
     }
     state = hireNow(state, 'joiner', 'novice');
@@ -536,7 +536,7 @@ describe('no bench in the hall', () => {
   it('stands a joiner with nowhere to work at the canteen door', () => {
     let state = atTheBench();
     // He is taken on while there is a bench, with the kit a joiner has to have, and starts today.
-    for (const specId of ['locker', 'canteenSeat', 'toolCabinet', 'handToolSet']) {
+    for (const specId of ['locker', 'toolCabinet', 'handToolSet']) {
       state = buyNow(state, specId);
     }
     state = hireNow(state, 'joiner', 'novice');

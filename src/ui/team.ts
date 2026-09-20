@@ -16,7 +16,6 @@ import {
   houseTierFor,
   ownerDrawPaidInWindow,
   ownerDrawPerDay,
-  staffManagementMinutes,
   weekOfDay,
 } from '../engine/index';
 import type { GameState, HiringOption, WeekMeters, Worker, WorkerRole } from '../engine/index';
@@ -36,7 +35,6 @@ import {
   secondShiftCheck,
   secondShiftRuns,
   shiftOf,
-  staffManagementTaker,
 } from '../engine/index';
 // Straight off its own module, not round the public API, which Turn 13 froze (REPORT-T13 10).
 import {
@@ -415,15 +413,6 @@ function secondShiftControl(state: GameState): string {
   );
 }
 
-/** What the assigning costs, and whose day it comes off (CLAUDE.md T13 3.9). */
-function managementLine(state: GameState): string {
-  const management = staffManagementMinutes(state);
-  if (management <= 0) return '';
-  return staffManagementTaker(state) === 'manager'
-    ? `<p class="hint">The production manager assigns the crew: ${minutes(management)} of his day.</p>`
-    : `<p class="hint">Managing them costs you ${minutes(management)} a day.</p>`;
-}
-
 /** The eight thresholds of the owner's draw, one chip each, the one held marked. No slider and
  *  nothing in between; raising it is a click, and the conflict "machines or me" is the whole
  *  point (PIOTR; CLAUDE.md T13 3.18). */
@@ -550,7 +539,6 @@ function tabBody(state: GameState, tab: TeamTab): string {
     (floor ? crewLimitLine(state) : '') +
     (crew === '' ? emptyLine('Nobody yet. Every hour is your own hour.') : crew) +
     (floor ? secondShiftControl(state) : '') +
-    (tab === 'workshop' || tab === 'management' ? managementLine(state) : '') +
     (tab === 'technical' ? joineryCoreLines(state) : '') +
     '<h3>Taking somebody on</h3>' +
     `<div class="tile-grid">${options.map((option) => candidateTile(state, option)).join('')}</div>`
