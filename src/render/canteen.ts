@@ -90,12 +90,6 @@ export function canteenPlateNames(state: GameState): string[] {
   );
 }
 
-/** How many of the eight compartments have a man in them, which is what the counter over the
- *  banks says and what the plates below it show. */
-export function canteenLockersInUse(state: GameState): number {
-  return canteenPlateNames(state).filter((name) => name !== '').length;
-}
-
 /** The plate is the size the picture painted it, so a longer name is cut to the characters that
  *  fit rather than shrunk to nothing. Eight is the art side's own figure. */
 function onAPlate(name: string): string {
