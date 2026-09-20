@@ -475,6 +475,9 @@ export interface HiringOption {
   rate: number;
   monthlyWage: number;
   minReputation: number;
+  /** What this man does with his day, in the words the hire card prints. The spec's own sentence
+   *  and the only one: a manager's says his grade's three figures (CLAUDE.md T23 2.4). */
+  duties: string;
   available: boolean;
   blockReason: string;
   /** What must be bought before this hire is possible, named and counted for the card. */

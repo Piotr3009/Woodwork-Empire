@@ -17,7 +17,12 @@ import {
   HAND_TOOL_SET,
   JOINER_PREREQUISITES,
   LET_GO_NOTICE_DAYS,
+  MANAGER_AHEAD_DAYS,
+  MANAGER_BEHIND_DAYS,
+  MANAGER_REPLAN_MINUTES,
   PRODUCING_ROLES,
+  PRODUCTION_MANAGER_CARRIES,
+  PRODUCTION_MANAGER_PACE,
   TIER_WORDS,
   TOOL_CABINET,
   WORKER_IDLE_REASONS,
@@ -29,7 +34,12 @@ import { addWorkingDays, formatCalendarDay, isOvertime, isWorkingDay, monthOfDay
 import { charge, formatMoney } from './economy';
 import { queueEvent } from './events';
 import { onAccident } from './insurance';
-import { assignJob, findJob, oldestReadyJob, takeOffJob } from './jobs';
+import { addToJob, assignJob, findJob, takeOffJob } from './jobs';
+// The work plan is where a job's projected end is worked out, and the master's re plan is read
+// off it rather than off a second projection of its own (CLAUDE.md T23 2.4). plan.ts reads this
+// module back for the men in today, which is the same two way pair production.ts and this module
+// have carried since Turn 13: neither touches the other while it is being loaded.
+import { workPlan } from './plan';
 import { crewLimit } from './layout';
 import {
   SPRAY_BOOTH,
@@ -44,9 +54,9 @@ import {
   toolSlotsOf,
 } from './machines';
 import { countOwnedOrOnOrder } from './orders';
-import { managerOnDuty } from './owner';
+import { managerOnDuty, managerOnDutyNow, managerTier } from './owner';
 import { effectiveReputation } from './reputation';
-import { hands, workMinute } from './production';
+import { hands, machineWantedFor, workMinute } from './production';
 import { chance, int, makeId } from './rng';
 import { STATION_IDLE } from './stations';
 import type {
@@ -472,6 +482,10 @@ export function hiringOptions(state: GameState): HiringOption[] {
       rate: spec.tier ? WORKER_RATES[spec.tier] : 0,
       monthlyWage: spec.monthlyWage,
       minReputation: spec.minReputation,
+      // The sentence the card prints, off the spec and off nothing else: the card kept a second
+      // table of its own until tonight, and a manager of four grades needs four sentences that
+      // only the spec knows (CLAUDE.md T23 2.4).
+      duties: spec.duties,
       available: blockReason === '',
       blockReason,
       missing,
@@ -557,19 +571,147 @@ export function hire(state: GameState, role: WorkerRole, tier: WorkerTier | null
   return worker;
 }
 
-/** A free joiner of this shift takes the oldest job whose material has arrived, and he takes it
- *  only while a production manager is on duty to put him on it (PIOTR, 20.09: "a man works when
- *  the boss puts him on a job"; CLAUDE.md T23 2.1). Without a manager nothing happens here at
- *  all: the free man waits at his bench for the owner's click in the Work Plan, which is the
- *  `ASSIGN_JOB` action and costs nobody a minute. The assignment itself goes through the one path
- *  in jobs.ts. The day asks for the day men; the night asks for its own, so the work plan gives a
- *  night man his job the way it gives a day man his (CLAUDE.md T13 3.9). */
+// ---------------------------------------------------------------------------
+// The production manager, in his four grades (PIOTR, 20.09; CLAUDE.md T23 2.4). His grade says
+// three things: how many men he carries, the order he hands their work out in, and what he does
+// to the pace of the men he carries. The three tables are `PRODUCTION_MANAGER_CARRIES`,
+// `PRODUCTION_MANAGER_ORDER_WORDS` and `PRODUCTION_MANAGER_PACE` in the constants, and nothing
+// here writes a figure of its own.
+// ---------------------------------------------------------------------------
+
+/** The men this manager carries: the men on the books in the order they were hired, as many of
+ *  them as his grade's number, and nobody else. A man past that number is a man without a
+ *  manager, who waits for the boss as in 2.1, which is what makes a better grade worth buying
+ *  (PIOTR, 20.09; CLAUDE.md T23 2.4).
+ *
+ *  The owner is not counted, because 2.4 says so, and neither is the manager himself: a manager
+ *  does not manage himself, and counting him would make a novice with nine joiners leave two of
+ *  them standing where the brief says the ninth is the one who waits. `state.workers` is in the
+ *  order the men were taken on, so the array's own order is the hiring order. */
+export function menCarried(state: GameState): Worker[] {
+  const manager = managerOnDutyNow(state);
+  if (manager === null || manager.tier === null) return [];
+  const under = state.workers.filter((worker) => worker.id !== manager.id);
+  return under.slice(0, PRODUCTION_MANAGER_CARRIES[manager.tier]);
+}
+
+/** True while this man has a manager over him: he is one of the men his grade carries. */
+export function hasManager(state: GameState, worker: Worker): boolean {
+  return menCarried(state).some((carried) => carried.id === worker.id);
+}
+
+/** What the manager does to this man's production minutes: his grade's pace factor, or 1 for a
+ *  man he does not carry and for every man in a workshop with no manager. It multiplies the
+ *  minute the way a tier's rate does, on the one path in `hands`, and it is what the efficiency
+ *  breakdown prints as `Manager: +5%` (CLAUDE.md T23 2.4). */
+export function managerPaceFor(state: GameState, worker: Worker): number {
+  const manager = managerOnDutyNow(state);
+  if (manager === null || manager.tier === null) return 1;
+  return hasManager(state, worker) ? PRODUCTION_MANAGER_PACE[manager.tier] : 1;
+}
+
+/** The open jobs in the order this grade hands them out. The novice takes the board's own order,
+ *  which is the order the work was taken on, so the oldest open job is first; every grade above
+ *  him sorts by the day it is due and keeps the board's order between two jobs due the same day
+ *  (CLAUDE.md T23 2.4). */
+function jobsInManagerOrder(state: GameState, tier: WorkerTier): Job[] {
+  const open = state.jobs.filter(
+    (job) => (job.stage === 'ready' || job.stage === 'inProduction') && job.assignees.length === 0,
+  );
+  if (tier === 'novice') return open;
+  return open
+    .map((job, index) => ({ job, index }))
+    .sort((a, b) => a.job.dueDay - b.job.dueDay || a.index - b.index)
+    .map((entry) => entry.job);
+}
+
+/** The next job for the next man, out of the ones still open, in this grade's way.
+ *
+ *  The novice and the experienced man take the first of their own order and think no further. The
+ *  senior and the master will not queue a second man at a machine another man is already wanted
+ *  at while another job's bench work is standing open: they look past the front runner for a job
+ *  whose current stage needs no machine at all, and take that instead [PIOTR's rule, 20.09]. */
+function pickJobForManager(
+  state: GameState,
+  open: readonly Job[],
+  tier: WorkerTier,
+  wanted: ReadonlySet<string>,
+): Job | null {
+  const first = open[0] ?? null;
+  if (first === null || tier === 'novice' || tier === 'experienced') return first;
+  const family = machineWantedFor(state, first);
+  if (family === null || !wanted.has(family)) return first;
+  return open.find((job) => machineWantedFor(state, job) === null) ?? first;
+}
+
+/** The machine families the hall is already queueing for: one entry per man who is on a job whose
+ *  current stage wants a machine. What the senior's rule is read against. */
+function machinesAlreadyWanted(state: GameState): Set<string> {
+  const wanted = new Set<string>();
+  for (const job of state.jobs) {
+    if (job.assignees.length === 0) continue;
+    const family = machineWantedFor(state, job);
+    if (family !== null) wanted.add(family);
+  }
+  return wanted;
+}
+
+/** A free joiner of this shift takes a job only while a production manager is on duty to put him
+ *  on it, and only while he is one of the men that manager's grade carries (PIOTR, 20.09: "a man
+ *  works when the boss puts him on a job"; CLAUDE.md T23 2.1, 2.4). Without a manager, and for a
+ *  man past his number, nothing happens here at all: he waits at his bench for the owner's click
+ *  in the Work Plan, which is the `ASSIGN_JOB` action and costs nobody a minute.
+ *
+ *  The order the jobs are handed out in is the manager's grade's, and the assignment itself goes
+ *  through the one path in jobs.ts. The day asks for the day men; the night asks for its own, so
+ *  the work plan gives a night man his job the way it gives a day man his (CLAUDE.md T13 3.9). */
 export function autoAssignJobs(state: GameState, shift: Shift = 'day'): void {
-  if (!managerOnDuty(state)) return;
+  const tier = managerTier(state);
+  if (tier === null) return;
+  const carried = new Set(menCarried(state).map((worker) => worker.id));
+  let open = jobsInManagerOrder(state, tier);
+  const wanted = machinesAlreadyWanted(state);
   for (const worker of availableJoiners(state, shift)) {
-    const job = oldestReadyJob(state);
-    if (!job || job.assignees.length > 0) return;
+    if (!carried.has(worker.id)) continue;
+    const job = pickJobForManager(state, open, tier, wanted);
+    if (job === null) return;
     assignJob(state, job.id, worker.id);
+    open = open.filter((entry) => entry.id !== job.id);
+    const family = machineWantedFor(state, job);
+    if (family !== null) wanted.add(family);
+  }
+}
+
+/** The master's re plan, and no other grade's: at every hour he looks at the board again and
+ *  moves a man off a job that is comfortably ahead of its deadline onto one that is behind
+ *  (PIOTR, 20.09; CLAUDE.md T23 2.4). The two gaps are `MANAGER_AHEAD_DAYS` and
+ *  `MANAGER_BEHIND_DAYS`, in working days of the work plan's own axis, and the whole day of slack
+ *  is what stops him swapping a man every hour over a projection that moved by a minute.
+ *
+ *  One man a re plan. He is moved through `addToJob`, which takes him off what he was on, so the
+ *  job that is behind gains a pair of hands rather than losing the man it already had. Only a man
+ *  the manager carries is moved, and never the owner: the owner's bench is his own business
+ *  (CLAUDE.md T23 2.3). */
+export function managerReplans(state: GameState): void {
+  if (managerTier(state) !== 'master') return;
+  if (state.clock.minute % MANAGER_REPLAN_MINUTES !== 0) return;
+  const rows = workPlan(state).rows;
+  const slackOf = (jobId: string): number | null => {
+    const row = rows.find((entry) => entry.jobId === jobId);
+    return row === undefined ? null : row.duePoint - row.to;
+  };
+  const behind = state.jobs.find((job) => {
+    if (job.stage !== 'ready' && job.stage !== 'inProduction') return false;
+    const slack = slackOf(job.id);
+    return slack !== null && slack <= -MANAGER_BEHIND_DAYS;
+  });
+  if (behind === undefined) return;
+  for (const worker of menCarried(state)) {
+    if (worker.jobId === null || worker.jobId === behind.id) continue;
+    if (!isWorkingToday(state, worker)) continue;
+    const slack = slackOf(worker.jobId);
+    if (slack === null || slack < MANAGER_AHEAD_DAYS) continue;
+    if (addToJob(state, behind.id, worker.id)) return;
   }
 }
 
@@ -586,7 +728,10 @@ export function waitsForTheBoss(state: GameState, worker: Worker): boolean {
   if (!PRODUCING_ROLES.includes(worker.role)) return false;
   if (!isWorkingToday(state, worker)) return false;
   if (worker.jobId !== null || worker.taskId !== null) return false;
-  return !managerOnDuty(state);
+  // Not "is there a manager" but "is there a manager over HIM": a man past his grade's number is
+  // a man without a manager, and he waits exactly as he would in a workshop with none
+  // (CLAUDE.md T23 2.4).
+  return !hasManager(state, worker);
 }
 
 /** A man's day meter, empty: the minutes he stood and the reasons they went to. One maker, read

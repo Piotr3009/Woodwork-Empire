@@ -12,6 +12,7 @@ import {
   NIGHT_ERROR_FACTOR,
   NIGHT_RATE,
   PRODUCTION_MANAGER_MONTHLY_WAGE,
+  PRODUCTION_MANAGER_PACE,
   SECOND_SHIFT_MINUTES,
   WORKER_HOURS_PER_MONTH,
   WORKER_RATES,
@@ -200,11 +201,17 @@ describe('the second shift', () => {
     const state = nightHall();
     state.owner.wentHome = true;
     const rates = hands(state, { shift: 'night' }).map((hand) => hand.rate);
+    // Three things on the minute and no more: the man's own rate, what the owner's absence takes
+    // off it, and what the manager over him adds. The manager of this hall is the experienced
+    // one, so his grade's pace is on the night the same as on the day: he runs the second shift
+    // and the men on it are men he carries (CLAUDE.md T13 3.9, T23 2.4).
+    const pace = PRODUCTION_MANAGER_PACE.experienced;
     expect(rates).toEqual([
-      WORKER_RATES.novice * absenceFactor(true),
-      WORKER_RATES.novice * absenceFactor(true),
+      WORKER_RATES.novice * absenceFactor(true) * pace,
+      WORKER_RATES.novice * absenceFactor(true) * pace,
     ]);
     expect(absenceFactor(true)).toBe(0.92);
+    expect(pace).toBe(1.05);
   });
 
   it('is run by the day end, and the summary carries the night minutes', () => {

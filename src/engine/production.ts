@@ -66,6 +66,7 @@ import { contractMen, contractWantsToday } from './contracts';
 import {
   bookMonthMinute,
   isWorkingToday,
+  managerPaceFor,
   spendWorkerIdleMinute,
   waitsForTheBoss,
 } from './staff';
@@ -140,7 +141,10 @@ export function hands(
     if (contractWantsToday(state, worker.id)) continue;
     const job = findJob(state, worker.jobId);
     if (!job || job.stage !== 'inProduction') continue;
-    list.push({ who: worker.id, job, rate: worker.rate * away });
+    // His own rate, what the owner's absence takes off it, and what the manager over him adds:
+    // the manager's pace multiplies the minute exactly the way a tier's rate does, on this one
+    // path and nowhere else (PIOTR, 20.09; CLAUDE.md T23 2.4).
+    list.push({ who: worker.id, job, rate: worker.rate * away * managerPaceFor(state, worker) });
   }
   return list;
 }
@@ -160,6 +164,15 @@ export function familiesWanted(state: GameState, job: Job, who = OWNER): string[
   if (!has(state, family) || machineIsShared(state, family)) return wanted;
   wanted.push(family);
   return wanted;
+}
+
+/** The machine family this job's current stage wants, or null while its current stage is bench
+ *  work, wants a family the workshop does not own, or wants a tool that is kept in a cabinet and
+ *  is never queued for. Read off `familiesWanted` above and never worked out a second time, so
+ *  the manager who spreads his men over the machines and the man who claims one are answering the
+ *  same question (CLAUDE.md T23 2.4). */
+export function machineWantedFor(state: GameState, job: Job, who = OWNER): string | null {
+  return familiesWanted(state, job, who).find((family) => family !== BENCH) ?? null;
 }
 
 export interface StationCheck {

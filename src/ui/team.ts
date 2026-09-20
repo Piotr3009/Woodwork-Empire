@@ -117,26 +117,11 @@ function heldBy(state: GameState, option: HiringOption): Worker[] {
   );
 }
 
-/** What a man of this role does with his day, in the words the board says it in. */
-const DUTIES: Record<WorkerRole, string> = {
-  joiner: 'Production at the bench and at the machines, by day or on the second shift.',
-  helper: 'Bag changes, cleaning, unloading, the weekly clean.',
-  officeAdmin:
-    'Emails, bookkeeping, the consumables and materials chore, and every specialist’s work at ' +
-    'double time until he is taken on.',
-  purchasingClerk: 'The daily consumables and materials chore, ahead of the office admin.',
-  salesman: 'Client calls, and the meeting a big job starts with.',
-  draftsman: 'The drawings, at 0.8 of your own speed, in the order the laptop has them.',
-  estimator:
-    'Reads the drawing and counts the sheets: the material take off, as many a day as his ' +
-    'minutes allow, and the site measure when you are not free for it.',
-  productionManager:
-    'Runs the second shift, assigns the crew, connects the machines, and covers the hall while ' +
-    'you are away. He makes nothing.',
-  sprayer:
-    'The finishing of a lacquered job, which is his trade, and a pair of hands at the bench on ' +
-    'anything else. A joiner can spray, slower.',
-};
+// What a man of this role does with his day used to be a table here, `DUTIES`, keyed by the role.
+// It is gone: the sentence is `HiringSpec.duties` in the constants, which the card now prints, so
+// a role's duties are written once and a production manager of four grades can say something
+// different on each of his four cards (CLAUDE.md T23 2.4). The words the other eight roles print
+// are the words this table held, moved across unchanged.
 
 /** What he costs: the month he is paid by, and nothing beside it. There is one unit of pay in the
  *  game and it is the month (PIOTR, 19.09: "I wanted everyone monthly"; CLAUDE.md T21 2.10), so the
@@ -185,7 +170,7 @@ function candidateTile(state: GameState, option: HiringOption): string {
     `<div class="tile${option.available ? '' : ' is-locked'}${owned === '' ? '' : ' is-owned'}" ` +
     `data-candidate="${option.role}.${option.tier ?? ''}">` +
     `<h3 class="tile-name">${escapeHtml(option.label)} ${owned}</h3>` +
-    `<p class="tile-text">${escapeHtml(DUTIES[option.role])}</p>` +
+    `<p class="tile-text">${escapeHtml(option.duties)}</p>` +
     figures +
     missing +
     `<div class="tile-action">${action}</div>` +

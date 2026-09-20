@@ -730,6 +730,22 @@ export const PRODUCTION_MANAGER_ORDER_WORDS: Record<WorkerTier, string> = {
   senior: 'soonest deadline, machines spread',
   master: 'soonest deadline, machines spread, re planned hourly',
 };
+
+/** The master's re plan, and his alone: how far ahead of its deadline a job has to be projected
+ *  before he will take a man off it, and how far past its deadline another has to be projected
+ *  before he will put that man on it. Both in working days of the work plan's own axis
+ *  [TUNE: one day each way, which is the case the brief's own test names: "the master's move once
+ *  a job is a day behind and another a day ahead"] (CLAUDE.md T23 2.4).
+ *
+ *  A day is what stops the churn. With no gap at all he would swap a man every hour over a
+ *  projection that moved by a minute; a whole day of slack means the job he is taken off still
+ *  makes its deadline without him. */
+export const MANAGER_AHEAD_DAYS = 1;
+export const MANAGER_BEHIND_DAYS = 1;
+
+/** How often the master looks at the board again, in minutes of the clock [PIOTR, 20.09: "at
+ *  every hour he re plans"] (CLAUDE.md T23 2.4). */
+export const MANAGER_REPLAN_MINUTES = 60;
 /** The second shift: this many minutes after the day shift [TUNE], at this much of salary for
  *  those hours [TUNE], the owner absent from the hall: quality a tier down for work done at
  *  night [TUNE] and the error chance doubled [TUNE] (CLAUDE.md T13 3.9). */
@@ -3441,9 +3457,12 @@ export interface HiringSpec {
   duties: string;
 }
 
-/** The four rows of a tiered role, off the one wage ladder and the one reputation gate. The
- *  duties line says what the tier is worth at the work, which is WORKER_RATES and not a figure
- *  typed twice.
+/** The four rows of a tiered role, off the one wage ladder and the one reputation gate.
+ *
+ *  `duties` is the sentence the hire card prints, and from Turn 23 it is the ONLY one: the card
+ *  used to read a second table of its own in `src/ui/team.ts`, so a role's duties were written
+ *  out twice and the spec's copy was read by nothing at all. The words here are the words that
+ *  were on the card (CLAUDE.md T23 2.4).
  *
  *  A role whose four wages are Piotr's own rather than the ladder's hands its own table in
  *  `wages`, and the ladder is not asked. The production manager is the one such role tonight: his
@@ -3498,7 +3517,7 @@ export const HIRING_SPECS: HiringSpec[] = [
     'joiner',
     'Joiner',
     JOINER_MONTHLY_WAGE_EXPERIENCED,
-    (tier) => `Production at ${WORKER_RATES[tier].toFixed(2)} of the owner speed.`,
+    () => 'Production at the bench and at the machines, by day or on the second shift.',
   ),
   {
     role: 'helper',
@@ -3508,7 +3527,7 @@ export const HIRING_SPECS: HiringSpec[] = [
     // over the month and a round figure, which is what the hire card now prints.]
     monthlyWage: 1800,
     minReputation: REPUTATION_MIN,
-    duties: 'Bag changes, cleaning, unloading.',
+    duties: 'Bag changes, cleaning, unloading, the weekly clean.',
   },
   {
     role: 'officeAdmin',
@@ -3516,7 +3535,9 @@ export const HIRING_SPECS: HiringSpec[] = [
     label: 'Office admin',
     monthlyWage: 1900,
     minReputation: 5,
-    duties: 'Emails, bookkeeping, daily ordering.',
+    duties:
+      'Emails, bookkeeping, the consumables and materials chore, and every specialist’s work ' +
+      'at double time until he is taken on.',
   },
   {
     role: 'purchasingClerk',
@@ -3524,7 +3545,7 @@ export const HIRING_SPECS: HiringSpec[] = [
     label: 'Purchasing clerk',
     monthlyWage: 1700,
     minReputation: 10,
-    duties: 'Per job material orders, about 16 a day.',
+    duties: 'The daily consumables and materials chore, ahead of the office admin.',
   },
   {
     role: 'draftsman',
@@ -3532,7 +3553,7 @@ export const HIRING_SPECS: HiringSpec[] = [
     label: 'Draftsman',
     monthlyWage: DRAFTSMAN_MONTHLY_WAGE,
     minReputation: DRAFTSMAN_REPUTATION,
-    duties: 'Drawings, at 0.8 of your own speed.',
+    duties: 'The drawings, at 0.8 of your own speed, in the order the laptop has them.',
   },
   {
     role: 'salesman',
@@ -3540,7 +3561,7 @@ export const HIRING_SPECS: HiringSpec[] = [
     label: 'Salesman',
     monthlyWage: 2200,
     minReputation: 15,
-    duties: 'Client calls.',
+    duties: 'Client calls, and the meeting a big job starts with.',
   },
   // The estimator and the finishing man, four tiers each like the joiner (CLAUDE.md T13 3.8,
   // T19 2.6, T20 2.5).
@@ -3548,13 +3569,17 @@ export const HIRING_SPECS: HiringSpec[] = [
     'estimator',
     'Estimator',
     ESTIMATOR_MONTHLY_WAGE_EXPERIENCED,
-    (tier) => `Material take offs, at ${WORKER_RATES[tier].toFixed(2)} of your own speed.`,
+    () =>
+      'Reads the drawing and counts the sheets: the material take off, as many a day as his ' +
+      'minutes allow, and the site measure when you are not free for it.',
   ),
   ...tieredSpecs(
     'sprayer',
     'Sprayer',
     SPRAYER_MONTHLY_WAGE_EXPERIENCED,
-    () => 'Spray finishing at full speed, bench work at 0.60.',
+    () =>
+      'The finishing of a lacquered job, which is his trade, and a pair of hands at the bench ' +
+      'on anything else. A joiner can spray, slower.',
   ),
   // The manager is a tiered role from Turn 23, four grades and four cards like the joiner, on his
   // own wage table (PIOTR, 20.09; CLAUDE.md T23 2.4).
