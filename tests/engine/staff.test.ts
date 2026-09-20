@@ -40,6 +40,7 @@ import type { GameState, Worker, WorkerTier } from '../../src/engine/index';
 import {
   acceptNow,
   act,
+  bossAssigns,
   buyNow,
   buyStartingKit,
   withExtraction,
@@ -241,6 +242,14 @@ function jobReadyWith(price: number, tier: Worker['tier']): GameState {
   return state;
 }
 
+/** The same hall on day 2 with the boss's click behind it. From Turn 23 nobody takes a job by
+ *  himself without a production manager on duty, so a test about what a man at work turns out has
+ *  to put him on the job first, which is one click in the Work Plan (PIOTR, 20.09;
+ *  CLAUDE.md T23 2.1). */
+function atWorkOn(price: number, tier: Worker['tier']): GameState {
+  return bossAssigns(runToDay(jobReadyWith(price, tier), 2).state);
+}
+
 describe('the production manager s four grades (CLAUDE.md T23 2.4)', () => {
   const cards = HIRING_SPECS.filter((spec) => spec.role === 'productionManager');
 
@@ -308,8 +317,12 @@ describe('joiners at the bench', () => {
     expect(minutesRemainingFor(state, job, WORKER_RATES.experienced) / 480).toBeCloseTo(10, 6);
   });
 
-  it('picks up the oldest ready job on its own', () => {
-    const state = runToDay(jobReadyWith(1600, 'novice'), 2).state;
+  it('takes the oldest ready job the moment the boss puts him on it', () => {
+    // And not before: a free man with an open job in front of him waits at his bench until the
+    // click comes (CLAUDE.md T23 2.1).
+    const waiting = runToDay(jobReadyWith(1600, 'novice'), 2).state;
+    expect(waiting.workers[0]?.jobId).toBeNull();
+    const state = bossAssigns(waiting);
     expect(state.workers[0]?.jobId).toBe(firstJob(state).id);
     expect(firstJob(state).stage).toBe('inProduction');
     const later = tick(state, 100);
@@ -317,7 +330,7 @@ describe('joiners at the bench', () => {
   });
 
   it('lets the player take the job off a joiner and put the owner on it', () => {
-    let state = runToDay(jobReadyWith(1600, 'novice'), 2).state;
+    let state = atWorkOn(1600, 'novice');
     const jobId = firstJob(state).id;
     state = act(state, { type: 'ASSIGN_JOB', jobId, workerId: 'owner' });
     expect(firstJob(state).assignees[0]).toBe('owner');
@@ -326,14 +339,14 @@ describe('joiners at the bench', () => {
   });
 
   it('produces at the tier rate', () => {
-    const state = runToDay(jobReadyWith(1600, 'novice'), 2).state;
+    const state = atWorkOn(1600, 'novice');
     const before = firstJob(state).labourRemaining;
     const after = firstJob(tick(state, 60)).labourRemaining;
     expect(before - after).toBeCloseTo(60 * OWNER_LABOUR_PER_MINUTE * WORKER_RATES.novice, 6);
   });
 
   it('drops the output of everyone the owner is not there to run', () => {
-    let state = runToDay(jobReadyWith(1600, 'novice'), 2).state;
+    let state = atWorkOn(1600, 'novice');
     state = act(state, { type: 'SKIP_DAY' });
     const before = firstJob(state).labourRemaining;
     const after = firstJob(tick(state, 60)).labourRemaining;
@@ -361,7 +374,9 @@ describe('the queue at the saw', () => {
     }
     fillRack(state, 60);
     for (const job of state.jobs) job.stage = 'ready';
-    return clearEvents(runToDay(state, 2).state);
+    // The boss puts each of the four on a wardrobe of his own: nobody takes one by himself now
+    // (CLAUDE.md T23 2.1).
+    return bossAssigns(clearEvents(runToDay(state, 2).state));
   }
 
   it('lets one man cut and stands the other three at the saw', () => {
@@ -395,7 +410,7 @@ describe('the queue at the saw', () => {
 
 describe('one path for putting a man on a job', () => {
   it('automatic assignment goes through the same door as the manual one', () => {
-    const state = runToDay(jobReadyWith(1600, 'novice'), 2).state;
+    const state = atWorkOn(1600, 'novice');
     const worker = state.workers[0];
     const job = firstJob(state);
     expect(worker?.jobId).toBe(job.id);
@@ -447,6 +462,9 @@ describe('the office working day', () => {
       dayLog: [],
       monthMinutes: 0,
       monthDaysOff: 0,
+      idleMinutes: 0,
+      idleByReason: { waitingForBoss: 0, noMachine: 0, noMaterial: 0 },
+      accidents: 0,
       anchorX: 1,
       anchorY: 1,
     };

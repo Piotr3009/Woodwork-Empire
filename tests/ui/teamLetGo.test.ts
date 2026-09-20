@@ -1,7 +1,9 @@
 // @vitest-environment jsdom
-// Our team carries the one control that ends a man's time here: Let go, on every worker's row and
-// never on the owner's. Once he has his notice the row says the day he goes on instead
-// (PIOTR, 18.09; CLAUDE.md T20 2.4).
+// Our team carries the one control that ends a man's time here: Let go, on every worker's tile and
+// never on the owner's. Once he has his notice the tile says the day he goes on instead
+// (PIOTR, 18.09; CLAUDE.md T20 2.4). From Turn 23 Our team is a column of the tiles of 2.13, so
+// the control is on a tile and no longer on a row, and the owner's carries Office in its place
+// (CLAUDE.md T23 2.13).
 
 import { beforeAll, describe, expect, it } from 'vitest';
 import { formatCalendarDay } from '../../src/engine/index';
@@ -18,8 +20,8 @@ function parse(html: string): HTMLElement {
   return holder;
 }
 
-function row(state: GameState, id: string): HTMLElement | null {
-  return parse(renderTeam(state, 'ourTeam')).querySelector(`[data-team="${id}"]`);
+function tile(state: GameState, id: string): HTMLElement | null {
+  return parse(renderTeam(state, 'ourTeam')).querySelector(`[data-person="${id}"]`);
 }
 
 function withAJoiner(): GameState {
@@ -33,15 +35,17 @@ function withAJoiner(): GameState {
 }
 
 describe('Let go on Our team', () => {
-  it('is on the man s row and never on the owner s', () => {
+  it('is on the man s tile and never on the owner s', () => {
     const state = withAJoiner();
     const man = state.workers[0];
     if (!man) throw new Error('nobody on the books');
-    const control = row(state, man.id)?.querySelector('[data-do="letGo"]');
+    const control = tile(state, man.id)?.querySelector('[data-do="letGo"]');
     expect(control).not.toBeNull();
     expect(control?.getAttribute('data-id')).toBe(man.id);
     expect(control?.textContent).toBe('Let go');
-    expect(row(state, 'owner')?.querySelector('[data-do="letGo"]')).toBeNull();
+    expect(tile(state, 'owner')?.querySelector('[data-do="letGo"]')).toBeNull();
+    // The owner's one button is Office instead (CLAUDE.md T23 2.13).
+    expect(tile(state, 'owner')?.querySelector('[data-do="openOffice"]')).not.toBeNull();
   });
 
   it('says the day he goes on once he has his notice, and offers no second click', () => {
@@ -49,7 +53,7 @@ describe('Let go on Our team', () => {
     const man = state.workers[0];
     if (!man) throw new Error('nobody on the books');
     expect(letGo(state, man.id)).toBe(true);
-    const leaving = row(state, man.id);
+    const leaving = tile(state, man.id);
     expect(leaving?.textContent).toContain(
       `leaves on ${formatCalendarDay(state.clock.day + LET_GO_NOTICE_DAYS)}`,
     );
@@ -107,11 +111,11 @@ describe('the Let go click, through the real DOM (CLAUDE.md T20 2.4)', () => {
     if (!man) throw new Error('nobody on the books');
     expect(man.leavesOnDay).toBeNull();
     const day = game().clock.day;
-    click(`[data-team="${man.id}"] [data-do="letGo"]`);
+    click(`[data-person="${man.id}"] [data-do="letGo"]`);
     const after = game().workers[0];
     expect(after?.leavesOnDay).toBe(day + LET_GO_NOTICE_DAYS);
     // The row has changed with him: the date instead of a second button.
-    const leaving = root().querySelector(`[data-team="${man.id}"]`);
+    const leaving = root().querySelector(`[data-person="${man.id}"]`);
     expect(leaving?.textContent).toContain(`leaves on ${formatCalendarDay(day + LET_GO_NOTICE_DAYS)}`);
     expect(leaving?.querySelector('[data-do="letGo"]')).toBeNull();
   });

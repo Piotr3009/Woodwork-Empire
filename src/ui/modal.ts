@@ -117,6 +117,9 @@ export const MODAL_SKINS: Record<string, ModalSkin> = {
   // The drop card is a card in a folder too: the question, the figures and the two buttons
   // (CLAUDE.md T21 2.3).
   dropJob: 'folder',
+  // One person's card is the machine card's skin, which is what 2.13 asks for: the same folder,
+  // the same size, the same cross (PIOTR, 20.09; CLAUDE.md T23 2.13).
+  personCard: 'folder',
 };
 
 /** The one board of the three that is a picture and not CSS: green felt in an oak frame, with the

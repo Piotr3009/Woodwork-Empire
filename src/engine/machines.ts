@@ -47,9 +47,13 @@ import {
   TOOL_CABINET,
   TOOL_CABINET_SLOTS,
   USED_VARIANT,
+  PRODUCTION_MANAGER_PACE,
 } from './constants';
 import { weekOfDay, monthOfDay, nextWorkingDay } from './clock';
 import { canAfford } from './economy';
+// The manager's grade, off owner.ts, which is the module every layer can reach: staff.ts reads
+// this module, so the manager cannot be asked for from there (CLAUDE.md T23 2.4).
+import { managerTier } from './owner';
 import {
   airBlockFor,
   airCheck,
@@ -643,6 +647,19 @@ export function outputBreakdown(state: GameState): OutputBreakdown {
       points: roundPoints(worker.rate - 1),
       hall: false,
       where: 'his own minutes',
+    });
+  }
+  // The manager over the men: his grade's pace multiplies the production minutes of the men he
+  // carries, the way a tier's rate multiplies one man's, so he is a line of this sheet and not a
+  // factor on the hall. Nothing is multiplied twice: the figure printed here is the same
+  // `PRODUCTION_MANAGER_PACE` that `hands` puts on the minute (PIOTR, 20.09; CLAUDE.md T23 2.4).
+  const tier = managerTier(state);
+  if (tier !== null) {
+    lines.push({
+      label: 'Manager',
+      points: roundPoints(PRODUCTION_MANAGER_PACE[tier] - 1),
+      hall: false,
+      where: 'the minutes of the men he carries',
     });
   }
   const families = new Set(

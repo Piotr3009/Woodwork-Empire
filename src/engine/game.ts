@@ -229,12 +229,14 @@ import {
   type Hand,
   jobOf,
   placeHand,
+  ownerTakesAJob,
   releaseIdleMachines,
   stationForProduction,
 } from './production';
 import {
   autoAssignJobs,
   availableJoiners,
+  managerReplans,
   bookMonthMinute,
   booksTaskMinutes,
   canHire,
@@ -1456,6 +1458,14 @@ function settle(state: GameState): void {
     delegateTasks(state);
   }
   autoAssignJobs(state);
+  // And the master's own hour: he alone looks at the board again and moves a man off a job that
+  // is comfortably ahead onto one that is behind (CLAUDE.md T23 2.4).
+  managerReplans(state);
+  // The men first, then the owner: with a manager on duty the crew take what there is and the
+  // owner takes what is left over, and without one the crew take nothing and the oldest open job
+  // is his. He never stands with his hands in his pockets while there is a bench to stand at
+  // (PIOTR, 20.09; CLAUDE.md T23 2.3).
+  ownerTakesAJob(state);
   updateStations(state);
   openNextEvent(state);
 }

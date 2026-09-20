@@ -189,6 +189,9 @@ describe('the hall on day 1', () => {
       dayLog: [],
       monthMinutes: 0,
       monthDaysOff: 0,
+      idleMinutes: 0,
+      idleByReason: { waitingForBoss: 0, noMachine: 0, noMaterial: 0 },
+      accidents: 0,
       anchorX: 4,
       anchorY: 4,
     });
@@ -273,6 +276,9 @@ describe('the placeholder art rules of 10.3', () => {
       dayLog: [],
       monthMinutes: 0,
       monthDaysOff: 0,
+      idleMinutes: 0,
+      idleByReason: { waitingForBoss: 0, noMachine: 0, noMaterial: 0 },
+      accidents: 0,
       anchorX: 0,
       anchorY: 4,
     });
@@ -333,6 +339,9 @@ describe('the placeholder art rules of 10.3', () => {
       dayLog: [],
       monthMinutes: 0,
       monthDaysOff: 0,
+      idleMinutes: 0,
+      idleByReason: { waitingForBoss: 0, noMachine: 0, noMaterial: 0 },
+      accidents: 0,
       anchorX: bench?.anchorX ?? 0,
       anchorY: bench?.anchorY ?? 0,
     });
@@ -380,6 +389,9 @@ describe('the laptop', () => {
       dayLog: [],
       monthMinutes: 0,
       monthDaysOff: 0,
+      idleMinutes: 0,
+      idleByReason: { waitingForBoss: 0, noMachine: 0, noMaterial: 0 },
+      accidents: 0,
       anchorX: 1,
       anchorY: 1,
     });

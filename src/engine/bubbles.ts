@@ -26,7 +26,7 @@ import {
   jobOf,
   waitingWordsFor,
 } from './production';
-import { isWorkingToday } from './staff';
+import { isWorkingToday, waitsForTheBoss } from './staff';
 import { cncOptions, currentStage } from './stages';
 import {
   STATION_LUNCH,
@@ -102,6 +102,11 @@ export function bubbleFor(state: GameState, who: string): Bubble | null {
   // A man the standing contract has is at work on it, whether or not the hall has a job for him:
   // the one thing that can be wrong with him is the machine he is queueing for (CLAUDE.md T20 2.1).
   if (who !== OWNER && contractOfWorker(state, who) !== null) return onAContract(who, station);
+  // Nobody has put him on anything and there is no manager on duty to: he is waiting for the
+  // boss's word, which is a click in the Work Plan (PIOTR, 20.09; CLAUDE.md T23 2.1). The owner
+  // waits for nobody, so the older words are still his.
+  const worker = who === OWNER ? null : state.workers.find((entry) => entry.id === who) ?? null;
+  if (worker !== null && waitsForTheBoss(state, worker)) return bubble(who, 'waitingForBoss');
   return bubble(who, 'nothingToDo');
 }
 

@@ -49,7 +49,7 @@ import { isBreak, nextWorkingDay, weekOfDay } from './clock';
 import { OWNER, has } from './machines';
 import { canUnload } from './materials';
 import { ownerIsAvailable } from './owner';
-import { bookOwnerIdleMinute } from './production';
+import { bookOwnerIdleMinute, bookWorkerIdleMinute } from './production';
 import { makeId } from './rng';
 import { plural } from './text';
 import {
@@ -794,7 +794,11 @@ export function bookWeekMinutes(state: GameState): void {
       // was asleep for (REPORT-T20.md, what was not done).
       if (!isWorkingToday(state, worker)) continue;
       const band = bandOf(state, worker.taskId, worker.jobId);
-      bookOne(state, worker, week, band, jobNameOf(state, worker.jobId));
+      const sample = bookOne(state, worker, week, band, jobNameOf(state, worker.jobId));
+      // And the other half of his day, the same way the owner's is taken above: a minute he put
+      // nothing into is a minute he stood, and from Turn 23 the commonest reason for it is that
+      // nobody has put him on anything (PIOTR, 20.09; CLAUDE.md T23 2.1).
+      if (sample !== null && !sample.worked) bookWorkerIdleMinute(state, worker);
     }
   }
   bookContractPieces(state, week);

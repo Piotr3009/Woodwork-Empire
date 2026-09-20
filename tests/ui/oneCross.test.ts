@@ -7,6 +7,7 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { MODAL_IS_FULL, currentState, mount, render } from '../../src/ui/app';
 import { closeButton } from '../../src/ui/modal';
+import { STATION_IDLE } from '../../src/engine/stations';
 import { renderMenu } from '../../src/ui/topbar';
 import { newGame, buyNow } from '../helpers';
 import { readFileSync } from 'node:fs';
@@ -40,6 +41,18 @@ function goTo(view: 'hall' | 'office'): void {
   click(`[data-do="setView"][data-view="${view}"]`);
 }
 
+/** The owner stands behind the office door from the first morning, and a figure through a door is
+ *  off the hall's drawing (CLAUDE.md T20 2.12), so his card cannot be clicked open until he is
+ *  out on the floor. This walks him out, which is the state 2.3 puts him in the moment his office
+ *  empties (CLAUDE.md T23 2.3, 2.13). */
+function ownerOntoTheFloor(): void {
+  const state = currentState();
+  if (state === null) throw new Error('no game');
+  state.owner.station = STATION_IDLE;
+  state.owner.currentTaskId = null;
+  render();
+}
+
 /** Every ModalId the player can open, and what opens it. The table is checked against
  *  `MODAL_IS_FULL`, which is the one list of the ids, so a new modal cannot be added without a
  *  line here. */
@@ -53,6 +66,9 @@ const OPENERS: Array<[string, string]> = [
   ['laptop', '[data-office="laptop"]'],
   ['settings', '[data-do="openSettings"]'],
   ['machineCard', '.hall-view [data-sprite="tableSaw"]'],
+  // A click on a man on the hall opens his card. The owner is the one figure there is always one
+  // of (PIOTR, 20.09; CLAUDE.md T23 2.13).
+  ['personCard', '[data-owner="1"]'],
 ];
 
 const CSS = readFileSync('src/ui/styles.css', 'utf8');
@@ -77,7 +93,12 @@ describe('the one cross (CLAUDE.md T18 2.5)', () => {
   it('gives each of them exactly one .modal-close, and the same markup for every one', () => {
     const wanted = closeButton();
     for (const [id, opener] of OPENERS) {
-      goTo(id === 'shopping' || id === 'machineCard' || id === 'settings' ? 'hall' : 'office');
+      goTo(
+        id === 'shopping' || id === 'machineCard' || id === 'settings' || id === 'personCard'
+          ? 'hall'
+          : 'office',
+      );
+      if (id === 'personCard') ownerOntoTheFloor();
       click(opener);
       dismissEvents();
       const modal = root().querySelector(`.modal-layer [data-modal="${id}"]`);

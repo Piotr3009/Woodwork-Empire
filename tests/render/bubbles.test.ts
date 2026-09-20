@@ -90,7 +90,7 @@ function markOver(svg: string, figure: string): string {
 }
 
 describe('a mark only where something is wrong (CLAUDE.md T22 2.5)', () => {
-  it('draws the disc with its exclamation over each of the four things the player can put right', () => {
+  it('draws the disc with its exclamation over each of the five things the player can put right', () => {
     const waiting = queueAtTheSaw();
     const svg = renderHall(waiting);
     // The first man of the queue is waiting for the machine; the man behind him is short of the
@@ -112,10 +112,11 @@ describe('a mark only where something is wrong (CLAUDE.md T22 2.5)', () => {
     const dry = markOver(renderHall(waiting), 'worker-staff-1');
     expect(dry).toContain('data-bubble="noMaterial"');
     expect(dry).toContain(`<div class="bubble">no sheets for ${job.name}</div>`);
-    // And a man on no job at all, who stands about with nothing to do.
+    // And a man on no job at all. With no production manager on duty nobody takes one by himself,
+    // so he is waiting for the boss's click and the mark says so (CLAUDE.md T23 2.1).
     const idle = markOver(renderHall(twoJobsAtOneSaw()), 'worker-staff-5');
-    expect(idle).toContain('data-bubble="nothingToDo"');
-    expect(idle).toContain('<div class="bubble">nothing to do</div>');
+    expect(idle).toContain('data-bubble="waitingForBoss"');
+    expect(idle).toContain('<div class="bubble">waiting for the boss</div>');
   });
 
   it('draws nothing at all over a man who is working', () => {

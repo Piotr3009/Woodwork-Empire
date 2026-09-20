@@ -5,6 +5,7 @@
 import { readFileSync } from 'node:fs';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { MODAL_IS_FULL, MODAL_IS_WIDE, currentState, mount, render } from '../../src/ui/app';
+import { STATION_IDLE } from '../../src/engine/stations';
 import { buyNow } from '../helpers';
 
 function root(): HTMLElement {
@@ -39,6 +40,18 @@ function goTo(view: 'hall' | 'office'): void {
   click(`[data-do="setView"][data-view="${view}"]`);
 }
 
+/** The owner stands behind the office door from the first morning, and a figure through a door is
+ *  off the hall's drawing (CLAUDE.md T20 2.12), so his card cannot be clicked open until he is
+ *  out on the floor. This walks him out, which is the state 2.3 puts him in the moment his office
+ *  empties (CLAUDE.md T23 2.3, 2.13). */
+function ownerOntoTheFloor(): void {
+  const state = currentState();
+  if (state === null) throw new Error('no game');
+  state.owner.station = STATION_IDLE;
+  state.owner.currentTaskId = null;
+  render();
+}
+
 /** What opens each modal the player can reach from the room and from the top bar. */
 const OPENERS: Array<[string, string]> = [
   ['workPlan', '[data-office="workPlan"]'],
@@ -50,6 +63,8 @@ const OPENERS: Array<[string, string]> = [
   ['laptop', '[data-office="laptop"]'],
   // One machine's own card, from a click on the machine standing in the hall (T17 2.6).
   ['machineCard', '.hall-view [data-sprite="tableSaw"]'],
+  // And one person's, from a click on the man himself (CLAUDE.md T23 2.13).
+  ['personCard', '[data-owner="1"]'],
 ];
 
 beforeAll(() => {
@@ -70,7 +85,10 @@ beforeAll(() => {
 describe('the size of every modal in the game', () => {
   it('fills the page for every list and board, and for nothing else', () => {
     for (const [id, opener] of OPENERS) {
-      goTo(id === 'shopping' || id === 'machineCard' ? 'hall' : 'office');
+      goTo(
+        id === 'shopping' || id === 'machineCard' || id === 'personCard' ? 'hall' : 'office',
+      );
+      if (id === 'personCard') ownerOntoTheFloor();
       click(opener);
       dismissEvents();
       const node = openModalNode();
@@ -94,8 +112,10 @@ describe('the size of every modal in the game', () => {
       laptop: true,
       // The settings are a small plate off the gear on the top bar (CLAUDE.md T13 3.22).
       settings: false,
-      // One machine's card is a card, not a list (CLAUDE.md T17 2.6).
+      // One machine's card is a card, not a list (CLAUDE.md T17 2.6), and one person's is a card
+      // in the same sense (CLAUDE.md T23 2.13).
       machineCard: false,
+      personCard: false,
     });
   });
 
@@ -112,6 +132,8 @@ describe('the size of every modal in the game', () => {
       company: false,
       settings: false,
       machineCard: true,
+      // A person's card wears the machine card's skin and its size with it (CLAUDE.md T23 2.13).
+      personCard: true,
     });
     const css = readFileSync('src/ui/styles.css', 'utf8');
     expect(css).toContain('.modal-folder.modal-wide {');
