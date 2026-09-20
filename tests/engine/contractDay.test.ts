@@ -62,6 +62,8 @@ function joiner(id: string, name: string): Worker {
     dayLog: [],
     monthMinutes: 0,
     monthDaysOff: 0,
+    idleMinutes: 0,
+    idleByReason: { waitingForBoss: 0, noMachine: 0, noMaterial: 0 },
     anchorX: 6,
     anchorY: 6,
   };

@@ -65,6 +65,8 @@ function joiner(id: string, name: string, tier: 'novice' | 'experienced' | 'seni
     dayLog: [],
     monthMinutes: 0,
     monthDaysOff: 0,
+    idleMinutes: 0,
+    idleByReason: { waitingForBoss: 0, noMachine: 0, noMaterial: 0 },
     anchorX: 6,
     anchorY: 6,
   };

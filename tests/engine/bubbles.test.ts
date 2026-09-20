@@ -13,7 +13,7 @@ import { BUBBLES } from '../../src/engine/constants';
 import { bubbleFor, bubblesFor } from '../../src/engine/bubbles';
 import { acceptContract, assignContract, drawContract } from '../../src/engine/contracts';
 import { waitingLine } from '../../src/engine/jobs';
-import { machineShortWord } from '../../src/engine/machines';
+import { OWNER, machineShortWord } from '../../src/engine/machines';
 import { WAITING_FOR_MATERIAL } from '../../src/engine/production';
 import { STATION_IDLE, STATION_LUNCH, STATION_OFFICE, stationNow } from '../../src/engine/stations';
 import type { BubbleKey, GameState, Job, TaskInstance } from '../../src/engine/index';
@@ -120,9 +120,19 @@ describe('the four things the player can put right (CLAUDE.md T22 2.5)', () => {
     expect(bubble?.text).toBe(`no sheets for ${job.name}`);
   });
 
-  it('says nothing to do to a man on no job, no contract and no job of work', () => {
+  it('says waiting for the boss to a man nobody has put on anything', () => {
+    // From Turn 23 nobody takes a job by himself without a production manager on duty, so the man
+    // standing at his bench is not a man with nothing to do: he is a man waiting for a click in
+    // the Work Plan, and the mark over his head says which (PIOTR, 20.09; CLAUDE.md T23 2.1).
     const state = oneManAlone();
     const bubble = bubbleFor(state, 'staff-1');
+    expect(bubble?.key).toBe('waitingForBoss');
+    expect(bubble?.text).toBe('waiting for the boss');
+  });
+
+  it('says nothing to do to the owner, who waits for nobody', () => {
+    const state = oneManAlone();
+    const bubble = bubbleFor(state, OWNER);
     expect(bubble?.key).toBe('nothingToDo');
     expect(bubble?.text).toBe('nothing to do');
   });
@@ -191,11 +201,13 @@ describe('nothing at all over a man nothing is wrong with [PIOTR, 19.09]', () =>
 });
 
 describe('the table itself', () => {
-  it('keeps four lines and no colour, and every one of them is a thing that is wrong', () => {
+  it('keeps five lines and no colour, and every one of them is a thing that is wrong', () => {
+    // The fifth is Turn 23's: a man nobody has put on anything (CLAUDE.md T23 2.1).
     expect(Object.keys(BUBBLES).sort()).toEqual([
       'noCutParts',
       'noMaterial',
       'nothingToDo',
+      'waitingForBoss',
       'waitingForMachine',
     ]);
     for (const words of Object.values(BUBBLES)) expect(typeof words).toBe('string');

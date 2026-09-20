@@ -16,6 +16,7 @@ import {
   materialLine,
 } from './jobCard';
 import { button, emptyLine, escapeHtml, money, tabBar } from './modal';
+import { NEEDS_A_JOB, ROLE_WORDS, workerDoing } from './team';
 
 /** Where a point of the axis sits across it, as a percentage. One axis for every row, so the blue
  *  line is the same line on all of them. The axis is in working days: Monday comes straight after
@@ -175,11 +176,40 @@ export function renderWorkPlan(
   return tabs + jobsTab(state, assignOpen);
 }
 
+/** The crew column of the board: everybody on the books, what he is on this minute, and the red
+ *  line over a man nobody has put on anything (PIOTR, 20.09; CLAUDE.md T23 2.1). It sits at the
+ *  head of the Jobs tab because it is the column the player reads before he clicks Assign on a
+ *  row: without a production manager nobody takes a job by himself, so this is where he sees who
+ *  is standing about.
+ *
+ *  The words are `workerDoing` in team.ts and are never written again here, so the tile, the mark
+ *  over his head and this column say the same thing about the same man. */
+function crewColumn(state: GameState): string {
+  if (state.workers.length === 0) return '';
+  const rows = state.workers
+    .map((worker) => {
+      const doing = workerDoing(state, worker);
+      const waiting = doing === NEEDS_A_JOB;
+      return (
+        `<div class="row" data-plan-crew="${worker.id}">` +
+        `<span class="row-main">${escapeHtml(worker.name)}, ` +
+        `${escapeHtml(ROLE_WORDS[worker.role])}</span>` +
+        `<span class="row-figure${waiting ? ' warn' : ''}">${escapeHtml(doing)}</span>` +
+        '</div>'
+      );
+    })
+    .join('');
+  // A `.card` and nothing new: on the board skin a card is paper on steel already, so the column
+  // wears the look every other block of this modal wears and the stylesheet gains no token
+  // (docs/ui-style.md 1, 11).
+  return `<div class="card" data-plan-crew-column><h3>The crew</h3>${rows}</div>`;
+}
+
 function jobsTab(state: GameState, assignOpen: string | null): string {
   const plan = workPlan(state);
   // The contract bar of v28 has left this tab: its chips and its button are in Running, on the
   // Contracts tab (PIOTR; CLAUDE.md T20 2.1.5).
-  if (plan.rows.length === 0) return emptyLine('No jobs yet. Open the board.');
+  if (plan.rows.length === 0) return crewColumn(state) + emptyLine('No jobs yet. Open the board.');
   const rows = plan.rows
     .map((row) => {
       const job = state.jobs.find((entry) => entry.id === row.jobId);
@@ -205,6 +235,7 @@ function jobsTab(state: GameState, assignOpen: string | null): string {
     'turns red. A job nobody has started yet carries the yellow tick on the last day it can be ' +
     'started and still be on time. The axis is working days: Monday follows Friday and no ' +
     'deadline falls at a weekend.</p>' +
+    crewColumn(state) +
     `<div class="plan">${scaleHtml(plan)}${rows}</div>`
   );
 }

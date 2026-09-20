@@ -100,6 +100,8 @@ function joiner(index: number): Worker {
     dayLog: [],
     monthMinutes: 0,
     monthDaysOff: 0,
+    idleMinutes: 0,
+    idleByReason: { waitingForBoss: 0, noMachine: 0, noMaterial: 0 },
     anchorX: 4 + index * 2,
     anchorY: 6,
   };

@@ -11,6 +11,7 @@ import {
 import { BOARD_DAYS_PAST_DUE, dayOfPoint, workPlan, workshopRate } from '../../src/engine/plan';
 import { isWorkingDay, workingDayIndex } from '../../src/engine/clock';
 import { minutesRemainingFor } from '../../src/engine/jobs';
+import { missingForHire } from '../../src/engine/staff';
 import { renderWorkPlan } from '../../src/ui/workPlan';
 import type { GameState } from '../../src/engine/index';
 import {
@@ -263,5 +264,48 @@ describe('the row says who is on it', () => {
     // One button closes it again, and it is the same single click.
     expect(open.querySelector('[data-do="closeAssign"]')).not.toBeNull();
     expect(open.querySelector('[data-do="openAssign"]')).toBeNull();
+  });
+});
+
+/** Buys whatever the gate still wants for one more joiner and takes him on, starting today. */
+function withJoiner(state: GameState): GameState {
+  let next = state;
+  let guard = 0;
+  while (missingForHire(next, 'joiner').length > 0 && guard < 20) {
+    for (const specId of missingForHire(next, 'joiner')) next = buyNow(next, specId);
+    guard += 1;
+  }
+  next = hireNow(next, 'joiner', 'novice');
+  const man = next.workers[next.workers.length - 1];
+  if (man) man.startDay = next.clock.day;
+  return next;
+}
+
+describe('the crew column [PIOTR, 20.09; CLAUDE.md T23 2.1]', () => {
+  it('says needs a job of a man nobody has put on anything', () => {
+    // With no production manager on duty nobody takes a job by himself, so the column is where
+    // the player sees who is standing about before he clicks Assign on a row.
+    const state = withJoiner(boardWith({ deadlineDays: 10 }));
+    const man = state.workers[0];
+    if (!man) throw new Error('a joiner is wanted');
+    const page = parse(renderWorkPlan(state));
+    const column = page.querySelector('[data-plan-crew-column]');
+    expect(column).not.toBeNull();
+    const row = column?.querySelector(`[data-plan-crew="${man.id}"]`);
+    expect(row?.textContent).toContain(man.name);
+    expect(row?.textContent).toContain('needs a job');
+    // And it is red, because it is something the player has to do something about.
+    expect(row?.querySelector('.row-figure.warn')?.textContent).toBe('needs a job');
+  });
+
+  it('says what he is on once the boss has put him on it', () => {
+    let state = withJoiner(boardWith({ deadlineDays: 10 }));
+    const man = state.workers[0];
+    if (!man) throw new Error('a joiner is wanted');
+    const job = firstJob(state);
+    state = act(state, { type: 'ASSIGN_JOB', jobId: job.id, workerId: man.id });
+    const row = parse(renderWorkPlan(state)).querySelector(`[data-plan-crew="${man.id}"]`);
+    expect(row?.textContent).toContain(`on ${job.name}`);
+    expect(row?.querySelector('.row-figure.warn')).toBeNull();
   });
 });

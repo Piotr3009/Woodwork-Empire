@@ -41,6 +41,7 @@ import {
   ROLE_WORDS,
   WEEK_CATEGORIES,
   letGoCheck,
+  waitsForTheBoss,
   weekBeforeOf,
   weekEfficiency,
   weekNowOf,
@@ -214,8 +215,14 @@ function dayMeterLine(worker: Worker): string {
   return `<span class="row-figure crew-day">Today: ${escapeHtml(text)}</span>`;
 }
 
+/** The words for a man nobody has put on anything, written once: the crew column of the Work Plan
+ *  and the Our team tile both print them, and the Work Plan's test reads this and not a second
+ *  copy of the sentence (CLAUDE.md T23 2.1). */
+export const NEEDS_A_JOB = 'needs a job';
+
 /** What this man is doing this minute, in the words the board says it in. The one answer: the
- *  crew row and the Our team row both print it (CLAUDE.md T17 2.9). */
+ *  crew row, the crew column of the Work Plan and the Our team row all print it
+ *  (CLAUDE.md T17 2.9, T23 2.1). */
 export function workerDoing(state: GameState, worker: Worker): string {
   const job = worker.jobId === null ? null : state.jobs.find((entry) => entry.id === worker.jobId);
   const night = shiftOf(state, worker) === 'night';
@@ -225,6 +232,11 @@ export function workerDoing(state: GameState, worker: Worker): string {
   if (worker.startDay > state.clock.day) return `starts ${formatCalendarDay(worker.startDay)}`;
   if (worker.taskId !== null) return 'on a job of work';
   if (job) return `${night ? 'tonight on' : 'on'} ${job.name}`;
+  // Nobody has put him on anything and there is no manager on duty to: the words the crew column
+  // of the Work Plan, the mark over his head and his own tile all say (PIOTR, 20.09;
+  // CLAUDE.md T23 2.1). He was called "free" until tonight, which read as a man at leisure and
+  // not as a man the player has to do something about.
+  if (waitsForTheBoss(state, worker)) return NEEDS_A_JOB;
   return night ? 'on the night shift, nothing to do yet' : 'free';
 }
 

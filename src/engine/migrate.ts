@@ -532,11 +532,18 @@ function carryArrearsIntoTheAccount(state: Raw): void {
  *    tonight a set is a thing in a cabinet and not a thing on the hall, so it has no position to
  *    carry (CLAUDE.md T23 2.6).
  *  - **The assigning.** Every staff management chore comes off the list, done or not. Nothing
- *    costs anybody minutes for assigning any more (CLAUDE.md T23 2.2). */
+ *    costs anybody minutes for assigning any more (CLAUDE.md T23 2.2).
+ *  - **The men's day meters.** A man on the books carries the minutes he stood and their reasons
+ *    from tonight, the way the owner has since Turn 21. A save made before them starts on nought
+ *    (CLAUDE.md T23 2.1, 2.13). */
 function liftToVersion20(state: Raw): void {
   state.monthlyReports = [];
   for (const worker of records(state.workers)) {
     if (worker.role === 'productionManager') worker.tier = 'experienced';
+    // The day meter a man on the books has from tonight: a save made before it starts the day it
+    // is lifted on nought, the way the morning would have left it (CLAUDE.md T23 2.1).
+    worker.idleMinutes = 0;
+    worker.idleByReason = { waitingForBoss: 0, noMachine: 0, noMaterial: 0 };
   }
   retireSpec(state, 'drill', 'Cordless drill retired (v36)');
   retireSpec(state, 'canteenSeat', 'Canteen seats retired (v36)');

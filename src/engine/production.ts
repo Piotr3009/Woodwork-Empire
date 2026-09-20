@@ -61,7 +61,12 @@ import {
   staffOutputFactor,
 } from './owner';
 import { contractMen, contractWantsToday } from './contracts';
-import { bookMonthMinute, isWorkingToday } from './staff';
+import {
+  bookMonthMinute,
+  isWorkingToday,
+  spendWorkerIdleMinute,
+  waitsForTheBoss,
+} from './staff';
 import {
   STATION_BENCH,
   machineStation,
@@ -78,7 +83,16 @@ import {
   stagePlanFor,
   tradeFactor,
 } from './stages';
-import type { Equipment, GameState, Job, LostMinuteCause, OwnerIdleReason, Shift } from './types';
+import type {
+  Equipment,
+  GameState,
+  Job,
+  LostMinuteCause,
+  OwnerIdleReason,
+  Shift,
+  Worker,
+  WorkerIdleReason,
+} from './types';
 
 /** One man who could put a minute into a job right now. */
 export interface Hand {
@@ -415,6 +429,32 @@ export function ownerIdleReason(state: GameState): OwnerIdleReason | null {
   const waiting =
     openTasks(state).some((task) => task.doneBy === null) || oldestReadyJob(state) !== null;
   return waiting ? 'nothingAssigned' : 'officeEmpty';
+}
+
+/** Why this man on the books stood through the minute just gone, or null when there was nothing of
+ *  his day to stand through. The owner's twin above, read the same way and answering the list that
+ *  is his own: nobody has put him on anything, or he is on a job and the rack or the machine has
+ *  stopped him (PIOTR, 20.09; CLAUDE.md T23 2.1).
+ *
+ *  The waiting is asked first, because a man nobody has put on anything has no job to be stopped
+ *  on. A man holding a chore is not standing at all, and neither is a man the manager simply has
+ *  no work for: the meter paints what it knows and invents no reason for him. */
+export function workerIdleReason(state: GameState, worker: Worker): WorkerIdleReason | null {
+  if (isBreak(state.clock.minute)) return null;
+  if (waitsForTheBoss(state, worker)) return 'waitingForBoss';
+  if (worker.taskId !== null) return null;
+  const job = jobOf(state, worker.id);
+  if (job === null) return null;
+  return rackCanSupply(state, job, jobProgress(job)) ? 'noMachine' : 'noMaterial';
+}
+
+/** Books the minute just gone onto this man's day as one he stood through, with its reason. Called
+ *  from the same one hook that books the owner's, and only for a minute the sampler has just said
+ *  he put nothing into (CLAUDE.md T23 2.1). */
+export function bookWorkerIdleMinute(state: GameState, worker: Worker): void {
+  const reason = workerIdleReason(state, worker);
+  if (reason === null) return;
+  spendWorkerIdleMinute(worker, reason);
 }
 
 /** Books the minute just gone onto the owner's day as one he stood through, with its reason. Called

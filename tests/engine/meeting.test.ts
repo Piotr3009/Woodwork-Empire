@@ -85,6 +85,8 @@ function staff(role: WorkerRole, id: string): Worker {
     dayLog: [],
     monthMinutes: 0,
     monthDaysOff: 0,
+    idleMinutes: 0,
+    idleByReason: { waitingForBoss: 0, noMachine: 0, noMaterial: 0 },
     anchorX: 1,
     anchorY: 1,
   };

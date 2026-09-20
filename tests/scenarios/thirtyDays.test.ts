@@ -512,12 +512,15 @@ describe('a month short handed, with a joiner and one small rack', () => {
     // of the price they used to (CLAUDE.md T13 3.3). Measured, not tuned.
     expect(state.cash).toBeGreaterThan(state.finance.overdraftLimit);
     // This is the month that goes furthest into the overdraft of the fifteen that stay inside it,
-    // and it still never reaches the limit: the lowest running balance of the month is -386, on
-    // day 31, the count of days below the limit never starts, and nothing is left unpaid, because
-    // from Turn 22 there is nowhere for a bill to go but the account (CLAUDE.md T22 2.1). It was
-    // -466 until tonight: this script kits out two men, and the two canteen seats it bought for
-    // them are eighty pounds it no longer spends (CLAUDE.md T23 2.11).
-    expect(Math.round(Math.min(...state.ledger.map((entry) => entry.balance)))).toBe(-386);
+    // and it still never reaches the limit: the lowest running balance of the month is -439, the
+    // count of days below the limit never starts, and nothing is left unpaid, because from Turn 22
+    // there is nowhere for a bill to go but the account (CLAUDE.md T22 2.1). It was -466 before
+    // tonight and -386 after the canteen seats went (CLAUDE.md T23 2.11); it is -439 now because
+    // nobody takes a job by himself any more. The scripted owner makes the boss's round once, at
+    // the start of the day, so a job that comes ready at eleven o'clock is picked up the next
+    // morning instead of the same minute, and half a day of the month's work slips with it
+    // (CLAUDE.md T23 2.1). Measured, not tuned.
+    expect(Math.round(Math.min(...state.ledger.map((entry) => entry.balance)))).toBe(-439);
     expect(state.finance.daysBelowOverdraft).toBe(0);
     expect(state.ledger.some((entry) => entry.unpaid)).toBe(false);
   });

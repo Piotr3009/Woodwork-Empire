@@ -18,6 +18,7 @@ import type {
   SoftwareTier,
   StageId,
   StageSpec,
+  WorkerIdleReason,
   WorkerRole,
   WorkerTier,
 } from './types';
@@ -3933,6 +3934,18 @@ export const OWNER_IDLE_REASONS: ReadonlyArray<{ id: OwnerIdleReason; label: str
   { id: 'officeEmpty', label: 'In the office with nothing to do' },
 ];
 
+/** The reasons a man on the books stood still, in the order his day meter lists them. His own
+ *  list and not the owner's above: a joiner has no office queue, and he has the one reason the
+ *  owner can never have, which is that nobody has put him on anything. From Turn 23 nobody takes
+ *  a job by himself without a manager on duty, so a free man's day is spent waiting for the
+ *  boss's word and his meter says so out loud (PIOTR, 20.09; CLAUDE.md T23 2.1, 2.13). The two
+ *  it shares with the owner are worded the same, because they are the same two things. */
+export const WORKER_IDLE_REASONS: ReadonlyArray<{ id: WorkerIdleReason; label: string }> = [
+  { id: 'waitingForBoss', label: 'Waiting for the boss' },
+  { id: 'noMachine', label: 'Waiting for a machine' },
+  { id: 'noMaterial', label: 'No material' },
+];
+
 // ---------------------------------------------------------------------------
 // T22 2.5 What is wrong with a man: the words of the mark over his head
 // ---------------------------------------------------------------------------
@@ -3942,7 +3955,7 @@ export const OWNER_IDLE_REASONS: ReadonlyArray<{ id: OwnerIdleReason; label: str
  *  so a word Piotr wants changed is a line here and not a repaint. A `{slot}` is filled off the
  *  state by `src/engine/bubbles.ts` and never by a second table of words.
  *
- *  Four lines and no colour: a mark is drawn only when something is wrong, so every one of them is
+ *  Five lines and no colour: a mark is drawn only when something is wrong, so every one of them is
  *  the red one [PIOTR, 19.09: "when all is fine, no bubble; only when it is bad"]. The green chore
  *  lines, the paper lines of a stage just begun and the dashed grey lines of a man off the hall are
  *  gone with the classes that drew them. */
@@ -3951,6 +3964,7 @@ export const BUBBLES: Record<BubbleKey, string> = {
   noCutParts: 'no cut parts yet',
   noMaterial: 'no sheets for {job}',
   nothingToDo: 'nothing to do',
+  waitingForBoss: 'waiting for the boss',
 };
 
 /** How far over a figure's head the point of the mark's tail sits, in screen pixels [PIOTR's

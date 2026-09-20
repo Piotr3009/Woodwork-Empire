@@ -9,6 +9,7 @@ import {
 } from '../../src/engine/constants';
 import {
   applyAction,
+  canBuild,
   contractPiece,
   helperOnDuty,
   joiners,
@@ -410,6 +411,31 @@ function takeContract(state: GameState, policy: Policy): GameState {
   return next;
 }
 
+/** The boss's round of the hall at the start of the day: every man standing about is put on the
+ *  oldest job nobody is on, which is what an attentive player does the moment he walks in. From
+ *  Turn 23 nobody takes a job by himself without a production manager on duty, so without this
+ *  round the crew stand at their benches all day and the scripted month makes nothing
+ *  (PIOTR, 20.09; CLAUDE.md T23 2.1). The click costs nobody a minute, exactly as it does in the
+ *  Work Plan.
+ *
+ *  One man to a job and no more: the engine's own assigning has always handed the oldest free job
+ *  to the first free man and then looked for the next free job, and this is that round made by
+ *  hand. A man already on a job is never moved: he stays on it to its end. */
+function assignFreeMen(state: GameState): GameState {
+  let next = state;
+  for (const worker of joiners(next)) {
+    if (worker.jobId !== null || worker.taskId !== null) continue;
+    if (!canBuild(next, worker.id)) continue;
+    const job = next.jobs.find(
+      (entry) =>
+        (entry.stage === 'ready' || entry.stage === 'inProduction') && entry.assignees.length === 0,
+    );
+    if (!job) break;
+    next = applyAction(next, { type: 'ASSIGN_JOB', jobId: job.id, workerId: worker.id });
+  }
+  return next;
+}
+
 /** Works down the wanted list: the dearest template the workshop can make today. */
 function takeWork(state: GameState, policy: Policy): GameState {
   const open = state.jobs.filter((job) => job.stage !== 'completed').length;
@@ -464,6 +490,8 @@ export function playDay(
     next = applyAction(next, { type: 'BUY_STOCK', sheets: policy.stockSheets });
   }
   if (policy.onDay !== undefined) next = policy.onDay(next, day);
+  // The boss's round of the hall, before the clock runs a minute of the day (CLAUDE.md T23 2.1).
+  next = assignFreeMen(next);
   let guard = 0;
   // A minute at a time takes a whole day of iterations, so the guard is sized to the step.
   const rounds = Math.ceil((400 * 30) / (options.step ?? 30));

@@ -453,9 +453,15 @@ export interface Worker {
   /** Day or night. Everybody is on the day shift until a production manager puts him on the
    *  second one (CLAUDE.md T13 3.9). */
   shift: Shift;
-  /** His own day, in the order it happened, for a man who has a day meter of his own: the
-   *  production manager's shows the assigning the owner no longer does (CLAUDE.md T13 3.9). */
+  /** His own day, in the order it happened, for a man who has a day meter of his own
+   *  (CLAUDE.md T13 3.9). */
   dayLog: DayLogEntry[];
+  /** Minutes of today he stood still, and why. The owner has had these since Turn 21; a man on
+   *  the books has them from Turn 23, because from tonight a free man waits for the boss and the
+   *  player has to be able to see what that cost him (PIOTR, 20.09; CLAUDE.md T23 2.1, 2.13).
+   *  Emptied every morning with the day log. */
+  idleMinutes: number;
+  idleByReason: Record<WorkerIdleReason, number>;
   /** Minutes he has actually worked since the 1st, and working days he was not in: the two
    *  figures the Our team page reads. Both start again on the 1st (CLAUDE.md T17 2.9). */
   monthMinutes: number;
@@ -1017,12 +1023,25 @@ export type LostMinuteCause = 'noPeople' | 'noMachine' | 'noMaterial' | 'ownerAw
  *  (CLAUDE.md T21 2.8). */
 export type OwnerIdleReason = 'noMachine' | 'noMaterial' | 'nothingAssigned' | 'officeEmpty';
 
+/** Why a man on the books stood still for a minute of his own day. His own list and not the
+ *  owner's: the two office reasons are the owner's alone, because a joiner has no office queue to
+ *  be empty, and a joiner has one of his own the owner can never have, which is that nobody has
+ *  put him on anything. From Turn 23 a free man waits for the boss's word, so the minutes he
+ *  stands are minutes with a reason and his day meter says which (PIOTR, 20.09; CLAUDE.md T23
+ *  2.1, 2.13). The words are `WORKER_IDLE_REASONS`. */
+export type WorkerIdleReason = 'waitingForBoss' | 'noMachine' | 'noMaterial';
+
 /** The state a mark over a figure's head is drawn for: the four things that are wrong with a man
  *  and that the player can put right (docs/mockups/t22/bubbles-v2.png, the red column;
  *  CLAUDE.md T22 2.5). A man who is working, at a chore of his own, at his lunch, in the office or
  *  out measuring has nothing wrong with him and carries no key at all
  *  [PIOTR, 19.09: "when all is fine, no bubble; only when it is bad"]. */
-export type BubbleKey = 'waitingForMachine' | 'noCutParts' | 'noMaterial' | 'nothingToDo';
+export type BubbleKey =
+  | 'waitingForMachine'
+  | 'noCutParts'
+  | 'noMaterial'
+  | 'nothingToDo'
+  | 'waitingForBoss';
 
 /** One mark over a man's head, ready to draw: the words it says on hover with every slot filled,
  *  and the figure it belongs to (CLAUDE.md T22 2.5). There is no tone on it: a mark is drawn only

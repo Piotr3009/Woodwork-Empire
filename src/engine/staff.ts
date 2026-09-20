@@ -20,6 +20,7 @@ import {
   PRODUCING_ROLES,
   TIER_WORDS,
   TOOL_CABINET,
+  WORKER_IDLE_REASONS,
   WORKER_HOURS_PER_MONTH,
   WORKER_NAMES,
   WORKER_RATES,
@@ -58,6 +59,7 @@ import type {
   WeekCategory,
   WeekMeters,
   Worker,
+  WorkerIdleReason,
   WorkerRole,
   WorkerTier,
 } from './types';
@@ -546,6 +548,8 @@ export function hire(state: GameState, role: WorkerRole, tier: WorkerTier | null
     anchorY: anchor.y,
     shift: 'day',
     dayLog: [],
+    idleMinutes: 0,
+    idleByReason: emptyWorkerIdle(),
     monthMinutes: 0,
     monthDaysOff: 0,
   };
@@ -553,16 +557,52 @@ export function hire(state: GameState, role: WorkerRole, tier: WorkerTier | null
   return worker;
 }
 
-/** A free joiner of this shift takes the oldest job whose material has arrived (CLAUDE.md 9.4).
- *  The assignment itself goes through the one path in jobs.ts. The day asks for the day men; the
- *  night asks for its own, so the work plan gives a night man his job the way it gives a day man
- *  his (CLAUDE.md T13 3.9). */
+/** A free joiner of this shift takes the oldest job whose material has arrived, and he takes it
+ *  only while a production manager is on duty to put him on it (PIOTR, 20.09: "a man works when
+ *  the boss puts him on a job"; CLAUDE.md T23 2.1). Without a manager nothing happens here at
+ *  all: the free man waits at his bench for the owner's click in the Work Plan, which is the
+ *  `ASSIGN_JOB` action and costs nobody a minute. The assignment itself goes through the one path
+ *  in jobs.ts. The day asks for the day men; the night asks for its own, so the work plan gives a
+ *  night man his job the way it gives a day man his (CLAUDE.md T13 3.9). */
 export function autoAssignJobs(state: GameState, shift: Shift = 'day'): void {
+  if (!managerOnDuty(state)) return;
   for (const worker of availableJoiners(state, shift)) {
     const job = oldestReadyJob(state);
     if (!job || job.assignees.length > 0) return;
     assignJob(state, job.id, worker.id);
   }
+}
+
+/** True while this man is standing about because nobody has put him on anything: he is in today,
+ *  he builds for a living, he holds no job and no chore, and there is no manager on duty to hand
+ *  him one. This is the one reading of it: the mark over his head, the crew column of the Work
+ *  Plan and the idle minute on his day meter all ask this and none of them works it out again
+ *  (PIOTR, 20.09; CLAUDE.md T23 2.1).
+ *
+ *  A man already on a job is not waiting, whatever else is on the board: he stays on it to its
+ *  end, and he carries it into tomorrow morning without a click, because nothing takes it off
+ *  him. */
+export function waitsForTheBoss(state: GameState, worker: Worker): boolean {
+  if (!PRODUCING_ROLES.includes(worker.role)) return false;
+  if (!isWorkingToday(state, worker)) return false;
+  if (worker.jobId !== null || worker.taskId !== null) return false;
+  return !managerOnDuty(state);
+}
+
+/** A man's day meter, empty: the minutes he stood and the reasons they went to. One maker, read
+ *  by the hire, by the morning and by a save being lifted, so a reason added to the list is added
+ *  in one place (CLAUDE.md T23 2.1). */
+export function emptyWorkerIdle(): Record<WorkerIdleReason, number> {
+  const empty = {} as Record<WorkerIdleReason, number>;
+  for (const reason of WORKER_IDLE_REASONS) empty[reason.id] = 0;
+  return empty;
+}
+
+/** Books the minute just gone onto this man's day as one he stood through, with its reason. The
+ *  owner's own is `spendOwnerIdleMinute` in owner.ts and this is its twin (CLAUDE.md T23 2.1). */
+export function spendWorkerIdleMinute(worker: Worker, reason: WorkerIdleReason): void {
+  worker.idleMinutes += 1;
+  worker.idleByReason[reason] += 1;
 }
 
 // ---------------------------------------------------------------------------
@@ -727,6 +767,10 @@ export function runStaffDayStart(state: GameState): void {
     worker.minutesWorked = 0;
     worker.ordersToday = 0;
     worker.dayLog = [];
+    // And a blank grey segment with it: the minutes he stood are today's and no other day's
+    // (CLAUDE.md T21 2.8, T23 2.1).
+    worker.idleMinutes = 0;
+    worker.idleByReason = emptyWorkerIdle();
   }
 }
 
