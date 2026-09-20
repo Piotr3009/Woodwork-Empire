@@ -11,6 +11,7 @@ import type {
   EquipmentVariant,
   EquipmentTab,
   Finish,
+  LedgerCategory,
   LostMinuteCause,
   MaterialKind,
   OwnerIdleReason,
@@ -437,10 +438,32 @@ export const DIFFICULTIES: DifficultySpec[] = [
  *  while the account is below zero and charged monthly, interest only; the balance stays negative
  *  until the player brings it up (PIOTR: 0.25; CLAUDE.md T13 3.14). */
 export const OVERDRAFT_RATE_YEARLY = 0.25;
-/** The one loan: up to this much [TUNE], at Piotr's yearly rate, over sixty monthly instalments
- *  (PIOTR: 5 years), interest on the outstanding balance charged monthly with the instalment.
- *  Early repayment costs nothing [TUNE] (CLAUDE.md T13 3.14). */
-export const LOAN_MAX = 50000;
+/** The one loan: at Piotr's yearly rate, over sixty monthly instalments (PIOTR: 5 years), interest
+ *  on the outstanding balance charged monthly with the instalment. Early repayment costs nothing
+ *  [TUNE] (CLAUDE.md T13 3.14).
+ *
+ *  How much of it there is stopped being one figure in Turn 23. The bank lends against the books
+ *  it is shown: a quarter of the last twelve calendar months' sales [PIOTR, 20.09], and never
+ *  less than the floor a company with no history gets [TUNE]. There is no upper cap at all
+ *  [PIOTR, 20.09: "no upper limit"], so a workshop that turns over a million may borrow a quarter
+ *  of it. `loanLimit` in src/engine/finance.ts is the one function that works it out, and the
+ *  refusal and the finance card both read it (CLAUDE.md T23 2.12). */
+export const LOAN_SHARE_OF_SALES = 0.25;
+export const LOAN_FLOOR = 10000;
+/** How many calendar months of the ledger the bank looks at, today's month among them [PIOTR: the
+ *  last twelve months]. A sale in the thirteenth month back is off the books it reads. */
+export const LOAN_SALES_MONTHS = 12;
+/** What the bank counts as a sale: money invoiced out of the workshop. The deposits and the
+ *  balances of the jobs, the weekly pieces of a standing contract and the pellets the hall sells
+ *  are the four lines of the ledger a customer's money arrives on; a loan drawn, an insurance
+ *  payout and a deposit the landlord gives back are not turnover and are not on it
+ *  (CLAUDE.md T23 2.12). */
+export const SALES_CATEGORIES: readonly LedgerCategory[] = [
+  'jobDeposit',
+  'jobBalance',
+  'contract',
+  'pellets',
+];
 export const LOAN_RATE_YEARLY = 0.15;
 export const LOAN_MONTHS = 60;
 export const LOAN_EARLY_REPAYMENT_PENALTY = 0;

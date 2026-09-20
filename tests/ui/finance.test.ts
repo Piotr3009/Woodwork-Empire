@@ -4,8 +4,9 @@
 // red (CLAUDE.md T13 3.14, 3.1).
 
 import { describe, expect, it } from 'vitest';
-import { LOAN_MAX, LOAN_MONTHS } from '../../src/engine/constants';
-import { loanInstalmentFor, takeLoan } from '../../src/engine/finance';
+import { LOAN_FLOOR, LOAN_MONTHS, LOAN_SHARE_OF_SALES } from '../../src/engine/constants';
+import { loanInstalmentFor, loanLimit, loanLimitLine, takeLoan } from '../../src/engine/finance';
+import type { GameState } from '../../src/engine/index';
 import { renderAccounting } from '../../src/ui/accounting';
 import { renderFinance } from '../../src/ui/finance';
 import { newGame } from '../helpers';
@@ -14,6 +15,23 @@ function parse(html: string): HTMLElement {
   const holder = document.createElement('div');
   holder.innerHTML = html;
   return holder;
+}
+
+/** The turnover that carries a loan of this much: the bank lends a quarter of the last twelve
+ *  months' sales from Turn 23, so a test that wants a bigger figure has to earn it
+ *  (CLAUDE.md T23 2.12). */
+function earn(state: GameState, wanted: number): GameState {
+  state.ledger.push({
+    id: `sale-${String(state.ledger.length)}`,
+    day: state.clock.day,
+    minute: 0,
+    category: 'jobBalance',
+    label: 'Balance from a client',
+    amount: wanted / LOAN_SHARE_OF_SALES,
+    balance: state.cash,
+    unpaid: false,
+  });
+  return state;
 }
 
 function rowFigure(page: HTMLElement, words: string): HTMLElement | null {
@@ -25,7 +43,7 @@ function rowFigure(page: HTMLElement, words: string): HTMLElement | null {
 
 describe('with nothing borrowed', () => {
   it('offers the loan with the typed amount on the one button', () => {
-    const page = parse(renderFinance(newGame(), '20000'));
+    const page = parse(renderFinance(earn(newGame(), 30000), '20000'));
     const field = page.querySelector('[data-field="loanAmount"]');
     expect(field?.getAttribute('value')).toBe('20000');
     const take = page.querySelector('[data-do="takeLoan"]');
@@ -34,11 +52,29 @@ describe('with nothing borrowed', () => {
     expect(page.querySelector('[data-do="repayLoan"]')).toBeNull();
   });
 
-  it('locks the button with the reason when the amount is over the cap, or nothing', () => {
-    const over = parse(renderFinance(newGame(), String(LOAN_MAX + 1)));
+  it('says where the figure comes from, in both of the bank s sentences', () => {
+    // The card and the refusal read the one function, so they cannot say different figures
+    // [PIOTR, 20.09] (CLAUDE.md T23 2.12).
+    const fresh = newGame();
+    expect(loanLimit(fresh)).toBe(LOAN_FLOOR);
+    expect(parse(renderFinance(fresh, '')).querySelector('.finance-loan')?.textContent).toContain(
+      'The bank lends a new company up to \u00a310,000',
+    );
+    const trading = earn(newGame(), 30000);
+    expect(parse(renderFinance(trading, '')).querySelector('.finance-loan')?.textContent).toContain(
+      'The bank lends up to \u00a330,000: a quarter of your last twelve months\u0027 sales',
+    );
+  });
+
+  it('locks the button with the reason when the amount is over what the books carry, or nothing', () => {
+    const trading = earn(newGame(), 30000);
+    const over = parse(renderFinance(trading, String(loanLimit(trading) + 1)));
     expect(over.querySelector('[data-do="takeLoan"]')).toBeNull();
     const locked = over.querySelector('.finance-loan button[disabled]');
-    expect(locked?.getAttribute('title')).toBe(`The bank lends up to ${LOAN_MAX}`);
+    expect(locked?.getAttribute('title')).toBe(loanLimitLine(trading));
+    expect(locked?.getAttribute('title')).toBe(
+      'The bank lends up to \u00a330,000: a quarter of your last twelve months\u0027 sales',
+    );
     const nothing = parse(renderFinance(newGame(), ''));
     expect(nothing.querySelector('.finance-loan button[disabled]')?.getAttribute('title')).toBe('Nothing to borrow');
   });
@@ -47,6 +83,7 @@ describe('with nothing borrowed', () => {
 describe('with a loan on the books', () => {
   it('shows the balance, the next instalment, the interest paid and the months left', () => {
     const state = newGame();
+    earn(state, 12000);
     takeLoan(state, 12000);
     const page = parse(renderFinance(state, '500'));
     const balance = rowFigure(page, 'Balance owed');
@@ -68,6 +105,7 @@ describe('with a loan on the books', () => {
 
   it('repays the typed amount or all of it, and locks what the cash cannot cover', () => {
     const state = newGame();
+    earn(state, 12000);
     takeLoan(state, 12000);
     const page = parse(renderFinance(state, '500'));
     const part = page.querySelector('[data-do="repayLoan"][data-amount="500"]');
@@ -107,6 +145,7 @@ describe('the overdraft', () => {
 describe('the binder', () => {
   it('opens the tab under Finance and names the loan and the covers among what is coming', () => {
     const state = newGame();
+    earn(state, 12000);
     takeLoan(state, 12000);
     state.insurance.liability = true;
     const finance = parse(renderAccounting(state, 'finance', [], null, '1000'));
