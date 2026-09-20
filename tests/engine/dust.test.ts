@@ -35,7 +35,6 @@ describe('dust is one figure per family, in cubic metres an hour of use', () => 
       cncHead: 0.06,
       solidWoodTools: 0,
       sprayBooth: 0,
-      drill: 0,
     });
     // About half a bag a day off a CNC cutting all day (0.48 of one, to the figure), and a saw
     // at a quarter of that: the point of reference the whole table is drawn from (T12 2.1).

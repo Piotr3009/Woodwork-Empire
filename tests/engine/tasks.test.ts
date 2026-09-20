@@ -25,7 +25,6 @@ import {
   joineryCoreOffer,
   materialOrderMinutes,
   openTasks,
-  staffManagementMinutes,
   startTaskCheck,
   tasksOfKind,
   unloadMinutes,
@@ -74,6 +73,9 @@ function staff(id: string, role: Worker['role'], monthlyWage: number): Worker {
     dayLog: [],
     monthMinutes: 0,
     monthDaysOff: 0,
+    idleMinutes: 0,
+    idleByReason: { waitingForBoss: 0, noMachine: 0, noMaterial: 0 },
+    accidents: 0,
     anchorX: 0,
     anchorY: 0,
   };
@@ -118,12 +120,16 @@ describe('minute curves', () => {
     expect(unloadMinutes(better)).toBe(10);
   });
 
-  it('charges 10 minutes a joiner a day for management', () => {
+  it('charges nobody a minute for assigning, however many joiners are on the books', () => {
+    // The daily staff management chore is gone from the game: putting a man on a job is a click
+    // and costs nobody any minutes (PIOTR, 20.09: "fewer problems for people";
+    // CLAUDE.md T23 2.2).
     const state = newGame();
-    expect(staffManagementMinutes(state)).toBe(0);
     state.workers.push({ ...staff('j1', 'joiner', 0), tier: 'novice', rate: 0.6, monthlyWage: 1950 });
     state.workers.push({ ...staff('j2', 'joiner', 0), tier: 'novice', rate: 0.6, monthlyWage: 1950 });
-    expect(staffManagementMinutes(state)).toBe(20);
+    createDailyTasks(state);
+    expect(state.tasks.map((task) => task.kind)).not.toContain('staffManagement');
+    expect(state.tasks.some((task) => task.label.toLowerCase().includes('staff'))).toBe(false);
   });
 });
 

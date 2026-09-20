@@ -58,6 +58,9 @@ function withJoiner(state: GameState): GameState {
     dayLog: [],
     monthMinutes: 0,
     monthDaysOff: 0,
+    idleMinutes: 0,
+    idleByReason: { waitingForBoss: 0, noMachine: 0, noMaterial: 0 },
+    accidents: 0,
     anchorX: 0,
     anchorY: 4,
   });

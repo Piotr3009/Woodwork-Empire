@@ -28,7 +28,6 @@ function known(): GameState {
   const state = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
   state.enquiries = [];
   placeEquipment(state, 'locker', { x: 6, y: 9 });
-  placeEquipment(state, 'canteenSeat', { x: 8, y: 9 });
   placeEquipment(state, 'handToolSet', { x: 12, y: 9 });
   placeEquipment(state, 'toolCabinet', { x: 10, y: 9 });
   state.reputation = 60;

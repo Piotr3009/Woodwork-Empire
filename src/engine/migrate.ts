@@ -8,7 +8,6 @@
 
 import {
   CABINET_SLOT_LAYOUT,
-  CANTEEN_SLOT_LAYOUT,
   EQUIPMENT_SPECS,
   LOCKER_SLOT_LAYOUT,
   SOUND_VOLUME_DEFAULT,
@@ -24,6 +23,19 @@ import type { GameState, WorkerTier } from './types';
  *  a week into a month any more, and the lift out of v16 still has to do the arithmetic that build
  *  did, so the figure is written here and only here (CLAUDE.md T21 2.10, section 7). */
 const WEEKS_PER_MONTH_V17 = 30 / 7;
+
+/** Where a canteen seat stood inside the canteen block in the builds that sold one: the door
+ *  column, the first seat just inside the door. Turn 23 took the seat out of the game, so the live
+ *  layout table is gone with it; the lift out of v15 still has to stand an old save's seats where
+ *  that build stood them, and a seat lifted to a cell it never occupied would be a seat the player
+ *  never put there. The figures are the historical ones and are written here and only here
+ *  (CLAUDE.md T23 2.11, T17 2.2). */
+const CANTEEN_SLOT_LAYOUT_V17: Array<{ x: number; y: number }> = [
+  { x: 4, y: 3 },
+  { x: 4, y: 2 },
+  { x: 4, y: 1 },
+  { x: 4, y: 0 },
+];
 
 /** The oldest save this build opens: Turn 11's v18, which is state version 12. */
 export const OLDEST_SAVE_VERSION = 12;
@@ -226,7 +238,7 @@ function liftToVersion15(state: Raw): void {
     }
     if (item.soldOnDay !== null && item.soldOnDay !== undefined) continue;
     if (item.specId === 'canteenSeat') {
-      const slot = CANTEEN_SLOT_LAYOUT[Math.min(seats, CANTEEN_SLOT_LAYOUT.length - 1)];
+      const slot = CANTEEN_SLOT_LAYOUT_V17[Math.min(seats, CANTEEN_SLOT_LAYOUT_V17.length - 1)];
       seats += 1;
       if (slot) {
         item.anchorX = slot.x;
@@ -388,7 +400,13 @@ function liftToVersion18(state: Raw): void {
   if (isRecord(state.finance)) state.finance.daysBelowOverdraft = 0;
   if (isRecord(state.owner)) {
     state.owner.idleMinutes = 0;
-    state.owner.idleByReason = { noMachine: 0, noMaterial: 0, nothingAssigned: 0, officeEmpty: 0 };
+    state.owner.idleByReason = {
+      noMachine: 0,
+      noMaterial: 0,
+      noCompressor: 0,
+      nothingAssigned: 0,
+      officeEmpty: 0,
+    };
   }
   liftCabinets(state);
   state.version = 18;
@@ -496,6 +514,84 @@ function carryArrearsIntoTheAccount(state: Raw): void {
   state.ledger = ledger;
 }
 
+/** Version 19 to 20: the months the company has closed are written down, the production manager
+ *  has a grade, the cordless drill and the canteen seat are out of the game, a man's hand tool set
+ *  is in a cabinet and not on the floor, and nobody is charged minutes for assigning
+ *  (CLAUDE.md T23 section 4).
+ *
+ *  What the lift does, and why each one is the honest answer:
+ *
+ *  - **The monthly reports.** An empty list. The months a save has already closed were added up
+ *    off a ledger that is still there, but the card the player was shown that evening is the one
+ *    the report is meant to be, and a report worked out again tonight under tonight's rules would
+ *    not be that card. A played company starts its list at its next month end (CLAUDE.md T23 2.14).
+ *  - **The manager's grade.** `experienced`, because that is the man the save has: a manager was
+ *    paid 3,400 a month in every build before this one, which is exactly what the experienced
+ *    grade costs tonight, so nobody's wage moves and nobody is promoted for nothing
+ *    (CLAUDE.md T23 2.4).
+ *  - **The drill and the seat.** Both are gone from the catalogue, so a save's own go with no
+ *    refund and one ledger line each says so: the player sees what happened to his kit rather than
+ *    finding a hole in the hall. The line moves no money, so it is a note on the books and not a
+ *    line of the month's money. The ones still on the lorry go too: a delivery of a thing the
+ *    catalogue no longer holds would have nowhere to land (CLAUDE.md T23 2.5, 2.11).
+ *  - **The hand tool set.** It keeps its id and its cabinet and loses the cell it stood on: from
+ *    tonight a set is a thing in a cabinet and not a thing on the hall, so it has no position to
+ *    carry (CLAUDE.md T23 2.6).
+ *  - **The assigning.** Every staff management chore comes off the list, done or not. Nothing
+ *    costs anybody minutes for assigning any more (CLAUDE.md T23 2.2).
+ *  - **The men's day meters.** A man on the books carries the minutes he stood and their reasons
+ *    from tonight, the way the owner has since Turn 21. A save made before them starts on nought
+ *    (CLAUDE.md T23 2.1, 2.13). */
+function liftToVersion20(state: Raw): void {
+  state.monthlyReports = [];
+  for (const worker of records(state.workers)) {
+    if (worker.role === 'productionManager') worker.tier = 'experienced';
+    // The day meter a man on the books has from tonight: a save made before it starts the day it
+    // is lifted on nought, the way the morning would have left it (CLAUDE.md T23 2.1).
+    worker.idleMinutes = 0;
+    worker.idleByReason = { waitingForBoss: 0, noMachine: 0, noMaterial: 0 };
+    // Nothing counted his accidents before tonight, so a save's men start on nought and the
+    // count runs from here (CLAUDE.md T23 2.13).
+    worker.accidents = 0;
+  }
+  retireSpec(state, 'drill', 'Cordless drill retired (v36)');
+  retireSpec(state, 'canteenSeat', 'Canteen seats retired (v36)');
+  for (const item of records(state.equipment)) {
+    if (item.specId !== 'handToolSet') continue;
+    delete item.anchorX;
+    delete item.anchorY;
+  }
+  state.tasks = records(state.tasks).filter((task) => task.kind !== 'staffManagement');
+  state.version = 20;
+}
+
+/** Every item of one retired family taken off the books, standing in the hall or still on the
+ *  lorry, with one ledger line when the save actually held any. No money comes back: the player
+ *  bought them under the old rules and the game is not buying them off him. Written against the
+ *  plain JSON of a save, like every other lift. */
+function retireSpec(state: Raw, specId: string, label: string): void {
+  const standing = records(state.equipment).filter((item) => item.specId === specId);
+  const onOrder = records(state.onOrder).filter((item) => item.specId === specId);
+  if (standing.length === 0 && onOrder.length === 0) return;
+  state.equipment = records(state.equipment).filter((item) => item.specId !== specId);
+  state.onOrder = records(state.onOrder).filter((item) => item.specId !== specId);
+  const clock = isRecord(state.clock) ? state.clock : null;
+  const day = typeof clock?.day === 'number' ? clock.day : 1;
+  const minute = typeof clock?.minute === 'number' ? clock.minute : 0;
+  const ledger = Array.isArray(state.ledger) ? state.ledger : [];
+  ledger.push({
+    id: `lift-v20-${specId}-${day}`,
+    day,
+    minute,
+    category: 'other',
+    label,
+    amount: 0,
+    balance: typeof state.cash === 'number' ? state.cash : 0,
+    unpaid: true,
+  });
+  state.ledger = ledger;
+}
+
 /** One lift per bump, keyed by the version it lifts from. */
 const LIFTS: Record<number, (state: Raw) => void> = {
   12: liftToVersion13,
@@ -505,6 +601,7 @@ const LIFTS: Record<number, (state: Raw) => void> = {
   16: liftToVersion17,
   17: liftToVersion18,
   18: liftToVersion19,
+  19: liftToVersion20,
 };
 
 /** The state a save holds, lifted bump by bump into this build's shape, or null when the save is

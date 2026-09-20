@@ -20,13 +20,14 @@ import { BUBBLES } from './constants';
 import { contractOfWorker } from './contracts';
 import { OWNER, machineShortWord } from './machines';
 import { ownerIsAvailable } from './owner';
+import { standsForAir } from './media';
 import {
   NO_CUT_PARTS,
   WAITING_FOR_MATERIAL,
   jobOf,
   waitingWordsFor,
 } from './production';
-import { isWorkingToday } from './staff';
+import { isWorkingToday, waitsForTheBoss } from './staff';
 import { cncOptions, currentStage } from './stages';
 import {
   STATION_LUNCH,
@@ -69,10 +70,14 @@ function onAJob(state: GameState, who: string, job: Job): Bubble | null {
   if (job.blockedBy === WAITING_FOR_MATERIAL) {
     return bubble(who, 'noMaterial', { job: job.name });
   }
+  const stage = currentStage(state, job, cncOptions(state, who, job));
+  // A bench with nothing in the hose stands him still, and it is a thing the player can put
+  // right with a compressor: media.ts decides it and the mark reports it (CLAUDE.md T23 2.7).
+  if (standsForAir(state, stage)) return bubble(who, 'noCompressor');
   const waiting = waitingWordsFor(state, who, job);
   if (waiting === NO_CUT_PARTS) return bubble(who, 'noCutParts');
   if (waiting === null) return null;
-  const family = currentStage(state, job, cncOptions(state, who, job))?.family ?? null;
+  const family = stage?.family ?? null;
   return family === null ? null : bubble(who, 'waitingForMachine', { machine: machineShortWord(family) });
 }
 
@@ -102,6 +107,11 @@ export function bubbleFor(state: GameState, who: string): Bubble | null {
   // A man the standing contract has is at work on it, whether or not the hall has a job for him:
   // the one thing that can be wrong with him is the machine he is queueing for (CLAUDE.md T20 2.1).
   if (who !== OWNER && contractOfWorker(state, who) !== null) return onAContract(who, station);
+  // Nobody has put him on anything and there is no manager on duty to: he is waiting for the
+  // boss's word, which is a click in the Work Plan (PIOTR, 20.09; CLAUDE.md T23 2.1). The owner
+  // waits for nobody, so the older words are still his.
+  const worker = who === OWNER ? null : state.workers.find((entry) => entry.id === who) ?? null;
+  if (worker !== null && waitsForTheBoss(state, worker)) return bubble(who, 'waitingForBoss');
   return bubble(who, 'nothingToDo');
 }
 

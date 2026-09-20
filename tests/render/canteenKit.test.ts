@@ -1,8 +1,12 @@
 // @vitest-environment jsdom
-// The welfare kit lives in the canteen (PIOTR, 17.09; CLAUDE.md T17 2.2): a seat and a locker
-// stand inside the block, take no hall cell, cannot be dragged onto the floor, and the man who
-// uses one stands in the doorway facing in. What they are worth is unchanged: a seat a man and a
-// locker a man, which is what hiring a joiner still asks for.
+// The welfare kit lives in the canteen (PIOTR, 17.09; CLAUDE.md T17 2.2): a locker stands inside
+// the block, takes no hall cell, cannot be dragged onto the floor, and the man who uses one stands
+// in the doorway facing in. What it is worth is unchanged: a locker a man, which is what hiring a
+// joiner still asks for.
+//
+// The seat stood beside it until Turn 23, when the canteen became a room with a table and two
+// stools of its own and nobody buys a seat any more (PIOTR, 20.09: "too much micromanagement";
+// CLAUDE.md T23 2.11). The kit is the locker alone from tonight.
 
 import { describe, expect, it } from 'vitest';
 import { ROOM_LAYOUT, WELFARE_IN_THE_CANTEEN, roomDoorCell } from '../../src/engine/constants';
@@ -25,10 +29,10 @@ function insideTheCanteen(cell: { x: number; y: number }): boolean {
   );
 }
 
-/** A hall with a seat and a locker bought, which is what hiring a joiner asks for. */
+/** A hall with a locker bought, which is what hiring a joiner asks for. */
 function withWelfare(): GameState {
   const bare = fillRack(buyStartingKit(newGame({ difficulty: 'veryEasy' })));
-  return buyNow(buyNow(bare, 'locker'), 'canteenSeat');
+  return buyNow(bare, 'locker');
 }
 
 function welfareOf(state: GameState): Equipment[] {
@@ -41,11 +45,11 @@ function page(svg: string): HTMLElement {
   return holder;
 }
 
-describe('the seats and the lockers', () => {
+describe('the lockers', () => {
   it('stand inside the canteen and on no hall cell at all', () => {
     const state = withWelfare();
     const kit = welfareOf(state);
-    expect(kit.length).toBe(2);
+    expect(kit.length).toBe(1);
     for (const item of kit) {
       expect(insideTheCanteen({ x: item.anchorX, y: item.anchorY }), item.specId).toBe(true);
       // The hall's own collision does not know about them: they are not on the floor.
@@ -93,14 +97,14 @@ describe('the seats and the lockers', () => {
     }
   });
 
-  it('are worth exactly what they were worth: a seat a man and a locker a man', () => {
+  it('is worth exactly what it was worth: a locker a man, and no seat is asked for', () => {
     const bare = fillRack(buyStartingKit(newGame({ difficulty: 'veryEasy' })));
     const short = shortfallForHire(bare, 'joiner').map((entry) => entry.specId);
     expect(short).toContain('locker');
-    expect(short).toContain('canteenSeat');
+    expect(short).not.toContain('canteenSeat');
     const state = withWelfare();
     const left = shortfallForHire(state, 'joiner').map((entry) => entry.specId);
     expect(left).not.toContain('locker');
-    expect(left).not.toContain('canteenSeat');
+    expect(WELFARE_IN_THE_CANTEEN).toEqual(['locker']);
   });
 });

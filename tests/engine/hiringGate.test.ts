@@ -6,11 +6,15 @@
 
 import { describe, expect, it } from 'vitest';
 import { HIRING_SPECS } from '../../src/engine/constants';
+import { WORKBENCH_PLACES, WORKBENCH_VARIANTS } from '../../src/engine/constants';
 import { canHire, hiringOptions, monthlyWageOf } from '../../src/engine/staff';
+import { OWNER, benchOf, benchPlaces, outputFactorOf } from '../../src/engine/machines';
+import { renderMachine } from '../../src/ui/machine';
+import type { Equipment } from '../../src/engine/index';
 import { formatMoney } from '../../src/engine/economy';
 import { renderTeam } from '../../src/ui/team';
 import type { GameState } from '../../src/engine/index';
-import { buyStartingKit, fillRack, newGame, placeEquipment } from '../helpers';
+import { buyStartingKit, fillRack, hireNow, newGame, placeEquipment } from '../helpers';
 
 function parse(html: string): HTMLElement {
   const holder = document.createElement('div');
@@ -23,7 +27,6 @@ function readyToHire(cash: number): GameState {
   const state = fillRack(buyStartingKit(newGame({ difficulty: 'veryEasy' })));
   state.enquiries = [];
   placeEquipment(state, 'locker', { x: 6, y: 9 });
-  placeEquipment(state, 'canteenSeat', { x: 8, y: 9 });
   placeEquipment(state, 'handToolSet', { x: 12, y: 9 });
   placeEquipment(state, 'toolCabinet', { x: 10, y: 9 });
   state.cash = cash;
@@ -116,5 +119,114 @@ describe('taking somebody on', () => {
       (entry) => entry.role === 'joiner' && entry.tier === 'novice',
     );
     expect(option?.blockReason).toContain('Buy first');
+  });
+});
+
+/** A bench holds one, two or three men by its class from Turn 23, and the gate counts the places
+ *  and not the benches, the way it counts the slots of the tool cabinets (PIOTR, 20.09;
+ *  CLAUDE.md T22 2.12, T23 2.17). */
+describe('a free place at a bench', () => {
+  /** The day one hall with its one bench swapped for the class asked for, the rest of a joiner's
+   *  kit standing in it, and money enough for anybody. */
+  function hallWith(variantId: string, sets: number): GameState {
+    const state = readyToHire(1000000);
+    const bench = state.equipment.find((item) => item.specId === 'workbench');
+    if (bench === undefined) throw new Error('the day one kit has a bench in it');
+    bench.variantId = variantId;
+    // A man wants a locker and a set of tools of his own as well, so the bench is the only thing
+    // the gate can be short of.
+    for (let index = 1; index < sets; index += 1) {
+      placeEquipment(state, 'locker', { x: 6 + index, y: 9 });
+      placeEquipment(state, 'handToolSet', { x: 12 + index, y: 9 });
+      placeEquipment(state, 'toolCabinet', { x: 10 + index, y: 9 });
+    }
+    return state;
+  }
+
+  it('counts the classes places over the benches of the hall', () => {
+    expect(WORKBENCH_PLACES).toEqual({ used: 1, budget: 1, standard: 2, pro: 2, industrial: 3 });
+    const one = hallWith('budget', 1);
+    expect(benchPlaces(one)).toBe(1);
+    expect(benchPlaces(hallWith('standard', 1))).toBe(2);
+    expect(benchPlaces(hallWith('industrial', 1))).toBe(3);
+  });
+
+  it('hires two at a standard bench and refuses the third with No place at a bench', () => {
+    let state = hallWith('standard', 4);
+    expect(canHire(state, 'joiner', 'novice').ok).toBe(true);
+    state = hireNow(state, 'joiner', 'novice');
+    expect(canHire(state, 'joiner', 'novice').ok).toBe(true);
+    state = hireNow(state, 'joiner', 'novice');
+    expect(state.workers).toHaveLength(2);
+    // The two places of the standard bench are taken, and the third man is refused in the words
+    // of the thing that is short.
+    expect(canHire(state, 'joiner', 'novice')).toEqual({
+      ok: false,
+      reason: 'No place at a bench',
+    });
+    // And a second bench puts it right: two more places, and the third man is taken on.
+    placeEquipment(state, 'workbench', { variantId: 'budget', x: 4, y: 7, id: 'kit-bench-2' });
+    expect(canHire(state, 'joiner', 'novice').ok).toBe(true);
+  });
+
+  it('puts the second man at the first man s bench, and the third at the next one', () => {
+    // The men fill the benches in the order they were hired, so two men at a standard bench stand
+    // at the same bench and are drawn there (CLAUDE.md T23 2.17).
+    let state = hallWith('standard', 4);
+    state = hireNow(state, 'joiner', 'novice');
+    state = hireNow(state, 'joiner', 'novice');
+    const bench = state.equipment.find((item) => item.specId === 'workbench');
+    if (bench === undefined) throw new Error('no bench');
+    const [first, second] = state.workers;
+    expect(benchOf(state, first?.id ?? '')?.id).toBe(bench.id);
+    expect(benchOf(state, second?.id ?? '')?.id).toBe(bench.id);
+    // Two figures at one bench: the renderer draws a man at his own home cell, and both of them
+    // have the same one.
+    expect([first?.anchorX, first?.anchorY]).toEqual([bench.anchorX, bench.anchorY]);
+    expect([second?.anchorX, second?.anchorY]).toEqual([bench.anchorX, bench.anchorY]);
+    // The owner takes what is left, which at a bench with two places and two men is nothing.
+    expect(benchOf(state, OWNER)).toBeNull();
+    // A second bench, and the third man stands at that one instead.
+    placeEquipment(state, 'workbench', { variantId: 'budget', x: 4, y: 7, id: 'kit-bench-2' });
+    state = hireNow(state, 'joiner', 'novice');
+    const third = state.workers[2];
+    expect(benchOf(state, third?.id ?? '')?.id).toBe('kit-bench-2');
+  });
+
+  it('works each man at a pro bench at that bench s pace, on his own job', () => {
+    // A pro bench holds two and each of them works his own job at 1.06: the pace follows the
+    // bench the man is at and not the job he is on (CLAUDE.md T23 2.17).
+    const variant = WORKBENCH_VARIANTS.find((entry) => entry.id === 'pro');
+    expect(variant?.outputFactor).toBe(1.06);
+    expect(WORKBENCH_PLACES.pro).toBe(2);
+    let state = hallWith('pro', 4);
+    state = hireNow(state, 'joiner', 'novice');
+    state = hireNow(state, 'joiner', 'novice');
+    const bench = state.equipment.find((item) => item.specId === 'workbench');
+    if (bench === undefined) throw new Error('no bench');
+    for (const worker of state.workers) {
+      const his = benchOf(state, worker.id);
+      expect(his?.id).toBe(bench.id);
+      expect(outputFactorOf(state, his as Equipment)).toBe(1.06);
+    }
+  });
+
+  it('re tuned the pace of the ladder to top out at a tenth', () => {
+    // 0.95, 1.00, 1.02, 1.05 and 1.08 become 0.95, 1.00, 1.03, 1.06 and 1.10
+    // [TUNE; PIOTR, 20.09, the top of it] (CLAUDE.md T23 2.17).
+    expect(WORKBENCH_VARIANTS.map((entry) => entry.outputFactor)).toEqual([
+      0.95, 1, 1.03, 1.06, 1.1,
+    ]);
+  });
+
+  it('says on the class card how many men it holds and what they work at', () => {
+    const card = renderMachine(newGame(), 'workbench');
+    expect(card).toContain('2 men, +3% pace');
+    expect(card).toContain('2 men, +6% pace');
+    expect(card).toContain('3 men, +10% pace');
+    // The minus is the number's own sign, the way the output line of every class card writes
+    // it, and not the typographic one.
+    expect(card).toContain('1 man, -5% pace');
+    expect(card).toContain('1 man, the standard pace');
   });
 });

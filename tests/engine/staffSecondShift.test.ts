@@ -12,8 +12,8 @@ import {
   NIGHT_ERROR_FACTOR,
   NIGHT_RATE,
   PRODUCTION_MANAGER_MONTHLY_WAGE,
+  PRODUCTION_MANAGER_PACE,
   SECOND_SHIFT_MINUTES,
-  STAFF_MANAGEMENT_MINUTES_PER_JOINER,
   WORKER_HOURS_PER_MONTH,
   WORKER_RATES,
 } from '../../src/engine/constants';
@@ -32,12 +32,6 @@ import {
 } from '../../src/engine/staff';
 import { absenceFactor, nightShareOf } from '../../src/engine/owner';
 import { hands, jobOf } from '../../src/engine/production';
-import {
-  createDailyTasks,
-  staffManagementMinutes,
-  staffManagementTaker,
-  tasksOfKind,
-} from '../../src/engine/tasks';
 import { formatCalendarDay, tick } from '../../src/engine/index';
 import type { GameState, Worker } from '../../src/engine/index';
 import { act, clearEvents, sixJoinersOnSheetWork } from '../helpers';
@@ -49,9 +43,11 @@ function manager(id = 'pm-1'): Worker {
     id,
     name: 'Frank',
     role: 'productionManager',
-    tier: null,
+    // The grade a save's manager is given and the grade he was always paid for: the experienced
+    // man costs the 3,400 a manager cost before Turn 23 gave him four (CLAUDE.md T23 2.4).
+    tier: 'experienced',
     rate: 0,
-    monthlyWage: PRODUCTION_MANAGER_MONTHLY_WAGE,
+    monthlyWage: PRODUCTION_MANAGER_MONTHLY_WAGE.experienced,
     leavesOnDay: null,
     startDay: 1,
     jobId: null,
@@ -69,6 +65,9 @@ function manager(id = 'pm-1'): Worker {
     dayLog: [],
     monthMinutes: 0,
     monthDaysOff: 0,
+    idleMinutes: 0,
+    idleByReason: { waitingForBoss: 0, noMachine: 0, noMaterial: 0 },
+    accidents: 0,
     anchorX: 1,
     anchorY: 1,
   };
@@ -203,11 +202,17 @@ describe('the second shift', () => {
     const state = nightHall();
     state.owner.wentHome = true;
     const rates = hands(state, { shift: 'night' }).map((hand) => hand.rate);
+    // Three things on the minute and no more: the man's own rate, what the owner's absence takes
+    // off it, and what the manager over him adds. The manager of this hall is the experienced
+    // one, so his grade's pace is on the night the same as on the day: he runs the second shift
+    // and the men on it are men he carries (CLAUDE.md T13 3.9, T23 2.4).
+    const pace = PRODUCTION_MANAGER_PACE.experienced;
     expect(rates).toEqual([
-      WORKER_RATES.novice * absenceFactor(true),
-      WORKER_RATES.novice * absenceFactor(true),
+      WORKER_RATES.novice * absenceFactor(true) * pace,
+      WORKER_RATES.novice * absenceFactor(true) * pace,
     ]);
     expect(absenceFactor(true)).toBe(0.92);
+    expect(pace).toBe(1.05);
   });
 
   it('is run by the day end, and the summary carries the night minutes', () => {
@@ -261,35 +266,3 @@ describe('the second shift', () => {
   });
 });
 
-// Assigning the crew is the production manager's the day he is in, and it comes off the owner's
-// day with him (CLAUDE.md T13 3.9 point 2).
-describe('who assigns the crew', () => {
-  it('is the owner until a manager is in, and the manager from then on', () => {
-    const state = sixJoinersOnSheetWork();
-    expect(staffManagementTaker(state)).toBe('owner');
-    createDailyTasks(state);
-    const settled = act(state, { type: 'SET_SPEED', speed: 1 });
-    // Nobody holds it: it sits on the owner's desk.
-    expect(tasksOfKind(settled, 'staffManagement')[0]?.doneBy).toBeNull();
-    state.workers.push(manager());
-    expect(staffManagementTaker(state)).toBe('manager');
-  });
-
-  it('moves the assign minutes off the owner’s day meter and onto the manager’s', () => {
-    const state = sixJoinersOnSheetWork();
-    state.workers.push(manager());
-    createDailyTasks(state);
-    const minutes = staffManagementMinutes(state);
-    expect(minutes).toBe(6 * STAFF_MANAGEMENT_MINUTES_PER_JOINER);
-    let next = act(state, { type: 'SET_SPEED', speed: 1 });
-    expect(tasksOfKind(next, 'staffManagement')[0]?.doneBy).toBe('pm-1');
-    next = clearEvents(tick(next, minutes));
-    const task = next.tasks.find((entry) => entry.kind === 'staffManagement');
-    expect(task?.done).toBe(true);
-    const pm = next.workers.find((worker) => worker.id === 'pm-1');
-    expect(pm?.dayLog).toEqual([{ category: 'assign', minutes }]);
-    expect(pm?.minutesWorked).toBe(minutes);
-    // The owner's day meter never gained a minute of assigning.
-    expect(next.owner.dayLog.some((entry) => entry.category === 'assign')).toBe(false);
-  });
-});

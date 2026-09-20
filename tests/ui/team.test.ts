@@ -10,12 +10,15 @@ import {
   DRAFTSMAN_REPUTATION,
   HIRING_SPECS,
   JOINERY_CORE_PRICE_YEARLY,
+  PRODUCTION_MANAGER_MONTHLY_WAGE,
+  TIERS,
+  productionManagerDuties,
 } from '../../src/engine/constants';
 import { hiringOptions, openJobs } from '../../src/engine/index';
 import { canHire, hasWorkingDay } from '../../src/engine/staff';
 
 import { jobTasks, taskWorkRate } from '../../src/engine/tasks';
-import { renderTeam, tradeOf } from '../../src/ui/team';
+import { renderTeam, tradeOf, wageText } from '../../src/ui/team';
 import { money } from '../../src/ui/modal';
 import { officeDoor } from '../../src/render/hall';
 import { laptopPageFrom } from '../../src/ui/laptop';
@@ -107,7 +110,13 @@ describe('the board itself', () => {
       Array.from(management.querySelectorAll('[data-candidate]')).map((tile) =>
         tile.getAttribute('data-candidate'),
       ),
-    ).toEqual(['productionManager.']);
+    // Four grades from Turn 23, a card each, like the joiner (PIOTR, 20.09; CLAUDE.md T23 2.4).
+    ).toEqual([
+      'productionManager.novice',
+      'productionManager.experienced',
+      'productionManager.senior',
+      'productionManager.master',
+    ]);
     const technical = parse(renderTeam(known(), 'technical'));
     expect(
       Array.from(technical.querySelectorAll('[data-candidate]')).map((tile) =>
@@ -119,6 +128,28 @@ describe('the board itself', () => {
       'estimator.senior',
       'estimator.master',
     ]);
+  });
+
+  it('says each manager grade\u2019s three figures in words on his own card', () => {
+    // The duties line is the spec's, through `productionManagerDuties`, and it carries the three
+    // things a grade is: how many men he carries, the order he assigns in and his pace. The card
+    // used to read a table of its own in team.ts, which said the same sentence about all four
+    // (PIOTR, 20.09; CLAUDE.md T23 2.4).
+    const page = parse(renderTeam(known(), 'management'));
+    for (const tier of TIERS) {
+      const tile = page.querySelector(`[data-candidate="productionManager.${tier}"]`);
+      expect(tile?.querySelector('.tile-text')?.textContent).toBe(productionManagerDuties(tier));
+    }
+    const experienced = page.querySelector('[data-candidate="productionManager.experienced"]');
+    // The brief's own sentence, word for word.
+    expect(experienced?.querySelector('.tile-text')?.textContent).toBe(
+      'Assigns up to 12 men, soonest deadline first, +5% pace',
+    );
+    // And the four wages are Piotr's own figures and not the one wage ladder.
+    for (const tier of TIERS) {
+      const tile = page.querySelector(`[data-candidate="productionManager.${tier}"]`);
+      expect(tile?.textContent).toContain(wageText(PRODUCTION_MANAGER_MONTHLY_WAGE[tier]));
+    }
   });
 
   it('carries the rate, the wage and the reputation on every tile, and one Hire', () => {

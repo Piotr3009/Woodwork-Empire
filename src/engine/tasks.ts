@@ -40,7 +40,6 @@ import {
   SERVICE_MINUTES,
   SITE_MEASURE_MINUTES,
   SOFTWARE_DESIGN_FACTOR,
-  STAFF_MANAGEMENT_MINUTES_PER_JOINER,
   UNLOAD_BASE_MINUTES,
   WEEK_JOBS_KEPT,
   WORK_EPSILON,
@@ -49,8 +48,8 @@ import { DAY_END_MINUTE } from './constants';
 import { isBreak, nextWorkingDay, weekOfDay } from './clock';
 import { OWNER, has } from './machines';
 import { canUnload } from './materials';
-import { managerOnDuty, ownerIsAvailable } from './owner';
-import { bookOwnerIdleMinute } from './production';
+import { ownerIsAvailable } from './owner';
+import { bookOwnerIdleMinute, bookWorkerIdleMinute } from './production';
 import { makeId } from './rng';
 import { plural } from './text';
 import {
@@ -59,7 +58,6 @@ import {
   hasWorkingDay,
   helperOnDuty,
   isWorkingToday,
-  joiners,
   staffMinutesLeft,
   weekMetersOf,
 } from './staff';
@@ -96,13 +94,6 @@ const TASK_DEFINITIONS: Record<TaskKind, TaskDefinition> = {
     category: 'admin',
     eligibleRoles: ['purchasingClerk', 'officeAdmin'],
     autoRoles: ['purchasingClerk', 'officeAdmin'],
-  },
-  // Assigning the crew is the production manager's the day he is hired, and it comes off the
-  // owner's day with him (CLAUDE.md T13 3.9).
-  staffManagement: {
-    category: 'admin',
-    eligibleRoles: ['productionManager'],
-    autoRoles: ['productionManager'],
   },
   // The salesman first, and the office admin behind him at half the speed when there is no
   // salesman on the books (CLAUDE.md T7 3.12).
@@ -181,7 +172,6 @@ export const DAY_CATEGORY_OF_TASK: Record<TaskKind, DayCategory> = {
   clientMeeting: 'meetings',
   bookkeeping: 'office',
   dailyOrdering: 'office',
-  staffManagement: 'assign',
   clientCall: 'calls',
   design: 'office',
   materialTakeOff: 'office',
@@ -428,17 +418,6 @@ export function emailMinutes(): number {
   return EMAIL_MINUTES;
 }
 
-export function staffManagementMinutes(state: GameState): number {
-  return joiners(state).length * STAFF_MANAGEMENT_MINUTES_PER_JOINER;
-}
-
-/** Whose day the assigning comes off: the production manager's from the day he is in, and the
- *  owner's until then (CLAUDE.md T13 3.9). The one answer the team page and the day meters
- *  agree on. */
-export function staffManagementTaker(state: GameState): 'owner' | 'manager' {
-  return managerOnDuty(state) ? 'manager' : 'owner';
-}
-
 // ---------------------------------------------------------------------------
 // The task list
 // ---------------------------------------------------------------------------
@@ -587,7 +566,7 @@ export function jobTasks(state: GameState, jobId: string): TaskInstance[] {
  *  dies at dusk with the calls (CLAUDE.md T17 2.15). A boot that was never finished goes too: the
  *  five minutes were spent yesterday and yesterday's laptop is shut (CLAUDE.md T17 2.17). */
 function dropDailyTasks(state: GameState): void {
-  const daily: TaskKind[] = ['bookkeeping', 'dailyOrdering', 'staffManagement', 'booting'];
+  const daily: TaskKind[] = ['bookkeeping', 'dailyOrdering', 'booting'];
   state.tasks = state.tasks.filter((task) => !daily.includes(task.kind));
 }
 
@@ -602,10 +581,6 @@ export function createDailyTasks(state: GameState): void {
     label: CONSUMABLES_LABEL,
     minutes: DAILY_ORDERING_MINUTES,
   });
-  const management = staffManagementMinutes(state);
-  if (management > 0) {
-    createTask(state, { kind: 'staffManagement', label: 'Staff management', minutes: management });
-  }
   const upkeep = websiteUpkeepMinutes(state);
   const last = state.website.lastUpkeepDay;
   if (upkeep > 0 && (last === null || weekOfDay(last) !== weekOfDay(state.clock.day))) {
@@ -713,7 +688,6 @@ export const WEEK_CATEGORY_OF_TASK: Record<TaskKind, WeekCategory> = {
   emails: 'desk',
   bookkeeping: 'desk',
   dailyOrdering: 'desk',
-  staffManagement: 'desk',
   clientCall: 'desk',
   clientMeeting: 'desk',
   design: 'desk',
@@ -820,7 +794,11 @@ export function bookWeekMinutes(state: GameState): void {
       // was asleep for (REPORT-T20.md, what was not done).
       if (!isWorkingToday(state, worker)) continue;
       const band = bandOf(state, worker.taskId, worker.jobId);
-      bookOne(state, worker, week, band, jobNameOf(state, worker.jobId));
+      const sample = bookOne(state, worker, week, band, jobNameOf(state, worker.jobId));
+      // And the other half of his day, the same way the owner's is taken above: a minute he put
+      // nothing into is a minute he stood, and from Turn 23 the commonest reason for it is that
+      // nobody has put him on anything (PIOTR, 20.09; CLAUDE.md T23 2.1).
+      if (sample !== null && !sample.worked) bookWorkerIdleMinute(state, worker);
     }
   }
   bookContractPieces(state, week);

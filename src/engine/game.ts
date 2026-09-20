@@ -11,9 +11,9 @@ import {
   BOARD_MIDDAY_MINUTE,
   BREAK_START_MINUTE,
   CABINET_SLOT_LAYOUT,
+  CANTEEN_LOCKERS,
   DAY_LOGS_KEPT,
   DAY_SUMMARIES_MAX,
-  CANTEEN_SLOT_LAYOUT,
   DAY_END_MINUTE,
   DIFFICULTIES,
   GATE_LANE,
@@ -99,6 +99,7 @@ import {
   emptyBooked,
   emptyTotals,
   formatMoney,
+  monthlyReportFor,
   pay,
   receive,
   refund,
@@ -131,7 +132,7 @@ import {
   isSold,
   itemStandsInTheHall,
   salePriceFor,
-  freeBenches,
+  benchOf,
   hallProductivityFactor,
   has,
   hasBenchFor,
@@ -144,6 +145,7 @@ import {
   requiresOneOfFor,
   standsInTheHall,
   zoneOf,
+  isServiced,
   serviceCostFor,
   serviceCallCheck,
   serviceMachine,
@@ -218,24 +220,35 @@ import { type StagePlan, labourPerMinute, tradeFactor } from './stages';
 import {
   airFactorFor,
   benchDrawsAir,
+  standsForAir,
   compressors,
   drawingOn,
+  extractionKit,
+  extractionRunning,
   hallAirCheck,
   sprayingOnWetAir,
   underExtracted,
 } from './media';
 import { cubicMetres, metresBy, plural } from './text';
-import { STATION_IDLE, STATION_NO_BENCH, stationForTask, storageSaleBlock } from './stations';
+import {
+  STATION_BENCH,
+  STATION_IDLE,
+  STATION_NO_BENCH,
+  stationForTask,
+  storageSaleBlock,
+} from './stations';
 import {
   type Hand,
   jobOf,
   placeHand,
+  ownerTakesAJob,
   releaseIdleMachines,
   stationForProduction,
 } from './production';
 import {
   autoAssignJobs,
   availableJoiners,
+  managerReplans,
   bookMonthMinute,
   booksTaskMinutes,
   canHire,
@@ -250,11 +263,13 @@ import {
   joiners,
   hurtWorker,
   letGo,
+  managerPaceFor,
   rollNightBreakdowns,
   runNightShift,
   runStaffDayStart,
   staffMinutesLeft,
   startMonthMeters,
+  waitsForTheBoss,
 } from './staff';
 import {
   AD_HOC_TASK_MINUTES,
@@ -424,6 +439,7 @@ export function createGame(options: NewGameOptions): GameState {
     tips: { seen: [] },
     shift: { second: false },
     monthEndShownFor: 0,
+    monthlyReports: [],
     ledger: [],
     eventQueue: [],
     activeEvent: null,
@@ -585,6 +601,13 @@ function raiseMonthEnd(state: GameState): void {
   const month = monthOfDay(state.clock.day);
   if (month <= 1 || state.monthEndShownFor >= month) return;
   state.monthEndShownFor = month;
+  // The month is written down here, once, in the figures the card is about to be drawn from. It
+  // has to be here and not a line later: `startMachineMeters` below zeroes the machines' month
+  // clocks and the savings on the card are read off them, so a report taken after that would be
+  // a month of blanks. Accounting's Monthly reports tab is this list read back, so a month the
+  // player never opened is not lost with the ledger it was added up from
+  // [PIOTR, 20.09] (CLAUDE.md T17 2.24, T23 2.14).
+  state.monthlyReports.push(monthlyReportFor(state, month - 1));
   queueEvent(state, {
     kind: 'monthEnd',
     title: `Month ${month - 1}: the report`,
@@ -1420,9 +1443,27 @@ function updateStations(state: GameState): void {
       continue;
     }
     // A joiner with work waiting and nowhere to do it stands at the canteen door (T4 3.4).
+    // "Nowhere to do it" is a question about this man and not about the hall: from Turn 23 a
+    // bench holds one, two or three men by its class, so `freeBenches` counts the places nobody
+    // on the books has, which is nought in any hall whose benches are all spoken for, and a man
+    // with a bench of his own would have been stood at the canteen door by it. `benchOf` is the
+    // one answer to whether this man has a place, and it is what `hasBenchFor` asks a line above
+    // (CLAUDE.md T4 3.4, T23 2.1, 2.17).
     const stuck =
-      worker.role === 'joiner' && freeBenches(state) === 0 && oldestReadyJob(state) !== null;
-    worker.station = stuck ? STATION_NO_BENCH : STATION_IDLE;
+      worker.role === 'joiner' && benchOf(state, worker.id) === null && oldestReadyJob(state) !== null;
+    if (stuck) {
+      worker.station = STATION_NO_BENCH;
+      continue;
+    }
+    // A man nobody has put on anything waits **at his home cell**, which is his own bench, and not
+    // at the canteen door where a man with nowhere to work stands: the two are different men and
+    // the player has to be able to tell them apart at a glance. The mark over his head says which
+    // (PIOTR, 20.09; CLAUDE.md T23 2.1, T4 3.4). A man with no bench of his own has no home cell
+    // to wait at, so he stands where he always did.
+    worker.station =
+      waitsForTheBoss(state, worker) && benchOf(state, worker.id) !== null
+        ? STATION_BENCH
+        : STATION_IDLE;
   }
 }
 
@@ -1456,6 +1497,14 @@ function settle(state: GameState): void {
     delegateTasks(state);
   }
   autoAssignJobs(state);
+  // And the master's own hour: he alone looks at the board again and moves a man off a job that
+  // is comfortably ahead onto one that is behind (CLAUDE.md T23 2.4).
+  managerReplans(state);
+  // The men first, then the owner: with a manager on duty the crew take what there is and the
+  // owner takes what is left over, and without one the crew take nothing and the oldest open job
+  // is his. He never stands with his hands in his pockets while there is a bench to stand at
+  // (PIOTR, 20.09; CLAUDE.md T23 2.3).
+  ownerTakesAJob(state);
   updateStations(state);
   openNextEvent(state);
 }
@@ -1551,7 +1600,13 @@ function handsAtWork(state: GameState, ownerOnTask: boolean, moving: boolean): H
       worker.jobId = null;
       continue;
     }
-    list.push({ who: worker.id, job, rate: worker.rate * staffFactor });
+    // His own rate, what the hall does to it, and what the manager over him adds. The night
+    // shift's own `hands` in production.ts has carried the manager's pace since it was written;
+    // the day's minute is this function, and until tonight it did not, so the efficiency
+    // breakdown printed `Manager: +3%` over a hall that was not getting it. The same
+    // `managerPaceFor` answers both, which is the one path 2.4 asks for
+    // (PIOTR, 20.09; CLAUDE.md T23 2.4).
+    list.push({ who: worker.id, job, rate: worker.rate * staffFactor * managerPaceFor(state, worker) });
   }
   return list;
 }
@@ -1644,10 +1699,28 @@ function runProductionMinute(state: GameState, ownerOnTask: boolean): void {
   // What the men at the benches draw for their nailers and their sanders, through the one
   // selector the hall and the board read as well (CLAUDE.md T10 3.2).
   const air = hallAirCheck(state);
+  // And what the men at the benches do when there is nothing in the hose: they stand. A bench
+  // wants its 30 l/min at 6 bar and without a compressor, or on one that is short, there is no
+  // bench work at all from tonight [PIOTR, 20.09] (CLAUDE.md T23 2.7). The night shift's own
+  // minute does exactly this in `workMinute`, which is the twin phase C is to fold this onto.
+  const running: AtWork[] = [];
+  for (const entry of atWork) {
+    if (standsForAir(state, entry.stage)) {
+      // He keeps his bench and stands at it. The minute is one of the hall's lost ones and the
+      // mark over his head says why (src/engine/bubbles.ts).
+      lose('noMachine');
+      continue;
+    }
+    running.push(entry);
+  }
+  if (running.length === 0 && contract.worked === 0) {
+    tallyEfficiency(state, 0, lost);
+    return;
+  }
   // The minutes somebody actually stood at each machine: that, and nothing else, is what wears
   // it out and what fills the hall's bags (CLAUDE.md T7 2, T12 2.3).
   const used = new Map<string, number>();
-  for (const { hand, stage, machine } of atWork) {
+  for (const { hand, stage, machine } of running) {
     const worker = state.workers.find((entry) => entry.id === hand.who);
     if (worker) {
       worker.productionMinutes += 1;
@@ -1684,11 +1757,20 @@ function runProductionMinute(state: GameState, ownerOnTask: boolean): void {
     const minute = labourPerMinute(hand.rate * trade, speed) * hall;
     if (addLabour(state, hand.job, minute, stage.id)) raiseJobAtGate(state, hand.job);
   }
+  // The extraction books its hours the whole time it is running, whoever is at what: a fan is
+  // pulling for the hall and not for one man, and it is serviced on those hours exactly as a
+  // machine is [PIOTR, 20.09] (CLAUDE.md T23 2.8). `isServiced` says which of the kit in the
+  // duct run wears out on them.
+  if (extractionRunning(state)) {
+    for (const fan of extractionKit(state)) {
+      if (isServiced(fan.specId)) used.set(fan.id, (used.get(fan.id) ?? 0) + 1);
+    }
+  }
   // What the owner's absence took off every staff minute this minute is the owner away line of
   // the efficiency breakdown (CLAUDE.md T13 3.5, 3.9).
   const away = staffOutputFactor(state);
   let worked = 0;
-  for (const { hand } of atWork) {
+  for (const { hand } of running) {
     if (hand.who === OWNER) {
       worked += 1;
       continue;
@@ -2420,6 +2502,11 @@ export function canBuy(
   if (specId === 'workbench' && countOf(state, 'workbench') >= state.unit.benchSlots) {
     return { ok: false, reason: 'No free bench slot in this unit' };
   }
+  // The canteen was built with eight compartments and a bigger one is not built yet, so there is
+  // nowhere for a ninth locker to stand (PIOTR, 20.09; CLAUDE.md T23 2.10, 8).
+  if (specId === 'locker' && countOf(state, 'locker') >= CANTEEN_LOCKERS) {
+    return { ok: false, reason: 'The canteen has eight lockers' };
+  }
   if (!prepaid && !canAfford(state, variant.price)) return { ok: false, reason: 'Not enough cash' };
   // A machine wants its working room as well as its price: a floor edgebander needs a free 5 by
   // 3 of hall and there is no point selling him one he cannot stand anywhere (T7 3.3, 3.6).
@@ -2442,7 +2529,6 @@ function defaultAnchor(state: GameState, specId: string): { x: number; y: number
   const index = countOf(state, specId) + onOrderCount(state, specId);
   if (specId === 'workbench') return slotFrom(BENCH_SLOT_LAYOUT, index);
   if (specId === 'locker') return slotFrom(LOCKER_SLOT_LAYOUT, index);
-  if (specId === 'canteenSeat') return slotFrom(CANTEEN_SLOT_LAYOUT, index);
   if (specId === TOOL_CABINET) return slotFrom(CABINET_SLOT_LAYOUT, index);
   const slot = STARTING_LAYOUT[specId];
   // Anything the layout has no opinion about starts in the front half, clear of the gate lane.

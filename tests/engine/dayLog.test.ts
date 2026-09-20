@@ -48,10 +48,10 @@ describe('the seven bands', () => {
     }
   });
 
-  it('is eight bands and no more, each with a name the player reads', () => {
-    // The eighth is the assigning of people, which a production manager takes off the owner
-    // (CLAUDE.md T13 3.9).
-    expect(DAY_CATEGORIES).toHaveLength(8);
+  it('is seven bands and no more, each with a name the player reads', () => {
+    // There was an eighth, the assigning of people, until Turn 23 stopped charging anybody
+    // minutes for putting a man on a job (PIOTR, 20.09; CLAUDE.md T23 2.2).
+    expect(DAY_CATEGORIES).toHaveLength(7);
     expect([...DAY_CATEGORIES]).toEqual([
       'workshop',
       'calls',
@@ -60,7 +60,6 @@ describe('the seven bands', () => {
       'siteMeasure',
       'office',
       'fixing',
-      'assign',
     ]);
     for (const category of DAY_CATEGORIES) {
       expect(DAY_CATEGORY_LABELS[category]).not.toBe('');

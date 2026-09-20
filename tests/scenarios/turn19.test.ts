@@ -181,7 +181,7 @@ function boothHall(): GameState {
   // of it, so buying the lot here is what keeps the two runs the same hall.
   // The cabinet before the set: a man's tools have to have a slot to live in, and the owner's own
   // set is already in the one slot the day one used cabinet holds (CLAUDE.md T22 2.12).
-  for (const specId of ['locker', 'canteenSeat', 'toolCabinet', 'handToolSet']) {
+  for (const specId of ['locker', 'toolCabinet', 'handToolSet']) {
     kitted = buyNow(kitted, specId);
   }
   const state = withDryAir(withAir(withExtraction(kitted)));

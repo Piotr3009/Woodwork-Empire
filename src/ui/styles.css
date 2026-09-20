@@ -1273,6 +1273,17 @@ input.num {
   opacity: 0.7;
 }
 
+/* The Work Plan's crew column is the one card in the game that is read down and not across: a
+   `.card` lays its parts out in a row, which reads with three men and runs off the right edge of
+   the modal with nine, and nine men under a novice manager is exactly the hall 2.1 is about. The
+   attribute is the one the renderer already writes, so nothing is named twice
+   (CLAUDE.md T23 2.1, docs/ui-style.md 11). */
+.card[data-plan-crew-column] {
+  align-items: stretch;
+  flex-direction: column;
+  gap: 2px;
+}
+
 .card h3 {
   color: var(--text);
   margin: 0 0 2px;
@@ -1502,7 +1513,12 @@ input.num {
 }
 
 /* --------------------------------------------------------------------------
-   The office room (docs/art/SPRITES.md 8)
+   The rooms the player walks into (docs/art/SPRITES.md 8)
+
+   The office was the only one until Turn 23, when the canteen became the second (CLAUDE.md T23
+   2.9). Both are built by src/render/room.ts and both wear these classes: the family is named
+   for the room that came first, and a second set of names for the same markup would be a second
+   code path. What is the canteen's alone is at the end of the block.
    -------------------------------------------------------------------------- */
 
 /* The room is letterboxed on the page background: one uniform scale, centred, never cropped. */
@@ -1603,6 +1619,7 @@ input.num {
 /* The laptop is its own layer and glows in its own shape instead (below), and a region whose
    lit overlay has landed shows the overlay instead of the spot. */
 .office-stack .office-region[data-office="laptop"]:hover,
+.office-stack[data-lit~="lockers"] .office-region[data-office="lockers"]:hover,
 .office-stack[data-lit~="door"] .office-region[data-office="door"]:hover {
   background-image: none;
 }
@@ -1622,7 +1639,8 @@ input.num {
   transition: opacity 120ms ease;
 }
 
-.office-stack:has(.office-region[data-office="door"]:hover) .office-lit[data-lit="door"] {
+.office-stack:has(.office-region[data-office="door"]:hover) .office-lit[data-lit="door"],
+.office-stack:has(.office-region[data-office="lockers"]:hover) .office-lit[data-lit="lockers"] {
   opacity: 1;
 }
 
@@ -1684,6 +1702,27 @@ input.num {
   max-width: 100%;
   overflow: hidden;
   white-space: nowrap;
+}
+
+/* The canteen's two live texts, in the blank areas its layers leave for them: the name on each of
+   the eight locker door plates and the counter over the banks (CLAUDE.md T23 2.9). The art side
+   painted the plates blank and measured them, so both sizes come in on the element off
+   CANTEEN_PLATE_TEXT and CANTEEN_COUNTER_TEXT, exactly as the office's clock does. The ink is the
+   page's own dark, which is what reads on a cream label and on the pale wall over the banks. */
+.canteen-plate,
+.canteen-counter {
+  align-items: center;
+  color: var(--page);
+  display: flex;
+  overflow: hidden;
+  pointer-events: none;
+  position: absolute;
+  white-space: nowrap;
+}
+
+/* The plate is a label with a name on it, so the name sits in the middle of it. */
+.canteen-plate {
+  justify-content: center;
 }
 
 /* The office layers are full width pictures, not sprites on a tile (CLAUDE.md T4 4). */
@@ -2493,6 +2532,15 @@ input.num {
 }
 
 .modal-board .row-figure.bad {
+  color: var(--bad);
+}
+
+/* And a figure the game has marked as a warning: the Work Plan's crew column says `needs a job`
+   in it, and the skin's ink above was winning on order alone, exactly as it did over the green and
+   the red. The laptop's screen skin has carried its own `.warn` since Turn 14; this is the board's
+   (CLAUDE.md T23 2.1). */
+.modal-board .warn,
+.modal-board .row-figure.warn {
   color: var(--bad);
 }
 
@@ -3543,22 +3591,9 @@ input.num {
   margin: 0 0 8px;
 }
 
-/* 2.9 Our team: the row is the list row everywhere else, with one more column for what he is on. */
-.team-when {
-  color: var(--text-dim);
-  font-size: var(--fs-small);
-}
-
-/* A man's week is the line under his row on Our team: the row wraps and the week takes the whole
-   width of it, so it is read across and his name is not squeezed into a column
-   (PIOTR; CLAUDE.md T20 2.7). */
-.team-row {
-  flex-wrap: wrap;
-}
-
-.team-week {
-  flex: 1 0 100%;
-}
+/* Our team was a list of rows with a week line under each until Turn 23, when every man on it
+   became a tile of the one card (CLAUDE.md T23 2.13). `.team-row`, `.team-when` and `.team-week`
+   went with the rows that wore them; the tile and the card are `.person-*` below. */
 
 /* 2.26 The workshop rate, the one figure at the top of the Company board and of the month end. */
 .rate-figure {
@@ -4416,4 +4451,98 @@ input.num {
 .bank-figs b {
   font-variant-numeric: tabular-nums;
   text-align: right;
+}
+
+/* ---------------------------------------------------------------------------
+   T23 2.13 A card for every person, and Our team made of them.
+   The tile and the card are the same markup (src/ui/personCard.ts), so they are the same classes
+   here: a `.tile` of the family above, laid out as a portrait beside a body. No new colour, font,
+   radius or shadow value; the two bar runs below read `--good` and `--bad`, which the game has
+   said good and bad in since Turn 1 (docs/ui-style.md 4, 13).
+   --------------------------------------------------------------------------- */
+.person-column {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.person-tile {
+  align-items: flex-start;
+  flex-direction: row;
+  gap: 12px;
+}
+
+.person-body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+/* The idle frame of his sheet, held to a portrait's box. A role with no sheet gets the capsule
+   shape in the renderer's own placeholder colour, which is already a token of this file. */
+.person-portrait {
+  flex: 0 0 auto;
+  height: 86px;
+  width: 52px;
+}
+
+.person-portrait.is-capsule {
+  background: var(--worker);
+  border-radius: 26px 26px 6px 6px;
+  display: block;
+}
+
+.person-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* A chip that says something rather than doing something: it is not a control, so it takes no
+   hover and no pointer. */
+.person-chips .chip {
+  cursor: default;
+  font-size: var(--fs-small);
+}
+
+.person-now {
+  margin: 4px 0 2px;
+}
+
+.person-day {
+  margin: 2px 0;
+}
+
+.person-figures {
+  margin: 0;
+}
+
+.person-wage {
+  font-weight: 600;
+}
+
+.person-rule {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: 8px 0;
+  width: 100%;
+}
+
+.person-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 6px;
+}
+
+/* The two runs of a person's day bar, beside `.seg-idle` of Turn 21, which is the grey the dinner
+   hour is drawn in here as well: worked and stood are the only two runs that were missing. */
+.seg-worked {
+  background: var(--good);
+}
+
+.seg-stood {
+  background: var(--bad);
 }

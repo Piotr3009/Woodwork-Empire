@@ -4,7 +4,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   MOVE_MINUTES_PER_ITEM,
-  NO_AIR_FACTOR,
   NO_AIR_LINE,
   PRODUCT_TEMPLATES,
   WET_AIR_FINISH_FACTOR,
@@ -13,7 +12,8 @@ import {
 import { blockFor, kitBlockFor } from '../../src/engine/board';
 import { lockReasonFor } from '../../src/engine/catalog';
 import { familyForStage } from '../../src/engine/stages';
-import { hallAirCheck, sprayingOnWetAir } from '../../src/engine/media';
+import { airCheck, benchHasAir, hallAirCheck, sprayingOnWetAir } from '../../src/engine/media';
+import { bubbleFor } from '../../src/engine/bubbles';
 import { applyRating } from '../../src/engine/reputation';
 import { itemIsHeavy } from '../../src/engine/machines';
 import { renderMachine } from '../../src/ui/machine';
@@ -124,7 +124,6 @@ function sprayedMinutes(dryer: boolean): number {
   placeEquipment(state, 'sprayBooth', { x: 7, y: 6 });
   placeEquipment(state, 'workbench', { variantId: 'budget', x: 4, y: 8 });
   placeEquipment(state, 'tableSaw', { variantId: 'used', x: 6, y: 1 });
-  placeEquipment(state, 'drill', { x: 16, y: 8 });
   placeEquipment(state, 'edgebander', { variantId: 'budget', x: 14, y: 8 });
   if (dryer) placeEquipment(state, 'airDryer', { x: 19, y: 2 });
   fillRack(state, 200);
@@ -159,7 +158,6 @@ function assembledMinutes(compressorClass: string | null): number {
     placeEquipment(state, 'compressor', { variantId: compressorClass, x: 18, y: 4 });
   }
   placeEquipment(state, 'tableSaw', { variantId: 'used', x: 6, y: 1 });
-  placeEquipment(state, 'drill', { x: 16, y: 8 });
   fillRack(state, 200);
   state.enquiries = [];
   for (let index = 0; index < 2; index += 1) {
@@ -187,12 +185,14 @@ function assembledMinutes(compressorClass: string | null): number {
 }
 
 describe('air for every bench', () => {
-  it('runs the assembly at 0.67 in a hall with no compressor at all', () => {
-    expect(NO_AIR_FACTOR).toBe(0.67);
+  it('works no assembly at all in a hall with no compressor at all', () => {
+    // Turn 11 ran it at 0.67, the nailer put down and the carcass screwed together by hand.
+    // Piotr looked at his own hall on 20.09 and said a bench without air stands still, so the
+    // minutes are nought and not two thirds of them (CLAUDE.md T23 2.7).
     const withAir = assembledMinutes('budget');
     const without = assembledMinutes(null);
     expect(withAir).toBeGreaterThan(0);
-    expect(without).toBeCloseTo(withAir * NO_AIR_FACTOR, 5);
+    expect(without).toBe(0);
   });
 
   it('runs it at 1.0 the moment a budget compressor is in the hall', () => {
@@ -219,6 +219,65 @@ describe('air for every bench', () => {
     expect(renderMachine(newGame(), 'compressor')).toContain(
       'Benches and edgebanders need air',
     );
+  });
+});
+
+/** One man at one bench, halfway into the assembly of one job, in a hall with the compressor
+ *  class asked for or with none at all. The saw is there because the cutting has to have been
+ *  possible for the assembly to be the stage he is standing at. */
+function benchHall(compressorClass: string | null): GameState {
+  const state = fillRack(withExtraction(newGame({ difficulty: 'veryEasy' })), 200);
+  if (compressorClass !== null) {
+    placeEquipment(state, 'compressor', { variantId: compressorClass, x: 18, y: 4 });
+  }
+  placeEquipment(state, 'tableSaw', { variantId: 'used', x: 6, y: 1 });
+  placeEquipment(state, 'workbench', { variantId: 'budget', x: 4, y: 8 });
+  state.enquiries = [];
+  const enquiry = placeEnquiry(state, { price: 4000, deadlineDays: 40 });
+  const next = acceptNow(state, enquiry.id, false);
+  const job = firstJob(next);
+  job.stage = 'inProduction';
+  job.assignees = ['owner'];
+  job.labourRemaining = job.labourValue * 0.5;
+  return next;
+}
+
+/** Piotr looked at a hall of his own size on 20.09 and said a bench with no air behind it stands
+ *  still: no nailer, no driver, no work, and not the two thirds of a minute Turn 11 gave it
+ *  (CLAUDE.md T23 2.7). */
+describe('no bench work without air', () => {
+  it('stands the man at his bench, with the mark over his head and the minutes on his meter', () => {
+    const ran = runClock(benchHall(null), 10);
+    // Not a minute of the assembly went into the job.
+    expect(firstJob(ran).labourRemaining).toBe(firstJob(benchHall(null)).labourRemaining);
+    // The red mark over him says the one thing the player has to buy.
+    expect(bubbleFor(ran, 'owner')?.key).toBe('noCompressor');
+    expect(bubbleFor(ran, 'owner')?.text).toBe('no compressor');
+    // And the minutes he stood are on his day meter under that reason, not under the machine.
+    expect(ran.owner.idleByReason.noCompressor).toBeGreaterThan(0);
+    expect(ran.owner.idleByReason.noMachine).toBe(0);
+  });
+
+  it('works the very next minute once a used compressor is in the hall', () => {
+    const stood = runClock(benchHall(null), 10);
+    const before = firstJob(stood).labourRemaining;
+    placeEquipment(stood, 'compressor', { variantId: 'used', x: 18, y: 4 });
+    const worked = runClock(stood, 1);
+    expect(firstJob(worked).labourRemaining).toBeLessThan(before);
+    expect(bubbleFor(worked, 'owner')).toBeNull();
+  });
+
+  it('keeps him working on a compressor that is merely short of litres, at Turn 10 s 0.7', () => {
+    // A compressor short of litres is not "no air": rule 2 of T10 3.2 runs every pneumatic
+    // consumer on it at 0.7 for the minute, the bench among them, and Turn 23 leaves that alone.
+    // Only an empty hall stands a man still, which is what the hover line "no compressor" says
+    // and what the brief's own "a used compressor bought: work resumes" asks for (T23 2.7).
+    const hall = benchHall('used');
+    expect(benchHasAir(hall)).toBe(true);
+    // Eight men at benches and one sanding is far past what a used compressor will carry, and it
+    // is still not a hall with no air in it.
+    expect(airCheck(hall, { bench: 8, sanding: 1 }).lowAir).toHaveLength(1);
+    expect(benchHasAir(hall)).toBe(true);
   });
 });
 

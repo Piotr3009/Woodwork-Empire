@@ -23,14 +23,16 @@
 import { describe, expect, it } from 'vitest';
 import { type Policy, playDay } from './autopilot';
 import { act, newGame } from '../helpers';
-import { BANKRUPTCY_LIMIT_FACTOR, PRODUCT_TEMPLATES } from '../../src/engine/constants';
+import { BANKRUPTCY_LIMIT_FACTOR, LOAN_FLOOR, PRODUCT_TEMPLATES } from '../../src/engine/constants';
 import {
   MONTH_LINES,
   efficiencyOf,
   freeSheets,
   houseTierFor,
   isLastWorkingDayOfMonth,
+  hiringOptions,
   isWorkingDay,
+  loanLimit,
   managerOnDuty,
   marginOfPrice,
   monthOfDay,
@@ -85,8 +87,12 @@ const PLAYTHROUGH: Policy = {
     // overdraft: the loan is 15% a year and the overdraft is 25%, and a hire wants a month of the
     // man's pay in the account (CLAUDE.md T13 3.14, T17 2.11). Once only, and only while he is
     // standing the workshop up: a run with the money never asks.
+    // He asks for twenty five thousand and takes what the bank will lend him against the books he
+    // can show it, which on day 8 of a new company is the floor of Turn 23's 2.12: no player can
+    // borrow what the bank has refused, and an attentive one borrows what it will give
+    // (CLAUDE.md T23 2.12).
     if (day <= LOAN_BY_DAY && next.cash < 0 && next.finance.loan === null) {
-      next = act(next, { type: 'TAKE_LOAN', amount: LOAN_AMOUNT });
+      next = act(next, { type: 'TAKE_LOAN', amount: Math.min(LOAN_AMOUNT, loanLimit(next)) });
     }
     // A contract's material comes off the rack now (CLAUDE.md T17 2.22), so the scripted player
     // keeps sheets on it while one is running: twenty at a time, the way the Stock page's Restock
@@ -120,13 +126,20 @@ const PLAYTHROUGH: Policy = {
     // From day 61 the owner takes a production manager on. The interview is an hour of his day and
     // the day he is free to sit it is not always the 61st, so the script asks again until one is on
     // the books and there is no interview already running (CLAUDE.md T17 5, phase A).
+    //
+    // The manager comes in four grades from Turn 23, each behind its own standing and its own
+    // wage, so the scripted player takes the best grade the workshop has actually earned rather
+    // than naming one and going without when the advert brings nobody (CLAUDE.md T23 2.4).
     if (
       day >= 61 &&
       isWorkingDay(day) &&
       !next.workers.some((worker) => worker.role === 'productionManager') &&
       !next.tasks.some((task) => task.kind === 'hiring' && !task.done)
     ) {
-      next = act(next, { type: 'HIRE', role: 'productionManager', tier: null });
+      const best = hiringOptions(next)
+        .filter((option) => option.role === 'productionManager' && option.available)
+        .pop();
+      if (best) next = act(next, { type: 'HIRE', role: best.role, tier: best.tier });
     }
     if (day >= HOLIDAY_FROM && !holidayTaken && isWorkingDay(day) && managerOnDuty(next)) {
       next = act(next, { type: 'TAKE_HOLIDAY', days: 5 });
@@ -186,24 +199,44 @@ const played = play('easy');
 const { state, days, months } = played;
 const control = play('veryEasy');
 
+/** **What Turn 23's 2.12 did to this run, for Piotr and for phase C.** The script borrowed
+ *  twenty five thousand on day 8 and the three months of 10.4 were paid for out of it. From
+ *  tonight the bank lends against the books it is shown and a company eight days old has shown it
+ *  nothing, so it gets the floor: ten thousand [PIOTR, 20.09]. Fifteen thousand less capital is
+ *  the whole of the difference, and it is a big one. Month 1 still closes at 7,151 in the black;
+ *  month 2 closes at -5,018 where it closed in the black, month 3 at -15,847, the production
+ *  manager of 10.4 is never affordable at all, and the bank pulls the overdraft on the morning of
+ *  day 91, the last day of the three months. 2.16's ladder makes it a shade worse again, because
+ *  a small restock pays 200 a sheet where it paid 175.
+ *
+ *  Nothing here is tuned to make that read better. The run is written down as it plays, because
+ *  the rule is Piotr's and what it costs a new company is the thing he asked to see. Whether the
+ *  floor of ten thousand is the right figure, or whether the script of 10.4 should buy a cheaper
+ *  saw and fan to live inside it, is his call and phase C's, and it is in docs/notes-t23-b2.md
+ *  (CLAUDE.md T23 2.12). */
 describe('the three month playthrough of 10.4, on Easy as the brief scripts it', () => {
   it('has the crew, the kit and the paper the brief asked for, in the order it asked', () => {
-    expect(state.gameOver).toBeNull();
+    // It traded all three months and the bank closed it on the morning of day 92, which is the
+    // day after them: what the three months did is still what this block is about.
     expect(state.clock.day).toBeGreaterThanOrEqual(91);
+    expect(state.gameOver?.day).toBe(91);
     const joiner = state.workers.find((worker) => worker.role === 'joiner');
     expect(joiner?.startDay).toBeLessThanOrEqual(5);
-    // With the loan drawn he has a month of the man's pay in the account on the day he asks, so
-    // the gate lets both hires through (CLAUDE.md T17 2.11): the estimator on day 32 and the
-    // manager on day 64, and the manager is what the five days away wait for (T13 3.9).
+    // The estimator on day 32, as ever. The production manager of 10.4 is not on the books at all
+    // any more: he was hired in month 3 out of the twenty five thousand, and ten thousand does not
+    // reach him. The gate that refuses him is the one that has always refused a hire the account
+    // cannot carry a month of (CLAUDE.md T17 2.11, T23 2.12).
     expect(state.workers.some((worker) => worker.role === 'estimator' && worker.startDay <= 35)).toBe(true);
-    expect(state.workers.some((worker) => worker.role === 'productionManager' && worker.startDay >= 61)).toBe(true);
+    expect(state.workers.some((worker) => worker.role === 'productionManager')).toBe(false);
     expect(state.equipment.some((item) => item.specId === 'tableSaw' && item.variantId === 'standard')).toBe(true);
     expect(state.equipment.some((item) => item.specId === 'extractor' && item.variantId === 'standard')).toBe(true);
     expect(state.pipes.length).toBeGreaterThanOrEqual(1);
     expect(state.security.level).toBe(1);
     expect(state.insurance.property && state.insurance.liability).toBe(true);
     expect(state.ownerDraw.tier).toBe(1);
-    expect(days.some((day) => onHoliday(day))).toBe(true);
+    // The holiday of 10.4 goes with the manager: a man only takes one while there is somebody to
+    // cover the hall, and there is no manager on these books any more (CLAUDE.md T13 3.9, T23 2.12).
+    expect(days.some((day) => onHoliday(day))).toBe(false);
   });
 
   it('took every residential enquiry with a margin over twenty per cent, and no commercial one', () => {
@@ -216,29 +249,34 @@ describe('the three month playthrough of 10.4, on Easy as the brief scripts it',
     }
   });
 
-  it('went to the bank in week 2 rather than live in the overdraft, and stayed out of it for two months', () => {
-    // 20,000 of capital, a 7,000 saw, a 1,400 fan, the joiner's kit and the deposit come to
-    // 23,000 in month 1 against 4,500 of revenue, so the account runs down to 16 by the Friday of
-    // week 1 and goes under on day 8. He borrows that day, once, and the first two months close in
-    // the black instead of in the overdraft (CLAUDE.md T13 3.14). Turn 20's Friday payroll took
-    // him under on day 4; from tonight the wages wait for the month's last working day, so nothing
-    // leaves the account for the crew in week 1 and the dip comes with week 2's buying instead
-    // (CLAUDE.md T21 2.10). What the overdraft charges for the days before the bank answered, and
-    // for the end of month 3, is small change beside the 25% a year it charged all three months
-    // before the script was rewritten.
+  it('went to the bank in week 2 rather than live in the overdraft, and stayed out of it for one month', () => {
+    // A 7,000 saw, a 1,400 fan, the joiner's kit and the deposit come to 23,000 in month 1 against
+    // 4,500 of revenue, so the account runs down to 16 by the Friday of week 1 and goes under on
+    // day 8. He goes to the bank that day, once (CLAUDE.md T13 3.14). Turn 20's Friday payroll
+    // took him under on day 4; from tonight the wages wait for the month's last working day, so
+    // nothing leaves the account for the crew in week 1 and the dip comes with week 2's buying
+    // instead (CLAUDE.md T21 2.10).
+    //
+    // He came away with ten thousand and not the twenty five he asked for, so only month 1 closes
+    // in the black and the overdraft carries months 2 and 3 (CLAUDE.md T23 2.12).
     const loan = state.finance.loan;
-    expect(loan?.principal).toBe(LOAN_AMOUNT);
+    // Twenty five thousand asked for and ten thousand lent: the bank reads the books, and on day 8
+    // there are none (CLAUDE.md T23 2.12).
+    expect(loan?.principal).toBe(LOAN_FLOOR);
     expect(loan?.startDay ?? 99).toBeLessThanOrEqual(8);
-    expect(months[0]?.cashClose ?? 0).toBeGreaterThan(0);
-    expect(months[1]?.cashClose ?? 0).toBeGreaterThan(0);
-    // Two charges in three months: 7.53 on day 31, for the days between going under and the bank
-    // answering, and 7.45 on day 91 for the end of month 3, when the crew of 10.4 is all on the
-    // books. The month end of month 2 carries none at all.
+    expect(Math.round(months[0]?.cashClose ?? 0)).toBe(6550);
+    expect(Math.round(months[1]?.cashClose ?? 0)).toBe(-5018);
+    expect(Math.round(months[2]?.cashClose ?? 0)).toBe(-15847);
+    // Three charges in three months now and not two: 8 on day 31 and 21 on day 61 for the few
+    // days each month that ran under, and 196 on day 91, which is month 3 spent in the
+    // overdraft from end to end. The first two are small change beside the 25% a year the
+    // overdraft charged all three months before the script was rewritten; the third is what
+    // living in it costs (CLAUDE.md T23 2.12).
     const overdraft = state.ledger.filter((entry) => entry.category === 'overdraftInterest');
-    expect(overdraft).toHaveLength(2);
-    expect(overdraft[0]?.day).toBe(31);
-    expect(Math.abs(overdraft[0]?.amount ?? 0)).toBeLessThan(10);
-    expect(overdraft.some((entry) => entry.day === 61)).toBe(false);
+    expect(overdraft.map((entry) => entry.day)).toEqual([31, 61, 91]);
+    expect(Math.abs(overdraft[0]?.amount ?? 0)).toBeLessThan(15);
+    expect(Math.abs(overdraft[1]?.amount ?? 0)).toBeLessThan(30);
+    expect(Math.abs(overdraft[2]?.amount ?? 0)).toBeGreaterThan(100);
   });
 
   it('reaches house tier 2 in month 2 once the raised draw is really paid, and keeps it', () => {
@@ -252,11 +290,11 @@ describe('the three month playthrough of 10.4, on Easy as the brief scripts it',
     expect(houseTierFor(state)).toBe(2);
   });
 
-  it('keeps the efficiency above 55% in month 3, holiday and all', () => {
+  it('keeps the efficiency above 55% in month 3', () => {
     expect(months[2]?.efficiencyMean ?? 0).toBeGreaterThan(55);
   });
 
-  it('took the first contract its crew could keep up with, made every week in full, and the client renegotiates it up', () => {
+  it('took the first contract its crew could keep up with and made every week of it in full', () => {
     const contracts = state.contracts.filter((contract) => contract.status !== 'offered');
     expect(contracts).toHaveLength(1);
     const first = contracts[0];
@@ -266,29 +304,18 @@ describe('the three month playthrough of 10.4, on Easy as the brief scripts it',
     expect((first?.weeks ?? []).slice(1).every((week) => week.made >= week.wanted)).toBe(true);
     expect(first?.sheetsUsed ?? 0).toBeGreaterThan(0);
     expect(state.ledger.some((entry) => entry.label.includes(': material'))).toBe(false);
-    // The term runs past the three months: the same script plays on until the client's answer or
-    // until the bank closes the company, whichever comes first.
+    // The term used to run past the three months, and the same script played on until the client's
+    // answer or until the bank closed the company, whichever came first. It was the bank, by a day
+    // or two either way, on day 120 or 121 depending on which figure had last moved.
     //
-    // **It is the bank, by one day, and the money of Turn 22 does not save it.** Measured on this
-    // build, and the sum is a different one from Turn 21's: there are no arrears to park a bill in
-    // any more, so the account carries the whole of month 4 itself and never stands under the
-    // overdraft limit for more than a day at a time (the count of days below the limit reads 1 on
-    // days 109, 114 and 120 and nought on every other morning), which puts the thirty day rule
-    // nowhere near this run. What closes the company is the amount, on the morning of day 120: day
-    // 120 is the last working day of month 4, the month's wages of 7,300 for the three men of 10.4
-    // go out of an account standing at -8,381, and that one line takes it to -15,681 against the
-    // -15,000 the bank allows. The bank looks as the morning's first act, and the term ends on day
-    // 121. It has been landing on the other side of that day since Turn 21, on luck: any figure at
-    // all moves it, and phase A moved two tonight (the measured ports of CLAUDE.md T22 2.8 make
-    // this hall's pipe three metres where it was five, and every purchase after day 8 falls on a
-    // different day).
-    //
-    // So the claim stays split, where phase A left it, with its figures brought up to tonight. What
-    // is asserted here is what the contract did, which is the substance of it and is true: the
-    // seventeen weeks of the term, every week after the opening part week made in full, off the
-    // rack, with no material line of its own. Beside it, what the four months' money did: the sum
-    // and the rule the company was closed under, and not a line of the run left unpaid
-    // (CLAUDE.md T22 2.1, 2.2).
+    // From tonight it is the bank a month sooner, and 2.12 is why: the company borrowed twenty
+    // five thousand on day 8 and now borrows the ten thousand the bank lends against books it has
+    // not written yet, so it never reaches month 4 at all. The run closes on the morning of day 92
+    // with thirteen weeks of the seventeen week term made, and the client's renegotiation, which
+    // came at the end of it, is never reached. What is asserted is what the contract did while the
+    // company lived, which is the substance of it: every week after the opening part week made in
+    // full, off the rack, with no material line of its own, and not a line of the run left unpaid
+    // (CLAUDE.md T22 2.1, 2.2, T23 2.12).
     let later = state;
     let guard = 0;
     while (
@@ -299,33 +326,42 @@ describe('the three month playthrough of 10.4, on Easy as the brief scripts it',
       later = playDay(later, PLAYTHROUGH);
       guard += 1;
     }
-    const running = later.contracts.find((contract) => contract.status === 'active');
-    expect(running?.weeks.length ?? 0).toBeGreaterThan(16);
-    expect(later.gameOver?.day).toBe(120);
-    expect((running?.endDay ?? 0) - (later.gameOver?.day ?? 0)).toBe(1);
-    // The rule it was closed under is the amount, and the line that got it there is the month's
-    // wages: 7,300 out of an account already 8,381 into the overdraft, and its own balance says
-    // where it left it. The other rule's count was on 1 of its 30.
+    const running = later.contracts.find((contract) => contract.status !== 'offered');
+    expect(running?.weeks.length ?? 0).toBe(13);
+    expect(running?.renegotiatedPrice ?? null).toBeNull();
+    expect(later.gameOver?.day).toBe(91);
+    // The term still had a month to run when the bank pulled it.
+    expect((running?.endDay ?? 0) - (later.gameOver?.day ?? 0)).toBe(30);
+    // The rule it was closed under is the amount and not the thirty days, and the count of days
+    // below the limit was on 8 of its 30 when the bank looked. The bank reads the account at the
+    // point the day's money is settled, which is the morning, and the card it queues carries the
+    // figure it read; by the close of that day a client's money had brought the account back to
+    // -15,847, which is the figure the run ends on (CLAUDE.md T22 2.2).
     expect(later.gameOver?.reason).toContain('cannot pay');
-    expect(Math.round(later.cash)).toBe(-15681);
-    expect(later.cash).toBeLessThanOrEqual(later.finance.overdraftLimit * BANKRUPTCY_LIMIT_FACTOR);
-    expect(later.finance.daysBelowOverdraft).toBe(1);
-    const paid = later.ledger.filter((entry) => entry.category === 'wages');
-    const last = paid[paid.length - 1];
-    expect([last?.day, last?.amount, Math.round(last?.balance ?? 0)]).toEqual([120, -7300, -15681]);
-    // Four months of one money track: nothing waited anywhere but the account (CLAUDE.md T22 2.1).
+    expect(Math.round(later.cash)).toBe(-15847);
+    expect(later.finance.daysBelowOverdraft).toBe(8);
+    const closed = later.eventQueue.find((entry) => entry.kind === 'bankruptcy');
+    expect(closed).toBeDefined();
+    expect(Number(closed?.data.cash ?? 0)).toBeLessThanOrEqual(
+      later.finance.overdraftLimit * BANKRUPTCY_LIMIT_FACTOR,
+    );
+    expect(Number(closed?.data.allowed ?? 0)).toBe(-15000);
+    // Three months of one money track: nothing waited anywhere but the account (CLAUDE.md T22 2.1).
     expect(later.ledger.some((entry) => entry.unpaid)).toBe(false);
   });
 
   it('pays every trade by the month, on its last working day, and never by the week', () => {
-    // The crew of 10.4 is three trades: a joiner in week 1, an estimator in month 2 and a
-    // production manager in month 3. Every one of them is on the one unit, and it is the month
+    // The crew of 10.4 is a joiner in week 1 and an estimator in month 2. Every one of them is on
+    // the one unit, and it is the month
     // (PIOTR, 19.09: "I wanted everyone monthly"; CLAUDE.md T21 2.10), so the three months are a
     // played proof that monthly pay covers the office as well as the bench.
     const roles = new Set(state.workers.map((worker) => worker.role));
     expect(roles.has('joiner')).toBe(true);
     expect(roles.has('estimator')).toBe(true);
-    expect(roles.has('productionManager')).toBe(true);
+    // The production manager of 10.4 is off the books from Turn 23: ten thousand of capital does
+    // not reach him (CLAUDE.md T23 2.12). The bench and the office are still the proof the block
+    // is about, and both of them are monthly.
+    expect(roles.has('productionManager')).toBe(false);
     for (const worker of state.workers) expect(worker.monthlyWage, worker.role).toBeGreaterThan(0);
     // The office salary line of the 1st of the month is gone with `monthlyWage`.
     expect(state.ledger.filter((entry) => entry.category === 'salaries')).toEqual([]);
@@ -339,10 +375,10 @@ describe('the three month playthrough of 10.4, on Easy as the brief scripts it',
       expect(entry.label, `day ${entry.day}`).toBe('Monthly wages');
     }
     // The last pay day of the three months pays the whole crew, each at his own monthly wage and
-    // nothing on top of it: the estimator and the manager are in the same line as the joiner.
+    // nothing on top of it: the estimator is in the same line as the joiner.
     const last = wages[wages.length - 1];
     const crew = state.workers.filter((worker) => worker.startDay <= (last?.day ?? 0));
-    expect(crew.length).toBe(3);
+    expect(crew.length).toBe(2);
     expect(Math.abs(last?.amount ?? 0)).toBeCloseTo(
       crew.reduce((total, worker) => total + worker.monthlyWage, 0),
       2,

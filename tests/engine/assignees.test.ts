@@ -5,6 +5,7 @@
 // stage at a machine still goes at one man's speed, because a machine takes one man at a time and
 // the rest stand in the queue; and every man on it has a standing place of his own.
 
+import { benchOf } from '../../src/engine/machines';
 import { describe, expect, it } from 'vitest';
 import {
   addToJob,
@@ -172,8 +173,10 @@ describe('the men on a job (CLAUDE.md T19 2.5)', () => {
       state,
       hands(state).filter((hand) => hand.job.id === job.id),
     );
-    const bench = state.equipment.find((item) => item.takenBy === 'staff-1');
-    if (!bench) throw new Error('the first man holds no bench');
+    // The bench is not taken off anybody from Turn 23: every man has his own place at one, and
+    // the men behind the lead work at the lead's (CLAUDE.md T19 2.5, T23 2.17).
+    const bench = benchOf(state, 'staff-1');
+    if (!bench) throw new Error('the first man has no place at a bench');
     const stations = job.assignees.map((who) => stationForProduction(state, who, job));
     expect(stations[0]).toBe(STATION_BENCH);
     expect(stations[1]).toBe(secondStation(bench.id));

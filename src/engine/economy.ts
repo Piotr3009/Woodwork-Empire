@@ -43,6 +43,12 @@ import { has, hasCentralExtraction, machinePowerPerDay } from './machines';
 import { ownerDrawPerDay } from './owner';
 import { makeId } from './rng';
 import { plural } from './text';
+import { monthEfficiency } from './efficiency';
+import type { MonthEfficiency } from './efficiency';
+import { machineSavings } from './machines';
+import type { MachineSavings } from './machines';
+import { monthRate } from './rate';
+import type { WorkshopRate } from './rate';
 import type {
   BookedTotals,
   DaySummary,
@@ -702,6 +708,35 @@ export interface MonthReport {
   /** The bank at the first line of the month and at the last. */
   cashOpen: number;
   cashClose: number;
+}
+
+/** A month the company has closed, written down at the month end in the figures its card was
+ *  drawn from: the money, the efficiency, what the machines saved and the rate the workshop
+ *  worked at (CLAUDE.md T23 2.14). Four shapes that already have names, composed and not restated,
+ *  so a report and the card the player saw that evening can never say different things. The month
+ *  number sits on the top of it because the list of reports is read by month and nothing should
+ *  have to reach inside a sum to find out which one it is. */
+export interface MonthlyReport {
+  month: number;
+  report: MonthReport;
+  efficiency: MonthEfficiency;
+  savings: MachineSavings;
+  rate: WorkshopRate;
+}
+
+/** This month written down, in the four shapes the month end card draws itself from. Called once,
+ *  at the month end, before the machines' own month clocks start again, because the machine
+ *  savings are read off those clocks and there is nothing left of the month once they are zeroed
+ *  (CLAUDE.md T17 2.24, T23 2.14). It is the same four calls the card makes, so a report opened
+ *  from Accounting a year later and the card the player saw that evening are the same figures. */
+export function monthlyReportFor(state: GameState, month: number): MonthlyReport {
+  return {
+    month,
+    report: monthReport(state, month),
+    efficiency: monthEfficiency(state, month),
+    savings: machineSavings(state, 'month'),
+    rate: monthRate(state, month),
+  };
 }
 
 /** The month's report, read off the ledger the state still carries (CLAUDE.md T13 3.20). The lines

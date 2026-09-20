@@ -28,7 +28,15 @@ import {
 } from './clock';
 import { queueEvent } from './events';
 import { int } from './rng';
-import type { DayCategory, DayLogEntry, GameState, Job, OwnerIdleReason } from './types';
+import type {
+  DayCategory,
+  DayLogEntry,
+  GameState,
+  Job,
+  OwnerIdleReason,
+  Worker,
+  WorkerTier,
+} from './types';
 
 /** Round to four places, which is where every factor in the engine stops. */
 function round4(value: number): number {
@@ -88,15 +96,31 @@ export function absenceFactor(hasManager: boolean): number {
   return 1 - (hasManager ? OWNER_AWAY_PENALTY_WITH_PM : OWNER_AWAY_PENALTY);
 }
 
-/** True while a production manager is on the books and in today (CLAUDE.md T13 3.9). Written
- *  here and not in staff.ts, which imports this module. */
-export function managerOnDuty(state: GameState): boolean {
-  return state.workers.some(
-    (worker) =>
-      worker.role === 'productionManager' &&
-      worker.startDay <= state.clock.day &&
-      worker.absentDaysRemaining === 0,
+/** The production manager who is on the books and in today, or null. Written here and not in
+ *  staff.ts, which imports this module, and read from here by machines.ts, which staff.ts imports
+ *  in its turn: this module has no engine imports below the clock, so it is the one place every
+ *  layer can ask (CLAUDE.md T13 3.9, T23 2.4). */
+export function managerOnDutyNow(state: GameState): Worker | null {
+  return (
+    state.workers.find(
+      (worker) =>
+        worker.role === 'productionManager' &&
+        worker.startDay <= state.clock.day &&
+        worker.absentDaysRemaining === 0,
+    ) ?? null
   );
+}
+
+/** True while a production manager is on the books and in today (CLAUDE.md T13 3.9). */
+export function managerOnDuty(state: GameState): boolean {
+  return managerOnDutyNow(state) !== null;
+}
+
+/** The grade of the manager on duty, or null while there is none. His grade is what says how many
+ *  men he carries, the order he hands their work out in and what he does to their pace, and every
+ *  one of those three is read off this (CLAUDE.md T23 2.4). */
+export function managerTier(state: GameState): WorkerTier | null {
+  return managerOnDutyNow(state)?.tier ?? null;
 }
 
 /** Staff output when the owner is not in the workshop (CLAUDE.md 7.3, T13 3.9). The manager adds
@@ -212,7 +236,7 @@ export function logDayMinute(log: DayLogEntry[], category: DayCategory): void {
 /** An owner's idle minute store with nothing in it. The morning empties it and the state factory
  *  starts from it (CLAUDE.md T21 2.8). */
 export function emptyOwnerIdle(): Record<OwnerIdleReason, number> {
-  return { noMachine: 0, noMaterial: 0, nothingAssigned: 0, officeEmpty: 0 };
+  return { noMachine: 0, noMaterial: 0, noCompressor: 0, nothingAssigned: 0, officeEmpty: 0 };
 }
 
 /** Books one clock minute the owner stood still, and why. The day meter's grey segment is the sum

@@ -1,14 +1,19 @@
 // @vitest-environment jsdom
-// Our team's second line: what this week was and what last week was, man by man and the owner
-// with them (PIOTR; CLAUDE.md T20 2.7). The hours, where they went, the pieces a contract took
-// off him, the jobs he stood at, and the one efficiency figure of the week.
+// A man's week: what this week was and what last week was, man by man and the owner with them
+// (PIOTR; CLAUDE.md T20 2.7). It was the second line of his row on Our team until Turn 23, in the
+// accountant's own hand: the hours, the six bands they went into, the pieces, the jobs and an
+// efficiency percentage. From tonight it is two lines of his CARD, in the two figures a player
+// reads, worked and idle, and the tile carries the one week figure it has room for
+// (PIOTR, 20.09: "made for an accountant, not a player";
+// docs/mockups/t23/team-cards.png; CLAUDE.md T23 2.13).
 
 import { describe, expect, it } from 'vitest';
 import { weekOfDay } from '../../src/engine/clock';
-import { weekEfficiency, weekNowOf, weekWorkedMinutes } from '../../src/engine/staff';
+import { weekNowOf, weekWorkedMinutes } from '../../src/engine/staff';
 import { assignJob } from '../../src/engine/jobs';
 import { renderTeam } from '../../src/ui/team';
-import type { GameState, Worker } from '../../src/engine/index';
+import { renderPerson } from '../../src/ui/personCard';
+import type { GameState } from '../../src/engine/index';
 import {
   acceptNow,
   buyStartingKit,
@@ -28,9 +33,10 @@ function parse(html: string): HTMLElement {
   return holder;
 }
 
-function weekLine(state: GameState, id: string): string {
-  const page = parse(renderTeam(state, 'ourTeam'));
-  return page.querySelector(`[data-team-week="${id}"]`)?.textContent ?? '';
+/** One of the two week lines of a man's card. */
+function weekLine(state: GameState, id: string, which: 'this week' | 'last week'): string {
+  const card = parse(renderPerson(state, id, 'card'));
+  return card.querySelector(`[data-week="${which}"]`)?.textContent ?? '';
 }
 
 /** A hall with a joiner at the bench on a job, an hour into the day. */
@@ -38,7 +44,6 @@ function anHourIn(): GameState {
   let state = fillRack(buyStartingKit(newGame({ difficulty: 'veryEasy' })), 60);
   state.enquiries = [];
   placeEquipment(state, 'locker', { x: 6, y: 9 });
-  placeEquipment(state, 'canteenSeat', { x: 8, y: 9 });
   placeEquipment(state, 'handToolSet', { x: 12, y: 9 });
   placeEquipment(state, 'toolCabinet', { x: 10, y: 9 });
   state.reputation = 20;
@@ -54,36 +59,46 @@ function anHourIn(): GameState {
   return clearEvents(runClock(state, 60));
 }
 
-describe('the week on Our team', () => {
-  it('gives every row a second line, the owner s too', () => {
+describe('the week on a man s card', () => {
+  it('gives every card its two week lines, the owner s too', () => {
     const state = anHourIn();
     const man = state.workers[0];
     if (!man) throw new Error('nobody on the books');
-    expect(weekLine(state, 'owner')).toContain('This week');
-    expect(weekLine(state, 'owner')).toContain('Last week');
-    expect(weekLine(state, man.id)).toContain('This week');
+    expect(weekLine(state, 'owner', 'this week')).toContain('this week');
+    expect(weekLine(state, 'owner', 'last week')).toContain('last week');
+    expect(weekLine(state, man.id, 'this week')).toContain('this week');
   });
 
-  it('prints the hours, the split, the job he stood at and the figure of the week', () => {
+  it('prints the hours he worked and the hours he stood, off the same meters', () => {
     const state = anHourIn();
     const man = state.workers[0];
     if (!man) throw new Error('nobody on the books');
     const meters = weekNowOf(man, weekOfDay(state.clock.day));
     if (!meters) throw new Error('no week on him');
-    const line = weekLine(state, man.id);
-    const hours = Math.round(weekWorkedMinutes(meters) / 6) / 10;
-    expect(line).toContain(`${hours} h worked`);
-    // The split is the same minutes, band by band, so it adds up to the hours.
-    const jobs = Math.round(meters.minutes.jobs / 6) / 10;
-    expect(line).toContain(`jobs ${jobs} h`);
-    expect(line).toContain(firstJob(state).name);
-    const figure = Math.round(weekEfficiency(man.rate, meters) * 100);
-    expect(line).toContain(`efficiency ${figure}%`);
+    const line = weekLine(state, man.id, 'this week');
+    const worked = Math.round(weekWorkedMinutes(meters) / 6) / 10;
+    expect(line).toContain(`${worked} h worked`);
+    // The idle hours are the minutes the company paid for that he put nothing into: the two come
+    // out of the one pair of meters, so they cannot disagree.
+    const stood = Math.round((meters.paidMinutes - weekWorkedMinutes(meters)) / 6) / 10;
+    expect(line).toContain(`${stood} h idle`);
   });
 
   it('says so plainly when a week has nothing in it yet', () => {
     const state = anHourIn();
-    const man = state.workers[0] as Worker;
-    expect(weekLine(state, man.id)).toContain('Last week: nothing yet');
+    const man = state.workers[0];
+    if (!man) throw new Error('nobody on the books');
+    expect(weekLine(state, man.id, 'last week')).toBe('last week: nothing yet');
+  });
+
+  it('keeps the accountant s week off Our team altogether', () => {
+    const state = anHourIn();
+    const text = parse(renderTeam(state, 'ourTeam')).textContent ?? '';
+    // The six bands, the pieces and the percentage are the card's business and no longer a second
+    // line under every row (CLAUDE.md T23 2.13).
+    expect(text).not.toContain('efficiency');
+    expect(text).not.toContain('This week:');
+    // The tile keeps the one week figure it has room for.
+    expect(text).toContain('this week');
   });
 });

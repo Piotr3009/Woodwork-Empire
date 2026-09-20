@@ -3,6 +3,7 @@
 // in production, completed, paid and rated (CLAUDE.md 9.5).
 
 import {
+  BUILDING_ROLES,
   COURIER_COST,
   MEETING_PRICE_THRESHOLD,
   SAW_FALLBACK_DEFAULT,
@@ -933,6 +934,34 @@ export function oldestReadyJob(state: GameState): Job | null {
   );
 }
 
+/** The oldest job of work standing open with nobody on it: ready for a bench, or already in
+ *  production and dropped by whoever had it. The board's own order is the order it was taken in,
+ *  so the first of them is the oldest (CLAUDE.md T23 2.3).
+ *
+ *  Not the same question as `oldestReadyJob` above, which falls through to a job somebody else is
+ *  already on so that the owner's idle reason can tell "there is work about" from "there is no
+ *  work at all". This one is the job a man can be PUT on, and nothing else. */
+export function oldestOpenJob(state: GameState): Job | null {
+  return (
+    state.jobs.find(
+      (job) =>
+        (job.stage === 'ready' || job.stage === 'inProduction') && job.assignees.length === 0,
+    ) ?? null
+  );
+}
+
+/** True while there is work of the board's about at all: a job ready for a bench, or one in
+ *  production, whoever is holding it. What the owner's idle reason asks to tell "there is work
+ *  here and none of it is mine" from "there is no work at all" (CLAUDE.md T23 2.3).
+ *
+ *  It has to count a job in production and not only a ready one. From tonight the owner takes the
+ *  oldest open job himself the minute his office empties, so a ready job with nobody on it can
+ *  never be the thing he is standing beside: by the time he is idle, every job about is somebody's
+ *  and every one of those is in production. */
+export function workIsAbout(state: GameState): boolean {
+  return state.jobs.some((job) => job.stage === 'ready' || job.stage === 'inProduction');
+}
+
 /** This job is this one man's: he goes on it and anybody else on it comes off. Start production
  *  and the hall's own automatic assignment go through here, so the job a man is handed is his
  *  alone; the player's Assign to this job adds men to what is already there and goes through
@@ -966,10 +995,10 @@ export function assignJob(state: GameState, jobId: string, workerId: string | nu
   return true;
 }
 
-/** The roles that may be put on a job at all. A helper never builds: he carries, cleans and
- *  empties bags, and the Assign list says so rather than offering him (PIOTR, 17.09;
- *  CLAUDE.md T19 2.5, 2.6). */
-export const BUILDING_ROLES: readonly WorkerRole[] = ['joiner', 'sprayer'];
+/** The roles that may be put on a job at all. The list itself is in constants.ts from Turn 23, so
+ *  that machines.ts can fill the benches with these men without reaching into this module; every
+ *  caller still reads it from here, where it has always been (CLAUDE.md T19 2.5, 2.6, T23 2.17). */
+export { BUILDING_ROLES };
 
 /** True while this man could be put on a job at all: a joiner or a sprayer, on the books and not
  *  off sick. The owner is always able, if he is about. */

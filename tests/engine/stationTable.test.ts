@@ -245,7 +245,7 @@ describe('the pallet', () => {
     expect(palletCell(state)).toEqual(first);
     expect(facingAtPallet(first)).toBe('nw');
     // Something standing on that cell: the fallback, facing south.
-    placeEquipment(state, 'drill', { variantId: 'standard', x: first.x, y: first.y });
+    placeEquipment(state, 'compressor', { variantId: 'budget', x: first.x, y: first.y });
     const fallback = palletCell(state);
     expect(fallback).toEqual({ x: GATE_LAYOUT.x + 1, y: GATE_LAYOUT.y - 1 });
     expect(['sw', 'se']).toContain(facingAtPallet(fallback));

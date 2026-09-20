@@ -11,6 +11,7 @@
 import {
   airDemandOf,
   bagsOf,
+  benchPlacesOf,
   compressorAirOf,
   compressors,
   countOf,
@@ -154,6 +155,18 @@ function bagsLine(spec: EquipmentSpec, variant: EquipmentVariant): string {
   return bags > 0 ? `Bags ${bags}, holds ${cubicMetres(bagsToM3(bags))}` : '';
 }
 
+/** What a class of bench holds, and what a man works at it at: how many can be round it at once,
+ *  and the pace they each work their own job at [PIOTR, 20.09] (CLAUDE.md T23 2.17). A bench is
+ *  not on the machine ladder, so this is the one line that says what the money buys on it. */
+function benchLine(spec: EquipmentSpec, variant: EquipmentVariant): Line {
+  const places = benchPlacesOf({ specId: spec.id, variantId: variant.id });
+  if (places <= 0) return line('');
+  const per = Math.round((variant.outputFactor - 1) * 100);
+  const men = `${places} ${places === 1 ? 'man' : 'men'}`;
+  if (per === 0) return line(`${men}, the standard pace`);
+  return line(`${men}, ${per > 0 ? '+' : ''}${per}% pace`, per);
+}
+
 /** What a class of shelving holds: the rack's own effect (CLAUDE.md T7 3.6). */
 function holdsLine(spec: EquipmentSpec, variant: EquipmentVariant): string {
   const sheets = sheetCapacityOf({ specId: spec.id, variantId: variant.id });
@@ -270,6 +283,7 @@ function effectLines(state: GameState, spec: EquipmentSpec, variant: EquipmentVa
     line(bagsLine(spec, variant)),
     line(spec.id === COMPRESSOR ? airLine(state, spec, variant) : ''),
     line(holdsLine(spec, variant)),
+    benchLine(spec, variant),
     // What a class of tool cabinet is for: how many men's hand tools it holds, in the words the
     // rack's card uses for its sheets (PIOTR, 19.09; CLAUDE.md T22 2.12).
     line(toolSlotsLine(spec.id, variant.id)),

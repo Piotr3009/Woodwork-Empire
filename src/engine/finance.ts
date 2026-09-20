@@ -5,13 +5,16 @@
 
 import {
   DAYS_PER_YEAR,
-  LOAN_MAX,
+  LOAN_FLOOR,
   LOAN_MONTHS,
   LOAN_RATE_YEARLY,
+  LOAN_SALES_MONTHS,
+  LOAN_SHARE_OF_SALES,
   OVERDRAFT_RATE_YEARLY,
+  SALES_CATEGORIES,
 } from './constants';
 import { monthOfDay } from './clock';
-import { canAfford, charge } from './economy';
+import { canAfford, charge, formatMoney } from './economy';
 import type { GameState, LoanState } from './types';
 
 export interface FinanceCheck {
@@ -30,12 +33,46 @@ export function loanInstalmentFor(principal: number, months = LOAN_MONTHS): numb
   return pence(principal / Math.max(1, months));
 }
 
+/** What the workshop invoiced in the twelve calendar months the bank looks at, today's month
+ *  among them: the four sale lines of the ledger added up, and nothing else on it. A sale in the
+ *  thirteenth month back is off the books the bank reads [PIOTR, 20.09] (CLAUDE.md T23 2.12). */
+export function salesLastTwelveMonths(state: GameState): number {
+  const thisMonth = monthOfDay(state.clock.day);
+  const first = thisMonth - (LOAN_SALES_MONTHS - 1);
+  let total = 0;
+  for (const entry of state.ledger) {
+    if (entry.amount <= 0) continue;
+    if (!SALES_CATEGORIES.includes(entry.category)) continue;
+    if (monthOfDay(entry.day) < first) continue;
+    total += entry.amount;
+  }
+  return pence(total);
+}
+
+/** How much the bank will lend this workshop: a quarter of what it has invoiced in the last
+ *  twelve months, and never less than what a company with no history gets. There is no upper cap
+ *  [PIOTR, 20.09: "no upper limit"]. The one function: `loanCheck` below and the Finance tab both
+ *  read it, so the refusal and the card cannot say different figures (CLAUDE.md T23 2.12). */
+export function loanLimit(state: GameState): number {
+  const share = Math.round(salesLastTwelveMonths(state) * LOAN_SHARE_OF_SALES);
+  return Math.max(LOAN_FLOOR, share);
+}
+
+/** Where the figure comes from, in the bank's own words: the quarter of the turnover while there
+ *  is turnover enough for it, and the floor while there is not [PIOTR, 20.09]. The refusal on the
+ *  button and the hint on the Finance tab are this one sentence (CLAUDE.md T23 2.12). */
+export function loanLimitLine(state: GameState): string {
+  const limit = loanLimit(state);
+  if (limit <= LOAN_FLOOR) return `The bank lends a new company up to ${formatMoney(LOAN_FLOOR)}`;
+  return `The bank lends up to ${formatMoney(limit)}: a quarter of your last twelve months' sales`;
+}
+
 /** Why a loan of this much cannot be taken, or that it can: one at a time, whole pounds, up to
- *  the cap (CLAUDE.md T13 3.14). */
+ *  what the books will carry (CLAUDE.md T13 3.14, T23 2.12). */
 export function loanCheck(state: GameState, amount: number): FinanceCheck {
   if (state.finance.loan !== null) return { ok: false, reason: 'One loan at a time' };
   if (!Number.isFinite(amount) || amount <= 0) return { ok: false, reason: 'Nothing to borrow' };
-  if (amount > LOAN_MAX) return { ok: false, reason: `The bank lends up to ${LOAN_MAX}` };
+  if (amount > loanLimit(state)) return { ok: false, reason: loanLimitLine(state) };
   return OK;
 }
 

@@ -122,7 +122,7 @@ describe('at the bench, not on it (PIOTR, 17.09; CLAUDE.md T19 2.4)', () => {
       buyStartingKit(newGame({ difficulty: 'veryEasy' }), { sawVariant: 'budget' }),
       40,
     );
-    for (const specId of ['workbench', 'locker', 'canteenSeat', 'toolCabinet', 'handToolSet']) {
+    for (const specId of ['workbench', 'locker', 'toolCabinet', 'handToolSet']) {
       state = buyNow(state, specId, specId === 'workbench' ? 'budget' : undefined);
     }
     const hired = hireNow(state, 'joiner', 'novice');

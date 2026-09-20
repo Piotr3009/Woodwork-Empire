@@ -9,7 +9,7 @@
 // and Order for this job on the job card are the two ways material is bought (T13 3.3).
 
 import { deliveriesInYard, deliveriesOnTheWay, formatCalendarDay, openJobs } from '../engine/index';
-import { restockCheck, stockLines } from '../engine/index';
+import { restockCheck, sheetPriceFor, stockLines } from '../engine/index';
 // Straight off its own module: the public API does not carry it (REPORT-T13 10).
 import { restockSheets } from '../engine/materials';
 import type { Delivery, GameState, Job, StockLine } from '../engine/index';
@@ -57,6 +57,16 @@ function askedSheets(typed: string): number | undefined {
   return Math.floor(asked);
 }
 
+/** What the typed number would pay a sheet, and what the order comes to, said before the click
+ *  and not after it: a sheet is priced by how many are on the order from Turn 23, so the player
+ *  has to be able to see the next band before he decides how many to buy
+ *  [PIOTR, 20.09] (CLAUDE.md T23 2.16). Empty while the field asks for nothing the rack can hold. */
+function ladderLine(sheets: number): string {
+  if (sheets <= 0) return '';
+  const each = sheetPriceFor(sheets);
+  return `${plural(sheets, 'sheet', 'sheets')} at ${money(each)} = ${money(sheets * each)}`;
+}
+
 /** The field and the one button beside it: so many sheets, capped at the free places on the rack,
  *  or the reason it cannot be pressed (CLAUDE.md T13 3.2, T17 2.20). The field is empty until he
  *  types in it, and what it would buy then is what fills the rack, which the placeholder shows. */
@@ -67,6 +77,13 @@ function restockControl(state: GameState, typed: string): string {
     '<input type="text" inputmode="numeric" pattern="[0-9]*" class="num" ' +
     `data-field="stockSheets" value="${escapeHtml(typed)}" placeholder="${fills}" ` +
     'aria-label="Sheets to order" /> sheets';
+  // The number the button would really buy, which is the typed one capped at the free places on
+  // the rack: the price the player is shown is the price he would pay.
+  const line = ladderLine(check.sheets);
+  // The game's own figure span, with a hook on it for the test: no new class and no new token
+  // (docs/ui-style.md 11).
+  const price =
+    line === '' ? '' : `<span class="row-figure" data-ladder="1">${escapeHtml(line)}</span>`;
   const action = check.ok
     ? button(
         'restock',
@@ -74,7 +91,7 @@ function restockControl(state: GameState, typed: string): string {
         `data-sheets="${check.sheets}"`,
       )
     : lockedButton('Restock', check.reason);
-  return `${field}<span class="row-action">${action}</span>`;
+  return `${field}${price}<span class="row-action">${action}</span>`;
 }
 
 /** A project and its material line: green with the sheets in hand, red with the shortfall and

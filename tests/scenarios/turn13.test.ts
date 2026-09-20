@@ -16,6 +16,7 @@ import {
   DAYS_PER_WEEK,
   GATE_OUTPUT_BONUS,
   GATE_PRICE,
+  LOAN_FLOOR,
   LOAN_MONTHS,
   LOAN_RATE_YEARLY,
   OWNER_AWAY_PENALTY_WITH_PM,
@@ -37,6 +38,7 @@ import {
   freeSheets,
   hasGate,
   isWorkingDay,
+  loanCheck,
   managerOnDuty,
   monthOfDay,
   monthReport,
@@ -62,14 +64,22 @@ function machinesOf(state: GameState, specId: string): GameState['equipment'] {
 
 describe('(t) a month with a loan, on Easy', () => {
   const seen: GameEvent[] = [];
-  const start = act(newGame({ seed: SEED, difficulty: 'easy' }), { type: 'TAKE_LOAN', amount: 20000 });
+  // It borrowed twenty thousand on the morning of day 1 until tonight. From Turn 23 the bank
+  // lends against the books it is shown, and a company on its first morning has shown it nothing:
+  // what it gets is the floor, which is what a new company with no history gets
+  // [PIOTR, 20.09] (CLAUDE.md T23 2.12).
+  const BORROWED = LOAN_FLOOR;
+  const start = act(newGame({ seed: SEED, difficulty: 'easy' }), { type: 'TAKE_LOAN', amount: BORROWED });
   const state = playUntilDay(start, 32, CAREFUL, seen);
 
-  it('lands the twenty thousand at the click and opens sixty months', () => {
+  it('lands the new company s ten thousand at the click and opens sixty months', () => {
     const drawn = start.ledger.find((entry) => entry.category === 'loan');
-    expect(drawn?.amount).toBe(20000);
-    expect(start.finance.loan?.balance).toBe(20000);
+    expect(BORROWED).toBe(10000);
+    expect(drawn?.amount).toBe(BORROWED);
+    expect(start.finance.loan?.balance).toBe(BORROWED);
     expect(start.finance.loan?.monthsLeft).toBe(LOAN_MONTHS);
+    // And a pound more than the floor is refused on that morning, because there are no sales.
+    expect(loanCheck(newGame({ seed: SEED, difficulty: 'easy' }), BORROWED + 1).ok).toBe(false);
   });
 
   it('charges the first instalment and the interest on the balance on the 1st, as two lines', () => {
@@ -77,11 +87,11 @@ describe('(t) a month with a loan, on Easy', () => {
     const interest = first.find((entry) => entry.category === 'loanInterest');
     const capital = first.find((entry) => entry.category === 'loan');
     // Fifteen per cent a year on the balance, over twelve; the capital over sixty.
-    expect(interest?.amount).toBeCloseTo(-(20000 * LOAN_RATE_YEARLY) / 12, 2);
-    expect(capital?.amount).toBeCloseTo(-20000 / LOAN_MONTHS, 2);
+    expect(interest?.amount).toBeCloseTo(-(BORROWED * LOAN_RATE_YEARLY) / 12, 2);
+    expect(capital?.amount).toBeCloseTo(-BORROWED / LOAN_MONTHS, 2);
     expect(state.finance.loan?.monthsLeft).toBe(LOAN_MONTHS - 1);
-    expect(state.finance.loan?.balance).toBeCloseTo(20000 - 20000 / LOAN_MONTHS, 2);
-    expect(state.finance.loan?.interestPaid).toBeCloseTo((20000 * LOAN_RATE_YEARLY) / 12, 2);
+    expect(state.finance.loan?.balance).toBeCloseTo(BORROWED - BORROWED / LOAN_MONTHS, 2);
+    expect(state.finance.loan?.interestPaid).toBeCloseTo((BORROWED * LOAN_RATE_YEARLY) / 12, 2);
   });
 
   it('never paid overdraft interest, because the loan kept the account above zero', () => {
@@ -308,7 +318,7 @@ describe('(w) a month with a production manager, a night joiner and five days aw
     reputation: 20,
     onDay: (current, day) => {
       let next = current;
-      if (day === 1) next = act(next, { type: 'HIRE', role: 'productionManager', tier: null });
+      if (day === 1) next = act(next, { type: 'HIRE', role: 'productionManager', tier: 'experienced' });
       if (day === 3) {
         next = act(next, { type: 'SET_SECOND_SHIFT', on: true });
         const second = next.workers.filter((worker) => worker.role === 'joiner')[1];

@@ -3,8 +3,7 @@ import {
   BESPOKE_COST_UPLIFT,
   LOW_STOCK_SHEETS,
   MATERIAL_FRACTION,
-  SHEET_PRICE_AD_HOC,
-  SHEET_PRICE_STOCK,
+  SHEET_PRICE_LADDER,
   SHEET_VALUE,
   TEMP_STORAGE_COST,
   TEMP_STORAGE_FETCH_MINUTES,
@@ -16,6 +15,7 @@ import {
   freeSheets,
   materialCostFor,
   orderForJobCost,
+  sheetPriceFor,
   rackCapacity,
   reservedSheets,
   restockCheck,
@@ -81,11 +81,13 @@ describe('what material costs', () => {
     expect(BESPOKE_COST_UPLIFT).toBe(0.15);
   });
 
-  it('is 0.34 of the price when the sheets were bought for stock', () => {
+  it('is the ladder s price for the number of sheets on the order', () => {
     const perJob = materialCostFor(1000, false);
     const sheets = sheetsForCost(perJob);
-    expect(stockCostFor(sheets)).toBeCloseTo(sheets * SHEET_PRICE_STOCK, 6);
-    expect(SHEET_PRICE_STOCK).toBeLessThan(SHEET_VALUE);
+    expect(stockCostFor(sheets)).toBeCloseTo(sheets * sheetPriceFor(sheets), 6);
+    // A load big enough to be worth stocking costs less a sheet than a sheet is worth, which is
+    // where the margin on holding stock comes from (CLAUDE.md T23 2.16).
+    expect(sheetPriceFor(50)).toBeLessThan(SHEET_VALUE);
   });
 
   it('turns a material cost into whole sheets of 200 of value each', () => {
@@ -362,7 +364,7 @@ describe('the rack the sheets live on', () => {
     let state = newGame();
     state.enquiries = [];
     // Everything but the shelving, so the job can be taken and ordered.
-    for (const specId of ['desk', 'laptop', 'tableSaw', 'drill', 'edgebander', 'extractor']) {
+    for (const specId of ['desk', 'laptop', 'tableSaw', 'edgebander', 'extractor']) {
       state = buyNow(state, specId);
     }
     state = softwareNow(state, 'oneOff');
@@ -508,11 +510,11 @@ describe('the reservation rule and Restock (CLAUDE.md T13 3.2, 3.3)', () => {
       ok: true,
       reason: '',
       sheets,
-      cost: sheets * SHEET_PRICE_STOCK,
+      cost: sheets * sheetPriceFor(sheets),
     });
     const before = state.cash;
     const bought = act(state, { type: 'RESTOCK' });
-    expect(before - bought.cash).toBeCloseTo(sheets * SHEET_PRICE_STOCK, 6);
+    expect(before - bought.cash).toBeCloseTo(sheets * sheetPriceFor(sheets), 6);
     expect(bought.deliveries[0]?.sheets).toBe(sheets);
     expect(bought.deliveries[0]?.jobId).toBeNull();
     expect(bought.ledger[bought.ledger.length - 1]?.category).toBe('material');
@@ -561,13 +563,48 @@ describe('the reservation rule and Restock (CLAUDE.md T13 3.2, 3.3)', () => {
     expect(restockSheets(state)).toBe(2);
   });
 
-  it('charges 175 a sheet for stock and 200 ad hoc for a job, and nothing between', () => {
-    expect(SHEET_PRICE_STOCK).toBe(175);
-    expect(SHEET_PRICE_AD_HOC).toBe(200);
-    expect(stockCostFor(4)).toBe(4 * SHEET_PRICE_STOCK);
+  it('prices a sheet by the number on the order, and prices a take off the same way', () => {
+    // Turn 13 had two prices and nothing between them: 175 for stock and 200 ad hoc, whatever the
+    // size of either order. Piotr made it one ladder on 20.09, because a merchant prices a load
+    // and not a customer (CLAUDE.md T23 2.16).
+    expect(sheetPriceFor(1)).toBe(200);
+    expect(sheetPriceFor(9)).toBe(200);
+    expect(sheetPriceFor(10)).toBe(190);
+    expect(sheetPriceFor(29)).toBe(190);
+    expect(sheetPriceFor(30)).toBe(180);
+    expect(sheetPriceFor(49)).toBe(180);
+    expect(sheetPriceFor(50)).toBe(170);
+    expect(sheetPriceFor(99)).toBe(170);
+    expect(sheetPriceFor(100)).toBe(160);
+    expect(sheetPriceFor(199)).toBe(160);
+    expect(sheetPriceFor(200)).toBe(150);
+    expect(sheetPriceFor(499)).toBe(150);
+    expect(sheetPriceFor(500)).toBe(135);
+    expect(sheetPriceFor(999)).toBe(135);
+    expect(sheetPriceFor(1000)).toBe(120);
+    expect(sheetPriceFor(5000)).toBe(120);
+    // The ladder only ever falls, and its first band starts at a single sheet.
+    expect(SHEET_PRICE_LADDER[0]?.from).toBe(1);
+    for (let index = 1; index < SHEET_PRICE_LADDER.length; index += 1) {
+      const above = SHEET_PRICE_LADDER[index - 1];
+      const band = SHEET_PRICE_LADDER[index];
+      expect(band?.from).toBeGreaterThan(above?.from ?? 0);
+      expect(band?.price).toBeLessThan(above?.price ?? 0);
+    }
+    // A restock of four and a take off of two both pay the top of it: they are small orders.
+    expect(stockCostFor(4)).toBe(4 * 200);
     const state = upToMaterial(ready(), { price: 800 });
     expect(shortfallOf(firstJob(state))).toBe(2);
-    expect(orderForJobCost(firstJob(state))).toBe(2 * SHEET_PRICE_AD_HOC);
+    expect(orderForJobCost(firstJob(state))).toBe(2 * 200);
+  });
+
+  it('pays the ladder for a take off of six, which is what the flat ad hoc price was', () => {
+    // 2.16's own worked example: six sheets is the top band, so a take off that small is not a
+    // penny different from what Turn 13 charged for it (CLAUDE.md T23 2.16).
+    expect(sheetPriceFor(6)).toBe(200);
+    expect(stockCostFor(6)).toBe(1200);
+    expect(stockCostFor(10)).toBe(1900);
+    expect(stockCostFor(1000)).toBe(120000);
   });
 
   it('gives the line a stock number in the style of the software, stable across a save', () => {

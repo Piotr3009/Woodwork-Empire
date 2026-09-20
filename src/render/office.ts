@@ -2,8 +2,9 @@
 // whatever room the page has under the top bar and centred, with the click regions and the live
 // text laid over them in canvas coordinates (docs/art/SPRITES.md 8).
 //
-// One scale value carries the stack, the regions and the text, so nothing can drift out of line.
-// The hall stays isometric; the two views never share a screen.
+// The machinery that does all of that is `src/render/room.ts`, which the canteen uses too since
+// Turn 23: one code path for both rooms (CLAUDE.md T23 2.9). What is left in this file is the
+// office itself, which is its layers, its regions, its two live texts and the man at the desk.
 
 import { formatTime } from '../engine/clock';
 import { has } from '../engine/machines';
@@ -13,24 +14,43 @@ import { STATION_OFFICE, STATION_PHONE } from '../engine/stations';
 import type { GameState } from '../engine/types';
 import { animationForStation, characterArt, characterSheet } from './characters';
 import { type Scene, escapeText, fitName } from './hall';
+import {
+  ROOM_CANVAS,
+  ROOM_LIVE_SLOT,
+  type RegionDressing,
+  type RoomLayer,
+  type RoomLitLayer,
+  type RoomRegion,
+  type RoomTextBox,
+  type Viewport,
+  boxStyle,
+  fitRoomStack,
+  renderRoom,
+  roomScale,
+  roomScene,
+  roundScale,
+} from './room';
 import { SPRITE_SCALE, pickSprite, spriteFiles } from './sprites';
 
-/** The empty element the office shell leaves for its live text. The hall's slot is an SVG group
- *  and the office is HTML, so the two are not the same element, only the same idea. */
-export const OFFICE_LIVE_SLOT = '<div class="office-live" data-live="1"></div>';
+/** The empty element the office shell leaves for its live text. */
+export const OFFICE_LIVE_SLOT = ROOM_LIVE_SLOT;
 
-/** The canvas every office layer is drawn on (docs/art/SPRITES.md 8.1). */
-export const OFFICE_CANVAS = { width: 1672, height: 941 };
+/** The canvas every office layer is drawn on (docs/art/SPRITES.md 8.1). It is the canvas of every
+ *  room in the game: the canteen is painted on the same one (CLAUDE.md T23 2.9). */
+export const OFFICE_CANVAS = ROOM_CANVAS;
 
-export interface OfficeLayer {
-  /** The sprite key, which is the file name in public/sprites. */
-  key: string;
-  /** What a flat placeholder rectangle says while the art is not there yet. */
-  name: string;
-  /** The catalogue line that has to be bought before this layer is in the room. Null for the
-   *  room itself, which is there from the first morning (CLAUDE.md T7 3.8). */
-  needs: string | null;
-}
+export type OfficeLayer = RoomLayer;
+export type OfficeLitLayer = RoomLitLayer;
+export type OfficeRegion = RoomRegion;
+export type OfficeTextBox = RoomTextBox;
+export type { Viewport };
+
+/** The one scale value: the biggest the whole canvas can be drawn without cropping it. */
+export const officeScale = roomScale;
+
+/** The scale re-taken from the room's own box once it is on the page. It finds whichever room the
+ *  player is standing in, because both wear the same shell. */
+export const fitOfficeStack = fitRoomStack;
 
 /** Back to front (docs/art/SPRITES.md 8.1). The desk, the catalogue on it and the binder come
  *  with the desk; the laptop comes on its own (CLAUDE.md T7 3.8). */
@@ -45,14 +65,6 @@ export function officeLayersOf(state: GameState): OfficeLayer[] {
   return OFFICE_LAYERS.filter((layer) => layer.needs === null || has(state, layer.needs));
 }
 
-export interface OfficeLitLayer {
-  /** The sprite key, which is the file name in public/sprites. */
-  key: string;
-  name: string;
-  /** The region whose pointer lights it. */
-  region: string;
-}
-
 /** The overlays that light one thing in the room while the pointer is on its region, painted by
  *  the art side one at a time (docs/art/REQUESTS-T14.md). Each goes through the same file check
  *  every sprite does: it is laid over the background only when its file is there, and until then
@@ -64,20 +76,6 @@ export const OFFICE_LIT_LAYERS: OfficeLitLayer[] = [
 /** The lit overlays the art side has delivered. */
 export function officeLitLayersOf(files: readonly string[]): OfficeLitLayer[] {
   return OFFICE_LIT_LAYERS.filter((layer) => pickSprite(files, layer.key) !== null);
-}
-
-export interface OfficeRegion {
-  id: string;
-  name: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  /** The clock is the live clock and opens nothing (docs/art/SPRITES.md 8.2). */
-  opens: boolean;
-  /** The catalogue line that has to be bought before this region does anything. Null for the
-   *  door, the clock and the whiteboard, which are the room itself (CLAUDE.md T7 3.8). */
-  needs?: string | null;
 }
 
 /** Where the company board hangs: flat on the rear wall, exactly in the middle between the door
@@ -175,15 +173,6 @@ export function officeRegionsOf(state: GameState): OfficeRegion[] {
   );
 }
 
-export interface OfficeTextBox {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  /** Pixels at scale 1. The stack's own scale carries it from there. */
-  fontSize: number;
-}
-
 /** The two texts the artwork leaves blank for the game to fill (docs/art/SPRITES.md 8.3). */
 /** The smallest the board is ever lettered at scale 1 [TUNE] (CLAUDE.md T6 3.10). */
 export const OFFICE_NAME_SIZE_MIN = 12;
@@ -204,121 +193,47 @@ export const OFFICE_TEXTS: Record<'clock' | 'company' | 'companyTotals', OfficeT
   },
 };
 
-export interface Viewport {
-  width: number;
-  height: number;
-}
-
-/** The one scale value: the biggest the whole canvas can be drawn without cropping it. */
-export function officeScale(viewport: Viewport): number {
-  return Math.min(
-    viewport.width / OFFICE_CANVAS.width,
-    viewport.height / OFFICE_CANVAS.height,
-  );
-}
-
-function round(value: number): number {
-  return Math.round(value * 10000) / 10000;
-}
-
-function boxStyle(box: { x: number; y: number; width: number; height: number }): string {
-  return `left:${box.x}px;top:${box.y}px;width:${box.width}px;height:${box.height}px`;
-}
-
-/** One layer: the delivered PNG, or a flat rectangle with the layer's name on it so the room is
- *  usable and testable before the art side has delivered (CLAUDE.md T4 3.1). */
-function layerHtml(layer: OfficeLayer, index: number, files: readonly string[]): string {
-  const url = pickSprite(files, layer.key);
-  if (url !== null) {
-    return (
-      `<img class="office-layer" data-layer="${layer.key}" src="${url}" alt="" ` +
-      'draggable="false" />'
-    );
-  }
-  return (
-    `<div class="office-layer office-placeholder office-placeholder-${index + 1}" ` +
-    `data-layer="${layer.key}"><span>${escapeText(layer.name)}</span></div>`
-  );
-}
-
-/** The label of a region: a handwritten pill with the region's name from the table, a child of
- *  the region every time and shown by the stylesheet alone while the pointer is on it, so the
- *  room's markup never changes with the pointer (CLAUDE.md T14 2.2, T9 3.4). */
-function labelHtml(region: OfficeRegion): string {
-  return `<span class="office-label">${escapeText(region.name)}</span>`;
-}
-
-/** A region is a transparent rectangle over the artwork: no frame, no button drawn on the room.
- *  The pointer on it lights the thing and names it, in CSS (CLAUDE.md T14 2.2). The catalogue on
- *  the floor is the one exception: there is no artwork under it, so the game draws the object
- *  itself with the word Equipment on its cover (CLAUDE.md T7 3.8). */
-function regionHtml(
-  region: OfficeRegion,
-  onTheFloor: boolean,
-  files: readonly string[],
-): string {
-  const style = boxStyle(region);
-  const label = labelHtml(region);
-  if (!region.opens) {
-    return (
-      `<div class="office-region is-quiet" data-office="${region.id}" style="${style}">` +
-      `${label}</div>`
-    );
-  }
-  if (region.id === COMPANY_BOARD) {
-    // The painted board when the art side has delivered it, the drawn one while it has not
-    // (SPRITES.md 11; PIOTR, 14.09: the drawn square goes once the picture is there).
-    const url = pickSprite(files, COMPANY_BOARD_SPRITE);
-    if (url !== null) {
-      return (
-        '<button class="office-region office-company-board is-art" data-do="officeRegion" ' +
-        `data-office="${region.id}" style="${style}">` +
-        `<img class="office-floor-art" data-sprite="${COMPANY_BOARD_SPRITE}" src="${url}" ` +
-        `alt="" draggable="false" />${label}</button>`
-      );
+/** The two things the office draws inside a region of its own. The company board and the floor
+ *  catalogue have no artwork under them until the art side paints one, so the game draws the
+ *  object itself rather than leaving an invisible rectangle over bare wall and bare floor
+ *  (CLAUDE.md T7 3.8, T9 3.10; SPRITES.md 11; PIOTR, 14.09: the drawn square goes once the
+ *  picture is there). */
+function officeDressing(onTheFloor: boolean) {
+  return (region: OfficeRegion, files: readonly string[]): RegionDressing | null => {
+    if (region.id === COMPANY_BOARD) {
+      const url = pickSprite(files, COMPANY_BOARD_SPRITE);
+      if (url !== null) {
+        return {
+          classes: 'office-company-board is-art',
+          inside:
+            `<img class="office-floor-art" data-sprite="${COMPANY_BOARD_SPRITE}" src="${url}" ` +
+            'alt="" draggable="false" />',
+        };
+      }
+      return {
+        classes: 'office-company-board',
+        inside: '<span>How the company is doing</span>',
+      };
     }
-    return (
-      '<button class="office-region office-company-board" data-do="officeRegion" ' +
-      `data-office="${region.id}" style="${style}">` +
-      `<span>How the company is doing</span>${label}</button>`
-    );
-  }
-  if (region.id === 'catalogue') {
-    // The same book on the floor before the desk and on the desk after it (PIOTR, 14.09): the
-    // loader first, the drawn object second, exactly as a machine is drawn in the hall
-    // (CLAUDE.md T3 3.6, T8 3.7). With the picture there is no drawn box under it.
-    const url = pickSprite(files, FLOOR_CATALOGUE_SPRITE);
-    if (url !== null) {
-      return (
-        `<button class="office-region office-floor-catalogue is-art${onTheFloor ? '' : ' on-desk'}" ` +
-        `data-do="officeRegion" data-office="${region.id}" ` +
-        `style="${style}"><img class="office-floor-art" data-sprite="${FLOOR_CATALOGUE_SPRITE}" ` +
-        `src="${url}" alt="" draggable="false" />${label}</button>`
-      );
+    if (region.id === 'catalogue') {
+      // The same book on the floor before the desk and on the desk after it (PIOTR, 14.09): the
+      // loader first, the drawn object second, exactly as a machine is drawn in the hall
+      // (CLAUDE.md T3 3.6, T8 3.7). With the picture there is no drawn box under it.
+      const url = pickSprite(files, FLOOR_CATALOGUE_SPRITE);
+      if (url !== null) {
+        return {
+          classes: `office-floor-catalogue is-art${onTheFloor ? '' : ' on-desk'}`,
+          inside:
+            `<img class="office-floor-art" data-sprite="${FLOOR_CATALOGUE_SPRITE}" ` +
+            `src="${url}" alt="" draggable="false" />`,
+        };
+      }
+      if (onTheFloor) {
+        return { classes: 'office-floor-catalogue', inside: '<span>Equipment</span>' };
+      }
     }
-    if (onTheFloor) {
-      return (
-        '<button class="office-region office-floor-catalogue" data-do="officeRegion" ' +
-        `data-office="${region.id}" style="${style}">` +
-        `<span>Equipment</span>${label}</button>`
-      );
-    }
-  }
-  return (
-    `<button class="office-region" data-do="officeRegion" data-office="${region.id}" ` +
-    `style="${style}">${label}</button>`
-  );
-}
-
-/** A lit overlay, over the room only while the pointer is on its region, which the stylesheet
- *  does off the stack's data-lit and the region's own pointer state (CLAUDE.md T14 2.2). */
-function litHtml(layer: OfficeLitLayer, files: readonly string[]): string {
-  const url = pickSprite(files, layer.key);
-  if (url === null) return '';
-  return (
-    `<img class="office-layer office-lit" data-layer="${layer.key}" data-lit="${layer.region}" ` +
-    `src="${url}" alt="" draggable="false" />`
-  );
+    return null;
+  };
 }
 
 /** Where the owner stands in the office, in canvas pixels [TUNE] (CLAUDE.md T19 2.2). The office
@@ -356,8 +271,8 @@ export function officeFigure(state: GameState, files: readonly string[]): string
   const top = -sheet.anchorY / SPRITE_SCALE;
   return (
     `<svg class="office-figure" data-office-figure="owner" style="${boxStyle(OFFICE_OWNER_BOX)}" ` +
-    `viewBox="${round(left)} ${round(top)} ${round(sheet.cellWidth / SPRITE_SCALE)} ` +
-    `${round(sheet.cellHeight / SPRITE_SCALE)}" aria-hidden="true">${art}</svg>`
+    `viewBox="${roundScale(left)} ${roundScale(top)} ${roundScale(sheet.cellWidth / SPRITE_SCALE)} ` +
+    `${roundScale(sheet.cellHeight / SPRITE_SCALE)}" aria-hidden="true">${art}</svg>`
   );
 }
 
@@ -391,73 +306,27 @@ function liveText(state: GameState, files: readonly string[]): string {
   );
 }
 
-/** The scale the renderer works out is taken from the window, because the room has to be drawn
- *  before it can be measured. Once it is on the page its own box is the authority, so the scale is
- *  re-taken from it: no copy of the stylesheet's numbers can then be wrong. In a headless DOM the
- *  box measures zero and the computed value stands. */
-export function fitOfficeStack(page: ParentNode): void {
-  const room = page.querySelector('.office-room');
-  const stack = room === null ? null : room.querySelector('.office-stack');
-  if (!(room instanceof HTMLElement) || !(stack instanceof HTMLElement)) return;
-  const box = room.getBoundingClientRect();
-  if (box.width <= 0 || box.height <= 0) return;
-  const scale = round(officeScale({ width: box.width, height: box.height }));
-  if (stack.dataset.scale === String(scale)) return;
-  stack.dataset.scale = String(scale);
-  stack.style.transform = `translate(-50%,-50%) scale(${scale})`;
-}
-
-/** The room in two pieces: the shell with the three pictures and the seven regions, which is
- *  built once and kept, and the live text, which is written again every minute. The pictures are
- *  megabytes and the stack's scale is corrected from its own box once it is on the page, so
- *  rebuilding the room every game minute made it blink and jump once a second.
- *
- *  `files` is what the art side has delivered. It is a parameter so a test can ask what the room
- *  looks like before the art arrives, which is what the placeholders are for (T4 3.1). */
+/** The office, in the two pieces the page needs it in. */
 export function officeScene(
   state: GameState,
   viewport: Viewport,
   files: readonly string[] = spriteFiles(),
 ): Scene {
-  const scale = round(officeScale(viewport));
-  const layers = officeLayersOf(state);
-  const lit = officeLitLayersOf(files);
-  const regions = officeRegionsOf(state);
   const onTheFloor = !has(state, 'desk');
-  // Neither the scale nor the viewport belongs in the key: the stack is scaled by a style the
-  // renderer writes once and fitOfficeStack corrects on the page, so a resize does not need the
-  // pictures loaded again. What the room has in it does belong in it: buying the desk puts a
-  // whole layer into the room (CLAUDE.md T7 3.8).
-  const key = [
-    'office',
-    layers.map((layer) => pickSprite(files, layer.key) ?? layer.key).join(','),
-    regions.map((region) => region.id).join(','),
-    // The floor catalogue is a picture of its own: delivering it rebuilds the room once.
-    onTheFloor ? pickSprite(files, FLOOR_CATALOGUE_SPRITE) ?? 'drawn' : '',
-    // So is every lit overlay (CLAUDE.md T14 2.2).
-    lit.map((layer) => layer.key).join(','),
-  ].join('|');
-  // The lit overlays go over the background and under the desk and the laptop, which stand in
-  // front of the door; the stack says which regions have one, so the stylesheet can drop the
-  // light spot on those (CLAUDE.md T14 2.2).
-  const [background, ...furniture] = layers;
-  const litRegions = lit.map((layer) => layer.region).join(' ');
-  return {
-    key,
-    shell: () =>
-      `<div class="office-room" data-scene="${key}">` +
-      `<div class="office-stack" data-scale="${scale}"` +
-      `${litRegions === '' ? '' : ` data-lit="${litRegions}"`} ` +
-      `style="width:${OFFICE_CANVAS.width}px;height:${OFFICE_CANVAS.height}px;` +
-      `transform:translate(-50%,-50%) scale(${scale})">` +
-      (background === undefined ? '' : layerHtml(background, 0, files)) +
-      lit.map((layer) => litHtml(layer, files)).join('') +
-      furniture.map((layer, index) => layerHtml(layer, index + 1, files)).join('') +
-      regions.map((region) => regionHtml(region, onTheFloor, files)).join('') +
-      OFFICE_LIVE_SLOT +
-      '</div></div>',
-    live: liveText(state, files),
-  };
+  return roomScene(
+    {
+      name: 'office',
+      layers: officeLayersOf(state),
+      lit: officeLitLayersOf(files),
+      regions: officeRegionsOf(state),
+      live: liveText(state, files),
+      // The floor catalogue is a picture of its own: delivering it rebuilds the room once.
+      keyExtra: [onTheFloor ? pickSprite(files, FLOOR_CATALOGUE_SPRITE) ?? 'drawn' : ''],
+      dress: officeDressing(onTheFloor),
+    },
+    viewport,
+    files,
+  );
 }
 
 /** The room as one string, for a caller that just wants the markup. */
@@ -466,8 +335,5 @@ export function renderOffice(
   viewport: Viewport,
   files: readonly string[] = spriteFiles(),
 ): string {
-  const scene = officeScene(state, viewport, files);
-  return scene
-    .shell()
-    .replace(OFFICE_LIVE_SLOT, `<div class="office-live" data-live="1">${scene.live}</div>`);
+  return renderRoom(officeScene(state, viewport, files));
 }

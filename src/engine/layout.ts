@@ -47,9 +47,10 @@ export function hallItems(state: GameState): Equipment[] {
   return state.equipment.filter((item) => {
     const spec = findSpec(item.specId);
     if (!spec || spec.category === 'furniture') return false;
-    // A seat and a locker stand inside the canteen, so they take no hall cell at all: nothing may
-    // bump into them and they eat none of the floor the crew is limited by
-    // (PIOTR, 17.09; CLAUDE.md T17 2.2).
+    // A locker stands inside the canteen, so it takes no hall cell at all: nothing may bump into
+    // it and it eats none of the floor the crew is limited by. The seat that stood beside it went
+    // with Turn 23, which gave the canteen a table and two stools of its own
+    // (PIOTR, 17.09 and 20.09; CLAUDE.md T17 2.2, T23 2.11).
     if (WELFARE_IN_THE_CANTEEN.includes(item.specId)) return false;
     if (!itemStandsInTheHall(item)) return false;
     return item.anchorX < state.unit.widthCells;
@@ -122,8 +123,8 @@ export function canPlaceSpec(
   }
   for (const room of ROOM_LAYOUT) {
     if (!overlaps(box, { x: room.x, y: room.y, width: room.width, depth: room.depth })) continue;
-    // The welfare kit lives inside the canteen and nowhere else: a seat and a locker belong out of
-    // the dust, and they take no hall cell at all (PIOTR, 17.09; CLAUDE.md T17 2.2).
+    // The welfare kit lives inside the canteen and nowhere else: a man's locker belongs out of the
+    // dust, and it takes no hall cell at all (PIOTR, 17.09; CLAUDE.md T17 2.2, T23 2.11).
     if (room.id === 'canteen' && WELFARE_IN_THE_CANTEEN.includes(specId)) continue;
     return { ok: false, reason: `On the ${room.name.toLowerCase()}` };
   }

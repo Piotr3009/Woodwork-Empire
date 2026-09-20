@@ -10,6 +10,7 @@ import type { Orientation, WorkerRole, WorkerTier } from '../src/engine/types';
 import {
   applyAction,
   bagStore,
+  canBuild,
   createGame,
   enduranceHoursFor,
   findSpec,
@@ -91,6 +92,29 @@ export function choose(state: GameState, choiceId: string): GameState {
 
 export function act(state: GameState, action: GameAction): GameState {
   return applyAction(state, action);
+}
+
+/** The boss's round of the hall: every man standing about is put on the oldest job nobody is on,
+ *  through the same `ASSIGN_JOB` click the player makes in the Work Plan. From Turn 23 nobody
+ *  takes a job by himself without a production manager on duty, so a test that wants a crew at
+ *  work says so with this and never by reaching into the state (PIOTR, 20.09; CLAUDE.md T23 2.1).
+ *
+ *  One man to a job and no more, which is the round the engine's own assigning has always made:
+ *  the oldest free job to the first free man, then on to the next free job. A man already on a
+ *  job is never moved. */
+export function bossAssigns(state: GameState): GameState {
+  let next = state;
+  for (const worker of next.workers) {
+    if (worker.jobId !== null || worker.taskId !== null) continue;
+    if (!canBuild(next, worker.id)) continue;
+    const job = next.jobs.find(
+      (entry) =>
+        (entry.stage === 'ready' || entry.stage === 'inProduction') && entry.assignees.length === 0,
+    );
+    if (!job) break;
+    next = applyAction(next, { type: 'ASSIGN_JOB', jobId: job.id, workerId: worker.id });
+  }
+  return next;
 }
 
 /** Says yes to an enquiry and takes the client's number at the budget: the two clicks a job costs
@@ -187,7 +211,6 @@ export const STARTING_KIT = [
   'chair',
   'laptop',
   'tableSaw',
-  'drill',
   'toolCabinet',
   'edgebander',
   'compressor',
@@ -505,6 +528,9 @@ export function sixJoinersOnSheetWork(
       dayLog: [],
       monthMinutes: 0,
       monthDaysOff: 0,
+      idleMinutes: 0,
+      idleByReason: { waitingForBoss: 0, noMachine: 0, noMaterial: 0 },
+      accidents: 0,
       anchorX: 4 + man * 2,
       anchorY: 6,
     });
@@ -578,6 +604,9 @@ export function twoMenOnSheetWork(
     dayLog: [],
     monthMinutes: 0,
     monthDaysOff: 0,
+    idleMinutes: 0,
+    idleByReason: { waitingForBoss: 0, noMachine: 0, noMaterial: 0 },
+    accidents: 0,
     anchorX: 0,
     anchorY: 4,
   });

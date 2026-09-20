@@ -275,7 +275,7 @@ export interface TopbarNews {
 
 export function renderTopbar(
   state: GameState,
-  view: 'hall' | 'office' | 'sprites',
+  view: 'hall' | 'office' | 'canteen' | 'sprites',
   pulse = false,
   news: TopbarNews = { board: false, orders: false },
 ): string {

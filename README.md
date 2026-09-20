@@ -9,15 +9,15 @@ archived in `docs`: `docs/turn-1-brief.md`, `docs/turn-2-brief.md`, `docs/turn-3
 `docs/turn-8-brief.md`, `docs/turn-9-brief.md`, `docs/turn-10-brief.md`, `docs/turn-11-brief.md`,
 `docs/turn-12-brief.md`, `docs/turn-13-brief.md`, `docs/turn-14-brief.md`, `docs/turn-15-brief.md`,
 `docs/turn-16-brief.md`, `docs/turn-17-brief.md`, `docs/turn-18-brief.md`,
-`docs/turn-19-brief.md`, `docs/turn-20-brief.md` and `docs/turn-21-brief.md`. The build reports
-are `REPORT-T1.md` to `REPORT-T22.md`.
+`docs/turn-19-brief.md`, `docs/turn-20-brief.md`, `docs/turn-21-brief.md` and
+`docs/turn-22-brief.md`. The build reports are `REPORT-T1.md` to `REPORT-T23.md`.
 
 The sprite contract between the art side and the game is `docs/art/SPRITES.md`; the art Turn 13
 asks for is listed in `docs/art/REQUESTS-T13.md`, the art Turn 14 asks for in
 `docs/art/REQUESTS-T14.md`, Turn 16's in `docs/art/REQUESTS-T16.md`, Turn 17's in
 `docs/art/REQUESTS-T17.md`, Turn 19's in `docs/art/REQUESTS-T19.md`, Turn 20's in
-`docs/art/REQUESTS-T20.md`, Turn 21's in `docs/art/REQUESTS-T21.md` and Turn 22's in
-`docs/art/REQUESTS-T22.md`.
+`docs/art/REQUESTS-T20.md`, Turn 21's in `docs/art/REQUESTS-T21.md`, Turn 22's in
+`docs/art/REQUESTS-T22.md` and Turn 23's in `docs/art/REQUESTS-T23.md`.
 
 ## Requirements
 
@@ -85,7 +85,7 @@ Run `npm run dev` and work through this. It is the same path the jsdom smoke tes
    shelving yet, and the line under the hall says so.
 3. Press Office in the top bar, or click the office room in the hall. The room is bare: there is
    no desk and no laptop yet, so the catalogue is lying on the floor by the door. Click it and
-   order: desk, chair, laptop, cordless drill, one workbench and the cheap shelving. The machines
+   order: desk, chair, laptop, one workbench and the cheap shelving. The machines
    are families: press Open on the table saw and the page fills with its five classes, from a used
    one at 1,800 to an industrial one at 25,000, each with what it does to the speed of the bench,
    to the dust it makes, to the life of the machine and to the meter. Order the used saw, then the
@@ -96,8 +96,8 @@ Run `npm run dev` and work through this. It is the same path the jsdom smoke tes
    board and no drawing. The top bar says Orders with the count on it: press it and the list says
    what is on the road, the shortest wait first. Open the menu, press End day and let the clock
    run out. The summary says the day went on nothing at all, which is what a first day is.
-5. Day 2, 08:00. One van at the gate with the whole of day 1 on it. The furniture, the hand tools,
-   the bench and the shelving are carried in and stand themselves in the hall and in the office;
+5. Day 2, 08:00. One van at the gate with the whole of day 1 on it. The furniture, the bench and
+   the shelving are carried in and stand themselves in the hall and in the office;
    the saw, the compressor and the extractor are two hours each and the event asks who takes them
    off. Unload them. The office now has a desk with a laptop on it.
 6. Click the catalogue again and buy the one off software bundle: it goes on the laptop the moment

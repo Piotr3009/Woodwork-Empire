@@ -9,6 +9,7 @@ import {
   findSpec,
   finishTimeFor,
   formatCalendarDay,
+  monthName,
   formatTime,
   gameMinutesPerRealSecond,
   moveConfirmPending,
@@ -67,13 +68,14 @@ import {
   roomById,
 } from '../engine/constants';
 import { centreOf, screenToTile } from '../render/iso';
+import { canteenScene } from '../render/canteen';
 import { fitOfficeStack, officeScene } from '../render/office';
 import { type AccountingTab, accountingTabFrom, renderAccounting } from './accounting';
 import { renderContracts } from './contracts';
 // Straight off its own module, not round the public API, which Turn 13 froze (REPORT-T13 10).
 import { contractManCheck } from '../engine/contracts';
 import { renderHouseCard } from './house';
-import { renderMonthEnd } from './monthEnd';
+import { renderMonthEnd, renderMonthlyReport } from './monthEnd';
 import { renderSettings } from './settings';
 import { renderTip, renderWarningStrip } from './tips';
 import { renderBoard } from './board';
@@ -101,7 +103,7 @@ import { applySoundSettings, play as soundPlay, setLoops, stopAllSounds, unlockS
 import { hallLoops, hallOneShots } from '../render/hall';
 import { walkPath } from '../engine/walk';
 import { unconnectedMachines } from '../engine/pipes';
-import { hasCentralExtraction } from '../engine/machines';
+import { OWNER, hasCentralExtraction } from '../engine/machines';
 import { nextSpriteOrientation } from '../render/sprites';
 import { patchInto } from './patch';
 import { renderOwnerOut } from './ownerOut';
@@ -110,6 +112,7 @@ import { renderShopping } from './shopping';
 import { renderStart } from './start';
 import { dropCardTitle, renderDropCard, renderDropCardFooter } from './dropCard';
 import { renderMachineCard } from './machineCard';
+import { isPerson, personCardTitle, renderPerson } from './personCard';
 import { decodeSaveFile, encodeSaveFile, saveFileName } from '../cloud/file';
 import {
   NO_STORED_SAVE,
@@ -138,7 +141,11 @@ type ModalId =
   /** One machine on the hall, opened by a click on the machine itself: its picture and class, its
    *  effects, its hours, its service, its extraction and the buttons the Owned tab has
    *  (PIOTR, 17.09; CLAUDE.md T17 2.6). */
-  | 'machineCard';
+  | 'machineCard'
+  /** One person, opened by a click on his figure on the hall or on his tile in Our team: his
+   *  portrait, his chips, his day, his week and the two buttons (PIOTR, 20.09;
+   *  docs/mockups/t23/team-cards.png; CLAUDE.md T23 2.13). */
+  | 'personCard';
 
 /** The Orders page: the enquiries, and the standing contracts beside them (CLAUDE.md T13 3.16). */
 export type BoardTab = 'enquiries' | 'contracts';
@@ -157,8 +164,9 @@ const TIP_KEY_OF_MODAL: Partial<Record<ModalId, string>> = {
 
 interface Ui {
   screen: 'start' | 'game';
-  /** The sprite check is a page of its own, reached from the Menu (CLAUDE.md T3 3.6). */
-  view: 'hall' | 'office' | 'sprites';
+  /** The rooms the player walks into, and the sprite check, which is a page of its own reached
+   *  from the Menu (CLAUDE.md T3 3.6). The canteen became the second room in Turn 23 (2.9). */
+  view: 'hall' | 'office' | 'canteen' | 'sprites';
   modal: ModalId | null;
   modalPosition: ModalPosition | null;
   eventPosition: ModalPosition | null;
@@ -200,6 +208,8 @@ interface Ui {
   sellConfirm: string | null;
   /** The machine whose own card is open, from a click on it on the hall (CLAUDE.md T17 2.6). */
   machineCard: string | null;
+  /** The person whose card is open: `owner` or a worker id (CLAUDE.md T23 2.13). */
+  personCard: string | null;
   /** Tasks the player has ticked on the laptop's Tasks page, in the order he ticked them, waiting
    *  for Do these (CLAUDE.md T17 2.16). */
   tickedTasks: string[];
@@ -218,6 +228,8 @@ interface Ui {
   /** The days of the books the player has opened on their lines. */
   openDays: number[];
   daySummary: number | null;
+  /** The month whose report is open over Accounting, or null (CLAUDE.md T23 2.14). */
+  monthlyReport: number | null;
   /** A new tab is new content, not the same list a minute later: it starts at the top. */
   scrollModalTop: boolean;
   /** Setting the hall out: the clock is stopped and the kit can be dragged about. */
@@ -272,6 +284,12 @@ interface Ui {
  *  hall, whose head is the thing's own name and class, because "Machine" over a tool cabinet says
  *  nothing and the card is opened by clicking that very cabinet (CLAUDE.md T22 2.13). */
 function modalTitleOf(id: ModalId, current: GameState): string {
+  // The card of a person is headed with his own name and trade, for the same reason the card of a
+  // thing on the hall is headed with its name: "Person" over a man the player has just clicked
+  // says nothing (CLAUDE.md T22 2.13, T23 2.13).
+  if (id === 'personCard') {
+    return personCardTitle(current, ui.personCard) ?? MODAL_TITLES[id];
+  }
   if (id !== 'machineCard') return MODAL_TITLES[id];
   const item = ui.machineCard === null
     ? undefined
@@ -296,6 +314,7 @@ const MODAL_TITLES: Record<ModalId, string> = {
   company: 'Company board',
   settings: 'Settings',
   machineCard: 'Machine',
+  personCard: 'Person',
 };
 
 /** How much of the page each modal takes. Anything that is a list or a board fills it; a small
@@ -314,6 +333,8 @@ export const MODAL_IS_FULL: Record<ModalId, boolean> = {
   settings: false,
   // One machine's card is a card, not a list: it sits on the page like an event does (T17 2.6).
   machineCard: false,
+  // A person's card is a card in the same sense, and it wears the machine card's skin (T23 2.13).
+  personCard: false,
 };
 
 /** The middle of the folder's three sizes, for a modal that is not a list but is more than two
@@ -331,6 +352,7 @@ export const MODAL_IS_WIDE: Record<ModalId, boolean> = {
   company: false,
   settings: false,
   machineCard: true,
+  personCard: true,
 };
 
 let ui: Ui = freshUi();
@@ -365,6 +387,7 @@ function freshUi(): Ui {
     ownedTab: 'all',
     sellConfirm: null,
     machineCard: null,
+    personCard: null,
     tickedTasks: [],
     dropConfirm: null,
     assignOpen: null,
@@ -372,6 +395,7 @@ function freshUi(): Ui {
     accountingMonth: null,
     openDays: [],
     daySummary: null,
+    monthlyReport: null,
     scrollModalTop: false,
     setup: false,
     rotate: 0,
@@ -493,6 +517,10 @@ function modalBody(id: ModalId, current: GameState): string {
       return renderWorkPlan(current, ui.workPlanTab, ui.assignOpen, ui.contractMan);
     case 'machineCard':
       return renderMachineCard(current, ui.machineCard, ui.sellConfirm);
+    case 'personCard':
+      return ui.personCard === null
+        ? '<p class="empty">Nobody by that name.</p>'
+        : renderPerson(current, ui.personCard, 'card');
     case 'accounting': {
       const books = renderAccounting(
         current,
@@ -705,15 +733,16 @@ function hallZoomControls(): string {
   );
 }
 
-/** A first guess at the room the office has, for the one render before it is on the page and can
+/** A first guess at the room a room view has, for the one render before it is on the page and can
  *  be measured. `VIEW_PADDING` is the padding of `.view` in styles.css; `TOPBAR_HEIGHT` is what the
  *  top bar comes to with that stylesheet's padding and type, and it is a guess, not a declared
  *  number. `fitOfficeStack` takes the real box a moment later, so neither has to be right. */
 const TOPBAR_HEIGHT = 70;
 const VIEW_PADDING = 12;
 
-/** The room the office has under the top bar, in CSS pixels, before it has been measured. */
-function officeViewport(): { width: number; height: number } {
+/** The room the office or the canteen has under the top bar, in CSS pixels, before it has been
+ *  measured. Both rooms are the same canvas on the same page, so they want the same box. */
+function roomViewport(): { width: number; height: number } {
   const width = typeof window === 'undefined' ? 1280 : window.innerWidth;
   const height = typeof window === 'undefined' ? 800 : window.innerHeight;
   return {
@@ -788,6 +817,26 @@ function modalSpecs(): ModalSpec[] {
       wide: true,
       position: null,
     });
+  }
+  // A month the company has closed, opened from Accounting's Monthly reports tab and drawn by the
+  // one function that draws it at the month end (CLAUDE.md T23 2.14). It is pushed after the
+  // laptop it was opened from, so it sits over it, and it carries the cross, Escape and a click
+  // outside like every other card.
+  if (ui.monthlyReport !== null) {
+    const asked = ui.monthlyReport;
+    const entry = current.monthlyReports.find((row) => row.month === asked) ?? null;
+    if (entry === null) {
+      ui.monthlyReport = null;
+    } else {
+      specs.push({
+        id: 'monthlyReport',
+        title: `${monthName(entry.month)}: the report`,
+        body: renderMonthlyReport(entry),
+        closable: true,
+        wide: true,
+        position: null,
+      });
+    }
   }
   // Dropping a project is the one action in the game that takes two clicks, because for a big job
   // it ends the company: the first click opens this card, which says what the drop costs before
@@ -868,7 +917,8 @@ function sceneFor(current: GameState): Scene | null {
   if (ui.view === 'hall') {
     return hallScene(current, { ghost: ghostFor(current), setup: ui.setup });
   }
-  return officeScene(current, officeViewport());
+  if (ui.view === 'canteen') return canteenScene(current, roomViewport());
+  return officeScene(current, roomViewport());
 }
 
 /** When the move he has just said yes to will be finished, in the words the toast wants: the rest
@@ -1184,6 +1234,16 @@ function openMachineCard(equipmentId: string): void {
   openModal('machineCard');
 }
 
+/** The one way onto one person's card: a click on his figure on the hall, and a click on his tile
+ *  in Our team. One function, the way the machine card has one (CLAUDE.md T23 2.13). */
+function openPersonCard(who: string): void {
+  if (!isPerson(game(), who)) return;
+  // The card is the answer to the click, so whatever the last click wrote under the hall goes.
+  setNote('');
+  ui.personCard = who;
+  openModal('personCard');
+}
+
 /** The one way onto a page of the laptop: a tile, the back arrow, the Joinery Core tile onto the
  *  Team's Technical tab, and the order board's "Open the team" all come through here. The lid is
  *  lifted first when the laptop is not open, which is what boots it (CLAUDE.md T15 2.3). A new
@@ -1407,6 +1467,12 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
         walkTo('hall');
         break;
       }
+      // The lockers are the men's, one each, so they open the page the men are on
+      // (PIOTR, 20.09; CLAUDE.md T23 2.9).
+      if (region === 'lockers') {
+        openLaptopPage('team');
+        break;
+      }
       const modal = OFFICE_REGION_MODALS[region];
       if (modal !== undefined) openModal(modal);
       break;
@@ -1562,6 +1628,24 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
       // new man: the player picks through the men with the clock stopped.
       ui.contractMan = element.dataset.worker ?? null;
       break;
+    // A click on a man's tile in Our team opens his card, the same card the hall's figure opens
+    // (PIOTR, 20.09; CLAUDE.md T23 2.13). The Assign button of a waiting man opens it too: the
+    // list he needs is on the card.
+    case 'openPersonCard':
+      openPersonCard(id);
+      break;
+    // The card's Assign: it opens the Work Plan on the job rows, where the Assign chips of
+    // Turn 19 are, which is the one list in the game for putting a man on a job. Nothing is
+    // dispatched: the click is free and the player makes the choice (CLAUDE.md T19 2.5, T23 2.1).
+    case 'openPersonAssign':
+      shutModal();
+      ui.workPlanTab = 'jobs';
+      openModal('workPlan');
+      break;
+    case 'openOffice':
+      shutModal();
+      walkTo('office');
+      break;
     case 'letGo':
       // The week's notice: he works it out, he is paid for it, and the morning after his last day
       // his jobs and his contracts are short of a man (PIOTR, 18.09; CLAUDE.md T20 2.4).
@@ -1631,6 +1715,10 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
       // The evening's own summary, put back in front of him from the books (CLAUDE.md T6 3.9).
       ui.daySummary = Number(id);
       break;
+    case 'openMonthlyReport':
+      // The month's own card, put back in front of him from the books (CLAUDE.md T23 2.14).
+      ui.monthlyReport = Number(id);
+      break;
     case 'closeModal': {
       // The cross on the event modal is the one choice it has. The cross on anything else just
       // shuts that modal: whatever is behind it is still there.
@@ -1643,6 +1731,10 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
       }
       if (which === 'daySummary') {
         ui.daySummary = null;
+        break;
+      }
+      if (which === 'monthlyReport') {
+        ui.monthlyReport = null;
         break;
       }
       // The cross on the drop card is "Keep the job": the card goes and the job stays
@@ -2018,22 +2110,22 @@ function copyState(): void {
  *  door in the hall, and the door of the room itself all come through here (CLAUDE.md T14 2.3).
  *  Leaving the hall ends setting it out, and walking out and back in shows the whole hall again
  *  [TUNE: reset or remember; REPORT-T6 says which was chosen]. */
-function walkTo(view: 'hall' | 'office'): void {
+function walkTo(view: 'hall' | 'office' | 'canteen'): void {
   ui.view = view;
   if (view !== 'hall') endSetup();
   resetCamera();
   requestRender();
 }
 
-/** Walking into a room. The office is a view of its own; the other two are a line under the
- *  hall (CLAUDE.md T6 3.1). */
+/** Walking into a room. The office and the canteen are views of their own; the WC is still a line
+ *  under the hall (CLAUDE.md T6 3.1, T23 2.9). */
 function handleRoomClick(room: RoomId): void {
   if (room === 'office') {
     walkTo('office');
-  } else if (room === 'wc') {
-    setNote(roomById('wc').tooltip);
+  } else if (room === 'canteen') {
+    walkTo('canteen');
   } else {
-    setNote(roomById('canteen').tooltip);
+    setNote(roomById('wc').tooltip);
   }
   requestRender();
 }
@@ -2046,6 +2138,21 @@ function handleSceneClick(element: DataElement): boolean {
   // laptop's Office tile.
   if (element.dataset.door === 'office') {
     walkTo('office');
+    return true;
+  }
+  // A click on a man on the hall opens his card: his portrait, his day, what he is on and the
+  // two buttons. It is the one way onto it beside his tile in Our team, and it takes the place of
+  // nothing, because a figure on the hall answered no click at all before tonight
+  // (PIOTR, 20.09; docs/mockups/t23/team-cards.png; CLAUDE.md T23 2.13).
+  const man = element.dataset.worker;
+  if (man !== undefined) {
+    openPersonCard(man);
+    requestRender();
+    return true;
+  }
+  if (element.dataset.owner !== undefined) {
+    openPersonCard(OWNER);
+    requestRender();
     return true;
   }
   const van = element.dataset.van;
@@ -2149,13 +2256,29 @@ function runClick(event: MouseEvent): void {
     ui.dropConfirm = null;
     requestRender();
   }
+  // And the same for a month's report: a click anywhere but inside it puts it away and leaves the
+  // books it was opened from where they were (CLAUDE.md T23 2.14).
+  if (
+    ui.monthlyReport !== null &&
+    target.closest('[data-modal="monthlyReport"]') === null &&
+    doer?.dataset.do !== 'openMonthlyReport'
+  ) {
+    ui.monthlyReport = null;
+    requestRender();
+  }
   if (doer) {
     if (doer instanceof HTMLButtonElement && doer.disabled) return;
     handleAction(doer, point);
     return;
   }
   if (state === null) return;
-  const scene = dataElement(target.closest('[data-van],[data-kit],[data-door]'));
+  // The things on the hall a click can land on. The two figure hooks join them tonight, because a
+  // click on a man opens his card (PIOTR, 20.09; CLAUDE.md T23 2.13); `data-worker` is the hook
+  // the hall has carried on every man since Turn 19 and `data-owner` the one it carries on the
+  // boss, so nothing new is drawn for this.
+  const scene = dataElement(
+    target.closest('[data-van],[data-kit],[data-door],[data-worker],[data-owner]'),
+  );
   if (scene) {
     handleSceneClick(scene);
     return;
@@ -2278,6 +2401,13 @@ export const ESCAPE_ORDER: ReadonlyArray<{
     isOpen: () => ui.daySummary !== null,
     shut: () => {
       ui.daySummary = null;
+    },
+  },
+  {
+    name: 'monthly report',
+    isOpen: () => ui.monthlyReport !== null,
+    shut: () => {
+      ui.monthlyReport = null;
     },
   },
   {

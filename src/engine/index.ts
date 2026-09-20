@@ -53,8 +53,7 @@ export {
   LAPTOP_BOOT_MINUTES,
   STATE_VERSION,
   WHY,
-  SHEET_PRICE_AD_HOC,
-  SHEET_PRICE_STOCK,
+  SHEET_PRICE_LADDER,
   SHEET_VALUE,
   SOFTWARE_ONE_OFF_PRICE,
   SOFTWARE_SUBSCRIPTION_MONTHLY,
@@ -72,7 +71,9 @@ export {
   BUBBLE_HEAD_GAP,
   OWNER_IDLE_REASONS,
   HOUSE_TIER_NAMES,
-  LOAN_MAX,
+  LOAN_FLOOR,
+  LOAN_SALES_MONTHS,
+  LOAN_SHARE_OF_SALES,
   LOW_STOCK_SHEETS,
   OWNER_DRAW_TIERS,
   SECURITY_LEVELS,
@@ -86,6 +87,8 @@ export {
   accrueOverdraftInterest,
   loanCheck,
   loanInstalmentFor,
+  loanLimit,
+  loanLimitLine,
   loanInterestForMonth,
   repayLoan,
   runFinanceMonth,
@@ -396,7 +399,6 @@ export {
   cleanerAtWork,
   manOnOpenTask,
   softwareActive,
-  staffManagementMinutes,
   startTaskCheck,
   taskWorkRate,
   tasksOfKind,
@@ -447,6 +449,10 @@ export {
   itemStandsInTheHall,
   isHeavy,
   isSellableFamily,
+  benchOf,
+  benchPlaces,
+  benchPlacesOf,
+  isServiced,
   isSold,
   salePriceFor,
   toolSlotsLine,
@@ -546,6 +552,7 @@ export {
   sheetsDueFor,
   sheetsForCost,
   shortfallOf,
+  sheetPriceFor,
   stockCostFor,
   stockFree,
   stockIsLow,
@@ -684,7 +691,6 @@ export {
 } from './owner';
 export {
   joineryCoreOffer,
-  staffManagementTaker,
 } from './tasks';
 export type { JoineryCoreOffer } from './tasks';
 export {
@@ -697,8 +703,9 @@ export {
   MONTH_LINE_OF,
   MONTH_LINES,
   monthReport,
+  monthlyReportFor,
 } from './economy';
-export type { MonthLine, MonthLineId, MonthReport } from './economy';
+export type { MonthLine, MonthLineId, MonthReport, MonthlyReport } from './economy';
 export {
   gateCheck,
   hasGate,

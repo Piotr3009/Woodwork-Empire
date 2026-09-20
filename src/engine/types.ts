@@ -1,5 +1,12 @@
 // All shapes of the simulation. Everything here is plain JSON: no classes, no functions,
 // no Map, no Set. `JSON.parse(JSON.stringify(state))` must return an identical state.
+//
+// One shape is not written here: a month's report is the four sums the month end card is drawn
+// from, and each of those already has a name in the module that works it out. The state carries
+// them, so the type is composed where they compose, in `economy.ts`, and reached from here by a
+// type only import that no build ever has to resolve at run time (CLAUDE.md T23 2.14).
+
+import type { MonthlyReport } from './economy';
 
 export type Difficulty = 'veryEasy' | 'easy' | 'hard';
 
@@ -49,10 +56,7 @@ export type DayCategory =
   | 'meetings'
   | 'siteMeasure'
   | 'office'
-  | 'fixing'
-  /** Assigning the crew to their work: the owner's until a production manager takes it off him,
-   *  and then the manager's own (CLAUDE.md T13 3.9). */
-  | 'assign';
+  | 'fixing';
 
 /** One run of minutes on one thing. Consecutive minutes on the same thing are one segment, so a
  *  morning of drawing is one entry and not two hundred (CLAUDE.md T11 3.1). */
@@ -224,7 +228,8 @@ export interface EquipmentSpec {
   /** Parked for a later stage: shown with a price, buy button disabled. */
   locked: boolean;
   lockReason: string;
-  /** One per worker (workbench, locker, canteen seat, hand tool set). */
+  /** One per worker (workbench, locker, hand tool set). The canteen seat was on that list
+   *  until Turn 23 took the seat out of the game (CLAUDE.md T23 2.11). */
   perWorker: boolean;
   /** More than one may be owned. */
   stackable: boolean;
@@ -449,9 +454,18 @@ export interface Worker {
   /** Day or night. Everybody is on the day shift until a production manager puts him on the
    *  second one (CLAUDE.md T13 3.9). */
   shift: Shift;
-  /** His own day, in the order it happened, for a man who has a day meter of his own: the
-   *  production manager's shows the assigning the owner no longer does (CLAUDE.md T13 3.9). */
+  /** His own day, in the order it happened, for a man who has a day meter of his own
+   *  (CLAUDE.md T13 3.9). */
   dayLog: DayLogEntry[];
+  /** Minutes of today he stood still, and why. The owner has had these since Turn 21; a man on
+   *  the books has them from Turn 23, because from tonight a free man waits for the boss and the
+   *  player has to be able to see what that cost him (PIOTR, 20.09; CLAUDE.md T23 2.1, 2.13).
+   *  Emptied every morning with the day log. */
+  idleMinutes: number;
+  idleByReason: Record<WorkerIdleReason, number>;
+  /** Accidents he has had since he started. His card says how many, and nothing in the state
+   *  counted them until Turn 23 (CLAUDE.md T23 2.13). */
+  accidents: number;
   /** Minutes he has actually worked since the 1st, and working days he was not in: the two
    *  figures the Our team page reads. Both start again on the 1st (CLAUDE.md T17 2.9). */
   monthMinutes: number;
@@ -465,6 +479,9 @@ export interface HiringOption {
   rate: number;
   monthlyWage: number;
   minReputation: number;
+  /** What this man does with his day, in the words the hire card prints. The spec's own sentence
+   *  and the only one: a manager's says his grade's three figures (CLAUDE.md T23 2.4). */
+  duties: string;
   available: boolean;
   blockReason: string;
   /** What must be bought before this hire is possible, named and counted for the card. */
@@ -647,7 +664,6 @@ export type TaskKind =
   | 'clientMeeting'
   | 'bookkeeping'
   | 'dailyOrdering'
-  | 'staffManagement'
   | 'clientCall'
   | 'design'
   /** Reading the drawing and counting the sheets for one accepted job: the owner's until an
@@ -1012,14 +1028,38 @@ export type LostMinuteCause = 'noPeople' | 'noMachine' | 'noMaterial' | 'ownerAw
  *  `LostMinuteCause`: that one counts every seat in the hall, and two of its four cannot be true
  *  of the man whose absence they measure. The words are `OWNER_IDLE_REASONS`
  *  (CLAUDE.md T21 2.8). */
-export type OwnerIdleReason = 'noMachine' | 'noMaterial' | 'nothingAssigned' | 'officeEmpty';
+export type OwnerIdleReason =
+  | 'noMachine'
+  | 'noMaterial'
+  /** He stood at a bench with no compressor behind it, or on one short of litres: from Turn 23
+   *  there is no bench work without air at all (PIOTR, 20.09; CLAUDE.md T23 2.7). */
+  | 'noCompressor'
+  | 'nothingAssigned'
+  | 'officeEmpty';
 
-/** The state a mark over a figure's head is drawn for: the four things that are wrong with a man
+/** Why a man on the books stood still for a minute of his own day. His own list and not the
+ *  owner's: the two office reasons are the owner's alone, because a joiner has no office queue to
+ *  be empty, and a joiner has one of his own the owner can never have, which is that nobody has
+ *  put him on anything. From Turn 23 a free man waits for the boss's word, so the minutes he
+ *  stands are minutes with a reason and his day meter says which (PIOTR, 20.09; CLAUDE.md T23
+ *  2.1, 2.13). The words are `WORKER_IDLE_REASONS`. */
+export type WorkerIdleReason = 'waitingForBoss' | 'noMachine' | 'noMaterial';
+
+/** The state a mark over a figure's head is drawn for: the six things that are wrong with a man
  *  and that the player can put right (docs/mockups/t22/bubbles-v2.png, the red column;
  *  CLAUDE.md T22 2.5). A man who is working, at a chore of his own, at his lunch, in the office or
  *  out measuring has nothing wrong with him and carries no key at all
  *  [PIOTR, 19.09: "when all is fine, no bubble; only when it is bad"]. */
-export type BubbleKey = 'waitingForMachine' | 'noCutParts' | 'noMaterial' | 'nothingToDo';
+export type BubbleKey =
+  | 'waitingForMachine'
+  | 'noCutParts'
+  | 'noMaterial'
+  /** He is at a bench the hall has no air for (CLAUDE.md T23 2.7). */
+  | 'noCompressor'
+  | 'nothingToDo'
+  /** Nobody has put him on anything, and without a production manager nobody but the owner can
+   *  (CLAUDE.md T23 2.1). */
+  | 'waitingForBoss';
 
 /** One mark over a man's head, ready to draw: the words it says on hover with every slot filled,
  *  and the figure it belongs to (CLAUDE.md T22 2.5). There is no tone on it: a mark is drawn only
@@ -1205,6 +1245,11 @@ export interface GameState {
   /** The month whose report has been put in front of the player, so it is shown once
    *  (CLAUDE.md T13 3.20). */
   monthEndShownFor: number;
+  /** Every month the company has closed, in the figures its month end card was drawn from, oldest
+   *  first. Accounting's Monthly reports tab is this list read back, so a month a player has not
+   *  looked at is not lost with the ledger it was added up from (PIOTR, 20.09;
+   *  CLAUDE.md T23 2.14). */
+  monthlyReports: MonthlyReport[];
   ledger: LedgerEntry[];
   eventQueue: GameEvent[];
   activeEvent: GameEvent | null;

@@ -9,7 +9,11 @@ import { peekSave } from '../../src/cloud/store';
 import type { SaveStore } from '../../src/cloud/store';
 import { OLDEST_SAVE_VERSION, canOpenVersion, migrateState } from '../../src/engine/migrate';
 import { STATE_VERSION, bagStore, tick } from '../../src/engine/index';
-import { CABINET_SLOT_LAYOUT, CANTEEN_SLOT_LAYOUT, roomById } from '../../src/engine/constants';
+import {
+  CABINET_SLOT_LAYOUT,
+  PRODUCTION_MANAGER_MONTHLY_WAGE,
+  roomById,
+} from '../../src/engine/constants';
 import type { GameState } from '../../src/engine/index';
 import { itemFootprint } from '../../src/engine/machines';
 import { orientationsFor } from '../../src/engine/ports';
@@ -142,7 +146,7 @@ describe('a v24 save in this build (CLAUDE.md T17 section 4)', () => {
     expect(opened.state).not.toBeNull();
     const state = opened.state as GameState;
     expect(state.version).toBe(STATE_VERSION);
-    expect(STATE_VERSION).toBe(19);
+    expect(STATE_VERSION).toBe(20);
     expect(state.taskQueue).toEqual([]);
     expect(state.dayStats.paidHours).toBe(0);
     expect(state.dayStats.expressUplift).toBe(0);
@@ -153,7 +157,7 @@ describe('a v24 save in this build (CLAUDE.md T17 section 4)', () => {
     for (const job of state.jobs) expect(job.assignees[1] ?? null).toBeNull();
   });
 
-  it('moves every seat and locker off the hall floor and into the canteen', () => {
+  it('moves every locker off the hall floor and into the canteen, and retires the seats', () => {
     const lifted = migrateState(v24WithWelfareOnTheFloor(), 14);
     expect(lifted).not.toBeNull();
     const state = lifted as GameState;
@@ -163,14 +167,13 @@ describe('a v24 save in this build (CLAUDE.md T17 section 4)', () => {
       item.anchorX < canteen.x + canteen.width &&
       item.anchorY >= canteen.y &&
       item.anchorY < canteen.y + canteen.depth;
-    const welfare = state.equipment.filter(
-      (item) => item.specId === 'canteenSeat' || item.specId === 'locker',
-    );
-    expect(welfare).toHaveLength(2);
-    for (const item of welfare) expect(inside(item), item.specId).toBe(true);
-    // The first seat is the cell just inside the door.
-    const seat = welfare.find((item) => item.specId === 'canteenSeat');
-    expect({ x: seat?.anchorX, y: seat?.anchorY }).toEqual(CANTEEN_SLOT_LAYOUT[0]);
+    const lockers = state.equipment.filter((item) => item.specId === 'locker');
+    expect(lockers).toHaveLength(1);
+    for (const item of lockers) expect(inside(item), item.specId).toBe(true);
+    // The seat the v15 lift stood inside the canteen is taken off the books by the v20 lift,
+    // because Turn 23 took the seat out of the game (CLAUDE.md T23 2.11).
+    expect(state.equipment.some((item) => item.specId === 'canteenSeat')).toBe(false);
+    expect(state.ledger.some((entry) => entry.label === 'Canteen seats retired (v36)')).toBe(true);
     // And a seat half way through a move is not a move any more: the hall never had it.
     expect(state.movedItems).toEqual([]);
   });
@@ -284,7 +287,7 @@ describe('a v28 save in this build (CLAUDE.md T20 section 4, T21 section 4)', ()
   if (lifted === null) throw new Error('the lift refused a version 16 state');
 
   it('renames every tier and brings the man up to what that tier is worth tonight', () => {
-    expect(lifted.version).toBe(19);
+    expect(lifted.version).toBe(20);
     expect(lifted.workers.map((worker) => worker.tier)).toEqual([
       'novice',
       'experienced',
@@ -344,6 +347,7 @@ describe('a v28 save in this build (CLAUDE.md T20 section 4, T21 section 4)', ()
     expect(lifted.owner.idleByReason).toEqual({
       noMachine: 0,
       noMaterial: 0,
+      noCompressor: 0,
       nothingAssigned: 0,
       officeEmpty: 0,
     });
@@ -406,7 +410,7 @@ describe('a v29 save in this build (CLAUDE.md T21 section 4)', () => {
   if (lifted === null) throw new Error('the lift refused a version 17 state');
 
   it('pays every man by the month at the conversion the Turn 20 build printed', () => {
-    expect(lifted.version).toBe(19);
+    expect(lifted.version).toBe(20);
     // Turn 20's four weekly wages for a joiner were 450, 600, 800 and 1,000, and the build printed
     // the month beside each of them at thirty days over seven. A lifted man costs what the game
     // told the player he cost, and his own wage is never re-read off the hiring specs: what he is
@@ -447,6 +451,7 @@ describe('a v29 save in this build (CLAUDE.md T21 section 4)', () => {
     expect(lifted.owner.idleByReason).toEqual({
       noMachine: 0,
       noMaterial: 0,
+      noCompressor: 0,
       nothingAssigned: 0,
       officeEmpty: 0,
     });
@@ -627,7 +632,7 @@ describe('a v31 save with an unpaid balance on it (CLAUDE.md T22 2.1)', () => {
     // There is one track for money from tonight: a cost the player did not choose is paid out of
     // the account whatever the balance, so a save that was carrying 2,780 it never paid has it
     // taken out of the account now (PIOTR, 19.09; CLAUDE.md T22 2.1, section 4).
-    expect(lifted.version).toBe(19);
+    expect(lifted.version).toBe(20);
     expect(lifted.cash).toBe(-4998 - 2780);
   });
 
@@ -676,5 +681,98 @@ describe('a v31 save with an unpaid balance on it (CLAUDE.md T22 2.1)', () => {
     expect(opened.ledger.some((entry) => entry.label.includes('carried into the account'))).toBe(
       false,
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Turn 23: version 19 to 20, the months written down, the manager's grade, and the three things
+// that left the game (CLAUDE.md T23 section 4)
+// ---------------------------------------------------------------------------
+
+/** A v35 save of a company with a manager, a drill and a seat standing in the hall, another drill
+ *  still on the lorry, a man's tool set on a cell, and the day's staff management chore on the
+ *  list. Cut down to what this one lift touches, the way the lift before it was. */
+function v35Save(): Record<string, unknown> {
+  return {
+    version: 19,
+    cash: 4200,
+    clock: { day: 40, minute: 300 },
+    workers: [
+      { id: 'pm-1', role: 'productionManager', tier: null, monthlyWage: 3400 },
+      { id: 'j-1', role: 'joiner', tier: 'novice', monthlyWage: 1950 },
+    ],
+    equipment: [
+      { id: 'kit-drill', specId: 'drill', variantId: 'budget', anchorX: 19, anchorY: 6 },
+      { id: 'kit-seat', specId: 'canteenSeat', variantId: 'standard', anchorX: 4, anchorY: 3 },
+      { id: 'kit-set', specId: 'handToolSet', variantId: 'standard', anchorX: 19, anchorY: 7 },
+      { id: 'kit-saw', specId: 'tableSaw', variantId: 'standard', anchorX: 5, anchorY: 0 },
+    ],
+    onOrder: [{ id: 'order-drill', specId: 'drill', variantId: 'pro', anchorX: 18, anchorY: 6 }],
+    tasks: [
+      { id: 'task-assign', kind: 'staffManagement', label: 'Staff management', minutes: 20 },
+      { id: 'task-books', kind: 'bookkeeping', label: 'Bookkeeping', minutes: 30 },
+    ],
+    ledger: [],
+  };
+}
+
+describe('a v35 save in this build (CLAUDE.md T23 section 4)', () => {
+  const lifted = migrateState(v35Save(), 19);
+  if (lifted === null) throw new Error('the lift refused a version 19 state');
+
+  it('comes up at this build s version with an empty list of months behind it', () => {
+    // A played company starts its list at its next month end: the card the player was shown that
+    // evening is the report, and one worked out again tonight would not be that card
+    // (CLAUDE.md T23 2.14).
+    expect(lifted.version).toBe(20);
+    expect(lifted.monthlyReports).toEqual([]);
+  });
+
+  it('gives the manager the grade he was always paid for, and leaves everybody else alone', () => {
+    const manager = lifted.workers.find((worker) => worker.role === 'productionManager');
+    expect(manager?.tier).toBe('experienced');
+    expect(manager?.monthlyWage).toBe(PRODUCTION_MANAGER_MONTHLY_WAGE.experienced);
+    expect(lifted.workers.find((worker) => worker.role === 'joiner')?.tier).toBe('novice');
+  });
+
+  it('takes the drill and the seat off the books, standing or on the lorry, with a line each', () => {
+    expect(lifted.equipment.map((item) => item.specId)).toEqual(['handToolSet', 'tableSaw']);
+    expect(lifted.onOrder).toEqual([]);
+    const lines = lifted.ledger.filter((entry) => entry.label.endsWith('retired (v36)'));
+    expect(lines.map((entry) => entry.label)).toEqual([
+      'Cordless drill retired (v36)',
+      'Canteen seats retired (v36)',
+    ]);
+    for (const line of lines) {
+      // No refund, so no money moved: a note on the books and not a line of the month's money.
+      expect(line.amount).toBe(0);
+      expect(line.unpaid).toBe(true);
+      expect(line.category).toBe('other');
+      expect(line.balance).toBe(lifted.cash);
+      expect(line.day).toBe(40);
+    }
+    expect(lifted.cash).toBe(4200);
+  });
+
+  it('takes the cell off a man s hand tool set and leaves the set itself alone', () => {
+    const set = lifted.equipment.find((item) => item.specId === 'handToolSet');
+    expect(set?.id).toBe('kit-set');
+    expect(Object.keys(set as unknown as Record<string, unknown>)).not.toContain('anchorX');
+    expect(Object.keys(set as unknown as Record<string, unknown>)).not.toContain('anchorY');
+  });
+
+  it('drops the staff management chore and nothing else off the list', () => {
+    expect(lifted.tasks.map((task) => task.kind)).toEqual(['bookkeeping']);
+  });
+
+  it('writes no line at all for a save that held neither', () => {
+    const clean = v35Save();
+    clean.equipment = (clean.equipment as Array<Record<string, unknown>>).filter(
+      (item) => item.specId !== 'drill' && item.specId !== 'canteenSeat',
+    );
+    clean.onOrder = [];
+    const opened = migrateState(clean, 19);
+    if (opened === null) throw new Error('the lift refused a clean version 19 state');
+    expect(opened.ledger).toEqual([]);
   });
 });

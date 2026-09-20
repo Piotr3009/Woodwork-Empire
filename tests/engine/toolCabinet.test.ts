@@ -12,6 +12,7 @@ import { describe, expect, it } from 'vitest';
 import {
   BENCH_SLOT_LAYOUT,
   CABINET_SLOT_LAYOUT,
+  HAND_TOOL_SET,
   JOINER_PREREQUISITES,
   M2_PER_PERSON,
   ROOM_LAYOUT,
@@ -186,6 +187,65 @@ describe('the hand edgebander holds no cell of the floor', () => {
   });
 });
 
+/** The day one hall with a cabinet big enough to take a set beside the owner's own: the used one
+ *  the starting kit buys holds a single man's tools, and that one is the owner's. */
+function roomForSets(): GameState {
+  const state = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
+  const cabinet = cabinetsOf(state)[0];
+  if (cabinet === undefined) throw new Error('the day one kit has a cabinet in it');
+  cabinet.variantId = 'pro';
+  return state;
+}
+
+/** That hall with one man's set bought into it. */
+function withASet(): GameState {
+  return buyNow(roomForSets(), HAND_TOOL_SET);
+}
+
+/** Turn 22 gave a man's hand tool set a cell of the hall and a slot on the floor to stand on.
+ *  Piotr looked at the hall and said the tools live in the cabinet, so from Turn 23 the set reads
+ *  exactly as the hand edgebander above it does: it is bought, it takes a cabinet slot, and it is
+ *  not a thing on the hall at all (PIOTR, 20.09; CLAUDE.md T23 2.6). */
+describe('the hand tool set holds no cell of the floor', () => {
+  it('cannot be placed anywhere, and is not in the way of anything', () => {
+    const state = withASet();
+    expect(countOf(state, HAND_TOOL_SET)).toBe(1);
+    // The one code path a thing kept in a cabinet goes through: a zone of nought by nought, which
+    // is what `standsInTheHall` reads and what the placement refuses on.
+    expect(standsInTheHall(HAND_TOOL_SET)).toBe(false);
+    const check = canPlaceSpec(state, HAND_TOOL_SET, 6, 6, null);
+    expect(check.ok).toBe(false);
+    expect(check.reason).toBe('It lives in a tool cabinet');
+    const set = state.equipment.find((item) => item.specId === HAND_TOOL_SET);
+    expect(set).toBeDefined();
+    expect(canPlace(state, set?.id ?? '', 6, 6).ok).toBe(false);
+    // Nothing on the floor collides with it, and there is no ducting on a thing that never stood
+    // anywhere to be unplugged from.
+    expect(hallItems(state).some((item) => item.specId === HAND_TOOL_SET)).toBe(false);
+    expect(needsDucting(HAND_TOOL_SET)).toBe(false);
+  });
+
+  it('is drawn nowhere on the hall, neither its picture nor a box with its name in it', () => {
+    const svg = renderHall(withASet());
+    // No picture, no placeholder box and no label: the set is in the cabinet and the hall says
+    // nothing about it (CLAUDE.md T23 2.6).
+    expect(svg).not.toContain('Hand tool set');
+    expect(svg).not.toContain('/sprites/handToolSet');
+    expect(svg).not.toContain('data-sprite="handToolSet"');
+  });
+
+  it('still takes a slot of a cabinet, and the hire still wants a free one and a set', () => {
+    // The gate is unchanged by the set coming off the hall: a man needs a free slot and a set
+    // (CLAUDE.md T22 2.12, T23 2.6).
+    const state = roomForSets();
+    expect(JOINER_PREREQUISITES).toContain(HAND_TOOL_SET);
+    expect(JOINER_PREREQUISITES).toContain(TOOL_CABINET);
+    const before = freeToolSlots(state);
+    const after = freeToolSlots(buyNow(state, HAND_TOOL_SET));
+    expect(after).toBe(before - 1);
+  });
+});
+
 describe('hiring wants a free cabinet', () => {
   it('counts slots and not cabinets: one for the owner and one for every joiner', () => {
     const state = newGame();
@@ -209,7 +269,7 @@ describe('hiring wants a free cabinet', () => {
     // With the owner's set in the one cabinet there is no slot for a man's, so the hire is short
     // one, and one used cabinet at ninety pounds is the cheapest way to give him one.
     expect(missingForHire(state, 'joiner')).toContain(TOOL_CABINET);
-    for (const specId of ['locker', 'canteenSeat']) state = buyNow(state, specId);
+    for (const specId of ['locker']) state = buyNow(state, specId);
     // His set cannot even be bought yet: there is nowhere to keep it, which is the other half of
     // 2.12's free slot rule and is `canBuy`'s own refusal.
     expect(canBuy(state, 'handToolSet').reason).toBe('No free slot in a tool cabinet');
@@ -232,15 +292,11 @@ describe('hiring wants a free cabinet', () => {
     const bigger = buyNow(hired, TOOL_CABINET, 'industrial');
     expect(toolSlots(bigger)).toBe(10);
     expect(freeToolSlots(bigger)).toBe(8);
-    // The cabinet is off the shortfall for good: the next man wants his own bench, locker, seat
-    // and tool set, and a slot to keep the set in, and the slots are there for seven more of him.
+    // The cabinet is off the shortfall for good: the next man wants his own bench, locker and
+    // tool set, and a slot to keep the set in, and the slots are there for seven more of him. The
+    // seat came off that list in Turn 23 (CLAUDE.md T23 2.11).
     expect(missingForHire(bigger, 'joiner')).not.toContain(TOOL_CABINET);
-    expect(missingForHire(bigger, 'joiner')).toEqual([
-      'workbench',
-      'locker',
-      'canteenSeat',
-      'handToolSet',
-    ]);
+    expect(missingForHire(bigger, 'joiner')).toEqual(['workbench', 'locker', 'handToolSet']);
   });
 
   it('blocks the hire while there is no cabinet free, and lets it through when there is', () => {
@@ -248,7 +304,7 @@ describe('hiring wants a free cabinet', () => {
     // The day 1 kit buys one, which is the owner's: the joiner has none.
     expect(countOf(state, TOOL_CABINET)).toBe(1);
     expect(missingForHire(state, 'joiner')).toContain(TOOL_CABINET);
-    for (const specId of ['locker', 'canteenSeat']) {
+    for (const specId of ['locker']) {
       state = buyNow(state, specId);
     }
     expect(canHire(state, 'joiner', 'novice').ok).toBe(false);

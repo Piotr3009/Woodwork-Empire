@@ -83,7 +83,6 @@ describe('every catalogue line is a family', () => {
       'cnc',
       'solidWoodTools',
       'sprayBooth',
-      'drill',
       'spindleMoulder',
     ]) {
       expect(CLASS_LADDER_FAMILIES, family).toContain(family);

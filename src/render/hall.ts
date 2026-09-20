@@ -6,6 +6,7 @@ import {
   DUCT_SYSTEMS,
   FINISHED_GOODS_LAYOUT,
   GATE_CROWD_LIMIT,
+  NO_AIR_LINE,
   GATE_LAYOUT,
   PALLET_LAYOUT,
   CLASS_BADGE,
@@ -356,8 +357,9 @@ export function doorLeaf(room: { x: number; y: number; width: number; depth: num
  *  through it (PIOTR, 18.09; CLAUDE.md T20 2.12).
  *
  *  Only the office carries `data-door`, because only the office door is a control: the canteen
- *  door is a door and the block behind it is still the way to the canteen's own note, and giving
- *  it the control's hook would have taken that click away from it. */
+ *  door is a door and the block behind it is still the way into the canteen, which from Turn 23 is
+ *  a room of its own, and giving the door the control's hook would have taken that click away from
+ *  the block (CLAUDE.md T23 2.9). */
 export function roomDoor(
   room: { x: number; y: number; width: number; depth: number },
   id: string,
@@ -1892,12 +1894,17 @@ export function hallProblems(state: GameState): HallProblem[] {
     });
   }
   // A compressor with more drawn on it than the pipe will carry: everything on it runs at 0.7
-  // for the minute (PIOTR, CLAUDE.md T10 3.2).
+  // for the minute (PIOTR, CLAUDE.md T10 3.2). A hall with no compressor in it at all is the
+  // other line this list can carry, and it has nothing on it to turn off and nothing running at
+  // 70%: the benches simply stand, which is what the line already says (CLAUDE.md T23 2.7).
   for (const line of hallAirCheck(state).lines) {
     list.push({
       kind: 'hall',
       equipmentId: null,
-      text: `${line}. Everything on it runs at 70% until something is turned off`,
+      text:
+        line === NO_AIR_LINE
+          ? line
+          : `${line}. Everything on it runs at 70% until something is turned off`,
     });
   }
   if (gateIsCrowded(state)) {

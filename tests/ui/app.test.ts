@@ -7,7 +7,6 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { advanceMinutes, currentState, mount, render } from '../../src/ui/app';
 import {
   BREAK_MINUTES,
-  LEDGER_VISIBLE_ENTRIES,
   LAPTOP_BOOT_MINUTES,
 } from '../../src/engine/constants';
 import { formatCalendarDay, monthName } from '../../src/engine/index';
@@ -408,13 +407,15 @@ describe('the modals', () => {
     click('[data-do="closeModal"]');
     click('[data-office="catalogue"]');
     // The filter works inside the tab that is open and nowhere else (CLAUDE.md T6 3.6).
-    click('[data-do="catalogueTab"][data-id="handTools"]');
+    // Sheet machines, because the hand tools tab holds one folder since the drill went
+    // (CLAUDE.md T23 2.5) and a filter has to have two things to choose between.
+    click('[data-do="catalogueTab"][data-id="sheetMachines"]');
     expect(html()).not.toContain('data-do="clearFilter"');
-    expect(html()).toContain('Drills');
-    type('[data-filter="catalogue"]', 'hand tool');
+    expect(html()).toContain('Table saws');
+    type('[data-filter="catalogue"]', 'edgeband');
     expect(html()).toContain('data-do="clearFilter"');
-    expect(html()).toContain('Hand tool sets');
-    expect(html()).not.toContain('Drills');
+    expect(html()).toContain('Edgebanders');
+    expect(html()).not.toContain('Table saws');
     // A tab with nothing matching says so, and never borrows a folder from another tab.
     click('[data-do="catalogueTab"][data-id="storage"]');
     expect(html()).toContain('Tool cabinets');
@@ -578,12 +579,11 @@ describe('why it is like this in real life', () => {
 describe('accounting', () => {
   it('plays blind while the books are behind, and shows everything once they are written up', () => {
     click('[data-office="binder"]');
-    click('[data-do="accountingTab"][data-id="ledger"]');
+    click('[data-do="accountingTab"][data-id="days"]');
     expect(html()).toContain(`Books not up to date since ${formatCalendarDay(1)}`);
     expect(html()).toContain('? today');
     expect(html()).not.toContain('Unit deposit');
-    // Nothing on the Days tab either: the month has not been written up.
-    click('[data-do="accountingTab"][data-id="days"]');
+    // Nothing on the Days tab: the month has not been written up.
     expect(html()).toContain(`Nothing has moved in ${monthName(1)}.`);
     click('[data-do="closeModal"]');
     // The bookkeeping task catches every day up at once.
@@ -593,12 +593,18 @@ describe('accounting', () => {
     expect(html()).not.toContain('Books not up to date');
     // The month a day at a time, out of the ledger itself (CLAUDE.md T6 3.9).
     expect(html()).toContain('data-day="1"');
-    click('[data-do="accountingTab"][data-id="ledger"]');
+    // The lines of a day, under the day they were written on. They had a screen of their own
+    // until Piotr read it on 20.09 and said it was made for an accountant and not for a player;
+    // the months the company has closed stand in its place (CLAUDE.md T23 2.14).
+    click('[data-do="toggleDay"][data-id="1"]');
     expect(html()).toContain('Unit deposit');
     expect(html()).toContain('Rent');
     expect(html()).toContain('s draw');
-    expect(html()).toContain(`Ledger, last ${LEDGER_VISIBLE_ENTRIES}`);
     expect(html()).toContain('Copy state as JSON');
+    click('[data-do="accountingTab"][data-id="reports"]');
+    expect(html()).toContain('Monthly reports');
+    expect(html()).toContain('No month has closed yet.');
+    expect(html()).not.toContain('Ledger, last');
     click('[data-do="closeModal"]');
   });
 

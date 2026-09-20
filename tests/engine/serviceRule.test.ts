@@ -11,12 +11,14 @@ import {
   OVERDUE_BREAKDOWN_CHANCE,
   PAST_LIFE_WEEK_HOURS,
   SERVICE_COST_FRACTION,
+  HOURS_PER_WORKING_DAY,
   SERVICE_INTERVAL_HOURS,
 } from '../../src/engine/constants';
 import { nextWorkingDay } from '../../src/engine/clock';
 import {
   enduranceHoursFor,
   familyStopped,
+  isServiced,
   freeMachines,
   lifeAfterServices,
   machineIsOut,
@@ -28,6 +30,8 @@ import {
   serviceIsDue,
   serviceMachine,
 } from '../../src/engine/machines';
+import { extractionKit, underExtracted } from '../../src/engine/media';
+import { stateLabel } from '../../src/ui/machinesPage';
 import { hallBlock } from '../../src/engine/jobs';
 import { SERVICE_IS_CALLED_IN, startTaskCheck } from '../../src/engine/tasks';
 import { jobProgress, tick } from '../../src/engine/index';
@@ -178,14 +182,19 @@ describe('the machine is out for the working day (CLAUDE.md T20 2.9.3)', () => {
     });
   });
 
-  it('refuses the call on the extraction, which is repaired and never serviced', () => {
+  it('takes the call on the extraction, which is serviced like the machines it serves', () => {
+    // It refused it until tonight, with the words "It is repaired, never serviced". Piotr put the
+    // fan on the same footing as the saw it pulls for on 20.09 (CLAUDE.md T23 2.8).
     const state = hall();
     const fan = state.equipment.find((item) => item.specId === 'extractor');
     if (fan === undefined) throw new Error('no extractor in the hall');
-    expect(serviceCallCheck(state, fan.id)).toEqual({
-      ok: false,
-      reason: 'It is repaired, never serviced',
-    });
+    expect(isServiced(fan.specId)).toBe(true);
+    expect(serviceCallCheck(state, fan.id)).toEqual({ ok: true, reason: '' });
+    // And the words are gone from the game, on the fan and on everything else.
+    const dryer = state.equipment.find((item) => item.specId === 'airDryer');
+    if (dryer !== undefined) {
+      expect(serviceCallCheck(state, dryer.id).reason).toBe('It is not serviced');
+    }
   });
 });
 
@@ -304,5 +313,63 @@ describe('a machine past its life (CLAUDE.md T20 2.9.4)', () => {
     // Half the original life again is a long way past where it stood, so it is inside its life.
     expect(saw.hoursUsed).toBeLessThan(saw.enduranceHours);
     expect(overdueBreakdownChance(saw)).toBe(0);
+  });
+});
+
+/** Piotr put the fan on the same footing as the machines it pulls for on 20.09: it books its
+ *  hours while the extraction runs and is serviced exactly as a saw is, on the same due point,
+ *  with the same call in, the same working day out and the same extension of life
+ *  (CLAUDE.md T20 2.9, T23 2.8). */
+describe('the extractor is serviced like a machine (CLAUDE.md T23 2.8)', () => {
+  function theFan(state: GameState): Equipment {
+    const fan = state.equipment.find((item) => item.specId === 'extractor');
+    if (fan === undefined) throw new Error('no extractor in the hall');
+    return fan;
+  }
+
+  it('books an hour of its own for every hour the extraction runs', () => {
+    // One man at the saw for an hour is an hour of the duct being open, and a fan pulls for the
+    // hall and not for one man: it books that hour whoever is at what.
+    const state = tick(cutting(), 60);
+    expect(theFan(state).hoursUsed).toBeCloseTo(1, 4);
+    // Three weeks of a hall that runs its working day is therefore this many hours, which is well
+    // past the due point every machine in the game shares. Nothing here is a second rule: it is
+    // the minute above multiplied out against the two constants.
+    const threeWeeks = 3 * 5 * HOURS_PER_WORKING_DAY;
+    expect(threeWeeks).toBeGreaterThan(SERVICE_INTERVAL_HOURS);
+  });
+
+  it('falls due at the same point, against the endurance its class already has', () => {
+    const state = hall();
+    const fan = theFan(state);
+    expect(fan.enduranceHours).toBe(enduranceHoursFor('extractor', fan.variantId));
+    expect(fan.enduranceHours).toBeGreaterThan(0);
+    expect(serviceIsDue(fan)).toBe(false);
+    fan.hoursUsed = SERVICE_INTERVAL_HOURS;
+    expect(serviceIsDue(fan)).toBe(true);
+    expect(isServiced(fan.specId)).toBe(true);
+    expect(stateLabel(state, fan)).toBe('service due');
+    expect(serviceCallCheck(state, fan.id).ok).toBe(true);
+  });
+
+  it('goes out for the working day on the call, and the hall is unserved while it is away', () => {
+    // One minute first, so the owner is standing at the saw and the duct is open: the extraction
+    // sum is the sum of the machines running this very minute (CLAUDE.md T10 3.1).
+    const state = tick(cutting(), 1);
+    const fan = theFan(state);
+    fan.hoursUsed = SERVICE_INTERVAL_HOURS;
+    // The hall is served while it stands there: the saw the owner is at is inside what it pulls.
+    expect(underExtracted(state)).toBe(false);
+    const before = fan.enduranceHours;
+    serviceMachine(state, fan.id);
+    expect(machineIsOut(fan, state.clock.day)).toBe(true);
+    expect(stateLabel(state, fan)).toBe('in service');
+    // The same extension of life a machine gets, and the hours start again.
+    expect(fan.enduranceHours).toBe(lifeAfterServices(originalLifeOf(fan), fan.serviceCount));
+    expect(fan.enduranceHours).toBeGreaterThan(before);
+    // And the van has it, so nothing pulls: the hall runs unserved for the day, which is the
+    // whole cost of putting the service off.
+    expect(extractionKit(state)).toHaveLength(0);
+    expect(underExtracted(state)).toBe(true);
   });
 });

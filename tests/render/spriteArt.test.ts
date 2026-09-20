@@ -55,8 +55,9 @@ describe('an object with a file is a picture, not a box', () => {
   it('draws the contact shadow under both the pictures and the boxes', () => {
     const svg = hall('pro');
     const shadows = svg.split('class="contact-shadow"').length - 1;
-    // Three rooms, the kit in the hall, and never fewer than one per object drawn.
-    expect(shadows).toBeGreaterThanOrEqual(10);
+    // Three rooms, the kit in the hall, and never fewer than one per object drawn. The cordless
+    // drill was one of them until Turn 23 took it out of the game (CLAUDE.md T23 2.5).
+    expect(shadows).toBeGreaterThanOrEqual(9);
     // The saw has a picture and the shelving has not: both stand on a shadow.
     expect(svg).toContain('<image href="/sprites/tableSaw.pro.png"');
     expect(svg).toContain('>Sheet rack: 0 / 50<');

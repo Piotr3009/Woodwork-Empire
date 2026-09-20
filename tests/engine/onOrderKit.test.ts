@@ -51,10 +51,8 @@ describe('kit that is bought and still on the road', () => {
     expect(freeMachines(state, 'tableSaw')).toEqual([]);
     expect(machineIsShared(state, 'tableSaw')).toBe(true);
     // What it does answer is the board's lock: a company that has ordered a saw can take sheet
-    // work, because the drawing and the material take days of their own (CLAUDE.md T8 3.2). The
-    // saw is off the list of what is missing; the drill, which nobody has bought, is on it.
-    expect(lockReasonFor(state, template('garageShelves'))).toBe('Needs cordless drill');
-    placeEquipment(state, 'drill', { x: 16, y: 8 });
+    // work, because the drawing and the material take days of their own (CLAUDE.md T8 3.2), so
+    // the saw is off the list of what is missing and the job is not locked at all.
     expect(lockReasonFor(state, template('garageShelves'))).toBeNull();
   });
 

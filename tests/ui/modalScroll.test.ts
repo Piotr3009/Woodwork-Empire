@@ -70,10 +70,13 @@ describe('a modal keeps its place while the clock runs', () => {
     }
     expect(rows.length).toBeLessThanOrEqual(LEDGER_MAX_ENTRIES);
     state.ledger = rows;
+    state.booksUpToDay = state.clock.day;
     click('[data-do="setView"][data-view="office"]');
     click('[data-office="binder"]');
-    // The lines themselves are on the Ledger tab; the books open on Days (CLAUDE.md T6 3.9).
-    click('[data-do="accountingTab"][data-id="ledger"]');
+    // The lines themselves are under the day they were written on. They were on a Ledger tab of
+    // their own until Turn 23 took that screen away (CLAUDE.md T6 3.9, T23 2.14).
+    click('[data-do="accountingTab"][data-id="days"]');
+    click('[data-do="toggleDay"][data-id="1"]');
     expect(body('accounting').innerHTML).toContain('Line 80');
     body('accounting').scrollTop = 500;
     advanceMinutes(1);

@@ -99,7 +99,7 @@ describe('the jobs the workshop cannot take', () => {
     });
     // The wardrobe as the catalogue has it is short of the tools in a bare hall, and says so.
     expect(blockFor(bare, template('wardrobe'), 60, 6400)?.reason).toBe(
-      'no table saw, cordless drill, edgebander',
+      'no table saw, edgebander',
     );
     // Too few people for the deadline: every tool in the hall and three days to make a kitchen.
     const kitted = withEverything();
@@ -162,7 +162,6 @@ function withEverything(): GameState {
   state.reputation = 60;
   for (const specId of [
     'tableSaw',
-    'drill',
     'edgebander',
     'thicknesser',
     'solidWoodTools',
