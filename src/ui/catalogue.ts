@@ -6,14 +6,18 @@ import {
   COMPRESSOR,
   EQUIPMENT_SPECS,
   EQUIPMENT_TABS,
+  EXTRACTION_MARGIN,
   GATE_OUTPUT_BONUS,
   GATE_PRICE,
+  LOW_AIR_FACTOR,
   SOFTWARE_ONE_OFF_PRICE,
   SOFTWARE_SUBSCRIPTION_MONTHLY,
+  UNDER_EXTRACTION_OUTPUT_PENALTY,
 } from '../engine/constants';
 import type { EquipmentSpec, EquipmentTab, OnOrderItem } from '../engine/types';
 import {
   airBlockFor,
+  airCheck,
   airDemandOf,
   bagStore,
   bagStoreLine,
@@ -28,7 +32,11 @@ import {
   compressorLabel,
   compressors,
   dustOutputOf,
+  extractionCapacityOf,
   extractionDemandOf,
+  extractionStanding,
+  isConnectedToExtraction,
+  mediaFigure,
   connectCheck,
   hasCentralExtraction,
   pipeRunFor,
@@ -287,14 +295,12 @@ export function airStateLine(state: GameState, item: Equipment): string {
     return `${compressorLabel(state, item)}: ${gives.bar} bar, ` +
       `${gives.litres.toLocaleString('en-GB')} l/min${dryer}`;
   }
-  const wants = airDemandOf(item);
-  if (wants === null && item.specId !== AIR_DRYER) return '';
+  // A consumer's air is in the specification block under the rule since v35, in colour; this line
+  // is the compressor's own and the dryer's (PIOTR, 20.09).
+  if (item.specId !== AIR_DRYER) return '';
   const on = compressorFor(state, item);
   const where = on === null ? 'no compressor in the hall' : compressorLabel(state, on);
-  if (item.specId === AIR_DRYER) return `Fitted to: ${where}`;
-  const block = airBlockFor(state, item);
-  const wanted = wants === null ? '' : ` · wants ${wants.bar} bar, ${wants.litres} l/min`;
-  return `Air: ${where}${wanted}${block === '' ? '' : ` · ${block}`}`;
+  return `Fitted to: ${where}`;
 }
 
 /** The valve: which compressor this machine or this dryer draws from. One click each, and the
@@ -434,6 +440,105 @@ function gateLine(state: GameState, item: Equipment): string {
   return `<p class="tile-figures">${signedFigure(`Automatic gate fitted: output +${per}%`, per)}</p>`;
 }
 
+/** One line of the specification under the rule of a card: what the thing needs from the hall
+ *  or gives it, against what the hall has. `ok` paints it green; `false` paints it red and is
+ *  followed by the line that says what it costs (PIOTR, 20.09). */
+export interface SpecLine {
+  text: string;
+  ok: boolean;
+}
+
+/** The specification of a thing on the hall, read off the same tables the hall runs on: the
+ *  extraction it wants or pulls against the standing sum of `extractionStanding`, and the air it
+ *  wants against the compressor it is on. Green while the hall meets it, red with the cost in
+ *  output when it does not, so the player reads it on the card and not in the catalogue
+ *  (PIOTR, 20.09). */
+export function specLines(state: GameState, item: Equipment): SpecLine[] {
+  const out: SpecLine[] = [];
+  const dustPenalty = Math.round(UNDER_EXTRACTION_OUTPUT_PENALTY * 100);
+  const wants = extractionDemandOf(item);
+  if (wants > 0) {
+    const hall = extractionStanding(state);
+    const connected = isConnectedToExtraction(state, item);
+    const enough = hall.demand <= hall.allowed;
+    out.push({
+      text: `Extraction: needs ${mediaFigure(wants)} m³/h · hall has ${mediaFigure(hall.allowed)} usable`,
+      ok: connected && enough,
+    });
+    if (!connected) {
+      out.push({ text: `Not connected: output −${dustPenalty}% while it runs`, ok: false });
+    } else if (!enough) {
+      out.push({
+        text:
+          `Extractor too small: ${hall.machines} machines need ${mediaFigure(hall.demand)} · ` +
+          `output −${dustPenalty}% while short`,
+        ok: false,
+      });
+    }
+  }
+  const pulls = extractionCapacityOf(item);
+  if (pulls > 0) {
+    const hall = extractionStanding(state);
+    const usable = Math.round(pulls * EXTRACTION_MARGIN);
+    const ok = hall.demand <= hall.allowed;
+    out.push({
+      text:
+        `Pulls ${mediaFigure(pulls)} m³/h, ${mediaFigure(usable)} usable · ` +
+        `${hall.machines} connected ${hall.machines === 1 ? 'machine needs' : 'machines need'} ${mediaFigure(hall.demand)}`,
+      ok,
+    });
+    if (!ok) {
+      out.push({
+        text: `Too many machines for the extraction: output −${dustPenalty}% while short`,
+        ok: false,
+      });
+    }
+  }
+  const air = airDemandOf(item);
+  if (air !== null) {
+    const on = compressorFor(state, item);
+    const block = airBlockFor(state, item);
+    const line = on === null ? undefined : airCheck(state).compressors.find((entry) => entry.id === on.id);
+    const gives = on === null ? null : compressorAirOf(on);
+    const have =
+      on === null || gives === null
+        ? 'no compressor in the hall'
+        : `${compressorLabel(state, on)} gives ${gives.bar} bar, ${gives.litres.toLocaleString('en-GB')} l/min`;
+    const low = line !== undefined && line.low;
+    out.push({
+      text: `Air: needs ${air.bar} bar, ${air.litres.toLocaleString('en-GB')} l/min · ${have}`,
+      ok: block === '' && !low,
+    });
+    if (block !== '') {
+      out.push({ text: `Will not run: ${block}`, ok: false });
+    } else if (line !== undefined && low) {
+      out.push({
+        text:
+          `Compressor short of air: ${mediaFigure(line.drawn)} l/min drawn of ` +
+          `${mediaFigure(line.allowed)} usable · runs at −${Math.round((1 - LOW_AIR_FACTOR) * 100)}%`,
+        ok: false,
+      });
+    }
+  }
+  return out;
+}
+
+/** The specification block under its rule, or nothing for a thing that asks the hall for nothing
+ *  and gives it nothing (a bench, a cabinet, a rack). */
+function specBlock(state: GameState, item: Equipment): string {
+  const lines = specLines(state, item);
+  if (lines.length === 0) return '';
+  return (
+    '<hr class="tile-rule">' +
+    lines
+      .map(
+        (line) =>
+          `<p class="tile-figures spec-line ${line.ok ? 'good' : 'warn'}">${escapeHtml(line.text)}</p>`,
+      )
+      .join('')
+  );
+}
+
 /** One machine's card as the Owned tab draws it. From Turn 17 the machine's own modal, opened by
  *  a click on it on the hall, is this same card: one drawing and one set of buttons, so Connect to
  *  extraction cannot be on one and missing from the other (CLAUDE.md T17 2.6). */
@@ -500,6 +605,7 @@ export function ownedTile(
     '<span class="badge badge-owned">Owned</span></h3>' +
     pictureSlot(spec.spriteKey, item.variantId) +
     lines +
+    specBlock(state, item) +
     bagStoreBlock(state, item) +
     gateLine(state, item) +
     airAssign(state, item) +

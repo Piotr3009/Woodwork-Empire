@@ -331,6 +331,7 @@ export {
   isConnectedToExtraction,
   unservedMachines,
   extractionCapacityOf,
+  extractionStanding,
   extractionCheck,
   extractionDemandOf,
   extractionKit,

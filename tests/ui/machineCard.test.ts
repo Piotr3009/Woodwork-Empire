@@ -7,12 +7,12 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { currentState, mount, render } from '../../src/ui/app';
 import { renderCatalogue } from '../../src/ui/catalogue';
 import { renderMachineCard } from '../../src/ui/machineCard';
-import { pipeRunFor } from '../../src/engine/pipes';
+import { connectExtraction, pipeRunFor } from '../../src/engine/pipes';
 import { canPlace } from '../../src/engine/layout';
 import { salePriceFor } from '../../src/engine/machines';
 import { CABINET_SLOT_LAYOUT } from '../../src/engine/constants';
 import type { GameState } from '../../src/engine/index';
-import { buyStartingKit, newGame } from '../helpers';
+import { buyStartingKit, newGame, placeEquipment } from '../helpers';
 
 function root(): HTMLElement {
   const element = document.querySelector('#app');
@@ -244,6 +244,53 @@ describe('a click on a machine on the hall', () => {
     // And a sold thing is not turned either: it stands where it is until the van comes.
     expect(card()?.textContent ?? '').toContain('Sold, collection on');
     click('.modal-layer [data-do="closeModal"]');
+  });
+
+  it('reads the specification under the rule, green while the hall meets it (v35)', () => {
+    // The kit's saw on the kit's fan: what it needs, what the hall has usable, and the air it
+    // wants beside what the compressor gives, every line green (PIOTR, 20.09).
+    click(`[data-kit="${kitId('tableSaw')}"]`);
+    const open = card();
+    if (open === null) throw new Error('no card');
+    const spec = Array.from(open.querySelectorAll('.spec-line'));
+    expect(spec.length).toBeGreaterThanOrEqual(1);
+    const extraction = spec.find((line) => line.textContent?.startsWith('Extraction: needs'));
+    expect(extraction?.textContent).toMatch(/needs [\d,]+ m³\/h · hall has [\d,]+ usable/);
+    expect(extraction?.className.split(' ')).toContain('good');
+    expect(open.querySelector('.tile-rule')).not.toBeNull();
+    expect(open.textContent).not.toContain('too small');
+    click('[data-do="closeModal"]');
+  });
+
+  it('turns the line red with the cost in output once the hall cannot meet it (v35)', () => {
+    // Two more standard saws on the same kit fan: the standing sum passes what the fan pulls
+    // less the margin, so every saw's card says so in red, with the 30% the output loses while
+    // the hall is short (CLAUDE.md T10 3.1).
+    const before = game().equipment.length;
+    placeEquipment(game(), 'tableSaw', { variantId: 'standard', x: 10, y: 6, id: 'spec-saw-2' });
+    placeEquipment(game(), 'tableSaw', { variantId: 'standard', x: 14, y: 6, id: 'spec-saw-3' });
+    for (const id of ['spec-saw-2', 'spec-saw-3']) connectExtraction(game(), id);
+    render();
+    click(`[data-kit="${kitId('tableSaw')}"]`);
+    const open = card();
+    if (open === null) throw new Error('no card');
+    const extraction = Array.from(open.querySelectorAll('.spec-line')).find((line) =>
+      line.textContent?.startsWith('Extraction: needs'),
+    );
+    expect(extraction?.className.split(' ')).toContain('warn');
+    expect(open.textContent).toContain('Extractor too small');
+    expect(open.textContent).toContain('output −30% while short');
+    click('[data-do="closeModal"]');
+    // The fan's own card says the same thing from its side.
+    click(`[data-kit="${kitId('extractor')}"]`);
+    const fan = card();
+    expect(fan?.textContent).toMatch(/Pulls [\d,]+ m³\/h, [\d,]+ usable/);
+    expect(fan?.textContent).toContain('Too many machines for the extraction');
+    click('[data-do="closeModal"]');
+    game().equipment = game().equipment.filter((item) => !item.id.startsWith('spec-saw-'));
+    game().pipes = game().pipes.filter((run) => !run.equipmentId.startsWith('spec-saw-'));
+    expect(game().equipment.length).toBe(before);
+    render();
   });
 
   it('leaves the Owned tab drawing the same card', () => {

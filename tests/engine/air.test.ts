@@ -280,7 +280,9 @@ describe('the assignment', () => {
     placeEquipment(state, 'edgebander', { variantId: 'standard', x: 4, y: 1 });
     placeEquipment(state, 'compressor', { variantId: 'pro', x: 18, y: 8, id: 'kit-air-2' });
     const page = renderCatalogue(state, '', 'owned', null, 'all');
-    expect(page).toContain('Air: compressor 1');
+    // The consumer's line moved under the rule of its card in v35, in colour, and says what it
+    // needs beside what the compressor gives (PIOTR, 20.09).
+    expect(page).toContain('compressor 1 gives');
     expect(page).toContain('compressor 1: 10 bar, 450 l/min');
     // Two compressors, so the valve is on the tile, one chip each and one click each.
     expect(page).toContain('data-do="assignAir"');

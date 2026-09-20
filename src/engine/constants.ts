@@ -100,7 +100,7 @@ export const STATE_VERSION = 19;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
-export const APP_VERSION = 'v34';
+export const APP_VERSION = 'v35';
 
 // ---------------------------------------------------------------------------
 // The owner's day, in the seven things it is made of

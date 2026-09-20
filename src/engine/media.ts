@@ -148,6 +148,31 @@ export function extractionCheck(state: GameState): ExtractionCheck {
   return { demand, capacity, allowed, short, line };
 }
 
+/** The standing picture of the extraction, for a card to say whether the hall is set up right:
+ *  every connected machine's demand added as if all of them ran at once, against the fans less
+ *  Piotr's margin. The minute by minute rule stays `extractionCheck` and nothing reads this for
+ *  the dust or the output; it is the same demand table and the same margin, summed over what
+ *  stands connected rather than over who is at it, so a card can say "too many saws for this
+ *  extractor" before the minute it happens (PIOTR, 20.09). */
+export function extractionStanding(state: GameState): {
+  demand: number;
+  capacity: number;
+  allowed: number;
+  machines: number;
+} {
+  let demand = 0;
+  let machines = 0;
+  for (const item of state.equipment) {
+    if (isSold(item) || !itemStandsInTheHall(item) || extractionDemandOf(item) <= 0) continue;
+    if (!isConnectedToExtraction(state, item)) continue;
+    demand += extractionDemandOf(item);
+    machines += 1;
+  }
+  let capacity = 0;
+  for (const item of extractionKit(state)) capacity += extractionCapacityOf(item);
+  return { demand, capacity, allowed: Math.round(capacity * EXTRACTION_MARGIN), machines };
+}
+
 /** True while the hall is under extracted: the one predicate the dust, the output and the job's
  *  own count of dusty minutes all read. */
 export function underExtracted(state: GameState): boolean {

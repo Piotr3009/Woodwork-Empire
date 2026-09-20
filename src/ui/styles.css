@@ -1353,6 +1353,19 @@ input.num {
   color: var(--bad);
 }
 
+/* The specification under its rule on a card of a thing on the hall (PIOTR, 20.09): a hairline
+   in the card's own ink, then one line per figure, green while the hall meets it (`.good`) and
+   red with the cost in output when it does not (`.warn`), both the tokens every screen paints
+   with. */
+.tile-rule {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: 8px 0 4px;
+}
+.spec-line {
+  font-weight: 600;
+}
+
 .hint,
 .empty {
   color: var(--text-dim);
