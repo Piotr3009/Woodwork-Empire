@@ -205,25 +205,30 @@ describe('what the player clicks at a zoom', () => {
     );
   }
 
-  function notes(): string {
-    return Array.from(app().querySelectorAll('.view-note'))
-      .map((element) => element.textContent ?? '')
-      .join(' ');
-  }
-
   it('resolves to the same room at 2x as at the fit', () => {
+    // The canteen is a room of its own from Turn 23, so the click walks into it and the way back
+    // is the top bar's Hall button, exactly as it is out of the office (CLAUDE.md T23 2.9).
     clickAt(frontFace('canteen'));
-    expect(notes()).toContain(roomById('canteen').tooltip);
+    expect(app().querySelector('[data-room-view="canteen"]')).not.toBeNull();
+    press('[data-do="setView"][data-view="hall"]');
+    press('[data-do="zoomFit"]');
     press('[data-do="zoomIn"]');
     press('[data-do="zoomIn"]');
     press('[data-do="zoomIn"]');
     press('[data-do="zoomIn"]');
     expect(camera().scale).toBeGreaterThan(2);
     clickAt(frontFace('canteen'));
-    expect(notes()).toContain(roomById('canteen').tooltip);
+    expect(app().querySelector('[data-room-view="canteen"]')).not.toBeNull();
+    press('[data-do="setView"][data-view="hall"]');
+    press('[data-do="zoomFit"]');
+    press('[data-do="zoomIn"]');
+    press('[data-do="zoomIn"]');
+    press('[data-do="zoomIn"]');
+    press('[data-do="zoomIn"]');
     // And the office is still the office, from the same place on the screen.
     clickAt(frontFace('office'));
     expect(app().querySelector('.hall-view')).toBeNull();
+    expect(app().querySelector('[data-room-view="office"]')).not.toBeNull();
     press('[data-do="setView"][data-view="hall"]');
     // Leaving the hall and coming back opens it where it always opens: a fifth past the fit,
     // with the middle of it in the middle of the frame (PIOTR; CLAUDE.md T10 3.9).
