@@ -229,7 +229,6 @@ describe('the board over time', () => {
   it('lifts the lock the moment the tools are on the floor', () => {
     let state = newGame();
     state = buyNow(state, 'tableSaw');
-    state = buyNow(state, 'drill');
     state = buyNow(state, 'toolCabinet');
     state = buyNow(state, 'edgebander');
     for (const enquiry of reachableEnquiries(state)) {

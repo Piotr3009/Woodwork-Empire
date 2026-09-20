@@ -129,9 +129,11 @@ describe('daily costs', () => {
     const extractorPower = findVariant('extractor', 'used')?.powerPerDay ?? 0;
     expect(extractorPower).toBe(2);
     expect(dailyPower(withExtractor)).toBe(POWER_BASE_DAILY + POWER_PER_MACHINE_DAILY + extractorPower);
-    // A drill is not a machine that draws power.
-    const withDrill = buyNow(withExtractor, 'drill');
-    expect(dailyPower(withDrill)).toBe(POWER_BASE_DAILY + POWER_PER_MACHINE_DAILY + extractorPower);
+    // A thing that is kept in a cabinet is not a machine that draws power. The cordless drill
+    // stood here until Turn 23 took it out of the game, and the cabinet it was kept in makes the
+    // same point (CLAUDE.md T23 2.5).
+    const withCabinet = buyNow(withExtractor, 'toolCabinet');
+    expect(dailyPower(withCabinet)).toBe(POWER_BASE_DAILY + POWER_PER_MACHINE_DAILY + extractorPower);
   });
 });
 
