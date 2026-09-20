@@ -1273,6 +1273,17 @@ input.num {
   opacity: 0.7;
 }
 
+/* The Work Plan's crew column is the one card in the game that is read down and not across: a
+   `.card` lays its parts out in a row, which reads with three men and runs off the right edge of
+   the modal with nine, and nine men under a novice manager is exactly the hall 2.1 is about. The
+   attribute is the one the renderer already writes, so nothing is named twice
+   (CLAUDE.md T23 2.1, docs/ui-style.md 11). */
+.card[data-plan-crew-column] {
+  align-items: stretch;
+  flex-direction: column;
+  gap: 2px;
+}
+
 .card h3 {
   color: var(--text);
   margin: 0 0 2px;
@@ -2521,6 +2532,15 @@ input.num {
 }
 
 .modal-board .row-figure.bad {
+  color: var(--bad);
+}
+
+/* And a figure the game has marked as a warning: the Work Plan's crew column says `needs a job`
+   in it, and the skin's ink above was winning on order alone, exactly as it did over the green and
+   the red. The laptop's screen skin has carried its own `.warn` since Turn 14; this is the board's
+   (CLAUDE.md T23 2.1). */
+.modal-board .warn,
+.modal-board .row-figure.warn {
   color: var(--bad);
 }
 

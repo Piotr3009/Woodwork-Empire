@@ -6,6 +6,7 @@ import {
   DUCT_SYSTEMS,
   FINISHED_GOODS_LAYOUT,
   GATE_CROWD_LIMIT,
+  NO_AIR_LINE,
   GATE_LAYOUT,
   PALLET_LAYOUT,
   CLASS_BADGE,
@@ -1893,12 +1894,17 @@ export function hallProblems(state: GameState): HallProblem[] {
     });
   }
   // A compressor with more drawn on it than the pipe will carry: everything on it runs at 0.7
-  // for the minute (PIOTR, CLAUDE.md T10 3.2).
+  // for the minute (PIOTR, CLAUDE.md T10 3.2). A hall with no compressor in it at all is the
+  // other line this list can carry, and it has nothing on it to turn off and nothing running at
+  // 70%: the benches simply stand, which is what the line already says (CLAUDE.md T23 2.7).
   for (const line of hallAirCheck(state).lines) {
     list.push({
       kind: 'hall',
       equipmentId: null,
-      text: `${line}. Everything on it runs at 70% until something is turned off`,
+      text:
+        line === NO_AIR_LINE
+          ? line
+          : `${line}. Everything on it runs at 70% until something is turned off`,
     });
   }
   if (gateIsCrowded(state)) {

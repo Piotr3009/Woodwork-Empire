@@ -7,11 +7,13 @@
 
 import { describe, expect, it } from 'vitest';
 import {
+  BREAK_MINUTES,
   MANAGER_AHEAD_DAYS,
   MANAGER_BEHIND_DAYS,
   MANAGER_REPLAN_MINUTES,
   PRODUCTION_MANAGER_CARRIES,
   PRODUCTION_MANAGER_MONTHLY_WAGE,
+  MINUTES_PER_WORKING_DAY,
   PRODUCTION_MANAGER_PACE,
   TIERS,
   WORKER_RATES,
@@ -29,7 +31,7 @@ import { hands, machineWantedFor } from '../../src/engine/production';
 import { outputBreakdown } from '../../src/engine/machines';
 import { workPlan } from '../../src/engine/plan';
 import type { GameState, Worker, WorkerTier } from '../../src/engine/index';
-import { sixJoinersOnSheetWork } from '../helpers';
+import { runClock, sixJoinersOnSheetWork } from '../helpers';
 
 /** A production manager of this grade on the books from day one, the way a test wants him without
  *  the interview. */
@@ -66,6 +68,20 @@ function manager(tier: WorkerTier): Worker {
   };
 }
 
+/** Nine joiners under a novice, who carries eight: the ninth is a man without a manager and the
+ *  one the cross check of section 7 asks about. The three extra men are copies of the first, put
+ *  in front of the manager because he is last on the books and the order the men were hired in is
+ *  what his grade counts down (CLAUDE.md T23 2.4). */
+function nineUnderANovice(): GameState {
+  const state = hallUnder('novice');
+  for (let extra = 7; extra <= 9; extra += 1) {
+    const copy = { ...state.workers[0], id: `staff-${extra}`, name: `Joiner ${extra}` } as Worker;
+    copy.idleByReason = { waitingForBoss: 0, noMachine: 0, noMaterial: 0 };
+    state.workers.splice(state.workers.length - 1, 0, copy);
+  }
+  return state;
+}
+
 /** Six joiners, every one of them free, and a manager of this grade over them. */
 function hallUnder(tier: WorkerTier): GameState {
   const state = sixJoinersOnSheetWork();
@@ -94,14 +110,7 @@ describe('how many men a grade carries', () => {
   });
 
   it('leaves the ninth man of a novice waiting for the boss', () => {
-    const state = hallUnder('novice');
-    // Nine joiners, a novice who carries eight. The ninth is a man without a manager.
-    for (let extra = 7; extra <= 9; extra += 1) {
-      const copy = { ...state.workers[0], id: `staff-${extra}`, name: `Joiner ${extra}` } as Worker;
-      copy.idleByReason = { waitingForBoss: 0, noMachine: 0, noMaterial: 0 };
-      // The manager is last on the books, so the new men go in front of him.
-      state.workers.splice(state.workers.length - 1, 0, copy);
-    }
+    const state = nineUnderANovice();
     const carried = menCarried(state).map((worker) => worker.id);
     expect(carried).toHaveLength(8);
     expect(carried).toContain('staff-8');
@@ -114,6 +123,22 @@ describe('how many men a grade carries', () => {
     const eighth = state.workers.find((worker) => worker.id === 'staff-8');
     if (!eighth) throw new Error('an eighth man is wanted');
     expect(waitsForTheBoss(state, eighth)).toBe(false);
+  });
+
+  it('books the ninth man a whole working day of waiting for the boss, and the eighth none', () => {
+    // Section 7's own line: a novice with nine men, and the ninth has a full day of idle with
+    // `waiting for the boss` on his meter. A full day is the working day less the dinner hour,
+    // 420 minutes of 480, because a man at his lunch is not standing about waiting for anybody
+    // and nothing is booked against him for it (CLAUDE.md T6 3.4). The eighth is inside the
+    // novice's eight, so his manager puts him on something and nothing is booked against him at
+    // all.
+    const state = nineUnderANovice();
+    const played = runClock(state, MINUTES_PER_WORKING_DAY);
+    const ninth = played.workers.find((worker) => worker.id === 'staff-9');
+    const eighth = played.workers.find((worker) => worker.id === 'staff-8');
+    if (!ninth || !eighth) throw new Error('nine men are wanted');
+    expect(ninth.idleByReason.waitingForBoss).toBe(MINUTES_PER_WORKING_DAY - BREAK_MINUTES);
+    expect(eighth.idleByReason.waitingForBoss).toBe(0);
   });
 
   it('carries nobody at all when there is no manager on duty', () => {

@@ -82,6 +82,18 @@ function twoJobsAtOneSaw(): GameState {
   return runClock(state, 2);
 }
 
+/** Six jobs at their cutting stage with one saw between them: one man has it and the rest stand at
+ *  its one waiting cell, which is three and more marks over one point of the hall. Until Turn 23
+ *  the third mark of this test was found at the canteen door, where every man with nothing to do
+ *  used to stand; from tonight a man nobody has put on anything waits at his own bench instead
+ *  (CLAUDE.md T23 2.1), so a queue at a machine is where marks still meet, which is the case
+ *  CLAUDE.md T22 2.5 names in its own words: "two marks over two men at one machine". */
+function threeJobsAtOneSaw(): GameState {
+  const state = sixJoinersOnSheetWork({ saws: 1 });
+  for (const job of state.jobs) job.labourRemaining = job.labourValue * 0.95;
+  return runClock(state, 2);
+}
+
 /** The mark drawn over one man, or '' when the hall drew him none. */
 function markOver(svg: string, figure: string): string {
   const group = groupOf(svg, figure);
@@ -188,10 +200,27 @@ describe('two marks over one cell (CLAUDE.md T22 2.5)', () => {
     expect(second).toContain('data-cell="5,2"');
     expect(markOver(svg, 'worker-staff-2')).toContain('data-bubble-for="staff-2">');
     expect(markOver(svg, 'worker-staff-3')).toContain('transform="translate(7,0)"');
-    // And the third mark over one cell steps twice as far: three idle men at the canteen door.
-    expect(markOver(svg, 'worker-staff-5')).toContain('data-bubble-for="staff-5">');
-    expect(markOver(svg, 'worker-staff-6')).toContain('transform="translate(7,0)"');
-    expect(markOver(svg, 'owner')).toContain('transform="translate(14,0)"');
+  });
+
+  it('steps the third mark over one cell twice as far', () => {
+    // Three men off three jobs and one saw between them: one man has it and the other two stand at
+    // its one waiting cell, which is three marks over one point of the hall counting the man at
+    // the saw itself. The first is where it is, the second steps aside by `step` and the third by
+    // twice it, and no two discs are ever drawn on top of each other (CLAUDE.md T22 2.5).
+    const svg = renderHall(threeJobsAtOneSaw());
+    // Read it off the hall itself rather than off three names: every figure group carries the cell
+    // it stands on, so the queue is whichever men the engine put at the saw's one waiting cell.
+    const marks = new Map<string, string[]>();
+    for (const piece of svg.split('data-figure="').slice(1)) {
+      const cell = piece.match(/data-cell="([^"]*)"/)?.[1] ?? '';
+      const at = piece.indexOf('<g class="mark"');
+      if (cell === '' || at < 0) continue;
+      const offset = piece.slice(at, at + 200).match(/transform="translate\((\d+),0\)"/)?.[1] ?? '0';
+      marks.set(cell, [...(marks.get(cell) ?? []), offset]);
+    }
+    const three = [...marks.values()].filter((list) => list.length >= 3);
+    expect(three.length).toBeGreaterThan(0);
+    for (const list of three) expect(list.slice(0, 3)).toEqual(['0', '7', '14']);
   });
 
   it('hangs every disc over the head of whichever man was drawn', () => {

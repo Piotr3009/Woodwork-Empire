@@ -230,7 +230,13 @@ import {
   underExtracted,
 } from './media';
 import { cubicMetres, metresBy, plural } from './text';
-import { STATION_IDLE, STATION_NO_BENCH, stationForTask, storageSaleBlock } from './stations';
+import {
+  STATION_BENCH,
+  STATION_IDLE,
+  STATION_NO_BENCH,
+  stationForTask,
+  storageSaleBlock,
+} from './stations';
 import {
   type Hand,
   jobOf,
@@ -263,6 +269,7 @@ import {
   runStaffDayStart,
   staffMinutesLeft,
   startMonthMeters,
+  waitsForTheBoss,
 } from './staff';
 import {
   AD_HOC_TASK_MINUTES,
@@ -1444,7 +1451,19 @@ function updateStations(state: GameState): void {
     // (CLAUDE.md T4 3.4, T23 2.1, 2.17).
     const stuck =
       worker.role === 'joiner' && benchOf(state, worker.id) === null && oldestReadyJob(state) !== null;
-    worker.station = stuck ? STATION_NO_BENCH : STATION_IDLE;
+    if (stuck) {
+      worker.station = STATION_NO_BENCH;
+      continue;
+    }
+    // A man nobody has put on anything waits **at his home cell**, which is his own bench, and not
+    // at the canteen door where a man with nowhere to work stands: the two are different men and
+    // the player has to be able to tell them apart at a glance. The mark over his head says which
+    // (PIOTR, 20.09; CLAUDE.md T23 2.1, T4 3.4). A man with no bench of his own has no home cell
+    // to wait at, so he stands where he always did.
+    worker.station =
+      waitsForTheBoss(state, worker) && benchOf(state, worker.id) !== null
+        ? STATION_BENCH
+        : STATION_IDLE;
   }
 }
 
