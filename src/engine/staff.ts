@@ -7,6 +7,7 @@
 import {
   ACCIDENT_CHANCE_PER_DAY,
   ACCIDENT_DAYS_OFF,
+  DAY_END_MINUTE,
   HELPER_HOME_CELL,
   HIRE_START_DELAY_DAYS,
   MINUTES_PER_WORKING_DAY,
@@ -30,7 +31,15 @@ import {
   WORKER_NAMES,
   WORKER_RATES,
 } from './constants';
-import { addWorkingDays, formatCalendarDay, isOvertime, isWorkingDay, monthOfDay } from './clock';
+import {
+  addWorkingDays,
+  breakMinutesBefore,
+  formatCalendarDay,
+  isOvertime,
+  isWorkingDay,
+  monthOfDay,
+  workedMinutesOfDay,
+} from './clock';
 import { charge, formatMoney } from './economy';
 import { queueEvent } from './events';
 import { onAccident } from './insurance';
@@ -564,11 +573,48 @@ export function hire(state: GameState, role: WorkerRole, tier: WorkerTier | null
     dayLog: [],
     idleMinutes: 0,
     idleByReason: emptyWorkerIdle(),
+    accidents: 0,
     monthMinutes: 0,
     monthDaysOff: 0,
   };
   state.workers.push(worker);
   return worker;
+}
+
+/** One person's day so far, in the three runs the tile and the card paint it in: the minutes he
+ *  worked, the minutes he stood, and the dinner hour he has taken, against the whole clock day
+ *  they are measured out of (PIOTR, 20.09, docs/mockups/t23/team-cards.png; CLAUDE.md T23 2.13).
+ *  The day meter of Turn 21's 2.8 and nothing else: nothing here counts a minute, it divides the
+ *  ones already counted.
+ *
+ *  The owner keeps his own two counters and they are read straight. A man on the books keeps only
+ *  the minutes he stood, so his worked minutes are what is left of the day that has run once the
+ *  dinner hour and the standing are taken out of it. That is the same invariant the owner's own
+ *  booking holds to: a minute is either worked or stood, and there are only so many of them. */
+export interface DayMeter {
+  worked: number;
+  idle: number;
+  /** The dinner hour, as much of it as has gone. */
+  breakMinutes: number;
+  /** The clock's whole working day, dinner included: what the bar is drawn out of. */
+  total: number;
+}
+
+export function dayMeterOf(state: GameState, holder: Worker | OwnerState): DayMeter {
+  const total = DAY_END_MINUTE;
+  const breakMinutes = breakMinutesBefore(Math.min(state.clock.minute, total));
+  if (!('role' in holder)) {
+    return {
+      worked: Math.max(0, holder.minutesWorked),
+      idle: Math.max(0, holder.idleMinutes),
+      breakMinutes: holder.breakSkipped ? 0 : breakMinutes,
+      total,
+    };
+  }
+  if (!isWorkingToday(state, holder)) return { worked: 0, idle: 0, breakMinutes: 0, total };
+  const ran = workedMinutesOfDay(Math.min(state.clock.minute, total));
+  const idle = Math.max(0, holder.idleMinutes);
+  return { worked: Math.max(0, ran - idle), idle, breakMinutes, total };
 }
 
 // ---------------------------------------------------------------------------
@@ -932,6 +978,9 @@ export function hurtWorker(
   options: { night?: boolean } = {},
 ): void {
   worker.absentDaysRemaining = ACCIDENT_DAYS_OFF;
+  // One more against his name, for the line his card prints. Nothing in the state counted them
+  // before tonight and the card is asked to say how many he has had (CLAUDE.md T23 2.13).
+  worker.accidents += 1;
   // He comes off the job and nobody else does: one man cutting his hand does not stop a job four
   // men are standing at (CLAUDE.md T19 2.5). The job falls back to the list only if he was the
   // last on it.

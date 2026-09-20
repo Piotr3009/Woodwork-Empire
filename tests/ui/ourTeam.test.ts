@@ -1,12 +1,14 @@
 // @vitest-environment jsdom
-// Our team: the roll call on the Team page of the laptop, one row a person, the owner at the top
-// of it (PIOTR, 16.09; CLAUDE.md T17 2.9). Name, role and class, the day he started and how long
-// ago that is, what he costs a month, the hours he has put in this month, the days he has had off
-// and what he is doing this minute.
+// Our team: the roll call on the Team page of the laptop, the owner at the top of it (PIOTR,
+// 16.09; CLAUDE.md T17 2.9). From Turn 23 it is a column of the tiles of 2.13 and no longer the
+// accountant's row of columns: the portrait, the name, a chip for the trade and a chip for the
+// grade, what he is on this minute, the bar of his day with its three figures, the wage and one
+// button (PIOTR, 20.09: "made for an accountant, not a player";
+// docs/mockups/t23/team-cards.png; CLAUDE.md T23 2.13).
 
 import { describe, expect, it } from 'vitest';
 import { WORKING_DAYS_PER_MONTH } from '../../src/engine/constants';
-import { formatCalendarDay, ownerDrawPerDay } from '../../src/engine/index';
+import { ownerDrawPerDay } from '../../src/engine/index';
 import { monthlyWageOf } from '../../src/engine/staff';
 import { renderTeam } from '../../src/ui/team';
 import { money } from '../../src/ui/modal';
@@ -26,8 +28,12 @@ function parse(html: string): HTMLElement {
   return holder;
 }
 
-function rows(state: GameState): HTMLElement[] {
-  return Array.from(parse(renderTeam(state, 'ourTeam')).querySelectorAll('[data-team]'));
+function tiles(state: GameState): HTMLElement[] {
+  return Array.from(parse(renderTeam(state, 'ourTeam')).querySelectorAll('[data-person]'));
+}
+
+function tileFor(state: GameState, id: string): HTMLElement | undefined {
+  return tiles(state).find((entry) => entry.getAttribute('data-person') === id);
 }
 
 /** A hall with the day 1 kit, the welfare a joiner has to have and one poor joiner on the books. */
@@ -41,44 +47,56 @@ function withAJoiner(): GameState {
 }
 
 describe('Our team', () => {
-  it('puts the owner in the first row, with the draw he pays himself', () => {
+  it('puts the owner in the first tile, with the draw he pays himself', () => {
     const state = withAJoiner();
-    const first = rows(state)[0];
-    expect(first?.getAttribute('data-team')).toBe('owner');
-    expect(first?.textContent).toContain(state.playerName);
-    expect(first?.textContent).toContain('owner');
-    expect(first?.textContent).toContain(`started ${formatCalendarDay(1)}`);
-    expect(first?.textContent).toContain(
+    const first = tiles(state)[0];
+    expect(first?.getAttribute('data-person')).toBe('owner');
+    expect(first?.querySelector('[data-name]')?.textContent).toBe(state.playerName);
+    expect(first?.querySelector('[data-role]')?.textContent).toBe('owner');
+    expect(first?.querySelector('[data-wage]')?.textContent).toContain(
       money(ownerDrawPerDay(state) * WORKING_DAYS_PER_MONTH),
     );
+    // His one button is Office, and nobody lets him go (CLAUDE.md T23 2.13).
+    expect(first?.querySelector('[data-do="openOffice"]')).not.toBeNull();
+    expect(first?.querySelector('[data-do="letGo"]')).toBeNull();
+    // The owner has no grade: he is the 1.00 every grade is measured against.
+    expect(first?.querySelector('[data-grade]')).toBeNull();
   });
 
-  it('gives every man his own row: when he started, what he costs a month and what he is on', () => {
+  it('gives every man his own tile: his trade, his grade and what he is on', () => {
     const state = withAJoiner();
     const man = state.workers[0];
     if (!man) throw new Error('no joiner');
-    const row = rows(state).find((entry) => entry.getAttribute('data-team') === man.id);
-    expect(row?.textContent).toContain(man.name);
-    // The words of a tier come off TIER_WORDS now, and nobody is poor (CLAUDE.md T20 2.5).
-    expect(row?.textContent).toContain('joiner, no experience');
-    expect(row?.textContent).toContain(`started ${formatCalendarDay(man.startDay)}`);
+    const tile = tileFor(state, man.id);
+    expect(tile?.querySelector('[data-name]')?.textContent).toBe(man.name);
+    // Two chips, not one line: the trade, and the grade with what a minute of his is worth. The
+    // words of a grade come off TIER_WORDS and never the engine key (CLAUDE.md 3, T20 2.5).
+    expect(tile?.querySelector('[data-role]')?.textContent).toBe('joiner');
+    expect(tile?.querySelector('[data-grade]')?.textContent).toBe('no experience ×0.60');
     // What a month of him costs is what he is paid: a joiner with no experience is on 1,950 and
     // there is no week behind it any more (CLAUDE.md T21 2.10).
     expect(monthlyWageOf(man)).toBe(man.monthlyWage);
     expect(man.monthlyWage).toBe(1950);
-    expect(row?.textContent).toContain(money(monthlyWageOf(man)));
-    expect(row?.textContent).toContain('0 days off');
-    // He does not start until the next working day, so that is what the row says of him.
-    expect(row?.textContent).toContain(`starts ${formatCalendarDay(man.startDay)}`);
+    expect(tile?.querySelector('[data-wage]')?.textContent).toContain(money(monthlyWageOf(man)));
+    // He does not start until the next working day, so that is what his line says of him.
+    expect(tile?.querySelector('[data-now]')?.textContent).toContain('starts');
   });
 
-  it('counts the hours of the month as they are worked', () => {
-    // A morning at the books: the minutes he spends are the minutes of his month.
+  it('paints the day he has had, and says the three figures under it', () => {
+    // A morning at the books: the minutes he spends are minutes of his day.
     const state = doTask(withAJoiner(), 'bookkeeping');
-    expect(state.owner.monthMinutes).toBeGreaterThan(0);
-    const first = rows(state)[0];
-    const hours = Math.round(state.owner.monthMinutes / 6) / 10;
-    expect(first?.textContent).toContain(`${hours} h this month`);
+    expect(state.owner.minutesWorked).toBeGreaterThan(0);
+    const first = tiles(state)[0];
+    const bar = first?.querySelector('[data-day-bar]');
+    expect(bar).not.toBeNull();
+    // Green for the minutes he worked, and it is a real width and not a nought.
+    const worked = bar?.querySelector('.seg-worked');
+    expect(worked).not.toBeNull();
+    expect(worked?.getAttribute('style')).toContain('width:');
+    const hours = Math.round(state.owner.minutesWorked / 6) / 10;
+    expect(first?.querySelector('[data-figures]')?.textContent).toContain(`${hours} h worked`);
+    expect(first?.querySelector('[data-figures]')?.textContent).toContain('idle');
+    expect(first?.querySelector('[data-figures]')?.textContent).toContain('this week');
   });
 
   it('lists the sprayer with his trade and the month he is paid by (CLAUDE.md T21 2.10)', () => {
@@ -90,13 +108,35 @@ describe('Our team', () => {
     const state = hireNow(ready, 'sprayer', 'experienced');
     const man = state.workers[state.workers.length - 1];
     if (!man || man.role !== 'sprayer') throw new Error('no sprayer on the books');
-    const row = rows(state).find((entry) => entry.getAttribute('data-team') === man.id);
-    expect(row?.textContent).toContain(man.name);
-    expect(row?.textContent).toContain('sprayer, experienced');
-    // He is paid by the month like everybody else (CLAUDE.md T21 2.10), and the row prints that
+    const tile = tileFor(state, man.id);
+    expect(tile?.querySelector('[data-name]')?.textContent).toBe(man.name);
+    expect(tile?.querySelector('[data-role]')?.textContent).toBe('sprayer');
+    expect(tile?.querySelector('[data-grade]')?.textContent).toContain('experienced');
+    // He is paid by the month like everybody else (CLAUDE.md T21 2.10), and the tile prints that
     // one figure.
     expect(man.monthlyWage).toBeGreaterThan(0);
-    expect(row?.textContent).toContain(money(monthlyWageOf(man)));
+    expect(tile?.querySelector('[data-wage]')?.textContent).toContain(money(monthlyWageOf(man)));
+  });
+
+  it('opens his own card on a click, and his buttons still do their own work', () => {
+    const state = withAJoiner();
+    const man = state.workers[0];
+    if (!man) throw new Error('no joiner');
+    const tile = tileFor(state, man.id);
+    // The whole tile is the way onto the card.
+    expect(tile?.getAttribute('data-do')).toBe('openPersonCard');
+    expect(tile?.getAttribute('data-id')).toBe(man.id);
+    // And the button inside it is the innermost `data-do`, so it keeps its own click.
+    const action = tile?.querySelector('[data-do="letGo"], [data-do="openPersonCard"][data-id]');
+    expect(action).not.toBeNull();
+  });
+
+  it('carries none of the accountant lines of Turn 17', () => {
+    const page = parse(renderTeam(withAJoiner(), 'ourTeam'));
+    const text = page.textContent ?? '';
+    expect(text).not.toContain('efficiency 0%');
+    expect(text).not.toContain('This week:');
+    expect(text).not.toContain('this month');
   });
 
   it('hires nobody: the roll call has no candidates on it', () => {

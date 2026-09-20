@@ -52,6 +52,7 @@ function officeManOn(
     monthDaysOff: 0,
     idleMinutes: 0,
     idleByReason: { waitingForBoss: 0, noMachine: 0, noMaterial: 0 },
+    accidents: 0,
   };
   state.workers.push(worker);
   return worker;

@@ -95,10 +95,13 @@ describe('the four classes on the hire cards', () => {
     );
     expect(page.querySelector(`[data-crew="${man.id}"]`)?.textContent).not.toContain('a week');
     expect(tile(state, 'joiner.senior')?.textContent).toContain(month);
-    // And Our team says the same figure and the same words.
+    // And Our team says the same figure and the same words. From Turn 23 it says them on his tile
+    // and in two chips rather than in one line of a row (CLAUDE.md T23 2.13), but they are the
+    // same words off the same `TIER_WORDS`.
     const roll = parse(renderTeam(state, 'ourTeam'));
-    const row = roll.querySelector(`[data-team="${man.id}"]`);
-    expect(row?.textContent).toContain(month);
-    expect(row?.textContent).toContain(`joiner, ${TIER_WORDS.senior}`);
+    const own = roll.querySelector(`[data-person="${man.id}"]`);
+    expect(own?.querySelector('[data-wage]')?.textContent).toContain(month);
+    expect(own?.querySelector('[data-role]')?.textContent).toBe('joiner');
+    expect(own?.querySelector('[data-grade]')?.textContent).toContain(TIER_WORDS.senior);
   });
 });

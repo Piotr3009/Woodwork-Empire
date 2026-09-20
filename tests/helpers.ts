@@ -530,6 +530,7 @@ export function sixJoinersOnSheetWork(
       monthDaysOff: 0,
       idleMinutes: 0,
       idleByReason: { waitingForBoss: 0, noMachine: 0, noMaterial: 0 },
+      accidents: 0,
       anchorX: 4 + man * 2,
       anchorY: 6,
     });
@@ -605,6 +606,7 @@ export function twoMenOnSheetWork(
     monthDaysOff: 0,
     idleMinutes: 0,
     idleByReason: { waitingForBoss: 0, noMachine: 0, noMaterial: 0 },
+    accidents: 0,
     anchorX: 0,
     anchorY: 4,
   });

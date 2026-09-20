@@ -11,20 +11,17 @@
 import {
   crewLine,
   dayMinutesByCategory,
-  formatCalendarDay,
   hiringOptions,
   houseTierFor,
   ownerDrawPaidInWindow,
   ownerDrawPerDay,
-  weekOfDay,
 } from '../engine/index';
-import type { GameState, HiringOption, WeekMeters, Worker, WorkerRole } from '../engine/index';
+import type { GameState, HiringOption, Worker, WorkerRole } from '../engine/index';
 import {
   DAY_CATEGORY_LABELS,
   HOUSE_TIER_NAMES,
   OWNER_DRAW_TIERS,
   TIER_WORDS,
-  WORKING_DAYS_PER_MONTH,
 } from '../engine/constants';
 import {
   HOLIDAY_OPTIONS_DAYS,
@@ -37,18 +34,8 @@ import {
   shiftOf,
 } from '../engine/index';
 // Straight off its own module, not round the public API, which Turn 13 froze (REPORT-T13 10).
-import {
-  ROLE_WORDS,
-  WEEK_CATEGORIES,
-  letGoCheck,
-  waitsForTheBoss,
-  weekBeforeOf,
-  weekEfficiency,
-  weekNowOf,
-  weekWorkedMinutes,
-} from '../engine/staff';
-import type { WeekHolder } from '../engine/staff';
-import { ownerDayLine } from './topbar';
+import { ROLE_WORDS } from '../engine/staff';
+import { renderOurTeam, workerDoing } from './personCard';
 import {
   button,
   emptyLine,
@@ -200,30 +187,9 @@ function dayMeterLine(worker: Worker): string {
   return `<span class="row-figure crew-day">Today: ${escapeHtml(text)}</span>`;
 }
 
-/** The words for a man nobody has put on anything, written once: the crew column of the Work Plan
- *  and the Our team tile both print them, and the Work Plan's test reads this and not a second
- *  copy of the sentence (CLAUDE.md T23 2.1). */
-export const NEEDS_A_JOB = 'needs a job';
-
-/** What this man is doing this minute, in the words the board says it in. The one answer: the
- *  crew row, the crew column of the Work Plan and the Our team row all print it
- *  (CLAUDE.md T17 2.9, T23 2.1). */
-export function workerDoing(state: GameState, worker: Worker): string {
-  const job = worker.jobId === null ? null : state.jobs.find((entry) => entry.id === worker.jobId);
-  const night = shiftOf(state, worker) === 'night';
-  if (worker.absentDaysRemaining > 0) {
-    return `off for ${plural(worker.absentDaysRemaining, 'more day', 'more days')}`;
-  }
-  if (worker.startDay > state.clock.day) return `starts ${formatCalendarDay(worker.startDay)}`;
-  if (worker.taskId !== null) return 'on a job of work';
-  if (job) return `${night ? 'tonight on' : 'on'} ${job.name}`;
-  // Nobody has put him on anything and there is no manager on duty to: the words the crew column
-  // of the Work Plan, the mark over his head and his own tile all say (PIOTR, 20.09;
-  // CLAUDE.md T23 2.1). He was called "free" until tonight, which read as a man at leisure and
-  // not as a man the player has to do something about.
-  if (waitsForTheBoss(state, worker)) return NEEDS_A_JOB;
-  return night ? 'on the night shift, nothing to do yet' : 'free';
-}
+// `NEEDS_A_JOB` and `workerDoing` have moved into `src/ui/personCard.ts`, which is where the one
+// function that draws a man now lives: the tile, the card, the crew column of the Work Plan and
+// the crew row below all say the same sentence about the same man (CLAUDE.md T23 2.13).
 
 /** The crew of one trade, as a row each: who he is, what he is doing and what he costs. */
 function crewRows(state: GameState, tab: TeamTab): string {
@@ -247,142 +213,11 @@ function crewRows(state: GameState, tab: TeamTab): string {
   return rows;
 }
 
-/** The owner has been here since the company's first day: nobody took him on (CLAUDE.md T17 2.9). */
-const OWNER_START_DAY = 1;
-
-/** Hours, to a tenth, the way a month of a man's time reads on the page. */
-function hoursText(minutesWorked: number): string {
-  return `${Math.round(minutesWorked / 6) / 10} h`;
-}
-
-/** When he started and how long ago that is, in the days the player counts everything else in. */
-function startedText(state: GameState, startDay: number): string {
-  const since = state.clock.day - startDay;
-  const ago =
-    since > 0
-      ? `${plural(since, 'day', 'days')} ago`
-      : since === 0
-        ? 'today'
-        : `in ${plural(-since, 'day', 'days')}`;
-  return `started ${formatCalendarDay(startDay)}, ${ago}`;
-}
-
-/** One row of Our team: who he is, when he started, what he costs, the hours he has put in this
- *  month, the days he has had off and what he is on this minute (CLAUDE.md T17 2.9). The pay is
- *  handed in as the words the row prints, because a man is paid by the week and the owner draws
- *  his by the day (CLAUDE.md T20 2.6). His week is the second line OF THE SAME ROW and never a row
- *  of its own: it is the last thing in the row and the row wraps, so it runs the whole width under
- *  everything the row says about him, in the game's own `<small>` (CLAUDE.md T20 1, 2.7). Put
- *  inside his name instead, as it was until the pictures were looked at, it squeezed his name into
- *  a column four lines deep (T20-C5). */
-function teamRow(
-  id: string,
-  name: string,
-  role: string,
-  when: string,
-  pay: string,
-  minutesWorked: number,
-  daysOff: number,
-  doing: string,
-  action = '',
-  week = '',
-): string {
-  return (
-    `<div class="row team-row" data-team="${id}">` +
-    `<span class="row-main">${escapeHtml(name)}, ${escapeHtml(role)}</span>` +
-    `<span class="row-figure team-when">${escapeHtml(when)}</span>` +
-    `<span class="row-figure">${escapeHtml(pay)}</span>` +
-    `<span class="row-figure">${hoursText(minutesWorked)} this month</span>` +
-    `<span class="row-figure">${plural(daysOff, 'day off', 'days off')}</span>` +
-    `<span class="row-figure">${escapeHtml(doing)}</span>` +
-    (action === '' ? '' : `<span class="row-action">${action}</span>`) +
-    week +
-    '</div>'
-  );
-}
-
-/** The one control a man's row carries: Let go, or the date he goes on once he has been given his
- *  notice. One click is one click: he works a week out, he is paid for it, and the morning after
- *  his last day his jobs and his contracts are a man short (PIOTR, 18.09: "how do I fire
- *  people?"; CLAUDE.md T20 2.4). The owner's row never has it: nobody lets him go. */
-function letGoControl(state: GameState, worker: Worker): string {
-  const check = letGoCheck(state, worker.id);
-  if (!check.ok) return reasonLabel(check.reason);
-  return button('letGo', 'Let go', `data-id="${worker.id}"`);
-}
-
-/** A man's week, in one line under his row: the hours he worked, where they went, the pieces a
- *  standing contract took off him, the jobs he stood at and the one efficiency figure of the week
- *  (PIOTR; CLAUDE.md T20 2.7). The engine samples the minutes; this prints them, and the bands
- *  add up to the hours because they are the same minutes.
- *
- *  The figure is his rate times the minutes he spent making something, over the minutes the
- *  company paid for while he was on the books. */
-function weekText(label: string, rate: number, meters: WeekMeters | null): string {
-  if (meters === null || meters.paidMinutes === 0) return `${label}: nothing yet`;
-  const worked = weekWorkedMinutes(meters);
-  const split = WEEK_CATEGORIES.filter((band) => meters.minutes[band] > 0)
-    .map((band) => `${band} ${hoursText(meters.minutes[band])}`)
-    .join(' \u00b7 ');
-  const parts = [`${hoursText(worked)} worked`];
-  if (split !== '') parts.push(split);
-  if (meters.pieces > 0) {
-    parts.push(`${plural(Math.round(meters.pieces), 'piece', 'pieces')} on contracts`);
-  }
-  if (meters.jobs.length > 0) parts.push(`on ${meters.jobs.join(', ')}`);
-  parts.push(`efficiency ${Math.round(weekEfficiency(rate, meters) * 100)}%`);
-  return `${label}: ${parts.join(', ')}`;
-}
-
-/** The second line of a man's row on Our team: this week and last, one under the other inside his
- *  own row (CLAUDE.md T20 2.7). */
-function weekLine(state: GameState, id: string, rate: number, holder: WeekHolder): string {
-  const week = weekOfDay(state.clock.day);
-  return (
-    `<span class="team-week" data-team-week="${id}">` +
-    `<small>${escapeHtml(weekText('This week', rate, weekNowOf(holder, week)))}</small>` +
-    `<small>${escapeHtml(weekText('Last week', rate, weekBeforeOf(holder, week)))}</small>` +
-    '</span>'
-  );
-}
-
-/** Everybody on the books, one row each, the owner first: the roll call Piotr asked for, with no
- *  hiring on it at all (PIOTR, 16.09; CLAUDE.md T17 2.9). The owner has no wage, so his month is
- *  the draw he pays himself on every working day of it. */
-function ourTeamRows(state: GameState): string {
-  const owner = state.owner;
-  const rows = [
-    teamRow(
-      'owner',
-      state.playerName,
-      'owner',
-      startedText(state, OWNER_START_DAY),
-      `${money(ownerDrawPerDay(state) * WORKING_DAYS_PER_MONTH)} a month`,
-      owner.monthMinutes,
-      owner.monthDaysOff,
-      ownerDayLine(state),
-      '',
-      // The owner works at his own speed, which is the 1.00 every tier is measured against.
-      weekLine(state, 'owner', 1, owner),
-    ),
-    ...state.workers.map(
-      (worker) =>
-        teamRow(
-          worker.id,
-          worker.name,
-          `${ROLE_WORDS[worker.role]}${worker.tier === null ? '' : `, ${TIER_WORDS[worker.tier]}`}`,
-          startedText(state, worker.startDay),
-          wageText(worker.monthlyWage),
-          worker.monthMinutes,
-          worker.monthDaysOff,
-          workerDoing(state, worker),
-          letGoControl(state, worker),
-          weekLine(state, worker.id, worker.rate > 0 ? worker.rate : 1, worker),
-        ),
-    ),
-  ];
-  return rows.join('');
-}
+// Our team's rows of Turn 17 are gone with the accountant's lines on them: `teamRow`,
+// `ourTeamRows`, `letGoControl`, `weekText`, `weekLine`, `startedText`, `hoursText` and
+// `OWNER_START_DAY`. The page is a column of the tiles of 2.13 now, and every figure those rows
+// printed is on the man's own tile or his card, in `src/ui/personCard.ts`, which draws both with
+// one function (PIOTR, 20.09: "made for an accountant, not a player"; CLAUDE.md T23 2.13).
 
 /** The floor's verdict on the crew, on the two tabs that hire onto it (CLAUDE.md T13 3.10). */
 function crewLimitLine(state: GameState): string {
@@ -510,13 +345,14 @@ function joineryCoreLines(state: GameState): string {
 }
 
 function tabBody(state: GameState, tab: TeamTab): string {
-  // The roll call, and nobody is hired from it (CLAUDE.md T17 2.9).
+  // The roll call, and nobody is hired from it (CLAUDE.md T17 2.9). A column of the tiles of
+  // 2.13 from Turn 23: the accountant's three lines of Turn 17 are gone and their figures are on
+  // the man's own card (PIOTR, 20.09; CLAUDE.md T23 2.13).
   if (tab === 'ourTeam') {
     return (
       '<h3>Our team</h3>' +
-      '<p class="hint">Everybody on the books, the owner first. The hours and the days off are ' +
-      'this month\u0027s; the line under each man is his week, and the week before it.</p>' +
-      ourTeamRows(state)
+      '<p class="hint">Everybody on the books, the owner first. Click a man for his card.</p>' +
+      renderOurTeam(state)
     );
   }
   const options = hiringOptions(state).filter((option) => tradeOf(option.role) === tab);

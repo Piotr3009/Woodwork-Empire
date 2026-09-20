@@ -544,6 +544,9 @@ function liftToVersion20(state: Raw): void {
     // is lifted on nought, the way the morning would have left it (CLAUDE.md T23 2.1).
     worker.idleMinutes = 0;
     worker.idleByReason = { waitingForBoss: 0, noMachine: 0, noMaterial: 0 };
+    // Nothing counted his accidents before tonight, so a save's men start on nought and the
+    // count runs from here (CLAUDE.md T23 2.13).
+    worker.accidents = 0;
   }
   retireSpec(state, 'drill', 'Cordless drill retired (v36)');
   retireSpec(state, 'canteenSeat', 'Canteen seats retired (v36)');

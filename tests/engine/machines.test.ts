@@ -257,6 +257,7 @@ describe('dust', () => {
         monthDaysOff: 0,
         idleMinutes: 0,
         idleByReason: { waitingForBoss: 0, noMachine: 0, noMaterial: 0 },
+        accidents: 0,
         anchorX: 0,
         anchorY: 4,
       });
@@ -306,6 +307,7 @@ describe('dust', () => {
       monthDaysOff: 0,
       idleMinutes: 0,
       idleByReason: { waitingForBoss: 0, noMachine: 0, noMaterial: 0 },
+      accidents: 0,
       anchorX: 0,
       anchorY: 4,
     });
@@ -367,6 +369,7 @@ describe('dust', () => {
         monthDaysOff: 0,
         idleMinutes: 0,
         idleByReason: { waitingForBoss: 0, noMachine: 0, noMaterial: 0 },
+        accidents: 0,
         anchorX: 0,
         anchorY: 4,
       });

@@ -102,6 +102,7 @@ function joiner(index: number): Worker {
     monthDaysOff: 0,
     idleMinutes: 0,
     idleByReason: { waitingForBoss: 0, noMachine: 0, noMaterial: 0 },
+    accidents: 0,
     anchorX: 4 + index * 2,
     anchorY: 6,
   };

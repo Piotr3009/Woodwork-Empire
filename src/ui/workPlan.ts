@@ -16,7 +16,8 @@ import {
   materialLine,
 } from './jobCard';
 import { button, emptyLine, escapeHtml, money, tabBar } from './modal';
-import { NEEDS_A_JOB, ROLE_WORDS, workerDoing } from './team';
+import { NEEDS_A_JOB, workerDoing } from './personCard';
+import { ROLE_WORDS } from './team';
 
 /** Where a point of the axis sits across it, as a percentage. One axis for every row, so the blue
  *  line is the same line on all of them. The axis is in working days: Monday comes straight after
@@ -182,8 +183,8 @@ export function renderWorkPlan(
  *  row: without a production manager nobody takes a job by himself, so this is where he sees who
  *  is standing about.
  *
- *  The words are `workerDoing` in team.ts and are never written again here, so the tile, the mark
- *  over his head and this column say the same thing about the same man. */
+ *  The words are `workerDoing` in personCard.ts and are never written again here, so the tile, the
+ *  mark over his head and this column say the same thing about the same man. */
 function crewColumn(state: GameState): string {
   if (state.workers.length === 0) return '';
   const rows = state.workers

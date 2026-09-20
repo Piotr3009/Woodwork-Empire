@@ -115,6 +115,7 @@ describe('setting the hall out', () => {
       monthDaysOff: 0,
       idleMinutes: 0,
       idleByReason: { waitingForBoss: 0, noMachine: 0, noMaterial: 0 },
+      accidents: 0,
       anchorX: bench?.anchorX ?? 0,
       anchorY: bench?.anchorY ?? 0,
     });

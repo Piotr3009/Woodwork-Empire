@@ -101,7 +101,7 @@ import { applySoundSettings, play as soundPlay, setLoops, stopAllSounds, unlockS
 import { hallLoops, hallOneShots } from '../render/hall';
 import { walkPath } from '../engine/walk';
 import { unconnectedMachines } from '../engine/pipes';
-import { hasCentralExtraction } from '../engine/machines';
+import { OWNER, hasCentralExtraction } from '../engine/machines';
 import { nextSpriteOrientation } from '../render/sprites';
 import { patchInto } from './patch';
 import { renderOwnerOut } from './ownerOut';
@@ -110,6 +110,7 @@ import { renderShopping } from './shopping';
 import { renderStart } from './start';
 import { dropCardTitle, renderDropCard, renderDropCardFooter } from './dropCard';
 import { renderMachineCard } from './machineCard';
+import { isPerson, personCardTitle, renderPerson } from './personCard';
 import { decodeSaveFile, encodeSaveFile, saveFileName } from '../cloud/file';
 import {
   NO_STORED_SAVE,
@@ -138,7 +139,11 @@ type ModalId =
   /** One machine on the hall, opened by a click on the machine itself: its picture and class, its
    *  effects, its hours, its service, its extraction and the buttons the Owned tab has
    *  (PIOTR, 17.09; CLAUDE.md T17 2.6). */
-  | 'machineCard';
+  | 'machineCard'
+  /** One person, opened by a click on his figure on the hall or on his tile in Our team: his
+   *  portrait, his chips, his day, his week and the two buttons (PIOTR, 20.09;
+   *  docs/mockups/t23/team-cards.png; CLAUDE.md T23 2.13). */
+  | 'personCard';
 
 /** The Orders page: the enquiries, and the standing contracts beside them (CLAUDE.md T13 3.16). */
 export type BoardTab = 'enquiries' | 'contracts';
@@ -200,6 +205,8 @@ interface Ui {
   sellConfirm: string | null;
   /** The machine whose own card is open, from a click on it on the hall (CLAUDE.md T17 2.6). */
   machineCard: string | null;
+  /** The person whose card is open: `owner` or a worker id (CLAUDE.md T23 2.13). */
+  personCard: string | null;
   /** Tasks the player has ticked on the laptop's Tasks page, in the order he ticked them, waiting
    *  for Do these (CLAUDE.md T17 2.16). */
   tickedTasks: string[];
@@ -272,6 +279,12 @@ interface Ui {
  *  hall, whose head is the thing's own name and class, because "Machine" over a tool cabinet says
  *  nothing and the card is opened by clicking that very cabinet (CLAUDE.md T22 2.13). */
 function modalTitleOf(id: ModalId, current: GameState): string {
+  // The card of a person is headed with his own name and trade, for the same reason the card of a
+  // thing on the hall is headed with its name: "Person" over a man the player has just clicked
+  // says nothing (CLAUDE.md T22 2.13, T23 2.13).
+  if (id === 'personCard') {
+    return personCardTitle(current, ui.personCard) ?? MODAL_TITLES[id];
+  }
   if (id !== 'machineCard') return MODAL_TITLES[id];
   const item = ui.machineCard === null
     ? undefined
@@ -296,6 +309,7 @@ const MODAL_TITLES: Record<ModalId, string> = {
   company: 'Company board',
   settings: 'Settings',
   machineCard: 'Machine',
+  personCard: 'Person',
 };
 
 /** How much of the page each modal takes. Anything that is a list or a board fills it; a small
@@ -314,6 +328,8 @@ export const MODAL_IS_FULL: Record<ModalId, boolean> = {
   settings: false,
   // One machine's card is a card, not a list: it sits on the page like an event does (T17 2.6).
   machineCard: false,
+  // A person's card is a card in the same sense, and it wears the machine card's skin (T23 2.13).
+  personCard: false,
 };
 
 /** The middle of the folder's three sizes, for a modal that is not a list but is more than two
@@ -331,6 +347,7 @@ export const MODAL_IS_WIDE: Record<ModalId, boolean> = {
   company: false,
   settings: false,
   machineCard: true,
+  personCard: true,
 };
 
 let ui: Ui = freshUi();
@@ -365,6 +382,7 @@ function freshUi(): Ui {
     ownedTab: 'all',
     sellConfirm: null,
     machineCard: null,
+    personCard: null,
     tickedTasks: [],
     dropConfirm: null,
     assignOpen: null,
@@ -493,6 +511,10 @@ function modalBody(id: ModalId, current: GameState): string {
       return renderWorkPlan(current, ui.workPlanTab, ui.assignOpen, ui.contractMan);
     case 'machineCard':
       return renderMachineCard(current, ui.machineCard, ui.sellConfirm);
+    case 'personCard':
+      return ui.personCard === null
+        ? '<p class="empty">Nobody by that name.</p>'
+        : renderPerson(current, ui.personCard, 'card');
     case 'accounting': {
       const books = renderAccounting(
         current,
@@ -1184,6 +1206,16 @@ function openMachineCard(equipmentId: string): void {
   openModal('machineCard');
 }
 
+/** The one way onto one person's card: a click on his figure on the hall, and a click on his tile
+ *  in Our team. One function, the way the machine card has one (CLAUDE.md T23 2.13). */
+function openPersonCard(who: string): void {
+  if (!isPerson(game(), who)) return;
+  // The card is the answer to the click, so whatever the last click wrote under the hall goes.
+  setNote('');
+  ui.personCard = who;
+  openModal('personCard');
+}
+
 /** The one way onto a page of the laptop: a tile, the back arrow, the Joinery Core tile onto the
  *  Team's Technical tab, and the order board's "Open the team" all come through here. The lid is
  *  lifted first when the laptop is not open, which is what boots it (CLAUDE.md T15 2.3). A new
@@ -1561,6 +1593,24 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
       // not return, because nothing is dispatched here and the card has to be drawn again for the
       // new man: the player picks through the men with the clock stopped.
       ui.contractMan = element.dataset.worker ?? null;
+      break;
+    // A click on a man's tile in Our team opens his card, the same card the hall's figure opens
+    // (PIOTR, 20.09; CLAUDE.md T23 2.13). The Assign button of a waiting man opens it too: the
+    // list he needs is on the card.
+    case 'openPersonCard':
+      openPersonCard(id);
+      break;
+    // The card's Assign: it opens the Work Plan on the job rows, where the Assign chips of
+    // Turn 19 are, which is the one list in the game for putting a man on a job. Nothing is
+    // dispatched: the click is free and the player makes the choice (CLAUDE.md T19 2.5, T23 2.1).
+    case 'openPersonAssign':
+      shutModal();
+      ui.workPlanTab = 'jobs';
+      openModal('workPlan');
+      break;
+    case 'openOffice':
+      shutModal();
+      walkTo('office');
       break;
     case 'letGo':
       // The week's notice: he works it out, he is paid for it, and the morning after his last day
@@ -2048,6 +2098,21 @@ function handleSceneClick(element: DataElement): boolean {
     walkTo('office');
     return true;
   }
+  // A click on a man on the hall opens his card: his portrait, his day, what he is on and the
+  // two buttons. It is the one way onto it beside his tile in Our team, and it takes the place of
+  // nothing, because a figure on the hall answered no click at all before tonight
+  // (PIOTR, 20.09; docs/mockups/t23/team-cards.png; CLAUDE.md T23 2.13).
+  const man = element.dataset.worker;
+  if (man !== undefined) {
+    openPersonCard(man);
+    requestRender();
+    return true;
+  }
+  if (element.dataset.owner !== undefined) {
+    openPersonCard(OWNER);
+    requestRender();
+    return true;
+  }
   const van = element.dataset.van;
   if (van !== undefined) {
     askUnload(van);
@@ -2155,7 +2220,13 @@ function runClick(event: MouseEvent): void {
     return;
   }
   if (state === null) return;
-  const scene = dataElement(target.closest('[data-van],[data-kit],[data-door]'));
+  // The things on the hall a click can land on. The two figure hooks join them tonight, because a
+  // click on a man opens his card (PIOTR, 20.09; CLAUDE.md T23 2.13); `data-worker` is the hook
+  // the hall has carried on every man since Turn 19 and `data-owner` the one it carries on the
+  // boss, so nothing new is drawn for this.
+  const scene = dataElement(
+    target.closest('[data-van],[data-kit],[data-door],[data-worker],[data-owner]'),
+  );
   if (scene) {
     handleSceneClick(scene);
     return;

@@ -462,6 +462,9 @@ export interface Worker {
    *  Emptied every morning with the day log. */
   idleMinutes: number;
   idleByReason: Record<WorkerIdleReason, number>;
+  /** Accidents he has had since he started. His card says how many, and nothing in the state
+   *  counted them until Turn 23 (CLAUDE.md T23 2.13). */
+  accidents: number;
   /** Minutes he has actually worked since the 1st, and working days he was not in: the two
    *  figures the Our team page reads. Both start again on the 1st (CLAUDE.md T17 2.9). */
   monthMinutes: number;

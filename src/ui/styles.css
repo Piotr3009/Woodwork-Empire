@@ -4417,3 +4417,97 @@ input.num {
   font-variant-numeric: tabular-nums;
   text-align: right;
 }
+
+/* ---------------------------------------------------------------------------
+   T23 2.13 A card for every person, and Our team made of them.
+   The tile and the card are the same markup (src/ui/personCard.ts), so they are the same classes
+   here: a `.tile` of the family above, laid out as a portrait beside a body. No new colour, font,
+   radius or shadow value; the two bar runs below read `--good` and `--bad`, which the game has
+   said good and bad in since Turn 1 (docs/ui-style.md 4, 13).
+   --------------------------------------------------------------------------- */
+.person-column {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.person-tile {
+  align-items: flex-start;
+  flex-direction: row;
+  gap: 12px;
+}
+
+.person-body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+/* The idle frame of his sheet, held to a portrait's box. A role with no sheet gets the capsule
+   shape in the renderer's own placeholder colour, which is already a token of this file. */
+.person-portrait {
+  flex: 0 0 auto;
+  height: 86px;
+  width: 52px;
+}
+
+.person-portrait.is-capsule {
+  background: var(--worker);
+  border-radius: 26px 26px 6px 6px;
+  display: block;
+}
+
+.person-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* A chip that says something rather than doing something: it is not a control, so it takes no
+   hover and no pointer. */
+.person-chips .chip {
+  cursor: default;
+  font-size: var(--fs-small);
+}
+
+.person-now {
+  margin: 4px 0 2px;
+}
+
+.person-day {
+  margin: 2px 0;
+}
+
+.person-figures {
+  margin: 0;
+}
+
+.person-wage {
+  font-weight: 600;
+}
+
+.person-rule {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: 8px 0;
+  width: 100%;
+}
+
+.person-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 6px;
+}
+
+/* The two runs of a person's day bar, beside `.seg-idle` of Turn 21, which is the grey the dinner
+   hour is drawn in here as well: worked and stood are the only two runs that were missing. */
+.seg-worked {
+  background: var(--good);
+}
+
+.seg-stood {
+  background: var(--bad);
+}
