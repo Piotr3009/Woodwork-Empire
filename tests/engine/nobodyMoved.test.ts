@@ -22,7 +22,7 @@ import {
   workMinute,
 } from '../../src/engine/production';
 import { ownerJob, waitingLine } from '../../src/engine/jobs';
-import { currentStage, stagePlanFor } from '../../src/engine/stages';
+import { currentStage, stageFor, stagePlanFor } from '../../src/engine/stages';
 import { stageText } from '../../src/engine/plan';
 import { bubbleFor } from '../../src/engine/bubbles';
 import { jobRow } from '../../src/ui/jobCard';
@@ -33,6 +33,22 @@ import { CREW, act, sixJoinersOnSheetWork } from '../helpers';
  *  stage, which wants the one saw, and two on a job at its assembly, which wants a bench. The other
  *  four jobs and the two men left over are taken out of the hall, so what is asserted is these four
  *  men and nothing else. */
+/** Puts labour into the stages by name, as the bag of work keeps it (v37): the shares of the
+ *  labour value, and the job's own figure kept in step with them. */
+function bagged(state: GameState, job: Job, shares: Partial<Record<string, number>>): void {
+  const plan = stagePlanFor(state, job);
+  let done = 0;
+  job.stageLabour = {};
+  for (const stage of plan) {
+    const share = shares[stage.id];
+    if (share === undefined) continue;
+    const put = (stage.to - stage.from) * share;
+    job.stageLabour[stage.id] = put;
+    done += put;
+  }
+  job.labourRemaining = job.labourValue - done;
+}
+
 function fourMenTwoJobs(): { state: GameState; cutting: Job; bench: Job } {
   let state = sixJoinersOnSheetWork({ saws: 1 });
   const first = state.jobs[0];
@@ -51,10 +67,11 @@ function fourMenTwoJobs(): { state: GameState; cutting: Job; bench: Job } {
       worker.jobId = null;
     }
   }
-  // A twentieth of the way through its making is the cutting stage and fifty five per cent of the
-  // way is the assembly one, which is the reading every test of the stages takes.
-  cutting.labourRemaining = cutting.labourValue * 0.95;
-  bench.labourRemaining = bench.labourValue * 0.45;
+  // The cutting job is a fifth through its cutting with its machining already done, so the saw is
+  // the one thing it has open: that is where a queue forms in the bag of work (v37). The bench job
+  // is past its cutting and its machining and a quarter into its assembly.
+  bagged(state, cutting, { cutting: 0.2, machining: 1 });
+  bagged(state, bench, { cutting: 1, machining: 1, assembly: 0.25 });
   return { state, cutting, bench };
 }
 
@@ -100,8 +117,9 @@ describe('four men, one saw, two jobs (CLAUDE.md T22 2.6)', () => {
 
   it('stands three of the four at the saw when both jobs want it, and counts every minute of it', () => {
     const { state, cutting, bench } = fourMenTwoJobs();
-    // Both jobs at their cutting stage: one saw, four men, and nothing else in the hall to do.
-    bench.labourRemaining = bench.labourValue * 0.95;
+    // Both jobs at their cutting stage with their machining done: one saw, four men, and nothing
+    // else in the hall to do, because assembly waits for the cut parts (PIOTR, 20.09).
+    bagged(state, bench, { cutting: 0.2, machining: 1 });
     const report = workMinute(state, hands(state));
     expect(report.worked).toBe(1);
     expect(report.lost.noMachine).toBe(3);
@@ -144,8 +162,10 @@ describe('the cutting stage and the men behind it', () => {
     const assembly = plan.find((stage) => stage.id === 'assembly');
     if (!cut || !assembly) throw new Error('a plan with both stages is wanted');
     expect(cut.to).toBeLessThanOrEqual(assembly.from);
-    cutting.labourRemaining = cutting.labourValue - (cut.from + (cut.to - cut.from) / 2);
+    bagged(state, cutting, { cutting: 0.5, machining: 1 });
     expect(currentStage(state, cutting)?.id).toBe('cutting');
+    // A second man finds nothing open but the saw: assembly waits for the cut parts (v37).
+    expect(stageFor(state, 'staff-3', cutting)?.id).toBe('cutting');
     // And the whole plan is ordered and end to end, which is the invariant the rule rests on.
     for (let at = 1; at < plan.length; at += 1) {
       expect(plan[at]?.from).toBe(plan[at - 1]?.to);

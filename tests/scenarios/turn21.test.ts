@@ -18,7 +18,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { CAREFUL, IDLE, type Policy, playDay, playUntilDay } from './autopilot';
-import { acceptNow, act, newGame, placeEnquiry } from '../helpers';
+import { acceptNow, act, newGame, placeEnquiry, withMachiningDone } from '../helpers';
 import {
   BANKRUPTCY_DAYS_BELOW_LIMIT,
   BANKRUPTCY_LIMIT_FACTOR,
@@ -161,6 +161,10 @@ function fourMenTwoJobs(benchWork: boolean): FourMen {
   jobOn(state, cuttingId).labourRemaining = jobOn(state, cuttingId).labourValue * 0.95;
   jobOn(state, benchId).labourRemaining =
     jobOn(state, benchId).labourValue * (benchWork ? 0.45 : 0.95);
+  // The bag of work (v37) would send the second man of a cutting job to its machining while the
+  // saw is taken; this scene is about the saw, so both jobs have their machining done and the saw
+  // is the one open station of a job at its cutting (assembly waits for the cut parts).
+  withMachiningDone(state);
   const opening = state;
   const played = opening.clock.day;
   const stood: Stood[] = [];

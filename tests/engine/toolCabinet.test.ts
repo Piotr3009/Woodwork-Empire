@@ -14,7 +14,6 @@ import {
   CABINET_SLOT_LAYOUT,
   HAND_TOOL_SET,
   JOINER_PREREQUISITES,
-  M2_PER_PERSON,
   ROOM_LAYOUT,
   TOOL_CABINET,
   UNIT_WIDTH_CELLS,
@@ -99,7 +98,6 @@ describe('the tool cabinet is a family of five (CLAUDE.md T22 2.12)', () => {
     // `perWorker` is gone from the cabinet: it is the free slots that are counted now, not the
     // cabinets (CLAUDE.md T22 2.12).
     expect(spec?.perWorker).toBe(false);
-    expect(spec?.stackable).toBe(true);
     // And the words the card prints, singular for the two that hold one.
     expect(toolSlotsLine(TOOL_CABINET, 'used')).toBe('Holds 1 man\u0027s tools');
     expect(toolSlotsLine(TOOL_CABINET, 'pro')).toBe('Holds 4 men\u0027s tools');
@@ -484,11 +482,13 @@ describe('the zone 3 by 2 the brief tags [TUNE] (CLAUDE.md T21 2.13)', () => {
     expect(fits).toBe(4);
   });
 
-  it('would cost the player a man off the crew limit', () => {
-    // The zone is what the free floor is measured against (`freeFloorM2`), so four more cells a
-    // cabinet is four square metres a cabinet off the floor the crew is counted on.
+  it('takes four more cells of floor than the cabinet stands on, and no man off the crew (v37)', () => {
+    // The zone is what the free floor is measured against (`freeFloorM2`): four more cells a
+    // cabinet is four square metres a cabinet off the floor. It costs no man since v37, because
+    // the crew is counted over the whole unit and not over the free floor (PIOTR, 20.09).
     const state = hall();
     const before = freeFloorM2(state);
+    const crew = crewLimit(state);
     const slot = CABINET_SLOT_LAYOUT[1];
     if (slot === undefined) throw new Error('a slot is wanted');
     placeEquipment(state, TOOL_CABINET, {
@@ -501,11 +501,7 @@ describe('the zone 3 by 2 the brief tags [TUNE] (CLAUDE.md T21 2.13)', () => {
     expect(before - freeFloorM2(state)).toBe(2);
     const extra = 3 * 2 - 2 * 1;
     expect(extra).toBe(4);
-    // Six of them is 24 m2, which is exactly one man of the limit (`M2_PER_PERSON`).
-    expect(CABINET_SLOT_LAYOUT.length * extra).toBe(M2_PER_PERSON);
-    expect(Math.floor((freeFloorM2(state) - M2_PER_PERSON) / M2_PER_PERSON)).toBe(
-      crewLimit(state) - 1,
-    );
+    expect(crewLimit(state)).toBe(crew);
   });
 });
 

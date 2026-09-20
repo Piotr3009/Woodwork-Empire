@@ -10,6 +10,7 @@ import {
   CABINET_SLOT_LAYOUT,
   EQUIPMENT_SPECS,
   LOCKER_SLOT_LAYOUT,
+  PRODUCTION_STAGES,
   SOUND_VOLUME_DEFAULT,
   STATE_VERSION,
   UNIT_WIDTH_CELLS,
@@ -565,6 +566,31 @@ function liftToVersion20(state: Raw): void {
   state.version = 20;
 }
 
+/** Version 20 to 21: a job's labour is kept by stage, the bag of work (PIOTR, 20.09; v37). A save
+ *  made under the one cursor of Turns 1 to 23 has one figure, the labour worked into the job, and
+ *  the cursor stood at the first stage that figure did not fill. So the lift pours that figure
+ *  into the stages in the plan's order, cutting first, until it runs out: exactly where the cursor
+ *  said the job was. A job cut on a CNC put its minutes into the same first two shares, which is
+ *  what the CNC's stage reads (`stageDone`), so the CNC plan lands in the same place. */
+function liftToVersion21(state: Raw): void {
+  for (const job of records(state.jobs)) {
+    if (isRecord(job.stageLabour)) continue;
+    const value = typeof job.labourValue === 'number' ? job.labourValue : 0;
+    const remaining = typeof job.labourRemaining === 'number' ? job.labourRemaining : value;
+    let done = Math.max(0, value - remaining);
+    const stageLabour: Record<string, number> = {};
+    for (const stage of PRODUCTION_STAGES) {
+      const need = stage.share * value;
+      const put = Math.min(done, need);
+      if (put > 0) stageLabour[stage.id] = put;
+      done -= put;
+      if (done <= 0) break;
+    }
+    job.stageLabour = stageLabour;
+  }
+  state.version = 21;
+}
+
 /** Every item of one retired family taken off the books, standing in the hall or still on the
  *  lorry, with one ledger line when the save actually held any. No money comes back: the player
  *  bought them under the old rules and the game is not buying them off him. Written against the
@@ -602,6 +628,7 @@ const LIFTS: Record<number, (state: Raw) => void> = {
   17: liftToVersion18,
   18: liftToVersion19,
   19: liftToVersion20,
+  20: liftToVersion21,
 };
 
 /** The state a save holds, lifted bump by bump into this build's shape, or null when the save is

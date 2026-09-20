@@ -7,6 +7,7 @@
 // he stays on the contract, because the client pays for every piece he makes.
 
 import { describe, expect, it } from 'vitest';
+import { stagePlanFor } from '../../src/engine/stages';
 import { CONTRACT_FREE_END_DAYS, JOINER_MONTHLY_WAGE, WORKER_RATES } from '../../src/engine/constants';
 import {
   CONTRACT_SHORT_WEEKS_ALLOWED,
@@ -155,6 +156,14 @@ describe('the day is the contract first and the job second (CLAUDE.md T20 2.1.4)
     expect(contractWantsToday(state, 'staff-1')).toBe(false);
     const saw = state.equipment.find((item) => item.specId === 'tableSaw');
     if (!saw) throw new Error('a saw is wanted');
+    // With the machining done the saw is the one station his job has open (v37), so a taken saw
+    // is a job that cannot use him this minute.
+    const job = state.jobs.find((entry) => entry.assignees.includes('staff-1'));
+    if (!job) throw new Error('his job is wanted');
+    const machining = stagePlanFor(state, job).find((stage) => stage.id === 'machining');
+    if (!machining) throw new Error('a machining stage is wanted');
+    job.stageLabour = { machining: machining.to - machining.from };
+    job.labourRemaining = job.labourValue - (machining.to - machining.from);
     saw.takenBy = 'owner';
     expect(contractWantsToday(state, 'staff-1')).toBe(true);
     // And the minute the saw is free again the job has him back: the question is asked fresh off the

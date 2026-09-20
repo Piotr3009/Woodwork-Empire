@@ -82,6 +82,10 @@ export interface WeekMeters {
   minutes: Record<WeekCategory, number>;
   /** Minutes the clock ran while he was on the books, worked or not: what he is paid for. */
   paidMinutes: number;
+  /** The minutes he stood waiting for a taken machine this week, by the machine's family, so his
+   *  card can say what the week's idle was for and the player can see whether a second one would
+   *  pay (PIOTR, 20.09; v37). Absent in a week counted before v37. */
+  waitedFor?: Partial<Record<string, number>>;
   /** Pieces of a standing contract finished while he was on it. A piece made by two men is half
    *  his, because two men made it. */
   pieces: number;
@@ -231,8 +235,6 @@ export interface EquipmentSpec {
   /** One per worker (workbench, locker, hand tool set). The canteen seat was on that list
    *  until Turn 23 took the seat out of the game (CLAUDE.md T23 2.11). */
   perWorker: boolean;
-  /** More than one may be owned. */
-  stackable: boolean;
   /** Other catalogue ids that must be owned first. */
   requires: string[];
   /** Catalogue ids of which at least one must be owned first. Empty means no such condition. */
@@ -580,6 +582,10 @@ export interface Job {
   /** Labour still to do. Machine reductions and the by hand penalty act on the minutes it takes
    *  to work this off, not on the figure itself (CLAUDE.md 9.5). */
   labourRemaining: number;
+  /** The labour worked into each stage, by stage, so two men on one job can be at two stages at
+   *  once and the job knows how far each of them is: the bag of work of v37 (PIOTR, 20.09). The
+   *  sum of it is `labourValue - labourRemaining`. */
+  stageLabour: Partial<Record<StageId, number>>;
   acceptedDay: number;
   dueDay: number;
   stage: JobStage;

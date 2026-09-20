@@ -130,7 +130,6 @@ import {
   itemIsHeavy,
   isSellableFamily,
   isSold,
-  itemStandsInTheHall,
   salePriceFor,
   benchOf,
   hallProductivityFactor,
@@ -2498,7 +2497,6 @@ export function canBuy(
     const names = oneOf.map((id) => findSpec(id)?.name ?? id).join(' or ');
     return { ok: false, reason: `Needs ${names} first` };
   }
-  if (!spec.stackable && has(state, specId)) return { ok: false, reason: 'Already owned' };
   if (specId === 'workbench' && countOf(state, 'workbench') >= state.unit.benchSlots) {
     return { ok: false, reason: 'No free bench slot in this unit' };
   }
@@ -2834,7 +2832,8 @@ export function canSell(state: GameState, equipmentId: string): BuyCheck {
   if (!item) return { ok: false, reason: 'Nothing to sell' };
   if (isSold(item)) return { ok: false, reason: 'Sold, collection tomorrow' };
   if (!isSellableFamily(item.specId)) return { ok: false, reason: 'Nobody buys second hand fittings' };
-  if (!itemStandsInTheHall(item)) return { ok: false, reason: 'It lives in a tool cabinet' };
+  // A tool kept in a cabinet sells like anything else and frees its slot when the buyer comes;
+  // it was refused here until v37 for no reason that survived a look (PIOTR, 20.09).
   if (item.broken) return { ok: false, reason: 'It is broken. Fix it first' };
   if (item.takenBy !== null) return { ok: false, reason: 'Somebody is standing at it' };
   // A rack goes when it is empty and nobody is at it (PIOTR, 18.09; CLAUDE.md T20 2.10). The one

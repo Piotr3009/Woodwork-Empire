@@ -6,6 +6,7 @@
 // the rest stand in the queue; and every man on it has a standing place of his own.
 
 import { benchOf } from '../../src/engine/machines';
+import { stagePlanFor } from '../../src/engine/stages';
 import { describe, expect, it } from 'vitest';
 import {
   addToJob,
@@ -68,7 +69,20 @@ function labourIn(
 ): number {
   const job = state.jobs.find((entry) => entry.id === jobId);
   if (!job) throw new Error('no job');
-  job.labourRemaining = job.labourValue * (at === 'cutting' ? 0.95 : 0.45);
+  // The bag of work (v37) keeps the labour by stage: at the cutting the machining is already done,
+  // so the saw is the one open station and a queue can form; at the assembly the cutting and the
+  // machining are behind it.
+  const plan = stagePlanFor(state, job);
+  const share = (id: string): number => {
+    const stage = plan.find((entry) => entry.id === id);
+    return stage ? stage.to - stage.from : 0;
+  };
+  job.stageLabour =
+    at === 'cutting'
+      ? { cutting: share('cutting') * 0.2, machining: share('machining') }
+      : { cutting: share('cutting'), machining: share('machining'), assembly: share('assembly') * 0.25 };
+  job.labourRemaining =
+    job.labourValue - Object.values(job.stageLabour).reduce((sum, value) => sum + (value ?? 0), 0);
   const before = job.labourRemaining;
   for (let minute = 0; minute < minutes; minute += 1) {
     workMinute(
@@ -151,7 +165,8 @@ describe('the men on a job (CLAUDE.md T19 2.5)', () => {
     // the one machine (CLAUDE.md T19 2.5, T22 2.6); that rule is asserted in
     // tests/engine/nobodyMoved.test.ts.
     state.jobs = [job];
-    job.labourRemaining = job.labourValue * 0.95;
+    // At the cutting with the machining done, so the saw is the one open station (v37).
+    labourIn(state, job.id, 'cutting', 0);
     workMinute(
       state,
       hands(state).filter((hand) => hand.job.id === job.id),

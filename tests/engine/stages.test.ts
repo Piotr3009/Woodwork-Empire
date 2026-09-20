@@ -187,11 +187,12 @@ describe('where a job has got to', () => {
     state = act(state, { type: 'SET_SPEED', speed: 1 });
     state = tick(state, 70);
     const job = firstJob(state);
-    // A 400 job is 240 minutes: 60 of cutting, then 36 of machining.
+    // A 400 job is 240 minutes: 60 of cutting, then 36 of machining. A run closes on the minute
+    // its stage is worked off (v37), the sixtieth of the cutting, which is minute 59 of the day.
     expect(job.stageRuns.map((run) => run.stage)).toEqual(['cutting', 'machining']);
     expect(job.stageRuns[0]?.startDay).toBe(1);
     expect(job.stageRuns[0]?.startMinute).toBe(0);
-    expect(job.stageRuns[0]?.endMinute).toBe(60);
+    expect(job.stageRuns[0]?.endMinute).toBe(59);
     expect(job.stageRuns[1]?.endDay).toBeNull();
   });
 });

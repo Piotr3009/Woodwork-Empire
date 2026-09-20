@@ -5,7 +5,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { M2_PER_PERSON, PRODUCTION_MANAGER_MONTHLY_WAGE } from '../../src/engine/constants';
-import { crewLimit, freeFloorM2 } from '../../src/engine/layout';
+import { crewLimit } from '../../src/engine/layout';
 import {
   canHire,
   crewCount,
@@ -77,31 +77,42 @@ function manager(id = 'pm-1'): Worker {
 }
 
 describe('the floor limit', () => {
-  it('is the free floor over the square metres a person wants, rounded down', () => {
+  it('is the whole unit over the square metres a person wants, rounded down', () => {
+    // The whole unit and not the free floor since v37 (PIOTR, 20.09: "200 over 24 is eight,
+    // simplest"): a machine takes floor, and that is the only way it limits men.
     const state = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
     expect(M2_PER_PERSON).toBe(24);
-    expect(crewLimit(state)).toBe(Math.floor(freeFloorM2(state) / M2_PER_PERSON));
+    expect(crewLimit(state)).toBe(
+      Math.floor((state.unit.widthCells * state.unit.depthCells) / M2_PER_PERSON),
+    );
+    expect(crewLimit(state)).toBe(8);
   });
 
-  it('lands a 200 m2 hall with the standard set at the owner and four, and refuses the fifth', () => {
+  it('lands a 200 m2 hall at the owner and seven, and refuses the eighth man', () => {
     let state = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
     state.reputation = 40;
     expect(state.unit.areaM2).toBe(200);
     expect(crewCount(state)).toBe(1);
-    expect(crewLimit(state)).toBeGreaterThanOrEqual(5);
-    state = withCrew(state, 4, 'novice');
-    expect(joiners(state)).toHaveLength(4);
-    expect(crewCount(state)).toBe(5);
-    // Every man's bench and cabinets took floor of their own: five is what is left.
-    expect(crewLimit(state)).toBe(5);
-    expect(crewLine(state)).toBe('Crew 5 / 5, floor limited');
+    expect(crewLimit(state)).toBe(8);
+    // Six joiners fill the unit's six bench slots; the helper needs no bench and is the eighth
+    // seat, so the crew is eight and the next man is refused by the unit and not the floor.
+    state = withCrew(state, 6, 'novice');
+    state = hireNow(state, 'helper', null);
+    expect(joiners(state)).toHaveLength(6);
+    expect(crewCount(state)).toBe(8);
+    // The benches and the cabinets took floor of their own and the limit did not move: eight is
+    // the unit's (v37).
+    expect(crewLimit(state)).toBe(8);
+    expect(crewLine(state)).toBe('Crew 8 / 8, the unit takes 8 people');
     expect(crewFull(state, 'joiner')).toBe(true);
-    expect(canHire(state, 'joiner', 'novice')).toEqual({ ok: false, reason: 'Crew 5 / 5, floor limited' });
-    // A helper stands on the floor too; the office does not.
-    expect(canHire(state, 'helper', null).reason).toBe('Crew 5 / 5, floor limited');
+    // A seventh joiner is stopped by the six bench slots before the crew line is reached; a
+    // second helper needs no bench and hears the unit's own line. The office does not.
+    expect(canHire(state, 'joiner', 'novice').ok).toBe(false);
+    expect(canHire(state, 'helper', null)).toEqual({
+      ok: false,
+      reason: 'Crew 8 / 8, the unit takes 8 people',
+    });
     expect(crewFull(state, 'officeAdmin')).toBe(false);
-    expect(canHire(state, 'officeAdmin', null).ok).toBe(true);
-    expect(canHire(state, 'estimator', 'experienced').ok).toBe(true);
   });
 
   it('counts the owner, the men on the floor and the manager, and never the desks', () => {

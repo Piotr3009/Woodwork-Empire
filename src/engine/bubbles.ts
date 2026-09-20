@@ -28,7 +28,7 @@ import {
   waitingWordsFor,
 } from './production';
 import { isWorkingToday, waitsForTheBoss } from './staff';
-import { cncOptions, currentStage } from './stages';
+import { cncOptions, stageFor } from './stages';
 import {
   STATION_LUNCH,
   roomBehindStation,
@@ -70,7 +70,7 @@ function onAJob(state: GameState, who: string, job: Job): Bubble | null {
   if (job.blockedBy === WAITING_FOR_MATERIAL) {
     return bubble(who, 'noMaterial', { job: job.name });
   }
-  const stage = currentStage(state, job, cncOptions(state, who, job));
+  const stage = stageFor(state, who, job, cncOptions(state, who, job));
   // A bench with nothing in the hose stands him still, and it is a thing the player can put
   // right with a compressor: media.ts decides it and the mark reports it (CLAUDE.md T23 2.7).
   if (standsForAir(state, stage)) return bubble(who, 'noCompressor');

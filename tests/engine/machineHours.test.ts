@@ -102,18 +102,20 @@ describe('the hours a machine gains', () => {
 });
 
 describe('one person per machine', () => {
-  it('makes the second man wait at the saw, and the saw gains one hour an hour', () => {
+  it('gives the saw to one man an hour, and sends the other to his own next stage (v37)', () => {
     const state = tick(twoMenOnSheetWork({ saws: 1 }), 60);
     const saw = machine(state, 'tableSaw');
     expect(saw.takenBy).toBe(OWNER);
     expect(saw.hoursUsed).toBeCloseTo(1, 4);
     const joiner = state.workers[0];
     if (!joiner) throw new Error('no joiner');
-    expect(joiner.station).toBe(waitingStation('tableSaw'));
-    const waiting = state.jobs.find((job) => job.assignees[0] === joiner.id);
-    expect(waiting?.blockedBy).toBe('waiting for the saw');
-    // He stood there for the hour and put nothing into his job.
-    expect(waiting?.labourRemaining).toBe(waiting?.labourValue);
+    // He does not stand at the saw: the bag of work sends him to the machining of his own job,
+    // which the hall's edgebander or a pair of hands can do while the saw is busy (PIOTR, 20.09).
+    expect(joiner.station).not.toBe(waitingStation('tableSaw'));
+    const his = state.jobs.find((job) => job.assignees[0] === joiner.id);
+    expect(his?.blockedBy).toBe('');
+    expect(his?.labourRemaining).toBeLessThan(his?.labourValue ?? 0);
+    expect(his?.stageLabour.machining ?? 0).toBeGreaterThan(0);
   });
 
   it('gives each man his own saw when there are two, and each gains its own hour', () => {

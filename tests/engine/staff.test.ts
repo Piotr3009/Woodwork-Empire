@@ -177,16 +177,15 @@ describe('the hiring pool', () => {
     expect(canHire(state, 'joiner', 'novice').ok).toBe(true);
   });
 
-  it('stops at the floor limit of the hall, before the bench slots of the unit', () => {
-    // One person per so many square metres of free floor, the owner among them, so a 200 m2
-    // hall with a normal set of kit holds the owner and four (PIOTR; CLAUDE.md T13 3.10).
-    const state = withCrew(buyStartingKit(newGame({ difficulty: 'veryEasy' })), 6, 'novice');
-    expect(joiners(state)).toHaveLength(4);
-    // Every man's bench and cabinets take floor of their own, so the limit came down with the
-    // hiring: the crew is now over it and the next hire is refused with the reason.
-    expect(crewLimit(state)).toBeLessThanOrEqual(joiners(state).length + 1);
+  it('stops at the bench slots of the unit, six, before the unit limit of eight (v37)', () => {
+    // One person per so many square metres of the whole unit, the owner among them, so a 200 m2
+    // hall holds the owner and seven (PIOTR, 20.09; v37); its six bench slots stop the seventh
+    // joiner first, which is the floor limiting men the only way it does now.
+    const state = withCrew(buyStartingKit(newGame({ difficulty: 'veryEasy' })), 9, 'novice');
+    expect(joiners(state)).toHaveLength(6);
+    expect(crewLimit(state)).toBe(8);
     const option = hiringOptions(state).find((entry) => entry.tier === 'novice');
-    expect(option?.blockReason).toContain('floor limited');
+    expect(option?.blockReason).not.toContain('the unit takes');
   });
 
   it('starts the new man the next working day and pays him monthly', () => {
@@ -379,32 +378,29 @@ describe('the queue at the saw', () => {
     return bossAssigns(clearEvents(runToDay(state, 2).state));
   }
 
-  it('lets one man cut and stands the other three at the saw', () => {
+  it('lets one man cut and puts the other three on the edging, nobody standing (v37)', () => {
     const state = fourAtTheCutting();
     expect(state.jobs.filter((job) => job.stage === 'inProduction')).toHaveLength(4);
     const before = state.jobs.map((job) => job.labourRemaining);
     const worked = tick(state, 60);
     const done = before.map((value, index) => value - (worked.jobs[index]?.labourRemaining ?? 0));
-    // One saw, one man on it: the ratio is not a multiplier on anybody's speed now, it is three
-    // men standing and waiting (CLAUDE.md T7 3.1).
+    // One saw, one man on it. The other three are not standing at it: the bag of work sends each
+    // to the next open stage of his own job whose station is free, which is the machining, done
+    // with the kit's hand edgebander out of the cabinet, a tool nobody queues for
+    // (PIOTR, 20.09; v37; CLAUDE.md T7 3.6).
     const full = 60 * OWNER_LABOUR_PER_MINUTE * WORKER_RATES.experienced;
-    expect(done.filter((value) => Math.abs(value - full) < 1e-6)).toHaveLength(1);
-    expect(done.filter((value) => value === 0)).toHaveLength(3);
+    expect(done.filter((value) => Math.abs(value - full) < 1e-6)).toHaveLength(4);
+    expect(worked.workers.filter((worker) => worker.station === 'machine:tableSaw')).toHaveLength(1);
     expect(
       worked.workers.filter((worker) => worker.station === waitingStation('tableSaw')),
-    ).toHaveLength(3);
-    expect(worked.jobs.filter((job) => job.blockedBy === 'waiting for the saw')).toHaveLength(3);
+    ).toHaveLength(0);
+    expect(worked.jobs.filter((job) => job.blockedBy === 'waiting for the saw')).toHaveLength(0);
   });
 
-  it('puts a second man to work the moment a second saw is bought', () => {
+  it('puts a second man on the saw the moment a second saw is bought', () => {
     const state = buyNow(fourAtTheCutting(), 'tableSaw');
-    const before = state.jobs.map((job) => job.labourRemaining);
     const worked = tick(state, 60);
-    const done = before.map((value, index) => value - (worked.jobs[index]?.labourRemaining ?? 0));
-    expect(done.filter((value) => value > 0)).toHaveLength(2);
-    expect(
-      worked.workers.filter((worker) => worker.station === waitingStation('tableSaw')),
-    ).toHaveLength(2);
+    expect(worked.workers.filter((worker) => worker.station === 'machine:tableSaw')).toHaveLength(2);
   });
 });
 

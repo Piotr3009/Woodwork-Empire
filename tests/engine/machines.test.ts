@@ -113,11 +113,12 @@ describe('the catalogue', () => {
     expect(canBuy(state, 'laptop').reason).toBe('Needs Desk first');
   });
 
-  it('refuses a second one of something that stands alone', () => {
-    // An extractor and a compressor may be owned several times over from Turn 10, because the
-    // hall adds their capacity up (CLAUDE.md T10 3.1, 3.2). A thicknesser still stands alone.
+  it('lets a second one of anything be bought, floor and money allowing', () => {
+    // Nothing stands alone since v37: a second thicknesser, edgebander or booth is bought like a
+    // second extractor, and only the floor, the money and the extraction say no
+    // (PIOTR, 20.09: "everything in any number").
     const state = buyNow(newGame(), 'thicknesser');
-    expect(canBuy(state, 'thicknesser')).toEqual({ ok: false, reason: 'Already owned' });
+    expect(canBuy(state, 'thicknesser').ok).toBe(true);
     expect(canBuy(state, 'extractor').ok).toBe(true);
     const two = buyNow(buyNow(state, 'extractor'), 'extractor');
     expect(countOf(two, 'extractor')).toBe(2);

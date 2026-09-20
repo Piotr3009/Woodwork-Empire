@@ -184,7 +184,7 @@ function rowFor(state: GameState, job: Job): PlanRow {
   const now = dayPoint(state.clock.day, state.clock.minute);
   const { rate, label } = rateFor(state, job);
   const left = minutesRemainingFor(state, job, rate);
-  const whole = minutesRemainingFor(state, { ...job, labourRemaining: job.labourValue }, rate);
+  const whole = minutesRemainingFor(state, { ...job, labourRemaining: job.labourValue, stageLabour: {} }, rate);
   const total = Math.max(whole, left);
   const from = productionStart(state, job);
   const notStarted = job.stageRuns.length === 0;

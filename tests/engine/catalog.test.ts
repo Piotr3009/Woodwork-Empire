@@ -54,6 +54,7 @@ function job(partial: Partial<Job>): Job {
     needsMeasure: false,
     labourValue: 160,
     labourRemaining: 0,
+    stageLabour: {},
     acceptedDay: 1,
     finishedDay: null,
     deliverOnDay: null,

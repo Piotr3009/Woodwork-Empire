@@ -253,10 +253,13 @@ export function freeFloorM2(state: GameState): number {
   return Math.max(0, state.unit.widthCells * state.unit.depthCells - taken);
 }
 
-/** How many people the floor has room for, the owner among them: one per so many square metres
- *  of free floor (PIOTR; CLAUDE.md T13 3.10). */
+/** How many people the unit has room for, the owner among them: one per so many square metres of
+ *  the whole unit, 200 over 24 is eight (PIOTR, 20.09: "the whole hall over 24, simplest"; v37).
+ *  Until v37 it was the free floor after the machines' zones, which refused a fifth joiner on a
+ *  working hall and left the canteen's eight lockers unreachable (REPORT-T23 items 1 and 6). The
+ *  machines still take floor: a bench needs its place, and that is the only way they limit men. */
 export function crewLimit(state: GameState): number {
-  return Math.floor(freeFloorM2(state) / M2_PER_PERSON);
+  return Math.floor((state.unit.widthCells * state.unit.depthCells) / M2_PER_PERSON);
 }
 
 /** The first cell, reading along each row in turn, where a thing of this kind fits. */

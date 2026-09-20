@@ -19,7 +19,6 @@ import {
   isOnJob,
   jobHeldBy,
   jobProgress,
-  jobStage,
   leadAssignee,
   oldestOpenJob,
   waitingLine,
@@ -86,9 +85,9 @@ import {
   waitingStation,
 } from './stations';
 import {
+  stageFor,
   type StagePlan,
   cncOptions,
-  currentStage,
   labourPerMinute,
   stageMinutes,
   stagePlanFor,
@@ -162,7 +161,7 @@ export function familiesWanted(state: GameState, job: Job, who = OWNER): string[
   // of his own, and one that is free is left for somebody else (CLAUDE.md T17 2.10).
   const lead = leadAssignee(job);
   const wanted: string[] = lead !== null && lead !== who && isOnJob(job, who) ? [] : [BENCH];
-  const stage = currentStage(state, job, cncOptions(state, who, job));
+  const stage = stageFor(state, who, job, cncOptions(state, who, job));
   const family = stage?.family ?? null;
   if (family === null || family === BENCH) return wanted;
   // A family the workshop does not own at all is done by hand, and a tool kept in a cabinet is
@@ -196,7 +195,7 @@ export function takeMachines(state: GameState, hand: Hand): StationCheck {
   for (const family of wanted) {
     if (claimMachine(state, hand.who, family) === null) return { machine: null, waitingFor: family };
   }
-  const stage = currentStage(state, hand.job, options);
+  const stage = stageFor(state, hand.who, hand.job, options);
   const family = stage?.family ?? null;
   if (family === null || !has(state, family) || machineIsShared(state, family)) {
     return { machine: sharedTool(state, family), waitingFor: null };
@@ -234,7 +233,7 @@ function placeAmong(job: Job, who: string, eligible: (other: string) => boolean)
  *  third and the rest take the places beyond the table's two, along the same side of the item
  *  (CLAUDE.md T19 2.5). */
 export function stationForProduction(state: GameState, who: string, job: Job): string {
-  const stage = currentStage(state, job, cncOptions(state, who, job));
+  const stage = stageFor(state, who, job, cncOptions(state, who, job));
   const family = stage?.family ?? null;
   // Everybody but the first man of the job works at the first man's bench: the second in its
   // second place and the rest along its front (CLAUDE.md T17 2.10, T19 2.5).
@@ -361,7 +360,7 @@ export const NO_CUT_PARTS = 'no cut parts yet';
  *  all. The queue is read the way `stationForProduction` reads it, through the same `placeAmong`, so
  *  the words and the cell he stands on cannot disagree (CLAUDE.md T21 2.6, 2.7). */
 export function waitingWordsFor(state: GameState, who: string, job: Job): string | null {
-  const stage = currentStage(state, job, cncOptions(state, who, job));
+  const stage = stageFor(state, who, job, cncOptions(state, who, job));
   const family = stage?.family ?? null;
   if (family === null || family === BENCH) return null;
   if (!has(state, family) || machineIsShared(state, family)) return null;
@@ -424,7 +423,9 @@ export function placeHand(state: GameState, hand: Hand): HandPlace {
     const noMaterial = hand.job.blockedBy === WAITING_FOR_MATERIAL;
     return { work: null, lost: noMaterial ? 'noMaterial' : 'noMachine', noMaterial };
   }
-  const stage = jobStage(state, hand.job, cncOptions(state, hand.who, hand.job));
+  // The stage this man works, which is his own from v37: two men on one job may be at two stages
+  // (the bag of work, PIOTR 20.09).
+  const stage = stageFor(state, hand.who, hand.job, cncOptions(state, hand.who, hand.job));
   if (stage === null) return { work: null, lost: null, noMaterial: false };
   const at = takeMachines(state, hand);
   if (at.waitingFor === null) {
@@ -462,7 +463,7 @@ export function ownerIdleReason(state: GameState): OwnerIdleReason | null {
     if (!rackCanSupply(state, job, jobProgress(job))) return 'noMaterial';
     // A bench the hall has no air for stands the owner still like anybody else, and his meter
     // says which of the two it was (PIOTR, 20.09; CLAUDE.md T23 2.7).
-    const stage = currentStage(state, job, cncOptions(state, OWNER, job));
+    const stage = stageFor(state, OWNER, job, cncOptions(state, OWNER, job));
     return standsForAir(state, stage) ? 'noCompressor' : 'noMachine';
   }
   // Nothing of his own at all. Either the hall's list has a chore nobody has taken, or there is

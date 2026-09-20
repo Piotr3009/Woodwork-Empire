@@ -41,21 +41,22 @@ describe('the floor limit on the team page', () => {
     for (const tab of ['workshop', 'management'] as const) {
       const page = parse(renderTeam(state, tab));
       expect(page.querySelector('.crew-limit')?.textContent).toBe(crewLine(state));
-      expect(page.querySelector('.crew-limit')?.textContent).toContain('floor limited');
+      expect(page.querySelector('.crew-limit')?.textContent).toContain('the unit takes');
     }
     expect(parse(renderTeam(state, 'office')).querySelector('.crew-limit')).toBeNull();
     expect(parse(renderTeam(state, 'technical')).querySelector('.crew-limit')).toBeNull();
   });
 
-  it('reads "Crew 5 / 5" with the owner and four, and the tiles refuse with the same line', () => {
+  it('reads "Crew 5 / 8" with the owner and four, and the tiles still hire (v37)', () => {
+    // The unit takes eight since v37 (PIOTR, 20.09), so four men and the owner leave three seats
+    // and the tiles are not refused by the crew line.
     const state = withCrew(buyStartingKit(known()), 4);
     const page = parse(renderTeam(state, 'workshop'));
-    expect(page.querySelector('.crew-limit')?.textContent).toBe('Crew 5 / 5, floor limited');
+    expect(page.querySelector('.crew-limit')?.textContent).toBe('Crew 5 / 8, the unit takes 8 people');
     const novice = page.querySelector('[data-candidate="joiner.novice"]');
-    expect(novice?.querySelectorAll('[data-do="hire"]')).toHaveLength(0);
-    expect(novice?.textContent).toContain('Crew 5 / 5, floor limited');
+    expect(novice?.textContent).not.toContain('the unit takes');
     const helper = page.querySelector('[data-candidate="helper."]');
-    expect(helper?.querySelectorAll('[data-do="hire"]')).toHaveLength(0);
+    expect(helper?.textContent).not.toContain('the unit takes');
     // The desks are not on the floor: the admin can still be taken on.
     const office = parse(renderTeam(state, 'office'));
     expect(office.querySelector('[data-candidate="officeAdmin."]')?.querySelectorAll('[data-do="hire"]')).toHaveLength(1);

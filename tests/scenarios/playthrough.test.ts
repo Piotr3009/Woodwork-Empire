@@ -264,9 +264,13 @@ describe('the three month playthrough of 10.4, on Easy as the brief scripts it',
     // there are none (CLAUDE.md T23 2.12).
     expect(loan?.principal).toBe(LOAN_FLOOR);
     expect(loan?.startDay ?? 99).toBeLessThanOrEqual(8);
-    expect(Math.round(months[0]?.cashClose ?? 0)).toBe(6550);
-    expect(Math.round(months[1]?.cashClose ?? 0)).toBe(-5018);
-    expect(Math.round(months[2]?.cashClose ?? 0)).toBe(-15847);
+    // Re-measured for v37, the bag of work (PIOTR, 20.09): 6,550, -5,018 and -15,847 under the
+    // one cursor of Turn 23. A man now edges or assembles while the saw is taken instead of
+    // standing, and this hall, on the day 1 fan, gives some of that back as dust; the months move
+    // by a few hundred to two thousand and the shape of the run does not.
+    expect(Math.round(months[0]?.cashClose ?? 0)).toBe(5781);
+    expect(Math.round(months[1]?.cashClose ?? 0)).toBe(-7402);
+    expect(Math.round(months[2]?.cashClose ?? 0)).toBe(-16492);
     // Three charges in three months now and not two: 8 on day 31 and 21 on day 61 for the few
     // days each month that ran under, and 196 on day 91, which is month 3 spent in the
     // overdraft from end to end. The first two are small change beside the 25% a year the
@@ -275,7 +279,7 @@ describe('the three month playthrough of 10.4, on Easy as the brief scripts it',
     const overdraft = state.ledger.filter((entry) => entry.category === 'overdraftInterest');
     expect(overdraft.map((entry) => entry.day)).toEqual([31, 61, 91]);
     expect(Math.abs(overdraft[0]?.amount ?? 0)).toBeLessThan(15);
-    expect(Math.abs(overdraft[1]?.amount ?? 0)).toBeLessThan(30);
+    expect(Math.abs(overdraft[1]?.amount ?? 0)).toBeLessThan(40);
     expect(Math.abs(overdraft[2]?.amount ?? 0)).toBeGreaterThan(100);
   });
 
@@ -290,8 +294,15 @@ describe('the three month playthrough of 10.4, on Easy as the brief scripts it',
     expect(houseTierFor(state)).toBe(2);
   });
 
-  it('keeps the efficiency above 55% in month 3', () => {
-    expect(months[2]?.efficiencyMean ?? 0).toBeGreaterThan(55);
+  it('keeps the efficiency above 55% in month 2, and loses it in month 3 to the money', () => {
+    // Month 3 fell to 47 in v37, and not to the machines: `noMachine` fell with the bag of work,
+    // and what grew is `noPeople`, men with no job to go to, 9,210 minutes of it, because a
+    // company sixteen thousand into its overdraft buys no material. That is the ten thousand loan
+    // floor of Turn 23's 2.12 doing what REPORT-T23 item 4 said it would, written down as it
+    // plays; Piotr's ruling of 20.09 is that the floor stays until a cheap start scenario says
+    // otherwise.
+    expect(months[1]?.efficiencyMean ?? 0).toBeGreaterThan(55);
+    expect(Math.round(months[2]?.efficiencyMean ?? 0)).toBe(47);
   });
 
   it('took the first contract its crew could keep up with and made every week of it in full', () => {
@@ -301,7 +312,12 @@ describe('the three month playthrough of 10.4, on Easy as the brief scripts it',
     // The opening week is the term's own part week, signed before the rack is fed for it; every
     // week after it is made in full, out of sheets held on the rack and never bought as a money
     // line on the contract (CLAUDE.md T17 2.22).
-    expect((first?.weeks ?? []).slice(1).every((week) => week.made >= week.wanted)).toBe(true);
+    // Every full week of the term made until the last one on the books, which the bank's morning
+    // cut short at nought (v37: the run closes on day 92 as before, one week earlier on the term).
+    const weeks = (first?.weeks ?? []).slice(1);
+    const cut = weeks[weeks.length - 1];
+    expect(weeks.slice(0, -1).every((week) => week.made >= week.wanted)).toBe(true);
+    expect(cut?.made).toBe(0);
     expect(first?.sheetsUsed ?? 0).toBeGreaterThan(0);
     expect(state.ledger.some((entry) => entry.label.includes(': material'))).toBe(false);
     // The term used to run past the three months, and the same script played on until the client's
@@ -327,19 +343,22 @@ describe('the three month playthrough of 10.4, on Easy as the brief scripts it',
       guard += 1;
     }
     const running = later.contracts.find((contract) => contract.status !== 'offered');
-    expect(running?.weeks.length ?? 0).toBe(13);
-    expect(running?.renegotiatedPrice ?? null).toBeNull();
+    // Re-measured for v37: the same script takes a twelve week term this time (the offer is the
+    // seeded stream's, and the day it is taken moved with the bag of work), which ends on day 85,
+    // six days before the bank, so the client's renegotiation is reached after all and stands
+    // unanswered at 53 when the company closes.
+    expect(running?.weeks.length ?? 0).toBe(12);
+    expect(running?.status).toBe('ended');
+    expect(running?.renegotiatedPrice).toBe(53);
     expect(later.gameOver?.day).toBe(91);
-    // The term still had a month to run when the bank pulled it.
-    expect((running?.endDay ?? 0) - (later.gameOver?.day ?? 0)).toBe(30);
+    expect((later.gameOver?.day ?? 0) - (running?.endDay ?? 0)).toBe(6);
     // The rule it was closed under is the amount and not the thirty days, and the count of days
-    // below the limit was on 8 of its 30 when the bank looked. The bank reads the account at the
+    // below the limit was on 10 of its 30 when the bank looked. The bank reads the account at the
     // point the day's money is settled, which is the morning, and the card it queues carries the
-    // figure it read; by the close of that day a client's money had brought the account back to
-    // -15,847, which is the figure the run ends on (CLAUDE.md T22 2.2).
+    // figure it read; the run ends on -16,492 (CLAUDE.md T22 2.2; v37).
     expect(later.gameOver?.reason).toContain('cannot pay');
-    expect(Math.round(later.cash)).toBe(-15847);
-    expect(later.finance.daysBelowOverdraft).toBe(8);
+    expect(Math.round(later.cash)).toBe(-16492);
+    expect(later.finance.daysBelowOverdraft).toBe(10);
     const closed = later.eventQueue.find((entry) => entry.kind === 'bankruptcy');
     expect(closed).toBeDefined();
     expect(Number(closed?.data.cash ?? 0)).toBeLessThanOrEqual(

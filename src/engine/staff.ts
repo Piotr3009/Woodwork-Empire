@@ -51,6 +51,7 @@ import { addToJob, assignJob, findJob, takeOffJob } from './jobs';
 // have carried since Turn 13: neither touches the other while it is being loaded.
 import { workPlan } from './plan';
 import { crewLimit } from './layout';
+import { plural } from './text';
 import {
   SPRAY_BOOTH,
   accidentRisk,
@@ -158,9 +159,10 @@ export function crewFull(state: GameState, role: WorkerRole): boolean {
   return crewCount(state) + 1 > crewLimit(state);
 }
 
-/** "Crew 4 / 5, floor limited": what the team page says (CLAUDE.md T13 3.10). */
+/** "Crew 4 / 8, the unit takes eight": what the team page says (CLAUDE.md T13 3.10; v37). */
 export function crewLine(state: GameState): string {
-  return `Crew ${crewCount(state)} / ${crewLimit(state)}, floor limited`;
+  const limit = crewLimit(state);
+  return `Crew ${crewCount(state)} / ${limit}, the unit takes ${plural(limit, 'person', 'people')}`;
 }
 
 /** The office role every other one is hired behind. She is the base office person: emails,
@@ -860,6 +862,7 @@ function freshMeters(week: number, bench: number): WeekMeters {
     week,
     minutes: { jobs: 0, contracts: 0, unloading: 0, cleaning: 0, desk: 0, site: 0 },
     paidMinutes: 0,
+    waitedFor: {},
     pieces: 0,
     jobs: [],
     day: 0,

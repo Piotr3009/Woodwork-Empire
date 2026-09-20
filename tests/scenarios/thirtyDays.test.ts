@@ -467,7 +467,7 @@ describe('30 days on Very easy behind the best saw money can buy', () => {
     const taken = state.jobs[0];
     if (!taken) throw new Error('no jobs in the month');
     // Measured on the whole job, because the month finished the ones it started.
-    const job = { ...taken, labourRemaining: taken.labourValue };
+    const job = { ...taken, labourRemaining: taken.labourValue, stageLabour: {} };
     expect(job.labourValue).toBeGreaterThan(0);
     expect(stageSpeed(state, job, 'cutting').speed).toBeCloseTo(1.3, 10);
     expect(stageSpeed(state, job, 'assembly').speed).toBeCloseTo(1, 10);
@@ -957,26 +957,24 @@ describe('a month of six joiners behind two saws', () => {
     expect(two.waiting).toBeLessThan(one.waiting / 4);
   });
 
-  it('gets more work out of the same six men, and ends the month with more money', () => {
+  it('gets the whole book out on one saw too, and the second saw buys time at the saw and not a job (v37)', () => {
     const done = (month: CrewMonth): number =>
       month.state.jobs.filter((job) => job.stage === 'completed').length;
     const lastDay = (month: CrewMonth): number =>
       month.state.jobs.reduce((latest, job) => Math.max(latest, job.finishedDay ?? 99), 0);
-    // Re-measured in Turn 21: the crew are back at 0.6 of the owner, which is what a man with no
-    // experience is worth on Piotr's own ladder (CLAUDE.md T21 2.9), a step slower than Turn 20
-    // read them. So the one saw month no longer gets the whole book out inside the thirty days and
-    // the second saw buys jobs again as well as days: six delivered against five, the sixth of
-    // them finished on day 25, and the one saw month's last job still on the bench when the month
-    // ends, which is what the 99 in `lastDay` stands for.
+    // Re-measured for v37, the bag of work (PIOTR, 20.09). Until v37 a man whose job wanted the
+    // one taken saw stood at it, so the one saw month got five of its six jobs out and the second
+    // saw bought the sixth and 3,246 of money. From v37 that man edges or assembles his own job
+    // while the saw is busy and comes back to it, so the one saw month gets all six out as well,
+    // the last of them on day 26 against day 25, and the second saw ends the month 90 behind the
+    // one saw month, having cost 1,800: it buys the crew its time at the saw (the next test) and
+    // no longer a job. Piotr should read this as the price of a machine falling once the men have
+    // other work to fill its gaps with, which is what a real shop does.
     expect(done(two)).toBe(6);
-    expect(done(one)).toBe(5);
-    expect(done(two)).toBeGreaterThan(done(one));
-    expect(lastDay(two)).toBeLessThan(lastDay(one));
-    // The second saw is 1800, and on tonight's figures it pays for itself inside the month and
-    // then some: the two saw month ends 3,246 ahead of the one saw month, having spent the 1,800
-    // on the machine, because the extra job out of the door is worth more than the saw
-    // (CLAUDE.md T7 3.1, T21 2.9).
-    expect(two.state.cash - one.state.cash).toBeGreaterThan(1800);
+    expect(done(one)).toBe(6);
+    expect(lastDay(two)).toBeLessThanOrEqual(lastDay(one));
+    expect(two.state.cash - one.state.cash).toBeGreaterThan(-1800);
+    expect(two.state.cash - one.state.cash).toBeLessThan(0);
   });
 
   it('stands the one saw crew at the saw for hours at a time, and says which machine', () => {
@@ -1009,23 +1007,14 @@ describe('a month of a full crew behind two saws on the day 1 fan alone', () => 
     seen,
   );
 
-  it('is three joiners and not six, because the floor has no room for more', () => {
-    // The script asks for six and the hall says no: two saws, their zones and every man's bench
-    // and cabinets leave floor for the owner and three (PIOTR; CLAUDE.md T13 3.10).
-    //
-    // It was three until Turn 21, two through Turn 21, and three again from Turn 22, and the one cell
-    // that moves it each time is the tool cabinet's. Turn 21 made a cabinet two metres wide, so
-    // each of the four in this hall took a cell more of the floor the crew limit is measured
-    // against and the hall lost a man; Turn 22 makes the cabinet a family of five and the cheapest
-    // class, which is the one the script buys, is a metre square again, so the cell comes back and
-    // the man with it (CLAUDE.md T22 2.12). The limit is
-    // `Math.floor(freeFloorM2 / M2_PER_PERSON)` with `M2_PER_PERSON` 24, so four cells is the whole
-    // difference between a fifth man and a fourth. Nothing about the crew rule itself has moved in
-    // either turn.
-    expect(state.workers.filter((worker) => worker.role === 'joiner')).toHaveLength(3);
-    expect(missingForHire(state, 'joiner')).toEqual([]);
-    const blocked = state.workers.length;
-    expect(blocked).toBeLessThan(6);
+  it('is six joiners, because the unit takes eight and the floor no longer counts them (v37)', () => {
+    // The script asks for six and gets six since v37: the crew is counted over the whole unit,
+    // 200 over 24 is eight with the owner, and the machines' zones no longer take men off it
+    // (PIOTR, 20.09). Until v37 the same hall stopped at three, and the cell that moved it each
+    // turn was the tool cabinet's (CLAUDE.md T13 3.10, T21 2.13, T22 2.12).
+    expect(state.workers.filter((worker) => worker.role === 'joiner')).toHaveLength(6);
+    // The seventh would want a bench, a locker and a set of tools the script never bought.
+    expect(missingForHire(state, 'joiner')).toContain('workbench');
   });
 
   it('fills the one bag in the month, and the owner empties it himself each time', () => {

@@ -11,6 +11,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { LAPTOP_BOOT_MINUTES, LET_GO_NOTICE_DAYS } from '../../src/engine/constants';
 import { formatCalendarDay } from '../../src/engine/index';
 import { STATION_IDLE } from '../../src/engine/stations';
+import { weekOfDay } from '../../src/engine/clock';
 import { assignJob } from '../../src/engine/jobs';
 import { renderPerson } from '../../src/ui/personCard';
 import { advanceMinutes, currentState, mount, render } from '../../src/ui/app';
@@ -96,6 +97,33 @@ describe('the tile and the card are one function', () => {
     // The card's two buttons.
     expect(card.querySelector('[data-do="openPersonAssign"]')).not.toBeNull();
     expect(card.querySelector('[data-do="letGo"]')).not.toBeNull();
+  });
+
+  it('says what the week idle was for, when it was a machine (v37)', () => {
+    // A week that stood six hours at the edgebander and two at the saw: the card names the one
+    // he waited for most, with its hours, so the player can see what a second one would buy
+    // (PIOTR, 20.09).
+    const state = withAJoiner();
+    const man = state.workers[0];
+    if (!man) throw new Error('a joiner is wanted');
+    const week = weekOfDay(state.clock.day);
+    man.weekNow = {
+      week,
+      minutes: { jobs: 1200, contracts: 0, unloading: 0, cleaning: 0, desk: 0, site: 0 },
+      paidMinutes: 1680,
+      waitedFor: { edgebander: 360, tableSaw: 120 },
+      pieces: 0,
+      jobs: [],
+      day: state.clock.day,
+      minute: 0,
+      seenBench: 0,
+      seenTask: 0,
+    };
+    const card = parse(renderPerson(state, man.id, 'card'));
+    const line = card.querySelector('[data-week="this week"]')?.textContent ?? '';
+    expect(line).toContain('8 h idle');
+    expect(line).toContain('6 h of it waiting for the edgebander');
+    expect(line).not.toContain('saw');
   });
 
   it('says what he is on, with the stage and how far in it is', () => {

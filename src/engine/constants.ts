@@ -107,11 +107,11 @@ import type {
  *  so it loses the cell it stood on; and nobody is charged minutes for assigning any more, so the
  *  daily staff management chore goes off the list (CLAUDE.md T23 section 4). Every v33, v34 and
  *  v35 save loads. */
-export const STATE_VERSION = 20;
+export const STATE_VERSION = 21;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
-export const APP_VERSION = 'v36';
+export const APP_VERSION = 'v37';
 
 // ---------------------------------------------------------------------------
 // The owner's day, in the seven things it is made of
@@ -2580,7 +2580,6 @@ const BASE_SPEC = {
   locked: false,
   lockReason: '',
   perWorker: false,
-  stackable: false,
   requires: [] as string[],
   requiresOneOf: [] as string[],
   height: 1,
@@ -2689,7 +2688,6 @@ const SPEC_DRAFTS: SpecDraft[] = [
     height: 1,
     spriteKey: 'tableSaw',
     usedOn: 'sheet',
-    stackable: true,
     effect: 'Cuts sheets and timber. One man at a time.',
   },
   {
@@ -2734,7 +2732,6 @@ const SPEC_DRAFTS: SpecDraft[] = [
     spriteKey: 'compressor',
     // A hall may have several, and every machine draws from the one it is assigned to
     // (CLAUDE.md T10 3.2).
-    stackable: true,
     effect:
       'Air for nailers, drivers, sanding, a floor bander, a CNC and a booth. Every consumer is ' +
       'assigned to one compressor and draws from that one only.',
@@ -2754,7 +2751,6 @@ const SPEC_DRAFTS: SpecDraft[] = [
     height: 1.5,
     spriteKey: 'airDryer',
     // One per compressor, so a hall with three compressors may want three (CLAUDE.md T10 3.3).
-    stackable: true,
     effect:
       'Takes the water out of the line of the compressor it is fitted to. A CNC will not run on ' +
       'wet air at all, and a spray booth on wet air takes half as long again over the finish ' +
@@ -2775,7 +2771,6 @@ const SPEC_DRAFTS: SpecDraft[] = [
     height: 2,
     spriteKey: 'extractor',
     // Several add up: what the hall pulls is the sum of every fan in it (CLAUDE.md T10 3.1).
-    stackable: true,
     effect:
       'Serves every machine. Without it there are no bags. What it pulls is in cubic metres an ' +
       'hour, and the machines at work have to add up to less than it. Can break down.',
@@ -2797,7 +2792,6 @@ const SPEC_DRAFTS: SpecDraft[] = [
     zoneDepth: 2,
     spriteKey: 'workbench',
     perWorker: true,
-    stackable: true,
     effect:
       'One per worker, and the assembly of every job is done at one. The unit has a fixed ' +
       'number of bench slots.',
@@ -2821,7 +2815,6 @@ const SPEC_DRAFTS: SpecDraft[] = [
     sheetCapacity: 50,
     // The better shelving of Turns 1 to 6 is a class of this family now, not a family of its own
     // (CLAUDE.md T7 3.6). More than one rack may stand in the hall and the sheets add up.
-    stackable: true,
     effect:
       'Holds sheets on edge, thirty to a hundred and sixty by its class. Nothing can be ' +
       'unloaded without somewhere to put it.',
@@ -2857,7 +2850,6 @@ const SPEC_DRAFTS: SpecDraft[] = [
     depth: 1,
     height: 1,
     spriteKey: 'toolCabinet',
-    stackable: true,
     effect:
       'Holds the hand tool sets of one man to eight by its class, and the hand edgebander with ' +
       'them. Every worker needs a slot in one and so do you.',
@@ -2875,7 +2867,6 @@ const SPEC_DRAFTS: SpecDraft[] = [
     height: 1,
     spriteKey: 'locker',
     perWorker: true,
-    stackable: true,
     effect: 'One per worker.',
   },
   {
@@ -2897,7 +2888,6 @@ const SPEC_DRAFTS: SpecDraft[] = [
     zoneDepth: 0,
     spriteKey: 'handToolSet',
     perWorker: true,
-    stackable: true,
     requires: ['toolCabinet'],
     effect: 'One per worker, bought by the owner. Kept in his tool cabinet.',
   },
@@ -3023,7 +3013,6 @@ const SPEC_DRAFTS: SpecDraft[] = [
     zoneWidth: 3,
     zoneDepth: 3,
     spriteKey: 'spindleMoulder',
-    stackable: true,
     effect:
       'Moulds a profile on an edge: the J profile of a handleless kitchen and the fronts of a ' +
       'sprayed one on the sheet side, and every moulding on the timber side. One man at a time.',

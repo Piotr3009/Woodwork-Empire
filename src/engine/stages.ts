@@ -19,7 +19,14 @@ import {
   SPRAYER_SPRAY_RATE,
   WORK_EPSILON,
 } from './constants';
-import { SPRAY_BOOTH, bestOutputFactor, freeMachines, has, heldMachine } from './machines';
+import {
+  SPRAY_BOOTH,
+  bestOutputFactor,
+  freeMachines,
+  has,
+  heldMachine,
+  machineIsShared,
+} from './machines';
 import type {
   Finish,
   GameState,
@@ -216,6 +223,47 @@ export function labourDone(job: Job): number {
   return Math.max(0, job.labourValue - job.labourRemaining);
 }
 
+/** The labour a stage of this plan has had worked into it. Two sources: the stage's own bag, and
+ *  the labour the job carries that no bag names, poured into the plan in order, cutting first,
+ *  which is where the one cursor of Turns 1 to 23 would have stood it. The pour covers a save
+ *  lifted from before the bags and a test that moves `labourRemaining` by hand, and costs a
+ *  played job nothing, because every minute it works goes into a bag. A CNC does the cutting and
+ *  the machining as one, so what went in on the saw and the edgebander counts for the CNC's stage
+ *  and what went in on the CNC counts for the saw's and the edgebander's in their shares: a job
+ *  half cut on the saw may finish on the CNC and the bag is one bag (CLAUDE.md T7 3.4; v37). */
+export function stageDone(job: Job, plan: readonly StagePlan[], stage: StagePlan): number {
+  const put = (id: StageId): number => job.stageLabour[id] ?? 0;
+  const bagged = (entry: StagePlan): number => {
+    if (entry.id === 'cnc') return put('cnc') + put('cutting') + put('machining');
+    if (entry.id === 'cutting' || entry.id === 'machining') {
+      const sheetShare = CNC_STAGE.share;
+      return put(entry.id) + (sheetShare > 0 ? put('cnc') * (entry.share / sheetShare) : 0);
+    }
+    return put(entry.id);
+  };
+  let loose = labourDone(job);
+  for (const id of ['cutting', 'machining', 'cnc', 'assembly', 'finishing', 'delivery'] as StageId[]) {
+    loose -= put(id);
+  }
+  let done = 0;
+  for (const entry of plan) {
+    const own = bagged(entry);
+    const room = Math.max(0, entry.to - entry.from - own);
+    const poured = Math.max(0, Math.min(room, loose));
+    loose -= poured;
+    if (entry === stage) {
+      done = own + poured;
+      break;
+    }
+  }
+  return done;
+}
+
+/** What a stage of this plan still wants, in labour. */
+export function stageLeft(job: Job, plan: readonly StagePlan[], stage: StagePlan): number {
+  return Math.max(0, stage.to - stage.from - stageDone(job, plan, stage));
+}
+
 /** What is left of the job for a man of this rate, stage by stage: a job half way through its
  *  cutting still has all of its assembly ahead of it at the bench's own speed. */
 export function minutesLeftFor(
@@ -224,30 +272,73 @@ export function minutesLeftFor(
   rate: number,
   options: StageOptions = {},
 ): number {
-  const done = labourDone(job);
   let minutes = 0;
-  for (const stage of stagePlanFor(state, job, options)) {
-    const left = Math.max(0, stage.to - Math.max(stage.from, done));
-    minutes += stageMinutes(left, rate, stage.speed);
+  const plan = stagePlanFor(state, job, options);
+  for (const stage of plan) {
+    minutes += stageMinutes(stageLeft(job, plan, stage), rate, stage.speed);
   }
   return minutes;
 }
 
-/** The stage a job with this much labour worked into it is standing at. */
-export function stageAt(plan: readonly StagePlan[], done: number): StagePlan | null {
-  for (const stage of plan) {
-    if (stage.to - done > WORK_EPSILON) return stage;
-  }
-  return plan.length > 0 ? (plan[plan.length - 1] ?? null) : null;
-}
-
-/** The stage the job is at now. Null only for a job with no labour in it at all. */
+/** The stage the job as a whole is standing at: the first of its plan with work left in it, which
+ *  is what a card, a plan row and a warning say about the job. A man on the job may be at another
+ *  one (`stageFor`). Null only for a job with no labour in it at all. */
 export function currentStage(
   state: GameState,
   job: Job,
   options: StageOptions = {},
 ): StagePlan | null {
-  return stageAt(stagePlanFor(state, job, options), labourDone(job));
+  const plan = stagePlanFor(state, job, options);
+  for (const stage of plan) {
+    if (stageLeft(job, plan, stage) > WORK_EPSILON) return stage;
+  }
+  return plan.length > 0 ? (plan[plan.length - 1] ?? null) : null;
+}
+
+/** The order the bag of work keeps: finishing only once everything else is done, and assembly only
+ *  once the parts are cut, which is the cutting stage or the CNC's (PIOTR, 20.09: "assembly after
+ *  cutting" stays; everything else in any order). */
+function stageMayStart(job: Job, plan: readonly StagePlan[], stage: StagePlan): boolean {
+  if (stage.id === 'finishing') {
+    return plan.every(
+      (other) => other.id === 'finishing' || stageLeft(job, plan, other) <= WORK_EPSILON,
+    );
+  }
+  if (stage.id === 'assembly') {
+    const cut = plan.find((other) => other.id === 'cutting' || other.id === 'cnc');
+    return cut === undefined || stageLeft(job, plan, cut) <= WORK_EPSILON;
+  }
+  return true;
+}
+
+/** True when this man could stand at the station this stage wants right now: the bench, a tool
+ *  out of a cabinet, a family the hall does not own (done by hand), a machine he already holds, or
+ *  a machine of the family nobody else holds. */
+function stationFreeFor(state: GameState, who: string, stage: StagePlan): boolean {
+  const family = stage.family;
+  if (family === null || family === 'workbench') return true;
+  if (!has(state, family) || machineIsShared(state, family)) return true;
+  return heldMachine(state, who, family) !== null || freeMachines(state, family).length > 0;
+}
+
+/** The stage this man works at on this job this minute: the bag of work (PIOTR, 20.09; v37). The
+ *  stages the job still has work in, in the plan's order, the order rules kept (`stageMayStart`),
+ *  and among them the first whose station is free for him; when none is free, the first of them,
+ *  where he queues as he always did. Two men on one job are therefore at two stages, one cutting
+ *  and one edging, and nobody stands behind a man at a machine while another stage of the same job
+ *  is open. Null only for a job with no labour in it at all. */
+export function stageFor(
+  state: GameState,
+  who: string,
+  job: Job,
+  options: StageOptions = {},
+): StagePlan | null {
+  const plan = stagePlanFor(state, job, options);
+  const open = plan.filter(
+    (stage) => stageLeft(job, plan, stage) > WORK_EPSILON && stageMayStart(job, plan, stage),
+  );
+  if (open.length === 0) return currentStage(state, job, options);
+  return open.find((stage) => stationFreeFor(state, who, stage)) ?? open[0] ?? null;
 }
 
 /** Labour per minute for a man of this rate working this stage at this speed. The one place a

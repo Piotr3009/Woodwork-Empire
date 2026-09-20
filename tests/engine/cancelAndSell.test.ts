@@ -167,7 +167,8 @@ describe('selling a machine', () => {
     };
     expect(canSell(broken, saw.id).reason).toBe('It is broken. Fix it first');
     // A hand edgebander lives in a tool cabinet, and is not sold off the hall.
-    expect(canSell(state, bander.id).reason).toBe('It lives in a tool cabinet');
+    // A tool in a cabinet sells like anything else since v37 (PIOTR, 20.09).
+    expect(canSell(state, bander.id).ok).toBe(true);
     // The bench is sold like any other thing standing on the floor (CLAUDE.md T19 2.8).
     expect(canSell(state, bench.id).ok).toBe(true);
     // The office furniture is what "fittings" means now, and it is still refused.

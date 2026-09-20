@@ -16,8 +16,7 @@ import {
   buyStartingKit,
   newGame,
   runClock,
-  sixJoinersOnSheetWork,
-} from '../helpers';
+  sixJoinersOnSheetWork, withMachiningDone } from '../helpers';
 
 const CSS = readFileSync('src/ui/styles.css', 'utf8');
 
@@ -58,6 +57,9 @@ function queueAtTheSaw(): GameState {
   const job = state.jobs.find((entry) => entry.id === first.id);
   if (!job) throw new Error('the job went missing');
   job.labourRemaining = job.labourValue * 0.95;
+  job.stageLabour = {};
+  // The saw is the one open station of a job at its cutting once its machining is done (v37).
+  withMachiningDone(state);
   const saw = state.equipment.find((item) => item.specId === 'tableSaw');
   if (!saw) throw new Error('one saw is wanted');
   saw.takenBy = 'staff-1';
@@ -78,7 +80,12 @@ function twoJobsAtOneSaw(): GameState {
   for (const worker of state.workers) {
     if (worker.jobId !== null && !keep.includes(worker.jobId)) worker.jobId = null;
   }
-  for (const job of state.jobs) job.labourRemaining = job.labourValue * 0.95;
+  for (const job of state.jobs) {
+    job.labourRemaining = job.labourValue * 0.95;
+    job.stageLabour = {};
+  }
+  // The saw is the one open station of a job at its cutting once its machining is done (v37).
+  withMachiningDone(state);
   return runClock(state, 2);
 }
 
@@ -90,7 +97,12 @@ function twoJobsAtOneSaw(): GameState {
  *  CLAUDE.md T22 2.5 names in its own words: "two marks over two men at one machine". */
 function threeJobsAtOneSaw(): GameState {
   const state = sixJoinersOnSheetWork({ saws: 1 });
-  for (const job of state.jobs) job.labourRemaining = job.labourValue * 0.95;
+  for (const job of state.jobs) {
+    job.labourRemaining = job.labourValue * 0.95;
+    job.stageLabour = {};
+  }
+  // The saw is the one open station of a job at its cutting once its machining is done (v37).
+  withMachiningDone(state);
   return runClock(state, 2);
 }
 

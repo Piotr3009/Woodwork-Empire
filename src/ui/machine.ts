@@ -313,9 +313,9 @@ function classCard(
   // The same question the order itself asks, against the hall as it will be once everything on
   // the road has landed (CLAUDE.md T7 3.10, T9 3.1).
   const check = orderEquipmentCheck(state, spec.id, variant.id);
-  // One click is one machine: what is on the road is already in that hall, so a second one of a
-  // family that is not stackable is refused there and the tile says when this one is due
-  // (PIOTR, 13.09; CLAUDE.md T9 3.1).
+  // One click is one machine: what is on the road is already in that hall and the tile says when
+  // this one is due (PIOTR, 13.09; CLAUDE.md T9 3.1). Every family may be owned in any number
+  // since v37 (PIOTR, 20.09).
   const onTheList = state.onOrder.find(
     (order) => order.specId === spec.id && order.variantId === variant.id && !order.arrived,
   );

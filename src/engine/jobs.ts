@@ -72,6 +72,9 @@ import { familyAirBlock } from './media';
 import { firstOnOrder } from './orders';
 import { ownerIsAvailable } from './owner';
 import {
+  stageFor,
+  stagePlanFor,
+  stageLeft,
   type StageOptions,
   type StagePlan,
   type StagedJob,
@@ -317,7 +320,7 @@ export function jobHasWorkFor(state: GameState, job: Job, who: string): boolean 
   if (job.stage !== 'inProduction') return false;
   if (hallBlock(state, job) !== '') return false;
   if (!rackCanSupply(state, job, jobProgress(job))) return false;
-  const stage = currentStage(state, job, cncOptions(state, who, job));
+  const stage = stageFor(state, who, job, cncOptions(state, who, job));
   const family = stage?.family ?? null;
   if (family === null || family === BENCH) return true;
   // By hand, or a tool out of a cabinet: there is no queue for either (CLAUDE.md T7 3.1, 3.6).
@@ -452,6 +455,7 @@ export function takeEnquiry(state: GameState, enquiryId: string, byHand: boolean
     needsMeasure: enquiry.needsMeasure,
     labourValue,
     labourRemaining: labourValue,
+    stageLabour: {},
     acceptedDay: state.clock.day,
     // The client counts the days his workshop is open and no others: a job taken on Friday
     // with three days on it is due on Wednesday (PIOTR; CLAUDE.md T10 3.5).
@@ -1110,13 +1114,12 @@ export function releaseJob(state: GameState, job: Job): void {
   if (job.stage === 'inProduction') job.stage = 'ready';
 }
 
-/** Writes down that somebody worked this stage this minute. A run is opened when the stage is not
- *  the one already open, and the one before it is closed at that moment: the Work Plan's bars and
- *  its grey gaps are read off these and off nothing else (CLAUDE.md T7 3.2). */
+/** Writes down that somebody worked this stage this minute. A run is opened for the stage when it
+ *  has none open; from v37 two stages may be open at once, because two men on one job may be at
+ *  two stages (the bag of work, PIOTR 20.09). The Work Plan's bars and its grey gaps are read off
+ *  these and off nothing else (CLAUDE.md T7 3.2). */
 export function noteStageWork(state: GameState, job: Job, stage: StageId): void {
-  const open = job.stageRuns[job.stageRuns.length - 1];
-  if (open && open.endDay === null && open.stage === stage) return;
-  if (open && open.endDay === null) closeStageRun(state, job);
+  if (job.stageRuns.some((run) => run.endDay === null && run.stage === stage)) return;
   job.stageRuns.push({
     stage,
     startDay: state.clock.day,
@@ -1126,12 +1129,13 @@ export function noteStageWork(state: GameState, job: Job, stage: StageId): void 
   });
 }
 
-/** Closes whatever run is open, at this minute. */
-export function closeStageRun(state: GameState, job: Job): void {
-  const open = job.stageRuns[job.stageRuns.length - 1];
-  if (!open || open.endDay !== null) return;
-  open.endDay = state.clock.day;
-  open.endMinute = state.clock.minute;
+/** Closes the open run of one stage, or every open run when no stage is named, at this minute. */
+export function closeStageRun(state: GameState, job: Job, stage: StageId | null = null): void {
+  for (const run of job.stageRuns) {
+    if (run.endDay !== null || (stage !== null && run.stage !== stage)) continue;
+    run.endDay = state.clock.day;
+    run.endMinute = state.clock.minute;
+  }
 }
 
 /** What an express job pays over its base price, earned with the labour that earns it: the whole
@@ -1154,6 +1158,13 @@ export function addLabour(state: GameState, job: Job, labour: number, stage: Sta
   noteStageWork(state, job, stage);
   const put = Math.min(labour, Math.max(0, job.labourRemaining));
   job.labourRemaining -= labour;
+  // The stage's own bag, so the next man on the job can be at another stage (v37).
+  job.stageLabour[stage] = (job.stageLabour[stage] ?? 0) + put;
+  const plan = stagePlanFor(state, job, cncOptions(state, leadAssignee(job) ?? OWNER, job));
+  const worked = plan.find((entry) => entry.id === stage);
+  if (worked !== undefined && stageLeft(job, plan, worked) <= WORK_EPSILON) {
+    closeStageRun(state, job, stage);
+  }
   state.dayStats.workMinutes += 1;
   state.dayStats.labourValue = Math.round((state.dayStats.labourValue + put) * 10000) / 10000;
   const uplift = expressUpliftOn(job, put);

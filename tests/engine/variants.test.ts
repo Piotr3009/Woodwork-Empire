@@ -202,9 +202,7 @@ describe('every catalogue line is a family', () => {
         depth: compressorSizes[index]?.[1],
       });
     });
-    // A hall may have several of either, so neither is refused as already owned.
-    expect(findSpec('extractor')?.stackable).toBe(true);
-    expect(findSpec('compressor')?.stackable).toBe(true);
+    // A hall may have several of anything since v37: nothing is refused as already owned.
   });
 
   it('keeps the Turn 1 price of every family that has one class', () => {

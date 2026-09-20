@@ -31,7 +31,7 @@ import {
   itemStandsInTheHall,
   machineIsOut,
 } from './machines';
-import { cncOptions, currentStage } from './stages';
+import { cncOptions, stageFor } from './stages';
 import type { Equipment, GameState } from './types';
 
 /** A whole number with the thousands marked, the way the hall writes a figure of m3/h or l/min. */
@@ -477,7 +477,7 @@ export function airHands(state: GameState): AirHands {
   for (const job of state.jobs) {
     const lead = job.assignees[0] ?? null;
     if (job.stage !== 'inProduction' || lead === null) continue;
-    const stage = currentStage(state, job, cncOptions(state, lead, job));
+    const stage = stageFor(state, lead, job, cncOptions(state, lead, job));
     if (stage === null) continue;
     const draw = benchDrawsAir(stage);
     if (draw === 'bench') hands.bench += 1;

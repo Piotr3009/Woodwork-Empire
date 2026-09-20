@@ -191,7 +191,7 @@ describe('the list', () => {
     const state = withCrewAtTheLimit(quietHall());
     const found = warnings(state);
     expect(found.map((warning) => warning.key)).toEqual(['crewFull']);
-    expect(found[0]?.text).toMatch(/^Crew \d+ \/ \d+, floor limited: no floor for another person$/);
+    expect(found[0]?.text).toMatch(/^Crew \d+ \/ \d+, the unit takes \d+ people: no room for another person$/);
   });
 });
 

@@ -24,8 +24,7 @@ import {
   firstJob,
   newGame,
   placeEnquiry,
-  twoMenOnSheetWork,
-} from '../helpers';
+  twoMenOnSheetWork, withMachiningDone } from '../helpers';
 
 /** The day 1 kit with a big job and the owner standing at it. */
 function atWork(): GameState {
@@ -68,7 +67,7 @@ describe('the figure of a man at work', () => {
   });
 
   it('stands the man who cannot have the saw at it, and says what he is waiting for', () => {
-    const state = tick(twoMenOnSheetWork({ saws: 1 }), 1);
+    const state = tick(withMachiningDone(twoMenOnSheetWork({ saws: 1 })), 1);
     const joiner = state.workers[0];
     if (!joiner) throw new Error('no joiner');
     expect(joiner.station).toBe(waitingStation('tableSaw'));

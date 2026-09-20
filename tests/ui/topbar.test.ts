@@ -21,7 +21,7 @@ import { renderTopbar } from '../../src/ui/topbar';
 import { renderDaySummary } from '../../src/ui/dayEnd';
 import { signedMoney } from '../../src/ui/modal';
 import { currentState, mount } from '../../src/ui/app';
-import { buyStartingKit, fillRack, newGame, runClock, twoMenOnSheetWork } from '../helpers';
+import { buyStartingKit, fillRack, newGame, runClock, twoMenOnSheetWork, withMachiningDone } from '../helpers';
 
 function parse(html: string): HTMLElement {
   const holder = document.createElement('div');
@@ -232,7 +232,7 @@ describe("the boss's day meter", () => {
 
 describe('the efficiency number next to the clock', () => {
   it('is one live number, worked over possible, in the clock block', () => {
-    const state = runClock(twoMenOnSheetWork({ saws: 1 }), 200);
+    const state = runClock(withMachiningDone(twoMenOnSheetWork({ saws: 1 })), 200);
     const html = renderTopbar(state, 'hall');
     const clock = parse(html).querySelector('.clock-block');
     const number = clock?.querySelector('details.efficiency > summary');
@@ -243,7 +243,7 @@ describe('the efficiency number next to the clock', () => {
   });
 
   it('opens on a click, with no handler, on to the plate of the four lines', () => {
-    const state = runClock(twoMenOnSheetWork({ saws: 1 }), 200);
+    const state = runClock(withMachiningDone(twoMenOnSheetWork({ saws: 1 })), 200);
     const page = parse(renderTopbar(state, 'hall'));
     const details = page.querySelector('details.efficiency');
     expect(details?.querySelector('summary')?.hasAttribute('data-do')).toBe(false);

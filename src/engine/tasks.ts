@@ -1,6 +1,7 @@
 // Task definitions, who can take them off the owner, their minute curves, and the runner that
 // spends the owner's minutes on the one he started.
 
+import { stationWaitingFor } from './stations';
 import {
   ADMIN_COVER_RATE,
   CONSUMABLES_LABEL,
@@ -798,7 +799,17 @@ export function bookWeekMinutes(state: GameState): void {
       // And the other half of his day, the same way the owner's is taken above: a minute he put
       // nothing into is a minute he stood, and from Turn 23 the commonest reason for it is that
       // nobody has put him on anything (PIOTR, 20.09; CLAUDE.md T23 2.1).
-      if (sample !== null && !sample.worked) bookWorkerIdleMinute(state, worker);
+      if (sample !== null && !sample.worked) {
+        bookWorkerIdleMinute(state, worker);
+        // And what he stood for, when it was a machine: the week keeps it by family, so his card
+        // can say "6 h of it waiting for the edgebander" (PIOTR, 20.09; v37).
+        const family = stationWaitingFor(worker.station);
+        if (family !== null) {
+          const meters = weekMetersOf(worker, week);
+          const waited = (meters.waitedFor ??= {});
+          waited[family] = (waited[family] ?? 0) + 1;
+        }
+      }
     }
   }
   bookContractPieces(state, week);

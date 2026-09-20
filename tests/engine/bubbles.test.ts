@@ -22,8 +22,7 @@ import {
   act,
   newGame,
   runClock,
-  sixJoinersOnSheetWork,
-} from '../helpers';
+  sixJoinersOnSheetWork, withMachiningDone } from '../helpers';
 
 /** Three men on one job at its cutting stage with one saw in the hall, the first of them standing at
  *  it: the scene of the drawing, one man cutting and two who cannot. */
@@ -36,6 +35,9 @@ function queueAtTheSaw(): { state: GameState; job: Job } {
   const job = state.jobs.find((entry) => entry.id === first.id);
   if (!job) throw new Error('the job went missing');
   job.labourRemaining = job.labourValue * 0.95;
+  job.stageLabour = {};
+  // The saw is the one open station of a job at its cutting once its machining is done (v37).
+  withMachiningDone(state);
   const saw = state.equipment.find((item) => item.specId === 'tableSaw');
   if (!saw) throw new Error('one saw is wanted');
   saw.takenBy = 'staff-1';

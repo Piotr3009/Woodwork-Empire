@@ -1,5 +1,6 @@
 // Shared test driver. One place clicks events away, so no test file grows its own copy.
 
+import { stagePlanFor } from '../src/engine/stages';
 import { WORKER_RATES } from '../src/engine/constants';
 // Straight off the modules, not through the public API: these are the engine's own writes, and
 // the tests use them to stand kit in the hall without sending the owner out for it.
@@ -545,6 +546,35 @@ export function sixJoinersOnSheetWork(
 
 /** The crew Piotr's saw question is asked about (CLAUDE.md T7 3.1). */
 export const CREW = 6;
+
+/** Every job of the hall with its machining already done, in the bag of work (v37): the saw is
+ *  then the one open station of a job at its cutting, so a test about a queue at the saw gets the
+ *  queue it is about. What the job had done stays where the one cursor of Turns 1 to 23 put it,
+ *  cutting first; the machining is added on top and taken off what is left. */
+export function withMachiningDone(state: GameState): GameState {
+  for (const job of state.jobs) {
+    const plan = stagePlanFor(state, job);
+    const machining = plan.find((stage) => stage.id === 'machining');
+    if (machining === undefined) continue;
+    const need = machining.to - machining.from;
+    const had = job.stageLabour.machining ?? 0;
+    const done = Math.max(0, job.labourValue - job.labourRemaining);
+    const bagged: Partial<Record<string, number>> = {};
+    let loose = done - Object.values(job.stageLabour).reduce((sum, value) => sum + (value ?? 0), 0);
+    for (const stage of plan) {
+      if (stage.id === 'machining') continue;
+      const own = job.stageLabour[stage.id] ?? 0;
+      const room = Math.max(0, stage.to - stage.from - own);
+      const poured = Math.max(0, Math.min(room, loose));
+      loose -= poured;
+      if (own + poured > 0) bagged[stage.id] = own + poured;
+    }
+    bagged.machining = need;
+    job.stageLabour = bagged as typeof job.stageLabour;
+    job.labourRemaining -= need - had;
+  }
+  return state;
+}
 
 /** Two men producing in the same minutes: the owner at one bench and a joiner with no experience at another,
  *  each on a job of sheet work. The one place a two man minute is set up, so the tests that ask

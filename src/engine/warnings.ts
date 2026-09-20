@@ -145,7 +145,7 @@ function noInsuranceWarning(state: GameState): Warning | null {
 
 function crewFullWarning(state: GameState): Warning | null {
   if (!crewFull(state, 'joiner')) return null;
-  return { key: 'crewFull', text: `${crewLine(state)}: no floor for another person` };
+  return { key: 'crewFull', text: `${crewLine(state)}: no room for another person` };
 }
 
 /** What a charge a day costs, in the words the strip wants it: the pound, or the pence while it is

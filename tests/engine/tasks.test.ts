@@ -173,6 +173,7 @@ describe('the daily list', () => {
       needsMeasure: false,
       labourValue: 160,
       labourRemaining: 160,
+      stageLabour: {},
       acceptedDay: 1,
       finishedDay: null,
       deliverOnDay: null,
