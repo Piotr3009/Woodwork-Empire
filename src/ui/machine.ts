@@ -38,6 +38,7 @@ import {
   COMPRESSOR_AIR,
   COMPRESSOR_WITH_DRYER,
   DUST_WASTE_MONTHLY,
+  EXTRACTION_MARGIN,
   GATE_OUTPUT_BONUS,
   bagsToM3,
 } from '../engine/constants';
@@ -132,11 +133,14 @@ function extractionLine(spec: EquipmentSpec, variant: EquipmentVariant): string 
   return wants > 0 ? `Needs ${mediaFigure(wants)} m³/h of extraction` : '';
 }
 
-/** What a class of fan pulls: its own effect, and the one figure the extraction sum reads
- *  (CLAUDE.md T10 3.1, T12 3.1). */
+/** What a class of fan pulls, and what the hall may be worked to on it: the pull less Piotr's
+ *  margin, said beside it so the 830 the strip counts against never looks like a wrong spec on a
+ *  fan sold as 1,000 (CLAUDE.md T10 3.1, T12 3.1; PIOTR, 20.09). */
 function pullsLine(spec: EquipmentSpec, variant: EquipmentVariant): string {
   const pulls = extractionCapacityOf({ specId: spec.id, variantId: variant.id });
-  return pulls > 0 ? `Pulls ${mediaFigure(pulls)} m³/h` : '';
+  if (pulls <= 0) return '';
+  const usable = Math.round(pulls * EXTRACTION_MARGIN);
+  return `Pulls ${mediaFigure(pulls)} m³/h, ${mediaFigure(usable)} usable`;
 }
 
 /** The bags on a class of extractor and what they hold, a cubic metre each; the central systems

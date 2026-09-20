@@ -83,7 +83,7 @@ describe('the sums for a two man shop', () => {
     expect(check.capacity).toBe(2000);
     expect(check.allowed).toBe(1660);
     expect(check.short).toBe(true);
-    expect(check.line).toBe('Extraction short: 2,500 of 1,660');
+    expect(check.line).toBe('Extraction short: 2,500 of 1,660 usable');
   });
 
   it('is fine on a pro extractor', () => {
@@ -189,7 +189,7 @@ describe('what a minute of under extraction costs', () => {
 
   it('says so on a chip over the floor, and never stops a machine', () => {
     const said = hallProblems(twoManShop('standard')).map((problem) => problem.text);
-    expect(said.join(' ')).toContain('Extraction short: 2,500 of 1,660');
+    expect(said.join(' ')).toContain('Extraction short: 2,500 of 1,660 usable');
     expect(said.join(' ')).toContain('everything is 30% slower');
     expect(hallProblems(twoManShop('pro')).join(' ')).not.toContain('Extraction short');
   });

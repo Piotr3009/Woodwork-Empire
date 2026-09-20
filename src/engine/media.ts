@@ -122,7 +122,9 @@ export interface ExtractionCheck {
   allowed: number;
   /** True while the hall is under extracted this minute. */
   short: boolean;
-  /** "Extraction short: 2,500 of 1,660", or empty while the sums are fine. */
+  /** "Extraction short: 2,500 of 1,660 usable", or empty while the sums are fine. The figure is
+   *  the fans less Piotr's margin, and says so, because a bare 830 beside a fan sold as 1,000 read
+   *  as a wrong spec (PIOTR, 20.09). */
   line: string;
 }
 
@@ -141,7 +143,7 @@ export function extractionCheck(state: GameState): ExtractionCheck {
     unserved.length > 0
       ? `Extraction: ${unserved.length === 1 ? 'a machine is' : `${unserved.length} machines are`} not connected`
       : short
-        ? `Extraction short: ${mediaFigure(demand)} of ${mediaFigure(allowed)}`
+        ? `Extraction short: ${mediaFigure(demand)} of ${mediaFigure(allowed)} usable`
         : '';
   return { demand, capacity, allowed, short, line };
 }

@@ -292,7 +292,7 @@ describe('the tiles inside a folder', () => {
     // (CLAUDE.md T12 3.2, T13 3.1).
     expect(effects(pro)).toEqual([
       lifeLine('extractor', 'pro'),
-      'Pulls 3,600 m\u00b3/h',
+      'Pulls 3,600 m\u00b3/h, 2,988 usable',
       'Bags 4, holds 4 m\u00b3',
     ]);
     expect(costs(pro)).toEqual([
@@ -304,7 +304,7 @@ describe('the tiles inside a folder', () => {
     expect(figures(tiles(state, 'extractor')[4])).toContain('Bags 10, holds 10 m\u00b3');
     expect(figures(tiles(state, 'extractor')[0])).toContain('Bags 1, holds 1 m\u00b3');
     const central = effects(tiles(state, 'dustSystem')[0]);
-    expect(central[1]).toBe('Pulls 12,000 m\u00b3/h');
+    expect(central[1]).toBe('Pulls 12,000 m\u00b3/h, 9,960 usable');
     expect(central[2]).toBe(`No bags. Waste collection ${money(DUST_WASTE_MONTHLY)} a month`);
     expect(central[2]).toBe('No bags. Waste collection \u00a3400 a month');
     expect(effects(tiles(state, 'flexiSystem')[0])[2]).toBe(central[2]);

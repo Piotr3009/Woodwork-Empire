@@ -1243,7 +1243,7 @@ describe('a month of two men on a fan too small for them', () => {
     const tight = extractionCheck(running(short.state));
     expect(tight.demand).toBe(2500);
     expect(tight.allowed).toBe(1660);
-    expect(tight.line).toBe('Extraction short: 2,500 of 1,660');
+    expect(tight.line).toBe('Extraction short: 2,500 of 1,660 usable');
     const roomy = extractionCheck(running(fine.state));
     expect(roomy.demand).toBe(2500);
     expect(roomy.allowed).toBe(2988);
