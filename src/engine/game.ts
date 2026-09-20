@@ -11,6 +11,7 @@ import {
   BOARD_MIDDAY_MINUTE,
   BREAK_START_MINUTE,
   CABINET_SLOT_LAYOUT,
+  CANTEEN_LOCKERS,
   DAY_LOGS_KEPT,
   DAY_SUMMARIES_MAX,
   DAY_END_MINUTE,
@@ -2474,6 +2475,11 @@ export function canBuy(
   if (!spec.stackable && has(state, specId)) return { ok: false, reason: 'Already owned' };
   if (specId === 'workbench' && countOf(state, 'workbench') >= state.unit.benchSlots) {
     return { ok: false, reason: 'No free bench slot in this unit' };
+  }
+  // The canteen was built with eight compartments and a bigger one is not built yet, so there is
+  // nowhere for a ninth locker to stand (PIOTR, 20.09; CLAUDE.md T23 2.10, 8).
+  if (specId === 'locker' && countOf(state, 'locker') >= CANTEEN_LOCKERS) {
+    return { ok: false, reason: 'The canteen has eight lockers' };
   }
   if (!prepaid && !canAfford(state, variant.price)) return { ok: false, reason: 'Not enough cash' };
   // A machine wants its working room as well as its price: a floor edgebander needs a free 5 by

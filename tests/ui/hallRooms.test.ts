@@ -96,11 +96,14 @@ function notes(root: HTMLElement): string {
     .join(' ');
 }
 
-it('opens the canteen, not the office, where the canteen is painted', () => {
+it('walks into the canteen, not the office, where the canteen is painted', () => {
+  // The canteen was a line under the hall until Turn 23, when it became a room of its own and the
+  // block became the way into it (PIOTR, 20.09; CLAUDE.md T23 2.9).
   const root = startHall();
   clickScene(root, frontFaceCentre('canteen'));
-  expect(root.querySelector('.hall-view')).not.toBeNull();
-  expect(notes(root)).toContain(roomById('canteen').tooltip);
+  expect(root.querySelector('.hall-view')).toBeNull();
+  expect(root.querySelector('[data-room-view="canteen"]')).not.toBeNull();
+  expect(root.querySelector('[data-room-view="office"]')).toBeNull();
 });
 
 it('walks into the office where the office is painted, clear of its door', () => {
@@ -129,12 +132,15 @@ it('walks into the office on the office door itself, the same as the Office butt
 });
 
 it('leaves the floor alone', () => {
+  // The WC is the one room that is still a line under the hall, so it is what this asks with
+  // (CLAUDE.md T6 3.1, T23 2.9). It is aimed at high on its face: the office block stands in
+  // front of the middle of it, which is the overlap this file was written about.
   const root = startHall();
-  clickScene(root, frontFaceCentre('canteen'));
+  clickScene(root, frontFaceAboveTheDoor('wc'));
   clickScene(root, tileToScreen(12, 8));
   expect(root.querySelector('.hall-view')).not.toBeNull();
-  // The note the canteen left stands: an empty floor is not a room and answers nothing.
-  expect(notes(root)).toContain(roomById('canteen').tooltip);
+  // The note the WC left stands: an empty floor is not a room and answers nothing.
+  expect(notes(root)).toContain(roomById('wc').tooltip);
 });
 
 it('opens the list of what is on order when the board by the door is clicked', () => {

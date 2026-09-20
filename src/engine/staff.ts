@@ -7,6 +7,7 @@
 import {
   ACCIDENT_CHANCE_PER_DAY,
   ACCIDENT_DAYS_OFF,
+  CANTEEN_LOCKERS,
   DAY_END_MINUTE,
   HELPER_HOME_CELL,
   HIRE_START_DELAY_DAYS,
@@ -484,6 +485,12 @@ export function hiringOptions(state: GameState): HiringOption[] {
       // The floor limits the crew: one person per so many square metres of free floor
       // (PIOTR; CLAUDE.md T13 3.10).
       blockReason = crewLine(state);
+    } else if (state.workers.length >= CANTEEN_LOCKERS) {
+      // And so does the canteen: it was built with eight compartments, every man on the books
+      // keeps his things in one of them, and the owner needs none. This comes before the
+      // shortfall below, because a ninth locker cannot be bought either and "Buy first: Locker"
+      // would send the player to a greyed line (PIOTR, 20.09; CLAUDE.md T23 2.10).
+      blockReason = 'No locker for him: the canteen holds eight';
     } else if (missing.length > 0) {
       // A bench holds one, two or three men by its class from Turn 23, so a hall that has benches
       // and no room left at them is short of a place and not of a bench, and says so in those

@@ -228,7 +228,8 @@ export interface EquipmentSpec {
   /** Parked for a later stage: shown with a price, buy button disabled. */
   locked: boolean;
   lockReason: string;
-  /** One per worker (workbench, locker, canteen seat, hand tool set). */
+  /** One per worker (workbench, locker, hand tool set). The canteen seat was on that list
+   *  until Turn 23 took the seat out of the game (CLAUDE.md T23 2.11). */
   perWorker: boolean;
   /** More than one may be owned. */
   stackable: boolean;

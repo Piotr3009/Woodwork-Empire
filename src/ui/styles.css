@@ -1502,7 +1502,12 @@ input.num {
 }
 
 /* --------------------------------------------------------------------------
-   The office room (docs/art/SPRITES.md 8)
+   The rooms the player walks into (docs/art/SPRITES.md 8)
+
+   The office was the only one until Turn 23, when the canteen became the second (CLAUDE.md T23
+   2.9). Both are built by src/render/room.ts and both wear these classes: the family is named
+   for the room that came first, and a second set of names for the same markup would be a second
+   code path. What is the canteen's alone is at the end of the block.
    -------------------------------------------------------------------------- */
 
 /* The room is letterboxed on the page background: one uniform scale, centred, never cropped. */
@@ -1603,6 +1608,7 @@ input.num {
 /* The laptop is its own layer and glows in its own shape instead (below), and a region whose
    lit overlay has landed shows the overlay instead of the spot. */
 .office-stack .office-region[data-office="laptop"]:hover,
+.office-stack[data-lit~="lockers"] .office-region[data-office="lockers"]:hover,
 .office-stack[data-lit~="door"] .office-region[data-office="door"]:hover {
   background-image: none;
 }
@@ -1622,7 +1628,8 @@ input.num {
   transition: opacity 120ms ease;
 }
 
-.office-stack:has(.office-region[data-office="door"]:hover) .office-lit[data-lit="door"] {
+.office-stack:has(.office-region[data-office="door"]:hover) .office-lit[data-lit="door"],
+.office-stack:has(.office-region[data-office="lockers"]:hover) .office-lit[data-lit="lockers"] {
   opacity: 1;
 }
 
@@ -1684,6 +1691,27 @@ input.num {
   max-width: 100%;
   overflow: hidden;
   white-space: nowrap;
+}
+
+/* The canteen's two live texts, in the blank areas its layers leave for them: the name on each of
+   the eight locker door plates and the counter over the banks (CLAUDE.md T23 2.9). The art side
+   painted the plates blank and measured them, so both sizes come in on the element off
+   CANTEEN_PLATE_TEXT and CANTEEN_COUNTER_TEXT, exactly as the office's clock does. The ink is the
+   page's own dark, which is what reads on a cream label and on the pale wall over the banks. */
+.canteen-plate,
+.canteen-counter {
+  align-items: center;
+  color: var(--page);
+  display: flex;
+  overflow: hidden;
+  pointer-events: none;
+  position: absolute;
+  white-space: nowrap;
+}
+
+/* The plate is a label with a name on it, so the name sits in the middle of it. */
+.canteen-plate {
+  justify-content: center;
 }
 
 /* The office layers are full width pictures, not sprites on a tile (CLAUDE.md T4 4). */

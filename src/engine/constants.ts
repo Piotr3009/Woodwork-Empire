@@ -3280,6 +3280,12 @@ export const CANTEEN_PLATES: readonly RoomRect[] = [
   { x: 618, y: 432, w: 95, h: 24 },
 ];
 
+/** How many compartments this canteen has, which is the one figure the room letters, the
+ *  catalogue greys the ninth locker by and the hiring gate refuses the ninth man by. It is the
+ *  plates the art side painted and not a second opinion about them: eight doors, eight lockers,
+ *  eight men, until there is a bigger canteen [PIOTR, 20.09; CLAUDE.md T23 2.10]. */
+export const CANTEEN_LOCKERS = CANTEEN_PLATES.length;
+
 /** The counter over the banks, where the room says how many of the eight are in use [PIOTR]. */
 export const CANTEEN_COUNTER: RoomRect = { x: 95, y: 35, w: 450, h: 65 };
 

@@ -68,6 +68,7 @@ import {
   roomById,
 } from '../engine/constants';
 import { centreOf, screenToTile } from '../render/iso';
+import { canteenScene } from '../render/canteen';
 import { fitOfficeStack, officeScene } from '../render/office';
 import { type AccountingTab, accountingTabFrom, renderAccounting } from './accounting';
 import { renderContracts } from './contracts';
@@ -163,8 +164,9 @@ const TIP_KEY_OF_MODAL: Partial<Record<ModalId, string>> = {
 
 interface Ui {
   screen: 'start' | 'game';
-  /** The sprite check is a page of its own, reached from the Menu (CLAUDE.md T3 3.6). */
-  view: 'hall' | 'office' | 'sprites';
+  /** The rooms the player walks into, and the sprite check, which is a page of its own reached
+   *  from the Menu (CLAUDE.md T3 3.6). The canteen became the second room in Turn 23 (2.9). */
+  view: 'hall' | 'office' | 'canteen' | 'sprites';
   modal: ModalId | null;
   modalPosition: ModalPosition | null;
   eventPosition: ModalPosition | null;
@@ -731,15 +733,16 @@ function hallZoomControls(): string {
   );
 }
 
-/** A first guess at the room the office has, for the one render before it is on the page and can
+/** A first guess at the room a room view has, for the one render before it is on the page and can
  *  be measured. `VIEW_PADDING` is the padding of `.view` in styles.css; `TOPBAR_HEIGHT` is what the
  *  top bar comes to with that stylesheet's padding and type, and it is a guess, not a declared
  *  number. `fitOfficeStack` takes the real box a moment later, so neither has to be right. */
 const TOPBAR_HEIGHT = 70;
 const VIEW_PADDING = 12;
 
-/** The room the office has under the top bar, in CSS pixels, before it has been measured. */
-function officeViewport(): { width: number; height: number } {
+/** The room the office or the canteen has under the top bar, in CSS pixels, before it has been
+ *  measured. Both rooms are the same canvas on the same page, so they want the same box. */
+function roomViewport(): { width: number; height: number } {
   const width = typeof window === 'undefined' ? 1280 : window.innerWidth;
   const height = typeof window === 'undefined' ? 800 : window.innerHeight;
   return {
@@ -914,7 +917,8 @@ function sceneFor(current: GameState): Scene | null {
   if (ui.view === 'hall') {
     return hallScene(current, { ghost: ghostFor(current), setup: ui.setup });
   }
-  return officeScene(current, officeViewport());
+  if (ui.view === 'canteen') return canteenScene(current, roomViewport());
+  return officeScene(current, roomViewport());
 }
 
 /** When the move he has just said yes to will be finished, in the words the toast wants: the rest
@@ -1461,6 +1465,12 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
       const region = element.dataset.office ?? '';
       if (region === 'door') {
         walkTo('hall');
+        break;
+      }
+      // The lockers are the men's, one each, so they open the page the men are on
+      // (PIOTR, 20.09; CLAUDE.md T23 2.9).
+      if (region === 'lockers') {
+        openLaptopPage('team');
         break;
       }
       const modal = OFFICE_REGION_MODALS[region];
@@ -2100,22 +2110,22 @@ function copyState(): void {
  *  door in the hall, and the door of the room itself all come through here (CLAUDE.md T14 2.3).
  *  Leaving the hall ends setting it out, and walking out and back in shows the whole hall again
  *  [TUNE: reset or remember; REPORT-T6 says which was chosen]. */
-function walkTo(view: 'hall' | 'office'): void {
+function walkTo(view: 'hall' | 'office' | 'canteen'): void {
   ui.view = view;
   if (view !== 'hall') endSetup();
   resetCamera();
   requestRender();
 }
 
-/** Walking into a room. The office is a view of its own; the other two are a line under the
- *  hall (CLAUDE.md T6 3.1). */
+/** Walking into a room. The office and the canteen are views of their own; the WC is still a line
+ *  under the hall (CLAUDE.md T6 3.1, T23 2.9). */
 function handleRoomClick(room: RoomId): void {
   if (room === 'office') {
     walkTo('office');
-  } else if (room === 'wc') {
-    setNote(roomById('wc').tooltip);
+  } else if (room === 'canteen') {
+    walkTo('canteen');
   } else {
-    setNote(roomById('canteen').tooltip);
+    setNote(roomById('wc').tooltip);
   }
   requestRender();
 }
