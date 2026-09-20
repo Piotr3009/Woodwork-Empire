@@ -306,6 +306,29 @@ describe('the Owned tab', () => {
     expect(card?.textContent).not.toContain(' h of ');
   });
 
+  it('gives the hand tool set its line and nothing to open, because it is in a cabinet', () => {
+    // The set is bought, it takes a slot, and from Turn 23 it is not a thing on the hall: its line
+    // in the Owned tab has no Turn and no Move on it, and a click on it opens nothing, because
+    // there is nothing to open (PIOTR, 20.09; CLAUDE.md T23 2.6).
+    const hall = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
+    // The used cabinet the starting kit buys holds one man's tools and that one is the owner's,
+    // so the hall is given a bigger one before a set is bought into it (CLAUDE.md T22 2.12).
+    const holderItem = hall.equipment.find((item) => item.specId === 'toolCabinet');
+    if (holderItem === undefined) throw new Error('the day one kit has a cabinet in it');
+    holderItem.variantId = 'pro';
+    const state = buyNow(hall, 'handToolSet');
+    const set = state.equipment.find((item) => item.specId === 'handToolSet');
+    const card = shop(state, 'owned').querySelector(`[data-owned="${set?.id}"]`);
+    expect(card).not.toBeNull();
+    expect(card?.textContent).toContain('Hand tool set');
+    expect(card?.querySelector('[data-do="turnItem"]')).toBeNull();
+    expect(card?.querySelector('[data-do="startSetup"]')).toBeNull();
+    // And the cabinet it lives in says what it holds and how much of it is in use, as it did.
+    const cabinet = state.equipment.find((item) => item.specId === 'toolCabinet');
+    const holder = shop(state, 'owned').querySelector(`[data-owned="${cabinet?.id}"]`);
+    expect(holder?.textContent).toContain('Holds 4 men\u0027s tools \u00b7 2 in use');
+  });
+
   it('says what has stopped a machine, and offers the same action the hall offers', () => {
     let state = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
     const saw = state.equipment.find((item) => item.specId === 'tableSaw');
