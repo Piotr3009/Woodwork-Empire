@@ -347,6 +347,7 @@ describe('a v28 save in this build (CLAUDE.md T20 section 4, T21 section 4)', ()
     expect(lifted.owner.idleByReason).toEqual({
       noMachine: 0,
       noMaterial: 0,
+      noCompressor: 0,
       nothingAssigned: 0,
       officeEmpty: 0,
     });
@@ -450,6 +451,7 @@ describe('a v29 save in this build (CLAUDE.md T21 section 4)', () => {
     expect(lifted.owner.idleByReason).toEqual({
       noMachine: 0,
       noMaterial: 0,
+      noCompressor: 0,
       nothingAssigned: 0,
       officeEmpty: 0,
     });

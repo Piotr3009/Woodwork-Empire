@@ -400,7 +400,13 @@ function liftToVersion18(state: Raw): void {
   if (isRecord(state.finance)) state.finance.daysBelowOverdraft = 0;
   if (isRecord(state.owner)) {
     state.owner.idleMinutes = 0;
-    state.owner.idleByReason = { noMachine: 0, noMaterial: 0, nothingAssigned: 0, officeEmpty: 0 };
+    state.owner.idleByReason = {
+      noMachine: 0,
+      noMaterial: 0,
+      noCompressor: 0,
+      nothingAssigned: 0,
+      officeEmpty: 0,
+    };
   }
   liftCabinets(state);
   state.version = 18;

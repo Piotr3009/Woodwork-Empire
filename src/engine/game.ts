@@ -217,6 +217,7 @@ import { type StagePlan, labourPerMinute, tradeFactor } from './stages';
 import {
   airFactorFor,
   benchDrawsAir,
+  standsForAir,
   compressors,
   drawingOn,
   hallAirCheck,
@@ -1644,10 +1645,28 @@ function runProductionMinute(state: GameState, ownerOnTask: boolean): void {
   // What the men at the benches draw for their nailers and their sanders, through the one
   // selector the hall and the board read as well (CLAUDE.md T10 3.2).
   const air = hallAirCheck(state);
+  // And what the men at the benches do when there is nothing in the hose: they stand. A bench
+  // wants its 30 l/min at 6 bar and without a compressor, or on one that is short, there is no
+  // bench work at all from tonight [PIOTR, 20.09] (CLAUDE.md T23 2.7). The night shift's own
+  // minute does exactly this in `workMinute`, which is the twin phase C is to fold this onto.
+  const running: AtWork[] = [];
+  for (const entry of atWork) {
+    if (standsForAir(state, entry.stage)) {
+      // He keeps his bench and stands at it. The minute is one of the hall's lost ones and the
+      // mark over his head says why (src/engine/bubbles.ts).
+      lose('noMachine');
+      continue;
+    }
+    running.push(entry);
+  }
+  if (running.length === 0 && contract.worked === 0) {
+    tallyEfficiency(state, 0, lost);
+    return;
+  }
   // The minutes somebody actually stood at each machine: that, and nothing else, is what wears
   // it out and what fills the hall's bags (CLAUDE.md T7 2, T12 2.3).
   const used = new Map<string, number>();
-  for (const { hand, stage, machine } of atWork) {
+  for (const { hand, stage, machine } of running) {
     const worker = state.workers.find((entry) => entry.id === hand.who);
     if (worker) {
       worker.productionMinutes += 1;
@@ -1688,7 +1707,7 @@ function runProductionMinute(state: GameState, ownerOnTask: boolean): void {
   // the efficiency breakdown (CLAUDE.md T13 3.5, 3.9).
   const away = staffOutputFactor(state);
   let worked = 0;
-  for (const { hand } of atWork) {
+  for (const { hand } of running) {
     if (hand.who === OWNER) {
       worked += 1;
       continue;

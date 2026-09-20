@@ -1015,14 +1015,27 @@ export type LostMinuteCause = 'noPeople' | 'noMachine' | 'noMaterial' | 'ownerAw
  *  `LostMinuteCause`: that one counts every seat in the hall, and two of its four cannot be true
  *  of the man whose absence they measure. The words are `OWNER_IDLE_REASONS`
  *  (CLAUDE.md T21 2.8). */
-export type OwnerIdleReason = 'noMachine' | 'noMaterial' | 'nothingAssigned' | 'officeEmpty';
+export type OwnerIdleReason =
+  | 'noMachine'
+  | 'noMaterial'
+  /** He stood at a bench with no compressor behind it, or on one short of litres: from Turn 23
+   *  there is no bench work without air at all (PIOTR, 20.09; CLAUDE.md T23 2.7). */
+  | 'noCompressor'
+  | 'nothingAssigned'
+  | 'officeEmpty';
 
-/** The state a mark over a figure's head is drawn for: the four things that are wrong with a man
+/** The state a mark over a figure's head is drawn for: the five things that are wrong with a man
  *  and that the player can put right (docs/mockups/t22/bubbles-v2.png, the red column;
  *  CLAUDE.md T22 2.5). A man who is working, at a chore of his own, at his lunch, in the office or
  *  out measuring has nothing wrong with him and carries no key at all
  *  [PIOTR, 19.09: "when all is fine, no bubble; only when it is bad"]. */
-export type BubbleKey = 'waitingForMachine' | 'noCutParts' | 'noMaterial' | 'nothingToDo';
+export type BubbleKey =
+  | 'waitingForMachine'
+  | 'noCutParts'
+  | 'noMaterial'
+  /** The fifth state, from Turn 23: he is at a bench the hall has no air for (CLAUDE.md T23 2.7). */
+  | 'noCompressor'
+  | 'nothingToDo';
 
 /** One mark over a man's head, ready to draw: the words it says on hover with every slot filled,
  *  and the figure it belongs to (CLAUDE.md T22 2.5). There is no tone on it: a mark is drawn only

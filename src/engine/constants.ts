@@ -1996,15 +1996,15 @@ export const AIR_SANDING_DEMAND = { bar: 6, litres: 200 };
  *  what the compressor makes, which is the headroom a receiver needs (CLAUDE.md T10 3.2). */
 export const AIR_DIVERSITY = 0.6;
 export const AIR_HEADROOM = 0.85;
+/** What the hall says while there is no air for the benches: no compressor at all, or the one the
+ *  hoses are on short of litres. Turn 11 let a man screw a carcass together by hand at 0.67 and
+ *  said so here; from Turn 23 there is no bench work without air and the bench stands still
+ *  [PIOTR, 20.09] (CLAUDE.md T23 2.7). */
+export const NO_AIR_LINE = 'No air: the benches stand still';
+
 /** What every pneumatic consumer on a compressor that is short of litres runs at, for that minute
- *  (PIOTR, CLAUDE.md T10 3.2). */
-/** What a bench is worth with no compressor in the hall at all: the nailer and the driver are no
- *  use and the assembly is screwed together by hand [TUNE] (PIOTR, 15.09; CLAUDE.md T11 3.8). */
-export const NO_AIR_FACTOR = 0.67;
-
-/** What the hall says while there is no air in the hose at all. */
-export const NO_AIR_LINE = 'No air: screws by hand';
-
+ *  (PIOTR, CLAUDE.md T10 3.2). A man at a bench is not one of them from Turn 23: he does not run
+ *  slow on short air, he stands (CLAUDE.md T23 2.7). */
 export const LOW_AIR_FACTOR = 0.7;
 /** A spray booth on wet air still runs, and the Finishing takes half as long again over it and
  *  the job loses a point of rating for the defects in the finish [TUNE] (CLAUDE.md T10 3.3). */
@@ -3929,6 +3929,7 @@ export const EFFICIENCY_CAUSES: ReadonlyArray<{ id: LostMinuteCause; label: stri
 export const OWNER_IDLE_REASONS: ReadonlyArray<{ id: OwnerIdleReason; label: string }> = [
   { id: 'noMachine', label: 'Waiting for a machine' },
   { id: 'noMaterial', label: 'No material' },
+  { id: 'noCompressor', label: 'No air at the bench' },
   { id: 'nothingAssigned', label: 'Nothing assigned' },
   { id: 'officeEmpty', label: 'In the office with nothing to do' },
 ];
@@ -3950,6 +3951,7 @@ export const BUBBLES: Record<BubbleKey, string> = {
   waitingForMachine: 'waiting for the {machine}',
   noCutParts: 'no cut parts yet',
   noMaterial: 'no sheets for {job}',
+  noCompressor: 'no compressor',
   nothingToDo: 'nothing to do',
 };
 

@@ -9,7 +9,6 @@
 import {
   AIR_BENCH_DEMAND,
   LOW_AIR_FACTOR,
-  NO_AIR_FACTOR,
   NO_AIR_LINE,
   AIR_DEMAND,
   AIR_DIVERSITY,
@@ -403,9 +402,12 @@ export function drawingOn(
 }
 
 /** What the air does to one man's minute: 0.7 while the compressor he is drawing on is short of
- *  litres (PIOTR, CLAUDE.md T10 3.2 rule 2), and 0.67 at a bench in a hall with no compressor at
- *  all, where the nailer and the driver are no use and it is screwed together by hand
- *  (PIOTR, 15.09; CLAUDE.md T11 3.8). A machine that wants no air is never touched by either. */
+ *  litres (PIOTR, CLAUDE.md T10 3.2 rule 2). A machine that wants no air is never touched by it.
+ *
+ *  A man at a bench is no longer on this ladder at all. Turn 11 let him screw a carcass together
+ *  by hand at 0.67 in a hall with no compressor; from Turn 23 there is no bench work without air,
+ *  and `standsForAir` below stands him still before ever a minute is worked
+ *  [PIOTR, 20.09] (CLAUDE.md T23 2.7). */
 export function airFactorFor(
   state: GameState,
   check: AirCheck,
@@ -413,7 +415,7 @@ export function airFactorFor(
   atTheBench: boolean,
 ): number {
   const compressor = drawingOn(state, machine, atTheBench);
-  if (compressor === null) return atTheBench ? NO_AIR_FACTOR : 1;
+  if (compressor === null) return 1;
   return compressorIsLow(check, compressor.id) ? LOW_AIR_FACTOR : 1;
 }
 
@@ -423,6 +425,38 @@ export function airFactorFor(
 export function benchDrawsAir(stage: { id: string; family: string | null }): 'bench' | 'sanding' | null {
   if (stage.id === 'finishing' && stage.family === null) return 'sanding';
   return stage.family === BENCH ? 'bench' : null;
+}
+
+/** True while there is air at the benches at all: a compressor in the hall giving at least the six
+ *  bar a bench wants of it. The hoses are on the first compressor, which is where `drawingOn`
+ *  sends a man at a bench (CLAUDE.md T10 3.2, T23 2.7).
+ *
+ *  This is the whole of the question, and a compressor short of litres is not part of it. A short
+ *  compressor runs every pneumatic consumer on it at 0.7 for the minute, the bench included, and
+ *  that is rule 2 of T10 3.2, which Turn 23 does not touch. The brief's own acceptance test says
+ *  "a used compressor bought: work resumes the next minute", and a used one gives 150 l/min, of
+ *  which 127.5 may be drawn: one man sanding at 200 and one at a bench at 30 come to 138 through
+ *  the trade's diversity, so a used compressor is short the moment two men work. Read the other
+ *  way, the day one hall would finish nothing at all and buying the used compressor the brief
+ *  names would not start it again. The note is in docs/notes-t23-b2.md. */
+export function benchHasAir(state: GameState): boolean {
+  const compressor = compressors(state)[0] ?? null;
+  if (compressor === null) return false;
+  return compressorAirOf(compressor).bar >= AIR_BENCH_DEMAND.bar;
+}
+
+/** True while this minute of work is bench work with nothing in the hose, which from Turn 23 is a
+ *  man standing at his bench and not a man screwing it together by hand: the mark over his head
+ *  says "no compressor", his minute is one of the hall's lost ones, and nothing goes into the job
+ *  [PIOTR, 20.09] (CLAUDE.md T23 2.7). The one place the rule is asked: the minute of production,
+ *  the owner's day meter and the mark over a man's head all read this and none of them re-derives
+ *  it. */
+export function standsForAir(
+  state: GameState,
+  stage: { id: string; family: string | null } | null,
+): boolean {
+  if (stage === null || benchDrawsAir(stage) === null) return false;
+  return !benchHasAir(state);
 }
 
 /** The men drawing air at a bench this minute: one for every joiner at an assembly with a nailer

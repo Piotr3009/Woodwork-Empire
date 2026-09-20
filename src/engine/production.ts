@@ -51,6 +51,7 @@ import {
   drawingOn,
   hallAirCheck,
   sprayingOnWetAir,
+  standsForAir,
   underExtracted,
 } from './media';
 import {
@@ -406,7 +407,11 @@ export function ownerIdleReason(state: GameState): OwnerIdleReason | null {
   if (owner.currentTaskId !== null) return null;
   const job = jobOf(state, OWNER);
   if (job !== null) {
-    return rackCanSupply(state, job, jobProgress(job)) ? 'noMachine' : 'noMaterial';
+    if (!rackCanSupply(state, job, jobProgress(job))) return 'noMaterial';
+    // A bench the hall has no air for stands the owner still like anybody else, and his meter
+    // says which of the two it was (PIOTR, 20.09; CLAUDE.md T23 2.7).
+    const stage = currentStage(state, job, cncOptions(state, OWNER, job));
+    return standsForAir(state, stage) ? 'noCompressor' : 'noMachine';
   }
   // Nothing of his own at all. Either the hall's list has a job of work nobody has taken, or a job
   // is standing ready for a bench, and either way there is work about that he has not been put on;
@@ -502,10 +507,26 @@ export function workMinute(
   // What the men at the benches draw for their nailers and their sanders, through the one
   // selector the hall and the board read as well (CLAUDE.md T10 3.2).
   const air = hallAirCheck(state);
+  // And what the men at the benches do when there is nothing in the hose: they stand. A bench
+  // wants its 30 l/min at 6 bar and without a compressor, or on one that is short, there is no
+  // bench work at all from tonight [PIOTR, 20.09] (CLAUDE.md T23 2.7). It is asked here and not
+  // in `placeHand`, because the air sum is the sum of the machines running this very minute and
+  // the machines are not taken until every hand has been placed.
+  const running: AtWork[] = [];
+  for (const entry of atWork) {
+    if (standsForAir(state, entry.stage)) {
+      // He keeps his bench and stands at it. The minute is one of the hall's lost ones and the
+      // mark over his head says why (src/engine/bubbles.ts).
+      lose('noMachine');
+      continue;
+    }
+    running.push(entry);
+  }
+  if (running.length === 0) return report;
   // The minutes somebody actually stood at each machine: that, and nothing else, is what wears
   // it out and what fills the hall's bags (CLAUDE.md T7 2, T12 2.3).
   const used = new Map<string, number>();
-  for (const { hand, stage, machine } of atWork) {
+  for (const { hand, stage, machine } of running) {
     const worker = state.workers.find((entry) => entry.id === hand.who);
     if (worker) {
       worker.productionMinutes += 1;
@@ -552,7 +573,7 @@ export function workMinute(
   // What the owner's absence took off every staff minute this minute is the owner away line of
   // the efficiency breakdown (CLAUDE.md T13 3.5, 3.9).
   const away = staffOutputFactor(state);
-  for (const { hand } of atWork) {
+  for (const { hand } of running) {
     if (hand.who === OWNER) {
       report.worked += 1;
       continue;

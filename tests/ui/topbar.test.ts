@@ -169,6 +169,7 @@ describe("the boss's day meter", () => {
     state.owner.idleByReason = {
       noMachine: 40,
       noMaterial: 20,
+      noCompressor: 0,
       nothingAssigned: 20,
       officeEmpty: 10,
     };
@@ -186,12 +187,13 @@ describe("the boss's day meter", () => {
     expect(html).not.toContain('seg-idle" data-band');
   });
 
-  it('lists the four reasons he stood on the same plate as the bands, with their minutes', () => {
+  it('lists the five reasons he stood on the same plate as the bands, with their minutes', () => {
     const state = withScriptedDay([['workshop', 120]]);
     state.owner.idleMinutes = 91;
     state.owner.idleByReason = {
       noMachine: 41,
       noMaterial: 20,
+      noCompressor: 0,
       nothingAssigned: 20,
       officeEmpty: 10,
     };
@@ -207,7 +209,7 @@ describe("the boss's day meter", () => {
     expect(plate).toContain('<span class="tip-key seg-idle"></span>');
     expect(plate).toContain('41 min');
     expect(plate).toContain('10 min');
-    // And the four add up to the figure beside the bar, which is the one the grey is drawn from.
+    // And they add up to the figure beside the bar, which is the one the grey is drawn from.
     const summed = OWNER_IDLE_REASONS.reduce(
       (sum, reason) => sum + state.owner.idleByReason[reason.id],
       0,
