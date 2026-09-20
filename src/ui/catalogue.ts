@@ -46,6 +46,7 @@ import {
   findSpec,
   hasExtraction,
   isSellableFamily,
+  isServiced,
   isSold,
   itemStandsInTheHall,
   rackCapacity,
@@ -550,9 +551,10 @@ export function ownedTile(
 ): string {
   const variant = variantFor(item);
   const className = variant?.name ?? 'standard';
-  // The hours and the service belong to the machines the hours are booked on. An extractor
-  // is repaired and never serviced, so it shows its state and no clock (CLAUDE.md T6 3.6).
-  const machine = spec.category === 'machine';
+  // The hours and the service belong to the kit the hours are booked on, which the engine's own
+  // `isServiced` names: the machines, and from Turn 23 the fans, which book their hours while the
+  // extraction runs and are serviced exactly as a machine is (CLAUDE.md T6 3.6, T23 2.8).
+  const machine = isServiced(spec.id);
   const due = serviceDueOn(state, item);
   const service = !machine
     ? ''

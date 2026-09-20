@@ -750,9 +750,25 @@ export function ductingDue(state: GameState): { machines: number } {
   return { machines: ductedMoves(state).length };
 }
 
-/** Machines with a bag or a blade, the ones that are serviced and can break down. */
+/** True for the kit a service is called on and whose hours are booked against a life: the
+ *  machines with a bag or a blade, and from Turn 23 the extractors beside them. A fan books its
+ *  hours while the extraction runs and is serviced exactly as a machine is, on the same due
+ *  point, with the same call in, the same working day out and the same extension of life
+ *  [PIOTR, 20.09] (CLAUDE.md T20 2.9, T23 2.8).
+ *
+ *  The central and the flexi systems are not on it. 2.8 says "serviceableMachines takes the
+ *  extraction in", but their own catalogue line promises the player "no more bags and no
+ *  breakdown", and everything on this list is rolled for a breakdown every morning it is past
+ *  its service. Section 6 leaves the dust rules alone, so the narrower reading is the one that
+ *  keeps a promise the player has already read. The note is in docs/notes-t23-b2.md. */
+export function isServiced(specId: string): boolean {
+  if (specId === 'extractor') return true;
+  return findSpec(specId)?.category === 'machine';
+}
+
+/** Machines with a bag or a blade, and the fans, the ones that are serviced and can break down. */
 export function serviceableMachines(state: GameState): Equipment[] {
-  return state.equipment.filter((item) => findSpec(item.specId)?.category === 'machine');
+  return state.equipment.filter((item) => isServiced(item.specId));
 }
 
 /** Hours the machine has run since it was last serviced. */
@@ -818,9 +834,7 @@ export function serviceCallCheck(
   const item = state.equipment.find((entry) => entry.id === equipmentId);
   if (!item) return { ok: false, reason: 'No such machine' };
   if (isSold(item)) return { ok: false, reason: 'Sold' };
-  if (findSpec(item.specId)?.category !== 'machine') {
-    return { ok: false, reason: 'It is repaired, never serviced' };
-  }
+  if (!isServiced(item.specId)) return { ok: false, reason: 'It is not serviced' };
   if (machineIsOut(item, state.clock.day)) return { ok: false, reason: 'In service' };
   if (item.broken) return { ok: false, reason: 'It is broken. Fix it first' };
   if (!canAfford(state, serviceCostFor(item))) return { ok: false, reason: 'Not enough cash' };
@@ -910,7 +924,8 @@ function round6(value: number): number {
  *  out and the cubic metres of dust it made, and nothing else. A machine nobody is at gains
  *  nothing, which is what "hours are the minutes somebody stood at it" means (CLAUDE.md T7 2).
  *  The map is person minutes per machine: one for a machine one man is standing at, more for a
- *  hand tool two men have out of their cabinets at once. The dust is the family's figure an hour
+ *  hand tool two men have out of their cabinets at once, and one for a fan the whole time the
+ *  extraction is running. The dust is the family's figure an hour
  *  (CLAUDE.md T12 2.1): every machine's goes on the day's total, and into the hall's one bag
  *  store while the hall keeps its dust in bags. A central system takes it away and a hall with no
  *  fan has no bag to put it in, and the figure is still counted for the day (CLAUDE.md T12 2.3).
@@ -925,7 +940,7 @@ export function accumulateMachineMinute(
     if (minutes <= 0) continue;
     const spec = findSpec(item.specId);
     if (!spec) continue;
-    if (spec.category === 'machine') {
+    if (isServiced(spec.id)) {
       item.hoursUsed = round6(item.hoursUsed + minutes / 60);
       // The machine's own week and month, for the Machines column and the month end: the life
       // clock cannot answer either of them (CLAUDE.md T17 2.24, 2.25).

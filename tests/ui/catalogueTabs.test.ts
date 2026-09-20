@@ -295,15 +295,26 @@ describe('the Owned tab', () => {
     expect(card?.textContent).toContain('80 h of use away');
   });
 
-  it('gives the extractor its state and no service, because its hours never move', () => {
+  it('gives the extractor its clock and its service, like the machines it pulls for', () => {
+    // Its card said its state and no clock until tonight, because it was repaired and never
+    // serviced. Piotr put the fan on the same footing as the saw on 20.09: it books its hours
+    // while the extraction runs, so the card carries the same life line and the same Service
+    // button every machine's card carries (CLAUDE.md T23 2.8).
     const state = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
     const extractor = state.equipment.find((item) => item.specId === 'extractor');
-    const card = shop(state, 'owned').querySelector(`[data-owned="${extractor?.id}"]`);
+    if (extractor === undefined) throw new Error('no extractor in the hall');
+    const card = shop(state, 'owned').querySelector(`[data-owned="${extractor.id}"]`);
     expect(card?.textContent).toContain('Extractor');
     expect(card?.textContent).toContain('running');
-    // It is repaired, never serviced, and no hours are ever booked on it.
-    expect(card?.textContent).not.toContain('service');
-    expect(card?.textContent).not.toContain(' h of ');
+    expect(card?.textContent).toContain(' h of ');
+    expect(card?.textContent).toContain('no service due while it stands idle');
+    // And once the hours are on it, the card offers the call the Machines page offers.
+    extractor.hoursUsed = SERVICE_INTERVAL_HOURS;
+    const due = shop(state, 'owned');
+    expect(due.querySelector(`[data-owned="${extractor.id}"]`)?.textContent)
+      .toContain('service due now');
+    expect(due.querySelector(`[data-owned="${extractor.id}"] [data-do="serviceMachine"]`))
+      .not.toBeNull();
   });
 
   it('gives the hand tool set its line and nothing to open, because it is in a cabinet', () => {

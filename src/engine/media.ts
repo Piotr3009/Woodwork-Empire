@@ -29,6 +29,7 @@ import {
   hasGate,
   isSold,
   itemStandsInTheHall,
+  machineIsOut,
 } from './machines';
 import { cncOptions, currentStage } from './stages';
 import type { Equipment, GameState } from './types';
@@ -67,10 +68,18 @@ export function extractingMachines(state: GameState): Equipment[] {
  *  however many fans are on it (CLAUDE.md T10 3.1). A machine that has been sold stops working
  *  the minute the sale is made (T8 3.5); a broken extractor keeps its capacity here, because the
  *  hall is already paying for the breakdown through its own line of the output breakdown and it
- *  is not charged twice for one fault (Turn 2 3.9). */
+ *  is not charged twice for one fault (Turn 2 3.9).
+ *
+ *  A fan away being serviced is a different thing and does pull nothing: the van has it, it is
+ *  out for the working day the call buys, and the hall is unserved that day, which is the whole
+ *  cost of putting a service off [PIOTR, 20.09] (CLAUDE.md T20 2.9.3, T23 2.8). */
 export function extractionKit(state: GameState): Equipment[] {
   return state.equipment.filter(
-    (item) => !isSold(item) && itemStandsInTheHall(item) && extractionCapacityOf(item) > 0,
+    (item) =>
+      !isSold(item) &&
+      itemStandsInTheHall(item) &&
+      !machineIsOut(item, state.clock.day) &&
+      extractionCapacityOf(item) > 0,
   );
 }
 

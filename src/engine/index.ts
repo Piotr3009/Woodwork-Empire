@@ -446,6 +446,7 @@ export {
   itemStandsInTheHall,
   isHeavy,
   isSellableFamily,
+  isServiced,
   isSold,
   salePriceFor,
   toolSlotsLine,

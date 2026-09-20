@@ -143,6 +143,7 @@ import {
   requiresOneOfFor,
   standsInTheHall,
   zoneOf,
+  isServiced,
   serviceCostFor,
   serviceCallCheck,
   serviceMachine,
@@ -220,6 +221,8 @@ import {
   standsForAir,
   compressors,
   drawingOn,
+  extractionKit,
+  extractionRunning,
   hallAirCheck,
   sprayingOnWetAir,
   underExtracted,
@@ -1702,6 +1705,15 @@ function runProductionMinute(state: GameState, ownerOnTask: boolean): void {
     const trade = tradeFactor(worker?.role ?? null, stage.family);
     const minute = labourPerMinute(hand.rate * trade, speed) * hall;
     if (addLabour(state, hand.job, minute, stage.id)) raiseJobAtGate(state, hand.job);
+  }
+  // The extraction books its hours the whole time it is running, whoever is at what: a fan is
+  // pulling for the hall and not for one man, and it is serviced on those hours exactly as a
+  // machine is [PIOTR, 20.09] (CLAUDE.md T23 2.8). `isServiced` says which of the kit in the
+  // duct run wears out on them.
+  if (extractionRunning(state)) {
+    for (const fan of extractionKit(state)) {
+      if (isServiced(fan.specId)) used.set(fan.id, (used.get(fan.id) ?? 0) + 1);
+    }
   }
   // What the owner's absence took off every staff minute this minute is the owner away line of
   // the efficiency breakdown (CLAUDE.md T13 3.5, 3.9).

@@ -283,13 +283,13 @@ describe('the three month playthrough of 10.4, on Easy as the brief scripts it',
     // overdraft limit for more than a day at a time (the count of days below the limit reads 1 on
     // days 109, 114 and 120 and nought on every other morning), which puts the thirty day rule
     // nowhere near this run. What closes the company is the amount, on the morning of day 120: day
-    // 120 is the last working day of month 4, the month's wages of 7,300 for the three men of 10.4
-    // go out of an account standing at -8,381, and that one line takes it to -15,681 against the
-    // -15,000 the bank allows. The bank looks as the morning's first act, and the term ends on day
-    // 121. It has been landing on the other side of that day since Turn 21, on luck: any figure at
-    // all moves it, and phase A moved two tonight (the measured ports of CLAUDE.md T22 2.8 make
-    // this hall's pipe three metres where it was five, and every purchase after day 8 falls on a
-    // different day).
+    // 120 is the last working day of month 4, the month's wages for the three men of 10.4 go out
+    // of an account already 10,278 into the overdraft, and that one line takes it past the
+    // -15,000 the bank allows. The bank looks as the morning's first act, and the term ends on
+    // that same day now. It has been landing on either side of that day since Turn 21, on luck:
+    // any figure at all moves it, and three things moved it tonight (the measured ports of
+    // CLAUDE.md T22 2.8 make this hall's pipe three metres where it was five, the manager is a
+    // tiered role and comes cheaper, and the fan is serviced from 2.8).
     //
     // So the claim stays split, where phase A left it, with its figures brought up to tonight. What
     // is asserted here is what the contract did, which is the substance of it and is true: the
@@ -307,26 +307,33 @@ describe('the three month playthrough of 10.4, on Easy as the brief scripts it',
       later = playDay(later, PLAYTHROUGH);
       guard += 1;
     }
-    const running = later.contracts.find((contract) => contract.status === 'active');
+    // The term is asked for by the one contract of the run and not by its status, because the day
+    // the bank closes the company is also the day the term runs out: the contract reads "ended"
+    // on that morning, which it did not when the close fell a day later (CLAUDE.md T23 2.8).
+    const running = later.contracts.find((contract) => contract.status !== 'offered');
     expect(running?.weeks.length ?? 0).toBeGreaterThan(16);
-    expect(later.gameOver?.day).toBe(121);
+    expect(later.gameOver?.day).toBe(120);
     expect((running?.endDay ?? 0) - (later.gameOver?.day ?? 0)).toBe(0);
     // The rule it was closed under is the amount, and the line that got it there is the month's
-    // wages: 6,300 out of an account already 7,299 into the overdraft, and its own balance says
-    // where it left it. The other rule's count was on 2 of its 30.
+    // wages: 6,300 out of an account already 10,278 into the overdraft, and its own balance says
+    // where it left it.
     //
-    // The four figures moved tonight and the reason is one thing: the production manager is a
-    // tiered role from Turn 23 and his standing gate is the one every tiered role passes, so the
-    // workshop that used to take the only manager there was now takes the best grade it has
-    // earned by day 61, which is the novice at 2,400 a month. A thousand a month less in wages is
-    // a company that lasts one day longer and closes 348 shallower (CLAUDE.md T23 2.4).
+    // The figures moved twice tonight, and both moves are one line of this brief each. Phase A
+    // made the production manager a tiered role, so the workshop that used to take the only
+    // manager there was now takes the best grade it has earned by day 61, the novice at 2,400 a
+    // month, and a thousand a month less in wages bought the company a day. 2.8 then took it
+    // back: the fan books its hours from tonight and is serviced on them like the saw, so this
+    // run pays for the fan's services as well and closes on day 120 at -16,068 rather than on
+    // day 121 at -15,333 (CLAUDE.md T23 2.4, 2.8).
     expect(later.gameOver?.reason).toContain('cannot pay');
-    expect(Math.round(later.cash)).toBe(-15333);
+    expect(Math.round(later.cash)).toBe(-16068);
     expect(later.cash).toBeLessThanOrEqual(later.finance.overdraftLimit * BANKRUPTCY_LIMIT_FACTOR);
-    expect(later.finance.daysBelowOverdraft).toBe(2);
+    // The other rule's count read 2 of its 30 while the close fell on day 121; on day 120 it is
+    // on 1 (CLAUDE.md T23 2.8).
+    expect(later.finance.daysBelowOverdraft).toBe(1);
     const paid = later.ledger.filter((entry) => entry.category === 'wages');
     const last = paid[paid.length - 1];
-    expect([last?.day, last?.amount, Math.round(last?.balance ?? 0)]).toEqual([120, -6300, -13599]);
+    expect([last?.day, last?.amount, Math.round(last?.balance ?? 0)]).toEqual([120, -6300, -16578]);
     // Four months of one money track: nothing waited anywhere but the account (CLAUDE.md T22 2.1).
     expect(later.ledger.some((entry) => entry.unpaid)).toBe(false);
   });

@@ -153,6 +153,23 @@ describe('the Machines page (CLAUDE.md T20 2.9)', () => {
     expect(row.querySelector('.reason')?.textContent).toBe('It is broken. Fix it first');
   });
 
+  it('says service due on the extractor too, and offers the call on its row', () => {
+    // The fan's row carried its state and a Service it could never have until tonight. It books
+    // its hours while the extraction runs from Turn 23 and is serviced exactly as the saw beside
+    // it is (PIOTR, 20.09; CLAUDE.md T23 2.8).
+    const state = hall();
+    const fan = state.equipment.find((item) => item.specId === 'extractor');
+    if (fan === undefined) throw new Error('no extractor in the hall');
+    expect(rowOf(state, fan.id).querySelector('.row-main')?.textContent).not.toContain('service due');
+    fan.hoursUsed = SERVICE_INTERVAL_HOURS;
+    const row = rowOf(state, fan.id);
+    expect(row.querySelector('.row-main')?.textContent).toContain('service due');
+    const button = row.querySelector('[data-do="serviceMachine"]');
+    expect(button?.getAttribute('data-id')).toBe(fan.id);
+    expect(button?.textContent).toContain(formatMoney(serviceCostFor(fan)));
+    expect(button?.getAttribute('title')).toContain('more hours of life');
+  });
+
   it('is behind the Machines tile of the laptop, with the page head every page has', () => {
     // The laptop is opened the way the player opens it: the office, the laptop on the desk, the
     // lid's five minutes, then the tile (CLAUDE.md T7 3.10, T15 2.3).
