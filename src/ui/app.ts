@@ -9,6 +9,7 @@ import {
   findSpec,
   finishTimeFor,
   formatCalendarDay,
+  monthName,
   formatTime,
   gameMinutesPerRealSecond,
   moveConfirmPending,
@@ -73,7 +74,7 @@ import { renderContracts } from './contracts';
 // Straight off its own module, not round the public API, which Turn 13 froze (REPORT-T13 10).
 import { contractManCheck } from '../engine/contracts';
 import { renderHouseCard } from './house';
-import { renderMonthEnd } from './monthEnd';
+import { renderMonthEnd, renderMonthlyReport } from './monthEnd';
 import { renderSettings } from './settings';
 import { renderTip, renderWarningStrip } from './tips';
 import { renderBoard } from './board';
@@ -218,6 +219,8 @@ interface Ui {
   /** The days of the books the player has opened on their lines. */
   openDays: number[];
   daySummary: number | null;
+  /** The month whose report is open over Accounting, or null (CLAUDE.md T23 2.14). */
+  monthlyReport: number | null;
   /** A new tab is new content, not the same list a minute later: it starts at the top. */
   scrollModalTop: boolean;
   /** Setting the hall out: the clock is stopped and the kit can be dragged about. */
@@ -372,6 +375,7 @@ function freshUi(): Ui {
     accountingMonth: null,
     openDays: [],
     daySummary: null,
+    monthlyReport: null,
     scrollModalTop: false,
     setup: false,
     rotate: 0,
@@ -788,6 +792,26 @@ function modalSpecs(): ModalSpec[] {
       wide: true,
       position: null,
     });
+  }
+  // A month the company has closed, opened from Accounting's Monthly reports tab and drawn by the
+  // one function that draws it at the month end (CLAUDE.md T23 2.14). It is pushed after the
+  // laptop it was opened from, so it sits over it, and it carries the cross, Escape and a click
+  // outside like every other card.
+  if (ui.monthlyReport !== null) {
+    const asked = ui.monthlyReport;
+    const entry = current.monthlyReports.find((row) => row.month === asked) ?? null;
+    if (entry === null) {
+      ui.monthlyReport = null;
+    } else {
+      specs.push({
+        id: 'monthlyReport',
+        title: `${monthName(entry.month)}: the report`,
+        body: renderMonthlyReport(entry),
+        closable: true,
+        wide: true,
+        position: null,
+      });
+    }
   }
   // Dropping a project is the one action in the game that takes two clicks, because for a big job
   // it ends the company: the first click opens this card, which says what the drop costs before
@@ -1631,6 +1655,10 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
       // The evening's own summary, put back in front of him from the books (CLAUDE.md T6 3.9).
       ui.daySummary = Number(id);
       break;
+    case 'openMonthlyReport':
+      // The month's own card, put back in front of him from the books (CLAUDE.md T23 2.14).
+      ui.monthlyReport = Number(id);
+      break;
     case 'closeModal': {
       // The cross on the event modal is the one choice it has. The cross on anything else just
       // shuts that modal: whatever is behind it is still there.
@@ -1643,6 +1671,10 @@ function runAction(element: DataElement, point: { x: number; y: number }): void 
       }
       if (which === 'daySummary') {
         ui.daySummary = null;
+        break;
+      }
+      if (which === 'monthlyReport') {
+        ui.monthlyReport = null;
         break;
       }
       // The cross on the drop card is "Keep the job": the card goes and the job stays
@@ -2149,6 +2181,16 @@ function runClick(event: MouseEvent): void {
     ui.dropConfirm = null;
     requestRender();
   }
+  // And the same for a month's report: a click anywhere but inside it puts it away and leaves the
+  // books it was opened from where they were (CLAUDE.md T23 2.14).
+  if (
+    ui.monthlyReport !== null &&
+    target.closest('[data-modal="monthlyReport"]') === null &&
+    doer?.dataset.do !== 'openMonthlyReport'
+  ) {
+    ui.monthlyReport = null;
+    requestRender();
+  }
   if (doer) {
     if (doer instanceof HTMLButtonElement && doer.disabled) return;
     handleAction(doer, point);
@@ -2278,6 +2320,13 @@ export const ESCAPE_ORDER: ReadonlyArray<{
     isOpen: () => ui.daySummary !== null,
     shut: () => {
       ui.daySummary = null;
+    },
+  },
+  {
+    name: 'monthly report',
+    isOpen: () => ui.monthlyReport !== null,
+    shut: () => {
+      ui.monthlyReport = null;
     },
   },
   {

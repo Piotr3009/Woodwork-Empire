@@ -98,6 +98,7 @@ import {
   emptyBooked,
   emptyTotals,
   formatMoney,
+  monthlyReportFor,
   pay,
   receive,
   refund,
@@ -589,6 +590,13 @@ function raiseMonthEnd(state: GameState): void {
   const month = monthOfDay(state.clock.day);
   if (month <= 1 || state.monthEndShownFor >= month) return;
   state.monthEndShownFor = month;
+  // The month is written down here, once, in the figures the card is about to be drawn from. It
+  // has to be here and not a line later: `startMachineMeters` below zeroes the machines' month
+  // clocks and the savings on the card are read off them, so a report taken after that would be
+  // a month of blanks. Accounting's Monthly reports tab is this list read back, so a month the
+  // player never opened is not lost with the ledger it was added up from
+  // [PIOTR, 20.09] (CLAUDE.md T17 2.24, T23 2.14).
+  state.monthlyReports.push(monthlyReportFor(state, month - 1));
   queueEvent(state, {
     kind: 'monthEnd',
     title: `Month ${month - 1}: the report`,

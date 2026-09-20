@@ -3754,8 +3754,9 @@ export const DAY_LOGS_KEPT = 7;
  *  end report and the house tier are sums over dated lines and want the whole month and the
  *  thirty days before it in the state (CLAUDE.md T13 3.18, 3.20). */
 export const LEDGER_MAX_ENTRIES = 2000;
-/** The Ledger tab shows the last 200 lines (PIOTR, CLAUDE.md T6 3.9). */
-export const LEDGER_VISIBLE_ENTRIES = 200;
+// The Ledger tab showed the last 200 of them and `LEDGER_VISIBLE_ENTRIES` said so. The tab is
+// gone from Turn 23 and so is the figure: the ledger is the engine's record now and has no screen
+// of its own to be cut to a length (CLAUDE.md T23 2.14).
 
 // ---------------------------------------------------------------------------
 // T13 3.15 Insurance

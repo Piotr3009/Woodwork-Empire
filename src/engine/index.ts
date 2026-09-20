@@ -700,8 +700,9 @@ export {
   MONTH_LINE_OF,
   MONTH_LINES,
   monthReport,
+  monthlyReportFor,
 } from './economy';
-export type { MonthLine, MonthLineId, MonthReport } from './economy';
+export type { MonthLine, MonthLineId, MonthReport, MonthlyReport } from './economy';
 export {
   gateCheck,
   hasGate,
