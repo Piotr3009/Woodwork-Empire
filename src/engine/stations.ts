@@ -430,8 +430,8 @@ export function freeSideOf(state: GameState, item: Equipment): Side {
  *  first free side at the same position along it where it is not, and the table's cell as it
  *  stands when nothing is free at all (the straight line walk still gets him there). */
 export function standingCell(state: GameState, item: Equipment, role: StationRole = 'operator'): Cell {
-  // A seat and a locker are inside the canteen: a man at one of them stands in the doorway and is
-  // not drawn through the wall (PIOTR, 17.09; CLAUDE.md T17 2.2).
+  // A locker is inside the canteen: a man at his stands in the doorway and is not drawn through
+  // the wall (PIOTR, 17.09; CLAUDE.md T17 2.2, T23 2.11).
   if (WELFARE_IN_THE_CANTEEN.includes(item.specId)) return roomDoorCell('canteen');
   const row = stationRow(item.specId);
   const box = standsOn(item);

@@ -356,8 +356,9 @@ export function doorLeaf(room: { x: number; y: number; width: number; depth: num
  *  through it (PIOTR, 18.09; CLAUDE.md T20 2.12).
  *
  *  Only the office carries `data-door`, because only the office door is a control: the canteen
- *  door is a door and the block behind it is still the way to the canteen's own note, and giving
- *  it the control's hook would have taken that click away from it. */
+ *  door is a door and the block behind it is still the way into the canteen, which from Turn 23 is
+ *  a room of its own, and giving the door the control's hook would have taken that click away from
+ *  the block (CLAUDE.md T23 2.9). */
 export function roomDoor(
   room: { x: number; y: number; width: number; depth: number },
   id: string,

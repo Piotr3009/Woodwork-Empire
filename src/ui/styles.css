@@ -3571,22 +3571,9 @@ input.num {
   margin: 0 0 8px;
 }
 
-/* 2.9 Our team: the row is the list row everywhere else, with one more column for what he is on. */
-.team-when {
-  color: var(--text-dim);
-  font-size: var(--fs-small);
-}
-
-/* A man's week is the line under his row on Our team: the row wraps and the week takes the whole
-   width of it, so it is read across and his name is not squeezed into a column
-   (PIOTR; CLAUDE.md T20 2.7). */
-.team-row {
-  flex-wrap: wrap;
-}
-
-.team-week {
-  flex: 1 0 100%;
-}
+/* Our team was a list of rows with a week line under each until Turn 23, when every man on it
+   became a tile of the one card (CLAUDE.md T23 2.13). `.team-row`, `.team-when` and `.team-week`
+   went with the rows that wore them; the tile and the card are `.person-*` below. */
 
 /* 2.26 The workshop rate, the one figure at the top of the Company board and of the month end. */
 .rate-figure {
