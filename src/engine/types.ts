@@ -283,6 +283,9 @@ export interface Equipment {
    *  cannot answer either (CLAUDE.md T17 2.24, 2.25). Both start again on their own boundary. */
   hoursThisWeek: number;
   hoursThisMonth: number;
+  /** The minutes its class saved last week, written down on the Monday before the week clock is
+   *  started again, so the Machines sheet can say last week beside this week (PIOTR, 21.09; v40). */
+  minutesSavedLastWeek: number;
   /** The one man standing at it: 'owner', a worker id, or null while it is free. A machine serves
    *  one person at a time (CLAUDE.md T7 3.1). */
   takenBy: string | null;
@@ -1127,6 +1130,9 @@ export interface DaySummary {
   /** Labour value produced and the people minutes that produced it (CLAUDE.md T6 3.8). */
   labourValue: number;
   workMinutes: number;
+  /** The workshop's average output that day: what a minute of production was worth on average,
+   *  everybody and every machine in it, weighted by the minutes worked (v40). */
+  outputToday: number;
   /** The owner's day as it happened, for the plate at the top of the summary (T11 3.1). */
   dayLog: DayLogEntry[];
   /** Cubic metres of sawdust the hall made that day (CLAUDE.md T12 3.4). */
@@ -1157,6 +1163,11 @@ export interface DayStats {
    *  the earned labour rate (CLAUDE.md T6 3.8). */
   labourValue: number;
   workMinutes: number;
+  /** What every production minute of the day was multiplied by, added up: the hall, the man, his
+   *  manager, the owner's absence and the class of machine at his stage, one multiplier a minute.
+   *  Over `workMinutes` it is the workshop's average output today, the one Output number on the
+   *  top bar and the company board (PIOTR, 21.09; v40). */
+  outputWorth: number;
   /** Cubic metres of sawdust the hall made today, bags or no bags (CLAUDE.md T12 3.4). */
   dustM3: number;
   /** The production minutes the workshop could have worked, did work, and lost, by cause

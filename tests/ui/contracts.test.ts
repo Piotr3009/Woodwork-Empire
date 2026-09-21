@@ -4,12 +4,13 @@
 import { describe, expect, it } from 'vitest';
 import {
   CONTRACT_FREE_END_DAYS,
-  CONTRACT_PIECES,
   WORKER_RATES,
 } from '../../src/engine/constants';
 import {
   acceptContract,
   assignContract,
+  contractPiece,
+  contractPriceFor,
   contractResultFor,
   drawContract,
   endContract,
@@ -73,8 +74,8 @@ function offered(state: GameState): Contract {
   const contract = drawContract(state);
   contract.pieceId = 'cutSheetPack';
   contract.name = 'Cut sheet packs for a shop';
-  // The piece's own price, off the table Piotr set (CLAUDE.md T20 2.2).
-  contract.pricePerPiece = CONTRACT_PIECES.find((piece) => piece.id === 'cutSheetPack')?.price ?? 0;
+  // The entry point's price (v40).
+  contract.pricePerPiece = contractPriceFor(contractPiece(contract));
   contract.quantityPerWeek = 60;
   state.contracts.push(contract);
   return contract;
@@ -95,8 +96,8 @@ describe('the Contracts tab', () => {
     const page = parse(renderContracts(state));
     const tile = page.querySelector(`.tile[data-contract="${contract.id}"]`);
     expect(tile?.querySelector('.tile-name')?.textContent).toBe(contract.name);
-    // The cut sheet pack is 50 a piece from tonight (CLAUDE.md T20 2.2).
-    expect(tile?.querySelector('.tile-price')?.textContent).toBe('£50 a piece');
+    // The cut sheet pack at the entry point's price (v40).
+    expect(tile?.querySelector('.tile-price')?.textContent).toBe(`${money(contract.pricePerPiece)} a piece`);
     expect(tile?.textContent).toContain('60 a week for');
     expect(tile?.textContent).toContain('£30 of material');
     expect(tile?.querySelector('[data-do="acceptContract"]')?.getAttribute('data-id')).toBe(contract.id);
@@ -159,8 +160,8 @@ describe('the Contracts tab', () => {
     const renew = block?.querySelector('[data-do="renewContract"][data-accept="1"]');
     const go = block?.querySelector('[data-do="renewContract"][data-accept="0"]');
     expect(renew?.getAttribute('data-id')).toBe(contract.id);
-    // Two full weeks put a percent on the 50 (CLAUDE.md T17 2.22, T20 2.2).
-    expect(renew?.textContent).toContain('Renew at £51');
+    // Two full weeks put two per cent on the price (CLAUDE.md T17 2.22, T20 2.2).
+    expect(renew?.textContent).toContain(`Renew at ${money(Math.round(contract.pricePerPiece * 1.02))}`);
     expect(go?.textContent).toBe('Let it go');
   });
 
@@ -200,8 +201,9 @@ describe('the material and the way out (CLAUDE.md T17 2.22)', () => {
     // The prices of T20 2.2 make a cut sheet pack pay by hand, so the line is his own figures and
     // not a loss typed into the test (CLAUDE.md T20 2.2).
     expect(row?.querySelector('small')?.textContent).toBe(
-      `${result.minutes} minutes a piece, ${money(result.labourCost)} of his time: ` +
-        `${signedMoney(result.margin)} a piece`,
+      `${result.minutes} minutes a piece, ${money(result.labourCost)} of his time` +
+        `${result.wear > 0 ? ` and ${money(result.wear)} of wear` : ''}: ` +
+        `${signedMoney(result.margin)} a piece, ${signedMoney(result.dayResult)} a day`,
     );
     expect(result.margin).toBeGreaterThan(0);
     expect(row?.querySelector('.row-figure')?.className).toContain('good');

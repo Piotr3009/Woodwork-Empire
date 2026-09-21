@@ -634,6 +634,21 @@ function retireSpec(state: Raw, specId: string, label: string): void {
 }
 
 /** One lift per bump, keyed by the version it lifts from. */
+/** v23 (v40, PIOTR 21.09): every machine writes down on the Monday what its class saved last week,
+ *  so the Machines sheet can say last week beside this week; a saved machine has no last week
+ *  yet, so its figure is nothing; the day's stats carry the sum behind the workshop's average
+ *  output, and every closed day the average it had, which a v22 save cannot know, so a closed
+ *  day is given the hall's own factor it wrote down, which is what the average reads before the
+ *  first minute. */
+function liftToVersion23(state: Raw): void {
+  for (const item of records(state.equipment)) item.minutesSavedLastWeek = 0;
+  if (isRecord(state.dayStats)) state.dayStats.outputWorth = 0;
+  for (const day of records(state.days)) {
+    day.outputToday = typeof day.hallFactor === 'number' ? day.hallFactor : 1;
+  }
+  state.version = 23;
+}
+
 const LIFTS: Record<number, (state: Raw) => void> = {
   12: liftToVersion13,
   13: liftToVersion14,
@@ -645,6 +660,7 @@ const LIFTS: Record<number, (state: Raw) => void> = {
   19: liftToVersion20,
   20: liftToVersion21,
   21: liftToVersion22,
+  22: liftToVersion23,
 };
 
 /** The state a save holds, lifted bump by bump into this build's shape, or null when the save is

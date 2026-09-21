@@ -106,12 +106,16 @@ import type {
  *  off its books with a line each; a man's hand tool set lives in a cabinet and not on the floor,
  *  so it loses the cell it stood on; and nobody is charged minutes for assigning any more, so the
  *  daily staff management chore goes off the list (CLAUDE.md T23 section 4). Every v33, v34 and
- *  v35 save loads. */
-export const STATE_VERSION = 22;
+ *  v35 save loads.
+ *
+ *  Version 23 is v40 (PIOTR, 21.09): every machine writes down on the Monday what its class saved
+ *  last week; the day's stats carry the sum behind the workshop's average output and every closed
+ *  day the average it had. Every v36 to v39 save loads. */
+export const STATE_VERSION = 23;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
-export const APP_VERSION = 'v38';
+export const APP_VERSION = 'v40';
 
 // ---------------------------------------------------------------------------
 // The owner's day, in the seven things it is made of
@@ -3852,82 +3856,81 @@ export interface ContractPieceSpec {
   stages: StageId[];
   /** Owner minutes a piece. */
   minutes: number;
-  /** What the client pays a piece, and what the material in it costs. */
-  price: number;
+  /** What the material in a piece costs. */
   material: number;
   /** What a piece takes off the rack, in sheets: the material in it over what a sheet is worth,
    *  so a piece with 30 of material in it is 0.15 of a 200 sheet. A contract's material comes off
    *  the rack like a job's and is never bought as money on the contract line (T17 2.22). Whole
    *  sheets are drawn as the pieces add up, the way a job draws them as it goes. */
   sheets: number;
-  /** The labour value in a piece, in pounds: what the workshop earns by making it, which is what
-   *  the workshop rate counts (CLAUDE.md T17 2.26). */
-  labour: number;
 }
 
-/** The pieces a contract can be for. `minutes` is owner minutes a piece, `price` what the client
- *  pays for one, `material` the money in its sheets, `sheets` what it takes off the rack, and
- *  `labour` the margin the piece carries, which is price less material (CLAUDE.md T13 3.16,
- *  T17 2.22, T20 2.2).
+/** The pieces a contract can be for. `minutes` is owner minutes a piece, `material` the money in
+ *  its sheets and `sheets` what it takes off the rack (CLAUDE.md T13 3.16, T17 2.22, T20 2.2).
  *
- *  The prices are Piotr's, and they are set so that a contract is worse than a job, better than
- *  paying a man to stand still, and worth a great deal more with machines under it [PIOTR, 18.09:
- *  "a contract is worse than a job, better than the wage, and rewards machines"]. By hand every
- *  piece lands near 25 pounds of margin an hour, between a joiner's wage of about 14 and a job's
- *  40; with a CNC on the cutting stage and an edgebander or a booth on the rest the same pieces
- *  reach 40 to 60. The wardrobe front is four hours of work now and no longer three days, which
- *  is what a wardrobe front actually is.
- *
- *  `sheets` a piece is unchanged for the two small pieces. The wardrobe front's is not, and that
- *  DEVIATES FROM THE LETTER of 2.2, which says "sheets per piece stays what it is". Why it was
- *  moved, and what the other answer is, in plain words:
- *
- *  The table's own rule is material = sheets x SHEET_VALUE. The cut sheet pack keeps it (0.15 x
- *  200 = 30) and so does the drawer box (0.13 x 200 = 26). The wardrobe front was 1.1 sheets
- *  beside 220 of material in v28, and 2.2 dropped the material to 60 without moving the sheets,
- *  so the piece was costed at 60 on the card and in the closing report and drew about 220 off the
- *  rack. The Contracts tab exists to tell the player whether a contract pays BEFORE he takes it
- *  (T20 2.1), and on that one piece it would have reported the opposite sign: +£100 a piece where
- *  the piece really loses about £90. Everything else 2.2 states (material 60, the margin of 100 a
- *  piece, the band of 22 to 30 an hour) needs the table to agree with itself, so the sheets moved
- *  to 60 / SHEET_VALUE and not the other three figures.
- *
- *  [TUNE, PIOTR'S TO RULE ON] The other answer is his: keep 1.1 sheets and move the material and
- *  the price together, about 220 of material and about 320 a piece, which holds the same margin an
- *  hour and makes the wardrobe front a dearer contract than the table says tonight. */
+ *  v40 (PIOTR, 21.09): the price a piece is no longer a figure in this table. It is worked out
+ *  from `CONTRACT_MARGIN_PER_DAY` at the entry point below, by `contractPriceFor` in
+ *  contracts.ts, so it follows the wages, the machine prices and the service rule wherever they
+ *  go; the labour value of a piece is its price less its material, read off the contract itself.
+ *  The typed prices of v28 to v39 (50, 52, 160) paid about 200 a week and forgot the saw: forty
+ *  cut sheet packs a week are 37 hours of a standard saw, which is 327 of service at a tenth of
+ *  7,000 every 80 hours, against 268 of margin. */
 export const CONTRACT_PIECES: readonly ContractPieceSpec[] = [
   {
     id: 'cutSheetPack',
     name: 'Cut sheet pack',
     stages: ['cutting'],
     minutes: 45,
-    price: 50,
     material: 30,
     sheets: 0.15,
-    labour: 20,
   },
   {
     id: 'drawerBox',
     name: 'Drawer box',
     stages: ['cutting', 'assembly'],
     minutes: 60,
-    price: 52,
     material: 26,
     sheets: 0.13,
-    labour: 26,
   },
   {
     id: 'wardrobeFront',
     name: 'Wardrobe front',
     stages: ['cutting', 'finishing'],
     minutes: 240,
-    price: 160,
     // [TUNE] 60 over SHEET_VALUE 200, so the piece draws off the rack exactly what it is costed
-    // at. It was 1.1 in v28, beside a material of 220. See the note above the table.
+    // at. It was 1.1 in v28, beside a material of 220 (T20 2.2).
     material: 60,
     sheets: 0.3,
-    labour: 100,
   },
+];
+
+/** What a contract is priced to leave a day, after the man's wages and the wear of his machine,
+ *  at the entry point: an experienced joiner on the standard class of the machine the piece is
+ *  done on [PIOTR, 21.09: "about 200 a day, that is the minimum, otherwise there is no point"].
+ *  The price a piece is set from this one figure, so a better man or a better machine makes more
+ *  pieces of the same price in the day and keeps more, the way a job works: a novice on a used
+ *  saw lands under it and a master on an industrial one well over (PIOTR: "not a fixed figure,
+ *  the way a normal job goes: more skill, more use of the machines, more money"). */
+export const CONTRACT_MARGIN_PER_DAY = 200;
+/** The entry point the price is worked out at: the tier of the man and the class of the machine.
+ *  Both are the middle of their ladders [PIOTR, 21.09]. */
+export const CONTRACT_REFERENCE_TIER: WorkerTier = 'experienced';
+export const CONTRACT_REFERENCE_CLASS = 'standard';
+
+/** How many pieces a week the client asks for, in cut sheet packs, by the workshop's standing:
+ *  a shop with a name gets asked for more, so a better crew is not throttled by the band
+ *  [PIOTR, 21.09: "higher capability, higher use of the machines, more money"; the steps TUNE].
+ *  The row whose `from` is the highest at or under the reputation is the one drawn from. */
+export interface ContractQuantityBand {
+  from: number;
+  min: number;
+  max: number;
+}
+export const CONTRACT_QUANTITY_BANDS: readonly ContractQuantityBand[] = [
+  { from: REPUTATION_MIN, min: 20, max: 40 },
+  { from: 20, min: 30, max: 60 },
+  { from: 40, min: 40, max: 80 },
+  { from: 60, min: 60, max: 100 },
 ];
 
 /** The owner minutes one piece of the quantity band stands for: the band of Turn 13 is 20 to 40
@@ -3943,11 +3946,9 @@ export const CONTRACT_FREE_END_DAYS = DAYS_PER_MONTH;
  *  the board at a time, and an offer stands for this many days [TUNE]. */
 export const CONTRACT_MIN_TIER = 1;
 export const CONTRACT_OFFER_DAYS = 5;
-/** A term of three to six months (PIOTR), and a quantity a week in this band [TUNE]. */
+/** A term of three to six months (PIOTR). The quantity a week is `CONTRACT_QUANTITY_BANDS`. */
 export const CONTRACT_TERM_MONTHS_MIN = 3;
 export const CONTRACT_TERM_MONTHS_MAX = 6;
-export const CONTRACT_QUANTITY_PER_WEEK_MIN = 20;
-export const CONTRACT_QUANTITY_PER_WEEK_MAX = 40;
 /** A short week is a point of reputation [TUNE]; at the end of the term every full week raises the
  *  offered price by this much and every short week lowers it by this much [TUNE]. */
 export const CONTRACT_SHORT_WEEK_REPUTATION = 1;
@@ -4094,7 +4095,7 @@ export const TIPS: Record<string, string> = {
   finance: 'A loan costs what it costs: sixty instalments and the interest on what is left.',
   insurance: 'You can go without, but an accident then costs what an accident costs.',
   security: 'A firm takes the risk to zero. That is what fixed costs feel like.',
-  contracts: 'Repeat work, low margin, steady money. Only people are assigned to it.',
+  contracts: 'Repeat work, steady money: what a day of it leaves depends on the man and the machine you put on it.',
   website: 'People buy with their eyes. Levels 1 to 3 change the enquiries; 4 and 5 add a little standing.',
   house: 'What you pay yourself every day is the house you sleep in.',
   team: 'The floor limits the crew: one person per so many square metres of free hall.',

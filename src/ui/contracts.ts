@@ -92,8 +92,9 @@ function pieceLine(contract: Contract): string {
 function resultLine(state: GameState, contract: Contract, worker: Worker): string {
   const result = contractResultFor(state, contract, worker);
   return (
-    `${result.minutes} minutes a piece, ${money(result.labourCost)} of his time: ` +
-    `${signedMoney(result.margin)} a piece`
+    `${result.minutes} minutes a piece, ${money(result.labourCost)} of his time` +
+    `${result.wear > 0 ? ` and ${money(result.wear)} of wear` : ''}: ` +
+    `${signedMoney(result.margin)} a piece, ${signedMoney(result.dayResult)} a day`
   );
 }
 
@@ -205,6 +206,7 @@ function endedBlock(state: GameState, contract: Contract): string {
     figureRow('Revenue', report.revenue) +
     figureRow('Material', -report.material) +
     figureRow(`Labour, ${report.labourHours} hours at cost`, -report.labourCost) +
+    figureRow('Machine wear over those hours', -report.machineWear) +
     figureRow('Net margin', report.margin) +
     `<p class="figures">${fullWeeksOf(contract)} full weeks, ${shortWeeksOf(contract)} short. ` +
     `The client offers <strong>${money(offered)} a piece</strong> for another term of ` +
@@ -219,8 +221,9 @@ function endedBlock(state: GameState, contract: Contract): string {
 
 export function renderContracts(state: GameState): string {
   const head =
-    '<p class="hint">Repeat work at a low margin: so many pieces a week for a term, at a price a ' +
-    'piece. Only people are put on it; the machines stay in the general queue.</p>';
+    '<p class="hint">Repeat work: so many pieces a week for a term, at a price a piece. What a ' +
+    'day of it leaves depends on the man and the machine you put on it, wages and wear taken off. ' +
+    'Only people are put on it; the machines stay in the general queue.</p>';
   const offer = offeredContract(state);
   const active = activeContracts(state);
   const ended = endedContracts(state);
@@ -466,12 +469,19 @@ function offerCard(state: GameState, contract: Contract, picked: string | null):
     countRow('Price a piece', money(contract.pricePerPiece)) +
     figureRow('Material a piece, from stock', -result.material) +
     figureRow(`${name === 'You' ? 'Your' : `${name}'s`} labour a piece, ${minutes(result.minutes)}`, -result.labourCost) +
+    // The service those minutes cost the machine he stands at, a tenth of its price every
+    // service interval: the line the typed prices of v28 to v39 forgot (PIOTR, 21.09; v40).
+    figureRow(
+      result.machineName === '' ? 'Machine wear a piece, by hand' : `Machine wear a piece, ${result.machineName.toLowerCase()}`,
+      -result.wear,
+    ) +
     figureRow('Margin a piece', result.margin) +
     countRow(
       `Pieces ${name} makes in a day`,
       `${result.piecesPerDay} of the ${result.piecesNeededPerDay} needed`,
       result.piecesPerDay >= result.piecesNeededPerDay ? 'good' : 'bad',
     ) +
+    figureRow(`A day of ${name === 'You' ? 'your' : `${name}'s`} pieces, after wages and wear`, result.dayResult) +
     countRow('Days a week on it', plural(result.daysPerWeek, 'day', 'days')) +
     figureRow(
       `The week: ${result.piecesPerWeek} pieces, ${plural(result.daysPerWeek, 'day', 'days')} of wages already counted`,

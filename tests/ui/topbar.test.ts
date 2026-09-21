@@ -337,6 +337,7 @@ describe('the plate at the top of the day end summary', () => {
       paidHours: 0,
       expressUplift: 0,
       hallFactor: 1,
+      outputToday: 1,
     });
     expect(html).toContain(`${formatCalendarDay(3)} done`);
     expect(html).toContain('370 of 480 min · overtime 0');

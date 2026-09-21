@@ -790,6 +790,25 @@ export function hallProductivityFactor(state: GameState): number {
   return outputBreakdown(state).total;
 }
 
+/** Books one production minute's multiplier for the workshop's average output (v40): the jobs
+ *  and the contracts both call it, once a man minute, with the same four things the minute's
+ *  labour was made of. `workMinutes` is counted where the labour lands, so the two halves of the
+ *  average are booked on the same minute. */
+export function bookOutputMinute(state: GameState, multiplier: number): void {
+  state.dayStats.outputWorth = Math.round((state.dayStats.outputWorth + multiplier) * 10000) / 10000;
+}
+
+/** The workshop's average output today: what a minute of production has been worth on average,
+ *  the hall, every man, his manager, the owner's absence and the class of machine at his stage,
+ *  weighted by the minutes worked. Before the first minute of the day it is the hall's own
+ *  factor, which is what a minute of a man at 1.0 would get (PIOTR, 21.09: one Output number,
+ *  not two; v40). */
+export function workshopOutputToday(state: GameState): number {
+  const minutes = state.dayStats.workMinutes;
+  if (minutes <= 0) return hallProductivityFactor(state);
+  return Math.round((state.dayStats.outputWorth / minutes) * 100) / 100;
+}
+
 /** What the classes of machine in the hall do to the speed of a job of this material: the best
  *  one of each family, multiplied together. Above 1 is quicker (CLAUDE.md T3 3.5). Two saws do
  *  not make the work twice as fast: only the better of them is used. */
@@ -915,6 +934,35 @@ export function machinesDueService(state: GameState): Equipment[] {
  *  here and every test reads the constant and never the figure. */
 export function serviceCostFor(item: Equipment): number {
   return Math.round(item.purchasePrice * SERVICE_COST_FRACTION * 100) / 100;
+}
+
+/** What a minute of a machine's running costs in service: a tenth of its price every
+ *  `SERVICE_INTERVAL_HOURS`, spread over those hours. A standard saw at 7,000 is 8.75 an hour,
+ *  a used one at 1,800 is 2.25. The one figure a contract's card and its closing report call
+ *  the machine's wear; the class's own price is read when the machine is not stood in the hall
+ *  yet, and the price paid when it is (PIOTR, 21.09; v40). */
+export function wearPerMinuteOf(price: number): number {
+  return (price * SERVICE_COST_FRACTION) / (SERVICE_INTERVAL_HOURS * 60);
+}
+
+export function machineWearPerMinute(item: Equipment): number {
+  return isServiced(item.specId) ? wearPerMinuteOf(item.purchasePrice) : 0;
+}
+
+/** The best class of this family standing in the hall, as a machine: the one whose class the
+ *  projection of a piece's minutes is worked out on. Null when the workshop owns none. */
+export function bestMachineOf(state: GameState, specId: string): Equipment | null {
+  let best: Equipment | null = null;
+  let factor = 0;
+  for (const item of owned(state, specId)) {
+    if (isSold(item)) continue;
+    const own = outputFactorOf(state, item);
+    if (own > factor) {
+      factor = own;
+      best = item;
+    }
+  }
+  return best;
 }
 
 /** The life the machine left the shop with, before any service was called on it. */
@@ -1237,9 +1285,26 @@ export function startMachineMeters(state: GameState): void {
     monthOfDay(before.day) !== monthOfDay(last.day);
   if (!freshWeek && !freshMonth) return;
   for (const item of state.equipment) {
-    if (freshWeek) item.hoursThisWeek = 0;
+    if (freshWeek) {
+      // What last week's hours saved at the class the machine has this morning, written down
+      // before the week clock starts again, so the Machines sheet can say last week beside
+      // this week (PIOTR, 21.09; v40). The class is read now, not then: a gate fitted over the
+      // weekend counts its week from Monday, which is one reading and not two.
+      item.minutesSavedLastWeek = minutesSavedBy(state, item, item.hoursThisWeek);
+      item.hoursThisWeek = 0;
+    }
     if (freshMonth) item.hoursThisMonth = 0;
   }
+}
+
+/** The minutes this machine's class saved over so many hours at it: the effect of its class, the
+ *  gate's two per cent in it, times the minutes it ran. The one arithmetic the week, the month
+ *  and last week are all read through (CLAUDE.md T17 2.24; v40). */
+export function minutesSavedBy(state: GameState, item: Equipment, hours: number): number {
+  const spec = findSpec(item.specId);
+  if (!spec || spec.category !== 'machine') return 0;
+  const effect = roundPoints(outputFactorOf(state, item) - 1);
+  return Math.round(hours * 60 * effect);
 }
 
 export interface MachineSaving {
@@ -1265,6 +1330,9 @@ export interface MachineSavings {
   hours: number;
   minutesSaved: number;
   hoursSaved: number;
+  /** What the same machines saved last week, in hours, off what each wrote down on the Monday
+   *  (v40). Only the week span carries it; the month's is 0. */
+  hoursSavedLastWeek: number;
 }
 
 /** What is wrong with this machine this minute: it cannot run on the air it is given, the
@@ -1295,13 +1363,15 @@ export function machineSavings(state: GameState, span: 'week' | 'month'): Machin
   const rows: MachineSaving[] = [];
   let hours = 0;
   let minutesSaved = 0;
+  let minutesSavedLastWeek = 0;
   for (const item of state.equipment) {
     if (isSold(item) || !itemStandsInTheHall(item)) continue;
     const spec = findSpec(item.specId);
     if (!spec || spec.category !== 'machine') continue;
     const effect = roundPoints(outputFactorOf(state, item) - 1);
     const ran = span === 'week' ? item.hoursThisWeek : item.hoursThisMonth;
-    const saved = Math.round(ran * 60 * effect);
+    const saved = minutesSavedBy(state, item, ran);
+    if (span === 'week') minutesSavedLastWeek += item.minutesSavedLastWeek;
     const wrong = machineMinus(state, item, air);
     rows.push({
       id: item.id,
@@ -1323,5 +1393,6 @@ export function machineSavings(state: GameState, span: 'week' | 'month'): Machin
     hours: Math.round(hours * 10) / 10,
     minutesSaved,
     hoursSaved: Math.round((minutesSaved / 60) * 10) / 10,
+    hoursSavedLastWeek: Math.round((minutesSavedLastWeek / 60) * 10) / 10,
   };
 }

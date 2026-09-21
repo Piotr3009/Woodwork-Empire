@@ -2774,6 +2774,23 @@ input.num {
   line-height: 1;
 }
 
+/* The workshop's average today under the hall's own number, one small line (v40). */
+.ledger-note {
+  align-items: baseline;
+  color: var(--sheet-dim);
+  display: flex;
+  flex: none;
+  font-size: var(--fs-small);
+  gap: 12px;
+  justify-content: space-between;
+  margin: -4px 0 8px;
+}
+
+.ledger-note strong {
+  font-size: var(--fs-lead);
+  font-variant-numeric: tabular-nums;
+}
+
 .ledger-head {
   color: var(--sheet-dim);
   display: flex;

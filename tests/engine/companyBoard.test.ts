@@ -11,7 +11,7 @@ import {
   UNDER_EXTRACTION_OUTPUT_PENALTY,
 } from '../../src/engine/constants';
 import { monthOfDay } from '../../src/engine/clock';
-import { hallProductivityFactor, machineSavings, outputBreakdown } from '../../src/engine/machines';
+import { hallProductivityFactor, machineSavings, minutesSavedBy, outputBreakdown } from '../../src/engine/machines';
 import { applyRating, changeReputation } from '../../src/engine/reputation';
 import { tick } from '../../src/engine/index';
 import type { GameState } from '../../src/engine/index';
@@ -220,6 +220,17 @@ describe('the Machines column (CLAUDE.md T17 2.24)', () => {
     };
     expect(saw(worked.state).hoursThisWeek).toBe(0);
     expect(saw(worked.state).hoursUsed).toBeGreaterThan(0);
+    // And what the week that has gone saved is written down on the Monday, at the class the saw
+    // has that morning, so the sheet can say last week beside this week (PIOTR, 21.09; v40).
+    expect(saw(friday).minutesSavedLastWeek).toBe(0);
+    // The game opened on that Monday, so the saw's whole life is that one week's hours.
+    const monday = saw(worked.state);
+    expect(monday.minutesSavedLastWeek).toBe(minutesSavedBy(worked.state, monday, monday.hoursUsed));
+    expect(saw(worked.state).minutesSavedLastWeek).toBeGreaterThan(0);
+    expect(machineSavings(worked.state, 'week').hoursSavedLastWeek).toBe(
+      Math.round((saw(worked.state).minutesSavedLastWeek / 60) * 10) / 10,
+    );
+    expect(machineSavings(worked.state, 'month').hoursSavedLastWeek).toBe(0);
     // The month: the first working day of month 2 still carries month 1, so the month end has
     // the month it reports on; the day after that starts the new one.
     const openingMonth2 = runToDay(atTheSaw(), 31).state;

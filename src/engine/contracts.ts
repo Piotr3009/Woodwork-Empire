@@ -6,11 +6,13 @@
 // renegotiates from the delivery history and the player renews or lets it go.
 
 import {
+  CONTRACT_MARGIN_PER_DAY,
   CONTRACT_MIN_TIER,
   CONTRACT_OFFER_DAYS,
   CONTRACT_PIECES,
-  CONTRACT_QUANTITY_PER_WEEK_MAX,
-  CONTRACT_QUANTITY_PER_WEEK_MIN,
+  CONTRACT_QUANTITY_BANDS,
+  CONTRACT_REFERENCE_CLASS,
+  CONTRACT_REFERENCE_TIER,
   CONTRACT_RENEW_FULL_WEEK,
   CONTRACT_RENEW_SHORT_WEEK,
   CONTRACT_SHORT_WEEKS_ALLOWED,
@@ -27,8 +29,12 @@ import {
   CONTRACT_QUANTITY_MINUTES,
   CONTRACT_CLIENTS,
   CONTRACT_FREE_END_DAYS,
+  ANSWER_MAX,
+  ANSWER_MIN,
+  WORKER_RATES,
 } from './constants';
-import type { ContractPieceSpec } from './constants';
+import type { ContractPieceSpec, ContractQuantityBand } from './constants';
+import { answerSkew, skewed } from './board';
 import { isBreak, isWorkingDay, weekOfDay, weekday, workedMinutesOfDay } from './clock';
 import { plural } from './text';
 import { charge, formatMoney } from './economy';
@@ -39,22 +45,26 @@ import {
   OWNER,
   accumulateMachineMinute,
   bagsFull,
+  bestMachineOf,
+  bookOutputMinute,
   claimMachine,
   findSpec,
   hallProductivityFactor,
   has,
   machineIsShared,
+  machineWearPerMinute,
   releaseMachines,
   variantFor,
+  wearPerMinuteOf,
 } from './machines';
 import { ownerDrawPerDay, staffOutputFactor } from './owner';
-import { changeReputation, reputationTier } from './reputation';
-import { chance, int, pick } from './rng';
+import { changeReputation, effectiveReputation, reputationTier } from './reputation';
+import { chance, float, int, pick } from './rng';
 import type { RngCarrier } from './rng';
 import { crewHasGoneHome, isWorkingToday, joiners } from './staff';
 import { STATION_BENCH, machineStation, waitingStation } from './stations';
 import { cncOptions, familyForStage, jobOnCnc, stageSpeed } from './stages';
-import type { Contract, ContractWeek, GameState, Job, StageId, Worker } from './types';
+import type { Contract, ContractWeek, Equipment, GameState, Job, StageId, Worker } from './types';
 
 /** What a man on a contract carries in `jobId`, so the jobs leave him alone: not available for
  *  a job, not at one, and not a job the plan could find (CLAUDE.md T13 3.16). */
@@ -107,10 +117,8 @@ export function contractPiece(contract: Contract): ContractPieceSpec {
     name: contract.pieceId,
     stages: ['cutting'],
     minutes: 45,
-    price: 0,
     material: 0,
     sheets: 0,
-    labour: 0,
   };
 }
 
@@ -185,6 +193,79 @@ export function quantityForPiece(piece: ContractPieceSpec, wanted: number): numb
 }
 
 // ---------------------------------------------------------------------------
+// The price (PIOTR, 21.09; v40): worked out from what a day on the contract is to leave at the
+// entry point, never typed. A contract is like a job: the client's price is what it is, and how
+// much of it the workshop keeps depends on the man and the machine it puts on it.
+// ---------------------------------------------------------------------------
+
+/** The band the client's quantity is drawn from at this standing: the row with the highest
+ *  `from` at or under the reputation (CLAUDE.md v40). */
+export function contractQuantityBand(reputation: number): ContractQuantityBand {
+  let band = CONTRACT_QUANTITY_BANDS[0] ?? { from: 0, min: 20, max: 40 };
+  for (const row of CONTRACT_QUANTITY_BANDS) {
+    if (reputation >= row.from && row.from >= band.from) band = row;
+  }
+  return band;
+}
+
+/** The family the piece is done on: its first stage's machine, the way `runContractMinute` works
+ *  the whole piece at that stage (the other stages of a piece are parked, CLAUDE.md T23 8). */
+function pieceFamily(piece: ContractPieceSpec): string | null {
+  const first = piece.stages[0] ?? 'cutting';
+  return familyForStage(stagedJob(0, 'sheet', false), first);
+}
+
+/** The entry point the price is set at: the man of `CONTRACT_REFERENCE_TIER` on the
+ *  `CONTRACT_REFERENCE_CLASS` of the piece's own machine, with his minutes, his wages, and the
+ *  service that class costs over those minutes. A piece with no machine (a stage done by hand)
+ *  costs the by hand speed and no wear. */
+export interface ContractReference {
+  minutes: number;
+  labourCost: number;
+  wear: number;
+  piecesPerDay: number;
+}
+
+export function contractReferenceFor(piece: ContractPieceSpec): ContractReference {
+  const rate = WORKER_RATES[CONTRACT_REFERENCE_TIER];
+  const middling = HIRING_SPECS.find(
+    (spec) => spec.role === 'joiner' && spec.tier === CONTRACT_REFERENCE_TIER,
+  );
+  const family = pieceFamily(piece);
+  const spec = family === null ? undefined : findSpec(family);
+  const standard = spec?.variants.find((variant) => variant.id === CONTRACT_REFERENCE_CLASS);
+  const speed = standard?.outputFactor ?? 1;
+  const minutes = Math.max(1, Math.round(piece.minutes / (rate * (speed > 0 ? speed : 1))));
+  const labourCost = pence(minutes * workerMinuteCost(middling?.monthlyWage ?? 0));
+  const wear = pence(minutes * (standard === undefined ? 0 : wearPerMinuteOf(standard.price)));
+  return {
+    minutes,
+    labourCost,
+    wear,
+    piecesPerDay: Math.max(1, Math.floor(MINUTES_PER_WORKING_DAY / minutes)),
+  };
+}
+
+/** What the client pays a piece: the material in it, the entry man's wages over it, the wear of
+ *  the entry machine over it, and the day's margin spread over the pieces that man makes in a
+ *  day, to the pound (PIOTR, 21.09: about 200 a day at the entry point, more with a better man or
+ *  a better machine, less with worse). One figure a piece for every offer, before the client's
+ *  own answer moves it (`drawContract`). */
+export function contractPriceFor(piece: ContractPieceSpec): number {
+  const reference = contractReferenceFor(piece);
+  return Math.round(
+    piece.material + reference.labourCost + reference.wear + CONTRACT_MARGIN_PER_DAY / reference.piecesPerDay,
+  );
+}
+
+/** The labour value in a piece of this contract: what the workshop earned by making it over the
+ *  material in it, which is what the workshop rate counts (CLAUDE.md T17 2.26). Read off the
+ *  contract's own price, so a contract the client priced high earns more an hour. */
+export function contractLabourValue(contract: Contract): number {
+  return pence(Math.max(0, contract.pricePerPiece - contractPiece(contract).material));
+}
+
+// ---------------------------------------------------------------------------
 // The material (PIOTR, 17.09; CLAUDE.md T17 2.22): a contract's sheets come off the rack the way
 // a job's do, held while the week runs and drawn as the pieces are made. Nothing is bought on the
 // contract line any more.
@@ -252,6 +333,11 @@ export interface ContractResult {
   labourCost: number;
   /** The material in one piece, off the piece's own table. */
   material: number;
+  /** The service his minutes at the machine cost, at the class he would get: a tenth of its price
+   *  every `SERVICE_INTERVAL_HOURS` (v40). Nothing when the piece is made by hand. */
+  wear: number;
+  /** The class he would stand at, for the card's line; empty by hand. */
+  machineName: string;
   margin: number;
   /** Pieces he makes in a working day, whole, the lunch break out. */
   piecesPerDay: number;
@@ -263,6 +349,8 @@ export interface ContractResult {
   freeMinutes: number;
   /** Pieces the week comes to with him on it: what the client wants, or what he can make. */
   piecesPerWeek: number;
+  /** A day of his pieces: what they leave after his wages and the machine's wear (v40). */
+  dayResult: number;
   /** The week's result: his pieces times his margin, his own wages already taken off in it. */
   weekResult: number;
   termResult: number;
@@ -315,20 +403,35 @@ function resultAtSpeed(
   contract: Contract,
   worker: Worker | null,
   speed: number,
+  /** The machine the speed belongs to when it is not one the hall has: its wear a minute and its
+   *  name, for the tip that costs a machine before it is bought (v40). */
+  candidate: { wearPerMinute: number; name: string } | null = null,
 ): ContractResult {
   const piece = contractPiece(contract);
   const rate = worker === null ? OWNER_RATE : worker.rate > 0 ? worker.rate : 1;
   // His minutes over a piece, which is what the day is counted in: never less than one.
   const minutes = Math.max(1, Math.round(piece.minutes / (rate * (speed > 0 ? speed : 1))));
   const labourCost = pence(minutes * contractMinuteCost(state, worker));
-  const margin = pence(contract.pricePerPiece - piece.material - labourCost);
+  const machine = candidate === null ? pieceMachine(state, worker === null ? OWNER : worker.id, piece) : null;
+  const wearPerMinute =
+    candidate !== null ? candidate.wearPerMinute : machine === null ? 0 : machineWearPerMinute(machine);
+  const wear = pence(minutes * wearPerMinute);
+  const margin = pence(contract.pricePerPiece - piece.material - labourCost - wear);
   const piecesPerDay = Math.floor(MINUTES_PER_WORKING_DAY / minutes);
   const piecesPerWeek = Math.min(contract.quantityPerWeek, piecesPerDay * WORKING_DAYS_PER_WEEK);
   return {
     minutes,
     labourCost,
     material: piece.material,
+    wear,
+    machineName:
+      candidate !== null
+        ? candidate.name
+        : machine === null
+          ? ''
+          : (variantFor(machine)?.name ?? findSpec(machine.specId)?.name ?? ''),
     margin,
+    dayResult: pence(piecesPerDay * margin),
     piecesPerDay,
     piecesNeededPerDay: Math.ceil(contract.quantityPerWeek / WORKING_DAYS_PER_WEEK),
     daysPerWeek:
@@ -392,12 +495,14 @@ export function contractMachineTip(
   for (const specId of candidates) {
     const spec = findSpec(specId);
     if (!spec) continue;
-    // The class the catalogue offers first is the one he would buy.
-    const speed =
-      specId === 'cnc'
-        ? stageSpeed(state, staged, 'cnc').speed
-        : (spec.variants[0]?.outputFactor ?? 1);
-    const withIt = resultAtSpeed(state, contract, worker, speed);
+    // The class the catalogue offers first is the one he would buy, and its wear comes with it,
+    // so the tip does not promise a saw's minutes at a used saw's service bill (v40).
+    const first = spec.variants[0];
+    const speed = specId === 'cnc' ? stageSpeed(state, staged, 'cnc').speed : (first?.outputFactor ?? 1);
+    const withIt = resultAtSpeed(state, contract, worker, speed, {
+      wearPerMinute: first === undefined ? 0 : wearPerMinuteOf(first.price),
+      name: first?.name ?? spec.name,
+    });
     const weekGain = pence(withIt.weekResult - now.weekResult);
     if (weekGain <= 0) continue;
     if (best === null || weekGain > best.weekGain) {
@@ -454,14 +559,24 @@ export function drawContract(state: GameState, carrier: RngCarrier = state): Con
   // piece it was written for, and turned into pieces of the one that was drawn, so a contract for
   // three day pieces wants one a week (CLAUDE.md T17 2.22). The draw itself is unchanged, so the
   // stream is the same shape it was.
+  const band = contractQuantityBand(effectiveReputation(state));
   const wanted =
     int(
       carrier,
-      Math.ceil(CONTRACT_QUANTITY_PER_WEEK_MIN / CONTRACT_QUANTITY_STEP),
-      Math.floor(CONTRACT_QUANTITY_PER_WEEK_MAX / CONTRACT_QUANTITY_STEP),
+      Math.ceil(band.min / CONTRACT_QUANTITY_STEP),
+      Math.floor(band.max / CONTRACT_QUANTITY_STEP),
     ) * CONTRACT_QUANTITY_STEP;
   const quantityPerWeek = quantityForPiece(piece, wanted);
   const months = int(carrier, CONTRACT_TERM_MONTHS_MIN, CONTRACT_TERM_MONTHS_MAX);
+  // The client's own answer on the price, the way a job's client answers a budget: a factor in
+  // the one band, bent by the standing of the shop and the team, so a poor name is offered less
+  // and a good one more, and neither ever leaves the band (CLAUDE.md T13 3.24; v40). Drawn off a
+  // side stream seeded from the offer's own, so the piece, the client, the quantity and the term
+  // come off the carrier exactly as they always did, and a month that draws its contract off the
+  // main stream is not moved by a step (T13 2.1, the reason `offerCarrier` exists).
+  const side: RngCarrier = { rng: (carrier.rng ^ 0x5bd1e995) | 0 };
+  const answer = ANSWER_MIN + (ANSWER_MAX - ANSWER_MIN) * skewed(float(side, 0, 1), answerSkew(state));
+  const pricePerPiece = Math.max(1, Math.round(contractPriceFor(piece) * answer));
   return {
     // Named by the day it was offered, one offer a day at most: the id counter is left alone, so
     // the ids of the jobs and the events read the same with and without an offer on the board.
@@ -470,7 +585,7 @@ export function drawContract(state: GameState, carrier: RngCarrier = state): Con
     pieceId: piece.id,
     quantityPerWeek,
     termWeeks: termWeeksFor(months),
-    pricePerPiece: piece.price,
+    pricePerPiece,
     status: 'offered',
     offeredDay: state.clock.day,
     expiresOnDay: state.clock.day + CONTRACT_OFFER_DAYS - 1,
@@ -658,6 +773,16 @@ function pieceStage(state: GameState, who: string, piece: ContractPieceSpec): { 
   return { stage, family: familyForStage(staged, stage) };
 }
 
+/** The machine this man's piece would be made on: the best CNC when he can have one, else the
+ *  best of the piece's own family in the hall, else nothing, by hand. The card's wear and the
+ *  closing report both read it, so what a piece is said to cost the machine is one reading. */
+function pieceMachine(state: GameState, who: string, piece: ContractPieceSpec): Equipment | null {
+  const { stage, family } = pieceStage(state, who, piece);
+  if (stage === 'cnc') return bestMachineOf(state, 'cnc');
+  if (family === null || !has(state, family) || machineIsShared(state, family)) return null;
+  return bestMachineOf(state, family);
+}
+
 /** Where a man on a contract stands, for the hall: at the machine of his stage, waiting at it,
  *  or at his bench. Null for a man on no contract. */
 export function contractStationFor(state: GameState, worker: Worker): string | null {
@@ -692,7 +817,8 @@ function finishPiece(state: GameState, contract: Contract, piece: ContractPieceS
   // What the workshop earned by making it, which is what the rate counts: the piece's own labour
   // and not its margin, so the day's labour value means one thing whatever produced it
   // (CLAUDE.md T17 2.26).
-  state.dayStats.labourValue = Math.round((state.dayStats.labourValue + piece.labour) * 10000) / 10000;
+  state.dayStats.labourValue =
+    Math.round((state.dayStats.labourValue + contractLabourValue(contract)) * 10000) / 10000;
   return true;
 }
 
@@ -776,6 +902,7 @@ export function runContractMinute(state: GameState): ContractMinute {
       contract.labourMinutes += 1;
       worker.productionMinutes += 1;
       state.dayStats.workMinutes += 1;
+      bookOutputMinute(state, worth);
       result.worked += away;
       if (machineId !== null) used.set(machineId, (used.get(machineId) ?? 0) + 1);
       while (contract.pieceMinutes >= piece.minutes) {
@@ -834,6 +961,9 @@ export interface ClosingReport {
   labourHours: number;
   /** The hours at what a joiner's minute costs, the job card's own figure. */
   labourCost: number;
+  /** The same hours at the wear of the machine the piece is made on now, the card's own reading
+   *  (v40). */
+  machineWear: number;
   margin: number;
 }
 
@@ -854,6 +984,8 @@ function labourMinuteCost(state: GameState): number {
 /** The closing report: pieces made, revenue, material, labour hours at cost, the net margin. */
 export function closingReport(state: GameState, contract: Contract): ClosingReport {
   const labourCost = pence(contract.labourMinutes * labourMinuteCost(state));
+  const machine = pieceMachine(state, OWNER, contractPiece(contract));
+  const machineWear = pence(contract.labourMinutes * (machine === null ? 0 : machineWearPerMinute(machine)));
   return {
     pieces: contract.piecesMade,
     revenue: pence(contract.revenue),
@@ -861,7 +993,8 @@ export function closingReport(state: GameState, contract: Contract): ClosingRepo
     labourMinutes: contract.labourMinutes,
     labourHours: Math.round((contract.labourMinutes / 60) * 10) / 10,
     labourCost,
-    margin: pence(contract.revenue - contract.materialCost - labourCost),
+    machineWear,
+    margin: pence(contract.revenue - contract.materialCost - labourCost - machineWear),
   };
 }
 
@@ -883,6 +1016,7 @@ function closingBody(state: GameState, contract: Contract): string {
     `${contract.name}: ${endedLine(contract)}. ${report.pieces} pieces made, ` +
     `${formatMoney(report.revenue)} of revenue, ${formatMoney(report.material)} of material, ` +
     `${report.labourHours} hours of labour at cost ${formatMoney(report.labourCost)}, ` +
+    `${formatMoney(report.machineWear)} of machine wear, ` +
     `net margin ${formatMoney(report.margin)}. ${full} full weeks and ${short} short. ` +
     `The client offers ${formatMoney(contract.renegotiatedPrice ?? contract.pricePerPiece)} a piece ` +
     'for another term. Renew or let it go on the Contracts tab.'
@@ -926,6 +1060,7 @@ export function endContract(
       material: report.material,
       labourHours: report.labourHours,
       labourCost: report.labourCost,
+      machineWear: report.machineWear,
       margin: report.margin,
       offered: contract.renegotiatedPrice,
     },

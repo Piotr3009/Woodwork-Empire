@@ -6,7 +6,6 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import {
   BREAK_MINUTES,
-  CONTRACT_PIECES,
   DAY_END_MINUTE,
   JOINER_MONTHLY_WAGE,
   MINUTES_PER_WORKING_DAY,
@@ -15,6 +14,8 @@ import {
 import {
   acceptContract,
   assignContract,
+  contractPiece,
+  contractPriceFor,
   contractResultFor,
   drawContract,
   endContract,
@@ -90,7 +91,7 @@ function offered(state: GameState, quantityPerWeek = 40): Contract {
   const contract = drawContract(state);
   contract.pieceId = 'cutSheetPack';
   contract.name = 'Cut sheet packs for a shop';
-  contract.pricePerPiece = CONTRACT_PIECES.find((piece) => piece.id === 'cutSheetPack')?.price ?? 0;
+  contract.pricePerPiece = contractPriceFor(contractPiece(contract));
   contract.quantityPerWeek = quantityPerWeek;
   state.contracts.push(contract);
   return contract;
@@ -107,7 +108,9 @@ describe('On offer, costed for the man who would do it (CLAUDE.md T20 2.1.1)', (
     const card = tab(state).querySelector(`.contract-offer[data-contract="${contract.id}"]`);
     expect(card).not.toBeNull();
     expect(card?.querySelector('h3')?.textContent).toBe(contract.name);
-    expect(card?.querySelector('.figures')?.textContent).toContain('40 a week, 13 weeks, £50 a piece, 45 min a piece by hand');
+    expect(card?.querySelector('.figures')?.textContent).toContain(
+      `40 a week, 13 weeks, ${money(contract.pricePerPiece)} a piece, 45 min a piece by hand`,
+    );
     // The owner and both joiners are offered, and the first joiner is the one it is worked out for.
     const chips = Array.from(card?.querySelectorAll('[data-do="pickContractMan"]') ?? []);
     expect(chips.map((chip) => chip.getAttribute('data-worker'))).toEqual(['owner', 'staff-1', 'staff-2']);
@@ -168,7 +171,10 @@ describe('On offer, costed for the man who would do it (CLAUDE.md T20 2.1.1)', (
 
   it('draws the next best man beside him for comparison, and names the machine that would help', () => {
     const state = hall();
-    offered(state);
+    // Eighty a week: at forty, Ben makes the client's whole week on the used saw already, and a
+    // CNC that makes more pieces the client will not take, at its own wear, gains nothing, so the
+    // tip is rightly silent (v40: a machine is costed with its service bill).
+    offered(state, 80);
     const days = tab(state).querySelectorAll('.contract-day');
     expect(days).toHaveLength(2);
     expect(days[1]?.textContent).toContain('for comparison');
@@ -176,6 +182,10 @@ describe('On offer, costed for the man who would do it (CLAUDE.md T20 2.1.1)', (
     const tip = tab(state).querySelector('.contract-tip')?.textContent ?? '';
     expect(tip).toContain('A CNC would take the piece to');
     expect(tip).toMatch(/\+£[0-9,]+ a week/);
+    // And at forty a week the tip says nothing, because nothing is gained.
+    const capped = hall();
+    offered(capped, 40);
+    expect(tab(capped).querySelector('.contract-tip')).toBeNull();
   });
 
   it('costs the owner as well, and says on his own row that he cannot be put on it', () => {

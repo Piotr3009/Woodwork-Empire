@@ -4,11 +4,12 @@
 
 import { describe, expect, it } from 'vitest';
 import {
+  ANSWER_MAX,
+  ANSWER_MIN,
   CONTRACT_OFFER_DAYS,
   CONTRACT_PIECES,
   JOINER_MONTHLY_WAGE,
-  CONTRACT_QUANTITY_PER_WEEK_MAX,
-  CONTRACT_QUANTITY_PER_WEEK_MIN,
+  CONTRACT_QUANTITY_BANDS,
   CONTRACT_RENEW_FULL_WEEK,
   CONTRACT_RENEW_SHORT_WEEK,
   CONTRACT_SHORT_WEEK_REPUTATION,
@@ -33,6 +34,7 @@ import {
   contractMen,
   contractPiece,
   contractPieceSpeed,
+  contractPriceFor,
   contractResultFor,
   contractShortfall,
   contractStationFor,
@@ -57,7 +59,7 @@ import {
 } from '../../src/engine/contracts';
 import { workerMinuteCost } from '../../src/engine/jobs';
 import { freeSheets, reservedSheets } from '../../src/engine/materials';
-import { hallProductivityFactor, variantFor } from '../../src/engine/machines';
+import { hallProductivityFactor, machineWearPerMinute, variantFor } from '../../src/engine/machines';
 import { staffOutputFactor } from '../../src/engine/owner';
 import type { Contract, GameState, Worker } from '../../src/engine/index';
 import {
@@ -167,13 +169,20 @@ describe('the offer', () => {
     expect(piece).toBeDefined();
     expect(contract.name).toContain(`${piece?.name ?? ''}s for `);
     // The client asks for a week's work: the band in cut sheet packs, converted to this piece.
+    // The band of the lowest standing, the one a young shop has (v40).
+    const band = CONTRACT_QUANTITY_BANDS[0];
+    if (band === undefined) throw new Error('no band');
     const packs = Math.round((contract.quantityPerWeek * (piece?.minutes ?? 45)) / CONTRACT_QUANTITY_MINUTES);
-    expect(packs).toBeGreaterThanOrEqual(CONTRACT_QUANTITY_PER_WEEK_MIN - CONTRACT_QUANTITY_STEP);
-    expect(packs).toBeLessThanOrEqual(CONTRACT_QUANTITY_PER_WEEK_MAX + CONTRACT_QUANTITY_STEP);
+    expect(packs).toBeGreaterThanOrEqual(band.min - CONTRACT_QUANTITY_STEP);
+    expect(packs).toBeLessThanOrEqual(band.max + CONTRACT_QUANTITY_STEP);
     expect(contract.quantityPerWeek).toBeGreaterThanOrEqual(1);
     expect(contract.termWeeks).toBeGreaterThanOrEqual(termWeeksFor(CONTRACT_TERM_MONTHS_MIN));
     expect(contract.termWeeks).toBeLessThanOrEqual(termWeeksFor(CONTRACT_TERM_MONTHS_MAX));
-    expect(contract.pricePerPiece).toBe(piece?.price);
+    // The price is the entry point's, moved by the client's answer inside its band (v40).
+    if (piece === undefined) throw new Error('no piece');
+    const asked = contractPriceFor(piece);
+    expect(contract.pricePerPiece).toBeGreaterThanOrEqual(Math.floor(asked * ANSWER_MIN));
+    expect(contract.pricePerPiece).toBeLessThanOrEqual(Math.ceil(asked * ANSWER_MAX));
     expect(contract.expiresOnDay).toBe(contract.offeredDay + CONTRACT_OFFER_DAYS - 1);
     // One on the board at a time: fifty more days bring no second one.
     for (let day = days + 1; day <= days + 50; day += 1) {
@@ -331,10 +340,10 @@ describe('the piece work', () => {
     expect(contract.piecesThisWeek).toBe(pieces);
     expect(contract.piecesMade).toBe(pieces);
     expect(contract.labourMinutes).toBe(200);
-    expect(contract.revenue).toBe(pieces * piece.price);
+    expect(contract.revenue).toBe(pieces * contract.pricePerPiece);
     expect(contract.materialCost).toBe(pieces * piece.material);
     // The cash is the pieces and nothing else: the material was on the rack (T17 2.22).
-    expect(state.cash).toBeCloseTo(cashBefore + pieces * piece.price, 6);
+    expect(state.cash).toBeCloseTo(cashBefore + pieces * contract.pricePerPiece, 6);
     expect(saw.takenBy).toBe('staff-1');
     expect(saw.hoursUsed).toBeCloseTo(200 / 60, 3);
     expect(state.workers[0]?.station).toBe('machine:tableSaw');
@@ -466,6 +475,12 @@ describe('the week and the term', () => {
     const report = closingReport(state, contract);
     const labourCost =
       Math.round(6000 * workerMinuteCost(JOINER_MONTHLY_WAGE.novice) * 100) / 100;
+    // The same minutes at the wear of the saw the piece is made on: the hall's used saw, a tenth
+    // of its price every service interval (v40).
+    const saw = state.equipment.find((item) => item.specId === 'tableSaw');
+    if (!saw) throw new Error('a saw is wanted');
+    const machineWear = Math.round(6000 * machineWearPerMinute(saw) * 100) / 100;
+    expect(machineWear).toBeGreaterThan(0);
     expect(report).toEqual({
       pieces: 100,
       revenue: 3800,
@@ -473,7 +488,8 @@ describe('the week and the term', () => {
       labourMinutes: 6000,
       labourHours: 100,
       labourCost,
-      margin: Math.round((3800 - 3000 - labourCost) * 100) / 100,
+      machineWear,
+      margin: Math.round((3800 - 3000 - labourCost - machineWear) * 100) / 100,
     });
   });
 
@@ -599,7 +615,7 @@ describe('the result with a man on it (CLAUDE.md T17 2.22)', () => {
     const piece = CONTRACT_PIECES.find((entry) => entry.id === 'cutSheetPack');
     if (piece === undefined) throw new Error('no cut sheet pack');
     contract.pieceId = piece.id;
-    contract.pricePerPiece = piece.price;
+    contract.pricePerPiece = contractPriceFor(piece);
     const green = state.workers[0] as Worker;
     const middling: Worker = {
       ...joiner('staff-2', 'Nick'),
@@ -633,7 +649,7 @@ describe('the result with a man on it (CLAUDE.md T17 2.22)', () => {
     empty.contracts.push(contract);
     expect(contractPieceSpeed(empty, green.id, piece)).toBeCloseTo(1 / 1.5, 4);
     expect(greenResult.margin).toBe(
-      Math.round((piece.price - piece.material - greenResult.labourCost) * 100) / 100,
+      Math.round((contract.pricePerPiece - piece.material - greenResult.labourCost - greenResult.wear) * 100) / 100,
     );
     // Piotr's four figures put the bottom two rungs of the wage ladder exactly on the speed
     // ladder: 1,950 over 0.6 and 2,600 over 0.8 are both 3,250 a point of speed, so the same piece
@@ -684,13 +700,13 @@ describe('the lengths of work the board offers (CLAUDE.md T17 2.22)', () => {
     const short = CONTRACT_PIECES.find((piece) => piece.id === 'drawerBox');
     const long = CONTRACT_PIECES.find((piece) => piece.id === 'wardrobeFront');
     expect(short?.minutes).toBe(60);
-    expect(short === undefined ? 0 : short.price - short.material).toBe(26);
     // The wardrobe front is four hours of work now and no longer three days (CLAUDE.md T20 2.2).
     expect(long?.minutes).toBe(240);
-    expect(long === undefined ? 0 : long.price - long.material).toBe(100);
-    // Every piece carries what the workshop earns by making it.
+    // No piece carries a price of its own any more: the price is the entry point's and the labour
+    // value is the contract's own price over its material (v40).
     for (const piece of CONTRACT_PIECES) {
-      expect(piece.labour).toBe(piece.price - piece.material);
+      expect('price' in piece).toBe(false);
+      expect('labour' in piece).toBe(false);
     }
     // What a piece takes off the rack is what it is costed at, every piece of the three: the two
     // readings of one piece of material can never part company again. The wardrobe front's sheets
@@ -717,7 +733,10 @@ describe('the lengths of work the board offers (CLAUDE.md T17 2.22)', () => {
       const contract = drawContract(state, offerCarrier(state));
       drawn.add(contract.pieceId);
       const piece = CONTRACT_PIECES.find((entry) => entry.id === contract.pieceId);
-      expect(contract.pricePerPiece).toBe(piece?.price);
+      if (piece === undefined) throw new Error('no piece');
+      // The entry point's price, moved by the client's answer and never out of its band (v40).
+      expect(contract.pricePerPiece).toBeGreaterThanOrEqual(Math.floor(contractPriceFor(piece) * ANSWER_MIN));
+      expect(contract.pricePerPiece).toBeLessThanOrEqual(Math.ceil(contractPriceFor(piece) * ANSWER_MAX));
     }
     expect(drawn.size).toBe(CONTRACT_PIECES.length);
   });

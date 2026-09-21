@@ -1,126 +1,201 @@
-// The prices that pay (PIOTR: "a contract is worse than a job, better than the wage, and rewards
-// machines"; CLAUDE.md T20 2.2). The three pieces are priced so that a piece made by hand lands
-// near 25 pounds an hour of margin, between the joiner's wage of about 14 an hour and the 40 a
-// job earns, and so that machines take it to 40 and beyond.
-//
-// The margin an hour by hand is the brief's own table, column by column: the price less the
-// material in the piece, over the hours the piece takes a man working at the owner's rate, which
-// is what "by hand" means. It is the gross the workshop makes an hour before the wage is taken
-// off it, which is why the band is above a joiner's 14 and below a job's 40.
+// The price of a piece is worked out, never typed (PIOTR, 21.09; v40). At the entry point, an
+// experienced joiner on the standard class of the piece's machine, a day of pieces leaves about
+// CONTRACT_MARGIN_PER_DAY after his wages and the machine's wear; a better man or a better machine
+// makes more pieces of the same price and keeps more, a worse one keeps less, the way a job goes.
+// Piotr's words: "not a fixed figure, the way a normal job goes: more skill, more use of the
+// machines, more money; but about 200 a day as the minimum, otherwise there is no point."
 
 import { describe, expect, it } from 'vitest';
 import {
+  ANSWER_MAX,
+  ANSWER_MIN,
+  CONTRACT_MARGIN_PER_DAY,
   CONTRACT_PIECES,
+  CONTRACT_QUANTITY_BANDS,
+  CONTRACT_REFERENCE_CLASS,
+  CONTRACT_REFERENCE_TIER,
+  HIRING_SPECS,
   MINUTES_PER_WORKING_DAY,
+  REPUTATION_MIN,
+  SERVICE_COST_FRACTION,
+  SERVICE_INTERVAL_HOURS,
   SHEET_VALUE,
   WORKER_RATES,
 } from '../../src/engine/constants';
-import { contractPiece, contractResultFor, drawContract } from '../../src/engine/contracts';
+import {
+  contractPiece,
+  contractPriceFor,
+  contractQuantityBand,
+  contractReferenceFor,
+  contractResultFor,
+  drawContract,
+  offerCarrier,
+} from '../../src/engine/contracts';
+import { findSpec, wearPerMinuteOf } from '../../src/engine/machines';
 import type { Contract, GameState, Worker } from '../../src/engine/index';
-import { buyStartingKit, newGame } from '../helpers';
-
-/** The band of CLAUDE.md T20 2.2 [TUNE: 22 to 30, the brief's own]. */
-const MARGIN_AN_HOUR_MIN = 22;
-const MARGIN_AN_HOUR_MAX = 30;
-
-function marginAnHour(piece: { price: number; material: number; minutes: number }): number {
-  return ((piece.price - piece.material) * 60) / piece.minutes;
-}
+import { newGame, placeEquipment, withExtraction } from '../helpers';
 
 function round(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
-describe('the prices that pay (CLAUDE.md T20 2.2)', () => {
-  it('lands every piece between 22 and 30 pounds an hour of margin by hand, and prints the three', () => {
+/** A hall with one saw of this class and enough extraction for it, and a cut sheet pack contract
+ *  at the entry point's price. */
+function hallWith(sawClass: string): { state: GameState; contract: Contract } {
+  const state = withExtraction(newGame({ difficulty: 'veryEasy' }));
+  placeEquipment(state, 'tableSaw', { variantId: sawClass, x: 8, y: 4 });
+  const contract = drawContract(state);
+  contract.pieceId = 'cutSheetPack';
+  contract.pricePerPiece = contractPriceFor(contractPiece(contract));
+  contract.quantityPerWeek = 200;
+  return { state, contract };
+}
+
+function joinerOf(tier: Exclude<Worker['tier'], null>): Worker {
+  const spec = HIRING_SPECS.find((entry) => entry.role === 'joiner' && entry.tier === tier);
+  if (spec === undefined) throw new Error(`no ${tier} joiner`);
+  return { id: `staff-${tier}`, rate: WORKER_RATES[tier], monthlyWage: spec.monthlyWage, tier } as Worker;
+}
+
+describe('the price a piece (v40)', () => {
+  it('carries no price in the table: the price is the entry point\'s, worked out', () => {
+    for (const piece of CONTRACT_PIECES) {
+      expect('price' in piece).toBe(false);
+      expect('labour' in piece).toBe(false);
+      expect(contractPriceFor(piece)).toBeGreaterThan(piece.material);
+      expect(Number.isInteger(contractPriceFor(piece))).toBe(true);
+    }
+  });
+
+  it('is the material, the entry man\'s wages, the entry machine\'s wear and the day\'s margin over his pieces', () => {
     const lines = CONTRACT_PIECES.map((piece) => {
-      const margin = piece.price - piece.material;
-      const perHour = marginAnHour(piece);
-      // The piece's own labour field is what the workshop earned by making it, and it is the
-      // margin by hand: the table is one set of figures and not two (CLAUDE.md T17 2.26).
-      expect(piece.labour).toBe(margin);
-      expect(perHour).toBeGreaterThanOrEqual(MARGIN_AN_HOUR_MIN);
-      expect(perHour).toBeLessThanOrEqual(MARGIN_AN_HOUR_MAX);
+      const reference = contractReferenceFor(piece);
+      const expected = Math.round(
+        piece.material + reference.labourCost + reference.wear + CONTRACT_MARGIN_PER_DAY / reference.piecesPerDay,
+      );
+      expect(contractPriceFor(piece)).toBe(expected);
+      expect(reference.piecesPerDay).toBe(Math.floor(MINUTES_PER_WORKING_DAY / reference.minutes));
       return (
-        `${piece.name}: ${piece.minutes} min by hand, £${piece.price} a piece, ` +
-        `£${piece.material} of material, £${margin} of margin, ` +
-        `£${round(perHour)} an hour`
+        `${piece.name}: ${reference.minutes} min at the entry point, £${piece.material} of material, ` +
+        `£${reference.labourCost} of wages, £${reference.wear} of wear, ${reference.piecesPerDay} a day: ` +
+        `£${contractPriceFor(piece)} a piece`
       );
     });
-    // Printed on one line apiece for REPORT-T20.md, the cross check of CLAUDE.md T20 7.
-    console.log(`MARGIN AN HOUR BY HAND\n${lines.join('\n')}`);
+    console.log(`THE PRICE A PIECE\n${lines.join('\n')}`);
     expect(lines).toHaveLength(3);
-    // The three figures themselves, so a price that moves has to move this test with it.
-    expect(round(marginAnHour(contractPiece({ pieceId: 'cutSheetPack' } as Contract)))).toBe(26.67);
-    expect(round(marginAnHour(contractPiece({ pieceId: 'drawerBox' } as Contract)))).toBe(26);
-    expect(round(marginAnHour(contractPiece({ pieceId: 'wardrobeFront' } as Contract)))).toBe(25);
+  });
+
+  it('reads the wear of a machine off the service rule: a tenth of its price every service interval', () => {
+    const saw = findSpec('tableSaw');
+    const standard = saw?.variants.find((variant) => variant.id === CONTRACT_REFERENCE_CLASS);
+    if (standard === undefined) throw new Error('no standard saw');
+    expect(wearPerMinuteOf(standard.price)).toBeCloseTo(
+      (standard.price * SERVICE_COST_FRACTION) / (SERVICE_INTERVAL_HOURS * 60),
+      9,
+    );
+    // The cut sheet pack's reference wear is that saw over the entry man's minutes.
+    const pack = contractPiece({ pieceId: 'cutSheetPack' } as Contract);
+    const reference = contractReferenceFor(pack);
+    expect(reference.wear).toBe(round(reference.minutes * wearPerMinuteOf(standard.price)));
+  });
+
+  it('leaves the entry man about the day\'s margin on the entry machine, and the ladder runs from a novice on a used saw to a master on an industrial one', () => {
+    const entry = hallWith(CONTRACT_REFERENCE_CLASS);
+    const entryMan = joinerOf(CONTRACT_REFERENCE_TIER);
+    const entryResult = contractResultFor(entry.state, entry.contract, entryMan);
+    // To the pound a piece: the price is rounded once, over the pieces of the day.
+    expect(Math.abs(entryResult.dayResult - CONTRACT_MARGIN_PER_DAY)).toBeLessThanOrEqual(entryResult.piecesPerDay);
+    expect(entryResult.wear).toBeGreaterThan(0);
+    expect(entryResult.machineName.toLowerCase()).toContain('standard');
+    const ladder: Array<[Exclude<Worker['tier'], null>, string]> = [
+      ['novice', 'used'],
+      ['experienced', 'standard'],
+      ['senior', 'pro'],
+      ['master', 'industrial'],
+    ];
+    const days = ladder.map(([tier, sawClass]) => {
+      const { state, contract } = hallWith(sawClass);
+      const result = contractResultFor(state, contract, joinerOf(tier));
+      return { tier, sawClass, day: result.dayResult, pieces: result.piecesPerDay, margin: result.margin };
+    });
+    console.log(
+      `A DAY OF CUT SHEET PACKS BY MAN AND SAW\n${days
+        .map((row) => `${row.tier} on a ${row.sawClass} saw: ${row.pieces} pieces at £${row.margin}, £${row.day} a day`)
+        .join('\n')}`,
+    );
+    // Every step up the ladder keeps more of the same price (PIOTR: "like a normal job").
+    for (let step = 1; step < days.length; step += 1) {
+      expect(days[step]?.day ?? 0).toBeGreaterThan(days[step - 1]?.day ?? 0);
+    }
+    // The bottom rung is under the entry point and the top well over it.
+    expect(days[0]?.day ?? 0).toBeLessThan(CONTRACT_MARGIN_PER_DAY);
+    expect(days[3]?.day ?? 0).toBeGreaterThan(CONTRACT_MARGIN_PER_DAY * 1.5);
+  });
+
+  it('asks for more pieces a week the better the workshop\'s name', () => {
+    const first = CONTRACT_QUANTITY_BANDS[0];
+    const last = CONTRACT_QUANTITY_BANDS[CONTRACT_QUANTITY_BANDS.length - 1];
+    if (first === undefined || last === undefined) throw new Error('no bands');
+    expect(contractQuantityBand(REPUTATION_MIN)).toEqual(first);
+    expect(contractQuantityBand(0)).toEqual(first);
+    expect(contractQuantityBand(last.from + 20)).toEqual(last);
+    let previous = 0;
+    for (const band of CONTRACT_QUANTITY_BANDS) {
+      expect(band.max).toBeGreaterThanOrEqual(band.min);
+      expect(band.min).toBeGreaterThanOrEqual(previous);
+      previous = band.min;
+      expect(contractQuantityBand(band.from)).toEqual(band);
+    }
+    // A shop with a name is asked for more: the draw with the high standing lands above the
+    // low band's ceiling on most days.
+    let above = 0;
+    for (let day = 1; day <= 60; day += 1) {
+      const state = newGame({ seed: day });
+      state.reputation = last.from + 10;
+      state.clock.day = day;
+      const contract = drawContract(state, offerCarrier(state));
+      if (contract.pieceId !== 'cutSheetPack') continue;
+      expect(contract.quantityPerWeek).toBeGreaterThanOrEqual(last.min);
+      expect(contract.quantityPerWeek).toBeLessThanOrEqual(last.max);
+      if (contract.quantityPerWeek > first.max) above += 1;
+    }
+    expect(above).toBeGreaterThan(0);
+  });
+
+  it('lets the client answer inside the one band, and a good name is offered more on average than a poor one', () => {
+    const pack = contractPiece({ pieceId: 'cutSheetPack' } as Contract);
+    const asked = contractPriceFor(pack);
+    const average = (reputation: number): number => {
+      let total = 0;
+      let count = 0;
+      for (let day = 1; day <= 120; day += 1) {
+        const state = newGame({ seed: 7 });
+        state.reputation = reputation;
+        state.clock.day = day;
+        const contract = drawContract(state, offerCarrier(state));
+        if (contract.pieceId !== 'cutSheetPack') continue;
+        expect(contract.pricePerPiece).toBeGreaterThanOrEqual(Math.floor(asked * ANSWER_MIN));
+        expect(contract.pricePerPiece).toBeLessThanOrEqual(Math.ceil(asked * ANSWER_MAX));
+        total += contract.pricePerPiece;
+        count += 1;
+      }
+      return count === 0 ? 0 : total / count;
+    };
+    const poor = average(REPUTATION_MIN);
+    const good = average(80);
+    console.log(`THE CLIENT'S ANSWER ON A PACK ASKED AT £${asked}: poor name £${round(poor)}, good name £${round(good)}`);
+    expect(good).toBeGreaterThan(poor);
   });
 
   it('costs every piece at the sheets it actually draws off the rack', () => {
-    // The table's own rule: material = sheets x SHEET_VALUE. The wardrobe front broke it, because
-    // 2.2 dropped its material to 60 and said the sheet count stays, so the card and the closing
-    // report costed it at 60 while the rack lost about 220 of stock a piece, and the Contracts
-    // tab, whose whole job is to say whether a contract pays before it is taken, reported the
-    // opposite sign on it. The sheets moved to 0.3 for it: the ONE deviation from the letter of
-    // 2.2 in this turn, and Piotr's to rule on (the note above CONTRACT_PIECES).
     for (const piece of CONTRACT_PIECES) {
       expect(Math.abs(piece.sheets * SHEET_VALUE - piece.material)).toBeLessThanOrEqual(1);
     }
-    console.log(
-      `WHAT A PIECE DRAWS OFF THE RACK\n${CONTRACT_PIECES.map(
-        (piece) =>
-          `${piece.name}: ${piece.sheets} of a sheet, £${round(piece.sheets * SHEET_VALUE)} of ` +
-          `stock, costed at £${piece.material}`,
-      ).join('\n')}`,
-    );
   });
 
   it('makes the wardrobe front four hours of work and not three days', () => {
     const front = contractPiece({ pieceId: 'wardrobeFront' } as Contract);
     expect(front.minutes).toBe(4 * 60);
     expect(front.minutes).toBeLessThan(MINUTES_PER_WORKING_DAY);
-    expect(front.minutes).toBeLessThan(3 * MINUTES_PER_WORKING_DAY);
-  });
-
-  it('leaves every tier under water by hand at these prices, and all four of them above it with one used saw', () => {
-    // The man's own result: the price less the material and less what his minutes cost, which is
-    // the margin the offer card puts on his row (CLAUDE.md T20 2.1.1). Piotr's four tier figures
-    // of tonight are a step slower than Turn 20's for nearly the same money (CLAUDE.md T21 2.9,
-    // 2.10), and that turns the by hand reading over: in an empty hall, where every piece is made
-    // at two thirds speed, a cut sheet pack at the T20 2.2 price of 50 against 30 of material
-    // costs more in a man's minutes than it pays, at every one of the four tiers. Turn 20's own
-    // measurement of this left the three lower tiers a thin line and the top man nothing.
-    // One used saw still puts all four well above water, so half of what T20 2.2 asked of the
-    // table holds and half of it does not: a contract pays well with machines and does not pay by
-    // hand [TUNE: the piece prices are Piotr's and this turn does not touch them, T21 6].
-    const tiers: Array<[Exclude<Worker['tier'], null>, number]> = [
-      ['novice', 1950],
-      ['experienced', 2600],
-      ['senior', 3500],
-      ['master', 4330],
-    ];
-    const packs = (state: GameState): Contract => {
-      const contract = drawContract(state);
-      contract.pieceId = 'cutSheetPack';
-      contract.pricePerPiece = 50;
-      contract.quantityPerWeek = 40;
-      return contract;
-    };
-    const byHand = newGame();
-    const hall = buyStartingKit(newGame({ difficulty: 'veryEasy' }));
-    const lines: string[] = [];
-    for (const [tier, monthly] of tiers) {
-      const worker = { id: `staff-${tier}`, rate: WORKER_RATES[tier], monthlyWage: monthly } as Worker;
-      const bare = contractResultFor(byHand, packs(byHand), worker);
-      const sawn = contractResultFor(hall, packs(hall), worker);
-      expect(bare.margin).toBeLessThan(0);
-      expect(sawn.margin).toBeGreaterThan(0);
-      expect(sawn.weekResult).toBeGreaterThan(0);
-      lines.push(
-        `${tier}: by hand ${bare.minutes} min a piece, margin £${bare.margin}; ` +
-          `with the used saw ${sawn.minutes} min, margin £${sawn.margin}`,
-      );
-    }
-    console.log(`A CUT SHEET PACK BY TIER\n${lines.join('\n')}`);
   });
 });

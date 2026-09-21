@@ -317,6 +317,7 @@ export function placeEquipment(
     inServiceUntilDay: null,
     hoursThisWeek: 0,
     hoursThisMonth: 0,
+    minutesSavedLastWeek: 0,
     enduranceHours: enduranceHoursFor(specId, variantId),
     hoursUsed: 0,
     takenBy: null,

@@ -499,8 +499,12 @@ describe('the Machines sheet (CLAUDE.md T17 2.24)', () => {
     expect(saw?.querySelector('small')?.textContent).toBe('ran 10 h at +5%');
     expect(saw?.querySelector('.ledger-points')?.textContent).toBe('+30 min');
     expect(saw?.querySelector('.ledger-points')?.className).toBe('ledger-points good');
-    // The figure at the top and the sentence at the bottom are the engine's own totals.
+    // The figure at the top and the sentence at the bottom are the engine's own totals, and last
+    // week's under the figure, the way the rate line says last week (PIOTR, 21.09; v40).
     expect(sheet?.querySelector('[data-figure="machines"]')?.textContent).toBe(`${savings.hoursSaved} h`);
+    expect(sheet?.querySelector('[data-figure="machinesLastWeek"] strong')?.textContent).toBe(
+      `${savings.hoursSavedLastWeek} h`,
+    );
     expect(sheet?.querySelector('[data-sum="total"]')?.textContent).toBe(
       `Machines saved us ${plural(savings.hoursSaved, 'hour', 'hours')} this week`,
     );

@@ -31,6 +31,7 @@ import {
   addDust,
   benchOf,
   benchPlaceAt,
+  bookOutputMinute,
   cabinetTools,
   claimMachine,
   countOf,
@@ -678,6 +679,9 @@ export function workMinute(
     // joiner is slower at it, and the sprayer is a pair of hands anywhere else (CLAUDE.md T19 2.6).
     const trade = tradeFactor(worker?.role ?? null, stage.family);
     const minute = labourPerMinute(hand.rate * trade, speed) * hall;
+    // The minute's own multiplier, for the workshop's average output (v40): the same four things
+    // the labour is made of, and nothing else.
+    bookOutputMinute(state, hand.rate * trade * speed * hall);
     if (addLabour(state, hand.job, minute, stage.id)) report.finished.push(hand.job);
   }
   // The extraction books its hours the whole time it is running, whoever is at what: a fan is

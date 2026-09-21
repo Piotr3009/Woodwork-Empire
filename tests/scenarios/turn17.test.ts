@@ -10,7 +10,7 @@ import { describe, expect, it } from 'vitest';
 import { CAREFUL, type Policy, playUntilDay } from './autopilot';
 import { acceptNow, act, buyStartingKit, fillRack, newGame, nextDay, placeEnquiry, withExtraction } from '../helpers';
 import { PAID_HOURS_PER_WORKING_DAY, RATE_WEEK_DAYS } from '../../src/engine/constants';
-import { contractPiece, drawContract, formatMoney, freeSheets, joiners, reservedSheets } from '../../src/engine/index';
+import { contractPiece, contractPriceFor, drawContract, formatMoney, freeSheets, joiners, reservedSheets } from '../../src/engine/index';
 import { monthRate, weekRate } from '../../src/engine/rate';
 import { renderCompany } from '../../src/ui/company';
 import { renderRateLine } from '../../src/ui/monthEnd';
@@ -64,7 +64,7 @@ function opening(): { state: GameState; jobId: string; men: string[] } {
   // The piece's own price off the table (CLAUDE.md T20 2.2), where the month used to make up 100
   // of its own. What this month measures is the rack and not the money, so nothing it asserts
   // moves with the price: the pieces made, the sheets drawn and the weeks kept are the same.
-  drawn.pricePerPiece = contractPiece(drawn).price;
+  drawn.pricePerPiece = contractPriceFor(contractPiece(drawn));
   next.contracts.push(drawn);
   next = act(next, { type: 'ACCEPT_CONTRACT', contractId: drawn.id });
   next = act(next, { type: 'ASSIGN_CONTRACT', contractId: drawn.id, workerId: men[2] ?? '', on: true });

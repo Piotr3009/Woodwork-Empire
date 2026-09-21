@@ -38,7 +38,7 @@ import {
   weekday,
 } from '../../src/engine/index';
 import { nextWorkingDay } from '../../src/engine/clock';
-import { contractPiece, contractResultFor } from '../../src/engine/contracts';
+import { contractPiece, contractPriceFor, contractResultFor } from '../../src/engine/contracts';
 import { hallBlock, orderForJobCheck } from '../../src/engine/jobs';
 import { hallProblems } from '../../src/render/hall';
 import type { Contract, Equipment, GameEvent, GameState, Job, Worker } from '../../src/engine/index';
@@ -106,8 +106,9 @@ function contractMonth(): ContractMonth {
   drawn.id = 'contract-month-cc';
   drawn.name = 'Cut sheet packs for Ashcombe Retail';
   drawn.pieceId = 'cutSheetPack';
-  // The piece's own price off the table of CLAUDE.md T20 2.2, never a figure this month made up.
-  drawn.pricePerPiece = contractPiece(drawn).price;
+  // The piece's own price, the entry point's of v40 without the client's answer, never a figure
+  // this month made up.
+  drawn.pricePerPiece = contractPriceFor(contractPiece(drawn));
   drawn.quantityPerWeek = PACKS_A_WEEK;
   drawn.termWeeks = TERM_WEEKS;
   state.contracts.push(drawn);
@@ -154,8 +155,8 @@ describe('(cc) a contract month with an experienced joiner, on Very easy', () =>
   it('puts the man the card costed on it, at the piece s own price, and keeps him there', () => {
     const contract = theContract(CC.opened);
     expect(CC.man.tier).toBe('experienced');
-    expect(contract.pricePerPiece).toBe(contractPiece(contract).price);
-    expect(contract.pricePerPiece).toBe(50);
+    // The entry point's price of v40, the way the month set it up.
+    expect(contract.pricePerPiece).toBe(contractPriceFor(contractPiece(contract)));
     expect(contract.assigned).toEqual([CC.man.id]);
     // The card's own reading of him, which is what the player saw before he pressed Take it
     // (CLAUDE.md T20 2.1.1): 59 minutes a piece behind the day 1 used saw at his 0.8 of the owner,
@@ -210,21 +211,27 @@ describe('(cc) a contract month with an experienced joiner, on Very easy', () =>
     // pays on its last working day (CLAUDE.md T21 2.10). One line, and it is his month whole.
     expect(wages.payDays).toHaveLength(1);
     expect(wages.total).toBe(pounds(CC.man.monthlyWage));
-    // 158 packs at 50 is 7,900 taken; 158 packs of 0.15 of a sheet at 200 a sheet is 4,740 of
-    // stock off the rack; the one pay day inside the term is his 2,600. The line of the cross check
-    // of CLAUDE.md T20 7, which tonight's figures keep: a contract month with an experienced joiner
-    // ends in profit AFTER his wages.
-    expect(revenue).toBe(7900);
+    // 158 packs at the entry point's 76 (v40) is 12,008 taken, where the typed 50 took 7,900;
+    // 158 packs of 0.15 of a sheet at 200 a sheet is 4,740 of stock off the rack; the one pay day
+    // inside the term is his 2,470 by the v38 ladder. The line of the cross check of CLAUDE.md
+    // T20 7, which tonight's figures keep: a contract month with an experienced joiner ends in
+    // profit AFTER his wages, and from v40 after the saw's wear as well: 158 packs are about
+    // 119 hours of the used saw, which is 268 of service at 2.25 an hour, out of the 4,798.
+    expect(revenue).toBe(158 * contract.pricePerPiece);
+    expect(revenue).toBe(12008);
     expect(material).toBe(4740);
-    // His wage by the v38 ladder (PIOTR, 21.09): 2,470, so the month clears 690 and not 560.
     expect(wages.total).toBe(2470);
-    expect(profit).toBe(690);
+    expect(profit).toBe(4798);
     expect(profit).toBeGreaterThan(0);
     // The closing report the player is handed says the same thing in its own arithmetic: it costs
-    // the minutes he actually stood at the contract and not the days he was paid for, so it reads
-    // higher than the month's own profit, and both are above water.
+    // the minutes he actually stood at the contract and not the days he was paid for, which reads
+    // higher than the month's own profit, and from v40 it takes the saw's wear off as well, which
+    // the month's own sum above does not; both are well above water.
     const report = closingReport(CC.ended, contract);
-    expect(report.margin).toBeGreaterThan(profit);
+    expect(report.machineWear).toBeGreaterThan(0);
+    expect(report.margin).toBe(pounds(revenue - material - report.labourCost - report.machineWear));
+    expect(report.margin + report.machineWear).toBeGreaterThan(profit);
+    expect(report.margin).toBeGreaterThan(0);
     console.log(
       '(cc) A CONTRACT MONTH WITH AN EXPERIENCED JOINER\n' +
         `piece: ${contractPiece(contract).name} at ${formatMoney(contract.pricePerPiece)}, ` +

@@ -477,6 +477,8 @@ export {
   ductingIsFree,
   dustBand,
   outputBreakdown,
+  workshopOutputToday,
+  bookOutputMinute,
   findSpec,
   gateIsCrowded,
   has,
@@ -495,6 +497,9 @@ export {
   owned,
   repairCostFor,
   serviceCostFor,
+  wearPerMinuteOf,
+  machineWearPerMinute,
+  bestMachineOf,
   SPRAY_BOOTH,
   // The service rule and the dirt the helper answers, Turn 20 (CLAUDE.md T20 2.8, 2.9).
   hallLooksDirty,
@@ -636,6 +641,9 @@ export {
   contractMen,
   contractOfWorker,
   contractPiece,
+  contractPriceFor,
+  contractQuantityBand,
+  contractReferenceFor,
   contractsAllowed,
   contractStationFor,
   drawContract,
@@ -649,7 +657,7 @@ export {
   weekOfTerm,
   weekWanted,
 } from './contracts';
-export type { ClosingReport, ContractMinute } from './contracts';
+export type { ClosingReport, ContractMinute, ContractReference } from './contracts';
 export {
   websiteLadder,
 } from './website';

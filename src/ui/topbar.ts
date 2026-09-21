@@ -23,6 +23,7 @@ import {
   shoppingList,
   skippedTask,
   workshopEfficiency,
+  workshopOutputToday,
 } from '../engine/index';
 import type { DayCategory, GameState, Speed } from '../engine/index';
 import { openJobs } from '../engine/jobs';
@@ -58,14 +59,32 @@ function speedButtons(state: GameState, pulse: boolean): string {
   return dinner + speedChips(state, pulse);
 }
 
-/** What today's work is multiplied by, shown only when the owner is paying for something: the
- *  overtime this week, or a dinner he worked through (CLAUDE.md T6 3.4). */
+/** The workshop's average output today, always on the bar: what a minute of production has been
+ *  worth on average, the hall, every man, his manager and the class of machine at his stage in
+ *  it (PIOTR, 21.09: one Output number, not one for the boss and one for the hall; v40). Red
+ *  under 1, green over it, as every signed figure is. The boss's own multiplier, the overtime and
+ *  the dinner he worked through, is his own minutes' and lives in the day meter's tip. */
 function outputChip(state: GameState): string {
+  const output = workshopOutputToday(state);
+  const tone = output < 1 ? ' warn' : output > 1 ? ' good' : '';
+  return (
+    `<span class="output${tone}" data-output="today" ` +
+    'title="Workshop output today: what a minute of production has been worth on average, everybody and every machine in it">' +
+    `Output ${output.toFixed(2)}</span>`
+  );
+}
+
+/** The boss's own multiplier, when he is paying for something: the overtime this week, or a
+ *  dinner he worked through (CLAUDE.md T6 3.4). One row in the day meter's tip, so it is not a
+ *  second Output on the bar (v40). */
+function ownerFactorRow(state: GameState): string {
   const factor = state.owner.labourFactor;
   if (factor >= 1) return '';
   return (
-    `<span class="output warn" title="Overtime and skipped breaks come off tomorrow">` +
-    `Output ${factor.toFixed(2)}</span>`
+    '<span class="tip-row" data-own-factor="1">' +
+    '<span class="tip-key seg-idle"></span>' +
+    '<span class="tip-name">Your own minutes, overtime and dinner</span>' +
+    `<span class="tip-min warn">×${factor.toFixed(2)}</span></span>`
   );
 }
 
@@ -220,7 +239,7 @@ function segmentTooltip(state: GameState): string {
       `<span class="tip-min">${minutes} min</span></span>`
     );
   }).join('');
-  return `<div class="day-tip">${worked}${stood}</div>`;
+  return `<div class="day-tip">${worked}${stood}${ownerFactorRow(state)}</div>`;
 }
 
 /** How long the bar is: the working day on the clock, 08:00 to 17:00, and the evening on the end

@@ -22,6 +22,7 @@ import {
   formatReputation,
   outputBreakdown,
   weekOfDay,
+  workshopOutputToday,
 } from '../engine/index';
 import { machineSavings } from '../engine/machines';
 import type { MachineSaving, MachineSavings } from '../engine/machines';
@@ -251,7 +252,7 @@ function outputRow(line: OutputLine, index: number): string {
  *  make it with their balance, and under a second rule the men and the machines, which act where
  *  they are and are not in the number above. The engine's breakdown is printed and nothing is
  *  computed from it (CLAUDE.md T15 0, 2.1). */
-function outputSheet(breakdown: OutputBreakdown): string {
+function outputSheet(breakdown: OutputBreakdown, workshopToday: number): string {
   const hall = breakdown.lines.filter((line) => line.hall);
   // The men who do not produce are off this sheet at the source, in `outputBreakdown`, where the
   // rule reads the role and never the name (CLAUDE.md T20 2.3.3).
@@ -262,6 +263,10 @@ function outputSheet(breakdown: OutputBreakdown): string {
     pin() +
     '<h3>Output</h3>' +
     totalLine('every minute of production is multiplied by it', breakdown.total.toFixed(2), 'output') +
+    // The one number the top bar shows, said here beside the hall's own: the average over the
+    // minutes worked today, everybody and every machine in it (PIOTR, 21.09; v40).
+    `<div class="ledger-note" data-figure="workshopToday"><span>Workshop today, everybody and every machine, ` +
+    `over the minutes worked</span><strong class="${signClass(workshopToday - 1)}">${workshopToday.toFixed(2)}</strong></div>` +
     '<div class="ledger-head"><span>What moves it</span><span>points</span></div>' +
     '<div class="ledger-list">' +
     base +
@@ -338,6 +343,9 @@ function machinesSheet(savings: MachineSavings): string {
     pin() +
     '<h3>Machines</h3>' +
     totalLine('what they saved this week', hours(savings.hoursSaved), 'machines') +
+    // Beside this week, last week's, the way the rate line says last week (PIOTR, 21.09; v40).
+    `<div class="ledger-note" data-figure="machinesLastWeek"><span>last week</span>` +
+    `<strong>${escapeHtml(hours(savings.hoursSavedLastWeek))}</strong></div>` +
     '<div class="ledger-head"><span>What it does to its stage</span><span>saved</span></div>' +
     '<div class="ledger-list">' +
     (savings.rows.length === 0
@@ -366,7 +374,7 @@ export function renderCompany(state: GameState): string {
     '</div>' +
     '<div class="sheets">' +
     reputationSheet(state, weeks) +
-    outputSheet(outputBreakdown(state)) +
+    outputSheet(outputBreakdown(state), workshopOutputToday(state)) +
     machinesSheet(machineSavings(state, 'week')) +
     '</div>' +
     '</div>'

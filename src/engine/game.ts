@@ -133,6 +133,8 @@ import {
   salePriceFor,
   benchOf,
   hallProductivityFactor,
+  workshopOutputToday,
+  bookOutputMinute,
   has,
   hasBenchFor,
   machinesDueService,
@@ -449,6 +451,7 @@ export function createGame(options: NewGameOptions): GameState {
       noMaterialWarned: false,
       labourValue: 0,
       workMinutes: 0,
+      outputWorth: 0,
       dustM3: 0,
       efficiency: emptyEfficiency(),
       nightMinutes: 0,
@@ -526,6 +529,7 @@ function startDay(state: GameState): void {
     noMaterialWarned: false,
     labourValue: 0,
     workMinutes: 0,
+    outputWorth: 0,
     dustM3: 0,
     efficiency: emptyEfficiency(),
     nightMinutes: 0,
@@ -945,6 +949,7 @@ export function daySummaryOf(state: GameState): DaySummary {
     ),
     labourValue: state.dayStats.labourValue,
     workMinutes: state.dayStats.workMinutes,
+    outputToday: workshopOutputToday(state),
     dayLog: owner.dayLog.map((entry) => ({ ...entry })),
     dustMadeM3: state.dayStats.dustM3,
     paidHours: state.dayStats.paidHours,
@@ -1754,6 +1759,9 @@ function runProductionMinute(state: GameState, ownerOnTask: boolean): void {
     // joiner's slower one there, and neither anywhere else (CLAUDE.md T19 2.6).
     const trade = tradeFactor(worker?.role ?? null, stage.family);
     const minute = labourPerMinute(hand.rate * trade, speed) * hall;
+    // The minute's own multiplier, for the workshop's average output (v40): the same four things
+    // the labour is made of, and nothing else. The night's minutes book theirs in `workMinute`.
+    bookOutputMinute(state, hand.rate * trade * speed * hall);
     if (addLabour(state, hand.job, minute, stage.id)) raiseJobAtGate(state, hand.job);
   }
   // The extraction books its hours the whole time it is running, whoever is at what: a fan is
@@ -2577,6 +2585,7 @@ function standItem(
     inServiceUntilDay: null,
     hoursThisWeek: 0,
     hoursThisMonth: 0,
+    minutesSavedLastWeek: 0,
     enduranceHours: enduranceHoursFor(specId, variant.id),
     hoursUsed: 0,
     takenBy: null,

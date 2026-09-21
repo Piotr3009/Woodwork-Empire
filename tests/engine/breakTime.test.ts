@@ -140,11 +140,18 @@ describe('the day puts its two questions and the top bar shows what they cost', 
     expect(five.activeEvent?.choices.map((choice) => choice.id)).toEqual(['home', 'overtime']);
   });
 
-  it('shows the output only when the owner is paying for something', () => {
+  it('keeps the owner\'s own factor in the day meter\'s tip, and the bar\'s Output is the workshop\'s', () => {
     const state = newGame();
-    expect(renderTopbar(state, 'hall')).not.toContain('Output');
+    // One Output on the bar, the workshop's average, from the first minute (v40): before any
+    // minute is worked it is the hall's own factor, 1.00 in a clean hall.
+    expect(renderTopbar(state, 'hall')).toContain('Output 1.00');
+    expect(renderTopbar(state, 'hall')).not.toContain('data-own-factor');
     state.owner.labourFactor = 0.87;
-    expect(renderTopbar(state, 'hall')).toContain('Output 0.87');
+    // His overtime and his dinner are his own minutes' and not the workshop's: the bar still
+    // reads the workshop, and the tip under it carries his 0.87.
+    expect(renderTopbar(state, 'hall')).toContain('Output 1.00');
+    expect(renderTopbar(state, 'hall')).toContain('data-own-factor');
+    expect(renderTopbar(state, 'hall')).toContain('\u00d70.87');
     // And the hour he worked through is an hour more on the bar.
     state.owner.breakSkipped = true;
     expect(renderTopbar(state, 'hall')).toContain(

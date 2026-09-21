@@ -12,7 +12,7 @@ import { renderShopping } from '../../src/ui/shopping';
 import { renderWorkPlan } from '../../src/ui/workPlan';
 import { acceptNow, act, buyStartingKit, fillRack, newGame, placeEnquiry } from '../helpers';
 import { drawContract } from '../../src/engine/index';
-import { contractPiece } from '../../src/engine/contracts';
+import { contractPiece, contractPriceFor } from '../../src/engine/contracts';
 
 const CSS = readFileSync('src/ui/styles.css', 'utf8');
 
@@ -44,7 +44,7 @@ function withAContract() {
   state.contracts = [];
   const offer = drawContract(state);
   offer.pieceId = 'cutSheetPack';
-  offer.pricePerPiece = contractPiece(offer).price;
+  offer.pricePerPiece = contractPriceFor(contractPiece(offer));
   state.contracts.push(offer);
   return state;
 }

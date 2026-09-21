@@ -148,6 +148,7 @@ describe('the two of them together', () => {
         paidHours: 0,
         expressUplift: 0,
         hallFactor: 1,
+        outputToday: 1,
       },
     ];
     state.dayStats.workMinutes = 480;
