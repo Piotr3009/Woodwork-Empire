@@ -115,7 +115,7 @@ export const STATE_VERSION = 25;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
-export const APP_VERSION = 'v45';
+export const APP_VERSION = 'v46';
 
 // ---------------------------------------------------------------------------
 // The owner's day, in the seven things it is made of
@@ -3748,6 +3748,13 @@ export const DUST_OUTPUT_M3_PER_HOUR: Record<string, number> = {
   // of the machine category is on this table and the test can hold it to that [TUNE].
   compressor: 0,
 };
+
+/** How full the hall's bags are when a helper on duty starts emptying them, as a fraction of
+ *  the store [PIOTR, 22.09: "let him empty them at 80 percent"; v46]. Until v46 the chore was
+ *  raised at the brim only, and the machines stood while he carried the bags out; with a helper
+ *  in the hall they need never stop. Without one the store still fills to the brim and the
+ *  question is put to the owner as it always was (CLAUDE.md T12 2.3). */
+export const BAGS_HELPER_EMPTY_AT = 0.8;
 
 /** The bags on each class of extractor, off the descriptions that were on the shelf already: a
  *  single bag, a single bag, twin bags, four bags and ten (PIOTR, CLAUDE.md T12 2.3). The hall's

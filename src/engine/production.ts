@@ -413,6 +413,13 @@ export function placeHand(state: GameState, hand: Hand): HandPlace {
     const noMaterial = hand.job.blockedBy === WAITING_FOR_MATERIAL;
     return { work: null, lost: noMaterial ? 'noMaterial' : 'noMachine', noMaterial };
   }
+  // His own place at a bench, which is a question about this man and not about the job: without
+  // one he stands, on his own, and the men beside him with a place work on (CLAUDE.md T4 3.4,
+  // T23 2.17; v46). Booked as a station he has not got, which is what the day meter counts.
+  if (benchOf(state, hand.who) === null) {
+    releaseMachines(state, hand.who);
+    return { work: null, lost: 'noMachine', noMaterial: false };
+  }
   // The stage this man works, which is his own from v37: two men on one job may be at two stages
   // (the bag of work, PIOTR 20.09).
   const stage = stageFor(state, hand.who, hand.job, cncOptions(state, hand.who, hand.job));

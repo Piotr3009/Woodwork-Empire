@@ -50,6 +50,7 @@ import {
   TOOL_CABINET_SLOTS,
   USED_VARIANT,
   PRODUCTION_MANAGER_PACE,
+  BAGS_HELPER_EMPTY_AT,
 } from './constants';
 import { weekOfDay, monthOfDay, nextWorkingDay } from './clock';
 import { canAfford } from './economy';
@@ -569,15 +570,18 @@ export function benchAtPlace(state: GameState, place: number): Equipment | null 
 }
 
 /** Without a bench there is no way to start production (CLAUDE.md T4 3.4). Two or three men can
- *  share one from Turn 23, by its class, so the question is whether the man on the job has a
- *  place at one, and whether the hall has a place spare for a job nobody is on yet. */
+ *  share one from Turn 23, by its class, so the question is whether a man on the job has a place
+ *  at one: any man on it, not the first. Until v46 the whole job stood on the first man's place,
+ *  so the owner leading a job with three joiners on it, who had the industrial bench's three
+ *  places between them and left him none, stopped all four of them with "no bench" and the saw
+ *  free (PIOTR, 22.09, the day 128 save). A man without a place stands on his own, `placeHand`
+ *  says so of him alone, and the men with a place work. For a job nobody is on yet the question
+ *  is the hall's: is there a bench in it at all (CLAUDE.md T23 2.17). */
 export function hasBenchFor(state: GameState, jobId: string | null): boolean {
   const job = jobId === null ? null : state.jobs.find((entry) => entry.id === jobId) ?? null;
-  const who = job?.assignees[0] ?? null;
-  if (who !== null) return benchOf(state, who) !== null;
-  // Nobody is on it yet, so the question is the hall's and not a man's: is there a bench in it at
-  // all. Whoever takes the job brings his own place with him, and the man who has not got one is
-  // told so the minute he is put on it, by the line above (CLAUDE.md T23 2.17).
+  if (job !== null && job.assignees.length > 0) {
+    return job.assignees.some((who) => benchOf(state, who) !== null);
+  }
   return benchPlaces(state) > 0;
 }
 
@@ -1169,6 +1173,14 @@ export function bagStore(state: GameState): BagStore {
 /** True while the hall's bags are full (CLAUDE.md T12 2.3). */
 export function bagsFull(state: GameState): boolean {
   return bagStore(state).full;
+}
+
+/** True once the store is far enough up for a helper to start on it: `BAGS_HELPER_EMPTY_AT` of
+ *  its capacity (PIOTR, 22.09; v46). Full counts too. */
+export function bagsWantEmptying(state: GameState): boolean {
+  const store = bagStore(state);
+  if (!store.exists || store.bags <= 0) return false;
+  return store.fillM3 >= store.capacityM3 * BAGS_HELPER_EMPTY_AT;
 }
 
 /** What the store reads on the floor, on the Owned tab and under the hall: "Bags 4.6 / 10 m3",

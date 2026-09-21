@@ -117,6 +117,7 @@ import {
   countOf,
   bagStore,
   bagsFull,
+  bagsWantEmptying,
   emptyBags,
   enduranceHoursFor,
   breakMachine,
@@ -136,7 +137,6 @@ import {
   workshopOutputToday,
   bookOutputMinute,
   has,
-  hasBenchFor,
   machinesDueService,
   overdueBreakdownChance,
   repairCostFor,
@@ -999,7 +999,7 @@ function finishDay(state: GameState): void {
   // give up at twice the day's chance.
   const night = runNightShift(state);
   for (const job of night.finished) raiseJobAtGate(state, job);
-  if (night.bagsFull) raiseBagsFull(state);
+  checkBags(state, night.bagsFull);
   for (const machine of rollNightBreakdowns(state, night.usedMachineIds)) {
     raiseMachineBroken(state, machine);
   }
@@ -1415,10 +1415,11 @@ function updateStations(state: GameState): void {
     owner.station = task ? stationForTask(state, task) : STATION_IDLE;
   } else if (ownerJob(state) !== null) {
     const job = ownerJob(state);
+    // His own place at a bench, not the job's: a man without one stands alone (v46).
     owner.station =
       job === null
         ? STATION_IDLE
-        : hasBenchFor(state, job.id)
+        : benchOf(state, OWNER) !== null
           ? stationForProduction(state, OWNER, job)
           : STATION_NO_BENCH;
   } else {
@@ -1436,9 +1437,10 @@ function updateStations(state: GameState): void {
     }
     const job = worker.jobId ? findJob(state, worker.jobId) : null;
     if (job && job.stage === 'inProduction') {
-      worker.station = hasBenchFor(state, job.id)
-        ? stationForProduction(state, worker.id, job)
-        : STATION_NO_BENCH;
+      worker.station =
+        benchOf(state, worker.id) !== null
+          ? stationForProduction(state, worker.id, job)
+          : STATION_NO_BENCH;
       continue;
     }
     // A man on a standing contract stands where the contract put him (CLAUDE.md T13 3.16).
@@ -1693,7 +1695,7 @@ function runProductionMinute(state: GameState, ownerOnTask: boolean): void {
   }
   // The men on a standing contract put their minute in beside the jobs (CLAUDE.md T13 3.16).
   const contract = runContractMinute(state);
-  if (contract.bagsFilled) raiseBagsFull(state);
+  checkBags(state, contract.bagsFilled);
   if (atWork.length === 0 && contract.worked === 0) {
     tallyEfficiency(state, 0, lost);
     return;
@@ -1791,7 +1793,7 @@ function runProductionMinute(state: GameState, ownerOnTask: boolean): void {
   state.productionMinutesMonth += 1;
   addDust(state, 1);
   // The minute the store fills, the workshop is told once, not once a machine (CLAUDE.md T12 2.3).
-  if (accumulateMachineMinute(state, used)) raiseBagsFull(state);
+  checkBags(state, accumulateMachineMinute(state, used));
 }
 
 /** The piece is made and standing in front of the gate. Nothing is paid until the client has it,
@@ -1844,6 +1846,20 @@ function ensureBagsTask(state: GameState): TaskInstance {
     label: emptyBagsLabel(store.bags),
     minutes: emptyBagsMinutes(store.bags),
   });
+}
+
+/** The bags after a minute of dust: a helper on duty starts on them at `BAGS_HELPER_EMPTY_AT` of
+ *  the store, before anything stops (PIOTR, 22.09; v46), and the brim is the workshop's own
+ *  event as it always was. One reading for the day's minute, the night's and the contract's. */
+function checkBags(state: GameState, full: boolean): void {
+  if (full) {
+    raiseBagsFull(state);
+    return;
+  }
+  if (helperOnDuty(state) && bagsWantEmptying(state)) {
+    ensureBagsTask(state);
+    delegateTasks(state);
+  }
 }
 
 /** The hall's bags are full: every machine that makes dust stops until they are emptied. One

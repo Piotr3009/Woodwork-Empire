@@ -399,9 +399,11 @@ describe('(dd) the helper s dirty hall day, with a lorry in the yard', () => {
     expect(sawdustPiles(DD.evening.dust)).toBe(0);
     expect(DD.evening.dust).toBeLessThan(5);
     // Emptied, and used again after: the saw goes on cutting all afternoon, so the store holds a
-    // fraction of one bag by five o'clock where it held the brim at nine.
+    // fraction of one bag by five o'clock where it held the brim at nine. From v46 the helper
+    // starts on the bags at 80% and the saw never stops for them, so the afternoon's dust is a
+    // little more than it was (a tenth of a bag and a bit).
     expect(bagStore(DD.evening).full).toBe(false);
-    expect(bagStore(DD.evening).fillM3).toBeLessThan(bagStore(DD.evening).capacityM3 / 10);
+    expect(bagStore(DD.evening).fillM3).toBeLessThan(bagStore(DD.evening).capacityM3 / 8);
     expect(DD.evening.deliveries.every((delivery) => delivery.unloaded)).toBe(true);
     for (const kind of ['cleaning', 'emptyBags', 'unload'] as const) {
       const done = DD.evening.tasks.filter((task) => task.kind === kind && task.done);
