@@ -1,13 +1,14 @@
-// The contract fills the day first (PIOTR; CLAUDE.md T20 2.1.4), and the client who has had two
-// short weeks ends it himself (CLAUDE.md T20 2.1.6).
+// A man on a contract is the contract's all day (PIOTR, 21.09; v42), and the client who has had
+// two short weeks ends it himself (CLAUDE.md T20 2.1.6).
 //
-// A man is on a contract and on a job at once from tonight. He books his pieces from 8:00 until
-// the day's share of the week is made, and only then goes to the job he is also on. The day's
-// share is the week's quantity spread over the working days of the week, and with no job to go to
-// he stays on the contract, because the client pays for every piece he makes.
+// Putting a man on a contract takes him off every job of work and shuts the jobs to him while he
+// is on it: "if you put a man on a contract he has to vanish from the jobs, even from the
+// possibility of being assigned to one, then we know we have four men on the jobs and that is
+// that". He makes pieces from 8:00 to 17:00, past the day's share and past the week that was
+// ordered, because the client takes every piece he makes. Turn 20's split day, where the contract
+// had his morning and a job the rest, is gone with its daily line `piecesDueBy`.
 
 import { describe, expect, it } from 'vitest';
-import { stagePlanFor } from '../../src/engine/stages';
 import { CONTRACT_FREE_END_DAYS, JOINER_MONTHLY_WAGE, WORKER_RATES } from '../../src/engine/constants';
 import {
   CONTRACT_SHORT_WEEKS_ALLOWED,
@@ -20,11 +21,10 @@ import {
   drawContract,
   endContractNow,
   endedContracts,
-  jobBesideContract,
-  piecesDueBy,
   runContractDay,
   weekWanted,
 } from '../../src/engine/contracts';
+import { addToJob, assignJob, canBuild, isOnJob } from '../../src/engine/jobs';
 import type { Contract, GameState, Job, Worker } from '../../src/engine/index';
 import {
   acceptNow,
@@ -117,143 +117,86 @@ function theJob(state: GameState): Job {
   return job;
 }
 
-describe('the day is the contract first and the job second (CLAUDE.md T20 2.1.4)', () => {
+describe("a man on a contract is the contract's all day (PIOTR, 21.09; v42)", () => {
   it('spreads the week over the working days of it', () => {
     const state = joinerHall();
     const contract = running(state, 60);
     expect(weekWanted(contract, 1)).toBe(60);
-    // Monday to Friday, twelve a day, and the line is what he works to.
-    expect([1, 2, 3, 4, 5].map((day) => piecesDueBy(contract, day))).toEqual([12, 24, 36, 48, 60]);
-    // Never more than the week itself.
-    expect(piecesDueBy(contract, 5)).toBe(weekWanted(contract, 5));
+    // The week's quantity is what the client asks for, not a ceiling on the man: Turn 20's daily
+    // line he worked to, `piecesDueBy`, is gone with the split day (PIOTR, 21.09; v42).
   });
 
-  it('wants him while the line is ahead of him, and hands him to the job once it is met', () => {
+  it('takes him off every job when he goes on it, and will not let him be put on one', () => {
     let state = joinerHall();
-    const contract = running(state, 5);
-    // No job to go to: the client pays for every piece, so the contract keeps him all day.
-    expect(piecesDueBy(contract, 1)).toBe(1);
-    contract.piecesThisWeek = 5;
-    expect(contractWantsToday(state, 'staff-1')).toBe(true);
-    // With a job under him, the day's share is the whole of the contract's claim on him.
     const under = jobUnderHim(state);
     state = under.state;
-    expect(jobBesideContract(state, 'staff-1')?.id).toBe(under.job.id);
-    expect(contractWantsToday(state, 'staff-1')).toBe(false);
-    theContract(state).piecesThisWeek = 0;
-    expect(contractWantsToday(state, 'staff-1')).toBe(true);
-  });
-
-  it('takes him back when the job he is on cannot use the minute (T20 2.1)', () => {
-    // The last thing asked before a man on a contract stands: his contract's pieces. His day's
-    // share is made and he has a job to go to, so the job has him; the minute the job cannot use him,
-    // because the saw its stage wants is taken, the contract has him again, because the client pays
-    // for every piece he makes (PIOTR; CLAUDE.md T20 2.1, T22 2.6).
-    let state = joinerHall();
-    const contract = running(state, 5);
-    contract.piecesThisWeek = 5;
-    state = jobUnderHim(state).state;
-    expect(contractWantsToday(state, 'staff-1')).toBe(false);
-    const saw = state.equipment.find((item) => item.specId === 'tableSaw');
-    if (!saw) throw new Error('a saw is wanted');
-    // With the machining done the saw is the one station his job has open (v37), so a taken saw
-    // is a job that cannot use him this minute.
-    const job = state.jobs.find((entry) => entry.assignees.includes('staff-1'));
-    if (!job) throw new Error('his job is wanted');
-    const machining = stagePlanFor(state, job).find((stage) => stage.id === 'machining');
-    if (!machining) throw new Error('a machining stage is wanted');
-    job.stageLabour = { machining: machining.to - machining.from };
-    job.labourRemaining = job.labourValue - (machining.to - machining.from);
-    saw.takenBy = 'owner';
-    expect(contractWantsToday(state, 'staff-1')).toBe(true);
-    // And the minute the saw is free again the job has him back: the question is asked fresh off the
-    // hall every minute and never off a flag written down last minute.
-    saw.takenBy = null;
-    expect(contractWantsToday(state, 'staff-1')).toBe(false);
-  });
-
-  it('books his pieces from the morning and gives the job what is left of the day', () => {
-    let state = joinerHall();
-    // One piece is the whole of Monday's share of the week, so the changeover lands inside a day
-    // of the clock.
-    running(state, 5);
-    state = jobUnderHim(state).state;
-    let jobMinutesBeforeThePiece = 0;
-    let handedOver = false;
-    for (let minute = 0; minute < 300; minute += 1) {
-      state = runClock(state, 1);
-      const contract = theContract(state);
-      const job = theJob(state);
-      if (contract.piecesMade === 0) {
-        // The contract has him: the job has not had a minute of him yet.
-        jobMinutesBeforeThePiece = job.productionMinutes;
-        expect(jobMinutesBeforeThePiece).toBe(0);
-        continue;
-      }
-      if (job.productionMinutes > 0) {
-        handedOver = true;
-        break;
-      }
-    }
-    const contract = theContract(state);
-    expect(contract.piecesMade).toBe(1);
-    expect(jobMinutesBeforeThePiece).toBe(0);
-    expect(handedOver).toBe(true);
-    // He is the job's now, and still on the contract: assigned once, he stays on it.
+    expect(isOnJob(theJob(state), 'staff-1')).toBe(true);
+    const contract = running(state, 60);
+    // On the contract, off the job, in the one action (PIOTR, 21.09: "he has to vanish from the
+    // jobs, even from the possibility of being assigned to one").
     expect(contract.assigned).toEqual(['staff-1']);
-    expect(state.workers.find((worker) => worker.id === 'staff-1')?.jobId).toBe(theJob(state).id);
+    expect(isOnJob(theJob(state), 'staff-1')).toBe(false);
+    expect(canBuild(state, 'staff-1')).toBe(false);
+    // And the two doors every assignment goes through are shut on him.
+    expect(assignJob(state, theJob(state).id, 'staff-1')).toBe(false);
+    expect(addToJob(state, theJob(state).id, 'staff-1')).toBe(false);
+    expect(isOnJob(theJob(state), 'staff-1')).toBe(false);
+    // Taken off the contract, he is a free man again and the jobs can have him.
+    expect(assignContract(state, contract.id, 'staff-1', false).ok).toBe(true);
+    expect(canBuild(state, 'staff-1')).toBe(true);
+    expect(state.workers.find((worker) => worker.id === 'staff-1')?.jobId).toBe(null);
   });
 
-  it('takes the morning back the next day, before the job has a minute of him', () => {
+  it('wants him every minute, whatever the week has already made', () => {
     const state = joinerHall();
     const contract = running(state, 5);
-    const under = jobUnderHim(state);
-    const next = under.state;
-    // Yesterday ended with him on the job: the day's open puts the marker back on him.
-    const ben = next.workers.find((worker) => worker.id === 'staff-1');
+    expect(contractWantsToday(state, 'staff-1')).toBe(true);
+    // The week's order is made twice over and he carries on: the client takes every piece
+    // (PIOTR, 21.09: "he takes as many as we can make, week after week").
+    contract.piecesThisWeek = 10;
+    expect(contractWantsToday(state, 'staff-1')).toBe(true);
+  });
+
+  it('gives no minute of his day to a job, and makes pieces past the week that was ordered', () => {
+    let state = joinerHall();
+    // One piece is the whole of a Monday's share of the old line: under Turn 20 the job would
+    // have had the rest of the day. It has none of it now.
+    state = jobUnderHim(state).state;
+    running(state, 5);
+    // He came off the job the moment he went on the contract, so the job has nobody.
+    expect(theJob(state).assignees).toEqual([]);
+    state = runClock(state, 300);
+    const contract = theContract(state);
+    expect(contract.piecesMade).toBeGreaterThan(1);
+    expect(theJob(state).productionMinutes).toBe(0);
+    expect(contract.assigned).toEqual(['staff-1']);
+    expect(state.workers.find((worker) => worker.id === 'staff-1')?.jobId).toBe(
+      contractMarker(contract.id),
+    );
+  });
+
+  it('puts the marker back on him at the open of every day', () => {
+    const state = joinerHall();
+    const contract = running(state, 5);
+    const ben = state.workers.find((worker) => worker.id === 'staff-1');
     if (!ben) throw new Error('a man is wanted');
-    ben.jobId = under.job.id;
-    theContract(next).piecesThisWeek = 0;
-    next.clock.day = 2;
-    runContractDay(next);
+    ben.jobId = null;
+    contract.piecesThisWeek = 0;
+    state.clock.day = 2;
+    runContractDay(state);
     expect(ben.jobId).toBe(contractMarker(contract.id));
   });
 
-  it('gives him to the job under him while the rack cannot cover the next piece', () => {
-    let state = joinerHall();
-    // The line is well ahead of him all day, so nothing but the empty rack can let the job have
-    // him.
-    running(state, 60);
-    state = jobUnderHim(state).state;
-    const job = theJob(state);
-    const contract = theContract(state);
-    // Every sheet on the rack is the job's own: the contract can hold none and cannot make a
-    // piece.
-    contract.sheetsReserved = 0;
-    job.sheetsReserved = job.sheets - job.sheetsUsed;
-    state.stock.sheets = job.sheetsReserved;
-    expect(contractWaitingForMaterial(state, contract)).toBe(true);
-    expect(contract.piecesThisWeek).toBeLessThan(piecesDueBy(contract, state.clock.day));
-    expect(contractWantsToday(state, 'staff-1')).toBe(false);
-    state = runClock(state, 60);
-    // The contract made nothing, because it could not; the job had his hour, and he is still on
-    // both.
-    expect(theContract(state).piecesMade).toBe(0);
-    expect(theJob(state).productionMinutes).toBeGreaterThan(0);
-    expect(theContract(state).assigned).toEqual(['staff-1']);
-    // A delivery lands and the contract has him back the next minute.
-    state.stock.sheets += 20;
-    expect(contractWaitingForMaterial(state, theContract(state))).toBe(false);
-    expect(contractWantsToday(state, 'staff-1')).toBe(true);
-  });
-
-  it('stands a man with no job to go to at his bench while the rack is empty', () => {
+  it('stands him at his bench while the rack cannot cover the next piece', () => {
     const state = joinerHall();
     const contract = running(state, 60);
     state.stock.sheets = 0;
+    contract.sheetsReserved = 0;
     expect(contractWaitingForMaterial(state, contract)).toBe(true);
-    // Nowhere else to go: the contract keeps him, as it always did.
+    // Nowhere else to go, because a contract man has no job: he waits for the delivery.
     expect(contractWantsToday(state, 'staff-1')).toBe(true);
+    const worked = runClock(state, 60);
+    expect(theContract(worked).piecesMade).toBe(0);
   });
 });
 

@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 // The Contracts tab of the Work Plan (PIOTR, the mockup of docs/mockups/t20/contracts-tab.html;
 // CLAUDE.md T20 2.1): the offer costed for the man who would do it, his day as blocks, the running
-// contract with what is left of his day going to the job, and the ended one greyed.
+// contract with the whole of his day on it, and the ended one greyed. From v42 the client's
+// quantity is the least he takes and not the most, so the card's week is what the man can make.
 
 import { beforeAll, describe, expect, it } from 'vitest';
 import {
@@ -134,7 +135,9 @@ describe('On offer, costed for the man who would do it (CLAUDE.md T20 2.1.1)', (
     expect(figures).toContain(`-${money(result.material)}`);
     expect(figures).toContain(`-${money(result.labourCost)}`);
     expect(figures).toContain(signedMoney(result.margin));
-    expect(figures).toContain(`${result.piecesPerDay} of the ${result.piecesNeededPerDay} needed`);
+    expect(figures).toContain(
+      `${result.piecesPerDay}, the client asks ${result.piecesNeededPerDay} at the least`,
+    );
     expect(figures).toContain(signedMoney(result.weekResult));
     expect(figures).toContain(signedMoney(result.termResult));
     expect(card?.textContent).toContain(`Ravi's labour a piece`);
@@ -159,7 +162,7 @@ describe('On offer, costed for the man who would do it (CLAUDE.md T20 2.1.1)', (
       pieces.map((_block, at) => String(at + 1)),
     );
     expect(day?.querySelectorAll('.contract-day-block.is-lunch')).toHaveLength(1);
-    expect(day?.textContent).toContain(`${result.freeMinutes} min left at the end`);
+    expect(day?.textContent).toContain(`${result.freeMinutes} min into the next`);
     // The blocks are laid across the working day and the last of them ends at 17:00.
     const free = day?.querySelector('.contract-day-block.is-free');
     expect(free?.getAttribute('style')).toContain('width:');
@@ -171,9 +174,6 @@ describe('On offer, costed for the man who would do it (CLAUDE.md T20 2.1.1)', (
 
   it('draws the next best man beside him for comparison, and names the machine that would help', () => {
     const state = hall();
-    // Eighty a week: at forty, Ben makes the client's whole week on the used saw already, and a
-    // CNC that makes more pieces the client will not take, at its own wear, gains nothing, so the
-    // tip is rightly silent (v40: a machine is costed with its service bill).
     offered(state, 80);
     const days = tab(state).querySelectorAll('.contract-day');
     expect(days).toHaveLength(2);
@@ -182,10 +182,13 @@ describe('On offer, costed for the man who would do it (CLAUDE.md T20 2.1.1)', (
     const tip = tab(state).querySelector('.contract-tip')?.textContent ?? '';
     expect(tip).toContain('A CNC would take the piece to');
     expect(tip).toMatch(/\+£[0-9,]+ a week/);
-    // And at forty a week the tip says nothing, because nothing is gained.
-    const capped = hall();
-    offered(capped, 40);
-    expect(tab(capped).querySelector('.contract-tip')).toBeNull();
+    // The same tip, to the pound, on a smaller order: what a machine gains no longer depends on
+    // how many the client asked for, because he takes every piece that is made (PIOTR, 21.09;
+    // v42). Until tonight the week was capped at the order, so at forty a week the card said a
+    // CNC gained nothing and the tip went silent.
+    const smaller = hall();
+    offered(smaller, 40);
+    expect(tab(smaller).querySelector('.contract-tip')?.textContent).toBe(tip);
   });
 
   it('costs the owner as well, and says on his own row that he cannot be put on it', () => {
@@ -204,35 +207,37 @@ describe('On offer, costed for the man who would do it (CLAUDE.md T20 2.1.1)', (
   });
 });
 
-describe('Running, and the day that goes to the job after it (CLAUDE.md T20 2.1.2)', () => {
-  it('shows the week live, the result so far, and the job minutes in the day track', () => {
+describe("Running, and the whole day that goes to it (PIOTR, 21.09; v42)", () => {
+  it('shows the week live, the result so far, and a day track of nothing but pieces', () => {
     let state = hall();
     const contract = offered(state, 5);
     acceptContract(state, contract.id);
-    assignContract(state, contract.id, 'staff-1', true);
-    // A job of work under him as well: the contract has the first of his day and the job the rest.
+    // A job of work under him first: going on the contract takes him off it, so the day track has
+    // no job block to draw any more (PIOTR, 21.09).
     const enquiry = placeEnquiry(state, { price: 6000, deadlineDays: 40 });
     state = acceptNow(state, enquiry.id);
     const job = state.jobs[0];
     if (!job) throw new Error('a job is wanted');
     job.stage = 'inProduction';
     job.assignees = ['staff-1'];
+    assignContract(state, contract.id, 'staff-1', true);
+    expect(job.assignees).toEqual([]);
     const running = tab(state).querySelector('.contract-bar');
     expect(running?.textContent).toContain('0 of 5, on course');
     expect(running?.textContent).toContain('Margin a piece with the men on it');
     expect(running?.textContent).toContain('Delivered in full');
-    // His day: his pieces first, then the minutes that go to the job, labelled with its name.
+    // His day is the contract's from 8:00 to 17:00: one block a piece, every piece he can make,
+    // and not the one piece the old daily line stopped him at.
     const day = running?.querySelector('.contract-day');
-    const jobBlock = day?.querySelector('.contract-day-block.is-job');
-    expect(jobBlock?.textContent).toBe(job.name);
+    expect(day?.querySelector('.contract-day-block.is-job')).toBeNull();
     const pieces = Array.from(day?.querySelectorAll('.contract-day-block') ?? []).filter(
       (block) => block.className === 'contract-day-block',
     );
     const result = contractResultFor(state, contract, state.workers[0] as Worker);
-    expect(pieces).toHaveLength(1);
-    expect(day?.textContent).toContain(
-      `then ${MINUTES_PER_WORKING_DAY - result.minutes} min on ${job.name}`,
-    );
+    expect(pieces).toHaveLength(result.piecesPerDay);
+    expect(result.piecesPerDay).toBeGreaterThan(1);
+    expect(day?.textContent).toContain(`${result.freeMinutes} min into the next`);
+    expect(MINUTES_PER_WORKING_DAY).toBeGreaterThan(result.piecesPerDay * result.minutes - 1);
   });
 
   it('says the week is short when the pace will not reach it, and offers the way out', () => {

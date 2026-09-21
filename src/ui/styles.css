@@ -3178,13 +3178,6 @@ input.num {
   color: var(--card-ink-2, var(--text-dim));
 }
 
-/* The minutes that go to the job he is also on: the house accent, as the drawing has them. The
-   ink is the one .btn-primary already puts on that amber. */
-.contract-day-block.is-job {
-  background: var(--accent);
-  color: #1c1f24;
-}
-
 .contract-day-ticks {
   color: var(--text-dim);
   display: flex;

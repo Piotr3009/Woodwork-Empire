@@ -111,11 +111,11 @@ import type {
  *  Version 23 is v40 (PIOTR, 21.09): every machine writes down on the Monday what its class saved
  *  last week; the day's stats carry the sum behind the workshop's average output and every closed
  *  day the average it had. Every v36 to v39 save loads. */
-export const STATE_VERSION = 23;
+export const STATE_VERSION = 24;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
-export const APP_VERSION = 'v41';
+export const APP_VERSION = 'v42';
 
 // ---------------------------------------------------------------------------
 // The owner's day, in the seven things it is made of

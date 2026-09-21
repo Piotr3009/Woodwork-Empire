@@ -649,6 +649,36 @@ function liftToVersion23(state: Raw): void {
   state.version = 23;
 }
 
+/** v24 (v42, PIOTR 21.09): a man on a contract is the contract's and vanishes from the jobs, so a
+ *  save made under Turn 20's split day, where he stood on a contract and a job at once, comes in
+ *  with him off every job. The job he leaves keeps whoever else was on it; a job he was the last
+ *  man on goes back on the list, ready, for the boss to give to somebody else. His `jobId` is the
+ *  contract's marker, which the first minute of the day would write anyway. */
+function liftToVersion24(state: Raw): void {
+  const onContracts = new Set<string>();
+  for (const contract of records(state.contracts)) {
+    if (contract.status !== 'active') continue;
+    const marker = `contract:${String(contract.id)}`;
+    for (const id of Array.isArray(contract.assigned) ? contract.assigned : []) {
+      if (typeof id !== 'string') continue;
+      onContracts.add(id);
+      for (const worker of records(state.workers)) {
+        if (worker.id === id) worker.jobId = marker;
+      }
+    }
+  }
+  if (onContracts.size > 0) {
+    for (const job of records(state.jobs)) {
+      const assignees = Array.isArray(job.assignees) ? job.assignees : [];
+      const kept = assignees.filter((id) => typeof id !== 'string' || !onContracts.has(id));
+      if (kept.length === assignees.length) continue;
+      job.assignees = kept;
+      if (kept.length === 0 && job.stage === 'inProduction') job.stage = 'ready';
+    }
+  }
+  state.version = 24;
+}
+
 const LIFTS: Record<number, (state: Raw) => void> = {
   12: liftToVersion13,
   13: liftToVersion14,
@@ -661,6 +691,7 @@ const LIFTS: Record<number, (state: Raw) => void> = {
   20: liftToVersion21,
   21: liftToVersion22,
   22: liftToVersion23,
+  23: liftToVersion24,
 };
 
 /** The state a save holds, lifted bump by bump into this build's shape, or null when the save is

@@ -30,7 +30,6 @@ import {
   closingReport,
   contractCounterLine,
   contractMarker,
-  jobBesideContract,
   contractMen,
   contractPiece,
   contractPieceSpeed,
@@ -264,9 +263,10 @@ describe('people, not machines', () => {
     expect(state.equipment.every((item) => item.takenBy !== 'staff-1')).toBe(true);
   });
 
-  it('leaves him on the job he is on: the contract takes the first of his day, not the whole of him', () => {
-    // Turn 19 took him off the job when he went on a contract. From tonight he is on both, and
-    // the contract has the morning (PIOTR; CLAUDE.md T20 2.1.4).
+  it('takes him off the job he is on: the contract is the whole of him, not the first of his day', () => {
+    // Turn 19 took him off the job; Turn 20 left him on both and split his day. From tonight the
+    // contract has the whole of him again (PIOTR, 21.09: "if you put a man on a contract he has
+    // to vanish from the jobs"; v42).
     let state = joinerHall();
     const enquiry = placeEnquiry(state, { price: 4000, deadlineDays: 30 });
     state = acceptNow(state, enquiry.id);
@@ -278,14 +278,14 @@ describe('people, not machines', () => {
     const ben = state.workers[0];
     if (ben) ben.jobId = job.id;
     const contract = running(state);
-    expect(job.assignees).toEqual(['staff-1']);
-    expect(job.stage).toBe('inProduction');
+    expect(job.assignees).toEqual([]);
+    // The last man off puts the job back on the list, where the boss can give it to somebody else.
+    expect(job.stage).toBe('ready');
     expect(ben?.jobId).toBe(contractMarker(contract.id));
-    expect(jobBesideContract(state, 'staff-1')?.id).toBe(job.id);
-    // And off the contract again he is the job's, where he came from.
+    // And off the contract again he is nobody's: a free man waiting for the boss, not the job's.
     expect(assignContract(state, contract.id, 'staff-1', false).ok).toBe(true);
-    expect(ben?.jobId).toBe(job.id);
-    expect(job.assignees).toEqual(['staff-1']);
+    expect(ben?.jobId).toBeNull();
+    expect(job.assignees).toEqual([]);
   });
 
   it('is left alone by the jobs: the marker survives a minute of the clock and he is not handed a ready job', () => {

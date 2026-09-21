@@ -10,7 +10,6 @@ import {
   DAYS_PER_WEEK,
   DAY_END_MINUTE,
   DAY_TRACK_TICK_MINUTES,
-  MINUTES_PER_WORKING_DAY,
   TIER_WORDS,
 } from '../engine/constants';
 import {
@@ -41,8 +40,6 @@ import {
   contractWorkerOf,
   endContractCheck,
   endedLine,
-  jobBesideContract,
-  piecesDueBy,
   sheetsForPieces,
   weekPace,
 } from '../engine/contracts';
@@ -310,17 +307,17 @@ function countRow(label: string, text: string, tone = ''): string {
 interface DayBlock {
   from: number;
   to: number;
-  kind: 'piece' | 'lunch' | 'job' | 'free';
+  kind: 'piece' | 'lunch' | 'free';
   label: string;
 }
 
 /** A man's day, 8:00 to 17:00, as the drawing has it: one block a piece, the lunch block where he
- *  puts his tools down, and what is left of the day going to the job he is also on, or standing
- *  free (PIOTR, the mockup; CLAUDE.md T20 2.1.1, 2.1.2). */
-function dayBlocks(pieces: number, perPiece: number, restLabel: string | null): DayBlock[] {
+ *  puts his tools down, and the tail of the day free. The job block of Turn 20 is gone with the
+ *  split day: a man on a contract has no job to give his afternoon to (PIOTR, 21.09; v42). */
+function dayBlocks(pieces: number, perPiece: number): DayBlock[] {
   const blocks: DayBlock[] = [];
-  const rest = restLabel === null ? 'free' : restLabel;
-  const kind: DayBlock['kind'] = restLabel === null ? 'free' : 'job';
+  const rest = 'free';
+  const kind: DayBlock['kind'] = 'free';
   let at = 0;
   let lunch = false;
   const takeLunch = (from: number): number => {
@@ -388,13 +385,14 @@ function dayTrack(head: string, figure: string, blocks: DayBlock[]): string {
   );
 }
 
-/** His day on the offer: his pieces from 8:00 and the free time at the end of it. */
+/** His day on the offer: pieces from 8:00 to 17:00, and the minutes at the end of it going into
+ *  the piece he carries into the morning. The contract has the whole of his day (v42). */
 function offerDay(state: GameState, contract: Contract, who: string, head: string): string {
   const result = contractResultFor(state, contract, contractWorkerOf(state, who));
   return dayTrack(
     head,
-    `${plural(result.piecesPerDay, 'piece', 'pieces')}, ${result.freeMinutes} min left at the end`,
-    dayBlocks(result.piecesPerDay, result.minutes, null),
+    `${plural(result.piecesPerDay, 'piece', 'pieces')}, ${result.freeMinutes} min into the next`,
+    dayBlocks(result.piecesPerDay, result.minutes),
   );
 }
 
@@ -476,15 +474,16 @@ function offerCard(state: GameState, contract: Contract, picked: string | null):
       -result.wear,
     ) +
     figureRow('Margin a piece', result.margin) +
+    // The client's quantity is the least he will take, not the most: every piece over it is
+    // bought too, so a fast man on it is worth more and the row says so (PIOTR, 21.09; v42).
     countRow(
       `Pieces ${name} makes in a day`,
-      `${result.piecesPerDay} of the ${result.piecesNeededPerDay} needed`,
+      `${result.piecesPerDay}, the client asks ${result.piecesNeededPerDay} at the least`,
       result.piecesPerDay >= result.piecesNeededPerDay ? 'good' : 'bad',
     ) +
     figureRow(`A day of ${name === 'You' ? 'your' : `${name}'s`} pieces, after wages and wear`, result.dayResult) +
-    countRow('Days a week on it', plural(result.daysPerWeek, 'day', 'days')) +
     figureRow(
-      `The week: ${result.piecesPerWeek} pieces, ${plural(result.daysPerWeek, 'day', 'days')} of wages already counted`,
+      `The week: ${result.piecesPerWeek} pieces, five days of wages already counted`,
       result.weekResult,
     ) +
     figureRow(`Over the term, ${plural(contract.termWeeks, 'week', 'weeks')}`, result.termResult) +
@@ -534,21 +533,15 @@ function marginWithTheMen(state: GameState, contract: Contract): number {
   return Math.round((total / men.length) * 100) / 100;
 }
 
-/** A man's day on a running contract: his pieces first, then, in the accent, the minutes that go
- *  to the job he is also on (PIOTR, the mockup; CLAUDE.md T20 2.1.2, 2.1.4). */
+/** A man's day on a running contract: pieces from 8:00 to 17:00 and the minutes at the end going
+ *  into the next one. The contract has his whole day, so there is no job block on the track any
+ *  more (PIOTR, 21.09; v42). */
 function runningDay(state: GameState, contract: Contract, id: string): string {
   const worker = contractWorkerOf(state, id);
   if (worker === null) return '';
   const result = contractResultFor(state, contract, worker);
-  const job = jobBesideContract(state, id);
-  const due = Math.max(0, piecesDueBy(contract, state.clock.day) - contract.piecesThisWeek);
-  const pieces = job === null ? result.piecesPerDay : Math.min(result.piecesPerDay, due);
-  const left = Math.max(0, MINUTES_PER_WORKING_DAY - pieces * result.minutes);
-  const figure =
-    job === null
-      ? `${plural(pieces, 'piece', 'pieces')}, ${left} min left at the end`
-      : `${plural(pieces, 'piece', 'pieces')}, then ${left} min on ${job.name}`;
-  return dayTrack(`${worker.name}'s day`, figure, dayBlocks(pieces, result.minutes, job?.name ?? null));
+  const figure = `${plural(result.piecesPerDay, 'piece', 'pieces')}, ${result.freeMinutes} min into the next`;
+  return dayTrack(`${worker.name}'s day`, figure, dayBlocks(result.piecesPerDay, result.minutes));
 }
 
 /** One running contract: the week live, what it is making, the men on it and their day

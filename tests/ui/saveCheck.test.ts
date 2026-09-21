@@ -117,8 +117,8 @@ afterEach(() => {
 
 describe('a fresh game in this build', () => {
   it('is on the build the brief names', () => {
-    expect(APP_VERSION).toBe('v41');
-    expect(STATE_VERSION).toBe(23);
+    expect(APP_VERSION).toBe('v42');
+    expect(STATE_VERSION).toBe(24);
   });
 
   it('saves through the store, the file and the cloud row on day 1, and loads back three ways', async () => {

@@ -36,6 +36,7 @@ import {
 import { canAccept, drawOffer, findEnquiry, removeEnquiry } from './board';
 import { callRinging, scheduleCalls } from './calls';
 import { template } from './catalog';
+import { contractOfWorker } from './contracts';
 import {
   addWorkingDays,
   formatCalendarDay,
@@ -1032,12 +1033,19 @@ export function assignJob(state: GameState, jobId: string, workerId: string | nu
  *  caller still reads it from here, where it has always been (CLAUDE.md T19 2.5, 2.6, T23 2.17). */
 export { BUILDING_ROLES };
 
-/** True while this man could be put on a job at all: a joiner or a sprayer, on the books and not
- *  off sick. The owner is always able, if he is about. */
+/** True while this man could be put on a job at all: a joiner or a sprayer, on the books, not off
+ *  sick and not on a standing contract. The owner is always able, if he is about.
+ *
+ *  The contract is the one gate that is not about the man himself: a man put on a contract is the
+ *  contract's and vanishes from the jobs, so the player can count the men he has left for the
+ *  board (PIOTR, 21.09: "if you put a man on a contract he has to vanish from the jobs, even from
+ *  the possibility of being assigned to one"; v42). It is asked here because `assignJob`,
+ *  `addToJob`, the manager's `autoAssignJobs` and his re plan all pass through this one door. */
 export function canBuild(state: GameState, workerId: string): boolean {
   if (workerId === OWNER) return ownerIsAvailable(state);
   const worker = state.workers.find((entry) => entry.id === workerId);
   if (!worker) return false;
+  if (contractOfWorker(state, workerId) !== null) return false;
   return BUILDING_ROLES.includes(worker.role) && worker.absentDaysRemaining <= 0;
 }
 

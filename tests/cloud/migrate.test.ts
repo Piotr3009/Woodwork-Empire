@@ -146,7 +146,7 @@ describe('a v24 save in this build (CLAUDE.md T17 section 4)', () => {
     expect(opened.state).not.toBeNull();
     const state = opened.state as GameState;
     expect(state.version).toBe(STATE_VERSION);
-    expect(STATE_VERSION).toBe(23);
+    expect(STATE_VERSION).toBe(24);
     expect(state.taskQueue).toEqual([]);
     expect(state.dayStats.paidHours).toBe(0);
     expect(state.dayStats.expressUplift).toBe(0);
@@ -291,7 +291,7 @@ describe('a v28 save in this build (CLAUDE.md T20 section 4, T21 section 4)', ()
   if (lifted === null) throw new Error('the lift refused a version 16 state');
 
   it('renames every tier and brings the man up to what that tier is worth tonight', () => {
-    expect(lifted.version).toBe(23);
+    expect(lifted.version).toBe(24);
     expect(lifted.workers.map((worker) => worker.tier)).toEqual([
       'novice',
       'experienced',
@@ -416,7 +416,7 @@ describe('a v29 save in this build (CLAUDE.md T21 section 4)', () => {
   if (lifted === null) throw new Error('the lift refused a version 17 state');
 
   it('pays every man by the month at the conversion the Turn 20 build printed', () => {
-    expect(lifted.version).toBe(23);
+    expect(lifted.version).toBe(24);
     // Turn 20's four weekly wages for a joiner were 450, 600, 800 and 1,000, and the build printed
     // the month beside each of them at thirty days over seven. A lifted man costs what the game
     // told the player he cost (CLAUDE.md T21 2.10). From v38 that holds until the v22 lift, which
@@ -633,7 +633,7 @@ describe('a v31 save with an unpaid balance on it (CLAUDE.md T22 2.1)', () => {
     // There is one track for money from tonight: a cost the player did not choose is paid out of
     // the account whatever the balance, so a save that was carrying 2,780 it never paid has it
     // taken out of the account now (PIOTR, 19.09; CLAUDE.md T22 2.1, section 4).
-    expect(lifted.version).toBe(23);
+    expect(lifted.version).toBe(24);
     expect(lifted.cash).toBe(-4998 - 2780);
   });
 
@@ -725,7 +725,7 @@ describe('a v35 save in this build (CLAUDE.md T23 section 4)', () => {
     // A played company starts its list at its next month end: the card the player was shown that
     // evening is the report, and one worked out again tonight would not be that card
     // (CLAUDE.md T23 2.14).
-    expect(lifted.version).toBe(23);
+    expect(lifted.version).toBe(24);
     expect(lifted.monthlyReports).toEqual([]);
   });
 
@@ -782,5 +782,64 @@ describe('a v35 save in this build (CLAUDE.md T23 section 4)', () => {
     const opened = migrateState(clean, 19);
     if (opened === null) throw new Error('the lift refused a clean version 19 state');
     expect(opened.ledger).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// v23 to v24: a man on a contract comes off the jobs he was also standing on
+// (PIOTR, 21.09; v42)
+// ---------------------------------------------------------------------------
+
+/** A v23 save made under Turn 20's split day: one man on a contract and on a job of his own, one
+ *  man on a contract sharing a job with a mate, and one man on nothing but a job. Cut down to what
+ *  this one lift touches. */
+function v41Save(): Record<string, unknown> {
+  return {
+    version: 23,
+    cash: 4200,
+    clock: { day: 40, minute: 300 },
+    workers: [
+      { id: 'j-1', role: 'joiner', jobId: 'job-1' },
+      { id: 'j-2', role: 'joiner', jobId: 'job-2' },
+      { id: 'j-3', role: 'joiner', jobId: 'job-2' },
+    ],
+    contracts: [
+      { id: 'c-1', status: 'active', assigned: ['j-1', 'j-2'] },
+      { id: 'c-old', status: 'ended', assigned: ['j-3'] },
+    ],
+    jobs: [
+      { id: 'job-1', stage: 'inProduction', assignees: ['j-1'] },
+      { id: 'job-2', stage: 'inProduction', assignees: ['j-2', 'j-3'] },
+    ],
+    equipment: [],
+    ledger: [],
+  };
+}
+
+describe('a v23 save made under the split day (PIOTR, 21.09; v42)', () => {
+  const lifted = migrateState(v41Save(), 23);
+  if (lifted === null) throw new Error('the lift refused a version 23 state');
+
+  it('comes up at this build s version', () => {
+    expect(lifted.version).toBe(24);
+  });
+
+  it('takes every man on a running contract off the jobs he was standing on', () => {
+    // The rule the lift is for: a man on a contract vanishes from the jobs (PIOTR, 21.09).
+    const one = lifted.jobs.find((job) => job.id === 'job-1');
+    const two = lifted.jobs.find((job) => job.id === 'job-2');
+    expect(one?.assignees).toEqual([]);
+    expect(two?.assignees).toEqual(['j-3']);
+    expect(lifted.workers.find((worker) => worker.id === 'j-1')?.jobId).toBe('contract:c-1');
+    expect(lifted.workers.find((worker) => worker.id === 'j-2')?.jobId).toBe('contract:c-1');
+  });
+
+  it('puts a job it emptied back on the list and leaves one that kept a man in production', () => {
+    expect(lifted.jobs.find((job) => job.id === 'job-1')?.stage).toBe('ready');
+    expect(lifted.jobs.find((job) => job.id === 'job-2')?.stage).toBe('inProduction');
+  });
+
+  it('leaves a man off a contract that has ended where he was', () => {
+    expect(lifted.workers.find((worker) => worker.id === 'j-3')?.jobId).toBe('job-2');
   });
 });

@@ -39,7 +39,7 @@ import { isBreak, isWorkingDay, weekOfDay, weekday, workedMinutesOfDay } from '.
 import { plural } from './text';
 import { charge, formatMoney } from './economy';
 import { queueEvent } from './events';
-import { isOnJob, jobHasWorkFor, stagedJob, workerMinuteCost } from './jobs';
+import { isOnJob, stagedJob, takeOffJob, workerMinuteCost } from './jobs';
 import { freeSheets } from './materials';
 import {
   OWNER,
@@ -64,7 +64,7 @@ import type { RngCarrier } from './rng';
 import { crewHasGoneHome, isWorkingToday, joiners } from './staff';
 import { STATION_BENCH, machineStation, waitingStation } from './stations';
 import { cncOptions, familyForStage, jobOnCnc, stageSpeed } from './stages';
-import type { Contract, ContractWeek, Equipment, GameState, Job, StageId, Worker } from './types';
+import type { Contract, ContractWeek, Equipment, GameState, StageId, Worker } from './types';
 
 /** What a man on a contract carries in `jobId`, so the jobs leave him alone: not available for
  *  a job, not at one, and not a job the plan could find (CLAUDE.md T13 3.16). */
@@ -341,13 +341,15 @@ export interface ContractResult {
   margin: number;
   /** Pieces he makes in a working day, whole, the lunch break out. */
   piecesPerDay: number;
-  /** Pieces a day the client's week asks for. */
+  /** Pieces a day the client's order asks for at the least: his week's quantity over the working
+   *  days of the week. It is a floor and not a ceiling, because the client takes every piece that
+   *  is made (PIOTR, 21.09: "he takes as many as we can make"; v42). */
   piecesNeededPerDay: number;
-  /** Days of his week the contract takes, never more than the week itself. */
-  daysPerWeek: number;
-  /** Minutes left at the end of a day of his pieces. */
+  /** Minutes of the day left over when his last whole piece is done. He starts the next one with
+   *  them and carries it into the morning: the contract has his whole day (v42). */
   freeMinutes: number;
-  /** Pieces the week comes to with him on it: what the client wants, or what he can make. */
+  /** Pieces the week comes to with him on it: five working days of his own pieces, whatever the
+   *  client ordered, because the client takes every piece he makes (PIOTR, 21.09; v42). */
   piecesPerWeek: number;
   /** A day of his pieces: what they leave after his wages and the machine's wear (v40). */
   dayResult: number;
@@ -418,7 +420,11 @@ function resultAtSpeed(
   const wear = pence(minutes * wearPerMinute);
   const margin = pence(contract.pricePerPiece - piece.material - labourCost - wear);
   const piecesPerDay = Math.floor(MINUTES_PER_WORKING_DAY / minutes);
-  const piecesPerWeek = Math.min(contract.quantityPerWeek, piecesPerDay * WORKING_DAYS_PER_WEEK);
+  // Every working day of the week, and no ceiling at what the client ordered: the man on a
+  // contract is the contract's all day and the client takes every piece he makes, so the week is
+  // what he can make and the order is the floor under it (PIOTR, 21.09: "he takes as many as we
+  // can make, week after week until the contract is used up"; v42).
+  const piecesPerWeek = piecesPerDay * WORKING_DAYS_PER_WEEK;
   return {
     minutes,
     labourCost,
@@ -434,10 +440,6 @@ function resultAtSpeed(
     dayResult: pence(piecesPerDay * margin),
     piecesPerDay,
     piecesNeededPerDay: Math.ceil(contract.quantityPerWeek / WORKING_DAYS_PER_WEEK),
-    daysPerWeek:
-      piecesPerDay > 0
-        ? Math.min(WORKING_DAYS_PER_WEEK, Math.ceil(contract.quantityPerWeek / piecesPerDay))
-        : WORKING_DAYS_PER_WEEK,
     freeMinutes: Math.max(0, MINUTES_PER_WORKING_DAY - piecesPerDay * minutes),
     piecesPerWeek,
     weekResult: pence(piecesPerWeek * margin),
@@ -664,17 +666,17 @@ export function contractAssignCheck(state: GameState, contract: Contract, who: s
 
 function takeOff(state: GameState, contract: Contract, worker: Worker): void {
   contract.assigned = contract.assigned.filter((id) => id !== worker.id);
-  // Off the contract and back to the job he was also standing on, when he was on one
-  // (CLAUDE.md T20 2.1.4).
-  if (worker.jobId === contractMarker(contract.id)) {
-    worker.jobId = jobBesideContract(state, worker.id)?.id ?? null;
-  }
+  // Off the contract and on nothing: he comes off it with no job under him and waits for the
+  // boss like any free man, because the contract took him off the jobs when it took him (v42).
+  if (worker.jobId === contractMarker(contract.id)) worker.jobId = null;
   releaseMachines(state, worker.id);
 }
 
-/** Puts a joiner on the contract or takes him off it. He keeps the job he is standing on: the
- *  contract has the first of his day and the job what is left of it, and the marker is what the
- *  jobs read while the contract wants him (CLAUDE.md T13 3.16, T20 2.1.4). */
+/** Puts a joiner on the contract or takes him off it. A man on a contract is the contract's and
+ *  nothing else: he comes off every job he was on and cannot be put on one while he is on it, so
+ *  the player can count the men he has left for the board (PIOTR, 21.09: "if you put a man on a
+ *  contract he has to vanish from the jobs, even from the possibility of being assigned to one";
+ *  v42). Turn 20's split day, where the contract had his morning and a job the rest, is gone. */
 export function assignContract(
   state: GameState,
   contractId: string,
@@ -693,8 +695,10 @@ export function assignContract(
   if (contract.assigned.includes(worker.id)) return OK;
   const elsewhere = contractOfWorker(state, worker.id);
   if (elsewhere) takeOff(state, elsewhere, worker);
-  // The job he is on stays his: the contract books his pieces from 8:00 and the job gets what is
-  // left of the day (PIOTR; CLAUDE.md T20 2.1.4). Turn 19's rule that he comes off it is gone.
+  // Off every job of work first: the contract has his whole day from here (PIOTR, 21.09; v42).
+  for (const job of state.jobs) {
+    if (isOnJob(job, worker.id)) takeOffJob(state, job.id, worker.id);
+  }
   releaseMachines(state, worker.id);
   worker.jobId = contractMarker(contract.id);
   contract.assigned.push(worker.id);
@@ -719,48 +723,15 @@ export function contractHands(state: GameState, contract: Contract): Worker[] {
   return hands;
 }
 
-/** The job of work this man is standing on beside his contract, or null when he has nothing else
- *  to go to. Only a job in production: a job that is not started is nowhere for him to go
- *  (CLAUDE.md T20 2.1.4). */
-export function jobBesideContract(state: GameState, workerId: string): Job | null {
-  return state.jobs.find((job) => job.stage === 'inProduction' && isOnJob(job, workerId)) ?? null;
-}
-
-/** The pieces the client wants by the end of today: the week's quantity spread over the working
- *  days of the week, which is the line the man on it works to (PIOTR; CLAUDE.md T20 2.1.4). A
- *  contract behind the line asks for the catch up on the next day it is read, because the line is
- *  the same line read forward. */
-export function piecesDueBy(contract: Contract, day: number): number {
-  const wanted = weekWanted(contract, day);
-  const days = workingDaysOfWeekInTerm(contract, day);
-  if (days <= 0) return wanted;
-  return Math.min(wanted, Math.ceil((wanted * workingDaysOfWeekSoFar(contract, day)) / days));
-}
-
-/** Does the contract want this man this minute? He books his pieces from 8:00 until the day's
- *  share of the week is made, and only then goes to the job he is also on (PIOTR;
- *  CLAUDE.md T20 2.1.4). With no job to go to he stays on the contract, because the client pays
- *  for every piece he makes. This is the one place the day's order is decided: the job's hands,
- *  the contract's minute and the Contracts tab all read it. */
+/** Does the contract want this man this minute? It wants him every minute he is on it: he is the
+ *  contract's whole day and has no job of work to go to, because going on a contract took him off
+ *  the jobs (PIOTR, 21.09; v42). He makes pieces past the day's share and past the week's order,
+ *  and the client takes them: "he takes as many as we can make, week after week until the
+ *  contract is used up". Turn 20's rule, where he made the day's share and then went to a job, is
+ *  gone with the split day. This is still the one place the day's order is decided: the job's
+ *  hands, the contract's minute and the Contracts tab all read it. */
 export function contractWantsToday(state: GameState, workerId: string): boolean {
-  const contract = contractOfWorker(state, workerId);
-  if (contract === null) return false;
-  // Nothing on the rack for its next piece: the contract cannot use the minute, so a man with a
-  // job of work under him goes to it instead of standing at his bench until a delivery lands.
-  // Only a man with nowhere else to go waits it out (CLAUDE.md T17 2.22, T20 2.1.4).
-  if (contractWaitingForMaterial(state, contract)) {
-    return jobBesideContract(state, workerId) === null;
-  }
-  if (contract.piecesThisWeek < piecesDueBy(contract, state.clock.day)) return true;
-  const job = jobBesideContract(state, workerId);
-  if (job === null) return true;
-  // His day's share is made and he has a job to go to, but the job cannot use the minute: its saw is
-  // taken, its rack is empty or the hall has stopped it. He makes pieces rather than stand at it,
-  // because the client pays for every piece he makes, and his contract is the last thing asked
-  // before he stands (PIOTR; CLAUDE.md T20 2.1, T22 2.6). Asked fresh every minute off
-  // the hall itself and never off a flag written down last minute, so the minute his job can have him
-  // again it has him.
-  return !jobHasWorkFor(state, job, workerId);
+  return contractOfWorker(state, workerId) !== null;
 }
 
 /** The stage the piece is at and the family it is done on: the CNC when the man can have one,
@@ -839,23 +810,13 @@ export function runContractMinute(state: GameState): ContractMinute {
   let hall: number | null = null;
   for (const contract of active) {
     const piece = contractPiece(contract);
-    // The contract fills the day first (PIOTR; CLAUDE.md T20 2.1.4): the men it still wants today
-    // are its own this minute, and a man whose share of the week is made goes back to the job he
-    // is also on, from the next minute, which is when the jobs read him again.
-    const wanted: Worker[] = [];
-    for (const worker of contractHands(state, contract)) {
-      if (contractWantsToday(state, worker.id)) {
-        wanted.push(worker);
-        continue;
-      }
-      const job = jobBesideContract(state, worker.id);
-      if (job) worker.jobId = job.id;
-    }
+    // The contract has the whole day of every man on it (PIOTR, 21.09; v42): its hands are its
+    // own this minute, first to last, with no job of work to give them back to.
+    const wanted = contractHands(state, contract);
     if (wanted.length === 0) continue;
     // Nothing on the rack for the next piece: the men on it stand at their benches, the way a job
-    // waits for its material (CLAUDE.md T17 2.22). A man with a job of work under him is not among
-    // them: `contractWantsToday` has already sent him to it, so only a man with nowhere else to go
-    // stands here (CLAUDE.md T20 2.1.4).
+    // waits for its material (CLAUDE.md T17 2.22). Every one of them stands, because a man on a
+    // contract has nowhere else to go (v42).
     if (contractWaitingForMaterial(state, contract)) {
       for (const worker of wanted) {
         // The marker goes back on, as it does on a working minute, so the contract keeps him
@@ -1097,11 +1058,9 @@ export function runContractDay(state: GameState): void {
     // What the week wants off the rack is held this morning, after the jobs have had theirs
     // (CLAUDE.md T17 2.22).
     reserveContractSheets(state, contract);
-    // The contract has the morning: a man it wants today carries its marker from 8:00, so the
-    // jobs do not have him for the first minute of the day (CLAUDE.md T20 2.1.4).
-    for (const worker of contractHands(state, contract)) {
-      if (contractWantsToday(state, worker.id)) worker.jobId = contractMarker(contract.id);
-    }
+    // Every man on it carries its marker from 8:00: the contract has his whole day, so the jobs
+    // never have him (PIOTR, 21.09; v42).
+    for (const worker of contractHands(state, contract)) worker.jobId = contractMarker(contract.id);
   }
 }
 

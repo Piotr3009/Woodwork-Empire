@@ -38,7 +38,7 @@ describe('GameState', () => {
     // moved the bags onto the extractor, and a Turn 11 save is lifted rather than refused
     // (CLAUDE.md T12 2.3). Turn 23 wrote the closed months down on the state
     // (CLAUDE.md T23 section 4).
-    expect(STATE_VERSION).toBe(23);
+    expect(STATE_VERSION).toBe(24);
     expect(sample.version).toBe(STATE_VERSION);
   });
 
