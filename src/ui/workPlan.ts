@@ -41,7 +41,7 @@ function minutesText(row: PlanRow): string {
  *  man has it back in the morning where the evening left it (PIOTR, 17.09; CLAUDE.md T17 2.12).
  *  Nothing at all by day: the crew are in the hall and the job is theirs. */
 function takeOverControl(state: GameState, job: Job): string {
-  if (ownerTookOver(job)) {
+  if (ownerTookOver(state, job)) {
     return '<span class="row-figure">You are on it tonight; he has it back in the morning</span>';
   }
   if (!canTakeOver(state, job)) return '';

@@ -96,7 +96,7 @@ import {
   syncModals,
   tabBar,
 } from './modal';
-import { playCharacters } from '../render/characters';
+import { playCharacters, setWalkPace } from '../render/characters';
 import { resetWalkers, stepWalkers, syncWalkers } from '../render/walkers';
 import { resetDoors, stepDoors, syncDoors } from '../render/doors';
 import { applySoundSettings, play as soundPlay, setLoops, stopAllSounds, unlockSound } from './sound';
@@ -2758,6 +2758,8 @@ function runFrame(now: number): void {
   // else the frame does and whatever the clock is at (CLAUDE.md T9 3.13; T16 2.2): first along
   // the floor, then on to the frame of their animation.
   if (root !== null) {
+    // The floor's pace is the game's speed this frame (PIOTR, 21.09; v44).
+    setWalkPace(game().speed);
     stepWalkers(root, now);
     // The doors swing on the renderer's own clock, beside the figures and for the same reason:
     // the page is written again under them and the swing is not game state (CLAUDE.md T19 2.3).

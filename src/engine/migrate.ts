@@ -679,6 +679,14 @@ function liftToVersion24(state: Raw): void {
   state.version = 24;
 }
 
+/** v25 (v44, PIOTR 21.09): the owner's evening take-over is remembered by the job's id, so that
+ *  dusk gives back that one job and not every job he stands second on. A save has no evening in
+ *  hand when it is opened in the morning, so it comes in with none. */
+function liftToVersion25(state: Raw): void {
+  if (isRecord(state.owner)) state.owner.tookOverJobId = null;
+  state.version = 25;
+}
+
 const LIFTS: Record<number, (state: Raw) => void> = {
   12: liftToVersion13,
   13: liftToVersion14,
@@ -692,6 +700,7 @@ const LIFTS: Record<number, (state: Raw) => void> = {
   21: liftToVersion22,
   22: liftToVersion23,
   23: liftToVersion24,
+  24: liftToVersion25,
 };
 
 /** The state a save holds, lifted bump by bump into this build's shape, or null when the save is

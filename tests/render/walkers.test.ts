@@ -5,7 +5,11 @@
 // change mid walk turns him from where he is.
 
 import { beforeEach, describe, expect, it } from 'vitest';
-import { WALK_CELLS_PER_SECOND, WALK_STRIDE_METRES } from '../../src/engine/constants';
+import {
+  WALK_CELLS_PER_SECOND,
+  WALK_CELLS_PER_SECOND_FAST,
+  WALK_STRIDE_METRES,
+} from '../../src/engine/constants';
 import {
   STATION_BENCH,
   STATION_GATE,
@@ -24,6 +28,10 @@ import {
   animationForStation,
   legCarries,
   playCharacters,
+  setWalkPace,
+  walkFps,
+  walkPace,
+  walkPaceFor,
 } from '../../src/render/characters';
 import { walkPath } from '../../src/engine/walk';
 import { renderHall, stationCell } from '../../src/render/hall';
@@ -65,11 +73,51 @@ function cellAttr(root: ParentNode, key: string): { x: number; y: number } {
 
 const A_CELL_ON_SCREEN = Math.hypot(24, 12) + 0.01;
 
-describe("a man's pace (PIOTR, 17.09; CLAUDE.md T18 2.1)", () => {
-  it('is one cell of the hall a second of real time, at x1 and at x30 alike', () => {
-    // A man does not walk faster because the clock does: the walker steps in real seconds and
-    // never reads the speed, so this one figure is his pace at every speed in the game.
-    expect(WALK_CELLS_PER_SECOND).toBe(1.0);
+describe("a man's pace (PIOTR, 17.09, 21.09; CLAUDE.md T18 2.1)", () => {
+  it('is a cell and a quarter a second of real time at x1, and a cell and a half when the clock runs faster', () => {
+    // A quarter more than the one cell of 17.09 (PIOTR, 21.09: "walking is too slow"), and half
+    // as fast again while the clock runs faster than x1, the same at x2 and at x30, so the
+    // figures keep up with a hurried day without flying (PIOTR: "not too much"; v44).
+    expect(WALK_CELLS_PER_SECOND).toBe(1.25);
+    expect(WALK_CELLS_PER_SECOND_FAST).toBe(1.5);
+    expect(walkPaceFor(0)).toBe(WALK_CELLS_PER_SECOND);
+    expect(walkPaceFor(1)).toBe(WALK_CELLS_PER_SECOND);
+    for (const speed of [2, 4, 10, 30]) expect(walkPaceFor(speed)).toBe(WALK_CELLS_PER_SECOND_FAST);
+  });
+
+  it('moves the walker at the pace the frame set, and plays the feet to it', () => {
+    resetWalkers();
+    const state = hall();
+    const joiner = state.workers[0];
+    if (!joiner) throw new Error('no joiner');
+    const key = `worker-${joiner.id}`;
+    joiner.station = STATION_BENCH;
+    let root = page(state);
+    const pathFor = (from: { x: number; y: number }, to: { x: number; y: number }): Array<{ x: number; y: number }> =>
+      walkPath(state, from, to);
+    syncWalkers(root, 0, pathFor);
+    joiner.station = STATION_GATE;
+    root = page(state);
+    syncWalkers(root, 0, pathFor);
+    const walker = walkerOf(key);
+    if (!walker) throw new Error('no walker');
+    const legs = walker.path.length;
+    expect(legs).toBeGreaterThan(4);
+    // One second at x1 covers a cell and a quarter of the path; one second at x10 a cell and a
+    // half of it: the same frame, a different pace.
+    setWalkPace(1);
+    stepWalkers(root, 1000);
+    const slow = legs - walker.path.length;
+    setWalkPace(10);
+    stepWalkers(root, 2000);
+    const fast = legs - walker.path.length - slow;
+    expect(slow).toBe(Math.floor(WALK_CELLS_PER_SECOND));
+    expect(fast).toBeGreaterThanOrEqual(slow);
+    expect(walkPace()).toBe(WALK_CELLS_PER_SECOND_FAST);
+    const sheet = { frames: 8, fps: 3 } as Parameters<typeof walkFps>[0];
+    expect(walkFps(sheet)).toBeCloseTo((8 * WALK_CELLS_PER_SECOND_FAST) / WALK_STRIDE_METRES, 6);
+    setWalkPace(1);
+    expect(walkFps(sheet)).toBeCloseTo((8 * WALK_CELLS_PER_SECOND) / WALK_STRIDE_METRES, 6);
   });
 });
 
@@ -368,7 +416,8 @@ describe('The movement (CLAUDE.md T19 2.1, PIOTR: "like robots, shaking like a l
       stepWalkers(root, now);
       if (walker.path.length > 0) facings.push(facingOf(root, key));
     }
-    expect(facings.length).toBeGreaterThan(600);
+    // Twelve cells at a cell and a quarter a second is under ten seconds of frames (v44).
+    expect(facings.length).toBeGreaterThan(500);
     expect(new Set(facings).size, `facings seen: ${Array.from(new Set(facings)).join(',')}`).toBe(1);
     // And the mirror never flips with it, which is what the eye actually catches.
     expect(

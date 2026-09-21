@@ -19,11 +19,7 @@
 // Nothing here is game state. A rebuilt page finds the walkers still here and puts every figure
 // back where it had actually got to (the same reason the slides of Turn 2 lived in the app).
 
-import {
-  FIGURE_DEPTH_OFFSET,
-  WALK_CELLS_PER_SECOND,
-  WALK_CORNER_CELLS,
-} from '../engine/constants';
+import { FIGURE_DEPTH_OFFSET, WALK_CORNER_CELLS } from '../engine/constants';
 import { STATION_GATE, STATION_RACK, isBehindTheDoor } from '../engine/stations';
 import {
   type Animation,
@@ -33,6 +29,7 @@ import {
   legCarries,
   playCharacters,
   setCharacterAnimation,
+  walkPace,
 } from './characters';
 import { centreOf, depthKey } from './iso';
 
@@ -425,7 +422,7 @@ export function stepWalkers(root: ParentNode, nowMs: number): number {
     const seconds = Math.max(0, (nowMs - walker.lastMs) / 1000);
     walker.lastMs = nowMs;
     if (walker.path.length === 0) continue;
-    let left = Math.min(1, seconds * WALK_CELLS_PER_SECOND);
+    let left = Math.min(1, seconds * walkPace());
     let heading: Facing | null = null;
     while (left > 0 && walker.path.length > 0) {
       const next = walker.path[0] as Cell;

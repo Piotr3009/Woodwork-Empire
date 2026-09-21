@@ -1116,25 +1116,29 @@ export function takeOverJob(state: GameState, jobId: string): boolean {
   if (held !== null && held.id !== job.id) takeOffJob(state, held.id, OWNER);
   job.assignees.splice(1, 0, OWNER);
   job.stage = 'inProduction';
+  state.owner.tookOverJobId = job.id;
   return true;
 }
 
-/** The evening is over: every job the owner took on for it goes back to the man it belongs to,
- *  who picks it up in the morning where the evening left it (CLAUDE.md T17 2.12). */
+/** The evening is over: the one job the owner took on for it goes back to the man it belongs to,
+ *  who picks it up in the morning where the evening left it (CLAUDE.md T17 2.12). Only that job:
+ *  until v44 dusk took him off every job he was not the lead of, which since v41 is every job he
+ *  joined by day as a second pair of hands, so he was thrown off his own work every night
+ *  (PIOTR, 21.09). */
 export function endOwnerTakeOver(state: GameState): void {
-  for (const job of state.jobs) {
-    if (ownerTookOver(job)) removeAssignee(job, OWNER);
-  }
+  const taken = state.owner.tookOverJobId;
+  state.owner.tookOverJobId = null;
+  if (taken === null) return;
+  const job = findJob(state, taken);
+  if (job !== null && ownerTookOver(state, job)) removeAssignee(job, OWNER);
 }
 
-/** True while the owner is standing at a job that is somebody else's: the row says "You are on
- *  it tonight" rather than offering the takeover again (CLAUDE.md T17 2.12). Read off the list
- *  and not off a place in it: with no limit on the men he can be third or tenth on the job, and
- *  the evening must still give it back to the man whose job it is (CLAUDE.md T19 2.5). A job he
- *  leads is his own and dusk never takes him off it. */
-export function ownerTookOver(job: Job): boolean {
-  const lead = leadAssignee(job);
-  return isOnJob(job, OWNER) && lead !== null && lead !== OWNER;
+/** True while the owner is standing at a job he took on for the evening: the row says "You are on
+ *  it tonight" rather than offering the takeover again (CLAUDE.md T17 2.12). It is the job he
+ *  pressed the button for and he is still on it; a job he joined by day is not a takeover, however
+ *  far down its list he stands (CLAUDE.md T19 2.5; v44). */
+export function ownerTookOver(state: GameState, job: Job): boolean {
+  return state.owner.tookOverJobId === job.id && isOnJob(job, OWNER);
 }
 
 /** Takes whoever is on the job off it, leaving the work done in place. He walks away from every

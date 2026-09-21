@@ -146,7 +146,7 @@ describe('a v24 save in this build (CLAUDE.md T17 section 4)', () => {
     expect(opened.state).not.toBeNull();
     const state = opened.state as GameState;
     expect(state.version).toBe(STATE_VERSION);
-    expect(STATE_VERSION).toBe(24);
+    expect(STATE_VERSION).toBe(25);
     expect(state.taskQueue).toEqual([]);
     expect(state.dayStats.paidHours).toBe(0);
     expect(state.dayStats.expressUplift).toBe(0);
@@ -291,7 +291,7 @@ describe('a v28 save in this build (CLAUDE.md T20 section 4, T21 section 4)', ()
   if (lifted === null) throw new Error('the lift refused a version 16 state');
 
   it('renames every tier and brings the man up to what that tier is worth tonight', () => {
-    expect(lifted.version).toBe(24);
+    expect(lifted.version).toBe(25);
     expect(lifted.workers.map((worker) => worker.tier)).toEqual([
       'novice',
       'experienced',
@@ -416,7 +416,7 @@ describe('a v29 save in this build (CLAUDE.md T21 section 4)', () => {
   if (lifted === null) throw new Error('the lift refused a version 17 state');
 
   it('pays every man by the month at the conversion the Turn 20 build printed', () => {
-    expect(lifted.version).toBe(24);
+    expect(lifted.version).toBe(25);
     // Turn 20's four weekly wages for a joiner were 450, 600, 800 and 1,000, and the build printed
     // the month beside each of them at thirty days over seven. A lifted man costs what the game
     // told the player he cost (CLAUDE.md T21 2.10). From v38 that holds until the v22 lift, which
@@ -633,7 +633,7 @@ describe('a v31 save with an unpaid balance on it (CLAUDE.md T22 2.1)', () => {
     // There is one track for money from tonight: a cost the player did not choose is paid out of
     // the account whatever the balance, so a save that was carrying 2,780 it never paid has it
     // taken out of the account now (PIOTR, 19.09; CLAUDE.md T22 2.1, section 4).
-    expect(lifted.version).toBe(24);
+    expect(lifted.version).toBe(25);
     expect(lifted.cash).toBe(-4998 - 2780);
   });
 
@@ -725,7 +725,7 @@ describe('a v35 save in this build (CLAUDE.md T23 section 4)', () => {
     // A played company starts its list at its next month end: the card the player was shown that
     // evening is the report, and one worked out again tonight would not be that card
     // (CLAUDE.md T23 2.14).
-    expect(lifted.version).toBe(24);
+    expect(lifted.version).toBe(25);
     expect(lifted.monthlyReports).toEqual([]);
   });
 
@@ -821,7 +821,7 @@ describe('a v23 save made under the split day (PIOTR, 21.09; v42)', () => {
   if (lifted === null) throw new Error('the lift refused a version 23 state');
 
   it('comes up at this build s version', () => {
-    expect(lifted.version).toBe(24);
+    expect(lifted.version).toBe(25);
   });
 
   it('takes every man on a running contract off the jobs he was standing on', () => {
@@ -841,5 +841,14 @@ describe('a v23 save made under the split day (PIOTR, 21.09; v42)', () => {
 
   it('leaves a man off a contract that has ended where he was', () => {
     expect(lifted.workers.find((worker) => worker.id === 'j-3')?.jobId).toBe('job-2');
+  });
+});
+
+describe('a v24 save in this build (v44)', () => {
+  it('comes in with no evening take-over in hand', () => {
+    const lifted = migrateState({ version: 24, owner: { wentHome: false } }, 24);
+    if (lifted === null) throw new Error('the lift refused a version 24 state');
+    expect(lifted.version).toBe(25);
+    expect(lifted.owner.tookOverJobId).toBe(null);
   });
 });

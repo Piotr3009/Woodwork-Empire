@@ -372,6 +372,10 @@ export interface OwnerState {
   breakAsked: boolean;
   homeAsked: boolean;
   wentHome: boolean;
+  /** The job he took on for the evening with "Take it on tonight", or null. Dusk gives that one
+   *  job back to its own man and no other: a job he joined by day as a second pair of hands is
+   *  his until somebody moves him (PIOTR, 21.09: "it throws me off my job the next day"; v44). */
+  tookOverJobId: string | null;
   currentTaskId: string | null;
   /** What the phone interrupted, so he goes back to it when the call is over (T4 3.3). */
   resumeTaskId: string | null;

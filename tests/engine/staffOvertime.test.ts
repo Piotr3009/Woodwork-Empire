@@ -9,6 +9,7 @@ import { describe, expect, it } from 'vitest';
 import { DAY_END_MINUTE } from '../../src/engine/constants';
 import { isLastWorkingDayOfMonth } from '../../src/engine/clock';
 import { crewHasGoneHome } from '../../src/engine/staff';
+import { ownerTookOver } from '../../src/engine/jobs';
 import type { GameState, Job } from '../../src/engine/index';
 import { act, clearEvents, runClock, runToDay, twoMenOnSheetWork } from '../helpers';
 
@@ -55,13 +56,37 @@ describe('five in the afternoon', () => {
     expect(mansJob(taken).assignees[1]).toBe('owner');
     const worked = clearEvents(runClock(taken, 60));
     expect(mansJob(worked).labourRemaining).toBeLessThan(before);
-    // The morning: the evening is over, the owner is off it and the man carries on with it.
+    expect(worked.owner.tookOverJobId).toBe(job.id);
+    expect(ownerTookOver(worked, mansJob(worked))).toBe(true);
+    // The morning: the evening is over and given back, the man carries on with his job as its
+    // lead, and the take-over is forgotten. Whether the owner stands beside him at 8:00 is the
+    // morning's own rule (v41: an empty office sends him to the soonest deadline) and not the
+    // evening's.
     const tomorrow = clearEvents(act(worked, { type: 'END_DAY' }));
     expect(tomorrow.clock.day).toBeGreaterThan(state.clock.day);
     const morning = mansJob(tomorrow);
-    expect(morning.assignees[1] ?? null).toBe(null);
     expect(morning.assignees[0]).toBe('staff-1');
+    expect(tomorrow.owner.tookOverJobId).toBe(null);
+    expect(ownerTookOver(tomorrow, morning)).toBe(false);
     expect(tomorrow.workers.find((worker) => worker.id === 'staff-1')?.jobId).toBe(morning.id);
+  });
+
+  it('keeps the owner on a job he joined by day: dusk gives back the evening and nothing else (v44)', () => {
+    // Until v44 dusk took the owner off every job he was not the lead of, which since v41 is every
+    // job he joined as a second pair of hands, so he was thrown off his own work every night
+    // (PIOTR, 21.09: "it throws me off the job I was assigned to the next day").
+    const state = twoMenOnSheetWork();
+    const job = mansJob(state);
+    const joined = act(state, { type: 'ADD_TO_JOB', jobId: job.id, workerId: 'owner' });
+    expect(mansJob(joined).assignees).toEqual(['staff-1', 'owner']);
+    expect(joined.owner.tookOverJobId).toBe(null);
+    expect(ownerTookOver(joined, mansJob(joined))).toBe(false);
+    let evening = joined;
+    evening.clock.minute = DAY_END_MINUTE;
+    evening.owner.homeAsked = true;
+    evening = clearEvents(act(evening, { type: 'END_DAY' }));
+    expect(evening.clock.day).toBeGreaterThan(state.clock.day);
+    expect(mansJob(evening).assignees).toEqual(['staff-1', 'owner']);
   });
 
   it('is the only time a job can be taken over: by day the job stays the mans', () => {

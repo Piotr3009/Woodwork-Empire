@@ -135,6 +135,22 @@ export function contractMen(state: GameState): string[] {
   return men;
 }
 
+/** The men on a standing contract who can hold a machine this minute: the hands of every active
+ *  contract that has material for its next piece, while the crew are in. The jobs' men are let
+ *  off their machines the minute they stop, and so is a contract's man now: until v45 every man
+ *  on a contract kept his saw whatever he was doing, so one waiting for a delivery, or gone home
+ *  at five, held the one saw and every job's man stood behind it with nobody at it (PIOTR, 22.09:
+ *  "everyone waits for the saw and nobody does anything"; v45). */
+export function contractMenAtWork(state: GameState): string[] {
+  if (crewHasGoneHome(state)) return [];
+  const men: string[] = [];
+  for (const contract of activeContracts(state)) {
+    if (contractWaitingForMaterial(state, contract)) continue;
+    men.push(...contractHands(state, contract).map((worker) => worker.id));
+  }
+  return men;
+}
+
 /** Contracts come with reputation, from the second tier up (CLAUDE.md T13 3.16). */
 export function contractsAllowed(state: GameState): boolean {
   return reputationTier(state.reputation) >= CONTRACT_MIN_TIER;

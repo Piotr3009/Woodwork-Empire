@@ -53,7 +53,7 @@ import {
   endContractNow,
   renewContract,
   runContractDay,
-  contractMen,
+  contractMenAtWork,
   contractStationFor,
   runContractMinute,
 } from './contracts';
@@ -385,6 +385,7 @@ export function createGame(options: NewGameOptions): GameState {
       breakAsked: false,
       homeAsked: false,
       wentHome: false,
+      tookOverJobId: null,
       currentTaskId: null,
       resumeTaskId: null,
       sickDaysRemaining: 0,
@@ -1670,8 +1671,9 @@ function runProductionMinute(state: GameState, ownerOnTask: boolean): void {
   const working = handsAtWork(state, ownerOnTask, moving);
   // Anybody who is not at a job this minute walks away from whatever he was standing at, so the
   // next man can have it (CLAUDE.md T7 3.1).
-  // The men on a standing contract keep their saw beside the jobs' men (CLAUDE.md T13 3.16).
-  releaseMachinesExcept(state, [...working.map((hand) => hand.who), ...contractMen(state)]);
+  // The men on a standing contract keep their saw beside the jobs' men while the contract can
+  // use them this minute (CLAUDE.md T13 3.16; v45).
+  releaseMachinesExcept(state, [...working.map((hand) => hand.who), ...contractMenAtWork(state)]);
   // Who actually stands at what this minute. Nothing is worked off the job yet: the machines have
   // to be taken before the hall can be asked what its media add up to.
   const atWork: AtWork[] = [];

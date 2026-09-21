@@ -9,13 +9,15 @@
 // had his morning and a job the rest, is gone with its daily line `piecesDueBy`.
 
 import { describe, expect, it } from 'vitest';
-import { CONTRACT_FREE_END_DAYS, JOINER_MONTHLY_WAGE, WORKER_RATES } from '../../src/engine/constants';
+import { CONTRACT_FREE_END_DAYS, DAY_END_MINUTE, JOINER_MONTHLY_WAGE, WORKER_RATES } from '../../src/engine/constants';
+import { crewHasGoneHome } from '../../src/engine/staff';
 import {
   CONTRACT_SHORT_WEEKS_ALLOWED,
   acceptContract,
   activeContracts,
   assignContract,
   contractMarker,
+  contractMenAtWork,
   contractWaitingForMaterial,
   contractWantsToday,
   drawContract,
@@ -28,6 +30,7 @@ import { addToJob, assignJob, canBuild, isOnJob } from '../../src/engine/jobs';
 import type { Contract, GameState, Job, Worker } from '../../src/engine/index';
 import {
   acceptNow,
+  act,
   buyStartingKit,
   fillRack,
   newGame,
@@ -187,16 +190,53 @@ describe("a man on a contract is the contract's all day (PIOTR, 21.09; v42)", ()
     expect(ben.jobId).toBe(contractMarker(contract.id));
   });
 
-  it('stands him at his bench while the rack cannot cover the next piece', () => {
-    const state = joinerHall();
-    const contract = running(state, 60);
+  it('stands him at his bench while the rack cannot cover the next piece, and lets go of the saw', () => {
+    let state = joinerHall();
+    running(state, 60);
+    state = runClock(state, 10);
+    const saw = (): string | null => state.equipment.find((item) => item.specId === 'tableSaw')?.takenBy ?? null;
+    expect(saw()).toBe('staff-1');
     state.stock.sheets = 0;
-    contract.sheetsReserved = 0;
-    expect(contractWaitingForMaterial(state, contract)).toBe(true);
+    theContract(state).sheetsReserved = 0;
+    expect(contractWaitingForMaterial(state, theContract(state))).toBe(true);
     // Nowhere else to go, because a contract man has no job: he waits for the delivery.
     expect(contractWantsToday(state, 'staff-1')).toBe(true);
-    const worked = runClock(state, 60);
-    expect(theContract(worked).piecesMade).toBe(0);
+    const made = theContract(state).piecesMade;
+    state = runClock(state, 5);
+    expect(theContract(state).piecesMade).toBe(made);
+    // And the saw is not his while he waits: until v45 he kept it, and every job's man stood
+    // behind a saw nobody was at (PIOTR, 22.09: "everyone waits for the saw and nobody does
+    // anything").
+    expect(saw()).toBe(null);
+    expect(contractMenAtWork(state)).toEqual([]);
+    // The owner takes a job that wants the saw, with sheets of its own on the rack: it is his.
+    const enquiry = placeEnquiry(state, { price: 4000, deadlineDays: 30 });
+    state = acceptNow(state, enquiry.id);
+    const job = theJob(state);
+    job.stage = 'ready';
+    state.stock.sheets = job.sheets;
+    job.sheetsReserved = job.sheets;
+    expect(contractWaitingForMaterial(state, theContract(state))).toBe(true);
+    state = act(state, { type: 'WORK_HERE', jobId: job.id });
+    state = runClock(state, 30);
+    expect(saw()).toBe('owner');
+    expect(theJob(state).productionMinutes).toBe(30);
+    // A delivery lands and the contract has him, and the saw, back in the queue like anybody.
+    state.stock.sheets += 20;
+    expect(contractWaitingForMaterial(state, theContract(state))).toBe(false);
+    expect(contractMenAtWork(state)).toEqual(['staff-1']);
+  });
+
+  it('lets go of the saw at five, when the crew have gone home', () => {
+    let state = joinerHall();
+    running(state, 60);
+    state = runClock(state, 10);
+    expect(state.equipment.find((item) => item.specId === 'tableSaw')?.takenBy).toBe('staff-1');
+    expect(contractMenAtWork(state)).toEqual(['staff-1']);
+    state.clock.minute = DAY_END_MINUTE;
+    state.owner.homeAsked = true;
+    expect(crewHasGoneHome(state)).toBe(true);
+    expect(contractMenAtWork(state)).toEqual([]);
   });
 });
 

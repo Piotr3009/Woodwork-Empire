@@ -68,7 +68,7 @@ import {
   spendOwnerMinute,
   staffOutputFactor,
 } from './owner';
-import { contractMen, contractWantsToday } from './contracts';
+import { contractMenAtWork, contractWantsToday } from './contracts';
 import {
   bookMonthMinute,
   isWorkingToday,
@@ -284,8 +284,9 @@ export function menAtJobs(state: GameState): string[] {
   }
   if (dinner) return atJobs;
   for (const hand of hands(state, { owner: false })) atJobs.push(hand.who);
-  // The men on a standing contract keep their saw between actions too (CLAUDE.md T13 3.16).
-  atJobs.push(...contractMen(state));
+  // The men on a standing contract keep their saw between actions too, while the contract can
+  // use them this minute (CLAUDE.md T13 3.16; v45).
+  atJobs.push(...contractMenAtWork(state));
   return atJobs;
 }
 

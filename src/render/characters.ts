@@ -13,7 +13,7 @@
 // flip. No sheet, or no animation, and the game draws the capsule it has always drawn.
 
 import sheets from '../../public/sprites/characters.json';
-import { WALK_CELLS_PER_SECOND, WALK_STRIDE_METRES } from '../engine/constants';
+import { WALK_CELLS_PER_SECOND, WALK_CELLS_PER_SECOND_FAST, WALK_STRIDE_METRES } from '../engine/constants';
 import {
   STATION_BENCH,
   STATION_CLEANING,
@@ -152,6 +152,25 @@ export function frameAt(sheet: CharacterSheet, nowMs: number): number {
  *  the floor's and not the sheet's (CLAUDE.md T19 2.1). */
 const LOCOMOTION: readonly Animation[] = ['walk', 'carry'];
 
+/** The pace the floor moves at this frame, in cells of real time a second: the x1 pace, or the
+ *  faster one while the clock runs quicker than x1 (PIOTR, 21.09; v44). It is the renderer's own
+ *  clock, like the walkers and the doors, and not game state: the frame sets it from the speed
+ *  the game is at before the figures are moved, and the walk sheets read it so the feet still
+ *  plant where the floor moves. */
+let pace = WALK_CELLS_PER_SECOND;
+
+export function walkPaceFor(speed: number): number {
+  return speed > 1 ? WALK_CELLS_PER_SECOND_FAST : WALK_CELLS_PER_SECOND;
+}
+
+export function setWalkPace(speed: number): void {
+  pace = walkPaceFor(speed);
+}
+
+export function walkPace(): number {
+  return pace;
+}
+
 /** How many frames a second a locomotion sheet plays at, so the feet plant where the floor moves
  *  (PIOTR, 17.09: "they walk like robots"; CLAUDE.md T19 2.1). One full cycle of the sheet is one
  *  stride of `WALK_STRIDE_METRES`, so the cycle has to last exactly as long as the man takes to
@@ -159,7 +178,7 @@ const LOCOMOTION: readonly Animation[] = ['walk', 'carry'];
  *  at 3.4286 fps with no stride at all beside them (docs/art/SPRITES.md 10.5), which at one cell a
  *  second dragged the feet 1.67 times past where they planted. The manifest is not touched: what
  *  is written on the figure is the renderer's, which is what SPRITES.md 10.4 leaves to it. */
-export function walkFps(sheet: CharacterSheet, cellsPerSecond = WALK_CELLS_PER_SECOND): number {
+export function walkFps(sheet: CharacterSheet, cellsPerSecond = walkPace()): number {
   if (sheet.frames <= 1 || WALK_STRIDE_METRES <= 0) return 0;
   return (sheet.frames * cellsPerSecond) / WALK_STRIDE_METRES;
 }
