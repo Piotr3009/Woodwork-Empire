@@ -139,14 +139,15 @@ describe('the hiring pool', () => {
     expect(state.workers[0]?.monthlyWage).toBe(1950);
   });
 
-  it('pays a joiner 1,950, 2,600, 3,500 and 4,330 a month, tier by tier', () => {
+  it('pays a joiner 1,950, 2,470, 2,940 and 3,350 a month, tier by tier (v38)', () => {
     // Piotr's own four figures: the excellent man at about 1,000 a week, which is 4,330 a month,
     // and the experienced one at 2,600, with the other two scaled off him [TUNE]
     // (PIOTR, 19.09; CLAUDE.md T21 2.9, 2.10). Written out as the four figures and not off the
     // table that makes them, so a change to the ladder has to be meant.
     const rows = HIRING_SPECS.filter((spec) => spec.role === 'joiner');
     expect(rows.map((spec) => spec.tier)).toEqual(['novice', 'experienced', 'senior', 'master']);
-    expect(rows.map((spec) => spec.monthlyWage)).toEqual([1950, 2600, 3500, 4330]);
+    // v38 (PIOTR, 21.09): a unit of work costs less a grade up, not more.
+    expect(rows.map((spec) => spec.monthlyWage)).toEqual([1950, 2470, 2940, 3350]);
     expect(rows.map((spec) => spec.minReputation)).toEqual([REPUTATION_MIN, 15, 35, 60]);
   });
 

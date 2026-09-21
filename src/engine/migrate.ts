@@ -9,6 +9,7 @@
 import {
   CABINET_SLOT_LAYOUT,
   EQUIPMENT_SPECS,
+  HIRING_SPECS,
   LOCKER_SLOT_LAYOUT,
   PRODUCTION_STAGES,
   SOUND_VOLUME_DEFAULT,
@@ -591,6 +592,20 @@ function liftToVersion21(state: Raw): void {
   state.version = 21;
 }
 
+/** Version 21 to 22: the four grades cost what v38 says they cost (PIOTR, 21.09). Every tiered man
+ *  on the books is put on this build's wage for his role and grade, read off the one table the
+ *  hire cards read, so a senior hired last month and one hired tomorrow are paid the same. A man
+ *  whose role has no grade, the production manager with his own four and the untiered roles, is
+ *  left alone. */
+function liftToVersion22(state: Raw): void {
+  for (const worker of records(state.workers)) {
+    if (worker.role === 'productionManager') continue;
+    const spec = HIRING_SPECS.find((entry) => entry.role === worker.role && entry.tier === worker.tier);
+    if (spec !== undefined && typeof worker.tier === 'string') worker.monthlyWage = spec.monthlyWage;
+  }
+  state.version = 22;
+}
+
 /** Every item of one retired family taken off the books, standing in the hall or still on the
  *  lorry, with one ledger line when the save actually held any. No money comes back: the player
  *  bought them under the old rules and the game is not buying them off him. Written against the
@@ -629,6 +644,7 @@ const LIFTS: Record<number, (state: Raw) => void> = {
   18: liftToVersion19,
   19: liftToVersion20,
   20: liftToVersion21,
+  21: liftToVersion22,
 };
 
 /** The state a save holds, lifted bump by bump into this build's shape, or null when the save is

@@ -216,8 +216,9 @@ describe('(cc) a contract month with an experienced joiner, on Very easy', () =>
     // ends in profit AFTER his wages.
     expect(revenue).toBe(7900);
     expect(material).toBe(4740);
-    expect(wages.total).toBe(2600);
-    expect(profit).toBe(560);
+    // His wage by the v38 ladder (PIOTR, 21.09): 2,470, so the month clears 690 and not 560.
+    expect(wages.total).toBe(2470);
+    expect(profit).toBe(690);
     expect(profit).toBeGreaterThan(0);
     // The closing report the player is handed says the same thing in its own arithmetic: it costs
     // the minutes he actually stood at the contract and not the days he was paid for, so it reads

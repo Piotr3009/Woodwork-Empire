@@ -53,6 +53,7 @@ import { workPlan } from './plan';
 import { crewLimit } from './layout';
 import { plural } from './text';
 import {
+  benchOf,
   SPRAY_BOOTH,
   accidentRisk,
   breakMachine,
@@ -258,6 +259,14 @@ export function helperOnDuty(state: GameState): boolean {
  *  bags and the van are his. Both are on the painted floor: (1, 1), where every man who is not a
  *  joiner used to be put, is inside the office block (CLAUDE.md T11 3.4). */
 export function homeCellOf(state: GameState, worker: Worker): { x: number; y: number } {
+  // A joiner's home is the bench he has now, asked of the benches as they stand, and not the one
+  // written down the day he was hired: benches are bought, sold and moved, and from Turn 23 one
+  // holds two or three men, so the anchor of the hiring day drew Eddie beside a rack where a bench
+  // used to be (PIOTR, 21.09; v38). The anchor stays the fallback for a hall with no bench.
+  if (worker.role === 'joiner') {
+    const bench = benchOf(state, worker.id);
+    if (bench !== null) return { x: bench.anchorX, y: bench.anchorY };
+  }
   if (worker.role !== 'helper') return { x: worker.anchorX, y: worker.anchorY };
   const fan = state.equipment.find(
     (item) => item.specId === 'extractor' && itemStandsInTheHall(item),

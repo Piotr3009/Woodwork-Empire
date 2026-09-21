@@ -84,9 +84,9 @@ describe('the four classes on the hire cards', () => {
     const man = state.workers[0];
     if (!man) throw new Error('nobody on the books');
     // One unit of pay and it is the month, so the one line is the month's figure: a very
-    // experienced joiner is on 3,500 (CLAUDE.md T21 2.9, 2.10).
+    // experienced joiner is on 2,940 from v38 (PIOTR, 21.09; CLAUDE.md T21 2.9, 2.10).
     const month = `${money(man.monthlyWage)} a month`;
-    expect(man.monthlyWage).toBe(3500);
+    expect(man.monthlyWage).toBe(2940);
     expect(monthlyWageOf(man)).toBe(man.monthlyWage);
     const page = parse(renderTeam(state, 'workshop'));
     expect(page.querySelector(`[data-crew="${man.id}"]`)?.textContent).toContain(month);

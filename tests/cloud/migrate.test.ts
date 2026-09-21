@@ -146,7 +146,7 @@ describe('a v24 save in this build (CLAUDE.md T17 section 4)', () => {
     expect(opened.state).not.toBeNull();
     const state = opened.state as GameState;
     expect(state.version).toBe(STATE_VERSION);
-    expect(STATE_VERSION).toBe(21);
+    expect(STATE_VERSION).toBe(22);
     expect(state.taskQueue).toEqual([]);
     expect(state.dayStats.paidHours).toBe(0);
     expect(state.dayStats.expressUplift).toBe(0);
@@ -287,7 +287,7 @@ describe('a v28 save in this build (CLAUDE.md T20 section 4, T21 section 4)', ()
   if (lifted === null) throw new Error('the lift refused a version 16 state');
 
   it('renames every tier and brings the man up to what that tier is worth tonight', () => {
-    expect(lifted.version).toBe(21);
+    expect(lifted.version).toBe(22);
     expect(lifted.workers.map((worker) => worker.tier)).toEqual([
       'novice',
       'experienced',
@@ -307,7 +307,9 @@ describe('a v28 save in this build (CLAUDE.md T20 section 4, T21 section 4)', ()
     // up the other comes back within a pound of itself: the sprayer's 2,700 is exactly 2,700 again
     // and the admin's 1,900 is 1,899, because 1,900 over 4.2857 was rounded to a whole 443 on the
     // way down (CLAUDE.md T20 2.6, T21 2.10).
-    expect(lifted.workers.map((worker) => worker.monthlyWage)).toEqual([2057, 2743, 2700, 1899]);
+    // And from v38 every graded man comes out on this build's wage for his grade, whatever his
+    // conversions came to (PIOTR, 21.09); the admin has no grade and keeps his 1,899.
+    expect(lifted.workers.map((worker) => worker.monthlyWage)).toEqual([1950, 2470, 3055, 1899]);
     for (const worker of lifted.workers) {
       expect(Object.keys(worker), String(worker.name)).not.toContain('weeklyWage');
       expect(worker.leavesOnDay, String(worker.name)).toBeNull();
@@ -410,18 +412,13 @@ describe('a v29 save in this build (CLAUDE.md T21 section 4)', () => {
   if (lifted === null) throw new Error('the lift refused a version 17 state');
 
   it('pays every man by the month at the conversion the Turn 20 build printed', () => {
-    expect(lifted.version).toBe(21);
+    expect(lifted.version).toBe(22);
     // Turn 20's four weekly wages for a joiner were 450, 600, 800 and 1,000, and the build printed
     // the month beside each of them at thirty days over seven. A lifted man costs what the game
-    // told the player he cost, and his own wage is never re-read off the hiring specs: what he is
-    // paid is what he was taken on for (CLAUDE.md T21 2.10).
-    expect(lifted.workers.map((worker) => worker.monthlyWage)).toEqual([
-      1929,
-      2571,
-      3429,
-      4286,
-      1907,
-    ]);
+    // told the player he cost (CLAUDE.md T21 2.10). From v38 that holds until the v22 lift, which
+    // does re-read every graded man off the hiring specs, because the ladder itself was wrong and
+    // Piotr's own senior was the case that showed it (PIOTR, 21.09).
+    expect(lifted.workers.map((worker) => worker.monthlyWage)).toEqual([1950, 2470, 2940, 3350, 1907]);
     for (const worker of lifted.workers) {
       expect(Object.keys(worker), String(worker.name)).not.toContain('weeklyWage');
     }
@@ -632,7 +629,7 @@ describe('a v31 save with an unpaid balance on it (CLAUDE.md T22 2.1)', () => {
     // There is one track for money from tonight: a cost the player did not choose is paid out of
     // the account whatever the balance, so a save that was carrying 2,780 it never paid has it
     // taken out of the account now (PIOTR, 19.09; CLAUDE.md T22 2.1, section 4).
-    expect(lifted.version).toBe(21);
+    expect(lifted.version).toBe(22);
     expect(lifted.cash).toBe(-4998 - 2780);
   });
 
@@ -724,7 +721,7 @@ describe('a v35 save in this build (CLAUDE.md T23 section 4)', () => {
     // A played company starts its list at its next month end: the card the player was shown that
     // evening is the report, and one worked out again tonight would not be that card
     // (CLAUDE.md T23 2.14).
-    expect(lifted.version).toBe(21);
+    expect(lifted.version).toBe(22);
     expect(lifted.monthlyReports).toEqual([]);
   });
 

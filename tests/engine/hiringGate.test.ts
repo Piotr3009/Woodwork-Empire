@@ -71,9 +71,11 @@ describe('taking somebody on', () => {
     // Piotr's own figures and the wage itself now, with nothing converted (CLAUDE.md T21 2.9,
     // 2.10). So 2,499 in the bank is a real workshop's answer to both of them at once: the green
     // man is affordable and the experienced one is not.
-    expect(payOf('novice')).toBeLessThan(2499);
-    expect(payOf('experienced')).toBeGreaterThan(2499);
-    const state = readyToHire(2499);
+    // From v38 the experienced man is 2,470 (PIOTR, 21.09), so the line between the two sits
+    // at 2,469.
+    expect(payOf('novice')).toBeLessThan(2469);
+    expect(payOf('experienced')).toBeGreaterThan(2469);
+    const state = readyToHire(2469);
     // An experienced joiner answers a workshop of some standing, and the bank is asked last, so
     // the standing has to be there before the balance is the reason (CLAUDE.md T17 2.11).
     state.reputation = 60;
@@ -89,26 +91,26 @@ describe('taking somebody on', () => {
     );
   });
 
-  it('stands at 2,600 for an experienced joiner, which is Piotr\u2019s own figure', () => {
+  it('stands at 2,470 for an experienced joiner, which is Piotr\u2019s own figure (v38)', () => {
     // The one wage field is the month's and the gate reads it directly, with nothing converted out
     // of a week on the way (PIOTR, 19.09: "I wanted everyone monthly"; CLAUDE.md T21 2.10, T17
     // 2.11). So the figure in the refusal is the figure on the hire card and the figure in the
     // bank: 2,600 takes him on and 2,599 does not.
-    expect(payOf('experienced')).toBe(2600);
-    const exact = readyToHire(2600);
+    expect(payOf('experienced')).toBe(2470);
+    const exact = readyToHire(2470);
     exact.reputation = 60;
     expect(canHire(exact, 'joiner', 'experienced')).toEqual({ ok: true, reason: '' });
-    const short = readyToHire(2599);
+    const short = readyToHire(2469);
     short.reputation = 60;
     expect(canHire(short, 'joiner', 'experienced')).toEqual({
       ok: false,
-      reason: 'Not enough in the bank: needs \u00a32,600',
+      reason: 'Not enough in the bank: needs \u00a32,470',
     });
     // And the card prints that sentence and no week beside it.
     const tile = parse(renderTeam(short, 'workshop')).querySelector(
       '[data-candidate="joiner.experienced"]',
     );
-    expect(tile?.textContent).toContain('Not enough in the bank: needs \u00a32,600');
+    expect(tile?.textContent).toContain('Not enough in the bank: needs \u00a32,470');
     expect(tile?.textContent).not.toContain('a week');
   });
 

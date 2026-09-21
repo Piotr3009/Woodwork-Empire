@@ -5,6 +5,7 @@
 // everywhere in the game (CLAUDE.md T3 3.1, T4 3.1).
 
 import {
+  contractMen,
   BUILDING_ROLES,
   callsScheduled,
   callsTaken,
@@ -140,8 +141,16 @@ function assignRow(
 /** Who the list offers, in the order it draws them: the owner, then the men who build, then the
  *  helpers, who are on it only to be told they do not build (CLAUDE.md T19 2.5). */
 function assignCandidates(state: GameState): string[] {
+  // A man on a standing contract is the contract's and is not offered for a job: with twenty men
+  // on the books nobody remembers that Eddie is on the shop's cabinets, so the list says only who
+  // can really go (PIOTR, 20.09; v38). He is not idle for it: with no job beside his contract he
+  // makes its pieces all day, which the client pays for (CLAUDE.md T20 2.1.4).
+  const onContracts = contractMen(state);
   const crew = state.workers.filter(
-    (worker) => onTheBooksToday(state, worker) && BUILDING_ROLES.includes(worker.role),
+    (worker) =>
+      onTheBooksToday(state, worker) &&
+      BUILDING_ROLES.includes(worker.role) &&
+      !onContracts.includes(worker.id),
   );
   const labourers = helpers(state).filter((worker) => onTheBooksToday(state, worker));
   return [OWNER, ...crew.map((worker) => worker.id), ...labourers.map((worker) => worker.id)];

@@ -107,11 +107,11 @@ import type {
  *  so it loses the cell it stood on; and nobody is charged minutes for assigning any more, so the
  *  daily staff management chore goes off the list (CLAUDE.md T23 section 4). Every v33, v34 and
  *  v35 save loads. */
-export const STATE_VERSION = 21;
+export const STATE_VERSION = 22;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
-export const APP_VERSION = 'v37';
+export const APP_VERSION = 'v38';
 
 // ---------------------------------------------------------------------------
 // The owner's day, in the seven things it is made of
@@ -707,13 +707,13 @@ export const JOINERY_CORE_EXTENSION_PRICE_YEARLY = 600;
  *  what each tier is worth against the owner at the take off is WORKER_RATES: an estimator is a
  *  man with a rate like any other, so he has no rate table of his own any more
  *  (CLAUDE.md T21 2.10). The standing each tier answers from is TIER_MIN_REPUTATION. */
-export const ESTIMATOR_MONTHLY_WAGE_EXPERIENCED = 2600;
+export const ESTIMATOR_MONTHLY_WAGE_EXPERIENCED = 2470;
 /** What an experienced sprayer costs a month [his own 2,700, back whole]. He is paid by the month
  *  like everybody else: there is one unit of pay in the game and it is the month (PIOTR, 19.09:
  *  "I wanted everyone monthly"; CLAUDE.md T21 2.10). His four tiers come off this by the one
  *  ladder in 9.3, and the standing each answers from is TIER_MIN_REPUTATION, the same gate every
  *  tiered role passes (CLAUDE.md T21 2.9). */
-export const SPRAYER_MONTHLY_WAGE_EXPERIENCED = 2700;
+export const SPRAYER_MONTHLY_WAGE_EXPERIENCED = 2565;
 /** What a joiner gets through in a minute of a lacquered job's finishing, against a sprayer's 1.0
  *  [TUNE]. A workshop without a sprayer is slower at the booth, never stuck
  *  (CLAUDE.md T19 2.6). */
@@ -3476,12 +3476,17 @@ export const TIER_MIN_REPUTATION: Record<WorkerTier, number> = {
  *  man at about 1,000 a week, which is 4,330 a month, and the rest scaled off the experienced
  *  2,600; TUNE the three below the top]. Every other tiered role's pay is that ladder against its
  *  own experienced man's wage, so no role grows a ladder of its own (CLAUDE.md T21 2.9, 2.10). */
-export const JOINER_MONTHLY_WAGE_EXPERIENCED = 2600;
+/** v38 (PIOTR, 21.09): what a unit of a man's work costs falls about 5% a grade, so the better man
+ *  is the cheaper one per hour of work done and not the dearer (it was 3,250 / 3,250 / 3,500 /
+ *  3,608 a unit, novice to master, which paid a shop to keep only novices). The rates are Piotr's
+ *  ladder and do not move; the wages move: 1,950 / 2,470 / 2,940 / 3,350 for a joiner, and the
+ *  sprayer's and the estimator's by the same four factors off their own experienced man. */
+export const JOINER_MONTHLY_WAGE_EXPERIENCED = 2470;
 export const TIER_WAGE_FACTOR: Record<WorkerTier, number> = {
-  novice: 1950 / 2600,
+  novice: 1950 / 2470,
   experienced: 1,
-  senior: 3500 / 2600,
-  master: 4330 / 2600,
+  senior: 2940 / 2470,
+  master: 3350 / 2470,
 };
 
 /** What this tier of a role costs a month, from what its experienced man costs, rounded to the

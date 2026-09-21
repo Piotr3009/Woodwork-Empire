@@ -67,7 +67,8 @@ describe('pay by the month, everybody', () => {
     );
     // An experienced sprayer is on 2,700, an experienced estimator and an experienced joiner both
     // on 2,600, and the office admin on 1,900: Piotr's own figures, whole (CLAUDE.md T21 2.9).
-    expect(monthlyWageBill(state)).toBe(2700 + 2600 + 1900);
+    // The sprayer and the estimator by the v38 ladder (PIOTR, 21.09): 2,565 and 2,470.
+    expect(monthlyWageBill(state)).toBe(2565 + 2470 + 1900);
     // One pay day in the month, and it is its last working day. The ledger calls it what the
     // player reads on the Accounting page.
     const days = payDaysOf(state);

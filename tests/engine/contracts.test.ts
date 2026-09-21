@@ -643,8 +643,12 @@ describe('the result with a man on it (CLAUDE.md T17 2.22)', () => {
     // to thin above the experienced man, where 3,500 over 1.0 is 3,500 a point of speed. The line
     // is his own either way, which is what the tab has to show before he is put on it
     // (CLAUDE.md T20 2.1).
-    expect(Math.abs(middlingResult.margin - greenResult.margin)).toBeLessThan(0.1);
-    expect(bestResult.margin).toBeLessThan(middlingResult.margin);
+    //
+    // From v38 the ladder runs the other way (PIOTR, 21.09): a unit of work costs 3,250 / 3,090 /
+    // 2,940 / 2,790 a point of speed, novice to master, so the better man makes the wider margin
+    // on the same piece, which is what a shop keeps a senior for.
+    expect(middlingResult.margin).toBeGreaterThan(greenResult.margin);
+    expect(bestResult.margin).toBeGreaterThan(middlingResult.margin);
     // And every one of them is above water behind the day 1 used saw at the prices of T20 2.2,
     // which is half of what the new table was for: a contract pays well with machines. The other
     // half of it, that it pays a little by hand, no longer holds at Piotr's tier figures, and

@@ -100,7 +100,8 @@ describe('the sprayer (CLAUDE.md T19 2.6)', () => {
     // A month of him is his wage and no arithmetic: 2,700 for the experienced man
     // (CLAUDE.md T21 2.10).
     expect(monthlyWageOf(man ?? { monthlyWage: 0 })).toBe(SPRAYER_MONTHLY_WAGE.experienced);
-    expect(SPRAYER_MONTHLY_WAGE.experienced).toBe(2700);
+    // His own 2,700 by the v38 ladder's factor (PIOTR, 21.09).
+    expect(SPRAYER_MONTHLY_WAGE.experienced).toBe(2565);
     // He is called a sprayer wherever he is drawn, and the Assign list reads the same table.
     expect(ROLE_WORDS.sprayer).toBe('sprayer');
   });
