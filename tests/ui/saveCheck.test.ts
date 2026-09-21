@@ -117,7 +117,7 @@ afterEach(() => {
 
 describe('a fresh game in this build', () => {
   it('is on the build the brief names', () => {
-    expect(APP_VERSION).toBe('v42');
+    expect(APP_VERSION).toBe('v43');
     expect(STATE_VERSION).toBe(24);
   });
 

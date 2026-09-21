@@ -22,7 +22,7 @@ import {
   act,
   newGame,
   runClock,
-  sixJoinersOnSheetWork, withMachiningDone } from '../helpers';
+  sixJoinersOnSheetWork, withOnlyCuttingLeft } from '../helpers';
 
 /** Three men on one job at its cutting stage with one saw in the hall, the first of them standing at
  *  it: the scene of the drawing, one man cutting and two who cannot. */
@@ -37,7 +37,7 @@ function queueAtTheSaw(): { state: GameState; job: Job } {
   job.labourRemaining = job.labourValue * 0.95;
   job.stageLabour = {};
   // The saw is the one open station of a job at its cutting once its machining is done (v37).
-  withMachiningDone(state);
+  withOnlyCuttingLeft(state);
   const saw = state.equipment.find((item) => item.specId === 'tableSaw');
   if (!saw) throw new Error('one saw is wanted');
   saw.takenBy = 'staff-1';
@@ -107,11 +107,13 @@ describe('the four things the player can put right (CLAUDE.md T22 2.5)', () => {
     expect(machineShortWord('tableSaw')).toBe('saw');
   });
 
-  it('says no cut parts yet to the men behind him, because the parts are still on the saw', () => {
+  it('says waiting for the saw to the men behind him as well (v43)', () => {
+    // "No cut parts yet" went with the rule that kept assembly closed until the cutting was done: a
+    // man queues at the saw now only when the saw is all his job has left (PIOTR, 21.09).
     const { state } = queueAtTheSaw();
     const bubble = bubbleFor(state, 'staff-3');
-    expect(bubble?.key).toBe('noCutParts');
-    expect(bubble?.text).toBe('no cut parts yet');
+    expect(bubble?.key).toBe('waitingForMachine');
+    expect(bubble?.text).toBe('waiting for the saw');
   });
 
   it('names the job the rack has no sheets for', () => {
@@ -203,13 +205,12 @@ describe('nothing at all over a man nothing is wrong with [PIOTR, 19.09]', () =>
 });
 
 describe('the table itself', () => {
-  it('keeps six lines and no colour, and every one of them is a thing that is wrong', () => {
-    // Four until tonight. Turn 23 hung the bench on the compressor for the fifth
-    // (CLAUDE.md T23 2.7) and stood a man who nobody has put on anything for the sixth
-    // (CLAUDE.md T23 2.1), both of them things the player can put right.
+  it('keeps five lines and no colour, and every one of them is a thing that is wrong', () => {
+    // Four until Turn 23, which hung the bench on the compressor and stood a man who nobody has
+    // put on anything (CLAUDE.md T23 2.1, 2.7); v43 took "no cut parts yet" out with the rule it
+    // explained.
     expect(Object.keys(BUBBLES).sort()).toEqual([
       'noCompressor',
-      'noCutParts',
       'noMaterial',
       'nothingToDo',
       'waitingForBoss',

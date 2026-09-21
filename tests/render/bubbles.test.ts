@@ -16,7 +16,7 @@ import {
   buyStartingKit,
   newGame,
   runClock,
-  sixJoinersOnSheetWork, withMachiningDone } from '../helpers';
+  sixJoinersOnSheetWork, withOnlyCuttingLeft } from '../helpers';
 
 const CSS = readFileSync('src/ui/styles.css', 'utf8');
 
@@ -47,7 +47,7 @@ function groupOf(svg: string, figure: string): string {
 }
 
 /** Three men on one job at its cutting stage with one saw, the first of them standing at it, so one
- *  man is cutting, one is waiting for the saw and one has no cut parts yet. */
+ *  man is cutting and two are waiting for the saw. */
 function queueAtTheSaw(): GameState {
   let state = sixJoinersOnSheetWork({ saws: 1 });
   const first = state.jobs[0];
@@ -59,7 +59,7 @@ function queueAtTheSaw(): GameState {
   job.labourRemaining = job.labourValue * 0.95;
   job.stageLabour = {};
   // The saw is the one open station of a job at its cutting once its machining is done (v37).
-  withMachiningDone(state);
+  withOnlyCuttingLeft(state);
   const saw = state.equipment.find((item) => item.specId === 'tableSaw');
   if (!saw) throw new Error('one saw is wanted');
   saw.takenBy = 'staff-1';
@@ -85,7 +85,7 @@ function twoJobsAtOneSaw(): GameState {
     job.stageLabour = {};
   }
   // The saw is the one open station of a job at its cutting once its machining is done (v37).
-  withMachiningDone(state);
+  withOnlyCuttingLeft(state);
   return runClock(state, 2);
 }
 
@@ -102,7 +102,7 @@ function threeJobsAtOneSaw(): GameState {
     job.stageLabour = {};
   }
   // The saw is the one open station of a job at its cutting once its machining is done (v37).
-  withMachiningDone(state);
+  withOnlyCuttingLeft(state);
   return runClock(state, 2);
 }
 
@@ -117,11 +117,10 @@ describe('a mark only where something is wrong (CLAUDE.md T22 2.5)', () => {
   it('draws the disc with its exclamation over each of the five things the player can put right', () => {
     const waiting = queueAtTheSaw();
     const svg = renderHall(waiting);
-    // The first man of the queue is waiting for the machine; the man behind him is short of the
-    // parts it has not cut yet.
+    // Every man of the queue is waiting for the machine (v43).
     for (const [who, key, words] of [
       ['worker-staff-2', 'waitingForMachine', 'waiting for the saw'],
-      ['worker-staff-3', 'noCutParts', 'no cut parts yet'],
+      ['worker-staff-3', 'waitingForMachine', 'waiting for the saw'],
     ] as const) {
       const mark = markOver(svg, who);
       expect(mark, who).toContain(`data-bubble="${key}"`);

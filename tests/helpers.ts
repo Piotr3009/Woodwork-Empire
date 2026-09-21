@@ -6,7 +6,8 @@ import { WORKER_RATES } from '../src/engine/constants';
 // the tests use them to stand kit in the hall without sending the owner out for it.
 import { buyEquipment, buySoftware } from '../src/engine/game';
 import { hire } from '../src/engine/staff';
-import { takeEnquiry } from '../src/engine/jobs';
+import { jobProgress, takeEnquiry } from '../src/engine/jobs';
+import { sheetsDueFor } from '../src/engine/materials';
 import type { Orientation, WorkerRole, WorkerTier } from '../src/engine/types';
 import {
   applyAction,
@@ -548,31 +549,40 @@ export function sixJoinersOnSheetWork(
 /** The crew Piotr's saw question is asked about (CLAUDE.md T7 3.1). */
 export const CREW = 6;
 
-/** Every job of the hall with its machining already done, in the bag of work (v37): the saw is
- *  then the one open station of a job at its cutting, so a test about a queue at the saw gets the
- *  queue it is about. What the job had done stays where the one cursor of Turns 1 to 23 put it,
- *  cutting first; the machining is added on top and taken off what is left. */
-export function withMachiningDone(state: GameState): GameState {
+/** Every job of the hall with nothing left but its cutting and its finishing, in the bag of work:
+ *  the saw is then the one open station of the job, so a test about a queue at the saw gets the
+ *  queue it is about. Until v43 the machining alone was enough, because assembly waited for the
+ *  cut parts; that rule is gone (PIOTR, 21.09), so the assembly is filled as well. What the job had
+ *  done stays where the one cursor of Turns 1 to 23 put it, cutting first; the two stages are added
+ *  on top and taken off what is left. */
+export function withOnlyCuttingLeft(state: GameState, jobIds: string[] | null = null): GameState {
+  const filled = ['machining', 'assembly'];
   for (const job of state.jobs) {
+    if (jobIds !== null && !jobIds.includes(job.id)) continue;
     const plan = stagePlanFor(state, job);
-    const machining = plan.find((stage) => stage.id === 'machining');
-    if (machining === undefined) continue;
-    const need = machining.to - machining.from;
-    const had = job.stageLabour.machining ?? 0;
     const done = Math.max(0, job.labourValue - job.labourRemaining);
     const bagged: Partial<Record<string, number>> = {};
     let loose = done - Object.values(job.stageLabour).reduce((sum, value) => sum + (value ?? 0), 0);
     for (const stage of plan) {
-      if (stage.id === 'machining') continue;
+      if (filled.includes(stage.id)) continue;
       const own = job.stageLabour[stage.id] ?? 0;
       const room = Math.max(0, stage.to - stage.from - own);
       const poured = Math.max(0, Math.min(room, loose));
       loose -= poured;
       if (own + poured > 0) bagged[stage.id] = own + poured;
     }
-    bagged.machining = need;
+    let added = 0;
+    for (const stage of plan) {
+      if (!filled.includes(stage.id)) continue;
+      const need = stage.to - stage.from;
+      added += need - (job.stageLabour[stage.id] ?? 0);
+      bagged[stage.id] = need;
+    }
     job.stageLabour = bagged as typeof job.stageLabour;
-    job.labourRemaining -= need - had;
+    job.labourRemaining -= added;
+    // The rack is drawn on by the job's progress as a whole, so the progress the two stages add
+    // has its sheets counted as cut, or the next minute would ask the rack for half the job at once.
+    job.sheetsUsed = Math.max(job.sheetsUsed, sheetsDueFor(job, jobProgress(job)));
   }
   return state;
 }

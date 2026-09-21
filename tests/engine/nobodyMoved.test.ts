@@ -7,14 +7,13 @@
 // This is the reverse of Turn 21's 2.7, which moved him to another job in production and was
 // asserted in tests/engine/nobodyWaits.test.ts; that file is gone with the move it asserted.
 //
-// Two rules of Turn 21 stay and are asserted here as well, because the queue is what they are
-// about: assembly never starts before the cutting stage of its job is complete, which in this model
-// is an invariant of the one labour number and not a second gate, and the words each man of a queue
-// says are his own.
+// One rule of Turn 21 stays and is asserted here as well, because the queue is what it is about:
+// the words each man of a queue says are his own. "Assembly never starts before the cutting is
+// complete" is gone (PIOTR, 21.09; v43): a queue at the saw forms only when the saw is all a job
+// has left, and every man in it is waiting for the saw.
 
 import { describe, expect, it } from 'vitest';
 import {
-  NO_CUT_PARTS,
   hands,
   ownerIdleReason,
   placeHand,
@@ -67,10 +66,10 @@ function fourMenTwoJobs(): { state: GameState; cutting: Job; bench: Job } {
       worker.jobId = null;
     }
   }
-  // The cutting job is a fifth through its cutting with its machining already done, so the saw is
-  // the one thing it has open: that is where a queue forms in the bag of work (v37). The bench job
-  // is past its cutting and its machining and a quarter into its assembly.
-  bagged(state, cutting, { cutting: 0.2, machining: 1 });
+  // The cutting job is a fifth through its cutting with its machining and its assembly done, so the
+  // saw is the one thing it has open: that is where a queue forms in the bag of work (v37, v43). The
+  // bench job is past its cutting and its machining and a quarter into its assembly.
+  bagged(state, cutting, { cutting: 0.2, machining: 1, assembly: 1 });
   bagged(state, bench, { cutting: 1, machining: 1, assembly: 0.25 });
   return { state, cutting, bench };
 }
@@ -117,9 +116,9 @@ describe('four men, one saw, two jobs (CLAUDE.md T22 2.6)', () => {
 
   it('stands three of the four at the saw when both jobs want it, and counts every minute of it', () => {
     const { state, cutting, bench } = fourMenTwoJobs();
-    // Both jobs at their cutting stage with their machining done: one saw, four men, and nothing
-    // else in the hall to do, because assembly waits for the cut parts (PIOTR, 20.09).
-    bagged(state, bench, { cutting: 0.2, machining: 1 });
+    // Both jobs with nothing left but their cutting: one saw, four men, and nothing else in the
+    // hall to do.
+    bagged(state, bench, { cutting: 0.2, machining: 1, assembly: 1 });
     const report = workMinute(state, hands(state));
     expect(report.worked).toBe(1);
     expect(report.lost.noMachine).toBe(3);
@@ -151,45 +150,42 @@ describe('four men, one saw, two jobs (CLAUDE.md T22 2.6)', () => {
 });
 
 describe('the cutting stage and the men behind it', () => {
-  it('gives a job whose cutting is half done nothing for an assembler', () => {
+  it('gives a job whose cutting is half done its assembly for a second man (v43)', () => {
     const { state, cutting } = fourMenTwoJobs();
-    // Half way through its cutting: the stage it stands at is the cutting one and no other, because
-    // a job stands at exactly one stage and its stages are consumed in order. There is no assembly to
-    // put a second man on, which is what "assembly never starts before the cutting stage of its job
-    // is complete" means in this model (CLAUDE.md T21 2.7, T22 2.6).
+    // Half way through its cutting with the machining done: the first man has the saw, and the
+    // second assembles what he has cut instead of standing behind him for the rest of the cutting
+    // (PIOTR, 21.09: three men at one saw the whole day). The plan is still ordered end to end and
+    // cutting is still first in it, which is why the first man takes the saw.
     const plan = stagePlanFor(state, cutting);
-    const cut = plan.find((stage) => stage.id === 'cutting');
-    const assembly = plan.find((stage) => stage.id === 'assembly');
-    if (!cut || !assembly) throw new Error('a plan with both stages is wanted');
-    expect(cut.to).toBeLessThanOrEqual(assembly.from);
-    bagged(state, cutting, { cutting: 0.5, machining: 1 });
-    expect(currentStage(state, cutting)?.id).toBe('cutting');
-    // A second man finds nothing open but the saw: assembly waits for the cut parts (v37).
-    expect(stageFor(state, 'staff-3', cutting)?.id).toBe('cutting');
-    // And the whole plan is ordered and end to end, which is the invariant the rule rests on.
     for (let at = 1; at < plan.length; at += 1) {
       expect(plan[at]?.from).toBe(plan[at - 1]?.to);
     }
+    bagged(state, cutting, { cutting: 0.5, machining: 1 });
+    expect(currentStage(state, cutting)?.id).toBe('cutting');
+    const saw = state.equipment.find((item) => item.specId === 'tableSaw');
+    if (!saw) throw new Error('one saw is wanted');
+    saw.takenBy = 'staff-1';
+    expect(stageFor(state, 'staff-1', cutting)?.id).toBe('cutting');
+    expect(stageFor(state, 'staff-3', cutting)?.id).toBe('assembly');
+    // Finishing still waits for everything else.
+    bagged(state, cutting, { cutting: 0.5, machining: 1, assembly: 1 });
+    expect(stageFor(state, 'staff-3', cutting)?.id).toBe('cutting');
   });
 
-  it('has the first man in the queue waiting for the saw and the men behind him short of parts', () => {
+  it('has every man in the queue waiting for the saw, and the man at it saying nothing', () => {
     const { state, cutting } = fourMenTwoJobs();
-    // Three men on the one cutting job and one saw between them: the queue forms and every man in it
-    // says his own truth (CLAUDE.md T21 2.6, T22 2.5).
+    // Three men on the one job with nothing left but its cutting, one saw between them: the queue
+    // forms and every man in it says the same true thing (CLAUDE.md T21 2.6, T22 2.5; v43).
     state.jobs = [cutting];
     cutting.assignees = ['staff-1', 'staff-2', 'staff-3'];
     for (const worker of state.workers) {
       worker.jobId = cutting.assignees.includes(worker.id) ? cutting.id : null;
     }
     workMinute(state, hands(state));
-    // The man on the saw says nothing: he is working, and a man at work carries no mark at all.
     expect(waitingWordsFor(state, 'staff-1', cutting)).toBeNull();
     expect(bubbleFor(state, 'staff-1')).toBeNull();
-    // The first man of the queue is waiting for the machine; the man behind him is waiting for the
-    // parts it has not cut yet.
     expect(waitingWordsFor(state, 'staff-2', cutting)).toBe('waiting for the saw');
-    expect(waitingWordsFor(state, 'staff-3', cutting)).toBe(NO_CUT_PARTS);
-    expect(NO_CUT_PARTS).toBe('no cut parts yet');
+    expect(waitingWordsFor(state, 'staff-3', cutting)).toBe('waiting for the saw');
   });
 
   it('says nothing about cut parts at a stage that is not the cutting one', () => {

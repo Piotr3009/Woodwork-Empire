@@ -69,9 +69,9 @@ function labourIn(
 ): number {
   const job = state.jobs.find((entry) => entry.id === jobId);
   if (!job) throw new Error('no job');
-  // The bag of work (v37) keeps the labour by stage: at the cutting the machining is already done,
-  // so the saw is the one open station and a queue can form; at the assembly the cutting and the
-  // machining are behind it.
+  // The bag of work (v37) keeps the labour by stage: at the cutting the machining and the assembly
+  // are already done, so the saw is the one open station and a queue can form (assembly no longer
+  // waits for the cut parts, v43); at the assembly the cutting and the machining are behind it.
   const plan = stagePlanFor(state, job);
   const share = (id: string): number => {
     const stage = plan.find((entry) => entry.id === id);
@@ -79,7 +79,7 @@ function labourIn(
   };
   job.stageLabour =
     at === 'cutting'
-      ? { cutting: share('cutting') * 0.2, machining: share('machining') }
+      ? { cutting: share('cutting') * 0.2, machining: share('machining'), assembly: share('assembly') }
       : { cutting: share('cutting'), machining: share('machining'), assembly: share('assembly') * 0.25 };
   job.labourRemaining =
     job.labourValue - Object.values(job.stageLabour).reduce((sum, value) => sum + (value ?? 0), 0);
@@ -138,8 +138,8 @@ describe('the men on a job (CLAUDE.md T19 2.5)', () => {
   });
 
   it('runs a cutting stage at one man’s speed with three men and one saw', () => {
-    // The saw takes one man at a time: the other two stand in the queue and the stage goes no
-    // faster than the man on it (CLAUDE.md T19 2.5).
+    // The saw takes one man at a time: with nothing else of the job left, the other two stand in
+    // the queue and the stage goes no faster than the man on it (CLAUDE.md T19 2.5).
     const one = menOnOne(1, 1);
     const three = menOnOne(3, 1);
     const alone = labourIn(one, jobOfFirst(one).id, 'cutting', 20);
@@ -165,7 +165,7 @@ describe('the men on a job (CLAUDE.md T19 2.5)', () => {
     // the one machine (CLAUDE.md T19 2.5, T22 2.6); that rule is asserted in
     // tests/engine/nobodyMoved.test.ts.
     state.jobs = [job];
-    // At the cutting with the machining done, so the saw is the one open station (v37).
+    // At the cutting with the machining and the assembly done, so the saw is the one open station.
     labourIn(state, job.id, 'cutting', 0);
     workMinute(
       state,

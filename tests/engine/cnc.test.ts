@@ -19,7 +19,7 @@ import {
 import { stagedJob } from '../../src/engine/jobs';
 import { waitingStation, machineStation } from '../../src/engine/stations';
 import { tick } from '../../src/engine/index';
-import type { GameState } from '../../src/engine/index';
+import type { GameState, Job } from '../../src/engine/index';
 import {
   acceptNow,
   act,
@@ -32,6 +32,7 @@ import {
   twoMenOnSheetWork,
   withDryAir,
   withExtraction,
+  withOnlyCuttingLeft,
 } from '../helpers';
 
 /** A job whose whole labour is this many minutes of the owner's own time. */
@@ -123,8 +124,11 @@ describe('one man per CNC', () => {
   });
 
   it('stands the second man at the CNC when the job card will not have the saw', () => {
-    const state = twoOnOneCnc();
+    // Nothing of his job left but the CNC's own stage, so the queue at it is the whole of what he
+    // can do (v43: with assembly open he would assemble instead of standing).
+    const state = withOnlyCuttingLeft(twoOnOneCnc());
     for (const job of state.jobs) job.sawFallback = false;
+    const before = state.jobs.map((job) => job.labourRemaining);
     const worked = tick(state, 60);
     const joiner = worked.workers[0];
     expect(joiner?.station).toBe(waitingStation('cnc'));
@@ -132,10 +136,11 @@ describe('one man per CNC', () => {
     // "the CNC" and not "cnc": the trade's own short word, which is also what the drawing over his
     // head says (CLAUDE.md T21 2.6, 2.7).
     expect(waiting?.blockedBy).toBe('waiting for the CNC');
-    expect(waiting?.labourRemaining).toBe(waiting?.labourValue);
+    // Not a minute of work went into his job while he stood.
+    expect(waiting?.labourRemaining).toBe(before[worked.jobs.indexOf(waiting as Job)]);
     // And the man who has it is at it.
     const owner = worked.jobs.find((job) => job.assignees[0] === OWNER);
-    expect(owner?.labourRemaining).toBeLessThan(owner?.labourValue ?? 0);
+    expect(owner?.labourRemaining).toBeLessThan(before[worked.jobs.indexOf(owner as Job)] ?? 0);
   });
 
   it('is set from the job card, one job at a time', () => {

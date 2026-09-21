@@ -295,20 +295,16 @@ export function currentStage(
   return plan.length > 0 ? (plan[plan.length - 1] ?? null) : null;
 }
 
-/** The order the bag of work keeps: finishing only once everything else is done, and assembly only
- *  once the parts are cut, which is the cutting stage or the CNC's (PIOTR, 20.09: "assembly after
- *  cutting" stays; everything else in any order). */
+/** The order the bag of work keeps: finishing only once everything else is done; everything else
+ *  in any order. "Assembly after cutting" is gone (PIOTR, 21.09; v43): with one saw it left every
+ *  man but the one at it standing behind him for the whole of the cutting, a day or two of it,
+ *  once the machining was done. Cutting is still first in the plan, so the first man takes the
+ *  saw and the others assemble what he has cut. */
 function stageMayStart(job: Job, plan: readonly StagePlan[], stage: StagePlan): boolean {
-  if (stage.id === 'finishing') {
-    return plan.every(
-      (other) => other.id === 'finishing' || stageLeft(job, plan, other) <= WORK_EPSILON,
-    );
-  }
-  if (stage.id === 'assembly') {
-    const cut = plan.find((other) => other.id === 'cutting' || other.id === 'cnc');
-    return cut === undefined || stageLeft(job, plan, cut) <= WORK_EPSILON;
-  }
-  return true;
+  if (stage.id !== 'finishing') return true;
+  return plan.every(
+    (other) => other.id === 'finishing' || stageLeft(job, plan, other) <= WORK_EPSILON,
+  );
 }
 
 /** True when this man could stand at the station this stage wants right now: the bench, a tool

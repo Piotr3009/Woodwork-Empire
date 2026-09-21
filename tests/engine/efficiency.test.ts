@@ -4,13 +4,12 @@
 // minutes and their percentages to a hundred; a day nobody could have worked reads 100.
 
 import { describe, expect, it } from 'vitest';
-import { stagePlanFor } from '../../src/engine/stages';
 import { EFFICIENCY_CAUSES } from '../../src/engine/constants';
 import { efficiencyOf, emptyEfficiency, topCause, workshopEfficiency } from '../../src/engine/efficiency';
 import { dayMinutesByCategory } from '../../src/engine/index';
 import type { EfficiencyStats, GameState } from '../../src/engine/index';
 import type { LostMinuteCause } from '../../src/engine/types';
-import { runClock, twoMenOnSheetWork } from '../helpers';
+import { runClock, twoMenOnSheetWork, withOnlyCuttingLeft } from '../helpers';
 
 interface PartialStats {
   possible?: number;
@@ -126,16 +125,10 @@ describe('on a played day, off the tally the production minute keeps', () => {
   });
 
   it('books a man waiting for the one saw as no machine free, and nothing else', () => {
-    // Two men, one saw, and nothing else open on the second job: its machining is done, so the
-    // saw is the one station it has (v37, the bag of work keeps the labour by stage).
-    const start = twoMenOnSheetWork({ saws: 1 });
-    for (const job of start.jobs) {
-      const plan = stagePlanFor(start, job);
-      const machining = plan.find((stage) => stage.id === 'machining');
-      if (!machining) continue;
-      job.stageLabour = { machining: machining.to - machining.from };
-      job.labourRemaining = job.labourValue - (machining.to - machining.from);
-    }
+    // Two men, one saw, and nothing else open on the second job: its machining and its assembly
+    // are done, so the saw is the one station it has (v37, v43: the bag of work keeps the labour
+    // by stage, and assembly no longer waits for the cut parts).
+    const start = withOnlyCuttingLeft(twoMenOnSheetWork({ saws: 1 }));
     const state = runClock(start, 200);
     const found = workshopEfficiency(state);
     expect(found.percent).toBe(50);

@@ -115,7 +115,7 @@ export const STATE_VERSION = 24;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
-export const APP_VERSION = 'v42';
+export const APP_VERSION = 'v43';
 
 // ---------------------------------------------------------------------------
 // The owner's day, in the seven things it is made of
@@ -4051,7 +4051,6 @@ export const WORKER_IDLE_REASONS: ReadonlyArray<{ id: WorkerIdleReason; label: s
  *  gone with the classes that drew them. */
 export const BUBBLES: Record<BubbleKey, string> = {
   waitingForMachine: 'waiting for the {machine}',
-  noCutParts: 'no cut parts yet',
   noMaterial: 'no sheets for {job}',
   noCompressor: 'no compressor',
   nothingToDo: 'nothing to do',

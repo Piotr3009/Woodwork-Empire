@@ -18,7 +18,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { CAREFUL, IDLE, type Policy, playDay, playUntilDay } from './autopilot';
-import { acceptNow, act, newGame, placeEnquiry, withMachiningDone } from '../helpers';
+import { acceptNow, act, newGame, placeEnquiry, withOnlyCuttingLeft } from '../helpers';
 import {
   BANKRUPTCY_DAYS_BELOW_LIMIT,
   BANKRUPTCY_LIMIT_FACTOR,
@@ -161,10 +161,11 @@ function fourMenTwoJobs(benchWork: boolean): FourMen {
   jobOn(state, cuttingId).labourRemaining = jobOn(state, cuttingId).labourValue * 0.95;
   jobOn(state, benchId).labourRemaining =
     jobOn(state, benchId).labourValue * (benchWork ? 0.45 : 0.95);
-  // The bag of work (v37) would send the second man of a cutting job to its machining while the
-  // saw is taken; this scene is about the saw, so both jobs have their machining done and the saw
-  // is the one open station of a job at its cutting (assembly waits for the cut parts).
-  withMachiningDone(state);
+  // The bag of work (v37) would send the second man of a cutting job to its machining, and from
+  // v43 to its assembly, while the saw is taken; this scene is about the saw, so a job at its
+  // cutting has nothing else left and the saw is its one open station. The bench job keeps its
+  // assembly, which is where the scene wants it.
+  withOnlyCuttingLeft(state, benchWork ? [cuttingId] : [cuttingId, benchId]);
   const opening = state;
   const played = opening.clock.day;
   const stood: Stood[] = [];
@@ -300,13 +301,13 @@ describe('(gg) four men, one saw and two jobs, on Very easy', () => {
     // of the second job worked every minute of it and carry nothing at all, and a man at work never
     // carries a mark. The man on the saw was marked twice, in the minute before the hall's first
     // production minute of a spell, at 08:00 and at 13:00, which is the same reading as the waiting
-    // cells above. The man behind him carried a mark all day and it said both of the things that
-    // were true of him in turn: he is waiting for the saw while he is the first of its queue, and he
-    // is short of cut parts while somebody else is. The dinner hour is no mark either, because a man
+    // cells above. The man behind him carried a mark all day, and it said the one thing that was
+    // true of him: he is waiting for the saw ("no cut parts yet" went with the rule that closed
+    // assembly until the cutting was done, v43). The dinner hour is no mark either, because a man
     // at his lunch has nothing wrong with him (CLAUDE.md T21 2.12, T22 2.5, 2.6).
     const waiting = GG.men[1]?.name ?? '';
     expect(GG.said.get(GG.men[0]?.name ?? '')).toEqual(['waiting for the saw']);
-    expect(GG.said.get(waiting)).toEqual(['no cut parts yet', 'waiting for the saw']);
+    expect(GG.said.get(waiting)).toEqual(['waiting for the saw']);
     for (const man of GG.men.slice(2)) {
       expect(GG.said.get(man.name), man.name).toBeUndefined();
     }
@@ -360,15 +361,13 @@ describe('(gg) the same hall with nothing in it but the saw s own work', () => {
     expect(bench.blockedBy).toBe('waiting for the saw');
     expect(stageText(GG_QUEUE.evening, cutting)).toBe('Cutting, waiting for the saw');
     expect(stageText(GG_QUEUE.evening, bench)).toBe('Cutting, waiting for the saw');
-    // Over their heads: the men at the saw's waiting cell are marked as waiting for it and the man
-    // behind the first of a queue is marked with what is really stopping him, which is the parts
-    // nobody has cut yet (docs/mockups/t22/bubbles-v2.png; CLAUDE.md T22 2.5).
+    // Over their heads: every man at the saw's waiting cell is marked as waiting for it
+    // (docs/mockups/t22/bubbles-v2.png; CLAUDE.md T22 2.5; v43).
     const words = [...GG_QUEUE.said.values()].flat();
     expect(words).toContain('waiting for the saw');
-    expect(words).toContain('no cut parts yet');
-    // And nothing else was said all day: every mark is one of the four things that are wrong, so
-    // there is no line left about the stage a man has just begun.
-    expect([...new Set(words)].sort()).toEqual(['no cut parts yet', 'waiting for the saw']);
+    // And nothing else was said all day: every mark is one of the things that are wrong, so there
+    // is no line left about the stage a man has just begun.
+    expect([...new Set(words)]).toEqual(['waiting for the saw']);
     // 962 readings of a man at a waiting cell: two of the three standing men are at the saw's own
     // waiting cell every one of the 480 minutes of the day, and the two left over are the man who
     // holds the saw at the top of his two spells, at 08:00 and 13:00, exactly as in the run beside

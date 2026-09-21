@@ -22,7 +22,6 @@ import { OWNER, machineShortWord } from './machines';
 import { ownerIsAvailable } from './owner';
 import { standsForAir } from './media';
 import {
-  NO_CUT_PARTS,
   WAITING_FOR_MATERIAL,
   jobOf,
   waitingWordsFor,
@@ -75,7 +74,6 @@ function onAJob(state: GameState, who: string, job: Job): Bubble | null {
   // right with a compressor: media.ts decides it and the mark reports it (CLAUDE.md T23 2.7).
   if (standsForAir(state, stage)) return bubble(who, 'noCompressor');
   const waiting = waitingWordsFor(state, who, job);
-  if (waiting === NO_CUT_PARTS) return bubble(who, 'noCutParts');
   if (waiting === null) return null;
   const family = stage?.family ?? null;
   return family === null ? null : bubble(who, 'waitingForMachine', { machine: machineShortWord(family) });

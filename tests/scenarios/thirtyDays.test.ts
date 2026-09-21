@@ -952,9 +952,11 @@ describe('a month of six joiners behind two saws', () => {
 
   it('keeps the crew cutting, with no gap longer than ten minutes in the month', () => {
     // Piotr: with six joiners you need two saws or they stand (CLAUDE.md T7 3.1). Nobody in this
-    // month stands at a taken saw for more than ten minutes together.
+    // month stands at a taken saw for more than ten minutes together, and the second saw halves
+    // what little waiting there is (v43: 9 minutes against 17, where the one saw crew used to
+    // stand for hours, because a man behind the saw now assembles what is cut).
     expect(two.longest).toBeLessThanOrEqual(CREW_MAX_GAP);
-    expect(two.waiting).toBeLessThan(one.waiting / 4);
+    expect(two.waiting).toBeLessThan(one.waiting);
   });
 
   it('gets the whole book out on one saw too, and the second saw buys time at the saw and not a job (v37)', () => {
@@ -977,11 +979,13 @@ describe('a month of six joiners behind two saws', () => {
     expect(two.state.cash - one.state.cash).toBeLessThan(0);
   });
 
-  it('stands the one saw crew at the saw for hours at a time, and says which machine', () => {
+  it('stands the one saw crew at the saw a minute at a time, and says which machine', () => {
     // The station carries the family, which is what the hall draws and the Gantt greys out
-    // (CLAUDE.md T7 3.1, 3.2).
+    // (CLAUDE.md T7 3.1, 3.2). Until v43 the one saw crew stood for hours; with assembly open
+    // while the saw is taken, the longest wait of the month is a minute. What the second saw buys
+    // now is cutting minutes and not standing minutes, which the cash test above measures.
     expect(one.waiting).toBeGreaterThan(0);
-    expect(one.longest).toBeGreaterThan(CREW_MAX_GAP);
+    expect(one.longest).toBeLessThanOrEqual(CREW_MAX_GAP);
   });
 
   it('keeps one store for the hall, the two fans added up, fed by both saws', () => {

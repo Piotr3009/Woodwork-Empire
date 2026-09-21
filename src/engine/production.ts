@@ -348,31 +348,19 @@ interface AtWork {
   machine: Equipment | null;
 }
 
-/** What the men behind the first one in a queue for a cutting machine say. They are not waiting for
- *  the saw, which only one man can stand at: they are waiting for the parts it has not cut yet, and
- *  that is what the drawing has the second man in the queue saying (docs/mockups/t21/bubbles.html,
- *  Callum at the saw and Ravi behind him; CLAUDE.md T21 2.6, 2.7). */
-export const NO_CUT_PARTS = 'no cut parts yet';
-
-/** What this one man says while he stands, which is not always what his job says. The first man in
- *  the queue for a machine is waiting for the machine; the men behind him at a cutting stage have no
- *  cut parts yet, because the parts they would be assembling are still on the saw
- *  [TUNE: the reading of who says which, from the drawing's two men]. Null when he is not standing at
- *  all. The queue is read the way `stationForProduction` reads it, through the same `placeAmong`, so
- *  the words and the cell he stands on cannot disagree (CLAUDE.md T21 2.6, 2.7). */
+/** What this one man says while he stands, which is not always what his job says: every man in the
+ *  queue for a machine is waiting for the machine. "No cut parts yet", the words of the men behind
+ *  the first in a saw queue, went with the rule that kept assembly closed until the cutting was done
+ *  (PIOTR, 21.09; v43): a man queues at the saw now only when the saw is all his job has left, so
+ *  there are no parts he is waiting to assemble. Null when he is not standing at all
+ *  (CLAUDE.md T21 2.6, 2.7). */
 export function waitingWordsFor(state: GameState, who: string, job: Job): string | null {
   const stage = stageFor(state, who, job, cncOptions(state, who, job));
   const family = stage?.family ?? null;
   if (family === null || family === BENCH) return null;
   if (!has(state, family) || machineIsShared(state, family)) return null;
   if (heldMachine(state, who, family) !== null) return null;
-  const queue = placeAmong(
-    job,
-    who,
-    (other) => other !== who && heldMachine(state, other, family) === null,
-  );
-  const cutting = stage !== null && (stage.id === 'cutting' || stage.id === 'cnc');
-  return queue > 0 && cutting ? NO_CUT_PARTS : waitingLine(family);
+  return waitingLine(family);
 }
 
 /** The words the job carries while the rack has nothing for it (CLAUDE.md T2 3.6). */

@@ -1061,7 +1061,6 @@ export type WorkerIdleReason = 'waitingForBoss' | 'noMachine' | 'noMaterial';
  *  [PIOTR, 19.09: "when all is fine, no bubble; only when it is bad"]. */
 export type BubbleKey =
   | 'waitingForMachine'
-  | 'noCutParts'
   | 'noMaterial'
   /** He is at a bench the hall has no air for (CLAUDE.md T23 2.7). */
   | 'noCompressor'
