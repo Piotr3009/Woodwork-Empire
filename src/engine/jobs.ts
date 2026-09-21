@@ -954,6 +954,34 @@ export function oldestOpenJob(state: GameState): Job | null {
   );
 }
 
+/** The job the owner goes to when his office empties: the open job with the SOONEST DEADLINE,
+ *  whether or not somebody is already on it [PIOTR, 21.09: "I should jump on the first job with a
+ *  DL, automatically"]. Turn 23's 2.3 gave him the oldest job with NOBODY on it, which in a hall
+ *  where the crew hold every job meant he stood in the office with his hands in his pockets, which
+ *  is the one thing 2.3 was written to stop. He joins as a second pair of hands now, the same way
+ *  the player's Assign does it, and the bag of work of v37 puts him at a stage whose station is
+ *  free, so he is never standing behind a man at a machine while another stage of that job is
+ *  open (v41).
+ *
+ *  The order: the day it is due, then the job fewest men are on, then the order the board was
+ *  taken in. A contract is no job of the board's and never comes out of here [PIOTR, 19.09]. */
+export function jobForTheOwner(state: GameState): Job | null {
+  const open = state.jobs.filter(
+    (job) =>
+      (job.stage === 'ready' || job.stage === 'inProduction') && !isOnJob(job, OWNER),
+  );
+  if (open.length === 0) return null;
+  const order = new Map(state.jobs.map((job, at) => [job.id, at]));
+  return (
+    [...open].sort(
+      (left, right) =>
+        left.dueDay - right.dueDay ||
+        left.assignees.length - right.assignees.length ||
+        (order.get(left.id) ?? 0) - (order.get(right.id) ?? 0),
+    )[0] ?? null
+  );
+}
+
 /** True while there is work of the board's about at all: a job ready for a bench, or one in
  *  production, whoever is holding it. What the owner's idle reason asks to tell "there is work
  *  here and none of it is mine" from "there is no work at all" (CLAUDE.md T23 2.3).

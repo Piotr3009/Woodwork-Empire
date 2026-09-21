@@ -1,18 +1,18 @@
-// The owner never stands doing nothing (PIOTR, 20.09; CLAUDE.md T23 2.3).
+// The owner never stands doing nothing (PIOTR, 20.09; CLAUDE.md T23 2.3; v41).
 //
 // Once a minute, when he is in, on the hall side of the door, holding no chore and no job, and
-// with nothing in his office queue he could do now, he takes the oldest job standing open with
-// nobody on it, as lead, exactly the way a joiner did until tonight. A job somebody else is on he
-// does not join by day: that is still the evening take over of Turn 17, which is a click. He never
-// takes a standing contract.
+// with nothing in his office queue he could do now, he goes to the job with the SOONEST DEADLINE
+// and JOINS it, whoever is already on it [PIOTR, 21.09: "I should jump on the first job with a DL,
+// automatically"]. Turn 23 gave him the oldest job with nobody on it, and in a hall where the crew
+// hold every job that is no job at all, so he stood in the office exactly as he did before 2.3 was
+// written. He never takes a standing contract.
 //
-// His own idle reason `nothingAssigned` therefore only fires when there is work about that he
-// cannot take, which is work somebody else already has; `officeEmpty` is unchanged.
+// `officeEmpty` is unchanged: no work of the board's about at all.
 
 import { describe, expect, it } from 'vitest';
 import { ownerIdleReason } from '../../src/engine/production';
 import { OWNER } from '../../src/engine/machines';
-import { oldestOpenJob } from '../../src/engine/jobs';
+import { jobForTheOwner } from '../../src/engine/jobs';
 import { missingForHire } from '../../src/engine/staff';
 import { createTask, openTasks } from '../../src/engine/tasks';
 import { tick } from '../../src/engine/index';
@@ -69,10 +69,10 @@ function clearOffice(state: GameState): GameState {
 }
 
 describe('an empty office sends the owner to the bench', () => {
-  it('puts him on the oldest open job within a minute', () => {
+  it('puts him on the job with the soonest deadline within a minute', () => {
     const state = emptyOffice();
     const job = firstJob(state);
-    expect(oldestOpenJob(state)?.id).toBe(job.id);
+    expect(jobForTheOwner(state)?.id).toBe(job.id);
     const after = tick(clearOffice(state), 1);
     expect(firstJob(after).assignees).toEqual([OWNER]);
     // And he is the lead, so the work goes in at his own speed.
@@ -86,18 +86,35 @@ describe('an empty office sends the owner to the bench', () => {
     expect(firstJob(worked).labourRemaining).toBeLessThan(before);
   });
 
-  it('leaves him alone once the player moves him off it', () => {
+  it('joins the job the crew are already on, as a second pair of hands', () => {
     let state = tick(emptyOffice({ withJoiner: true }), 1);
     expect(firstJob(state).assignees).toEqual([OWNER]);
     const man = state.workers[0];
     if (!man) throw new Error('a joiner is wanted');
-    // The Work Plan moves him off it and onto the joiner, like anybody.
+    // The Work Plan moves him off it and onto the joiner, like anybody: ASSIGN_JOB hands the job
+    // to the one man named, so the joiner is the lead of it from that click.
     state = act(state, { type: 'ASSIGN_JOB', jobId: firstJob(state).id, workerId: man.id });
-    expect(firstJob(state).assignees).toEqual([man.id]);
-    // And he does not walk back onto a job that is now somebody's: that is the evening take over
-    // and it is a click of its own (CLAUDE.md T17 2.12).
-    const later = tick(clearOffice(state), 30);
-    expect(firstJob(later).assignees).toEqual([man.id]);
+    expect(firstJob(state).assignees[0]).toBe(man.id);
+    // And from v41 the owner walks back onto it beside him rather than standing in the office:
+    // the job has the soonest deadline on the board and it is the only one there is. The joiner
+    // keeps it and the lead with it; the owner is the second name on it (PIOTR, 21.09).
+    const later = tick(clearOffice(state), 2);
+    expect(firstJob(later).assignees).toEqual([man.id, OWNER]);
+    // The evening take over of Turn 17, which puts him on INSTEAD of the man, is still its own
+    // click and is not what this is.
+  });
+
+  it('goes to the soonest deadline and not to the oldest job', () => {
+    const state = emptyOffice();
+    // A second job, taken later but due sooner: that is the one he goes to.
+    const older = firstJob(state);
+    older.dueDay = state.clock.day + 40;
+    const urgent = { ...older, id: 'job-urgent', name: 'Urgent bookcase', assignees: [], dueDay: state.clock.day + 3 };
+    state.jobs.push(urgent);
+    expect(jobForTheOwner(state)?.id).toBe('job-urgent');
+    const after = tick(clearOffice(state), 1);
+    expect(after.jobs.find((job) => job.id === 'job-urgent')?.assignees).toEqual([OWNER]);
+    expect(after.jobs.find((job) => job.id === older.id)?.assignees).toEqual([]);
   });
 });
 
@@ -141,21 +158,31 @@ describe('what he says when there is nothing at all', () => {
       ),
     );
     state.jobs = [];
-    expect(oldestOpenJob(state)).toBeNull();
+    expect(jobForTheOwner(state)).toBeNull();
     expect(ownerIdleReason(state)).toBe('officeEmpty');
   });
 
-  it('reads nothingAssigned only when every open job is already a man of his own', () => {
+  it('never reads nothingAssigned over a job the crew are on: he joins it instead', () => {
     let state = tick(emptyOffice({ withJoiner: true }), 1);
     const man = state.workers[0];
     if (!man) throw new Error('a joiner is wanted');
-    // The job is the joiner's, so there is work about and none of it the owner can take.
+    // The job is the joiner's. Until v41 that left the owner standing with `nothingAssigned`;
+    // now the job is still his to join, so the reason is not the one he reads.
     state = clearOffice(act(state, {
       type: 'ASSIGN_JOB',
       jobId: firstJob(state).id,
       workerId: man.id,
     }));
-    expect(oldestOpenJob(state)).toBeNull();
-    expect(ownerIdleReason(state)).toBe('nothingAssigned');
+    const later = tick(state, 2);
+    // The joiner has it and the owner is on it beside him, so the minutes he would have stood
+    // through with `nothingAssigned` are minutes of work instead.
+    expect(firstJob(later).assignees[0]).toBe(man.id);
+    expect(firstJob(later).assignees).toContain(OWNER);
+    // One minute of it at most: the minute between the player's click and the next look at the
+    // board, which is the same minute a man takes to walk over. It never runs on.
+    expect(later.owner.idleByReason.nothingAssigned ?? 0).toBeLessThanOrEqual(1);
+    expect(ownerIdleReason(later)).not.toBe('nothingAssigned');
+    const onwards = tick(later, 30);
+    expect(onwards.owner.idleByReason.nothingAssigned ?? 0).toBeLessThanOrEqual(1);
   });
 });

@@ -13,14 +13,14 @@ import { addWorkingDays, isBreak, workedMinutesOfDay } from './clock';
 import {
   BUILDING_ROLES,
   addLabour,
-  assignJob,
+  addToJob,
   findJob,
   hallBlock,
   isOnJob,
   jobHeldBy,
   jobProgress,
   leadAssignee,
-  oldestOpenJob,
+  jobForTheOwner,
   waitingLine,
   workIsAbout,
 } from './jobs';
@@ -471,9 +471,10 @@ export function ownerIdleReason(state: GameState): OwnerIdleReason | null {
   // work of the board's about that is every bit of it somebody else's; or there is none of that
   // and he is in the office with his hands in his pockets.
   //
-  // From Turn 23 the second of those is the only way a job can leave him standing: he takes the
-  // oldest open one himself the minute his office empties, so `nothingAssigned` now means the
-  // crew have all the work and he has none of it (CLAUDE.md T23 2.3).
+  // From v41 no job of the board's can leave him standing at all: he joins the one with the
+  // soonest deadline the minute his office empties, whoever is on it (PIOTR, 21.09). So
+  // `nothingAssigned` is the minute between a player's click and the next look at the board, and
+  // a chore standing untaken that is nobody's to give him (CLAUDE.md T23 2.3; v41).
   const waiting = openTasks(state).some((task) => task.doneBy === null) || workIsAbout(state);
   return waiting ? 'nothingAssigned' : 'officeEmpty';
 }
@@ -481,16 +482,20 @@ export function ownerIdleReason(state: GameState): OwnerIdleReason | null {
 /** The owner goes to the bench when his office is empty (PIOTR, 20.09: "he never stands doing
  *  nothing"; CLAUDE.md T23 2.3). Once a minute: he is in, he is on the hall side of the door, he
  *  holds no chore and no job, and there is nothing in his office queue he could do now. Then he
- *  takes the oldest job standing open with nobody on it, as lead, exactly the way a joiner did
- *  until tonight.
+ *  goes to the job with the soonest deadline, `jobForTheOwner`.
  *
- *  A job somebody else is on he does not join by day: that is the evening take over of Turn 17
- *  and it stays a click of its own (CLAUDE.md T17 2.12). He never takes a standing contract
- *  [PIOTR, 19.09], which `oldestOpenJob` cannot hand him because a contract is no job of the
- *  board's. The player can move him off it in the Work Plan like anybody.
+ *  v41 (PIOTR, 21.09): he JOINS it, whoever is on it. Turn 23 gave him the oldest job with nobody
+ *  on it, and in a hall where the crew hold every job that is no job at all, so he stood in the
+ *  office exactly as he did before 2.3 was written. He is a second pair of hands now and the bag
+ *  of work puts him at a stage whose station is free. The evening take over of Turn 17 is still
+ *  its own click, for a job he wants INSTEAD of the man on it.
  *
- *  So his own idle reason `nothingAssigned` now only fires when there is work about that he
- *  cannot take, which is work somebody else already has; `officeEmpty` is unchanged. */
+ *  He never takes a standing contract [PIOTR, 19.09], which `jobForTheOwner` cannot hand him
+ *  because a contract is no job of the board's. The player can move him off it in the Work Plan
+ *  like anybody.
+ *
+ *  So his own idle reason `nothingAssigned` now fires only for a man the hall cannot put on
+ *  anything at all; `officeEmpty` is unchanged. */
 export function ownerTakesAJob(state: GameState): void {
   const owner = state.owner;
   if (!ownerIsAvailable(state)) return;
@@ -502,9 +507,11 @@ export function ownerTakesAJob(state: GameState): void {
   // Anything of his own still to do comes first: the office queue is the owner's day and the
   // bench is what he does with what is left of it.
   if (openTasks(state).some((task) => task.doneBy === null)) return;
-  const job = oldestOpenJob(state);
+  const job = jobForTheOwner(state);
   if (job === null) return;
-  assignJob(state, job.id, OWNER);
+  // He joins it rather than taking it over: a job the crew are already on keeps them
+  // (PIOTR, 21.09; v41).
+  addToJob(state, job.id, OWNER);
 }
 
 /** Why this man on the books stood through the minute just gone, or null when there was nothing of
