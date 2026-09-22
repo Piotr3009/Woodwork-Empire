@@ -23,3 +23,12 @@ docs/mockups/v47/output-who-made-it.png has it.
 The pure tail of `takeMachines` became `machineAtWork` in production.ts so the man who is placed
 and the row that says what he made read one answer; eight engine tests and six board tests, the
 day 128 and day 149 fixtures among them.
+
+**T24-B2 2.2 The gate counts the owner's place.** `benchPlacesNeeded(state, hiring)` in staff.ts is
+the joiners on the books, the man at the door and the owner, and `shortfallForHire` counts the
+bench in those places exactly as it counts the cabinet in slots; the refusal is
+`No place at a bench for him: the owner needs one too`. A save whose crew already fills the benches
+loads as it is and only the next hire is refused, asserted.
+Five card tests and two engine tests; the rule moved twenty-one halls in the existing suite, every
+one of them flipped rather than kept beside a new one, and section 0 item 2 has the two
+consequences Piotr should see.

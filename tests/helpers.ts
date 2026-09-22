@@ -261,6 +261,23 @@ export function softwareNow(state: GameState, mode: 'oneOff' | 'subscription'): 
   return settled(next);
 }
 
+/** Room at a bench for so many more men. From Turn 24 the hiring gate counts the owner's own
+ *  place beside the crew's, so the day one hall, whose budget bench holds one man, has room for
+ *  the owner and nobody else and will not take a joiner on until a second place is bought
+ *  [PIOTR, 22.09] (CLAUDE.md T24 2.2). A test that wants a crew and is not about the gate says
+ *  this once and carries on; a test that is about the gate counts the places itself. */
+export function benchPlacesFor(state: GameState, men = 1): GameState {
+  for (let man = 0; man < men; man += 1) {
+    placeEquipment(state, 'workbench', {
+      variantId: 'used',
+      x: 16,
+      y: 2 + man,
+      id: `kit-place-${man + 1}`,
+    });
+  }
+  return state;
+}
+
 /** And for taking somebody on, without the interview. */
 export function hireNow(
   state: GameState,

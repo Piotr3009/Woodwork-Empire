@@ -22,13 +22,19 @@ function parse(html: string): HTMLElement {
   return holder;
 }
 
-/** A hall that wants for nothing but money: the kit a joiner needs is all standing in it. */
+/** A hall that wants for nothing but money: the kit a joiner needs is all standing in it, the
+ *  second place at a bench included, because the gate counts the owner's own from Turn 24
+ *  (CLAUDE.md T24 2.2). The bench of two places is the day one bench's own, so the hall still
+ *  holds exactly one bench and the places it has are the class's. */
 function readyToHire(cash: number): GameState {
   const state = fillRack(buyStartingKit(newGame({ difficulty: 'veryEasy' })));
   state.enquiries = [];
   placeEquipment(state, 'locker', { x: 6, y: 9 });
   placeEquipment(state, 'handToolSet', { x: 12, y: 9 });
   placeEquipment(state, 'toolCabinet', { x: 10, y: 9 });
+  const bench = state.equipment.find((item) => item.specId === 'workbench');
+  if (bench === undefined) throw new Error('the day one kit has a bench in it');
+  bench.variantId = 'standard';
   state.cash = cash;
   return state;
 }
@@ -153,22 +159,50 @@ describe('a free place at a bench', () => {
     expect(benchPlaces(hallWith('industrial', 1))).toBe(3);
   });
 
-  it('hires two at a standard bench and refuses the third with No place at a bench', () => {
-    let state = hallWith('standard', 4);
+  it('hires two at an industrial bench and refuses the third, because the owner needs a place too', () => {
+    // The gate counts the places against the joiners on the books, the man at the door and the
+    // owner, who has stood at a bench since the first morning [PIOTR, 22.09] (CLAUDE.md T24 2.2).
+    let state = hallWith('industrial', 4);
+    expect(benchPlaces(state)).toBe(3);
     expect(canHire(state, 'joiner', 'novice').ok).toBe(true);
     state = hireNow(state, 'joiner', 'novice');
+    // Two places gone, one left, and the second man takes it: the owner has none yet and the
+    // third of the bench's places is his.
     expect(canHire(state, 'joiner', 'novice').ok).toBe(true);
     state = hireNow(state, 'joiner', 'novice');
     expect(state.workers).toHaveLength(2);
-    // The two places of the standard bench are taken, and the third man is refused in the words
-    // of the thing that is short.
+    // Two men and the owner fill the three places, and the third man is refused in the words of
+    // the thing that is short, which names the boss.
     expect(canHire(state, 'joiner', 'novice')).toEqual({
       ok: false,
-      reason: 'No place at a bench',
+      reason: 'No place at a bench for him: the owner needs one too',
     });
-    // And a second bench puts it right: two more places, and the third man is taken on.
-    placeEquipment(state, 'workbench', { variantId: 'budget', x: 4, y: 7, id: 'kit-bench-2' });
+    // And a used bench puts it right: one more place, and the third man is taken on.
+    placeEquipment(state, 'workbench', { variantId: 'used', x: 4, y: 7, id: 'kit-bench-2' });
+    expect(benchPlaces(state)).toBe(4);
     expect(canHire(state, 'joiner', 'novice').ok).toBe(true);
+  });
+
+  it('loads a hall whose crew already fills the benches as it is, and refuses only the next man', () => {
+    // The gate is about the next hire and never about the men already on the books: a save made
+    // before tonight comes in with its crew where it left them (CLAUDE.md T24 2.2).
+    let state = hallWith('standard', 4);
+    state = hireNow(state, 'joiner', 'novice');
+    // A second man written into the hall the way a save carries him, past the gate.
+    const first = state.workers[0];
+    if (!first) throw new Error('nobody on the books');
+    state.workers.push({ ...first, id: 'staff-saved', name: 'Saved' });
+    const bench = state.equipment.find((item) => item.specId === 'workbench');
+    if (bench === undefined) throw new Error('no bench');
+    expect(benchOf(state, first.id)?.id).toBe(bench.id);
+    expect(benchOf(state, 'staff-saved')?.id).toBe(bench.id);
+    // Nobody is turned off a bench, and the owner is the one left standing; the next man is the
+    // only one the gate has anything to say about.
+    expect(benchOf(state, OWNER)).toBeNull();
+    expect(canHire(state, 'joiner', 'novice')).toEqual({
+      ok: false,
+      reason: 'No place at a bench for him: the owner needs one too',
+    });
   });
 
   it('puts the second man at the first man s bench, and the third at the next one', () => {
@@ -176,6 +210,8 @@ describe('a free place at a bench', () => {
     // at the same bench and are drawn there (CLAUDE.md T23 2.17).
     let state = hallWith('standard', 4);
     state = hireNow(state, 'joiner', 'novice');
+    // A second place for the owner, and the second man takes the first man's other one.
+    placeEquipment(state, 'workbench', { variantId: 'budget', x: 4, y: 7, id: 'kit-bench-2' });
     state = hireNow(state, 'joiner', 'novice');
     const bench = state.equipment.find((item) => item.specId === 'workbench');
     if (bench === undefined) throw new Error('no bench');
@@ -186,13 +222,14 @@ describe('a free place at a bench', () => {
     // have the same one.
     expect([first?.anchorX, first?.anchorY]).toEqual([bench.anchorX, bench.anchorY]);
     expect([second?.anchorX, second?.anchorY]).toEqual([bench.anchorX, bench.anchorY]);
-    // The owner takes what is left, which at a bench with two places and two men is nothing.
-    expect(benchOf(state, OWNER)).toBeNull();
-    // A second bench, and the third man stands at that one instead.
-    placeEquipment(state, 'workbench', { variantId: 'budget', x: 4, y: 7, id: 'kit-bench-2' });
+    // The owner takes what is left, which is the one place of the second bench.
+    expect(benchOf(state, OWNER)?.id).toBe('kit-bench-2');
+    // A third bench, and the third man stands at the second one, the owner moving on again.
+    placeEquipment(state, 'workbench', { variantId: 'budget', x: 6, y: 7, id: 'kit-bench-3' });
     state = hireNow(state, 'joiner', 'novice');
     const third = state.workers[2];
     expect(benchOf(state, third?.id ?? '')?.id).toBe('kit-bench-2');
+    expect(benchOf(state, OWNER)?.id).toBe('kit-bench-3');
   });
 
   it('works each man at a pro bench at that bench s pace, on his own job', () => {

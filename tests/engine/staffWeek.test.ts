@@ -23,6 +23,7 @@ import { assignJob } from '../../src/engine/jobs';
 import type { GameState, Worker } from '../../src/engine/index';
 import {
   acceptNow,
+  benchPlacesFor,
   buyStartingKit,
   choose,
   clearEvents,
@@ -44,6 +45,9 @@ function readyHall(sheets = 60): GameState {
   placeEquipment(state, 'locker', { x: 6, y: 9 });
   placeEquipment(state, 'handToolSet', { x: 12, y: 9 });
   placeEquipment(state, 'toolCabinet', { x: 10, y: 9 });
+  // The gate counts the owner's own place at a bench beside the crew's from Turn 24, so the day
+  // one hall needs a second place before it takes anybody on (CLAUDE.md T24 2.2).
+  benchPlacesFor(state);
   state.reputation = 20;
   state = hireNow(state, 'joiner', 'experienced');
   const enquiry = placeEnquiry(state, { price: 6000, deadlineDays: 60 });

@@ -281,6 +281,9 @@ describe('hiring wants a free cabinet', () => {
     // both, the hire goes through, and there is nothing spare for the next man.
     expect(toolSlots(state)).toBe(2);
     expect(freeToolSlots(state)).toBe(0);
+    // And a second place at a bench, because the gate counts the owner's own from Turn 24
+    // (CLAUDE.md T24 2.2). The cabinet is what this test is about; the bench is bought and gone.
+    state = buyNow(state, 'workbench');
     expect(missingForHire(state, 'joiner')).toEqual([]);
     expect(canHire(state, 'joiner', 'novice').ok).toBe(true);
     const hired = hireNow(state, 'joiner', 'novice');
@@ -312,6 +315,8 @@ describe('hiring wants a free cabinet', () => {
     state = buyNow(state, TOOL_CABINET);
     expect(countOf(state, TOOL_CABINET)).toBe(2);
     state = buyNow(state, 'handToolSet');
+    // And a second place at a bench, for the owner (CLAUDE.md T24 2.2).
+    state = buyNow(state, 'workbench');
     expect(missingForHire(state, 'joiner')).toEqual([]);
     expect(canHire(state, 'joiner', 'novice').ok).toBe(true);
     state = hireNow(state, 'joiner', 'novice');

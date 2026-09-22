@@ -23,7 +23,10 @@ function withJoinerKit(state: GameState): GameState {
   let guard = 0;
   while (missingForHire(next, 'joiner').length > 0 && guard < 20) {
     for (const specId of missingForHire(next, 'joiner')) {
-      next = buyNow(next, specId);
+      // A bench of two places. A hall owns no more benches than the unit has slots for, six, so a
+      // crew of one place benches now tops out at five men and the owner: the gate counts his own
+      // place from Turn 24 (CLAUDE.md T24 2.2). The class is the lever, as it is for the cabinet.
+      next = buyNow(next, specId, specId === 'workbench' ? 'standard' : undefined);
     }
     guard += 1;
   }
