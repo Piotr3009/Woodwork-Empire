@@ -31,6 +31,8 @@ import {
   CONTRACT_FREE_END_DAYS,
   ANSWER_MAX,
   ANSWER_MIN,
+  CNC_STAGE,
+  PRODUCTION_STAGES,
   WORKER_RATES,
 } from './constants';
 import type { ContractPieceSpec, ContractQuantityBand } from './constants';
@@ -433,7 +435,10 @@ function resultAtSpeed(
   const machine = candidate === null ? pieceMachine(state, worker === null ? OWNER : worker.id, piece) : null;
   const wearPerMinute =
     candidate !== null ? candidate.wearPerMinute : machine === null ? 0 : machineWearPerMinute(machine);
-  const wear = pence(minutes * wearPerMinute);
+  // The wear is charged on the minutes the man actually stands at the machine and on no other:
+  // none on a minute at the bench and none on a minute by hand [PIOTR, 22.09] (CLAUDE.md T24 2.4).
+  const machineMinutes = minutes * pieceMachineShare(state, worker === null ? OWNER : worker.id, piece);
+  const wear = pence(machineMinutes * wearPerMinute);
   const margin = pence(contract.pricePerPiece - piece.material - labourCost - wear);
   const piecesPerDay = Math.floor(MINUTES_PER_WORKING_DAY / minutes);
   // Every working day of the week, and no ceiling at what the client ordered: the man on a
@@ -760,6 +765,30 @@ function pieceStage(state: GameState, who: string, piece: ContractPieceSpec): { 
   return { stage, family: familyForStage(staged, stage) };
 }
 
+/** What one stage of a piece is worth of its work, off the game's own table. A CNC does the cutting
+ *  and the machining as one stage and carries the two shares together (CLAUDE.md T7 3.4). */
+function stageShareOf(stage: StageId): number {
+  if (stage === CNC_STAGE.id) return CNC_STAGE.share;
+  return PRODUCTION_STAGES.find((entry: { id: StageId }) => entry.id === stage)?.share ?? 0;
+}
+
+/** The share of a piece's minutes worked at a machine of its family: the stage the machine does,
+ *  in the share `PRODUCTION_STAGES` gives it, over the stages this piece actually has. A cut sheet
+ *  pack is all saw and reads 1, so nothing about it moves; a wardrobe front is cut and then
+ *  finished and only its cutting is at the saw, so its wear falls to those minutes
+ *  [PIOTR, 22.09] (CLAUDE.md T24 2.4). The card and the closing report read this one figure, so a
+ *  piece cannot be said to cost the machine one thing before the term and another after it. */
+function pieceMachineShare(state: GameState, who: string, piece: ContractPieceSpec): number {
+  const { stage } = pieceStage(state, who, piece);
+  const first = piece.stages[0];
+  const machine = stageShareOf(stage);
+  let total = 0;
+  for (const entry of piece.stages) {
+    total += entry === first ? machine : stageShareOf(entry);
+  }
+  return total <= 0 ? 0 : machine / total;
+}
+
 /** The machine this man's piece would be made on: the best CNC when he can have one, else the
  *  best of the piece's own family in the hall, else nothing, by hand. The card's wear and the
  *  closing report both read it, so what a piece is said to cost the machine is one reading. */
@@ -970,8 +999,11 @@ function labourMinuteCost(state: GameState): number {
 /** The closing report: pieces made, revenue, material, labour hours at cost, the net margin. */
 export function closingReport(state: GameState, contract: Contract): ClosingReport {
   const labourCost = pence(contract.labourMinutes * labourMinuteCost(state));
-  const machine = pieceMachine(state, OWNER, contractPiece(contract));
-  const machineWear = pence(contract.labourMinutes * (machine === null ? 0 : machineWearPerMinute(machine)));
+  const piece = contractPiece(contract);
+  const machine = pieceMachine(state, OWNER, piece);
+  // The same rule as the card's: the minutes at the machine and no others (CLAUDE.md T24 2.4).
+  const machineMinutes = contract.labourMinutes * pieceMachineShare(state, OWNER, piece);
+  const machineWear = pence(machineMinutes * (machine === null ? 0 : machineWearPerMinute(machine)));
   return {
     pieces: contract.piecesMade,
     revenue: pence(contract.revenue),

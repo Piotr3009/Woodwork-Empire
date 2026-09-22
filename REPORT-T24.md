@@ -41,3 +41,11 @@ with two saws idle.
 The station and the mark are read off the one `contractMenAtWork`, so where he stands and what is
 wrong with him cannot disagree; four engine tests and two render tests, the empty rack, the
 delivery the next minute and five o'clock among them.
+
+**T24-B4 2.4 Wear on the machine minutes only.** `pieceMachineShare` in contracts.ts is the share
+of a piece's minutes worked at a machine of its family, its machine stage's own share over the
+stages the piece actually has, off `PRODUCTION_STAGES`; `contractResultFor` and `closingReport`
+both multiply by it, so the card and the term's report cannot disagree.
+A cut sheet pack is all saw and reads 1, so its figures do not move to the pence, asserted; a
+wardrobe front is cut and then finished and reads 0.625, so its wear falls to its cutting minutes;
+a piece made by hand still shows `Machine wear a piece, by hand` at nought.
