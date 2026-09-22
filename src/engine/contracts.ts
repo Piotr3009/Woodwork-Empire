@@ -879,7 +879,7 @@ export function runContractMinute(state: GameState): ContractMinute {
       contract.labourMinutes += 1;
       worker.productionMinutes += 1;
       state.dayStats.workMinutes += 1;
-      bookOutputMinute(state, worth);
+      bookOutputMinute(state, worker.id, worth);
       result.worked += away;
       if (machineId !== null) used.set(machineId, (used.get(machineId) ?? 0) + 1);
       while (contract.pieceMinutes >= piece.minutes) {

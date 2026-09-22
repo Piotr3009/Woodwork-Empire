@@ -13,6 +13,7 @@ import {
   LOW_AIR_FACTOR,
   EXTRACTOR_BROKEN_OUTPUT_FACTOR,
   BREAK_SKIP_FACTOR,
+  BY_HAND_DURATION_FACTOR,
   GATE_CROWD_FACTOR,
   GATE_CROWD_LIMIT,
   GATE_OUTPUT_BONUS,
@@ -56,18 +57,29 @@ import { weekOfDay, monthOfDay, nextWorkingDay } from './clock';
 import { canAfford } from './economy';
 // The manager's grade, off owner.ts, which is the module every layer can reach: staff.ts reads
 // this module, so the manager cannot be asked for from there (CLAUDE.md T23 2.4).
-import { managerTier } from './owner';
+import { managerTier, ownerEfficiency } from './owner';
 import {
   airBlockFor,
   airCheck,
   airDemandOf,
   compressorFor,
   compressorIsLow,
+  extractionCapacityOf,
   extractionCheck,
   extractionDemandOf,
   isConnectedToExtraction,
   underExtracted,
 } from './media';
+// The words of "Who made it today" are the words the rest of the game already has for a man, his
+// stage and the job he was locked out of the machines on, so the block is read out of the same
+// selectors the hall, the Work Plan and the board read. stages.ts and catalog.ts both read this
+// module in turn; nothing here is called while a module is being evaluated, so the pair of rings
+// is the one media.ts has always made with it (CLAUDE.md T24 2.1).
+import { lockReasonFor, template } from './catalog';
+import { jobHeldBy } from './jobs';
+import { machineAtWork } from './production';
+import { cncOptions, stageDoing, stageFor } from './stages';
+import type { StagePlan } from './stages';
 import type { AirCheck } from './media';
 import { cubicMetres, trimmed } from './text';
 import type {
@@ -77,6 +89,7 @@ import type {
   GameState,
   MaterialKind,
   Orientation,
+  WorkerTier,
 } from './types';
 
 export function specOf(specId: string): EquipmentSpec {
@@ -676,6 +689,18 @@ function roundPoints(value: number): number {
   return Math.round(value * 10000) / 10000;
 }
 
+/** A man's grade and his trade in the game's own words: "experienced joiner", "a helper". The one
+ *  spelling, read by the Output sheet's own line for him and by the row that says what he made
+ *  today, so the two cannot disagree about him (CLAUDE.md T20 2.5, T24 2.1). */
+function tradeWords(worker: { tier: WorkerTier | null; role: string }): string {
+  return `${worker.tier === null ? 'a' : TIER_WORDS[worker.tier]} ${worker.role}`;
+}
+
+/** The same man with his name in front of it, which is how the sheet's own line for him reads. */
+function manWords(worker: { name: string; tier: WorkerTier | null; role: string }): string {
+  return `${worker.name}, ${tradeWords(worker)}`;
+}
+
 /** What the hall is turning out and why, line by line. The one selector for it: the number the
  *  engine multiplies production by is this list's total, so the board and the bench cannot
  *  disagree about the state of the hall (CLAUDE.md T9 3.10). */
@@ -745,7 +770,7 @@ export function outputBreakdown(state: GameState): OutputBreakdown {
   for (const worker of state.workers) {
     if (!PRODUCING_ROLES.includes(worker.role)) continue;
     lines.push({
-      label: `${worker.name}, ${worker.tier === null ? 'a' : TIER_WORDS[worker.tier]} ${worker.role}`,
+      label: manWords(worker),
       points: roundPoints(worker.rate - 1),
       hall: false,
       where: 'his own minutes',
@@ -791,9 +816,18 @@ export function hallProductivityFactor(state: GameState): number {
 /** Books one production minute's multiplier for the workshop's average output (v40): the jobs
  *  and the contracts both call it, once a man minute, with the same four things the minute's
  *  labour was made of. `workMinutes` is counted where the labour lands, so the two halves of the
- *  average are booked on the same minute. */
-export function bookOutputMinute(state: GameState, multiplier: number): void {
+ *  average are booked on the same minute.
+ *
+ *  From v50 it is also booked against the man who worked it, `who` being a worker's id or `OWNER`,
+ *  so the Output sheet can say who made today's number and the engine, not the sheet, keeps the
+ *  figures (PIOTR, 22.09; CLAUDE.md T24 2.1). The day loop, the night loop and the contract minute
+ *  all come through here and there is no second way of booking a minute. */
+export function bookOutputMinute(state: GameState, who: string, multiplier: number): void {
   state.dayStats.outputWorth = Math.round((state.dayStats.outputWorth + multiplier) * 10000) / 10000;
+  const booked = state.dayStats.byMan[who] ?? { minutes: 0, worth: 0 };
+  booked.minutes += 1;
+  booked.worth = Math.round((booked.worth + multiplier) * 10000) / 10000;
+  state.dayStats.byMan[who] = booked;
 }
 
 /** The workshop's average output today: what a minute of production has been worth on average,
@@ -805,6 +839,183 @@ export function workshopOutputToday(state: GameState): number {
   const minutes = state.dayStats.workMinutes;
   if (minutes <= 0) return hallProductivityFactor(state);
   return Math.round((state.dayStats.outputWorth / minutes) * 100) / 100;
+}
+
+// ---------------------------------------------------------------------------
+// Who made today's number (PIOTR, 22.09; CLAUDE.md T24 2.1)
+// ---------------------------------------------------------------------------
+
+/** One row of "Who made it today": a man who has put a production minute in since this morning,
+ *  or the hall itself. Every word of it is written here, because the sheet prints the block and
+ *  computes nothing (CLAUDE.md T15 0, T24 2.1). */
+export interface WorkshopBreakdownRow {
+  /** A worker's id, `OWNER`, or `HALL_ROW` for the hall's own row. */
+  who: string;
+  /** `<Name>, <tier> <role>, <doing> <job>`, in the words the person card uses; `Hall`. */
+  main: string;
+  /** `<why>, <his minutes> min: <his rate> times <his stage's speed>`; the hall's state. */
+  words: string;
+  /** His minutes today; nought on the hall's row, which is a factor and not a man. */
+  minutes: number;
+  /** What a minute of his was worth on average today, or the hall's own factor. */
+  figure: number;
+}
+
+/** The hall's own row carries this instead of a man's id. */
+export const HALL_ROW = 'hall';
+
+export interface WorkshopBreakdown {
+  /** `dayStats.workMinutes`: what the head of the block counts. */
+  minutes: number;
+  /** The men, the owner first and then the crew in the order of `state.workers`. Empty before
+   *  the first production minute of the day, when there is nothing to say and no block is drawn. */
+  men: WorkshopBreakdownRow[];
+  /** The hall's row, drawn under the men. Null when nobody has worked. */
+  hall: WorkshopBreakdownRow | null;
+  /** `workshopOutputToday`: the same figure as the line above the block. */
+  total: number;
+  /** The one sentence under the block. Empty when there is nothing to say. */
+  note: string;
+}
+
+/** The state of the hall in the words the sheet's own lines have for it: `clean, extraction
+ *  working`, `dusty`, and the two states no line of the breakdown carries, a fan away being
+ *  serviced and a store nothing can run into (CLAUDE.md T24 2.1). */
+function hallWordsToday(state: GameState): string {
+  const words = outputBreakdown(state)
+    .lines.filter((line) => line.hall)
+    // "Hall clean" is the hall saying it is clean, and the row it goes on is already called Hall.
+    .map((line) => line.label.replace(/^Hall /, '').toLowerCase());
+  // A fan away for the day is not "extraction working", and `outputBreakdown` has no line for it
+  // because the factor it costs is the shortfall the missing capacity already makes
+  // (CLAUDE.md T20 2.9.3). It is said in the fan's own name.
+  const away = machinesInService(state).find((item) => extractionCapacityOf(item) > 0);
+  if (away !== undefined) {
+    const said = `${(findSpec(away.specId)?.name ?? away.specId).toLowerCase()} on service`;
+    const at = words.indexOf('extraction working');
+    if (at >= 0) words[at] = said;
+    else words.push(said);
+  }
+  if (bagsFull(state)) words.push('bags full');
+  return words.join(', ');
+}
+
+/** Two places, the way every multiplier on a sheet is written. */
+function twoPlaceText(value: number): string {
+  return (Math.round(value * 100) / 100).toFixed(2);
+}
+
+/** Why his minute was worth what it was: the class of the machine he is standing at, the by hand
+ *  penalty when he is at none and his stage falls back to a pair of hands, or his bench. The
+ *  machine comes first because it is what actually set his speed: `runProductionMinute` reads the
+ *  class he got and never the plan's own figure, so a man with a bench under a by hand job is
+ *  quicker than that job's 0.67 and this row says so. A row whose two figures did not multiply out
+ *  to the one beside them would be the very thing 2.1 is for (PIOTR, 22.09; CLAUDE.md T24 2.1, and
+ *  the open question of section 8 about rule 9.5). */
+function whyWords(stage: StagePlan | null, machine: Equipment | null): string {
+  if (machine !== null) {
+    return (variantFor(machine)?.name ?? findSpec(machine.specId)?.name ?? machine.specId).toLowerCase();
+  }
+  if (stage === null) return 'at the bench';
+  return stage.byHand ? 'by hand' : 'at the bench';
+}
+
+/** The speed his stage ran at this minute: the class of the machine he actually got, or the
+ *  plan's own speed when he is at none. The same two lines `runProductionMinute` reads, before
+ *  the air factor (CLAUDE.md T7 3.1). */
+function stageSpeedNow(state: GameState, stage: StagePlan | null, machine: Equipment | null): number {
+  if (machine !== null) return outputFactorOf(state, machine);
+  return stage === null ? 1 : stage.speed;
+}
+
+/** One man's row. `rate` is his own rate, which for the owner is what his day has left him
+ *  (`ownerEfficiency`) and for a man on the books is his grade's. */
+function manRow(
+  state: GameState,
+  who: string,
+  name: string,
+  trade: string,
+  rate: number,
+  booked: { minutes: number; worth: number },
+): WorkshopBreakdownRow {
+  const job = jobHeldBy(state, who);
+  const stage = job === null ? null : stageFor(state, who, job, cncOptions(state, who, job));
+  const machine = job === null ? null : machineAtWork(state, who, job);
+  const doing =
+    job === null || stage === null ? '' : `${stageDoing(stage.id, job.finish === 'lacquer')} ${job.name}`;
+  const mine = who === OWNER ? `your ${twoPlaceText(rate)}` : twoPlaceText(rate);
+  return {
+    who,
+    main: [name, trade, doing].filter((part) => part !== '').join(', '),
+    words:
+      `${whyWords(stage, machine)}, ${booked.minutes} min: ` +
+      `${mine} times ${twoPlaceText(stageSpeedNow(state, stage, machine))}`,
+    minutes: booked.minutes,
+    figure: booked.minutes <= 0 ? 0 : Math.round((booked.worth / booked.minutes) * 100) / 100,
+  };
+}
+
+/** The one sentence under the block, and at most one: a job today's minutes went into by hand
+ *  first, because that is the thing the player can put right with an order, and the hall under
+ *  1.00 after it. A low number made of slow men says itself in the rows above and gets no
+ *  sentence (CLAUDE.md T24 2.1). */
+function breakdownNote(state: GameState, hall: number): string {
+  for (const id of state.dayStats.jobsAdvanced) {
+    const job = state.jobs.find((entry) => entry.id === id);
+    if (!job || !job.byHand) continue;
+    // The tools the enquiry was locked on, in the board's own words: "Needs solid wood tools".
+    const locked = lockReasonFor(state, template(job.templateId)) ?? '';
+    const tools = locked.replace(/^Needs /, '').toLowerCase();
+    if (tools === '') continue;
+    return (
+      `${job.name} was taken by hand: no ${tools} in the hall, so every stage of it runs at ` +
+      `${twoPlaceText(1 / BY_HAND_DURATION_FACTOR)}, the saw included.`
+    );
+  }
+  if (hall < 1) {
+    const reason = hallWordsToday(state);
+    if (reason !== '') return `The hall ran at ${twoPlaceText(hall)} today: ${reason}.`;
+  }
+  return '';
+}
+
+/** Who made today's Output number and why: one row a man who has put a production minute in since
+ *  this morning, the owner first and then the crew in the order of `state.workers`, the hall's own
+ *  row under them, the total the line above the block already carries, and at most one sentence
+ *  saying the one thing the rows cannot (PIOTR, 22.09: "the player has no way of knowing what to
+ *  fix"; CLAUDE.md T24 2.1).
+ *
+ *  The minutes and the worth are the day's own, booked a minute at a time by `bookOutputMinute`;
+ *  everything else is read off the hall as it stands this minute, which is where the man is and
+ *  what he is standing at. */
+export function workshopBreakdownToday(state: GameState): WorkshopBreakdown {
+  const men: WorkshopBreakdownRow[] = [];
+  const owner = state.dayStats.byMan[OWNER];
+  if (owner !== undefined && owner.minutes > 0) {
+    men.push(manRow(state, OWNER, state.playerName, '', ownerEfficiency(state), owner));
+  }
+  for (const worker of state.workers) {
+    const booked = state.dayStats.byMan[worker.id];
+    if (booked === undefined || booked.minutes <= 0) continue;
+    men.push(manRow(state, worker.id, worker.name, tradeWords(worker), worker.rate, booked));
+  }
+  const hallFactor = hallProductivityFactor(state);
+  return {
+    minutes: state.dayStats.workMinutes,
+    men,
+    hall:
+      men.length === 0
+        ? null
+        : {
+            who: HALL_ROW,
+            main: 'Hall',
+            words: hallWordsToday(state),
+            minutes: 0,
+            figure: Math.round(hallFactor * 100) / 100,
+          },
+    total: workshopOutputToday(state),
+    note: men.length === 0 ? '' : breakdownNote(state, hallFactor),
+  };
 }
 
 /** What the classes of machine in the hall do to the speed of a job of this material: the best

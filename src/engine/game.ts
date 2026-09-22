@@ -1770,8 +1770,9 @@ function runProductionMinute(state: GameState, ownerOnTask: boolean): void {
     const trade = tradeFactor(worker?.role ?? null, stage.family);
     const minute = labourPerMinute(hand.rate * trade, speed) * hall;
     // The minute's own multiplier, for the workshop's average output (v40): the same four things
-    // the labour is made of, and nothing else. The night's minutes book theirs in `workMinute`.
-    bookOutputMinute(state, hand.rate * trade * speed * hall);
+    // the labour is made of, and nothing else, booked against the man who worked it so the Output
+    // sheet can say who made the number (v50). The night's minutes book theirs in `workMinute`.
+    bookOutputMinute(state, hand.who, hand.rate * trade * speed * hall);
     if (addLabour(state, hand.job, minute, stage.id)) raiseJobAtGate(state, hand.job);
   }
   // The extraction books its hours the whole time it is running, whoever is at what: a fan is

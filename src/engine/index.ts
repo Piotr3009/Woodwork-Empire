@@ -296,7 +296,13 @@ export {
 export { dropJob, dropReputationCost } from './jobs';
 export { changeReputation, companyTotals } from './reputation';
 export type { LifecycleStep, StartCheck, StepState } from './jobs';
-export type { BagStore, OutputBreakdown, OutputLine } from './machines';
+export type {
+  BagStore,
+  OutputBreakdown,
+  OutputLine,
+  WorkshopBreakdown,
+  WorkshopBreakdownRow,
+} from './machines';
 
 // Production in stages (CLAUDE.md T7 3.1)
 export {
@@ -478,6 +484,8 @@ export {
   dustBand,
   outputBreakdown,
   workshopOutputToday,
+  workshopBreakdownToday,
+  HALL_ROW,
   bookOutputMinute,
   findSpec,
   gateIsCrowded,
