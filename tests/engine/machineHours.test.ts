@@ -85,8 +85,8 @@ describe('the hours a machine gains', () => {
     for (const item of tomorrow.equipment) expect(item.takenBy, item.specId).toBeNull();
   });
 
-  it('brings the service on by the calendar and by nothing else: six months from the purchase, run or not (v50)', () => {
-    // Until v50 the service came on by the hours the machine ran (80 of them). Piotr, 22.09:
+  it('brings the service on by the calendar and by nothing else: six months from the purchase, run or not (v51)', () => {
+    // Until v51 the service came on by the hours the machine ran (80 of them). Piotr, 22.09:
     // "every six months, for every machine, and that is all".
     const state = oneManAtWork();
     const saw = machine(state, 'tableSaw');

@@ -286,19 +286,25 @@ describe('the three month playthrough of 10.4, on Easy as the brief scripts it',
     // Re-measured for v43: 9,120, -2,166 and -11,048. Assembly no longer waits for the cutting,
     // so a second man on a job assembles while the saw is taken; month 1 is a thousand better,
     // month 3 seven hundred worse, and the shape of the run is unchanged.
-    // Re-measured for v50: 6,482, -3,294 and -9,832, the service on the calendar (PIOTR, 22.09).
-    // Three things moved. The contract pays 66 a piece and not 73, because the entry point
-    // carries the reference saw's wear and the wear fell six fold with the interval: 2,400 less
-    // over the three months. No saw is overdue inside six months, so nothing rolls its 2% and
-    // gives up: the v43 run's table saw repair on day 50 and compressor repair on day 71 are
-    // gone, and only the extractor breaks (day 75, dust, as before). And with the saw whole the
-    // crew gets through the sheets sooner, so the script's restock lands in month 1 instead of
-    // month 2 (material 12,800 in month 1 against 9,920, and 11,710 in month 2 against 15,050),
-    // which is what makes month 1 read 2,600 worse; month 3 closes 1,200 better all told and
-    // the shape of the run is unchanged.
+    // Re-measured for v50 (CLAUDE.md T24 2.8): a restock is not trimmed to the rack any more, so
+    // the script's twenty sheets are twenty sheets and what will not fit goes into the store at
+    // 150 a load. Month 1 does not move, month 2 is 381 worse for the storage, and the hall stops
+    // running dry: month 3 is 7,297 better and the run ends 3,391 better off (the contract test
+    // below). Measured on the finished tree, not tuned: 9,120, -2,547 and -3,751.
+    // Re-measured for v51: 6,482, -3,675 and -10,404, the service on the calendar (PIOTR, 22.09).
+    // Three things moved, measured off the ledger by category against the v50 run. The contract
+    // pays 66 a piece and not 73, because the entry point carries the reference saw's wear and
+    // the wear fell six fold with the interval: 2,126 less over the three months. No saw is
+    // overdue inside six months, so nothing rolls its 2% and gives up for want of a service: the
+    // v50 run's table saw repair on day 50 and compressor repair on day 71 are gone, only the
+    // extractor breaks (day 75, dust), and the crew puts 2,415 more into the jobs. And a crew
+    // that never stops for a broken saw goes through its sheets sooner, so the script restocks
+    // three times and not twice (material 33,180 against 26,040) and closes day 90 with 42
+    // sheets on the rack against 6: the 7,140 more of material is mostly stock still standing
+    // there, which is why month 3 reads 6,650 worse while the company has done more work.
     expect(Math.round(months[0]?.cashClose ?? 0)).toBe(6482);
-    expect(Math.round(months[1]?.cashClose ?? 0)).toBe(-3294);
-    expect(Math.round(months[2]?.cashClose ?? 0)).toBe(-9832);
+    expect(Math.round(months[1]?.cashClose ?? 0)).toBe(-3675);
+    expect(Math.round(months[2]?.cashClose ?? 0)).toBe(-10404);
     // Three charges in three months: 7 on day 31 and 1 on day 61 for the few days each month
     // that ran under, and 109 on day 91, which is most of month 3 spent in the overdraft. The
     // first two are small change beside the 25% a year the overdraft charged all three months
@@ -329,11 +335,12 @@ describe('the three month playthrough of 10.4, on Easy as the brief scripts it',
     // company sixteen thousand into its overdraft buys no material. From v40 the contract pays
     // 73 a piece and the company is six thousand better off in month 3, so it buys its sheets
     // and month 3 reads 73 (75 from v43). The ten thousand loan floor of Turn 23's 2.12 stays as
-    // Piotr ruled on 20.09; what changed is the money the contract brings in against it. 77 from
-    // v50: no saw breaks down for want of a service inside six months, so no day of month 3 is
-    // spent with the cutting stopped.
+    // Piotr ruled on 20.09; what changed is the money the contract brings in against it.
+    // Seventy seven from v50: the rack runs dry less often, because a restock is bought whole
+    // (CLAUDE.md T24 2.8). Seventy six from v51: no saw breaks down for want of a service inside
+    // six months, and the third restock keeps the rack fed to the end.
     expect(months[1]?.efficiencyMean ?? 0).toBeGreaterThan(55);
-    expect(Math.round(months[2]?.efficiencyMean ?? 0)).toBe(77);
+    expect(Math.round(months[2]?.efficiencyMean ?? 0)).toBe(76);
   });
 
   it('took the first contract its crew could keep up with and made every week of it in full', () => {
@@ -350,7 +357,7 @@ describe('the three month playthrough of 10.4, on Easy as the brief scripts it',
     const weeks = (first?.weeks ?? []).slice(1);
     expect(weeks.length).toBeGreaterThan(10);
     expect(weeks.every((week) => week.made >= week.wanted)).toBe(true);
-    // 66 from v50 (73 from v40): the entry point's price with the reference saw's wear at six
+    // 66 from v51 (73 from v40): the entry point's price with the reference saw's wear at six
     // months between services in it, answered at this company's standing.
     expect(first?.pricePerPiece).toBe(66);
     expect(first?.sheetsUsed ?? 0).toBeGreaterThan(0);
@@ -385,17 +392,20 @@ describe('the three month playthrough of 10.4, on Easy as the brief scripts it',
     expect(running.weeks.length).toBe(18);
     expect(running.status).toBe('ended');
     expect(running.renegotiatedPrice).toBe(renegotiatedPriceFor(running));
-    // 84 from v43, the history's own arithmetic on that draw; 76 from v50, the same arithmetic
-    // on the 66 the draw answers at v50's entry point.
+    // 84 from v43, the history's own arithmetic on that draw; 76 from v51, the same arithmetic
+    // on the 66 the draw answers at v51's entry point.
     expect(running.renegotiatedPrice).toBe(76);
     expect(later.gameOver).toBeNull();
     expect(later.clock.day).toBe(122);
     // Still in the overdraft on the day the term ends, and one day under the limit: the bank has
     // not looked twice at it (CLAUDE.md T22 2.2).
     // -14,893 on day 122 (v43): nine more days of the overdraft than the v40 run's day 113.
-    // -11,844 from v50: three thousand better over the four months, the saw and the compressor
-    // never breaking for want of a service, against a contract that pays 66 and not 73.
-    expect(Math.round(later.cash)).toBe(-11844);
+    // -11,502 from v50: the same day, 3,391 less of the overdraft, because the hall is not
+    // standing about waiting for sheets that were trimmed off its own order (CLAUDE.md T24 2.8).
+    // -13,552 from v51: the same day 122, the saw and the compressor never breaking for want of a
+    // service, against a contract that pays 66 and not 73 and a rack that was restocked once more
+    // (the note on the months above); the extractor broke twice on the way, days 75 and 101.
+    expect(Math.round(later.cash)).toBe(-13552);
     expect(later.eventQueue.find((entry) => entry.kind === 'bankruptcy')).toBeUndefined();
     // Three months of one money track: nothing waited anywhere but the account (CLAUDE.md T22 2.1).
     expect(later.ledger.some((entry) => entry.unpaid)).toBe(false);

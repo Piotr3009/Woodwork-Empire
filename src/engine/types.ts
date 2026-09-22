@@ -266,7 +266,7 @@ export interface Equipment {
   anchorY: number;
   broken: boolean;
   /** The day it was bought or last serviced: the next service is due six months on, by the
-   *  calendar and not by the hours it ran (PIOTR, 22.09; v50). */
+   *  calendar and not by the hours it ran (PIOTR, 22.09; v51). */
   servicedDay: number;
   /** Services it has had. The first adds half of its original life, and each one after that half
    *  of what the last one added (CLAUDE.md T20 2.9). */
@@ -735,7 +735,6 @@ export type GameEventKind =
   /** 17:00: home, or two more hours. */
   | 'goingHome'
   | 'deliveryArrived'
-  | 'stockOverflow'
   /** The hall's bags are full: nothing that makes dust runs until they are emptied (T12 2.3). */
   | 'bagsFull'
   | 'machineBroken'
@@ -1189,6 +1188,11 @@ export interface DayStats {
    *  so the workshop rate counts it on top of the labour value; nothing else reads it and express
    *  itself is untouched (CLAUDE.md T17 2.26). */
   expressUplift: number;
+  /** The same sum as `outputWorth`, kept a man at a time: the production minutes each person has
+   *  put in today and what they were worth added up, keyed by the worker's id and by `OWNER` for
+   *  the boss. The Output sheet's "Who made it today" block prints these and computes nothing
+   *  (PIOTR, 22.09; CLAUDE.md T24 2.1). A man with no minutes today has no entry. */
+  byMan: Record<string, { minutes: number; worth: number }>;
 }
 
 /** One line of the reputation log: the day, what happened, and what it was worth. The company
@@ -1273,7 +1277,7 @@ export interface GameState {
    *  CLAUDE.md T23 2.14). */
   monthlyReports: MonthlyReport[];
   /** The day a shop last rang with a contract, declined or not, or null before the first: a name
-   *  of twenty is owed a ring every week (PIOTR, 22.09; v50). */
+   *  of twenty is owed a ring every week (PIOTR, 22.09; v51). */
   lastContractOfferDay: number | null;
   ledger: LedgerEntry[];
   eventQueue: GameEvent[];

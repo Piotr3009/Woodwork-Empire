@@ -21,6 +21,7 @@ import {
   CONTRACT_QUANTITY_STEP,
   CONTRACT_QUANTITY_MINUTES,
   CONTRACT_FREE_END_DAYS,
+  PRODUCTION_STAGES,
   SHEET_VALUE,
 } from '../../src/engine/constants';
 import type { ContractPieceSpec } from '../../src/engine/constants';
@@ -222,7 +223,7 @@ describe('the offer', () => {
     expect(declineContract(state, contract.id).ok).toBe(false);
   });
 
-  it('comes at least once a week from a name of twenty, whatever the dice say (PIOTR, 22.09; v50)', () => {
+  it('comes at least once a week from a name of twenty, whatever the dice say (PIOTR, 22.09; v51)', () => {
     // Under twenty the chance of the day is all there is, so a run of quiet days is what the
     // dice give: a young shop can go weeks without a ring.
     const young = newGame();
@@ -523,12 +524,22 @@ describe('the week and the term', () => {
     const report = closingReport(state, contract);
     const labourCost =
       Math.round(6000 * workerMinuteCost(JOINER_MONTHLY_WAGE.novice) * 100) / 100;
-    // The same minutes at the wear of the saw the piece is made on: the hall's used saw, a tenth
-    // of its price every service interval (v40).
+    // The minutes at the saw, and no others, at the wear of the saw the piece is made on: the
+    // hall's used saw, a tenth of its price every service interval (v40). From Turn 24 a minute at
+    // the bench or by hand costs the machine nothing, so a piece of more than one stage is charged
+    // its cutting share alone [PIOTR, 22.09] (CLAUDE.md T24 2.4).
     const saw = state.equipment.find((item) => item.specId === 'tableSaw');
     if (!saw) throw new Error('a saw is wanted');
-    const machineWear = Math.round(6000 * machineWearPerMinute(saw) * 100) / 100;
+    const piece = contractPiece(contract);
+    const shares = piece.stages.map(
+      (stage) => PRODUCTION_STAGES.find((entry) => entry.id === stage)?.share ?? 0,
+    );
+    const machineShare = (shares[0] ?? 0) / shares.reduce((sum, share) => sum + share, 0);
+    const machineWear = Math.round(6000 * machineShare * machineWearPerMinute(saw) * 100) / 100;
     expect(machineWear).toBeGreaterThan(0);
+    // The cut sheet pack is all saw and reads 1; anything with a bench stage on it reads less.
+    expect(machineShare).toBe(piece.stages.length === 1 ? 1 : machineShare);
+    expect(machineShare).toBeLessThanOrEqual(1);
     expect(report).toEqual({
       pieces: 100,
       revenue: 3800,

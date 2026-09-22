@@ -283,7 +283,7 @@ describe('(v) a four week contract with the joiner taken off it for two of them'
     expect(contract?.renegotiatedPrice).toBe(Math.round(priceAtStart * factor));
     // 67, where it read 74 from v40 to v49 and 49 before that: the month runs at the entry
     // point's price, and the entry point carries the reference saw's wear, which fell six fold
-    // when the service went from 80 hours to six months (PIOTR, 22.09; v50): 76 became 69, and
+    // when the service went from 80 hours to six months (PIOTR, 22.09; v51): 76 became 69, and
     // 0.97 of 69 rounds to 67. The price moved it and nothing else did: the weeks, the short
     // weeks and the factor are what they were.
     expect(contract?.renegotiatedPrice).toBe(67);

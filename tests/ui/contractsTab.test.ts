@@ -241,7 +241,7 @@ describe("Running, and the whole day that goes to it (PIOTR, 21.09; v42)", () =>
     expect(MINUTES_PER_WORKING_DAY).toBeGreaterThan(result.piecesPerDay * result.minutes - 1);
   });
 
-  it('says how many men the contract is for when one cannot make the client s day (PIOTR, 22.09; v50)', () => {
+  it('says how many men the contract is for when one cannot make the client s day (PIOTR, 22.09; v51)', () => {
     // Piotr's day 115: Dave alone made eleven packs a day of a contract that wanted fourteen, and
     // nothing on the card said the contract was two men's work. "So the hint is: this contract is
     // for two men at the least."

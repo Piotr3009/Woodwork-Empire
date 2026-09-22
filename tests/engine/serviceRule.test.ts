@@ -104,7 +104,7 @@ describe('a service buys the machine more life (CLAUDE.md T20 2.9.1)', () => {
     expect(lifeAfterServices(original, 20)).toBeLessThanOrEqual(original * 2);
   });
 
-  it('starts the six months to the next service again, so one that was due is not due any more (v50)', () => {
+  it('starts the six months to the next service again, so one that was due is not due any more (v51)', () => {
     const state = hall();
     const saw = theSaw(state);
     saw.servicedDay = state.clock.day - SERVICE_INTERVAL_DAYS - 1;
@@ -280,7 +280,7 @@ describe('a machine past its life (CLAUDE.md T20 2.9.4)', () => {
     const saw = theSaw(state);
     // Just past the end of its life, with its service up to date, so the one figure moving is the
     // life: the Turn 8 chance, unchanged, in the first week past the end.
-    // (v50: the service is on the calendar and up to date on the day of purchase, so nothing here
+    // (v51: the service is on the calendar and up to date on the day of purchase, so nothing here
     // touches it; the hours are the life alone.)
     const today = state.clock.day;
     saw.hoursUsed = saw.enduranceHours;
@@ -327,12 +327,12 @@ describe('the extractor is serviced like a machine (CLAUDE.md T23 2.8)', () => {
     // hall and not for one man: it books that hour whoever is at what.
     const state = tick(cutting(), 60);
     expect(theFan(state).hoursUsed).toBeCloseTo(1, 4);
-    // Those hours are its life running down, against the endurance its class has; since v50 the
+    // Those hours are its life running down, against the endurance its class has; since v51 the
     // service itself is on the calendar and the hours say nothing about it.
     expect(theFan(state).enduranceHours).toBeGreaterThan(theFan(state).hoursUsed);
   });
 
-  it('falls due at the same point, six months on the calendar, against the endurance its class already has (v50)', () => {
+  it('falls due at the same point, six months on the calendar, against the endurance its class already has (v51)', () => {
     const state = hall();
     const fan = theFan(state);
     expect(fan.enduranceHours).toBe(enduranceHoursFor('extractor', fan.variantId));

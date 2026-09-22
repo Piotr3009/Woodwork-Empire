@@ -189,27 +189,36 @@ export interface StationCheck {
   waitingFor: string | null;
 }
 
-/** Gives this man what the stage he is at needs, and takes back whatever it does not. */
-export function takeMachines(state: GameState, hand: Hand): StationCheck {
-  const options = cncOptions(state, hand.who, hand.job);
-  const wanted = familiesWanted(state, hand.job, hand.who);
-  releaseMachines(state, hand.who, wanted);
-  for (const family of wanted) {
-    if (claimMachine(state, hand.who, family) === null) return { machine: null, waitingFor: family };
-  }
-  const stage = stageFor(state, hand.who, hand.job, options);
+/** The machine this man's stage stands him at, his own bench and a tool out of a cabinet included,
+ *  asked without claiming anything and without writing anything down: it is the machine
+ *  `runProductionMinute` reads his speed off, and so the one thing the Output sheet's "Who made it
+ *  today" has to know to say why his minute was worth what it was (CLAUDE.md T7 3.1, T24 2.1).
+ *  `takeMachines` below is this, with the claiming in front of it, so a man is never placed by one
+ *  reading and reported by another. */
+export function machineAtWork(state: GameState, who: string, job: Job): Equipment | null {
+  const stage = stageFor(state, who, job, cncOptions(state, who, job));
   const family = stage?.family ?? null;
   if (family === null || !has(state, family) || machineIsShared(state, family)) {
-    return { machine: sharedTool(state, family), waitingFor: null };
+    return sharedTool(state, family);
   }
   // A bench is his own place at one and not a thing he took off anybody, so it is asked for by
   // name. Only the man who wanted a bench has one: the men behind the lead work at the lead's and
   // put their minutes in at the stage's own speed, as they have since Turn 19
   // (CLAUDE.md T19 2.5, T23 2.17).
   if (family === BENCH) {
-    return { machine: wanted.includes(BENCH) ? benchOf(state, hand.who) : null, waitingFor: null };
+    return familiesWanted(state, job, who).includes(BENCH) ? benchOf(state, who) : null;
   }
-  return { machine: heldMachine(state, hand.who, family), waitingFor: null };
+  return heldMachine(state, who, family);
+}
+
+/** Gives this man what the stage he is at needs, and takes back whatever it does not. */
+export function takeMachines(state: GameState, hand: Hand): StationCheck {
+  const wanted = familiesWanted(state, hand.job, hand.who);
+  releaseMachines(state, hand.who, wanted);
+  for (const family of wanted) {
+    if (claimMachine(state, hand.who, family) === null) return { machine: null, waitingFor: family };
+  }
+  return { machine: machineAtWork(state, hand.who, hand.job), waitingFor: null };
 }
 
 /** The hand tool a stage is done with when its family is kept in a cabinet: there is no queue for
@@ -666,8 +675,8 @@ export function workMinute(
     const trade = tradeFactor(worker?.role ?? null, stage.family);
     const minute = labourPerMinute(hand.rate * trade, speed) * hall;
     // The minute's own multiplier, for the workshop's average output (v40): the same four things
-    // the labour is made of, and nothing else.
-    bookOutputMinute(state, hand.rate * trade * speed * hall);
+    // the labour is made of, and nothing else, booked against the man who worked it (v50).
+    bookOutputMinute(state, hand.who, hand.rate * trade * speed * hall);
     if (addLabour(state, hand.job, minute, stage.id)) report.finished.push(hand.job);
   }
   // The extraction books its hours the whole time it is running, whoever is at what: a fan is

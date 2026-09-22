@@ -121,7 +121,7 @@ describe('the chips over the floor', () => {
   it('names the machine that is due a service, with the button that does it', () => {
     const saw = game().equipment.find((item) => item.specId === 'tableSaw');
     if (saw === undefined) throw new Error('no saw in the hall');
-    // Long past its service: a year since the last one on the calendar (v50).
+    // Long past its service: a year since the last one on the calendar (v51).
     saw.servicedDay = game().clock.day - SERVICE_INTERVAL_DAYS * 2;
     render();
     const due = chips().find((text) => text.includes('due a service'));

@@ -262,7 +262,7 @@ describe('(mm) the same crew with a novice manager over them', () => {
     // month the overdue saw kit-137 rolled its 2% and gave up on the main stream's dice, and stayed
     // broken; the same rolls moved the extractor's, which broke twice as well (days 23 and 25).
     // (ll)'s saws were just as overdue and simply rolled no breakdown. With the service on the
-    // calendar (PIOTR, 22.09; v50) nothing is overdue inside six months, nothing rolls, and the
+    // calendar (PIOTR, 22.09; v51) nothing is overdue inside six months, nothing rolls, and the
     // month reads what the grade puts in it. Measured on this build: no repair line in either
     // month, every saw whole.
     expect(NOVICE.done).toBeGreaterThan(NO_MANAGER.done);

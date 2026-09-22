@@ -211,11 +211,11 @@ describe('(cc) a contract month with an experienced joiner, on Very easy', () =>
     // pays on its last working day (CLAUDE.md T21 2.10). One line, and it is his month whole.
     expect(wages.payDays).toHaveLength(1);
     expect(wages.total).toBe(pounds(CC.man.monthlyWage));
-    // 158 packs at the entry point's 69 (v50; 76 from v40, the typed 50 before that) is 10,902
+    // 158 packs at the entry point's 69 (v51; 76 from v40, the typed 50 before that) is 10,902
     // taken; 158 packs of 0.15 of a sheet at 200 a sheet is 4,740 of stock off the rack; the one
     // pay day inside the term is his 2,470 by the v38 ladder. The entry point fell from 76 to 69
     // because it carries the reference saw's wear, and the wear fell six fold when the service
-    // went from 80 hours to six months (PIOTR, 22.09; v50). The line of the cross check of
+    // went from 80 hours to six months (PIOTR, 22.09; v51). The line of the cross check of
     // CLAUDE.md T20 7, which the figures keep: a contract month with an experienced joiner ends
     // in profit AFTER his wages, and from v40 after the saw's wear as well: 158 packs are about
     // 119 hours of the used saw, which is 45 of service at 0.38 an hour, out of the 3,692.
@@ -565,8 +565,9 @@ describe('(ee) a fifty thousand pound bespoke job and a fifty place rack', () =>
     expect(shortfallOf(EE.job)).toBe(0);
     expect(EE.job.sheetsReserved + EE.job.sheetsUsed).toBe(EE.job.sheets);
     expect(orderForJobCheck(EE.state, EE.job)).toEqual({ ok: false, reason: 'Nothing short' });
-    // None of it was ever left standing in the yard to be lost by morning.
-    expect(EE.seen.filter((event) => event.kind === 'stockOverflow')).toEqual([]);
+    // None of it was ever left standing in the yard to be lost by morning: from Turn 24 nothing
+    // is, on a job's lorry or a stock one (CLAUDE.md T20 2.16, T24 2.8).
+    expect(EE.state.deliveries.every((entry) => entry.overflowSheets === 0)).toBe(true);
     console.log(
       '(ee) THE FIFTY THOUSAND POUND BESPOKE JOB\n' +
         `sheets the job wants ${EE.job.sheets}, places on the rack ${places}\n` +

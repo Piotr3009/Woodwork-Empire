@@ -6,7 +6,7 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { SERVICE_INTERVAL_HOURS, TEMP_STORAGE_COST } from '../../src/engine/constants';
+import { SERVICE_INTERVAL_DAYS, TEMP_STORAGE_COST } from '../../src/engine/constants';
 import { migrateState } from '../../src/engine/migrate';
 import {
   OWNER,
@@ -165,18 +165,19 @@ describe('section 7, the contract and the hall', () => {
     expect(all.wear).toBe(Math.round(all.minutes * machineWearPerMinute(packSaw) * 100) / 100);
   });
 
-  it('brings a dust system that ran three weeks due a service', () => {
+  it('brings a dust system bought today due a service six months on and not before (v51)', () => {
     let state = fillRack(buyStartingKit(newGame({ difficulty: 'veryEasy' })), 200);
     state.cash = 400000;
     state = buyNow(state, 'dustSystem');
     const system = state.equipment.find((item) => item.specId === 'dustSystem');
     if (!system) throw new Error('a dust system is wanted');
-    expect(serviceIsDue(system)).toBe(false);
-    // Three weeks of a hall whose extraction runs the working day: fifteen days of eight hours.
-    const threeWeeks = 3 * 5 * 8;
-    expect(threeWeeks).toBeGreaterThan(SERVICE_INTERVAL_HOURS);
-    system.hoursUsed = threeWeeks;
-    expect(serviceIsDue(system)).toBe(true);
+    expect(serviceIsDue(system, state.clock.day)).toBe(false);
+    // Three weeks of a hall whose extraction runs the working day bring nothing due: the service
+    // is on the calendar (PIOTR, 22.09), six months from the purchase.
+    system.hoursUsed = 3 * 5 * 8;
+    expect(serviceIsDue(system, state.clock.day + 21)).toBe(false);
+    expect(serviceIsDue(system, state.clock.day + SERVICE_INTERVAL_DAYS - 1)).toBe(false);
+    expect(serviceIsDue(system, state.clock.day + SERVICE_INTERVAL_DAYS)).toBe(true);
   });
 
   it('takes sixty sheets into a rack with room for forty and stores the twenty', () => {

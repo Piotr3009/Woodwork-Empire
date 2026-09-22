@@ -3,10 +3,12 @@
 // extractors alone, because the two systems sell themselves on "no more bags and no breakdown"
 // and everything on the list is rolled for a breakdown past its service. They book their hours,
 // come due, take the same card button and go out for the same working day; what they still never
-// do is give up, which is the half of their own line that is about breaking down.
+// do is give up, which is the half of their own line that is about breaking down. From v51 the
+// due point is the calendar's, six months from the purchase or the last service (PIOTR, 22.09),
+// and the hours they book are their life running down and nothing else.
 
 import { describe, expect, it } from 'vitest';
-import { SERVICE_COST_FRACTION, SERVICE_INTERVAL_HOURS } from '../../src/engine/constants';
+import { SERVICE_COST_FRACTION, SERVICE_INTERVAL_DAYS } from '../../src/engine/constants';
 import { extractionKit } from '../../src/engine/media';
 import {
   isServiced,
@@ -43,9 +45,9 @@ function withSystem(specId: string): { state: GameState; system: Equipment } {
   return { state, system };
 }
 
-/** Three weeks of the extraction running, in hours, without playing them. */
-function hoursOf(system: Equipment, hours: number): void {
-  system.hoursUsed = hours;
+/** Six months on the calendar since the system was bought, without playing them (v51). */
+function sixMonthsOn(state: GameState, system: Equipment): void {
+  system.servicedDay = state.clock.day - SERVICE_INTERVAL_DAYS;
 }
 
 describe('a central system s service', () => {
@@ -59,29 +61,31 @@ describe('a central system s service', () => {
       expect(system.hoursUsed).toBe(0);
     });
 
-    it(`brings the ${specId} due on the same hours as an extractor, at the same tenth of its price`, () => {
+    it(`brings the ${specId} due on the same six months as an extractor, at the same tenth of its price`, () => {
       const { state, system } = withSystem(specId);
-      expect(serviceIsDue(system)).toBe(false);
-      // Three weeks of a hall that runs its extraction all day is well past the interval.
-      hoursOf(system, SERVICE_INTERVAL_HOURS);
-      expect(serviceIsDue(system)).toBe(true);
+      expect(serviceIsDue(system, state.clock.day)).toBe(false);
+      // Hours on it bring nothing due (v51): the calendar does.
+      system.hoursUsed = 500;
+      expect(serviceIsDue(system, state.clock.day)).toBe(false);
+      sixMonthsOn(state, system);
+      expect(serviceIsDue(system, state.clock.day)).toBe(true);
       expect(machinesDueService(state).map((item) => item.specId)).toContain(specId);
       expect(serviceCostFor(system)).toBe(system.purchasePrice * SERVICE_COST_FRACTION);
     });
 
     it(`calls the ${specId} in on the same button and takes it out for the same working day`, () => {
       const { state, system } = withSystem(specId);
-      hoursOf(system, SERVICE_INTERVAL_HOURS);
+      sixMonthsOn(state, system);
       expect(serviceCallCheck(state, system.id)).toEqual({ ok: true, reason: '' });
       const serviced = serviceMachine(state, system.id);
       expect(serviced?.id).toBe(system.id);
       expect(machineIsOut(system, state.clock.day)).toBe(true);
-      expect(serviceIsDue(system)).toBe(false);
+      expect(serviceIsDue(system, state.clock.day)).toBe(false);
     });
 
     it(`gives the ${specId} a row on the Machines page with the same words and the same button`, () => {
       const { state, system } = withSystem(specId);
-      hoursOf(system, SERVICE_INTERVAL_HOURS);
+      sixMonthsOn(state, system);
       const row = rowOf(renderMachinesPage(state), system.id);
       expect(row).toContain('service due');
       expect(row).toContain(`Service · ${formatMoney(serviceCostFor(system))}`);
@@ -95,10 +99,10 @@ describe('a central system s service', () => {
     });
 
     it(`never lets the ${specId} give up, which is the line the player bought it on`, () => {
-      const { system } = withSystem(specId);
-      hoursOf(system, SERVICE_INTERVAL_HOURS * 10);
-      expect(serviceIsDue(system)).toBe(true);
-      expect(overdueBreakdownChance(system)).toBe(0);
+      const { state, system } = withSystem(specId);
+      system.servicedDay = state.clock.day - SERVICE_INTERVAL_DAYS * 10;
+      expect(serviceIsDue(system, state.clock.day)).toBe(true);
+      expect(overdueBreakdownChance(system, state.clock.day)).toBe(0);
     });
   }
 
@@ -106,8 +110,8 @@ describe('a central system s service', () => {
     const state = fillRack(buyStartingKit(newGame({ difficulty: 'veryEasy' })), 400);
     const fan = state.equipment.find((item) => item.specId === 'extractor');
     if (!fan) throw new Error('a fan is wanted');
-    fan.hoursUsed = SERVICE_INTERVAL_HOURS;
-    expect(serviceIsDue(fan)).toBe(true);
-    expect(overdueBreakdownChance(fan)).toBeGreaterThan(0);
+    fan.servicedDay = state.clock.day - SERVICE_INTERVAL_DAYS;
+    expect(serviceIsDue(fan, state.clock.day)).toBe(true);
+    expect(overdueBreakdownChance(fan, state.clock.day)).toBeGreaterThan(0);
   });
 });

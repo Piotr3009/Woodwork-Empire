@@ -86,7 +86,7 @@ describe('the price a piece (v40)', () => {
     expect(lines).toHaveLength(3);
   });
 
-  it('reads the wear of a machine off the service rule: a tenth of its price every six months, over the hours a one man shop puts on it (v50)', () => {
+  it('reads the wear of a machine off the service rule: a tenth of its price every six months, over the hours a one man shop puts on it (v51)', () => {
     const saw = findSpec('tableSaw');
     const standard = saw?.variants.find((variant) => variant.id === CONTRACT_REFERENCE_CLASS);
     if (standard === undefined) throw new Error('no standard saw');

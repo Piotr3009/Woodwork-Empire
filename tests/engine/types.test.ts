@@ -37,9 +37,10 @@ describe('GameState', () => {
     // put the owner's own day on the state, and the last week of them (CLAUDE.md T11 3.1). Turn 12
     // moved the bags onto the extractor, and a Turn 11 save is lifted rather than refused
     // (CLAUDE.md T12 2.3). Turn 23 wrote the closed months down on the state
-    // (CLAUDE.md T23 section 4). v50 put the service on the calendar: the day a machine was
-    // last serviced in place of its hours, and the day a shop last rang (PIOTR, 22.09).
-    expect(STATE_VERSION).toBe(26);
+    // (CLAUDE.md T23 section 4). Turn 24 wrote down who made the day's number (CLAUDE.md T24
+    // section 4). v51 put the service on the calendar: the day a machine was last serviced in
+    // place of its hours, and the day a shop last rang (PIOTR, 22.09).
+    expect(STATE_VERSION).toBe(27);
     expect(sample.version).toBe(STATE_VERSION);
   });
 

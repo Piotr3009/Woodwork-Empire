@@ -399,7 +399,7 @@ function offerDay(state: GameState, contract: Contract, who: string, head: strin
 
 /** The hint under the day's pieces when one man cannot make the client's day: how many men like
  *  him the contract is for, and on a running contract how many are on it (PIOTR, 22.09: "the hint
- *  is: this contract is for two men at the least"; v50). Nothing when he can. */
+ *  is: this contract is for two men at the least"; v51). Nothing when he can. */
 function menNeededLine(state: GameState, contract: Contract, who: string, onIt: number | null): string {
   const needed = contractMenNeeded(state, contract, contractWorkerOf(state, who));
   if (needed <= 1 || (onIt !== null && onIt >= needed)) return '';

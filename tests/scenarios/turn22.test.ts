@@ -94,7 +94,7 @@ const TRADING_UNDER: Policy = {
  *  days that closes the company and not the amount.
  *
  *  Three thousand from v40, where it was one thousand. The contract pays the entry point's price
- *  and not 50 (PIOTR, 21.09): 73 a piece from v40, 66 from v50, when the reference saw's wear in
+ *  and not 50 (PIOTR, 21.09): 73 a piece from v40, 66 from v51, when the reference saw's wear in
  *  the entry point fell six fold with the service going from 80 hours to six months (PIOTR,
  *  22.09). So this company is no longer at break even under the limit: it climbs about 50 a
  *  working day at 66 (130 at 73), and a thousand under it was back above the limit on the second
@@ -167,7 +167,7 @@ describe('(jj) a company trading under the overdraft limit, on Very easy', () =>
       ['joiner', 'novice', 1950],
     ]);
     // The trade: one standing contract, taken off the board on day 3 by the scripted player and
-    // worked ever since, twenty cut sheet packs a week at 66 a piece (v50: the entry point's 69
+    // worked ever since, twenty cut sheet packs a week at 66 a piece (v51: the entry point's 69
     // answered at this company's standing; it was 76 and 73 from v40 to v49, and the table's 50
     // before that. The entry point carries the reference saw's wear, which fell six fold when the
     // service went from 80 hours to six months, PIOTR 22.09). Fifty three pieces were made and
@@ -198,7 +198,7 @@ describe('(jj) a company trading under the overdraft limit, on Very easy', () =>
     // stands at -14,161 on the twenty ninth morning, which is day 45 of the calendar, and the
     // company is still trading. It is four thousand two hundred under the limit after twenty
     // nine days of it and 839 inside the -15,000 the bank allows: the contract pays more than
-    // the days take out, about 50 a working day at v50's 66 a piece (130 at v40's 73), and only
+    // the days take out, about 50 a working day at v51's 66 a piece (130 at v40's 73), and only
     // the month's wages on day 30 push the account down (CLAUDE.md T22 2.1, 2.2; the note above
     // UNDER_BY).
     expect(JJ.twentyNine.finance.daysBelowOverdraft).toBe(BANKRUPTCY_DAYS_BELOW_LIMIT - 1);
@@ -244,7 +244,7 @@ describe('(jj) a company trading under the overdraft limit, on Very easy', () =>
     // The look is the day's first act, so the clock is at the top of the morning it closed on.
     expect(JJ.thirty.clock.minute).toBe(0);
     // The amount was never the reason: the account is -14,072 against the -15,000 the bank allows,
-    // 928 the right side of the line it never reached (v50; 1,854 at v40's price). This is the
+    // 928 the right side of the line it never reached (v51; 1,854 at v40's price). This is the
     // whole of the rule: a company can be closed while it can still pay.
     expect(Math.round(JJ.thirty.cash)).toBe(-14072);
     expect(JJ.thirty.cash).toBeGreaterThan(bankruptcyFloor(JJ.thirty));
@@ -299,7 +299,7 @@ describe('(jj) a company trading under the overdraft limit, on Very easy', () =>
   it('was trading the whole way, off the rack and the contract s own pieces', () => {
     // What kept it alive: 132 more pieces made after the money was written, 185 in all, and a line
     // of contract revenue on every working day from that morning to the last one it traded. Twenty
-    // two lines, 8,712 in all at 66 a piece (v50; 9,636 at v40's 73, 6,600 at the 50 of the
+    // two lines, 8,712 in all at 66 a piece (v51; 9,636 at v40's 73, 6,600 at the 50 of the
     // table), 330, 396 or 462 a day beside the 307 the day itself takes out. That is the company
     // a shade above break even under the limit, and it is why the thirty days are reachable at
     // all.

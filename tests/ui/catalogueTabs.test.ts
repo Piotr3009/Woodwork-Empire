@@ -292,7 +292,7 @@ describe('the Owned tab', () => {
     expect(card).toContain('Table saw');
     expect(card).toContain('Used table saw');
     expect(card).toContain('0 h of 750 h');
-    // The service is six months on the calendar from the purchase, run or not (v50).
+    // The service is six months on the calendar from the purchase, run or not (v51).
     expect(card).toContain(`service on ${formatCalendarDay(state.clock.day + SERVICE_INTERVAL_DAYS)}`);
     expect(card).toContain(`in ${SERVICE_INTERVAL_DAYS} days`);
     expect(card).toContain('running');
@@ -313,7 +313,7 @@ describe('the Owned tab', () => {
     expect(card).toContain('Sell for £630');
   });
 
-  it('names the day the service lands on, the same day whether or not work goes through the machine (v50)', () => {
+  it('names the day the service lands on, the same day whether or not work goes through the machine (v51)', () => {
     const state = fillRack(buyStartingKit(newGame({ difficulty: 'veryEasy' })));
     state.enquiries = [];
     const enquiry = placeEnquiry(state, { price: 4000, deadlineDays: 90 });
@@ -322,7 +322,7 @@ describe('the Owned tab', () => {
     const working = act(taken, { type: 'WORK_HERE', jobId: null });
     const saw = working.equipment.find((item) => item.specId === 'tableSaw');
     const card = shop(working, 'owned').querySelector(`[data-owned="${saw?.id}"]`);
-    // Until v50 the day was projected off the hours the work put through the saw; now it is six
+    // Until v51 the day was projected off the hours the work put through the saw; now it is six
     // months of the calendar from the purchase, and the work moves it not at all.
     const due = (saw?.servicedDay ?? 0) + SERVICE_INTERVAL_DAYS;
     expect(card?.textContent).toContain(`service on ${formatCalendarDay(due)}`);

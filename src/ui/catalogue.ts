@@ -574,7 +574,7 @@ export function ownedTile(
   // extraction runs and are serviced exactly as a machine is (CLAUDE.md T6 3.6, T23 2.8).
   const machine = isServiced(spec.id);
   // Six months on the calendar from the purchase or the last service, whether it ran or stood
-  // (PIOTR, 22.09; v50): the date and the days to it, no hours of use in it any more.
+  // (PIOTR, 22.09; v51): the date and the days to it, no hours of use in it any more.
   const service = !machine
     ? ''
     : serviceIsDue(item, state.clock.day)
