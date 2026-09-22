@@ -43,8 +43,13 @@ describe('the house card', () => {
     const card = page.querySelector('.house-card');
     expect(card?.getAttribute('data-house-tier')).toBe('1');
     expect(housePictureKey(1)).toBe('house.1');
-    expect(page.querySelector('[data-placeholder="house.1"]')).not.toBeNull();
-    expect(page.querySelector('svg.house-picture')).not.toBeNull();
+    // The eight rooms landed in v48 (docs/art/REQUESTS-HOUSE.md): the card draws the file off the
+    // manifest and not the placeholder any more.
+    expect(page.querySelector('[data-placeholder="house.1"]')).toBeNull();
+    const picture = page.querySelector('img.house-picture');
+    expect(picture?.getAttribute('src')).toBe('/sprites/house.1.png');
+    expect(picture?.getAttribute('data-house-picture')).toBe('house.1');
+    expect(picture?.getAttribute('alt')).toBe(HOUSE_TIER_NAMES[0] ?? '');
     expect(page.querySelector('.house-line')?.textContent).toBe(HOUSE_LINE);
     expect(HOUSE_LINE).toBe('Resting at home now. See you at the workshop in the morning.');
     expect(page.querySelector('.house-name')?.textContent).toContain(HOUSE_TIER_NAMES[0] ?? '');
@@ -56,17 +61,18 @@ describe('the house card', () => {
     expect(houseTierFor(state)).toBe(3);
     const page = parse(renderHouseCard(state));
     expect(page.querySelector('.house-card')?.getAttribute('data-house-tier')).toBe('3');
-    expect(page.querySelector('[data-placeholder="house.3"]')).not.toBeNull();
+    expect(page.querySelector('img.house-picture')?.getAttribute('src')).toBe('/sprites/house.3.png');
     expect(page.querySelector('.house-name')?.textContent).toContain(HOUSE_TIER_NAMES[2] ?? '');
   });
 
-  it('is a still picture: one svg, nothing that moves, and a card as wide as the day end', () => {
+  it('is a still picture: one image, nothing that moves, the villa at the top of the ladder', () => {
     const html = renderHouseCard(paidAtTier(10000));
     const page = parse(html);
-    expect(page.querySelectorAll('svg')).toHaveLength(1);
+    expect(page.querySelectorAll('img.house-picture')).toHaveLength(1);
+    expect(page.querySelectorAll('svg')).toHaveLength(0);
     expect(html).not.toContain('<animate');
     expect(html).not.toContain('<video');
-    expect(page.querySelector('svg')?.getAttribute('width')).toBe('900');
-    expect(page.querySelector('[data-placeholder="house.8"]')).not.toBeNull();
+    expect(page.querySelector('img.house-picture')?.getAttribute('src')).toBe('/sprites/house.8.png');
+    expect(page.querySelector('[data-placeholder="house.8"]')).toBeNull();
   });
 });
