@@ -84,6 +84,19 @@ function parse(html: string): HTMLElement {
   return holder;
 }
 
+/** The id of the first job of work the open page offers a Start on, or null. A control the engine
+ *  would refuse is never drawn (docs/ui-style.md 3), so the button's own presence is the answer. */
+function startable(): string | null {
+  const button = root().querySelector('[data-modal="laptop"] [data-do="startTask"][data-id]');
+  return button?.getAttribute('data-id') ?? null;
+}
+
+/** The same of the first row offering Add as next. */
+function queueable(): string | null {
+  const button = root().querySelector('[data-modal="laptop"] [data-do="queueTaskNext"][data-id]');
+  return button?.getAttribute('data-id') ?? null;
+}
+
 beforeAll(() => {
   document.body.innerHTML = '<div id="app"></div>';
   mount(root());
@@ -207,11 +220,16 @@ describe('through the page', () => {
     openPage('drawings');
     const state = currentState();
     if (state === null) throw new Error('no game');
-    const design = state.tasks.find((task) => task.kind === 'design' && !task.done);
-    if (design === undefined) throw new Error('no drawing waiting');
+    expect(state.tasks.some((task) => task.kind === 'design' && !task.done)).toBe(true);
     expect(laptop().textContent).toContain('Design queue');
-    click(`[data-modal="laptop"] [data-do="startTask"][data-id="${design.id}"]`);
-    expect(currentState()?.owner.currentTaskId).toBe(design.id);
+    // The drawing the page actually offers a Start on. The board's own draw decides which of the
+    // day's jobs of work the engine will let the owner pick up first, and this game is started
+    // through the start screen, which seeds itself: what is asserted is the click and not which
+    // row the draw put it on.
+    const start = startable();
+    if (start === null) throw new Error('no drawing the page offers a start on');
+    click(`[data-modal="laptop"] [data-do="startTask"][data-id="${start}"]`);
+    expect(currentState()?.owner.currentTaskId).toBe(start);
     expect(page()).toBe('drawings');
     click('[data-modal="laptop"] [data-do="pauseTask"]');
     expect(currentState()?.owner.currentTaskId).toBeNull();
@@ -222,20 +240,22 @@ describe('through the page', () => {
   // one case that presses it on the running page (CLAUDE.md T19 2.12).
   it('adds a second job of work behind the running one with one click, and keeps the first', () => {
     openPage('tasks');
-    const state = currentState();
-    if (state === null) throw new Error('no game');
-    const open = state.tasks.filter((task) => !task.done);
-    const first = open[0];
-    const second = open[1];
-    if (first === undefined || second === undefined) throw new Error('two jobs of work wanted');
-    click(`[data-modal="laptop"] [data-do="startTask"][data-id="${first.id}"]`);
-    expect(currentState()?.owner.currentTaskId).toBe(first.id);
-    click(`[data-modal="laptop"] [data-do="queueTaskNext"][data-id="${second.id}"]`);
+    expect(currentState()).not.toBeNull();
+    // The two rows the page itself offers the two clicks on, in the order it draws them: this
+    // game is started through the start screen, which seeds itself, so which jobs of work the
+    // day drew is the draw's business and what is asserted is the pair of clicks.
+    const first = startable();
+    if (first === null) throw new Error('no job of work the page offers a start on');
+    click(`[data-modal="laptop"] [data-do="startTask"][data-id="${first}"]`);
+    expect(currentState()?.owner.currentTaskId).toBe(first);
+    const second = queueable();
+    if (second === null) throw new Error('no second job of work to add as next');
+    click(`[data-modal="laptop"] [data-do="queueTaskNext"][data-id="${second}"]`);
     // The one he is on is still in his hands: Add as next never put it down.
-    expect(currentState()?.owner.currentTaskId).toBe(first.id);
-    expect(currentState()?.taskQueue).toContain(second.id);
+    expect(currentState()?.owner.currentTaskId).toBe(first);
+    expect(currentState()?.taskQueue).toContain(second);
     // And the row that was pressed says where it stands, with no second button to press.
-    const row = root().querySelector(`[data-modal="laptop"] [data-task="${second.id}"]`);
+    const row = root().querySelector(`[data-modal="laptop"] [data-task="${second}"]`);
     expect(row?.querySelector('[data-do="queueTaskNext"]')).toBeNull();
   });
 });
