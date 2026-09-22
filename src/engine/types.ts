@@ -1189,6 +1189,11 @@ export interface DayStats {
    *  so the workshop rate counts it on top of the labour value; nothing else reads it and express
    *  itself is untouched (CLAUDE.md T17 2.26). */
   expressUplift: number;
+  /** The same sum as `outputWorth`, kept a man at a time: the production minutes each person has
+   *  put in today and what they were worth added up, keyed by the worker's id and by `OWNER` for
+   *  the boss. The Output sheet's "Who made it today" block prints these and computes nothing
+   *  (PIOTR, 22.09; CLAUDE.md T24 2.1). A man with no minutes today has no entry. */
+  byMan: Record<string, { minutes: number; worth: number }>;
 }
 
 /** One line of the reputation log: the day, what happened, and what it was worth. The company

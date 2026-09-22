@@ -110,12 +110,16 @@ import type {
  *
  *  Version 23 is v40 (PIOTR, 21.09): every machine writes down on the Monday what its class saved
  *  last week; the day's stats carry the sum behind the workshop's average output and every closed
- *  day the average it had. Every v36 to v39 save loads. */
-export const STATE_VERSION = 25;
+ *  day the average it had. Every v36 to v39 save loads.
+ *
+ *  Version 26 is v50 (PIOTR, 22.09): the day's stats carry the minutes and the worth of every man
+ *  who put a production minute in today, so the Output sheet can say who made the number
+ *  (CLAUDE.md T24 2.1, section 4). Every v25 save loads. */
+export const STATE_VERSION = 26;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
-export const APP_VERSION = 'v49';
+export const APP_VERSION = 'v50';
 
 // ---------------------------------------------------------------------------
 // The owner's day, in the seven things it is made of

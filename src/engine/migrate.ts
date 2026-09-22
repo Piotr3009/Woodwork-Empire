@@ -687,6 +687,16 @@ function liftToVersion25(state: Raw): void {
   state.version = 25;
 }
 
+/** v26 (v50, PIOTR 22.09): the Output sheet says who made today's number, so the day's stats keep
+ *  the minutes and the worth of every man who has put a production minute in. A save was made in
+ *  the middle of a day this build did not count that way, so it opens with nobody booked: the
+ *  block is empty until the next minute is worked, and the total above it is untouched, because
+ *  `outputWorth` and `workMinutes` are the save's own (CLAUDE.md T24 2.1, section 4). */
+function liftToVersion26(state: Raw): void {
+  if (isRecord(state.dayStats)) state.dayStats.byMan = {};
+  state.version = 26;
+}
+
 const LIFTS: Record<number, (state: Raw) => void> = {
   12: liftToVersion13,
   13: liftToVersion14,
@@ -701,6 +711,7 @@ const LIFTS: Record<number, (state: Raw) => void> = {
   22: liftToVersion23,
   23: liftToVersion24,
   24: liftToVersion25,
+  25: liftToVersion26,
 };
 
 /** The state a save holds, lifted bump by bump into this build's shape, or null when the save is

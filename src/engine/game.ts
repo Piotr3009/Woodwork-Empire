@@ -459,6 +459,7 @@ export function createGame(options: NewGameOptions): GameState {
       nightMinutes: 0,
       paidHours: 0,
       expressUplift: 0,
+      byMan: {},
     },
     days: [],
     lastExpressDay: null,
@@ -537,6 +538,7 @@ function startDay(state: GameState): void {
     nightMinutes: 0,
     paidHours: 0,
     expressUplift: 0,
+    byMan: {},
   };
   // Nobody stands at a machine overnight: the hall starts the day with every one of them free
   // (CLAUDE.md T7 3.1).
