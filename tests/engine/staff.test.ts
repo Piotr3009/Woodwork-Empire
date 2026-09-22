@@ -54,15 +54,19 @@ import {
   runToDay,
 } from '../helpers';
 
-/** Buys exactly what the engine says is missing for one more joiner. */
-function withJoinerKit(state: GameState): GameState {
+/** Buys exactly what the engine says is missing for one more joiner. `bench` is the class of
+ *  bench it buys: the cheapest one holds one man, and a hall owns no more benches than the unit
+ *  has slots for, so a crew past five wants a class that holds two (CLAUDE.md T22 2.12 for the
+ *  cabinet, T23 2.17 and T24 2.2 for the bench). The default is the cheapest, whose factor is
+ *  0.95, so a test about what a man turns out is not measuring a better bench. */
+function withJoinerKit(state: GameState, bench?: string): GameState {
   let next = state;
   // A tool cabinet is wanted one deeper than the rest, the owner keeping his tools in one too,
   // so the list is bought out until nothing is short (CLAUDE.md T6 3.5).
   let guard = 0;
   while (missingForHire(next, 'joiner').length > 0 && guard < 20) {
     for (const specId of missingForHire(next, 'joiner')) {
-      next = buyNow(next, specId);
+      next = buyNow(next, specId, specId === 'workbench' ? bench : undefined);
     }
     guard += 1;
   }
@@ -70,10 +74,10 @@ function withJoinerKit(state: GameState): GameState {
 }
 
 /** Kits out and hires `count` joiners of one tier. */
-function withCrew(state: GameState, count: number, tier: Worker['tier']): GameState {
+function withCrew(state: GameState, count: number, tier: Worker['tier'], bench?: string): GameState {
   let next = state;
   for (let index = 0; index < count; index += 1) {
-    next = withJoinerKit(next);
+    next = withJoinerKit(next, bench);
     next = hireNow(next, 'joiner', tier);
   }
   return next;
@@ -117,11 +121,16 @@ describe('the hiring pool', () => {
     // The cabinet's cheapest class is the used one at ninety pounds from Turn 22, and two of them
     // is what a hall with none is short: one slot for the owner's set and one for the new man's
     // (CLAUDE.md T22 2.12).
+    // Two places at a bench on the first hire as well, one for the new man and one for the owner,
+    // who has stood at a bench since the first morning and whom the gate never counted
+    // [PIOTR, 22.09] (CLAUDE.md T24 2.2).
+    expect(shortfallForHire(state, 'joiner')).toContainEqual({ specId: 'workbench', count: 2 });
     // The bench, the locker, the tool set and two cabinets: the canteen seat came off the list
     // when Turn 23 took the seat out of the game (CLAUDE.md T23 2.11).
-    expect(option?.missingCost).toBe(120 + 80 + 400 + 90 * 2);
+    expect(option?.missingCost).toBe(120 * 2 + 80 + 400 + 90 * 2);
     // Named, never the catalogue id: nothing of the engine's own reaches the card (CLAUDE.md 3).
     expect(option?.missing).toContain('Tool cabinet x 2');
+    expect(option?.missing).toContain('Workbench x 2');
     expect(option?.missing.join(' ')).not.toContain(TOOL_CABINET);
     expect(option?.blockReason).toContain('Workbench');
   });
@@ -182,7 +191,9 @@ describe('the hiring pool', () => {
     // One person per so many square metres of the whole unit, the owner among them, so a 200 m2
     // hall holds the owner and seven (PIOTR, 20.09; v37); its six bench slots stop the seventh
     // joiner first, which is the floor limiting men the only way it does now.
-    const state = withCrew(buyStartingKit(newGame({ difficulty: 'veryEasy' })), 9, 'novice');
+    // Benches of two places, because the gate counts the owner's own place from Turn 24 and six
+    // benches of one place hold five men and the boss (CLAUDE.md T24 2.2).
+    const state = withCrew(buyStartingKit(newGame({ difficulty: 'veryEasy' })), 9, 'novice', 'standard');
     expect(joiners(state)).toHaveLength(6);
     expect(crewLimit(state)).toBe(8);
     const option = hiringOptions(state).find((entry) => entry.tier === 'novice');

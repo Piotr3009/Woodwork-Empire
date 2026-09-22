@@ -332,12 +332,15 @@ export const STATION_TABLE: Record<string, StationRow> = {
     second: null,
   },
   workbench: {
-    // The bench's own two places stay where they are: 18.9% of the man over his bench in front of
-    // it and 9.4% behind it, which is a joiner leaning over his work. The waiting cell at the
-    // right hand end was 59.3% and is 11.2% a cell out.
+    // The bench's places are a row along its front, one to a column of its own footprint: the
+    // operator at the first column, the second man at the second and the third at the third, an
+    // industrial bench being three wide [REPORT-T23 0.12] (CLAUDE.md T24 2.5). The second place
+    // was the back right cell until tonight, which on a two wide bench is a cell diagonally off
+    // its top corner, and at the fit the second man read as standing past the end of the bench.
+    // The waiting cell at the right hand end was 59.3% and is 11.2% a cell out.
     operator: { side: 'front', along: 0 },
     waiting: { side: 'front', along: 'right', out: 1 },
-    second: { side: 'back', along: 'right' },
+    second: { side: 'front', along: 1 },
   },
   sheetRack: { operator: 'freeSide', waiting: null, second: null },
   extractor: { operator: 'freeSide', waiting: null, second: null },
@@ -525,14 +528,13 @@ export function queueCellsAt(state: GameState, item: Equipment, count: number): 
  *  the front (CLAUDE.md T19 2.5). */
 export function benchCellsAt(state: GameState, item: Equipment, count: number): Cell[] {
   if (count <= 0) return [];
-  const cells: Cell[] = [standingCell(state, item, 'operator')];
-  if (cells.length < count) {
-    const second = standingCell(state, item, 'second');
-    if (!cells.some((taken) => sameCell(taken, second))) cells.push(second);
-  }
-  // The rest are along the front, which is the side the bench is worked from and the side the
-  // player sees: the second place is behind it and is the only man drawn at the back.
-  return fillAlong(state, item, 'front', cells, count);
+  // A row along the front, one place to a column of the bench's own footprint: the operator at the
+  // first, the second man at the second and the third at the third, which is as wide as an
+  // industrial bench gets. The front is the side the bench is worked from and the side the player
+  // sees, and no place of a bench is off its footprint any more [REPORT-T23 0.12]
+  // (CLAUDE.md T19 2.5, T24 2.5). `fillAlong` walks the same side a cell further out when the row
+  // itself is blocked, so a man never lands on the end of the bench.
+  return fillAlong(state, item, 'front', [standingCell(state, item, 'operator')], count);
 }
 
 /** Where the man unloading the pallet stands: in front of it on the hall side, the cell east of

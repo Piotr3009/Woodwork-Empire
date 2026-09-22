@@ -20,6 +20,7 @@ import {
   reservedSheets,
   restockCheck,
   restockSheets,
+  restockSplit,
   sheetsDueFor,
   sheetsForCost,
   shortfallOf,
@@ -187,7 +188,7 @@ describe('buying sheets for stock', () => {
   });
 });
 
-describe('a rack that is too small', () => {
+describe('a rack that is too small (CLAUDE.md T24 2.8)', () => {
   function overflowing(): { state: GameState; events: GameEvent[] } {
     let state = act(ready('veryEasy'), { type: 'BUY_STOCK', sheets: 55 });
     const events: GameEvent[] = [];
@@ -196,42 +197,25 @@ describe('a rack that is too small', () => {
     return { state, events };
   }
 
-  it('fills the rack and asks what happens to the rest', () => {
+  it('fills the rack and puts the rest in the store, asking nothing', () => {
     const { state } = overflowing();
+    // Fifty on the rack and five in the store: the player asked for fifty five and got fifty
+    // five. Turn 2's "leave them in the yard" question is gone with the trimming that made it
+    // unreachable: the tab quotes the store before the click (CLAUDE.md T20 2.16, T24 2.8).
     expect(state.stock.sheets).toBe(50);
-    expect(state.activeEvent?.kind).toBe('stockOverflow');
-    expect(state.activeEvent?.data.sheets).toBe(5);
-    expect(state.activeEvent?.choices.map((choice) => choice.id)).toEqual(['storage', 'outside']);
-  });
-
-  it('writes off what was left in the yard, in the morning', () => {
-    const { state } = overflowing();
-    const left = choose(state, 'outside');
-    expect(left.deliveries[0]?.overflowSheets).toBe(5);
-    const cashBefore = left.cash;
-    const run = runToDay(left, 3);
-    expect(run.state.stock.sheets).toBe(50);
-    expect(run.state.deliveries[0]?.overflowSheets).toBe(0);
-    const writeOff = run.state.ledger.find((entry) => entry.label.includes('written off'));
-    expect(writeOff?.unpaid).toBe(true);
-    expect(writeOff?.amount).toBeCloseTo(-stockCostFor(5), 6);
-    // The cash went when the sheets were bought: the write off moves no money.
-    expect(run.state.cash).toBeLessThan(cashBefore);
-    expect(
-      run.state.ledger
-        .filter((entry) => entry.unpaid)
-        .every((entry) => entry.category === 'material'),
-    ).toBe(true);
+    expect(state.stock.tempStorageSheets).toBe(5);
+    expect(state.deliveries[0]?.overflowSheets).toBe(0);
+    expect(state.activeEvent).toBeNull();
   });
 
   it('pays 150 for storage and loses an hour fetching them back', () => {
     const { state } = overflowing();
-    const cashBefore = state.cash;
-    let stored = choose(state, 'storage');
-    expect(cashBefore - stored.cash).toBe(TEMP_STORAGE_COST);
-    expect(stored.stock.tempStorageSheets).toBe(5);
-    expect(stored.deliveries[0]?.overflowSheets).toBe(0);
-    stored = clearEvents(runToDay(stored, 3).state);
+    // The fee is charged at the unload and nothing is left standing in the yard overnight.
+    const storage = state.ledger.filter((entry) => entry.category === 'storage');
+    expect(storage).toHaveLength(1);
+    expect(storage[0]?.amount).toBeCloseTo(-TEMP_STORAGE_COST, 6);
+    expect(state.ledger.some((entry) => entry.label.includes('written off'))).toBe(false);
+    const stored = clearEvents(runToDay(state, 3).state);
     const fetch = stored.tasks.find((task) => task.kind === 'fetchStorage' && !task.done);
     expect(fetch?.minutesTotal).toBe(TEMP_STORAGE_FETCH_MINUTES);
     const done = doTask(stored, 'fetchStorage');
@@ -240,13 +224,13 @@ describe('a rack that is too small', () => {
     expect(done.owner.minutesByCategory.workshop).toBeGreaterThanOrEqual(60);
   });
 
-  it('never asks the question when everything fits', () => {
+  it('charges nothing and stores nothing when everything fits', () => {
     let state = act(ready('veryEasy'), { type: 'BUY_STOCK', sheets: 8 });
-    const events: GameEvent[] = [];
-    state = clearEvents(runToDay(state, 2).state, events);
+    state = clearEvents(runToDay(state, 2).state);
     state = doTask(state, 'unload');
-    expect(eventsOfKind(events, 'stockOverflow')).toHaveLength(0);
     expect(state.stock.sheets).toBe(8);
+    expect(state.stock.tempStorageSheets).toBe(0);
+    expect(state.ledger.filter((entry) => entry.category === 'storage')).toHaveLength(0);
     expect(state.activeEvent).toBeNull();
   });
 });
@@ -306,15 +290,17 @@ describe('what stock cannot cover', () => {
     expect(state.deliveries).toHaveLength(0);
   });
 
-  it('puts the write off through the ledger like every other line', () => {
+  it('puts the storage charge through the ledger like every other line', () => {
+    // Nothing is written off in the yard any more: an overflow goes into the store at the unload
+    // and its fee is a line of the account like every other (CLAUDE.md T20 2.16, T24 2.8).
     let state = act(ready('veryEasy'), { type: 'BUY_STOCK', sheets: 55 });
     state = clearEvents(runToDay(state, 2).state);
     state = doTask(state, 'unload');
-    state = choose(state, 'outside');
     const run = runToDay(state, 3);
-    const writeOff = run.state.ledger.find((entry) => entry.label.includes('written off'));
-    expect(writeOff).toBeDefined();
-    expect(writeOff?.balance).toBeGreaterThan(0);
+    expect(run.state.ledger.some((entry) => entry.label.includes('written off'))).toBe(false);
+    const storage = run.state.ledger.find((entry) => entry.category === 'storage');
+    expect(storage).toBeDefined();
+    expect(storage?.balance).toBeGreaterThan(0);
     expect(run.state.ledger.length).toBeLessThanOrEqual(200);
   });
 });
@@ -526,7 +512,7 @@ describe('the reservation rule and Restock (CLAUDE.md T13 3.2, 3.3)', () => {
     expect(again.cash).toBe(bought.cash);
   });
 
-  it('buys the number the player typed, capped at the free places on the rack', () => {
+  it('buys the number the player typed, whole, and never trims it to the rack', () => {
     const state = fillRack(ready(), 2);
     // Six sheets asked for, six bought (CLAUDE.md T17 2.20).
     expect(restockSheets(state, 6)).toBe(6);
@@ -535,10 +521,20 @@ describe('the reservation rule and Restock (CLAUDE.md T13 3.2, 3.3)', () => {
     // The material lands the next working day, which is the lead time a standard sheet has.
     expect(six.deliveries[0]?.arriveDay).toBe(addWorkingDays(state.clock.day, 1));
     expect(six.deliveries[0]?.bespoke).toBe(false);
-    // More than the rack holds is cut back to what it holds, and never refused outright.
+    // More than the rack holds is bought in full from Turn 24: it was cut back to the rack from
+    // v38, so a man who asked for fifty more got what fitted and no word about the rest
+    // [PIOTR, 22.09] (CLAUDE.md T24 2.8).
     const room = stockFree(state);
-    expect(restockSheets(state, room + 50)).toBe(room);
-    expect(restockCheck(state, room + 50).sheets).toBe(room);
+    expect(restockSheets(state, room + 50)).toBe(room + 50);
+    expect(restockCheck(state, room + 50).sheets).toBe(room + 50);
+    // And the split says where every one of them lands, before the click.
+    expect(restockSplit(state, room + 50)).toEqual({
+      sheets: room + 50,
+      onRack: room,
+      toStorage: 50,
+      storageCost: TEMP_STORAGE_COST,
+    });
+    expect(restockSplit(state, 6)).toEqual({ sheets: 6, onRack: 6, toStorage: 0, storageCost: 0 });
   });
 
   it('does nothing when the rack is full', () => {

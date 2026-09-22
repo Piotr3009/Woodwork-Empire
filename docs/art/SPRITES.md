@@ -344,9 +344,12 @@ rest is on record for the art side. `npm run sprites:manifest` folds every `char
   (direction from the screen vector of the move, held until the next move), `bench` while it is on a
   production stage at a bench, `carry` while it fetches sheets or unloads, `idle` otherwise. A
   missing animation falls back to `idle`, then to frame 0 of `walk`, then to the capsule.
-- Playback at the manifest's fps in real time, independent of game speed (a man does not walk faster
-  at 4x; he covers ground faster because the move is shorter in real seconds). Each sheet has its
-  own fps and its own cell size: the loader never assumes them.
+- Playback at the manifest's fps in real time, independent of game speed. A man walks at
+  `WALK_CELLS_PER_SECOND` while the clock runs at x1 and at `WALK_CELLS_PER_SECOND_FAST`, half as
+  fast again, whenever it runs faster than that, which is Piotr's own rule of 21.09 and not the
+  clock's own multiple (v44; CLAUDE.md T24 2.9). This line said a man did not walk faster at x10
+  at all, which stopped being true with v44. Each sheet has its own fps and its own cell size: the
+  loader never assumes them.
 - The figure's name label and status line stay under the anchor as today.
 - The Sprite check page shows every character sheet as a strip with the anchor marked.
 

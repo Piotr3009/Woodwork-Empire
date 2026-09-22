@@ -14,6 +14,7 @@ import { money } from '../../src/ui/modal';
 import { renderTeam } from '../../src/ui/team';
 import type { GameState } from '../../src/engine/index';
 import {
+  benchPlacesFor,
   buyStartingKit,
   fillRack,
   hireNow,
@@ -39,6 +40,9 @@ function kitted(reputation: number): GameState {
   placeEquipment(state, 'locker', { x: 6, y: 9 });
   placeEquipment(state, 'handToolSet', { x: 12, y: 9 });
   placeEquipment(state, 'toolCabinet', { x: 10, y: 9 });
+  // The gate counts the owner's own place at a bench beside the crew's from Turn 24, so the day
+  // one hall needs a second place before it takes anybody on (CLAUDE.md T24 2.2).
+  benchPlacesFor(state);
   state.reputation = reputation;
   state.cash = 200000;
   return state;

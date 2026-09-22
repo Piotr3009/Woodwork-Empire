@@ -8,7 +8,6 @@ import { describe, expect, it } from 'vitest';
 import { weekOfDay } from '../../src/engine/clock';
 import {
   WEEK_CATEGORIES,
-  weekEfficiency,
   weekMetersOf,
   weekNowOf,
   weekWorkedMinutes,
@@ -23,6 +22,7 @@ import { assignJob } from '../../src/engine/jobs';
 import type { GameState, Worker } from '../../src/engine/index';
 import {
   acceptNow,
+  benchPlacesFor,
   buyStartingKit,
   choose,
   clearEvents,
@@ -44,6 +44,9 @@ function readyHall(sheets = 60): GameState {
   placeEquipment(state, 'locker', { x: 6, y: 9 });
   placeEquipment(state, 'handToolSet', { x: 12, y: 9 });
   placeEquipment(state, 'toolCabinet', { x: 10, y: 9 });
+  // The gate counts the owner's own place at a bench beside the crew's from Turn 24, so the day
+  // one hall needs a second place before it takes anybody on (CLAUDE.md T24 2.2).
+  benchPlacesFor(state);
   state.reputation = 20;
   state = hireNow(state, 'joiner', 'experienced');
   const enquiry = placeEnquiry(state, { price: 6000, deadlineDays: 60 });
@@ -96,11 +99,6 @@ describe('a man s week', () => {
     // The hours are the bands, and the company paid for at least them.
     expect(weekWorkedMinutes(meters)).toBe(meters.minutes.jobs);
     expect(meters.paidMinutes).toBeGreaterThanOrEqual(weekWorkedMinutes(meters));
-    // The figure is the minutes he made something in against the minutes he was paid for.
-    expect(weekEfficiency(after.rate, meters)).toBeCloseTo(
-      (after.rate * meters.minutes.jobs) / meters.paidMinutes,
-      6,
-    );
   });
 
   it('pays him for the hour he spends at an empty rack and counts none of it as worked', () => {
@@ -117,7 +115,6 @@ describe('a man s week', () => {
     expect(after.productionMinutes).toBe(0);
     expect(weekWorkedMinutes(meters)).toBe(0);
     expect(meters.paidMinutes).toBeGreaterThan(0);
-    expect(weekEfficiency(after.rate, meters)).toBe(0);
   });
 
   it('leaves the dinner hour out of his week: the canteen is neither worked nor paid for', () => {

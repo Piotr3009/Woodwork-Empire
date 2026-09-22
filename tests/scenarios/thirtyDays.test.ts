@@ -1015,8 +1015,12 @@ describe('a month of a full crew behind two saws on the day 1 fan alone', () => 
     // (PIOTR, 20.09). Until v37 the same hall stopped at three, and the cell that moved it each
     // turn was the tool cabinet's (CLAUDE.md T13 3.10, T21 2.13, T22 2.12).
     expect(state.workers.filter((worker) => worker.role === 'joiner')).toHaveLength(6);
-    // The seventh would want a bench, a locker and a set of tools the script never bought.
-    expect(missingForHire(state, 'joiner')).toContain('workbench');
+    // The seventh would want a locker and a set of tools the script never bought. The bench is
+    // not among them any more: from Turn 24 the gate counts the owner's own place, a unit holds
+    // no more benches than its six slots, and one place benches will not carry six men and the
+    // boss at all, so this script buys the two place class and its places run ahead of its men
+    // (CLAUDE.md T24 2.2).
+    expect(missingForHire(state, 'joiner')).toEqual(['locker', 'toolCabinet', 'handToolSet']);
   });
 
   it('fills the one bag in the month, and the owner empties it himself each time', () => {

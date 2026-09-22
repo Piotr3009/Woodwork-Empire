@@ -942,22 +942,6 @@ export function oldestReadyJob(state: GameState): Job | null {
   );
 }
 
-/** The oldest job of work standing open with nobody on it: ready for a bench, or already in
- *  production and dropped by whoever had it. The board's own order is the order it was taken in,
- *  so the first of them is the oldest (CLAUDE.md T23 2.3).
- *
- *  Not the same question as `oldestReadyJob` above, which falls through to a job somebody else is
- *  already on so that the owner's idle reason can tell "there is work about" from "there is no
- *  work at all". This one is the job a man can be PUT on, and nothing else. */
-export function oldestOpenJob(state: GameState): Job | null {
-  return (
-    state.jobs.find(
-      (job) =>
-        (job.stage === 'ready' || job.stage === 'inProduction') && job.assignees.length === 0,
-    ) ?? null
-  );
-}
-
 /** The job the owner goes to when his office empties: the open job with the SOONEST DEADLINE,
  *  whether or not somebody is already on it [PIOTR, 21.09: "I should jump on the first job with a
  *  DL, automatically"]. Turn 23's 2.3 gave him the oldest job with NOBODY on it, which in a hall

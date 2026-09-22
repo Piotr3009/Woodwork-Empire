@@ -15,7 +15,7 @@ import {
   STOCK_LINE_KINDS,
 } from './constants';
 import { addWorkingDays } from './clock';
-import { canAfford, noteLoss, pay } from './economy';
+import { canAfford, pay } from './economy';
 import { isSold, itemStandsInTheHall, sheetCapacityOf } from './machines';
 import { makeId } from './rng';
 import { createTask, unloadMinutes } from './tasks';
@@ -156,15 +156,31 @@ export function pendingStockSheets(state: GameState): number {
   return pending;
 }
 
-/** What Restock would buy: the number the player typed, or, when he has typed none, what fills the
- *  rack. Either way it is capped at the free places on the rack less what is already on the road
- *  for stock, because a lorry that cannot be unloaded is the overflow question of Turn 2 and a
- *  button should not walk the player into it (PIOTR, 16.09; CLAUDE.md T13 3.2, T17 2.20). */
+/** What Restock would buy: the number the player typed, whole, or, when he has typed none, what
+ *  fills the rack. The typed number was trimmed to the free places on the rack from v38, so a man
+ *  who asked for sixty got forty and no word about the other twenty; from tonight he gets sixty,
+ *  what fits goes on the rack and the rest goes into the temporary store on landing, which is the
+ *  rule a job's own delivery has followed since Turn 20 [PIOTR, 22.09]
+ *  (CLAUDE.md T13 3.2, T17 2.20, T20 2.16, T24 2.8). The tab says the split and its fee before
+ *  the click, so nothing about it is a surprise. */
 export function restockSheets(state: GameState, asked?: number): number {
-  const pending = pendingStockSheets(state);
-  const room = stockFree(state) - pending;
-  const wanted = asked === undefined ? room : Math.floor(asked);
-  return Math.max(0, Math.min(wanted, room));
+  const room = stockFree(state) - pendingStockSheets(state);
+  if (asked === undefined) return Math.max(0, room);
+  return Math.max(0, Math.floor(asked));
+}
+
+/** What a restock of this many sheets does when it lands: what the rack can hold of it, what goes
+ *  into the temporary store, and what the store charges. The Materials tab prints it before the
+ *  click and the engine does it at the unload, off the same two numbers (CLAUDE.md T24 2.8). */
+export function restockSplit(
+  state: GameState,
+  asked?: number,
+): { sheets: number; onRack: number; toStorage: number; storageCost: number } {
+  const sheets = restockSheets(state, asked);
+  const room = Math.max(0, stockFree(state) - pendingStockSheets(state));
+  const onRack = Math.min(sheets, room);
+  const toStorage = sheets - onRack;
+  return { sheets, onRack, toStorage, storageCost: toStorage > 0 ? TEMP_STORAGE_COST : 0 };
 }
 
 export interface RestockCheck {
@@ -186,6 +202,9 @@ export function restockCheck(state: GameState, asked?: number): RestockCheck {
   if (sheets <= 0 && pending > 0) {
     return refused(`${plural(pending, 'sheet is', 'sheets are')} on the way`);
   }
+  // A full rack is no longer a refusal: the player may buy past it and the overflow goes into the
+  // store, which the tab quotes him first (CLAUDE.md T24 2.8). Nought sheets is still nothing to
+  // do, which is what an empty field over a full rack asks for.
   if (sheets <= 0) return refused('No room on the rack');
   const cost = stockCostFor(sheets);
   if (!canAfford(state, cost)) return { ok: false, reason: 'Not enough cash', sheets, cost };
@@ -366,7 +385,7 @@ export function buyStock(state: GameState, sheets: number): boolean {
 /** Sheets come off the lorry. What does not fit on the rack needs a decision (CLAUDE.md 8.9).
  *  A load for one job is held for that job first; whatever else lands is free for every job with
  *  a shortfall, in the order they were accepted (CLAUDE.md T13 3.3). */
-export function unloadIntoStock(state: GameState, delivery: Delivery): number {
+export function unloadIntoStock(state: GameState, delivery: Delivery): void {
   const room = stockFree(state);
   const fitted = Math.min(delivery.sheets, room);
   state.stock.sheets += fitted;
@@ -388,10 +407,14 @@ export function unloadIntoStock(state: GameState, delivery: Delivery): number {
     if (held > 0) job.sheetsReserved += held;
     if (overflow > 0) moveOverflowToStorage(state, delivery);
     reserveShortfalls(state);
-    return 0;
+    return;
   }
+  // A load for stock takes the same path from tonight: the player asked for more than the rack
+  // holds, the tab told him what the store would cost him, and being asked the question a second
+  // time at the lorry is asking him something he has already answered [PIOTR, 22.09]
+  // (CLAUDE.md T20 2.16, T24 2.8).
+  if (overflow > 0) moveOverflowToStorage(state, delivery);
   reserveShortfalls(state);
-  return overflow;
 }
 
 /** 150 now, and somebody loses an hour fetching them in the morning (CLAUDE.md 8.9). */
@@ -400,23 +423,6 @@ export function moveOverflowToStorage(state: GameState, delivery: Delivery): voi
   pay(state, 'storage', `Temporary storage for ${delivery.overflowSheets} sheets`, TEMP_STORAGE_COST);
   state.stock.tempStorageSheets += delivery.overflowSheets;
   delivery.overflowSheets = 0;
-}
-
-/** Sheets left in the yard overnight are gone in the morning. */
-export function writeOffSheetsLeftOutside(state: GameState): number {
-  let lost = 0;
-  for (const delivery of state.deliveries) {
-    if (delivery.overflowSheets <= 0) continue;
-    // A job's own load never reaches here: `unloadIntoStock` puts what would not fit on the rack
-    // into storage for the job the moment the lorry is unloaded (CLAUDE.md T20 2.16).
-    lost += delivery.overflowSheets;
-    delivery.overflowSheets = 0;
-  }
-  if (lost > 0) {
-    // The cash went days ago: this line is the loss, not a payment.
-    noteLoss(state, 'material', `${lost} sheets left outside, written off`, stockCostFor(lost));
-  }
-  return lost;
 }
 
 /** The hour somebody loses in the morning bringing the stored sheets back. What comes back is
