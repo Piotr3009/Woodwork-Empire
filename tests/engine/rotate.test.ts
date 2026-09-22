@@ -234,8 +234,10 @@ describe('what turning does to the picture', () => {
     // cabinets came first (19.09), then the benches, the saws and the corrected equipment of
     // 20.09: every class of every floor family the game draws has a true quarter turn now, and
     // only the character sheets, the rooms and the old better rack have none.
+    // Fifty one from v49: the thicknessers, the van, the forklift and the pallet truck of the
+    // pack of 22.09 turned too.
     const turned = spriteFiles().filter((name) => name.endsWith('.r.png'));
-    expect(turned).toHaveLength(43);
+    expect(turned).toHaveLength(51);
     for (const family of ['compressor', 'edgebander', 'extractor', 'sheetRack', 'spindleMoulder', 'tableSaw', 'toolCabinet', 'workbench']) {
       for (const tier of ['used', 'budget', 'standard', 'pro', 'industrial']) {
         expect(turned, `${family}.${tier}`).toContain(`${family}.${tier}.r.png`);

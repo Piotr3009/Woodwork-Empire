@@ -76,8 +76,9 @@ export interface Port {
  *
  *  The two hand edgebanders (`used`, `budget`) want no extraction at all
  *  (`EXTRACTION_DEMAND` 0) and have no line, which is the one case where a missing line is right.
- *  The thicknesser, the solid wood tools and the CNC have an extraction demand and no picture yet,
- *  so there is nothing to measure; `docs/art/REQUESTS-T22.md` 6 asks for the pictures. */
+ *  The thicknessers landed on 22.09 and are measured below. The solid wood tools and the CNC have
+ *  an extraction demand and no picture yet, so there is nothing to measure on them;
+ *  `docs/art/REQUESTS-T22.md` 6 asks for the pictures. */
 export const PORTS: Record<string, Port> = {
   // The extractors: the mouth of the fan, and which way it opens [PIOTR, 19.09].
   'extractor.used.png': { px: 89, py: 61, faces: '+x', cell: { x: 1, y: 0 } },
@@ -131,6 +132,20 @@ export const PORTS: Record<string, Port> = {
   'edgebander.standard.r.png': { px: 100, py: 70, cell: { x: 0, y: 1 } },
   'edgebander.pro.r.png': { px: 100, py: 95, cell: { x: 0, y: 1 } },
   'edgebander.industrial.r.png': { px: 130, py: 97, cell: { x: 0, y: 2 } },
+  // The thicknessers (the art side's pack of 22.09, tools, thicknessers and vehicles; v49): the
+  // mouth of the hood on top of the cutter block, read off each picture by Claude in chat with the
+  // marks in docs/mockups/v47/thicknesser-ports.png. The cell is the footprint cell under the
+  // mouth on the file's own diamond. [TUNE until Piotr confirms them on the hall.]
+  'thicknesser.used.png': { px: 110, py: 15, cell: { x: 1, y: 0 } },
+  'thicknesser.budget.png': { px: 113, py: 19, cell: { x: 1, y: 0 } },
+  'thicknesser.standard.png': { px: 112, py: 19, cell: { x: 1, y: 0 } },
+  'thicknesser.pro.png': { px: 133, py: 27, cell: { x: 2, y: 0 } },
+  'thicknesser.industrial.png': { px: 165, py: 18, cell: { x: 1, y: 0 } },
+  'thicknesser.used.r.png': { px: 95, py: 15, cell: { x: 0, y: 0 } },
+  'thicknesser.budget.r.png': { px: 56, py: 21, cell: { x: 0, y: 1 } },
+  'thicknesser.standard.r.png': { px: 56, py: 21, cell: { x: 0, y: 1 } },
+  'thicknesser.pro.r.png': { px: 81, py: 42, cell: { x: 0, y: 1 } },
+  'thicknesser.industrial.r.png': { px: 126, py: 55, cell: { x: 0, y: 1 } },
 };
 
 /** The suffix each orientation's file carries: 0 the base picture, then a quarter turn at a time

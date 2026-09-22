@@ -195,8 +195,11 @@ describe('the file on disk and the footprint in the engine', () => {
     // and air families of Turn 10, and the three synthetic standard classes measured in Turn 10),
     // plus the five spindle moulders of 19.09 and the tool cabinet's five, which are a class
     // ladder from tonight (CLAUDE.md T22 2.12). The twenty turned cabinet files are not counted
-    // here: this loop counts one file a class, and the turned ones are measured below.
-    expect(checked).toBe(43);
+    // here: this loop counts one file a class, and the turned ones are measured below. Fifty two
+    // from v49: the five thicknessers, the van, the forklift, the pallet truck and the hand tool
+    // set of the pack of 22.09 (tools, thicknessers and vehicles), every one measured against its
+    // footprint above.
+    expect(checked).toBe(52);
     for (const name of ['dustSystem.standard.png', 'flexiSystem.standard.png', 'pelletiser.standard.png']) {
       expect(spriteFiles(), name).toContain(name);
     }
@@ -224,6 +227,8 @@ describe('the file on disk and the footprint in the engine', () => {
     // tests/engine/rotate.test.ts.
     const turnedFiles = spriteFiles().filter((name) => name.endsWith('.r.png'));
     expect(turnedFiles).toContain(turned);
-    expect(turnedFiles).toHaveLength(43);
+    // Fifty one from v49: the pack of 22.09 turned the five thicknessers, the van, the forklift
+    // and the pallet truck; the hand tool set is a catalogue picture and has no turn.
+    expect(turnedFiles).toHaveLength(51);
   });
 });

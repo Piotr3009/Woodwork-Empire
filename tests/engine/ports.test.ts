@@ -53,11 +53,11 @@ describe('the table covers what a pipe is drawn to (CLAUDE.md T22 2.8)', () => {
       expect(portFor(row.file), row.file).not.toBeNull();
       checked += 1;
     }
-    // The five saws, the five spindle moulders and the three floor edgebanders: thirteen pictures
-    // of machines with a demand have landed. The thicknesser, the solid wood tools and the CNC
-    // have a demand and no picture yet, so there is nothing to measure on them
+    // The five saws, the five spindle moulders, the three floor edgebanders and, from v49, the
+    // five thicknessers: eighteen pictures of machines with a demand have landed. The solid wood
+    // tools and the CNC have a demand and no picture yet, so there is nothing to measure on them
     // (docs/art/REQUESTS-T22.md 6).
-    expect(checked).toBe(13);
+    expect(checked).toBe(18);
   });
 
   it('has a line for every delivered picture of a fan, and none for a central system', () => {
@@ -89,10 +89,10 @@ describe('the table covers what a pipe is drawn to (CLAUDE.md T22 2.8)', () => {
     }
   });
 
-  it('measures thirty six files and every pixel of them is inside its own file', () => {
+  it('measures forty six files and every pixel of them is inside its own file', () => {
     // Eighteen base pictures, and since v33 the true quarter turn of every one of them (the art
-    // side's packs of 19.09 and 20.09).
-    expect(measuredFiles()).toHaveLength(36);
+    // side's packs of 19.09 and 20.09); the five thicknessers and their turns from v49.
+    expect(measuredFiles()).toHaveLength(46);
     for (const file of measuredFiles()) {
       const port = portFor(file);
       if (port === null) throw new Error(`no line for ${file}`);
