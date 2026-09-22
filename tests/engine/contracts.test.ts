@@ -16,14 +16,15 @@ import {
   CONTRACT_TERM_MONTHS_MAX,
   CONTRACT_TERM_MONTHS_MIN,
   DAYS_PER_WEEK,
+  CONTRACT_WEEKLY_OFFER_REPUTATION,
   WORKER_RATES,
   CONTRACT_QUANTITY_STEP,
   CONTRACT_QUANTITY_MINUTES,
   CONTRACT_FREE_END_DAYS,
-  PRODUCTION_STAGES,
   SHEET_VALUE,
 } from '../../src/engine/constants';
 import type { ContractPieceSpec } from '../../src/engine/constants';
+import { isWorkingDay } from '../../src/engine/clock';
 import {
   acceptContract,
   activeContracts,
@@ -48,6 +49,7 @@ import {
   drawContract,
   endedContracts,
   offerContract,
+  weeklyOfferOwed,
   offeredContract,
   renegotiatedPriceFor,
   renewContract,
@@ -218,6 +220,51 @@ describe('the offer', () => {
     expect(declineContract(state, contract.id).ok).toBe(true);
     expect(state.contracts).toHaveLength(0);
     expect(declineContract(state, contract.id).ok).toBe(false);
+  });
+
+  it('comes at least once a week from a name of twenty, whatever the dice say (PIOTR, 22.09; v50)', () => {
+    // Under twenty the chance of the day is all there is, so a run of quiet days is what the
+    // dice give: a young shop can go weeks without a ring.
+    const young = newGame();
+    expect(young.lastContractOfferDay).toBe(null);
+    expect(weeklyOfferOwed(young)).toBe(false);
+    // A name of twenty with no offer ever is owed one on the first working day.
+    const known = newGame();
+    known.reputation = CONTRACT_WEEKLY_OFFER_REPUTATION;
+    expect(weeklyOfferOwed(known)).toBe(true);
+    expect(firstOffer(known).days).toBe(1);
+    expect(known.lastContractOfferDay).toBe(1);
+    // Declined on the day, the ring is still remembered: nothing is owed until a week has gone
+    // by, and then it is. The days between are the dice's.
+    const offer = offeredContract(known);
+    if (!offer) throw new Error('an offer is wanted');
+    declineContract(known, offer.id);
+    expect(known.lastContractOfferDay).toBe(1);
+    for (let day = 2; day < 1 + DAYS_PER_WEEK; day += 1) {
+      expect(weeklyOfferOwed({ ...known, clock: { ...known.clock, day } }), `day ${day}`).toBe(false);
+    }
+    expect(weeklyOfferOwed({ ...known, clock: { ...known.clock, day: 1 + DAYS_PER_WEEK } })).toBe(true);
+    // The rule itself, with the dice out of it: a week since the last ring is owed.
+    const quiet = newGame();
+    quiet.reputation = CONTRACT_WEEKLY_OFFER_REPUTATION;
+    quiet.lastContractOfferDay = 10;
+    quiet.clock.day = 10 + DAYS_PER_WEEK - 1;
+    expect(weeklyOfferOwed(quiet)).toBe(false);
+    quiet.clock.day = 10 + DAYS_PER_WEEK;
+    expect(weeklyOfferOwed(quiet)).toBe(true);
+    // A working day that is owed one gets it, and the board says so the same day.
+    for (let day = 10 + DAYS_PER_WEEK; day <= 10 + 2 * DAYS_PER_WEEK; day += 1) {
+      quiet.clock.day = day;
+      if (!isWorkingDay(day)) continue;
+      offerContract(quiet);
+      break;
+    }
+    expect(offeredContract(quiet)).not.toBeNull();
+    expect(quiet.lastContractOfferDay).toBe(quiet.clock.day);
+    // And one on the board already is not doubled by the rule.
+    quiet.clock.day += DAYS_PER_WEEK + 1;
+    offerContract(quiet);
+    expect(quiet.contracts.filter((entry) => entry.status === 'offered')).toHaveLength(1);
   });
 });
 
@@ -476,22 +523,12 @@ describe('the week and the term', () => {
     const report = closingReport(state, contract);
     const labourCost =
       Math.round(6000 * workerMinuteCost(JOINER_MONTHLY_WAGE.novice) * 100) / 100;
-    // The minutes at the saw, and no others, at the wear of the saw the piece is made on: the
-    // hall's used saw, a tenth of its price every service interval (v40). From Turn 24 a minute at
-    // the bench or by hand costs the machine nothing, so a piece of more than one stage is charged
-    // its cutting share alone [PIOTR, 22.09] (CLAUDE.md T24 2.4).
+    // The same minutes at the wear of the saw the piece is made on: the hall's used saw, a tenth
+    // of its price every service interval (v40).
     const saw = state.equipment.find((item) => item.specId === 'tableSaw');
     if (!saw) throw new Error('a saw is wanted');
-    const piece = contractPiece(contract);
-    const shares = piece.stages.map(
-      (stage) => PRODUCTION_STAGES.find((entry) => entry.id === stage)?.share ?? 0,
-    );
-    const machineShare = (shares[0] ?? 0) / shares.reduce((sum, share) => sum + share, 0);
-    const machineWear = Math.round(6000 * machineShare * machineWearPerMinute(saw) * 100) / 100;
+    const machineWear = Math.round(6000 * machineWearPerMinute(saw) * 100) / 100;
     expect(machineWear).toBeGreaterThan(0);
-    // The cut sheet pack is all saw and reads 1; anything with a bench stage on it reads less.
-    expect(machineShare).toBe(piece.stages.length === 1 ? 1 : machineShare);
-    expect(machineShare).toBeLessThanOrEqual(1);
     expect(report).toEqual({
       pieces: 100,
       revenue: 3800,

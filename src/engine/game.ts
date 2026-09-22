@@ -29,13 +29,14 @@ import {
   SKIP_SPEED,
   OVERTIME_DEBT_PER_DAY,
   REPUTATION_START,
-  SERVICE_INTERVAL_HOURS,
+  SERVICE_INTERVAL_MONTHS,
   SOFTWARE_ONE_OFF_JOBS,
   HIRING_MINUTES,
   LAPTOP_BOOT_MINUTES,
   SOFTWARE_ONE_OFF_PRICE,
   SOFTWARE_TURN1_TIER,
   STARTING_LAYOUT,
+  TEMP_STORAGE_COST,
   TOOL_CABINET,
   HAND_TOOL_SET,
   STATE_VERSION,
@@ -191,10 +192,12 @@ import {
   deliveriesArrivingOn,
   fetchFromStorage,
   findDelivery,
+  moveOverflowToStorage,
   rackCapacity,
   restockSheets,
   stockIsLow,
   unloadIntoStock,
+  writeOffSheetsLeftOutside,
 } from './materials';
 import {
   chargeOvertimeDebt,
@@ -440,6 +443,7 @@ export function createGame(options: NewGameOptions): GameState {
     shift: { second: false },
     monthEndShownFor: 0,
     monthlyReports: [],
+    lastContractOfferDay: null,
     ledger: [],
     eventQueue: [],
     activeEvent: null,
@@ -456,7 +460,6 @@ export function createGame(options: NewGameOptions): GameState {
       nightMinutes: 0,
       paidHours: 0,
       expressUplift: 0,
-      byMan: {},
     },
     days: [],
     lastExpressDay: null,
@@ -535,7 +538,6 @@ function startDay(state: GameState): void {
     nightMinutes: 0,
     paidHours: 0,
     expressUplift: 0,
-    byMan: {},
   };
   // Nobody stands at a machine overnight: the hall starts the day with every one of them free
   // (CLAUDE.md T7 3.1).
@@ -563,6 +565,15 @@ function startDay(state: GameState): void {
   runContractDay(state);
   runInsuranceDay(state);
   runBurglary(state);
+  const lost = writeOffSheetsLeftOutside(state);
+  if (lost > 0) {
+    queueEvent(state, {
+      kind: 'stockOverflow',
+      title: 'The yard is empty',
+      body: `${lost} sheets left outside overnight have gone. Written off.`,
+      data: { sheets: lost },
+    });
+  }
   if (state.stock.tempStorageSheets > 0) {
     createTask(state, {
       kind: 'fetchStorage',
@@ -784,7 +795,8 @@ function callServiceIn(state: GameState, equipmentId: string): void {
   }
 }
 
-/** A machine wants a service once a month, and one that never gets it gives up (CLAUDE.md T2 3.9). */
+/** A machine wants a service every six months, and one that never gets it gives up (CLAUDE.md T2 3.9;
+ *  PIOTR, 22.09). */
 function runServiceDue(state: GameState): void {
   for (const machine of machinesDueService(state)) {
     if (machine.broken) continue;
@@ -798,7 +810,7 @@ function runServiceDue(state: GameState): void {
       kind: 'serviceDue',
       title: `Service due: ${name.toLowerCase()}`,
       body:
-        `It has ${SERVICE_INTERVAL_HOURS} hours on it since the last one. The parts and the oil come to ` +
+        `It is ${SERVICE_INTERVAL_MONTHS} months since the last one. The parts and the oil come to ` +
         `${formatMoney(serviceCostFor(machine))}. Left alone it will give up in the middle of a ` +
         'job.',
       // A service is called in and paid for; nobody stands at it with a spanner (CLAUDE.md T20 2.9).
@@ -813,7 +825,7 @@ function runServiceDue(state: GameState): void {
 
 function runOverdueBreakdowns(state: GameState): void {
   for (const machine of serviceableMachines(state)) {
-    if (!chance(state, overdueBreakdownChance(machine))) continue;
+    if (!chance(state, overdueBreakdownChance(machine, state.clock.day))) continue;
     const broken = breakMachine(state, machine.id);
     if (broken) raiseMachineBroken(state, broken);
   }
@@ -1151,10 +1163,9 @@ function applyTaskCompletion(state: GameState, task: TaskInstance): void {
       const delivery = task.deliveryId ? findDelivery(state, task.deliveryId) : null;
       if (delivery) {
         delivery.unloaded = true;
-        // Every delivery lands on the rack, per job orders included, and whatever will not go on
-        // it goes into the temporary store with its fee and its fetch chore
-        // (CLAUDE.md T2 3.6, T20 2.16, T24 2.8).
-        unloadIntoStock(state, delivery);
+        // Every delivery lands on the rack, per job orders included (CLAUDE.md T2 3.6).
+        const overflow = unloadIntoStock(state, delivery);
+        if (overflow > 0) raiseStockOverflow(state, delivery, overflow);
         onDeliveryUnloaded(state, delivery.jobId);
       }
       break;
@@ -1759,9 +1770,8 @@ function runProductionMinute(state: GameState, ownerOnTask: boolean): void {
     const trade = tradeFactor(worker?.role ?? null, stage.family);
     const minute = labourPerMinute(hand.rate * trade, speed) * hall;
     // The minute's own multiplier, for the workshop's average output (v40): the same four things
-    // the labour is made of, and nothing else, booked against the man who worked it so the Output
-    // sheet can say who made the number (v50). The night's minutes book theirs in `workMinute`.
-    bookOutputMinute(state, hand.who, hand.rate * trade * speed * hall);
+    // the labour is made of, and nothing else. The night's minutes book theirs in `workMinute`.
+    bookOutputMinute(state, hand.rate * trade * speed * hall);
     if (addLabour(state, hand.job, minute, stage.id)) raiseJobAtGate(state, hand.job);
   }
   // The extraction books its hours the whole time it is running, whoever is at what: a fan is
@@ -1809,6 +1819,24 @@ function raiseJobAtGate(state: GameState, job: Job): void {
       `${transportLabel(state)}.`,
     choices,
     data: { jobId: job.id },
+  });
+}
+
+/** Sheets that do not fit on the rack: leave them out and lose them, or pay to store them
+ *  (CLAUDE.md 8.9). */
+function raiseStockOverflow(state: GameState, delivery: Delivery, overflow: number): void {
+  queueEvent(state, {
+    kind: 'stockOverflow',
+    title: 'The rack is full',
+    body:
+      `${overflow} sheets do not fit. Left in the yard they will be gone by morning. ` +
+      `Temporary storage is ${formatMoney(TEMP_STORAGE_COST)} now and ` +
+      `${AD_HOC_TASK_MINUTES.fetchStorage} min to fetch them back.`,
+    choices: [
+      { id: 'storage', label: `Pay ${formatMoney(TEMP_STORAGE_COST)} for storage` },
+      { id: 'outside', label: 'Leave them in the yard' },
+    ],
+    data: { deliveryId: delivery.id, sheets: overflow },
   });
 }
 
@@ -2062,6 +2090,12 @@ function resolveEvent(state: GameState, choiceId: string): void {
         if (typeof taskId === 'string') startTask(state, taskId, true);
       }
       break;
+    case 'stockOverflow': {
+      const deliveryId = event.data.deliveryId;
+      const delivery = typeof deliveryId === 'string' ? findDelivery(state, deliveryId) : null;
+      if (delivery && choiceId === 'storage') moveOverflowToStorage(state, delivery);
+      break;
+    }
     case 'jobAtGate': {
       const jobId = event.data.jobId;
       if (choiceId === 'later' || typeof jobId !== 'string') break;
@@ -2570,7 +2604,7 @@ function standItem(
     anchorX: at.x,
     anchorY: at.y,
     broken: false,
-    serviceHours: 0,
+    servicedDay: state.clock.day,
     serviceCount: 0,
     inServiceUntilDay: null,
     hoursThisWeek: 0,

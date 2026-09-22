@@ -8,8 +8,8 @@
 // night shift runs on it; the day's production minute in game.ts does the same arithmetic and
 // phase C folds it onto this function (the note in REPORT-T13-B2.md).
 
-import { HOURS_PER_WORKING_DAY, WET_AIR_FINISH_FACTOR } from './constants';
-import { addWorkingDays, isBreak, workedMinutesOfDay } from './clock';
+import { WET_AIR_FINISH_FACTOR } from './constants';
+import { isBreak, workedMinutesOfDay } from './clock';
 import {
   BUILDING_ROLES,
   addLabour,
@@ -35,8 +35,6 @@ import {
   bookOutputMinute,
   cabinetTools,
   claimMachine,
-  countOf,
-  findSpec,
   floorMachines,
   hallProductivityFactor,
   has,
@@ -45,7 +43,6 @@ import {
   machineIsShared,
   releaseMachines,
   releaseMachinesExcept,
-  serviceDueIn,
   specOf,
   variantOf,
 } from './machines';
@@ -92,8 +89,6 @@ import {
   cncOptions,
   labourPerMinute,
   stageAtTheBench,
-  stageMinutes,
-  stagePlanFor,
   tradeFactor,
 } from './stages';
 import type {
@@ -194,36 +189,27 @@ export interface StationCheck {
   waitingFor: string | null;
 }
 
-/** The machine this man's stage stands him at, his own bench and a tool out of a cabinet included,
- *  asked without claiming anything and without writing anything down: it is the machine
- *  `runProductionMinute` reads his speed off, and so the one thing the Output sheet's "Who made it
- *  today" has to know to say why his minute was worth what it was (CLAUDE.md T7 3.1, T24 2.1).
- *  `takeMachines` below is this, with the claiming in front of it, so a man is never placed by one
- *  reading and reported by another. */
-export function machineAtWork(state: GameState, who: string, job: Job): Equipment | null {
-  const stage = stageFor(state, who, job, cncOptions(state, who, job));
+/** Gives this man what the stage he is at needs, and takes back whatever it does not. */
+export function takeMachines(state: GameState, hand: Hand): StationCheck {
+  const options = cncOptions(state, hand.who, hand.job);
+  const wanted = familiesWanted(state, hand.job, hand.who);
+  releaseMachines(state, hand.who, wanted);
+  for (const family of wanted) {
+    if (claimMachine(state, hand.who, family) === null) return { machine: null, waitingFor: family };
+  }
+  const stage = stageFor(state, hand.who, hand.job, options);
   const family = stage?.family ?? null;
   if (family === null || !has(state, family) || machineIsShared(state, family)) {
-    return sharedTool(state, family);
+    return { machine: sharedTool(state, family), waitingFor: null };
   }
   // A bench is his own place at one and not a thing he took off anybody, so it is asked for by
   // name. Only the man who wanted a bench has one: the men behind the lead work at the lead's and
   // put their minutes in at the stage's own speed, as they have since Turn 19
   // (CLAUDE.md T19 2.5, T23 2.17).
   if (family === BENCH) {
-    return familiesWanted(state, job, who).includes(BENCH) ? benchOf(state, who) : null;
+    return { machine: wanted.includes(BENCH) ? benchOf(state, hand.who) : null, waitingFor: null };
   }
-  return heldMachine(state, who, family);
-}
-
-/** Gives this man what the stage he is at needs, and takes back whatever it does not. */
-export function takeMachines(state: GameState, hand: Hand): StationCheck {
-  const wanted = familiesWanted(state, hand.job, hand.who);
-  releaseMachines(state, hand.who, wanted);
-  for (const family of wanted) {
-    if (claimMachine(state, hand.who, family) === null) return { machine: null, waitingFor: family };
-  }
-  return { machine: machineAtWork(state, hand.who, hand.job), waitingFor: null };
+  return { machine: heldMachine(state, hand.who, family), waitingFor: null };
 }
 
 /** The hand tool a stage is done with when its family is kept in a cabinet: there is no queue for
@@ -309,45 +295,6 @@ export function menAtJobs(state: GameState): string[] {
  *  can have it. Asked after every minute and every action (CLAUDE.md T7 3.1). */
 export function releaseIdleMachines(state: GameState): void {
   releaseMachinesExcept(state, menAtJobs(state));
-}
-
-/** The share of a man's minutes on this job that a family of machine takes. A saw has him for the
- *  cutting and no longer, which is why two saws serve six joiners (CLAUDE.md T7 3.1). */
-export function familyShareOfJob(state: GameState, job: Job, family: string): number {
-  const plan: StagePlan[] = stagePlanFor(state, job);
-  let total = 0;
-  let atIt = 0;
-  for (const stage of plan) {
-    const minutes = stageMinutes(stage.to - stage.from, 1, stage.speed);
-    total += minutes;
-    if (stage.family === family) atIt += minutes;
-  }
-  return total > 0 ? atIt / total : 0;
-}
-
-/** The hours one machine of this family gains in a day at the rate the workshop is using it now:
- *  what the men at work want of the family, spread over the machines of it that the hall has. A
- *  family nobody's work goes through gains nothing, which is why an extractor never comes due for
- *  a service (CLAUDE.md T7 3.1). It is the demand and not the claim of this minute, so the figure
- *  does not flicker every time a man walks from the saw to his bench. */
-export function machineHoursPerDay(state: GameState, item: Equipment): number {
-  const spec = findSpec(item.specId);
-  if (!spec || spec.category !== 'machine') return 0;
-  let hours = 0;
-  for (const hand of hands(state)) {
-    hours += familyShareOfJob(state, hand.job, item.specId) * HOURS_PER_WORKING_DAY;
-  }
-  return hours / Math.max(1, countOf(state, item.specId));
-}
-
-/** The day the next service lands on if the machine keeps being used the way it is used today.
- *  Null when nobody is putting anything through it, because then it never comes due. */
-export function serviceDueOn(state: GameState, item: Equipment): number | null {
-  const perDay = machineHoursPerDay(state, item);
-  if (perDay <= 0) return null;
-  // Hours are gained on the days the workshop is open, so the days counted off are working days:
-  // counting calendar days would put every service a weekend or two too early.
-  return addWorkingDays(state.clock.day, Math.max(1, Math.ceil(serviceDueIn(item) / perDay)));
 }
 
 // ---------------------------------------------------------------------------
@@ -719,8 +666,8 @@ export function workMinute(
     const trade = tradeFactor(worker?.role ?? null, stage.family);
     const minute = labourPerMinute(hand.rate * trade, speed) * hall;
     // The minute's own multiplier, for the workshop's average output (v40): the same four things
-    // the labour is made of, and nothing else, booked against the man who worked it (v50).
-    bookOutputMinute(state, hand.who, hand.rate * trade * speed * hall);
+    // the labour is made of, and nothing else.
+    bookOutputMinute(state, hand.rate * trade * speed * hall);
     if (addLabour(state, hand.job, minute, stage.id)) report.finished.push(hand.job);
   }
   // The extraction books its hours the whole time it is running, whoever is at what: a fan is

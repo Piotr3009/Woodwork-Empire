@@ -281,10 +281,12 @@ describe('(v) a four week contract with the joiner taken off it for two of them'
   it('renegotiates from the history: a per cent up for the full week, four down for the short', () => {
     const factor = 1 + CONTRACT_RENEW_FULL_WEEK - 2 * CONTRACT_RENEW_SHORT_WEEK;
     expect(contract?.renegotiatedPrice).toBe(Math.round(priceAtStart * factor));
-    // 74, where it read 49 until v40: the month runs at the entry point's 76 now instead of the
-    // typed 50, and 0.97 of 76 rounds to 74. The price moved it and nothing else did: the weeks,
-    // the short weeks and the factor are what they were.
-    expect(contract?.renegotiatedPrice).toBe(74);
+    // 67, where it read 74 from v40 to v49 and 49 before that: the month runs at the entry
+    // point's price, and the entry point carries the reference saw's wear, which fell six fold
+    // when the service went from 80 hours to six months (PIOTR, 22.09; v50): 76 became 69, and
+    // 0.97 of 69 rounds to 67. The price moved it and nothing else did: the weeks, the short
+    // weeks and the factor are what they were.
+    expect(contract?.renegotiatedPrice).toBe(67);
     const report = seen.find((event) => event.kind === 'contractEnded');
     expect(report).toBeDefined();
     expect(report?.data.pieces).toBe(contract?.piecesMade);

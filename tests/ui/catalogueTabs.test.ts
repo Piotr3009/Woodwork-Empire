@@ -8,16 +8,13 @@ import {
   EQUIPMENT_TABS,
   GATE_OUTPUT_BONUS,
   GATE_PRICE,
-  HOURS_PER_WORKING_DAY,
-  SERVICE_INTERVAL_HOURS,
+  SERVICE_INTERVAL_DAYS,
 } from '../../src/engine/constants';
 import { catalogueTabFrom, ownedState, renderCatalogue } from '../../src/ui/catalogue';
 import { findSpec } from '../../src/engine/machines';
 import { extractionDemandOf } from '../../src/engine/media';
-import { addWorkingDays } from '../../src/engine/clock';
-import { machineHoursPerDay } from '../../src/engine/production';
 import { formatCalendarDay } from '../../src/engine/index';
-import type { Equipment, GameState } from '../../src/engine/index';
+import type { GameState } from '../../src/engine/index';
 import {
   acceptNow,
   act,
@@ -295,8 +292,9 @@ describe('the Owned tab', () => {
     expect(card).toContain('Table saw');
     expect(card).toContain('Used table saw');
     expect(card).toContain('0 h of 750 h');
-    // Nothing is going through it, so no service is coming.
-    expect(card).toContain('no service due while it stands idle');
+    // The service is six months on the calendar from the purchase, run or not (v50).
+    expect(card).toContain(`service on ${formatCalendarDay(state.clock.day + SERVICE_INTERVAL_DAYS)}`);
+    expect(card).toContain(`in ${SERVICE_INTERVAL_DAYS} days`);
     expect(card).toContain('running');
     // Nothing is offered on a machine with nothing wrong with it but the gate it can take on its
     // drop (CLAUDE.md T13 3.11), shifting it, which is setting the hall out (CLAUDE.md T17 2.6),
@@ -315,7 +313,7 @@ describe('the Owned tab', () => {
     expect(card).toContain('Sell for £630');
   });
 
-  it('names the day the service lands on once there is work going through the machine', () => {
+  it('names the day the service lands on, the same day whether or not work goes through the machine (v50)', () => {
     const state = fillRack(buyStartingKit(newGame({ difficulty: 'veryEasy' })));
     state.enquiries = [];
     const enquiry = placeEnquiry(state, { price: 4000, deadlineDays: 90 });
@@ -324,15 +322,15 @@ describe('the Owned tab', () => {
     const working = act(taken, { type: 'WORK_HERE', jobId: null });
     const saw = working.equipment.find((item) => item.specId === 'tableSaw');
     const card = shop(working, 'owned').querySelector(`[data-owned="${saw?.id}"]`);
-    // One man, and only the cutting quarter of his job goes through the saw, so eighty hours of
-    // use is a long way off. The weekends in between are counted out, because a saw gains nothing
-    // over a weekend (CLAUDE.md T6 3.6, T7 3.1).
-    const perDay = machineHoursPerDay(working, saw as Equipment);
-    expect(perDay).toBeGreaterThan(0);
-    expect(perDay).toBeLessThan(HOURS_PER_WORKING_DAY / 3);
-    const due = addWorkingDays(working.clock.day, Math.ceil(SERVICE_INTERVAL_HOURS / perDay));
+    // Until v50 the day was projected off the hours the work put through the saw; now it is six
+    // months of the calendar from the purchase, and the work moves it not at all.
+    const due = (saw?.servicedDay ?? 0) + SERVICE_INTERVAL_DAYS;
     expect(card?.textContent).toContain(`service on ${formatCalendarDay(due)}`);
-    expect(card?.textContent).toContain('80 h of use away');
+    expect(card?.textContent).not.toContain('of use away');
+    const later = { ...working, clock: { ...working.clock, day: working.clock.day + 100 } };
+    const laterCard = shop(later, 'owned').querySelector(`[data-owned="${saw?.id}"]`);
+    expect(laterCard?.textContent).toContain(`service on ${formatCalendarDay(due)}`);
+    expect(laterCard?.textContent).toContain(`in ${SERVICE_INTERVAL_DAYS - 100} days`);
   });
 
   it('gives the extractor its clock and its service, like the machines it pulls for', () => {
@@ -347,9 +345,9 @@ describe('the Owned tab', () => {
     expect(card?.textContent).toContain('Extractor');
     expect(card?.textContent).toContain('running');
     expect(card?.textContent).toContain(' h of ');
-    expect(card?.textContent).toContain('no service due while it stands idle');
-    // And once the hours are on it, the card offers the call the Machines page offers.
-    extractor.hoursUsed = SERVICE_INTERVAL_HOURS;
+    expect(card?.textContent).toContain(`service on ${formatCalendarDay(state.clock.day + SERVICE_INTERVAL_DAYS)}`);
+    // And once its six months are up, the card offers the call the Machines page offers.
+    extractor.servicedDay = state.clock.day - SERVICE_INTERVAL_DAYS;
     const due = shop(state, 'owned');
     expect(due.querySelector(`[data-owned="${extractor.id}"]`)?.textContent)
       .toContain('service due now');
@@ -397,7 +395,7 @@ describe('the Owned tab', () => {
       broken.querySelector(`[data-owned="${saw.id}"] [data-do="repairMachine"]`),
     ).not.toBeNull();
     saw.broken = false;
-    saw.hoursUsed = SERVICE_INTERVAL_HOURS;
+    saw.servicedDay = state.clock.day - SERVICE_INTERVAL_DAYS;
     const due = shop(state, 'owned');
     expect(due.innerHTML).toContain('service due now');
     expect(due.querySelector(`[data-owned="${saw.id}"] [data-do="serviceMachine"]`)).not.toBeNull();

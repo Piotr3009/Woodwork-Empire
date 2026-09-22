@@ -687,13 +687,22 @@ function liftToVersion25(state: Raw): void {
   state.version = 25;
 }
 
-/** v26 (v50, PIOTR 22.09): the Output sheet says who made today's number, so the day's stats keep
- *  the minutes and the worth of every man who has put a production minute in. A save was made in
- *  the middle of a day this build did not count that way, so it opens with nobody booked: the
- *  block is empty until the next minute is worked, and the total above it is untouched, because
- *  `outputWorth` and `workMinutes` are the save's own (CLAUDE.md T24 2.1, section 4). */
+/** v50 (PIOTR, 22.09): the service runs on the calendar. Every machine's six months start on the
+ *  day the save is opened, whatever hours it had at its last service, which is the one figure the
+ *  old rule kept and the new one has no use for; and the state remembers the last day a shop rang,
+ *  read off the offers it has. */
 function liftToVersion26(state: Raw): void {
-  if (isRecord(state.dayStats)) state.dayStats.byMan = {};
+  const today = isRecord(state.clock) && typeof state.clock.day === 'number' ? state.clock.day : 1;
+  for (const item of records(state.equipment)) {
+    item.servicedDay = today;
+    delete item.serviceHours;
+  }
+  let last: number | null = null;
+  for (const contract of records(state.contracts)) {
+    if (typeof contract.offeredDay !== 'number') continue;
+    if (last === null || contract.offeredDay > last) last = contract.offeredDay;
+  }
+  state.lastContractOfferDay = last;
   state.version = 26;
 }
 

@@ -2,14 +2,9 @@
 // it. Nothing is a share of a capacity any more (CLAUDE.md T7 2 and 3.1).
 
 import { describe, expect, it } from 'vitest';
-import {
-  HOURS_PER_WORKING_DAY,
-  MINUTES_PER_WORKING_DAY,
-  SERVICE_INTERVAL_HOURS,
-} from '../../src/engine/constants';
+import { SERVICE_INTERVAL_DAYS } from '../../src/engine/constants';
 import { EQUIPMENT_SPECS } from '../../src/engine/constants';
 import { OWNER, serviceIsDue } from '../../src/engine/machines';
-import { familyShareOfJob, machineHoursPerDay } from '../../src/engine/production';
 import { waitingStation } from '../../src/engine/stations';
 import type { Equipment, GameState } from '../../src/engine/index';
 import { tick } from '../../src/engine/index';
@@ -22,7 +17,6 @@ import {
   newGame,
   nextDay,
   placeEnquiry,
-  placeEquipment,
   twoMenOnSheetWork,
 } from '../helpers';
 
@@ -91,13 +85,18 @@ describe('the hours a machine gains', () => {
     for (const item of tomorrow.equipment) expect(item.takenBy, item.specId).toBeNull();
   });
 
-  it('brings the service on by hours and by nothing else', () => {
-    let state = oneManAtWork();
+  it('brings the service on by the calendar and by nothing else: six months from the purchase, run or not (v50)', () => {
+    // Until v50 the service came on by the hours the machine ran (80 of them). Piotr, 22.09:
+    // "every six months, for every machine, and that is all".
+    const state = oneManAtWork();
     const saw = machine(state, 'tableSaw');
-    saw.hoursUsed = SERVICE_INTERVAL_HOURS - 0.5;
-    expect(serviceIsDue(machine(state, 'tableSaw'))).toBe(false);
-    state = tick(state, 31);
-    expect(serviceIsDue(machine(state, 'tableSaw'))).toBe(true);
+    expect(saw.servicedDay).toBe(state.clock.day);
+    expect(serviceIsDue(saw, state.clock.day)).toBe(false);
+    expect(serviceIsDue(saw, state.clock.day + SERVICE_INTERVAL_DAYS - 1)).toBe(false);
+    expect(serviceIsDue(saw, state.clock.day + SERVICE_INTERVAL_DAYS)).toBe(true);
+    // Hours on it move nothing.
+    saw.hoursUsed = 10000;
+    expect(serviceIsDue(saw, state.clock.day)).toBe(false);
   });
 });
 
@@ -139,34 +138,3 @@ describe('one person per machine', () => {
   });
 });
 
-describe('what the Owned tab projects', () => {
-  it('counts only the share of the day the work at it takes, over the saws there are', () => {
-    const state = tick(twoMenOnSheetWork({ saws: 1 }), 60);
-    const saw = machine(state, 'tableSaw');
-    const job = state.jobs.find((entry) => entry.assignees[0] === OWNER);
-    if (!job) throw new Error('no job under the owner');
-    const share = familyShareOfJob(state, job, 'tableSaw');
-    // A saw has a man for the cutting quarter and no longer, which is why two of them serve six
-    // joiners (CLAUDE.md T7 3.1).
-    expect(share).toBeGreaterThan(0.2);
-    expect(share).toBeLessThan(0.3);
-    // Two men want it, and there is one of it.
-    expect(machineHoursPerDay(state, saw)).toBeCloseTo(2 * share * HOURS_PER_WORKING_DAY, 6);
-    // A second saw halves what each of them gains.
-    const two = { ...state, equipment: [...state.equipment] };
-    placeEquipment(two, 'tableSaw', { variantId: 'standard', x: 10, y: 1, id: 'saw-2' });
-    expect(machineHoursPerDay(two, saw)).toBeCloseTo(share * HOURS_PER_WORKING_DAY, 6);
-    // Nothing in the hall has a stage on the compressor, so it never comes due.
-    expect(machineHoursPerDay(state, machine(state, 'compressor'))).toBe(0);
-  });
-
-  it('gives a machine nobody stands at no hours at all', () => {
-    const state = newGame({ difficulty: 'veryEasy' });
-    placeEquipment(state, 'extractor');
-    const thicknesser = placeEquipment(state, 'thicknesser', { x: 12, y: 1 });
-    const worked = tick(state, MINUTES_PER_WORKING_DAY);
-    void worked;
-    expect(thicknesser.hoursUsed).toBe(0);
-    expect(machineHoursPerDay(state, thicknesser)).toBe(0);
-  });
-});

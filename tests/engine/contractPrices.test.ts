@@ -18,7 +18,8 @@ import {
   MINUTES_PER_WORKING_DAY,
   REPUTATION_MIN,
   SERVICE_COST_FRACTION,
-  SERVICE_INTERVAL_HOURS,
+  SERVICE_INTERVAL_MONTHS,
+  MACHINE_HOURS_PER_MONTH,
   SHEET_VALUE,
   WORKER_RATES,
 } from '../../src/engine/constants';
@@ -85,12 +86,12 @@ describe('the price a piece (v40)', () => {
     expect(lines).toHaveLength(3);
   });
 
-  it('reads the wear of a machine off the service rule: a tenth of its price every service interval', () => {
+  it('reads the wear of a machine off the service rule: a tenth of its price every six months, over the hours a one man shop puts on it (v50)', () => {
     const saw = findSpec('tableSaw');
     const standard = saw?.variants.find((variant) => variant.id === CONTRACT_REFERENCE_CLASS);
     if (standard === undefined) throw new Error('no standard saw');
     expect(wearPerMinuteOf(standard.price)).toBeCloseTo(
-      (standard.price * SERVICE_COST_FRACTION) / (SERVICE_INTERVAL_HOURS * 60),
+      (standard.price * SERVICE_COST_FRACTION) / (SERVICE_INTERVAL_MONTHS * MACHINE_HOURS_PER_MONTH * 60),
       9,
     );
     // The cut sheet pack's reference wear is that saw over the entry man's minutes.

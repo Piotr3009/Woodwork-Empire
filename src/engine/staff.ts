@@ -408,20 +408,9 @@ export function toolSlotsNeeded(state: GameState, hiring = 0): number {
   return joiners(state).length + hiring + 1;
 }
 
-/** How many places at a bench the workshop owes: one for every joiner, one for the owner, and one
- *  more when somebody is about to be taken on. The owner is one of the men who stands at a bench
- *  and the gate never counted his place, so a shop could hire its way into a hall where the boss
- *  stood all day with nowhere to put a carcass down; Piotr's own day 128 save is that hall
- *  [PIOTR, 22.09] (CLAUDE.md T24 2.2). It is the cabinet's own rule, `toolSlotsNeeded`, in
- *  places. */
-export function benchPlacesNeeded(state: GameState, hiring = 0): number {
-  return joiners(state).length + hiring + 1;
-}
-
 /** Kit the workshop is short of before this hire can start, and how many of each: the first hire
- *  needs two cabinets and two places at a bench, one of each for the new man and one for the
- *  owner (CLAUDE.md T6 3.5, T24 2.2). The one count the block, the bill and the words on the card
- *  are all read off. */
+ *  needs two cabinets, one for the new man and one for the owner (CLAUDE.md T6 3.5). The one
+ *  count the block, the bill and the words on the card are all read off. */
 export function shortfallForHire(
   state: GameState,
   role: WorkerRole,
@@ -439,12 +428,7 @@ export function shortfallForHire(
     // counted in slots: a class holds one, two or three men, so the shortfall is the places the
     // hall is short, which is the number of used benches at a hundred and twenty that would put
     // it right, and any dearer class covers more of it at once (CLAUDE.md T23 2.17).
-    const wanted =
-      specId === TOOL_CABINET
-        ? toolSlotsNeeded(state, 1)
-        : specId === BENCH
-          ? benchPlacesNeeded(state, 1)
-          : needed;
+    const wanted = specId === TOOL_CABINET ? toolSlotsNeeded(state, 1) : needed;
     const has =
       specId === TOOL_CABINET
         ? toolSlotsOwnedOrOnOrder(state)
@@ -523,13 +507,11 @@ export function hiringOptions(state: GameState): HiringOption[] {
       // and no room left at them is short of a place and not of a bench, and says so in those
       // words. A hall that is short of other things as well is told what to buy, as it always was
       // [PIOTR, 20.09] (CLAUDE.md T23 2.17). One rule either way: both readings are the same
-      // shortfall, counted in places by `shortfallForHire`. From tonight the count is the places
-      // for the joiners, for the man at the door and for the owner, who has stood at a bench since
-      // the first morning and was never counted [PIOTR, 22.09] (CLAUDE.md T24 2.2).
+      // shortfall, counted in places by `shortfallForHire`.
       const short = missingForHire(state, spec.role);
       blockReason =
         short.length === 1 && short[0] === BENCH
-          ? 'No place at a bench for him: the owner needs one too'
+          ? 'No place at a bench'
           : `Buy first: ${missing.join(', ')}`;
     } else if (state.cash < spec.monthlyWage) {
       // Last of the refusals, because it is the only one that changes by the minute: who answers
@@ -930,6 +912,15 @@ export function weekWorkedMinutes(meters: WeekMeters): number {
   return WEEK_CATEGORIES.reduce((total, band) => total + meters.minutes[band], 0);
 }
 
+/** What he earned the company for the minutes it paid for: his rate times the minutes he spent
+ *  making something, over the minutes on the clock while he was on the books. One figure a week
+ *  (CLAUDE.md T20 2.7). Nought while nothing has been paid for yet. */
+export function weekEfficiency(rate: number, meters: WeekMeters): number {
+  if (meters.paidMinutes <= 0) return 0;
+  const making = meters.minutes.jobs + meters.minutes.contracts;
+  return (rate * making) / meters.paidMinutes;
+}
+
 // ---------------------------------------------------------------------------
 // Letting a man go (PIOTR, 18.09: "how do I fire people?"; CLAUDE.md T20 2.4). He works a week's
 // notice out, he is paid for it, and the morning after his last day his jobs and his contracts
@@ -1067,7 +1058,7 @@ export function rollNightBreakdowns(state: GameState, usedMachineIds: readonly s
   for (const id of usedMachineIds) {
     const item = state.equipment.find((entry) => entry.id === id);
     if (!item) continue;
-    if (!chance(state, overdueBreakdownChance(item) * NIGHT_ERROR_FACTOR)) continue;
+    if (!chance(state, overdueBreakdownChance(item, state.clock.day) * NIGHT_ERROR_FACTOR)) continue;
     const gone = breakMachine(state, id);
     if (gone) broken.push(gone);
   }

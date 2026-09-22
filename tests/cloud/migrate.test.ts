@@ -853,29 +853,43 @@ describe('a v24 save in this build (v44)', () => {
   });
 });
 
-describe('a v25 save in this build (CLAUDE.md T24 section 4)', () => {
-  it('comes in with nobody booked against the day, and its own total untouched', () => {
-    const lifted = migrateState(
-      { version: 25, dayStats: { workMinutes: 12, outputWorth: 9, byMan: undefined } },
-      25,
-    );
-    if (lifted === null) throw new Error('the lift refused a version 25 state');
+describe('a v25 save in this build (PIOTR, 22.09; v50)', () => {
+  // Piotr's own day 115 hall: the old saw with 421 hours and five services on it, the compressor
+  // with eleven, two contracts offered on days 99 and 108 (one ended, one running) and one on
+  // offer on day 108's heels. The service goes on the calendar tonight, so every machine's six
+  // months start on the day the save is opened, whatever hours it had; and the last day a shop
+  // rang is read off the offers.
+  const raw = JSON.parse(readFileSync('tests/fixtures/day115-v25.woodwork.json', 'utf8')) as {
+    state: Record<string, unknown> & { version: number; clock: { day: number } };
+  };
+  const lifted = migrateState(raw.state, raw.state.version);
+  if (lifted === null) throw new Error('the lift refused a version 25 state');
+
+  it('comes up at this build s version', () => {
     expect(lifted.version).toBe(26);
-    expect(lifted.dayStats.byMan).toEqual({});
-    // The figure the sheet prints above the block is the save's own and is not guessed at.
-    expect(lifted.dayStats.workMinutes).toBe(12);
-    expect(lifted.dayStats.outputWorth).toBe(9);
+    expect(lifted.version).toBe(STATE_VERSION);
   });
 
-  it('opens both of the day fixtures Piotr sent', () => {
-    for (const path of ['tests/fixtures/day128-v25.woodwork.json', 'tests/fixtures/day149-v25.woodwork.json']) {
-      const raw = JSON.parse(readFileSync(path, 'utf8')) as {
-        state: Record<string, unknown> & { version: number };
-      };
-      const lifted = migrateState(raw.state, raw.state.version);
-      if (lifted === null) throw new Error(`${path} did not open`);
-      expect(lifted.version).toBe(26);
-      expect(lifted.dayStats.byMan).toEqual({});
+  it('starts every machine s six months on the day the save is opened, and drops the hours at the last service', () => {
+    expect(lifted.equipment.length).toBeGreaterThan(0);
+    for (const item of lifted.equipment) {
+      expect(item.servicedDay, item.id).toBe(raw.state.clock.day);
+      expect('serviceHours' in item, item.id).toBe(false);
     }
+    // The saw that was in for its fifth service that day keeps the count and the life it bought.
+    const oldSaw = lifted.equipment.find((item) => item.id === 'kit-52');
+    expect(oldSaw?.serviceCount).toBe(5);
+    expect(oldSaw?.inServiceUntilDay).toBe(116);
+  });
+
+  it('remembers the last day a shop rang, off the offers the save holds', () => {
+    const days = lifted.contracts.map((contract) => contract.offeredDay);
+    expect(lifted.lastContractOfferDay).toBe(Math.max(...days));
+  });
+
+  it('remembers nothing when the save never had an offer', () => {
+    const bare = migrateState({ version: 25, clock: { day: 40, minute: 0 }, equipment: [], contracts: [] }, 25);
+    if (bare === null) throw new Error('the lift refused a bare version 25 state');
+    expect(bare.lastContractOfferDay).toBe(null);
   });
 });

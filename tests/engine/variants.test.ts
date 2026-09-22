@@ -11,7 +11,7 @@ import {
   MACHINE_ENDURANCE_HOURS_DEFAULT,
   OVERDUE_BREAKDOWN_CHANCE,
   POWER_BASE_DAILY,
-  SERVICE_INTERVAL_HOURS,
+  SERVICE_INTERVAL_DAYS,
   STANDARD_VARIANT,
   TABLE_SAW_VARIANTS,
 } from '../../src/engine/constants';
@@ -320,17 +320,17 @@ describe('what a class of saw does to the life of the machine', () => {
 
   it('gives a worn out machine the same chance of giving up as an unserviced one, on top', () => {
     const state = newGame();
+    const today = state.clock.day;
     const saw = placeEquipment(state, 'tableSaw', { variantId: 'used' });
-    expect(overdueBreakdownChance(saw)).toBe(0);
-    // Worn out, and serviced the hour it wore out: one chance.
+    expect(overdueBreakdownChance(saw, today)).toBe(0);
+    // Worn out, with its service up to date: one chance.
     saw.hoursUsed = saw.enduranceHours;
-    saw.serviceHours = saw.hoursUsed;
-    expect(overdueBreakdownChance(saw)).toBe(OVERDUE_BREAKDOWN_CHANCE);
-    // A service overdue on top of that: two.
-    saw.serviceHours = saw.hoursUsed - SERVICE_INTERVAL_HOURS;
-    expect(overdueBreakdownChance(saw)).toBe(OVERDUE_BREAKDOWN_CHANCE * 2);
+    expect(overdueBreakdownChance(saw, today)).toBe(OVERDUE_BREAKDOWN_CHANCE);
+    // A service overdue on top of that, six months on the calendar since the last (v50): two.
+    saw.servicedDay = today - SERVICE_INTERVAL_DAYS;
+    expect(overdueBreakdownChance(saw, today)).toBe(OVERDUE_BREAKDOWN_CHANCE * 2);
     saw.broken = true;
-    expect(overdueBreakdownChance(saw)).toBe(0);
+    expect(overdueBreakdownChance(saw, today)).toBe(0);
   });
 });
 

@@ -11,8 +11,7 @@ import {
   OVERDUE_BREAKDOWN_CHANCE,
   PAST_LIFE_WEEK_HOURS,
   SERVICE_COST_FRACTION,
-  HOURS_PER_WORKING_DAY,
-  SERVICE_INTERVAL_HOURS,
+  SERVICE_INTERVAL_DAYS,
 } from '../../src/engine/constants';
 import { nextWorkingDay } from '../../src/engine/clock';
 import {
@@ -68,19 +67,16 @@ describe('a service buys the machine more life (CLAUDE.md T20 2.9.1)', () => {
     expect(saw.enduranceHours).toBe(original);
     expect(saw.serviceCount).toBe(0);
 
-    saw.hoursUsed = SERVICE_INTERVAL_HOURS;
     serviceMachine(state, saw.id);
     expect(saw.serviceCount).toBe(1);
     expect(saw.enduranceHours).toBe(Math.round(original * 1.5));
 
     saw.inServiceUntilDay = null;
-    saw.hoursUsed += SERVICE_INTERVAL_HOURS;
     serviceMachine(state, saw.id);
     expect(saw.serviceCount).toBe(2);
     expect(saw.enduranceHours).toBe(Math.round(original * 1.75));
 
     saw.inServiceUntilDay = null;
-    saw.hoursUsed += SERVICE_INTERVAL_HOURS;
     serviceMachine(state, saw.id);
     expect(saw.serviceCount).toBe(3);
     expect(saw.enduranceHours).toBe(Math.round(original * 1.875));
@@ -108,13 +104,14 @@ describe('a service buys the machine more life (CLAUDE.md T20 2.9.1)', () => {
     expect(lifeAfterServices(original, 20)).toBeLessThanOrEqual(original * 2);
   });
 
-  it('starts the clock on the next service, so one that was due is not due any more', () => {
+  it('starts the six months to the next service again, so one that was due is not due any more (v50)', () => {
     const state = hall();
     const saw = theSaw(state);
-    saw.hoursUsed = SERVICE_INTERVAL_HOURS + 1;
-    expect(serviceIsDue(saw)).toBe(true);
+    saw.servicedDay = state.clock.day - SERVICE_INTERVAL_DAYS - 1;
+    expect(serviceIsDue(saw, state.clock.day)).toBe(true);
     serviceMachine(state, saw.id);
-    expect(serviceIsDue(saw)).toBe(false);
+    expect(saw.servicedDay).toBe(state.clock.day);
+    expect(serviceIsDue(saw, state.clock.day)).toBe(false);
   });
 });
 
@@ -235,7 +232,7 @@ describe('a service is called in, never worked off (CLAUDE.md T20 2.9)', () => {
     // says where the one path is.
     const state = hall();
     const saw = theSaw(state);
-    saw.hoursUsed = SERVICE_INTERVAL_HOURS + 1;
+    saw.servicedDay = state.clock.day - SERVICE_INTERVAL_DAYS - 1;
     // The day's open raises it and the player answers Leave it, the way the scripted owner does:
     // the reminder is then on the Workshop list with nobody on it, which is the state this is
     // about.
@@ -283,23 +280,21 @@ describe('a machine past its life (CLAUDE.md T20 2.9.4)', () => {
     const saw = theSaw(state);
     // Just past the end of its life, with its service up to date, so the one figure moving is the
     // life: the Turn 8 chance, unchanged, in the first week past the end.
+    // (v50: the service is on the calendar and up to date on the day of purchase, so nothing here
+    // touches it; the hours are the life alone.)
+    const today = state.clock.day;
     saw.hoursUsed = saw.enduranceHours;
-    saw.serviceHours = saw.hoursUsed;
-    expect(overdueBreakdownChance(saw)).toBeCloseTo(OVERDUE_BREAKDOWN_CHANCE, 10);
+    expect(overdueBreakdownChance(saw, today)).toBeCloseTo(OVERDUE_BREAKDOWN_CHANCE, 10);
     // A week past it, two weeks, three: double, and double again.
     saw.hoursUsed = saw.enduranceHours + PAST_LIFE_WEEK_HOURS;
-    saw.serviceHours = saw.hoursUsed;
-    expect(overdueBreakdownChance(saw)).toBeCloseTo(OVERDUE_BREAKDOWN_CHANCE * 2, 10);
+    expect(overdueBreakdownChance(saw, today)).toBeCloseTo(OVERDUE_BREAKDOWN_CHANCE * 2, 10);
     saw.hoursUsed = saw.enduranceHours + PAST_LIFE_WEEK_HOURS * 2;
-    saw.serviceHours = saw.hoursUsed;
-    expect(overdueBreakdownChance(saw)).toBeCloseTo(OVERDUE_BREAKDOWN_CHANCE * 4, 10);
+    expect(overdueBreakdownChance(saw, today)).toBeCloseTo(OVERDUE_BREAKDOWN_CHANCE * 4, 10);
     saw.hoursUsed = saw.enduranceHours + PAST_LIFE_WEEK_HOURS * 3;
-    saw.serviceHours = saw.hoursUsed;
-    expect(overdueBreakdownChance(saw)).toBeCloseTo(OVERDUE_BREAKDOWN_CHANCE * 8, 10);
+    expect(overdueBreakdownChance(saw, today)).toBeCloseTo(OVERDUE_BREAKDOWN_CHANCE * 8, 10);
     // It never passes a certainty, and it is still on the floor: nothing scrapped it.
     saw.hoursUsed = saw.enduranceHours * 10;
-    saw.serviceHours = saw.hoursUsed;
-    expect(overdueBreakdownChance(saw)).toBe(1);
+    expect(overdueBreakdownChance(saw, today)).toBe(1);
     expect(state.equipment.some((item) => item.id === saw.id)).toBe(true);
     expect(freeMachines(state, 'tableSaw').map((item) => item.id)).toEqual([saw.id]);
   });
@@ -308,11 +303,11 @@ describe('a machine past its life (CLAUDE.md T20 2.9.4)', () => {
     const state = hall();
     const saw = theSaw(state);
     saw.hoursUsed = saw.enduranceHours + PAST_LIFE_WEEK_HOURS;
-    expect(overdueBreakdownChance(saw)).toBeGreaterThan(OVERDUE_BREAKDOWN_CHANCE);
+    expect(overdueBreakdownChance(saw, state.clock.day)).toBeGreaterThan(OVERDUE_BREAKDOWN_CHANCE);
     serviceMachine(state, saw.id);
     // Half the original life again is a long way past where it stood, so it is inside its life.
     expect(saw.hoursUsed).toBeLessThan(saw.enduranceHours);
-    expect(overdueBreakdownChance(saw)).toBe(0);
+    expect(overdueBreakdownChance(saw, state.clock.day)).toBe(0);
   });
 });
 
@@ -332,21 +327,19 @@ describe('the extractor is serviced like a machine (CLAUDE.md T23 2.8)', () => {
     // hall and not for one man: it books that hour whoever is at what.
     const state = tick(cutting(), 60);
     expect(theFan(state).hoursUsed).toBeCloseTo(1, 4);
-    // Three weeks of a hall that runs its working day is therefore this many hours, which is well
-    // past the due point every machine in the game shares. Nothing here is a second rule: it is
-    // the minute above multiplied out against the two constants.
-    const threeWeeks = 3 * 5 * HOURS_PER_WORKING_DAY;
-    expect(threeWeeks).toBeGreaterThan(SERVICE_INTERVAL_HOURS);
+    // Those hours are its life running down, against the endurance its class has; since v50 the
+    // service itself is on the calendar and the hours say nothing about it.
+    expect(theFan(state).enduranceHours).toBeGreaterThan(theFan(state).hoursUsed);
   });
 
-  it('falls due at the same point, against the endurance its class already has', () => {
+  it('falls due at the same point, six months on the calendar, against the endurance its class already has (v50)', () => {
     const state = hall();
     const fan = theFan(state);
     expect(fan.enduranceHours).toBe(enduranceHoursFor('extractor', fan.variantId));
     expect(fan.enduranceHours).toBeGreaterThan(0);
-    expect(serviceIsDue(fan)).toBe(false);
-    fan.hoursUsed = SERVICE_INTERVAL_HOURS;
-    expect(serviceIsDue(fan)).toBe(true);
+    expect(serviceIsDue(fan, state.clock.day)).toBe(false);
+    fan.servicedDay = state.clock.day - SERVICE_INTERVAL_DAYS;
+    expect(serviceIsDue(fan, state.clock.day)).toBe(true);
     expect(isServiced(fan.specId)).toBe(true);
     expect(stateLabel(state, fan)).toBe('service due');
     expect(serviceCallCheck(state, fan.id).ok).toBe(true);
@@ -357,7 +350,7 @@ describe('the extractor is serviced like a machine (CLAUDE.md T23 2.8)', () => {
     // sum is the sum of the machines running this very minute (CLAUDE.md T10 3.1).
     const state = tick(cutting(), 1);
     const fan = theFan(state);
-    fan.hoursUsed = SERVICE_INTERVAL_HOURS;
+    fan.servicedDay = state.clock.day - SERVICE_INTERVAL_DAYS;
     // The hall is served while it stands there: the saw the owner is at is inside what it pulls.
     expect(underExtracted(state)).toBe(false);
     const before = fan.enduranceHours;

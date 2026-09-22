@@ -57,7 +57,7 @@ export function stateLabel(state: GameState, item: Equipment): string {
   if (item.broken) return 'broken';
   if (machineIsOut(item, state.clock.day)) return 'in service';
   if (pastEndurance(item)) return 'past its life';
-  if (serviceIsDue(item) && isServiced(item.specId)) return 'service due';
+  if (serviceIsDue(item, state.clock.day) && isServiced(item.specId)) return 'service due';
   return '';
 }
 

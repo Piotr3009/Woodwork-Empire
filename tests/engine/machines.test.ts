@@ -12,19 +12,13 @@ import {
   MACHINE_REPAIR_COST_FRACTION,
   OVERDUE_BREAKDOWN_CHANCE,
   SERVICE_COST_FRACTION,
-  SERVICE_INTERVAL_HOURS,
+  SERVICE_INTERVAL_DAYS,
   EXTRACTOR_REPAIR_COST,
   REPAIR_MINUTES,
   NO_HELPER_DUST_MULTIPLIER,
   GATE_OUTPUT_BONUS,
   GATE_PRICE,
 } from '../../src/engine/constants';
-import { addWorkingDays } from '../../src/engine/clock';
-import {
-  familyShareOfJob,
-  machineHoursPerDay,
-  serviceDueOn,
-} from '../../src/engine/production';
 import {
   accidentRisk,
   familyStopped,
@@ -34,6 +28,7 @@ import {
 
   machinesDueService,
   serviceDueIn,
+  serviceDueOn,
   serviceIsDue,
   benchOf,
   benchPlacesOf,
@@ -512,11 +507,6 @@ describe('no bench in the hall', () => {
     for (const specId of ['locker', 'toolCabinet', 'handToolSet']) {
       state = buyNow(state, specId);
     }
-    // A bench of two places: the gate wants one for the man and one for the owner from Turn 24,
-    // and a hall that cannot seat the boss will not take anybody on (CLAUDE.md T24 2.2).
-    const twoPlaces = state.equipment.find((item) => item.specId === 'workbench');
-    if (!twoPlaces) throw new Error('one bench wanted');
-    twoPlaces.variantId = 'standard';
     state = hireNow(state, 'joiner', 'novice');
     const joiner = state.workers[0];
     if (!joiner) throw new Error('nobody was hired');
@@ -532,18 +522,19 @@ describe('no bench in the hall', () => {
     second.stage = 'ready';
     expect(state.equipment.filter((item) => item.specId === 'workbench')).toHaveLength(1);
     // It was a claim on the bench until Turn 23 and it is a place at one now, so nobody is ever
-    // turned off one: there is nothing to turn him off. The one bench of this hall holds two men,
-    // and they are the joiner and the owner, because the crew fill the benches in the order they
-    // were hired and the owner takes what is left over. The gate buys a place for the man at the
-    // door and a place for the owner, so neither of them is the one standing at the canteen door
-    // (CLAUDE.md T7 3.1, T23 2.17, T24 2.2).
+    // turned off one: there is nothing to turn him off. The one bench of this hall holds one man,
+    // and the man who has him is the joiner, because the crew fill the benches in the order they
+    // were hired and the owner takes what is left over. The gate bought that bench for the
+    // joiner, so the joiner is not the one standing at the canteen door (CLAUDE.md T7 3.1,
+    // T23 2.17).
     const bench = state.equipment.find((item) => item.specId === 'workbench');
     if (!bench) throw new Error('one bench wanted');
-    expect(benchPlacesOf(bench)).toBe(2);
+    expect(benchPlacesOf(bench)).toBe(1);
     expect(benchOf(state, joiner.id)?.id ?? null).toBe(bench.id);
-    expect(benchOf(state, 'owner')?.id ?? null).toBe(bench.id);
-    // The owner is put on the second job and the joiner on the first, each at his own place at
-    // the one bench. The hall has a bench, so neither job is stopped by the hall.
+    expect(benchOf(state, 'owner')).toBeNull();
+    // The owner is put on the second job with no place at a bench and the joiner on the first
+    // with one. The hall has a bench, so neither job is stopped by the hall; the owner's own
+    // question is asked of him at the stages done at a bench, in `placeHand` (v47).
     state = act(state, { type: 'ASSIGN_JOB', jobId: second.id, workerId: 'owner' });
     expect(hallHasABench(state)).toBe(true);
     state = tick(state, 1);
@@ -553,19 +544,15 @@ describe('no bench in the hall', () => {
     state = act(state, { type: 'ASSIGN_JOB', jobId: first.id, workerId: joiner.id });
     expect(state.jobs[0]?.id).toBe(first.id);
     expect(benchOf(state, joiner.id)?.id ?? null).toBe(bench.id);
-    expect(benchOf(state, 'owner')?.id ?? null).toBe(bench.id);
+    expect(benchOf(state, 'owner')).toBeNull();
   });
 
   it('stands a joiner with nowhere to work at the canteen door', () => {
     let state = atTheBench();
     // He is taken on while there is a bench, with the kit a joiner has to have, and starts today.
-    // The bench holds two, because the gate wants a place for him and one for the owner (T24 2.2).
     for (const specId of ['locker', 'toolCabinet', 'handToolSet']) {
       state = buyNow(state, specId);
     }
-    const bench = state.equipment.find((item) => item.specId === 'workbench');
-    if (!bench) throw new Error('one bench wanted');
-    bench.variantId = 'standard';
     state = hireNow(state, 'joiner', 'novice');
     const joiner = state.workers[0];
     if (!joiner) throw new Error('nobody was hired');
@@ -584,67 +571,71 @@ describe('no bench in the hall', () => {
   });
 });
 
-/** Puts hours on a machine without running the workshop for weeks to get them. */
-function withHours(state: GameState, specId: string, hours: number): GameState {
+/** Backdates a machine's last service so that the six months to the next one are up today,
+ *  without running the workshop for six months to get there (v50). */
+function withServiceDue(state: GameState, specId: string): GameState {
   const next = { ...state, equipment: state.equipment.map((item) => ({ ...item })) };
   const machine = next.equipment.find((item) => item.specId === specId);
-  if (machine) machine.hoursUsed = hours;
+  if (machine) machine.servicedDay = state.clock.day - SERVICE_INTERVAL_DAYS;
   return next;
 }
 
-describe('the service, counted on the machine\u0027s own clock', () => {
-  it('falls due after its hours, not after a month of the calendar', () => {
+describe('the service, every six months on the calendar (PIOTR, 22.09; v50)', () => {
+  it('falls due six months after the purchase or the last service, whatever hours it has run', () => {
+    // Until v50 it fell due after 80 hours of the machine's own clock, so a saw with three men on
+    // it went in every nine working days (twenty services in Piotr's first 115 days).
     const state = atTheBench();
     const saw = state.equipment.find((item) => item.specId === 'tableSaw');
-    expect(saw?.serviceHours).toBe(0);
-    expect(serviceIsDue(saw as Equipment)).toBe(false);
+    expect(saw?.servicedDay).toBe(state.clock.day);
+    expect(serviceIsDue(saw as Equipment, state.clock.day)).toBe(false);
     expect(serviceCostFor(saw as Equipment)).toBe(1800 * SERVICE_COST_FRACTION);
-    // A month of the calendar with nothing put through it is not a service.
+    // A month of the calendar, run or not, is not a service.
     const idle = runToDay({ ...state, jobs: [] }, 1 + 30);
     expect(machinesDueService(idle.state)).toEqual([]);
-    // Its hours are what bring it due.
-    const worn = withHours(state, 'tableSaw', SERVICE_INTERVAL_HOURS);
-    const wornSaw = worn.equipment.find((item) => item.specId === 'tableSaw');
-    expect(serviceIsDue(wornSaw as Equipment)).toBe(true);
-    expect(serviceDueIn(wornSaw as Equipment)).toBe(0);
+    // Hours on it bring nothing due.
+    const worn = { ...state, equipment: state.equipment.map((item) => ({ ...item, hoursUsed: 500 })) };
+    expect(machinesDueService(worn)).toEqual([]);
+    // The calendar does.
+    const due = withServiceDue(state, 'tableSaw');
+    const dueSaw = due.equipment.find((item) => item.specId === 'tableSaw');
+    expect(serviceIsDue(dueSaw as Equipment, state.clock.day)).toBe(true);
+    expect(serviceDueIn(dueSaw as Equipment, state.clock.day)).toBe(0);
+    expect(machinesDueService(due).map((item) => item.specId)).toEqual(['tableSaw']);
   });
 
-  it('says which day it lands on at the rate the machine is used, or that it never will', () => {
+  it('says which day it lands on: six months on from the last one, whether the machine runs or stands', () => {
     const state = atTheBench();
     const saw = state.equipment.find((item) => item.specId === 'tableSaw');
-    const job = state.jobs.find((entry) => entry.stage === 'inProduction');
-    if (!job) throw new Error('nobody at a bench');
-    // One man, and the cutting is the only stage of his job that wants the saw (T7 3.1).
-    const perDay = familyShareOfJob(state, job, 'tableSaw') * 8;
-    expect(machineHoursPerDay(state, saw as Equipment)).toBeCloseTo(perDay, 6);
-    const days = Math.ceil(SERVICE_INTERVAL_HOURS / perDay);
-    // Working days, not days of the calendar: the saw gains nothing over a weekend, so counting
-    // the weekends in would put every service a fortnight too early.
-    expect(serviceDueOn(state, saw as Equipment)).toBe(addWorkingDays(state.clock.day, days));
-    expect(serviceDueOn(state, saw as Equipment)).toBeGreaterThan(state.clock.day + days);
-    // Nothing on the bench and nothing wears out.
+    expect(serviceDueOn(saw as Equipment)).toBe(state.clock.day + SERVICE_INTERVAL_DAYS);
+    expect(serviceDueIn(saw as Equipment, state.clock.day)).toBe(SERVICE_INTERVAL_DAYS);
+    expect(serviceDueIn(saw as Equipment, state.clock.day + 100)).toBe(SERVICE_INTERVAL_DAYS - 100);
+    // Nothing on the bench, the same date: the calendar does not care.
     const quiet = { ...state, jobs: [] };
-    expect(machineHoursPerDay(quiet, saw as Equipment)).toBe(0);
-    expect(serviceDueOn(quiet, saw as Equipment)).toBeNull();
+    expect(serviceDueOn(quiet.equipment.find((item) => item.specId === 'tableSaw') as Equipment)).toBe(
+      state.clock.day + SERVICE_INTERVAL_DAYS,
+    );
   });
 
-  it('raises the service, and calling it in pays for it and starts the clock again', () => {
+  it('raises the service, and calling it in pays for it and starts the six months again', () => {
     // Turn 8's half hour at the spanner is gone: a service is called in and paid for at the call,
     // and the machine is away for the working day (PIOTR, 18.09; CLAUDE.md T20 2.9.2, 2.9.3).
-    let state = withHours(atTheBench(), 'tableSaw', SERVICE_INTERVAL_HOURS);
+    let state = withServiceDue(atTheBench(), 'tableSaw');
     const saw = state.equipment.find((item) => item.specId === 'tableSaw');
     // `runToDay` answers whatever the day throws up with its first choice, which is Call it in.
     const run = runToDay(state, state.clock.day + 1);
     const due = eventsOfKind(run.events, 'serviceDue');
     expect(due.length).toBeGreaterThanOrEqual(1);
     expect(due[0]?.title).toContain('Service due');
+    expect(due[0]?.body).toContain('6 months since the last one');
     expect(due[0]?.choices[0]?.id).toBe('service');
     state = run.state;
     // Nothing is left on the list for anybody to stand at.
     expect(state.tasks.some((entry) => entry.kind === 'service' && !entry.done)).toBe(false);
     const serviced = state.equipment.find((item) => item.specId === 'tableSaw');
-    expect(serviced?.serviceHours).toBe(serviced?.hoursUsed);
-    expect(serviceIsDue(serviced as Equipment)).toBe(false);
+    expect(serviced?.servicedDay).toBeGreaterThanOrEqual(1);
+    expect(serviced?.servicedDay).toBeLessThanOrEqual(state.clock.day);
+    expect(serviceIsDue(serviced as Equipment, state.clock.day)).toBe(false);
+    expect(serviceDueOn(serviced as Equipment)).toBe((serviced?.servicedDay ?? 0) + SERVICE_INTERVAL_DAYS);
     // The bill went out at the call, on its own line, and it is a tenth of what the saw cost.
     const bill = state.ledger.find((entry) => entry.label.endsWith('service'));
     expect(bill?.amount).toBeCloseTo(-serviceCostFor(saw as Equipment), 6);
@@ -653,12 +644,11 @@ describe('the service, counted on the machine\u0027s own clock', () => {
   it('gives an overdue machine a 2% chance a day of giving up, and it is out until repaired', () => {
     const state = atTheBench();
     const saw = state.equipment.find((item) => item.specId === 'tableSaw');
-    expect(overdueBreakdownChance(saw as Equipment)).toBe(0);
-    // Put a month of hours on the saw, so it is the only machine that is overdue.
-    const broken = { ...state, equipment: state.equipment.map((item) => ({ ...item })) };
+    expect(overdueBreakdownChance(saw as Equipment, state.clock.day)).toBe(0);
+    // Let the saw's six months run out, so it is the only machine that is overdue.
+    const broken = withServiceDue(state, 'tableSaw');
     const target = broken.equipment.find((item) => item.specId === 'tableSaw');
-    if (target) target.hoursUsed = SERVICE_INTERVAL_HOURS;
-    expect(overdueBreakdownChance(target as Equipment)).toBe(OVERDUE_BREAKDOWN_CHANCE);
+    expect(overdueBreakdownChance(target as Equipment, state.clock.day)).toBe(OVERDUE_BREAKDOWN_CHANCE);
     if (target) target.broken = true;
     expect(familyStopped(broken, 'tableSaw')?.item.specId).toBe('tableSaw');
     const before = firstJob(broken).labourRemaining;
@@ -676,9 +666,9 @@ describe('the service, counted on the machine\u0027s own clock', () => {
   it('breaks an overdue machine sooner or later, and never a serviced one', () => {
     let broken = 0;
     for (const seed of [1, 2, 3, 4]) {
-      // The saw starts the run with a month of hours on it and no service against them, and the
-      // owner never gets round to it, which is the case the roll is about.
-      let state = withHours(atTheBench({ seed }), 'tableSaw', SERVICE_INTERVAL_HOURS);
+      // The saw starts the run with its six months up and no service called, and the owner never
+      // gets round to it, which is the case the roll is about.
+      let state = withServiceDue(atTheBench({ seed }), 'tableSaw');
       // The extractor gives up on dust, not on a service it never had: it is not counted here.
       const machines = new Set(
         state.equipment.filter((item) => item.specId !== 'extractor').map((item) => item.id),

@@ -836,17 +836,12 @@ export function stationCell(
     }
   }
   // The second man of a job stands at the first man's own bench, in its second place: two men on
-  // one bench, side by side along its front (CLAUDE.md T17 2.10, T24 2.5). A bench reads its
-  // places through `benchCellsAt`, the same list the third man and beyond come off, so the second
-  // place and the third cannot be worked out two different ways.
+  // one bench, one in front of it and one behind it (CLAUDE.md T17 2.10).
   const secondAt = stationSecondAt(station);
   if (secondAt !== null) {
     const item = state.equipment.find((entry) => entry.id === secondAt && !isSold(entry));
     if (item) {
-      const cell =
-        item.specId === BENCH
-          ? (benchCellsAt(state, item, 2)[1] ?? standingCell(state, item, 'second'))
-          : standingCell(state, item, 'second');
+      const cell = standingCell(state, item, 'second');
       return { ...cell, facing: facingAt(cell, item) };
     }
   }
@@ -1481,7 +1476,7 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
       ? 'var(--stopped-dark)'
       : CATEGORY_SHADE[spec.category] ?? 'var(--kit-machine-dark)';
     const bagLine = item.specId === 'extractor' && store.full ? ' (bags full)' : '';
-    const serviceLine = !item.broken && serviceIsDue(item) ? ' (service due)' : '';
+    const serviceLine = !item.broken && serviceIsDue(item, state.clock.day) ? ' (service due)' : '';
     const rackLine =
       sheetCapacityOf(item) > 0 ? `: ${state.stock.sheets} / ${rackCapacity(state)}` : '';
     const atThisBench =

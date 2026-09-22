@@ -246,25 +246,27 @@ describe('(mm) the same crew with a novice manager over them', () => {
     // with no manager in it. So the pace reached the second shift alone while the efficiency sheet
     // printed `Manager: +3%` over a day crew that was not getting it. The lead put the same factor
     // on the day's hands, which is the one path 2.4 asks for, and this is the month that measures
-    // it: 4,091.97 without him, 4,096.14 with him [both measured on this build].
+    // it: 4,091.97 without him, 4,261.25 with him [both measured on this build].
     //
-    // **Four pounds of work and not the hundred and twenty three that 1.03 of 4,091.97 would be,
-    // and that is not the manager, it is the hall.** Every one of the 14,400 hand minutes of the
-    // month carries his 1.03: the rates of the day's hands add up to exactly three per cent more
-    // than (ll)'s, measured. What the hall gives back is the dust. This hall is three saws and one
-    // used fan with no helper behind it, so it works at a hall factor of about 0.75 and spends
-    // four minutes in five under the extraction's margin; three per cent more work in it is three
-    // per cent more dust, and the faster month spends 129 more minutes of the 14,094 in the worse
-    // band. The gain and the giving back are the same size to within a tenth of a per cent.
+    // **Four per cent, and not the three the grade says**, and the one per cent over is not the
+    // manager either: it is the hall. Every one of the 14,400 hand minutes of the month carries
+    // his 1.03: the rates of the day's hands add up to exactly three per cent more than (ll)'s,
+    // measured. The rest is the dust swinging the hall factor: this hall is three saws and one
+    // used fan with no helper behind it, and a month that lands on the good side of the
+    // extraction's margin a few minutes more banks a little over the three per cent.
     //
-    // It is not a fixed exchange either, which is the point worth Piotr's eye: the same ten days
-    // on the same hall with a standard fan in place of the used one come to 4,162.46 without the
-    // manager and 4,333.42 with him, which is **4.11 per cent**, because that hall lands on the
-    // good side of the band more often. A hall whose extraction keeps up with it banks the three
-    // per cent and a little of the swing; a hall that is already over its margin hands it straight
-    // back. The flat +3% is on the minute, where 2.4 puts it, and never on the month.
+    // From v40 to v49 this figure read 4,096.14, four pounds over (ll) and not the hundred and
+    // twenty three, and the comment here blamed the dust for the hundred and nineteen given
+    // back. It was not the dust: it was the service rule. Every saw on this hall passes 80 hours
+    // inside the two months, the scripted player leaves the reminder alone, and in the manager's
+    // month the overdue saw kit-137 rolled its 2% and gave up on the main stream's dice, and stayed
+    // broken; the same rolls moved the extractor's, which broke twice as well (days 23 and 25).
+    // (ll)'s saws were just as overdue and simply rolled no breakdown. With the service on the
+    // calendar (PIOTR, 22.09; v50) nothing is overdue inside six months, nothing rolls, and the
+    // month reads what the grade puts in it. Measured on this build: no repair line in either
+    // month, every saw whole.
     expect(NOVICE.done).toBeGreaterThan(NO_MANAGER.done);
-    expect(NOVICE.done).toBeCloseTo(4096.14, 2);
+    expect(NOVICE.done).toBeCloseTo(4261.25, 2);
   });
 
   it('never sends the owner to the Work Plan', () => {

@@ -5,7 +5,7 @@
 // clean hall with nothing waiting shows no chip but the setting out.
 
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { CLEANING_MINUTES, SERVICE_INTERVAL_HOURS } from '../../src/engine/constants';
+import { CLEANING_MINUTES, SERVICE_INTERVAL_DAYS } from '../../src/engine/constants';
 import { currentState, mount, render } from '../../src/ui/app';
 import type { GameState } from '../../src/engine/index';
 import { createTask } from '../../src/engine/tasks';
@@ -121,9 +121,8 @@ describe('the chips over the floor', () => {
   it('names the machine that is due a service, with the button that does it', () => {
     const saw = game().equipment.find((item) => item.specId === 'tableSaw');
     if (saw === undefined) throw new Error('no saw in the hall');
-    // Long past its service interval, with the hours on its own clock.
-    saw.hoursUsed = SERVICE_INTERVAL_HOURS * 2;
-    saw.serviceHours = 0;
+    // Long past its service: a year since the last one on the calendar (v50).
+    saw.servicedDay = game().clock.day - SERVICE_INTERVAL_DAYS * 2;
     render();
     const due = chips().find((text) => text.includes('due a service'));
     expect(due).toBeDefined();

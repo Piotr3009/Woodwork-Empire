@@ -17,6 +17,7 @@ import {
   assignContract,
   contractPiece,
   contractPriceFor,
+  contractMenNeeded,
   contractResultFor,
   drawContract,
   endContract,
@@ -238,6 +239,35 @@ describe("Running, and the whole day that goes to it (PIOTR, 21.09; v42)", () =>
     expect(result.piecesPerDay).toBeGreaterThan(1);
     expect(day?.textContent).toContain(`${result.freeMinutes} min into the next`);
     expect(MINUTES_PER_WORKING_DAY).toBeGreaterThan(result.piecesPerDay * result.minutes - 1);
+  });
+
+  it('says how many men the contract is for when one cannot make the client s day (PIOTR, 22.09; v50)', () => {
+    // Piotr's day 115: Dave alone made eleven packs a day of a contract that wanted fourteen, and
+    // nothing on the card said the contract was two men's work. "So the hint is: this contract is
+    // for two men at the least."
+    const state = hall();
+    const ben = state.workers[0] as Worker;
+    const one = contractResultFor(state, offered(state, 5), ben);
+    state.contracts = [];
+    // A week that wants more than one Ben makes: the offer card and the running card both say it.
+    const heavy = offered(state, one.piecesPerDay * 5 + 5);
+    const needed = contractMenNeeded(state, heavy, ben);
+    expect(needed).toBe(2);
+    const offer = tab(state).querySelector('.contract-offer');
+    expect(offer?.querySelector('.contract-hands')?.textContent).toBe('This contract is for 2 men at the least.');
+    acceptContract(state, heavy.id);
+    assignContract(state, heavy.id, 'staff-1', true);
+    const running = tab(state).querySelector('.contract-bar');
+    expect(running?.querySelector('.contract-hands')?.textContent).toBe(
+      'This contract is for 2 men at the least, 1 man on it.',
+    );
+    // With the second man on it the hint goes.
+    assignContract(state, heavy.id, 'staff-2', true);
+    expect(tab(state).querySelector('.contract-bar .contract-hands')).toBeNull();
+    // And a week one man makes has no hint at all.
+    state.contracts = [];
+    offered(state, 5);
+    expect(tab(state).querySelector('.contract-offer .contract-hands')).toBeNull();
   });
 
   it('says the week is short when the pace will not reach it, and offers the way out', () => {

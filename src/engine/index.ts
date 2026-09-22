@@ -296,13 +296,7 @@ export {
 export { dropJob, dropReputationCost } from './jobs';
 export { changeReputation, companyTotals } from './reputation';
 export type { LifecycleStep, StartCheck, StepState } from './jobs';
-export type {
-  BagStore,
-  OutputBreakdown,
-  OutputLine,
-  WorkshopBreakdown,
-  WorkshopBreakdownRow,
-} from './machines';
+export type { BagStore, OutputBreakdown, OutputLine } from './machines';
 
 // Production in stages (CLAUDE.md T7 3.1)
 export {
@@ -484,8 +478,6 @@ export {
   dustBand,
   outputBreakdown,
   workshopOutputToday,
-  workshopBreakdownToday,
-  HALL_ROW,
   bookOutputMinute,
   findSpec,
   gateIsCrowded,
@@ -497,6 +489,9 @@ export {
   requiresOneOfFor,
   standsInTheHall,
   serviceIsDue,
+  serviceDueOn,
+  serviceDueIn,
+  daysSinceService,
   hasCentralExtraction,
   hasExtraction,
   needsDucting,
@@ -524,11 +519,8 @@ export {
 // Who is standing at which machine (CLAUDE.md T7 3.1)
 export {
   familiesWanted,
-  familyShareOfJob,
   hands,
   jobOf,
-  machineHoursPerDay,
-  serviceDueOn,
   stationForProduction,
   takeMachines,
 } from './production';

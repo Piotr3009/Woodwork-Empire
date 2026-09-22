@@ -7,7 +7,7 @@ import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
   LAPTOP_BOOT_MINUTES,
   LIFE_LOW_FRACTION,
-  SERVICE_INTERVAL_HOURS,
+  SERVICE_INTERVAL_DAYS,
 } from '../../src/engine/constants';
 import { serviceCostFor, serviceMachine } from '../../src/engine/machines';
 import { formatMoney } from '../../src/engine/index';
@@ -144,7 +144,7 @@ describe('the Machines page (CLAUDE.md T20 2.9)', () => {
   it('says broken, and service due, in the same place', () => {
     const state = hall();
     const saw = theSaw(state);
-    saw.hoursUsed = SERVICE_INTERVAL_HOURS;
+    saw.servicedDay = state.clock.day - SERVICE_INTERVAL_DAYS;
     expect(rowOf(state, saw.id).querySelector('.row-main')?.textContent).toContain('service due');
     saw.broken = true;
     const row = rowOf(state, saw.id);
@@ -161,7 +161,7 @@ describe('the Machines page (CLAUDE.md T20 2.9)', () => {
     const fan = state.equipment.find((item) => item.specId === 'extractor');
     if (fan === undefined) throw new Error('no extractor in the hall');
     expect(rowOf(state, fan.id).querySelector('.row-main')?.textContent).not.toContain('service due');
-    fan.hoursUsed = SERVICE_INTERVAL_HOURS;
+    fan.servicedDay = state.clock.day - SERVICE_INTERVAL_DAYS;
     const row = rowOf(state, fan.id);
     expect(row.querySelector('.row-main')?.textContent).toContain('service due');
     const button = row.querySelector('[data-do="serviceMachine"]');

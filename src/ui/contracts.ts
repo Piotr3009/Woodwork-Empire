@@ -35,6 +35,7 @@ import {
   contractMachineTip,
   contractManCheck,
   contractManOf,
+  contractMenNeeded,
   contractResultFor,
   contractShortfall,
   contractWorkerOf,
@@ -396,6 +397,16 @@ function offerDay(state: GameState, contract: Contract, who: string, head: strin
   );
 }
 
+/** The hint under the day's pieces when one man cannot make the client's day: how many men like
+ *  him the contract is for, and on a running contract how many are on it (PIOTR, 22.09: "the hint
+ *  is: this contract is for two men at the least"; v50). Nothing when he can. */
+function menNeededLine(state: GameState, contract: Contract, who: string, onIt: number | null): string {
+  const needed = contractMenNeeded(state, contract, contractWorkerOf(state, who));
+  if (needed <= 1 || (onIt !== null && onIt >= needed)) return '';
+  const tail = onIt === null ? '' : `, ${plural(onIt, 'man', 'men')} on it`;
+  return `<p class="hint contract-hands bad">This contract is for ${plural(needed, 'man', 'men')} at the least${tail}.</p>`;
+}
+
 /** The one machine that would shorten the piece most among those the hall has not got, in the
  *  drawing's own words, every figure of it computed (CLAUDE.md T20 2.1.1). */
 function machineTipLine(state: GameState, contract: Contract, who: string): string {
@@ -481,6 +492,7 @@ function offerCard(state: GameState, contract: Contract, picked: string | null):
       `${result.piecesPerDay}, the client asks ${result.piecesNeededPerDay} at the least`,
       result.piecesPerDay >= result.piecesNeededPerDay ? 'good' : 'bad',
     ) +
+    menNeededLine(state, contract, who, null) +
     figureRow(`A day of ${name === 'You' ? 'your' : `${name}'s`} pieces, after wages and wear`, result.dayResult) +
     figureRow(
       `The week: ${result.piecesPerWeek} pieces, five days of wages already counted`,
@@ -573,6 +585,9 @@ function runningCard(state: GameState, contract: Contract, assignOpen: string | 
     figureRow('This week so far', Math.round(pace.made * margin * 100) / 100) +
     figureRow('Term so far', closingReport(state, contract).margin) +
     countRow('Delivered in full', `${fullWeeksOf(contract)} of ${contract.weeks.length} weeks`) +
+    // The hint is worked out for the first man on it, whose day is drawn first under it; a
+    // contract with nobody on it is worked out for the first man who could go on it.
+    menNeededLine(state, contract, contract.assigned[0] ?? contractManOf(state, null), contract.assigned.length) +
     contract.assigned.map((id) => runningDay(state, contract, id)).join('') +
     `<div class="row"><span class="row-main"></span><span class="row-action">${endIt}</span></div>` +
     '</div>'

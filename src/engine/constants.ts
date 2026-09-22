@@ -112,9 +112,9 @@ import type {
  *  last week; the day's stats carry the sum behind the workshop's average output and every closed
  *  day the average it had. Every v36 to v39 save loads.
  *
- *  Version 26 is v50 (PIOTR, 22.09): the day's stats carry the minutes and the worth of every man
- *  who put a production minute in today, so the Output sheet can say who made the number
- *  (CLAUDE.md T24 2.1, section 4). Every v25 save loads. */
+ *  Version 26 is v50 (PIOTR, 22.09): a machine's service runs on the calendar, so every machine
+ *  carries the day it was bought or last serviced in place of the hours it had at the last one,
+ *  and the state remembers the day a contract was last offered. Every v25 save loads. */
 export const STATE_VERSION = 26;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
@@ -924,12 +924,18 @@ export const DEADLINE_SLACK_PERCENT_MAX = 15;
  *  and not 40%, which is what an uplift of a fifth is worth (PIOTR, 17.09; CLAUDE.md T17 2.23). */
 export const DEADLINE_EXPRESS_FACTOR = 0.8;
 
-/** Every machine wants a service once a month, and it costs half an hour (PIOTR). From Turn 6 the
- *  month is counted on the machine's own clock and not on the calendar: 80 hours is the month a
- *  one man shop puts on a table saw, which serves three, so the service he is used to lands where
- *  it always did, and a saw with three men on it is serviced three times as often
- *  [TUNE: 80] (CLAUDE.md T6 3.6). */
-export const SERVICE_INTERVAL_HOURS = 80;
+/** [PIOTR, 22.09] Every machine is serviced every six months, on the calendar, and that is all:
+ *  "services every six months for every machine, not every twenty days, too much
+ *  micromanagement". Turn 6's rule, a service every 80 hours of the machine's own clock, put a
+ *  saw with three men on it in for a service every nine working days and the compressor every
+ *  nine as well (his day 115 ledger: twenty services in 115 days, eleven of them the compressor).
+ *  The six months run from the day the machine was bought or last serviced (v50). */
+export const SERVICE_INTERVAL_MONTHS = 6;
+export const SERVICE_INTERVAL_DAYS = SERVICE_INTERVAL_MONTHS * DAYS_PER_MONTH;
+/** The month a one man shop puts on a table saw, in hours: Turn 6's figure, which was the service
+ *  interval until v50 and is now only the basis two other readings are written in, the wear a
+ *  minute of a machine and a week of its own clock past its life [TUNE: 80] (CLAUDE.md T6 3.6). */
+export const MACHINE_HOURS_PER_MONTH = 80;
 export const SERVICE_MINUTES = 30;
 /** [PIOTR, 18.09] A service is a tenth of what the machine cost (CLAUDE.md T20 2.9.2). It was 2%
  *  from Turn 6 to Turn 19. */
@@ -938,11 +944,11 @@ export const SERVICE_COST_FRACTION = 0.1;
  *  time, and half of the last extension each time after that, so the extensions are 50%, 25%,
  *  12.5% of the original and they never add up past the original again (CLAUDE.md T20 2.9.1). */
 export const SERVICE_LIFE_EXTENSION = 0.5;
-/** [TUNE] A week of a machine's own clock, which is the same reading `SERVICE_INTERVAL_HOURS` is
+/** [TUNE] A week of a machine's own clock, which is the same reading `MACHINE_HOURS_PER_MONTH` is
  *  written in: 80 hours is the month a one man shop puts on a saw (CLAUDE.md T6 3.6), so a week of
  *  it is that over the weeks in a month. No new figure: the two it is made of are Piotr's own
  *  (CLAUDE.md T20 2.9.4). */
-export const PAST_LIFE_WEEK_HOURS = (SERVICE_INTERVAL_HOURS * DAYS_PER_WEEK) / DAYS_PER_MONTH;
+export const PAST_LIFE_WEEK_HOURS = (MACHINE_HOURS_PER_MONTH * DAYS_PER_WEEK) / DAYS_PER_MONTH;
 /** [PIOTR, 18.09: "red when under a tenth is left"] The share of a machine's life left at which
  *  the bar on the Machines page turns from good to bad (CLAUDE.md T20 2.9). */
 export const LIFE_LOW_FRACTION = 0.1;
@@ -3262,28 +3268,17 @@ export const CANTEEN_REGIONS: Record<'door' | 'lockers' | 'kitchen' | 'table', R
   table: { x: 12, y: 690, w: 310, h: 242 },
 };
 
-/** The eight door plates of the two locker banks, lettered across both banks the way the room is
- *  read: the top row of the near bank, then the top row of the far one, then the two bottom rows.
- *  The game writes the name of whoever's locker it is on each. Turn 23 lettered them bank by bank,
- *  so the fifth name landed on the top row of the far bank rather than carrying on along the
- *  bottom of the near one, which is not how anybody reads a wall [REPORT-T23 0.13]
- *  (CLAUDE.md T23 2.9, 2.10, T24 2.6).
- *
- *  Every figure is measured off `public/sprites/canteenLockers.png`, the painted label strip under
- *  each plate: the far bank's four were re-measured tonight and sit on their strips' own centres
- *  to a pixel, the first of them moved by that one pixel and the other three left as the art side
- *  wrote them (REPORT-T24 T24-B6 has the pixels). */
+/** The eight door plates of the two locker banks, in reading order: the first four are the near
+ *  bank, the last four the far one, and the game writes the name of whoever's locker it is on each
+ *  [PIOTR: measured off canteenLockers.png]. Eight plates, eight lockers, eight men
+ *  (CLAUDE.md T23 2.9, 2.10). */
 export const CANTEEN_PLATES: readonly RoomRect[] = [
-  // The near bank, top row.
   { x: 97, y: 250, w: 147, h: 33 },
   { x: 296, y: 255, w: 125, h: 30 },
-  // The far bank, top row.
-  { x: 476, y: 259, w: 106, h: 27 },
-  { x: 618, y: 263, w: 95, h: 24 },
-  // The near bank, bottom row.
   { x: 117, y: 466, w: 95, h: 24 },
   { x: 311, y: 450, w: 95, h: 24 },
-  // The far bank, bottom row.
+  { x: 476, y: 260, w: 106, h: 27 },
+  { x: 618, y: 263, w: 95, h: 24 },
   { x: 482, y: 437, w: 95, h: 24 },
   { x: 618, y: 432, w: 95, h: 24 },
 ];
@@ -3973,6 +3968,10 @@ export const CONTRACT_FREE_END_DAYS = DAYS_PER_MONTH;
  *  the board at a time, and an offer stands for this many days [TUNE]. */
 export const CONTRACT_MIN_TIER = 1;
 export const CONTRACT_OFFER_DAYS = 5;
+/** [PIOTR, 22.09] From this reputation up a shop rings at least once a week: a week with no
+ *  offer on the board and none made in it ends with one, whatever the dice said. Under it the
+ *  chance of the day is all there is. */
+export const CONTRACT_WEEKLY_OFFER_REPUTATION = 20;
 /** A term of three to six months (PIOTR). The quantity a week is `CONTRACT_QUANTITY_BANDS`. */
 export const CONTRACT_TERM_MONTHS_MIN = 3;
 export const CONTRACT_TERM_MONTHS_MAX = 6;
