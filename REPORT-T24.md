@@ -49,3 +49,41 @@ both multiply by it, so the card and the term's report cannot disagree.
 A cut sheet pack is all saw and reads 1, so its figures do not move to the pence, asserted; a
 wardrobe front is cut and then finished and reads 0.625, so its wear falls to its cutting minutes;
 a piece made by hand still shows `Machine wear a piece, by hand` at nought.
+
+**T24-B5 2.5 The men at a bench stand on its front row.** `benchCellsAt` is one `fillAlong` of the
+bench's front, so the operator, the second man and the third take the front cells of the first,
+second and third columns of the bench's own footprint; the table's `second` offset moved from the
+back right cell to the second front one and `stationCell` reads a bench's second place off the same
+list as its third. Four render tests: a standard bench at 8,6 puts its two men on 8,7 and 9,7, an
+industrial one puts three on 8,7, 9,7 and 10,7, and no class of bench ever puts a man behind it.
+
+**T24-B6 2.6 The canteen's plates read across.** `CANTEEN_PLATES` and
+docs/mockups/t23/canteen-regions.json are lettered across both banks: the near bank's top row, the
+far bank's top row, then the two bottom rows.
+The far bank's four were re-measured off `public/sprites/canteenLockers.png` by decoding the PNG and
+reading the painted label strips. Strip centres and plate centres, in pixels: 272.4 against 273.5,
+275.0 against 275.0, 449.0 against 449.0, 443.6 against 444.0. So REPORT-T23 0.13's "a few pixels
+high" does not reproduce: the far bank's plates sit on their strips to about a pixel, and only the
+first of them moves, from y 260 to 259. The near bank's four measure 265.1 against 266.5, 269.1
+against 270.0, 477.7 against 478.0 and 461.9 against 462.0, and are left as the art side wrote
+them.
+
+**T24-B7 2.7 Central systems serviced like extractors.** `isServiced` takes
+`CENTRAL_EXTRACTION_SPECS` in, so `dustSystem` and `flexiSystem` book their hours from the duct run
+the day loop already reads, come due on the same 80 hours, carry the same `Service · £X` button on
+the Machines page and go out for the same working day. `overdueBreakdownChance` returns nought for
+them, which keeps the half of their own catalogue line that says "no breakdown"; eleven tests,
+including the extractor left exactly where Turn 23 left it.
+
+**T24-B8 2.8 A restock is never trimmed to the rack.** `restockSheets` hands back the number the
+player typed, whole; `restockSplit` says what lands on the rack, what goes to the store and what
+the store charges, and the Materials tab prints it before the click
+(`60 sheets: 40 on the rack, 20 to storage at £150`). `unloadIntoStock` sends a stock lorry's
+overflow into the store exactly as it has sent a job's since Turn 20, so nothing is left in the
+yard and nothing is asked twice. Six tab and engine tests; the dead yard track is section 0 item 5.
+
+**T24-B9 2.9 Two deletions and one sentence.** `oldestOpenJob` and `weekEfficiency` are gone with
+their exports and the two assertions that were their only readers;
+`grep -rn "oldestOpenJob\|weekEfficiency" src tests` is silent. docs/art/SPRITES.md 10.4 no longer
+says a man does not walk faster at x10: it names `WALK_CELLS_PER_SECOND` and
+`WALK_CELLS_PER_SECOND_FAST` and says which applies when.

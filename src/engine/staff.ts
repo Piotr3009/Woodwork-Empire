@@ -930,15 +930,6 @@ export function weekWorkedMinutes(meters: WeekMeters): number {
   return WEEK_CATEGORIES.reduce((total, band) => total + meters.minutes[band], 0);
 }
 
-/** What he earned the company for the minutes it paid for: his rate times the minutes he spent
- *  making something, over the minutes on the clock while he was on the books. One figure a week
- *  (CLAUDE.md T20 2.7). Nought while nothing has been paid for yet. */
-export function weekEfficiency(rate: number, meters: WeekMeters): number {
-  if (meters.paidMinutes <= 0) return 0;
-  const making = meters.minutes.jobs + meters.minutes.contracts;
-  return (rate * making) / meters.paidMinutes;
-}
-
 // ---------------------------------------------------------------------------
 // Letting a man go (PIOTR, 18.09: "how do I fire people?"; CLAUDE.md T20 2.4). He works a week's
 // notice out, he is paid for it, and the morning after his last day his jobs and his contracts

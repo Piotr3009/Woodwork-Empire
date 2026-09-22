@@ -8,7 +8,6 @@ import { describe, expect, it } from 'vitest';
 import { weekOfDay } from '../../src/engine/clock';
 import {
   WEEK_CATEGORIES,
-  weekEfficiency,
   weekMetersOf,
   weekNowOf,
   weekWorkedMinutes,
@@ -100,11 +99,6 @@ describe('a man s week', () => {
     // The hours are the bands, and the company paid for at least them.
     expect(weekWorkedMinutes(meters)).toBe(meters.minutes.jobs);
     expect(meters.paidMinutes).toBeGreaterThanOrEqual(weekWorkedMinutes(meters));
-    // The figure is the minutes he made something in against the minutes he was paid for.
-    expect(weekEfficiency(after.rate, meters)).toBeCloseTo(
-      (after.rate * meters.minutes.jobs) / meters.paidMinutes,
-      6,
-    );
   });
 
   it('pays him for the hour he spends at an empty rack and counts none of it as worked', () => {
@@ -121,7 +115,6 @@ describe('a man s week', () => {
     expect(after.productionMinutes).toBe(0);
     expect(weekWorkedMinutes(meters)).toBe(0);
     expect(meters.paidMinutes).toBeGreaterThan(0);
-    expect(weekEfficiency(after.rate, meters)).toBe(0);
   });
 
   it('leaves the dinner hour out of his week: the canteen is neither worked nor paid for', () => {

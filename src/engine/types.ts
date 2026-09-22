@@ -735,7 +735,6 @@ export type GameEventKind =
   /** 17:00: home, or two more hours. */
   | 'goingHome'
   | 'deliveryArrived'
-  | 'stockOverflow'
   /** The hall's bags are full: nothing that makes dust runs until they are emptied (T12 2.3). */
   | 'bagsFull'
   | 'machineBroken'

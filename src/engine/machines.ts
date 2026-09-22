@@ -1105,13 +1105,14 @@ export function ductingDue(state: GameState): { machines: number } {
  *  point, with the same call in, the same working day out and the same extension of life
  *  [PIOTR, 20.09] (CLAUDE.md T20 2.9, T23 2.8).
  *
- *  The central and the flexi systems are not on it. 2.8 says "serviceableMachines takes the
- *  extraction in", but their own catalogue line promises the player "no more bags and no
- *  breakdown", and everything on this list is rolled for a breakdown every morning it is past
- *  its service. Section 6 leaves the dust rules alone, so the narrower reading is the one that
- *  keeps a promise the player has already read. The note is in docs/notes-t23-b2.md. */
+ *  The central and the flexi systems are on it from tonight: they book their hours while the
+ *  extraction runs and come due, are called in on the same card button and go out for the same
+ *  working day [PIOTR, 22.09; REPORT-T23 0.8] (CLAUDE.md T24 2.7). What they do not do is give
+ *  up: their own catalogue line promises the player "no more bags and no breakdown", and
+ *  `overdueBreakdownChance` keeps that promise. A plant that is serviced and never breaks down is
+ *  what the two lines say together. */
 export function isServiced(specId: string): boolean {
-  if (specId === 'extractor') return true;
+  if (specId === 'extractor' || CENTRAL_EXTRACTION_SPECS.includes(specId)) return true;
   return findSpec(specId)?.category === 'machine';
 }
 
@@ -1248,6 +1249,10 @@ export function repairCostFor(item: Equipment): number {
  *  always been, so nothing about a machine that has just worn out has changed. */
 export function overdueBreakdownChance(item: Equipment): number {
   if (item.broken) return 0;
+  // The central and the flexi systems are serviced from v50 and still never break down: their own
+  // catalogue line is "no more bags and no breakdown", and a line the player has already read is
+  // not taken off him by a rule about servicing (CLAUDE.md T10 3.4, T24 2.7).
+  if (CENTRAL_EXTRACTION_SPECS.includes(item.specId)) return 0;
   let chance = 0;
   if (serviceIsDue(item)) chance += OVERDUE_BREAKDOWN_CHANCE;
   if (pastEndurance(item)) {

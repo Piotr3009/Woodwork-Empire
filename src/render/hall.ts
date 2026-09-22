@@ -836,12 +836,17 @@ export function stationCell(
     }
   }
   // The second man of a job stands at the first man's own bench, in its second place: two men on
-  // one bench, one in front of it and one behind it (CLAUDE.md T17 2.10).
+  // one bench, side by side along its front (CLAUDE.md T17 2.10, T24 2.5). A bench reads its
+  // places through `benchCellsAt`, the same list the third man and beyond come off, so the second
+  // place and the third cannot be worked out two different ways.
   const secondAt = stationSecondAt(station);
   if (secondAt !== null) {
     const item = state.equipment.find((entry) => entry.id === secondAt && !isSold(entry));
     if (item) {
-      const cell = standingCell(state, item, 'second');
+      const cell =
+        item.specId === BENCH
+          ? (benchCellsAt(state, item, 2)[1] ?? standingCell(state, item, 'second'))
+          : standingCell(state, item, 'second');
       return { ...cell, facing: facingAt(cell, item) };
     }
   }

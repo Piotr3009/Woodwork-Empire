@@ -36,7 +36,6 @@ import {
   SOFTWARE_ONE_OFF_PRICE,
   SOFTWARE_TURN1_TIER,
   STARTING_LAYOUT,
-  TEMP_STORAGE_COST,
   TOOL_CABINET,
   HAND_TOOL_SET,
   STATE_VERSION,
@@ -192,12 +191,10 @@ import {
   deliveriesArrivingOn,
   fetchFromStorage,
   findDelivery,
-  moveOverflowToStorage,
   rackCapacity,
   restockSheets,
   stockIsLow,
   unloadIntoStock,
-  writeOffSheetsLeftOutside,
 } from './materials';
 import {
   chargeOvertimeDebt,
@@ -566,15 +563,6 @@ function startDay(state: GameState): void {
   runContractDay(state);
   runInsuranceDay(state);
   runBurglary(state);
-  const lost = writeOffSheetsLeftOutside(state);
-  if (lost > 0) {
-    queueEvent(state, {
-      kind: 'stockOverflow',
-      title: 'The yard is empty',
-      body: `${lost} sheets left outside overnight have gone. Written off.`,
-      data: { sheets: lost },
-    });
-  }
   if (state.stock.tempStorageSheets > 0) {
     createTask(state, {
       kind: 'fetchStorage',
@@ -1163,9 +1151,10 @@ function applyTaskCompletion(state: GameState, task: TaskInstance): void {
       const delivery = task.deliveryId ? findDelivery(state, task.deliveryId) : null;
       if (delivery) {
         delivery.unloaded = true;
-        // Every delivery lands on the rack, per job orders included (CLAUDE.md T2 3.6).
-        const overflow = unloadIntoStock(state, delivery);
-        if (overflow > 0) raiseStockOverflow(state, delivery, overflow);
+        // Every delivery lands on the rack, per job orders included, and whatever will not go on
+        // it goes into the temporary store with its fee and its fetch chore
+        // (CLAUDE.md T2 3.6, T20 2.16, T24 2.8).
+        unloadIntoStock(state, delivery);
         onDeliveryUnloaded(state, delivery.jobId);
       }
       break;
@@ -1823,24 +1812,6 @@ function raiseJobAtGate(state: GameState, job: Job): void {
   });
 }
 
-/** Sheets that do not fit on the rack: leave them out and lose them, or pay to store them
- *  (CLAUDE.md 8.9). */
-function raiseStockOverflow(state: GameState, delivery: Delivery, overflow: number): void {
-  queueEvent(state, {
-    kind: 'stockOverflow',
-    title: 'The rack is full',
-    body:
-      `${overflow} sheets do not fit. Left in the yard they will be gone by morning. ` +
-      `Temporary storage is ${formatMoney(TEMP_STORAGE_COST)} now and ` +
-      `${AD_HOC_TASK_MINUTES.fetchStorage} min to fetch them back.`,
-    choices: [
-      { id: 'storage', label: `Pay ${formatMoney(TEMP_STORAGE_COST)} for storage` },
-      { id: 'outside', label: 'Leave them in the yard' },
-    ],
-    data: { deliveryId: delivery.id, sheets: overflow },
-  });
-}
-
 /** The one open chore for the hall's bags, or a fresh one sized to the store: fifteen minutes a
  *  bag, ten bags ten times as long (CLAUDE.md T12 2.3). It carries no machine of its own, because
  *  the store is the hall's and not one extractor's. */
@@ -2091,12 +2062,6 @@ function resolveEvent(state: GameState, choiceId: string): void {
         if (typeof taskId === 'string') startTask(state, taskId, true);
       }
       break;
-    case 'stockOverflow': {
-      const deliveryId = event.data.deliveryId;
-      const delivery = typeof deliveryId === 'string' ? findDelivery(state, deliveryId) : null;
-      if (delivery && choiceId === 'storage') moveOverflowToStorage(state, delivery);
-      break;
-    }
     case 'jobAtGate': {
       const jobId = event.data.jobId;
       if (choiceId === 'later' || typeof jobId !== 'string') break;

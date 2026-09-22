@@ -3262,17 +3262,28 @@ export const CANTEEN_REGIONS: Record<'door' | 'lockers' | 'kitchen' | 'table', R
   table: { x: 12, y: 690, w: 310, h: 242 },
 };
 
-/** The eight door plates of the two locker banks, in reading order: the first four are the near
- *  bank, the last four the far one, and the game writes the name of whoever's locker it is on each
- *  [PIOTR: measured off canteenLockers.png]. Eight plates, eight lockers, eight men
- *  (CLAUDE.md T23 2.9, 2.10). */
+/** The eight door plates of the two locker banks, lettered across both banks the way the room is
+ *  read: the top row of the near bank, then the top row of the far one, then the two bottom rows.
+ *  The game writes the name of whoever's locker it is on each. Turn 23 lettered them bank by bank,
+ *  so the fifth name landed on the top row of the far bank rather than carrying on along the
+ *  bottom of the near one, which is not how anybody reads a wall [REPORT-T23 0.13]
+ *  (CLAUDE.md T23 2.9, 2.10, T24 2.6).
+ *
+ *  Every figure is measured off `public/sprites/canteenLockers.png`, the painted label strip under
+ *  each plate: the far bank's four were re-measured tonight and sit on their strips' own centres
+ *  to a pixel, the first of them moved by that one pixel and the other three left as the art side
+ *  wrote them (REPORT-T24 T24-B6 has the pixels). */
 export const CANTEEN_PLATES: readonly RoomRect[] = [
+  // The near bank, top row.
   { x: 97, y: 250, w: 147, h: 33 },
   { x: 296, y: 255, w: 125, h: 30 },
+  // The far bank, top row.
+  { x: 476, y: 259, w: 106, h: 27 },
+  { x: 618, y: 263, w: 95, h: 24 },
+  // The near bank, bottom row.
   { x: 117, y: 466, w: 95, h: 24 },
   { x: 311, y: 450, w: 95, h: 24 },
-  { x: 476, y: 260, w: 106, h: 27 },
-  { x: 618, y: 263, w: 95, h: 24 },
+  // The far bank, bottom row.
   { x: 482, y: 437, w: 95, h: 24 },
   { x: 618, y: 432, w: 95, h: 24 },
 ];

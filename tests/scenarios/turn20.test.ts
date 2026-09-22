@@ -563,8 +563,9 @@ describe('(ee) a fifty thousand pound bespoke job and a fifty place rack', () =>
     expect(shortfallOf(EE.job)).toBe(0);
     expect(EE.job.sheetsReserved + EE.job.sheetsUsed).toBe(EE.job.sheets);
     expect(orderForJobCheck(EE.state, EE.job)).toEqual({ ok: false, reason: 'Nothing short' });
-    // None of it was ever left standing in the yard to be lost by morning.
-    expect(EE.seen.filter((event) => event.kind === 'stockOverflow')).toEqual([]);
+    // None of it was ever left standing in the yard to be lost by morning: from Turn 24 nothing
+    // is, on a job's lorry or a stock one (CLAUDE.md T20 2.16, T24 2.8).
+    expect(EE.state.deliveries.every((entry) => entry.overflowSheets === 0)).toBe(true);
     console.log(
       '(ee) THE FIFTY THOUSAND POUND BESPOKE JOB\n' +
         `sheets the job wants ${EE.job.sheets}, places on the rack ${places}\n` +
