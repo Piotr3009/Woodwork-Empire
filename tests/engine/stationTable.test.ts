@@ -50,7 +50,10 @@ describe('the station table', () => {
     expect(STATION_TABLE.tableSaw?.operator).toEqual({ side: 'front', along: 'right', out: 1 });
     expect(STATION_TABLE.thicknesser?.waiting).toEqual({ side: 'left', along: 0, out: 1 });
     expect(STATION_TABLE.cnc?.second).toEqual({ side: 'back', along: 'middle' });
-    expect(STATION_TABLE.workbench?.second).toEqual({ side: 'back', along: 'right' });
+    // The bench's places are a row along its front, one to a column of its own footprint, from
+    // Turn 24: the second was the back right cell, which on a two wide bench is a cell off its
+    // top corner [REPORT-T23 0.12] (CLAUDE.md T24 2.5).
+    expect(STATION_TABLE.workbench?.second).toEqual({ side: 'front', along: 1 });
   });
 
   it('keeps the man a cell out of the cells his own body would be painted over', () => {
@@ -63,7 +66,7 @@ describe('the station table', () => {
     expect(STATION_TABLE.sprayBooth?.operator).toEqual({ side: 'front', along: 'middle', out: 1 });
     expect(STATION_TABLE.workbench?.waiting).toEqual({ side: 'front', along: 'right', out: 1 });
     expect(STATION_TABLE.workbench?.operator).toEqual({ side: 'front', along: 0 });
-    expect(STATION_TABLE.workbench?.second).toEqual({ side: 'back', along: 'right' });
+    expect(STATION_TABLE.workbench?.second).toEqual({ side: 'front', along: 1 });
     expect(STATION_TABLE.spindleMoulder?.operator).toEqual({ side: 'front', along: 0 });
   });
 
@@ -117,10 +120,15 @@ describe('the station table', () => {
     expect(men[0]).toEqual(standingCell(floor, bench, 'operator'));
     expect(men[1]).toEqual(standingCell(floor, bench, 'second'));
     const wb = box(bench);
-    // The second place is the one behind it; the rest are along the front where the player sees
-    // them.
-    expect(men[1]?.y).toBe(wb.y - 1);
-    for (const cell of men.slice(2)) expect(cell.y).toBeGreaterThanOrEqual(wb.y + wb.depth);
+    // Every place is on the front, where the player sees them, and the first of them are the
+    // bench's own columns: nobody is drawn behind it or off the end of it (CLAUDE.md T24 2.5).
+    expect(men[1]?.y).toBe(wb.y + wb.depth);
+    expect(men[1]?.x).toBe(wb.x + 1);
+    for (const cell of men) expect(cell.y).toBeGreaterThanOrEqual(wb.y + wb.depth);
+    for (const cell of men.slice(0, wb.width)) {
+      expect(cell.x).toBeGreaterThanOrEqual(wb.x);
+      expect(cell.x).toBeLessThan(wb.x + wb.width);
+    }
     expect(new Set(men.map((cell) => `${cell.x},${cell.y}`)).size).toBe(4);
   });
 
@@ -163,8 +171,8 @@ describe('the station table', () => {
     const bench = placeEquipment(state, 'workbench', { variantId: 'standard', x: 15, y: 8 });
     const wb = box(bench);
     expect(standingCell(state, bench, 'operator')).toEqual({ x: wb.x, y: wb.y + wb.depth });
-    expect(standingCell(state, bench, 'second')).toEqual({ x: wb.x + wb.width - 1, y: wb.y - 1 });
-    expect(['sw', 'se']).toContain(facingAt(standingCell(state, bench, 'second'), bench));
+    expect(standingCell(state, bench, 'second')).toEqual({ x: wb.x + 1, y: wb.y + wb.depth });
+    expect(['nw', 'ne']).toContain(facingAt(standingCell(state, bench, 'second'), bench));
   });
 
   it('turns to the first free side at the same position when the table cell is taken', () => {

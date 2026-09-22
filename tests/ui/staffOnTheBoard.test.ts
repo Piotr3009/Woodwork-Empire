@@ -8,7 +8,13 @@ import { PRODUCING_ROLES } from '../../src/engine/constants';
 import { produces } from '../../src/engine/staff';
 import { renderCompany } from '../../src/ui/company';
 import type { GameState } from '../../src/engine/index';
-import { buyStartingKit, hireNow, newGame, placeEquipment } from '../helpers';
+import {
+  benchPlacesFor,
+  buyStartingKit,
+  hireNow,
+  newGame,
+  placeEquipment,
+} from '../helpers';
 
 function parse(html: string): HTMLElement {
   const holder = document.createElement('div');
@@ -30,6 +36,9 @@ function known(): GameState {
   placeEquipment(state, 'locker', { x: 6, y: 9 });
   placeEquipment(state, 'handToolSet', { x: 12, y: 9 });
   placeEquipment(state, 'toolCabinet', { x: 10, y: 9 });
+  // The gate counts the owner's own place at a bench beside the crew's from Turn 24, so the day
+  // one hall needs a second place before it takes anybody on (CLAUDE.md T24 2.2).
+  benchPlacesFor(state);
   state.reputation = 60;
   state.cash = 200000;
   return state;

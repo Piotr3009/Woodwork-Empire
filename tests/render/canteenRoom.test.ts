@@ -55,8 +55,12 @@ function crewOf(size: number): GameState {
   state.cash = 400000;
   state = buyNow(state, 'toolCabinet', 'industrial');
   state = buyNow(state, 'handToolSet');
+  // The owner's own place at a bench, which the gate counts from Turn 24: a bench of three
+  // places, so the eight this canteen holds fit inside the unit's six bench slots
+  // (CLAUDE.md T24 2.2).
+  state = buyNow(state, 'workbench', 'industrial');
   for (let index = 0; index < size; index += 1) {
-    state = buyNow(state, 'workbench');
+    state = buyNow(state, 'workbench', 'industrial');
     state = buyNow(state, 'handToolSet');
     state = buyNow(state, 'locker');
     state = hireNow(state, 'joiner', 'novice');

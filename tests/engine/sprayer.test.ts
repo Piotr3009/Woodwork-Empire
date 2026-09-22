@@ -42,6 +42,9 @@ function boothHall(): GameState {
   for (const specId of ['locker', 'toolCabinet', 'handToolSet']) {
     kitted = buyNow(kitted, specId);
   }
+  // And a second place at a bench, because the gate counts the owner's own from Turn 24
+  // (CLAUDE.md T24 2.2).
+  kitted = buyNow(kitted, 'workbench');
   const state = kitted;
   placeEquipment(state, 'sprayBooth', { x: 7, y: 6 });
   state.enquiries = [];

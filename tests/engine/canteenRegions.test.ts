@@ -55,6 +55,23 @@ describe('the canteen room s rectangles', () => {
     expect(CANTEEN_COUNTER).toEqual(measured.counter);
   });
 
+  it('reads across both banks and not bank by bank (CLAUDE.md T24 2.6)', () => {
+    // The two banks stand side by side: the near one's plates are the left half of the wall and
+    // the far one's the right half, and a wall is read across. Turn 23 lettered the near bank's
+    // four and then the far bank's four, so the fifth name jumped the wall [REPORT-T23 0.13].
+    const near = CANTEEN_PLATES.filter((plate) => plate.x < 440);
+    const far = CANTEEN_PLATES.filter((plate) => plate.x >= 440);
+    expect(near).toHaveLength(4);
+    expect(far).toHaveLength(4);
+    // The top row of both banks first, left to right, then the bottom row of both.
+    const rows = CANTEEN_PLATES.map((plate) => (plate.y < 350 ? 'top' : 'bottom'));
+    expect(rows).toEqual(['top', 'top', 'top', 'top', 'bottom', 'bottom', 'bottom', 'bottom']);
+    for (const row of [CANTEEN_PLATES.slice(0, 4), CANTEEN_PLATES.slice(4)]) {
+      const xs = row.map((plate) => plate.x);
+      expect([...xs].sort((one, two) => one - two)).toEqual(xs);
+    }
+  });
+
   it('carry the hands the measurement gives, so no renderer types a size', () => {
     expect(CANTEEN_PLATE_TEXT.fontSize).toBe(measured.textStyle.namePlate.fontSize);
     expect(CANTEEN_PLATE_TEXT.maxCharacters).toBe(measured.textStyle.namePlate.maxCharacters);

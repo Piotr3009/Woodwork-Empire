@@ -11,7 +11,7 @@
 import { deliveriesInYard, deliveriesOnTheWay, formatCalendarDay, openJobs } from '../engine/index';
 import { restockCheck, sheetPriceFor, stockLines } from '../engine/index';
 // Straight off its own module: the public API does not carry it (REPORT-T13 10).
-import { restockSheets } from '../engine/materials';
+import { restockSheets, restockSplit } from '../engine/materials';
 import type { Delivery, GameState, Job, StockLine } from '../engine/index';
 import { placeholderSvg } from '../render/placeholder';
 import { button, emptyLine, escapeHtml, lockedButton, money, plural } from './modal';
@@ -67,23 +67,39 @@ function ladderLine(sheets: number): string {
   return `${plural(sheets, 'sheet', 'sheets')} at ${money(each)} = ${money(sheets * each)}`;
 }
 
-/** The field and the one button beside it: so many sheets, capped at the free places on the rack,
- *  or the reason it cannot be pressed (CLAUDE.md T13 3.2, T17 2.20). The field is empty until he
- *  types in it, and what it would buy then is what fills the rack, which the placeholder shows. */
+/** Where a restock of this many sheets would land: on the rack, and in the temporary store when
+ *  the player has asked for more than the rack holds, with what the store charges. Said before the
+ *  click, because the click is not trimmed any more and a man who types sixty gets sixty
+ *  [PIOTR, 22.09] (CLAUDE.md T24 2.8). Empty while the whole order fits. */
+function storageLine(split: { onRack: number; toStorage: number; storageCost: number }): string {
+  if (split.toStorage <= 0) return '';
+  return (
+    `${split.onRack + split.toStorage} sheets: ${split.onRack} on the rack, ` +
+    `${split.toStorage} to storage at ${money(split.storageCost)}`
+  );
+}
+
+/** The field and the one button beside it: so many sheets, whole, or the reason it cannot be
+ *  pressed (CLAUDE.md T13 3.2, T17 2.20, T24 2.8). The field is empty until he types in it, and
+ *  what it would buy then is what fills the rack, which the placeholder shows. */
 function restockControl(state: GameState, typed: string): string {
   const check = restockCheck(state, askedSheets(typed));
   const fills = restockSheets(state);
+  const split = restockSplit(state, askedSheets(typed));
   const field =
     '<input type="text" inputmode="numeric" pattern="[0-9]*" class="num" ' +
     `data-field="stockSheets" value="${escapeHtml(typed)}" placeholder="${fills}" ` +
     'aria-label="Sheets to order" /> sheets';
-  // The number the button would really buy, which is the typed one capped at the free places on
-  // the rack: the price the player is shown is the price he would pay.
+  // The number the button would really buy, which is the number he typed: the price the player is
+  // shown is the price he would pay.
   const line = ladderLine(check.sheets);
   // The game's own figure span, with a hook on it for the test: no new class and no new token
   // (docs/ui-style.md 11).
   const price =
     line === '' ? '' : `<span class="row-figure" data-ladder="1">${escapeHtml(line)}</span>`;
+  const where = storageLine(split);
+  const landing =
+    where === '' ? '' : `<span class="row-figure" data-storage="1">${escapeHtml(where)}</span>`;
   const action = check.ok
     ? button(
         'restock',
@@ -91,7 +107,7 @@ function restockControl(state: GameState, typed: string): string {
         `data-sheets="${check.sheets}"`,
       )
     : lockedButton('Restock', check.reason);
-  return `${field}${price}<span class="row-action">${action}</span>`;
+  return `${field}${price}${landing}<span class="row-action">${action}</span>`;
 }
 
 /** A project and its material line: green with the sheets in hand, red with the shortfall and

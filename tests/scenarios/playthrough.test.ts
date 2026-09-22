@@ -286,9 +286,14 @@ describe('the three month playthrough of 10.4, on Easy as the brief scripts it',
     // Re-measured for v43: 9,120, -2,166 and -11,048. Assembly no longer waits for the cutting,
     // so a second man on a job assembles while the saw is taken; month 1 is a thousand better,
     // month 3 seven hundred worse, and the shape of the run is unchanged.
+    // Re-measured for v50 (CLAUDE.md T24 2.8): a restock is not trimmed to the rack any more, so
+    // the script's twenty sheets are twenty sheets and what will not fit goes into the store at
+    // 150 a load. Month 1 does not move, month 2 is 381 worse for the storage, and the hall stops
+    // running dry: month 3 is 7,297 better and the run ends 3,391 better off (the contract test
+    // below). Measured on the finished tree, not tuned.
     expect(Math.round(months[0]?.cashClose ?? 0)).toBe(9120);
-    expect(Math.round(months[1]?.cashClose ?? 0)).toBe(-2166);
-    expect(Math.round(months[2]?.cashClose ?? 0)).toBe(-11048);
+    expect(Math.round(months[1]?.cashClose ?? 0)).toBe(-2547);
+    expect(Math.round(months[2]?.cashClose ?? 0)).toBe(-3751);
     // Three charges in three months: 7 on day 31 and 1 on day 61 for the few days each month
     // that ran under, and 109 on day 91, which is most of month 3 spent in the overdraft. The
     // first two are small change beside the 25% a year the overdraft charged all three months
@@ -320,8 +325,10 @@ describe('the three month playthrough of 10.4, on Easy as the brief scripts it',
     // 73 a piece and the company is six thousand better off in month 3, so it buys its sheets
     // and month 3 reads 73. The ten thousand loan floor of Turn 23's 2.12 stays as Piotr ruled on
     // 20.09; what changed is the money the contract brings in against it.
+    // Seventy seven from v50: the rack runs dry less often, because a restock is bought whole
+    // (CLAUDE.md T24 2.8).
     expect(months[1]?.efficiencyMean ?? 0).toBeGreaterThan(55);
-    expect(Math.round(months[2]?.efficiencyMean ?? 0)).toBe(75);
+    expect(Math.round(months[2]?.efficiencyMean ?? 0)).toBe(77);
   });
 
   it('took the first contract its crew could keep up with and made every week of it in full', () => {
@@ -378,7 +385,9 @@ describe('the three month playthrough of 10.4, on Easy as the brief scripts it',
     // Still in the overdraft on the day the term ends, and one day under the limit: the bank has
     // not looked twice at it (CLAUDE.md T22 2.2).
     // -14,893 on day 122 (v43): nine more days of the overdraft than the v40 run's day 113.
-    expect(Math.round(later.cash)).toBe(-14893);
+    // -11,502 from v50: the same day, 3,391 less of the overdraft, because the hall is not
+    // standing about waiting for sheets that were trimmed off its own order (CLAUDE.md T24 2.8).
+    expect(Math.round(later.cash)).toBe(-11502);
     expect(later.eventQueue.find((entry) => entry.kind === 'bankruptcy')).toBeUndefined();
     // Three months of one money track: nothing waited anywhere but the account (CLAUDE.md T22 2.1).
     expect(later.ledger.some((entry) => entry.unpaid)).toBe(false);

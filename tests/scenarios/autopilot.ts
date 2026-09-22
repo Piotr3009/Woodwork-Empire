@@ -18,7 +18,7 @@ import {
   tick,
   unconnectedMachines,
 } from '../../src/engine/index';
-import { waitsForTheBoss } from '../../src/engine/staff';
+import { missingForHire, waitsForTheBoss } from '../../src/engine/staff';
 import type { Contract, GameEvent, GameState, TaskInstance, WorkerTier } from '../../src/engine/index';
 
 /** What the script answers when the clock stops for a decision. */
@@ -350,6 +350,17 @@ function buyLicence(state: GameState, policy: Policy): GameState {
 /** What a joiner has to have before he can start (CLAUDE.md 9.3). */
 export const JOINER_KIT = ['workbench', 'locker', 'toolCabinet', 'handToolSet'];
 
+/** The class of bench the scripted player buys for his men: the day one one, which holds one, when
+ *  the crew he means to take on will fit on those, and the two place class when it will not. From
+ *  Turn 24 the gate counts the owner's own place at a bench as well as the crew's, so a hall wants
+ *  one more place than it has men; a unit holds no more benches than its bench slots, and a bench
+ *  already standing cannot be swapped for a better one, so the class has to be right from the
+ *  first man [PIOTR, 22.09] (CLAUDE.md T23 2.17, T24 2.2). */
+function benchClassFor(state: GameState, policy: Policy): string | undefined {
+  const places = (policy.joiners ?? 1) + 1;
+  return places > state.unit.benchSlots ? 'standard' : DAY_ONE_CLASS.workbench;
+}
+
 function takeOnJoiner(state: GameState, policy: Policy): GameState {
   const wanted = policy.joiners ?? 1;
   if (state.workers.filter((worker) => worker.role === 'joiner').length >= wanted) return state;
@@ -365,7 +376,20 @@ function takeOnJoiner(state: GameState, policy: Policy): GameState {
   }
   for (let man = 0; man < wanted; man += 1) {
     for (const specId of JOINER_KIT) {
-      next = applyAction(next, { type: 'BUY_EQUIPMENT', specId, variantId: DAY_ONE_CLASS[specId] });
+      const variantId =
+        specId === 'workbench' ? benchClassFor(next, policy) : DAY_ONE_CLASS[specId];
+      next = applyAction(next, { type: 'BUY_EQUIPMENT', specId, variantId });
+    }
+    // And whatever the card still says is short, which from Turn 24 is the owner's own place at a
+    // bench: a real player buys what the refusal names him (CLAUDE.md T24 2.2).
+    let guard = 0;
+    while (missingForHire(next, 'joiner').length > 0 && guard < 12) {
+      for (const specId of missingForHire(next, 'joiner')) {
+        const variantId =
+          specId === 'workbench' ? benchClassFor(next, policy) : DAY_ONE_CLASS[specId];
+        next = applyAction(next, { type: 'BUY_EQUIPMENT', specId, variantId });
+      }
+      guard += 1;
     }
     next = applyAction(next, { type: 'HIRE', role: 'joiner', tier: policy.joinerTier ?? 'novice' });
   }

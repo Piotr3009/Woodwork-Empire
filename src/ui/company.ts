@@ -22,6 +22,7 @@ import {
   formatReputation,
   outputBreakdown,
   weekOfDay,
+  workshopBreakdownToday,
   workshopOutputToday,
 } from '../engine/index';
 import { machineSavings } from '../engine/machines';
@@ -36,6 +37,8 @@ import type {
   OutputBreakdown,
   OutputLine,
   ReputationEntry,
+  WorkshopBreakdown,
+  WorkshopBreakdownRow,
 } from '../engine/index';
 import { emptyLine, escapeHtml, money, signClass } from './modal';
 
@@ -252,7 +255,35 @@ function outputRow(line: OutputLine, index: number): string {
  *  make it with their balance, and under a second rule the men and the machines, which act where
  *  they are and are not in the number above. The engine's breakdown is printed and nothing is
  *  computed from it (CLAUDE.md T15 0, 2.1). */
-function outputSheet(breakdown: OutputBreakdown, workshopToday: number): string {
+/** One row of "Who made it today": the engine's own words, and the figure on the right red under
+ *  1.00 and green over it, through the same `tone` every other row of the sheet uses. */
+function madeRow(row: WorkshopBreakdownRow): string {
+  return ledgerRow(row.main, row.words, row.figure.toFixed(2), row.figure - 1);
+}
+
+/** Who made today's number and why, under the line that carries it: one row a man who has put a
+ *  production minute in since this morning, the hall's own row under them, the total again, and
+ *  at most one sentence saying the one thing the rows cannot. Nothing here is worked out: every
+ *  word and every figure is a field of `workshopBreakdownToday`
+ *  (PIOTR, 22.09; CLAUDE.md T15 0, T24 2.1; docs/mockups/v47/output-who-made-it.png). */
+function madeTodayBlock(made: WorkshopBreakdown): string {
+  if (made.men.length === 0 || made.hall === null) return '';
+  return (
+    `<div class="ledger-head"><span>${escapeHtml(`Who made it today, ${made.minutes} min worked`)}` +
+    '</span><span>a minute</span></div>' +
+    '<div class="ledger-list" data-figure="workshopBreakdown">' +
+    made.men.map(madeRow).join('') +
+    madeRow(made.hall) +
+    `<div class="ledger-sum"><span data-sum="total">= ${escapeHtml(made.total.toFixed(2))}</span></div>` +
+    (made.note === ''
+      ? ''
+      : `<div class="ledger-note"><span>${escapeHtml(made.note)}</span></div>`) +
+    '</div>' +
+    '<hr class="ledger-rule" />'
+  );
+}
+
+function outputSheet(breakdown: OutputBreakdown, workshopToday: number, made: WorkshopBreakdown): string {
   const hall = breakdown.lines.filter((line) => line.hall);
   // The men who do not produce are off this sheet at the source, in `outputBreakdown`, where the
   // rule reads the role and never the name (CLAUDE.md T20 2.3.3).
@@ -267,6 +298,9 @@ function outputSheet(breakdown: OutputBreakdown, workshopToday: number): string 
     // minutes worked today, everybody and every machine in it (PIOTR, 21.09; v40).
     `<div class="ledger-note" data-figure="workshopToday"><span>Workshop today, everybody and every machine, ` +
     `over the minutes worked</span><strong class="${signClass(workshopToday - 1)}">${workshopToday.toFixed(2)}</strong></div>` +
+    // Who made that number, before the lines that say what the hall does to every minute of it
+    // (PIOTR, 22.09: "the player has no way of knowing what to fix"; CLAUDE.md T24 2.1).
+    madeTodayBlock(made) +
     '<div class="ledger-head"><span>What moves it</span><span>points</span></div>' +
     '<div class="ledger-list">' +
     base +
@@ -374,7 +408,7 @@ export function renderCompany(state: GameState): string {
     '</div>' +
     '<div class="sheets">' +
     reputationSheet(state, weeks) +
-    outputSheet(outputBreakdown(state), workshopOutputToday(state)) +
+    outputSheet(outputBreakdown(state), workshopOutputToday(state), workshopBreakdownToday(state)) +
     machinesSheet(machineSavings(state, 'week')) +
     '</div>' +
     '</div>'

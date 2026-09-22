@@ -17,7 +17,7 @@
 // of them.
 
 import { BUBBLES } from './constants';
-import { contractOfWorker } from './contracts';
+import { contractMenAtWork, contractOfWorker } from './contracts';
 import { OWNER, machineShortWord } from './machines';
 import { ownerIsAvailable } from './owner';
 import { standsForAir } from './media';
@@ -36,7 +36,7 @@ import {
   stationWaitingFor,
 } from './stations';
 import { findTask } from './tasks';
-import type { Bubble, BubbleKey, GameState, Job } from './types';
+import type { Bubble, BubbleKey, Contract, GameState, Job } from './types';
 
 /** The words of one mark with its slots filled. A slot the state cannot answer is left as it
  *  stands, so a missing fact shows up as `{job}` in a test and never as a half sentence in the
@@ -83,11 +83,19 @@ function onAJob(state: GameState, who: string, job: Job): Bubble | null {
   return family === null ? null : bubble(who, 'waitingForMachine', { machine: machineShortWord(family) });
 }
 
-/** What is wrong with the man on a standing contract: the machine he is queueing for, and nothing
- *  else. He is at work on his week's pieces otherwise, so nothing is drawn over him at all; the
- *  count of them was the paper bubble of Turn 21 and is gone with it, and the Contracts tab is
- *  where that figure is read (CLAUDE.md T22 2.5). */
-function onAContract(who: string, station: string): Bubble | null {
+/** What is wrong with the man on a standing contract: the sheets his contract has not got, the
+ *  machine he is queueing for, and nothing else. He is at work on his week's pieces otherwise, so
+ *  nothing is drawn over him at all; the count of them was the paper bubble of Turn 21 and is gone
+ *  with it, and the Contracts tab is where that figure is read (CLAUDE.md T22 2.5).
+ *
+ *  A contract that cannot use him is a thing the player can put right with an order, so it is said
+ *  over his head in the contract's own name, and he is standing at the canteen door while it is
+ *  [PIOTR, 22.09] (CLAUDE.md T24 2.3). `contractStationFor` stands him there off the same
+ *  `contractMenAtWork`, so the mark and the cell are one answer. */
+function onAContract(state: GameState, who: string, station: string, contract: Contract): Bubble | null {
+  if (!contractMenAtWork(state).includes(who)) {
+    return bubble(who, 'noMaterial', { job: contract.name });
+  }
   const family = stationWaitingFor(station);
   return family === null ? null : bubble(who, 'waitingForMachine', { machine: machineShortWord(family) });
 }
@@ -107,8 +115,10 @@ export function bubbleFor(state: GameState, who: string): Bubble | null {
   const job = jobOf(state, who);
   if (job !== null) return onAJob(state, who, job);
   // A man the standing contract has is at work on it, whether or not the hall has a job for him:
-  // the one thing that can be wrong with him is the machine he is queueing for (CLAUDE.md T20 2.1).
-  if (who !== OWNER && contractOfWorker(state, who) !== null) return onAContract(who, station);
+  // what can be wrong with him is the sheets it has not got and the machine he is queueing for
+  // (CLAUDE.md T20 2.1, T24 2.3).
+  const contract = who === OWNER ? null : contractOfWorker(state, who);
+  if (contract !== null) return onAContract(state, who, station, contract);
   // Nobody has put him on anything and there is no manager on duty to: he is waiting for the
   // boss's word, which is a click in the Work Plan (PIOTR, 20.09; CLAUDE.md T23 2.1). The owner
   // waits for nobody, so the older words are still his.

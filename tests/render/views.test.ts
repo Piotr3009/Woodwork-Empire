@@ -556,8 +556,10 @@ describe('two men at one bench', () => {
     state.enquiries = [];
     const bench = state.equipment.find((item) => item.specId === 'workbench');
     if (bench === undefined) throw new Error('the day one kit has a bench in it');
-    // A standard bench holds two, and the rest of a joiner's kit for both of them.
-    bench.variantId = 'standard';
+    // An industrial bench holds three, and the rest of a joiner's kit for both men: the gate
+    // counts the owner's own place beside the crew's from Turn 24, so two men want three
+    // (CLAUDE.md T23 2.17, T24 2.2).
+    bench.variantId = 'industrial';
     for (let index = 0; index < 2; index += 1) {
       placeEquipment(state, 'locker', { x: 6 + index, y: 9 });
       placeEquipment(state, 'handToolSet', { x: 12 + index, y: 9 });

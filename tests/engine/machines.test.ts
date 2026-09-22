@@ -512,6 +512,11 @@ describe('no bench in the hall', () => {
     for (const specId of ['locker', 'toolCabinet', 'handToolSet']) {
       state = buyNow(state, specId);
     }
+    // A bench of two places: the gate wants one for the man and one for the owner from Turn 24,
+    // and a hall that cannot seat the boss will not take anybody on (CLAUDE.md T24 2.2).
+    const twoPlaces = state.equipment.find((item) => item.specId === 'workbench');
+    if (!twoPlaces) throw new Error('one bench wanted');
+    twoPlaces.variantId = 'standard';
     state = hireNow(state, 'joiner', 'novice');
     const joiner = state.workers[0];
     if (!joiner) throw new Error('nobody was hired');
@@ -527,19 +532,18 @@ describe('no bench in the hall', () => {
     second.stage = 'ready';
     expect(state.equipment.filter((item) => item.specId === 'workbench')).toHaveLength(1);
     // It was a claim on the bench until Turn 23 and it is a place at one now, so nobody is ever
-    // turned off one: there is nothing to turn him off. The one bench of this hall holds one man,
-    // and the man who has him is the joiner, because the crew fill the benches in the order they
-    // were hired and the owner takes what is left over. The gate bought that bench for the
-    // joiner, so the joiner is not the one standing at the canteen door (CLAUDE.md T7 3.1,
-    // T23 2.17).
+    // turned off one: there is nothing to turn him off. The one bench of this hall holds two men,
+    // and they are the joiner and the owner, because the crew fill the benches in the order they
+    // were hired and the owner takes what is left over. The gate buys a place for the man at the
+    // door and a place for the owner, so neither of them is the one standing at the canteen door
+    // (CLAUDE.md T7 3.1, T23 2.17, T24 2.2).
     const bench = state.equipment.find((item) => item.specId === 'workbench');
     if (!bench) throw new Error('one bench wanted');
-    expect(benchPlacesOf(bench)).toBe(1);
+    expect(benchPlacesOf(bench)).toBe(2);
     expect(benchOf(state, joiner.id)?.id ?? null).toBe(bench.id);
-    expect(benchOf(state, 'owner')).toBeNull();
-    // The owner is put on the second job with no place at a bench and the joiner on the first
-    // with one. The hall has a bench, so neither job is stopped by the hall; the owner's own
-    // question is asked of him at the stages done at a bench, in `placeHand` (v47).
+    expect(benchOf(state, 'owner')?.id ?? null).toBe(bench.id);
+    // The owner is put on the second job and the joiner on the first, each at his own place at
+    // the one bench. The hall has a bench, so neither job is stopped by the hall.
     state = act(state, { type: 'ASSIGN_JOB', jobId: second.id, workerId: 'owner' });
     expect(hallHasABench(state)).toBe(true);
     state = tick(state, 1);
@@ -549,15 +553,19 @@ describe('no bench in the hall', () => {
     state = act(state, { type: 'ASSIGN_JOB', jobId: first.id, workerId: joiner.id });
     expect(state.jobs[0]?.id).toBe(first.id);
     expect(benchOf(state, joiner.id)?.id ?? null).toBe(bench.id);
-    expect(benchOf(state, 'owner')).toBeNull();
+    expect(benchOf(state, 'owner')?.id ?? null).toBe(bench.id);
   });
 
   it('stands a joiner with nowhere to work at the canteen door', () => {
     let state = atTheBench();
     // He is taken on while there is a bench, with the kit a joiner has to have, and starts today.
+    // The bench holds two, because the gate wants a place for him and one for the owner (T24 2.2).
     for (const specId of ['locker', 'toolCabinet', 'handToolSet']) {
       state = buyNow(state, specId);
     }
+    const bench = state.equipment.find((item) => item.specId === 'workbench');
+    if (!bench) throw new Error('one bench wanted');
+    bench.variantId = 'standard';
     state = hireNow(state, 'joiner', 'novice');
     const joiner = state.workers[0];
     if (!joiner) throw new Error('nobody was hired');

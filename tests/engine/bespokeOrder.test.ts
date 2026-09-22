@@ -24,7 +24,6 @@ import {
   reservedSheets,
   shortfallOf,
   unloadIntoStock,
-  writeOffSheetsLeftOutside,
 } from '../../src/engine/materials';
 import { orderForJobCheck, orderShortfall } from '../../src/engine/jobs';
 import { materialLine } from '../../src/ui/jobCard';
@@ -69,7 +68,7 @@ describe('the fifty thousand pound job and the fifty place rack (CLAUDE.md T20 2
     arriveDeliveries(state);
     const delivery = deliveriesInYard(state)[0];
     if (!delivery) throw new Error('a lorry is wanted');
-    expect(unloadIntoStock(state, delivery)).toBe(0);
+    unloadIntoStock(state, delivery);
     delivery.unloaded = true;
 
     // No shortfall after: the rack holds fifty of them and storage holds the rest, and every one
@@ -106,8 +105,8 @@ describe('the fifty thousand pound job and the fifty place rack (CLAUDE.md T20 2
     const stored = state.stock.tempStorageSheets;
     expect(stored).toBe(job.sheets - rackCapacity(state));
 
-    // The night comes and nothing of the job's own load is in the yard to be written off.
-    expect(writeOffSheetsLeftOutside(state)).toBe(0);
+    // Nothing of the job's own load is left in the yard at all: the unload put it in the store.
+    expect(state.deliveries.every((entry) => entry.overflowSheets === 0)).toBe(true);
     expect(state.stock.tempStorageSheets).toBe(stored);
 
     // The morning fetch brings them in and they are still the job's: one order bought the lot.
@@ -119,7 +118,7 @@ describe('the fifty thousand pound job and the fifty place rack (CLAUDE.md T20 2
     expect(freeSheets(state)).toBe(0);
   });
 
-  it('leaves a stock lorry overflow where it was, nobody\u0027s and gone by morning', () => {
+  it('puts a stock lorry s overflow into the store too, with its fee (CLAUDE.md T24 2.8)', () => {
     const state = hall();
     placeEquipment(state, 'sheetRack', { variantId: 'budget', x: 2, y: 2, id: 'rack-2' });
     const room = rackCapacity(state);
@@ -137,9 +136,13 @@ describe('the fifty thousand pound job and the fifty place rack (CLAUDE.md T20 2
       overflowSheets: 0,
     };
     state.deliveries.push(delivery);
-    expect(unloadIntoStock(state, delivery)).toBe(15);
-    expect(delivery.overflowSheets).toBe(15);
-    expect(writeOffSheetsLeftOutside(state)).toBe(15);
+    const cashBefore = state.cash;
+    unloadIntoStock(state, delivery);
+    // Five on the rack and fifteen in the store, nothing left in the yard and nothing to answer:
+    // a stock lorry takes the path a job's own has taken since Turn 20 (CLAUDE.md T20 2.16).
+    expect(state.stock.sheets).toBe(room);
+    expect(state.stock.tempStorageSheets).toBe(15);
     expect(delivery.overflowSheets).toBe(0);
+    expect(cashBefore - state.cash).toBe(TEMP_STORAGE_COST);
   });
 });
