@@ -217,7 +217,7 @@ import {
 } from './owner';
 import { paidHoursToday } from './rate';
 import { chance, int, makeId } from './rng';
-import { type StagePlan, labourPerMinute, tradeFactor } from './stages';
+import { type StagePlan, cncOptions, labourPerMinute, stageFor, tradeFactor } from './stages';
 import {
   airFactorFor,
   benchDrawsAir,
@@ -244,6 +244,7 @@ import {
   placeHand,
   ownerTakesAJob,
   releaseIdleMachines,
+  standsForBench,
   stationForProduction,
 } from './production';
 import {
@@ -1415,13 +1416,13 @@ function updateStations(state: GameState): void {
     owner.station = task ? stationForTask(state, task) : STATION_IDLE;
   } else if (ownerJob(state) !== null) {
     const job = ownerJob(state);
-    // His own place at a bench, not the job's: a man without one stands alone (v46).
+    // His own place at a bench, not the job's, and only for a stage done at one (v46, v47).
     owner.station =
       job === null
         ? STATION_IDLE
-        : benchOf(state, OWNER) !== null
-          ? stationForProduction(state, OWNER, job)
-          : STATION_NO_BENCH;
+        : standsForBench(state, OWNER, stageFor(state, OWNER, job, cncOptions(state, OWNER, job)))
+          ? STATION_NO_BENCH
+          : stationForProduction(state, OWNER, job);
   } else {
     owner.station = STATION_IDLE;
   }
@@ -1437,10 +1438,13 @@ function updateStations(state: GameState): void {
     }
     const job = worker.jobId ? findJob(state, worker.jobId) : null;
     if (job && job.stage === 'inProduction') {
-      worker.station =
-        benchOf(state, worker.id) !== null
-          ? stationForProduction(state, worker.id, job)
-          : STATION_NO_BENCH;
+      worker.station = standsForBench(
+        state,
+        worker.id,
+        stageFor(state, worker.id, job, cncOptions(state, worker.id, job)),
+      )
+        ? STATION_NO_BENCH
+        : stationForProduction(state, worker.id, job);
       continue;
     }
     // A man on a standing contract stands where the contract put him (CLAUDE.md T13 3.16).
@@ -1454,7 +1458,7 @@ function updateStations(state: GameState): void {
     // bench holds one, two or three men by its class, so `freeBenches` counts the places nobody
     // on the books has, which is nought in any hall whose benches are all spoken for, and a man
     // with a bench of his own would have been stood at the canteen door by it. `benchOf` is the
-    // one answer to whether this man has a place, and it is what `hasBenchFor` asks a line above
+    // one answer to whether this man has a place, and it is what `standsForBench` asks above
     // (CLAUDE.md T4 3.4, T23 2.1, 2.17).
     const stuck =
       worker.role === 'joiner' && benchOf(state, worker.id) === null && oldestReadyJob(state) !== null;

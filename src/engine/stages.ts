@@ -22,6 +22,7 @@ import {
 import {
   SPRAY_BOOTH,
   bestOutputFactor,
+  benchOf,
   freeMachines,
   has,
   heldMachine,
@@ -307,13 +308,24 @@ function stageMayStart(job: Job, plan: readonly StagePlan[], stage: StagePlan): 
   );
 }
 
-/** True when this man could stand at the station this stage wants right now: the bench, a tool
- *  out of a cabinet, a family the hall does not own (done by hand), a machine he already holds, or
- *  a machine of the family nobody else holds. */
-function stationFreeFor(state: GameState, who: string, stage: StagePlan): boolean {
+/** True when a stage is done at a man's own bench and not at a floor machine: bench work, work
+ *  with nothing but hands, a tool out of a cabinet, or a family the hall does not own, done by
+ *  hand. Only these want him to have a place at a bench (PIOTR, 22.09; v47). */
+export function stageAtTheBench(state: GameState, stage: { family: string | null }): boolean {
   const family = stage.family;
   if (family === null || family === 'workbench') return true;
-  if (!has(state, family) || machineIsShared(state, family)) return true;
+  return !has(state, family) || machineIsShared(state, family);
+}
+
+/** True when this man could stand at the station this stage wants right now: his own place at a
+ *  bench for a stage done there, a machine he already holds, or a machine of the family nobody
+ *  else holds. Until v47 the bench was always free: a man with no place at one stood at the
+ *  canteen door whatever his stage, with two saws idle (PIOTR, 22.09: "I should be cutting now,
+ *  the saws are free, I can see them"). Now a man without a place is sent to a machine stage
+ *  when the job has one open, and wants a place only for the bench work. */
+function stationFreeFor(state: GameState, who: string, stage: StagePlan): boolean {
+  if (stageAtTheBench(state, stage)) return benchOf(state, who) !== null;
+  const family = stage.family as string;
   return heldMachine(state, who, family) !== null || freeMachines(state, family).length > 0;
 }
 

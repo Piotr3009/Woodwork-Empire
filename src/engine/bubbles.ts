@@ -24,6 +24,7 @@ import { standsForAir } from './media';
 import {
   WAITING_FOR_MATERIAL,
   jobOf,
+  standsForBench,
   waitingWordsFor,
 } from './production';
 import { isWorkingToday, waitsForTheBoss } from './staff';
@@ -72,6 +73,9 @@ function onAJob(state: GameState, who: string, job: Job): Bubble | null {
   const stage = stageFor(state, who, job, cncOptions(state, who, job));
   // A bench with nothing in the hose stands him still, and it is a thing the player can put
   // right with a compressor: media.ts decides it and the mark reports it (CLAUDE.md T23 2.7).
+  // No place at a bench for a stage done at one: the thing to put right is a bench, and until v47
+  // the mark said "waiting for the saw" over a man with two saws idle (PIOTR, 22.09).
+  if (standsForBench(state, who, stage)) return bubble(who, 'noBench');
   if (standsForAir(state, stage)) return bubble(who, 'noCompressor');
   const waiting = waitingWordsFor(state, who, job);
   if (waiting === null) return null;

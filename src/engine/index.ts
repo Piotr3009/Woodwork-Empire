@@ -465,7 +465,7 @@ export {
   enduranceHoursFor,
   findVariant,
   freeBenches,
-  hasBenchFor,
+  hallHasABench,
   machineOutputFactor,
   machinePowerPerDay,
   pastEndurance,

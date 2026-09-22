@@ -53,7 +53,7 @@ import {
   findSpec,
   freeMachines,
   has,
-  hasBenchFor,
+  hallHasABench,
   hasExtraction,
   heldMachine,
   machineIsShared,
@@ -71,6 +71,7 @@ import {
 } from './materials';
 import { familyAirBlock } from './media';
 import { firstOnOrder } from './orders';
+import { NO_BENCH } from './production';
 import { ownerIsAvailable } from './owner';
 import {
   stageFor,
@@ -796,8 +797,10 @@ function onOrderBlock(state: GameState, family: string): string {
  *  while the job is free to be worked on (CLAUDE.md T2 3.9). */
 export function hallBlock(state: GameState, job: Job): string {
   if (!job.byHand && !hasExtraction(state)) return 'no extraction';
-  // A bench is the one thing a piece cannot be made without, by hand or not (CLAUDE.md T4 3.4).
-  if (!hasBenchFor(state, job.id)) return 'no bench';
+  // A bench is the one thing a piece cannot be made without, by hand or not (CLAUDE.md T4 3.4):
+  // the hall's own question. Whether a man on the job has a place at one is his, asked in
+  // `placeHand` at the stages done at a bench and nowhere else (v47).
+  if (!hallHasABench(state)) return NO_BENCH;
   if (job.byHand) return '';
   // Only the machine of the stage he is at can stop him: a broken edgebander does not stop a
   // job that is still being cut (CLAUDE.md T7 3.1).

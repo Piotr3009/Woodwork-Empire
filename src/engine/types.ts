@@ -1066,6 +1066,8 @@ export type WorkerIdleReason = 'waitingForBoss' | 'noMachine' | 'noMaterial';
 export type BubbleKey =
   | 'waitingForMachine'
   | 'noMaterial'
+  /** He has no place at a bench for a stage done at one (v47). */
+  | 'noBench'
   /** He is at a bench the hall has no air for (CLAUDE.md T23 2.7). */
   | 'noCompressor'
   | 'nothingToDo'

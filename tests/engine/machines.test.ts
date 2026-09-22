@@ -37,7 +37,7 @@ import {
   serviceIsDue,
   benchOf,
   benchPlacesOf,
-  hasBenchFor,
+  hallHasABench,
   bagsExist,
   dustBand,
   dustFactor,
@@ -486,7 +486,7 @@ describe('no bench in the hall', () => {
     state.equipment = state.equipment.filter((item) => item.specId !== 'workbench');
     expect(has(state, 'tableSaw')).toBe(true);
     expect(hasExtraction(state)).toBe(true);
-    expect(hasBenchFor(state, firstJob(state).id)).toBe(false);
+    expect(hallHasABench(state)).toBe(false);
     const before = firstJob(state).labourRemaining;
     state = tick(state, 60);
     expect(firstJob(state).labourRemaining).toBe(before);
@@ -537,18 +537,19 @@ describe('no bench in the hall', () => {
     expect(benchPlacesOf(bench)).toBe(1);
     expect(benchOf(state, joiner.id)?.id ?? null).toBe(bench.id);
     expect(benchOf(state, 'owner')).toBeNull();
-    // The owner is put on the second job and has nowhere to work; the joiner takes the first and
-    // has. Neither answer changes with a minute of the clock, which is the whole of the rule.
+    // The owner is put on the second job with no place at a bench and the joiner on the first
+    // with one. The hall has a bench, so neither job is stopped by the hall; the owner's own
+    // question is asked of him at the stages done at a bench, in `placeHand` (v47).
     state = act(state, { type: 'ASSIGN_JOB', jobId: second.id, workerId: 'owner' });
-    expect(hasBenchFor(state, second.id)).toBe(false);
+    expect(hallHasABench(state)).toBe(true);
     state = tick(state, 1);
     const waiting = state.jobs[0];
     if (!waiting) throw new Error('no first job');
     waiting.stage = 'ready';
     state = act(state, { type: 'ASSIGN_JOB', jobId: first.id, workerId: joiner.id });
     expect(state.jobs[0]?.id).toBe(first.id);
-    expect(hasBenchFor(state, first.id)).toBe(true);
-    expect(hasBenchFor(state, second.id)).toBe(false);
+    expect(benchOf(state, joiner.id)?.id ?? null).toBe(bench.id);
+    expect(benchOf(state, 'owner')).toBeNull();
   });
 
   it('stands a joiner with nowhere to work at the canteen door', () => {

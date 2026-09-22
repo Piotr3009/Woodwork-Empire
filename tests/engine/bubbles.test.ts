@@ -205,11 +205,13 @@ describe('nothing at all over a man nothing is wrong with [PIOTR, 19.09]', () =>
 });
 
 describe('the table itself', () => {
-  it('keeps five lines and no colour, and every one of them is a thing that is wrong', () => {
+  it('keeps six lines and no colour, and every one of them is a thing that is wrong', () => {
     // Four until Turn 23, which hung the bench on the compressor and stood a man who nobody has
     // put on anything (CLAUDE.md T23 2.1, 2.7); v43 took "no cut parts yet" out with the rule it
-    // explained.
+    // explained; v47 put "no bench" in, the one thing a man with two saws idle was actually
+    // standing for (PIOTR, 22.09).
     expect(Object.keys(BUBBLES).sort()).toEqual([
+      'noBench',
       'noCompressor',
       'noMaterial',
       'nothingToDo',

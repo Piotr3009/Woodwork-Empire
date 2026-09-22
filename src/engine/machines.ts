@@ -569,19 +569,13 @@ export function benchAtPlace(state: GameState, place: number): Equipment | null 
   return null;
 }
 
-/** Without a bench there is no way to start production (CLAUDE.md T4 3.4). Two or three men can
- *  share one from Turn 23, by its class, so the question is whether a man on the job has a place
- *  at one: any man on it, not the first. Until v46 the whole job stood on the first man's place,
- *  so the owner leading a job with three joiners on it, who had the industrial bench's three
- *  places between them and left him none, stopped all four of them with "no bench" and the saw
- *  free (PIOTR, 22.09, the day 128 save). A man without a place stands on his own, `placeHand`
- *  says so of him alone, and the men with a place work. For a job nobody is on yet the question
- *  is the hall's: is there a bench in it at all (CLAUDE.md T23 2.17). */
-export function hasBenchFor(state: GameState, jobId: string | null): boolean {
-  const job = jobId === null ? null : state.jobs.find((entry) => entry.id === jobId) ?? null;
-  if (job !== null && job.assignees.length > 0) {
-    return job.assignees.some((who) => benchOf(state, who) !== null);
-  }
+/** Without a bench in the hall there is no way to make anything (CLAUDE.md T4 3.4): the one
+ *  question a job asks of the hall. Whether a man on it has a place at one is his own question,
+ *  asked of him alone and only at the stages done at a bench (`standsForBench`, v47). Until v46
+ *  the whole job stood on its first man's place, so the owner leading a job with three joiners
+ *  on it, who had the industrial bench's three places between them and left him none, stopped
+ *  all four of them with "no bench" and the saw free (PIOTR, 22.09, the day 128 save). */
+export function hallHasABench(state: GameState): boolean {
   return benchPlaces(state) > 0;
 }
 

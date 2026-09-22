@@ -30,6 +30,7 @@ import {
   accumulateMachineMinute,
   addDust,
   benchOf,
+  hallHasABench,
   benchPlaceAt,
   bookOutputMinute,
   cabinetTools,
@@ -90,6 +91,7 @@ import {
   type StagePlan,
   cncOptions,
   labourPerMinute,
+  stageAtTheBench,
   stageMinutes,
   stagePlanFor,
   tradeFactor,
@@ -161,8 +163,12 @@ export function familiesWanted(state: GameState, job: Job, who = OWNER): string[
   // The second man works at the first man's bench, in its second place: he does not take a bench
   // of his own, and one that is free is left for somebody else (CLAUDE.md T17 2.10).
   const lead = leadAssignee(job);
-  const wanted: string[] = lead !== null && lead !== who && isOnJob(job, who) ? [] : [BENCH];
   const stage = stageFor(state, who, job, cncOptions(state, who, job));
+  // His bench is wanted for the stages done at one and not at a machine stage (v47): the
+  // second man works at the first man's bench, in its second place, and takes none of his own.
+  const atBench = stage !== null && stageAtTheBench(state, stage);
+  const wanted: string[] =
+    atBench && !(lead !== null && lead !== who && isOnJob(job, who)) ? [BENCH] : [];
   const family = stage?.family ?? null;
   if (family === null || family === BENCH) return wanted;
   // A family the workshop does not own at all is done by hand, and a tool kept in a cabinet is
@@ -367,6 +373,25 @@ export function waitingWordsFor(state: GameState, who: string, job: Job): string
 /** The words the job carries while the rack has nothing for it (CLAUDE.md T2 3.6). */
 export const WAITING_FOR_MATERIAL = 'waiting for material';
 
+/** The words a man carries, and the row of his job, while he has no place at a bench for the
+ *  stage he is at (CLAUDE.md T4 3.4; v47). The same words `hallBlock` uses for a hall with no
+ *  bench in it at all. */
+export const NO_BENCH = 'no bench';
+
+/** True while this man stands for want of a bench: the hall has none at all (CLAUDE.md T4 3.4),
+ *  or he would be at his bench for the stage he is at and has no place at one. The one reading
+ *  `placeHand`, the stations, the day meter and the mark over his head all take (PIOTR, 22.09;
+ *  v47). Null stage, nothing to stand for. */
+export function standsForBench(
+  state: GameState,
+  who: string,
+  stage: { family: string | null } | null,
+): boolean {
+  if (!hallHasABench(state)) return true;
+  if (stage === null) return false;
+  return stageAtTheBench(state, stage) && benchOf(state, who) === null;
+}
+
 /** True when the job can be worked on this minute. Writes down why it cannot, either way: the
  *  hall first, then the rack, which has to hand over what the next slice of work needs or the job
  *  stands still and the joiners stand around (CLAUDE.md T2 3.6, T2 3.9). */
@@ -413,17 +438,19 @@ export function placeHand(state: GameState, hand: Hand): HandPlace {
     const noMaterial = hand.job.blockedBy === WAITING_FOR_MATERIAL;
     return { work: null, lost: noMaterial ? 'noMaterial' : 'noMachine', noMaterial };
   }
-  // His own place at a bench, which is a question about this man and not about the job: without
-  // one he stands, on his own, and the men beside him with a place work on (CLAUDE.md T4 3.4,
-  // T23 2.17; v46). Booked as a station he has not got, which is what the day meter counts.
-  if (benchOf(state, hand.who) === null) {
-    releaseMachines(state, hand.who);
-    return { work: null, lost: 'noMachine', noMaterial: false };
-  }
   // The stage this man works, which is his own from v37: two men on one job may be at two stages
   // (the bag of work, PIOTR 20.09).
   const stage = stageFor(state, hand.who, hand.job, cncOptions(state, hand.who, hand.job));
   if (stage === null) return { work: null, lost: null, noMaterial: false };
+  // His own place at a bench, a question about this man and not about the job, and asked only at
+  // a stage done at a bench: at a machine stage he needs none (PIOTR, 22.09: "the bench only at
+  // assembly"; v47). Without one he stands, on his own, the row says so, and the men beside him
+  // work on. Booked as a station he has not got, which is what the day meter counts.
+  if (standsForBench(state, hand.who, stage)) {
+    releaseMachines(state, hand.who);
+    hand.job.blockedBy = NO_BENCH;
+    return { work: null, lost: 'noMachine', noMaterial: false };
+  }
   const at = takeMachines(state, hand);
   if (at.waitingFor === null) {
     return { work: { stage, machine: at.machine }, lost: null, noMaterial: false };
