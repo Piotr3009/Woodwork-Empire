@@ -32,3 +32,12 @@ loads as it is and only the next hire is refused, asserted.
 Five card tests and two engine tests; the rule moved twenty-one halls in the existing suite, every
 one of them flipped rather than kept beside a new one, and section 0 item 2 has the two
 consequences Piotr should see.
+
+**T24-B3 2.3 A contract man with nothing to do stands at the canteen door.** `contractStationFor`
+asks `contractMenAtWork` first and returns `STATION_NO_BENCH`, the cell a man with no bench stands
+on, whenever the list does not carry him; `bubbleFor` hands him `noMaterial` with the contract's
+own name, so the mark reads `no sheets for <contract>` and never `waiting for the saw` over a man
+with two saws idle.
+The station and the mark are read off the one `contractMenAtWork`, so where he stands and what is
+wrong with him cannot disagree; four engine tests and two render tests, the empty rack, the
+delivery the next minute and five o'clock among them.

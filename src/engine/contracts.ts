@@ -62,7 +62,7 @@ import { changeReputation, effectiveReputation, reputationTier } from './reputat
 import { chance, float, int, pick } from './rng';
 import type { RngCarrier } from './rng';
 import { crewHasGoneHome, isWorkingToday, joiners } from './staff';
-import { STATION_BENCH, machineStation, waitingStation } from './stations';
+import { STATION_BENCH, STATION_NO_BENCH, machineStation, waitingStation } from './stations';
 import { cncOptions, familyForStage, jobOnCnc, stageSpeed } from './stages';
 import type { Contract, ContractWeek, Equipment, GameState, StageId, Worker } from './types';
 
@@ -770,11 +770,20 @@ function pieceMachine(state: GameState, who: string, piece: ContractPieceSpec): 
   return bestMachineOf(state, family);
 }
 
-/** Where a man on a contract stands, for the hall: at the machine of his stage, waiting at it,
- *  or at his bench. Null for a man on no contract. */
+/** Where a man on a contract stands, for the hall: at the canteen door when the contract cannot
+ *  use him this minute, and otherwise at the machine of his stage, waiting at it, or at his bench.
+ *  Null for a man on no contract.
+ *
+ *  v45 let him go of his saw the minute the contract stopped wanting him, and left him standing at
+ *  the saw's waiting cell all the same, which reads as a man queueing for a machine nobody is at.
+ *  From tonight he stands where a man with nothing to do stands, at the canteen door, and the mark
+ *  over his head says the contract has no sheets [PIOTR, 22.09] (CLAUDE.md T24 2.3). The one
+ *  question is `contractMenAtWork`, which is the same list that decides whether he may hold a
+ *  machine, so where he stands and what he may do cannot disagree. */
 export function contractStationFor(state: GameState, worker: Worker): string | null {
   const contract = contractOfWorker(state, worker.id);
   if (!contract) return null;
+  if (!contractMenAtWork(state).includes(worker.id)) return STATION_NO_BENCH;
   const { family } = pieceStage(state, worker.id, contractPiece(contract));
   if (family === null || !has(state, family) || machineIsShared(state, family)) return STATION_BENCH;
   const held = state.equipment.some((item) => item.specId === family && item.takenBy === worker.id);
