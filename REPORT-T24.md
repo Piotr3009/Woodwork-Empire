@@ -87,3 +87,10 @@ their exports and the two assertions that were their only readers;
 `grep -rn "oldestOpenJob\|weekEfficiency" src tests` is silent. docs/art/SPRITES.md 10.4 no longer
 says a man does not walk faster at x10: it names `WALK_CELLS_PER_SECOND` and
 `WALK_CELLS_PER_SECOND_FAST` and says which applies when.
+
+**T24-B10 2.10 The cheap start, a year of it.** `tests/scenarios/turn24.test.ts` plays (pp): Easy,
+the day one list in the cheapest class of every family, one joiner on day 1 and one a quarter after
+that, the first standing contract the crew can keep up with, and the bank on the first day the
+account is under. It asserts nothing about survival; what it asserts is that the bank lends the
+floor and that a year was actually played, and it prints the table. The company did not reach month
+twelve, and the table is section 3 of this report.
