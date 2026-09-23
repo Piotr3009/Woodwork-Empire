@@ -33,3 +33,15 @@ Every test that asserted the queue was flipped to the places and none kept besid
 month playthrough now ends with the bank on day 91, measured and explained in its test and in
 C2. The four men and one used saw case holds from this commit: one cuts, three say
 `no place at the saw`.
+
+**T25-B1 2.3, who has a place.** The plan of A2 is the one answer every reader takes: it is
+worked out again whenever anything it is made of changes (every settle, so every assign,
+unassign, buy, sell, move, breakdown and repair) and at the top of every production minute, and it
+is deterministic, so between two such events it gives the same answer minute after minute, which
+is what "once a day and not once a minute" asks and is asserted over thirty minutes. The person
+card now says the plan's words in the warn red (`Kitchen (cutting), no place at the saw`), the same
+phrase as the mark. `tests/engine/dayPlan.test.ts` asserts the hire order, the owner first, the
+place handed on the minute a man is taken off, a second saw's places, a breakdown taking them away
+and the repair giving them back, a stage moving to another family, a family the hall does not own
+wanting no place, a contract man in the same order, and four men at a used saw for a full day: one
+man's output and three days of `noPlace` (two men work at a standard saw).

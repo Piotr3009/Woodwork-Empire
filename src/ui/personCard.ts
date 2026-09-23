@@ -73,6 +73,8 @@ interface Person {
   /** True while nobody has put him on anything and there is no manager on duty to
    *  (CLAUDE.md T23 2.1). The owner never waits: he takes the oldest open job himself (2.3). */
   waiting: boolean;
+  /** The family the day plan has no place for him at, or '' (CLAUDE.md T25 2.3). */
+  noPlaceFor: string;
 }
 
 function personOf(state: GameState, who: string): Person | null {
@@ -93,6 +95,7 @@ function personOf(state: GameState, who: string): Person | null {
       job: state.jobs.find((entry) => entry.assignees.includes(OWNER)) ?? null,
       worker: null,
       waiting: false,
+      noPlaceFor: state.owner.noPlaceFor,
     };
   }
   const worker = state.workers.find((entry) => entry.id === who);
@@ -112,6 +115,7 @@ function personOf(state: GameState, who: string): Person | null {
     job: worker.jobId === null ? null : state.jobs.find((entry) => entry.id === worker.jobId) ?? null,
     worker,
     waiting: waitsForTheBoss(state, worker),
+    noPlaceFor: worker.noPlaceFor,
   };
 }
 
@@ -154,12 +158,13 @@ function chips(person: Person): string {
   );
 }
 
-/** What he is at this minute, in one line. A man nobody has put on anything says so in the red
- *  the rest of the game warns in, with the reason the mark over his head is carrying, so the hall
- *  and the card cannot disagree about him (CLAUDE.md T22 2.5, T23 2.1, 2.13). */
+/** What he is at this minute, in one line. A man nobody has put on anything, and a man the hall
+ *  has no place for, says so in the red the rest of the game warns in, with the reason the mark
+ *  over his head is carrying, so the hall and the card cannot disagree about him
+ *  (CLAUDE.md T22 2.5, T23 2.1, 2.13, T25 2.3). */
 function nowLine(state: GameState, person: Person): string {
   const words = doingWords(state, person);
-  const warn = person.waiting ? ' warn' : '';
+  const warn = person.waiting || person.noPlaceFor !== '' ? ' warn' : '';
   return `<p class="person-now${warn}" data-now>now: ${escapeHtml(words)}</p>`;
 }
 
@@ -198,8 +203,12 @@ function doingWords(state: GameState, person: Person): string {
   if (person.job !== null) {
     const stage = jobStage(state, person.job);
     const where = stage === null ? '' : ` (${stageLabel(stage.id).toLowerCase()})`;
-    return `${person.job.name}${where}`;
+    // On his job and with no place at its machine: the words over his head (CLAUDE.md T25 2.3).
+    const place = person.noPlaceFor === '' ? '' : `, ${placeLine(person.noPlaceFor)}`;
+    return `${person.job.name}${where}${place}`;
   }
+  // A man on a contract with no place at its machine says so as well (CLAUDE.md T25 2.3).
+  if (person.noPlaceFor !== '') return placeLine(person.noPlaceFor);
   if (person.worker !== null) return workerDoing(state, person.worker);
   return ownerDayLine(state);
 }
