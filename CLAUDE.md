@@ -1,230 +1,226 @@
-# Turn 24: the number says who made it, the boss has a bench, nine leftovers closed
+# Turn 24: places at the machines, and no man ever queues again
 
-Woodwork Empire. Autonomous session brief for Claude Code (cloud, one agent, serial, effort
-high). Owner: Piotr. Programmer: Claude. Spec author: Claude (chat), 22.09.2026, from Piotr's
-decisions of 21.09 and 22.09 (Petros: software/woodwork-empire, STAN, the v40 to v49 blocks).
+Woodwork Empire. Autonomous session brief for Claude Code (Opus 5, effort ultracode, cloud, agent
+teams expected, a day of it). Owner: Piotr. Programmer: Claude. Spec author: Claude (chat),
+21.09.2026, from Piotr's decision of the same evening (Petros: software/woodwork-empire, STAN).
 
 Read this whole file (first line must say "Turn 24"; if the root CLAUDE.md does not, stop and
-report), then REPORT-T23.md section 0, docs/ui-style.md, and the pictures in docs/mockups/v47.
-Where files disagree, this one wins. All standing rules apply (no em or en dashes anywhere, scope
-1:1, one code path, constants never in the UI, [TUNE] for every figure you choose and [PIOTR]
-for his, kill background processes, PR without merge, end the session, no PR watching, npm run
-check gated on its own exit code, every click single, one APP_VERSION bump, delete the old track
-and never write a parallel one, flip a test and never keep it beside a new one).
+report), then REPORT-T23.md in full, then docs/mockups/t24/README.md and its picture, then
+docs/ui-style.md, then the archived briefs in docs/. Where files disagree, this one wins. All
+standing rules apply (no em or en dashes anywhere, scope 1:1, one code path, constants never in
+the UI, [TUNE] for every figure you choose and [PIOTR] for his, kill background processes, PR
+without merge, end the session, no PR watching, npm run check gated on its own exit code, every
+click single, one APP_VERSION bump).
 
-Precondition. main carries Turn 23 merged and the chat fixes v37 to v49: APP_VERSION 'v49',
-STATE_VERSION 25. If APP_VERSION is not 'v49', stop and report.
+Precondition. main carries Turn 23 merged and the chat fixes v37 and v38: APP_VERSION 'v38',
+STATE_VERSION 22. If APP_VERSION is not 'v38', stop and report.
 
-The four rules of 18.09 bind: **one game, one look**; **nothing visual without a mockup** (2.1
-builds from docs/mockups/v47/output-who-made-it.png; 2.5 and 2.6 are placement figures with the
-rule written here and nothing new drawn); **no sound without a recorded file**; **every modal,
-popover and list has the cross, Escape and click outside**.
+The four rules of 18.09 bind every agent: one game, one look; nothing visual without a mockup;
+no sound without a recorded file; every modal, popover and list has the cross, Escape and click
+outside.
 
-## 0. What this turn is for (Piotr, 21.09 and 22.09)
+## 0. What this turn is for (PIOTR, 21.09)
 
-Three days of playing v40 to v49 found the same thing four times: the game did something for a
-reason and told the player a different reason, or none. "Output 0.75" with nothing under it (a
-by hand job, a serviced extractor and a one man day all read 0.75); "waiting for the saw" over a
-man with two saws idle; the owner standing all day because the hiring gate never counted his own
-place at a bench. Piotr: "the player has no way of knowing what to fix." This turn makes the
-Output number account for itself, closes the bench gap at the gate, and closes nine leftovers
-Piotr ticked off the list on 22.09.
+Piotr watched four men stand in a heap by the saw again and said the thing that decides this
+turn: **"this queueing and waiting drives me mad; the whole logic is too complicated and it will
+always break."** He is right, and the fault is not in the code: the game models a real shop's
+station-by-station flow (a man takes a machine, the next man waits, the bag of work of v37 sends
+him to another stage of his own job), and every turn adds another edge for it to break on. It is
+faithful and it is miserable to play, and it makes a contract a gamble, because nobody can tell
+from the hall whether the crew can keep up.
+
+From tonight the shop works the way a tycoon reads: **a machine is not a thing one man takes, it
+is a number of places to work.** A man is put on a job and he works. If the hall has no place for
+him, the game says so plainly, once, in words, and the player buys a machine or takes a man off.
+Nobody queues, nobody is sent to another stage to fill a gap, no station is held, and the class of
+a machine stops being a token to be seized and becomes what it should have been: more places, a
+faster hall, a longer life.
+
+Nothing about the shop's money, jobs, stages, dust, air or extraction changes tonight. What is
+deleted is the whole apparatus of taking, queueing and waiting for a station.
 
 ## 1. Rules restated (short)
 
-Everything from Turns 1 to 23 and the chat fixes v37 to v49. Tonight in addition:
+Everything from Turns 1 to 23. Tonight in addition:
 
-- APP_VERSION = 'v50'. STATE_VERSION bumps to 26 in phase A, once, for 2.1; every v25 save loads.
-- **The Output sheet says who made today's number and why** [PIOTR, 22.09].
-- **The owner has a place at a bench before a joiner is hired past him** [PIOTR, 22.09].
-- **A contract man with nothing to do stands at the canteen door** [PIOTR, 22.09].
-- **A contract's machine wear is charged on the minutes at the machine only** [PIOTR, 22.09].
+- APP_VERSION = 'v39'. STATE_VERSION bumps to 23 in phase A, once.
+- **A man is never blocked by another man** [PIOTR, 21.09]. He works, or the hall has no place for
+  him and the game says so.
+- **A machine is places, a pace and a life** [PIOTR]. Nothing else.
+- **The player can see, before he signs, what his hall makes in a week** [PIOTR].
 
 ## 2. Changes to the design (the contract)
 
-### The number
+### The heart of it
 
-**2.1 Who made it today [PIOTR, 22.09; docs/mockups/v47/output-who-made-it.png].** Under the
-Output sheet's line `Workshop today, everybody and every machine, over the minutes worked` a new
-block, in the sheet's own classes and nothing new in the stylesheet:
+**2.1 A machine has places [PIOTR, 21.09].** Every floor family that men work at carries a table
+of places by class, beside its prices, in `constants.ts`, the way `WORKBENCH_PLACES` already does
+(CLAUDE.md T23 2.17) [TUNE, Piotr's own for the saw]:
 
-- A `ledger-head` reading `Who made it today, N min worked` with `a minute` on the right, N being
-  `dayStats.workMinutes`.
-- One `ledger-row` per person who has put a production minute in today, the owner first and then
-  the crew in the order of `state.workers`. Main line `<Name>, <tier> <role>, <doing> <job>` in
-  the words the person card already uses (`stageDoing`, the job's name; the owner is `Piotr,`
-  with no tier). Second line `<why>, <his minutes> min: <his rate> times <his stage's speed>`,
-  where `<why>` is `by hand` for a by hand job or a by hand stage, the class of the machine he
-  stands at (`standard table saw`) for a machine stage, and `at the bench` for bench work. The
-  figure on the right is his worth a minute averaged over his minutes today, red under 1.00 and
-  green over it through the sheet's own `tone`.
-- One row `Hall`, second line the hall's state in the words the breakdown lines already have
-  (`clean, extraction working`; `extractor on service`; `dusty`; `bags full`), figure the hall
-  factor.
-- A `ledger-sum` with only the total: `= 0.75`, the same figure as the line above the block.
-- One `ledger-note` sentence, only when there is something to say, and at most one, in this
-  order: a by hand job among today's minutes (`<Job> was taken by hand: no <tools> in the hall,
-  so every stage of it runs at 0.67, the saw included.`, `<tools>` off the enquiry's lock reason),
-  else the hall under 1.00 (`The hall ran at 0.70 today: <reason>.`). Nothing else says anything:
-  a low number made of slow men is what the rows above already say.
+| class | table saw | spindle moulder | edgebander | thicknesser | CNC | spray booth | workbench |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| used | 1 | 1 | 1 | 1 | n/a | n/a | 1 |
+| budget | 1 | 1 | 1 | 1 | n/a | n/a | 1 |
+| standard | 2 | 1 | 1 | 1 | 1 | 1 | 2 |
+| pro | 2 | 2 | 2 | 1 | 1 | 1 | 2 |
+| industrial | 3 | 2 | 2 | 2 | 2 | 2 | 3 |
 
-The engine keeps the figures and the sheet prints them, computing nothing (T15 0). New on
-`dayStats`: `byMan: Record<string, { minutes: number; worth: number }>`, written by
-`bookOutputMinute`, which gains the man's id; zeroed with the day's stats; a v25 save opens with
-`{}`. `workshopBreakdownToday(state)` in machines.ts returns the rows as data (name, words,
-minutes, worth, the hall row, the note); the day loop, the night loop and the contract minute all
-book through the one `bookOutputMinute`. Done: the engine tests (four men on a by hand job for 14
-minutes each: four rows, every one `by hand`, the sum equal to `workshopOutputToday` to the
-pence; the extractor on service: the hall row says so and the note names it; nobody worked: no
-rows and no note; the day 141 fixture after one minute: four rows and `= 0.75`), the board test
-against the mockup's words, the migration test.
+One function, `placesOf(item)`, reads every table; `hallPlaces(state, family)` adds up the places
+of every unbroken machine of a family standing in the hall. A broken machine has no places, which
+is what a breakdown now costs, beside its repair.
 
-### The boss and his bench
+**2.2 Nobody takes a machine, and nobody waits for one [PIOTR: "they never stand, they always
+work"].** Deleted, from the engine and from every screen: `takenBy` as a claim on a machine, the
+waiting stations (`waitingStation`, `stationWaitingFor`, the waiting row of `stationRow`),
+`heldMachine`, `freeMachines` as a queue question, the "waiting for the saw" blocked line, the
+`noMachine` idle reason as a per-minute event, and the bag of work of v37 (`stageFor`,
+`stationFreeFor`, `stageMayStart`; `stageLabour` **stays**, because the stages are still where the
+work goes and the Work Plan draws them). A man put on a job works his job's current stage at his
+own rate, minute after minute, and the hall's places decide only **how many men can work at once**
+(2.3). `Equipment.takenBy` is kept in the record for one turn as a dead field the migration
+clears, so an old save loads.
 
-**2.2 The gate counts the owner's place [PIOTR, 22.09].** `canHire` for a joiner asks for a free
-place at a bench for him **and** one for the owner: places on the hall against the joiners on
-the books plus one. The refusal line: `No place at a bench for him: the owner needs one too`. A
-save whose crew already fills the benches loads as it is; the gate only refuses the next man.
-Done: the engine test (one industrial bench, three places: the second joiner is hired, the third
-refused with the line; a used bench bought: the third is hired), the hire card test.
+**2.3 The hall's places decide who works, once a day and not once a minute [PIOTR].** At the start
+of each working day, and again whenever the player assigns, unassigns, buys, sells, moves or
+breaks something, the engine works out **who has a place** and writes it on the man
+(`Worker.working: boolean` and `Worker.noPlaceFor: string`, the family he could not get into):
 
-**2.3 A contract man with nothing to do stands at the canteen door [PIOTR, 22.09].** v45 lets
-him go of his saw while the contract waits for material or the crew have gone home;
-`contractStationFor` still stands him at the saw's waiting cell. Tonight, whenever
-`contractMenAtWork` does not list him, `contractStationFor` returns the canteen door cell, the
-one a man with no bench stands on (`STATION_NO_BENCH` draws it), and the mark over his head is
-`noMaterial` with the contract's name (`no sheets for <contract>`), through `bubbleFor`. Done:
-the engine test (rack empty: at the canteen door with the mark; a delivery: at the saw the next
-minute), the render test (the mark's words).
+- Every man on a job needs one place of the family his job's current stage wants (`familyForStage`,
+  unchanged). A stage whose family the hall does not own at all is worked by hand as it always was
+  (CLAUDE.md T7 3.6) and needs no place.
+- Places are given out in the order the men were hired, the owner first, so the answer never
+  flickers between two minutes.
+- A man with no place **does not work that day**: his figure stands at his home cell with the red
+  mark of Turn 22's 2.5 and the hover line `no place at the saw`, his card says the same, and his
+  minutes are idle with the reason `noPlace`. The efficiency breakdown's `noMachine` line becomes
+  `noPlace` and means this and only this.
+- The moment a place frees (a man is taken off a job, a machine is repaired, another is bought),
+  the next man in order takes it and works from that minute.
 
-**2.4 Wear on the machine minutes only [PIOTR, 22.09].** A contract charges its machine wear on
-the minutes the man actually stands at a machine of the piece's family, and none on a minute at
-the bench or by hand. `contractResultFor` and the closing report read the same rule: the card's
-`Machine wear a piece` is the piece's machine minutes times `machineWearPerMinute`, and a piece
-made by hand shows `Machine wear a piece, by hand` at nought as it does today. The cut sheet
-pack is all saw, so its figures do not move; a wardrobe front is cut and assembled, so its wear
-falls to the cut minutes only. Done: the engine tests (a pack: unchanged to the pence; a front:
-wear equal to its cutting minutes times the saw's wear a minute), tests/engine/contractPrices
-restated where it moves.
+**2.4 The class of a machine is the hall's pace [PIOTR: "the machine's class should add to the
+efficiency, that is easy to count"].** The `outputFactor` of a machine class stops applying to
+whoever holds it and becomes the hall's, by family: for a stage of family F, the pace is the
+**best class of F standing unbroken in the hall**, whatever machine of it the man is at [TUNE,
+Piotr's figures]:
 
-### Nine leftovers
+| class | pace |
+| --- | --- |
+| used | 0.95 |
+| budget | 1.00 |
+| standard | 1.05 |
+| pro | 1.08 |
+| industrial | 1.12 |
 
-**2.5 The men at a bench stand on its front row [REPORT-T23 0.12].** The second and third man
-at a bench stand on the front cells of the bench's own footprint, in a row: the operator on the
-front cell of the first column, the second man on the front cell of the second column, the third
-on the third (an industrial bench is three wide). `secondStation` and `placeStation` resolve to
-those cells and to nothing off the footprint. Done: the render test (a standard bench at 8,6:
-the two men on 8,7 and 9,7, both inside the footprint), the station test.
+A hall with an industrial saw and a used one cuts at 1.12, because the shop cuts on the good saw
+and the old one takes the overflow. The efficiency breakdown gains one line per family that is
+above or below 1.00, so the player sees what his machines buy him: `Saw, industrial: +12%`. The
+bench's places and pace of Turn 23 fold into these two tables and stop being their own rule.
 
-**2.6 The canteen's plates read across [REPORT-T23 0.13].** The eight plates are lettered in
-reading order across both banks: the top row of the left bank, then the top row of the right, then
-the two bottom rows. The right bank's plates sit at the height the picture has them: measured on
-`canteenLockers.png` by the agent, the figures written into `CANTEEN_PLATES` and into
-docs/mockups/t23/canteen-regions.json alike, the report says the pixels. Done: the render test.
+**2.5 The card of a machine says who is at it [PIOTR, 21.09].** A machine's card and its hover
+line say its places and who is in them this minute: `Places: 2 of 2 in use, Pete and Eddie` or
+`Places: 1 of 2 in use, Eddie` or `Free`. The Owned tab's tile says the short form
+(`2 of 2 in use`). This is read off the same day plan as 2.3, so it can never disagree with the
+figures on the floor.
 
-**2.7 Central systems serviced like extractors [REPORT-T23 0.8].** `dustSystem` and
-`flexiSystem` book their hours while the extraction runs and are serviced exactly as an
-extractor is since T23 2.8: the same due point, the same card button, the same day out. Done: the
-engine test (a system that ran three weeks has hours and comes due), the Machines page test.
+**2.6 The men spread over the machines they are drawn at [PIOTR: "with two saws let them go to the
+second one"].** The figure loop places a working man at the machine of his family that holds him:
+the machines of a family are filled in the order they were bought, each up to its places, so the
+second man of a two place saw stands at its second place and the third man stands at the **second
+saw**, not in a heap at the first. One function, `machineForPlace(state, family, index)`, is what
+the figure loop and the card of 2.5 both read.
 
-**2.8 A restock is never trimmed to the rack [open since v38].** A restock larger than the rack's
-free room is accepted in full: what fits goes on the rack, the rest goes to the temporary store
-under T20's overflow rule, with its fee and its fetch task, and the Materials tab says so before
-the click (`60 sheets: 40 on the rack, 20 to storage at £X`). Done: the engine test (a rack with
-room for 40, an order of 60: 40 on the rack, 20 in storage, the fee charged), the tab test.
+### What it fixes beyond the queue
 
-**2.9 Two deletions and one sentence.** `oldestOpenJob` (jobs.ts, no reader since v41) and
-`weekEfficiency` (staff.ts, no reader since T23) are deleted with their exports and tests.
-docs/art/SPRITES.md 10.4 says a man does not walk faster at x10; v44 made him walk at 1.5 cells a
-second when the clock runs faster than x1: the one sentence is corrected and names
-`WALK_CELLS_PER_SECOND_FAST`. Done: `grep -rn "oldestOpenJob\|weekEfficiency" src tests`:
-nothing.
+**2.7 A contract says what the hall can make [PIOTR: "we take a contract and we do not know
+whether the hall can do it"].** The contract offer card, the Contracts tab and the acceptance
+check gain one line, off the same numbers: `Your hall makes about 26 of these a week at full
+crew; this term wants 20`, red when the wanted figure is above what the hall makes. The figure is
+the arithmetic the engine already has: the piece's minutes at the hall's pace for its family
+(2.4), the men who could have a place for it (2.3), and the working days of a week. No new rule,
+one honest number. Done: the engine test (a one saw hall makes fewer than a three saw hall; the
+line turns red when the term wants more than the hall makes), the card tests.
 
-**2.10 The cheap start, a year of it [PIOTR, 20.09].** A scenario in tests/scenarios, (pp): a
-year on Easy with the scripted player buying used machines only, hiring one joiner a quarter, and
-taking the first contract its crew can keep up with, against the 10,000 loan floor. It asserts
-nothing about survival: it prints the twelve month ends (cash, reputation, crew, machines) and
-whether the bank closed the company, and the report carries the table, so Piotr can rule on the
-floor with the figures in front of him. Done: the scenario green, the table in the report.
+**2.8 The Work Plan says the same in one line.** Above the jobs: `4 men working · 1 with no place
+at the saw`. Nothing else on that screen changes.
 
-## 3. How to run this session
+## 3. How to run this session (agents)
 
-One agent, serial, in the order of section 5. Phase A first (STATE_VERSION 26, the migration,
-`byMan`, the version bump), then 2.1 to 2.10, then the notes, the cross check, the pictures, the
-report and the PR. No worktrees, no agent teams: nothing here is large enough to split.
+- **Phase A (one agent, serial):** the two tables of 2.1 and 2.4, `placesOf`, `hallPlaces`,
+  `machineForPlace`, `Worker.working` and `Worker.noPlaceFor`, STATE_VERSION 23 and the migration
+  of section 4, and the deletions of 2.2 in the engine. Frozen for phase B after this.
+- **Phase B (three agents):** B1 the day plan of 2.3 and the pace of 2.4 (production.ts,
+  staff.ts, efficiency.ts, jobs.ts); B2 the screens: the cards of 2.5, the Work Plan line of 2.8,
+  the breakdown lines, the removal of every waiting word (catalogue.ts, machine.ts, jobCard.ts,
+  workPlan.ts, personCard.ts, topbar.ts); B3 the figures of 2.6 and the contract line of 2.7
+  (hall.ts, stations.ts, characters.ts, contracts.ts, contractsTab).
+- **Phase C (one agent, serial):** the notes, the scenarios (every one that turned on a queue
+  rewritten to places: (pp) four men and one used saw: one works, three say `no place at the saw`,
+  and the month's output is one man's; (qq) the same four with an industrial saw: three work at
+  1.12 and the fourth says the line; (rr) a contract the hall cannot keep up with is red on its
+  card before it is signed), the cross check of section 7, the pictures, the report, the PR.
 
 ## 4. State
 
-STATE_VERSION 26. `dayStats.byMan` is added, `{}` in an old save; nothing else changes. Every
-v25 save loads, the two fixtures in tests/fixtures (day128, day149) among them.
+STATE_VERSION 23. `Worker.working` and `Worker.noPlaceFor` are added (the migration works them
+out on the first day it runs, so an old save opens with the right men working);
+`Equipment.takenBy` is cleared to null on every item and never written again; every job's
+`blockedBy` that says `waiting for the ...` is cleared. Every v33 to v38 save loads.
 
 ## 5. Task queue, in order
 
-Branch turn-24-who-made-it from main. One commit per task, npm run check green on its own exit
-code before each, two report lines per task in REPORT-T24.md.
+Branch turn-24-places-at-the-machines from main. One commit per task, npm run check green on its
+own exit code before each, two report lines per task in REPORT-T24.md.
 
-T24-A1 Housekeeping and v50: docs/turn-23-brief.md byte for byte from main's CLAUDE.md, this
-file as CLAUDE.md, APP_VERSION 'v50', STATE_VERSION 26 and the migration of section 4.
-T24-B1 2.1. T24-B2 2.2. T24-B3 2.3. T24-B4 2.4. T24-B5 2.5. T24-B6 2.6. T24-B7 2.7.
-T24-B8 2.8. T24-B9 2.9. T24-B10 2.10.
-T24-C1 notes. T24-C2 the scenarios re run and the playthrough figures restated if they move
-(2.4 and 2.8 may move them; say by how much and why). T24-C3 the cross check of section 7.
-T24-C4 look and shoot into docs/report-t24/: the Output sheet with the block on the day 141
-fixture (load it through the loader, play a minute, open the board); the hire card refused with
-the owner's line; a contract man at the canteen door with `no sheets for` over him; two men on a
-standard bench and three on an industrial one; the canteen with eight names in reading order; a
-dust system's card with `Service it`; the Materials tab with the storage line. T24-C5 report and
-PR titled `Turn 24: the number says who made it, the boss has a bench, nine leftovers closed`,
-do not merge, end the session.
+T24-A1 Housekeeping and v39: docs/turn-23-brief.md archived byte for byte, the README's lines,
+APP_VERSION 'v39', docs/art/REQUESTS-T24.md.
+T24-A2 Phase A as section 3 says.
+T24-B1a 2.3. T24-B1b 2.4. T24-B2a 2.5. T24-B2b 2.8 and the breakdown. T24-B2c the words: no screen
+says "waiting for" a machine anywhere. T24-B3a 2.6. T24-B3b 2.7.
+T24-C1 notes. T24-C2 scenarios. T24-C3 cross check. T24-C4 look and shoot: ten pictures into
+docs/report-t24/ (four men and one used saw, three of them marked `no place at the saw`; the same
+hall with an industrial saw; a two place saw with two men at it; two saws with men spread over
+both; a machine card with `Places: 2 of 2 in use, Pete and Eddie`; the Owned tile's short form;
+the efficiency breakdown with `Saw, industrial: +12%` and a `no place` line; the Work Plan's line;
+a contract card with the green capacity line; one with the red). T24-C5 report and PR titled
+`Turn 24: places at the machines, and no man ever queues again`, do not merge, end the session.
 
 ## 6. Do not (tonight)
 
-- No change to what a production minute is worth, to the stage shares, to the bag of work, to the
-  contract prices, to the walk speed, to the bench rule of v47, to the by hand rule of 9.5.
-- No decision on the open questions of section 8: leave them as they are.
-- No pipe elements, no van classes, no electric pallet truck: the art side's spare files stay out
-  of the repository.
-- No touching CLAUDE.md after A1, the archived briefs, the mockup files, the character sheets,
-  the sprite files; docs/art/SPRITES.md only the one sentence of 2.9;
-  docs/mockups/t23/canteen-regions.json only the figures of 2.6.
+- No change to the money, the job templates, the stages and their shares, the dust, the air, the
+  extraction, the wages, the crew limit, the canteen, the loan.
+- The machines' hours, their service and their breakdowns **stay exactly as they are** [PIOTR,
+  21.09: keep the hours]: a machine books an hour for every hour a man works at one of its places.
+- No sound; no new screen; no picture drawn by an agent; no sprite touched.
 - No storage access outside src/cloud/store.ts; no PixiJS, mobile, Steam, Electron.
 - No watch loops, nothing left running.
 
 ## 7. The cross check (before the PR)
 
-- On the day 141 fixture after one minute: four rows under `Who made it today`, every one `by
-  hand`, the sum `= 0.75` to the figure the top bar shows, the note naming the oak table and the
-  solid wood tools, asserted.
-- An extractor on service: the hall row reads `extractor on service`, asserted.
-- One industrial bench, two joiners on the books: a third hire refused with the owner's line;
-  a used bench bought: hired, asserted.
-- A contract man with an empty rack: at the canteen door, no saw held, `no sheets for` over
-  him, asserted.
-- A wardrobe front's wear equals its cutting minutes times the saw's wear a minute, asserted; a
-  cut sheet pack's card unchanged to the pence, asserted.
-- Two men at a standard bench on its two front cells, asserted.
-- A dust system that ran three weeks is due a service, asserted.
-- Sixty sheets into a rack with room for forty: forty on the rack, twenty in storage, asserted.
-- `grep -rn "oldestOpenJob\|weekEfficiency" src tests`: nothing.
-- Every scenario green; the playthrough figures restated if 2.4 or 2.8 moved them, with the
-  reason; the year of (pp) in the report as a table.
+- `grep -rn "waiting for the\|waitingStation\|heldMachine\|takenBy" src`: nothing but the
+  migration and the dead field's declaration.
+- Four men, one used saw, a full day: one man's output, three idle minutes with `noPlace`,
+  asserted; the same four with a standard saw: two work, asserted.
+- A man taken off his job frees his place and the next man works the next minute, asserted.
+- A hall with a used and an industrial saw cuts at 1.12, asserted.
+- Two saws, four men: the figures stand at four different places over two machines, asserted.
+- The contract line's figure falls when a saw is sold, asserted.
+- Every scenario green; the thirty day and three month figures restated in the report, with the
+  reason for every move over 5%.
 - Every changed screen beside its nearest existing one in the report; `git diff main --stat --
   src/ui/styles.css` with no new token.
-- The pictures of C4.
+- The ten pictures.
 
-## 8. Parked (Piotr has not ruled)
+## 8. Parked
 
-- A by hand job runs at 0.67 at a saw the hall owns (rule 9.5): keep, or let the saw count?
-- A contract's day (201) equal to a job's (203), or lower it (T20 2.2)?
-- The wardrobe front at 370 a piece, or a fractional daily target?
-- Five van classes and an electric pallet truck (the art is in the pack of 22.09): a design
-  turn, not tonight.
+- The tool cabinet's slots, the lockers, the bench places as a hiring gate: unchanged tonight.
+- A bigger canteen, the owner's holidays, the weekly summary card, the tips under a monthly
+  report, the Restock cap (Piotr has not ruled), the sprayer's sheets, the backs of the sprites,
+  the sound files.
+- The three Turn 20 leftovers Piotr has not ruled on.
 
-## 9. Art
+## 9. Art requested (docs/art/REQUESTS-T24.md)
 
-- Landed since T23: the eight house pictures (v48), the thicknessers, the van, the forklift, the
-  pallet truck and the hand tool set (v49). Nothing owed for them.
-- Still wanted from earlier turns: the sprayer's four sheets, the helper's bench sheet, the seven
-  recordings, a perspective pass on the canteen lockers.
+- Nothing new tonight. Still owed from earlier turns: the sprayer's four sheets, the helper's
+  bench sheet, the backs (`.rr`, `.rrr`) of every floor family, the seven recordings.
 
 End of brief.
