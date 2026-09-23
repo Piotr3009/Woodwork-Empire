@@ -1444,8 +1444,8 @@ export const MACHINE_PACE: Record<string, number> = {
 
 /** The families whose class is a pace: every family of the places table, and the solid wood tools,
  *  the one stage family a man works at without a place because the tools are shared out of a
- *  cabinet (CLAUDE.md T25 2.3, 2.4). Every other family's class is its capacity, its air or its
- *  store, and never a speed. */
+ *  cabinet (CLAUDE.md T25 2.3, 2.4) [TUNE: the tools are in it because their class was a speed on
+ *  v51 too]. Every other family's class is its capacity, its air or its store, and never a speed. */
 export const PACED_FAMILIES: readonly string[] = [...Object.keys(MACHINE_PLACES), 'solidWoodTools'];
 
 /** The five classes of workbench. Prices, places and footprints are Piotr's table; the endurance

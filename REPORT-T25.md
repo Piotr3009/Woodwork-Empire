@@ -2,7 +2,44 @@
 
 Woodwork Empire, Turn 25. Built against `CLAUDE.md` of 23.09.2026 (first line "Turn 25").
 Branch `turn-25-places-at-the-machines`, off `3eb8ef2`, the tree `origin/main` stands on.
-`APP_VERSION` v51 to v52, `STATE_VERSION` 27 to 28.
+`APP_VERSION` v51 to v52, `STATE_VERSION` 27 to 28. One agent, serial, no worktrees, one commit a
+task, `npm run check` green on its own exit code before each.
+
+## 0. What Piotr should read first
+
+1. **A machine is places, and nobody queues.** The queue of v37 to v51 is deleted, not hidden: no
+   claim on a machine, no waiting cell, no bag of work. A man on a job works his job's current
+   stage at a place of its family, or the hall has no place for him and he stands at his home cell
+   with `no place at the saw` over his head, on his card, and in his idle minutes (`noPlace`).
+   Pictures 1 and 2.
+2. **The class ladder moved to Piotr's figures, and every dearer machine is slower than it was.**
+   An industrial saw is 1.12 (was 1.30), a pro one 1.08 (was 1.15), the edgebander's top 1.12 (was
+   1.35); the bench's own column folds into the ladder, so a good bench is a little quicker. The
+   pace is the hall's best class, whichever machine the man is at. Notes 4.
+3. **The three month playthrough ends at the bank on day 91** (A2, unmoved since). Months 1 and 2
+   are better (the joiner cuts beside the owner at the saw's second place); being in the black on
+   day 61 lets the script hire the manager and take the holiday, and month 3 pays for both. C2 has
+   it line by line off the ledger. Nothing was tuned to change it.
+4. **Two thirty day months moved by more than 5%**, the two men on a fan: -11.4% and +22.1%. Both
+   work more minutes than on v51; the cash follows which jobs the script takes. Measured with the
+   v51 pace and with one place a saw put back: neither is the cause, 2.2 is. C2.
+5. **There is no day 53 save.** Section 7 and C4 name one; nothing in the history is called that.
+   The checks ran on every save the tree has, and picture 5 is the day 115 save (seven people).
+   If a day 53 save exists, one file is all that is wanted.
+6. **The section 7 grep finds one line beyond the migration and the dead field:**
+   `waitingForBoss: 'waiting for the boss'`, the Turn 23 mark over a man nobody has put on anything.
+   It is about the boss, not a machine, and it stays.
+7. **The owner never takes a place from a man by his own choice.** The plan's order puts him first,
+   so when the player puts him on a job he is first; when he picks a job himself (Turn 23 2.3) he
+   only takes one whose stage has a place to spare. Notes 3.
+8. **A fifth lost minute cause, `Hall stopped`**, so `No place` means only that (2.3). A closed
+   month's old `noMachine` minutes all become `noPlace` in the lift, because they cannot be split.
+9. **The cross check found men who share a bench standing on its one cell** (the day 128 save). A
+   joiner's home is now his own place at his bench. C3.
+10. **Looking found the capacity line grey on the Contracts tab.** It is a row now, green and red;
+    v51's men line under it is grey the same way and was left alone. C4.
+11. **The by hand lead of REPORT-T24 is gone**: every man at a stage works at the stage's one speed,
+    so the lead of a by hand job is at 0.67 like the men behind him. Notes 5.
 
 ## The tasks
 
@@ -220,3 +257,7 @@ differs by is what this turn did to it.
 | `09-the-work-plan-s-line.png` | the Work Plan's Jobs tab: under the crew column, `1 man working · 3 with no place at the saw` over the jobs | `report-t23/02-the-work-plan-crew-column.png`: the same tab with the crew column straight onto the jobs |
 | `10-a-contract-card-the-hall-can-keep-up-with.png` | the Contracts tab's offer card, cut sheet packs, 100 a week: `Your hall makes about 105 of these a week at full crew;` and `this term wants 100` in green, v51's `This contract is for 3 men at the least` under it | `report-t20/01-contracts-on-offer.png`: the same offer card with nothing about the hall. The men line says the men; the new row says the hall |
 | `11-a-contract-card-the-hall-cannot-keep-up-with.png` | the same card in a one used saw hall, 40 a week: `Your hall makes about 30 of these a week at full crew;` and `this term wants 40` in red | picture 10: the green against the red, before the contract is signed |
+
+**T25-C5 report and PR.** This file, and the pull request titled `Turn 25: places at the machines,
+and no man ever queues again`, not merged. The dev server the pictures were taken on was stopped
+and nothing is left running.
