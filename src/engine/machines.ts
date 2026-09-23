@@ -567,11 +567,18 @@ function benchQueue(state: GameState): string[] {
  *  holding its class's men, filled by `benchQueue` in order. Nobody is turned off a bench he is
  *  standing at, because nobody was ever standing at somebody else's (CLAUDE.md T23 2.17). */
 export function benchOf(state: GameState, who: string): Equipment | null {
+  return benchPlaceOf(state, who)?.item ?? null;
+}
+
+/** The bench this man works at and which of its places is his: the one answer `benchOf` reads,
+ *  with the place kept, so three men whose home is one industrial bench stand at its three places
+ *  and not on one cell (CLAUDE.md T23 2.17, T25 2.6). */
+export function benchPlaceOf(state: GameState, who: string): { item: Equipment; place: number } | null {
   let place = benchQueue(state).indexOf(who);
   if (place < 0) return null;
   for (const bench of benches(state)) {
     const places = placesOf(bench);
-    if (place < places) return bench;
+    if (place < places) return { item: bench, place };
     place -= places;
   }
   return null;

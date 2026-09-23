@@ -9,6 +9,7 @@ import { describe, expect, it } from 'vitest';
 import { bubbleFor } from '../../src/engine/bubbles';
 import { WAITING_FOR_MATERIAL, planPlaces } from '../../src/engine/production';
 import { STATION_OFFICE } from '../../src/engine/stations';
+import { drawContract } from '../../src/engine/contracts';
 import { CAPSULE_HEAD_TOP, markArt, renderHall } from '../../src/render/hall';
 import type { GameState } from '../../src/engine/index';
 import {
@@ -63,51 +64,35 @@ function noPlaceAtTheSaw(): GameState {
   return state;
 }
 
-/** The second joiner's bench, turned into one of this class: the men who have their home at it
- *  stand at its one home cell while the hall has no place for them, which is where marks meet. */
-function sharedHome(state: GameState, variantId: string, drop: string[] = []): void {
-  state.equipment = state.equipment.filter((item) => !drop.includes(item.id));
-  const bench = state.equipment.find((item) => item.id === 'kit-workbench-12');
-  if (!bench) throw new Error('the second bench is wanted');
-  bench.variantId = variantId;
-}
-
-/** Two jobs at their cutting stage with a budget saw between them, and the second and the third
- *  man at home at one standard bench: played two minutes, the two of them have no place and stand
- *  at that bench's one home cell, which is where two marks would be drawn on top of each other. */
-function twoJobsAtOneSaw(): GameState {
+/** So many men taken off their jobs and put on one standing contract whose rack has no sheets
+ *  for it: every one of them stands at the canteen door with the contract's mark, which is one
+ *  cell and one point over the hall for all of them [PIOTR, 22.09] (CLAUDE.md T24 2.3). Until v52
+ *  the men with no place at a machine shared its waiting cell, or the home cell of one bench; from
+ *  v52 each has his own place at his bench (CLAUDE.md T25 2.6), and the door is where marks still
+ *  meet. */
+function atTheDoor(men: string[]): GameState {
   let state = sixJoinersOnSheetWork({ saws: 1, sawVariant: 'budget' });
-  sharedHome(state, 'standard');
-  const [first, second] = state.jobs;
-  if (!first || !second) throw new Error('two jobs are wanted');
-  state = act(state, { type: 'ADD_TO_JOB', jobId: first.id, workerId: 'staff-3' });
-  state = act(state, { type: 'ADD_TO_JOB', jobId: second.id, workerId: 'staff-4' });
-  const keep = [first.id, second.id];
-  state.jobs = state.jobs.filter((job) => keep.includes(job.id));
-  for (const worker of state.workers) {
-    if (worker.jobId !== null && !keep.includes(worker.jobId)) worker.jobId = null;
+  const contract = drawContract(state);
+  contract.pieceId = 'cutSheetPack';
+  contract.status = 'offered';
+  state.contracts = [contract];
+  state = act(state, { type: 'ACCEPT_CONTRACT', contractId: contract.id });
+  for (const who of men) {
+    state = act(state, { type: 'ASSIGN_CONTRACT', contractId: contract.id, workerId: who, on: true });
   }
-  for (const job of state.jobs) {
-    job.labourRemaining = job.labourValue * 0.95;
-    job.stageLabour = {};
-  }
-  withOnlyCuttingLeft(state);
+  state.stock.sheets = 0;
   return runClock(state, 2);
 }
 
-/** Six jobs at their cutting stage with a budget saw between them, and the second, third and
- *  fourth man at home at one industrial bench: one man has the saw's place and the three stand at
- *  that bench's home cell, three marks over one point of the hall, the case CLAUDE.md T22 2.5
+/** Two men at the door: two marks over one cell. */
+function twoJobsAtOneSaw(): GameState {
+  return atTheDoor(['staff-2', 'staff-3']);
+}
+
+/** Three men at the door: three marks over one point of the hall, the case CLAUDE.md T22 2.5
  *  names in its own words ("two marks over two men at one machine"). */
 function threeJobsAtOneSaw(): GameState {
-  const state = sixJoinersOnSheetWork({ saws: 1, sawVariant: 'budget' });
-  sharedHome(state, 'industrial', ['kit-workbench-13', 'kit-workbench-14']);
-  for (const job of state.jobs) {
-    job.labourRemaining = job.labourValue * 0.95;
-    job.stageLabour = {};
-  }
-  withOnlyCuttingLeft(state);
-  return runClock(state, 2);
+  return atTheDoor(['staff-2', 'staff-3', 'staff-4']);
 }
 
 /** The mark drawn over one man, or '' when the hall drew him none. */
@@ -141,7 +126,12 @@ describe('a mark only where something is wrong (CLAUDE.md T22 2.5)', () => {
     expect(dry).toContain(`<div class="bubble">no sheets for ${job.name}</div>`);
     // And a man on no job at all. With no production manager on duty nobody takes one by himself,
     // so he is waiting for the boss's click and the mark says so (CLAUDE.md T23 2.1).
-    const idle = markOver(renderHall(twoJobsAtOneSaw()), 'worker-staff-5');
+    const loose = twoJobsAtOneSaw();
+    const five = loose.jobs.find((entry) => entry.assignees.includes('staff-5'));
+    if (five) five.assignees = five.assignees.filter((who) => who !== 'staff-5');
+    const man = loose.workers.find((worker) => worker.id === 'staff-5');
+    if (man) man.jobId = null;
+    const idle = markOver(renderHall(loose), 'worker-staff-5');
     expect(idle).toContain('data-bubble="waitingForBoss"');
     expect(idle).toContain('<div class="bubble">waiting for the boss</div>');
   });
@@ -207,8 +197,8 @@ describe('two marks over one cell (CLAUDE.md T22 2.5)', () => {
   it('stands them side by side and never one on top of the other', () => {
     const state = twoJobsAtOneSaw();
     const svg = renderHall(state);
-    // Two men off two jobs with no place, at the home cell of the one bench they share: the same
-    // cell, so the same point over the hall, and the second mark steps aside.
+    // Two men on a contract with no sheets, at the canteen door: the same cell, so the same point
+    // over the hall, and the second mark steps aside.
     const first = groupOf(svg, 'worker-staff-2');
     const second = groupOf(svg, 'worker-staff-3');
     const cellOf = (group: string): string => group.match(/data-cell="([^"]*)"/)?.[1] ?? '';
@@ -219,8 +209,8 @@ describe('two marks over one cell (CLAUDE.md T22 2.5)', () => {
   });
 
   it('steps the third mark over one cell twice as far', () => {
-    // Three men with no place at the saw, at the home cell of the one bench they share: three marks
-    // over one point of the hall. The first is where it is, the second steps aside by `step` and
+    // Three men on a contract with no sheets, at the canteen door: three marks over one point of
+    // the hall. The first is where it is, the second steps aside by `step` and
     // the third by twice it, and no two discs are ever drawn on top of each other
     // (CLAUDE.md T22 2.5).
     const svg = renderHall(threeJobsAtOneSaw());

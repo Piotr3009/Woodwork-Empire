@@ -167,3 +167,22 @@ could carry), balances -3,032.90 and deposits -2,325 (9 jobs delivered against 1
 26 to 7 on the jobs late in the owner's week away), material -3,110 and storage -300 (two loads
 in temporary storage on days 80 and 81), contract +1,056, repair +150 (v51's day 75 extractor
 repair is not in this run), transport +240, overdraft interest -24.53, insurance -16.66.
+
+**T25-C3 the cross check.** The section 7 grep finds the migration (lines 749 to 772), the dead
+field's declaration (`types.ts:288`) and `waitingForBoss: 'waiting for the boss'` (B5, the Turn 23
+boss mark), and nothing else. `tests/engine/crossCheckT25.test.ts` opens every save the tree has
+(the three day fixtures and the v18 to v20 saves; there is no day 53 save, notes 6) and runs one
+minute: no queue station survives, `takenBy` is null on every item, and no two men on the floor
+stand on one cell. It found one thing on its first run, and it is fixed here: on the day 128 save
+Eddie, Pete and Callum have no place at the saw and share one industrial bench as home, and all
+three stood on its first cell, because `homeCellOf` gave a joiner his bench's anchor. It now gives
+him his own place at it (`benchPlaceOf`, the place `benchOf` always counted, and `placeCellsAt`),
+so men who share a bench stand at its places. Two render tests built their two and three marks
+over one cell from exactly that heap; they are rebuilt at the canteen door (contract men with no
+sheets, T24 2.3), where marks still meet, and `v38.test.ts`'s home cell reads the place.
+The rest of section 7 is asserted in the task tests: four men at a used saw for a full day and
+two at a standard one (`dayPlan.test.ts`), the place handed on the next minute (`dayPlan`,
+`nobodyMoved`), used plus industrial at 1.12 (`variants.test.ts`), four men over two saws at four
+places (`placesFigures.test.ts`), the contract figure halving when a saw is sold
+(`contractHall.test.ts`). Every scenario is green; `git diff 3eb8ef2 --stat -- src/ui/styles.css`
+is empty, so no token and no rule was added.
