@@ -45,3 +45,22 @@ place handed on the minute a man is taken off, a second saw's places, a breakdow
 and the repair giving them back, a stage moving to another family, a family the hall does not own
 wanting no place, a contract man in the same order, and four men at a used saw for a full day: one
 man's output and three days of `noPlace` (two men work at a standard saw).
+
+**T25-B2 2.4, the hall's pace, and the Output sheet's `<why>`.** `outputFactor` is gone from
+every class of every family and from `EquipmentVariant`: one ladder, `MACHINE_PACE`, read through
+`classPaceOf` for the families a man works at (`PACED_FAMILIES`: the places table's seven and the
+solid wood tools, whose class was a speed on v51 too), and 1 for everything else.
+`paceOf` adds the gate's 2% as before; `hallPace(state, family)` is the best of the family
+standing unbroken and not away for its service (`bestMachineOf`, which now skips a broken or
+serviced machine), and `stageSpeed` reads it for every stage, the CNC's included (its head times
+its pace). `bestOutputFactor`, `outputFactorOf` and the dead `machineOutputFactor` are deleted.
+What moves: the top of every machine ladder falls from 1.30 (the edgebander 1.35) to 1.12 and the
+pro class from 1.15 to 1.08, which are Piotr's figures; the bench's Turn 23 column
+(1.03/1.06/1.10) folds into the ladder (1.05/1.08/1.12). A machine's savings row reads the hall's
+pace, because every hour at any saw ran at it. The `<why>` of a man's row on the Output sheet is
+`saw, industrial` (the family's short word and the class that sets the pace), `at the bench` and
+`by hand` as before. Tests flipped: the industrial saw's cutting quarter (143 minutes of 640, was
+123), the thirty day industrial month's cutting at 1.12, the class card's `Output +12%`, the
+bench card's `+5%/+8%/+12% pace`, the CNC tests on a budget CNC (pace 1.00, so the head's figures
+hold); new: a used and an industrial saw cut at 1.12 and at 0.95 while the good one is broken or
+away, and the `<why>` of the day 128 save and of a two saw hall.

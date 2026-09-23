@@ -472,7 +472,6 @@ export {
   findVariant,
   freeBenches,
   hallHasABench,
-  machineOutputFactor,
   machinePowerPerDay,
   pastEndurance,
   variantFor,
@@ -727,7 +726,9 @@ export {
   gateCheck,
   hasGate,
   insuranceAddedYearly,
-  outputFactorOf,
+  classPaceOf,
+  hallPace,
+  paceOf,
 } from './machines';
 export {
   extractionLoad,

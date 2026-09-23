@@ -1313,7 +1313,6 @@ export const TABLE_SAW_VARIANTS: EquipmentVariant[] = [
     height: 1.4,
     zoneWidth: 3,
     zoneDepth: 3,
-    outputFactor: 0.95,
     enduranceFactor: 0.25,
     powerPerDay: 3,
     description:
@@ -1330,7 +1329,6 @@ export const TABLE_SAW_VARIANTS: EquipmentVariant[] = [
     height: 1.4,
     zoneWidth: 3,
     zoneDepth: 3,
-    outputFactor: 1,
     enduranceFactor: 1,
     powerPerDay: 3,
     description:
@@ -1347,7 +1345,6 @@ export const TABLE_SAW_VARIANTS: EquipmentVariant[] = [
     height: 1.95,
     zoneWidth: 4,
     zoneDepth: 3,
-    outputFactor: 1.05,
     enduranceFactor: 1.2,
     powerPerDay: 4,
     description:
@@ -1364,7 +1361,6 @@ export const TABLE_SAW_VARIANTS: EquipmentVariant[] = [
     height: 2.15,
     zoneWidth: 6,
     zoneDepth: 3,
-    outputFactor: 1.15,
     enduranceFactor: 1.5,
     powerPerDay: 5,
     description:
@@ -1381,7 +1377,6 @@ export const TABLE_SAW_VARIANTS: EquipmentVariant[] = [
     height: 2.65,
     zoneWidth: 5,
     zoneDepth: 4,
-    outputFactor: 1.3,
     enduranceFactor: 2,
     powerPerDay: 7,
     description:
@@ -1447,13 +1442,17 @@ export const MACHINE_PACE: Record<string, number> = {
   industrial: 1.12,
 };
 
+/** The families whose class is a pace: every family of the places table, and the solid wood tools,
+ *  the one stage family a man works at without a place because the tools are shared out of a
+ *  cabinet (CLAUDE.md T25 2.3, 2.4). Every other family's class is its capacity, its air or its
+ *  store, and never a speed. */
+export const PACED_FAMILIES: readonly string[] = [...Object.keys(MACHINE_PLACES), 'solidWoodTools'];
+
 /** The five classes of workbench. Prices, places and footprints are Piotr's table; the endurance
  *  and the power are [TUNE] (CLAUDE.md T7 3.6, T23 2.17). A bench is not a machine, so its hours
  *  never move: the ladder is there so the family reads like every other one.
- *
- *  `outputFactor` is the pace a man works at one, and Turn 23 re tuned the column to top out at
- *  +10% where it topped out at +8%: 1.02, 1.05 and 1.08 become 1.03, 1.06 and 1.10 [TUNE, the
- *  figures; PIOTR, 20.09, the top of the ladder]. */
+ *  The pace a man works at one is `MACHINE_PACE`, the one ladder of every family, from v52
+ *  (CLAUDE.md T25 2.4). */
 export const WORKBENCH_VARIANTS: EquipmentVariant[] = [
   {
     id: 'used',
@@ -1464,7 +1463,6 @@ export const WORKBENCH_VARIANTS: EquipmentVariant[] = [
     height: 0.9,
     zoneWidth: 2,
     zoneDepth: 2,
-    outputFactor: 0.95,
     enduranceFactor: ENDURANCE_BY_CLASS.used ?? 1,
     powerPerDay: 1,
     description:
@@ -1481,7 +1479,6 @@ export const WORKBENCH_VARIANTS: EquipmentVariant[] = [
     height: 0.9,
     zoneWidth: 2,
     zoneDepth: 2,
-    outputFactor: 1,
     enduranceFactor: ENDURANCE_BY_CLASS.budget ?? 1,
     powerPerDay: 1,
     description:
@@ -1498,7 +1495,6 @@ export const WORKBENCH_VARIANTS: EquipmentVariant[] = [
     height: 0.9,
     zoneWidth: 2,
     zoneDepth: 2,
-    outputFactor: 1.03,
     enduranceFactor: ENDURANCE_BY_CLASS.standard ?? 1,
     powerPerDay: 1,
     description:
@@ -1514,7 +1510,6 @@ export const WORKBENCH_VARIANTS: EquipmentVariant[] = [
     height: 0.9,
     zoneWidth: 2,
     zoneDepth: 2,
-    outputFactor: 1.06,
     enduranceFactor: ENDURANCE_BY_CLASS.pro ?? 1,
     powerPerDay: 1,
     description:
@@ -1531,7 +1526,6 @@ export const WORKBENCH_VARIANTS: EquipmentVariant[] = [
     height: 0.9,
     zoneWidth: 3,
     zoneDepth: 2,
-    outputFactor: 1.10,
     enduranceFactor: ENDURANCE_BY_CLASS.industrial ?? 1,
     powerPerDay: 2,
     description:
@@ -1555,7 +1549,6 @@ export const SHEET_RACK_VARIANTS: EquipmentVariant[] = [
     zoneWidth: 2,
     zoneDepth: 2,
     sheetCapacity: 30,
-    outputFactor: 1,
     enduranceFactor: ENDURANCE_BY_CLASS.used ?? 1,
     powerPerDay: 1,
     description:
@@ -1572,7 +1565,6 @@ export const SHEET_RACK_VARIANTS: EquipmentVariant[] = [
     zoneWidth: 2,
     zoneDepth: 2,
     sheetCapacity: 50,
-    outputFactor: 1,
     enduranceFactor: ENDURANCE_BY_CLASS.budget ?? 1,
     powerPerDay: 1,
     description:
@@ -1589,7 +1581,6 @@ export const SHEET_RACK_VARIANTS: EquipmentVariant[] = [
     zoneWidth: 2,
     zoneDepth: 2,
     sheetCapacity: 75,
-    outputFactor: 1,
     enduranceFactor: ENDURANCE_BY_CLASS.standard ?? 1,
     powerPerDay: 1,
     description:
@@ -1606,7 +1597,6 @@ export const SHEET_RACK_VARIANTS: EquipmentVariant[] = [
     zoneWidth: 3,
     zoneDepth: 2,
     sheetCapacity: 110,
-    outputFactor: 1,
     enduranceFactor: ENDURANCE_BY_CLASS.pro ?? 1,
     powerPerDay: 1,
     description:
@@ -1623,7 +1613,6 @@ export const SHEET_RACK_VARIANTS: EquipmentVariant[] = [
     zoneWidth: 4,
     zoneDepth: 2,
     sheetCapacity: 160,
-    outputFactor: 1,
     enduranceFactor: ENDURANCE_BY_CLASS.industrial ?? 1,
     powerPerDay: 1,
     description:
@@ -1669,7 +1658,6 @@ export const TOOL_CABINET_VARIANTS: EquipmentVariant[] = [
     height: 1,
     zoneWidth: 1,
     zoneDepth: 1,
-    outputFactor: 1,
     enduranceFactor: ENDURANCE_BY_CLASS.used ?? 1,
     powerPerDay: 1,
     description:
@@ -1686,7 +1674,6 @@ export const TOOL_CABINET_VARIANTS: EquipmentVariant[] = [
     height: 1,
     zoneWidth: 1,
     zoneDepth: 1,
-    outputFactor: 1,
     enduranceFactor: ENDURANCE_BY_CLASS.budget ?? 1,
     powerPerDay: 1,
     description:
@@ -1703,7 +1690,6 @@ export const TOOL_CABINET_VARIANTS: EquipmentVariant[] = [
     height: 1,
     zoneWidth: 2,
     zoneDepth: 1,
-    outputFactor: 1,
     enduranceFactor: ENDURANCE_BY_CLASS.standard ?? 1,
     powerPerDay: 1,
     description:
@@ -1720,7 +1706,6 @@ export const TOOL_CABINET_VARIANTS: EquipmentVariant[] = [
     height: 1.8,
     zoneWidth: 2,
     zoneDepth: 1,
-    outputFactor: 1,
     enduranceFactor: ENDURANCE_BY_CLASS.pro ?? 1,
     powerPerDay: 1,
     description:
@@ -1736,7 +1721,6 @@ export const TOOL_CABINET_VARIANTS: EquipmentVariant[] = [
     height: 2,
     zoneWidth: 3,
     zoneDepth: 1,
-    outputFactor: 1,
     enduranceFactor: ENDURANCE_BY_CLASS.industrial ?? 1,
     powerPerDay: 1,
     description:
@@ -1760,7 +1744,6 @@ export const EDGEBANDER_VARIANTS: EquipmentVariant[] = [
     zoneWidth: 0,
     zoneDepth: 0,
     requires: [TOOL_CABINET_ID],
-    outputFactor: 0.95,
     enduranceFactor: ENDURANCE_BY_CLASS.used ?? 1,
     powerPerDay: 1,
     description:
@@ -1777,7 +1760,6 @@ export const EDGEBANDER_VARIANTS: EquipmentVariant[] = [
     zoneWidth: 0,
     zoneDepth: 0,
     requires: [TOOL_CABINET_ID],
-    outputFactor: 1,
     enduranceFactor: ENDURANCE_BY_CLASS.budget ?? 1,
     powerPerDay: 1,
     description:
@@ -1795,7 +1777,6 @@ export const EDGEBANDER_VARIANTS: EquipmentVariant[] = [
     zoneDepth: 3,
     requires: [],
     requiresOneOf: ['extractor', 'dustSystem', 'flexiSystem'],
-    outputFactor: 1.1,
     enduranceFactor: ENDURANCE_BY_CLASS.standard ?? 1,
     powerPerDay: 4,
     description:
@@ -1814,7 +1795,6 @@ export const EDGEBANDER_VARIANTS: EquipmentVariant[] = [
     zoneDepth: 3,
     requires: [],
     requiresOneOf: ['extractor', 'dustSystem', 'flexiSystem'],
-    outputFactor: 1.2,
     enduranceFactor: ENDURANCE_BY_CLASS.pro ?? 1,
     powerPerDay: 5,
     description:
@@ -1832,7 +1812,6 @@ export const EDGEBANDER_VARIANTS: EquipmentVariant[] = [
     zoneDepth: 3,
     requires: [],
     requiresOneOf: ['extractor', 'dustSystem', 'flexiSystem'],
-    outputFactor: 1.35,
     enduranceFactor: ENDURANCE_BY_CLASS.industrial ?? 1,
     powerPerDay: 6,
     description:
@@ -1859,7 +1838,6 @@ export const EXTRACTOR_VARIANTS: EquipmentVariant[] = [
     height: 2,
     zoneWidth: 1,
     zoneDepth: 1,
-    outputFactor: 1,
     enduranceFactor: ENDURANCE_BY_CLASS.used ?? 1,
     powerPerDay: 2,
     description:
@@ -1876,7 +1854,6 @@ export const EXTRACTOR_VARIANTS: EquipmentVariant[] = [
     height: 2,
     zoneWidth: 1,
     zoneDepth: 1,
-    outputFactor: 1,
     enduranceFactor: ENDURANCE_BY_CLASS.budget ?? 1,
     powerPerDay: 3,
     description:
@@ -1893,7 +1870,6 @@ export const EXTRACTOR_VARIANTS: EquipmentVariant[] = [
     height: 2,
     zoneWidth: 2,
     zoneDepth: 1,
-    outputFactor: 1,
     enduranceFactor: ENDURANCE_BY_CLASS.standard ?? 1,
     powerPerDay: 5,
     description:
@@ -1909,7 +1885,6 @@ export const EXTRACTOR_VARIANTS: EquipmentVariant[] = [
     height: 2.5,
     zoneWidth: 3,
     zoneDepth: 1,
-    outputFactor: 1,
     enduranceFactor: ENDURANCE_BY_CLASS.pro ?? 1,
     powerPerDay: 8,
     description:
@@ -1925,7 +1900,6 @@ export const EXTRACTOR_VARIANTS: EquipmentVariant[] = [
     height: 2.5,
     zoneWidth: 5,
     zoneDepth: 1,
-    outputFactor: 1,
     enduranceFactor: ENDURANCE_BY_CLASS.industrial ?? 1,
     powerPerDay: 14,
     description:
@@ -1951,7 +1925,6 @@ export const COMPRESSOR_VARIANTS: EquipmentVariant[] = [
     height: 1,
     zoneWidth: 1,
     zoneDepth: 1,
-    outputFactor: 1,
     enduranceFactor: ENDURANCE_BY_CLASS.used ?? 1,
     powerPerDay: 2,
     description:
@@ -1968,7 +1941,6 @@ export const COMPRESSOR_VARIANTS: EquipmentVariant[] = [
     height: 1,
     zoneWidth: 1,
     zoneDepth: 1,
-    outputFactor: 1,
     enduranceFactor: ENDURANCE_BY_CLASS.budget ?? 1,
     powerPerDay: 3,
     description:
@@ -1984,7 +1956,6 @@ export const COMPRESSOR_VARIANTS: EquipmentVariant[] = [
     height: 1.5,
     zoneWidth: 2,
     zoneDepth: 1,
-    outputFactor: 1,
     enduranceFactor: ENDURANCE_BY_CLASS.standard ?? 1,
     powerPerDay: 6,
     description:
@@ -2000,7 +1971,6 @@ export const COMPRESSOR_VARIANTS: EquipmentVariant[] = [
     height: 1.5,
     zoneWidth: 2,
     zoneDepth: 1,
-    outputFactor: 1,
     enduranceFactor: ENDURANCE_BY_CLASS.pro ?? 1,
     powerPerDay: 10,
     description:
@@ -2016,7 +1986,6 @@ export const COMPRESSOR_VARIANTS: EquipmentVariant[] = [
     height: 2.5,
     zoneWidth: 2,
     zoneDepth: 2,
-    outputFactor: 1,
     enduranceFactor: ENDURANCE_BY_CLASS.industrial ?? 1,
     powerPerDay: 20,
     description:
@@ -2158,7 +2127,6 @@ export const THICKNESSER_VARIANTS: EquipmentVariant[] = [
     height: 1,
     zoneWidth: 4,
     zoneDepth: 2,
-    outputFactor: 0.95,
     enduranceFactor: 0.25,
     powerPerDay: 3,
     description:
@@ -2175,7 +2143,6 @@ export const THICKNESSER_VARIANTS: EquipmentVariant[] = [
     height: 1,
     zoneWidth: 4,
     zoneDepth: 2,
-    outputFactor: 1,
     enduranceFactor: 1,
     powerPerDay: 3,
     description:
@@ -2191,7 +2158,6 @@ export const THICKNESSER_VARIANTS: EquipmentVariant[] = [
     height: 1,
     zoneWidth: 4,
     zoneDepth: 2,
-    outputFactor: 1.05,
     enduranceFactor: 1.2,
     powerPerDay: 4,
     description:
@@ -2207,7 +2173,6 @@ export const THICKNESSER_VARIANTS: EquipmentVariant[] = [
     height: 1,
     zoneWidth: 5,
     zoneDepth: 2,
-    outputFactor: 1.15,
     enduranceFactor: 1.5,
     powerPerDay: 5,
     description:
@@ -2224,7 +2189,6 @@ export const THICKNESSER_VARIANTS: EquipmentVariant[] = [
     height: 1.2,
     zoneWidth: 5,
     zoneDepth: 3,
-    outputFactor: 1.3,
     enduranceFactor: 2,
     powerPerDay: 7,
     description:
@@ -2246,7 +2210,6 @@ export const SOLID_WOOD_TOOLS_VARIANTS: EquipmentVariant[] = [
     height: 1,
     zoneWidth: 3,
     zoneDepth: 2,
-    outputFactor: 0.95,
     enduranceFactor: 0.25,
     powerPerDay: 3,
     description:
@@ -2262,7 +2225,6 @@ export const SOLID_WOOD_TOOLS_VARIANTS: EquipmentVariant[] = [
     height: 1,
     zoneWidth: 3,
     zoneDepth: 2,
-    outputFactor: 1,
     enduranceFactor: 1,
     powerPerDay: 3,
     description:
@@ -2278,7 +2240,6 @@ export const SOLID_WOOD_TOOLS_VARIANTS: EquipmentVariant[] = [
     height: 1,
     zoneWidth: 3,
     zoneDepth: 2,
-    outputFactor: 1.05,
     enduranceFactor: 1.2,
     powerPerDay: 4,
     description:
@@ -2294,7 +2255,6 @@ export const SOLID_WOOD_TOOLS_VARIANTS: EquipmentVariant[] = [
     height: 1,
     zoneWidth: 4,
     zoneDepth: 2,
-    outputFactor: 1.15,
     enduranceFactor: 1.5,
     powerPerDay: 5,
     description:
@@ -2310,7 +2270,6 @@ export const SOLID_WOOD_TOOLS_VARIANTS: EquipmentVariant[] = [
     height: 1.2,
     zoneWidth: 5,
     zoneDepth: 3,
-    outputFactor: 1.3,
     enduranceFactor: 2,
     powerPerDay: 7,
     description:
@@ -2333,7 +2292,6 @@ export const CNC_VARIANTS: EquipmentVariant[] = [
     height: 1,
     zoneWidth: 5,
     zoneDepth: 4,
-    outputFactor: 0.95,
     enduranceFactor: 0.25,
     powerPerDay: 8,
     description:
@@ -2350,7 +2308,6 @@ export const CNC_VARIANTS: EquipmentVariant[] = [
     height: 1,
     zoneWidth: 5,
     zoneDepth: 4,
-    outputFactor: 1,
     enduranceFactor: 1,
     powerPerDay: 8,
     description:
@@ -2367,7 +2324,6 @@ export const CNC_VARIANTS: EquipmentVariant[] = [
     height: 1,
     zoneWidth: 5,
     zoneDepth: 4,
-    outputFactor: 1.05,
     enduranceFactor: 1.2,
     powerPerDay: 10,
     description:
@@ -2384,7 +2340,6 @@ export const CNC_VARIANTS: EquipmentVariant[] = [
     height: 1.2,
     zoneWidth: 6,
     zoneDepth: 4,
-    outputFactor: 1.15,
     enduranceFactor: 1.5,
     powerPerDay: 12,
     description:
@@ -2401,7 +2356,6 @@ export const CNC_VARIANTS: EquipmentVariant[] = [
     height: 1.2,
     zoneWidth: 6,
     zoneDepth: 5,
-    outputFactor: 1.3,
     enduranceFactor: 2,
     powerPerDay: 16,
     description:
@@ -2423,7 +2377,6 @@ export const SPRAY_BOOTH_VARIANTS: EquipmentVariant[] = [
     height: 1.5,
     zoneWidth: 4,
     zoneDepth: 3,
-    outputFactor: 0.95,
     enduranceFactor: 0.25,
     powerPerDay: 4,
     description:
@@ -2440,7 +2393,6 @@ export const SPRAY_BOOTH_VARIANTS: EquipmentVariant[] = [
     height: 1.5,
     zoneWidth: 4,
     zoneDepth: 3,
-    outputFactor: 1,
     enduranceFactor: 1,
     powerPerDay: 4,
     description:
@@ -2456,7 +2408,6 @@ export const SPRAY_BOOTH_VARIANTS: EquipmentVariant[] = [
     height: 1.5,
     zoneWidth: 4,
     zoneDepth: 3,
-    outputFactor: 1.05,
     enduranceFactor: 1.2,
     powerPerDay: 5,
     description:
@@ -2473,7 +2424,6 @@ export const SPRAY_BOOTH_VARIANTS: EquipmentVariant[] = [
     height: 1.8,
     zoneWidth: 5,
     zoneDepth: 3,
-    outputFactor: 1.15,
     enduranceFactor: 1.5,
     powerPerDay: 7,
     description:
@@ -2489,7 +2439,6 @@ export const SPRAY_BOOTH_VARIANTS: EquipmentVariant[] = [
     height: 2,
     zoneWidth: 6,
     zoneDepth: 4,
-    outputFactor: 1.3,
     enduranceFactor: 2,
     powerPerDay: 10,
     description:
@@ -2514,7 +2463,6 @@ export const SPINDLE_MOULDER_VARIANTS: EquipmentVariant[] = [
     height: 1.9,
     zoneWidth: 3,
     zoneDepth: 3,
-    outputFactor: 0.95,
     enduranceFactor: 0.25,
     powerPerDay: 3,
     description:
@@ -2531,7 +2479,6 @@ export const SPINDLE_MOULDER_VARIANTS: EquipmentVariant[] = [
     height: 1.85,
     zoneWidth: 3,
     zoneDepth: 3,
-    outputFactor: 1,
     enduranceFactor: 1,
     powerPerDay: 3,
     description:
@@ -2547,7 +2494,6 @@ export const SPINDLE_MOULDER_VARIANTS: EquipmentVariant[] = [
     height: 2.25,
     zoneWidth: 3,
     zoneDepth: 3,
-    outputFactor: 1.05,
     enduranceFactor: 1.2,
     powerPerDay: 4,
     description:
@@ -2564,7 +2510,6 @@ export const SPINDLE_MOULDER_VARIANTS: EquipmentVariant[] = [
     height: 2.15,
     zoneWidth: 4,
     zoneDepth: 3,
-    outputFactor: 1.15,
     enduranceFactor: 1.5,
     powerPerDay: 5,
     description:
@@ -2581,7 +2526,6 @@ export const SPINDLE_MOULDER_VARIANTS: EquipmentVariant[] = [
     height: 2.85,
     zoneWidth: 5,
     zoneDepth: 3,
-    outputFactor: 1.3,
     enduranceFactor: 2,
     powerPerDay: 7,
     description:
@@ -2641,7 +2585,6 @@ function withVariants(draft: SpecDraft): EquipmentSpec {
       id: STANDARD_VARIANT,
       name: draft.name,
       price: draft.price,
-      outputFactor: 1,
       enduranceFactor: 1,
       powerPerDay: POWER_PER_MACHINE_DAILY,
       description: draft.effect,

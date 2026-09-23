@@ -154,9 +154,6 @@ export interface EquipmentVariant {
   id: string;
   name: string;
   price: number;
-  /** Multiplies the production speed of the stage this machine does, and of no other
-   *  (CLAUDE.md T7 3.1). */
-  outputFactor: number;
   /** Multiplies the family's base endurance in hours. */
   enduranceFactor: number;
   /** Power this one draws a day. */

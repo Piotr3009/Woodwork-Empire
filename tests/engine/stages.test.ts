@@ -98,16 +98,17 @@ describe('the stages a job is made in', () => {
 });
 
 describe('what a machine does to the minutes', () => {
-  it('gives a 640 minute job a cutting stage of 123 minutes on an industrial saw', () => {
+  it('gives a 640 minute job a cutting stage of 143 minutes on an industrial saw', () => {
     const state = hallWithSaw('industrial');
     const job = jobOfMinutes(640);
     const cutting = stagePlanFor(state, job)[0];
     expect(cutting?.id).toBe('cutting');
-    // 640 minutes, a quarter of them cutting, divided by the industrial saw's 1.30.
+    // 640 minutes, a quarter of them cutting, divided by the industrial class's pace, 1.12 from
+    // v52 where it was 1.30 (CLAUDE.md T25 2.4).
     const minutes = (cutting?.to ?? 0) / (OWNER_LABOUR_PER_MINUTE * (cutting?.speed ?? 1));
-    expect(minutes).toBeCloseTo(123.08, 2);
+    expect(minutes).toBeCloseTo(142.86, 2);
     // Every other stage still runs at the speed of a standard machine tonight.
-    expect(jobMinutesFor(state, job, 1)).toBeCloseTo(123.08 + 640 * 0.75, 1);
+    expect(jobMinutesFor(state, job, 1)).toBeCloseTo(142.86 + 640 * 0.75, 1);
   });
 
   it('speeds up its own stage and no other', () => {

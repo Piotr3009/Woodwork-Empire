@@ -62,7 +62,7 @@ import {
 } from '../../src/engine/contracts';
 import { workerMinuteCost } from '../../src/engine/jobs';
 import { freeSheets, reservedSheets } from '../../src/engine/materials';
-import { bestOutputFactor, hallProductivityFactor, machineWearPerMinute, menAtMachine, menAtPlaces } from '../../src/engine/machines';
+import { hallPace, hallProductivityFactor, machineWearPerMinute, menAtMachine, menAtPlaces } from '../../src/engine/machines';
 import { planPlaces } from '../../src/engine/production';
 import { STATION_DOOR, STATION_HOME } from '../../src/engine/stations';
 import { staffOutputFactor } from '../../src/engine/owner';
@@ -388,7 +388,7 @@ describe('the piece work', () => {
     const piece = contractPiece(contract);
     const saw = state.equipment.find((item) => item.specId === 'tableSaw');
     if (!saw) throw new Error('a saw is wanted');
-    const speed = bestOutputFactor(state, 'tableSaw');
+    const speed = hallPace(state, 'tableSaw');
     const worth = WORKER_RATES.novice * staffOutputFactor(state) * speed * hallProductivityFactor(state);
     const cashBefore = state.cash;
     const worked = minutes(state, 200);

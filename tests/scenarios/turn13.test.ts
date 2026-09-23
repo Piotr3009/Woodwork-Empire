@@ -46,10 +46,9 @@ import {
   unservedMachines,
   weekOfDay,
   onHoliday,
-  outputFactorOf,
+  classPaceOf,
+  paceOf,
   staffOutputFactor,
-  variantOf,
-  findSpec,
 } from '../../src/engine/index';
 import type { GameEvent, GameState } from '../../src/engine/index';
 
@@ -454,15 +453,11 @@ describe('(x) a thicknesser and two saws on one extractor, with gates on the saw
   });
 
   it('gives a gated saw two per cent more output on its own stage', () => {
-    const baseOf = (item: { specId: string; variantId: string }): number => {
-      const spec = findSpec(item.specId);
-      if (!spec) throw new Error(`no spec ${item.specId}`);
-      return variantOf(spec, item.variantId).outputFactor;
-    };
+    const baseOf = (item: { specId: string; variantId: string }): number => classPaceOf(item);
     for (const saw of saws) {
-      expect(outputFactorOf(gated, saw)).toBeCloseTo(baseOf(saw) * (1 + GATE_OUTPUT_BONUS), 6);
+      expect(paceOf(gated, saw)).toBeCloseTo(baseOf(saw) * (1 + GATE_OUTPUT_BONUS), 6);
     }
-    expect(outputFactorOf(gated, thicknesser)).toBe(baseOf(thicknesser));
+    expect(paceOf(gated, thicknesser)).toBe(baseOf(thicknesser));
   });
 
   it('counts a gated saw only while it runs, and the ungated thicknesser whenever the fan does', () => {

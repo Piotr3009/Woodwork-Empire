@@ -19,7 +19,7 @@ import {
   SPRAYER_SPRAY_RATE,
   WORK_EPSILON,
 } from './constants';
-import { OWNER, SPRAY_BOOTH, bestOutputFactor, has } from './machines';
+import { OWNER, SPRAY_BOOTH, hallPace, has } from './machines';
 import { stationMachine } from './stations';
 import type {
   Finish,
@@ -146,8 +146,8 @@ export function familyForStage(job: StagedJob, stage: StageId): string | null {
  *  nothing is made at all, which the hall says for itself (CLAUDE.md T4 3.4). */
 const BY_HAND_STAGES: StageId[] = ['cutting', 'machining', 'cnc'];
 
-/** What the hall does to the minutes of one stage: the best class of the family it is done on,
- *  or the by hand penalty when the family is not in the hall at all. */
+/** What the hall does to the minutes of one stage: the hall's pace for the family it is done on
+ *  (CLAUDE.md T25 2.4), or the by hand penalty when the family is not in the hall at all. */
 export function stageSpeed(
   state: GameState,
   job: StagedJob,
@@ -156,12 +156,13 @@ export function stageSpeed(
 ): { speed: number; byHand: boolean } {
   // A job made entirely by hand uses no machine at any stage (CLAUDE.md 9.5).
   if (job.byHand) return { speed: 1 / BY_HAND_DURATION_FACTOR, byHand: true };
-  if (stage === 'cnc') return { speed: cncFactor(state), byHand: false };
+  // The CNC's own head times the hall's pace at it, like every family (CLAUDE.md T25 2.4).
+  if (stage === 'cnc') return { speed: cncFactor(state) * hallPace(state, 'cnc'), byHand: false };
   const family = familyForStage(job, stage);
   if (family === null) return { speed: 1, byHand: false };
   // Parts come off a CNC cut and drilled, so the bench takes half the minutes (CLAUDE.md T7 3.4).
   const cnc = stage === 'assembly' && jobOnCnc(state, job, options) ? CNC_ASSEMBLY_FACTOR : 1;
-  if (has(state, family)) return { speed: bestOutputFactor(state, family) * cnc, byHand: false };
+  if (has(state, family)) return { speed: hallPace(state, family) * cnc, byHand: false };
   if (!BY_HAND_STAGES.includes(stage)) return { speed: cnc, byHand: false };
   return { speed: cnc / BY_HAND_DURATION_FACTOR, byHand: true };
 }

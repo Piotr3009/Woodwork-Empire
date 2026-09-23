@@ -49,6 +49,7 @@ import {
   OWNER,
   accumulateMachineMinute,
   bestMachineOf,
+  classPaceOf,
   bookOutputMinute,
   findSpec,
   hallProductivityFactor,
@@ -234,7 +235,7 @@ export function contractReferenceFor(piece: ContractPieceSpec): ContractReferenc
   const family = pieceFamily(piece);
   const spec = family === null ? undefined : findSpec(family);
   const standard = spec?.variants.find((variant) => variant.id === CONTRACT_REFERENCE_CLASS);
-  const speed = standard?.outputFactor ?? 1;
+  const speed = standard === undefined || family === null ? 1 : classPaceOf({ specId: family, variantId: standard.id });
   const minutes = Math.max(1, Math.round(piece.minutes / (rate * (speed > 0 ? speed : 1))));
   const labourCost = pence(minutes * workerMinuteCost(middling?.monthlyWage ?? 0));
   const wear = pence(minutes * (standard === undefined ? 0 : wearPerMinuteOf(standard.price)));
@@ -512,7 +513,12 @@ export function contractMachineTip(
     // The class the catalogue offers first is the one he would buy, and its wear comes with it,
     // so the tip does not promise a saw's minutes at a used saw's service bill (v40).
     const first = spec.variants[0];
-    const speed = specId === 'cnc' ? stageSpeed(state, staged, 'cnc').speed : (first?.outputFactor ?? 1);
+    const speed =
+      specId === 'cnc'
+        ? stageSpeed(state, staged, 'cnc').speed
+        : first === undefined
+          ? 1
+          : classPaceOf({ specId, variantId: first.id });
     const withIt = resultAtSpeed(state, contract, worker, speed, {
       wearPerMinute: first === undefined ? 0 : wearPerMinuteOf(first.price),
       name: first?.name ?? spec.name,

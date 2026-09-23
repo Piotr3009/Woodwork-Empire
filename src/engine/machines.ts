@@ -25,7 +25,9 @@ import {
   SERVICE_INTERVAL_MONTHS,
   MACHINE_HOURS_PER_MONTH,
   TIER_WORDS,
+  MACHINE_PACE,
   MACHINE_PLACES,
+  PACED_FAMILIES,
   DUST_HIGH_THRESHOLD,
   DUST_MAX,
   DUST_PER_PRODUCTION_MINUTE,
@@ -89,7 +91,6 @@ import type {
   EquipmentSpec,
   EquipmentVariant,
   GameState,
-  MaterialKind,
   Orientation,
   WorkerTier,
 } from './types';
@@ -444,12 +445,19 @@ export function hasGate(state: GameState, item: { id: string }): boolean {
   return state.gates.includes(item.id);
 }
 
-/** What this machine does to the speed of its family's stage: its class's factor, and the
- *  gate's bonus on top of it once one is fitted (PIOTR: +2%; CLAUDE.md T13 3.11). The one place a
- *  machine's output factor is read: the hall's best of the family, the projection and the board
- *  all come through here. */
-export function outputFactorOf(state: GameState, item: Equipment): number {
-  const base = variantFor(item)?.outputFactor ?? 1;
+/** The pace a class of this family works at, off the one table of 2.4: used 0.95 up to industrial
+ *  1.12 for every family a man works at, and 1 for everything else (the extraction, the air, the
+ *  storage), whose class is never a speed [PIOTR, 21.09] (CLAUDE.md T25 2.4). */
+export function classPaceOf(item: { specId: string; variantId: string }): number {
+  if (!PACED_FAMILIES.includes(item.specId)) return 1;
+  return MACHINE_PACE[item.variantId] ?? 1;
+}
+
+/** What this machine does to the pace of its family: its class's pace, and the gate's bonus on
+ *  top of it once one is fitted (PIOTR: +2%; CLAUDE.md T13 3.11, T25 2.4). The one place a
+ *  machine's pace is read: the hall's pace, the projection and the board all come through here. */
+export function paceOf(state: GameState, item: Equipment): number {
+  const base = classPaceOf(item);
   if (!hasGate(state, item)) return base;
   return Math.round(base * (1 + GATE_OUTPUT_BONUS) * 10000) / 10000;
 }
@@ -794,7 +802,7 @@ export function outputBreakdown(state: GameState): OutputBreakdown {
       .map((item) => item.specId),
   );
   for (const specId of Array.from(families).sort()) {
-    const factor = bestOutputFactor(state, specId);
+    const factor = hallPace(state, specId);
     const spec = findSpec(specId);
     lines.push({
       label: `${spec?.name ?? specId}, best in the hall`,
@@ -904,16 +912,15 @@ function twoPlaceText(value: number): string {
   return (Math.round(value * 100) / 100).toFixed(2);
 }
 
-/** Why his minute was worth what it was: the class of the machine he is standing at, the by hand
- *  penalty when he is at none and his stage falls back to a pair of hands, or his bench. The
- *  machine comes first because it is what actually set his speed: `runProductionMinute` reads the
- *  class he got and never the plan's own figure, so a man with a bench under a by hand job is
- *  quicker than that job's 0.67 and this row says so. A row whose two figures did not multiply out
- *  to the one beside them would be the very thing 2.1 is for (PIOTR, 22.09; CLAUDE.md T24 2.1, and
- *  the open question of section 8 about rule 9.5). */
-function whyWords(stage: StagePlan | null, machine: Equipment | null): string {
-  if (machine !== null) {
-    return (variantFor(machine)?.name ?? findSpec(machine.specId)?.name ?? machine.specId).toLowerCase();
+/** Why his minute was worth what it was: the family his place is at and the class that sets the
+ *  hall's pace for it (`saw, industrial`), whichever of its machines he is at, because the hall's
+ *  best class is what set his speed; `at the bench` at a bench, and `by hand` when his stage falls
+ *  back to a pair of hands. A row whose two figures did not multiply out to the one beside them
+ *  would be the very thing it is for (PIOTR, 22.09; CLAUDE.md T24 2.1, T25 2.4). */
+function whyWords(state: GameState, stage: StagePlan | null, machine: Equipment | null): string {
+  if (machine !== null && machine.specId !== BENCH) {
+    const best = bestMachineOf(state, machine.specId) ?? machine;
+    return `${machineShortWord(machine.specId)}, ${best.variantId}`;
   }
   if (stage === null) return 'at the bench';
   return stage.byHand ? 'by hand' : 'at the bench';
@@ -946,7 +953,7 @@ function manRow(
     who,
     main: [name, trade, doing].filter((part) => part !== '').join(', '),
     words:
-      `${whyWords(stage, machine)}, ${booked.minutes} min: ` +
+      `${whyWords(state, stage, machine)}, ${booked.minutes} min: ` +
       `${mine} times ${twoPlaceText(stageSpeedNow(stage))}`,
     minutes: booked.minutes,
     figure: booked.minutes <= 0 ? 0 : Math.round((booked.worth / booked.minutes) * 100) / 100,
@@ -1016,35 +1023,14 @@ export function workshopBreakdownToday(state: GameState): WorkshopBreakdown {
   };
 }
 
-/** What the classes of machine in the hall do to the speed of a job of this material: the best
- *  one of each family, multiplied together. Above 1 is quicker (CLAUDE.md T3 3.5). Two saws do
- *  not make the work twice as fast: only the better of them is used. */
-export function machineOutputFactor(state: GameState, material: MaterialKind): number {
-  const best = new Map<string, number>();
-  for (const item of state.equipment) {
-    const spec = findSpec(item.specId);
-    if (!spec || spec.category !== 'machine' || isSold(item)) continue;
-    if (spec.usedOn !== null && spec.usedOn !== material) continue;
-    const factor = outputFactorOf(state, item);
-    best.set(spec.id, Math.max(best.get(spec.id) ?? 0, factor));
-  }
-  let product = 1;
-  for (const factor of best.values()) product *= factor;
-  return product;
-}
-
-/** The best class of this family standing in the hall: what the projection of a job's minutes is
- *  worked out from before anybody knows which one of them he will actually get. 1 when the
- *  workshop owns none, so a caller that has not asked `has` first is never told a job is quicker
- *  than it is (CLAUDE.md T7 3.1). */
-export function bestOutputFactor(state: GameState, specId: string): number {
-  let best = 0;
-  for (const item of owned(state, specId)) {
-    if (isSold(item)) continue;
-    const factor = outputFactorOf(state, item);
-    if (factor > best) best = factor;
-  }
-  return best > 0 ? best : 1;
+/** The hall's pace at a stage of this family: the best class of it standing unbroken in the hall
+ *  and not away for its service, whatever machine of it the man is at. A hall with an industrial
+ *  saw and a used one cuts at 1.12, because the shop cuts on the good saw and the old one takes
+ *  the overflow [PIOTR, 21.09] (CLAUDE.md T25 2.4). 1 when the hall has none it can work at, so a
+ *  caller that has not asked `has` first is never told a job is quicker than it is. */
+export function hallPace(state: GameState, family: string): number {
+  const best = bestMachineOf(state, family);
+  return best === null ? 1 : paceOf(state, best);
 }
 
 /** The extractor is on the floor. The hall carries on at a quarter speed (CLAUDE.md T2 3.9). */
@@ -1166,16 +1152,17 @@ export function machineWearPerMinute(item: Equipment): number {
   return isServiced(item.specId) ? wearPerMinuteOf(item.purchasePrice) : 0;
 }
 
-/** The best class of this family standing in the hall, as a machine: the one whose class the
- *  projection of a piece's minutes is worked out on. Null when the workshop owns none. */
+/** The best class of this family standing in the hall, unbroken and not away for its service, as
+ *  a machine: the one that sets the hall's pace (2.4), and the one a piece's minutes and its wear
+ *  are worked out on. The first bought wins a tie. Null when the hall has none it can work at. */
 export function bestMachineOf(state: GameState, specId: string): Equipment | null {
   let best: Equipment | null = null;
-  let factor = 0;
+  let pace = 0;
   for (const item of owned(state, specId)) {
-    if (isSold(item)) continue;
-    const own = outputFactorOf(state, item);
-    if (own > factor) {
-      factor = own;
+    if (isSold(item) || item.broken || machineIsOut(item, state.clock.day)) continue;
+    const own = paceOf(state, item);
+    if (own > pace) {
+      pace = own;
       best = item;
     }
   }
@@ -1532,7 +1519,7 @@ export function startMachineMeters(state: GameState): void {
 export function minutesSavedBy(state: GameState, item: Equipment, hours: number): number {
   const spec = findSpec(item.specId);
   if (!spec || spec.category !== 'machine') return 0;
-  const effect = roundPoints(outputFactorOf(state, item) - 1);
+  const effect = roundPoints(hallPace(state, item.specId) - 1);
   return Math.round(hours * 60 * effect);
 }
 
@@ -1597,7 +1584,7 @@ export function machineSavings(state: GameState, span: 'week' | 'month'): Machin
     if (isSold(item) || !itemStandsInTheHall(item)) continue;
     const spec = findSpec(item.specId);
     if (!spec || spec.category !== 'machine') continue;
-    const effect = roundPoints(outputFactorOf(state, item) - 1);
+    const effect = roundPoints(hallPace(state, item.specId) - 1);
     const ran = span === 'week' ? item.hoursThisWeek : item.hoursThisMonth;
     const saved = minutesSavedBy(state, item, ran);
     if (span === 'week') minutesSavedLastWeek += item.minutesSavedLastWeek;

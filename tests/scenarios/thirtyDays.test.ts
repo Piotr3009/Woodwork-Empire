@@ -462,24 +462,26 @@ describe('30 days on Very easy behind the best saw money can buy', () => {
     ).toBe(true);
   });
 
-  it('gets 30% more out of every minute of the cutting, and of no other stage', () => {
+  it('gets 12% more out of every minute of the cutting, and of no other stage', () => {
     const taken = state.jobs[0];
     if (!taken) throw new Error('no jobs in the month');
     // Measured on the whole job, because the month finished the ones it started.
     const job = { ...taken, labourRemaining: taken.labourValue, stageLabour: {} };
     expect(job.labourValue).toBeGreaterThan(0);
-    expect(stageSpeed(state, job, 'cutting').speed).toBeCloseTo(1.3, 10);
+    // The industrial class's pace, 1.12 from v52 where the saw's own factor was 1.30: the class is
+    // the hall's pace off the one ladder of every family (CLAUDE.md T25 2.4).
+    expect(stageSpeed(state, job, 'cutting').speed).toBeCloseTo(1.12, 10);
     expect(stageSpeed(state, job, 'assembly').speed).toBeCloseTo(1, 10);
     const minutes = minutesRemainingFor(state, job, 1);
     // The same hall with a saw of standard speed in it: only the cutting quarter moves, so the
-    // whole job is 6% quicker and not 30% (CLAUDE.md T7 3.1).
+    // whole job is 3% quicker and not 12% (CLAUDE.md T7 3.1).
     const budget = {
       ...state,
       equipment: state.equipment.map((item) =>
         item.specId === 'tableSaw' ? { ...item, variantId: 'budget' } : item,
       ),
     };
-    expect(minutesRemainingFor(budget, job, 1) / minutes).toBeCloseTo(1 / (0.25 / 1.3 + 0.75), 6);
+    expect(minutesRemainingFor(budget, job, 1) / minutes).toBeCloseTo(1 / (0.25 / 1.12 + 0.75), 6);
   });
 
   it('has twice the hours in it and draws more off the meter', () => {

@@ -11,6 +11,7 @@
 import {
   airDemandOf,
   bagsOf,
+  classPaceOf,
   placesOf,
   compressorAirOf,
   compressors,
@@ -75,8 +76,8 @@ function line(text: string, value: number | null = null): Line {
 
 /** Above 1.0 is quicker than a standard machine, below it is slower: green, red or the body
  *  colour by the sign (CLAUDE.md T12 3.1). */
-function outputLine(variant: EquipmentVariant): Line {
-  const per = Math.round((variant.outputFactor - 1) * 100);
+function outputLine(spec: EquipmentSpec, variant: EquipmentVariant): Line {
+  const per = Math.round((classPaceOf({ specId: spec.id, variantId: variant.id }) - 1) * 100);
   if (per === 0) return line('Output as a standard machine');
   return line(`Output ${per > 0 ? '+' : ''}${per}%`, per);
 }
@@ -161,7 +162,7 @@ function bagsLine(spec: EquipmentSpec, variant: EquipmentVariant): string {
 function benchLine(spec: EquipmentSpec, variant: EquipmentVariant): Line {
   const places = spec.id === 'workbench' ? placesOf({ specId: spec.id, variantId: variant.id }) : 0;
   if (places <= 0) return line('');
-  const per = Math.round((variant.outputFactor - 1) * 100);
+  const per = Math.round((classPaceOf({ specId: spec.id, variantId: variant.id }) - 1) * 100);
   const men = `${places} ${places === 1 ? 'man' : 'men'}`;
   if (per === 0) return line(`${men}, the standard pace`);
   return line(`${men}, ${per > 0 ? '+' : ''}${per}% pace`, per);
@@ -275,7 +276,7 @@ function figureLines(lines: Line[]): string {
 function effectLines(state: GameState, spec: EquipmentSpec, variant: EquipmentVariant): Line[] {
   const machine = spec.category === 'machine';
   return [
-    ...(machine ? [outputLine(variant), line(dustLine(spec))] : []),
+    ...(machine ? [outputLine(spec, variant), line(dustLine(spec))] : []),
     line(extractionLine(spec, variant)),
     line(spec.id === COMPRESSOR ? '' : airLine(state, spec, variant)),
     line(lifeLine(spec, variant)),

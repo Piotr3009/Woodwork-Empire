@@ -40,12 +40,11 @@ import {
   extractorBreakdownChance,
   countOf,
   has,
-  bestOutputFactor,
+  classPaceOf,
+  hallPace,
   gateCheck,
   hasGate,
-  machineOutputFactor,
-  outputFactorOf,
-  variantFor,
+  paceOf,
 } from '../../src/engine/machines';
 import { canBuy } from '../../src/engine/game';
 import { startProductionCheck } from '../../src/engine/jobs';
@@ -134,9 +133,9 @@ describe('the automatic gate (CLAUDE.md T13 3.11)', () => {
     const state = shop();
     const saw = state.equipment.find((item) => item.id === 'kit-saw');
     if (!saw) throw new Error('no saw');
-    const base = variantFor(saw)?.outputFactor ?? 0;
+    const base = classPaceOf(saw);
     expect(base).toBe(1.05);
-    expect(outputFactorOf(state, saw)).toBe(base);
+    expect(paceOf(state, saw)).toBe(base);
     expect(hasGate(state, saw)).toBe(false);
     // Fitted through the action, which pays for it (game.ts, phase A) and marks the machine.
     const fitted = act(state, { type: 'BUY_GATE', equipmentId: 'kit-saw' });
@@ -145,14 +144,13 @@ describe('the automatic gate (CLAUDE.md T13 3.11)', () => {
     expect(hasGate(fitted, gated)).toBe(true);
     expect(fitted.cash).toBe(state.cash - GATE_PRICE);
     expect(GATE_OUTPUT_BONUS).toBe(0.02);
-    expect(outputFactorOf(fitted, gated)).toBe(1.071);
-    // The projection and the board read the same factor as the man on it (CLAUDE.md T7 3.1).
-    expect(bestOutputFactor(fitted, 'tableSaw')).toBe(1.071);
-    expect(machineOutputFactor(fitted, 'sheet')).toBe(1.071);
+    expect(paceOf(fitted, gated)).toBe(1.071);
+    // The projection and the board read the same pace as the man on it (CLAUDE.md T7 3.1).
+    expect(hallPace(fitted, 'tableSaw')).toBe(1.071);
     // A second saw of the same class without a gate leaves the hall's pace where the gated one
     // put it: the pace is the best of the family, whichever saw a man is at (CLAUDE.md T25 2.4).
     placeEquipment(fitted, 'tableSaw', { variantId: 'standard', x: 10, y: 1, id: 'kit-saw-2' });
-    expect(bestOutputFactor(fitted, 'tableSaw')).toBe(1.071);
+    expect(hallPace(fitted, 'tableSaw')).toBe(1.071);
   });
 
   it('is refused on a machine with no extraction demand, twice on one machine, and without the cash', () => {

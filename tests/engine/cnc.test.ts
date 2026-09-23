@@ -42,12 +42,13 @@ function jobOfMinutes(minutes: number, material: 'sheet' | 'solidWood' = 'sheet'
   return stagedJob(minutes * OWNER_LABOUR_PER_MINUTE, material, false);
 }
 
-/** The day 1 kit with a CNC standing in the hall beside it. */
+/** The day 1 kit with a budget CNC standing in the hall beside it: the class whose pace is 1.00, so
+ *  what is asserted here is the CNC's own head and nothing of its class (CLAUDE.md T25 2.4). */
 function withCnc(): GameState {
   const state = withDryAir(
     withExtraction(buyStartingKit(newGame({ difficulty: 'veryEasy' }), { sawVariant: 'budget' })),
   );
-  placeEquipment(state, 'cnc', { x: 2, y: 6 });
+  placeEquipment(state, 'cnc', { variantId: 'budget', x: 2, y: 6 });
   state.enquiries = [];
   return fillRack(state, 80);
 }
