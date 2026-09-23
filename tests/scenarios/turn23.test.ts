@@ -35,10 +35,10 @@ import type { GameState } from '../../src/engine/index';
 
 const SEED = 20260911;
 
-/** Three joiners with no experience, a saw apiece so nobody queues, and sheets on the rack. The
- *  script takes nothing off the enquiry board: the work these months are played on is put there by
- *  hand, three jobs big enough to outlast the stretch, so that what is being measured is the men
- *  and never the board's own luck. */
+/** Three joiners with no experience, a saw apiece so nobody is short of a place, and sheets on
+ *  the rack. The script takes nothing off the enquiry board: the work these months are played on
+ *  is put there by hand, three jobs big enough to outlast the stretch, so that what is being
+ *  measured is the men and never the board's own luck. */
 const THREE_MEN: Policy = {
   maxOpenJobs: 0,
   buyKit: true,
@@ -435,14 +435,12 @@ describe('(oo) a bench and no compressor', () => {
   it('books every minute he stood onto his day meter', () => {
     const man = BENCH_WEEK.man;
     if (man === undefined) throw new Error('a man is wanted here');
-    // Nobody is waiting for the boss in this hall: he has his job and he is standing at it. His
-    // minutes go to `noMachine`, which is where a man stopped at a job he cannot advance has always
-    // booked them; the reason the brief names is on the mark over his head and on the owner's own
-    // meter, because the four causes of the efficiency plate are frozen this turn
-    // (docs/notes-t23-b2.md 1.2, CLAUDE.md T23 6).
+    // Nobody is waiting for the boss in this hall: he has his job and he is standing at it. Until
+    // v52 his minutes went to the queue's `noMachine`; the day meter of a man on the books has the
+    // owner's `noCompressor` from v52, because `noPlace` means one thing only (CLAUDE.md T25 2.3).
     expect(man.idleByReason.waitingForBoss).toBe(0);
-    expect(man.idleByReason.noMachine).toBeGreaterThan(0);
-    expect(man.idleMinutes).toBe(man.idleByReason.noMachine);
+    expect(man.idleByReason.noCompressor).toBeGreaterThan(0);
+    expect(man.idleMinutes).toBe(man.idleByReason.noCompressor);
   });
 
   it('works the very next minute once a used compressor stands in the hall', () => {

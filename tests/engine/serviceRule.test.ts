@@ -18,7 +18,7 @@ import {
   enduranceHoursFor,
   familyStopped,
   isServiced,
-  freeMachines,
+  placedMachines,
   lifeAfterServices,
   machineIsOut,
   machinesInService,
@@ -152,13 +152,13 @@ describe('the machine is out for the working day (CLAUDE.md T20 2.9.3)', () => {
     expect(machineIsOut(saw, nextWorkingDay(state.clock.day))).toBe(false);
   });
 
-  it('is no use to anybody while it is out, and its stage falls back as a broken one s does', () => {
+  it('has no places while it is out, and its stage falls back as a broken one s does', () => {
     const state = hall();
     const saw = theSaw(state);
-    expect(freeMachines(state, 'tableSaw').map((item) => item.id)).toEqual([saw.id]);
+    expect(placedMachines(state, 'tableSaw').map((item) => item.id)).toEqual([saw.id]);
     expect(familyStopped(state, 'tableSaw')).toBeNull();
     serviceMachine(state, saw.id);
-    expect(freeMachines(state, 'tableSaw')).toEqual([]);
+    expect(placedMachines(state, 'tableSaw')).toEqual([]);
     expect(familyStopped(state, 'tableSaw')).toEqual({ item: saw, why: 'service' });
     // A broken one still says broken: the two are told apart, and stop the stage the same way.
     saw.broken = true;
@@ -296,7 +296,7 @@ describe('a machine past its life (CLAUDE.md T20 2.9.4)', () => {
     saw.hoursUsed = saw.enduranceHours * 10;
     expect(overdueBreakdownChance(saw, today)).toBe(1);
     expect(state.equipment.some((item) => item.id === saw.id)).toBe(true);
-    expect(freeMachines(state, 'tableSaw').map((item) => item.id)).toEqual([saw.id]);
+    expect(placedMachines(state, 'tableSaw').map((item) => item.id)).toEqual([saw.id]);
   });
 
   it('is put off by a service, because the service moves the end of the life', () => {

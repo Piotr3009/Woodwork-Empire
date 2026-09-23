@@ -31,15 +31,17 @@ import {
   serviceIsDue,
 } from '../engine/machines';
 import { footprintOrigin, isConnected, wantsExtraction } from '../engine/pipes';
-import { jobsAtGate, waitingLine } from '../engine/jobs';
+import { jobsAtGate } from '../engine/jobs';
+import { placeLine } from '../engine/production';
 import { orderName, reservedItems, shoppingList } from '../engine/orders';
 import {
   OWNER,
-  BENCH,
   isSold,
   itemFootprint,
   itemStandsInTheHall,
   itemZone,
+  menAtPlaces,
+  placesLine,
   sheetCapacityOf,
 } from '../engine/machines';
 import { machineInUse } from '../engine/game';
@@ -47,10 +49,11 @@ import { rackCapacity } from '../engine/materials';
 import {
   STATION_BENCH,
   STATION_CLEANING,
+  STATION_DOOR,
   STATION_GATE,
+  STATION_HOME,
   STATION_IDLE,
   STATION_LUNCH,
-  STATION_NO_BENCH,
   STATION_OFFICE,
   STATION_PHONE,
   STATION_RACK,
@@ -61,13 +64,9 @@ import {
   facingTowards,
   itemAtCell,
   palletCell,
-  benchCellsAt,
-  queueCellsAt,
+  placeCellsAt,
   standingCell,
   stationMachine,
-  stationPlaceAt,
-  stationSecondAt,
-  stationWaitingFor,
 } from '../engine/stations';
 import { ownerIsAvailable } from '../engine/owner';
 import { homeCellOf } from '../engine/staff';
@@ -814,52 +813,32 @@ export interface Standing {
 
 /** The standing cell a station puts a figure on, and the way he faces there: the station table's
  *  cell at the item, on its free side, facing the item (CLAUDE.md T16 2.1). Anything the workshop
- *  has not bought falls back to the middle of the floor (CLAUDE.md T2 3.3). */
+ *  has not bought falls back to the middle of the floor (CLAUDE.md T2 3.3). `who` names the man,
+ *  so a man at his place stands at his own place of his own machine and not in a heap at the first
+ *  one (CLAUDE.md T25 2.6). */
 export function stationCell(
   state: GameState,
   station: string,
   bench: { x: number; y: number },
+  who: string | null = null,
 ): Standing {
-  // The third man and beyond, at a place of his own along the same side of the same item: the
-  // engine counts the places and the renderer knows where they are, so twenty men on one job do
-  // not stand on one tile (PIOTR, 17.09; CLAUDE.md T19 2.5).
-  const placeAt = stationPlaceAt(station);
-  if (placeAt !== null) {
-    const item = state.equipment.find((entry) => entry.id === placeAt.id && !isSold(entry));
-    if (item) {
-      const cells =
-        item.specId === BENCH
-          ? benchCellsAt(state, item, placeAt.place + 1)
-          : queueCellsAt(state, item, placeAt.place + 1);
-      const cell = cells[placeAt.place] ?? standingCell(state, item, 'operator');
-      return { ...cell, facing: facingAt(cell, item) };
-    }
-  }
-  // The second man of a job stands at the first man's own bench, in its second place: two men on
-  // one bench, side by side along its front (CLAUDE.md T17 2.10, T24 2.5). A bench reads its
-  // places through `benchCellsAt`, the same list the third man and beyond come off, so the second
-  // place and the third cannot be worked out two different ways.
-  const secondAt = stationSecondAt(station);
-  if (secondAt !== null) {
-    const item = state.equipment.find((entry) => entry.id === secondAt && !isSold(entry));
-    if (item) {
-      const cell =
-        item.specId === BENCH
-          ? (benchCellsAt(state, item, 2)[1] ?? standingCell(state, item, 'second'))
-          : standingCell(state, item, 'second');
-      return { ...cell, facing: facingAt(cell, item) };
-    }
-  }
-  // A man waiting for a machine stands at its waiting cell, which is what waiting at one looks
-  // like (T7 3.1; T16 2.1).
-  const waitingFor = stationWaitingFor(station);
-  const specId = stationMachine(station) ?? waitingFor;
+  const specId = stationMachine(station);
   if (specId !== null) {
+    // A man at work stands at his own place: the machines of his family filled in the order they
+    // were bought, each up to its places, the one list `placeCellsAt` gives for every family,
+    // benches included [PIOTR, 21.09: "with two saws let them go to the second one"]
+    // (CLAUDE.md T25 2.6).
+    const placed = who === null ? undefined : menAtPlaces(state).find((entry) => entry.who === who);
+    if (placed !== undefined) {
+      const cell = placeCellsAt(state, placed.item, placed.place + 1)[placed.place] ?? standingCell(state, placed.item);
+      return { ...cell, facing: facingAt(cell, placed.item) };
+    }
+    // A man at a machine on an errand, a service or a bag change, stands at its operator's cell.
     const item = state.equipment.find(
       (entry) => entry.specId === specId && !isSold(entry) && itemStandsInTheHall(entry),
     );
     if (item) {
-      const cell = standingCell(state, item, waitingFor === null ? 'operator' : 'waiting');
+      const cell = standingCell(state, item, 'operator');
       return { ...cell, facing: facingAt(cell, item) };
     }
   }
@@ -882,11 +861,12 @@ export function stationCell(
     const cell = roomDoorCell('office');
     return { ...cell, facing: facingTowards(cell, { x: cell.x, y: cell.y - 1 }) };
   }
-  // The canteen door: a man with nothing to do, a joiner with no bench to work at, and from Turn 21
+  // The canteen door: a man with nothing to do, a joiner with no bench of his own, a man on a
+  // contract with no sheets (T24 2.3), and from Turn 21
   // every man of the hall at the dinner hour, who walks to this cell and goes through it
   // (CLAUDE.md T4 3.4, T11 3.4, T21 2.12). The walk is the walk the hall already had; what the lunch
   // station adds is that he does not stop in the doorway.
-  if (station === STATION_IDLE || station === STATION_NO_BENCH || station === STATION_LUNCH) {
+  if (station === STATION_IDLE || station === STATION_DOOR || station === STATION_LUNCH) {
     const cell = roomDoorCell('canteen');
     return { ...cell, facing: facingTowards(cell, { x: cell.x - 1, y: cell.y + 1 }) };
   }
@@ -920,11 +900,11 @@ export function standingCellsNow(state: GameState): Array<{ x: number; y: number
   const cells: Array<{ x: number; y: number }> = [];
   for (const worker of state.workers) {
     if (worker.startDay > state.clock.day) continue;
-    const cell = stationCell(state, worker.station, homeCellOf(state, worker));
+    const cell = stationCell(state, worker.station, homeCellOf(state, worker), worker.id);
     cells.push({ x: cell.x, y: cell.y });
   }
   if (ownerIsAvailable(state)) {
-    const cell = stationCell(state, state.owner.station, ownerBenchCell(state));
+    const cell = stationCell(state, state.owner.station, ownerBenchCell(state), OWNER);
     cells.push({ x: cell.x, y: cell.y });
   }
   return cells;
@@ -939,16 +919,12 @@ export function doorIsUsed(state: GameState, room: RoomId): boolean {
 }
 
 /** The line under a figure's name: where he is standing, in words. */
-function stationLabel(station: string): string {
+function stationLabel(station: string, noPlaceFor = ''): string {
   const specId = stationMachine(station);
   if (specId !== null) return (findSpec(specId)?.name ?? specId).toLowerCase();
-  const waiting = stationWaitingFor(station);
-  // The one phrase for a machine a man cannot have. The hall built its own copy of it until Turn 21
-  // put the article in: two copies meant the Work Plan said "waiting for the table saw" and the man
-  // under his own name said "waiting for table saw" (CLAUDE.md T21 2.6).
-  if (waiting !== null) return waitingLine(waiting);
-  if (stationSecondAt(station) !== null) return 'the bench, second place';
-  if (stationPlaceAt(station) !== null) return 'alongside, on the next place';
+  // Standing at his home cell: the one phrase for a machine the hall has no place for him at,
+  // the words the mark over his head and his card say too (CLAUDE.md T21 2.6, T25 2.3).
+  if (station === STATION_HOME) return noPlaceFor === '' ? 'standing' : placeLine(noPlaceFor);
   if (station === STATION_RACK) return 'the rack';
   if (station === STATION_GATE) return 'the gate';
   if (station === STATION_OFFICE) return 'the office';
@@ -957,7 +933,7 @@ function stationLabel(station: string): string {
   // The cleaning is a station of its own since 2.8.2, and a man with a broom in his hands is not
   // waiting for anything (CLAUDE.md T20 2.8).
   if (station === STATION_CLEANING) return 'sweeping the floor';
-  if (station === STATION_NO_BENCH) return 'no bench';
+  if (station === STATION_DOOR) return 'the canteen door';
   // In the canteen for the dinner hour (CLAUDE.md T21 2.12). The words were the bubble table's
   // until Turn 22 took the dinner hour off it: a man at his lunch has nothing wrong with him, so he
   // has no mark, and the hour is said on the line under his name alone (CLAUDE.md T22 2.5).
@@ -1484,23 +1460,17 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
     const serviceLine = !item.broken && serviceIsDue(item, state.clock.day) ? ' (service due)' : '';
     const rackLine =
       sheetCapacityOf(item) > 0 ? `: ${state.stock.sheets} / ${rackCapacity(state)}` : '';
-    const atThisBench =
-      spec.category === 'bench'
-        ? state.workers.find(
-            (worker) => worker.anchorX === item.anchorX && worker.anchorY === item.anchorY,
-          )
-        : undefined;
-    const benchLine =
-      spec.category !== 'bench' ? '' : atThisBench ? `: ${atThisBench.name}` : ' (free)';
     // A machine that wants a pipe and has none is not served: the hall says so under its name, in
     // the game's red, and never writes "connected" anywhere (CLAUDE.md T16 2.3).
     const unconnected = wantsExtraction(item) && !isConnected(state, item);
-    const name = `${spec.name}${bagLine}${serviceLine}${benchLine}${rackLine}`;
+    const name = `${spec.name}${bagLine}${serviceLine}${rackLine}`;
     // Pointing at the extractor reads the hall's store (CLAUDE.md T12 3.3).
+    // Its places and who is in them, off the day plan the figures stand by (CLAUDE.md T25 2.5).
+    const places = placesLine(state, item, 'card');
     const tooltip =
       item.specId === 'extractor' && store.exists
         ? `${name}. ${bagStoreLine(store)}. ${spec.effect}`
-        : `${name}${unconnected ? ', not connected' : ''}. ${spec.effect}`;
+        : `${name}${unconnected ? ', not connected' : ''}.${places === '' ? '' : ` ${places}.`} ${spec.effect}`;
     const fx = machineFx(state, item, spec);
     drawables.push({
       depth: depthKey(item.anchorX, item.anchorY),
@@ -1635,8 +1605,8 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
     // The dinner hour is the canteen, and the station says so: `stationNow` is the one place the
     // hour is read (CLAUDE.md T21 2.12).
     const station = stationNow(state, worker.id);
-    const where = stationLabel(station);
-    const cell = stationCell(state, station, bench);
+    const where = stationLabel(station, worker.noPlaceFor);
+    const cell = stationCell(state, station, bench, worker.id);
     const bubble = bubbleOf(worker.id);
     // He has gone through a door and is in the room behind it: off the hall's drawing until he
     // comes out again (PIOTR, 18.09; CLAUDE.md T20 2.12). From Turn 21 that is every man and not the
@@ -1661,7 +1631,7 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
     );
   }
   const ownerStation = stationNow(state, OWNER);
-  const ownerCell = stationCell(state, ownerStation, ownerBenchCell(state));
+  const ownerCell = stationCell(state, ownerStation, ownerBenchCell(state), OWNER);
   const ownerBubble = ownerIsAvailable(state) ? bubbleOf(OWNER) : null;
   // The owner in the office is not on the hall at all: he went through the door, and the office
   // view draws him at his desk (PIOTR, 18.09; CLAUDE.md T20 2.12, T19 2.2).
@@ -1670,7 +1640,7 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
       figure(
         'owner',
         ownerCell,
-        `${state.playerName}, ${stationLabel(ownerStation)}`,
+        `${state.playerName}, ${stationLabel(ownerStation, state.owner.noPlaceFor)}`,
         true,
         'data-owner="1"',
         // The owner is his sheet where the art side has delivered one (character.owner.*, the
@@ -2031,8 +2001,9 @@ function benchStagesNow(state: GameState): Array<{ stage: StageId; finish: strin
  *  booth while somebody sprays (CLAUDE.md T19 2.10). */
 export function hallLoops(state: GameState): Set<HallLoopName> {
   const on = new Set<HallLoopName>();
-  // Somebody is at the saw when the saw is taken: `takenBy` is how the hall already knows to spin
-  // its blade and throw chips off it (machineFx above reads the same thing).
+  // Somebody is at the saw while a man is at one of its places: `machineInUse` is how the hall
+  // already knows to spin its blade and throw chips off it (machineFx above reads the same thing,
+  // CLAUDE.md T25 2.5).
   if (familyInUse(state, 'tableSaw')) on.add('tableSaw');
   // The extraction pulls while a machine on it is running, which is what makes its own fan breathe
   // on the hall: the same predicate, on the extraction item itself, so what is heard and what is

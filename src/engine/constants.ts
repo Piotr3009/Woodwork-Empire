@@ -118,12 +118,17 @@ import type {
  *
  *  Version 27 is v51 (PIOTR, 22.09): a machine's service runs on the calendar, so every machine
  *  carries the day it was bought or last serviced in place of the hours it had at the last one,
- *  and the state remembers the day a contract was last offered. Every v25 and v26 save loads. */
-export const STATE_VERSION = 27;
+ *  and the state remembers the day a contract was last offered. Every v25 and v26 save loads.
+ *
+ *  Version 28 is v52 (PIOTR, 21.09): a machine is places and nobody takes one. Every man and the
+ *  owner carry `working` and `noPlaceFor`, the day plan's answer; the old claim on a machine is a
+ *  dead field the lift clears; the queue's lost minutes are `noPlace` (CLAUDE.md T25 section 4). Every v25, v26
+ *  and v27 save loads. */
+export const STATE_VERSION = 28;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
-export const APP_VERSION = 'v51';
+export const APP_VERSION = 'v52';
 
 // ---------------------------------------------------------------------------
 // The owner's day, in the seven things it is made of
@@ -1308,7 +1313,6 @@ export const TABLE_SAW_VARIANTS: EquipmentVariant[] = [
     height: 1.4,
     zoneWidth: 3,
     zoneDepth: 3,
-    outputFactor: 0.95,
     enduranceFactor: 0.25,
     powerPerDay: 3,
     description:
@@ -1325,7 +1329,6 @@ export const TABLE_SAW_VARIANTS: EquipmentVariant[] = [
     height: 1.4,
     zoneWidth: 3,
     zoneDepth: 3,
-    outputFactor: 1,
     enduranceFactor: 1,
     powerPerDay: 3,
     description:
@@ -1342,7 +1345,6 @@ export const TABLE_SAW_VARIANTS: EquipmentVariant[] = [
     height: 1.95,
     zoneWidth: 4,
     zoneDepth: 3,
-    outputFactor: 1.05,
     enduranceFactor: 1.2,
     powerPerDay: 4,
     description:
@@ -1359,7 +1361,6 @@ export const TABLE_SAW_VARIANTS: EquipmentVariant[] = [
     height: 2.15,
     zoneWidth: 6,
     zoneDepth: 3,
-    outputFactor: 1.15,
     enduranceFactor: 1.5,
     powerPerDay: 5,
     description:
@@ -1376,7 +1377,6 @@ export const TABLE_SAW_VARIANTS: EquipmentVariant[] = [
     height: 2.65,
     zoneWidth: 5,
     zoneDepth: 4,
-    outputFactor: 1.3,
     enduranceFactor: 2,
     powerPerDay: 7,
     description:
@@ -1405,11 +1405,6 @@ const ENDURANCE_BY_CLASS: Record<string, number> = {
   industrial: 2,
 };
 
-/** How many men can work at one bench of this class at once [TUNE] (PIOTR, 20.09, the rule;
- *  CLAUDE.md T23 2.17). A bench is a bench, and a three metre assembly station on a steel frame
- *  is three men round a wardrobe lying down. The hiring gate counts places and not benches
- *  through `benchPlaces` in src/engine/machines.ts, and each man at one works his own job at that
- *  bench's pace. */
 /** The roles that may be put on a job at all, and so the roles that take a place at a bench. A
  *  helper never builds: he carries, cleans and empties bags, and the Assign list says so rather
  *  than offering him (PIOTR, 17.09; CLAUDE.md T19 2.5, 2.6). It lives here from Turn 23 because
@@ -1417,21 +1412,47 @@ const ENDURANCE_BY_CLASS: Record<string, number> = {
  *  and re-exports it under the name every caller has always used (CLAUDE.md T23 2.17). */
 export const BUILDING_ROLES: readonly WorkerRole[] = ['joiner', 'sprayer'];
 
-export const WORKBENCH_PLACES: Record<string, number> = {
-  used: 1,
-  budget: 1,
-  standard: 2,
-  pro: 2,
-  industrial: 3,
+/** How many men can work at one machine of this class at once: a machine is not a thing one man
+ *  takes, it is a number of places to work [PIOTR, 21.09; TUNE, Piotr's own for the saw]
+ *  (CLAUDE.md T25 2.1). Every floor family men work at has its row, the bench's being Turn 23's
+ *  `WORKBENCH_PLACES` folded in (T23 2.17). The CNC and the booth have no used or budget class in
+ *  Piotr's table ("n/a"), but the catalogue sells both, so each of those has the one place a
+ *  machine cannot have fewer of [TUNE]. `placesOf` in src/engine/machines.ts is the one reader, and
+ *  a family that is not here has no places at all: nobody works at it. */
+export const MACHINE_PLACES: Record<string, Record<string, number>> = {
+  tableSaw: { used: 1, budget: 1, standard: 2, pro: 2, industrial: 3 },
+  spindleMoulder: { used: 1, budget: 1, standard: 1, pro: 2, industrial: 2 },
+  edgebander: { used: 1, budget: 1, standard: 1, pro: 2, industrial: 2 },
+  thicknesser: { used: 1, budget: 1, standard: 1, pro: 1, industrial: 2 },
+  cnc: { used: 1, budget: 1, standard: 1, pro: 1, industrial: 2 },
+  sprayBooth: { used: 1, budget: 1, standard: 1, pro: 1, industrial: 2 },
+  workbench: { used: 1, budget: 1, standard: 2, pro: 2, industrial: 3 },
 };
+
+/** The hall's pace at a stage, by the best class of the stage's family standing unbroken in the
+ *  hall and not away for its service, whatever machine of it the man is at [PIOTR, 21.09: "the
+ *  machine's class should add to the efficiency, that is easy to count"; TUNE, Piotr's figures]
+ *  (CLAUDE.md T25 2.4). One ladder for every family, the bench's included: a class stops being a
+ *  factor on whoever holds the machine and becomes the hall's. */
+export const MACHINE_PACE: Record<string, number> = {
+  used: 0.95,
+  budget: 1,
+  standard: 1.05,
+  pro: 1.08,
+  industrial: 1.12,
+};
+
+/** The families whose class is a pace: every family of the places table, and the solid wood tools,
+ *  the one stage family a man works at without a place because the tools are shared out of a
+ *  cabinet (CLAUDE.md T25 2.3, 2.4) [TUNE: the tools are in it because their class was a speed on
+ *  v51 too]. Every other family's class is its capacity, its air or its store, and never a speed. */
+export const PACED_FAMILIES: readonly string[] = [...Object.keys(MACHINE_PLACES), 'solidWoodTools'];
 
 /** The five classes of workbench. Prices, places and footprints are Piotr's table; the endurance
  *  and the power are [TUNE] (CLAUDE.md T7 3.6, T23 2.17). A bench is not a machine, so its hours
  *  never move: the ladder is there so the family reads like every other one.
- *
- *  `outputFactor` is the pace a man works at one, and Turn 23 re tuned the column to top out at
- *  +10% where it topped out at +8%: 1.02, 1.05 and 1.08 become 1.03, 1.06 and 1.10 [TUNE, the
- *  figures; PIOTR, 20.09, the top of the ladder]. */
+ *  The pace a man works at one is `MACHINE_PACE`, the one ladder of every family, from v52
+ *  (CLAUDE.md T25 2.4). */
 export const WORKBENCH_VARIANTS: EquipmentVariant[] = [
   {
     id: 'used',
@@ -1442,7 +1463,6 @@ export const WORKBENCH_VARIANTS: EquipmentVariant[] = [
     height: 0.9,
     zoneWidth: 2,
     zoneDepth: 2,
-    outputFactor: 0.95,
     enduranceFactor: ENDURANCE_BY_CLASS.used ?? 1,
     powerPerDay: 1,
     description:
@@ -1459,7 +1479,6 @@ export const WORKBENCH_VARIANTS: EquipmentVariant[] = [
     height: 0.9,
     zoneWidth: 2,
     zoneDepth: 2,
-    outputFactor: 1,
     enduranceFactor: ENDURANCE_BY_CLASS.budget ?? 1,
     powerPerDay: 1,
     description:
@@ -1476,7 +1495,6 @@ export const WORKBENCH_VARIANTS: EquipmentVariant[] = [
     height: 0.9,
     zoneWidth: 2,
     zoneDepth: 2,
-    outputFactor: 1.03,
     enduranceFactor: ENDURANCE_BY_CLASS.standard ?? 1,
     powerPerDay: 1,
     description:
@@ -1492,7 +1510,6 @@ export const WORKBENCH_VARIANTS: EquipmentVariant[] = [
     height: 0.9,
     zoneWidth: 2,
     zoneDepth: 2,
-    outputFactor: 1.06,
     enduranceFactor: ENDURANCE_BY_CLASS.pro ?? 1,
     powerPerDay: 1,
     description:
@@ -1509,7 +1526,6 @@ export const WORKBENCH_VARIANTS: EquipmentVariant[] = [
     height: 0.9,
     zoneWidth: 3,
     zoneDepth: 2,
-    outputFactor: 1.10,
     enduranceFactor: ENDURANCE_BY_CLASS.industrial ?? 1,
     powerPerDay: 2,
     description:
@@ -1533,7 +1549,6 @@ export const SHEET_RACK_VARIANTS: EquipmentVariant[] = [
     zoneWidth: 2,
     zoneDepth: 2,
     sheetCapacity: 30,
-    outputFactor: 1,
     enduranceFactor: ENDURANCE_BY_CLASS.used ?? 1,
     powerPerDay: 1,
     description:
@@ -1550,7 +1565,6 @@ export const SHEET_RACK_VARIANTS: EquipmentVariant[] = [
     zoneWidth: 2,
     zoneDepth: 2,
     sheetCapacity: 50,
-    outputFactor: 1,
     enduranceFactor: ENDURANCE_BY_CLASS.budget ?? 1,
     powerPerDay: 1,
     description:
@@ -1567,7 +1581,6 @@ export const SHEET_RACK_VARIANTS: EquipmentVariant[] = [
     zoneWidth: 2,
     zoneDepth: 2,
     sheetCapacity: 75,
-    outputFactor: 1,
     enduranceFactor: ENDURANCE_BY_CLASS.standard ?? 1,
     powerPerDay: 1,
     description:
@@ -1584,7 +1597,6 @@ export const SHEET_RACK_VARIANTS: EquipmentVariant[] = [
     zoneWidth: 3,
     zoneDepth: 2,
     sheetCapacity: 110,
-    outputFactor: 1,
     enduranceFactor: ENDURANCE_BY_CLASS.pro ?? 1,
     powerPerDay: 1,
     description:
@@ -1601,7 +1613,6 @@ export const SHEET_RACK_VARIANTS: EquipmentVariant[] = [
     zoneWidth: 4,
     zoneDepth: 2,
     sheetCapacity: 160,
-    outputFactor: 1,
     enduranceFactor: ENDURANCE_BY_CLASS.industrial ?? 1,
     powerPerDay: 1,
     description:
@@ -1647,7 +1658,6 @@ export const TOOL_CABINET_VARIANTS: EquipmentVariant[] = [
     height: 1,
     zoneWidth: 1,
     zoneDepth: 1,
-    outputFactor: 1,
     enduranceFactor: ENDURANCE_BY_CLASS.used ?? 1,
     powerPerDay: 1,
     description:
@@ -1664,7 +1674,6 @@ export const TOOL_CABINET_VARIANTS: EquipmentVariant[] = [
     height: 1,
     zoneWidth: 1,
     zoneDepth: 1,
-    outputFactor: 1,
     enduranceFactor: ENDURANCE_BY_CLASS.budget ?? 1,
     powerPerDay: 1,
     description:
@@ -1681,7 +1690,6 @@ export const TOOL_CABINET_VARIANTS: EquipmentVariant[] = [
     height: 1,
     zoneWidth: 2,
     zoneDepth: 1,
-    outputFactor: 1,
     enduranceFactor: ENDURANCE_BY_CLASS.standard ?? 1,
     powerPerDay: 1,
     description:
@@ -1698,7 +1706,6 @@ export const TOOL_CABINET_VARIANTS: EquipmentVariant[] = [
     height: 1.8,
     zoneWidth: 2,
     zoneDepth: 1,
-    outputFactor: 1,
     enduranceFactor: ENDURANCE_BY_CLASS.pro ?? 1,
     powerPerDay: 1,
     description:
@@ -1714,7 +1721,6 @@ export const TOOL_CABINET_VARIANTS: EquipmentVariant[] = [
     height: 2,
     zoneWidth: 3,
     zoneDepth: 1,
-    outputFactor: 1,
     enduranceFactor: ENDURANCE_BY_CLASS.industrial ?? 1,
     powerPerDay: 1,
     description:
@@ -1738,7 +1744,6 @@ export const EDGEBANDER_VARIANTS: EquipmentVariant[] = [
     zoneWidth: 0,
     zoneDepth: 0,
     requires: [TOOL_CABINET_ID],
-    outputFactor: 0.95,
     enduranceFactor: ENDURANCE_BY_CLASS.used ?? 1,
     powerPerDay: 1,
     description:
@@ -1755,7 +1760,6 @@ export const EDGEBANDER_VARIANTS: EquipmentVariant[] = [
     zoneWidth: 0,
     zoneDepth: 0,
     requires: [TOOL_CABINET_ID],
-    outputFactor: 1,
     enduranceFactor: ENDURANCE_BY_CLASS.budget ?? 1,
     powerPerDay: 1,
     description:
@@ -1773,7 +1777,6 @@ export const EDGEBANDER_VARIANTS: EquipmentVariant[] = [
     zoneDepth: 3,
     requires: [],
     requiresOneOf: ['extractor', 'dustSystem', 'flexiSystem'],
-    outputFactor: 1.1,
     enduranceFactor: ENDURANCE_BY_CLASS.standard ?? 1,
     powerPerDay: 4,
     description:
@@ -1792,7 +1795,6 @@ export const EDGEBANDER_VARIANTS: EquipmentVariant[] = [
     zoneDepth: 3,
     requires: [],
     requiresOneOf: ['extractor', 'dustSystem', 'flexiSystem'],
-    outputFactor: 1.2,
     enduranceFactor: ENDURANCE_BY_CLASS.pro ?? 1,
     powerPerDay: 5,
     description:
@@ -1810,7 +1812,6 @@ export const EDGEBANDER_VARIANTS: EquipmentVariant[] = [
     zoneDepth: 3,
     requires: [],
     requiresOneOf: ['extractor', 'dustSystem', 'flexiSystem'],
-    outputFactor: 1.35,
     enduranceFactor: ENDURANCE_BY_CLASS.industrial ?? 1,
     powerPerDay: 6,
     description:
@@ -1837,7 +1838,6 @@ export const EXTRACTOR_VARIANTS: EquipmentVariant[] = [
     height: 2,
     zoneWidth: 1,
     zoneDepth: 1,
-    outputFactor: 1,
     enduranceFactor: ENDURANCE_BY_CLASS.used ?? 1,
     powerPerDay: 2,
     description:
@@ -1854,7 +1854,6 @@ export const EXTRACTOR_VARIANTS: EquipmentVariant[] = [
     height: 2,
     zoneWidth: 1,
     zoneDepth: 1,
-    outputFactor: 1,
     enduranceFactor: ENDURANCE_BY_CLASS.budget ?? 1,
     powerPerDay: 3,
     description:
@@ -1871,7 +1870,6 @@ export const EXTRACTOR_VARIANTS: EquipmentVariant[] = [
     height: 2,
     zoneWidth: 2,
     zoneDepth: 1,
-    outputFactor: 1,
     enduranceFactor: ENDURANCE_BY_CLASS.standard ?? 1,
     powerPerDay: 5,
     description:
@@ -1887,7 +1885,6 @@ export const EXTRACTOR_VARIANTS: EquipmentVariant[] = [
     height: 2.5,
     zoneWidth: 3,
     zoneDepth: 1,
-    outputFactor: 1,
     enduranceFactor: ENDURANCE_BY_CLASS.pro ?? 1,
     powerPerDay: 8,
     description:
@@ -1903,7 +1900,6 @@ export const EXTRACTOR_VARIANTS: EquipmentVariant[] = [
     height: 2.5,
     zoneWidth: 5,
     zoneDepth: 1,
-    outputFactor: 1,
     enduranceFactor: ENDURANCE_BY_CLASS.industrial ?? 1,
     powerPerDay: 14,
     description:
@@ -1929,7 +1925,6 @@ export const COMPRESSOR_VARIANTS: EquipmentVariant[] = [
     height: 1,
     zoneWidth: 1,
     zoneDepth: 1,
-    outputFactor: 1,
     enduranceFactor: ENDURANCE_BY_CLASS.used ?? 1,
     powerPerDay: 2,
     description:
@@ -1946,7 +1941,6 @@ export const COMPRESSOR_VARIANTS: EquipmentVariant[] = [
     height: 1,
     zoneWidth: 1,
     zoneDepth: 1,
-    outputFactor: 1,
     enduranceFactor: ENDURANCE_BY_CLASS.budget ?? 1,
     powerPerDay: 3,
     description:
@@ -1962,7 +1956,6 @@ export const COMPRESSOR_VARIANTS: EquipmentVariant[] = [
     height: 1.5,
     zoneWidth: 2,
     zoneDepth: 1,
-    outputFactor: 1,
     enduranceFactor: ENDURANCE_BY_CLASS.standard ?? 1,
     powerPerDay: 6,
     description:
@@ -1978,7 +1971,6 @@ export const COMPRESSOR_VARIANTS: EquipmentVariant[] = [
     height: 1.5,
     zoneWidth: 2,
     zoneDepth: 1,
-    outputFactor: 1,
     enduranceFactor: ENDURANCE_BY_CLASS.pro ?? 1,
     powerPerDay: 10,
     description:
@@ -1994,7 +1986,6 @@ export const COMPRESSOR_VARIANTS: EquipmentVariant[] = [
     height: 2.5,
     zoneWidth: 2,
     zoneDepth: 2,
-    outputFactor: 1,
     enduranceFactor: ENDURANCE_BY_CLASS.industrial ?? 1,
     powerPerDay: 20,
     description:
@@ -2136,7 +2127,6 @@ export const THICKNESSER_VARIANTS: EquipmentVariant[] = [
     height: 1,
     zoneWidth: 4,
     zoneDepth: 2,
-    outputFactor: 0.95,
     enduranceFactor: 0.25,
     powerPerDay: 3,
     description:
@@ -2153,7 +2143,6 @@ export const THICKNESSER_VARIANTS: EquipmentVariant[] = [
     height: 1,
     zoneWidth: 4,
     zoneDepth: 2,
-    outputFactor: 1,
     enduranceFactor: 1,
     powerPerDay: 3,
     description:
@@ -2169,7 +2158,6 @@ export const THICKNESSER_VARIANTS: EquipmentVariant[] = [
     height: 1,
     zoneWidth: 4,
     zoneDepth: 2,
-    outputFactor: 1.05,
     enduranceFactor: 1.2,
     powerPerDay: 4,
     description:
@@ -2185,7 +2173,6 @@ export const THICKNESSER_VARIANTS: EquipmentVariant[] = [
     height: 1,
     zoneWidth: 5,
     zoneDepth: 2,
-    outputFactor: 1.15,
     enduranceFactor: 1.5,
     powerPerDay: 5,
     description:
@@ -2202,7 +2189,6 @@ export const THICKNESSER_VARIANTS: EquipmentVariant[] = [
     height: 1.2,
     zoneWidth: 5,
     zoneDepth: 3,
-    outputFactor: 1.3,
     enduranceFactor: 2,
     powerPerDay: 7,
     description:
@@ -2224,7 +2210,6 @@ export const SOLID_WOOD_TOOLS_VARIANTS: EquipmentVariant[] = [
     height: 1,
     zoneWidth: 3,
     zoneDepth: 2,
-    outputFactor: 0.95,
     enduranceFactor: 0.25,
     powerPerDay: 3,
     description:
@@ -2240,7 +2225,6 @@ export const SOLID_WOOD_TOOLS_VARIANTS: EquipmentVariant[] = [
     height: 1,
     zoneWidth: 3,
     zoneDepth: 2,
-    outputFactor: 1,
     enduranceFactor: 1,
     powerPerDay: 3,
     description:
@@ -2256,7 +2240,6 @@ export const SOLID_WOOD_TOOLS_VARIANTS: EquipmentVariant[] = [
     height: 1,
     zoneWidth: 3,
     zoneDepth: 2,
-    outputFactor: 1.05,
     enduranceFactor: 1.2,
     powerPerDay: 4,
     description:
@@ -2272,7 +2255,6 @@ export const SOLID_WOOD_TOOLS_VARIANTS: EquipmentVariant[] = [
     height: 1,
     zoneWidth: 4,
     zoneDepth: 2,
-    outputFactor: 1.15,
     enduranceFactor: 1.5,
     powerPerDay: 5,
     description:
@@ -2288,7 +2270,6 @@ export const SOLID_WOOD_TOOLS_VARIANTS: EquipmentVariant[] = [
     height: 1.2,
     zoneWidth: 5,
     zoneDepth: 3,
-    outputFactor: 1.3,
     enduranceFactor: 2,
     powerPerDay: 7,
     description:
@@ -2311,7 +2292,6 @@ export const CNC_VARIANTS: EquipmentVariant[] = [
     height: 1,
     zoneWidth: 5,
     zoneDepth: 4,
-    outputFactor: 0.95,
     enduranceFactor: 0.25,
     powerPerDay: 8,
     description:
@@ -2328,7 +2308,6 @@ export const CNC_VARIANTS: EquipmentVariant[] = [
     height: 1,
     zoneWidth: 5,
     zoneDepth: 4,
-    outputFactor: 1,
     enduranceFactor: 1,
     powerPerDay: 8,
     description:
@@ -2345,7 +2324,6 @@ export const CNC_VARIANTS: EquipmentVariant[] = [
     height: 1,
     zoneWidth: 5,
     zoneDepth: 4,
-    outputFactor: 1.05,
     enduranceFactor: 1.2,
     powerPerDay: 10,
     description:
@@ -2362,7 +2340,6 @@ export const CNC_VARIANTS: EquipmentVariant[] = [
     height: 1.2,
     zoneWidth: 6,
     zoneDepth: 4,
-    outputFactor: 1.15,
     enduranceFactor: 1.5,
     powerPerDay: 12,
     description:
@@ -2379,7 +2356,6 @@ export const CNC_VARIANTS: EquipmentVariant[] = [
     height: 1.2,
     zoneWidth: 6,
     zoneDepth: 5,
-    outputFactor: 1.3,
     enduranceFactor: 2,
     powerPerDay: 16,
     description:
@@ -2401,7 +2377,6 @@ export const SPRAY_BOOTH_VARIANTS: EquipmentVariant[] = [
     height: 1.5,
     zoneWidth: 4,
     zoneDepth: 3,
-    outputFactor: 0.95,
     enduranceFactor: 0.25,
     powerPerDay: 4,
     description:
@@ -2418,7 +2393,6 @@ export const SPRAY_BOOTH_VARIANTS: EquipmentVariant[] = [
     height: 1.5,
     zoneWidth: 4,
     zoneDepth: 3,
-    outputFactor: 1,
     enduranceFactor: 1,
     powerPerDay: 4,
     description:
@@ -2434,7 +2408,6 @@ export const SPRAY_BOOTH_VARIANTS: EquipmentVariant[] = [
     height: 1.5,
     zoneWidth: 4,
     zoneDepth: 3,
-    outputFactor: 1.05,
     enduranceFactor: 1.2,
     powerPerDay: 5,
     description:
@@ -2451,7 +2424,6 @@ export const SPRAY_BOOTH_VARIANTS: EquipmentVariant[] = [
     height: 1.8,
     zoneWidth: 5,
     zoneDepth: 3,
-    outputFactor: 1.15,
     enduranceFactor: 1.5,
     powerPerDay: 7,
     description:
@@ -2467,7 +2439,6 @@ export const SPRAY_BOOTH_VARIANTS: EquipmentVariant[] = [
     height: 2,
     zoneWidth: 6,
     zoneDepth: 4,
-    outputFactor: 1.3,
     enduranceFactor: 2,
     powerPerDay: 10,
     description:
@@ -2492,7 +2463,6 @@ export const SPINDLE_MOULDER_VARIANTS: EquipmentVariant[] = [
     height: 1.9,
     zoneWidth: 3,
     zoneDepth: 3,
-    outputFactor: 0.95,
     enduranceFactor: 0.25,
     powerPerDay: 3,
     description:
@@ -2509,7 +2479,6 @@ export const SPINDLE_MOULDER_VARIANTS: EquipmentVariant[] = [
     height: 1.85,
     zoneWidth: 3,
     zoneDepth: 3,
-    outputFactor: 1,
     enduranceFactor: 1,
     powerPerDay: 3,
     description:
@@ -2525,7 +2494,6 @@ export const SPINDLE_MOULDER_VARIANTS: EquipmentVariant[] = [
     height: 2.25,
     zoneWidth: 3,
     zoneDepth: 3,
-    outputFactor: 1.05,
     enduranceFactor: 1.2,
     powerPerDay: 4,
     description:
@@ -2542,7 +2510,6 @@ export const SPINDLE_MOULDER_VARIANTS: EquipmentVariant[] = [
     height: 2.15,
     zoneWidth: 4,
     zoneDepth: 3,
-    outputFactor: 1.15,
     enduranceFactor: 1.5,
     powerPerDay: 5,
     description:
@@ -2559,7 +2526,6 @@ export const SPINDLE_MOULDER_VARIANTS: EquipmentVariant[] = [
     height: 2.85,
     zoneWidth: 5,
     zoneDepth: 3,
-    outputFactor: 1.3,
     enduranceFactor: 2,
     powerPerDay: 7,
     description:
@@ -2619,7 +2585,6 @@ function withVariants(draft: SpecDraft): EquipmentSpec {
       id: STANDARD_VARIANT,
       name: draft.name,
       price: draft.price,
-      outputFactor: 1,
       enduranceFactor: 1,
       powerPerDay: POWER_PER_MACHINE_DAILY,
       description: draft.effect,
@@ -4042,8 +4007,15 @@ export const BURGLARY_MACHINES_MAX = 2;
  *  the lost minutes (PIOTR; CLAUDE.md T13 3.5). */
 export const EFFICIENCY_CAUSES: ReadonlyArray<{ id: LostMinuteCause; label: string }> = [
   { id: 'noPeople', label: 'No people' },
-  { id: 'noMachine', label: 'No machine free' },
+  // A man the hall had no place for at the machine his work wanted, and nothing else: nobody
+  // queues for a machine from v52 (CLAUDE.md T25 2.3).
+  { id: 'noPlace', label: 'No place' },
   { id: 'noMaterial', label: 'No material' },
+  // A man with a place whose job the hall stopped: no extraction, the bags full, a machine that
+  // will not run on its air, kit still on the lorry, a bench with no air behind it. Until v52
+  // these were booked with the queue as "no machine free"; `noPlace` means one thing now, so
+  // they have a line of their own [TUNE: the words] (CLAUDE.md T25 2.3).
+  { id: 'hallStopped', label: 'Hall stopped' },
   { id: 'ownerAway', label: 'Owner away' },
 ];
 
@@ -4058,9 +4030,10 @@ export const EFFICIENCY_CAUSES: ReadonlyArray<{ id: LostMinuteCause; label: stri
  *  The two lists meet on the machine and the material, which is why the words here are the words
  *  there. */
 export const OWNER_IDLE_REASONS: ReadonlyArray<{ id: OwnerIdleReason; label: string }> = [
-  { id: 'noMachine', label: 'Waiting for a machine' },
+  { id: 'noPlace', label: 'No place at a machine' },
   { id: 'noMaterial', label: 'No material' },
   { id: 'noCompressor', label: 'No air at the bench' },
+  { id: 'hallStopped', label: 'Hall stopped' },
   { id: 'nothingAssigned', label: 'Nothing assigned' },
   { id: 'officeEmpty', label: 'In the office with nothing to do' },
 ];
@@ -4068,13 +4041,15 @@ export const OWNER_IDLE_REASONS: ReadonlyArray<{ id: OwnerIdleReason; label: str
 /** The reasons a man on the books stood still, in the order his day meter lists them. His own
  *  list and not the owner's above: a joiner has no office queue, and he has the one reason the
  *  owner can never have, which is that nobody has put him on anything. From Turn 23 nobody takes
- *  a job by himself without a manager on duty, so a free man's day is spent waiting for the
+ *  a job by himself without a manager on duty, so a free man's day is spent standing until the
  *  boss's word and his meter says so out loud (PIOTR, 20.09; CLAUDE.md T23 2.1, 2.13). The two
  *  it shares with the owner are worded the same, because they are the same two things. */
 export const WORKER_IDLE_REASONS: ReadonlyArray<{ id: WorkerIdleReason; label: string }> = [
   { id: 'waitingForBoss', label: 'Waiting for the boss' },
-  { id: 'noMachine', label: 'Waiting for a machine' },
+  { id: 'noPlace', label: 'No place at a machine' },
   { id: 'noMaterial', label: 'No material' },
+  { id: 'noCompressor', label: 'No air at the bench' },
+  { id: 'hallStopped', label: 'Hall stopped' },
 ];
 
 // ---------------------------------------------------------------------------
@@ -4091,10 +4066,8 @@ export const WORKER_IDLE_REASONS: ReadonlyArray<{ id: WorkerIdleReason; label: s
  *  lines, the paper lines of a stage just begun and the dashed grey lines of a man off the hall are
  *  gone with the classes that drew them. */
 export const BUBBLES: Record<BubbleKey, string> = {
-  waitingForMachine: 'waiting for the {machine}',
+  noPlace: 'no place at the {machine}',
   noMaterial: 'no sheets for {job}',
-  /** No place at a bench for the stage he is at (v47). */
-  noBench: 'no bench',
   noCompressor: 'no compressor',
   nothingToDo: 'nothing to do',
   waitingForBoss: 'waiting for the boss',
@@ -4104,16 +4077,12 @@ export const BUBBLES: Record<BubbleKey, string> = {
  *  drawing says six] (docs/mockups/t22/bubbles-v2.png; CLAUDE.md T22 2.5). */
 export const BUBBLE_HEAD_GAP = 6;
 
-/** What a man calls a machine when he is standing about waiting for it: the trade's own short word,
- *  not the catalogue's name [PIOTR's drawing, 19.09: "waiting for the saw", "the CNC", "the booth"].
- *  The bubble over his head and the line on the Work Plan both read it through `waitingLine`, so the
- *  two say the same thing (CLAUDE.md T21 2.6, 2.7).
- *
- *  Only the families a man can really queue for are on it, which is what `familyForStage` returns:
- *  the saw, the CNC, the moulder, the edgebander, the booth and the bench. The edgebander is left
- *  off because the catalogue already calls it an edgebander and a second entry saying the same word
- *  is a second thing to keep in step. A family that is not on this table is called by its catalogue
- *  name, lowercased, which is what the game did before tonight. */
+/** What a man calls a machine: the trade's own short word, not the catalogue's name [PIOTR's
+ *  drawing, 19.09: "the saw", "the CNC", "the booth"]. The mark over a man the hall has no place
+ *  for, his card and the Work Plan's line all read it through `placeLine`, so the three say the
+ *  same thing: `no place at the saw` (CLAUDE.md T21 2.6, T25 2.3). A family that is not on this
+ *  table is called by its catalogue name, lowercased; the edgebander is left off because the
+ *  catalogue already calls it an edgebander. */
 export const MACHINE_SHORT_WORDS: Record<string, string> = {
   tableSaw: 'saw',
   cnc: 'CNC',

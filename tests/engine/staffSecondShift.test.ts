@@ -3,6 +3,7 @@
 // is no second shift; with him the night men work after the day, at the night rate, with the
 // owner gone home. And the assigning is his, off the owner's day (3.9 point 2).
 
+import { menAtPlaces } from '../../src/engine/machines';
 import { describe, expect, it } from 'vitest';
 import {
   ACCIDENT_CHANCE_PER_DAY,
@@ -66,7 +67,9 @@ function manager(id = 'pm-1'): Worker {
     monthMinutes: 0,
     monthDaysOff: 0,
     idleMinutes: 0,
-    idleByReason: { waitingForBoss: 0, noMachine: 0, noMaterial: 0 },
+    idleByReason: { waitingForBoss: 0, noPlace: 0, noMaterial: 0, noCompressor: 0, hallStopped: 0 },
+    working: false,
+    noPlaceFor: '',
     accidents: 0,
     anchorX: 1,
     anchorY: 1,
@@ -194,8 +197,8 @@ describe('the second shift', () => {
     const line = state.ledger[state.ledger.length - 1];
     expect(line?.category).toBe('wagesNight');
     expect(line?.amount).toBe(-45.5);
-    // Nobody stands at a machine overnight.
-    expect(state.equipment.every((item) => item.takenBy === null)).toBe(true);
+    // Nobody is at a place overnight (CLAUDE.md T25 2.3).
+    expect(menAtPlaces(state)).toEqual([]);
   });
 
   it('runs at the rate the manager’s cover leaves, with the owner gone home', () => {

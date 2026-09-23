@@ -25,7 +25,9 @@ import {
   SERVICE_INTERVAL_MONTHS,
   MACHINE_HOURS_PER_MONTH,
   TIER_WORDS,
-  WORKBENCH_PLACES,
+  MACHINE_PACE,
+  MACHINE_PLACES,
+  PACED_FAMILIES,
   DUST_HIGH_THRESHOLD,
   DUST_MAX,
   DUST_PER_PRODUCTION_MINUTE,
@@ -79,17 +81,16 @@ import {
 // is the one media.ts has always made with it (CLAUDE.md T24 2.1).
 import { lockReasonFor, template } from './catalog';
 import { jobHeldBy } from './jobs';
-import { machineAtWork } from './production';
-import { cncOptions, stageDoing, stageFor } from './stages';
+import { stageOfMan } from './production';
+import { stageDoing } from './stages';
 import type { StagePlan } from './stages';
 import type { AirCheck } from './media';
-import { cubicMetres, trimmed } from './text';
+import { andList, cubicMetres, trimmed } from './text';
 import type {
   Equipment,
   EquipmentSpec,
   EquipmentVariant,
   GameState,
-  MaterialKind,
   Orientation,
   WorkerTier,
 } from './types';
@@ -104,15 +105,11 @@ export function findSpec(specId: string): EquipmentSpec | null {
   return EQUIPMENT_SPECS.find((entry) => entry.id === specId) ?? null;
 }
 
-/** What a man calls this family of machine when he is standing about waiting for it: the trade's
- *  own short word where `MACHINE_SHORT_WORDS` has one, and the catalogue's name lowercased where it
- *  has not (PIOTR's drawing, 19.09, "waiting for the saw"; CLAUDE.md T21 2.6, 2.7).
- *
- *  The phrase it goes into is `waitingLine` in `src/engine/jobs.ts`, which builds the same word the
- *  same way; the bubble over a man's head fills its own `{machine}` slot from here, and
- *  `tests/render/bubbles.test.ts` holds the two equal. A note for the lead in
- *  docs/notes-t21-b3.md asks for `waitingLine` to read this one function, which this agent may not
- *  edit `jobs.ts` to do. */
+/** What a man calls this family of machine: the trade's own short word where
+ *  `MACHINE_SHORT_WORDS` has one, and the catalogue's name lowercased where it has not (PIOTR's
+ *  drawing, 19.09, "the saw"; CLAUDE.md T21 2.6, 2.7). The one reader of the table: `placeLine`
+ *  in production.ts builds `no place at the saw` off it, and the mark over a man's head fills its
+ *  `{machine}` slot from here, so the two can never say different words (CLAUDE.md T25 2.3). */
 export function machineShortWord(specId: string): string {
   return MACHINE_SHORT_WORDS[specId] ?? (findSpec(specId)?.name ?? specId).toLowerCase();
 }
@@ -259,29 +256,30 @@ export function requiresOneOfFor(spec: EquipmentSpec, variant: EquipmentVariant)
 }
 
 // ---------------------------------------------------------------------------
-// One person per machine (CLAUDE.md T7 3.1). A machine is free or it is taken by one man. He
-// keeps it while he needs it and lets it go the moment he does not, and anybody who wants a
-// machine of that family while it is taken stands and waits at it.
+// A machine is places (PIOTR, 21.09; CLAUDE.md T25 2.1). It is not a thing one man takes: it is a
+// number of places to work, by its class, and the hall's places decide how many men can work at
+// once. Nobody queues and nobody holds anything; the day plan in production.ts gives the places
+// out and this module counts them.
 // ---------------------------------------------------------------------------
 
-/** Who a machine is taken by, when it is the owner. A worker is his own id. */
+/** The owner, where a man is named by id. A worker is his own id. */
 export const OWNER = 'owner';
 
-/** True when the hall has nothing of this family to queue for: either it owns none at all, or
- *  everything it owns is kept in a cabinet and comes out to the bench in whoever's hands want it
- *  (CLAUDE.md T7 3.6). */
+/** True when the hall has nothing of this family standing on its floor: either it owns none at
+ *  all, or everything it owns is kept in a cabinet and comes out to the bench in whoever's hands
+ *  want it. Neither has places, and neither needs one (CLAUDE.md T7 3.6, T25 2.3). */
 export function machineIsShared(state: GameState, specId: string): boolean {
   return floorMachines(state, specId).length === 0;
 }
 
-/** Machines of this family that stand on the floor: the ones there can be a queue for. A machine
+/** Machines of this family that stand on the floor: the ones that have places. A machine
  *  that is sold is not one of them: it stops working the minute the sale is made and stands there
  *  until the buyer's van comes (CLAUDE.md T8 3.5). */
 export function floorMachines(state: GameState, specId: string): Equipment[] {
   return owned(state, specId).filter((item) => itemStandsInTheHall(item) && !isSold(item));
 }
 
-/** Sold, and waiting for the van at the gate. */
+/** Sold, and standing until the van comes to the gate. */
 export function isSold(item: Equipment): boolean {
   return item.soldOnDay !== null;
 }
@@ -335,61 +333,104 @@ export function cabinetTools(state: GameState, specId: string): Equipment[] {
   return owned(state, specId).filter((item) => !itemStandsInTheHall(item) && !isSold(item));
 }
 
-/** Machines of this family nobody is standing at. */
-export function freeMachines(state: GameState, specId: string): Equipment[] {
-  // A machine away being serviced is no more use than a broken one (CLAUDE.md T20 2.9.3).
-  return floorMachines(state, specId).filter(
-    (item) => item.takenBy === null && !item.broken && !machineIsOut(item, state.clock.day),
+/** How many men can work at this machine at once: its class's row of `MACHINE_PLACES`, and
+ *  nought for anything that is not a floor family men work at. The one reader of the table
+ *  (PIOTR, 21.09; CLAUDE.md T25 2.1). */
+export function placesOf(item: { specId: string; variantId: string }): number {
+  return MACHINE_PLACES[item.specId]?.[item.variantId] ?? 0;
+}
+
+/** The machines of this family that have places today, in the order they were bought, which is
+ *  the order they are filled in: standing in the hall, not sold, not broken and not away for its
+ *  service. A broken machine has no places, which is what a breakdown costs beside its repair
+ *  (CLAUDE.md T20 2.9.3, T25 2.1). */
+export function placedMachines(state: GameState, family: string): Equipment[] {
+  return floorMachines(state, family).filter(
+    (item) => !item.broken && !machineIsOut(item, state.clock.day),
   );
 }
 
-/** The machine of this family this man is standing at, or null. A bench is not one of them from
- *  Turn 23: it is not taken off anybody, every man has his own place at one, and `benchOf` says
- *  which (CLAUDE.md T23 2.17). */
-export function heldMachine(state: GameState, who: string, specId: string): Equipment | null {
-  return owned(state, specId).find((item) => item.takenBy === who) ?? null;
+/** Every place at this family in the hall: the places of each of its machines that has any,
+ *  added up (CLAUDE.md T25 2.1). */
+export function hallPlaces(state: GameState, family: string): number {
+  return placedMachines(state, family).reduce((total, item) => total + placesOf(item), 0);
 }
 
-/** Everything this man is standing at. */
-export function heldMachines(state: GameState, who: string): Equipment[] {
-  return state.equipment.filter((item) => item.takenBy === who);
-}
-
-/** Gives this man a machine of the family, or says there is none to be had. He keeps the one he
- *  is already at; otherwise he takes the best of the free ones, which is what a joiner would do
- *  and what the projection on his job card assumes he will get. */
-export function claimMachine(state: GameState, who: string, specId: string): Equipment | null {
-  // A bench is never claimed. A class holds one, two or three men and each of them has his own
-  // place at one, so there is nothing to take and nothing to queue for: he either has a place or
-  // the hall has not got one for him (CLAUDE.md T23 2.17).
-  if (specId === BENCH) return benchOf(state, who);
-  const held = heldMachine(state, who, specId);
-  if (held) return held;
-  const free = freeMachines(state, specId);
-  let best: Equipment | null = null;
-  for (const item of free) {
-    const factor = outputFactorOf(state, item);
-    if (best === null || factor > outputFactorOf(state, best)) best = item;
+/** The machine the man at this place of the family works at, and which of its own places he
+ *  is at: the machines in the order they were bought, each filled up to its places, so the
+ *  second man at a two place saw is at its second place and the third is at the second saw
+ *  [PIOTR: "with two saws let them go to the second one"]. Null past the hall's last place. The
+ *  figure loop and the machine's card both read this (CLAUDE.md T25 2.5, 2.6). */
+export function machineForPlace(
+  state: GameState,
+  family: string,
+  index: number,
+): { item: Equipment; place: number } | null {
+  if (index < 0) return null;
+  let left = index;
+  for (const item of placedMachines(state, family)) {
+    const places = placesOf(item);
+    if (left < places) return { item, place: left };
+    left -= places;
   }
-  if (best === null) return null;
-  best.takenBy = who;
-  return best;
+  return null;
 }
 
-/** He walks away from everything he is standing at, except the families named. */
-export function releaseMachines(state: GameState, who: string, keep: readonly string[] = []): void {
-  for (const item of state.equipment) {
-    if (item.takenBy !== who) continue;
-    if (keep.includes(item.specId)) continue;
-    item.takenBy = null;
+/** The men at their places this minute, in the day plan's order (the owner first, then the crew
+ *  in the order they were hired), each with the machine his place is at and which of its places
+ *  it is. Read off what the plan wrote on them: a working man's station names the family, and his
+ *  rank among the working men of that family is the place `machineForPlace` gives him. The one
+ *  answer to "who is at this machine" for the hall's sums, the figures and the cards alike
+ *  (CLAUDE.md T25 2.5, 2.6). */
+export function menAtPlaces(state: GameState): Array<{ who: string; item: Equipment; place: number }> {
+  const found: Array<{ who: string; item: Equipment; place: number }> = [];
+  const given = new Map<string, number>();
+  const men: Array<{ who: string; man: { working: boolean; station: string } }> = [
+    { who: OWNER, man: state.owner },
+    ...state.workers.map((worker) => ({ who: worker.id, man: worker })),
+  ];
+  for (const { who, man } of men) {
+    if (!man.working || !man.station.startsWith('machine:')) continue;
+    const family = man.station.slice('machine:'.length);
+    const index = given.get(family) ?? 0;
+    given.set(family, index + 1);
+    const at = machineForPlace(state, family, index);
+    if (at !== null) found.push({ who, item: at.item, place: at.place });
   }
+  return found;
 }
 
-/** Everybody who is not in this list walks away from whatever he was standing at. */
-export function releaseMachinesExcept(state: GameState, working: readonly string[]): void {
-  for (const item of state.equipment) {
-    if (item.takenBy !== null && !working.includes(item.takenBy)) item.takenBy = null;
-  }
+/** Who is at this machine this minute, in the order of its places (CLAUDE.md T25 2.5). */
+export function menAtMachine(state: GameState, item: { id: string }): string[] {
+  return menAtPlaces(state)
+    .filter((entry) => entry.item.id === item.id)
+    .sort((a, b) => a.place - b.place)
+    .map((entry) => entry.who);
+}
+
+/** A machine's places and who is in them this minute, read off the same day plan the figures on
+ *  the floor are (CLAUDE.md T25 2.5): on its card and its hover line `Places: 2 of 2 in use, Pete
+ *  and Eddie`, on the Owned tab's tile the short form `2 of 2 in use`, and `Free` on both while
+ *  nobody is at it. Empty for a thing nobody works at, and for a machine that has no places this
+ *  minute because it is broken, away for its service or sold: its card says which. */
+export function placesLine(state: GameState, item: Equipment, form: 'card' | 'tile'): string {
+  const places = placesOf(item);
+  if (places <= 0) return '';
+  if (!placedMachines(state, item.specId).some((entry) => entry.id === item.id)) return '';
+  const men = menAtMachine(state, item);
+  if (men.length === 0) return 'Free';
+  const count = `${men.length} of ${places} in use`;
+  if (form === 'tile') return count;
+  const names = men.map((who) =>
+    who === OWNER ? state.playerName : (state.workers.find((worker) => worker.id === who)?.name ?? who),
+  );
+  return `Places: ${count}, ${andList(names)}`;
+}
+
+/** The ids of every machine somebody is at this minute: what the extraction and the air are the
+ *  sums of (CLAUDE.md T10 3.1, 3.2). */
+export function machinesAtWork(state: GameState): Set<string> {
+  return new Set(menAtPlaces(state).map((entry) => entry.item.id));
 }
 
 /** The class of machine this is, or the cheapest one in the family when the id is unknown. */
@@ -423,12 +464,19 @@ export function hasGate(state: GameState, item: { id: string }): boolean {
   return state.gates.includes(item.id);
 }
 
-/** What this machine does to the speed of its own stage: its class's factor, and the gate's
- *  bonus on top of it once one is fitted (PIOTR: +2%; CLAUDE.md T13 3.11). The one place a
- *  machine's output factor is read: the man on it, the projection, the board and the choice of
- *  the best free one all come through here. */
-export function outputFactorOf(state: GameState, item: Equipment): number {
-  const base = variantFor(item)?.outputFactor ?? 1;
+/** The pace a class of this family works at, off the one table of 2.4: used 0.95 up to industrial
+ *  1.12 for every family a man works at, and 1 for everything else (the extraction, the air, the
+ *  storage), whose class is never a speed [PIOTR, 21.09] (CLAUDE.md T25 2.4). */
+export function classPaceOf(item: { specId: string; variantId: string }): number {
+  if (!PACED_FAMILIES.includes(item.specId)) return 1;
+  return MACHINE_PACE[item.variantId] ?? 1;
+}
+
+/** What this machine does to the pace of its family: its class's pace, and the gate's bonus on
+ *  top of it once one is fitted (PIOTR: +2%; CLAUDE.md T13 3.11, T25 2.4). The one place a
+ *  machine's pace is read: the hall's pace, the projection and the board all come through here. */
+export function paceOf(state: GameState, item: Equipment): number {
+  const base = classPaceOf(item);
   if (!hasGate(state, item)) return base;
   return Math.round(base * (1 + GATE_OUTPUT_BONUS) * 10000) / 10000;
 }
@@ -487,13 +535,6 @@ export const BENCH = 'workbench';
  *  trade: he is at his full rate there and a joiner is slower (CLAUDE.md T19 2.6). */
 export const SPRAY_BOOTH = 'sprayBooth';
 
-/** How many men can work at this bench at once: its class's place in Piotr's table, and nought
- *  for anything that is not a bench (CLAUDE.md T23 2.17). */
-export function benchPlacesOf(item: { specId: string; variantId: string }): number {
-  if (item.specId !== BENCH) return 0;
-  return WORKBENCH_PLACES[item.variantId] ?? 1;
-}
-
 /** The benches standing in the hall, in the order they were bought, which is the order the men
  *  fill them in. A broken one is no bench at all, the way a broken machine is no machine. */
 export function benches(state: GameState): Equipment[] {
@@ -503,7 +544,7 @@ export function benches(state: GameState): Equipment[] {
 /** Places at the benches of the hall, the classes added up: what the hiring gate counts, the way
  *  it counts the slots of the tool cabinets and not the cabinets (CLAUDE.md T22 2.12, T23 2.17). */
 export function benchPlaces(state: GameState): number {
-  return benches(state).reduce((total, item) => total + benchPlacesOf(item), 0);
+  return benches(state).reduce((total, item) => total + placesOf(item), 0);
 }
 
 /** The men who have a place at a bench, in the order they get one: the crew in the order they
@@ -526,29 +567,21 @@ function benchQueue(state: GameState): string[] {
  *  holding its class's men, filled by `benchQueue` in order. Nobody is turned off a bench he is
  *  standing at, because nobody was ever standing at somebody else's (CLAUDE.md T23 2.17). */
 export function benchOf(state: GameState, who: string): Equipment | null {
+  return benchPlaceOf(state, who)?.item ?? null;
+}
+
+/** The bench this man works at and which of its places is his: the one answer `benchOf` reads,
+ *  with the place kept, so three men whose home is one industrial bench stand at its three places
+ *  and not on one cell (CLAUDE.md T23 2.17, T25 2.6). */
+export function benchPlaceOf(state: GameState, who: string): { item: Equipment; place: number } | null {
   let place = benchQueue(state).indexOf(who);
   if (place < 0) return null;
   for (const bench of benches(state)) {
-    const places = benchPlacesOf(bench);
-    if (place < places) return bench;
+    const places = placesOf(bench);
+    if (place < places) return { item: bench, place };
     place -= places;
   }
   return null;
-}
-
-/** Which of his bench's places is his: nought for the first man at it, one for the second, two
- *  for the third. The renderer wants it so that two men at one bench are two figures beside each
- *  other and not one drawn on top of another, which is the rule of Turn 19's 2.5 asked of a bench
- *  that holds more than one man (CLAUDE.md T19 2.5, T23 2.17). */
-export function benchPlaceAt(state: GameState, who: string): number {
-  let place = benchQueue(state).indexOf(who);
-  if (place < 0) return 0;
-  for (const bench of benches(state)) {
-    const places = benchPlacesOf(bench);
-    if (place < places) return place;
-    place -= places;
-  }
-  return 0;
 }
 
 /** How many places at a bench the hall's own men already have: the owner and every trade that
@@ -567,7 +600,7 @@ export function freeBenches(state: GameState): number {
 export function benchPlacesOwnedOrOnOrder(state: GameState): number {
   return (
     benchPlaces(state) +
-    state.onOrder.reduce((total, item) => total + benchPlacesOf(item), 0)
+    state.onOrder.reduce((total, item) => total + (item.specId === BENCH ? placesOf(item) : 0), 0)
   );
 }
 
@@ -577,7 +610,7 @@ export function benchPlacesOwnedOrOnOrder(state: GameState): number {
 export function benchAtPlace(state: GameState, place: number): Equipment | null {
   let left = place;
   for (const bench of benches(state)) {
-    const places = benchPlacesOf(bench);
+    const places = placesOf(bench);
     if (left < places) return bench;
     left -= places;
   }
@@ -585,11 +618,9 @@ export function benchAtPlace(state: GameState, place: number): Equipment | null 
 }
 
 /** Without a bench in the hall there is no way to make anything (CLAUDE.md T4 3.4): the one
- *  question a job asks of the hall. Whether a man on it has a place at one is his own question,
- *  asked of him alone and only at the stages done at a bench (`standsForBench`, v47). Until v46
- *  the whole job stood on its first man's place, so the owner leading a job with three joiners
- *  on it, who had the industrial bench's three places between them and left him none, stopped
- *  all four of them with "no bench" and the saw free (PIOTR, 22.09, the day 128 save). */
+ *  question a job asks of the hall. Whether a man on it has a place at one is the day plan's, asked
+ *  of him alone and only at the stages done at a bench, like any family's places
+ *  (CLAUDE.md T25 2.3). */
 export function hallHasABench(state: GameState): boolean {
   return benchPlaces(state) > 0;
 }
@@ -797,7 +828,7 @@ export function outputBreakdown(state: GameState): OutputBreakdown {
       .map((item) => item.specId),
   );
   for (const specId of Array.from(families).sort()) {
-    const factor = bestOutputFactor(state, specId);
+    const factor = hallPace(state, specId);
     const spec = findSpec(specId);
     lines.push({
       label: `${spec?.name ?? specId}, best in the hall`,
@@ -907,26 +938,24 @@ function twoPlaceText(value: number): string {
   return (Math.round(value * 100) / 100).toFixed(2);
 }
 
-/** Why his minute was worth what it was: the class of the machine he is standing at, the by hand
- *  penalty when he is at none and his stage falls back to a pair of hands, or his bench. The
- *  machine comes first because it is what actually set his speed: `runProductionMinute` reads the
- *  class he got and never the plan's own figure, so a man with a bench under a by hand job is
- *  quicker than that job's 0.67 and this row says so. A row whose two figures did not multiply out
- *  to the one beside them would be the very thing 2.1 is for (PIOTR, 22.09; CLAUDE.md T24 2.1, and
- *  the open question of section 8 about rule 9.5). */
-function whyWords(stage: StagePlan | null, machine: Equipment | null): string {
-  if (machine !== null) {
-    return (variantFor(machine)?.name ?? findSpec(machine.specId)?.name ?? machine.specId).toLowerCase();
+/** Why his minute was worth what it was: the family his place is at and the class that sets the
+ *  hall's pace for it (`saw, industrial`), whichever of its machines he is at, because the hall's
+ *  best class is what set his speed; `at the bench` at a bench, and `by hand` when his stage falls
+ *  back to a pair of hands. A row whose two figures did not multiply out to the one beside them
+ *  would be the very thing it is for (PIOTR, 22.09; CLAUDE.md T24 2.1, T25 2.4). */
+function whyWords(state: GameState, stage: StagePlan | null, machine: Equipment | null): string {
+  if (machine !== null && machine.specId !== BENCH) {
+    const best = bestMachineOf(state, machine.specId) ?? machine;
+    return `${machineShortWord(machine.specId)}, ${best.variantId}`;
   }
   if (stage === null) return 'at the bench';
   return stage.byHand ? 'by hand' : 'at the bench';
 }
 
-/** The speed his stage ran at this minute: the class of the machine he actually got, or the
- *  plan's own speed when he is at none. The same two lines `runProductionMinute` reads, before
- *  the air factor (CLAUDE.md T7 3.1). */
-function stageSpeedNow(state: GameState, stage: StagePlan | null, machine: Equipment | null): number {
-  if (machine !== null) return outputFactorOf(state, machine);
+/** The speed his stage ran at this minute: the stage's own, which is the hall's pace for its family
+ *  whichever machine his place is at, the one figure `runProductionMinute` reads before the air
+ *  factor (CLAUDE.md T7 3.1, T25 2.4). */
+function stageSpeedNow(stage: StagePlan | null): number {
   return stage === null ? 1 : stage.speed;
 }
 
@@ -941,8 +970,8 @@ function manRow(
   booked: { minutes: number; worth: number },
 ): WorkshopBreakdownRow {
   const job = jobHeldBy(state, who);
-  const stage = job === null ? null : stageFor(state, who, job, cncOptions(state, who, job));
-  const machine = job === null ? null : machineAtWork(state, who, job);
+  const stage = job === null ? null : stageOfMan(state, who, job);
+  const machine = job === null ? null : (menAtPlaces(state).find((entry) => entry.who === who)?.item ?? null);
   const doing =
     job === null || stage === null ? '' : `${stageDoing(stage.id, job.finish === 'lacquer')} ${job.name}`;
   const mine = who === OWNER ? `your ${twoPlaceText(rate)}` : twoPlaceText(rate);
@@ -950,8 +979,8 @@ function manRow(
     who,
     main: [name, trade, doing].filter((part) => part !== '').join(', '),
     words:
-      `${whyWords(stage, machine)}, ${booked.minutes} min: ` +
-      `${mine} times ${twoPlaceText(stageSpeedNow(state, stage, machine))}`,
+      `${whyWords(state, stage, machine)}, ${booked.minutes} min: ` +
+      `${mine} times ${twoPlaceText(stageSpeedNow(stage))}`,
     minutes: booked.minutes,
     figure: booked.minutes <= 0 ? 0 : Math.round((booked.worth / booked.minutes) * 100) / 100,
   };
@@ -1020,35 +1049,14 @@ export function workshopBreakdownToday(state: GameState): WorkshopBreakdown {
   };
 }
 
-/** What the classes of machine in the hall do to the speed of a job of this material: the best
- *  one of each family, multiplied together. Above 1 is quicker (CLAUDE.md T3 3.5). Two saws do
- *  not make the work twice as fast: only the better of them is used. */
-export function machineOutputFactor(state: GameState, material: MaterialKind): number {
-  const best = new Map<string, number>();
-  for (const item of state.equipment) {
-    const spec = findSpec(item.specId);
-    if (!spec || spec.category !== 'machine' || isSold(item)) continue;
-    if (spec.usedOn !== null && spec.usedOn !== material) continue;
-    const factor = outputFactorOf(state, item);
-    best.set(spec.id, Math.max(best.get(spec.id) ?? 0, factor));
-  }
-  let product = 1;
-  for (const factor of best.values()) product *= factor;
-  return product;
-}
-
-/** The best class of this family standing in the hall: what the projection of a job's minutes is
- *  worked out from before anybody knows which one of them he will actually get. 1 when the
- *  workshop owns none, so a caller that has not asked `has` first is never told a job is quicker
- *  than it is (CLAUDE.md T7 3.1). */
-export function bestOutputFactor(state: GameState, specId: string): number {
-  let best = 0;
-  for (const item of owned(state, specId)) {
-    if (isSold(item)) continue;
-    const factor = outputFactorOf(state, item);
-    if (factor > best) best = factor;
-  }
-  return best > 0 ? best : 1;
+/** The hall's pace at a stage of this family: the best class of it standing unbroken in the hall
+ *  and not away for its service, whatever machine of it the man is at. A hall with an industrial
+ *  saw and a used one cuts at 1.12, because the shop cuts on the good saw and the old one takes
+ *  the overflow [PIOTR, 21.09] (CLAUDE.md T25 2.4). 1 when the hall has none it can work at, so a
+ *  caller that has not asked `has` first is never told a job is quicker than it is. */
+export function hallPace(state: GameState, family: string): number {
+  const best = bestMachineOf(state, family);
+  return best === null ? 1 : paceOf(state, best);
 }
 
 /** The extractor is on the floor. The hall carries on at a quarter speed (CLAUDE.md T2 3.9). */
@@ -1170,16 +1178,41 @@ export function machineWearPerMinute(item: Equipment): number {
   return isServiced(item.specId) ? wearPerMinuteOf(item.purchasePrice) : 0;
 }
 
-/** The best class of this family standing in the hall, as a machine: the one whose class the
- *  projection of a piece's minutes is worked out on. Null when the workshop owns none. */
+/** One line of the efficiency plate for a family whose pace is not 1.00: `Saw, industrial` and
+ *  `+12%`, so the player sees what his machines buy him [PIOTR, 21.09] (CLAUDE.md T25 2.4). */
+export interface PaceLine {
+  family: string;
+  label: string;
+  /** The hall's pace for the family less 1, as a whole signed percentage: 12 is +12%. */
+  percent: number;
+}
+
+/** The families a man works at whose pace in this hall is above or below 1.00, in the order of
+ *  `PACED_FAMILIES`, each named by its short word and the class that sets it. */
+export function paceLines(state: GameState): PaceLine[] {
+  const lines: PaceLine[] = [];
+  for (const family of PACED_FAMILIES) {
+    const best = bestMachineOf(state, family);
+    if (best === null) continue;
+    const percent = Math.round((paceOf(state, best) - 1) * 100);
+    if (percent === 0) continue;
+    const word = machineShortWord(family);
+    lines.push({ family, label: `${word.charAt(0).toUpperCase()}${word.slice(1)}, ${best.variantId}`, percent });
+  }
+  return lines;
+}
+
+/** The best class of this family standing in the hall, unbroken and not away for its service, as
+ *  a machine: the one that sets the hall's pace (2.4), and the one a piece's minutes and its wear
+ *  are worked out on. The first bought wins a tie. Null when the hall has none it can work at. */
 export function bestMachineOf(state: GameState, specId: string): Equipment | null {
   let best: Equipment | null = null;
-  let factor = 0;
+  let pace = 0;
   for (const item of owned(state, specId)) {
-    if (isSold(item)) continue;
-    const own = outputFactorOf(state, item);
-    if (own > factor) {
-      factor = own;
+    if (isSold(item) || item.broken || machineIsOut(item, state.clock.day)) continue;
+    const own = paceOf(state, item);
+    if (own > pace) {
+      pace = own;
       best = item;
     }
   }
@@ -1536,7 +1569,7 @@ export function startMachineMeters(state: GameState): void {
 export function minutesSavedBy(state: GameState, item: Equipment, hours: number): number {
   const spec = findSpec(item.specId);
   if (!spec || spec.category !== 'machine') return 0;
-  const effect = roundPoints(outputFactorOf(state, item) - 1);
+  const effect = roundPoints(hallPace(state, item.specId) - 1);
   return Math.round(hours * 60 * effect);
 }
 
@@ -1601,7 +1634,7 @@ export function machineSavings(state: GameState, span: 'week' | 'month'): Machin
     if (isSold(item) || !itemStandsInTheHall(item)) continue;
     const spec = findSpec(item.specId);
     if (!spec || spec.category !== 'machine') continue;
-    const effect = roundPoints(outputFactorOf(state, item) - 1);
+    const effect = roundPoints(hallPace(state, item.specId) - 1);
     const ran = span === 'week' ? item.hoursThisWeek : item.hoursThisMonth;
     const saved = minutesSavedBy(state, item, ran);
     if (span === 'week') minutesSavedLastWeek += item.minutesSavedLastWeek;

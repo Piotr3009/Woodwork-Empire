@@ -19,15 +19,8 @@ import {
   SPRAYER_SPRAY_RATE,
   WORK_EPSILON,
 } from './constants';
-import {
-  SPRAY_BOOTH,
-  bestOutputFactor,
-  benchOf,
-  freeMachines,
-  has,
-  heldMachine,
-  machineIsShared,
-} from './machines';
+import { OWNER, SPRAY_BOOTH, hallPace, has } from './machines';
+import { stationMachine } from './stations';
 import type {
   Finish,
   GameState,
@@ -95,8 +88,8 @@ export function stageDoing(id: StageId, lacquer: boolean): string {
 /** How this job is to be made this minute. The CNC is the one thing that changes the shape of a
  *  job's stages, so it is the one option there is (CLAUDE.md T7 3.4). */
 export interface StageOptions {
-  /** False when the CNC is not to be used: the hall has none, or it is taken and the job card
-   *  allows the saw instead. Left out means "use it if the hall has one". */
+  /** False when the CNC is not to be used: the hall has none, or it has no place for the man and
+   *  the job card allows the saw instead. Left out means "use it if the hall has one". */
   cnc?: boolean;
 }
 
@@ -113,18 +106,26 @@ export function cncFactor(state: GameState): number {
   return has(state, 'cncHead') ? CNC_STAGE_FACTOR_WITH_HEAD : CNC_STAGE_FACTOR;
 }
 
-/** How this man's job is made this minute: on the CNC when he can have one, on the saw and the
- *  edgebander when the CNC is taken and the job card allows it, and waiting for the CNC when it
- *  does not (CLAUDE.md T7 3.4). */
+/** The families a sheet job is cut and machined on when the CNC is not doing it: a man whose
+ *  place is at one of these in a hall that has a CNC is a man the CNC had no place for. */
+const OFF_CNC_FAMILIES = ['tableSaw', 'edgebander', 'spindleMoulder', 'solidWoodTools'];
+
+/** How this man's job is made this minute: on the CNC, or on the saw and the edgebander when the
+ *  day plan had no place for him at the CNC and the job card allows it (CLAUDE.md T7 3.4,
+ *  T25 2.3). Read off what the plan wrote on him, his station while he works and the family he
+ *  has no place at while he does not, so every reader asks the plan and none of them works it
+ *  out again. */
 export function cncOptions(
   state: GameState,
   who: string,
   job: { sawFallback: boolean },
 ): StageOptions {
   if (!has(state, 'cnc')) return { cnc: false };
-  if (heldMachine(state, who, 'cnc') !== null) return { cnc: true };
-  if (freeMachines(state, 'cnc').length > 0) return { cnc: true };
-  return { cnc: !job.sawFallback };
+  if (!job.sawFallback) return { cnc: true };
+  const man = who === OWNER ? state.owner : state.workers.find((worker) => worker.id === who);
+  if (man === undefined) return { cnc: true };
+  const at = man.working ? stationMachine(man.station) : man.noPlaceFor;
+  return { cnc: at === null || !OFF_CNC_FAMILIES.includes(at) };
 }
 
 /** The family a stage is done on for a job of this material and finish, or null when it is done
@@ -145,8 +146,8 @@ export function familyForStage(job: StagedJob, stage: StageId): string | null {
  *  nothing is made at all, which the hall says for itself (CLAUDE.md T4 3.4). */
 const BY_HAND_STAGES: StageId[] = ['cutting', 'machining', 'cnc'];
 
-/** What the hall does to the minutes of one stage: the best class of the family it is done on,
- *  or the by hand penalty when the family is not in the hall at all. */
+/** What the hall does to the minutes of one stage: the hall's pace for the family it is done on
+ *  (CLAUDE.md T25 2.4), or the by hand penalty when the family is not in the hall at all. */
 export function stageSpeed(
   state: GameState,
   job: StagedJob,
@@ -155,12 +156,13 @@ export function stageSpeed(
 ): { speed: number; byHand: boolean } {
   // A job made entirely by hand uses no machine at any stage (CLAUDE.md 9.5).
   if (job.byHand) return { speed: 1 / BY_HAND_DURATION_FACTOR, byHand: true };
-  if (stage === 'cnc') return { speed: cncFactor(state), byHand: false };
+  // The CNC's own head times the hall's pace at it, like every family (CLAUDE.md T25 2.4).
+  if (stage === 'cnc') return { speed: cncFactor(state) * hallPace(state, 'cnc'), byHand: false };
   const family = familyForStage(job, stage);
   if (family === null) return { speed: 1, byHand: false };
   // Parts come off a CNC cut and drilled, so the bench takes half the minutes (CLAUDE.md T7 3.4).
   const cnc = stage === 'assembly' && jobOnCnc(state, job, options) ? CNC_ASSEMBLY_FACTOR : 1;
-  if (has(state, family)) return { speed: bestOutputFactor(state, family) * cnc, byHand: false };
+  if (has(state, family)) return { speed: hallPace(state, family) * cnc, byHand: false };
   if (!BY_HAND_STAGES.includes(stage)) return { speed: cnc, byHand: false };
   return { speed: cnc / BY_HAND_DURATION_FACTOR, byHand: true };
 }
@@ -281,9 +283,9 @@ export function minutesLeftFor(
   return minutes;
 }
 
-/** The stage the job as a whole is standing at: the first of its plan with work left in it, which
- *  is what a card, a plan row and a warning say about the job. A man on the job may be at another
- *  one (`stageFor`). Null only for a job with no labour in it at all. */
+/** The stage the job is standing at: the first of its plan with work left in it, which is where
+ *  every man on it works and what a card, a plan row and a warning say about it (CLAUDE.md
+ *  T25 2.2). Null only for a job with no labour in it at all. */
 export function currentStage(
   state: GameState,
   job: Job,
@@ -294,59 +296,6 @@ export function currentStage(
     if (stageLeft(job, plan, stage) > WORK_EPSILON) return stage;
   }
   return plan.length > 0 ? (plan[plan.length - 1] ?? null) : null;
-}
-
-/** The order the bag of work keeps: finishing only once everything else is done; everything else
- *  in any order. "Assembly after cutting" is gone (PIOTR, 21.09; v43): with one saw it left every
- *  man but the one at it standing behind him for the whole of the cutting, a day or two of it,
- *  once the machining was done. Cutting is still first in the plan, so the first man takes the
- *  saw and the others assemble what he has cut. */
-function stageMayStart(job: Job, plan: readonly StagePlan[], stage: StagePlan): boolean {
-  if (stage.id !== 'finishing') return true;
-  return plan.every(
-    (other) => other.id === 'finishing' || stageLeft(job, plan, other) <= WORK_EPSILON,
-  );
-}
-
-/** True when a stage is done at a man's own bench and not at a floor machine: bench work, work
- *  with nothing but hands, a tool out of a cabinet, or a family the hall does not own, done by
- *  hand. Only these want him to have a place at a bench (PIOTR, 22.09; v47). */
-export function stageAtTheBench(state: GameState, stage: { family: string | null }): boolean {
-  const family = stage.family;
-  if (family === null || family === 'workbench') return true;
-  return !has(state, family) || machineIsShared(state, family);
-}
-
-/** True when this man could stand at the station this stage wants right now: his own place at a
- *  bench for a stage done there, a machine he already holds, or a machine of the family nobody
- *  else holds. Until v47 the bench was always free: a man with no place at one stood at the
- *  canteen door whatever his stage, with two saws idle (PIOTR, 22.09: "I should be cutting now,
- *  the saws are free, I can see them"). Now a man without a place is sent to a machine stage
- *  when the job has one open, and wants a place only for the bench work. */
-function stationFreeFor(state: GameState, who: string, stage: StagePlan): boolean {
-  if (stageAtTheBench(state, stage)) return benchOf(state, who) !== null;
-  const family = stage.family as string;
-  return heldMachine(state, who, family) !== null || freeMachines(state, family).length > 0;
-}
-
-/** The stage this man works at on this job this minute: the bag of work (PIOTR, 20.09; v37). The
- *  stages the job still has work in, in the plan's order, the order rules kept (`stageMayStart`),
- *  and among them the first whose station is free for him; when none is free, the first of them,
- *  where he queues as he always did. Two men on one job are therefore at two stages, one cutting
- *  and one edging, and nobody stands behind a man at a machine while another stage of the same job
- *  is open. Null only for a job with no labour in it at all. */
-export function stageFor(
-  state: GameState,
-  who: string,
-  job: Job,
-  options: StageOptions = {},
-): StagePlan | null {
-  const plan = stagePlanFor(state, job, options);
-  const open = plan.filter(
-    (stage) => stageLeft(job, plan, stage) > WORK_EPSILON && stageMayStart(job, plan, stage),
-  );
-  if (open.length === 0) return currentStage(state, job, options);
-  return open.find((stage) => stationFreeFor(state, who, stage)) ?? open[0] ?? null;
 }
 
 /** Labour per minute for a man of this rate working this stage at this speed. The one place a

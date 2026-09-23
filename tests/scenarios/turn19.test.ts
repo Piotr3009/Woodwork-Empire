@@ -36,7 +36,7 @@ const SEED = 20260911;
 // (aa) Three men on one job (PIOTR, 17.09; CLAUDE.md T19 2.5)
 // ---------------------------------------------------------------------------
 
-/** Three joiners with a saw each, so the month measures the men and never the queue at one
+/** Three joiners with a saw each, so the month measures the men and never the places at one
  *  machine, sheets on the rack from day 1, and nothing taken off the board: the piece the three
  *  of them stand at is the only thing happening. */
 const THREE_MEN: Policy = {
@@ -137,9 +137,9 @@ describe('(aa) three men on one job, on Very easy', () => {
   });
 
   it('never goes more than three times faster with three men on it', () => {
-    // The rule, in one line: a machine is one man's, so a stage at a machine goes at the speed of
-    // the man who holds it however many are on the job, and the others queue; a bench stage gives
-    // every man his own full minute at his own rate. The engine test asserts the arithmetic to
+    // The rule, in one line: a machine is so many places, so a stage at a machine goes as fast as
+    // the men the hall has places for and a man with no place does not work it; a bench stage gives
+    // every man with a bench place his own full minute at his own rate (CLAUDE.md T25 2.3). The engine test asserts the arithmetic to
     // four places (tests/engine/assignees.test.ts). What a month can say is the ceiling: the whole
     // piece is machine stages and bench stages one after another, so three men cannot beat one
     // man by more than three to one, and the machine stages mean they do not come close to it.

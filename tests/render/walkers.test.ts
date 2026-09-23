@@ -14,13 +14,12 @@ import {
   STATION_BENCH,
   STATION_GATE,
   STATION_IDLE,
-  STATION_NO_BENCH,
+  STATION_DOOR,
+  STATION_HOME,
   STATION_OFFICE,
   STATION_PHONE,
   STATION_RACK,
   machineStation,
-  secondStation,
-  waitingStation,
 } from '../../src/engine/stations';
 import { createTask } from '../../src/engine/tasks';
 import {
@@ -515,9 +514,9 @@ describe('The movement (CLAUDE.md T19 2.1, PIOTR: "like robots, shaking like a l
 describe('nobody walks on the spot (CLAUDE.md T17 1, section 7)', () => {
   it('rests every station at something that is not a walk and not a carry', () => {
     // The one place a resting figure's animation is chosen, over every station the game puts a
-    // man at: the benches, the machines and their waiting cells, the bench's second place, the
-    // rack, the gate, the office, the phone and standing idle. An unload rests at the gate or at
-    // the rack, which are both on the list.
+    // man at: the benches, his place at a machine, his home cell with no place, the canteen door,
+    // the rack, the gate, the office, the phone and standing idle. An unload rests at the gate or
+    // at the rack, which are both on the list (CLAUDE.md T25 2.3, 2.6).
     const stations = [
       STATION_BENCH,
       STATION_RACK,
@@ -525,10 +524,10 @@ describe('nobody walks on the spot (CLAUDE.md T17 1, section 7)', () => {
       STATION_IDLE,
       STATION_OFFICE,
       STATION_PHONE,
-      STATION_NO_BENCH,
+      STATION_DOOR,
+      STATION_HOME,
       machineStation('tableSaw'),
-      waitingStation('tableSaw'),
-      secondStation('kit-bench-1'),
+      machineStation('workbench'),
     ];
     for (const station of stations) {
       const rest = animationForStation(station);

@@ -30,7 +30,7 @@ import {
   staffMinutesLeft,
 } from '../../src/engine/staff';
 import { crewLimit } from '../../src/engine/layout';
-import { waitingStation } from '../../src/engine/stations';
+import { STATION_HOME } from '../../src/engine/stations';
 import { MATERIAL_TAKE_OFF_MINUTES } from '../../src/engine/constants';
 import { createTask, estimatorCapacity } from '../../src/engine/tasks';
 import { minutesRemainingFor, ownerJob } from '../../src/engine/jobs';
@@ -365,7 +365,7 @@ describe('joiners at the bench', () => {
   });
 });
 
-describe('the queue at the saw', () => {
+describe('the places at the saw', () => {
   /** Four joiners, each on a wardrobe of his own, every one of them at the cutting. */
   function fourAtTheCutting(): GameState {
     let state = withExtraction(
@@ -390,23 +390,22 @@ describe('the queue at the saw', () => {
     return bossAssigns(clearEvents(runToDay(state, 2).state));
   }
 
-  it('lets one man cut and puts the other three on the edging, nobody standing (v37)', () => {
+  it('lets one man cut at the budget saw s one place and has none for the other three', () => {
     const state = fourAtTheCutting();
     expect(state.jobs.filter((job) => job.stage === 'inProduction')).toHaveLength(4);
     const before = state.jobs.map((job) => job.labourRemaining);
     const worked = tick(state, 60);
     const done = before.map((value, index) => value - (worked.jobs[index]?.labourRemaining ?? 0));
-    // One saw, one man on it. The other three are not standing at it: the bag of work sends each
-    // to the next open stage of his own job whose station is free, which is the machining, done
-    // with the kit's hand edgebander out of the cabinet, a tool nobody queues for
-    // (PIOTR, 20.09; v37; CLAUDE.md T7 3.6).
+    // One saw, one place, one man at it. The other three are not sent to another stage of their
+    // own jobs to fill the gap: every man works his job's current stage, the cutting, and the
+    // hall has no place for them, which they say (PIOTR, 21.09; CLAUDE.md T25 2.2, 2.3).
     const full = 60 * OWNER_LABOUR_PER_MINUTE * WORKER_RATES.experienced;
-    expect(done.filter((value) => Math.abs(value - full) < 1e-6)).toHaveLength(4);
+    expect(done.filter((value) => Math.abs(value - full) < 1e-6)).toHaveLength(1);
+    expect(done.filter((value) => value === 0)).toHaveLength(3);
     expect(worked.workers.filter((worker) => worker.station === 'machine:tableSaw')).toHaveLength(1);
-    expect(
-      worked.workers.filter((worker) => worker.station === waitingStation('tableSaw')),
-    ).toHaveLength(0);
-    expect(worked.jobs.filter((job) => job.blockedBy === 'waiting for the saw')).toHaveLength(0);
+    const standing = worked.workers.filter((worker) => worker.station === STATION_HOME);
+    expect(standing).toHaveLength(3);
+    for (const man of standing) expect(man.noPlaceFor).toBe('tableSaw');
   });
 
   it('puts a second man on the saw the moment a second saw is bought', () => {
@@ -471,7 +470,9 @@ describe('the office working day', () => {
       monthMinutes: 0,
       monthDaysOff: 0,
       idleMinutes: 0,
-      idleByReason: { waitingForBoss: 0, noMachine: 0, noMaterial: 0 },
+      idleByReason: { waitingForBoss: 0, noPlace: 0, noMaterial: 0, noCompressor: 0, hallStopped: 0 },
+      working: false,
+      noPlaceFor: '',
       accidents: 0,
       anchorX: 1,
       anchorY: 1,

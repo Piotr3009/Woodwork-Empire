@@ -1,7 +1,8 @@
 // Standing contracts (CLAUDE.md T13 3.16): repeat work at a low margin, so many pieces a week for
 // a term of months at a price a piece. The offer arrives like an enquiry, one on the board at a
-// time; accepting it opens a standing bar on the Work Plan; only people are put on it, and the
-// machines it uses stay in the general queue, so a better saw makes more pieces without a click.
+// time; accepting it opens a standing bar on the Work Plan; only people are put on it, and each
+// of them wants a place at the machine of his piece like any man on a job, so a better saw makes
+// more pieces without a click (CLAUDE.md T25 2.2).
 // A short week costs a point of reputation and is remembered; at the end of the term the client
 // renegotiates from the delivery history and the player renews or lets it go.
 
@@ -47,16 +48,15 @@ import { freeSheets } from './materials';
 import {
   OWNER,
   accumulateMachineMinute,
-  bagsFull,
   bestMachineOf,
+  classPaceOf,
   bookOutputMinute,
-  claimMachine,
   findSpec,
+  hallPlaces,
   hallProductivityFactor,
   has,
   machineIsShared,
   machineWearPerMinute,
-  releaseMachines,
   variantFor,
   wearPerMinuteOf,
 } from './machines';
@@ -65,7 +65,7 @@ import { changeReputation, effectiveReputation, reputationTier } from './reputat
 import { chance, float, int, pick } from './rng';
 import type { RngCarrier } from './rng';
 import { crewHasGoneHome, isWorkingToday, joiners } from './staff';
-import { STATION_BENCH, STATION_NO_BENCH, machineStation, waitingStation } from './stations';
+import { STATION_DOOR, STATION_HOME } from './stations';
 import { cncOptions, familyForStage, jobOnCnc, stageSpeed } from './stages';
 import type { Contract, ContractWeek, Equipment, GameState, StageId, Worker } from './types';
 
@@ -104,7 +104,7 @@ export function activeContracts(state: GameState): Contract[] {
   return state.contracts.filter((contract) => contract.status === 'active');
 }
 
-/** Terms that are over and waiting for the renew answer. */
+/** Terms that are over, with the renew answer still to be given. */
 export function endedContracts(state: GameState): Contract[] {
   return state.contracts.filter((contract) => contract.status === 'ended');
 }
@@ -130,27 +130,10 @@ export function contractOfWorker(state: GameState, workerId: string): Contract |
   return activeContracts(state).find((contract) => contract.assigned.includes(workerId)) ?? null;
 }
 
-/** Everybody on a standing contract: the men `handsAtWork` and `menAtJobs` leave at their
- *  machines (CLAUDE.md T13 3.16). */
+/** Everybody on a standing contract: the men the jobs leave alone (CLAUDE.md T13 3.16). */
 export function contractMen(state: GameState): string[] {
   const men: string[] = [];
   for (const contract of activeContracts(state)) men.push(...contract.assigned);
-  return men;
-}
-
-/** The men on a standing contract who can hold a machine this minute: the hands of every active
- *  contract that has material for its next piece, while the crew are in. The jobs' men are let
- *  off their machines the minute they stop, and so is a contract's man now: until v45 every man
- *  on a contract kept his saw whatever he was doing, so one waiting for a delivery, or gone home
- *  at five, held the one saw and every job's man stood behind it with nobody at it (PIOTR, 22.09:
- *  "everyone waits for the saw and nobody does anything"; v45). */
-export function contractMenAtWork(state: GameState): string[] {
-  if (crewHasGoneHome(state)) return [];
-  const men: string[] = [];
-  for (const contract of activeContracts(state)) {
-    if (contractWaitingForMaterial(state, contract)) continue;
-    men.push(...contractHands(state, contract).map((worker) => worker.id));
-  }
   return men;
 }
 
@@ -253,7 +236,7 @@ export function contractReferenceFor(piece: ContractPieceSpec): ContractReferenc
   const family = pieceFamily(piece);
   const spec = family === null ? undefined : findSpec(family);
   const standard = spec?.variants.find((variant) => variant.id === CONTRACT_REFERENCE_CLASS);
-  const speed = standard?.outputFactor ?? 1;
+  const speed = standard === undefined || family === null ? 1 : classPaceOf({ specId: family, variantId: standard.id });
   const minutes = Math.max(1, Math.round(piece.minutes / (rate * (speed > 0 ? speed : 1))));
   const labourCost = pence(minutes * workerMinuteCost(middling?.monthlyWage ?? 0));
   const wear = pence(minutes * (standard === undefined ? 0 : wearPerMinuteOf(standard.price)));
@@ -497,6 +480,51 @@ export function contractMenNeeded(state: GameState, contract: Contract, worker: 
   return Math.max(1, Math.ceil(result.piecesNeededPerDay / Math.max(1, result.piecesPerDay)));
 }
 
+/** What the hall makes of this contract's piece in a week at full crew, against what the term
+ *  wants: every joiner on the books on it, as many of them as the hall has places for at the
+ *  family the piece wants, in the order they were hired (2.3), each at his own rate and the hall's
+ *  pace for the family (2.4), over the working days of a week. No new rule, the arithmetic the
+ *  engine already has [PIOTR, 21.09: "we take a contract and we do not know whether the hall can
+ *  do it"] (CLAUDE.md T25 2.7). The owner is not in it, because a contract is work for a joiner. */
+export interface HallCapacity {
+  /** Pieces a week, whole. */
+  perWeek: number;
+  /** The term's pieces a week. */
+  wanted: number;
+  /** True when the term wants more than the hall makes: the line is red. */
+  short: boolean;
+}
+
+export function contractHallCapacity(state: GameState, contract: Contract): HallCapacity {
+  const piece = contractPiece(contract);
+  const { stage } = pieceStageOn(state, piece, true);
+  const speed = stageSpeed(state, stagedJob(0, 'sheet', false), stage).speed;
+  const family = contractFamilyOf(state, piece, true);
+  const places = family === null ? Number.POSITIVE_INFINITY : hallPlaces(state, family);
+  const week = MINUTES_PER_WORKING_DAY * WORKING_DAYS_PER_WEEK;
+  let perWeek = 0;
+  for (const worker of joiners(state).slice(0, places)) {
+    const rate = worker.rate > 0 ? worker.rate : 1;
+    // His minutes over a piece, rounded the way his card rounds them (`resultAtSpeed`).
+    const minutes = Math.max(1, Math.round(piece.minutes / (rate * (speed > 0 ? speed : 1))));
+    perWeek += Math.floor(week / minutes);
+  }
+  const wanted = contract.quantityPerWeek;
+  return { perWeek, wanted, short: wanted > perWeek };
+}
+
+/** The line the offer card and the Contracts tab both carry, off `contractHallCapacity`
+ *  (CLAUDE.md T25 2.7). */
+export function contractHallLine(
+  state: GameState,
+  contract: Contract,
+): { text: string; hall: string; wants: string; short: boolean } {
+  const capacity = contractHallCapacity(state, contract);
+  const hall = `Your hall makes about ${capacity.perWeek} of these a week at full crew`;
+  const wants = `this term wants ${capacity.wanted}`;
+  return { text: `${hall}; ${wants}`, hall, wants, short: capacity.short };
+}
+
 /** The one machine that would shorten the piece most among those the hall has not got: what the
  *  piece would take, what the day would come to and what the week would gain by it. Null when
  *  there is nothing to buy that would help (PIOTR, the mockup of docs/mockups/t20;
@@ -531,7 +559,12 @@ export function contractMachineTip(
     // The class the catalogue offers first is the one he would buy, and its wear comes with it,
     // so the tip does not promise a saw's minutes at a used saw's service bill (v40).
     const first = spec.variants[0];
-    const speed = specId === 'cnc' ? stageSpeed(state, staged, 'cnc').speed : (first?.outputFactor ?? 1);
+    const speed =
+      specId === 'cnc'
+        ? stageSpeed(state, staged, 'cnc').speed
+        : first === undefined
+          ? 1
+          : classPaceOf({ specId, variantId: first.id });
     const withIt = resultAtSpeed(state, contract, worker, speed, {
       wearPerMinute: first === undefined ? 0 : wearPerMinuteOf(first.price),
       name: first?.name ?? spec.name,
@@ -708,12 +741,11 @@ export function contractAssignCheck(state: GameState, contract: Contract, who: s
   return contractManCheck(state, who);
 }
 
-function takeOff(state: GameState, contract: Contract, worker: Worker): void {
+function takeOff(contract: Contract, worker: Worker): void {
   contract.assigned = contract.assigned.filter((id) => id !== worker.id);
   // Off the contract and on nothing: he comes off it with no job under him and waits for the
   // boss like any free man, because the contract took him off the jobs when it took him (v42).
   if (worker.jobId === contractMarker(contract.id)) worker.jobId = null;
-  releaseMachines(state, worker.id);
 }
 
 /** Puts a joiner on the contract or takes him off it. A man on a contract is the contract's and
@@ -733,17 +765,16 @@ export function assignContract(
   const check = contractAssignCheck(state, contract, workerId);
   if (!check.ok || !worker) return check;
   if (!on) {
-    takeOff(state, contract, worker);
+    takeOff(contract, worker);
     return OK;
   }
   if (contract.assigned.includes(worker.id)) return OK;
   const elsewhere = contractOfWorker(state, worker.id);
-  if (elsewhere) takeOff(state, elsewhere, worker);
+  if (elsewhere) takeOff(elsewhere, worker);
   // Off every job of work first: the contract has his whole day from here (PIOTR, 21.09; v42).
   for (const job of state.jobs) {
     if (isOnJob(job, worker.id)) takeOffJob(state, job.id, worker.id);
   }
-  releaseMachines(state, worker.id);
   worker.jobId = contractMarker(contract.id);
   contract.assigned.push(worker.id);
   return OK;
@@ -778,14 +809,36 @@ export function contractWantsToday(state: GameState, workerId: string): boolean 
   return contractOfWorker(state, workerId) !== null;
 }
 
-/** The stage the piece is at and the family it is done on: the CNC when the man can have one,
- *  otherwise the piece's own first stage, through the same reading a job's stages get. */
-function pieceStage(state: GameState, who: string, piece: ContractPieceSpec): { stage: StageId; family: string | null } {
+/** The stage a piece is made at and the family it is done on: the CNC when `cnc` says the man has
+ *  a place at it, otherwise the piece's own first stage, through the same reading a job's stages
+ *  get. A contract always allows the saw when the CNC has no place (CLAUDE.md T7 3.4). */
+function pieceStageOn(state: GameState, piece: ContractPieceSpec, cnc: boolean): { stage: StageId; family: string | null } {
   const staged = stagedJob(0, 'sheet', false);
   const first = piece.stages[0] ?? 'cutting';
-  const onCnc = first === 'cutting' && jobOnCnc(state, staged, cncOptions(state, who, { sawFallback: true }));
+  const onCnc = first === 'cutting' && jobOnCnc(state, staged, { cnc });
   const stage: StageId = onCnc ? 'cnc' : first;
   return { stage, family: familyForStage(staged, stage) };
+}
+
+/** The same for a man already on the contract: on the CNC or off it as the day plan put him. */
+function pieceStage(state: GameState, who: string, piece: ContractPieceSpec): { stage: StageId; family: string | null } {
+  return pieceStageOn(state, piece, cncOptions(state, who, { sawFallback: true }).cnc ?? true);
+}
+
+/** The family a man on a contract's piece is done on, the CNC's when `cnc` says the plan still
+ *  has a place at it for him (CLAUDE.md T7 3.4, T25 2.3). */
+export function contractStageFamilyOf(state: GameState, piece: ContractPieceSpec, cnc: boolean): string | null {
+  return pieceStageOn(state, piece, cnc).family;
+}
+
+/** The family a man on a contract wants a place at: see `contractStageFamilyOf` for the family his
+ *  piece is done on; a bench for a piece made at one, or null when the hall has no machine of the
+ *  family standing on its floor and the piece is made by hand or with a tool out of a cabinet. */
+export function contractFamilyOf(state: GameState, piece: ContractPieceSpec, cnc: boolean): string | null {
+  const { family } = pieceStageOn(state, piece, cnc);
+  if (family === null || family === 'workbench') return 'workbench';
+  if (!has(state, family) || machineIsShared(state, family)) return null;
+  return family;
 }
 
 /** What one stage of a piece is worth of its work, off the game's own table. A CNC does the cutting
@@ -822,24 +875,17 @@ function pieceMachine(state: GameState, who: string, piece: ContractPieceSpec): 
   return bestMachineOf(state, family);
 }
 
-/** Where a man on a contract stands, for the hall: at the canteen door when the contract cannot
- *  use him this minute, and otherwise at the machine of his stage, waiting at it, or at his bench.
- *  Null for a man on no contract.
- *
- *  v45 let him go of his saw the minute the contract stopped wanting him, and left him standing at
- *  the saw's waiting cell all the same, which reads as a man queueing for a machine nobody is at.
- *  From tonight he stands where a man with nothing to do stands, at the canteen door, and the mark
- *  over his head says the contract has no sheets [PIOTR, 22.09] (CLAUDE.md T24 2.3). The one
- *  question is `contractMenAtWork`, which is the same list that decides whether he may hold a
- *  machine, so where he stands and what he may do cannot disagree. */
+/** Where a man on a contract stands, for the hall: at the canteen door while the contract has no
+ *  sheets for him, with the mark over his head, or once the crew have gone home at five
+ *  [PIOTR, 22.09] (CLAUDE.md T24 2.3), and otherwise
+ *  where the day plan put him, at his place or at his home cell with no place (CLAUDE.md T25 2.3).
+ *  Null for a man on no contract. */
 export function contractStationFor(state: GameState, worker: Worker): string | null {
   const contract = contractOfWorker(state, worker.id);
   if (!contract) return null;
-  if (!contractMenAtWork(state).includes(worker.id)) return STATION_NO_BENCH;
-  const { family } = pieceStage(state, worker.id, contractPiece(contract));
-  if (family === null || !has(state, family) || machineIsShared(state, family)) return STATION_BENCH;
-  const held = state.equipment.some((item) => item.specId === family && item.takenBy === worker.id);
-  return held ? machineStation(family) : waitingStation(family);
+  // No sheets, or five o'clock and the crew gone home: nothing for him to do (T24 2.3).
+  if (contractWaitingForMaterial(state, contract) || crewHasGoneHome(state)) return STATION_DOOR;
+  return worker.working || worker.noPlaceFor !== '' ? worker.station : STATION_HOME;
 }
 
 export interface ContractMinute {
@@ -871,10 +917,13 @@ function finishPiece(state: GameState, contract: Contract, piece: ContractPieceS
 }
 
 /** One production minute of every man on a contract: the piece in hand moves on at his rate and
- *  the class of the machine he actually got, the machines it uses stay in the general queue, and
- *  a finished piece is booked (CLAUDE.md T13 3.16). The crew take their dinner, nobody works an
+ *  the hall's pace at its stage, at the place the day plan gave him, and a finished piece is
+ *  booked (CLAUDE.md T13 3.16, T25 2.3). The crew take their dinner, nobody works an
  *  evening the owner is not there for, and nothing that makes dust runs with the bags full. */
-export function runContractMinute(state: GameState): ContractMinute {
+export function runContractMinute(
+  state: GameState,
+  places: ReadonlyMap<string, { working: boolean; machine: Equipment | null }>,
+): ContractMinute {
   const result: ContractMinute = { worked: 0, bagsFilled: false };
   const active = activeContracts(state);
   if (active.length === 0) return result;
@@ -891,15 +940,15 @@ export function runContractMinute(state: GameState): ContractMinute {
     // own this minute, first to last, with no job of work to give them back to.
     const wanted = contractHands(state, contract);
     if (wanted.length === 0) continue;
-    // Nothing on the rack for the next piece: the men on it stand at their benches, the way a job
-    // waits for its material (CLAUDE.md T17 2.22). Every one of them stands, because a man on a
-    // contract has nowhere else to go (v42).
+    // Nothing on the rack for the next piece: the men on it stand at the canteen door, the way a
+    // job waits for its material (CLAUDE.md T17 2.22, T24 2.3). Every one of them stands, because
+    // a man on a contract has nowhere else to go (v42).
     if (contractWaitingForMaterial(state, contract)) {
       for (const worker of wanted) {
         // The marker goes back on, as it does on a working minute, so the contract keeps him
         // between the minutes.
         worker.jobId = contractMarker(contract.id);
-        worker.station = STATION_BENCH;
+        worker.station = STATION_DOOR;
       }
       continue;
     }
@@ -907,33 +956,14 @@ export function runContractMinute(state: GameState): ContractMinute {
       // The jobs' own hook writes the marker off every minute it finds no job behind it; it goes
       // back on here, so the man stays on the contract between the minutes.
       worker.jobId = contractMarker(contract.id);
-      const { stage, family } = pieceStage(state, worker.id, piece);
-      let speed: number;
-      let machineId: string | null = null;
-      if (family !== null && has(state, family) && !machineIsShared(state, family)) {
-        if (bagsFull(state)) {
-          worker.station = waitingStation(family);
-          continue;
-        }
-        const machine = claimMachine(state, worker.id, family);
-        if (machine === null) {
-          worker.station = waitingStation(family);
-          continue;
-        }
-        // The class he actually got, the way production reads it; the CNC's stage has its own
-        // factor whatever the class (CLAUDE.md T7 3.1, 3.4).
-        speed =
-          stage === 'cnc'
-            ? stageSpeed(state, stagedJob(0, 'sheet', false), stage).speed
-            : (variantFor(machine)?.outputFactor ?? 1);
-        machineId = machine.id;
-        worker.station = machineStation(family);
-      } else {
-        // No machine of the family in the hall, or a tool out of a cabinet: the by hand penalty
-        // or the tool's factor, through the one reading the stages give.
-        speed = stageSpeed(state, stagedJob(0, 'sheet', false), stage).speed;
-        worker.station = STATION_BENCH;
-      }
+      // His place, off the day plan like any man's: none, or the bags full on a machine that makes
+      // dust, and he stands (CLAUDE.md T12 2.3, T25 2.3).
+      const place = places.get(worker.id);
+      if (place === undefined || !place.working) continue;
+      // The hall's pace at his piece's stage, or the by hand penalty with no machine of the family
+      // in the hall, through the one reading the stages give (CLAUDE.md T7 3.4, T25 2.4).
+      const { stage } = pieceStage(state, worker.id, piece);
+      const speed = stageSpeed(state, stagedJob(0, 'sheet', false), stage).speed;
       hall ??= hallProductivityFactor(state);
       const worth = worker.rate * away * speed * hall;
       contract.pieceMinutes = Math.round((contract.pieceMinutes + worth) * 10000) / 10000;
@@ -942,7 +972,8 @@ export function runContractMinute(state: GameState): ContractMinute {
       state.dayStats.workMinutes += 1;
       bookOutputMinute(state, worker.id, worth);
       result.worked += away;
-      if (machineId !== null) used.set(machineId, (used.get(machineId) ?? 0) + 1);
+      // A machine books an hour for every hour a man works at one of its places (T25 section 6).
+      if (place.machine !== null) used.set(place.machine.id, (used.get(place.machine.id) ?? 0) + 1);
       while (contract.pieceMinutes >= piece.minutes) {
         if (!finishPiece(state, contract, piece)) break;
       }
@@ -1083,7 +1114,7 @@ export function endContract(
   contract.renegotiatedPrice = renegotiatedPriceFor(contract);
   for (const id of [...contract.assigned]) {
     const worker = state.workers.find((entry) => entry.id === id);
-    if (worker) takeOff(state, contract, worker);
+    if (worker) takeOff(contract, worker);
   }
   contract.assigned = [];
   contract.status = 'ended';

@@ -443,10 +443,9 @@ describe('placed and stood at as any other 2 by 1 (CLAUDE.md T21 2.13, T22 2.12)
     const cabinet = standard(state);
     const cells = footprintCells(cabinet);
     expect(cells.width).toBe(2);
-    // The default row's waiting cell is a cell further out than the operator's, because the second
-    // cell along a small item's front edge is the one the body leans over; the second place falls
-    // back to the operator's, the row naming none.
-    for (const [role, reach] of [['operator', 1], ['waiting', 2], ['second', 1]] as const) {
+    // The default row names no second place, so the second role falls back to the operator's cell
+    // (CLAUDE.md T25 2.6: the waiting cell went with the queue).
+    for (const [role, reach] of [['operator', 1], ['second', 1]] as const) {
       const cell = standingCell(state, cabinet, role);
       // Beside the cabinet: never on one of the two cells it stands on.
       expect(covers(cells, cell), role).toBe(false);

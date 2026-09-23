@@ -40,7 +40,7 @@ describe('GameState', () => {
     // (CLAUDE.md T23 section 4). Turn 24 wrote down who made the day's number (CLAUDE.md T24
     // section 4). v51 put the service on the calendar: the day a machine was last serviced in
     // place of its hours, and the day a shop last rang (PIOTR, 22.09).
-    expect(STATE_VERSION).toBe(27);
+    expect(STATE_VERSION).toBe(28);
     expect(sample.version).toBe(STATE_VERSION);
   });
 

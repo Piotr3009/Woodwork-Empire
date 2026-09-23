@@ -141,7 +141,7 @@ export function houseLineFor(state: GameState): string {
   return HOUSE_TIER_NAMES[houseTierFor(state) - 1] ?? HOUSE_TIER_NAMES[0] ?? '';
 }
 
-/** "73%, mostly no machine free": the number, and the cause that took the most of what was lost
+/** "73%, mostly no place": the number, and the cause that took the most of what was lost
  *  (CLAUDE.md T13 3.5). The engine works both out; this prints them. */
 function efficiencyLine(summary: DaySummary): string {
   const efficiency = efficiencyOf(summary.efficiency);

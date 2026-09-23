@@ -174,7 +174,8 @@ describe('the tiles inside a folder', () => {
     expect(insuranceLine(1800)).toBe('Insurance \u00a336 a year');
     const industrial = tiles(state, 'tableSaw')[4];
     expect(effects(industrial)).toEqual([
-      'Output +30%',
+      // The industrial class's pace, +12% from v52 (CLAUDE.md T25 2.4).
+      'Output +12%',
       'Dust 0.015 m\u00b3/h of use',
       'Needs 2,200 m\u00b3/h of extraction',
       'Life about 6,000 hours',

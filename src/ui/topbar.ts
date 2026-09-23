@@ -22,13 +22,14 @@ import {
   ownerJob,
   shoppingList,
   skippedTask,
+  paceLines,
   workshopEfficiency,
   workshopOutputToday,
 } from '../engine/index';
 import type { DayCategory, GameState, Speed } from '../engine/index';
 import { openJobs } from '../engine/jobs';
 import { cadenceControl } from './dayEnd';
-import { closeButton, escapeHtml, minutes, money, signedMoney } from './modal';
+import { closeButton, escapeHtml, minutes, money, signedFigure, signedMoney } from './modal';
 
 /** The five speed knobs. One place builds them, whatever else the top bar has to say. The Pause
  *  knob pulses once when the player asks for something stopped time will not give him
@@ -120,6 +121,16 @@ function efficiencyBlock(state: GameState): string {
         `<span class="tip-min">${line.percent}%</span></span>`,
     )
     .join('');
+  // Under the lost minutes, what the machines buy the hall: one line a family whose pace is not
+  // 1.00, `Saw, industrial` and `+12%` (CLAUDE.md T25 2.4).
+  const paces = paceLines(state)
+    .map(
+      (line) =>
+        `<span class="efficiency-line" data-pace="${line.family}">` +
+        `<span class="tip-name">${escapeHtml(line.label)}</span>` +
+        `<span class="tip-min">${signedFigure(`${line.percent > 0 ? '+' : ''}${line.percent}%`, line.percent)}</span></span>`,
+    )
+    .join('');
   return (
     `<details class="efficiency" data-efficiency="${efficiency.percent}">` +
     '<summary class="efficiency-number" ' +
@@ -129,6 +140,7 @@ function efficiencyBlock(state: GameState): string {
     `<p class="hint">${minutes(efficiency.worked)} worked of ${minutes(efficiency.possible)}, ` +
     `${minutes(efficiency.lost)} lost</p>` +
     lines +
+    paces +
     '</div></details>'
   );
 }

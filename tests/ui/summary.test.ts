@@ -173,7 +173,7 @@ describe('the efficiency line on the summary', () => {
       efficiency: {
         possible: 480,
         worked: 350,
-        lost: { noPeople: 10, noMachine: 100, noMaterial: 20, ownerAway: 0 },
+        lost: { noPeople: 10, noPlace: 100, noMaterial: 20, hallStopped: 0, ownerAway: 0 },
       },
     };
     const html = renderDaySummary(summary);
@@ -181,7 +181,7 @@ describe('the efficiency line on the summary', () => {
       row.querySelector('.row-main')?.textContent,
       row.querySelector('.row-figure')?.textContent,
     ]);
-    expect(rows).toContainEqual(['Efficiency', '73%, mostly no machine free']);
+    expect(rows).toContainEqual(['Efficiency', '73%, mostly no place']);
     expect(html).not.toContain('Night shift');
     const night = renderDaySummary({ ...summary, nightMinutes: 120 });
     expect(parse(night).textContent).toContain('Night shift');
@@ -189,7 +189,7 @@ describe('the efficiency line on the summary', () => {
     // Nothing lost, nothing to blame.
     const clean = renderDaySummary({
       ...summary,
-      efficiency: { possible: 480, worked: 480, lost: { noPeople: 0, noMachine: 0, noMaterial: 0, ownerAway: 0 } },
+      efficiency: { possible: 480, worked: 480, lost: { noPeople: 0, noPlace: 0, noMaterial: 0, hallStopped: 0, ownerAway: 0 } },
     });
     expect(parse(clean).textContent).toContain('Efficiency100%');
     expect(parse(clean).textContent).not.toContain('mostly');

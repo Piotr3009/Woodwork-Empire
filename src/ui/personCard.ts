@@ -22,7 +22,8 @@ import type { GameState, Job, Worker } from '../engine/index';
 // Straight off their own modules, not round the public API, which Turn 13 froze (REPORT-T13 10).
 import { OWNER } from '../engine/machines';
 import { stageLabel } from '../engine/stages';
-import { jobStage, waitingLine } from '../engine/jobs';
+import { jobStage } from '../engine/jobs';
+import { placeLine } from '../engine/production';
 import {
   ROLE_WORDS,
   dayMeterOf,
@@ -72,6 +73,8 @@ interface Person {
   /** True while nobody has put him on anything and there is no manager on duty to
    *  (CLAUDE.md T23 2.1). The owner never waits: he takes the oldest open job himself (2.3). */
   waiting: boolean;
+  /** The family the day plan has no place for him at, or '' (CLAUDE.md T25 2.3). */
+  noPlaceFor: string;
 }
 
 function personOf(state: GameState, who: string): Person | null {
@@ -92,6 +95,7 @@ function personOf(state: GameState, who: string): Person | null {
       job: state.jobs.find((entry) => entry.assignees.includes(OWNER)) ?? null,
       worker: null,
       waiting: false,
+      noPlaceFor: state.owner.noPlaceFor,
     };
   }
   const worker = state.workers.find((entry) => entry.id === who);
@@ -111,6 +115,7 @@ function personOf(state: GameState, who: string): Person | null {
     job: worker.jobId === null ? null : state.jobs.find((entry) => entry.id === worker.jobId) ?? null,
     worker,
     waiting: waitsForTheBoss(state, worker),
+    noPlaceFor: worker.noPlaceFor,
   };
 }
 
@@ -153,12 +158,13 @@ function chips(person: Person): string {
   );
 }
 
-/** What he is at this minute, in one line. A man nobody has put on anything says so in the red
- *  the rest of the game warns in, with the reason the mark over his head is carrying, so the hall
- *  and the card cannot disagree about him (CLAUDE.md T22 2.5, T23 2.1, 2.13). */
+/** What he is at this minute, in one line. A man nobody has put on anything, and a man the hall
+ *  has no place for, says so in the red the rest of the game warns in, with the reason the mark
+ *  over his head is carrying, so the hall and the card cannot disagree about him
+ *  (CLAUDE.md T22 2.5, T23 2.1, 2.13, T25 2.3). */
 function nowLine(state: GameState, person: Person): string {
   const words = doingWords(state, person);
-  const warn = person.waiting ? ' warn' : '';
+  const warn = person.waiting || person.noPlaceFor !== '' ? ' warn' : '';
   return `<p class="person-now${warn}" data-now>now: ${escapeHtml(words)}</p>`;
 }
 
@@ -197,8 +203,12 @@ function doingWords(state: GameState, person: Person): string {
   if (person.job !== null) {
     const stage = jobStage(state, person.job);
     const where = stage === null ? '' : ` (${stageLabel(stage.id).toLowerCase()})`;
-    return `${person.job.name}${where}`;
+    // On his job and with no place at its machine: the words over his head (CLAUDE.md T25 2.3).
+    const place = person.noPlaceFor === '' ? '' : `, ${placeLine(person.noPlaceFor)}`;
+    return `${person.job.name}${where}${place}`;
   }
+  // A man on a contract with no place at its machine says so as well (CLAUDE.md T25 2.3).
+  if (person.noPlaceFor !== '') return placeLine(person.noPlaceFor);
   if (person.worker !== null) return workerDoing(state, person.worker);
   return ownerDayLine(state);
 }
@@ -242,8 +252,8 @@ function dayFigures(state: GameState, person: Person): string {
   );
 }
 
-/** The one control a tile carries: Office on the owner, Assign on a man waiting for the boss, and
- *  Let go on everybody else, which is the click of Turn 20's 2.4 and unchanged. */
+/** The one control a tile carries: Office on the owner, Assign on a man the boss has not put on
+ *  anything, and Let go on everybody else, which is the click of Turn 20's 2.4 and unchanged. */
 function tileAction(state: GameState, person: Person): string {
   if (person.id === OWNER) return button('openOffice', 'Office');
   if (person.waiting) return button('openPersonCard', 'Assign', `data-id="${person.id}"`);
@@ -271,8 +281,9 @@ function weekLines(state: GameState, person: Person): string {
     }
     const worked = weekWorkedMinutes(meters);
     const stood = Math.max(0, meters.paidMinutes - worked);
-    // And what the standing was for, when the week knows: the one machine he waited for most, so
-    // the player reads off the card whether a second one would pay (PIOTR, 20.09; v37).
+    // And what the standing was for, when the week knows: the one machine the hall had no place
+    // for him at most, so the player reads off the card whether a second one would pay
+    // (PIOTR, 20.09; v37; CLAUDE.md T25 2.3).
     let waitedFor: [string, number] | null = null;
     for (const [family, count] of Object.entries(meters.waitedFor ?? {})) {
       if (count !== undefined && count > 0 && (waitedFor === null || count > waitedFor[1])) {
@@ -280,7 +291,7 @@ function weekLines(state: GameState, person: Person): string {
       }
     }
     const forWhat =
-      waitedFor === null ? '' : `, ${hoursText(waitedFor[1])} of it ${waitingLine(waitedFor[0])}`;
+      waitedFor === null ? '' : `, ${hoursText(waitedFor[1])} of it ${placeLine(waitedFor[0])}`;
     return (
       `<p class="tile-figures" data-week="${label}">` +
       escapeHtml(`${label}: ${hoursText(worked)} worked · ${hoursText(stood)} idle${forWhat}`) +

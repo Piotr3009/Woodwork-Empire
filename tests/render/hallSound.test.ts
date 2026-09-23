@@ -9,11 +9,13 @@ import { OWNER } from '../../src/engine/machines';
 import type { GameState } from '../../src/engine/index';
 import {
   acceptNow,
+  atAPlace,
   buyNow,
   buyStartingKit,
   fillRack,
   firstJob,
   newGame,
+  offHisPlace,
   placeEnquiry,
   withExtraction,
 } from '../helpers';
@@ -42,18 +44,18 @@ describe('the loops the hall is running', () => {
     expect(Array.from(hallOneShots(state))).toEqual([]);
   });
 
-  it('runs the saw only while somebody is standing at it', () => {
+  it('runs the saw only while somebody is at one of its places', () => {
     const state = quiet();
     const saw = state.equipment.find((item) => item.specId === 'tableSaw');
     if (!saw) throw new Error('no saw');
     expect(hallLoops(state).has('tableSaw')).toBe(false);
-    saw.takenBy = OWNER;
+    atAPlace(state, OWNER, 'tableSaw');
     expect(hallLoops(state).has('tableSaw')).toBe(true);
-    // A saw that has stopped makes no noise, however many men are standing at it.
+    // A saw that has stopped makes no noise, and has no places for anybody (CLAUDE.md T25 2.1).
     saw.broken = true;
     expect(hallLoops(state).has('tableSaw')).toBe(false);
     saw.broken = false;
-    saw.takenBy = null;
+    offHisPlace(state, OWNER);
     expect(hallLoops(state).has('tableSaw')).toBe(false);
   });
 
@@ -64,14 +66,14 @@ describe('the loops the hall is running', () => {
     if (!saw || fans.length === 0) throw new Error('no kit');
     // An extraction standing idle in a hall where nothing is cut is silent.
     expect(hallLoops(state).has('extractor')).toBe(false);
-    saw.takenBy = OWNER;
+    atAPlace(state, OWNER, 'tableSaw');
     expect(hallLoops(state).has('extractor')).toBe(true);
     // And a broken fan pulls nothing, which is what the hall already draws.
     for (const fan of fans) fan.broken = true;
     expect(hallLoops(state).has('extractor')).toBe(false);
   });
 
-  it('hisses the booth only while somebody is standing at one', () => {
+  it('hisses the booth only while somebody is at a place of one', () => {
     let state = buyNow(quiet(), 'sprayBooth', 'standard');
     state = inProduction(state, 'lacquer');
     const booth = state.equipment.find((item) => item.specId === 'sprayBooth');
@@ -79,7 +81,7 @@ describe('the loops the hall is running', () => {
     // A lacquered job at its finishing stage is not a man spraying: a workshop with no booth
     // cannot spray at all, and must not be heard to.
     expect(hallLoops(state).has('sprayBooth')).toBe(false);
-    booth.takenBy = OWNER;
+    atAPlace(state, OWNER, 'sprayBooth');
     expect(hallLoops(state).has('sprayBooth')).toBe(true);
   });
 

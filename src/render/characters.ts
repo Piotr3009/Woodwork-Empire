@@ -20,8 +20,6 @@ import {
   STATION_GATE,
   STATION_PHONE,
   STATION_RACK,
-  stationPlaceAt,
-  stationSecondAt,
 } from '../engine/stations';
 import { pickSprite, spriteFiles, SPRITE_SCALE } from './sprites';
 
@@ -343,12 +341,10 @@ export function playCharacters(root: ParentNode, nowMs: number): void {
  *  the leg between two of them, and the walker plays it (CLAUDE.md T9 3.13; T16 2.2). A man is
  *  never seen walking on the spot. */
 export function animationForStation(station: string): Animation {
-  // The second man of a job is at the first man's bench, in its second place: bench work, the
-  // same as the man in front of him (CLAUDE.md T17 2.10). So is everybody past him, at his own
-  // place along the same side (CLAUDE.md T19 2.5).
+  // At a bench or at his place at a machine, which is where every man at work stands
+  // (CLAUDE.md T25 2.6). A man standing at his home cell with no place is not working, and stands
+  // (`STATION_HOME` falls through to idle).
   if (station === STATION_BENCH || station.startsWith('machine:')) return 'bench';
-  if (stationSecondAt(station) !== null) return 'bench';
-  if (stationPlaceAt(station) !== null) return 'bench';
   if (station === STATION_RACK) return 'bench';
   if (station === STATION_GATE) return 'idle';
   // The broom, for as long as the sweeping lasts (PIOTR, 18.09; CLAUDE.md T20 2.8).

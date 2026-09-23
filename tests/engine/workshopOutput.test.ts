@@ -9,7 +9,7 @@ import { describe, expect, it } from 'vitest';
 import { WORKER_RATES } from '../../src/engine/constants';
 import { tick } from '../../src/engine/index';
 import type { GameState } from '../../src/engine/index';
-import { hallProductivityFactor, variantFor, workshopOutputToday } from '../../src/engine/machines';
+import { classPaceOf, hallProductivityFactor, workshopOutputToday } from '../../src/engine/machines';
 import { renderTopbar } from '../../src/ui/topbar';
 import { renderCompany } from '../../src/ui/company';
 import {
@@ -54,7 +54,7 @@ describe('the workshop\'s average output today (v40)', () => {
     const worked = tick(ownerAtTheBench('standard'), 60);
     expect(worked.dayStats.workMinutes).toBe(60);
     const saw = worked.equipment.find((item) => item.specId === 'tableSaw');
-    const sawClass = saw === undefined ? 1 : (variantFor(saw)?.outputFactor ?? 1);
+    const sawClass = saw === undefined ? 1 : classPaceOf(saw);
     // Sixty minutes of cutting at the standard saw's class, the owner at 1.0, the hall clean:
     // the average is the class itself, and the sum behind it is sixty of it.
     expect(worked.dayStats.outputWorth).toBeCloseTo(60 * sawClass * hallProductivityFactor(worked), 3);

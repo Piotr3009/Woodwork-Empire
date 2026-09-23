@@ -22,7 +22,7 @@ const SEED = 20260911;
 // (y) Two men on one job, and a contract on the rack (CLAUDE.md T17 2.10, 2.22)
 // ---------------------------------------------------------------------------
 
-/** Three joiners with a saw each so nobody queues for the one machine, sheets on the rack from
+/** Three joiners with a saw each so nobody is short of a place at it, sheets on the rack from
  *  day 1, and nothing taken off the board: the month is about the one piece the men stand at and
  *  the contract the third of them keeps, and nothing else is allowed to crowd it. */
 const QUIET_MONTH: Policy = {

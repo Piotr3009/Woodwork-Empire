@@ -109,8 +109,8 @@ export interface Policy {
   joinerTier?: WorkerTier;
   /** How the management software is paid for: outright unless the month says the subscription. */
   licence?: 'oneOff' | 'subscription';
-  /** Saws to stand in the hall beyond the one in the day 1 kit. A machine serves one man at a
-   *  time, so this is what says whether the crew cuts or queues (CLAUDE.md T7 3.1). */
+  /** Saws to stand in the hall beyond the one in the day 1 kit. A machine is so many places, so
+   *  this is what says whether the crew cuts or has no place to (CLAUDE.md T7 3.1, T25 2.1). */
   extraSaws?: number;
   /** Sheets to buy in advance on day 1. Jobs then try to draw from the rack. */
   stockSheets: number;
@@ -179,9 +179,10 @@ export const SHORT_HANDED: Policy = {
   stockSheets: 8,
 };
 
-/** Six joiners and the saws to keep them cutting. One saw serves one man at a time, so the same
- *  crew behind one saw stands at it (CLAUDE.md T7 3.1). Very easy, because six men and their kit
- *  is a lot of money on day 1 and the month is about the queue, not the overdraft. */
+/** Six joiners and the saws to keep them cutting. A saw has its places and no more, so the same
+ *  crew with one saw has men with no place at it (CLAUDE.md T7 3.1, T25 2.3). Very easy, because
+ *  six men and their kit is a lot of money on day 1 and the month is about the places, not the
+ *  overdraft. */
 export const SIX_JOINERS_TWO_SAWS: Policy = {
   maxOpenJobs: 6,
   buyKit: true,
@@ -365,8 +366,8 @@ function takeOnJoiner(state: GameState, policy: Policy): GameState {
   const wanted = policy.joiners ?? 1;
   if (state.workers.filter((worker) => worker.role === 'joiner').length >= wanted) return state;
   let next = state;
-  // Extra saws first: a machine serves one man at a time, and a crew with one saw queues at it
-  // (CLAUDE.md T7 3.1).
+  // Extra saws first: a machine has its places and no more, and a crew with one saw has men with
+  // no place at it (CLAUDE.md T7 3.1, T25 2.3).
   for (let index = 0; index < (policy.extraSaws ?? 0); index += 1) {
     next = applyAction(next, {
       type: 'BUY_EQUIPMENT',

@@ -52,7 +52,6 @@ import {
   endContractNow,
   renewContract,
   runContractDay,
-  contractMenAtWork,
   contractStationFor,
   runContractMinute,
 } from './contracts';
@@ -136,10 +135,11 @@ import {
   workshopOutputToday,
   bookOutputMinute,
   has,
+  machinesAtWork,
   machinesDueService,
+  menAtMachine,
   overdueBreakdownChance,
   repairCostFor,
-  releaseMachinesExcept,
   repairMachine,
   requiresFor,
   requiresOneOfFor,
@@ -151,7 +151,6 @@ import {
   serviceMachine,
   serviceableMachines,
   gateCheck,
-  outputFactorOf,
   specOf,
   startMachineMeters,
   variantOf,
@@ -214,7 +213,7 @@ import {
 } from './owner';
 import { paidHoursToday } from './rate';
 import { chance, int, makeId } from './rng';
-import { type StagePlan, cncOptions, labourPerMinute, stageFor, tradeFactor } from './stages';
+import { type StagePlan, labourPerMinute, tradeFactor } from './stages';
 import {
   airFactorFor,
   benchDrawsAir,
@@ -230,8 +229,9 @@ import {
 import { cubicMetres, metresBy, plural } from './text';
 import {
   STATION_BENCH,
+  STATION_DOOR,
+  STATION_HOME,
   STATION_IDLE,
-  STATION_NO_BENCH,
   stationForTask,
   storageSaleBlock,
 } from './stations';
@@ -239,10 +239,8 @@ import {
   type Hand,
   jobOf,
   placeHand,
+  planPlaces,
   ownerTakesAJob,
-  releaseIdleMachines,
-  standsForBench,
-  stationForProduction,
 } from './production';
 import {
   autoAssignJobs,
@@ -376,6 +374,8 @@ export function createGame(options: NewGameOptions): GameState {
       minutesWorked: 0,
       idleMinutes: 0,
       idleByReason: emptyOwnerIdle(),
+      working: false,
+      noPlaceFor: '',
       overtimeMinutes: 0,
       labourFactor: 1,
       overtimeDebt: 0,
@@ -538,9 +538,6 @@ function startDay(state: GameState): void {
     expressUplift: 0,
     byMan: {},
   };
-  // Nobody stands at a machine overnight: the hall starts the day with every one of them free
-  // (CLAUDE.md T7 3.1).
-  releaseMachinesExcept(state, []);
   // The month's paper before the day's: the loan, the covers and the security run with the
   // monthly items, and the report is put in front of the player before the board (T13 3.20).
   runDayCosts(state, state.clock.day);
@@ -1391,9 +1388,12 @@ function delegateTasks(state: GameState): void {
   assignStaffTasks(state);
 }
 
-/** Where everybody is standing, worked out from what they are doing (CLAUDE.md T2 3.3). */
+/** Where everybody is standing, worked out from what they are doing (CLAUDE.md T2 3.3). The day
+ *  plan goes first: it says who has a place, writes it on every man, and stands every man it placed
+ *  at his place or at his home cell (CLAUDE.md T25 2.3); everybody else is stood here. */
 function updateStations(state: GameState): void {
   const owner = state.owner;
+  const placed = new Set(planPlaces(state).map((entry) => entry.who));
   // At dinner the workshop is in the canteen. The owner is with them unless he said he would
   // work through it, and then he is the only one on the floor (CLAUDE.md T6 3.4).
   const dinner = isBreak(state.clock.minute);
@@ -1407,17 +1407,10 @@ function updateStations(state: GameState): void {
   } else if (owner.currentTaskId !== null) {
     const task = findTask(state, owner.currentTaskId);
     owner.station = task ? stationForTask(state, task) : STATION_IDLE;
-  } else if (ownerJob(state) !== null) {
-    const job = ownerJob(state);
-    // His own place at a bench, not the job's, and only for a stage done at one (v46, v47).
-    owner.station =
-      job === null
-        ? STATION_IDLE
-        : standsForBench(state, OWNER, stageFor(state, OWNER, job, cncOptions(state, OWNER, job)))
-          ? STATION_NO_BENCH
-          : stationForProduction(state, OWNER, job);
-  } else {
-    owner.station = STATION_IDLE;
+  } else if (!placed.has(OWNER)) {
+    // On a job the hall or the rack has stopped he stands at his own home cell; with none at all
+    // he is nothing in particular.
+    owner.station = ownerJob(state) !== null ? STATION_HOME : STATION_IDLE;
   }
   for (const worker of state.workers) {
     if (dinner || !isWorkingToday(state, worker)) {
@@ -1429,15 +1422,13 @@ function updateStations(state: GameState): void {
       worker.station = task ? stationForTask(state, task) : STATION_IDLE;
       continue;
     }
+    // The plan stood him already, at his place or at his home cell (CLAUDE.md T25 2.3).
+    if (placed.has(worker.id)) continue;
     const job = worker.jobId ? findJob(state, worker.jobId) : null;
     if (job && job.stage === 'inProduction') {
-      worker.station = standsForBench(
-        state,
-        worker.id,
-        stageFor(state, worker.id, job, cncOptions(state, worker.id, job)),
-      )
-        ? STATION_NO_BENCH
-        : stationForProduction(state, worker.id, job);
+      // His job is stopped by the hall or the rack: he stands at his home cell and the job's
+      // row says why.
+      worker.station = STATION_HOME;
       continue;
     }
     // A man on a standing contract stands where the contract put him (CLAUDE.md T13 3.16).
@@ -1446,17 +1437,12 @@ function updateStations(state: GameState): void {
       worker.station = onContract;
       continue;
     }
-    // A joiner with work waiting and nowhere to do it stands at the canteen door (T4 3.4).
-    // "Nowhere to do it" is a question about this man and not about the hall: from Turn 23 a
-    // bench holds one, two or three men by its class, so `freeBenches` counts the places nobody
-    // on the books has, which is nought in any hall whose benches are all spoken for, and a man
-    // with a bench of his own would have been stood at the canteen door by it. `benchOf` is the
-    // one answer to whether this man has a place, and it is what `standsForBench` asks above
-    // (CLAUDE.md T4 3.4, T23 2.1, 2.17).
+    // A joiner with work waiting and no bench of his own stands at the canteen door (T4 3.4).
+    // `benchOf` is the one answer to whether this man has a home at a bench (CLAUDE.md T23 2.17).
     const stuck =
       worker.role === 'joiner' && benchOf(state, worker.id) === null && oldestReadyJob(state) !== null;
     if (stuck) {
-      worker.station = STATION_NO_BENCH;
+      worker.station = STATION_DOOR;
       continue;
     }
     // A man nobody has put on anything waits **at his home cell**, which is his own bench, and not
@@ -1481,8 +1467,6 @@ function settle(state: GameState): void {
   refreshInsuredValue(state);
   dropOrphanPipes(state);
   refreshMaterial(state);
-  // Nobody holds a machine he is not standing at (CLAUDE.md T7 3.1).
-  releaseIdleMachines(state);
   keepTheMoveHonest(state);
   // Nothing else happens while the hall is being moved. The clock it used to force to 4x is the
   // Skip ahead run now, which the player asks for on the confirm (CLAUDE.md T8 3.4).
@@ -1654,7 +1638,7 @@ function tallyEfficiency(
   stats.possible += possible;
   stats.worked = Math.round((stats.worked + Math.min(worked, possible)) * 10000) / 10000;
   let explained = 0;
-  for (const cause of ['noMachine', 'noMaterial', 'ownerAway'] as const) {
+  for (const cause of ['noPlace', 'noMaterial', 'hallStopped', 'ownerAway'] as const) {
     const minutes = Math.min(lost[cause] ?? 0, Math.max(0, possible - worked - explained));
     stats.lost[cause] = Math.round((stats.lost[cause] + minutes) * 10000) / 10000;
     explained += minutes;
@@ -1668,30 +1652,27 @@ function runProductionMinute(state: GameState, ownerOnTask: boolean): void {
   // Every bench waits while the machines are being shifted about (CLAUDE.md T4 3.5).
   const moving = movingMachines(state) !== null;
   const working = handsAtWork(state, ownerOnTask, moving);
-  // Anybody who is not at a job this minute walks away from whatever he was standing at, so the
-  // next man can have it (CLAUDE.md T7 3.1).
-  // The men on a standing contract keep their saw beside the jobs' men while the contract can
-  // use them this minute (CLAUDE.md T13 3.16; v45).
-  releaseMachinesExcept(state, [...working.map((hand) => hand.who), ...contractMenAtWork(state)]);
-  // Who actually stands at what this minute. Nothing is worked off the job yet: the machines have
-  // to be taken before the hall can be asked what its media add up to.
+  // Who has a place this minute, the men on jobs at work in it and the men on the contracts
+  // (CLAUDE.md T25 2.3). Nothing is worked off the job yet: the hall's media are the sums of the
+  // machines at work this very minute.
+  const plan = new Map(planPlaces(state, 'day', working).map((entry) => [entry.who, entry]));
   const atWork: AtWork[] = [];
   const lost: Partial<Record<LostMinuteCause, number>> = {};
   const lose = (cause: LostMinuteCause, minutes = 1): void => {
     lost[cause] = (lost[cause] ?? 0) + minutes;
   };
   for (const hand of working) {
-    // One reading of a man's minute (CLAUDE.md T22 2.6): the job he is on, and the machine of its
-    // stage, or the wait at it. Nobody is moved to another job, and the night shift runs the same
-    // function through `workMinute`.
-    const place = placeHand(state, hand);
+    // One reading of a man's minute (CLAUDE.md T22 2.6, T25 2.3): his place, the hall, the rack.
+    // Nobody is moved to another job, and the night shift runs the same function through
+    // `workMinute`.
+    const place = placeHand(state, hand, plan.get(hand.who));
     if (place.noMaterial) raiseNoMaterial(state);
     if (place.lost !== null) lose(place.lost);
     if (place.work === null) continue;
     atWork.push({ hand, stage: place.work.stage, machine: place.work.machine });
   }
   // The men on a standing contract put their minute in beside the jobs (CLAUDE.md T13 3.16).
-  const contract = runContractMinute(state);
+  const contract = runContractMinute(state, plan);
   checkBags(state, contract.bagsFilled);
   if (atWork.length === 0 && contract.worked === 0) {
     tallyEfficiency(state, 0, lost);
@@ -1711,9 +1692,9 @@ function runProductionMinute(state: GameState, ownerOnTask: boolean): void {
   const running: AtWork[] = [];
   for (const entry of atWork) {
     if (standsForAir(state, entry.stage)) {
-      // He keeps his bench and stands at it. The minute is one of the hall's lost ones and the
-      // mark over his head says why (src/engine/bubbles.ts).
-      lose('noMachine');
+      // He keeps his place at the bench and stands at it. The minute is one the hall stopped and
+      // the mark over his head says why (src/engine/bubbles.ts).
+      lose('hallStopped');
       continue;
     }
     running.push(entry);
@@ -1738,12 +1719,12 @@ function runProductionMinute(state: GameState, ownerOnTask: boolean): void {
     // ones, which is what the client sees when it lands (CLAUDE.md T10 3.1).
     hand.job.productionMinutes += 1;
     if (dusty) hand.job.dustyMinutes += 1;
+    // A machine books an hour for every hour a man works at one of its places (PIOTR, 21.09:
+    // "keep the hours"; CLAUDE.md T25 section 6).
     if (machine !== null) used.set(machine.id, (used.get(machine.id) ?? 0) + 1);
-    // A machine speeds up its own stage and nothing else, and only for the man on it, so the
-    // speed is the class of the machine he actually got (CLAUDE.md T7 3.1).
-    let speed = machine === null
-      ? stage.speed
-      : outputFactorOf(state, machine);
+    // The pace is the hall's and not the machine's he is at: the stage's own speed, the best of
+    // its family in the hall, whichever of them his place is at (CLAUDE.md T25 2.4).
+    let speed = stage.speed;
     // A compressor that is short of litres runs every pneumatic consumer on it at 0.7 for the
     // minute, and a booth on wet air takes half as long again over the finish and marks the
     // piece (PIOTR, CLAUDE.md T10 3.2, 3.3).
@@ -2440,21 +2421,21 @@ export function buyGate(state: GameState, equipmentId: string): BuyCheck {
 // ---------------------------------------------------------------------------
 
 
-/** True when somebody is standing at this machine this minute. The hall reads it to spin the
- *  blade and throw the dust: nothing in the engine turns on it (CLAUDE.md T3 3.7). A machine is
- *  taken by one man or by nobody, so this is the one question there is to ask (T7 3.1). */
+/** True when somebody is at one of this machine's places this minute. The hall reads it to spin
+ *  the blade and throw the dust: nothing in the engine turns on it (CLAUDE.md T3 3.7, T25 2.5). */
 export function machineInUse(state: GameState, item: Equipment): boolean {
   const spec = findSpec(item.specId);
   if (!spec || item.broken) return false;
+  const atWork = machinesAtWork(state);
   if (spec.category === 'extraction') {
     // The extraction serves whatever is running, so any machine at work sets it going.
     return state.equipment.some((other) => {
       const otherSpec = findSpec(other.specId);
-      return otherSpec?.category === 'machine' && other.takenBy !== null && !other.broken;
+      return otherSpec?.category === 'machine' && atWork.has(other.id) && !other.broken;
     });
   }
   if (spec.category !== 'machine') return false;
-  return item.takenBy !== null;
+  return atWork.has(item.id);
 }
 
 export interface BuyCheck {
@@ -2580,7 +2561,6 @@ function standItem(
     minutesSavedLastWeek: 0,
     enduranceHours: enduranceHoursFor(specId, variant.id),
     hoursUsed: 0,
-    takenBy: null,
     purchasePrice: variant.price,
     soldOnDay: null,
     // Everything draws on the first compressor in the hall until the player says otherwise
@@ -2836,7 +2816,7 @@ export function canSell(state: GameState, equipmentId: string): BuyCheck {
   // A tool kept in a cabinet sells like anything else and frees its slot when the buyer comes;
   // it was refused here until v37 for no reason that survived a look (PIOTR, 20.09).
   if (item.broken) return { ok: false, reason: 'It is broken. Fix it first' };
-  if (item.takenBy !== null) return { ok: false, reason: 'Somebody is standing at it' };
+  if (menAtMachine(state, item).length > 0) return { ok: false, reason: 'Somebody is standing at it' };
   // A rack goes when it is empty and nobody is at it (PIOTR, 18.09; CLAUDE.md T20 2.10). The one
   // sentence: the Owned tab prints this very string.
   const storage = storageSaleBlock(state, item);
@@ -2853,7 +2833,6 @@ export function sellMachine(state: GameState, equipmentId: string): BuyCheck {
   if (!item) return check;
   if (timeIsPaused(state)) state.speed = 1;
   item.soldOnDay = nextWorkingDay(state.clock.day);
-  item.takenBy = null;
   // Off the extraction the day it is sold; the buyer's van takes the machine, not the pipe.
   disconnectExtraction(state, item.id);
   return OK;

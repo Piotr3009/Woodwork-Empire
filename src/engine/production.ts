@@ -1,53 +1,46 @@
-// Who is standing at which machine this minute (CLAUDE.md T7 3.1), and the one minute of
-// production itself (CLAUDE.md T13 3.9).
+// Who has a place at which machine (CLAUDE.md T25 2.3), and the one minute of production itself
+// (CLAUDE.md T13 3.9).
 //
-// A machine is free or it is taken by one man. This module says who wants one, who gets one and
-// who stands and waits at it, and it is the one place that knows both the stages of a job and the
-// people in the hall. `workMinute` is the minute of work: the men at their machines, the hall's
-// factors, the labour into the job, the hours onto the machine and the dust into the store. The
-// night shift runs on it; the day's production minute in game.ts does the same arithmetic and
-// phase C folds it onto this function (the note in REPORT-T13-B2.md).
+// A machine is a number of places to work, and the day plan here gives them out: the men in the
+// order they were hired, the owner first, each wanting one place of the family his work is at.
+// A man with a place works; a man with none stands at his home cell and says so. `workMinute` is
+// the minute of work: the men at their places, the hall's factors, the labour into the job, the
+// hours onto the machine and the dust into the store. The night shift runs on it; the day's
+// production minute in game.ts does the same arithmetic (the note in REPORT-T13-B2.md).
 
 import { WET_AIR_FINISH_FACTOR } from './constants';
 import { isBreak, workedMinutesOfDay } from './clock';
 import {
-  BUILDING_ROLES,
   addLabour,
   addToJob,
   findJob,
   hallBlock,
-  isOnJob,
+  hallStops,
   jobHeldBy,
   jobProgress,
   leadAssignee,
   jobForTheOwner,
-  waitingLine,
   workIsAbout,
+  BUILDING_ROLES,
 } from './jobs';
 import {
   BENCH,
   OWNER,
   accumulateMachineMinute,
   addDust,
-  benchOf,
-  hallHasABench,
-  benchPlaceAt,
+  bagsFull,
   bookOutputMinute,
   cabinetTools,
-  claimMachine,
-  floorMachines,
+  hallPlaces,
   hallProductivityFactor,
   has,
-  heldMachine,
   isServiced,
+  machineForPlace,
   machineIsShared,
-  releaseMachines,
-  releaseMachinesExcept,
-  specOf,
-  variantOf,
+  machineShortWord,
 } from './machines';
 import { drawSheetsFor, rackCanSupply } from './materials';
-import { openTasks } from './tasks';
+import { movingMachines, openTasks } from './tasks';
 import {
   airFactorFor,
   benchDrawsAir,
@@ -66,32 +59,35 @@ import {
   spendOwnerMinute,
   staffOutputFactor,
 } from './owner';
-import { contractMenAtWork, contractWantsToday } from './contracts';
+import {
+  contractFamilyOf,
+  contractStageFamilyOf,
+  contractHands,
+  contractOfWorker,
+  contractPiece,
+  contractWaitingForMaterial,
+  contractWantsToday,
+} from './contracts';
 import {
   bookMonthMinute,
+  crewHasGoneHome,
   isWorkingToday,
   managerPaceFor,
   spendWorkerIdleMinute,
   waitsForTheBoss,
 } from './staff';
+import { STATION_BENCH, STATION_HOME, machineStation, roomBehindStation, stationNow } from './stations';
+import { plural } from './text';
 import {
-  STATION_BENCH,
-  machineStation,
-  placeStation,
-  roomBehindStation,
-  secondStation,
-  stationNow,
-  waitingStation,
-} from './stations';
-import {
-  stageFor,
   type StagePlan,
   cncOptions,
+  currentStage,
+  jobOnCnc,
   labourPerMinute,
-  stageAtTheBench,
   tradeFactor,
 } from './stages';
 import type {
+  Contract,
   Equipment,
   GameState,
   Job,
@@ -152,209 +148,259 @@ export function hands(
   return list;
 }
 
-/** The families this man needs while he is on this job: his bench, which he holds from the first
- *  minute to the last, and the machine of the stage he is at (CLAUDE.md T4 3.4, T7 3.1). */
-export function familiesWanted(state: GameState, job: Job, who = OWNER): string[] {
-  // The second man works at the first man's bench, in its second place: he does not take a bench
-  // of his own, and one that is free is left for somebody else (CLAUDE.md T17 2.10).
-  const lead = leadAssignee(job);
-  const stage = stageFor(state, who, job, cncOptions(state, who, job));
-  // His bench is wanted for the stages done at one and not at a machine stage (v47): the
-  // second man works at the first man's bench, in its second place, and takes none of his own.
-  const atBench = stage !== null && stageAtTheBench(state, stage);
-  const wanted: string[] =
-    atBench && !(lead !== null && lead !== who && isOnJob(job, who)) ? [BENCH] : [];
-  const family = stage?.family ?? null;
-  if (family === null || family === BENCH) return wanted;
-  // A family the workshop does not own at all is done by hand, and a tool kept in a cabinet is
-  // never taken off anybody: neither is queued for (CLAUDE.md T7 3.1, 3.6).
-  if (!has(state, family) || machineIsShared(state, family)) return wanted;
-  wanted.push(family);
-  return wanted;
-}
+// ---------------------------------------------------------------------------
+// The day plan: who has a place (PIOTR, 21.09: "they never stand, they always work";
+// CLAUDE.md T25 2.2, 2.3). A machine is a number of places. Every man on a job wants one place of
+// the family his job's current stage is done on, every man on a standing contract one of his
+// piece's family, and the places are given out in the order the men were hired, the owner first.
+// A man with no place does not work, and says so; nobody queues, nobody holds anything and nobody
+// is sent to another stage to fill a gap.
+// ---------------------------------------------------------------------------
 
-/** The machine family this job's current stage wants, or null while its current stage is bench
- *  work, wants a family the workshop does not own, or wants a tool that is kept in a cabinet and
- *  is never queued for. Read off `familiesWanted` above and never worked out a second time, so
- *  the manager who spreads his men over the machines and the man who claims one are answering the
- *  same question (CLAUDE.md T23 2.4). */
-export function machineWantedFor(state: GameState, job: Job, who = OWNER): string | null {
-  return familiesWanted(state, job, who).find((family) => family !== BENCH) ?? null;
-}
-
-export interface StationCheck {
-  /** The machine of the stage he is at, or null when the stage wants none. */
+/** What one man of the plan wants and whether he got it. */
+export interface PlaceEntry {
+  /** 'owner', or a worker id. */
+  who: string;
+  /** The job he is on, or null for a man on a standing contract. */
+  job: Job | null;
+  /** The contract he is on, or null for a man on a job. */
+  contract: Contract | null;
+  /** The family his work wants a place at, or null when it wants none: by hand, a tool out of a
+   *  cabinet, or a family the hall does not own at all (CLAUDE.md T7 3.6, T25 2.3). */
+  family: string | null;
+  /** True while he works: he has his place, or his work wants none. */
+  working: boolean;
+  /** The machine his place is at, and which of its places, or null when he has none. */
   machine: Equipment | null;
-  /** The family he is standing and waiting for, or null when he has everything he needs. */
-  waitingFor: string | null;
+  place: number;
 }
 
-/** The machine this man's stage stands him at, his own bench and a tool out of a cabinet included,
- *  asked without claiming anything and without writing anything down: it is the machine
- *  `runProductionMinute` reads his speed off, and so the one thing the Output sheet's "Who made it
- *  today" has to know to say why his minute was worth what it was (CLAUDE.md T7 3.1, T24 2.1).
- *  `takeMachines` below is this, with the claiming in front of it, so a man is never placed by one
- *  reading and reported by another. */
-export function machineAtWork(state: GameState, who: string, job: Job): Equipment | null {
-  const stage = stageFor(state, who, job, cncOptions(state, who, job));
-  const family = stage?.family ?? null;
-  if (family === null || !has(state, family) || machineIsShared(state, family)) {
-    return sharedTool(state, family);
-  }
-  // A bench is his own place at one and not a thing he took off anybody, so it is asked for by
-  // name. Only the man who wanted a bench has one: the men behind the lead work at the lead's and
-  // put their minutes in at the stage's own speed, as they have since Turn 19
-  // (CLAUDE.md T19 2.5, T23 2.17).
-  if (family === BENCH) {
-    return familiesWanted(state, job, who).includes(BENCH) ? benchOf(state, who) : null;
-  }
-  return heldMachine(state, who, family);
+/** The family a stage wants a place at, or null when it wants none. A bench stage wants a bench
+ *  place, which is the whole of v47's rule from tonight (CLAUDE.md T25 2.3); a by hand job wants
+ *  one at the bench and at no machine, because it uses no machine at any stage (CLAUDE.md 9.5); a
+ *  family the hall does not own at all is worked by hand and a tool out of a cabinet is shared,
+ *  and neither needs a place (CLAUDE.md T7 3.6). */
+export function placeFamilyOf(
+  state: GameState,
+  stage: { family: string | null } | null,
+  byHand: boolean,
+): string | null {
+  if (stage === null) return null;
+  const family = stage.family;
+  if (family === null || family === BENCH) return BENCH;
+  if (byHand) return null;
+  if (!has(state, family) || machineIsShared(state, family)) return null;
+  return family;
 }
 
-/** Gives this man what the stage he is at needs, and takes back whatever it does not. */
-export function takeMachines(state: GameState, hand: Hand): StationCheck {
-  const wanted = familiesWanted(state, hand.job, hand.who);
-  releaseMachines(state, hand.who, wanted);
-  for (const family of wanted) {
-    if (claimMachine(state, hand.who, family) === null) return { machine: null, waitingFor: family };
-  }
-  return { machine: machineAtWork(state, hand.who, hand.job), waitingFor: null };
+/** The job's current stage for this man, with the CNC when the hall has a place at one for him
+ *  and the saw when it has not and the job allows it: the plan's own question, asked with the
+ *  places still left in its hands and never of anything written on the man. */
+function planStage(
+  state: GameState,
+  job: Job,
+  left: Map<string, number>,
+): StagePlan | null {
+  const onCnc = currentStage(state, job, { cnc: true });
+  if (!jobOnCnc(state, job) || onCnc === null || onCnc.id !== CNC_STAGE_ID) return onCnc;
+  if ((left.get(CNC_STAGE_ID) ?? 0) > 0 || !job.sawFallback) return onCnc;
+  return currentStage(state, job, { cnc: false });
 }
 
-/** The hand tool a stage is done with when its family is kept in a cabinet: there is no queue for
- *  it, and its bag and its hours still count the minutes it is out of the cabinet. */
+const CNC_STAGE_ID = 'cnc';
+
+/** The hand tool a stage is done with when its family is kept in a cabinet: it needs no place, and
+ *  its bag and its hours still count the minutes it is out of the cabinet (CLAUDE.md T7 3.6). */
 function sharedTool(state: GameState, family: string | null): Equipment | null {
-  if (family === null || !machineIsShared(state, family)) return null;
+  if (family === null || !has(state, family) || !machineIsShared(state, family)) return null;
   return cabinetTools(state, family)[0] ?? null;
 }
 
-/** Where this man stands among the men on his job, counting only the ones the same thing is true
- *  of. Nought is the first of them, and the list's own order is the order they were put on. */
-function placeAmong(job: Job, who: string, eligible: (other: string) => boolean): number {
-  let place = 0;
-  for (const other of job.assignees) {
-    if (other === who) return place;
-    if (eligible(other)) place += 1;
-  }
-  return place;
-}
-
-/** Where a man on a job is standing: at the machine of the stage he is at, waiting at one
- *  somebody else has, or at his bench (CLAUDE.md T7 3.1). With more than two men on the job the
- *  third and the rest take the places beyond the table's two, along the same side of the item
- *  (CLAUDE.md T19 2.5). */
-export function stationForProduction(state: GameState, who: string, job: Job): string {
-  const stage = stageFor(state, who, job, cncOptions(state, who, job));
-  const family = stage?.family ?? null;
-  // Everybody but the first man of the job works at the first man's bench: the second in its
-  // second place and the rest along its front (CLAUDE.md T17 2.10, T19 2.5).
-  const lead = leadAssignee(job);
-  const behind = lead !== null && lead !== who && isOnJob(job, who);
-  const bench = behind ? benchOf(state, lead) : null;
-  const atTheBench = (): string => {
-    if (bench === null) {
-      // His own bench, and his own place at it. A class holds one, two or three men from Turn 23
-      // and the first of them stands at its operator's cell, so the second and the third take the
-      // places beside it and no two figures are drawn on the one cell (T19 2.5, T23 2.17).
-      const mine = benchOf(state, who);
-      if (mine === null) return STATION_BENCH;
-      const place = benchPlaceAt(state, who);
-      if (place === 0) return STATION_BENCH;
-      return place === 1 ? secondStation(mine.id) : placeStation(mine.id, place);
-    }
-    const place = placeAmong(job, who, (other) => other !== lead);
-    return place === 0 ? secondStation(bench.id) : placeStation(bench.id, place + 1);
-  };
-  if (family === null || family === BENCH) return atTheBench();
-  // By hand, or out of a cabinet: either way he does it at his bench.
-  if (!has(state, family) || machineIsShared(state, family)) return atTheBench();
-  if (heldMachine(state, who, family) !== null) return machineStation(family);
-  // He is queueing for it. The first man waiting takes the waiting cell and the next of them the
-  // free cells along the same side, one out at a time (CLAUDE.md T19 2.5).
-  const queue = placeAmong(
-    job,
-    who,
-    (other) => other !== who && heldMachine(state, other, family) === null,
-  );
-  if (queue === 0) return waitingStation(family);
-  const item = floorMachines(state, family)[0] ?? null;
-  return item === null ? waitingStation(family) : placeStation(item.id, queue + 1);
-}
-
-/** Everybody who is standing at a job this minute, whatever else is true of the clock: the owner
- *  unless he is at the desk, and every joiner not on a job of work of his own. At dinner the hall
- *  is in the canteen and every machine is free, unless the owner said he would work through it
- *  (CLAUDE.md T6 3.4). */
-export function menAtJobs(state: GameState): string[] {
+/** Everybody who could work a production minute now, in the plan's order: the owner first, then
+ *  the crew in the order they were hired, each on his job or on his contract. The night asks for
+ *  its own men and never the owner, who has gone home (CLAUDE.md T13 3.9). A man on an errand, at
+ *  his dinner, gone home at five, or on a job the hall has stopped or the rack cannot feed has no
+ *  work to want a place for this minute and is not on the list: his place goes to the next man. */
+function planCandidates(
+  state: GameState,
+  shift: Shift,
+  given: readonly Hand[] | null,
+): Array<{ who: string; job: Job | null; contract: Contract | null }> {
+  const list: Array<{ who: string; job: Job | null; contract: Contract | null }> = [];
+  // Every bench waits while the machines are being shifted about (CLAUDE.md T4 3.5).
+  if (movingMachines(state) !== null) return list;
   const dinner = isBreak(state.clock.minute);
-  if (dinner && !state.owner.breakSkipped) return [];
-  const atJobs: string[] = [];
-  if (jobOf(state, OWNER) && ownerIsAvailable(state) && state.owner.currentTaskId === null) {
-    atJobs.push(OWNER);
+  // The minute names its own hands, already at work in it; the plan read between minutes asks
+  // who of the shift would be.
+  const byHand = new Map((given ?? hands(state, { shift })).map((hand) => [hand.who, hand]));
+  const owner = byHand.get(OWNER);
+  if (
+    owner !== undefined &&
+    (given !== null || (state.owner.currentTaskId === null && (!dinner || state.owner.breakSkipped)))
+  ) {
+    list.push({ who: OWNER, job: owner.job, contract: null });
   }
-  if (dinner) return atJobs;
-  for (const hand of hands(state, { owner: false })) atJobs.push(hand.who);
-  // The men on a standing contract keep their saw between actions too, while the contract can
-  // use them this minute (CLAUDE.md T13 3.16; v45).
-  atJobs.push(...contractMenAtWork(state));
-  return atJobs;
+  if (given === null && dinner) return list;
+  if (shift === 'day' && crewHasGoneHome(state)) return list;
+  for (const worker of state.workers) {
+    const hand = byHand.get(worker.id);
+    if (hand !== undefined) {
+      list.push({ who: worker.id, job: hand.job, contract: null });
+      continue;
+    }
+    if (shift !== 'day') continue;
+    const contract = contractOfWorker(state, worker.id);
+    if (contract === null || contractWaitingForMaterial(state, contract)) continue;
+    if (!contractHands(state, contract).some((entry) => entry.id === worker.id)) continue;
+    list.push({ who: worker.id, job: null, contract });
+  }
+  return list;
 }
 
-/** Anybody who is not standing at a job walks away from every machine he was at, so the next man
- *  can have it. Asked after every minute and every action (CLAUDE.md T7 3.1). */
-export function releaseIdleMachines(state: GameState): void {
-  releaseMachinesExcept(state, menAtJobs(state));
+/** The day plan: who has a place and at which machine, worked out from the men on the floor, the
+ *  stages their work is at and the places the hall has. It is a reading of the hall and nothing
+ *  else, so it gives the same answer every minute until one of the things it is made of changes:
+ *  a man is put on a job or taken off one, a machine is bought, sold, moved, broken, repaired or
+ *  back from its service, a job's current stage moves to another family, or a man goes to his
+ *  dinner, to an errand or home (PIOTR, 21.09; CLAUDE.md T25 2.3). */
+export function dayPlan(
+  state: GameState,
+  shift: Shift = 'day',
+  given: readonly Hand[] | null = null,
+): PlaceEntry[] {
+  const left = new Map<string, number>();
+  const placedSoFar = new Map<string, number>();
+  const placesLeft = (family: string): number => {
+    if (!left.has(family)) left.set(family, hallPlaces(state, family));
+    return left.get(family) ?? 0;
+  };
+  // Asked before the first man is placed, so the CNC's places are known to the first stage asked.
+  if (has(state, CNC_STAGE_ID)) placesLeft(CNC_STAGE_ID);
+  const entries: PlaceEntry[] = [];
+  for (const candidate of planCandidates(state, shift, given)) {
+    let family: string | null;
+    // The tool out of a cabinet his stage is done with, when it is: it needs no place and still
+    // books its hours (CLAUDE.md T7 3.6, T25 section 6).
+    let tool: Equipment | null = null;
+    if (candidate.job !== null) {
+      const job = candidate.job;
+      const stage = planStage(state, job, left);
+      if (stage === null) continue;
+      if (!job.byHand) tool = sharedTool(state, stage.family);
+      // A job the hall has stopped, or the rack cannot feed, has nothing for him to do this
+      // minute: he wants no place, and the minute says why (`placeHand`).
+      if (hallStops(state, job, stage) !== '' || !rackCanSupply(state, job, jobProgress(job))) continue;
+      family = placeFamilyOf(state, stage, job.byHand);
+    } else if (candidate.contract !== null) {
+      const cnc = has(state, CNC_STAGE_ID) && placesLeft(CNC_STAGE_ID) > 0;
+      family = contractFamilyOf(state, contractPiece(candidate.contract), cnc);
+      tool = sharedTool(state, contractStageFamilyOf(state, contractPiece(candidate.contract), cnc));
+      // Nothing that makes dust runs with the bags full (CLAUDE.md T12 2.3).
+      if (family !== null && family !== BENCH && bagsFull(state)) continue;
+    } else {
+      continue;
+    }
+    if (family === null) {
+      entries.push({ ...candidate, family, working: true, machine: tool, place: 0 });
+      continue;
+    }
+    if (placesLeft(family) <= 0) {
+      entries.push({ ...candidate, family, working: false, machine: null, place: 0 });
+      continue;
+    }
+    left.set(family, placesLeft(family) - 1);
+    const index = placedSoFar.get(family) ?? 0;
+    placedSoFar.set(family, index + 1);
+    const at = machineForPlace(state, family, index);
+    entries.push({
+      ...candidate,
+      family,
+      working: true,
+      machine: at?.item ?? null,
+      place: at?.place ?? 0,
+    });
+  }
+  return entries;
 }
 
-// ---------------------------------------------------------------------------
-// The minute of production (CLAUDE.md T7 3.1, T10 3.1 to 3.3, T12 2.3, T13 3.9). One arithmetic
-// for the day and the night.
-// ---------------------------------------------------------------------------
+/** Works the plan out and writes it on the men: `working` and `noPlaceFor` on every man and the
+ *  owner, and the station of every man the plan placed, at the machine of his family or at his
+ *  own home cell (CLAUDE.md T25 2.3, 2.6). Everything else that asks where a man is or whether he
+ *  works reads what this wrote. */
+export function planPlaces(
+  state: GameState,
+  shift: Shift = 'day',
+  given: readonly Hand[] | null = null,
+): PlaceEntry[] {
+  const entries = dayPlan(state, shift, given);
+  const write = (man: { working: boolean; noPlaceFor: string; station: string }, entry: PlaceEntry | undefined): void => {
+    if (entry === undefined) {
+      man.working = false;
+      man.noPlaceFor = '';
+      return;
+    }
+    man.working = entry.working;
+    man.noPlaceFor = entry.working || entry.family === null ? '' : entry.family;
+    // At his place when he has one; at his bench when his work wants none (by hand, a tool out of
+    // the cabinet); and standing at his home cell with the mark over his head when the hall has
+    // no place for him (CLAUDE.md T22 2.5, T25 2.3).
+    if (!entry.working) man.station = STATION_HOME;
+    else man.station = entry.family === null ? STATION_BENCH : machineStation(entry.family);
+  };
+  const byWho = new Map(entries.map((entry) => [entry.who, entry]));
+  write(state.owner, byWho.get(OWNER));
+  for (const worker of state.workers) write(worker, byWho.get(worker.id));
+  return entries;
+}
 
-/** One man putting one minute into one job, with the machine he got for it. Gathered before the
+/** The stage this man works on his job this minute: the job's current stage, on the CNC or off
+ *  it as the plan put him (CLAUDE.md T25 2.2). Every man on a job is at the same stage: the bag of
+ *  work of v37 is gone. Null only for a job with no labour in it at all. */
+export function stageOfMan(state: GameState, who: string, job: Job): StagePlan | null {
+  return currentStage(state, job, cncOptions(state, who, job));
+}
+
+/** The machine family this job's current stage wants a place at, or null while it wants none or
+ *  a bench: what the senior manager reads before he sends a second man to a family whose places
+ *  another job already wants (CLAUDE.md T23 2.4, T25 2.3). */
+export function machineWantedFor(state: GameState, job: Job): string | null {
+  const family = placeFamilyOf(state, stageOfMan(state, leadAssignee(job) ?? OWNER, job), job.byHand);
+  return family === BENCH ? null : family;
+}
+
+/** The words a man, his card and the Work Plan say while the hall has no place for him: `no place
+ *  at the saw`, the family in the trade's own short word (CLAUDE.md T21 2.6, T25 2.3). */
+export function placeLine(family: string): string {
+  return `no place at the ${machineShortWord(family)}`;
+}
+
+/** The Work Plan's one line over the jobs, off the day plan: how many are working and how many
+ *  the hall has no place for, by the family they want, `4 men working · 1 with no place at the
+ *  saw` (CLAUDE.md T25 2.8). Always a line, `0 men working` included, so the board under the
+ *  player's pointer keeps its shape from one frame to the next (CLAUDE.md T14 2.4). */
+export function placesSummary(state: GameState): string {
+  const people = [state.owner, ...state.workers];
+  const working = people.filter((man) => man.working).length;
+  const standing = new Map<string, number>();
+  for (const man of people) {
+    if (man.working || man.noPlaceFor === '') continue;
+    standing.set(man.noPlaceFor, (standing.get(man.noPlaceFor) ?? 0) + 1);
+  }
+  const parts = [`${plural(working, 'man', 'men')} working`];
+  for (const [family, count] of standing) parts.push(`${count} with ${placeLine(family)}`);
+  return parts.join(' \u00b7 ');
+}
+
+/** The words the job carries while the rack has nothing for it (CLAUDE.md T2 3.6). */
+export const WAITING_FOR_MATERIAL = 'waiting for material';
+
+/** One man putting one minute into one job, with the machine of his place. Gathered before the
  *  hall is measured, because the extraction and the air sums are the sums of the machines running
  *  this very minute and not of last minute's (CLAUDE.md T10 3.1, 3.2). */
 interface AtWork {
   hand: Hand;
   stage: StagePlan;
   machine: Equipment | null;
-}
-
-/** What this one man says while he stands, which is not always what his job says: every man in the
- *  queue for a machine is waiting for the machine. "No cut parts yet", the words of the men behind
- *  the first in a saw queue, went with the rule that kept assembly closed until the cutting was done
- *  (PIOTR, 21.09; v43): a man queues at the saw now only when the saw is all his job has left, so
- *  there are no parts he is waiting to assemble. Null when he is not standing at all
- *  (CLAUDE.md T21 2.6, 2.7). */
-export function waitingWordsFor(state: GameState, who: string, job: Job): string | null {
-  const stage = stageFor(state, who, job, cncOptions(state, who, job));
-  const family = stage?.family ?? null;
-  if (family === null || family === BENCH) return null;
-  if (!has(state, family) || machineIsShared(state, family)) return null;
-  if (heldMachine(state, who, family) !== null) return null;
-  return waitingLine(family);
-}
-
-/** The words the job carries while the rack has nothing for it (CLAUDE.md T2 3.6). */
-export const WAITING_FOR_MATERIAL = 'waiting for material';
-
-/** The words a man carries, and the row of his job, while he has no place at a bench for the
- *  stage he is at (CLAUDE.md T4 3.4; v47). The same words `hallBlock` uses for a hall with no
- *  bench in it at all. */
-export const NO_BENCH = 'no bench';
-
-/** True while this man stands for want of a bench: the hall has none at all (CLAUDE.md T4 3.4),
- *  or he would be at his bench for the stage he is at and has no place at one. The one reading
- *  `placeHand`, the stations, the day meter and the mark over his head all take (PIOTR, 22.09;
- *  v47). Null stage, nothing to stand for. */
-export function standsForBench(
-  state: GameState,
-  who: string,
-  stage: { family: string | null } | null,
-): boolean {
-  if (!hallHasABench(state)) return true;
-  if (stage === null) return false;
-  return stageAtTheBench(state, stage) && benchOf(state, who) === null;
 }
 
 /** True when the job can be worked on this minute. Writes down why it cannot, either way: the
@@ -374,11 +420,12 @@ export function canWorkOn(state: GameState, job: Job): boolean {
 // on it; the production manager will do the moving, later"] (CLAUDE.md T22 2.6).
 // ---------------------------------------------------------------------------
 
-/** What this man did with the minute: the stage and the machine he got, or why he stood. The whole
- *  of one man's minute before the hall's factors are applied to it, in one place, because the day
- *  and the night both have to ask exactly the same question (CLAUDE.md T22 2.6). */
+/** What this man did with the minute: the stage he worked and the machine his place is at, or
+ *  why he stood. The whole of one man's minute before the hall's factors are applied to it, in one
+ *  place, because the day and the night both have to ask exactly the same question
+ *  (CLAUDE.md T22 2.6). */
 export interface HandPlace {
-  /** The stage he is at and the machine he got, or null when he stood. */
+  /** The stage he is at and the machine of his place, or null when he stood. */
   work: { stage: StagePlan; machine: Equipment | null } | null;
   /** What the minute is booked as lost to, or null when he worked it. */
   lost: LostMinuteCause | null;
@@ -386,46 +433,32 @@ export interface HandPlace {
   noMaterial: boolean;
 }
 
-/** Gets this man to work on the job he is on, and stands him at its machine when another man has
- *  it. The one reading of a man's minute: the hall, then the rack, then the machine of his stage.
+/** One man's minute on the job he is on, read off the day plan: no place, and he stands at his
+ *  home cell and says so; the hall or the rack has stopped his job, and he stands and the job's
+ *  row says why; or he works his job's current stage at the machine of his place.
  *
- *  He is never moved to another job. Turn 21 moved him, and Piotr reversed it on 19.09: a man is
- *  assigned to a job, so he works on that job, and the hall's own lever for moving men will be the
- *  production manager, whose design is parked for Turn 23 (CLAUDE.md T22 2.6, 8). The minute he
- *  stands is booked to `noMachine` and counted by the day meter's idle segment, which is the point
- *  of it: the queue at the machine is there for the player to see and to shorten by buying a second
- *  one. */
-export function placeHand(state: GameState, hand: Hand): HandPlace {
+ *  He is never moved to another job and never to another stage of his own (PIOTR, 19.09 and
+ *  21.09; CLAUDE.md T22 2.6, T25 2.2). A minute with no place is booked to `noPlace`, and that is
+ *  the one thing `noPlace` means: the player buys a machine or takes a man off. */
+export function placeHand(state: GameState, hand: Hand, entry: PlaceEntry | undefined): HandPlace {
+  if (entry !== undefined && !entry.working) {
+    // The job's own row says what the hall has to say about it, a broken saw for one, and draws
+    // nothing off the rack for a man who is not working (CLAUDE.md T2 3.9).
+    hand.job.blockedBy = hallBlock(state, hand.job);
+    return { work: null, lost: 'noPlace', noMaterial: false };
+  }
   if (!canWorkOn(state, hand.job)) {
     // The hall or the rack has stopped this job, and the man stays on it: the chips and the warning
-    // strip say what is wrong and the mark over his head says it over him (CLAUDE.md T22 2.5).
-    releaseMachines(state, hand.who);
+    // strip say what is wrong (CLAUDE.md T22 2.5).
     const noMaterial = hand.job.blockedBy === WAITING_FOR_MATERIAL;
-    return { work: null, lost: noMaterial ? 'noMaterial' : 'noMachine', noMaterial };
+    return { work: null, lost: noMaterial ? 'noMaterial' : 'hallStopped', noMaterial };
   }
-  // The stage this man works, which is his own from v37: two men on one job may be at two stages
-  // (the bag of work, PIOTR 20.09).
-  const stage = stageFor(state, hand.who, hand.job, cncOptions(state, hand.who, hand.job));
+  // The plan had nothing for him to want this minute although the job can be worked: the hall
+  // stopped it at his stage a moment ago. He stands, and the minute is the hall's.
+  if (entry === undefined) return { work: null, lost: 'hallStopped', noMaterial: false };
+  const stage = stageOfMan(state, hand.who, hand.job);
   if (stage === null) return { work: null, lost: null, noMaterial: false };
-  // His own place at a bench, a question about this man and not about the job, and asked only at
-  // a stage done at a bench: at a machine stage he needs none (PIOTR, 22.09: "the bench only at
-  // assembly"; v47). Without one he stands, on his own, the row says so, and the men beside him
-  // work on. Booked as a station he has not got, which is what the day meter counts.
-  if (standsForBench(state, hand.who, stage)) {
-    releaseMachines(state, hand.who);
-    hand.job.blockedBy = NO_BENCH;
-    return { work: null, lost: 'noMachine', noMaterial: false };
-  }
-  const at = takeMachines(state, hand);
-  if (at.waitingFor === null) {
-    return { work: { stage, machine: at.machine }, lost: null, noMaterial: false };
-  }
-  // He stands at the machine until the man on it is done with it (CLAUDE.md T7 3.1). This is also
-  // the cap on the men: one machine is one man's, so a stage at a machine goes at that one man's
-  // speed however many are on the job, and the others put their minutes in only on the bench work
-  // the stage allows, which for a cutting stage is none (CLAUDE.md T19 2.5).
-  hand.job.blockedBy = waitingLine(at.waitingFor);
-  return { work: null, lost: 'noMachine', noMaterial: false };
+  return { work: { stage, machine: entry.machine }, lost: null, noMaterial: false };
 }
 
 // ---------------------------------------------------------------------------
@@ -438,23 +471,17 @@ export function placeHand(state: GameState, hand: Hand): HandPlace {
  *  and a minute he holds something is a minute `spendOwnerMinute` has already booked as worked
  *  (CLAUDE.md T21 2.8). The four reasons are `OWNER_IDLE_REASONS`, in the order the hover lists them.
  *
- *  Two of the four are the two the workshop's own efficiency breakdown counts, and they are read the
- *  same way here: the rack first, and then the hall and the machine of the stage, which is everything
- *  else (CLAUDE.md T13 3.5). The other two are his alone: nothing in the hall is his, or there is
- *  nothing in the hall at all. */
+ *  The reasons of a man on a job are the workshop's own and are read the same way for him and for a
+ *  man on the books (`standingReason`): no place, then the rack, then the air at the bench, and
+ *  the hall for everything else (CLAUDE.md T13 3.5, T25 2.3). The other two are his alone: nothing
+ *  in the hall is his, or there is nothing in the hall at all. */
 export function ownerIdleReason(state: GameState): OwnerIdleReason | null {
   const owner = state.owner;
   if (!ownerIsAvailable(state)) return null;
   if (isBreak(state.clock.minute) && !owner.breakSkipped) return null;
   if (owner.currentTaskId !== null) return null;
   const job = jobOf(state, OWNER);
-  if (job !== null) {
-    if (!rackCanSupply(state, job, jobProgress(job))) return 'noMaterial';
-    // A bench the hall has no air for stands the owner still like anybody else, and his meter
-    // says which of the two it was (PIOTR, 20.09; CLAUDE.md T23 2.7).
-    const stage = stageFor(state, OWNER, job, cncOptions(state, OWNER, job));
-    return standsForAir(state, stage) ? 'noCompressor' : 'noMachine';
-  }
+  if (job !== null) return standingReason(state, owner, job);
   // Nothing of his own at all. Either the hall's list has a chore nobody has taken, or there is
   // work of the board's about that is every bit of it somebody else's; or there is none of that
   // and he is in the office with his hands in his pockets.
@@ -467,6 +494,30 @@ export function ownerIdleReason(state: GameState): OwnerIdleReason | null {
   return waiting ? 'nothingAssigned' : 'officeEmpty';
 }
 
+/** True when this job's current stage has a place the day plan has not given out, or wants none:
+ *  the only jobs the owner walks on to by himself, so he never takes a place from a man already on
+ *  one (CLAUDE.md T25 2.3). */
+function placeToSpareFor(state: GameState, job: Job): boolean {
+  const family = placeFamilyOf(state, currentStage(state, job, { cnc: true }), job.byHand);
+  if (family === null) return true;
+  const wanting = dayPlan(state).filter((entry) => entry.family === family).length;
+  return wanting < hallPlaces(state, family);
+}
+
+/** Why a man on a job stood through the minute: the hall had no place for him, the rack had
+ *  nothing for his job, his bench had no air behind it, or the hall stopped the job. The one
+ *  reading of it, for the owner and for a man on the books alike (CLAUDE.md T23 2.7, T25 2.3). */
+function standingReason(
+  state: GameState,
+  man: { noPlaceFor: string },
+  job: Job,
+): 'noPlace' | 'noMaterial' | 'noCompressor' | 'hallStopped' {
+  if (man.noPlaceFor !== '') return 'noPlace';
+  if (!rackCanSupply(state, job, jobProgress(job))) return 'noMaterial';
+  const who = man === state.owner ? OWNER : (state.workers.find((worker) => worker === man)?.id ?? OWNER);
+  return standsForAir(state, stageOfMan(state, who, job)) ? 'noCompressor' : 'hallStopped';
+}
+
 /** The owner goes to the bench when his office is empty (PIOTR, 20.09: "he never stands doing
  *  nothing"; CLAUDE.md T23 2.3). Once a minute: he is in, he is on the hall side of the door, he
  *  holds no chore and no job, and there is nothing in his office queue he could do now. Then he
@@ -474,8 +525,9 @@ export function ownerIdleReason(state: GameState): OwnerIdleReason | null {
  *
  *  v41 (PIOTR, 21.09): he JOINS it, whoever is on it. Turn 23 gave him the oldest job with nobody
  *  on it, and in a hall where the crew hold every job that is no job at all, so he stood in the
- *  office exactly as he did before 2.3 was written. He is a second pair of hands now and the bag
- *  of work puts him at a stage whose station is free. The evening take over of Turn 17 is still
+ *  office exactly as he did before 2.3 was written. He is a second pair of hands now, and as the
+ *  first man of the day plan he has the first place at his job's stage (CLAUDE.md T25 2.3). The
+ *  evening take over of Turn 17 is still
  *  its own click, for a job he wants INSTEAD of the man on it.
  *
  *  He never takes a standing contract [PIOTR, 19.09], which `jobForTheOwner` cannot hand him
@@ -495,7 +547,7 @@ export function ownerTakesAJob(state: GameState): void {
   // Anything of his own still to do comes first: the office queue is the owner's day and the
   // bench is what he does with what is left of it.
   if (openTasks(state).some((task) => task.doneBy === null)) return;
-  const job = jobForTheOwner(state);
+  const job = jobForTheOwner(state, (open) => placeToSpareFor(state, open));
   if (job === null) return;
   // He joins it rather than taking it over: a job the crew are already on keeps them
   // (PIOTR, 21.09; v41).
@@ -516,7 +568,7 @@ export function workerIdleReason(state: GameState, worker: Worker): WorkerIdleRe
   if (worker.taskId !== null) return null;
   const job = jobOf(state, worker.id);
   if (job === null) return null;
-  return rackCanSupply(state, job, jobProgress(job)) ? 'noMachine' : 'noMaterial';
+  return standingReason(state, worker, job);
 }
 
 /** Books the minute just gone onto this man's day as one he stood through, with its reason. Called
@@ -563,10 +615,10 @@ export interface MinuteReport {
   usedMachineIds: string[];
 }
 
-/** One clock minute of production for the hands given: the men take their machines, the hall is
- *  measured with those machines running, and every man who got what he needs puts a minute into
- *  his job at the speed his machine and the hall give him. The hours go on the machines he stood
- *  at, and the dust into the store (CLAUDE.md T7 3.1, T10 3.1 to 3.3, T12 2.3). At night every
+/** One clock minute of production for the hands given: the day plan gives them their places, the
+ *  hall is measured with the machines at work running, and every man with a place puts a minute
+ *  into his job at the pace of his stage and the hall's factor. The hours go on the machines of
+ *  their places, and the dust into the store (CLAUDE.md T7 3.1, T10 3.1 to 3.3, T12 2.3). At night every
  *  minute is written on the job as a night one, which the client sees in the finish, and on the
  *  day's night count (CLAUDE.md T13 3.9). The day's production minute in game.ts does exactly
  *  this; the night shift calls it here. */
@@ -576,12 +628,8 @@ export function workMinute(
   options: { night?: boolean } = {},
 ): MinuteReport {
   const night = options.night === true;
-  // Anybody who is not at a job this minute walks away from whatever he was standing at, so the
-  // next man can have it (CLAUDE.md T7 3.1).
-  releaseMachinesExcept(
-    state,
-    working.map((hand) => hand.who),
-  );
+  // Who has a place this minute: the plan of the shift that is working (CLAUDE.md T25 2.3).
+  const plan = new Map(planPlaces(state, night ? 'night' : 'day', working).map((entry) => [entry.who, entry]));
   const report: MinuteReport = {
     worked: 0,
     lost: {},
@@ -593,13 +641,12 @@ export function workMinute(
   const lose = (cause: LostMinuteCause, minutes = 1): void => {
     report.lost[cause] = (report.lost[cause] ?? 0) + minutes;
   };
-  // Who actually stands at what this minute. Nothing is worked off the job yet: the machines have
-  // to be taken before the hall can be asked what its media add up to.
+  // Who actually works this minute. Nothing is worked off the job yet: the hall's media are the
+  // sums of the machines at work this very minute (CLAUDE.md T10 3.1, 3.2).
   const atWork: AtWork[] = [];
   for (const hand of working) {
-    // One reading of a man's minute (CLAUDE.md T22 2.6): the job he is on, and the machine of its
-    // stage, or the wait at it. Nobody is moved to another job.
-    const place = placeHand(state, hand);
+    // One reading of a man's minute (CLAUDE.md T22 2.6, T25 2.3): his place, the hall, the rack.
+    const place = placeHand(state, hand, plan.get(hand.who));
     if (place.noMaterial) report.noMaterial = true;
     if (place.lost !== null) lose(place.lost);
     if (place.work === null) continue;
@@ -616,14 +663,14 @@ export function workMinute(
   // And what the men at the benches do when there is nothing in the hose: they stand. A bench
   // wants its 30 l/min at 6 bar and without a compressor, or on one that is short, there is no
   // bench work at all from tonight [PIOTR, 20.09] (CLAUDE.md T23 2.7). It is asked here and not
-  // in `placeHand`, because the air sum is the sum of the machines running this very minute and
-  // the machines are not taken until every hand has been placed.
+  // in `placeHand`, because the air sum is the sum of the machines running this very minute, which
+  // is not known until every hand has been placed.
   const running: AtWork[] = [];
   for (const entry of atWork) {
     if (standsForAir(state, entry.stage)) {
-      // He keeps his bench and stands at it. The minute is one of the hall's lost ones and the
-      // mark over his head says why (src/engine/bubbles.ts).
-      lose('noMachine');
+      // He keeps his place at the bench and stands at it. The minute is one the hall stopped and
+      // the mark over his head says why (src/engine/bubbles.ts).
+      lose('hallStopped');
       continue;
     }
     running.push(entry);
@@ -651,13 +698,12 @@ export function workMinute(
       hand.job.nightMinutes += 1;
       state.dayStats.nightMinutes += 1;
     }
+    // A machine books an hour for every hour a man works at one of its places (PIOTR, 21.09:
+    // "keep the hours"; CLAUDE.md T25 section 6).
     if (machine !== null) used.set(machine.id, (used.get(machine.id) ?? 0) + 1);
-    // A machine speeds up its own stage and nothing else, and only for the man on it, so the
-    // speed is the class of the machine he actually got (CLAUDE.md T7 3.1).
-    let speed =
-      machine === null
-        ? stage.speed
-        : variantOf(specOf(machine.specId), machine.variantId).outputFactor;
+    // The pace is the hall's and not the machine's he is at: the stage's own speed, the best of
+    // its family in the hall, whichever of them his place is at (CLAUDE.md T25 2.4).
+    let speed = stage.speed;
     // A compressor that is short of litres runs every pneumatic consumer on it at 0.7 for the
     // minute, and a booth on wet air takes half as long again over the finish and marks the
     // piece (PIOTR, CLAUDE.md T10 3.2, 3.3).

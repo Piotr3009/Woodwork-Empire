@@ -6,9 +6,9 @@
 
 import { describe, expect, it } from 'vitest';
 import { HIRING_SPECS } from '../../src/engine/constants';
-import { WORKBENCH_PLACES, WORKBENCH_VARIANTS } from '../../src/engine/constants';
+import { MACHINE_PLACES, WORKBENCH_VARIANTS } from '../../src/engine/constants';
 import { canHire, hiringOptions, monthlyWageOf } from '../../src/engine/staff';
-import { OWNER, benchOf, benchPlaces, outputFactorOf } from '../../src/engine/machines';
+import { OWNER, benchOf, benchPlaces, classPaceOf, paceOf } from '../../src/engine/machines';
 import { renderMachine } from '../../src/ui/machine';
 import type { Equipment } from '../../src/engine/index';
 import { formatMoney } from '../../src/engine/economy';
@@ -152,7 +152,7 @@ describe('a free place at a bench', () => {
   }
 
   it('counts the classes places over the benches of the hall', () => {
-    expect(WORKBENCH_PLACES).toEqual({ used: 1, budget: 1, standard: 2, pro: 2, industrial: 3 });
+    expect(MACHINE_PLACES.workbench).toEqual({ used: 1, budget: 1, standard: 2, pro: 2, industrial: 3 });
     const one = hallWith('budget', 1);
     expect(benchPlaces(one)).toBe(1);
     expect(benchPlaces(hallWith('standard', 1))).toBe(2);
@@ -233,11 +233,11 @@ describe('a free place at a bench', () => {
   });
 
   it('works each man at a pro bench at that bench s pace, on his own job', () => {
-    // A pro bench holds two and each of them works his own job at 1.06: the pace follows the
-    // bench the man is at and not the job he is on (CLAUDE.md T23 2.17).
+    // A pro bench holds two and each of them works his own job at the pro class's pace, 1.08, off
+    // the one ladder of every family (CLAUDE.md T23 2.17, T25 2.4).
     const variant = WORKBENCH_VARIANTS.find((entry) => entry.id === 'pro');
-    expect(variant?.outputFactor).toBe(1.06);
-    expect(WORKBENCH_PLACES.pro).toBe(2);
+    expect(classPaceOf({ specId: 'workbench', variantId: variant?.id ?? '' })).toBe(1.08);
+    expect(MACHINE_PLACES.workbench?.pro).toBe(2);
     let state = hallWith('pro', 4);
     state = hireNow(state, 'joiner', 'novice');
     state = hireNow(state, 'joiner', 'novice');
@@ -246,23 +246,23 @@ describe('a free place at a bench', () => {
     for (const worker of state.workers) {
       const his = benchOf(state, worker.id);
       expect(his?.id).toBe(bench.id);
-      expect(outputFactorOf(state, his as Equipment)).toBe(1.06);
+      expect(paceOf(state, his as Equipment)).toBe(1.08);
     }
   });
 
-  it('re tuned the pace of the ladder to top out at a tenth', () => {
-    // 0.95, 1.00, 1.02, 1.05 and 1.08 become 0.95, 1.00, 1.03, 1.06 and 1.10
-    // [TUNE; PIOTR, 20.09, the top of it] (CLAUDE.md T23 2.17).
-    expect(WORKBENCH_VARIANTS.map((entry) => entry.outputFactor)).toEqual([
-      0.95, 1, 1.03, 1.06, 1.1,
+  it('folds the bench s pace into the one ladder of every family', () => {
+    // Turn 23's own column (0.95, 1.00, 1.03, 1.06, 1.10) is gone: the bench reads MACHINE_PACE
+    // like the saw [TUNE, Piotr's figures] (CLAUDE.md T25 2.4).
+    expect(WORKBENCH_VARIANTS.map((entry) => classPaceOf({ specId: 'workbench', variantId: entry.id }))).toEqual([
+      0.95, 1, 1.05, 1.08, 1.12,
     ]);
   });
 
   it('says on the class card how many men it holds and what they work at', () => {
     const card = renderMachine(newGame(), 'workbench');
-    expect(card).toContain('2 men, +3% pace');
-    expect(card).toContain('2 men, +6% pace');
-    expect(card).toContain('3 men, +10% pace');
+    expect(card).toContain('2 men, +5% pace');
+    expect(card).toContain('2 men, +8% pace');
+    expect(card).toContain('3 men, +12% pace');
     // The minus is the number's own sign, the way the output line of every class card writes
     // it, and not the typographic one.
     expect(card).toContain('1 man, -5% pace');

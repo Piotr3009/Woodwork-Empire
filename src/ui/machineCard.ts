@@ -21,5 +21,5 @@ export function renderMachineCard(
   if (spec === undefined || spec === null) {
     return '<p class="hint">That machine is not in the hall any more.</p>';
   }
-  return `<div class="machine-card">${ownedTile(state, item, spec, sellConfirm)}</div>`;
+  return `<div class="machine-card">${ownedTile(state, item, spec, sellConfirm, 'card')}</div>`;
 }

@@ -1,16 +1,17 @@
-// Where a figure stands: at the machine of the stage he is working, or waiting at one somebody
-// else has. The Turn 2 cycle of fifteen minutes at the bench and five at the saw is gone
-// (CLAUDE.md T7 3.1 and 3.9).
+// Where a figure stands: at his place at the machine of the stage he is working, or at his own
+// home cell when the hall has no place for him. The Turn 2 cycle of fifteen minutes at the bench
+// and five at the saw is gone (CLAUDE.md T7 3.1 and 3.9, T25 2.3, 2.6).
 
 import { describe, expect, it } from 'vitest';
 import { footprintIn, renderHall, stationCell } from '../../src/render/hall';
 import {
   STATION_BENCH,
+  STATION_HOME,
   itemAtCell,
   machineStation,
   standingCell,
-  waitingStation,
 } from '../../src/engine/stations';
+import { OWNER } from '../../src/engine/machines';
 import { footprintCells, isFree } from '../../src/engine/walk';
 import { tick } from '../../src/engine/index';
 import type { GameState } from '../../src/engine/index';
@@ -61,30 +62,38 @@ describe('the figure of a man at work', () => {
     const job = firstJob(cutting);
     job.labourRemaining = job.labourValue * 0.5;
     const assembling = tick(cutting, 1);
-    expect(assembling.owner.station).toBe('bench');
+    // At his place at the bench, which is a family with places like any other (CLAUDE.md T25 2.2).
+    expect(assembling.owner.station).toBe(machineStation('workbench'));
     // And the hall draws him there, with what he is doing under his name.
-    expect(renderHall(assembling)).toContain('the bench');
+    expect(renderHall(assembling)).toContain('workbench');
   });
 
-  it('stands the man who cannot have the saw at it, and says what he is waiting for', () => {
-    const state = tick(withOnlyCuttingLeft(twoMenOnSheetWork({ saws: 1 })), 1);
+  it('stands the man the budget saw has no place for at his home cell, and says so', () => {
+    const state = tick(withOnlyCuttingLeft(twoMenOnSheetWork({ saws: 1, sawVariant: 'budget' })), 1);
     const joiner = state.workers[0];
     if (!joiner) throw new Error('no joiner');
-    expect(joiner.station).toBe(waitingStation('tableSaw'));
+    expect(joiner.station).toBe(STATION_HOME);
     const svg = renderHall(state);
-    expect(svg).toContain('waiting for the saw');
-    // He waits beside the man who has it rather than on top of him.
-    const working = stationCell(state, machineStation('tableSaw'), { x: 0, y: 0 });
-    const waiting = stationCell(state, waitingStation('tableSaw'), { x: 0, y: 0 });
-    expect({ x: waiting.x, y: waiting.y }).not.toEqual({ x: working.x, y: working.y });
-    // Both in front of the saw and neither on it: the man working it is a cell out from the table
-    // and the man waiting is at the other end of the same front edge (CLAUDE.md T19 2.4).
+    expect(svg).toContain('no place at the saw');
+    // He is not in a heap at the saw: he stands at his own bench's cell (CLAUDE.md T25 2.3).
+    const working = stationCell(state, machineStation('tableSaw'), { x: 0, y: 0 }, OWNER);
+    const home = stationCell(state, STATION_HOME, { x: joiner.anchorX, y: joiner.anchorY }, joiner.id);
+    expect({ x: home.x, y: home.y }).not.toEqual({ x: working.x, y: working.y });
+  });
+
+  it('stands two men at a standard saw s two places, side by side and neither on it', () => {
+    const state = tick(withOnlyCuttingLeft(twoMenOnSheetWork({ saws: 1, sawVariant: 'standard' })), 1);
+    const joiner = state.workers[0];
+    if (!joiner) throw new Error('no joiner');
+    expect(joiner.station).toBe(machineStation('tableSaw'));
+    const first = stationCell(state, machineStation('tableSaw'), { x: 0, y: 0 }, OWNER);
+    const second = stationCell(state, machineStation('tableSaw'), { x: 0, y: 0 }, joiner.id);
+    expect({ x: second.x, y: second.y }).not.toEqual({ x: first.x, y: first.y });
     const saw = state.equipment.find((item) => item.specId === 'tableSaw');
     if (!saw) throw new Error('no saw');
     const stands = footprintIn(saw);
-    expect(waiting.y).toBeGreaterThanOrEqual(Math.floor(stands.y + stands.depth));
-    expect(working.y).toBe(waiting.y + 1);
-    expect(working.x).not.toBe(waiting.x);
+    expect(first.y).toBeGreaterThanOrEqual(Math.floor(stands.y + stands.depth));
+    expect(second.y).toBeGreaterThanOrEqual(Math.floor(stands.y + stands.depth));
   });
 
   it('has no cycle of minutes left in it at all', () => {
@@ -107,7 +116,9 @@ describe('the figure of a man at work', () => {
     // The finishing of a laminate job is done at the bench with nothing but hands (T7 3.1).
     job.labourRemaining = job.labourValue * 0.05;
     const finishing = tick(state, 1);
-    expect(finishing.owner.station).toBe('bench');
+    // A stage with nothing but hands is bench work, and bench work wants a place at a bench
+    // (CLAUDE.md T25 2.3).
+    expect(finishing.owner.station).toBe(machineStation('workbench'));
     // Nothing but his bench, so the cell he is given is the bench cell he was handed.
     const cell = stationCell(finishing, STATION_BENCH, { x: 7, y: 7 });
     expect({ x: cell.x, y: cell.y }).toEqual({ x: 7, y: 7 });

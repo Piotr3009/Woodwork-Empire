@@ -1,7 +1,6 @@
 // Task definitions, who can take them off the owner, their minute curves, and the runner that
 // spends the owner's minutes on the one he started.
 
-import { stationWaitingFor } from './stations';
 import {
   ADMIN_COVER_RATE,
   CONSUMABLES_LABEL,
@@ -142,7 +141,7 @@ const TASK_DEFINITIONS: Record<TaskKind, TaskDefinition> = {
   service: { category: 'workshop', eligibleRoles: [], autoRoles: [] },
   repair: { category: 'workshop', eligibleRoles: ['joiner'], autoRoles: [] },
   moveMachines: { category: 'workshop', eligibleRoles: ['joiner', 'helper'], autoRoles: [] },
-  // The owner does his own interviewing and his own waiting for the laptop: there is nobody to
+  // The owner does his own interviewing and his own sitting at the laptop: there is nobody to
   // hand either of them to (CLAUDE.md T7 3.10, T9 3.1).
   hiring: { category: 'admin', eligibleRoles: [], autoRoles: [] },
   booting: { category: 'admin', eligibleRoles: [], autoRoles: [] },
@@ -231,7 +230,7 @@ export function cleanerAtWork(state: GameState): Worker | null {
   return manOnOpenTask(state, 'cleaning');
 }
 
-/** What the hall says while the van or the bag is waiting for the man whose job it is. */
+/** What the hall says while the van or the bag waits on the man whose job it is. */
 export const WAITING_FOR_HELPER = 'Waiting for the helper';
 
 /** What the service row says instead of a Start: nobody stands at a service, it is called in and
@@ -801,9 +800,10 @@ export function bookWeekMinutes(state: GameState): void {
       // nobody has put him on anything (PIOTR, 20.09; CLAUDE.md T23 2.1).
       if (sample !== null && !sample.worked) {
         bookWorkerIdleMinute(state, worker);
-        // And what he stood for, when it was a machine: the week keeps it by family, so his card
-        // can say "6 h of it waiting for the edgebander" (PIOTR, 20.09; v37).
-        const family = stationWaitingFor(worker.station);
+        // And what he stood for, when it was a machine with no place for him: the week keeps it
+        // by family, so his card can say how much of it was no place at the edgebander and the
+        // player can see whether a second one would pay (PIOTR, 20.09; v37; CLAUDE.md T25 2.3).
+        const family = worker.noPlaceFor === '' ? null : worker.noPlaceFor;
         if (family !== null) {
           const meters = weekMetersOf(worker, week);
           const waited = (meters.waitedFor ??= {});

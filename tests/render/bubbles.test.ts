@@ -7,8 +7,9 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { bubbleFor } from '../../src/engine/bubbles';
-import { WAITING_FOR_MATERIAL } from '../../src/engine/production';
+import { WAITING_FOR_MATERIAL, planPlaces } from '../../src/engine/production';
 import { STATION_OFFICE } from '../../src/engine/stations';
+import { drawContract } from '../../src/engine/contracts';
 import { CAPSULE_HEAD_TOP, markArt, renderHall } from '../../src/render/hall';
 import type { GameState } from '../../src/engine/index';
 import {
@@ -46,10 +47,10 @@ function groupOf(svg: string, figure: string): string {
   throw new Error(`${figure} has no end`);
 }
 
-/** Three men on one job at its cutting stage with one saw, the first of them standing at it, so one
- *  man is cutting and two are waiting for the saw. */
-function queueAtTheSaw(): GameState {
-  let state = sixJoinersOnSheetWork({ saws: 1 });
+/** Three men on one job at its cutting stage with a budget saw of one place, so one man is
+ *  cutting and two have no place at the saw (CLAUDE.md T25 2.3). */
+function noPlaceAtTheSaw(): GameState {
+  let state = sixJoinersOnSheetWork({ saws: 1, sawVariant: 'budget' });
   const first = state.jobs[0];
   if (!first) throw new Error('a job is wanted');
   state = act(state, { type: 'ADD_TO_JOB', jobId: first.id, workerId: 'staff-2' });
@@ -58,52 +59,40 @@ function queueAtTheSaw(): GameState {
   if (!job) throw new Error('the job went missing');
   job.labourRemaining = job.labourValue * 0.95;
   job.stageLabour = {};
-  // The saw is the one open station of a job at its cutting once its machining is done (v37).
   withOnlyCuttingLeft(state);
-  const saw = state.equipment.find((item) => item.specId === 'tableSaw');
-  if (!saw) throw new Error('one saw is wanted');
-  saw.takenBy = 'staff-1';
+  planPlaces(state);
   return state;
 }
 
-/** Two jobs at their cutting stage with one saw between them, played two minutes so the engine has
- *  put every man at his own station: the two men who cannot have the saw stand at its one waiting
- *  cell, which is where two marks would be drawn on top of each other. */
-function twoJobsAtOneSaw(): GameState {
-  let state = sixJoinersOnSheetWork({ saws: 1 });
-  const [first, second] = state.jobs;
-  if (!first || !second) throw new Error('two jobs are wanted');
-  state = act(state, { type: 'ADD_TO_JOB', jobId: first.id, workerId: 'staff-3' });
-  state = act(state, { type: 'ADD_TO_JOB', jobId: second.id, workerId: 'staff-4' });
-  const keep = [first.id, second.id];
-  state.jobs = state.jobs.filter((job) => keep.includes(job.id));
-  for (const worker of state.workers) {
-    if (worker.jobId !== null && !keep.includes(worker.jobId)) worker.jobId = null;
+/** So many men taken off their jobs and put on one standing contract whose rack has no sheets
+ *  for it: every one of them stands at the canteen door with the contract's mark, which is one
+ *  cell and one point over the hall for all of them [PIOTR, 22.09] (CLAUDE.md T24 2.3). Until v52
+ *  the men with no place at a machine shared its waiting cell, or the home cell of one bench; from
+ *  v52 each has his own place at his bench (CLAUDE.md T25 2.6), and the door is where marks still
+ *  meet. */
+function atTheDoor(men: string[]): GameState {
+  let state = sixJoinersOnSheetWork({ saws: 1, sawVariant: 'budget' });
+  const contract = drawContract(state);
+  contract.pieceId = 'cutSheetPack';
+  contract.status = 'offered';
+  state.contracts = [contract];
+  state = act(state, { type: 'ACCEPT_CONTRACT', contractId: contract.id });
+  for (const who of men) {
+    state = act(state, { type: 'ASSIGN_CONTRACT', contractId: contract.id, workerId: who, on: true });
   }
-  for (const job of state.jobs) {
-    job.labourRemaining = job.labourValue * 0.95;
-    job.stageLabour = {};
-  }
-  // The saw is the one open station of a job at its cutting once its machining is done (v37).
-  withOnlyCuttingLeft(state);
+  state.stock.sheets = 0;
   return runClock(state, 2);
 }
 
-/** Six jobs at their cutting stage with one saw between them: one man has it and the rest stand at
- *  its one waiting cell, which is three and more marks over one point of the hall. Until Turn 23
- *  the third mark of this test was found at the canteen door, where every man with nothing to do
- *  used to stand; from tonight a man nobody has put on anything waits at his own bench instead
- *  (CLAUDE.md T23 2.1), so a queue at a machine is where marks still meet, which is the case
- *  CLAUDE.md T22 2.5 names in its own words: "two marks over two men at one machine". */
+/** Two men at the door: two marks over one cell. */
+function twoJobsAtOneSaw(): GameState {
+  return atTheDoor(['staff-2', 'staff-3']);
+}
+
+/** Three men at the door: three marks over one point of the hall, the case CLAUDE.md T22 2.5
+ *  names in its own words ("two marks over two men at one machine"). */
 function threeJobsAtOneSaw(): GameState {
-  const state = sixJoinersOnSheetWork({ saws: 1 });
-  for (const job of state.jobs) {
-    job.labourRemaining = job.labourValue * 0.95;
-    job.stageLabour = {};
-  }
-  // The saw is the one open station of a job at its cutting once its machining is done (v37).
-  withOnlyCuttingLeft(state);
-  return runClock(state, 2);
+  return atTheDoor(['staff-2', 'staff-3', 'staff-4']);
 }
 
 /** The mark drawn over one man, or '' when the hall drew him none. */
@@ -115,12 +104,12 @@ function markOver(svg: string, figure: string): string {
 
 describe('a mark only where something is wrong (CLAUDE.md T22 2.5)', () => {
   it('draws the disc with its exclamation over each of the five things the player can put right', () => {
-    const waiting = queueAtTheSaw();
+    const waiting = noPlaceAtTheSaw();
     const svg = renderHall(waiting);
-    // Every man of the queue is waiting for the machine (v43).
+    // Every man the saw has no place for says so (CLAUDE.md T25 2.3).
     for (const [who, key, words] of [
-      ['worker-staff-2', 'waitingForMachine', 'waiting for the saw'],
-      ['worker-staff-3', 'waitingForMachine', 'waiting for the saw'],
+      ['worker-staff-2', 'noPlace', 'no place at the saw'],
+      ['worker-staff-3', 'noPlace', 'no place at the saw'],
     ] as const) {
       const mark = markOver(svg, who);
       expect(mark, who).toContain(`data-bubble="${key}"`);
@@ -137,19 +126,24 @@ describe('a mark only where something is wrong (CLAUDE.md T22 2.5)', () => {
     expect(dry).toContain(`<div class="bubble">no sheets for ${job.name}</div>`);
     // And a man on no job at all. With no production manager on duty nobody takes one by himself,
     // so he is waiting for the boss's click and the mark says so (CLAUDE.md T23 2.1).
-    const idle = markOver(renderHall(twoJobsAtOneSaw()), 'worker-staff-5');
+    const loose = twoJobsAtOneSaw();
+    const five = loose.jobs.find((entry) => entry.assignees.includes('staff-5'));
+    if (five) five.assignees = five.assignees.filter((who) => who !== 'staff-5');
+    const man = loose.workers.find((worker) => worker.id === 'staff-5');
+    if (man) man.jobId = null;
+    const idle = markOver(renderHall(loose), 'worker-staff-5');
     expect(idle).toContain('data-bubble="waitingForBoss"');
     expect(idle).toContain('<div class="bubble">waiting for the boss</div>');
   });
 
   it('draws nothing at all over a man who is working', () => {
-    const state = queueAtTheSaw();
+    const state = noPlaceAtTheSaw();
     expect(bubbleFor(state, 'staff-1')).toBeNull();
     expect(markOver(renderHall(state), 'worker-staff-1')).toBe('');
   });
 
   it('draws nothing at all over a helper sweeping the floor', () => {
-    const state = queueAtTheSaw();
+    const state = noPlaceAtTheSaw();
     const worker = state.workers.find((entry) => entry.id === 'staff-4');
     if (!worker) throw new Error('a man is wanted');
     worker.jobId = null;
@@ -203,24 +197,25 @@ describe('two marks over one cell (CLAUDE.md T22 2.5)', () => {
   it('stands them side by side and never one on top of the other', () => {
     const state = twoJobsAtOneSaw();
     const svg = renderHall(state);
-    // Two men off two jobs at the one saw's waiting cell: the same cell, so the same point over the
-    // hall, and the second mark steps aside.
+    // Two men on a contract with no sheets, at the canteen door: the same cell, so the same point
+    // over the hall, and the second mark steps aside.
     const first = groupOf(svg, 'worker-staff-2');
     const second = groupOf(svg, 'worker-staff-3');
-    expect(first).toContain('data-cell="5,2"');
-    expect(second).toContain('data-cell="5,2"');
+    const cellOf = (group: string): string => group.match(/data-cell="([^"]*)"/)?.[1] ?? '';
+    expect(cellOf(first)).not.toBe('');
+    expect(cellOf(second)).toBe(cellOf(first));
     expect(markOver(svg, 'worker-staff-2')).toContain('data-bubble-for="staff-2">');
     expect(markOver(svg, 'worker-staff-3')).toContain('transform="translate(7,0)"');
   });
 
   it('steps the third mark over one cell twice as far', () => {
-    // Three men off three jobs and one saw between them: one man has it and the other two stand at
-    // its one waiting cell, which is three marks over one point of the hall counting the man at
-    // the saw itself. The first is where it is, the second steps aside by `step` and the third by
-    // twice it, and no two discs are ever drawn on top of each other (CLAUDE.md T22 2.5).
+    // Three men on a contract with no sheets, at the canteen door: three marks over one point of
+    // the hall. The first is where it is, the second steps aside by `step` and
+    // the third by twice it, and no two discs are ever drawn on top of each other
+    // (CLAUDE.md T22 2.5).
     const svg = renderHall(threeJobsAtOneSaw());
     // Read it off the hall itself rather than off three names: every figure group carries the cell
-    // it stands on, so the queue is whichever men the engine put at the saw's one waiting cell.
+    // it stands on, so the three are whichever men the engine stood on that one cell.
     const marks = new Map<string, string[]>();
     for (const piece of svg.split('data-figure="').slice(1)) {
       const cell = piece.match(/data-cell="([^"]*)"/)?.[1] ?? '';
@@ -235,7 +230,7 @@ describe('two marks over one cell (CLAUDE.md T22 2.5)', () => {
   });
 
   it('hangs every disc over the head of whichever man was drawn', () => {
-    const svg = renderHall(queueAtTheSaw());
+    const svg = renderHall(noPlaceAtTheSaw());
     const mark = markOver(svg, 'worker-staff-2');
     // The capsule's own crown, six pixels of gap, the tail and then the disc: the tail's point is
     // over his head and the disc is over the tail.
@@ -249,9 +244,9 @@ describe('two marks over one cell (CLAUDE.md T22 2.5)', () => {
 
 describe('the words on the hover (CLAUDE.md T22 2.5)', () => {
   it('keeps the paper in the DOM beside the disc and lets the stylesheet bring it up', () => {
-    const mark = markOver(renderHall(queueAtTheSaw()), 'worker-staff-2');
+    const mark = markOver(renderHall(noPlaceAtTheSaw()), 'worker-staff-2');
     expect(mark).toContain('class="mark-line"');
-    expect(mark).toContain('<div class="bubble">waiting for the saw</div>');
+    expect(mark).toContain('<div class="bubble">no place at the saw</div>');
     // Hidden until the pointer is on the figure, and the figure group is where the rule hangs, so
     // pointing at the disc and pointing at the man are the one hover. No JavaScript at all.
     expect(ruleBody('.mark-line')).toContain('visibility: hidden');
@@ -259,23 +254,23 @@ describe('the words on the hover (CLAUDE.md T22 2.5)', () => {
   });
 
   it('lets the disc be pointed at and the paper eat nothing', () => {
-    const mark = markOver(renderHall(queueAtTheSaw()), 'worker-staff-2');
+    const mark = markOver(renderHall(noPlaceAtTheSaw()), 'worker-staff-2');
     // The disc takes the mouse; the paper takes none, so it cannot eat a click meant for the hall.
     expect(ruleBody('.mark')).toContain('pointer-events: auto');
     expect(mark).toContain('pointer-events="none"');
     expect(mark).toContain('overflow="visible"');
     // The hover line of Turn 11 is still the group's own title and is not the mark's.
-    const group = groupOf(renderHall(queueAtTheSaw()), 'worker-staff-2');
+    const group = groupOf(renderHall(noPlaceAtTheSaw()), 'worker-staff-2');
     expect(group).toContain('<title>');
     expect(mark).not.toContain('data-character');
   });
 
   it('draws the discs and the words at x10 and x30, where the old paper bubbles came down', () => {
     for (const speed of [1, 4, 10, 30] as const) {
-      const fast = act(queueAtTheSaw(), { type: 'SET_SPEED', speed });
+      const fast = act(noPlaceAtTheSaw(), { type: 'SET_SPEED', speed });
       const mark = markOver(renderHall(fast), 'worker-staff-2');
       expect(mark, String(speed)).toContain('class="mark-disc"');
-      expect(mark, String(speed)).toContain('<div class="bubble">waiting for the saw</div>');
+      expect(mark, String(speed)).toContain('<div class="bubble">no place at the saw</div>');
     }
   });
 });

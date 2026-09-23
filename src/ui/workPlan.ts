@@ -6,6 +6,7 @@ import { formatCalendarDay, workPlan } from '../engine/index';
 import type { GameState, Job, PlanRow, WorkPlan } from '../engine/index';
 // Straight off their own module, not round the public API, which Turn 13 froze (REPORT-T13 10).
 import { canTakeOver, ownerTookOver } from '../engine/jobs';
+import { placesSummary } from '../engine/production';
 import { renderContractsTab } from './contracts';
 import {
   callsLine,
@@ -206,6 +207,15 @@ function crewColumn(state: GameState): string {
   return `<div class="card" data-plan-crew-column><h3>The crew</h3>${rows}</div>`;
 }
 
+/** The one line over the jobs: who is working and who the hall has no place for, off the day plan
+ *  the figures and the cards read (CLAUDE.md T25 2.8). In the hint's own class, and in the warn red
+ *  the rest of the game warns in while anybody has no place. */
+function placesHtml(state: GameState): string {
+  const line = placesSummary(state);
+  const standing = [state.owner, ...state.workers].some((man) => !man.working && man.noPlaceFor !== '');
+  return `<p class="hint${standing ? ' warn' : ''}" data-plan-places>${escapeHtml(line)}</p>`;
+}
+
 function jobsTab(state: GameState, assignOpen: string | null): string {
   const plan = workPlan(state);
   // The contract bar of v28 has left this tab: its chips and its button are in Running, on the
@@ -237,6 +247,7 @@ function jobsTab(state: GameState, assignOpen: string | null): string {
     'started and still be on time. The axis is working days: Monday follows Friday and no ' +
     'deadline falls at a weekend.</p>' +
     crewColumn(state) +
+    placesHtml(state) +
     `<div class="plan">${scaleHtml(plan)}${rows}</div>`
   );
 }

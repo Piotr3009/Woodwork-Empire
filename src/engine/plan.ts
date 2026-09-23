@@ -196,7 +196,7 @@ function rowFor(state: GameState, job: Job): PlanRow {
   // The bar is as long as the work in it, from the day it was picked up. Started, its right edge
   // is the projected end and never the deadline: now plus what is left at this rate, which is the
   // same thing as the length of the work plus every minute the job's clock did not move. An hour
-  // waiting for the saw stretches it by an hour and the end walks towards DL
+  // with no place at the saw stretches it by an hour and the end walks towards DL
   // (PIOTR, 15.09; CLAUDE.md T11 3.3).
   const to = notStarted
     ? from + length

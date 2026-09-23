@@ -167,9 +167,10 @@ describe("the boss's day meter", () => {
     const state = withScriptedDay([['workshop', 120]]);
     state.owner.idleMinutes = 90;
     state.owner.idleByReason = {
-      noMachine: 40,
+      noPlace: 40,
       noMaterial: 20,
       noCompressor: 0,
+      hallStopped: 0,
       nothingAssigned: 20,
       officeEmpty: 10,
     };
@@ -187,13 +188,14 @@ describe("the boss's day meter", () => {
     expect(html).not.toContain('seg-idle" data-band');
   });
 
-  it('lists the five reasons he stood on the same plate as the bands, with their minutes', () => {
+  it('lists the six reasons he stood on the same plate as the bands, with their minutes', () => {
     const state = withScriptedDay([['workshop', 120]]);
     state.owner.idleMinutes = 91;
     state.owner.idleByReason = {
-      noMachine: 41,
+      noPlace: 41,
       noMaterial: 20,
       noCompressor: 0,
+      hallStopped: 0,
       nothingAssigned: 20,
       officeEmpty: 10,
     };
@@ -232,7 +234,7 @@ describe("the boss's day meter", () => {
 
 describe('the efficiency number next to the clock', () => {
   it('is one live number, worked over possible, in the clock block', () => {
-    const state = runClock(withOnlyCuttingLeft(twoMenOnSheetWork({ saws: 1 })), 200);
+    const state = runClock(withOnlyCuttingLeft(twoMenOnSheetWork({ saws: 1, sawVariant: 'budget' })), 200);
     const html = renderTopbar(state, 'hall');
     const clock = parse(html).querySelector('.clock-block');
     const number = clock?.querySelector('details.efficiency > summary');
@@ -242,8 +244,8 @@ describe('the efficiency number next to the clock', () => {
     expect(workshopEfficiency(state).percent).toBe(50);
   });
 
-  it('opens on a click, with no handler, on to the plate of the four lines', () => {
-    const state = runClock(withOnlyCuttingLeft(twoMenOnSheetWork({ saws: 1 })), 200);
+  it('opens on a click, with no handler, on to the plate of the lost minutes lines', () => {
+    const state = runClock(withOnlyCuttingLeft(twoMenOnSheetWork({ saws: 1, sawVariant: 'budget' })), 200);
     const page = parse(renderTopbar(state, 'hall'));
     const details = page.querySelector('details.efficiency');
     expect(details?.querySelector('summary')?.hasAttribute('data-do')).toBe(false);
@@ -256,9 +258,10 @@ describe('the efficiency number next to the clock', () => {
     for (const cause of EFFICIENCY_CAUSES) {
       expect(plate?.textContent, cause.id).toContain(cause.label);
     }
-    // Each line is its share of the lost minutes: the man waiting for the saw is all of it.
-    const waiting = lines.find((line) => line.getAttribute('data-cause') === 'noMachine');
-    expect(waiting?.textContent).toBe('No machine free100%');
+    // Each line is its share of the lost minutes: the man the budget saw has no place for is all
+    // of it (CLAUDE.md T25 2.3).
+    const waiting = lines.find((line) => line.getAttribute('data-cause') === 'noPlace');
+    expect(waiting?.textContent).toBe('No place100%');
     expect(plate?.textContent).toContain('200 min worked of 400 min, 200 min lost');
     // A summary click toggles a details element in the browser itself; here in jsdom too.
     details?.querySelector('summary')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
@@ -332,7 +335,7 @@ describe('the plate at the top of the day end summary', () => {
       labourValue: 0,
       workMinutes: 0,
       dayLog: state.owner.dayLog,
-      efficiency: { possible: 0, worked: 0, lost: { noPeople: 0, noMachine: 0, noMaterial: 0, ownerAway: 0 } },
+      efficiency: { possible: 0, worked: 0, lost: { noPeople: 0, noPlace: 0, noMaterial: 0, hallStopped: 0, ownerAway: 0 } },
       nightMinutes: 0,
       paidHours: 0,
       expressUplift: 0,

@@ -31,7 +31,7 @@ import {
   serviceDueOn,
   serviceIsDue,
   benchOf,
-  benchPlacesOf,
+  placesOf,
   hallHasABench,
   bagsExist,
   dustBand,
@@ -40,17 +40,16 @@ import {
   extractorBreakdownChance,
   countOf,
   has,
-  bestOutputFactor,
-  claimMachine,
+  classPaceOf,
+  hallPace,
   gateCheck,
   hasGate,
-  machineOutputFactor,
-  outputFactorOf,
-  variantFor,
+  paceOf,
 } from '../../src/engine/machines';
 import { canBuy } from '../../src/engine/game';
 import { startProductionCheck } from '../../src/engine/jobs';
-import { STATION_NO_BENCH, tick } from '../../src/engine/index';
+import { STATION_DOOR, STATION_HOME, tick } from '../../src/engine/index';
+import { BENCHLESS_HALL } from '../../src/engine/jobs';
 import type { Equipment, GameEvent, GameState } from '../../src/engine/index';
 import { hallProblems, renderHall } from '../../src/render/hall';
 import {
@@ -134,9 +133,9 @@ describe('the automatic gate (CLAUDE.md T13 3.11)', () => {
     const state = shop();
     const saw = state.equipment.find((item) => item.id === 'kit-saw');
     if (!saw) throw new Error('no saw');
-    const base = variantFor(saw)?.outputFactor ?? 0;
+    const base = classPaceOf(saw);
     expect(base).toBe(1.05);
-    expect(outputFactorOf(state, saw)).toBe(base);
+    expect(paceOf(state, saw)).toBe(base);
     expect(hasGate(state, saw)).toBe(false);
     // Fitted through the action, which pays for it (game.ts, phase A) and marks the machine.
     const fitted = act(state, { type: 'BUY_GATE', equipmentId: 'kit-saw' });
@@ -145,13 +144,13 @@ describe('the automatic gate (CLAUDE.md T13 3.11)', () => {
     expect(hasGate(fitted, gated)).toBe(true);
     expect(fitted.cash).toBe(state.cash - GATE_PRICE);
     expect(GATE_OUTPUT_BONUS).toBe(0.02);
-    expect(outputFactorOf(fitted, gated)).toBe(1.071);
-    // The projection and the board read the same factor as the man on it (CLAUDE.md T7 3.1).
-    expect(bestOutputFactor(fitted, 'tableSaw')).toBe(1.071);
-    expect(machineOutputFactor(fitted, 'sheet')).toBe(1.071);
-    // A second saw of the same class without a gate is the one nobody prefers.
+    expect(paceOf(fitted, gated)).toBe(1.071);
+    // The projection and the board read the same pace as the man on it (CLAUDE.md T7 3.1).
+    expect(hallPace(fitted, 'tableSaw')).toBe(1.071);
+    // A second saw of the same class without a gate leaves the hall's pace where the gated one
+    // put it: the pace is the best of the family, whichever saw a man is at (CLAUDE.md T25 2.4).
     placeEquipment(fitted, 'tableSaw', { variantId: 'standard', x: 10, y: 1, id: 'kit-saw-2' });
-    expect(claimMachine(fitted, 'owner', 'tableSaw')?.id).toBe('kit-saw');
+    expect(hallPace(fitted, 'tableSaw')).toBe(1.071);
   });
 
   it('is refused on a machine with no extraction demand, twice on one machine, and without the cash', () => {
@@ -254,7 +253,9 @@ describe('dust', () => {
         monthMinutes: 0,
         monthDaysOff: 0,
         idleMinutes: 0,
-        idleByReason: { waitingForBoss: 0, noMachine: 0, noMaterial: 0 },
+        idleByReason: { waitingForBoss: 0, noPlace: 0, noMaterial: 0, noCompressor: 0, hallStopped: 0 },
+        working: false,
+        noPlaceFor: '',
         accidents: 0,
         anchorX: 0,
         anchorY: 4,
@@ -304,7 +305,9 @@ describe('dust', () => {
       monthMinutes: 0,
       monthDaysOff: 0,
       idleMinutes: 0,
-      idleByReason: { waitingForBoss: 0, noMachine: 0, noMaterial: 0 },
+      idleByReason: { waitingForBoss: 0, noPlace: 0, noMaterial: 0, noCompressor: 0, hallStopped: 0 },
+      working: false,
+      noPlaceFor: '',
       accidents: 0,
       anchorX: 0,
       anchorY: 4,
@@ -366,7 +369,9 @@ describe('dust', () => {
         monthMinutes: 0,
         monthDaysOff: 0,
         idleMinutes: 0,
-        idleByReason: { waitingForBoss: 0, noMachine: 0, noMaterial: 0 },
+        idleByReason: { waitingForBoss: 0, noPlace: 0, noMaterial: 0, noCompressor: 0, hallStopped: 0 },
+        working: false,
+        noPlaceFor: '',
         accidents: 0,
         anchorX: 0,
         anchorY: 4,
@@ -485,9 +490,9 @@ describe('no bench in the hall', () => {
     const before = firstJob(state).labourRemaining;
     state = tick(state, 60);
     expect(firstJob(state).labourRemaining).toBe(before);
-    expect(firstJob(state).blockedBy).toBe('no bench');
+    expect(firstJob(state).blockedBy).toBe(BENCHLESS_HALL);
     // The extraction comes first in the list, so the bench is the next thing it names.
-    expect(startProductionCheck(state, firstJob(state)).reason).toBe('no bench');
+    expect(startProductionCheck(state, firstJob(state)).reason).toBe(BENCHLESS_HALL);
     const bought = tick(buyNow(state, 'workbench'), 10);
     expect(firstJob(bought).labourRemaining).toBeLessThan(before);
     expect(firstJob(bought).blockedBy).toBe('');
@@ -534,7 +539,7 @@ describe('no bench in the hall', () => {
     // (CLAUDE.md T7 3.1, T23 2.17, T24 2.2).
     const bench = state.equipment.find((item) => item.specId === 'workbench');
     if (!bench) throw new Error('one bench wanted');
-    expect(benchPlacesOf(bench)).toBe(2);
+    expect(placesOf(bench)).toBe(2);
     expect(benchOf(state, joiner.id)?.id ?? null).toBe(bench.id);
     expect(benchOf(state, 'owner')?.id ?? null).toBe(bench.id);
     // The owner is put on the second job and the joiner on the first, each at his own place at
@@ -573,9 +578,11 @@ describe('no bench in the hall', () => {
     waiting.stage = 'ready';
     state.equipment = state.equipment.filter((item) => item.specId !== 'workbench');
     state = tick(state, 1);
-    expect(state.workers[0]?.station).toBe(STATION_NO_BENCH);
-    expect(state.owner.station).toBe(STATION_NO_BENCH);
-    expect(renderHall(state)).toContain('no bench');
+    // The joiner has no bench of his own at all and stands at the canteen door; the owner's job is
+    // stopped by the hall, and he stands at his own home cell (CLAUDE.md T4 3.4, T25 2.3).
+    expect(state.workers[0]?.station).toBe(STATION_DOOR);
+    expect(state.owner.station).toBe(STATION_HOME);
+    expect(renderHall(state)).toContain('the canteen door');
   });
 });
 

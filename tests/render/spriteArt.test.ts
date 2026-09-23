@@ -46,8 +46,8 @@ describe('an object with a file is a picture, not a box', () => {
   it('takes the name off the picture and leaves it in the tooltip', () => {
     const svg = hall('pro');
     // The workbench has a file, so its name is a title and not text over the art.
-    expect(svg).toContain('<title>Workbench (free). One per worker,');
-    expect(svg).not.toContain('>Workbench (free)<');
+    expect(svg).toContain('<title>Workbench. Free. One per worker,');
+    expect(svg).not.toContain('>Workbench<');
     // The cheap shelving has none, so it keeps its label.
     expect(svg).toContain('>Sheet rack: 0 / 50<');
   });

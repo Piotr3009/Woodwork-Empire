@@ -1,6 +1,7 @@
 // Machine families and the classes a family can be bought as (CLAUDE.md T3 3.5).
 
 import { describe, expect, it } from 'vitest';
+import { classPaceOf, hallPace } from '../../src/engine/machines';
 import {
   CLASS_BADGE,
   CLASS_LADDER_FAMILIES,
@@ -146,7 +147,7 @@ describe('every catalogue line is a family', () => {
     expect(findSpec('thicknesser')?.variants).toHaveLength(5);
     expect(findSpec('airDryer')?.variants).toHaveLength(1);
     expect(findSpec('airDryer')?.variants[0]?.id).toBe(STANDARD_VARIANT);
-    expect(findSpec('airDryer')?.variants[0]?.outputFactor).toBe(1);
+    expect(classPaceOf({ specId: 'airDryer', variantId: STANDARD_VARIANT })).toBe(1);
   });
 
   it('gives the extractor and the compressor the five classes of Turn 10', () => {
@@ -262,9 +263,10 @@ describe('what a class of saw does to the work', () => {
     expect(stageSpeed(used, firstJob(used), 'cutting').speed).toBeCloseTo(0.95, 10);
     expect(minutesRemainingFor(used, firstJob(used), 1)).toBeCloseTo(minutesWithSaw(0.95), 6);
     const industrial = withSaw('industrial');
-    expect(stageSpeed(industrial, firstJob(industrial), 'cutting').speed).toBeCloseTo(1.3, 10);
+    // The industrial class's pace, 1.12 from v52 (CLAUDE.md T25 2.4).
+    expect(stageSpeed(industrial, firstJob(industrial), 'cutting').speed).toBeCloseTo(1.12, 10);
     expect(minutesRemainingFor(industrial, firstJob(industrial), 1)).toBeCloseTo(
-      minutesWithSaw(1.3),
+      minutesWithSaw(1.12),
       6,
     );
     // The assembly of the same job is the bench's business and the saw never touches it.
@@ -274,14 +276,34 @@ describe('what a class of saw does to the work', () => {
   it('counts only the better of two saws, not both', () => {
     const state = withSaw('used');
     placeEquipment(state, 'tableSaw', { variantId: 'pro', x: 10, y: 8 });
-    expect(stageSpeed(state, firstJob(state), 'cutting').speed).toBeCloseTo(1.15, 10);
+    // The pro saw's 1.08 is the hall's pace, whichever saw the man is at (CLAUDE.md T25 2.4).
+    expect(stageSpeed(state, firstJob(state), 'cutting').speed).toBeCloseTo(1.08, 10);
+  });
+
+  it('cuts at the industrial saw s 1.12 with a used saw beside it, and at 0.95 while it is down', () => {
+    // The shop cuts on the good saw and the old one takes the overflow: the pace is the hall's,
+    // the best class standing unbroken and not away for its service [PIOTR, 21.09]
+    // (CLAUDE.md T25 2.4).
+    const state = withSaw('used');
+    placeEquipment(state, 'tableSaw', { variantId: 'industrial', x: 10, y: 8, id: 'kit-saw-good' });
+    expect(hallPace(state, 'tableSaw')).toBe(1.12);
+    expect(stageSpeed(state, firstJob(state), 'cutting').speed).toBeCloseTo(1.12, 10);
+    const good = state.equipment.find((item) => item.id === 'kit-saw-good');
+    if (good === undefined) throw new Error('the industrial saw is wanted');
+    good.broken = true;
+    expect(hallPace(state, 'tableSaw')).toBe(0.95);
+    good.broken = false;
+    good.inServiceUntilDay = state.clock.day + 1;
+    expect(hallPace(state, 'tableSaw')).toBe(0.95);
+    good.inServiceUntilDay = null;
+    expect(hallPace(state, 'tableSaw')).toBe(1.12);
   });
 
   it('cuts a solid wood job too, and leaves its machining to the timber tools', () => {
     const state = withSaw('industrial');
     const table = { ...firstJob(state), materialKind: 'solidWood' as const };
     // Every job is cut on the saw (CLAUDE.md T7 3.1); only the machining takes the material.
-    expect(stageSpeed(state, table, 'cutting').speed).toBeCloseTo(1.3, 10);
+    expect(stageSpeed(state, table, 'cutting').speed).toBeCloseTo(1.12, 10);
     expect(stageSpeed(state, table, 'machining').byHand).toBe(true);
   });
 });

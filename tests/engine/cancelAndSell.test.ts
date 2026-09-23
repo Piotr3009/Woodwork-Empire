@@ -5,7 +5,7 @@
 import { describe, expect, it } from 'vitest';
 import { SALE_FRACTION, SALE_FRACTION_USED } from '../../src/engine/constants';
 import { canSell, salePriceFor } from '../../src/engine/index';
-import { freeBenches, releaseMachinesExcept } from '../../src/engine/machines';
+import { freeBenches, hallPlaces } from '../../src/engine/machines';
 import { nextWorkingDay } from '../../src/engine/clock';
 import { shoppingList } from '../../src/engine/orders';
 import { renderCatalogue } from '../../src/ui/catalogue';
@@ -50,6 +50,15 @@ function toDay(state: GameState, day: number, seen: GameEvent[] = []): GameState
     guard += 1;
   }
   return clearEvents(next, seen);
+}
+
+/** The same hall with the owner at the first place of a family, the way the day plan writes it on
+ *  him: working, and his station at the machine (CLAUDE.md T25 2.3, 2.6). */
+function ownerAtA(state: GameState, family: string): GameState {
+  const busy = structuredClone(state);
+  busy.owner.working = true;
+  busy.owner.station = `machine:${family}`;
+  return busy;
 }
 
 describe('cancelling an order', () => {
@@ -149,13 +158,8 @@ describe('selling a machine', () => {
     const bench = state.equipment.find((item) => item.specId === 'workbench');
     if (!saw || !bander || !bench) throw new Error('no kit');
     expect(canSell(state, saw.id).ok).toBe(true);
-    // Somebody is standing at it.
-    const busy: GameState = {
-      ...state,
-      equipment: state.equipment.map((item) =>
-        item.id === saw.id ? { ...item, takenBy: 'owner' } : item,
-      ),
-    };
+    // Somebody is at one of its places.
+    const busy = ownerAtA(state, 'tableSaw');
     expect(canSell(busy, saw.id).ok).toBe(false);
     expect(canSell(busy, saw.id).reason).toBe('Somebody is standing at it');
     // Broken.
@@ -186,9 +190,9 @@ describe('selling a machine', () => {
     const saw = state.equipment.find((item) => item.specId === 'tableSaw');
     if (!saw) throw new Error('no saw');
     state = act(state, { type: 'SELL_MACHINE', equipmentId: saw.id });
-    // The catalogue says so, and nobody can take it.
+    // The catalogue says so, and it has no places for anybody.
     expect(renderCatalogue(state, '', 'owned', null, 'all')).toContain('does no more work');
-    expect(state.equipment.find((item) => item.id === saw.id)?.takenBy).toBeNull();
+    expect(hallPlaces(state, 'tableSaw')).toBe(0);
   });
 });
 
@@ -221,12 +225,7 @@ describe('selling the bench (CLAUDE.md T19 2.8)', () => {
 
   it('refuses one somebody is working at, with the reason on the tile', () => {
     const { state, benchId } = withBench();
-    const busy: GameState = {
-      ...state,
-      equipment: state.equipment.map((item) =>
-        item.id === benchId ? { ...item, takenBy: 'owner' } : item,
-      ),
-    };
+    const busy = ownerAtA(state, 'workbench');
     expect(canSell(busy, benchId).ok).toBe(false);
     expect(canSell(busy, benchId).reason).toBe('Somebody is standing at it');
     const holder = document.createElement('div');
@@ -238,14 +237,12 @@ describe('selling the bench (CLAUDE.md T19 2.8)', () => {
 
   it('lets it go once the day has ended and nobody is standing at it any more', () => {
     const { state, benchId } = withBench();
-    // A man holds his bench from the first minute of a job to the last; he lets go of it when he
-    // is not at a job any more, which is what the end of the day does (CLAUDE.md T7 3.1).
-    const bench = state.equipment.find((item) => item.id === benchId);
-    if (!bench) throw new Error('no bench');
-    bench.takenBy = 'owner';
-    expect(canSell(state, benchId).ok).toBe(false);
-    releaseMachinesExcept(state, []);
-    expect(canSell(state, benchId).ok).toBe(true);
+    // A man is at a place of it while the day plan has him working there; when he is not at a job
+    // any more the plan writes him off it (CLAUDE.md T25 2.3).
+    const busy = ownerAtA(state, 'workbench');
+    expect(canSell(busy, benchId).ok).toBe(false);
+    busy.owner.working = false;
+    expect(canSell(busy, benchId).ok).toBe(true);
     const sold = act(state, { type: 'SELL_MACHINE', equipmentId: benchId });
     expect(sold.equipment.find((item) => item.id === benchId)?.soldOnDay).toBe(
       nextWorkingDay(sold.clock.day),

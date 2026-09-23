@@ -116,6 +116,15 @@ describe('who made it today', () => {
     );
   });
 
+  it('says the saw s family and the hall s best class, whichever saw the man is at', () => {
+    // An industrial saw bought beside the budget one: the owner may stand at either, and the hall
+    // cuts at 1.12 because the shop cuts on the good saw (CLAUDE.md T25 2.4).
+    const state = sawHall();
+    placeEquipment(state, 'tableSaw', { variantId: 'industrial', x: 12, y: 1, id: 'kit-saw-good' });
+    const made = workshopBreakdownToday(runClock(state, 5));
+    expect(made.men[0]?.words).toMatch(/^saw, industrial, \d+ min: your [\d.]+ times 1\.12$/);
+  });
+
   it('says what the hall was, in the words the sheet already has for it', () => {
     const made = workshopBreakdownToday(runClock(byHandHall(), 14));
     expect(made.hall?.main).toBe('Hall');
@@ -170,16 +179,18 @@ describe('the day fixtures Piotr sent, one minute in', () => {
     return state;
   }
 
-  it('gives the day 128 hall four rows and the figure the top bar carries', () => {
+  it('gives the day 128 hall one row, the owner s at the saw s one place, and the figure the top bar carries', () => {
+    // Four men on the kitchen at its cutting and a budget saw of one place: the owner cuts and the
+    // three joiners have no place at it, so they made nothing today and have no row (CLAUDE.md
+    // T25 2.3). Until v52 the bag of work sent them to the machining and the assembly.
     const state = runClock(load('tests/fixtures/day128-v25.woodwork.json'), 1);
     const made = workshopBreakdownToday(state);
-    expect(made.men).toHaveLength(4);
-    expect(made.men.map((row) => row.main)).toEqual([
-      'Piotr, cutting Small kitchen (6 units), commercial',
-      'Eddie, experienced joiner, machining Small kitchen (6 units), commercial',
-      'Pete, very experienced joiner, assembling Small kitchen (6 units), commercial',
-      'Callum, excellent joiner, assembling Small kitchen (6 units), commercial',
-    ]);
+    expect(made.men).toHaveLength(1);
+    expect(made.men.map((row) => row.main)).toEqual(['Piotr, cutting Small kitchen (6 units), commercial']);
+    // The why is the family and the class that sets the hall's pace for it, in place of the
+    // machine he stood at, and the figure after it is that pace: the budget class's 1.00 and the
+    // gate the save's saw carries, 2% on top (CLAUDE.md T13 3.11, T25 2.4).
+    expect(made.men[0]?.words).toMatch(/^saw, budget, \d+ min: your [\d.]+ times 1\.02$/);
     expect(made.total).toBe(workshopOutputToday(state));
     expect(made.hall?.words).toBe('clean, extraction working');
     expect(made.note).toBe('');

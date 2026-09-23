@@ -11,7 +11,7 @@ import {
   drawContract,
 } from '../../src/engine/contracts';
 import { roomDoorCell } from '../../src/engine/constants';
-import { STATION_NO_BENCH } from '../../src/engine/stations';
+import { STATION_DOOR } from '../../src/engine/stations';
 import { renderHall, stationCell } from '../../src/render/hall';
 import type { Contract, GameState, Worker } from '../../src/engine/index';
 import {
@@ -65,7 +65,9 @@ function joiner(id: string, name: string): Worker {
     monthMinutes: 0,
     monthDaysOff: 0,
     idleMinutes: 0,
-    idleByReason: { waitingForBoss: 0, noMachine: 0, noMaterial: 0 },
+    idleByReason: { waitingForBoss: 0, noPlace: 0, noMaterial: 0, noCompressor: 0, hallStopped: 0 },
+    working: false,
+    noPlaceFor: '',
     accidents: 0,
     anchorX: 6,
     anchorY: 6,
@@ -92,20 +94,20 @@ function dryContract(): { state: GameState; contract: Contract; man: Worker } {
 }
 
 describe('the contract man with nothing to do, on the hall', () => {
-  it('stands on the canteen door cell, the one a man with no bench stands on', () => {
+  it('stands on the canteen door cell, the one a man with no bench of his own stands on', () => {
     const { state, man } = dryContract();
-    expect(man.station).toBe(STATION_NO_BENCH);
+    expect(man.station).toBe(STATION_DOOR);
     expect(stationCell(state, man.station, { x: man.anchorX, y: man.anchorY })).toMatchObject(
       roomDoorCell('canteen'),
     );
   });
 
-  it('carries the contract s name on his mark, and no saw is queued for', () => {
+  it('carries the contract s name on his mark, and no place at the saw', () => {
     const { state, contract, man } = dryContract();
     const mark = groupOf(renderHall(state), `worker-${man.id}`);
     expect(mark).toContain('data-bubble="noMaterial"');
     expect(mark).toContain(`<div class="bubble">no sheets for ${contract.name}</div>`);
-    expect(mark).not.toContain('waiting for the saw');
+    expect(mark).not.toContain('no place at the saw');
     expect(bubbleFor(state, man.id)?.text).toBe(`no sheets for ${contract.name}`);
   });
 });

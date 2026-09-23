@@ -5,24 +5,19 @@ import {
   STATION_IDLE,
   STATION_OFFICE,
   STATION_RACK,
-  benchCellsAt,
   itemAtCell,
   machineStation,
-  queueCellsAt,
+  placeCellsAt,
   standingCell,
   stationForTask,
   stationMachine,
-  stationWaitingFor,
   unloadLegAt,
   unloadStation,
   unloadTrips,
-  waitingStation,
 } from '../../src/engine/stations';
 import { footprintCells, isFree } from '../../src/engine/walk';
 import { placeEquipment } from '../helpers';
 import { SHEETS_PER_TRIP } from '../../src/engine/constants';
-import { stationForProduction } from '../../src/engine/production';
-import { OWNER } from '../../src/engine/machines';
 import { createTask } from '../../src/engine/tasks';
 import { tick } from '../../src/engine/index';
 import type { GameState } from '../../src/engine/index';
@@ -50,21 +45,20 @@ function atTheBench(): GameState {
 }
 
 describe('the station of a stage', () => {
-  it('reads a machine station and a waiting one back', () => {
+  it('reads a machine station back', () => {
     expect(stationMachine(machineStation('tableSaw'))).toBe('tableSaw');
     expect(stationMachine(STATION_BENCH)).toBeNull();
-    expect(stationWaitingFor(waitingStation('tableSaw'))).toBe('tableSaw');
-    expect(stationWaitingFor(machineStation('tableSaw'))).toBeNull();
   });
 
-  it('keeps a figure at the bench when the workshop has not bought the machine', () => {
-    // One minute of work is what puts him at a machine: until then he has taken nothing.
+  it('keeps a figure at his bench when the workshop has not bought the machine', () => {
+    // The job opens on its cutting, which is the saw the day 1 kit bought: a place at it.
     const state = tick(atTheBench(), 1);
-    const job = firstJob(state);
-    // The job opens on its cutting, which is the saw the day 1 kit bought.
-    expect(stationForProduction(state, OWNER, job)).toBe(machineStation('tableSaw'));
-    const bare = { ...state, equipment: [] };
-    expect(stationForProduction(bare, OWNER, job)).toBe(STATION_BENCH);
+    expect(state.owner.station).toBe(machineStation('tableSaw'));
+    // Without the saw the cutting is done by hand, at his bench, and wants no place
+    // (CLAUDE.md T7 3.6, T25 2.3).
+    const bare = atTheBench();
+    bare.equipment = bare.equipment.filter((item) => item.specId !== 'tableSaw');
+    expect(tick(bare, 1).owner.station).toBe(STATION_BENCH);
   });
 });
 
@@ -141,7 +135,8 @@ describe('where the owner stands', () => {
     const job = firstJob(state);
     job.labourRemaining = job.labourValue * 0.5;
     const assembling = tick(state, 1);
-    expect(assembling.owner.station).toBe(STATION_BENCH);
+    // At a place at the bench, a family with places like any other (CLAUDE.md T25 2.2).
+    expect(assembling.owner.station).toBe(machineStation('workbench'));
     // The edgebander comes out of a tool cabinet, so the machining is done at the bench too
     // (CLAUDE.md T6 3.5).
     job.labourRemaining = job.labourValue * 0.7;
@@ -186,7 +181,7 @@ describe('where the owner stands', () => {
   });
 });
 
-describe('a queue of men at one thing (CLAUDE.md T19 2.5)', () => {
+describe('the places at one thing (CLAUDE.md T19 2.5, T25 2.6)', () => {
   /** A hall with nothing in it but the one thing being asked about. */
   function only(specId: string, variantId = 'standard'): { state: GameState; item: ReturnType<typeof placeEquipment> } {
     const state = newGame({ difficulty: 'veryEasy' });
@@ -195,12 +190,11 @@ describe('a queue of men at one thing (CLAUDE.md T19 2.5)', () => {
     return { state, item: placeEquipment(state, specId, { variantId, x: 8, y: 4 }) };
   }
 
-  it('gives a machine the operator, then the waiting cell, then free cells along the same side', () => {
+  it('gives a machine the operator, then free cells along the same side', () => {
     const { state, item } = only('tableSaw');
-    const cells = queueCellsAt(state, item, 6);
+    const cells = placeCellsAt(state, item, 6);
     expect(cells).toHaveLength(6);
     expect(cells[0]).toEqual(standingCell(state, item, 'operator'));
-    expect(cells[1]).toEqual(standingCell(state, item, 'waiting'));
     // No two men in one place while the floor has room, and nobody standing on the saw.
     expect(new Set(cells.map((cell) => `${cell.x},${cell.y}`)).size).toBe(6);
     for (const cell of cells) {
@@ -208,8 +202,8 @@ describe('a queue of men at one thing (CLAUDE.md T19 2.5)', () => {
       expect(itemAtCell(state, cell)).toBeNull();
     }
     // As many as are asked for and not one more, and nothing at all for nobody.
-    expect(queueCellsAt(state, item, 0)).toEqual([]);
-    expect(queueCellsAt(state, item, 2)).toEqual(cells.slice(0, 2));
+    expect(placeCellsAt(state, item, 0)).toEqual([]);
+    expect(placeCellsAt(state, item, 2)).toEqual(cells.slice(0, 2));
   });
 
   it('gives a bench a row of places along its front, one to each of its own columns', () => {
@@ -218,10 +212,9 @@ describe('a queue of men at one thing (CLAUDE.md T19 2.5)', () => {
     // (CLAUDE.md T24 2.5).
     const { state, item } = only('workbench');
     const box = footprintCells(item);
-    const cells = benchCellsAt(state, item, 5);
+    const cells = placeCellsAt(state, item, 5);
     expect(cells).toHaveLength(5);
     expect(cells[0]).toEqual(standingCell(state, item, 'operator'));
-    expect(cells[1]).toEqual(standingCell(state, item, 'second'));
     // Every place is in front of the bench, and the first of them are its own columns in order.
     for (const cell of cells) expect(cell.y).toBeGreaterThanOrEqual(box.y + box.depth);
     for (let column = 0; column < box.width; column += 1) {
@@ -241,7 +234,7 @@ describe('a queue of men at one thing (CLAUDE.md T19 2.5)', () => {
       x: state.unit.widthCells - 2,
       y: state.unit.depthCells - 1,
     });
-    const cells = benchCellsAt(state, item, 8);
+    const cells = placeCellsAt(state, item, 8);
     expect(cells).toHaveLength(8);
     for (const cell of cells) expect(Number.isFinite(cell.x) && Number.isFinite(cell.y)).toBe(true);
   });

@@ -126,7 +126,7 @@ describe('the tile and the card are one function', () => {
     const card = parse(renderPerson(state, man.id, 'card'));
     const line = card.querySelector('[data-week="this week"]')?.textContent ?? '';
     expect(line).toContain('8 h idle');
-    expect(line).toContain('6 h of it waiting for the edgebander');
+    expect(line).toContain('6 h of it no place at the edgebander');
     expect(line).not.toContain('saw');
   });
 

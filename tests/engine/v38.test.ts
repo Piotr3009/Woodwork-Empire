@@ -5,6 +5,7 @@
 import { describe, expect, it } from 'vitest';
 import { JOINER_MONTHLY_WAGE, WORKER_RATES } from '../../src/engine/constants';
 import { homeCellOf } from '../../src/engine/staff';
+import { placeCellsAt } from '../../src/engine/stations';
 import { jobAssignControls } from '../../src/ui/jobCard';
 import { contractMen } from '../../src/engine/contracts';
 import { placeEquipment, sixJoinersOnSheetWork } from '../helpers';
@@ -17,7 +18,10 @@ describe('a joiner stands at the bench he has now', () => {
     // Every bench of the kit goes and an industrial one stands on the far side of the hall.
     state.equipment = state.equipment.filter((item) => item.specId !== 'workbench');
     const bench = placeEquipment(state, 'workbench', { variantId: 'industrial', x: 16, y: 7 });
-    expect(homeCellOf(state, man)).toEqual({ x: bench.anchorX, y: bench.anchorY });
+    // His own place at it, the first of its front row, from v52 (CLAUDE.md T25 2.6).
+    expect(homeCellOf(state, man)).toEqual(placeCellsAt(state, bench, 1)[0]);
+    const home = homeCellOf(state, man);
+    expect(Math.abs(home.x - bench.anchorX) + Math.abs(home.y - bench.anchorY)).toBeLessThanOrEqual(4);
     // With no bench at all the hiring day's anchor is still his place.
     state.equipment = state.equipment.filter((item) => item.specId !== 'workbench');
     expect(homeCellOf(state, man)).toEqual({ x: man.anchorX, y: man.anchorY });

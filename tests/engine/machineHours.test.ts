@@ -1,11 +1,12 @@
-// A machine is free or it is taken by one man, and its hours are the minutes somebody stood at
-// it. Nothing is a share of a capacity any more (CLAUDE.md T7 2 and 3.1).
+// A machine is a number of places, and its hours are the minutes men worked at them: an hour for
+// every hour a man works at one of its places (PIOTR, 21.09: "keep the hours"; CLAUDE.md T7 2,
+// T25 2.1 and section 6). Nothing is a share of a capacity.
 
 import { describe, expect, it } from 'vitest';
-import { SERVICE_INTERVAL_DAYS } from '../../src/engine/constants';
+import { MINUTES_PER_WORKING_DAY, SERVICE_INTERVAL_DAYS } from '../../src/engine/constants';
 import { EQUIPMENT_SPECS } from '../../src/engine/constants';
-import { OWNER, serviceIsDue } from '../../src/engine/machines';
-import { waitingStation } from '../../src/engine/stations';
+import { OWNER, menAtMachine, serviceIsDue } from '../../src/engine/machines';
+import { STATION_HOME } from '../../src/engine/stations';
 import type { Equipment, GameState } from '../../src/engine/index';
 import { tick } from '../../src/engine/index';
 import {
@@ -49,7 +50,7 @@ describe('the hours a machine gains', () => {
     const state = tick(oneManAtWork(), 60);
     // An hour of cutting is an hour on the saw, whole minutes, because he had it to himself.
     expect(machine(state, 'tableSaw').hoursUsed).toBeCloseTo(1, 4);
-    expect(machine(state, 'tableSaw').takenBy).toBe(OWNER);
+    expect(menAtMachine(state, machine(state, 'tableSaw'))).toEqual([OWNER]);
     // He is at the saw, so the edgebander in his cabinet and the compressor gained nothing.
     expect(machine(state, 'edgebander').hoursUsed).toBe(0);
     expect(machine(state, 'compressor').hoursUsed).toBe(0);
@@ -73,16 +74,17 @@ describe('the hours a machine gains', () => {
     job.labourRemaining = job.labourValue * 0.7;
     const worked = tick(state, 60);
     expect(machine(worked, 'tableSaw').hoursUsed).toBe(0);
-    expect(machine(worked, 'tableSaw').takenBy).toBeNull();
+    expect(menAtMachine(worked, machine(worked, 'tableSaw'))).toEqual([]);
     expect(machine(worked, 'edgebander').hoursUsed).toBeCloseTo(1, 4);
   });
 
-  it('never run on overnight: the hall starts every day with every machine free', () => {
+  it('never run on overnight: nobody is at a place before the day starts', () => {
     const state = tick(oneManAtWork(), 60);
-    expect(machine(state, 'tableSaw').takenBy).toBe(OWNER);
+    expect(menAtMachine(state, machine(state, 'tableSaw'))).toEqual([OWNER]);
     const tomorrow = nextDay(state);
     expect(tomorrow.clock.day).toBe(2);
-    for (const item of tomorrow.equipment) expect(item.takenBy, item.specId).toBeNull();
+    // What it booked is the rest of his day at it and not a minute of the night.
+    expect(machine(tomorrow, 'tableSaw').hoursUsed).toBeLessThanOrEqual((MINUTES_PER_WORKING_DAY + 60) / 60);
   });
 
   it('brings the service on by the calendar and by nothing else: six months from the purchase, run or not (v51)', () => {
@@ -100,27 +102,34 @@ describe('the hours a machine gains', () => {
   });
 });
 
-describe('one person per machine', () => {
-  it('gives the saw to one man an hour, and sends the other to his own next stage (v37)', () => {
-    const state = tick(twoMenOnSheetWork({ saws: 1 }), 60);
+describe('the places at a machine', () => {
+  it('has one place at a budget saw: the owner cuts and the joiner has none, and says so', () => {
+    const state = tick(twoMenOnSheetWork({ saws: 1, sawVariant: 'budget' }), 60);
     const saw = machine(state, 'tableSaw');
-    expect(saw.takenBy).toBe(OWNER);
+    expect(menAtMachine(state, saw)).toEqual([OWNER]);
     expect(saw.hoursUsed).toBeCloseTo(1, 4);
     const joiner = state.workers[0];
     if (!joiner) throw new Error('no joiner');
-    // He does not stand at the saw: the bag of work sends him to the machining of his own job,
-    // which the hall's edgebander or a pair of hands can do while the saw is busy (PIOTR, 20.09).
-    expect(joiner.station).not.toBe(waitingStation('tableSaw'));
+    // Nobody is sent to another stage of his own job to fill the gap: he stands at his home cell
+    // and says what he has no place at (PIOTR, 21.09; CLAUDE.md T25 2.2, 2.3).
+    expect(joiner.station).toBe(STATION_HOME);
+    expect(joiner.noPlaceFor).toBe('tableSaw');
     const his = state.jobs.find((job) => job.assignees[0] === joiner.id);
-    expect(his?.blockedBy).toBe('');
-    expect(his?.labourRemaining).toBeLessThan(his?.labourValue ?? 0);
-    expect(his?.stageLabour.machining ?? 0).toBeGreaterThan(0);
+    expect(his?.labourRemaining).toBe(his?.labourValue);
+    expect(joiner.idleByReason.noPlace).toBeGreaterThan(0);
   });
 
-  it('gives each man his own saw when there are two, and each gains its own hour', () => {
-    const worked = tick(twoMenOnSheetWork({ saws: 2 }), 60);
+  it('has two places at a standard saw, and books an hour for each man at them', () => {
+    const state = tick(twoMenOnSheetWork({ saws: 1, sawVariant: 'standard' }), 60);
+    const saw = machine(state, 'tableSaw');
+    expect(menAtMachine(state, saw)).toEqual([OWNER, state.workers[0]?.id]);
+    expect(saw.hoursUsed).toBeCloseTo(2, 4);
+  });
+
+  it('puts the second man at the second saw when the first has one place, each saw its own hour', () => {
+    const worked = tick(twoMenOnSheetWork({ saws: 2, sawVariant: 'budget' }), 60);
     const saws = worked.equipment.filter((item) => item.specId === 'tableSaw');
-    expect(saws.map((item) => item.takenBy).filter((who) => who !== null)).toHaveLength(2);
+    expect(saws.map((item) => menAtMachine(worked, item).length)).toEqual([1, 1]);
     for (const saw of saws) expect(saw.hoursUsed).toBeCloseTo(1, 4);
     const joiner = worked.workers[0];
     const working = worked.jobs.find((job) => job.assignees[0] === joiner?.id);
@@ -128,13 +137,12 @@ describe('one person per machine', () => {
     expect(working?.labourRemaining).toBeLessThan(working?.labourValue ?? 0);
   });
 
-  it('lets two men use a hand tool at once, because it is never taken off anybody', () => {
+  it('lets two men use a hand tool at once, because a tool out of the cabinet needs no place', () => {
     const state = twoMenOnSheetWork();
     for (const job of state.jobs) job.labourRemaining = job.labourValue * 0.7;
     const worked = tick(state, 60);
     // Both are machining at their benches, so the hand edgebander has two men's minutes on it.
     expect(machine(worked, 'edgebander').hoursUsed).toBeCloseTo(2, 4);
-    expect(machine(worked, 'edgebander').takenBy).toBeNull();
+    expect(menAtMachine(worked, machine(worked, 'edgebander'))).toEqual([]);
   });
 });
-

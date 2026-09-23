@@ -153,7 +153,7 @@ describe('what the waiting man says and what it costs him', () => {
     const stood = after.workers[0];
     expect(stood?.idleMinutes).toBeGreaterThanOrEqual(59);
     expect(stood?.idleByReason.waitingForBoss).toBe(stood?.idleMinutes);
-    expect(stood?.idleByReason.noMachine).toBe(0);
+    expect(stood?.idleByReason.noPlace).toBe(0);
     expect(stood?.idleByReason.noMaterial).toBe(0);
   });
 
