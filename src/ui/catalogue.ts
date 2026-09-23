@@ -40,6 +40,7 @@ import {
   connectCheck,
   hasCentralExtraction,
   pipeRunFor,
+  placesLine,
   wantsExtraction,
   orderSoftwareCheck,
   countOf,
@@ -566,6 +567,7 @@ export function ownedTile(
   item: Equipment,
   spec: EquipmentSpec,
   sellConfirm: string | null,
+  form: 'card' | 'tile' = 'tile',
 ): string {
   const variant = variantFor(item);
   const className = variant?.name ?? 'standard';
@@ -607,6 +609,9 @@ export function ownedTile(
     service,
     cabinetLine(state, item),
     ownedState(state, item),
+    // Its places and who is in them, the short form on the Owned tab's tile and the long one on
+    // the machine's own card (CLAUDE.md T25 2.5).
+    placesLine(state, item, form),
     pipeLine(state, item),
     airStateLine(state, item),
   ]

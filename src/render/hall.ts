@@ -41,6 +41,7 @@ import {
   itemStandsInTheHall,
   itemZone,
   menAtPlaces,
+  placesLine,
   sheetCapacityOf,
 } from '../engine/machines';
 import { machineInUse } from '../engine/game';
@@ -1459,23 +1460,17 @@ export function hallScene(state: GameState, options: HallOptions = {}): Scene {
     const serviceLine = !item.broken && serviceIsDue(item, state.clock.day) ? ' (service due)' : '';
     const rackLine =
       sheetCapacityOf(item) > 0 ? `: ${state.stock.sheets} / ${rackCapacity(state)}` : '';
-    const atThisBench =
-      spec.category === 'bench'
-        ? state.workers.find(
-            (worker) => worker.anchorX === item.anchorX && worker.anchorY === item.anchorY,
-          )
-        : undefined;
-    const benchLine =
-      spec.category !== 'bench' ? '' : atThisBench ? `: ${atThisBench.name}` : ' (free)';
     // A machine that wants a pipe and has none is not served: the hall says so under its name, in
     // the game's red, and never writes "connected" anywhere (CLAUDE.md T16 2.3).
     const unconnected = wantsExtraction(item) && !isConnected(state, item);
-    const name = `${spec.name}${bagLine}${serviceLine}${benchLine}${rackLine}`;
+    const name = `${spec.name}${bagLine}${serviceLine}${rackLine}`;
     // Pointing at the extractor reads the hall's store (CLAUDE.md T12 3.3).
+    // Its places and who is in them, off the day plan the figures stand by (CLAUDE.md T25 2.5).
+    const places = placesLine(state, item, 'card');
     const tooltip =
       item.specId === 'extractor' && store.exists
         ? `${name}. ${bagStoreLine(store)}. ${spec.effect}`
-        : `${name}${unconnected ? ', not connected' : ''}. ${spec.effect}`;
+        : `${name}${unconnected ? ', not connected' : ''}.${places === '' ? '' : ` ${places}.`} ${spec.effect}`;
     const fx = machineFx(state, item, spec);
     drawables.push({
       depth: depthKey(item.anchorX, item.anchorY),

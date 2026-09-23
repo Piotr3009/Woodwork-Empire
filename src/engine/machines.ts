@@ -85,7 +85,7 @@ import { stageOfMan } from './production';
 import { stageDoing } from './stages';
 import type { StagePlan } from './stages';
 import type { AirCheck } from './media';
-import { cubicMetres, trimmed } from './text';
+import { andList, cubicMetres, trimmed } from './text';
 import type {
   Equipment,
   EquipmentSpec,
@@ -406,6 +406,25 @@ export function menAtMachine(state: GameState, item: { id: string }): string[] {
     .filter((entry) => entry.item.id === item.id)
     .sort((a, b) => a.place - b.place)
     .map((entry) => entry.who);
+}
+
+/** A machine's places and who is in them this minute, read off the same day plan the figures on
+ *  the floor are (CLAUDE.md T25 2.5): on its card and its hover line `Places: 2 of 2 in use, Pete
+ *  and Eddie`, on the Owned tab's tile the short form `2 of 2 in use`, and `Free` on both while
+ *  nobody is at it. Empty for a thing nobody works at, and for a machine that has no places this
+ *  minute because it is broken, away for its service or sold: its card says which. */
+export function placesLine(state: GameState, item: Equipment, form: 'card' | 'tile'): string {
+  const places = placesOf(item);
+  if (places <= 0) return '';
+  if (!placedMachines(state, item.specId).some((entry) => entry.id === item.id)) return '';
+  const men = menAtMachine(state, item);
+  if (men.length === 0) return 'Free';
+  const count = `${men.length} of ${places} in use`;
+  if (form === 'tile') return count;
+  const names = men.map((who) =>
+    who === OWNER ? state.playerName : (state.workers.find((worker) => worker.id === who)?.name ?? who),
+  );
+  return `Places: ${count}, ${andList(names)}`;
 }
 
 /** The ids of every machine somebody is at this minute: what the extraction and the air are the

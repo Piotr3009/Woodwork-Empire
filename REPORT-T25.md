@@ -64,3 +64,14 @@ pace, because every hour at any saw ran at it. The `<why>` of a man's row on the
 bench card's `+5%/+8%/+12% pace`, the CNC tests on a budget CNC (pace 1.00, so the head's figures
 hold); new: a used and an industrial saw cut at 1.12 and at 0.95 while the good one is broken or
 away, and the `<why>` of the day 128 save and of a two saw hall.
+
+**T25-B3 2.5, who is at a machine.** One engine line, `placesLine(state, item, form)` in
+`machines.ts`, read off `menAtMachine`, which is the day plan's: `Places: 2 of 2 in use, Pete and
+Eddie` on the machine's own card (`renderMachineCard` draws `ownedTile` in its `card` form) and
+in its hover `<title>` on the hall, `2 of 2 in use` on the Owned tab's tile, `Free` on both while
+nobody is at it, nothing on a thing nobody works at and nothing on a broken, serviced or sold
+machine, whose card already says why it stands. The bench's old hover words (`Workbench (free)`,
+`Workbench: Ben`, read off a man's anchor cell and not off any plan) are deleted for it, so every
+family says its places the one way; the two render tests that read them are flipped.
+`andList` joins the names. `tests/ui/placesCard.test.ts` asserts the card, the tile and the hover
+of a two place saw with two men, one man, none, a broken saw and a fan.

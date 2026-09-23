@@ -33,3 +33,9 @@ export function cubicMetres(value: number, places = 1): string {
 export function metresBy(size: { width: number; depth: number }): string {
   return `${size.width} m by ${size.depth} m`;
 }
+
+/** Names in a sentence: `Pete`, `Pete and Eddie`, `Pete, Eddie and Ben`. */
+export function andList(names: readonly string[]): string {
+  if (names.length <= 1) return names.join('');
+  return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+}

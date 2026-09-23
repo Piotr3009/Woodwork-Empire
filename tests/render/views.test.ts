@@ -5,7 +5,8 @@ import { renderOffice } from '../../src/render/office';
 import { renderGameOver } from '../../src/ui/dayEnd';
 import { renderLaptop } from '../../src/ui/laptop';
 import { CLASS_BADGE, FINISHED_GOODS_LAYOUT } from '../../src/engine/constants';
-import { sheetCapacityOf } from '../../src/engine/machines';
+import { placesOf, sheetCapacityOf } from '../../src/engine/machines';
+import { machineStation } from '../../src/engine/stations';
 import { centreOf } from '../../src/render/iso';
 import type { GameState } from '../../src/engine/index';
 import { tick } from '../../src/engine/index';
@@ -320,44 +321,19 @@ describe('the placeholder art rules of 10.3', () => {
     expect(saw).toBeDefined();
   });
 
-  it('says whether a bench is free or who is at it', () => {
+  it('says whether a bench is free or who is at its places', () => {
+    // The bench's places and who is in them, off the day plan the figures stand by, the way every
+    // family's hover line says it (CLAUDE.md T25 2.5).
     const state = buyStartingKit(newGame());
-    expect(renderHall(state)).toContain('Workbench (free)');
+    expect(renderHall(state)).toContain('<title>Workbench. Free. ');
     const bench = state.equipment.find((item) => item.specId === 'workbench');
-    state.workers.push({
-      id: 'staff-1',
-      name: 'Ben',
-      role: 'joiner',
-      tier: 'novice',
-      rate: 0.6,
-      monthlyWage: 1950,
-      leavesOnDay: null,
-      startDay: 1,
-      jobId: null,
-      taskId: null,
-      minutesWorked: 0,
-      ordersToday: 0,
-    overtimeMinutes: 0,
-    overtimeMinutesWeek: 0,
-    overtimeDays: 0,
-    tiredOfOvertime: false,
-      station: 'idle',
-      productionMinutes: 0,
-      absentDaysRemaining: 0,
-      shift: 'day',
-      dayLog: [],
-      monthMinutes: 0,
-      monthDaysOff: 0,
-      idleMinutes: 0,
-      idleByReason: { waitingForBoss: 0, noPlace: 0, noMaterial: 0, noCompressor: 0, hallStopped: 0 },
-      working: false,
-      noPlaceFor: '',
-      accidents: 0,
-      anchorX: bench?.anchorX ?? 0,
-      anchorY: bench?.anchorY ?? 0,
-    });
-    expect(renderHall(state)).toContain('Workbench: Ben');
-    expect(renderHall(state)).not.toContain('Workbench (free)');
+    if (bench === undefined) throw new Error('a bench is wanted');
+    // What the plan writes on the owner when his job's stage is at the bench.
+    state.owner.working = true;
+    state.owner.station = machineStation('workbench');
+    const places = placesOf(bench);
+    expect(renderHall(state)).toContain(`<title>Workbench. Places: 1 of ${places} in use, ${state.playerName}. `);
+    expect(renderHall(state)).not.toContain('Workbench. Free.');
   });
 
   it('gives the rooms the one line tooltip 10.1 asks for', () => {
