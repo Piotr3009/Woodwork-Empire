@@ -316,7 +316,6 @@ export {
   labourPerMinute,
   minutesLeftFor,
   stageDone,
-  stageFor,
   stageLabel,
   stageLeft,
   stageMinutes,
@@ -446,20 +445,21 @@ export {
   bagsOf,
   dustOutputOf,
   cabinetTools,
-  claimMachine,
   countOf,
   floorMachines,
   footprintOf,
-  freeMachines,
-  heldMachine,
-  heldMachines,
+  hallPlaces,
   itemIsHeavy,
   itemStandsInTheHall,
   isHeavy,
   isSellableFamily,
   benchOf,
   benchPlaces,
-  benchPlacesOf,
+  machineForPlace,
+  machinesAtWork,
+  menAtMachine,
+  menAtPlaces,
+  placesOf,
   isServiced,
   isSold,
   salePriceFor,
@@ -524,15 +524,16 @@ export {
   weeksPastLife,
 } from './machines';
 
-// Who is standing at which machine (CLAUDE.md T7 3.1)
+// Who has a place at which machine (CLAUDE.md T25 2.3)
 export {
-  familiesWanted,
+  dayPlan,
   hands,
   jobOf,
-  stationForProduction,
-  takeMachines,
+  placeLine,
+  planPlaces,
+  stageOfMan,
 } from './production';
-export type { Hand, StationCheck } from './production';
+export type { Hand, PlaceEntry } from './production';
 
 // What is bought, paid for and not here yet (CLAUDE.md T8 3.2)
 export {
@@ -589,19 +590,17 @@ export type { Box, PlaceCheck } from './layout';
 // Where everybody is standing
 export {
   STATION_BENCH,
+  STATION_DOOR,
   STATION_GATE,
+  STATION_HOME,
   STATION_IDLE,
-  STATION_NO_BENCH,
   STATION_OFFICE,
   STATION_PHONE,
   STATION_RACK,
   machineStation,
-  placeStation,
+  placeCellsAt,
   stationForTask,
   stationMachine,
-  stationPlaceAt,
-  stationWaitingFor,
-  waitingStation,
 } from './stations';
 
 // Text

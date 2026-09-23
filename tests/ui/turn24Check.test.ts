@@ -17,7 +17,7 @@ import {
   workshopBreakdownToday,
   workshopOutputToday,
 } from '../../src/engine/machines';
-import { benchCellsAt, standsOn } from '../../src/engine/stations';
+import { placeCellsAt, standsOn } from '../../src/engine/stations';
 import { canHire, joiners } from '../../src/engine/staff';
 import { contractPiece, contractPriceFor, contractResultFor, drawContract } from '../../src/engine/contracts';
 import { restockSplit } from '../../src/engine/materials';
@@ -127,11 +127,11 @@ describe('section 7, the boss and his bench', () => {
     hall.equipment = [];
     const bench = placeEquipment(hall, 'workbench', { variantId: 'standard', x: 8, y: 6 });
     const box = standsOn(bench);
-    expect(benchCellsAt(hall, bench, 2)).toEqual([
+    expect(placeCellsAt(hall, bench, 2)).toEqual([
       { x: 8, y: 7 },
       { x: 9, y: 7 },
     ]);
-    for (const cell of benchCellsAt(hall, bench, 2)) {
+    for (const cell of placeCellsAt(hall, bench, 2)) {
       expect(cell.y).toBe(box.y + box.depth);
       expect(cell.x).toBeGreaterThanOrEqual(box.x);
       expect(cell.x).toBeLessThan(box.x + box.width);

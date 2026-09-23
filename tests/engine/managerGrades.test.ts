@@ -61,7 +61,9 @@ function manager(tier: WorkerTier): Worker {
     monthMinutes: 0,
     monthDaysOff: 0,
     idleMinutes: 0,
-    idleByReason: { waitingForBoss: 0, noMachine: 0, noMaterial: 0 },
+    idleByReason: { waitingForBoss: 0, noPlace: 0, noMaterial: 0, noCompressor: 0, hallStopped: 0 },
+    working: false,
+    noPlaceFor: '',
     accidents: 0,
     anchorX: 1,
     anchorY: 1,
@@ -76,7 +78,7 @@ function nineUnderANovice(): GameState {
   const state = hallUnder('novice');
   for (let extra = 7; extra <= 9; extra += 1) {
     const copy = { ...state.workers[0], id: `staff-${extra}`, name: `Joiner ${extra}` } as Worker;
-    copy.idleByReason = { waitingForBoss: 0, noMachine: 0, noMaterial: 0 };
+    copy.idleByReason = { waitingForBoss: 0, noPlace: 0, noMaterial: 0, noCompressor: 0, hallStopped: 0 };
     state.workers.splice(state.workers.length - 1, 0, copy);
   }
   return state;

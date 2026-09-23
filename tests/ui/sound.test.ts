@@ -45,6 +45,7 @@ import type {
 import {
   acceptNow,
   act,
+  atAPlace,
   buyStartingKit,
   fillRack,
   firstJob,
@@ -221,12 +222,11 @@ function quietHall(): GameState {
   return state;
 }
 
-/** The same hall with somebody standing at the named machine. */
+/** The same hall with somebody at a place of the named machine (CLAUDE.md T25 2.3). */
 function somebodyAt(state: GameState, specId: string): GameState {
   const machine = state.equipment.find((item) => item.specId === specId);
   if (machine === undefined) throw new Error(`no ${specId} in the hall`);
-  machine.takenBy = 'owner';
-  return state;
+  return atAPlace(state, 'owner', specId);
 }
 
 /** A hall with one job in production, standing at the named stage, finished the named way. */
@@ -386,7 +386,7 @@ describe('the loops follow the hall', () => {
     expect(hallLoops(lacquered).has('sprayBooth')).toBe(false);
     const booth = placeEquipment(lacquered, 'sprayBooth', { x: 14, y: 7 });
     expect(hallLoops(lacquered).has('sprayBooth')).toBe(false);
-    booth.takenBy = 'owner';
+    atAPlace(lacquered, 'owner', booth.specId);
     expect(hallLoops(lacquered).has('sprayBooth')).toBe(true);
   });
 });

@@ -1,5 +1,5 @@
 // The extraction has to add up (PIOTR's tables of 13.09; CLAUDE.md T10 3.1). Every machine has a
-// demand while somebody is standing at it, every fan has a capacity, and the sums decide whether
+// demand while somebody is at one of its places (CLAUDE.md T25 2.3), every fan has a capacity, and the sums decide whether
 // the hall runs clean. Nothing is pre-booked and no machine ever stops.
 
 import { describe, expect, it } from 'vitest';
@@ -26,17 +26,28 @@ import { dustGainPerMinute, hallProductivityFactor } from '../../src/engine/mach
 import { applyRating } from '../../src/engine/reputation';
 import { hallProblems } from '../../src/render/hall';
 import type { GameState, Job } from '../../src/engine/index';
-import { acceptNow, act, fillRack, firstJob, newGame, placeEnquiry, placeEquipment, runClock } from '../helpers';
+import {
+  acceptNow,
+  act,
+  atAPlace,
+  fillRack,
+  firstJob,
+  newGame,
+  offHisPlace,
+  placeEnquiry,
+  placeEquipment,
+  runClock,
+} from '../helpers';
 
 /** A two man shop: a standard saw and a floor edgebander, both with a man at them, and one
  *  extractor of the class the test names. Piotr's own example (CLAUDE.md T10 3.1). */
 function twoManShop(extractorClass: string): GameState {
   const state = newGame({ difficulty: 'veryEasy' });
-  const saw = placeEquipment(state, 'tableSaw', { variantId: 'standard', x: 6, y: 1 });
-  const bander = placeEquipment(state, 'edgebander', { variantId: 'standard', x: 12, y: 1 });
+  placeEquipment(state, 'tableSaw', { variantId: 'standard', x: 6, y: 1 });
+  placeEquipment(state, 'edgebander', { variantId: 'standard', x: 12, y: 1 });
   placeEquipment(state, 'extractor', { variantId: extractorClass, x: 18, y: 6 });
-  saw.takenBy = 'owner';
-  bander.takenBy = 'staff-1';
+  atAPlace(state, 'owner', 'tableSaw');
+  atAPlace(state, 'staff-1', 'edgebander');
   return state;
 }
 
@@ -111,7 +122,7 @@ describe('the sums for a two man shop', () => {
     const bander = state.equipment.find((item) => item.specId === 'edgebander');
     const saw = state.equipment.find((item) => item.specId === 'tableSaw');
     if (!bander || !saw) throw new Error('no machines');
-    bander.takenBy = null;
+    offHisPlace(state, 'staff-1');
     expect(extractionCheck(state).demand).toBe(2500);
     expect(underExtracted(state)).toBe(true);
     // The gate: the saw alone is 1,100 against the 1,660 the fan allows.
@@ -119,7 +130,7 @@ describe('the sums for a two man shop', () => {
     expect(extractionCheck(state).demand).toBe(1100);
     expect(underExtracted(state)).toBe(false);
     // A gated machine with a man at it counts as it always did.
-    bander.takenBy = 'staff-1';
+    atAPlace(state, 'staff-1', 'edgebander');
     expect(extractionCheck(state).demand).toBe(2500);
     expect(underExtracted(state)).toBe(true);
     // And the gate changes the air sum only: the dust the bander makes is the family's figure,
@@ -129,7 +140,8 @@ describe('the sums for a two man shop', () => {
 
   it('counts nothing at all while no machine runs, gates or no gates', () => {
     const state = twoManShop('standard');
-    for (const item of state.equipment) item.takenBy = null;
+    offHisPlace(state, 'owner');
+    offHisPlace(state, 'staff-1');
     expect(extractionCheck(state).demand).toBe(0);
     expect(underExtracted(state)).toBe(false);
     expect(extractionCheck(state).line).toBe('');

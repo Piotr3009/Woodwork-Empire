@@ -1,17 +1,12 @@
 // The men at a bench stand on its front row (REPORT-T23 0.12; CLAUDE.md T24 2.5). The second place
 // was the back right cell, which on a two wide bench is the cell diagonally off its top corner:
 // measured, a bench at 8,6 put the first man at 8,7 and the second at 9,5, and at the fit he read
-// as standing past the end of the bench. Every place is a column of the bench's own footprint now.
+// as standing past the end of the bench. Every place is a column of the bench's own footprint now,
+// read off `placeCellsAt`, the one list of places for every family (CLAUDE.md T25 2.6).
 
 import { describe, expect, it } from 'vitest';
-import { BENCH } from '../../src/engine/machines';
-import {
-  benchCellsAt,
-  placeStation,
-  secondStation,
-  standingCell,
-  standsOn,
-} from '../../src/engine/stations';
+import { BENCH, OWNER, machineForPlace } from '../../src/engine/machines';
+import { placeCellsAt, standingCell, standsOn } from '../../src/engine/stations';
 import { stationCell } from '../../src/render/hall';
 import type { Equipment, GameState } from '../../src/engine/index';
 import { newGame, placeEquipment } from '../helpers';
@@ -33,7 +28,7 @@ function onTheFrontRow(bench: Equipment, cell: { x: number; y: number }): boolea
 describe('the places at a bench', () => {
   it('puts the two men of a standard bench at 8,6 on 8,7 and 9,7', () => {
     const { state, bench } = benchAt('standard');
-    const cells = benchCellsAt(state, bench, 2);
+    const cells = placeCellsAt(state, bench, 2);
     expect(cells).toEqual([
       { x: 8, y: 7 },
       { x: 9, y: 7 },
@@ -43,7 +38,7 @@ describe('the places at a bench', () => {
 
   it('puts the three men of an industrial bench in a row across its three columns', () => {
     const { state, bench } = benchAt('industrial');
-    const cells = benchCellsAt(state, bench, 3);
+    const cells = placeCellsAt(state, bench, 3);
     expect(cells).toEqual([
       { x: 8, y: 7 },
       { x: 9, y: 7 },
@@ -52,15 +47,17 @@ describe('the places at a bench', () => {
     for (const cell of cells) expect(onTheFrontRow(bench, cell), JSON.stringify(cell)).toBe(true);
   });
 
-  it('resolves the second and the place stations to those very cells and to nothing off the bench', () => {
+  it('stands the man at the bench s first place on its first cell, and counts its places in order', () => {
     const { state, bench } = benchAt('industrial');
     const home = { x: bench.anchorX, y: bench.anchorY };
-    const second = stationCell(state, secondStation(bench.id), home);
-    const third = stationCell(state, placeStation(bench.id, 2), home);
-    expect({ x: second.x, y: second.y }).toEqual({ x: 9, y: 7 });
-    expect({ x: third.x, y: third.y }).toEqual({ x: 10, y: 7 });
-    expect(onTheFrontRow(bench, second)).toBe(true);
-    expect(onTheFrontRow(bench, third)).toBe(true);
+    // The owner at work at the bench, as the day plan writes it on him (CLAUDE.md T25 2.3).
+    state.owner.working = true;
+    state.owner.station = `machine:${BENCH}`;
+    const at = stationCell(state, state.owner.station, home, OWNER);
+    expect({ x: at.x, y: at.y }).toEqual({ x: 8, y: 7 });
+    // Its three places are its own, in order, and a fourth is past the hall's last place.
+    expect(machineForPlace(state, BENCH, 2)).toEqual({ item: bench, place: 2 });
+    expect(machineForPlace(state, BENCH, 3)).toBeNull();
     // And the operator is the first of the same row, so the three are one line.
     const operator = standingCell(state, bench, 'operator');
     expect(operator).toEqual({ x: 8, y: 7 });
@@ -72,7 +69,7 @@ describe('the places at a bench', () => {
       const box = standsOn(bench);
       const second = standingCell(state, bench, 'second');
       expect(second.y, variantId).toBe(box.y + box.depth);
-      for (const cell of benchCellsAt(state, bench, 3)) {
+      for (const cell of placeCellsAt(state, bench, 3)) {
         expect(cell.y, `${variantId} ${JSON.stringify(cell)}`).toBeGreaterThanOrEqual(box.y + box.depth);
       }
     }

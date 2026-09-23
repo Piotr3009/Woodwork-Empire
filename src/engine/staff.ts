@@ -61,8 +61,6 @@ import {
   isSold,
   itemStandsInTheHall,
   overdueBreakdownChance,
-  releaseMachines,
-  releaseMachinesExcept,
   BENCH,
   benchAtPlace,
   benchPlacesOwnedOrOnOrder,
@@ -71,7 +69,7 @@ import {
 import { countOwnedOrOnOrder } from './orders';
 import { managerOnDuty, managerOnDutyNow, managerTier } from './owner';
 import { effectiveReputation } from './reputation';
-import { hands, machineWantedFor, workMinute } from './production';
+import { hands, machineWantedFor, planPlaces, workMinute } from './production';
 import { chance, int, makeId } from './rng';
 import { STATION_IDLE } from './stations';
 import type {
@@ -623,6 +621,8 @@ export function hire(state: GameState, role: WorkerRole, tier: WorkerTier | null
     tiredOfOvertime: false,
     ordersToday: 0,
     station: STATION_IDLE,
+    working: false,
+    noPlaceFor: '',
     productionMinutes: 0,
     absentDaysRemaining: 0,
     anchorX: anchor.x,
@@ -732,9 +732,10 @@ function jobsInManagerOrder(state: GameState, tier: WorkerTier): Job[] {
 /** The next job for the next man, out of the ones still open, in this grade's way.
  *
  *  The novice and the experienced man take the first of their own order and think no further. The
- *  senior and the master will not queue a second man at a machine another man is already wanted
- *  at while another job's bench work is standing open: they look past the front runner for a job
- *  whose current stage needs no machine at all, and take that instead [PIOTR's rule, 20.09]. */
+ *  senior and the master will not send a second man to a machine family another job already wants
+ *  a place at while another job's bench work is standing open: they look past the front runner for
+ *  a job whose current stage needs no machine at all, and take that instead [PIOTR's rule, 20.09;
+ *  the places of CLAUDE.md T25 2.1]. */
 function pickJobForManager(
   state: GameState,
   open: readonly Job[],
@@ -748,8 +749,8 @@ function pickJobForManager(
   return open.find((job) => machineWantedFor(state, job) === null) ?? first;
 }
 
-/** The machine families the hall is already queueing for: one entry per man who is on a job whose
- *  current stage wants a machine. What the senior's rule is read against. */
+/** The machine families the jobs already on the go want a place at: one entry per job with a man
+ *  on it whose current stage wants a machine. What the senior's rule is read against. */
 function machinesAlreadyWanted(state: GameState): Set<string> {
   const wanted = new Set<string>();
   for (const job of state.jobs) {
@@ -979,7 +980,6 @@ function walkOutTheGone(state: GameState): Worker[] {
       if (task) task.doneBy = null;
       worker.taskId = null;
     }
-    releaseMachines(state, worker.id);
     // `workerQuit` is the one kind the game has for a man going off the books. It was written for
     // the overtime quit of Turn 8, which went with the evenings in Turn 17, and nothing has raised
     // it since; a man let go leaves by the same gate (GameEventKind is in the frozen types.ts,
@@ -1135,8 +1135,6 @@ export function runNightShift(state: GameState): NightReport {
   const crew = nightCrew(state);
   if (crew.length === 0) return noNight();
   const report: NightReport = { ...noNight(), ran: true, crew: crew.map((worker) => worker.id) };
-  // Everybody who went home at five walks away from his machine before the night starts.
-  releaseMachinesExcept(state, []);
   const used = new Set<string>();
   for (let minute = 0; minute < SECOND_SHIFT_MINUTES; minute += 1) {
     autoAssignJobs(state, 'night');
@@ -1149,8 +1147,9 @@ export function runNightShift(state: GameState): NightReport {
     for (const id of done.usedMachineIds) used.add(id);
   }
   report.usedMachineIds = [...used];
-  // Nobody stands at a machine overnight (CLAUDE.md T7 3.1).
-  releaseMachinesExcept(state, []);
+  // The night men go home and nobody is at a place overnight: a plan with nobody in it, and the
+  // morning's is worked out when the day opens (CLAUDE.md T25 2.3).
+  planPlaces(state, 'night', []);
   // The premium is for the shift the man turned up for, not for the minutes the rack let him
   // work: he is paid to be there (CLAUDE.md T13 1, nothing is free).
   const premium = Math.round(crew.reduce((sum, worker) => sum + nightPremiumFor(worker), 0) * 100) / 100;

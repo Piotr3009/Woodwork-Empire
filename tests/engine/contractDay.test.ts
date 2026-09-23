@@ -17,7 +17,6 @@ import {
   activeContracts,
   assignContract,
   contractMarker,
-  contractMenAtWork,
   contractWaitingForMaterial,
   contractWantsToday,
   drawContract,
@@ -27,6 +26,8 @@ import {
   weekWanted,
 } from '../../src/engine/contracts';
 import { addToJob, assignJob, canBuild, isOnJob } from '../../src/engine/jobs';
+import { dayPlan } from '../../src/engine/production';
+import { menAtMachine } from '../../src/engine/machines';
 import type { Contract, GameState, Job, Worker } from '../../src/engine/index';
 import {
   acceptNow,
@@ -67,7 +68,9 @@ function joiner(id: string, name: string): Worker {
     monthMinutes: 0,
     monthDaysOff: 0,
     idleMinutes: 0,
-    idleByReason: { waitingForBoss: 0, noMachine: 0, noMaterial: 0 },
+    idleByReason: { waitingForBoss: 0, noPlace: 0, noMaterial: 0, noCompressor: 0, hallStopped: 0 },
+    working: false,
+    noPlaceFor: '',
     accidents: 0,
     anchorX: 6,
     anchorY: 6,
@@ -118,6 +121,19 @@ function theJob(state: GameState): Job {
   const job = state.jobs[0];
   if (!job) throw new Error('a job is wanted');
   return job;
+}
+
+/** The men on a contract the day plan has at work this minute (CLAUDE.md T25 2.3). */
+function contractMenPlaced(state: GameState): string[] {
+  return dayPlan(state)
+    .filter((entry) => entry.contract !== null && entry.working)
+    .map((entry) => entry.who);
+}
+
+/** Who is at the hall's saw this minute, the first of its places, or null. */
+function atTheSaw(state: GameState): string | null {
+  const saw = state.equipment.find((item) => item.specId === 'tableSaw');
+  return saw === undefined ? null : (menAtMachine(state, saw)[0] ?? null);
 }
 
 describe("a man on a contract is the contract's all day (PIOTR, 21.09; v42)", () => {
@@ -190,11 +206,11 @@ describe("a man on a contract is the contract's all day (PIOTR, 21.09; v42)", ()
     expect(ben.jobId).toBe(contractMarker(contract.id));
   });
 
-  it('stands him at his bench while the rack cannot cover the next piece, and lets go of the saw', () => {
+  it('stands him while the rack cannot cover the next piece, and gives his place at the saw up', () => {
     let state = joinerHall();
     running(state, 60);
     state = runClock(state, 10);
-    const saw = (): string | null => state.equipment.find((item) => item.specId === 'tableSaw')?.takenBy ?? null;
+    const saw = (): string | null => atTheSaw(state);
     expect(saw()).toBe('staff-1');
     state.stock.sheets = 0;
     theContract(state).sheetsReserved = 0;
@@ -204,11 +220,11 @@ describe("a man on a contract is the contract's all day (PIOTR, 21.09; v42)", ()
     const made = theContract(state).piecesMade;
     state = runClock(state, 5);
     expect(theContract(state).piecesMade).toBe(made);
-    // And the saw is not his while he waits: until v45 he kept it, and every job's man stood
-    // behind a saw nobody was at (PIOTR, 22.09: "everyone waits for the saw and nobody does
-    // anything").
+    // And the saw's place is not his while he waits: until v45 he kept the saw, and every job's
+    // man stood behind a saw nobody was at (PIOTR, 22.09: "everyone waits for the saw and nobody
+    // does anything"); from v52 a man with no work wants no place (CLAUDE.md T25 2.3).
     expect(saw()).toBe(null);
-    expect(contractMenAtWork(state)).toEqual([]);
+    expect(contractMenPlaced(state)).toEqual([]);
     // The owner takes a job that wants the saw, with sheets of its own on the rack: it is his.
     const enquiry = placeEnquiry(state, { price: 4000, deadlineDays: 30 });
     state = acceptNow(state, enquiry.id);
@@ -221,22 +237,26 @@ describe("a man on a contract is the contract's all day (PIOTR, 21.09; v42)", ()
     state = runClock(state, 30);
     expect(saw()).toBe('owner');
     expect(theJob(state).productionMinutes).toBe(30);
-    // A delivery lands and the contract has him, and the saw, back in the queue like anybody.
+    // A delivery lands and the contract has him back, wanting a place at the saw like anybody: the
+    // saw's one place is the owner's, first in the day plan's order, so he has none and says so
+    // (CLAUDE.md T25 2.3).
     state.stock.sheets += 20;
     expect(contractWaitingForMaterial(state, theContract(state))).toBe(false);
-    expect(contractMenAtWork(state)).toEqual(['staff-1']);
+    const him = dayPlan(state).find((entry) => entry.who === 'staff-1');
+    expect(him?.family).toBe('tableSaw');
+    expect(him?.working).toBe(false);
   });
 
-  it('lets go of the saw at five, when the crew have gone home', () => {
+  it('wants no place at the saw at five, when the crew have gone home', () => {
     let state = joinerHall();
     running(state, 60);
     state = runClock(state, 10);
-    expect(state.equipment.find((item) => item.specId === 'tableSaw')?.takenBy).toBe('staff-1');
-    expect(contractMenAtWork(state)).toEqual(['staff-1']);
+    expect(atTheSaw(state)).toBe('staff-1');
+    expect(contractMenPlaced(state)).toEqual(['staff-1']);
     state.clock.minute = DAY_END_MINUTE;
     state.owner.homeAsked = true;
     expect(crewHasGoneHome(state)).toBe(true);
-    expect(contractMenAtWork(state)).toEqual([]);
+    expect(contractMenPlaced(state)).toEqual([]);
   });
 });
 

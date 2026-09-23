@@ -58,7 +58,7 @@ describe('the minutes the owner stood', () => {
     // The hall's list has the morning's jobs of work on it and nobody has taken one, so there is work
     // about that he is not on: that is what the meter calls nothing assigned.
     expect(state.owner.idleByReason.nothingAssigned).toBe(100);
-    expect(state.owner.idleByReason.noMachine).toBe(0);
+    expect(state.owner.idleByReason.noPlace).toBe(0);
     // And the two halves are the whole of the day that has run.
     expect(state.owner.minutesWorked + state.owner.idleMinutes).toBe(ranToday(state));
   });
@@ -104,12 +104,12 @@ describe('why he stood', () => {
     expect(ownerIdleReason(state)).toBe('noMaterial');
   });
 
-  it('is the machine when he is at a bench and somebody else has the saw', () => {
+  it('is no place when the day plan has none for him', () => {
     const state = ownerAtABench();
-    const saw = state.equipment.find((item) => item.specId === 'tableSaw');
-    if (!saw) throw new Error('a saw is wanted');
-    saw.takenBy = 'staff-1';
-    expect(ownerIdleReason(state)).toBe('noMachine');
+    // What the plan writes on him when the machine his stage wants has no place left
+    // (CLAUDE.md T25 2.3).
+    state.owner.noPlaceFor = 'tableSaw';
+    expect(ownerIdleReason(state)).toBe('noPlace');
   });
 
   it('is the empty office when the hall has nothing on its list at all', () => {

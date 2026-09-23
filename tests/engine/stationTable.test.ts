@@ -6,14 +6,13 @@ import { describe, expect, it } from 'vitest';
 import { GATE_LAYOUT, ROOM_LAYOUT } from '../../src/engine/constants';
 import {
   STATION_TABLE,
-  benchCellsAt,
   cellAt,
   facingAt,
   facingAtPallet,
   facingTowards,
   freeSideOf,
   palletCell,
-  queueCellsAt,
+  placeCellsAt,
   standingCell,
   standsOn,
 } from '../../src/engine/stations';
@@ -48,12 +47,14 @@ describe('the station table', () => {
       expect(STATION_TABLE[family], family).toBeDefined();
     }
     expect(STATION_TABLE.tableSaw?.operator).toEqual({ side: 'front', along: 'right', out: 1 });
-    expect(STATION_TABLE.thicknesser?.waiting).toEqual({ side: 'left', along: 0, out: 1 });
+    expect(STATION_TABLE.thicknesser?.operator).toEqual({ side: 'left', along: 0 });
     expect(STATION_TABLE.cnc?.second).toEqual({ side: 'back', along: 'middle' });
     // The bench's places are a row along its front, one to a column of its own footprint, from
-    // Turn 24: the second was the back right cell, which on a two wide bench is a cell off its
-    // top corner [REPORT-T23 0.12] (CLAUDE.md T24 2.5).
-    expect(STATION_TABLE.workbench?.second).toEqual({ side: 'front', along: 1 });
+    // Turn 24 (CLAUDE.md T24 2.5): its row names no second place, and `placeCellsAt` runs the
+    // places on along the front from the operator's, the one list every family's places come off
+    // (CLAUDE.md T25 2.6). The waiting cells went with the queue (T25 2.2).
+    expect(STATION_TABLE.workbench?.second).toBeNull();
+    for (const row of Object.values(STATION_TABLE)) expect(Object.keys(row).sort()).toEqual(['operator', 'second']);
   });
 
   it('keeps the man a cell out of the cells his own body would be painted over', () => {
@@ -64,9 +65,7 @@ describe('the station table', () => {
     expect(STATION_TABLE.edgebander?.operator).toEqual({ side: 'front', along: 1, out: 1 });
     expect(STATION_TABLE.cnc?.operator).toEqual({ side: 'front', along: 'right', out: 1 });
     expect(STATION_TABLE.sprayBooth?.operator).toEqual({ side: 'front', along: 'middle', out: 1 });
-    expect(STATION_TABLE.workbench?.waiting).toEqual({ side: 'front', along: 'right', out: 1 });
     expect(STATION_TABLE.workbench?.operator).toEqual({ side: 'front', along: 0 });
-    expect(STATION_TABLE.workbench?.second).toEqual({ side: 'front', along: 1 });
     expect(STATION_TABLE.spindleMoulder?.operator).toEqual({ side: 'front', along: 0 });
   });
 
@@ -89,7 +88,7 @@ describe('the station table', () => {
       const state = emptyHall();
       const item = placeEquipment(state, specId, { variantId, x: 8, y: 4 });
       const at = box(item);
-      for (const role of ['operator', 'waiting', 'second'] as const) {
+      for (const role of ['operator', 'second'] as const) {
         const cell = standingCell(state, item, role);
         expect(isFree(state, cell), `${specId} ${role}`).toBe(true);
         const onIt =
@@ -99,26 +98,24 @@ describe('the station table', () => {
     }
   });
 
-  it('lines a queue of men up along one side, the operator first and the rest behind him', () => {
-    // What 2.5 hands a job with more men on it than an item has places (CLAUDE.md T19 2.5).
+  it('lays an item s places along one side, the operator first and the rest beside him', () => {
+    // A machine's places, and a bench's, off the one list (CLAUDE.md T19 2.5, T25 2.6).
     const state = emptyHall();
     const saw = placeEquipment(state, 'tableSaw', { variantId: 'standard', x: 8, y: 4 });
-    const queue = queueCellsAt(state, saw, 5);
-    expect(queue).toHaveLength(5);
-    expect(queue[0]).toEqual(standingCell(state, saw, 'operator'));
-    expect(queue[1]).toEqual(standingCell(state, saw, 'waiting'));
-    for (const cell of queue) expect(isFree(state, cell)).toBe(true);
-    expect(new Set(queue.map((cell) => `${cell.x},${cell.y}`)).size).toBe(5);
-    expect(queueCellsAt(state, saw, 0)).toEqual([]);
-    expect(queueCellsAt(state, saw, 1)).toEqual([standingCell(state, saw, 'operator')]);
+    const places = placeCellsAt(state, saw, 5);
+    expect(places).toHaveLength(5);
+    expect(places[0]).toEqual(standingCell(state, saw, 'operator'));
+    for (const cell of places) expect(isFree(state, cell)).toBe(true);
+    expect(new Set(places.map((cell) => `${cell.x},${cell.y}`)).size).toBe(5);
+    expect(placeCellsAt(state, saw, 0)).toEqual([]);
+    expect(placeCellsAt(state, saw, 1)).toEqual([standingCell(state, saw, 'operator')]);
 
     // The bench on open floor, where there is room for a queue at all.
     const floor = emptyHall();
     const bench = placeEquipment(floor, 'workbench', { variantId: 'standard', x: 8, y: 4 });
-    const men = benchCellsAt(floor, bench, 4);
+    const men = placeCellsAt(floor, bench, 4);
     expect(men).toHaveLength(4);
     expect(men[0]).toEqual(standingCell(floor, bench, 'operator'));
-    expect(men[1]).toEqual(standingCell(floor, bench, 'second'));
     const wb = box(bench);
     // Every place is on the front, where the player sees them, and the first of them are the
     // bench's own columns: nobody is drawn behind it or off the end of it (CLAUDE.md T24 2.5).
@@ -132,7 +129,7 @@ describe('the station table', () => {
     expect(new Set(men.map((cell) => `${cell.x},${cell.y}`)).size).toBe(4);
   });
 
-  it('puts the saw man at the right end of the front, back to us, and the waiting man at the left', () => {
+  it('puts the saw man at the right end of the front, back to us', () => {
     const state = emptyHall();
     const saw = placeEquipment(state, 'tableSaw', { variantId: 'standard', x: 8, y: 4 });
     const at = box(saw);
@@ -141,18 +138,16 @@ describe('the station table', () => {
     const operator = standingCell(state, saw, 'operator');
     // A cell out from the table, where the floor is his and not the saw's (CLAUDE.md T19 2.4).
     expect(operator).toEqual({ x: at.x + at.width - 1, y: at.y + at.depth + 1 });
-    expect(standingCell(state, saw, 'waiting')).toEqual({ x: at.x, y: at.y + at.depth });
     // Facing the saw from its front is facing away from the camera.
     expect(['ne', 'nw']).toContain(facingAt(operator, saw));
   });
 
-  it('puts the thicknesser man at the left end facing along it, the waiting man a cell further', () => {
+  it('puts the thicknesser man at the left end facing along it', () => {
     const state = emptyHall();
     const thicknesser = placeEquipment(state, 'thicknesser', { variantId: 'standard', x: 8, y: 4 });
     const at = box(thicknesser);
     const operator = standingCell(state, thicknesser, 'operator');
     expect(operator).toEqual({ x: at.x - 1, y: at.y });
-    expect(standingCell(state, thicknesser, 'waiting')).toEqual({ x: at.x - 2, y: at.y });
     // Along the machine: towards +x on the world, down-right on the screen.
     expect(facingAt(operator, thicknesser)).toBe('se');
   });
@@ -162,17 +157,17 @@ describe('the station table', () => {
     const edgebander = placeEquipment(state, 'edgebander', { variantId: 'standard', x: 8, y: 4 });
     const eb = box(edgebander);
     expect(standingCell(state, edgebander, 'operator')).toEqual({ x: eb.x + 1, y: eb.y + eb.depth + 1 });
-    expect(standingCell(state, edgebander, 'waiting')).toEqual({ x: eb.x, y: eb.y + eb.depth });
     const cnc = placeEquipment(state, 'cnc', { variantId: 'standard', x: 12, y: 5 });
     const at = box(cnc);
     expect(standingCell(state, cnc, 'operator')).toEqual({ x: at.x + at.width - 1, y: at.y + at.depth + 1 });
-    expect(standingCell(state, cnc, 'waiting')).toEqual({ x: at.x + Math.floor(at.width / 2), y: at.y + at.depth });
     expect(standingCell(state, cnc, 'second')).toEqual({ x: at.x + Math.floor(at.width / 2), y: at.y - 1 });
     const bench = placeEquipment(state, 'workbench', { variantId: 'standard', x: 15, y: 8 });
     const wb = box(bench);
     expect(standingCell(state, bench, 'operator')).toEqual({ x: wb.x, y: wb.y + wb.depth });
-    expect(standingCell(state, bench, 'second')).toEqual({ x: wb.x + 1, y: wb.y + wb.depth });
-    expect(['nw', 'ne']).toContain(facingAt(standingCell(state, bench, 'second'), bench));
+    const second = placeCellsAt(state, bench, 2)[1];
+    if (second === undefined) throw new Error('two places are wanted');
+    expect(second).toEqual({ x: wb.x + 1, y: wb.y + wb.depth });
+    expect(['nw', 'ne']).toContain(facingAt(second, bench));
   });
 
   it('turns to the first free side at the same position when the table cell is taken', () => {

@@ -14,3 +14,22 @@ tests that name it flipped, and `STATE_VERSION` left for A2 as section 1 says.
 `docs/art/REQUESTS-T25.md` asks for nothing new (section 9) and restates the backlog read off
 `public/sprites`: the sprayer's four sheets, the helper's bench sheet, the backs of every floor
 family but the tool cabinet, and the seven recordings.
+
+**T25-A2 Phase A: places, the plan, the deletions, STATE_VERSION 28.** `MACHINE_PLACES` (the table
+of 2.1, the bench's row being Turn 23's `WORKBENCH_PLACES` folded in) and `MACHINE_PACE` (2.4) in
+`constants.ts`; `placesOf`, `placedMachines`, `hallPlaces`, `machineForPlace` and `menAtPlaces` in
+`machines.ts`; `placeCellsAt` in `stations.ts`; `Worker.working` and `Worker.noPlaceFor` and the
+owner's two, written by `planPlaces` in `production.ts`, the day plan every reader reads. Deleted:
+`takenBy` as a claim (a dead optional field the lift clears), `heldMachine(s)`, `claimMachine`,
+`releaseMachines(Except)`, `freeMachines`, `takeMachines`, `familiesWanted`, `machineAtWork`,
+`menAtJobs`, `releaseIdleMachines`, `contractMenAtWork`, `waitingStation`, `stationWaitingFor`,
+`secondStation`, `placeStation`, `queueCellsAt`, `benchCellsAt`, `benchPlaceAt`, `benchPlacesOf`,
+`stageFor`, `stationFreeFor`, `stageMayStart`, `stageAtTheBench`, `standsForBench`, `NO_BENCH`,
+`waitingWordsFor`, `waitingLine`, `jobHasWorkFor` and the waiting role of the station table.
+`liftToVersion28` clears the claims, gives every man the two fields, stands a man at a waiting
+cell at his home cell, clears the rows that waited, moves the queue's lost minutes to `noPlace`
+today, on every closed day and in every monthly report, and the lift then runs the day plan.
+Every test that asserted the queue was flipped to the places and none kept beside it; the three
+month playthrough now ends with the bank on day 91, measured and explained in its test and in
+C2. The four men and one used saw case holds from this commit: one cuts, three say
+`no place at the saw`.

@@ -82,9 +82,9 @@ export interface WeekMeters {
   minutes: Record<WeekCategory, number>;
   /** Minutes the clock ran while he was on the books, worked or not: what he is paid for. */
   paidMinutes: number;
-  /** The minutes he stood waiting for a taken machine this week, by the machine's family, so his
-   *  card can say what the week's idle was for and the player can see whether a second one would
-   *  pay (PIOTR, 20.09; v37). Absent in a week counted before v37. */
+  /** The minutes he had no place at a machine this week, by the machine's family, so his card can
+   *  say what the week's idle was for and the player can see whether a second one would pay
+   *  (PIOTR, 20.09; v37; CLAUDE.md T25 2.3). Absent in a week counted before v37. */
   waitedFor?: Partial<Record<string, number>>;
   /** Pieces of a standing contract finished while he was on it. A piece made by two men is half
    *  his, because two men made it. */
@@ -286,9 +286,9 @@ export interface Equipment {
   /** The minutes its class saved last week, written down on the Monday before the week clock is
    *  started again, so the Machines sheet can say last week beside this week (PIOTR, 21.09; v40). */
   minutesSavedLastWeek: number;
-  /** The one man standing at it: 'owner', a worker id, or null while it is free. A machine serves
-   *  one person at a time (CLAUDE.md T7 3.1). */
-  takenBy: string | null;
+  /** Dead since v52: a machine is places and nobody takes one (CLAUDE.md T25 2.2). Kept in the
+   *  record for one turn so an older save loads; the migration clears it and nothing writes it. */
+  takenBy?: string | null;
   purchasePrice: number;
   /** The working day the buyer's van comes for it. Null while it is the company's. A machine
    *  that is sold stops working the moment the sale is made (CLAUDE.md T8 3.5). */
@@ -389,6 +389,12 @@ export interface OwnerState {
   holidayDaysRemaining: number;
   /** Where he is standing: bench, machine:<specId>, rack, gate, office or idle. */
   station: string;
+  /** True while the day plan has a place for him at the machine his work wants, or his work
+   *  wants none: he works (CLAUDE.md T25 2.3). Written by `planPlaces`, never by a screen. */
+  working: boolean;
+  /** The family he could not get a place at, or '' when he has one or wants none: what his mark,
+   *  his card and his idle minutes say (CLAUDE.md T25 2.3). */
+  noPlaceFor: string;
   /** Minutes of production worked, which drives the bench and machine cycle. */
   productionMinutes: number;
   /** Today's day, in the order it happened: one segment per run of minutes on the same thing.
@@ -455,6 +461,12 @@ export interface Worker {
   ordersToday: number;
   /** Where he is standing: bench, machine:<specId>, rack, gate, office or idle. */
   station: string;
+  /** True while the day plan has a place for him at the machine his work wants, or his work
+   *  wants none: he works (CLAUDE.md T25 2.3). Written by `planPlaces`, never by a screen. */
+  working: boolean;
+  /** The family he could not get a place at, or '' when he has one or wants none: what his mark,
+   *  his card and his idle minutes say (CLAUDE.md T25 2.3). */
+  noPlaceFor: string;
   /** Minutes of production worked, which drives the bench and machine cycle. */
   productionMinutes: number;
   absentDaysRemaining: number;
@@ -1034,15 +1046,19 @@ export interface ShiftState {
 }
 
 /** Why a production minute the workshop could have worked was not worked (CLAUDE.md T13 3.5). */
-export type LostMinuteCause = 'noPeople' | 'noMachine' | 'noMaterial' | 'ownerAway';
+export type LostMinuteCause = 'noPeople' | 'noPlace' | 'noMaterial' | 'hallStopped' | 'ownerAway';
 
 /** Why the owner himself stood still for a minute of his own day. Not the same list as
  *  `LostMinuteCause`: that one counts every seat in the hall, and two of its four cannot be true
  *  of the man whose absence they measure. The words are `OWNER_IDLE_REASONS`
  *  (CLAUDE.md T21 2.8). */
 export type OwnerIdleReason =
-  | 'noMachine'
+  /** The hall has no place for him at the machine his stage wants (CLAUDE.md T25 2.3). */
+  | 'noPlace'
   | 'noMaterial'
+  /** The hall stopped his job: no extraction, the bags full, a machine that will not run on the
+   *  air it has, or kit still on the lorry (CLAUDE.md T25 2.3). */
+  | 'hallStopped'
   /** He stood at a bench with no compressor behind it, or on one short of litres: from Turn 23
    *  there is no bench work without air at all (PIOTR, 20.09; CLAUDE.md T23 2.7). */
   | 'noCompressor'
@@ -1055,7 +1071,7 @@ export type OwnerIdleReason =
  *  put him on anything. From Turn 23 a free man waits for the boss's word, so the minutes he
  *  stands are minutes with a reason and his day meter says which (PIOTR, 20.09; CLAUDE.md T23
  *  2.1, 2.13). The words are `WORKER_IDLE_REASONS`. */
-export type WorkerIdleReason = 'waitingForBoss' | 'noMachine' | 'noMaterial';
+export type WorkerIdleReason = 'waitingForBoss' | 'noPlace' | 'noMaterial' | 'noCompressor' | 'hallStopped';
 
 /** The state a mark over a figure's head is drawn for: the six things that are wrong with a man
  *  and that the player can put right (docs/mockups/t22/bubbles-v2.png, the red column;
@@ -1063,10 +1079,9 @@ export type WorkerIdleReason = 'waitingForBoss' | 'noMachine' | 'noMaterial';
  *  out measuring has nothing wrong with him and carries no key at all
  *  [PIOTR, 19.09: "when all is fine, no bubble; only when it is bad"]. */
 export type BubbleKey =
-  | 'waitingForMachine'
+  /** The hall has no place for him at the machine his work wants (CLAUDE.md T25 2.3). */
+  | 'noPlace'
   | 'noMaterial'
-  /** He has no place at a bench for a stage done at one (v47). */
-  | 'noBench'
   /** He is at a bench the hall has no air for (CLAUDE.md T23 2.7). */
   | 'noCompressor'
   | 'nothingToDo'

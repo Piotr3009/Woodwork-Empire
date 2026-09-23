@@ -62,7 +62,9 @@ import {
 } from '../../src/engine/contracts';
 import { workerMinuteCost } from '../../src/engine/jobs';
 import { freeSheets, reservedSheets } from '../../src/engine/materials';
-import { hallProductivityFactor, machineWearPerMinute, variantFor } from '../../src/engine/machines';
+import { bestOutputFactor, hallProductivityFactor, machineWearPerMinute, menAtMachine, menAtPlaces } from '../../src/engine/machines';
+import { planPlaces } from '../../src/engine/production';
+import { STATION_DOOR, STATION_HOME } from '../../src/engine/stations';
 import { staffOutputFactor } from '../../src/engine/owner';
 import type { Contract, GameState, Worker } from '../../src/engine/index';
 import {
@@ -117,7 +119,9 @@ function joiner(id: string, name: string): Worker {
     monthMinutes: 0,
     monthDaysOff: 0,
     idleMinutes: 0,
-    idleByReason: { waitingForBoss: 0, noMachine: 0, noMaterial: 0 },
+    idleByReason: { waitingForBoss: 0, noPlace: 0, noMaterial: 0, noCompressor: 0, hallStopped: 0 },
+    working: false,
+    noPlaceFor: '',
     accidents: 0,
     anchorX: 6,
     anchorY: 6,
@@ -148,7 +152,11 @@ function running(state: GameState, day = 1, quantity = 60): Contract {
 
 function minutes(state: GameState, count: number): number {
   let worked = 0;
-  for (let at = 0; at < count; at += 1) worked += runContractMinute(state).worked;
+  for (let at = 0; at < count; at += 1) {
+    // The day plan the day's own minute would hand it (CLAUDE.md T25 2.3).
+    const plan = new Map(planPlaces(state).map((entry) => [entry.who, entry]));
+    worked += runContractMinute(state, plan).worked;
+  }
   return worked;
 }
 
@@ -308,8 +316,9 @@ describe('people, not machines', () => {
     expect(assignContract(state, contract.id, 'staff-1', false).ok).toBe(true);
     expect(ben?.jobId).toBeNull();
     expect(contract.assigned).toEqual([]);
-    // The saw was never his to keep: nothing is held while he is off it.
-    expect(state.equipment.every((item) => item.takenBy !== 'staff-1')).toBe(true);
+    // Off it, he has no place at anything (CLAUDE.md T25 2.3).
+    planPlaces(state);
+    expect(menAtPlaces(state).every((entry) => entry.who !== 'staff-1')).toBe(true);
   });
 
   it('takes him off the job he is on: the contract is the whole of him, not the first of his day', () => {
@@ -366,20 +375,20 @@ describe('people, not machines', () => {
     const ben = state.workers[0];
     if (!job || !ben) throw new Error('a job and a man are wanted');
     ben.jobId = job.id;
-    runContractMinute(state);
+    minutes(state, 1);
     expect(contract.assigned).toEqual(['staff-1']);
     expect(ben.jobId).toBe(contractMarker(contract.id));
   });
 });
 
 describe('the piece work', () => {
-  it('advances the piece at his rate and the class of the saw he got, and books each piece', () => {
+  it('advances the piece at his rate and the hall s pace at the saw, and books each piece', () => {
     const state = joinerHall();
     const contract = running(state);
     const piece = contractPiece(contract);
     const saw = state.equipment.find((item) => item.specId === 'tableSaw');
     if (!saw) throw new Error('a saw is wanted');
-    const speed = variantFor(saw)?.outputFactor ?? 1;
+    const speed = bestOutputFactor(state, 'tableSaw');
     const worth = WORKER_RATES.novice * staffOutputFactor(state) * speed * hallProductivityFactor(state);
     const cashBefore = state.cash;
     const worked = minutes(state, 200);
@@ -393,7 +402,7 @@ describe('the piece work', () => {
     expect(contract.materialCost).toBe(pieces * piece.material);
     // The cash is the pieces and nothing else: the material was on the rack (T17 2.22).
     expect(state.cash).toBeCloseTo(cashBefore + pieces * contract.pricePerPiece, 6);
-    expect(saw.takenBy).toBe('staff-1');
+    expect(menAtMachine(state, saw)).toEqual(['staff-1']);
     expect(saw.hoursUsed).toBeCloseTo(200 / 60, 3);
     expect(state.workers[0]?.station).toBe('machine:tableSaw');
     expect(contractStationFor(state, state.workers[0] as Worker)).toBe('machine:tableSaw');
@@ -426,25 +435,29 @@ describe('the piece work', () => {
     running(fast);
     minutes(fast, 300);
     expect(activeContracts(fast)[0]?.piecesMade ?? 0).toBeGreaterThan(activeContracts(slow)[0]?.piecesMade ?? 0);
-    const held = fast.equipment.find((item) => item.takenBy === 'staff-1');
-    expect(held?.id).toBe('kit-saw-pro');
+    // He stands at the first saw bought, the first place of the family, and cuts at the hall's
+    // pace, which is the pro saw's (CLAUDE.md T25 2.4, 2.6).
+    const held = menAtPlaces(fast).find((entry) => entry.who === 'staff-1');
+    expect(held?.item.id).not.toBe('kit-saw-pro');
   });
 
-  it('waits while somebody else has the saw: the machine stays in the general queue', () => {
+  it('stands while the hall has no place for him at the saw, and works the minute it has one', () => {
     const state = joinerHall();
     const contract = running(state);
     const saw = state.equipment.find((item) => item.specId === 'tableSaw');
     if (!saw) throw new Error('a saw is wanted');
-    saw.takenBy = 'owner';
+    // A broken saw has no places (CLAUDE.md T25 2.1).
+    saw.broken = true;
     minutes(state, 100);
     expect(contract.pieceMinutes).toBe(0);
     expect(contract.labourMinutes).toBe(0);
-    expect(state.workers[0]?.station).toBe('waiting:tableSaw');
-    expect(contractStationFor(state, state.workers[0] as Worker)).toBe('waiting:tableSaw');
-    saw.takenBy = null;
+    expect(state.workers[0]?.station).toBe(STATION_HOME);
+    expect(state.workers[0]?.noPlaceFor).toBe('tableSaw');
+    expect(contractStationFor(state, state.workers[0] as Worker)).toBe(STATION_HOME);
+    saw.broken = false;
     minutes(state, 10);
     expect(contract.labourMinutes).toBe(10);
-    expect(saw.takenBy).toBe('staff-1');
+    expect(menAtMachine(state, saw)).toEqual(['staff-1']);
   });
 
   it('stops with the bags full, rests at dinner, and does nothing with nobody on it', () => {
@@ -638,7 +651,7 @@ describe('the material off the rack (CLAUDE.md T17 2.22)', () => {
     expect(contract.sheetsReserved).toBe(Math.max(0, held - contract.sheetsUsed));
   });
 
-  it('stands the men at their benches while the rack cannot cover the next piece', () => {
+  it('stands the men at the canteen door while the rack cannot cover the next piece', () => {
     const state = joinerHall();
     const contract = packs(state);
     state.stock.sheets = 0;
@@ -646,7 +659,9 @@ describe('the material off the rack (CLAUDE.md T17 2.22)', () => {
     const worked = minutes(state, 60);
     expect(worked).toBe(0);
     expect(contract.piecesMade).toBe(0);
-    expect(state.workers[0]?.station).toBe('bench');
+    // The canteen door, where the hall stands a contract man with no sheets (CLAUDE.md T24 2.3):
+    // the minute writes it now as well as the stations, so the two cannot disagree.
+    expect(state.workers[0]?.station).toBe(STATION_DOOR);
     // A delivery lands and the work goes on.
     state.stock.sheets = 20;
     expect(contractWaitingForMaterial(state, contract)).toBe(false);

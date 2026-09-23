@@ -2,10 +2,9 @@
 // The men on a job, and there is no limit on how many (PIOTR, 17.09; CLAUDE.md T19 2.5). The two
 // fields of Turn 17, the man it was assigned to and the second man, are one list now. Everybody on
 // it books his own minutes into the job at his own rate, so twenty men do make it go faster; a
-// stage at a machine still goes at one man's speed, because a machine takes one man at a time and
-// the rest stand in the queue; and every man on it has a standing place of his own.
+// stage at a machine goes at the speed of as many men as the hall has places for at it, and the
+// rest say they have no place (CLAUDE.md T25 2.3); and every man at work has a place of his own.
 
-import { benchOf } from '../../src/engine/machines';
 import { stagePlanFor } from '../../src/engine/stages';
 import { describe, expect, it } from 'vitest';
 import {
@@ -17,16 +16,9 @@ import {
   minutesRemainingFor,
   takeOffJob,
 } from '../../src/engine/jobs';
-import { hands, stationForProduction, workMinute } from '../../src/engine/production';
-import { placeStation, stationPlaceAt } from '../../src/engine/stations';
+import { hands, workMinute } from '../../src/engine/production';
 import { stationCell } from '../../src/render/hall';
-import {
-  STATION_BENCH,
-  secondStation,
-  standingCell,
-  stationSecondAt,
-  waitingStation,
-} from '../../src/engine/stations';
+import { STATION_BENCH, STATION_HOME, machineStation } from '../../src/engine/stations';
 import { animationForStation } from '../../src/render/characters';
 import { renderWorkPlan } from '../../src/ui/workPlan';
 import type { GameState, Job } from '../../src/engine/index';
@@ -47,10 +39,10 @@ function jobOfFirst(state: GameState): Job {
   return job;
 }
 
-/** Six benches and a saw each, so the hall never queues for a machine: the question here is the
- *  men, not the saw. Each man put on the first job comes off his own. */
-function menOnOne(count: number, saws = CREW): GameState {
-  let state = sixJoinersOnSheetWork({ saws });
+/** Six benches and a saw each, so the hall never runs out of places at a machine: the question
+ *  here is the men, not the saw. Each man put on the first job comes off his own. */
+function menOnOne(count: number, saws = CREW, sawVariant = 'standard'): GameState {
+  let state = sixJoinersOnSheetWork({ saws, sawVariant });
   const jobId = jobOfFirst(state).id;
   for (let man = 2; man <= count; man += 1) {
     state = act(state, { type: 'ADD_TO_JOB', jobId, workerId: `staff-${man}` });
@@ -69,9 +61,9 @@ function labourIn(
 ): number {
   const job = state.jobs.find((entry) => entry.id === jobId);
   if (!job) throw new Error('no job');
-  // The bag of work (v37) keeps the labour by stage: at the cutting the machining and the assembly
-  // are already done, so the saw is the one open station and a queue can form (assembly no longer
-  // waits for the cut parts, v43); at the assembly the cutting and the machining are behind it.
+  // The labour by stage: at the cutting the machining and the assembly are already done, which
+  // is how a job at its cutting has always been stood; at the assembly the cutting and the
+  // machining are behind it. Every man on it works its current stage (CLAUDE.md T25 2.2).
   const plan = stagePlanFor(state, job);
   const share = (id: string): number => {
     const stage = plan.find((entry) => entry.id === id);
@@ -137,15 +129,25 @@ describe('the men on a job (CLAUDE.md T19 2.5)', () => {
     expect(done(twoMen)).toBeGreaterThan(done(oneMan) * 1.5);
   });
 
-  it('runs a cutting stage at one man’s speed with three men and one saw', () => {
-    // The saw takes one man at a time: with nothing else of the job left, the other two stand in
-    // the queue and the stage goes no faster than the man on it (CLAUDE.md T19 2.5).
-    const one = menOnOne(1, 1);
-    const three = menOnOne(3, 1);
+  it('runs a cutting stage at one man s speed with three men and a saw of one place', () => {
+    // A budget saw has one place: the other two have none and the stage goes no faster than the
+    // man at it (CLAUDE.md T25 2.1, 2.3).
+    const one = menOnOne(1, 1, 'budget');
+    const three = menOnOne(3, 1, 'budget');
     const alone = labourIn(one, jobOfFirst(one).id, 'cutting', 20);
     const crowd = labourIn(three, jobOfFirst(three).id, 'cutting', 20);
     expect(alone).toBeGreaterThan(0);
     expect(crowd).toBeCloseTo(alone, 4);
+  });
+
+  it('runs it at two men s speed with the same three men and a saw of two places', () => {
+    const one = menOnOne(1, 1, 'standard');
+    const three = menOnOne(3, 1, 'standard');
+    const alone = labourIn(one, jobOfFirst(one).id, 'cutting', 20);
+    const crowd = labourIn(three, jobOfFirst(three).id, 'cutting', 20);
+    expect(alone).toBeGreaterThan(0);
+    // Two of the three at the saw's two places, the three being all novices at one rate.
+    expect(crowd).toBeCloseTo(alone * 2, 4);
   });
 
   it('runs the assembly stage at three men’s speed with the same three men', () => {
@@ -157,30 +159,23 @@ describe('the men on a job (CLAUDE.md T19 2.5)', () => {
     expect(crowd).toBeGreaterThan(alone * 2.5);
   });
 
-  it('sends the men past the first to the waiting cell and then along the same side', () => {
-    const state = menOnOne(3, 1);
+  it('stands the men a one place saw has no place for at their home cells, and says why', () => {
+    const state = menOnOne(3, 1, 'budget');
     const job = jobOfFirst(state);
-    // The one job in the hall, so the queue this test is about is the whole of the hall's work. From
-    // Turn 22 nobody is moved between jobs at all, so the queue forms wherever two men of a job want
-    // the one machine (CLAUDE.md T19 2.5, T22 2.6); that rule is asserted in
-    // tests/engine/nobodyMoved.test.ts.
+    // The one job in the hall, so the places this test is about are the whole of the hall's work.
+    // Nobody is moved between jobs and nobody to another stage (CLAUDE.md T22 2.6, T25 2.2).
     state.jobs = [job];
-    // At the cutting with the machining and the assembly done, so the saw is the one open station.
     labourIn(state, job.id, 'cutting', 0);
     workMinute(
       state,
       hands(state).filter((hand) => hand.job.id === job.id),
     );
-    const stations = job.assignees.map((who) => stationForProduction(state, who, job));
-    expect(new Set(stations).size).toBe(3);
-    expect(stations.filter((station) => station.startsWith('machine:'))).toHaveLength(1);
-    expect(stations).toContain(waitingStation('tableSaw'));
-    const beyond = stations.map((station) => stationPlaceAt(station)).filter((place) => place);
-    expect(beyond).toHaveLength(1);
-    expect(beyond[0]?.place).toBe(2);
+    const men = job.assignees.map((who) => state.workers.find((worker) => worker.id === who));
+    expect(men.map((man) => man?.station)).toEqual([machineStation('tableSaw'), STATION_HOME, STATION_HOME]);
+    expect(men.map((man) => man?.noPlaceFor)).toEqual(['', 'tableSaw', 'tableSaw']);
   });
 
-  it('stands them at the bench’s own places, the second behind it and the third along it', () => {
+  it('stands them at the benches places, every man at a place of his own', () => {
     const state = menOnOne(3);
     const job = jobOfFirst(state);
     job.labourRemaining = job.labourValue * 0.45;
@@ -188,25 +183,23 @@ describe('the men on a job (CLAUDE.md T19 2.5)', () => {
       state,
       hands(state).filter((hand) => hand.job.id === job.id),
     );
-    // The bench is not taken off anybody from Turn 23: every man has his own place at one, and
-    // the men behind the lead work at the lead's (CLAUDE.md T19 2.5, T23 2.17).
-    const bench = benchOf(state, 'staff-1');
-    if (!bench) throw new Error('the first man has no place at a bench');
-    const stations = job.assignees.map((who) => stationForProduction(state, who, job));
-    expect(stations[0]).toBe(STATION_BENCH);
-    expect(stations[1]).toBe(secondStation(bench.id));
-    expect(stationPlaceAt(stations[2] ?? '')).toEqual({ id: bench.id, place: 2 });
-    // The second place of Turn 16, which is a cell of its own and not the operator's.
-    expect(stationSecondAt(secondStation(bench.id))).toBe(bench.id);
-    expect(standingCell(state, bench, 'second')).not.toEqual(standingCell(state, bench, 'operator'));
-    expect(animationForStation(secondStation(bench.id))).toBe('bench');
+    // The bench is a family with places like any other, filled in the order the benches were
+    // bought (CLAUDE.md T25 2.2, 2.6).
+    const stations = job.assignees.map(
+      (who) => state.workers.find((worker) => worker.id === who)?.station ?? '',
+    );
+    expect(stations).toEqual([
+      machineStation('workbench'),
+      machineStation('workbench'),
+      machineStation('workbench'),
+    ]);
+    expect(animationForStation(machineStation('workbench'))).toBe('bench');
     expect(animationForStation(STATION_BENCH)).toBe('bench');
-    // And the third man works at the bench like the two in front of him (CLAUDE.md T19 2.5).
-    expect(animationForStation(placeStation(bench.id, 2))).toBe('bench');
-    // The renderer gives him a cell of his own: three men, three cells, none of them shared. This
-    // is the half the engine cannot check on its own, and it was the last thing left of the "one
-    // sprite on top of another" that 2.5 set out to fix (T19-C1g).
-    const cells = stations.map((station) => stationCell(state, station, { x: 0, y: 0 }));
+    // The renderer gives each a cell of his own: three men, three cells, none of them shared. This
+    // is the half the engine cannot check on its own (T19-C1g, T25 2.6).
+    const cells = job.assignees.map((who, index) =>
+      stationCell(state, stations[index] ?? '', { x: 0, y: 0 }, who),
+    );
     const seen = new Set(cells.map((cell) => `${cell.x},${cell.y}`));
     expect(seen.size).toBe(3);
   });

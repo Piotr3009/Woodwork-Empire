@@ -1,8 +1,8 @@
 // What is wrong with a man (PIOTR, 19.09; docs/mockups/t22/bubbles-v2.png; CLAUDE.md T22 2.5).
 //
-// One mark over a man's head, and only while something is wrong with him: he is waiting for a
-// machine another man has, waiting for parts nobody has cut yet, on a job the rack has no sheets
-// for, or standing with nothing to do at all. A man working, a helper at his chore, a man at his
+// One mark over a man's head, and only while something is wrong with him: the hall has no place
+// for him at the machine his work wants, his job has no sheets on the rack, his bench has no air,
+// or he is standing with nothing to do at all. A man working, a helper at his chore, a man at his
 // lunch, in the office or out measuring gets nothing: no mark, no words, no paper
 // [PIOTR, 19.09: "when all is fine, no bubble; only when it is bad"].
 //
@@ -12,29 +12,17 @@
 // because a word Piotr wants changed has to be one line in one table.
 //
 // Nothing in here decides anything. Every fact it reports is already decided somewhere else: the
-// station by `updateStations` and `stationNow`, why a man stands by `placeHand` and
-// `waitingWordsFor`, what is on the rack by `canWorkOn`. The mark reports them and re-derives none
-// of them.
+// station by `updateStations` and `stationNow`, who has a place by the day plan (`planPlaces`),
+// what is on the rack by `canWorkOn`. The mark reports them and re-derives none of them.
 
 import { BUBBLES } from './constants';
-import { contractMenAtWork, contractOfWorker } from './contracts';
+import { contractOfWorker, contractWaitingForMaterial } from './contracts';
 import { OWNER, machineShortWord } from './machines';
 import { ownerIsAvailable } from './owner';
 import { standsForAir } from './media';
-import {
-  WAITING_FOR_MATERIAL,
-  jobOf,
-  standsForBench,
-  waitingWordsFor,
-} from './production';
+import { WAITING_FOR_MATERIAL, jobOf, stageOfMan } from './production';
 import { isWorkingToday, waitsForTheBoss } from './staff';
-import { cncOptions, stageFor } from './stages';
-import {
-  STATION_LUNCH,
-  roomBehindStation,
-  stationNow,
-  stationWaitingFor,
-} from './stations';
+import { STATION_LUNCH, roomBehindStation, stationNow } from './stations';
 import { findTask } from './tasks';
 import type { Bubble, BubbleKey, Contract, GameState, Job } from './types';
 
@@ -62,42 +50,46 @@ function holdsAJobOfWork(state: GameState, who: string): boolean {
   return findTask(state, id) !== null;
 }
 
-/** What is wrong with a man on a job in production: the rack first, then the machine he cannot have.
- *  Null while he is working, and null while his job is stopped by something the mark has no word
- *  for: the hall's own chips say the bags are full or the saw is broken, and a mark over a man whose
- *  job has stopped for a reason he cannot mend would be the one thing the section is against. */
+/** The family the hall has no place for this man at, or '' while he has one or wants none: what
+ *  the day plan wrote on him (CLAUDE.md T25 2.3). */
+function noPlaceOf(state: GameState, who: string): string {
+  const man = who === OWNER ? state.owner : state.workers.find((worker) => worker.id === who);
+  return man?.noPlaceFor ?? '';
+}
+
+/** What is wrong with a man on a job in production: no place for him, then the rack, then the air
+ *  at his bench. Null while he is working, and null while his job is stopped by something the mark
+ *  has no word for: the hall's own chips say the bags are full or the saw is broken, and a mark
+ *  over a man whose job has stopped for a reason he cannot mend would be the one thing the section
+ *  is against. */
 function onAJob(state: GameState, who: string, job: Job): Bubble | null {
+  // The hall has no place for him: the thing to put right is a machine, or a man taken off
+  // (PIOTR, 21.09; CLAUDE.md T25 2.3).
+  const family = noPlaceOf(state, who);
+  if (family !== '') return bubble(who, 'noPlace', { machine: machineShortWord(family) });
   if (job.blockedBy === WAITING_FOR_MATERIAL) {
     return bubble(who, 'noMaterial', { job: job.name });
   }
-  const stage = stageFor(state, who, job, cncOptions(state, who, job));
   // A bench with nothing in the hose stands him still, and it is a thing the player can put
   // right with a compressor: media.ts decides it and the mark reports it (CLAUDE.md T23 2.7).
-  // No place at a bench for a stage done at one: the thing to put right is a bench, and until v47
-  // the mark said "waiting for the saw" over a man with two saws idle (PIOTR, 22.09).
-  if (standsForBench(state, who, stage)) return bubble(who, 'noBench');
-  if (standsForAir(state, stage)) return bubble(who, 'noCompressor');
-  const waiting = waitingWordsFor(state, who, job);
-  if (waiting === null) return null;
-  const family = stage?.family ?? null;
-  return family === null ? null : bubble(who, 'waitingForMachine', { machine: machineShortWord(family) });
+  if (standsForAir(state, stageOfMan(state, who, job))) return bubble(who, 'noCompressor');
+  return null;
 }
 
 /** What is wrong with the man on a standing contract: the sheets his contract has not got, the
- *  machine he is queueing for, and nothing else. He is at work on his week's pieces otherwise, so
- *  nothing is drawn over him at all; the count of them was the paper bubble of Turn 21 and is gone
- *  with it, and the Contracts tab is where that figure is read (CLAUDE.md T22 2.5).
+ *  place the hall has not got for him, and nothing else. He is at work on his week's pieces
+ *  otherwise, so nothing is drawn over him at all (CLAUDE.md T22 2.5).
  *
- *  A contract that cannot use him is a thing the player can put right with an order, so it is said
- *  over his head in the contract's own name, and he is standing at the canteen door while it is
+ *  A contract with no sheets is a thing the player can put right with an order, so it is said over
+ *  his head in the contract's own name, and he is standing at the canteen door while it is
  *  [PIOTR, 22.09] (CLAUDE.md T24 2.3). `contractStationFor` stands him there off the same
- *  `contractMenAtWork`, so the mark and the cell are one answer. */
-function onAContract(state: GameState, who: string, station: string, contract: Contract): Bubble | null {
-  if (!contractMenAtWork(state).includes(who)) {
+ *  `contractWaitingForMaterial`, so the mark and the cell are one answer. */
+function onAContract(state: GameState, who: string, contract: Contract): Bubble | null {
+  if (contractWaitingForMaterial(state, contract)) {
     return bubble(who, 'noMaterial', { job: contract.name });
   }
-  const family = stationWaitingFor(station);
-  return family === null ? null : bubble(who, 'waitingForMachine', { machine: machineShortWord(family) });
+  const family = noPlaceOf(state, who);
+  return family === '' ? null : bubble(who, 'noPlace', { machine: machineShortWord(family) });
 }
 
 /** The mark over this man's head this minute, or null while there is nothing wrong with him. `who`
@@ -115,10 +107,10 @@ export function bubbleFor(state: GameState, who: string): Bubble | null {
   const job = jobOf(state, who);
   if (job !== null) return onAJob(state, who, job);
   // A man the standing contract has is at work on it, whether or not the hall has a job for him:
-  // what can be wrong with him is the sheets it has not got and the machine he is queueing for
-  // (CLAUDE.md T20 2.1, T24 2.3).
+  // what can be wrong with him is the sheets it has not got and the place the hall has not got
+  // for him (CLAUDE.md T20 2.1, T24 2.3, T25 2.3).
   const contract = who === OWNER ? null : contractOfWorker(state, who);
-  if (contract !== null) return onAContract(state, who, station, contract);
+  if (contract !== null) return onAContract(state, who, contract);
   // Nobody has put him on anything and there is no manager on duty to: he is waiting for the
   // boss's word, which is a click in the Work Plan (PIOTR, 20.09; CLAUDE.md T23 2.1). The owner
   // waits for nobody, so the older words are still his.

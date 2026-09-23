@@ -1,14 +1,15 @@
-// Workshop efficiency (CLAUDE.md T13 3.5): one engine function computes the number and the four
+// Workshop efficiency (CLAUDE.md T13 3.5): one engine function computes the number and the five
 // lines of its breakdown; the top bar and the day end print them.
 //
 // The number is the production minutes actually worked this day over the minutes the workshop
 // could have worked with every hired person at a station, the owner counted while he is in
-// (game.ts `possibleSeats` and `tallyEfficiency`, one call a production minute). The four lines
-// are where the rest went, each a share of the lost minutes: a man waiting for a machine is "no
-// machine free", a rack that cannot supply is "no material", what the owner's absence took off
-// every staff minute is "owner away", and a seat nobody stood at is "no people". A day nobody
-// could have worked (possible 0) reads 100: nothing was lost, and the number erodes from there as
-// the first seat goes empty.
+// (game.ts `possibleSeats` and `tallyEfficiency`, one call a production minute). The five lines
+// are where the rest went, each a share of the lost minutes: a man the hall had no place for at
+// the machine his work wanted is "no place" (CLAUDE.md T25 2.3), a rack that cannot supply is "no
+// material", a job the hall stopped is "hall stopped", what the owner's absence took off every
+// staff minute is "owner away", and a seat nobody stood at is "no people". A day nobody could
+// have worked (possible 0) reads 100: nothing was lost, and the number erodes from there as the
+// first seat goes empty.
 
 import { monthOfDay } from './clock';
 import { EFFICIENCY_CAUSES } from './constants';
@@ -19,7 +20,7 @@ export interface EfficiencyLine {
   id: LostMinuteCause;
   label: string;
   minutes: number;
-  /** Of the lost minutes, as a whole percentage. The four add up to a hundred, or to nothing. */
+  /** Of the lost minutes, as a whole percentage. The lines add up to a hundred, or to nothing. */
   percent: number;
 }
 
@@ -32,7 +33,7 @@ export interface Efficiency {
 }
 
 export function emptyEfficiency(): EfficiencyStats {
-  return { possible: 0, worked: 0, lost: { noPeople: 0, noMachine: 0, noMaterial: 0, ownerAway: 0 } };
+  return { possible: 0, worked: 0, lost: { noPeople: 0, noPlace: 0, noMaterial: 0, hallStopped: 0, ownerAway: 0 } };
 }
 
 /** The ratio of production minutes actually worked this day to the minutes the workshop could
@@ -48,7 +49,7 @@ export function efficiencyOf(stats: EfficiencyStats): Efficiency {
   }));
   const causes = lines.reduce((sum, line) => sum + line.minutes, 0);
   if (causes > 0) {
-    // Largest remainder, so the four come to a hundred and never to ninety nine.
+    // Largest remainder, so the lines come to a hundred and never to ninety nine.
     const exact = lines.map((line) => (line.minutes / causes) * 100);
     let left = 100;
     lines.forEach((line, index) => {
@@ -74,7 +75,7 @@ export function workshopEfficiency(state: GameState): Efficiency {
 }
 
 /** The line that took the most of the lost minutes, for the one sentence the day end says about
- *  the number ("73%, mostly no machine free"); null when nothing was lost. Ties go to the first
+ *  the number ("73%, mostly no place"); null when nothing was lost. Ties go to the first
  *  in the table's order. */
 export function topCause(efficiency: Efficiency): EfficiencyLine | null {
   let top: EfficiencyLine | null = null;

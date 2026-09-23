@@ -170,16 +170,14 @@ describe('the day fixtures Piotr sent, one minute in', () => {
     return state;
   }
 
-  it('gives the day 128 hall four rows and the figure the top bar carries', () => {
+  it('gives the day 128 hall one row, the owner s at the saw s one place, and the figure the top bar carries', () => {
+    // Four men on the kitchen at its cutting and a budget saw of one place: the owner cuts and the
+    // three joiners have no place at it, so they made nothing today and have no row (CLAUDE.md
+    // T25 2.3). Until v52 the bag of work sent them to the machining and the assembly.
     const state = runClock(load('tests/fixtures/day128-v25.woodwork.json'), 1);
     const made = workshopBreakdownToday(state);
-    expect(made.men).toHaveLength(4);
-    expect(made.men.map((row) => row.main)).toEqual([
-      'Piotr, cutting Small kitchen (6 units), commercial',
-      'Eddie, experienced joiner, machining Small kitchen (6 units), commercial',
-      'Pete, very experienced joiner, assembling Small kitchen (6 units), commercial',
-      'Callum, excellent joiner, assembling Small kitchen (6 units), commercial',
-    ]);
+    expect(made.men).toHaveLength(1);
+    expect(made.men.map((row) => row.main)).toEqual(['Piotr, cutting Small kitchen (6 units), commercial']);
     expect(made.total).toBe(workshopOutputToday(state));
     expect(made.hall?.words).toBe('clean, extraction working');
     expect(made.note).toBe('');

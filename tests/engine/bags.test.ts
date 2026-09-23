@@ -20,7 +20,7 @@ import {
 import type { Equipment, GameState } from '../../src/engine/index';
 // The clock's own booking of a minute at a machine, off the module: the tests stand a man at a
 // thicknesser, which no stage of any job does yet.
-import { accumulateMachineMinute } from '../../src/engine/machines';
+import { accumulateMachineMinute, menAtMachine } from '../../src/engine/machines';
 import {
   acceptNow,
   act,
@@ -177,7 +177,7 @@ describe('emptying the bags', () => {
     state = tick(state, 30);
     expect(firstJob(state).blockedBy).toBe('bags full');
     expect(firstJob(state).labourRemaining).toBe(before);
-    expect(machineOf(state, 'tableSaw').takenBy).toBeNull();
+    expect(menAtMachine(state, machineOf(state, 'tableSaw'))).toEqual([]);
     // Nothing asks on its own while they stand stopped; the extractor asks when it is clicked.
     expect(state.activeEvent).toBeNull();
     state = act(state, { type: 'ASK_EMPTY_BAGS' });
@@ -188,7 +188,7 @@ describe('emptying the bags', () => {
     const running = tick(state, 30);
     expect(firstJob(running).blockedBy).toBe('');
     expect(firstJob(running).labourRemaining).toBeLessThan(before);
-    expect(machineOf(running, 'tableSaw').takenBy).toBe('owner');
+    expect(menAtMachine(running, machineOf(running, 'tableSaw'))).toEqual(['owner']);
   });
 
   it('tells the workshop once, the minute the store fills, and not once a machine', () => {

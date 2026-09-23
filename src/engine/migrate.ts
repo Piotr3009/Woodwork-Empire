@@ -18,6 +18,7 @@ import {
   WEBSITE_START_LEVEL,
   WORKER_RATES,
 } from './constants';
+import { planPlaces } from './production';
 import type { GameState, WorkerTier } from './types';
 
 /** The weeks in a month that the Turn 20 build converted a monthly wage with, thirty days over
@@ -716,6 +717,72 @@ function liftToVersion27(state: Raw): void {
   state.version = 27;
 }
 
+/** A tally of lost minutes or of a man's idle ones, lifted to the causes of v52: the queue's
+ *  `noMachine` becomes `noPlace`, the one thing a machine can still stop a man for, and the causes
+ *  that are new start on nought (CLAUDE.md T25 2.3). */
+function liftCauses(tally: unknown, added: readonly string[]): void {
+  if (!isRecord(tally)) return;
+  if (typeof tally.noMachine === 'number') {
+    tally.noPlace = tally.noMachine;
+    delete tally.noMachine;
+  }
+  if (typeof tally.noPlace !== 'number') tally.noPlace = 0;
+  for (const key of added) if (typeof tally[key] !== 'number') tally[key] = 0;
+}
+
+/** The waiting lines a closed month keeps, in the order and the words of `EFFICIENCY_CAUSES` of
+ *  v52: the queue's line becomes "No place" and "Hall stopped" is added on nought, so a month card
+ *  drawn from an old report reads the same lines as one drawn tonight (CLAUDE.md T25 2.3). */
+function liftWaitingLines(lines: unknown): unknown {
+  if (!Array.isArray(lines)) return lines;
+  const out: Raw[] = [];
+  for (const line of lines) {
+    if (!isRecord(line)) continue;
+    if (line.id === 'noMachine') out.push({ ...line, id: 'noPlace', label: 'No place' });
+    else out.push(line);
+    if (line.id === 'noMaterial') out.push({ id: 'hallStopped', label: 'Hall stopped', minutes: 0, percent: 0 });
+  }
+  return out;
+}
+
+/** v28 (v52, PIOTR 21.09): a machine is places and nobody takes one (CLAUDE.md T25 section 4).
+ *  `takenBy` is cleared on every item and is never written again; every man and the owner get
+ *  `working` and `noPlaceFor`, worked out by the day plan once the lift is done
+ *  (`migrateState`), so an old save opens with the right men working; a job's row that said it
+ *  was waiting for a machine or for a bench is cleared, and a man standing at a waiting cell or at
+ *  a place of the old queue stands at his home cell. The lost minutes of the day, of every closed
+ *  day and of every monthly report move from the queue's cause to `noPlace`. */
+function liftToVersion28(state: Raw): void {
+  for (const item of records(state.equipment)) item.takenBy = null;
+  const men = [state.owner, ...records(state.workers)];
+  for (const man of men) {
+    if (!isRecord(man)) continue;
+    man.working = false;
+    man.noPlaceFor = '';
+    const station = typeof man.station === 'string' ? man.station : '';
+    if (station.startsWith('waiting:') || station.startsWith('place:') || station.startsWith('second:')) {
+      man.station = 'home';
+    }
+    if (station === 'noBench') man.station = 'door';
+  }
+  if (isRecord(state.owner)) liftCauses(state.owner.idleByReason, ['hallStopped']);
+  for (const worker of records(state.workers)) liftCauses(worker.idleByReason, ['noCompressor', 'hallStopped']);
+  for (const job of records(state.jobs)) {
+    const blocked = typeof job.blockedBy === 'string' ? job.blockedBy : '';
+    if (blocked.startsWith('waiting for the ') || blocked === 'no bench') job.blockedBy = '';
+  }
+  if (isRecord(state.dayStats) && isRecord(state.dayStats.efficiency)) {
+    liftCauses(state.dayStats.efficiency.lost, ['hallStopped']);
+  }
+  for (const day of records(state.days)) {
+    if (isRecord(day.efficiency)) liftCauses(day.efficiency.lost, ['hallStopped']);
+  }
+  for (const report of records(state.monthlyReports)) {
+    if (isRecord(report.efficiency)) report.efficiency.waiting = liftWaitingLines(report.efficiency.waiting);
+  }
+  state.version = 28;
+}
+
 const LIFTS: Record<number, (state: Raw) => void> = {
   12: liftToVersion13,
   13: liftToVersion14,
@@ -732,6 +799,7 @@ const LIFTS: Record<number, (state: Raw) => void> = {
   24: liftToVersion25,
   25: liftToVersion26,
   26: liftToVersion27,
+  27: liftToVersion28,
 };
 
 /** The state a save holds, lifted bump by bump into this build's shape, or null when the save is
@@ -745,5 +813,17 @@ export function migrateState(raw: unknown, version: number): GameState | null {
     if (lift === undefined) return null;
     lift(state);
   }
-  return state as unknown as GameState;
+  const lifted = state as unknown as GameState;
+  // Who has a place, worked out the moment the save is open rather than left for the first
+  // minute: an old save opens with the right men working (CLAUDE.md T25 section 4). A fragment of
+  // a state that is not a whole hall cannot be planned, and is lifted as it is: its first minute
+  // plans it, as every minute does.
+  if (version < 28) {
+    try {
+      planPlaces(lifted);
+    } catch {
+      // Not a whole hall: nothing to plan.
+    }
+  }
+  return lifted;
 }

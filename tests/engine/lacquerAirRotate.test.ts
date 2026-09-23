@@ -255,7 +255,7 @@ describe('no bench work without air', () => {
     expect(bubbleFor(ran, 'owner')?.text).toBe('no compressor');
     // And the minutes he stood are on his day meter under that reason, not under the machine.
     expect(ran.owner.idleByReason.noCompressor).toBeGreaterThan(0);
-    expect(ran.owner.idleByReason.noMachine).toBe(0);
+    expect(ran.owner.idleByReason.noPlace).toBe(0);
   });
 
   it('works the very next minute once a used compressor is in the hall', () => {

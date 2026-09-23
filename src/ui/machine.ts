@@ -11,7 +11,7 @@
 import {
   airDemandOf,
   bagsOf,
-  benchPlacesOf,
+  placesOf,
   compressorAirOf,
   compressors,
   countOf,
@@ -159,7 +159,7 @@ function bagsLine(spec: EquipmentSpec, variant: EquipmentVariant): string {
  *  and the pace they each work their own job at [PIOTR, 20.09] (CLAUDE.md T23 2.17). A bench is
  *  not on the machine ladder, so this is the one line that says what the money buys on it. */
 function benchLine(spec: EquipmentSpec, variant: EquipmentVariant): Line {
-  const places = benchPlacesOf({ specId: spec.id, variantId: variant.id });
+  const places = spec.id === 'workbench' ? placesOf({ specId: spec.id, variantId: variant.id }) : 0;
   if (places <= 0) return line('');
   const per = Math.round((variant.outputFactor - 1) * 100);
   const men = `${places} ${places === 1 ? 'man' : 'men'}`;

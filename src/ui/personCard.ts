@@ -22,7 +22,8 @@ import type { GameState, Job, Worker } from '../engine/index';
 // Straight off their own modules, not round the public API, which Turn 13 froze (REPORT-T13 10).
 import { OWNER } from '../engine/machines';
 import { stageLabel } from '../engine/stages';
-import { jobStage, waitingLine } from '../engine/jobs';
+import { jobStage } from '../engine/jobs';
+import { placeLine } from '../engine/production';
 import {
   ROLE_WORDS,
   dayMeterOf,
@@ -271,8 +272,9 @@ function weekLines(state: GameState, person: Person): string {
     }
     const worked = weekWorkedMinutes(meters);
     const stood = Math.max(0, meters.paidMinutes - worked);
-    // And what the standing was for, when the week knows: the one machine he waited for most, so
-    // the player reads off the card whether a second one would pay (PIOTR, 20.09; v37).
+    // And what the standing was for, when the week knows: the one machine the hall had no place
+    // for him at most, so the player reads off the card whether a second one would pay
+    // (PIOTR, 20.09; v37; CLAUDE.md T25 2.3).
     let waitedFor: [string, number] | null = null;
     for (const [family, count] of Object.entries(meters.waitedFor ?? {})) {
       if (count !== undefined && count > 0 && (waitedFor === null || count > waitedFor[1])) {
@@ -280,7 +282,7 @@ function weekLines(state: GameState, person: Person): string {
       }
     }
     const forWhat =
-      waitedFor === null ? '' : `, ${hoursText(waitedFor[1])} of it ${waitingLine(waitedFor[0])}`;
+      waitedFor === null ? '' : `, ${hoursText(waitedFor[1])} of it ${placeLine(waitedFor[0])}`;
     return (
       `<p class="tile-figures" data-week="${label}">` +
       escapeHtml(`${label}: ${hoursText(worked)} worked · ${hoursText(stood)} idle${forWhat}`) +

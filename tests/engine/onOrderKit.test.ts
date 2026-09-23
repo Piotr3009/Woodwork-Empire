@@ -1,13 +1,13 @@
 // A machine on order is a drawing on the floor and nothing more (CLAUDE.md T10 1, 3.10). It cuts
-// nothing, it holds no queue and it answers no question about what is in the hall. The one
+// nothing, it has no places and it answers no question about what is in the hall. The one
 // question it may answer is the board's lock, and the board asked it days before anybody cut
 // anything.
 
 import { describe, expect, it } from 'vitest';
 import {
   countOf,
-  freeMachines,
   hallBlock,
+  hallPlaces,
   has,
   hasExtraction,
   machineIsShared,
@@ -48,7 +48,7 @@ describe('kit that is bought and still on the road', () => {
     expect(state.onOrder.map((item) => item.specId)).toEqual(['tableSaw']);
     expect(has(state, 'tableSaw')).toBe(false);
     expect(countOf(state, 'tableSaw')).toBe(0);
-    expect(freeMachines(state, 'tableSaw')).toEqual([]);
+    expect(hallPlaces(state, 'tableSaw')).toBe(0);
     expect(machineIsShared(state, 'tableSaw')).toBe(true);
     // What it does answer is the board's lock: a company that has ordered a saw can take sheet
     // work, because the drawing and the material take days of their own (CLAUDE.md T8 3.2), so
@@ -73,9 +73,9 @@ describe('kit that is bought and still on the road', () => {
     const state = sawOnTheRoad();
     const order = state.onOrder[0];
     if (!order) throw new Error('the saw should be on order');
-    // The article is the drawing's, and the phrase is the one the game says about any machine a job
-    // cannot have (CLAUDE.md T21 2.7).
-    const wanted = `waiting for the saw (on order, due ${formatCalendarDay(order.dueDay)})`;
+    // The trade's own word for the machine and the day the lorry comes (CLAUDE.md T21 2.7,
+    // T25 2.2: nothing says it waits for a machine).
+    const wanted = `saw on order, due ${formatCalendarDay(order.dueDay)}`;
     expect(hallBlock(state, firstJob(state))).toBe(wanted);
     expect(startProductionCheck(state, firstJob(state))).toEqual({ ok: false, reason: wanted });
   });
@@ -86,9 +86,7 @@ describe('kit that is bought and still on the road', () => {
     if (!order) throw new Error('the saw should be on order');
     const next = runClock(act(state, { type: 'WORK_HERE', jobId: firstJob(state).id }), 10);
     const job = firstJob(next);
-    expect(job.blockedBy).toBe(
-      `waiting for the saw (on order, due ${formatCalendarDay(order.dueDay)})`,
-    );
+    expect(job.blockedBy).toBe(`saw on order, due ${formatCalendarDay(order.dueDay)}`);
     // And nothing was cut while it waited.
     expect(job.labourRemaining).toBe(job.labourValue);
   });

@@ -1,19 +1,20 @@
 // A contract man with nothing to do stands at the canteen door (PIOTR, 22.09; CLAUDE.md T24 2.3).
 // v45 let him go of his saw the minute the contract stopped wanting him and left him standing at
-// the saw's waiting cell all the same, so the hall drew a man queueing for a machine nobody was at
-// and "waiting for the saw" stood over a man with two saws idle in front of him.
+// the saw's waiting cell all the same. From v52 a man with no work wants no place at all, and the
+// day plan gives the saw's places to the men who have work (CLAUDE.md T25 2.3).
 
 import { describe, expect, it } from 'vitest';
 import { bubbleFor } from '../../src/engine/bubbles';
 import {
   acceptContract,
   assignContract,
-  contractMenAtWork,
   contractStationFor,
   drawContract,
   runContractMinute,
 } from '../../src/engine/contracts';
-import { STATION_NO_BENCH } from '../../src/engine/stations';
+import { STATION_DOOR } from '../../src/engine/stations';
+import { dayPlan, planPlaces } from '../../src/engine/production';
+import { menAtMachine } from '../../src/engine/machines';
 import type { Contract, GameState, Worker } from '../../src/engine/index';
 import {
   buyStartingKit,
@@ -50,7 +51,9 @@ function joiner(id: string, name: string): Worker {
     monthMinutes: 0,
     monthDaysOff: 0,
     idleMinutes: 0,
-    idleByReason: { waitingForBoss: 0, noMachine: 0, noMaterial: 0 },
+    idleByReason: { waitingForBoss: 0, noPlace: 0, noMaterial: 0, noCompressor: 0, hallStopped: 0 },
+    working: false,
+    noPlaceFor: '',
     accidents: 0,
     anchorX: 6,
     anchorY: 6,
@@ -76,13 +79,27 @@ function onAContract(sheets: number): { state: GameState; contract: Contract; ma
   return { state, contract, man };
 }
 
+/** The contract's minute with the day plan the day's minute would hand it (CLAUDE.md T25 2.3). */
+function contractMinute(state: GameState): void {
+  runContractMinute(state, new Map(planPlaces(state).map((entry) => [entry.who, entry])));
+}
+
+/** The men on a contract the day plan has at work this minute. */
+function contractMenPlaced(state: GameState): string[] {
+  return dayPlan(state)
+    .filter((entry) => entry.contract !== null && entry.working)
+    .map((entry) => entry.who);
+}
+
 describe('a contract man the contract cannot use', () => {
-  it('stands at the canteen door with an empty rack, holding no saw', () => {
+  it('stands at the canteen door with an empty rack, with no place at the saw', () => {
     const { state, man } = onAContract(0);
-    expect(contractMenAtWork(state)).toEqual([]);
-    expect(contractStationFor(state, man)).toBe(STATION_NO_BENCH);
-    runContractMinute(state);
-    expect(state.equipment.find((item) => item.specId === 'tableSaw')?.takenBy ?? null).toBe(null);
+    expect(contractMenPlaced(state)).toEqual([]);
+    expect(contractStationFor(state, man)).toBe(STATION_DOOR);
+    contractMinute(state);
+    const saw = state.equipment.find((item) => item.specId === 'tableSaw');
+    if (!saw) throw new Error('a saw is wanted');
+    expect(menAtMachine(state, saw)).toEqual([]);
   });
 
   it('carries the contract s own name over his head, and not the machine s', () => {
@@ -95,21 +112,21 @@ describe('a contract man the contract cannot use', () => {
 
   it('is back at the saw the minute a delivery lands, with nothing over his head', () => {
     const { state, man } = onAContract(0);
-    expect(contractStationFor(state, man)).toBe(STATION_NO_BENCH);
+    expect(contractStationFor(state, man)).toBe(STATION_DOOR);
     state.stock.sheets = 60;
-    expect(contractMenAtWork(state)).toEqual(['staff-1']);
-    runContractMinute(state);
+    expect(contractMenPlaced(state)).toEqual(['staff-1']);
+    contractMinute(state);
     man.station = contractStationFor(state, man) ?? 'idle';
     expect(man.station).toBe('machine:tableSaw');
     expect(bubbleFor(state, man.id)).toBe(null);
   });
 
-  it('goes to the door at five with the crew, and not to the saw s waiting cell', () => {
+  it('goes to the door at five with the crew', () => {
     const { state, man } = onAContract(60);
-    expect(contractStationFor(state, man)).not.toBe(STATION_NO_BENCH);
+    expect(contractStationFor(state, man)).not.toBe(STATION_DOOR);
     // Five o'clock: the crew have gone home and the contract wants nobody.
     state.clock.minute = 9 * 60 + 1;
-    expect(contractMenAtWork(state)).toEqual([]);
-    expect(contractStationFor(state, man)).toBe(STATION_NO_BENCH);
+    expect(contractMenPlaced(state)).toEqual([]);
+    expect(contractStationFor(state, man)).toBe(STATION_DOOR);
   });
 });

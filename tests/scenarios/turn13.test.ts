@@ -5,7 +5,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { CAREFUL, IDLE, type Policy, playDay, playUntilDay } from './autopilot';
-import { act, buyNow, buyStartingKit, clearEvents, connectAll, newGame, runToDay } from '../helpers';
+import { act, atAPlace, buyNow, buyStartingKit, clearEvents, connectAll, newGame, runToDay } from '../helpers';
 import {
   BURGLARY_PAYOUT_DAYS,
   DUST_OUTPUT_M3_PER_HOUR,
@@ -466,9 +466,16 @@ describe('(x) a thicknesser and two saws on one extractor, with gates on the saw
   });
 
   it('counts a gated saw only while it runs, and the ungated thicknesser whenever the fan does', () => {
+    // A man at a place of each machine named, the way the day plan writes it on him: the first
+    // man at a family stands at its first machine bought, and the next at the next machine's place
+    // once the first has no more (the kit's budget saw has one), CLAUDE.md T25 2.3, 2.6.
     const running = (ids: string[]): GameState => {
       const next = JSON.parse(JSON.stringify(gated)) as GameState;
-      for (const item of next.equipment) item.takenBy = ids.includes(item.id) ? 'owner' : null;
+      ids.forEach((id, index) => {
+        const item = next.equipment.find((entry) => entry.id === id);
+        if (!item) throw new Error(`no ${id}`);
+        atAPlace(next, index === 0 ? 'owner' : `staff-at-${index}`, item.specId);
+      });
       return next;
     };
     // Nobody at anything: the fan is off and nothing counts.
@@ -511,11 +518,9 @@ describe('10.1 one model of dust: a pipe changes connection and nothing else', (
   state = connectAll(state);
   const thicknesser = machinesOf(state, 'thicknesser')[0];
   if (!thicknesser) throw new Error('no thicknesser');
-  const running = (base: GameState): GameState => {
-    const next = JSON.parse(JSON.stringify(base)) as GameState;
-    for (const item of next.equipment) item.takenBy = item.id === thicknesser.id ? 'owner' : null;
-    return next;
-  };
+  // The owner at the thicknesser's place (CLAUDE.md T25 2.3).
+  const running = (base: GameState): GameState =>
+    atAPlace(JSON.parse(JSON.stringify(base)) as GameState, 'owner', 'thicknesser');
 
   it('counts an unconnected machine as not served, and a connected one as served', () => {
     const connected = running(state);

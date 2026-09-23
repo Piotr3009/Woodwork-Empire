@@ -17,7 +17,9 @@ import {
   stageSpeed,
 } from '../../src/engine/stages';
 import { stagedJob } from '../../src/engine/jobs';
-import { waitingStation, machineStation } from '../../src/engine/stations';
+import { STATION_HOME, machineStation } from '../../src/engine/stations';
+import { menAtMachine } from '../../src/engine/machines';
+import { bubbleFor } from '../../src/engine/bubbles';
 import { tick } from '../../src/engine/index';
 import type { GameState, Job } from '../../src/engine/index';
 import {
@@ -101,41 +103,43 @@ describe('what a CNC does to a sheet job', () => {
   });
 });
 
-describe('one man per CNC', () => {
+describe('the CNC s places', () => {
   /** Two men, each on a sheet job, in a hall with one CNC. */
   function twoOnOneCnc(): GameState {
-    // A CNC will not run on wet air at all, and this is about the queue at it (T10 3.3).
+    // A CNC will not run on wet air at all, and this is about its one place (T10 3.3, T25 2.1).
     const state = withDryAir(twoMenOnSheetWork({ saws: 1 }));
     placeEquipment(state, 'cnc', { x: 2, y: 6, id: 'kit-cnc' });
     return state;
   }
 
-  it('puts one man on it and leaves the saw free for the other', () => {
+  it('puts one man at its one place and the other at the saw', () => {
     const state = tick(twoOnOneCnc(), 60);
     const cnc = state.equipment.find((item) => item.specId === 'cnc');
     const saw = state.equipment.find((item) => item.specId === 'tableSaw');
-    expect(cnc?.takenBy).toBe(OWNER);
-    // The second man falls back to the saw, which the CNC has left free (CLAUDE.md T7 3.4).
-    expect(saw?.takenBy).toBe(state.workers[0]?.id);
+    if (!cnc || !saw) throw new Error('a CNC and a saw are wanted');
+    // The owner is first in the day plan's order and has the CNC's one place; the second man's
+    // job allows the saw, so he has a place there (CLAUDE.md T7 3.4, T25 2.3).
+    expect(menAtMachine(state, cnc)).toEqual([OWNER]);
+    expect(menAtMachine(state, saw)).toEqual([state.workers[0]?.id]);
     for (const job of state.jobs) expect(job.blockedBy, job.name).toBe('');
     // Both put work in, and the man on the CNC put in more than twice what the saw did.
     const done = state.jobs.map((job) => job.labourValue - job.labourRemaining);
     expect(done.every((value) => value > 0)).toBe(true);
   });
 
-  it('stands the second man at the CNC when the job card will not have the saw', () => {
-    // Nothing of his job left but the CNC's own stage, so the queue at it is the whole of what he
-    // can do (v43: with assembly open he would assemble instead of standing).
+  it('has no place for the second man when the job card will not have the saw', () => {
+    // Nothing of his job left but the CNC's own stage, and its one place is the owner's.
     const state = withOnlyCuttingLeft(twoOnOneCnc());
     for (const job of state.jobs) job.sawFallback = false;
     const before = state.jobs.map((job) => job.labourRemaining);
     const worked = tick(state, 60);
     const joiner = worked.workers[0];
-    expect(joiner?.station).toBe(waitingStation('cnc'));
+    expect(joiner?.station).toBe(STATION_HOME);
+    expect(joiner?.noPlaceFor).toBe('cnc');
     const waiting = worked.jobs.find((job) => job.assignees[0] === joiner?.id);
-    // "the CNC" and not "cnc": the trade's own short word, which is also what the drawing over his
-    // head says (CLAUDE.md T21 2.6, 2.7).
-    expect(waiting?.blockedBy).toBe('waiting for the CNC');
+    // "the CNC" and not "cnc": the trade's own short word, over his head (CLAUDE.md T21 2.6,
+    // T25 2.3).
+    expect(bubbleFor(worked, joiner?.id ?? '')?.text).toBe('no place at the CNC');
     // Not a minute of work went into his job while he stood.
     expect(waiting?.labourRemaining).toBe(before[worked.jobs.indexOf(waiting as Job)]);
     // And the man who has it is at it.

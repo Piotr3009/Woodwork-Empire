@@ -118,8 +118,13 @@ import type {
  *
  *  Version 27 is v51 (PIOTR, 22.09): a machine's service runs on the calendar, so every machine
  *  carries the day it was bought or last serviced in place of the hours it had at the last one,
- *  and the state remembers the day a contract was last offered. Every v25 and v26 save loads. */
-export const STATE_VERSION = 27;
+ *  and the state remembers the day a contract was last offered. Every v25 and v26 save loads.
+ *
+ *  Version 28 is v52 (PIOTR, 21.09): a machine is places and nobody takes one. Every man and the
+ *  owner carry `working` and `noPlaceFor`, the day plan's answer; `takenBy` is a dead field the
+ *  lift clears; the queue's lost minutes are `noPlace` (CLAUDE.md T25 section 4). Every v25, v26
+ *  and v27 save loads. */
+export const STATE_VERSION = 28;
 
 /** Shown in the corner of every screen and bumped by every delivery (PIOTR, 13.09). The only
  *  place the number lives. */
@@ -1405,11 +1410,6 @@ const ENDURANCE_BY_CLASS: Record<string, number> = {
   industrial: 2,
 };
 
-/** How many men can work at one bench of this class at once [TUNE] (PIOTR, 20.09, the rule;
- *  CLAUDE.md T23 2.17). A bench is a bench, and a three metre assembly station on a steel frame
- *  is three men round a wardrobe lying down. The hiring gate counts places and not benches
- *  through `benchPlaces` in src/engine/machines.ts, and each man at one works his own job at that
- *  bench's pace. */
 /** The roles that may be put on a job at all, and so the roles that take a place at a bench. A
  *  helper never builds: he carries, cleans and empties bags, and the Assign list says so rather
  *  than offering him (PIOTR, 17.09; CLAUDE.md T19 2.5, 2.6). It lives here from Turn 23 because
@@ -1417,12 +1417,34 @@ const ENDURANCE_BY_CLASS: Record<string, number> = {
  *  and re-exports it under the name every caller has always used (CLAUDE.md T23 2.17). */
 export const BUILDING_ROLES: readonly WorkerRole[] = ['joiner', 'sprayer'];
 
-export const WORKBENCH_PLACES: Record<string, number> = {
-  used: 1,
+/** How many men can work at one machine of this class at once: a machine is not a thing one man
+ *  takes, it is a number of places to work [PIOTR, 21.09; TUNE, Piotr's own for the saw]
+ *  (CLAUDE.md T25 2.1). Every floor family men work at has its row, the bench's being Turn 23's
+ *  `WORKBENCH_PLACES` folded in (T23 2.17). The CNC and the booth have no used or budget class in
+ *  Piotr's table ("n/a"), but the catalogue sells both, so each of those has the one place a
+ *  machine cannot have fewer of [TUNE]. `placesOf` in src/engine/machines.ts is the one reader, and
+ *  a family that is not here has no places at all: nobody works at it. */
+export const MACHINE_PLACES: Record<string, Record<string, number>> = {
+  tableSaw: { used: 1, budget: 1, standard: 2, pro: 2, industrial: 3 },
+  spindleMoulder: { used: 1, budget: 1, standard: 1, pro: 2, industrial: 2 },
+  edgebander: { used: 1, budget: 1, standard: 1, pro: 2, industrial: 2 },
+  thicknesser: { used: 1, budget: 1, standard: 1, pro: 1, industrial: 2 },
+  cnc: { used: 1, budget: 1, standard: 1, pro: 1, industrial: 2 },
+  sprayBooth: { used: 1, budget: 1, standard: 1, pro: 1, industrial: 2 },
+  workbench: { used: 1, budget: 1, standard: 2, pro: 2, industrial: 3 },
+};
+
+/** The hall's pace at a stage, by the best class of the stage's family standing unbroken in the
+ *  hall and not away for its service, whatever machine of it the man is at [PIOTR, 21.09: "the
+ *  machine's class should add to the efficiency, that is easy to count"; TUNE, Piotr's figures]
+ *  (CLAUDE.md T25 2.4). One ladder for every family, the bench's included: a class stops being a
+ *  factor on whoever holds the machine and becomes the hall's. */
+export const MACHINE_PACE: Record<string, number> = {
+  used: 0.95,
   budget: 1,
-  standard: 2,
-  pro: 2,
-  industrial: 3,
+  standard: 1.05,
+  pro: 1.08,
+  industrial: 1.12,
 };
 
 /** The five classes of workbench. Prices, places and footprints are Piotr's table; the endurance
@@ -4042,8 +4064,15 @@ export const BURGLARY_MACHINES_MAX = 2;
  *  the lost minutes (PIOTR; CLAUDE.md T13 3.5). */
 export const EFFICIENCY_CAUSES: ReadonlyArray<{ id: LostMinuteCause; label: string }> = [
   { id: 'noPeople', label: 'No people' },
-  { id: 'noMachine', label: 'No machine free' },
+  // A man the hall had no place for at the machine his work wanted, and nothing else: nobody
+  // queues for a machine from v52 (CLAUDE.md T25 2.3).
+  { id: 'noPlace', label: 'No place' },
   { id: 'noMaterial', label: 'No material' },
+  // A man with a place whose job the hall stopped: no extraction, the bags full, a machine that
+  // will not run on its air, kit still on the lorry, a bench with no air behind it. Until v52
+  // these were booked with the queue as "no machine free"; `noPlace` means one thing now, so
+  // they have a line of their own [TUNE: the words] (CLAUDE.md T25 2.3).
+  { id: 'hallStopped', label: 'Hall stopped' },
   { id: 'ownerAway', label: 'Owner away' },
 ];
 
@@ -4058,9 +4087,10 @@ export const EFFICIENCY_CAUSES: ReadonlyArray<{ id: LostMinuteCause; label: stri
  *  The two lists meet on the machine and the material, which is why the words here are the words
  *  there. */
 export const OWNER_IDLE_REASONS: ReadonlyArray<{ id: OwnerIdleReason; label: string }> = [
-  { id: 'noMachine', label: 'Waiting for a machine' },
+  { id: 'noPlace', label: 'No place at a machine' },
   { id: 'noMaterial', label: 'No material' },
   { id: 'noCompressor', label: 'No air at the bench' },
+  { id: 'hallStopped', label: 'Hall stopped' },
   { id: 'nothingAssigned', label: 'Nothing assigned' },
   { id: 'officeEmpty', label: 'In the office with nothing to do' },
 ];
@@ -4073,8 +4103,10 @@ export const OWNER_IDLE_REASONS: ReadonlyArray<{ id: OwnerIdleReason; label: str
  *  it shares with the owner are worded the same, because they are the same two things. */
 export const WORKER_IDLE_REASONS: ReadonlyArray<{ id: WorkerIdleReason; label: string }> = [
   { id: 'waitingForBoss', label: 'Waiting for the boss' },
-  { id: 'noMachine', label: 'Waiting for a machine' },
+  { id: 'noPlace', label: 'No place at a machine' },
   { id: 'noMaterial', label: 'No material' },
+  { id: 'noCompressor', label: 'No air at the bench' },
+  { id: 'hallStopped', label: 'Hall stopped' },
 ];
 
 // ---------------------------------------------------------------------------
@@ -4091,10 +4123,8 @@ export const WORKER_IDLE_REASONS: ReadonlyArray<{ id: WorkerIdleReason; label: s
  *  lines, the paper lines of a stage just begun and the dashed grey lines of a man off the hall are
  *  gone with the classes that drew them. */
 export const BUBBLES: Record<BubbleKey, string> = {
-  waitingForMachine: 'waiting for the {machine}',
+  noPlace: 'no place at the {machine}',
   noMaterial: 'no sheets for {job}',
-  /** No place at a bench for the stage he is at (v47). */
-  noBench: 'no bench',
   noCompressor: 'no compressor',
   nothingToDo: 'nothing to do',
   waitingForBoss: 'waiting for the boss',
@@ -4104,16 +4134,12 @@ export const BUBBLES: Record<BubbleKey, string> = {
  *  drawing says six] (docs/mockups/t22/bubbles-v2.png; CLAUDE.md T22 2.5). */
 export const BUBBLE_HEAD_GAP = 6;
 
-/** What a man calls a machine when he is standing about waiting for it: the trade's own short word,
- *  not the catalogue's name [PIOTR's drawing, 19.09: "waiting for the saw", "the CNC", "the booth"].
- *  The bubble over his head and the line on the Work Plan both read it through `waitingLine`, so the
- *  two say the same thing (CLAUDE.md T21 2.6, 2.7).
- *
- *  Only the families a man can really queue for are on it, which is what `familyForStage` returns:
- *  the saw, the CNC, the moulder, the edgebander, the booth and the bench. The edgebander is left
- *  off because the catalogue already calls it an edgebander and a second entry saying the same word
- *  is a second thing to keep in step. A family that is not on this table is called by its catalogue
- *  name, lowercased, which is what the game did before tonight. */
+/** What a man calls a machine: the trade's own short word, not the catalogue's name [PIOTR's
+ *  drawing, 19.09: "the saw", "the CNC", "the booth"]. The mark over a man the hall has no place
+ *  for, his card and the Work Plan's line all read it through `placeLine`, so the three say the
+ *  same thing: `no place at the saw` (CLAUDE.md T21 2.6, T25 2.3). A family that is not on this
+ *  table is called by its catalogue name, lowercased; the edgebander is left off because the
+ *  catalogue already calls it an edgebander. */
 export const MACHINE_SHORT_WORDS: Record<string, string> = {
   tableSaw: 'saw',
   cnc: 'CNC',

@@ -10,7 +10,7 @@ import {
   STATION_BENCH,
   STATION_IDLE,
   STATION_LUNCH,
-  STATION_NO_BENCH,
+  STATION_DOOR,
   STATION_OFFICE,
   STATION_PHONE,
   isBehindTheDoor,
@@ -96,7 +96,7 @@ describe('a man goes through it (CLAUDE.md T20 2.12)', () => {
     expect(isDoorwayCell(canteen)).toBe(true);
     expect(isBehindTheDoor(STATION_LUNCH, canteen)).toBe(true);
     expect(isBehindTheDoor(STATION_IDLE, canteen)).toBe(false);
-    expect(isBehindTheDoor(STATION_NO_BENCH, canteen)).toBe(false);
+    expect(isBehindTheDoor(STATION_DOOR, canteen)).toBe(false);
     // And a station is only behind its own door: a man at his desk is not in the canteen.
     expect(isBehindTheDoor(STATION_OFFICE, office)).toBe(true);
     expect(isBehindTheDoor(STATION_PHONE, office)).toBe(true);

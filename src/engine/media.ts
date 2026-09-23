@@ -30,8 +30,9 @@ import {
   isSold,
   itemStandsInTheHall,
   machineIsOut,
+  machinesAtWork,
 } from './machines';
-import { cncOptions, stageFor } from './stages';
+import { cncOptions, currentStage } from './stages';
 import type { Equipment, GameState } from './types';
 
 /** A whole number with the thousands marked, the way the hall writes a figure of m3/h or l/min. */
@@ -56,11 +57,12 @@ export function extractionCapacityOf(item: { specId: string; variantId: string }
   return EXTRACTION_CAPACITY[item.specId]?.[item.variantId] ?? 0;
 }
 
-/** The machines drawing on the extraction this minute: the ones a man has taken (CLAUDE.md T7
- *  3.1). A machine on order is a drawing on the floor and is not here at all (T10 3.10). */
+/** The machines drawing on the extraction this minute: the ones a man is at (CLAUDE.md T25 2.3).
+ *  A machine on order is a drawing on the floor and is not here at all (T10 3.10). */
 export function extractingMachines(state: GameState): Equipment[] {
+  const atWork = machinesAtWork(state);
   return state.equipment.filter(
-    (item) => item.takenBy !== null && !isSold(item) && extractionDemandOf(item) > 0,
+    (item) => atWork.has(item.id) && !isSold(item) && extractionDemandOf(item) > 0,
   );
 }
 
@@ -104,13 +106,14 @@ export function extractionRunning(state: GameState): boolean {
  *  while somebody is actually standing at it. Nothing runs, nothing is pulled. */
 export function extractionLoad(state: GameState): Equipment[] {
   if (!extractionRunning(state)) return [];
+  const atWork = machinesAtWork(state);
   return state.equipment.filter(
     (item) =>
       !isSold(item) &&
       itemStandsInTheHall(item) &&
       extractionDemandOf(item) > 0 &&
       isConnectedToExtraction(state, item) &&
-      (item.takenBy !== null || !hasGate(state, item)),
+      (atWork.has(item.id) || !hasGate(state, item)),
   );
 }
 
@@ -242,10 +245,11 @@ export function compressorHasDryer(state: GameState, item: Equipment): boolean {
   );
 }
 
-/** The machines drawing air from this compressor this minute: the ones a man has taken. */
+/** The machines drawing air from this compressor this minute: the ones a man is at. */
 export function airConsumers(state: GameState, compressor: Equipment): Equipment[] {
+  const atWork = machinesAtWork(state);
   return state.equipment.filter((item) => {
-    if (item.takenBy === null || isSold(item)) return false;
+    if (!atWork.has(item.id) || isSold(item)) return false;
     if (airDemandOf(item) === null) return false;
     return (compressorFor(state, item)?.id ?? null) === compressor.id;
   });
@@ -477,7 +481,7 @@ export function airHands(state: GameState): AirHands {
   for (const job of state.jobs) {
     const lead = job.assignees[0] ?? null;
     if (job.stage !== 'inProduction' || lead === null) continue;
-    const stage = stageFor(state, lead, job, cncOptions(state, lead, job));
+    const stage = currentStage(state, job, cncOptions(state, lead, job));
     if (stage === null) continue;
     const draw = benchDrawsAir(stage);
     if (draw === 'bench') hands.bench += 1;

@@ -12,7 +12,7 @@ import { canPlace } from '../../src/engine/layout';
 import { salePriceFor } from '../../src/engine/machines';
 import { CABINET_SLOT_LAYOUT } from '../../src/engine/constants';
 import type { GameState } from '../../src/engine/index';
-import { buyStartingKit, newGame, placeEquipment } from '../helpers';
+import { atAPlace, buyStartingKit, newGame, offHisPlace, placeEquipment } from '../helpers';
 
 function root(): HTMLElement {
   const element = document.querySelector('#app');
@@ -115,14 +115,11 @@ describe('a click on a machine on the hall', () => {
     const card = renderMachineCard(game(), benchId, null);
     expect(card).toContain('data-do="sellMachine"');
     // And one somebody is standing at says why it cannot go, rather than offering the button.
-    const busy = game();
-    const bench = busy.equipment.find((item) => item.id === benchId);
-    if (bench === undefined) throw new Error('no bench');
-    bench.takenBy = 'owner';
+    const busy = atAPlace(game(), 'owner', 'workbench');
     const held = renderMachineCard(busy, benchId, null);
     expect(held).not.toContain('data-do="sellMachine"');
     expect(held).toContain('Cannot sell it: Somebody is standing at it');
-    bench.takenBy = null;
+    offHisPlace(busy, 'owner');
   });
 
   it('opens the bench’s card from the hall, the same click as a machine (CLAUDE.md T19 2.8)', () => {

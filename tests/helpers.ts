@@ -8,7 +8,7 @@ import { buyEquipment, buySoftware } from '../src/engine/game';
 import { hire } from '../src/engine/staff';
 import { jobProgress, takeEnquiry } from '../src/engine/jobs';
 import { sheetsDueFor } from '../src/engine/materials';
-import type { Orientation, WorkerRole, WorkerTier } from '../src/engine/types';
+import type { Orientation, Worker, WorkerRole, WorkerTier } from '../src/engine/types';
 import {
   applyAction,
   bagStore,
@@ -524,36 +524,7 @@ export function sixJoinersOnSheetWork(
     job.labourRemaining = job.labourValue * (1 - index / CREW);
   });
   for (let man = 0; man < CREW; man += 1) {
-    next.workers.push({
-      id: `staff-${man + 1}`,
-      name: `Joiner ${man + 1}`,
-      role: 'joiner',
-      tier: 'novice',
-      rate: WORKER_RATES.novice,
-      monthlyWage: 1950,
-      leavesOnDay: null,
-      startDay: 1,
-      jobId: null,
-      taskId: null,
-      minutesWorked: 0,
-      ordersToday: 0,
-    overtimeMinutes: 0,
-    overtimeMinutesWeek: 0,
-    overtimeDays: 0,
-    tiredOfOvertime: false,
-      station: 'idle',
-      productionMinutes: 0,
-      absentDaysRemaining: 0,
-      shift: 'day',
-      dayLog: [],
-      monthMinutes: 0,
-      monthDaysOff: 0,
-      idleMinutes: 0,
-      idleByReason: { waitingForBoss: 0, noMachine: 0, noMaterial: 0 },
-      accidents: 0,
-      anchorX: 4 + man * 2,
-      anchorY: 6,
-    });
+    next.workers.push(testJoiner(`staff-${man + 1}`, `Joiner ${man + 1}`, 4 + man * 2, 6));
   }
   for (let man = 0; man < CREW; man += 1) {
     const job = next.jobs[man];
@@ -561,6 +532,69 @@ export function sixJoinersOnSheetWork(
     next = act(next, { type: 'ASSIGN_JOB', jobId: job.id, workerId: `staff-${man + 1}` });
   }
   return next;
+}
+
+/** A joiner with no experience, on the books from day 1 and on nothing: the one shape a test puts
+ *  a man on the books in by hand. */
+export function testJoiner(id: string, name: string, anchorX = 6, anchorY = 6): Worker {
+  return {
+    id,
+    name,
+    role: 'joiner',
+    tier: 'novice',
+    rate: WORKER_RATES.novice,
+    monthlyWage: 1950,
+    leavesOnDay: null,
+    startDay: 1,
+    jobId: null,
+    taskId: null,
+    minutesWorked: 0,
+    ordersToday: 0,
+    overtimeMinutes: 0,
+    overtimeMinutesWeek: 0,
+    overtimeDays: 0,
+    tiredOfOvertime: false,
+    station: 'idle',
+    productionMinutes: 0,
+    absentDaysRemaining: 0,
+    shift: 'day',
+    dayLog: [],
+    monthMinutes: 0,
+    monthDaysOff: 0,
+    idleMinutes: 0,
+    idleByReason: { waitingForBoss: 0, noPlace: 0, noMaterial: 0, noCompressor: 0, hallStopped: 0 },
+    working: false,
+    noPlaceFor: '',
+    accidents: 0,
+    anchorX,
+    anchorY,
+  };
+}
+
+/** Stands a man at a place of this family, the way the day plan writes it on him: working, with
+ *  his station at the family (CLAUDE.md T25 2.3). A worker id the hall does not have yet is put on
+ *  the books first. The one way a test says "somebody is at that machine". */
+export function atAPlace(state: GameState, who: string, family: string): GameState {
+  if (who === 'owner') {
+    state.owner.working = true;
+    state.owner.station = `machine:${family}`;
+    return state;
+  }
+  let man = state.workers.find((worker) => worker.id === who);
+  if (man === undefined) {
+    man = testJoiner(who, who);
+    state.workers.push(man);
+  }
+  man.working = true;
+  man.station = `machine:${family}`;
+  return state;
+}
+
+/** Takes a man off his place, the way the day plan writes a man it has no work for. */
+export function offHisPlace(state: GameState, who: string): GameState {
+  const man = who === 'owner' ? state.owner : state.workers.find((worker) => worker.id === who);
+  if (man !== undefined) man.working = false;
+  return state;
 }
 
 /** The crew Piotr's saw question is asked about (CLAUDE.md T7 3.1). */
@@ -663,7 +697,9 @@ export function twoMenOnSheetWork(
     monthMinutes: 0,
     monthDaysOff: 0,
     idleMinutes: 0,
-    idleByReason: { waitingForBoss: 0, noMachine: 0, noMaterial: 0 },
+    idleByReason: { waitingForBoss: 0, noPlace: 0, noMaterial: 0, noCompressor: 0, hallStopped: 0 },
+    working: false,
+    noPlaceFor: '',
     accidents: 0,
     anchorX: 0,
     anchorY: 4,

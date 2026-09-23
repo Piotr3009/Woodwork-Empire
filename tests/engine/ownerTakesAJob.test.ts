@@ -5,7 +5,9 @@
 // and JOINS it, whoever is already on it [PIOTR, 21.09: "I should jump on the first job with a DL,
 // automatically"]. Turn 23 gave him the oldest job with nobody on it, and in a hall where the crew
 // hold every job that is no job at all, so he stood in the office exactly as he did before 2.3 was
-// written. He never takes a standing contract.
+// written. He never takes a standing contract. From v52 he joins only a job whose current stage has
+// a place to spare: he is first in the day plan's order, and a job he walked on to by himself must
+// not take the place of a man the player put there (CLAUDE.md T25 1, 2.3).
 //
 // `officeEmpty` is unchanged: no work of the board's about at all.
 
@@ -35,9 +37,9 @@ import {
 /** The day 1 hall with one wardrobe ready for a bench and nothing at all in the office queue: the
  *  state 2.3 is about. Whatever the morning raised is marked done, so the only thing left for the
  *  owner to do is the job. */
-function emptyOffice(options: { withJoiner?: boolean } = {}): GameState {
+function emptyOffice(options: { withJoiner?: boolean; sawVariant?: string } = {}): GameState {
   let state = withExtraction(
-    buyStartingKit(newGame({ difficulty: 'veryEasy' }), { sawVariant: 'budget' }),
+    buyStartingKit(newGame({ difficulty: 'veryEasy' }), { sawVariant: options.sawVariant ?? 'budget' }),
   );
   state.reputation = 40;
   if (options.withJoiner === true) {
@@ -86,8 +88,8 @@ describe('an empty office sends the owner to the bench', () => {
     expect(firstJob(worked).labourRemaining).toBeLessThan(before);
   });
 
-  it('joins the job the crew are already on, as a second pair of hands', () => {
-    let state = tick(emptyOffice({ withJoiner: true }), 1);
+  it('joins the job the crew are already on, as a second pair of hands, at a saw of two places', () => {
+    let state = tick(emptyOffice({ withJoiner: true, sawVariant: 'standard' }), 1);
     expect(firstJob(state).assignees).toEqual([OWNER]);
     const man = state.workers[0];
     if (!man) throw new Error('a joiner is wanted');
@@ -96,12 +98,27 @@ describe('an empty office sends the owner to the bench', () => {
     state = act(state, { type: 'ASSIGN_JOB', jobId: firstJob(state).id, workerId: man.id });
     expect(firstJob(state).assignees[0]).toBe(man.id);
     // And from v41 the owner walks back onto it beside him rather than standing in the office:
-    // the job has the soonest deadline on the board and it is the only one there is. The joiner
-    // keeps it and the lead with it; the owner is the second name on it (PIOTR, 21.09).
+    // the job has the soonest deadline on the board and it is the only one there is, and its saw
+    // has a second place. The joiner keeps it and the lead with it; the owner is the second name
+    // on it (PIOTR, 21.09).
     const later = tick(clearOffice(state), 2);
     expect(firstJob(later).assignees).toEqual([man.id, OWNER]);
     // The evening take over of Turn 17, which puts him on INSTEAD of the man, is still its own
     // click and is not what this is.
+  });
+
+  it('stays off it when the saw has one place and the joiner has it', () => {
+    let state = tick(emptyOffice({ withJoiner: true }), 1);
+    const man = state.workers[0];
+    if (!man) throw new Error('a joiner is wanted');
+    state = act(state, { type: 'ASSIGN_JOB', jobId: firstJob(state).id, workerId: man.id });
+    // A budget saw of one place, and the joiner the player put on the job at it: the owner, first
+    // in the day plan's order, would take it from him, so he does not walk on (CLAUDE.md T25 2.3).
+    const later = tick(clearOffice(state), 2);
+    expect(firstJob(later).assignees).toEqual([man.id]);
+    expect(man.id).toBe(later.workers[0]?.id);
+    expect(later.workers[0]?.working).toBe(true);
+    expect(ownerIdleReason(later)).toBe('nothingAssigned');
   });
 
   it('goes to the soonest deadline and not to the oldest job', () => {
@@ -162,8 +179,8 @@ describe('what he says when there is nothing at all', () => {
     expect(ownerIdleReason(state)).toBe('officeEmpty');
   });
 
-  it('never reads nothingAssigned over a job the crew are on: he joins it instead', () => {
-    let state = tick(emptyOffice({ withJoiner: true }), 1);
+  it('never reads nothingAssigned over a job the crew are on with a place to spare: he joins it', () => {
+    let state = tick(emptyOffice({ withJoiner: true, sawVariant: 'standard' }), 1);
     const man = state.workers[0];
     if (!man) throw new Error('a joiner is wanted');
     // The job is the joiner's. Until v41 that left the owner standing with `nothingAssigned`;

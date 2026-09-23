@@ -78,7 +78,8 @@ import {
   DAY_CATEGORIES,
   HELPER_ONLY_KINDS,
   STATION_IDLE,
-  STATION_NO_BENCH,
+  STATION_DOOR,
+  hallPlaces,
   addWorkingDays,
   bagStore,
   dayPercentages,
@@ -576,8 +577,8 @@ describe('a month short handed, with a joiner and one small rack', () => {
     // The joiner kit buys a second bench, and the hiring rule will not let him start without it.
     expect(state.equipment.filter((item) => item.specId === 'workbench').length)
       .toBeGreaterThanOrEqual(2);
-    for (const job of state.jobs) expect(job.blockedBy, job.name).not.toBe('no bench');
-    expect(state.workers.every((worker) => worker.station !== STATION_NO_BENCH)).toBe(true);
+    for (const job of state.jobs) expect(job.blockedBy, job.name).not.toBe('the hall has no workbench');
+    expect(state.workers.every((worker) => worker.station !== STATION_DOOR)).toBe(true);
   });
 
   it('gave the joiner a cabinet of his own, and wants a third for the next man', () => {
@@ -895,24 +896,22 @@ describe('a month with a job worth twenty five thousand on the books', () => {
   });
 });
 
-/** The longest anybody may stand at a taken machine in the two saw month (CLAUDE.md T7 3.1). */
-const CREW_MAX_GAP = 10;
 
 /** Sheets on the rack every morning of the crew month. The rack is never the thing that stops
  *  them there: the month is about the queue at the saw and about nothing else. */
 const CREW_RACK = 400;
 
 interface CrewMonth {
-  /** Minutes of somebody's day spent standing at a machine that was taken. */
+  /** Minutes of somebody's day spent with no place at the machine his work wanted. */
   waiting: number;
   /** The longest run of them one man had in a row. */
   longest: number;
   state: GameState;
 }
 
-/** A month of six joiners behind the saws the hall has, minute by minute. Piotr's claim in one
- *  run: a machine serves one man at a time, so the crew behind one saw stands at it and the crew
- *  behind two does not (CLAUDE.md T7 3.1). */
+/** A month of six joiners behind the saws the hall has, minute by minute, counting every minute a
+ *  man had no place at the machine his work wanted (CLAUDE.md T25 2.3). Until v52 it counted the
+ *  minutes a man stood at a machine another man had taken. */
 function crewMonth(saws: number): CrewMonth {
   let state = sixJoinersOnSheetWork({ saws });
   let waiting = 0;
@@ -924,7 +923,7 @@ function crewMonth(saws: number): CrewMonth {
     state.stock.sheets = CREW_RACK;
     state = clearEvents(runClock(state, 1));
     for (const worker of state.workers) {
-      if (!String(worker.station).startsWith('waiting')) {
+      if (worker.noPlaceFor === '') {
         standing.set(worker.id, 0);
         continue;
       }
@@ -948,13 +947,15 @@ describe('a month of six joiners behind two saws', () => {
     expect(one.state.equipment.filter((item) => item.specId === 'tableSaw')).toHaveLength(1);
   });
 
-  it('keeps the crew cutting, with no gap longer than ten minutes in the month', () => {
-    // Piotr: with six joiners you need two saws or they stand (CLAUDE.md T7 3.1). Nobody in this
-    // month stands at a taken saw for more than ten minutes together, and the second saw halves
-    // what little waiting there is (v43: 9 minutes against 17, where the one saw crew used to
-    // stand for hours, because a man behind the saw now assembles what is cut).
-    expect(two.longest).toBeLessThanOrEqual(CREW_MAX_GAP);
-    expect(two.waiting).toBeLessThan(one.waiting);
+  it('has a place for every man who wants the saw, on a standard saw s two places', () => {
+    // Piotr: with six joiners you need two saws or they stand (CLAUDE.md T7 3.1). The saws of this
+    // hall are standard ones, two places each (CLAUDE.md T25 2.1), and six jobs at six points of
+    // their making never want more than two places at the saw in the same minute: not one minute
+    // of no place in the month, on one saw or on two. Measured on v52: 0 and 0. The one saw month
+    // of v43 stood 17 minutes and the two saw month 9, with the bag of work filling the rest.
+    expect(two.waiting).toBe(0);
+    expect(one.waiting).toBe(0);
+    expect(two.longest).toBe(0);
   });
 
   it('gets the whole book out on one saw too, and the second saw buys time at the saw and not a job (v37)', () => {
@@ -977,13 +978,10 @@ describe('a month of six joiners behind two saws', () => {
     expect(two.state.cash - one.state.cash).toBeLessThan(0);
   });
 
-  it('stands the one saw crew at the saw a minute at a time, and says which machine', () => {
-    // The station carries the family, which is what the hall draws and the Gantt greys out
-    // (CLAUDE.md T7 3.1, 3.2). Until v43 the one saw crew stood for hours; with assembly open
-    // while the saw is taken, the longest wait of the month is a minute. What the second saw buys
-    // now is cutting minutes and not standing minutes, which the cash test above measures.
-    expect(one.waiting).toBeGreaterThan(0);
-    expect(one.longest).toBeLessThanOrEqual(CREW_MAX_GAP);
+  it('has no longest stand at all on one saw either, the one saw having the places the crew wants', () => {
+    // What a second saw buys a hall whose one saw has the places its crew wants is nothing: the
+    // cash test above measures it at a few pounds of power (CLAUDE.md T25 2.1).
+    expect(one.longest).toBe(0);
   });
 
   it('keeps one store for the hall, the two fans added up, fed by both saws', () => {
@@ -1138,9 +1136,9 @@ describe('a month that sells the used saw on day 5 after buying a standard one',
       addWorkingDays(5, 1),
     );
     expect(salePriceFor(used ?? ({} as Equipment))).toBe(630);
-    // It is still standing there, and nobody may stand at it.
+    // It is still standing there, and it has no places for anybody (CLAUDE.md T25 2.1).
     expect(sold.equipment.some((item) => item.id === used?.id)).toBe(true);
-    expect(sold.equipment.find((item) => item.id === used?.id)?.takenBy).toBeNull();
+    expect(hallPlaces(sold, 'tableSaw')).toBe(0);
   });
 
   it('takes it away the next morning and puts the money in the bank', () => {
@@ -1257,11 +1255,15 @@ describe('a month of two men on a fan too small for them', () => {
 
   it('is short of air the moment the saw and the bander are both running', () => {
     // Piotr's own example: 2,500 of 1,660 (CLAUDE.md T10 3.1).
+    // A man at a place of each, as the day plan writes it on them (CLAUDE.md T25 2.3).
     const running = (state: GameState): GameState => {
-      const next = { ...state, equipment: state.equipment.map((item) => ({ ...item })) };
-      for (const item of next.equipment) {
-        if (item.specId === 'tableSaw' || item.specId === 'edgebander') item.takenBy = 'owner';
-      }
+      const next = structuredClone(state);
+      next.owner.working = true;
+      next.owner.station = 'machine:tableSaw';
+      const man = next.workers.find((worker) => worker.role === 'joiner');
+      if (man === undefined) throw new Error('a joiner is wanted');
+      man.working = true;
+      man.station = 'machine:edgebander';
       return next;
     };
     const tight = extractionCheck(running(short.state));
