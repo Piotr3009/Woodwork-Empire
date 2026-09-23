@@ -98,3 +98,14 @@ draws the hall, both Work Plan tabs, the top bar, the Company board, the Owned t
 page, the team page, the day end, every job row, every machine card and every person card over a
 crowded saw and a crowded bench, and asserts none of them (text or hover) carries the old words
 and that the new one, `no place at the`, is there.
+
+**T25-B6 2.6, the men spread over the machines.** The code is A2's: `stationCell` resolves a
+working man's own place through `menAtPlaces` (his rank among the working men of his family in
+the plan's order, then `machineForPlace`) and `placeCellsAt`, the one list of a machine's place
+cells for every family, benches included, and the figure loop and the owner's figure both call it
+with the man's id. Nothing new was wanted in `characters.ts` beyond A2's removal of the queue
+stations. `tests/render/placesFigures.test.ts` asserts it: two men at a two place saw at two
+cells; four men over two standard saws at four different cells, the third and fourth at the
+second saw, each beside the saw that holds him, `machineForPlace` giving the first saw's two
+places, the second's first and nothing past the fourth; three men at an industrial bench's three
+cells; a man with no place at his own home cell.
