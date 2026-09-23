@@ -52,6 +52,7 @@ import {
   classPaceOf,
   bookOutputMinute,
   findSpec,
+  hallPlaces,
   hallProductivityFactor,
   has,
   machineIsShared,
@@ -477,6 +478,51 @@ export function contractResultFor(
 export function contractMenNeeded(state: GameState, contract: Contract, worker: Worker | null): number {
   const result = contractResultFor(state, contract, worker);
   return Math.max(1, Math.ceil(result.piecesNeededPerDay / Math.max(1, result.piecesPerDay)));
+}
+
+/** What the hall makes of this contract's piece in a week at full crew, against what the term
+ *  wants: every joiner on the books on it, as many of them as the hall has places for at the
+ *  family the piece wants, in the order they were hired (2.3), each at his own rate and the hall's
+ *  pace for the family (2.4), over the working days of a week. No new rule, the arithmetic the
+ *  engine already has [PIOTR, 21.09: "we take a contract and we do not know whether the hall can
+ *  do it"] (CLAUDE.md T25 2.7). The owner is not in it, because a contract is work for a joiner. */
+export interface HallCapacity {
+  /** Pieces a week, whole. */
+  perWeek: number;
+  /** The term's pieces a week. */
+  wanted: number;
+  /** True when the term wants more than the hall makes: the line is red. */
+  short: boolean;
+}
+
+export function contractHallCapacity(state: GameState, contract: Contract): HallCapacity {
+  const piece = contractPiece(contract);
+  const { stage } = pieceStageOn(state, piece, true);
+  const speed = stageSpeed(state, stagedJob(0, 'sheet', false), stage).speed;
+  const family = contractFamilyOf(state, piece, true);
+  const places = family === null ? Number.POSITIVE_INFINITY : hallPlaces(state, family);
+  const week = MINUTES_PER_WORKING_DAY * WORKING_DAYS_PER_WEEK;
+  let perWeek = 0;
+  for (const worker of joiners(state).slice(0, places)) {
+    const rate = worker.rate > 0 ? worker.rate : 1;
+    // His minutes over a piece, rounded the way his card rounds them (`resultAtSpeed`).
+    const minutes = Math.max(1, Math.round(piece.minutes / (rate * (speed > 0 ? speed : 1))));
+    perWeek += Math.floor(week / minutes);
+  }
+  const wanted = contract.quantityPerWeek;
+  return { perWeek, wanted, short: wanted > perWeek };
+}
+
+/** The line the offer card and the Contracts tab both carry, off `contractHallCapacity`
+ *  (CLAUDE.md T25 2.7). */
+export function contractHallLine(state: GameState, contract: Contract): { text: string; short: boolean } {
+  const capacity = contractHallCapacity(state, contract);
+  return {
+    text:
+      `Your hall makes about ${capacity.perWeek} of these a week at full crew; ` +
+      `this term wants ${capacity.wanted}`,
+    short: capacity.short,
+  };
 }
 
 /** The one machine that would shorten the piece most among those the hall has not got: what the

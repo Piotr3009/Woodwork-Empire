@@ -35,6 +35,7 @@ import {
   contractMachineTip,
   contractManCheck,
   contractManOf,
+  contractHallLine,
   contractMenNeeded,
   contractResultFor,
   contractShortfall,
@@ -111,6 +112,7 @@ function offerTile(state: GameState, contract: Contract): string {
     `<p class="tile-figures">${contract.quantityPerWeek} a week for ${plural(contract.termWeeks, 'week', 'weeks')}, ` +
     `about ${plural(months, 'month', 'months')} · ${escapeHtml(expiryLine(state, contract))}</p>` +
     `<p class="tile-figures">${escapeHtml(pieceLine(contract))}</p>` +
+    hallLine(state, contract, 'tile-figures') +
     `<p class="tile-text">A short week costs a point of reputation and the client remembers it ` +
     'at the end of the term.</p>' +
     `<div class="tile-action">${primaryButton('acceptContract', 'Accept', `data-id="${contract.id}"`)}` +
@@ -407,6 +409,14 @@ function menNeededLine(state: GameState, contract: Contract, who: string, onIt: 
   return `<p class="hint contract-hands bad">This contract is for ${plural(needed, 'man', 'men')} at the least${tail}.</p>`;
 }
 
+/** What the hall makes of the piece in a week at full crew against what the term wants, in the
+ *  green when it can keep up and the red when it cannot, before the contract is taken
+ *  (CLAUDE.md T25 2.7). The same line on the offer tile and the Contracts tab's offer card. */
+function hallLine(state: GameState, contract: Contract, className: string): string {
+  const line = contractHallLine(state, contract);
+  return `<p class="${className} ${line.short ? 'bad' : 'good'}" data-hall-makes>${escapeHtml(line.text)}.</p>`;
+}
+
 /** The one machine that would shorten the piece most among those the hall has not got, in the
  *  drawing's own words, every figure of it computed (CLAUDE.md T20 2.1.1). */
 function machineTipLine(state: GameState, contract: Contract, who: string): string {
@@ -492,6 +502,8 @@ function offerCard(state: GameState, contract: Contract, picked: string | null):
       `${result.piecesPerDay}, the client asks ${result.piecesNeededPerDay} at the least`,
       result.piecesPerDay >= result.piecesNeededPerDay ? 'good' : 'bad',
     ) +
+    // One says the hall and the other says the men (CLAUDE.md T25 2.7): the hall's line first.
+    hallLine(state, contract, 'hint contract-hall') +
     menNeededLine(state, contract, who, null) +
     figureRow(`A day of ${name === 'You' ? 'your' : `${name}'s`} pieces, after wages and wear`, result.dayResult) +
     figureRow(

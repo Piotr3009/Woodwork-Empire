@@ -109,3 +109,19 @@ cells; four men over two standard saws at four different cells, the third and fo
 second saw, each beside the saw that holds him, `machineForPlace` giving the first saw's two
 places, the second's first and nothing past the fourth; three men at an industrial bench's three
 cells; a man with no place at his own home cell.
+
+**T25-B7 2.7, what the hall makes of a contract.** `contractHallCapacity(state, contract)` in
+`contracts.ts`: the piece's stage and family as the day plan reads them (the CNC's when the hall
+has one), the hall's pace at it (`stageSpeed`, 2.4), the joiners on the books in hire order up to
+the places the hall has at the family (`hallPlaces`, 2.3; the owner is not in it, because a
+contract is work for a joiner and `contractManCheck` refuses him), each man's minutes a piece
+rounded the way his own card rounds them, over the minutes of a working week. `contractHallLine`
+words it: `Your hall makes about 26 of these a week at full crew; this term wants 20`. It is drawn
+green (`good`) or red (`bad`, when the term wants more) on the offer tile of the Contracts board
+and on the Contracts tab's offer card, above v51's `This contract is for 2 men at the least`,
+which stays. The game has no acceptance dialog of its own: the Accept and `Take it` buttons are
+on those two cards, so the line is on the card the click is made on, before it is made, and the
+engine's `acceptContract` is unchanged, as "no new rule" asks. `tests/engine/contractHall.test.ts`
+asserts the figure's arithmetic, a one saw hall at a third of a three saw hall, the red past the
+figure and the green at it, the figure halving when one of two saws is sold, the industrial
+saw's pace in it, and both cards green and red with the men line kept.
