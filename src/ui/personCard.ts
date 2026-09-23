@@ -252,8 +252,8 @@ function dayFigures(state: GameState, person: Person): string {
   );
 }
 
-/** The one control a tile carries: Office on the owner, Assign on a man waiting for the boss, and
- *  Let go on everybody else, which is the click of Turn 20's 2.4 and unchanged. */
+/** The one control a tile carries: Office on the owner, Assign on a man the boss has not put on
+ *  anything, and Let go on everybody else, which is the click of Turn 20's 2.4 and unchanged. */
 function tileAction(state: GameState, person: Person): string {
   if (person.id === OWNER) return button('openOffice', 'Office');
   if (person.waiting) return button('openPersonCard', 'Assign', `data-id="${person.id}"`);

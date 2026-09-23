@@ -86,3 +86,15 @@ them, A2) and gains `paceLines(state)` under them, one line a family whose pace 
 `Saw, industrial` and `+12%`, in the plate's own `efficiency-line` spans (name left, figure
 right, so the brief's colon is the plate's column and not a character). `tests/ui/placesLines.test.ts`
 asserts the line at a used and an industrial saw, the line without a `no place` part, `0 men working`, and the plate's `+12%`, `-5%` and no line at 1.00.
+
+**T25-B5 the words.** No string the game prints says "waiting for" a machine or "no bench": A2
+took the bubbles (`noBench`, `waitingForMachine`), the job rows' `waiting for the ...` and the
+`NO_BENCH` station, and this task sweeps what was left, which was comments only. The section 7
+grep (`waiting for the\|waitingStation\|heldMachine\|takenBy`) now finds the migration, the dead
+field's declaration and one more line: `waitingForBoss: 'waiting for the boss'`, the Turn 23 mark
+over a man nobody has put on anything. It is about the boss and not a machine, so it stays, and it
+is named here so the grep's one extra line is not a surprise. `tests/ui/noQueueWords.test.ts`
+draws the hall, both Work Plan tabs, the top bar, the Company board, the Owned tab, the machines
+page, the team page, the day end, every job row, every machine card and every person card over a
+crowded saw and a crowded bench, and asserts none of them (text or hover) carries the old words
+and that the new one, `no place at the`, is there.

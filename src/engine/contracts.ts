@@ -103,7 +103,7 @@ export function activeContracts(state: GameState): Contract[] {
   return state.contracts.filter((contract) => contract.status === 'active');
 }
 
-/** Terms that are over and waiting for the renew answer. */
+/** Terms that are over, with the renew answer still to be given. */
 export function endedContracts(state: GameState): Contract[] {
   return state.contracts.filter((contract) => contract.status === 'ended');
 }

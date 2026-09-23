@@ -121,8 +121,8 @@ import type {
  *  and the state remembers the day a contract was last offered. Every v25 and v26 save loads.
  *
  *  Version 28 is v52 (PIOTR, 21.09): a machine is places and nobody takes one. Every man and the
- *  owner carry `working` and `noPlaceFor`, the day plan's answer; `takenBy` is a dead field the
- *  lift clears; the queue's lost minutes are `noPlace` (CLAUDE.md T25 section 4). Every v25, v26
+ *  owner carry `working` and `noPlaceFor`, the day plan's answer; the old claim on a machine is a
+ *  dead field the lift clears; the queue's lost minutes are `noPlace` (CLAUDE.md T25 section 4). Every v25, v26
  *  and v27 save loads. */
 export const STATE_VERSION = 28;
 
@@ -4041,7 +4041,7 @@ export const OWNER_IDLE_REASONS: ReadonlyArray<{ id: OwnerIdleReason; label: str
 /** The reasons a man on the books stood still, in the order his day meter lists them. His own
  *  list and not the owner's above: a joiner has no office queue, and he has the one reason the
  *  owner can never have, which is that nobody has put him on anything. From Turn 23 nobody takes
- *  a job by himself without a manager on duty, so a free man's day is spent waiting for the
+ *  a job by himself without a manager on duty, so a free man's day is spent standing until the
  *  boss's word and his meter says so out loud (PIOTR, 20.09; CLAUDE.md T23 2.1, 2.13). The two
  *  it shares with the owner are worded the same, because they are the same two things. */
 export const WORKER_IDLE_REASONS: ReadonlyArray<{ id: WorkerIdleReason; label: string }> = [

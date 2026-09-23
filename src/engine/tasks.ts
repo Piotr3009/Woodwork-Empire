@@ -141,7 +141,7 @@ const TASK_DEFINITIONS: Record<TaskKind, TaskDefinition> = {
   service: { category: 'workshop', eligibleRoles: [], autoRoles: [] },
   repair: { category: 'workshop', eligibleRoles: ['joiner'], autoRoles: [] },
   moveMachines: { category: 'workshop', eligibleRoles: ['joiner', 'helper'], autoRoles: [] },
-  // The owner does his own interviewing and his own waiting for the laptop: there is nobody to
+  // The owner does his own interviewing and his own sitting at the laptop: there is nobody to
   // hand either of them to (CLAUDE.md T7 3.10, T9 3.1).
   hiring: { category: 'admin', eligibleRoles: [], autoRoles: [] },
   booting: { category: 'admin', eligibleRoles: [], autoRoles: [] },
@@ -230,7 +230,7 @@ export function cleanerAtWork(state: GameState): Worker | null {
   return manOnOpenTask(state, 'cleaning');
 }
 
-/** What the hall says while the van or the bag is waiting for the man whose job it is. */
+/** What the hall says while the van or the bag waits on the man whose job it is. */
 export const WAITING_FOR_HELPER = 'Waiting for the helper';
 
 /** What the service row says instead of a Start: nobody stands at a service, it is called in and

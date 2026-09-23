@@ -279,7 +279,7 @@ export function floorMachines(state: GameState, specId: string): Equipment[] {
   return owned(state, specId).filter((item) => itemStandsInTheHall(item) && !isSold(item));
 }
 
-/** Sold, and waiting for the van at the gate. */
+/** Sold, and standing until the van comes to the gate. */
 export function isSold(item: Equipment): boolean {
   return item.soldOnDay !== null;
 }

@@ -111,7 +111,7 @@ export function bubbleFor(state: GameState, who: string): Bubble | null {
   // for him (CLAUDE.md T20 2.1, T24 2.3, T25 2.3).
   const contract = who === OWNER ? null : contractOfWorker(state, who);
   if (contract !== null) return onAContract(state, who, contract);
-  // Nobody has put him on anything and there is no manager on duty to: he is waiting for the
+  // Nobody has put him on anything and there is no manager on duty to: he stands until the
   // boss's word, which is a click in the Work Plan (PIOTR, 20.09; CLAUDE.md T23 2.1). The owner
   // waits for nobody, so the older words are still his.
   const worker = who === OWNER ? null : state.workers.find((entry) => entry.id === who) ?? null;
