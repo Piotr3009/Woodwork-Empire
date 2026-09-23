@@ -75,3 +75,14 @@ machine, whose card already says why it stands. The bench's old hover words (`Wo
 family says its places the one way; the two render tests that read them are flipped.
 `andList` joins the names. `tests/ui/placesCard.test.ts` asserts the card, the tile and the hover
 of a two place saw with two men, one man, none, a broken saw and a fan.
+
+**T25-B4 2.8 and the breakdown.** `placesSummary(state)` in `production.ts` counts the day plan
+(the owner and the crew): `4 men working · 1 with no place at the saw`, a part per family with
+men standing for it, and `0 men working` while nobody is on anything: a line that came and went
+shifted the board under the pointer, and `tests/ui/oneClick.test.ts` caught it, so it is always drawn. The Work Plan's Jobs tab draws it
+over the jobs in the `hint` class, with `warn` while anybody has no place; nothing else on the
+screen moves. The top bar's efficiency plate keeps its five lost minute lines (`No place` among
+them, A2) and gains `paceLines(state)` under them, one line a family whose pace is not 1.00:
+`Saw, industrial` and `+12%`, in the plate's own `efficiency-line` spans (name left, figure
+right, so the brief's colon is the plate's column and not a character). `tests/ui/placesLines.test.ts`
+asserts the line at a used and an industrial saw, the line without a `no place` part, `0 men working`, and the plate's `+12%`, `-5%` and no line at 1.00.

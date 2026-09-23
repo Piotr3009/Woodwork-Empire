@@ -729,6 +729,7 @@ export {
   classPaceOf,
   hallPace,
   paceOf,
+  paceLines,
   placesLine,
 } from './machines';
 export {

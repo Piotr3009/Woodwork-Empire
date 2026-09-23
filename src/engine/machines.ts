@@ -1171,6 +1171,30 @@ export function machineWearPerMinute(item: Equipment): number {
   return isServiced(item.specId) ? wearPerMinuteOf(item.purchasePrice) : 0;
 }
 
+/** One line of the efficiency plate for a family whose pace is not 1.00: `Saw, industrial` and
+ *  `+12%`, so the player sees what his machines buy him [PIOTR, 21.09] (CLAUDE.md T25 2.4). */
+export interface PaceLine {
+  family: string;
+  label: string;
+  /** The hall's pace for the family less 1, as a whole signed percentage: 12 is +12%. */
+  percent: number;
+}
+
+/** The families a man works at whose pace in this hall is above or below 1.00, in the order of
+ *  `PACED_FAMILIES`, each named by its short word and the class that sets it. */
+export function paceLines(state: GameState): PaceLine[] {
+  const lines: PaceLine[] = [];
+  for (const family of PACED_FAMILIES) {
+    const best = bestMachineOf(state, family);
+    if (best === null) continue;
+    const percent = Math.round((paceOf(state, best) - 1) * 100);
+    if (percent === 0) continue;
+    const word = machineShortWord(family);
+    lines.push({ family, label: `${word.charAt(0).toUpperCase()}${word.slice(1)}, ${best.variantId}`, percent });
+  }
+  return lines;
+}
+
 /** The best class of this family standing in the hall, unbroken and not away for its service, as
  *  a machine: the one that sets the hall's pace (2.4), and the one a piece's minutes and its wear
  *  are worked out on. The first bought wins a tie. Null when the hall has none it can work at. */

@@ -77,6 +77,7 @@ import {
   waitsForTheBoss,
 } from './staff';
 import { STATION_BENCH, STATION_HOME, machineStation, roomBehindStation, stationNow } from './stations';
+import { plural } from './text';
 import {
   type StagePlan,
   cncOptions,
@@ -371,6 +372,23 @@ export function machineWantedFor(state: GameState, job: Job): string | null {
  *  at the saw`, the family in the trade's own short word (CLAUDE.md T21 2.6, T25 2.3). */
 export function placeLine(family: string): string {
   return `no place at the ${machineShortWord(family)}`;
+}
+
+/** The Work Plan's one line over the jobs, off the day plan: how many are working and how many
+ *  the hall has no place for, by the family they want, `4 men working · 1 with no place at the
+ *  saw` (CLAUDE.md T25 2.8). Always a line, `0 men working` included, so the board under the
+ *  player's pointer keeps its shape from one frame to the next (CLAUDE.md T14 2.4). */
+export function placesSummary(state: GameState): string {
+  const people = [state.owner, ...state.workers];
+  const working = people.filter((man) => man.working).length;
+  const standing = new Map<string, number>();
+  for (const man of people) {
+    if (man.working || man.noPlaceFor === '') continue;
+    standing.set(man.noPlaceFor, (standing.get(man.noPlaceFor) ?? 0) + 1);
+  }
+  const parts = [`${plural(working, 'man', 'men')} working`];
+  for (const [family, count] of standing) parts.push(`${count} with ${placeLine(family)}`);
+  return parts.join(' \u00b7 ');
 }
 
 /** The words the job carries while the rack has nothing for it (CLAUDE.md T2 3.6). */
