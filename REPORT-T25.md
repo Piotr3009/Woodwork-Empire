@@ -132,3 +132,38 @@ never taking a place from a man by his own choice; the pace ladder's moves, the 
 its stage and the solid wood tools among the paced families; the by hand lead of REPORT-T24 now at
 0.67 with the rest of the job; the day 53 fixture that is not in the history; the one boss line the
 grep still finds; the Work Plan line drawn at nought; the reading of "the acceptance check".
+
+**T25-C2 scenarios, and the figures restated.** `tests/scenarios/turn25.test.ts`: (qq) four men
+and one used saw, thirty days: the first man hired works 10,560 minutes (22 days of 480), the
+other three nought, and their three months, 31,680 minutes, are all `noPlace`; `no place at the
+saw` over the three. (rr) the same four and an industrial saw: three men at 10,560 each at the
+hall's 1.12, the fourth's month all `noPlace`, the line over him. (ss) cut sheet packs: the used
+saw's hall makes 30 a week and the industrial's 105; a term of 31 is red on the offer tile and the
+Contracts tab of the first and green on the second's, unsigned. The scenarios that turned on the
+queue were flipped in A2 (turn21's (gg), the crew month, nobodyMoved) and their comments, and the
+policies' notes in `autopilot.ts`, now speak of places.
+
+The thirty day months, v51 (`3eb8ef2`) against v52, played by the same script and read off the
+ledger by category: Easy careful 2,829 and 2,829; Hard idle -7,778 and -7,778 (the bank on day 22
+both); Very easy big saw 7,613 and 7,613; short handed 49 and 49; with a helper 32,277 and 32,277;
+thicknesser on one bag 20,950 and 20,950; lacquer on wet air 11,704 and 11,704, every line of their
+ledgers the same. Three moved. Six joiners behind two saws 12,888.50 to 13,215 (+2.5%, under 5%:
+deposits +355, balances -28.50). Two men on the short fan 8,466.50 to 7,500 (-11.4%) and on the
+big fan 6,544.50 to 7,993.50 (+22.1%): both halls work more minutes (7,880 and 9,169 against 6,917
+and 6,233), and the cash moves by which jobs the script takes, one whenever it has fewer than
+three open. The short fan takes 14 jobs and not 16, its first two garage shelves finishing on day
+12 where the bag of work had them on day 10 (deposits -1,030, material -230, balances +293.50);
+the big fan takes 16 either way, bookcases and a TV unit where v51 took garage shelves (deposits
++1,385, balances +524, material -460). Measured, not guessed: with v51's pace table put back, or
+with every saw at one place, the short fan's month still takes 14, so the move is 2.2's (each
+man on his own job's current stage). The reason is in the test's comment.
+
+The three month playthrough (A2's figures, unmoved by B1 to B7): month closes 6,482, -3,675 and
+-10,404 on v51 against 7,272, 948 and -15,551, the bank on day 91. Month 1 +790: contract +990
+(the joiner cutting beside the owner at the standard saw's second place), material -200. Month 2
++3,827 on the month's own ledger: contract +1,518, deposits +2,605, balances +162.50, material
+-460. Month 3 -9,763: wages -2,400 (the novice manager of day 73, whom a month 2 in the black
+could carry), balances -3,032.90 and deposits -2,325 (9 jobs delivered against 11, the name from
+26 to 7 on the jobs late in the owner's week away), material -3,110 and storage -300 (two loads
+in temporary storage on days 80 and 81), contract +1,056, repair +150 (v51's day 75 extractor
+repair is not in this run), transport +240, overdraft interest -24.53, insurance -16.66.

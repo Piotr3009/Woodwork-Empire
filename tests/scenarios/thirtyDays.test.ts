@@ -900,7 +900,7 @@ describe('a month with a job worth twenty five thousand on the books', () => {
 
 
 /** Sheets on the rack every morning of the crew month. The rack is never the thing that stops
- *  them there: the month is about the queue at the saw and about nothing else. */
+ *  them there: the month is about the places at the saws and about nothing else. */
 const CREW_RACK = 400;
 
 interface CrewMonth {
@@ -1313,6 +1313,18 @@ describe('a month of two men on a fan too small for them', () => {
     // Everything in an under extracted hall is 30% slower and the dust rises three times as fast
     // (PIOTR; CLAUDE.md T10 3.1). Measured over the month, not asserted as a ratio: the two halls
     // took different work off the same board.
+    //
+    // Measured on v52 against v51, off the ledger (CLAUDE.md T25 C2): the short fan's month closes
+    // at 7,500 where it closed at 8,466.50 (-11.4%) and the big fan's at 7,993.50 where it closed
+    // at 6,544.50 (+22.1%). Both halls work more minutes than on v51 (7,880 and 9,169 against 6,917
+    // and 6,233), the queue's minutes gone. The cash moves by the deposits of the jobs the script
+    // takes, one whenever it has fewer than three open: the short fan's first two garage shelves
+    // finish on day 12 where the bag of work had them on day 10, so it takes 14 jobs and not 16
+    // (deposits -1,030, material -230, balances +293.50); the big fan takes 16 either way but its
+    // bookcases and a TV unit come off the board where v51 took garage shelves (deposits +1,385,
+    // balances +524, material -460). Neither the pace table of 2.4 nor the saw's second place is
+    // the cause: the short fan's month takes 14 jobs with the v51 figures put back for either one,
+    // measured. What is left is 2.2, each man on his own job's current stage.
     const done = (state: GameState): number =>
       state.jobs.filter((job) => job.stage === 'completed').length;
     expect(done(fine.state)).toBeGreaterThanOrEqual(done(short.state));

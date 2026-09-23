@@ -87,7 +87,7 @@ function topUpTheCrew(state: GameState, day: number): GameState {
 /** Four joiners with no experience, one saw between them, sheets on the rack and nothing taken off
  *  the board: the two jobs the scene wants are put on the books by hand at the end of the opening
  *  days, so the hall is the section's hall and not whatever the board happened to offer. Very easy,
- *  because four men and their kit is a lot of money on day 1 and the day is about the queue. */
+ *  because four men and their kit is a lot of money on day 1 and the day is about the places at the saw. */
 const FOUR_MEN_ONE_SAW: Policy = {
   ...CAREFUL,
   maxOpenJobs: 0,

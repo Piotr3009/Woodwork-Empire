@@ -35,10 +35,10 @@ import type { GameState } from '../../src/engine/index';
 
 const SEED = 20260911;
 
-/** Three joiners with no experience, a saw apiece so nobody queues, and sheets on the rack. The
- *  script takes nothing off the enquiry board: the work these months are played on is put there by
- *  hand, three jobs big enough to outlast the stretch, so that what is being measured is the men
- *  and never the board's own luck. */
+/** Three joiners with no experience, a saw apiece so nobody is short of a place, and sheets on
+ *  the rack. The script takes nothing off the enquiry board: the work these months are played on
+ *  is put there by hand, three jobs big enough to outlast the stretch, so that what is being
+ *  measured is the men and never the board's own luck. */
 const THREE_MEN: Policy = {
   maxOpenJobs: 0,
   buyKit: true,
