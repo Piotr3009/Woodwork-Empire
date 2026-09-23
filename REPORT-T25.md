@@ -125,3 +125,10 @@ engine's `acceptContract` is unchanged, as "no new rule" asks. `tests/engine/con
 asserts the figure's arithmetic, a one saw hall at a third of a three saw hall, the red past the
 figure and the green at it, the figure halving when one of two saws is sold, the industrial
 saw's pace in it, and both cards green and red with the men line kept.
+
+**T25-C1 notes.** `docs/notes-t25.md`: why the plan runs at every settle and every minute and
+still gives the brief's once a day answer; the `hallStopped` cause beside `noPlace`; the owner
+never taking a place from a man by his own choice; the pace ladder's moves, the CNC's class now in
+its stage and the solid wood tools among the paced families; the by hand lead of REPORT-T24 now at
+0.67 with the rest of the job; the day 53 fixture that is not in the history; the one boss line the
+grep still finds; the Work Plan line drawn at nought; the reading of "the acceptance check".
