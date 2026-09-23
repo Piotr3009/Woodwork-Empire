@@ -186,3 +186,37 @@ two at a standard one (`dayPlan.test.ts`), the place handed on the next minute (
 places (`placesFigures.test.ts`), the contract figure halving when a saw is sold
 (`contractHall.test.ts`). Every scenario is green; `git diff 3eb8ef2 --stat -- src/ui/styles.css`
 is empty, so no token and no rule was added.
+
+**T25-C4 look and shoot.** Eleven pictures into `docs/report-t25/`, every one the real app (the
+Vite dev server) in headless Chromium at 1280 by 800 at one device pixel, in front of a save
+written by the game's own `encodeSaveFile` and opened by its own Continue button, the clock on the
+game's own Pause; every one asserts in the script that the words it is named for are on the page
+before it is saved, and every one logs the speed knob, which reads `Pause` on all eleven (opening a
+machine card and walking to the office start the clock at 1x, so the script presses Pause again
+before those two shots). The halls were stood up with the engine's own helpers; the staging
+scripts are not committed, as Turns 21 to 24 did not commit theirs. Looking found one thing, fixed
+here: the capacity line of 2.7 was a `hint` with `good` or `bad` on it, and the board's skin inks
+a hint in its own grey whatever its class, so on the Contracts tab it was neither green nor red.
+It is a row now, the hall on the left and `this term wants 40` as its figure, which the board
+prints green and red (`.modal-board .row-figure.good/.bad`), with no new style. v51's men line
+under it (`This contract is for 2 men at the least`, `hint contract-hands bad`) has the same grey
+and is left as it is: it is v51's, and section 1's scope does not reach it.
+
+## The eleven pictures
+
+The third column is the nearest existing picture of the same screen, and the one thing each pair
+differs by is what this turn did to it.
+
+| picture | what it shows | beside |
+| --- | --- | --- |
+| `01-four-men-and-one-used-saw.png` | Pete at the used saw's one place, Eddie, Ben and Callum each at his own place along the industrial bench with a red mark, Ben's paper up: `no place at the saw`; Efficiency 20% | `report-t22/05-the-hover-line-over-a-mark.png`: the same mark over a man at the saw's waiting cell reading `waiting for the saw`. Here nobody waits at the saw: the three stand at home and say they have no place |
+| `02-the-same-four-with-an-industrial-saw.png` | Pete, Eddie and Ben at the industrial saw's three places, Callum at the bench with the mark and his paper `no place at the saw`; Efficiency 60% | picture 1: one place there, three here, the same four men |
+| `03-a-two-place-saw-with-two-men-at-it.png` | Eddie and Pete at the standard saw's two places, one at each end, nobody behind anybody | `report-t24/03-a-contract-man-at-the-canteen-door.png`: one man at a saw, the others off it. Two at one saw, both working, is new tonight |
+| `04-two-saws-with-the-men-spread-over-both.png` | two standard saws, four men: two at the first saw's places and two at the second's, four cells | picture 3: the third and fourth man go to the second saw and not in a heap at the first |
+| `05-the-day-115-save-after-one-minute.png` | the day 115 save (seven people, three saws, the table saw away for its service): Frank at a saw, Dave and Jack at the CNC, the owner, Liam and Adam at the benches, nobody on another man's cell | the day 115 save has no earlier picture; it stands in for the day 53 one the brief names and the tree does not have (notes 6) |
+| `06-a-machine-card-with-its-places.png` | the standard saw's own card, opened by a click on it: `Places: 2 of 2 in use, Pete and Eddie` under `running` | `report-t22/13-the-cabinets-card.png`: the same card frame, whose tool cabinet says `Holds 1 man's tools · 1 in use`. The saw says who is at it the same way |
+| `07-the-owned-tile-short-form.png` | the catalogue's Owned tab, the standard saw's tile: `2 of 2 in use`, beside the tool cabinet's `Holds 1 man's tools · 1 in use` | picture 6: the long form on the card, the short one on the tile |
+| `08-the-efficiency-plate-with-the-saw-s-pace.png` | the efficiency plate opened: `No people 50%`, `No place 50%`, `No material`, `Hall stopped`, `Owner away` at 0%, and `Saw, industrial +12%` in green | `report-t13/33-efficiency-plate.jpg`: the plate with its four lost minute lines and nothing about the machines. `No machine` is `No place`, `Hall stopped` is new, and the pace line is new |
+| `09-the-work-plan-s-line.png` | the Work Plan's Jobs tab: under the crew column, `1 man working · 3 with no place at the saw` over the jobs | `report-t23/02-the-work-plan-crew-column.png`: the same tab with the crew column straight onto the jobs |
+| `10-a-contract-card-the-hall-can-keep-up-with.png` | the Contracts tab's offer card, cut sheet packs, 100 a week: `Your hall makes about 105 of these a week at full crew;` and `this term wants 100` in green, v51's `This contract is for 3 men at the least` under it | `report-t20/01-contracts-on-offer.png`: the same offer card with nothing about the hall. The men line says the men; the new row says the hall |
+| `11-a-contract-card-the-hall-cannot-keep-up-with.png` | the same card in a one used saw hall, 40 a week: `Your hall makes about 30 of these a week at full crew;` and `this term wants 40` in red | picture 10: the green against the red, before the contract is signed |

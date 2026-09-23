@@ -515,14 +515,14 @@ export function contractHallCapacity(state: GameState, contract: Contract): Hall
 
 /** The line the offer card and the Contracts tab both carry, off `contractHallCapacity`
  *  (CLAUDE.md T25 2.7). */
-export function contractHallLine(state: GameState, contract: Contract): { text: string; short: boolean } {
+export function contractHallLine(
+  state: GameState,
+  contract: Contract,
+): { text: string; hall: string; wants: string; short: boolean } {
   const capacity = contractHallCapacity(state, contract);
-  return {
-    text:
-      `Your hall makes about ${capacity.perWeek} of these a week at full crew; ` +
-      `this term wants ${capacity.wanted}`,
-    short: capacity.short,
-  };
+  const hall = `Your hall makes about ${capacity.perWeek} of these a week at full crew`;
+  const wants = `this term wants ${capacity.wanted}`;
+  return { text: `${hall}; ${wants}`, hall, wants, short: capacity.short };
 }
 
 /** The one machine that would shorten the piece most among those the hall has not got: what the

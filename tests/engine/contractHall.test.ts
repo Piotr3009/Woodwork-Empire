@@ -60,6 +60,8 @@ describe('what the hall makes of a contract (CLAUDE.md T25 2.7)', () => {
     contract.quantityPerWeek = makes;
     expect(contractHallLine(state, contract)).toEqual({
       text: `Your hall makes about ${makes} of these a week at full crew; this term wants ${makes}`,
+      hall: `Your hall makes about ${makes} of these a week at full crew`,
+      wants: `this term wants ${makes}`,
       short: false,
     });
     contract.quantityPerWeek = makes + 1;
@@ -95,21 +97,24 @@ describe('what the hall makes of a contract (CLAUDE.md T25 2.7)', () => {
 describe('the line on the cards, before the contract is signed (CLAUDE.md T25 2.7)', () => {
   it('is green on the offer tile and the Contracts tab when the hall keeps up', () => {
     const { state, contract } = offered(3, 'standard', 1);
-    const text = contractHallLine(state, contract).text;
+    const words = contractHallLine(state, contract);
     for (const html of [renderContracts(state), renderWorkPlan(state, 'contracts')]) {
       const line = parse(html).querySelector('[data-hall-makes]');
-      expect(line?.textContent).toBe(`${text}.`);
-      expect(line?.classList.contains('good')).toBe(true);
-      expect(line?.classList.contains('bad')).toBe(false);
+      expect(line?.querySelector('.row-main')?.textContent).toBe(`${words.hall};`);
+      // The figure is what the term wants, in the green the board's paper prints a row's figure in.
+      const figure = line?.querySelector('.row-figure');
+      expect(figure?.textContent).toBe(words.wants);
+      expect(figure?.classList.contains('good')).toBe(true);
+      expect(figure?.classList.contains('bad')).toBe(false);
     }
   });
 
   it('is red on both when the term wants more than the hall makes, with the men line kept', () => {
     const { state } = offered(1, 'used', 500);
     for (const html of [renderContracts(state), renderWorkPlan(state, 'contracts')]) {
-      const line = parse(html).querySelector('[data-hall-makes]');
-      expect(line?.classList.contains('bad')).toBe(true);
-      expect(line?.textContent).toContain('this term wants 500');
+      const figure = parse(html).querySelector('[data-hall-makes] .row-figure');
+      expect(figure?.classList.contains('bad')).toBe(true);
+      expect(figure?.textContent).toBe('this term wants 500');
     }
     // v51's line under it on the offer card: one says the hall, the other says the men.
     const card = parse(renderWorkPlan(state, 'contracts'));

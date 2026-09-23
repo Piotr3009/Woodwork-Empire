@@ -160,13 +160,14 @@ describe('(ss) a contract the hall cannot keep up with (CLAUDE.md T25 section 3,
     offeredTo(small, wanted);
     offeredTo(big, wanted);
     for (const html of [renderContracts(small), renderWorkPlan(small, 'contracts')]) {
-      expect(line(html)?.classList.contains('bad')).toBe(true);
-      expect(line(html)?.textContent).toBe(
-        `Your hall makes about ${smallMakes} of these a week at full crew; this term wants ${wanted}.`,
+      expect(line(html)?.querySelector('.row-figure')?.classList.contains('bad')).toBe(true);
+      expect(line(html)?.querySelector('.row-main')?.textContent).toBe(
+        `Your hall makes about ${smallMakes} of these a week at full crew;`,
       );
+      expect(line(html)?.querySelector('.row-figure')?.textContent).toBe(`this term wants ${wanted}`);
     }
     for (const html of [renderContracts(big), renderWorkPlan(big, 'contracts')]) {
-      expect(line(html)?.classList.contains('good')).toBe(true);
+      expect(line(html)?.querySelector('.row-figure')?.classList.contains('good')).toBe(true);
     }
     // Nothing has been signed: the line is read before the click.
     expect(small.contracts[0]?.status).toBe('offered');
